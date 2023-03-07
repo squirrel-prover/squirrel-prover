@@ -356,8 +356,7 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      prf 16.
-      rewrite if_true // in 16.
+      prf 16, F (sk2R _, _); [1:auto].
       xor 16, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
       rewrite if_true in 16.
       use len_F with rR(i,j,k), skR(j).
@@ -378,7 +377,7 @@ Proof.
        deduce 15.
        repeat fa 15.
        fa 17.
-       prf 16; rewrite if_true // in 16.
+       prf 16, F (sk2R _, _); [1:auto].
        xor 16, n_PRF.
        rewrite if_true // in 16.
        use len_F with DrR(j,k), skR(j).
@@ -397,8 +396,7 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      prf 15.
-      rewrite if_true // in 15.
+      prf 15, F (sk2I _, _); [1:auto].
       xor 15, xor(F(rI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 15.
       use len_F with rI(i,j,k), skI(i).
@@ -420,8 +418,7 @@ Proof.
       fa 15.
       fa 15.
       fa 15.
-      prf 16.
-      rewrite if_true // in 16.
+      prf 16, F (sk2I _,_); [1:auto].
       xor 16, xor(F(DrI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 16.
       use len_F with DrI(i,j,k), skI(i).
@@ -645,8 +642,8 @@ Proof.
   intro Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kR(k,i,j)); rewrite if_true // in 1.
-  prf 1, G(_,n_PRF); rewrite if_true // in 1.
+  prf 1, kdf(s,kR(k,i,j)); [1:auto]. 
+  prf 1, G(_,n_PRF); [1:auto]. 
   xor 1,  xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
   rewrite len_G.
   namelength s, n_PRF1.
@@ -668,8 +665,8 @@ Proof.
   intro Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kI(i,j,k)); rewrite if_true // in 1.
-  prf 1, G(_, n_PRF); rewrite if_true // in 1.
+  prf 1, kdf(s,kI(i,j,k)); [1:auto]. 
+  prf 1, G(_, n_PRF); [1:auto]. 
   xor 1, n_PRF1; rewrite if_true // in 1.
   rewrite len_xor.
   by rewrite !len_G.

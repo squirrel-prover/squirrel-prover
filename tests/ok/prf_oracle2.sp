@@ -20,22 +20,14 @@ Proof.
 induction t; try auto.
 expandall.
 fa 0; fa 1; fa 1. 
-prf 1.
-(* easy case, it is the firt produced hash. *)
-rewrite if_true; 1: by project; auto.
+prf 1 => //.
+(* easy case, it is the first produced hash. *)
 by fresh 1.
 
 expandall.
 fa 0; fa 1; fa 1. 
-prf 1. 
-rewrite if_true /=.
-split; 1: auto.
-split.
+prf 1 => //. 
 
-(* Here, if the macros are not correclty projected, we cannot prove the goal,
-else it is automatically simplified. *)
-by project; intro H0; depends A, A1. 
-by project; intro H0; depends A, A1. 
-
+by intro H0; depends A, A1. 
 by fresh 1.
 Qed.

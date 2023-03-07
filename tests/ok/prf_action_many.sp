@@ -11,6 +11,7 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,h(<n(i),n(j)>,k)).
 
+
 (* only directy cases *)
 global goal _ (i:index[param]) : 
 [(diff(n(i),m(i)) <> <n(i),n(i)>) = true] ->
@@ -18,9 +19,9 @@ global goal _ (i:index[param]) :
 equiv(output@A(i,i), h(diff(n(i),m(i)),k)).
 Proof.
   intro H Hap.
-  prf 1. 
-  rewrite H.
-  by rewrite if_true in 1. 
+  prf 1;
+  [1,2:by rewrite H].
+  auto.
 Qed.
 
 
@@ -38,8 +39,8 @@ equiv(frame@A(i,i), h(diff(n(i),m(i)),k)).
 Proof.
   intro H1 H2 E Hap. 
   prf 1.
-  rewrite H1 H2.
-  rewrite if_true in 1; 1: auto.
-  fresh 1; 1:auto.
-  by apply E.
+  + by rewrite H1 H2.
+  + by rewrite H1 H2.
+  + fresh 1; 1:auto.
+    by apply E.
 Qed.

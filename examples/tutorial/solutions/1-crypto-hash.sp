@@ -108,14 +108,8 @@ Qed.
 global goal hash_5_lemma : equiv(diff(h(a,k),n),m).
 Proof.
   prf 0.
-  (* The `prf` tactic replaced the hash `h(a,k)` with a `if-then-else` term
-     whose condition check that `a` has naver been hashed before.
-     In this exemple, this is trivially the case. We can therefore 
-     simplify the `if-then-else` using the `if_true` lemma. 
-     Check the lemma statements before applying it. *)
-  print if_true.
-  rewrite if_true in 0.
-  auto.
+  (* The `prf` tactic replaced the hash `h(a,k)` with a fresh name.
+     It first checked that `a` has never been hashed before. *)
   by fresh 0.
 Qed.
 
@@ -125,8 +119,8 @@ global goal hash_6 :
 Proof.
   (* BEGIN EXO *) 
   intro H.
-  prf 0; rewrite if_true // in 0. 
-  prf 1; rewrite if_true // in 1. 
+  prf 0; 1:auto.
+  prf 1.
   fresh 0; 1:auto.
   fresh 0; 1:auto.
   refl.

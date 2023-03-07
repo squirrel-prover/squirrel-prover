@@ -13,28 +13,32 @@ system null.
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index[param]) : 
-  seq(i,y:index => h(n(i),k)), diff(h(n(i),k),h(m(i),k)).
+  seq(i,y:index => h(n(i),k)), h(diff(n(i),m(i)),k).
 Proof.
-  prf 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  have ->:
+  have H:
     (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))) =
     true.
   admit. 
-  by rewrite if_true in 1.
+  prf 1.
+  + rewrite H. true.
+  + rewrite H. true.
+  + auto.
 Qed.
 
 (* Secondary test, without any bound variable, just to check
    that an empty forall is not produced. *)
 equiv empty (i:index[param]) : 
-  h(n(i),k), diff(h(n(i),k),h(m(i),k)).
+  h(n(i),k), h(diff(n(i),m(i)),k).
 Proof.
-  prf 1.
-  (* Check that the right formula has been produced,
+   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  have ->:
+  have H:
     (diff(n(i), m(i)) <> n(i)) = true.
   admit.
-  by rewrite if_true in 1.
+  prf 1.
+  + auto.
+  + rewrite H; admit.
+  + auto.
 Qed.

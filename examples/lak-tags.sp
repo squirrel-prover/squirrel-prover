@@ -207,9 +207,9 @@ Proof.
     fa 2; deduce 1.
     fa 1; deduce 1.
     prf 1.
-    rewrite if_true.
-    by use tags_neq; project.
-    by fresh 1.
+    * by use tags_neq. 
+    * by use tags_neq. 
+    * by fresh 1.
 
   (* Case R2 *)
   + expand frame, exec, output.
@@ -222,11 +222,10 @@ Proof.
     expand m2(i,j)@T(i,j).
     fa !<_,_>, if _ then _, <_,_>.
     prf 2.
-    rewrite if_true. {
-      simpl.
-      use tags_neq.
-      by project; repeat split; intro > _ _ [[_ Meq] _]; fresh Meq.
-    }
-    fresh 2; 1:auto.
-    by fresh 1.
+    * use tags_neq.
+      repeat split => //; by intro > _ _ [[_ Meq] _]; fresh Meq.
+    * use tags_neq.
+      repeat split => //; by intro > _ _ [[_ Meq] _]; fresh Meq.
+    * fresh 2; 1:auto.
+      by fresh 1.
 Qed.

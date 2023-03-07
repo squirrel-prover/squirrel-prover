@@ -173,7 +173,7 @@ axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 
 name m : message.
 
-global goal [default/left,default/left]
+global goal [set:default/left; equiv:default/left,default/left]
   strong_secrecy (tau:timestamp[const]) : 
     Forall (tau':timestamp[const]),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s@tau',m)).
@@ -189,7 +189,7 @@ Proof.
     
     + have H := lastupdate_A tau' i _=> //=. 
       rewrite H // in *; expand s@A(i). 
-      prf 0; rewrite if_true; [2: by fresh 0].
+      prf 0; [2: by fresh 0].
       intro /= i' HAi'.
       use non_repeating with pred(A(i)),pred(A(i')) => //.
       by exists i'.
@@ -197,22 +197,24 @@ Proof.
   (* Oracle *)
   - expand frame, output, exec, cond.
     fa 0; fa 1; fa 1; fa 1.
-    prf 1; rewrite if_true /=. {
-      have -> : forall (x, y, b : bool), 
-        diff(x => b, y => b) = (diff(x,y) => b) by project.
 
-      split; intro i' H; try destruct H as [H|H].
-      * by apply unique_queries.
-      * have ? : happens(pred (A(i'))) by (project; try case H). 
+    
+     prf 1.
+    * intro i' H.
+      have ? : happens(pred (A(i'))) by case H.
         rewrite equiv IH (pred(A(i'))) => //.
         intro Hf; by fresh Hf.
-    }.
+    * intro _ _. by apply unique_queries.
+    * intro i' _.
+      have ? : happens(pred (A(i'))) by auto.
+        rewrite equiv IH (pred(A(i'))) => //.
+        intro Hf; by fresh Hf.
     
-    fresh 1; 1:auto..
-    prf 1; rewrite if_true /=.
+    * fresh 1; 1:auto.
+    prf 1. 
     + split; intro i' H; try destruct H as [H|H];
       try by apply unique_queries.
-      * rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+      ++ rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
     
     + fresh 1; 1:auto.
       by apply IH.
@@ -220,7 +222,7 @@ Proof.
     (* Tag *)
   - expand frame, exec, cond, output.
     fa 0; fa 1; fa 1.
-    prf 1; rewrite if_true /=; 2: (fresh 1; [1: auto | 2: by apply IH]).
+    prf 1; 2: (fresh 1; [1: auto | 2: by apply IH]).
     split; intro i' H; try destruct H as [H|H].
     * rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
     * use non_repeating with A(i),A(i') => //; by exists i.

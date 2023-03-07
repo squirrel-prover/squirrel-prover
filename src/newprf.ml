@@ -24,10 +24,34 @@ module Sp = MP.Sp
 
 let soft_failure = Tactics.soft_failure
 
+(*------------------------------------------------------------------*)
+(* Two utility functions used when searching for the
+   parameters of the tactic *)
 
-(* hash occurrence: store the hashed message and the key *)
-(* same as int_occs in euf.ml, but I think it's clearer to keep them
-   separate *)
+(** Checks that there is no binder in t above any name
+    with the same symbol as n.
+    Does not unfold any macro (meant to be used after substituting
+    in prf_param, so we know that no occurrence of n (n_PRF) can be
+    hidden in a macro) *)
+let rec no_binders_above (n:Name.t) (t:term) : bool =
+  if Term.is_binder t then
+    not (ER.has_name n t)
+  else
+    Term.tforall (no_binders_above n) t
+
+
+(** Returns true iff f is declared as a hash function *)
+let is_hash (table:Symbols.table) (f:Symbols.fname) =
+  Symbols.(is_ftype f Hash table)
+
+
+
+(*------------------------------------------------------------------*)
+
+
+(** Hash occurrence: store the hashed message and the key.
+    (Same as int_occs in euf.ml, but I think it's clearer to keep them
+    separate) *)
 type hash_occ = ((term * Name.t), unit) NO.simple_occ
 type hash_occs = hash_occ list
 
@@ -46,8 +70,7 @@ let mk_hash_occ
 
 
 (*------------------------------------------------------------------*)
-(* Look for occurrences using NameOccs *)
-
+(** Look for occurrences using NameOccs *)
 let get_bad_occs
     (env : Env.t)
     (m:term)
@@ -108,8 +131,8 @@ let get_bad_occs
   | _ -> retry_on_subterms ()
 
 
-(* constructs the formula expressing that a hash occurrence h(m',k')
-   is indeed in collision with h(m, k) *)
+(** Constructs the formula expressing that a hash occurrence h(m',k')
+    is indeed in collision with h(m, k) *)
 let hash_formula
     ~(negate : bool)
     ((m', k') : term * Name.t)
@@ -130,100 +153,6 @@ let hash_formula
 
 
 
-(* to do move this somewhere else *)
-(* some functions are copied from indcca.ml. VERY UGLY THIS IS BAD *)
-
-
-(** Checks that there is no diff or binder in t above any name
-    with the same symbol as n.
-    Does not unfold any macro (meant to be used after rewriting
-    in indcca_param, so we know that no occurrence of n can be
-    under a macro) *)
-let rec check_nodiffbind (n:Name.t) (t:term) : bool =
-  if not (ER.has_name n t) then true
-  else
-    match t with
-    | Diff (Explicit _) -> false
-    | _ when Term.is_binder t -> false
-    | _ -> Term.tforall (check_nodiffbind n) t
-
-
-(** returns true iff f is a symmetric or asymmetric encryption function *)
-let is_hash (table:Symbols.table) (f:Symbols.fname) =
-  Symbols.(is_ftype f Hash table)
-
-(** Returns true iff t contains an encryption function.
-    does not unfold macros. *)
-let rec has_hash (table:Symbols.table) (t:term) : bool =
-  match t with
-  | Term.App (Fun (f, _), _) when is_hash table f -> true
-  | _ -> Term.texists (has_hash table) t
-
-
-(** Returns true iff t contains a name w/ the same symbol as n.
-    Does not unfold macros. *)
-let rec has_name (n:Name.t) (t:term) : bool =
-  match t with
-  | Term.Name (ns, _) when ns.s_symb = n.symb.s_symb -> true
-  | _ -> Term.texists (has_name n) t
-
-(** Checks that each term ti in ts is f(argsi) for the same f,
-    if so returns f and the list [args1;…;argsn]. 
-    Does the same if each ti is Tuple(argsi). *)
-(* TODO: duplicated with function in `cca.ml` *)
-let same_head_function (ts:Term.terms) :
-  ((Symbols.fname * applied_ftype) option * Term.terms list) option =
-  let rec aux ts f =
-    match ts, f with
-    | [], _ -> f
-    | (Term.App (Fun (fs', ft'), args))::ll, Some (Some (fs, ft), largs)
-      when fs = fs' && ft = ft' ->
-      aux ll (Some (Some (fs, ft), args::largs))
-    | (Term.App (Fun (fs, ft), args))::ll, None ->
-      aux ll (Some (Some (fs, ft), [args]))
-    | (Term.Tuple args)::ll, Some (None, largs) ->
-      aux ll (Some (None, args::largs))
-    | (Term.Tuple args)::ll, None ->
-      aux ll (Some (None, [args]))
-    | _ -> None
-  in
-  aux (List.rev ts) None
-
-(** Moves any diff that is above a hash function down
-    as much as possible, stopping once it gets under the hash.
-    Also moves diffs under tuples. *)
-(* TODO this is very ad hoc this is bad *)
-let rec move_diff_hash (table:Symbols.table) (t:term) : term =
-  match t with
-  | Diff (Explicit l) ->
-    let (lp, lt) = List.split l in
-    begin
-      match same_head_function lt with
-      | Some (Some (fs, ft), largs) when has_hash table t ->
-        (* diff over a function -> move it under
-           (only if there is still a hash below) *)
-        let largs = List.megacombine largs in
-        let largs = List.map
-            (fun args -> Term.mk_diff (List.combine lp args))
-            largs
-        in
-        let t = Term.mk_fun0 fs ft largs in
-        Term.tmap (move_diff_hash table) t
-
-      | Some (None, largs) ->
-        (* diff over a tuple -> move it under *)
-        let largs = List.megacombine largs in
-        let largs = List.map
-            (fun args -> Term.mk_diff (List.combine lp args))
-            largs
-        in
-        let t = Term.mk_tuple largs in
-        Term.tmap (move_diff_hash table) t
-
-      | _ -> Term.tmap (move_diff_hash table) t
-    end
-  | _ -> Term.tmap (move_diff_hash table) t
-      
   
 
 (*------------------------------------------------------------------*)
@@ -231,139 +160,98 @@ let rec move_diff_hash (table:Symbols.table) (t:term) : term =
 
 (** parameters for the prf tactic *)
 type prf_param = { (* info on the h(m,k) we want to apply prf to *)
-  pp_hash_f  : Symbols.fname;     (* hash function *)
-  pp_key     : Term.term;         (* hash key *)
-  pp_msg     : Term.term;         (* hashed message m *)
-  pp_context : Term.term;         (* context around the hash *)
-  pp_cname   : Name.t;            (* fresh name standing in for the
-                                     hash in the context *)
-  pp_table   : Symbols.table;     (* updated table with an entry xc *)
+  pp_hash_f       : Symbols.fname;     (* hash function *)
+  pp_key          : Term.term;         (* hash key *)
+  pp_msg          : Term.term;         (* hashed message m *)
+  pp_context_nprf : Term.term;         (* context around the hash *)
+  pp_nprf         : Name.t;            (* fresh name standing in for the
+                                          hash in the context *)
+  pp_cond         : Term.term * Term.term;
+                      (* a pair of conditions expressing that
+                         on the left (resp. right), the condition above
+                         at least one of the occurrences of the hash in the term
+                         is satisfied.
+                         When looking at proof obligations we may assume 
+                         that condition holds, since otherwise nothing happens. *)
+  pp_table        : Symbols.table;     (* updated table with an entry nprf *)
 }
 
 
-(** Finds the parameters of the prf application when no pattern selecting the
-    hash to use is specified *)
-let prf_param_nopattern
-    ~(loc:L.t)
-    (t:Term.term)    (* element in the goal where we want to apply prf *)
-    (s:sequent)    
-  : prf_param
-  = 
-  let table = ES.table s in
-  let secontx = ES.system s in
-  let sys = ES.get_system_pair s in 
-  let hyps = ES.get_trace_hyps s in
-  let t = move_diff_hash table t in (* move the diffs under the hashes,
-                                            as much as possible *)
-
-  (* rw_rule trying to rewrite an instance of f(xm,xk) into n_PRF *)
-  (* use "Tuple [xm;xk]" to retrieve the value of vars once instantiated *) 
-  let mk_rewrule
-      (f:Symbols.fname)
-      (hty:Type.ty) (mty:Type.ty) (kty:Type.ty) :
-    Rewrite.rw_rule * Symbols.table * Name.t =
-    let n_fty = Type.mk_ftype [] [] hty in
-    let nprfdef = Symbols.{n_fty} in
-    let sn_prf = (L.mk_loc L._dummy "n_PRF") in
-    let table, nprfs =
-      Symbols.Name.declare table sn_prf nprfdef
-    in
-    let table = Process.add_namelength_axiom table sn_prf n_fty in
-    let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
-    let xm = Vars.make_fresh mty "M" in
-    let xk = Vars.make_fresh kty "K" in
-    {rw_tyvars = [];
-     rw_system = SE.to_arbitrary sys;
-     rw_vars   = Vars.Tag.local_vars [xm; xk];
-     (* local information, since we allow to match diff operators *)
-     
-     rw_conds  = [mk_eq ~simpl:false
-                   (mk_tuple [mk_var xm; mk_var xk])
-                   mk_false];
-     rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xk]),
-                 (Name.to_term nprf);},
-    table,
-    nprf  in
-  
-  (* go through all hash functions, try to find a hash in the term *)
-  let res = Symbols.Function.fold
-      (fun f _ _ x -> (* for all functions:*)
-         match x with
-         | None when is_hash table f ->
-           (* f is a hash symbol: try to find a ctxt *)
-           let fty, _ = Symbols.Function.get_def f table in
-           let hty = fty.fty_out in
-           let mty, kty =
-             match fty.fty_args with
-             | [Type.Tuple [x;y]] -> x,y
-             | _ -> assert false
-           in
-           
-           let rule, table, nprf = mk_rewrule f hty mty kty in
-           let res =
-             Rewrite.rewrite
-               table
-               Vars.empty_env
-               (* only local variables, hence [env] is useless here *)
-
-               secontx InSequent hyps TacticsArgs.Once
-               rule
-               Equiv.(Global (Atom (Equiv [t])))
-           in
-           begin
-             match res with
-             | Rewrite.RW_Result rr -> Some (f, rr, table, nprf)
-             | _ -> None
-           end           
-         | _ -> x) (* already found, or f is another function *)
-      None
-      table
+(** subst_term ~cond u v t returns t where instances of u are replaced with v
+    1) except under binders
+    2) not recursively
+    3) collects the list of conditions above each replaced occurrence,
+    with the corresponding system
+    (each cond in the list returned is a list whose 'and'
+     is the condition above one occ) *)    
+let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) : 
+  Term.term * ((SE.fset * Term.terms) list) =
+  let conds,_,t' =
+    Match.Pos.map_fold ~mode:(`TopDown false)
+      (fun t' se fv cond _ acc_conds ->
+         assert (fv = []); (* sanity check: we never go under binders *)
+         let se = SE.to_fset se in (* will always succeed *)
+         if t' = u then (* found u: replace and add current condition to list *)
+           (se,cond)::acc_conds, `Map v
+         else if is_binder t' then (* t' is a binder: stop there for this branch *)
+           (se,cond)::acc_conds, `Map t'
+         else (* keep going *)
+           acc_conds, `Continue)
+      (se :> SE.arbitrary)
+      []
+      t
   in
+  t', conds
+    
 
-  match res with
-  | None -> (* no hash was rewritten *)
-    soft_failure ~loc (Tactics.Failure "no hash found")
-      
-  | Some (hash_f, (ccc, [(_, l)]), table, nprf) -> (* a hash was found *)
-
-    (* get the context *)
-    let cc =
-      match (Equiv.any_to_equiv ccc) with
-      | Equiv.(Atom (Equiv [cc])) -> cc
-      | _ -> assert false
-    in
-                  
-    (* get the content of variables from the conditions *)
-    let m, k =
-      match l with
-      | Term.(App (Fun (ff, _), [Tuple [m; k]; fff])) when
-          ff = Term.f_eq && fff = Term.mk_false ->
-        m, k
-      | _ -> assert false
-    in
-
-    (* only thing left is checking there's no diff or binders
-       above nprf in cc *)
-    if not (check_nodiffbind nprf cc) then 
-      soft_failure ~loc
-        (Tactics.Failure 
-           "no diff or binder allowed above the hash for prf");
-    (* return the parameters *)
-    {pp_hash_f=hash_f; pp_key=k; pp_msg=m; pp_context=cc;
-     pp_cname=nprf; pp_table=table}
-
-  | _ -> assert false
+(** Takes a projection, and a list of (system, condition list),
+    select the elements where the proj is in the system, and returns
+    the 'or' of the 'and' of each element. 
+    Each element is meant to be the list of conditions whose 'and' is the 
+    condition above an occurrence of the has we replace, either on one 
+    or both sides depending on the system. 
+    So we select a side with proj, and compute a term saying 
+    'the condition above at least one of the occurrences on that side holds'.*)
+let project_conditions
+    (proj:Term.proj) (conds:(SE.fset * Term.terms) list) : Term.term =
+  let conds_p =
+    List.filter_map
+      (fun (se, cond) ->
+         let projs = SE.to_projs se in
+           (* when we'll use it, 
+              projs will always be either a pair or a singleton *)
+         if List.mem proj projs then 
+           (* this condition applies to the side we're looking at:
+              keep its 'and' *)
+           let cond_p = List.map (Term.project1 proj) cond in
+           Some (Term.mk_ands ~simpl:true cond_p)
+         else 
+           (* the condition is for an occurrence on the other side: ignore it *)
+           None)
+      conds
+  in
+  Term.mk_ors ~simpl:true conds_p
 
 
+
+(** Finds the first hash in the term
+   (not under binders, does not unfold macros) *)
+let rec find_hash (table:Symbols.table) (t:Term.term) : Term.term option =
+  match t with
+  | Fun (f,_,[Tuple [_; _]]) when is_hash table f -> Some t
+  | _ when is_binder t -> None
+  |_ -> Term.tfold
+          (fun t' op -> if op = None then find_hash table t' else op)
+          t
+          None
 
 
 (** Finds the parameters of the prf application when a pattern selecting the
     hash to use is specified
     (the pattern is in fact a term, as it gets instantiated before
     it's given to the tactic)
-    Fails if the given pattern is not a hash *)
-(* THIS IS NOT PRETTY TODO FACTOR THIS WITH THE PREVIOUS FUNCTION *)
-let prf_param_withpattern
+    Fails if the pattern given is not a hash *)
+let prf_param_pattern
     ~(loc:L.t)
     (t:Term.term)    (* element in the goal where we want to apply prf *)
     (p:Term.term)    (* (supposedly) the hash to use *)
@@ -371,12 +259,7 @@ let prf_param_withpattern
   : prf_param
   = 
   let table = ES.table s in
-  let secontx = ES.system s in
-  let sys = ES.get_system_pair s in 
-  let hyps = ES.get_trace_hyps s in
-  let t = move_diff_hash table t in (* move the diffs under the hashes,
-                                            as much as possible *)
-  
+  let sys = ES.get_system_pair s in
 
   (* check that the pattern p is indeed a hash, extract the msg and key *)
   let hash_f, hty, m, k =
@@ -387,7 +270,7 @@ let prf_param_withpattern
     | _ -> soft_failure ~loc
              (Tactics.Failure "the pattern given to prf is not a hash")
   in
-
+  
   (* generate a new name n_PRF to replace the hash with *)
   let n_fty = Type.mk_ftype [] [] hty in
   let nprfdef = Symbols.{n_fty} in
@@ -398,84 +281,90 @@ let prf_param_withpattern
   let table = Process.add_namelength_axiom table sn_prf n_fty in
   let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
 
-  (* rewrite rule trying to rewrite p into n_PRF *)
-  (* (useful in case several occs of p are in t. maybe not very
-     relevant, but it was already like that for the nopattern
-     case, so why not *)
-  let rule =
-    Rewrite.{rw_tyvars = [];
-     rw_system = SE.to_arbitrary sys;
-     rw_vars   = [];
-     rw_conds  = [];
-     rw_rw     = p, Name.to_term nprf;}
-  in
+  (* replace instances of p with n_PRF, everywhere in t *)
+  (* t_nprf is both the context in which prf will be applied,
+     and the term left in the remaining proof goal afterwards *)
+  let t_nprf, sysconds = subst_term sys p (Name.to_term nprf) t in
+  
+  (* sanity check: there's no diff or binders above n_PRF in t_nprf *)
+  assert (no_binders_above nprf t_nprf);
 
-  (* rewrite it *)
-  let res =
-    Rewrite.rewrite
-      table
-      Vars.empty_env
-      (* only local variables, hence [env] is useless here *)
-      secontx InSequent hyps TacticsArgs.Once
-      rule
-      Equiv.(Global (Atom (Equiv [t])))
-  in
-  let cc = (* the context around the hash in t *)
-    match res with
-    | Rewrite.RW_Result (rr, _) ->
-      (match (Equiv.any_to_equiv rr) with
-       | Equiv.(Atom (Equiv [cc])) -> cc
-       | _ -> assert false)
-    |_ -> soft_failure ~loc
-            (Tactics.Failure "no instance of the pattern found")
-            
-  in
+  (* we may assume, when considering generated proof obligations on one side,
+     that at least one replacement was performed on that side. 
+     That assumption is computed here *)
+  let proj_l,_ = SE.fst sys in
+  let proj_r,_ = SE.snd sys in
+  let cond_l = project_conditions proj_l sysconds in
+  let cond_r = project_conditions proj_r sysconds in
+
+ (* return the parameters *)
+  {pp_hash_f=hash_f; pp_key=k; pp_msg=m; pp_context_nprf=t_nprf;
+   pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table}
   
-  (* only thing left is checking there's no diff or binders
-       above n_PRF in cc *)
-  if not (check_nodiffbind nprf cc) then 
-    soft_failure ~loc
-      (Tactics.Failure 
-         "no diff or binder allowed above the hash for prf");
-  (* return the parameters *)
-  {pp_hash_f=hash_f; pp_key=k; pp_msg=m; pp_context=cc;
-   pp_cname=nprf; pp_table=table}
   
+(** Finds the parameters of the prf application *)
+let prf_param
+    ~(loc:L.t)
+    (t:Term.term)    (* element in the goal where we want to apply prf *)
+    (op:Term.term option) (* optional: the hash we want to replace *)
+    (s:sequent)
+  : prf_param
+  = 
+  let table = ES.table s in
+  let p =
+    match op with
+    | Some p -> p (* use the given pattern *)
+    | None ->
+      match find_hash table t with
+      | Some p -> p (* find some hash in the term *)
+      | None -> (* no usable hash in the term *)
+        soft_failure ~loc (Tactics.Failure "no hash found")    
+  in
+  prf_param_pattern ~loc t p s
 
 
 
 (** Constructs the formula expressing that in the proj
-    of (the biframe + the context cc, the message m, the key k):
+    of (the biframe + the context cc_nprf, the message m, the key k):
     - the proj of k is correctly used
-    - the message m is not hashed anywhere else. *)
+    - the message m is not hashed anywhere else.
+    Fails if the resulting formula still contains n_PRF.
+    That case could be handled similarly to what's done in IND-CCA,
+    but it is complicated and the usefulness is unclear.
+    Alternately, we could find syntactic conditions on cc_nprf that guarantee
+    this won't happen, but again it's unclear whether that's useful. *)
 let phi_proj
     ?(use_path_cond=false)
     (loc     : L.t)
     (env     : Env.t)
     (contx   : Constr.trace_cntxt)
-    (hash_f   : Symbols.fname)
-    (biframe : terms)
-    (cc      : term)   (* context above the hash in the goal *)
-    (m       : term)
-    (k       : term)
-    (xc      : Name.t) (* stand-in for the ciphertext in cc. *)
+    (hash_f  : Symbols.fname)
+    (biframe : Term.terms)
+    (cc_nprf : Term.term)
+    (m       : Term.term)
+    (k       : Term.term)
+    (nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
     (proj    : proj)
   : Term.terms
   =
   (* project everything *)
   let system_p = SE.project [proj] contx.system in
-  let env = Env.update ~system:{ env.system with set = (system_p :> SE.arbitrary); } env in
+  let env =
+    Env.update
+      ~system:{ env.system with set = (system_p :> SE.arbitrary); }
+      env
+  in
   let contx_p = { contx with system = system_p } in
-  let cc_p = Term.project1 proj cc in
+  let cc_nprf_p = Term.project1 proj cc_nprf in
   let m_p = Term.project1 proj m in
   
-  (* check that the key, once projected,is a name. *)
+  (* check that the key, once projected, is a name. *)
   let k_p = 
     match Term.project1 proj k with
     | Name _ as kp -> 
       Name.of_term kp
     | _ -> soft_failure ~loc
-             (Tactics.Failure "Can only be applied on a hash where\
+             (Tactics.Failure "Can only be applied on a hash where \
                                the key is a name")
   in
   let frame_p = List.map (Term.project1 proj) biframe in
@@ -487,10 +376,11 @@ let phi_proj
   let get_bad = get_bad_occs env m_p k_p hash_f in
 
   let phi_k, phi_hash =
-    NO.occurrence_formulas ~use_path_cond ~mode:PTimeSI ~negate:true ~pp_ns:(Some pp_k)
+    NO.occurrence_formulas
+      ~use_path_cond ~mode:PTimeSI ~negate:true ~pp_ns:(Some pp_k)
       hash_formula
       get_bad contx_p env
-      (cc_p :: m_p :: k_p.args @ frame_p)
+      (cc_nprf_p :: m_p :: k_p.args @ frame_p)
   in
   
   (* finally, fail if the generated formula contains the context's hole,
@@ -499,14 +389,15 @@ let phi_proj
 
   let phi = phi_k @ phi_hash in
   
-  if List.exists (has_name xc) phi then
-    soft_failure ~loc (Tactics.Failure "Bad context, generated formula has holes");
+  if List.exists (ER.has_name nprf) phi then
+    soft_failure ~loc
+      (Tactics.Failure "The hash was in a bad context, the generated formula has holes");
 
   phi
 
 
 (*------------------------------------------------------------------*)
-(** The PRF tactic  *)
+(** The PRF tactic *)
 let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let contx = ES.mk_pair_trace_cntxt s in
   let env = ES.env s in
@@ -522,41 +413,82 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
      cc does not contain diffs or binders above xc.
      (at least the diff part could maybe be relaxed?) *)
   let {pp_hash_f=hash_f; pp_key=k; pp_msg=m;
-       pp_context=cc; pp_cname=xc; pp_table=tablexc} =
-    match p with
-    | None -> prf_param_nopattern ~loc e s
-    | Some p -> prf_param_withpattern ~loc e p s
+       pp_context_nprf=cc_nprf; pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table_nprf} =
+    prf_param ~loc e p s
   in
-  let contxxc = {contx with table=tablexc} in
+  let contx_nprf = {contx with table=table_nprf} in
 
+  Printer.pr
+    "@[<v 0>Applying PRF to %a@;@;"
+    Term.pp (Term.mk_fun contx.table hash_f [Term.mk_tuple [m;k]]);  
   let phi_proj =
-    phi_proj ~use_path_cond:false loc env contxxc hash_f biframe cc m k xc 
+    phi_proj ~use_path_cond:false loc
+      env contx_nprf hash_f biframe cc_nprf m k nprf 
     (* FEATURE: allow the user to set [use_path_cond] to true *)
   in
 
-
-  Printer.pr "@[<v 0>Checking for side conditions on the left@; @[<v 0>";
+  Printer.pr "@[<v 0>Checking for bad use of the key on the left@; @[<v 0>";
+  (* get proof obligation for occurrences *)
   let phi_l = phi_proj proj_l in
           
-  Printer.pr "@]@,Checking for side conditions on the right@; @[<v 0>";
+  Printer.pr "@]@,Checking for bad use of the key on the right@; @[<v 0>";
+  (* get proof obligation for occurrences *)
   let phi_r = phi_proj proj_r in
+
   Printer.pr "@]@]@;";
 
-  (* Removing duplicates. We already did that for occurrences, but
-     only within phi_l and phi_r, not across both *)
-  let cstate = Reduction.mk_cstate contx.table in
-  let phis =
-    Utils.List.remove_duplicate
-      (Reduction.conv cstate) (phi_l @ phi_r)
+  (* add the assumption that the condition of at least one occ holds *)
+  (* we'll ask to prove cond_l => phi_l on the left
+     and similarly on the right *)
+  (* when cond_l = cond_r (typically = true), we can factor a little:
+     the intersection of phi_l and phi_r can be proved directly on both sides *)
+  let phi_l, phi_r, phi_lr =
+    if Term.alpha_conv cond_l cond_r then
+      let inter = List.filter (fun u -> List.exists (Term.alpha_conv u) phi_r) phi_l in
+      let phi_l = List.diff phi_l inter in
+      let phi_r = List.filter (fun u -> not (List.exists (Term.alpha_conv u) inter)) phi_r in
+      Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true phi_l),
+      Term.mk_impl ~simpl:true cond_r (Term.mk_ands ~simpl:true phi_r),
+      Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true inter)
+        (* cond_l = cond_r *)
+    else 
+      Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true phi_l),
+      Term.mk_impl ~simpl:true cond_r (Term.mk_ands ~simpl:true phi_r),
+      Term.mk_true
   in
 
-  let phi = Term.mk_ands ~simpl:true phis in
 
-  (* no need to substitute xc in cc: it is already a name called n_PRF *)
-  (* only need to add it the table containing it to s, in the equiv case *)
-  let new_biframe = List.rev_append before (cc::after) in
-  [ES.set_reach_goal phi s; ES.set_equiv_goal new_biframe (ES.set_table tablexc s)]
+  (* goals:
+     - phi_l in the previous sequent on the left system
+     - phi_r in the previous sequent on the right system
+     - if needed, phi_lr in the previous sequent
+     - frame with t replaced with cc_nprf, with the updated table *) 
+  let oldcontext = ES.system s in
+  let oldpair = oget (oldcontext.pair) in
 
+  let left = (SE.of_list [SE.fst oldpair] :> SE.arbitrary) in
+  let left_sequent =
+    ES.set_goal_in_context {oldcontext with set=left} (Equiv.mk_reach_atom phi_l) s
+  in
+
+  let right = (SE.of_list [SE.snd oldpair] :> SE.arbitrary) in
+  let right_sequent =
+    ES.set_goal_in_context {oldcontext with set=right} (Equiv.mk_reach_atom phi_r) s
+  in
+  let leftright_sequent =
+      ES.set_reach_goal phi_lr s
+  in
+
+  (* remove trivial goals *)
+  let tracegoals = 
+    List.filter 
+      (fun x -> ES.goal x <> Equiv.mk_reach_atom Term.mk_true)
+      [left_sequent; leftright_sequent; right_sequent]
+  in
+  
+  let new_biframe = List.rev_append before (cc_nprf::after) in
+  let equiv_sequent = ES.set_equiv_goal new_biframe (ES.set_table table_nprf s) in
+  tracegoals @ [equiv_sequent]
   
 
 (*------------------------------------------------------------------*)
@@ -570,11 +502,11 @@ let prf_tac arg =
 
 
 let () =
-  T.register_typed "newprf"
+  T.register_typed "prf"
     ~general_help: "Apply the PRF axiom."
     ~detailed_help: "It allows to replace a hash h(m,k) by a name,\
                      provided a proof obligation stating that the key k is only\
-                     used as a hash key, and is not hashed anywhere else.\
+                     used as a hash key, and m is not hashed anywhere else.\
                      Behaves similarly to the fresh tactic."
     ~usages_sorts: []
     ~tactic_group: Cryptographic

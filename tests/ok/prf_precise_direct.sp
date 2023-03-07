@@ -17,7 +17,5 @@ global goal _ (j : index[param]) :
  equiv(h(zero,k), seq(i:index => if A(i) < A(j) then h(n(i),k))).
 Proof.
   intro H. 
-  prf 0.
-  rewrite if_true in 0 => //=.
-  by intro i H1; fresh H1.
+  prf 0 => //.
 Qed.

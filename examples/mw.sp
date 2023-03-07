@@ -201,13 +201,13 @@ Proof.
     fa 2; deduce 1.
     fa 1; deduce 1.
 
-    prf 1.
-    rewrite if_true.
-    by use tags_neq; project.
-    xor 1,n_PRF.
-    rewrite if_true.
-    by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
-    by fresh 1.
+    prf 1. 
+    * by use tags_neq.
+    * by use tags_neq.
+    * xor 1,n_PRF.
+      rewrite if_true.
+      by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+      by fresh 1.
 
   (* Case R2 *)
   + expand frame, exec, cond, output.
@@ -220,16 +220,17 @@ Proof.
     fa !<_,_>, if _ then _, <_,_>.
 
     prf 2. (* we use PRF under XOR to be able to use XOR tactic later on *)
-    rewrite if_true. {
-      use tags_neq.
-      simpl; project;
-      by (repeat split => > _;
-          repeat split => > _ [_ [_ Meq]];
-          fresh Meq).
-    }
-    fresh 1 => //.
-    xor 1, n_PRF.
-    rewrite if_true.
-    by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
-    by fresh 1.
+    * use tags_neq.
+      repeat split => > _ //;
+      repeat split => > _ [_ [_ Meq]];
+        by fresh Meq.
+    * use tags_neq.
+      repeat split => > _ //;
+      repeat split => > _ [_ [_ Meq]];
+        by fresh Meq.
+    * fresh 1 => //.
+      xor 1, n_PRF.
+      rewrite if_true.
+      by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+      by fresh 1.
 Qed.

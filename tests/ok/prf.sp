@@ -12,14 +12,10 @@ system null.
 (* Test direct case *)
 equiv test : h (diff(m,n), k), h(diff(n,m), k) .
 Proof.
-prf 1.
-
-rewrite if_true in 1.
-by project.
+prf 1 => //.
 fresh 1; 1:auto.
 
-prf 0.
-by rewrite if_true in 0.
+by prf 0. 
 Qed.
 
 
@@ -39,23 +35,17 @@ auto.
 
 expandall.
 fa 0.
-fa 1. fa 1. prf 1. 
+fa 1. fa 1.
+prf 1 => //. 
 (* easy case, it is the firt produced hash. *)
-rewrite if_true in 1.
-by project.
 by fresh 1.
 
 expandall.
 fa 0.
 fa 1; fa 1.
-prf 1.
-rewrite if_true in 1; simpl.
-project.
+prf 1 => //.
 
-(* Here, if the macros are not correclty projected, we cannot prove the goal,
-else it is automatically simplified. *)
-by split; intro H0; depends A, A1.
-by split; intro H0; depends A, A1.
+by intro H0; depends A, A1.
 
 by fresh 1.
 Qed.
@@ -76,5 +66,5 @@ auto.
 
 expandall.
 fa 0; fa 1; fa 1; fa 1.
-checkfail prf 1 exn BadSSC.
+checkfail prf 1 exn Failure.
 Abort.

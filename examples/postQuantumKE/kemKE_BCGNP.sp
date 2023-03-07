@@ -377,11 +377,9 @@ global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
 Proof.
   intro Hap .
   use reflex with R2(i,j,k) => //.
-  expandall.
-  prf 1, exct(skex,kR(k,i,j)); rewrite if_true in 1.
-  auto.
-  prf 1; rewrite if_true in 1.
-  auto.
+  expandall. simpl.
+  prf 1, exct(skex,kR(k,i,j)).
+  prf 1, expd(_,n_PRF). 
   xor 1, xor _ _, n_PRF1. 
   rewrite len_expd.
   namelength n_PRF1, skex.
@@ -406,12 +404,10 @@ Proof.
   intro Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, exct(skex,kI(i,j,k)); rewrite if_true in 1.
-  auto.
+  prf 1, exct(skex,kI(i,j,k)).
   prf 1, expd(<pk(skI(i)),
                <encap(n_CCA1(i,j,k),rI(i,j,k),pk(skR(j))),
-                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; rewrite if_true in 1.
-  auto.
+                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF). 
   xor 1, n_PRF1.
   rewrite len_expd.
   namelength n_PRF1, skex.

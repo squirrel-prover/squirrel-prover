@@ -196,7 +196,6 @@ name k : message.
 global goal hash_5_lemma : equiv(diff(h(a,k),n1),n2).
 Proof.
   prf 0.
-  rewrite if_true // in 0.
   by fresh 0.
 Qed.
 

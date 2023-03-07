@@ -102,10 +102,8 @@ global goal [set:default/left; equiv:default] _ :
 Proof.
   intro U.
   have H : equiv(diff(h(a,k),n),diff(h(b,k),m)). 
-  prf 0.
-  rewrite if_true // in 0. 
-  prf 1.
-  rewrite if_true // in 1. 
+  prf 0 => //.
+  prf 1 => //.
   fresh 0 => //.
   by fresh 0.
 

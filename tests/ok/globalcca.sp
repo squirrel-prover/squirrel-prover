@@ -42,8 +42,7 @@ print.
 enrich pk(kenc), n_CCA, r, h(enc(n_CCA,r,pk(kenc)),khash).
 
 induction t.
-prf 0.
-rewrite if_true // in 0.
+prf 0 => //.
 
 expandall.
 fa 4.
