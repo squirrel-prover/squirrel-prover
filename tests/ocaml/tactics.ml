@@ -1,3 +1,5 @@
+(** Checking various tactics: case study, namelength. *)
+
 open Squirrellib
 open Util
 module ES = EquivSequent

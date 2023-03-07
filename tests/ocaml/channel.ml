@@ -1,16 +1,13 @@
-open Squirrellib
-include Symbols.Channel
+(** Unit tests for the {!Channel} module. *)
 
+open Squirrellib
 module L = Location
 open Channel
 
-(** {2 Test Suite} *)
 let channels =
   let mk c = L.mk_loc L._dummy c in      
   let table_c = declare Symbols.builtins_table (mk "c") in  
   let table_cd = declare table_c (mk "d") in
-
-  (* Checks.add_suite "Channel" [ *)
   [
     "Basic", `Quick,
     fun () ->
@@ -47,4 +44,3 @@ let channels =
         ~actual:(of_lsymb (mk "c") table_cd = of_lsymb (mk "d") table_cd)
         ~expected:false
   ]
-

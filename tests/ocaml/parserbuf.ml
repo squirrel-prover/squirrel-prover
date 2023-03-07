@@ -1,8 +1,9 @@
-open  Squirrellib
-open  Parserbuf
+(** Testing the parser on terms and processes. *)
+
+open Squirrellib
+open Parserbuf
 
 module L = Location
-(** Testing *)
 
 let parse_theory_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test Parser.declarations lexbuf ~filename
@@ -35,9 +36,8 @@ let parse_process table ?(typecheck=false) str =
   p
 
 let process_parsing =
-  let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
-
-  (* Checks.add_suite "Process parsing" [ *)
+  let table =
+    Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
   [
     "Null", `Quick, begin fun () ->
       ignore (parse_process table "null" : Process.process)
@@ -113,12 +113,11 @@ let process_parsing =
                  else error)"
               : Process.process)
     end
-  ];;
+  ]
 
 let models =
   let exception Ok in
   let test = true in
-  (* Checks.add_suite "Models" [ *)
   [
     "Null model", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/null.sp"
@@ -232,5 +231,4 @@ let models =
            with Process.Error (_,
                                DuplicatedUpdate "s") -> raise Ok)
     end ;
-  ];;
-
+  ]

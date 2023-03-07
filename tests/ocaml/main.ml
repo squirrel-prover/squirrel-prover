@@ -1,11 +1,11 @@
+(** Various tests... *)
+
 open Squirrellib
 open Main
 
-(*------------------- Tests -----------------------------------*)(* {↓{ *)
 let tactics =
   let exception Ok in
   let test = true in
-  (* Checks.add_suite "Tactics" [ *)
   [
     "Name Finite 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -153,7 +153,6 @@ let tactics =
 let equivalence =
   let exception Ok in
   let test = true in
-  (* Checks.add_suite "Equivalence" [ *)
   [
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -212,12 +211,11 @@ let equivalence =
     end
   ]
 
-  (*------------------------------------------------------------------*)
-  let includes =
+(*------------------------------------------------------------------*)
+let includes =
     let exception Ok in
     let test = true in
     [
-  (* Checks.add_suite "Include" [ *)
     "Cycle", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
@@ -253,4 +251,3 @@ let equivalence =
              Theory.Conv (_, UndefInSystem _) -> raise Ok)
     end ;
   ]
-(* }↑} *)
