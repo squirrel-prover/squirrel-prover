@@ -1,3 +1,5 @@
+(** Testing various commands of the prover: search, print, include. *)
+
 module Prover = Squirrellib.Prover
 module ProverLib = Squirrellib.ProverLib
 module Theory = Squirrellib.Theory
@@ -75,7 +77,8 @@ let search_about_1 () =
     Prover.exec_command 
         "channel c
         system [T] (S : !_i new n; out(c,n))." st
-    |> Prover.exec_command "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
+    |> Prover.exec_command
+         "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
   |> Prover.exec_command "Proof."
   |> Prover.exec_command "search happens(_)."
   in

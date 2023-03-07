@@ -1,3 +1,5 @@
+(** Template for creating tests. *)
+
 module Prover = Squirrellib.Prover
 
 let template_test () =

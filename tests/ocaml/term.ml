@@ -1,3 +1,5 @@
+(** Unit tests for the {!Term} module. *)
+
 open Squirrellib
 
 let tests = [
