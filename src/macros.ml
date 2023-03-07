@@ -293,26 +293,27 @@ let get_definition_nocntxt
 
   | Symbols.State _, _ ->
     `Def begin
-      let descr_updates =
-        List.map (fun (ss,args,t) ->
-            ss, Term.subst_vars descr_subst args, Term.subst descr_subst t
-          ) unapplied_descr.updates
-      in
       try
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
-        let (_ns, ns_args, msg) : Symbols.macro * Vars.vars * Term.term =
-          List.find (fun (ns,ns_args,_) ->
-              ns = symb.s_symb &&
-              List.length ns_args = List.length args
-            ) descr_updates
+        let (ns_args, msg) : Term.terms * Term.term =
+          let _, ns_args, msg =
+            List.find (fun (ns,ns_args,_) ->
+                ns = symb.s_symb &&
+                List.length ns_args = List.length args
+              ) unapplied_descr.updates
+          in
+          List.map (Term.subst descr_subst) ns_args, Term.subst descr_subst msg
         in
 
         (* Init case: we substitute the indices by their definition. *)
         if asymb = Symbols.init_action then
           let s = List.map2 (fun i1 i2 ->
-              Term.ESubst (Term.mk_var i1, i2)
+              match i1 with
+              | Term.Var _ -> Term.ESubst (i1, i2)
+              | _ -> assert false
+              (* impossible for well-formed action description for init *)
             ) ns_args args
           in
           Term.subst s msg
@@ -321,13 +322,12 @@ let get_definition_nocntxt
            are equal to indices [ns_args] corresponding to this macro
            in the action description, then the macro is expanded as defined
            by the update term. *)
-        else if args = Term.mk_vars ns_args then
+        else if List.for_all2 Term.equal args ns_args then
           msg
 
         (* Otherwise, we need to take into account the possibility that
            [arg] and [ns_args] might be equal, and generate a conditional.  *)
         else
-          let ns_args : Term.terms = Term.mk_vars ns_args in
           let def =
             Term.mk_ite
               (Term.mk_eqs ~simpl:true args ns_args)

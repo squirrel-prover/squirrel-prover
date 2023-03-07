@@ -214,7 +214,9 @@ let global_rename
         (fun action_descr ->
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
-           List.iter (fun (_,_,m) -> iter#visit_message m) action_descr.updates)
+           List.iter (fun (_,args,m) ->
+               List.iter iter#visit_message (m :: args)
+             ) action_descr.updates)
     with OldFresh.Deprecated_Name_found ->
       Tactics.hard_failure
         (Tactics.Failure "The name on the right-hand side already \
@@ -605,9 +607,6 @@ type x_hash_occ = {
   (* macro of the occurrence *)
   x_msymb : Symbols.macro;
 
-  (* macro definition of the occurrence *)
-  x_mdef : Symbols.macro_def;
-
   x_a : Symbols.action;
   (* action of the occurrence *)
 
@@ -901,14 +900,19 @@ let global_prf_t
 
   let (table, occs) : Symbols.table * XO.t list =
     SystemExpr.fold_descrs (fun descr (table,occs) ->
-        Iter.fold_descr ~globals:true (fun ms _a_is _m_is mdef t (table,occs) ->
+        Iter.fold_descr ~globals:true (fun ms _a_is ~args ~body (table,occs) ->           
             (* find new occurrences using NoDelta, as we also fold over 
                global macros. *)
             let new_occs =
-              Iter.deprecated_get_f_messages_ext ~mode:`NoDelta
-                ~fv:descr.indices 
-                (old_system :> SE.arbitrary) table
-                h_fn h_key.symb.s_symb t
+              List.fold_left (fun new_occs t ->
+                  let occs_t = 
+                    Iter.deprecated_get_f_messages_ext ~mode:`NoDelta
+                      ~fv:descr.indices 
+                      (old_system :> SE.arbitrary) table
+                      h_fn h_key.symb.s_symb t
+                  in
+                  occs_t @ new_occs
+                ) [] (body :: args)
             in
 
             (* extend new occurrences with additional information *)
@@ -918,7 +922,6 @@ let global_prf_t
                   table,
                   XO.mk {
                     x_msymb = ms;
-                    x_mdef  = mdef;
                     x_occ   = occ;
                     x_nsymb;
                     x_a     = descr.name;

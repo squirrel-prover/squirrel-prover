@@ -1258,7 +1258,10 @@ let global_diff_eq (s : ES.t) =
      let miter = iter [action_descr.Action.name] action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
-     List.iter (fun (_,_,m) -> miter m) action_descr.Action.updates) ;
+     List.iter (fun (_,args,m) ->
+         List.iter miter args;
+         miter m
+       ) action_descr.Action.updates) ;
 
   (* Function converting each occurrence to the corresponding subgoal. *)
   let subgoal_of_occ (vs,is,t) =
@@ -2029,7 +2032,10 @@ let is_ddh_context
       fun d ->
         iter#visit_message (snd d.condition) ;
         iter#visit_message (snd d.output) ;
-        List.iter (fun (_,_,t) -> iter#visit_message t) d.updates;
+        List.iter (fun (_,args,t) ->
+            List.iter iter#visit_message args;
+            iter#visit_message t
+          ) d.updates;
     );
    (* we then check inside the frame *)
     List.iter iter#visit_message elem_list;

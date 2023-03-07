@@ -352,13 +352,8 @@ process_i:
 | LET id=lsymb ty=colon_ty? EQ t=term IN p=process
     { Process.Let (id,t,ty,p) }
 
-| id=lsymb terms=term_list COLONEQ t=term p=process_cont
-    { let to_idx t = match L.unloc t with
-        | Theory.Symb x -> x
-        | _ -> raise @@ Theory.Conv (L.loc t, Theory.Failure "must be a variable")
-      in
-      let l = List.map to_idx terms in
-      Process.Set (id,l,t,p) }
+| id=lsymb args=term_list COLONEQ t=term p=process_cont
+    { Process.Set (id,args,t,p) }
 
 | s=loc(BANG) p=process { Process.Repl (s,p) }
 

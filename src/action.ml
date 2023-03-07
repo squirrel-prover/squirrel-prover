@@ -296,14 +296,14 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 
 (*------------------------------------------------------------------*)
 (** An action description features an input, a condition (which sums up
-  * several [Exist] constructs which might have succeeded or not) and
-  * subsequent updates and outputs.
-  * The condition binds variables in the updates and output.
-  * An action description may feature free index variables, that are
-  * in a sense bound by the corresponding action. We also include a list of
-  * all used indices, since they are not explicitly declared as part of
-  * the action or current condition (they could be introduced by previous
-  * conditions). *)
+    several [Exist] constructs which might have succeeded or not) and
+    subsequent updates and outputs.
+    The condition binds variables in the updates and output.
+    An action description may feature free index variables, that are
+    in a sense bound by the corresponding action. We also include a list of
+    all used indices, since they are not explicitly declared as part of
+    the action or current condition (they could be introduced by previous
+    conditions). *)
 
 type descr = {
   name      : Symbols.action ;
@@ -311,7 +311,7 @@ type descr = {
   input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
-  updates   : (Symbols.macro * Vars.vars * Term.term) list ;
+  updates   : (Symbols.macro * Term.terms * Term.term) list ;
   output    : Channel.t * Term.term;
   globals   : Symbols.macro list;
 }
@@ -328,7 +328,7 @@ let check_descr d =
       Sv.subset (Term.fv cond) dfv &&
       Sv.subset (Term.fv outp) dfv &&
       List.for_all (fun (_, args, state) ->
-          Sv.subset (Sv.union (Term.fv state) (Sv.of_list args)) dfv 
+          Sv.subset (Sv.union (Term.fv state) (Term.fvs args)) dfv 
         ) d.updates
     end
 
@@ -344,7 +344,7 @@ let subst_descr subst (descr : descr) =
     Term.subst subst (snd descr.condition) in
   let updates =
     List.map (fun (ss,args,t) ->
-        ss, Term.subst_vars subst args, Term.subst subst t
+        ss, List.map (Term.subst subst) args, Term.subst subst t
       ) descr.updates
   in
   let output = fst descr.output, Term.subst subst (snd descr.output) in
@@ -376,15 +376,9 @@ let pp_descr ~dbg ppf descr =
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hv>%a@]@]@;"
        (Fmt.list
           ~sep:(Fmt.any ";@ ")
-          (fun ppf (s, args, t) ->
-             let _, args, subst = (* rename quantified vars. to avoid name clashes *)
-               let fv_b = List.fold_left ((^~) Sv.remove) (Term.fv t) args in
-               Term.add_vars_simpl_env (Vars.of_set fv_b) args
-             in
-             let t = Term.subst subst t in
-             
+          (fun ppf (s, args, t) ->             
              Fmt.pf ppf "@[%a@[(%a)@] :=@ %a@]" 
-               Symbols.pp s (Vars._pp_typed_list ~dbg) args
+               Symbols.pp s (Fmt.list (Term._pp ~dbg)) args 
                (Term._pp ~dbg) t)))
     descr.updates
     (Utils.pp_ne_list "@[<hv 2>globals:@ @[<hv>%a@]@]@;"
@@ -406,7 +400,7 @@ let descr_map
   in
   let updates =
     List.map (fun (ss,args,t) -> 
-        ss, args, f ss t
+        ss, List.map (f ss) args, f ss t
       ) descr.updates
   in
   let output = fst descr.output, f Symbols.out (snd descr.output) in
@@ -428,7 +422,8 @@ let project_descr (s : Term.proj) d =
   let project1 t = Term.project1 s t in
   { d with
     condition = (let is,t = d.condition in is, project1 t);
-    updates   = List.map (fun (st, args, m) -> st, args, project1 m) d.updates;
+    updates   =
+      List.map (fun (st, args, m) -> st, List.map project1 args, project1 m) d.updates;
     output    = (let c,m = d.output in c, project1 m) }
 
 let strongly_compatible_descr d1 d2 : bool =

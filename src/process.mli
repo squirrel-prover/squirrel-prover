@@ -34,8 +34,9 @@ type process_i =
   | Out of Channel.p_channel * term * process  (** Output *)
   | Parallel of process * process              (** Parallel composition *)
   
-  | Set of lsymb * lsymb list * term * process
-  (** [Set (s,l,t,p)] stores [t] in cell [s(l)] and continues with [p]. *)
+  | Set of lsymb * term list * term * process
+  (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
+      FIXME: for now, we only allow argument of type index. *)
            
   | Let of lsymb * term * Theory.p_ty option * process 
   (** Local definition, optional type information *)

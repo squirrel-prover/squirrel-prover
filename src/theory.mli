@@ -217,9 +217,9 @@ val declare_state :
   Symbols.table -> lsymb -> bnds -> p_ty option -> term -> Symbols.table
        
 (** [get_init_states] returns all the initial values of declared state symbols,
-    used to register the init action *)
+    used to register the init action. *)
 val get_init_states :
-  Symbols.table -> (Symbols.macro * Vars.vars * Term.term) list
+  Symbols.table -> (Symbols.macro * Term.terms * Term.term) list
 
 (** [declare_abstract n i m] declares a new function symbol
   * of type [index^i -> message^m -> message]. *)
@@ -380,8 +380,8 @@ val convert_any : conv_env -> any_term -> Equiv.any_form
 (** {2 Misc} *)
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
-  * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
-  * term [t]. *)
+    exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
+    term [t]. *)
 val find_app_terms : term -> string list -> string list
 
 val parse_projs : lsymb list option -> Term.projs 

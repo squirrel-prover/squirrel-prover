@@ -609,36 +609,31 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Folding over action descriptions} *)
 
-let is_state : Symbols.macro_def -> bool = function
-  | Symbols.State _ -> true
-  | _ -> false
-
 (** Fold over macros defined at a given description.
     Also folds over global macros if [globals] is [true]. *)
 let fold_descr
     ~(globals:bool)
     (func :
-       Symbols.macro ->       (* macro symbol [ms] *)
-       Vars.var list ->       (* action indices *)
-       Vars.var list ->       (* additional indices [is] of [ms] *)
-       Symbols.macro_def ->   (* macro definition *)
-       Term.term ->           (* term [t] defining [ms(is)] *)
-       'a ->                  (* folding argument *)
-       'a)
+       (Symbols.macro ->       (* macro symbol [ms] *)
+        Vars.var list ->       (* action indices *)
+        args:Term.term list -> (* argument of the macro [ms] for state and globals *)
+        body:Term.term ->      (* term [t] defining [ms(is)] *)
+        'a ->                  (* folding argument *)
+        'a))
     (table  : Symbols.table)
     (system : SE.fset)
     (descr  : Action.descr)
     (init   : 'a) : 'a
   =
-  let mval = func Symbols.out  descr.indices [] Symbols.Output (snd descr.output   ) init in
-  let mval = func Symbols.cond descr.indices [] Symbols.Cond   (snd descr.condition) mval in
+  let mval =
+    func Symbols.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
+    func Symbols.cond descr.indices ~args:[] ~body:(snd descr.condition) 
+  in
 
   (* fold over state macros *)
   let mval =
-    List.fold_left (fun mval (st, is, t) ->
-        let mdef = Symbols.Macro.get_def st table in
-        assert (is_state mdef);
-        func st descr.indices is mdef t mval
+    List.fold_left (fun mval (st, args, t) ->
+        func st descr.indices ~args ~body:t mval
       ) mval descr.updates
   in
 
@@ -649,19 +644,18 @@ let fold_descr
 
     (* fold over global macros in scope of [descr.action] *)
     List.fold_left (fun mval (mg : Symbols.macro) ->
-        let mdef, is_arr, ty = match Symbols.Macro.get_def mg table with
-          | Global (is,ty) as mdef -> mdef, is, ty
+        let is_arr, ty = match Symbols.Macro.get_def mg table with
+          | Global (is,ty) -> is, ty
           | _ -> assert false
         in
-        let is = List.take is_arr descr.Action.indices in
+        let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
         let t = 
           let msymb = Term.mk_symb mg ty in
-          let args = Term.mk_vars is in
           match Macros.get_definition cntxt msymb ~args ~ts with
           | `Def t -> t
           | _ -> assert false
         in
-        func mg descr.indices is mdef t mval
+        func mg descr.indices ~args ~body:t mval
       ) mval descr.globals
 
 (*------------------------------------------------------------------*)
@@ -975,19 +969,24 @@ let macro_support
         fold_descr ~globals:true
           (fun
             (msymb : Symbols.macro) 
-            (a_is : Vars.vars) (m_is : Vars.vars) 
-            _ (t : Term.term) (sm : MsetAbs.t) ->
+            (a_is : Vars.vars) ~(args : Term.terms) 
+            ~(body : Term.term) (sm : MsetAbs.t) ->
+            (* Represent the update [msymb(args) := body]. *)
+            
             if List.mem_assoc msymb sm then
               (* we compute the substitution which we will use to instantiate
-                 [t] on the indices of the macro set in [sm]. *)
+                 in [body] the arguments [args] on the arguments of the macro 
+                 set [mset] (which are [args' = mset.args]), i.e. we build the
+                 substitution [args -> args']. *)
               let subst =
                 let mset = List.assoc msymb sm in
-                List.map2 (fun i j ->
-                    Term.ESubst (Term.mk_var i, Term.mk_var j)
-                  ) m_is mset.Mset.args
+                (* Remark:  [arg] may be an arbitrary term. *)
+                List.map2 (fun arg j ->
+                    Term.ESubst (arg, Term.mk_var j)
+                  ) args mset.Mset.args
               in
-              let t = Term.subst subst t in
-              let m_is = Term.subst_vars subst m_is in
+              let body = Term.subst subst body in
+              let args = List.map (Term.subst subst) args in
               let a_is = Term.subst_vars subst a_is in
               
               (* Compute a valid path condition.
@@ -997,7 +996,10 @@ let macro_support
                   (PathCond.Before [descr]) (List.assoc msymb sm).path_cond 
               in
 
-              let sm' = get_msymbs ~expand_mode:`Delta ~path_cond ~fv:(a_is @ m_is) t in
+              let sm' =
+                let fv = a_is @ Sv.elements (Term.fvs args) in
+                get_msymbs ~expand_mode:`Delta ~path_cond ~fv body
+              in
               MsetAbs.join sm' sm
 
             else sm
@@ -1071,7 +1073,8 @@ let _fold_macro_support
   in
 
   if pp_dbg then                (* debug printing, turned-off  *)
-    List.iter (fun (_, mset_abs) -> Fmt.epr "macro_support:@.%a@." MsetAbs.pp mset_abs ) sm;
+    List.iter
+      (fun (_, mset_abs) -> Fmt.epr "macro_support:@.%a@." MsetAbs.pp mset_abs ) sm;
 
   (* reversing the association map: we want to map macros to
      pairs of possible sources and macro set *)
@@ -1089,20 +1092,21 @@ let _fold_macro_support
   in
 
   SE.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb _a_is m_is _ t acc ->
+      fold_descr ~globals:true (fun msymb _a_is ~args ~body acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 
-            let m_is' = mset.Mset.args in
+            let args' = mset.Mset.args in
             (* we compute the substitution which we will use to instantiate
                [t] on the indices of the macro set in [mset]. *)
             let subst =
-              List.map2 (fun i j ->
-                  Term.ESubst (Term.mk_var i, Term.mk_var j)
-                ) m_is m_is'
+              List.map2 (fun arg j ->
+                  (* Remark:  [arg] may be an arbitrary term. *)
+                  Term.ESubst (arg, Term.mk_var j)
+                ) args args'
             in
 
-            let iocc_cnt = Term.subst subst t in
+            let iocc_cnt = Term.subst subst body in
             let iocc_action = 
               Action.subst_action subst (Action.to_action descr.action) 
             in

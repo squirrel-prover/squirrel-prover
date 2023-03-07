@@ -23,7 +23,7 @@ type process_i =
   | In       of Channel.p_channel * lsymb * process
   | Out      of Channel.p_channel * term * process
   | Parallel of process * process
-  | Set      of lsymb * lsymb list * term * process
+  | Set      of lsymb * term list * term * process
   | Let      of lsymb * term * Theory.p_ty option * process
   | Repl     of lsymb * process
   | Exists   of lsymb list * term * process * process
@@ -52,10 +52,10 @@ let rec pp_process ppf process =
     pf ppf "@[<hov 2>!_%s@ @[%a@]@]"
       (L.unloc s) pp_process p
 
-  | Set (s, indices, t, p) ->
+  | Set (s, args, t, p) ->
     pf ppf "@[<hov>%s%a %a@ %a;@ @[%a@]@]"
       (L.unloc s)
-      (Utils.pp_list Fmt.string) (L.unlocs indices)
+      (Utils.pp_list Theory.pp) args
       (Printer.kws `ProcessKeyword) ":="
       Theory.pp t
       pp_process p
@@ -235,7 +235,7 @@ let check_proc
       Theory.check env ~local:true ty_env projs m k ;
       List.iter (fun x ->
           Theory.check 
-            env ~local:true ty_env projs (Theory.var_of_lsymb x) Type.tindex
+            env ~local:true ty_env projs x Type.tindex
         ) l ;
       check_p ty_env  env p
 
@@ -295,8 +295,8 @@ let check_proc
     error (L.loc process) Freetyunivar;
 
   (* close the typing environment and substitute *)
-  let tsubst = Type.Infer.close ty_env in
-  let args = List.map (Vars.tsubst tsubst) args in
+  let tysubst = Type.Infer.close ty_env in
+  let args = List.map (Vars.tsubst tysubst) args in
   (* no need to substitute in the process itself, as we retype it later *)
 
   (* process are stored with an ad hoc type for variables *)
@@ -362,17 +362,17 @@ type p_env = {
 
   isubst : (string * Theory.term_i * Vars.var) list ;
   (* substitution for index variables (Repl, Exists, Apply)
-   * mapping each variable from the original process (before refresh)
-   * to the associated refreshed variables
-   * as Theory.term and as a Vars.var suitable for use in Term.term *)
+     mapping each variable from the original process (before refresh)
+     to the associated refreshed variables
+     as Theory.term and as a Vars.var suitable for use in Term.term *)
 
   msubst : (string * Theory.term_i * Term.term) list ;
   (* substitution for message variables (New, Let, In, Apply)
-   * each variable from the original process (before refresh)
-   * is mapped to the associated refreshed variable
-   * as a Theory.term and as a Term.term
-   * (the third component is also used to map input variables to
-   * input macros) *)
+     each variable from the original process (before refresh)
+     is mapped to the associated refreshed variable
+     as a Theory.term and as a Term.term
+     (the third component is also used to map input variables to
+     input macros) *)
 
   inputs : (Channel.t * Vars.var) list ;
   (* bound input variables *)
@@ -388,14 +388,27 @@ type p_env = {
   facts : Term.term list ;
   (* list of formulas to create the condition term of the action *)
 
-  updates : (lsymb * Vars.var list * Type.ty * Term.term) list ;
-  (* list of updates performed in the action.
-   * The type can be a type unification variables. *)
+  updates : (lsymb * Term.terms * Type.ty * Term.term) list ;
+  (* List of updates performed in the action of the form [(s, args, ty, body)].
+     [ty] is the type of [body].
+     See [updates] in [Action.descr] for a description of the semantics. *)
 
   globals : Symbols.macro list;
   (* list of global macros declared at [action] *)
 
 }
+
+
+(*------------------------------------------------------------------*)
+(* Used to get the 2nd and 3rd component associated to the string [v] in
+ * the substitutions [isubst] or [msubst]. *)
+let list_assoc v l =
+  let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
+  th,tm
+
+let to_tsubst (env : p_env) =
+  List.map (fun (x,y,_) -> x,y) env.isubst @
+  List.map (fun (x,y,_) -> x,y) env.msubst
 
 (*------------------------------------------------------------------*)
 (* Creates an axiom namelength_name with formula : 
@@ -465,15 +478,6 @@ let add_namelength_axiom
 
 
 (*------------------------------------------------------------------*)
-(* Used to get the 2nd and 3rd component associated to the string [v] in
- * the substitutions [isubst] or [msubst]. *)
-let list_assoc v l =
-  let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
-  th,tm
-
-let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst 
-
-(*------------------------------------------------------------------*)
 (* Update env.vars_env with a new variable of sort [sort] computed from
  * [name] *)
 let make_fresh param (penv : p_env) sort name =
@@ -481,7 +485,7 @@ let make_fresh param (penv : p_env) sort name =
   { penv with env = { penv.env with vars }}, x
 
 (*------------------------------------------------------------------*)
-let create_subst (venv : Vars.env) isubst msubst =
+let create_subst (venv : Vars.env) isubst msubst : Term.subst =
   List.map (fun (x,_,tm) -> 
       let v, _ = as_seq1 (Vars.find venv x) in
       (* cannot have two variables with the same name since previous 
@@ -528,7 +532,6 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     env,ts,dummy_in
   in
 
-  (* TODO: types: move functions below *)
   (* Close all type unification variables un [unis]. *)
   let tsubst_of_unis ?loc ty_env (unis : Ident.Sid.t) : Type.tsubst =
     Ident.Sid.fold (fun (u : Ident.t) tsubst ->
@@ -629,9 +632,10 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
           let ms = Symbols.Macro.of_lsymb s penv.env.table in
           let t = Term.subst (subst_ts @ subst_input) t in
 
+          let close_univars = term_close_univars ~loc:(L.loc s) penv.ty_env  in
           (* close unification variables *)
-          let t = term_close_univars ~loc:(L.loc s) penv.ty_env t in
-          let args = vars_close_univars  ~loc:(L.loc s) penv.ty_env args in
+          let t = close_univars t in
+          let args = List.map close_univars args in
 
           ( ms, args, t)
         ) penv.updates
@@ -642,7 +646,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
          (fun ch (u,args,v) ->
             Format.fprintf ch "%a(%a) := %a" 
               Symbols.pp u
-              Vars.pp_list args
+              (Fmt.list Term.pp) args
               Term.pp v))
       updates ;
 
@@ -713,40 +717,28 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       if penv.projs <> projs' then
         error (L.loc proc) (ProjsMismatch (penv.projs, projs'));
 
-      let new_env, isubst', msubst' =
+      let new_env, msubst =
         (* TODO avoid or handle conflicts with variables already
          * in domain of subst, i.e. variables bound above the apply *)
-        let tsubst = (to_tsubst penv.isubst@to_tsubst penv.msubst) in
+        let tsubst = to_tsubst penv in
         List.fold_left2
-          (fun (new_env,iacc,macc) (x, ty) v ->
+          (fun (new_env,msubst) (x, ty) arg ->
              let new_env, _ = make_fresh `Shadow new_env ty x in
 
-             match ty with
-             | Type.Index ->
-               let v'_th = Theory.subst v tsubst in
-               let v'_tm : Term.term =
-                 conv_term penv (Term.mk_var ts) v ty in
-               let v'_tm = Utils.oget (Term.destr_var v'_tm) in
+             let arg_th = Theory.subst arg tsubst in
+             let arg_t : Term.term =
+               conv_term penv (Term.mk_var ts) arg ty
+             in
+            
+             new_env, (x, L.unloc arg_th, arg_t) :: msubst
 
-               new_env, (x, L.unloc v'_th, v'_tm) :: iacc, macc
-
-             | Type.Timestamp -> assert false
-
-             | _ ->
-               let v'_th = Theory.subst v tsubst in
-               let v'_tm : Term.term =
-                 conv_term penv (Term.mk_var ts) v ty in
-
-               new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
-
-          ) (penv, penv.isubst,penv.msubst) proc_ty args
+          ) (penv, penv.msubst) proc_ty args
       in
 
       let penv =
         { new_env with
           alias  = a' ;
-          isubst = isubst' ;
-          msubst = msubst' }
+          msubst = msubst }
       in
       (penv,p)
 
@@ -798,7 +790,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       | Some pty -> Theory.convert_ty ~ty_env:penv.ty_env penv.env pty 
     in
 
-    let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
+    let t' = Theory.subst t (to_tsubst penv) in
     let updated_states =
       if in_update then
         let apps = List.map (fun (s,_,_,_) -> L.unloc s) penv.updates in
@@ -817,7 +809,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       | _ as ty -> ty
     in
 
-  (* Close all type unification variables un [body]. *)
+    (* Close all type unification variables un [body]. *)
     let body = term_close_univars ~loc:(L.loc t) penv.ty_env body in
 
     let invars = List.map snd penv.inputs in
@@ -973,9 +965,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         @ penv_p.isubst
       in
       let penv_p = { penv_p with isubst = isubst' } in
-      let cond' =
-        Theory.subst cond (to_tsubst penv_p.isubst @ to_tsubst penv_p.msubst)
-      in
+      let cond' = Theory.subst cond (to_tsubst penv_p) in
 
       (* No state updates have been done yet in the current
        * action. We thus have to substitute [ts] by [pred(ts)] for all state
@@ -1056,29 +1046,27 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
              There is no in-between value. *)
         error loc (DuplicatedUpdate (L.unloc s));
 
-      let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
-      let l' =
-        List.map
-          (fun i ->
-             snd (list_assoc (L.unloc i) penv.isubst))
-          l
-      in
+      let subst = to_tsubst penv in
+      let t' = Theory.subst t subst in
+      let l' = List.map (fun i -> Theory.subst i subst) l in
       let updated_states =
         let apps = List.map (fun (s,_,_,_) -> L.unloc s) penv.updates in
-        Theory.find_app_terms t' apps            
+        (* dummy term containing [t'] and [l'] to use [find_app_terms] *)
+        let dt = L.mk_loc L._dummy (Theory.App (t', l')) in
+        Theory.find_app_terms dt apps
       in
       let ty = Theory.check_state penv.env.table s (List.length l) in
       let t'_tm =
         Term.subst_macros_ts penv.env.table updated_states (Term.mk_var ts)
           (conv_term penv (Term.mk_var ts) t ty)
       in
+      let l'_tm =
+        List.map (fun t -> conv_term penv (Term.mk_var ts) t Type.tindex) l'
+      in
       let penv =
-        { penv with updates = (s,l',ty,t'_tm) :: penv.updates }
+        { penv with updates = (s,l'_tm,ty,t'_tm) :: penv.updates }
       in
       let p',pos',table = p_update ~penv p in
-
-      (* we could re-use the location in [l] here. *)
-      let l' = List.map (fun x -> mk_dum (Vars.name x)) l' in
 
       ( Set (s,l',t',p'),
         pos',
@@ -1086,7 +1074,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     | Out (c,t,p) ->
       let ch = Channel.of_lsymb c penv.env.table in
-      let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
+      let t' = Theory.subst t (to_tsubst penv) in
 
       let penv,a' = register_action loc penv.alias (Some (ch,t)) penv in
       let penv =
