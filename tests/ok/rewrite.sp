@@ -496,6 +496,21 @@ Proof.
   rewrite H //. 
 Qed.
 
+(* check that `rewrite` does not exploits too much *)
+goal [any] _ (b : boolean, x, y, z : message) : 
+  (b => x = y) => if b then x else x = if b then y else y.
+Proof.
+  intro H.
+  rewrite H; 2: auto.
+
+  (* `auto` should not conclude *)
+  checkfail auto exn GoalNotClosed.
+
+  (* check the precise condition generated *)
+  have A : b by admit.
+  assumption A.
+Qed.
+
 (*------------------------------------------------------------------*)
 (* rewrite n times *)
 
