@@ -16,15 +16,31 @@ let soft_failure = Tactics.soft_failure
     - [pat]: pattern of the instance found (no free variables left)
     - [right]: right term instantiated with the instance found
     - [system]: systems applying to the instance found 
+    - [cond] and [vars]: conditions and variables applying at the subterm 
+      where the instance was found.
 
     Type unification environments has already been closed. *) 
 type found = { 
   pat    : Term.term Term.pat_op; 
   right  : Term.term;
   system : SE.t; 
-  subgs  : (SE.t * Term.term) list;
+  conds  : Term.terms;
+  vars   : Vars.vars;
+  subgs  : Term.term list;      (* [vars] and [conds] not yet added *)
 }
 
+(** Build the final subgoals associated to a instance found. *)
+let subgoals_of_found (f : found) : (SE.t * Term.term) list =
+  List.map (fun subg ->
+      let goal =
+        Term.mk_forall ~simpl:true f.vars 
+          (Term.mk_impls ~simpl:true f.conds subg)
+      in 
+      f.system, goal
+    ) f.subgs
+
+(*------------------------------------------------------------------*)
+(** Rewrite internal state, propagated downward. *)
 type rw_state = { 
   rl_system  : SE.t;
   init_pat   : Term.term Term.pat_op;
@@ -153,8 +169,6 @@ let rw_inst
       | `Found inst -> 
         (* we already found the rewrite instance earlier *)
 
-        (* TODO: types: need to do something about conds, that may not be
-           the same than for the first instance found ... *)
         (* check if the same system apply to the subterm *)
         if not (SE.subset table se inst.system) then 
           s, `Continue 
@@ -167,6 +181,13 @@ let rw_inst
             with
             | NoMatch _ -> s, `Continue
             | Match _mv -> 
+              (* When we found another occurrence of the same rewrite
+                 instance, we clear the conditions, as they may not be
+                 the same than for the first instance found. 
+                 We could be less strict and look whether there are common 
+                 conditions, but this is probably not worth the effort. *)
+              let s = { s with found_instance = `Found { inst with conds = []; }; } in
+
               (* project the already found instance with the projections
                  applying to the current subterm *)
               s, `Map (Term.project_opt projs inst.right)
@@ -215,12 +236,11 @@ let rw_inst
             let right_proj = Term.project_opt projs s.init_right in
             do_subst right_proj
           in
+          let found_conds = List.map do_subst conds in
           let found_subs =
             List.map (fun rsub ->
                 let rsub = Term.project_opt projs rsub in
-                se, 
-                Term.mk_forall ~simpl:true vars
-                  (Term.mk_impls ~simpl:true conds (do_subst rsub))
+                do_subst rsub
               ) s.init_subs
           in
 
@@ -234,6 +254,8 @@ let rw_inst
               pat    = found_pat;
               right;
               system = se;
+              vars; 
+              conds  = found_conds;
               subgs  = found_subs;
             } in
 
@@ -258,7 +280,7 @@ let rewrite_head
   match rw_inst expand_context table env hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t ->
-    Some (t, inst.subgs)
+    Some (t, subgoals_of_found inst)
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -336,17 +358,19 @@ let do_rewrite
     | (Args.Once | Args.Many | Args.Exact _), `False -> 
       raise (Failed NothingToRewrite)
 
-    | Args.Once, `Found inst -> f, inst.subgs
+    | Args.Once, `Found inst -> f, subgoals_of_found inst
 
     | Args.Exact i, `Found inst ->
-      if i = 1 then f, inst.subgs 
+      let inst_subgs = subgoals_of_found inst in
+      if i = 1 then f, inst_subgs 
       else
         let f, rsubs' = _rewrite Args.(Exact (i - 1)) f in
-        f, List.rev_append inst.subgs rsubs'
+        f, List.rev_append inst_subgs rsubs'
 
     | (Args.Many | Args.Any), `Found inst  ->
+      let inst_subgs = subgoals_of_found inst in
       let f, rsubs' = _rewrite Args.Any f in
-      f, List.rev_append inst.subgs rsubs'
+      f, List.rev_append inst_subgs rsubs'
   in
 
   let f, subs = 
