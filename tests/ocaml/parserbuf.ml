@@ -28,13 +28,47 @@ let parse parser parser_name string =
       parser_name (Lexing.lexeme lexbuf) ;
     raise e
 
+(** Testing term parsing. *)
+let term_parsing =
+  let parse = parse Parser.top_formula "term" in
+  [
+    "Try find i:index", `Quick, begin fun () ->
+      ignore (parse "try find i:index such that true in empty")
+    end ;
+    "Try find _:index", `Quick, begin fun () ->
+      ignore (parse "try find _:index such that true in empty")
+    end ;
+    "Try find _:_", `Quick, begin fun () ->
+      ignore (parse "try find _:_ such that true in empty")
+    end ;
+    "Try find i,j,k:index", `Quick, begin fun () ->
+      ignore (parse "try find i,j,k:index such that true in empty")
+    end ;
+    "Try find _,_,_:index", `Quick, begin fun () ->
+      ignore (parse "try find _,_,_:index such that true in empty")
+    end ;
+    "Try find i:index,t:timestamp", `Quick, begin fun () ->
+      ignore (parse "try find i:index,t:timestamp such that true in empty")
+    end ;
+    "Try find (i:index)", `Quick, begin fun () ->
+      ignore (parse "try find (i:index) such that true in empty")
+    end ;
+    "Try find (_:_)", `Quick, begin fun () ->
+      ignore (parse "try find (_:_) such that true in empty")
+    end ;
+    "Try find (i,_:_)", `Quick, begin fun () ->
+      ignore (parse "try find (i,_:_) such that true in empty")
+    end ;
+  ]
+
 let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
   let projs = [ Term.left_proj; Term.right_proj; ] in
   if typecheck then 
-    ignore(Process.check_proc table ~args:[] projs p) ;
+    ignore (Process.check_proc table ~args:[] projs p) ;
   p
 
+(** Testing process parsing. *)
 let process_parsing =
   let table =
     Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
@@ -115,6 +149,7 @@ let process_parsing =
     end
   ]
 
+(** Testing that Squirrel correctly accepts files describing models. *)
 let models =
   let exception Ok in
   let test = true in

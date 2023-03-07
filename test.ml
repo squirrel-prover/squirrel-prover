@@ -14,8 +14,9 @@ let test_suites : unit Alcotest.test list =
     ("Tactics", Squirreltests.Main.tactics);
     ("Equivalence", Squirreltests.Main.equivalence);
     ("Channel", Squirreltests.Channel.channels);
-    ("Models", Squirreltests.Parserbuf.models);
-    ("Process parsing", Squirreltests.Parserbuf.process_parsing);
+    ("Models",         Squirreltests.Parserbuf.models);
+    ("ProcessParsing", Squirreltests.Parserbuf.process_parsing);
+    ("TermParsing",    Squirreltests.Parserbuf.term_parsing);
     ("Prover", Squirreltests.Prover.tests);
     ("NewTactics", Squirreltests.Tactics.tests);
     ("Term", Squirreltests.Term.tests)
