@@ -32,7 +32,9 @@ goal stateSemantics1 (i,j:index):
     happens(T(i,j)) => 
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof. 
-auto.
+  intro Hap. 
+  rewrite /output.
+  auto.
 Qed.
 
 

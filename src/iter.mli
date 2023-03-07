@@ -170,12 +170,11 @@ val deprecated_get_f_messages_ext :
     Also folds over global macros if [globals] is [true]. *)
 val fold_descr :
   globals:bool ->
-  ( Symbols.macro     -> (* macro symbol [ms] *)
-    Vars.var list     ->       (* action indices *)
-    Vars.var list     ->       (* additional indices [is] of [ms] *)
-    Symbols.macro_def -> (* macro definition *)
-    Term.term         -> (* term [t] defining [ms(is)] *)
-    'a                -> (* folding accumulator *)
+  ( Symbols.macro ->       (* macro symbol [ms] *)
+    Vars.var list ->       (* action indices *)
+    args:Term.term list -> (* argument of the macro [ms] for state and globals *)
+    body:Term.term ->      (* term [t] defining [ms(is)] *)
+    'a ->                  (* folding argument *)
     'a) ->
   Symbols.table -> 
   SystemExpr.fset ->

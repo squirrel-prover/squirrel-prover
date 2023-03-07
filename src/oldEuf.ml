@@ -92,9 +92,10 @@ let key_ssc
   let errors3 =
     SystemExpr.fold_descrs (fun descr acc ->
         let name = descr.name in
-        Iter.fold_descr ~globals (fun ms _a_is _m_is _mdef t acc ->
+        Iter.fold_descr ~globals (fun ms _a_is ~args ~body acc ->
+            let _ = args in
             let err_msg = err_msg_of_msymb cntxt.table name ms in
-            match check err_msg t with
+            match check err_msg body with
             | None -> acc
             | Some x -> x :: acc
           ) cntxt.table cntxt.system descr acc

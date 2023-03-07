@@ -660,7 +660,7 @@ let build_task
                     let ns_args =
                       match ns_args with [x] -> x | _ -> assert false in
                     t_if
-                      (t_equ index (index_to_wterm ns_args))
+                      (t_equ index (msg_to_wterm ns_args))
                       expansion_ok
                       same_as_pred
                 with Not_found -> same_as_pred in

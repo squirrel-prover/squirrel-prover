@@ -177,7 +177,7 @@ let pp_term_id ppf term =
 let pp_update ppf (state,args,term) =
   Format.fprintf ppf "%a(%a) := %a"
     Term.pp_msymb_s state
-    Vars.pp_list args
+    (Fmt.list pp_term) args
     pp_term term
 
 (** If [opt] is [Some value], print the line "[property]": "[value]".

@@ -28,7 +28,9 @@ let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn ke
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,_,t) -> ssc#visit_message t) action_descr.updates)
+       List.iter (fun (_,args,t) ->
+           List.iter ssc#visit_message (t :: args)
+         ) action_descr.updates)
 
 
 (* Iterator to check that the given randoms are only used in random seed
@@ -66,7 +68,9 @@ let deprecated_random_ssc
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,_,t) -> ssc#visit_message t) action_descr.updates)
+       List.iter (fun (_,args,t) ->
+           List.iter ssc#visit_message (t :: args)
+         ) action_descr.updates)
 
 
   (* Given cases produced by an OldEuf.mk_rule for some symmetric encryption

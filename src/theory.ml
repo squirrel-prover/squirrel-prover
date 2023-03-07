@@ -1636,12 +1636,12 @@ let declare_state
       (Symbols.State (List.length typed_args,out_ty)) in
   table
 
-let get_init_states table : (Symbols.macro * Vars.vars * Term.term) list =
+let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
   Symbols.Macro.fold (fun s def data acc ->
       match (def,data) with
       | ( Symbols.State (_arity,kind), StateInit_data (l,t) ) ->
         assert (Type.equal kind (Term.ty t));
-        (s,l,t) :: acc
+        (s,List.map Term.mk_var l,t) :: acc
       | _ -> acc
     ) [] table
 

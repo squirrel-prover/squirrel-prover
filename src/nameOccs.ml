@@ -717,7 +717,7 @@ let find_occurrences
        "%d bad occurrence%s remaining@;@]"
        loccs' (if loccs' = 1 then "" else "s"));
   if pp_ns <> None then
-    Printer.pr "@]";
+    Printer.pr "@;@]";
   occs, acc
 
 (*------------------------------------------------------------------*)
