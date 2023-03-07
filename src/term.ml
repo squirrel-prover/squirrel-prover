@@ -752,6 +752,7 @@ module SmartDestructors = struct
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
   let is_iff  f = destr_iff  f <> None
+  let is_pair f = destr_pair f <> None
 
   let is_exists f = destr_exists f <> None
   let is_forall f = destr_forall f <> None
