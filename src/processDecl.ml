@@ -259,13 +259,23 @@ let declare table decl : Symbols.table * Goal.t list =
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
-  | Decl.Decl_name (s, p_args_ty, p_out_ty) ->
+  | Decl.Decl_name (s, p_ty) ->
     let env = Env.init ~table () in
 
-    let p_args_tys = match p_args_ty with
-      | Some { pl_desc = Theory.P_tuple p_tys} -> p_tys
-      | Some p_ty -> [p_ty]
-      | None -> []
+    let p_args_tys, p_out_ty = 
+      match p_ty with
+      | { pl_desc = 
+            Theory.P_fun (
+              { pl_desc = Theory.P_tuple p_args_ty},
+              p_out_ty
+            )
+        } ->
+        p_args_ty, p_out_ty
+
+      | { pl_desc = Theory.P_fun (p_arg_ty, p_out_ty)} -> 
+        [p_arg_ty], p_out_ty
+
+      | _ -> [], p_ty
     in
 
     let args_tys = List.map (Theory.convert_ty env) p_args_tys in

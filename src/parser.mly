@@ -383,21 +383,6 @@ ty_var:
 | TICK id=lsymb     { id }
 
 (*------------------------------------------------------------------*)
-/* base type, no arrows */
-p_base_ty_i:
-| MESSAGE      { Theory.P_message }
-| INDEX        { Theory.P_index }
-| TIMESTAMP    { Theory.P_timestamp }
-| BOOLEAN      { Theory.P_boolean }
-| BOOL         { Theory.P_boolean }
-| tv=ty_var    { Theory.P_tvar tv }
-| l=lsymb      { Theory.P_tbase l }
-
-p_base_ty:
-| ty=loc(p_base_ty_i) { ty }
-
-
-(*------------------------------------------------------------------*)
 /* general types */
 
 ty_i:
@@ -406,7 +391,13 @@ ty_i:
 | t1=sty STAR tys=slist1(sty, STAR) { Theory.P_tuple (t1 :: tys) }
 
 sty_i:
-| t=p_base_ty_i                  { t }
+| MESSAGE                        { Theory.P_message }
+| INDEX                          { Theory.P_index }
+| TIMESTAMP                      { Theory.P_timestamp }
+| BOOLEAN                        { Theory.P_boolean }
+| BOOL                           { Theory.P_boolean }
+| tv=ty_var                      { Theory.P_tvar tv }
+| l=lsymb                        { Theory.P_tbase l }
 | LPAREN ty=ty_i RPAREN          { ty }
 | UNDERSCORE                     { Theory.P_ty_pat }
 
@@ -419,7 +410,7 @@ ty:
 (*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
-| l=lsymb COLON ty=p_base_ty { Decl.{ cty_space = l;
+| l=lsymb COLON ty=ty { Decl.{ cty_space = l;
                                       cty_ty    = ty; } }
 
 /* crypto assumption typed space */
@@ -496,11 +487,8 @@ declaration_i:
       let m, m_info = mm in
       Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
-| NAME e=lsymb COLON targs=ty ARROW tout=p_base_ty
-                          { Decl.Decl_name (e, Some targs, tout) }
-
-| NAME e=lsymb COLON tout=p_base_ty
-                          { Decl.Decl_name (e, None, tout) }
+| NAME e=lsymb COLON ty=ty
+                          { Decl.Decl_name (e, ty) }
 
 | ACTION e=lsymb COLON a_arity=int
                           { Decl.Decl_action { a_name = e; a_arity; } }

@@ -120,7 +120,7 @@ type declaration_i =
 
   | Decl_action   of action_decl
 
-  | Decl_name     of lsymb * Theory.p_ty option * Theory.p_ty
+  | Decl_name     of lsymb * Theory.p_ty
   | Decl_state    of macro_decl
   | Decl_operator of operator_decl
   | Decl_abstract of abstract_decl

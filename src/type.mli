@@ -49,7 +49,10 @@ type ty =
 (** {2 Misc} *)
 
 val pp : Format.formatter -> ty -> unit
-val _pp : Format.formatter -> ty -> unit
+
+(** Encoding of a type as a string without discontinuity nor
+    parenthesis. *)
+val to_string : ty -> string
 
 (** Equality relation *)
 val equal : ty -> ty -> bool
