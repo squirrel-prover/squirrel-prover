@@ -414,11 +414,12 @@ let to_tsubst (env : p_env) =
 (* Creates an axiom namelength_name with formula : 
   len(s) = namelength_hashS with hashS depending on out type of name s *)
 let mk_namelength_statement 
-    (name:string) (* Statement name → could be namelength_s by default *)
-    (table:Symbols.table) (* the table *)
-    (s:lsymb) (* symbol of targeted name *)
-    (ftype:Type.ftype) (* type of name term *)
-  : Symbols.table * Goal.statement =
+    (name  : string)        (* Statement name → could be namelength_s by default *)
+    (table : Symbols.table) (* the table *)
+    (s     : lsymb)         (* symbol of targeted name *)
+    (ftype : Type.ftype)    (* type of name term *)
+  : Symbols.table * Goal.statement
+  =
 
   (* take name from table certainly just defined earlier *)
   let n = Symbols.Name.of_lsymb s table in
@@ -433,7 +434,7 @@ let mk_namelength_statement
   let tn = Term.mk_name (Term.mk_symb n tyn) tvars in
   
   (* cst hash is built from hash of output type of n : tyn *)
-  let cst = Format.flush_str_formatter (Type.pp Format.str_formatter tyn) in
+  let cst = Type.to_string tyn in
   let cst_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (cst_hash) in
 
