@@ -760,19 +760,31 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let hypothesis_case ~nb id (s : S.sequent) : c_res list =
     let destr_err () = soft_failure (Failure "not a disjunction") in
 
-    let rec case acc form = match S.Hyp.destr_or ~env:(S.env s) form with
-      | Some (f,g) -> case (case acc g) f
-      | None       -> form :: acc in
+    let rec doit_case acc (form : S.hyp_form) =
+      match S.Hyp.destr_or ~env:(S.env s) form with
+      | Some (f,g) -> doit_case (doit_case acc g) f
+      | None       -> form :: acc 
+    in
+
+    let rec doit_cases (form : S.hyp_form) =
+      match nb with
+      | `Any -> doit_case [] form
+      | `Some l -> 
+        match S.Hyp.destr_ors ~env:(S.env s) l form with
+        | None -> 
+          let form, has_red = 
+            S.Reduce.expand_head_once Reduction.rp_full s S.hyp_kind form 
+          in
+          if has_red then 
+            doit_cases form
+          else destr_err ()
+        | Some cases -> cases
+    in
 
     let form = Hyps.by_id id s in
     let s = Hyps.remove id s in
 
-    let cases = match nb with
-      | `Any -> case [] form
-      | `Some l -> match S.Hyp.destr_ors ~env:(S.env s) l form with
-        | None -> destr_err ()
-        | Some cases -> cases
-    in
+    let cases = doit_cases form in
 
     if List.length cases = 1 then destr_err ();
 
@@ -902,82 +914,120 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let form = Hyps.by_id hid s in
       let s = Hyps.remove hid s in
 
-      if S.Hyp.is_eq form then
-        begin
-          match S.Reduce.destr_eq s S.hyp_kind form with
-          | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
-            let l1 = oget (Term.destr_tuple a) in
-            let l2 = oget (Term.destr_tuple b) in
-            let eqs = List.map2 Term.mk_eq l1 l2 in
+      (* local exception for failed destructions *)
+      let exception Failed in
 
-            let forms =
-              List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) eqs
-            in
-            let ids, s = Hyps.add_i_list forms s in
-            List.map (fun id -> `Hyp id) ids, s
+      let try_destr_eq form =
+        match S.Reduce.destr_eq s S.hyp_kind form with
+        | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
+          let l1 = oget (Term.destr_tuple a) in
+          let l2 = oget (Term.destr_tuple b) in
+          let eqs = List.map2 Term.mk_eq l1 l2 in
 
-          | Some (a,b) ->
-            let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
-            and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
-            let f1 = Term.mk_eq a1 b1
-            and f2 = Term.mk_eq a2 b2 in
-
-            let forms =
-              List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) [f1;f2]
-            in
-            let ids, s = Hyps.add_i_list forms s in
-            List.map (fun id -> `Hyp id) ids, s
-
-          | _ -> destr_fail (fun fmt -> S.pp_hyp fmt form)
-        end
-
-      else if S.Hyp.is_and form then
-        begin
-          let ands =
-            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands len form)
-          in
-          let ands = List.map (fun x -> Args.Unnamed, x) ands in
-          let ids, s = Hyps.add_i_list ands s in
-          List.map (fun id -> `Hyp id) ids, s
-        end
-
-      else if S.Hyp.is_iff form then
-        begin 
-          if len <> 2 then destr_fail (fun fmt -> Fmt.pf fmt "expected 2 patterns");
-
-          let f1, f2 =
-            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
-          in
-          let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
           let forms =
-            List.map (fun x -> Args.Unnamed, x) forms
+            List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) eqs
           in
           let ids, s = Hyps.add_i_list forms s in
           List.map (fun id -> `Hyp id) ids, s
-        end
 
-      else if S.Hyp.is_exists ~env form then
-        begin
-          let vs, f =
-            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists_tagged ~env form)
+        | Some (a,b) when Term.is_pair a && Term.is_pair b ->
+          let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
+          and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
+          let f1 = Term.mk_eq a1 b1
+          and f2 = Term.mk_eq a2 b2 in
+
+          let forms =
+            List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) [f1;f2]
           in
+          let ids, s = Hyps.add_i_list forms s in
+          List.map (fun id -> `Hyp id) ids, s
 
-          if List.length vs < len - 1 then
-            soft_failure (Tactics.PatNumError (len - 1, List.length vs));
+        | _ -> raise Failed 
+      in
 
-          let vs, vs' = List.takedrop (len - 1) vs in
+      let try_destr_and form =
+        if S.Hyp.is_and form then
+          begin
+            let ands =
+              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands len form)
+            in
+            let ands = List.map (fun x -> Args.Unnamed, x) ands in
+            let ids, s = Hyps.add_i_list ands s in
+            List.map (fun id -> `Hyp id) ids, s
+          end
+        else raise Failed
+      in
 
-          let vs_fresh, subst = Term.refresh_vars_w_info vs in
+      let try_destr_iff form =
+        if S.Hyp.is_iff form then
+          begin 
+            if len <> 2 then destr_fail (fun fmt -> Fmt.pf fmt "expected 2 patterns");
+      
+            let f1, f2 =
+              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
+            in
+            let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
+            let forms =
+              List.map (fun x -> Args.Unnamed, x) forms
+            in
+            let ids, s = Hyps.add_i_list forms s in
+            List.map (fun id -> `Hyp id) ids, s
+          end
+        else raise Failed
+      in
 
-          let f = S.Hyp.mk_exists_tagged vs' f in
-          let f = S.subst_hyp subst f in
+      let try_destr_exists form =
+        if S.Hyp.is_exists ~env form then
+          begin
+            let vs, f =
+              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists_tagged ~env form)
+            in
 
-          let idf, s = Hyps.add_i Args.Unnamed f s in
+            if List.length vs < len - 1 then
+              soft_failure (Tactics.PatNumError (len - 1, List.length vs));
 
-          ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
-        end
+            let vs, vs' = List.takedrop (len - 1) vs in
 
-      else destr_fail (fun fmt -> S.pp_hyp fmt form)
+            let vs_fresh, subst = Term.refresh_vars_w_info vs in
+
+            let f = S.Hyp.mk_exists_tagged vs' f in
+            let f = S.subst_hyp subst f in
+
+            let idf, s = Hyps.add_i Args.Unnamed f s in
+
+            ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
+          end
+        else raise Failed
+      in
+
+      (* list of possible destruct function *)
+      let init_destr_list = [
+        try_destr_eq;
+        try_destr_and;
+        try_destr_iff;
+        try_destr_exists; 
+      ] in
+
+      (* Try all destruct function on [form].
+         If all fail, reduce [form] once and recurse. *)
+      let rec doit (form : S.hyp_form) destr_list = 
+        match destr_list with
+        | try_destr :: destr_list ->
+          begin
+            try try_destr form with
+            | Failed -> doit form destr_list
+          end
+
+        | [] ->
+          let form, has_red = 
+            S.Reduce.expand_head_once Reduction.rp_full s S.hyp_kind form 
+          in
+          if has_red then 
+            doit form init_destr_list (* start again *)
+          else 
+            destr_fail (fun fmt -> S.pp_hyp fmt form)
+      in
+      doit form init_destr_list
 
   (** Apply an And/Or pattern to an ident hypothesis handler. *)
   let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
@@ -1050,91 +1100,111 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** introduces the topmost variable of the goal. *)
-  let rec do_intro_var (s : S.t) : Args.ip_handler * S.t =
+  let do_intro_var (s : S.t) : Args.ip_handler * S.t =
     let form = S.goal s in
     let table = S.table s in
 
-    if S.Conc.is_forall form then
-      begin
-        match S.Conc.decompose_forall_tagged form with
-        | (x,tag) :: vs, f ->
-          let x' = Vars.refresh x in
+    let rec doit (form : S.conc_form) =
+      if S.Conc.is_forall form then
+        begin
+          match S.Conc.decompose_forall_tagged form with
+          | (x,tag) :: vs, f ->
+            let x' = Vars.refresh x in
 
-          let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
+            let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
 
-          let f = S.Conc.mk_forall_tagged ~simpl:false vs f in
+            let f = S.Conc.mk_forall_tagged ~simpl:false vs f in
 
-          let new_formula = S.subst_conc subst f in
+            let new_formula = S.subst_conc subst f in
 
-          (* for finite types which do not depend on the security
-             parameter η, we have
-             [∀ x, phi] ≡ ∀ x. const(x) → [phi]
-             (where the RHS quantification is a global quantification) *)
-          let tag =
-            match S.conc_kind with
-            | Equiv.Local_t  -> 
-              if Symbols.TyInfo.is_finite table (Vars.ty x) && 
-                 Symbols.TyInfo.is_fixed  table (Vars.ty x) then
-                { tag with const = true } 
-              else tag
-            | Equiv.Global_t -> tag
-            | Equiv.Any_t    -> assert false
-          in
+            (* for finite types which do not depend on the security
+               parameter η, we have
+               [∀ x, phi] ≡ ∀ x. const(x) → [phi]
+               (where the RHS quantification is a global quantification) *)
+            let tag =
+              match S.conc_kind with
+              | Equiv.Local_t  -> 
+                if Symbols.TyInfo.is_finite table (Vars.ty x) && 
+                   Symbols.TyInfo.is_fixed  table (Vars.ty x) then
+                  { tag with const = true } 
+                else tag
+              | Equiv.Global_t -> tag
+              | Equiv.Any_t    -> assert false
+            in
 
-          ( `Var (x',tag),
-            S.set_goal new_formula s )
+            ( `Var (x',tag),
+              S.set_goal new_formula s )
 
-        | [], f ->
-          (* FIXME: this case should never happen. *)
-          do_intro_var (S.set_goal f s)
-      end
+          | [], f ->
+            (* FIXME: this case should never happen. *)
+            doit f
+        end
 
-    else soft_failure Tactics.NothingToIntroduce
+      else
+        let form, has_red = 
+          S.Reduce.expand_head_once Reduction.rp_full s S.conc_kind form 
+        in
+        if has_red then 
+          doit form
+        else 
+          soft_failure Tactics.NothingToIntroduce
+    in 
+    doit form
 
   (** Introduce the topmost element of the goal. *)
-  let rec do_intro (s : S.t) : Args.ip_handler * S.t =
+  let do_intro (s : S.t) : Args.ip_handler * S.t =
     let form = S.goal s in
     let env = S.env s in
     
-    if S.Conc.is_forall form then
-      begin
-        match S.Conc.decompose_forall form with
-        | [], f ->
-          (* FIXME: this case should never happen. *)
-          do_intro (S.set_goal f s)
+    let rec doit (form : S.conc_form) =
+      if S.Conc.is_forall form then
+        begin
+          match S.Conc.decompose_forall form with
+          | [], f ->
+            (* FIXME: this case should never happen. *)
+            doit f
 
-        | _ -> do_intro_var s
-      end
+          | _ -> do_intro_var s
+        end
 
-    else if S.Conc.is_impl ~env form then
-      begin
-        let lhs, rhs = oget (S.Conc.destr_impl ~env form) in
-        let lhs = S.hyp_of_conc lhs in
-        let id, s = Hyps.add_i Args.Unnamed lhs s in
-        let s = S.set_goal rhs s in
-        `Hyp id, s
-      end
+      else if S.Conc.is_impl ~env form then
+        begin
+          let lhs, rhs = oget (S.Conc.destr_impl ~env form) in
+          let lhs = S.hyp_of_conc lhs in
+          let id, s = Hyps.add_i Args.Unnamed lhs s in
+          let s = S.set_goal rhs s in
+          `Hyp id, s
+        end
 
-    else if S.Conc.is_not form then
-      begin
-        let f = oget (S.Conc.destr_not form) in
-        let f = S.hyp_of_conc f in
-        let id, s = Hyps.add_i Args.Unnamed f s in
-        let s = S.set_goal S.Conc.mk_false s in
-        `Hyp id, s
-      end
+      else if S.Conc.is_not form then
+        begin
+          let f = oget (S.Conc.destr_not form) in
+          let f = S.hyp_of_conc f in
+          let id, s = Hyps.add_i Args.Unnamed f s in
+          let s = S.set_goal S.Conc.mk_false s in
+          `Hyp id, s
+        end
 
-    else if S.Conc.is_neq form then
-      begin
-        let u, v = oget (S.Conc.destr_neq form) in
-        let h = Term.mk_atom `Eq u v in
-        let h = S.unwrap_hyp (Local h) in
-        let id, s = Hyps.add_i Args.Unnamed h s in
-        let s = S.set_goal S.Conc.mk_false s in
-        `Hyp id, s
-      end
+      else if S.Conc.is_neq form then
+        begin
+          let u, v = oget (S.Conc.destr_neq form) in
+          let h = Term.mk_atom `Eq u v in
+          let h = S.unwrap_hyp (Local h) in
+          let id, s = Hyps.add_i Args.Unnamed h s in
+          let s = S.set_goal S.Conc.mk_false s in
+          `Hyp id, s
+        end
 
-    else soft_failure Tactics.NothingToIntroduce
+      else 
+        let form, has_red = 
+          S.Reduce.expand_head_once Reduction.rp_full s S.conc_kind form 
+        in
+        if has_red then 
+          doit form
+        else 
+          soft_failure Tactics.NothingToIntroduce
+    in
+    doit form
 
   let do_intro_pat (ip : Args.simpl_pat) s : S.t list =
     let handler, s = do_intro s in
@@ -1175,12 +1245,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Left/Right} *)
 
   let goal_or_right_1 (s : S.t) =
-    match S.Conc.destr_or ~env:(S.env s) (S.goal s) with
+    match S.Reduce.destr_or s S.conc_kind (S.goal s) with
     | Some (lformula, _) -> [S.set_goal (lformula) s]
     | None -> soft_failure (Tactics.Failure "not a disjunction")
 
   let goal_or_right_2 (s : S.t) =
-    match S.Conc.destr_or ~env:(S.env s) (S.goal s) with
+    match S.Reduce.destr_or s S.conc_kind (S.goal s) with
     | Some (_, rformula) -> [S.set_goal (rformula) s]
     | None -> soft_failure (Tactics.Failure "not a disjunction")
 

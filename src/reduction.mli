@@ -58,16 +58,24 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
     
-  val expand_head_once :
+  val expand_head_once_term :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
     red_param -> t -> Term.term -> Term.term * bool
+                                   
+  val expand_head_once :
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
   val destr_not : 
     t -> 'a Equiv.f_kind -> 'a -> Term.term option
+
+  val destr_or : 
+    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   val destr_and : 
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option

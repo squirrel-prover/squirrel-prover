@@ -386,6 +386,7 @@ module Smart : sig
   val is_or     : term -> bool
   val is_impl   : term -> bool
   val is_iff    : term -> bool
+  val is_pair   : term -> bool
   val is_forall : term -> bool
   val is_exists : term -> bool
 

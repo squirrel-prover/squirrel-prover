@@ -464,9 +464,10 @@ Proof.
      have -> : exec@Sfail <=> false. {
        split => //.
        intro Hfail.
-       use S_charac; try auto.
-       depends Sok, Sfail => // _.
-       by apply exec_le Sfail.
+       use S_charac => //.
+       - depends Sok, Sfail => // _.
+         by apply exec_le Sfail. 
+       - rewrite /exec // in Hfail. 
      }
      by rewrite if_false in 17.
 
@@ -476,8 +477,9 @@ Proof.
       split => //.
       intro Hfail.
       use P_charac; try auto.
-      depends PDIS5, Pfail => // _.
-      by apply exec_le Pfail.
+      - depends PDIS5, Pfail => // _.
+        by apply exec_le Pfail.
+       - rewrite /exec // in Hfail.
   }
   by rewrite if_false in 17.
 Qed.

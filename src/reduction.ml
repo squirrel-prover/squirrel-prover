@@ -216,16 +216,24 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
 
-  val expand_head_once :
+  val expand_head_once_term :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
     red_param -> t -> Term.term -> Term.term * bool
+                                   
+  val expand_head_once :
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
   val destr_not : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term) option
+
+  val destr_or : 
+    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   val destr_and : 
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
@@ -483,7 +491,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (*------------------------------------------------------------------*)
   (** Exported. *)
-  let expand_head_once
+  let expand_head_once_term
       ?(expand_context : Macros.expand_context = InSequent)
       ?(se : SE.arbitrary option)
       (param : red_param) (s : S.t)
@@ -492,6 +500,27 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let se = odflt (S.system s).set se in
     let state = mk_state ~expand_context ~se (S.vars s) param s in
     expand_head_once state t
+
+  (*------------------------------------------------------------------*)
+  (** Exported.
+      We need type introspection here. *)
+  let expand_head_once (type a) 
+      ?(expand_context : Macros.expand_context = InSequent)
+      ?(system : SE.context option)
+      (param : red_param) (s : S.t)
+      (k : a Equiv.f_kind) (x : a) : a * bool
+    =
+    let se = omap (fun system -> system.SE.set) system in
+    match k with
+    | Local_t  -> expand_head_once_term ~expand_context ?se param s x
+    | Global_t -> x, false
+    | Any_t ->
+      match x with
+      | Local  x -> 
+        let x, has_red = expand_head_once_term ~expand_context ?se param s x in
+        Local x, has_red
+
+      | Global _ -> x, false
       
   (*------------------------------------------------------------------*)
   (** Exported. *)
@@ -566,45 +595,92 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Local x   -> Local (reduce_term  ~expand_context ?se     param s x)
       | Global x -> Global (reduce_equiv ~expand_context ?system param s x)
 
- (*------------------------------------------------------------------*)
-  (* FEATURE: use [s] to reduce [x] if necessary *)
+  (*------------------------------------------------------------------*)
+  (* Destruct [x] according to an arbitrary destruct function [destr_f], 
+     using [s] to reduce [x] if necessary. *)
+  let mk_destr (type a)
+      (destr_f : Term.term -> 'b option)
+      ?(se : SE.arbitrary option)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : 'b option
+    =
+    let rec destr_term (x : Term.term) =
+      match destr_f x with
+      | Some _ as res -> res
+      | None ->
+        let x, has_red = expand_head_once_term ?se rp_full s x in
+        if not has_red then 
+          None                  (* did not reduce, failed *)
+        else
+          destr_term x          (* reduced, recurse to try again *)
+    in
+    let destr_equiv (x : Equiv.form) = obind destr_term (Equiv.destr_reach x) in
+
+    match k with
+    | Local_t  -> destr_term  x
+    | Global_t -> destr_equiv x
+    | Any_t ->
+      match x with
+      | Local x  -> destr_term  x
+      | Global x -> destr_equiv x
+
+  (*------------------------------------------------------------------*)
+  (* Similar to [mk_destr], but with a dependent return type and
+     two different destruct functions. *)
+  let mk_destr_k (type a)
+      (destr_t0 : Term.term  -> (Term.term  * Term.term ) option)
+      (destr_e  : Equiv.form -> (Equiv.form * Equiv.form) option)
+      ?(se : SE.arbitrary option)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : (a * a) option
+    =
+    let rec destr_t (x : Term.term) =
+      match destr_t0 x with
+      | Some _ as res -> res
+      | None ->
+        let x, has_red = expand_head_once_term ?se rp_full s x in
+        if not has_red then 
+          None               (* did not reduce, failed *)
+        else
+          destr_t x          (* reduced, recurse to try again *)
+    in
+
+    match k with
+    | Local_t  -> destr_t x
+    | Global_t -> destr_e x
+    | Any_t ->
+      match x with
+      | Local x  -> omap (fun (a,b) -> Equiv.Local  a, Equiv.Local  b) (destr_t x)
+      | Global x -> omap (fun (a,b) -> Equiv.Global a, Equiv.Global b) (destr_e x)
+
+  (*------------------------------------------------------------------*)
   let destr_eq (type a)
-      (_ : S.t) (k : a Equiv.f_kind)
+      (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (Term.term * Term.term) option
     =
-    let destr_eq x =
+    let destr_eq_or_iff x =
       match Term.destr_eq x with
       | Some _ as res -> res
       | None -> Term.destr_iff x
     in
-    let e_destr_eq x = obind destr_eq (Equiv.destr_reach x) in
+    mk_destr destr_eq_or_iff s k x
 
-    match k with
-    | Local_t  ->   destr_eq x
-    | Global_t -> e_destr_eq x
-    | Any_t ->
-      match x with
-      | Local x  ->   destr_eq x
-      | Global x -> e_destr_eq x
-
-  (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_not (type a)
-      (_ : S.t) (k : a Equiv.f_kind)
+      (s : S.t) (k : a Equiv.f_kind)
       (x : a) : Term.term option
     =
-    let e_destr_not x = obind Term.destr_not (Equiv.destr_reach x) in
+    mk_destr Term.destr_not s k x
 
-    match k with
-    | Local_t  -> Term.destr_not x
-    | Global_t ->    e_destr_not x
-    | Any_t ->
-      match x with
-      | Local x  -> Term.destr_not x
-      | Global x ->    e_destr_not x
+  (*------------------------------------------------------------------*)
+  let destr_or (type a)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : (a * a) option
+    =
+    mk_destr_k Term.destr_or (Equiv.Smart.destr_or ~env:(S.env s)) s k x
 
-  (* FEATURE: use [s] to reduce [x] if necessary *)
+  (*------------------------------------------------------------------*)
   let destr_and (type a)
-      (_ : S.t) (k : a Equiv.f_kind)
+      (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (a * a) option
     =
     let destr_and x =
@@ -618,17 +694,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
             
         | None -> None
     in
-    let e_destr_and x = Equiv.Smart.destr_and x in
-
-    match k with
-    | Local_t  ->   destr_and x
-    | Global_t -> e_destr_and x
-    | Any_t ->
-      match x with
-      | Local x ->
-        omap (fun (x,y) -> Equiv.Local x, Equiv.Local y) (destr_and x)
-      | Global x ->
-        omap (fun (x,y) -> Equiv.Global x, Equiv.Global y) (e_destr_and x)
+    mk_destr_k destr_and Equiv.Smart.destr_and s k x
 
   (*------------------------------------------------------------------*)
   (** Make a cstate from a sequent *)
