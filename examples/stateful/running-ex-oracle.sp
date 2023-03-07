@@ -300,7 +300,7 @@ Proof.
 
     - use lastupdate_A with i',j,tau' as H; try auto.
       rewrite H // in *; expand s(i')@A(i',j).
-      prf 0; rewrite if_true; [2: by fresh 0].
+      prf 0; [2: by fresh 0].
       simpl. intro j0 HAi0.
       use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
         * use H2 with j0 as H3; try auto.
@@ -312,36 +312,32 @@ Proof.
   + (* Oracle *)
      expand frame, exec, cond, output.
      fa !<_,_>, if _ then _, (_ && _), <_,_>.
-     prf 1; rewrite if_true. {
-       simpl. 
-       split.
+     prf 1.
+       * intro i0 j0 H.
+         have ? : happens(pred (A(i0, j0))) by case H. 
+         rewrite equiv IH i0 (pred(A(i0,j0))) => //. 
+         intro Hf; by fresh Hf.
        * intro j0 H.
          by apply unique_queries.
-       * intro i0 j0.
-         have -> : forall (x, y, b : bool), diff(x => b, y => b) = (diff(x,y) => b) by project.
-         intro H.
-         have ? : happens(pred (A(i0, j0))) by (project; try case H). 
+       * intro i0 j0 H.
+         have ? : happens(pred (A(i0, j0))) by auto. 
          rewrite equiv IH i0 (pred(A(i0,j0))) => //. 
-         project.
-         ** destruct H as [H1|H2]; intro Hf; by fresh Hf.
-         ** intro Hf; by fresh Hf.
-     }.
-     fresh 1; 1:auto.
-     prf 1; rewrite if_true. {
+         intro Hf; by fresh Hf.
+       * fresh 1; 1:auto.
+     prf 1. 
        simpl; split.
-         * intro j0 H.
+         ++ intro j0 H.
            apply unique_queries; auto.
-         * intro i0 j0 H.
+         ++ intro i0 j0 H.
            rewrite equiv IH i0 (A(i0,j0)) => // Hf.
            by fresh Hf.
-     }.
      fresh 1; 1:auto.
      by apply IH.
 
    + (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
   fa 0. fa 1. fa 1.
-  prf 1; rewrite if_true. {
+  prf 1.
     simpl; split.
       - intro j0 H.
         rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
@@ -350,7 +346,6 @@ Proof.
         case H0.
           * by use monotonic_chain with A(i,j),A(i,j0),i,j => //.
           * by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
-  }.
   fresh 1; 1:auto.
   by apply IH.
 Qed.

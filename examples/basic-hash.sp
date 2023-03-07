@@ -202,8 +202,7 @@ Proof.
         which the then branch is the fresh name.
         The goal is now to prove that this condition always evaluates to
         `true`. *)
-    prf 2. rewrite if_true. {
-      split; 1: true.
+    prf 2.
   (** Several conjuncts must now be proved, the same tactic can be
   used on all of them. Here are representative cases:
 
@@ -218,13 +217,13 @@ Proof.
   To be able to use (split and) fresh, we first project the goal into
   into one goal for the left projection and one goal for the right
   projection of the initial bi-system. *)
-      project; repeat split; intro *; by fresh Meq.
-    }.
+      * repeat split; intro *; by fresh Meq.
+      * repeat split; intro *; by fresh Meq.
 
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,
         so we can remove it using the `fresh` tactic. *)
-    fresh 2; 1:auto.
+    * fresh 2; 1:auto.
     (** We can also remove the name `nT(i,k)`, and conclude by induction
         hypothesis. *)
     by fresh 1.

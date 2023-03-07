@@ -248,17 +248,15 @@ global goal [set:default/left; equiv:default/left, default/left]
     if cond@t then diff(kA(A,B,i)@t, nfresh)).
 Proof.
   intro Heq Hhap Hcorrupt. 
-  rewrite /kA. 
+  rewrite /kA.
   prf 1 => /=. 
-  rewrite (if_true _ n_PRF). {
-    intro Cond.
-    rewrite Heq in *.
-    intro j H1 H2.
-    have ? : O(j) <= t0 by case H1. 
-    clear H1.
-    rewrite eq_sym in H2. 
-    by apply kA_weak_forward_secret in H2.
-  }.
-  fa 1.
-  by fresh 2.
+   + intro Cond.
+     rewrite Heq in *.
+     intro j H1 H2.
+     have ? : O(j) <= t0 by case H1. 
+     clear H1.
+     rewrite eq_sym in H2. 
+     by apply kA_weak_forward_secret in H2.
+   + fa 1.
+     by fresh 2.
 Qed.

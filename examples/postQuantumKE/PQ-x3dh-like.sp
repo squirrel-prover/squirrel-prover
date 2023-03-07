@@ -999,7 +999,7 @@ Qed.
 global axiom [idealized3/left,idealized3/left]auth3 (i,j,l:index):
    [happens(FI(i,j,l))] ->
        [exec@FI(i,j,l)] ->
-        Exists (k:index),
+        Exists (k:index[const]),
           [I(i,j,l) < FI(i,j,l) &&
           SR(j,k,i) < FI(i,j,l) &&
           input@SR(j,k,i) =  output@I(i,j,l) &&
@@ -1064,7 +1064,7 @@ Proof.
            by use I with i,j,k0.
 
     + rewrite multprf.
-      prf 1, F1(_,n_PRF2(i,j,k0)); rewrite if_true in 1 => //.
+      prf 1, F1(_,n_PRF2(i,j,k0)).
       xor 1; rewrite if_true in 1.
       rewrite len_F; 1: by namelength skex,n_PRF1.
       by fresh 1.
@@ -1083,7 +1083,7 @@ Proof.
   expand kj8.
 
   rewrite multprf.
-  prf 1, F1(_,n_PRF2(i,j,k)); rewrite if_true in 1 => //.
+  prf 1, F1(_,n_PRF2(i,j,k)).
   xor 1; rewrite if_true in 1.
   rewrite len_F.
   namelength skex,n_PRF1.

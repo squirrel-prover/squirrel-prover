@@ -128,9 +128,8 @@ Proof.
   (* We apply the prf assumption. *)
   prf 1, h(s,kI).
   (* The condition for the validity of the PRF application is trivial, as kI is
-  hidden from the attacker through the CCA application. *) (* We thus simplify the
-  trivial conditional. *) 
-  rewrite if_true // in 1.
+  hidden from the attacker through the CCA application. *)
+  
   (* We now use the one-time pad property of the xor. *)
   xor 1.
   (* We show that the condition of the introduced conditional is always true. *)

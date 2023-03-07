@@ -145,7 +145,6 @@ Proof.
   fa 1. fa 1.
   expand output@T(i,j). expand kT(i)@T(i,j).
   prf 1.
-  rewrite if_true; simpl.
     + intro i0 j0 *.
       use stateInequalityHelpful with i,j,j0 => //.
     + fresh 1; 1:auto.

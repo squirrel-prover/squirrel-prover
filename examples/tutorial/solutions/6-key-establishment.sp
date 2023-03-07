@@ -228,7 +228,6 @@ name k : message.
 global goal hash_5_lemma : equiv(diff(h(a,k),n1),n2).
 Proof.
   prf 0.
-  rewrite if_true // in 0.
   by fresh 0.
 Qed.
 
@@ -250,8 +249,8 @@ Proof.
   (* BEGIN EXO *)
   intro H.
   have E : equiv(diff(h(a,k),n1),diff(h(b,k),n2)). {
-    prf 0; rewrite if_true // in 0. 
-    prf 1; rewrite if_true // in 1. 
+    prf 0; 1:auto.
+    prf 1.
     fresh 0; 1:auto.
     fresh 0; 1:auto.
     refl.

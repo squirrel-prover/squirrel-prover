@@ -133,12 +133,10 @@ Proof.
   + expand frame, exec, cond, output.
     fa 0; fa 1; fa 1; fa 1.
     prf 2.
-    rewrite if_true /=. {
-      project;
-      repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
-    }
-    fresh 2; 1:auto.
-    by fresh 1.
+     * repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
+     * repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
+     * fresh 2; 1:auto.
+       by fresh 1.
 Qed.
 
 

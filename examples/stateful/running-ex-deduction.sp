@@ -86,8 +86,7 @@ Proof.
   + expandall. fa !<_,_>. apply IH.
 
   + expandall. fa !<_,_>, (if _ then _).
-    prf 1; rewrite if_true.
-      split; 1: auto.
+    prf 1. 
       intro i0 j0 H Heq. use
       h_unique with i0, i, j0, j; 2: auto.
       by destruct H0.
@@ -141,8 +140,7 @@ Proof.
   expandall.
   fa !<_,_>, if _ then _.
   (* Get rid of item 1 using PRF, as before. *)
-  prf 1; rewrite if_true.
-    split; 1: auto.
+  prf 1.
     intro i0 j0 H Heq. 
     by use h_unique with i0, i, j0, j.
   fresh 1; 1:auto.

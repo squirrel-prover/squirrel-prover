@@ -1388,7 +1388,7 @@ let prf arg (s : ES.t) : ES.t list =
   [ES.set_equiv_goal biframe s]
 
 let () =
-  T.register_typed "prf"
+  T.register_typed "oldprf"
     ~general_help:"Apply the PRF axiom."
     ~detailed_help:"It allows to replace a hash h(m,k) by 'if new_hash(m) then \
                     zero else h(m,k)' where new_hash(m) states that m \

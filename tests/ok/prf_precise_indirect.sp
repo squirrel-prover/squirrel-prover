@@ -23,8 +23,7 @@ Proof.
   rewrite /frame /exec /cond /output.
   fa 0.
   prf 2.
-  rewrite H1 H2.
-  rewrite if_true in 2; 1: auto.
-  fresh 2; 1:auto.    
-  apply E.
+  + by rewrite H1 H2.
+  + fresh 2; 1:auto.    
+    apply E.
 Qed.

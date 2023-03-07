@@ -18,6 +18,5 @@ Proof.
   expandall.
   fa 0; fa 1; fa 1.
   prf 1.
-  rewrite if_true in 1; 1: auto.
   by fresh 1.
 Qed.

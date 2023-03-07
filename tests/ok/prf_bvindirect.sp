@@ -20,18 +20,17 @@ global goal _ (tau:timestamp[param],i:index[param]) :
          forall (i0:index), (A(i0) <= tau => n(i) <> <zero,n(i0)>),
          forall (i0:index), (A(i0) <= tau => m(i) <> <zero,n(i0)>)) &&
     diff(
-         forall (i0,i1:index), (A(i0) <= tau => n(i) <> <one,n(i1)>),
-         forall (i0,i1:index), (A(i0) <= tau => m(i) <> <one,n(i1)>))) = true] ->
+         forall (i1,i0:index), (A(i0) <= tau => n(i) <> <one,n(i1)>),
+         forall (i1,i0:index), (A(i0) <= tau => m(i) <> <one,n(i1)>))) = true] ->
   equiv(output@tau) ->
-  equiv(output@tau, diff(h(n(i),k),h(m(i),k))).
+  equiv(output@tau, h(diff(n(i), m(i)),k)).
 Proof.
   intro H E.
   prf 1.
-
-  rewrite H.
-  rewrite if_true in 1; 1: auto.
-  fresh 1; 1:auto.
-  by apply E.
+  + by rewrite H.
+  + by rewrite H.
+  + fresh 1; 1:auto.
+    by apply E.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -42,19 +41,18 @@ system [bis] !_i out(c,<h(<one,n(i)>,k),seq(i:index => h(<one,n(i)>,k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal [bis] _ (tau:timestamp[param],i:index[param]) :
-  [(forall (i0,i1:index), 
+  [(forall (i1,i0:index), 
      diff(
      (A(i0) <= tau => n(i) <> <one,n(i1)>),
      (A(i0) <= tau => m(i) <> <one,n(i1)>))) = true] ->
   equiv(output@tau) ->
-  equiv(output@tau, diff(h(n(i),k),h(m(i),k))).
+  equiv(output@tau, h(diff(n(i), m(i)),k)).
 Proof.
   intro H E.
   prf 1.
-
-  rewrite H.
-  rewrite if_true in 1; 1: auto.
-  fresh 1; 1:auto.
-  by apply E.
+  + by rewrite H.
+  + by rewrite H.
+  + fresh 1; 1:auto.
+    by apply E.
 Qed.
 
