@@ -79,17 +79,13 @@
 %nonassoc NOSIMPL
 
 %start declarations
-(* %start declaration_eof *)
 %start top_formula
 %start system_expr
 %start top_process
 %start interactive
 %start top_proofmode
 %start top_global_formula
-(* %start bulleted_tactic *)
 %type <Decl.declarations> declarations
-(* %type <Decl.declaration> declaration_eof *)
-(* %type <Decl.declaration> declaration *)
 %type <Theory.term> top_formula
 %type <Theory.global_formula> top_global_formula
 %type <SystemExpr.Parse.t> system_expr
@@ -269,11 +265,17 @@ simpl_lval:
 /* many binders, grouped  */
 
 | x=simpl_lval    { [x, L.mk_loc (L.loc x) Theory.P_ty_pat] }
-/* single binder `x`, no argument */
+/* single binder `x`, unspecified type */
 
-/* Many binder declarations. */
-bnds:
+/* Many binder declarations, strict version
+   for use when binder declarations are followed by COLON or COMMA. */
+bnds_strict:
 | l=slist(bnd, empty) { List.flatten l }
+
+/* Many binder declarations, non-strict version with some added variants. */
+bnds:
+| bnds_strict                     { $1 }
+| l=bnd_group_list(simpl_lval,ty) { l }
 
 (*------------------------------------------------------------------*)
 /* variable tags */
@@ -442,13 +444,13 @@ system_modifier:
 | RENAME gf=global_formula
     { Decl.Rename gf }
 
-| GCCA args=bnds COMMA enc=term
+| GCCA args=bnds_strict COMMA enc=term
     { Decl.CCA (args, enc) }
 
-| GPRF args=bnds COMMA hash=term
+| GPRF args=bnds_strict COMMA hash=term
     { Decl.PRF (args, hash) }
 
-| GPRF TIME args=bnds COMMA hash=term
+| GPRF TIME args=bnds_strict COMMA hash=term
     { Decl.PRFt (args, hash) }
 
 | REWRITE p=rw_args
@@ -515,7 +517,7 @@ declaration_i:
                 op_tyout     = tyo;
                 op_body      = t; }) }
 
-| MUTABLE name=lsymb args=bnds out_ty=colon_ty? EQ init_body=term
+| MUTABLE name=lsymb args=bnds_strict out_ty=colon_ty? EQ init_body=term
                           { Decl.Decl_state {name; args; out_ty; init_body; }}
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }

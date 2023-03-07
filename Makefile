@@ -143,18 +143,15 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	 ; then $(ECHO) -n . ; \
 	 else $(ECHO) "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; $(ECHO) -n '!' ; fi
 
-# Only executes tests if dependencies have changed,
+# Rebuild and run tests.
+# Only executes tests if dependencies have changed (?)
 # relying on dune file to know (possibly runtime) dependencies.
 alcotest: version
 	dune runtest
 
-# Apparently needs to build everything for the test.exe
-_build/default/test.exe: version
-	dune build
-
-# Will print out only the FAILs tests as before
-alcotest_full: _build/default/test.exe version
-	@./_build/default/test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
+# Same as above but will print out only the FAILs tests as before
+alcotest_full: version
+	@dune exec ./test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
 	@$(ECHO) "Done"
 
 clean:
@@ -174,11 +171,9 @@ clean_prev_bench:
 clean_all_bench:
 	rm -rf $(BENCHDIR)
 
-_build/default/squirrel.exe: version
+# We have to "touch" ./squirrel executable for other recipes
+squirrel: version
 	dune build squirrel.exe
-
-# we have to "touch" ./squirrel executable for other recipes
-squirrel: _build/default/squirrel.exe
 	cp -f _build/default/squirrel.exe squirrel
 
 # Run tests (forcing a re-run) with bisect_ppx instrumentation on
