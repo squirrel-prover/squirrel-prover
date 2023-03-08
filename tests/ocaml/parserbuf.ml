@@ -32,32 +32,41 @@ let parse parser parser_name string =
 let term_parsing =
   let parse = parse Parser.top_formula "term" in
   [
-    "Try find i:index", `Quick, begin fun () ->
+    "try find i:index such that ...", `Quick, begin fun () ->
       ignore (parse "try find i:index such that true in empty")
     end ;
-    "Try find _:index", `Quick, begin fun () ->
+    "try find _:index such that ...", `Quick, begin fun () ->
       ignore (parse "try find _:index such that true in empty")
     end ;
-    "Try find _:_", `Quick, begin fun () ->
+    "try find _:_ such that ...", `Quick, begin fun () ->
       ignore (parse "try find _:_ such that true in empty")
     end ;
-    "Try find i,j,k:index", `Quick, begin fun () ->
+    "try find i,j,k:index such that ...", `Quick, begin fun () ->
       ignore (parse "try find i,j,k:index such that true in empty")
     end ;
-    "Try find _,_,_:index", `Quick, begin fun () ->
+    "try find _,_,_:index such that ...", `Quick, begin fun () ->
       ignore (parse "try find _,_,_:index such that true in empty")
     end ;
-    "Try find i:index,t:timestamp", `Quick, begin fun () ->
+    "try find i:index,t:timestamp such that ...", `Quick, begin fun () ->
       ignore (parse "try find i:index,t:timestamp such that true in empty")
     end ;
-    "Try find (i:index)", `Quick, begin fun () ->
+    "try find (i:index) such that ...", `Quick, begin fun () ->
       ignore (parse "try find (i:index) such that true in empty")
     end ;
-    "Try find (_:_)", `Quick, begin fun () ->
+    "try find (_:_) such that ...", `Quick, begin fun () ->
       ignore (parse "try find (_:_) such that true in empty")
     end ;
-    "Try find (i,_:_)", `Quick, begin fun () ->
+    "try find (i,_:_) such that ...", `Quick, begin fun () ->
       ignore (parse "try find (i,_:_) such that true in empty")
+    end ;
+    "forall i : index, ...", `Quick, begin fun () ->
+      ignore (parse "forall i : index, true")
+    end ;
+    "forall (i,_ : index), ...", `Quick, begin fun () ->
+      ignore (parse "forall (i,_ : index), true")
+    end ;
+    "forall i, ...", `Quick, begin fun () ->
+      ignore (parse "forall i, true")
     end ;
   ]
 

@@ -1,11 +1,14 @@
-(* NOTE: these "open!" are necessary to perform the side effects
- *       in each opened module; we use "open!" instead of "open" to avoid
- *       an "unused open" warning *)
+(** Main executable for running Alcotest unit tests. *)
 
-(* Cannot wrtie tests for Term since it has private type term *)
-open! Squirrellib.Term
+(* These modules register tests suites as side effects,
+ * and must be forcibly loaded. These tests may be hard to
+ * extract from the modules as they may rely on abstract types. *)
 open! Squirrellib.Constr
 open! Squirrellib.Completion
+open! Squirrellib.Tactics
+open! Squirrellib.Term
+open! Squirrellib.Theory
+open! Squirrellib.Vars
 
 let test_suites : unit Alcotest.test list =
   [

@@ -1,11 +1,9 @@
 (** Utilities for testing. *)
 
-module Parser = Squirrellib.Parser
-module Theory = Squirrellib.Theory
-module Lexer = Squirrellib.Lexer
+open Squirrellib
+(* Insist that we need Prover from Squirrellib, not Squirreltests.
+ * TODO is this an OCaml bug?! *)
 module Prover = Squirrellib.Prover
-module LowTraceSequent = Squirrellib.LowTraceSequent
-module LowEquivSequent = Squirrellib.LowEquivSequent
 
 let term_from_string (s:string) =
   Theory.Local 
