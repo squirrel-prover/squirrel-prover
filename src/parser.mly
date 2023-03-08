@@ -309,9 +309,12 @@ bnds_tagged:
 /* single binder `x`, no argument */
 | x=simpl_lval    { [Theory.L_var x, (L.mk_loc (L.loc x) Theory.P_ty_pat, [])] }
 
-/* Many binder declarations with tags. */
+/* Many binder declarations with tags (see bnds_strict). */
+ext_bnds_tagged_strict:
+| l=slist(ext_bnd_tagged, empty)   { List.flatten l }
 ext_bnds_tagged:
-| l=slist(ext_bnd_tagged, empty) { List.flatten l }
+| ext_bnds_tagged_strict           { $1 }
+| v=simpl_lval COLON ty=ty_tagged  { [Theory.L_var v, ty] }
 
 (*------------------------------------------------------------------*)
 top_formula:
@@ -507,7 +510,7 @@ declaration_i:
                 abs_tys   = t; }) }
 
 
-| OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged tyo=colon_ty? EQ t=term
+| OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged_strict tyo=colon_ty? EQ t=term
     { let symb_type, name = e in
       Decl.(Decl_operator
               { op_name      = name;
