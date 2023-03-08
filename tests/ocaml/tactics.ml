@@ -607,7 +607,7 @@ let namelength () =
   let n = Symbols.Name.of_lsymb (mk "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
   
-  let cst = Format.flush_str_formatter (Type.pp Format.str_formatter tyn) in
+  let cst = Type.to_string tyn in
   let name_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (name_hash) in
 
@@ -628,14 +628,63 @@ let namelength () =
     Term.App (Fun (sy',_),[_t1';t2'])
     when sy = Symbols.fs_eq && sy' = Symbols.fs_eq -> 
     Alcotest.(check (term_testable)) 
-      "len(n) = namelength_129913994 = len(m) "
+      "len(n) = namelength_message = len(m) "
       (t2)
       (t2');
   | _ -> assert false
   in ()
 
+let namelength2 () =
+  let mk c = L.mk_loc L._dummy c in      
+  let st = Prover.exec_all (Prover.init ())
+        "
+        system null.
+        name n : message * message.
+
+        goal _ : True.
+        Proof.
+        " in
+  Printer.pr "%a@." (Prover.pp_subgoals st) ();
+  let tn = find_in_sys_from_string "n" st in
+  let tyn = Term.ty tn in 
+  let table = Prover.get_table st in
+
+  let axiom_n = "namelength_n" in
+
+  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
+
+  let system = SystemExpr.context_any in
+
+  Alcotest.(check (sys_testable table)) 
+    "SystemExpr equals → context_any"
+    (system.set)
+    (stmt_n.system.set);
+  
+  (* Should be of same length ↓ *)
+  Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
+
+  let n = Symbols.Name.of_lsymb (mk "n") table in
+  let tn = Term.mk_name (Term.mk_symb n tyn) [] in
+  
+  let cst = Type.to_string tyn in
+  let name_hash = "namelength_" ^ cst in
+  let lsy = L.mk_loc L._dummy (name_hash) in
+
+  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+    | Some fn -> table, fn
+    | None -> assert false
+  in
+  let cst = Term.mk_fun table fname [] in
+  let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+
+  Alcotest.(check (term_testable)) 
+    "axiom namelength_n → len(n) = namelength_message•message"
+    (f)
+    (stmt_n.formula)
+
 let tests =
   [ ("case_study", `Quick, case_study) ;
     ("namelength", `Quick, namelength);
+    ("namelength2", `Quick, namelength2);
     ("case_study_fail", `Quick, case_study_fail) ;
     ("case_study_fail'", `Quick, case_study_fail') ]
