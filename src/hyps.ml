@@ -438,10 +438,7 @@ let setup_change_hyps_context
             | None -> true);
 
   (* Flags indicating which parts of the context are changed. *)
-  (* For the set, use SE.equal, which ignores the labels of the systems
-     and compares the sets as sets (i.e. double inclusion) *)
-  (* For the pair, the labels must be the same, so use equality *)
-  let set_unchanged = SE.equal table new_context.SE.set old_context.SE.set in
+  let set_unchanged = new_context.SE.set = old_context.SE.set in
   let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
 
   (* Can we project formulas from the old to the new context? *)
@@ -472,25 +469,23 @@ let setup_change_hyps_context
         has not changed. Otherwise they must be pure trace formulas.
       + Equivalence atoms are only allowed if the trace annotation has
         not changed. *)
-  let rec can_keep_global = function
-    | Equiv.Quant (_,_,f) :: l ->
-        can_keep_global (f::l)
+  let rec can_keep_global env = function
+    | Equiv.Quant (_,vars,f) ->
+      let env = { env with Env.vars = Vars.add_vars vars env.Env.vars } in
+      can_keep_global env f
 
-    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
-        can_keep_global (f::g::l)
+    | Impl (f,g) | Equiv.And (f,g) | Or (f,g) ->
+      can_keep_global env f && can_keep_global env g
 
-    | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
+    | Atom (Equiv _) -> pair_unchanged
 
-    | Atom (Reach a) :: l ->
-      ( ( HighTerm.is_constant `Exact env a &&
-          HighTerm.is_system_indep env a )
-        || set_unchanged )
-      && can_keep_global l
-        
-    | [] -> true
+    | Atom (Reach a) ->
+      (HighTerm.is_constant `Exact env a &&
+       HighTerm.is_system_indep env a)
+      || set_unchanged
   in
   let update_global f =
-    if can_keep_global [f] then Some f else
+    if can_keep_global env f then Some f else
       match f with
         | Equiv.Atom (Reach f) ->
             Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
