@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath("./_ext"))
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -15,13 +20,18 @@ release = '0.1'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'myst_parser',
-    'sphinxcontrib.bibtex'
+    'sphinx_tabs.tabs', # Needs `pip install sphinx-tabs`
+    'myst_parser', # Needs `pip install myst-parser`
+    'sphinxcontrib.bibtex',
+    'helloworld',
+    'squirreldomain'
 ]
 
 # Add autodoc for ocaml ↓ But is not up to date (downgrade ocaml ?)
 # extensions.append("sphinxcontrib.ocaml")
 # primary_domain = "ocaml"
+# Use the Squirrel domain
+primary_domain = 'squirrel'
 # ocaml_source_directories = ["../../../src"]
 # ocaml_findlib_packages = ["batteries", "js_of_ocaml"]
 
@@ -39,6 +49,8 @@ exclude_patterns = []
 
 # html_theme = 'alabaster'
 html_theme = 'sphinx_rtd_theme'
+# Needs `pip install sphinx_rtd_theme beautifulsoup4 \
+# antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex`
 
 # Add any paths that contain custom themes here, relative to this directory.
 import sphinx_rtd_theme
