@@ -24,7 +24,58 @@ In addition to standard reST directives (a directive is similar to a LaTeX envir
 Squirrel objects
 ================
 
-Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (think *type signature*), followed by an optional body (a description of that object).  The following example defines two objects: a variant of the ``simpl`` tactic, and an error that it may raise:
+Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (think *type signature*), followed by an optional body (a description of that object).  The following example defines two objects: a variant of the ``cs`` tactic, and an error that it may raise:
+
+.. tabs::
+
+   .. tab:: reStructuredText
+
+      .. code-block:: rst
+
+         .. tacv:: cs @pattern {? in @system}
+            :name: case_study
+
+            Performs case study on conditionals inside an equivalence.
+
+            Without a specific target, ``cs phi`` will project all conditionals
+            on phi in the equivalence. With a specific target, ``cs phi in i``
+            will only project conditionals in the i-th item of the equivalence.
+
+             .. example:: when proving an equivalence
+             equiv(if phi then t1 else t2, if phi then u1 else u2)
+             invoking ``nosimpl cs phi`` results in two subgoals:
+             equiv(phi, t1, u1) and equiv(phi, t2, u2).
+
+            .. exn:: Argument of cs should match a boolean
+               :undocumented:
+
+            .. exn:: did not find any conditional to analyze
+               :undocumented:
+
+   .. tab:: Produces
+
+      .. tacv:: cs @pattern {? in @system}
+         :name: case_study
+
+         Performs case study on conditionals inside an equivalence.
+
+         Without a specific target, ``cs phi`` will project all conditionals
+         on phi in the equivalence. With a specific target, ``cs phi in i``
+         will only project conditionals in the i-th item of the equivalence.
+
+          .. example:: when proving an equivalence
+
+             :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
+             invoking ``nosimpl cs phi`` results in two subgoals:
+             :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
+
+         .. exn:: Argument of cs should match a boolean
+            :undocumented:
+
+         .. exn:: did not find any conditional to analyze
+            :undocumented:
+
+Or ``simpl`` tactic :
 
 .. tabs::
 

@@ -15,7 +15,7 @@ output.tex
 *.toc
 *.synctex.gz
 *.out
-squirrel*
+squirrel
 sanity
 /tex/auto/*.el
 *.fdb_latexmk
@@ -33,3 +33,5 @@ _opam/
 *.\#*.sp
 .venv/*
 documentation/sphinx/build/
+# *.py[cod]
+*__pycache__/
