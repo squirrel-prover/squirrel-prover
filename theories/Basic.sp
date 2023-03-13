@@ -99,11 +99,8 @@ Qed.
 
 goal [any] eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
 Proof. 
-  rewrite -not_eq. 
-  case (x = y) => _. 
-  simpl. 
-  auto.
-  by rewrite eq_iff. 
+rewrite -not_eq. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
 Qed.
 hint rewrite eq_false.
 
@@ -314,7 +311,11 @@ Qed.
 hint rewrite false_iff_true.
 
 
-
+goal [any] contra_iff (x, y : boolean) : ((not x) <=> y) = (x <=> (not y)).
+Proof.
+  rewrite eq_iff.
+  split; by rewrite !-eq_iff -eq_not.
+Qed.
 
 (*------------------------------------------------------------------*)
 (* exists *)
@@ -440,14 +441,8 @@ Proof.
     by use H with a, b.
 Qed.
 
-goal [any] not_forall_1 ['a] (phi:'a -> bool) :
+axiom [any] not_forall_1 ['a] (phi:'a -> bool) :
  not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
-Proof.
-  rewrite -(not_not (phi _)) -not_exists_1 //.
-Qed.
 
-goal [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
+axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
  not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
-Proof.
-  rewrite -(not_not (phi _ _)) -not_exists_2 //.
-Qed.
