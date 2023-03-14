@@ -940,8 +940,11 @@ class SquirreltopBlocksTransform(Transform):
         dli = nodes.definition_list_item()
         for sentence, output in pairs:
             # Use Coqdoc to highlight input TODO ↓
-            # in_chunks = highlight_using_coqdoc(sentence)
-            # dli += nodes.term(sentence, '', *in_chunks, classes=self.block_classes(options['input']))
+            # in_chunks = highlight_using_squirreldoc(sentence)
+            source_literal = nodes.literal_block(sentence, sentence)
+            source_literal['language'] = 'coq'
+
+            dli += nodes.term(sentence, '', *source_literal, classes=self.block_classes(options['input']))
             if output:
                 # Parse ANSI sequences to highlight output
                 out_chunks = AnsiColorsParser().colorize_str(output)
@@ -959,6 +962,7 @@ class SquirreltopBlocksTransform(Transform):
         with SquirrelTop(color=True) as repl:
             repl.send_initial_options()
             for node in self.document.traverse(SquirreltopBlocksTransform.is_squirreltop_block):
+                print(node)
                 try:
                     self.add_squirrel_output_1(repl, node)
                 except SquirrelTopError as err:

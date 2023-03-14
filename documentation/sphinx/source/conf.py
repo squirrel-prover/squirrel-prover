@@ -67,3 +67,9 @@ html_context = {
 }
 # since sphinxcontrib-bibtex version 2 we need this
 bibtex_bibfiles = [ "biblio.bib" ]
+
+# The name of the Pygments (syntax highlighting) style to use.
+# pygments_style = 'sphinx'
+highlight_language = 'rst'
+suppress_warnings = ["misc.highlighting_failure"]
+

@@ -31,7 +31,7 @@ class SquirrelTop:
     """
 
     # COQTOP_PROMPT = re.compile("\r\n[^< \r\n]+ < ")
-    SQUIRRELTOP_PROMPT = re.compile("\r\n[> ")
+    SQUIRRELTOP_PROMPT = re.compile("\[>")
 
     def __init__(self, squirreltop_bin=None, color=False, args=None) -> str:
         """Configure a squirreltop instance (but don't start it yet).
@@ -69,7 +69,7 @@ class SquirrelTop:
         # TODO ↓
         self.squirreltop.expect(SquirrelTop.SQUIRRELTOP_PROMPT, timeout = 10)
         return self.squirreltop.before
-        return ""
+        # return ""
 
     def sendone(self, sentence):
         """Send a single sentence to squirreltop.

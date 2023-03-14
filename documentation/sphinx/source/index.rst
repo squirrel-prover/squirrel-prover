@@ -349,9 +349,9 @@ Here is the list of all objects of the Squirrel domain (The symbol :black_nib: i
 Squirrel directives
 ===================
 
-In addition to the objects above, the ``coqrst`` Sphinx plugin defines the following directives:
+In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines the following directives:
 
-``.. coqtop::`` A reST directive to describe interactions with Coqtop.
+``.. squirreltop::`` A reST directive to describe interactions with Coqtop.
     Usage::
 
     .. squirreltop:: options…
@@ -366,16 +366,21 @@ In addition to the objects above, the ``coqrst`` Sphinx plugin defines the follo
 
          .. code-block:: rst
 
-            .. coqtop:: in reset
+            .. squirreltop:: all
 
-               Print nat.
-               Definition a := 1.
+               name n:message.
+               name s:message.
+               goal [any] toto : true=>true.
+               Proof.
 
-      .. tab:: reStructuredText
+      .. tab:: produces
 
          .. squirreltop:: all
 
             name n:message.
+            name s:message.
+            goal [any] toto : true=>true.
+            Proof.
 
 
     The blank line after the directive is required.  If you begin a proof,
@@ -735,19 +740,6 @@ And here the end.
    This project is under active development.
 
 Here a citation : :cite:`baelde:hal-03172119`: 
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Tactics:
-
-   tactics
-
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Basic:
-
-   basic_test
 
 .. toctree::
    :maxdepth: 2
