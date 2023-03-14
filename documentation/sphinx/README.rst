@@ -1,17 +1,20 @@
 SQUIRREL
 ========
 
-The **Squirrel Prover** is a proof assistant for protocols. It is based on first-order logic and provides guarantees in the computational model.
+This is the documentation tool for **Squirrel-prover**. It uses
+**Sphinx** and a custom **Squirrel Domain** described here.
 
 Dependences
 -----------
 
-``apt install python3-sphinx``
-Needs `pip install sphinx-tabs`
-Needs `pip install myst-parser`
+First, install ``sphinx`` with ``apt install python3-sphinx`` (for debian
+distributions)
 
-pip install sphinx_rtd_theme beautifulsoup4 \
-antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex
+Then with pip :
+
+.. code::
+   pip install sphinx_rtd_theme beautifulsoup4 sphinx-tabs\
+   antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
 Build
 -----

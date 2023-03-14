@@ -373,10 +373,9 @@ In addition to the objects above, the ``coqrst`` Sphinx plugin defines the follo
 
       .. tab:: reStructuredText
 
-         .. squirreltop:: in reset
+         .. squirreltop:: all
 
-            Print nat.
-            Definition a := 1.
+            name n:message.
 
 
     The blank line after the directive is required.  If you begin a proof,

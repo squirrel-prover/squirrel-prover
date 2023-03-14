@@ -30,7 +30,8 @@ class SquirrelTop:
     confuse it).
     """
 
-    SQUIRRELTOP_PROMPT = re.compile("\r\n[^< \r\n]+ < ")
+    # COQTOP_PROMPT = re.compile("\r\n[^< \r\n]+ < ")
+    SQUIRRELTOP_PROMPT = re.compile("\r\n[> ")
 
     def __init__(self, squirreltop_bin=None, color=False, args=None) -> str:
         """Configure a squirreltop instance (but don't start it yet).
@@ -40,34 +41,34 @@ class SquirrelTop:
                            the ansicolors module)
         :param args:       Additional arguments to squirreltop.
         """
-        self.squirreltop_bin = squirreltop_bin or os.path.join(os.getenv('SQUIRRELBIN', ""), "squirreltop")
+        self.squirreltop_bin = squirreltop_bin or os.path.join(os.getenv('SQUIRRELBIN', ""), "squirrel")
         if not pexpect.utils.which(self.squirreltop_bin):
-            print(f"squirreltop binary not found: "+format(self.squirreltop_bin))
-            # raise ValueError("squirreltop binary not found: '{}'".format(self.squirreltop_bin))
-        self.args = (args or []) + ["-q"] + ["-color", "on"] * color
+            # print(f"squirreltop binary not found: "+format(self.squirreltop_bin))
+            raise ValueError("squirreltop binary not found: '{}'".format(self.squirreltop_bin))
+        self.args = (args or []) + ["-i"]
         self.squirreltop = None
 
     def __enter__(self):
         if self.squirreltop:
             raise ValueError("This module isn't re-entrant")
         # TODO ↓
-        # self.squirreltop = pexpect.spawn(self.squirreltop_bin, args=self.args, echo=False, encoding="utf-8")
+        self.squirreltop = pexpect.spawn(self.squirreltop_bin, args=self.args, echo=False, encoding="utf-8")
         # Disable delays (http://pexpect.readthedocs.io/en/stable/commonissues.html?highlight=delaybeforesend)
-        # self.squirreltop.delaybeforesend = 0
-        # self.next_prompt()
+        self.squirreltop.delaybeforesend = 0
+        self.next_prompt()
         return self
 
     def __exit__(self, type, value, traceback):
         print("Exiting squirreltop…")
         # TODO ↓
-        # self.squirreltop.kill(9)
+        self.squirreltop.kill(9)
 
     def next_prompt(self):
         """Wait for the next squirreltop prompt, and return the output preceding it."""
         print("Wait squirreltop…")
         # TODO ↓
-        # self.squirreltop.expect(SquirrelTop.SQUIRRELTOP_PROMPT, timeout = 10)
-        # return self.squirreltop.before
+        self.squirreltop.expect(SquirrelTop.SQUIRRELTOP_PROMPT, timeout = 10)
+        return self.squirreltop.before
         return ""
 
     def sendone(self, sentence):
@@ -78,14 +79,13 @@ class SquirrelTop:
         """
         # Suppress newlines, but not spaces: they are significant in notations
         # TODO ↓
-        # sentence = re.sub(r"[\r\n]+", " ", sentence).strip()
-        # try:
-        #     self.squirreltop.sendline(sentence)
-        #     output = self.next_prompt()
-        # except Exception as err:
-        #     raise SquirrelTopError(err, sentence, self.squirreltop.before)
-        # return output
-        return ""
+        sentence = re.sub(r"[\r\n]+", " ", sentence).strip()
+        try:
+            self.squirreltop.sendline(sentence)
+            output = self.next_prompt()
+        except Exception as err:
+            raise SquirrelTopError(err, sentence, self.squirreltop.before)
+        return output
 
     def send_initial_options(self):
         """Options to send when starting the toplevel and after a Reset Initial."""

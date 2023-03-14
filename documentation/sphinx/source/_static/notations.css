@@ -112,18 +112,18 @@
 }
 
 /************************/
-/* Coqtop IO and Coqdoc */
+/* Squirreltop IO and Squirreldoc */
 /************************/
 
-.coqtop dd, .ansi-bg-default {
+.squirreltop dd, .ansi-bg-default {
     background: #eeeeee !important;
 }
 
-.coqtop dd, .ansi-fg-default {
+.squirreltop dd, .ansi-fg-default {
     color: #2e3436 !important;
 }
 
-.coqtop dt {                    /* Questions */
+.squirreltop dt {                    /* Questions */
     background: none !important;
     color: #333 !important;
     font-weight: normal !important;
@@ -131,32 +131,32 @@
     margin: 0 !important;
 }
 
-.coqtop dd {                    /* Responses */
+.squirreltop dd {                    /* Responses */
     padding: 0.5em;
     margin-left: 0 !important;
     margin-top: 0.5em !important;
 }
 
-.coqdoc, .coqtop dl {
+.squirreldoc, .squirreltop dl {
     margin: 12px; /* Copied from RTD theme */
 }
 
-.coqdoc {
+.squirreldoc {
     display: block;
     white-space: pre;
 }
 
-.coqtop dt, .coqtop dd {
+.squirreltop dt, .squirreltop dd {
     border: none !important;
     display: block !important;
 }
 
-.coqtop.coqtop-hidden, dd.coqtop-hidden, dt.coqtop-hidden { /* Overqualifying for precedence */
+.squirreltop.squirreltop-hidden, dd.squirreltop-hidden, dt.squirreltop-hidden { /* Overqualifying for precedence */
     display: none !important;
 }
 
 /* FIXME: Specific to the RTD theme */
-.coqdoc, .coqtop dt, .coqtop dd, pre { /* pre added because of production lists */
+.squirreldoc, .squirreltop dt, .squirreltop dd, pre { /* pre added because of production lists */
     font-family: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter","DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace !important; /* Copied from RTD theme */
     font-size: 12px !important; /* Copied from RTD theme */
     line-height: 1.5 !important; /* Copied from RTD theme */
@@ -254,7 +254,7 @@ dt > .property {
   color: #FFFFFF;
 }
 
-/* Pygments for Coq is confused by ‘…’ */
+/* Pygments for Squirrel is confused by ‘…’ */
 code span.error {
     background: inherit !important;
     line-height: inherit !important;
@@ -268,7 +268,7 @@ code span.error {
 }
 
 
-.coqdoc-comment {
+.squirreldoc-comment {
     color: #808080 !important
 }
 

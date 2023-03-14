@@ -685,11 +685,11 @@ class SquirreltopDirective(Directive):
     def run(self):#TODO
         # Uses a ‘container’ instead of a ‘literal_block’ to disable
         # Pygments-based post-processing (we could also set rawsource to '')
-        # content = '\n'.join(self.content)
-        # args = self.arguments[0].split()
-        # node = nodes.container(content, squirreltop_options = set(args),
-        #                        classes=['squirreltop', 'literal-block'])
-        node = nodes.paragraph(text="squirreltop is not implemented yet !")
+        content = '\n'.join(self.content)
+        args = self.arguments[0].split()
+        node = nodes.container(content, squirreltop_options = set(args),
+                               classes=['squirreltop', 'literal-block'])
+        # node = nodes.paragraph(text="squirreltop is not implemented yet !")
         self.add_name(node)
         return [node]
 

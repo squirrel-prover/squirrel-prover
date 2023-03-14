@@ -2,6 +2,7 @@ GITHASH := $(shell scripts/git-hash)
 CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
 
 PREFIX = ~/.local
+SQUIRRELBIN = $(PREFIX)/bin/squirrel
 
 ECHO = /bin/echo
 
@@ -198,6 +199,7 @@ coverage:
 install: squirrel
 	cp -f squirrel $(PREFIX)/bin/squirrel
 	cp -r theories $(PREFIX)/bin/theories
+	export $(SQUIRRElBIN)
 
 doc:
 	dune build @doc
