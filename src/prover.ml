@@ -321,12 +321,16 @@ let search_about (st:state) (q:ProverLib.search_query) :
         pat_op_vars;
         pat_op_term = t; } 
     in
+
+    (* allow capture of bound variables when matching *)
+    let option = { Match.default_match_option with allow_capture = true; } in
+    
     Symbols.Lemma.fold begin fun _ _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find st.table sys pat f
-        | Local  f -> Match.T.find st.table sys pat f
+        | Global f -> Match.E.find ~option st.table sys pat f
+        | Local  f -> Match.T.find ~option st.table sys pat f
         end in
         begin match res with
           | [] -> acc
@@ -350,12 +354,16 @@ let search_about (st:state) (q:ProverLib.search_query) :
     let pat = Term.{
         pat_op_tyvars = [];
         pat_op_vars;
-        pat_op_term = t; } in 
+        pat_op_term = t; } in
+
+    (* allow capture of bound variables when matching *)
+    let option = { Match.default_match_option with allow_capture = true; } in
+
     Symbols.Lemma.fold (fun _ _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find_glob st.table sys pat f
+        | Global f -> Match.E.find_glob ~option st.table sys pat f
         | Local  _ -> [] (* can't find Equiv.form in
                                       Term.term ? *)
         end in
