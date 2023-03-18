@@ -1,30 +1,44 @@
-.. squirrel documentation master file, created by
-   sphinx-quickstart on Tue Feb 21 17:33:32 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Squirrel documentation master file.
+   This file should at least contain the root `toctree` directive.
 
-The Squirrel Prover is a proof assistant for protocols. It is based on first-order logic and provides guarantees in the computational model.
-Here are the `sources <https://github.com/squirrel-prover/squirrel-prover/>`_
+The Squirrel Prover is a proof assistant for cryptographic protocols.
+It is based on a higher-order version of the Bana-Comon logic,
+and provides guarantees in the computational model.
 
-README imported from COQ :
+.. note::
+   This project is under active development.
 
-=================================
- Documenting Squirrel with Sphinx
-=================================
+You are reading the user's documentation.
+For a more theoretical perspective on Squirrel,
+you may read some of the associated publications:
+:cite:`baelde:hal-03172119`,
+:cite:`baelde:hal-03500056` and
+:cite:`cremers:hal-03620358`.
 
-..
-   README.rst is auto-generated from README.template.rst and the _ext/*.py files
-   (in particular squirreldomain.py).
+Find more information on the
+`Squirrel homepage <https://squirrel-prover.github.io/>`_
+or get `sources <https://github.com/squirrel-prover/squirrel-prover/>`_.
+
+Below is a README adapted from the Coq documentation,
+explaining how to write this documentation.
+
+================================
+Documenting Squirrel with Sphinx
+================================
 
 Squirrel's reference manual is written in `reStructuredText <http://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html>`_ (“reST”), and compiled with `Sphinx <http://www.sphinx-doc.org/en/master/>`_.
 See `this README <../README.md>`_ for compilation instructions.
 
 In addition to standard reST directives (a directive is similar to a LaTeX environment) and roles (a role is similar to a LaTeX command), the ``squirrelrst`` plugin loaded by the documentation uses a custom *Squirrel domain* — a set of Squirrel-specific directives that define *objects* like tactics, commands (vernacs), warnings, etc. —, some custom *directives*, and a few custom *roles*.  Finally, this manual uses a small DSL to describe tactic invocations and commands.
 
+TODO in each category below,
+indicate clearly what is not yet available for Squirrel,
+perhaps only keep what will soon be available
+
 Squirrel objects
 ================
 
-Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (think *type signature*), followed by an optional body (a description of that object).  The following example defines two objects: a variant of the ``cs`` tactic, and an error that it may raise:
+Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* (think *type signature*), followed by an optional body (a description of that object).  The following example defines two objects: a variant of the ``cs`` tactic, and an error that it may raise.
 
 .. tabs::
 
@@ -32,7 +46,7 @@ Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (
 
       .. code-block:: rst
 
-         .. tacv:: cs @pattern {? in @system}
+         .. tacn:: cs @pattern {? in @system}
             :name: case_study
 
             Performs case study on conditionals inside an equivalence.
@@ -54,8 +68,8 @@ Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (
 
    .. tab:: Produces
 
-      .. tacv:: cs @pattern {? in @system}
-         :name: case_study
+      .. tacn:: cs @pattern {? in @system}
+         :name: case_study_demo
 
          Performs case study on conditionals inside an equivalence.
 
@@ -70,12 +84,14 @@ Our Squirrel domain define multiple `objects`_.  Each object has a *signature* (
              :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
 
          .. exn:: Argument of cs should match a boolean
+            :name: argument_demo
             :undocumented:
 
          .. exn:: did not find any conditional to analyze
+            :name: did_not_demo
             :undocumented:
 
-Or ``simpl`` tactic :
+Or ``simpl`` tactic, shown as a variant:
 
 .. tabs::
 
@@ -186,7 +202,7 @@ As an exercise, what do the following patterns mean?
          generalize {+, @term at {+ @natural} as @ident}
          fix @ident @natural with {+ (@ident {+ @binder} {? {struct @ident'}} : @type)}
 
-   .. tab:: answer
+   .. tab:: Result
 
       .. cmd:: pattern {+, @term {? at {+ @natural}}}
       .. cmd:: generalize {+, @term at {+ @natural} as @ident}
@@ -351,12 +367,12 @@ Squirrel directives
 
 In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines the following directives:
 
-``.. squirreltop::`` A reST directive to describe interactions with Coqtop.
+``.. squirreltop::`` A reST directive to describe interactions with Squirrel.
     Usage::
 
     .. squirreltop:: options…
 
-       squirrel code to send to coqtop
+       code to be executed by Squirrel
 
     Example:
 
@@ -384,7 +400,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
 
     The blank line after the directive is required.  If you begin a proof,
-    use the ``abort`` option to reset coqtop for the next example.
+    use the ``abort`` option to reset squirrel for the next example.
 
     Here is a list of permissible options:
 
@@ -406,6 +422,8 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
     ``coqtop``\ 's state is preserved across consecutive ``.. coqtop::`` blocks
     of the same document (``coqrst`` creates a single ``coqtop`` process per
     reST source file).  Use the ``reset`` option to reset Coq's state.
+
+    TODO how to pass these options? abort probably not up-to-date
 
 ``.. coqdoc::`` A reST directive to display Coqtop-formatted source code.
     Usage::
@@ -503,10 +521,12 @@ In addition to the objects and directives above, the ``coqrst`` Sphinx plugin de
     You're not likely to use this role very commonly; instead, use a ``prodn``
     directive and reference its tokens using ``:token:`…```.
 
-``:gdef:`` Marks the definition of a glossary term inline in the text.  Matching :term:`XXX`
-    constructs will link to it.  Use the form :gdef:`text <term>` to display "text"
-    for the definition of "term", such as when "term" must be capitalized or plural
-    for grammatical reasons.  The term will also appear in the Glossary Index.
+``:gdef:`` Marks the definition of a glossary term inline in the text.
+    Matching ``:term:`XXX``` constructs will link to it.
+    Use the form ``:gdef:`text <term>``` to display "text"
+    for the definition of "term", such as when
+    "term" must be capitalized or plural for grammatical reasons.
+    The term will also appear in the Glossary Index.
 
     Examples::
 
@@ -727,19 +747,21 @@ Advanced uses of notations
   - Don't use the escape for a ``|`` separator in ``{*`` and ``{+``.  These
     should appear as ``{*|`` and ``{+|``.
 
-Here some tests about directives :
+=================
+Table of contents
+=================
 
-.. helloworld::
+.. toctree::
+   :maxdepth: 2
+   :caption: Language
 
-And here the end.
+   language
 
-.. This would work with sphinxcontrib.ocaml
-.. autoocamlmodule::squirrellib
+.. toctree::
+   :maxdepth: 2
+   :caption: Proofs
 
-.. note::
-   This project is under active development.
-
-Here a citation : :cite:`baelde:hal-03172119`: 
+   proofs
 
 .. toctree::
    :maxdepth: 2
@@ -751,7 +773,6 @@ Here a citation : :cite:`baelde:hal-03172119`:
    :caption: Appendix
 
    bibliography
-
 
 Indices and tables
 ==================

@@ -11,9 +11,9 @@ sys.path.append(os.path.abspath("./_ext"))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'squirrel'
-copyright = '2023, SPICY team'
-author = 'SPICY team'
+project = 'Squirrel'
+copyright = '2023, Squirrel developpers'
+author = 'Squirrel developpers'
 release = '0.1'
 
 # -- General configuration ---------------------------------------------------
