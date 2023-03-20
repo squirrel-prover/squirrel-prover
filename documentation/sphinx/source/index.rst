@@ -14,6 +14,9 @@ you may read some of the associated publications:
 :cite:`baelde:hal-03172119`,
 :cite:`baelde:hal-03500056` and
 :cite:`cremers:hal-03620358`.
+=================================
+ Documenting Squirrel with Sphinx
+=================================
 
 Find more information on the
 `Squirrel homepage <https://squirrel-prover.github.io/>`_
@@ -51,14 +54,15 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
             Performs case study on conditionals inside an equivalence.
 
-            Without a specific target, ``cs phi`` will project all conditionals
-            on phi in the equivalence. With a specific target, ``cs phi in i``
+            Without a specific target, :g:`cs phi` will project all conditionals
+            on phi in the equivalence. With a specific target, :g:`cs phi in i`
             will only project conditionals in the i-th item of the equivalence.
 
              .. example:: when proving an equivalence
-             equiv(if phi then t1 else t2, if phi then u1 else u2)
-             invoking ``nosimpl cs phi`` results in two subgoals:
-             equiv(phi, t1, u1) and equiv(phi, t2, u2).
+
+                :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
+                invoking ``nosimpl cs phi`` results in two subgoals:
+                :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`
 
             .. exn:: Argument of cs should match a boolean
                :undocumented:
@@ -73,14 +77,14 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
          Performs case study on conditionals inside an equivalence.
 
-         Without a specific target, ``cs phi`` will project all conditionals
-         on phi in the equivalence. With a specific target, ``cs phi in i``
+         Without a specific target, :g:`cs phi` will project all conditionals
+         on phi in the equivalence. With a specific target, :g:`cs phi in i`
          will only project conditionals in the i-th item of the equivalence.
 
           .. example:: when proving an equivalence
 
              :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
-             invoking ``nosimpl cs phi`` results in two subgoals:
+             invoking :g:`nosimpl cs phi` results in two subgoals:
              :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
 
          .. exn:: Argument of cs should match a boolean
@@ -91,7 +95,7 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
             :name: did_not_demo
             :undocumented:
 
-Or ``simpl`` tactic, shown as a variant:
+Or :g:`fa` tactic :
 
 .. tabs::
 
@@ -99,32 +103,50 @@ Or ``simpl`` tactic, shown as a variant:
 
       .. code-block:: rst
 
-         .. tacv:: simpl @pattern at {+ @natural}
-            :name: simpl_at
+         .. tacv:: fa {?{| @natural | {+ @fa_arg}}}
+            :name: fa
 
-            This applies ``simpl`` only to the :n:`{+ @natural}` occurrences of the subterms
-            matching :n:`@pattern` in the current goal.
+            Apply the function application rule.
 
-            .. exn:: Too few occurrences
+            Local sequent:
+            When we have G => f(u) = f(v), produces the
+            goal G => u=v. Produces as many subgoals as
+            arugment of the head function symbol.
+            Global sequent:
+
+            To prove that a goal containing f(u1,...,un) is
+            diff-equivalent, one can prove that the goal containing the
+            sequence u1,...,un is diff-equivalent.
+
+            .. exn:: improper arguments
                :undocumented:
 
    .. tab:: Produces
 
-      .. tacv:: simpl @pattern at {+ @natural}
-         :name: simpl_at
+      .. tacv:: fa {? {| @natural | {+ @fa_arg} } }
+         :name: fa
 
-         This applies ``simpl`` only to the :n:`{+ @natural}` occurrences of the subterms
-         matching :n:`@pattern` in the current goal.
+         Apply the function application rule.
 
-         .. exn:: Too few occurrences
+         Local sequent:
+         When we have G => f(u) = f(v), produces the
+         goal G => u=v. Produces as many subgoals as
+         arugment of the head function symbol.
+         Global sequent:
+
+         To prove that a goal containing f(u1,...,un) is
+         diff-equivalent, one can prove that the goal containing the
+         sequence u1,...,un is diff-equivalent.
+
+         .. exn:: improper arguments
             :undocumented:
 
-Objects are automatically collected into indices, and can be linked to using the role version of the object's directive. For example, you could link to the tactic variant above using ``:tacv:`simpl_at```, and to its exception using ``:exn:`Too few occurrences```.
+
+Objects are automatically collected into indices, and can be linked to using the role version of the object's directive. For example, you could link to the tactic variant above using ``:tacv:`fa```, and to its exception using ``:exn:`imporper arguments```.
 
 Names (link targets) are auto-generated for most simple objects, though they can always be overwritten using a ``:name:`` option, as shown above.
 
-- Options, errors, warnings have their name set to their signature, with ``...`` replacing all notation bits.  For example, the auto-generated name of ``.. exn:: @qualid is not a module`` is ``... is not a module``, and a link to it would take the form ``:exn:`... is not a module```.
-- Vernacs (commands) have their name set to the first word of their signature.  For example, the auto-generated name of ``Axiom @ident : @term`` is ``Axiom``, and a link to it would take the form ``:cmd:`Axiom```.
+- Vernacs (commands) have their name set to the first word of their signature.  For example, the auto-generated name of :g:`system @id = @sys_descr with @sys_modifier` is ``system``, and a link to it would take the form ``:cmd:`system```.
 - Vernac variants, tactic notations, and tactic variants do not have a default name.
 
 Most objects should have a body (i.e. a block of indented text following the signature, called “contents” in Sphinx terms).  Undocumented objects should have the ``:undocumented:`` flag instead, as shown above.  When multiple objects have a single description, they can be grouped into a single object, like this (semicolons can be used to separate the names of the objects; names starting with ``_`` will be omitted from the indexes):
@@ -388,6 +410,8 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
                name s:message.
                goal [any] toto : true=>true.
                Proof.
+                  admit.
+               Qed.
 
       .. tab:: produces
 
@@ -397,7 +421,8 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
             name s:message.
             goal [any] toto : true=>true.
             Proof.
-
+               admit.
+            Qed.
 
     The blank line after the directive is required.  If you begin a proof,
     use the ``abort`` option to reset squirrel for the next example.
@@ -419,24 +444,34 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
       - ``restart``: Send a ``Restart`` command before running this block (only works in proof mode)
       - ``abort``: Send an ``Abort All`` command after running this block (leaves all pending proofs if any)
 
-    ``coqtop``\ 's state is preserved across consecutive ``.. coqtop::`` blocks
-    of the same document (``coqrst`` creates a single ``coqtop`` process per
+    ``squirreltop``\ 's state is preserved across consecutive ``.. squirreltop::`` blocks
+    of the same document (``coqrst`` creates a single ``squirreltop`` process per
     reST source file).  Use the ``reset`` option to reset Coq's state.
 
     TODO how to pass these options? abort probably not up-to-date
 
-``.. coqdoc::`` A reST directive to display Coqtop-formatted source code.
+``.. squirreldoc::`` A reST directive to display squirreltop-formatted source code.
     Usage::
 
-       .. coqdoc::
+       .. squirreldoc::
 
-          Coq code to highlight
+          squirrel code to highlight
 
-    Example::
+    .. tabs::
 
-       .. coqdoc::
+      .. tab:: reStructuredText
 
-          Definition test := 1.
+         .. code-block:: rst
+
+             .. squirreldoc::
+
+                name n:index->message.
+
+      .. tab:: produces
+
+          .. squirreldoc::
+
+             name n:index->message.
 
 ``.. example::`` A reST directive for examples.
     This behaves like a generic admonition; see
@@ -452,7 +487,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
           The following adds ``plus_comm`` to the ``plu`` database:
 
-          .. coqdoc::
+          .. squirreldoc::
 
              Hint Resolve plus_comm : plu.
 
@@ -617,21 +652,21 @@ DON'T
 
      .. tacv:: assert form as simple_intropattern
 
-Using the ``.. coqtop::`` directive for syntax highlighting
------------------------------------------------------------
+Using the ``.. squirreltop::`` directive for syntax highlighting
+----------------------------------------------------------------
 
 DO
   .. code::
 
      A tactic of the form:
 
-     .. coqdoc::
+     .. squirreldoc::
 
         do [ t1 | … | tn ].
 
      is equivalent to the standard Ltac expression:
 
-     .. coqdoc::
+     .. squirreldoc::
 
         first [ t1 | … | tn ].
 
@@ -640,13 +675,13 @@ DON'T
 
      A tactic of the form:
 
-     .. coqtop:: in
+     .. squirreltop:: in
 
         do [ t1 | … | tn ].
 
      is equivalent to the standard Ltac expression:
 
-     .. coqtop:: in
+     .. squirreltop:: in
 
         first [ t1 | … | tn ].
 
@@ -675,7 +710,7 @@ DO
 
      Here is a useful axiom:
 
-     .. coqdoc::
+     .. squirreldoc::
 
         Axiom proof_irrelevance : forall (P : Prop) (x y : P), x=y.
 
@@ -693,7 +728,7 @@ DON'T
 
      .. example::
 
-        .. coqdoc::
+        .. squirreldoc::
 
            Axiom proof_irrelevance : forall (P : Prop) (x y : P), x=y.
 
@@ -703,13 +738,13 @@ Tips and tricks
 Nested lemmas
 -------------
 
-The ``.. coqtop::`` directive does *not* reset Coq after running its contents.  That is, the following will create two nested lemmas (which by default results in a failure)::
+The ``.. squirreltop::`` directive does *not* reset Coq after running its contents.  That is, the following will create two nested lemmas (which by default results in a failure)::
 
-   .. coqtop:: all
+   .. squirreltop:: all
 
       Lemma l1: 1 + 1 = 2.
 
-   .. coqtop:: all
+   .. squirreltop:: all
 
       Lemma l2: 2 + 2 <> 1.
 

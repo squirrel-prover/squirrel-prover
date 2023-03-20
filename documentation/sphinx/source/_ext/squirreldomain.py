@@ -5,6 +5,7 @@ This is mainly inspired by Coq' sphinx domain
 
 import os
 import re
+import pygments
 from itertools import chain
 from collections import defaultdict
 
@@ -643,18 +644,18 @@ def squirrel_code_role(role, rawtext, text, lineno, inliner, options={}, content
        :g:`Set Printing All.`
        :g:`forall (x: t), P(x)`
     """
-    # options['language'] = 'Squirrel' # ← FIXME can we add it ?
-    options['language'] = 'Coq'
-    return code_role(role, rawtext, text, lineno, inliner, options, content)
-    ## Too heavy:
-    ## Forked from code_role to use our custom tokenizer; this doesn't work for
-    ## snippets though: for example CoqDoc swallows the parentheses around this:
-    ## “(a: A) (b: B)”
-    # set_classes(options)
-    # classes = ['code', 'coq']
-    # code = utils.unescape(text, 1)
-    # node = nodes.literal(rawtext, '', *highlight_using_coqdoc(code), classes=classes)
-    # return [node], []
+
+    classes = ['code', 'squirrel']
+    try:
+        lexer = pygments.lexers.get_lexer_by_name("squirrel")
+    except ValueError:
+        options['language'] = 'squirrel'
+        return code_role(role, rawtext, text, lineno, inliner, options, content)
+    code = utils.unescape(text, 1)
+    parsed = pygments.highlight(code,lexer,pygments.formatters.TerminalFormatter())
+    in_chunks = AnsiColorsParser().colorize_str(parsed)
+    node = nodes.inline(code, '', *in_chunks,classes=['squirrelinline'])
+    return [node], []
 
 SquirrelCodeRole = squirrel_code_role
 
@@ -720,14 +721,21 @@ class SquirreldocDirective(Directive):
     def run(self):#TODO
         # Uses a ‘container’ instead of a ‘literal_block’ to disable
         # Pygments-based post-processing (we could also set rawsource to '')
-        # content = '\n'.join(self.content)
+        content = '\n'.join(self.content)
         # node = nodes.container(content)
         # TODO ↓ add highlight
         # node = nodes.inline(content, '', *highlight_using_coqdoc(content))
-        # TODO ↓ add squirreldoc css class
-        # wrapper = nodes.container(content, node, classes=['squirreldoc','literal-block'])
-        wrapper = nodes.paragraph(text="squirreldoc is not implemented yet !")
-        self.add_name(wrapper)
+        try:
+            lexer = pygments.lexers.get_lexer_by_name("squirrel")
+        except ValueError:
+            source_literal = nodes.literal_block(content, content)
+            node = nodes.inline(content, '', *source_literal)
+        parsed = pygments.highlight(content,lexer,pygments.formatters.TerminalFormatter())
+        in_chunks = AnsiColorsParser().colorize_str(parsed)
+        node = nodes.inline(content, '', *in_chunks)
+        wrapper = nodes.container(content, node, classes=['squirreldoc','literal-block'])
+        # wrapper = nodes.paragraph(text="squirreldoc is not implemented yet !")
+        # self.add_name(wrapper)
         return [wrapper]
 
 class ExampleDirective(BaseAdmonition):#TODO
@@ -787,7 +795,7 @@ class AnsiColorsParser():
                 self.new_nodes.append(nodes.inline('', text))
 
     def colorize_str(self, raw):
-        """Parse raw (an ANSI-colored output string from Coqtop) into Sphinx nodes."""
+        """Parse raw (an ANSI-colored output string from Squirreltop) into Sphinx nodes."""
         last_end = 0
         for match in AnsiColorsParser.COLOR_PATTERN.finditer(raw):
             self._add_text(raw, last_end, match.start())
@@ -941,10 +949,18 @@ class SquirreltopBlocksTransform(Transform):
         for sentence, output in pairs:
             # Use Coqdoc to highlight input TODO ↓
             # in_chunks = highlight_using_squirreldoc(sentence)
-            source_literal = nodes.literal_block(sentence, sentence)
-            source_literal['language'] = 'coq'
-
-            dli += nodes.term(sentence, '', *source_literal, classes=self.block_classes(options['input']))
+            try:
+                lexer = pygments.lexers.get_lexer_by_name("squirrel")
+            except ValueError:
+                source_literal = nodes.literal_block(sentence, sentence)
+                dli += nodes.term(sentence, '', *source_literal, classes=self.block_classes(options['input']))
+            parsed = pygments.highlight(sentence,lexer,pygments.formatters.TerminalFormatter())
+            in_chunks = AnsiColorsParser().colorize_str(parsed)
+            dli += nodes.term(sentence, '', *in_chunks, classes=self.block_classes(options['input']))
+            # Or dirctly in html ? ↓
+            # parsed = pygments.highlight(sentence,lexer,pygments.formatters.HtmlFormatter())
+            # dli += nodes.raw('input', parsed, format='html',
+            #                  classes=self.block_classes(options['input']))
             if output:
                 # Parse ANSI sequences to highlight output
                 out_chunks = AnsiColorsParser().colorize_str(output)

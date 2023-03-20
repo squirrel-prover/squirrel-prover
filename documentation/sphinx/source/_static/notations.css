@@ -155,6 +155,11 @@
     display: none !important;
 }
 
+.squirrelinline {
+    font-family: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter","DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace !important; /* Copied from RTD theme */
+    font-size: 12px !important; /* Copied from RTD theme */
+}
+
 /* FIXME: Specific to the RTD theme */
 .squirreldoc, .squirreltop dt, .squirreltop dd, pre { /* pre added because of production lists */
     font-family: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter","DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace !important; /* Copied from RTD theme */
