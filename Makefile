@@ -124,7 +124,7 @@ $(BENCHDIR)/all/last.json:
 	@echo
 
 example: squirrel
-	# @rm -rf `$(RUNLOGDIR)/examples`
+	@rm -rf `$(RUNLOGDIR)/examples`
 	@$(ECHO) "================== EXAMPLES ======================"
 	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
@@ -154,7 +154,8 @@ alcotest: version
 # Same as above but will print out only the FAILs tests as before
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
-	@dune exec -- ./test.exe | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]"
+	@dune exec -- ./test.exe | sed -e 's/\x1b\[[0-9;]*m//g' | { grep -E --color "^[^│] \[FAIL\]" || true; }
+	@$(ECHO) "DONE"
 
 clean:
 	dune clean
