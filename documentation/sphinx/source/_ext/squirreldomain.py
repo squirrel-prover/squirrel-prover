@@ -272,7 +272,7 @@ class NotationObject(DocumentableObject):
         signode += addnodes.desc_name(signature, '', tacn_node)
 
 class VernacObject(NotationObject):
-    """A :oq command.
+    """A :squirrel command.
 
     Example::
 

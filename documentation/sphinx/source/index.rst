@@ -14,6 +14,7 @@ you may read some of the associated publications:
 :cite:`baelde:hal-03172119`,
 :cite:`baelde:hal-03500056` and
 :cite:`cremers:hal-03620358`.
+
 =================================
  Documenting Squirrel with Sphinx
 =================================
@@ -49,7 +50,7 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
       .. code-block:: rst
 
-         .. tacn:: cs @pattern {? in @system}
+         .. tacn:: cs @pattern {? in @natural}
             :name: case_study
 
             Performs case study on conditionals inside an equivalence.
@@ -58,8 +59,9 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
             on phi in the equivalence. With a specific target, :g:`cs phi in i`
             will only project conditionals in the i-th item of the equivalence.
 
-             .. example:: when proving an equivalence
+             .. example:: 
 
+                when proving an equivalence
                 :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
                 invoking ``nosimpl cs phi`` results in two subgoals:
                 :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`
@@ -72,7 +74,7 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
    .. tab:: Produces
 
-      .. tacn:: cs @pattern {? in @system}
+      .. tacn:: cs @pattern {? in @natural}
          :name: case_study_demo
 
          Performs case study on conditionals inside an equivalence.
@@ -81,8 +83,9 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
          on phi in the equivalence. With a specific target, :g:`cs phi in i`
          will only project conditionals in the i-th item of the equivalence.
 
-          .. example:: when proving an equivalence
+          .. example::
 
+             when proving an equivalence
              :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
              invoking :g:`nosimpl cs phi` results in two subgoals:
              :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
@@ -513,6 +516,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
           -----------------------------
           \WTEG{\forall~x:T,U}{\Prop}
 
+
 ``.. preamble::`` A reST directive to include a TeX file.
     Mostly useful to let MathJax know about `\def`\s and `\newcommand`\s.  The
     contents of the TeX file are wrapped in a math environment, as MathJax
@@ -561,7 +565,7 @@ In addition to the objects and directives above, the ``coqrst`` Sphinx plugin de
     Use the form ``:gdef:`text <term>``` to display "text"
     for the definition of "term", such as when
     "term" must be capitalized or plural for grammatical reasons.
-    The term will also appear in the Glossary Index.
+    The term will also appear in the :ref:`glossary index <glossary_index>`.
 
     Examples::
 

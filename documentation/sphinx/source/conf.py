@@ -65,6 +65,10 @@ html_context = {
     'github_version': 'master',
     'conf_py_path': '/documentation/sphinx/'
 }
+
+# navtree options
+navtree_shift = True
+
 # since sphinxcontrib-bibtex version 2 we need this
 bibtex_bibfiles = [ "biblio.bib" ]
 

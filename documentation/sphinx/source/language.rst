@@ -49,6 +49,7 @@ TODO better rendering for syntax
   .. squirreltop:: all
 
      hash h.
+     (* declare something *)
      print h.
 
   TODO cannot write comments in squirrel top; do not show empty output?
