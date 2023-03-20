@@ -19,6 +19,7 @@ bench: bench_example
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 BENCHDIR=_build/bench
+TESTS_OUT=_build/tests.output
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
 BENCH_OUT=$(BENCHDIR)/last.json
@@ -123,7 +124,8 @@ $(BENCHDIR)/all/last.json:
 	@echo
 
 example: squirrel
-	rm -rf `$(RUNLOGDIR)/examples`
+	# @rm -rf `$(RUNLOGDIR)/examples`
+	@$(ECHO) "================== EXAMPLES ======================"
 	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
@@ -133,7 +135,7 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@if test -f tests/tests.ko ; then \
 	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
-	 else $(ECHO) All tests passed successfully. ; fi
+	 else $(ECHO) All examples passed successfully. ; fi
 
 %.ok: %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
@@ -150,9 +152,9 @@ alcotest: version
 	dune runtest
 
 # Same as above but will print out only the FAILs tests as before
-alcotest_full: version
-	@dune exec ./test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
-	@$(ECHO) "Done"
+alcotest_full: version 
+	@$(ECHO) "================== ALCOTEST ======================"
+	@dune exec -- ./test.exe | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]"
 
 clean:
 	dune clean
@@ -174,7 +176,7 @@ clean_all_bench:
 # We have to "touch" ./squirrel executable for other recipes
 squirrel: version
 	dune build squirrel.exe
-	cp -f _build/default/squirrel.exe squirrel
+	@cp -f _build/default/squirrel.exe squirrel
 
 # Run tests (forcing a re-run) with bisect_ppx instrumentation on
 # to get coverage files, and generate an HTML report from them.
