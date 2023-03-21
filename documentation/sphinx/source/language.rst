@@ -52,7 +52,7 @@ using the following declaration:
   be passed to indicate assumptions on the new type.
 
   .. prodn::
-    type_tag ::= large | well_founded | finite | fix | name_fixed_length
+    type_tag ::= large | well_founded | finite | fixed | name_fixed_length
 
   The meaning of tags is as follows:
 
