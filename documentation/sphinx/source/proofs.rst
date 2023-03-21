@@ -19,9 +19,47 @@ Tacticals
 Tactics
 -------
 
-TODO make pattern/system links to their definitions
+Tactic arguments
+~~~~~~~~~~~~~~~~
 
-.. tacn:: cs @pattern {? in @system}
+In the context of a (sub)goal, an :gdef:`assumption` refers to
+an hypothesis in the current goal,
+a previously proved goal, or
+a previously declared axiom.
+Assumptions are referred to by their identifier when used in
+tactics.
+
+.. prodn::
+  assumption ::= @identifier
+
+Tactics that apply to equivalence goals may take a natural number
+as argument to identify one item in the equivalence. This is represented
+using the :token:`position` token.
+
+.. prodn::
+  position ::= @natural
+
+Proof terms
+~~~~~~~~~~~
+
+:gdef:`Proof terms <proof term>`
+are used by several tactics as a convenient way to
+combine :term:`assumptions <assumption>` in order to derive new
+facts that may be used in various ways.
+
+TODO
+
+Common errors
+~~~~~~~~~~~~~
+
+.. exn:: out of range position
+
+     Argument does not correspond to a valid equivalence item.
+
+Equivalence tactics
+~~~~~~~~~~~~~~~~~~~
+
+.. tacn:: cs @pattern {? in @position}
    :name: case_study
 
    Performs case study on conditionals inside an equivalence.
@@ -38,9 +76,25 @@ TODO make pattern/system links to their definitions
      ``equiv(phi, t1, u1)`` and ``equiv(phi, t2, u2)``.
 
    TODO convention on capitalization for errors?
+   Coq: capitalized + period.
 
    .. exn:: Argument of cs should match a boolean
       :undocumented:
 
    .. exn:: did not find any conditional to analyze
-      :undocumented:
+
+        some doc
+
+.. tacn:: prf @position
+   :name: prf
+
+   TODO why optional message in Squirrel tactic; also fix help in tool
+
+   .. exn:: out of range position
+
+.. tacn:: fresh @position
+   :name: fresh
+
+   .. exn:: out of range position
+
+     See :exn:`out of range position`

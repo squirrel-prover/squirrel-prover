@@ -2,17 +2,33 @@
 Language
 ========
 
-Here we define the syntax and informal semantics of our terms and formulas.
-We also document the various declarations available in the prover,
-and commands.
+Here we define the syntax and informal semantics of our logic,
+and the various declarations available in the prover to introduce
+new function symbols, cryptographic primitives, types, etc.
 
-TODO can't see subsections in toc and navbar
+Systems will be documented elsewhere as they are not tied to the
+logic.
 
-Syntax
-======
+Lexical conventions
+====================
+
+Throughout the documentation we use the following lexical units:
+
+.. prodn::
+  natural ::= {+ 0 .. 9 }
+  identifier ::= {| a .. z | A .. Z } {* {| a .. z | A .. Z | 0 .. 9 | ' } }
 
 Types
------
+======
+
+Base types
+-----------
+
+A base type can generally be thought of as a set of bitstrings,
+though this is a simplified view as we shall see below.
+
+.. prodn::
+  base_type ::= bool | message | timestamp | index | @identifier
 
 Squirrel comes with several builtin base types:
 
@@ -25,18 +41,40 @@ Squirrel comes with several builtin base types:
 .. note:: When we say that a type is finite, it is still unbounded:
   the semantics for the type can be any finite set.
 
-The user may define other base types TODO
+Additional :gdef:`custom types` may be declared by the user
+using the following declaration:
 
-TODO what's the proper way to reference terms?
-should we do the same for technical terms such as message
-and bool?
+.. cmd:: type @identifier {? [ {+, @type_tag } ] }
 
-Arbitrary :gdef:`types <type>` are simple types, derived from base types
+  Declare a new type called :token:`identifier`.
+  The values of that type are assumed to be convertible to bitstrings,
+  hence the type is a subtype of :g:`message`. Tags can optionally
+  be passed to indicate assumptions on the new type.
+
+  .. prodn::
+    type_tag ::= large | well_founded | finite | fix | name_fixed_length
+
+  The meaning of tags is as follows:
+
+  * a type is :gdef:`well-founded` when :g:`<` is well-founded
+    on that type, for any :math:`\eta`;
+  * a type is finite if it has the same finite cardinal
+    for all :math:`\eta`;
+  * a type is :gdef:`large` when it supports drawing any number of
+    values, denoted by :term:`names <name>`, in such a way that two
+    distinct names have a negligible chance of being equal;
+  * a type with :gdef:`name_fixed_length` means that all names sampled
+    in that type (for a given :math:`\eta`) have the same length;
+  * TODO fix (perhaps mistakenly included in finite)
+
+General types
+--------------
+
+General types are derived from base types
 and type variables using the arrow and tupling type constructors.
 
-  type ::= alpha | base-type | type -> type | (type * ... * type)
-
-TODO better rendering for syntax
+.. prodn::
+  type ::= @type_variable | @base_type | @type -> @type | (@type * ... * @type)
 
 .. note:: The most common function symbols have
   types of the form ``(b1*...*bn)->b'`` where the ``b1``, ...,
@@ -46,16 +84,8 @@ TODO better rendering for syntax
   ``(message*message)->message``: it takes a message to be hashed,
   a key, and the returned hash is also a message.
 
-  .. squirreltop:: all
-
-     hash h.
-     (* declare something *)
-     print h.
-
-  TODO cannot write comments in squirrel top; do not show empty output?
-
 Terms
------
+======
 
 :gdef:`Terms <term>` are syntactic expressions that denote probabilistic
 values.
@@ -65,6 +95,8 @@ is a probabilistic boolean value.
 
 Term syntax, lambda calculus TODO
 
+TODO :gdef:`names <name>`
+
 .. note::
   Unlike in the original BC logic and the meta-logic that was used at first
   in Squirrel, our terms are not necessarily computable in polynomial time
@@ -73,33 +105,67 @@ Term syntax, lambda calculus TODO
   which tests whether ``f`` is idempotent, something that is not
   necessarily computable even when ``f`` is PTIME.
 
-  TODO citations, colors for terms
+  TODO citations
 
 Formulas
---------
+=========
 
 Squirrel features two kinds of formulas: local and global ones.
 
 :gdef:`Local formulas <local formula>`
-are simply `terms`_ of type `bool`_. They can in particular be constructed
-using common syntax, given below
+are `terms`_ of type `bool`_. They can in particular be constructed
+using common syntax, given below:
 
-   phi ::= (phi && phi) | (phi || phi) | (phi => phi) | not phi
-         | forall <binders>, phi | exists <binders>, phi
+.. prodn::
+  formula ::= @formula && @formula | @formula || @formula | @formula => @formula | not @formula
+    | forall @binders, @formula | exists @binders, @formula
+    | happens({+, @terms}) | cond@@term | exec@@term
+    | @term = @term | @term <= @term | @term < @term | @term >= @term | @term > @term
+
+TODO generalized infix operators
+
+:gdef:`Global formulas <global formula>`
+are first order formulas, written as follows:
+
+.. prodn::
+  global_formula ::= [@formula] | equiv({*, @term})
+    | @global_formula -> @global_formula
+    | @global_formula /\ @global_formula | @global_formula \/ @global_formula
+    | Forall @binders, @global_formula | Exists @binders, @global_formula
 
 Declarations
-============
+=============
 
 Symbols
--------
+--------
+
+Function symbols are deterministic polynomial time.
 
 Systems
--------
+--------
+
+.. prodn::
+  system_id ::= identifier | identifier / identifier
+  system_expr ::= {| any | {+, @system_id} }
+
+TODO expr and set expressions
 
 Goals
------
+------
 
-Commands
-========
+.. prodn::
+  goal ::= local_goal
+  local_goal ::= {? local } goal {? system_expr } {| identifier | _ } parameters : local_formula
+  global_goal ::= global goal {? system_expr } {| identifier | _ } parameters : global_formula
 
-Print, help, search, etc.
+.. example:: Unnamed local goal
+
+  :g:`goal [myProtocol/left] _ : cond@A2 => input@A1 = ok.`
+
+.. example:: Global goal expressing observational equivalence
+
+  .. squirreldoc::
+    global goal [myProtocol] obs_equiv (t:timestamp) :
+      happens(t) => equiv(frame@t).`
+
+  TODO squirreldoc not implemented?
