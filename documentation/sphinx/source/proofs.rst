@@ -97,4 +97,4 @@ Equivalence tactics
 
    .. exn:: out of range position
 
-     See :exn:`out of range position`
+     See :exn:`out of range position`.

@@ -58,14 +58,14 @@ using the following declaration:
 
   * a type is :gdef:`well-founded` when :g:`<` is well-founded
     on that type, for any :math:`\eta`;
-  * a type is finite if it has the same finite cardinal
-    for all :math:`\eta`;
+  * a type is :gdef:`finite` if
+    it has a finite cardinal for each :math:`\eta`;
+  * a type is :gdef:`fixed` if it is the same for all :math:`\eta`;
   * a type is :gdef:`large` when it supports drawing any number of
     values, denoted by :term:`names <name>`, in such a way that two
     distinct names have a negligible chance of being equal;
   * a type with :gdef:`name_fixed_length` means that all names sampled
     in that type (for a given :math:`\eta`) have the same length;
-  * TODO fix (perhaps mistakenly included in finite)
 
 General types
 --------------
@@ -155,8 +155,8 @@ Goals
 
 .. prodn::
   goal ::= local_goal
-  local_goal ::= {? local } goal {? system_expr } {| identifier | _ } parameters : local_formula
-  global_goal ::= global goal {? system_expr } {| identifier | _ } parameters : global_formula
+  local_goal ::= {? local } goal {? @system_expr } {| @identifier | _ } @parameters : @formula
+  global_goal ::= global goal {? @system_expr } {| @identifier | _ } @parameters : @global_formula
 
 .. example:: Unnamed local goal
 
@@ -164,8 +164,4 @@ Goals
 
 .. example:: Global goal expressing observational equivalence
 
-  .. squirreldoc::
-    global goal [myProtocol] obs_equiv (t:timestamp) :
-      happens(t) => equiv(frame@t).`
-
-  TODO squirreldoc not implemented?
+  :g:`global goal [myProtocol] obs_equiv (t:timestamp) : happens(t) => equiv(frame@t).`
