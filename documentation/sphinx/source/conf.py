@@ -20,6 +20,7 @@ release = '0.1'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'sphinx.ext.ifconfig',
     'sphinx_tabs.tabs', # Needs `pip install sphinx-tabs`
     'myst_parser', # Needs `pip install myst-parser`
     'sphinxcontrib.bibtex',

@@ -36,6 +36,8 @@ PARSE_ERROR = """{}:{} Parse error in notation!
 Offending notation: {}
 Error message: {}"""
 
+TERM_FORMATTER = pygments.formatters.TerminalFormatter(bg="dark")
+
 def notation_to_sphinx(notation, source, line, rawtext=None):
     """Parse notation and wrap it in an inline node"""
     try:
@@ -669,7 +671,7 @@ def squirrel_code_role(role, rawtext, text, lineno, inliner, options={}, content
         options['language'] = 'squirrel'
         return code_role(role, rawtext, text, lineno, inliner, options, content)
     code = utils.unescape(text, 1)
-    parsed = pygments.highlight(code,lexer,pygments.formatters.TerminalFormatter())
+    parsed = pygments.highlight(code,lexer,TERM_FORMATTER)
     in_chunks = AnsiColorsParser().colorize_str(parsed)
     node = nodes.inline(code, '', *in_chunks,classes=['squirrelinline'])
     return [node], []
@@ -727,7 +729,6 @@ class SquirreldocDirective(Directive):
 
           Definition test := 1.
     """
-    # TODO implement this as a Pygments highlighter?
     has_content = True
     required_arguments = 0
     optional_arguments = 0
@@ -735,24 +736,25 @@ class SquirreldocDirective(Directive):
     option_spec = { 'name': directives.unchanged }
     directive_name = "squirreldoc"
 
-    def run(self):#TODO
+    def run(self):
         # Uses a ‘container’ instead of a ‘literal_block’ to disable
         # Pygments-based post-processing (we could also set rawsource to '')
         content = '\n'.join(self.content)
         # node = nodes.container(content)
-        # TODO ↓ add highlight
-        # node = nodes.inline(content, '', *highlight_using_coqdoc(content))
         try:
             lexer = pygments.lexers.get_lexer_by_name("squirrel")
-            parsed = pygments.highlight(content,lexer,pygments.formatters.TerminalFormatter())
+            parsed = pygments.highlight(content,
+                                        lexer,
+                                        TERM_FORMATTER)
             in_chunks = AnsiColorsParser().colorize_str(parsed)
             node = nodes.inline(content, '', *in_chunks)
         except ValueError:
             source_literal = nodes.literal_block(content, content)
             node = nodes.inline(content, '', *source_literal)
+
         wrapper = nodes.container(content, node, classes=['squirreldoc','literal-block'])
         # wrapper = nodes.paragraph(text="squirreldoc is not implemented yet !")
-        # self.add_name(wrapper)
+        self.add_name(wrapper)
         return [wrapper]
 
 class ExampleDirective(BaseAdmonition):#TODO
@@ -968,7 +970,7 @@ class SquirreltopBlocksTransform(Transform):
             # in_chunks = highlight_using_squirreldoc(sentence)
             try:
                 lexer = pygments.lexers.get_lexer_by_name("squirrel")
-                parsed = pygments.highlight(sentence,lexer,pygments.formatters.TerminalFormatter())
+                parsed = pygments.highlight(sentence,lexer,TERM_FORMATTER)
                 in_chunks = AnsiColorsParser().colorize_str(parsed)
                 dli += nodes.term(sentence, '', *in_chunks, classes=self.block_classes(options['input']))
             except ValueError:
@@ -1301,12 +1303,14 @@ def setup(app):
         app.add_directive(directive.directive_name, directive)
 
     app.add_transform(SquirreltopBlocksTransform)
+    # TODO for latex ? ↓
     # app.connect('doctree-resolved', simplify_source_code_blocks_for_latex)
     app.connect('doctree-resolved',
                 SquirreltopBlocksTransform.merge_consecutive_squirreltop_blocks)
 
     # Add extra styles TODO
     app.add_css_file("ansi.css")
+    # Don't need since we use pygments ↓
     # app.add_css_file("coqdoc.css")
     app.add_js_file("notations.js")
     app.add_css_file("notations.css")
