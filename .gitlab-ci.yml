@@ -9,4 +9,3 @@ build:
   script:
   - make
   - make test
-  - make doc
