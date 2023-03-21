@@ -727,12 +727,12 @@ class SquirreldocDirective(Directive):
         # node = nodes.inline(content, '', *highlight_using_coqdoc(content))
         try:
             lexer = pygments.lexers.get_lexer_by_name("squirrel")
+            parsed = pygments.highlight(content,lexer,pygments.formatters.TerminalFormatter())
+            in_chunks = AnsiColorsParser().colorize_str(parsed)
+            node = nodes.inline(content, '', *in_chunks)
         except ValueError:
             source_literal = nodes.literal_block(content, content)
             node = nodes.inline(content, '', *source_literal)
-        parsed = pygments.highlight(content,lexer,pygments.formatters.TerminalFormatter())
-        in_chunks = AnsiColorsParser().colorize_str(parsed)
-        node = nodes.inline(content, '', *in_chunks)
         wrapper = nodes.container(content, node, classes=['squirreldoc','literal-block'])
         # wrapper = nodes.paragraph(text="squirreldoc is not implemented yet !")
         # self.add_name(wrapper)
@@ -951,12 +951,12 @@ class SquirreltopBlocksTransform(Transform):
             # in_chunks = highlight_using_squirreldoc(sentence)
             try:
                 lexer = pygments.lexers.get_lexer_by_name("squirrel")
+                parsed = pygments.highlight(sentence,lexer,pygments.formatters.TerminalFormatter())
+                in_chunks = AnsiColorsParser().colorize_str(parsed)
+                dli += nodes.term(sentence, '', *in_chunks, classes=self.block_classes(options['input']))
             except ValueError:
                 source_literal = nodes.literal_block(sentence, sentence)
                 dli += nodes.term(sentence, '', *source_literal, classes=self.block_classes(options['input']))
-            parsed = pygments.highlight(sentence,lexer,pygments.formatters.TerminalFormatter())
-            in_chunks = AnsiColorsParser().colorize_str(parsed)
-            dli += nodes.term(sentence, '', *in_chunks, classes=self.block_classes(options['input']))
             # Or dirctly in html ? ↓
             # parsed = pygments.highlight(sentence,lexer,pygments.formatters.HtmlFormatter())
             # dli += nodes.raw('input', parsed, format='html',
