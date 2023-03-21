@@ -288,6 +288,23 @@ class VernacObject(NotationObject):
         m = re.match(r"[a-zA-Z0-9_ ]+", signature)
         return m.group(0).strip() if m else None
 
+class DeclObject(NotationObject):
+    """A :squirrel declaration.
+
+    Example::
+
+       .. decl:: Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
+
+          This command is equivalent to :n:`…`.
+    """
+    subdomain = "decl"
+    index_suffix = "(declaration)"
+    annotation = "Declaration"
+
+    def _name_from_signature(self, signature):
+        m = re.match(r"[a-zA-Z0-9_ ]+", signature)
+        return m.group(0).strip() if m else None
+
 class VernacVariantObject(VernacObject):
     """A variant of a Coq command.
 
@@ -1048,6 +1065,9 @@ class SquirrelSubdomainsIndex(Index):
         content = sorted(content.items())
         return content, collapse
 
+class SquirrelDeclIndex(SquirrelSubdomainsIndex):
+    name, localname, shortname, subdomains = "declindex", "Declration Index", "declarations", ["decl"]
+
 class SquirrelVernacIndex(SquirrelSubdomainsIndex):
     name, localname, shortname, subdomains = "cmdindex", "Command Index", "commands", ["cmd"]
 
@@ -1123,6 +1143,7 @@ class SquirrelDomain(Domain):
 
     object_types = {
         # ObjType (= directive type) → (Local name, *xref-roles)
+        'decl': ObjType('decl', 'decl'),
         'cmd': ObjType('cmd', 'cmd'),
         'cmdv': ObjType('cmdv', 'cmd'),
         'tacn': ObjType('tacn', 'tacn'),
@@ -1142,6 +1163,7 @@ class SquirrelDomain(Domain):
         # Note that some directives live in the same semantic subdomain; ie
         # there's one directive per object type, but some object types map to
         # the same role.
+        'decl': DeclObject,
         'cmd': VernacObject,
         'cmdv': VernacVariantObject,
         'tacn': TacticObject,
@@ -1158,6 +1180,7 @@ class SquirrelDomain(Domain):
 
     roles = {
         # Each of these roles lives in a different semantic “subdomain”
+        'decl': XRefRole(warn_dangling=True),
         'cmd': XRefRole(warn_dangling=True),
         'tacn': XRefRole(warn_dangling=True),
         'opt': XRefRole(warn_dangling=True),
@@ -1175,13 +1198,14 @@ class SquirrelDomain(Domain):
         'g': SquirrelCodeRole
     }
 
-    indices = [SquirrelVernacIndex, SquirrelTacticIndex, SquirrelOptionIndex, SquirrelGallinaIndex, SquirrelExceptionIndex, SquirrelAttributeIndex]
+    indices = [SquirrelDeclIndex, SquirrelVernacIndex, SquirrelTacticIndex, SquirrelOptionIndex, SquirrelGallinaIndex, SquirrelExceptionIndex, SquirrelAttributeIndex]
 
     data_version = 1
     initial_data = {
         # Collect everything under a key that we control, since Sphinx adds
         # others, such as “version”
         'objects' : { # subdomain → name → docname, objtype, targetid
+            'decl': {},
             'cmd': {},
             'tacn': {},
             'opt': {},
