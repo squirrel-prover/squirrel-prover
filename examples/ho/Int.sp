@@ -1,4 +1,4 @@
-type int [well_founded, fix].
+type int [well_founded, fixed].
 
 (*==================================================================*)
 (* `Ordering` *)

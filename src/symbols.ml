@@ -135,7 +135,7 @@ type bty_info =
   | Large
   | Name_fixed_length
   | Finite
-  | Fix
+  | Fixed
   | Well_founded
 
 type bty_infos = bty_info list
@@ -678,7 +678,7 @@ module TyInfo = struct
     | "name_fixed_length" -> Name_fixed_length 
     | "large"             -> Large 
     | "well_founded"      -> Well_founded 
-    | "fix"               -> Fix
+    | "fixed"             -> Fixed
     | "finite"            -> Finite
     | _ -> symb_err (L.loc info) (Failure "unknown type information")
 
@@ -712,7 +712,7 @@ module TyInfo = struct
       | Boolean | Message | Index | Timestamp -> true
       | Tuple l -> List.for_all check  l
       | Fun (t1, t2) -> check t1 && check t2
-      | TBase _ as ty -> check_bty_info table ty Fix
+      | TBase _ as ty -> check_bty_info table ty Fixed
       | _ -> false
     in 
     check ty
