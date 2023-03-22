@@ -194,7 +194,7 @@ Proof.
   intro i j Hh Hc.
   expand cond.
   euf Hc.
-  intro *. 
+  intro [k _].
   by exists k.
 Qed.
 
