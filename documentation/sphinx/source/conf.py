@@ -73,6 +73,10 @@ navtree_shift = True
 # since sphinxcontrib-bibtex version 2 we need this
 bibtex_bibfiles = [ "biblio.bib" ]
 
+# Change this to "info" or "warning" to get notifications about undocumented Coq
+# objects (objects with no contents).
+report_undocumented_squirrel_objects = "warning"
+
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = 'sphinx'
 highlight_language = 'rst'
