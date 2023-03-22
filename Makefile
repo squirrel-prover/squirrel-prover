@@ -25,6 +25,11 @@ NOW=`date +"%m_%d_%Y_%H_%M"`
 BENCH_OUT=$(BENCHDIR)/last.json
 BENCH_COMMIT_OUT=$(BENCHDIR)/$(GITCOMMIT).json
 
+ORA=\033[0;33m
+RED=\033[0;31m
+GRE=\033[0;32m
+NC=\033[0m
+
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
@@ -154,8 +159,12 @@ alcotest: version
 # Same as above but will print out only the FAILs tests as before
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
-	@dune exec -- ./test.exe | sed -e 's/\x1b\[[0-9;]*m//g' | { grep -E --color "^[^│] \[FAIL\]" || true; }
-	@$(ECHO) "DONE"
+	@if dune exec -- ./test.exe > $(TESTS_OUT) ; \
+		then echo "${GRE}Alcotests passed successfully !${NC}" ; \
+		else echo "${RED}Alcotests FAILED :${NC}" ; \
+			cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
+			exit 1; \
+	fi
 
 clean:
 	dune clean
@@ -215,10 +224,6 @@ version:
 		sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml; \
 	fi
 
-ORA=\033[0;33m
-RED=\033[0;31m
-GRE=\033[0;32m
-NC=\033[0m
 HEAD:=$(shell git rev-parse --short HEAD)
 GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
 LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
