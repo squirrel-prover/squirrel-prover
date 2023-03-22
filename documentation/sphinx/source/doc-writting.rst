@@ -535,8 +535,10 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
             .. squirreltop:: all
 
+               (* comment *)
                name n:message.
                name s:message.
+               hash h.
                goal [any] toto : true=>true.
                Proof.
                   admit.
@@ -546,8 +548,10 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
          .. squirreltop:: all
 
+            (* comment *)
             name n:message.
             name s:message.
+            hash h.
             goal [any] toto : true=>true.
             Proof.
                admit.

@@ -13,19 +13,16 @@ Table of contents
    self
 
 .. toctree::
-   :maxdepth: 2
    :caption: Language
 
    language
 
 .. toctree::
-   :maxdepth: 2
    :caption: Proofs
 
    proofs
 
 .. toctree::
-   :maxdepth: 2
    :caption: Tutorial
 
    tutorial
@@ -37,6 +34,7 @@ Table of contents
    appendix/indexes/index
    doc-writting
    bibliography
+
 
 Indices and tables
 ==================

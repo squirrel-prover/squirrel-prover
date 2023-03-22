@@ -31,7 +31,7 @@ class SquirrelTop:
     """
 
     # COQTOP_PROMPT = re.compile("\r\n[^< \r\n]+ < ")
-    SQUIRRELTOP_PROMPT = re.compile("\[>")
+    SQUIRRELTOP_PROMPT = re.compile("\[> ")
 
     def __init__(self, squirreltop_bin=None, color=False, args=None) -> str:
         """Configure a squirreltop instance (but don't start it yet).
@@ -60,16 +60,13 @@ class SquirrelTop:
 
     def __exit__(self, type, value, traceback):
         print("Exiting squirreltop…")
-        # TODO ↓
         self.squirreltop.kill(9)
 
     def next_prompt(self):
         """Wait for the next squirreltop prompt, and return the output preceding it."""
         print("Wait squirreltop…")
-        # TODO ↓
         self.squirreltop.expect(SquirrelTop.SQUIRRELTOP_PROMPT, timeout = 10)
         return self.squirreltop.before
-        # return ""
 
     def sendone(self, sentence):
         """Send a single sentence to squirreltop.
@@ -78,19 +75,17 @@ class SquirrelTop:
                    prompts and we'll get confused)
         """
         # Suppress newlines, but not spaces: they are significant in notations
-        # TODO ↓
         sentence = re.sub(r"[\r\n]+", " ", sentence).strip()
         try:
             self.squirreltop.sendline(sentence)
             output = self.next_prompt()
         except Exception as err:
             raise SquirrelTopError(err, sentence, self.squirreltop.before)
-        return output
+        return output.strip()
 
     def send_initial_options(self):
         """Options to send when starting the toplevel and after a Reset Initial."""
-        self.sendone('Set squirreltop Exit On Error.')
-        self.sendone('Set Warnings "+default".')
+        # self.sendone('include Basic.')
 
 def sendmany(*sentences):
     """A small demo: send each sentence in sentences and print the output"""
@@ -107,8 +102,7 @@ def main():
     with SquirrelTop() as squirreltop:
         for _ in range(200):
             print(repr(squirreltop.sendone("Check nat.")))
-        sendmany("Goal False -> True.", "Proof.", "intros H.",
-                 "Check H.", "Chchc.", "apply I.", "Qed.")
+        sendmany("goal _ : False.", "Proof.", "admit", "Qed.")
 
 if __name__ == '__main__':
     main()

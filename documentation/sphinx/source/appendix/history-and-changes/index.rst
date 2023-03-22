@@ -15,7 +15,7 @@ will help you understand the differences with the previous version and
 upgrade your projects.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: -1
 
    ../../history
    ../../changes

@@ -933,7 +933,7 @@ class SquirreltopBlocksTransform(Transform):
             output = AnsiColorsParser.COLOR_PATTERN.sub("", output).strip()
             if opt_input:
                 blocks.append(sentence)
-            if output and opt_output:
+            if output and opt_output and output != "" and not output.isspace():
                 blocks.append(re.sub("^", "    ", output, flags=re.MULTILINE) + "\n")
         return '\n'.join(blocks)
 
@@ -942,6 +942,7 @@ class SquirreltopBlocksTransform(Transform):
 
         pairs = []
 
+        # TODO ↓
         if options['restart']:
             repl.sendone('Restart.')
         if options['reset']:
@@ -980,12 +981,13 @@ class SquirreltopBlocksTransform(Transform):
             # parsed = pygments.highlight(sentence,lexer,pygments.formatters.HtmlFormatter())
             # dli += nodes.raw('input', parsed, format='html',
             #                  classes=self.block_classes(options['input']))
-            if output:
+            if output and output != "" and not output.isspace():
                 # Parse ANSI sequences to highlight output
                 out_chunks = AnsiColorsParser().colorize_str(output)
                 dli += nodes.definition(output, *out_chunks, classes=self.block_classes(options['output'], output))
+        is_there_output = output and output != "" and not output.isspace()
         node.clear()
-        node.rawsource = self.make_rawsource(pairs, options['input'], options['output'])
+        node.rawsource = self.make_rawsource(pairs, options['input'], is_there_output)
         node['classes'].extend(self.block_classes(options['input'] or options['output']))
         node += nodes.inline('', '', classes=['squirreltop-reset'] * options['reset'])
         node += nodes.definition_list(node.rawsource, dli)
@@ -1310,6 +1312,7 @@ def setup(app):
 
     # Add extra styles TODO
     app.add_css_file("ansi.css")
+    # app.add_css_file("ansi-dark.css")
     # Don't need since we use pygments ↓
     # app.add_css_file("coqdoc.css")
     app.add_js_file("notations.js")

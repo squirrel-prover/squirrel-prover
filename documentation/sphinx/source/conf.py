@@ -59,6 +59,10 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 html_static_path = ['_static']
 
+html_theme_options = {
+    'collapse_navigation': False,
+    'navigation_depth': -1,
+}
 html_context = {
     'display_github': True,
     'github_user': 'squirrel-prover',
