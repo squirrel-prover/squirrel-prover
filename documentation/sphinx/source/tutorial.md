@@ -181,6 +181,7 @@ goal wa :
      cond@R(j,i) =>
          exists (k:index),
               T(i,k) <= R(j,i) && fst(input@R(j,i)) = nT(i,k).
+              
 ```
 
 We write bellow the simple proof of this statement. Once inside a proof context, delimited by `Proof.` and `Qed.`, it is possible to get the list of available tactics by typing `help.`, and details about any tactic with `help tacticname.`
@@ -193,7 +194,8 @@ Proof.
   intro i j Hh Hc.
   expand cond.
   euf Hc.
-  intro *; by exists k.
+  intro *. 
+  by exists k.
 Qed.
 
 ```
