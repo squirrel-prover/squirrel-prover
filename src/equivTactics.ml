@@ -607,7 +607,13 @@ let enrich _ty f _loc (s : ES.t) =
 
 let enrich_a arg s =
   match 
-    Args.convert_args (ES.env s) [arg] Args.(Sort Term) (Global (ES.goal s)) 
+    let env = ES.env s in
+    let env =
+      Env.{env with
+           system = SE.{set = (ES.get_system_pair s :> SE.arbitrary);
+                        pair = None;} }
+    in
+    Args.convert_args env [arg] Args.(Sort Term) (Global (ES.goal s)) 
   with
   | Args.Arg (Term (ty, t, loc)) -> enrich ty t loc s
   | _ -> bad_args ()

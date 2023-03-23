@@ -477,8 +477,8 @@ let pp_error_i ppf = function
     Fmt.pf ppf "missing system annotation"
 
   | BadProjInSubterm (ps1, ps2) ->
-    Fmt.pf ppf "@[<v 2>invalid projection:@;missing projections: %a@;\
-                unknown projections: %a@]"
+    Fmt.pf ppf "@[<v 2>invalid projection:@;missing projections: @[%a@]@;\
+                unknown projections: @[%a@]@]"
       Term.pp_projs ps1
       Term.pp_projs ps2
 

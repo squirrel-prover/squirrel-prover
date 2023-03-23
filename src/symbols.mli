@@ -121,7 +121,7 @@ type bty_info =
   | Large               (** collision probabiliy between names is negligible *)
   | Name_fixed_length   (** for any η, all names have the same length *)
   | Finite              (** finite for all η *)
-  | Fix                 (** independent from η *)
+  | Fixed               (** independent from η *)
   | Well_founded        (** well-founded for all η *)
     
 type bty_infos = bty_info list

@@ -182,11 +182,10 @@ let rw_inst
             | NoMatch _ -> s, `Continue
             | Match _mv -> 
               (* When we found another occurrence of the same rewrite
-                 instance, we clear the conditions, as they may not be
-                 the same than for the first instance found. 
-                 We could be less strict and look whether there are common 
-                 conditions, but this is probably not worth the effort. *)
-              let s = { s with found_instance = `Found { inst with conds = []; }; } in
+                 instance, we clear the conditions that are not shared by 
+                 both occurrences (i.e. we keep only common conditions) *)
+              let conds = List.filter (fun cond -> List.mem cond conds) inst.conds in
+              let s = { s with found_instance = `Found { inst with conds } } in
 
               (* project the already found instance with the projections
                  applying to the current subterm *)

@@ -314,7 +314,11 @@ Qed.
 hint rewrite false_iff_true.
 
 
-
+goal [any] contra_iff (x, y : boolean) : ((not x) <=> y) = (x <=> (not y)).
+Proof.
+  rewrite eq_iff.
+  split; by rewrite !-eq_iff -eq_not.
+Qed.
 
 (*------------------------------------------------------------------*)
 (* exists *)

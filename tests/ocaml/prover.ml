@@ -6,6 +6,7 @@ module Theory = Squirrellib.Theory
 
 open Util
 
+(*------------------------------------------------------------------*)
 let some_print () =
   let exception Ok in
   Alcotest.check_raises "print stuff" Ok
@@ -30,6 +31,7 @@ let some_print () =
       raise Ok
     )
 
+(*------------------------------------------------------------------*)
 let search_unify () =
   let exception Ok in
   Alcotest.check_raises "unify Names with special arity when search" Ok
@@ -70,6 +72,7 @@ let search_unify () =
       raise Ok
     )
 
+(*------------------------------------------------------------------*)
 let search_about_1 () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
@@ -111,6 +114,7 @@ let search_about_1 () =
   let _ =  Prover.exec_command "search n(_)." st in
   ()
 
+(*------------------------------------------------------------------*)
 let search_about_2 () =
   let exception Ok in
   let exception Ko in
@@ -168,33 +172,84 @@ let search_about_2 () =
   let _ = Prover.exec_command "print myeq." st in
   ()
 
-let search_about_type_holes () =
+(*------------------------------------------------------------------*)
+let search_about_type_holes_1 () =
   let exception Ok in
-  Alcotest.check_raises "unify Names with special arity when search" Ok
+  Alcotest.check_raises "search with type holes 1" Ok
     (fun () ->
       let st = Prover.init () in
       let st = try Prover.exec_all st
         "axiom [any] bar1 ['a] : exists (x : 'a), true.
          axiom [any] bar2 ['a] : exists (x : 'a -> 'a), true."
-      with | e -> raise e in
+      with e -> raise e in
 
       (* test 1 *)
       let matches = Prover.search_about st 
           (ProverLib.Srch_term (term_from_string "exists (x : _), _"))
       in
-      Alcotest.(check' int) ~msg:"Found one axiom with exists (x : _), _" 
+      Alcotest.(check' int) ~msg:"Test 1" 
         ~actual:(List.length matches) ~expected:2;
 
       (* test 2 *)
       let matches = Prover.search_about st 
           (ProverLib.Srch_term (term_from_string "exists (x : _ -> _), _"))
       in
-      Alcotest.(check' int) ~msg:"Found one axiom with exists (x : _), _" 
+      Alcotest.(check' int) ~msg:"Test 2" 
         ~actual:(List.length matches) ~expected:1;
 
       raise Ok
     )
 
+(*------------------------------------------------------------------*)
+let search_about_type_holes_2 () =
+  let exception Ok in
+    Alcotest.check_raises "search with type holes 2" Ok
+    (fun () ->
+      let st = Prover.init () in
+      let st = try Prover.exec_all st
+        "axiom [any] foo ['a] (phi:'a -> bool) :
+         (not (exists (a:'a), (phi a))) = (forall (a:'a), not (phi a)).
+
+         axiom [any] bar ['a] (phi:bool) :
+         (not (exists (a:'a), (phi))) = (forall (a:'a), not (phi))."
+      with e -> raise e in
+
+      (* test 1 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term
+             (term_from_string "(not (exists (a:_), _ a)) = (forall (a:_), not (_ a))"))
+      in
+      Alcotest.(check' int) ~msg:"Test 1" 
+        ~actual:(List.length matches) ~expected:2;
+
+      (* test 2 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term
+             (term_from_string "(not (exists (a:_), _ a)) = (forall (a:_), not  _   )"))
+      in
+      Alcotest.(check' int) ~msg:"Test 2" 
+        ~actual:(List.length matches) ~expected:2;
+
+      (* test 3 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term
+             (term_from_string "(not (exists  _   , _ _)) = (forall  _   , _   (_ _))"))
+      in
+      Alcotest.(check' int) ~msg:"Test 3" 
+        ~actual:(List.length matches) ~expected:1;
+
+      (* test 4 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term
+             (term_from_string "(not (exists  _   ,   _)) = (forall  _   ,         _)"))
+      in
+      Alcotest.(check' int) ~msg:"Test 4" 
+        ~actual:(List.length matches) ~expected:2;
+
+      raise Ok
+    )
+
+(*------------------------------------------------------------------*)
 let include_search () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
@@ -239,6 +294,7 @@ let include_search () =
     ~actual:(List.length matches) ~expected:2;
   ()
 
+(*------------------------------------------------------------------*)
 let include_ite () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
@@ -264,11 +320,13 @@ let include_ite () =
   Alcotest.(check' int) ~msg:"Found one lemma with if _ then _ else _"
     ~actual:(List.length matches) ~expected:11 (* to update regarding to Basic.sp *)
 
-let tests = [ ("search_about1",     `Quick, search_about_1);
-              ("search_about2",     `Quick, search_about_2);
-              ("search_type_holes", `Quick, search_about_type_holes);
-              ("include_search",    `Quick, include_search);
-              ("include_ite",       `Quick, include_ite);
-              ("search_unify",      `Quick, search_unify);
-              ("some_print",        `Quick, some_print);
+(*------------------------------------------------------------------*)
+let tests = [ ("search_about1",      `Quick, search_about_1);
+              ("search_about2",      `Quick, search_about_2);
+              ("search_type_holes1", `Quick, search_about_type_holes_1);
+              ("search_type_holes2", `Quick, search_about_type_holes_2);
+              ("include_search",     `Quick, include_search);
+              ("include_ite",        `Quick, include_ite);
+              ("search_unify",       `Quick, search_unify);
+              ("some_print",         `Quick, some_print);
             ]
