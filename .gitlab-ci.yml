@@ -4,6 +4,7 @@ before_script:
  - opam switch -y create gitrunner ocaml-base-compiler.4.13.1
  - opam install . -y --deps-only
  - eval $(opam env)
+ - pip install -U pip
  - pip install -U sphinx
  - pip install sphinx_rtd_theme beautifulsoup4 sphinx-tabs antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 build:
