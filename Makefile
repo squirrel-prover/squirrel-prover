@@ -157,10 +157,14 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 alcotest: version
 	dune runtest
 
+# Apparently needs to build everything for the test.exe
+_build/default/test.exe: version
+	dune build
+
 # Same as above but will print out only the FAILs tests as before
-alcotest_full: version 
+alcotest_full: _build/default/test.exe version 
 	@$(ECHO) "================== ALCOTEST ======================"
-	@if dune exec -- ./test.exe > $(TESTS_OUT) ; \
+	@if dune exec ./_build/default/test.exe > $(TESTS_OUT) ; \
 		then echo "${GRE}Alcotests passed successfully !${NC}" ; \
 		else echo "${RED}Alcotests FAILED :${NC}" ; \
 			cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
