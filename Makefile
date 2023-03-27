@@ -20,7 +20,7 @@ bench: bench_example
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 BENCHDIR=_build/bench
-TESTS_OUT=_build/tests.output
+TESTS_OUT=/tmp/squirrel_tests.output
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
 BENCH_OUT=$(BENCHDIR)/last.json
