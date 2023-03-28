@@ -160,7 +160,7 @@ Notations
 The signatures of most objects can be written using a succinct DSL for Squirrel notations (think regular expressions written with a Lispy syntax).  A typical signature might look like ``Hint Extern @natural {? @pattern} => @tactic``, which means that the ``Hint Extern`` command takes a number (``natural``), followed by an optional pattern, and a mandatory tactic.  The language has the following constructs (the full grammar is in `TacticNotations.g <_ext/notations/TacticNotations.g>`_):
 
 ``@…``
-  A placeholder (``@ident``, ``@natural``, ``@tactic``\ …)
+  A placeholder (``@ident``, ``@natural``, ``@tactic``\ ...)
 
 ``{? …}``
   an optional block
@@ -244,13 +244,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
        .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
-          This command is equivalent to …
+          This command is equivalent to
 
    .. tab:: Produces
 
     .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
-       This command is equivalent to …
+       This command is equivalent to
 
 
 
@@ -265,13 +265,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
        .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
-          This command is equivalent to :n:`…`.
+          This command is equivalent to :n:`...`.
 
    .. tab:: Produces
 
     .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
-       This command is equivalent to :n:`…`.
+       This command is equivalent to :n:`...`.
 
 
 ``.. cmdv::`` |black_nib| A variant of a Squirrel command.
@@ -439,13 +439,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
           .. tacn:: _do @natural @expr
 
-             :token:`expr` is evaluated to ``v`` which must be a tactic value. …
+             :token:`expr` is evaluated to ``v`` which must be a tactic value...
 
       .. tab:: produces
 
           .. tacn:: _do @natural @expr
 
-             :token:`expr` is evaluated to ``v`` which must be a tactic value. …
+             :token:`expr` is evaluated to ``v`` which must be a tactic value...
 
 ``.. tacv::`` |black_nib| A variant of a tactic.
 
@@ -460,12 +460,12 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
                 This is the always-failing tactic: it does not solve any goal. It is
                 useful for defining other tacticals since it can be caught by
                 :tacn:`try`, :tacn:`repeat`, :tacn:`match goal`, or the branching
-                tacticals. …
+                tacticals...
 
                 .. tacv:: _fail @natural
 
                    The number is the failure level. If no level is specified, it
-                   defaults to 0. …
+                   defaults to 0...
 
       .. tab:: produces
 
@@ -474,12 +474,12 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              This is the always-failing tactic: it does not solve any goal. It is
              useful for defining other tacticals since it can be caught by
              :tacn:`_try`, :tacn:`_repeat`, :tacn:`_match goal`, or the branching
-             tacticals. …
+             tacticals...
 
              .. tacv:: _fail @natural
 
                 The number is the failure level. If no level is specified, it
-                defaults to 0. …
+                defaults to 0...
 
 ``.. thm::`` A theorem.
 
@@ -532,7 +532,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 ``.. squirreltop::`` A reST directive to describe interactions with Squirrel.
     Usage::
 
-    .. squirreltop:: options…
+    .. squirreltop:: options...
 
        code to be executed by Squirrel
 
@@ -771,13 +771,13 @@ DO
   .. code::
 
      :n:`power_tac @term [@ltac]`
-       allows :tacn:`ring` and :tacn:`ring_simplify` to recognize …
+       allows :tacn:`ring` and :tacn:`ring_simplify` to recognize...
 
 DON'T
   .. code::
 
      power_tac :n:`@term` [:n:`@ltac`]
-       allows :tacn:`ring` and :tacn:`ring_simplify` to recognize …
+       allows :tacn:`ring` and :tacn:`ring_simplify` to recognize...
 
 ..
 
@@ -871,7 +871,7 @@ DO
 
      .. example:: Using proof-irrelevance
 
-        If you assume the axiom above, …
+        If you assume the axiom above
 
 DON'T
   .. code::

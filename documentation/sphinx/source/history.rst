@@ -412,7 +412,7 @@ universe levels, universe consistency check being relegated to the
 final type checking pass. This induced a certain puzzlement in early
 users who saw, after a successful proof search, their ``QED`` followed
 by silence, followed by a failure message due to a universe
-inconsistency…
+inconsistency
 
 The set of examples comprise set theory experiments by Hugo Herbelin,
 and notably the Schroeder-Bernstein theorem.
