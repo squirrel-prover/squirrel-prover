@@ -3,6 +3,12 @@ import os
 
 sys.path.append(os.path.abspath("./_ext"))
 
+# -- Prolog ---------------------------------------------------------------
+
+# Include substitution definitions in all files
+with open("refman-preamble.rst") as s:
+    rst_prolog = s.read()
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -28,6 +34,10 @@ extensions = [
     'squirreldomain'
 ]
 
+latex_additional_files = [
+    "refman-preamble.sty",
+]
+
 # Add autodoc for ocaml ↓ But is not up to date (downgrade ocaml ?)
 # extensions.append("sphinxcontrib.ocaml")
 # primary_domain = "ocaml"
@@ -43,7 +53,16 @@ source_suffix = {
 }
 
 templates_path = ['_templates']
-exclude_patterns = []
+
+SUPPORTED_FORMATS = ["html", "latex"]
+
+exclude_patterns = [
+    'build',
+    'Thumbs.db',
+    '.DS_Store',
+    'refman-preamble.rst',
+] + ["*.{}.rst".format(fmt) for fmt in SUPPORTED_FORMATS]
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -71,13 +90,55 @@ html_context = {
     'conf_py_path': '/documentation/sphinx/'
 }
 
+# -- Options for LaTeX output ---------------------------------------------
+
+###########################
+# Set things up for XeTeX #
+###########################
+
+latex_elements = {
+    'babel': '',
+    'fontenc': '',
+    'inputenc': '',
+    'utf8extra': '',
+    'cmappkg': '',
+    'papersize': 'letterpaper',
+    'classoptions': ',openany', # No blank pages
+    'polyglossia': '\\usepackage{polyglossia}',
+    'sphinxsetup': 'verbatimwithframe=false',
+    'preamble': r"""
+                 \usepackage{unicode-math}
+                 \usepackage{microtype}
+
+                 % Macro definitions
+                 \usepackage{refman-preamble}
+
+                 % Style definitions for notations
+                 %\usepackage{squirrelqnotations}
+
+                 % Style tweaks
+                 \newcssclass{sigannot}{\textrm{#1:}}
+
+                 % Silence 'LaTeX Warning: Command \nobreakspace invalid in math mode'
+                 \everymath{\def\nobreakspace{\ }}
+                 """
+}
+
+latex_engine = "xelatex"
+
+# Cf. https://github.com/sphinx-doc/sphinx/issues/7015
+latex_use_xindy = False
+
+
+
 # navtree options
 navtree_shift = True
 
 # since sphinxcontrib-bibtex version 2 we need this
 bibtex_bibfiles = [ "biblio.bib" ]
 
-# Change this to "info" or "warning" to get notifications about undocumented Coq
+# Change this to "info" or "warning" to get notifications about
+# undocumented Squirrel
 # objects (objects with no contents).
 report_undocumented_squirrel_objects = "warning"
 

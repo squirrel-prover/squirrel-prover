@@ -7,10 +7,6 @@ See `this README <../README.md>`_ for compilation instructions.
 
 In addition to standard reST directives (a directive is similar to a LaTeX environment) and roles (a role is similar to a LaTeX command), the ``squirrelrst`` plugin loaded by the documentation uses a custom *Squirrel domain* — a set of Squirrel-specific directives that define *objects* like tactics, commands (vernacs), warnings, etc. —, some custom *directives*, and a few custom *roles*.  Finally, this manual uses a small DSL to describe tactic invocations and commands.
 
-TODO in each category below,
-indicate clearly what is not yet available for Squirrel,
-perhaps only keep what will soon be available
-
 Squirrel objects
 ================
 
@@ -591,6 +587,8 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
     of the same document (``squirrelrst`` creates a single ``squirreltop`` process per
     reST source file).  Use the ``reset`` option to reset Coq's state.
 
+    Example:
+
     .. tabs::
 
       .. tab:: reStructuredText
@@ -604,13 +602,12 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
             .. squirreltop:: all
 
-               print toto.
                print tutu.
+               print toto.
 
             .. squirreltop:: reset all
 
                print toto.
-               print tutu.
 
       .. tab:: produces
 
@@ -621,20 +618,20 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
             .. squirreltop:: all
 
-               print toto.
                print tutu.
+               print toto.
 
             .. squirreltop:: reset all
 
                print toto.
-               print tutu.
+
 
 ``.. squirreldoc::`` A reST directive to display squirreltop-formatted source code.
     Usage::
 
        .. squirreldoc::
 
-          squirrel code to highlight
+          squirrel code to highlight.
 
     .. tabs::
 
@@ -644,19 +641,91 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
              .. squirreldoc::
 
-                name n:index->message.
-                name m:index->message.
-                (* ceci est un commentaire *)
-                name y:index->message.
+               name key  : index -> message
+               name key' : index * index -> message
+
+               (* Finally, we declare the channels used by the protocol. *)
+
+               channel cT
+               channel cR.
+
+               process tag(i:index,k:index) =
+                 new nT;
+                 out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>).
+
+               process reader(j:index) =
+                 in(cT,x);
+                 if exists (i,k:index), snd(x) = h(fst(x),diff(key(i),key'(i,k))) then
+                   out(cR,ok)
+                 else
+                   out(cR,ko).
+
+               (* The system is finally defined by putting an unbounded number of tag and
+                   reader processes in parallel.
+                   This system is automatically translated to a set of actions:
+
+                   * the initial action (`init`);
+                   * one action for the tag (`T`);
+                   * two actions for the reader, corresponding to the two branches of the
+                     conditional (respectively `R` and `R1`). *)
+
+               system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+
+               goal [BasicHash] wa_R :
+                 forall (tau:timestamp),
+                   happens(tau) =>
+                   ((exists (i,k:index),
+                      snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
+                    <=>
+                    (exists (i,k:index), T(i,k) < tau &&
+                      fst(output@T(i,k)) = fst(input@tau) &&
+                      snd(output@T(i,k)) = snd(input@tau))).
 
       .. tab:: produces
 
           .. squirreldoc::
 
-             name n:index->message.
-             name m:index->message.
-             (* ceci est un commentaire *)
-             name y:index->message.
+               name key  : index -> message
+               name key' : index * index -> message
+
+               (* Finally, we declare the channels used by the protocol. *)
+
+               channel cT
+               channel cR.
+
+               process tag(i:index,k:index) =
+                 new nT;
+                 out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>).
+
+               process reader(j:index) =
+                 in(cT,x);
+                 if exists (i,k:index), snd(x) = h(fst(x),diff(key(i),key'(i,k))) then
+                   out(cR,ok)
+                 else
+                   out(cR,ko).
+
+               (* The system is finally defined by putting an unbounded number of tag and
+                   reader processes in parallel.
+                   This system is automatically translated to a set of actions:
+
+                   * the initial action (`init`);
+                   * one action for the tag (`T`);
+                   * two actions for the reader, corresponding to the two branches of the
+                     conditional (respectively `R` and `R1`). *)
+
+               system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+
+               goal [BasicHash] wa_R :
+                 forall (tau:timestamp),
+                   happens(tau) =>
+                   ((exists (i,k:index),
+                      snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
+                    <=>
+                    (exists (i,k:index), T(i,k) < tau &&
+                      fst(output@T(i,k)) = fst(input@tau) &&
+                      snd(output@T(i,k)) = snd(input@tau))).
+
+This is not equivalent to ``.. squirreltop:: in`` since none of the given content is sent to ``squirreltop`` and then take time to be computed when doc is generated !
 
 
 ``.. example::`` A reST directive for examples.
@@ -667,81 +736,85 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
     Optionally, any text immediately following the ``.. example::`` header is
     used as the example's title.
 
-    Example::
+    Example:
 
-       .. example:: Adding a hint to a database
+    .. tabs::
 
-          The following adds ``plus_comm`` to the ``plu`` database:
+      .. tab:: reStructuredText
 
-          .. squirreldoc::
+         .. code-block:: rst
 
-             Hint Resolve plus_comm : plu.
+             .. example:: Adding a hint to the automatic constraint solving procedure 
 
-``.. inference::`` A reST directive to format inference rules.
-    This also serves as a small illustration of the way to create new Sphinx
-    directives.
+                The following adds ``not_true`` to the solver
 
-    Usage::
+                .. squirreldoc::
 
-       .. inference:: name
+                  axiom [any] not_true : not(true) = false.
+                  hint rewrite not_true.
 
-          newline-separated premises
-          --------------------------
-          conclusion
+      .. tab:: produces
 
-    Example::
+          .. example:: Adding a hint to the automatic constraint solving procedure 
 
-       .. inference:: Prod-Pro
+             The following adds ``not_true`` to the solver
 
-          \WTEG{T}{s}
-          s \in \Sort
-          \WTE{\Gamma::(x:T)}{U}{\Prop}
-          -----------------------------
-          \WTEG{\forall~x:T,U}{\Prop}
+             .. squirreldoc::
+
+               axiom [any] not_true : not(true) = false.
+               hint rewrite not_true.
 
 
-``.. preamble::`` A reST directive to include a TeX file.
-    Mostly useful to let MathJax know about `\def`\s and `\newcommand`\s.  The
-    contents of the TeX file are wrapped in a math environment, as MathJax
-    doesn't process LaTeX definitions otherwise.
+Squirrel roles
+==============
 
-    Usage::
+In addition to the objects and directives above, the ``squirrelrst`` Sphinx plugin defines the following roles:
 
-       .. preamble:: preamble.tex
+``:g:`` Squirrel code.
+    Use this for Gallina and Ltac snippets:
 
-Coq roles
-=========
+    .. tabs::
 
-In addition to the objects and directives above, the ``coqrst`` Sphinx plugin defines the following roles:
+      .. tab:: reStructuredText
 
-``:g:`` Coq code.
-    Use this for Gallina and Ltac snippets::
+         .. code-block:: rst
 
-       :g:`apply plus_comm; reflexivity`
-       :g:`Set Printing All.`
-       :g:`forall (x: t), P(x)`
+             Apply tactics :g:`apply not_true; reflexivity` 
+             or set options 
+             :g:`set postQuantumSound=true.`
+             or declare 
+             :g:`(forall (a:'a), true) = true.`
+
+      .. tab:: produces
+
+             Apply tactics :g:`apply not_true; reflexivity` 
+             or set options 
+             :g:`set postQuantumSound=true.`
+             or declare 
+             :g:`(forall (a:'a), true) = true.`
 
 ``:n:`` Any text using the notation syntax (``@id``, ``{+, …}``, etc.).
     Use this to explain tactic equivalences.  For example, you might write
-    this::
+    this:
 
-       :n:`generalize @term as @ident` is just like :n:`generalize @term`, but
-       it names the introduced hypothesis :token:`ident`.
+    .. tabs::
+
+      .. tab:: reStructuredText
+
+         .. code-block:: rst
+
+          :n:`generalize @term as @ident` is just like :n:`generalize @term`, but
+          it names the introduced hypothesis :token:`ident`.
+
+      .. tab:: produces
+
+          :n:`generalize @term as @ident` is just like :n:`generalize @term`, but
+          it names the introduced hypothesis :token:`ident`.
 
     Note that this example also uses ``:token:``.  That's because ``ident`` is
     defined in the Coq manual as a grammar production, and ``:token:``
     creates a link to that.  When referring to a placeholder that happens to be
     a grammar production, ``:token:`…``` is typically preferable to ``:n:`@…```.
-
-``:production:`` A grammar production not included in a ``prodn`` directive.
-    Useful to informally introduce a production, as part of running text.
-
-    Example::
-
-       :production:`string` indicates a quoted string.
-
-    You're not likely to use this role very commonly; instead, use a ``prodn``
-    directive and reference its tokens using ``:token:`…```.
 
 ``:gdef:`` Marks the definition of a glossary term inline in the text.
     Matching ``:term:`XXX``` constructs will link to it.
@@ -750,10 +823,21 @@ In addition to the objects and directives above, the ``coqrst`` Sphinx plugin de
     "term" must be capitalized or plural for grammatical reasons.
     The term will also appear in the :ref:`glossary index <glossary_index>`.
 
-    Examples::
+    Examples:
 
-       A :gdef:`prime` number is divisible only by itself and 1.
-       :gdef:`Composite <composite>` numbers are the non-prime numbers.
+    .. tabs::
+
+      .. tab:: reStructuredText
+
+         .. code-block:: rst
+
+             A :gdef:`prime` number is divisible only by itself and 1.
+             :gdef:`Composite <composite>` numbers are the non-prime numbers.
+
+      .. tab:: produces
+
+             A :gdef:`prime` number is divisible only by itself and 1.
+             :gdef:`Composite <composite>` numbers are the non-prime numbers.
 
 Common mistakes
 ===============
@@ -785,7 +869,6 @@ DON'T
      Foo all the :token:`bar`\ s in
      the current context
 
-You can set the ``report_undocumented_coq_objects`` setting in ``conf.py`` to ``"info"`` or ``"warning"`` to get a list of all Coq objects without a description.
 
 Overusing ``:token:``
 ---------------------
@@ -925,37 +1008,26 @@ Tips and tricks
 Nested lemmas
 -------------
 
-The ``.. squirreltop::`` directive does *not* reset Coq after running its contents.  That is, the following will create two nested lemmas (which by default results in a failure)::
+The ``.. squirreltop::`` directive does *not* reset Squirrel after running its contents.  That is, the following will create two nested lemmas (which by default results in a failure)::
 
    .. squirreltop:: all
 
-      Lemma l1: 1 + 1 = 2.
+      goal l1: 1 + 1 = 2.
 
    .. squirreltop:: all
 
-      Lemma l2: 2 + 2 <> 1.
+      goal l2: 2 + 2 <> 1.
 
 Add either ``abort`` to the first block or ``reset`` to the second block to avoid nesting lemmas.
 
 Abbreviations and macros
 ------------------------
 
-Substitutions for specially-formatted names (like ``|Cic|``, ``|Ltac|`` and ``|Latex|``), along with some useful LaTeX macros, are defined in a `separate file </doc/sphinx/refman-preamble.rst>`_.  This file is automatically included in all manual pages.
-
-Emacs
------
-
-The ``dev/tools/coqdev.el`` folder contains a convenient Emacs function to quickly insert Sphinx roles and quotes.  It takes a single character (one of ``gntm:```), and inserts one of ``:g:``, ``:n:``, ``:t:``, or an arbitrary role, or double quotes.  You can also select a region of text, and wrap it in single or double backticks using that function.
-
-Use the following snippet to bind it to `F12` in ``rst-mode``::
-
-   (with-eval-after-load 'rst
-     (define-key rst-mode-map (kbd "<f12>") #'coqdev-sphinx-rst-coq-action))
+Substitutions for specially-formatted names (like  ``|Cic|``, ``|Ltac|`` and ``|Latex|`` give |Cic|, |Ltac| and |Latex|), along with some useful LaTeX macros, are defined in a `separate file <refman-preamble.html>`_.  This file is automatically included in all manual pages.
 
 
 Advanced uses of notations
 --------------------------
-
 
   - Use `%` to escape grammar literal strings that are the same as metasyntax,
     such as ``{``, ``|``, ``}`` and ``{|``.  (While this is optional for

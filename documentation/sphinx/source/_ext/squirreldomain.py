@@ -790,6 +790,52 @@ class ExampleDirective(BaseAdmonition):#TODO
         self.options['classes'] = ['admonition', 'note']
         return super().run()
 
+def make_math_node(latex, docname, nowrap):
+    node = nodes.math_block(latex, latex)
+    node['label'] = None # Otherwise equations are numbered
+    node['nowrap'] = nowrap
+    node['docname'] = docname
+    node['number'] = None
+    return node
+
+class PreambleDirective(Directive):
+    r"""A reST directive to include a TeX file.
+
+    Mostly useful to let MathJax know about `\def`\s and `\newcommand`\s.  The
+    contents of the TeX file are wrapped in a math environment, as MathJax
+    doesn't process LaTeX definitions otherwise.
+
+    Usage::
+
+       .. preamble:: preamble.tex
+    """
+    has_content = False
+    required_arguments = 1
+    optional_arguments = 0
+    final_argument_whitespace = True
+    option_spec = {}
+    directive_name = "preamble"
+
+    def run(self):
+        document = self.state.document
+        env = document.settings.env
+
+        if not document.settings.file_insertion_enabled:
+            msg = 'File insertion disabled'
+            return [document.reporter.warning(msg, line=self.lineno)]
+
+        rel_fname, abs_fname = env.relfn2path(self.arguments[0])
+        env.note_dependency(rel_fname)
+
+        with open(abs_fname, encoding="utf-8") as ltx:
+            latex = ltx.read()
+
+        node = make_math_node(latex, env.docname, nowrap=False)
+        node['classes'] = ["math-preamble"]
+        set_source_info(self, node)
+        return [node]
+
+
 class AnsiColorsParser():
     """Parse ANSI-colored output from Coqtop into Sphinx nodes."""
 
@@ -1259,6 +1305,7 @@ class SquirrelDomain(Domain):
 SQUIRREL_ADDITIONAL_DIRECTIVES = [SquirreltopDirective,
                                   SquirreldocDirective,
                                   ExampleDirective,
+                                  PreambleDirective,
                                   ]
 # SQUIRREL_ADDITIONAL_DIRECTIVES = [CoqtopDirective, TODO
 #                              CoqdocDirective,
