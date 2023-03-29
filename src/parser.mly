@@ -42,7 +42,7 @@
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION
-%token PROOF QED UNDO ABORT HINT
+%token PROOF QED RESET UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH
 %token SMT
@@ -1134,6 +1134,7 @@ interactive:
 | PROOF              { ProverLib.Prover Proof }
 | i=p_include        { ProverLib.Prover (Include i) }
 | QED                { ProverLib.Prover Qed }
+| RESET              { ProverLib.Prover Reset }
 | g=goal             { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }
 | EOF                { ProverLib.Prover EOF }
@@ -1162,4 +1163,5 @@ top_proofmode:
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | ABORT              { ProverLib.Prover Abort }
 | QED                { ProverLib.Prover Qed }
+| RESET              { ProverLib.Prover Reset }
 | EOF                { ProverLib.Prover EOF }

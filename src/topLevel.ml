@@ -67,6 +67,9 @@ module type S = sig
     (** Only switch prover_mode to AllDone → to finish program *)
     val do_eof : state -> state
 
+    (** Reset prover_state *)
+    val do_reset : state -> state
+
     (** Start a proof : initialize the prover state and set
      * prover_state regarding to a given `Check mode *)
     val do_start_proof : state -> [ `Check | `NoCheck ] -> state
@@ -158,6 +161,9 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
    * here FIXME not anymore ! *)
   let do_eof (st: state) : state = 
     { st with prover_state = Prover.do_eof st.prover_state}
+
+  let do_reset (st: state) : state = 
+    { st with prover_state = Prover.init ()}
 
   let do_start_proof (st: state) (mode: [`Check | `NoCheck]) : state =
     match Prover.start_proof st.prover_state mode with

@@ -104,6 +104,7 @@ type prover_input =
   | Tactic of bulleted_tactics
   | Print   of print_query
   | Search of search_query
+  | Reset
   | Goal    of Goal.Parsed.t Location.located
   | Proof
   | Qed

@@ -394,13 +394,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
          .. code-block:: rst
 
            .. prodn:: _occ_switch ::= { {? {| + | - } } {* @natural } }
-                    _term += let: @pattern := @term in @term
+                    _term += let: @pattern := @_term in @_term
                     | _second_production
 
       .. tab:: produces
 
            .. prodn:: _occ_switch ::= { {? {| + | - } } {* @natural } }
-                       _term += let: @pattern := @term in @term
+                       _term += let: @pattern := @_term in @_term
                        | _second_production
 
        The first line defines "occ_switch", which must be unique in the document.  The second
@@ -554,6 +554,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
                Proof.
                   admit.
                Qed.
+               print toto.
 
       .. tab:: produces
 
@@ -567,6 +568,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
             Proof.
                admit.
             Qed.
+            print toto.
 
     The blank line after the directive is required.  If you begin a proof,
     use the ``abort`` option to reset squirrel for the next example.
@@ -582,17 +584,50 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
     - Behavior options
 
-      - ``reset``: Send a ``Reset Initial`` command before running this block
-      - ``fail``: Don't die if a command fails, implies ``warn`` (so no need to put both)
-      - ``warn``: Don't die if a command emits a warning
-      - ``restart``: Send a ``Restart`` command before running this block (only works in proof mode)
-      - ``abort``: Send an ``Abort All`` command after running this block (leaves all pending proofs if any)
+      - ``reset``: Send a ``Reset.`` command before running this block
+      - ``abort``: Send an ``Abort.`` command after running this block (leaves all pending proofs if any)
 
     ``squirreltop``\ 's state is preserved across consecutive ``.. squirreltop::`` blocks
-    of the same document (``coqrst`` creates a single ``squirreltop`` process per
+    of the same document (``squirrelrst`` creates a single ``squirreltop`` process per
     reST source file).  Use the ``reset`` option to reset Coq's state.
 
-    TODO how to pass these options? abort probably not up-to-date
+    .. tabs::
+
+      .. tab:: reStructuredText
+
+         .. code-block:: rst
+
+            .. squirreltop:: abort all
+
+               goal [any] tutu : true=>true.
+               Proof.
+
+            .. squirreltop:: all
+
+               print toto.
+               print tutu.
+
+            .. squirreltop:: reset all
+
+               print toto.
+               print tutu.
+
+      .. tab:: produces
+
+            .. squirreltop:: abort all
+
+               goal [any] tutu : true=>true.
+               Proof.
+
+            .. squirreltop:: all
+
+               print toto.
+               print tutu.
+
+            .. squirreltop:: reset all
+
+               print toto.
+               print tutu.
 
 ``.. squirreldoc::`` A reST directive to display squirreltop-formatted source code.
     Usage::

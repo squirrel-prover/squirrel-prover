@@ -67,6 +67,9 @@ module type S = sig
     (** Only switch prover_mode to AllDone → to finish program *)
     val do_eof : state -> state
 
+    (** Reset prover state *)
+    val do_reset : state -> state
+
     (** Start a proof : initialize the prover state and set
      * prover_state regarding to a given `Check mode *)
     val do_start_proof : state -> [ `Check | `NoCheck ] -> state

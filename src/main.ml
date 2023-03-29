@@ -261,6 +261,7 @@ and do_command
     | _, Tactic t                -> do_tactic state t
     | _, Print q                 -> ToplevelProver.do_print st q; st
     | _, Search t                -> ToplevelProver.do_search st t; st
+    | _, Reset                   -> ToplevelProver.do_reset st
     | WaitQed, Qed               -> ToplevelProver.do_qed st
     | GoalMode, Hint h           -> ToplevelProver.do_add_hint st h
                                  (* ↓ touch global config ↓ *)

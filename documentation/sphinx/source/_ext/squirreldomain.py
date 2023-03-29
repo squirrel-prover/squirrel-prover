@@ -886,11 +886,10 @@ class SquirreltopBlocksTransform(Transform):
 
         # Behavior options
         opt_reset = 'reset' in options
-        opt_fail = 'fail' in options
-        opt_warn = 'warn' in options
-        opt_restart = 'restart' in options
+        # opt_fail = 'fail' in options
+        # opt_warn = 'warn' in options
         opt_abort = 'abort' in options
-        options = options - {'reset', 'fail', 'warn', 'restart', 'abort'}
+        options = options - {'reset', 'abort'}
 
         unexpected_options = list(options - {'all', 'none', 'in', 'out'})
         if unexpected_options:
@@ -908,11 +907,10 @@ class SquirreltopBlocksTransform(Transform):
 
         return {
             'reset': opt_reset,
-            'fail': opt_fail,
+            # 'fail': opt_fail,
             # if errors are allowed, then warnings too
             # and they should be displayed as warnings, not errors
-            'warn': opt_warn or opt_fail,
-            'restart': opt_restart,
+            # 'warn': opt_warn or opt_fail,
             'abort': opt_abort,
             'input': opt_input or opt_all,
             'output': opt_output or opt_all
@@ -943,15 +941,9 @@ class SquirreltopBlocksTransform(Transform):
         pairs = []
 
         # TODO ↓
-        if options['restart']:
-            repl.sendone('Restart.')
         if options['reset']:
-            repl.sendone('Reset Initial.')
+            repl.sendone('Reset.')
             repl.send_initial_options()
-        if options['fail']:
-            repl.sendone('Unset squirreltop Exit On Error.')
-        if options['warn']:
-            repl.sendone('Set Warnings "default".')
         for sentence in self.split_lines(node.rawsource):
             comment = re.compile(r"\s*\(\*.*?\*\)\s*", re.DOTALL)
             wo_comments = re.sub(comment, "", sentence)
@@ -959,11 +951,7 @@ class SquirreltopBlocksTransform(Transform):
             output = repl.sendone(sentence) if has_tac else ""
             pairs.append((sentence, output))
         if options['abort']:
-            repl.sendone('Abort All.')
-        if options['fail']:
-            repl.sendone('Set squirreltop Exit On Error.')
-        if options['warn']:
-            repl.sendone('Set Warnings "+default".')
+            repl.sendone('Abort.')
 
         dli = nodes.definition_list_item()
         for sentence, output in pairs:

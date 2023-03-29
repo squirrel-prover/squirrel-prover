@@ -145,6 +145,7 @@ rule token = parse
 | "Proof."            { PROOF }
 | "hint"              { HINT }
 | "Qed."              { QED }
+| "Reset."            { RESET }
 | "Abort."            { ABORT }
 | "help"              { HELP }
 | "cycle"             { CYCLE }

@@ -500,6 +500,7 @@ let rec do_command (state:state) (command:ProverLib.prover_input) : state =
   | Print q          -> do_print state q; state
   | Search t         -> do_search state t; state
   | Qed              -> complete_proof state
+  | Reset            -> init ()
   | Hint h           -> add_hint state h
   | SetOption sp     -> set_param state sp
   | Goal g           -> add_new_goal state g
