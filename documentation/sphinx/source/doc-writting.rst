@@ -42,8 +42,8 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
    .. tab:: Produces
 
-      .. tacn:: cs @pattern {? in @natural}
-         :name: case_study_demo
+      .. tacn:: _cs @pattern {? in @natural}
+         :name: _case_study_demo
 
          Performs case study on conditionals inside an equivalence.
 
@@ -74,8 +74,8 @@ Or :g:`fa` tactic :
 
       .. code-block:: rst
 
-         .. tacv:: fa {?{| @natural | {+ @fa_arg}}}
-            :name: fa
+         .. tacv:: _fa {?{| @natural | {+ @fa_arg}}}
+            :name: _fa
 
             Apply the function application rule.
 
@@ -94,8 +94,8 @@ Or :g:`fa` tactic :
 
    .. tab:: Produces
 
-      .. tacv:: fa {? {| @natural | {+ @fa_arg} } }
-         :name: fa
+      .. tacv:: _fa {? {| @natural | {+ @fa_arg} } }
+         :name: _fa
 
          Apply the function application rule.
 
@@ -128,25 +128,25 @@ Most objects should have a body (i.e. a block of indented text following the sig
 
       .. code-block:: rst
 
-         .. cmdv:: Lemma @identifier {* @binder } : @type
-                   Remark @identifier {* @binder } : @type
-                   Fact @identifier {* @binder } : @type
-                   Corollary @identifier {* @binder } : @type
-                   Proposition @identifier {* @binder } : @type
-            :name: Lemma; Remark; Fact; Corollary; Proposition
+         .. cmdv:: _Lemma @identifier {* @binder } : @type
+                   _Remark @identifier {* @binder } : @type
+                   _kFact @identifier {* @binder } : @type
+                   _Corollary @identifier {* @binder } : @type
+                   _Proposition @identifier {* @binder } : @type
+            :name: _Lemma; _Remark; _Fact; _Corollary; _Proposition
 
-            These commands are all synonyms of :n:`Theorem @identifier {* @binder } : type`.
+            These commands are all synonyms of :n:`_Theorem @identifier {* @binder } : type`.
 
    .. tab:: Produces
 
-      .. cmdv:: Lemma @identifier {* @binder } : @type
-                Remark @identifier {* @binder } : @type
-                Fact @identifier {* @binder } : @type
-                Corollary @identifier {* @binder } : @type
-                Proposition @identifier {* @binder } : @type
-         :name: Lemma; Remark; Fact; Corollary; Proposition
+      .. cmdv:: _Lemma @identifier {* @binder } : @type
+                _Remark @identifier {* @binder } : @type
+                _Fact @identifier {* @binder } : @type
+                _Corollary @identifier {* @binder } : @type
+                _Proposition @identifier {* @binder } : @type
+         :name: _Lemma; _Remark; _Fact; _Corollary; _Proposition
 
-         These commands are all synonyms of :n:`Theorem @identifier {* @binder } : type`.
+         These commands are all synonyms of :n:`_Theorem @identifier {* @binder } : type`.
 
 
 
@@ -191,19 +191,19 @@ As an exercise, what do the following patterns mean?
 
       .. code::
 
-         pattern {+, @term {? at {+ @natural}}}
-         generalize {+, @term at {+ @natural} as @identifier}
-         fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
+         _pattern {+, @term {? at {+ @natural}}}
+         _generalize {+, @term at {+ @natural} as @identifier}
+         _fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
 
    .. tab:: Result
 
-      .. cmd:: pattern {+, @term {? at {+ @natural}}}
+      .. cmd:: _pattern {+, @term {? at {+ @natural}}}
          :undocumented:
 
-      .. cmd:: generalize {+, @term at {+ @natural} as @identifier}
+      .. cmd:: _generalize {+, @term at {+ @natural} as @identifier}
          :undocumented:
 
-      .. cmd:: fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
+      .. cmd:: _fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
          :undocumented:
 
 Objects
@@ -222,11 +222,11 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-         .. attr:: local
+         .. attr:: _local
 
    .. tab:: Produces
 
-      .. attr:: local
+      .. attr:: _local
          :undocumented:
 
 ``.. decl::`` |black_nib| A Squirrel declaration.
@@ -285,7 +285,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              the global environment. The fact asserted by :token:`term` is thus assumed as a
              postulate.
 
-             .. cmdv:: Parameter @identifier : @term.
+             .. cmdv:: _Parameter @identifier : @term.
 
                 This is equivalent to :n:`_Axiom @identifier : @term`.
 
@@ -297,7 +297,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              the global environment. The fact asserted by :token:`term` is thus assumed as a
              postulate.
 
-             .. cmdv:: Parameter @identifier : @term.
+             .. cmdv:: _Parameter @identifier : @term.
 
                 This is equivalent to :n:`_Axiom @identifier : @term`.
 
@@ -365,7 +365,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
       .. code-block:: rst
 
        .. opt:: _Hyps Limit @natural
-          :name: Hyps Limit
+          :name: _Hyps Limit
 
           Controls the maximum number of hypotheses displayed in goals after
           application of a tactic.
@@ -373,7 +373,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
    .. tab:: produces
 
        .. opt:: _Hyps Limit @natural
-          :name: Hyps Limit
+          :name: _Hyps Limit
 
           Controls the maximum number of hypotheses displayed in goals after
           application of a tactic.
@@ -418,14 +418,14 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
          .. code-block:: rst
 
           .. table:: _Search Blacklist @string
-             :name: Search Blacklist
+             :name: _Search Blacklist
 
              Controls ...
 
       .. tab:: produces
       
           .. table:: _Search Blacklist @string
-             :name: Search Blacklist
+             :name: _Search Blacklist
 
              Controls ...
 
@@ -555,14 +555,14 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
          .. code-block:: rst
 
-             .. warn:: Ambiguous path
+             .. warn:: _Ambiguous path
 
                 When the coercion :token:`qualid` is added to the inheritance graph, non
                 valid coercion paths are ignored.
 
       .. tab:: produces
 
-          .. warn:: Ambiguous path
+          .. warn:: _Ambiguous path
 
              When the coercion :token:`qualid` is added to the inheritance graph, non
              valid coercion paths are ignored.
@@ -851,12 +851,12 @@ In addition to the objects and directives above, the ``squirrelrst`` Sphinx plug
 
          .. code-block:: rst
 
-          :n:`generalize @term as @identifier` is just like :n:`generalize @term`, but
+          :n:`_generalize @term as @identifier` is just like :n:`_generalize @term`, but
           it names the introduced hypothesis :token:`identifier`.
 
       .. tab:: produces
 
-          :n:`generalize @term as @identifier` is just like :n:`generalize @term`, but
+          :n:`_generalize @term as @identifier` is just like :n:`_generalize @term`, but
           it names the introduced hypothesis :token:`identifier`.
 
     Note that this example also uses ``:token:``.  That's because ``identifier`` is
