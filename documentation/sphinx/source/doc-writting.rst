@@ -271,6 +271,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
 
 ``.. cmdv::`` |black_nib| A variant of a Squirrel command.
+    Example:
 
 .. tabs::
 
@@ -331,6 +332,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              Raised if :n:`@tactic` does not fully solve the goal.
 
 ``.. flag::`` |black_nib| A Squirrel flag (i.e. a boolean setting).
+    Example:
 
 .. tabs::
 
@@ -354,6 +356,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
 
 ``.. opt::`` |black_nib| A Squirrel option (a setting with non-boolean value, e.g. a string or numeric value).
+    Example:
 
 .. tabs::
 
@@ -406,6 +409,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
        column in the output blank.
 
 ``.. table::`` |black_nib| A Squirrel table, i.e. a setting that is a set of values.
+    Example:
 
     .. tabs::
 
@@ -426,6 +430,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              Controls ...
 
 ``.. tacn::`` |black_nib| A tactic, or a tactic notation.
+    Example:
 
     .. tabs::
 
@@ -444,6 +449,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              :token:`expr` is evaluated to ``v`` which must be a tactic value...
 
 ``.. tacv::`` |black_nib| A variant of a tactic.
+    Example:
 
     .. tabs::
 
@@ -478,6 +484,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
                 defaults to 0...
 
 ``.. thm::`` A theorem.
+    Example:
 
     .. tabs::
 
@@ -526,33 +533,19 @@ Squirrel directives
 In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines the following directives:
 
 ``.. squirreltop::`` A reST directive to describe interactions with Squirrel.
-    Usage::
+ Usage::
 
     .. squirreltop:: options...
 
        code to be executed by Squirrel
 
-    Example:
+ Example:
 
-    .. tabs::
+ .. tabs::
 
-      .. tab:: reStructuredText
+   .. tab:: reStructuredText
 
-         .. code-block:: rst
-
-            .. squirreltop:: all
-
-               (* comment *)
-               name n:message.
-               name s:message.
-               hash h.
-               goal [any] toto : true=>true.
-               Proof.
-                  admit.
-               Qed.
-               print toto.
-
-      .. tab:: produces
+      .. code-block:: rst
 
          .. squirreltop:: all
 
@@ -566,64 +559,78 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
             Qed.
             print toto.
 
-    The blank line after the directive is required.  If you begin a proof,
-    use the ``abort`` option to reset squirrel for the next example.
+   .. tab:: produces
 
-    Here is a list of permissible options:
+      .. squirreltop:: all
 
-    - Display options (choose exactly one)
+         (* comment *)
+         name n:message.
+         name s:message.
+         hash h.
+         goal [any] toto : true=>true.
+         Proof.
+            admit.
+         Qed.
+         print toto.
 
-      - ``all``: Display input and output
-      - ``in``: Display only input
-      - ``out``: Display only output
-      - ``none``: Display neither (useful for setup commands)
+ The blank line after the directive is required.  If you begin a proof,
+ use the ``abort`` option to reset squirrel for the next example.
 
-    - Behavior options
+ Here is a list of permissible options:
 
-      - ``reset``: Send a ``Reset.`` command before running this block
-      - ``abort``: Send an ``Abort.`` command after running this block (leaves all pending proofs if any)
+ - Display options (choose exactly one)
 
-    ``squirreltop``\ 's state is preserved across consecutive ``.. squirreltop::`` blocks
-    of the same document (``squirrelrst`` creates a single ``squirreltop`` process per
-    reST source file).  Use the ``reset`` option to reset Squirrel's state.
+   - ``all``: Display input and output
+   - ``in``: Display only input
+   - ``out``: Display only output
+   - ``none``: Display neither (useful for setup commands)
 
-    Example:
+ - Behavior options
 
-    .. tabs::
+   - ``reset``: Send a ``Reset.`` command before running this block
+   - ``abort``: Send an ``Abort.`` command after running this block (leaves all pending proofs if any)
 
-      .. tab:: reStructuredText
+ ``squirreltop``\ 's state is preserved across consecutive ``.. squirreltop::`` blocks
+ of the same document (``squirrelrst`` creates a single ``squirreltop`` process per
+ reST source file).  Use the ``reset`` option to reset Squirrel's state.
 
-         .. code-block:: rst
+ Example:
 
-            .. squirreltop:: abort all
+ .. tabs::
 
-               goal [any] tutu : true=>true.
-               Proof.
+   .. tab:: reStructuredText
 
-            .. squirreltop:: all
+      .. code-block:: rst
 
-               print tutu.
-               print toto.
+         .. squirreltop:: abort all
 
-            .. squirreltop:: reset all
+            goal [any] tutu : true=>true.
+            Proof.
 
-               print toto.
+         .. squirreltop:: all
 
-      .. tab:: produces
+            print tutu.
+            print toto.
 
-            .. squirreltop:: abort all
+         .. squirreltop:: reset all
 
-               goal [any] tutu : true=>true.
-               Proof.
+            print toto.
 
-            .. squirreltop:: all
+   .. tab:: produces
 
-               print tutu.
-               print toto.
+         .. squirreltop:: abort all
 
-            .. squirreltop:: reset all
+            goal [any] tutu : true=>true.
+            Proof.
 
-               print toto.
+         .. squirreltop:: all
+
+            print tutu.
+            print toto.
+
+         .. squirreltop:: reset all
+
+            print toto.
 
 
 ``.. squirreldoc::`` A reST directive to display squirreltop-formatted source code.

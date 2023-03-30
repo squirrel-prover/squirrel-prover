@@ -88,7 +88,7 @@ called the basic hash protocol:
 * Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. _Formal
 Verification of Privacy for RFID Systems_. pages 75–88, July 2010.
 
-```{squirreltop} all
+```
 
 T --> R : <nT, h(nT,kT)>
 R --> T : ok
