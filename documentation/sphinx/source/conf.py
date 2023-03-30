@@ -142,6 +142,9 @@ bibtex_bibfiles = [ "biblio.bib" ]
 # objects (objects with no contents).
 report_undocumented_squirrel_objects = "warning"
 
+# The encoding of source files.
+source_encoding = 'utf-8-sig'
+
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = 'sphinx'
 highlight_language = 'rst'
