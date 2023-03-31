@@ -11,26 +11,63 @@ let rev_subst subst =
 
 (*------------------------------------------------------------------*)
 type red_param = { 
-  delta  : bool;
-  beta   : bool;
-  constr : bool;
+  rewrite : bool;   (** user-defined rewriting rules *)
+  delta   : bool;   (** replace defined variables by their body *)
+  beta    : bool;   (** β-reduction *)
+  proj    : bool;   (** reduce projections *)
+  constr  : bool;   (** reduce tautologies over timestamps *)
 }
 
-let rp_default = { beta = true; delta = false; constr = false; }
+let rp_empty = { 
+  rewrite = false;
+  beta    = false; 
+  delta   = false; 
+  proj    = false; 
+  constr  = false; 
+}
 
-let rp_full = { beta = true; delta = true; constr = false; }
+let rp_default = { 
+  rewrite = true;
+  beta    = true; 
+  delta   = false; 
+  proj    = true; 
+  constr  = false; 
+}
+
+let rp_full = { 
+  rewrite = true;
+  beta    = true; 
+  delta   = true; 
+  proj    = true; 
+  constr  = false; 
+}
 
 let parse_simpl_args
     (param : red_param) (args : Args.named_args) : red_param
   =
+  let parse_tag param (tag : Symbols.lsymb) =
+    match tag with
+    | L.{ pl_desc = "rw"     } -> { param with rewrite = true; }
+    | L.{ pl_desc = "beta"   } -> { param with beta    = true; }
+    | L.{ pl_desc = "delta"  } -> { param with delta   = true; }
+    | L.{ pl_desc = "proj"   } -> { param with proj    = true; }
+    | L.{ pl_desc = "constr" } -> { param with constr  = true; }
+
+    | l -> Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+  in
+
   List.fold_left (fun param arg ->
       match arg with
-      | Args.NArg l ->
-        if Location.unloc l = "constr" then { param with constr = true; }
-        else
-          Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
-    ) param args
+      | Args.NArg tag -> parse_tag param tag
 
+      | Args.NList (L.{ pl_desc = "flags" }, tags) -> 
+        (* set all flags to [false], then parse [tags] *)
+        List.fold_left parse_tag rp_empty tags
+
+      | Args.NList (l,_) ->
+          Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+
+    ) param args
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
@@ -306,11 +343,19 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         if has_red then t, true
         else try_red red_funcs
     in
-    try_red [expand_head_once st; 
-             rewrite_head_once st;
-             Match.reduce_beta;
-             Match.reduce_proj;
-             reduce_constr st; ]
+    try_red [expand_head_once st;  (* δ *)
+             rewrite_head_once st; (* user rewriting rules *)
+             reduce_beta st;       (* β *)
+             reduce_proj st;       (* proj *)
+             reduce_constr st; ]   (* constr *)
+
+  and reduce_beta (st : state) (t : Term.term) : Term.term * bool =
+    if not st.param.beta then t, false
+    else Match.reduce_beta t
+
+  and reduce_proj (st : state) (t : Term.term) : Term.term * bool =
+    if not st.param.proj then t, false
+    else Match.reduce_proj t
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
   and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
@@ -341,31 +386,33 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    let db = Hint.get_rewrite_db st.table in
-    let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
+    if not st.param.rewrite then t, false 
+    else 
+      let db = Hint.get_rewrite_db st.table in
+      let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
-    let rule = List.find_map (fun Hint.{ rule } ->
-        match 
-          Rewrite.rewrite_head
-            st.table st.env st.expand_context (lazy st.hyps) st.sexpr 
-            rule t 
-        with
-        | None -> None
-        | Some (red_t, subs) ->
-          let subs_valid =  
-            List.for_all (fun (sexpr, sub) -> 
-                (* FEATURE: conversion *)
-                fst (reduce { st with sexpr; param = rp_default } sub) = 
-                Term.mk_true
-              ) subs 
-          in              
-          if subs_valid then Some red_t else None            
-      ) hints
-    in
+      let rule = List.find_map (fun Hint.{ rule } ->
+          match 
+            Rewrite.rewrite_head
+              st.table st.env st.expand_context (lazy st.hyps) st.sexpr 
+              rule t 
+          with
+          | None -> None
+          | Some (red_t, subs) ->
+            let subs_valid =  
+              List.for_all (fun (sexpr, sub) -> 
+                  (* FEATURE: conversion *)
+                  fst (reduce { st with sexpr; param = rp_default } sub) = 
+                  Term.mk_true
+                ) subs 
+            in              
+            if subs_valid then Some red_t else None            
+        ) hints
+      in
 
-    match rule with
-    | None -> t, false
-    | Some red_t -> red_t, true
+      match rule with
+      | None -> t, false
+      | Some red_t -> red_t, true
 
   (* Reduce all strict subterms *)
   and reduce_subterms (st : state) (t : Term.term) : Term.term * bool = 

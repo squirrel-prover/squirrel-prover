@@ -26,8 +26,11 @@ type lsymb = Theory.lsymb
 let p_fresh_arg (nargs : Args.named_args) : bool =
   match nargs with
   | [Args.NArg L.{ pl_desc = "precise_ts" }] -> true
-  | (Args.NArg l) :: _ ->
+
+  | Args.NList (l,_) :: _ 
+  | Args.NArg  l     :: _ ->
     hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+
   | [] -> false
 
 (*------------------------------------------------------------------*)

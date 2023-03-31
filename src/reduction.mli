@@ -5,9 +5,11 @@ module THyps = Hyps.TraceHyps
   
 (*------------------------------------------------------------------*)
 type red_param = { 
-  delta  : bool;
-  beta   : bool;
-  constr : bool;
+  rewrite : bool;   (** user-defined rewriting rules *)
+  delta   : bool;   (** replace defined variables by their body *)
+  beta    : bool;   (** β-reduction *)
+  proj    : bool;   (** reduce projections *)
+  constr  : bool;   (** reduce tautologies over timestamps *)
 }
 
 val rp_default : red_param

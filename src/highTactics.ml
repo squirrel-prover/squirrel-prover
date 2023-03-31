@@ -102,24 +102,43 @@ let () = T.register_general "induction"
    Because of this, there is some code replication below, to reflect this
    asymmetry. *)
 
-let tac_autosimpl args s sk fk = match s with
-  | Goal.Trace s ->
-    let sk l fk =
-      sk (List.map (fun s -> Goal.Trace s) l) fk
-    in
-    TraceTactics.tac_autosimpl args s sk fk
-  | Goal.Equiv _ -> EquivTactics.tac_autosimpl args s sk fk
-
-let tac_auto : 'a list -> LowTactics.f_simpl =
-  fun args ~red_param ~strong ~close s sk fk -> 
+let tac_autosimpl args s sk fk = 
+  let () =
+    match args with
+    | [] -> ()
+    | _ -> hard_failure (Tactics.Failure "no argument allowed")
+  in
   match s with
   | Goal.Trace s ->
     let sk l fk =
       sk (List.map (fun s -> Goal.Trace s) l) fk
     in
-    TraceTactics.tac_auto ~red_param ~close ~strong args s sk fk
-  | Goal.Equiv _ -> EquivTactics.tac_auto ~red_param ~close ~strong args s sk fk
+    TraceTactics.trace_autosimpl s sk fk
+  | Goal.Equiv _ -> EquivTactics.equiv_autosimpl s sk fk
 
+(*------------------------------------------------------------------*)
+(* [auto] and [simpl] *)
+let auto : LowTactics.f_simpl =
+  fun ~red_param ~strong ~close s sk fk -> 
+  match s with
+  | Goal.Trace s ->
+    let sk l fk =
+      sk (List.map (fun s -> Goal.Trace s) l) fk
+    in
+    TraceTactics.trace_auto ~red_param ~close ~strong s sk fk
+  | Goal.Equiv _ -> EquivTactics.equiv_auto ~red_param ~close ~strong s sk fk
+
+let tac_auto (args : 'a list) ~(strong:bool) ~(close:bool) : Goal.t Tactics.tac =
+  fun s sk fk -> 
+  let red_param =
+    match args with
+    | [] -> Reduction.rp_default
+    | [Args.Auto n] -> Reduction.parse_simpl_args Reduction.rp_default n
+    | _ -> bad_args ()
+  in
+  auto ~red_param ~strong ~close s sk fk
+
+(*------------------------------------------------------------------*)
 let () =
   T.register_general "autosimpl"
     ~tactic_help:{general_help = "Simplify a goal, without closing \
@@ -131,26 +150,22 @@ let () =
     tac_autosimpl
 
 let () =
-  (* FEATURE: allow user to change [red_param] *)
-  let red_param = Reduction.rp_default in
   T.register_general "simpl"
     ~tactic_help:{general_help = "Simplifies a goal, without closing it.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~red_param ~close:false ~strong:true)
+    (tac_auto ~close:false ~strong:true)
 
 let () =
-  (* FEATURE: allow user to change [red_param] *)
-  let red_param = Reduction.rp_default in
   T.register_general "auto"
     ~tactic_help:{general_help = "Closes a goal.";
                   detailed_help = "Stronger automation than simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~red_param ~close:true ~strong:true)
+    (tac_auto ~close:true ~strong:true)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -165,7 +180,7 @@ let () =
       usages_sorts  = [];
       tactic_group  = Structural;}
     ~pq_sound:true
-    (LT.rewrite_tac (tac_auto []))
+    (LT.rewrite_tac auto)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -179,4 +194,4 @@ let () =
       usages_sorts = [];
       tactic_group = Logical}
     ~pq_sound:true
-    (LT.intro_tac (tac_auto []))
+    (LT.intro_tac auto)

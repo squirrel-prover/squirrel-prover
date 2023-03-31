@@ -809,9 +809,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_goal (S.Reduce.reduce param s S.conc_kind (S.goal s)) s
 
   let reduce_args args s : S.t list =
-    match args with
-    | [] -> [reduce_goal Reduction.rp_full s]
-    | _ -> bad_args ()
+    let red_param = 
+      match args with
+      | [] -> Reduction.rp_full
+      | [Args.Reduce n] -> Reduction.parse_simpl_args Reduction.rp_full n
+      | _ -> bad_args ()
+    in
+    [reduce_goal red_param s]
 
   let reduce_tac args = wrap_fail (reduce_args args)
 
@@ -1565,8 +1569,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let p_apply_faduparg (nargs : Args.named_args) : bool =
     match nargs with
     | [Args.NArg L.{ pl_desc = "inductive" }] -> true
-    | (Args.NArg l) :: _ ->
+
+    | Args.NList (l,_) :: _ 
+    | Args.NArg  l     :: _ ->
       hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+
     | [] -> false
 
   let bad_apply_pt loc () =

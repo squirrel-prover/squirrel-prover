@@ -10,9 +10,9 @@ val constraints_tac : Args.parser_args -> LT.etac
 
 val old_or_new_induction : Args.parser_args -> LT.etac
 
-val tac_autosimpl : Args.parser_args -> LT.gentac
+val equiv_autosimpl : LT.gentac
 
-val tac_auto :
+val equiv_auto :
   red_param:Reduction.red_param ->
   close:bool ->
-  strong:bool -> Args.parser_args -> LT.gentac
+  strong:bool -> LT.gentac

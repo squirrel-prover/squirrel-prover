@@ -1053,17 +1053,15 @@ let simpl ~red_param ~strong ~close ~auto_intro : TS.t Tactics.tac =
   in
   simpl_aux ~close
     
-let tac_auto args ~red_param ~strong ~close s sk (fk : Tactics.fk) =
+let trace_auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
   let auto_intro = (TConfig.auto_intro (LowTraceSequent.table s)) in
-  match args with
-  | [] -> simpl ~red_param ~close ~strong ~auto_intro s sk fk
-  | _ -> hard_failure (Tactics.Failure "no argument allowed")
+  simpl ~red_param ~close ~strong ~auto_intro s sk fk
 
-let tac_autosimpl args s =
-  tac_auto
+let trace_autosimpl s =
+  trace_auto
     ~red_param:Reduction.rp_default
     ~close:false
-    ~strong:(TConfig.auto_intro (LowTraceSequent.table s)) args s
+    ~strong:(TConfig.auto_intro (LowTraceSequent.table s)) s
 
 
 (* tries to close the goal with simpl *)

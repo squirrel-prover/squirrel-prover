@@ -41,3 +41,70 @@ goal [any] _ :
  =
  empty.
 Proof. by rewrite [/= ~constr] exists_true1 /=. Qed.
+
+(*==================================================================*)
+(* small tests for flags and rewriting *)
+
+axiom [any] foo (x,y : message): (x,y)#1 = y.
+
+goal [any] _ (a,b : message) : (a,b)#1 = b.
+Proof. 
+  checkfail rewrite /= foo exn Failure.
+  checkfail rewrite [/= ~flags:[proj]] foo exn Failure.
+  rewrite [/= ~flags:[]]. 
+  rewrite foo. 
+  apply eq_refl.
+Qed.
+
+goal [any] _ (a,b : message) : (a,b)#1 = b.
+Proof. 
+  checkfail simpl; rewrite foo exn Failure.
+  checkfail simpl ~flags:[proj]; rewrite foo exn Failure.
+  simpl ~flags:[].
+  rewrite foo. 
+  apply eq_refl.
+Qed.
+
+goal [any] _ (a,b : message) : (a,b)#1 = b.
+Proof. 
+  checkfail reduce; rewrite foo exn Failure.
+  checkfail reduce ~flags:[proj]; rewrite foo exn Failure.
+  reduce ~flags:[].
+  rewrite foo. 
+  apply eq_refl.
+Qed.
+
+(*------------------------------------------------------------------*)
+axiom [any] bar (a,b : message) : (fun x y => y) a b = a.
+
+goal [any] _ (a,b : message) : 
+  (fun x y => y) a b = a.
+Proof. 
+  checkfail rewrite /= bar exn NothingToRewrite.
+  checkfail rewrite [/= ~flags:[beta]] bar exn NothingToRewrite.
+  rewrite [/= ~flags:[]]. 
+  rewrite bar. 
+  apply eq_refl.
+Qed.
+
+goal [any] _ (a,b : message) : 
+  (fun x y => y) a b = a.
+Proof. 
+  checkfail simpl; rewrite bar exn NothingToRewrite.
+  checkfail simpl ~flags:[beta]; rewrite bar exn NothingToRewrite.
+  simpl ~flags:[]. 
+  rewrite bar. 
+  apply eq_refl.
+Qed.
+
+goal [any] _ (a,b : message) : 
+  (fun x y => y) a b = a.
+Proof. 
+  checkfail reduce; rewrite bar exn NothingToRewrite.
+  checkfail reduce ~flags:[beta]; rewrite bar exn NothingToRewrite.
+  reduce ~flags:[]. 
+  rewrite bar. 
+  apply eq_refl.
+Qed.
+
+
