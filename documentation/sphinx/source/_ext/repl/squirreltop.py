@@ -59,12 +59,12 @@ class SquirrelTop:
         return self
 
     def __exit__(self, type, value, traceback):
-        print("Exiting squirreltop…")
+        print("Exiting squirreltop")
         self.squirreltop.kill(9)
 
     def next_prompt(self):
         """Wait for the next squirreltop prompt, and return the output preceding it."""
-        print("Wait squirreltop…")
+        print("Wait squirreltop")
         self.squirreltop.expect(SquirrelTop.SQUIRRELTOP_PROMPT, timeout = 10)
         return self.squirreltop.before
 
