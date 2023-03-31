@@ -91,6 +91,7 @@ Equivalence tactics
    TODO why optional message in Squirrel tactic; also fix help in tool
 
    .. exn:: out of range position
+      :undocumented:
 
 .. tacn:: fresh @position
    :name: fresh

@@ -364,6 +364,40 @@ class TacticVariantObject(TacticObject):
     def _name_from_signature(self, signature):
         return None
 
+class TacticTraceObject(TacticObject):
+    """A variant of a tactic for traces
+
+    Example::
+
+       .. tact:: true
+
+          Solves a goal when the conclusion is true.
+
+    """
+    index_suffix = "(trace tactic)"
+    annotation = "TraceTactic"
+
+    def _name_from_signature(self, signature):
+        return None
+
+class TacticEquivObject(TacticObject):
+    """A variant of a tactic for equivalences
+
+    Example::
+
+       .. tact:: deduce
+
+          `deduce i` removes the ith element from the biframe when it can be
+           computed from the rest of the bi-frame.
+          `deduce` try to deduce the biframe with the first equivalence in the hypotheses it finds.
+
+    """
+    index_suffix = "(equiv tactic)"
+    annotation = "EquivTactic"
+
+    def _name_from_signature(self, signature):
+        return None
+
 class OptionObject(NotationObject):
     """A Squirrel option (a setting with non-boolean value, e.g. a string or numeric value).
 
@@ -1186,6 +1220,8 @@ class SquirrelDomain(Domain):
         'cmdv': ObjType('cmdv', 'cmd'),
         'tacn': ObjType('tacn', 'tacn'),
         'tacv': ObjType('tacv', 'tacn'),
+        'tact': ObjType('tact', 'tacn'),
+        'tace': ObjType('tace', 'tacn'),
         'opt': ObjType('opt', 'opt'),
         'flag': ObjType('flag', 'flag'),
         'table': ObjType('table', 'table'),
@@ -1206,6 +1242,8 @@ class SquirrelDomain(Domain):
         'cmdv': VernacVariantObject,
         'tacn': TacticObject,
         'tacv': TacticVariantObject,
+        'tact': TacticTraceObject,
+        'tace': TacticEquivObject,
         'opt': OptionObject,
         'flag': FlagObject,
         'table': TableObject,

@@ -483,6 +483,47 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
                 The number is the failure level. If no level is specified, it
                 defaults to 0...
 
+``.. tact::`` |black_nib| A tactic, or a tactic notation over trace.
+    Example:
+
+    .. tabs::
+
+      .. tab:: reStructuredText
+
+         .. code-block:: rst
+
+           .. tact:: true
+
+              Solves a goal when the conclusion is true.
+
+
+      .. tab:: produces
+
+           .. tact:: true
+
+              Solves a goal when the conclusion is true.
+
+``.. tace::`` |black_nib| A tactic, or a tactic notation over equivalence.
+    Example:
+
+    .. tabs::
+
+      .. tab:: reStructuredText
+
+         .. code-block:: rst
+
+           .. tace:: deduce {? @natural }
+
+              Invoking :g:`deduce i` removes the ith element from the biframe when it can be computed from the rest of the bi-frame. 
+              :g:`deduce` try to deduce the biframe with the first equivalence in the hypotheses it finds.
+
+      .. tab:: produces
+
+           .. tace:: deduce {? @natural }
+
+              Invoking :g:`deduce i` removes the ith element from the biframe when it can be computed from the rest of the bi-frame.
+              :g:`deduce` try to deduce the biframe with the first equivalence in the hypotheses it finds.
+
 ``.. thm::`` A theorem.
     Example:
 
