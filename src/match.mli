@@ -215,6 +215,9 @@ module Mvar : sig
   val to_subst_locals :
     mode:[`Match|`Unif] -> t -> Term.subst
 
+  (** Checks that all arguments of [pat] have been inferred in [mv]. *)
+  val check_args_inferred : 'a Term.pat_op -> t -> unit 
+
   val pp : Format.formatter -> t -> unit
 end
 
