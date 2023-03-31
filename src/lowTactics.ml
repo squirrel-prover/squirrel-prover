@@ -1749,21 +1749,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
     in
 
-    (* sub-goals resulting from the convertion of the proof term [pt] *)
-    let subgs = List.map (fun g -> S.set_goal g s) subgs in
-
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;
 
-   (* rename cleanly the variables *)
-    let _, vars, subst =
-      let pat_vars = List.map fst pat.pat_vars in
-      Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
+    (* rename cleanly the variables *)
+    let do_rename form =
+      let _, vars, subst =
+        let pat_vars = List.map fst pat.pat_vars in
+        Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
+      in
+      S.Conc.mk_forall ~simpl:true vars (S.subst_conc subst form)
     in
-    let f = S.subst_conc subst pat.pat_term in
-    let f =
-      S.Conc.mk_forall ~simpl:true vars f
-    in
+    let subgs = List.map do_rename subgs in
+    let f = do_rename pat.pat_term in
+
+    (* sub-goals resulting from the convertion of the proof term [pt] *)
+    let subgs = List.map (fun g -> S.set_goal g s) subgs in
 
     (* If [mode=`IntroImpl], compute subgoals by introducing implications
        on the left. *)
