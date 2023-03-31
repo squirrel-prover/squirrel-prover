@@ -318,7 +318,7 @@ let include_ite () =
     (ProverLib.Srch_term (term_from_string "if _ then _ else _ "))
   in
   Alcotest.(check' int) ~msg:"Found one lemma with if _ then _ else _"
-    ~actual:(List.length matches) ~expected:11 (* to update regarding to Basic.sp *)
+    ~actual:(List.length matches) ~expected:12 (* to update regarding to Basic.sp *)
 
 (*------------------------------------------------------------------*)
 let tests = [ ("search_about1",      `Quick, search_about_1);
