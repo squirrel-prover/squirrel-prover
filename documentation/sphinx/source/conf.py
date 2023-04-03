@@ -30,7 +30,6 @@ extensions = [
     'sphinx_tabs.tabs', # Needs `pip install sphinx-tabs`
     'myst_parser', # Needs `pip install myst-parser`
     'sphinxcontrib.bibtex',
-    'helloworld',
     'squirreldomain'
 ]
 
