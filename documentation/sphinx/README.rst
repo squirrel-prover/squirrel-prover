@@ -16,6 +16,10 @@ Then with pip :
    pip install sphinx_rtd_theme beautifulsoup4 sphinx-tabs\
    antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
+You may want syntax coloration included in your generated
+doc. There is a [fork of `pygments`](https://github.com/ThomasRuby/pygments) including a lexer for `squirrel`
+files. You can install it but it's not necessary.
+
 Build
 -----
 
