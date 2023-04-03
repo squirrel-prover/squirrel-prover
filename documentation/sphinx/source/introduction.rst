@@ -16,7 +16,6 @@ and provides guarantees in the computational model.
     * Distinguish commands and declarations using separate directives.
     * Decide on a place to document commands such as print, search, etc.
     * Tweak toc and navbar to show (sub)sections.
-    * Support comments in squirreltop directive.
     * Settle on a convention for documenting errors common to multiple tactics
       (only document the error once, maybe have links from subsequent uses to
       first one).

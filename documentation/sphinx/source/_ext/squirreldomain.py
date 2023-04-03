@@ -55,13 +55,6 @@ def notation_to_string(notation):
         # FIXME source and line aren't defined below — see cc93f419e0
         raise ExtensionError(PARSE_ERROR.format(os.path.basename(source), line, notation, e.msg)) from e
 
-def highlight_using_squirreldoc(sentence):
-    """Lex sentence using squirreldoc, and yield inline nodes for each token"""
-    raise NotImplementedError()
-    # tokens = coqdoc.lex(utils.unescape(sentence, 1))
-    # for classes, value in tokens:
-    #     yield nodes.inline(value, value, classes=classes)
-
 def make_target(objtype, targetid):
     """Create a target to an object of type objtype and id targetid"""
     return "squirrel:{}.{}".format(objtype, targetid)
@@ -736,7 +729,7 @@ class SquirreltopDirective(Directive):
     option_spec = { 'name': directives.unchanged }
     directive_name = "squirreltop"
 
-    def run(self):#TODO
+    def run(self):
         # Uses a ‘container’ instead of a ‘literal_block’ to disable
         # Pygments-based post-processing (we could also set rawsource to '')
         content = '\n'.join(self.content)
@@ -791,7 +784,7 @@ class SquirreldocDirective(Directive):
         self.add_name(wrapper)
         return [wrapper]
 
-class ExampleDirective(BaseAdmonition):#TODO
+class ExampleDirective(BaseAdmonition):
     """A reST directive for examples.
 
     This behaves like a generic admonition; see
@@ -1020,7 +1013,6 @@ class SquirreltopBlocksTransform(Transform):
 
         pairs = []
 
-        # TODO ↓
         if options['reset']:
             repl.sendone('Reset.')
             repl.send_initial_options()
@@ -1035,8 +1027,6 @@ class SquirreltopBlocksTransform(Transform):
 
         dli = nodes.definition_list_item()
         for sentence, output in pairs:
-            # Use Coqdoc to highlight input TODO ↓
-            # in_chunks = highlight_using_squirreldoc(sentence)
             try:
                 lexer = pygments.lexers.get_lexer_by_name("squirrel")
                 parsed = pygments.highlight(sentence,lexer,TERM_FORMATTER)
@@ -1345,16 +1335,8 @@ SQUIRREL_ADDITIONAL_DIRECTIVES = [SquirreltopDirective,
                                   ExampleDirective,
                                   PreambleDirective,
                                   ]
-# SQUIRREL_ADDITIONAL_DIRECTIVES = [CoqtopDirective, TODO
-#                              CoqdocDirective,
-#                              ExampleDirective,
-#                              InferenceDirective,
-#                              PreambleDirective]
 
 SQUIRREL_ADDITIONAL_ROLES = [GlossaryDefRole]
-# SQUIRREL_ADDITIONAL_ROLES = [GrammarProductionRole, TODO
-#                         GlossaryDefRole]
-
 
 def setup(app):
     """Register the Squirrel domain"""
@@ -1378,16 +1360,12 @@ def setup(app):
         app.add_directive(directive.directive_name, directive)
 
     app.add_transform(SquirreltopBlocksTransform)
-    # TODO for latex ? ↓
-    # app.connect('doctree-resolved', simplify_source_code_blocks_for_latex)
     app.connect('doctree-resolved',
                 SquirreltopBlocksTransform.merge_consecutive_squirreltop_blocks)
 
-    # Add extra styles TODO
+    # Add extra styles
     app.add_css_file("ansi.css")
     # app.add_css_file("ansi-dark.css")
-    # Don't need since we use pygments ↓
-    # app.add_css_file("coqdoc.css")
     app.add_js_file("notations.js")
     app.add_css_file("notations.css")
     app.add_css_file("pre-text.css")
