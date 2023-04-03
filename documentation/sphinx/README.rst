@@ -7,13 +7,14 @@ This is the documentation tool for **Squirrel-prover**. It uses
 Dependences
 -----------
 
-First, install ``sphinx`` with ``apt install python3-sphinx`` (for debian
-distributions)
+First, install ``sphinx``, for instance with `pip3 install -U sphinx` (see
+sphinx's [documentation](https://www.sphinx-doc.org/en/master/usage/installation.html)
+for alternatives). 
 
 Then with pip :
 
 .. code::
-   pip install sphinx_rtd_theme beautifulsoup4 sphinx-tabs\
+   pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs\
    antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
 You may want syntax coloration included in your generated
