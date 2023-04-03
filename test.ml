@@ -21,6 +21,7 @@ let test_suites : unit Alcotest.test list =
     ("ProcessParsing", Squirreltests.Parserbuf.process_parsing);
     ("TermParsing",    Squirreltests.Parserbuf.term_parsing);
     ("Prover", Squirreltests.Prover.tests);
+    ("Search", Squirreltests.Search.tests);
     ("NewTactics", Squirreltests.Tactics.tests);
     ("Term", Squirreltests.Term.tests)
   ]
