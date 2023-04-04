@@ -30,7 +30,6 @@ Table of contents
 .. toctree::
    :caption: Appendix
 
-   appendix/history-and-changes/index
    appendix/indexes/index
    doc-writting
    bibliography
