@@ -221,6 +221,9 @@ doc:
 	dune build @doc
 	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
+refman-html:
+	dune build --no-buffer @refman-html
+
 # If this touch commit.ml for inserting same hash dune will rebuild for nothing
 version:
 	@if [ $(CURHASH) = $(GITHASH) ]; then \

@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath("./_ext"))
+sys.path.append(os.path.abspath("./ext"))
 
 # -- Prolog ---------------------------------------------------------------
 
@@ -75,7 +75,7 @@ html_theme = 'sphinx_rtd_theme'
 import sphinx_rtd_theme
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
-html_static_path = ['_static']
+html_static_path = ['static']
 
 html_theme_options = {
     'collapse_navigation': False,
@@ -147,5 +147,6 @@ source_encoding = 'utf-8-sig'
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = 'sphinx'
 highlight_language = 'rst'
+# suppress_warnings = ["misc.highlighting_failure","ref.cmd","ref.tacn"]
 suppress_warnings = ["misc.highlighting_failure"]
 
