@@ -35,3 +35,4 @@ _opam/
 documentation/sphinx/build/
 # *.py[cod]
 *__pycache__/
+documentation/sphinx/public/
