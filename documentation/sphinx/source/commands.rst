@@ -12,20 +12,24 @@ Commands
 .. cmd:: Proof
 
   Enter proof mode with a unique subgoal
-  corresponding to the previous unproved goal.
+  corresponding to the previous unproved :n:`@goal`.
 
 .. cmd:: Qed
 
-   Close the current goal if it's completed.
+   Close the current :n:`@goal` if it's completed.
 
 .. cmd:: Abort
 
    Abort the current proof.
 
-.. cmd:: undo
+.. cmd:: undo {? @natural}
 
-   Undo the last sentence. Concretely takes the previous prover state
+   Undo the :n:`@natural` (default 1) last sentence(s). 
+   Concretely takes :n:`@natural`:math:`^{th}` previous prover state
    as the current one.
+
+   In general :cmd:`undo` commands are not used in `Squirrel` scripts but used for
+   `Proof-General <https://proofgeneral.github.io/>`_ navigation.
 
 .. cmd:: Reset
 
@@ -50,10 +54,10 @@ Commands
 
         print foo.
 
-.. cmd:: search @pattern {? in @system_id}
+.. cmd:: search @pattern {? in {| @system_id | @system_exp } }
 
    Search lemmas containing a given :n:`@pattern`. 
-   A :n:`@system_id` can be specified otherwise it is searched in the global
+   A :n:`{| @system_id | @system_exp }` can be specified otherwise it is searched in the :n:`@global`
    system.
 
   .. example:: searching axioms with included patterns
