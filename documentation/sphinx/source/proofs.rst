@@ -1,3 +1,5 @@
+.. _section-proofs:
+
 .. How to write proofs in Squirrel
 
 ------
@@ -15,6 +17,20 @@ is completed and ``Qed.`` can be used.
 
 Tacticals
 ---------
+
+**TODO** I'm not sure we want to document tacticals using the same
+role as elementary tactics, I did it like this for now just so the
+references to try and repeat in the appendix work.
+
+.. tacn:: try @tactic
+
+  Try to apply the given tactic. If it fails, succeed with the
+  subgoal left unchanged.
+
+.. tacn:: repeat @tactic
+
+  Apply the given tactic, and recursively apply it again on the
+  generated subgoals, until it fails.
 
 Tactics
 -------
@@ -52,7 +68,7 @@ TODO
 Common errors
 ~~~~~~~~~~~~~
 
-.. exn:: out of range position
+.. exn:: Out of range position.
 
      Argument does not correspond to a valid equivalence item.
 
@@ -78,10 +94,10 @@ Equivalence tactics
    TODO convention on capitalization for errors?
    Coq: capitalized + period.
 
-   .. exn:: Argument of cs should match a boolean
+   .. exn:: Argument of cs should match a boolean.
       :undocumented:
 
-   .. exn:: did not find any conditional to analyze
+   .. exn:: Did not find any conditional to analyze.
 
         some doc
 
@@ -90,12 +106,7 @@ Equivalence tactics
 
    TODO why optional message in Squirrel tactic; also fix help in tool
 
-   .. exn:: out of range position
-      :undocumented:
-
 .. tacn:: fresh @position
    :name: fresh
 
-   .. exn:: out of range position
-
-     See :exn:`out of range position`.
+   TODO

@@ -1,6 +1,8 @@
-========
-Language
-========
+.. _section-logic:
+
+======
+Logic
+======
 
 Here we define the syntax and informal semantics of our logic,
 and the various declarations available in the prover to introduce
@@ -8,15 +10,6 @@ new function symbols, cryptographic primitives, types, etc.
 
 Systems will be documented elsewhere as they are not tied to the
 logic.
-
-Lexical conventions
-====================
-
-Throughout the documentation we use the following lexical units:
-
-.. prodn::
-  natural ::= {+ 0 .. 9 }
-  identifier ::= {| a .. z | A .. Z } {* {| a .. z | A .. Z | 0 .. 9 | ' } }
 
 Types
 ======
@@ -38,13 +31,13 @@ Squirrel comes with several builtin base types:
 * :gdef:`index` represent an arbitrary finite set used to index
   unbounded collections of objects.
 
-.. note:: When we say that a type is finite, it is still unbounded:
+.. note:: A finite type is still unbounded:
   the semantics for the type can be any finite set.
 
 Additional :gdef:`custom types` may be declared by the user
 using the following declaration:
 
-.. cmd:: type @identifier {? [ {+, @type_tag } ] }
+.. decl:: type @identifier {? [ {+, @type_tag } ] }
 
   Declare a new type called :token:`identifier`.
   The values of that type are assumed to be convertible to bitstrings,
@@ -107,6 +100,8 @@ TODO :gdef:`names <name>`
 
   TODO citations
 
+**TODO** introduce :gdef:`macro` and :gdef:`system`.
+
 Formulas
 =========
 
@@ -132,6 +127,8 @@ are first order formulas, written as follows:
     | @global_formula -> @global_formula
     | @global_formula /\ @global_formula | @global_formula \/ @global_formula
     | Forall @binders, @global_formula | Exists @binders, @global_formula
+
+.. _section-declarations:
 
 Declarations
 =============

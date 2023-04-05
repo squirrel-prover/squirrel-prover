@@ -20,7 +20,7 @@ with open("refman-preamble.rst") as s:
 project = 'Squirrel'
 copyright = '2023, Squirrel developpers'
 author = 'Squirrel developpers'
-release = '0.1'
+release = ''
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

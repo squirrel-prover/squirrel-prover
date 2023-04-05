@@ -1,6 +1,9 @@
-==========================
-Introduction and Contents
-==========================
+.. Squirrel documentation master file, which must include all others
+   (directly or not, possibly through the TOC).
+
+=============
+Introduction
+=============
 
 .. include:: introduction.rst
 
@@ -13,14 +16,17 @@ Table of contents
    self
 
 .. toctree::
-   :caption: Language
+   :caption: Reference manual
 
-   language
+   reference-intro
 
-.. toctree::
-   :caption: Proofs
+   logic
 
    proofs
+
+   commands
+
+   processes
 
 .. toctree::
    :caption: Tutorial
@@ -31,7 +37,7 @@ Table of contents
    :caption: Appendix
 
    appendix/indexes/index
-   doc-writting
+   doc-writing
    bibliography
 
 

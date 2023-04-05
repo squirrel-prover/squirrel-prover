@@ -29,21 +29,21 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
              .. example:: 
 
-                when proving an equivalence
+                When proving an equivalence
                 :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
                 invoking ``nosimpl cs phi`` results in two subgoals:
                 :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`
 
-            .. exn:: Argument of cs should match a boolean
+            .. exn:: Argument of cs should match a boolean.
                :undocumented:
 
-            .. exn:: did not find any conditional to analyze
+            .. exn:: Did not find any conditional to analyze.
                :undocumented:
 
    .. tab:: Produces
 
-      .. tacn:: _cs @pattern {? in @natural}
-         :name: _case_study_demo
+      .. tacn:: cs @pattern {? in @natural}
+         :name: _ignore
 
          Performs case study on conditionals inside an equivalence.
 
@@ -53,17 +53,17 @@ Our Squirrel domain defines multiple `objects`_.  Each object has a *signature* 
 
           .. example::
 
-             when proving an equivalence
+             When proving an equivalence
              :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
              invoking :g:`nosimpl cs phi` results in two subgoals:
              :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
 
-         .. exn:: Argument of cs should match a boolean
-            :name: argument_demo
+         .. exn:: Argument of cs should match a boolean.
+            :name: _ignore
             :undocumented:
 
-         .. exn:: did not find any conditional to analyze
-            :name: did_not_demo
+         .. exn:: Did not find any conditional to analyze.
+            :name: _ignore
             :undocumented:
 
 Or :g:`fa` tactic :
@@ -109,7 +109,7 @@ Or :g:`fa` tactic :
          diff-equivalent, one can prove that the goal containing the
          sequence u1,...,un is diff-equivalent.
 
-         .. exn:: improper arguments
+         .. exn:: _improper arguments
             :undocumented:
 
 
@@ -332,6 +332,9 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
              Raised if :n:`@tactic` does not fully solve the goal.
 
 ``.. flag::`` |black_nib| A Squirrel flag (i.e. a boolean setting).
+
+    **TODO** we rather call them options in the tool.
+
     Example:
 
 .. tabs::
@@ -340,19 +343,17 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-       .. flag:: _Nonrecursive Elimination Schemes
+       .. flag:: postQuantumSound
 
-          Controls whether types declared with the keywords
-          :cmd:`Variant` and :cmd:`Record` get an automatic declaration of
-          induction principles.
+          Perform extra checks to ensure that results
+          are sound wrt a quantum adversary.
 
    .. tab:: produces
 
-       .. flag:: _Nonrecursive Elimination Schemes
+       .. flag:: Nonrecursive Elimination Schemes
 
-          Controls whether types declared with the keywords
-          :cmd:`_Variant` and :cmd:`_Record` get an automatic declaration of
-          induction principles.
+          Perform extra checks to ensure that results
+          are sound wrt a quantum adversary.
 
 
 ``.. opt::`` |black_nib| A Squirrel option (a setting with non-boolean value, e.g. a string or numeric value).
@@ -461,7 +462,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
                 This is the always-failing tactic: it does not solve any goal. It is
                 useful for defining other tacticals since it can be caught by
-                :tacn:`try`, :tacn:`repeat`, :tacn:`match goal`, or the branching
+                :tacn:`try`, :tacn:`repeat`, or the branching
                 tacticals...
 
                 .. tacv:: _fail @natural
@@ -475,7 +476,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
              This is the always-failing tactic: it does not solve any goal. It is
              useful for defining other tacticals since it can be caught by
-             :tacn:`_try`, :tacn:`_repeat`, :tacn:`_match goal`, or the branching
+             :tacn:`try`, :tacn:`repeat`, or the branching
              tacticals...
 
              .. tacv:: _fail @natural

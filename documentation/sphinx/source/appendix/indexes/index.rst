@@ -15,7 +15,5 @@ find what you are looking for.
    ../../squirrel-declindex
    ../../squirrel-cmdindex
    ../../squirrel-tacindex
-   ../../squirrel-attrindex
-   ../../squirrel-optindex
    ../../squirrel-exnindex
    ../../genindex
