@@ -36,6 +36,8 @@ Commands
    Reset the prover state. This command can be undone with :cmd:`undo` since it does not clear
    the history of state.
 
+.. cmd:: set @identifier = 
+
 .. cmd:: print {? @identifier}
 
   Shows definition of given :n:`@identifier` if it is a lemma, function, name, macro or system.
@@ -54,7 +56,7 @@ Commands
 
         print foo.
 
-.. cmd:: search @pattern {? in {| @system_id | @system_exp } }
+.. cmd:: search @pattern {? in [{| @system_id | @system_exp }] }
 
    Search lemmas containing a given :n:`@pattern`. 
    A :n:`{| @system_id | @system_exp }` can be specified otherwise it is searched in the :n:`@global`
