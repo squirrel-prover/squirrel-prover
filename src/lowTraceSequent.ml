@@ -3,6 +3,7 @@ open Utils
 module L    = Location
 module SE   = SystemExpr
 module Args = TacticsArgs
+module Sv   = Vars.Sv
 
 (*------------------------------------------------------------------*)
 type hyp_form = Equiv.any_form
@@ -22,19 +23,6 @@ let dbg ?(force=false) s =
 
 (*------------------------------------------------------------------*)
 module H = Hyps.TraceHyps
-
-(*------------------------------------------------------------------*)
-(* for finite types which do not depend on the security
-   parameter η, we have
-   [∀ x, phi] ≡ ∀ x. const(x) → [phi]
-   (where the RHS quantification is a global quantification) *)
-let strengthen_vars table (vars : Vars.env) : Vars.env =
-  Vars.map_tag (fun v tag ->
-      if Symbols.TyInfo.is_finite table (Vars.ty v) && 
-         Symbols.TyInfo.is_fixed  table (Vars.ty v) then
-        { tag with const = true } 
-      else tag
-    ) vars
 
 (*------------------------------------------------------------------*)
 module S : sig
@@ -116,12 +104,8 @@ let _pp ~dbg ppf s =
       assert false
 
   let init_sequent ~(env : Env.t) ~conclusion =
-    let env = Env.update ~vars:(strengthen_vars env.table env.vars) env in
-    let s = {
-      env ;
-      hyps = H.empty;
-      conclusion; 
-    } in
+    let hyps = H.empty in
+    let s = { env ; hyps; conclusion; } in
     sanity_check s;
     s
 
@@ -274,13 +258,10 @@ let ty_vars s = s.env.ty_vars
 let system  s = s.env.system
 let table   s = s.env.table
 
-let set_env (env : Env.t) s = 
-  let env = Env.update ~vars:(strengthen_vars env.table env.vars) env in
-  S.update ~env s
+let set_env (env : Env.t) s = S.update ~env s
 
 (*------------------------------------------------------------------*)
 let set_vars (vars : Vars.env) s = 
-  let vars = strengthen_vars s.env.table vars in
   let env = Env.update ~vars s.env in
   S.update ~env s
 
