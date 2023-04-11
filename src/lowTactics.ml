@@ -809,9 +809,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_goal (S.Reduce.reduce param s S.conc_kind (S.goal s)) s
 
   let reduce_args args s : S.t list =
-    match args with
-    | [] -> [reduce_goal Reduction.rp_full s]
-    | _ -> bad_args ()
+    let red_param = 
+      match args with
+      | [] -> Reduction.rp_full
+      | [Args.Reduce n] -> Reduction.parse_simpl_args Reduction.rp_full n
+      | _ -> bad_args ()
+    in
+    [reduce_goal red_param s]
 
   let reduce_tac args = wrap_fail (reduce_args args)
 
@@ -1398,26 +1402,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       with other tactics that would have to generate global sequents
       as premisses. *)
 
-  (** Checks that all arguments of [pat] have been inferred in [mv]. *)
-  let check_args_inferred (pat : S.conc_form Term.pat_op) (mv : Match.Mvar.t) : unit =
-    let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
-    
-    let vars_inf =               (* inferred variables *)
-      Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat_vars
-    in
-    if not (Sv.is_empty vars_inf) then
-      begin
-        let err_msg = 
-          Fmt.str "apply: some arguments could not be inferred: %a"
-            (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements vars_inf)
-        in
-        soft_failure (Failure err_msg)
-      end
-
   (** Returns the sub-goals, and the substitution instantiating the
       pattern variables. *)
   let do_apply
-      ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list * Term.subst * Type.tsubst
+      ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) 
+    : S.t list * Term.subst * Type.tsubst
     =
     let option =
       { Match.default_match_option with mode = `EntailRL; use_fadup }
@@ -1461,7 +1450,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           
       (* match succeeded *)
       | Match mv -> 
-        check_args_inferred pat mv;
+        Match.Mvar.check_args_inferred pat mv;
         
         let tsubst = Type.Infer.close ty_env in
         let subst =
@@ -1580,8 +1569,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let p_apply_faduparg (nargs : Args.named_args) : bool =
     match nargs with
     | [Args.NArg L.{ pl_desc = "inductive" }] -> true
-    | (Args.NArg l) :: _ ->
+
+    | Args.NList (l,_) :: _ 
+    | Args.NArg  l     :: _ ->
       hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+
     | [] -> false
 
   let bad_apply_pt loc () =
@@ -1757,21 +1749,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
     in
 
-    (* sub-goals resulting from the convertion of the proof term [pt] *)
-    let subgs = List.map (fun g -> S.set_goal g s) subgs in
-
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;
 
-   (* rename cleanly the variables *)
-    let _, vars, subst =
-      let pat_vars = List.map fst pat.pat_vars in
-      Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
+    (* rename cleanly the variables *)
+    let do_rename form =
+      let _, vars, subst =
+        let pat_vars = List.map fst pat.pat_vars in
+        Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
+      in
+      S.Conc.mk_forall ~simpl:true vars (S.subst_conc subst form)
     in
-    let f = S.subst_conc subst pat.pat_term in
-    let f =
-      S.Conc.mk_forall ~simpl:true vars f
-    in
+    let subgs = List.map do_rename subgs in
+    let f = do_rename pat.pat_term in
+
+    (* sub-goals resulting from the convertion of the proof term [pt] *)
+    let subgs = List.map (fun g -> S.set_goal g s) subgs in
 
     (* If [mode=`IntroImpl], compute subgoals by introducing implications
        on the left. *)

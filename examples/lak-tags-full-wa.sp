@@ -6,6 +6,7 @@
 
 include Basic.
 set postQuantumSound = true.
+set timout=10.
 
 hash h
 

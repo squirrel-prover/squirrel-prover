@@ -155,6 +155,9 @@ rule token = parse
 | "assert"            { ASSERT }
 | "localize"          { LOCALIZE }
 | "have"              { HAVE }
+| "reduce"            { REDUCE }
+| "auto"              { AUTO }
+| "simpl"             { SIMPL }
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }

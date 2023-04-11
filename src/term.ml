@@ -56,7 +56,7 @@ let pp_funname ~dbg ppf ((fn,fty_app) : Symbols.fname * applied_ftype) =
     Fmt.pf ppf "%a"
       (Printer.kws `GoalFunction) (Symbols.to_string fn)
   else 
-    Fmt.pf ppf "@[<hov 2>%a<%a>)@]"
+    Fmt.pf ppf "@[<hov 2>%a<%a>@]"
       (Printer.kws `GoalFunction) (Symbols.to_string fn)
       (Fmt.list ~sep:Fmt.sp Type.pp) fty_app.ty_args
 

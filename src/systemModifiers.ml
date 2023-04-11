@@ -227,10 +227,16 @@ let global_rename
   let evars = Term.get_vars n1 in
   let vs, subs = Term.refresh_vars evars in
   let n1', n2' = (Term.subst subs n1, Term.subst subs n2) in
+
+  let rw_vars = (* remove variable that do not need to be inferred from [vs] *)
+    let fv = Term.fv n1' in
+    List.filter (fun v -> Sv.mem v fv) vs
+  in
+
   let rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Tag.local_vars vs;
+      rw_vars   = Vars.Tag.local_vars rw_vars;
       rw_conds  = [];
       rw_rw     = n1', n2';
     }
@@ -348,10 +354,16 @@ let global_prf
           (mk_eqs ~simpl_tuples:true left_key_ids h_key.args)
       ) (Term.mk_name_with_tuple_args ns (Term.mk_vars is)) hash_pattern
   in
+
+  let rw_vars = (* remove variable that do not need to be inferred from [is1] *)
+    let fv = Term.fv hash_pattern in
+    List.filter (fun v -> Sv.mem v fv) is1
+  in
+
   let rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: is1);
+      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: rw_vars);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
     }
@@ -517,18 +529,28 @@ let global_cca
       ) (plaintext) dec_pattern
   in
 
-  let enc_rw_rule = Rewrite.{
+  let enc_rw_rule = 
+    let enc_rw_vars = (* remove variable that do not need to be inferred from [is] *)
+      let fv = Term.fv enc in
+      List.filter (fun v -> Sv.mem v fv) is
+    in
+    Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Tag.local_vars is;
+      rw_vars   = Vars.Tag.local_vars enc_rw_vars;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
     }
   in
-  let dec_rw_rule = Rewrite.{
+  let dec_rw_rule =
+    let dec_rw_vars = (* remove variable that do not need to be inferred from [is] *)
+      let fv = Term.fv dec_pattern in
+      List.filter (fun v -> Sv.mem v fv) is1
+    in
+    Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: is1);
+      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: dec_rw_vars);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
     }

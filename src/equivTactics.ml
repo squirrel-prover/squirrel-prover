@@ -1223,13 +1223,11 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
   in
   auto_rec s sk fk
     
-let tac_auto ~red_param ~close ~strong args s sk (fk : Tactics.fk) =
-  match args with
-  | [] -> auto ~red_param ~close ~strong s sk fk
-  | _ -> hard_failure (Tactics.Failure "no argument allowed")
+let equiv_auto ~red_param ~close ~strong s sk (fk : Tactics.fk) =
+  auto ~red_param ~close ~strong s sk fk
 
-let tac_autosimpl s = 
-  tac_auto
+let equiv_autosimpl s = 
+  equiv_auto
     ~red_param:Reduction.rp_default
     ~close:false
     ~strong:false s

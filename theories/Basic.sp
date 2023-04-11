@@ -99,11 +99,8 @@ Qed.
 
 goal [any] eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
 Proof. 
-  rewrite -not_eq. 
-  case (x = y) => _. 
-  simpl. 
-  auto.
-  by rewrite eq_iff. 
+rewrite -not_eq. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
 Qed.
 hint rewrite eq_false.
 
@@ -444,14 +441,77 @@ Proof.
     by use H with a, b.
 Qed.
 
-goal [any] not_forall_1 ['a] (phi:'a -> bool) :
+axiom [any] not_forall_1 ['a] (phi:'a -> bool) :
  not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
+
+axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
+ not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
+
+(*------------------------------------------------------------------*)
+
+(** Choose takes a predicate and returns an element that satisfies it,
+    if one exists. Otherwise it returns an arbitrary element. This
+    is possible because types cannot be empty in our logic.
+    Introducing choose gives as a way to denote an inhabitant of
+    each type as, namely as (choose (fun _ => false)). *)
+abstract choose ['a] : ('a -> bool) -> 'a.
+
+axiom [any] choose_spec ['a] (phi:'a->bool) (x:'a) :
+  phi x =>
+  phi (choose phi).
+
+(* This axiom should imply the previous one, but the proof is not
+   convenient due to limitations of the case tactic. *)
+axiom [any] try_carac_1 ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) :
+  (try find x such that phi x in f x else g) =
+  (if exists x, phi x then f (choose phi) else g).
+
+(** The try find construct chooses witnesses following the choose function. *)
+goal [any] try_choose ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) (x:'a) :
+  phi x =>
+  (try find x such that phi x in f x else g) =
+  (f (choose phi)).
 Proof.
-  rewrite -(not_not (phi _)) -not_exists_1 //.
+  intro H.
+  rewrite try_carac_1.
+  rewrite if_true => //.
+  by exists x.
 Qed.
 
-goal [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
- not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
+(** Quantifier commutations. *)
+
+goal [any] forall_exists ['a 'b] (phi:'a->'b->bool) :
+  (forall x:'a, exists y:'b, phi x y) =
+  (exists y':'a->'b, forall x:'a, phi x (y' x)).
 Proof.
-  rewrite -(not_not (phi _ _)) -not_exists_2 //.
+  rewrite eq_iff; split.
+  + intro H.
+    exists (fun x => choose (fun y => phi x y)).
+    intro x; simpl.
+    have [y Hy] := H x.
+    (* Perform beta-expansion before applying choose_spec. *)
+    assert (phi x (choose (fun y => phi x y)) =
+            (fun y => phi x y) (choose (fun y => phi x y)))
+      as -> by auto.
+    apply choose_spec _ y.
+    simpl; assumption.
+  + intro [y' H] x.
+    exists (y' x).
+    by apply H.
+Qed.
+
+goal [any] implies_exists ['a] (phi:bool,psi:'a->bool) :
+  (phi => exists j:'a, psi(j)) =
+  (exists x:'a, phi => psi(x)).
+Proof.
+  rewrite eq_iff; split.
+  + intro H.
+    case phi.
+    * intro phi.
+      assert exists x, psi x as [x _] by apply H.
+      by exists x.
+    * intro _.
+      by exists (choose (fun _ => false)).
+  + intro [x H] H'.
+    by exists x.
 Qed.

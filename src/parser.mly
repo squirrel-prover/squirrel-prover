@@ -39,6 +39,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
+%token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION
@@ -771,7 +772,9 @@ tac_any_term:
 /* tactics named arguments */
 
 named_arg:
-| TILDE l=lsymb { TacticsArgs.NArg l }
+| TILDE l=lsymb         { TacticsArgs.NArg l }
+| TILDE l=lsymb COLON LBRACKET ll=slist(lsymb,COMMA) RBRACKET
+                        { TacticsArgs.NList (l,ll) }
 
 named_args:
 | args=slist(named_arg, empty) { args }
@@ -900,6 +903,15 @@ tac:
   | l=lloc(FRESH) a=named_args arg=fresh_arg
     { mk_abstract l "fresh" [TacticsArgs.Fresh (a,arg)] }
 
+  | l=lloc(AUTO) a=named_args 
+    { mk_abstract l "auto" [TacticsArgs.Auto a] }
+
+  | l=lloc(SIMPL) a=named_args 
+    { mk_abstract l "simpl" [TacticsArgs.Auto a] } /* same [TacticsArgs] as `auto` */
+
+  | l=lloc(REDUCE) a=named_args 
+    { mk_abstract l "reduce" [TacticsArgs.Reduce a] }
+
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
@@ -947,32 +959,35 @@ tac:
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
 help_tac_i:
-| FA         { "fa"}
-| CS         { "cs"}
-| INTRO      { "intro"}
-| DESTRUCT   { "destruct"}
-| DEPENDS    { "depends"}
-| REMEMBER   { "remember"}
-| EXISTS     { "exists"}
-| REVERT     { "revert"}
-| GENERALIZE { "generalize"}
-| INDUCTION  { "induction"}
-| CLEAR      { "clear"}
-| ASSERT     { "have"}
-| HAVE       { "have"}
-| USE        { "use"}
-| REWRITE    { "rewrite"}
-| TRANS      { "trans"}
-| FRESH      { "fresh"}
-| APPLY      { "apply"}
-| SPLITSEQ   { "splitseq"}
-| CONSTSEQ   { "constseq"}
-| MEMSEQ     { "memseq"}
-| DDH        { "ddh"}
-| GDH        { "gdh"}
-| CDH        { "cdh"}
-| PRINT      { "print"}
-| SEARCH     { "search"}
+| FA         { "fa"         }
+| CS         { "cs"         }
+| INTRO      { "intro"      }
+| DESTRUCT   { "destruct"   }
+| DEPENDS    { "depends"    }
+| REMEMBER   { "remember"   }
+| EXISTS     { "exists"     }
+| REVERT     { "revert"     }
+| GENERALIZE { "generalize" }
+| INDUCTION  { "induction"  }
+| CLEAR      { "clear"      }
+| REDUCE     { "reduce"     }
+| SIMPL      { "simpl"      }
+| AUTO       { "auto"       }
+| ASSERT     { "have"       }
+| HAVE       { "have"       }
+| USE        { "use"        }
+| REWRITE    { "rewrite"    }
+| TRANS      { "trans"      }
+| FRESH      { "fresh"      }
+| APPLY      { "apply"      }
+| SPLITSEQ   { "splitseq"   }
+| CONSTSEQ   { "constseq"   }
+| MEMSEQ     { "memseq"     }
+| DDH        { "ddh"        }
+| GDH        { "gdh"        }
+| CDH        { "cdh"        }
+| PRINT      { "print"      }
+| SEARCH     { "search"     }
 
 | DEPENDENT INDUCTION  { "dependent induction"}
 | GENERALIZE DEPENDENT { "generalize dependent"}

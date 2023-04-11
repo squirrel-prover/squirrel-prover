@@ -16,7 +16,8 @@ type in_target = [`Goal | `All | `Hyps of lsymb list]
 (** {2 Tactics named arguments} *)
 
 type named_arg =
-  | NArg of lsymb               (** '~id' *)
+  | NArg  of lsymb               (** '~id' *)
+  | NList of lsymb * lsymb list  (** "~id:[id1, ..., idn]" *)
 
 type named_args = named_arg list
 
@@ -162,6 +163,8 @@ type parser_arg =
   | ApplyIn      of named_args * Theory.p_pt * apply_in
   | Have         of simpl_pat option * Theory.any_term
   | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Reduce       of named_args
+  | Auto         of named_args  (* used by `auto` and `simpl` *)
   | SplitSeq     of int L.located * Theory.term * Theory.term option
   | ConstSeq     of int L.located * (Theory.term * Theory.term) list
   | MemSeq       of int L.located * int L.located

@@ -718,6 +718,9 @@ module Mvar : sig[@warning "-32"]
   val to_subst_locals :
     mode:[`Match|`Unif] -> t -> Term.subst
 
+  (** Checks that all arguments of [pat] have been inferred in [mv]. *)
+  val check_args_inferred : 'a Term.pat_op -> t -> unit 
+
   val pp : Format.formatter -> t -> unit
 end = struct
   (** [id] is a unique identifier used to do memoisation. *)
@@ -861,6 +864,24 @@ end = struct
         Memo.add memo (t,mode) r;
         r
 
+  (*------------------------------------------------------------------*)
+  (** Checks that all arguments of [pat] have been inferred in [mv]. *)
+  let check_args_inferred
+      (pat : 'a Term.pat_op) (mv : t) : unit 
+    =
+    let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
+
+    let vars_inf =               (* inferred variables *)
+      Sv.filter (fun v -> not (mem v mv)) pat_vars
+    in
+    if not (Sv.is_empty vars_inf) then
+      begin
+        let err_msg = 
+          Fmt.str "some arguments could not be inferred: %a"
+            (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements vars_inf)
+        in
+        Tactics.soft_failure (Failure err_msg)
+      end
 end
 
 

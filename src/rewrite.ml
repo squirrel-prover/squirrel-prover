@@ -209,6 +209,8 @@ let rw_inst
 
         (* head matches *)
         | Match mv -> 
+          Match.Mvar.check_args_inferred s.init_pat mv;
+
           (* we found the rewrite instance *)
           let subst =
             let pat_vars =
@@ -217,7 +219,7 @@ let rw_inst
                  specifies *)
 
               |> Vars.add_vars (Vars.Tag.local_vars vars)
-              (* vars above the current position are unrestricted, i.e. local vars*)
+              (* vars above the current position are unrestricted, i.e. local vars *)
             in
             match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
             | `Subst subst -> subst
