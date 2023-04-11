@@ -16,8 +16,8 @@ pages:
   - make
   - make install
   - make test
-  - make refman-html
+  - make deploy-html
   artifacts:
     paths:
-    - _build/default/documentation/sphinx/public
+    - public
 
