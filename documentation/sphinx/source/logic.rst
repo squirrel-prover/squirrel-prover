@@ -86,6 +86,9 @@ For instance, a term of type :term:`message` represents a probabilistic value
 which ranges over messages, and a term of type :term:`bool`
 is a probabilistic boolean value.
 
+.. prodn::
+  term ::= TODO
+
 Term syntax, lambda calculus TODO
 
 TODO :gdef:`names <name>`

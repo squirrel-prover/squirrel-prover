@@ -84,56 +84,52 @@ facts that may be used in various ways.
 
 TODO
 
-.. _autosimpl:
+.. _reduction:
 
-Simplification engine
-~~~~~~~~~~~~~~~~~~~~~
+Reduction
+~~~~~~~~~
 
-Several tactics (e.g., `simpl`_ and `auto`_) rely on an automatic
-simplification engine. This engine repeatedly applies several
-transformations, corresponding to the following flags.
+Several tactics (e.g., `simpl`_ and `auto`_) rely on an reduction
+engine. This engine repeatedly applies several transformations,
+corresponding to the following flags.
 
 .. prodn::
-  simpl_flags ::= ~flags:[{*, {| beta | proj | delta | constr}}]
+  simpl_flags ::= ~flags:[{*, {| rw | beta | proj | delta | constr}}]
 
-Leaving the flags unspecified results in all simplifications
-being used. Specifying an empty list of flags results in no
-simplification being applied. Otherwise, only the specified
-transformations are applied, as described next:
+Leaving the flags unspecified results in the :n:`rw`, :n:`beta` and
+:n:`proj` transformations being used. Specifying an empty list of
+flags results in no transformations being applied. Otherwise, only the
+specified transformations are applied, as described next:
 
-- :n:`rewrite`: perform user-defined rewriting;
-- :n:`delta`: replace macros and operators by their definitions;
+- :n:`rw`: perform user-defined rewriting;
 - :n:`beta`: perform beta-reductions;
-- :n:`proj`: compute projections;
+- :n:`proj`: compute tuple projections;
+- :n:`delta`: replace macros and operators by their definitions;
 - :n:`constr`: automatically simplify trace formulas using
   constraint reasoning.
 
-The :n:`constr` simplification replaces trace (sub)formulas that
+The :n:`constr` transformation replaces trace (sub)formulas that
 are provably equal to ``true`` or ``false`` by this value.
 When doing so, the constraint solver takes into account
 the current hypotheses but also the conditionals that surround
 the trace formula.
 
-The user-defined rewriting simplification corresponds to eagerly
-applying the rewrite rules corresponding to the lemmas added
-to the rewriting database using the `hint rewrite`_ command.
+The user-defined rewriting transformation eagerly applies the rewrite
+rules added to the rewriting database using the `hint rewrite`_
+command.
 
 .. cmd:: hint rewrite @identifier
 
-  Add lemma :n:`@identifier` to the user-defined rewriting database.
-  The lemma should establish a local formula consisting of
-  a universally quantified conditional equality.
-  In other words, it should essentially be of the form
-  ``forall ..., phi_1 => ... => phi_n => u = v``.
+  Add a rewriting rule from the lemma :n:`@identifier` to the
+  user-defined rewriting database. The lemma should establish a local
+  formula consisting of a universally quantified conditional equality.
+  In other words, it should essentially be of the form ``forall ...,
+  phi_1 => ... => phi_n => u = v``.
 
-  The goal will be used to rewrite occurrences of ``u`` into
-  the corresponding occurrences of ``v``. When this happens,
-  the conditions ``phi_1, ..., phi_n`` will be added as subgoals.
-  Note that rewriting is solely controlled by pattern-matching
-  against ``u``; there is no way to restrict it based on the
-  provability of the conditions ``phi_i``. Hence one should
-  be careful not to enter rewriting lemmas with a too general
-  left-hand side ``u``.
+  The goal will be used to rewrite occurrences of ``u`` into the
+  corresponding occurrences of ``v``, assuming the conditions ``phi_1,
+  ..., phi_n`` reduces to ``true`` (recursively, using the reduction
+  engine).
 
 Common errors
 ~~~~~~~~~~~~~
@@ -145,24 +141,29 @@ Common errors
 Common tactics
 ~~~~~~~~~~~~~~
 
-.. tacn:: auto {? simpl_flags}
+.. tacn:: auto {? @simpl_flags}
 
      Attempt to automatically prove a subgoal.
 
-     The tactic uses the :ref:`simplification engine <autosimpl>`
+     The tactic uses the :ref:`reduction engine <reduction>`
      with the provided flags.
 
-     For local goals, the tactic relies on basic propositional reasoning,
-     rewriting simplications, and both `constraints`_ and `congruence`_.
+     Moreover, for local goals, the tactic relies on basic
+     propositional reasoning, rewriting simplications, and both
+     `constraints`_ and `congruence`_.
 
+     .. exn:: cannot close goal
+        :name: _goalnotclosed
+
+        The current goal could not be closed.
 
 .. tacn:: congruence
 
-     Attempt to conclude by automated reasoning on message (dis)equalities.
+     Attempt to conclude by automated reasoning on message (dis-)equalities.
      Equalities and disequalities are collected from hypotheses, both local 
      and global, after the destruction of conjunctions (but no case analyses 
      are performed to handle conjunctive hypotheses). If the conclusion
-     is also a message (dis)equality then it is taken into account as well.
+     is a message (dis-)equality then it is taken into account as well.
 
 .. tacn:: constraints
 
@@ -170,26 +171,26 @@ Common tactics
      Literals are collected from hypotheses, both local and global,
      after the destruction of conjunctions (but no case analyses are
      performed to handle conjunctive hypotheses). If the conclusion
-     is also a trace literal then it is taken into account as well.
+     is a trace literal then it is taken into account as well.
 
-.. tacn:: simpl {? simpl_flags}
+.. tacn:: simpl {? @simpl_flags}
 
      Simplify a subgoal, working on both hypotheses and conclusion.
      This tactic always succeeds, replacing the initial subgoal with
      a unique simplified subgoal (which may be identical to the
      initial one).
 
-     The tactic uses the :ref:`simplification engine <autosimpl>`
+     The tactic uses the :ref:`reduction engine <reduction>`
      with the provided flags.
 
      When the conclusion of the goal is a conjunction, the tactic
-     will attempt to automatically prove some conjuncts (using `auto`_)
+     will attempt to automatically prove some conjuncts (using :tacn:`auto`)
      and will then return a simplified subgoal without these conjuncts.
      In the degenerate case where no conjunct remains, the conclusion
      of the subgoal will be ``true``.
 
      When the conclusion of the goal is an equivalence, the tactic
-     will automatically perform ``fa`` when at most one of the remaining
+     will automatically perform :tacn:`fa` when at most one of the remaining
      subterms is non-deducible. It may thus remove a deducible item
      from the equivalence, or replace an item ``<u,v>`` by ``u``
      if it determines that ``v`` is deducible.
@@ -227,5 +228,10 @@ Equivalence tactics
 
 .. tacn:: fresh @position
    :name: fresh
+
+   TODO
+
+.. tacn:: fa {@position | @term}
+   :name: fa
 
    TODO
