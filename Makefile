@@ -175,6 +175,7 @@ clean:
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
+	rm -rf public
 
 # Clean last bench
 clean_bench:
@@ -223,6 +224,11 @@ doc:
 
 refman-html:
 	dune build --no-buffer @refman-html
+	@$(ECHO) "Documentation available: _build/default/documentation/sphinx/public/index.html"
+
+deploy-html: refman-html
+	mkdir public
+	cp -r _build/default/documentation/sphinx/public .
 
 # If this touch commit.ml for inserting same hash dune will rebuild for nothing
 version:
