@@ -36,7 +36,25 @@ Commands
    Reset the prover state. This command can be undone with :cmd:`undo` since it does not clear
    the history of state.
 
-.. cmd:: set @identifier = 
+.. cmd:: set @identifier = {| @bool | @natural }
+
+   Set any squirrel option using its :n:`@identifier`:
+
+   ====================== ============================================ ======================
+   Option identifier      Description                                  Default value
+   ====================== ============================================ ======================
+   timeout                timeout for the solver in seconds.           2
+   printTRSEquations      Print equations of the TRS system            false
+   debugConstr            Debug information for the constraint checker false
+   debugCompletion        Debug information for the completion checker false
+   debugTactics           Debug information for tactics                false
+   processStrictAliasMode Strict alias mode for processus              false
+   showStrengthenedHyp    Show hypothesis after strengthening          false
+   autoIntro              Automatic introductions                      false
+   autoFADup              Automatic FA Dup                             true
+   newInduction           New equivalence induction principle (FIXME)  false
+   postQuantumSound       Post-quantum soundness                       false
+   ====================== ============================================ ======================
 
 .. cmd:: print {? @identifier}
 
