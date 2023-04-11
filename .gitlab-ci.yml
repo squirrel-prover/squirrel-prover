@@ -16,7 +16,7 @@ pages:
   - make
   - make install
   - make test
-  - sphinx-build -b html documentation/sphinx/source/. public
+  - make refman-html
   artifacts:
     paths:
     - public
