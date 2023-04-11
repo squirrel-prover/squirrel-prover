@@ -77,10 +77,24 @@ as :token:`term`, :token:`formula`, :token:`pattern`,
 Proof terms
 ~~~~~~~~~~~
 
-:gdef:`Proof terms <proof term>`
-are used by several tactics as a convenient way to
-combine :term:`assumptions <assumption>` in order to derive new
-facts that may be used in various ways.
+Proof terms are used by several tactics as a convenient way to combine
+and (partially) apply :term:`assumptions <assumption>` in order to
+derive new facts.
+
+.. prodn::
+   proof_term ::= @assumption {? @pt_arg}
+
+.. prodn::
+   pt_arg ::= @assumption | @sterm | (% @proof_term)
+
+Note that the grammar for proof term arguments :token:`pt_arg` is
+ambiguous (because of the :token:`assumption` and :token:`sterm`
+productions). When this happens, Squirrel tries to desambiguate using
+the context.
+
+.. note::
+   The :n:`(% @proof_term)` syntax is experimental, and is subject to
+   change in the future.
 
 TODO
 
@@ -89,9 +103,9 @@ TODO
 Reduction
 ~~~~~~~~~
 
-Several tactics (e.g., `simpl`_ and `auto`_) rely on an reduction
-engine. This engine repeatedly applies several transformations,
-corresponding to the following flags.
+Several tactics (e.g., :tacn:`simpl` and :tacn:`auto`) rely on an
+reduction engine. This engine repeatedly applies several
+transformations, corresponding to the following flags.
 
 .. prodn::
   simpl_flags ::= ~flags:[{*, {| rw | beta | proj | delta | constr}}]
@@ -109,7 +123,7 @@ specified transformations are applied, as described next:
   constraint reasoning.
 
 The :n:`constr` transformation replaces trace (sub)formulas that
-are provably equal to ``true`` or ``false`` by this value.
+are provably equal to :n:`true` or :n:`false` by this value.
 When doing so, the constraint solver takes into account
 the current hypotheses but also the conditionals that surround
 the trace formula.
@@ -123,13 +137,13 @@ command.
   Add a rewriting rule from the lemma :n:`@identifier` to the
   user-defined rewriting database. The lemma should establish a local
   formula consisting of a universally quantified conditional equality.
-  In other words, it should essentially be of the form ``forall ...,
-  phi_1 => ... => phi_n => u = v``.
+  In other words, it should essentially be of the form
+  :n:`forall @binders, phi_1 => ... => phi_n => u = v`.
 
-  The goal will be used to rewrite occurrences of ``u`` into the
-  corresponding occurrences of ``v``, assuming the conditions ``phi_1,
-  ..., phi_n`` reduces to ``true`` (recursively, using the reduction
-  engine).
+  The goal will be used to rewrite occurrences of :n:`u` into the
+  corresponding occurrences of :n:`v`, assuming the conditions
+  :n:`phi_1, ..., phi_n` reduces to :n:`true` (recursively, using the
+  reduction engine).
 
 Common errors
 ~~~~~~~~~~~~~
@@ -141,6 +155,37 @@ Common errors
 Common tactics
 ~~~~~~~~~~~~~~
 
+.. tacn:: reduce {? @simpl_flags}
+
+     Reduce all terms in a subgoal, working on both hypotheses and conclusion.
+     
+     This tactic always succeeds, replacing the initial subgoal with a
+     unique subgoal (which may be identical to the initial one).
+
+     The tactic uses the :ref:`reduction engine <reduction>`
+     with the provided flags.
+
+.. tacn:: simpl {? @simpl_flags}
+
+     Simplify a subgoal, working on both hypotheses and conclusion.
+     This tactic always succeeds, replacing the initial subgoal with
+     a unique simplified subgoal.
+
+     The tactic uses the :ref:`reduction engine <reduction>`
+     with the provided flags.
+
+     When the conclusion of the goal is a conjunction, the tactic
+     will attempt to automatically prove some conjuncts (using :tacn:`auto`)
+     and will then return a simplified subgoal without these conjuncts.
+     In the degenerate case where no conjunct remains, the conclusion
+     of the subgoal will be :n:`true`.
+
+     When the conclusion of the goal is an equivalence, the tactic
+     will automatically perform :tacn:`fa` when at most one of the remaining
+     subterms is non-deducible. It may thus remove a deducible item
+     from the equivalence, or replace an item :n:`<u,v>` by :n:`u`
+     if it determines that :n:`v` is deducible.
+
 .. tacn:: auto {? @simpl_flags}
 
      Attempt to automatically prove a subgoal.
@@ -150,7 +195,7 @@ Common tactics
 
      Moreover, for local goals, the tactic relies on basic
      propositional reasoning, rewriting simplications, and both
-     `constraints`_ and `congruence`_.
+     :tacn:`constraints` and :tacn:`congruence`.
 
      .. exn:: cannot close goal
         :name: _goalnotclosed
@@ -172,28 +217,6 @@ Common tactics
      after the destruction of conjunctions (but no case analyses are
      performed to handle conjunctive hypotheses). If the conclusion
      is a trace literal then it is taken into account as well.
-
-.. tacn:: simpl {? @simpl_flags}
-
-     Simplify a subgoal, working on both hypotheses and conclusion.
-     This tactic always succeeds, replacing the initial subgoal with
-     a unique simplified subgoal (which may be identical to the
-     initial one).
-
-     The tactic uses the :ref:`reduction engine <reduction>`
-     with the provided flags.
-
-     When the conclusion of the goal is a conjunction, the tactic
-     will attempt to automatically prove some conjuncts (using :tacn:`auto`)
-     and will then return a simplified subgoal without these conjuncts.
-     In the degenerate case where no conjunct remains, the conclusion
-     of the subgoal will be ``true``.
-
-     When the conclusion of the goal is an equivalence, the tactic
-     will automatically perform :tacn:`fa` when at most one of the remaining
-     subterms is non-deducible. It may thus remove a deducible item
-     from the equivalence, or replace an item ``<u,v>`` by ``u``
-     if it determines that ``v`` is deducible.
 
 Equivalence tactics
 ~~~~~~~~~~~~~~~~~~~

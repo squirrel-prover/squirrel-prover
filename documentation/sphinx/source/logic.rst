@@ -45,7 +45,7 @@ using the following declaration:
   be passed to indicate assumptions on the new type.
 
   .. prodn::
-    type_tag ::= large | well_founded | finite | fixed | name_fixed_length
+    type_tag ::= large | well_founded | finite | fixed | name_fixed_length
 
   The meaning of tags is as follows:
 
@@ -54,7 +54,7 @@ using the following declaration:
   * a type is :gdef:`finite` if
     it has a finite cardinal for each :math:`\eta`;
   * a type is :gdef:`fixed` if it is the same for all :math:`\eta`;
-  * a type is :gdef:`large` when it supports drawing any number of
+  * a type is :gdef:`large` when it supports drawing any number of
     values, denoted by :term:`names <name>`, in such a way that two
     distinct names have a negligible chance of being equal;
   * a type with :gdef:`name_fixed_length` means that all names sampled
@@ -63,11 +63,13 @@ using the following declaration:
 General types
 --------------
 
-General types are derived from base types
-and type variables using the arrow and tupling type constructors.
+General types are derived from base types and type variables using the
+arrow and tupling type constructors.  A type (or part of a type) can
+be left unwritten using a type holes `_`, which must be then
+inferred by Squirrel.
 
 .. prodn::
-  type ::= @type_variable | @base_type | @type -> @type | (@type * ... * @type)
+  type ::= _ | @type_variable | @base_type | @type -> @type | (@type * ... * @type)
 
 .. note:: The most common function symbols have
   types of the form ``(b1*...*bn)->b'`` where the ``b1``, ...,
@@ -76,6 +78,35 @@ and type variables using the arrow and tupling type constructors.
   For example, a hash function will have type
   ``(message*message)->message``: it takes a message to be hashed,
   a key, and the returned hash is also a message.
+
+Binders and tags
+================
+
+.. prodn::
+  variable ::= @identifier
+  var_or_pat ::= _ | @variable
+
+:token:`variable` are represented by string identifiers. 
+A hole `_` can be used as name for a variable which is either unused
+or whose name does not matter. 
+
+Note that two occurrences of the same variable name are internally
+bound to different variables (there is a hidden unique identifier).
+
+.. prodn::
+  tag ::= @identifier
+
+Tags restrict a type in various ways.
+
+TODO describe tags
+
+.. prodn::
+  binder ::= @var_or_pat | ({+, {+, @var_or_pat } : @type {? [{+ @tag}]} }) 
+  binders ::= {* @binder }
+
+Binders with tags are not supported everywhere.
+
+TODO describe binders
 
 Terms
 ======
@@ -87,7 +118,20 @@ which ranges over messages, and a term of type :term:`bool`
 is a probabilistic boolean value.
 
 .. prodn::
-  term ::= TODO
+  term ::= (@sterm) 
+       | @term @ @term 
+       | @term @term 
+       | @term @infix_op @term 
+       | @term # @natural
+       | fun @binders => @term
+       | @quantif @binders, @term
+       | if @term then @term else @term 
+       | find @binders such that @term in @term {? else @term }
+  sterm ::= _
+        | @identifier
+        | diff(@term, @term)
+        | ( {+, @term} )
+  quantif ::= forall | exists
 
 Term syntax, lambda calculus TODO
 
@@ -116,7 +160,7 @@ using common syntax, given below:
 
 .. prodn::
   formula ::= @formula && @formula | @formula || @formula | @formula => @formula | not @formula
-    | forall @binders, @formula | exists @binders, @formula
+    | @quantif @binders, @formula
     | happens({+, @terms}) | cond@@term | exec@@term
     | @term = @term | @term <= @term | @term < @term | @term >= @term | @term > @term
 
@@ -129,7 +173,7 @@ are first order formulas, written as follows:
   global_formula ::= [@formula] | equiv({*, @term})
     | @global_formula -> @global_formula
     | @global_formula /\ @global_formula | @global_formula \/ @global_formula
-    | Forall @binders, @global_formula | Exists @binders, @global_formula
+    | Forall @binders, @global_formula | Exists @binders, @global_formula
 
 .. _section-declarations:
 
