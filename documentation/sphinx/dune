@@ -1,7 +1,7 @@
 (rule
+ (targets public)
  (alias refman-html)
- (package squirrel)
  (deps
   (source_tree source))
  (action
-  (run sphinx-build -b html source/. public)))
+  (run sphinx-build -b html source/. %{targets})))
