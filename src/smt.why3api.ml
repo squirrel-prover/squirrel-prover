@@ -4,14 +4,23 @@ let filter_ty t = List.filter (fun x -> Vars.ty x = t)
 let filter_msg  = List.filter (fun x -> let t = Vars.ty x in
                                 t <> Type.Index && t <> Type.Timestamp)
 
-let get_smt_setup
-  : unit -> (Why3.Theory.theory * Why3.Whyconf.config_prover * Why3.Driver.driver) option =
+(*------------------------------------------------------------------*)
+type smt_state = {
+  theory        : Why3.Theory.theory;
+  config_prover : Why3.Whyconf.config_prover;
+  main          : Why3.Whyconf.main;
+  driver        : Why3.Driver.driver;
+}
+
+(*------------------------------------------------------------------*)
+let get_smt_setup : unit -> smt_state option =
   let mem = ref None in
   fun () -> match !mem with
     | Some _ as x -> x
     | None -> begin
         (* Setup following http://why3.lri.fr/doc/api.html *)
         let config = Why3.Whyconf.init_config None in
+        let main = Why3.Whyconf.get_main config in
         (* builds the environment from the [loadpath]
          * theory_dir taken from the code of Main.mk_load_paths *)
         let env =
@@ -26,11 +35,15 @@ let get_smt_setup
                                 (filter_provers config
                                    (parse_filter_prover "Alt-Ergo"))) in
           try
-            let result =
-              Some (tm_theory, alt_ergo,
-                    Why3.Whyconf.(load_driver (get_main config) env alt_ergo)) in
-            mem := result;
-            result
+            let result = {
+              theory        = tm_theory;
+              config_prover = alt_ergo;
+              main;
+              driver        = Why3.Driver.(load_driver_for_prover main env alt_ergo);
+            }
+            in
+            mem := Some result;
+            Some result
           with e ->
             Format.printf "smt: Alt-Ergo driver failed to load: %a@.\n"
               Why3.Exn_printer.exn_printer e; None
@@ -47,15 +60,16 @@ let run_prover table ?limit_opt task =
     | None   -> TConfig.solver_timeout (table)
     | Some x -> x
   in
-  let opam_prefix = Sys.getenv "OPAM_SWITCH_PREFIX" in
-  Utils.omap (fun (_env, prover, driver) ->
+  (* let opam_prefix = Sys.getenv "OPAM_SWITCH_PREFIX" in *)
+  Utils.omap (fun smt_state ->
       Why3.Call_provers.wait_on_call
-        (Why3.Driver.prove_task
-           ~libdir:(Filename.concat opam_prefix "/lib/why3")
-           ~datadir:(Filename.concat opam_prefix "/share/why3")
-           ~limit:{ Why3.Call_provers.empty_limit with limit_time = limit }
-           ~command:prover.Why3.Whyconf.command
-           driver task))
+        (Why3.Driver.prove_task 
+           ~config:smt_state.main
+           (* ~libdir:(Filename.concat opam_prefix "/lib/why3") *)
+           (* ~datadir:(Filename.concat opam_prefix "/share/why3") *)
+           ~limit:{ Why3.Call_provers.empty_limit with limit_time = float_of_int limit }
+           ~command:smt_state.config_prover.Why3.Whyconf.command
+           smt_state.driver task))
     (get_smt_setup ())
 
 
@@ -725,9 +739,9 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
   try
     match get_smt_setup () with
     | None -> Format.printf "smt: setup failed@."; false
-    | Some (tm_theory, _, _) -> begin
+    | Some smt_state -> begin
         let task =
-          build_task table system evars msg_atoms trace_lits axioms tm_theory in
+          build_task table system evars msg_atoms trace_lits axioms smt_state.theory in
         Format.printf "@[task is:@\n%a@]@." Why3.Pretty.print_task task;
         Utils.omap (fun x -> x.Why3.Call_provers.pr_answer)
           (if slow 
