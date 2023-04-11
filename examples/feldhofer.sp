@@ -29,7 +29,7 @@ This is a "light" model without the last check of T.
 
 *)
 
-set timeout=4.
+set timeout=10.
 set postQuantumSound=true.
 
 channel cR
