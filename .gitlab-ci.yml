@@ -19,5 +19,5 @@ pages:
   - make refman-html
   artifacts:
     paths:
-    - public
+    - _build/default/documentation/sphinx/public
 
