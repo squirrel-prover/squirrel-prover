@@ -6,8 +6,7 @@ Commands
 
 **TODO**
 
-- describe the (few) commands available in Squirrel;
-- `Proof`, `Qed`, `Abort`, `Reset`... are also commands.
+- describe `hint`
 
 .. cmd:: Proof
 
@@ -35,6 +34,20 @@ Commands
 
    Reset the prover state. This command can be undone with :cmd:`undo` since it does not clear
    the history of state.
+
+.. cmd:: Include @file
+
+   Loads the theories/:n:`@file`.sp. 
+
+     .. example:: Including theories/Basic.sp
+
+       .. squirreltop:: in
+
+          include Basic.
+
+   If you
+   install squirrel (with ``make install``) and not running it from root directory of its
+   sources, this directory is located in ``~/.local/bin``.
 
 .. cmd:: set @identifier = {| @bool | @natural }
 
