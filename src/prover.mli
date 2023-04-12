@@ -27,6 +27,9 @@ val init : unit -> state
 (** Execute a command : see @ProverLib.prover_input *)
 val do_command : state -> ProverLib.prover_input -> state
 
+(** Run the given squirrel file *)
+val run : ?test:bool -> string -> unit
+
 (** Execute a single command from string *)
 val exec_command : string -> state -> state
 

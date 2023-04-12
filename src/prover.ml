@@ -511,11 +511,11 @@ and do_include (st:state) (i: ProverLib.include_param) : state =
   (* `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
   let file = Driver.locate load_paths (Location.unloc i.th_name) in
-  do_all_commands_in st file
-and do_all_commands_in (st:state) (file:Driver.file) : state =
-  match Driver.next_input ~test:false file st.prover_mode with
+  do_all_commands_in ~test:true st file
+and do_all_commands_in ~test (st:state) (file:Driver.file) : state =
+  match Driver.next_input ~test file st.prover_mode with
   | ProverLib.Prover EOF -> do_eof st
-  | cmd -> do_all_commands_in 
+  | cmd -> do_all_commands_in ~test
              (do_command st (get_prover_command cmd)) file
 and exec_command (s:string) (st:state) : state  = 
   let input = command_from_string st s in
@@ -527,3 +527,10 @@ and exec_all (st:state) (s:string) =
   List.fold_left (fun st s -> 
       exec_command (s^".") st) st commands
 (* }↑} *)
+
+(* run entire squirrel file with given path as string *)
+let run ?(test=false) (file_path:string) : unit =
+  match Driver.file_from_path LP_none 
+          (Filename.remove_extension file_path) with
+  | Some file -> let _ = do_all_commands_in ~test (init ()) file in ()
+  | None -> failwith "File not found !" 

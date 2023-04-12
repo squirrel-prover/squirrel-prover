@@ -26,7 +26,7 @@ let test_suites : unit Alcotest.test list =
     ("Term", Squirreltests.Term.tests)
   ]
 
-let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
+let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
   let exception Ok in
   let get_sp_from_dir s =
       Sys.readdir s
@@ -38,7 +38,7 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
   let okfails = List.map (fun f -> 
     f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
       begin fun () ->
-        Squirrellib.Main.run ~test:true f;
+        runner ~test:true f;
         raise Ok
       end
     end
@@ -47,8 +47,10 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
 
 let () =
   List.iter (fun (s,t) -> Squirrellib.Checks.add_suite s t) test_suites;
-  Squirrellib.Checks.add_suite "tests/ok/" (alcotests "tests/ok");
-  Squirrellib.Checks.add_suite "tests/fail/" (alcotests "tests/fail");
+  (* let runner = Squirrellib.Prover.run in *)
+  let runner = Squirrellib.Main.run in
+  Squirrellib.Checks.add_suite "tests/ok/" (alcotests runner "tests/ok");
+  Squirrellib.Checks.add_suite "tests/fail/" (alcotests runner "tests/fail");
   Format.eprintf "Running Alcotests on test suites :\n";
   List.iter (fun (n,_) -> 
     Format.eprintf "\t%s\n" n;
