@@ -82,7 +82,7 @@ and (partially) apply :term:`assumptions <assumption>` in order to
 derive new facts.
 
 .. prodn::
-   proof_term ::= @assumption {? @pt_arg}
+   proof_term ::= @assumption {* @pt_arg}
 
 .. prodn::
    pt_arg ::= @assumption | @sterm | (% @proof_term)
