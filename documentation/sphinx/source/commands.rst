@@ -4,10 +4,6 @@
 Commands
 =========
 
-**TODO**
-
-- describe `hint`
-
 .. cmd:: Proof
 
   Enter proof mode with a unique subgoal
@@ -56,7 +52,7 @@ Commands
    ====================== ============================================ ======================
    Option identifier      Description                                  Default value
    ====================== ============================================ ======================
-   timeout                timeout for the solver in seconds.           2
+   timeout                Timeout for the solver in seconds            2
    printTRSEquations      Print equations of the TRS system            false
    debugConstr            Debug information for the constraint checker false
    debugCompletion        Debug information for the completion checker false
@@ -87,11 +83,12 @@ Commands
 
         print foo.
 
-.. cmd:: search @pattern {? in [{| @system_id | @system_exp }] }
+.. cmd:: search @term {? in [{| @system_id | @system_exp }] }
 
-   Search lemmas containing a given :n:`@pattern`. 
-   A :n:`{| @system_id | @system_exp }` can be specified otherwise it is searched in the :n:`@global`
-   system.
+   Search lemmas containing a given :n:`@term` (that can contains
+   holes ``_`` as specified in :n:`@sterm`). 
+   A :n:`{| @system_id | @system_exp }` can be specified otherwise it is searched in :n:`@any`
+   systems.
 
   .. example:: searching axioms with included patterns
 
@@ -104,3 +101,24 @@ Commands
 
         search exists (x : _), _.
         search exists (x : _ -> _), _.
+
+
+.. cmd:: hint rewrite @identifier
+
+  Add a rewriting rule from the lemma :n:`@identifier` to the
+  user-defined rewriting database. The lemma should establish a local
+  formula consisting of a universally quantified conditional equality.
+  In other words, it should essentially be of the form
+  :n:`forall @binders, phi_1 => ... => phi_n => u = v`.
+
+  The goal will be used to rewrite occurrences of :n:`u` into the
+  corresponding occurrences of :n:`v`, assuming the conditions
+  :n:`phi_1, ..., phi_n` reduces to :n:`true` (recursively, using the
+  reduction engine).
+
+  .. example:: add rewriting rule
+
+    .. squirreltop:: in
+
+        axiom [any] and_true_l (b : boolean) : (true && b) = b.
+        hint rewrite and_true_l.

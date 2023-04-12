@@ -107,20 +107,19 @@ Several tactics (e.g., :tacn:`simpl` and :tacn:`auto`) rely on an
 reduction engine. This engine repeatedly applies several
 transformations, corresponding to the following flags.
 
-.. prodn::
-  simpl_flags ::= ~flags:[{*, {| rw | beta | proj | delta | constr}}]
+.. prodn:: simpl_flags ::= ~flags:[ {*, {| rw | beta | proj | delta | constr } } ]
 
 Leaving the flags unspecified results in the :n:`rw`, :n:`beta` and
 :n:`proj` transformations being used. Specifying an empty list of
 flags results in no transformations being applied. Otherwise, only the
 specified transformations are applied, as described next:
 
-- :n:`rw`: perform user-defined rewriting;
-- :n:`beta`: perform beta-reductions;
-- :n:`proj`: compute tuple projections;
-- :n:`delta`: replace macros and operators by their definitions;
-- :n:`constr`: automatically simplify trace formulas using
-  constraint reasoning.
+  - :n:`rw`: perform user-defined rewriting;
+  - :n:`beta`: perform beta-reductions;
+  - :n:`proj`: compute tuple projections;
+  - :n:`delta`: replace macros and operators by their definitions;
+  - :n:`constr`: automatically simplify trace formulas using
+    constraint reasoning.
 
 The :n:`constr` transformation replaces trace (sub)formulas that
 are provably equal to :n:`true` or :n:`false` by this value.
@@ -129,21 +128,8 @@ the current hypotheses but also the conditionals that surround
 the trace formula.
 
 The user-defined rewriting transformation eagerly applies the rewrite
-rules added to the rewriting database using the `hint rewrite`_
+rules added to the rewriting database using the :cmd:`hint rewrite`
 command.
-
-.. cmd:: hint rewrite @identifier
-
-  Add a rewriting rule from the lemma :n:`@identifier` to the
-  user-defined rewriting database. The lemma should establish a local
-  formula consisting of a universally quantified conditional equality.
-  In other words, it should essentially be of the form
-  :n:`forall @binders, phi_1 => ... => phi_n => u = v`.
-
-  The goal will be used to rewrite occurrences of :n:`u` into the
-  corresponding occurrences of :n:`v`, assuming the conditions
-  :n:`phi_1, ..., phi_n` reduces to :n:`true` (recursively, using the
-  reduction engine).
 
 Common errors
 ~~~~~~~~~~~~~
