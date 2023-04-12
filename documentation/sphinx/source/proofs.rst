@@ -7,13 +7,13 @@ Proofs
 ------
 
 The proof of a goal is given after the goal
-between the ``Proof.`` and ``Qed.`` markers.
+between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
 tactic modifies the proof state, which contains a list of goals to prove.
 Initially, the proof state consists a single goal, as declared by the
 user. Then each tactic reduces the first goal of the proof state to
 an arbitrary number of new subgoals. When no goal is left, the proof
-is completed and ``Qed.`` can be used.
+is completed and :g:`Qed` can be used.
 
 Tacticals
 ---------
@@ -109,20 +109,20 @@ transformations, corresponding to the following flags.
 
 .. prodn:: simpl_flags ::= ~flags:[ {*, {| rw | beta | proj | delta | constr } } ]
 
-Leaving the flags unspecified results in the :n:`rw`, :n:`beta` and
-:n:`proj` transformations being used. Specifying an empty list of
+Leaving the flags unspecified results in the :g:`rw`, :g:`beta` and
+:g:`proj` transformations being used. Specifying an empty list of
 flags results in no transformations being applied. Otherwise, only the
 specified transformations are applied, as described next:
 
-  - :n:`rw`: perform user-defined rewriting;
-  - :n:`beta`: perform beta-reductions;
-  - :n:`proj`: compute tuple projections;
-  - :n:`delta`: replace macros and operators by their definitions;
-  - :n:`constr`: automatically simplify trace formulas using
+  - :g:`rw`: perform user-defined rewriting;
+  - :g:`beta`: perform beta-reductions;
+  - :g:`proj`: compute tuple projections;
+  - :g:`delta`: replace macros and operators by their definitions;
+  - :g:`constr`: automatically simplify trace formulas using
     constraint reasoning.
 
-The :n:`constr` transformation replaces trace (sub)formulas that
-are provably equal to :n:`true` or :n:`false` by this value.
+The :g:`constr` transformation replaces trace (sub)formulas that
+are provably equal to :g:`true` or :g:`false` by this value.
 When doing so, the constraint solver takes into account
 the current hypotheses but also the conditionals that surround
 the trace formula.
@@ -164,13 +164,13 @@ Common tactics
      will attempt to automatically prove some conjuncts (using :tacn:`auto`)
      and will then return a simplified subgoal without these conjuncts.
      In the degenerate case where no conjunct remains, the conclusion
-     of the subgoal will be :n:`true`.
+     of the subgoal will be :g:`true`.
 
      When the conclusion of the goal is an equivalence, the tactic
      will automatically perform :tacn:`fa` when at most one of the remaining
      subterms is non-deducible. It may thus remove a deducible item
-     from the equivalence, or replace an item :n:`<u,v>` by :n:`u`
-     if it determines that :n:`v` is deducible.
+     from the equivalence, or replace an item :g:`<u,v>` by :g:`u`
+     if it determines that :g:`v` is deducible.
 
 .. tacn:: auto {? @simpl_flags}
 
@@ -212,16 +212,16 @@ Equivalence tactics
 
    Performs case study on conditionals inside an equivalence.
 
-   Without a specific target, ``cs phi`` will project all conditionals
-   on phi in the equivalence. With a specific target, ``cs phi in i``
+   Without a specific target, :g:`cs phi` will project all conditionals
+   on phi in the equivalence. With a specific target, :g:`cs phi in i`
    will only project conditionals in the i-th item of the equivalence.
 
    .. example::
 
      When proving an equivalence
-     ``equiv(if phi then t1 else t2, if phi then u1 else u2)``
-     invoking ``cs phi`` results in two subgoals:
-     ``equiv(phi, t1, u1)`` and ``equiv(phi, t2, u2)``.
+     :g:`equiv(if phi then t1 else t2, if phi then u1 else u2)`
+     invoking :g:`cs phi` results in two subgoals:
+     :g:`equiv(phi, t1, u1)` and :g:`equiv(phi, t2, u2)`.
 
    .. exn:: Argument of cs should match a boolean.
       :undocumented:

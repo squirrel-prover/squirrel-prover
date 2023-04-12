@@ -820,7 +820,7 @@ Squirrel roles
 In addition to the objects and directives above, the ``squirrelrst`` Sphinx plugin defines the following roles:
 
 ``:g:`` Squirrel code.
-    Use this for Gallina and Ltac snippets:
+    Use this for Squirrel snippets:
 
     .. tabs::
 
