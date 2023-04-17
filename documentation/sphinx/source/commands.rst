@@ -19,8 +19,8 @@ Commands
 
 .. cmd:: undo {? @natural}
 
-   Undo the :n:`@natural` (default 1) last sentence(s). 
-   Concretely takes :n:`@natural`:math:`^{th}` previous prover state
+   :g:`undo n` undo the :g:`n` (default 1) last sentence(s). 
+   Concretely takes :g:`n`:math:`^{th}` previous prover state
    as the current one.
 
    In general :cmd:`undo` commands are not used in `Squirrel` scripts but used for
