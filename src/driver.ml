@@ -94,11 +94,14 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
   | Sys_error _ -> None
 
 (*------ TOMOVE in Utils or Commandline ? --------------------------*)
-let valid_theory_regexp = Pcre.regexp "[a-zA-Z][[a-zA-Z0-9]*"
+(* let valid_theory_regexp = Str.regexp "[a-zA-Z][[a-zA-Z0-9]*" *)
+let valid_theory_regexp = Str.regexp {|[a-zA-Z][[a-zA-Z0-9]*|}
 
 (** try to locate a file according to some loading paths *) 
 let locate (lds : load_paths) (name : string) : file =
-  if not (Pcre.pmatch ~rex:valid_theory_regexp name) then
+  (* if not (Str.string_match valid_theory_regexp name 0) then *)
+  (*   Command.cmd_error (InvalidTheoryName name);  (1* FIXME: location *1) *)  
+  if not (Str.string_partial_match valid_theory_regexp name 0) then
     Command.cmd_error (InvalidTheoryName name);  (* FIXME: location *)  
 
   let rec try_dirs (dirs : load_paths) : file =

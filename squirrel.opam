@@ -20,7 +20,6 @@ depends: [
   "ppx_inline_test"
   "menhir" {>= "20180523"}
   "menhirLib"
-  "pcre"
   "conf-which" {build}
 ]
 

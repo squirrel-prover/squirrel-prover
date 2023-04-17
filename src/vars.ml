@@ -307,16 +307,15 @@ let refresh v =
     ty = v.ty; }
 
 (*------------------------------------------------------------------*)
-let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
+let prefix_count_regexp = Str.regexp {|#*\(_*.*[^0-9]\)\([0-9]*\)$|}
 
 (* Split a string [name] into a prefix [s] and an suffix [i] which is 
    a string representing a base 10 integer.
    We have that [name = s ^ i] if [i >= 0], and [name = s] if [i = -1]. *)
 let split_var_name (name : string) : string * string =
-  let substrings = Pcre.exec ~rex:prefix_count_regexp name in
-  let s = Pcre.get_substring substrings 1 in
-
-  let i = Pcre.get_substring substrings 2 in
+  let _ = Str.search_forward prefix_count_regexp name 0 in
+  let s = Str.matched_group 1 name in
+  let i = Str.matched_group 2 name in
 
   let i = if i = "" then "-1" else i in
   s, i

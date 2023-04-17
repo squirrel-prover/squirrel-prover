@@ -178,6 +178,18 @@ let get_first_subgoal (ps:state) : Goal.t =
   | Some _, j :: _ -> j
   | _ -> raise Not_found
 
+let get_deepest_table (st:state) : Symbols.table = 
+  begin match st.prover_mode with
+  | ProofMode -> 
+    let goal = get_first_subgoal st
+    in
+    begin match goal with
+      | Trace j -> (LowTraceSequent.env j).table
+      | Equiv j -> (LowEquivSequent.env j).table
+    end
+  | _ -> get_table st
+  end
+
 let current_goal_name (ps:state) : string option =
   Utils.omap (function 
       | ProverLib.UnprovedLemma (stmt,_) -> stmt.Goal.name
@@ -280,10 +292,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
   let env = 
     begin match st.prover_mode with
     | ProofMode -> 
-      let goal = match get_current_goal st with
-        | None -> assert false
-        | Some (ProofObl g)
-        | Some (UnprovedLemma (_, g)) -> g
+      let goal = get_first_subgoal st
       in
       begin match goal with
         | Trace j -> LowTraceSequent.env j
@@ -305,6 +314,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
   in
   Printer.prt `Default "@[<2>Search in context system@ [@[%a@]].@]@."
     SystemExpr.pp env.system.set;
+
   let t = match q with
     | ProverLib.Srch_inSys (t,_)
     | ProverLib.Srch_term t -> t in
@@ -329,8 +339,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find ~option st.table sys pat f
-        | Local  f -> Match.T.find ~option st.table sys pat f
+        | Global f -> Match.E.find ~option env.table sys pat f
+        | Local  f -> Match.T.find ~option env.table sys pat f
         end in
         begin match res with
           | [] -> acc
@@ -339,7 +349,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
               List.map (fun x -> Equiv.Local x) res in
             (g,any_res)::acc
         end
-    end [] st.table in
+    end [] env.table in
 
   match t with
   | Local p -> 
@@ -363,7 +373,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find_glob ~option st.table sys pat f
+        | Global f -> Match.E.find_glob ~option env.table sys pat f
         | Local  _ -> [] (* can't find Equiv.form in
                                       Term.term ? *)
         end in
@@ -374,7 +384,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
             List.map (fun x -> Equiv.Global x) res in
           (g,any_res)::acc
         end
-      ) [] st.table
+      ) [] env.table
 
 let do_search (st:state) (t:ProverLib.search_query) : unit =
   let matches = search_about st t in
@@ -460,7 +470,7 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
     | Pr_system s_opt -> print_system st s_opt
     | Pr_any l -> 
       begin
-        let table = (get_table st) in
+        let table = (get_deepest_table st) in
         let searchs_in = [
           print_lemma;    (* first try printing lemma *)
           print_function; (* then try printing function *)
@@ -512,11 +522,11 @@ and do_include (st:state) (i: ProverLib.include_param) : state =
   (* `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
   let file = Driver.locate load_paths (Location.unloc i.th_name) in
-  do_all_commands_in st file
-and do_all_commands_in (st:state) (file:Driver.file) : state =
-  match Driver.next_input ~test:false file st.prover_mode with
+  do_all_commands_in ~test:true st file
+and do_all_commands_in ~test (st:state) (file:Driver.file) : state =
+  match Driver.next_input ~test file st.prover_mode with
   | ProverLib.Prover EOF -> do_eof st
-  | cmd -> do_all_commands_in 
+  | cmd -> do_all_commands_in ~test
              (do_command st (get_prover_command cmd)) file
 and exec_command (s:string) (st:state) : state  = 
   let input = command_from_string st s in
@@ -528,3 +538,10 @@ and exec_all (st:state) (s:string) =
   List.fold_left (fun st s -> 
       exec_command (s^".") st) st commands
 (* }↑} *)
+
+(* run entire squirrel file with given path as string *)
+let run ?(test=false) (file_path:string) : unit =
+  match Driver.file_from_path LP_none 
+          (Filename.remove_extension file_path) with
+  | Some file -> let _ = do_all_commands_in ~test (init ()) file in ()
+  | None -> failwith "File not found !" 
