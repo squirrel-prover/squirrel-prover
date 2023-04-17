@@ -10,7 +10,6 @@ ENV SQUIRREL_DIR_NAME="squirrel-prover"
 # Install Squirrel from the main stream repo
 
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config \
- libpcre3-dev \
  curl 
 RUN curl -o opam -fsSL https://github.com/ocaml/opam/releases/download/2.1.2/opam-2.1.2-x86_64-linux
 RUN chmod u+x opam && mv opam bin

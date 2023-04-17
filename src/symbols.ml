@@ -238,14 +238,14 @@ include Table
 (*------------------------------------------------------------------*)
 let empty_table : table = mk Msymb.empty
 
-let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+let prefix_count_regexp = Str.regexp {|\([^0-9]*\)\([0-9]*\)|}
 
 let table_add table name d = Msymb.add name d table
 
-let fresh ?(group=default_group) prefix table =
-  let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
-  let prefix = Pcre.get_substring substrings 1 in
-  let i0 = Pcre.get_substring substrings 2 in
+let fresh ?(group=default_group) name table =
+  let _ = Str.search_forward prefix_count_regexp name 0 in
+  let prefix = Str.matched_group 1 name in
+  let i0 = Str.matched_group 2 name in
   let i0 = if i0 = "" then 0 else int_of_string i0 in
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
