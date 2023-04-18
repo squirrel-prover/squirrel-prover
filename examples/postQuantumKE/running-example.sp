@@ -1,40 +1,36 @@
-(*******************************************************************************
+(*****************************************************************************
 
-This is a toy example illustrating how one can use an IND-CCA asymmetric encryption to
-build a key-exchange, in a very basic threat model with a single session.
+This is a toy example illustrating how one can use an IND-CCA asymmetric
+encryption to build a key-exchange, in a very basic threat model with a single
+session.
 
-# Protocol description We consider two parties I (initiator) and R (responder).
- They both exchange fresh nonces kI and kR, encrypted using the
-other party public key, and then derive a shared secret h(s,kI2) XOR h(s,kR2),
-where h is a PRF hash function and s a public seed.  and derive from them a
-secret using a kdf and xor.
+# Protocol description
 
+We consider two parties I (initiator) and R (responder).
+They both exchange fresh nonces kI and kR, encrypted using the other party's
+public key, and then derive a shared secret h(s,kI2) XOR h(s,kR2),
+where h is a PRF hash function and s a public seed.
 
-Static keys for party X := skX
-Public keys for party X : pkX = pk(skX)
+Static keys for party X : skX.
+Public keys for party X : pkX = pk(skX).
 
-Initiator                                  Responder
-new kI;
-ctI := Encap(kI, rI  ,pk(skR))
+```
+------------------------------+----------------------------------
+         Initiator            |        Responder
+------------------------------+----------------------------------
+  new kI;                     |  new kR;
+  ctI := Encap(kI, rI, pkR)   |  ctR := Encap(kR, rR, pkI)
+                              |
+                       I  --(ctI)-> R
+                       I <--(ctR)-- R
+                              |
+  kR2 := Decap(ctR,dkI)       |  kI2 := Decap(ctI,dkI)
+------------------------------+----------------------------------
+```
 
-                      --(pkI,ctI)->
+Final key derivation: KIR := h(s,kI2) XOR h(s,kR2).
 
-
-                                         new kR;
-                                         ctR := Encap(kR, rR , pkI)
-                   I <--(R,ctR)-- R
-
-
-
-kR := Decap(ctR,dkI)
-
-                                         kI := Decap(ctI,dkI)
-
-Final key deriviation:
-KIR := h(s,kI2) XOR h(s,kR2)
-
-
-*******************************************************************************)
+******************************************************************************)
 
 include Basic.
 
@@ -42,110 +38,172 @@ include Basic.
 (* Global Declarations *)
 (***********************)
 
-(* We first enable the postQuantum checks. *)
+(* Enable post-quantum checks so that results are post-quantum sound. *)
 set postQuantumSound = true.
 
-(* This line declares a hash function h, that is assumed to be a prf. *)
-hash h
+(* Declare a hash function h, that is assumed to be a prf. *)
+hash h.
 
-(* We declare a public random name (nonce) for the key derivations with h *)
-name s : message
+(* Declare a public random name (nonce) for the key derivations with h. *)
+name s : message.
 
-(* We declare an assymetric encryption assumed to be IND-CCA2*)
-aenc enc,dec,pk
+(* Declare an asymmetric encryption assumed to be IND-CCA2. *)
+aenc enc,dec,pk.
 
-(* Long term key of I *)
-name skI :  message
+(* Long term keys of I and R. *)
+name skI :  message.
+name skR : message.
 
-(* Long term key of R *)
-name skR :  message
+(* Session names. *)
+name kI : message.
+name rI : message.
+name kR : message.
+name rR : message.
 
-(* Cells used to stored the derived key *)
-mutable sIR: message =  zero
-mutable sRI: message =  zero
+(* Cells used to stored the derived keys. *)
+mutable sIR : message =  zero.
+mutable sRI : message =  zero.
 
-channel cI
+(* Communication channels. *)
+channel cI.
 channel cR.
 
-(********************************)
-(* Protocol Agents Declarations *)
-(********************************)
+(* Squirrel currently doesn't allow a flexible modelling of the length
+   of hashes. The PRF assumption implicitly assumes that hashes are
+   of length namelength_message (aka the security parameter eta) which
+   we also need to make explicit here. *)
+axiom [any] len_h (x,y:message) : len(h(x,y)) = namelength_message.
+
+(******************)
+(* Protocol Model *)
+(******************)
 
 process Initiator =
- (* Fresh ephemeral secret share. *)
- new kI;
- (* Fresh randomness for the encryption. *)
- new rI;
- (* Send kI encrypted for R *)
- out(cI,  enc(kI, rI,pk(skR)) );
- (* Receive some encrypted share. *)
- in(cR,ctR);
- (* Decrypt it. *)
- let kR = dec(ctR,skI) in
- (* And combine kI and kR in a key. *)
- sIR :=  h(s,kI) XOR h(s,kR).
+  (* Fresh ephemeral secret share. *)
+  (* Fresh randomness for the encryption. *)
+  (* Send kI encrypted for R. *)
+  out(cI, enc(kI,rI,pk(skR)) );
+  (* Receive some encrypted share. *)
+  in(cR,ctR);
+  (* Decrypt it. *)
+  let kR = dec(ctR,skI) in
+  (* Combine kI and kR in a key. *)
+  sIR :=  h(s,kI) XOR h(s,kR).
 
 process Responder =
-   new kR;
-   new rR;
-   in(cI, ctI);
-   out(cR, enc(kR, rR, pk(skI))).
-   (* We omit the Responder key derivation for simplicity *)
+  in(cI, ctI);
+  out(cR, enc(kR, rR, pk(skI))).
+  (* We omit the Responder key derivation for simplicity. *)
 
-(* We finally declare the protocol model. *)
-system [main] out(cI,s); (Responder | Initiator).
+(* Finally declare our "real" system, where the public seed
+   s is disclosed, after which our two agents run in parallel. *)
+system [real] out(cI,s); (Responder | Initiator).
 
+(**********************)
+(* Idealized Protocol *)
+(**********************)
 
-(* As a first proof step, we first apply globally CCA to hide kR from the
-attacker, this yield a new system mainCCAkr that we know to be equivalent from
-the previous one. *)
-system mainCCAkR = [main/left] with gcca, enc(kI, rI,
-pk(skR)).
+(* Variant of the protocol where kfresh replaces kI in the first message.
+   This will lead to our "ideal" system. We will prove, using the CCA1
+   assumption, that the two systems are equivalent in a strong sense.
+   This will allow us to prove strong secrecy for the ideal system and
+   then transfer the result to the real system. *)
 
-(*******************************************)
-(*** Strong Secrecy of the derived key ***)
-(*******************************************)
+name kfresh: message.
 
-(* We  define a fresh ideal key. *)
-name ikIR : message.
+process InitiatorCCA =
+  out(cI,enc(kfresh,rI,pk(skR)));
+  in(cR,ctR);
+  let kR = dec(ctR,skI) in
+  sIR := h(s,kI) XOR h(s,kR).
 
-(* And we must assume that hashes are of the same length as the expected length of secret keys.  *)
-axiom  [mainCCAkR] len_hashes (x1,x2:message) : len(h(x1,x2)) = len(s).
-(* And we prove that whenever the initiator terminates, which correspond to
-action Initiator1, the key stored in the state sIR@Initiator1 is
-indistinguishable from ikIR.  Remark that this holds even if the encryption
-received by the initiator is dishonnest, because the attacker cannot compute kI.
- *)
-global goal [mainCCAkR, mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
+system [ideal] out(cI,s); (Responder | InitiatorCCA).
+
+(* Note that both of our systems are bi-systems with equal projections.
+   This could be improved when Squirrel allows the declaration of single
+   systems. It could also be avoided by declaring a bi-system whose
+   projections would correspond to the ideal and real systems. *)
+
+(**********)
+(* Proofs *)
+(**********)
+
+(* Technical lemma about lengths. *)
+goal [real/left,ideal/left] lengths :
+  len(diff(kI,kfresh)) = namelength_message.
 Proof.
-  intro Hap .
+  project. by rewrite namelength_kI. by rewrite namelength_kfresh.
+Qed.
 
-  (* We expand all the macros. *)
-  expandall.
-  (* This action has a trivial output, so we can simplify it with function applications *)
-  fa 0.
+(* Equivalence between the real and ideal systems,
+   with some extra messages given to the distinguisher. *)
+global goal [set: real/left; equiv: real/left, ideal/left] ideal_real :
+  Forall (tau:timestamp[const]),
+  [happens(tau)] -> equiv(frame@tau, pk(skR), pk(skI), kI, s, skI).
+Proof.
+  intro tau; induction tau => Htau.
+  + (* tau = init *)
+    auto.
+  + (* tau = A *)
+    by expandall; apply IH.
+  + (* tau = Responder *)
+    expandall. fa !<_,_>, (if _ then _), enc _.
+    fresh 1 => //. (* kR *)
+    fresh 1 => //. (* rR *)
+    by apply IH.
+  + (* tau = Initiator *)
+    expandall. fa !<_,_>, if _ then _.
+    cca1 1 => //.
+    fa enc _.
+    rewrite lengths.
+    fresh 1 => //. (* rI *)
+    apply IH => //.
+  + (* tau = Initiator1 *)
+    by expandall; apply IH.
+Qed.
 
-  (* We apply the prf assumption. *)
+(* Strong secrecy for the ideal system,
+   expressed using a fresh ideal key ikIR. *)
+name ikIR : message.
+global goal [ideal/left, ideal/left] strong_ideal (tau:timestamp[const]) :
+  [happens(tau)] ->
+  equiv(frame@tau,if tau = Initiator1 then diff(sIR@tau,ikIR)).
+Proof.
+  induction tau => Hap; try by rewrite if_false.
+  (* tau = Initiator1 *)
+  simpl. rewrite /sIR.
   prf 1, h(s,kI).
-  (* The condition for the validity of the PRF application is trivial, as kI is
-  hidden from the attacker through the CCA application. *)
-  
-  (* We now use the one-time pad property of the xor. *)
   xor 1.
-  (* We show that the condition of the introduced conditional is always true. *)
-  rewrite if_true in 1.
-  (* First by using the axiom saying that the length of the hash output is equal
-  to the length of the public name s. *)
-  rewrite len_hashes.
-  (* Then using the assumption that all names of the same length. *)
-  by namelength s,n_PRF.
+  rewrite if_true.
+  + by rewrite len_h namelength_n_PRF.
+  + by fresh 1.
+Qed.
 
-  (* Finally, we have to prove that two completely fresh names are
-  indistinguishable. This is done with the fresh tactic. *)
-  fresh 1; 1:auto.
+(* Technical lemma. *)
+goal [real/left, ideal/left] diff_refl (x:message) : diff(x,x) = x.
+Proof.
+  by project.
+Qed.
 
-  (* We only have left to prove that before the computation of the key, the
-  protocol was indistinguishable, which is trivial because it did not contain any
-  diff operations. *)
-  diffeq => *.
+(* The final strong secrecy result is the consequence of the previous
+   lemmas by transitivity. *)
+global goal [set: real/left;
+             equiv: real/left,real/left] SSec_real (tau:timestamp[const]) :
+  [happens(tau)] ->
+  equiv(frame@tau,if tau = Initiator1 then diff(sIR@tau,ikIR)).
+Proof.
+  intro Hap.
+  trans [ideal/left,ideal/left].
+
+  * (* First equivalence: real versus ideal with sIR. *)
+    rewrite /sIR /kR1 /kR2.
+    rewrite diff_refl.
+    by apply ideal_real.
+
+  * (* Second equivalence: strong secrecy on ideal system.  *)
+    by apply strong_ideal.
+
+  * (* Third equivalence: ideal versus real with ikIR. *)
+    fa 1; fresh 2 => //.
+    by apply ideal_real.
 Qed.
