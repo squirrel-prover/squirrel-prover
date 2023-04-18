@@ -1901,6 +1901,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Args.(Pair (Message (tn, tyn), Message (tm, tym)))
       (s : S.t) : S.t list
     =
+
+    Printer.prt
+      `Warning
+      "The namelength tactic is deprecated! It will disappear soon.\n\
+       Consider using the namelength_* axioms instead.";
+
     match tn, tm with
     | Name (n, _), Name _ ->
       let table = S.table s in

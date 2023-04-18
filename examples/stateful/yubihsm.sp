@@ -564,11 +564,11 @@ Proof.
       rewrite /* in 0.
       cca1 2; [1:auto]. 
       rewrite !len_pair len_diff in 2.
-      namelength k(pid), k_dummy(pid)=> -> /=.
-      rewrite diff_refl in 2. 
+      rewrite namelength_k namelength_k_dummy diff_refl in 2.
 
-      remember zeroes (len (k_dummy(pid)) ++
-                (len (mpid pid) ++ len (sid(pid)) ++ c_pair) ++ c_pair) as tlen => Eq_len.
+      remember
+        zeroes (namelength_message ++ (len (mpid pid) ++ len (sid pid) ++ c_pair) ++ c_pair)
+        as tlen => Eq_len.
       (* transitivity reasoning, to get rid of the key *)
       trans 2 : enc (tlen, rinit(pid), keyFresh). 
       * have ->:

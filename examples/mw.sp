@@ -22,8 +22,6 @@ hash H
 abstract id : index -> message
 abstract id': index * index -> message
 
-name dummy : message
-
 name key : index -> message
 name key': index * index -> message
 
@@ -56,8 +54,8 @@ system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 include Basic.
 
-axiom len_id (i:index)   : len(id(i))    = len(dummy)
-axiom len_id' (i,t:index): len(id'(i,t)) = len(dummy)
+axiom len_id (i:index)   : len(id(i))    = namelength_message.
+axiom len_id' (i,t:index): len(id'(i,t)) = namelength_message.
 
 axiom tags_neq : tag0 <> tag1.
 
@@ -205,8 +203,7 @@ Proof.
     * by use tags_neq.
     * by use tags_neq.
     * xor 1,n_PRF.
-      rewrite if_true.
-      by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+      rewrite len_id len_id' namelength_n_PRF //=.
       by fresh 1.
 
   (* Case R2 *)
@@ -230,7 +227,6 @@ Proof.
         by fresh Meq.
     * fresh 1 => //.
       xor 1, n_PRF.
-      rewrite if_true.
-      by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+      rewrite len_id len_id' namelength_n_PRF //=.
       by fresh 1.
 Qed.

@@ -91,16 +91,21 @@ hash F2
 
 hash G
 
-
 (* public random salt *)
+name s : message.
 
-name s : message
+(* Assumption about lengths. *)
+axiom [any] len_F   (x1,x2:message) : len(F(x1,x2)) = namelength_message.
+axiom [any] len_G   (x1,x2:message) : len(G(x1,x2)) = namelength_message.
+axiom [any] len_xor (x1,x2:message) : len(x1) = len(x2) => len(x1 XOR x2) = len(x1).
 
 (* KEMs *)
 
 aenc encap,decap,pk
 
-aenc wencap,wdecap,wpk
+aenc wencap,wdecap,wpk.
+
+axiom [any] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z) = x.
 
 (* long term keys of I *)
 name dkI : index -> message
@@ -321,10 +326,6 @@ system [main_rand] out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: In
 | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))
 ).
 
-
-axiom [main_rand] len_F (x1,x2:message) : len(F(x1,x2)) = len(s).
-
-
 equiv [main_rand] trans_auth.
 Proof.
   enrich seq(i:index=>dkI(i)); enrich seq(i:index=> dkR(i)); enrich s.
@@ -359,8 +360,7 @@ Proof.
       prf 16, F (sk2R _, _); [1:auto].
       xor 16, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
       rewrite if_true in 16.
-      use len_F with rR(i,j,k), skR(j).
-      namelength n_PRF,s.
+      by rewrite len_F namelength_n_PRF.
       fa 16. fa 16.
       fresh 17; 1:auto.
       by apply IH.
@@ -380,8 +380,7 @@ Proof.
        prf 16, F (sk2R _, _); [1:auto].
        xor 16, n_PRF.
        rewrite if_true // in 16.
-       use len_F with DrR(j,k), skR(j).
-       namelength n_PRF,s.
+       by rewrite len_F namelength_n_PRF.
        fresh 16; 1: auto.
        by apply IH.
 
@@ -399,8 +398,7 @@ Proof.
       prf 15, F (sk2I _, _); [1:auto].
       xor 15, xor(F(rI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 15.
-      use len_F with rI(i,j,k), skI(i).
-      by namelength n_PRF,s.
+      by rewrite len_F namelength_n_PRF.
       fa 15.
       fresh 16; 1:auto.
       by apply IH.
@@ -421,8 +419,7 @@ Proof.
       prf 16, F (sk2I _,_); [1:auto].
       xor 16, xor(F(DrI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 16.
-      use len_F with DrI(i,j,k), skI(i).
-      by namelength n_PRF,s.
+      by rewrite len_F namelength_n_PRF.
       fresh 16; 1:auto.
       by apply IH.
 
@@ -560,7 +557,9 @@ in
 
 system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
 
-axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+(* ======== *)
+(*  Proofs  *)
+(* ======== *)
 
 equiv [mainCCAkI,idealized/left] ideal.
 Proof.
@@ -624,10 +623,6 @@ Proof.
   diffeq => *.
 Qed.
 
-axiom  [idealized/left,idealized/left]  len_G (x1,x2:message) : len(G(x1,x2)) = len(s).
-
-axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(x2) => len(xor x1 x2) = len(x1).
-
 (*******************************************)
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
@@ -645,11 +640,9 @@ Proof.
   prf 1, kdf(s,kR(k,i,j)); [1:auto]. 
   prf 1, G(_,n_PRF); [1:auto]. 
   xor 1,  xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
-  rewrite len_G.
-  namelength s, n_PRF1.
+  by rewrite len_G namelength_n_PRF1.
   xor 1,  n_XOR; rewrite if_true // in 1.
-  rewrite len_G.
-  namelength s, n_XOR.
+  by rewrite len_G namelength_n_XOR.
   by fresh 1.
 Qed.
 
@@ -670,7 +663,6 @@ Proof.
   xor 1, n_PRF1; rewrite if_true // in 1.
   rewrite len_xor.
   by rewrite !len_G.
-  rewrite len_G.
-  by namelength s, n_PRF1.
+  by rewrite len_G namelength_n_PRF1.
   by fresh 1.
 Qed.
