@@ -32,7 +32,7 @@ Squirrel comes with several builtin base types:
   unbounded collections of objects.
 
 .. note:: A finite type is still unbounded:
-  the semantics for the type can be any finite set.
+          the semantics for the type can be any finite set.
 
 Additional :gdef:`custom types` may be declared by the user
 using the following declaration:
@@ -60,80 +60,157 @@ using the following declaration:
   * a type with :gdef:`name_fixed_length` means that all names sampled
     in that type (for a given :math:`\eta`) have the same length;
 
+Type variables
+--------------
+
+Squirrel supports parametric polymorphism à la Hindley–Milner. 
+Type variables can be represented by any identifier preceded by a
+single apostrophe, e.g. :n:`'x`.
+
+.. prodn::
+  type_variable ::= '@identifier
+
 General types
 --------------
 
 General types are derived from base types and type variables using the
 arrow and tupling type constructors.  A type (or part of a type) can
-be left unwritten using a type holes `_`, which must be then
+be left unwritten using a type holes :g:`_`, which must be then
 inferred by Squirrel.
 
 .. prodn::
   type ::= _ | @type_variable | @base_type | @type -> @type | (@type * ... * @type)
 
-.. note:: The most common function symbols have
-  types of the form ``(b1*...*bn)->b'`` where the ``b1``, ...,
-  ``bn`` and ``b'`` are base types.
+.. note:: The most common function symbols have types of the form
+  :g:`(b1 * ... * bn) -> b` where :g:`b1,...,bn` and :g:`b` are base
+  types.
 
-  For example, a hash function will have type
-  ``(message*message)->message``: it takes a message to be hashed,
+  For example, a hash function may have type
+  :g:`(message * message) -> message`: it takes a message to be hashed,
   a key, and the returned hash is also a message.
 
 Binders and tags
-================
-
-.. prodn::
-  variable ::= @identifier
-  var_or_pat ::= _ | @variable
+----------------
 
 :token:`variable` are represented by string identifiers. 
 A hole `_` can be used as name for a variable which is either unused
 or whose name does not matter. 
 
-Note that two occurrences of the same variable name are internally
-bound to different variables (there is a hidden unique identifier).
+.. prodn::
+  variable ::= @identifier
+  var_or_hole ::= @variable | _
+
+Tags restrict a possible variable instantiation various ways.
 
 .. prodn::
-  tag ::= @identifier
+  tag ::= const | glob
 
-Tags restrict a type in various ways.
+Currently, only two different tags are supported. A tagged bound
+variable :g:`(x : t[tag])` restricts :g:`x` instantiations according
+to :g:`tag`:
 
-TODO describe tags
+- :gdef:`const` requires that :g:`x` is a constant random variable,
+  which does not depend on the random tape nor the security parameter
+  :math:`\eta`.
+- :gdef:`glob` forces :g:`x` to be a *single* random variable --- said
+  otherwise, :g:`x` must represent a *system-independent* random
+  variable ; for example, this excludes any :term:`diff-term`
+  (e.g. :g:`diff(s,t)`), or any term with system-specific macros
+  (e.g. :g:`output@tau`).
+
+Squirrel uses the following syntax for binders:
 
 .. prodn::
-  binder ::= @var_or_pat | ({+, {+, @var_or_pat } : @type {? [{+ @tag}]} }) 
+  binder ::= @var_or_hole | ({+, {+, @var_or_hole } : @type {? [{+ @tag}]} }) 
   binders ::= {* @binder }
 
-Binders with tags are not supported everywhere.
+A binder :g:`x` without any attached (using directly a
+:n:`@var_or_hole`) is equivalent to using a type hole :g:`(x : _)`.
+The type hole will have to be inferred by unification.
 
-TODO describe binders
+.. note:: Tags in binders do not always have a meaning, e.g. in the
+          function :g:`fun (x : int[const]) => f`. Squirrel will
+          ignore the tags in such cases.
+
+.. note:: Binding twice the same variable name yields two distinct
+          variables (there is a hidden unique identifier).
 
 Terms
-======
+=====
 
-:gdef:`Terms <term>` are syntactic expressions that denote probabilistic
-values.
-For instance, a term of type :term:`message` represents a probabilistic value
-which ranges over messages, and a term of type :term:`bool`
-is a probabilistic boolean value.
+:gdef:`Terms <term>` are syntactic expressions that denote
+probabilistic values (actualy families of probabilistic values indexed
+by the security parameter :math:`\eta`, though this can often be
+ignored).
+For instance, a term of type :g:`message` represents a
+probabilistic value which ranges over messages, and a term of type
+:g:`bool` is a probabilistic boolean value.
 
 .. prodn::
-  term ::= (@sterm) 
-       | @term @ @term 
-       | @term @term 
+  term ::= @term {+ @term } 
        | @term @infix_op @term 
        | @term # @natural
-       | fun @binders => @term
-       | @quantif @binders, @term
-       | if @term then @term else @term 
-       | find @binders such that @term in @term {? else @term }
+       | @term @ @term 
+       | @term_with_binder
+       | @sterm
   sterm ::= _
         | @identifier
-        | diff(@term, @term)
+        | @diff_term
         | ( {+, @term} )
+
+A term can be
+
+- an application :n:`@term__1 @term__2` ; application is
+  left-associative, and the term :n:`@term__1 @term__2 ... @term__n`
+  corresponds to :n:`(...(@term__1 @term__2) ... @term__n)`;
+- the application of an infix operator :n:`@term__1 @infix_op @term__2`, 
+  which corresponds :n:`(@infix_op) @term__1 @term__2`;
+- the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
+  (:n:`@term` must be a tuple with sufficiently many elements);
+- the application :n:`@term__m @ @term__t` of a macro term
+  :n:`@term__m` at a time-point :n:`@term__t` (of type :g:`timestamp`); this is only 
+  possible if :n:`@term__m` is a :term:`macro`;
+- a term with binders, see :token:`term_with_binder`;
+- an identifier :n:`x`, which must be bound by the context, and can be
+  a :term:`logical variable <logical_var>`, an :term:`operator`, an
+  :term:`abstract function<abstract_fun>`, or TODO (more?);
+- a :term:`diff-term` representing several probabilistic values which depend
+  on the system;
+- a tuple :n:`(@term__1,...,@term__n)`.
+
+
+.. note:: Many tactics use :token:`sterm` instead of :token:`term`,
+           which creates less ambiguities in the parser.  Note that
+           enclosing a :token:`term` in parentheses yields a
+           :token:`sterm`.
+
+Logical variables
+-----------------
+
+:gdef:`Logical variable <logical_var>` TODO
+
+Terms with binders
+------------------
+
+.. prodn:: 
+   term_with_binder ::= | fun @binders => @term
+                        | @quantif @binders, @term
+                        | if @term then @term else @term 
+                        | find @binders such that @term in @term {? else @term }
   quantif ::= forall | exists
 
-Term syntax, lambda calculus TODO
+TODO
+
+Diff-terms
+----------
+
+TODO :gdef:`diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` represents ...
+
+.. prodn:: 
+   diff_term ::= diff(@term, @term)
+
+Names
+-----
 
 TODO :gdef:`names <name>`
 
@@ -147,21 +224,24 @@ TODO :gdef:`names <name>`
 
   TODO citations
 
-**TODO** introduce :gdef:`macro` and :gdef:`system`.
+Macros
+------
+
+TODO :gdef:`macros <macro>`
 
 Formulas
-=========
+========
 
 Squirrel features two kinds of formulas: local and global ones.
 
 :gdef:`Local formulas <local formula>`
-are `terms`_ of type `bool`_. They can in particular be constructed
+are :term:`terms <term>` of type :g:`bool`. They can in particular be constructed
 using common syntax, given below:
 
 .. prodn::
   formula ::= @formula && @formula | @formula || @formula | @formula => @formula | not @formula
     | @quantif @binders, @formula
-    | happens({+, @terms}) | cond@@term | exec@@term
+    | happens({+, @term}) | cond@@term | exec@@term
     | @term = @term | @term <= @term | @term < @term | @term >= @term | @term > @term
 
 TODO generalized infix operators
@@ -180,13 +260,22 @@ are first order formulas, written as follows:
 Declarations
 =============
 
-Symbols
---------
+Abstract symbols
+----------------
+
+:gdef:`Abstract functions<abstract_fun>` TODO
 
 Function symbols are deterministic polynomial time.
 
+Operators
+---------
+
+:gdef:`Operators <operator>`
+
 Systems
---------
+-------
+
+:gdef:`systems <system>` TODO
 
 .. prodn::
   system_id ::= identifier | identifier / identifier
@@ -195,7 +284,7 @@ Systems
 TODO expr and set expressions
 
 Goals
-------
+-----
 
 .. prodn::
   goal ::= local_goal

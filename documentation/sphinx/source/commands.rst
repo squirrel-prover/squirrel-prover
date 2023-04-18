@@ -113,8 +113,7 @@ Commands
 
   The goal will be used to rewrite occurrences of :n:`u` into the
   corresponding occurrences of :n:`v`, assuming the conditions
-  :n:`phi_1, ..., phi_n` reduces to :n:`true` (recursively, using the
-  reduction engine).
+  :n:`phi_1, ..., phi_n` reduces to :n:`true` (using :ref:`reduction`).
 
   .. example:: add rewriting rule
 
