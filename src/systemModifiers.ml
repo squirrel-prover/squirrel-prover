@@ -342,7 +342,8 @@ let global_prf
   let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n =
     Symbols.Name.declare table s ndef in
-  let table = Process.add_namelength_axiom table s n_fty in
+  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
+  let table = Process.add_namelength_axiom table real_name n_fty in
   
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
@@ -499,7 +500,8 @@ let global_cca
   let table,n =
     Symbols.Name.declare table s ndef
   in
-  let table = Process.add_namelength_axiom table s n_fty in
+  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
+  let table = Process.add_namelength_axiom table real_name n_fty in
   (*     Type.Message in *)
   (* let table = Lemma.add_lemma `Axiom stmt table in *)
   
@@ -576,12 +578,13 @@ let global_cca
   let s = (L.mk_loc L._dummy "r_CCA") in
   let ty_args = List.map Vars.ty is in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
-  let table, _r =
+  let table, r =
     let rdef = Symbols.{ n_fty }
     in
     Symbols.Name.declare table s rdef
   in
-  let table = Process.add_namelength_axiom table s n_fty in
+  let real_name = L.mk_loc L._dummy (Symbols.to_string r) in
+  let table = Process.add_namelength_axiom table real_name n_fty in
 
   (* let enrich = [Term.mk_var fresh_x_var] in
    * let make_conclusion equiv =
@@ -916,7 +919,8 @@ let global_prf_t
       let ndef = Symbols.{ n_fty } in
       let s = (L.mk_loc L._dummy "n_PRF") in
       let table, ns = Symbols.Name.declare table s ndef in
-      let table = Process.add_namelength_axiom table s n_fty in
+      let real_name = L.mk_loc L._dummy (Symbols.to_string ns) in
+      let table = Process.add_namelength_axiom table real_name n_fty in
       table,ns
   in
 

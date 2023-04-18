@@ -278,7 +278,8 @@ let prf_param_pattern
   let table, nprfs =
     Symbols.Name.declare table sn_prf nprfdef
   in
-  let table = Process.add_namelength_axiom table sn_prf n_fty in
+  let real_name = L.mk_loc L._dummy (Symbols.to_string nprfs) in
+  let table = Process.add_namelength_axiom table real_name n_fty in
   let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
 
   (* replace instances of p with n_PRF, everywhere in t *)

@@ -750,7 +750,8 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let ndef = Symbols.{ n_fty } in
 
     let table,n' = Symbols.Name.declare penv.env.table n ndef in
-    let table = add_namelength_axiom table n n_fty in
+    let real_name = L.mk_loc L._dummy (Symbols.to_string n') in
+    let table = add_namelength_axiom table real_name n_fty in
 
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in

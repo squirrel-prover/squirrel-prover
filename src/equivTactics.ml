@@ -1924,8 +1924,9 @@ let xor arg (s : ES.t) =
   let table,n =
     Symbols.Name.declare (ES.table s) sym ndef
   in
+  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
   let table = 
-    Process.add_namelength_axiom table sym n_fty in
+    Process.add_namelength_axiom table real_name n_fty in
 
   let ns = Term.mk_symb n Message in
   let s = ES.set_table table s in
