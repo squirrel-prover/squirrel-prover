@@ -100,7 +100,7 @@ or whose name does not matter.
   variable ::= @identifier
   var_or_hole ::= @variable | _
 
-Tags restrict a possible variable instantiation various ways.
+:gdef:`Tags <tag>` restrict a possible variable instantiation various ways.
 
 .. prodn::
   tag ::= const | glob
@@ -125,11 +125,11 @@ Squirrel uses the following syntax for binders:
   binders ::= {* @binder }
 
 A binder :g:`x` without any attached (using directly a
-:n:`@var_or_hole`) is equivalent to using a type hole :g:`(x : _)`.
+:n:`@var_or_hole`) is equivalent to using a type hole :g:`(x:_)`.
 The type hole will have to be inferred by unification.
 
 .. note:: Tags in binders do not always have a meaning, e.g. in the
-          function :g:`fun (x : int[const]) => f`. Squirrel will
+          function :g:`fun(x:int[const])=>f`. Squirrel will
           ignore the tags in such cases.
 
 .. note:: Binding twice the same variable name yields two distinct
@@ -151,7 +151,8 @@ probabilistic value which ranges over messages, and a term of type
        | @term @infix_op @term 
        | @term # @natural
        | @term @ @term 
-       | @term_with_binder
+       | if @term then @term else @term 
+       | @term_with_binders
        | @sterm
   sterm ::= _
         | @identifier
@@ -170,7 +171,10 @@ A term can be
 - the application :n:`@term__m @ @term__t` of a macro term
   :n:`@term__m` at a time-point :n:`@term__t` (of type :g:`timestamp`); this is only 
   possible if :n:`@term__m` is a :term:`macro`;
-- a term with binders, see :token:`term_with_binder`;
+- an conditional :n:`if @term__b then @term__0 else @term__1` where
+  :n:`@term__b` must be of type :g:`bool`, and :n:`@term__0` and
+  :n:`@term__1` must have the same type;
+- a term with binders, see :token:`term_with_binders`;
 - an identifier :n:`x`, which must be bound by the context, and can be
   a :term:`logical variable <logical_var>`, an :term:`operator`, an
   :term:`abstract function<abstract_fun>`, or TODO (more?);
@@ -184,22 +188,36 @@ A term can be
            enclosing a :token:`term` in parentheses yields a
            :token:`sterm`.
 
-Logical variables
------------------
-
-:gdef:`Logical variable <logical_var>` TODO
-
 Terms with binders
 ------------------
 
 .. prodn:: 
-   term_with_binder ::= | fun @binders => @term
-                        | @quantif @binders, @term
-                        | if @term then @term else @term 
-                        | find @binders such that @term in @term {? else @term }
+   term_with_binders ::= fun @binders => @term
+                    | @quantif @binders, @term
+                    | find @binders such that @term in @term {? else @term }
   quantif ::= forall | exists
 
-TODO
+A term with binders can be:
+
+- an abstraction, e.g. :n:`fun(x:@type)=>@term__body` is the
+  function that maps a value :n:`x` of type :n:`type` to
+  :n:`@term__body`;
+- a universal or existential quantification, e.g. 
+  :n:`forall @binders,@term__pred` 
+  where :n:`@term__pred` must be of type :g:`bool`;
+- a try-find construct, e.g. if :n:`@term__b` is of type
+  :g:`bool` and :n:`@term__i` and :n:`@term__e` have the same
+  type, then
+  :n:`find(x:@type)such that @term__b in @term__i else @term__e`
+  search a :n:`x` of type :n:`type` such that :n:`@term__b`: if such a value exists, 
+  it returns :n:`@term__b`, otherwise it returns :n:`@term__e` (terms
+  :n:`@term__b` and :n:`@term__i` can use the variable :n:`x`, while
+  :n:`@term__b` cannot).
+
+.. note:: :term:`Tags <tag>` are not supported in term binders. They are
+          accepted by the parser, but ignored by Squirrel.
+
+
 
 Diff-terms
 ----------
@@ -234,26 +252,49 @@ Formulas
 
 Squirrel features two kinds of formulas: local and global ones.
 
-:gdef:`Local formulas <local formula>`
-are :term:`terms <term>` of type :g:`bool`. They can in particular be constructed
-using common syntax, given below:
+Local formulas
+--------------
+
+:gdef:`Local formulas <local formula>` are :term:`terms <term>` of
+type :g:`bool`. They can in particular be constructed using common
+syntax and construction specific to Squirrel describdee below:
 
 .. prodn::
-  formula ::= @formula && @formula | @formula || @formula | @formula => @formula | not @formula
-    | @quantif @binders, @formula
-    | happens({+, @term}) | cond@@term | exec@@term
-    | @term = @term | @term <= @term | @term < @term | @term >= @term | @term > @term
+  term += @term && @term | @term %|%| @term | @term => @term | not @term
+    | happens({+, @term}) 
 
-TODO generalized infix operators
+Boolean connectives for *local* formulas are :n:`&&, ||, =>, not`,
+where :n:`&&, ||, =>` are used with a right infix notation, and
+:n:`not` in prenex form.
+
+The :gdef:`happens` predicate defines the time-points that have been
+scheduled in the execution, e.g. :n:`happens(@term)` (where :n:`@term`
+is of type :g:`timestamp`) state that :n:`@term` has been scheduled.
+:n:`happens(@term__1,...,@term__n)` is syntactic sugar (provided by
+the parser) for :n:`happens(@term__1)&&...&&@happens(term__n)`.
+
+..
+  I removed this production, which did not make sens with the current
+  style of introducing term syntax.
+  .. prodn::
+    formula ::= @formula && @formula | @formula || @formula | @formula => @formula | not @formula
+      | @quantif @binders, @formula
+      | happens({+, @term}) | cond@@term | exec@@term
+      | @term = @term | @term <= @term | @term < @term | @term >= @term | @term > @term
+
+Global formulas
+---------------
 
 :gdef:`Global formulas <global formula>`
 are first order formulas, written as follows:
 
 .. prodn::
-  global_formula ::= [@formula] | equiv({*, @term})
+  global_formula ::= [@term] | equiv({*, @term})
     | @global_formula -> @global_formula
     | @global_formula /\ @global_formula | @global_formula \/ @global_formula
     | Forall @binders, @global_formula | Exists @binders, @global_formula
+
+TODO description
 
 .. _section-declarations:
 
@@ -298,3 +339,15 @@ Goals
 .. example:: Global goal expressing observational equivalence
 
   :g:`global goal [myProtocol] obs_equiv (t:timestamp) : happens(t) => equiv(frame@t).`
+
+.. _section-judgements:
+
+Judgements
+==========
+
+TODO
+
+Logical variables
+-----------------
+
+:gdef:`Logical variable <logical_var>` TODO
