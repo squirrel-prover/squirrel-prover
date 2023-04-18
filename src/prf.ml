@@ -366,7 +366,7 @@ let phi_proj
       Name.of_term kp
     | _ -> soft_failure ~loc
              (Tactics.Failure "Can only be applied on a hash where \
-                               the key is a name")
+                               the key is a name.")
   in
   let frame_p = List.map (Term.project1 proj) biframe in
 

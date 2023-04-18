@@ -48,19 +48,19 @@ let rec check_nodiffbind (n:Name.t) (t:term) : bool =
     | _ -> Term.tforall (check_nodiffbind n) t
 
 
-(** returns true iff f is a symmetric or asymmetric encryption function *)
+(** Returns true iff f is a symmetric or asymmetric encryption function. *)
 let is_enc (table:Symbols.table) (f:Symbols.fname) =
   Symbols.(is_ftype f AEnc table || is_ftype f SEnc table)
 
 (** Returns true iff t contains an encryption function.
-    does not unfold macros. *)
+    Does not unfold macros. *)
 let rec has_enc (table:Symbols.table) (t:term) : bool =
   match t with
   | Term.Fun (f, _) when is_enc table f -> true
   | _ -> Term.texists (has_enc table) t
 
 (** Checks that each term ti in ts is f(argsi) for the same f,
-    if so returns f and the list [args1;…;argsn]. 
+    if so returns f and the list [args1;…;argsn].
     Does the same if each ti is Tuple(argsi). *)
 let same_head_function (ts:Term.terms) :
   ((Symbols.fname * applied_ftype) option * Term.terms list) option =
@@ -327,8 +327,8 @@ let phi_proj
         when pk_f = pk_f' -> (* asym enc: key is a pk *)
       Name.of_term kp, Name.of_term rp        
     | _ -> soft_failure ~loc
-             (Tactics.Failure "Can only be applied on an encryption\
-                               where the random and (secret) key are names")
+             (Tactics.Failure "Can only be applied on an encryption \
+                               where the random and (secret) key are names.")
   in
   let frame_p = List.map (Term.project1 proj) biframe in
 

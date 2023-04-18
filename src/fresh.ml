@@ -199,7 +199,7 @@ let equiv_fresh_phi_proj
     match t with
     | Name _ -> Name.of_term t
     | _ -> soft_failure ~loc
-             (Tactics.Failure "Can only be applied to diff(n_L, n_R)")
+             (Tactics.Failure "Can only be applied to diff(n_L, n_R).")
   in
 
   let ty = n.Name.symb.s_typ in
