@@ -767,7 +767,7 @@ class SquirreldocDirective(Directive):
         # Uses a ‘container’ instead of a ‘literal_block’ to disable
         # Pygments-based post-processing (we could also set rawsource to '')
         content = '\n'.join(self.content)
-        # node = nodes.container(content)
+        content = content.strip()
         try:
             lexer = pygments.lexers.get_lexer_by_name("squirrel")
             parsed = pygments.highlight(content,

@@ -37,7 +37,7 @@ Commands
 
      .. example:: Including theories/Basic.sp
 
-       .. squirreltop:: in
+       .. squirreldoc::
 
           include Basic.
 
@@ -117,7 +117,8 @@ Commands
 
   .. example:: add rewriting rule
 
-    .. squirreltop:: in
+    .. squirreldoc::
 
         axiom [any] and_true_l (b : boolean) : (true && b) = b.
         hint rewrite and_true_l.
+
