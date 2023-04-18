@@ -166,8 +166,6 @@ let indcca_param
     let table, xcs =
       Symbols.Name.declare table s xcdef
     in
-    let real_name = L.mk_loc L._dummy (Symbols.to_string xcs) in
-    let table = Process.add_namelength_axiom table real_name n_fty in
 
     let xc = Name.{symb=Term.mk_symb xcs cty; args=[]} in
     let xm = Vars.make_fresh mty "M" in
