@@ -197,22 +197,30 @@ Terms with binders
                     | find @binders such that @term in @term {? else @term }
   quantif ::= forall | exists
 
-A term with binders can be:
+*Abstraction* are of the form :n:`fun @binders => @term` where
+:n:`@term` can use the variables bound by :n:`@binders`.
+E.g. :n:`fun(x:@type)=>@term__body` is the function that maps a value
+:n:`x` of type :n:`type` to :n:`@term__body`.
 
-- an abstraction, e.g. :n:`fun(x:@type)=>@term__body` is the
-  function that maps a value :n:`x` of type :n:`type` to
-  :n:`@term__body`;
-- a universal or existential quantification, e.g. 
-  :n:`forall @binders,@term__pred` 
-  where :n:`@term__pred` must be of type :g:`bool`;
-- a try-find construct, e.g. if :n:`@term__b` is of type
-  :g:`bool` and :n:`@term__i` and :n:`@term__e` have the same
-  type, then
-  :n:`find(x:@type)such that @term__b in @term__i else @term__e`
-  search a :n:`x` of type :n:`type` such that :n:`@term__b`: if such a value exists, 
-  it returns :n:`@term__b`, otherwise it returns :n:`@term__e` (terms
-  :n:`@term__b` and :n:`@term__i` can use the variable :n:`x`, while
-  :n:`@term__b` cannot).
+Universal or existential *quantification* are of the form 
+:n:`@quantif @binders, @term` , e.g. :n:`forall @binders,@term__pred` where
+:n:`@term__pred` must be of type :g:`bool`.
+
+Multiple binders in an abstraction or quantifier construct represent
+multiple nested constructs, e.g. :n:`fun x y=>@term` is a short form
+for :n:`fun x=>(fun y=>@term)`.
+
+A try-find performs a look-up through all values of a type, filtered
+according to some predicate, and returining some computation. E.g. if
+:n:`@term__b` is of type :g:`bool` and :n:`@term__i` and :n:`@term__e`
+have the same type, then 
+:n:`find(x:@type)such that @term__b in @term__i else @term__e` 
+search a :n:`x` of type :n:`type` such that
+:n:`@term__b`: if such a value exists, it returns :n:`@term__b`,
+otherwise it returns :n:`@term__e` (terms :n:`@term__b` and
+:n:`@term__i` can use the variable :n:`x`, while :n:`@term__b`
+cannot). If no :n:`else` branch term is provided, :n:`@term__e`
+defaults to :g:`zero` (the zero bit-string).
 
 .. note:: :term:`Tags <tag>` are not supported in term binders. They are
           accepted by the parser, but ignored by Squirrel.
