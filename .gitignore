@@ -32,3 +32,5 @@ _opam/
 *.exrc
 *.\#*.sp
 .venv/
+jsexport.bc.js
+jsexport.bc-for-jsoo

@@ -20,7 +20,12 @@ depends: [
   "ppx_inline_test"
   "menhir" {>= "20180523"}
   "menhirLib"
+  "js_of_ocaml"
   "conf-which" {build}
+  "js_of_ocaml"
+  "js_of_ocaml-ppx"
+  "js_of_ocaml-lwt"
+  "yojson"
 ]
 
 depopts: [
