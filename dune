@@ -3,6 +3,15 @@
   (libraries squirrellib)
   (modules squirrel))
 
+; needs js_of_ocaml and some other deps
+(executable
+  (name jsexport)
+  (promote)
+  (libraries squirrellib)
+  (modes js)
+  (preprocess (pps js_of_ocaml-ppx))
+  (modules jsexport))
+
 (test
   (name test)
   (libraries squirrellib squirreltests)
