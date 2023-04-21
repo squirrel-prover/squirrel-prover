@@ -29,7 +29,7 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
           let info = Vars.get_info v venv in
           info.const            (* const => det, so this is sound *)
         with Not_found -> false
-        (* The environment look-up fails if we did give a complete environment.
+        (* The environment look-up fails if we did not give a complete environment.
            Anyhow, it is always sound to return [false]. *)
       end
 
@@ -41,14 +41,14 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
       let env = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
       Term.tforall (is_det env) t
         
-    | t -> Term.tforall (is_det venv) t
+    (* recurse *)
+    | App _ |Fun _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+      Term.tforall (is_det venv) t
   in
   is_det env.vars t
 
 (*------------------------------------------------------------------*)
-let is_constant
-    ?(allow_adv_rand = false) (env : Env.t) (t : Term.term) : bool
-  =
+let is_constant (env : Env.t) (t : Term.term) : bool =
   let rec is_const (venv : Vars.env): Term.term -> bool = function
     | Var v ->
       begin
@@ -63,21 +63,21 @@ let is_constant
     | Name _ | Macro _ -> false
 
     | Fun (f, _) -> 
-      if f = Symbols.fs_att then allow_adv_rand else true
+      if f = Symbols.fs_att then false else true
 
-    | Find (vs, _, _, _) 
-    | Quant (_,vs,_) as t when
+    | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
+      let fixed_type_binders =
         List.for_all (fun v -> 
             Symbols.TyInfo.is_fixed env.table (Vars.ty v)
-          ) vs ->
-      let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
-      (* ( mode = `Exact || *)
-      (*   List.for_all (fun v ->  *)
-      (*       Symbols.TyInfo.is_finite env.table (Vars.ty v)) vs *)
-      (* ) && *)
-      Term.tforall (is_const venv) t
+          ) vs 
+      in
+      if not fixed_type_binders then false else
+        let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
+        Term.tforall (is_const venv) t
         
-    | t -> Term.tforall (is_const venv) t
+    (* recurse *)
+    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+      Term.tforall (is_const venv) t
   in
   is_const env.vars t
 
@@ -104,8 +104,7 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
       Operator.is_system_indep env.table fs &&
       Term.tforall (is_si env) t
 
-    | Find (vs, _, _, _) 
-    | Quant (_,vs,_) as t ->
+    | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
       let env = 
         Env.update
           ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true vs) env.vars) 
@@ -113,7 +112,11 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
       in
       Term.tforall (is_si env) t
 
-    | t -> Term.tforall (is_si env) t
+    (* recurse *)
+    (* notice that [Action _] is allowed, since we check the independence of the system 
+       among all compatible systems. *)
+    | Name _ | App _ | Action _ | Tuple _ | Proj _ as t ->
+      Term.tforall (is_si env) t
   in
   (* a term is system-independent if it applies to a single system (for 
      both set and pair), or if it uses only system-independent constructs *)

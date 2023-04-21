@@ -13,20 +13,15 @@ module Smart : SmartFO.S with type form = Term.term
 val is_system_indep : Env.t -> Term.term -> bool 
 
 (** Check if a term represents a deterministic (i.e. 
-    non-probabilistic) computation. *)
+    non-probabilistic) value. *)
 val is_deterministic : Env.t -> Term.term -> bool
 
 (** Check if a term represents a constant (i.e. 
-    non-probabilistic and η-independent) computation.
-    If [allow_adv_rand] is [true], adversary randomness is allowed. *)
-val is_constant : 
-  ?allow_adv_rand:bool -> Env.t -> Term.term -> bool
+    non-probabilistic and η-independent) value. *)
+val is_constant : Env.t -> Term.term -> bool
 
 (** Check if a term is deducible in ptime by an adversary with no direct 
-    access to the protocol randomness.
-    This requires that the term is:
-    - constant
-    - uses only ptime computable functions *)
+    access to the protocol randomness. *)
 val is_ptime_deducible : 
   si:bool -> Env.t -> Term.term -> bool
 
