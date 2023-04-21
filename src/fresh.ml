@@ -75,7 +75,7 @@ let get_bad_occs
     Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
   match t with
-  | _ when HighTerm.is_constant `Exact env t -> retry_on_subterms ()
+  | _ when HighTerm.is_constant env t -> retry_on_subterms ()
 
   | Var v ->
     soft_failure

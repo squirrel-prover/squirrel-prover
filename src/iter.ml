@@ -503,9 +503,9 @@ let get_macro_occs
     assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
 
     match t with
-    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~const:`Exact ~si:true  env t -> []
-    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> []
-    | _ when mode = Const     && HighTerm.is_constant        `Exact                  env t -> []
+    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
+    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env t -> []
+    | _ when mode = Const     && HighTerm.is_constant                  env t -> []
 
     | Term.Var v -> 
       let err_str =

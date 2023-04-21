@@ -729,7 +729,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       (* in a global sequent, flag introduce variables as constant
          if [ts] is determinstic. *)
-      let const = HighTerm.is_constant `Exact (S.env s) ts in
+      let const = HighTerm.is_constant (S.env s) ts in
       
       let indices =
         match S.conc_kind with
@@ -1305,7 +1305,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
 
     let tag =
-      let const = HighTerm.is_constant `Exact (S.env s) t in
+      let const = HighTerm.is_constant (S.env s) t in
       { S.var_info with const }
     in
     (v,tag), S.set_goal goal s

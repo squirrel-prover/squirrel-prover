@@ -47,8 +47,7 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
 
 (*------------------------------------------------------------------*)
 let is_constant
-    (mode : [`Exact | `Approx]) ?(allow_adv_rand = false)
-    (env : Env.t) (t : Term.term) : bool
+    ?(allow_adv_rand = false) (env : Env.t) (t : Term.term) : bool
   =
   let rec is_const (venv : Vars.env): Term.term -> bool = function
     | Var v ->
@@ -69,13 +68,13 @@ let is_constant
     | Find (vs, _, _, _) 
     | Quant (_,vs,_) as t when
         List.for_all (fun v -> 
-            Symbols.TyInfo.is_fixed  env.table (Vars.ty v)
+            Symbols.TyInfo.is_fixed env.table (Vars.ty v)
           ) vs ->
       let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
-      ( mode = `Exact ||
-        List.for_all (fun v -> 
-            Symbols.TyInfo.is_finite env.table (Vars.ty v)) vs
-      ) &&
+      (* ( mode = `Exact || *)
+      (*   List.for_all (fun v ->  *)
+      (*       Symbols.TyInfo.is_finite env.table (Vars.ty v)) vs *)
+      (* ) && *)
       Term.tforall (is_const venv) t
         
     | t -> Term.tforall (is_const venv) t
@@ -123,8 +122,8 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
 
 (*------------------------------------------------------------------*)
 let is_ptime_deducible
-    ~(const : [`Exact | `Approx]) ~(si:bool) (env : Env.t) (t : Term.term) : bool
+    ~(si:bool) (env : Env.t) (t : Term.term) : bool
   =
-  is_constant ~allow_adv_rand:true const env t &&
+  is_constant ~allow_adv_rand:true env t &&
   (not si || is_system_indep env t) &&
   true                          (* TODO: det: ptime: check PTIME *)

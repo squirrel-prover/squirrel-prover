@@ -552,7 +552,7 @@ module Mk (Args : MkArgs) : S with
       if f_arg_tag.system_indep && not (HTerm.is_system_indep env pt_arg) then
         error_pt_apply_not_system_indep arg_loc ~pt ~arg:pt_arg;
 
-      if f_arg_tag.const && not (HTerm.is_constant `Exact env pt_arg) then
+      if f_arg_tag.const && not (HTerm.is_constant env pt_arg) then
         error_pt_apply_not_constant arg_loc ~pt ~arg:pt_arg;
     in
 

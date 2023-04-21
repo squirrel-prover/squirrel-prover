@@ -279,7 +279,7 @@ let pp_dbg = pp_toplevel ~dbg:true
 
 let is_constant ?(env : Env.t option) (t : Term.term) : bool =
   let env = odflt (Env.init ~table:Symbols.builtins_table ()) env in
-  HighTerm.is_constant `Exact env t
+  HighTerm.is_constant env t
 
 let is_system_indep
     ?(env : Env.t = Env.init ~table:Symbols.builtins_table ())

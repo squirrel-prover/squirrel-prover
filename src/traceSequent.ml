@@ -19,7 +19,7 @@ include Sequent.Mk(struct
             match hyp with
             | Global f -> ES.Hyps.add (Args.Named (Ident.name id)) f es
             | Local f ->
-              if HighTerm.is_constant `Exact (env s) f &&
+              if HighTerm.is_constant     (env s) f &&
                  HighTerm.is_system_indep (env s) f 
               then
                 ES.Hyps.add

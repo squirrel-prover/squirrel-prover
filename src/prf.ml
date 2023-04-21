@@ -99,14 +99,14 @@ let get_bad_occs
     List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
   
-  (* variables quantified above the current point are considered deterministic,
+  (* variables quantified above the current point are considered constant,
      so we add them to the env usd for "is_ptime_deducible" *)
   let env =
     Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
   match t with
   (* deterministic term -> no occurrences needed *)
-  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([], [])
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([], [])
   (* SI not needed here *)
 
   (* non ptime deterministic variable -> forbidden *)

@@ -1334,7 +1334,7 @@ let rewrite_equiv_transform
   let rec aux (t : term) : term = 
     match Term.ty t with
     | Type.Timestamp | Type.Index when
-        HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+        HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* system-independence needed, so that we leave [t] unchanged when the system do *)
       
     | _ ->
@@ -1344,7 +1344,7 @@ let rewrite_equiv_transform
 
   and aux_rec (t : Term.term) : Term.term = 
     match t with
-    | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+    | t when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* system-independence needed, so that we leave [t] unchanged when the system do *)
 
     | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
@@ -1401,7 +1401,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     TS.Hyps.filter
       (fun _ -> function
          | Local f -> 
-           HighTerm.is_constant `Exact (TS.env s) f &&
+           HighTerm.is_constant     (TS.env s) f &&
            HighTerm.is_system_indep (TS.env s) f
          | Global  _ -> true)
   in

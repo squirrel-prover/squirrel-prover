@@ -790,7 +790,7 @@ end = struct
             (tag.Vars.Tag.system_indep &&
              not (HighTerm.is_system_indep env t)) ||
             (tag.Vars.Tag.const &&
-             not (HighTerm.is_constant `Exact env t))
+             not (HighTerm.is_constant env t))
           ) (Mv.bindings mv.subst)
       in
       if bad_instanciations = [] then
@@ -2392,7 +2392,7 @@ module E = struct
        and build the deducible specialization of the initial term. *)
     match cand.term with
     (* special case for pure timestamps *)
-    | _ as f when HighTerm.is_ptime_deducible ~const:`Exact ~si:true cand_env f -> [cand]
+    | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
 
     | Term.Macro (ms, l, ts) ->
       begin
@@ -2738,7 +2738,7 @@ module E = struct
     let env = env_of_unif_state st in  
 
     match cterm.term with
-    | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t -> Some []
+    | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)
     | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
