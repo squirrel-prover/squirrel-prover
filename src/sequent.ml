@@ -511,6 +511,16 @@ module Mk (Args : MkArgs) : S with
     in
     soft_failure ~loc (Failure err_str)
 
+  (*------------------------------------------------------------------*)
+  let error_pt_apply_not_adv loc ~(pt : PT.t) ~(arg : Term.t) =
+    let err_str =
+      Fmt.str "@[<v 0>The term:@;  @[%a@]@;\
+               is not computable by the adversary. It cannot be applied to:@;  @[%a@].@]"
+        Term.pp arg
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
+
     (*------------------------------------------------------------------*)
   let error_pt_apply_not_constant loc ~(pt : PT.t) ~(arg : Term.t) =
     let err_str =
@@ -552,6 +562,10 @@ module Mk (Args : MkArgs) : S with
       (* check a variable instantiation *)
       if f_arg_tag.system_indep && not (HTerm.is_system_indep env pt_arg) then
         error_pt_apply_not_system_indep arg_loc ~pt ~arg:pt_arg;
+
+      (* check a variable instantiation *)
+      if f_arg_tag.adv && not (HTerm.is_ptime_deducible ~si:false env pt_arg) then
+        error_pt_apply_not_adv arg_loc ~pt ~arg:pt_arg;
 
       if f_arg_tag.const && not (HTerm.is_constant env pt_arg) then
         error_pt_apply_not_constant arg_loc ~pt ~arg:pt_arg;

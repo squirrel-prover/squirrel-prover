@@ -787,10 +787,9 @@ end = struct
             let sys_cntxt = SE.{ set = system; pair = None; } in
             let env = Env.init ~table ~vars:env ~system:sys_cntxt () in
 
-            (tag.Vars.Tag.system_indep &&
-             not (HighTerm.is_system_indep env t)) ||
-            (tag.Vars.Tag.const &&
-             not (HighTerm.is_constant env t))
+            (tag.Vars.Tag.system_indep && not (HighTerm.is_system_indep              env t)) ||
+            (tag.Vars.Tag.const        && not (HighTerm.is_constant                  env t)) ||
+            (tag.Vars.Tag.adv          && not (HighTerm.is_ptime_deducible ~si:false env t))
           ) (Mv.bindings mv.subst)
       in
       if bad_instantiations = [] then

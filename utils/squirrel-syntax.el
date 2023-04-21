@@ -89,6 +89,7 @@
   "have"
   "case"
   "const"
+  "adv"
   "collision"
   "depends"
   "eqnames"

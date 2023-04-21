@@ -1,5 +1,5 @@
 (* tests some instantiations of local and global lemmas in global sequents w.r.t.
-   determinism. *)
+   constant variable tag. *)
 
 name n : message.
 name nb : bool.

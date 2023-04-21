@@ -728,13 +728,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let name = Term.subst sbst name in
 
       (* in a global sequent, flag introduce variables as constant
-         if [ts] is determinstic. *)
-      let const = HighTerm.is_constant (S.env s) ts in
+         if [ts] is constant. *)
+      let const = HighTerm.is_constant                  (S.env s) ts in
+      (* idem for [adv] *)
+      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) ts in
       
       let indices =
         match S.conc_kind with
-        | Equiv.Local_t  -> Vars.Tag.local_vars         indices
-        | Equiv.Global_t -> Vars.Tag.global_vars ~const indices
+        | Equiv.Local_t  -> Vars.Tag.local_vars              indices
+        | Equiv.Global_t -> Vars.Tag.global_vars ~const ~adv indices
         | Equiv.Any_t    -> assert false
       in
       indices, name
@@ -1305,8 +1307,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
 
     let tag =
-      let const = HighTerm.is_constant (S.env s) t in
-      { S.var_info with const }
+      let const = HighTerm.is_constant                  (S.env s) t in
+      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) t in
+      { S.var_info with const; adv }
     in
     (v,tag), S.set_goal goal s
 

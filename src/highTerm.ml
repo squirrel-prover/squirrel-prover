@@ -126,27 +126,32 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
 let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
   let rec is_adv (venv : Vars.env): Term.term -> bool = function
     | Var v ->
-      begin
+      (* check that the variable is constant, and of a type whose elements 
+         are of at-most polynomial size.
+         FEATURE: we check fixed+finite, which is sound but coarse. *)
+      let is_poly_constant =
         try
-          (* check that the variable is constant, and of a type whose elements 
-             are of at-most polynomial size.
-             FEATURE: we check fixed+finite, which indeed implies that elements 
-             are at-most pol. sized, but is too coarse. *)
           let info = Vars.get_info v venv in
           info.const &&
           Symbols.TyInfo.is_fixed  env.table (Vars.ty v) &&
           Symbols.TyInfo.is_finite env.table (Vars.ty v) 
-
-        with Not_found -> false
-        (* The environment look-up fails if we did give a complete environment.
-           Anyhow, it is always sound to return [false]. *)
-      end
+        with Not_found -> false (* sound though possibly inprecise *)
+      in
+      let is_adv =
+        try (Vars.get_info v venv).adv with 
+        | Not_found -> false (* sound though possibly inprecise *)
+      in
+      is_adv || is_poly_constant
 
     | Name _ | Macro _ -> false
 
     | Fun _ -> true
 
-    | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
+    | Quant ((Lambda | Seq),vs,_) as t ->
+      let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true ~adv:true vs) venv in
+      Term.tforall (is_adv venv) t
+
+    | Find (vs, _, _, _) | Quant ((ForAll | Exists),vs,_) as t ->
       (* fixed + finite => polynomial **cardinal** for the type
          (though we could be more precise with another type information) *)
       let poly_card_type_binders =
@@ -156,7 +161,7 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
           ) vs 
       in
       if not poly_card_type_binders then false else
-        let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
+        let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true ~adv:true vs) venv in
         Term.tforall (is_adv venv) t
         
     (* recurse *)
