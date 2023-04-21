@@ -1009,8 +1009,14 @@ let expand_head_once
 
   | _ -> raise exn
 
-
+(*------------------------------------------------------------------*)
 (* projection reduction *)
+
+let can_reduce_proj (t : Term.term) : bool =
+  match t with
+  | Term.Proj (_, Term.Tuple _) -> true
+  | _ -> false
+
 let reduce_proj (t : Term.term) : Term.term * bool =
   match t with
   | Term.Proj (i, t) ->
@@ -1022,7 +1028,14 @@ let reduce_proj (t : Term.term) : Term.term * bool =
 
   | _ -> t, false
 
+(*------------------------------------------------------------------*)
 (* β-reduction *)
+
+let can_reduce_beta (t : Term.term) : bool =
+  match t with
+  | Term.App (Quant (Lambda, _ :: _, _), _ :: _) -> true
+  | _ -> false
+
 let reduce_beta (t : Term.term) : Term.term * bool =
   match t with
   | Term.App (t, arg :: args) -> 
@@ -1422,24 +1435,21 @@ module T (* : S with type t = Term.term *) = struct
       if pat_red then tunif t pat st
       else no_unif ()
 
-    (* projection reduction *)
-    | Proj _, Proj _ ->
-      let t, t_red = reduce_proj t in
-      if t_red then tunif t pat st
-      else 
-        let pat, pat_red = reduce_proj pat in
-        if pat_red then tunif t pat st
-        else no_unif ()
+    | _, _ when can_reduce_beta t ->
+      let t, _ = reduce_beta t in
+      tunif t pat st
 
-    | Proj _, _ ->
-      let t, t_red = reduce_proj t in
-      if t_red then tunif t pat st
-      else no_unif ()
+    | _, _ when can_reduce_beta pat ->
+      let pat, _ = reduce_beta pat in
+      tunif t pat st
 
-    | _, Proj _ ->
-      let pat, pat_red = reduce_proj pat in
-      if pat_red then tunif t pat st
-      else no_unif ()
+    | _, _ when can_reduce_proj t ->
+      let t, _ = reduce_proj t in
+      tunif t pat st
+
+    | _, _ when can_reduce_proj pat ->
+      let pat, _ = reduce_proj pat in
+      tunif t pat st
 
     (* other *)
     | Var _, _ -> no_unif ()   (* FEATURE *)

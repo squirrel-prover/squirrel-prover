@@ -306,10 +306,12 @@ val expand_head_once :
   Term.term * bool 
 
 (** projection reduction *)
-val reduce_proj : Term.term -> Term.term * bool 
+val can_reduce_proj : Term.term -> bool 
+val     reduce_proj : Term.term -> Term.term * bool 
 
 (** β-reduction *)
-val reduce_beta : Term.term -> Term.term * bool 
+val can_reduce_beta : Term.term -> bool 
+val     reduce_beta : Term.term -> Term.term * bool 
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
