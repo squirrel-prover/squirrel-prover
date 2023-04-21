@@ -122,11 +122,46 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
      both set and pair), or if it uses only system-independent constructs *)
   SE.is_single_system env.system || is_si env t
 
-
 (*------------------------------------------------------------------*)
-let is_ptime_deducible
-    ~(si:bool) (env : Env.t) (t : Term.term) : bool
-  =
-  is_constant ~allow_adv_rand:true env t &&
-  (not si || is_system_indep env t) &&
-  true                          (* TODO: det: ptime: check PTIME *)
+let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
+  let rec is_adv (venv : Vars.env): Term.term -> bool = function
+    | Var v ->
+      begin
+        try
+          (* check that the variable is constant, and of a type whose elements 
+             are of at-most polynomial size.
+             FEATURE: we check fixed+finite, which indeed implies that elements 
+             are at-most pol. sized, but is too coarse. *)
+          let info = Vars.get_info v venv in
+          info.const &&
+          Symbols.TyInfo.is_fixed  env.table (Vars.ty v) &&
+          Symbols.TyInfo.is_finite env.table (Vars.ty v) 
+
+        with Not_found -> false
+        (* The environment look-up fails if we did give a complete environment.
+           Anyhow, it is always sound to return [false]. *)
+      end
+
+    | Name _ | Macro _ -> false
+
+    | Fun _ -> true
+
+    | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
+      (* fixed + finite => polynomial **cardinal** for the type
+         (though we could be more precise with another type information) *)
+      let poly_card_type_binders =
+        List.for_all (fun v -> 
+            Symbols.TyInfo.is_fixed  env.table (Vars.ty v) &&
+            Symbols.TyInfo.is_finite env.table (Vars.ty v) 
+          ) vs 
+      in
+      if not poly_card_type_binders then false else
+        let venv = Vars.add_vars (Vars.Tag.global_vars ~const:true vs) venv in
+        Term.tforall (is_adv venv) t
+        
+    (* recurse *)
+    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+      Term.tforall (is_adv venv) t
+  in
+  is_adv env.vars t &&
+  (not si || is_system_indep env t) 
