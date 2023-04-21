@@ -88,6 +88,7 @@
   "sym"
   "have"
   "case"
+  "const"
   "collision"
   "depends"
   "eqnames"

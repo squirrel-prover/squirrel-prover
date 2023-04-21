@@ -7,7 +7,7 @@ system null.
 
 goal test (i,j:index): i <> j => h(n(i,i),k) <> n(i,j).
 Proof.
- nosimpl(intro Hneq Heq).
- nosimpl(fresh Heq).
+ intro Hneq Heq.
+ fresh Heq.
  auto.
 Qed.

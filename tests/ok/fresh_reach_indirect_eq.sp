@@ -6,9 +6,9 @@ system !_i out(c,n(i)).
 
 goal _ (j:index,t:timestamp) : n(j) = input@t => A(j) < t.
 Proof.
-  nosimpl(intro Heq).
-  nosimpl(fresh Heq).
-  nosimpl(intro H).
+  intro Heq.
+  fresh Heq.
+  intro H.
   constraints.
 Qed.
 

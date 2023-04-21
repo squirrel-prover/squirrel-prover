@@ -27,7 +27,8 @@ Abort.
 
 (* Check that timestamp atoms are not dropped by rewrite equiv. *)
 goal [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
-Proof.
+Proof. 
+  const tau.
   rewrite equiv ax_ground.
   intro H; assumption.
 Qed.
