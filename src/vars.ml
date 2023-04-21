@@ -19,7 +19,7 @@ type scope = Local | Global
 
 module Tag = struct
 
-  (** Variable information restricting its possible instanciations. *)
+  (** Variable information restricting its possible instantiations. *)
   type t = {
     const : bool;
     (** var represents a constant computation *)

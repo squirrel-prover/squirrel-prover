@@ -17,10 +17,10 @@
       refresh variables (to avoid capture issues). 
 
     A variable can either represent:
-    - a single computation, in which can it can only be instanciated by 
+    - a single computation, in which can it can only be instantiated by 
       system-independent terms. 
       This is the case for global variables.
-    - many computations, in which can it can be instanciated by terms with
+    - many computations, in which can it can be instantiated by terms with
       diff operators and multi-system macros.
       This is the case for local variables. *)
 
@@ -44,7 +44,7 @@ type scope = Local | Global
 (** {2 Variable information} *)
     
 module Tag : sig
-  (** Variable information restricting its possible instanciations. *)
+  (** Variable information restricting its possible instantiations. *)
   type t = {
     const : bool;
     (** var represents a constant computation *)

@@ -202,7 +202,7 @@ module Mvar : sig
     (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> 'b -> 'b) -> t -> 'b -> 'b
 
   (** [table] and [env] are necessary to check that restrictions on 
-      variables instanciation have been respected. *)
+      variables instantiation have been respected. *)
   val to_subst :
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->

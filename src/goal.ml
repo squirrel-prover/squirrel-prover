@@ -185,7 +185,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
          - all variables in [vs_loc] are local variables (i.e. have a local tag) *)
       (* FIXME: this splitting is silent and approximate.
          Indeed, local variables may be put in [vs_glob], which may prevent
-         (wrongly) future instanciation of the lemma. *)
+         (wrongly) future instantiation of the lemma. *)
       let vs_glob, vs_loc =
         let rec split vs_loc = function
           | [] -> [], vs_loc

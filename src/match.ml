@@ -705,7 +705,7 @@ module Mvar : sig[@warning "-32"]
     (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> 'b -> 'b) -> t -> 'b -> 'b
 
   (** [table] and [env] are necessary to check that restrictions on 
-      variables instanciation have been respected. *)
+      variables instantiation have been respected. *)
   val to_subst :
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
@@ -779,8 +779,8 @@ end = struct
     : [`Subst of Term.subst | `BadInst of Format.formatter -> unit]
     =
     let check_subst (subst : Term.subst) =
-      let bad_instanciations =
-        (* check that the instanciation of [v], which has tag [tag], 
+      let bad_instantiations =
+        (* check that the instantiation of [v], which has tag [tag], 
            by [t] is correct *)
         List.filter (fun (v,(tag, system, _)) ->
             let t = Term.subst subst (Term.mk_var v) in
@@ -793,11 +793,11 @@ end = struct
              not (HighTerm.is_constant env t))
           ) (Mv.bindings mv.subst)
       in
-      if bad_instanciations = [] then
+      if bad_instantiations = [] then
         `Subst subst
       else
         let pp_err fmt =
-          Fmt.pf fmt "@[<hv 2>bad variable instanciation(s):@;@[<v>%a@]@]"
+          Fmt.pf fmt "@[<hv 2>bad variable instantiation(s):@;@[<v>%a@]@]"
             (Fmt.list ~sep:Fmt.cut
                (fun fmt (v,(tag,_system,_)) ->
                   Fmt.pf fmt "@[%a@] -> @[%a@]"
@@ -805,7 +805,7 @@ end = struct
                     Term.pp (Term.subst subst (Term.mk_var v))
                )
             )
-            bad_instanciations
+            bad_instantiations
         in
         `BadInst pp_err
     in
@@ -2676,7 +2676,7 @@ module E = struct
         match Mvar.to_subst ~mode:`Unif st.table st.env mv with
         | `Subst subst -> subst
         | `BadInst _pp_err ->
-          (* Fmt.epr "bad instanciation: %t@." _pp_err; *) 
+          (* Fmt.epr "bad instantiation: %t@." _pp_err; *) 
           no_unif ()
       in
       let known_cond = Term.subst subst known_cond in
