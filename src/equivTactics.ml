@@ -1505,10 +1505,9 @@ let const_seq
         check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
 
         (* check that [p_bool] is a const+SI formula *)
-        if not (HighTerm.is_constant     (ES.env s) t_bool &&
-                HighTerm.is_system_indep (ES.env s) t_bool   ) then
+        if not (HighTerm.is_ptime_deducible ~si:true (ES.env s) t_bool) then
           hard_failure ~loc:p_bool_loc
-            (Failure "conditions must be constant and system-independent");
+            (Failure "conditions must be ptime and system-independent");
 
         t_bool, term
       ) b_t_terms
