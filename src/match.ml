@@ -1822,10 +1822,11 @@ let known_set_add_frame (k : known_set) : known_set list =
     assert (l = []);
     let tv' = Vars.make_fresh Type.Timestamp "t" in
     let ts' = Term.mk_var tv' in
-    (* [det] is set to true, as knowing [frame@t] implies that we known
+    (* [const] is set to **false**, as knowing [frame@t] implies that we known
        [input@t'] for any [t' <= t], even if [t'] is non-constant. 
-       Furthermore, this implies that we known [t]. *)
-    let vars = (tv', Vars.Tag.make ~const:false Vars.Global) :: k.vars in
+       Furthermore, this implies that we known [t]. 
+       Idem for the [adv] tag. *)
+    let vars = (tv', Vars.Tag.make ~const:false ~adv:false Vars.Global) :: k.vars in
 
     let term_frame = Term.mk_macro ms [] ts' in
     let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
@@ -1879,7 +1880,7 @@ let rec known_set_decompose (k : known_set) : known_set list =
     let term = Term.subst s term in
     let k = 
       { term;
-        vars = k.vars @ (Vars.Tag.global_vars ~const:true vars);
+        vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
         cond = k.cond }
     in
     known_set_decompose k
@@ -1920,7 +1921,7 @@ let known_set_of_mset
     Term.mk_and ~simpl:true cond_le extra_cond_le
   in
   { term = term;
-    vars = Vars.Tag.global_vars ~const:true (t :: mset.indices);
+    vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices);
     cond; }
 
 let known_sets_of_mset_l
@@ -2382,7 +2383,7 @@ module E = struct
     in
 
     let cand_env =
-      let vars = Vars.add_vars (Vars.Tag.global_vars ~const:true cand.vars) env in
+      let vars = Vars.add_vars (Vars.Tag.global_vars ~adv:true cand.vars) env in
       Env.init ~table ~system:{ set = (system :> SE.arbitrary); pair = None; } ~vars ()
     in
 
@@ -2781,9 +2782,9 @@ module E = struct
         let es, subst = Term.refresh_vars es in
         let term = Term.subst subst term in
 
-        (* binder variables are declared global and constant,
+        (* binder variables are declared global, constant and adv,
            as these are inputs (hence known values) to the adversary  *)
-        let st = { st with bvs = (Vars.Tag.global_vars ~const:true es) @ st.bvs; } in
+        let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
         Some [(st, { cterm with term; })]
 
     | Find (is, c, d, e)
@@ -2796,8 +2797,8 @@ module E = struct
       let is, subst = Term.refresh_vars is in
       let c, d = Term.subst subst c, Term.subst subst d in
 
-      (* idem, binder variables are declared global and constant *)
-      let st1 = { st with bvs = (Vars.Tag.global_vars ~const:true is) @ st.bvs; } in
+      (* idem, binder variables are declared global, constant and adv *)
+      let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
 
       let d_cond = Term.mk_and cterm.cond c in
       let e_cond =
