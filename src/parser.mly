@@ -663,6 +663,10 @@ s_item_body:
 | s=s_item_body { s,[] }
 | LBRACKET s=s_item_body a=named_args RBRACKET { s, a }
 
+/* same as a [s_item], but without arguments */
+s_item_noargs:
+| s=s_item_body { s,[] }
+
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
@@ -682,9 +686,6 @@ selector:
 
 tac_term:
 | f=term  %prec tac_prec { f }
-
-as_ip:
-| AS ip=simpl_pat { ip }
 
 as_n_ips:
 | AS n_ips=slist1(naming_pat, empty) { n_ips }
@@ -749,10 +750,7 @@ fresh_arg:
 %inline rewrite_equiv:
 | REWRITE EQUIV { }
 
-%inline have_kw: 
-| ASSERT {}
-| HAVE   {}
-
+(*------------------------------------------------------------------*)
 /* local or global formula */
 %inline any_term:
   | f=term           { Theory.Local f }
@@ -761,11 +759,23 @@ fresh_arg:
 tac_any_term:
 | f=any_term %prec tac_prec { f }
 
+(*------------------------------------------------------------------*)
+/* have ip (with AS keyword) for legacy usage */
+as_have_ip:
+| AS ip=simpl_pat { ([],ip,[]) }
+
+s_item_noargs_list:
+| l=slist(s_item_noargs,empty) { l }
+
+/* FIXME: allow [s_item] with arguments */
+have_ip:
+| pre=s_item_noargs_list ip=simpl_pat post=s_item_noargs_list { (pre, ip, post) }
+
 %inline have_tac:
-| l=lloc(have_kw) p=tac_term ip=as_ip?
+| l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
     { mk_abstract l "have" [TacticsArgs.Have (ip, Theory.Local p)] }
 
-| l=lloc(have_kw) ip=simpl_pat COLON p=tac_any_term 
+| l=lloc(HAVE) ip=have_ip COLON p=tac_any_term 
     { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
 
 (*------------------------------------------------------------------*)
@@ -888,12 +898,12 @@ tac:
   | t=have_tac l=lloc(BY) t1=tac
     { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
-  | l=lloc(USE) pt=pt_use_tac ip=as_ip?
+  | l=lloc(USE) pt=pt_use_tac ip=as_have_ip?
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `IntroImpl)] }
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
-  | l=lloc(HAVE) ip=simpl_pat? COLONEQ pt=p_pt 
+  | l=lloc(HAVE) ip=have_ip? COLONEQ pt=p_pt 
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)

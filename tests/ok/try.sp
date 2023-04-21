@@ -29,14 +29,14 @@ Proof.
   auto.
   expandall.
   fa 0; fa 1; fa 1.
-  assert ->:
+  have ->:
     try find j j2 such that (j = i && diff(j,j2) = diff(j2, i)) in 
      <mess(i),mess(j2)>
     =
     try find j j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
   by project; fa.
   
-  assert ->:
+  have ->:
     try find j j2 such that (j = i && j = j2) in <mess(i),mess(j2)> 
     = 
     <mess(i),mess(i)>. {

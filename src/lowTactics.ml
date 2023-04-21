@@ -1856,14 +1856,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     
     s1 :: s2
 
-  let have_args args (s : S.t) : Goal.t list =
-    match args with
-    | [Args.HavePt (pt, ip, mode)] ->
+  let do_have (ip : Args.simpl_pat option) arg (s : S.t) : Goal.t list =
+    match arg with
+    | `HavePt (pt, mode) ->
       List.map S.to_general_sequent (have_pt ~mode ip pt s)
-    | [Args.Have (ip, f)] -> have_form ip f s
-    | _ -> bad_args ()
-
-  let have_tac args = wrap_fail (have_args args)
+    | `Have f -> have_form ip f s
 
   (*------------------------------------------------------------------*)
   (** {3 Depends} *)
@@ -2622,29 +2619,40 @@ let () = T.register "split"
 
 (*------------------------------------------------------------------*)
     
-let have_tac args s =
-  match s with
-  | Goal.Trace s -> TraceLT.have_tac args s
-  | Goal.Equiv s -> EquivLT.have_tac args s
-                      
-let () =
-  T.register_general "have"
-    ~tactic_help:
-      {general_help = "Add a new hypothesis.";
-       detailed_help =
-         "- have form\n\
-         \  Add `form` to the hypotheses, and produce a subgoal to prove \
-          `form`. \n\
-          - have form as intro_pat\n\
-         \  Idem, except that `intro_pat` is applied to `form`.\n\
-          - have intro_pat : local_or_global_form\n\
-         \  Idem, except that both local and global formulas are supported.\n\
-          - have intro_pat := proof_term\n\
-         \  Compute the formula corresponding to `proof_term`, and\n\
-         \  apply `intro_pat` to it.\n\
-         \  Exemples: `have H := H0 i i2`\n\
-         \            `have H := H0 _ i2`";
-       usages_sorts = [];
-       tactic_group = Logical}
-    ~pq_sound:true
-    have_tac
+let have_tac (simpl : f_simpl) args (s : Goal.t) : Goal.t list =
+  (* lift to [Goal.t] *)
+  let do_have (ip : Args.have_ip option) arg (s : Goal.t) : Goal.t list =
+    let presitems, ip0, postsitems = 
+      match ip with
+      | None -> [], None, []
+      | Some (presitems, ip0, postsitems) -> presitems, Some ip0, postsitems
+    in
+
+    (* apply [s_items] before the core tactic application *)
+    let s = 
+      match do_intros_ip simpl (List.map (fun i -> Args.SItem i) presitems) s with
+      | [s] -> s
+      | [] ->
+        let loc = L.mergeall (List.map Args.s_item_loc presitems) in
+        hard_failure ~loc (Failure "no goal remaining")
+      | _ -> assert false       (* impossible *)
+    in
+
+    (* core tactic application *)
+    let s : Goal.t list =
+      match s with
+      | Goal.Trace s -> TraceLT.do_have ip0 arg s
+      | Goal.Equiv s -> EquivLT.do_have ip0 arg s
+    in
+
+    (* apply [s_items] after the core tactic application *)
+    List.concat_map (do_intros_ip simpl (List.map (fun i -> Args.SItem i) postsitems)) s
+  in
+
+  match args with
+  | [Args.HavePt (pt, ip, mode)] -> do_have ip (`HavePt (pt,mode)) s
+  | [Args.Have (ip, f)]          -> do_have ip (`Have   (f      )) s
+  | _ -> bad_args ()
+
+let have_tac (simpl : f_simpl) args : gentac =
+  wrap_fail (have_tac simpl args)
