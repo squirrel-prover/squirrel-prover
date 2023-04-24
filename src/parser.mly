@@ -760,7 +760,7 @@ tac_any_term:
 | f=any_term %prec tac_prec { f }
 
 (*------------------------------------------------------------------*)
-/* have ip (with AS keyword) for legacy usage */
+/* have ip (with AS keyword) for legacy usage (no support for s_items) */
 as_have_ip:
 | AS ip=simpl_pat { ([],ip,[]) }
 
