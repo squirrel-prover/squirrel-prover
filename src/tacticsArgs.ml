@@ -49,6 +49,8 @@ let pp_s_item fmt (s, named_args) =
   else
     Fmt.pf fmt "[%a ...]" pp_s_item_body s
 
+let s_item_loc (s,_) = match s with Tryauto l | Tryautosimpl l | Simplify l -> l
+
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
@@ -219,6 +221,15 @@ type trans_arg =
   | TransTerms  of (int L.located * Theory.term) list
 
 (*------------------------------------------------------------------*)
+(** {2 Have tactic arguments} *)
+
+(** before, simpl pat for produced hypothesis, after *)
+type have_ip = s_item list * simpl_pat * s_item list
+
+type have_arg    = have_ip option * Theory.any_term
+type have_pt_arg = Theory.p_pt * have_ip option * [`IntroImpl | `None]
+
+(*------------------------------------------------------------------*)
 (** {2 Tactics args} *)
 
 (** A parser tactic argument *)
@@ -237,8 +248,8 @@ type parser_arg =
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | Have         of simpl_pat option * Theory.any_term
-  | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Have         of have_arg
+  | HavePt       of have_pt_arg
   | Reduce       of named_args
   | Auto         of named_args  (* used by `auto` and `simpl` *)
   | SplitSeq     of int L.located * Theory.term * Theory.term option
@@ -277,13 +288,11 @@ let pp_parser_arg ppf = function
   | ApplyIn (_, _, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
-  | HavePt (_, ip, `IntroImpl) ->
-    Fmt.pf ppf "... as %a"
-      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+  | HavePt (_, _, `IntroImpl) ->
+    Fmt.pf ppf "..."
 
-  | HavePt (_, ip, `None) ->
-    Fmt.pf ppf "(%a := ...)"
-      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+  | HavePt (_, _, `None) ->
+    Fmt.pf ppf "(.. := ...)"
 
   | ConstSeq (i, _t) -> Fmt.pf ppf "%d: ..." (L.unloc i)
 
