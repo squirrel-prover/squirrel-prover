@@ -29,7 +29,7 @@ type univar  = Ident.t
 type univars = univar list
 
 (* always debug printing *)
-let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp_full u
+let pp_univar fmt u = Fmt.pf fmt "%a" Ident.pp_full u
 
 let to_univar u = u
 
@@ -245,7 +245,7 @@ end = struct
   let set ~tgt ~value = tgt := !value
 
   let mk_univar (env : env) =
-    let uv = Ident.create "u" in
+    let uv = Ident.create "_u" in
     let ety = TUnivar uv in
     env := Mid.add uv ety !env;
     uv
