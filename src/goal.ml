@@ -230,7 +230,9 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
 
   (* close the typing environment and substitute *)
   let tsubst = Type.Infer.close ty_env in
+
   let formula = Equiv.Any.tsubst tsubst formula in
+  let goal = map (TS.tsubst tsubst) (ES.tsubst tsubst) goal in
 
   { name; system; ty_vars; formula },
   goal
