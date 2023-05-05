@@ -1,5 +1,5 @@
-module Prover = Squirrellib.Prover
-module ProverLib = Squirrellib.ProverLib
+module Prover = Squirrelprover.Prover
+module ProverLib = Squirrelcore.ProverLib
 
 open Util
 
@@ -105,11 +105,11 @@ let search_about_2 () =
   Alcotest.check_raises "search fail without context 1" Ok
       (fun () ->
         let _ = try Prover.exec_command "search input@A." st with
-          | Squirrellib.Theory.Conv _ -> raise Ok in raise Ko);
+          | Squirrelcore.Theory.Conv _ -> raise Ok in raise Ko);
   Alcotest.check_raises "search fail without context 2" Ok
       (fun () ->
         let _ = try Prover.exec_command "search output@A." st with
-          | Squirrellib.Theory.Conv _ -> raise Ok in raise Ko);
+          | Squirrelcore.Theory.Conv _ -> raise Ok in raise Ko);
   let _ = Prover.exec_command "search input@A in [S]." st in
   let _ = Prover.exec_command "search output@A in [S]." st in
   let matches = Prover.search_about st

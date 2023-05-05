@@ -1,7 +1,7 @@
 (** Various tests... *)
 
-open Squirrellib
-open Main
+open Squirrelcore
+open Squirrellib.Main
 
 let tactics =
   let exception Ok in

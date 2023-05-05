@@ -1,6 +1,6 @@
 (** Checking various tactics: case study, namelength. *)
 
-open Squirrellib
+open Squirrelcore
 open Util
 module ES = EquivSequent
 module TS = TraceSequent

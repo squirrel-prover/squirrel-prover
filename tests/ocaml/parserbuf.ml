@@ -1,6 +1,7 @@
 (** Testing the parser on terms and processes. *)
 
-open Squirrellib
+open Squirrelcore
+open Squirrelfront
 open Parserbuf
 
 module L = Location

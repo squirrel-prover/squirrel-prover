@@ -1,3 +1,8 @@
+open Squirrelcore
+open Squirrelprover
+open Squirrelfront
+open Squirreltactics
+open Squirrelhtml
 open Utils
 open Driver
 

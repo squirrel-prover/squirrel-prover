@@ -3,12 +3,12 @@
 (* These modules register tests suites as side effects,
  * and must be forcibly loaded. These tests may be hard to
  * extract from the modules as they may rely on abstract types. *)
-open! Squirrellib.Constr
-open! Squirrellib.Completion
-open! Squirrellib.Tactics
-open! Squirrellib.Term
-open! Squirrellib.Theory
-open! Squirrellib.Vars
+open! Squirrelcore.Constr
+open! Squirrelcore.Completion
+open! Squirrelcore.Tactics
+open! Squirrelcore.Term
+open! Squirrelcore.Theory
+open! Squirrelcore.Vars
 
 let test_suites : unit Alcotest.test list =
   [
@@ -46,15 +46,15 @@ let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [>
   okfails
 
 let () =
-  List.iter (fun (s,t) -> Squirrellib.Checks.add_suite s t) test_suites;
-  (* let runner = Squirrellib.Prover.run in *)
+  List.iter (fun (s,t) -> Squirrelcore.Checks.add_suite s t) test_suites;
+  (* let runner = Squirrelprover.Prover.run in *)
   let runner = Squirrellib.Main.run in
-  Squirrellib.Checks.add_suite "tests/ok/" (alcotests runner "tests/ok");
-  Squirrellib.Checks.add_suite "tests/fail/" (alcotests runner "tests/fail");
+  Squirrelcore.Checks.add_suite "tests/ok/" (alcotests runner "tests/ok");
+  Squirrelcore.Checks.add_suite "tests/fail/" (alcotests runner "tests/fail");
   Format.eprintf "Running Alcotests on test suites :\n";
   List.iter (fun (n,_) -> 
     Format.eprintf "\t%s\n" n;
-  ) (!Squirrellib.Checks.suites);
+  ) (!Squirrelcore.Checks.suites);
   Format.eprintf "@.";
 
-  Squirrellib.Checks.run ()
+  Squirrelcore.Checks.run ()

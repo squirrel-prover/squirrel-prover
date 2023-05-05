@@ -1,5 +1,5 @@
 open Js_of_ocaml
-open Squirrellib
+open Squirrelprover
 
 let _ = 
   (* Printer.init Printer.Html; *)

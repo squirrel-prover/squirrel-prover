@@ -1,8 +1,8 @@
 (** Testing various commands of the prover: search, print, include. *)
 
-module Prover = Squirrellib.Prover
-module ProverLib = Squirrellib.ProverLib
-module Theory = Squirrellib.Theory
+module Prover = Squirrelprover.Prover
+module ProverLib = Squirrelcore.ProverLib
+module Theory = Squirrelcore.Theory
 
 open Util
 

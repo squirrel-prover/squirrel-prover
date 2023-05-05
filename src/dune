@@ -8,25 +8,25 @@
   (instrumentation (backend bisect_ppx))
   (inline_tests)
   (preprocess (pps ppx_inline_test))
-  (modules_without_implementation smartFO)
-  (libraries fmt fmt.tty alcotest ocamlgraph str menhirLib
-    (select smt.ml from
-      (why3  -> smt.why3api.ml)
-      (!why3 -> smt.stub.ml))
-    (select server.ml from
-      (tiny_httpd  -> server.real.ml)
-      (!tiny_httpd -> server.stub.ml))))
+  (libraries squirrelcore squirreltactics squirrelprover squirrelfront
+             squirrelhtml))
+    ; (select smt.ml from
+    ;   (why3  -> smt.why3api.ml)
+    ;   (!why3 -> smt.stub.ml))
+    ; (select server.ml from
+    ;   (tiny_httpd  -> server.real.ml)
+    ;   (!tiny_httpd -> server.stub.ml))))
 
-(ocamllex htmlLexer)
+; (ocamllex htmlLexer)
 ;; Adding -ml option to ocamllex : have no limit size for automaton
-(rule
- (target lexer.ml)
- (deps   lexer.mll)
- (action (chdir %{workspace_root}
-          (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
-(menhir
-  (modules parser htmlParser)
-   (flags --table --explain))
+; (rule
+;  (target lexer.ml)
+;  (deps   lexer.mll)
+;  (action (chdir %{workspace_root}
+;           (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
+; (menhir
+;   (modules parser htmlParser)
+;    (flags --table --explain))
 
 ;; We decide to ignore the following warnings:
 ;; 7:  method overriden

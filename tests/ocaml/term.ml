@@ -1,6 +1,6 @@
 (** Unit tests for the {!Term} module. *)
 
-open Squirrellib
+open Squirrelcore
 
 let tests = [
   "fresh_forall", `Quick, begin fun () ->

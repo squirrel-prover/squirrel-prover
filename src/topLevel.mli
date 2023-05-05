@@ -1,3 +1,4 @@
+open Squirrelcore
 (** {2 PROVER sig}
  *
  * The minimal signature for PROVER :

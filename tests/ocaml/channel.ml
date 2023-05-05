@@ -1,6 +1,6 @@
 (** Unit tests for the {!Channel} module. *)
 
-open Squirrellib
+open Squirrelcore
 module L = Location
 open Channel
 
