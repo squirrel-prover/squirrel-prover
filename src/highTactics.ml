@@ -169,6 +169,29 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
+  T.register_general "have"
+    ~tactic_help:
+      {general_help = "Add a new hypothesis.";
+       detailed_help =
+         "- have form\n\
+         \  Add `form` to the hypotheses, and produce a subgoal to prove \
+          `form`. \n\
+          - have form as intro_pat\n\
+         \  Idem, except that `intro_pat` is applied to `form`.\n\
+          - have intro_pat : local_or_global_form\n\
+         \  Idem, except that both local and global formulas are supported.\n\
+          - have intro_pat := proof_term\n\
+         \  Compute the formula corresponding to `proof_term`, and\n\
+         \  apply `intro_pat` to it.\n\
+         \  Exemples: `have H := H0 i i2`\n\
+         \            `have H := H0 _ i2`";
+       usages_sorts = [];
+       tactic_group = Logical}
+    ~pq_sound:true
+    (LT.have_tac auto)
+
+(*------------------------------------------------------------------*)
+let () =
   T.register_general "rewrite"
     ~tactic_help:{
       general_help =

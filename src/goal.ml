@@ -164,20 +164,23 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 
+  (* open a typing environment *)
+  let ty_env = Type.Infer.mk_env () in
+
   let env, vs =
     let var_tag =
       match formula with
       | Local _ -> Vars.Tag.make Vars.Local
       | Global _ | Obs_equiv -> Vars.Tag.gtag
     in
-    Theory.convert_bnds_tagged var_tag env vars
+    Theory.convert_bnds_tagged ~ty_env var_tag env vars
   in
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
     | Local f ->
-      let f,_ = Theory.convert conv_env ~ty:Type.Boolean f in
+      let f,_ = Theory.convert ~ty_env conv_env ~ty:Type.Boolean f in
       let s = TS.init ~env f in
 
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
@@ -185,7 +188,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
          - all variables in [vs_loc] are local variables (i.e. have a local tag) *)
       (* FIXME: this splitting is silent and approximate.
          Indeed, local variables may be put in [vs_glob], which may prevent
-         (wrongly) future instanciation of the lemma. *)
+         (wrongly) future instantiation of the lemma. *)
       let vs_glob, vs_loc =
         let rec split vs_loc = function
           | [] -> [], vs_loc
@@ -220,6 +223,16 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       assert (vs = [] && ty_vars = []) ;
       make_obs_equiv table system
   in
+
+  (* check that the typing environment is closed *)
+  if not (Type.Infer.is_closed ty_env) then 
+    Tactics.hard_failure (Failure "some types could not be inferred");
+
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+
+  let formula = Equiv.Any.tsubst tsubst formula in
+  let goal = map (TS.tsubst tsubst) (ES.tsubst tsubst) goal in
 
   { name; system; ty_vars; formula },
   goal

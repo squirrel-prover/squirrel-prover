@@ -705,7 +705,7 @@ module Mvar : sig[@warning "-32"]
     (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> 'b -> 'b) -> t -> 'b -> 'b
 
   (** [table] and [env] are necessary to check that restrictions on 
-      variables instanciation have been respected. *)
+      variables instantiation have been respected. *)
   val to_subst :
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
@@ -779,25 +779,24 @@ end = struct
     : [`Subst of Term.subst | `BadInst of Format.formatter -> unit]
     =
     let check_subst (subst : Term.subst) =
-      let bad_instanciations =
-        (* check that the instanciation of [v], which has tag [tag], 
+      let bad_instantiations =
+        (* check that the instantiation of [v], which has tag [tag], 
            by [t] is correct *)
         List.filter (fun (v,(tag, system, _)) ->
             let t = Term.subst subst (Term.mk_var v) in
             let sys_cntxt = SE.{ set = system; pair = None; } in
             let env = Env.init ~table ~vars:env ~system:sys_cntxt () in
 
-            (tag.Vars.Tag.system_indep &&
-             not (HighTerm.is_system_indep env t)) ||
-            (tag.Vars.Tag.const &&
-             not (HighTerm.is_constant `Exact env t))
+            (tag.Vars.Tag.system_indep && not (HighTerm.is_system_indep              env t)) ||
+            (tag.Vars.Tag.const        && not (HighTerm.is_constant                  env t)) ||
+            (tag.Vars.Tag.adv          && not (HighTerm.is_ptime_deducible ~si:false env t))
           ) (Mv.bindings mv.subst)
       in
-      if bad_instanciations = [] then
+      if bad_instantiations = [] then
         `Subst subst
       else
         let pp_err fmt =
-          Fmt.pf fmt "@[<hv 2>bad variable instanciation(s):@;@[<v>%a@]@]"
+          Fmt.pf fmt "@[<hv 2>bad variable instantiation(s):@;@[<v>%a@]@]"
             (Fmt.list ~sep:Fmt.cut
                (fun fmt (v,(tag,_system,_)) ->
                   Fmt.pf fmt "@[%a@] -> @[%a@]"
@@ -805,7 +804,7 @@ end = struct
                     Term.pp (Term.subst subst (Term.mk_var v))
                )
             )
-            bad_instanciations
+            bad_instantiations
         in
         `BadInst pp_err
     in
@@ -1010,8 +1009,14 @@ let expand_head_once
 
   | _ -> raise exn
 
-
+(*------------------------------------------------------------------*)
 (* projection reduction *)
+
+let can_reduce_proj (t : Term.term) : bool =
+  match t with
+  | Term.Proj (_, Term.Tuple _) -> true
+  | _ -> false
+
 let reduce_proj (t : Term.term) : Term.term * bool =
   match t with
   | Term.Proj (i, t) ->
@@ -1023,7 +1028,14 @@ let reduce_proj (t : Term.term) : Term.term * bool =
 
   | _ -> t, false
 
+(*------------------------------------------------------------------*)
 (* β-reduction *)
+
+let can_reduce_beta (t : Term.term) : bool =
+  match t with
+  | Term.App (Quant (Lambda, _ :: _, _), _ :: _) -> true
+  | _ -> false
+
 let reduce_beta (t : Term.term) : Term.term * bool =
   match t with
   | Term.App (t, arg :: args) -> 
@@ -1423,24 +1435,21 @@ module T (* : S with type t = Term.term *) = struct
       if pat_red then tunif t pat st
       else no_unif ()
 
-    (* projection reduction *)
-    | Proj _, Proj _ ->
-      let t, t_red = reduce_proj t in
-      if t_red then tunif t pat st
-      else 
-        let pat, pat_red = reduce_proj pat in
-        if pat_red then tunif t pat st
-        else no_unif ()
+    | _, _ when can_reduce_beta t ->
+      let t, _ = reduce_beta t in
+      tunif t pat st
 
-    | Proj _, _ ->
-      let t, t_red = reduce_proj t in
-      if t_red then tunif t pat st
-      else no_unif ()
+    | _, _ when can_reduce_beta pat ->
+      let pat, _ = reduce_beta pat in
+      tunif t pat st
 
-    | _, Proj _ ->
-      let pat, pat_red = reduce_proj pat in
-      if pat_red then tunif t pat st
-      else no_unif ()
+    | _, _ when can_reduce_proj t ->
+      let t, _ = reduce_proj t in
+      tunif t pat st
+
+    | _, _ when can_reduce_proj pat ->
+      let pat, _ = reduce_proj pat in
+      tunif t pat st
 
     (* other *)
     | Var _, _ -> no_unif ()   (* FEATURE *)
@@ -1823,10 +1832,11 @@ let known_set_add_frame (k : known_set) : known_set list =
     assert (l = []);
     let tv' = Vars.make_fresh Type.Timestamp "t" in
     let ts' = Term.mk_var tv' in
-    (* [det] is set to true, as knowing [frame@t] implies that we known
+    (* [const] is set to **false**, as knowing [frame@t] implies that we known
        [input@t'] for any [t' <= t], even if [t'] is non-constant. 
-       Furthermore, this implies that we known [t]. *)
-    let vars = (tv', Vars.Tag.make ~const:false Vars.Global) :: k.vars in
+       Furthermore, this implies that we known [t]. 
+       Idem for the [adv] tag. *)
+    let vars = (tv', Vars.Tag.make ~const:false ~adv:false Vars.Global) :: k.vars in
 
     let term_frame = Term.mk_macro ms [] ts' in
     let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
@@ -1880,7 +1890,7 @@ let rec known_set_decompose (k : known_set) : known_set list =
     let term = Term.subst s term in
     let k = 
       { term;
-        vars = k.vars @ (Vars.Tag.global_vars ~const:true vars);
+        vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
         cond = k.cond }
     in
     known_set_decompose k
@@ -1921,7 +1931,7 @@ let known_set_of_mset
     Term.mk_and ~simpl:true cond_le extra_cond_le
   in
   { term = term;
-    vars = Vars.Tag.global_vars ~const:true (t :: mset.indices);
+    vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices);
     cond; }
 
 let known_sets_of_mset_l
@@ -2383,7 +2393,7 @@ module E = struct
     in
 
     let cand_env =
-      let vars = Vars.add_vars (Vars.Tag.global_vars ~const:true cand.vars) env in
+      let vars = Vars.add_vars (Vars.Tag.global_vars ~adv:true cand.vars) env in
       Env.init ~table ~system:{ set = (system :> SE.arbitrary); pair = None; } ~vars ()
     in
 
@@ -2392,7 +2402,7 @@ module E = struct
        and build the deducible specialization of the initial term. *)
     match cand.term with
     (* special case for pure timestamps *)
-    | _ as f when HighTerm.is_ptime_deducible ~const:`Exact ~si:true cand_env f -> [cand]
+    | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
 
     | Term.Macro (ms, l, ts) ->
       begin
@@ -2676,7 +2686,7 @@ module E = struct
         match Mvar.to_subst ~mode:`Unif st.table st.env mv with
         | `Subst subst -> subst
         | `BadInst _pp_err ->
-          (* Fmt.epr "bad instanciation: %t@." _pp_err; *) 
+          (* Fmt.epr "bad instantiation: %t@." _pp_err; *) 
           no_unif ()
       in
       let known_cond = Term.subst subst known_cond in
@@ -2738,7 +2748,7 @@ module E = struct
     let env = env_of_unif_state st in  
 
     match cterm.term with
-    | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t -> Some []
+    | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)
     | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
@@ -2782,9 +2792,9 @@ module E = struct
         let es, subst = Term.refresh_vars es in
         let term = Term.subst subst term in
 
-        (* binder variables are declared global and constant,
+        (* binder variables are declared global, constant and adv,
            as these are inputs (hence known values) to the adversary  *)
-        let st = { st with bvs = (Vars.Tag.global_vars ~const:true es) @ st.bvs; } in
+        let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
         Some [(st, { cterm with term; })]
 
     | Find (is, c, d, e)
@@ -2797,8 +2807,8 @@ module E = struct
       let is, subst = Term.refresh_vars is in
       let c, d = Term.subst subst c, Term.subst subst d in
 
-      (* idem, binder variables are declared global and constant *)
-      let st1 = { st with bvs = (Vars.Tag.global_vars ~const:true is) @ st.bvs; } in
+      (* idem, binder variables are declared global, constant and adv *)
+      let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
 
       let d_cond = Term.mk_and cterm.cond c in
       let e_cond =

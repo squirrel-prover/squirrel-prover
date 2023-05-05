@@ -80,8 +80,8 @@ axiom [any] bar (a,b : message) : (fun x y => y) a b = a.
 goal [any] _ (a,b : message) : 
   (fun x y => y) a b = a.
 Proof. 
-  checkfail rewrite /= bar exn NothingToRewrite.
-  checkfail rewrite [/= ~flags:[beta]] bar exn NothingToRewrite.
+  checkfail rewrite /= bar exn Failure.
+  checkfail rewrite [/= ~flags:[beta]] bar exn Failure.
   rewrite [/= ~flags:[]]. 
   rewrite bar. 
   apply eq_refl.
@@ -90,8 +90,8 @@ Qed.
 goal [any] _ (a,b : message) : 
   (fun x y => y) a b = a.
 Proof. 
-  checkfail simpl; rewrite bar exn NothingToRewrite.
-  checkfail simpl ~flags:[beta]; rewrite bar exn NothingToRewrite.
+  checkfail simpl; rewrite bar exn Failure.
+  checkfail simpl ~flags:[beta]; rewrite bar exn Failure.
   simpl ~flags:[]. 
   rewrite bar. 
   apply eq_refl.
@@ -100,8 +100,8 @@ Qed.
 goal [any] _ (a,b : message) : 
   (fun x y => y) a b = a.
 Proof. 
-  checkfail reduce; rewrite bar exn NothingToRewrite.
-  checkfail reduce ~flags:[beta]; rewrite bar exn NothingToRewrite.
+  checkfail reduce; rewrite bar exn Failure.
+  checkfail reduce ~flags:[beta]; rewrite bar exn Failure.
   reduce ~flags:[]. 
   rewrite bar. 
   apply eq_refl.

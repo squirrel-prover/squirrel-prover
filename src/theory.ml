@@ -844,11 +844,12 @@ let rec convert_tags ~(dflt_tag : Vars.Tag.t) (tags : var_tags) : Vars.Tag.t =
   | [] -> dflt_tag
   | t :: tags ->
     if L.unloc t = "param" then
-      convert_tags ~dflt_tag:{ const = true; 
-                               system_indep = true; 
-                               (* ptime = true;  *)} tags
+      convert_tags
+        ~dflt_tag:{ const = true; adv = true; system_indep = true; } tags
     else if L.unloc t = "const" then
       convert_tags ~dflt_tag:{ dflt_tag with const = true; } tags
+    else if L.unloc t = "adv" then
+      convert_tags ~dflt_tag:{ dflt_tag with adv = true; } tags
     else if L.unloc t = "glob" then
       convert_tags ~dflt_tag:{ dflt_tag with system_indep = true; } tags
     else conv_err (L.loc t) (Failure ("unknown tag: " ^ (L.unloc t)))

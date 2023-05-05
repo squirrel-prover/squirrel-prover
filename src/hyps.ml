@@ -480,7 +480,7 @@ let setup_change_hyps_context
     | Atom (Equiv _) -> pair_unchanged
 
     | Atom (Reach a) ->
-      (HighTerm.is_constant `Exact env a &&
+      (HighTerm.is_constant     env a &&
        HighTerm.is_system_indep env a)
       || set_unchanged
   in

@@ -19,31 +19,35 @@ type scope = Local | Global
 
 module Tag = struct
 
-  (** Variable information restricting its possible instanciations. *)
+  (** Variable information restricting its possible instantiations. *)
   type t = {
     const : bool;
-    (** var represents a constant computation *)
+    (** var represents a constant value *)
+
+    adv : bool;
+    (** var represents an adversarially computable value *)
 
     system_indep : bool;
     (** var must be instantiated by a term representiang a
-        system-independent computation *)
+        system-independent value *)
   }
 
   (*------------------------------------------------------------------*)
-  let pp fmt { const; system_indep; } =
+  let pp fmt { const; system_indep; adv; } =
     let l =
-      (if const then ["const"] else []) @
-      (if system_indep then ["glob"] else [])
+      (if const        then ["const"] else []) @
+      (if adv          then ["adv"  ] else []) @
+      (if system_indep then ["glob" ] else [])
     in
     if l = [] then ()
     else
       Fmt.pf fmt "@[<h>[%a]@]" (Fmt.list ~sep:Fmt.comma Fmt.string) l
 
   (*------------------------------------------------------------------*)
-  let make ?(const = false) (sc : scope) : t =
+  let make ?(const = false) ?(adv = false) (sc : scope) : t =
     match sc with
-    | Local  -> { const; system_indep = false; }
-    | Global -> { const; system_indep = true; }
+    | Local  -> { const; adv; system_indep = false; }
+    | Global -> { const; adv; system_indep = true; }
 
   (*------------------------------------------------------------------*)
   (** default local tag *)               
@@ -53,11 +57,11 @@ module Tag = struct
   let gtag = make Global
 
   (*------------------------------------------------------------------*)
-  let local_vars ?(const = false) (vs : vars) : (var * t) list =
-    List.map (fun v -> v, make ~const Local) vs
+  let local_vars ?const ?adv (vs : vars) : (var * t) list =
+    List.map (fun v -> v, make ?const ?adv Local) vs
 
-  let global_vars ?(const = false) (vs : vars) : (var * t) list =
-    List.map (fun v -> v, make ~const Global) vs
+  let global_vars ?const ?adv (vs : vars) : (var * t) list =
+    List.map (fun v -> v, make ?const ?adv Global) vs
 end
 
 type tagged_var = var * Tag.t

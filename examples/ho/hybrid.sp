@@ -14,9 +14,9 @@ system null.
    which would allow to do this cleanly.
    Remark that the new higher-order semantics can easily account for
    such an extension. *)
-global axiom case_int (i : int[const]) : 
+global axiom case_int (i : int[const, adv]) : 
   [i = i0] \/ 
-  Exists (j : int[const]), [i = succi j].
+  Exists (j : int[const, adv]), [i = succi j].
 
 (*------------------------------------------------------------------*)
 (* auxiliary lemma  *)
@@ -34,9 +34,10 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global goal hybrid ['a] (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+global goal hybrid ['a] 
+  (N1 : int[const, adv]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
  (* Inductive case of the hybrid proof *)
- (Forall (N0 : int[const]), 
+ (Forall (N0 : int[const, adv]), 
    [N0 <= N1] ->
    equiv(u, z, (fun (i:int) => if i < N0 then (diff(fL,fR)) i else z)) ->
    equiv( u,
@@ -49,7 +50,7 @@ global goal hybrid ['a] (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : mes
     u,z,
     (fun (i : int) => if i <= N1 then (diff(fL,fR)) i else z)).
 Proof. 
-  induction N1 => N IH Hyp.
+  induction N1 => N IH Hyp. 
   have [Eq0 | [N0 Eq0]] := case_int N; rewrite Eq0 /= in *.
   * rewrite !i0_lub.
     constseq 2:

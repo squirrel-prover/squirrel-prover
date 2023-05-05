@@ -171,7 +171,7 @@ let get_bad_occs_and_ciphertexts
     Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([],[])
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([],[])
                                                          
   | Var v ->
     soft_failure
@@ -290,7 +290,7 @@ let get_bad_randoms
     Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([],[])
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([],[])
 
   | Var v ->
     soft_failure

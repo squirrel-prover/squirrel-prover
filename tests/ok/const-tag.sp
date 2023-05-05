@@ -1,5 +1,5 @@
 (* tests some instantiations of local and global lemmas in global sequents w.r.t.
-   determinism. *)
+   constant variable tag. *)
 
 name n : message.
 name nb : bool.
@@ -23,10 +23,12 @@ Proof.
   (*     *) have ? := r dx.
   (*     *) have ? := r (dx,dy).
   (*     *) have ? := r true.
-  checkfail have ? := r x      exn Failure.
-  checkfail have ? := r n      exn Failure.
-  checkfail have ? := r (x,y)  exn Failure.
-  checkfail have ? := r (x,dy) exn Failure.
+  (*     *) have ? := r (fun (a : message) => a = dx).
+  checkfail have ? := r x                             exn Failure.
+  checkfail have ? := r n                             exn Failure.
+  checkfail have ? := r (x,y)                         exn Failure.
+  checkfail have ? := r (x,dy)                        exn Failure.
+  checkfail have ? := r (fun (a : message) => a = x)  exn Failure.
 
   (*     *) have ? := p dx.
   (*     *) have ? := p (dx,dy).

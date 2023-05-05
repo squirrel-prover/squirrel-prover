@@ -19,7 +19,7 @@ bench: bench_example
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 BENCHDIR=_build/bench
-TESTS_OUT=/tmp/squirrel_tests.output
+TESTS_OUT=_build/default/tests.output
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
 BENCH_OUT=$(BENCHDIR)/last.json
@@ -156,18 +156,15 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 alcotest: version
 	dune runtest
 
-# Apparently needs to build everything for the test.exe
-_build/default/test.exe: version
-	dune build
-
 # Same as above but will print out only the FAILs tests as before
-alcotest_full: _build/default/test.exe version 
+alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
-	@if dune exec ./_build/default/test.exe > $(TESTS_OUT) ; \
-		then echo "${GRE}Alcotests passed successfully !${NC}" ; \
-		else echo "${RED}Alcotests FAILED :${NC}" ; \
-			cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
+	@dune build @mytest
+	@if cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -q "^[^│] \[FAIL\]" ; \
+		then echo "${RED}Alcotests FAILED :${NC}" ; \
+		  cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
 			exit 1; \
+		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
 
 clean:

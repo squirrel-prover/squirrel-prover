@@ -293,5 +293,9 @@ type f_simpl =
 val do_intros_ip :
   f_simpl -> Args.intro_pattern list -> Goal.t -> Goal.t list
 
+(*------------------------------------------------------------------*)
+(** {3 Tactics that require a [f_simpl]} *)
+
+val have_tac    : f_simpl -> Args.parser_args -> gentac
 val rewrite_tac : f_simpl -> Args.parser_args -> gentac
 val intro_tac   : f_simpl -> Args.parser_args -> gentac

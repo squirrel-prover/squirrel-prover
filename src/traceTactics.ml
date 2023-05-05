@@ -324,6 +324,99 @@ let constraints_tac args : LT.ttac =
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
+(** Check if [v] type can be assume to be [const] in [s]. 
+    Use the fact that for finite types which do not depend on the 
+    security parameter η, we have
+    [∀ x, phi] ≡ ∀ x. const(x) → [phi]
+    (where the RHS quantification is a global quantification) *)
+let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
+  let table = TS.table s in
+  if Symbols.TyInfo.is_finite table (Vars.ty v) && 
+     Symbols.TyInfo.is_fixed  table (Vars.ty v) then
+
+    (* check that [v] does not appear in any global hypothesis *)
+    TS.Hyps.fold (fun _ hyp b ->
+        match hyp with
+        | Equiv.Local _ -> b
+        | Equiv.Global f -> 
+          b && not (Sv.mem v (Equiv.fv f))
+      ) s true
+
+  else false
+
+(*------------------------------------------------------------------*)
+(** Try to add the [const] tag to all variables of the sequent.
+    Added in [simpl]. *)
+let strengthen_const_vars (s : TS.t) : TS.t =
+  let vars = 
+    Vars.map_tag (fun v tag ->
+        { tag with const = tag.const || strengthen_const_var s v } 
+      ) (TS.vars s) 
+  in
+  TS.set_vars vars s
+
+(*------------------------------------------------------------------*)
+let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
+  let table = TS.table s in
+
+  if not (Symbols.TyInfo.is_finite table ty && 
+          Symbols.TyInfo.is_fixed  table ty   ) then
+    soft_failure ~loc
+      (Failure "only applies to finite and fixed (η-independent) types");
+
+  let v = 
+    match f with 
+    | Var v -> v
+    | _ -> soft_failure ~loc (Failure "must be a variable");
+  in
+
+  let to_lower = 
+    TS.Hyps.fold (fun id hyp to_lower -> 
+        match hyp with
+        | Equiv.Local _ -> to_lower
+
+        | Equiv.(Global (Atom (Reach hyp))) -> 
+          if Sv.mem v (Term.fv hyp) then (id, hyp) :: to_lower else to_lower
+
+        | Equiv.Global hyp -> 
+          if Sv.mem v (Equiv.fv hyp) then 
+            soft_failure ~loc
+              (Failure 
+                 (Fmt.str "%a appears in non-localizable hypothesis %a \
+                           (clear the hypothesis?)"
+                    Vars.pp v Ident.pp id))
+          else to_lower
+      ) s []
+  in
+ 
+  if to_lower <> [] then
+    Printer.prt `Warning 
+      "@[<hov 2>localize:@ %a@]" 
+      (Fmt.list ~sep:Fmt.sp Ident.pp) (List.map fst to_lower);
+
+  let s = TS.Hyps.filter (fun id _ -> not (List.mem_assoc id to_lower)) s in
+  let s = 
+    let to_lower = 
+      List.map
+        (fun (id,hyp) -> (Args.Named (Ident.name id), Equiv.Local hyp) ) 
+        to_lower 
+    in
+    TS.Hyps.add_list to_lower s
+  in
+  [strengthen_const_vars s]
+
+let () =
+  T.register_typed "const"
+    ~general_help:"Add the `const` tag to a variable."
+    ~detailed_help:"The variable must be of a finite and fixed (η-independent) type, \
+                      and must not appear in any global hypothesis (some global \
+                      hypotheses may be localized if necessary)."
+    ~tactic_group:Structural
+    ~pq_sound:true
+    (LowTactics.genfun_of_pure_tfun_arg const_tac)
+    Args.((Term : _ sort))
+
+(*------------------------------------------------------------------*)
 (* SMT-based combination of constraints and congruence *)
 
 let smt (s : TS.t) =
@@ -602,9 +695,6 @@ let deprecated_mk_fresh_indirect_cases
   List.filter (fun (_, occs) -> occs <> []) macro_cases
 
 
-
-
-    
 (*------------------------------------------------------------------*)
 let apply_substitute subst s =
     let s =
@@ -931,6 +1021,7 @@ let fa_tac args = match args with
 
 let new_simpl ~red_param ~congr ~constr s =
   let s = TraceLT.reduce_sequent red_param s in
+  let s = strengthen_const_vars s in
 
   let goals = Term.decompose_ands (TS.goal s) in
   let s = TS.set_goal Term.mk_false s in
@@ -969,6 +1060,8 @@ let _simpl ~red_param ~close ~strong ~auto_intro =
 
   let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
 
+  let strengthen_const_vars s sk fk = sk [strengthen_const_vars s] fk in
+
   let new_simpl ~congr ~constr =
     if strong && not intro
     then [wrap_fail (new_simpl ~red_param ~congr ~constr)] @ assumption
@@ -983,6 +1076,7 @@ let _simpl ~red_param ~close ~strong ~auto_intro =
 
 
   andthen_list ~cut:true (
+    [strengthen_const_vars] @
     (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
     assumption @
@@ -1240,7 +1334,7 @@ let rewrite_equiv_transform
   let rec aux (t : term) : term = 
     match Term.ty t with
     | Type.Timestamp | Type.Index when
-        HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+        HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* system-independence needed, so that we leave [t] unchanged when the system do *)
       
     | _ ->
@@ -1250,7 +1344,7 @@ let rewrite_equiv_transform
 
   and aux_rec (t : Term.term) : Term.term = 
     match t with
-    | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+    | t when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* system-independence needed, so that we leave [t] unchanged when the system do *)
 
     | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
@@ -1307,7 +1401,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     TS.Hyps.filter
       (fun _ -> function
          | Local f -> 
-           HighTerm.is_constant `Exact (TS.env s) f &&
+           HighTerm.is_constant     (TS.env s) f &&
            HighTerm.is_system_indep (TS.env s) f
          | Global  _ -> true)
   in

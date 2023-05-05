@@ -92,7 +92,7 @@ val pp_quant : Format.formatter -> quant -> unit
 type term = private
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
-  (** An applied function type, instanciating type variable when [f] 
+  (** An applied function type, instantiating type variable when [f] 
       is polymorphique. *)
 
   | Name   of nsymb * term list             (** [Name(s,l)] : [l] of length 0 or 1 *)
@@ -464,12 +464,12 @@ val mk_fun_tuple :
   term
 
 (** High-level smart constructor for application of a function symbols.
-    Type variables of the function symbols must all be instanciated using 
+    Type variables of the function symbols must all be instantiated using 
     the types of the arguments. 
 
     For example, comparison is polymorphique, and has type [< : 'a -> 'a -> bool].
     Then, in [t1 < t2], the type variable ['a] can be automatically infered to 
-    instanciate [<] on [ty t1]. *)
+    instantiate [<] on [ty t1]. *)
 val mk_fun_infer_tyargs : Symbols.table -> Symbols.fname -> term list -> term
 
 (*------------------------------------------------------------------*)

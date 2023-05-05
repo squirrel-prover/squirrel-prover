@@ -57,5 +57,7 @@ Proof.
   rewrite equiv H.
   (** It remains now to show that the attacker cannot deduce a fresh name,
   using the `fresh` tactic. *)
-  intro H'. by fresh H'.
+  intro H'. 
+  clear H; const tau. 
+  by fresh H'.
 Qed.

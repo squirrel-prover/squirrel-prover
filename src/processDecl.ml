@@ -93,7 +93,8 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
 
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
-      Theory.convert_ext_bnds ~ty_env (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
+      Theory.convert_ext_bnds 
+        ~ty_env (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
       (* assume global constant variables to properly check that the
          body represents a deterministic computations later
          (as constant => deterministic). *)

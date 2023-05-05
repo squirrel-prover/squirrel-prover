@@ -17,10 +17,10 @@
       refresh variables (to avoid capture issues). 
 
     A variable can either represent:
-    - a single computation, in which can it can only be instanciated by 
+    - a single computation, in which can it can only be instantiated by 
       system-independent terms. 
       This is the case for global variables.
-    - many computations, in which can it can be instanciated by terms with
+    - many computations, in which can it can be instantiated by terms with
       diff operators and multi-system macros.
       This is the case for local variables. *)
 
@@ -44,14 +44,17 @@ type scope = Local | Global
 (** {2 Variable information} *)
     
 module Tag : sig
-  (** Variable information restricting its possible instanciations. *)
+  (** Variable information restricting its possible instantiations. *)
   type t = {
     const : bool;
-    (** var represents a constant computation *)
+    (** var represents a constant value *)
+
+    adv : bool;
+    (** var represents an adversarially computable value *)
 
     system_indep : bool;
     (** var must be instantiated by a term representiang a
-        system-independent computation *)
+        system-independent value *)
   }
 
   (*------------------------------------------------------------------*)
@@ -59,7 +62,7 @@ module Tag : sig
 
   (*------------------------------------------------------------------*)
   (** Built variable information according to the scope of a variable *)
-  val make : ?const:bool -> scope -> t
+  val make : ?const:bool -> ?adv:bool -> scope -> t
 
   (*------------------------------------------------------------------*)
   (** default local tag *)               
@@ -70,10 +73,10 @@ module Tag : sig
 
   (*------------------------------------------------------------------*)
   (** Attached local information to a variable *)
-  val local_vars : ?const:bool -> vars -> (var * t) list
+  val local_vars : ?const:bool -> ?adv:bool -> vars -> (var * t) list
 
   (** Attached global information to a variable *)
-  val global_vars : ?const:bool -> vars -> (var * t) list
+  val global_vars : ?const:bool -> ?adv:bool -> vars -> (var * t) list
 end
 
 type tagged_var = var * Tag.t

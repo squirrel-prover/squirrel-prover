@@ -19,7 +19,7 @@ Qed.
 
 goal _ (i:message) : a=b.
 Proof.
-  assert T: i=i by auto.
+  have T: i=i by auto.
   by apply ax.
 Qed.
 

@@ -202,7 +202,7 @@ module Mvar : sig
     (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> 'b -> 'b) -> t -> 'b -> 'b
 
   (** [table] and [env] are necessary to check that restrictions on 
-      variables instanciation have been respected. *)
+      variables instantiation have been respected. *)
   val to_subst :
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
@@ -306,10 +306,12 @@ val expand_head_once :
   Term.term * bool 
 
 (** projection reduction *)
-val reduce_proj : Term.term -> Term.term * bool 
+val can_reduce_proj : Term.term -> bool 
+val     reduce_proj : Term.term -> Term.term * bool 
 
 (** β-reduction *)
-val reduce_beta : Term.term -> Term.term * bool 
+val can_reduce_beta : Term.term -> bool 
+val     reduce_beta : Term.term -> Term.term * bool 
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)

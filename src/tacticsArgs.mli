@@ -31,6 +31,8 @@ type s_item_body =
 
 type s_item = s_item_body * named_args
 
+val s_item_loc : s_item -> L.t
+
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
@@ -140,6 +142,15 @@ type trans_arg =
   | TransTerms  of (int L.located * Theory.term) list
 
 (*------------------------------------------------------------------*)
+(** {2 Have tactic arguments} *)
+
+(** before, simpl pat for produced hypothesis, after *)
+type have_ip = s_item list * simpl_pat * s_item list
+
+type have_arg    = have_ip option * Theory.any_term
+type have_pt_arg = Theory.p_pt * have_ip option * [`IntroImpl | `None]
+
+(*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
 
 
@@ -161,8 +172,8 @@ type parser_arg =
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | Have         of simpl_pat option * Theory.any_term
-  | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Have         of have_arg
+  | HavePt       of have_pt_arg
   | Reduce       of named_args
   | Auto         of named_args  (* used by `auto` and `simpl` *)
   | SplitSeq     of int L.located * Theory.term * Theory.term option

@@ -78,7 +78,7 @@ let deprecated_get_name_indices_ext
   in
   let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : deprecated_name_occs =
     match t with
-    | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false (env fv) t -> []
+    | _ when HighTerm.is_ptime_deducible ~si:false (env fv) t -> []
 
     | Var _ -> raise Deprecated_Var_found
 

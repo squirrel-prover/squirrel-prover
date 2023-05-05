@@ -332,8 +332,8 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
         match ty with
         | Type.Timestamp ->
           let env = ES.env s in
-          if not (HighTerm.is_constant `Exact env f &&
-                  HighTerm.is_system_indep         env f   ) then
+          if not (HighTerm.is_constant     env f &&
+                  HighTerm.is_system_indep env f   ) then
             hard_failure ~loc
               (Failure "global case must be on a constant and \
                         system-independent term");
@@ -514,8 +514,8 @@ let old_induction Args.(Message (ts,_)) s =
   assert (Type.equal (Term.ty ts) Type.ttimestamp);
 
   let env = ES.env s in
-  if not (HighTerm.is_constant `Exact env ts &&
-          HighTerm.is_system_indep         env ts   ) then
+  if not (HighTerm.is_constant     env ts &&
+          HighTerm.is_system_indep env ts   ) then
     hard_failure 
       (Failure "simple global induction must be on a constant and \
                 system-independent timestamp term (maybe try dependent induction ?)");
@@ -547,7 +547,7 @@ let old_induction Args.(Message (ts,_)) s =
     let init_s = ES.set_goal init_goal s in
     let init_s = intro_back init_s in
 
-    let const = HighTerm.is_constant `Exact env ts in
+    let const = HighTerm.is_constant env ts in
     
     (* Creates the goal corresponding to the case
        where [t] is instantiated by [action]. *)
@@ -665,7 +665,7 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
   let is_deducible_vars (l : Term.terms) : bool =
     List.for_all (fun t ->
         Term.is_var t &&
-        HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t
+        HighTerm.is_ptime_deducible ~si:true env t
       ) l
   in
   let l =
@@ -675,12 +675,13 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
 
     (* use [tf] to check that the function symbol is pptime computable. *)
     | Fun _ as tf -> 
-      if HighTerm.is_ptime_deducible ~const:`Exact ~si:true env tf then [] else raise (No_FA `HeadNoFun)
+      if HighTerm.is_ptime_deducible ~si:true env tf then [] else 
+        raise (No_FA `HeadNoFun)
 
     | App (Fun _ as tf, [Tuple l]) 
     | App (Fun _ as tf, l) -> 
       let l = if is_deducible_vars l then [] else l in
-      let tf = if HighTerm.is_ptime_deducible ~const:`Exact ~si:true env tf then [] else [tf] in
+      let tf = if HighTerm.is_ptime_deducible ~si:true env tf then [] else [tf] in
       tf @ l
 
     | Proj (_,t) -> if is_deducible_vars [t] then [] else [t]
@@ -1488,7 +1489,8 @@ let const_seq
   let e_is, e_ti = match e with
     | Quant ((Seq | Lambda), is, ti) -> is, ti
     | _ ->
-      soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq or a lambda"))
+      soft_failure ~loc:(L.loc li) 
+        (Failure (string_of_int i ^ " is not a seq or a lambda"))
   in
   let b_t_terms : (Term.term * Term.term) list =
     List.map (fun (p_bool, p_term) ->
@@ -1502,11 +1504,10 @@ let const_seq
 
         check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
 
-        (* check that [p_bool] is a det+SI formula *)
-        if not (HighTerm.is_constant `Exact (ES.env s) t_bool &&
-                HighTerm.is_system_indep         (ES.env s)  t_bool   ) then
+        (* check that [p_bool] is a const+SI formula *)
+        if not (HighTerm.is_ptime_deducible ~si:true (ES.env s) t_bool) then
           hard_failure ~loc:p_bool_loc
-            (Failure "conditions must be constant and system-independent");
+            (Failure "conditions must be ptime and system-independent");
 
         t_bool, term
       ) b_t_terms
