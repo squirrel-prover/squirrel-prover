@@ -269,6 +269,14 @@ Proof.
 Qed.
 hint rewrite if_else.
 
+goal [any] if_else_inv (b:boolean, m0,m1:message):
+  if b then m0 else m1 = if b then m0 else (if not b then m1).
+Proof. by case b. Qed.
+
+goal [any] if_push (b:boolean, m0,m1:message):
+  if b then m0 else m1 = if b then (if b then m0) else (if (not b) then m1).
+Proof. by rewrite if_else_inv if_then_inv. Qed.
+
 goal [any] if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
  b = not b' => 
  if b then (if b' then x else y) else z = 
