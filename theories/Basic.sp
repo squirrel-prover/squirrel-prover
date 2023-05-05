@@ -109,6 +109,9 @@ hint rewrite eq_false.
 
 axiom [any] and_comm (b,b' : boolean) : (b && b') = (b' && b).
 
+goal [any] and_dist (b0,b1,b2: boolean) : ((b0 || b1) && b2) = ((b0 && b2) || (b1 && b2)).
+Proof. rewrite eq_iff. by split. Qed.
+
 axiom [any] and_true_l (b : boolean) : (true && b) = b.
 hint rewrite and_true_l.
 
@@ -126,6 +129,9 @@ hint rewrite and_false_r.
 (*------------------------------------------------------------------*)
 (* or *)
 axiom [any] or_comm (b,b' : boolean) : (b || b') = (b' || b).
+
+goal [any] or_dist (b0,b1,b2: boolean) : ((b0 || b2) && (b1 || b2)) =  ((b0 && b1) || b2).
+Proof. rewrite eq_iff. by split. Qed.
 
 axiom [any] or_false_l (b : boolean) : (false || b) = b.
 hint rewrite or_false_l.
@@ -156,9 +162,9 @@ goal [any] impl_true_r (b : boolean) : (b => true) = true.
 Proof. auto. Qed.
 hint rewrite impl_true_r.
 
-goal [any] impl_true_false : (true => false) = false.
-Proof. by rewrite impl_charac. Qed.
-hint rewrite impl_true_false.
+goal [any] impl_true_l (b: boolean) : (true => b) = b.
+Proof. by rewrite eq_iff. Qed.
+hint rewrite impl_true_l.
 
 (*------------------------------------------------------------------*)
 (* not: more lemmas *)
@@ -216,6 +222,16 @@ Proof.
   by case b; case b'.
 Qed.
 
+goal [any] if_then_or (b0,b1: boolean, m0,m1:message): 
+  if b0 then m0 else (if b1 then m0 else m1) = if b0 || b1 then m0 else m1.
+(* It would have been more logical to call it if_then_else to match the name if_then_then,
+   but if_then_else is a pretty bad name so I used if_then_or *)
+Proof. 
+assert(b0 || not(b0)) as [_|_] by auto. rewrite if_true => //. rewrite if_true => //. 
+assert(b1 || not(b1)) as [_|_] by auto. rewrite if_false => //. rewrite !if_true => //. 
+rewrite !if_false => //.
+Qed.
+
 goal [any] if_then_implies ['a] (b,b' : boolean, x,y,z : 'a):
   if b then (if b' then x else y) else z =
   if b then (if b => b' then x else y) else z.
@@ -238,6 +254,11 @@ Proof.
   by intro ->; case b'.
 Qed.
 hint rewrite if_then.
+
+goal [any] if_then_inv (b:boolean, m0,m1:message): 
+  if b then m0 else m1 = if b then (if b then m0) else m1.
+  (* More practical than the previous lemma when you want to expand. *)
+Proof. auto. Qed.
 
 goal [any] if_else ['a] (b,b' : boolean, x,y,z : 'a):
  b = b' => 
