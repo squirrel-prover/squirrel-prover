@@ -1,0 +1,18 @@
+(library
+  (name squirrelhtml)
+  (public_name squirrel.html)
+  ; the library_flags line just below is required to perform the side-effects
+  ; (let () = ...) that register the test suite; it is copy-pasted from
+  ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
+  (library_flags (:standard -linkall))
+  (instrumentation (backend bisect_ppx))
+  (libraries squirrelcore squirrelfront squirrelprover
+    (select server.ml from
+      (tiny_httpd  -> server.real.ml)
+      (!tiny_httpd -> server.stub.ml))))
+
+(ocamllex htmlLexer)
+
+(menhir
+  (modules htmlParser)
+   (flags --table --explain))

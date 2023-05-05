@@ -1,0 +1,21 @@
+(library
+  (name squirrelfront)
+  (public_name squirrel.front)
+  ; the library_flags line just below is required to perform the side-effects
+  ; (let () = ...) that register the test suite; it is copy-pasted from
+  ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
+  (library_flags (:standard -linkall))
+  (instrumentation (backend bisect_ppx))
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
+  (libraries squirrelcore))
+
+;; Adding -ml option to ocamllex : have no limit size for automaton
+(rule
+ (target lexer.ml)
+ (deps   lexer.mll)
+ (action (chdir %{workspace_root}
+          (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
+(menhir
+  (modules parser)
+   (flags --table --explain))

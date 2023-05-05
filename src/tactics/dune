@@ -1,0 +1,12 @@
+(library
+  (name squirreltactics)
+  (public_name squirrel.tactics)
+  ; the library_flags line just below is required to perform the side-effects
+  ; (let () = ...) that register the test suite; it is copy-pasted from
+  ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
+  (library_flags (:standard -linkall))
+  (instrumentation (backend bisect_ppx))
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
+  (libraries squirrelcore))
+
