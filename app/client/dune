@@ -1,0 +1,17 @@
+(executable
+ (name client)
+ (modes js)
+ (libraries jsquirrel js_of_ocaml js_of_ocaml-lwt js_of_ocaml-tyxml)
+ (js_of_ocaml
+  (flags :standard --dynlink +dynlink.js +toplevel.js 
+         --toplevel
+         --linkall
+         --noinline --disable shortvar --debug-info
+         ; ↓ FIXME ↓
+         ; -I /home/thomas/.opam/default/lib/cmdliner
+         ; -I `opam var lib`/cmdliner
+         --extern-fs
+         --setenv PATH=/bin))
+ (link_flags -linkall -no-check-prims)
+ (preprocess (staged_pps tyxml-ppx lwt_ppx js_of_ocaml-ppx ppx_import
+                         ppx_deriving_yojson)))

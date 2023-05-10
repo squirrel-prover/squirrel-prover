@@ -9,9 +9,11 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest_full example
+.PHONY: test
+test: alcotest_full example ## Run alcotests (see ./test.ml) then the examples
 
-bench: bench_example
+.PHONY: bench
+bench: bench_example ## Perform benchmarks (cf. wikis/Dev-README on gitlab)
 
 # squirrel is not PHONY here, it exists as executable
 .PHONY: okfail okfail_end example examples_end alcotest alcotest_full
@@ -167,13 +169,15 @@ alcotest_full: version
 		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
 
-clean:
+.PHONY: clean
+clean: ## Call dune clean and remove executable and coverage
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
 
 # Clean last bench
-clean_bench:
+.PHONY: clean_bench
+clean_bench: ## Clean previous bench
 	rm -f $(BENCHDIR)/*.json
 
 # Clean previous local bench
@@ -181,7 +185,8 @@ clean_prev_bench:
 	rm -f $(BENCHDIR)/prev/*.json
 
 # Clean all local bench
-clean_all_bench:
+.PHONY: clean_all_bench
+clean_all_bench: ## Clean all benchs
 	rm -rf $(BENCHDIR)
 
 # We have to "touch" ./squirrel executable for other recipes
@@ -198,7 +203,8 @@ squirrel: version
 # 2. These tests could be ran as dune tests rather than through this
 #    Makefile, which would render instrumentation available and would
 #    also avoid re-runnning tests when unnecessary.
-coverage:
+.PHONY: coverage
+coverage: ## Generates coverage report in _coverage/index.html
 	rm -rf _coverage
 	dune runtest --force --instrument-with bisect_ppx
 	find . -name '*.coverage' | \
@@ -212,7 +218,8 @@ install: squirrel
 	cp -f squirrel $(PREFIX)/bin/squirrel
 	cp -r theories $(PREFIX)/bin/theories
 
-doc:
+.PHONY: doc
+doc: ## Build generated API documentation
 	dune build @doc
 	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
@@ -234,31 +241,36 @@ PLOT=./plot.py
 STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
 # This plot tactics statistics
-plot:
+.PHONY: plot
+plot: ## Call plot script (by default plots the last bench)
 	python3 $(PLOT)
 
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
-plot_all:
+.PHONY: plot_all
+plot_all: ## Draw a graph that compare the mean of all previous bench with the last one
 	rm -f $(BENCHDIR)/all/last.json
 	$(MAKE) $(BENCHDIR)/all/last.json
 	python3 $(PLOT) $(BENCHDIR)/all/last.json
 
 # This shows you the last benchmark compared to previous one
 # Needs `matplotlib` (pip install)
-plot_diff_last:
+.PHONY: plot_diff_last
+plot_diff_last: ## Plots comparison graph btwn last bench and previous one
 	@echo "Compare ${ORA}$(LAST2)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST2) $(LAST) 
 
 # This shows you the last benchmark compared to the most recent commit bench
 # Needs `matplotlib` (pip install)
-plot_diff_commit:
+.PHONY: plot_diff_commit
+plot_diff_commit: ## Plots last benchmark compared to the most recent commit bench
 	@echo "Compare ${ORA}$(LAST_COMMIT)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST_COMMIT) $(LAST)
 
 # compare bench of current work with a specified commit in GITCOMMIT
 # GITCOMMIT is by default to HEAD~1
-bench_compare: bench_preamble $(BENCH_OUT)
+.PHONY: bench_compare
+bench_compare: bench_preamble $(BENCH_OUT) ## Compare bench with given commit (cf Dev-README)
 	@echo "↑ Bench ${GRE}master with current work${NC} ↑"
 	@echo "Verify $(BENCH_OUT) and copy in $(BENCHDIR)/prev/$(NOW).json…"
 	@if python3 -m json.tool $(BENCH_OUT) > $(BENCHDIR)/prev/$(NOW).json \
@@ -348,6 +360,7 @@ start: ## Serve the application with a local HTTP server
 	mkdir -p static
 	rm -f static/client.js
 	cp _build/default/$(APPDIR)client/client.bc.js static/client.js
+	cp ./scripts/visualisation/visualisation_style.css static/.
 	dune exec $(APPDIR)server/server.exe
 
 .PHONY: watch

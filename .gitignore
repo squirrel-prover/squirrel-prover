@@ -22,6 +22,7 @@ sanity
 *.fls
 _coverage/
 _opam/
+static/
 *.coverage
 /src/commit.ml
 .DS_Store

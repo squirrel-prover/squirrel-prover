@@ -1,9 +1,8 @@
 (env
  (_
   (js_of_ocaml
-   (flags (:standard --enable effects --enable pretty --linkall))
-   (build_runtime_flags (:standard --enable effects --enable pretty
-                                   --toplevel)))))
+   (flags (:standard --enable effects --enable pretty))
+   (build_runtime_flags (:standard --enable effects --enable pretty)))))
 
 (executable
   (name squirrel)
