@@ -29,14 +29,14 @@ The body of a process is defined with sequential or parallel composition of comm
 ..  prodn::
     process_id ::= @identifier
     alias ::= @identifier
-    proc ::= command; proc
-        | proc | proc
-	| if term then proc else proc
-	| try find @binders such that @term in proc else proc
-	| let @identifier = term in proc
-	| !_@identifier proc
+    proc ::= @command; @proc
+        | @proc | @proc
+	| if @term then @proc else @proc
+	| try find @binders such that @term in @proc else @proc
+	| let @identifier = @term in @proc
+	| !_@identifier @proc
 	| @process_id[({*, @term})]
-	| @alias : proc
+	| @alias : @proc
     process_decl ::= process @process_id[({*, @binders})] = @proc	
 
 The construct :g:`A : proc` does not have any impact on the semantics of the model: it is only used to give an alias to this location in the process.	
