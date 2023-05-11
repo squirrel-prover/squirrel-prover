@@ -62,6 +62,9 @@ type pp = [ `Prompt | `Start | `Result | `Error
 (** Print with the printer's standard formatter w.r.t. a given markup. *)
 val prt : pp -> ('a, Format.formatter, unit) format -> 'a
 
+(** Print for html with the printer's standard formatter w.r.t. a given markup. *)
+val prthtml : pp -> ('a, Format.formatter, unit) format -> 'a
+
 (** Default printing on the printer's standard formatter. *)
 val pr : ('a, Format.formatter, unit) format -> 'a
 

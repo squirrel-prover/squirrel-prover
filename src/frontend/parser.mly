@@ -1159,7 +1159,6 @@ interactive:
 | t=search_query     { ProverLib.Prover (Search t) }
 | PROOF              { ProverLib.Prover Proof }
 | i=p_include        { ProverLib.Prover (Include i) }
-| QED                { ProverLib.Prover Qed }
 | g=goal             { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }
 | EOF                { ProverLib.Prover EOF }

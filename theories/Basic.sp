@@ -22,14 +22,26 @@ Proof.
   by rewrite eq_refl_e.
 Qed.
 
-goal [any] neq_irefl ['a] (x : 'a) : (x <> x) <=> false.
+goal [any] neq_irrefl ['a] (x : 'a) : (x <> x) <=> false.
 Proof. by split. Qed.
-hint rewrite neq_irefl.
+hint rewrite neq_irrefl.
+
+
+goal [any] eq_assoc (b0,b1,b2: boolean) : ((b0 = b1) = b2) = (b0 = (b1 = b2)).
+Proof. 
+(* smaller proof if put after section true/false *)
+assert((true = false) = false) as true_false by rewrite eq_iff.
+assert((false = true) = false) as false_true by rewrite eq_iff.
+case b0; case b1; case b2; try auto. by rewrite true_false. by rewrite false_true. 
+Qed.
+ 
+
 
 (*------------------------------------------------------------------*)
 (* true/false *)
 
-axiom [any] true_false : (true = false) = false.
+goal [any] true_false : (true = false) = false.
+Proof. by rewrite eq_iff. Qed.
 hint rewrite true_false.
 
 goal [any] false_true : (false = true) = false.
@@ -126,6 +138,11 @@ goal [any] and_false_r (b : boolean) : (b && false) = false.
 Proof. by rewrite and_comm and_false_l. Qed.
 hint rewrite and_false_r.
 
+
+goal [any] and_double (b:boolean) : (b && b) = b.
+Proof.  by case b. Qed.
+
+
 (*------------------------------------------------------------------*)
 (* or *)
 axiom [any] or_comm (b,b' : boolean) : (b || b') = (b' || b).
@@ -146,6 +163,10 @@ hint rewrite or_true_l.
 goal [any] or_true_r (b : boolean) : (b || true) = true.
 Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
+
+goal [any] or_double (b:boolean) : (b || b) = b.
+Proof. by case b. Qed.
+
 
 (*------------------------------------------------------------------*)
 (* impl *)
@@ -544,3 +565,43 @@ Proof.
   + intro [x H] H'.
     by exists x.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* Order *)
+
+axiom [any] le_trans    ['a] (x,y,z : 'a) : x <= y => y <= z => x <= z.
+axiom [any] lt_trans    ['a] (x,y,z : 'a) : x < y  => y < z  => x < z.
+axiom [any] lt_le_trans ['a] (x,y,z : 'a) : x < y  => y <= z => x < z.
+axiom [any] le_lt_trans ['a] (x,y,z : 'a) : x <= y => y < z  => x < z.
+
+axiom [any] lt_charac ['a] (x,y : 'a) : x < y <=> (x <> y && x <= y).
+
+axiom [any] le_not_lt_impl_eq ['a] (x,y : 'a) : x <= y => not (x < y) => x = y.
+
+goal [any] lt_impl_le ['a] (x,y : 'a) : x < y => x <= y.
+Proof. by rewrite lt_charac. Qed.
+
+goal [any] not_lt_refl ['a] (x:'a) : not (x < x).
+Proof. auto. Qed.
+
+goal [any] lt_irrefl ['a] (x : 'a) : x < x <=> false.
+Proof. auto. Qed.
+
+(* The next lemma could be strengthened as an equivalence for all
+   types except timestamps. *)
+axiom [any] le_impl_eq_lt ['a] (x,y : 'a) : x <= y => (x = y || x < y).
+
+(* The ordering is not well-behaved on timestamps,
+   hence some properties do not hold on all types;
+   specific lemmas are given below for useful types. *)
+axiom [any] le_refl_index (x:index) : x <= x.
+goal [any] le_refl_index_eq (x:index) : (x <= x) = true.
+Proof.
+  by rewrite le_refl_index.
+Qed.
+hint rewrite le_refl_index_eq.
+
+goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
+Proof. by rewrite eq_iff. Qed.
+
+axiom [any] le_lt ['a] (x, x' : 'a): x <> x' => (x <= x') = (x < x').

@@ -55,7 +55,7 @@
       (pgocaml	 "PG-OCaml" "pgml")
       (pghaskell "PG-Haskell" "pghci")
 
-      (squirrel "squirrel" "sp")
+      (squirrel "Squirrel" "sp")
       
       ;; Incomplete/obsolete:
 

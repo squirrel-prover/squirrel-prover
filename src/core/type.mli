@@ -59,6 +59,9 @@ val equal : ty -> ty -> bool
 
 val is_tuni : ty -> bool
 
+(** Are the element of the type all encodable as bit-strings *)
+val is_bitstring_encodable : ty -> bool
+
 (*------------------------------------------------------------------*)
 val free_univars      : ty      -> Ident.Sid.t 
 val free_univars_list : ty list -> Ident.Sid.t 

@@ -2251,7 +2251,7 @@ module E = struct
       and check2 =
         known_set_check_impl_auto table hyp cond
       and check3 = 
-          known_set_check_exec_case table global_hyps cond
+        known_set_check_exec_case table global_hyps cond
       in check1 || check2 || check3
     in
     List.for_all check_one (Term.decompose_ands cond)

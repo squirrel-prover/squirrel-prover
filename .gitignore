@@ -15,14 +15,15 @@ output.tex
 *.toc
 *.synctex.gz
 *.out
-squirrel*
+./squirrel.exe
+squirrel
 sanity
 /tex/auto/*.el
 *.fdb_latexmk
 *.fls
 _coverage/
 _opam/
-static/
+node_modules/
 *.coverage
 /src/commit.ml
 .DS_Store
@@ -33,5 +34,8 @@ static/
 *.exrc
 *.\#*.sp
 .venv/
-jsexport.bc.js
-jsexport.bc-for-jsoo
+*.bc.js
+*.bc-for-jsoo
+package-lock.json
+app/static/client.js binary
+app/static/editor.bundle.js binary

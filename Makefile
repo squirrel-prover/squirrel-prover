@@ -35,7 +35,7 @@ NC=\033[0m
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/basic-tutorial/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
 BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
 okfail: squirrel
@@ -47,7 +47,7 @@ okfail: squirrel
 okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; \
     rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
@@ -60,7 +60,7 @@ bench_preamble:
 
 # Populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 tac_count_examples: squirrel
-	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@for example in $(PROVER_EXAMPLES); do \
 		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
 		mkdir -p `dirname $${stat_name}`;\
@@ -77,7 +77,7 @@ tac_count_examples: squirrel
 # README → /usr/bin/time is not always installed by default in your OS !
 # In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
-	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running bench onCounting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for example in $(PROVER_EXAMPLES); do \
@@ -133,14 +133,14 @@ $(BENCHDIR)/all/last.json:
 example: squirrel
 	@rm -rf `$(RUNLOGDIR)/examples`
 	@$(ECHO) "================== EXAMPLES ======================"
-	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All examples passed successfully. ; fi
 
@@ -162,9 +162,10 @@ alcotest: version
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
 	@dune build @mytest
-	@if cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -q "^[^│] \[FAIL\]" ; \
+	@python3 ./sed.py $(TESTS_OUT) /tmp/tests.output
+	@if cat /tmp/tests.output | grep -q "^[^│] \[FAIL\]" ; \
 		then echo "${RED}Alcotests FAILED :${NC}" ; \
-		  cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
+		  cat /tmp/tests.output | grep -E --color "^[^│] \[FAIL\]" ; \
 			exit 1; \
 		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
@@ -357,10 +358,13 @@ APPDIR=app/
 .PHONY: start
 start: ## Serve the application with a local HTTP server
 	dune build $(APPDIR)client/client.bc.js
-	mkdir -p static
-	rm -f static/client.js
-	cp _build/default/$(APPDIR)client/client.bc.js static/client.js
-	cp ./scripts/visualisation/visualisation_style.css static/.
+	mkdir -p $(APPDIR)static
+	rm -f $(APPDIR)static/client.js
+	rm -f $(APPDIR)static/editor.bundle.js
+	cp _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
+	# node_modules/.bin/rollup $(APPDIR)client/editor.mjs -f iife --output.name MyBundle \
+	# -o $(APPDIR)static/editor.bundle.js -p @rollup/plugin-node-resolve
+	npm run prepare
 	dune exec $(APPDIR)server/server.exe
 
 .PHONY: watch

@@ -185,7 +185,7 @@ Proof.
   intro i j Hh Hc.
   expand cond.
   euf Hc.
-  intro *; by exists k.
+  intro [k _]; by exists k.
 Qed.
 
 (*```

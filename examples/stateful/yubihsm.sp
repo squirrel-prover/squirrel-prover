@@ -246,35 +246,6 @@ hint rewrite dec_enc.
 goal [any] dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
 
-(* Others *)
-
-goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
-Proof.
-  by rewrite eq_iff.
-Qed.
-
-goal [any] le_not_lt (t, t' : timestamp):
-  t <= t' => not (t < t') => t = t'.
-Proof.
-  by case t' = init.
-Qed.
-
-goal [any] le_not_lt_charac (t, t' : timestamp):
- (not (t < t') && t <= t') = (happens(t) && t = t').
-Proof.
- by rewrite eq_iff.
-Qed.
-
-goal [any] lt_impl_le (t, t' : timestamp):
-  t < t' => t <= t'.
-Proof. auto. Qed.
-
-goal le_lt (t, t' : timestamp):
-  t <> t' => (t <= t') = (t < t').
-Proof.
-  by intro *; rewrite eq_iff.
-Qed.
-
 (*------------------------------------------------------------------*)
 (* HELPING LEMMAS - counter increase *)
 
@@ -392,8 +363,8 @@ goal monotonicity (j, j', pid:index):
 Proof.
   intro Hap [_ _ H].
   assert
-    (Server(pid,j) = Server(pid,j') || 
-     Server(pid,j)< Server(pid,j') || 
+    (Server(pid,j) = Server(pid,j') ||
+     Server(pid,j)< Server(pid,j') ||
      Server(pid,j) > Server(pid,j')) as Ht;
   1: constraints.
   case Ht.
@@ -535,8 +506,9 @@ Proof.
        by apply ~inductive Hind (pred(t)))).
 
   + (* init *)
-    rewrite /*. 
+    rewrite /*.
     by rewrite if_false in 1.
+
   + (* Setup(pid) *)
     repeat destruct Eq as [_ Eq].
     splitseq 2: (fun (pid0 : index) => pid = pid0).
@@ -551,54 +523,55 @@ Proof.
           * case U. by rewrite if_false. by destruct U as [_ _].
 
       - rewrite if_then_then in 3.
-        assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H. {
+        assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t))
+        as H. {
           intro pid0; case pid = pid0 => _ /=.
-        by rewrite eq_iff.
-        by rewrite le_lt.
-      }.
+          by rewrite eq_iff.
+          by rewrite le_lt.
+        }.
 
-      rewrite /= H -le_pred_lt in 3.
-      rewrite /AEAD in 1.
-      fa 1.
-      rewrite /AEAD in 4.
-      rewrite /* in 0.
-      cca1 2; [1:auto]. 
-      rewrite !len_pair len_diff in 2.
-      rewrite namelength_k namelength_k_dummy diff_refl in 2.
-
-      remember
-        zeroes (namelength_message ++ (len (mpid pid) ++ len (sid pid) ++ c_pair) ++ c_pair)
-        as tlen => Eq_len.
-      (* transitivity reasoning, to get rid of the key *)
-      trans 2 : enc (tlen, rinit(pid), keyFresh). 
-      * have ->:
-         diff(
-           enc (tlen, rinit(pid), mkey),
-           enc (tlen, rinit(pid), keyFresh)) 
-         =
-         enc (tlen, rinit(pid), diff(mkey,keyFresh))
-        by project. 
-        rewrite Eq_len; enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh; 1: auto. 
-        
-        fa 2; fa 2.
-        fresh 4; 1:auto. 
-        fresh 3; 1:auto.
+        rewrite /= H -le_pred_lt in 3.
+        rewrite /AEAD in 1.
+        fa 1.
+        rewrite /AEAD in 4.
         rewrite /* in 0.
-        by apply Hind (pred t).
-        
-        (* rewrite (diff_apply enc) in 2. *) (* TODO: anomaly *)
-        (*  *)
-      * have ->:
-          diff(
-            enc (tlen, rinit(pid), keyFresh),
-            enc (tlen, rinit(pid), mkey)) 
-          =
-          enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project. 
-        rewrite Eq_len; enckp 2; 1: auto. 
-        fa 2; fa 2.
-        fresh 4; 1:auto.  
-        fresh 3; 1:auto.
-        refl.
+        cca1 2; [1:auto].
+        rewrite !len_pair len_diff in 2.
+        rewrite namelength_k namelength_k_dummy diff_refl in 2.
+
+        remember
+          zeroes (namelength_message ++ (len (mpid pid) ++ len (sid pid) ++ c_pair) ++ c_pair)
+          as tlen => Eq_len.
+        (* transitivity reasoning, to get rid of the key *)
+        trans 2 : enc (tlen, rinit(pid), keyFresh).
+        * have ->:
+           diff(
+             enc (tlen, rinit(pid), mkey),
+             enc (tlen, rinit(pid), keyFresh))
+           =
+           enc (tlen, rinit(pid), diff(mkey,keyFresh))
+          by project.
+          rewrite Eq_len;
+            enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh;
+            1: auto.
+
+          fa 2; fa 2.
+          fresh 4; 1:auto.
+          fresh 3; 1:auto.
+          rewrite /* in 0.
+          by apply Hind (pred t).
+        * have ->:
+            diff(
+              enc (tlen, rinit(pid), keyFresh),
+              enc (tlen, rinit(pid), mkey))
+            =
+            enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project.
+          rewrite Eq_len; enckp 2; 1: auto.
+          fa 2; fa 2.
+          fresh 4; 1:auto.
+          fresh 3; 1:auto.
+          refl.
+
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
     rewrite /AEAD in 1.
@@ -609,12 +582,12 @@ Proof.
 
     rewrite valid_decode_charac //.
     (* rewrite the content of the then branch *)
-    rewrite /otp_dec /aead_dec if_aux /= in 2. 
+    rewrite /otp_dec /aead_dec if_aux /= in 2.
     fa 2.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
-    memseq 1 6; 1: by exists pid; rewrite if_true.
     rewrite diff_refl => /=.
+    rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //.
     by apply Hind (pred(t)).
 
   + (* Decode1(pid,j) *)
@@ -627,7 +600,7 @@ Proof.
     rewrite valid_decode_charac //.
     rewrite /otp /aead.
     fa _ && _, not (_), !_ && _. fa 1.
-    memseq 1 5; 1: by exists pid; rewrite if_true.
+    rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //.
     by apply  Hind (pred(t)).
 Qed.
 
@@ -656,16 +629,16 @@ Proof.
     + by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
-axiom sctr_nhap (i : index, t' : timestamp) : 
+axiom sctr_nhap (i : index, t' : timestamp) :
    not (happens(t')) => SCtr(i)@t' = empty.
 
-axiom yctr_nhap (i : index, t' : timestamp) : 
+axiom yctr_nhap (i : index, t' : timestamp) :
    not (happens(t')) => YCtr(i)@t' = empty.
 
 (* default value of `exec` at timestamp not in the trace. Left arbitrary. *)
 abstract exec_dflt : boolean.
 
-axiom exec_nhap (t' : timestamp) : 
+axiom exec_nhap (t' : timestamp) :
    not (happens(t')) => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
@@ -679,8 +652,8 @@ global goal equiv_real_ideal_enrich_tmax :
   )).
 Proof.
   use equiv_real_ideal_enrich_tmax0 as [Hap C U].
-  split; 1: auto. 
-  split; 1: auto. 
+  split; 1: auto.
+  split; 1: auto.
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
     {intro t'; rewrite eq_iff.
     by split; 2: intro _; apply C.}
@@ -695,7 +668,7 @@ Proof.
     (fun (i : index, t' : timestamp) => happens(t')) zero
     (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
     +  auto.
-    +   split; intro i t' _. 
+    +   split; intro i t' _.
        - by rewrite if_false.
        - by rewrite if_true // sctr_nhap.
 
@@ -747,8 +720,8 @@ goal [default/left] injective_correspondence (j, pid:index[glob]):
          exec@Server(pid,j') =>
          YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') =>
          j = j'.
-Proof. 
-  intro Hap. 
+Proof.
+  intro Hap.
   rewrite equiv injective_correspondence_equiv pid j => // Hexec.
   executable Server(pid,j) => //.
   intro exec.
@@ -768,12 +741,12 @@ Proof.
   assert (Server(pid,j) = Server(pid,j') ||
           Server(pid,j) < Server(pid,j') ||
           Server(pid,j) > Server(pid,j')) => //.
-  case H;1: auto. 
+  case H;1: auto.
 
   + (* 1st case: Server(pid,j) < Server(pid,j') *)
     assert (Server(pid,j) = pred(Server(pid,j')) ||
             Server(pid,j) < pred(Server(pid,j'))) by constraints.
-    case H0. 
+    case H0.
 
     - (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
       use counterIncreaseStrictly with pid, j'; 2: auto.
@@ -781,8 +754,8 @@ Proof.
         by apply orderStrict in Meq.
       * rewrite /cond.
         destruct Hexec' as [H1 H2 H3 H4 H5].
-        split; 1:congruence. 
-        by rewrite H3 H4 H5. 
+        split; 1:congruence.
+        by rewrite H3 H4 H5.
 
     - (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *)
       use counterIncreaseStrictly with pid, j' => //.
@@ -809,9 +782,9 @@ Proof.
         by apply orderStrict in H1.
       * rewrite /cond. split; 1:congruence.
         clear Hexec' exec Eq Eq2 Meq Ht Hexecpred.
-        split; 1: by rewrite Mneq2. 
-        split; 1: by rewrite Hcpt. 
-        by rewrite Hpid. 
+        split; 1: by rewrite Mneq2.
+        split; 1: by rewrite Hcpt.
+        by rewrite Hpid.
 
     - (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)
       use counterIncreaseStrictly with pid, j => //.

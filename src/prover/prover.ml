@@ -1,5 +1,4 @@
 open Squirrelcore
-open Squirrelfront
 module Sv = Vars.Sv
 
 (*------------------ Prover ----------------------------------*)
@@ -268,13 +267,33 @@ let tactic_handle (ps:state) = function
  | ProverLib.Brace `Open  -> open_brace ps
  | ProverLib.Brace `Close -> close_brace ps
  | ProverLib.BTactic utac  -> eval_tactic utac ps
+
+let do_tactic ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : state =
+  begin match check with
+    | `NoCheck -> assert (state.prover_mode = WaitQed)
+    | `Check   -> 
+      if state.prover_mode <> ProverLib.ProofMode then
+        Command.cmd_error Unexpected_command;
+  end;
+
+  match check with
+  | `NoCheck -> state
+  | `Check   ->
+    let state = 
+      begin 
+        try List.fold_left tactic_handle state l
+        with
+          | e -> 
+            raise e
+      end in
+    try_complete_proof state
 (* }↑} *)
 (*--------------------- Printings         ------------------*)(* {↓{ *)
 let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
-  | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
+  | Some _, [] -> Fmt.pf ppf "No subgoals remaining.@."
   | Some _, j :: _ ->
-    Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]@."
+    Fmt.pf ppf "Focused goal (1/%d):@;%a@;@."
       (List.length ps.subgoals)
       Goal.pp j
   | _ -> assert false
@@ -495,29 +514,19 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
 
-let get_prover_command = function
-  | ProverLib.Prover c -> c
-  | _ -> assert false
-
-let command_from_string (st:state) (s:string) = 
-  if st.prover_mode = ProverLib.ProofMode 
-  then
-    Parser.top_proofmode Lexer.token (Lexing.from_string s)
-  else
-    Parser.interactive Lexer.token (Lexing.from_string s)
-
 (* Command handlers *)(* {↓{ *)
-let rec do_command (state:state) (command:ProverLib.prover_input) : state =
+let rec do_command ?(check=`Check) (state:state) (command:ProverLib.prover_input)
+ : state =
   match command with
   | InputDescr decls -> fst (add_decls state decls)
-  | Tactic l         -> List.fold_left tactic_handle state l
+  | Tactic l         -> do_tactic ~check state l
   | Print q          -> do_print state q; state
   | Search t         -> do_search state t; state
   | Qed              -> complete_proof state
   | Hint h           -> add_hint state h
   | SetOption sp     -> set_param state sp
   | Goal g           -> add_new_goal state g
-  | Proof            -> snd (start_proof state `Check)
+  | Proof            -> snd (start_proof state check)
   | Abort            -> abort state
   | Include i        -> do_include state i
   | EOF              -> do_eof state
@@ -525,26 +534,28 @@ and do_include (st:state) (i: ProverLib.include_param) : state =
   (* `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
   let file = Driver.locate load_paths (Location.unloc i.th_name) in
-  do_all_commands_in ~test:true st file
-and do_all_commands_in ~test (st:state) (file:Driver.file) : state =
-  match Driver.next_input ~test file st.prover_mode with
-  | ProverLib.Prover EOF -> do_eof st
-  | cmd -> do_all_commands_in ~test
-             (do_command st (get_prover_command cmd)) file
-and exec_command (s:string) (st:state) : state  = 
-  let input = command_from_string st s in
-  do_command st (get_prover_command input)
-and exec_all (st:state) (s:string) = 
-  let commands = List.filter 
-      (function | "" -> false | _ -> true) 
-      (String.split_on_char '.' s) in
-  List.fold_left (fun st s -> 
-      exec_command (s^".") st) st commands
+  let st = 
+    try do_all_commands_in ~check:`NoCheck ~test:true st file with
+      x -> Driver.close_chan file.f_chan; raise x 
+  in
+  st
+and do_all_commands_in ~check ~test (st:state) (file:Driver.file) : state =
+  match Driver.next_input_file ~test file st.prover_mode with
+  | ProverLib.Prover EOF -> if test then st else do_eof st
+  | cmd -> do_all_commands_in ~check ~test
+             (do_command ~check st (ProverLib.get_prover_command cmd)) file
+and exec_command ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+  (* let input = Parserbuf.command_from_string st.prover_mode s in *)
+  let input = Driver.next_input_file ~test (Driver.file_from_str s) st.prover_mode in
+  do_command ~check st (ProverLib.get_prover_command input)
+and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
+  let file_from_string = Driver.file_from_str s in
+  do_all_commands_in ~check ~test st file_from_string 
 (* }↑} *)
 
 (* run entire squirrel file with given path as string *)
 let run ?(test=false) (file_path:string) : unit =
   match Driver.file_from_path LP_none 
           (Filename.remove_extension file_path) with
-  | Some file -> let _ = do_all_commands_in ~test (init ()) file in ()
+  | Some file -> let _ = do_all_commands_in ~check:`Check ~test (init ()) file in ()
   | None -> failwith "File not found !" 

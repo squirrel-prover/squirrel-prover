@@ -9,7 +9,7 @@ let search_unify () =
   Alcotest.check_raises "unify Names with special arity when search" Ok
     (fun () ->
       let st = Prover.init () in
-      let st = try Prover.exec_all st
+      let st = try Prover.exec_all ~test:true st
         "channel c
         system [T] (S : !_i !_i new n; out(c,n)).
         goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
@@ -49,13 +49,13 @@ let search_about_1 () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_command 
+    Prover.exec_command ~test:true 
         "channel c
         system [T] (S : !_i new n; out(c,n))." st
-    |> Prover.exec_command
+    |> Prover.exec_command ~test:true
          "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
-  |> Prover.exec_command "Proof."
-  |> Prover.exec_command "search happens(_)."
+  |> Prover.exec_command ~test:true "Proof."
+  |> Prover.exec_command ~test:true "search happens(_)."
   in
   let matches = Prover.search_about st 
       (ProverLib.Srch_term (term_from_string "happens(_)"))
@@ -65,8 +65,8 @@ let search_about_1 () =
 
   Alcotest.(check' int) ~msg:"Found one pattern happens(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
-  let st = Prover.exec_command "auto." st
-  |> Prover.exec_command "Qed."
+  let st = Prover.exec_command ~test:true "auto." st
+  |> Prover.exec_command ~test:true "Qed."
   in
   let pprint_option ppf = function 
     | Some s -> Fmt.pf ppf "%s" s
@@ -83,7 +83,7 @@ let search_about_1 () =
   Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
-  let _ =  Prover.exec_command "search n(_)." st in
+  let _ =  Prover.exec_command ~test:true "search n(_)." st in
   ()
 
 (*------------------------------------------------------------------*)
@@ -92,7 +92,7 @@ let search_about_2 () =
   let exception Ko in
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
-  let st = Prover.exec_all st 
+  let st = Prover.exec_all ~test:true st 
     "channel c
     name n : index->message
     system [S] (A : out(c,diff(zero,empty))).
@@ -104,14 +104,14 @@ let search_about_2 () =
   in
   Alcotest.check_raises "search fail without context 1" Ok
       (fun () ->
-        let _ = try Prover.exec_command "search input@A." st with
+        let _ = try Prover.exec_command ~test:true "search input@A." st with
           | Squirrelcore.Theory.Conv _ -> raise Ok in raise Ko);
   Alcotest.check_raises "search fail without context 2" Ok
       (fun () ->
-        let _ = try Prover.exec_command "search output@A." st with
+        let _ = try Prover.exec_command ~test:true "search output@A." st with
           | Squirrelcore.Theory.Conv _ -> raise Ok in raise Ko);
-  let _ = Prover.exec_command "search input@A in [S]." st in
-  let _ = Prover.exec_command "search output@A in [S]." st in
+  let _ = Prover.exec_command ~test:true "search input@A in [S]." st in
+  let _ = Prover.exec_command ~test:true "search output@A in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "output@A"),
                            sexpr_from_string "[S]"))
@@ -119,9 +119,9 @@ let search_about_2 () =
   Alcotest.(check int) "Found one lemma with output@A"
     1 (List.length matches);
   (* works but no matches *)
-  let _ = Prover.exec_command "search <_,_>." st in
-  let _ = Prover.exec_command "search (_,_)." st in
-  let st = Prover.exec_all st
+  let _ = Prover.exec_command ~test:true "search <_,_>." st in
+  let _ = Prover.exec_command ~test:true "search (_,_)." st in
+  let st = Prover.exec_all ~test:true st
     "global goal [S] myeq : equiv(true).
     Proof.
       admit.
@@ -133,7 +133,7 @@ let search_about_2 () =
   in
   Alcotest.(check' int) ~msg:"Found one lemma with equiv(_)"
     ~expected:1 ~actual:(List.length matches);
-  let _ = Prover.exec_command "search true in [S]." st in
+  let _ = Prover.exec_command ~test:true "search true in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "true"),
                            sexpr_from_string "[S]"))
@@ -141,7 +141,7 @@ let search_about_2 () =
   Alcotest.(check' int) ~msg:"Found one lemma with true"
     ~expected:1 ~actual:(List.length matches);
   (* Should print ↓ *)
-  let _ = Prover.exec_command "print myeq." st in
+  let _ = Prover.exec_command ~test:true "print myeq." st in
   ()
 
 (*------------------------------------------------------------------*)
@@ -150,7 +150,7 @@ let search_about_type_holes_1 () =
   Alcotest.check_raises "search with type holes 1" Ok
     (fun () ->
       let st = Prover.init () in
-      let st = try Prover.exec_all st
+      let st = try Prover.exec_all ~test:true st
         "axiom [any] bar1 ['a] : exists (x : 'a), true.
          axiom [any] bar2 ['a] : exists (x : 'a -> 'a), true."
       with e -> raise e in
@@ -178,7 +178,7 @@ let search_about_type_holes_2 () =
     Alcotest.check_raises "search with type holes 2" Ok
     (fun () ->
       let st = Prover.init () in
-      let st = try Prover.exec_all st
+      let st = try Prover.exec_all ~test:true st
         "axiom [any] foo ['a] (phi:'a -> bool) :
          (not (exists (a:'a), (phi a))) = (forall (a:'a), not (phi a)).
 
@@ -226,7 +226,7 @@ let include_search () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_all st
+    Prover.exec_all ~test:true st
         "include Basic.
         channel c
         system [T] (S : !_i new n; out(c,n)).
@@ -241,8 +241,8 @@ let include_search () =
 
   Alcotest.(check' int) ~msg:"Found one pattern happens(_) in lemma"
     ~expected:1 ~actual:(List.length (snd (List.hd matches)));
-  let st = Prover.exec_command "auto." st
-  |> Prover.exec_command "Qed."
+  let st = Prover.exec_command ~test:true "auto." st
+  |> Prover.exec_command ~test:true "Qed."
   in
   let pprint_option ppf = function 
     | Some s -> Fmt.pf ppf "%s" s
@@ -271,7 +271,7 @@ let include_ite () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_all st
+    Prover.exec_all ~test:true st
         "
         goal [any] if_true ['a] (b : boolean, x,y : 'a):
          b => if b then x else y = x.
@@ -310,7 +310,7 @@ let include_ite () =
         goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
         Proof.
          admit.
-        Qed"
+        Qed."
   in
   let matches = Prover.search_about st
       (ProverLib.Srch_inSys ((term_from_string "happens(_)"),

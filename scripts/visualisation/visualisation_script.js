@@ -116,7 +116,7 @@ class Reader {
     if (xmlhttp.status==200) {
       result = JSON.parse(xmlhttp.responseText);
     } else {
-      result = { "error": "Server not responding" };
+      result = { "error": "Server not connected" };
     }
     return result;
   }
@@ -607,8 +607,8 @@ class Visualisation {
     */
   constructor(config) {
     this.config = config;
-    this.titleSelection = d3.select("body")
-      .append("h1");
+    this.titleSelection = d3.select("div#visu-panel")
+      .append("h3");
     this.scene = null;
 
     this.reader = new Reader(config.address);
@@ -616,18 +616,24 @@ class Visualisation {
     
     this.es = new EventSource("events");
     this.es.addEventListener("update", event => this.importData());
+
+    this.ejs = new Event("update");
+    document.getElementById("body")
+      .addEventListener("update", event => this.importData(event.detail));
   }
   
   /** Get data from the reader.
     * Update content of the title and the scene accordingly.
     */
-  importData() {
-    const data = this.reader.data;
+  importData(data=null) {
+    console.log(data)
+    if(!data)
+      data = this.reader.data;
     if (data.error) {
       this.titleSelection.html(data.error);
       this.deleteScene(this.config);
     } else {
-      this.titleSelection.html("Visualisation");
+      this.titleSelection.html("");
       this.plotScene(data);
     }
   }
@@ -638,7 +644,7 @@ class Visualisation {
     */
   plotScene(data) {
     if (!this.scene) {
-      const svgSelection = d3.select("body").append("svg");
+      const svgSelection = d3.select("div#visu-panel").append("svg");
       this.scene = new Scene(svgSelection, config);
     }
     this.scene.plot(data);
@@ -656,5 +662,5 @@ class Visualisation {
 
 /* -------------------------------------------------------------------------- */
 
-const config = new Configuration("http://localhost:8080/dump.json", 20, 5, "80em", 200);
+const config = new Configuration("http://localhost:8080/dump.json", 10, 5, "40em", 200);
 const visu = new Visualisation(config);

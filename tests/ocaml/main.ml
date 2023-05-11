@@ -1,6 +1,7 @@
 (** Various tests... *)
 
 open Squirrelcore
+open Squirreltop
 open Squirrellib.Main
 
 let tactics =
@@ -35,7 +36,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/ts_leq_not_lt.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
 (* TODO: rework these tests.
    They were checking that the tactics failed as expected in cases
@@ -100,7 +101,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/capture.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
     "Not Depends", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -121,7 +122,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/completion_unsupported_term.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
     "Indexed abstract", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -139,13 +140,14 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/undo.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
     "Undo out of proof does not assert false", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/undo_proof.sp" with
-           | Unfinished -> raise Ok)
+           (* parser.interactive does not accept Qed anymore *)
+           | Squirrelfront.Parser.Error -> raise Ok)
     end 
   ] 
 
@@ -158,7 +160,7 @@ let equivalence =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/fresh_frame.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
     "Fresh System", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -201,7 +203,7 @@ let equivalence =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/pred.sp" with
-           | Unfinished -> raise Ok)
+           | TopLevel.Unfinished -> raise Ok)
     end ;
     "DDH not PQ Sound", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

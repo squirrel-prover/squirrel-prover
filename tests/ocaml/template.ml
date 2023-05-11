@@ -2,11 +2,13 @@
 
 module Prover = Squirrelprover.Prover
 
+module ProverLib = Squirrelcore.ProverLib
+
 let template_test () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_all st
+    Prover.exec_all ~check:`Check ~test:true st
         "channel c
         system S : !_i new n; out(c,n).
         goal foo (i:index) : happens(S(i)) => output@S(i) = n(i).
@@ -22,9 +24,18 @@ let template_test () =
   (* assert (Prover.current_goal_name st = Some "foo"); *)
   Alcotest.(check bool) "Subgoals empty" 
     ((Prover.get_subgoals st)=[]) true;
-  (* assert (Prover.get_subgoals st = []); *)
 
-  let st = Prover.exec_command "Qed." st in
+  Alcotest.(check' bool) 
+    ~msg:"is proof completed ?" 
+    ~expected:true
+    ~actual:(Prover.is_proof_completed st);
+
+  Alcotest.(check' bool) 
+    ~msg:"mode is WaitQed ?" 
+    ~expected:true
+    ~actual:((Prover.get_mode st) = ProverLib.WaitQed);
+
+  let st = Prover.exec_command ~check:`Check ~test:true "Qed." st in
   (* assert (Prover.current_goal_name st = None) *)
   Alcotest.(check some_testable) "Goal name" 
     (Prover.current_goal_name st) (None)

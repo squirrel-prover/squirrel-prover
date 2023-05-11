@@ -265,7 +265,7 @@ val make_global :
 val make_exact : 'a genv -> Type.ty -> string -> 'a -> ('a genv * var) option
 
 (*------------------------------------------------------------------*)
-(** Create a new variable whose name resemble the one given in argument.  *)
+(** Create a new variable whose name resembles the one given in argument. *)
 val make_approx : 'a genv -> var -> 'a -> 'a genv * var
 
 (** Stateful version of [make_approx]. *)
@@ -282,7 +282,7 @@ val make_approx_r : 'a genv ref -> var -> 'a -> var
     exception of pattern holes [_]) *)
 val refresh : var -> var
 
-(** Make a new variable with a given name. Caveats of [refresh] applies! *)
+(** Make a new variable with a given name. Caveats of [refresh] apply! *)
 val make_fresh : Type.ty -> string -> var
 
 

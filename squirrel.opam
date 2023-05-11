@@ -1,7 +1,7 @@
 opam-version: "2.0"
 name: "squirrel"
 synopsis: "The Squirrel Prover is a proof assistant for protocols, based on first-order logic and provides guarantees in the computational model"
-version: "0.15"
+version: "0.16"
 homepage: "https://squirrel-prover.github.io/"
 bug-reports: "https://github.com/squirrel-prover/squirrel-prover/issues"
 maintainer: "Charlie Jacomme <charlie.jacomme@cispa.de>"
@@ -13,24 +13,23 @@ build: [
 ]
 
 depends: [
-  "ocaml" {>= "4.10"}
+  "ocaml" {= "5.0.0"}
   "fmt" {>= "0.8.7"}
   "ocamlgraph"
   "alcotest"
   "ppx_inline_test"
   "menhir" {>= "20180523"}
   "menhirLib"
-  "js_of_ocaml"
   "conf-which" {build}
-  "js_of_ocaml"
-  "js_of_ocaml-ppx"
-  "js_of_ocaml-lwt"
-  "yojson"
 ]
 
 depopts: [
   "why3"
   "alt-ergo"
+  "js_of_ocaml"
+  "js_of_ocaml-tyxml"
+  "ppx_deriving_yojson"
+  "dream"
 ]
 
 install: [make "PREFIX=%{prefix}%" "install"]

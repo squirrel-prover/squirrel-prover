@@ -97,8 +97,21 @@ let rec fv = function
 (*------------------------------------------------------------------*)
 let mk_quant0_tagged q (evs : Vars.tagged_vars) f = match evs, f with
   | [], _ -> f
-  | _, Quant (q, evs', f) -> Quant (q, evs @ evs', f)
+  | _, Quant (q', evs', f) when q = q' -> Quant (q, evs @ evs', f)
   | _, _ -> Quant (q, evs, f)
+
+let%test_unit _ =
+  let f = Atom (Equiv []) in
+  let v1 = [Vars.make_fresh Type.Message "x",Vars.Tag.ltag] in
+  let v2 = [Vars.make_fresh Type.Message "y",Vars.Tag.ltag] in
+  assert (mk_quant0_tagged ForAll [] f = f) ;
+  assert (mk_quant0_tagged ForAll v1 f = Quant (ForAll,v1,f)) ;
+  assert (f |> mk_quant0_tagged ForAll v2
+            |> mk_quant0_tagged ForAll v1 =
+          Quant (ForAll, v1@v2, f)) ;
+  assert (f |> mk_quant0_tagged ForAll v2
+            |> mk_quant0_tagged Exists v1 =
+          Quant (Exists,v1,Quant (ForAll,v2,f)))
 
 let mk_reach_atom f = Atom (Reach f)
 let mk_equiv_atom f = Atom (Equiv f)

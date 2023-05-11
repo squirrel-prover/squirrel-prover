@@ -16,27 +16,35 @@ type load_path =
 
 type load_paths = load_path list
 
+type t_chan = Channel of in_channel | String of string
+
 type file = {
+  f_chan   : t_chan;                 (** channel *)
   f_name   : string;                     (** short name, no extention *)
-  f_path   : [`Stdin | `File of string]; (** file path *)
+  f_path   : [`Str | `Stdin | `File of string]; (** file path *)
   f_lexbuf : Lexing.lexbuf;
 }
 
 (** Print precise location error (to be caught by emacs) *)
 let pp_loc_error (file:file) ppf loc =
-  if !interactive then
-    match file.f_path with
-    | `Stdin ->
-      let lexbuf = Lexing.from_channel stdin in
-      let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
-      Fmt.pf ppf
-        "[error-%d-%d]@;"
-        (max 0 (loc.L.loc_bchar - startpos))
-        (max 0 (loc.L.loc_echar - startpos))
-    | `File f ->
-      let loc = { loc with L.loc_fname = f; } in
-      Fmt.pf ppf "%s:@;" (L.tostring loc)
-
+  match file.f_path with
+  | `Str ->
+    let lexbuf = file.f_lexbuf in
+    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    Fmt.pf ppf
+      "[error-%d-%d]@;"
+      (max 0 (loc.Location.loc_bchar - startpos))
+      (max 0 (loc.Location.loc_echar - startpos))
+  | `Stdin ->
+    let lexbuf = Lexing.from_channel stdin in
+    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    Fmt.pf ppf
+      "[error-%d-%d]@;"
+      (max 0 (loc.Location.loc_bchar - startpos))
+      (max 0 (loc.Location.loc_echar - startpos))
+  | `File f ->
+    let loc = { loc with Location.loc_fname = f; } in
+    Fmt.pf ppf "%s:@;" (Location.tostring loc)
 
 let pp_loc_error_opt (file:file) ppf = function
   | None -> ()
@@ -55,27 +63,41 @@ let get_lexbuf (file : file) : string * Lexing.lexbuf =
        messages are not acurate afterward. I do not understand why exactly (the
        lexer buffer positions must not be properly updated somewhere). *)
 
-    | `File _ -> file.f_lexbuf
+    | `Str | `File _ -> file.f_lexbuf
   in
   file.f_name ^ ".sp", lexbuf
 
-(** Get the next input from the current file. Driver *)
-let next_input ~test (file : file) (p_mode: ProverLib.prover_mode) :
-ProverLib.input =
-  let filename, lexbuf = get_lexbuf file in
+(** Get the next input from lexing buffer. Driver *)
+let next_input ~test ~filename (lexbuf:Lexing.lexbuf) (p_mode:
+  ProverLib.prover_mode) =
   Parserbuf.parse_from_buf
     ~test ~interactive:!interactive
-    (if p_mode = ProverLib.ProofMode then
+    (* ↓ can also be WaitQed since the parser can read intern tactics
+       and the prover will ignore them anyway in `NoCheck mode *)
+    (if (p_mode = ProverLib.ProofMode) || (p_mode = ProverLib.WaitQed) then
        Parser.top_proofmode
      else
        Parser.interactive)
     lexbuf ~filename
 
+(** Get the next input from the current file. Driver *)
+let next_input_file ~test (file : file) (p_mode: ProverLib.prover_mode) :
+ProverLib.input =
+  let filename, lexbuf = get_lexbuf file in
+  next_input ~test ~filename lexbuf p_mode
+
 (*--------------- Driver -------------------------------------------*)
 let file_from_stdin () : file =
-  { f_name = "#stdin";
+  { f_chan = Channel stdin;
+    f_name = "#stdin";
     f_path = `Stdin;
     f_lexbuf = Lexing.from_channel stdin; }
+
+let file_from_str (s:string) : file =
+  { f_chan = String s;
+    f_name = "#str";
+    f_path = `Str;
+    f_lexbuf = Lexing.from_string s; }
     
 (*--------------- Driver -------------------------------------------*)
 let file_from_path (dir : load_path) (partial_path : string) : file option =
@@ -89,7 +111,8 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
 
-    Some { f_name   = partial_path;
+    Some { f_chan   = Channel chan;
+           f_name   = partial_path;
            f_path   = `File path;
            f_lexbuf = lexbuf; }
   with
@@ -134,3 +157,7 @@ let mk_load_paths ~main_mode () : load_paths =
     | `File path -> LP_dir (Filename.dirname path)
   in
   [top_load_path; theory_load_path]
+
+let close_chan : t_chan -> unit = function
+  | Channel chan -> Stdlib.close_in_noerr chan
+  | String _ -> ()

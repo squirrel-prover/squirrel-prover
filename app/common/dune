@@ -3,6 +3,4 @@
   (modes byte native)
   (flags :standard -w -39)
   (library_flags (:standard -linkall))
-  (preprocess (staged_pps lwt_ppx ppx_import ppx_deriving_yojson))
-  (libraries squirrelprover squirrelcore squirreltactics js_of_ocaml-compiler
-    yojson ppx_deriving_yojson.runtime))
+  (libraries squirrelhtml squirrelprover squirrelcore squirreltactics js_of_ocaml-compiler))

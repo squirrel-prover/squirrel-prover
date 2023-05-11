@@ -1,0 +1,1238 @@
+
+@top Script { Sentence* }
+@skip { space | BlockComment }
+
+paraSep<content> {
+  "" | content (PARALLEL content)*
+}
+
+paraSep1<content> {
+  content (PARALLEL content)*
+}
+
+starSep1<content> {
+  content (STAR content)*
+}
+
+commaSep<content> {
+  "" | content (COMMA content)*
+}
+
+/* emptySep<content> { */
+/*   "" | content (empty content)* */
+/* } */
+
+emptySep<content> {
+  ""
+| content emptySep<content>
+}
+
+emptySep1<content> {
+  content emptySep<content>
+}
+
+commaSep1<content> {
+  content (COMMA content)*
+}
+
+lsymb { ID }
+
+empty { "" }
+
+kw<term> { @specialize[@name={term}]<ID, term> }
+
+//TODO split keywords in groups
+  NOT { kw<"not"> }
+  TRUE { kw<"True"> }
+  FALSE { kw<"False"> }
+  IF { kw<"if"> }
+  THEN { kw<"then"> }
+  ELSE { kw<"else"> }
+  LET { kw<"let"> }
+  XOR { kw<"XOR"> }
+  BY[@name=closing] { kw<"by"> }
+  ASSUMPTION[@name=closing] { kw<"assumption"> }
+  CONGRUENCE[@name=closing] { kw<"congruence"> }
+  CONSTRAINTS[@name=closing] { kw<"constraints"> }
+  CONST[@name=tackeyw] { kw<"const"> }
+  IN { kw<"in"> }
+  OUT { kw<"out"> }
+  NEW { kw<"new"> }
+  FIND { TRY kw<"find"> }
+  SUCHTHAT { kw<"such"> kw<"that"> }
+  PROCESS[@name=decl] { kw<"process"> }
+  ABSTRACT[@name=decl] { kw<"abstract"> }
+  ACTION[@name=decl] { kw<"action"> }
+  OP[@name=decl] { kw<"op"> }
+  TYPE[@name=decl] { kw<"type"> }
+  NAME[@name=decl] { kw<"name"> }
+  NAMELENGTH[@name=tackeyw] { kw<"namelength"> }
+  MUTABLE[@name=decl] { kw<"mutable"> }
+  SYSTEM[@name=decl] { kw<"system"> }
+  SET { kw<"set"> }
+  HASH[@name=decl] { kw<"hash"> }
+  AENC[@name=decl] { kw<"aenc"> }
+  SENC[@name=decl] { kw<"senc"> }
+  SIGNATURE[@name=decl] { kw<"signature"> }
+  INTRO[@name=tackeyw] { kw<"intro"> }
+  adv[@name=tackeyw] { kw<"adv"> }
+  collision[@name=tackeyw] { kw<"collision"> }
+  eqnames[@name=tackeyw] { kw<"eqnames"> }
+  eqtraces[@name=tackeyw] { kw<"eqtraces"> }
+  ANYINTRO[@name=tackeyw] { kw<"anyintro"> }
+  euf[@name=tackeyw] { kw<"euf"> }
+  executable[@name=tackeyw] { kw<"executable"> }
+  DESTRUCT[@name=tackeyw] { kw<"destruct"> }
+  FA[@name=tackeyw] { kw<"fa"> }
+  CS[@name=tackeyw] { kw<"cs"> }
+  INDEX { kw<"index"> }
+  MESSAGE { kw<"message"> }
+  CHANNEL[@name=decl] { kw<"channel"> }
+  BOOLEAN { kw<"boolean"> }
+  BOOL { kw<"bool"> }
+  TIMESTAMP { kw<"timestamp"> }
+  NULL { kw<"null"> }
+  ORACLE[@name=decl] { kw<"oracle"> }
+  WITH[@name=decl] { kw<"with"> }
+  WHERE[@name=decl] { kw<"where"> }
+  TIME { kw<"time"> }
+  FORALL { kw<"forall"> }
+  EXISTS { kw<"exists"> }
+  UFORALL { kw<"Forall"> }
+  UEXISTS { kw<"Exists"> }
+  SPLITSEQ[@name=tackeyw] { kw<"splitseq"> }
+  expand[@name=tackeyw] { kw<"expand"> }
+  prof[@name=tackeyw] { kw<"prof"> }
+  left[@name=tackeyw] { kw<"left"> }
+  right[@name=tackeyw] { kw<"right"> }
+  notleft[@name=tackeyw] { kw<"notleft"> }
+  simpl_left[@name=tackeyw] { kw<"simpl_left"> }
+  project[@name=tackeyw] { kw<"project"> }
+  split[@name=tackeyw] { kw<"split"> }
+  subst[@name=tackeyw] { kw<"subst"> }
+  true[@name=tackeyw] { kw<"true"> }
+  cca1[@name=tackeyw] { kw<"cca1"> }
+  enckp[@name=tackeyw] { kw<"enckp"> }
+  enrich[@name=tackeyw] { kw<"enrich"> }
+  equivalent[@name=tackeyw] { kw<"equivalent"> }
+  expandall[@name=tackeyw] { kw<"expandall"> }
+  show[@name=tackeyw] { kw<"show"> }
+  deduce[@name=tackeyw] { kw<"deduce"> }
+  prf[@name=tackeyw] { kw<"prf"> }
+  xor[@name=tackeyw] { kw<"xor"> }
+  intctxt[@name=tackeyw] { kw<"intctxt"> }
+  trivialif[@name=tackeyw] { kw<"trivialif"> }
+  byequiv[@name=tackeyw] { kw<"byequiv"> }
+  diffeq[@name=tackeyw] { kw<"diffeq"> }
+  CONSTSEQ[@name=tackeyw] { kw<"constseq"> }
+  MEMSEQ[@name=tackeyw] { kw<"memseq"> }
+  REMEMBER[@name=tackeyw] { kw<"remember"> }
+  DEPENDENT[@name=tackeyw] { kw<"dependent"> }
+  GOAL { kw<"goal"> }
+  LOCAL { kw<"local"> }
+  GLOBAL { kw<"global"> }
+  EQUIV { kw<"equiv"> }
+  AXIOM { kw<"axiom"> }
+  HINT[@name=closing] { kw<"hint"> }
+  HELP[@name=tackeyw] { kw<"help"> }
+  CYCLE { kw<"cycle"> }
+  UNDO[@name=tackeyw] { kw<"undo"> }
+  ASSERT[@name=tackeyw] { kw<"assert"> }
+  AS[@name=tackeyw] { kw<"as"> }
+  LOCALIZE[@name=tackeyw] { kw<"localize"> }
+  HAVE[@name=tackeyw] { kw<"have"> }
+  CASE[@name=tackeyw] { kw<"case"> }
+  EXPAND[@name=tackeyw] { kw<"expand"> }
+  REDUCE[@name=tackeyw] { kw<"reduce"> }
+  AUTO[@name=closing] { kw<"auto"> }
+  admit { kw<"admit"> }
+  REFL[@name=closing] { kw<"refl"> }
+  SIMPL[@name=closing] { kw<"simpl"> }
+  USE[@name=tackeyw] { kw<"use"> }
+  REWRITE[@name=tackeyw] { kw<"rewrite"> }
+  TRANS[@name=tackeyw] { kw<"trans"> }
+  SYM[@name=tackeyw] { kw<"sym"> }
+  FRESH[@name=tackeyw] { kw<"fresh"> } 
+  APPLY[@name=tackeyw] { kw<"apply"> }
+  REVERT[@name=tackeyw] { kw<"revert"> }
+  GENERALIZE[@name=tackeyw] { kw<"generalize"> }
+  INDUCTION[@name=tackeyw] { kw<"induction"> }
+  DEPENDS[@name=tackeyw] { kw<"depends"> }
+  CLEAR[@name=tackeyw] { kw<"clear"> }
+  DDH[@name=tackeyw] { kw<"ddh"> }
+  CDH[@name=tackeyw] { kw<"cdh"> }
+  GDH[@name=tackeyw] { kw<"gdh"> }
+  RENAME[@name=tackeyw] { kw<"rename"> }
+  GPRF[@name=tackeyw] { kw<"gprf"> }
+  GCCA[@name=tackeyw] { kw<"gcca"> }
+  INCLUDE { kw<"include"> }
+  SMT { kw<"smt"> }
+  PRINT[@name=tackeyw] { kw<"print"> }
+  SEARCH[@name=tackeyw] { kw<"search"> }
+
+  FUN[@name=fun] { kw<"fun"> }
+  /* INPUT[@name=fun] { kw<"input"> } */
+  /* COND[@name=fun] { kw<"cond"> } */
+  /* OUTPUT[@name=fun] { kw<"output"> } */
+  /* EXEC[@name=fun] { kw<"exec"> } */
+  /* FRAME[@name=fun] { kw<"frame"> } */
+  SEQ[@name=fun] { kw<"seq"> }
+  DIFF[@name=fun] { kw<"diff"> }
+  /* HAPPENS[@name=fun] { kw<"happens"> } */
+  /* LEN[@name=fun] { kw<"len"> } */
+  /* xor[@name=fun] { kw<"xor"> } */
+
+  TRY[@name=tacticals] { kw<"try"> }
+  /* ORElSE[@name=tacticals] { kw<"orelse"> } */
+  NOSIMPL[@name=tacticals] { kw<"nosimpl"> }
+  CHECKFAIL[@name=tacticals] { kw<"checkfail"> }
+  REPEAT[@name=tacticals] { kw<"repeat"> }
+  EXN[@name=tacticals] { kw<"exn"> }
+
+@precedence {
+ QUANTIF,
+ ARROW @right,
+ DARROW @right,
+ DEQUIVARROW @right,
+ AND OR @right,
+ GAND GOR @right,
+ EQ,
+ NEQ,
+ GEQ,
+ LEQ,
+ LANGLE,
+ RANGLE,
+ empty_else,
+ ELSE,
+ SHARP @left,
+ RIGHTINFIXSYMB @right,
+ LEFTINFIXSYMB @left,
+ XOR @left,
+ AT @left,
+ SLASH @left,
+ tac_prec,
+ BY,
+ PLUS @left,
+ SEMICOLON @right,
+ REPEAT,
+ TRY,
+ NOSIMPL
+}
+
+tactic_param {
+  !tac_prec term
+| INT
+}
+
+tactic_params {
+  empty
+| tactic_param
+| tactic_param COMMA tactic_params
+}
+
+int { INT }
+
+tac {
+    LPAREN tac RPAREN                
+  | tac !SEMICOLON SEMICOLON tac              
+  | tac !SEMICOLON SEMICOLON LBRACKET sel_tacs RBRACKET
+  | !tac_prec tac !SEMICOLON SEMICOLON sel_tac
+  | !BY BY tac
+  | tac !PLUS PLUS tac                   
+  | !TRY TRY tac                          
+  | !REPEAT REPEAT tac                       
+  | lsymb tactic_params           
+  | CS tac_term
+  | CS term IN int
+  | FA commaSep1<fa_arg>
+  | FA int
+  | FA
+  | INTRO intro_pat_list
+  | tac !DARROW DARROW intro_pat_list
+  | DESTRUCT lsymb
+  | DESTRUCT lsymb AS and_or_pat
+  | LOCALIZE lsymb AS naming_pat
+  | DEPENDS tactic_params
+  | DEPENDS tactic_params !BY BY tac
+  | REMEMBER term AS lsymb
+  | EXISTS tactic_params
+  | !NOSIMPL NOSIMPL tac                      
+  | !tac_prec TIME tac
+  | CYCLE INT
+  | CYCLE MINUS INT
+  | CHECKFAIL tac EXN ID  
+  | REVERT emptySep1<lsymb>
+  | GENERALIZE emptySep1<sterm> as_n_ips?
+  | generalize_dependent emptySep1<sterm> as_n_ips?
+  | INDUCTION tactic_params
+  | dependent_induction tactic_params
+  | CLEAR emptySep1<lsymb>
+  | SMT 
+  | have_tac 
+  | have_tac !BY BY tac
+  | USE pt_use_tac as_have_ip?
+  | HAVE have_ip? COLONEQ p_pt 
+  | TRANS trans_arg
+  | FRESH named_args fresh_arg
+  | AUTO named_args 
+  | SIMPL named_args 
+  | REDUCE named_args 
+  | REWRITE rw_args in_target
+  | rewrite_equiv rw_equiv_item
+  | APPLY named_args p_pt apply_in
+  | SPLITSEQ INT COLON LPAREN term RPAREN sterm?
+  | CONSTSEQ INT COLON emptySep1<constseq_arg>
+  | MEMSEQ INT INT
+  | DDH ~ddhambig lsymb COMMA lsymb COMMA lsymb COMMA lsymb
+  | CDH ~cdhambig tac_term COMMA tac_term
+  | GDH ~gdhambig tac_term COMMA tac_term
+  | euf lsymb
+  | executable lsymb
+  | CASE term
+  | EXPAND term
+  | HELP
+  | HELP lsymb
+  | HELP Help_tac
+  // TODO ↓ give grammar of tactic !
+  | NAMELENGTH
+  | ANYINTRO
+  | SYM
+  | CONST
+  | adv
+  | collision
+  | eqnames
+  | eqtraces
+  | SPLITSEQ
+  | expand
+  | prof
+  /* | left */
+  | right
+  | notleft
+  | simpl_left
+  | project
+  | split
+  | subst
+  // Seems to confuse when use in term !
+  /* | true */
+  | cca1
+  | enckp
+  | enrich
+  | equivalent
+  | expandall
+  | show
+  | deduce
+  | prf
+  | xor
+  | intctxt
+  | trivialif
+  | byequiv
+  | diffeq
+  | MEMSEQ
+  // Closing without grammar
+  | admit
+  | CONGRUENCE
+  | ASSUMPTION
+  | REFL
+  | CONSTRAINTS
+  // ??? tactical unused
+  /* | ORELSE */
+}
+
+Help_tac_i {
+  FA         
+| CS         
+| INTRO      
+| DESTRUCT   
+| DEPENDS    
+| REMEMBER   
+| EXISTS     
+| REVERT     
+| GENERALIZE 
+| INDUCTION  
+| CLEAR      
+| REDUCE     
+| SIMPL      
+| AUTO       
+| ASSERT     
+| HAVE       
+| USE        
+| REWRITE    
+| TRANS      
+| NAMELENGTH
+| FRESH      
+| APPLY      
+| SPLITSEQ   
+| CONSTSEQ   
+| MEMSEQ     
+| DDH        
+| GDH        
+| CDH        
+| PRINT      
+| SEARCH     
+| DEPENDENT INDUCTION 
+| GENERALIZE DEPENDENT
+| REWRITE EQUIV
+}
+
+Help_tac {
+  Help_tac_i
+}
+
+Tactic {
+  tac DOT
+}
+
+process_cont {
+  empty
+| !SEMICOLON SEMICOLON process
+}
+
+term_list {
+  empty
+| LPAREN commaSep<term> RPAREN
+/* | paren<commaSep<term>> */
+}
+
+else_process {
+  !empty_else empty
+| !ELSE ELSE process
+}
+
+opt_indices {
+  empty
+| lsymb
+| lsymb COMMA opt_indices
+}
+
+process_i {
+  NULL
+| LPAREN processes_i RPAREN
+| lsymb COLON process
+| OUT LPAREN lsymb COMMA term RPAREN process_cont
+| lsymb term_list
+| NEW lsymb colon_ty? !SEMICOLON SEMICOLON process
+| IN LPAREN lsymb COMMA lsymb RPAREN process_cont
+| IF term THEN process else_process
+| FIND opt_indices SUCHTHAT term IN process else_process
+| LET lsymb colon_ty? !EQ EQ term IN process
+| lsymb term_list COLONEQ term process_cont
+| BANG process
+}
+
+process {
+  process_i
+}
+
+processes_i {
+  process_i
+| process PARALLEL processes_i
+}
+
+bullet {
+  MINUS
+| !PLUS PLUS
+| STAR
+| !RIGHTINFIXSYMB RIGHTINFIXSYMB
+| !LEFTINFIXSYMB LEFTINFIXSYMB
+}
+
+brace {
+  LBRACE
+| RBRACE
+}
+
+Bulleted_tactic {
+  bullet Bulleted_tactic
+| brace  Bulleted_tactic
+| Tactic
+| DOT
+}
+
+
+top_proofmode {
+  Bulleted_tactic
+| ABORT
+| QED
+}
+
+Sentence {
+  interactive |
+  top_proofmode
+}
+
+option_param {
+  TRUE
+| FALSE
+| ID
+| INT
+}
+
+Set_option {
+  SET ID !EQ EQ option_param DOT
+}
+
+ty_i {
+  sty_i
+/* | Ty ~ty !ARROW ARROW Ty ~ty */
+| Ty !ARROW ARROW Ty
+| sty STAR starSep1<sty>
+}
+
+
+sty_i {
+  MESSAGE
+| INDEX
+| TIMESTAMP
+| BOOLEAN
+| BOOL
+| ty_var
+| lsymb
+| LPAREN ty_i RPAREN
+| UNDERSCORE
+}
+
+
+sty {
+  sty_i
+}
+
+ty_var {
+ TICK lsymb
+}
+
+Ty {
+  ty_i
+}
+
+c_ty {
+ lsymb COLON Ty
+}
+
+c_tys {
+ WHERE emptySep1<c_ty> |
+ ""
+}
+
+ty_args {
+  empty
+| LBRACKET emptySep1<ty_var> RBRACKET
+}
+
+bty_info {
+  lsymb
+}
+
+bty_infos {
+  LBRACKET commaSep<bty_info> RBRACKET
+| empty
+}
+
+lsymb_decl {
+  lsymb
+| LPAREN !RIGHTINFIXSYMB RIGHTINFIXSYMB RPAREN
+| LPAREN !LEFTINFIXSYMB LEFTINFIXSYMB  RPAREN
+}
+
+
+simpl_lval {
+  UNDERSCORE
+| lsymb
+}
+
+lval {
+  simpl_lval
+| LPAREN commaSep1<lsymb> RPAREN
+}
+
+bnd_group<l,t> {
+  commaSep1<l> COLON t
+}
+
+bnd_group_list<l,t> {
+  commaSep1<bnd_group<l,t>>
+}
+
+var_tags {
+  empty
+| LBRACKET commaSep1<lsymb> RBRACKET
+}
+
+ty_tagged {
+  Ty var_tags
+}
+
+// Auxiliary: a single binder declarations with tags
+bnd_tagged {
+  LPAREN bnd_group_list<simpl_lval,ty_tagged> RPAREN
+| simpl_lval
+}
+
+// Many binder declarations with tags.
+bnds_tagged {
+  emptySep<bnd_tagged>
+}
+
+ext_bnd_tagged {
+  LPAREN bnd_group_list<lval,ty_tagged> RPAREN
+| simpl_lval
+}
+
+ext_bnds_tagged_strict {
+  emptySep<ext_bnd_tagged>
+}
+
+ext_bnds_tagged {
+  ext_bnds_tagged_strict
+| simpl_lval COLON ty_tagged
+}
+
+colon_ty {
+  COLON Ty
+}
+
+Fun_symb {
+  lsymb /* for futur fun symb */
+}
+
+Sterm_i {
+  lsymb ~symb /* ambiguous with Fun_symb */
+| UNDERSCORE
+| DIFF LPAREN term COMMA term RPAREN
+| SEQ LPAREN bnd_group_list<lval,ty_tagged> !DARROW DARROW term RPAREN
+| NOT sterm
+| FALSE
+| TRUE
+| Fun_symb ~symb LPAREN commaSep1<term> RPAREN
+| LPAREN commaSep1<term> RPAREN
+/* | paren<commaSep1<term>> */
+}
+
+sterm {
+  Sterm_i 
+}
+
+else_term { 
+  !empty_else empty
+| !ELSE ELSE term
+}
+
+Infix_s {
+  !AND AND
+| !OR OR
+| !LEFTINFIXSYMB LEFTINFIXSYMB
+| !RIGHTINFIXSYMB RIGHTINFIXSYMB
+| !XOR XOR
+| !DARROW DARROW
+| !DEQUIVARROW DEQUIVARROW
+}
+
+Ord {
+  !EQ EQ
+| !NEQ NEQ
+| !LEQ LEQ
+| !LANGLE LANGLE
+| !GEQ GEQ
+| !RANGLE RANGLE
+}
+
+Quantif {
+  EXISTS
+| FORALL
+}
+
+Quant {
+  UFORALL
+| UEXISTS
+}
+
+Macro {
+  term
+}
+
+//Ambigous term
+Term_i {
+  Sterm_i
+| Macro ~term !AT AT term
+| sterm emptySep1<sterm>
+| IF term THEN term else_term
+| term ~term Infix_s term
+| term ~term Ord ~term term
+| FUN ext_bnds_tagged !DARROW DARROW term 
+| !LANGLE LANGLE term ~term COMMA term !RANGLE RANGLE
+| !QUANTIF Quantif ext_bnds_tagged COMMA term
+| FIND bnds SUCHTHAT term IN term else_term
+/* | term ~term !SHARP SHARP INT */
+| term !SHARP SHARP INT
+}
+
+term {
+  Term_i
+}
+
+projs {
+  empty
+| LBRACE emptySep<lsymb> RBRACE
+}
+
+selector {
+  commaSep1<int>
+}
+
+tac_term {
+  !tac_prec term
+}
+
+naming_pat {
+  UNDERSCORE
+| QMARK
+| ID
+}
+
+and_or_pat {
+  LBRACKET simpl_pat          emptySep<simpl_pat> RBRACKET
+| LBRACKET simpl_pat PARALLEL paraSep<simpl_pat> RBRACKET
+| LBRACKET RBRACKET
+}
+
+ip_rw_dir {
+  !ARROW ARROW
+| RARROW
+}
+
+simpl_pat {
+  naming_pat
+| and_or_pat
+| ip_rw_dir
+}
+
+s_item_body {
+  SLASHSLASH
+| SLASHEQUAL
+| SLASHSLASHEQUAL
+}
+
+s_item {
+  s_item_body
+| LBRACKET s_item_body named_args RBRACKET
+}
+
+s_item_noargs {
+  s_item_body
+}
+
+intro_pat {
+  s_item
+| STAR
+| !RANGLE RANGLE
+| simpl_pat
+| expnd_item
+}
+
+intro_pat_list {
+  emptySep1<intro_pat>
+}
+
+as_n_ips {
+  AS emptySep1<naming_pat>
+}
+
+sel_tac {
+  selector COLON tac
+}
+
+sel_tacs {
+  paraSep1<sel_tac>
+}
+
+p_pt_arg {
+  sterm
+| LPAREN PERCENT p_pt RPAREN
+}
+
+p_pt {
+  lsymb emptySep<p_pt_arg>
+}
+
+pt_use_tac {
+  lsymb
+| lsymb WITH commaSep1<tac_term>
+}
+
+spt {
+  lsymb
+| LPAREN p_pt RPAREN
+}
+
+constseq_arg {
+  LPAREN term RPAREN sterm
+}
+
+rw_mult {
+  int BANGU
+| BANGU
+| QMARK
+| empty
+}
+
+as_have_ip {
+  AS simpl_pat
+}
+
+s_item_noargs_list {
+  emptySep<s_item_noargs>
+}
+
+have_ip {
+  s_item_noargs_list simpl_pat s_item_noargs_list
+}
+
+have_tac {
+  ASSERT tac_term as_have_ip? 
+| HAVE have_ip COLON tac_any_term 
+}
+
+named_arg {
+  TILDE lsymb
+| TILDE lsymb COLON LBRACKET commaSep<lsymb> RBRACKET
+}
+
+named_args {
+  emptySep<named_arg>
+}
+
+fa_arg {
+//  rw_mult term %prec tac_prec
+  !tac_prec rw_mult term
+}
+
+
+apply_in {
+  empty
+| IN lsymb
+}
+
+generalize_dependent {
+ GENERALIZE DEPENDENT
+}
+
+dependent_induction {
+ DEPENDENT INDUCTION
+}
+
+rewrite_equiv {
+ REWRITE EQUIV
+}
+
+trans_arg_item {
+  !tac_prec int COLON term
+}
+
+trans_arg {
+  System_annot
+| commaSep1<trans_arg_item>
+}
+
+fresh_arg {
+  int
+| lsymb
+}
+
+rw_dir {
+  empty
+| MINUS
+}
+
+rw_type {
+  spt
+| SLASH lsymb_decl
+| SLASH STAR
+}
+
+expnd_type {
+  ATSLASH lsymb
+| ATSLASH STAR
+}
+
+rw_item {
+  rw_mult rw_dir rw_type
+}
+
+rw_equiv_item {
+  rw_dir p_pt
+}
+
+expnd_item {
+  rw_dir expnd_type
+}
+
+
+rw_arg {
+  rw_item 
+| s_item
+}
+
+rw_args {
+  emptySep1<rw_arg>
+}
+
+single_target {
+  lsymb
+| int
+}
+
+in_target {
+  empty
+| IN commaSep1<single_target>
+| IN STAR
+}
+
+bnd {
+  LPAREN bnd_group_list<simpl_lval,Ty> RPAREN
+| simpl_lval
+}
+
+bnds_strict {
+  emptySep<bnd>
+}
+
+/* Many binder declarations, non-strict version with some added variants. */
+bnds {
+  bnds_strict
+| bnd_group_list<simpl_lval,Ty>
+}
+
+dh_flag {
+  empty
+| DDH ~ddhambig
+| CDH ~cdhambig
+| GDH ~gdhambig 
+}
+
+dh_flags {
+  commaSep1<dh_flag>
+}
+
+system_modifier {
+  RENAME global_formula
+| GCCA bnds_strict COMMA term
+| GPRF bnds_strict COMMA term
+| GPRF TIME bnds_strict COMMA term
+| REWRITE rw_args
+}
+
+declaration_i {
+  HASH lsymb c_tys |
+  HASH lsymb WITH ORACLE term |
+  AENC lsymb COMMA lsymb COMMA lsymb c_tys |
+  SENC lsymb COMMA lsymb c_tys |
+  SENC lsymb COMMA lsymb WITH HASH lsymb |
+  SIGNATURE lsymb COMMA lsymb COMMA lsymb c_tys |
+  SIGNATURE lsymb COMMA lsymb COMMA lsymb WITH ORACLE term |
+  /* dh_flags lsymb COMMA lsymb_decl c_tys | */
+  /* dh_flags lsymb COMMA lsymb_decl COMMA lsymb_decl c_tys | */
+  NAME lsymb COLON Ty |
+  ACTION lsymb COLON int |
+  TYPE Ty bty_infos |
+  ABSTRACT lsymb_decl ty_args COLON Ty |
+  OP lsymb_decl ty_args ext_bnds_tagged_strict colon_ty? !EQ EQ term |
+  MUTABLE lsymb bnds_strict colon_ty? !EQ EQ term |
+  CHANNEL lsymb |
+  PROCESS lsymb projs bnds !EQ EQ process |
+         AXIOM Local_statement |
+   LOCAL AXIOM Local_statement |
+  GLOBAL AXIOM Global_statement |
+  SYSTEM projs ~decl process |
+  SYSTEM LBRACKET lsymb RBRACKET projs process |
+  SYSTEM ~decl lsymb !EQ EQ system_expr WITH system_modifier
+}
+
+Declaration {
+  declaration_i
+}
+
+declaration_list {
+  Declaration+
+}
+
+Declarations {
+  declaration_list DOT
+}
+
+sys_side {
+  left | right
+}
+
+System_item {
+  lsymb 
+| lsymb SLASH sys_side
+}
+
+system_item_list {
+  System_item
+| System_item COMMA system_item_list
+}
+
+system_expr {
+  LBRACKET system_item_list RBRACKET
+}
+
+System_annot {
+  empty
+| LBRACKET system_item_list RBRACKET
+| LBRACKET SET COLON system_item_list !SEMICOLON SEMICOLON
+  EQUIV COLON system_item_list
+  RBRACKET
+}
+
+Statement_name {
+  lsymb
+| UNDERSCORE
+}
+
+Local_statement {
+  System_annot Statement_name ty_args bnds_tagged COLON term
+}
+
+Global_statement {
+  System_annot Statement_name ty_args bnds_tagged COLON global_formula
+}
+
+pr_query {
+  SYSTEM system_expr DOT
+| lsymb DOT
+|       DOT
+}
+
+biframe {
+  term
+| term COMMA biframe
+}
+
+global_formula_i {
+  LBRACKET term RBRACKET
+| TILDE LPAREN biframe RPAREN
+| EQUIV LPAREN biframe RPAREN
+| LPAREN global_formula_i RPAREN
+| global_formula !ARROW ARROW global_formula
+| !QUANTIF Quant bnds_tagged COMMA global_formula
+| Quant bnds_tagged COMMA global_formula
+| global_formula ~glob !GAND GAND global_formula
+| global_formula !GOR GOR global_formula
+}
+
+global_formula {
+  global_formula_i
+}
+
+any_term {
+    term
+  | global_formula
+}
+
+tac_any_term {
+  !tac_prec any_term
+}
+
+Search_query {
+  SEARCH   any_term IN system_expr DOT
+| SEARCH   any_term DOT
+}
+
+obs_equiv_statement {
+  System_annot Statement_name
+}
+
+Goal {
+         GOAL Local_statement  DOT
+|  LOCAL GOAL Local_statement  DOT
+| GLOBAL GOAL Global_statement DOT
+| EQUIV  obs_equiv_statement   DOT
+| EQUIV System_annot Statement_name bnds_tagged COLON biframe DOT
+}
+
+
+Hint {
+  HINT REWRITE lsymb DOT
+| HINT SMT     lsymb DOT
+}
+
+include_params {
+  LBRACKET commaSep<lsymb> RBRACKET
+| ()
+}
+
+include_name[@name=include_name] {
+  lsymb
+}
+
+P_include {
+  INCLUDE include_params include_name DOT
+}
+
+undo {
+  UNDO INT DOT
+}
+
+interactive {
+  Set_option
+| Declarations
+| undo
+| PRINT pr_query
+| Search_query
+| PROOF
+| P_include
+| Goal
+| Hint
+/* | EOF DO NOT USE WITH TESTS ! */
+}
+
+
+@tokens {
+
+  right_infix_char_first { 
+    "+" | 
+    "-" |
+    "*" |
+    "|" |
+    "&" |
+    "~"
+  }
+
+  left_infix_char_first { "^" }
+
+  infix_char {
+    right_infix_char_first |
+    left_infix_char_first |
+    "<" | 
+    ">"
+  }
+
+  BANG { "!_" ID }
+  AND { "&&" }
+  GAND { "/\\" }
+  GOR { "\\/" }
+  OR { "||" }
+  LANGLE[@name=operator] { "<" }
+  RANGLE[@name=operator] { ">" }
+  LBRACKET { "[" }
+  RBRACKET { "]" }
+  LBRACE { "{" }
+  RBRACE { "}" }
+  QMARK[@name=operator] { "?" }
+  COMMA { "," }
+  BANGU[@name=operator] { "!" }
+  DOT { "." }
+  SHARP[@name=operator] { "#" }
+  COLON[@name=operator] { ":" }
+  COLONEQ { ":=" }
+  SEMICOLON[@name=tacticals] { ";" }
+  STAR { "*" }
+  UNDERSCORE { "_" }
+  SLASHSLASH { "//" }
+  SLASHEQUAL { "/=" }
+  SLASHSLASHEQUAL { "//=" }
+  SLASH { "/" }
+  ATSLASH { "@/" }
+  EQ[@name=operator] { "=" }
+  NEQ { "<>" }
+  GEQ { ">=" }
+  LEQ { "<=" }
+  LPAREN { "(" }
+  RPAREN { ")" }
+  PARALLEL[@name=operator] { "|" }
+  ARROW { "->" }
+  RARROW { "<-" }
+  DARROW { "=>" }
+  DEQUIVARROW { "<=>" }
+  MINUS { "-" }
+  AT[@name=operator] { "@" }
+  TILDE[@name=operator] { "~" }
+  PLUS[@name=tacticals] { "+" }
+  TICK { "\'" }
+  PERCENT { "%" }
+  PROOF { "Proof." }
+  QED { "Qed." }
+  ABORT { "Abort." }
+  
+  INT { @digit+ }
+
+  /* EOF { @eof } */
+
+  LEFTINFIXSYMB {
+     left_infix_char_first  ( infix_char* | ($[0-9]* infix_char+) )
+  }
+
+  RIGHTINFIXSYMB {
+     right_infix_char_first ( infix_char* | ($[0-9]* infix_char+) )
+  }
+
+  identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
+  ID { @asciiLetter (identifierChar | @digit)* }
+
+  space { @whitespace+ }
+
+  BlockComment { "(*" blockCommentRest }
+
+  blockCommentRest { ![*] blockCommentRest | "*" blockCommentAfterStar }
+
+  blockCommentAfterStar { ")" | "*" blockCommentAfterStar | ![)*] blockCommentRest }
+
+  @precedence {
+    PROOF ,
+    QED ,
+    ABORT ,
+    DOT ,
+    ARROW ,
+    RARROW ,
+    DARROW ,
+    DEQUIVARROW ,
+    NEQ ,
+    GEQ ,
+    LEQ ,
+    SLASHSLASH ,
+    SLASHEQUAL ,
+    SLASHSLASHEQUAL ,
+
+    STAR ,
+
+    BANG ,
+    AND ,
+    GAND ,
+    GOR ,
+    OR ,
+
+    LANGLE ,
+    RANGLE ,
+    LBRACKET ,
+    RBRACKET ,
+    LBRACE ,
+    RBRACE ,
+    QMARK ,
+    COMMA ,
+    BANGU ,
+    SHARP ,
+    COLON ,
+    COLONEQ ,
+    SEMICOLON ,
+    UNDERSCORE ,
+    ATSLASH ,
+    SLASH ,
+    EQ ,
+    LPAREN ,
+    RPAREN ,
+    PARALLEL ,
+    MINUS ,
+    AT,
+    TILDE ,
+    PLUS ,
+    TICK ,
+    PERCENT,
+
+    //FIXME ↓  is it the right place ?
+    LEFTINFIXSYMB,
+    RIGHTINFIXSYMB,
+
+    ID
+  }
+
+}

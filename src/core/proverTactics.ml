@@ -240,7 +240,8 @@ let pp_list_count (file:string) : unit =
     else
       Printf.fprintf oc "\"%s\" : %d \n" name count
   ) counts;
-  Printf.fprintf oc "}\n"
+  Printf.fprintf oc "}\n";
+  Stdlib.close_out_noerr oc
 
 let pp_list fmt () =
   let helps =

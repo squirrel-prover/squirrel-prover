@@ -6,7 +6,6 @@
 include Basic.
 include Int.
 
-(*------------------------------------------------------------------*)
 system null.
 
 (* Case analysis axiom on integers.
@@ -14,30 +13,14 @@ system null.
    which would allow to do this cleanly.
    Remark that the new higher-order semantics can easily account for
    such an extension. *)
-global axiom case_int (i : int[const, adv]) : 
+global axiom case_int (i : int[const]) : 
   [i = i0] \/ 
-  Exists (j : int[const, adv]), [i = succi j].
+  Exists (j : int[const]), [i = succi j].
 
-(*------------------------------------------------------------------*)
-(* auxiliary lemma  *)
-goal lt_succ (i, j : int) :
-  (i < succi j) <=>
-  (i <> succi j && i <= succi j).
-Proof. 
-  split.
-  + intro H.
-    split; 1:auto.
-    by apply lt_impl_le. 
-  + intro [H1 H2].
-    apply le_impl_eq_lt in H2.
-    by case H2.
-Qed.
-
-(*------------------------------------------------------------------*)
 global goal hybrid ['a] 
-  (N1 : int[const, adv]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+ (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
  (* Inductive case of the hybrid proof *)
- (Forall (N0 : int[const, adv]), 
+ (Forall (N0 : int[const]), 
    [N0 <= N1] ->
    equiv(u, z, (fun (i:int) => if i < N0 then (diff(fL,fR)) i else z)) ->
    equiv( u,

@@ -34,7 +34,7 @@ let mk_message st s =
 let case_study_fail () =
   let st = Prover.init () in
   let st =
-    Prover.exec_all st
+    Prover.exec_all ~test:true st
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
@@ -42,7 +42,7 @@ let case_study_fail () =
        Proof."
   in
   try
-    ignore (Prover.exec_command "nosimpl cs false." st) ;
+    ignore (Prover.exec_command ~test:true "nosimpl cs false." st) ;
     Alcotest.failf "Tactic application should have failed."
   with
   | Tactics.(Tactic_soft_failure (_,Failure e)) ->
@@ -51,7 +51,7 @@ let case_study_fail () =
         ~expected:"did not find any conditional to analyze"
         ~actual:e;
   try
-    ignore (Prover.exec_command "nosimpl cs (if true then _)." st) ;
+    ignore (Prover.exec_command ~test:true "nosimpl cs (if true then _)." st) ;
     Alcotest.failf "Tactic application should have failed with bad
     arguments."
   with
@@ -66,7 +66,7 @@ let case_study_fail () =
 let case_study_fail' () =
   let st = Prover.init () in
   let st =
-    Prover.exec_all st
+    Prover.exec_all ~test:true st
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
@@ -75,9 +75,9 @@ let case_study_fail' () =
        Proof."
   in
   (* "cs true" works in 0 but not in 1 *)
-  ignore (Prover.exec_command "nosimpl cs true in 0." st) ;
+  ignore (Prover.exec_command ~test:true "nosimpl cs true in 0." st) ;
   try
-    ignore (Prover.exec_command "nosimpl cs true in 1." st) ;
+    ignore (Prover.exec_command ~test:true "nosimpl cs true in 1." st) ;
     Alcotest.failf "Tactic application should have failed."
   with
   | Tactics.(Tactic_soft_failure (_,Failure e)) ->
@@ -91,7 +91,7 @@ let case_study () =
 
   let st = Prover.init () in
   let st = 
-    Prover.exec_all st
+    Prover.exec_all ~test:true st
         "mutable state : message = empty.
         name nfresh : message.
         system null.
@@ -101,7 +101,7 @@ let case_study () =
   in
 
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
@@ -124,7 +124,7 @@ let case_study () =
     ~expected:(Term.mk_true);
 
   (* deux sous-buts, l'un avec true,zero, l'autre true,empty *)
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         name n : message.
@@ -134,7 +134,7 @@ let case_study () =
         Proof."
   in
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
   (* deux sous-buts, l'un avec equiv(true,zero,n) l'autre equiv(true,empty,m) *)
   let terms = get_seq_in_nth_goal st 0 in
@@ -169,7 +169,7 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(Term.mk_true);
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         global goal _ : 
@@ -180,7 +180,7 @@ let case_study () =
         Proof."
   in
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true in 1." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs true in 1." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
   (* deux sous-buts, equiv(true,if true then zero else empty,n)
      et  equiv(true,if true then zero else empty,m) *)
@@ -230,14 +230,14 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(m);
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         abstract f : message->message.
         global goal _ : equiv(f(if true then diff(n,m) else empty)).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
@@ -273,12 +273,12 @@ let case_study () =
     ~expected:(Term.mk_true);
 
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
         global goal _ : equiv(f(diff(if true then n else empty,if true then m else empty))).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
@@ -313,7 +313,7 @@ let case_study () =
     ~actual:(List.nth terms 1)
     ~expected:(Term.mk_true);
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         abstract x : message.
@@ -328,7 +328,7 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@_." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs exec@_." st in
   (* même effet que `cs exec@tau`, `cs exec@tau in 3`, `cs exec@_ in 3`:
       deux buts
       1) exec@tau, exec@tau, frame@tau, if exec@tau' then x else y, x
@@ -380,7 +380,7 @@ let case_study () =
     ~actual:(List.nth terms 3)
     ~expected:(y);
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -392,7 +392,7 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@tau." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs exec@tau." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let x = find_in_sys_from_string "x" st in
@@ -465,7 +465,7 @@ let case_study () =
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -477,7 +477,7 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@tau in 3." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs exec@tau in 3." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let x = find_in_sys_from_string "x" st in
@@ -518,7 +518,7 @@ let case_study () =
     ~expected:(y);
 
 
-  let st = Prover.exec_all st
+  let st = Prover.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -530,7 +530,7 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@_ in 3." st in
+  let st = Prover.exec_command ~test:true "nosimpl cs exec@_ in 3." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let x = find_in_sys_from_string "x" st in
@@ -572,7 +572,7 @@ let case_study () =
 
 let namelength () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = Prover.exec_all (Prover.init ())
+  let st = Prover.exec_all ~test:true (Prover.init ())
         "
         system null.
         name n : message.
@@ -636,7 +636,7 @@ let namelength () =
 
 let namelength2 () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = Prover.exec_all (Prover.init ())
+  let st = Prover.exec_all ~test:true (Prover.init ())
         "
         system null.
         name n : message * message.

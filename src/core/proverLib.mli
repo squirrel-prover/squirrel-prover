@@ -99,3 +99,5 @@ type prover_input =
 type input =
   | Prover of prover_input
   | Toplvl of toplevel_input
+
+val get_prover_command : input -> prover_input

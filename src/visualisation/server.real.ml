@@ -1,3 +1,5 @@
+open Squirrelcore
+open Squirrelprover
 module S = Tiny_httpd
 
 (* Utilities for reading files from script/ directory,
@@ -19,7 +21,8 @@ let repository = Filename.dirname (make_absolute Sys.argv.(0))
 
 let read_file filename =
   read_whole_file
-    (Filename.concat repository (Filename.concat "scripts/visualisation" filename))
+    (Filename.concat repository
+       (Filename.concat "scripts/visualisation" filename))
 
 (* Function to send update events. It will be updated when creating
    the corresponding route in the server. *)
@@ -82,7 +85,10 @@ let start () =
       (fun filename ->
          S.add_route_handler ~meth:`GET server
            S.Route.(exact filename @/ return)
-           (fun _req -> S.Response.make_string (Ok (read_file filename)))) ["visualisation.html";"visualisation_style.css";"visualisation_script.js";"favicon.ico"];
+           (fun _req ->
+              S.Response.make_string (Ok (read_file filename))))
+      ["visualisation.html";"visualisation_style.css";
+       "visualisation_script.js";"favicon.ico"];
 
     (* Data *)
   
@@ -98,7 +104,7 @@ let start () =
                in
                S.Response.make_string ~headers:headers (Ok json)
            | _ | exception _ -> 
-               let json = "{\"error\": \"Nothing to visualise\"}" in
+               let json = "{\"error\": \"Nothing to visualize\"}" in
                S.Response.make_string ~headers:headers (Ok json));
 
     S.add_route_handler ~meth:`GET server

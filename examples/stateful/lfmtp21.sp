@@ -199,7 +199,7 @@ Proof.
     fa 0; fa 1; fa 1; fa 1.
 
     
-     prf 1.
+    prf 1.
     * intro i' H.
       have ? : happens(pred (A(i'))) by case H.
         rewrite equiv IH (pred(A(i'))) => //.
@@ -208,18 +208,16 @@ Proof.
     * intro i' _.
       have ? : happens(pred (A(i'))) by auto.
         rewrite equiv IH (pred(A(i'))) => //.
-        intro Hf; by fresh Hf.
-    
+        intro Hf; by fresh Hf.    
     * fresh 1; 1:auto.
-    prf 1. 
-    + split; intro i' H; try destruct H as [H|H];
-      try by apply unique_queries.
-      ++ rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+      prf 1. 
+      + split; intro i' H; try destruct H as [H|H];
+        try by apply unique_queries.
+        rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+      + fresh 1; 1:auto.
+        by apply IH.
     
-    + fresh 1; 1:auto.
-      by apply IH.
-    
-    (* Tag *)
+  (* Tag *)
   - expand frame, exec, cond, output.
     fa 0; fa 1; fa 1.
     prf 1; 2: (fresh 1; [1: auto | 2: by apply IH]).

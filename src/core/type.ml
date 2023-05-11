@@ -138,6 +138,17 @@ let to_string (ty : ty) : string =
 (*------------------------------------------------------------------*)
 let is_tuni = function TUnivar _ -> true | _ -> false
 
+let rec is_bitstring_encodable = function 
+  | Message
+  | Boolean
+  | Index  
+  | Timestamp
+  | TBase _  -> true
+
+  | Tuple tys -> List.for_all is_bitstring_encodable tys
+
+  | Fun _ | TVar _ | TUnivar _ -> false
+
 (*------------------------------------------------------------------*)
 let free_univars (t : ty) : Sid.t = 
   let rec fuvs acc t =

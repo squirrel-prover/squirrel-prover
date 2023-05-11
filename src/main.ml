@@ -1,13 +1,15 @@
-open Squirrelcore
 open Squirrelprover
+open Squirreltop
 open Squirrelfront
 open Squirreltactics
 open Squirrelhtml
-open Utils
 open Driver
 
+(* not necessary ↓ Only for do_include *)
+open Squirrelcore
 module L = Location
 
+(* maybe just include Squirreltactics for registering ? *)
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
    * e.g. registering tactics - hence the use of "open!" *)
@@ -60,7 +62,7 @@ type driver_state = {
 
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) : ProverLib.input =
-  Driver.next_input ~test state.file
+  Driver.next_input_file ~test state.file
     (ToplevelProver.get_mode state.toplvl_state)
 
 (*------------------------------------------------------------------*)
@@ -138,16 +140,12 @@ let pp_toplevel_error
     
   | _ -> assert false
 
-(*------------------------------------------------------------------*)
-
-exception Unfinished
-
 (*---------------- Main --------------------------------------------*)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, toplvl_state =
   HistoryTP.reset_state state.history_state nb_undo in
   let () = match ToplevelProver.get_mode toplvl_state with
-    | ProofMode -> Printer.pr "%a" (ToplevelProver.pp_goal
+    | ProofMode -> Printer.prt `Goal "%a" (ToplevelProver.pp_goal
                      toplvl_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
                     (ToplevelProver.get_table toplvl_state)
@@ -228,6 +226,7 @@ let rec do_include
   try
     let final_state = do_all_commands ~test incl_state in
     Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
+    Driver.close_chan file.f_chan;
     final_state.toplvl_state
 
     (* XXX Does that mean that file, file_stack and check_mode are the
@@ -247,6 +246,7 @@ let rec do_include
     let _ : HistoryTP.state =
       HistoryTP.reset_from_state state.toplvl_state
     in
+    Driver.close_chan file.f_chan;
     Command.cmd_error (IncludeFailed err_mess)
 
 (** The main loop body: do one command *)
@@ -261,33 +261,19 @@ and do_command
   | Prover c -> 
     let st = state.toplvl_state in
     let mode = ToplevelProver.get_mode st in
+    let check = state.check_mode in
     let toplvl_state = match mode, c with
-    | GoalMode, InputDescr decls -> ToplevelProver.do_decls st decls
     | _, Tactic t                -> do_tactic state t
-    | _, Print q                 -> ToplevelProver.do_print st q; st
-    | _, Search t                -> ToplevelProver.do_search st t; st
-    | WaitQed, Qed               -> ToplevelProver.do_qed st
-    | GoalMode, Hint h           -> ToplevelProver.do_add_hint st h
                                  (* ↓ touch global config ↓ *)
     | GoalMode, SetOption sp     -> do_set_option state sp
-    | GoalMode, Goal g           -> ToplevelProver.do_add_goal st g
+                                 (* ↓ gives right check mode ↓ *)
     | GoalMode, Proof            -> ToplevelProver.do_start_proof st
-                                      state.check_mode
+                                      ~check
     | GoalMode, Include inc      -> do_include ~test state inc
     | GoalMode, EOF              -> assert (state.file_stack = []);
                                     ToplevelProver.do_eof st
-    | WaitQed, Abort -> 
-        if test then
-          raise (Failure "Trying to abort a completed proof.");
-        Command.cmd_error AbortIncompleteProof
-    | ProofMode, Abort ->
-      Printer.prt `Result
-        "Exiting proof mode and aborting current proof.@.";
-          ToplevelProver.abort state.toplvl_state
-    | _, Qed ->
-      if test then raise Unfinished;
-      Command.cmd_error Unexpected_command
-    | _, _ -> Command.cmd_error Unexpected_command
+              (* ↓ handle default behaviour ↓ *)
+    | _, _ -> ToplevelProver.do_command ~test st command
     in { state with toplvl_state; }
 
 (* FIXME why not using do_all_commands when not interactive ? *)
@@ -322,13 +308,15 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
-    Server.update new_state.toplvl_state.prover_state;
+    if !html then
+      Server.update new_state.toplvl_state.prover_state;
     new_state, ToplevelProver.get_mode new_state.toplvl_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
     (if !stat_filename <> "" then
       ProverTactics.pp_list_count !stat_filename);
+    Driver.close_chan state.file.f_chan;
     if not test && not !html then exit 0;
 
   (* loop *)
@@ -351,7 +339,10 @@ and main_loop_error ~test (state : driver_state) : unit =
   else if !html then 
     Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" 
       state.file.f_name
-  else if not test then exit 1
+  else begin
+    Driver.close_chan state.file.f_chan;
+    if not test then exit 1
+  end
 
 let start_main_loop
     ?(test=false)

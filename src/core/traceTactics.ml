@@ -665,7 +665,11 @@ let deprecated_mk_fresh_indirect_cases
   let env = Env.init ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv () in
 
   let macro_cases =
-    Iter.fold_macro_support0 (fun action_name a t macro_cases ->
+    Iter.fold_macro_support (fun iocc macro_cases ->
+        let action_name = iocc.iocc_aname  in
+        let a           = iocc.iocc_action in
+        let t           = iocc.iocc_cnt    in
+        
         let fv =
           Sv.diff
             (Sv.union (Action.fv_action a) (Term.fv t))
@@ -1214,7 +1218,7 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
-  | Term.App (Fun (hash, _), [Tuple [_m; Name (_key, _)]]) ->
+  | Term.App (Fun (hash, _), [Tuple [_msg; Name (_key, _)]]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
 
   | _ -> false
@@ -1240,7 +1244,8 @@ let top_level_hashes s =
            match h1, h2 with
            | Term.App (Fun (hash1, _), [Tuple [_; Name (key1,args1)]]),
              Term.App (Fun (hash2, _), [Tuple [_; Name (key2,args2)]])
-             when hash1 = hash2 && (key1,args1) = (key2,args2) -> (h1, h2) :: acc
+             when hash1 = hash2 && (key1,args1) = (key2,args2) ->
+             (h1, h2) :: acc
            | _ -> acc)
         (make_eq acc q) q
   in
@@ -1253,17 +1258,17 @@ let top_level_hashes s =
 
 
 
-(** [collision_resistance judge sk fk] applies the collision resistance axiom
-    between the hashes:
-    - if [i = Some j], collision in hypothesis [j]
-    - if [i = None], collects all equalities between hashes that occur at
+(** [collision_resistance arg judge sk fk]
+    applies the collision resistance axiom between the hashes:
+    - if [arg = Some h], collision in hypothesis [j]
+    - if [arg = None], collects all equalities between hashes that occur at
     toplevel in message hypotheses. *)
-let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
+let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
 
-  let hash_eqs = match i with
+  let hash_eqs = match arg with
     | None -> top_level_hashes s
-    | Some (String j) -> 
-      let _, h = Hyps.by_name j s in
+    | Some (String h) ->
+      let _, h = Hyps.by_name h s in
       match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
         let cntxt = TS.mk_trace_cntxt s in
@@ -1294,7 +1299,7 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
 
 let () = T.register_typed "collision"
     ~general_help:"Collects all equalities between hashes \
-                   occurring at toplevel in\
+                   occurring at toplevel in \
                    message hypotheses, and adds the equalities \
                    between messages that have the same hash with \
                    the same valid key."

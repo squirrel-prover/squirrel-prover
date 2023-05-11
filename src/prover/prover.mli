@@ -28,16 +28,16 @@ type state
 val init : unit -> state
 
 (** Execute a command : see @ProverLib.prover_input *)
-val do_command : state -> ProverLib.prover_input -> state
+val do_command : ?check:[`Check | `NoCheck] -> state -> ProverLib.prover_input -> state
 
 (** Run the given squirrel file *)
 val run : ?test:bool -> string -> unit
 
 (** Execute a single command from string *)
-val exec_command : string -> state -> state
+val exec_command : ?check:[`Check | `NoCheck] -> ?test:bool -> string -> state -> state
 
 (** Execute a chunk of commands from string *)
-val exec_all : state -> string -> state
+val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state -> string -> state
 
 (** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
@@ -64,6 +64,10 @@ val set_table : state -> Symbols.table -> state
 
 (** Handler of parsed input *)
 val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+
+(** do tactic with or without check of parsed input *)
+val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+  ProverLib.bulleted_tactics -> state
 
 val is_proof_completed : state -> bool
 
@@ -118,3 +122,6 @@ val do_search : state -> ProverLib.search_query -> unit
 (** Get the first subgoal.
     @raise Not_found if there is no subgoal or current goal. *)
 val get_first_subgoal : state -> Goal.t
+
+(** For toplevel *)
+val do_include: state -> ProverLib.include_param -> state

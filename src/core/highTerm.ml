@@ -126,10 +126,10 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
 let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
   let rec is_adv (venv : Vars.env): Term.term -> bool = function
     | Var v ->
-      (* check that the variable is constant, and of a type whose elements 
-         are of at-most polynomial size.
-         FEATURE: we check fixed+finite, which is sound but coarse. *)
-      let is_poly_constant =
+      (* check that the variable is constant, fixed and finite
+         FEATURE: we could check instead that the type contains elements at-most
+         polynomial sized. *)
+      let is_constant_fixed_finite =
         try
           let info = Vars.get_info v venv in
           info.const &&
@@ -137,11 +137,18 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
           Symbols.TyInfo.is_finite env.table (Vars.ty v) 
         with Not_found -> false (* sound though possibly inprecise *)
       in
+      (* const + encodable as bit-strings => adv *)
+      let is_const_base_type =
+        try
+          let info = Vars.get_info v venv in
+          info.const && Type.is_bitstring_encodable (Vars.ty v)
+        with Not_found -> false 
+      in
       let is_adv =
         try (Vars.get_info v venv).adv with 
-        | Not_found -> false (* sound though possibly inprecise *)
+        | Not_found -> false 
       in
-      is_adv || is_poly_constant
+      is_constant_fixed_finite || is_const_base_type || is_adv
 
     | Name _ | Macro _ -> false
 
@@ -152,7 +159,7 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
       Term.tforall (is_adv venv) t
 
     | Find (vs, _, _, _) | Quant ((ForAll | Exists),vs,_) as t ->
-      (* fixed + finite => polynomial **cardinal** for the type
+      (* fixed + finite => enumerable in polynomial time
          (though we could be more precise with another type information) *)
       let poly_card_type_binders =
         List.for_all (fun v -> 

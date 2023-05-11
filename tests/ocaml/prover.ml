@@ -12,7 +12,7 @@ let some_print () =
   Alcotest.check_raises "print stuff" Ok
     (fun () ->
       let st = Prover.init () in
-      let _ = try Prover.exec_all st
+      let _ = try Prover.exec_all ~test:true st
         "include Basic.
         channel c
         system [T] (S : !_i !_i new n; out(c,n)).

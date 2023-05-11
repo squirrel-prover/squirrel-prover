@@ -115,3 +115,7 @@ type prover_input =
 type input =
   | Prover of prover_input
   | Toplvl of toplevel_input
+
+let get_prover_command = function
+  | Prover c -> c
+  | _ -> assert false

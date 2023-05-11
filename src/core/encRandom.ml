@@ -28,7 +28,8 @@ let soft_failure = Tactics.soft_failure
 
 
 (** Auxiliary function to check if a name with the same 
-   symbol as n occurs in t (without expanding macros) *)
+   symbol as n occurs in t (without expanding macros)
+  (duplicate from Occurrences, will eventually be removed) *)
 let rec has_name (n:Name.t) (t:term) : bool =
   match t with
   | Name (nn, _) when nn = n.symb -> true

@@ -277,6 +277,19 @@ let pp_pref (ty : pp) =
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
+let pphtml_pref (ty : pp) =
+  match ty with
+  | `Prompt  -> pr "@[[> "
+  | `Start   -> pr "@[[start>"
+  | `Result  -> pr "@["
+  | `Error   -> pr "@[\x1B<div class=err \x1B>" (* vertical box, for nice errors in Emacs mode *)
+  | `Dbg     -> pr "@[[dbg>"
+  | `Warning -> pr "@[\x1B<div class=warning \x1B>"(* vertical box, for nice errors in Emacs mode *)
+  | `Ignore  -> ()
+  | `Goal    -> pr "@[\x1B<div class=goal \x1B>"
+  | `Default -> ()
+
+
 let pp_suf fmt (ty : pp) =
   match ty with
   | `Prompt  -> Fmt.pf fmt "@;@]@?"
@@ -289,11 +302,29 @@ let pp_suf fmt (ty : pp) =
   | `Goal    -> Fmt.pf fmt "@;@]@?"
   | `Default -> ()
 
+let pphtml_suf fmt (ty : pp) =
+  match ty with
+  | `Prompt  -> Fmt.pf fmt "@;@]@?"
+  | `Start   -> Fmt.pf fmt "@;<]@]@?"
+  | `Result  -> Fmt.pf fmt "@;@]@?"
+  | `Error   -> Fmt.pf fmt "\x1B</div\x1B>@;@]@?"
+  | `Dbg     -> Fmt.pf fmt "@;<]@]@?"
+  | `Warning -> Fmt.pf fmt "\x1B</div\x1B>@;<]@]@?"
+  | `Ignore  -> ()
+  | `Goal    -> Fmt.pf fmt "\x1B</div\x1B>@;@]@?"
+  | `Default -> ()
+
 let prt ty fmt = 
   let out = match ty with
     | `Ignore -> dummy_fmt
     | _ -> get_std () in
     pp_pref ty; Fmt.kpf (fun fmt -> pp_suf fmt ty) out fmt
+
+let prthtml ty fmt = 
+  let out = match ty with
+    | `Ignore -> dummy_fmt
+    | _ -> get_std () in
+    pphtml_pref ty; Fmt.kpf (fun fmt -> pphtml_suf fmt ty) out fmt
 
 let pr fmt = prt `Default fmt
 
