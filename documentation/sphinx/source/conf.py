@@ -27,6 +27,7 @@ release = ''
 
 extensions = [
     'sphinx.ext.ifconfig',
+    'sphinx.ext.todo', # add todo:: directive
     'sphinx_tabs.tabs', # Needs `pip install sphinx-tabs`
     'myst_parser', # Needs `pip install myst-parser`
     'sphinxcontrib.bibtex',
@@ -128,8 +129,6 @@ latex_engine = "xelatex"
 # Cf. https://github.com/sphinx-doc/sphinx/issues/7015
 latex_use_xindy = False
 
-
-
 # navtree options
 navtree_shift = True
 
@@ -144,9 +143,11 @@ report_undocumented_squirrel_objects = "warning"
 # The encoding of source files.
 source_encoding = 'utf-8-sig'
 
+# TODO pass it to False for publishing
+todo_include_todos = True
+
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = 'sphinx'
 highlight_language = 'rst'
 # suppress_warnings = ["misc.highlighting_failure","ref.cmd","ref.tacn"]
 suppress_warnings = ["misc.highlighting_failure"]
-

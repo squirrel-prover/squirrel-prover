@@ -7,6 +7,52 @@ See `this README <../README.md>`_ for compilation instructions.
 
 In addition to standard reST directives (a directive is similar to a LaTeX environment) and roles (a role is similar to a LaTeX command), the ``squirrelrst`` plugin loaded by the documentation uses a custom *Squirrel domain* — a set of Squirrel-specific directives that define *objects* like tactics, commands (vernacs), warnings, etc. —, some custom *directives*, and a few custom *roles*.  Finally, this manual uses a small DSL to describe tactic invocations and commands.
 
+TODO list generation
+====================
+
+You can add a task in the todo list with this directive :
+
+.. tabs::
+
+   .. tab:: reStructuredText
+
+      .. code-block:: rst
+
+         .. todo::
+            
+            This is a task added into the todo list
+
+         .. todo::
+            
+            This is an other task added into the todo list
+
+
+   .. tab:: Produces
+
+      .. todo::
+
+         This is a task added into the todo list
+
+      .. todo::
+         
+         This is an other task added into the todo list
+
+
+The list can be displayed with :
+
+.. tabs::
+
+   .. tab:: reStructuredText
+
+      .. code-block:: rst
+
+         .. todolist::
+
+   .. tab:: Produces
+
+      .. todolist::
+
+
 Squirrel objects
 ================
 
