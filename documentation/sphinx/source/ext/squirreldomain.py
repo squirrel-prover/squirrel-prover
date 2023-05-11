@@ -696,11 +696,13 @@ def squirrel_code_role(role, rawtext, text, lineno, inliner, options={}, content
         lexer = pygments.lexers.get_lexer_by_name("squirrel")
     except ValueError:
         options['language'] = 'squirrel'
-        return code_role(role, rawtext, text, lineno, inliner, options, content)
+        return code_role(role, rawtext.strip(), text.strip(), lineno, inliner, options, content)
+
     code = utils.unescape(text, 1)
     parsed = pygments.highlight(code,lexer,TERM_FORMATTER)
+    parsed = parsed.strip()
     in_chunks = AnsiColorsParser().colorize_str(parsed)
-    node = nodes.inline(code, '', *in_chunks,classes=['squirrelinline'])
+    node = nodes.literal(code, '', *in_chunks,classes=['squirrelinline'])
     return [node], []
 
 SquirrelCodeRole = squirrel_code_role
