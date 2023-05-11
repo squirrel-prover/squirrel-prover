@@ -11,6 +11,9 @@ new function symbols, cryptographic primitives, types, etc.
 Systems will be documented elsewhere as they are not tied to the
 logic.
 
+.. todo::
+   Charlie: Despite the previous sentence, systems are marked as TODOS further down in this file. Do we want to remove the previous sentence, or indeed change a bit the structure?
+
 Types
 ======
 
@@ -28,11 +31,8 @@ Squirrel comes with several builtin base types:
 * :gdef:`message` represents bitstrings;
 * :gdef:`bool` represents a single bit;
 * :gdef:`timestamp` represents the points in a finite execution trace;
-* :gdef:`index` represent an arbitrary finite set used to index
+* :gdef:`index` represents an arbitrary finite set used to index
   unbounded collections of objects.
-
-.. note:: A finite type is still unbounded:
-          the semantics for the type can be any finite set.
 
 Additional :gdef:`custom types` may be declared by the user
 using the following declaration:
@@ -42,7 +42,7 @@ using the following declaration:
   Declare a new type called :token:`identifier`.
   The values of that type are assumed to be convertible to bitstrings,
   hence the type is a subtype of :g:`message`. Tags can optionally
-  be passed to indicate assumptions on the new type.
+  be passed to indicate assumptions on the new type, which intuitively puts restriction on the underlying set of bitstrings.
 
   .. prodn::
     type_tag ::= large | well_founded | finite | fixed | name_fixed_length
@@ -60,10 +60,16 @@ using the following declaration:
   * a type with :gdef:`name_fixed_length` means that all names sampled
     in that type (for a given :math:`\eta`) have the same length;
 
+The underlying parameter :math:`\eta` corresponds to the security parameter used in security proofs, and names are then used to model the sampling of nonces of length :math:`\eta`.
+
+.. note:: A finite type is still unbounded:
+          the semantics for the type can be any finite set.
+
+    
 Type variables
 --------------
 
-Squirrel supports parametric polymorphism à la Hindley–Milner. 
+Squirrel supports parametric polymorphism à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_. 
 Type variables can be represented by any identifier preceded by a
 single apostrophe, e.g. :n:`'x`.
 
@@ -75,20 +81,18 @@ General types
 
 General types are derived from base types and type variables using the
 arrow and tupling type constructors.  A type (or part of a type) can
-be left unwritten using a type holes :g:`_`, which must be then
+be left unwritten using a type holes :g:`_`, which must then be
 inferred by Squirrel.
 
 .. prodn::
   type ::= _ | @type_variable | @base_type | @type -> @type | (@type * ... * @type)
 
-.. note:: The most common function symbols have types of the form
-  :g:`(b1 * ... * bn) -> b` where :g:`b1,...,bn` and :g:`b` are base
-  types.
+The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b` where :g:`b1,...,bn` and :g:`b` are base types.
 
-  For example, a hash function may have type
-  :g:`(message * message) -> message`: it takes a message to be hashed,
-  a key, and the returned hash is also a message.
-
+.. example:: Hash function
+	     
+   A hash function may have type :g:`(message * message) -> message`: it takes a message to be hashedand a key, and the returned hash is also a message. Given that any hash value is often has a constant length, a specific type for the hash outputs could has been defined as a :g:`fixed` type.
+  
 Binders and tags
 ----------------
 
@@ -100,7 +104,7 @@ or whose name does not matter.
   variable ::= @identifier
   var_or_hole ::= @variable | _
 
-:gdef:`Tags <tag>` restrict a possible variable instantiation various ways.
+:gdef:`Tags <tag>` restrict a possible variable instantiation in various ways.
 
 .. prodn::
   tag ::= const | glob
@@ -117,7 +121,7 @@ to :g:`tag`:
   variable ; for example, this excludes any :term:`diff-term`
   (e.g. :g:`diff(s,t)`), or any term with system-specific macros
   (e.g. :g:`output@tau`).
-
+ 
 Squirrel uses the following syntax for binders:
 
 .. prodn::
@@ -132,6 +136,8 @@ The type hole will have to be inferred by unification.
           function :g:`fun(x:int[const])=>f`. Squirrel will
           ignore the tags in such cases.
 
+.. todo:: Charlie: the previous note uses an abstraction before it is defined, move this note down a bit? Or add a see later in the note? Specify why the binder does not have a meaning here would also be a plus. (I actually thought that tags in binders never have a meaning, which a later note actually says.
+
 .. note:: Binding twice the same variable name yields two distinct
           variables (there is a hidden unique identifier).
 
@@ -139,7 +145,7 @@ Terms
 =====
 
 :gdef:`Terms <term>` are syntactic expressions that denote
-probabilistic values (actualy families of probabilistic values indexed
+probabilistic values (families of probabilistic values indexed
 by the security parameter :math:`\eta`, though this can often be
 ignored).
 For instance, a term of type :g:`message` represents a
@@ -210,12 +216,12 @@ Multiple binders in an abstraction or quantifier construct represent
 multiple nested constructs, e.g. :n:`fun x y=>@term` is a short form
 for :n:`fun x=>(fun y=>@term)`.
 
-A try-find performs a look-up through all values of a type, filtered
+A :n:`find` performs a look-up through all values of a type, filtered
 according to some predicate, and returining some computation. E.g. if
 :n:`@term__b` is of type :g:`bool` and :n:`@term__i` and :n:`@term__e`
 have the same type, then 
 :n:`find(x:@type)such that @term__b in @term__i else @term__e` 
-search a :n:`x` of type :n:`type` such that
+looks for some :n:`x` of type :n:`type` such that
 :n:`@term__b`: if such a value exists, it returns :n:`@term__b`,
 otherwise it returns :n:`@term__e` (terms :n:`@term__b` and
 :n:`@term__i` can use the variable :n:`x`, while :n:`@term__b`
@@ -235,10 +241,16 @@ TODO :gdef:`diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` rep
 .. prodn:: 
    diff_term ::= diff(@term, @term)
 
+.. todo:: Charlie: Not sure we want to define diff operator and diff_term here (especially as we later define formulas over terms, not over diff-terms) This is linked to the question of where we want to define systems. I would propose to have a "pure" logic.html file with Types/Terms/Formulas/Judgments, and push somewhere else declarations systems, diff-terms and names.
+   
 Names
 -----
 
 TODO :gdef:`names <name>`
+
+.. prodn::
+   name_id ::= @identifier
+   name ::= name @name_id : [(@index * ... * @index) ->] @type
 
 .. note::
   Unlike in the original BC logic and the meta-logic that was used at first
@@ -264,7 +276,7 @@ Local formulas
 --------------
 
 :gdef:`Local formulas <local formula>` are :term:`terms <term>` of
-type :g:`bool`. They can in particular be constructed using common
+type :g:`bool`. They correspond to the embedding of a lower-level logic inside of our terms. They can in particular be constructed using common
 syntax and construction specific to Squirrel describdee below:
 
 .. prodn::

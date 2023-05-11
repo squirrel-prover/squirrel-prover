@@ -10,17 +10,17 @@ The proof of a goal is given after the goal
 between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
 tactic modifies the proof state, which contains a list of goals to prove.
-Initially, the proof state consists a single goal, as declared by the
-user. Then each tactic reduces the first goal of the proof state to
+Initially, the proof state consists of a single goal, as declared by the
+user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new subgoals. When no goal is left, the proof
 is completed and :g:`Qed` can be used.
 
 Tacticals
 ---------
 
-**TODO** I'm not sure we want to document tacticals using the same
-role as elementary tactics, I did it like this for now just so the
-references to try and repeat in the appendix work.
+.. todo:: David: I'm not sure we want to document tacticals using the same
+	  role as elementary tactics, I did it like this for now just so the
+	  references to try and repeat in the appendix work.
 
 .. tacn:: nosimpl @tactic
 
@@ -45,8 +45,8 @@ Tactics
 Automatic simplifications
 -------------------------
 
-**TODO** document what is done implicitly after each tactic invokation,
-clarify that this is not the same as calling the `simpl` tactic.
+.. todo:: document what is done implicitly after each tactic invokation,
+	  clarify that this is not the same as calling the `simpl` tactic.
 
 Tactic arguments
 ~~~~~~~~~~~~~~~~
@@ -68,11 +68,11 @@ using the :token:`position` token.
 .. prodn::
   position ::= @natural
 
-**TODO** most (all?) tactics take terms and formulas as patterns,
-with an implicit filling of the holes by matching against the subgoal's
-conclusion; document this, and also decide whether arguments are shown
-as :token:`term`, :token:`formula`, :token:`pattern`,
-:token:`formula_pattern`, etc.
+.. todo:: most (all?) tactics take terms and formulas as patterns,
+	  with an implicit filling of the holes by matching against the subgoal's
+	  conclusion; document this, and also decide whether arguments are shown
+	  as :token:`term`, :token:`formula`, :token:`pattern`,
+	  :token:`formula_pattern`, etc.
 
 Proof terms
 ~~~~~~~~~~~

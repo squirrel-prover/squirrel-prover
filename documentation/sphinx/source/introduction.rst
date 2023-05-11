@@ -25,13 +25,13 @@ It introduces, relatively informally, the languages used in Squirrel:
 - finally, proving these properties is done using a
   :ref:`tactic language <section-proofs>`.
 
-A Squirrel file consists of a list of directives which impact
+A Squirrel file consists of a list of directives that impact
 the prover state:
 
 - :ref:`declarations <section-declarations>`,
   which introduce new function symbols, cryptographic
   assumptions, processes, systems, and goals (i.e. lemmas or theorems);
-- :ref:`commands <section-commands>`
+- :ref:`commands <section-commands>`,
   which are used to enter or exit the proof mode,
   query the current state of the prover
   (e.g. find lemmas about a given function symbol) or
@@ -41,10 +41,10 @@ the prover state:
 
 For a more theoretical perspective on Squirrel,
 you may read some of the associated publications:
-:cite:`bdjkm21sp`,
-:cite:`bdkm22csf`,
-:cite:`cfj22sp` and
-:cite:`bkl23hal`.
+:cite:`bdjkm21sp` for the original paper,
+:cite:`bdkm22csf` for the extension to stateful protocols,
+:cite:`cfj22sp` for the extension to post-quantum attackers and
+:cite:`bkl23hal` for the up to date presentation of the logic.
 
 .. note::
   This documentation heavily borrows from the infrastructure of the
