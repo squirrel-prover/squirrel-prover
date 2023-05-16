@@ -279,6 +279,25 @@ let global_rename
   (Some lemma, [], table)
 
 
+
+(*------------------------------------------------------------------*)
+(* Timeless global tactis can only be applied to simple terms. that
+   are only basic function applications over names. *)
+let rec is_simple (t : Term.term) : bool =
+  let are_simple = List.for_all is_simple in
+  match t with
+  | Var _
+  | Fun (_, _)  -> true
+  | App (t, l) -> are_simple (t :: l)
+  | Tuple l                       
+  | Name (_,l) -> are_simple l                      
+  | Macro (_, _, _) 
+  | Action (_,_) 
+  | Proj (_, _) 
+  | Diff (_) 
+  | Find (_, _, _, _)
+  | Quant (_, _, _) -> false
+
 (*------------------------------------------------------------------*)
 (** {2 PRF} *)
 
@@ -320,6 +339,12 @@ let global_prf
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
 
+  (* Check that the target hash is a simple term (no macros, no diff, no quant) *)
+  if not (is_simple hash) then
+    Tactics.hard_failure 
+      (Failure
+         "the target term should be a simple term, without macros, diff, quantifications, etc.");
+  
   (* We first refresh globably the indices to create the left pattern *)
   let is1, left_subst = Term.refresh_vars is in
 
@@ -476,7 +501,13 @@ let global_cca
            "The first encryption symbol is not used with the correct \
             public key function.")
   in
+  (* Check that the target enc is a simple term (no macros, no diff, no quant) *)
+  if not (is_simple enc) then
+    Tactics.hard_failure 
+      (Failure
+         "the target term should be a simple term, without macros, diff, quantifications, etc.");
 
+  
   (* TODO: check randomness is used only once, and message is distinct. *)
 
   (* We first refresh globably the indices to create the left patterns *)
