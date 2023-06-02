@@ -11,7 +11,7 @@
 ;;(require 'proof-syntax)
 (require 'squirrel-syntax)
 
-(proof-easy-config 'squirrel "squirrel"
+(proof-easy-config 'squirrel "Squirrel"
 
  proof-prog-name		                   "squirrel -i"  ;; your program
  proof-terminal-string                 "."            ;; end of commands
