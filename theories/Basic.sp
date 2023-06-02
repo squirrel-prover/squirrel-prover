@@ -22,9 +22,9 @@ Proof.
   by rewrite eq_refl_e.
 Qed.
 
-goal [any] neq_irefl ['a] (x : 'a) : (x <> x) <=> false.
+goal [any] neq_irrefl ['a] (x : 'a) : (x <> x) <=> false.
 Proof. by split. Qed.
-hint rewrite neq_irefl.
+hint rewrite neq_irrefl.
 
 (*------------------------------------------------------------------*)
 (* true/false *)
@@ -544,3 +544,38 @@ Proof.
   + intro [x H] H'.
     by exists x.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* Order *)
+
+axiom [any] le_trans    ['a] (x,y,z : 'a) : x <= y => y <= z => x <= z.
+axiom [any] lt_trans    ['a] (x,y,z : 'a) : x < y  => y < z  => x < z.
+axiom [any] lt_le_trans ['a] (x,y,z : 'a) : x < y  => y <= z => x < z.
+axiom [any] le_lt_trans ['a] (x,y,z : 'a) : x <= y => y < z  => x < z.
+
+axiom [any] lt_charac ['a] (x,y : 'a) : x < y <=> (x <> y && x <= y).
+
+axiom [any] le_not_lt_impl_eq ['a] (x,y : 'a) : x <= y => not (x < y) => x = y.
+
+goal [any] lt_impl_le ['a] (x,y : 'a) : x < y => x <= y.
+Proof. by rewrite lt_charac. Qed.
+
+goal [any] not_lt_refl ['a] (x:'a) : not (x < x).
+Proof. auto. Qed.
+
+goal [any] lt_irrefl ['a] (x : 'a) : x < x <=> false.
+Proof. auto. Qed.
+
+(* The next lemma could be strengthened as an equivalence for all
+   types except timestamps. *)
+axiom [any] le_impl_eq_lt ['a] (x,y : 'a) : x <= y => (x = y || x < y).
+
+(* The ordering is not well-behaved on timestamps,
+   hence some properties do not hold on all types;
+   specific lemmas are given below for useful types. *)
+axiom [any] le_refl_index (x:index) : x <= x.
+goal [any] le_refl_index_eq (x:index) : (x <= x) = true.
+Proof.
+  by rewrite le_refl_index.
+Qed.
+hint rewrite le_refl_index_eq.
