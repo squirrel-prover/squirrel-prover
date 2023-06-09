@@ -48,7 +48,7 @@ cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 - Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
    add to the list `proof-assistant-table-default` the following line:
 ```
- (squirrel "squirrel" "sp")
+ (squirrel "Squirrel" "sp")
 ```
 Then erase the outdated compiled version of this file:
 ```
