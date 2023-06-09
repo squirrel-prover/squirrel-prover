@@ -246,35 +246,6 @@ hint rewrite dec_enc.
 goal [any] dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
 
-(* Others *)
-
-goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
-Proof.
-  by rewrite eq_iff.
-Qed.
-
-goal [any] le_not_lt (t, t' : timestamp):
-  t <= t' => not (t < t') => t = t'.
-Proof.
-  by case t' = init.
-Qed.
-
-goal [any] le_not_lt_charac (t, t' : timestamp):
- (not (t < t') && t <= t') = (happens(t) && t = t').
-Proof.
- by rewrite eq_iff.
-Qed.
-
-goal [any] lt_impl_le (t, t' : timestamp):
-  t < t' => t <= t'.
-Proof. auto. Qed.
-
-goal le_lt (t, t' : timestamp):
-  t <> t' => (t <= t') = (t < t').
-Proof.
-  by intro *; rewrite eq_iff.
-Qed.
-
 (*------------------------------------------------------------------*)
 (* HELPING LEMMAS - counter increase *)
 

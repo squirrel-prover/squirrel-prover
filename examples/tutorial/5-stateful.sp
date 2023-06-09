@@ -115,13 +115,13 @@ axiom [any] order_incr (n1,n2:message):
 op (~~<) (x : message, y : message) : boolean = x ~< y || x = y.
 
 (* We now prove a few properties of `~~<` and `~<` *)
-goal [any] le_lt (n1,n2 : message):
+goal [any] tt_le_lt (n1,n2 : message):
   n1 ~< n2 => n1 ~~< n2.
 Proof. 
   by intro ?; rewrite /(~~<); left. 
 Qed.
 
-goal [any] le_lt_trans (n1,n2,n3 : message):
+goal [any] tt_le_lt_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -130,7 +130,7 @@ Proof.
   + by rewrite H1. 
 Qed.
 
-goal [any] lt_le_trans (n1,n2,n3 : message):
+goal [any] tt_lt_le_trans (n1,n2,n3 : message):
   n1 ~< n2 => n2 ~~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -141,7 +141,7 @@ Qed.
 
 (* Prove, using `order_trans`, that `~~<` is also
    a transitive relation. *)
-goal [any] le_trans (n1,n2,n3 : message):
+goal [any] tt_le_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~~< n3 => n1 ~~< n3.
 Proof. 
   admit. (* TODO *)

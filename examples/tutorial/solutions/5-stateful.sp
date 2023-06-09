@@ -115,13 +115,13 @@ axiom [any] order_incr (n1,n2:message):
 op (~~<) (x : message, y : message) : boolean = x ~< y || x = y.
 
 (* We now prove a few properties of `~~<` and `~<` *)
-goal [any] le_lt (n1,n2 : message):
+goal [any] tt_le_lt (n1,n2 : message):
   n1 ~< n2 => n1 ~~< n2.
 Proof. 
   by intro ?; rewrite /(~~<); left. 
 Qed.
 
-goal [any] le_lt_trans (n1,n2,n3 : message):
+goal [any] tt_le_lt_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -130,7 +130,7 @@ Proof.
   + by rewrite H1. 
 Qed.
 
-goal [any] lt_le_trans (n1,n2,n3 : message):
+goal [any] tt_lt_le_trans (n1,n2,n3 : message):
   n1 ~< n2 => n2 ~~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -141,7 +141,7 @@ Qed.
 
 (* Prove, using `order_trans`, that `~~<` is also
    a transitive relation. *)
-goal [any] le_trans (n1,n2,n3 : message):
+goal [any] tt_le_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~~< n3 => n1 ~~< n3.
 Proof. 
   (* BEGIN EXO *) 
@@ -247,7 +247,7 @@ Proof.
     rewrite /cpt.
     case (tau1 = tau2) => ?; 1: by rewrite /(~~<); right.
     case (i = i0) => ? //=; 2: by apply IH.
-    apply le_trans _ (cpt(i)@pred(tau2)) => //.
+    apply tt_le_trans _ (cpt(i)@pred(tau2)) => //.
     - by apply IH.        
     - by rewrite /(~~<); left; apply order_incr.
   (* END EXO *)
@@ -261,9 +261,9 @@ goal counter_increaseT_strict (tau1, tau2 : timestamp, i,k : index):
 Proof.
   (* BEGIN EXO *)
   intro H2 H3. 
-  apply le_lt_trans _ (cpt(i)@pred(T(i,k))). 
+  apply tt_le_lt_trans _ (cpt(i)@pred(T(i,k))).
   + by apply counter_increaseT.
-  + apply lt_le_trans _ (cpt(i)@T(i,k)). 
+  + apply tt_lt_le_trans _ (cpt(i)@T(i,k)).
     - rewrite /cpt.
       by apply order_incr.
     - by apply counter_increaseT.
@@ -286,7 +286,7 @@ Proof.
     case (tau1 = tau2) => ?; 1: by rewrite /(~~<); right.
     case (i = i0) => ? //=; 2: by apply IH.
     rewrite /exec /cond /c in E. 
-    apply le_trans _ (Rcpt(i)@pred(tau2)) => //.
+    apply tt_le_trans _ (Rcpt(i)@pred(tau2)) => //.
     by apply IH.        
 
   (* R1(j,i0) *)
@@ -295,7 +295,7 @@ Proof.
     case (tau1 = tau2) => ?; 1: by rewrite /(~~<); right.
     case (i = i0) => ? //=; 2: by apply IH.
     rewrite /exec /cond /c in E. 
-    apply le_trans _ (Rcpt(i)@pred(tau2)) => //.
+    apply tt_le_trans _ (Rcpt(i)@pred(tau2)) => //.
     - by apply IH.        
 
   (* T(i0,k) *)

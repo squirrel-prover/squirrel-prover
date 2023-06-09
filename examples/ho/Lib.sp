@@ -17,39 +17,6 @@ Proof.
   auto.
 Qed.
 
-(*------------------------------------------------------------------*)
-(* others *)
-
-goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
-Proof. 
-  by rewrite eq_iff.
-Qed.
-
-goal [any] le_not_lt (t, t' : timestamp): 
-  t <= t' => not (t < t') => t = t'.
-Proof.
-  by case t' = init. 
-Qed.
-
-goal [any] le_not_lt_charac (t, t' : timestamp):
- (not (t < t') && t <= t') = (happens(t) && t = t').
-Proof.
- by rewrite eq_iff.
-Qed.
-
-(* special case of [le_lt] on timestamp, can be proved. *)
-goal le_lt_ts (t, t' : timestamp):
-  t <> t' => (t <= t') = (t < t').
-Proof.
-  by intro *; rewrite eq_iff.
-Qed.
-
-axiom [any] lt_impl_le ['a] (x, x' : 'a): 
-  x < x' => x <= x'.
-
-axiom [any] le_lt ['a] (x, x' : 'a): 
-  x <> x' => (x <= x') = (x < x').
-
 (*==================================================================*)
 (* Group axiomatisation *)
 
