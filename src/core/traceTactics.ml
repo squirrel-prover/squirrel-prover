@@ -665,7 +665,11 @@ let deprecated_mk_fresh_indirect_cases
   let env = Env.init ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv () in
 
   let macro_cases =
-    Iter.fold_macro_support0 (fun action_name a t macro_cases ->
+    Iter.fold_macro_support (fun iocc macro_cases ->
+        let action_name = iocc.iocc_aname  in
+        let a           = iocc.iocc_action in
+        let t           = iocc.iocc_cnt    in
+        
         let fv =
           Sv.diff
             (Sv.union (Action.fv_action a) (Term.fv t))

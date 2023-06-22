@@ -516,7 +516,7 @@ let get_macro_occs
       Tactics.soft_failure (Tactics.Failure err_str)
 
     | Term.Macro (ms, l, ts) ->
-      let default () =
+      let mk_occ () =
         { occ_cnt  = { symb = ms; args = l; } ;
           occ_vars = List.rev fv;
           occ_cond = cond;
@@ -527,8 +527,8 @@ let get_macro_occs
       if expand_mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
         match Macros.get_definition constr ms ~args:l ~ts with
         | `Def t -> get t ~fv ~cond
-        | `Undef | `MaybeDef -> default ()
-      else default ()
+        | `Undef | `MaybeDef -> mk_occ ()
+      else mk_occ ()
 
     | _ -> rec_strict_subterms t ~fv ~cond
 
@@ -542,6 +542,58 @@ let get_macro_occs
   in
   get t ~fv ~cond:[]
 
+
+(*------------------------------------------------------------------*)
+(** {2 Folding over action descriptions} *)
+
+(** Fold over macros defined at a given description.
+    Also folds over global macros if [globals] is [true]. *)
+let fold_descr
+    ~(globals : bool)
+    (func :
+       (Symbols.macro ->       (* macro symbol [ms] *)
+        Vars.var list ->       (* action indices *)
+        args:Term.term list -> (* argument of the macro [ms] for state and globals *)
+        body:Term.term ->      (* term [t] defining [ms(is)] *)
+        'a ->                  (* folding argument *)
+        'a))
+    (table  : Symbols.table)
+    (system : SE.fset)
+    (descr  : Action.descr)
+    (init   : 'a) : 'a
+  =
+  let mval =
+    func Symbols.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
+    func Symbols.cond descr.indices ~args:[] ~body:(snd descr.condition) 
+  in
+
+  (* fold over state macros *)
+  let mval =
+    List.fold_left (fun mval (st, args, t) ->
+        func st descr.indices ~args ~body:t mval
+      ) mval descr.updates
+  in
+
+  if not globals then mval
+  else
+    let ts = SE.action_to_term table system (Action.to_action descr.action) in
+    let cntxt = Constr.{ system; table; models = None; } in
+
+    (* fold over global macros in scope of [descr.action] *)
+    List.fold_left (fun mval (mg : Symbols.macro) ->
+        let is_arr, ty = match Symbols.Macro.get_def mg table with
+          | Global (is,ty) -> is, ty
+          | _ -> assert false
+        in
+        let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
+        let t = 
+          let msymb = Term.mk_symb mg ty in
+          match Macros.get_definition cntxt msymb ~args ~ts with
+          | `Def t -> t
+          | _ -> assert false
+        in
+        func mg descr.indices ~args ~body:t mval
+      ) mval descr.globals
 
 (*------------------------------------------------------------------*)
 (** {2 Path conditions} *)
@@ -607,58 +659,8 @@ module PathCond = struct
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Folding over action descriptions} *)
+(** {2 Set of macros} *)
 
-(** Fold over macros defined at a given description.
-    Also folds over global macros if [globals] is [true]. *)
-let fold_descr
-    ~(globals:bool)
-    (func :
-       (Symbols.macro ->       (* macro symbol [ms] *)
-        Vars.var list ->       (* action indices *)
-        args:Term.term list -> (* argument of the macro [ms] for state and globals *)
-        body:Term.term ->      (* term [t] defining [ms(is)] *)
-        'a ->                  (* folding argument *)
-        'a))
-    (table  : Symbols.table)
-    (system : SE.fset)
-    (descr  : Action.descr)
-    (init   : 'a) : 'a
-  =
-  let mval =
-    func Symbols.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
-    func Symbols.cond descr.indices ~args:[] ~body:(snd descr.condition) 
-  in
-
-  (* fold over state macros *)
-  let mval =
-    List.fold_left (fun mval (st, args, t) ->
-        func st descr.indices ~args ~body:t mval
-      ) mval descr.updates
-  in
-
-  if not globals then mval
-  else
-    let ts = SE.action_to_term table system (Action.to_action descr.action) in
-    let cntxt = Constr.{ system; table; models = None; } in
-
-    (* fold over global macros in scope of [descr.action] *)
-    List.fold_left (fun mval (mg : Symbols.macro) ->
-        let is_arr, ty = match Symbols.Macro.get_def mg table with
-          | Global (is,ty) -> is, ty
-          | _ -> assert false
-        in
-        let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
-        let t = 
-          let msymb = Term.mk_symb mg ty in
-          match Macros.get_definition cntxt msymb ~args ~ts with
-          | `Def t -> t
-          | _ -> assert false
-        in
-        func mg descr.indices ~args ~body:t mval
-      ) mval descr.globals
-
-(*------------------------------------------------------------------*)
 module Ss = Symbols.Ss(Symbols.Macro)
 module Ms = Symbols.Ms(Symbols.Macro)
 
@@ -1036,17 +1038,17 @@ let macro_support
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
 type iocc = {
-  iocc_aname     : Symbols.action;
-  iocc_action    : Action.action;
-  iocc_vars      : Sv.t;
-  iocc_cnt       : Term.term;
-  iocc_sources   : Term.term list;
+  iocc_aname   : Symbols.action;
+  iocc_action  : Action.action;
+  iocc_vars    : Sv.t;
+  iocc_cnt     : Term.term;
+  iocc_sources : Term.term list;
 
   iocc_path_cond : PathCond.t;
 }
 
 let pp_iocc fmt (o : iocc) : unit =
-  Fmt.pf fmt "@[<v 2>[%a(%a):@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
+  Fmt.pf fmt "@[<v 2>[@[%a(%a)@]:@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
     Symbols.pp o.iocc_aname
     (Fmt.list ~sep:Fmt.comma Term.pp) (Action.get_args o.iocc_action)
     Term.pp o.iocc_cnt
@@ -1114,8 +1116,8 @@ let _fold_macro_support
               Sv.union (Action.fv_action iocc_action) (Term.fv iocc_cnt) 
             in
             let iocc = {
-              iocc_aname   = descr.name;
-              iocc_vars    = Sv.diff iocc_fv venv;
+              iocc_aname = descr.name;
+              iocc_vars  = Sv.diff iocc_fv venv;
               iocc_action;
               iocc_cnt;
               iocc_sources = srcs;
@@ -1139,24 +1141,6 @@ let fold_macro_support
     (init  : 'a) : 'a
   =
   _fold_macro_support ?mode (fun _ -> func) cntxt env terms init
-
-(** Less precise version of [fold_macro_support], which does not track 
-    sources. *)
-let fold_macro_support0
-    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
-    (func : (
-        Symbols.action -> (* action name *)
-        Action.action ->  (* action *)
-        Term.term ->      (* term *)
-        'a -> 'a))
-    (cntxt : Constr.trace_cntxt)
-    (env   : Env.t)
-    (terms : Term.term list)
-    (init  : 'a) : 'a
-  =
-  _fold_macro_support ?mode (fun _ iocc acc ->
-      func iocc.iocc_aname iocc.iocc_action iocc.iocc_cnt acc
-    ) cntxt env terms init
 
 
 (** Less precise version of [fold_macro_support], which does not track 

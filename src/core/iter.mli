@@ -244,15 +244,15 @@ type allowed_constants = Const | PTimeSI | PTimeNoSI
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname    : Symbols.action;
-  iocc_action   : Action.action;
-  iocc_vars     : Sv.t;
-  iocc_cnt      : Term.term;
-  iocc_sources  : Term.term list;
+  iocc_aname   : Symbols.action;
+  iocc_action  : Action.action;
+  iocc_vars    : Sv.t;
+  iocc_cnt     : Term.term;
+  iocc_sources : Term.term list;
 
   iocc_path_cond : PathCond.t;
   (** Path condition on the timestamps [τ] at which the occurrence can occur:
-      for any source timestamp [τ_src] (in [iocc_sources]),
+      for any source timestamp [τ0] (in [iocc_sources]),
       [path_cond τ τ0] *)
 }
 
@@ -285,21 +285,6 @@ val pp_iocc : Format.formatter -> iocc -> unit
 val fold_macro_support :
   ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (iocc -> 'a -> 'a) ->
-  Constr.trace_cntxt -> 
-  Env.t -> 
-  Term.term list -> 
-  'a -> 
-  'a
-
-(** Less precise version of [fold_macro_support], which does not track 
-    sources. *)
-val fold_macro_support0 :
-  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
-  (Symbols.action ->         (* action name *)
-   Action.action  ->         (* action *)
-   Term.term      ->         (* term *)
-   'a             ->         (* folding accumulator *)
-   'a) ->
   Constr.trace_cntxt -> 
   Env.t -> 
   Term.term list -> 
