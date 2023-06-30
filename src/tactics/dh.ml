@@ -307,7 +307,7 @@ let cgdh
     dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
   in
   let pp_nab =
-    fun ppf () -> Fmt.pf ppf "%a and %a" Name.pp na Name.pp nb
+    fun ppf () -> Fmt.pf ppf "bad occurrences@ of %a and %a" Name.pp na Name.pp nb
   in
   let get_bad : NOS.f_fold_occs =
     get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]

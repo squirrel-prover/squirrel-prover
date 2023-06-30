@@ -707,7 +707,7 @@ struct
     let table = contx.table in
 
     let ppp ppf = match pp_ns with
-      | Some x -> Fmt.pf ppf "of @[%a@] " x ()
+      | Some x -> Fmt.pf ppf "@[%a@] " x ()
       | None   -> Fmt.pf ppf ""
     in
 
@@ -732,7 +732,7 @@ struct
            (* printing *)
            if pp_ns <> None && occs <> [] then
              Printer.pr "@[<hv 2>\
-                         @[<hov 0>Direct bad occurrences@ @[%t@]in@ @[%a@]:@]\
+                         @[<hov 0>Direct @[%t@]@ in@ @[%a@]:@]\
                          @;@[%a@]@]@;@;@;"
                ppp Term.pp t EO.pp_occs occs;
            dir_occs @ occs)
@@ -781,7 +781,7 @@ struct
 
     (* printing *)
     if pp_ns <> None && ind_occs <> [] then
-      Printer.pr "@[<hv 2>@[Bad occurrences@ @[%t@]in other actions:@]@;%a@]@;@;"
+      Printer.pr "@[<hv 2>@[Indirect @[%t@]@ in other actions:@]@;%a@]@;@;"
         ppp
         EO.pp_occs ind_occs;
 
@@ -796,13 +796,13 @@ struct
 
     if pp_ns <> None && loccs <> 0 then
       (Printer.pr
-         "Total: @[<v 0>%d bad occurrence%s@;"
+         "Total: @[<v 0>%d occurrence%s@;"
          loccs (if loccs = 1 then "" else "s");
        Printer.pr
          "%d of them %s subsumed by another@;"
          lsub (if lsub = 1 then "is" else "are");
        Printer.pr
-         "%d bad occurrence%s remaining@;@]"
+         "%d occurrence%s remaining@;@]"
          loccs' (if loccs' = 1 then "" else "s"));
     if pp_ns <> None then
       Printer.pr "@;@]";

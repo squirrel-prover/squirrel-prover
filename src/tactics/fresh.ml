@@ -144,7 +144,7 @@ let fresh_trace
       fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, contx) hyp s
     in
 
-    let pp_n ppf () = Fmt.pf ppf "%a" Name.pp n in
+    let pp_n ppf () = Fmt.pf ppf "occurrences of %a" Name.pp n in
     let get_bad : NOS.f_fold_occs = get_bad_occs env n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
@@ -213,7 +213,7 @@ let equiv_fresh_phi_proj
 
   (* [frame] is the projection of [biframe] over [proj] *)
   let frame = List.map (Term.project1 proj) biframe in
-  let pp_n ppf () = Fmt.pf ppf "%a" Name.pp n in
+  let pp_n ppf () = Fmt.pf ppf "occurrences of@ %a" Name.pp n in
 
   let get_bad : NOS.f_fold_occs = get_bad_occs env n in
 

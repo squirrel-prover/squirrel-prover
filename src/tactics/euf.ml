@@ -87,7 +87,7 @@ struct
     match x with
     | BadKey k -> Fmt.pf fmt "%a" Name.pp k
     | IntegrityMsg im ->
-      Fmt.pf fmt "%a authenticated with %a" Term.pp im.msg Name.pp im.key
+      Fmt.pf fmt "%a auth. by %a" Term.pp im.msg Name.pp im.key
 
   let pp_data fmt () : unit =
     Fmt.pf fmt ""
@@ -295,9 +295,9 @@ let euf
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) contx hyp s
   in
-  
+
   let pp_k ppf () =
-    Fmt.pf ppf "%a, and messages authenticated with %a" Name.pp k Name.pp k
+    Fmt.pf ppf "bad occurrences of %a,@ and messages authenticated by it" Name.pp k
   in
 
   (* apply euf: first construct the IOS.f_fold_occs to use *)
