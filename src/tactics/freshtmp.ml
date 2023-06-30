@@ -2,7 +2,10 @@
 open Squirrelcore
 
 open Utils
-                    
+    
+module NO = NameOccs
+module Name = NO.Name
+                
 module TS = TraceSequent
 module ES = EquivSequent
 
@@ -34,57 +37,55 @@ let p_fresh_arg (nargs : Args.named_args) : bool =
 (*------------------------------------------------------------------*)
 (** {2 Library: used in trace and equiv fresh} *)
 
-module O = Occurrences
-module Name = O.Name 
-module NOC = O.NameOC
-module NOS = O.NameOccSearch
-module NOF = O.NameOccFormulas
-
-
-(** Look for occurrences using [Occurrences].
-    A [NOS.f_fold_occs] function.
+(** Look for occurrences using [NameOccs].
+    A [(unit,unit) NO.f_fold_occs] function, for use with [NO.occurrence_goals].
     Looks for occurrences of [n] in [t]:
-    - if [t] is an name with the same symbol as [n]: returns the occurrence,
-      and look recursively in the arguments
+    - if [t] is [n]: returns the occurrence
     - otherwise: asks to be called recursively on subterms.
     Do not uses an accumulator, so returns an empty unit list. *)
 let get_bad_occs
     (env : Env.t)
-    (n : Name.t) 
-    (retry_on_subterms : unit -> NOS.simple_occs)
-    (rec_call_on_subterms : O.pos_info -> Term.term -> NOS.simple_occs) 
-    (info : O.pos_info)
-    (t : Term.term) 
-  : NOS.simple_occs
+    (n   : Name.t) 
+    (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
+    (rec_call_on_subterms : 
+       (fv   : Vars.vars ->
+        cond : Term.terms ->
+        p    : MP.pos ->
+        info : NO.expand_info ->
+        st   : Term.term -> 
+        Term.term ->
+        NO.n_occs * NO.empty_occs))
+    ~(info : NO.expand_info)
+    ~(fv   : Vars.vars)
+    ~(cond : Term.terms)
+    ~(p    : MP.pos)
+    ~(st   : Term.term)
+    (t     : Term.term) 
+  : NO.n_occs * NO.empty_occs
   =
+  let _ = p in (* unused for now *)
+
   (* handles a few cases, using [rec_call_on_subterm] for rec calls,
      and calls [retry_on_subterm] for the rest *)
-
-  (* add variables from fv (ie bound above where we're looking) to env with const tag. *)
-  let env =
-    Env.update
-      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
+  (* only use this rec_call shorthand if the parameters don't change! *)
+  let rec_call = (* rec call on a list *)
+    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
 
+  let env =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   match t with
   (* for freshness, we can ignore **constant** subterms *)
-  | _ when HighTerm.is_constant env t -> []
+  | _ when HighTerm.is_constant env t -> retry_on_subterms ()
 
-
-  (* the fresh tactic does not apply to terms with non-constant variables *)
   | Var v ->
     soft_failure
       (Failure (Fmt.str "terms contain a non-constant variable: %a" Vars.pp v))
 
-  (* a name with the symbol we want: build an occurrence, and also look in its args *)
-  | Name (nn, nn_args) when nn.s_symb = n.symb.s_symb ->
-    (* keep the same info: all good except the Match.pos is not kept up to date.
-       still fine, since we don't actually use it. *)
-    (* in fact here we could just rec_call_on_subterms. *)
-    let occs = List.concat_map (rec_call_on_subterms info) nn_args in
-    (NOS.EO.SO.mk_simple_occ
-       (Name.of_term t) n ()
-       (info.pi_vars) (info.pi_cond) (info.pi_occtype) (info.pi_subterm)) :: occs
+  | Name (nn, nn_args) when nn.s_symb = n.Name.symb.s_symb ->
+    let occs, _ = rec_call nn_args in    
+    (NO.mk_nocc (Name.of_term t) n fv cond (fst info) st) :: occs, []
 
   | _ -> retry_on_subterms ()
 
@@ -97,12 +98,12 @@ let get_bad_occs
     (looks under macros if possible *)
 let fresh_trace_param
     ~(hyp_loc : L.t) 
-    (einfo     : O.expand_info) 
+    (info     : NO.expand_info) 
     (hyp      : Term.term)
     (s        : TS.sequent)
   : Name.t * Term.term
   =
-  let _, contx = einfo in
+  let _, contx = info in
   let table = contx.table in
   let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
@@ -110,8 +111,8 @@ let fresh_trace_param
       soft_failure ~loc:hyp_loc
         (Tactics.Failure "can only be applied on an equality hypothesis")
   in
-  let em1 = O.expand_macro_check_all einfo m1 in
-  let em2 = O.expand_macro_check_all einfo m2 in
+  let em1 = NO.expand_macro_check_all info m1 in
+  let em2 = NO.expand_macro_check_all info m2 in
   let n, t = match em1, em2 with
     | (Name _ as ns), _ -> (Name.of_term ns, em2)
     | _, (Name _ as ns) -> (Name.of_term ns, em1)
@@ -141,21 +142,18 @@ let fresh_trace
     let contx = TS.mk_trace_cntxt s in
     let env = TS.env s in
     let (n, t) =
-      fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, contx) hyp s
+      fresh_trace_param ~hyp_loc:(L.loc m) (NO.EI_direct, contx) hyp s
     in
 
     let pp_n ppf () = Fmt.pf ppf "%a" Name.pp n in
-    let get_bad : NOS.f_fold_occs = get_bad_occs env n in
+    let get_bad = get_bad_occs env n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
-
-    let occs =
-      NOS.find_all_occurrences ~mode:Iter.Const ~pp_ns:(Some pp_n)
-        get_bad contx env (t::n.args)
+    let phis =
+      NO.name_occurrence_formulas ~mode:Iter.Const ~use_path_cond ~pp_ns:(Some pp_n)
+        get_bad contx env (t :: n.args)
     in
     Printer.pr "@]@;";
-
-    let phis = List.map (NOF.occurrence_formula ~negate:false ~use_path_cond) occs in
 
     let g = TS.goal s in
     List.map
@@ -196,9 +194,9 @@ let equiv_fresh_phi_proj
   let system = SE.project [proj] contx.system in
   let contx = { contx with system } in
   let env = Env.init ~table ~system:(SE.reachability_context system) ~vars:venv () in
-  let info = (O.EI_direct, contx) in
+  let info = (NO.EI_direct, contx) in
 
-  let t = O.expand_macro_check_all info (Term.project1 proj t) in
+  let t = NO.expand_macro_check_all info (Term.project1 proj t) in
   let n : Name.t = 
     match t with
     | Name _ -> Name.of_term t
@@ -215,21 +213,19 @@ let equiv_fresh_phi_proj
   let frame = List.map (Term.project1 proj) biframe in
   let pp_n ppf () = Fmt.pf ppf "%a" Name.pp n in
 
-  let get_bad : NOS.f_fold_occs = get_bad_occs env n in
+  let get_bad : (unit, unit) NO.f_fold_occs = get_bad_occs env n in
 
-  let occs =
-    NOS.find_all_occurrences ~mode:Iter.Const ~pp_ns:(Some pp_n)
+  let phi : Term.terms =
+    NO.name_occurrence_formulas
+      ~mode:Iter.Const ~use_path_cond ~negate:true ~pp_ns:(Some pp_n)
       get_bad contx env (frame @ n.args)
-  in
-  let phis  =
-    List.map (NOF.occurrence_formula ~use_path_cond ~negate:true) occs
   in
 
   (* We do not remove duplicates here, as we already do that on
      occurrences. 
      Later, we remove duplicates between the left and
      right occurrences [phi_l] and [phi_r]. *)
-  phis
+  phi
 
 (*------------------------------------------------------------------*)
 (** Constructs the sequent where goal [i], when of the form [diff(n_l, n_r)],
@@ -284,7 +280,7 @@ let fresh_equiv_tac (args : TacticsArgs.parser_args) : LowTactics.etac =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newfresh"
+  T.register_general "fresh"
     ~tactic_help:{
       general_help = "Exploit the freshness of a name.";
       detailed_help =

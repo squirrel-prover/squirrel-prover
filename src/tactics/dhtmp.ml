@@ -7,6 +7,7 @@ open Utils
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
+module NO = NameOccs
 
 module TS = TraceSequent
 
@@ -19,15 +20,9 @@ type lsymb = Theory.lsymb
 module MP = Match.Pos
 module Sp = MP.Sp
 
+module Name = NO.Name
+                
 open LowTactics
-
-(*------------------------------------------------------------------*)
-(* Instantiating the occurrence search module *)
-module O = Occurrences
-module Name = O.Name
-module NOC = O.NameOC
-module NOS = O.NameOccSearch
-module NOF = O.NameOccFormulas
 
 (*------------------------------------------------------------------*)
 let wrap_fail = TraceLT.wrap_fail
@@ -41,14 +36,14 @@ let hard_failure = Tactics.hard_failure
 (** Returns the list of factors of t for the given multiplication
     (if mult = none then t is its own only factor)
     (unfolds the macros when possible) *)
-let rec factors (mult:Symbols.fname option) (info:O.expand_info)
+let rec factors (mult:Symbols.fname option) (info:NO.expand_info)
     (t:term) : (term list) =
   match t with
   | App (Fun (f, _), [t1; t2]) when mult = Some f ->
     factors mult info t1 @ factors mult info t2
   | Macro _ ->
     begin
-      match O.expand_macro_check_once info t with
+      match NO.expand_macro_check_once info t with
       | Some t' -> factors mult info t'
       | None -> [t]
     end
@@ -59,7 +54,7 @@ let rec factors (mult:Symbols.fname option) (info:O.expand_info)
     and m is not itself an exponential.
     (unfolds the macros when possible) *) 
 let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
-    (info:O.expand_info)
+    (info:NO.expand_info)
     (t:term) : term * (term list) =
   match t with
   | App (Fun (f, _), [t1; t2]) when f = exp ->
@@ -68,7 +63,7 @@ let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
     (m, ps@fs)
   | Macro _ ->
     begin
-      match O.expand_macro_check_once info t with
+      match NO.expand_macro_check_once info t with
       | Some t' -> powers exp mult info t'
       | None -> (t, [])
     end
@@ -93,7 +88,7 @@ let partition_powers
 (* future work: return a tree of and/or of name_occs and generate
    the goals accordingly *)
 
-(** A NOS.f_fold_occs function.
+(** A (unit,unit) NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of names in nab not allowed by CDH or GDH
     (depending on gdh_oracles).
     Finds all possible occurrences of nab in t (ground), except
@@ -102,27 +97,43 @@ let partition_powers
     If t is of the form something^something, looks directly for occurrences
     in t,
     and uses the provided continuation for the rec calls on its subterms.
-    Otherwise, gives up, and asks occurrence_goals to be called
-    again on subterms. *)
+    Otherwise, gives up, and asks occurrence_goals to call it again on subterms.
+   Does not use any accumulator, so returns an empty unit list. *)
 let get_bad_occs
     (env : Env.t)            (* initial environment  *)
     (gdh_oracles:bool) (g:term) (exp:Symbols.fname) (mult:Symbols.fname option)
     (nab:Name.t list) 
-    (retry_on_subterms : unit -> NOS.simple_occs)
-    (rec_call_on_subterms : O.pos_info -> Term.term -> NOS.simple_occs)
-    (info:O.pos_info)
-    (t:Term.term)
-  : NOS.simple_occs
+    (retry_on_subterms : (unit -> NO.n_occs * NO.empty_occs))
+    (rec_call_on_subterms :
+       (fv:Vars.vars ->
+        cond:terms ->
+        p:MP.pos ->
+        info:NO.expand_info ->
+        st:term ->
+        term ->
+        NO.n_occs * NO.empty_occs))
+    ~(info:NO.expand_info)
+    ~(fv:Vars.vars)
+    ~(cond:terms)
+    ~(p:MP.pos)
+    ~(st:term)
+    (t:term) 
+  : NO.n_occs * NO.empty_occs 
   =
   (* get all bad occurrences in m ^ (p1 * … * pn) *)
   (* st is the current subterm, to be recorded in the occurrence *)
   let get_illegal_powers
-      (m:Term.term) (pows:Term.terms)
-      (info:O.pos_info)
-    : NOS.simple_occs 
+      (m:term) (pows:terms)
+      ~(fv:Vars.vars) ~(cond:terms) ~(p:MP.pos) ~(info:NO.expand_info)
+      ~(st:term) : NO.n_occs 
     =
+    (* only use this rec_call shorthand if the parameters don't change! *)
+    let rec_call = (* rec call on a list *)
+      List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+    in
     if m <> g then (* all occs in m, pows are bad *)
-      List.concat_map (rec_call_on_subterms info) (m :: pows)
+      let occs1, _ = rec_call (m :: pows) in
+      occs1
 
     else (* 1 bad pi is allowed.
             bad occs = all bad pi except 1 + bad occs in other pis *)
@@ -133,46 +144,48 @@ let get_bad_occs
       (* the others are bad occs *)
       let bad_pows_occs =
         List.concat_map
-          (fun n_bad -> O.find_name_occ n_bad nab info)
+          (fun nn -> NO.find_name_occ nn nab fv cond (fst info) st)
           bad_pows_minus_1
       in
-
       (* look recursively in the other pows,
          and the arguments of all the bad_pows (incl. the one we dropped) *)
-      let occs1 =
-        List.concat_map
-        (rec_call_on_subterms info)
-        ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
+      let occs1, _ =
+        rec_call
+          ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
       in
       bad_pows_occs @ occs1
   in 
 
+  (* handle a few cases, using rec_call_on_subterm for rec calls,
+     and calls retry_on_subterm for the rest *)
+  (* only use this rec_call shorthand if the parameters don't change! *)
+  let rec_call = (* rec call on a list *)
+    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+  in
 
   let env =
-    Env.update
-      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([],[])
 
   | Var v ->
     soft_failure
-      (Tactics.Failure
-         (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
+      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
       
   | Name (_, nargs) as n when Name.exists_name (Name.of_term n) nab ->
     (* one of the nab: generate occs for all potential collisions *)
     let occs1 =
-      O.find_name_occ (Name.of_term n) nab info
+      NO.find_name_occ (Name.of_term n) nab fv cond (fst info) st
     in
     (* rec call on the arguments *)
-    let occs2 = List.concat_map (rec_call_on_subterms info) nargs in
-    occs1 @ occs2
+    let occs2, _ = rec_call nargs in
+    occs1 @ occs2, []
 
   | App (Fun (f, _), _) when f = exp ->
-    let (m, pows) = powers exp mult (O.get_expand_info info) t in
+    let (m, pows) = powers exp mult info t in
     (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
-    get_illegal_powers m pows info
+    get_illegal_powers m pows ~fv ~cond ~p ~info ~st, []
 
   | App (Fun (f, _), [t1; t2]) when f = f_eq && gdh_oracles ->
     (* u^p1…pn = v^q1…qn *)
@@ -180,8 +193,8 @@ let get_bad_occs
        Then we recurse on the rest, using illegal powers
        so we don't need to reconstruct the term.
        Also recurse on the args of the n that was dropped, if any *)
-    let (u, pows) = powers exp mult (O.get_expand_info info) t1 in
-    let (v, qows) = powers exp mult (O.get_expand_info info) t2 in
+    let (u, pows) = powers exp mult info t1 in
+    let (v, qows) = powers exp mult info t2 in
     let (bad_pows, other_pows) = partition_powers nab pows in
     let (bad_qows, other_qows) = partition_powers nab qows in
     let bad_pows_minus_1 = List.drop_right 1 bad_pows in
@@ -191,22 +204,22 @@ let get_bad_occs
     let occs1 =
       get_illegal_powers
         u ((List.map Name.to_term bad_pows_minus_1) @ other_pows)
-        {info with pi_subterm = t}
+        ~fv ~cond ~p ~info ~st:t
       @ get_illegal_powers
         v ((List.map Name.to_term bad_qows_minus_1) @ other_qows)
-        {info with pi_subterm = t}
+        ~fv ~cond ~p ~info ~st:t
     in
-    let occs2 =
+    let occs2, _ =
       match bad_pows with
-      | [] -> []
-      | n :: _ -> List.concat_map (rec_call_on_subterms info) n.args
+      | [] -> [], []
+      | n :: _ -> rec_call n.args
     in
-    let occs3 =
+    let occs3, _ =
       match bad_qows with
-      | [] -> []
-      | n :: _ -> List.concat_map (rec_call_on_subterms info) n.args
+      | [] -> [], []
+      | n :: _ -> rec_call n.args
     in
-    occs1 @ occs2 @ occs3
+    occs1 @ occs2 @ occs3, []
     
   | _ -> retry_on_subterms ()
 
@@ -243,7 +256,7 @@ let dh_param
   : term * Symbols.fname * Symbols.fname option * term * Name.t * Name.t
   =
 
-  let einfo = O.EI_direct, contx in
+  let info = NO.EI_direct, contx in
   let table = contx.table in
   (* get generator *)
   let gen_n = Symbols.Function.of_lsymb g table in
@@ -270,8 +283,8 @@ let dh_param
                 (Tactics.Failure
                    "can only be applied on an equality hypothesis")
   in
-  let (u, pows) = powers exp_n mult_n einfo m1 in
-  let (v, qows) = powers exp_n mult_n einfo m2 in
+  let (u, pows) = powers exp_n mult_n info m1 in
+  let (v, qows) = powers exp_n mult_n info m2 in
 
   let (t, a, b) = match (u,pows,v,qows) with
     | (_, _, _, [Name _ as n1; Name _ as n2]) when v = gen ->
@@ -309,16 +322,14 @@ let cgdh
   let pp_nab =
     fun ppf () -> Fmt.pf ppf "%a and %a" Name.pp na Name.pp nb
   in
-  let get_bad : NOS.f_fold_occs =
+  let get_bad:((unit,unit) NO.f_fold_occs) =
     get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]
   in
 
-  let occs =
-    NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_nab)
+  let phis =
+    NO.name_occurrence_formulas ~mode:PTimeNoSI ~pp_ns:(Some pp_nab)
       get_bad contx env [t]
   in
-
-  let phis = List.map (NOF.occurrence_formula ~negate:false) occs in
 
   let g = TS.goal s in
   List.map
@@ -342,7 +353,7 @@ let cdh_tac args s =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newcdh"
+  T.register_general "cdh"
     ~tactic_help:{
       general_help =
         "Usage: cdh H, g.\nApplies the CDH assumption (including \
@@ -375,7 +386,7 @@ let gdh_tac args s =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newgdh"
+  T.register_general "gdh"
     ~tactic_help:{
       general_help =
         "Usage: gdh H, g.\nApplies the GDH assumption (including \
