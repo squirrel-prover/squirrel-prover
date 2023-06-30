@@ -284,7 +284,7 @@ let fresh_equiv_tac (args : TacticsArgs.parser_args) : LowTactics.etac =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newfresh"
+  T.register_general "fresh"
     ~tactic_help:{
       general_help = "Exploit the freshness of a name.";
       detailed_help =

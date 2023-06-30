@@ -62,6 +62,12 @@ sig
   val collision_formula :
     negate:bool -> content -> content -> data -> Term.term
 
+  (** Applies a substitution to an occurrence content *)
+  val subst_content : Term.subst -> content -> content
+
+  (** Applies a substitution to an occurrence additional data *)
+  val subst_data : Term.subst -> data -> data
+
   (** Printing function for occurrence contents *)
   val pp_content : Format.formatter -> content -> unit
 
@@ -136,7 +142,10 @@ sig
   type simple_occs = simple_occ list
 
 
-  (** Constructs a simple occurrence. *)
+  (** Constructs a simple occurrence.
+      alpha-renames the variables given in parameters, to avoid confusion. 
+      Hence it is assumed fv contains all variables occurring in the content
+      and data that are bound above the occurrence. *)
   val mk_simple_occ :
     content -> content -> data ->
     Vars.vars -> Term.terms -> occ_type -> Term.term ->

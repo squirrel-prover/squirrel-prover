@@ -17,6 +17,8 @@ sig
   type data
   val collision_formula :
     negate:bool -> content -> content -> data -> Term.term
+  val subst_content : Term.subst -> content -> content
+  val subst_data : Term.subst -> data -> data
   val pp_content : Format.formatter -> content -> unit
   val pp_data : Format.formatter -> data -> unit
 end
@@ -37,6 +39,10 @@ struct
     else
       Term.mk_not ~simpl:false (Term.mk_eq ~simpl:false ts tss)
 
+  let subst_content = Term.subst
+
+  let subst_data _ () = ()
+
   let pp_content = Term.pp
 
   let pp_data (fmt : Format.formatter) () : unit =
@@ -53,6 +59,10 @@ struct
   let collision_formula ~(negate : bool) () () () : Term.term =
     if not negate then Term.mk_true
     else Term.mk_false
+
+  let subst_content _ () = ()
+
+  let subst_data _ () = ()
 
   let pp_content (fmt:Format.formatter) () = Fmt.pf fmt ""
 
@@ -141,13 +151,16 @@ struct
       (vars : Vars.vars) (cond : Term.terms) (ot : occ_type) (st : Term.term)
     : simple_occ 
     =
-    {so_cnt=cnt;
-     so_coll=coll;
-     so_ad=ad;
-     so_vars=vars;
-     so_cond=cond;
-     so_occtype=ot;
-     so_subterm=st}
+    let vars, sigma = Term.refresh_vars vars in
+    {so_cnt  = OC.subst_content sigma cnt;
+     so_coll = coll; (* variables bound above the occurrence are not supposed
+                      to occur in coll *)
+     so_ad   = OC.subst_data sigma ad; 
+     so_vars = vars;
+     so_cond = List.map (Term.subst sigma) cond;
+     so_occtype = subst_occtype sigma ot;
+     so_subterm=st; (* don't rename in st, to keep it more readable *)
+    }
 
 
   (** Internal.
@@ -1148,6 +1161,10 @@ struct
       Term.mk_eqs  ~simpl:true  ~simpl_tuples:true ncoll.args n.args
     else
       Term.mk_neqs ~simpl:false ~simpl_tuples:true ncoll.args n.args
+
+  let subst_content = Name.subst
+
+  let subst_data _ () = ()
 
   let pp_content = Name.pp
 

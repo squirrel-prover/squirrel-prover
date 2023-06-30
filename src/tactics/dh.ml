@@ -342,7 +342,7 @@ let cdh_tac args s =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newcdh"
+  T.register_general "cdh"
     ~tactic_help:{
       general_help =
         "Usage: cdh H, g.\nApplies the CDH assumption (including \
@@ -375,7 +375,7 @@ let gdh_tac args s =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "newgdh"
+  T.register_general "gdh"
     ~tactic_help:{
       general_help =
         "Usage: gdh H, g.\nApplies the GDH assumption (including \
