@@ -160,9 +160,10 @@ alcotest: version
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
 	@dune build @mytest
-	@if cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -q "^[^│] \[FAIL\]" ; \
+	@python ./sed.py $(TESTS_OUT) /tmp/tests.output
+	@if cat /tmp/tests.output | grep -q "^[^│] \[FAIL\]" ; \
 		then echo "${RED}Alcotests FAILED :${NC}" ; \
-		  cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
+		  cat /tmp/tests.output | grep -E --color "^[^│] \[FAIL\]" ; \
 			exit 1; \
 		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
