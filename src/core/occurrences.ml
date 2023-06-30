@@ -1161,11 +1161,14 @@ module NameOccFormulas = MakeFormulas (NameOccSearch.EO)
 
 
 (** Exported (see `.mli`) *)
-let find_name_occ
-    (n:Name.t) (ns:Name.t list)
-    (fv:Vars.vars) (cond:Term.terms) (ot:occ_type) (st:Term.term)
+let find_name_occ (n:Name.t) (ns:Name.t list) (info:pos_info)
   : NameOccSearch.simple_occs =
   List.map
     (fun (nn:Name.t) ->
-       NameOccSearch.EO.SO.mk_simple_occ n nn () fv cond ot st)
+       NameOccSearch.EO.SO.mk_simple_occ
+         n nn ()
+         info.pi_vars
+         info.pi_cond
+         info.pi_occtype
+         info.pi_subterm)
     (Name.find_name n ns)

@@ -456,7 +456,6 @@ module NameOccFormulas :
     finds all names in the list with the same symbol as the given name,
     returns the corresponding simple occs *)
 val find_name_occ :
-  Name.t -> Name.t list ->
-  Vars.vars -> Term.terms -> occ_type -> Term.term ->
+  Name.t -> Name.t list -> pos_info ->
   NameOccSearch.simple_occs
 
