@@ -1142,6 +1142,12 @@ struct
 
   let find_name (n:t) (ns:t list) : t list =
     List.filter (fun nn -> n.symb.s_symb = nn.symb.s_symb) ns
+
+  let rec has_name (n:t) (t:Term.term) : bool =
+    match t with
+    | Name (nn, _) when nn = n.symb -> true
+    | _ -> Term.texists (has_name n) t
+
 end
 
 

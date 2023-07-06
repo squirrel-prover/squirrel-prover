@@ -6,7 +6,7 @@ open Utils
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
-                
+
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -34,14 +34,14 @@ type name = Name.t
 
 
 (** We search at the same time for bad ocurrences of the key, and for
-   protected (signed/hashed) messages (with a key) *)
+    protected (signed/hashed) messages (with a key) *)
 type integrity_content =
   | BadKey of name
   | IntegrityMsg of {msg:Term.term; key:name}
 
 
 module IntegrityOC : O.OccContent with type content = integrity_content
-                                 and type data = unit =
+                                   and type data = unit =
 struct
   type content = integrity_content
   type data = unit
@@ -67,14 +67,14 @@ struct
           (mk_eq ~simpl:true imcoll.msg im.msg)
           (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
       else
-        mk_or
-          (mk_not (mk_eq ~simpl:true imcoll.msg im.msg))
-          (mk_neqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+        mk_impl
+          (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+          (mk_neq ~simpl:true imcoll.msg im.msg)
     | _ ->
       (* sanity check: we should never record a collision between two things
          with a different constructor *)
       assert false
-        
+
   let subst_content sigma x =
     match x with
     | BadKey k -> BadKey (Name.subst sigma k)
@@ -167,7 +167,7 @@ let get_bad_occs
          even if k'=k, just look in k' args *)
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
-    
+
 
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', kargs', but do not record
@@ -201,7 +201,7 @@ let get_bad_occs
         (IntegrityMsg {msg=m ; key=k})
         ()
         info.pi_vars info.pi_cond info.pi_occtype info.pi_subterm ]
-             
+
   | _ -> retry_on_subterms ()
 
 
@@ -279,7 +279,7 @@ let euf_param
         | _ -> fail ()
       end
     | _ -> fail ()
-                   
+
 
 (*------------------------------------------------------------------*)
 let euf
@@ -291,13 +291,14 @@ let euf
   let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
   let env = TS.env s in
-  
+
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) contx hyp s
   in
 
   let pp_k ppf () =
-    Fmt.pf ppf "bad occurrences of %a,@ and messages authenticated by it" Name.pp k
+    Fmt.pf ppf "bad occurrences of key %a,@ and messages authenticated by it" 
+      Name.pp k
   in
 
   (* apply euf: first construct the IOS.f_fold_occs to use *)
@@ -320,18 +321,19 @@ let euf
          | IntegrityMsg _ -> false)
       occs
   in
-
   let occs = occs_key @ occs_int in
-  
+
+  (* compute the formulas stating that one of the occs is a collision *)
   let phis = List.map (IOF.occurrence_formula ~negate:false) occs in
 
+  (* finally generate all corresponding goals *)
   let g = TS.goal s in 
   let integrity_goals =
     List.map
-    (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
-    phis
+      (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+      phis
   in
-  
+
   (* copied from old euf, handles the composition goals *)
   let tag_s =
     let f =
@@ -362,9 +364,9 @@ let euf
 
       | _ -> assert false 
   in
-  
+
   tag_s @ integrity_goals
-  
+
 
 (*------------------------------------------------------------------*)
 let euf_tac args s =

@@ -447,6 +447,9 @@ sig
 
   (** finds all names with the same symbol in the list *)
   val find_name : t -> t list -> t list
+
+  (** checks if t contains a name w/ same symb. as n (w/o expanding macros) *)
+  val has_name : t -> Term.term -> bool
 end
 
 
