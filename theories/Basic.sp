@@ -26,10 +26,22 @@ goal [any] neq_irrefl ['a] (x : 'a) : (x <> x) <=> false.
 Proof. by split. Qed.
 hint rewrite neq_irrefl.
 
+
+goal [any] eq_assoc (b0,b1,b2: boolean) : ((b0 = b1) = b2) = (b0 = (b1 = b2)).
+Proof. 
+(* smaller proof if put after section true/false *)
+assert((true = false) = false) as true_false by rewrite eq_iff.
+assert((false = true) = false) as false_true by rewrite eq_iff.
+case b0; case b1; case b2; try auto. by rewrite true_false. by rewrite false_true. 
+Qed.
+ 
+
+
 (*------------------------------------------------------------------*)
 (* true/false *)
 
-axiom [any] true_false : (true = false) = false.
+goal [any] true_false : (true = false) = false.
+Proof. by rewrite eq_iff. Qed.
 hint rewrite true_false.
 
 goal [any] false_true : (false = true) = false.
