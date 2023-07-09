@@ -6,9 +6,7 @@ open Utils
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
-module NO = NameOccs
-module Name = NO.Name
-                
+
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -27,63 +25,114 @@ let wrap_fail = TraceLT.wrap_fail
 let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
-(* integrity occurrence *)
-type int_occ = ((term * Name.t), unit) NO.simple_occ
-type int_occs = int_occ list
+(*------------------------------------------------------------------*)
+(* Instantiating the occurrence search module *)
 
-let mk_int_occ
-    (t:term) (tcoll:term) (k:Name.t) (kcoll:Name.t)
-    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
-  let fv, sigma = Term.refresh_vars fv in
-  let cond = List.map (Term.subst sigma) cond in
-  let ot = NO.subst_occtype sigma ot in
-  let t = Term.subst sigma t in
-  let k = Name.subst sigma k in
-  let st = subst sigma st in
-  NO.mk_simple_occ (t,k) (tcoll,kcoll) () fv cond ot st
+module O = Occurrences
+module Name = O.Name
+type name = Name.t
+
+
+(** We search at the same time for bad ocurrences of the key, and for
+    protected (signed/hashed) messages (with a key) *)
+type integrity_content =
+  | BadKey of name
+  | IntegrityMsg of {msg:Term.term; key:name}
+
+
+module IntegrityOC : O.OccContent with type content = integrity_content
+                                   and type data = unit =
+struct
+  type content = integrity_content
+  type data = unit
+
+  let collision_formula ~(negate : bool)
+      (x : content) (xcoll : content) ()
+    : Term.term
+    =
+    match x, xcoll with
+    | BadKey k, BadKey kcoll ->
+      (* sanity check: only apply when same symbol *)
+      assert (k.symb = kcoll.symb);
+      if not negate then
+        Term.mk_eqs ~simpl:true ~simpl_tuples:true kcoll.args k.args
+      else
+        Term.mk_neqs ~simpl:false ~simpl_tuples:true kcoll.args k.args
+
+    | IntegrityMsg im, IntegrityMsg imcoll ->
+      (* sanity check: key must have same symbol in both messages *)
+      assert (im.key.symb = imcoll.key.symb);
+      if not negate then
+        mk_and
+          (mk_eq ~simpl:true imcoll.msg im.msg)
+          (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+      else
+        mk_impl
+          (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+          (mk_neq ~simpl:true imcoll.msg im.msg)
+    | _ ->
+      (* sanity check: we should never record a collision between two things
+         with a different constructor *)
+      assert false
+
+  let subst_content sigma x =
+    match x with
+    | BadKey k -> BadKey (Name.subst sigma k)
+    | IntegrityMsg im -> IntegrityMsg  {msg=Term.subst sigma im.msg;
+                                        key=Name.subst sigma im.key}
+
+  let subst_data _ () = ()
+
+  let pp_content fmt x =
+    match x with
+    | BadKey k -> Fmt.pf fmt "%a" Name.pp k
+    | IntegrityMsg im ->
+      Fmt.pf fmt "%a auth. by %a" Term.pp im.msg Name.pp im.key
+
+  let pp_data fmt () : unit =
+    Fmt.pf fmt ""
+end
+
+module IOC = IntegrityOC
+module IOS = O.MakeSearch (IOC)
+module IOF = O.MakeFormulas (IOS.EO)
+let mk_simple_occ = IOS.EO.SO.mk_simple_occ
 
 
 (*------------------------------------------------------------------*)
-(* Look for occurrences using NameOccs *)
+(* Look for occurrences using the Occurrences module *)
 
-(**  *)
+(** A IOS.f_fold_occs function.
+    Looks for
+    1) bad occurrences of the key k: places where a key with the same symbol
+       as k is used other than in key position
+    2) occurrences of protected (signed/hashed) messages, with a key that has
+       the same symbol as k. *)
 let get_bad_occs
     (env : Env.t)
-    (m:term)
-    (k:Name.t)
+    (m:Term.term)
+    (k:name)
     (int_f:Symbols.fname) (* function with integrity (hash, signature) *)
     ?(pk_f:Symbols.fname option=None) (* public key function.
                                          Must be None iff hash *)
-    (retry_on_subterms : (unit -> NO.n_occs * int_occs))
-    (rec_call_on_subterms :
-       (fv:Vars.vars ->
-        cond:terms ->
-        p:MP.pos ->
-        info:NO.expand_info ->
-        st:term ->
-        term ->
-        NO.n_occs * int_occs))
-    ~(info:NO.expand_info)
-    ~(fv:Vars.vars)
-    ~(cond:terms)
-    ~(p:MP.pos)
-    ~(st:term)
+    (retry_on_subterms : unit -> IOS.simple_occs)
+    (rec_call_on_subterms : O.pos_info -> Term.term -> IOS.simple_occs)
+    (info:O.pos_info)
     (t:term) 
-  : NO.n_occs * int_occs =
+  :IOS.simple_occs =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
-  (* only use this rec_call shorthand if the parameters don't change! *)
-  let rec_call ?(st = st) = (* rec call on a list *)
-    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
-  in
 
   (* variables quantified above the current point are considered constant,
-     so we add them to the env usd for "is_ptime_deducible" *)
+     so we add them to the env used for "is_ptime_deducible" *)
   let env =
-    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+    Env.update
+      ~vars:(Vars.add_vars
+               (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars)
+      env
   in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([], [])
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
   (* SI not needed here *)
 
   (* non ptime deterministic variable -> forbidden *)
@@ -95,33 +144,48 @@ let get_bad_occs
   (* occurrence of the signing/hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
-    let occs1, accs1 = rec_call kargs' in
-    (NO.mk_nocc (Name.of_term k') k fv cond (fst info) st) :: occs1,
-    accs1
+    let occs1 = List.concat_map (rec_call_on_subterms info) kargs' in
+    let oc =
+      (mk_simple_occ
+         (BadKey (Name.of_term k'))
+         (BadKey k)
+         ()
+         info.pi_vars
+         info.pi_cond
+         info.pi_occtype
+         info.pi_subterm)
+    in
+    oc :: occs1
 
   (* occurrence of the public key (for the signature case only) *)
   | App (Fun (f, _), [tk']) when pk_f = Some f -> (* public key *)
     begin
-      match NO.expand_macro_check_all info tk' with
-      | Name (_, tkargs') -> rec_call tkargs'
+      match O.expand_macro_check_all (O.get_expand_info info) tk' with
+      | Name (_, tkargs') ->
+        List.concat_map (rec_call_on_subterms info) tkargs'
       (* pk(k'): no occ,
          even if k'=k, just look in k' args *)
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
-    
+
 
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', kargs', but do not record
      m' as a hash occurrence. *)
   | App (Fun (f, _), [u; App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]])])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
-    rec_call ~st:t (u :: m' :: kargs') (* change st *)
+    List.concat_map
+      (rec_call_on_subterms {info with pi_subterm=t}) (* we change the
+                                                         subterm *)
+      (u :: m' :: kargs')
 
 
   (* hash verification oracle (converse case h(m', k) = u). *)
   | App (Fun (f, _), [App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]]); u])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
-    rec_call ~st:t (u :: m' :: kargs') (* change st *)
+    List.concat_map
+      (rec_call_on_subterms {info with pi_subterm=t})
+      (u :: m' :: kargs') (* we change st here as well*)
 
   (* hash/sign/etc w/ a name that could be the right key *) 
   (* record this hash occurrence, but allow the key *)
@@ -130,32 +194,17 @@ let get_bad_occs
      a: that would be sound but generate too many occs *)
   | App (Fun (f, _), [Tuple [m'; Name (ksb', kargs') as k']])
     when f = int_f && k.symb.s_symb = ksb'.s_symb ->
-    let occs, accs = rec_call (m' :: kargs') in
-    occs,
-    accs @ [mk_int_occ m' m (Name.of_term k') k cond fv (fst info) st]
-             
+    let occs = List.concat_map (rec_call_on_subterms info) (m' :: kargs') in
+    occs @
+    [ mk_simple_occ
+        (IntegrityMsg {msg=m'; key=Name.of_term k'})
+        (IntegrityMsg {msg=m ; key=k})
+        ()
+        info.pi_vars info.pi_cond info.pi_occtype info.pi_subterm ]
+
   | _ -> retry_on_subterms ()
 
 
-(* constructs the formula expressing that an integrity occurrence m',k'
-   is indeed in collision with m, k *)
-let integrity_formula
-    ~(negate : bool)
-    ((m', k') : term * Name.t)
-    ((m, k) : term * Name.t)
-    ()
-    : term =
-  (* every occurrence we generated should satisfy this *)
-  assert (k.symb.s_symb = k'.symb.s_symb); 
-
-  if not negate then 
-    mk_and
-      (mk_eq ~simpl:true m m')
-      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
-  else
-    mk_or 
-      (mk_not (mk_eq ~simpl:true m m'))
-      (mk_neqs ~simpl:true ~simpl_tuples:true k.args k'.args)
 
 (*------------------------------------------------------------------*)
 (** {2 EUF tactic} *)
@@ -185,19 +234,19 @@ let euf_param
       (Tactics.Failure "can only be applied on an hypothesis of the form \
                         checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
   in
-  let info = NO.EI_direct, contx in
+  let einfo = O.EI_direct, contx in
   let table = contx.table in
 
   (* try to write hyp as u = v *)
   match TS.Reduce.destr_eq s Equiv.Local_t hyp with
   | Some (u, v) -> (* an equality: try to see u or v as h(m, k) *)
-    let u = NO.expand_macro_check_all info u in
-    let v = NO.expand_macro_check_all info v in
+    let u = O.expand_macro_check_all einfo u in
+    let v = O.expand_macro_check_all einfo v in
     let try_t (t:term) (t':term) : euf_param option =
       match t with
       | App (Fun (f, _), [Tuple [m; tk]]) ->
         begin
-          match NO.expand_macro_check_all info tk with
+          match O.expand_macro_check_all einfo tk with
           | Name _ as k when Symbols.is_ftype f Symbols.Hash table ->
             Some {ep_key=Name.of_term k; ep_intmsg=m; ep_term=t';
                   ep_int_f=f; ep_pk_f=None}
@@ -214,14 +263,14 @@ let euf_param
         | None -> fail ()
     end
   | None -> (* not an equality: try to see if it's checksign(m,s,pk) *)
-    match NO.expand_macro_check_all info hyp with
+    match O.expand_macro_check_all einfo hyp with
     | App (Fun (f, _), [Tuple [m; s; tpk]]) ->
       begin
-        match NO.expand_macro_check_all info tpk with
+        match O.expand_macro_check_all einfo tpk with
         | App (Fun (g, _), [tk]) ->
           begin
             match Theory.check_signature table f g, 
-                  NO.expand_macro_check_all info tk with
+                  O.expand_macro_check_all einfo tk with
             | Some sg, (Name _ as k) ->
               {ep_key= Name.of_term k; ep_intmsg=m; ep_term=s;
                ep_int_f=sg; ep_pk_f=Some g}
@@ -230,7 +279,7 @@ let euf_param
         | _ -> fail ()
       end
     | _ -> fail ()
-                   
+
 
 (*------------------------------------------------------------------*)
 let euf
@@ -242,31 +291,49 @@ let euf
   let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
   let env = TS.env s in
-  
+
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) contx hyp s
   in
-  
-  let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
 
-  (* apply euf *)
-  let get_bad : ((term * Name.t, unit) NO.f_fold_occs) = 
+  let pp_k ppf () =
+    Fmt.pf ppf "bad occurrences of key %a,@ and messages authenticated by it" 
+      Name.pp k
+  in
+
+  (* apply euf: first construct the IOS.f_fold_occs to use *)
+  let get_bad : IOS.f_fold_occs = 
     get_bad_occs env m k int_f ~pk_f 
   in
-  let phis_bad, phis_int =
-    NO.occurrence_formulas ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
-      integrity_formula
+
+  (* get all occurrences *)
+  let occs =
+    IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
       get_bad contx env (t :: m :: k.Name.args)
   in
-  let phis = phis_bad @ phis_int in
 
+  (* sort the occurrences: first the key occs, then the integrity occs *)
+  let occs_key, occs_int =
+    List.partition
+      (fun x ->
+         match IOS.EO.(x.eo_occ.SO.so_cnt) with
+         | BadKey _ -> true
+         | IntegrityMsg _ -> false)
+      occs
+  in
+  let occs = occs_key @ occs_int in
+
+  (* compute the formulas stating that one of the occs is a collision *)
+  let phis = List.map (IOF.occurrence_formula ~negate:false) occs in
+
+  (* finally generate all corresponding goals *)
   let g = TS.goal s in 
   let integrity_goals =
     List.map
-    (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
-    phis
+      (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+      phis
   in
-  
+
   (* copied from old euf, handles the composition goals *)
   let tag_s =
     let f =
@@ -297,9 +364,9 @@ let euf
 
       | _ -> assert false 
   in
-  
+
   tag_s @ integrity_goals
-  
+
 
 (*------------------------------------------------------------------*)
 let euf_tac args s =

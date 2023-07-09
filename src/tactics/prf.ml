@@ -6,13 +6,9 @@ open Utils
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
-module NO = NameOccs
-module ER = EncRandom
 module ES = EquivSequent
 module LT = LowTactics
 module T = ProverTactics
-
-module Name = NameOccs.Name
 
 type sequent = ES.sequent
 
@@ -25,6 +21,86 @@ module Sp = MP.Sp
 
 let soft_failure = Tactics.soft_failure
 
+
+(*------------------------------------------------------------------*)
+(** Instantiating the occurrence search module *)
+(* This is the same instantiation we use for EUF. (except the print function)
+   In the beginning it seemed clearer to keep a copy here, rather
+   than put it in a separate module called by both EUF and PRF.
+   Maybe not though? *)
+
+module O = Occurrences
+module Name = O.Name
+type name = Name.t
+
+
+(** We search at the same time for bad ocurrences of the key, and for
+    hashed messages (with a key) *)
+type integrity_content =
+  | BadKey of name
+  | IntegrityMsg of {msg:Term.term; key:name}
+
+
+module IntegrityOC : O.OccContent with type content = integrity_content
+                                   and type data = unit =
+struct
+  type content = integrity_content
+  type data = unit
+
+  let collision_formula ~(negate : bool)
+      (x : content) (xcoll : content) ()
+    : Term.term
+    =
+    match x, xcoll with
+    | BadKey k, BadKey kcoll ->
+      (* sanity check: only apply when same symbol *)
+      assert (k.symb = kcoll.symb);
+      if not negate then
+        Term.mk_eqs ~simpl:true ~simpl_tuples:true kcoll.args k.args
+      else
+        Term.mk_neqs ~simpl:false ~simpl_tuples:true kcoll.args k.args
+
+    | IntegrityMsg im, IntegrityMsg imcoll ->
+      (* sanity check: key must have same symbol in both messages *)
+      assert (im.key.symb = imcoll.key.symb);
+      if not negate then
+        mk_and
+          (mk_eq ~simpl:true imcoll.msg im.msg)
+          (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+      else
+        mk_impl
+          (mk_eqs ~simpl:true ~simpl_tuples:true imcoll.key.args im.key.args)
+          (mk_neq ~simpl:true imcoll.msg im.msg)
+    | _ ->
+      (* sanity check: we should never record a collision between two things
+         with a different constructor *)
+      assert false
+
+  let subst_content sigma x =
+    match x with
+    | BadKey k -> BadKey (Name.subst sigma k)
+    | IntegrityMsg im -> IntegrityMsg  {msg=Term.subst sigma im.msg;
+                                        key=Name.subst sigma im.key}
+
+  let subst_data _ () = ()
+
+  let pp_content fmt x =
+    match x with
+    | BadKey k -> Fmt.pf fmt "%a" Name.pp k
+    | IntegrityMsg im ->
+      Fmt.pf fmt "%a hashed by %a" Term.pp im.msg Name.pp im.key
+
+  let pp_data fmt () : unit =
+    Fmt.pf fmt ""
+end
+
+module IOC = IntegrityOC
+module IOS = O.MakeSearch (IOC)
+module IOF = O.MakeFormulas (IOS.EO)
+let mk_simple_occ = IOS.EO.SO.mk_simple_occ
+
+
+
 (*------------------------------------------------------------------*)
 (* Two utility functions used when searching for the
    parameters of the tactic *)
@@ -36,7 +112,7 @@ let soft_failure = Tactics.soft_failure
     hidden in a macro) *)
 let rec no_binders_above (n:Name.t) (t:term) : bool =
   if Term.is_binder t then
-    not (ER.has_name n t)
+    not (Name.has_name n t)
   else
     Term.tforall (no_binders_above n) t
 
@@ -48,113 +124,82 @@ let is_hash (table:Symbols.table) (f:Symbols.fname) =
 
 
 (*------------------------------------------------------------------*)
+(** Look for occurrences using the Occurrences module *)
 
-
-(** Hash occurrence: store the hashed message and the key.
-    (Same as int_occs in euf.ml, but I think it's clearer to keep them
-    separate) *)
-type hash_occ = ((term * Name.t), unit) NO.simple_occ
-type hash_occs = hash_occ list
-
-let mk_hash_occ
-    (t:term) (tcoll:term) (k:Name.t) (kcoll:Name.t)
-    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) :
-  hash_occ =
-  let fv, sigma = Term.refresh_vars fv in
-  let cond = List.map (Term.subst sigma) cond in
-  let ot = NO.subst_occtype sigma ot in
-  let t = Term.subst sigma t in
-  let k = Name.subst sigma k in
-  let st = subst sigma st in
-  NO.mk_simple_occ (t,k) (tcoll,kcoll) () fv cond ot st
-
-
-
-(*------------------------------------------------------------------*)
-(** Look for occurrences using NameOccs *)
+(** A IOS.f_fold_occs function.
+    Looks for
+    1) bad occurrences of the key k: places where a key with the same symbol
+       as k is used other than in key position
+    2) occurrences of hashed messages, with a key that has
+       the same symbol as k. *)
 let get_bad_occs
     (env : Env.t)
     (m:term)
     (k:Name.t)
     (hash_f:Symbols.fname) (* hash function *)
-    (retry_on_subterms : (unit -> NO.n_occs * hash_occs))
-    (rec_call_on_subterms :
-       (fv:Vars.vars ->
-        cond:terms ->
-        p:MP.pos ->
-        info:NO.expand_info ->
-        st:term ->
-        term ->
-        NO.n_occs * hash_occs))
-    ~(info:NO.expand_info)
-    ~(fv:Vars.vars)
-    ~(cond:terms)
-    ~(p:MP.pos)
-    ~(st:term)
+    (retry_on_subterms : unit -> IOS.simple_occs)
+    (rec_call_on_subterms : O.pos_info -> Term.term -> IOS.simple_occs)
+    (info:O.pos_info)
     (t:term) 
-  : NO.n_occs * hash_occs =
+  : IOS.simple_occs =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
-  (* only use this rec_call shorthand if the parameters don't change! *)
-  let rec_call ?(st = st) = (* rec call on a list *)
-    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
-  in
-  
+
   (* variables quantified above the current point are considered constant,
      so we add them to the env usd for "is_ptime_deducible" *)
   let env =
-    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+    Env.update 
+      ~vars:(Vars.add_vars 
+               (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
   in
   match t with
   (* deterministic term -> no occurrences needed *)
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> ([], [])
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
   (* SI not needed here *)
 
   (* non ptime deterministic variable -> forbidden *)
   (* (this is where we used to check variables were only timestamps or indices) *)
   | Var v ->
     soft_failure
-      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
+      (Tactics.Failure 
+         (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
 
   (* occurrence of the hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
-    let occs1, accs1 = rec_call kargs' in
-    (NO.mk_nocc (Name.of_term k') k fv cond (fst info) st) :: occs1,
-    accs1
+    let occs1 = List.concat_map (rec_call_on_subterms info) kargs' in
+    let occ =
+      mk_simple_occ
+        (BadKey (Name.of_term k'))
+        (BadKey k)
+        ()
+        info.pi_vars
+        info.pi_cond
+        info.pi_occtype
+        info.pi_subterm 
+    in
+    occ :: occs1
 
   (* hash occurrence: no key occ but record the message hashed *)
   | App (Fun (f, _), [Tuple [m'; Name (ksb',kargs') as k']])
     when f = hash_f && ksb'.s_symb = k.symb.s_symb ->
-    let occs, accs = rec_call (m' :: kargs') in
-    occs, accs @ [mk_hash_occ m' m (Name.of_term k') k  cond fv (fst info) st]
+    let occs = List.concat_map (rec_call_on_subterms info) (m' :: kargs') in
+    (* we add to the end here, it seems to produce goals
+       in a more intuitive order *)
+    occs @
+    [ mk_simple_occ
+        (IntegrityMsg {msg=m'; key=Name.of_term k'})
+        (IntegrityMsg {msg=m; key=k})
+        ()
+        info.pi_vars
+        info.pi_cond
+        info.pi_occtype
+        info.pi_subterm ]
 
   | _ -> retry_on_subterms ()
 
 
-(** Constructs the formula expressing that a hash occurrence h(m',k')
-    is indeed in collision with h(m, k) *)
-let hash_formula
-    ~(negate : bool)
-    ((m', k') : term * Name.t)
-    ((m, k) : term * Name.t)
-    ()
-    : term =
-  (* every occurrence we generated should satisfy this *)
-  assert (k.symb.s_symb = k'.symb.s_symb); 
 
-  if not negate then 
-    mk_and
-      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
-      (mk_eq ~simpl:true m m')
-  else
-    mk_impl
-      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
-      (mk_neq ~simpl:true m m')
-
-
-
-  
 
 (*------------------------------------------------------------------*)
 (** PRF tactic *)
@@ -168,12 +213,12 @@ type prf_param = { (* info on the h(m,k) we want to apply prf to *)
   pp_nprf         : Name.t;            (* fresh name standing in for the
                                           hash in the context *)
   pp_cond         : Term.term * Term.term;
-                      (* a pair of conditions expressing that
-                         on the left (resp. right), the condition above
-                         at least one of the occurrences of the hash in the term
-                         is satisfied.
-                         When looking at proof obligations we may assume 
-                         that condition holds, since otherwise nothing happens. *)
+  (* a pair of conditions expressing that
+     on the left (resp. right), the condition above
+     at least one of the occurrences of the hash in the term
+     is satisfied.
+     When looking at proof obligations we may assume 
+     that condition holds, since otherwise nothing happens. *)
   pp_table        : Symbols.table;     (* updated table with an entry nprf *)
 }
 
@@ -194,7 +239,8 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
          let se = SE.to_fset se in (* will always succeed *)
          if t' = u then (* found u: replace and add current condition to list *)
            (se,cond)::acc_conds, `Map v
-         else if is_binder t' then (* t' is a binder: stop there for this branch *)
+         else if is_binder t' then (* t' is a binder: 
+                                      stop there for this branch *)
            (se,cond)::acc_conds, `Map t'
          else (* keep going *)
            acc_conds, `Continue)
@@ -203,7 +249,7 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
       t
   in
   t', conds
-    
+
 
 (** Takes a projection, and a list of (system, condition list),
     select the elements where the proj is in the system, and returns
@@ -219,8 +265,8 @@ let project_conditions
     List.filter_map
       (fun (se, cond) ->
          let projs = SE.to_projs se in
-           (* when we'll use it, 
-              projs will always be either a pair or a singleton *)
+         (* when we'll use it, 
+            projs will always be either a pair or a singleton *)
          if List.mem proj projs then 
            (* this condition applies to the side we're looking at:
               keep its 'and' *)
@@ -236,7 +282,7 @@ let project_conditions
 
 
 (** Finds the first hash in the term
-   (not under binders, does not unfold macros) *)
+    (not under binders, does not unfold macros) *)
 let rec find_hash (table:Symbols.table) (t:Term.term) : Term.term option =
   match t with
   | App (Fun (f,_), [Tuple [_; _]]) when is_hash table f -> Some t
@@ -271,7 +317,7 @@ let prf_param_pattern
     | _ -> soft_failure ~loc
              (Tactics.Failure "the pattern given to prf is not a hash")
   in
-  
+
   (* generate a new name n_PRF to replace the hash with *)
   let n_fty = Type.mk_ftype [] [] hty in
   let nprfdef = Symbols.{n_fty} in
@@ -287,7 +333,7 @@ let prf_param_pattern
   (* t_nprf is both the context in which prf will be applied,
      and the term left in the remaining proof goal afterwards *)
   let t_nprf, sysconds = subst_term sys p (Name.to_term nprf) t in
-  
+
   (* sanity check: there's no diff or binders above n_PRF in t_nprf *)
   assert (no_binders_above nprf t_nprf);
 
@@ -299,11 +345,11 @@ let prf_param_pattern
   let cond_l = project_conditions proj_l sysconds in
   let cond_r = project_conditions proj_r sysconds in
 
- (* return the parameters *)
+  (* return the parameters *)
   {pp_hash_f=hash_f; pp_key=k; pp_msg=m; pp_context_nprf=t_nprf;
    pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table}
-  
-  
+
+
 (** Finds the parameters of the prf application *)
 let prf_param
     ~(loc:L.t)
@@ -330,11 +376,11 @@ let prf_param
     of (the biframe + the context cc_nprf, the message m, the key k):
     - the proj of k is correctly used
     - the message m is not hashed anywhere else.
-    Fails if the resulting formula still contains n_PRF.
-    That case could be handled similarly to what's done in IND-CCA,
-    but it is complicated and the usefulness is unclear.
-    Alternately, we could find syntactic conditions on cc_nprf that guarantee
-    this won't happen, but again it's unclear whether that's useful. *)
+      Fails if the resulting formula still contains n_PRF.
+      That case could be handled similarly to what's done in IND-CCA,
+      but it is complicated and the usefulness is unclear.
+      Alternately, we could find syntactic conditions on cc_nprf that guarantee
+      this won't happen, but again it's unclear whether that's useful. *)
 let phi_proj
     ?(use_path_cond=false)
     (loc     : L.t)
@@ -359,7 +405,7 @@ let phi_proj
   let contx_p = { contx with system = system_p } in
   let cc_nprf_p = Term.project1 proj cc_nprf in
   let m_p = Term.project1 proj m in
-  
+
   (* check that the key, once projected, is a name. *)
   let k_p = 
     match Term.project1 proj k with
@@ -371,30 +417,44 @@ let phi_proj
   in
   let frame_p = List.map (Term.project1 proj) biframe in
 
-  let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k_p in
+  let pp_k ppf () = 
+    Fmt.pf ppf "bad occurrences of key %a,@ and messages hashed by it" 
+      Name.pp k_p
+  in
+
+  (* first construct the IOS.folds_occs *)
+  let get_bad = get_bad_occs env m_p k_p hash_f in
+
 
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
-  let get_bad = get_bad_occs env m_p k_p hash_f in
-
-  let phi_k, phi_hash =
-    NO.occurrence_formulas
-      ~use_path_cond ~mode:PTimeSI ~negate:true ~pp_ns:(Some pp_k)
-      hash_formula
-      get_bad contx_p env
-      (cc_nprf_p :: m_p :: k_p.args @ frame_p)
+  let occs = IOS.find_all_occurrences ~mode:PTimeSI ~pp_ns:(Some pp_k)
+      get_bad contx_p env (cc_nprf_p :: m_p :: k_p.args @ frame_p)
   in
-  
+  (* sort the occurrences: first the key occs, then the hash occs *)
+  let occs_key, occs_hash =
+    List.partition
+      (fun x ->
+         match IOS.EO.(x.eo_occ.SO.so_cnt) with
+         | BadKey _ -> true
+         | IntegrityMsg _ -> false)
+      occs
+  in
+  let occs = occs_key @ occs_hash in
+
+  (* compute the formulas stating that none of the occs is a collision *)
+  let phi = 
+    List.map (IOF.occurrence_formula ~use_path_cond ~negate:true) occs
+  in
+
   (* finally, fail if the generated formula contains the context's hole,
      ie name xc.
      TODO it should be possible to handle that case, see how. *)
 
-  let phi = phi_k @ phi_hash in
-  
-  if List.exists (ER.has_name nprf) phi then
+  if List.exists (Name.has_name nprf) phi then
     soft_failure ~loc
-      (Tactics.Failure "The hash was in a bad context, the generated formula has holes");
-
+      (Tactics.Failure 
+         "The hash was in a bad context, the generated formula has holes");
   phi
 
 
@@ -409,8 +469,8 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   let before, e, after = LT.split_equiv_goal i s in
   let biframe = List.rev_append before after in
-  
-  
+
+
   (* get the parameters, enforcing that
      cc does not contain diffs or binders above xc.
      (at least the diff part could maybe be relaxed?) *)
@@ -426,14 +486,14 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let phi_proj =
     phi_proj ~use_path_cond:false loc
       env contx_nprf hash_f biframe cc_nprf m k nprf 
-    (* FEATURE: allow the user to set [use_path_cond] to true *)
+      (* FEATURE: allow the user to set [use_path_cond] to true *)
   in
 
-  Printer.pr "@[<v 0>Checking for bad use of the key on the left@; @[<v 0>";
+  Printer.pr "@[<v 0>Checking for occurrences on the left@; @[<v 0>";
   (* get proof obligation for occurrences *)
   let phi_l = phi_proj proj_l in
-          
-  Printer.pr "@]@,Checking for bad use of the key on the right@; @[<v 0>";
+
+  Printer.pr "@]@,Checking for occurrences on the right@; @[<v 0>";
   (* get proof obligation for occurrences *)
   let phi_r = phi_proj proj_r in
 
@@ -452,7 +512,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
       Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true phi_l),
       Term.mk_impl ~simpl:true cond_r (Term.mk_ands ~simpl:true phi_r),
       Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true inter)
-        (* cond_l = cond_r *)
+      (* cond_l = cond_r *)
     else 
       Term.mk_impl ~simpl:true cond_l (Term.mk_ands ~simpl:true phi_l),
       Term.mk_impl ~simpl:true cond_r (Term.mk_ands ~simpl:true phi_r),
@@ -479,7 +539,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   in
   let leftright = (oldpair :> SE.arbitrary) in
   let leftright_sequent =
-      ES.set_goal_in_context {oldcontext with set=leftright} (Equiv.mk_reach_atom phi_lr) s
+    ES.set_goal_in_context {oldcontext with set=leftright} (Equiv.mk_reach_atom phi_lr) s
   in
 
   (* remove trivial goals *)
@@ -488,14 +548,14 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
       (fun x -> ES.goal x <> Equiv.mk_reach_atom Term.mk_true)
       [left_sequent; leftright_sequent; right_sequent]
   in
-  
+
   let new_biframe = List.rev_append before (cc_nprf::after) in
   let equiv_sequent = ES.set_equiv_goal new_biframe (ES.set_table table_nprf s) in
 
 
   (* copied from old prf for the composition stuff *)
   (* not sure how this works *)
-  
+
   (* XXX This get options refs from Prover 
    * → it depends on Prover state *)
   let oracle_formula =
@@ -526,9 +586,9 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
       | _ -> assert false
   in
 
-  
+
   tag_f @ tracegoals @ [equiv_sequent]
-  
+
 
 (*------------------------------------------------------------------*)
 let prf_tac arg =
