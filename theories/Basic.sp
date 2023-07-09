@@ -128,7 +128,7 @@ hint rewrite and_false_r.
 
 
 goal [any] and_double (b:boolean) : (b && b) = b.
-Proof. intro b. by case b. Qed.
+Proof.  by case b. Qed.
 
 
 (*------------------------------------------------------------------*)
@@ -153,7 +153,7 @@ Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
 
 goal [any] or_double (b:boolean) : (b || b) = b.
-Proof. intro b. by case b. Qed.
+Proof. by case b. Qed.
 
 
 (*------------------------------------------------------------------*)
