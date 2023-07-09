@@ -126,6 +126,11 @@ goal [any] and_false_r (b : boolean) : (b && false) = false.
 Proof. by rewrite and_comm and_false_l. Qed.
 hint rewrite and_false_r.
 
+
+goal [any] and_double (b:boolean) : (b && b) = b.
+Proof. intro b. by case b. Qed.
+
+
 (*------------------------------------------------------------------*)
 (* or *)
 axiom [any] or_comm (b,b' : boolean) : (b || b') = (b' || b).
@@ -146,6 +151,10 @@ hint rewrite or_true_l.
 goal [any] or_true_r (b : boolean) : (b || true) = true.
 Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
+
+goal [any] or_double (b:boolean) : (b || b) = b.
+Proof. intro b. by case b. Qed.
+
 
 (*------------------------------------------------------------------*)
 (* impl *)
