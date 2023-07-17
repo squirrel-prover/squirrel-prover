@@ -45,7 +45,7 @@ okfail: squirrel
 okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; \
     rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
@@ -138,7 +138,7 @@ example: squirrel
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All examples passed successfully. ; fi
 
@@ -160,7 +160,7 @@ alcotest: version
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
 	@dune build @mytest
-	@python ./sed.py $(TESTS_OUT) /tmp/tests.output
+	@python3 ./sed.py $(TESTS_OUT) /tmp/tests.output
 	@if cat /tmp/tests.output | grep -q "^[^│] \[FAIL\]" ; \
 		then echo "${RED}Alcotests FAILED :${NC}" ; \
 		  cat /tmp/tests.output | grep -E --color "^[^│] \[FAIL\]" ; \
