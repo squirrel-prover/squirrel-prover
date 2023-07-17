@@ -525,7 +525,11 @@ and do_include (st:state) (i: ProverLib.include_param) : state =
   (* `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
   let file = Driver.locate load_paths (Location.unloc i.th_name) in
-  do_all_commands_in ~test:true st file
+  let st = 
+    try do_all_commands_in ~test:true st file with
+      x -> Stdlib.close_in file.f_chan; raise x 
+  in
+  st
 and do_all_commands_in ~test (st:state) (file:Driver.file) : state =
   match Driver.next_input ~test file st.prover_mode with
   | ProverLib.Prover EOF -> do_eof st

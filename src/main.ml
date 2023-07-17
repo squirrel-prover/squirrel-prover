@@ -228,6 +228,7 @@ let rec do_include
   try
     let final_state = do_all_commands ~test incl_state in
     Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
+    Stdlib.close_in_noerr file.f_chan;
     final_state.toplvl_state
 
     (* XXX Does that mean that file, file_stack and check_mode are the
@@ -247,6 +248,7 @@ let rec do_include
     let _ : HistoryTP.state =
       HistoryTP.reset_from_state state.toplvl_state
     in
+    Stdlib.close_in_noerr file.f_chan;
     Command.cmd_error (IncludeFailed err_mess)
 
 (** The main loop body: do one command *)
@@ -322,13 +324,15 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
-    Server.update new_state.toplvl_state.prover_state;
+    if !html then
+      Server.update new_state.toplvl_state.prover_state;
     new_state, ToplevelProver.get_mode new_state.toplvl_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
     (if !stat_filename <> "" then
       ProverTactics.pp_list_count !stat_filename);
+    Stdlib.close_in state.file.f_chan;
     if not test && not !html then exit 0;
 
   (* loop *)
@@ -351,7 +355,10 @@ and main_loop_error ~test (state : driver_state) : unit =
   else if !html then 
     Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" 
       state.file.f_name
-  else if not test then exit 1
+  else begin
+    Stdlib.close_in state.file.f_chan;
+    if not test then exit 1
+  end
 
 let start_main_loop
     ?(test=false)

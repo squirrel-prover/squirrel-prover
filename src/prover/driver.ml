@@ -17,6 +17,7 @@ type load_path =
 type load_paths = load_path list
 
 type file = {
+  f_chan   : in_channel;                 (** channel *)
   f_name   : string;                     (** short name, no extention *)
   f_path   : [`Stdin | `File of string]; (** file path *)
   f_lexbuf : Lexing.lexbuf;
@@ -73,7 +74,8 @@ ProverLib.input =
 
 (*--------------- Driver -------------------------------------------*)
 let file_from_stdin () : file =
-  { f_name = "#stdin";
+  { f_chan = stdin;
+    f_name = "#stdin";
     f_path = `Stdin;
     f_lexbuf = Lexing.from_channel stdin; }
     
@@ -89,7 +91,8 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
 
-    Some { f_name   = partial_path;
+    Some { f_chan   = chan;
+           f_name   = partial_path;
            f_path   = `File path;
            f_lexbuf = lexbuf; }
   with
