@@ -33,7 +33,7 @@ NC=\033[0m
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/basic-tutorial/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
 BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
 okfail: squirrel
