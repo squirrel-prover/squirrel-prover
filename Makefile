@@ -75,7 +75,7 @@ tac_count_examples: squirrel
 # README → /usr/bin/time is not always installed by default in your OS !
 # In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
-	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running bench onCounting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for example in $(PROVER_EXAMPLES); do \
@@ -131,7 +131,7 @@ $(BENCHDIR)/all/last.json:
 example: squirrel
 	@rm -rf `$(RUNLOGDIR)/examples`
 	@$(ECHO) "================== EXAMPLES ======================"
-	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.
