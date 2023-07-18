@@ -259,7 +259,7 @@ Always make sure that the resulting Term Rewriting System is terminating.
 
  *)
 
-axiom split_k (x,y : message) :  k (<x,y>) = x.
+axiom [any] split_k (x,y : message) :  k (<x,y>) = x.
 
 hint rewrite split_k.
 
