@@ -58,7 +58,7 @@ bench_preamble:
 
 # Populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 tac_count_examples: squirrel
-	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@for example in $(PROVER_EXAMPLES); do \
 		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
 		mkdir -p `dirname $${stat_name}`;\
