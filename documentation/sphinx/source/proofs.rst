@@ -152,6 +152,8 @@ Tactics are organized in three categories:
 
 In addition, they are also split between tactics applicable to :term:`local goals <local goal>` only, :term:`global goals <global goal>` only, or tactics common to both types of goals. Remark that the type of the current goal may evolve overtime when using tactic.
 
+Additionaly, we also have a few utility tactics listed at the end.
+
 
 Logical tactics
 ---------------
@@ -163,41 +165,33 @@ Common tactics
    :name: admit     
 
     Admit the current goal, or admit an element from a 
-    biframe. 
+    biframe by refering to its position. 
 
 
-.. tacn:: assumption (local+global)
+.. tacn:: assumption {? @assumption}
    :name: assump
       
     Concludes if the goal or false appears in the
-    hypotheses. 
+    hypotheses. The corresponding hypothesis may be directly given as argument.
 
+
+.. tacn:: case {@assumption | @term}
+	  
+    Perform a case analysis over the given arugment, which can either be:
     
-    Usages: assumption 
-    assumption H  
-
-
-.. tacn:: case (local+global)
-	  
-    Perform a case analysis. 
+     - an assumption which is a disjunction, split into several cases;
+     - a term of type timestamp, in which case the cases are over the fact that this timestamp must be equal to one of the actions of the system instantiated with some newly existantial indices.
       
-    Usages: case ts
-            case H
-            case m  
-
-.. tacn:: clear (local+global)
-	  
-    Clear an hypothesis. 
       
      
-.. tacn:: dependent induction  (local+global)
+.. tacn:: dependent induction  todo
 	  
     Apply the induction scheme to the
     conclusion. 
       
     Usage: dependent induction   
 
-.. tacn:: destruct  (local+global)
+.. tacn:: destruct  todo
 	  
     Destruct an hypothesis. An optional And/Or introduction pattern can be
     given.
@@ -207,56 +201,42 @@ Common tactics
       
        
 
-.. tacn:: exists  (local+global)
+.. tacn:: exists {* @variable}
 	  
     Introduce the existentially quantified variables in the conclusion of the
-    judgment, using the arguments as existential witnesses.
-    
-    Usage: exists v1, v2, ... 
-      
+    judgment, using the arguments as names for the existential witnesses.          
        
 
-.. tacn:: generalize (local+global)
+.. tacn:: generalize todo
 	  
     Generalize the goal on some terms 
       
        
 
-.. tacn:: generalize dependent  (local+global)
+.. tacn:: generalize dependent  todo
 	  
     Generalize the goal and hypotheses on some terms 
       
        
 
-.. tacn:: have (local+global)
+.. tacn:: have todo
 	  
     Add a new hypothesis. 
       
        
-
-.. tacn:: help
-	  
-    Display all available commands.
-    
-    Usages: help
-            help tacname
-            help concise 
-      
        
+.. tacn:: id
 
-.. tacn:: id (local+global)
-	  
-    Identity. 
-      
-    Usage: id   
+   The identity tactic, which does nothing.	  
+   .. todo:: Charlie: Maybe add justification of why we have this tactic, but I don't know it.
 
-.. tacn:: induction (local+global)
+.. tacn:: induction todo
 	  
     Apply the induction scheme to the conclusion. 
       
     Usage: induction   
 
-.. tacn:: intro (local+global)
+.. tacn:: intro todo
 	  
     Introduce topmost connectives of conclusion formula, when it can be done
     in an invertible, nonbranching fashion.
@@ -265,35 +245,10 @@ Common tactics
       
        
 
-.. tacn:: left  (local+global)
+.. tacn:: left
 	  
     Reduce a goal with a disjunction conclusion into the goal where the
     conclusion has been replaced with the first disjunct. 
-      
-    Usage: left   
-
-.. tacn:: lemmas (local+global)
-	  
-    Print all proved lemmas. 
-      
-    Usage: lemmas   
-
-
-
-
-.. tacn:: print  (local+global)
-	  
-    Shows def of given symbol or system. By default shows current
-    system. 
-      
-    Usage: print   
-
-.. tacn:: prof
-	  
-    Print profiling information. 
-      
-    Usage: prof   
-
 
 
 .. tacn:: reduce {? @simpl_flags}
@@ -305,51 +260,30 @@ Common tactics
 
      The tactic uses the :ref:`reduction engine <reduction>`
      with the provided flags.
-
-
      
-.. tacn:: remember (local+global)
+.. tacn:: remember @term
 	  
-    substitute a term by a fresh variable 
+    Substitute the given term by a fresh variable and adds as hypothesis the equality between the term and the new variable.
       
        
-
-.. tacn:: revert (local+global)
+.. tacn:: revert todo
 	  
     Take an hypothesis H, and turns the conclusion C into the implication H
     => C. 
-      
-       
-
-.. tacn:: right  (local+global)
+             
+.. tacn:: right
 	  
     Reduce a goal with a disjunction conclusion into the goal where the
     conclusion has been replaced with the second disjunct. 
-      
-    Usage: right   
 
-.. tacn:: search  (local+global)
-	  
-    Search lemmas containing a given pattern. 
-      
-    Usage: search   
-
-.. tacn:: show  (local+global)
-	  
-    Print the messages given as argument. Can be used to print the values
-    matching a pattern. 
-      
-    Usage: show m  
-
-.. tacn:: split  (local+global)
+.. tacn:: split
 	  
     Split a conjunction conclusion, creating one subgoal per
     conjunct. 
-      
-    Usage: split   
 
        
-.. tacn:: use  (local+global)
+.. tacn:: use todo
+   :name: use	   
 	  
     Instantiate a lemma or hypothesis on some arguments.
     
@@ -362,20 +296,15 @@ Common tactics
 Local tactics
 ~~~~~~~~~~~~~
 
-
-
-.. tact:: true (lowtactic)
+.. tact:: true
 	  
-    Solves a goal when the conclusion is true. 
-      
-    Usage: true   
+    Closes a goal when the conclusion is true. 
 
       
 Global tactics
 ~~~~~~~~~~~~~~
 
-
-.. tace:: byequiv (equiv)
+.. tace:: byequiv todo
 	  
     transform an equivalence goal into a reachability
     goal. 
@@ -383,21 +312,16 @@ Global tactics
     Usage: byequiv   
   
 
-.. tace:: constseq (equiv)
+.. tace:: constseq todo
 	  
     simplifies a constant sequence 
-      
-       
-
-.. tace:: enrich (equiv)
+             
+.. tace:: enrich @term
 	  
-    Enrich the goal with the given term. 
-      
-    Usages: enrich m
-            enrich f  
+    Enrich the equivalence goal with the given term, that can either be of type :g:`message` or :g:`bool`. Note that this changes the number of items in the equivalence, and if added before other tactics may break later references.
 
 
-.. tace:: localize  (global)
+.. tacn:: localize  todo
 	  
     Change a global hypothesis containing a reachability formula to a local
     hypothesis. 
@@ -405,32 +329,28 @@ Global tactics
     Usage: localize H1, H2  
 
 
-.. tace:: memseq (equiv)
+.. tace:: memseq todo
 	  
     prove that an biframe element appears in a sequence of the biframe. 
       
        
 
-.. tace:: refl (equiv)
+.. tace:: refl
 	  
-    Closes a reflexive goal. 
-      
-    Usage: refl   
+    Closes a reflexive goal, where all items must be reflexive. As an overapproximation, it only works if the goal does not contain variable or macros, as those may break reflexivity.
 
 
-.. tace:: splitseq (equiv)
+.. tace:: splitseq todo
 	  
     splits a sequence according to some boolean 
       
        
 
-.. tace:: sym (equiv)
+.. tace:: sym
 	  
-    Prove an equivalence by symmetry. 
-      
-    Usage: sym   
+    Swap the left and right system of the equivalence goal.
 
-.. tace:: trans (equiv)
+.. tace:: trans todo
 	  
     Prove an equivalence by transitivity. 
       
@@ -443,7 +363,8 @@ Common tactics
 ~~~~~~~~~~~~~~
 
       
-.. tacn:: apply  (local+global)
+.. tacn:: apply  todo
+   :name: apply	  
 	  
     Matches the goal with the conclusion of the formula F provided (F can be
     an hypothesis, a lemma, an axiom, or a proof term), trying to instantiate
@@ -474,7 +395,7 @@ Common tactics
         The current goal could not be closed.
 
 
-.. tacn:: autosimpl (local+global)
+.. tacn:: autosimpl todo
 	  
     Simplify a goal, without closing it. Automatically called after each
     tactic. 
@@ -491,7 +412,7 @@ Common tactics
      is a trace literal then it is taken into account as well.
 
     
-.. tacn:: depends  (local+global)
+.. tacn:: depends {@timestamp, @timestamp}
 	  
     If the second action depends on the first action, and if the second
     action happened, add the corresponding timestamp
@@ -500,7 +421,7 @@ Common tactics
     Usage: depends ts1, ts2  
 
 
-.. tacn:: expand  (local+global)
+.. tacn:: expand  todo
 	  
     Expand all occurences of the given macro inside the
     goal. 
@@ -509,7 +430,7 @@ Common tactics
             expand m
             expand f  
 
-.. tacn:: expandall  (local+global)
+.. tacn:: expandall  todo
 	  
     Expand all possible macros in the sequent. 
       
@@ -524,7 +445,7 @@ Common tactics
 
 
 
-.. tacn:: namelength (local+global)
+.. tacn:: namelength todo
 	  
     Adds the fact that two names have the same
     length. 
@@ -532,7 +453,7 @@ Common tactics
     Usage: namelength m1, m2  
 
 
-.. tacn:: rewrite (local+global)
+.. tacn:: rewrite todo
 	  
     If t1 = t2, rewrite all occurences of t1 into t2 in the goal.
     Usage: rewrite Hyp Lemma Axiom.
@@ -581,28 +502,28 @@ Local tactics
      are performed to handle conjunctive hypotheses). If the conclusion
      is a message (dis)-equality then it is taken into account as well.
 
-.. tact:: const (local)
+.. tact:: const todo
 	  
     Add the `const` tag to a variable. 
       
     Usage: const t  
 	    
 
-.. tact:: eqnames (local)
+.. tact:: eqnames todo
 	  
     Add index constraints resulting from names equalities, modulo the known
     equalities. 
       
     Usage: eqnames   
 
-.. tact:: eqtrace (local)
+.. tact:: eqtrace todo
 	  
     Add terms constraints resulting from timestamp and index
     equalities. 
       
     Usage: eqtrace   
 
-.. tact:: executable (local)
+.. tact:: executable todo
 	  
     Assert that exec@_ implies exec@_ for all previous
     timestamps. 
@@ -610,7 +531,7 @@ Local tactics
     Usage: executable ts  
 
 
-.. tact:: project (local)
+.. tact:: project todo
 	  
     Turn a goal on a bisystem into one goal for each projection of the
     bisystem. 
@@ -618,24 +539,24 @@ Local tactics
     Usage: project
 
 
-.. tact:: rewrite equiv  (local)
+.. tact:: rewrite equiv  todo
 	  
     Use an equivalence to rewrite a reachability goal. 
 
 
-.. tact:: slowsmt (local)
+.. tact:: slowsmt todo
 	  
     Version of smt tactic with higher time limit. 
       
     Usage: slowsmt   
 
-.. tact:: smt (local)
+.. tact:: smt todo
 	  
     Tries to discharge goal using an SMT solver. 
       
     Usage: smt   
 
-.. tact:: subst (local)
+.. tact:: subst todo
 	  
     If i = t where i is a variable, substitute all occurences of i by t and
     remove i from the context
@@ -678,7 +599,7 @@ Global tactics
 	
 
 
-.. tace:: deduce (equiv)
+.. tace:: deduce todo
 	  
     `deduce i` removes the ith element from the biframe when it can be
     computed from the rest of the biframe.
@@ -688,7 +609,7 @@ Global tactics
     Usage: deduce [i]  
 
 
-.. tace:: diffeq (equiv)
+.. tace:: diffeq todo
 	  
     Closes a reflexive goal up to equality 
       
@@ -713,7 +634,7 @@ Local tactics
 ~~~~~~~~~~~~~
 
 
-.. tact:: cdh (local)
+.. tact:: cdh todo
 	  
     Usage: cdh H, g.
     Applies the CDH assumption (including squareCDH) on H using generator
@@ -721,7 +642,7 @@ Local tactics
       
        
 
-.. tact:: collision  (local)
+.. tact:: collision  todo
 	  
     Collects all equalities between hashes occurring at toplevel in message
     hypotheses, and adds the equalities between messages that have the same
@@ -730,13 +651,13 @@ Local tactics
     Usage: collision [H]  
 
 
-.. tact:: euf (local)
+.. tact:: euf todo
 	  
     Apply the euf axiom to the given hypothesis name. 
       
        
 
-.. tact:: gdh (local)
+.. tact:: gdh todo
 	  
     Usage: gdh H, g.
     Applies the GDH assumption (including squareGDH) on H with generator
@@ -744,7 +665,7 @@ Local tactics
       
        
 
-.. tact:: intctxt (local)
+.. tact:: intctxt todo
 	  
     Apply the INTCTXT axiom to the given hypothesis name. 
       
@@ -755,19 +676,19 @@ Global tactics
 ~~~~~~~~~~~~~~
 
 
-.. tace:: cca1 (equiv)
+.. tace:: cca1 todo
 	  
     Apply the cca1 axiom on all instances of a ciphertext. 
       
        
-.. tace:: ddh (equiv)
+.. tace:: ddh todo
 	  
     Closes the current system, if it is an instance of a context of
     ddh. 
       
     Usage: ddh H1, H2, H3, H4  
 
-.. tace:: enckp (equiv)
+.. tace:: enckp todo
 	  
     Keyprivacy changes the key in some encryption
     subterm. 
@@ -781,7 +702,7 @@ Global tactics
    TODO why optional message in Squirrel tactic; also fix help in tool    
        
 
-.. tace:: xor (equiv)
+.. tace:: xor todo
 	  
     Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is
     fresh. 
@@ -789,3 +710,44 @@ Global tactics
     Usage: xor i, [m1], [m2]  
 
 	
+Utility tactics
+---------------
+
+.. tacn:: clear {@assumption}
+	  
+    Drop the specified hypothesis. 
+
+
+.. tacn:: help {? {@tacn|concise}}
+	  
+    When used without argument, display all available commands. It can also display the details for the given tactic name, or display or more concise list. It is a tactic and not a command, it can only be used inside proofs.
+
+.. tacn:: lemmas
+	  
+    Print all proved lemmas. This is usefull to know which lemmas can be used through the :tacn:`use` or :tacn:`apply` tactics.
+
+
+
+.. tacn:: print {? identifier}
+
+    By default, shows the current system. Otherwise, gives the definition of the given symbol (that may be a macro or a system).
+
+.. tacn:: prof
+	  
+    Print profiling information. 
+
+
+.. tacn:: search  todo
+	  
+    Search lemmas containing a given pattern. 
+      
+    Usage: search   
+
+    
+.. tacn:: show  todo
+	  
+    Print the messages given as argument. Can be used to print the values
+    matching a pattern. 
+      
+    Usage: show m  
+    
