@@ -179,7 +179,7 @@ Common tactics
     hypotheses. The corresponding hypothesis may be directly given as argument.
 
 
-.. tacn:: case {@assumption | @term}
+.. tacn:: case {| @assumption | @term}
 	  
     Perform a case analysis over the given arugment, which can either be:
     
@@ -219,26 +219,28 @@ Common tactics
 
 .. tacn:: generalize todo
 	  
-    Generalize the goal on some terms 
-      
-       
+    Generalize the goal on some terms              
 
 .. tacn:: generalize dependent  todo
 	  
-    Generalize the goal and hypotheses on some terms 
-      
-       
+    Generalize the goal and hypotheses on some terms              
 
-.. tacn:: have todo
-	  
-    Add a new hypothesis. 
-      
-       
-       
+.. tacn:: have {|@term|@term as @intropattern|@intropattern : {|@term|@global_formula}| @intropattern : @proof_term}
+
+    This is used to introduce a new hypothesis that will have to be proved in a new goal. The multiple usages behave as follow:
+
+     - :g:`have t` add as a new hypothesis a :token:`term` :g:`t` of type :g:`bool`, and the corresponding goal is created;
+     - :g:`have t as intro_pat` behaves similarly but also apply the given :token:`intropattern` to the newly introduced hypothesis;
+     - :g:`have intro_pat : formula_or_global_f` also works for both local and global formulas;
+     - :g:`have intro_pat := proof_term` first computes the given :token:`proof_term` before proceeding.
+                    
 .. tacn:: id
 
-   The identity tactic, which does nothing.	  
-   .. todo:: Charlie: Maybe add justification of why we have this tactic, but I don't know it.
+   The identity tactic, which does nothing.
+   
+   .. todo::
+
+      Charlie: Maybe add justification of why we have this tactic, but I don't know it.
 
 .. tacn:: induction todo
 	  
@@ -422,7 +424,7 @@ Common tactics
      is a trace literal then it is taken into account as well.
 
     
-.. tacn:: depends {@timestamp, @timestamp}
+.. tacn:: depends @timestamp, @timestamp
 	  
     If the second action depends on the first action, and if the second
     action happened, add the corresponding timestamp
@@ -448,7 +450,7 @@ Common tactics
 
 
 
-.. tacn:: fa {@position | @term}
+.. tacn:: fa {|@position | @term}
    :name: fa
 
    TODO
@@ -723,12 +725,12 @@ Global tactics
 Utility tactics
 ---------------
 
-.. tacn:: clear {@assumption}
+.. tacn:: clear @assumption
 	  
     Drop the specified hypothesis. 
 
 
-.. tacn:: help {? {@tacn|concise}}
+.. tacn:: help {? {|@tacn|concise}}
 	  
     When used without argument, display all available commands. It can also display the details for the given tactic name, or display or more concise list. It is a tactic and not a command, it can only be used inside proofs.
 
