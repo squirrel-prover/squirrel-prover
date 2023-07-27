@@ -24,6 +24,9 @@ The basic commands are:
 .. prodn::
    command ::= new @name_id | @state[({*, @term})] := @term | out(@channel, @term) | in(@channel, @term)
 
+A command can be:
+ * the binding of a name with :g:`new name`, which implicitly declares a new name based on the current replication indices. This is strictly syntactic sugar that can be avoided by explicitely declaring all names at the begining    
+   
 The body of a process is defined with sequential or parallel composition of commands,conditionals, find constructs, replication or process calls.
 
 ..  prodn::

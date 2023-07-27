@@ -4,6 +4,14 @@
 Commands
 =========
 
+.. cmd:: system
+	 
+  Defines a new system , see :term:`systems <system>` for details.
+
+.. cmd:: goal
+	 
+   Defines a new system , see :term:`goals <goals>` for details. 	 
+
 .. cmd:: Proof
 
   Enter proof mode with a unique subgoal

@@ -347,6 +347,8 @@ TODO expr and set expressions
 Goals
 -----
 
+A :gdef:`goal <goal>` defines a new formula to be proved. It can either be a :gdef:`local goal <local goal>` or a :gdef:`global goal <global goal>`, respectively corresponding to defining as a goal a :term:`local formula <local formula>` or a :term:`global formula <global formula>`.
+
 .. prodn::
   goal ::= local_goal
   local_goal ::= {? local } goal {? @system_expr } {| @identifier | _ } @parameters : @formula
