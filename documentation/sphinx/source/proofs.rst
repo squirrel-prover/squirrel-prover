@@ -188,12 +188,10 @@ Common tactics
       
       
      
-.. tacn:: dependent induction  todo
+.. tacn:: dependent induction {? @variable}
 	  
-    Apply the induction scheme to the
-    conclusion. 
-      
-    Usage: dependent induction   
+    Apply the induction scheme to the conclusion. If no argument is specified, the conclusion must be a universal quantification over a well-founded type. Alternatively, a variable of the goal can be given as argument, in which case the goal is first generalized as the universal quantification over the given variable before proceeding with the induction.
+
 
 .. tacn:: destruct @assumption {? as @intropattern}
 	  
