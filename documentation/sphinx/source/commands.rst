@@ -10,7 +10,7 @@ Commands
 
 .. cmd:: goal
 	 
-   Defines a new system , see :term:`goals <goals>` for details. 	 
+   Defines a new system , see :term:`goal <goal>` for details. 	 
 
 .. cmd:: Proof
 

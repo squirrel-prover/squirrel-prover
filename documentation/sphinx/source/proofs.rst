@@ -69,6 +69,10 @@ using the :token:`position` token.
 .. prodn::
   position ::= @natural
 
+The way new hypothesis are introduced by tactics can be defined with so-called intro patterns. We inherit the definition of intro patterns :token:`intropattern` from the corresponding `coq documentation <https://coq.inria.fr/refman/proof-engine/tactics.html#intro-patterns>`_, restricted to the notation :g:`[ ]` for And/Or introductions.
+
+.. todo:: Charlie: the previous intropattern token definition does not perfectly work, as future cross-references :token:`intropattern` are not clickable links, see e.g. the :tacn:`destruct` tactic where the link is not clickable.
+  
 .. todo:: most (all?) tactics take terms and formulas as patterns,
 	  with an implicit filling of the holes by matching against the subgoal's
 	  conclusion; document this, and also decide whether arguments are shown
@@ -191,13 +195,19 @@ Common tactics
       
     Usage: dependent induction   
 
-.. tacn:: destruct  todo
+.. tacn:: destruct @assumption {? as @intropattern}
 	  
-    Destruct an hypothesis. An optional And/Or introduction pattern can be
-    given.
+    Destruct an hypothesis based on its topmost destructable operator (existantial quantification, disjunction or conjunction). An optional And/Or introduction pattern can be given.
     
-    Usages: destruct H.
-            destruct H as [A | [B C]] 
+    .. example::
+       
+       If there exists an hypthesis :g:`H: A \/ (B /\ C)`, the command
+       :g:`destruct H as [H1 | [H2 H3]]` will remove the H hypothesis and introduce instead:
+       .. squirreldoc::
+
+	  H1: A
+	  H2: B
+	  H3: C
       
        
 
