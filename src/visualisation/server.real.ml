@@ -1,5 +1,5 @@
-open Squirrelcore
 open Squirrelprover
+open Squirrelcore
 module S = Tiny_httpd
 
 (* Utilities for reading files from script/ directory,
