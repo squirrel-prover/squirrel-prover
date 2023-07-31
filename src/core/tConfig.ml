@@ -30,7 +30,7 @@ let declare table (s:Theory.lsymb) (v:p_param_val) =
 (*------- Import from Config for default params --------------------*)
 
 let s_timeout = "timeout"
-let vint_timeout = 2
+let vint_timeout = 10
 let v_timeout = Config.Param_int vint_timeout
 
 let s_print_equ = "printTRSEquations"
