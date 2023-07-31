@@ -293,6 +293,12 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let get_mode (st:state) : ProverLib.prover_mode = 
     Prover.get_mode st.prover_state
 
+  let str_mode = function
+    | ProverLib.GoalMode -> "GoalMode"
+    | ProverLib.ProofMode -> "ProofMode"
+    | ProverLib.WaitQed -> "WaitQed"
+    | ProverLib.AllDone -> "AllDone"
+
   let rec do_command ?(check=`Check) ?(test=false) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
     let open ProverLib in
     let pst = st.prover_state in
@@ -315,7 +321,8 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       | GoalMode, Goal g           -> do_add_goal st g
       | GoalMode, Proof            -> do_start_proof ~check st
       | GoalMode, Include inc      -> do_include st inc
-      | GoalMode, EOF              -> do_eof st
+      | GoalMode, EOF              -> 
+        if test then st else do_eof st
       | WaitQed, Abort -> 
           if test then
             raise (Failure "Trying to abort a completed proof.");
@@ -327,7 +334,11 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       | _, Qed ->
         if test then raise Unfinished;
         Command.cmd_error Unexpected_command
-      | _, _ -> Command.cmd_error Unexpected_command
+      | _, _ -> 
+        Printer.pr "What is this command ? %s" (str_mode mode);
+
+        Command.cmd_error Unexpected_command
+
   and do_include (st:state) (i: ProverLib.include_param) : state =
     (* `Stdin will add cwd in path with theories *)
     let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
@@ -337,15 +348,20 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         x -> Driver.close_chan file.f_chan; raise x 
     in
     st
-  and do_all_commands_in ~check ~test (st:state) (file:Driver.file) : state =
+
+  and do_all_commands_in 
+      ~check ~test (st:state) (file:Driver.file) : state =
     match Driver.next_input_file ~test file (get_mode st) with
     | ProverLib.Prover EOF -> if test then st else do_eof st
     | cmd -> do_all_commands_in ~check ~test
                (do_command ~check ~test st file cmd) file
-  and exec_command ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
-    (* let input = Parserbuf.command_from_string st.prover_mode s in *)
-    let input = Driver.next_input_file ~test (Driver.file_from_str s) (get_mode st) in
+
+  and exec_command 
+      ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+    let input = Driver.next_input_file 
+        ~test (Driver.file_from_str s) (get_mode st) in
     do_command ~check ~test st (Driver.file_from_str s) input
+
   and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
     let file_from_string = Driver.file_from_str s in
     do_all_commands_in ~check ~test st file_from_string 
