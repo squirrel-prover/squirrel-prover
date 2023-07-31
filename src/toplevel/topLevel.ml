@@ -17,6 +17,8 @@ module type PROVER = sig
   val get_mode : state -> ProverLib.prover_mode
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+  val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+    ProverLib.bulleted_tactics -> state
   val is_proof_completed : state -> bool
   val current_goal_name : state -> string option
   val pp_goal : state -> Format.formatter -> unit -> unit
@@ -65,6 +67,10 @@ module type S = sig
 
     (** Handle different parsed elements including Tactics ! *)
     val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+
+    (** do tactics by calling tactic_handle and manages check mode ! *)
+    val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+      Lexing.lexbuf -> ProverLib.bulleted_tactics -> state
 
     (** return the Symbols table *)
     val get_table : state -> Symbols.table
@@ -118,14 +124,16 @@ module type S = sig
     val get_mode : state -> ProverLib.prover_mode
 
     (** Basic/default command handler *)
-    val do_command : ?test:bool -> state ->
-      ProverLib.input -> state
+    val do_command : ?check:[`Check | `NoCheck] -> ?test:bool -> state ->
+      Driver.file -> ProverLib.input -> state
 
     (** Execute the given sentence and return new state *)
-    val exec_command : string -> state -> state
+    val exec_command : ?check:[`Check | `NoCheck] -> ?test:bool ->
+      string -> state -> state 
 
     (** Execute the given string and return new state *)
-    val exec_all : state -> string -> state
+    val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state
+      -> string -> state
 end
 
 module Make (Prover : PROVER) : S with type prover_state_ty =
@@ -167,6 +175,22 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let tactic_handle (st:state) l = 
     { st with prover_state = 
                 Prover.tactic_handle st.prover_state l }
+
+  let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf) (l:ProverLib.bulleted_tactics) : state =
+    if not !Driver.interactive then 
+    begin
+      let lnum = lex.lex_curr_p.pos_lnum in
+      let b_tacs = List.filter_map 
+        (function ProverLib.BTactic t -> Some t | _ -> None) l
+      in
+      match b_tacs with
+        | [utac] ->
+            Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
+        | _ ->
+            Printer.prt `Prompt "Line %d: ??" lnum
+    end;
+    { st with prover_state = Prover.do_tactic ~check st.prover_state l; }
+
 
   let get_table (st:state) : Symbols.table = 
     Prover.get_table st.prover_state
@@ -229,17 +253,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     : unit =
     Prover.do_search st.prover_state t
 
-  let do_tactic (state : state) (l:ProverLib.bulleted_tactics) : 
-  state =
-    let toplvl_state = 
-      begin 
-        try List.fold_left 
-              tactic_handle state l
-        with
-          | e -> 
-            raise e
-      end in
-    try_complete_proof toplvl_state
   (* }↑} *)
 
   (*---------------- Options handling -- FIXME ---------------*)(* {↓{ *)
@@ -280,8 +293,9 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let get_mode (st:state) : ProverLib.prover_mode = 
     Prover.get_mode st.prover_state
 
-  let do_command ?(test=false) (st:state) (command:ProverLib.input) : state =
+  let rec do_command ?(check=`Check) ?(test=false) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
     let open ProverLib in
+    let pst = st.prover_state in
     match command with 
       (* ↓ touch toplvl_state and history_state ↓ *)
     | Toplvl Undo _ ->
@@ -290,17 +304,17 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       let mode = get_mode st in
       match mode, c with
       | GoalMode, InputDescr decls -> do_decls st decls
-      | _, Tactic t                -> do_tactic st t
-      | _, Print q                 -> do_print st q; st
-      | _, Search t                -> do_search st t; st
+                                   (* ↓ will print locations ↓ *)
+      | _, Tactic t                -> do_tactic st file.f_lexbuf t
+      | _, Print q                 -> Prover.do_print pst q; st
+      | _, Search t                -> Prover.do_search pst t; st
       | WaitQed, Qed               -> do_qed st
       | GoalMode, Hint h           -> do_add_hint st h
                                    (* ↓ touch global config ↓ *)
       | GoalMode, SetOption sp     -> do_set_option st sp
       | GoalMode, Goal g           -> do_add_goal st g
-      | GoalMode, Proof            -> do_start_proof st
-      | GoalMode, Include inc      -> 
-          { st with prover_state = Prover.do_include st.prover_state inc }
+      | GoalMode, Proof            -> do_start_proof ~check st
+      | GoalMode, Include inc      -> do_include st inc
       | GoalMode, EOF              -> do_eof st
       | WaitQed, Abort -> 
           if test then
@@ -314,16 +328,26 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         if test then raise Unfinished;
         Command.cmd_error Unexpected_command
       | _, _ -> Command.cmd_error Unexpected_command
-
-    let exec_command (s:string) (st:state) : state  = 
-        let input = Driver.next_input ~test:false ~filename:"fake_file" (Lexing.from_string
-        s) (get_mode st) in
-        do_command st input
-    let exec_all (st:state) (s:string) = 
-        let commands = List.filter 
-            (function | "" -> false | _ -> true) 
-            (String.split_on_char '.' s) in
-        List.fold_left (fun st s -> 
-            exec_command (s^".") st) st commands
+  and do_include (st:state) (i: ProverLib.include_param) : state =
+    (* `Stdin will add cwd in path with theories *)
+    let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
+    let file = Driver.locate load_paths (Location.unloc i.th_name) in
+    let st = 
+      try do_all_commands_in ~check:`NoCheck ~test:true st file with
+        x -> Driver.close_chan file.f_chan; raise x 
+    in
+    st
+  and do_all_commands_in ~check ~test (st:state) (file:Driver.file) : state =
+    match Driver.next_input_file ~test file (get_mode st) with
+    | ProverLib.Prover EOF -> if test then st else do_eof st
+    | cmd -> do_all_commands_in ~check ~test
+               (do_command ~check ~test st file cmd) file
+  and exec_command ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+    (* let input = Parserbuf.command_from_string st.prover_mode s in *)
+    let input = Driver.next_input_file ~test (Driver.file_from_str s) (get_mode st) in
+    do_command ~check ~test st (Driver.file_from_str s) input
+  and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
+    let file_from_string = Driver.file_from_str s in
+    do_all_commands_in ~check ~test st file_from_string 
 end
 (* }↑} *)

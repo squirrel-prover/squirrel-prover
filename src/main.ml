@@ -1,6 +1,5 @@
 open Squirrelprover
 open Squirreltop
-open Squirrelfront
 open Squirreltactics
 open Squirrelhtml
 open Driver
@@ -65,81 +64,6 @@ let next_input ~test (state : driver_state) : ProverLib.input =
   Driver.next_input_file ~test state.file
     (ToplevelProver.get_mode state.toplvl_state)
 
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-(** check if an exception is handled *)
-let is_toplevel_error ~test (e : exn) : bool =
-  match e with
-  | Parserbuf.Error                 _
-  | ProverLib.Error                 _
-  | Command.Cmd_error               _
-  | Process.Error                   _
-  | ProcessDecl.Error               _
-  | Theory.Conv                     _
-  | Symbols.Error                   _
-  | System.Error                    _
-  | SystemExpr.Error                _
-  | Tactics.Tactic_soft_failure     _
-  | Tactics.Tactic_hard_failure     _ -> not test
-
-  | _e when !interactive -> not test
-
-  | _ -> false
-
-(** [is_toplevel_error] must be synchronized with [pp_toplevel_error] *)
-let pp_toplevel_error
-    ~test
-    (state : driver_state)
-    (fmt : Format.formatter)
-    (e : exn) : unit
-  =
-  let pp_loc_error     = pp_loc_error     state.file in
-  let pp_loc_error_opt = pp_loc_error_opt state.file in
-
-  match e with
-  | Parserbuf.Error s ->
-    Fmt.string fmt s
-
-  | ProverLib.Error e ->
-    ProverLib.pp_error pp_loc_error fmt e
-
-  | Command.Cmd_error e ->
-    Command.pp_cmd_error fmt e
-
-  | Process.Error e ->
-    (Process.pp_error pp_loc_error) fmt e
-
-  | ProcessDecl.Error e when not test ->
-    (ProcessDecl.pp_error pp_loc_error) fmt e
-
-  | Theory.Conv e when not test ->
-    (Theory.pp_error pp_loc_error) fmt e
-
-  | Symbols.Error e when not test ->
-    (Symbols.pp_error pp_loc_error) fmt e
-
-  | System.Error e when not test ->
-    Format.fprintf fmt "System error: %a" System.pp_error e
-
-  | SystemExpr.Error e when not test ->
-    Format.fprintf fmt "System error: %a" SystemExpr.pp_error e
-
-  | Tactics.Tactic_soft_failure (l,e) when not test ->
-    Fmt.pf fmt "%aTactic failed: %a"
-      pp_loc_error_opt l
-      Tactics.pp_tac_error_i e
-
-  | Tactics.Tactic_hard_failure (l,e) when not test ->
-    Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a"
-      pp_loc_error_opt l
-      Tactics.pp_tac_error_i e
-
-  | e when !interactive ->
-    Fmt.pf fmt "Anomaly, please report: %s" (Printexc.to_string e)
-    
-  | _ -> assert false
-
 (*---------------- Main --------------------------------------------*)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, toplvl_state =
@@ -154,51 +78,27 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   { state with toplvl_state; history_state; }
 
 (*----------Part can be done here and tactic handling in Prover ----*)
-let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) :
-  ToplevelProver.state =
-  begin match state.check_mode with
-    | `NoCheck -> assert (ToplevelProver.get_mode state.toplvl_state = WaitQed)
-    | `Check   -> 
-      if ToplevelProver.get_mode state.toplvl_state <> ProverLib.ProofMode then
-        Command.cmd_error Unexpected_command;
-  end;
-
-  if not !interactive then 
-  begin
-    let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-    let b_tacs = List.filter_map 
-      (function ProverLib.BTactic t -> Some t | _ -> None) l
-    in
-    match b_tacs with
-      | [utac] ->
-          Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
-      | _ ->
-          Printer.prt `Prompt "Line %d: ??" lnum
-  end;
-
-  match state.check_mode with
-  | `NoCheck -> state.toplvl_state
-  | `Check   ->
-    let saved_ps = state.toplvl_state in
-    let toplvl_state = 
-      begin 
-        try List.fold_left 
-              ToplevelProver.tactic_handle state.toplvl_state l
-        with
-          | e -> 
-            (* XXX ↓ impure ↓  XXX will only reset Config params refs *)
-            ignore (HistoryTP.reset_from_state 
-                      saved_ps) ; raise e
-      end in
-    ToplevelProver.try_complete_proof toplvl_state
+(* let _do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : *)
+(*   ToplevelProver.state = *)
+(*   let saved_ps = state.toplvl_state in *)
+(*   try *)  
+(*     ToplevelProver.do_tactic ~check:state.check_mode *)
+(*       state.toplvl_state state.file.f_lexbuf l *)
+(*       with *)
+(*         (1* FIXME should be handle by main loop ! *1) *)
+(*         | e -> *) 
+(*           (1* XXX ↓ impure ↓  XXX will only reset Config params refs *1) *)
+(*           ignore (HistoryTP.reset_from_state *) 
+(*                     saved_ps) ; raise e *)
 
 (* XXX Touch global Config that has to be recorded in History *)
-let do_set_option (state : driver_state) (sp : Config.p_set_param) :
-  ToplevelProver.state =
-  match Config.set_param sp with
-  | `Failed _ -> (* TODO should be only ↓ *)
-                ToplevelProver.do_set_option state.toplvl_state sp
-  | `Success -> state.toplvl_state
+(* let _do_set_option (state : driver_state) (sp : Config.p_set_param) : *)
+(*   ToplevelProver.state = *)
+(*   (1* FIXME we still have variables in global config ? *1) *)
+(*   match Config.set_param sp with *)
+(*   | `Failed _ -> (1* TODO should be only ↓ *1) *)
+(*                 ToplevelProver.do_set_option state.toplvl_state sp *)
+(*   | `Success -> state.toplvl_state *)
 
 let rec do_include 
     ~test
@@ -235,11 +135,11 @@ let rec do_include
   (* include failed, revert state *)
   (* XXX WHEN CONFIG* WILL BE IN PROPAGATED DRIVER_STATE XXX
    * ALL THAT PART SHOULD BE MANAGED BY main_loop EXCEPTION HANDLER *)
-  with e when is_toplevel_error ~test e ->
+  with e when Errors.is_toplevel_error ~test e ->
     let err_mess fmt =
       Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
         (L.unloc i.th_name)
-        (pp_toplevel_error ~test incl_state) e
+        (Errors.pp_toplevel_error ~test incl_state.file) e
     in
     (* XXX will only reset params and options that are globals *)
     (* main_loop will return previous state anyway *)
@@ -263,17 +163,18 @@ and do_command
     let mode = ToplevelProver.get_mode st in
     let check = state.check_mode in
     let toplvl_state = match mode, c with
-    | _, Tactic t                -> do_tactic state t
-                                 (* ↓ touch global config ↓ *)
-    | GoalMode, SetOption sp     -> do_set_option state sp
-                                 (* ↓ gives right check mode ↓ *)
-    | GoalMode, Proof            -> ToplevelProver.do_start_proof st
-                                      ~check
+                                 (* ↓ FIXME only manages history state
+                                  * like in main loop ↓ *)
+    (* | _, Tactic t                -> _do_tactic state t *)
+                                 (* ↓ TODO remove if none config
+                                  * variable remains global ↓ *)
+    (* | GoalMode, SetOption sp     -> do_set_option state sp *)
     | GoalMode, Include inc      -> do_include ~test state inc
-    | GoalMode, EOF              -> assert (state.file_stack = []);
-                                    ToplevelProver.do_eof st
+    (* | GoalMode, EOF              -> assert (state.file_stack = []); *)
+    (*                                 ToplevelProver.do_eof st *)
               (* ↓ handle default behaviour ↓ *)
-    | _, _ -> ToplevelProver.do_command ~test st command
+    | _, _ -> ToplevelProver.do_command ~check ~test st state.file command
+    (* let toplvl_state = ToplevelProver.do_command ~test st state.file command *)
     in { state with toplvl_state; }
 
 (* FIXME why not using do_all_commands when not interactive ? *)
@@ -326,8 +227,8 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
-  | exception e when is_toplevel_error ~test e ->
-    Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
+  | exception e when Errors.is_toplevel_error ~test e ->
+    Printer.prt `Error "%a" (Errors.pp_toplevel_error ~test state.file) e;
     main_loop_error ~test state
 
 and main_loop_error ~test (state : driver_state) : unit =

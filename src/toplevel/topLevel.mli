@@ -1,4 +1,5 @@
 open Squirrelcore
+open Squirrelprover
 
 exception Unfinished
 
@@ -17,6 +18,8 @@ sig
   val get_mode : state -> ProverLib.prover_mode
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+  val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+    ProverLib.bulleted_tactics -> state
   val is_proof_completed : state -> bool
   val current_goal_name : state -> string option
   val pp_goal : state -> Format.formatter -> unit -> unit
@@ -65,6 +68,10 @@ module type S = sig
 
     (** Handle different parsed elements including Tactics ! *)
     val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+
+    (** do tactics ! *)
+    val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+      Lexing.lexbuf -> ProverLib.bulleted_tactics ->  state
 
     (** return the Symbols table *)
     val get_table : state -> Symbols.table
@@ -118,14 +125,16 @@ module type S = sig
     val get_mode : state -> ProverLib.prover_mode
 
     (** Evaluate the given input and return new state *)
-    val do_command : ?test:bool -> state ->
-      ProverLib.input -> state
+    val do_command : ?check:[`Check | `NoCheck] -> ?test:bool -> state ->
+      Driver.file -> ProverLib.input -> state
 
     (** Execute the given sentence and return new state *)
-    val exec_command : string -> state -> state
+    val exec_command : ?check:[`Check | `NoCheck] -> ?test:bool ->
+      string -> state -> state 
 
     (** Execute the given string and return new state *)
-    val exec_all : state -> string -> state
+    val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state
+      -> string -> state
 end
 
 (** {2 Toplevel prover}
