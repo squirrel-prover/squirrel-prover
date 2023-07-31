@@ -320,9 +320,12 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       | GoalMode, SetOption sp     -> do_set_option st sp
       | GoalMode, Goal g           -> do_add_goal st g
       | GoalMode, Proof            -> do_start_proof ~check st
+                                      (* ↓ TODO do not manage stack file
+                                       * yet ↓ *)
       | GoalMode, Include inc      -> do_include st inc
       | GoalMode, EOF              -> 
-        if test then st else do_eof st
+        (* ↓ If interactive, never end ↓ *)
+        if TConfig.interactive (get_table st) then st else do_eof st
       | WaitQed, Abort -> 
           if test then
             raise (Failure "Trying to abort a completed proof.");
@@ -352,7 +355,9 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   and do_all_commands_in 
       ~check ~test (st:state) (file:Driver.file) : state =
     match Driver.next_input_file ~test file (get_mode st) with
-    | ProverLib.Prover EOF -> if test then st else do_eof st
+    | ProverLib.Prover EOF ->
+        (* ↓ If test or interactive, never end ↓ *)
+        if test || TConfig.interactive (get_table st) then st else do_eof st
     | cmd -> do_all_commands_in ~check ~test
                (do_command ~check ~test st file cmd) file
 

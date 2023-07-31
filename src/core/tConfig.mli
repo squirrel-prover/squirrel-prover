@@ -15,8 +15,13 @@ val solver_timeout : Symbols.table -> int
 
 val vint_timeout : int
 
+val s_interactive : string
+
 (** Print equations of the TRS system. *)
 val print_trs_equations : Symbols.table -> bool
+
+(** get interactive boolean set *)
+val interactive : Symbols.table -> bool
 
 (** Debug information for the constraint checker. *)
 val debug_constr : Symbols.table -> bool

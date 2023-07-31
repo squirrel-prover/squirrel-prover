@@ -20,6 +20,8 @@ output=firstOutput}]
 
 let init () =
   prover_state := TProver.init ();
+  prover_state := TProver.do_set_option 
+      !prover_state (TConfig.s_interactive,Config.Param_bool true);
   prover_stack := [{ps= !prover_state; output=firstOutput}]
 
 let push (s:state) : stack =
@@ -75,7 +77,7 @@ let get_goal_print () : string =
 (* will return boolean that is true if every thing is ok and output *)
 let exec_sentence ?(check=`Check) s : bool * string = 
   try
-    prover_state := TProver.exec_all ~check ~test:true !prover_state s;
+    prover_state := TProver.exec_all ~check !prover_state s;
     let info = Format.flush_str_formatter () in
     prover_stack := 
       push {ps= !prover_state; output= get_goal_print ()};
@@ -87,7 +89,7 @@ let exec_sentence ?(check=`Check) s : bool * string =
 
 let exec_command ?(check=`Check) s : string = 
   try
-    let _ = TProver.exec_command ~check ~test:true s !prover_state in
+    let _ = TProver.exec_command ~check s !prover_state in
     let info = Format.flush_str_formatter () in
     info
   with e -> 
