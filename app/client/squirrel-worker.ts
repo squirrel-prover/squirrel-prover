@@ -244,7 +244,9 @@ export class SquirrelWorker {
   async getStringOfNode(x:SyntaxNode, viewState:EditorState): Promise<string> {
     if(x.firstChild && x.firstChild.type.name === "P_include"){
       //TODO get fname !
-      return await this.fileManager.getFileString("Basic.sp");
+      let include_name = x.firstChild.getChild("include_name");
+      let name = viewState.sliceDoc(include_name.from, include_name.to);
+      return await this.fileManager.getFileString(name+".sp");
     } else {
       return viewState.sliceDoc(x.from, x.to);
     }
