@@ -278,7 +278,7 @@ Common tactics
     Substitute the given term by a fresh variable and adds as hypothesis the equality between the term and the new variable.
       
        
-.. tacn:: revert todo
+.. tacn:: revert @assumption
 	  
     Take an hypothesis H, and turns the conclusion C into the implication H
     => C. 
@@ -294,15 +294,12 @@ Common tactics
     conjunct. 
 
        
-.. tacn:: use todo
+.. tacn:: use @assumption {? with {+ variables}} {?as @intropattern}
    :name: use	   
 	  
-    Instantiate a lemma or hypothesis on some arguments.
-    
-    Usage:
-    use H with v1, ..., vn.
-    use H with v1 as intro_pat. 
-      
+    Instantiate a lemma or hypothesis based on the given. The optionnaly given variables are used to instantiate the universally quantified variables of the lemma.
+    An intropattern can also be specified.
+          
 
       
 Local tactics
