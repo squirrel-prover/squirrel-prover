@@ -188,10 +188,14 @@ Common tactics
       
       
      
-.. tacn:: dependent induction {? @variable}
+.. tacn:: dependent induction {? @variable} todo
 	  
     Apply the induction scheme to the conclusion. If no argument is specified, the conclusion must be a universal quantification over a well-founded type. Alternatively, a variable of the goal can be given as argument, in which case the goal is first generalized as the universal quantification over the given variable before proceeding with the induction.
 
+   .. todo::
+
+      Charlie: Discussions needed, check out discord + cleanup_induction branch    
+    
 
 .. tacn:: destruct @assumption {? as @intropattern}
 	  
@@ -215,13 +219,13 @@ Common tactics
     judgment, using the arguments as names for the existential witnesses.          
        
 
-.. tacn:: generalize todo
+.. tacn:: generalize {+ @variable} {? as {+ @variable}}
 	  
-    Generalize the goal on some terms              
+    Generalize the goal on some variables, that is, make the goal universally quantified over the given variables. New names for the now universally quantified variables can be specfied.
 
-.. tacn:: generalize dependent  todo
+.. tacn:: generalize dependent  {+ @variable} {? as {+ @variable}}
 	  
-    Generalize the goal and hypotheses on some terms              
+    Generalize the goal and hypotheses on some terms. Hypothesis that depend on the specified variable are first pushed back inside the goal, before the goal is generalized.              
 
 .. tacn:: have {|@term|@term as @intropattern|@intropattern : {|@term|@global_formula}| @intropattern : @proof_term}
 
@@ -240,20 +244,18 @@ Common tactics
 
       Charlie: Maybe add justification of why we have this tactic, but I don't know it.
 
-.. tacn:: induction todo
+.. tacn:: induction {? @variable} todo
 	  
-    Apply the induction scheme to the conclusion. 
-      
-    Usage: induction   
+  
+   .. todo::
 
-.. tacn:: intro todo
+      Charlie: Discussions needed, check out discord + cleanup_induction branch
+
+
+.. tacn:: intro {+ @intropattern}
 	  
-    Introduce topmost connectives of conclusion formula, when it can be done
+    Introduce topmost connectives of conclusion formula by following the sequence of :token:`intropattern`, when it can be done
     in an invertible, nonbranching fashion.
-    
-    Usage: intro a b _ c * 
-      
-       
 
 .. tacn:: left
 	  
