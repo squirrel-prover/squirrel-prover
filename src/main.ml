@@ -276,7 +276,10 @@ let start_main_loop
     (* file_stack can be changed regarding to includes main.ml:426 *)
     file_stack = []; }
   in
-  main_loop ~test state
+  (* add interactive option to the table *)
+  let tp_state = ToplevelProver.do_set_option 
+      state.toplvl_state (TConfig.s_interactive,Config.Param_bool !interactive) in
+  main_loop ~test { state with toplvl_state = tp_state }
 
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;

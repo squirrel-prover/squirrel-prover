@@ -160,8 +160,11 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     { st with prover_state = 
                 Prover.tactic_handle st.prover_state l }
 
+  let get_table (st:state) : Symbols.table = 
+    Prover.get_table st.prover_state
+
   let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf) (l:ProverLib.bulleted_tactics) : state =
-    if not !Driver.interactive then 
+    if not (TConfig.interactive (get_table st)) then 
     begin
       let lnum = lex.lex_curr_p.pos_lnum in
       let b_tacs = List.filter_map 
@@ -174,10 +177,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
             Printer.prt `Prompt "Line %d: ??" lnum
     end;
     { st with prover_state = Prover.do_tactic ~check st.prover_state l; }
-
-
-  let get_table (st:state) : Symbols.table = 
-    Prover.get_table st.prover_state
 
   (*---------------- do_* commands handling ------------------*)(* {↓{ *)
   (* Since prover_mode is handled by the toplevel this has to be done
