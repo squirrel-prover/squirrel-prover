@@ -135,11 +135,11 @@ let rec do_include
   (* include failed, revert state *)
   (* XXX WHEN CONFIG* WILL BE IN PROPAGATED DRIVER_STATE XXX
    * ALL THAT PART SHOULD BE MANAGED BY main_loop EXCEPTION HANDLER *)
-  with e when Errors.is_toplevel_error ~test e ->
+  with e when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
     let err_mess fmt =
       Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
         (L.unloc i.th_name)
-        (Errors.pp_toplevel_error ~test incl_state.file) e
+        (Errors.pp_toplevel_error ~interactive:!interactive ~test incl_state.file) e
     in
     (* XXX will only reset params and options that are globals *)
     (* main_loop will return previous state anyway *)
@@ -227,8 +227,8 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
-  | exception e when Errors.is_toplevel_error ~test e ->
-    Printer.prt `Error "%a" (Errors.pp_toplevel_error ~test state.file) e;
+  | exception e when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
+    Printer.prt `Error "%a" (Errors.pp_toplevel_error ~interactive:!interactive ~test state.file) e;
     main_loop_error ~test state
 
 and main_loop_error ~test (state : driver_state) : unit =

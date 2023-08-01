@@ -6,7 +6,7 @@ include Driver
 (** {2 Error handling} *)
 
 (** check if an exception is handled *)
-let is_toplevel_error ~test (e : exn) : bool =
+let is_toplevel_error ?(interactive=true) ~test (e : exn) : bool =
   match e with
   | Parserbuf.Error                 _
   | ProverLib.Error                 _
@@ -20,12 +20,13 @@ let is_toplevel_error ~test (e : exn) : bool =
   | Tactics.Tactic_soft_failure     _
   | Tactics.Tactic_hard_failure     _ -> not test
 
-  | _e when !interactive -> not test
+  | _e when interactive -> not test
 
   | _ -> false
 
 (** [is_toplevel_error] must be synchronized with [pp_toplevel_error] *)
 let pp_toplevel_error
+    ?(interactive=true)
     ~test
     (file : file)
     (fmt : Format.formatter)
@@ -72,7 +73,7 @@ let pp_toplevel_error
       pp_loc_error_opt l
       Tactics.pp_tac_error_i e
 
-  | e when !interactive ->
+  | e when interactive ->
     Fmt.pf fmt "Anomaly, please report: %s" (Printexc.to_string e)
     
   | _ -> assert false
