@@ -300,6 +300,6 @@ let () =
          instance of the name cannot have been produced by another \
          action.";
       usages_sorts = [Sort String; Sort Int];
-      tactic_group=Structural }
+      tactic_group= Cryptographic }
     ~pq_sound:true
     (LowTactics.gentac_of_any_tac_arg fresh_trace_tac fresh_equiv_tac)
