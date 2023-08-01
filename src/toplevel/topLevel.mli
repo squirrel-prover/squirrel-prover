@@ -33,7 +33,6 @@ sig
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
   val do_search : state -> ProverLib.search_query -> unit
-  val try_complete_proof : state -> state
   val do_eof : state -> state
   val do_include : state -> ProverLib.include_param -> state
 end
@@ -61,10 +60,6 @@ module type S = sig
 
     (** Return Toplevel.PROVER in init state *)
     val init : unit -> state
-
-    (** If current proof is completed change prover_mode and printout
-     * informations *)
-    val try_complete_proof : state -> state
 
     (** Handle different parsed elements including Tactics ! *)
     val tactic_handle : state -> ProverLib.bulleted_tactic -> state

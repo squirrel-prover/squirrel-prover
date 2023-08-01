@@ -32,7 +32,6 @@ module type PROVER = sig
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
   val do_search : state -> ProverLib.search_query -> unit
-  val try_complete_proof : state -> state
   val do_eof : state -> state
   val do_include : state -> ProverLib.include_param -> state
 end
@@ -60,10 +59,6 @@ module type S = sig
 
     (** Return Toplevel.PROVER in init state *)
     val init : unit -> state
-
-    (** If current proof is completed change prover_mode and printout
-     * informations *)
-    val try_complete_proof : state -> state
 
     (** Handle different parsed elements including Tactics ! *)
     val tactic_handle : state -> ProverLib.bulleted_tactic -> state
@@ -161,17 +156,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       option_defs = [];
     }
 
-  let try_complete_proof (st:state) : state = 
-    if Prover.is_proof_completed st.prover_state then 
-    begin
-      Printer.prt `Goal "Goal %s is proved"
-        (Utils.oget (Prover.current_goal_name st.prover_state))
-    end else begin
-      Printer.prt `Goal "%a" (Prover.pp_goal st.prover_state) ()
-    end;
-    { st with prover_state = Prover.try_complete_proof
-                      st.prover_state}
-
   let tactic_handle (st:state) l = 
     { st with prover_state = 
                 Prover.tactic_handle st.prover_state l }
@@ -210,7 +194,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let do_start_proof ?(check=`NoCheck) (st: state) : state =
     match Prover.start_proof st.prover_state check with
     | None, ps ->
-      Printer.pr "%a" (Prover.pp_goal ps) ();
+      Printer.prt `Goal "%a" (Prover.pp_goal ps) ();
       { st with prover_state = ps }
     | Some es, _ -> Command.cmd_error (StartProofError es)
 

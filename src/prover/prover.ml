@@ -69,11 +69,44 @@ let abort (ps:state) : state =
 let is_proof_completed (ps:state) : bool =
   ps.subgoals = [] && Bullets.is_empty ps.bullets
 
+let current_goal_name (ps:state) : string option =
+  Utils.omap (function 
+      | ProverLib.UnprovedLemma (stmt,_) -> stmt.Goal.name
+      | ProofObl _ -> "proof obligation" ) ps.current_goal
+
+(*--------------------- Printings         ------------------*)(* {↓{ *)
+let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
+  | None,[] -> assert false
+  | Some _, [] -> Fmt.pf ppf "No subgoals remaining.@."
+  | Some _, j :: _ ->
+    Fmt.pf ppf "Focused goal (1/%d):@;%a@;@."
+      (List.length ps.subgoals)
+      Goal.pp j
+  | _ -> assert false
+
+let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
+  | None,[] -> assert false
+  | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
+  | Some _, subgoals ->
+    List.iteri (fun i sg -> 
+    Fmt.pf ppf "@[<v 0>[goal> (%d/%d):@;%a@;@]@." 
+      (i+1) 
+      (List.length subgoals) 
+      Goal.pp sg
+    ) subgoals
+  | _ -> assert false
+(* }↑} *)
+
 let try_complete_proof (ps:state) : state =
-  if is_proof_completed ps then
+  if is_proof_completed ps then begin
+    Printer.prt `Goal "Goal %s is proved"
+      (Utils.oget (current_goal_name ps));
     { ps with prover_mode = WaitQed }
-  else
+  end
+  else begin
+    Printer.prt `Goal "%a" (pp_goal ps) ();
     { ps with prover_mode = ProofMode}
+  end
 
 let complete_proof (ps:state) : state = 
   assert (is_proof_completed ps);
@@ -190,11 +223,6 @@ let get_deepest_table (st:state) : Symbols.table =
     end
   | _ -> get_table st
   end
-
-let current_goal_name (ps:state) : string option =
-  Utils.omap (function 
-      | ProverLib.UnprovedLemma (stmt,_) -> stmt.Goal.name
-      | ProofObl _ -> "proof obligation" ) ps.current_goal
 (* }↑} *)
 
 (*--------------------- Tactics evaluation -----------------*)(* {↓{ *)
@@ -288,28 +316,8 @@ let do_tactic ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : s
       end in
     try_complete_proof state
 (* }↑} *)
-(*--------------------- Printings         ------------------*)(* {↓{ *)
-let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
-  | None,[] -> assert false
-  | Some _, [] -> Fmt.pf ppf "No subgoals remaining.@."
-  | Some _, j :: _ ->
-    Fmt.pf ppf "Focused goal (1/%d):@;%a@;@."
-      (List.length ps.subgoals)
-      Goal.pp j
-  | _ -> assert false
 
-let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
-  | None,[] -> assert false
-  | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
-  | Some _, subgoals ->
-    List.iteri (fun i sg -> 
-    Fmt.pf ppf "@[<v 0>[goal> (%d/%d):@;%a@;@]@." 
-      (i+1) 
-      (List.length subgoals) 
-      Goal.pp sg
-    ) subgoals
-  | _ -> assert false
-
+(*----------------------- Search --------------------------*)(* {↓{ *)
 let search_about (st:state) (q:ProverLib.search_query) : 
   (Lemma.lemma * Equiv.any_form list) list =
   let env = 
@@ -509,7 +517,7 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
         if not found then
         Printer.prt `Default "%s not found@." (Location.unloc l)
       end
-  (* }↑} *)
+(* }↑} *)
 
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
