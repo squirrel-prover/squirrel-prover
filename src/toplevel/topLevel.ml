@@ -33,7 +33,6 @@ module type PROVER = sig
   val do_print : state -> ProverLib.print_query -> unit
   val do_search : state -> ProverLib.search_query -> unit
   val do_eof : state -> state
-  val do_include : state -> ProverLib.include_param -> state
 end
 
 module type S = sig
@@ -119,7 +118,7 @@ module type S = sig
     val get_mode : state -> ProverLib.prover_mode
 
     (** Basic/default command handler *)
-    val do_command : ?check:[`Check | `NoCheck] -> ?test:bool -> state ->
+    val do_command : ?test:bool -> ?check:[`Check | `NoCheck] -> state ->
       Driver.file -> ProverLib.input -> state
 
     (** Execute the given sentence and return new state *)
@@ -129,6 +128,9 @@ module type S = sig
     (** Execute the given string and return new state *)
     val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state
       -> string -> state
+
+    (** Run the given squirrel file *)
+    val run : ?test:bool -> string -> unit
 end
 
 module Make (Prover : PROVER) : S with type prover_state_ty =
@@ -282,7 +284,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     | ProverLib.WaitQed -> "WaitQed"
     | ProverLib.AllDone -> "AllDone"
 
-  let rec do_command ?(check=`Check) ?(test=false) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
+  let rec do_command ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
     let open ProverLib in
     let pst = st.prover_state in
     match command with 
@@ -294,7 +296,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       match mode, c with
       | GoalMode, InputDescr decls -> do_decls st decls
                                    (* ↓ will print locations ↓ *)
-      | _, Tactic t                -> do_tactic st file.f_lexbuf t
+      | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
       | _, Print q                 -> Prover.do_print pst q; st
       | _, Search t                -> Prover.do_search pst t; st
       | WaitQed, Qed               -> do_qed st
@@ -325,12 +327,15 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
 
         Command.cmd_error Unexpected_command
 
-  and do_include (st:state) (i: ProverLib.include_param) : state =
+  and do_include ?(test=true) (st:state) (i: ProverLib.include_param) : state =
     (* `Stdin will add cwd in path with theories *)
     let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
     let file = Driver.locate load_paths (Location.unloc i.th_name) in
+    let checkInclude = 
+      if TConfig.checkInclude (get_table st) then `Check else
+        `NoCheck in
     let st = 
-      try do_all_commands_in ~check:`NoCheck ~test:true st file with
+      try do_all_commands_in ~check:checkInclude ~test st file with
         x -> Driver.close_chan file.f_chan; raise x 
     in
     st
@@ -342,16 +347,23 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         (* ↓ If test or interactive, never end ↓ *)
         if test || TConfig.interactive (get_table st) then st else do_eof st
     | cmd -> do_all_commands_in ~check ~test
-               (do_command ~check ~test st file cmd) file
+               (do_command ~test ~check st file cmd) file
 
   and exec_command 
       ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
     let input = Driver.next_input_file 
         ~test (Driver.file_from_str s) (get_mode st) in
-    do_command ~check ~test st (Driver.file_from_str s) input
+    do_command ~test ~check st (Driver.file_from_str s) input
 
   and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
     let file_from_string = Driver.file_from_str s in
     do_all_commands_in ~check ~test st file_from_string 
+
+  (* run entire squirrel file with given path as string *)
+  let run ?(test=false) (file_path:string) : unit =
+    match Driver.file_from_path LP_none 
+            (Filename.remove_extension file_path) with
+    | Some file -> let _ = do_all_commands_in ~test ~check:`Check (init ()) file in ()
+    | None -> failwith "File not found !" 
 end
 (* }↑} *)

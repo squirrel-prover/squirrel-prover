@@ -22,6 +22,8 @@ let init () =
   prover_state := TProver.init ();
   prover_state := TProver.do_set_option 
       !prover_state (TConfig.s_interactive,Config.Param_bool true);
+  prover_state := TProver.do_set_option 
+      !prover_state (TConfig.s_CheckInclude,Config.Param_bool false);
   prover_stack := [{ps= !prover_state; output=firstOutput}]
 
 let push (s:state) : stack =

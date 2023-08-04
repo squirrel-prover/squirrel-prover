@@ -17,11 +17,16 @@ val vint_timeout : int
 
 val s_interactive : string
 
+val s_CheckInclude : string
+
 (** Print equations of the TRS system. *)
 val print_trs_equations : Symbols.table -> bool
 
 (** get interactive boolean set *)
 val interactive : Symbols.table -> bool
+
+(** get checkInclude boolean set *)
+val checkInclude : Symbols.table -> bool
 
 (** Debug information for the constraint checker. *)
 val debug_constr : Symbols.table -> bool

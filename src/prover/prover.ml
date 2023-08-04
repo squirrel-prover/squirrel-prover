@@ -97,6 +97,7 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
   | _ -> assert false
 (* }↑} *)
 
+(* FIXME all printing stuff should be done at toplevel instead *)
 let try_complete_proof (ps:state) : state =
   if is_proof_completed ps then begin
     Printer.prt `Goal "Goal %s is proved"
@@ -521,49 +522,3 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
-
-(* Command handlers *)(* {↓{ *)
-let rec do_command ?(check=`Check) (state:state) (command:ProverLib.prover_input)
- : state =
-  match command with
-  | InputDescr decls -> fst (add_decls state decls)
-  | Tactic l         -> do_tactic ~check state l
-  | Print q          -> do_print state q; state
-  | Search t         -> do_search state t; state
-  | Qed              -> complete_proof state
-  | Hint h           -> add_hint state h
-  | SetOption sp     -> set_param state sp
-  | Goal g           -> add_new_goal state g
-  | Proof            -> snd (start_proof state check)
-  | Abort            -> abort state
-  | Include i        -> do_include state i
-  | EOF              -> do_eof state
-and do_include (st:state) (i: ProverLib.include_param) : state =
-  (* `Stdin will add cwd in path with theories *)
-  let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
-  let file = Driver.locate load_paths (Location.unloc i.th_name) in
-  let st = 
-    try do_all_commands_in ~check:`NoCheck ~test:true st file with
-      x -> Driver.close_chan file.f_chan; raise x 
-  in
-  st
-and do_all_commands_in ~check ~test (st:state) (file:Driver.file) : state =
-  match Driver.next_input_file ~test file st.prover_mode with
-  | ProverLib.Prover EOF -> if test then st else do_eof st
-  | cmd -> do_all_commands_in ~check ~test
-             (do_command ~check st (ProverLib.get_prover_command cmd)) file
-and exec_command ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
-  (* let input = Parserbuf.command_from_string st.prover_mode s in *)
-  let input = Driver.next_input_file ~test (Driver.file_from_str s) st.prover_mode in
-  do_command ~check st (ProverLib.get_prover_command input)
-and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
-  let file_from_string = Driver.file_from_str s in
-  do_all_commands_in ~check ~test st file_from_string 
-(* }↑} *)
-
-(* run entire squirrel file with given path as string *)
-let run ?(test=false) (file_path:string) : unit =
-  match Driver.file_from_path LP_none 
-          (Filename.remove_extension file_path) with
-  | Some file -> let _ = do_all_commands_in ~check:`Check ~test (init ()) file in ()
-  | None -> failwith "File not found !" 

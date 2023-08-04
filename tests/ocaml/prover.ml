@@ -1,18 +1,18 @@
 (** Testing various commands of the prover: search, print, include. *)
 
+module TopLevel = Squirreltop.TopLevel
 module Prover = Squirrelprover.Prover
+module TProver = TopLevel.Make(Prover)
 module ProverLib = Squirrelcore.ProverLib
 module Theory = Squirrelcore.Theory
-
-open Util
 
 (*------------------------------------------------------------------*)
 let some_print () =
   let exception Ok in
   Alcotest.check_raises "print stuff" Ok
     (fun () ->
-      let st = Prover.init () in
-      let _ = try Prover.exec_all ~test:true st
+      let st = TProver.init () in
+      let _ = try TProver.exec_all ~test:true st
         "include Basic.
         channel c
         system [T] (S : !_i !_i new n; out(c,n)).
@@ -35,13 +35,13 @@ let run_test () =
   let exception Ok in
   Alcotest.check_raises "run test" Ok
     (fun () ->
-       let _ = Prover.run ~test:true "tests/ok/test.sp" in
+       let _ = TProver.run ~test:true "tests/ok/test.sp" in
        raise Ok
     )
 
 let compare_runner () = 
   let t = Sys.time() in
-  let _ = Prover.run ~test:true "examples/lak-tags-full-wa.sp" in
+  let _ = TProver.run ~test:true "examples/lak-tags-full-wa.sp" in
   let t1 = Sys.time() -. t in
   Printf.printf "Execution time Prover: %fs\n" t1;
   let t = Sys.time() in

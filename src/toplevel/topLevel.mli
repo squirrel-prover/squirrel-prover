@@ -34,7 +34,6 @@ sig
   val do_print : state -> ProverLib.print_query -> unit
   val do_search : state -> ProverLib.search_query -> unit
   val do_eof : state -> state
-  val do_include : state -> ProverLib.include_param -> state
 end
 
 module type S = sig
@@ -120,7 +119,7 @@ module type S = sig
     val get_mode : state -> ProverLib.prover_mode
 
     (** Evaluate the given input and return new state *)
-    val do_command : ?check:[`Check | `NoCheck] -> ?test:bool -> state ->
+    val do_command : ?test:bool -> ?check:[`Check | `NoCheck] -> state ->
       Driver.file -> ProverLib.input -> state
 
     (** Execute the given sentence and return new state *)
@@ -130,6 +129,9 @@ module type S = sig
     (** Execute the given string and return new state *)
     val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state
       -> string -> state
+
+    (** Run the given squirrel file *)
+    val run : ?test:bool -> string -> unit
 end
 
 (** {2 Toplevel prover}
