@@ -289,7 +289,7 @@ tac {
   | euf lsymb
   | executable lsymb
   | CASE term
-  | EXPAND term
+  | EXPAND commaSep1<term>
   | HELP
   | HELP lsymb
   | HELP Help_tac
