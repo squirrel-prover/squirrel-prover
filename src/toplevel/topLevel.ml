@@ -53,47 +53,36 @@ module type S = sig
     (** Print goal *)
     val pp_goal : state -> Format.formatter -> unit -> unit
 
-    (** Abort the current proof *)
-    val abort : state -> state
-
     (** Return Toplevel.PROVER in init state *)
     val init : unit -> state
 
-    (** Handle different parsed elements including Tactics ! *)
-    val tactic_handle : state -> ProverLib.bulleted_tactic -> state
-
     (** do tactics by calling tactic_handle and manages check mode ! *)
     val do_tactic : ?check:[`Check | `NoCheck] -> state ->
-      Lexing.lexbuf -> ProverLib.bulleted_tactics -> state
+      Lexing.lexbuf -> ProverLib.bulleted_tactics -> prover_state_ty
 
     (** return the Symbols table *)
     val get_table : state -> Symbols.table
-
-    (** Only switch prover_mode to AllDone → to finish program *)
-    val do_eof : state -> state
 
     (** print current goal *)
     val do_print_goal : state -> unit
 
     (** Start a proof : initialize the prover state and set
      * prover_state regarding to a given `Check mode *)
-    val do_start_proof : ?check:[ `Check | `NoCheck ] -> state ->  state
+    val do_start_proof : ?check:[ `Check | `NoCheck ] -> state ->
+      prover_state_ty
 
     (** Add given parsed goal and print it out *)
-    val do_add_goal : state -> Goal.Parsed.t Location.located -> state
-
-    (** Add hint *)
-    val do_add_hint : state -> Hint.p_hint -> state
+    val do_add_goal : state -> Goal.Parsed.t Location.located -> prover_state_ty
 
     (** set param/option from Config *)
     val do_set_option : state -> Config.p_set_param -> state
 
     (** Complete the proofs, resetting the current goal to None and
      * print exiting proof *)
-    val do_qed : state -> state
+    val do_qed : state -> prover_state_ty
 
     (** Add declarations to the table and print new proof obligations *)
-    val do_decls : state -> Decl.declarations -> state
+    val do_decls : state -> Decl.declarations -> prover_state_ty
 
     (** Print current system *)
     val do_print : state -> ProverLib.print_query -> unit
@@ -147,9 +136,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
     Prover.pp_goal st.prover_state fmt ()
 
-  let abort (st:state) : state = 
-    { st with prover_state = Prover.abort st.prover_state;}
-
   let init () : state = 
     let _ = Config.reset_params () in 
     let _ = ProverLib.reset_option_defs () in
@@ -158,14 +144,11 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       option_defs = [];
     }
 
-  let tactic_handle (st:state) l = 
-    { st with prover_state = 
-                Prover.tactic_handle st.prover_state l }
-
   let get_table (st:state) : Symbols.table = 
     Prover.get_table st.prover_state
 
-  let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf) (l:ProverLib.bulleted_tactics) : state =
+  let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf)
+      (l:ProverLib.bulleted_tactics) : Prover.state =
     if not (TConfig.interactive (get_table st)) then 
     begin
       let lnum = lex.lex_curr_p.pos_lnum in
@@ -178,29 +161,26 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         | _ ->
             Printer.prt `Prompt "Line %d: ??" lnum
     end;
-    { st with prover_state = Prover.do_tactic ~check st.prover_state l; }
+    Prover.do_tactic ~check st.prover_state l
 
   (*---------------- do_* commands handling ------------------*)(* {↓{ *)
   (* Since prover_mode is handled by the toplevel this has to be done
    * here FIXME not anymore ! *)
-  let do_eof (st: state) : state = 
-    { st with prover_state = Prover.do_eof st.prover_state}
-
   let do_print_goal (st:state) : unit = 
     match Prover.get_mode st.prover_state with
     | ProverLib.ProofMode -> 
       Printer.prt `Goal "%a" (Prover.pp_goal st.prover_state) ();
     | _ -> ()
 
-  let do_start_proof ?(check=`NoCheck) (st: state) : state =
+  let do_start_proof ?(check=`NoCheck) (st: state) : Prover.state =
     match Prover.start_proof st.prover_state check with
     | None, ps ->
       Printer.prt `Goal "%a" (Prover.pp_goal ps) ();
-      { st with prover_state = ps }
+      ps
     | Some es, _ -> Command.cmd_error (StartProofError es)
 
   let do_add_goal (st:state) (g:Goal.Parsed.t Location.located) :
-    state =
+    Prover.state =
     let new_ps = Prover.add_new_goal st.prover_state g in
     (* for printing new goal ↓ *)
     let goal,name = match Prover.first_goal new_ps with
@@ -209,26 +189,23 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     in
     Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name Goal.pp_init goal;
     (* return toplevel state with new prover_state *)
-    { st with prover_state = new_ps }
-
-  let do_add_hint (st:state) (h:Hint.p_hint) : state =
-    { st with prover_state = Prover.add_hint st.prover_state h }
+    new_ps
 
   let do_set_option (st:state) (sp:Config.p_set_param) : state =
     { st with prover_state = Prover.set_param st.prover_state sp }
 
-  let do_qed (st : state) : state =
+  let do_qed (st : state) : Prover.state =
     let prover_state = Prover.complete_proof st.prover_state in
     Printer.prt `Result "Exiting proof mode.@.";
-    { st with prover_state; }
+    prover_state
 
-  let do_decls (st:state) (decls : Decl.declarations) : state =
+  let do_decls (st:state) (decls : Decl.declarations) : Prover.state =
     let new_prover_state, proof_obls = 
       Prover.add_decls st.prover_state decls in
     if proof_obls <> [] then
       Printer.pr "@[<v 2>proof obligations:@;%a@]"
         (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
-    { st with prover_state = new_prover_state; }
+    new_prover_state
 
   let do_print (st:state) (q : ProverLib.print_query) 
     : unit =
@@ -293,16 +270,20 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
           raise (Failure "Toplvl: Trying to Undo without history.")
     | Prover c -> 
       let mode = get_mode st in
-      match mode, c with
+      let ps = match mode, c with
       | GoalMode, InputDescr decls -> do_decls st decls
                                    (* ↓ will print locations ↓ *)
       | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
-      | _, Print q                 -> Prover.do_print pst q; st
-      | _, Search t                -> Prover.do_search pst t; st
+      | _, Print q                 -> 
+          Prover.do_print pst q; st.prover_state
+      | _, Search t                -> 
+          Prover.do_search pst t; st.prover_state
+                                  (* ↓ will print stuff and call Prover ↓ *)
       | WaitQed, Qed               -> do_qed st
-      | GoalMode, Hint h           -> do_add_hint st h
+      | GoalMode, Hint h           -> Prover.add_hint st.prover_state h
                                    (* ↓ touch global config ↓ *)
-      | GoalMode, SetOption sp     -> do_set_option st sp
+      | GoalMode, SetOption sp     -> 
+          Prover.set_param st.prover_state sp
       | GoalMode, Goal g           -> do_add_goal st g
       | GoalMode, Proof            -> do_start_proof ~check st
                                       (* ↓ TODO do not manage stack file
@@ -310,7 +291,8 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       | GoalMode, Include inc      -> do_include st inc
       | GoalMode, EOF              -> 
         (* ↓ If interactive, never end ↓ *)
-        if TConfig.interactive (get_table st) then st else do_eof st
+        if TConfig.interactive (get_table st) 
+        then st.prover_state else Prover.do_eof st.prover_state
       | WaitQed, Abort -> 
           if test then
             raise (Failure "Trying to abort a completed proof.");
@@ -318,16 +300,19 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       | ProofMode, Abort ->
         Printer.prt `Result
           "Exiting proof mode and aborting current proof.@.";
-            abort st
+            Prover.abort st.prover_state
       | _, Qed ->
         if test then raise Unfinished;
         Command.cmd_error Unexpected_command
       | _, _ -> 
         Printer.pr "What is this command ? %s" (str_mode mode);
-
         Command.cmd_error Unexpected_command
+      in
+    { st with prover_state = ps; }
 
-  and do_include ?(test=true) (st:state) (i: ProverLib.include_param) : state =
+
+  and do_include ?(test=true) (st:state) (i: ProverLib.include_param) :
+    Prover.state =
     (* `Stdin will add cwd in path with theories *)
     let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
     let file = Driver.locate load_paths (Location.unloc i.th_name) in
@@ -338,14 +323,15 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
       try do_all_commands_in ~check:checkInclude ~test st file with
         x -> Driver.close_chan file.f_chan; raise x 
     in
-    st
+    st.prover_state
 
   and do_all_commands_in 
       ~check ~test (st:state) (file:Driver.file) : state =
     match Driver.next_input_file ~test file (get_mode st) with
     | ProverLib.Prover EOF ->
         (* ↓ If test or interactive, never end ↓ *)
-        if test || TConfig.interactive (get_table st) then st else do_eof st
+        if test || TConfig.interactive (get_table st) 
+        then st else { st with prover_state = Prover.do_eof st.prover_state}
     | cmd -> do_all_commands_in ~check ~test
                (do_command ~test ~check st file cmd) file
 

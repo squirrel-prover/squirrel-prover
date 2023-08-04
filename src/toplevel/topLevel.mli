@@ -54,47 +54,37 @@ module type S = sig
     (** Print goal *)
     val pp_goal : state -> Format.formatter -> unit -> unit
 
-    (** Abort the current proof *)
-    val abort : state -> state
-
     (** Return Toplevel.PROVER in init state *)
     val init : unit -> state
 
-    (** Handle different parsed elements including Tactics ! *)
-    val tactic_handle : state -> ProverLib.bulleted_tactic -> state
-
     (** do tactics ! *)
     val do_tactic : ?check:[`Check | `NoCheck] -> state ->
-      Lexing.lexbuf -> ProverLib.bulleted_tactics ->  state
+      Lexing.lexbuf -> ProverLib.bulleted_tactics ->  prover_state_ty
 
     (** return the Symbols table *)
     val get_table : state -> Symbols.table
-
-    (** Only switch prover_mode to AllDone → to finish program *)
-    val do_eof : state -> state
 
     (** print current goal *)
     val do_print_goal : state -> unit
 
     (** Start a proof : initialize the prover state and set
      * prover_state regarding to a given `Check mode *)
-    val do_start_proof : ?check:[ `Check | `NoCheck ] -> state -> state
+    val do_start_proof : ?check:[ `Check | `NoCheck ] -> state ->
+      prover_state_ty
 
     (** Add given parsed goal and print it out *)
-    val do_add_goal : state -> Goal.Parsed.t Location.located -> state
-
-    (** Add hint *)
-    val do_add_hint : state -> Hint.p_hint -> state
+    val do_add_goal : state -> Goal.Parsed.t Location.located ->
+      prover_state_ty
 
     (** set param/option from Config *)
     val do_set_option : state -> Config.p_set_param -> state
 
     (** Complete the proofs, resetting the current goal to None and
      * print exiting proof *)
-    val do_qed : state -> state
+    val do_qed : state -> prover_state_ty
 
     (** Add declarations to the table and print new proof obligations *)
-    val do_decls : state -> Decl.declarations -> state
+    val do_decls : state -> Decl.declarations -> prover_state_ty
 
     (** Print current system *)
     val do_print : state -> ProverLib.print_query -> unit
