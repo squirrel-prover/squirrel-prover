@@ -2065,7 +2065,8 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
       (Failure "no DDH assumption on this generator");
 
   let exp_symb = match Symbols.Function.get_data gen_symb tbl with
-    | Symbols.AssociatedFunctions [exp] -> exp
+    | Symbols.AssociatedFunctions [exp       ] -> exp
+    | Symbols.AssociatedFunctions [exp; _mult] -> exp
     | _ -> assert false
   in
 
