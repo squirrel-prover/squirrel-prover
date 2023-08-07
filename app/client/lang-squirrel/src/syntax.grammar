@@ -289,6 +289,8 @@ tac {
   | euf lsymb
   | executable lsymb
   | CASE term
+  | collision
+  | collision term 
   | EXPAND commaSep1<term>
   | HELP
   | HELP lsymb
@@ -299,7 +301,6 @@ tac {
   | SYM
   | CONST
   | adv
-  | collision
   | eqnames
   | eqtraces
   | SPLITSEQ
