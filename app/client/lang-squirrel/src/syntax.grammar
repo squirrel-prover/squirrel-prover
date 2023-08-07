@@ -1,5 +1,5 @@
 
-@top Script { Sentence* }
+@top Script { (Interactive | blockProof)* }
 @skip { space | BlockComment }
 
 paraSep<content> {
@@ -75,7 +75,7 @@ kw<term> { @specialize[@name={term}]<ID, term> }
   SENC[@name=decl] { kw<"senc"> }
   SIGNATURE[@name=decl] { kw<"signature"> }
   INTRO[@name=tackeyw] { kw<"intro"> }
-  adv[@name=tackeyw] { kw<"adv"> }
+  /* adv[@name=tackeyw] { kw<"adv"> } */
   collision[@name=tackeyw] { kw<"collision"> }
   eqnames[@name=tackeyw] { kw<"eqnames"> }
   eqtraces[@name=tackeyw] { kw<"eqtraces"> }
@@ -101,7 +101,6 @@ kw<term> { @specialize[@name={term}]<ID, term> }
   UFORALL { kw<"Forall"> }
   UEXISTS { kw<"Exists"> }
   SPLITSEQ[@name=tackeyw] { kw<"splitseq"> }
-  expand[@name=tackeyw] { kw<"expand"> }
   prof[@name=tackeyw] { kw<"prof"> }
   left[@name=tackeyw] { kw<"left"> }
   right[@name=tackeyw] { kw<"right"> }
@@ -287,47 +286,46 @@ tac {
   | CDH ~cdhambig tac_term COMMA tac_term
   | GDH ~gdhambig tac_term COMMA tac_term
   | euf lsymb
-  | executable lsymb
+  | executable term
   | CASE term
   | collision
   | collision term 
+  | enrich term
   | EXPAND commaSep1<term>
   | HELP
   | HELP lsymb
   | HELP Help_tac
-  // TODO ↓ give grammar of tactic !
-  | NAMELENGTH
-  | ANYINTRO
-  | SYM
-  | CONST
-  | adv
+  | byequiv
+  | diffeq
   | eqnames
-  | eqtraces
-  | SPLITSEQ
-  | expand
-  | prof
-  /* | left */
+  | expandall
+  | CONST term
+  /* | CONST */
+  | NAMELENGTH term COMMA term
+  | SYM
   | right
+  | split
+  | subst term COMMA term
+  | left
+  | project
+  | cca1 INT
+  // TODO ↓ Never used !
+  | ANYINTRO
+  /* | adv */
   | notleft
   | simpl_left
-  | project
-  | split
-  | subst
+  // TODO ↓ give grammar of tactic !
+  /* | diffeq diffeq_arg */
   // Seems to confuse when use in term !
   /* | true */
-  | cca1
   | enckp
-  | enrich
   | equivalent
-  | expandall
   | show
   | deduce
   | prf
   | xor
   | intctxt
   | trivialif
-  | byequiv
-  | diffeq
   | MEMSEQ
   // Closing without grammar
   | admit
@@ -442,24 +440,13 @@ brace {
 | RBRACE
 }
 
-Bulleted_tactic {
+Bulleted_tactic[@name=Sentence] {
   bullet Bulleted_tactic
 | brace  Bulleted_tactic
 | Tactic
 | DOT
 }
 
-
-top_proofmode {
-  Bulleted_tactic
-| ABORT
-| QED
-}
-
-Sentence {
-  interactive |
-  top_proofmode
-}
 
 option_param {
   TRUE
@@ -514,7 +501,7 @@ c_tys {
  ""
 }
 
-ty_args {
+Ty_args {
   empty
 | LBRACKET emptySep1<ty_var> RBRACKET
 }
@@ -569,7 +556,7 @@ bnd_tagged {
 }
 
 // Many binder declarations with tags.
-bnds_tagged {
+Bnds_tagged {
   emptySep<bnd_tagged>
 }
 
@@ -792,13 +779,13 @@ have_tac {
 | HAVE have_ip COLON tac_any_term 
 }
 
-named_arg {
+Named_arg {
   TILDE lsymb
 | TILDE lsymb COLON LBRACKET commaSep<lsymb> RBRACKET
 }
 
 named_args {
-  emptySep<named_arg>
+  emptySep<Named_arg>
 }
 
 fa_arg {
@@ -914,7 +901,7 @@ dh_flags {
 }
 
 system_modifier {
-  RENAME global_formula
+  RENAME Global_formula
 | GCCA bnds_strict COMMA term
 | GPRF bnds_strict COMMA term
 | GPRF TIME bnds_strict COMMA term
@@ -934,8 +921,8 @@ declaration_i {
   NAME lsymb COLON Ty |
   ACTION lsymb COLON int |
   TYPE Ty bty_infos |
-  ABSTRACT lsymb_decl ty_args COLON Ty |
-  OP lsymb_decl ty_args ext_bnds_tagged_strict colon_ty? !EQ EQ term |
+  ABSTRACT lsymb_decl Ty_args COLON Ty |
+  OP lsymb_decl Ty_args ext_bnds_tagged_strict colon_ty? !EQ EQ term |
   MUTABLE lsymb bnds_strict colon_ty? !EQ EQ term |
   CHANNEL lsymb |
   PROCESS lsymb projs bnds !EQ EQ process |
@@ -991,11 +978,11 @@ Statement_name {
 }
 
 Local_statement {
-  System_annot Statement_name ty_args bnds_tagged COLON term
+  System_annot Statement_name Ty_args Bnds_tagged COLON term
 }
 
 Global_statement {
-  System_annot Statement_name ty_args bnds_tagged COLON global_formula
+  System_annot Statement_name Ty_args Bnds_tagged COLON Global_formula
 }
 
 pr_query {
@@ -1014,20 +1001,20 @@ global_formula_i {
 | TILDE LPAREN biframe RPAREN
 | EQUIV LPAREN biframe RPAREN
 | LPAREN global_formula_i RPAREN
-| global_formula !ARROW ARROW global_formula
-| !QUANTIF Quant bnds_tagged COMMA global_formula
-| Quant bnds_tagged COMMA global_formula
-| global_formula ~glob !GAND GAND global_formula
-| global_formula !GOR GOR global_formula
+| Global_formula !ARROW ARROW Global_formula
+| !QUANTIF Quant Bnds_tagged COMMA Global_formula
+| Quant Bnds_tagged COMMA Global_formula
+| Global_formula ~glob !GAND GAND Global_formula
+| Global_formula !GOR GOR Global_formula
 }
 
-global_formula {
+Global_formula {
   global_formula_i
 }
 
 any_term {
     term
-  | global_formula
+  | Global_formula
 }
 
 tac_any_term {
@@ -1048,7 +1035,7 @@ Goal {
 |  LOCAL GOAL Local_statement  DOT
 | GLOBAL GOAL Global_statement DOT
 | EQUIV  obs_equiv_statement   DOT
-| EQUIV System_annot Statement_name bnds_tagged COLON biframe DOT
+| EQUIV System_annot Statement_name Bnds_tagged COLON biframe DOT
 }
 
 
@@ -1074,11 +1061,17 @@ undo {
   UNDO INT DOT
 }
 
-interactive {
+EndProof[@name=Sentence] { QED | ABORT }
+StartProof[@name=Sentence] { PROOF }
+
+blockProof { StartProof Bulleted_tactic+ EndProof }
+
+Interactive[@name=Sentence] {
   Set_option
 | Declarations
 | undo
 | PRINT pr_query
+| prof
 | Search_query
 | PROOF
 | P_include
@@ -1124,8 +1117,8 @@ interactive {
   BANGU[@name=operator] { "!" }
   DOT { "." }
   SHARP[@name=operator] { "#" }
-  COLON[@name=operator] { ":" }
   COLONEQ { ":=" }
+  COLON[@name=operator] { ":" }
   SEMICOLON[@name=tacticals] { ";" }
   STAR { "*" }
   UNDERSCORE { "_" }
@@ -1149,6 +1142,7 @@ interactive {
   AT[@name=operator] { "@" }
   TILDE[@name=operator] { "~" }
   PLUS[@name=tacticals] { "+" }
+  PLUSPLUS { "++" }
   TICK { "\'" }
   PERCENT { "%" }
   PROOF { "Proof." }
@@ -1212,8 +1206,8 @@ interactive {
     COMMA ,
     BANGU ,
     SHARP ,
-    COLON ,
     COLONEQ ,
+    COLON ,
     SEMICOLON ,
     UNDERSCORE ,
     ATSLASH ,
@@ -1225,6 +1219,7 @@ interactive {
     MINUS ,
     AT,
     TILDE ,
+    PLUSPLUS ,
     PLUS ,
     TICK ,
     PERCENT,

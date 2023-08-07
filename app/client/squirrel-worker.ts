@@ -287,13 +287,22 @@ export class SquirrelWorker {
    */
   sentencesFromTo(from:SyntaxNode,to:SyntaxNode,sentences:Array<SyntaxNode>) {
     while (from.from != to.from) {
-      if(from.node.type.name === "Sentence")
+      if(from.node.type.name === "Sentence"){
         if (!from.node.type.isError)
           this.addSentence(from.node,sentences);
-      else {
-        console.warn("try to send error sentence :")
-        console.log(from.node)
+        else {
+          console.warn("try to send error sentence :")
+          console.log(from.node)
+        }
       }
+      // else if (from.node.type.name === "blockProof"){
+      //   if(from.firstChild)
+      //     this.sentencesFromTo(from.firstChild,to,sentences);
+      //   else {
+      //     console.error("Empty BlockProof ?")
+      //     console.log(from.node)
+      //   }
+      // }
       if (from.nextSibling) 
         from = from.nextSibling;
       else return sentences;
