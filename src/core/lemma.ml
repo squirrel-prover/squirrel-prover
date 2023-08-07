@@ -38,11 +38,11 @@ let find_opt gname table : lemma option =
   else Some (find gname table)
 
 (*------------------------------------------------------------------*)
-let find_stmt_reach gname table =
-  Goal.to_reach_statement ~loc:(L.loc gname) (find gname table).stmt
+let find_stmt_local gname table =
+  Goal.to_local_statement ~loc:(L.loc gname) (find gname table).stmt
 
-let find_stmt_equiv gname table =
-  Goal.to_equiv_statement ~loc:(L.loc gname) (find gname table).stmt
+let find_stmt_global gname table =
+  Goal.to_global_statement ~loc:(L.loc gname) (find gname table).stmt
 
 (*------------------------------------------------------------------*)
 let find_stmt gname table : Goal.statement    = (find gname table).stmt
@@ -52,15 +52,15 @@ let find_kind gname table : [`Axiom | `Lemma] = (find gname table).kind
 let mem gname table : bool =
   Symbols.Lemma.mem_lsymb gname table
 
-let mem_reach gname table : bool =
+let mem_local gname table : bool =
   match find_opt gname table with
   | None -> false
-  | Some s -> Goal.is_reach_statement s.stmt
+  | Some s -> Goal.is_local_statement s.stmt
 
-let mem_equiv gname table : bool =
+let mem_global gname table : bool =
   match find_opt gname table with
   | None -> false
-  | Some s -> Goal.is_equiv_statement s.stmt
+  | Some s -> Goal.is_global_statement s.stmt
 
 (*------------------------------------------------------------------*)
 let add_lemma

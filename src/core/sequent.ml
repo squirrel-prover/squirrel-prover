@@ -225,9 +225,9 @@ module type S = sig
   module Reduce : Reduction.S with type t := t
 
   (*------------------------------------------------------------------*)
-  val is_assumption       : lsymb -> t -> bool
-  val is_equiv_assumption : lsymb -> t -> bool
-  val is_reach_assumption : lsymb -> t -> bool
+  val is_assumption        : lsymb -> t -> bool
+  val is_global_assumption : lsymb -> t -> bool
+  val is_local_assumption  : lsymb -> t -> bool
 
   (*------------------------------------------------------------------*)
   val to_general_sequent : t -> Goal.t
@@ -274,13 +274,13 @@ module Mk (Args : MkArgs) : S with
     Hyps.mem_name (L.unloc name) s ||
     Lemma.mem name (S.table s)
 
-  let is_equiv_assumption (name : lsymb) (s : sequent) =
+  let is_global_assumption (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s ||
-    Lemma.mem_equiv name (S.table s)
+    Lemma.mem_global name (S.table s)
 
-  let is_reach_assumption (name : lsymb) (s : sequent) =
+  let is_local_assumption (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s ||
-    Lemma.mem_reach name (S.table s)
+    Lemma.mem_local name (S.table s)
 
   (*------------------------------------------------------------------*)
   let destr_impl_k
