@@ -49,7 +49,7 @@ secrecy of the keys.
 
 
 *******************************************************************************)
-set timeout = 10.
+set timeout = 50.
 set postQuantumSound = true.
 
 include Basic.
