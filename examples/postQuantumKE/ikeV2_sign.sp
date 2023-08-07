@@ -255,20 +255,29 @@ goal [core3,core/right] authI (i,j:index[param]):
 Proof.
   intro H @/exec [H0 H1]. 
   expand cond.
-  euf H1. intro [l [H2 HE]].
+  euf H1 => [l [H2 [?[?[??]]]]]. 
+  clear H1.
   
   depends SI(i,j), FI(i,j) by auto.
   intro C.
-  assert SR(j,l) < FI(i,j) by case H2.
+  have ? : SR(j,l) < FI(i,j) by case H2.
+
   executable pred(FI(i,j)); 1,2: auto.
   intro Hexec.
-  use Hexec with SR(j,l); 2: auto.
+  have H3 :=  Hexec (SR(j,l)) _; 1: auto.
+  clear Hexec.
+
   expand exec.
   expand cond.
   destruct H3 as [? H4].
-  by case H2; euf H4.
+  case H2.
+  + euf H4 => [?[?[?[??]]]]. 
+    clear H4.
+    auto. 
+  + euf H4 => [?[?[?[??]]]]. 
+    clear H4.
+    auto. 
 Qed.
-
 
 axiom [core3,core/right] ddhcommu (i,j,k,l:index):
  exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
