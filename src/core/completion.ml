@@ -1563,7 +1563,7 @@ let check_equalities state l = List.for_all (check_equality state) l
 (*------------------------------------------------------------------*)
 (** {2 Names and Constants Equalities} *)
 
-(** [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
+(** [star_apply (f : 'a -> 'a -> 'b list) (l : 'a list)] applies [f] to the
     first element of [l] and all the other elements of [l], and return the
     concatenation of the results of these application.
     If [l] is the list [a1],...,[an], then [star_apply f l] returns:
@@ -1593,11 +1593,7 @@ let x_index_cnstrs state l select f_cnstr =
   |> List.flatten
 
 
-(** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
-    rewrite relation in [state], and add the corresponding index equalities.
-    Only applies to names with \[large\] types.
-    E.g., if n(i,j) and n(k,l) are equal, then i = k and j = l.*)
-let name_index_cnstrs table state l : Term.term list =
+let name_index_cnstrs table state l =
   (* decompose a name as a symbol + arguments *)
   let decompose (a : cterm) : Symbols.name * cterm list =
     match a.cnt with
@@ -1611,14 +1607,8 @@ let name_index_cnstrs table state l : Term.term list =
   let n_cnstr (a : cterm) (b : cterm) =
     let n,  is  = decompose a
     and n', is' = decompose b in
-    if n <> n' then
-      [Term.mk_false]
-    else
-        List.map2 (fun x y -> 
-            Term.mk_atom `Eq 
-              (term_of_cterm table x)
-              (term_of_cterm table y)
-          ) is is'
+    [(n , List.map (term_of_cterm table) is ),
+     (n', List.map (term_of_cterm table) is') ]
   in
 
   x_index_cnstrs state l (is_lname table) n_cnstr

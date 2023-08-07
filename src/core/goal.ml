@@ -60,9 +60,9 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type statement       = (string, Equiv.any_form) abstract_statement
-type equiv_statement = (string, Equiv.form    ) abstract_statement
-type reach_statement = (string, Term.term     ) abstract_statement
+type statement        = (string, Equiv.any_form) abstract_statement
+type global_statement = (string, Equiv.form    ) abstract_statement
+type local_statement  = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
 let pp_statement fmt (g : statement) : unit =
@@ -80,20 +80,20 @@ let pp_statement fmt (g : statement) : unit =
 
 (*------------------------------------------------------------------*)
 
-let is_reach_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
+let is_local_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
   match stmt.formula with
   | Global _ -> false
   | Local _ -> true
 
-let is_equiv_statement stmt : bool =
+let is_global_statement stmt : bool =
   match stmt.formula with
   | Equiv.Global _ -> true
   | Equiv.Local _ -> false
 
-let to_reach_statement ?loc stmt =
+let to_local_statement ?loc stmt =
   { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Local_t stmt.formula }
 
-let to_equiv_statement ?loc stmt =
+let to_global_statement ?loc stmt =
   { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Global_t stmt.formula }
 
 (*------------------------------------------------------------------*)
@@ -214,7 +214,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       formula, Trace s
 
     | Global f ->
-      let f = Theory.convert_global_formula conv_env f in
+      let f = Theory.convert_global_formula ~ty_env conv_env f in
       let s = ES.init ~env f in
       let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Equiv s

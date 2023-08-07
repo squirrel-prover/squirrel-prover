@@ -83,7 +83,7 @@ type tac_error_i =
 
 type tac_error = L.t option * tac_error_i
 
-let rec tac_error_to_string = function
+let rec tac_error_to_string ?(short = false) = function
   | More               -> "More"
   | NotEqualArguments  -> "NotEqualArguments"
   | Bad_SSC            -> "BadSSC"
@@ -113,7 +113,9 @@ let rec tac_error_to_string = function
   | InvalidVarName     -> "InvalidVarName"
   | ApplyBadInst       -> "ApplyBadInst"
 
-  | Failure s             -> Format.sprintf "Failure %S" s
+  | Failure s             -> 
+    if short then Format.sprintf "Failure" else Format.sprintf "Failure %S" s
+
   | NotDepends (s1, s2)   -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | ApplyMatchFailure _   -> "ApplyMatchFailure"
@@ -184,9 +186,10 @@ let pp_tac_error_i ppf = function
 
   | CannotConvert -> Fmt.pf ppf "conversion error"
 
-  | FailWithUnexpected t -> Fmt.pf ppf "the tactic did not fail with the expected \
-                                      exception, but failed with: %s"
-                            (tac_error_to_string t)
+  | FailWithUnexpected t -> 
+    Fmt.pf ppf "the tactic did not fail with the expected \
+                exception, but failed with: %s"
+      (tac_error_to_string t)
 
   | GoalNotClosed -> Fmt.pf ppf "cannot close goal"
 
@@ -399,11 +402,8 @@ let checkfail_tac (exc : string) t j (sk : 'a sk) (fk : fk) =
     t j sk fk
   with
   | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when
-      tac_error_to_string e = exc ->
+      tac_error_to_string ~short:true e = exc ->
     sk [j] fk
-
-  | (Tactic_soft_failure (_, Failure _) | Tactic_hard_failure (_, Failure _) )
-    when exc="Failure" -> sk [j] fk
 
   | Tactic_soft_failure (l,e) | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
@@ -706,10 +706,10 @@ module AST (M:S) = struct
   exception Return of M.judgment list
 
   (** The evaluation of a tactic, may either raise a soft failure or a hard
-    * failure (cf tactics.ml). A soft failure should be formatted inside the
-    * [Tactic_Soft_Failure] exception.
-    * A hard failure inside Tactic_hard_failure. Those exceptions are caught
-    * inside the interactive loop. *)
+      failure.
+      A soft failure should be formatted inside the [Tactic_Soft_Failure] exception.
+      A hard failure inside [Tactic_hard_failure]. 
+      Those exceptions are caught inside the interactive loop. *)
   let eval_judgment (post_quantum:bool) ast j =
     let tac = eval post_quantum [] ast in
     (* The failure should raise the soft failure,

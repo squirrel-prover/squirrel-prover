@@ -20,12 +20,14 @@ val check_equalities : state -> (Term.term * Term.term) list -> bool
 val check_disequalities :
   state -> (Term.term * Term.term) list -> (Term.term * Term.term) list -> bool
 
-(** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
-    rewrite relation in [state], and add the corresponding index equalities.
-    E.g., if [n[i,j]] and [n[k,l]] are equal, then the returned list
-    would contain [i=k] and [j=l]. *)
+(** [name_index_cnstrs state l] looks for all [large] names that are equal 
+    w.r.t. the rewrite relation in [state], and returns the 
+    corresponding equalities.
+    E.g., if [n(i,j)] and [m(k,l)] are equal, then the returned list
+    will contain [(n, \[i;k\]), (m, \[j;l\]]. *)
 val name_index_cnstrs :
-  Symbols.table -> state -> Term.term list -> Term.term list
+  Symbols.table -> state -> Term.term list ->
+  ((Symbols.name * Term.term list) * (Symbols.name * Term.term list)) list
 
 (** Print the set of rules in the initial TRS (e.g. dec(enc(x,y,r),y) -> x) *)
 val print_init_trs : Format.formatter -> Symbols.table -> unit

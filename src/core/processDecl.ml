@@ -334,7 +334,7 @@ let declare_list table decls =
 
 (*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : lsymb) db =
-  let lem = Lemma.find_stmt_reach s table in
+  let lem = Lemma.find_stmt_local s table in
   
   if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(L.loc s)
@@ -343,7 +343,7 @@ let add_hint_rewrite table (s : lsymb) db =
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
 
 let add_hint_smt table (s : lsymb) db =
-  let lem = Lemma.find_stmt_reach s table in
+  let lem = Lemma.find_stmt_local s table in
 
   if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(L.loc s)

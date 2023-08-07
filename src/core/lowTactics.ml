@@ -572,7 +572,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         dir (p_pt : Theory.p_pt) 
       : Term.term list * Rewrite.rw_rule * Ident.t option 
       =
-      let ghyp, tyvars, pt (* pat_system, subgs, pat *) =
+      let ghyp, tyvars, pt =
         S.convert_pt_gen
           ~check_compatibility:false
           ~close_pats:false
@@ -580,16 +580,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       assert (pt.mv = Match.Mvar.empty);
 
+      (*  *)
+      let kind = 
+        match pt.form with Global _ -> Rewrite.GlobalEq | Local _ -> Rewrite.LocalEq 
+      in
+
       (* TODO: allow equivalences as subgoals by changing [subgs] type 
          to [Equiv.any_form] *)
-      let loc = p_pt.p_pt_loc in
       let subgs, pat = 
-        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Local_t tyvars pt 
+        let loc = p_pt.p_pt_loc in
+        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Local_t tyvars pt
       in
 
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
-      subgs, pat_to_rw_rule s pt.system.set dir pat, id_opt
+      subgs, pat_to_rw_rule s pt.system.set kind dir pat, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg =
@@ -1035,6 +1040,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       doit form init_destr_list
 
+  (*------------------------------------------------------------------*)
+  (* utility function *)
+  let get_rw_kind (hyp : S.hyp_form) : Rewrite.rw_kind =
+    match S.hyp_kind, hyp with
+    | Equiv.Global_t, _ -> Rewrite.GlobalEq
+    | Equiv.Any_t, Equiv.Local _ -> Rewrite.LocalEq
+    | Equiv.Any_t, Equiv.Global _ -> Rewrite.GlobalEq
+    | Equiv.Local_t, _ -> assert false
+
+  (*------------------------------------------------------------------*)
   (** Apply an And/Or pattern to an ident hypothesis handler. *)
   let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
     : S.t list =
@@ -1086,15 +1101,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | `Hyp id, Args.Srewrite dir ->
       let loc = L.loc dir in
+      let hyp = Hyps.by_id id s in
       let f =
         Equiv.Babel.convert ~loc
           ~src:S.hyp_kind
           ~dst:Equiv.Local_t
-          (Hyps.by_id id s)
+          hyp
       in
       let s = Hyps.remove id s in
+
+      let kind = get_rw_kind hyp in
+
       let pat = Term.pat_of_form f in
-      let erule = pat_to_rw_rule s ~loc (S.system s).set (L.unloc dir) pat in
+      let erule = pat_to_rw_rule s ~loc (S.system s).set kind (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (Args.Once, Some id, erule) s
       in
@@ -2195,7 +2214,7 @@ let do_s_item
 
   | Args.Tryautosimpl _loc ->
     let tac =
-      Tactics.andthen         (* FIXME: inneficient *)
+      Tactics.andthen         (* FIXME: inefficient *)
         (Tactics.try_tac (simpl ~red_param ~strong:true ~close:true))
         (simpl ~red_param ~strong:true ~close:false)
     in

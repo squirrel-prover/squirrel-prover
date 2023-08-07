@@ -25,13 +25,13 @@ val find : lsymb -> Symbols.table -> lemma
 val find_stmt : lsymb -> Symbols.table -> Goal.statement
 val find_kind : lsymb -> Symbols.table -> [`Axiom | `Lemma] 
 
-val find_stmt_reach : lsymb -> Symbols.table -> Goal.reach_statement
-val find_stmt_equiv : lsymb -> Symbols.table -> Goal.equiv_statement
+val find_stmt_local  : lsymb -> Symbols.table -> Goal.local_statement
+val find_stmt_global : lsymb -> Symbols.table -> Goal.global_statement
 
 (*------------------------------------------------------------------*)
-val mem       : lsymb -> Symbols.table -> bool
-val mem_reach : lsymb -> Symbols.table -> bool
-val mem_equiv : lsymb -> Symbols.table -> bool
+val mem        : lsymb -> Symbols.table -> bool
+val mem_local  : lsymb -> Symbols.table -> bool
+val mem_global : lsymb -> Symbols.table -> bool
 
 (*------------------------------------------------------------------*)
 val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit

@@ -85,7 +85,7 @@ let add_hint_rewrite (s : lsymb) tyvars form table : Symbols.table =
   let rule = 
     LowRewrite.pat_to_rw_rule
       ~loc:(L.loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
-      SE.any `LeftToRight pat 
+      SE.any GlobalEq `LeftToRight pat 
   in
   let h = { name = L.unloc s; rule; } in
   let head =

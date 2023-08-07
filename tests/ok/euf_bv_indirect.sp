@@ -16,7 +16,7 @@ goal _ (tau:timestamp[param],i,j,w:index[param]):
   i = j.
 Proof.
   intro Hap Heq.
-  euf Heq.
+  euf Heq => [a H].
   auto.
 Qed.
 

@@ -16,7 +16,7 @@ goal _ (i,j,w:index[param]):
   i = j.
 Proof.
   intro Hseq.
-  euf Hseq.
+  euf Hseq => [a H].
   auto.
 Qed.
 

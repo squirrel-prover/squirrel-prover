@@ -594,8 +594,8 @@ let namelength () =
   let axiom_n = "namelength_n" in
   let axiom_m = "namelength_m" in
 
-  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
-  let stmt_m = Lemma.find_stmt_reach (mk axiom_m) table in
+  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
+  let stmt_m = Lemma.find_stmt_local (mk axiom_m) table in
 
   let system = SystemExpr.context_any in
 
@@ -655,7 +655,7 @@ let namelength2 () =
 
   let axiom_n = "namelength_n" in
 
-  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
+  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
 
   let system = SystemExpr.context_any in
 

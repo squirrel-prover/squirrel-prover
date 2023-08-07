@@ -116,7 +116,7 @@ goal [default/left] wa_R1_left (i,r:index):
    output@R(r) = input@T(i,t)).
 Proof.
   rewrite eq_iff; split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq. auto.
+  intro Meq; euf Meq; 1: intro [r0 ?] //.
   intro [t _]. exists t; simpl.
   assert input@T(i,t) = nr(r) as F by auto.
   by (fresh F => C ;

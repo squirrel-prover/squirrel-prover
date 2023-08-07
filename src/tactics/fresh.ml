@@ -62,14 +62,16 @@ let get_bad_occs
 
   (* add variables from fv (ie bound above where we're looking) to env with const tag. *)
   let env =
-    Env.update
-      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
+    let vars = 
+      Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars 
+    in
+    Env.update ~vars env
   in
 
   match t with
-  (* for freshness, we can ignore **constant** subterms *)
+  (* for freshness, we can ignore **constant** subterms
+     FIXME: we could allow sub-terms depending only on the adversarial randomness. *)
   | _ when HighTerm.is_constant env t -> []
-
 
   (* the fresh tactic does not apply to terms with non-constant variables *)
   | Var v ->
