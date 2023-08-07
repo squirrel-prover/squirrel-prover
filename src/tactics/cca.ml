@@ -181,7 +181,9 @@ let indcca_param
                    (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
                    (mk_witness ~ty_arg:(Type.tuple [mty; rty; kty]))];
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
-                 (Name.to_term xc);},
+                 (Name.to_term xc);
+     rw_kind   = GlobalEq;
+    },
     table,
     xc
   in

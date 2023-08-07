@@ -239,6 +239,7 @@ let global_rename
       rw_vars   = Vars.Tag.local_vars rw_vars;
       rw_conds  = [];
       rw_rw     = n1', n2';
+      rw_kind   = GlobalEq;
     }
   in
 
@@ -392,6 +393,7 @@ let global_prf
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: rw_vars);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
+      rw_kind   = GlobalEq;
     }
   in
 
@@ -573,6 +575,7 @@ let global_cca
       rw_vars   = Vars.Tag.local_vars enc_rw_vars;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
+      rw_kind   = GlobalEq;
     }
   in
   let dec_rw_rule =
@@ -586,6 +589,7 @@ let global_cca
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: dec_rw_vars);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
+      rw_kind   = GlobalEq;
     }
   in
 
@@ -1212,7 +1216,9 @@ let global_prf_t
           rw_system = SE.any;
           rw_vars   = Vars.Tag.local_vars (x :: is);
           rw_conds  = [];
-          rw_rw     = (to_rw, rw_target tau0 xocc); }
+          rw_rw     = (to_rw, rw_target tau0 xocc); 
+          rw_kind   = GlobalEq;
+        }
       in
       Some rule
   in

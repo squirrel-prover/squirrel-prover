@@ -277,6 +277,7 @@ let rewrite_head
     (rule  : rw_rule)
     (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
+  assert (rule.rw_kind = GlobalEq);
   let s = mk_state rule sexpr in
   match rw_inst expand_context table env hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
@@ -328,8 +329,7 @@ let do_rewrite
        This may require renaming projections in [rule], and removing some
        projections from [rule]. 
 
-       Rebuild at each application of [_rewrite], to have a new 
-       ty_env. *)
+       Rebuild at each application of [_rewrite], to have a new [ty_env]. *)
     let s = 
       let target_systems : SE.t =
         match target with
@@ -339,8 +339,9 @@ let do_rewrite
       mk_state rule target_systems
     in
 
-    let s, f = match f with
-      | Global f ->
+    let s, f = 
+      match f with
+      | Global f when rule.rw_kind = GlobalEq ->
         let s, _, f = 
           Pos.map_fold_e (rw_inst expand_context table env hyps) system s f 
         in
@@ -351,6 +352,8 @@ let do_rewrite
           Pos.map_fold (rw_inst expand_context table env hyps) system.set s f 
         in
         s, Equiv.Local f
+
+      | _ -> s, f
     in
 
     match mult, s.found_instance with
@@ -438,6 +441,7 @@ let high_rewrite
       match mk_rule vars p with
       | None -> `Continue
       | Some rule ->
+        assert (rule.rw_kind = GlobalEq);
         assert (rule.rw_conds = []);
         
         let state = mk_state rule se in

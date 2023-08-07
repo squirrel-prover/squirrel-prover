@@ -3,17 +3,18 @@ module SE   = SystemExpr
 module Sv   = Vars.Sv
 
 (*------------------------------------------------------------------*)
-(** A rewrite rule.
-    Invariant: if
-    [{ rw_tyvars = tyvars; rw_vars = sv; rw_conds = φ; rw_rw = (l,r); }]
-    is a rewrite rule, then:
-    - sv ⊆ FV(l) *)
+(** See `.mli` *)
+type rw_kind = LocalEq | GlobalEq
+
+(*------------------------------------------------------------------*)
+(** See `.mli` *)
 type rw_rule = {
-  rw_tyvars : Type.tvars;            (** type variables *)
-  rw_system : SE.t;                  (** systems the rule applies to *)
-  rw_vars   : Vars.tagged_vars;      (** term variables *)
-  rw_conds  : Term.term list;        (** premises *)
-  rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
+  rw_tyvars : Type.tvars;            
+  rw_system : SE.t;                  
+  rw_vars   : Vars.tagged_vars;      
+  rw_conds  : Term.term list; 
+  rw_rw     : Term.term * Term.term; 
+  rw_kind   : rw_kind;
 }
 
 let pp_rw_rule fmt (rw : rw_rule) =
@@ -52,6 +53,7 @@ let pat_to_rw_rule ?loc
     ~(destr_eq  : Term.term -> (Term.term * Term.term) option)
     ~(destr_not : Term.term -> (            Term.term) option)
     (system    : SE.arbitrary) 
+    (rw_kind   : rw_kind)
     (dir       : [< `LeftToRight | `RightToLeft ])
     (p         : Term.term Term.pat) 
   : rw_rule 
@@ -81,6 +83,7 @@ let pat_to_rw_rule ?loc
     rw_vars   = p.pat_vars;
     rw_conds  = subs;
     rw_rw     = e;
+    rw_kind;
   } in
   
   (* We check that the rule is valid *)
