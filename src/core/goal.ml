@@ -214,7 +214,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       formula, Trace s
 
     | Global f ->
-      let f = Theory.convert_global_formula conv_env f in
+      let f = Theory.convert_global_formula ~ty_env conv_env f in
       let s = ES.init ~env f in
       let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Equiv s
