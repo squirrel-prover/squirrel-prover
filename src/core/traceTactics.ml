@@ -496,6 +496,12 @@ let () = T.register "slowsmt"
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TS.t) =
   let table = TS.table s in
+  let env   = TS.env   s in
+
+  let add_hyp s c =
+    let () = dbg "new equalities (eqnames): %a" Term.pp c in
+    Hyps.add Args.Unnamed c s
+  in
 
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
@@ -504,9 +510,17 @@ let eq_names (s : TS.t) =
     Completion.name_index_cnstrs table trs (TS.get_all_messages s)
   in
   let s =
-    List.fold_left (fun s c ->
-        let () = dbg "new equalities (names): %a" Term.pp c in
-        Hyps.add Args.Unnamed c s
+    List.fold_left (fun (s : sequent) ((n1,l1),(n2,l2)) ->
+        (* we have [n1 l1 = n2 l2] *)
+        if List.for_all (HighTerm.is_constant env) (l1 @ l2) then
+          if n1 <> n2 then
+            add_hyp s Term.mk_false
+          else            
+            List.fold_left2 (fun s t1 t2 ->
+                add_hyp s (Term.mk_eq t1 t2)
+              ) s l1 l2
+        else 
+          s
       ) s cnstrs
   in
   [s]

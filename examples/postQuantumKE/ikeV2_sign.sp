@@ -286,6 +286,7 @@ Proof.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
     case try find (jf, kf : index)  such that _ in _ else fail.
+    intro [???].
     by collision.
  
     intro [[TFneg] TFeq].
@@ -304,7 +305,7 @@ Proof.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
     case try find (jf, kf : index) such that _ in _ else fail.
-
+    intro [???].
     by collision.
 
 
