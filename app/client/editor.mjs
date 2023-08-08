@@ -16,8 +16,10 @@ import { Squirrel } from "./squirrel.js"
 
 let worker = new SquirrelWorker(fileManager,new URL('./client.js', window.location));
 
+// Bind worker and fileManager
 fileManager.bindWorker(worker);
 
+// Keybinding extension
 function squirrelKeymap(view) {
   return keymap.of([{
     key: "Ctrl-Enter",
@@ -39,13 +41,17 @@ function squirrelKeymap(view) {
   }])
 }
 
+// Extension for updates 
 let updateListenerExtension = EditorView.updateListener.of((update) => {
   if (update.docChanged) {
     //Boolean for system file
     fileManager.dirty = true; 
+    //call updateCursor when the document has changed
     worker.updateCursor(update)
   }
 });
+
+// Create CodeMirror6 View ↓
 
 let myview = new EditorView({
   doc:"include Basic.\n"
@@ -72,7 +78,7 @@ let myview = new EditorView({
 
 //Buttons
 
-// bind buttons 
+// bind buttons to worker functions
 var buttonToCursor = document.getElementById('to-cursor');
 buttonToCursor.onclick = function() { 
   worker.execToCursor(myview);

@@ -80,23 +80,15 @@ export class SquirrelWorker {
   protected curSentences: Array<SyntaxNode>;
   protected executedSentences: Array<SyntaxNode>;
 
-  intvec: Int32Array;
-
   private load_progress: (ratio: number, ev: ProgressEvent) => void;
 
   // Misc
-  private _boot : Future<void>;
   protected when_created: Promise<void>;
   protected _handler: (msg : any) => void;
 
   // Needs work to move to a standard typed registration mechanism
   // The protected here is not respected by the {package,squirrel}-manager(s), thus we have commented it out.
   /* protected */ observers: SquirrelEventObserver[];
-
-  // Private stuff to handle our implementation of requests
-  private routes: Map<number,SquirrelEventObserver[]>;
-  private sids: Future<void>[];
-  private _gen_rid : number;
 
   fileManager: FileManager;
 
@@ -108,8 +100,6 @@ export class SquirrelWorker {
     this.config.path = scriptPath || this.config.path;
 
     this.observers = [this];
-    this.routes = new Map([[0,this.observers]]);
-    this.sids = [, new Future()];
     this.pos = 0;
     this.cursor = null;
     this.scriptNode = null;
@@ -165,32 +155,26 @@ export class SquirrelWorker {
   /**
    * @param {Worker} worker
    */
-  attachWorker(worker) {
+  attachWorker(worker:Worker) {
     this.worker = worker;
     this.worker.addEventListener('message',
                                  this._handler = evt => this.squirrel_handler(evt));
   }
 
   /**
+   * TODO create proper type like jsquirrel_cmd
    * Sends a Command to Squirrel worker
    *
-   * @param {string} msg
+   * @param {any[]} msg 
    * @memberof SquirrelWorker
    */
-  sendCommand(msg) {
+  sendCommand(msg:any[]) {
     if(DEBUG)
       console.log("Posting: ", msg);
     this.worker.postMessage(msg);
   }
 
-  /**
-   * @param {any[]} msg
-   */
-  sendDirective(msg) {   // directives are intercepted by the JS part of the worker
-    this.worker.postMessage(msg);    // for this reason, they are not stringified
-  }
-
-  reset(view) {
+  reset(view:EditorView) {
     this.sendCommand(["Reset"]);
     this.cursor = null;
     removeMarks(view,0,view.state.doc.length);
@@ -227,9 +211,9 @@ export class SquirrelWorker {
    */
   undo(n:number) {
     this.sendCommand(["Undo", n]);
-    let lastRemoved = this.executedSentences[this.executedSentences.length-1];
+    // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
     for(let i=0; i<n; i++){
-      lastRemoved = this.executedSentences.pop();
+      this.executedSentences.pop();
     }
 
     if(this.executedSentences.length == 0){
@@ -287,7 +271,7 @@ export class SquirrelWorker {
    */
   sentencesFromTo(from:SyntaxNode,to:SyntaxNode,sentences:Array<SyntaxNode>) {
     while (from.from != to.from) {
-      if(from.node.type.name === "Sentence"){
+      if(this.isSentence(from.node)){
         if (!from.node.type.isError)
           this.addSentence(from.node,sentences);
         else {
@@ -325,7 +309,7 @@ export class SquirrelWorker {
    * @param {SyntaxNode} node
    */
   getInnerFirstSentence(node:SyntaxNode) : SyntaxNode {
-    if(node && node.type.name === "Sentence") return node;
+    if(node && this.isSentence(node)) return node;
     else if(node && node.type.name === "BlockComment") return this.getInnerFirstSentence(node.nextSibling);
     else if(node.firstChild) 
       return this.getInnerFirstSentence(node.firstChild);
@@ -343,15 +327,17 @@ export class SquirrelWorker {
    */
   getLastExecutedBeforeChange(viewState:EditorState,posChange:number) : SyntaxNode {
     let lastExecuted = this.executedSentences[this.executedSentences.length - 1];
+    // If changes are done after the lastExecuted node
     if (posChange >= lastExecuted.to)
       return lastExecuted
     else {
       let sentenceChanged = lastExecuted;
       let index = (this.executedSentences.length - 1);
-      while(sentenceChanged.from > posChange && index>0) 
+      while(sentenceChanged.from > posChange && index>0){
         sentenceChanged = this.executedSentences[index--]
-      return sentenceChanged && sentenceChanged.prevSibling ? 
-        sentenceChanged!.prevSibling :
+      }
+      // Take the previous one if it exists
+      return this.executedSentences[index] ? this.executedSentences[index] :
         this.getInnerFirstSentence(syntaxTree(viewState).topNode);
     }
   }
@@ -526,201 +512,12 @@ export class SquirrelWorker {
     })
   }
 
-  /**
-   * @param {number} sid
-   */
-  cancel(sid) {
-    for (let i in this.sids)
-      if (+i >= sid && this.sids[i]) { this.sids[i]?.reject(); delete this.sids[i]; }
-    this.sendCommand(["Cancel", sid]);
-  }
-
-  /**
-   * @param {any} sid
-   */
-  goals(sid) {
-    this.sendCommand(["Query", sid, 0, ["Goals"]]);
-  }
-
-  /**
-   * @param {number} sid
-   * @param {any} rid
-   * @param {any[]} query
-   */
-  query(sid, rid, query) {
-    if (typeof query == 'undefined') { query = rid; rid = undefined; }
-    if (typeof rid == 'undefined')
-      rid = this._gen_rid = (this._gen_rid || 0) + 1;
-    this.sendCommand(["Query", sid, rid, query]);
-    return rid;
-  }
-
-  inspect(sid, rid, search_query) {
-    if (typeof search_query == 'undefined') { search_query = rid; rid = undefined; }
-    return this.query(sid, rid, ['Inspect', search_query])
-  }
-
-  /**
-   * @param {string | string[]} option_name
-   */
-  getOpt(option_name) {
-    if (typeof option_name === 'string')
-      option_name = option_name.split(/\s+/);
-    this.sendCommand(["GetOpt", option_name]);
-  }
-
-  /**
-   * @param {base_path: string, pkg: string} | string url
-   */
-  loadPkg(url) {
-    if (typeof url !== 'object') throw new Error('invalid URL for js mode (object expected)');
-    this.sendCommand(["LoadPkg", this.resolveUri(url.base_path), url.pkg]);
-  }
-
-  /**
-   * @param {any} base_path
-   * @param {any} pkgs
-   */
-  infoPkg(base_path, pkgs) {
-    this.sendCommand(["InfoPkg", this.resolveUri(base_path), pkgs]);
-  }
-
-  /**
-   * @param {any} load_path
-   */
-  refreshLoadPath(load_path) {
-    this.sendCommand(["ReassureLoadPath", load_path]);
-  }
-
-
-
-  /**
-   * @param {string} filename
-   * @param {Buffer} content
-   */
-  put(filename, content, transferOwnership=false) {
-    /* Access ArrayBuffer behind Node.js Buffer */
-    var abuf = /** @type {Buffer | ArrayBufferLike} */ (content);
-    if (typeof Buffer !== 'undefined' && content instanceof Buffer) {
-      abuf = this.arrayBufferOfBuffer(content);
-      content = new Buffer(abuf);
-    }
-
-    var msg = ["Put", filename, content];
-    if(this.config.debug) {
-      console.debug("Posting file: ", msg);
-    }
-    this.worker.postMessage(msg, transferOwnership ? [abuf] : []);
-    /* Notice: when transferOwnership is true, the 'content' buffer is
-     * transferred to the worker (for efficiency);
-     * it becomes unusable in the original context.
-     */
-  }
-
-  /**
-   * @param {Buffer} buffer
-   */
-  arrayBufferOfBuffer(buffer) {
-    return (buffer.byteOffset === 0 &&
-            buffer.byteLength === buffer.buffer.byteLength) ?
-            buffer.buffer :
-            buffer.buffer.slice(buffer.byteOffset,
-                                buffer.byteOffset + buffer.byteLength);
-  }
-
-  /**
-   * @param {any} filename
-   */
-  register(filename) {
-    this.sendCommand(["Register", filename]);
-  }
-
-  interruptSetup() {
-    if (typeof SharedArrayBuffer !== 'undefined') {
-      this.intvec = new Int32Array(new SharedArrayBuffer(4));
-      try {
-        this.sendDirective(["InterruptSetup", this.intvec]);
-      }
-      catch (e) {  /* this fails in Firefox 72 even with SharedArrayBuffer enabled */
-        console.warn('SharedArrayBuffer is available but not serializable -- interrupts disabled');
-      }
-    }
-    else {
-      console.warn('SharedArrayBuffer is not available -- interrupts disabled');
-    }
-  }
-
-  interrupt() {
-    if (this.intvec)
-      Atomics.add(this.intvec, 0, 1);
-    else
-      console.warn("interrupt requested but has not been set up");
-  }
-
-  async restart() {
-    this.sids = [, new Future()];
-
-    this.end();  // kill!
-
-    return await this.createWorker();
-  }
-
   end() {
     if (this.worker) {
       this.worker.removeEventListener('message', this._handler);
       this.worker.terminate();
       this.worker = undefined;
     }
-  }
-
-  // Promise-based APIs
-
-  /**
-   * @param {string | number} sid
-   */
-  execPromise(sid) {
-    this.exec(sid);
-
-    if (!this.sids[sid]) {
-      console.warn(`exec'd sid=${sid} that was not added (or was cancelled)`);
-      this.sids[sid] = new Future();
-    }
-    return this.sids[sid].promise;
-  }
-
-  /**
-   * @param {any} sid
-   * @param {any} rid
-   * @param {any} query
-   */
-  queryPromise(sid, rid, query) {
-    return this._wrapWithPromise(
-      rid = this.query(sid, rid, query));
-  }
-
-  /**
-   * @param {any} sid
-   * @param {any} rid
-   * @param {any} search_query
-   */
-  inspectPromise(sid, rid, search_query?) {
-    return this._wrapWithPromise(
-      this.inspect(sid, rid, search_query));
-  }
-
-  /**
-   * @param {string | number} rid
-   */
-  _wrapWithPromise(rid) {
-    let pfr = new PromiseFeedbackRoute();
-    this.routes.set(rid, [pfr]);
-    pfr.atexit = () => { this.routes.delete(rid); };
-    return pfr.promise;
-  }
-
-  join(child) {
-    this.worker.removeEventListener('message', child._handler);
-    this.worker.addEventListener('message', this._handler);
   }
 
   // Internal event handling
@@ -799,44 +596,12 @@ export class SquirrelWorker {
     }
   }
 
+  // usefull function TODO move in utils
   changeHtmlOf(id,inner){
     document.getElementById(id)!.innerHTML = inner;
   }
 
-  squirrelBoot() {
-    if (this._boot)
-      this._boot.resolve(null);
-  }
-
-  /**
-   * @param { contents: string | any[]; route: number; span_id: any; }} fb_msg
-   * @param {any} in_mode
-   */
-  squirrelFeedback(fb_msg, in_mode) {
-
-    var feed_tag = fb_msg.contents[0];
-    var feed_route = fb_msg.route || 0;
-    var feed_args = [fb_msg.span_id, ...fb_msg.contents.slice(1), in_mode];
-    var handled = false;
-
-    if(this.config.debug)
-      console.log('squirrel Feedback message', fb_msg.span_id, fb_msg.contents);
-
-    // We call the corresponding method feed$feed_tag(sid, msg[1]..msg[n])
-    const routes = this.routes.get(feed_route) || [];
-    for (let o of routes) {
-      let handler = o['feed'+feed_tag];
-      if (handler) {
-        handler.apply(o, feed_args);
-        handled = true;
-      }
-    }
-
-    if (!handled && this.config.warn) {
-      console.warn(`Feedback type ${feed_tag} not handled (route ${feed_route})`);
-    }
-  }
-
+  // Initialize the worker
   async launch() {
     try {
       await this.when_created;
