@@ -310,3 +310,14 @@ process yubikeyplug (pid:index) =
 ==> 
 
 Script(Sentence(Declarations(Declaration(decl(process),ID,LPAREN,ID,operator,Ty(INDEX(index)),RPAREN,operator,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,ID,LPAREN,Term_i(Sterm_i(ID)),RPAREN,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(ID)),RPAREN),DOT)))
+
+# processlfmtp21
+
+system (
+   (O: !_i in(o,x); out(o,<H(x,k),G(x,k')>)) |
+   (A: !_i s:=H(s,k); out(o,G(s,k')))
+).
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(system),LPAREN,LPAREN,ID,operator,BANG,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(operator,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),operator),RPAREN,RPAREN,operator,LPAREN,ID,operator,BANG,ID,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN,RPAREN,RPAREN),DOT)))

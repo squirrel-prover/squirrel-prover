@@ -1162,7 +1162,7 @@ Interactive[@name=Sentence] {
   }
 
   identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
-  ID { @asciiLetter (identifierChar | @digit)* }
+  ID { @asciiLetter (identifierChar | @digit )* TICK* }
 
   space { @whitespace+ }
 
