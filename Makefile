@@ -356,16 +356,21 @@ help: ## Print this help message
 APPDIR=app/
 
 .PHONY: start
-start: ## Serve the application with a local HTTP server
+start: jsquirrel bundle ## Serve the application with a local HTTP server
+	dune exec $(APPDIR)server/server.exe
+
+jsquirrel: 
 	dune build $(APPDIR)client/client.bc.js
 	mkdir -p $(APPDIR)static
 	rm -f $(APPDIR)static/client.js
-	rm -f $(APPDIR)static/editor.bundle.js
 	cp _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
+
+bundle:
+	mkdir -p $(APPDIR)static
+	rm -f $(APPDIR)static/editor.bundle.js
 	# node_modules/.bin/rollup $(APPDIR)client/editor.mjs -f iife --output.name MyBundle \
 	# -o $(APPDIR)static/editor.bundle.js -p @rollup/plugin-node-resolve
 	npm run prepare
-	dune exec $(APPDIR)server/server.exe
 
 .PHONY: watch
 watch: ## Watch for the filesystem and rebuild on every change
