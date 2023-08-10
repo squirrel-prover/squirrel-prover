@@ -78,7 +78,6 @@ kw<term> { @specialize[@name={term}]<ID, term> }
   /* adv[@name=tackeyw] { kw<"adv"> } */
   collision[@name=tackeyw] { kw<"collision"> }
   eqnames[@name=tackeyw] { kw<"eqnames"> }
-  eqtraces[@name=tackeyw] { kw<"eqtraces"> }
   ANYINTRO[@name=tackeyw] { kw<"anyintro"> }
   euf[@name=tackeyw] { kw<"euf"> }
   executable[@name=tackeyw] { kw<"executable"> }
@@ -109,7 +108,7 @@ kw<term> { @specialize[@name={term}]<ID, term> }
   project[@name=tackeyw] { kw<"project"> }
   split[@name=tackeyw] { kw<"split"> }
   subst[@name=tackeyw] { kw<"subst"> }
-  true[@name=tackeyw] { kw<"true"> }
+  /* true[@name=tackeyw] { kw<"true"> } FIXME never used */
   cca1[@name=tackeyw] { kw<"cca1"> }
   enckp[@name=tackeyw] { kw<"enckp"> }
   enrich[@name=tackeyw] { kw<"enrich"> }
@@ -316,8 +315,6 @@ tac {
   | simpl_left
   // TODO ↓ give grammar of tactic !
   /* | diffeq diffeq_arg */
-  // Seems to confuse when use in term !
-  /* | true */
   | enckp
   | equivalent
   | show
@@ -890,8 +887,7 @@ bnds {
 }
 
 dh_flag {
-  empty
-| DDH ~ddhambig
+  DDH ~ddhambig
 | CDH ~cdhambig
 | GDH ~gdhambig 
 }
@@ -916,8 +912,8 @@ declaration_i {
   SENC lsymb COMMA lsymb WITH HASH lsymb |
   SIGNATURE lsymb COMMA lsymb COMMA lsymb c_tys |
   SIGNATURE lsymb COMMA lsymb COMMA lsymb WITH ORACLE term |
-  /* dh_flags lsymb COMMA lsymb_decl c_tys | */
-  /* dh_flags lsymb COMMA lsymb_decl COMMA lsymb_decl c_tys | */
+  dh_flags lsymb COMMA lsymb_decl c_tys |
+  dh_flags lsymb COMMA lsymb_decl COMMA lsymb_decl c_tys |
   NAME lsymb COLON Ty |
   ACTION lsymb COLON int |
   TYPE Ty bty_infos |
@@ -1073,7 +1069,6 @@ Interactive[@name=Sentence] {
 | PRINT pr_query
 | prof
 | Search_query
-| PROOF
 | P_include
 | Goal
 | Hint
@@ -1142,7 +1137,6 @@ Interactive[@name=Sentence] {
   AT[@name=operator] { "@" }
   TILDE[@name=operator] { "~" }
   PLUS[@name=tacticals] { "+" }
-  PLUSPLUS { "++" }
   TICK { "\'" }
   PERCENT { "%" }
   PROOF { "Proof." }
@@ -1219,7 +1213,6 @@ Interactive[@name=Sentence] {
     MINUS ,
     AT,
     TILDE ,
-    PLUSPLUS ,
     PLUS ,
     TICK ,
     PERCENT,
