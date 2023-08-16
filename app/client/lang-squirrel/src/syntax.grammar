@@ -289,7 +289,7 @@ tac {
   | CASE term
   | collision
   | collision term 
-  | enrich term
+  | enrich term (COMMA term)*
   | EXPAND commaSep1<term>
   | HELP
   | HELP lsymb
@@ -299,6 +299,13 @@ tac {
   | eqnames
   | expandall
   | CONST term
+  | intctxt lsymb
+  | enckp INT
+  | enckp INT COMMA lsymb
+  | enckp INT COMMA lsymb COMMA lsymb
+  | xor INT
+  | xor INT COMMA lsymb
+  | xor INT COMMA lsymb COMMA lsymb
   /* | CONST */
   | NAMELENGTH term COMMA term
   | SYM
@@ -315,13 +322,10 @@ tac {
   | simpl_left
   // TODO ↓ give grammar of tactic !
   /* | diffeq diffeq_arg */
-  | enckp
   | equivalent
   | show
   | deduce
   | prf
-  | xor
-  | intctxt
   | trivialif
   | MEMSEQ
   // Closing without grammar
@@ -441,6 +445,7 @@ Bulleted_tactic[@name=Sentence] {
   bullet Bulleted_tactic
 | brace  Bulleted_tactic
 | Tactic
+| Infos
 | DOT
 }
 
@@ -1062,13 +1067,17 @@ StartProof[@name=Sentence] { PROOF }
 
 blockProof { StartProof Bulleted_tactic+ EndProof }
 
+Infos[@name=Sentence] {
+ PRINT pr_query
+ | Search_query
+}
+
 Interactive[@name=Sentence] {
   Set_option
 | Declarations
 | undo
-| PRINT pr_query
+| Infos
 | prof
-| Search_query
 | P_include
 | Goal
 | Hint
