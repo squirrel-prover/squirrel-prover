@@ -115,11 +115,11 @@ Now, the counter value associated to this token is this new value. *)
 process server(ii:index) =
   in(cR,y1);
   try find i such that fst(y1) = pid(i) in
-    if dec(snd(snd(y1)),k(i)) <> fail
+    (if dec(snd(snd(y1)),k(i)) <> fail
         && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
     then
       SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
-      out(cR,accept).
+      out(cR,accept)).
 
 (** In the final system, processes can play in parallel an unbounded number
 of sessions. *)

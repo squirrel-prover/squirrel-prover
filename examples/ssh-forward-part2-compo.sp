@@ -117,7 +117,7 @@ process P1FA =
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then (
   out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
@@ -125,10 +125,10 @@ process P1FA =
   !_i (
     in(cP,y);
     let x = dec(y,k11) in
-    if x <> fail then
-    if fst(x) = reqsign then
+    if x <> fail then (
+    if fst(x) = reqsign then (
     out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,r2(i),k11))
-  ).
+  )))).
 
 process PDIS =
   (* begin S0 *)
@@ -140,7 +140,7 @@ process PDIS =
   let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then
+  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then (
       out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -152,13 +152,13 @@ process PDIS =
   in(cP,t);
   let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(sidP, snd(t),pkS) then
+  if pkS = pk(kS) && checksign(sidP, snd(t),pkS) then (
     out(cP, enc( <reqsign, sidP>,r3,k11));
     in(cP, signans);
     let y = dec(signans,k11) in
-    if y <> fail then
-    if fst(y) = anssign then
-    Pok: out(cP, enc(snd(y),r4,gB^a1)).
+    if y <> fail then (
+    if fst(y) = anssign then (
+    Pok: out(cP, enc(snd(y),r4,gB^a1)))))).
 
 
 process SDIS =
@@ -187,7 +187,7 @@ process P1FADDH =
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then (
   out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
@@ -198,7 +198,7 @@ process P1FADDH =
     if x2 <> fail then
     if fst(x2) = reqsign then
     out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,r2(i),k11))
-  )
+  )).
 
 process PDISDDH =
   (* begin S0 *)
@@ -210,7 +210,7 @@ process PDISDDH =
   let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then
+  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then (
   out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -218,7 +218,7 @@ process PDISDDH =
   in(cP, gB);
   (* end Pdis0 *)
   if gB = g^b1 then
-  out(cP,diff(g^a1^b1,g^c11))
+  out(cP,diff(g^a1^b1,g^c11))).
 
 
 process SDISDDH =
@@ -228,8 +228,8 @@ process SDISDDH =
   (* end SDIS0 *)
 
   (* begin SDIS1 *)
-  if gP = g^a1 then
-  out(cP,diff(g^a1^b1,g^c11))
+  if gP = g^a1 then (
+  out(cP,diff(g^a1^b1,g^c11))).
 
 system [secret] K: (P1FADDH | SDISDDH | PDISDDH).
 
@@ -249,7 +249,7 @@ process P1FAauth =
   in(cP,t);
   let sidPaF = h(<<g^ake11,gB>,k11>, hKey) in
   let pkSaF = fst(t) in
-  if pkSaF = pk(kS) && checksign(sidPaF, snd(t), pkS) then
+  if pkSaF = pk(kS) && checksign(sidPaF, snd(t), pkS) then (
   out(cP, enc(sign(sidPaF,kP),r,k11));
   (* end P1 *)
 
@@ -260,7 +260,7 @@ process P1FAauth =
     if x3 <> fail then
     if fst(x3) = reqsign then
     out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,r2(i),k11))
-  )
+  )).
 
 process PDISauth =
   (* begin S0 *)
@@ -272,7 +272,7 @@ process PDISauth =
   let sidS0a = h(<<gP1,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0a, kS)>);
   in(cS, encP );
-  if checksign(sidS0a, dec(encP,gP1^bke11), pk(kP)) then
+  if checksign(sidS0a, dec(encP,gP1^bke11), pk(kP)) then (
   out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -285,18 +285,18 @@ process PDISauth =
   in(cP,t);
   let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkSa = fst(t) in
-  if pkSa = pk(kS) && checksign(sidPa, snd(t), pkSa) then
+  if pkSa = pk(kS) && checksign(sidPa, snd(t), pkSa) then (
   out(cP, enc( <reqsign, sidPa>,r3,k11));
   in(cP, signans);
   let ya = dec(signans,k11) in
-  if ya <> fail then
-  if fst(ya) = anssign then
+  if ya <> fail then (
+  if fst(ya) = anssign then (
   out(cP, enc(snd(ya),r4,gB^a1));
   in(cP,challenge);
-  try find i such that
-    gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11
-  in out(cP,ok)
-  else Pfail : out(cP,diff(ok,ko))
+  try find i such that (
+    gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11)
+  in (out(cP,ok))
+  else (Pfail : out(cP,diff(ok,ko))))))).
 
 
 process SDISauth =
@@ -311,13 +311,13 @@ process SDISauth =
   out(cS, <<pk(kS),g^b1>,sign(sidSa, kS)>);
   in(cS, encP );
   let x4 = dec(encP,gP^b1) in
-  if checksign(<forwarded, sidSa>, x4, pk(kP)) then
+  if checksign(<forwarded, sidSa>, x4, pk(kP)) then (
     out(cS,ok);
     in(cS,challenge);
-    try find i such that gP = g^a(i) || gP = g^a1 in
-      out(cS,ok)
-    else
-      Sfail :  out(cS,diff(ok,ko))
+    try find i such that (gP = g^a(i) || gP = g^a1) in
+      (out(cS,ok))
+    else (
+      Sfail :  out(cS,diff(ok,ko))))
 
 system [auth] K: ( P1FAauth | SDISauth | PDISauth).
 

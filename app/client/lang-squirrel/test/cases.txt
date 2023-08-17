@@ -355,3 +355,18 @@ system (
 ==> 
 
 Script(Sentence(Declarations(Declaration(decl(system),LPAREN,LPAREN,ID,operator,BANG,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(operator,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),operator),RPAREN,RPAREN,operator,LPAREN,ID,operator,BANG,ID,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN,RPAREN,RPAREN),DOT)))
+
+# tryif
+
+process server(ii:index) =
+  in(cR,y1);
+  try find i such that fst(y1) = pid(i) in
+    (if dec(snd(snd(y1)),k(i)) <> fail
+        && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
+    then
+      SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
+      out(cR,accept)).
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),ID,LPAREN,ID,operator,Ty(INDEX(index)),RPAREN,operator,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,FIND(tacticals(try),find),ID,SUCHTHAT(such,that),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),Ord(operator),Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN))),IN(in),LPAREN,IF(if),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),Ord(NEQ),Term_i(Term_i(Sterm_i(ID)),Infix_s(AND),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),Infix_s(RIGHTINFIXSYMB),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),RPAREN)),Ord(operator),Term_i(Sterm_i(ID)))))),THEN(then),ID,LPAREN,Term_i(Sterm_i(ID)),RPAREN,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(ID)),RPAREN,RPAREN),DOT)))
+
