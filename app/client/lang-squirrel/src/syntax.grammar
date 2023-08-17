@@ -1105,6 +1105,15 @@ Interactive[@name=Sentence] {
     ">"
   }
 
+  LEFTINFIXSYMB {
+     left_infix_char_first  ( infix_char* | (@digit* infix_char+) )
+  }
+
+  RIGHTINFIXSYMB {
+     right_infix_char_first ( infix_char* | (@digit* infix_char+) )
+  }
+
+
   BANG { "!_" ID }
   AND { "&&" }
   GAND { "/\\" }
@@ -1156,14 +1165,6 @@ Interactive[@name=Sentence] {
 
   /* EOF { @eof } */
 
-  LEFTINFIXSYMB {
-     left_infix_char_first  ( infix_char* | ($[0-9]* infix_char+) )
-  }
-
-  RIGHTINFIXSYMB {
-     right_infix_char_first ( infix_char* | ($[0-9]* infix_char+) )
-  }
-
   identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
   ID { @asciiLetter (identifierChar | @digit )* TICK* }
 
@@ -1208,6 +1209,7 @@ Interactive[@name=Sentence] {
     QMARK ,
     COMMA ,
     BANGU ,
+
     SHARP ,
     COLONEQ ,
     COLON ,
@@ -1221,14 +1223,15 @@ Interactive[@name=Sentence] {
     PARALLEL ,
     MINUS ,
     AT,
-    TILDE ,
-    PLUS ,
-    TICK ,
-    PERCENT,
 
     //FIXME ↓  is it the right place ?
     LEFTINFIXSYMB,
     RIGHTINFIXSYMB,
+
+    TILDE ,
+    PLUS ,
+    TICK ,
+    PERCENT,
 
     ID
   }

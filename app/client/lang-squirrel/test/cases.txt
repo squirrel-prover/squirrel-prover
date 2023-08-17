@@ -1,4 +1,4 @@
-# complexgoalcommentfixmeconst
+# constandadvbadnames
 
 global goal hybrid ['a] 
   (N1 : int[const, adv]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
@@ -223,7 +223,7 @@ print n.
 
 ==>
 
-Script(Sentence(tackeyw(print),ID,DOT))
+Script(Sentence(Sentence(tackeyw(print),ID,DOT)))
 
 # search
 
@@ -231,7 +231,7 @@ search if _ then _ else _.
 
 ==>
 
-Script(Sentence(Search_query(tackeyw(search),Term_i(IF(if),Term_i(Sterm_i(UNDERSCORE)),THEN(then),Term_i(Sterm_i(UNDERSCORE)),ELSE(else),Term_i(Sterm_i(UNDERSCORE))),DOT)))
+Script(Sentence(Sentence(Search_query(tackeyw(search),Term_i(IF(if),Term_i(Sterm_i(UNDERSCORE)),THEN(then),Term_i(Sterm_i(UNDERSCORE)),ELSE(else),Term_i(Sterm_i(UNDERSCORE))),DOT))))
 
 # channel
 
@@ -289,7 +289,7 @@ search input@_.
 
 ==>
 
-Script(Sentence(Search_query(tackeyw(search),Term_i(Macro(Term_i(Sterm_i(ID))),operator,Term_i(Sterm_i(UNDERSCORE))),DOT)))
+Script(Sentence(Sentence(Search_query(tackeyw(search),Term_i(Macro(Term_i(Sterm_i(ID))),operator,Term_i(Sterm_i(UNDERSCORE))),DOT))))
 
 
 # searchinput2
@@ -310,6 +310,40 @@ process yubikeyplug (pid:index) =
 ==> 
 
 Script(Sentence(Declarations(Declaration(decl(process),ID,LPAREN,ID,operator,Ty(INDEX(index)),RPAREN,operator,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,ID,LPAREN,Term_i(Sterm_i(ID)),RPAREN,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(ID)),RPAREN),DOT)))
+
+# abstract++
+
+abstract (++) : message.
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(abstract),LPAREN,RIGHTINFIXSYMB,RPAREN,Ty_args,operator,Ty(MESSAGE(message))),DOT)))
+
+
+# rightinfixsymb
+
+abstract (~<) : message.
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(abstract),LPAREN,RIGHTINFIXSYMB,RPAREN,Ty_args,operator,Ty(MESSAGE(message))),DOT)))
+
+
+# processyubikey2
+
+process server(ii:index) =
+  in(cR,y1);
+  if dec(snd(snd(y1)),k(i)) <> fail
+      && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
+  then
+    SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
+    out(cR,accept).
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),ID,LPAREN,ID,operator,Ty(INDEX(index)),RPAREN,operator,IN(in),LPAREN,ID,COMMA,ID,RPAREN,tacticals,IF(if),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),Ord(NEQ),Term_i(Term_i(Sterm_i(ID)),Infix_s(AND),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),Infix_s(RIGHTINFIXSYMB),Term_i(Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),RPAREN)),Ord(operator),Term_i(Sterm_i(ID)))))),THEN(then),ID,LPAREN,Term_i(Sterm_i(ID)),RPAREN,COLONEQ,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),COMMA,Term_i(Sterm_i(Fun_symb(ID),LPAREN,Term_i(Sterm_i(ID)),RPAREN)),RPAREN)),RPAREN)),tacticals,OUT(out),LPAREN,ID,COMMA,Term_i(Sterm_i(ID)),RPAREN),DOT)))
+
+
 
 # processlfmtp21
 
