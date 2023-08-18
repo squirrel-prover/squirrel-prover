@@ -110,39 +110,39 @@ function isErrorSentence(sentence:SyntaxNode, view:EditorView){
    * @param {number} side
    */
 export const sentenceHover = hoverTooltip((view, pos, side) => {
-    // Remove all equivalent style class 
-    removeHoverMarks(view);
-    let start = pos, end = pos;
-    let viewState = view.state;
-    // Node at pos
-    let node = syntaxTree(viewState).resolveInner(pos);
-    let type = node.type.name;
+  // Remove all equivalent style class 
+  removeHoverMarks(view);
+  let start = pos, end = pos;
+  let viewState = view.state;
+  // Node at pos
+  let node = syntaxTree(viewState).resolveInner(pos);
+  let type = node.type.name;
 
-    // if (node.type.isError)
-    //   highlightNodes(node,"")
+  // if (node.type.isError)
+  //   highlightNodes(node,"")
 
-    //     while (node) {
-    //       const text = viewState.sliceDoc(node.from, node.to);
-    //       let parent = node.parent;
-    //       type = parent!.type.name;
-    //       start = node.from;
-    //       end = node.to;
-    //       console.log("Groupe of "+text+":"+type)
-    //       node = parent!;
-    //     }
+  //     while (node) {
+  //       const text = viewState.sliceDoc(node.from, node.to);
+  //       let parent = node.parent;
+  //       type = parent!.type.name;
+  //       start = node.from;
+  //       end = node.to;
+  //       console.log("Groupe of "+text+":"+type)
+  //       node = parent!;
+  //     }
 
-    if(node.type.name === "BlockComment") return {pos: start, end, above: false, 
-      create(view) {
-        let dom = document.createElement("div")
-        dom.textContent = "Comments…"
-        return {dom}
-      }
-    };
-    start = node.from;
-    end = node.to;
-    // If you only want type of sentence ↓
+  if(node.type.name === "BlockComment") return {pos: start, end, above: false, 
+    create(view) {
+      let dom = document.createElement("div")
+      dom.textContent = "Comments…"
+      return {dom}
+    }
+  };
+  start = node.from;
+  end = node.to;
+  // If you only want type of sentence ↓
+  try {
     let sentence = getSentenceFromNode(node);
-
     if (sentence) {
       const text = viewState.sliceDoc(sentence.from, sentence.to);
       let child = sentence.firstChild;
@@ -173,5 +173,6 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
         return {dom}
       }
     }
-  })
+  } catch (e) {console.warn(e)}
+})
 

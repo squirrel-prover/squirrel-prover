@@ -353,6 +353,7 @@ export class SquirrelWorker {
     //Do this only when doc changed
     let view = update.view;
 
+    //Remove hover mark if there was one
     removeHoverMarks(view);
 
     //Find the upper change position in doc 
@@ -366,40 +367,44 @@ export class SquirrelWorker {
         this.printSentence(view.state,cursorNode);
       }
 
-      //Since cursor must be over a Sentence node, it must have a Script parent
-      let index = this.executedSentences.findIndex(
-        (v) => v.to == cursorNode!.to
-      );
-      let nbToUndo = this.executedSentences.length - (index+1)
+      //Didn't find node → this is the top of the file
+      if (cursorNode) {
 
-      if(DEBUG){
-        let childs = this.executedSentences.slice(index+1);
-        console.log("Index of this sentence : ",index);
-        console.log("siblings to undo : ");
-        childs.forEach((n) => {
-          this.printSentence(update.startState,n);
-        });
-        console.log("Size : ",childs.length)
-        console.log(nbToUndo)
+        //Since cursor must be over a Sentence node, it must have a Script parent
+        let index = this.executedSentences.findIndex(
+          (v) => v.to == cursorNode!.to
+        );
+        let nbToUndo = this.executedSentences.length - (index+1)
+
+        if(DEBUG){
+          let childs = this.executedSentences.slice(index+1);
+          console.log("Index of this sentence : ",index);
+          console.log("siblings to undo : ");
+          childs.forEach((n) => {
+            this.printSentence(update.startState,n);
+          });
+          console.log("Size : ",childs.length)
+          console.log(nbToUndo)
+        }
+        //Tell to the prover to undo nbToUndo sentences
+        if(nbToUndo>0)
+          this.undo(nbToUndo);
+
+        //update executedSentences and cursor
+        this.executedSentences = this.executedSentences.slice(0,index+1)
+        if(this.executedSentences.length == 0)
+          this.cursor = null;
+        else
+          this.cursor = cursorNode.cursor();
+
+        //Remove marks of undone sentences
+        if(this.cursor)
+          removeMarks(view,(this.cursor.to)+1,view.state.doc.length);
+        else 
+          removeMarks(view,0,view.state.doc.length);
       }
-      //Tell to the prover to undo nbToUndo sentences
-      if(nbToUndo>0)
-        this.undo(nbToUndo);
-
-      //update executedSentences and cursor
-      this.executedSentences = this.executedSentences.slice(0,index+1)
-      if(this.executedSentences.length == 0)
-        this.cursor = null;
-      else
-        this.cursor = cursorNode.cursor();
-
-      //Remove marks of undone sentences
-      if(this.cursor)
-        removeMarks(view,(this.cursor.to)+1,view.state.doc.length);
-      else 
-        removeMarks(view,0,view.state.doc.length);
+      //If no cursor the first `exec` will init it
     }
-    //If no cursor the first `exec` will init it
   }
 
   isSentence(node:SyntaxNode) {
