@@ -3,6 +3,8 @@ import {parser} from "./syntax.grammar"
 import {LRLanguage, LanguageSupport, indentNodeProp, foldNodeProp, foldInside, delimitedIndent} from "@codemirror/language"
 import {styleTags, tags as t} from "@lezer/highlight"
 import {completeFromList} from "@codemirror/autocomplete"
+import {globalCompletion, localCompletionSource} from "./complete"
+
 
 export const SquirrelLanguage = LRLanguage.define({
   parser: parser.configure({
@@ -28,7 +30,7 @@ export const SquirrelLanguage = LRLanguage.define({
         "closing!": t.comment,
 
         //tacticals keywords
-        "tacticals!": t.function(t.string),
+        "Tacticals!": t.function(t.string),
 
         //fun keywords
         'Fun_symb!': t.meta,
@@ -67,18 +69,10 @@ export const SquirrelLanguage = LRLanguage.define({
   })
 })
 
-// FIXME does not work when started by client.ml
-export const exampleCompletion = SquirrelLanguage.data.of({
-  autocomplete: completeFromList([
-    {label: "system", type: "keyword"},
-    {label: "goal", type: "keyword"},
-    {label: "congruence", type: "method"}
-  ])
-})
-
 export function Squirrel() {
-  return new LanguageSupport(SquirrelLanguage, 
-    [ exampleCompletion,
+  return new LanguageSupport(SquirrelLanguage, [
+    // SquirrelLanguage.data.of({autocomplete: localCompletionSource}),
+    SquirrelLanguage.data.of({autocomplete: globalCompletion})
     ])
   // return new LanguageSupport(SquirrelLanguage)
 }
