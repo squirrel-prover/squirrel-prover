@@ -1,5 +1,5 @@
 
-@top Script { (Interactive | BlockProof)* }
+@top Script { (Interactive | blockProof)* }
 @skip { space | BlockComment }
 
 paraSep<content> {
@@ -1053,7 +1053,7 @@ undo {
 EndProof[@name=Sentence] { QED | ABORT }
 StartProof[@name=Sentence] { PROOF }
 
-BlockProof { StartProof Bulleted_tactic+ EndProof }
+blockProof { StartProof Bulleted_tactic+ EndProof }
 
 Infos[@name=Sentence] {
  PRINT pr_query

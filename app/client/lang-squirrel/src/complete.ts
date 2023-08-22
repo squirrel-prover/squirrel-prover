@@ -6,7 +6,7 @@ import {Text} from "@codemirror/state"
 
 const cache = new NodeWeakMap<readonly Completion[]>()
 
-const tactics_completions: readonly Completion[] = [
+const tactics_completions: readonly Completion[] = [//{↓{
 
   {label:"use",detail:"H with v1 (, …, vn)? as intro_pat",
     info:"Instantiate a lemma or hypothesis on some arguments."},
@@ -65,12 +65,12 @@ const tactics_completions: readonly Completion[] = [
     info:`Introduce topmost connectives of conclusion\n
           formula, when it can be done in an invertible,\n
           non-branching fashion.`},
-  snip("apply ${H}", 
-  {label:"apply",detail:"(Hypothesis|Lemma|Axiom)",
-  info:`Matches the goal with the conclusion of the formula F provided \n
-  (F can be an hypothesis, a lemma, an axiom, or a proof term), trying\n
-         to instantiate F variables by matching.\n
-         Creates one subgoal for each premises of F.`}),
+  snip("apply ${F}", 
+  {label:"apply",detail:"F",
+  info:`Matches the goal with the conclusion of the formula F provided
+   (F can be an hypothesis, a lemma, an axiom, or a proof term), trying
+   to instantiate F variables by matching.
+   Creates one subgoal for each premises of F.`}),
   {label:"generalize",detail:"Term( Term)*",
     info:"Generalize the goal on some terms"},
   {label:"dependent induction",detail:"(Term)*",
@@ -198,10 +198,10 @@ const tactics_completions: readonly Completion[] = [
     info:`Admit goal.`},
   {label:"diffeq",detail:"",
     info:`Closes a reflexive goal up to equality`}
-].map(t => {t.type = "function"; t.boost = 50;return t});
+].map(t => {t.type = "function"; t.boost = 50;return t});//}↑}
 
 const ScopeNodes = new Set([
- "Script", "Interactive", "Declaration", "Goal", "Local_statement", "Global_statement", "BlockProof", "Hint"
+ "Script", "Interactive", "Declaration", "Local_statement", "Global_statement", "Hint"
 ])
 
 function defID(type: string) {
@@ -316,8 +316,8 @@ function inNodeType(type:string,node:SyntaxNode | null):boolean {
   return false
 }
 
-function inBlockProof(node:SyntaxNode | null):boolean {
-  return inNodeType("BlockProof",node);
+function inBulletedTac(node:SyntaxNode | null):boolean {
+  return (inNodeType("Bulleted_tactic",node) || inNodeType("Tactic",node))
 }
 
 
@@ -337,7 +337,7 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
       options = options.concat(scope_completions);
     }
   }
-  if (inBlockProof(inner)){
+  if (inBulletedTac(inner)){
     console.warn("In Proof !")
     options = options.concat(tactics_completions);
   }
