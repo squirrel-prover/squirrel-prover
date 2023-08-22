@@ -71,7 +71,7 @@ export const SquirrelLanguage = LRLanguage.define({
 
 export function Squirrel() {
   return new LanguageSupport(SquirrelLanguage, [
-    // SquirrelLanguage.data.of({autocomplete: localCompletionSource}),
+    SquirrelLanguage.data.of({autocomplete: localCompletionSource}),
     SquirrelLanguage.data.of({autocomplete: globalCompletion})
     ])
   // return new LanguageSupport(SquirrelLanguage)

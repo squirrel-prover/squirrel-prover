@@ -306,9 +306,10 @@ tac {
   | xor INT
   | xor INT COMMA Lsymb
   | xor INT COMMA Lsymb COMMA Lsymb
+  | prf INT
+  | prf INT
   /* | CONST */
   | NAMELENGTH Term COMMA Term
-  | SYM
   | right
   | split
   | subst Term COMMA Term
@@ -325,7 +326,6 @@ tac {
   | equivalent
   | show
   | deduce
-  | prf
   | trivialif
   | MEMSEQ
   // Closing without grammar
@@ -525,7 +525,7 @@ Simpl_lval {
 | Lsymb
 }
 
-lval {
+Lval {
   Simpl_lval
 | LPAREN commaSep1<Lsymb> RPAREN
 }
@@ -559,7 +559,7 @@ Bnds_tagged {
 }
 
 ext_bnd_tagged {
-  LPAREN bnd_group_list<lval,ty_tagged> RPAREN
+  LPAREN bnd_group_list<Lval,ty_tagged> RPAREN
 | Simpl_lval
 }
 
@@ -584,7 +584,7 @@ Sterm_i {
   Lsymb ~symb /* ambiguous with Fun_symb */
 | UNDERSCORE
 | DIFF LPAREN Term COMMA Term RPAREN
-| SEQ LPAREN bnd_group_list<lval,ty_tagged> !DARROW DARROW Term RPAREN
+| SEQ LPAREN bnd_group_list<Lval,ty_tagged> !DARROW DARROW Term RPAREN
 | NOT sterm
 | FALSE
 | TRUE
