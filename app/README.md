@@ -8,6 +8,7 @@ It may asks you to install `libev-devel` with your OS's package-manager.
 ```bash
 opam update
 opam install . --deps-only
+opam install js_of_ocaml js_of_ocaml-tyxml ppx_deriving_yojson dream
 ```
 
 Should have `js_of_ocaml >= 5.2.0` here.
@@ -32,6 +33,5 @@ Then visit [http://localhost:8080](http://localhost:8080)…
 
 ## Usage
 
-At this point only `ctrl-enter` (exec to cursor command) is bound.
-You dans execute sentences and retract script by modifying previous
-sentences.
+At this point only `ctrl-enter`, `ctrl-↑`, `ctrl-↓`  (resp. exec to
+cursor, undo, exec next sentence commands) are bound.
