@@ -410,11 +410,11 @@ Process {
 | Lsymb COLON Process
 | OUT LPAREN Lsymb COMMA Term RPAREN process_cont
 | Lsymb term_list
-| NEW Lsymb colon_ty? !SEMICOLON SEMICOLON Process
+| NEW Lsymb Colon_ty? !SEMICOLON SEMICOLON Process
 | IN LPAREN Lsymb COMMA Lsymb RPAREN process_cont
 | IF Term THEN Process else_process
 | FIND opt_indices SUCHTHAT Term IN Process else_process
-| LET Lsymb colon_ty? !EQ EQ Term IN Process
+| LET Lsymb Colon_ty? !EQ EQ Term IN Process
 | Lsymb term_list COLONEQ Term process_cont
 | BANG Process
 }
@@ -543,13 +543,13 @@ var_tags {
 | LBRACKET commaSep1<Lsymb> RBRACKET
 }
 
-ty_tagged {
+Ty_tagged {
   Ty var_tags
 }
 
 // Auxiliary: a single binder declarations with tags
 bnd_tagged {
-  LPAREN bnd_group_list<Simpl_lval,ty_tagged> RPAREN
+  LPAREN bnd_group_list<Simpl_lval,Ty_tagged> RPAREN
 | Simpl_lval
 }
 
@@ -559,7 +559,7 @@ Bnds_tagged {
 }
 
 ext_bnd_tagged {
-  LPAREN bnd_group_list<Lval,ty_tagged> RPAREN
+  LPAREN bnd_group_list<Lval,Ty_tagged> RPAREN
 | Simpl_lval
 }
 
@@ -569,10 +569,10 @@ ext_bnds_tagged_strict {
 
 ext_bnds_tagged {
   ext_bnds_tagged_strict
-| Simpl_lval COLON ty_tagged
+| Simpl_lval COLON Ty_tagged
 }
 
-colon_ty {
+Colon_ty {
   COLON Ty
 }
 
@@ -584,7 +584,7 @@ Sterm_i {
   Lsymb ~symb /* ambiguous with Fun_symb */
 | UNDERSCORE
 | DIFF LPAREN Term COMMA Term RPAREN
-| SEQ LPAREN bnd_group_list<Lval,ty_tagged> !DARROW DARROW Term RPAREN
+| SEQ LPAREN bnd_group_list<Lval,Ty_tagged> !DARROW DARROW Term RPAREN
 | NOT sterm
 | FALSE
 | TRUE
@@ -915,8 +915,8 @@ Declaration {
   ACTION Lsymb COLON int |
   TYPE Ty bty_infos |
   ABSTRACT Lsymb_decl Ty_args COLON Ty |
-  OP Lsymb_decl Ty_args ext_bnds_tagged_strict colon_ty? !EQ EQ Term |
-  MUTABLE Lsymb bnds_strict colon_ty? !EQ EQ Term |
+  OP Lsymb_decl Ty_args ext_bnds_tagged_strict Colon_ty? !EQ EQ Term |
+  MUTABLE Lsymb bnds_strict Colon_ty? !EQ EQ Term |
   CHANNEL Lsymb |
   PROCESS Lsymb projs bnds !EQ EQ Process |
          AXIOM Local_statement |

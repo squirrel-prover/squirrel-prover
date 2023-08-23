@@ -11,15 +11,6 @@
   (link_flags -linkall -g)
   (modules squirrel))
 
-; Recipe to produce squirrel executable in js
-; (executable
-;   (name jsexport)
-;   (promote)
-;   (libraries squirrellib)
-;   (modes js)
-;   (preprocess (pps js_of_ocaml-ppx))
-;   (modules jsexport))
-
 (test
   (name test)
   (libraries squirrelcore squirreltests)

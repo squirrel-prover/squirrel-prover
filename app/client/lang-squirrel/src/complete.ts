@@ -320,13 +320,21 @@ function inBulletedTac(node:SyntaxNode | null):boolean {
   return (inNodeType("Bulleted_tactic",node) || inNodeType("Tactic",node))
 }
 
+function isFirstWord(node:SyntaxNode): boolean {
+  return !node.prevSibling //If there is no prevSibling => it's first node
+}
+
+const typeNames = new Set([
+ "Ty", "Ty_tagged", "Colon_ty"
+])
+
 
 /// Completion source that looks up locally defined declarations
 export function localCompletionSource(context: CompletionContext): CompletionResult | null {
   let inner = syntaxTree(context.state).resolveInner(context.pos, -1)
   // if (dontComplete.indexOf(inner.name) > -1) return null
   let isLsymb = inner.type.name == "Lsymb" 
-  let isType = inner.type.name == "Ty" 
+  let isType = typeNames.has(inner.type.name)
 
     // || inner.to - inner.from < 20 && Identifier.test(context.state.sliceDoc(inner.from, inner.to))
   // if (!isWord && !context.explicit) return null
@@ -337,10 +345,10 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
       options = options.concat(scope_completions);
     }
   }
-  if (inBulletedTac(inner)){
-    console.warn("In Proof !")
+  if (inBulletedTac(inner) && isFirstWord(inner)){
     options = options.concat(tactics_completions);
   }
+  options = isType ? options.filter((v) => (v.type === "type")) : options;
   return {
     options,
     from: inner.from
@@ -432,6 +440,19 @@ export const snippets: readonly Completion[] = [
     label: "fun",
     detail: " ${ext_bnd_tagged} => ${Term}",
     info: "Term fun",
+    type: "keyword"
+  }),
+  snip("print", {
+    label: "print",
+    detail: "[system] [symb]",
+    info: `Shows def of given symbol (lemma, function, name or macro) in given system.
+           By default shows current system.`,
+    type: "keyword"
+  }),
+  snip("search ${pat} in ${sys}.", {
+    label: "search",
+    detail: "[pat] [in sys]",
+    info: `Search lemmas containing a given pattern.`,
     type: "keyword"
   }),
   snip("if ${Term} then (${Term}) else (${Term})", {
