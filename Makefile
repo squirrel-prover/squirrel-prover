@@ -162,7 +162,7 @@ alcotest: version
 alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
 	@dune build @mytest
-	@python3 ./sed.py $(TESTS_OUT) /tmp/tests.output
+	@python3 ./scripts/sed.py $(TESTS_OUT) /tmp/tests.output
 	@if cat /tmp/tests.output | grep -q "^[^│] \[FAIL\]" ; \
 		then echo "${RED}Alcotests FAILED :${NC}" ; \
 		  cat /tmp/tests.output | grep -E --color "^[^│] \[FAIL\]" ; \
@@ -238,7 +238,7 @@ GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
 LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
 LAST2=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -2 | tail -1`
 LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
-PLOT=./plot.py
+PLOT=./scripts/plot.py
 STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
 # This plot tactics statistics
