@@ -4,10 +4,10 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import {lezer} from "@lezer/generator/rollup";
 
 export default {
-  input: "app/client/editor.mjs",
+  input: "./client/editor.mjs",
   output: [
     {
-      file: "app/static/editor.bundle.js", 
+      file: "./static/editor.bundle.js", 
       format: "iife", 
       name:"MyBundle"
     }

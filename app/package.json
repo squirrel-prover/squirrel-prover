@@ -1,7 +1,7 @@
 {
   "name": "squirrel-project",
   "workspaces": [
-    "./app/client/lang-squirrel"
+    "./client/lang-squirrel"
   ],
   "dependencies": {
     "@codemirror/lang-markdown": "github:codemirror/lang-markdown",
@@ -24,7 +24,7 @@
     "typescript": "^4.3.4"
   },
   "scripts": {
-    "test": "mocha app/client/lang-squirrel/test/test.js",
+    "test": "mocha ./client/lang-squirrel/test/test.js",
     "prepare": "node_modules/.bin/rollup -c"
   }
 }

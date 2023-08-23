@@ -368,9 +368,10 @@ jsquirrel:
 bundle:
 	mkdir -p $(APPDIR)static
 	rm -f $(APPDIR)static/editor.bundle.js
+	cd $(APPDIR)
 	# node_modules/.bin/rollup $(APPDIR)client/editor.mjs -f iife --output.name MyBundle \
 	# -o $(APPDIR)static/editor.bundle.js -p @rollup/plugin-node-resolve
-	npm run prepare
+	npm run prepare --prefix app/
 
 .PHONY: watch
 watch: ## Watch for the filesystem and rebuild on every change
