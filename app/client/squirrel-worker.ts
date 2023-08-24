@@ -602,8 +602,10 @@ export class SquirrelWorker {
   }
 
   // usefull function TODO move in utils
-  changeHtmlOf(id,inner){
-    document.getElementById(id)!.innerHTML = inner;
+  changeHtmlOf(id:string,inner:string){
+    let element = document.getElementById(id)!;
+    element.innerHTML = inner;
+    element.scrollTop = element.scrollHeight;
   }
 
   // Initialize the worker
