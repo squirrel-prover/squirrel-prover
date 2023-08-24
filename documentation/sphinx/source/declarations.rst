@@ -61,7 +61,7 @@ axiomatizations. This notably includes the logical connectors for a
 
 
 .. todo::
-   what do we have here? if then else, pair, fst, snd, len? 
+   what do we have here? if then else, pair, fst, snd, len, pred
 
 
 Cryptographic functions
@@ -102,9 +102,20 @@ the equation giving its defintion.
 Macros
 ------
 
-TODO :gdef:`macros <macro>`
 
+:gdef:`Macros <macro>` are a very specific kind of recursive operators
+only taking timestamps as input. They cannot be user-defined now, and
+a dedicated set of macros can only be defined through the definition
+of a system, see the :ref:`system-defined macro section
+<section-system-macros>`.
 
+Macros can occur in terms, and their syntax is as follows:
+
+.. prodn::
+   macro_id ::= @identifier
+   macro ::= @macro_id@@term
+
+The syntax :g:`macro@ts` is intuitively a shortcut for :g:`macro(ts)`, and the argument passed my be of type :g:`timestamp`.
 
 .. _section-processes:
 
@@ -154,25 +165,64 @@ The body of a process is defined with sequential or parallel composition of comm
 The construct :g:`A : proc` does not have any impact on the semantics of the model: it is only used to give an alias to this location in the process.	
 
 
+Actions
+-------
+
+Squirrel only manipulates set of actions, to which protocoles as
+processes are translated. An action intuitively an atomtic step of a
+protocol, where upon receiving an input from the attacker, a condition
+is checked and if it holds an output is given back to the
+attacker. Actions cannot be directly specified and can only be
+declared via processes.
+
+
+There are identified by an action identifier:
+
+.. prodn::
+   action_id ::= @identifier
+
+When translating processes, names are automatically given to actions. Alternatively, they can be specified by an :n:`@alias`.
+
+An action is defined by an action identifier :n:`@action_id`, a set of
+:g:`index` variables for the replications, and :g:`message` variable
+for the input, and a term of type :g:`bool` for its condition and a term of
+type :g:`message` for its output, where the free variables in the two terms
+are only the replication and input variables.
+
+
 
 Systems
 -------
 
-:gdef:`systems <system>` TODO
+:gdef:`Systems <system>` are used to declare protocols through set of actions. A system can either refer to a set of actions, or to a set of protocols, and thus a set of set of actions.
+
+A system a defined by a main process:
 
 .. prodn::
-  system_id ::= identifier | identifier / identifier
-  system_expr ::= {| any | {+, @system_id} }
-
-TODO expr and set expressions
-
-
-
-Finally, a system is defined by a main process:
-
-.. prodn::
+   system_id ::= identifier
    system_decl ::= system [@system_id] @process
 
+As processes are defined over bi-terms, we in fact declare here a bi-system, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms.
+
+Multi-systems can be refereed to using system expressions:
+
+.. prodn::
+   system_expr ::= {| any | {+, {| @system_id | @system_id/left | @system_id/right } } }
+
+
+.. _section-system-macros:
+
+System-defined Macros
++++++++++++++++++++++
+
+
+Whenever a system is declared, for each action `A[idx]` inside the system with output value `o(x)` and condition `c(x)` where `x` denotes the input of action `A[idx]`, multiple mutually recursive macros are declared:
+
+* :g:`output@A[idx] := o(input@A[idx])`.
+* :g:`cond@A[idx] := c(input@A[idx])`.
+* :g:`input@A[idx] := att(frame@pred([idx]))`.
+* :g:`frame@tau` is equal to :g:`<frame@pred(tau), if cond@tau then output@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`frame@tau` is :g:`empty`.
+* :g:`exec@tau` is equal to :g:`exec@pred(tau) && cond@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`exec@init` is :g:`true`.
 
 .. todo::
    - the implicit declaration of macros,
