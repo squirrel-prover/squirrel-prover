@@ -4,47 +4,100 @@
 Declarations
 ============
 
+We details here how to define the multiple constructs over which the
+logic will reason.
+
+
 Term constructs
 ===============
+        
+Names
+-----
+
+:gdef:`Names <name>` model values that are sampled uniformaly at random whihin a :term:`large` type. They are drawn independantly from 
+
+.. prodn::
+   name_id ::= @identifier
+   name ::= name @name_id : [(@index * ... * @index) ->] @base_type
+
+.. note::
+   Since :cite:`bkl23hal`, our terms are not necessarily
+   computable in polynomial time by probabilistic Turing machines.  An
+   example of a non-PTIME term is ``forall (x:message), x = f(x)``
+   which tests whether ``f`` is idempotent, something that is not
+   necessarily computable even when ``f`` is PTIME.
 
 
 Abstract symbols
 ----------------
 
-:gdef:`Abstract functions<abstract_fun>` TODO
+:gdef:`Abstract functions<abstract_fun>` are free function symbols,
+that model function over which no assumptions are made by
+default, except that they are deterministic polynomial time computations.
 
-Function symbols are deterministic polynomial time.
+
+.. prodn::
+   fun_id ::= @identifier
+   tvar_args ::=  [{+ @type_variable }]
+   function ::= abstract {? @tvar_args} @fun_id : @type
+
+Function symbols support polymorphisms through the optional :n:`@type_variable`.
+The behaviour of functions symbols can be defined through :term:`axioms <axiom>`. 
+
+.. note:: 
+   Many builtins function symbols heavily rely on the
+   polymoprhisms, allowing for instance to have a common equality
+   symbol for all types :g:`abstract (=) ['a] : 'a -> 'a -> bool`.
+   When declaring :term:`axioms <axiom>` over such function symbols
+   can easily lead to contradictions, as for instance one may assume
+   that all types contain a single element, or are infinite, ....
+
+Builtins
+++++++++
+
+Several function symbols are builtin in Squirrel, along with their
+axiomatizations. This notably includes the logical connectors for a
+:term:`local formula`.
+
+
+.. todo::
+   what do we have here? if then else, pair, fst, snd, len? 
+
 
 Cryptographic functions
 -----------------------
 
+Squirrel allows to declare functions modeling classical cryptographic with:
 
+.. prodn::
+   crypto_decl ::= hash @fun_id 
+   | signature @fun_id, @fun_id, @fun_id
+   | aenc @fun_id, @fun_id, @fun_id
+   | senc @fun_id, @fun_id, @fun_id
+   | {| ddh | cdh | gdh } @fun_id, @fun_id where group:@base_type exponents:@base_type
+
+where:
+
+* :g:`hash h` declares a keyed hash function :g:`h(m,k)` satisfying PRF and known key collision resistance.
+* :g:`signature sig,ver,pk` declares an unforgeable (EUF-CMA) signature with the equation :g:`ver(sig(m,sk),m,pk(sk))=true`.
+* :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption with the equation :g:`dec(enc(m,pk(sk)),sk)=m`.
+* :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption with the equation :g:`dec(enc(m,sk),sk)=m`. 
+* :g:`ddh g, (^) where group:message exponents:message.` declares a group with generator :g:`g`, exponentation function :g:`^` over the given types. Dedicate types for exponents and messages are often defined.  The group satisfies DDH when declared with :g:`ddh`, CDH with :g:`cdh`, and gapDH with :g:`gdh`.
 
 
 Operators
 ---------
 
-:gdef:`Operators <operator>`
-
-         
-Names
------
-
-TODO :gdef:`names <name>`
+:gdef:`Operators <operator>` are function symbols defined with a
+concrete computation corresponding to their evluation.
 
 .. prodn::
-   name_id ::= @identifier
-   name ::= name @name_id : [(@index * ... * @index) ->] @type
-
-.. note::
-  Unlike in the original BC logic and the meta-logic that was used at first
-  in Squirrel, our terms are not necessarily computable in polynomial time
-  by probabilistic Turing machines.
-  An example of a non-PTIME term is ``forall (x:message), x = f(x)``
-  which tests whether ``f`` is idempotent, something that is not
-  necessarily computable even when ``f`` is PTIME.
-
-  TODO citations
+   op_id ::= @identifier
+   operator ::= op @op_id {? @tvar_args } {+ ({+, @variable} : @type) } : @type = @term
+ 
+As recursion is not yet supported, this is in fact currently syntact
+sugar for declaring an :term:`abstract function <abstract_fun>` symbol along with an :term:`axiom` stating
+the equation giving its defintion.
 
 Macros
 ------
@@ -80,7 +133,9 @@ The basic commands are:
 
 A command can be:
  * the binding of a name with :g:`new name`, which implicitly declares a new name based on the current replication indices. This is strictly syntactic sugar that can be avoided by explicitely declaring all names at the begining    
-   
+ * todos
+
+  
 The body of a process is defined with sequential or parallel composition of commands,conditionals, find constructs, replication or process calls.
 
 ..  prodn::
@@ -129,6 +184,8 @@ Logics
 
 Axioms
 ------
+
+An :gdef:`axiom` defines...
 
 Goals
 -----

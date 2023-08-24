@@ -104,7 +104,7 @@ or whose name does not matter.
 :gdef:`Tags <tag>` restrict a possible variable instantiation in various ways.
 
 .. prodn::
-  tag ::= const | glob
+  tag ::= const | glob | adv
 
 .. todo::
    Charlie: missing adv
@@ -121,6 +121,15 @@ to :g:`tag`:
   variable ; for example, this excludes any :term:`diff-term`
   (e.g. :g:`diff(s,t)`), or any term with system-specific macros
   (e.g. :g:`output@tau`).
+- :gdef:`adv` forces the variable to be computable by a PTTM with
+  access to a dedicated randomness tape. This tag is used to define
+  adversarial functions, that can be seen as probabilist polynomial
+  time attackers.
+
+.. note::
+   Squirrel includes a builtin function symbol :g:`att :
+   message -> message [adv]` that can be used to refer to an
+   adversary.
  
 Squirrel uses the following syntax for binders:
 
@@ -256,7 +265,7 @@ Local formulas
 
 :gdef:`Local formulas <local formula>` are :term:`terms <term>` of
 type :g:`bool`. They correspond to the embedding of a lower-level logic inside of our terms. They can in particular be constructed using common
-syntax and construction specific to Squirrel describdee below:
+syntax and construction specific to Squirrel described below:
 
 .. prodn::
   term += @term && @term | @term %|%| @term | @term => @term | not @term
