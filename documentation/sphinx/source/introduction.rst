@@ -13,8 +13,14 @@ or get the source code of the tool from
    Please bear with us and do not hesitate to contact us to report
    problems or ask for clarifications.
 
-You are reading the user's documentation.
-It introduces, relatively informally, the languages used in Squirrel:
+You are reading the user's documentation. This documentation is not
+meant as a first introduction to Squirrel; a linear read for people
+unfamiliar with all the high level concepts will be difficult. For a
+first introduction, we recommend to start with the :ref:`tutorial
+<tutorial>`.
+
+In this documention, the languages used in Squirrel are introduced in
+distinct sections:
 
 .. TODO there must be a better way to cite (sub)sections of doc
 

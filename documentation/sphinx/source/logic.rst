@@ -4,15 +4,8 @@
 Logic
 ======
 
-Here we define the syntax and informal semantics of our logic,
-and the various declarations available in the prover to introduce
-new function symbols, cryptographic primitives, types, etc.
-
-Systems will be documented elsewhere as they are not tied to the
-logic.
-
-.. todo::
-   Charlie: Despite the previous sentence, systems are marked as TODOS further down in this file. Do we want to remove the previous sentence, or indeed change a bit the structure?
+We here define the syntax and informal semantics of our logic
+independently from protocols and cryptographic construcs.
 
 Types
 ======
@@ -91,7 +84,11 @@ The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b
 
 .. example:: Hash function
 	     
-   A hash function may have type :g:`(message * message) -> message`: it takes a message to be hashedand a key, and the returned hash is also a message. Given that any hash value is often has a constant length, a specific type for the hash outputs could has been defined as a :g:`fixed` type.
+   A hash function may have type :g:`(message * message) -> message`:
+   it takes a message to be hashedand a key, and the returned hash is
+   also a message. Given that any hash value often has a constant
+   length, a specific type for the hash outputs could also be defined
+   as a :g:`fixed` type.
   
 Binders and tags
 ----------------
@@ -109,6 +106,9 @@ or whose name does not matter.
 .. prodn::
   tag ::= const | glob
 
+.. todo::
+   Charlie: missing adv
+  
 Currently, only two different tags are supported. A tagged bound
 variable :g:`(x : t[tag])` restricts :g:`x` instantiations according
 to :g:`tag`:
@@ -132,11 +132,10 @@ A binder :g:`x` without any attached (using directly a
 :n:`@var_or_hole`) is equivalent to using a type hole :g:`(x:_)`.
 The type hole will have to be inferred by unification.
 
-.. note:: Tags in binders do not always have a meaning, e.g. in the
-          function :g:`fun(x:int[const])=>f`. Squirrel will
-          ignore the tags in such cases.
-
-.. todo:: Charlie: the previous note uses an abstraction before it is defined, move this note down a bit? Or add a see later in the note? Specify why the binder does not have a meaning here would also be a plus. (I actually thought that tags in binders never have a meaning, which a later note actually says.
+.. note:: Tags in binders do not always have a meaning, e.g., in the
+          function declared with an :term:`abstraction` as follows
+          :g:`fun(x:int[const])=>f`, Squirrel will ignore the tags in
+          such cases.
 
 .. note:: Binding twice the same variable name yields two distinct
           variables (there is a hidden unique identifier).
@@ -203,7 +202,7 @@ Terms with binders
                     | find @binders such that @term in @term {? else @term }
   quantif ::= forall | exists
 
-*Abstraction* are of the form :n:`fun @binders => @term` where
+:gdef:`Abstractions <abstraction>` are of the form :n:`fun @binders => @term` where
 :n:`@term` can use the variables bound by :n:`@binders`.
 E.g. :n:`fun(x:@type)=>@term__body` is the function that maps a value
 :n:`x` of type :n:`type` to :n:`@term__body`.
@@ -234,38 +233,18 @@ defaults to :g:`zero` (the zero bit-string).
 
 
 Diff-terms
-----------
+-----------
 
-TODO :gdef:`diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` represents ...
+:gdef:`Diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` represents
+two terms at once. This is a convinient way to define two similar
+terms except for a small part. Later on, they will be used to
+define easily two protocols that only slightly differ. The logic
+in the tool allows to reason on diff-terms, proving for instance
+that the two representations are equivalent.
 
 .. prodn:: 
    diff_term ::= diff(@term, @term)
 
-.. todo:: Charlie: Not sure we want to define diff operator and diff_term here (especially as we later define formulas over terms, not over diff-terms) This is linked to the question of where we want to define systems. I would propose to have a "pure" logic.html file with Types/Terms/Formulas/Judgments, and push somewhere else declarations systems, diff-terms and names.
-   
-Names
------
-
-TODO :gdef:`names <name>`
-
-.. prodn::
-   name_id ::= @identifier
-   name ::= name @name_id : [(@index * ... * @index) ->] @type
-
-.. note::
-  Unlike in the original BC logic and the meta-logic that was used at first
-  in Squirrel, our terms are not necessarily computable in polynomial time
-  by probabilistic Turing machines.
-  An example of a non-PTIME term is ``forall (x:message), x = f(x)``
-  which tests whether ``f`` is idempotent, something that is not
-  necessarily computable even when ``f`` is PTIME.
-
-  TODO citations
-
-Macros
-------
-
-TODO :gdef:`macros <macro>`
 
 Formulas
 ========
@@ -285,7 +264,8 @@ syntax and construction specific to Squirrel describdee below:
 
 Boolean connectives for *local* formulas are :n:`&&, ||, =>, not`,
 where :n:`&&, ||, =>` are used with a right infix notation, and
-:n:`not` in prenex form.
+:n:`not` in prenex form. Bear in mind that those connectives are in
+fact classical function symbols of the terms.
 
 The :gdef:`happens` predicate defines the time-points that have been
 scheduled in the execution, e.g. :n:`happens(@term)` (where :n:`@term`
@@ -314,62 +294,15 @@ are first order formulas, written as follows:
     | @global_formula /\ @global_formula | @global_formula \/ @global_formula
     | Forall @binders, @global_formula | Exists @binders, @global_formula
 
-TODO description
+The classical construction of the first-order logic mostly behave as expected.
 
-.. _section-declarations:
+.. note:: Compared to the paper presentations of the logic, where
+   diff-terms don't exist, the universal quantifiers can in Squirrel
+   be instantiated by diff-terms. The :g:`glob` tag allows to restric
+   quantifications over non diff-terms.
 
-Declarations
-=============
 
-Abstract symbols
-----------------
-
-:gdef:`Abstract functions<abstract_fun>` TODO
-
-Function symbols are deterministic polynomial time.
-
-Operators
----------
-
-:gdef:`Operators <operator>`
-
-Systems
--------
-
-:gdef:`systems <system>` TODO
-
-.. prodn::
-  system_id ::= identifier | identifier / identifier
-  system_expr ::= {| any | {+, @system_id} }
-
-TODO expr and set expressions
-
-Goals
------
-
-A :gdef:`goal <goal>` defines a new formula to be proved. It can either be a :gdef:`local goal <local goal>` or a :gdef:`global goal <global goal>`, respectively corresponding to defining as a goal a :term:`local formula <local formula>` or a :term:`global formula <global formula>`.
-
-.. prodn::
-  goal ::= local_goal
-  local_goal ::= {? local } goal {? @system_expr } {| @identifier | _ } @parameters : @formula
-  global_goal ::= global goal {? @system_expr } {| @identifier | _ } @parameters : @global_formula
-
-.. example:: Unnamed local goal
-
-  :g:`goal [myProtocol/left] _ : cond@A2 => input@A1 = ok.`
-
-.. example:: Global goal expressing observational equivalence
-
-  :g:`global goal [myProtocol] obs_equiv (t:timestamp) : happens(t) => equiv(frame@t).`
+The :n:`[@term]` predicates holds if :n:`@term`  evaluates to true with overwhelming probability.
 
 .. _section-judgements:
 
-Judgements
-==========
-
-TODO
-
-Logical variables
------------------
-
-:gdef:`Logical variable <logical_var>` TODO

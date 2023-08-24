@@ -22,11 +22,11 @@ Table of contents
 
    logic
 
+   declarations
+
    proofs
 
    commands
-
-   processes
 
 .. toctree::
    :caption: Tutorial

@@ -6,15 +6,33 @@
 Proofs
 ------
 
+.. todo::
+   Charlie: for each tactic, the name contains todo if it was never touched, and the description is just imported from help.
+
 The proof of a goal is given after the goal
 between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
 tactic modifies the proof state, which contains a list of goals to prove.
+Each goal is displayed as a judgment displaying its current state.
 Initially, the proof state consists of a single goal, as declared by the
 user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new subgoals. When no goal is left, the proof
 is completed and :g:`Qed` can be used.
 
+.. todo::
+   Charlie: add link to index
+
+Judgements
+==========
+
+TODO
+
+Logical variables
+-----------------
+
+:gdef:`Logical variable <logical_var>` TODO
+
+   
 Generalities
 ============
 
@@ -227,7 +245,7 @@ Common tactics
 	  
     Generalize the goal and hypotheses on some terms. Hypothesis that depend on the specified variable are first pushed back inside the goal, before the goal is generalized.              
 
-.. tacn:: have {|@term|@term as @intropattern|@intropattern : {|@term|@global_formula}| @intropattern : @proof_term}
+.. tacn:: have {|@term|@term as @intropattern|@intropattern : {|@term|@global_formula}| @intropattern := @proof_term}
 
     This is used to introduce a new hypothesis that will have to be proved in a new goal. The multiple usages behave as follow:
 
@@ -294,7 +312,7 @@ Common tactics
     conjunct. 
 
        
-.. tacn:: use @assumption {? with {+ variables}} {?as @intropattern}
+.. tacn:: use @assumption {? with {+ variables}} {? as @intropattern}
    :name: use	   
 	  
     Instantiate a lemma or hypothesis based on the given. The optionnaly given variables are used to instantiate the universally quantified variables of the lemma.
