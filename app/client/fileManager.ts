@@ -278,7 +278,6 @@ import { StateField } from "@codemirror/state";
 const filePanelState = StateField.define<boolean>({
   create: () => false,
   update(value, tr) {
-    console.warn("try to update filePanelState !");
     for (let e of tr.effects) if (e.is(toggleFile)) value = e.value
     return value
   },

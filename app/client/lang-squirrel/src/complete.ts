@@ -6,6 +6,98 @@ import {Text} from "@codemirror/state"
 
 const cache = new NodeWeakMap<readonly Completion[]>()
 
+const declaration_completions: readonly Completion[] = [//{↓{
+  
+  snip("aenc ${enc},${dec},${pk}", 
+  {label:"aenc",detail:"enc,dec,pk",info:`Declare an asymmetric encryption.`}),
+  snip("signature ${sign},${checksign},${pk}", 
+  {label:"signature",detail:"sign,checksign,pk ((where c_tys)|(with oracle Term))?",
+    info:`Declare signature function (with oracle or given types)`}),
+  snip("hash ${h}", 
+  {label:"hash",detail:"${h} ((where c_tys)|(with oracle Term))?",
+    info:`Declare hash function (with oracle or given types)`}),
+  snip("senc ${enc},${dec}", 
+  {label:"senc",detail:"${enc},${dec} ((where c_tys)|(with oracle Term))?",
+    info:`Declare symetric encryption symbol (with oracle or given types)`}),
+  snip("ddh ${generator}, ${name1}, ${name2}, ${name3}", 
+  {label:"ddh",detail:"g, a, b, k",
+    info:`It must be called on (generator, a, b, c) where
+          (a,b,c) are strings that corresponds
+          to names, but without any indices. It then
+          applies ddh to all the copies of the names,
+          and checks that all actions of the protocol
+          uses the names in a correct way. Can be used
+          in collaboration with some transitivity to
+          obtain a system where ddh can be applied.`}),
+  snip("gdh ${Hyp}, ${generator}", 
+  {label:"gdh",detail:"H, g",info:`
+    Applies the GDH assumption (including
+    square-GDH) on H with generator g.
+    `}),
+  snip("cdh ${Hyp}, ${generator}", 
+  {label:"cdh",detail:"Hyp, generator",
+    info:`Applies the CDH assumption (including
+         square-CDH) on H using generator g.`}),
+  snip("name ${Name}: ${Type}", 
+  {label:"name",detail:"${Name}: ${Type}",info:`Declare name with given type`}),
+  snip("action ${Name}: ${Int}", 
+  {label:"action",detail:"${Name}: ${Int}",info:`Define action`}),
+  snip("type ${Name}", 
+  {label:"type",detail:"${Name} ([${Bty_info}])?",
+    info:`Declare new type with given name`}),
+  snip("abstract ${Name} : ${Type}", 
+  {label:"abstract",detail:"Name (['t1 't2 … 'tn])? : Type",
+    info:`Declare abstract function/cst etc… with given type`}),
+  snip("op ${Name} : ${Type} = ${Term}", 
+  {label:"op",detail:"${Name}:${Type} = ${Term}",info:`Declare operation`}),
+  snip("system ${Process}", 
+  {label:"system",detail:"([Name])? projs Process",info:`Declare system`}),
+  snip("channel ${Name}", 
+  {label:"channel",detail:"Name",
+    info:`Declare channel with given name`}),
+  snip("mutable ${Name} : ${Type} = ${Term}", 
+  {label:"mutable",detail:"${Name} : ${Type} = ${Term}",info:``}),
+  snip("process ${Name} = ${Process}", 
+  {label:"process",detail:"${Name} = ${Process}",info:`Declare process of given name`})
+].map(t => {t.type = "property"; t.boost = 50;return t});//}↑}
+//
+const interactive_completions: readonly Completion[] = [//{↓{
+  
+  snip("print", {
+    label: "print",
+    detail: "[system] [symb]",
+    info: `Shows def of given symbol (lemma, function, name or macro) in given system.
+           By default shows current system.`
+  }),
+  {label:"prof",detail:"",
+    info:"prof."},
+  snip("include ${File}", {
+      label: "include",
+      detail: " File",
+      info: "include 'File.sp'"
+    }),
+  snip("search ${pat} in ${sys}.", {
+    label: "search",
+    detail: "[pat] [in sys]",
+    info: `Search lemmas containing a given pattern.`
+  }),
+  snip("goal ${Name} : ${Term}.", {
+    label: "goal",
+    detail: "[sys] Name (t: ty, …) : Term.",
+    info: `Define goal of given Name with given term of formula`
+  }),
+  snip("equiv ${Name} : ${Biframe}.", {
+    label: "equiv",
+    detail: "[sys] Name ((t: ty, …) : Biframe)?",
+    info: `Define equivalence of given Name with given Biframe`
+  }),
+  snip("hint rewrite ${Name}.", {
+    label: "hint",
+    detail: "Name",
+    info: `Add given axiom to hints`
+  })
+].map(t => {t.type = "property"; t.boost = 50;return t});//}↑}
+
 const tactics_completions: readonly Completion[] = [//{↓{
 
   {label:"use",detail:"H with v1 (, …, vn)? as intro_pat",
@@ -104,28 +196,27 @@ const tactics_completions: readonly Completion[] = [//{↓{
     info:`If t1 = t2, rewrite all occurences of t1 into t2 in the goal.`},
   {label:"true",detail:"",
     info:"Solves a goal when the conclusion is true."},
+  snip("repeat ${tac}", {
+    label: "repeat",
+    detail: "${tac}",
+    info: `Repeat given tactic.`,
+    type: "keyword"
+  }),
+  snip("checkfail ${tac} exn ${ExName}", {
+    label: "checkfail",
+    detail: "${tac} exn ${exname}",
+    info: `Check if the given tactic fails with given exception.`,
+    type: "keyword"
+  }),
+  snip("by ${tac}", {
+    label: "by",
+    detail: "${tac}",
+    info: `Using given tactic.`,
+    type: "keyword"
+  }),
   snip("cca1 ${N}", 
   {label:"cca1",detail:"Int",
     info:"Apply the cca1 axiom on all instances of a ciphertext."}),
-  snip("ddh ${generator}, ${name1}, ${name2}, ${name3}", 
-  {label:"ddh",detail:"g, a, b, k",
-    info:`It must be called on (generator, a, b, c) where
-          (a,b,c) are strings that corresponds
-          to names, but without any indices. It then
-          applies ddh to all the copies of the names,
-          and checks that all actions of the protocol
-          uses the names in a correct way. Can be used
-          in collaboration with some transitivity to
-          obtain a system where ddh can be applied.`}),
-  snip("gdh ${Hyp}, ${generator}", 
-  {label:"gdh",detail:"H, g",info:`
-    Applies the GDH assumption (including
-    square-GDH) on H with generator g.
-    `}),
-  snip("cdh ${Hyp}, ${generator}", 
-  {label:"cdh",detail:"Hyp, generator",
-    info:`Applies the CDH assumption (including
-         square-CDH) on H using generator g.`}),
   {label:"enckp",detail:"Int",
     info:`Key-privacy captures the property of an encryption to provide
           confidentiality of the encryption key.
@@ -186,6 +277,12 @@ const tactics_completions: readonly Completion[] = [//{↓{
     reachability goal.
     `},
   {label:"cycle",detail:"Int",info:`TODO`},
+  snip("try ${tac}", {
+    label: "try",
+    detail: "tac",
+    info: "Try given tactic",
+    type: "method"
+  }),
   {label:"congruence",detail:"",
     info:`Tries to derive false from the messages equalities.`},
   {label:"assumption",detail:"",
@@ -199,6 +296,16 @@ const tactics_completions: readonly Completion[] = [//{↓{
   {label:"diffeq",detail:"",
     info:`Closes a reflexive goal up to equality`}
 ].map(t => {t.type = "function"; t.boost = 50;return t});//}↑}
+//
+const types_completion: readonly Completion[] = [
+  "index",
+  "message",
+  "boolean",
+  "bool",
+  "timestamp",
+  "large",
+  "name_fixed_length"
+].map(n => ({label: n, type: "type"}))
 
 const ScopeNodes = new Set([
  "Script", "Interactive", "Declaration", "Local_statement", "Global_statement", "Hint"
@@ -236,7 +343,6 @@ const gatherCompletions: {
   Lsymb_decl(node, def) {
   },
   Declaration(node, def) {
-    console.log("declaration autocomplete called !")
     for (let child = node.node.firstChild; child; child = child.nextSibling) {
       if (child.type.name == "Lsymb") 
         def(child, "variable")
@@ -249,7 +355,6 @@ const gatherCompletions: {
     }
   },
   Local_statement(node, def) {
-    console.log("local_statement autocomplete called !")
     let name_node = node.node.getChild("Statement_name")
     if (name_node) {
       let lsymb_node = name_node.node.getChild("Lsymb")
@@ -262,7 +367,6 @@ const gatherCompletions: {
   //   gatherCompletions[child!.name]
   // },
   Global_statement(node, def) {
-    console.log("global_statement autocomplete called !")
     let name_node = node.node.getChild("Statement_name")
     if (name_node) {
       let lsymb_node = name_node.node.getChild("Lsymb")
@@ -274,7 +378,6 @@ const gatherCompletions: {
 }
 
 function getScope(doc: Text, node: SyntaxNode) {
-  console.log("getScope")
   let cached = cache.get(node)
   if (cached) return cached
 
@@ -285,9 +388,7 @@ function getScope(doc: Text, node: SyntaxNode) {
   }
   node.cursor(IterMode.IncludeAnonymous).iterate(node => {
     if (node.name) {
-      console.log("Autocompletion : "+node.name)
       let gather = gatherCompletions[node.name]
-      console.log(gather)
       if (gather && gather(node, def, top) 
         || !top && ScopeNodes.has(node.name)) return false
       top = false
@@ -306,9 +407,9 @@ function getScope(doc: Text, node: SyntaxNode) {
 const dontComplete = ["BlockComment"]
 
 
-function inNodeType(type:string,node:SyntaxNode | null):boolean {
+function inNodeType(types:Set<string>,node:SyntaxNode | null):boolean {
   do{
-    if (node!.type.name == type)
+    if (types.has(node!.type.name))
       return true
     node = node!.parent
   }
@@ -317,27 +418,50 @@ function inNodeType(type:string,node:SyntaxNode | null):boolean {
 }
 
 function inBulletedTac(node:SyntaxNode | null):boolean {
-  return (inNodeType("Bulleted_tactic",node) || inNodeType("Tactic",node))
+  const set = new Set([
+   "Bulleted_tactic", "Tactic"
+  ]);
+  return (inNodeType(set,node))
 }
 
 function isFirstWord(node:SyntaxNode): boolean {
   return !node.prevSibling //If there is no prevSibling => it's first node
 }
 
-const typeNames = new Set([
- "Ty", "Ty_tagged", "Colon_ty"
-])
+function inLsymb(node:SyntaxNode): boolean {
+  return inNodeType(new Set(["Lsymb"]),node)
+}
 
+function inType(node:SyntaxNode): boolean {
+  const typeNames = new Set([
+   "Ty", "Ty_tagged", "Colon_ty"
+  ])
+  return inNodeType(typeNames,node)
+}
 
-/// Completion source that looks up locally defined declarations
-export function localCompletionSource(context: CompletionContext): CompletionResult | null {
-  let inner = syntaxTree(context.state).resolveInner(context.pos, -1)
-  // if (dontComplete.indexOf(inner.name) > -1) return null
-  let isLsymb = inner.type.name == "Lsymb" 
-  let isType = typeNames.has(inner.type.name)
+const typesInteractive = new Set([
+   "Declaration", "Infos", "P_include", "Goal", "Hint"
+  ])
 
-    // || inner.to - inner.from < 20 && Identifier.test(context.state.sliceDoc(inner.from, inner.to))
+function getChildNodeOfTypes(types:Set<string>, node:SyntaxNode): SyntaxNode | null {
+  do{
+    if (types.has(node.type.name))
+      return node.firstChild
+    else if (node.parent && types.has(node.parent.type.name))
+      return node;
+    node = node.parent!
+  }
+  while(node)
+  return node
+}
+
+function getScopeFrom(context:  CompletionContext, inner:SyntaxNode) : Completion[] {
+  // || inner.to - inner.from < 20 && Identifier.test(context.state.sliceDoc(inner.from, inner.to))
   // if (!isWord && !context.explicit) return null
+
+  // let isLsymb = inLsymb(inner);
+  let isType = inType(inner);
+
   let options: Completion[] = []
   for (let pos: SyntaxNode | null = inner; pos; pos = pos.parent) {
     if (ScopeNodes.has(pos.name)) {
@@ -345,29 +469,47 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
       options = options.concat(scope_completions);
     }
   }
-  if (inBulletedTac(inner) && isFirstWord(inner)){
-    options = options.concat(tactics_completions);
+  if (isType)
+    options = options.concat(types_completion);
+  return isType ? options.filter((v) => (v.type === "type")) : options;
+}
+
+/// Completion source that looks up locally defined declarations
+export function localCompletionSource(context: CompletionContext): CompletionResult | null {
+  let inner = syntaxTree(context.state).resolveInner(context.pos, -1)
+  let options: Completion[] = []
+
+  options = options.concat(getScopeFrom(context,inner));
+
+  if(context.explicit){ // explicitly ask autocompletion
+      options = options.concat(tactics_completions);
+      options = options.concat(declaration_completions);
+      options = options.concat(interactive_completions);
   }
-  options = isType ? options.filter((v) => (v.type === "type")) : options;
+  else if (inBulletedTac(inner)){
+    console.log("Proof mode !")
+    let tacNode = getChildNodeOfTypes(new Set(["Tactic"]),inner);
+    // We need a tactic name
+    if(tacNode && isFirstWord(tacNode))
+      options = options.concat(tactics_completions);
+  }
+  else { // Interactive mode
+    console.log("Interactive mode !")
+    let interacNode = getChildNodeOfTypes(typesInteractive,inner);
+    if(!interacNode || (interacNode && isFirstWord(interacNode))){
+      options = options.concat(declaration_completions);
+      options = options.concat(interactive_completions);
+    }
+  }
   return {
     options,
     from: inner.from
   }
 }
 
-
 const globals: readonly Completion[] = [
   "false", "null", "true"
 ].map(n => ({label: n, type: "constant"})).concat([
-
-  "index",
-  "message",
-  "boolean",
-  "bool",
-  "timestamp",
-  "large",
-  "name_fixed_length"
-].map(n => ({label: n, type: "type"}))).concat([
 
   "input",
   "cond",
@@ -379,25 +521,7 @@ const globals: readonly Completion[] = [
   "happens",
   "len",
   "xor"
-].map(n => ({label: n, type: "function"}))).concat([
-
-  "aenc",
-  "signature",
-  "hash",
-  "senc",
-  "abstract",
-  "op",
-  "system",
-  "type",
-  "name",
-  "action",
-  "channel",
-  "mutable",
-  "process",
-  "with oracle",
-  "with hash",
-  "where"
-].map(n => ({label: n, type: "property"})))
+].map(n => ({label: n, type: "function"})))
 
 export const snippets: readonly Completion[] = [
   snip("if ${Term} then (${Process}) else (${Process})", {
@@ -442,31 +566,18 @@ export const snippets: readonly Completion[] = [
     info: "Term fun",
     type: "keyword"
   }),
-  snip("print", {
-    label: "print",
-    detail: "[system] [symb]",
-    info: `Shows def of given symbol (lemma, function, name or macro) in given system.
-           By default shows current system.`,
-    type: "keyword"
-  }),
-  snip("search ${pat} in ${sys}.", {
-    label: "search",
-    detail: "[pat] [in sys]",
-    info: `Search lemmas containing a given pattern.`,
-    type: "keyword"
-  }),
   snip("if ${Term} then (${Term}) else (${Term})", {
     label: "if",
     detail: " ${Term} then (${Term}) else (${Term})",
     info: "Term of form if _ then _ else _",
     type: "keyword"
   }),
-  snip("include ${File}", {
-    label: "include",
-    detail: " File",
-    info: "include 'File.sp'",
-    type: "keyword"
-  })]
+  {label:"with oracle",detail:"",info:`with oracle`},
+  {label:"with hash",detail:"",info:`with hash`},
+  {label:"where", detail:"",info:`where`},
+  {label:"global", detail:"",info:`global`},
+  {label:"local", detail:"",info:`local`}
+  ]
 
 /// Autocompletion for built-in Python globals and keywords.
 export const globalCompletion = ifNotIn(dontComplete, completeFromList(globals.concat(snippets)))
