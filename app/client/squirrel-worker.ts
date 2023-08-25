@@ -244,25 +244,27 @@ export class SquirrelWorker {
    * @param {Array<SyntaxNode>} nodes
    */
   async execNodes(view:EditorView,nodes:Array<SyntaxNode>) {
-    let viewState = view.state;
-    // highlight with pending background
-    highlightNodes(view,nodes,"squirrel-eval-pending")
+    if(nodes.length > 0){
+      let viewState = view.state;
+      // highlight with pending background
+      highlightNodes(view,nodes,"squirrel-eval-pending")
 
-    if (this.curSentences.length != 0){
-      this.queueSentences = this.queueSentences.concat(nodes)
-    } else {
+      if (this.curSentences.length != 0){
+        this.queueSentences = this.queueSentences.concat(nodes)
+      } else {
 
-      this.curSentences = nodes;
-      // Get the strings out of the SyntaxNodes of type Sentence
-      let sentences = new Array<string>()
-      for(const x of nodes){
-        sentences.push(await this.getStringOfNode(x,viewState));
+        this.curSentences = nodes;
+        // Get the strings out of the SyntaxNodes of type Sentence
+        let sentences = new Array<string>()
+        for(const x of nodes){
+          sentences.push(await this.getStringOfNode(x,viewState));
+        }
+        if(DEBUG) {
+          console.log("Sentences before cursor :");
+          sentences.forEach(e => console.log(e));
+        }
+        this.exec(sentences);
       }
-      if(DEBUG) {
-        console.log("Sentences before cursor :");
-        sentences.forEach(e => console.log(e));
-      }
-      this.exec(sentences);
     }
   }
 
@@ -589,8 +591,10 @@ export class SquirrelWorker {
       // If it's last send queued sentences
       if((this.curSentences.length -1) == msg[1]){
         this.curSentences = [];
-        this.execNodes(this.view,this.queueSentences);
-        this.queueSentences = [];
+        if(this.queueSentences.length > 0){
+          this.execNodes(this.view,this.queueSentences);
+          this.queueSentences = [];
+        }
       }
 
       break;
