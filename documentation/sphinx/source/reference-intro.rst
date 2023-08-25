@@ -1,6 +1,6 @@
-=============
-Introduction
-=============
+=========
+Notations
+=========
 
 Thourghout this documention, we rely on the classical `EBNF notations <https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form>`_ for presenting Squirrel's syntax, with the following conventions.
 
