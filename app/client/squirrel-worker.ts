@@ -419,36 +419,41 @@ export class SquirrelWorker {
     return node.type.name === "Sentence";
   }
 
-  getNextSentence(node:SyntaxNode) {
-    if(node){
-      if(node.nextSibling){
-        if(this.isSentence(node.nextSibling))
-          return node.nextSibling;
-        else { // This maybe a BlockComment
-          // Continue searching for a sentence
-          return this.getNextSentence(node.nextSibling);
-        }
-      } else {
-        console.warn("Syntax tree: Couldn't find next sentence.")
-        return null;
-      }
-    } else {
-      console.warn("Argument is null !")
-      return null;
+  nextSiblingSentence(node:SyntaxNode) : SyntaxNode {
+    if(node.nextSibling && this.isSentence(node.nextSibling))
+      return node.nextSibling
+    else if(node.nextSibling) 
+      return this.nextSiblingSentence(node.nextSibling)
+    else 
+      return null
+  }
+
+  getNextSentence(view:EditorView) {
+    if(this.queueSentences.length != 0){ // Already queued stuff
+      return this.nextSiblingSentence(
+        this.queueSentences[this.queueSentences.length -1])
+    }
+    else if (this.curSentences.length != 0) { // Already executing stuff
+      return this.nextSiblingSentence(
+        this.curSentences[this.curSentences.length -1])
+    }
+    else if (this.cursor) { // Execution at cursor
+      return this.nextSiblingSentence(this.cursor.node); 
+    }
+    else { // first sentence of doc
+      let tree = syntaxTree(view.state);
+      return this.getInnerFirstSentence(tree.topNode);
     }
   }
 
-  execNextSentence(view:EditorView){
+  execNextSentence(view:EditorView):boolean{
     this.view = view
     let viewState = view.state;
     let tree = syntaxTree(viewState);
-    let firstSentence = this.getInnerFirstSentence(tree.topNode);
-    if(this.cursor){
-      firstSentence = this.getNextSentence(this.cursor.node);
-      if(!firstSentence){
-        this.changeHtmlOf("query-panel","No sentence to execute.");
-        return false;
-      }
+    let firstSentence = this.getNextSentence(view);
+    if(!firstSentence){
+      this.changeHtmlOf("query-panel","No sentence to execute.");
+      return false;
     }
     this.execNodes(view,[firstSentence]);
     return true;
@@ -458,26 +463,11 @@ export class SquirrelWorker {
    * This will execute sentences to the cursor
    * @param {EditorView} view
    */
-  execToCursor(view:EditorView){
+  execToCursor(view:EditorView): boolean{
     this.view = view
     let viewState = view.state;
     let tree = syntaxTree(viewState);
-    let firstSentence = this.getInnerFirstSentence(tree.topNode);
-    if(this.queueSentences.length != 0){ // Already queued stuff
-      firstSentence = 
-        this.queueSentences[this.queueSentences.length -1].nextSibling
-    }
-    else if (this.curSentences.length != 0) { // Already executing stuff
-      firstSentence = 
-        this.curSentences[this.curSentences.length -1].nextSibling
-    }
-    else if (this.cursor) { // Execution at cursor
-      if(DEBUG) {
-        console.log("Current Node :");
-        this.printSentence(viewState,this.cursor.node)
-      }
-      firstSentence = this.cursor.node.nextSibling!; 
-    }
+    let firstSentence = this.getNextSentence(view);
     if (!firstSentence) {
       console.warn("Nothing todo !")
       return false;

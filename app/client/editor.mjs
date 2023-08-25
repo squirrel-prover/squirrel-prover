@@ -25,16 +25,14 @@ function squirrelKeymap(view) {
     key: "Ctrl-Enter",
     any(view,e) { 
       if (e.key == "Enter" && e.ctrlKey) {
-        worker.execToCursor(view)
-        return true
+        return worker.execToCursor(view)
       }
       if (e.key == "ArrowUp" && e.ctrlKey) {
         worker.undo(1)
         return true
       }
       if (e.key == "ArrowDown" && e.ctrlKey) {
-        worker.execNextSentence(view)
-        return true
+        return worker.execNextSentence(view)
       }
       return false 
     }
@@ -81,8 +79,7 @@ let myview = new EditorView({
 // bind buttons to worker functions
 var buttonToCursor = document.getElementById('to-cursor');
 buttonToCursor.onclick = function() { 
-  worker.execToCursor(myview);
-  return false; 
+  return worker.execToCursor(myview);
 }
 
 var buttonReset = document.getElementById('reset');
@@ -105,8 +102,7 @@ buttonUp.onclick = function() {
 
 var buttonDown = document.getElementById('down');
 buttonDown.onclick = function() { 
-  worker.execNextSentence(myview)
-  return false; 
+  return worker.execNextSentence(myview);
 }
 
 worker.launch()
