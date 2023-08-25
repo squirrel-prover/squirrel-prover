@@ -6,9 +6,6 @@
 Proofs
 ------
 
-.. todo::
-   Charlie: for each tactic, the name contains todo if it was never touched, and the description is just imported from help.
-
 The proof of a goal is given after the goal
 between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
@@ -25,12 +22,73 @@ The complete list of tactics can be found in the corresponding
 Judgements
 ==========
 
-TODO
+A proof state is described within a judgment. A judgment is made of a set of goals that need to be proved. Each goal is linked to some systems, the set of :term:`logical variables <logical_var>`, the current set of hypothesis, and the conclusion to reach. 
+
+The display of each current goal whitin the judgment depends on its type.
 
 Logical variables
 -----------------
 
-:gdef:`Logical variable <logical_var>` TODO
+:gdef:`Logical variable <logical_var>` are free variables in a current goal. Such variables are implicitly quantified based on their type and tag.
+
+Local goal
+----------
+
+The general layout for a local goal is as follows:
+
+.. squirreldoc::
+   
+      [goal> Focused goal (x/N):
+      System: currentSystem
+      Variables: vars
+      H_1: formula_1
+      ...
+      H_k: formula_k
+      —————————————-
+      conc
+
+
+Here, we are proving the goal number :g:`x` out of :g:`N` goals. The system of the current goal is :g:`currentSystem`, a prettified :n:`@system_expr`, :g:`vars` is a set of fullet specified variables with names, types and tags. Each hypothesis is identified by its name :g:`H_i` and each :g:`formula_i` as well as :g:`conc` is a :term:`local formula`.
+     
+
+Global Goal
+-----------
+
+The general layout for a global goal is similar to the local one except that now:
+
+ * :g:`currentSystem` can also be a prettified :n:`@global_decl` of
+   the systems used for interpreting the local formulas and the equiv
+   predicates.
+ * each hypothesis and the conclusion can be a :term:`global formula`.
+
+
+When the conclusion is a single :n:`equiv(@term,...,@term)` predicate,
+all the bi-terms that need to be proved equivalent are displayed as a
+numbered list.
+
+.. example:: Initial judgment for observational equivalence
+   
+	     Consider a goal for observational equivalence, where the
+	     frame is enriched with some public key, as follows:
+	     :g:`global goal [myProtocol] obs_equiv (t:timestamp) :
+	     [happens(t)] -> equiv(frame@t, pk(sk)).`. When starting
+	     its proof, after doing :g:`intro H`, the goal is
+	     displayed as:
+	     
+	     .. squirreldoc::
+		[goal> Focused goal (1/1):
+		Systems: left:myProtocol/left, right:myProtocol/right (same for equivalences)
+		Variables: t:timestamp[glob]
+		H: [happens(t)]
+		----------------------------------------
+		0: frame@t
+		1: pk (sk)
+ 
+
+
+
+   
+
 
    
 Generalities
@@ -56,15 +114,59 @@ using the :token:`position` token.
 .. prodn::
   position ::= @natural
 
-The way new hypothesis are introduced by tactics can be defined with so-called intro patterns. We inherit the definition of intro patterns :token:`intropattern` from the corresponding `coq documentation <https://coq.inria.fr/refman/proof-engine/tactics.html#intro-patterns>`_, restricted to the notation :g:`[ ]` for And/Or introductions.
 
-.. todo:: Charlie: the previous intropattern token definition does not perfectly work, as future cross-references :token:`intropattern` are not clickable links, see e.g. the :tacn:`destruct` tactic where the link is not clickable.
+When a tactic expect a term (which can then be a local formula), it is allowed to underspecify the term by using holes of the form :g:`_`.
+
+Such term patterns are produced by appending to the production of :n:`term` the hole construct:
+
+.. prodn:: term_pattern ::= ...
+	   | _
+
+Arguments that are :n:`@term_pattern` will first by patterned match against the conclusion of the goal, the match being the actual term passed to the tactics.
+
+Intro patterns
+~~~~~~~~~~~~~~
   
-.. todo:: most (all?) tactics take terms and formulas as patterns,
-	  with an implicit filling of the holes by matching against the subgoal's
-	  conclusion; document this, and also decide whether arguments are shown
-	  as :token:`term`, :token:`formula`, :token:`pattern`,
-	  :token:`formula_pattern`, etc.
+The way new hypothesis are introduced by tactics can be defined with so-called intro patterns. We inherit the definition of intro patterns from the corresponding `coq documentation <https://coq.inria.fr/refman/proof-engine/tactics.html#intro-patterns>`_, restricted to the notation :g:`[ ]` for And/Or introductions.
+
+.. prodn::
+   intropattern ::= @assumption
+                | @variable
+		| *
+		| _
+		| {+ @intropattern }
+		| [ {+ @intropattern } ]
+		| [ {+/ @intropattern } ]
+
+This behaves as follows:
+
+* :n:`@assumption` and :n:`@variable` are used to specify the names of the introduced hypothesis and variables. :n:`*` is used to select automatically a name, and :n:`_` to not give any.
+* a sequence of patterns is applied sequentially.
+* :n:`[ @assumption ... @assumption]` is used to split a conjunction and name all the introduced sub hypothesis.
+* :n:`[ @assumption / ... / @assumption]` is used to split a disjunction, thus creating subgoals.
+  
+We also have extended intro patterns, that apply some additional transformations to the obtained hypothesis.
+
+.. prodn::
+   ext_intropattern ::=  {+ @intropattern | @ext_intropattern }
+                | ->
+		| <-
+		| //
+		| /=
+		| //=
+		| @/@macro
+
+The extended features are:
+
+* :g:`->` and :g:`<-` will try to use the introduced hypothesis to rewrite the goal in the directio given by the arrow.
+* :g:`//` applies :g:`try auto` in all subgoals, leaving the one not closed without any simplification.
+* :g:`/=` applies :tacn:`simpl` to all subgoals.
+* :g:`//=` combines both previous operators.
+* :g:`@/@macro` expands the given macro in the hypothesis.  
+  
+
+  
+
 
 Proof terms
 -----------
@@ -90,7 +192,7 @@ the context.
 
    
 .. todo::
-   Todo
+   Charlie: not trying to do that^^
 
 .. _reduction:
 
@@ -153,21 +255,20 @@ called automatically after each tactic, unless the tactical
 
 .. tacn:: autosimpl
 	  
-    Simplify a goal, without closing it or any of the created subgoals.
-    This is automatically called after each tactic.
+    Simplify a goal, without closing it.
 
     The tactic uses the :ref:`reduction engine <reduction>`
     with the flags :g:`rw,beta,proj`.
 
-    When the conclusion of the goal is a conjuction,
+    When the conclusion of the goal is a conjuction, it splits this
+    goal into several subgoals, automatically closing only the trivial
+    goals closed by :tacn:`true` and :tacn:`assump`.
 
-    When the conclusion of the goal is an equivalence,    
-
-    .. todo::
-       Charlie: does anybody knows exactly what happens wihtout
-       reverse engineering the code?
+    When the conclusion of the goal is a global formula which only contains
+    a local formula, the goal is then turned into a local formula. Otherwise
+    this does nothing.
     
-    Addiotionaly If the :term:`option` :g:`autoIntro` is set to true, introductions
+    Additionaly If the :term:`option` :g:`autoIntro` is set to true, introductions
     are also made automically.
 
 
@@ -198,38 +299,61 @@ called automatically after each tactic, unless the tactical
 Tacticals
 ---------
 
-.. todo:: David: I'm not sure we want to document tacticals using the same
-	  role as elementary tactics, I did it like this for now just so the
-	  references to try and repeat in the appendix work.
 
-.. tacn:: nosimpl @tactic
+The full syntax of tactic combinations is as follows:
+
+.. prodn::
+   tactical ::=  @tactical; {*, @natural } @tactical
+   | @tactical + @tactical
+   | by @tactical   
+   | nosimpl @tactical
+   | try @tactical
+   | repeat @tactical
+   | @tactical => @ext_intropattern
+
+
+   
+The semi-column :g:`;` is used for sequential composition. The second tactical is then applied to all subgoals created by the first one, unless number of subgoals are specified. The :g:`+` performs a or-else when the first tactical fails.
+
+The reminder behaves as follows:
+
+.. tacn:: by @tactical
+	  
+   Fails unless the tactical closes the goal.
+
+.. tacn:: nosimpl @tactical
 
   Call tactic without the subsequent implicit use of simplications.
   This can be useful to understand what's going on step by step.
   This is also necessary in rare occasions where simplifications are
   actually undesirable to complete the proof.
 
-.. tacn:: try @tactic
+.. tacn:: try @tactical
 
   Try to apply the given tactic. If it fails, succeed with the
   subgoal left unchanged.
 
-.. tacn:: repeat @tactic
+.. tacn:: repeat @tactical
 
   Apply the given tactic, and recursively apply it again on the
   generated subgoals, until it fails.
 
-
+Finally, :g:`tactical => ext_intropattern` is syntactic sugar for :g:`tactical; intros ext_intropattern`
+  
 Common errors
 -------------
 
-.. exn:: Out of range position.
+.. exn:: Out of range position.v
 
      Argument does not correspond to a valid equivalence item.
 
 
 Tactics
 =======
+
+
+.. todo::
+   Charlie: for each tactic, the name contains todo if it was never touched, and the description is just imported from help.
 
 Tactics are organized in three categories:
 
@@ -263,7 +387,7 @@ Common tactics
     hypotheses. The corresponding hypothesis may be directly given as argument.
 
 
-.. tacn:: case {| @assumption | @term}
+.. tacn:: case {| @assumption | @term_pattern}
 	  
     Perform a case analysis over the given arugment, which can either be:
     
@@ -281,7 +405,7 @@ Common tactics
       Charlie: Discussions needed, check out discord + cleanup_induction branch    
     
 
-.. tacn:: destruct @assumption {? as @intropattern}
+.. tacn:: destruct @assumption {? as @ext_intropattern}
 	  
     Destruct an hypothesis based on its topmost destructable operator (existantial quantification, disjunction or conjunction). An optional And/Or introduction pattern can be given.
     
@@ -311,12 +435,12 @@ Common tactics
 	  
     Generalize the goal and hypotheses on some terms. Hypothesis that depend on the specified variable are first pushed back inside the goal, before the goal is generalized.              
 
-.. tacn:: have {|@term|@term as @intropattern|@intropattern : {|@term|@global_formula}| @intropattern := @proof_term}
+.. tacn:: have {|@term_pattern|@term_pattern as @ext_intropattern|@ext_intropattern : {|@term_pattern|@global_formula}| @intropattern := @proof_term}
 
     This is used to introduce a new hypothesis that will have to be proved in a new goal. The multiple usages behave as follow:
 
      - :g:`have t` add as a new hypothesis a :token:`term` :g:`t` of type :g:`bool`, and the corresponding goal is created;
-     - :g:`have t as intro_pat` behaves similarly but also apply the given :token:`intropattern` to the newly introduced hypothesis;
+     - :g:`have t as intro_pat` behaves similarly but also apply the given :token:`ext_intropattern` to the newly introduced hypothesis;
      - :g:`have intro_pat : formula_or_global_f` also works for both local and global formulas;
      - :g:`have intro_pat := proof_term` first computes the given :token:`proof_term` before proceeding.
                     
@@ -336,9 +460,9 @@ Common tactics
       Charlie: Discussions needed, check out discord + cleanup_induction branch
 
 
-.. tacn:: intro {+ @intropattern}
+.. tacn:: intro {+ @ext_intropattern}
 	  
-    Introduce topmost connectives of conclusion formula by following the sequence of :token:`intropattern`, when it can be done
+    Introduce topmost connectives of conclusion formula by following the sequence of :token:`ext_intropattern`, when it can be done
     in an invertible, nonbranching fashion.
 
 .. tacn:: left
@@ -357,7 +481,7 @@ Common tactics
      The tactic uses the :ref:`reduction engine <reduction>`
      with the provided flags.
      
-.. tacn:: remember @term
+.. tacn:: remember @term_pattern
 	  
     Substitute the given term by a fresh variable and adds as hypothesis the equality between the term and the new variable.
       
@@ -378,7 +502,7 @@ Common tactics
     conjunct. 
 
        
-.. tacn:: use @assumption {? with {+ variables}} {? as @intropattern}
+.. tacn:: use @assumption {? with {+ variables}} {? as @ext_intropattern}
    :name: use	   
 	  
     Instantiate a lemma or hypothesis based on the given. The optionnaly given variables are used to instantiate the universally quantified variables of the lemma.
@@ -390,6 +514,7 @@ Local tactics
 ~~~~~~~~~~~~~
 
 .. tact:: true
+   :name: true	  
 	  
     Closes a goal when the conclusion is true. 
 
@@ -504,7 +629,7 @@ Common tactics
 
 
 
-.. tacn:: fa {|@position | @term}
+.. tacn:: fa {|@position | @term_pattern}
    :name: fa
 
    TODO

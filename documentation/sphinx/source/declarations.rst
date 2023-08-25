@@ -255,10 +255,12 @@ As processes are defined over bi-terms, we in fact declare here a bi-system, ref
 	     (Dummy | out(c,empty))`, which would this time be named
 	     :n:`default`.
 
-Multi-systems can be refereed to, notably in proof goals and axioms, using system expressions:
+Systems can be refereed to, notably in proof goals and axioms, using system expressions:
 
 .. prodn::
-   system_expr ::= {| any | {+, {| @system_id | @system_id/left | @system_id/right } } }
+   single_expr ::= @system_id/left | @system_id/right
+   pair_expr ::= @system_id | @single_expr, @single_expr
+   system_expr ::= any | pair_expr 
 
 
 .. _section-system-macros:
@@ -304,13 +306,28 @@ A :gdef:`goal <goal>` defines a new formula to be proved. It can either be a :gd
 
 .. prodn::
   goal ::= local_goal
-  local_goal ::= {? local } goal {? @system_expr } {| @identifier | _ } @parameters : @formula
-  global_goal ::= global goal {? @system_expr } {| @identifier | _ } @parameters : @global_formula
+  local_goal ::= {? local } goal {? [@system_expr] } {| @identifier | _ } @parameters : @formula
   
 .. example:: Unnamed local goal
 
   :g:`goal [myProtocol/left] _ : cond@A2 => input@A1 = ok.`
 
+
+
+A global formula can contain both equivalence predicate as well as local formulas. By default, if a system is specified, both equivalence predicates and local predicates will be instantied in the global system. It is possible to refine this using a :gdef:`global system declaration`.
+
+.. prodn::
+   global_decl ::= [set: @system_expr; equiv:  @system_expr]
+   global_goal ::= global goal {? {| [@system_expr] | @global_decl } } {| @identifier | _ } @parameters : @global_formula
+
+The system specified in the :g:`set:` will then be the system attached to all the local formulas whitin the global goal and the :g:`equiv` system used for all the :g:`equiv` statements.
+
+
 .. example:: Global goal expressing observational equivalence
 
-  :g:`global goal [myProtocol] obs_equiv (t:timestamp) : happens(t) => equiv(frame@t).`
+  :g:`global goal [myProtocol] obs_equiv (t:timestamp) : [happens(t)] -> equiv(frame@t).`
+
+
+.. example:: Global goal expressing a transitivity
+	     
+    :g:`global goal [set: real/left; equiv: real/left,ideal/right] ideal_real : Forall (tau:timestamp[const]),  [happens(tau)] -> equiv(frame@tau)`
