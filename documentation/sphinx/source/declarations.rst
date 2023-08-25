@@ -207,6 +207,28 @@ type :g:`message` for its output, where the free variables in the two terms
 are only the replication and input variables.
 
 
+.. example:: Actions corresponding to process definition
+
+   Consider the following Squirrel code.
+	     
+   .. squirreldoc::
+      abstract one:message.
+      channel c.
+
+      system (!_i (in(c,x);
+                  if x=zero then
+		     A: out(c,zero)
+		  else
+		     B: out(c,x)
+		  )   
+              | 
+	        in(c,x); out(c,empty)).
+	
+   It roduces a set of three actions:
+   
+   * action :n:`A[i]`, with input variable x, condition `x=zero` and output `zero`;
+   * action :n:`B[i]`,  with input variable x, condition `x<>zero` and output `x`;
+   * and action :n:`A1` (with automatic naming), condition `true` and output `empty`.  
 
 Systems
 -------
