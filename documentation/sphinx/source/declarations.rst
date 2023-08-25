@@ -56,18 +56,35 @@ Builtins
 ++++++++
 
 Several function symbols are builtin in Squirrel, along with their
-axiomatizations. This notably includes the logical connectors for a
-:term:`local formula`.
+axiomatizations.
 
 
-.. todo::
-   what do we have here? if then else, pair, fst, snd, len, pred
+* :n:`diff(@term,@term)` and :n:`if @term then @term else @term`,
+  introduced to describe the syntax of :term:`terms <term>`, are from
+  a theoretical point abstract function builtins.
+* :n:`happens(@term)`, :n:`pred(@term)` and :n:`init` are three
+  function symbols dedicated to the :term:`timestamp` type. Each model
+  instantiates the set of timestamps by specifying which one happens
+  on the given trace, and for all the one that happen, their total
+  ordering, :n:`init` refering to a fixed first timestamp and
+  :n:`pred` being the predecessor function.
+* The connector for a :term:`local formula` are in fact a builtin,
+  with :n:`true`, :n:`false`, :n:`&&`, :n:`||`, :n:`=>`, :n:`<=>`) and :n:`not`.
+* Comparison operators :n:`=`, :n:`<>`, :n:`<=`, :n:`<`, :n:`>=` and :n:`>`.
+* A witness function :n:`witness`.
+* A dedicated :n:`xor` symbol along with its :n:`zero`. (this should be deprecated at some point in favour of a :term:`cryptographic function` declaration).  
+* A convertion function from :g:`bool` to :g:`message`, :n:`of_bool`.
+* Utility constants for failure, :n:`fail`, and an empty message, :n:`empty`.
+* The successor function over natural numbers `succ`.
+* Pairing and projection functions, :n:`pair` (also denoted :n:`<x,y>`) with :n:`fst` and :n:`snd`.
+* A length function for the number of bits in messages, :n:`len`, as well as a function producing a bitstring of zeroes of the same length as the input, :n:`zeroes`.
+
 
 
 Cryptographic functions
 -----------------------
 
-Squirrel allows to declare functions modeling classical cryptographic with:
+Squirrel allows to declare functions modeling classical :gdef:`cryptographic functions <cryptographic function>` with:
 
 .. prodn::
    crypto_decl ::= hash @fun_id 

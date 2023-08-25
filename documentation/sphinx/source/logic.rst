@@ -21,9 +21,9 @@ though this is a simplified view as we shall see below.
 
 Squirrel comes with several builtin base types:
 
-* :gdef:`message` represents bitstrings;
-* :gdef:`bool` represents a single bit;
-* :gdef:`timestamp` represents the points in a finite execution trace;
+* :gdef:`message` represents bitstrings.
+* :gdef:`bool` represents a single bit.
+* :gdef:`timestamp` represents the points in a finite execution trace. 
 * :gdef:`index` represents an arbitrary finite set used to index
   unbounded collections of objects.
 
@@ -105,9 +105,6 @@ or whose name does not matter.
 
 .. prodn::
   tag ::= const | glob | adv
-
-.. todo::
-   Charlie: missing adv
   
 Currently, only two different tags are supported. A tagged bound
 variable :g:`(x : t[tag])` restricts :g:`x` instantiations according
