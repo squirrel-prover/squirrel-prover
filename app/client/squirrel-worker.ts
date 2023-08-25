@@ -78,6 +78,7 @@ export class SquirrelWorker {
   protected tree: Tree | null;
   protected scriptNode: any;
   protected curSentences: Array<SyntaxNode>;
+  protected queueSentences: Array<SyntaxNode>;
   protected executedSentences: Array<SyntaxNode>;
 
   private load_progress: (ratio: number, ev: ProgressEvent) => void;
@@ -104,6 +105,7 @@ export class SquirrelWorker {
     this.cursor = null;
     this.scriptNode = null;
     this.curSentences = [];
+    this.queueSentences = [];
     this.executedSentences = [];
     this.view = null;
 
@@ -243,19 +245,25 @@ export class SquirrelWorker {
    */
   async execNodes(view:EditorView,nodes:Array<SyntaxNode>) {
     let viewState = view.state;
-    this.curSentences = nodes;
     // highlight with pending background
     highlightNodes(view,nodes,"squirrel-eval-pending")
-    // Get the strings out of the SyntaxNodes of type Sentence
-    let sentences = new Array<string>()
-    for(const x of nodes){
-      sentences.push(await this.getStringOfNode(x,viewState));
+
+    if (this.curSentences.length != 0){
+      this.queueSentences = this.queueSentences.concat(nodes)
+    } else {
+
+      this.curSentences = nodes;
+      // Get the strings out of the SyntaxNodes of type Sentence
+      let sentences = new Array<string>()
+      for(const x of nodes){
+        sentences.push(await this.getStringOfNode(x,viewState));
+      }
+      if(DEBUG) {
+        console.log("Sentences before cursor :");
+        sentences.forEach(e => console.log(e));
+      }
+      this.exec(sentences);
     }
-    if(DEBUG) {
-      console.log("Sentences before cursor :");
-      sentences.forEach(e => console.log(e));
-    }
-    this.exec(sentences);
   }
 
   async addSentence(x:SyntaxNode,sentences:Array<SyntaxNode>){
@@ -455,7 +463,15 @@ export class SquirrelWorker {
     let viewState = view.state;
     let tree = syntaxTree(viewState);
     let firstSentence = this.getInnerFirstSentence(tree.topNode);
-    if (this.cursor) {
+    if(this.queueSentences.length != 0){ // Already queued stuff
+      firstSentence = 
+        this.queueSentences[this.queueSentences.length -1].nextSibling
+    }
+    else if (this.curSentences.length != 0) { // Already executing stuff
+      firstSentence = 
+        this.curSentences[this.curSentences.length -1].nextSibling
+    }
+    else if (this.cursor) { // Execution at cursor
       if(DEBUG) {
         console.log("Current Node :");
         this.printSentence(viewState,this.cursor.node)
@@ -579,21 +595,32 @@ export class SquirrelWorker {
       this.view!.dispatch({
         effects: addMarks.of([evaluatedMark.range(sentence.from, sentence.to)])
       });
+
+      // If it's last send queued sentences
+      if((this.curSentences.length -1) == msg[1]){
+        this.curSentences = [];
+        this.execNodes(this.view,this.queueSentences);
+        this.queueSentences = [];
+      }
+
       break;
       case "Ko":
         if(DEBUG){
-        console.warn("Ko for ",msg[1]);
+        console.error("Ko for ",msg[1]);
         console.log("visu ",msg[2]);
       }
       sentence = this.curSentences[msg[1]];
+      let lastSentence = this.curSentences[this.curSentences.length-1];
 
       // Remove previous mark
-      removeMarks(this.view!,sentence.from,sentence.to);
+      removeMarks(this.view!,sentence.from,lastSentence.to);
 
       // Add error mark on the sentence
       this.view!.dispatch({
         effects: addMarks.of([errorMark.range(sentence.from, sentence.to)])
       });
+      this.curSentences = [];
+      this.queueSentences = [];
       break;
       default:
         // Bad command received 
