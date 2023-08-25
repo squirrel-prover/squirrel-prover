@@ -188,11 +188,13 @@ A term can be
 - a term with binders, see :token:`term_with_binders`;
 - an identifier :n:`x`, which must be bound by the context, and can be
   a :term:`logical variable <logical_var>`, an :term:`operator`, an
-  :term:`abstract function<abstract_fun>`, or TODO (more?);
+  :term:`abstract function<abstract_fun>`.
 - a :term:`diff-term` representing several probabilistic values which depend
   on the system;
 - a tuple :n:`(@term__1,...,@term__n)`.
 
+.. todo::
+   Charlie: Can an identifier be other things?
 
 .. note:: Many tactics use :token:`sterm` instead of :token:`term`,
            which creates less ambiguities in the parser.  Note that

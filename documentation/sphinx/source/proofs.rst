@@ -145,7 +145,7 @@ This behaves as follows:
 * :n:`[ @assumption ... @assumption]` is used to split a conjunction and name all the introduced sub hypothesis.
 * :n:`[ @assumption / ... / @assumption]` is used to split a disjunction, thus creating subgoals.
   
-We also have extended intro patterns, that apply some additional transformations to the obtained hypothesis.
+We also have :gdef:`extended intro patterns <ext intro pat>`, that apply some additional transformations to the obtained hypothesis.
 
 .. prodn::
    ext_intropattern ::=  {+ @intropattern | @ext_intropattern }
@@ -351,10 +351,6 @@ Common errors
 Tactics
 =======
 
-
-.. todo::
-   Charlie: for each tactic, the name contains todo if it was never touched, and the description is just imported from help.
-
 Tactics are organized in three categories:
 
  - logical, that rely on general logical properties;
@@ -396,7 +392,7 @@ Common tactics
       
       
      
-.. tacn:: dependent induction {? @variable} todo
+.. tacn:: dependent induction {? @variable}
 	  
     Apply the induction scheme to the conclusion. If no argument is specified, the conclusion must be a universal quantification over a well-founded type. Alternatively, a variable of the goal can be given as argument, in which case the goal is first generalized as the universal quantification over the given variable before proceeding with the induction.
 
@@ -407,14 +403,16 @@ Common tactics
 
 .. tacn:: destruct @assumption {? as @ext_intropattern}
 	  
-    Destruct an hypothesis based on its topmost destructable operator (existantial quantification, disjunction or conjunction). An optional And/Or introduction pattern can be given.
+    Destruct an hypothesis based on its topmost destructable operator (existantial quantification, disjunction or conjunction). An optional :term:`extended introduction pattern <ext intro pat>`  can be given.
     
-    .. example::
+    .. example:: Destruct 
        
        If there exists an hypthesis :g:`H: A \/ (B /\ C)`, the command
-       :g:`destruct H as [H1 | [H2 H3]]` will remove the H hypothesis and introduce instead:
+       :g:`destruct H as [H1 | [H2 H3]]` will remove the H hypothesis
+       and introduce instead:
+	  
        .. squirreldoc::
-
+	  
 	  H1: A
 	  H2: B
 	  H3: C
@@ -522,56 +520,129 @@ Local tactics
 Global tactics
 ~~~~~~~~~~~~~~
 
-.. tace:: byequiv todo
+.. tace:: byequiv
 	  
-    transform an equivalence goal into a reachability
-    goal. 
-      
-    Usage: byequiv   
+    Transform an global goal which is local formula into a
+    reachability.
   
 
-.. tace:: constseq todo
+.. tace:: constseq @position: {+ (fun @binders => @term) @term}
 	  
-    simplifies a constant sequence 
+    Simplifies a sequence at the given :n:`@position` when it only
+    contains a finite number of possible values :g:`v_1`,...,:g:`v_i`
+    depending on the value of the sequence variable.
+
+    Given a sequence over a variable of a given type, the arguments
+    passed must be of the form `(fun_1 v_1) ... (fun_i v_i)`, where
+    all the :g:`fun` function must be binders over the sequence type
+    and must return a boolean.  This tactic creates two subgoals
+    asking to prove the two required properties of the arguments and
+    sequence:
+    
+    * All the functions must be such that over an input element one
+      and only one of the function return true.
+    * The sequence is then expected to be equal to the value of `v_i`
+      for all input elements such that fun_i is true.
+
+    .. example::  Constseq one or zero
+
+       Consider the following conclusion goal :g:`0:
+       seq(t':timestamp=>(if (t' < t) then one))` (assuming that
+       :g:`t'` is a free :g:`timestamp` variable).
+
+       It is clear that this sequence only returns :g:`one` or
+       :g:`zero` (zero is in the implicit else branch). It can then be
+       simplified by calling the tactic:
+
+	.. squirreldoc::  
+
+	   constseq 0: 
+	      (fun (t':timestamp) => t' < t) one) 
+              (fun (t':timestamp) => not (t' < t)) zero).
+
+
+       This replaces in the current goal the constant by zero and one,
+       and creats two subgoal, asking to prove the two following formulas:
+
+       .. squirreldoc::
+
+	  forall (t':timestamp),
+	     (fun (t':timestamp) => t' < t) t'
+	  || (fun (t':timestamp) => not (t' < t)) t'
+       	 
+
+       .. squirreldoc::
+
+	  (forall (t':timestamp),
+            (fun (t':timestamp) => t' < t) t' => if (t' < t) then one = one) &&
+	  forall (t':timestamp),
+	    (fun (t':timestamp) => not (t' < t)) t' => if (t' < t) then one = zero
+
+
+    
              
 .. tace:: enrich @term
 	  
     Enrich the equivalence goal with the given term, that can either be of type :g:`message` or :g:`bool`. Note that this changes the number of items in the equivalence, and if added before other tactics may break later references.
 
 
-.. tacn:: localize  todo
+.. tacn:: localize @assumption as @ext_intropattern
 	  
-    Change a global hypothesis containing a reachability formula to a local
-    hypothesis. 
+    Change a global hypothesis containing a reachability formula to a
+    local hypothesis, and applies the given :term:`extended
+    introduction pattern <ext intro pat>` to the new hypothesis.
       
-    Usage: localize H1, H2  
 
 
-.. tace:: memseq todo
+.. tace:: memseq
 	  
-    prove that an biframe element appears in a sequence of the biframe. 
-      
+    Prove that a biframe element appears in a sequence of the biframe. 
+
+    .. todo::
+       Charlie: hum. There are no examples nor test for this function.
+       It should be tested before being documented (don't know who did it)
        
 
 .. tace:: refl
 	  
-    Closes a reflexive goal, where all items must be reflexive. As an overapproximation, it only works if the goal does not contain variable or macros, as those may break reflexivity.
+    Closes a reflexive goal, where all items must be reflexive. As an
+    overapproximation, it only works if the goal does not contain
+    variable or macros, as those may break reflexivity.
 
 
-.. tace:: splitseq todo
+.. tace:: splitseq @position: (fun @binders => @term)
 	  
-    splits a sequence according to some boolean 
-      
-       
+   Splits a sequence according to some boolean test, replacing the
+   sequence by two subsequence.
 
+   The function passed as argument must be a function taking as
+   argument a variable of the same type as the sequence and must
+   return a boolean.
+
+   .. example:: Splitting a sequence
+      
+      Called over a conclusion of the form :g:`0: seq(x:message =>
+      value)`, the tactic :g:`splitseq 0: (fun y:message => some_test)` replaces the conclusion by:
+
+      .. squirreldoc::
+
+	 0: seq(x:message=>
+	          (if  (fun y:message => some_test) x then
+                    value))
+	 1: seq(x:message=>
+	          (if not ((fun y:message => some_test) x) then
+                    value))		    
+            
 .. tace:: sym
 	  
     Swap the left and right system of the equivalence goal.
 
-.. tace:: trans todo
+.. tace:: trans
 	  
     Prove an equivalence by transitivity. 
-      
+
+    .. todo::
+       Charlie:: this is not used either. It is deprecated I think.
 
 Structural tactics
 ------------------
@@ -581,18 +652,17 @@ Common tactics
 ~~~~~~~~~~~~~~
 
       
-.. tacn:: apply  todo
+.. tacn:: apply
    :name: apply	  
 	  
     Matches the goal with the conclusion of the formula F provided (F can be
     an hypothesis, a lemma, an axiom, or a proof term), trying to instantiate
     F variables by matching. Creates one subgoal for each premises of
     F.
-    Usage
-    apply H.
-    apply lemma.
-    apply axiom. 
-      
+
+   .. todo::
+      TODO
+     
 
 .. tacn:: constraints
 
@@ -607,49 +677,35 @@ Common tactics
 	  
     If the second action depends on the first action, and if the second
     action happened, add the corresponding timestamp
-    inequality. 
-      
-    Usage: depends ts1, ts2  
+    inequality.       
 
-
-.. tacn:: expand  todo
+.. tacn:: expand {+ @macro | @macro@@term }
 	  
-    Expand all occurences of the given macro inside the
-    goal. 
-      
-    Usages: expand H
-            expand m
-            expand f  
-
-.. tacn:: expandall  todo
+    Expand all occurences of the given macros, either fully specified with an action or simply a type of macro, inside the goal.
+    
+.. tacn:: expandall
 	  
     Expand all possible macros in the sequent. 
-      
-       
-
-
+             
 
 .. tacn:: fa {|@position | @term_pattern}
    :name: fa
 
-   TODO
+   .. todo::
+      TODO
 
-
-
-.. tacn:: namelength todo
+.. tacn:: namelength @term, @term
 	  
     Adds the fact that two names have the same
-    length. 
+    length. The two arguments must the indeed be a :term:`name`.
       
     Usage: namelength m1, m2  
 
 
-.. tacn:: rewrite todo
+.. tacn:: rewrite
 	  
-    If t1 = t2, rewrite all occurences of t1 into t2 in the goal.
-    Usage: rewrite Hyp Lemma Axiom.
-    rewrite Lemma Axiom.
-    rewrite Lemma in H. 
+    .. todo::
+       Big todo with many options, see tutorial advanced for some starting point.
       
        
 
@@ -668,70 +724,75 @@ Local tactics
      are performed to handle conjunctive hypotheses). If the conclusion
      is a message (dis)-equality then it is taken into account as well.
 
-.. tact:: const todo
+.. tact:: const @variable
 	  
-    Add the `const` tag to a variable. 
-      
-    Usage: const t  
+    Add the `const` tag to a variable.
+
+    The variable must be of a finite and fixed (η-independent) type,
+    and must not appear in any global hypothesis (some global
+    hypotheses may be localized (see :tacn:`localize`) if necessary.
+
 	    
-
-.. tact:: eqnames todo
+.. tact:: eqnames
 	  
-    Add index constraints resulting from names equalities, modulo the known
-    equalities. 
-      
-    Usage: eqnames   
+    Add index constraints resulting from names equalities,
+    modulo the known equalities.
+     
+    If :g:`n[i] = n[j]` then :g:`i = j`. This is checked on all name
+    equality entailed by the current context.
 
-.. tact:: eqtrace todo
+.. tact:: eqtrace
 	  
     Add terms constraints resulting from timestamp and index
     equalities. 
-      
-    Usage: eqtrace   
 
-.. tact:: executable todo
+    Whenver :g:`i=j` or :g:`ts=ts'`, we can substitute one by another
+    in the other terms.
+
+.. tact:: executable @term
 	  
     Assert that exec@_ implies exec@_ for all previous
     timestamps. 
+
+    Given as input a timestamp :g:`ts`, this tactic produces two new
+    subgoal, requiring to prove that :g:`happens(ts)` holds and that
+    :g:`exec@ts` also holds. The fact that :g:`(forall (t:timestamp),
+    t <= ts => exec@t)` is added to the current goal.
+
+
+.. tact:: project
+	  
+    Turn a goal on a :term:`bi-system` into one goal for each
+    projection of the bi-system.
       
-    Usage: executable ts  
 
 
-.. tact:: project todo
+.. tact:: rewrite equiv
 	  
-    Turn a goal on a bisystem into one goal for each projection of the
-    bisystem. 
-      
-    Usage: project
+    Use an equivalence to rewrite a reachability goal.
+
+    .. todo::
+       TODO
 
 
-.. tact:: rewrite equiv  todo
+.. tact:: slowsmt
 	  
-    Use an equivalence to rewrite a reachability goal. 
-
-
-.. tact:: slowsmt todo
-	  
-    Version of smt tactic with higher time limit. 
+    Version of the :tacn:`smt` tactic with higher time limit. 
       
     Usage: slowsmt   
 
-.. tact:: smt todo
+.. tact:: smt
+   :name: smt	  
 	  
-    Tries to discharge goal using an SMT solver. 
+    Tries to discharge the current goal using an SMT solver. 
       
-    Usage: smt   
 
-.. tact:: subst todo
-	  
-    If i = t where i is a variable, substitute all occurences of i by t and
-    remove i from the context
-    variables. 
-      
-    Usages: subst idx1, idx2
-            subst ts1, ts2
-            subst m1, m2  
+.. tact:: subst @term, @term
 
+    Replaces all occurences of a variable by a value it must be equal
+    to.  Call as :g:`subst x, t`, if :g:`x = t` where :g:`x` is a
+    variable, substitute all occurences of :g:`x` by :g:`t` and remove
+    :g:`x` from the :term:`logical variables <logical_var>`.
     
     
 Global tactics
@@ -765,21 +826,23 @@ Global tactics
 	
 
 
-.. tace:: deduce todo
+.. tace:: deduce
 	  
     `deduce i` removes the ith element from the biframe when it can be
     computed from the rest of the biframe.
     `deduce` try to deduce the biframe with the first equivalence in the
     hypotheses it finds. 
-      
-    Usage: deduce [i]  
 
+    .. todo:: 
+       TODO
 
-.. tace:: diffeq todo
+.. tace:: diffeq
 	  
     Closes a reflexive goal up to equality 
       
-    Usage: diffeq       
+    .. todo::
+       Charlie: Here, still waiting to have clean multisystem
+       support in reachabiliy goal to clarify this..
 	    
 
 
@@ -793,87 +856,109 @@ Common tactics
 .. tacn:: fresh @position
    :name: fresh
 
-   TODO
+   .. todo::	  
+      TODO
 
    
 Local tactics
 ~~~~~~~~~~~~~
 
 
-.. tact:: cdh todo
-	  
+.. tact:: cdh
+   
     Usage: cdh H, g.
     Applies the CDH assumption (including squareCDH) on H using generator
     g. 
-      
+
+   .. todo::	  
+      TODO
        
 
-.. tact:: collision  todo
+.. tact:: collision
 	  
     Collects all equalities between hashes occurring at toplevel in message
     hypotheses, and adds the equalities between messages that have the same
     hash with the same valid key. 
       
-    Usage: collision [H]  
+    Usage: collision [H]
+
+    .. todo::	  
+       TODO
 
 
-.. tact:: euf todo
+.. tact:: euf
 	  
     Apply the euf axiom to the given hypothesis name. 
-      
+
+.. todo::	  
+       TODO      
        
 
-.. tact:: gdh todo
+.. tact:: gdh
 	  
     Usage: gdh H, g.
     Applies the GDH assumption (including squareGDH) on H with generator
     g. 
       
-       
+    .. todo::	  
+       TODO       
 
-.. tact:: intctxt todo
+.. tact:: intctxt
 	  
     Apply the INTCTXT axiom to the given hypothesis name. 
       
-       
+    .. todo::	  
+       TODO       
 
 
 Global tactics
 ~~~~~~~~~~~~~~
 
 
-.. tace:: cca1 todo
+.. tace:: cca1
 	  
     Apply the cca1 axiom on all instances of a ciphertext. 
       
-       
-.. tace:: ddh todo
+    .. todo::	  
+       TODO
+    
+.. tace:: ddh
 	  
     Closes the current system, if it is an instance of a context of
     ddh. 
       
-    Usage: ddh H1, H2, H3, H4  
+    Usage: ddh H1, H2, H3, H4
 
-.. tace:: enckp todo
+    .. todo::	  
+       TODO    
+
+.. tace:: enckp
 	  
     Keyprivacy changes the key in some encryption
     subterm. 
       
-    Usage: enckp i, [m1], [m2]  
+    Usage: enckp i, [m1], [m2]
+
+    .. todo::	  
+       TODO    
 
 
 .. tacn:: prf @position
    :name: prf
 
-   TODO why optional message in Squirrel tactic; also fix help in tool    
+    .. todo::	  	  
+       TODO why optional message in Squirrel tactic; also fix help in tool    
        
 
-.. tace:: xor todo
+.. tace:: xor
 	  
     Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is
     fresh. 
       
-    Usage: xor i, [m1], [m2]  
+    Usage: xor i, [m1], [m2]
+    
+    .. todo::	  
+       TODO    
 
 	
 Utility tactics

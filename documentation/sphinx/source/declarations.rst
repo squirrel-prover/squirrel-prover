@@ -163,8 +163,10 @@ The basic commands are:
    command ::= new @name_id | @state[({*, @term})] := @term | out(@channel, @term) | in(@channel, @term)
 
 A command can be:
- * the binding of a name with :g:`new name`, which implicitly declares a new name based on the current replication indices. This is strictly syntactic sugar that can be avoided by explicitely declaring all names at the begining    
- * todos
+
+ * The binding of a name with :g:`new name`, which implicitly declares a new name based on the current replication indices. This is strictly syntactic sugar that can be avoided by explicitely declaring all names at the begining.
+ * The update of a state cell.
+ * An input or an output over some channel.
 
   
 The body of a process is defined with sequential or parallel composition of commands,conditionals, find constructs, replication or process calls.
@@ -245,7 +247,7 @@ A system a defined by a main process:
    system_id ::= identifier
    system_decl ::= system {? [@system_id]} @process
 
-As processes are defined over bi-terms, we in fact declare here a bi-system, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms. If no system identifier is specified, the :n:`default` name is used.
+As processes are defined over bi-terms, we in fact declare here a :gdef:`bi-system`, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms. If no system identifier is specified, the :n:`default` name is used.
 
 .. example:: System declarations
 
