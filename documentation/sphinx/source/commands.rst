@@ -53,9 +53,11 @@ Commands
    install squirrel (with ``make install``) and not running it from root directory of its
    sources, this directory is located in ``~/.local/bin``.
 
+
+   
 .. cmd:: set @identifier = {| @bool | @natural }
 
-   Set any squirrel option using its :n:`@identifier`:
+   Set any squirrel :gdef:`option` using its :n:`@identifier`:
 
    ====================== ============================================ ======================
    Option identifier      Description                                  Default value

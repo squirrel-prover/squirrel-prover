@@ -36,37 +36,6 @@ Logical variables
 Generalities
 ============
 
-Tacticals
----------
-
-.. todo:: David: I'm not sure we want to document tacticals using the same
-	  role as elementary tactics, I did it like this for now just so the
-	  references to try and repeat in the appendix work.
-
-.. tacn:: nosimpl @tactic
-
-  Call tactic without the subsequent implicit use of simplications.
-  This can be useful to understand what's going on step by step.
-  This is also necessary in rare occasions where simplifications are
-  actually undesirable to complete the proof.
-
-.. tacn:: try @tactic
-
-  Try to apply the given tactic. If it fails, succeed with the
-  subgoal left unchanged.
-
-.. tacn:: repeat @tactic
-
-  Apply the given tactic, and recursively apply it again on the
-  generated subgoals, until it fails.
-
-
-Automatic simplifications
--------------------------
-
-.. todo:: document what is done implicitly after each tactic invokation,
-	  clarify that this is not the same as calling the `simpl` tactic.
-
 Tactic arguments
 ----------------
 
@@ -119,7 +88,9 @@ the context.
    The :n:`(% @proof_term)` syntax is experimental, and is subject to
    change in the future.
 
-TODO
+   
+.. todo::
+   Todo
 
 .. _reduction:
 
@@ -153,6 +124,101 @@ the trace formula.
 The user-defined rewriting transformation eagerly applies the rewrite
 rules added to the rewriting database using the :cmd:`hint rewrite`
 command.
+
+
+Automatic simplifications tactics
+---------------------------------
+
+There are three automated tactics. The :tacn:`autosimpl` tactic is
+called automatically after each tactic, unless the tactical
+:tacn:`nosimpl` is used.
+     
+     
+.. tacn:: auto {? @simpl_flags}
+
+     Attempt to automatically prove a subgoal.
+
+     The tactic uses the :ref:`reduction engine <reduction>`
+     with the provided flags.
+
+     Moreover, for local goals, the tactic relies on basic
+     propositional reasoning, rewriting simplications, and both
+     :tacn:`constraints` and :tacn:`congruence`.
+
+     .. exn:: cannot close goal
+        :name: _goalnotclosed
+
+        The current goal could not be closed.
+
+
+.. tacn:: autosimpl
+	  
+    Simplify a goal, without closing it or any of the created subgoals.
+    This is automatically called after each tactic.
+
+    The tactic uses the :ref:`reduction engine <reduction>`
+    with the flags :g:`rw,beta,proj`.
+
+    When the conclusion of the goal is a conjuction,
+
+    When the conclusion of the goal is an equivalence,    
+
+    .. todo::
+       Charlie: does anybody knows exactly what happens wihtout
+       reverse engineering the code?
+    
+    Addiotionaly If the :term:`option` :g:`autoIntro` is set to true, introductions
+    are also made automically.
+
+
+
+.. tacn:: simpl {? @simpl_flags}
+
+     Simplify a subgoal, working on both hypotheses and conclusion.
+     This tactic always succeeds, replacing the initial subgoal with
+     a unique simplified subgoal.
+
+     The tactic uses the :ref:`reduction engine <reduction>`
+     with the provided flags.
+
+     When the conclusion of the goal is a conjunction, the tactic
+     will attempt to automatically prove some conjuncts (using :tacn:`auto`)
+     and will then return a simplified subgoal without these conjuncts.
+     In the degenerate case where no conjunct remains, the conclusion
+     of the subgoal will be :g:`true`.
+
+     When the conclusion of the goal is an equivalence, the tactic
+     will automatically perform :tacn:`fa` when at most one of the remaining
+     subterms is non-deducible. It may thus remove a deducible item
+     from the equivalence, or replace an item :g:`<u,v>` by :g:`u`
+     if it determines that :g:`v` is deducible.
+
+         
+
+Tacticals
+---------
+
+.. todo:: David: I'm not sure we want to document tacticals using the same
+	  role as elementary tactics, I did it like this for now just so the
+	  references to try and repeat in the appendix work.
+
+.. tacn:: nosimpl @tactic
+
+  Call tactic without the subsequent implicit use of simplications.
+  This can be useful to understand what's going on step by step.
+  This is also necessary in rare occasions where simplifications are
+  actually undesirable to complete the proof.
+
+.. tacn:: try @tactic
+
+  Try to apply the given tactic. If it fails, succeed with the
+  subgoal left unchanged.
+
+.. tacn:: repeat @tactic
+
+  Apply the given tactic, and recursively apply it again on the
+  generated subgoals, until it fails.
+
 
 Common errors
 -------------
@@ -402,33 +468,6 @@ Common tactics
     apply lemma.
     apply axiom. 
       
-       
-
-
-.. tacn:: auto {? @simpl_flags}
-
-     Attempt to automatically prove a subgoal.
-
-     The tactic uses the :ref:`reduction engine <reduction>`
-     with the provided flags.
-
-     Moreover, for local goals, the tactic relies on basic
-     propositional reasoning, rewriting simplications, and both
-     :tacn:`constraints` and :tacn:`congruence`.
-
-     .. exn:: cannot close goal
-        :name: _goalnotclosed
-
-        The current goal could not be closed.
-
-
-.. tacn:: autosimpl todo
-	  
-    Simplify a goal, without closing it. Automatically called after each
-    tactic. 
-      
-    Usage: autosimpl   
-
 
 .. tacn:: constraints
 
@@ -489,31 +528,6 @@ Common tactics
       
        
 
-       
-
-
-.. tacn:: simpl {? @simpl_flags}
-
-     Simplify a subgoal, working on both hypotheses and conclusion.
-     This tactic always succeeds, replacing the initial subgoal with
-     a unique simplified subgoal.
-
-     The tactic uses the :ref:`reduction engine <reduction>`
-     with the provided flags.
-
-     When the conclusion of the goal is a conjunction, the tactic
-     will attempt to automatically prove some conjuncts (using :tacn:`auto`)
-     and will then return a simplified subgoal without these conjuncts.
-     In the degenerate case where no conjunct remains, the conclusion
-     of the subgoal will be :g:`true`.
-
-     When the conclusion of the goal is an equivalence, the tactic
-     will automatically perform :tacn:`fa` when at most one of the remaining
-     subterms is non-deducible. It may thus remove a deducible item
-     from the equivalence, or replace an item :g:`<u,v>` by :g:`u`
-     if it determines that :g:`v` is deducible.
-
-     
       
 Local tactics
 ~~~~~~~~~~~~~
