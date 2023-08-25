@@ -110,7 +110,8 @@ concrete computation corresponding to their evluation.
 
 .. prodn::
    op_id ::= @identifier
-   operator ::= op @op_id {? @tvar_args } {+ ({+, @variable} : @type) } : @type = @term
+   parameters ::= {+ ({+, @variable} : @type) }
+   operator ::= op @op_id {? @tvar_args } {? parameters } : @type = @term
  
 As recursion is not yet supported, this is in fact currently syntact
 sugar for declaring an :term:`abstract function <abstract_fun>` symbol along with an :term:`axiom` stating
@@ -149,10 +150,12 @@ Processes are allowed to manipulate states, defined with an identifier, a replic
 
 .. prodn::
    state_id ::= @identifier
-   state ::= mutable @state_id[({*, @binders})] : @type = @term
+   state ::= mutable @state_id {? ({+, var@} : index) } : @type = @term
 
-.. todo::
-  Charlie: I'm not sure how to restrict the set of binders to binders of type index.
+.. example:: State counter
+	     
+   With :g:`mutable counter (i,j,k:index) : message = zero.`
+   we declare a set of counter states, all initialized to zero.
 
 The basic commands are:
 
@@ -240,11 +243,19 @@ A system a defined by a main process:
 
 .. prodn::
    system_id ::= identifier
-   system_decl ::= system [@system_id] @process
+   system_decl ::= system {? [@system_id]} @process
 
-As processes are defined over bi-terms, we in fact declare here a bi-system, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms.
+As processes are defined over bi-terms, we in fact declare here a bi-system, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms. If no system identifier is specified, the :n:`default` name is used.
 
-Multi-systems can be refereed to using system expressions:
+.. example:: System declarations
+
+	     Using the previously defined :n:`Dummy` process, we
+	     define a system with :g:`system [myProtocol] Dummy`.
+	     Another distinct system could be declared with :g:`system
+	     (Dummy | out(c,empty))`, which would this time be named
+	     :n:`default`.
+
+Multi-systems can be refereed to, notably in proof goals and axioms, using system expressions:
 
 .. prodn::
    system_expr ::= {| any | {+, {| @system_id | @system_id/left | @system_id/right } } }
@@ -264,10 +275,6 @@ Whenever a system is declared, for each action `A[idx]` inside the system with o
 * :g:`frame@tau` is equal to :g:`<frame@pred(tau), if cond@tau then output@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`frame@tau` is :g:`empty`.
 * :g:`exec@tau` is equal to :g:`exec@pred(tau) && cond@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`exec@init` is :g:`true`.
 
-.. todo::
-   - the implicit declaration of macros,
-   - the role of diff operators
-
 
 Logics
 ======
@@ -275,8 +282,21 @@ Logics
 Axioms
 ------
 
-An :gdef:`axiom` defines...
+An :gdef:`axiom` defines a :term:`local formula` as true over the corresponding system (over system :n:`default` by default).
 
+.. prodn::
+   axiom_id ::= identifier
+   axiom_decl ::= axiom  {? @system_expr } @axiom_id {? @parameters } : @formula.
+
+
+.. example:: Basic axiom
+	     
+	     The following line declares that in system :n:`default,` the constant
+	     :n:`fail` cannot be equal to any pair: :g:`axiom fail_not_pair
+	     (x,y:message): fail <> <x,y>`.
+
+   
+   
 Goals
 -----
 
@@ -286,7 +306,7 @@ A :gdef:`goal <goal>` defines a new formula to be proved. It can either be a :gd
   goal ::= local_goal
   local_goal ::= {? local } goal {? @system_expr } {| @identifier | _ } @parameters : @formula
   global_goal ::= global goal {? @system_expr } {| @identifier | _ } @parameters : @global_formula
-
+  
 .. example:: Unnamed local goal
 
   :g:`goal [myProtocol/left] _ : cond@A2 => input@A1 = ok.`
