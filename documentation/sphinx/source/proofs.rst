@@ -19,8 +19,8 @@ user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new subgoals. When no goal is left, the proof
 is completed and :g:`Qed` can be used.
 
-.. todo::
-   Charlie: add link to index
+The complete list of tactics can be found in the corresponding
+:ref:`tactic index <tactic_index>`.
 
 Judgements
 ==========
