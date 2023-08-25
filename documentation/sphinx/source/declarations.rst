@@ -215,7 +215,8 @@ are only the replication and input variables.
       abstract one:message.
       channel c.
 
-      system (!_i (in(c,x);
+      process Dummy =
+             (!_i (in(c,x);
                   if x=zero then
 		     A: out(c,zero)
 		  else
