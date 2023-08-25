@@ -9,16 +9,17 @@ const cache = new NodeWeakMap<readonly Completion[]>()
 const declaration_completions: readonly Completion[] = [//{↓{
   
   snip("aenc ${enc},${dec},${pk}", 
-  {label:"aenc",detail:"enc,dec,pk",info:`Declare an asymmetric encryption.`}),
-  snip("signature ${sign},${checksign},${pk}", 
-  {label:"signature",detail:"sign,checksign,pk ((where c_tys)|(with oracle Term))?",
-    info:`Declare signature function (with oracle or given types)`}),
+  {label:"aenc",detail:"enc,dec,pk",
+    info:`declares an IND-CCA2 asymmetric encryption with the equation dec(enc(m,pk(sk)),sk)=m`}),
+  snip("signature ${sig},${ver},${pk}", 
+  {label:"signature",detail:"sig,ver,pk ((where c_tys)|(with oracle Term))?",
+    info:`Declares an unforgeable (EUF-CMA) signature with the equation ver(sig(m,sk),m,pk(sk))=true`}),
   snip("hash ${h}", 
   {label:"hash",detail:"${h} ((where c_tys)|(with oracle Term))?",
-    info:`Declare hash function (with oracle or given types)`}),
+    info:`Declares a keyed hash function h(m,k) satisfying PRF and known key collision resistance`}),
   snip("senc ${enc},${dec}", 
   {label:"senc",detail:"${enc},${dec} ((where c_tys)|(with oracle Term))?",
-    info:`Declare symetric encryption symbol (with oracle or given types)`}),
+    info:`declares an IND-CCA2 symmetric encryption with the equation dec(enc(m,sk),sk)=m`}),
   snip("ddh ${generator}, ${name1}, ${name2}, ${name3}", 
   {label:"ddh",detail:"g, a, b, k",
     info:`It must be called on (generator, a, b, c) where
