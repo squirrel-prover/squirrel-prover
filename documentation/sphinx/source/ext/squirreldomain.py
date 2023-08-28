@@ -770,18 +770,23 @@ class SquirreldocDirective(Directive):
         # Pygments-based post-processing (we could also set rawsource to '')
         content = '\n'.join(self.content)
         content = content.strip()
-        try:
-            lexer = pygments.lexers.get_lexer_by_name("squirrel")
-            parsed = pygments.highlight(content,
-                                        lexer,
-                                        TERM_FORMATTER)
-            in_chunks = AnsiColorsParser().colorize_str(parsed)
-            node = nodes.inline(content, '', *in_chunks)
-        except ValueError:
-            source_literal = nodes.literal_block(content, content)
-            node = nodes.inline(content, '', *source_literal)
+        dli = nodes.definition_list_item()
+        for sentence in self.content:
+            try:
+                sentence = sentence.strip()
+                lexer = pygments.lexers.get_lexer_by_name("squirrel")
+                parsed = pygments.highlight(sentence,
+                                            lexer,
+                                            TERM_FORMATTER)
+                parsed = parsed.strip()
+                in_chunks = AnsiColorsParser().colorize_str(parsed)
+                dli += nodes.term(sentence, '', *in_chunks,classes=['in'])
+            except ValueError:
+                source_literal = nodes.literal_block(sentence, sentence)
+                node = nodes.term(sentence, '', *source_literal,classes=['in'])
 
-        wrapper = nodes.container(content, node, classes=['squirreldoc','literal-block'])
+        node = nodes.definition_list(content, dli)
+        wrapper = nodes.container(content, node, classes=['squirreltop','literal-block'])
         # wrapper = nodes.paragraph(text="squirreldoc is not implemented yet !")
         self.add_name(wrapper)
         return [wrapper]
