@@ -31,6 +31,14 @@ Logical variables
 
 :gdef:`Logical variable <logical_var>` are free variables in a current goal. Such variables are implicitly quantified based on their type and tag.
 
+Hypotheses
+----------
+
+.. prodn:: hypothesis_id ::= identifier
+
+.. todo::
+   Adrien: todo
+   
 Local goal
 ----------
 
@@ -98,14 +106,13 @@ Tactic arguments
 ----------------
 
 In the context of a (sub)goal, an :gdef:`assumption` refers to
-an hypothesis in the current goal,
-a previously proved goal, or
-a previously declared axiom.
+an hypothesis in the current goal, or
+an axiom or previously proven goal.
 Assumptions are referred to by their identifier when used in
 tactics.
 
 .. prodn::
-  assumption ::= @identifier
+  assumption ::= @hypothesis_id | @statement_id
 
 Tactics that apply to equivalence goals may take a natural number
 as argument to identify one item in the equivalence. This is represented

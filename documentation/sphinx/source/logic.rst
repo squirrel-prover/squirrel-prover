@@ -19,7 +19,7 @@ though this is a simplified view as we shall see below.
 .. prodn::
   base_type ::= bool | message | timestamp | index | @identifier
 
-Squirrel comes with several builtin base types:
+Squirrel comes with several built-in base types:
 
 * :gdef:`message` represents bitstrings.
 * :gdef:`bool` represents a single bit.
@@ -32,42 +32,49 @@ using the following declaration:
 
 .. decl:: type @identifier {? [ {+, @type_tag } ] }
 
-  Declare a new type called :token:`identifier`.
-  The values of that type are assumed to be convertible to bitstrings,
-  hence the type is a subtype of :g:`message`. Tags can optionally
-  be passed to indicate assumptions on the new type, which intuitively puts restriction on the underlying set of bitstrings.
+  Declare a new base type called :token:`identifier`.
+  The values of that type are assumed to be encodable as bitstrings.
+  Tags can optionally be passed to restrict the new type possible
+  instantiations.
 
   .. prodn::
     type_tag ::= large | well_founded | finite | fixed | name_fixed_length
 
-  The meaning of tags is as follows:
+  Tags have the following semantics:
 
-  * a type is :gdef:`well-founded` when :g:`<` is well-founded
+  * a type is :gdef:`well-founded` when the :term:`built-in` function symbol :g:`<` is well-founded
     on that type, for any :math:`\eta`;
   * a type is :gdef:`finite` if
     it has a finite cardinal for each :math:`\eta`;
-  * a type is :gdef:`fixed` if it is the same for all :math:`\eta`;
-  * a type is :gdef:`large` when it supports drawing any number of
-    values, denoted by :term:`names <name>`, in such a way that two
-    distinct names have a negligible chance of being equal;
-  * a type with :gdef:`name_fixed_length` means that all names sampled
-    in that type (for a given :math:`\eta`) have the same length;
+  * a type is :gdef:`fixed` if its interpretation does not depend on :math:`\eta`;
+  * a type is :gdef:`large` when random samplings over that type
+    (using :term:`names <name>`) are such that two
+    distinct names have a negligible probability of collision;
+  * a type is :gdef:`name_fixed_length` if all :term:`names<name>`
+    over that type sample values of the same length (for a given
+    :math:`\eta`).
 
-The underlying parameter :math:`\eta` corresponds to the security parameter used in security proofs, and names are then used to model the sampling of nonces of length :math:`\eta`.
+The parameter :math:`\eta` corresponds to the underlying security parameter used in security proofs.
 
 .. note:: A finite type is still unbounded:
           the semantics for the type can be any finite set.
 
-    
-Type variables
---------------
 
-Squirrel supports parametric polymorphism à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_. 
-Type variables can be represented by any identifier preceded by a
+.. _section-polymorphism:
+
+Type variables and polymorphism
+-------------------------------
+
+Squirrel supports :gdef:`parametric type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (in :term:`operators<operator>`, :term:`goals<goal>`, ...).
+Type variables must be an identifier preceded by a
 single apostrophe, e.g. :n:`'x`.
 
 .. prodn::
   type_variable ::= '@identifier
+  tvar_params ::=  {* @type_variable }
+
+When parametrizing a declaration, type variables are enclosed in brackets, e.g. :g:`['a 'b 'c]`.
+
 
 General types
 --------------
@@ -84,12 +91,10 @@ The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b
 
 .. example:: Hash function
 	     
-   A hash function may have type :g:`(message * message) -> message`:
-   it takes a message to be hashedand a key, and the returned hash is
-   also a message. Given that any hash value often has a constant
-   length, a specific type for the hash outputs could also be defined
-   as a :g:`fixed` type.
-  
+   A hash function may have type :g:`(message * key_ty) -> hash_ty`:
+   it takes as input the value to be hashed (of type :g:`message`) and a
+   key (of type :g:`key_ty`), and returns a digest of type :g:`hash_ty`.
+
 Binders and tags
 ----------------
 
@@ -106,7 +111,7 @@ or whose name does not matter.
 .. prodn::
   tag ::= const | glob | adv
   
-Currently, only two different tags are supported. A tagged bound
+Currently, only a few different tags are supported. A tagged bound
 variable :g:`(x : t[tag])` restricts :g:`x` instantiations according
 to :g:`tag`:
 
@@ -124,7 +129,7 @@ to :g:`tag`:
   time attackers.
 
 .. note::
-   Squirrel includes a builtin function symbol :g:`att :
+   Squirrel includes a built-in function symbol :g:`att :
    message -> message [adv]` that can be used to refer to an
    adversary.
  
@@ -134,14 +139,13 @@ Squirrel uses the following syntax for binders:
   binder ::= @var_or_hole | ({+, {+, @var_or_hole } : @type {? [{+ @tag}]} }) 
   binders ::= {* @binder }
 
-A binder :g:`x` without any attached (using directly a
-:n:`@var_or_hole`) is equivalent to using a type hole :g:`(x:_)`.
-The type hole will have to be inferred by unification.
+A bound variable :g:`x` without any attached type (i.e. using directly a
+:n:`@var_or_hole`) amounts to use a type hole :g:`(x:_)`,
+which will have to be be inferred by Squirrel.
 
-.. note:: Tags in binders do not always have a meaning, e.g., in the
-          function declared with an :term:`abstraction` as follows
-          :g:`fun(x:int[const])=>f`, Squirrel will ignore the tags in
-          such cases.
+.. note:: Not all binders support tags, e.g. it would be meaningless
+          to declare a function :term:`abstraction` with a :g:`const`
+          tag, as in :g:`fun(x:int[const])=>t`.
 
 .. note:: Binding twice the same variable name yields two distinct
           variables (there is a hidden unique identifier).
@@ -161,7 +165,7 @@ probabilistic value which ranges over messages, and a term of type
   term ::= @term {+ @term } 
        | @term @infix_op @term 
        | @term # @natural
-       | @term @ @term 
+       | @macro
        | if @term then @term else @term 
        | @term_with_binders
        | @sterm
@@ -179,15 +183,13 @@ A term can be
   which corresponds :n:`(@infix_op) @term__1 @term__2`;
 - the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
   (:n:`@term` must be a tuple with sufficiently many elements);
-- the application :n:`@term__m @ @term__t` of a macro term
-  :n:`@term__m` at a time-point :n:`@term__t` (of type :g:`timestamp`); this is only 
-  possible if :n:`@term__m` is a :term:`macro`;
+- a macro term, see :term:`macro`;
 - an conditional :n:`if @term__b then @term__0 else @term__1` where
   :n:`@term__b` must be of type :g:`bool`, and :n:`@term__0` and
   :n:`@term__1` must have the same type;
 - a term with binders, see :token:`term_with_binders`;
 - an identifier :n:`x`, which must be bound by the context, and can be
-  a :term:`logical variable <logical_var>`, an :term:`operator`, an
+  a :term:`logical variable <logical_var>`, an :term:`operator`, or an
   :term:`abstract function<abstract_fun>`.
 - a :term:`diff-term` representing several probabilistic values which depend
   on the system;
@@ -195,6 +197,8 @@ A term can be
 
 .. todo::
    Charlie: Can an identifier be other things?
+
+   Adrien: I think this is it.
 
 .. note:: Many tactics use :token:`sterm` instead of :token:`term`,
            which creates less ambiguities in the parser.  Note that
@@ -224,7 +228,7 @@ multiple nested constructs, e.g. :n:`fun x y=>@term` is a short form
 for :n:`fun x=>(fun y=>@term)`.
 
 A :n:`find` performs a look-up through all values of a type, filtered
-according to some predicate, and returining some computation. E.g. if
+according to some predicate, and returning some computation. E.g. if
 :n:`@term__b` is of type :g:`bool` and :n:`@term__i` and :n:`@term__e`
 have the same type, then 
 :n:`find(x:@type)such that @term__b in @term__i else @term__e` 
@@ -241,7 +245,7 @@ Diff-terms
 -----------
 
 :gdef:`Diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` represents
-two terms at once. This is a convinient way to define two similar
+two terms at once. This is a convenient way to define two similar
 terms except for a small part. Later on, they will be used to
 define easily two protocols that only slightly differ. The logic
 in the tool allows to reason on diff-terms, proving for instance
@@ -250,18 +254,22 @@ that the two representations are equivalent.
 .. prodn:: 
    diff_term ::= diff(@term, @term)
 
+.. todo::
+   Adrien: this needs to be seriously expanded and detailed.
 
 Formulas
 ========
 
-Squirrel features two kinds of formulas: local and global ones.
+Squirrel features two kinds of formulas: :term:`local formulas<local
+formula>` and :term:`global formulas<global formula>`.
 
 Local formulas
 --------------
 
 :gdef:`Local formulas <local formula>` are :term:`terms <term>` of
-type :g:`bool`. They correspond to the embedding of a lower-level logic inside of our terms. They can in particular be constructed using common
-syntax and construction specific to Squirrel described below:
+type :g:`bool`. They correspond to the embedding of a lower-level
+logic inside using terms.  They can in particular be constructed using
+the following (standard and Squirrel-specific) logical constructs:
 
 .. prodn::
   term += @term && @term | @term %|%| @term | @term => @term | not @term
@@ -272,6 +280,9 @@ where :n:`&&, ||, =>` are used with a right infix notation, and
 :n:`not` in prenex form. Bear in mind that those connectives are in
 fact classical function symbols of the terms.
 
+.. todo::
+   Adrien: "Bear in mind ... of the terms" => I did not understand
+   
 The :gdef:`happens` predicate defines the time-points that have been
 scheduled in the execution, e.g. :n:`happens(@term)` (where :n:`@term`
 is of type :g:`timestamp`) state that :n:`@term` has been scheduled.
@@ -299,15 +310,22 @@ are first order formulas, written as follows:
     | @global_formula /\ @global_formula | @global_formula \/ @global_formula
     | Forall @binders, @global_formula | Exists @binders, @global_formula
 
-The classical construction of the first-order logic mostly behave as expected.
+Global boolean connectives :n:`->, /\, \/` are used in infix
+notation, and have a standard semantics.
+
+An :gdef:`reachability atom` :n:`[@term]` holds if :n:`@term` evaluates to true with overwhelming probability.
+
+An :gdef:`equivalence atom` :n:`@equiv(@term__1,...,@term__n)` holds if
+:n:`@term__1,...,@term__n` are diff-terms which any PPTM adversary has
+at most a negligible probability of distinguishing
 
 .. note:: Compared to the paper presentations of the logic, where
-   diff-terms don't exist, the universal quantifiers can in Squirrel
-   be instantiated by diff-terms. The :g:`glob` tag allows to restric
+   diff-terms don't exist, universal quantifiers can in Squirrel
+   be instantiated by diff-terms. The :g:`glob` variable tag allows to restric
    quantifications over non diff-terms.
 
-
-The :n:`[@term]` predicates holds if :n:`@term`  evaluates to true with overwhelming probability.
-
+.. todo::
+   Adrien: I feel like this note is slightly out-of-place here. Maybe in the section of diff-terms?
+   
 .. _section-judgements:
 
