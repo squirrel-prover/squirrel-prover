@@ -235,9 +235,6 @@ otherwise it returns :n:`@term__e` (terms :n:`@term__b` and
 cannot). If no :n:`else` branch term is provided, :n:`@term__e`
 defaults to :g:`zero` (the zero bit-string).
 
-.. note:: :term:`Tags <tag>` are not supported in term binders. They are
-          accepted by the parser, but ignored by Squirrel.
-
 
 
 Diff-terms
