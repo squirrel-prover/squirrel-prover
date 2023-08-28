@@ -50,7 +50,7 @@ cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 - Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
    add to the list `proof-assistant-table-default` the following line:
 ```
- (squirrel "squirrel" "sp")
+ (squirrel "Squirrel" "sp")
 ```
 Then erase the outdated compiled version of this file:
 ```
@@ -326,3 +326,10 @@ It can be generated through:
 $ make coverage
 ```
 The documentation can then be browsed through `_coverage/index.html`.
+
+# JSquirrel
+
+If you want to run `Squirrel` in your browser we've transpiled Squirrel
+into JS using [JSofOcaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview) linked to [CodeMirror6](https://codemirror.net/) editor.
+
+See `app/README.md` for more.

@@ -1,0 +1,9 @@
+(executable
+ (name server)
+ (libraries dream))
+
+(rule
+ (targets server.ml)
+ (deps server.eml.ml ../static/editor.bundle.js)
+ (action (run dream_eml %{deps} --workspace %{workspace_root})))
+

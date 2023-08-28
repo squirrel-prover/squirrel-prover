@@ -1,0 +1,23 @@
+(executable
+ (name client)
+ (modes js)
+ (promote (until-clean))
+ (libraries yojson jsquirrel js_of_ocaml js_of_ocaml-tyxml )
+ (js_of_ocaml
+    (javascript_files
+    ; can get some js import with ↓
+    ; ./basic.js 
+    js_stub/unix.js)
+  (flags :standard
+         --linkall 
+         ; ↓ Apparently already in, but where ? ↓
+         ; --pretty
+         ; --disable shortvar 
+         ; --debug-info
+         ; ↓ FIXME ↓
+         ; -I /home/thomas/.opam/default/lib/cmdliner
+         ; -I `opam var lib`/cmdliner
+         --extern-fs
+         --setenv PATH=/bin))
+ (link_flags -linkall -no-check-prims)
+ (preprocess (staged_pps js_of_ocaml-ppx ppx_deriving_yojson)))

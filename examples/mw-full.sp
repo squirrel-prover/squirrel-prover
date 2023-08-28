@@ -342,11 +342,11 @@ Proof.
             admit. (* WIP *)
           simpl.
           case output@R1(r) => Meq1.
-          destruct Meq1 as [_ _ [Meq1 ->]].
-          by euf Meq1.
+          ++ destruct Meq1 as [_ _ [Meq1 ->]].
+             by (euf Meq1 => [r0 A0]).
 
-          destruct Meq1 as [H0 _].
-          by use H0 with i,t.
+          ++ destruct Meq1 as [H0 _].
+             by use H0 with i,t.
            
           intro [t0 [Ctrace A]].
           assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
@@ -397,7 +397,7 @@ Proof.
         case output@R1(r) => Meq1.
         - destruct Meq1 as [_ _ [Meq1 Meq2]].
           rewrite Meq2 in H1.
-          by project; euf Meq1.
+          by (project; euf Meq1 => [? ?]).
         - destruct Meq1 as [H0 _].
           by use H0 with i,t.
     }
@@ -429,7 +429,7 @@ Proof.
         case output@R1(r) => Meq1.
         * destruct Meq1 as [_ _ [Meq1 Meq2]].
           rewrite Meq2 in H2.
-          by project; euf Meq1.
+          by (project; euf Meq1 => [? ?]).
         * destruct Meq1 as [H0 _].
           by use H0 with i,t.
 
@@ -462,7 +462,7 @@ Proof.
           simpl.
           case output@R1(r) => Meq1.
           -- destruct Meq1 as [_ _ [Meq1 ->]].
-             by euf Meq1.
+             by (euf Meq1 => [? ?]).
           -- destruct Meq1 as [H0 _].
              by use H0 with i,t.
 

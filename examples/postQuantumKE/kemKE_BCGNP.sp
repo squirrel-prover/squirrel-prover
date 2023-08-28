@@ -76,7 +76,9 @@ hash expd
 
 (* public random key for exct *)
 
-name skex : message
+name skex : message.
+
+axiom [any] len_expd (x1,x2:message) : len(expd(x1,x2)) = namelength_message.
 
 (* KEM *)
 
@@ -269,11 +271,12 @@ process InitiatorToCompromised2(i,j,k:index) =
  let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
  sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
 
-
-
 system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 
-axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+
+(* ======== *)
+(*  Proofs  *)
+(* ======== *)
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
 equiv [mainCCAkI,idealized/left] test.
@@ -356,14 +359,10 @@ Proof.
             auto.
 Qed.
 
-
 equiv [idealized/left,idealized/left] reflex.
 Proof.
   diffeq => *.
 Qed.
-
-axiom  [idealized/left,idealized/left] len_expd (x1,x2:message) : len(expd(x1,x2)) = len(skex).
-
 
 (*******************************************)
 (*** Strong Secrecy of the responder key ***)
@@ -375,20 +374,16 @@ global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
   [happens(R2(i,j,k))] -> 
   equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))).
 Proof.
-  intro Hap .
+  intro Hap.
   use reflex with R2(i,j,k) => //.
   expandall. simpl.
   prf 1, exct(skex,kR(k,i,j)).
   prf 1, expd(_,n_PRF). 
-  xor 1, xor _ _, n_PRF1. 
-  rewrite len_expd.
-  namelength n_PRF1, skex.
-  intro Len.
-  rewrite if_true in 1.
-  auto.
+search len _.
+  xor 1, xor _ _, n_PRF1.
+  rewrite len_expd namelength_n_PRF1 //=.
   by fresh 1.
 Qed.
-
 
 
 (*******************************************)
@@ -409,12 +404,6 @@ Proof.
                <encap(n_CCA1(i,j,k),rI(i,j,k),pk(skR(j))),
                 <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF). 
   xor 1, n_PRF1.
-  rewrite len_expd.
-  namelength n_PRF1, skex.
-  intro Len.
-  rewrite if_true in 1.
-  auto.
+  rewrite len_expd namelength_n_PRF1 //=.
   by fresh 1.
 Qed.
-
-

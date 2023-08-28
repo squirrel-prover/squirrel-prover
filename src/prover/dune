@@ -1,0 +1,9 @@
+(library
+  (name squirrelprover)
+  (public_name squirrel.prover)
+  (library_flags (:standard -linkall))
+  (instrumentation (backend bisect_ppx))
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
+  (libraries squirrelcore squirrelfront))
+

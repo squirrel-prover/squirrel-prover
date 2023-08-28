@@ -22,6 +22,7 @@ sanity
 *.fls
 _coverage/
 _opam/
+node_modules/
 *.coverage
 /src/commit.ml
 .DS_Store
@@ -36,4 +37,7 @@ documentation/sphinx/build/
 # *.py[cod]
 *__pycache__/
 documentation/sphinx/public/
-public/
+*.bc.js
+package-lock.json
+app/static/client.js
+app/static/editor.bundle.js

@@ -10,9 +10,11 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest_full example
+.PHONY: test
+test: alcotest_full example ## Run alcotests (see ./test.ml) then the examples
 
-bench: bench_example
+.PHONY: bench
+bench: bench_example ## Perform benchmarks (cf. wikis/Dev-README on gitlab)
 
 # squirrel is not PHONY here, it exists as executable
 .PHONY: okfail okfail_end example examples_end alcotest alcotest_full
@@ -20,7 +22,7 @@ bench: bench_example
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 BENCHDIR=_build/bench
-TESTS_OUT=/tmp/squirrel_tests.output
+TESTS_OUT=_build/default/tests.output
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
 BENCH_OUT=$(BENCHDIR)/last.json
@@ -34,7 +36,7 @@ NC=\033[0m
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/basic-tutorial/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp)
 BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
 okfail: squirrel
@@ -46,7 +48,7 @@ okfail: squirrel
 okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; \
     rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
@@ -59,7 +61,7 @@ bench_preamble:
 
 # Populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 tac_count_examples: squirrel
-	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@for example in $(PROVER_EXAMPLES); do \
 		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
 		mkdir -p `dirname $${stat_name}`;\
@@ -76,7 +78,7 @@ tac_count_examples: squirrel
 # README → /usr/bin/time is not always installed by default in your OS !
 # In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
-	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running bench onCounting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for example in $(PROVER_EXAMPLES); do \
@@ -132,14 +134,14 @@ $(BENCHDIR)/all/last.json:
 example: squirrel
 	@rm -rf `$(RUNLOGDIR)/examples`
 	@$(ECHO) "================== EXAMPLES ======================"
-	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  wc -l < tests/tests.ko | tr -d '\n'; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All examples passed successfully. ; fi
 
@@ -157,28 +159,28 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 alcotest: version
 	dune runtest
 
-# Apparently needs to build everything for the test.exe
-_build/default/test.exe: version
-	dune build
-
 # Same as above but will print out only the FAILs tests as before
-alcotest_full: _build/default/test.exe version 
+alcotest_full: version 
 	@$(ECHO) "================== ALCOTEST ======================"
-	@if dune exec ./_build/default/test.exe > $(TESTS_OUT) ; \
-		then echo "${GRE}Alcotests passed successfully !${NC}" ; \
-		else echo "${RED}Alcotests FAILED :${NC}" ; \
-			cat $(TESTS_OUT) | sed -e 's/\x1b\[[0-9;]*m//g' | grep -E --color "^[^│] \[FAIL\]" ; \
+	@dune build @mytest
+	@python3 ./scripts/sed.py $(TESTS_OUT) /tmp/tests.output
+	@if cat /tmp/tests.output | grep -q "^[^│] \[FAIL\]" ; \
+		then echo "${RED}Alcotests FAILED :${NC}" ; \
+		  cat /tmp/tests.output | grep -E --color "^[^│] \[FAIL\]" ; \
 			exit 1; \
+		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
 
-clean:
+.PHONY: clean
+clean: ## Call dune clean and remove executable and coverage
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
 	rm -rf public
 
 # Clean last bench
-clean_bench:
+.PHONY: clean_bench
+clean_bench: ## Clean previous bench
 	rm -f $(BENCHDIR)/*.json
 
 # Clean previous local bench
@@ -186,7 +188,8 @@ clean_prev_bench:
 	rm -f $(BENCHDIR)/prev/*.json
 
 # Clean all local bench
-clean_all_bench:
+.PHONY: clean_all_bench
+clean_all_bench: ## Clean all benchs
 	rm -rf $(BENCHDIR)
 
 # We have to "touch" ./squirrel executable for other recipes
@@ -203,7 +206,8 @@ squirrel: version
 # 2. These tests could be ran as dune tests rather than through this
 #    Makefile, which would render instrumentation available and would
 #    also avoid re-runnning tests when unnecessary.
-coverage:
+.PHONY: coverage
+coverage: ## Generates coverage report in _coverage/index.html
 	rm -rf _coverage
 	dune runtest --force --instrument-with bisect_ppx
 	find . -name '*.coverage' | \
@@ -218,7 +222,8 @@ install: squirrel
 	cp -r theories $(PREFIX)/bin/theories
 	export $(SQUIRRElBIN)
 
-doc:
+.PHONY: doc
+doc: ## Build generated API documentation
 	dune build @doc
 	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
@@ -244,35 +249,40 @@ GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
 LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
 LAST2=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -2 | tail -1`
 LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
-PLOT=./plot.py
+PLOT=./scripts/plot.py
 STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
 # This plot tactics statistics
-plot:
+.PHONY: plot
+plot: ## Call plot script (by default plots the last bench)
 	python3 $(PLOT)
 
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
-plot_all:
+.PHONY: plot_all
+plot_all: ## Draw a graph that compare the mean of all previous bench with the last one
 	rm -f $(BENCHDIR)/all/last.json
 	$(MAKE) $(BENCHDIR)/all/last.json
 	python3 $(PLOT) $(BENCHDIR)/all/last.json
 
 # This shows you the last benchmark compared to previous one
 # Needs `matplotlib` (pip install)
-plot_diff_last:
+.PHONY: plot_diff_last
+plot_diff_last: ## Plots comparison graph btwn last bench and previous one
 	@echo "Compare ${ORA}$(LAST2)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST2) $(LAST) 
 
 # This shows you the last benchmark compared to the most recent commit bench
 # Needs `matplotlib` (pip install)
-plot_diff_commit:
+.PHONY: plot_diff_commit
+plot_diff_commit: ## Plots last benchmark compared to the most recent commit bench
 	@echo "Compare ${ORA}$(LAST_COMMIT)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST_COMMIT) $(LAST)
 
 # compare bench of current work with a specified commit in GITCOMMIT
 # GITCOMMIT is by default to HEAD~1
-bench_compare: bench_preamble $(BENCH_OUT)
+.PHONY: bench_compare
+bench_compare: bench_preamble $(BENCH_OUT) ## Compare bench with given commit (cf Dev-README)
 	@echo "↑ Bench ${GRE}master with current work${NC} ↑"
 	@echo "Verify $(BENCH_OUT) and copy in $(BENCHDIR)/prev/$(NOW).json…"
 	@if python3 -m json.tool $(BENCH_OUT) > $(BENCHDIR)/prev/$(NOW).json \
@@ -346,5 +356,36 @@ $(BENCHDIR)/commits/%.json:
 	else \
 		echo "No work pop back from stash"; \
 	fi
+
+.PHONY: help
+help: ## Print this help message
+	@echo "List of available make commands";
+	@echo "";
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}';
+	@echo "";
+
+APPDIR=app/
+
+.PHONY: start
+start: jsquirrel bundle ## Serve the application with a local HTTP server
+	dune exec $(APPDIR)server/server.exe
+
+jsquirrel: 
+	dune build $(APPDIR)client/client.bc.js
+	mkdir -p $(APPDIR)static
+	rm -f $(APPDIR)static/client.js
+	cp _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
+
+bundle:
+	mkdir -p $(APPDIR)static
+	rm -f $(APPDIR)static/editor.bundle.js
+	cd $(APPDIR)
+	# node_modules/.bin/rollup $(APPDIR)client/editor.mjs -f iife --output.name MyBundle \
+	# -o $(APPDIR)static/editor.bundle.js -p @rollup/plugin-node-resolve
+	npm run prepare --prefix app/
+
+.PHONY: watch
+watch: ## Watch for the filesystem and rebuild on every change
+	$(DUNE) build @@default --watch
 
 .PHONY: version clean

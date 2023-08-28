@@ -49,7 +49,7 @@ secrecy of the keys.
 
 
 *******************************************************************************)
-set timeout = 10.
+set timeout = 50.
 set postQuantumSound = true.
 
 include Basic.
@@ -58,7 +58,7 @@ hash exct
 
 (* public random key for exct *)
 
-name skex : message
+name skex : message.
 
 (* KEM *)
 
@@ -73,7 +73,9 @@ signature sign,checksign,spk
 (* PRF *)
 
 hash F1
-hash F2
+hash F2.
+
+axiom [any] len_F (x1,x2:message) : len(F1(x1,x2)) = namelength_message.
 
 (* long term keys of I *)
 
@@ -267,8 +269,6 @@ process InitiatorToCompromised2(i,j,k:index) =
     DFI :  sIR(i,j,k) := kj.
 
 system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
-
-axiom [mainCCAkR,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
 equiv [mainCCAkR,idealized/left] test.
@@ -480,6 +480,10 @@ process InitiatorToCompromised3(i,j,k:index) =
 
 
 system [idealized3]  out(cI,skex); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised3(i,j,k))).
+
+(* ============= *)
+(*    PROOFS     *)
+(* ============= *)
 
 axiom [idealized3/left,idealized2] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))) =  att(frame@pred(I1(i,j,k))).
 
@@ -1016,14 +1020,11 @@ Qed.
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
 
-axiom  [idealized3/left,idealized3/left]  fst_p: forall (x,y:message), fst(<x,y>)=x.
-axiom  [idealized3/left,idealized3/left]  snd_p: forall (x,y:message), snd(<x,y>)=y.
-
 name n_PRF2 : index * index * index -> message.
- (* multi PRF assumption, F1(_,n) and F2(_,n) can be seen as F1(_,n') and F2(_,n) *)
-axiom  [idealized3/left,idealized3/left] multprf (i,j,k:index,m:message): F1(m,n_PRF(i,j,k)) = F1(m,n_PRF2(i,j,k)).
 
-axiom   [idealized3/left,idealized3/left] len_F (x1,x2:message) : len(F1(x1,x2)) = len(skex).
+(* multi PRF assumption, F1(_,n) and F2(_,n) can be seen as F1(_,n') and F2(_,n) *)
+axiom [idealized3/left,idealized3/left] multprf (i,j,k:index,m:message):
+  F1(m,n_PRF(i,j,k)) = F1(m,n_PRF2(i,j,k)).
 
 (* In idealized, we prove that at the end of I, the derived key is strongly secret. *)
 global goal [idealized3/left,idealized3/left] resp_key (i,j,k:index[param]):
@@ -1048,8 +1049,7 @@ Proof.
               F1(sid10(i,j,k)@FI(i,j,k),n_PRF(i,j,k0)).
     + localize H0' as H0. clear H0'. repeat destruct H0.
       expand output.
-      rewrite ?snd_p in Meq0, Meq, Meq1.
-      rewrite ?fst_p in  Meq0, Meq, Meq1.
+      rewrite //= in Meq0, Meq, Meq1.
       expand C4.
       case try find il jl kl such that _ in  F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl)) else _.
         ++ intro [i1 j1 k1 [I1 I2]].
@@ -1066,7 +1066,7 @@ Proof.
     + rewrite multprf.
       prf 1, F1(_,n_PRF2(i,j,k0)).
       xor 1; rewrite if_true in 1.
-      rewrite len_F; 1: by namelength skex,n_PRF1.
+      rewrite len_F namelength_n_PRF1 //=.
       by fresh 1.
 Qed.
 
@@ -1085,8 +1085,6 @@ Proof.
   rewrite multprf.
   prf 1, F1(_,n_PRF2(i,j,k)).
   xor 1; rewrite if_true in 1.
-  rewrite len_F.
-  namelength skex,n_PRF1.
-  auto.
+  rewrite len_F namelength_n_PRF1 //.
   by fresh 1.
 Qed.

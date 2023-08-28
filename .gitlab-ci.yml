@@ -3,7 +3,7 @@ image: python3.7-alpine
 before_script:
  - opam update
  - opam switch -y remove gitrunner ||  echo "Opam environment clean up"
- - opam switch -y create gitrunner ocaml-base-compiler.4.13.1
+ - opam switch -y create gitrunner ocaml-base-compiler.5.0.0
  - opam install . -y --deps-only
  - eval $(opam env)
  - pip3 install -U pip

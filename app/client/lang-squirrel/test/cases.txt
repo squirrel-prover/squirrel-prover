@@ -1,0 +1,372 @@
+# constandadvbadnames
+
+global goal hybrid ['a] 
+  (N1 : int[const, adv]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+ (* Inductive case of the hybrid proof *)
+ (Forall (N0 : int[const, adv]), 
+   [N0 <= N1] ->
+   equiv(u, z, (fun (i:int) => if i < N0 then (diff(fL,fR)) i else z)) ->
+   equiv( u,
+          z,
+          (fun (i:int) =>(if i < N0 then (diff(fL,fR)) i else z)),
+          (diff(fL,fR)) N0) ) ->
+
+  (* Conclusion *)
+  equiv(
+    u,z,
+    (fun (i : int) => if i <= N1 then (diff(fL,fR)) i else z)).
+
+==>
+
+Script(Sentence(Goal(GLOBAL(global),GOAL(goal),Global_statement(System_annot,Statement_name(ID),Ty_args(LBRACKET,TICK,ID,RBRACKET),Bnds_tagged(LPAREN,ID,operator,Ty(ID),LBRACKET,ID,COMMA,ID,RBRACKET,RPAREN,LPAREN,ID,COMMA,ID,operator,Ty(Ty(ID),ARROW,Ty(TICK,ID)),RPAREN,LPAREN,ID,operator,Ty(TICK,ID),RPAREN,LPAREN,ID,operator,Ty(MESSAGE(message)),RPAREN),operator,BlockComment,Global_formula(Global_formula(LPAREN,Global_formula(Quant(UFORALL(Forall)),Bnds_tagged(LPAREN,ID,operator,Ty(ID),LBRACKET,ID,COMMA,ID,RBRACKET,RPAREN),COMMA,Global_formula(LBRACKET,Term_i(Term_i(Sterm_i(ID)),Ord(LEQ),Term_i(Sterm_i(ID))),RBRACKET)),ARROW,Global_formula(Global_formula(EQUIV(equiv),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(LPAREN,Term_i(fun(fun),LPAREN,ID,operator,Ty(ID),RPAREN,DARROW,Term_i(IF(if),Term_i(Term_i(Sterm_i(ID)),Ord(operator),Term_i(Sterm_i(ID))),THEN(then),Term_i(Sterm_i(LPAREN,Term_i(Sterm_i(fun(diff),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN),Sterm_i(ID)),ELSE(else),Term_i(Sterm_i(ID)))),RPAREN)),RPAREN),ARROW,Global_formula(EQUIV(equiv),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(LPAREN,Term_i(fun(fun),LPAREN,ID,operator,Ty(ID),RPAREN,DARROW,Term_i(Sterm_i(LPAREN,Term_i(IF(if),Term_i(Term_i(Sterm_i(ID)),Ord(operator),Term_i(Sterm_i(ID))),THEN(then),Term_i(Sterm_i(LPAREN,Term_i(Sterm_i(fun(diff),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN),Sterm_i(ID)),ELSE(else),Term_i(Sterm_i(ID))),RPAREN))),RPAREN)),COMMA,Term_i(Sterm_i(LPAREN,Term_i(Sterm_i(fun(diff),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN),Sterm_i(ID)),RPAREN)),RPAREN),ARROW,BlockComment,Global_formula(EQUIV(equiv),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(LPAREN,Term_i(fun(fun),LPAREN,ID,operator,Ty(ID),RPAREN,DARROW,Term_i(IF(if),Term_i(Term_i(Sterm_i(ID)),Ord(LEQ),Term_i(Sterm_i(ID))),THEN(then),Term_i(Sterm_i(LPAREN,Term_i(Sterm_i(fun(diff),LPAREN,Term_i(Sterm_i(ID)),COMMA,Term_i(Sterm_i(ID)),RPAREN)),RPAREN),Sterm_i(ID)),ELSE(else),Term_i(Sterm_i(ID)))),RPAREN)),RPAREN))),DOT)))
+
+# complexgoalcomment2
+
+global goal hybrid ['a] 
+  (N1 : int[coucou, adv]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+ (* Inductive case of the hybrid proof *)
+ (Forall (N0 : int[coucou, adv]), 
+   [N0 <= N1] ->
+   equiv(u, z, (fun (i:int) => if i < N0 then (diff(fL,fR)) i else z)) ->
+   equiv( u,
+          z,
+          (fun (i:int) =>(if i < N0 then (diff(fL,fR)) i else z)),
+          (diff(fL,fR)) N0) ) ->
+
+  (* Conclusion *)
+  equiv(
+    u,z,
+    (fun (i : int) => if i <= N1 then (diff(fL,fR)) i else z)).
+
+==>
+
+Script(Sentence(Goal(GLOBAL(global),GOAL(goal),Global_statement(System_annot,Statement_name(Lsymb(ID)),Ty_args(LBRACKET,TICK,Lsymb(ID),RBRACKET),Bnds_tagged(LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(Lsymb(ID)),LBRACKET,Lsymb(ID),COMMA,Lsymb(ID),RBRACKET)),RPAREN,LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),COMMA,Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(Ty(Lsymb(ID)),ARROW,Ty(TICK,Lsymb(ID))))),RPAREN,LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(TICK,Lsymb(ID)))),RPAREN,LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(MESSAGE(message)))),RPAREN),operator,BlockComment,Global_formula(Global_formula(LPAREN,Global_formula(Quant(UFORALL(Forall)),Bnds_tagged(LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(Lsymb(ID)),LBRACKET,Lsymb(ID),COMMA,Lsymb(ID),RBRACKET)),RPAREN),COMMA,Global_formula(LBRACKET,Term(Term(Sterm_i(Lsymb(ID))),Ord(LEQ),Term(Sterm_i(Lsymb(ID)))),RBRACKET)),ARROW,Global_formula(Global_formula(EQUIV(equiv),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(LPAREN,Term(fun(fun),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(Lsymb(ID)))),RPAREN,DARROW,Term(IF(if),Term(Term(Sterm_i(Lsymb(ID))),Ord(operator),Term(Sterm_i(Lsymb(ID)))),THEN(then),Term(Sterm_i(LPAREN,Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),Sterm_i(Lsymb(ID))),ELSE(else),Term(Sterm_i(Lsymb(ID))))),RPAREN)),RPAREN),ARROW,Global_formula(EQUIV(equiv),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(LPAREN,Term(fun(fun),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(Lsymb(ID)))),RPAREN,DARROW,Term(Sterm_i(LPAREN,Term(IF(if),Term(Term(Sterm_i(Lsymb(ID))),Ord(operator),Term(Sterm_i(Lsymb(ID)))),THEN(then),Term(Sterm_i(LPAREN,Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),Sterm_i(Lsymb(ID))),ELSE(else),Term(Sterm_i(Lsymb(ID)))),RPAREN))),RPAREN)),COMMA,Term(Sterm_i(LPAREN,Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),ARROW,BlockComment,Global_formula(EQUIV(equiv),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(LPAREN,Term(fun(fun),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(Lsymb(ID)))),RPAREN,DARROW,Term(IF(if),Term(Term(Sterm_i(Lsymb(ID))),Ord(LEQ),Term(Sterm_i(Lsymb(ID)))),THEN(then),Term(Sterm_i(LPAREN,Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),Sterm_i(Lsymb(ID))),ELSE(else),Term(Sterm_i(Lsymb(ID))))),RPAREN)),RPAREN))),DOT)))
+
+# complexformula 
+
+global goal [main/left, mainCCAkR/left] ideal_real (tau:timestamp) : 
+    [happens(tau)]-> equiv(frame@tau, pk(skR), pk(skI), kI, s, skI).
+
+==>
+
+Script(Sentence(Goal(GLOBAL(global),GOAL(goal),Global_statement(System_annot(LBRACKET,System_item(Lsymb(ID),SLASH,tackeyw(left)),COMMA,System_item(Lsymb(ID),SLASH,tackeyw(left)),RBRACKET),Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged(LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(TIMESTAMP(timestamp)))),RPAREN),operator,Global_formula(Global_formula(LBRACKET,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RBRACKET),ARROW,Global_formula(EQUIV(equiv),LPAREN,Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Sterm_i(Lsymb(ID)))),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),COMMA,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))),DOT)))
+
+# systemeq
+
+system Q1 = [Q/left] with rewrite foo.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(system),Lsymb(ID),operator,LBRACKET,System_item(Lsymb(ID),SLASH,tackeyw(left)),RBRACKET,decl(with),tackeyw(rewrite),Lsymb(ID)),DOT)))
+
+# axiomhint
+
+axiom [any] len_a : len(a) = eta.
+axiom [any] len_b : len(b) = eta.
+hint rewrite len_a.
+hint rewrite len_b.
+
+==>
+
+Script(Sentence(Declarations(Declaration(AXIOM(axiom),Local_statement(System_annot(LBRACKET,System_item(Lsymb(ID)),RBRACKET),Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged,operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Ord(operator),Term(Sterm_i(Lsymb(ID)))))),DOT)),Sentence(Declarations(Declaration(AXIOM(axiom),Local_statement(System_annot(LBRACKET,System_item(Lsymb(ID)),RBRACKET),Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged,operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Ord(operator),Term(Sterm_i(Lsymb(ID)))))),DOT)),Sentence(Hint(closing(hint),tackeyw(rewrite),Lsymb(ID),DOT)),Sentence(Hint(closing(hint),tackeyw(rewrite),Lsymb(ID),DOT)))
+
+# action
+
+action A : 1.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(action),Lsymb(ID),operator,INT),DOT)))
+
+# sometac
+
+Proof.
+  help.
+  help intro.
+  intro i j Hh Hc.
+  expand cond.
+  euf Hc.
+  intro *; by exists k.
+Qed.
+
+
+==>
+
+Script(Sentence(PROOF),Sentence(Tactic(tackeyw(help),DOT)),Sentence(Tactic(tackeyw(help),Help_tac(Help_tac_i(tackeyw(intro))),DOT)),Sentence(Tactic(tackeyw(intro),ID,ID,ID,ID,DOT)),Sentence(Tactic(tackeyw(expand),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(Tactic(tackeyw(euf),Lsymb(ID),DOT)),Sentence(Tactic(tackeyw(intro),STAR,Tacticals,closing(by),EXISTS(exists),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(QED))
+
+# stuffedgoal
+
+goal wa :
+  forall (i:index, j:index),
+  happens(R(j,i)) =>
+     cond@R(j,i) =>
+         exists (k:index),
+              T(i,k) <= R(j,i) && fst(input@R(j,i)) = nT(i,k).
+==>
+
+Script(Sentence(Goal(GOAL(goal),Local_statement(System_annot,Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged,operator,Term(Term(Quantif(FORALL(forall)),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(INDEX(index)))),COMMA,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(INDEX(index)))),RPAREN,COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN))),Infix_s(DARROW),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(DARROW),Term(Term(Quantif(EXISTS(exists)),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(INDEX(index)))),RPAREN,COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))),Ord(LEQ),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(AND),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))),RPAREN)),Ord(operator),Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))))))))),DOT)))
+
+# systembang
+
+system [simple] ((!_j reader(j)) | (!_i tag(i))).
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(system),LBRACKET,Lsymb(ID),RBRACKET,Process(LPAREN,Process(LPAREN,Process(BANG,Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),operator,Process(LPAREN,Process(BANG,Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),RPAREN)),DOT)))
+
+# systembang2
+
+system ((!_j reader(j)) | (!_i !_k tag(i))).
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(system),Process(LPAREN,Process(LPAREN,Process(BANG,Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN),operator,Process(LPAREN,Process(BANG,Process(BANG,Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN))),RPAREN),RPAREN)),DOT)))
+
+# process
+
+process reader(j:index) =
+  in(cT,x);
+  try find i such that snd(x) = h(fst(x),key(i)) in
+   R : out(cR,ok)
+  else
+    out(cR,ko).
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty(INDEX(index))),RPAREN,operator,Process(IN(in),LPAREN,Lsymb(ID),COMMA,Lsymb(ID),RPAREN,Tacticals,Process(FIND(Tacticals(try),find),Lsymb(ID),SUCHTHAT(such,that),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Ord(operator),Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN))),IN(in),Process(Lsymb(ID),operator,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),ELSE(else),Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)))),DOT)))
+
+# process2
+
+process tag(i:index) =
+  new nT;
+  T : out(cT, <nT, h(nT,key(i))>).
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty(INDEX(index))),RPAREN,operator,Process(NEW(new),Lsymb(ID),Tacticals,Process(Lsymb(ID),operator,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(operator,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),operator),RPAREN)))),DOT)))
+
+# cyrpto
+
+signature sign,checksign,pk
+hash h
+senc enc,dec
+aenc asenc,asdec,aspk.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(signature),Lsymb(ID),COMMA,Lsymb(ID),COMMA,Lsymb(ID)),Declaration(decl(hash),Lsymb(ID)),Declaration(decl(senc),Lsymb(ID),COMMA,Lsymb(ID)),Declaration(decl(aenc),Lsymb(ID),COMMA,Lsymb(ID),COMMA,Lsymb(ID)),DOT)))
+
+# namesstart
+
+name n2 : index * index -> message.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(name),Lsymb(ID),operator,Ty(Ty(INDEX(index),STAR,INDEX(index)),ARROW,Ty(MESSAGE(message)))),DOT)))
+
+# names
+
+name n : message
+name n1 : index -> message
+name key : index -> message.
+mutable s : message = s0.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(name),Lsymb(ID),operator,Ty(MESSAGE(message))),Declaration(decl(name),Lsymb(ID),operator,Ty(Ty(INDEX(index)),ARROW,Ty(MESSAGE(message)))),Declaration(decl(name),Lsymb(ID),operator,Ty(Ty(INDEX(index)),ARROW,Ty(MESSAGE(message)))),DOT)),Sentence(Declarations(Declaration(decl(mutable),Lsymb(ID),Colon_ty(operator,Ty(MESSAGE(message))),operator,Term(Sterm_i(Lsymb(ID)))),DOT)))
+
+# abstract
+
+abstract ok : message.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(abstract),Lsymb_decl(Lsymb(ID)),Ty_args,operator,Ty(MESSAGE(message))),DOT)))
+
+# null
+
+system null.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(system),Process(NULL(null))),DOT)))
+
+
+# Identifiers
+
+name n : message.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(name),Lsymb(ID),operator,Ty(MESSAGE(message))),DOT)))
+
+
+# Strings
+
+type T [s,y].
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(type),Ty(Lsymb(ID)),LBRACKET,Bty_info(Lsymb(ID)),COMMA,Bty_info(Lsymb(ID)),RBRACKET),DOT)))
+
+# op
+
+op yo : T -> T = fun(x : T) => x.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(op),Lsymb_decl(Lsymb(ID)),Ty_args,Colon_ty(operator,Ty(Ty(Lsymb(ID)),ARROW,Ty(Lsymb(ID)))),operator,Term(fun(fun),LPAREN,Bnd_group(Lval(Simpl_lval(Lsymb(ID))),operator,Ty_tagged(Ty(Lsymb(ID)))),RPAREN,DARROW,Term(Sterm_i(Lsymb(ID))))),DOT)))
+
+# print
+
+print n.
+
+==>
+
+Script(Sentence(Sentence(tackeyw(print),Lsymb(ID),DOT)))
+
+# search
+
+search if _ then _ else _.
+
+==>
+
+Script(Sentence(Sentence(Search_query(tackeyw(search),Term(IF(if),Term(Sterm_i(UNDERSCORE)),THEN(then),Term(Sterm_i(UNDERSCORE)),ELSE(else),Term(Sterm_i(UNDERSCORE))),DOT))))
+
+# channel
+
+channel c.
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(channel),Lsymb(ID)),DOT)))
+
+# system
+
+system [S] (A : out(c,diff(zero,empty))).
+
+==>
+
+Script(Sentence(Declarations(Declaration(decl(system),LBRACKET,Lsymb(ID),RBRACKET,Process(LPAREN,Process(Lsymb(ID),operator,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),RPAREN)),DOT)))
+
+# goal
+
+goal foo_lem (x : message) : f(x) = a.
+
+==>
+
+Script(Sentence(Goal(GOAL(goal),Local_statement(System_annot,Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged(LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(MESSAGE(message)))),RPAREN),operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Ord(operator),Term(Sterm_i(Lsymb(ID))))),DOT)))
+
+# goal12
+
+goal _: happens(Q) => zu@Q = diff(zero,zero).
+
+==>
+
+Script(Sentence(Goal(GOAL(goal),Local_statement(System_annot,Statement_name(UNDERSCORE),Ty_args,Bnds_tagged,operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(DARROW),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Term(Sterm_i(Lsymb(ID))),Ord(operator),Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)))))),DOT)))
+
+# goal2
+
+goal [S] foo : happens(A) => output@A = diff(zero,zero).
+
+==>
+
+Script(Sentence(Goal(GOAL(goal),Local_statement(System_annot(LBRACKET,System_item(Lsymb(ID)),RBRACKET),Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged,operator,Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(DARROW),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Term(Sterm_i(Lsymb(ID))),Ord(operator),Term(Sterm_i(fun(diff),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)))))),DOT)))
+
+
+# goal3
+
+goal [S/left] foo : true.
+
+==>
+
+Script(Sentence(Goal(GOAL(goal),Local_statement(System_annot(LBRACKET,System_item(Lsymb(ID),SLASH,tackeyw(left)),RBRACKET),Statement_name(Lsymb(ID)),Ty_args,Bnds_tagged,operator,Term(Sterm_i(Lsymb(ID)))),DOT)))
+
+
+# searchinput
+
+search input@_.
+
+==>
+
+Script(Sentence(Sentence(Search_query(tackeyw(search),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Sterm_i(UNDERSCORE))),DOT))))
+
+
+# searchinput2
+
+global goal [S] _ (x,y:message) : equiv((x,y)).
+
+==>
+
+Script(Sentence(Goal(GLOBAL(global),GOAL(goal),Global_statement(System_annot(LBRACKET,System_item(Lsymb(ID)),RBRACKET),Statement_name(UNDERSCORE),Ty_args,Bnds_tagged(LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),COMMA,Simpl_lval(Lsymb(ID)),operator,Ty_tagged(Ty(MESSAGE(message)))),RPAREN),operator,Global_formula(EQUIV(equiv),LPAREN,Term(Sterm_i(LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),DOT)))
+
+# processyubikey
+
+process yubikeyplug (pid:index) =
+  in(cY,x1);
+  YCtr(pid) := mySucc(YCtr(pid));
+  out(cY,endplug).
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty(INDEX(index))),RPAREN,operator,Process(IN(in),LPAREN,Lsymb(ID),COMMA,Lsymb(ID),RPAREN,Tacticals,Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN,COLONEQ,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),Tacticals,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)))),DOT)))
+
+# abstract++
+
+abstract (++) : message.
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(abstract),Lsymb_decl(LPAREN,RIGHTINFIXSYMB,RPAREN),Ty_args,operator,Ty(MESSAGE(message))),DOT)))
+
+
+# rightinfixsymb
+
+abstract (~<) : message.
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(abstract),Lsymb_decl(LPAREN,RIGHTINFIXSYMB,RPAREN),Ty_args,operator,Ty(MESSAGE(message))),DOT)))
+
+
+# processyubikey2
+
+process server(ii:index) =
+  in(cR,y1);
+  if dec(snd(snd(y1)),k(i)) <> fail
+      && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
+  then
+    SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
+    out(cR,accept).
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty(INDEX(index))),RPAREN,operator,Process(IN(in),LPAREN,Lsymb(ID),COMMA,Lsymb(ID),RPAREN,Tacticals,Process(IF(if),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),Ord(NEQ),Term(Term(Sterm_i(Lsymb(ID))),Infix_s(AND),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(RIGHTINFIXSYMB),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),RPAREN)),Ord(operator),Term(Sterm_i(Lsymb(ID))))))),THEN(then),Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN,COLONEQ,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),RPAREN)),Tacticals,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))))),DOT)))
+
+
+
+# processlfmtp21
+
+system (
+   (O: !_i in(o,x); out(o,<H(x,k),G(x,k')>)) |
+   (A: !_i s:=H(s,k); out(o,G(s,k')))
+).
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(system),Process(LPAREN,Process(LPAREN,Process(Lsymb(ID),operator,Process(BANG,Process(IN(in),LPAREN,Lsymb(ID),COMMA,Lsymb(ID),RPAREN,Tacticals,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(operator,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),operator),RPAREN)))),RPAREN),operator,Process(LPAREN,Process(Lsymb(ID),operator,Process(BANG,Process(Lsymb(ID),COLONEQ,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),Tacticals,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)))),RPAREN),RPAREN)),DOT)))
+
+# tryif
+
+process server(ii:index) =
+  in(cR,y1);
+  try find i such that fst(y1) = pid(i) in
+    (if dec(snd(snd(y1)),k(i)) <> fail
+        && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
+    then
+      SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
+      out(cR,accept)).
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),LPAREN,Bnd_group(Simpl_lval(Lsymb(ID)),operator,Ty(INDEX(index))),RPAREN,operator,Process(IN(in),LPAREN,Lsymb(ID),COMMA,Lsymb(ID),RPAREN,Tacticals,Process(FIND(Tacticals(try),find),Lsymb(ID),SUCHTHAT(such,that),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Ord(operator),Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN))),IN(in),Process(LPAREN,Process(IF(if),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),Ord(NEQ),Term(Term(Sterm_i(Lsymb(ID))),Infix_s(AND),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),Infix_s(RIGHTINFIXSYMB),Term(Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),RPAREN)),Ord(operator),Term(Sterm_i(Lsymb(ID))))))),THEN(then),Process(Lsymb(ID),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN,COLONEQ,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),COMMA,Term(Sterm_i(Fun_symb(Lsymb(ID)),LPAREN,Term(Sterm_i(Lsymb(ID))),RPAREN)),RPAREN)),RPAREN)),Tacticals,Process(OUT(out),LPAREN,Lsymb(ID),COMMA,Term(Sterm_i(Lsymb(ID))),RPAREN))),RPAREN)))),DOT)))
+

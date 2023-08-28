@@ -1,3 +1,4 @@
+open Squirrelcore
 (*----------------- History ----------------------------------*)(* {↓{ *)
 (** {History Functor}
  * Historiable is the signature of the state that can be saved and

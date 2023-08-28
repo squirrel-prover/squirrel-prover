@@ -59,16 +59,16 @@ process Schall(j:index) =
   in(cS, x1);
   let gp = snd(x1) in
   let pkp = fst(x1) in
-  if pkp = pk(skP) then
+  if pkp = pk(skP) then (
     out(cS, < <pk(skS),g^b(j)>, sign(<<gp,g^b(j)>,pkp>,skS)>);
     in(cS, x3);
-    if checksign(<<g^b(j),gp>,pk(skS)>,x3,pkp) then
+    if checksign(<<g^b(j),gp>,pk(skS)>,x3,pkp) then (
       out(cS,ok);
       in(cS, challenge);
       try find i such that gp = g^a(i) in
-        out(cS, diff(g^a(i)^b(j),g^k(i,j)))
+        (out(cS, diff(g^a(i)^b(j),g^k(i,j))))
       else
-        out(cS, diff(ok,ko))
+        out(cS, diff(ok,ko))))
 
 system  (!_i P(i) | !_j Schall(j)).
 

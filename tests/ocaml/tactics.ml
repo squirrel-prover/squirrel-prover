@@ -1,10 +1,14 @@
 (** Checking various tactics: case study, namelength. *)
 
-open Squirrellib
+open Squirrelcore
 open Util
 module ES = EquivSequent
 module TS = TraceSequent
 module L = Location
+
+module TopLevel = Squirreltop.TopLevel
+module Prover = Squirrelprover.Prover
+module TProver = TopLevel.Make(Prover)
 
 let pprint_option ppf = function 
   | Some s -> Fmt.pf ppf "%s" s
@@ -32,9 +36,9 @@ let mk_message st s =
 (** Check that case study fails when there is no conditional
     with the target condition. *)
 let case_study_fail () =
-  let st = Prover.init () in
+  let st = TProver.init () in
   let st =
-    Prover.exec_all st
+    TProver.exec_all ~test:true st
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
@@ -42,7 +46,7 @@ let case_study_fail () =
        Proof."
   in
   try
-    ignore (Prover.exec_command "nosimpl cs false." st) ;
+    ignore (TProver.exec_command ~test:true "nosimpl cs false." st) ;
     Alcotest.failf "Tactic application should have failed."
   with
   | Tactics.(Tactic_soft_failure (_,Failure e)) ->
@@ -51,7 +55,7 @@ let case_study_fail () =
         ~expected:"did not find any conditional to analyze"
         ~actual:e;
   try
-    ignore (Prover.exec_command "nosimpl cs (if true then _)." st) ;
+    ignore (TProver.exec_command ~test:true "nosimpl cs (if true then _)." st) ;
     Alcotest.failf "Tactic application should have failed with bad
     arguments."
   with
@@ -64,9 +68,9 @@ let case_study_fail () =
 (** Check that case study fails when there is no conditional
     with the target condition in the target item. *)
 let case_study_fail' () =
-  let st = Prover.init () in
+  let st = TProver.init () in
   let st =
-    Prover.exec_all st
+    TProver.exec_all ~test:true st
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
@@ -75,9 +79,9 @@ let case_study_fail' () =
        Proof."
   in
   (* "cs true" works in 0 but not in 1 *)
-  ignore (Prover.exec_command "nosimpl cs true in 0." st) ;
+  ignore (TProver.exec_command ~test:true "nosimpl cs true in 0." st) ;
   try
-    ignore (Prover.exec_command "nosimpl cs true in 1." st) ;
+    ignore (TProver.exec_command ~test:true "nosimpl cs true in 1." st) ;
     Alcotest.failf "Tactic application should have failed."
   with
   | Tactics.(Tactic_soft_failure (_,Failure e)) ->
@@ -89,9 +93,9 @@ let case_study_fail' () =
 (** Check that case study works as expected on several examples. *)
 let case_study () =
 
-  let st = Prover.init () in
+  let st = TProver.init () in
   let st = 
-    Prover.exec_all st
+    TProver.exec_all ~test:true st
         "mutable state : message = empty.
         name nfresh : message.
         system null.
@@ -101,9 +105,9 @@ let case_study () =
   in
 
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
-  let terms = get_seq_in_nth_goal st 0 in
+  let st = TProver.exec_command ~test:true "nosimpl cs true." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,ZERO"
     ~actual:(List.hd terms)
@@ -113,7 +117,7 @@ let case_study () =
     ~actual:(List.nth terms 1)
     ~expected:(Term.mk_true);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,EMPTY"
     ~actual:(List.hd terms)
@@ -124,7 +128,7 @@ let case_study () =
     ~expected:(Term.mk_true);
 
   (* deux sous-buts, l'un avec true,zero, l'autre true,empty *)
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         name n : message.
@@ -134,15 +138,15 @@ let case_study () =
         Proof."
   in
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  let st = TProver.exec_command ~test:true "nosimpl cs true." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
   (* deux sous-buts, l'un avec equiv(true,zero,n) l'autre equiv(true,empty,m) *)
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → true,ZERO,n"
     ~actual:(List.hd terms)
     ~expected:(Term.mk_zero);
-  let n = mk_message st "n" in
+  let n = mk_message st.prover_state "n" in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,zero,N"
     ~actual:(List.nth terms 1)
@@ -152,13 +156,13 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(Term.mk_true);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) →
     true,EMPTY,m"
     ~actual:(List.hd terms)
     ~expected:(Term.empty);
-  let m = mk_message st "m" in
+  let m = mk_message st.prover_state "m" in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,empty,M"
     ~actual:(List.nth terms 1)
@@ -169,7 +173,7 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(Term.mk_true);
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         global goal _ : 
@@ -180,11 +184,11 @@ let case_study () =
         Proof."
   in
   (* Attention, simpl va trivialiser ce but. *)
-  let st = Prover.exec_command "nosimpl cs true in 1." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  let st = TProver.exec_command ~test:true "nosimpl cs true in 1." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
   (* deux sous-buts, equiv(true,if true then zero else empty,n)
      et  equiv(true,if true then zero else empty,m) *)
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
     true,
@@ -207,7 +211,7 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(n);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
     true,
@@ -230,25 +234,25 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(m);
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         abstract f : message->message.
         global goal _ : equiv(f(if true then diff(n,m) else empty)).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = TProver.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
 
-  let terms = get_seq_in_nth_goal st 0 in
-  let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
+  let f = Symbols.Function.of_lsymb (mk "f") (TProver.get_table st) in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     true,
     F DIFF(N,M)"
     ~actual:(List.hd terms)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (TProver.get_table st) f  
        [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
@@ -257,13 +261,13 @@ let case_study () =
     ~actual:(List.nth terms 1)
     ~expected:(Term.mk_true);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     true,
     F EMPTY"
     ~actual:(List.hd terms)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (TProver.get_table st) f  
        [Term.empty]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
@@ -273,23 +277,23 @@ let case_study () =
     ~expected:(Term.mk_true);
 
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
         global goal _ : equiv(f(diff(if true then n else empty,if true then m else empty))).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs true." st in
+  let st = TProver.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
 
-  let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
-  let terms = get_seq_in_nth_goal st 0 in
+  let f = Symbols.Function.of_lsymb (mk "f") (TProver.get_table st) in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
     true,
     F DIFF(N,M)"
     ~actual:(List.hd terms)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (TProver.get_table st) f  
        [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
@@ -298,13 +302,13 @@ let case_study () =
     ~actual:(List.nth terms 1)
     ~expected:(Term.mk_true);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
     true,
     F EMPTY"
     ~actual:(List.hd terms)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (TProver.get_table st) f  
        [Term.empty]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
@@ -313,7 +317,7 @@ let case_study () =
     ~actual:(List.nth terms 1)
     ~expected:(Term.mk_true);
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         abstract x : message.
@@ -328,16 +332,16 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@_." st in
+  let st = TProver.exec_command ~test:true "nosimpl cs exec@_." st in
   (* même effet que `cs exec@tau`, `cs exec@tau in 3`, `cs exec@_ in 3`:
       deux buts
       1) exec@tau, exec@tau, frame@tau, if exec@tau' then x else y, x
       2) idem avec y à la fin au lieu de x *)
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
-  let x = find_in_sys_from_string "x" st in
-  let y = find_in_sys_from_string "y" st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
+  let x = find_in_sys_from_string "x" st.prover_state in
+  let y = find_in_sys_from_string "y" st.prover_state in
 
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
@@ -351,7 +355,7 @@ let case_study () =
     exec@tau"
     ~actual:(List.nth terms 3)
     ~expected:(x);
-  let exectau' = find_in_sys_from_string "exec@tau'" st in
+  let exectau' = find_in_sys_from_string "exec@tau'" st.prover_state in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
@@ -366,7 +370,7 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
@@ -380,7 +384,7 @@ let case_study () =
     ~actual:(List.nth terms 3)
     ~expected:(y);
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -392,13 +396,13 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@tau." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  let st = TProver.exec_command ~test:true "nosimpl cs exec@tau." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
 
-  let x = find_in_sys_from_string "x" st in
-  let y = find_in_sys_from_string "y" st in
+  let x = find_in_sys_from_string "x" st.prover_state in
+  let y = find_in_sys_from_string "y" st.prover_state in
 
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -414,7 +418,7 @@ let case_study () =
     exec@tau"
     ~actual:(List.nth terms 3)
     ~expected:(x);
-  let exectau' = find_in_sys_from_string "exec@tau'" st in
+  let exectau' = find_in_sys_from_string "exec@tau'" st.prover_state in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -431,7 +435,7 @@ let case_study () =
     ~actual:(List.nth terms 2)
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -447,7 +451,7 @@ let case_study () =
     exec@tau"
     ~actual:(List.nth terms 3)
     ~expected:(y);
-  let exectau' = find_in_sys_from_string "exec@tau'" st in
+  let exectau' = find_in_sys_from_string "exec@tau'" st.prover_state in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -465,7 +469,7 @@ let case_study () =
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -477,13 +481,13 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@tau in 3." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  let st = TProver.exec_command ~test:true "nosimpl cs exec@tau in 3." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
 
-  let x = find_in_sys_from_string "x" st in
-  let y = find_in_sys_from_string "y" st in
+  let x = find_in_sys_from_string "x" st.prover_state in
+  let y = find_in_sys_from_string "y" st.prover_state in
 
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -500,7 +504,7 @@ let case_study () =
     ~actual:(List.nth terms 4)
     ~expected:(x);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -518,7 +522,7 @@ let case_study () =
     ~expected:(y);
 
 
-  let st = Prover.exec_all st
+  let st = TProver.exec_all ~test:true st
         "Abort.
 
         global goal _ (x,y:message,tau,tau':timestamp) :
@@ -530,13 +534,13 @@ let case_study () =
           ).
         Proof."
   in
-  let st = Prover.exec_command "nosimpl cs exec@_ in 3." st in
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
+  let st = TProver.exec_command ~test:true "nosimpl cs exec@_ in 3." st in
+  Printer.pr "%a" (Prover.pp_subgoals st.prover_state) ();
 
-  let x = find_in_sys_from_string "x" st in
-  let y = find_in_sys_from_string "y" st in
+  let x = find_in_sys_from_string "x" st.prover_state in
+  let y = find_in_sys_from_string "y" st.prover_state in
 
-  let terms = get_seq_in_nth_goal st 0 in
+  let terms = get_seq_in_nth_goal st.prover_state 0 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -553,7 +557,7 @@ let case_study () =
     ~actual:(List.nth terms 4)
     ~expected:(x);
 
-  let terms = get_seq_in_nth_goal st 1 in
+  let terms = get_seq_in_nth_goal st.prover_state 1 in
   Alcotest.(check' term_testable) 
     ~msg:"global goal _ (tau,tau':timestamp) :
     equiv(
@@ -572,7 +576,7 @@ let case_study () =
 
 let namelength () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = Prover.exec_all (Prover.init ())
+  let st = TProver.exec_all ~test:true (TProver.init ())
         "
         system null.
         name n : message.
@@ -581,17 +585,17 @@ let namelength () =
         goal _ : True.
         Proof.
         " in
-  Printer.pr "%a@." (Prover.pp_subgoals st) ();
-  let tn = find_in_sys_from_string "n" st in
-  let _tm = find_in_sys_from_string "m" st in
+  Printer.pr "%a@." (Prover.pp_subgoals st.prover_state) ();
+  let tn = find_in_sys_from_string "n" st.prover_state in
+  let _tm = find_in_sys_from_string "m" st.prover_state in
   let tyn = Term.ty tn in 
-  let table = Prover.get_table st in
+  let table = TProver.get_table st in
 
   let axiom_n = "namelength_n" in
   let axiom_m = "namelength_m" in
 
-  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
-  let stmt_m = Lemma.find_stmt_reach (mk axiom_m) table in
+  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
+  let stmt_m = Lemma.find_stmt_local (mk axiom_m) table in
 
   let system = SystemExpr.context_any in
 
@@ -636,7 +640,7 @@ let namelength () =
 
 let namelength2 () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = Prover.exec_all (Prover.init ())
+  let st = TProver.exec_all ~test:true (TProver.init ())
         "
         system null.
         name n : message * message.
@@ -644,14 +648,14 @@ let namelength2 () =
         goal _ : True.
         Proof.
         " in
-  Printer.pr "%a@." (Prover.pp_subgoals st) ();
-  let tn = find_in_sys_from_string "n" st in
+  Printer.pr "%a@." (Prover.pp_subgoals st.prover_state) ();
+  let tn = find_in_sys_from_string "n" st.prover_state in
   let tyn = Term.ty tn in 
-  let table = Prover.get_table st in
+  let table = TProver.get_table st in
 
   let axiom_n = "namelength_n" in
 
-  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
+  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
 
   let system = SystemExpr.context_any in
 

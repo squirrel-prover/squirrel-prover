@@ -6,7 +6,6 @@
 include Basic.
 include Int.
 
-(*------------------------------------------------------------------*)
 system null.
 
 (* Case analysis axiom on integers.
@@ -18,23 +17,8 @@ global axiom case_int (i : int[const]) :
   [i = i0] \/ 
   Exists (j : int[const]), [i = succi j].
 
-(*------------------------------------------------------------------*)
-(* auxiliary lemma  *)
-goal lt_succ (i, j : int) :
-  (i < succi j) <=>
-  (i <> succi j && i <= succi j).
-Proof. 
-  split.
-  + intro H.
-    split; 1:auto.
-    by apply lt_impl_le. 
-  + intro [H1 H2].
-    apply le_impl_eq_lt in H2.
-    by case H2.
-Qed.
-
-(*------------------------------------------------------------------*)
-global goal hybrid ['a] (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+global goal hybrid ['a] 
+ (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
  (* Inductive case of the hybrid proof *)
  (Forall (N0 : int[const]), 
    [N0 <= N1] ->
@@ -49,7 +33,7 @@ global goal hybrid ['a] (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : mes
     u,z,
     (fun (i : int) => if i <= N1 then (diff(fL,fR)) i else z)).
 Proof. 
-  induction N1 => N IH Hyp.
+  induction N1 => N IH Hyp. 
   have [Eq0 | [N0 Eq0]] := case_int N; rewrite Eq0 /= in *.
   * rewrite !i0_lub.
     constseq 2:

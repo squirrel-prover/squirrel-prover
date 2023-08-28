@@ -1,13 +1,33 @@
+(env
+ (_
+  (env-vars (ALCOTEST_COLUMNS 100))
+  (js_of_ocaml
+   (flags (:standard --enable effects))
+   (build_runtime_flags (:standard)))))
+
 (executable
   (name squirrel)
   (libraries squirrellib)
+  (link_flags -linkall -g)
   (modules squirrel))
 
 (test
   (name test)
-  (libraries squirrellib squirreltests)
+  (libraries squirrelcore squirreltests)
   (modules test)
   (action (run %{test} --compact))
   ;; some tests rely on *.sp files in tests/ and theories/
   (deps (source_tree tests) (source_tree theories)) 
   (instrumentation (backend bisect_ppx)))
+
+(rule
+  (alias mytest)
+  (deps squirrel.exe (source_tree tests) (source_tree theories)) 
+  (action 
+   (progn
+    (with-outputs-to tests.output 
+     ;; keep going anyway to enrich tests.output
+          (with-accepted-exit-codes (or 0 1)
+            (run ./test.exe)))
+    ))
+  )

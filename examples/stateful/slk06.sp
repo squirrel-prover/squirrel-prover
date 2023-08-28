@@ -57,13 +57,13 @@ channel cR
 process tag(i:index,j:index) =
   in(cR, x1);
   if fst(x1) = h(snd(x1),k) && TSorder(snd(kT(i)),snd(x1)) = TSorderOk then
-    out(cT, h1(fst(kT(i)),key1(i)));
+    (out(cT, h1(fst(kT(i)),key1(i)));
     in(cR, x3);
     if x3 = h2(<fst(kT(i)),pin(i)>,key2(i)) then
-      kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
-      out(cT, ok)
+      (kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
+      out(cT, ok))
     else
-      out(cT, error)
+      out(cT, error))
   else
     out(cT, error)
 

@@ -1,9 +1,10 @@
 (** Utilities for testing. *)
 
-open Squirrellib
+open Squirrelcore
+open Squirrelfront
 (* Insist that we need Prover from Squirrellib, not Squirreltests.
  * TODO is this an OCaml bug?! *)
-module Prover = Squirrellib.Prover
+module Prover = Squirrelprover.Prover
 
 let term_from_string (s:string) =
   Theory.Local 

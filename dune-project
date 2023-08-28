@@ -1,3 +1,3 @@
-(lang dune 2.8)
+(lang dune 3.0)
 (name squirrel)
 (using menhir 2.1)

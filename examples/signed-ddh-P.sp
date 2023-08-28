@@ -73,7 +73,7 @@ process Pchall(i:index) =
   let gS = snd(fst(x2)) in
   let pkS = fst(fst(x2)) in
   if checksign(<<g^a(i),gS>,pk(skP)>,snd(x2),pkS) && pkS = pk(skS) then
-    out(cP,sign(<<gS,g^a(i)>,pkS>,skP));
+    (out(cP,sign(<<gS,g^a(i)>,pkS>,skP));
     in(cP, challenge);
       try find j such that gS = g^b(j) in
         out(cP, diff(g^a(i)^b(j),g^k(i,j)))
@@ -83,17 +83,17 @@ process Pchall(i:index) =
         We thus output a bi-term with distinct public constants so that
         the equivalence for the strong secrecy could not hold if this else
         branch is reached. *)
-        out(cP, diff(ok,ko))
+        out(cP, diff(ok,ko)))
 
 process S(j:index) =
   in(cS, x1);
   let gP = snd(x1) in
   let pkP = fst(x1) in
-  if pkP = pk(skP) then
+  if pkP = pk(skP) then (
     out(cS, < <pk(skS),g^b(j)>, sign(<<gP,g^b(j)>,pkP>,skS)>);
     in(cS, x3);
     if checksign(<<g^b(j),gP>,pk(skS)>,x3,pkP) then
-      out(cS,ok)
+      out(cS,ok))
 
 system (!_i Pchall(i) | !_j S(j)).
 

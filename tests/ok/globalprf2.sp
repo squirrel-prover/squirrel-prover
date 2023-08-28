@@ -84,6 +84,7 @@ system [p] (!_i U: let m = H(n1p(i),k) in out(c, m)).
 
 system p2 = [p/left] with gprf time, H(_, k).
 
+
 print system [p2].
 
 goal [p2] _ (i : index) : 
@@ -145,14 +146,32 @@ Proof.
   auto.
 Qed.
 
+print system [t/left].
+
+
 
 (* The following system are not allowed, as they ave several hashes in the 
    same macros. *)
 (* (*------------------------------------------------------------------*) *)
 (* (* system with two hashes *) *)
 
-(* system [v] (!_i U: out(c, <H(n1(i), k), H(n2(i,i),k)>)). *)
+ system [v] (!_i U: out(c, <H(n1(i), k), H(n2(i,i),k)>)). 
+
 
 (* system v2 = [v/left] with gprf time, H(_, k). *)
 
 (* print system [v2]. *)
+
+(* But we can do it with the classical gprf: *)
+ system v2 = [v/left] with gprf (i:index), H(n2(i,i), k). 
+
+print system [v2].
+
+
+
+(* However, the following tactic application of gprf fails due to the macro. *)
+(* 
+system u3 = [t/left] with gprf (il,jl:index), H(output@U(il), k).
+
+print system [u3].
+*)

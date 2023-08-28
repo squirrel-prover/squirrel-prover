@@ -220,7 +220,10 @@ Proof.
   rewrite -JCond0 -JCond1 /= in JCond. 
   clear JCond0 JCond1. 
 
-  have ?: i = i0 by euf JCond. 
+  have ?: i = i0. {
+    euf JCond; 1: auto.
+    by intro [??].
+  }.
   clear Cond0.
 
   collision JCond => [A B].
