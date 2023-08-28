@@ -837,30 +837,49 @@ let convert_var
   with
   | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
 
-(*------------------------------------------------------------------*)
-(** Convert variable tags as variable information *)
-let rec convert_tags ~(dflt_tag : Vars.Tag.t) (tags : var_tags) : Vars.Tag.t =
-  match tags with
-  | [] -> dflt_tag
-  | t :: tags ->
-    if L.unloc t = "param" then
-      convert_tags
-        ~dflt_tag:{ const = true; adv = true; system_indep = true; } tags
-    else if L.unloc t = "const" then
-      convert_tags ~dflt_tag:{ dflt_tag with const = true; } tags
-    else if L.unloc t = "adv" then
-      convert_tags ~dflt_tag:{ dflt_tag with adv = true; } tags
-    else if L.unloc t = "glob" then
-      convert_tags ~dflt_tag:{ dflt_tag with system_indep = true; } tags
-    else conv_err (L.loc t) (Failure ("unknown tag: " ^ (L.unloc t)))
 
+(*------------------------------------------------------------------*)
+(** {3 Binders conversion} *)
+
+type bnds_tag_mode =
+  | NoTags
+  | DefaultTag of Vars.Tag.t
+
+(** Convert variable tags as variable information *)
+let convert_tags ~(mode : bnds_tag_mode) (parsed_tags : var_tags) : Vars.Tag.t =
+  let rec doit (tag : Vars.Tag.t) (parsed_tags : var_tags) : Vars.Tag.t =
+    match parsed_tags with
+    | [] -> tag
+    | t :: tags ->
+      if L.unloc t = "param" then
+        doit
+          { const = true; adv = true; system_indep = true; } tags
+      else if L.unloc t = "const" then
+        doit { tag with const = true; } tags
+      else if L.unloc t = "adv" then
+        doit { tag with adv = true; } tags
+      else if L.unloc t = "glob" then
+        doit { tag with system_indep = true; } tags
+      else conv_err (L.loc t) (Failure ("unknown tag: " ^ (L.unloc t)))
+  in
+  match mode with
+  | NoTags ->
+    if parsed_tags <> [] then begin
+      let loc = L.mergeall (List.map L.loc parsed_tags) in
+      conv_err loc (Failure ("tags unsupported here"));
+    end;
+    
+    Vars.Tag.ltag
+
+  | DefaultTag t -> doit t parsed_tags
+    
 (** Convert a tagged variable binding *)
 let convert_bnd_tagged
     ?(ty_env : Type.Infer.env option)
-    (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, (p_ty, tags)) : bnd_tagged)
+    ~(mode : bnds_tag_mode) (env : Env.t) ((vsymb, (p_ty, p_tags)) : bnd_tagged)
   : Env.t * Vars.tagged_var
   =
-  let tag = convert_tags ~dflt_tag tags in
+  let tag = convert_tags ~mode p_tags in
   let ty = convert_ty ?ty_env env p_ty in
   let vars, v = Vars.make `Shadow env.vars ty (L.unloc vsymb) tag in
   { env with vars }, (v,tag) 
@@ -868,19 +887,19 @@ let convert_bnd_tagged
 (** Convert a list of tagged variable bindings *)
 let convert_bnds_tagged
     ?(ty_env : Type.Infer.env option)
-    (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
+    ~(mode : bnds_tag_mode) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
   =
-  let env, vars = List.map_fold (convert_bnd_tagged ?ty_env tag) env bnds in
+  let env, vars = List.map_fold (convert_bnd_tagged ?ty_env ~mode) env bnds in
   env, vars
 
 (** Convert a list of variable bindings *)
 let convert_bnds
     ?(ty_env : Type.Infer.env option)
-    (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds) : Env.t * Vars.vars
+    ~(mode : bnds_tag_mode) (env : Env.t) (bnds : bnds) : Env.t * Vars.vars
   =
   (* add an empty list of tags and use [convert_bnds_tagged] *)
   let env, tagged_vars =
-    convert_bnds_tagged ?ty_env tag env (List.map (fun (v,ty) -> v, (ty, [])) bnds)
+    convert_bnds_tagged ?ty_env ~mode env (List.map (fun (v,ty) -> v, (ty, [])) bnds)
   in
   env, List.map fst tagged_vars
     
@@ -888,17 +907,17 @@ let convert_bnds
 (** See [convert_ext_bnds] in `.mli` *)
 let convert_ext_bnd
     ?(ty_env : Type.Infer.env option)
-    (dflt_tag : Vars.Tag.t) (env : Env.t) (ebnd : ext_bnd)
+    ~(mode : bnds_tag_mode) (env : Env.t) (ebnd : ext_bnd)
   : (Env.t * Term.subst) * Vars.var
   =
   match ebnd with
   | L_var v, tagged_ty ->
-    let env, (var, _tag) = convert_bnd_tagged ?ty_env dflt_tag env (v,tagged_ty) in
+    let env, (var, _tag) = convert_bnd_tagged ?ty_env ~mode env (v,tagged_ty) in
     (env, []), var
 
   (* Corresponds to [(x1, ..., xn) : p_tuple_ty] where
      [p_tuple_ty] must be of the form [(ty1 * ... * tyn)] *)
-  | L_tuple p_vars, (p_tuple_ty, tags) ->
+  | L_tuple p_vars, (p_tuple_ty, p_tags) ->
      (* Decompose [p_tuple_ty] as [(ty1 * ... * tyn)]  *)
     let tys, tuple_ty =
       match convert_ty ?ty_env env p_tuple_ty with
@@ -909,7 +928,7 @@ let convert_ext_bnd
       conv_err (L.loc p_tuple_ty)
         (BadTupleLength (List.length tys, List.length p_vars));
 
-    let info = convert_tags ~dflt_tag tags in
+    let info = convert_tags ~mode p_tags in
     
     (* create variables [x1, ..., xn] *)
     let env, bnd_vars =
@@ -939,12 +958,12 @@ let convert_ext_bnd
 (** See `.mli` *)
 let convert_ext_bnds
     ?(ty_env : Type.Infer.env option)
-    (tag : Vars.Tag.t) (env : Env.t) (ebnds : ext_bnds)
+    ~(mode : bnds_tag_mode) (env : Env.t) (ebnds : ext_bnds)
   : Env.t * Term.subst * Vars.vars
   =
   let (env, subst), vars =
     List.map_fold (fun (env, subst) ebnd ->
-        let (env, subst'), var = convert_ext_bnd ?ty_env tag env ebnd in
+        let (env, subst'), var = convert_ext_bnd ?ty_env ~mode env ebnd in
         (env, subst @ subst'), var
       ) (env, []) ebnds
   in
@@ -952,6 +971,8 @@ let convert_ext_bnds
 
 
 (*------------------------------------------------------------------*)
+(** {3 Local formula conversion conversion} *)
+
 let get_fun table lsymb =
   match Symbols.Function.of_lsymb_opt lsymb table with
   | Some n -> n
@@ -1120,7 +1141,7 @@ and convert0
 
   | Find (vs,c,t,e) ->
     let env, is = 
-      convert_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs 
+      convert_bnds ~ty_env:state.ty_env ~mode:NoTags state.env vs 
     in
     let c = conv ~env Type.tboolean c in
     let t = conv ~env ty t in
@@ -1129,7 +1150,7 @@ and convert0
 
   | Quant ((ForAll | Exists as q),vs,f) ->
     let env, subst, evs =
-      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env ~mode:NoTags state.env vs
     in
     let f = conv ~env Type.tboolean f in
     let f = Term.subst subst f in
@@ -1137,7 +1158,7 @@ and convert0
 
   | Quant (Seq,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env ~mode:NoTags state.env vs
     in
 
     let t = 
@@ -1149,8 +1170,8 @@ and convert0
     (* seq are only over finite types *)
     List.iter2 (fun _ ebnd ->
         match ebnd with
-        | L_var p_v, (_, tags) ->
-          if tags <> [] then
+        | L_var p_v, (_, p_tags) ->
+          if p_tags <> [] then
             conv_err (L.loc p_v) (Failure "tag unsupported here");
 
         | L_tuple l,_ ->
@@ -1162,7 +1183,7 @@ and convert0
 
   | Quant (Lambda,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env ~mode:NoTags state.env vs
     in
 
     let t = 
@@ -1524,7 +1545,7 @@ let convert
     t, Type.Infer.norm ty_env ty
 
 (*------------------------------------------------------------------*)
-(** {2 Convert equiv formulas} *)
+(** {3 Global formulas conversion} *)
 
 let convert_equiv 
     ?(ty_env : Type.Infer.env option) 
@@ -1566,7 +1587,7 @@ let convert_global_formula
 
     | PQuant (q, bnds, e) ->
       let env, evs = 
-        convert_bnds_tagged ?ty_env Vars.Tag.gtag cenv.env bnds 
+        convert_bnds_tagged ?ty_env ~mode:(DefaultTag Vars.Tag.gtag) cenv.env bnds 
       in
       let e = conve ~env e in
       let q = match q with
@@ -1606,7 +1627,7 @@ let declare_state
   let env = Env.init ~table () in
   let conv_env = { env; cntxt = InProc ([], ts_init); } in
 
-  let env, args = convert_bnds ~ty_env (Vars.Tag.make Vars.Local) env typed_args in
+  let env, args = convert_bnds ~ty_env ~mode:NoTags env typed_args in
   let conv_env = { conv_env with env } in
 
   (* parse the macro type *)

@@ -130,7 +130,7 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
   : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
-  let env,is = Theory.convert_bnds (Vars.Tag.make Vars.Local) env bnds in
+  let env,is = Theory.convert_bnds ~mode:NoTags env bnds in
 
   Vars.check_type_vars is [Type.Index]
     (fun () ->

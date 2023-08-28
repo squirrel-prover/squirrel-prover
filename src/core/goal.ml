@@ -173,7 +173,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       | Local _ -> Vars.Tag.make Vars.Local
       | Global _ | Obs_equiv -> Vars.Tag.gtag
     in
-    Theory.convert_bnds_tagged ~ty_env var_tag env vars
+    Theory.convert_bnds_tagged ~ty_env ~mode:(DefaultTag var_tag) env vars
   in
 
   let conv_env = Theory.{ env; cntxt = InGoal } in

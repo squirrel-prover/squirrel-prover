@@ -286,7 +286,7 @@ let check_proc
   let ty_env = Type.Infer.mk_env () in
 
   let env = Env.init ~table () in
-  let env, args = Theory.convert_bnds ~ty_env Vars.Tag.ltag env args in
+  let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env args in
 
   check_p ty_env env process;
 

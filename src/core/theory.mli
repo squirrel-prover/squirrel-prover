@@ -338,6 +338,9 @@ type conv_env = {
   cntxt : conv_cntxt; 
 }
 
+(*------------------------------------------------------------------*)
+(** {3 Local formula conversion} *)
+
 (** Converts and infers the type.
     Only the [set] part of the [SE.context] inside the environment
     is useful. *)
@@ -350,22 +353,39 @@ val convert :
   Term.term * Type.ty
 
 (*------------------------------------------------------------------*)
+(** {3 Binders conversion} *)
+
+(** Are variable tags supported during binder conversion *)
+type bnds_tag_mode =
+  | NoTags
+  | DefaultTag of Vars.Tag.t
+
 (** Convert binders. *)  
 val convert_bnds : 
   ?ty_env:Type.Infer.env -> 
-  Vars.Tag.t -> Env.t -> bnds -> Env.t * Vars.vars
+  mode:bnds_tag_mode ->
+  Env.t ->
+  bnds ->
+  Env.t * Vars.vars
 
 val convert_bnds_tagged :
   ?ty_env:Type.Infer.env -> 
-  Vars.Tag.t -> Env.t -> bnds_tagged -> Env.t * Vars.tagged_vars
+  mode:bnds_tag_mode ->
+  Env.t ->
+  bnds_tagged ->
+  Env.t * Vars.tagged_vars
 
 (** Convert extended binders.
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
 val convert_ext_bnds :
   ?ty_env:Type.Infer.env -> 
-  Vars.Tag.t -> Env.t -> ext_bnds -> Env.t * Term.subst * Vars.vars
+  mode:bnds_tag_mode ->
+  Env.t -> ext_bnds ->
+  Env.t * Term.subst * Vars.vars
 
 (*------------------------------------------------------------------*)
+(** {3 Global formulas conversion} *)
+
 (** Converts and infers the type.
     Each part of the [SE.context] inside the environment
     is used when converting the corresponding kind of atom. *)
