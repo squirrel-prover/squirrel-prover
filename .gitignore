@@ -37,5 +37,5 @@ node_modules/
 *.bc.js
 *.bc-for-jsoo
 package-lock.json
-app/static/client.js binary
-app/static/editor.bundle.js binary
+app/static/client.js
+app/static/editor.bundle.js

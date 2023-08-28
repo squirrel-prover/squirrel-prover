@@ -324,3 +324,10 @@ It can be generated through:
 $ make coverage
 ```
 The documentation can then be browsed through `_coverage/index.html`.
+
+# JSquirrel
+
+If you want to run `Squirrel` in your browser we've transpiled Squirrel
+into JS using [JSofOcaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview) linked to [CodeMirror6](https://codemirror.net/) editor.
+
+See `app/README.md` for more.
