@@ -6,7 +6,7 @@ Commands
 
 .. cmd:: system
 	 
-  Defines a new system , see :term:`systems <system>` for details.
+  Defines a new system , see :decl:`systems <system>` for details.
 
 .. cmd:: goal
 	 

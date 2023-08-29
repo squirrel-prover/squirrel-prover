@@ -25,7 +25,7 @@ distinct sections:
 .. TODO there must be a better way to cite (sub)sections of doc
 
 - protocols are modelled as :ref:`processes <section-processes>`
-  from which :term:`systems <system>` are extracted;
+  from which :decl:`systems <system>` are extracted;
 - properties of these systems are expressed using the local and global
   formulas of our :ref:`logic <section-logic>`;
 - finally, proving these properties is done using a

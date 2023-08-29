@@ -14,29 +14,29 @@ Term symbols
 Names
 -----
 
-:gdef:`Names<name>` are used to model random samplings.
-Distinct names represent independant random samplings.
+Names are used to model random samplings.
 
 .. prodn::
    name_id ::= @identifier
-   name_decl ::= name @name_id : {? @type ->} @type
 
-A name declaration :n:`name @name_id : {? @type__i ->} @type__s` adds a
-new name symbol :n:`@name_id` optionally indexed by :n:`@type__i` and
-sampling values of type :n:`@type__s`.
+.. decl:: name @name_id : {? @type ->} @type
 
-It is required that the indexing type :n:`@type__i` is a
-:term:`finite` type, but there are no restrictions over sampling type
-:n:`@type__s`. 
+  A name declaration :n:`name @name_id : {? @type__i ->} @type__s` adds a
+  new name symbol :n:`@name_id` optionally indexed by :n:`@type__i` and
+  sampling values of type :n:`@type__s`.
+  
+  It is required that the indexing type :n:`@type__i` is a
+  :term:`finite` type, but there are no restrictions over sampling type
+  :n:`@type__s`. 
+   
+  The sampling *distribution* used over the sampling type :n:`@type__s`
+  is usually arbitrary --- though it can be restricted using 
+  :term:`type tags<type tag>` --- except for the
+  :g:`message` type, over which sampling is done uniformly at
+  random over bit-strings of length exactly :math:`\eta`.
 
 Two distinct applied name symbols, or the same name symbol applied to
 two different index values, denote **independent** random samplings.
-
-The sampling *distribution* used over the sampling type :n:`@type__s`
-is usually arbitrary --- though it can be restricted using 
-:term:`type tags<type tag>` --- except for the
-:g:`message` type, over which sampling is done uniformly at
-random over bit-strings of length exactly :math:`\eta`.
 
 .. note::
    Since :cite:`bkl23hal`, terms do not necessarily represents
@@ -57,13 +57,16 @@ they are *deterministic* and *polynomial-time computable*.
 If needed, their behaviour can be restricted further through :term:`axioms
 <axiom>`.
 
-
 .. prodn::
    fun_id ::= @identifier | (@infix_op)
-   abstract_function_decl ::= abstract @fun_id {? [@tvar_params]} : @type
 
-Abstract function declarations can be :ref:`polymorphic<section-polymorphism>` through the optional
-:n:`@tvar_params` type variable parameters.
+.. decl:: abstract @fun_id {? [@tvar_params]} : @type
+
+  Declares a deterministic and polynomial-type computable abstract
+  function named :n:`@fun_id` with type :n:`@type`.
+
+  The function can be :ref:`polymorphic<section-polymorphism>` 
+  through the optional :n:`@tvar_params` type variable parameters.
 
 An abstract function must be used in prefix notation if its name is an
 :n:`@identifier`, and in infix notation if its name is an
@@ -138,18 +141,25 @@ where:
 Operators
 ---------
 
-:gdef:`Operators <operator>` are function symbols with a concrete user-defined semantics.
+Operators are function symbols with a concrete user-defined semantics.
 An operator's semantics must be *deterministic*.
 
 .. prodn::
    op_id ::= @identifier | (@infix_op)
-   operator ::= op @op_id {? [@tvar_params] } @binders {? : @type } = @term
 
-An operator declaration *fails* if Squirrel cannot syntactically check
-that its body represents a deterministic value.
+.. decl:: operator ::= op @op_id {? [@tvar_params] } @binders {? : @type } = @term
 
-Operator declarations can be :ref:`polymorphic<section-polymorphism>` through the optional
-:n:`@tvar_params` type variable parameters.
+   Declares an operator named :n:`@op_id`, arguments :n:`@binders` and
+   returning :n:`@term`. 
+
+   The return type :n:`@type` can be provided, or left to be
+   automatically inferred by Squirrel.
+  
+   Operator declarations can be :ref:`polymorphic<section-polymorphism>` through 
+   the optional :n:`@tvar_params` type variable parameters.
+
+   An operator declaration *fails* if Squirrel cannot syntactically check
+   that its body represents a deterministic value.
 
 An operator must be used in prefix notation if its name is an
 :n:`@identifier`, and in infix notation if its name is an
@@ -182,32 +192,41 @@ Communications over the network are performed over public channels, identified b
 
 .. prodn::
    channel_id ::= @identifier
-   channel_decl ::= channel @channel_id
 
-   
+.. decl:: channel @channel_id
+
+   Declares a channel named :n:`@channel_id`.
+ 
+  
 .. _section-mutable-state:
 
 Mutable state
 -------------
 
-Processes are allowed to manipulate states, defined with an
-identifier, a replication indices, the type of term stored inside the
-state and the initial value of the state:
+Processes in Squirrel can use mutable states.
 
 .. prodn::
    state_id ::= @identifier
-   state_decl ::= mutable @state_id @binders {? : @type} = @term
 
-A memory cell can only be indexed by arguments of type :g:`index`.
+.. decl:: mutable @state_id @binders {? : @type} = @term
+  
+   Declares a memory cell named :n:`state_id` indexed by arguments
+   :n:`@binders` --- which must be of :term:`finite` type --- and initialized
+   to :n:`term`.
+
+   The return type :n:`@type` can be provided, or left to be
+   automatically inferred by Squirrel.
    
 .. example:: State counter
 	     
-   :g:`mutable counter (i,j,k:index) : message = zero` declares a set
-   of counter states indexed by :g:`i,j,k`, all initialized to
-   :g:`zero`.
+   .. squirreldoc:: 
+      mutable counter (i,j,k:index) : message = zero
 
-.. todo::
-   Adrien: I think this description is not accurrate.
+   declares a set of counter states indexed by :g:`i,j,k`, all initialized 
+   to :g:`zero`, i.e. the following formula is valid:
+  
+   .. squirreldoc::
+      forall i j k, counter (i,j,k) @ init = zero`
    
 Process declaration
 -------------------
@@ -220,7 +239,7 @@ The basic process constructs are:
 A basic process can be:
 
  * The binding of a name with :g:`new name`, which implicitly declares
-   a new :term:`name symbol<name>` indexed by the current replication indices. This
+   a new :decl:`name symbol<name>` indexed by the current replication indices. This
    is syntactic sugar that can be avoided by manually declaring the
    needed name symbols with the appropriate arities before the process
    declaration.
@@ -243,10 +262,14 @@ replication or process calls.
 	| !_@identifier @proc
 	| @process_id[({*, @term})]
 	| @alias : @proc
-    process_decl ::= process @process_id @binders = @proc	
 
 The construct :g:`A : proc` does not have any semantic impact: it is
 only used to give an alias to this location in the process.
+
+.. decl:: process @process_id @binders = @proc	
+   
+   Declares a new process named :n:`@process_id` with arguments :n:`@binders`
+   and body :n:`@proc`.
 
 
 Actions
@@ -301,24 +324,25 @@ are only the replication and input variables.
 Systems
 -------
 
-:gdef:`Systems <system>` are used to declare protocols through set of
-actions. A system can either refer to a set of actions, or to a
-set of protocols, and thus a set of set of actions.
+Systems are used to declare protocols through set of
+actions. A single system can refer to a set of actions, and a system
+is usually though of as a set of single systems.
 
 A system a defined by a main process:
 
 .. prodn::
    system_id ::= @identifier
-   system_decl ::= system {? [@system_id]} @process
 
-The system name :n:`@system_id` defaults to :n:`default` when no
-system identifier is specified.
+.. decl:: system {? [@system_id]} @process
 
-As processes uses bi-terms, a process declaration defines a
-:gdef:`bi-system` comprising a left and right :gdef:`single system`,
-where the left (resp. right) single system is described by the
-protocol obtained by taking the left (resp. right) components of all
-bi-terms appearing in the process.
+   As :n:`@process` uses bi-terms, this declares a :gdef:`bi-system`
+   comprising a left and right :gdef:`single system`, where the left
+   (resp. right) single system is described by the protocol obtained
+   by taking the left (resp. right) components of all bi-terms
+   appearing in :n:`@process`.
+
+   The system name :n:`@system_id` defaults to :n:`default` when no
+   system identifier is specified.
 
 .. example:: System declarations
 
@@ -357,7 +381,7 @@ component of the :term:`bi-system` named :n:`@system_id`.
 .. prodn::
    system_expr ::= any | @system_id | {*, @single_system_expr}
 
-A :gdef:`multi-system` is a finite set of labeled :term:`single systems<single system>`.
+A :gdef:`multi-system<multi system>` is a finite set of labeled :term:`single systems<single system>`.
 Mutli-systems are specified in Squirrel using
 :gdef:`system expressions<system expression>`.
 

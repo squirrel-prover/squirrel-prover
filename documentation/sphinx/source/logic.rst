@@ -48,9 +48,9 @@ using the following declaration:
     it has a finite cardinal for each :math:`\eta`;
   * a type is :gdef:`fixed` if its interpretation does not depend on :math:`\eta`;
   * a type is :gdef:`large` when random samplings over that type
-    (using :term:`names <name>`) are such that two
+    (using :decl:`names <name>`) are such that two
     distinct names have a negligible probability of collision;
-  * a type is :gdef:`name_fixed_length` if all :term:`names<name>`
+  * a type is :gdef:`name_fixed_length` if all :decl:`names<name>`
     over that type sample values of the same length (for a given
     :math:`\eta`).
 
@@ -65,7 +65,7 @@ The parameter :math:`\eta` corresponds to the underlying security parameter used
 Type variables and polymorphism
 -------------------------------
 
-Squirrel supports :gdef:`parametric type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (in :term:`operators<operator>`, :term:`goals<goal>`, ...).
+Squirrel supports :gdef:`parametric type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (in :decl:`operators<operator>`, :term:`goals<goal>`, ...).
 Type variables must be an identifier preceded by a
 single apostrophe, e.g. :n:`'x`.
 
@@ -182,7 +182,7 @@ A term can be
   corresponds to :n:`(...(@term__1 @term__2) ... @term__n)`;
 - the application of an infix operator :n:`@term__1 @infix_op @term__2`, 
   which corresponds :n:`(@infix_op) @term__1 @term__2`;
-- a name term application :n:`@name_id {? @term__i}`, see :term:`names<name>`;
+- a name term application :n:`@name_id {? @term__i}`, see :decl:`names<name>`;
 - the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
   (:n:`@term` must be a tuple with sufficiently many elements);
 - a macro term, see :term:`macro`;
@@ -191,8 +191,8 @@ A term can be
   :n:`@term__1` must have the same type;
 - a term with binders, see :token:`term_with_binders`;
 - an identifier :n:`x`, which must be bound by the context, and can be
-  a :term:`logical variable <logical_var>`, an :term:`operator`, or an
-  :term:`abstract function<abstract_fun>`.
+  a :term:`logical variable <logical_var>`, or an :decl:`operator` or
+  :decl:`abstract function<abstract>` symbol.
 - a :term:`diff-term` representing several probabilistic values which depend
   on the system;
 - a tuple :n:`(@term__1,...,@term__n)`.
@@ -253,8 +253,8 @@ components of a multi-terms by writting a *single syntactic object*
 behavior between its components using:
 
 * the :n:`diff` construct, see :term:`diff-terms<diff-term>`;
-* and :term:`macro terms<macro>` when reasoning over multiple
-  :term:`systems<system>` simultaneously.
+* and :term:`macro terms<macro>` when reasoning over a 
+  :term:`mutli_system`.
 
 There is no syntactic separation between terms and multi-terms: any
 Squirrel term can be a multi-terms (though syntactic checks are
@@ -267,12 +267,6 @@ between two terms :n:`t__1` and :n:`t__2` can be denoted by an
 where :n:`@term__bi` is any bi-term (i.e. a 2 multi-term) such that
 its left (resp. right) component is :n:`t__1` (resp. :n:`t__1`).
    
-..  
-  :term:`systems<system>` 
-
-  Squirrel syntax for bi-terms allow to factorize
-  common behavior by
-
 
 Diff-terms
 -----------
@@ -313,7 +307,7 @@ it is being interpreted in:
   definition, see the :ref:`system-defined macros section
   <section-system-macros>`.
 
-* over a :term:`multi-system` :n:`P__1,...,P__n`, it
+* over a :term:`mutli-system<multi system>` :n:`P__1,...,P__n`, it
   represents a :n:`n` mutli-term, where the :n:`i`-th component corresponds to
   the interpretation of the macro over the single system :n:`P__i`.
 
