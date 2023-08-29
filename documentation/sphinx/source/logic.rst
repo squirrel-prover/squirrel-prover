@@ -32,10 +32,10 @@ using the following declaration:
 
 .. decl:: type @identifier {? [ {+, @type_tag } ] }
 
-  Declare a new base type called :token:`identifier`.
+  Declare a new base type called :n:`@identifier`.
   The values of that type are assumed to be encodable as bitstrings.
-  Tags can optionally be passed to restrict the new type possible
-  instantiations.
+  :gdef:`Type tags<type tag>` can optionally be passed to restrict the new 
+  type possible instantiations.
 
   .. prodn::
     type_tag ::= large | well_founded | finite | fixed | name_fixed_length
@@ -164,8 +164,9 @@ probabilistic value which ranges over messages, and a term of type
 .. prodn::
   term ::= @term {+ @term } 
        | @term @infix_op @term 
+       | @name_id {? @term}
        | @term # @natural
-       | @macro
+       | @macro_application
        | if @term then @term else @term 
        | @term_with_binders
        | @sterm
@@ -181,6 +182,7 @@ A term can be
   corresponds to :n:`(...(@term__1 @term__2) ... @term__n)`;
 - the application of an infix operator :n:`@term__1 @infix_op @term__2`, 
   which corresponds :n:`(@infix_op) @term__1 @term__2`;
+- a name term application :n:`@name_id {? @term__i}`, see :term:`names<name>`;
 - the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
   (:n:`@term` must be a tuple with sufficiently many elements);
 - a macro term, see :term:`macro`;
@@ -240,23 +242,82 @@ cannot). If no :n:`else` branch term is provided, :n:`@term__e`
 defaults to :g:`zero` (the zero bit-string).
 
 
+Multi-terms
+===========
+
+A k :gdef:`multi-term` is a single syntactic object used to represents a
+k-tuple of terms.
+Squirrel syntax allows to factorize common behavior between the
+components of a multi-terms by writting a *single syntactic object*
+--- the multi-term --- which can have sub-terms representing diverging
+behavior between its components using:
+
+* the :n:`diff` construct, see :term:`diff-terms<diff-term>`;
+* and :term:`macro terms<macro>` when reasoning over multiple
+  :term:`systems<system>` simultaneously.
+
+There is no syntactic separation between terms and multi-terms: any
+Squirrel term can be a multi-terms (though syntactic checks are
+performed in some places when it is necessary that the user provides a
+single term to Squirrel).
+
+Squirrel heavily uses multi-terms. Most notably, the equivalence
+between two terms :n:`t__1` and :n:`t__2` can be denoted by an
+:term:`equivalence atom` :n:`equiv(@term__bi)`,
+where :n:`@term__bi` is any bi-term (i.e. a 2 multi-term) such that
+its left (resp. right) component is :n:`t__1` (resp. :n:`t__1`).
+   
+..  
+  :term:`systems<system>` 
+
+  Squirrel syntax for bi-terms allow to factorize
+  common behavior by
+
 
 Diff-terms
 -----------
 
-:gdef:`Diff-terms <diff-term>` of the form :n:`diff(@term__1,@term__2)` represents
-two terms at once. This is a convenient way to define two similar
-terms except for a small part. Later on, they will be used to
-define easily two protocols that only slightly differ. The logic
-in the tool allows to reason on diff-terms, proving for instance
-that the two representations are equivalent.
-
 .. prodn:: 
    diff_term ::= diff(@term, @term)
 
-.. todo::
-   Adrien: this needs to be seriously expanded and detailed.
+:n:`diff(@term__1,@term__2)` is a :gdef:`diff-term <diff-term>`
+representing a diverging behavior between the *left* component
+:n:`@term__1` and the *right* component :n:`@term__2`.
+Currently, diff-terms can only have two components, hence can only be
+used in bi-terms. 
 
+
+Macros
+------
+
+:gdef:`Macros <macro>` are a special built-in *probabilistic*
+functions defined by recurence over the execution trace (i.e. the 
+:g:`timestamp` type). 
+Applied macros can occur in terms as follows:
+
+.. prodn::
+   macro_id ::= @identifier
+   macro_application ::= @macro_id {* @term} @ @term
+
+The timestamp argument :n:`ts` of a macro :n:`@macro_id` is passed using a special syntax :n:`@macro_id @ ts`.
+
+The term :n:`@macro_id @term__1 ... @term_n @ @term__t` represents the
+application of macro symbol :n:`@macro_id` which arguments
+:n:`@term__1 ... @term_n` at a time-point :n:`@term__t` (of type
+:g:`timestamp`).
+
+The semantics of a macro symbol :n:`@macro_id` depends on the systems
+it is being interpreted in:
+
+* its semantics over a :term:`single system`, depends on the system
+  definition, see the :ref:`system-defined macros section
+  <section-system-macros>`.
+
+* over a :term:`multi-system` :n:`P__1,...,P__n`, it
+  represents a :n:`n` mutli-term, where the :n:`i`-th component corresponds to
+  the interpretation of the macro over the single system :n:`P__i`.
+
+   
 Formulas
 ========
 

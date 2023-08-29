@@ -161,7 +161,7 @@ We also have :gdef:`extended intro patterns <ext intro pat>`, that apply some ad
 		| //
 		| /=
 		| //=
-		| @/@macro
+		| @/@macro_id
 
 The extended features are:
 
@@ -169,7 +169,7 @@ The extended features are:
 * :g:`//` applies :g:`try auto` in all subgoals, leaving the one not closed without any simplification.
 * :g:`/=` applies :tacn:`simpl` to all subgoals.
 * :g:`//=` combines both previous operators.
-* :g:`@/@macro` expands the given macro in the hypothesis.  
+* :g:`@/@macro_id` expands the given macro in the hypothesis.  
   
 
   
@@ -686,7 +686,7 @@ Common tactics
     action happened, add the corresponding timestamp
     inequality.       
 
-.. tacn:: expand {+ @macro | @macro@@term }
+.. tacn:: expand {+ @macro_id | @macro_application }
 	  
     Expand all occurences of the given macros, either fully specified with an action or simply a type of macro, inside the goal.
     

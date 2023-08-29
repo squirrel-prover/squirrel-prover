@@ -4,22 +4,39 @@
 Declarations
 ============
 
-We details here how to define the multiple constructs over which the
-logic will reason.
+We details here how to define the multiple symbols and objects used by
+the logic.
 
 
-Term constructs
-===============
+Term symbols
+============
         
 Names
 -----
 
-:gdef:`Names<name>` model values that are sampled uniformaly at
-random. Distinct names represent independant random samplings.
+:gdef:`Names<name>` are used to model random samplings.
+Distinct names represent independant random samplings.
 
 .. prodn::
    name_id ::= @identifier
-   name_decl ::= name @name_id : [(@index * ... * @index) ->] @base_type
+   name_decl ::= name @name_id : {? @type ->} @type
+
+A name declaration :n:`name @name_id : {? @type__i ->} @type__s` adds a
+new name symbol :n:`@name_id` optionally indexed by :n:`@type__i` and
+sampling values of type :n:`@type__s`.
+
+It is required that the indexing type :n:`@type__i` is a
+:term:`finite` type, but there are no restrictions over sampling type
+:n:`@type__s`. 
+
+Two distinct applied name symbols, or the same name symbol applied to
+two different index values, denote **independent** random samplings.
+
+The sampling *distribution* used over the sampling type :n:`@type__s`
+is usually arbitrary --- though it can be restricted using 
+:term:`type tags<type tag>` --- except for the
+:g:`message` type, over which sampling is done uniformly at
+random over bit-strings of length exactly :math:`\eta`.
 
 .. note::
    Since :cite:`bkl23hal`, terms do not necessarily represents
@@ -56,7 +73,9 @@ declaration).
 .. example:: 
              
    Equality is defined in Squirrel as the polymorphic abstract function 
-   :g:`abstract (=) ['a] : 'a -> 'a -> bool`.
+
+   .. squirreldoc::
+      abstract (=) ['a] : 'a -> 'a -> bool
 ..
   Adrien: I removed the sentence below, which seemed too specific and not
   clear enough.
@@ -146,31 +165,6 @@ declaration).
    Adrien: removed the comment about axiomatization.
 
 
-Macros
-------
-
-:gdef:`Macros <macro>` are a special built-in *probabilistic*
-functions defined by recurence over the execution trace (i.e. the 
-:g:`timestamp` type). A new set of macros is defined whenever a system
-is declared, see the :ref:`system-defined macro section
-<section-system-macros>`.
-
-Macros can occur in terms, and their syntax is as follows:
-
-.. prodn::
-   macro_id ::= @identifier
-   macro ::= @macro_id {* @term} @ @term
-
-The timestamp argument :n:`ts` of a macro :n:`@macro_id` is passed using a special syntax :n:`@macro_id @ ts`.
-
-The term :n:`@macro_id @term__1 ... @term_n @ @term__t` represents the
-application of macro symbol :n:`@macro_id` which arguments
-:n:`@term__1 ... @term_n` at a time-point :n:`@term__t` (of type
-:g:`timestamp`).
-
-.. todo::
-   Adrien: incomplete, as *global* and *state* macros are not presented here.   
-
 .. _section-processes:
 
 Processes
@@ -251,7 +245,8 @@ replication or process calls.
 	| @alias : @proc
     process_decl ::= process @process_id @binders = @proc	
 
-The construct :g:`A : proc` does not have any impact on the semantics of the model: it is only used to give an alias to this location in the process.	
+The construct :g:`A : proc` does not have any semantic impact: it is
+only used to give an alias to this location in the process.
 
 
 Actions
@@ -306,7 +301,9 @@ are only the replication and input variables.
 Systems
 -------
 
-:gdef:`Systems <system>` are used to declare protocols through set of actions. A system can either refer to a set of actions, or to a set of protocols, and thus a set of set of actions.
+:gdef:`Systems <system>` are used to declare protocols through set of
+actions. A system can either refer to a set of actions, or to a
+set of protocols, and thus a set of set of actions.
 
 A system a defined by a main process:
 
@@ -314,7 +311,14 @@ A system a defined by a main process:
    system_id ::= @identifier
    system_decl ::= system {? [@system_id]} @process
 
-As processes are defined over bi-terms, we in fact declare here a :gdef:`bi-system`, refering to the left and right protocols made up when projecting on the left or the righ the bi-terms. If no system identifier is specified, the :n:`default` name is used.
+The system name :n:`@system_id` defaults to :n:`default` when no
+system identifier is specified.
+
+As processes uses bi-terms, a process declaration defines a
+:gdef:`bi-system` comprising a left and right :gdef:`single system`,
+where the left (resp. right) single system is described by the
+protocol obtained by taking the left (resp. right) components of all
+bi-terms appearing in the process.
 
 .. example:: System declarations
 
@@ -324,26 +328,6 @@ As processes are defined over bi-terms, we in fact declare here a :gdef:`bi-syst
 	     (Dummy | out(c,empty))`, which would this time be named
 	     :n:`default`.
 
-System expressions and contexts
-+++++++++++++++++++++++++++++++
-
-Systems can be refereed to, notably in proof goals and axioms, using system expressions:
-
-.. prodn::
-   single_expr ::= @system_id/left | @system_id/right
-   pair_expr ::= @system_id | @single_expr, @single_expr
-   system_expr ::= any | @pair_expr
-   system_context ::= set: @system_expr; equiv:  @pair_expr | @system_id
-
-.. todo::
-   Adrien: describe single system as well as pairs and sets of systems.
-   
-A *concrete system context* :g:`set:S; equiv:P` comprises:
-* a set of systems :g:`S` used to interpret :term:`reachability atoms<reachability atom>`
-* a pair of systems :g:`P` used to interpret :term:`equivalence atoms<equivalence atom>`.
-
-A *system context alias* :g:`S` --- where :g:`S` is a :n:`@system_id`,
-hence a bi-system --- is syntactic sugar for :g:`set:S; equiv:S/left,S\right`.
 
 .. _section-system-macros:
 
@@ -358,6 +342,57 @@ Whenever a system is declared, for each action `A[idx]` inside the system with o
 * :g:`input@A[idx] := att(frame@pred([idx]))`.
 * :g:`frame@tau` is equal to :g:`<frame@pred(tau), if cond@tau then output@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`frame@tau` is :g:`empty`.
 * :g:`exec@tau` is equal to :g:`exec@pred(tau) && cond@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`exec@init` is :g:`true`.
+
+System expressions
+++++++++++++++++++
+
+.. prodn::
+   single_system_expr ::= @system_id/left | @system_id/right
+
+:n:`@system_id/proj` is an unlabeled single system 
+representing the left (if :n:`proj = left`) or right (if :n:`proj = right`)
+component of the :term:`bi-system` named :n:`@system_id`.
+
+
+.. prodn::
+   system_expr ::= any | @system_id | {*, @single_system_expr}
+
+A :gdef:`multi-system` is a finite set of labeled :term:`single systems<single system>`.
+Mutli-systems are specified in Squirrel using
+:gdef:`system expressions<system expression>`.
+
+* :n:`any` containts all labeled single systems;
+
+* :n:`@system_id` is the bi-system composed of the two single systems
+  defined by :n:`@system_id`, implicitely labeled by :n:`left` and
+  :n:`right`;
+
+* :n:`@single_system_expr__1,...,@single_system_expr__n` is the multi-system of
+  the :n:`n` given single systems implicitely labeled:
+
+  + ε if :n:`n = 1`
+
+  + :n:`left` and :n:`right` if :n:`n = 2`
+
+  + by the :n:`n` first positive integers otherwise
+
+System contexts
++++++++++++++++
+  
+.. prodn::
+   system_context ::= set: @system_expr; equiv:  @system_expr
+   | @system_id
+
+A *concrete system context* :g:`set:S; equiv:P` comprises:
+
+* a multi-system specified by :g:`S` used to interpret
+  :term:`reachability atoms<reachability atom>`
+
+* a pair of systems (i.e. a mutli-system with two elements) :g:`P`
+  used to interpret :term:`equivalence atoms<equivalence atom>`.
+
+A *system context alias* :g:`S` --- where :g:`S` is a
+:n:`@system_id` --- is syntactic sugar for :g:`set:S; equiv:S/left,S\right`.
 
 
 Axioms and Goals
@@ -394,7 +429,7 @@ Local statements
 :n:`{? [@system_expr] } @goal_id [@tvar_params] @binders : @formula`
 
 is a local statement over the systems :n:`[@system_expr]` (which
-defaults to system :n:`[default]`) named :n:`@goal_id`.  This
+defaults to system expression :n:`[default]`) named :n:`@goal_id`.  This
 statements holds if, for any value of the type parameters
 :n:`@tvar_params`, the local formula :n:`forall @binders, @formula`
 holds.
