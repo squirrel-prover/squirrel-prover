@@ -14,7 +14,8 @@ import { SquirrelWorker } from "./squirrel-worker.ts"
 // Load language syntax
 import { Squirrel } from "./lang-squirrel/src/index.ts"
 
-let worker = new SquirrelWorker(fileManager,new URL('./client.js', window.location));
+let worker = new 
+  SquirrelWorker(fileManager,new URL('./client.js', window.location));
 
 // Bind worker and fileManager
 fileManager.bindWorker(worker);

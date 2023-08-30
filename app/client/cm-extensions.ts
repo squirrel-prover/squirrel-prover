@@ -22,8 +22,6 @@ const syntaxErrorMark = Decoration.mark({
 export const addMarks = StateEffect.define<Range<Decoration>[]>();
 const filterMarks = StateEffect.define<(from:number, to:number, value:Decoration)=>boolean>();
 
-export const toggleFile = StateEffect.define<boolean>()
-
 // This value must be added to the set of extensions to enable this
 export const markField = StateField.define({
   // Start with an empty set of decorations
