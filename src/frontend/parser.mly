@@ -589,7 +589,7 @@ rw_type:
 | SLASH l=lloc(STAR)            { `ExpandAll l }
 
 expnd_type:
-| ATSLASH s=lsymb       { `Expand s }
+| ATSLASH s=lsymb_decl  { `Expand (snd s) }
 | ATSLASH l=lloc(STAR)  { `ExpandAll l }
 
 rw_item:

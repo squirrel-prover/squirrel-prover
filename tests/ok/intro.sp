@@ -1,5 +1,3 @@
-
-
 channel ch
 abstract ok : message
 
@@ -60,3 +58,13 @@ Proof.
  intro [_ _ _]; assumption.
 Qed.
 
+(*------------------------------------------------------------------*)
+
+op foo x y = <x,y>.
+op (+*) x y = <x,y>.
+
+goal _ x y : x +* y = foo x y.
+Proof.
+  intro @/foo @/( +* ).
+  auto.
+Qed.
