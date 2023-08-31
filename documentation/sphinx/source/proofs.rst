@@ -545,9 +545,9 @@ Common tactics
    .. prodn:: have_ip ::= {* @s_item} @simpl_ip {* @s_item}
 
    :n:`have @have_ip : F` introduces the new hypothesis :n:`F`, which
-   can be a local formula `@term` or a :n:`global_formula`. The new
-   hypothesis is processed by :n:`@have_ip` (see below). A new
-   sub-goal with conclusion :n:`@term` is :n:created.
+   can be a local formula :n:`@term` or a :n:`@global_formula`. The new
+   hypothesis is processed by :n:`@@have_ip` (see below). A new
+   sub-goal with conclusion :n:`@term` is created.
 
    If :n:`@have_ip` is the introduction pattern :n:`@s_item__pre @simpl_ip @s_item__post` then:
 
