@@ -1010,7 +1010,7 @@ Global tactics
       :undocumented:
 
    .. exn:: Did not find any conditional to analyze.
-
+      :undocumented:
 
 .. tace:: deduce
     
