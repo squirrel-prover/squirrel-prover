@@ -4,14 +4,6 @@
 Commands
 =========
 
-.. cmd:: system
-	 
-  Defines a new system , see :decl:`systems <system>` for details.
-
-.. cmd:: goal
-	 
-   Defines a new system , see :term:`goal <goal>` for details. 	 
-
 .. cmd:: Proof
 
   Enter proof mode with a unique subgoal
@@ -78,7 +70,7 @@ Commands
 .. cmd:: print {? @identifier}
 
   Shows definition of given :n:`@identifier` if it is a lemma, function, name, macro or system.
-  :g:`print` without :n:`@idendifier` shows current system.
+  :g:`print` without :n:`@idendifier` shows the current system.
 
   .. example:: printing a goal
 
@@ -97,7 +89,7 @@ Commands
 
    Search lemmas containing a given :n:`@term` (that can contains
    holes ``_`` as specified in :n:`@sterm`). 
-   A :n:`{| @system_id | @system_exp }` can be specified otherwise it is searched in :n:`@any`
+   A :n:`{| @system_id | @system_expr }` can be specified otherwise it is searched in :n:`@any`
    systems.
 
   .. example:: searching axioms with included patterns

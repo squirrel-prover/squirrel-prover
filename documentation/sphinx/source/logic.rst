@@ -197,15 +197,17 @@ A term can be
   on the system;
 - a tuple :n:`(@term__1,...,@term__n)`.
 
-.. todo::
-   Charlie: Can an identifier be other things?
+Many tactics use :token:`sterm` instead of :token:`term`,
+which creates less ambiguities in the parser.  Note that
+enclosing a :token:`term` in parentheses yields a
+:token:`sterm`.
 
-   Adrien: I think this is it.
-
-.. note:: Many tactics use :token:`sterm` instead of :token:`term`,
-           which creates less ambiguities in the parser.  Note that
-           enclosing a :token:`term` in parentheses yields a
-           :token:`sterm`.
+.. note::
+   Since :cite:`bkl23hal`, terms do not necessarily represents
+   computable values.
+   An example of a non PTIME-computable term is :g:`forall(x:message), x = f(x)`
+   which tests whether :g:`f` is idempotent, something that is not
+   necessarily computable even when :g:`f` is.
 
 Terms with binders
 ------------------
@@ -254,7 +256,7 @@ behavior between its components using:
 
 * the :n:`diff` construct, see :term:`diff-terms<diff-term>`;
 * and :term:`macro terms<macro>` when reasoning over a 
-  :term:`mutli_system`.
+  :term:`mutli system`.
 
 There is no syntactic separation between terms and multi-terms: any
 Squirrel term can be a multi-terms (though syntactic checks are

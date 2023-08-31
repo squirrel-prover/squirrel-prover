@@ -38,15 +38,6 @@ Names are used to model random samplings.
 Two distinct applied name symbols, or the same name symbol applied to
 two different index values, denote **independent** random samplings.
 
-.. note::
-   Since :cite:`bkl23hal`, terms do not necessarily represents
-   computable values.
-   An example of a non-PTIME term is :g:`forall(x:message), x = f(x)`
-   which tests whether :g:`f` is idempotent, something that is not
-   necessarily computable even when :g:`f` is.
-
-.. todo::
-   Adrien: this last note is out-of-place.
 
 Abstract function
 -----------------
@@ -117,25 +108,37 @@ Cryptographic functions
 -----------------------
 
 Squirrel allows to declare functions modeling standard
-:gdef:`cryptographic functions <cryptographic function>` with:
+:gdef:`cryptographic functions <cryptographic function>` with
+associated cryptographic assumptions.
 
-.. prodn::
-   crypto_decl ::= hash @fun_id 
-   | signature @fun_id, @fun_id, @fun_id
-   | aenc @fun_id, @fun_id, @fun_id
-   | senc @fun_id, @fun_id, @fun_id
-   | {| ddh | cdh | gdh } @fun_id, @fun_id where group:@base_type exponents:@base_type
+.. decl:: hash @fun_id 
 
-where:
+   :g:`hash h` declares a keyed hash function :g:`h(m,k)` satisfying
+   PRF and known key collision resistance assumptions.
 
-* :g:`hash h` declares a keyed hash function :g:`h(m,k)` satisfying PRF and known key collision resistance.
-* :g:`signature sig,ver,pk` declares an unforgeable (EUF-CMA) signature with the equation :g:`ver(sig(m,sk),m,pk(sk))=true`.
-* :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption with the equation :g:`dec(enc(m,pk(sk)),sk)=m`.
-* :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption with the equation :g:`dec(enc(m,sk),sk)=m`. 
-* :g:`ddh g, (^) where group:message exponents:message.` declares a
-  group with generator :g:`g` and exponentation :g:`(^)`. The group
-  must satisfy the DDH assumption when declared with :g:`ddh`, the CDH assumption with
-  :g:`cdh`, and the GapDH assumption with :g:`gdh`.
+.. decl:: signature @fun_id, @fun_id, @fun_id
+
+   :g:`signature sig,ver,pk` declares an unforgeable against chosen
+   message attacks (EUF-CMA) signature scheme satisfyinh the equation
+   :g:`ver(sig(m,sk),m,pk(sk))=true`.
+
+.. decl:: aenc @fun_id, @fun_id, @fun_id
+
+   :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption
+   scheme satisfying the equation :g:`dec(enc(m,pk(sk)),sk)=m`.
+
+.. decl:: senc @fun_id, @fun_id, @fun_id
+
+   :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption scheme
+   satisfying the equation :g:`dec(enc(m,sk),sk)=m`.
+
+.. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
+
+   :g:`ddh g, (^) where group:tyg exponents:tye.` declares a
+   group with generator :g:`g` and exponentation :g:`(^)`. The group
+   must satisfy the DDH assumption when declared with :g:`ddh`, the
+   CDH assumption with :g:`cdh`, and the GapDH assumption with
+   :g:`gdh`.
 
 
 Operators
@@ -170,9 +173,6 @@ declaration).
   As recursion is not yet supported, this is in fact currently syntact
   sugar for declaring an :term:`abstract function <abstract_fun>` symbol along with an :term:`axiom` stating
   the equation giving its defintion.
-
-.. todo::
-   Adrien: removed the comment about axiomatization.
 
 
 .. _section-processes:
@@ -231,10 +231,11 @@ Processes in Squirrel can use mutable states.
 Process declaration
 -------------------
 
-The basic process constructs are:
-
 .. prodn::
-   basic_process ::= new @name_id | @state[({*, @term})] := @term | out(@channel, @term) | in(@channel, @term)
+   basic_process ::= new @name_id 
+   | @state_id {? ({*, @term})} := @term
+   | out(@channel, @term) 
+   | in(@channel, @term)
 
 A basic process can be:
 
@@ -254,33 +255,39 @@ replication or process calls.
 ..  prodn::
     process_id ::= @identifier
     alias ::= @identifier
-    proc ::= @basic_process; @proc
-        | @proc | @proc
-	| if @term then @proc else @proc
-	| try find @binders such that @term in @proc else @proc
-	| let @identifier = @term in @proc
-	| !_@identifier @proc
-	| @process_id[({*, @term})]
-	| @alias : @proc
+    process ::= @basic_process
+    | @process; @process
+    | @process | @process
+	  | if @term then @process {? else @process}
+	  | try find @binders such that @term in @process {? else @process}
+	  | let @identifier = @term in @process
+	  | !_@identifier @process
+    | @process_id {? ({*, @term}) }
+    | @alias : @process
 
 The construct :g:`A : proc` does not have any semantic impact: it is
 only used to give an alias to this location in the process.
 
-.. decl:: process @process_id @binders = @proc	
+.. decl:: process @process_id @binders = @proc	ess
    
    Declares a new process named :n:`@process_id` with arguments :n:`@binders`
-   and body :n:`@proc`.
+   and body :n:`@process`.
 
 
 Actions
 -------
 
 Squirrel only manipulates set of actions, to which protocoles as
-processes are translated. An action intuitively an atomtic step of a
-protocol, where upon receiving an input from the attacker, a condition
-is checked and if it holds an output is given back to the
-attacker. Actions cannot be directly specified and can only be
-declared via processes.
+processes are translated. An action represents an atomtic step of a
+protocol comprising: 
+
+* the reception of a input message from the network
+  attacker;
+* the verification of the action executability; 
+* and, if it is executable, the output of a message to the network.
+
+Actions cannot be directly specified and can only be declared via
+processes.
 
 
 There are identified by an action identifier:
@@ -288,18 +295,21 @@ There are identified by an action identifier:
 .. prodn::
    action_id ::= @identifier
 
-When translating processes, names are automatically given to actions. Alternatively, they can be specified by an :n:`@alias`.
+When translating processes into sets of action, fresh action
+identifiers are automatically generated to name created
+actions. Alternatively, the user can give a naming hint using the
+:n:`@alias` process construct. Note however that Squirrel may not
+respect such naming hints.
 
-An action is defined by an action identifier :n:`@action_id`, a set of
-:g:`index` variables for the replications, and :g:`message` variable
-for the input, and a term of type :g:`bool` for its condition and a term of
-type :g:`message` for its output, where the free variables in the two terms
-are only the replication and input variables.
+Internally, an action is defined by:
+
+* an action identifier :n:`@action_id`;
+* a list of :g:`index` replications variables;
+* a :n:`@term` of type :g:`bool` represeting the action executability condition;
+* a term of type :g:`message` represeting the action output.
 
 
-.. example:: Actions corresponding to process definition
-
-   Consider the following Squirrel code.
+.. example:: Actions corresponding to a process definition
 	     
    .. squirreldoc::
       abstract one:message.
@@ -315,11 +325,11 @@ are only the replication and input variables.
               | 
 	        in(c,x); out(c,empty)).
 	
-   It roduces a set of three actions:
+   defines a set of three actions:
    
-   * action :n:`A[i]`, with input variable x, condition `x=zero` and output `zero`;
-   * action :n:`B[i]`,  with input variable x, condition `x<>zero` and output `x`;
-   * and action :n:`A1` (with automatic naming), condition `true` and output `empty`.  
+   * action :n:`A[i]`, which on input :g:`x`, checks whether :g:`x=zero` and outputs :g:`zero`;
+   * action :n:`B[i]`,  which on input :g:`x`, checks whether :g:`x<>zero` and outputs :g:`x`;
+   * and action :n:`A1` (automatically named), which checks whether :g:`true` and outputs :g:`empty`.  
 
 Systems
 -------
@@ -359,13 +369,20 @@ System-defined macros
 +++++++++++++++++++++
 
 
-Whenever a system is declared, for each action `A[idx]` inside the system with output value `o(x)` and condition `c(x)` where `x` denotes the input of action `A[idx]`, multiple mutually recursive macros are declared:
+Whenever a system is declared, for each action :g:`A[idx]` inside the
+system with output value :g:`o(x)` and condition :g:`c(x)` where :g:`x` denotes
+the input of the action, several mutually recursive macros are
+declared:
 
 * :g:`output@A[idx] := o(input@A[idx])`.
 * :g:`cond@A[idx] := c(input@A[idx])`.
 * :g:`input@A[idx] := att(frame@pred([idx]))`.
-* :g:`frame@tau` is equal to :g:`<frame@pred(tau), if cond@tau then output@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`frame@tau` is :g:`empty`.
-* :g:`exec@tau` is equal to :g:`exec@pred(tau) && cond@tau>` if :g:`tau` happens and is not the first timestamp :g:`init`. Otherwise, :g:`exec@init` is :g:`true`.
+* :g:`frame@tau := <frame@pred tau, exec@tau, if exec@tau then output@tau>` 
+  if :g:`tau` happens and is not the initial timestamp
+  :g:`init`. Otherwise, :g:`frame@tau` is :g:`empty`.
+* :g:`exec@tau := exec@pred tau && cond@tau>` if
+  :g:`tau` happens and is not the initial timestamp
+  :g:`init`. Otherwise, :g:`exec@init` is :g:`true`.
 
 System expressions
 ++++++++++++++++++
@@ -435,8 +452,6 @@ discharged by the user through a :ref:`proof<section-proofs>`.
    statement_id ::= @identifier 
    local_statement ::= {? [@system_expr] } {| @goal_id | _} {? [@tvar_params]} @binders : @formula
    global_statement ::= {? [@system_context] } {| @goal_id | _} {? [@tvar_params]} @binders : @global_formula
-   goal_or_axiom_decl ::= {? local} {| goal | axiom } @local_statement
-                      | global {| goal | axiom} @global_statement
 
 
 Local and global statements can be
@@ -445,7 +460,7 @@ Local and global statements can be
 
 Unnamed (local and global) statements can be declared using an
 underscore :g:`_` instead of a statement identifier
-:g:`@statement_id`.
+:n:`@statement_id`.
                       
 Local statements
 ----------------
@@ -457,6 +472,10 @@ defaults to system expression :n:`[default]`) named :n:`@goal_id`.  This
 statements holds if, for any value of the type parameters
 :n:`@tvar_params`, the local formula :n:`forall @binders, @formula`
 holds.
+
+.. decl:: {? local} {| goal | axiom } @local_statement
+   
+   Declares a new local :g:`goal` or :g:`axiom`.
 
 .. example:: Some axioms and goals
 	     
@@ -487,6 +506,10 @@ defaults to system context :n:`[default]`) named :n:`@goal_id`.  This
 statements holds if, for any value of the type parameters
 :n:`@tvar_params`, the global formula :n:`Forall @binders, @global_formula`
 holds.
+
+.. decl:: global {| goal | axiom} @global_statement
+
+   Declares a new global :g:`goal` or :g:`axiom`.
 
 .. example:: 
 
