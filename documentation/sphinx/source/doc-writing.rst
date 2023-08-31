@@ -174,25 +174,25 @@ Most objects should have a body (i.e. a block of indented text following the sig
 
       .. code-block:: rst
 
-         .. cmdv:: _Lemma @identifier {* @binder } : @type
-                   _Remark @identifier {* @binder } : @type
-                   _kFact @identifier {* @binder } : @type
-                   _Corollary @identifier {* @binder } : @type
-                   _Proposition @identifier {* @binder } : @type
+         .. cmdv:: _Lemma @ident {* @binder } : @type
+                   _Remark @ident {* @binder } : @type
+                   _kFact @ident {* @binder } : @type
+                   _Corollary @ident {* @binder } : @type
+                   _Proposition @ident {* @binder } : @type
             :name: _Lemma; _Remark; _Fact; _Corollary; _Proposition
 
-            These commands are all synonyms of :n:`_Theorem @identifier {* @binder } : type`.
+            These commands are all synonyms of :n:`_Theorem @ident {* @binder } : type`.
 
    .. tab:: Produces
 
-      .. cmdv:: _Lemma @identifier {* @binder } : @type
-                _Remark @identifier {* @binder } : @type
-                _Fact @identifier {* @binder } : @type
-                _Corollary @identifier {* @binder } : @type
-                _Proposition @identifier {* @binder } : @type
+      .. cmdv:: _Lemma @ident {* @binder } : @type
+                _Remark @ident {* @binder } : @type
+                _Fact @ident {* @binder } : @type
+                _Corollary @ident {* @binder } : @type
+                _Proposition @ident {* @binder } : @type
          :name: _Lemma; _Remark; _Fact; _Corollary; _Proposition
 
-         These commands are all synonyms of :n:`_Theorem @identifier {* @binder } : type`.
+         These commands are all synonyms of :n:`_Theorem @ident {* @binder } : type`.
 
 
 
@@ -202,7 +202,7 @@ Notations
 The signatures of most objects can be written using a succinct DSL for Squirrel notations (think regular expressions written with a Lispy syntax).  A typical signature might look like ``Hint Extern @natural {? @pattern} => @tactic``, which means that the ``Hint Extern`` command takes a number (``natural``), followed by an optional pattern, and a mandatory tactic.  The language has the following constructs (the full grammar is in `TacticNotations.g <_ext/notations/TacticNotations.g>`_):
 
 ``@…``
-  A placeholder (``@identifier``, ``@natural``, ``@tactic``\ ...)
+  A placeholder (``@ident``, ``@natural``, ``@tactic``\ ...)
 
 ``{? …}``
   an optional block
@@ -238,18 +238,18 @@ As an exercise, what do the following patterns mean?
       .. code::
 
          _pattern {+, @term {? at {+ @natural}}}
-         _generalize {+, @term at {+ @natural} as @identifier}
-         _fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
+         _generalize {+, @term at {+ @natural} as @ident}
+         _fix @ident @natural with {+ (@ident {+ @binder} {? {struct @ident'}} : @type)}
 
    .. tab:: Result
 
       .. cmd:: _pattern {+, @term {? at {+ @natural}}}
          :undocumented:
 
-      .. cmd:: _generalize {+, @term at {+ @natural} as @identifier}
+      .. cmd:: _generalize {+, @term at {+ @natural} as @ident}
          :undocumented:
 
-      .. cmd:: _fix @identifier @natural with {+ (@identifier {+ @binder} {? {struct @identifier'}} : @type)}
+      .. cmd:: _fix @ident @natural with {+ (@ident {+ @binder} {? {struct @ident'}} : @type)}
          :undocumented:
 
 Objects
@@ -284,13 +284,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-       .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @identifier }
+       .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
           This command is equivalent to
 
    .. tab:: Produces
 
-    .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @identifier }
+    .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
        This command is equivalent to
 
@@ -305,13 +305,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-       .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @identifier }
+       .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
           This command is equivalent to :n:`...`.
 
    .. tab:: Produces
 
-    .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @identifier }
+    .. cmd:: _Infix @string := @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
        This command is equivalent to :n:`...`.
 
@@ -325,27 +325,27 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-          .. cmd:: _Axiom @identifier : @term.
+          .. cmd:: _Axiom @ident : @term.
 
              This command links :token:`term` to the name :token:`term` as its specification in
              the global environment. The fact asserted by :token:`term` is thus assumed as a
              postulate.
 
-             .. cmdv:: _Parameter @identifier : @term.
+             .. cmdv:: _Parameter @ident : @term.
 
-                This is equivalent to :n:`_Axiom @identifier : @term`.
+                This is equivalent to :n:`_Axiom @ident : @term`.
 
    .. tab:: produces
 
-          .. cmd:: _Axiom @identifier : @term.
+          .. cmd:: _Axiom @ident : @term.
 
              This command links :token:`term` to the name :token:`term` as its specification in
              the global environment. The fact asserted by :token:`term` is thus assumed as a
              postulate.
 
-             .. cmdv:: _Parameter @identifier : @term.
+             .. cmdv:: _Parameter @ident : @term.
 
-                This is equivalent to :n:`_Axiom @identifier : @term`.
+                This is equivalent to :n:`_Axiom @ident : @term`.
 
 ``.. exn::`` |black_nib| An error raised by a Squirrel command or tactic.
     This commonly appears nested in the ``.. tacn::`` that raises the
@@ -898,12 +898,12 @@ In addition to the objects and directives above, the ``squirrelrst`` Sphinx plug
 
          .. code-block:: rst
 
-          :n:`_generalize @term as @identifier` is just like :n:`_generalize @term`, but
+          :n:`_generalize @term as @ident` is just like :n:`_generalize @term`, but
           it names the introduced hypothesis :token:`identifier`.
 
       .. tab:: produces
 
-          :n:`_generalize @term as @identifier` is just like :n:`_generalize @term`, but
+          :n:`_generalize @term as @ident` is just like :n:`_generalize @term`, but
           it names the introduced hypothesis :token:`identifier`.
 
     Note that this example also uses ``:token:``.  That's because ``identifier`` is
@@ -971,7 +971,7 @@ Overusing ``:token:``
 DO
   .. code::
 
-     This is equivalent to :n:`_Axiom @identifier : @term`.
+     This is equivalent to :n:`_Axiom @ident : @term`.
 
 DON'T
   .. code::

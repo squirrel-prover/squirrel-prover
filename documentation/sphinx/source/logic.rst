@@ -17,7 +17,7 @@ A base type can generally be thought of as a set of bitstrings,
 though this is a simplified view as we shall see below.
 
 .. prodn::
-  base_type ::= bool | message | timestamp | index | @identifier
+  base_type ::= bool | message | timestamp | index | @ident
 
 Squirrel comes with several built-in base types:
 
@@ -30,9 +30,9 @@ Squirrel comes with several built-in base types:
 Additional :gdef:`custom types` may be declared by the user
 using the following declaration:
 
-.. decl:: type @identifier {? [ {+, @type_tag } ] }
+.. decl:: type @ident {? [ {+, @type_tag } ] }
 
-  Declare a new base type called :n:`@identifier`.
+  Declare a new base type called :n:`@ident`.
   The values of that type are assumed to be encodable as bitstrings.
   :gdef:`Type tags<type tag>` can optionally be passed to restrict the new 
   type possible instantiations.
@@ -70,7 +70,7 @@ Type variables must be an identifier preceded by a
 single apostrophe, e.g. :n:`'x`.
 
 .. prodn::
-  type_variable ::= '@identifier
+  type_variable ::= '@ident
   tvar_params ::=  {* @type_variable }
 
 When parametrizing a declaration, type variables are enclosed in brackets, e.g. :g:`['a 'b 'c]`.
@@ -90,7 +90,7 @@ inferred by Squirrel.
 The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b` where :g:`b1,...,bn` and :g:`b` are base types.
 
 .. example:: Hash function
-	     
+       
    A hash function may have type :g:`(message * key_ty) -> hash_ty`:
    it takes as input the value to be hashed (of type :g:`message`) and a
    key (of type :g:`key_ty`), and returns a digest of type :g:`hash_ty`.
@@ -103,10 +103,10 @@ A hole `_` can be used as name for a variable which is either unused
 or whose name does not matter. 
 
 .. prodn::
-  variable ::= @identifier
+  variable ::= @ident
   var_or_hole ::= @variable | _
 
-:gdef:`Tags <tag>` restrict a possible variable instantiation in various ways.
+:gdef:`Variable tags <tag>` restrict a possible variable instantiation in various ways.
 
 .. prodn::
   tag ::= const | glob | adv
@@ -171,7 +171,7 @@ probabilistic value which ranges over messages, and a term of type
        | @term_with_binders
        | @sterm
   sterm ::= _
-        | @identifier
+        | @ident
         | @diff_term
         | ( {+, @term} )
 
@@ -256,7 +256,7 @@ behavior between its components using:
 
 * the :n:`diff` construct, see :term:`diff-terms<diff-term>`;
 * and :term:`macro terms<macro>` when reasoning over a 
-  :term:`mutli system`.
+  :term:`multi-system<multi system>`.
 
 There is no syntactic separation between terms and multi-terms: any
 Squirrel term can be a multi-terms (though syntactic checks are
@@ -292,7 +292,7 @@ functions defined by recurence over the execution trace (i.e. the
 Applied macros can occur in terms as follows:
 
 .. prodn::
-   macro_id ::= @identifier
+   macro_id ::= @ident
    macro_application ::= @macro_id {* @term} @ @term
 
 The timestamp argument :n:`ts` of a macro :n:`@macro_id` is passed using a special syntax :n:`@macro_id @ ts`.
@@ -306,10 +306,9 @@ The semantics of a macro symbol :n:`@macro_id` depends on the systems
 it is being interpreted in:
 
 * its semantics over a :term:`single system`, depends on the system
-  definition, see the :ref:`system-defined macros section
-  <section-system-macros>`.
+  definition, see the :ref:`system-defined macros section <section-system-macros>`.
 
-* over a :term:`mutli-system<multi system>` :n:`P__1,...,P__n`, it
+* over a :term:`multi-system<multi system>` :n:`P__1,...,P__n`, it
   represents a :n:`n` mutli-term, where the :n:`i`-th component corresponds to
   the interpretation of the macro over the single system :n:`P__i`.
 

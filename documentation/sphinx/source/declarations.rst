@@ -17,7 +17,7 @@ Names
 Names are used to model random samplings.
 
 .. prodn::
-   name_id ::= @identifier
+   name_id ::= @ident
 
 .. decl:: name @name_id : {? @type ->} @type
 
@@ -49,7 +49,7 @@ If needed, their behaviour can be restricted further through :term:`axioms
 <axiom>`.
 
 .. prodn::
-   fun_id ::= @identifier | (@infix_op)
+   fun_id ::= @ident | (@infix_op)
 
 .. decl:: abstract @fun_id {? [@tvar_params]} : @type
 
@@ -60,7 +60,7 @@ If needed, their behaviour can be restricted further through :term:`axioms
   through the optional :n:`@tvar_params` type variable parameters.
 
 An abstract function must be used in prefix notation if its name is an
-:n:`@identifier`, and in infix notation if its name is an
+:n:`@ident`, and in infix notation if its name is an
 :n:`@infix_op` (note the parenthesis around :n:`(@infix_op)` in the
 declaration).
 
@@ -148,7 +148,7 @@ Operators are function symbols with a concrete user-defined semantics.
 An operator's semantics must be *deterministic*.
 
 .. prodn::
-   op_id ::= @identifier | (@infix_op)
+   op_id ::= @ident | (@infix_op)
 
 .. decl:: operator ::= op @op_id {? [@tvar_params] } @binders {? : @type } = @term
 
@@ -165,7 +165,7 @@ An operator's semantics must be *deterministic*.
    that its body represents a deterministic value.
 
 An operator must be used in prefix notation if its name is an
-:n:`@identifier`, and in infix notation if its name is an
+:n:`@ident`, and in infix notation if its name is an
 :n:`@infix_op` (note the parenthesis around :n:`(@infix_op)` in the
 declaration).
 
@@ -191,7 +191,7 @@ Channels
 Communications over the network are performed over public channels, identified by a name.
 
 .. prodn::
-   channel_id ::= @identifier
+   channel_id ::= @ident
 
 .. decl:: channel @channel_id
 
@@ -206,7 +206,7 @@ Mutable state
 Processes in Squirrel can use mutable states.
 
 .. prodn::
-   state_id ::= @identifier
+   state_id ::= @ident
 
 .. decl:: mutable @state_id @binders {? : @type} = @term
   
@@ -218,7 +218,7 @@ Processes in Squirrel can use mutable states.
    automatically inferred by Squirrel.
    
 .. example:: State counter
-	     
+       
    .. squirreldoc:: 
       mutable counter (i,j,k:index) : message = zero
 
@@ -253,22 +253,22 @@ composition of basic processes, conditionals, find constructs,
 replication or process calls.
 
 ..  prodn::
-    process_id ::= @identifier
-    alias ::= @identifier
+    process_id ::= @ident
+    alias ::= @ident
     process ::= @basic_process
     | @process; @process
     | @process | @process
-	  | if @term then @process {? else @process}
-	  | try find @binders such that @term in @process {? else @process}
-	  | let @identifier = @term in @process
-	  | !_@identifier @process
+    | if @term then @process {? else @process}
+    | try find @binders such that @term in @process {? else @process}
+    | let @ident = @term in @process
+    | !_@ident @process
     | @process_id {? ({*, @term}) }
     | @alias : @process
 
 The construct :g:`A : proc` does not have any semantic impact: it is
 only used to give an alias to this location in the process.
 
-.. decl:: process @process_id @binders = @proc	ess
+.. decl:: process @process_id @binders = @proc  ess
    
    Declares a new process named :n:`@process_id` with arguments :n:`@binders`
    and body :n:`@process`.
@@ -293,7 +293,7 @@ processes.
 There are identified by an action identifier:
 
 .. prodn::
-   action_id ::= @identifier
+   action_id ::= @ident
 
 When translating processes into sets of action, fresh action
 identifiers are automatically generated to name created
@@ -310,7 +310,7 @@ Internally, an action is defined by:
 
 
 .. example:: Actions corresponding to a process definition
-	     
+       
    .. squirreldoc::
       abstract one:message.
       channel c.
@@ -318,13 +318,13 @@ Internally, an action is defined by:
       process Dummy =
              (!_i (in(c,x);
                   if x=zero then
-		     A: out(c,zero)
-		  else
-		     B: out(c,x)
-		  )   
+         A: out(c,zero)
+      else
+         B: out(c,x)
+      )   
               | 
-	        in(c,x); out(c,empty)).
-	
+          in(c,x); out(c,empty)).
+  
    defines a set of three actions:
    
    * action :n:`A[i]`, which on input :g:`x`, checks whether :g:`x=zero` and outputs :g:`zero`;
@@ -341,7 +341,7 @@ is usually though of as a set of single systems.
 A system a defined by a main process:
 
 .. prodn::
-   system_id ::= @identifier
+   system_id ::= @ident
 
 .. decl:: system {? [@system_id]} @process
 
@@ -356,11 +356,11 @@ A system a defined by a main process:
 
 .. example:: System declarations
 
-	     Using the previously defined :n:`Dummy` process, we
-	     define a system with :g:`system [myProtocol] Dummy`.
-	     Another distinct system could be declared with :g:`system
-	     (Dummy | out(c,empty))`, which would this time be named
-	     :n:`default`.
+       Using the previously defined :n:`Dummy` process, we
+       define a system with :g:`system [myProtocol] Dummy`.
+       Another distinct system could be declared with :g:`system
+       (Dummy | out(c,empty))`, which would this time be named
+       :n:`default`.
 
 
 .. _section-system-macros:
@@ -449,7 +449,7 @@ declaration is that the former creates a proof-obligation that must be
 discharged by the user through a :ref:`proof<section-proofs>`.
 
 .. prodn::
-   statement_id ::= @identifier 
+   statement_id ::= @ident 
    local_statement ::= {? [@system_expr] } {| @goal_id | _} {? [@tvar_params]} @binders : @formula
    global_statement ::= {? [@system_context] } {| @goal_id | _} {? [@tvar_params]} @binders : @global_formula
 
@@ -478,7 +478,7 @@ holds.
    Declares a new local :g:`goal` or :g:`axiom`.
 
 .. example:: Some axioms and goals
-	     
+       
    .. squirreldoc::
       axiom [any] fail_not_pair (x,y:message): <x,y> <> fail
 

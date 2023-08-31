@@ -47,9 +47,9 @@ Commands
 
 
    
-.. cmd:: set @identifier = {| @bool | @natural }
+.. cmd:: set @ident = {| @bool | @natural }
 
-   Set any squirrel :gdef:`option` using its :n:`@identifier`:
+   Set any squirrel :gdef:`option` using its :n:`@ident`:
 
    ====================== ============================================ ======================
    Option identifier      Description                                  Default value
@@ -67,9 +67,9 @@ Commands
    postQuantumSound       Post-quantum soundness                       false
    ====================== ============================================ ======================
 
-.. cmd:: print {? @identifier}
+.. cmd:: print {? @ident}
 
-  Shows definition of given :n:`@identifier` if it is a lemma, function, name, macro or system.
+  Shows definition of given :n:`@ident` if it is a lemma, function, name, macro or system.
   :g:`print` without :n:`@idendifier` shows the current system.
 
   .. example:: printing a goal
@@ -105,9 +105,9 @@ Commands
         search exists (x : _ -> _), _.
 
 
-.. cmd:: hint rewrite @identifier
+.. cmd:: hint rewrite @ident
 
-  Add a rewriting rule from the lemma :n:`@identifier` to the
+  Add a rewriting rule from the lemma :n:`@ident` to the
   user-defined rewriting database. The lemma should establish a local
   formula consisting of a universally quantified conditional equality.
   In other words, it should essentially be of the form
