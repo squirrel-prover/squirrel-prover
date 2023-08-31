@@ -513,8 +513,13 @@ Common tactics
     .. example:: Destruct 
        
        If we have the hypothesis :g:`H: A \/ (B /\ C)`, the tactic
-       :g:`destruct H as [H1 | [H2 H3]]` will remove the :g:`H` hypothesis
-       and introduce instead:
+
+       .. squirreldoc::
+       
+          destruct H as [H1 | [H2 H3]]
+          
+
+       removes the :g:`H` hypothesis and introduces instead:
     
        .. squirreldoc::
     
@@ -750,7 +755,13 @@ Global tactics
    .. example:: Splitting a sequence
       
       Called over a conclusion of the form :g:`0: seq(x:message =>
-      value)`, the tactic :g:`splitseq 0: (fun y:message => some_test)` replaces the conclusion by:
+      value)`, the tactic:
+
+      .. squirreldoc::
+
+         splitseq 0: (fun y:message => some_test)
+
+      replaces the conclusion by:
 
       .. squirreldoc::
 
