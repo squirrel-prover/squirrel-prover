@@ -773,12 +773,10 @@ class SquirreldocDirective(Directive):
         dli = nodes.definition_list_item()
         for sentence in self.content:
             try:
-                sentence = sentence.strip()
                 lexer = pygments.lexers.get_lexer_by_name("squirrel")
                 parsed = pygments.highlight(sentence,
                                             lexer,
                                             TERM_FORMATTER)
-                parsed = parsed.strip()
                 in_chunks = AnsiColorsParser().colorize_str(parsed)
                 dli += nodes.term(sentence, '', *in_chunks,classes=['in'])
             except ValueError:
