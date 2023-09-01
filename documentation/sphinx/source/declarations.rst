@@ -78,6 +78,40 @@ declaration).
   can easily lead to contradictions, as for instance one may assume
   that all types contain a single element, or are infinite, ....
 
+Operators
+---------
+
+Operators are function symbols with a concrete user-defined semantics.
+An operator's semantics must be *deterministic*.
+
+.. prodn::
+   operator_id ::= @ident | (@infix_op)
+
+.. decl:: operator ::= op @operator_id {? [@tvar_params] } @binders {? : @type } = @term
+
+   Declares an operator named :n:`@op_id`, arguments :n:`@binders` and
+   returning :n:`@term`. 
+
+   The return type :n:`@type` can be provided, or left to be
+   automatically inferred by Squirrel.
+  
+   Operator declarations can be :ref:`polymorphic<section-polymorphism>` through 
+   the optional :n:`@tvar_params` type variable parameters.
+
+   An operator declaration *fails* if Squirrel cannot syntactically check
+   that its body represents a deterministic value.
+
+An operator must be used in prefix notation if its name is an
+:n:`@ident`, and in infix notation if its name is an
+:n:`@infix_op` (note the parenthesis around :n:`(@infix_op)` in the
+declaration).
+
+..
+  As recursion is not yet supported, this is in fact currently syntact
+  sugar for declaring an :term:`abstract function <abstract_fun>` symbol along with an :term:`axiom` stating
+  the equation giving its defintion.
+
+
 Built-ins
 +++++++++
 
@@ -139,40 +173,6 @@ associated cryptographic assumptions.
    must satisfy the DDH assumption when declared with :g:`ddh`, the
    CDH assumption with :g:`cdh`, and the GapDH assumption with
    :g:`gdh`.
-
-
-Operators
----------
-
-Operators are function symbols with a concrete user-defined semantics.
-An operator's semantics must be *deterministic*.
-
-.. prodn::
-   op_id ::= @ident | (@infix_op)
-
-.. decl:: operator ::= op @op_id {? [@tvar_params] } @binders {? : @type } = @term
-
-   Declares an operator named :n:`@op_id`, arguments :n:`@binders` and
-   returning :n:`@term`. 
-
-   The return type :n:`@type` can be provided, or left to be
-   automatically inferred by Squirrel.
-  
-   Operator declarations can be :ref:`polymorphic<section-polymorphism>` through 
-   the optional :n:`@tvar_params` type variable parameters.
-
-   An operator declaration *fails* if Squirrel cannot syntactically check
-   that its body represents a deterministic value.
-
-An operator must be used in prefix notation if its name is an
-:n:`@ident`, and in infix notation if its name is an
-:n:`@infix_op` (note the parenthesis around :n:`(@infix_op)` in the
-declaration).
-
-..
-  As recursion is not yet supported, this is in fact currently syntact
-  sugar for declaring an :term:`abstract function <abstract_fun>` symbol along with an :term:`axiom` stating
-  the equation giving its defintion.
 
 
 .. _section-processes:
@@ -303,7 +303,7 @@ respect such naming hints.
 
 Internally, an action is defined by:
 
-* an action identifier :n:`@action_id`;
+* an :gdef:`action identifier or constructor<action constructor>` :n:`@action_id`;
 * a list of :g:`index` replications variables;
 * a :n:`@term` of type :g:`bool` represeting the action executability condition;
 * a term of type :g:`message` represeting the action output.

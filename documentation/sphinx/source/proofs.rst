@@ -154,12 +154,13 @@ G` then the pattern will start by acting on `x` or `H`).
 
 .. prodn::
    naming_ip ::= {| _ | ? | @idend }
-   and_or_ip ::= {| [] | [ {+ @simpl_ip } ] | {+| @simpl_ip } }
+   and_or_ip ::= {| [] | [ {+ @simpl_ip } ] | [{+| @simpl_ip } }]
    simpl_ip ::= {| @naming_pat | @and_or_ip | @rewrite_ip }
    s_item ::= {| // | /= | //= }
    rewrite_ip ::= {| -> | <- }
    expand_ip ::= @/{| @macro_id | @operator_id }
-   intro_pat ::= simpl_ip | s_item | expand_ip | * | >
+   clear_switch ::= %{ {+ @hypothesis_id} %}
+   intro_pat ::= @simpl_ip | @s_item | @expand_ip | @clear_switch | * | >
   
 A :gdef:`naming introduction pattern<naming ip>` :n:`@naming_ip` pop
 the top-most variable or assumption of the goal and name it according
@@ -176,12 +177,12 @@ to the pattern:
 A :gdef:`and/or introduction pattern<and or ip>` :n:`@and_or_ip` will,
 for each focused sub-goals, destruct the top assumption of the goal:
 
-* :n:`[ @simpl_ip ... @simpl_ip]`: the top assumption of the goal must
+* :n:`[ @simpl_ip ... @simpl_ip ]`: the top assumption of the goal must
   be a conjunction with as many conjunct as provided simple
   patterns. Destruct the conjunction, handling each conjunct according
   to the corresponding :n:`@simpl_ip`.
 
-* :n:`[ @simpl_ip | ... | @simpl_ip]`: the top assumption of the goal
+* :n:`[ @simpl_ip | ... | @simpl_ip ]`: the top assumption of the goal
   must be a disjunction with as many disjunct as provided simple
   patterns. Destruct the disjunction, creating one new sub-goal for
   each disjunct and handling each of them according to the
@@ -192,7 +193,7 @@ simplifies the goals in focus of the pattern:
 
 * :g:`//` applies :g:`try auto` to the focused goals;
 * :g:`/=` applies :tacn:`simpl` to the focused goals;
-* :g:`//=` is :g:`// /=`;
+* :g:`//=` is syntactic equivalent to :g:`// /=`;
 
 A :gdef:`rewrite ip item<rewrite ip item>` :n:`@rewrite_ip` uses the top assumption to rewrite
 the focused goals. The top assumption is cleared after rewriting.
@@ -207,6 +208,9 @@ An :gdef:`expansion item<expansion item>` :n:`@expand_ip` expands definitions in
   shown to happen;
 * :n:`@/@operator_id` expands the operator :n:`@operator_id`,
   :math:`\beta`-reducing the operator if it is applied.
+
+A :gdef:`clear switch<clear switch>` :n:`@clear_switch` clears the
+specified hypotheses from the proof context.
 
 
 Proof terms
@@ -433,7 +437,7 @@ The reminder behaves as follows:
 
    .. prodn:: intro_pat_list ::= {* @intro_pat}
 
-   :n:`@tactical => @intro_pat_list` is syntactic sugar for :n:`@tactical; intro @intro_pat_list`
+   :n:`@tactical => @intro_pat_list` is equivalent to :n:`@tactical; intro @intro_pat_list`
   
 Common errors
 -------------
@@ -472,8 +476,8 @@ Common tactics
 .. tacn:: admit {? @position}
    :name: admit     
 
-    Admit the current goal, or admit an element from a 
-    biframe by refering to its position. 
+   Admit the current goal, or admit the element at position
+   :n:`@position` when the goal is an equivalence.
 
 
 .. tacn:: assumption {? @hypothesis_id}
@@ -486,11 +490,15 @@ Common tactics
 
 .. tacn:: case {| @hypothesis_id | @term_pat}
     
-    Perform a case analysis over the given arugment, which can either be:
-    
-     - an assumption which is a disjunction, split into several cases;
-     - a term of type timestamp, in which case the cases are over the fact that this timestamp must be equal to one of the actions of the system instantiated with some newly existantial indices.
-      
+   Perform a case analysis over the given argument:
+   
+   - :n:`@hypothesis_id`: create on sub-goal for each disjunct of
+     :n:`@hypothesis_id`;
+   - :n:`@term_pat` a term of type :g:`timestamp`: create one sub-goal
+     for each possible :term:`action constructor<action constructor>` of the sequent current
+     system
+     (all systems appearing in a sequent have the same set of actions,
+     as they must be be compatible).
       
      
 .. tacn:: dependent induction {? @variable}
@@ -506,9 +514,9 @@ Common tactics
     
     Destruct an hypothesis based on its top-most connective
     (existantial quantification, disjunction or conjunction), 
-    applying the simple introduction pattern :n:`simpl_ip` to it.
+    applying the simple introduction pattern :n:`@simpl_ip` to it.
 
-    :n:`@simpl_ip` defaults to :n:`?`.
+    :n:`@simpl_ip` defaults to :n:`?` if not pattern is provided by the user.
     
     .. example:: Destruct 
        
@@ -519,43 +527,46 @@ Common tactics
           destruct H as [H1 | [H2 H3]]
           
 
-       removes the :g:`H` hypothesis and introduces instead:
+       removes the :g:`H` hypothesis and create two sub-goal, one with the hypothesis :g:`H1:A`, the other
+       with the hypotheses :g:`H2:B, H3:C`.
     
-       .. squirreldoc::
-    
-          H1: A
-          H2: B
-          H3: C
-
 .. tacn:: exists {* @term}
     
     :n:`exists @term__1 ... @term__n` uses the terms :n:`@term__1 ... @term__n` 
     as witnesses to prove an existentially quantified goal.
 
-.. tacn:: generalize {+ @variable} {? as {+ @variable}}
+    For example, :g:`exists t` transform a goal
+    :n:`(exists x, phi)` into :n:`(phi{x -> t})`.
     
-    Generalize the goal on some variables, that is, make the goal universally quantified over the given variables. New names for the now universally quantified variables can be specfied.
+.. tacn:: generalize {+ @term_pat} {? as {+ @variable}}
 
-.. tacn:: generalize dependent  {+ @variable} {? as {+ @variable}}
-    
-    Generalize the goal and hypotheses on some terms. Hypothesis that depend on the specified variable are first pushed back inside the goal, before the goal is generalized.              
+    :n:`generalize @term_pat` looks for an instance :n:`@term` of
+    :n:`@term_pat` in the goal. Then, replace all occurrences of :n:`@term`
+    by a fresh universally quantified variable
+    (automatically named, or :n:`@variable` if provided).
+
+.. tacn:: generalize dependent {+ @term_pat} {? as {+ @variable}}
+
+    Same as :n:`generalize`, but also generalize in the proof context.
+    All hypotheses in which generalization occured are pushed back into the
+    goal before the newly added quantified variables.
 
 .. tacn:: have @have_ip : {|@term|@global_formula}
    
    .. prodn:: have_ip ::= {* @s_item} @simpl_ip {* @s_item}
 
    :n:`have @have_ip : F` introduces the new hypothesis :n:`F`, which
-   can be a local formula :n:`@term` or a :n:`@global_formula`. The new
-   hypothesis is processed by :n:`@@have_ip` (see below). A new
-   sub-goal with conclusion :n:`@term` is created.
+   can be a :n:`@term` or a :n:`@global_formula`. The new
+   hypothesis is processed by :n:`@have_ip` (see below). A new
+   sub-goal requiring to prove :n:`F` is created.
 
    If :n:`@have_ip` is the introduction pattern :n:`@s_item__pre @simpl_ip @s_item__post` then:
 
    * the simplification item :n:`@s_item__pre` is applied to the *goal*
      before adding the hypothesis;
 
-   * the simple intro-pattern :n:`@simpl_ip` is applied to the
-     *introduced hypothesis*;
+   * the simple intro-pattern :n:`@simpl_ip` is applied to introduce the
+     *new hypothesis* :n:`F`;
 
    * the simplification item :n:`@s_item__post` is applied to the *goals*
      after adding the hypothesis.
