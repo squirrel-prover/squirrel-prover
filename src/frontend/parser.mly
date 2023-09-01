@@ -639,21 +639,21 @@ naming_pat:
 | QMARK       { TacticsArgs.AnyName }
 | id=ID       { TacticsArgs.Named id }
 
-and_or_pat:
-| LBRACKET s=simpl_pat          ips=slist(simpl_pat, empty)    RBRACKET
+and_or_ip:
+| LBRACKET s=simpl_ip          ips=slist(simpl_ip, empty)    RBRACKET
                     { TacticsArgs.And (s :: ips) }
-| LBRACKET s=simpl_pat PARALLEL ips=slist(simpl_pat, PARALLEL) RBRACKET
+| LBRACKET s=simpl_ip PARALLEL ips=slist(simpl_ip, PARALLEL) RBRACKET
                     { TacticsArgs.Or  (s :: ips) }
 | LBRACKET RBRACKET { TacticsArgs.Split }
 
-ip_rw_dir:
+rewrite_ip:
 | ARROW  { `LeftToRight }
 | RARROW { `RightToLeft }
 
-simpl_pat:
+simpl_ip:
 | n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
-| ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
-| d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
+| ao_ip=and_or_ip { TacticsArgs.SAndOr ao_ip }
+| d=loc(rewrite_ip) { TacticsArgs.Srewrite d }
 
 s_item_body:
 | l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
@@ -672,7 +672,7 @@ intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
 | l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}
-| pat=simpl_pat { TacticsArgs.Simpl pat }
+| pat=simpl_ip { TacticsArgs.Simpl pat }
 | e=expnd_item  { TacticsArgs.SExpnd e }
 
 intro_pat_list:
@@ -763,14 +763,14 @@ tac_any_term:
 (*------------------------------------------------------------------*)
 /* have ip (with AS keyword) for legacy usage (no support for s_items) */
 as_have_ip:
-| AS ip=simpl_pat { ([],ip,[]) }
+| AS ip=simpl_ip { ([],ip,[]) }
 
 s_item_noargs_list:
 | l=slist(s_item_noargs,empty) { l }
 
 /* FIXME: allow [s_item] with arguments */
 have_ip:
-| pre=s_item_noargs_list ip=simpl_pat post=s_item_noargs_list { (pre, ip, post) }
+| pre=s_item_noargs_list ip=simpl_ip post=s_item_noargs_list { (pre, ip, post) }
 
 %inline have_tac:
 | l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
@@ -837,7 +837,7 @@ tac:
   | l=lloc(DESTRUCT) i=lsymb
     { mk_abstract l "destruct" [TacticsArgs.String_name i] }
 
-  | l=lloc(DESTRUCT) i=lsymb AS p=and_or_pat
+  | l=lloc(DESTRUCT) i=lsymb AS p=and_or_ip
     { mk_abstract l "destruct" [TacticsArgs.String_name i;
                                 TacticsArgs.AndOrPat p] }
 
