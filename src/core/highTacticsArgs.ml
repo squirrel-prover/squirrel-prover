@@ -13,16 +13,9 @@ let convert_pat_arg
     (sel : int) conv_cntxt (p : Theory.term) (conc : Equiv.any_form)
   =
   let t, ty = Theory.convert ~pat:true conv_cntxt p in
-  let vars =
-    Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
-  in
-  let pat = Term.{
-      pat_op_tyvars = [];
-      pat_op_vars   = Vars.Tag.local_vars vars;
-      (* local information, since we allow to match diff operators *)
-      
-      pat_op_term   = t; }
-  in
+
+  let pat = Pattern.op_pat_of_term t in
+  
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
   and system = conv_cntxt.env.system in

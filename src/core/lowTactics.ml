@@ -109,9 +109,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert_args (s : S.sequent) args sort =
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.goal s))
 
-  let convert (s : S.sequent) term =
+  let convert ?pat (s : S.sequent) term =
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
-    Theory.convert cenv term
+    Theory.convert ?pat cenv term
 
   let convert_any (s : S.sequent) (term : Theory.any_term) =
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
@@ -1112,7 +1112,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let kind = get_rw_kind hyp in
 
-      let pat = Term.pat_of_form f in
+      let pat = Pattern.pat_of_form f in
       let erule = pat_to_rw_rule s ~loc (S.system s).set kind (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (Args.Once, Some id, erule) s
@@ -1301,17 +1301,53 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
 
-  let _generalize ~dependent (t : Term.term) (s : S.t) : Vars.tagged_var * S.t =
-    let v = Vars.make_fresh (Term.ty t) "_x" in
+      
+  (* [pat] can feature term holes [_] *)
+  let _generalize
+      ?loc ~dependent (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
+    =
+    let v = Vars.make_fresh (Term.ty pat) "_x" in
 
-    let subst = [Term.ESubst (t, Term.mk_var v)] in
+    (* find an occurrence of [pat] in the conclusion *)
+    let term =
+      if not (Sv.exists Vars.is_pat (Term.fv pat)) then
+        pat
+      else begin
+        let pat = Pattern.op_pat_of_term pat in
 
+        let option = Match.default_match_option in
+        let table, system, goal = S.table s, S.system s, S.goal s in
+
+        let res : Term.terms = 
+          match S.conc_kind with
+          | Local_t  -> Match.T.find ~option table system pat goal
+          | Global_t -> Match.E.find ~option table system pat goal
+          | Any_t -> assert false   (* impossible *)
+        in
+        let term_list =
+          (* Clear terms whose free variables are not a subset of the context free
+             variables (because the term appeared under a binder). *)
+          List.filter (fun t ->
+              Sv.subset (Term.fv t) (Vars.to_vars_set (S.vars s))
+            ) res
+        in
+        if term_list = [] then soft_failure ?loc (Failure "no occurrence found");
+        List.hd term_list
+      end
+    in
+
+    let subst = [Term.ESubst (term, Term.mk_var v)] in
+
+    (* substitute [pat] by [v] in the goal, or the 
+       whole sequent if [dependent = true]. *)
     let s =
       if not dependent
       then S.set_goal (S.subst_conc subst (S.goal s)) s
       else S.subst subst s
     in
-
+    
+    (* if [dependent = true], introduce back hypotheses where [pat] was 
+       found. *)
     let gen_hyps, s =
       if not dependent
       then [], s
@@ -1325,18 +1361,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
 
+    (* compute tags of [v] *)
     let tag =
-      let const = HighTerm.is_constant                  (S.env s) t in
-      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) t in
+      let const = HighTerm.is_constant                  (S.env s) term in
+      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) term in
       { S.var_info with const; adv }
     in
     (v,tag), S.set_goal goal s
 
   (** [terms] and [n_ips] must be of the same length *)
-  let generalize ~dependent (terms : Term.terms) n_ips (s : S.t) : S.t =
+  let generalize
+      ~dependent (terms : (Term.term * L.t option) list) n_ips (s : S.t) : S.t
+    =
     let s, vars =
-      List.fold_right (fun term (s, vars) ->
-          let var, s = _generalize ~dependent term s in
+      List.fold_right (fun (term,loc) (s, vars) ->
+          let var, s = _generalize ?loc ~dependent term s in
           s, var :: vars
         ) terms (s,[])
     in
@@ -1345,7 +1384,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let t_fv =
       List.fold_left (fun vars t ->
           Sv.union vars (Term.fv t)
-        ) Sv.empty terms
+        ) Sv.empty (List.map fst terms) |>
+      Sv.filter (not -| Vars.is_pat)
     in
     let s = try_clean_env t_fv s in
 
@@ -1384,16 +1424,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     match args with
     | [Args.Generalize (terms, n_ips_opt)] ->
       let terms =
-        List.map (fun arg ->
-            match convert_args s [Args.Theory arg] (Args.Sort Args.Term) with
-            | Args.Arg (Args.Term (_, t, _)) -> t
-
-            | _ -> bad_args ()
+        List.map (fun p_arg ->
+            let arg, _ty = convert ~pat:true s p_arg in 
+            arg, Some (L.loc p_arg)
           ) terms
       in
       let n_ips =
         match n_ips_opt with
-        | None -> List.map naming_pat_of_term terms
+        | None -> List.map (naming_pat_of_term -| fst) terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \
@@ -1705,7 +1743,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
 
   let induction_gen ~dependent (t : Term.term) s : S.t list =
-    let s = generalize ~dependent [t] [naming_pat_of_term t] s in
+    let s = generalize ~dependent [t, None] [naming_pat_of_term t] s in
     induction s
 
   let induction_args ~dependent args s =

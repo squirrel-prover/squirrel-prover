@@ -64,7 +64,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val convert_args :
     S.t -> Args.parser_arg list -> Args.esort -> Args.earg
 
-  val convert    : S.t -> Theory.term  -> Term.term * Type.ty
+  val convert : ?pat:bool -> S.t -> Theory.term  -> Term.term * Type.ty
 
   (*------------------------------------------------------------------*)
   (** {3 Expantion} *)

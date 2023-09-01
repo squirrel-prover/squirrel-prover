@@ -631,11 +631,7 @@ type 'a pat_op = {
 val project_tpat        : projs        -> term pat -> term pat
 val project_tpat_opt    : projs option -> term pat -> term pat
 val project_tpat_op_opt : projs option -> term pat_op -> term pat_op
-
-(** Make a pattern out of a formula: all universally quantified variables
-    are added to [pat_vars]. *)
-val pat_of_form : term -> term pat
-
+    
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 

@@ -2073,15 +2073,6 @@ type 'a pat_op = {
   pat_op_term   : 'a;
 }
 
-let pat_of_form (t : term) =
-  let vs, t = decompose_forall_tagged t in
-  let vs, s = refresh_vars_w_info vs in
-  let t = subst s t in
-
-  { pat_tyvars = [];
-    pat_vars = vs;
-    pat_term = t; }
-
 let project_tpat (projs : projs) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }
 
