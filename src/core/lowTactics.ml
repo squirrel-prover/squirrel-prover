@@ -2229,6 +2229,12 @@ let do_rw_item
     (TraceLT.do_rw_item rw_item rw_in)
     (EquivLT.do_rw_item rw_item rw_in)
 
+(* lifting to [Goal.t] *)
+let clear_str (str : lsymb) : Goal.t -> Goal.t =
+  Goal.map
+    (TraceLT.clear_str str)
+    (EquivLT.clear_str str)
+
 (** Applies a rewrite arg  *)
 let do_rw_arg
     (simpl : f_simpl)
@@ -2300,8 +2306,22 @@ let rec do_intros_ip
   match intros with
   | [] -> [s]
 
+  (* when a clear switch precedes a simplification items, application is in
+     reversed order *)
+  | Args.SClear l :: Args.SItem s_item :: intros ->
+    let s_l = do_s_item simpl s_item s in
+    let s_l =
+      List.map (fun s -> List.fold_left (fun s str -> clear_str str s) s l) s_l
+    in
+    do_intros_ip_list simpl intros s_l
+
+  | Args.SClear l :: intros ->
+    let s = List.fold_left (fun s str -> clear_str str s) s l in
+    do_intros_ip_list simpl intros [s]
+
   | Args.SItem s_item :: intros ->
-    do_intros_ip_list simpl intros (do_s_item simpl s_item s)
+    let s_l = do_s_item simpl s_item s in
+    do_intros_ip_list simpl intros s_l
 
   | Args.Simpl s_ip :: intros ->
     let ss = do_intro_pat s_ip s in
