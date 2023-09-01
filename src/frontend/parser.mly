@@ -141,13 +141,22 @@ lsymb:
 | id=loc(ID) { id }
 
 %inline infix_s:
-| AND              { "&&"  }
-| OR               { "||"   }
-| s=LEFTINFIXSYMB  { s }
-| s=RIGHTINFIXSYMB { s }
-| XOR              { "xor"  }
-| DARROW           { "=>" }
-| DEQUIVARROW      { "<=>" }
+| EQ               { "=" , `Left }
+| NEQ              { "<>", `Left }
+| LEQ              { "<=", `Left }
+| LANGLE           { "<" , `Left }
+| GEQ              { ">=", `Left }
+| RANGLE           { ">" , `Left }
+| AND              { "&&", `Left }
+| OR               { "||", `Left }
+| s=LEFTINFIXSYMB  { s, `Left }
+| s=RIGHTINFIXSYMB { s, `Right }
+| XOR              { "xor", `Left }
+| DARROW           { "=>" , `Left }
+| DEQUIVARROW      { "<=>", `Left }
+
+%inline infix_s0:
+| s=infix_s { fst s }
 
 (*------------------------------------------------------------------*)
 /* non-ambiguous term */
@@ -189,7 +198,7 @@ term_i:
    { let fsymb = sloc $startpos $endpos "pair" in
      Theory.mk_app_i (Theory.mk_symb fsymb) [t;t0] }
 
-| t=term s=loc(infix_s) t0=term       
+| t=term s=loc(infix_s0) t0=term       
    { Theory.mk_app_i (Theory.mk_symb s) [t;t0] }
 
 | t=term SHARP i=loc(INT)
@@ -201,9 +210,6 @@ term_i:
 
 | FIND vs=bnds SUCHTHAT b=term IN t=term t0=else_term
                                  { Theory.Find (vs,b,t,t0) }
-
-| f=term o=loc(ord) f0=term                
-    { Theory.mk_app_i (Theory.mk_symb o) [f;f0] }
 
 | FUN vs=ext_bnds_tagged DARROW f=term
                                  { Theory.Quant (Lambda,vs,f)  }
@@ -228,15 +234,6 @@ term:
 term_list:
 |                            { [] }
 | t=paren(slist(term,COMMA)) { t }
-
-(*------------------------------------------------------------------*)
-%inline ord:
-| EQ                             { "=" }
-| NEQ                            { "<>" }
-| LEQ                            { "<=" }
-| LANGLE                         { "<" }
-| GEQ                            { ">=" }
-| RANGLE                         { ">" }
 
 (*------------------------------------------------------------------*)
 /* simple lvalues: only support variable declarations */
@@ -437,9 +434,12 @@ bty_infos:
 |                                           { [] }
 
 lsymb_decl:
-| id=lsymb                            { `Prefix, id }
-| LPAREN s=loc(RIGHTINFIXSYMB) RPAREN { `Infix `Right, s }
-| LPAREN s=loc(LEFTINFIXSYMB)  RPAREN { `Infix `Left, s }
+| id=lsymb                     { `Prefix, id }
+| LPAREN s=loc(infix_s) RPAREN 
+          { let loc = L.loc s in
+            let k = snd @@ L.unloc s in
+            let s = fst @@ L.unloc s in
+            `Infix k, L.mk_loc loc s }
 
 %inline projs:
 |                                     { None }

@@ -1938,7 +1938,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Failure "names are of a type that is not [name_fixed_length]");
 
       let f =
-        Term.mk_atom `Eq (Term.mk_len tn) (Term.mk_len tm)
+        Term.mk_eq (Term.mk_len tn) (Term.mk_len tm)
       in
       let f = Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.conc_kind in
 

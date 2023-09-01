@@ -543,7 +543,7 @@ let global_cca
       let ns = Term.mk_symb n Message in
       Term.mk_name_with_tuple_args ns enc_rnd.args
     else
-      Term.mk_zeroes (Term.mk_len plaintext) in
+      Term.Prelude.mk_zeroes table (Term.mk_len plaintext) in
 
   let new_enc =
     let t_pk = Term.mk_fun table enc_pk [Name.to_term enc_key]  in

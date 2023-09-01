@@ -620,7 +620,7 @@ let namelength () =
     | None -> assert false
   in
   let cst = Term.mk_fun table fname [] in
-  let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+  let f = Term.mk_eq (Term.mk_len tn) cst in
 
   Alcotest.(check (term_testable)) 
     "axiom namelength_n → len(n) = namelength_message"

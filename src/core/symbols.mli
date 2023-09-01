@@ -419,10 +419,6 @@ val fs_lt  : fname
 val fs_geq : fname
 val fs_gt  : fname
 
-(** Witness *)
-
-val fs_witness : fname
-
 (** Successor over natural numbers *)
 
 val fs_succ : fname
@@ -456,7 +452,6 @@ val fs_empty  : fname
 (** Length *)
 
 val fs_len    : fname
-val fs_zeroes : fname
 
 (*------------------------------------------------------------------*)
 module Ss (S : Namespace) : Set.S with type elt := S.ns t 

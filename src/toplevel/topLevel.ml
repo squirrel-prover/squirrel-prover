@@ -286,8 +286,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
           Prover.set_param st.prover_state sp
       | GoalMode, Goal g           -> do_add_goal st g
       | GoalMode, Proof            -> do_start_proof ~check st
-                                      (* ↓ TODO do not manage stack file
-                                       * yet ↓ *)
+                                      (* ↓ TODO do not manage stack file yet ↓ *)
       | GoalMode, Include inc      -> do_include st inc
       | GoalMode, EOF              -> 
         (* ↓ If interactive, never end ↓ *)
@@ -311,8 +310,9 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     { st with prover_state = ps; }
 
 
-  and do_include ?(test=true) (st:state) (i: ProverLib.include_param) :
-    Prover.state =
+  and do_include
+      ?(test=true) (st:state) (i: ProverLib.include_param) : Prover.state 
+    =
     (* `Stdin will add cwd in path with theories *)
     let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
     let file = Driver.locate load_paths (Location.unloc i.th_name) in
@@ -326,7 +326,8 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     st.prover_state
 
   and do_all_commands_in 
-      ~check ~test (st:state) (file:Driver.file) : state =
+      ~check ~test (st:state) (file:Driver.file) : state 
+    =
     match Driver.next_input_file ~test file (get_mode st) with
     | ProverLib.Prover EOF ->
         (* ↓ If test or interactive, never end ↓ *)

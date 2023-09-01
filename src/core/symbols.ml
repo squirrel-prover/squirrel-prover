@@ -759,7 +759,7 @@ let infix_assoc (s : fname t) : assoc =
   assert (is_infix s);
   let s = to_string s in
   if s = "=" || s = "<>" || s = "<=" || 
-     s = "<" || s = ">=" || s = ">" then `NonAssoc
+     s = "<" || s = ">=" || s = ">" || s = "<=>" then `NonAssoc
   else if is_right_infix_str s then `Right
   else if is_left_infix_str s then `Left
   else assert false
@@ -826,6 +826,8 @@ let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) (f : string) arity =
   builtin_ref := table;
   f
 
+(*------------------------------------------------------------------*)
+
 (** Diff *)
 
 let fs_diff  = mk_fsymb "diff" 2
@@ -882,14 +884,6 @@ let fs_lt  = mk_comp "<"
 let fs_geq = mk_comp ">="
 let fs_gt  = mk_comp ">"
 
-(** Witness *)
-
-let fs_witness =
-  let tyv = Type.mk_tvar "t" in
-  let tyvar = Type.TVar tyv in
-  let fty = Type.mk_ftype [tyv] [] tyvar in
-  mk_fsymb ~fty "witness" (-1)
-
 (** Fail *)
 
 let fs_fail = mk_fsymb "fail" 0
@@ -932,10 +926,6 @@ let fs_len =
   let fty = Type.mk_ftype [tyv] [tyvar] Type.Message
   in
   mk_fsymb ~fty "len" 1
-
-let fs_zeroes = mk_fsymb "zeroes" 1
-
-
 (** {3 Builtins table} *)
 
 let builtins_table = !builtin_ref

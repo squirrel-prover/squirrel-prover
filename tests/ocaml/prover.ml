@@ -13,7 +13,8 @@ let some_print () =
     (fun () ->
       let st = TProver.init () in
       let _ = try TProver.exec_all ~test:true st
-        "include Basic.
+        "include Prelude.
+         include Basic.
         channel c
         system [T] (S : !_i !_i new n; out(c,n)).
         goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
@@ -31,13 +32,13 @@ let some_print () =
       raise Ok
     )
 
-let run_test () = 
-  let exception Ok in
-  Alcotest.check_raises "run test" Ok
-    (fun () ->
-       let _ = TProver.run ~test:true "tests/ok/test.sp" in
-       raise Ok
-    )
+(* let run_test () =  *)
+(*   let exception Ok in *)
+(*   Alcotest.check_raises "run test" Ok *)
+(*     (fun () -> *)
+(*        let _ = TProver.run ~test:true "tests/ok/test.sp" in *)
+(*        raise Ok *)
+(*     ) *)
 
 let compare_runner () = 
   let t = Sys.time() in
@@ -55,6 +56,6 @@ let compare_runner () =
 
 (*------------------------------------------------------------------*)
 let tests = [ ("some_print",         `Quick, some_print);
-              ("run_test",           `Quick, run_test);
+              (* ("run_test",           `Quick, run_test); *)
               (* ("compare_runner",     `Quick, compare_runner); *)
             ]

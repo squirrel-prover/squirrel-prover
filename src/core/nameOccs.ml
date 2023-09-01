@@ -393,7 +393,7 @@ let get_actions_ext
           in
           let occ = {
               so_cnt  = ts;
-              so_coll = Term.mk_witness ~ty_arg:Type.ttimestamp; 
+              so_coll = Term.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp; 
               (* unused, so always set to some arbitrary value *)
 
               so_ad = (); (* unused *)

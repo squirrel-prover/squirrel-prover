@@ -100,7 +100,7 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
 (* FIXME all printing stuff should be done at toplevel instead *)
 let try_complete_proof (ps:state) : state =
   if is_proof_completed ps then begin
-    Printer.prt `Goal "Goal %s is proved"
+    Printer.prt `Goal "Goal %s is proved@."
       (Utils.oget (current_goal_name ps));
     { ps with prover_mode = WaitQed }
   end
