@@ -333,11 +333,8 @@ the following (standard and Squirrel-specific) logical constructs:
 
 Boolean connectives for *local* formulas are :n:`&&, ||, =>, not`,
 where :n:`&&, ||, =>` are used with a right infix notation, and
-:n:`not` in prenex form. Bear in mind that those connectives are in
-fact classical function symbols of the terms.
-
-.. todo::
-   Adrien: "Bear in mind ... of the terms" => I did not understand
+:n:`not` in prenex form.
+Concretely, these are all :term:`built-in<built-in>` function symbols.
    
 The :gdef:`happens` predicate defines the time-points that have been
 scheduled in the execution, e.g. :n:`happens(@term)` (where :n:`@term`
@@ -375,13 +372,9 @@ An :gdef:`equivalence atom` :n:`@equiv(@term__1,...,@term__n)` holds if
 :n:`@term__1,...,@term__n` are diff-terms which any PPTM adversary has
 at most a negligible probability of distinguishing
 
-.. note:: Compared to the paper presentations of the logic, where
-   diff-terms don't exist, universal quantifiers can in Squirrel
-   be instantiated by diff-terms. The :g:`glob` variable tag allows to restric
-   quantifications over non diff-terms.
-
-.. todo::
-   Adrien: I feel like this note is slightly out-of-place here. Maybe in the section of diff-terms?
-   
-.. _section-judgements:
+.. note:: Compared to the paper presentations of the logic, which do
+   not describe diff-terms, Squirrel variables are by default
+   multi-term variables, and can be instantiated by diff-terms. 
+   The :g:`glob` variable tag --- present by default --- allows to
+   restric global quantifications to be over non-diff-terms.
 

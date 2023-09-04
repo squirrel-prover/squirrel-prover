@@ -19,6 +19,8 @@ is completed and :g:`Qed` can be used.
 The complete list of tactics can be found in the corresponding
 :ref:`tactic index <tactic_index>`.
 
+.. _section-judgements:
+
 Judgements
 ==========
 

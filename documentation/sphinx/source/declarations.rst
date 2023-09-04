@@ -435,7 +435,7 @@ A *concrete system context* :g:`set:S; equiv:P` comprises:
 A *system context alias* :g:`S` --- where :g:`S` is a
 :n:`@system_id` --- is syntactic sugar for :g:`set:S; equiv:S/left,S\right`.
 
-
+   
 Axioms and Goals
 ================
 
