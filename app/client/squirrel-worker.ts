@@ -339,12 +339,15 @@ export class SquirrelWorker {
   getLastExecutedBeforeChange(viewState:EditorState,posChange:number) : SyntaxNode {
     let lastExecuted = this.executedSentences[this.executedSentences.length - 1];
     // If changes are done after the lastExecuted node
-    if (posChange >= lastExecuted.to)
+    if (posChange > lastExecuted.to){
       return lastExecuted
+    }
     else {
-      let sentenceChanged = lastExecuted;
       let index = (this.executedSentences.length - 1);
-      while(sentenceChanged.from > posChange && index>0){
+      // The lastExecuted at least has changed, then start by the
+      // previous one
+      let sentenceChanged = this.executedSentences[index--];
+      while(posChange < sentenceChanged.from && index>0){
         sentenceChanged = this.executedSentences[index--]
       }
       // Take the previous one if it exists
