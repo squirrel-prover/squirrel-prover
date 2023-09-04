@@ -28,7 +28,6 @@ const evaluatedMark = Decoration.mark({
   class: "squirrel-eval-ok"
 })
 
-
 /**
  * Main squirrel Worker Class
  *
@@ -248,6 +247,8 @@ export class SquirrelWorker {
       let viewState = view.state;
       // highlight with pending background
       highlightNodes(view,nodes,"squirrel-eval-pending")
+      let cursorPos = nodes[nodes.length - 1].to;
+      view.dispatch({selection: {anchor: cursorPos, head: cursorPos}});
 
       if (this.curSentences.length != 0){
         this.queueSentences = this.queueSentences.concat(nodes)
