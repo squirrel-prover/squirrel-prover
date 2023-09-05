@@ -1,6 +1,5 @@
 import * as localforage from "localforage";
 import {EditorView } from "codemirror";
-import { EditorState } from "@codemirror/state";
 import { showPanel, Panel } from "@codemirror/view";
 import myJquery from 'jquery';
 

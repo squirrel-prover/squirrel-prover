@@ -206,6 +206,10 @@ export class SquirrelWorker {
     this.sendCommand(["Exec", sentences]);
   }
 
+  execNoCheck(sentences:Array<string>) {
+    this.sendCommand(["NoCheck", sentences]);
+  }
+
   /**
    * Will ask worker to pop n states from the history
    * @param {number} n
@@ -226,9 +230,13 @@ export class SquirrelWorker {
     }
   }
 
+  // TODO move out
+  isInclude(x:SyntaxNode):boolean {
+    return x.firstChild && x.firstChild.type.name === "P_include"
+  }
+
   async getStringOfNode(x:SyntaxNode, viewState:EditorState): Promise<string> {
-    if(x.firstChild && x.firstChild.type.name === "P_include"){
-      //TODO get fname !
+    if(this.isInclude(x)){
       let include_name = x.firstChild.getChild("include_name");
       let name = viewState.sliceDoc(include_name.from, include_name.to);
       return await this.fileManager.getFileString(name+".sp");
@@ -254,17 +262,44 @@ export class SquirrelWorker {
         this.queueSentences = this.queueSentences.concat(nodes)
       } else {
 
-        this.curSentences = nodes;
-        // Get the strings out of the SyntaxNodes of type Sentence
-        let sentences = new Array<string>()
-        for(const x of nodes){
-          sentences.push(await this.getStringOfNode(x,viewState));
+        let includeIndex = nodes.findIndex(this.isInclude)
+        if(includeIndex == -1){ // No include found
+          this.curSentences = nodes;
+          // Get the strings out of the SyntaxNodes of type Sentence
+          let sentences = new Array<string>()
+          for(const x of nodes){
+            sentences.push(await this.getStringOfNode(x,viewState));
+          }
+          this.exec(sentences);
+        } else if(includeIndex == 0) { // If include is first node
+          // Get that node
+          let includeNode = nodes.shift();
+          this.curSentences = [includeNode];
+          // Queue the rest
+          this.queueSentences = this.queueSentences.concat(nodes)
+          if(DEBUG) {
+            console.warn("nodes")
+            nodes.forEach((x) => this.printSentence(viewState,x));
+          }
+
+          let sentences = new Array<string>()
+          sentences.push(await this.getStringOfNode(includeNode,viewState))
+          // just execute the include without check
+          this.execNoCheck(sentences);
+        } else {
+          //Splice will remove elements from nodes
+          let sliceToExecute = nodes.splice(0,includeIndex);
+          this.curSentences = sliceToExecute;
+
+          // Queue the rest
+          this.queueSentences = this.queueSentences.concat(nodes)
+
+          let sentences = new Array<string>()
+          for(const x of sliceToExecute){
+            sentences.push(await this.getStringOfNode(x,viewState));
+          }
+          this.exec(sentences);
         }
-        if(DEBUG) {
-          console.log("Sentences before cursor :");
-          sentences.forEach(e => console.log(e));
-        }
-        this.exec(sentences);
       }
     }
   }
@@ -596,8 +631,9 @@ export class SquirrelWorker {
       if((this.curSentences.length -1) == msg[1]){
         this.curSentences = [];
         if(this.queueSentences.length > 0){
-          this.execNodes(this.view,this.queueSentences);
+          let queueClone = [...this.queueSentences];
           this.queueSentences = [];
+          this.execNodes(this.view,queueClone);
         }
       }
 
