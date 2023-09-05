@@ -218,18 +218,16 @@ specified hypotheses from the proof context.
 Proof terms
 -----------
 
-Proof terms are used by several tactics as a convenient way to combine
-and (partially) apply hypothesis, axioms or proven goals, in order to
-derive new facts.
+Proof terms are used by several tactics (see e.g. :tacn:`have` or
+:tacn:`apply`) as a convenient way to combine and (partially) apply
+hypothesis, axioms or proven goals, in order to derive new facts.
 
 .. prodn::
    proof_term ::= @ident {* @pt_arg}
-
-.. prodn::
    pt_arg ::= @sterm_pat | @ident | (% @proof_term) | _
 
 In a :n:`@proof_term` or a :n:`pt_arg`, an identifier :n:`@ident` must
-refer to an hypothesis in the current proof context, or an axiom or
+refer to an hypothesis in the current proof context, an axiom or a
 previously proven goal.
 
 Note that the grammar for proof term arguments :token:`pt_arg` is
@@ -240,7 +238,7 @@ the context.
 .. note::
    The :n:`(% @proof_term)` syntax is experimental, and is subject to
    change in the future.
-
+   
 .. _section-pt-resolution:
 
 Proof-term resolution
@@ -249,7 +247,7 @@ Proof-term resolution
 A proof-term :n:`@ident @pt_arg__1 ... @pt_arg__n` is 
 resolved into a local or global formula as follows:
 
-* First, the proof-term head :n:`@ident` is resolved as a :n:`@term`
+* First, the proof-term head :n:`@ident` is resolved as a :n:`@local_formula`
   or :n:`@global_formula` :g:`F`.
 
 * Then, this local or global formula :g:`F` is successively modified
@@ -263,7 +261,7 @@ resolved into a local or global formula as follows:
     each hole :n:`_` in :n:`@sterm_pat`.
 
   + :n:`@ident`: the top-most element of :n:`F`
-    must be a assumption, which is popped and unified with the formula
+    must be an assumption, which is popped and unified with the formula
     corresponding to the hypothesis, axiom or proven goal identified
     by :n:`@ident`.
 
@@ -281,6 +279,10 @@ resolved into a local or global formula as follows:
   generalizes the term unification variables that remains, or leave
   the term unification environment unclosed.
 
+.. todo::
+   Charlie: need example
+
+  
 
 In practice, the application of a proof-term argument is more complex
 that described above, for several reasons:
@@ -582,6 +584,7 @@ Common tactics
    where :n:`@simpl_ip` defaults to :g:`?`.
 
 .. tacn:: have @have_ip := @proof_term
+   :name: have	  
 
    :n:`have @have_ip := @proof_term` :ref:`resolves <section-pt-resolution>` 
    :n:`@proof_term` --- requiring that the term unification
