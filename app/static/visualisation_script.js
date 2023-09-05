@@ -611,15 +611,15 @@ class Visualisation {
       .append("h3");
     this.scene = null;
 
-    // this.reader = new Reader(config.address);
-    // this.importData();
+    this.reader = new Reader(config.address);
+    this.importData();
     
-    // this.es = new EventSource("events");
-    // this.es.addEventListener("update", event => this.importData());
+    this.es = new EventSource("events");
+    this.es.addEventListener("update", event => this.importData());
 
-    // this.ejs = new Event("update");
-    // document.getElementById("body")
-    //   .addEventListener("update", event => this.importData(event.detail));
+    this.ejs = new Event("update");
+    document.getElementById("body")
+      .addEventListener("update", event => this.importData(event.detail));
   }
   
   /** Get data from the reader.
