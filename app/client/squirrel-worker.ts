@@ -256,7 +256,9 @@ export class SquirrelWorker {
       // highlight with pending background
       highlightNodes(view,nodes,"squirrel-eval-pending")
       let cursorPos = nodes[nodes.length - 1].to;
-      view.dispatch({selection: {anchor: cursorPos, head: cursorPos}});
+      view.dispatch({selection: {anchor: cursorPos, head: cursorPos},
+                    effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
+      });
 
       if (this.curSentences.length != 0){
         this.queueSentences = this.queueSentences.concat(nodes)
