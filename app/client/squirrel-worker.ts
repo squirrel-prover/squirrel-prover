@@ -215,18 +215,28 @@ export class SquirrelWorker {
    * @param {number} n
    */
   undo(n:number) {
-    this.sendCommand(["Undo", n]);
-    // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
-    for(let i=0; i<n; i++){
-      this.executedSentences.pop();
-    }
+    // First remove queued sentences if there are
+    if (this.queueSentences.length > 0){
+      this.queueSentences.pop();
+      while(this.queueSentences.length > 0 && n > 0) {
+        this.executedSentences.pop();
+        n=n-1;
+      }
+    } 
+    if (n > 0) {
+      this.sendCommand(["Undo", n]);
+      // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
+      for(let i=0; i<n; i++){
+        this.executedSentences.pop();
+      }
 
-    if(this.executedSentences.length == 0){
-      this.cursor = null;
-      removeMarks(this.view,0,this.view.state.doc.length);
-    } else {
-      this.cursor = this.executedSentences[this.executedSentences.length-1].cursor();
-      removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
+      if(this.executedSentences.length == 0){
+        this.cursor = null;
+        removeMarks(this.view,0,this.view.state.doc.length);
+      } else {
+        this.cursor = this.executedSentences[this.executedSentences.length-1].cursor();
+        removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
+      }
     }
   }
 
@@ -472,27 +482,31 @@ export class SquirrelWorker {
   }
 
   getNextSentence(view:EditorView) {
+    let tree = syntaxTree(view.state);
+    let pos = 0;
     if(this.queueSentences.length != 0){ // Already queued stuff
-      return this.nextSiblingSentence(
-        this.queueSentences[this.queueSentences.length -1])
+      pos = this.queueSentences[this.queueSentences.length -1].from + 1;
     }
     else if (this.curSentences.length != 0) { // Already executing stuff
-      return this.nextSiblingSentence(
-        this.curSentences[this.curSentences.length -1])
+      pos = this.curSentences[this.curSentences.length -1].from + 1;
     }
     else if (this.cursor) { // Execution at cursor
-      return this.nextSiblingSentence(this.cursor.node); 
-    }
-    else { // first sentence of doc
-      let tree = syntaxTree(view.state);
+      pos = this.cursor.node.from + 1;
+    } else { // first sentence of doc
+      console.warn("From start ?")
       return this.getInnerFirstSentence(tree.topNode);
     }
+    let node = tree.resolveInner(pos);
+    node = getSentenceFromNode(node);
+    if (DEBUG) {
+      console.warn("Sentence to execute :");
+      this.printSentence(view.state,this.nextSiblingSentence(node));
+    }
+    return this.nextSiblingSentence(node); 
   }
 
   execNextSentence(view:EditorView):boolean{
     this.view = view
-    let viewState = view.state;
-    let tree = syntaxTree(viewState);
     let firstSentence = this.getNextSentence(view);
     if(!firstSentence){
       this.changeHtmlOf("query-panel","No sentence to execute.");
