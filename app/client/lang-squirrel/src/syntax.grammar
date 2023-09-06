@@ -129,6 +129,9 @@ kw<Term> { @specialize[@name={Term}]<ID, Term> }
   GOAL { kw<"goal"> }
   LOCAL { kw<"local"> }
   GLOBAL { kw<"global"> }
+  GLOB { kw<"glob"> }
+  ADV { kw<"adv"> }
+  DET { kw<"det"> }
   EQUIV { kw<"equiv"> }
   AXIOM { kw<"axiom"> }
   HINT[@name=closing] { kw<"hint"> }
@@ -538,9 +541,16 @@ bnd_group_list<l,t> {
   commaSep1<Bnd_group<l,t>>
 }
 
+tag {
+  CONST
+| ADV
+| GLOB
+| DET
+}
+
 var_tags {
   empty
-| LBRACKET commaSep1<Lsymb> RBRACKET
+| LBRACKET commaSep1<tag> RBRACKET
 }
 
 Ty_tagged {

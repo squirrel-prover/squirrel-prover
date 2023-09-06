@@ -2,7 +2,7 @@
 import {parser} from "./syntax.grammar"
 import {LRLanguage, LanguageSupport, indentNodeProp, foldNodeProp, foldInside, delimitedIndent} from "@codemirror/language"
 import {styleTags, tags as t} from "@lezer/highlight"
-import {completeFromList} from "@codemirror/autocomplete"
+// import {completeFromList} from "@codemirror/autocomplete"
 import {globalCompletion, localCompletionSource} from "./complete"
 
 
