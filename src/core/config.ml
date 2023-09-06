@@ -60,9 +60,6 @@ let v_debug_completion = Param_bool false
 let s_debug_tactics = "debugTactics"
 let v_debug_tactics = Param_bool false
 
-let s_old_completion = "oldCompletion"
-let v_old_completion = Param_bool false
-
 (*------------------------------------------------------------------*)
 (** Default parameters values.
     Add one line for each new parameter. *)
@@ -70,7 +67,6 @@ let default_params =
       decl s_debug_constr PBool v_debug_constr M.empty
   |>  decl s_debug_completion PBool v_debug_completion
   |>  decl s_debug_tactics PBool v_debug_tactics
-  |>  decl s_old_completion PBool v_old_completion
 
 (*------------------------------------------------------------------*)
 (** reference to the current parameters *)
@@ -91,10 +87,6 @@ let set_params p = params := p
 let debug_constr     () = get_bool (M.find s_debug_constr !params)
 let debug_completion () = get_bool (M.find s_debug_completion !params)
 let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
-
-
-(* FIXME seems to be used once for a test … *)
-let old_completion () = get_bool (M.find s_old_completion !params)
 
 let pp_kind fmt = function
   | PBool -> Fmt.pf fmt "bool"

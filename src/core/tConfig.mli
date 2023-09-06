@@ -52,9 +52,6 @@ val auto_fadup : Symbols.table -> bool
 (** New equivalence induction principle. *)
 val new_ind : Symbols.table -> bool
 
-(** Old congruence closure. *)
-val old_completion : Symbols.table -> bool
-
 (** Post-quantum soundness. *)
 val post_quantum : Symbols.table -> bool
 
