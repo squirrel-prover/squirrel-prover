@@ -1567,11 +1567,7 @@ module Lit = struct
     | App (Fun (fslt,  _), [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
     | App (Fun (fsgeq, _), [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
     | App (Fun (fsgt,  _), [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
-    | _ -> 
-      if Config.old_completion () then
-        None
-      else
-        Some (Atom form)
+    | _ -> Some (Atom form)
 
   let rec form_to_literal (form : term) : literal option =
     match form with

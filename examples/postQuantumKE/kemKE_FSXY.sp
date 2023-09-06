@@ -627,8 +627,6 @@ Qed.
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
 
-set oldCompletion = true.
-
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
  [happens(R2(i,j,k))] -> 

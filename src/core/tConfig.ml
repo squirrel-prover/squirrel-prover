@@ -66,9 +66,6 @@ let v_auto_fadup = Config.Param_bool true
 let s_new_ind = "newInduction"
 let v_new_ind = Config.Param_bool false
 
-let s_old_completion = "oldCompletion"
-let v_old_completion = Config.Param_bool false
-
 let s_post_quantum = "postQuantumSound"
 let v_post_quantum = Config.Param_bool false
 
@@ -91,7 +88,6 @@ let reset_params (table:Symbols.table) : Symbols.table =
   |>  decl s_auto_intro Symbols.PBool v_auto_intro
   |>  decl s_auto_fadup Symbols.PBool v_auto_fadup
   |>  decl s_new_ind Symbols.PBool v_new_ind
-  |>  decl s_old_completion Symbols.PBool v_old_completion
   |>  decl s_post_quantum Symbols.PBool v_post_quantum
 
 
@@ -137,8 +133,6 @@ let auto_intro = get_bool s_auto_intro
 let auto_fadup = get_bool s_auto_fadup
     (* FIXME never used ? *)
 let new_ind = get_bool s_new_ind
-    (* FIXME relevant ? *)
-let old_completion = get_bool s_old_completion
     (*OK*)
 let post_quantum = get_bool s_post_quantum
 

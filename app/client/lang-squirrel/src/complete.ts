@@ -99,6 +99,58 @@ const interactive_completions: readonly Completion[] = [//{↓{
   })
 ].map(t => {t.type = "property"; t.boost = 50;return t});//}↑}
 
+const process_completions: readonly Completion[] = [//{↓{
+  snip("if ${Term} then (${Process}) else (${Process})", {
+    label: "if",
+    detail: " ${Term} then (${Process}) else (${Process})",
+    info: "Process of form if _ then _ else _",
+    type: "method"
+  }),
+  snip("try find ${bnds} such that (${Term}) in (${Term}) else (${Term})", {
+    label: "find",
+    detail: " ${bnds} such that (${Term}) in (${Term}) else (${Term})",
+    info: "Process of form try find …",
+    type: "method"
+  }),
+  snip("let ${Lsymb}:${Ty} = (${Term}) in (${Process})", {
+    label: "let",
+    detail: " ${Lsymb}:${Ty} = (${Term}) in (${Process})",
+    info: "Process of form let _ = _ in",
+    type: "method"
+  }),
+  snip("in(${Lsymb},${Lsymb});${Process}", {
+    label: "in",
+    detail: "(c,x);P",
+    info: "Receive `x` from channel `c`, \
+           continue with process `P`.",
+    type: "method"
+  }),
+  snip("in(${Lsymb},${Lsymb})", {
+    label: "in",
+    detail: "(c,x)",
+    info: "Receive `x` from channel `c`.",
+    type: "method"
+  }),
+  snip("out(${Lsymb},${Term})", {
+    label: "out",
+    detail: "(c,m)",
+    info: "Send message `m` on channel `c`.",
+    type: "method"
+  }),
+  snip("out(${Lsymb},${Term});${Process}", {
+    label: "out",
+    detail: "(c,m);P",
+    info: "Send message `m` on channel `c`, continue with `P`.",
+    type: "method"
+  }),
+  snip("new ${Lsymb}:${Ty} ; ${Process}", {
+    label: "new",
+    detail: " ${Lsymb}:${Ty} ; ${Process}",
+    info: "Process `new n` id used to instantiate a fresh name",
+    type: "method"
+  })
+]//}↑}
+
 const tactics_completions: readonly Completion[] = [//{↓{
 
   {label:"use",detail:"H with v1 (, …, vn)? as intro_pat",
@@ -425,6 +477,14 @@ function inBulletedTac(node:SyntaxNode | null):boolean {
   return (inNodeType(set,node))
 }
 
+function inProcess(node:SyntaxNode | null):boolean {
+  const set = new Set([
+   "Process"
+  ]);
+  return (inNodeType(set,node))
+}
+
+
 function isFirstWord(node:SyntaxNode): boolean {
   return !node.prevSibling //If there is no prevSibling => it's first node
 }
@@ -494,6 +554,9 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
     if(tacNode && isFirstWord(tacNode))
       options = options.concat(tactics_completions);
   }
+  else if (inProcess(inner)){
+    options = options.concat(process_completions);
+  }
   else { // Interactive mode
     console.log("Interactive mode !")
     let interacNode = getChildNodeOfTypes(typesInteractive,inner);
@@ -525,52 +588,16 @@ const globals: readonly Completion[] = [
 ].map(n => ({label: n, type: "function"})))
 
 export const snippets: readonly Completion[] = [
-  snip("if ${Term} then (${Process}) else (${Process})", {
+  snip("if ${Term} then (${Term}) else (${Term})", {
     label: "if",
-    detail: " ${Term} then (${Process}) else (${Process})",
-    info: "Process of form if _ then _ else _",
-    type: "method"
-  }),
-  snip("try find ${bnds} such that (${Term}) in (${Term}) else (${Term})", {
-    label: "find",
-    detail: " ${bnds} such that (${Term}) in (${Term}) else (${Term})",
-    info: "Process of form try find …",
-    type: "method"
-  }),
-  snip("let ${Lsymb}:${Ty} = (${Term}) in (${Process})", {
-    label: "let",
-    detail: " ${Lsymb}:${Ty} = (${Term}) in (${Process})",
-    info: "Process of form let _ = _ in",
-    type: "method"
-  }),
-  snip("in(${Lsymb},${Lsymb})", {
-    label: "in",
-    detail: "(${CHANNEL},${Lsymb})",
-    info: "Process in(c,x)` is used to receive some value from channel `c`, bound to the variable `x`",
-    type: "method"
-  }),
-  snip("out(${Lsymb},${Term})", {
-    label: "out",
-    detail: "(${Lsymb},${Term})",
-    info: "Process `out(c,m)` is used to send the Term `m` over the channel `c`",
-    type: "method"
-  }),
-  snip("new ${Lsymb}:${Ty} ; ${Process}", {
-    label: "new",
-    detail: " ${Lsymb}:${Ty} ; ${Process}",
-    info: "Process `new n` id used to instantiate a fresh name",
-    type: "method"
+    detail: " ${Term} then (${Term}) else (${Term})",
+    info: "Term of form if _ then _ else _",
+    type: "keyword"
   }),
   snip("fun ${ext_bnd_tagged} => ${Term}", {
     label: "fun",
     detail: " ${ext_bnd_tagged} => ${Term}",
     info: "Term fun",
-    type: "keyword"
-  }),
-  snip("if ${Term} then (${Term}) else (${Term})", {
-    label: "if",
-    detail: " ${Term} then (${Term}) else (${Term})",
-    info: "Term of form if _ then _ else _",
     type: "keyword"
   }),
   {label:"with oracle",detail:"",info:`with oracle`},
