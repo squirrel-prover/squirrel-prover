@@ -214,16 +214,24 @@ export class SquirrelWorker {
    * Will ask worker to pop n states from the history
    * @param {number} n
    */
-  undo(n:number) {
+  undo(n:number): boolean {
     // First remove queued sentences if there are
     if (this.queueSentences.length > 0){
-      this.queueSentences.pop();
+      let removed = this.queueSentences.pop();
       while(this.queueSentences.length > 0 && n > 0) {
-        this.executedSentences.pop();
+        removed = this.queueSentences.pop();
         n=n-1;
       }
+      removeMarks(this.view,(removed.from),this.view.state.doc.length);
     } 
     if (n > 0) {
+      if (this.curSentences.length != 0) {
+        // TODO manage that case with promises ?
+        console.warn("Try to undo an already sent sentence !")
+        this.changeHtmlOf("query-panel",
+          "<div class='err'>Please wait… impossible to undo a sentence that is being executed !</div>");
+        return false;
+      }
       this.sendCommand(["Undo", n]);
       // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
       for(let i=0; i<n; i++){
@@ -238,6 +246,7 @@ export class SquirrelWorker {
         removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
       }
     }
+    return true;
   }
 
   // TODO move out
