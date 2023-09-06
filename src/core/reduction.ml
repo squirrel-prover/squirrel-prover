@@ -178,9 +178,11 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
 
   | Term.App (u1, v1), Term.App (u2, v2) ->
     conv st u1 u2;
+    if List.length v1 <> List.length v2 then not_conv ();
     conv_l st v1 v2
     
   | Term.Tuple l1, Term.Tuple l2 ->
+    if List.length l1 <> List.length l2 then not_conv ();
     conv_l st l1 l2
 
   | Term.Proj (i1, t1), Term.Proj (i2, t2) ->
