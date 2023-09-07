@@ -1579,11 +1579,7 @@ module Lit = struct
     | App (Fun (fslt,  _), [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
     | App (Fun (fsgeq, _), [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
     | App (Fun (fsgt,  _), [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
-    | _ -> 
-      if Config.old_completion () then
-        None
-      else
-        Some (Atom form)
+    | _ -> Some (Atom form)
 
   let rec form_to_literal (form : term) : literal option =
     match form with
@@ -2084,15 +2080,6 @@ type 'a pat_op = {
   pat_op_vars   : (Vars.var * Vars.Tag.t) list;
   pat_op_term   : 'a;
 }
-
-let pat_of_form (t : term) =
-  let vs, t = decompose_forall_tagged t in
-  let vs, s = refresh_vars_w_info vs in
-  let t = subst s t in
-
-  { pat_tyvars = [];
-    pat_vars = vs;
-    pat_term = t; }
 
 let project_tpat (projs : projs) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }

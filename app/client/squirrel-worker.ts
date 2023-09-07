@@ -28,7 +28,6 @@ const evaluatedMark = Decoration.mark({
   class: "squirrel-eval-ok"
 })
 
-
 /**
  * Main squirrel Worker Class
  *
@@ -207,29 +206,56 @@ export class SquirrelWorker {
     this.sendCommand(["Exec", sentences]);
   }
 
+  execNoCheck(sentences:Array<string>) {
+    this.sendCommand(["NoCheck", sentences]);
+  }
+
   /**
    * Will ask worker to pop n states from the history
    * @param {number} n
    */
-  undo(n:number) {
-    this.sendCommand(["Undo", n]);
-    // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
-    for(let i=0; i<n; i++){
-      this.executedSentences.pop();
-    }
+  undo(n:number): boolean {
+    // First remove queued sentences if there are
+    if (this.queueSentences.length > 0){
+      let removed = this.queueSentences.pop();
+      while(this.queueSentences.length > 0 && n > 0) {
+        removed = this.queueSentences.pop();
+        n=n-1;
+      }
+      removeMarks(this.view,(removed.from),this.view.state.doc.length);
+    } 
+    if (n > 0) {
+      if (this.curSentences.length != 0) {
+        // TODO manage that case with promises ?
+        console.warn("Try to undo an already sent sentence !")
+        this.changeHtmlOf("query-panel",
+          "<div class='err'>Please wait… impossible to undo a sentence that is being executed !</div>");
+        return false;
+      }
+      this.sendCommand(["Undo", n]);
+      // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
+      for(let i=0; i<n; i++){
+        this.executedSentences.pop();
+      }
 
-    if(this.executedSentences.length == 0){
-      this.cursor = null;
-      removeMarks(this.view,0,this.view.state.doc.length);
-    } else {
-      this.cursor = this.executedSentences[this.executedSentences.length-1].cursor();
-      removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
+      if(this.executedSentences.length == 0){
+        this.cursor = null;
+        removeMarks(this.view,0,this.view.state.doc.length);
+      } else {
+        this.cursor = this.executedSentences[this.executedSentences.length-1].cursor();
+        removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
+      }
     }
+    return true;
+  }
+
+  // TODO move out
+  isInclude(x:SyntaxNode):boolean {
+    return x.firstChild && x.firstChild.type.name === "P_include"
   }
 
   async getStringOfNode(x:SyntaxNode, viewState:EditorState): Promise<string> {
-    if(x.firstChild && x.firstChild.type.name === "P_include"){
-      //TODO get fname !
+    if(this.isInclude(x)){
       let include_name = x.firstChild.getChild("include_name");
       let name = viewState.sliceDoc(include_name.from, include_name.to);
       return await this.fileManager.getFileString(name+".sp");
@@ -248,22 +274,53 @@ export class SquirrelWorker {
       let viewState = view.state;
       // highlight with pending background
       highlightNodes(view,nodes,"squirrel-eval-pending")
+      let cursorPos = nodes[nodes.length - 1].to;
+      view.dispatch({selection: {anchor: cursorPos, head: cursorPos},
+                    effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
+      });
 
       if (this.curSentences.length != 0){
         this.queueSentences = this.queueSentences.concat(nodes)
       } else {
 
-        this.curSentences = nodes;
-        // Get the strings out of the SyntaxNodes of type Sentence
-        let sentences = new Array<string>()
-        for(const x of nodes){
-          sentences.push(await this.getStringOfNode(x,viewState));
+        let includeIndex = nodes.findIndex(this.isInclude)
+        if(includeIndex == -1){ // No include found
+          this.curSentences = nodes;
+          // Get the strings out of the SyntaxNodes of type Sentence
+          let sentences = new Array<string>()
+          for(const x of nodes){
+            sentences.push(await this.getStringOfNode(x,viewState));
+          }
+          this.exec(sentences);
+        } else if(includeIndex == 0) { // If include is first node
+          // Get that node
+          let includeNode = nodes.shift();
+          this.curSentences = [includeNode];
+          // Queue the rest
+          this.queueSentences = this.queueSentences.concat(nodes)
+          if(DEBUG) {
+            console.warn("nodes")
+            nodes.forEach((x) => this.printSentence(viewState,x));
+          }
+
+          let sentences = new Array<string>()
+          sentences.push(await this.getStringOfNode(includeNode,viewState))
+          // just execute the include without check
+          this.execNoCheck(sentences);
+        } else {
+          //Splice will remove elements from nodes
+          let sliceToExecute = nodes.splice(0,includeIndex);
+          this.curSentences = sliceToExecute;
+
+          // Queue the rest
+          this.queueSentences = this.queueSentences.concat(nodes)
+
+          let sentences = new Array<string>()
+          for(const x of sliceToExecute){
+            sentences.push(await this.getStringOfNode(x,viewState));
+          }
+          this.exec(sentences);
         }
-        if(DEBUG) {
-          console.log("Sentences before cursor :");
-          sentences.forEach(e => console.log(e));
-        }
-        this.exec(sentences);
       }
     }
   }
@@ -338,12 +395,15 @@ export class SquirrelWorker {
   getLastExecutedBeforeChange(viewState:EditorState,posChange:number) : SyntaxNode {
     let lastExecuted = this.executedSentences[this.executedSentences.length - 1];
     // If changes are done after the lastExecuted node
-    if (posChange >= lastExecuted.to)
+    if (posChange > lastExecuted.to){
       return lastExecuted
+    }
     else {
-      let sentenceChanged = lastExecuted;
       let index = (this.executedSentences.length - 1);
-      while(sentenceChanged.from > posChange && index>0){
+      // The lastExecuted at least has changed, then start by the
+      // previous one
+      let sentenceChanged = this.executedSentences[index--];
+      while(posChange < sentenceChanged.from && index>0){
         sentenceChanged = this.executedSentences[index--]
       }
       // Take the previous one if it exists
@@ -431,27 +491,31 @@ export class SquirrelWorker {
   }
 
   getNextSentence(view:EditorView) {
+    let tree = syntaxTree(view.state);
+    let pos = 0;
     if(this.queueSentences.length != 0){ // Already queued stuff
-      return this.nextSiblingSentence(
-        this.queueSentences[this.queueSentences.length -1])
+      pos = this.queueSentences[this.queueSentences.length -1].from + 1;
     }
     else if (this.curSentences.length != 0) { // Already executing stuff
-      return this.nextSiblingSentence(
-        this.curSentences[this.curSentences.length -1])
+      pos = this.curSentences[this.curSentences.length -1].from + 1;
     }
     else if (this.cursor) { // Execution at cursor
-      return this.nextSiblingSentence(this.cursor.node); 
-    }
-    else { // first sentence of doc
-      let tree = syntaxTree(view.state);
+      pos = this.cursor.node.from + 1;
+    } else { // first sentence of doc
+      console.warn("From start ?")
       return this.getInnerFirstSentence(tree.topNode);
     }
+    let node = tree.resolveInner(pos);
+    node = getSentenceFromNode(node);
+    if (DEBUG) {
+      console.warn("Sentence to execute :");
+      this.printSentence(view.state,this.nextSiblingSentence(node));
+    }
+    return this.nextSiblingSentence(node); 
   }
 
   execNextSentence(view:EditorView):boolean{
     this.view = view
-    let viewState = view.state;
-    let tree = syntaxTree(viewState);
     let firstSentence = this.getNextSentence(view);
     if(!firstSentence){
       this.changeHtmlOf("query-panel","No sentence to execute.");
@@ -592,8 +656,9 @@ export class SquirrelWorker {
       if((this.curSentences.length -1) == msg[1]){
         this.curSentences = [];
         if(this.queueSentences.length > 0){
-          this.execNodes(this.view,this.queueSentences);
+          let queueClone = [...this.queueSentences];
           this.queueSentences = [];
+          this.execNodes(this.view,queueClone);
         }
       }
 

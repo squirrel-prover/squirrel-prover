@@ -668,7 +668,11 @@ s_item_body:
 s_item_noargs:
 | s=s_item_body { s,[] }
 
+clear_ip:
+| LBRACE l=slist1(lsymb, empty) RBRACE { l }
+
 intro_pat:
+| l=clear_ip    { TacticsArgs.SClear l }
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
 | l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}

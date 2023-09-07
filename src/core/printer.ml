@@ -317,6 +317,9 @@ let pphtml_suf fmt (ty : pp) =
 let prt ty fmt = 
   let out = match ty with
     | `Ignore -> dummy_fmt
+    | `Goal -> if !printer_mode = Html 
+      then dummy_fmt (* do not print goal when Html mode *)
+      else get_std ()     
     | _ -> get_std () in
     pp_pref ty; Fmt.kpf (fun fmt -> pp_suf fmt ty) out fmt
 

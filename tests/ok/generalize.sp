@@ -38,7 +38,25 @@ goal _ :
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
   intro Ass y x.
-  generalize (f(x)) (f(y)) as x y.
+  generalize (f x) (f y) as x y.
+  assumption Ass.
+Qed.
+
+goal _ :
+ (forall (x,y : message), x = a || y = b) =>
+ (forall (y,x : message), f(x) = a || f(y) = b).
+Proof.
+  intro Ass y x.
+  generalize (f _) (f _) as u v.
+  assumption Ass.
+Qed.
+
+goal _ :
+ (forall (x,y : message), x = a || y = b) =>
+ (forall (y,x : message), f(x) = a || f(y) = b).
+Proof.
+  intro Ass y x.
+  generalize (f x) (f _) as u v.
   assumption Ass.
 Qed.
 

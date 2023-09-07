@@ -33,9 +33,6 @@ val debug_completion : unit -> bool
 (** Debug information for tactics. *)
 val debug_tactics : unit -> bool
 
-(** Old congruence closure. *)
-val old_completion : unit -> bool
-
 (*------------------------------------------------------------------*)
 (** {2  set functions} *)
 

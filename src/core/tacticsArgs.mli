@@ -103,9 +103,10 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-  | Srewrite of rw_dir                    (** -> or <-*)
+  | Srewrite of rw_dir      (** -> or <-*)
 
 type intro_pattern =
+  | SClear of lsymb list    (** [{H H' ...}] *)
   | Star   of Location.t    (** [*] *)
   | StarV  of Location.t    (** [>] *)
   | SItem  of s_item

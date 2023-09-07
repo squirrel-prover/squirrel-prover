@@ -80,7 +80,7 @@ type p_hint =
 
 let add_hint_rewrite (s : lsymb) tyvars form table : Symbols.table =
   let db = hint_db table in
-  let pat = Term.pat_of_form form in
+  let pat = Pattern.pat_of_form form in
   let pat = Term.{ pat with pat_tyvars = tyvars; } in      
   let rule = 
     LowRewrite.pat_to_rw_rule

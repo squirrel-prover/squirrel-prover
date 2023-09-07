@@ -155,6 +155,7 @@ and simpl_pat =
   | Srewrite of rw_dir      (** -> or <-*)
 
 type intro_pattern =
+  | SClear of lsymb list    (** [{H H' ...}] *)
   | Star   of Location.t    (** '*' *)
   | StarV  of Location.t    (** '>' *)
   | SItem  of s_item
@@ -188,6 +189,7 @@ and pp_simpl_pat fmt = function
 
 
 let pp_intro_pat fmt = function
+  | SClear   _ -> Fmt.pf fmt "{...}"
   | SItem s    -> pp_s_item fmt s
   | Star     _ -> Fmt.pf fmt "*"
   | StarV    _ -> Fmt.pf fmt ">"
