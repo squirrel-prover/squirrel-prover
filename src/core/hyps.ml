@@ -458,7 +458,10 @@ let setup_change_hyps_context
     Utils.omap (fun project -> project f) set_projections
   in
 
-  let env = Env.init ~table ~vars ~system:{ new_context with pair = None; } () in
+  (* Environment used to analyze [Reach _] atoms in hypotheses
+     of the old sequent. *)
+  let env =
+    Env.init ~table ~vars ~system:{ old_context with pair = None; } () in
   
   (* For global hypotheses:
     - Reachability atoms are handled as local hypotheses.

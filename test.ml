@@ -23,7 +23,8 @@ let test_suites : unit Alcotest.test list =
     ("Prover", Squirreltests.Prover.tests);
     ("Search", Squirreltests.Search.tests);
     ("NewTactics", Squirreltests.Tactics.tests);
-    ("Term", Squirreltests.Term.tests)
+    ("Term", Squirreltests.Term.tests);
+    ("Projection", Squirreltests.Projection.tests)
   ]
 
 let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [> `Quick] * (unit -> unit )) list = 

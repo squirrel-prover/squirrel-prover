@@ -85,6 +85,8 @@ type form =
   | And   of form * form
   | Or    of form * form
 
+let equal : form -> form -> bool = (=)
+
 (*------------------------------------------------------------------*)
 (** Free variables. *)
 let rec fv = function
@@ -662,7 +664,9 @@ let kind_equal (type a b) (k1 : a f_kind) (k2 : b f_kind) : bool =
 
 (** Module Any without conversion functions. *)
 module PreAny = struct
+
   type t = any_form
+
   let pp fmt = function
     | Local  f -> Term.pp fmt f
     | Global f ->      pp fmt f
@@ -674,6 +678,11 @@ module PreAny = struct
   let pp_dbg fmt = function
     | Local  f -> Term.pp_dbg fmt f
     | Global f ->      pp_dbg fmt f
+
+  let equal x y = match x,y with
+    | Local  f, Local  g  -> Term.equal f g
+    | Global f, Global g ->       equal f g
+    | _ -> false
 
   let subst s = function
     | Local  f -> Local  (Term.subst s f)
