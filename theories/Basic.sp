@@ -604,4 +604,8 @@ hint rewrite le_refl_index_eq.
 goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
 Proof. by rewrite eq_iff. Qed.
 
+goal [any] neq_le_pred_le (t, t' : timestamp):
+  t<>t' => (t <= t') = (t <= pred(t')).
+Proof. by rewrite eq_iff. Qed.
+
 axiom [any] le_lt ['a] (x, x' : 'a): x <> x' => (x <= x') = (x < x').
