@@ -280,20 +280,6 @@ let start_main_loop
   in
   let state = { state with toplvl_state; } in
 
-  (* Load prelude. This is mostly unused for now. *)
-  let state = 
-    let toplvl_state = 
-      do_include ~test state
-        ProverLib.{ th_name = L.mk_loc L._dummy "Prelude"; params = []; } 
-    in
-
-    (* impure: set the table of built-in symbols *)
-    (* let table = ToplevelProver.get_table toplvl_state in *)
-    (* Symbols.prelude_set_builtin_table table; *)
-
-    { state with toplvl_state; }
-  in
-
   main_loop ~test state
 
 let generate_html (filename : string) (html_filename : string) =

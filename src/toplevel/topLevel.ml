@@ -1,5 +1,9 @@
 open Squirrelcore
 open Squirrelprover
+
+(* can call a "foo" function in js stubs but async must be managed… *)
+(* external foo : string -> string = "caml_foo" *)
+
 (*------------- Toplevel -------------------------------------*)(* {↓{ *)
 (** {2 Toplevel}
  *
@@ -54,7 +58,7 @@ module type S = sig
     val pp_goal : state -> Format.formatter -> unit -> unit
 
     (** Return Toplevel.PROVER in init state *)
-    val init : unit -> state
+    val init : ?withPrelude:bool -> unit -> state
 
     (** do tactics by calling tactic_handle and manages check mode ! *)
     val do_tactic : ?check:[`Check | `NoCheck] -> state ->
@@ -135,14 +139,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
     Prover.pp_goal st.prover_state fmt ()
-
-  let init () : state = 
-    let _ = Config.reset_params () in 
-    let _ = ProverLib.reset_option_defs () in
-    { prover_state= Prover.init ();
-      params      = Config.get_params ();
-      option_defs = [];
-    }
 
   let get_table (st:state) : Symbols.table = 
     Prover.get_table st.prover_state
@@ -345,6 +341,27 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
     let file_from_string = Driver.file_from_str s in
     do_all_commands_in ~check ~test st file_from_string 
+
+  let init ?(withPrelude=true) () : state = 
+    let _ = Config.reset_params () in 
+    let _ = ProverLib.reset_option_defs () in
+
+    let state = { 
+      prover_state= Prover.init ();
+      params      = Config.get_params ();
+      option_defs = [];
+    } in
+    (* impure: set the table of built-in symbols *)
+    (* let table = ToplevelProver.get_table toplvl_state in *)
+    (* Symbols.prelude_set_builtin_table table; *)
+
+    if withPrelude then begin
+      Printer.pr "With prelude !";
+      let inc = ProverLib.{ th_name = Location.mk_loc Location._dummy
+          "Prelude"; params = []; } in
+      { state with prover_state = do_include state inc }
+    end
+    else state
 
   (* run entire squirrel file with given path as string *)
   let run ?(test=false) (file_path:string) : unit =

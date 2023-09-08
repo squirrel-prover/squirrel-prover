@@ -13,8 +13,7 @@ let some_print () =
     (fun () ->
       let st = TProver.init () in
       let _ = try TProver.exec_all ~test:true st
-        "include Prelude.
-         include Basic.
+        "include Basic.
         channel c
         system [T] (S : !_i !_i new n; out(c,n)).
         goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).

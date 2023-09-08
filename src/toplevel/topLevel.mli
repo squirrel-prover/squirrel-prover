@@ -55,7 +55,7 @@ module type S = sig
     val pp_goal : state -> Format.formatter -> unit -> unit
 
     (** Return Toplevel.PROVER in init state *)
-    val init : unit -> state
+    val init : ?withPrelude:bool -> unit -> state
 
     (** do tactics ! *)
     val do_tactic : ?check:[`Check | `NoCheck] -> state ->

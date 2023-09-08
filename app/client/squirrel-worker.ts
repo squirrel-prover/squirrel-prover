@@ -176,7 +176,7 @@ export class SquirrelWorker {
   }
 
   reset(view:EditorView) {
-    this.sendCommand(["Reset"]);
+    this.init();
     this.cursor = null;
     removeMarks(view,0,view.state.doc.length);
   }
@@ -186,8 +186,9 @@ export class SquirrelWorker {
    * At that moment, Reset will call the init () function
    * @memberof SquirrelWorker
    */
-  init() {
+  async init() {
     this.sendCommand(["Reset"]);
+    this.exec([await this.fileManager.getFileString("Prelude.sp")])
   }
 
 

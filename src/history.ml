@@ -5,7 +5,7 @@ open Squirrelcore
  * restored *)
 module type TOPLEVELPROVER = sig
   type state
-  val init : unit -> state
+  val init : ?withPrelude:bool -> unit -> state
 
   (* TODO This is ugly ! Remove Config from globals ! Or only the
    * params that are ``historiable'' (that can change during
