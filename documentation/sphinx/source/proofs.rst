@@ -504,16 +504,76 @@ Common tactics
      (all systems appearing in a sequent have the same set of actions,
      as they must be be compatible).
       
+
+.. tacn:: induction {? @term_pat}
+
+   Apply the induction scheme to the conclusion. There are
+   several behaviours depending on the current type of the goal
+   and whether an argument given.
+
+   For a reachability goal, if no argument is specified, the
+   conclusion must be a universal quantification over a
+   well-founded type and the induction is performed over the
+   first quantified variable. If a term is manually
+   specified, the goal is first generalized (see
+   :tacn:`generalize`) w.r.t. those variables and only then is
+   the induction applied.
+	  
+   For an equivalence goal, an argument must always be specified,
+   and,
+   
+    - if a timestamp variable is given then, a weak induction is
+      performed over this variable as well as a case over all
+      possible actions;
+    - for any other term argument, the
+      tactic behave as in the reachability case.
+
+   The weak induction variant is in fact the most widely used tactic
+   in current Squirrel examples to prove the observational equivalence
+   of a protocol.
+
+   .. example:: Induction for observational equivalence.
+
+       Over a goal of the form
+
+       .. squirreldoc::
+
+	  [goal> Focused goal (1/1):
+	  Systems: left:myProtocol/left, right:myProtocol/right (same for equivalences)
+	  Variables: t:timestamp[glob]
+	  H: [happens(t)]
+	  ----------------------------------------
+	  0: frame@t
+
+       Calling :g:`induction t` will behave in apply the weak
+       induction and case, yielding as many goals as there are actions
+       in the protocol, plus one additional goal for the
+       initialization. Assuming an action :g:`A` is in the protocol,
+       that has a total of 3 actions, a corresponding created subgoal
+       will look like
+
+       .. squirreldoc::
+
+	  [goal> Focused goal (1/4):
+	  Systems: left:myProtocol/left, right:myProtocol/right (same for equivalences)
+	  H: [happens(A)]
+	  IH:  equiv(frame@pred (A))
+	  ----------------------------------------
+	  0: frame@A
+       
      
 .. tacn:: dependent induction {? @variable}
     
-    Apply the induction scheme to the conclusion. If no argument is specified, the conclusion must be a universal quantification over a well-founded type. Alternatively, a variable of the goal can be given as argument, in which case the goal is first generalized as the universal quantification over the given variable before proceeding with the induction.
+    Apply the induction scheme to the conclusion. If no argument is
+    specified, the conclusion must be a universal quantification over
+    a well-founded type. Alternatively, a term of a well-founded type
+    can be given as argument, in which case the goal is first
+    generalized in the dependent variant (see :tacn:`generalize
+    dependent`) before proceeding with the induction.
 
-   .. todo::
-
-      Charlie: Discussions needed, check out discord + cleanup_induction branch    
-    
-
+    This always behaves as the induction in the reachability goal
+    setting (also for equivalence goals),
+  
 .. tacn:: destruct @hypothesis_id {? as @simpl_ip}
     
     Destruct an hypothesis based on its top-most connective
@@ -543,6 +603,7 @@ Common tactics
     :n:`(exists x, phi)` into :n:`(phi{x -> t})`.
     
 .. tacn:: generalize {+ @term_pat} {? as {+ @variable}}
+   :name: generalize	  
 
     :n:`generalize @term_pat` looks for an instance :n:`@term` of
     :n:`@term_pat` in the goal. Then, replace all occurrences of :n:`@term`
@@ -550,7 +611,8 @@ Common tactics
     (automatically named, or :n:`@variable` if provided).
 
 .. tacn:: generalize dependent {+ @term_pat} {? as {+ @variable}}
-
+   :name: generalize dependent
+	  
     Same as :n:`generalize`, but also generalize in the proof context.
     All hypotheses in which generalization occured are pushed back into the
     goal before the newly added quantified variables.
@@ -595,15 +657,7 @@ Common tactics
 
    The identity tactic, which does nothing. Sometimes useful when
    writing :ref:`tacticals<section-tacticals>`.
-   
-
-.. tacn:: induction {? @variable} todo
-  
-  
-   .. todo::
-
-      Charlie: Discussions needed, check out discord + cleanup_induction branch
-
+	  
 
 .. tacn:: intro {+ @intro_pat}
     
