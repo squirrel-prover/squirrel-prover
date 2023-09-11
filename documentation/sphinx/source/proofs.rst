@@ -1166,13 +1166,67 @@ Common tactics
 ~~~~~~~~~~~~~~
 
 
-.. tacn:: fresh @position
+.. tacn:: fresh {? ~precise_ts} {| @position | @hypothesis_id }
    :name: fresh
 
-   .. todo::    
-      TODO
+   Fresh is an unconditionaly sound tactic relying on the fact that
+   two fresh names, that is, two names never seen by the attacker
+   before, are indistinguishable. This can be exploited in multiple
+   ways, for instance to remove a fresh name from an equivalence, or
+   to state that a term can never be equal to a fresh name.
 
-   Latest formal Squirrel description: :cite:`bkl23hal`.
+     
+   In a local goal, called over an hypothesis of the form :g:`t=n` for
+   some name :g:`n` over a current goal formula :g:`phi`, turns the
+   goal into a formula :g:`not_fresh(n,t)) => phi` where
+   :g:`not_fresh(n,t)` is a formula capturing conditions so that
+   :g:`n` is not fresh in `t` (equivalently, it is possible that
+   :g:`n` is a subterm of :g:`t`). If one can then prove that :g:`n`
+   cannot occur in :g:`t`, that is that :g:`not_fresh(n,t)` is false,
+   it then allows to close the goal. If :g:`not_fresh(n,t)` is
+   trivially false, e.g. if :g:`t` is a macro-free term without :g:`n`
+   as a subterm, the goal will be directly closed.
+
+
+   .. example:: Name leak
+
+      Consider a small process :g:`in(c,x); A : out(c,x);in(c,x); B:
+      out(c,n)`, where we want to prove that :g:`input@A <>
+      n`. Intuitively, this holds as :g:`n` is only revealed after
+      :g:`A` has occured.
+
+      The judgment corresponding to this proof will look like this:
+
+      .. squirreldoc::
+	 [goal> Focused goal (1/1):
+	 System: left:default/left, right:default/right
+	 Eq: input@A = n
+	 H: happens(A)
+	 ----------------------------------------
+	 false
+
+      And calling :g:`fresh Eq` turns the judgment into:
+
+      .. squirreldoc::
+	 [goal> Focused goal (1/1):
+	 System: left:default/left, right:default/right
+	 Eq: input@A = n
+	 H: happens(A)
+	 ----------------------------------------
+	 B < A => false
+
+      Here, Squirrel automatically deduced that :g:`n` can only occur
+      inside :g:`input@A` if the output of :g:`B` happened before
+      :g:`A`. Here, one would conclude by using the fact that in the
+      process definition, this is impossible.
+
+
+
+
+   .. todo::    
+      TODO equiv variant
+
+   Latest formal Squirrel description: :cite:`bkl23hal` (Appendix F).
 
 Local tactics
 ~~~~~~~~~~~~~
