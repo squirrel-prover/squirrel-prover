@@ -329,6 +329,11 @@ let prthtml ty fmt =
     | _ -> get_std () in
     pphtml_pref ty; Fmt.kpf (fun fmt -> pphtml_suf fmt ty) out fmt
 
+let defprt ty fmt = 
+  match !printer_mode with
+  | Html -> prthtml ty fmt
+  | _ -> prt ty fmt
+
 let pr fmt = prt `Default fmt
 
 let kw (keyword : keyword) ppf fmt =

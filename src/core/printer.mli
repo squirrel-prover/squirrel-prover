@@ -65,6 +65,9 @@ val prt : pp -> ('a, Format.formatter, unit) format -> 'a
 (** Print for html with the printer's standard formatter w.r.t. a given markup. *)
 val prthtml : pp -> ('a, Format.formatter, unit) format -> 'a
 
+(** Default printer, look at mode and use either prt or prthml. *)
+val defprt : pp -> ('a, Format.formatter, unit) format -> 'a
+
 (** Default printing on the printer's standard formatter. *)
 val pr : ('a, Format.formatter, unit) format -> 'a
 

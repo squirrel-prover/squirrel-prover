@@ -17,8 +17,7 @@ let prover_state : TProver.state ref = ref (TProver.init ~withPrelude:false ())
 
 let firstOutput = "TProver initial state : Ready to go !"
 
-let prover_stack : (state list) ref = ref [{ps= !prover_state;
-output=firstOutput}]
+let prover_stack : (state list) ref = ref [{ps= !prover_state;output=firstOutput}]
 
 let init () =
   prover_state := TProver.init ~withPrelude:false ();

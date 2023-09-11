@@ -68,10 +68,10 @@ let get_lexbuf (file : file) : string * Lexing.lexbuf =
   file.f_name ^ ".sp", lexbuf
 
 (** Get the next input from lexing buffer. Driver *)
-let next_input ~test ~filename (lexbuf:Lexing.lexbuf) (p_mode:
+let next_input ~test ~interactive ~filename (lexbuf:Lexing.lexbuf) (p_mode:
   ProverLib.prover_mode) =
   Parserbuf.parse_from_buf
-    ~test ~interactive:!interactive
+    ~test ~interactive
     (* ↓ can also be WaitQed since the parser can read intern tactics
        and the prover will ignore them anyway in `NoCheck mode *)
     (if (p_mode = ProverLib.ProofMode) || (p_mode = ProverLib.WaitQed) then
@@ -81,10 +81,10 @@ let next_input ~test ~filename (lexbuf:Lexing.lexbuf) (p_mode:
     lexbuf ~filename
 
 (** Get the next input from the current file. Driver *)
-let next_input_file ~test (file : file) (p_mode: ProverLib.prover_mode) :
+let next_input_file ~test ~interactive (file : file) (p_mode: ProverLib.prover_mode) :
 ProverLib.input =
   let filename, lexbuf = get_lexbuf file in
-  next_input ~test ~filename lexbuf p_mode
+  next_input ~test ~interactive ~filename lexbuf p_mode
 
 (*--------------- Driver -------------------------------------------*)
 let file_from_stdin () : file =

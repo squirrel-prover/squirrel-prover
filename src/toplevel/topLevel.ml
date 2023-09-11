@@ -326,18 +326,20 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   and do_all_commands_in 
       ~check ~test (st:state) (file:Driver.file) : state 
     =
-    match Driver.next_input_file ~test file (get_mode st) with
+    let interactive = TConfig.interactive (get_table st) in
+    match Driver.next_input_file ~test ~interactive file (get_mode st) with
     | ProverLib.Prover EOF ->
         (* ↓ If test or interactive, never end ↓ *)
-        if test || TConfig.interactive (get_table st) 
+        if test || interactive 
         then st else { st with prover_state = Prover.do_eof st.prover_state}
     | cmd -> do_all_commands_in ~check ~test
                (do_command ~test ~check st file cmd) file
 
   and exec_command 
       ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+    let interactive = TConfig.interactive (get_table st) in
     let input = Driver.next_input_file 
-        ~test (Driver.file_from_str s) (get_mode st) in
+        ~test ~interactive (Driver.file_from_str s) (get_mode st) in
     do_command ~test ~check st (Driver.file_from_str s) input
 
   and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 

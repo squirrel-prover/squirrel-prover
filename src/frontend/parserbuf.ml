@@ -78,12 +78,12 @@ let parse_from_buf
         let msg = Fmt.str "%a" pp_error () in
         raise (Error msg)
       else begin
-        Printer.prt `Error "%a" pp_error () ;
+        Printer.defprt `Error "%a" pp_error () ;
         exit 1
       end
     | None ->
       if test || interactive then raise e else begin
-        Printer.prt `Error
+        Printer.defprt `Error
           "@[Exception %a: @,%s.@]@.@.\
            %s@."
           pp_loc ()

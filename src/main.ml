@@ -61,7 +61,7 @@ type driver_state = {
 
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) : ProverLib.input =
-  Driver.next_input_file ~test state.file
+  Driver.next_input_file ~test ~interactive:!interactive state.file
     (ToplevelProver.get_mode state.toplvl_state)
 
 (*---------------- Main --------------------------------------------*)
