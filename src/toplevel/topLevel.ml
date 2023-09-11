@@ -54,6 +54,8 @@ module type S = sig
       option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
 
+    val state0 : (state option) ref
+
     (** Print goal *)
     val pp_goal : state -> Format.formatter -> unit -> unit
 
@@ -342,26 +344,32 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     let file_from_string = Driver.file_from_str s in
     do_all_commands_in ~check ~test st file_from_string 
 
+  let state0 : (state option) ref = ref None
+
   let init ?(withPrelude=true) () : state = 
     let _ = Config.reset_params () in 
     let _ = ProverLib.reset_option_defs () in
+    match !state0 with
+    | Some st -> st
+    | None -> 
+      let state = { 
+        prover_state= Prover.init ();
+        params      = Config.get_params ();
+        option_defs = [];
+      } in
+      (* impure: set the table of built-in symbols *)
+      (* let table = ToplevelProver.get_table toplvl_state in *)
+      (* Symbols.prelude_set_builtin_table table; *)
 
-    let state = { 
-      prover_state= Prover.init ();
-      params      = Config.get_params ();
-      option_defs = [];
-    } in
-    (* impure: set the table of built-in symbols *)
-    (* let table = ToplevelProver.get_table toplvl_state in *)
-    (* Symbols.prelude_set_builtin_table table; *)
-
-    if withPrelude then begin
-      Printer.pr "With prelude !";
-      let inc = ProverLib.{ th_name = Location.mk_loc Location._dummy
-          "Prelude"; params = []; } in
-      { state with prover_state = do_include state inc }
-    end
-    else state
+      if withPrelude then begin
+        Printer.pr "With prelude !";
+        let inc = ProverLib.{ th_name = Location.mk_loc Location._dummy
+            "Prelude"; params = []; } in
+        let state = { state with prover_state = do_include state inc } in
+        state0 := Some state;
+        state
+      end
+      else state
 
   (* run entire squirrel file with given path as string *)
   let run ?(test=false) (file_path:string) : unit =
