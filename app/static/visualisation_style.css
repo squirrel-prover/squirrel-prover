@@ -35,6 +35,10 @@ span.name {
 .test{
   background-color: yellow;
 }
-.err{
+div.err{
+  background-color: Tomato;
+}
+
+span.err{
   background-color: red;
 }
