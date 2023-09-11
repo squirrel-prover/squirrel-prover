@@ -1172,21 +1172,25 @@ Common tactics
    .. todo::    
       TODO
 
-   
+   Latest formal Squirrel description: :cite:`bkl23hal`.
+
 Local tactics
 ~~~~~~~~~~~~~
 
 
 .. tact:: cdh
    
-    Usage: cdh H, g.
-    Applies the CDH assumption (including squareCDH) on H using generator
-    g. 
+   Usage: cdh H, g.
+   Applies the CDH assumption (including squareCDH) on H using generator
+   g.
 
    .. todo::    
       TODO
-       
 
+    
+   .. warning::
+      This is a work in progress, a formal description of the rule is pending.
+             
 .. tact:: collision
     
     Collects all equalities between hashes occurring at toplevel in message
@@ -1198,15 +1202,17 @@ Local tactics
     .. todo::    
        TODO
 
+    Latest formal Squirrel description: :cite:`bkl23hal` (only as an example).       
 
 .. tact:: euf
     
-    Apply the euf axiom to the given hypothesis name. 
-
-.. todo::    
+    Apply the euf axiom to the given hypothesis name.
+   
+    .. todo::    
        TODO      
        
-
+    Latest formal Squirrel description: :cite:`bkl23hal`.
+       
 .. tact:: gdh
     
     Usage: gdh H, g.
@@ -1214,14 +1220,19 @@ Local tactics
     g. 
       
     .. todo::    
-       TODO       
+       TODO
+
+    .. warning::
+       This is a work in progress, a formal description of the rule is pending.       
 
 .. tact:: intctxt
     
     Apply the INTCTXT axiom to the given hypothesis name. 
       
     .. todo::    
-       TODO       
+       TODO
+
+    Latest formal Squirrel description: :cite:`bdjkm21sp`.      
 
 
 Global tactics
@@ -1230,48 +1241,93 @@ Global tactics
 
 .. tace:: cca1
     
-    Apply the cca1 axiom on all instances of a ciphertext. 
+    Apply the cca1 axiom on all instances of a ciphertext.
       
     .. todo::    
        TODO
+
+    Latest formal Squirrel description::cite:`bkl23hal`.  
     
 .. tace:: ddh
     
-    Closes the current system, if it is an instance of a context of
-    ddh. 
-      
-    Usage: ddh H1, H2, H3, H4
+   Closes the current system, if it is an instance of a context of
+   ddh. 
+   
+   Usage: ddh H1, H2, H3, H4
 
-    .. todo::    
+   .. todo::    
        TODO    
 
-.. tace:: enckp
+   Latest formal Squirrel description: :cite:`bdjkm21sp`.
+       
+.. tace:: enckp @position {? @term_pat } {? @term }
     
-    Keyprivacy changes the key in some encryption
-    subterm. 
+   Enc-kp assumes that a symmetric or an asymmetric encryption scheme
+   does not leak any infor- mation about the public (or secret) key
+   used to encrypt the plain-text. It is based on the IK-CPA notion of
+   :cite:`bellare2001key`.
+   
+   On a biframe element of the form :g:`i:
+   enc(n,r,diff(pk(k1),pk(k2)))`, the tactic :g:`enckp i` will
+   simplify the biframe element by only keeping the key on the left,
+   yielding :g:`i: enc(n,r,pk(k1))`.
+
+   The tactic expects as argument:
+   
+   • the number identifying the biframe element;
+   • optional: the encryption term over which to apply the tactic;
+   • optional: the new key by which to replace the key.
+     
+   On a biframe element of the form :g:`i: enc(n,r,m)`, the tactic
+   :g:`enckp i, k` will simplify the biframe element by using the specified
+   key, yielding :g:`i: enc(n,r,pk(k))`.  On a biframe element of the
+   form :g:`i: ⟨ enc(n,r,m),m'⟩`, the tactic :g:`enckp i,enc(n,r,m),
+   k` will simplify the biframe element by using the specified key,
+   yielding :g:`i: ⟨ enc(n,r,pk(k)),m '⟩`.
+
+   The tactic is used similarly in the symmetric case.
+
+   .. topic:: Syntactic Side Conditions - Asymmetric case
+   
+      To use the tactic on an element :g:`C[enc(n, r, m)]`,
+	      
+      • :g:`r` must be a name which is fresh;
+      • there is no decryption in :g:`C`
+      • there is no universal message variable that occurs
+      • :g:`m` is either a key or the diff of two keys, such that the
+	keys only appear in key position, under :g:`pk`, :g:`dec` or
+	:g:`enc`.
+      • If :g:`m` is a key, and a key has been given as argument to the
+	tactic, this key must also occur only in key position.
+
+   .. topic:: Syntactic Side Conditions - Symmetric case
+
+      In the symmetric case, a further condition is that all occurrences
+      of encryptions with the given key must occur with a unique fresh
+      randomness.
+
+    Latest formal Squirrel description::cite:`bdjkm21sp`.
       
-    Usage: enckp i, [m1], [m2]
-
-    .. todo::    
-       TODO    
-
-
 .. tacn:: prf @position
    :name: prf
 
-    .. todo::        
-       TODO why optional message in Squirrel tactic; also fix help in tool    
+   .. todo::        
+      TODO why optional message in Squirrel tactic; also fix help in tool    
        
 
+   Latest formal Squirrel description: :cite:`bkl23hal`.
+       
 .. tace:: xor
     
-    Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is
-    fresh. 
-      
-    Usage: xor i, [m1], [m2]
+   Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is
+   fresh.
+
+   Usage: xor i, [m1], [m2]
     
-    .. todo::    
-       TODO    
+   .. todo::    
+      TODO
+
+   Latest formal Squirrel description: :cite:`bdjkm21sp`.
 
 .. _section-utility-tactics:
   
