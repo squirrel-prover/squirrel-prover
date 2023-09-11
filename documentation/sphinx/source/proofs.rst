@@ -915,14 +915,42 @@ Common tactics
     Expand all possible macros in the judgement. 
              
 
-.. tacn:: fa {|@position | {+ @fa_arg}}
+.. tacn:: fa {|@position | @term_pat | {+ , @fa_arg}}
    :name: fa
 
-   .. prodn::
-      fa_arg ::= {? {| ! | ?}} @term_pat
+   This tactic is a function application, it simplifies a goal by
+   removing the head function symbol as follows:
+   
+   * in a local goal with conclusion :g:`f(u)=f(v)`, the conclusion is
+     replaced with :g:`u=v`. This produces as many subgoals as argument
+     of the head function symbol. For a local goal, the tactic takes no
+     arguments.
+   * in a global goal containing :g:`f(u1,...,un)`, one can prove it by
+     proving that the goal containing the sequence :g:`u1,...,un` is
+     diff-equivalent.
 
-   .. todo::
-      TODO
+     
+   In the global goal setting, the target hypothesis can be selected
+   with its :n:`@position`. Otherwise, by giving a :n:`@term_pat`, the
+   function application will target the first hypothesis matching the
+   pattern. At least one such hypothesis must exist.
+
+   The function application can be made more complex with:
+	  
+   .. prodn::
+      fa_arg ::= {| ! | ?} @term_pat
+
+   The different options behaves as follows:
+   
+   * calling :g:`fa !t` repeats the function application as much as
+     possible over all possible hypothesis.
+   * :g:`fa ?t` tries to apply function application one
+     matching the pattern, but does not fail if no match is
+     found.
+   * :g:`fa t1, t2, ...` is syntactic sugar for
+     :g:`fa t1; fa t2; ...`.
+	 
+    
 
 .. tacn:: namelength @term, @term
     
