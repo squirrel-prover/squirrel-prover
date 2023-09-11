@@ -345,13 +345,15 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     do_all_commands_in ~check ~test st file_from_string 
 
   let init : ?withPrelude:bool -> unit -> state =
-    let state0 : (state option) ref = ref None in
+    (* memoise state with prelude *)
+    let state0 : state option ref = ref None in
+    
     fun ?(withPrelude=true) () : state ->
       let () = Config.reset_params () in 
       let () = ProverLib.reset_option_defs () in
       match !state0 with
-      | Some st -> st
-      | None -> 
+      | Some st when withPrelude = true -> st
+      | _ -> 
         let state = { 
           prover_state = Prover.init ();
           params       = Config.get_params ();
@@ -359,7 +361,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         } in
 
         if withPrelude then begin
-          Printer.pr "With prelude !";
+          Printer.pr "With prelude!";
           let inc =
             ProverLib.{ th_name = L.mk_loc L._dummy "Prelude"; params = []; }
           in
