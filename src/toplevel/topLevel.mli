@@ -51,9 +51,6 @@ module type S = sig
       option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
 
-    (** memoisation of initial state *)
-    val state0 : (state option) ref
-
     (** Print goal *)
     val pp_goal : state -> Format.formatter -> unit -> unit
 
