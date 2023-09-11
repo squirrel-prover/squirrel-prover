@@ -217,7 +217,7 @@ coverage: ## Generates coverage report in _coverage/index.html
 # so that dune exec could work.
 install: squirrel
 	cp -f squirrel $(PREFIX)/bin/squirrel
-	cp -r theories $(PREFIX)/bin/theories
+	\cp -r theories $(PREFIX)/bin/
 
 .PHONY: doc
 doc: ## Build generated API documentation
