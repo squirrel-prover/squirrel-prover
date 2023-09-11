@@ -1,6 +1,8 @@
 open Squirrelcore
 open Squirrelprover
 
+module L = Location
+  
 (* can call a "foo" function in js stubs but async must be managed… *)
 (* external foo : string -> string = "caml_foo" *)
 
@@ -347,24 +349,22 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let state0 : (state option) ref = ref None
 
   let init ?(withPrelude=true) () : state = 
-    let _ = Config.reset_params () in 
-    let _ = ProverLib.reset_option_defs () in
+    let () = Config.reset_params () in 
+    let () = ProverLib.reset_option_defs () in
     match !state0 with
     | Some st -> st
     | None -> 
       let state = { 
-        prover_state= Prover.init ();
-        params      = Config.get_params ();
-        option_defs = [];
+        prover_state = Prover.init ();
+        params       = Config.get_params ();
+        option_defs  = [];
       } in
-      (* impure: set the table of built-in symbols *)
-      (* let table = ToplevelProver.get_table toplvl_state in *)
-      (* Symbols.prelude_set_builtin_table table; *)
 
       if withPrelude then begin
         Printer.pr "With prelude !";
-        let inc = ProverLib.{ th_name = Location.mk_loc Location._dummy
-            "Prelude"; params = []; } in
+        let inc =
+          ProverLib.{ th_name = L.mk_loc L._dummy "Prelude"; params = []; }
+        in
         let state = { state with prover_state = do_include state inc } in
         state0 := Some state;
         state
@@ -375,7 +375,10 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let run ?(test=false) (file_path:string) : unit =
     match Driver.file_from_path LP_none 
             (Filename.remove_extension file_path) with
-    | Some file -> let _ = do_all_commands_in ~test ~check:`Check (init ()) file in ()
+    | Some file ->
+      let _ : state =
+        do_all_commands_in ~test ~check:`Check (init ()) file
+      in ()
     | None -> failwith "File not found !" 
 end
 (* }↑} *)
