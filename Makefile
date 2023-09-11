@@ -359,11 +359,13 @@ APPDIR=app/
 start: jsquirrel bundle ## Serve the application with a local HTTP server
 	dune exec $(APPDIR)server/server.exe
 
+# TODO in dune !
 jsquirrel: 
+	rm -f $(APPDIR)client/client.bc.js
 	dune build $(APPDIR)client/client.bc.js
 	mkdir -p $(APPDIR)static
 	rm -f $(APPDIR)static/client.js
-	cp _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
+	mv _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
 
 bundle:
 	mkdir -p $(APPDIR)static

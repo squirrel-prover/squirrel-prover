@@ -100,15 +100,13 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
 (*                 ToplevelProver.do_set_option state.toplvl_state sp *)
 (*   | `Success -> state.toplvl_state *)
 
-let rec do_include 
-    ~test
-    (state : driver_state)
-    (i : ProverLib.include_param) 
+let rec do_include
+    ~(test : bool) (state : driver_state) (i : ProverLib.include_param)
   : ToplevelProver.state 
   =
-  let file = include_get_file state.file_stack
-                              state.load_paths
-                              i.th_name in
+  let file = 
+    include_get_file state.file_stack state.load_paths i.th_name 
+  in
   let file_stack = state.file :: state.file_stack in
 
   let hstate = { state with 
@@ -162,20 +160,22 @@ and do_command
     let st = state.toplvl_state in
     let mode = ToplevelProver.get_mode st in
     let check = state.check_mode in
-    let toplvl_state = match mode, c with
-                                 (* ↓ FIXME only manages history state
-                                  * like in main loop ↓ *)
-    (* | _, Tactic t                -> _do_tactic state t *)
-                                 (* ↓ TODO remove if none config
-                                  * variable remains global ↓ *)
-    (* | GoalMode, SetOption sp     -> do_set_option state sp *)
-    | GoalMode, Include inc      -> do_include ~test state inc
-    (* | GoalMode, EOF              -> assert (state.file_stack = []); *)
-    (*                                 ToplevelProver.do_eof st *)
-              (* ↓ handle default behaviour ↓ *)
-    | _, _ -> ToplevelProver.do_command ~check ~test st state.file command
-    (* let toplvl_state = ToplevelProver.do_command ~test st state.file command *)
-    in { state with toplvl_state; }
+    let toplvl_state = 
+      match mode, c with
+      (* ↓ FIXME only manages history state like in main loop ↓ *)
+      (* | _, Tactic t                -> _do_tactic state t *)
+
+      (* ↓ TODO remove if none config variable remains global ↓ *)
+      (* | GoalMode, SetOption sp     -> do_set_option state sp *)
+      | GoalMode, Include inc      -> do_include ~test state inc
+      (* | GoalMode, EOF              -> assert (state.file_stack = []); *)
+      (*                                 ToplevelProver.do_eof st *)
+
+      (* ↓ handle default behaviour ↓ *)
+      | _, _ -> ToplevelProver.do_command ~check ~test st state.file command
+      (* let toplvl_state = ToplevelProver.do_command ~test st state.file command *)
+    in
+    { state with toplvl_state; }
 
 (* FIXME why not using do_all_commands when not interactive ? *)
 (** Do all command from a file until EOF is reached *)
@@ -189,41 +189,40 @@ and do_all_commands ~(test : bool) (state : driver_state) : driver_state =
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) (state : driver_state) =
+let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
   if !interactive then Printer.prt `Prompt "";
 
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
-  let state = begin
+  let state = 
     if save then
       {state with
        history_state =
-        (* XXX ↓ impure ↓ XXX *)
-         HistoryTP.save_state state.history_state
-         state.toplvl_state
+         (* XXX ↓ impure ↓ XXX *)
+         HistoryTP.save_state state.history_state state.toplvl_state
       }
     else state
-  end in
+  in
 
   match
     let cmd = next_input ~test state in
-    let new_state = do_command ~test state cmd
-    in
+    let new_state = do_command ~test state cmd in
+
     if !html then
       Server.update new_state.toplvl_state.prover_state;
+
     new_state, ToplevelProver.get_mode new_state.toplvl_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
-    (if !stat_filename <> "" then
-      ProverTactics.pp_list_count !stat_filename);
+    if !stat_filename <> "" then
+      ProverTactics.pp_list_count !stat_filename;
     Driver.close_chan state.file.f_chan;
     if not test && not !html then exit 0;
 
   (* loop *)
   | new_state, _ ->
-    if !html then
-      Html.pp ();
+    if !html then Html.pp ();
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
@@ -246,9 +245,7 @@ and main_loop_error ~test (state : driver_state) : unit =
   end
 
 let start_main_loop
-    ?(test=false)
-    ~(main_mode : [`Stdin | `File of string])
-    () : unit
+    ?(test=false) ~(main_mode : [`Stdin | `File of string]) () : unit
   =
   (* interactive is only set here *)
   interactive := main_mode = `Stdin;
@@ -277,9 +274,13 @@ let start_main_loop
     file_stack = []; }
   in
   (* add interactive option to the table *)
-  let tp_state = ToplevelProver.do_set_option 
-      state.toplvl_state (TConfig.s_interactive,Config.Param_bool !interactive) in
-  main_loop ~test { state with toplvl_state = tp_state }
+  let toplvl_state = 
+    ToplevelProver.do_set_option 
+      state.toplvl_state (TConfig.s_interactive,Config.Param_bool !interactive) 
+  in
+  let state = { state with toplvl_state; } in
+
+  main_loop ~test state
 
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;

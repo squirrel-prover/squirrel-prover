@@ -1,5 +1,11 @@
 open Squirrelcore
 open Squirrelprover
+
+module L = Location
+  
+(* can call a "foo" function in js stubs but async must be managed… *)
+(* external foo : string -> string = "caml_foo" *)
+
 (*------------- Toplevel -------------------------------------*)(* {↓{ *)
 (** {2 Toplevel}
  *
@@ -54,7 +60,7 @@ module type S = sig
     val pp_goal : state -> Format.formatter -> unit -> unit
 
     (** Return Toplevel.PROVER in init state *)
-    val init : unit -> state
+    val init : ?withPrelude:bool -> unit -> state
 
     (** do tactics by calling tactic_handle and manages check mode ! *)
     val do_tactic : ?check:[`Check | `NoCheck] -> state ->
@@ -135,14 +141,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
     Prover.pp_goal st.prover_state fmt ()
-
-  let init () : state = 
-    let _ = Config.reset_params () in 
-    let _ = ProverLib.reset_option_defs () in
-    { prover_state= Prover.init ();
-      params      = Config.get_params ();
-      option_defs = [];
-    }
 
   let get_table (st:state) : Symbols.table = 
     Prover.get_table st.prover_state
@@ -286,8 +284,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
           Prover.set_param st.prover_state sp
       | GoalMode, Goal g           -> do_add_goal st g
       | GoalMode, Proof            -> do_start_proof ~check st
-                                      (* ↓ TODO do not manage stack file
-                                       * yet ↓ *)
+                                      (* ↓ TODO do not manage stack file yet ↓ *)
       | GoalMode, Include inc      -> do_include st inc
       | GoalMode, EOF              -> 
         (* ↓ If interactive, never end ↓ *)
@@ -311,8 +308,9 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     { st with prover_state = ps; }
 
 
-  and do_include ?(test=true) (st:state) (i: ProverLib.include_param) :
-    Prover.state =
+  and do_include
+      ?(test=true) (st:state) (i: ProverLib.include_param) : Prover.state 
+    =
     (* `Stdin will add cwd in path with theories *)
     let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
     let file = Driver.locate load_paths (Location.unloc i.th_name) in
@@ -326,7 +324,8 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     st.prover_state
 
   and do_all_commands_in 
-      ~check ~test (st:state) (file:Driver.file) : state =
+      ~check ~test (st:state) (file:Driver.file) : state 
+    =
     match Driver.next_input_file ~test file (get_mode st) with
     | ProverLib.Prover EOF ->
         (* ↓ If test or interactive, never end ↓ *)
@@ -345,11 +344,41 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     let file_from_string = Driver.file_from_str s in
     do_all_commands_in ~check ~test st file_from_string 
 
+  let init : ?withPrelude:bool -> unit -> state =
+    (* memoise state with prelude *)
+    let state0 : state option ref = ref None in
+    
+    fun ?(withPrelude=true) () : state ->
+      let () = Config.reset_params () in 
+      let () = ProverLib.reset_option_defs () in
+      match !state0 with
+      | Some st when withPrelude = true -> st
+      | _ -> 
+        let state = { 
+          prover_state = Prover.init ();
+          params       = Config.get_params ();
+          option_defs  = [];
+        } in
+
+        if withPrelude then begin
+          Printer.pr "With prelude!";
+          let inc =
+            ProverLib.{ th_name = L.mk_loc L._dummy "Prelude"; params = []; }
+          in
+          let state = { state with prover_state = do_include state inc } in
+          state0 := Some state;
+          state
+        end
+        else state
+
   (* run entire squirrel file with given path as string *)
   let run ?(test=false) (file_path:string) : unit =
     match Driver.file_from_path LP_none 
             (Filename.remove_extension file_path) with
-    | Some file -> let _ = do_all_commands_in ~test ~check:`Check (init ()) file in ()
+    | Some file ->
+      let _ : state =
+        do_all_commands_in ~test ~check:`Check (init ()) file
+      in ()
     | None -> failwith "File not found !" 
 end
 (* }↑} *)

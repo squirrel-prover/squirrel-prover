@@ -176,7 +176,7 @@ export class SquirrelWorker {
   }
 
   reset(view:EditorView) {
-    this.sendCommand(["Reset"]);
+    this.init();
     this.cursor = null;
     removeMarks(view,0,view.state.doc.length);
   }
@@ -186,8 +186,9 @@ export class SquirrelWorker {
    * At that moment, Reset will call the init () function
    * @memberof SquirrelWorker
    */
-  init() {
+  async init() {
     this.sendCommand(["Reset"]);
+    this.exec([await this.fileManager.getFileString("Prelude.sp")])
   }
 
 
@@ -232,11 +233,18 @@ export class SquirrelWorker {
           "<div class='err'>Please wait… impossible to undo a sentence that is being executed !</div>");
         return false;
       }
-      this.sendCommand(["Undo", n]);
-      // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
-      for(let i=0; i<n; i++){
-        this.executedSentences.pop();
+      if (this.executedSentences.length >= n){
+        this.sendCommand(["Undo", n]);
+        // let lastRemoved = this.executedSentences[this.executedSentences.length-1];
+        for(let i=0; i<n; i++){
+          this.executedSentences.pop();
+        }
+      } else {
+        console.error("Cannot undo "+n.toString()+" when only "
+                      +this.executedSentences.length.toString()+" sentences have been executed…")
       }
+
+      console.warn("nb executed sentence : "+this.executedSentences.length.toString())
 
       if(this.executedSentences.length == 0){
         this.cursor = null;
@@ -634,23 +642,25 @@ export class SquirrelWorker {
       }
       let sentence = this.curSentences[msg[1]];
 
-      // Add this sentence to the list of executedSentences
-      this.executedSentences.push(sentence);
+      if (sentence) {
+        // Add this sentence to the list of executedSentences
+        this.executedSentences.push(sentence);
 
-      // Update cursor
-      this.cursor = sentence.cursor();
+        // Update cursor
+        this.cursor = sentence.cursor();
 
-      // Send update with visu data
-      e = 
-        new CustomEvent("update", {"detail": JSON.parse(msg[2])});
-      document.getElementById("body")?.dispatchEvent(e);
+        // Send update with visu data
+        e = 
+          new CustomEvent("update", {"detail": JSON.parse(msg[2])});
+        document.getElementById("body")?.dispatchEvent(e);
 
-      // Remove previous mark
-      removeMarks(this.view!,sentence.from,sentence.to);
-      // Add evaluated mark on the sentence
-      this.view!.dispatch({
-        effects: addMarks.of([evaluatedMark.range(sentence.from, sentence.to)])
-      });
+        // Remove previous mark
+        removeMarks(this.view!,sentence.from,sentence.to);
+        // Add evaluated mark on the sentence
+        this.view!.dispatch({
+          effects: addMarks.of([evaluatedMark.range(sentence.from, sentence.to)])
+        });
+      }
 
       // If it's last send queued sentences
       if((this.curSentences.length -1) == msg[1]){

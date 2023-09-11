@@ -250,8 +250,6 @@ let f_happens = Symbols.fs_happens
 
 let f_pred = Symbols.fs_pred
 
-let f_witness = Symbols.fs_witness
-
 (** Boolean connectives *)
 
 let f_false  = Symbols.fs_false
@@ -307,7 +305,6 @@ let empty =
 (** Length *)
 
 let f_len    = Symbols.fs_len
-let f_zeroes = Symbols.fs_zeroes
 
 (** Init action *)
 let init = Action(Symbols.init_action,[])
@@ -499,14 +496,33 @@ end
 include SmartConstructors
 
 (*------------------------------------------------------------------*)
+(** {3 Prelude terms} *)
+
+module Prelude = struct
+
+  (** Get a prelude-defined symbol *)
+  let get_prelude_fsymb table (s : string) : Symbols.fname =
+    try Symbols.Function.of_lsymb (L.mk_loc L._dummy s) table with
+    | Symbols.Error _ -> assert false
+
+  (*------------------------------------------------------------------*)
+  let mk_fun table str ?ty_args args =
+    let symb = get_prelude_fsymb table str in
+    mk_fun table symb ?ty_args args
+
+  (*------------------------------------------------------------------*)
+  let mk_witness table ~ty_arg = mk_fun table "witness" ~ty_args:[ty_arg] []
+
+  let mk_zeroes table term = mk_fun table "zeroes" [term]
+end
+
+(*------------------------------------------------------------------*)
 (** {3 For terms} *)
 
 let mk_zero  = mk_fbuiltin Symbols.fs_zero []
 let mk_fail  = mk_fbuiltin Symbols.fs_fail []
 
 let mk_len term    = mk_fbuiltin Symbols.fs_len    [term]
-let mk_zeroes term = mk_fbuiltin Symbols.fs_zeroes [term]
-
 let mk_pair t0 t1 = mk_fbuiltin Symbols.fs_pair [t0;t1]
 
 let mk_ite ?(simpl=true) c t e =
@@ -516,10 +532,6 @@ let mk_ite ?(simpl=true) c t e =
   | _ -> mk_fbuiltin Symbols.fs_ite [c;t;e]
 
 let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [t]
-
-let mk_witness ~ty_arg =
-  (* type argument must be manually provided here. *)
-  mk_fun Symbols.builtins_table f_witness ~ty_args:[ty_arg] []
 
 let mk_find ?(simpl=false) is c t e =
   if not simpl then Find (is, c, t, e)

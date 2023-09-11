@@ -5,5 +5,7 @@
   (instrumentation (backend bisect_ppx))
   (inline_tests)
   (preprocess (pps ppx_inline_test))
+  ; This enable external function called "foo" also for js stubs…
+  ; (foreign_stubs (language c) (names foo))
   (libraries squirrelprover squirrelfront squirrelcore))
 

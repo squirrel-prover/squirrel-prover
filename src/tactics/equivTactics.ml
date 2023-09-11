@@ -1405,7 +1405,7 @@ let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.se
       match Term.ty ti with
       | Type.Message -> Term.mk_zero
       | Type.Boolean -> Term.mk_false
-      | ty           -> Term.mk_witness ~ty_arg:ty
+      | ty           -> Term.Prelude.mk_witness (ES.table s) ~ty_arg:ty
   in
 
   let ti_t = Term.mk_ite cond               ti else_branch in
@@ -1774,7 +1774,7 @@ let remove_name_occ (n,a) l = match l with
 let mk_xor_phi_base (s : ES.t) biframe
     ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) =
   let cntxt = mk_pair_trace_cntxt s in
-  let env = ES.vars s in
+  let env   = ES.vars  s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
   let biframe =
@@ -1794,11 +1794,11 @@ let mk_xor_phi_base (s : ES.t) biframe
   in
 
   let len_left =
-    Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left n_left_args)))
+    Term.(mk_eq (mk_len l_left) (mk_len (mk_name n_left n_left_args)))
   in
 
   let len_right =
-    Term.(mk_atom `Eq (mk_len l_right) (mk_len (mk_name n_right n_right_args)))
+    Term.(mk_eq (mk_len l_right) (mk_len (mk_name n_right n_right_args)))
   in
 
   let len = if len_left = len_right then [len_left] else [len_left;len_right] in

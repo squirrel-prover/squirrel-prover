@@ -532,7 +532,7 @@ let get_actions_ext
           let occ =
             TSOcc.mk_simple_occ
               ts
-              (Term.mk_witness ~ty_arg:Type.ttimestamp)
+              (Term.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp)
               (* unused, so always set
                  to some arbitrary value *)
               () (* unused *)

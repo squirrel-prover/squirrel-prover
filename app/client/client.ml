@@ -12,7 +12,7 @@
 (* open Code_mirror *)
 
 open Js_of_ocaml
-open! SquirrelWorker
+
 (* open Js_of_ocaml_lwt *)
 module Html = Dom_html
 

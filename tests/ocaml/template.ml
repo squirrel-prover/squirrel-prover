@@ -7,7 +7,7 @@ module TProver = TopLevel.Make(Prover)
 module ProverLib = Squirrelcore.ProverLib
 
 let template_test () =
-  let st = TProver.init () in
+  let st = TProver.init ~withPrelude:false () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     TProver.exec_all ~check:`Check ~test:true st

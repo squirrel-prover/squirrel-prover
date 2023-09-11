@@ -312,8 +312,6 @@ val f_snd  : Symbols.fname
 val f_of_bool : Symbols.fname
 
 val f_len    : Symbols.fname
-val f_zeroes : Symbols.fname
-
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
 
@@ -476,11 +474,18 @@ val mk_fun_infer_tyargs : Symbols.table -> Symbols.fname -> term list -> term
 val mk_zero    : term
 val mk_fail    : term
 val mk_len     : term -> term
-val mk_zeroes  : term -> term
 val mk_of_bool : term -> term
 val mk_pair    : term -> term -> term
 
-val mk_witness : ty_arg:Type.ty -> term
+(*------------------------------------------------------------------*)
+(** {3 Prelude terms} *)
+
+(** This module contains the term constructors for 
+    symbols declared in Squirrel prelude. *)
+module Prelude : sig
+  val mk_witness : Symbols.table -> ty_arg:Type.ty -> term
+  val mk_zeroes  : Symbols.table -> term -> term
+end
 
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)

@@ -35,21 +35,24 @@ export class FileManager {
 
       this.theories_dir = new URL("static/theories/", base_path);
 
-      let fname = "Basic.sp";
-      fetch(this.theories_dir+fname)
-      .then((res) => {
-        if (res.ok)
-          return res.blob();
-        else {
-          console.error("couldn't find ")
-          return null;
-        }
+      let fnames = ["Basic.sp", "Prelude.sp"];
+      fnames.forEach((fname) => {
+        fetch(this.theories_dir+fname)
+        .then((res) => {
+          if (res.ok)
+            return res.blob();
+          else {
+            console.error("couldn't find ")
+            return null;
+          }
+        })
+        .then((blob) => { 
+          if(blob) {
+            this.file_store.setItem(fname,blob.text());
+          }
+          return blob.text();
+        });
       })
-      .then((blob) => { 
-        if(blob) {
-          this.file_store.setItem(fname,blob.text());
-        }
-      });
     }
 
   async getFileString(fname:string): Promise<string> {

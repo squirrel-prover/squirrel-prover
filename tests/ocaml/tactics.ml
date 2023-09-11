@@ -36,7 +36,7 @@ let mk_message st s =
 (** Check that case study fails when there is no conditional
     with the target condition. *)
 let case_study_fail () =
-  let st = TProver.init () in
+  let st = TProver.init ~withPrelude:false () in
   let st =
     TProver.exec_all ~test:true st
       "name n : message.\n\
@@ -68,7 +68,7 @@ let case_study_fail () =
 (** Check that case study fails when there is no conditional
     with the target condition in the target item. *)
 let case_study_fail' () =
-  let st = TProver.init () in
+  let st = TProver.init ~withPrelude:false () in
   let st =
     TProver.exec_all ~test:true st
       "name n : message.\n\
@@ -93,7 +93,7 @@ let case_study_fail' () =
 (** Check that case study works as expected on several examples. *)
 let case_study () =
 
-  let st = TProver.init () in
+  let st = TProver.init ~withPrelude:false () in
   let st = 
     TProver.exec_all ~test:true st
         "mutable state : message = empty.
@@ -576,7 +576,7 @@ let case_study () =
 
 let namelength () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = TProver.exec_all ~test:true (TProver.init ())
+  let st = TProver.exec_all ~test:true (TProver.init ~withPrelude:false ())
         "
         system null.
         name n : message.
@@ -620,7 +620,7 @@ let namelength () =
     | None -> assert false
   in
   let cst = Term.mk_fun table fname [] in
-  let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+  let f = Term.mk_eq (Term.mk_len tn) cst in
 
   Alcotest.(check (term_testable)) 
     "axiom namelength_n → len(n) = namelength_message"
@@ -640,7 +640,7 @@ let namelength () =
 
 let namelength2 () =
   let mk c = L.mk_loc L._dummy c in      
-  let st = TProver.exec_all ~test:true (TProver.init ())
+  let st = TProver.exec_all ~test:true (TProver.init ~withPrelude:false ())
         "
         system null.
         name n : message * message.

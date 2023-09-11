@@ -170,6 +170,34 @@ function caml_unix_read() {
   return 0;
 }
 
+//Provides: caml_unix_open
+//Requires: caml_unix_ll
+function caml_unix_open() {
+  caml_unix_ll("caml_unix_open", arguments);
+  return 0;
+}
+
+//Provides: caml_foo
+//Requires: caml_string_of_jsstring
+async function caml_foo() {
+  console.warn("Opening:")
+  console.log(arguments[0])
+  let fname = "theories/"+arguments[0]+".sp";
+  let text = await fetch(fname)
+    .then((r) => {
+      if (r.ok) {
+        return r.text();
+      } 
+      else console.error("KO : Bad file name ? "+fname);
+    })
+    .catch((error) => {console.error(error+" : Couldn't load "+arguments[0])})
+  console.log(text);
+  // FIXME This send too late the text to ocaml…
+  return caml_string_of_jsstring(text)
+  //caml_raise_with_string, caml_global_data
+  // caml_raise_with_string (caml_global_data.Sys_error, text);
+}
+
 //Provides: caml_unix_opendir
 //Requires: caml_unix_ll
 // function caml_unix_opendir(dir) {
@@ -385,9 +413,6 @@ function caml_unix_mkfifo()                { caml_unix_ll("caml_unix_mkfifo", ar
 // Provides: caml_unix_nice
 // Requires: caml_unix_ll
 function caml_unix_nice()                  { caml_unix_ll("caml_unix_nice", arguments); }
-// Provides: caml_unix_open
-// Requires: caml_unix_ll
-function caml_unix_open()                  { caml_unix_ll("caml_unix_open", arguments); }
 // Provides: caml_unix_putenv
 // Requires: caml_unix_ll
 function caml_unix_putenv()                { caml_unix_ll("caml_unix_putenv", arguments); }

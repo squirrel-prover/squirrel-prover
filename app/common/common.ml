@@ -11,7 +11,9 @@ type state = {ps: TProver.state; output: string}
 
 type stack = state list
 
-let prover_state : TProver.state ref = ref (TProver.init ())
+(* Loading Prelude will fail since in full JS it can't access file
+ * system *)
+let prover_state : TProver.state ref = ref (TProver.init ~withPrelude:false ())
 
 let firstOutput = "TProver initial state : Ready to go !"
 
@@ -19,7 +21,7 @@ let prover_stack : (state list) ref = ref [{ps= !prover_state;
 output=firstOutput}]
 
 let init () =
-  prover_state := TProver.init ();
+  prover_state := TProver.init ~withPrelude:false ();
   prover_state := TProver.do_set_option 
       !prover_state (TConfig.s_interactive,Config.Param_bool true);
   prover_stack := [{ps= !prover_state; output=firstOutput}]
