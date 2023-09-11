@@ -1262,28 +1262,57 @@ Global tactics
        
 .. tace:: enckp @position {? @term_pat } {? @term }
     
-   Enc-kp assumes that a symmetric or an asymmetric encryption scheme
-   does not leak any infor- mation about the public (or secret) key
-   used to encrypt the plain-text. It is based on the IK-CPA notion of
+   ENC-KP assumes that a symmetric or an asymmetric encryption scheme
+   does not leak any information about the public (or secret) key
+   used to encrypt the plaintext. It is based on the IK-CPA notion of
    :cite:`bellare2001key`.
-   
-   On a biframe element of the form :g:`i:
-   enc(n,r,diff(pk(k1),pk(k2)))`, the tactic :g:`enckp i` will
-   simplify the biframe element by only keeping the key on the left,
-   yielding :g:`i: enc(n,r,pk(k1))`.
+
+   .. example:: Basic ENC-KP application
+	 
+      On a biframe element of the form
+      
+      .. squirreldoc::
+	 i : enc(n,r,diff(pk(k1),pk(k2)))
+	 
+      calling the tactic :g:`enckp i` will simplify the biframe
+      element by only keeping the key on the left, yielding
+      
+      .. squirreldoc::
+         i: enc(n,r,pk(k1))
 
    The tactic expects as argument:
    
    • the number identifying the biframe element;
    • optional: the encryption term over which to apply the tactic;
    • optional: the new key by which to replace the key.
-     
-   On a biframe element of the form :g:`i: enc(n,r,m)`, the tactic
-   :g:`enckp i, k` will simplify the biframe element by using the specified
-   key, yielding :g:`i: enc(n,r,pk(k))`.  On a biframe element of the
-   form :g:`i: ⟨ enc(n,r,m),m'⟩`, the tactic :g:`enckp i,enc(n,r,m),
-   k` will simplify the biframe element by using the specified key,
-   yielding :g:`i: ⟨ enc(n,r,pk(k)),m '⟩`.
+
+
+   .. example:: Switching key with ENC-KP
+		
+      On a biframe element of the form
+      
+      .. squirreldoc::	 
+	 i: enc(n,r,m)
+
+      the tactic :g:`enckp i, k` will simplify the biframe element by using the specified
+      key, yielding
+      
+      .. squirreldoc::
+	 i: enc(n,r,pk(k))
+
+
+   .. example:: Targeted ENC-KP application
+		   
+      On a biframe element of the form
+      
+      .. squirreldoc::
+	 i: ⟨ enc(n,r,m),m'⟩
+
+      the tactic :g:`enckp i,enc(n,r,m), k` will simplify the biframe
+      element by using the specified key, yielding
+      
+      .. squirreldoc::
+	 i: ⟨ enc(n,r,pk(k)),m '⟩
 
    The tactic is used similarly in the symmetric case.
 
