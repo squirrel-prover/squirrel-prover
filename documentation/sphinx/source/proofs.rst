@@ -956,9 +956,10 @@ Common tactics
     
     Adds the fact that two names have the same
     length. The two arguments must the indeed be a :decl:`name`.
-      
-    Usage: namelength m1, m2  
 
+    .. todo:: Charlie: Don't we want to deprecate this one?  Some
+       tests just need to be fixed, but otherwise no more example use
+       this.  
 
 .. tacn:: rewrite {* @rw_arg} {? in @rw_target}
     
@@ -1021,19 +1022,19 @@ Local tactics
 .. tact:: congruence
    :name: congruence     
 
-     Attempt to conclude by automated reasoning on message (dis)-equalities.
-     Equalities and disequalities are collected from hypotheses, both local 
-     and global, after the destruction of conjunctions (but no case analyses 
-     are performed to handle conjunctive hypotheses). If the conclusion
-     is a message (dis)-equality then it is taken into account as well.
+   Attempt to conclude by automated reasoning on message (dis)-equalities.
+   Equalities and disequalities are collected from hypotheses, both local 
+   and global, after the destruction of conjunctions (but no case analyses 
+   are performed to handle conjunctive hypotheses). If the conclusion
+   is a message (dis)-equality then it is taken into account as well.
 
 .. tact:: const @variable
     
-    Add the `const` tag to a variable.
+   Add the `const` tag to a variable.
 
-    The variable must be of a finite and fixed (η-independent) type,
-    and must not appear in any global hypothesis (some global
-    hypotheses may be localized (see :tacn:`localize`) if necessary.
+   The variable must be of a finite and fixed (η-independent) type,
+   and must not appear in any global hypothesis (some global
+   hypotheses may be localized (see :tacn:`localize`) if necessary.
 
       
 .. tact:: eqnames
