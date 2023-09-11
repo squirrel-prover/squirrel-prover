@@ -1134,12 +1134,13 @@ Global tactics
 
 .. tace:: diffeq
     
-    Closes a reflexive goal up to equality 
+   Closes a reflexive goal up to equality. That is, if all diff-term
+   whitin the global goal always evaluate to the same value in all
+   systems, the diff-equivalence holds. For each diff-term, a
+   dedicated sub-goal is created.
       
-    .. todo::
-       Charlie: Here, still waiting to have clean multisystem
-       support in reachabiliy goal to clarify this..
-      
+   .. warning:: This tactic is still at an experimental development
+       stage. We do not recommend its usage.     
 
 .. _section-crypto-tactics:
 
