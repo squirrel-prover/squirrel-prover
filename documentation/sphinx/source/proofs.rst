@@ -1122,15 +1122,16 @@ Global tactics
    .. exn:: Did not find any conditional to analyze.
       :undocumented:
 
-.. tace:: deduce
+.. tace:: deduce @position
     
-    `deduce i` removes the ith element from the biframe when it can be
+    :g:`deduce i` removes the ith element from the biframe when it can be
     computed from the rest of the biframe.
-    `deduce` try to deduce the biframe with the first equivalence in the
-    hypotheses it finds. 
+    :g:`deduce` try to deduce the biframe with the first equivalence in the
+    hypotheses it finds.
 
-    .. todo:: 
-       TODO
+    .. todo::
+       Charlie: I don't understand the second sentence, to update.
+   
 
 .. tace:: diffeq
     
