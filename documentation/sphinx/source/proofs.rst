@@ -1122,15 +1122,29 @@ Global tactics
    .. exn:: Did not find any conditional to analyze.
       :undocumented:
 
-.. tace:: deduce @position
+.. tace:: deduce {? @position}
     
-    :g:`deduce i` removes the ith element from the biframe when it can be
-    computed from the rest of the biframe.
-    :g:`deduce` try to deduce the biframe with the first equivalence in the
-    hypotheses it finds.
+    :g:`deduce i` removes the ith element from the biframe when it can
+    be computed from the rest of the biframe. Without any argument, it
+    will remove the first equivalence that can be dropped, if it
+    exists.
+
+    Here, the fact that the biframe element :g:`u` can be computed
+    from the other biframe elements :g:`x,y,...` means that there
+    exists a context :g:`C` made of function applications such that
+    :g:`u` is equal to :g:`C[x,y,..]`.
+
+    This rely on some automated reasoning that may not be complete,
+    notably w.r.t. equational theories. Regarding macros, some partial
+    support is enabled, typically that for any timestamp :g:`t`,
+    :g:`frame@pred(t)` allows to deduce :g:`input@t`, all :g:`frame@t'`
+    for :g:`t' < pred(t)`, as well as the :g:`output@t'` for whenever
+    :g:`exec@t'` is true.
+
+    
 
     .. todo::
-       Charlie: I don't understand the second sentence, to update.
+       Charlie: do we want an exhaustive description of the deduce algo?
    
 
 .. tace:: diffeq
