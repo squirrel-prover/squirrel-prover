@@ -1162,6 +1162,94 @@ Global tactics
 Cryptographic tactics
 ---------------------
 
+Cryptographic tactics enables reasoning over cryptographic and
+probabilistic properties of random samplings and primitves. For each one, if pertinent, we refer to the corresponding classical computational assumption, as well as
+
+Occurence formula
+~~~~~~~~~~~~~~~~~
+
+Several reasonings imply to be able to track how a given name is
+used. For instance, if the name :g:`n` does not ocurr at all in term
+:g:`t`, then :g:`n=t` is false with overwelming probability. To apply
+a cryptographic assumption that needs a secret key, one need to check
+that all occurences of the secret key are valid ones, e.g. only used
+in key position of the corresponding primitive.
+
+Over macro-free terms, collecting occurences is simply equivalent to
+looking at the subterms. However, if some macros occur in :g:`t`,
+typically :g:`input@ts` or :g:`output@ts`, we need to look through all
+the actions that may have happened before :g:`ts` and may depend on
+:g:`n`.
+
+We define here how to build an :gdef:`occurence formula` that will be
+reused in several tactics description. For any name :g:`n`, any term
+:g:`t` and a set of allowed patterns :g:`pats` (patterns built over the name :g:`n` and function applications), we define the formula
+:g:`occurs(n,t,pats)` as the conjunction of conditions under which it
+is possible that :g:`n` occurs in :g:`t` without following the pattern
+of `pats`:
+
+* whenever :g:`t` contains as a subterm an occurence :g:`n` that does not follow any of the allowed patterns :g:`pats`, the formula is :g:`true`.
+* whenever :g:`t` contains a :ref:`system-defined macro<section-system-macros>`, :g:`macro@ts`, if `ts` is a concrete action, we simply unfold the definition of the macro, and whenever is it not concrete, we collect all actions of the form :g:`A1` such that :g:`n` occurs in the definition of the action not as an allowed pattern, and the formula :g:`A1<=ts` is added to the conjunction of :g:`occurs(n,t,pats)`.
+
+Occurs is of course generally defined for indiced names that may
+occured in index actions.
+
+.. example:: Basic name occurence
+	     
+   Consider the following process:
+
+   .. squirreldoc::
+      name n : index->message
+
+      channel c
+
+      system (!_i !_j A : out(c,n(i)) | B :in(c,x);out(c,x)).
+
+      
+   The formula :g:`occurs(n(i),input@B,none)` is equal to :g:`exists j. A(i,j) < B`.  
+
+
+.. example:: Key corruption
+	     
+   Consider the following process:
+
+   .. squirreldoc::
+      name k : message
+      name r : message
+
+      senc enc,dec.
+      
+      channel c.
+
+      system (Corr: out(c,k) | B : in(c,x);out(c,enc(x,r,k))).
+
+      
+   To reason about the encrypted message, the key :g:`k` needs to be secret, and thus the dynamic corruption should not have happened. This intuition is captured by the formula :g:`occurs(k,input@B,enc(_,r,k))`, which is equal to :g:`Corr < B`.  
+
+   
+This formula may be imprecise, for example due to states.
+
+.. example:: Imprecise state occurence
+
+   .. squirreldoc:: 
+      name n : message
+
+      mutable s = n.
+      
+      channel c
+
+      system (A: out(c,s) | B :in(c,x);out(c,x))  .      
+      
+   Here, :g:`n` occurs only inside the :g:`init` action, where the
+   mutable state is initialized with value :g:`n`. The formula
+   :g:`occurs(n,input@B,none)` is then equal to :g:`init < B`.
+   However, the occurence can happen only if :g:`A` did occur between
+   :g:`init` and :g:`B` to reveal the value of the state.
+
+
+We define a precise variant :g:`precise_occurs(n,t,pats)`, that tracks more precisly the usages of the states, and also adds the condition that the correct value of the state is revealed if a state can contain an occurence of :g:`n`.
+
+   
 Common tactics
 ~~~~~~~~~~~~~~
 
@@ -1174,18 +1262,17 @@ Common tactics
    before, are indistinguishable. This can be exploited in multiple
    ways, for instance to remove a fresh name from an equivalence, or
    to state that a term can never be equal to a fresh name.
-
-     
+   
    In a local goal, called over an hypothesis of the form :g:`t=n` for
    some name :g:`n` over a current goal formula :g:`phi`, turns the
-   goal into a formula :g:`not_fresh(n,t)) => phi` where
-   :g:`not_fresh(n,t)` is a formula capturing conditions so that
-   :g:`n` is not fresh in `t` (equivalently, it is possible that
-   :g:`n` is a subterm of :g:`t`). If one can then prove that :g:`n`
-   cannot occur in :g:`t`, that is that :g:`not_fresh(n,t)` is false,
-   it then allows to close the goal. If :g:`not_fresh(n,t)` is
-   trivially false, e.g. if :g:`t` is a macro-free term without :g:`n`
-   as a subterm, the goal will be directly closed.
+   goal into a formula :g:`not(occur(n,t,none))) => phi` (see the
+   definition of the :term:`occurence formula`)
+
+   If one can then prove that :g:`n` cannot occur in :g:`t`, that is
+   that :g:`not(occur(n,t,none))` is false, it then allows to close
+   the goal. If :g:`not(occur(n,t,none))` is trivially false, e.g. if
+   :g:`t` is a macro-free term without :g:`n` as a subterm, the goal
+   will be directly closed.
 
 
    .. example:: Name leak
@@ -1220,9 +1307,12 @@ Common tactics
       :g:`A`. Here, one would conclude by using the fact that in the
       process definition, this is impossible.
 
+      The :g:`precise_ts` makes the tactic use `precise_occur` instead
+      of `occur`.
+      
+      In an equivalence goal, the tactic 
 
-
-
+      
    .. todo::    
       TODO equiv variant
 
