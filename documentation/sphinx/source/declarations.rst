@@ -162,14 +162,14 @@ associated cryptographic assumptions.
 
    :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption
    scheme satisfying the equation
-   :g:`dec(enc(m,pk(sk)),sk)=m`. Enables the use of :tacn:`cca1`, :tacn:`enckp`
-   and :tacn:`intctxt`.
+   :g:`dec(enc(m,pk(sk)),sk)=m`. Enables the use of :tacn:`cca1`, :tacn:`enckp`.
+   
 
 .. decl:: senc @fun_id, @fun_id, @fun_id
 
-   :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption scheme
+   :g:`senc enc,dec` declares an IND-CCA2 :gdef:`symmetric encryption` scheme
    satisfying the equation :g:`dec(enc(m,sk),sk)=m`. Enables the use
-   of :tacn:`cca1` and :tacn:`enckp`.
+   of :tacn:`cca1`, :tacn:`intctxt` and :tacn:`enckp`.
 
 .. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
 

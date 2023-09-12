@@ -1447,13 +1447,28 @@ Local tactics
     .. warning::
        This is a work in progress, a formal description of the rule is pending.       
 
-.. tact:: intctxt
+.. tact:: intctxt @hypothesis_id
    :name: intctxt
 	  
-    Apply the INTCTXT axiom to the given hypothesis name. 
-      
-    .. todo::    
-       TODO
+    This tactics applies the INTCTXT assumption (see
+    e.g. :cite:`bellare2000authenticated`).
+
+    It requires the declaration of a :term:`symmetric encryption`.
+    
+    It can be applied to an hypothesis either of the form
+    :g:`dec(c,k)<>fail` or :g:`dec(c,k) = t` (in the latter case,
+    generates as an additional goal that `t <> fail`).
+
+    In both cases, Squirrel will collect all honest encryptions made
+    with key :g:`k`, and produce a subogal corresponding to each case
+    where :g:`c` is equal to one of those honest encryptions.
+
+    The key :g:`k` must only be used in key position, so a subgoal
+    asking to prove that :g:`not(occur(k,c,(enc(_,_,k),dec(_,k)))` is
+    created (when it is not trivially true).
+
+    In additition, a goal asking to prove that all randomness used for
+    encryption are disjoint and fresh (when it is not trivially true).
 
     Latest formal Squirrel description: :cite:`bdjkm21sp`.      
 
