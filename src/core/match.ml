@@ -799,7 +799,7 @@ end = struct
           Fmt.pf fmt "@[<hv 2>bad variable instantiation(s):@;@[<v>%a@]@]"
             (Fmt.list ~sep:Fmt.cut
                (fun fmt (v,(tag,_system,_)) ->
-                  Fmt.pf fmt "@[%a@] -> @[%a@]"
+                  Fmt.pf fmt "@[@[%a@] -> @[%a@]@]"
                     Vars.pp_typed_tagged_list [v,tag]
                     Term.pp (Term.subst subst (Term.mk_var v))
                )
