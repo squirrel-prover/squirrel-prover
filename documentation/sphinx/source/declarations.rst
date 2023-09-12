@@ -169,7 +169,7 @@ associated cryptographic assumptions.
 .. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
 
    :g:`ddh g, (^) where group:tyg exponents:tye.` declares a
-   group with generator :g:`g` and exponentation :g:`(^)`. The group
+   :gdef:`group` with generator :g:`g` and exponentation :g:`(^)`. The group
    must satisfy the DDH assumption when declared with :g:`ddh`, the
    CDH assumption with :g:`cdh`, and the GapDH assumption with
    :g:`gdh`.

@@ -1265,12 +1265,12 @@ Common tactics
    
    In a local goal, called over an hypothesis of the form :g:`t=n` for
    some name :g:`n` over a current goal formula :g:`phi`, turns the
-   goal into a formula :g:`not(occur(n,t,none))) => phi` (see the
+   goal into a formula :g:`occur(n,t,none) => phi` (see the
    definition of the :term:`occurence formula`)
 
    If one can then prove that :g:`n` cannot occur in :g:`t`, that is
-   that :g:`not(occur(n,t,none))` is false, it then allows to close
-   the goal. If :g:`not(occur(n,t,none))` is trivially false, e.g. if
+   that :g:`occur(n,t,none)` is false, it then allows to close
+   the goal. If :g:`occur(n,t,none)` is trivially false, e.g. if
    :g:`t` is a macro-free term without :g:`n` as a subterm, the goal
    will be directly closed.
 
@@ -1326,15 +1326,19 @@ Local tactics
 ~~~~~~~~~~~~~
 
 
-.. tact:: cdh
-   
-   Usage: cdh H, g.
-   Applies the CDH assumption (including squareCDH) on H using generator
-   g.
+.. tact:: cdh @hypothesis_id, @term
 
-   .. todo::    
-      TODO
+   This tactic applies the Computational Diffie-Helman assumption,
+   stating that given two groups elents :g:`g^a` and :g:`g^b` it is
+   difficult to compute :g:`g^(ab)`.
 
+   A cdh, ddh or gdh :term:`group declaration <group>` must have been
+   specified. For a group with generator :g:`g` and exponentiation
+   :g:`^`, calling :g:`cdh M, g` over a message equality :g:`M` of the
+   form `t=g^{a b}` will replace the current goal :g:`phi` by
+   :g:`occur(a,t,g^a) || occur(b,t,g^b) => phi`. If :g:`a`
+   and :g:`b` only occur as :g:`g^a` and :g:`g^b`, the goal is then
+   closed automatically.
     
    .. warning::
       This is a work in progress, a formal description of the rule is pending.
