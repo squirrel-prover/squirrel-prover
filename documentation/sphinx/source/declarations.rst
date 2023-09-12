@@ -147,32 +147,37 @@ associated cryptographic assumptions.
 
 .. decl:: hash @fun_id 
 
-   :g:`hash h` declares a keyed hash function :g:`h(m,k)` satisfying
-   PRF and known key collision resistance assumptions.
+   :g:`hash h` declares a keyed :gdef:`hash function <hash function>`
+   :g:`h(m,k)` satisfying PRF and known key collision resistance
+   assumptions, enabling the use of :tacn:`prf`, :tacn:`euf` and
+   :tacn:`collision`.
 
 .. decl:: signature @fun_id, @fun_id, @fun_id
 
    :g:`signature sig,ver,pk` declares an unforgeable against chosen
    message attacks (EUF-CMA) signature scheme satisfyinh the equation
-   :g:`ver(sig(m,sk),m,pk(sk))=true`.
+   :g:`ver(sig(m,sk),m,pk(sk))=true`. Enables the use of :tacn:`euf`.
 
 .. decl:: aenc @fun_id, @fun_id, @fun_id
 
    :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption
-   scheme satisfying the equation :g:`dec(enc(m,pk(sk)),sk)=m`.
+   scheme satisfying the equation
+   :g:`dec(enc(m,pk(sk)),sk)=m`. Enables the use of :tacn:`cca1`, :tacn:`enckp`
+   and :tacn:`intctxt`.
 
 .. decl:: senc @fun_id, @fun_id, @fun_id
 
    :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption scheme
-   satisfying the equation :g:`dec(enc(m,sk),sk)=m`.
+   satisfying the equation :g:`dec(enc(m,sk),sk)=m`. Enables the use of :tacn:`cca1`.
 
 .. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
 
-   :g:`ddh g, (^) where group:tyg exponents:tye.` declares a
-   :gdef:`group` with generator :g:`g` and exponentation :g:`(^)`. The group
-   must satisfy the DDH assumption when declared with :g:`ddh`, the
-   CDH assumption with :g:`cdh`, and the GapDH assumption with
-   :g:`gdh`.
+   :g:`ddh g, (^) where group:tyg exponents:tye.` is a
+   :gdef:`group declaration` with generator :g:`g` and exponentation
+   :g:`(^)`. The group must satisfy the DDH assumption when declared
+   with :g:`ddh`, the CDH assumption with :g:`cdh`, and the GapDH
+   gassumption with g:`gdh`.  Enables the use of :tacn:`cdh`,
+   :tacn:`gdh` and :tacn:`ddh`.
 
 
 .. _section-processes:

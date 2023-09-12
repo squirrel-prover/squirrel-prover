@@ -1327,12 +1327,13 @@ Local tactics
 
 
 .. tact:: cdh @hypothesis_id, @term
+   :name: cdh
 
    This tactic applies the Computational Diffie-Helman assumption,
    stating that given two groups elents :g:`g^a` and :g:`g^b` it is
    difficult to compute :g:`g^(ab)`.
 
-   A cdh, ddh or gdh :term:`group declaration <group>` must have been
+   A cdh, ddh or gdh :term:`group declaration <group declaration>` must have been
    specified. For a group with generator :g:`g` and exponentiation
    :g:`^`, calling :g:`cdh M, g` over a message equality :g:`M` of the
    form `t=g^{a b}` will replace the current goal :g:`phi` by
@@ -1344,29 +1345,37 @@ Local tactics
       This is a work in progress, a formal description of the rule is pending.
              
 .. tact:: collision
-    
-    Collects all equalities between hashes occurring at toplevel in message
-    hypotheses, and adds the equalities between messages that have the same
-    hash with the same valid key. 
-      
-    Usage: collision [H]
+   :name: collision
+	  
+   Requires a :term:`hash function declaration <hash function>`.
 
-    .. todo::    
-       TODO
+   This tactis applies the known key collision resistance assumption
+   (see e.g. the cr2-kk assumption from
+   :cite:`goldwasser1996lecture`).
+    
+   Collects all equalities between hashes occurring at toplevel in
+   message hypotheses, that is all hypothesis of the form
+   :g:`h(u,k)=h(v,k)`, and for each such hypothesis it adds as new
+   hypothesis :g:`u=v`.
+
+   As this supports the known-key variant of collision resistance,
+   there is no side condition checked here over the hash key.
 
     Latest formal Squirrel description: :cite:`bkl23hal` (only as an example).       
 
 .. tact:: euf
-    
-    Apply the euf axiom to the given hypothesis name.
+   :name: euf
+	  
+   Apply the euf axiom to the given hypothesis name.
    
-    .. todo::    
+   .. todo::    
        TODO      
        
-    Latest formal Squirrel description: :cite:`bkl23hal`.
+   Latest formal Squirrel description: :cite:`bkl23hal`.
        
 .. tact:: gdh
-    
+   :name: gdh
+	  
     Usage: gdh H, g.
     Applies the GDH assumption (including squareGDH) on H with generator
     g. 
@@ -1378,7 +1387,8 @@ Local tactics
        This is a work in progress, a formal description of the rule is pending.       
 
 .. tact:: intctxt
-    
+   :name: intctxt
+	  
     Apply the INTCTXT axiom to the given hypothesis name. 
       
     .. todo::    
@@ -1392,7 +1402,8 @@ Global tactics
 
 
 .. tace:: cca1
-    
+   :name: cca1
+	  
     Apply the cca1 axiom on all instances of a ciphertext.
       
     .. todo::    
@@ -1401,7 +1412,8 @@ Global tactics
     Latest formal Squirrel description::cite:`bkl23hal`.  
     
 .. tace:: ddh
-    
+   :name: ddh
+   
    Closes the current system, if it is an instance of a context of
    ddh. 
    
@@ -1413,7 +1425,8 @@ Global tactics
    Latest formal Squirrel description: :cite:`bdjkm21sp`.
        
 .. tace:: enckp @position {? @term_pat } {? @term }
-    
+   :name: enckp
+
    ENC-KP assumes that a symmetric or an asymmetric encryption scheme
    does not leak any information about the public (or secret) key
    used to encrypt the plaintext. It is based on the IK-CPA notion of
