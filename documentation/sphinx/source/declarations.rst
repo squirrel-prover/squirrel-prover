@@ -160,16 +160,17 @@ associated cryptographic assumptions.
 
 .. decl:: aenc @fun_id, @fun_id, @fun_id
 
-   :g:`aenc enc,dec,pk` declares an IND-CCA2 asymmetric encryption
+   :g:`aenc enc,dec,pk` declares an IND-CPA and INT-CTXT :gdef:`asymmetric encryption`
    scheme satisfying the equation
    :g:`dec(enc(m,pk(sk)),sk)=m`. Enables the use of :tacn:`cca1`, :tacn:`enckp`.
    
 
 .. decl:: senc @fun_id, @fun_id, @fun_id
 
-   :g:`senc enc,dec` declares an IND-CCA2 :gdef:`symmetric encryption` scheme
-   satisfying the equation :g:`dec(enc(m,sk),sk)=m`. Enables the use
-   of :tacn:`cca1`, :tacn:`intctxt` and :tacn:`enckp`.
+   :g:`senc enc,dec` declares an IND-CPA and INT-CTXT
+   :gdef:`symmetric encryption` scheme satisfying the equation
+   :g:`dec(enc(m,sk),sk)=m`. Enables the use of :tacn:`cca1`,
+   :tacn:`intctxt` and :tacn:`enckp`.
 
 .. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
 

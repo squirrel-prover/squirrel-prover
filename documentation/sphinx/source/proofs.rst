@@ -1450,7 +1450,7 @@ Local tactics
 .. tact:: intctxt @hypothesis_id
    :name: intctxt
 	  
-    This tactics applies the INTCTXT assumption (see
+    This tactics applies the INT-CTXT assumption (see
     e.g. :cite:`bellare2000authenticated`).
 
     It requires the declaration of a :term:`symmetric encryption`.
@@ -1477,15 +1477,46 @@ Global tactics
 ~~~~~~~~~~~~~~
 
 
-.. tace:: cca1
+.. tace:: cca1 @position
    :name: cca1
 	  
-    Apply the cca1 axiom on all instances of a ciphertext.
-      
-    .. todo::    
-       TODO
+   This tactics applies the IND-CCA assumption (see
+   e.g. :cite:`bellare2000authenticated`).
 
-    Latest formal Squirrel description::cite:`bkl23hal`.  
+   It requires the declaration of a :term:`symmetric encryption` or
+   an :term:`asymmetric encryption`.
+
+   The tactic can be called over a biframe element containing a term of
+   the form :g:`C[enc(n, r, m)]`, where
+	      
+      • :g:`r` must be a name which is fresh;
+      • there is no decryption in :g:`C`
+      • there is no universal message variable that occurs
+      • :g:`m` is  a key  or a public key such that the key
+	only appear in key position, under :g:`pk`, :g:`dec` or
+	:g:`enc`.    
+
+
+   The tactic will then replace the encryption occurence by an
+   encryption of zeroes, yielding :g:`C[enc(zeroes( len(n)), r,
+   pk(k))]`.
+
+
+   In addition, the tactic creates a subgoal asking to prove that all
+   occurences of the key and encryptions are correct. Notably, one
+   must prove that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is
+   false (or :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the
+   asymmetric case).
+
+   In addition, in the asymetric case, a subgoal is created to prove the
+   freshness of the random used in the encryption, with the conclusion
+   :g:`occur(r,biframe,enc(n,r,m))`.
+
+   In the symmetric case, an additional subgoal is created ensuring
+   that all encryptions are made with distinct fresh randoms (and not
+   that just the encryption we are looking at is fresh).
+
+   Latest formal Squirrel description::cite:`bkl23hal`.  
     
 .. tace:: ddh @term, @term, @term, @term
    :name: ddh
@@ -1579,7 +1610,9 @@ Global tactics
 	 i: ⟨ enc(n,r,pk(k)),m '⟩
 
 
-   To apply the enckp tactic, the key :g:`k` must be such that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is trivially false. (or :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
+   To apply the enckp tactic, the key :g:`k` must be such that
+   :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is trivially false. (or
+   :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
 
    When it is not trivially true, a subgoal is created to prove the
    freshness of the random used in the encryption, with the conclusion
