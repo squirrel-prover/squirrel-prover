@@ -1183,10 +1183,11 @@ the actions that may have happened before :g:`ts` and may depend on
 
 We define here how to build an :gdef:`occurence formula` that will be
 reused in several tactics description. For any name :g:`n`, any term
-:g:`t` and a set of allowed patterns :g:`pats` (patterns built over the name :g:`n` and function applications), we define the formula
+:g:`t` and a set of allowed patterns :g:`pats` (patterns built over
+the name :g:`n` and function applications), we define the formula
 :g:`occurs(n,t,pats)` as the conjunction of conditions under which it
-is possible that :g:`n` occurs in :g:`t` without following the pattern
-of `pats`:
+is possible that :g:`n` occurs in :g:`t` without following one of the
+allowed pattern of `pats`:
 
 * whenever :g:`t` contains as a subterm an occurence :g:`n` that does not follow any of the allowed patterns :g:`pats`, the formula is :g:`true`.
 * whenever :g:`t` contains a :ref:`system-defined macro<section-system-macros>`, :g:`macro@ts`, if `ts` is a concrete action, we simply unfold the definition of the macro, and whenever is it not concrete, we collect all actions of the form :g:`A1` such that :g:`n` occurs in the definition of the action not as an allowed pattern, and the formula :g:`A1<=ts` is added to the conjunction of :g:`occurs(n,t,pats)`.
@@ -1247,8 +1248,14 @@ This formula may be imprecise, for example due to states.
    :g:`init` and :g:`B` to reveal the value of the state.
 
 
-We define a precise variant :g:`precise_occurs(n,t,pats)`, that tracks more precisly the usages of the states, and also adds the condition that the correct value of the state is revealed if a state can contain an occurence of :g:`n`.
+We define a precise variant :g:`precise_occurs(n,t,pats)`, that tracks
+more precisly the usages of the states, and also adds the condition
+that the correct value of the state is revealed if a state can contain
+an occurence of :g:`n`.
 
+We also generalize occur to allow for collecting multiple name
+occurences at once, useful when we want to allow patterns depending on
+two names at once (see e.g. :tacn:`gdh` or :tacn:`ddh`).
    
 Common tactics
 ~~~~~~~~~~~~~~
@@ -1329,15 +1336,16 @@ Local tactics
 .. tact:: cdh @hypothesis_id, @term
    :name: cdh
 
-   This tactic applies the Computational Diffie-Helman assumption,
-   stating that given two groups elents :g:`g^a` and :g:`g^b` it is
-   difficult to compute :g:`g^(ab)`.
+   This tactic applies the Computational Diffie-Helman assumption (see
+   e.g. :cite:`okamoto2001gap`), stating that given two groups elents
+   :g:`g^a` and :g:`g^b` it is difficult to compute :g:`g^(ab)`.
 
    A cdh, ddh or gdh :term:`group declaration <group declaration>` must have been
    specified. For a group with generator :g:`g` and exponentiation
    :g:`^`, calling :g:`cdh M, g` over a message equality :g:`M` of the
    form `t=g^{a b}` will replace the current goal :g:`phi` by
-   :g:`occur(a,t,g^a) || occur(b,t,g^b) => phi`. If :g:`a`
+   :g:`occur(a,t,g^a) || occur(b,t,g^b) => phi` (see the
+   definition of the :term:`occurence formula`). If :g:`a`
    and :g:`b` only occur as :g:`g^a` and :g:`g^b`, the goal is then
    closed automatically.
     
@@ -1373,15 +1381,24 @@ Local tactics
        
    Latest formal Squirrel description: :cite:`bkl23hal`.
        
-.. tact:: gdh
+.. tact:: gdh @hypothesis_id, @term
    :name: gdh
-	  
-    Usage: gdh H, g.
-    Applies the GDH assumption (including squareGDH) on H with generator
-    g. 
-      
-    .. todo::    
-       TODO
+
+   This tactic applies the gap Diffie-Hellman assumption (see
+   e.g. :cite:`okamoto2001gap`), which is similar to CDH over :g:`g^a`
+   and :g:`g^b` but the attacker is also allowed to access an oracle
+   testing equality to :g:`g^ab`. It also includes the square GDH
+   variant (see :cite:`fujioka2011designing`), equivalent to the GDH
+   assumption for prime order groups, where the attacker can also test
+   equality to :g:`g^aa` and :g:`g^bb`.
+
+   A gdh :term:`group declaration <group declaration>` must have been
+   specified.
+
+   The behaviour of the tactic is similar to :tacn:`cdh`, expect that
+   the current goal :g:`phi` is replaced by a more permissive formula
+   :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
+   (see the definition of the :term:`occurence formula`).
 
     .. warning::
        This is a work in progress, a formal description of the rule is pending.       
@@ -1411,16 +1428,23 @@ Global tactics
 
     Latest formal Squirrel description::cite:`bkl23hal`.  
     
-.. tace:: ddh
+.. tace:: ddh @term, @term, @term, @term
    :name: ddh
-   
-   Closes the current system, if it is an instance of a context of
-   ddh. 
-   
-   Usage: ddh H1, H2, H3, H4
 
-   .. todo::    
-       TODO    
+
+   This tactic applies the Decisional Diffie-Helman assumption (see
+   e.g. :cite:`okamoto2001gap`), stating that given two groups elents
+   :g:`g^a` and :g:`g^b` it is difficult to distinguish :g:`g^(ab)`
+   from a fresh :g:`g^c`.
+
+   A ddh :term:`group declaration <group declaration>` must have been
+   specified.
+
+   When calling, :g:`ddh g,a,b,k`, the goal must contain only diff
+   terms of the form :g:`diff(g^(ab),g^(c)))`. The tactic will close
+   the goal if the formula
+   :g:`occur((a,b,c),goal,(g^a,g^b,diff(g^(ab),c)))` instantly reduces
+   to false (see the definition of the :term:`occurence formula`).
 
    Latest formal Squirrel description: :cite:`bdjkm21sp`.
        
