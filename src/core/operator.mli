@@ -27,5 +27,6 @@ val is_system_indep : Symbols.table -> Symbols.fname -> bool
 
 (*------------------------------------------------------------------*)
 val unfold : 
-  Symbols.table -> SE.arbitrary -> Symbols.fname -> Term.term list ->
-  [`FreeTyv | `Ok of Term.term]
+  Symbols.table -> SE.arbitrary -> Symbols.fname ->
+  Type.ty list -> Term.term list ->
+  Term.term

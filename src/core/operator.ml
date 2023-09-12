@@ -68,8 +68,9 @@ let unfold
     (table  : Symbols.table)
     (_se    : SE.arbitrary)
     (opsymb : Symbols.fname)
+    (tyargs : Type.ty list)
     (args   : Term.term list)
-  : [`FreeTyv | `Ok of Term.term]
+  : Term.term
   =
   let op = 
     match Symbols.Function.get_data opsymb table with
@@ -77,11 +78,10 @@ let unfold
     | _ -> assert false
   in
 
-  (* create a new ty_env *)
-  let ty_env = Type.Infer.mk_env () in
-
-  (* refresh type variables *)
-  let _, ts = Type.Infer.open_tvars ty_env op.ty_vars in
+  (* apply type argument type variables *)
+  let ts =
+    List.fold_left2 Type.tsubst_add_tvar Type.tsubst_empty op.ty_vars tyargs
+  in
   let op_args = List.map (Vars.tsubst ts) op.args in
   let op_body =
     match op.body with Single body -> Term.tsubst ts body
@@ -94,23 +94,12 @@ let unfold
   let op_args1, op_args2 = List.takedrop i op_args in
 
   let subst = 
-    List.map2 (fun x t ->       (* add types information to [ty_env] *)
-        let _ : [`Ok | `Fail] =
-          Type.Infer.unify_eq ty_env (Term.ty t) (Vars.ty x)
-        in
-        
+    List.map2 (fun x t -> 
         Term.ESubst (Term.mk_var x,t)
       ) op_args1 args1
   in
-  let term = 
-    Term.mk_app 
-      (Term.subst subst
-         (Term.mk_lambda ~simpl:false op_args2 op_body))
-      args2 
-  in
-  
-  if not (Type.Infer.is_closed ty_env) then `FreeTyv
-  else
-    let tysubst = Type.Infer.close ty_env in
-    `Ok (Term.tsubst tysubst term)
-  
+  Term.mk_app 
+    (Term.subst subst
+       (Term.mk_lambda ~simpl:false op_args2 op_body))
+    args2 
+

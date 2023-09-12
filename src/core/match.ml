@@ -998,14 +998,11 @@ let expand_head_once
       | _ -> raise exn 
     else raise exn 
 
-  | Fun (fs, _)
-  | App (Fun (fs, _), _) when Operator.is_operator table fs -> 
+  | Fun (fs, { ty_args })
+  | App (Fun (fs, { ty_args }), _) when Operator.is_operator table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
-    begin
-      match Operator.unfold table sexpr fs args with
-      | `Ok t -> t, true
-      | `FreeTyv -> raise exn
-    end
+    let t = Operator.unfold table sexpr fs ty_args args in
+    t, true
 
   | _ -> raise exn
 

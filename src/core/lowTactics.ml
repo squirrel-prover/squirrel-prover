@@ -226,20 +226,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
 
-    | Fun (fs, _)
-    | App (Fun (fs, _), _)
+    | Fun (fs, { ty_args })
+    | App (Fun (fs, { ty_args }), _)
       when Operator.is_operator (S.table s) fs ->
       let args = match t with App (_,args) -> args | _ -> [] in
-      begin
-        match Operator.unfold (S.table s) se fs args with
-        | `Ok t -> t
-        | `FreeTyv ->
-          let err_str =
-            Fmt.str "cannot expand operator %a: free type variable remaining"
-              Symbols.pp fs
-          in
-          soft_failure (Tactics.Failure err_str)
-      end
+      Operator.unfold (S.table s) se fs ty_args args 
       
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")
