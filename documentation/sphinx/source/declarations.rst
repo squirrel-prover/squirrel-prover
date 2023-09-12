@@ -155,7 +155,7 @@ associated cryptographic assumptions.
 .. decl:: signature @fun_id, @fun_id, @fun_id
 
    :g:`signature sig,ver,pk` declares an unforgeable against chosen
-   message attacks (EUF-CMA) signature scheme satisfyinh the equation
+   message attacks (EUF-CMA) :gdef:`signature scheme` satisfying the equation
    :g:`ver(sig(m,sk),m,pk(sk))=true`. Enables the use of :tacn:`euf`.
 
 .. decl:: aenc @fun_id, @fun_id, @fun_id
@@ -168,7 +168,8 @@ associated cryptographic assumptions.
 .. decl:: senc @fun_id, @fun_id, @fun_id
 
    :g:`senc enc,dec` declares an IND-CCA2 symmetric encryption scheme
-   satisfying the equation :g:`dec(enc(m,sk),sk)=m`. Enables the use of :tacn:`cca1`.
+   satisfying the equation :g:`dec(enc(m,sk),sk)=m`. Enables the use
+   of :tacn:`cca1` and :tacn:`enckp`.
 
 .. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
 

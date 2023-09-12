@@ -1371,14 +1371,58 @@ Local tactics
 
     Latest formal Squirrel description: :cite:`bkl23hal` (only as an example).       
 
-.. tact:: euf
+.. tact:: euf @hypothesis_id
    :name: euf
 	  
-   Apply the euf axiom to the given hypothesis name.
+   Requires either a :term:`hash function` or a :term:`signature
+   scheme` declaration.
+
+   This tactic applies the UF-CMA axiom, either for keyed-hashes or
+   signatures. (see e.g. :cite:`goldwasser1996lecture`)
+
+   For a hash function :g:`h(x,k)`, one may call :g:`euf M` over a
+   message equality :g:`M` of the form :g:`t = h(m,k)` or :g:`h(m,k)=t`.  The
+   tactic then create a first new subgoal asking to prove that the key
+   is only used in correct position, that is a goal with conclusion
+   :g:`not(occur(k,goal,h(_,k))`.  The tactics then collects all
+   possible occurence of honest hash :g:`h(u,k)` inside :g:`t`, and
+   for each of them, creates a subgoal with a new hypothesis stating
+   that :g:`m=u`. If such an occurence happens under a macro, the goal
+   will state that the computation must have happened before.
+
+   .. example:: Basic hashing
+		
+      Consider the following system:
+      
+      .. squirreldoc:: 
+      
+	 hash h
+	 name k:message
+	 channel c
+	 name n : message
+	 name m : message
+
+	 system (!_i out(c,h(n,k)) | in(c,x);out(c,x)).
+
+      Calling :g:`euf` over an hypothesis of the form :g:`input@tau <>
+      h(m,k)` would add n the fact that :g:`h(m,k)` needs to be equal
+      to one of the honestly computed hashes appearing in
+      :g:`input@tau`, which are all of the form :g:`h(n,k)`. The new
+      hypothesis would then be equal to
+
+      .. squirreldoc::
+	 (exists (i:index), A(i) < tau && m = n)
    
-   .. todo::    
-       TODO      
-       
+   For a signature function :g:`sign(x,r,k)`, public key :g:`pk(k)`
+   and check function :g:`check(s,m,pub)`, :g:`euf` must be called
+   over an hypothesis of the form :g:`check(s,m,pk(k))`. The behaviour
+   is then similar to the hash case, honest signatures that may occur
+   in s will be collected, and :g:`m` must be equal to one of the
+   honestly signed message. A subgoal for each possible honest signing
+   case is created, as well as a subgoal specifying that the key is
+   correctly used, that is, a goal with conclusion
+   :g:`not(occur(k,goal,sign(_,k), pk(k))`.
+    
    Latest formal Squirrel description: :cite:`bkl23hal`.
        
 .. tact:: gdh @hypothesis_id, @term
