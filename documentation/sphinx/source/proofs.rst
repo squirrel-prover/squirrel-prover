@@ -1500,6 +1500,22 @@ Global tactics
    used to encrypt the plaintext. It is based on the IK-CPA notion of
    :cite:`bellare2001key`.
 
+   The tactic can be called over a biframe element containing a term of
+   the form :g:`C[enc(n, r, m)]`, where
+	      
+      • :g:`r` must be a name which is fresh;
+      • there is no decryption in :g:`C`
+      • there is no universal message variable that occurs
+      • :g:`m` is either a key or the diff of two keys, such that the
+	keys only appear in key position, under :g:`pk`, :g:`dec` or
+	:g:`enc`.
+      • If :g:`m` is a key, and a key has been given as argument to the
+	tactic, this key must also occur only in key position.
+
+   When :g:`m` is the diff of a key, the diff is simplified by keeping
+   only the key on the left. When :g:`m` is just a key, a new key by
+   which it is replaced can be specified as arugment.
+	 
    .. example:: Basic ENC-KP application
 	 
       On a biframe element of the form
@@ -1547,28 +1563,18 @@ Global tactics
       .. squirreldoc::
 	 i: ⟨ enc(n,r,pk(k)),m '⟩
 
-   The tactic is used similarly in the symmetric case.
 
-   .. topic:: Syntactic Side Conditions - Asymmetric case
+   To apply the enckp tactic, the key :g:`k` must be such that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is trivially false. (or :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
+
+   When it is not trivially true, a subgoal is created to prove the
+   freshness of the random used in the encryption, with the conclusion
+   :g:`occur(r,biframe,enc(n,r,m))`.
+
+   In the symmetric case, an additional check is performed ensuring
+   that all encryptions are made with distinct fresh randoms (and not
+   that just the encryption we are looking at is fresh).
    
-      To use the tactic on an element :g:`C[enc(n, r, m)]`,
-	      
-      • :g:`r` must be a name which is fresh;
-      • there is no decryption in :g:`C`
-      • there is no universal message variable that occurs
-      • :g:`m` is either a key or the diff of two keys, such that the
-	keys only appear in key position, under :g:`pk`, :g:`dec` or
-	:g:`enc`.
-      • If :g:`m` is a key, and a key has been given as argument to the
-	tactic, this key must also occur only in key position.
-
-   .. topic:: Syntactic Side Conditions - Symmetric case
-
-      In the symmetric case, a further condition is that all occurrences
-      of encryptions with the given key must occur with a unique fresh
-      randomness.
-
-    Latest formal Squirrel description::cite:`bdjkm21sp`.
+   Latest formal Squirrel description::cite:`bdjkm21sp`.
       
 .. tacn:: prf @position
    :name: prf
