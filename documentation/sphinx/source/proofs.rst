@@ -1306,15 +1306,19 @@ Common tactics
       inside :g:`input@A` if the output of :g:`B` happened before
       :g:`A`. Here, one would conclude by using the fact that in the
       process definition, this is impossible.
-
-      The :g:`precise_ts` makes the tactic use `precise_occur` instead
-      of `occur`.
       
-      In an equivalence goal, the tactic 
+   In an equivalence goal, the tactic must be applied to a biframe
+   element :g:`i` of the form :g:`diff(nL,nR)`.  If we denote by
+   :g:`bf` the biframe, the biframe element is then replaced by
 
-      
-   .. todo::    
-      TODO equiv variant
+   .. squirreldoc::
+      if not(diff(occur(nL,bf,none),occur(n,bf,none))) then
+        zero
+      else
+        diff(nL,nR)
+
+   In all cases, the :g:`precise_ts` makes the tactic use
+   `precise_occur` instead of `occur`.
 
    Latest formal Squirrel description: :cite:`bkl23hal` (Appendix F).
 
