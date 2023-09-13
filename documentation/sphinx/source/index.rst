@@ -44,7 +44,6 @@ Table of contents
 Indices and tables
 ==================
 
-* :ref:`tutorial`
 * :ref:`modindex`
 * :ref:`search`
 
