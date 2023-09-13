@@ -48,7 +48,6 @@ module type S = sig
     type state = {
       prover_state : prover_state_ty; (* prover state *)
       params       : Config.params; (* save global params… *)
-      option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
 
     (** Print goal *)
@@ -98,12 +97,6 @@ module type S = sig
 
     (** Saves Config params *)
     val set_params : state -> Config.params -> state
-
-    (** Get saved option_defs  *)
-    val get_option_defs : state -> ProverLib.option_def list
-
-    (** Saves option_defs *)
-    val set_option_defs : state -> ProverLib.option_def list -> state
 
     (** Get prover mode *)
     val get_mode : state -> ProverLib.prover_mode

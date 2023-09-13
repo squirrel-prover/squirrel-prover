@@ -53,7 +53,6 @@ module type S = sig
     type state = {
       prover_state : prover_state_ty; (* prover state *)
       params       : Config.params; (* save global params… *)
-      option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
 
     (** Print goal *)
@@ -103,12 +102,6 @@ module type S = sig
     (** Saves Config params *)
     val set_params : state -> Config.params -> state
 
-    (** Get saved option_defs  *)
-    val get_option_defs : state -> ProverLib.option_def list
-
-    (** Saves option_defs *)
-    val set_option_defs : state -> ProverLib.option_def list -> state
-
     (** Get prover mode *)
     val get_mode : state -> ProverLib.prover_mode
 
@@ -136,7 +129,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   type state = {
     prover_state : prover_state_ty; (* prover state *)
     params       : Config.params; (* save global params… *)
-    option_defs  : ProverLib.option_def list; (* save global option_def *)
   }
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
@@ -244,12 +236,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   let set_params (st:state) (params:Config.params) : state =
     { st with params = params }
 
-  let get_option_defs (st:state) : ProverLib.option_def list =
-    st.option_defs
-
-  let set_option_defs (st:state) (optdefs:ProverLib.option_def list) : state =
-    { st with option_defs = optdefs }
-
   let get_mode (st:state) : ProverLib.prover_mode = 
     Prover.get_mode st.prover_state
 
@@ -352,14 +338,12 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     
     fun ?(withPrelude=true) () : state ->
       let () = Config.reset_params () in 
-      let () = ProverLib.reset_option_defs () in
       match !state0 with
       | Some st when withPrelude = true -> st
       | _ -> 
         let state = { 
           prover_state = Prover.init ();
           params       = Config.get_params ();
-          option_defs  = [];
         } in
 
         if withPrelude then begin

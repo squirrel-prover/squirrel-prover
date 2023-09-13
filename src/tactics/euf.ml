@@ -338,7 +338,7 @@ let euf
   let tag_s =
     let f =
       (* XXX depends on Prover_state *)
-      ProverLib.get_oracle_tag_formula (Symbols.to_string int_f)
+      Oracle.get_oracle_tag_formula (Symbols.to_string int_f) (TS.table s)
     in
     (* if the hash is not tagged, the formula is False, and we don't create
        another goal. *)
