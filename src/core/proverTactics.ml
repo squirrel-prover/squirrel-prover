@@ -163,15 +163,6 @@ let register_typed id
          with TacticsArgs.Uncastable ->
            Tactics.hard_failure (Tactics.Failure "ill-formed arguments"))
 
-(* FIXME never used ? *)
-(* let register_macro *)
-(*       id ?(modifiers=["nosimpl"]) ~tactic_help ?(pq_sound=false) m = *)
-(*   register_general id ~tactic_help ~pq_sound *)
-(*     (fun args s sk fk -> *)
-(*        if args = [] then AST.eval false modifiers m s sk fk else *)
-(*          Tactics.hard_failure *)
-(*            (Tactics.Failure "this tactic does not take arguments")) *)
-
 let pp_usage tacname fmt esort =
   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 let pp details fmt (id : Theory.lsymb) =

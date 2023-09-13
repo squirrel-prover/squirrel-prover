@@ -145,7 +145,7 @@ val do_qed : state -> state
 val do_decls : state -> Decl.declarations -> state
 
 (** Evaluate the given input and return new state *)
-val do_command : ?test:bool -> ?check:[`Check | `NoCheck] -> state ->
+val do_command : ?main_mode:[`Stdin | `File of string]  -> ?file_stack:Driver.file list -> ?test:bool -> ?check:[`Check | `NoCheck] -> state ->
   Driver.file -> ProverLib.input -> state
 
 (** Execute the given sentence and return new state *)

@@ -106,7 +106,6 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
   | _ -> assert false
 (* }↑} *)
 
-(* FIXME all printing stuff should be done at toplevel instead *)
 let try_complete_proof (ps:state) : state =
   if is_proof_completed ps then begin
     Printer.prt `Goal "Goal %s is proved@."
@@ -591,33 +590,25 @@ let do_eof (st:state) : state =
 exception Unfinished
 
 (* Manage all command *)
-let rec do_command ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
+let rec do_command ?(main_mode=`Stdin) ?(file_stack=[]) ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
   let open ProverLib in
   let pst = st in
   match command with 
-    (* ↓ touch toplvl_state and history_state ↓ *)
   | Toplvl Undo _ ->
-        raise (Failure "Toplvl: Trying to Undo without history.")
+        raise (Failure "Prover: Trying to Undo without history.")
   | Prover c -> 
     let mode = get_mode st in
     match mode, c with
     | GoalMode, InputDescr decls -> do_decls st decls
-                                 (* ↓ will print locations ↓ *)
     | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
-    | _, Print q                 -> 
-        do_print pst q; st
-    | _, Search t                -> 
-        do_search pst t; st
-                                (* ↓ will print stuff and call Prover ↓ *)
+    | _, Print q                 -> do_print pst q; st
+    | _, Search t                -> do_search pst t; st
     | WaitQed, Qed               -> do_qed st
     | GoalMode, Hint h           -> add_hint st h
-                                 (* ↓ touch global config ↓ *)
-    | GoalMode, SetOption sp     -> 
-        set_param st sp
+    | GoalMode, SetOption sp     -> set_param st sp
     | GoalMode, Goal g           -> do_add_goal st g
     | GoalMode, Proof            -> do_start_proof ~check st
-                                    (* ↓ TODO do not manage stack file yet ↓ *)
-    | GoalMode, Include inc      -> do_include st inc
+    | GoalMode, Include inc      -> do_include ~main_mode ~file_stack st inc
     | GoalMode, EOF              -> 
       (* ↓ If interactive, never end ↓ *)
       if TConfig.interactive (get_table st) 
@@ -638,21 +629,39 @@ let rec do_command ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (
       Command.cmd_error Unexpected_command
 
 and do_include
-    ?(test=true) (st:state) (i: ProverLib.include_param) : state 
+    ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i: ProverLib.include_param) : state 
   =
-  (* `Stdin will add cwd in path with theories *)
-  let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
-  let file = Driver.locate load_paths (Location.unloc i.th_name) in
+  (* if main_mode = `Stdin will add cwd in path with theories *)
+  let load_paths = Driver.mk_load_paths ~main_mode () in
+  let file = Driver.include_get_file file_stack load_paths
+      i.th_name  in
+  let interactive = TConfig.interactive (get_table st) in
   let checkInclude = 
-    if TConfig.checkInclude (get_table st) then `Check else
-      `NoCheck in
+    if TConfig.checkInclude (get_table st) then `Check 
+    else begin
+      if List.exists 
+          (fun x -> Location.unloc x = "admit") i.ProverLib.params 
+      then `NoCheck
+      else `Check
+    end in
+  let new_file_stack = file :: file_stack in
   let st = 
-    try do_all_commands_in ~check:checkInclude ~test st file with
-      x -> Driver.close_chan file.f_chan; raise x 
+    try do_all_commands_in ~main_mode ~file_stack:new_file_stack 
+          ~check:checkInclude ~test st file 
+    with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
+      let err_mess fmt =
+        Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
+          (Location.unloc i.th_name)
+          (Errors.pp_toplevel_error ~interactive:interactive ~test file) e
+      in
+      Driver.close_chan file.f_chan;
+      Command.cmd_error (IncludeFailed err_mess)
   in
+  Driver.close_chan file.f_chan;
+  Printer.prt `Warning "loaded: %s.sp" file.f_name;
   st
 
-and do_all_commands_in 
+and do_all_commands_in ~main_mode ?(file_stack=[]) 
     ~check ~test (st:state) (file:Driver.file) : state 
   =
   let interactive = TConfig.interactive (get_table st) in
@@ -661,8 +670,8 @@ and do_all_commands_in
       (* ↓ If test or interactive, never end ↓ *)
       if test || interactive 
       then st else do_eof st
-  | cmd -> do_all_commands_in ~check ~test
-             (do_command ~test ~check st file cmd) file
+  | cmd -> do_all_commands_in ~main_mode ~file_stack ~check ~test
+             (do_command ~main_mode ~file_stack ~test ~check st file cmd) file
 
 and exec_command 
     ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
@@ -673,7 +682,7 @@ and exec_command
 
 and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
   let file_from_string = Driver.file_from_str s in
-  do_all_commands_in ~check ~test st file_from_string 
+  do_all_commands_in ~main_mode:`Stdin ~check ~test st file_from_string 
 
 let init : ?withPrelude:bool -> unit -> state =
   (* memoise state with prelude *)
@@ -690,7 +699,7 @@ let init : ?withPrelude:bool -> unit -> state =
           ProverLib.{ th_name = Location.mk_loc Location._dummy "Prelude";
                       params = []; }
         in
-        let state = do_include state inc in
+        let state = do_include ~main_mode:(`File "Prelude") state inc in
         state0 := Some state;
         state
       end
@@ -701,7 +710,8 @@ let run ?(test=false) (file_path:string) : unit =
   match Driver.file_from_path LP_none 
           (Filename.remove_extension file_path) with
   | Some file ->
+    let name = Filename.remove_extension file.f_name in
     let _ : state =
-      do_all_commands_in ~test ~check:`Check (init ()) file
+      do_all_commands_in ~main_mode:(`File name) ~file_stack:[file] ~test ~check:`Check (init ()) file
     in ()
   | None -> failwith "File not found !" 

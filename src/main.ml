@@ -23,22 +23,18 @@ module HistoryTP = History.Make(Prover)
 
 (** State of the main loop. *)
 type driver_state = {
-  toplvl_state : Prover.state;
-  (* toplvl_state : Prover.state = {
-      prover_state : Prover.state = {
+  prover_state : Prover.state;
+  (* prover_state : Prover.state = {
         goals        : ProverLib.pending_proof list;
         table        : Symbols.table; 
         current_goal : ProverLib.pending_proof option;
         subgoals     : Goal.t list;
         bullets      : Bullets.path;
         prover_mode  : ProverLib.prover_mode;
-      }
-      params       : Config.params; (* save global params… *)
-      option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
   *)
 
-  (* ↓ history of toplvl_state ↑ *)
+  (* ↓ history of prover_state ↑ *)
   history_state : HistoryTP.history_state;
 
   (* The check_mode can be changed regarding to includes main.ml:426 *)
@@ -60,134 +56,44 @@ type driver_state = {
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) : ProverLib.input =
   Driver.next_input_file ~test ~interactive:!interactive state.file
-    (Prover.get_mode state.toplvl_state)
+    (Prover.get_mode state.prover_state)
 
 (*---------------- Main --------------------------------------------*)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
-  let history_state, toplvl_state =
+  let history_state, prover_state =
   HistoryTP.reset_state state.history_state nb_undo in
-  let () = match Prover.get_mode toplvl_state with
+  let () = match Prover.get_mode prover_state with
     | ProofMode -> Printer.prt `Goal "%a" (Prover.pp_goal
-                     toplvl_state) ()
+                     prover_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
-                    (Prover.get_table toplvl_state)
+                    (Prover.get_table prover_state)
     | WaitQed -> ()
     | AllDone -> assert false in
-  { state with toplvl_state; history_state; }
-
-(*----------Part can be done here and tactic handling in Prover ----*)
-(* let _do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : *)
-(*   Prover.state = *)
-(*   let saved_ps = state.toplvl_state in *)
-(*   try *)  
-(*     Prover.do_tactic ~check:state.check_mode *)
-(*       state.toplvl_state state.file.f_lexbuf l *)
-(*       with *)
-(*         (1* FIXME should be handle by main loop ! *1) *)
-(*         | e -> *) 
-(*           (1* XXX ↓ impure ↓  XXX will only reset Config params refs *1) *)
-(*           ignore (HistoryTP.reset_from_state *) 
-(*                     saved_ps) ; raise e *)
-
-(* XXX Touch global Config that has to be recorded in History *)
-(* let _do_set_option (state : driver_state) (sp : Config.p_set_param) : *)
-(*   Prover.state = *)
-(*   (1* FIXME we still have variables in global config ? *1) *)
-(*   match Config.set_param sp with *)
-(*   | `Failed _ -> (1* TODO should be only ↓ *1) *)
-(*                 Prover.do_set_option state.toplvl_state sp *)
-(*   | `Success -> state.toplvl_state *)
-
-let rec do_include
-    ~(test : bool) (state : driver_state) (i : ProverLib.include_param)
-  : Prover.state 
-  =
-  let file = 
-    include_get_file state.file_stack state.load_paths i.th_name 
-  in
-  let file_stack = state.file :: state.file_stack in
-
-  let hstate = { state with 
-     history_state = HistoryTP.push_pt_history state.history_state }
-  in
-
-  let check_mode = 
-    if List.exists (fun x -> L.unloc x = "admit") i.ProverLib.params 
-    then `NoCheck
-    else `Check
-  in
-  let incl_state = { hstate with file; file_stack; check_mode; } in
-
-  (* try to do the include *)
-  try
-    let final_state = do_all_commands ~test incl_state in
-    Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
-    Driver.close_chan file.f_chan;
-    final_state.toplvl_state
-
-    (* XXX Does that mean that file, file_stack and check_mode are the
-     * only values that are relevant in driver_state → do_include ? *)
-
-  (* include failed, revert state *)
-  (* XXX WHEN CONFIG* WILL BE IN PROPAGATED DRIVER_STATE XXX
-   * ALL THAT PART SHOULD BE MANAGED BY main_loop EXCEPTION HANDLER *)
-  with e when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
-    let err_mess fmt =
-      Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
-        (L.unloc i.th_name)
-        (Errors.pp_toplevel_error ~interactive:!interactive ~test incl_state.file) e
-    in
-    (* XXX will only reset params and options that are globals *)
-    (* main_loop will return previous state anyway *)
-    let _ : HistoryTP.state =
-      HistoryTP.reset_from_state state.toplvl_state
-    in
-    Driver.close_chan file.f_chan;
-    Command.cmd_error (IncludeFailed err_mess)
+  { state with prover_state; history_state; }
 
 (** The main loop body: do one command *)
-and do_command
+let do_command
+    ~main_mode
     ~(test : bool)
     (state : driver_state)
     (command : ProverLib.input) : driver_state
   =
   match command with 
-    (* ↓ touch toplvl_state and history_state ↓ *)
+    (* ↓ touch prover_state and history_state ↓ *)
   | Toplvl Undo nb_undo          -> do_undo state nb_undo
-  | Prover c -> 
-    let st = state.toplvl_state in
-    let mode = Prover.get_mode st in
+  | Prover _ -> 
+    let st = state.prover_state in
     let check = state.check_mode in
-    let toplvl_state = 
-      match mode, c with
-      (* ↓ FIXME only manages history state like in main loop ↓ *)
-      (* | _, Tactic t                -> _do_tactic state t *)
-
-      (* ↓ TODO remove if none config variable remains global ↓ *)
-      (* | GoalMode, SetOption sp     -> do_set_option state sp *)
-      | GoalMode, Include inc      -> do_include ~test state inc
-      (* | GoalMode, EOF              -> assert (state.file_stack = []); *)
-      (*                                 Prover.do_eof st *)
-
-      (* ↓ handle default behaviour ↓ *)
-      | _, _ -> Prover.do_command ~check ~test st state.file command
-      (* let toplvl_state = Prover.do_command ~test st state.file command *)
-    in
-    { state with toplvl_state; }
-
-(* FIXME why not using do_all_commands when not interactive ? *)
-(** Do all command from a file until EOF is reached *)
-and do_all_commands ~(test : bool) (state : driver_state) : driver_state =
-  match next_input ~test state with
-  | ProverLib.Prover EOF -> state
-  | cmd -> do_all_commands ~test (do_command ~test state cmd)
+    let prover_state = Prover.do_command ~main_mode
+        ~file_stack:[state.file] ~check ~test st state.file command in
+    { state with prover_state; }
 
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
+let rec main_loop ~main_mode ~test ?(save=true) (state : driver_state) : unit =
   if !interactive then Printer.prt `Prompt "";
 
   (* Save the state if instructed to do so.
@@ -196,20 +102,19 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
     if save then
       {state with
        history_state =
-         (* XXX ↓ impure ↓ XXX *)
-         HistoryTP.save_state state.history_state state.toplvl_state
+         HistoryTP.save_state state.history_state state.prover_state
       }
     else state
   in
 
   match
     let cmd = next_input ~test state in
-    let new_state = do_command ~test state cmd in
+    let new_state = do_command ~main_mode ~test state cmd in
 
     if !html then
-      Server.update new_state.toplvl_state;
+      Server.update new_state.prover_state;
 
-    new_state, Prover.get_mode new_state.toplvl_state
+    new_state, Prover.get_mode new_state.prover_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
@@ -221,18 +126,18 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
   (* loop *)
   | new_state, _ ->
     if !html then Html.pp ();
-    (main_loop[@tailrec]) ~test new_state
+    (main_loop[@tailrec]) ~main_mode ~test new_state
 
   (* error handling *)
   | exception e when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
     Printer.prt `Error "%a" (Errors.pp_toplevel_error ~interactive:!interactive ~test state.file) e;
-    main_loop_error ~test state
+    main_loop_error ~main_mode ~test state
 
-and main_loop_error ~test (state : driver_state) : unit =
+and main_loop_error ~main_mode ~test (state : driver_state) : unit =
   if !interactive
   then begin (* at top-level, query again *)
     assert (state.file.f_path = `Stdin);
-    (main_loop[@tailrec]) ~test ~save:false state
+    (main_loop[@tailrec]) ~main_mode ~test ~save:false state
   end
   else if !html then 
     Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" 
@@ -251,11 +156,8 @@ let start_main_loop
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
   in
-  (* XXX the state is mainly composed by attributes only "config"
-   * and "option_defs" values do not change in the program *)
   let state = {
-    (* XXX ↓ impure ↓ XXX Configs and option_defs are reset here *)
-    toplvl_state = Prover.init ();
+    prover_state = Prover.init ();
 
     history_state = HistoryTP.init_history_state;
 
@@ -272,13 +174,13 @@ let start_main_loop
     file_stack = []; }
   in
   (* add interactive option to the table *)
-  let toplvl_state = 
+  let prover_state = 
     Prover.do_set_option 
-      state.toplvl_state (TConfig.s_interactive,Config.Param_bool !interactive) 
+      state.prover_state (TConfig.s_interactive,Config.Param_bool !interactive) 
   in
-  let state = { state with toplvl_state; } in
+  let state = { state with prover_state; } in
 
-  main_loop ~test state
+  main_loop ~main_mode ~test state
 
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;
