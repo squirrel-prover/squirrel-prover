@@ -45,14 +45,10 @@ module type S = sig
     (** {TopLevel state}
      * composed with:
      * - PROVER.state the prover state (see Prover)
-     * - Configs.params 
-     * - option_defs (mainly used for oracles)
-     * - prover_mode (keep trace of state of the current proof)
      *)
     type prover_state_ty
     type state = {
       prover_state : prover_state_ty; (* prover state *)
-      params       : Config.params; (* save global params… *)
     }
 
     (** Print goal *)
@@ -95,13 +91,6 @@ module type S = sig
     (** Search a term and print matches *)
     val do_search : state -> ProverLib.search_query -> unit
 
-    (** ↓ TODO remove params and options from globals ↓ *)
-    (** Gets saved Config params *)
-    val get_params : state -> Config.params
-
-    (** Saves Config params *)
-    val set_params : state -> Config.params -> state
-
     (** Get prover mode *)
     val get_mode : state -> ProverLib.prover_mode
 
@@ -128,7 +117,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   type prover_state_ty = Prover.state
   type state = {
     prover_state : prover_state_ty; (* prover state *)
-    params       : Config.params; (* save global params… *)
   }
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
@@ -182,7 +170,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     new_ps
 
   let do_set_option (st:state) (sp:Config.p_set_param) : state =
-    { st with prover_state = Prover.set_param st.prover_state sp }
+    { prover_state = Prover.set_param st.prover_state sp }
 
   let do_qed (st : state) : Prover.state =
     let prover_state = Prover.complete_proof st.prover_state in
@@ -227,14 +215,6 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
   (*   | Some (Option.Oracle_formula f) -> f *)
   (*   | None -> Term.mk_false *)
   (* }↑} *)
-
-  (* TODO should be removed when Config will be removed from global
-   * refs *)
-  let get_params (st:state) : Config.params =
-    st.params
-
-  let set_params (st:state) (params:Config.params) : state =
-    { st with params = params }
 
   let get_mode (st:state) : ProverLib.prover_mode = 
     Prover.get_mode st.prover_state
@@ -291,7 +271,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
         Printer.pr "What is this command ? %s" (str_mode mode);
         Command.cmd_error Unexpected_command
       in
-    { st with prover_state = ps; }
+    { prover_state = ps; }
 
 
   and do_include
@@ -317,7 +297,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     | ProverLib.Prover EOF ->
         (* ↓ If test or interactive, never end ↓ *)
         if test || interactive 
-        then st else { st with prover_state = Prover.do_eof st.prover_state}
+        then st else { prover_state = Prover.do_eof st.prover_state}
     | cmd -> do_all_commands_in ~check ~test
                (do_command ~test ~check st file cmd) file
 
@@ -337,13 +317,11 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
     let state0 : state option ref = ref None in
     
     fun ?(withPrelude=true) () : state ->
-      let () = Config.reset_params () in 
       match !state0 with
       | Some st when withPrelude = true -> st
       | _ -> 
         let state = { 
           prover_state = Prover.init ();
-          params       = Config.get_params ();
         } in
 
         if withPrelude then begin
@@ -351,7 +329,7 @@ module Make (Prover : PROVER) : S with type prover_state_ty =
           let inc =
             ProverLib.{ th_name = L.mk_loc L._dummy "Prelude"; params = []; }
           in
-          let state = { state with prover_state = do_include state inc } in
+          let state = { prover_state = do_include state inc } in
           state0 := Some state;
           state
         end

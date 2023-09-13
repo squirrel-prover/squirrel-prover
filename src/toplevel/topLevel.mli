@@ -40,14 +40,10 @@ module type S = sig
     (** {TopLevel state}
      * composed with:
      * - PROVER.state the prover state (see Prover)
-     * - Configs.params 
-     * - option_defs (mainly used for oracles)
-     * - prover_mode (keep trace of state of the current proof)
      *)
     type prover_state_ty
     type state = {
       prover_state : prover_state_ty; (* prover state *)
-      params       : Config.params; (* save global params… *)
     }
 
     (** Print goal *)
@@ -90,13 +86,6 @@ module type S = sig
   
     (** Search a term and print matches *)
     val do_search : state -> ProverLib.search_query -> unit
-
-    (** ↓ TODO remove params and options from globals ↓ *)
-    (** Gets saved Config params *)
-    val get_params : state -> Config.params
-
-    (** Saves Config params *)
-    val set_params : state -> Config.params -> state
 
     (** Get prover mode *)
     val get_mode : state -> ProverLib.prover_mode
