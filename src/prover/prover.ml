@@ -25,7 +25,7 @@ type state = {
 }
 
 (* GoalMode is always the initial prover_mode *)
-let init () : state = 
+let init' () : state = 
 { goals         = [];
   table         = TConfig.reset_params Symbols.builtins_table;
   current_goal  = None;
@@ -48,6 +48,9 @@ let set_table (ps:state) (table: Symbols.table) : state =
 
 let set_param (ps:state) (sp: Config.p_set_param) : state =
   { ps with table = TConfig.set_param sp ps.table }
+
+let do_set_option (st:state) (sp:Config.p_set_param) : state =
+  set_param st sp
 
 let add_hint (ps:state) (h: Hint.p_hint) : state =
   let table = 
@@ -75,6 +78,12 @@ let current_goal_name (ps:state) : string option =
       | ProofObl _ -> "proof obligation" ) ps.current_goal
 
 (*--------------------- Printings         ------------------*)(* {↓{ *)
+let str_mode = function
+  | ProverLib.GoalMode -> "GoalMode"
+  | ProverLib.ProofMode -> "ProofMode"
+  | ProverLib.WaitQed -> "WaitQed"
+  | ProverLib.AllDone -> "AllDone"
+
 let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf ppf "No subgoals remaining.@."
@@ -127,6 +136,11 @@ let complete_proof (ps:state) : state =
             prover_mode = GoalMode
   }
 
+let do_qed (st : state) : state =
+  let prover_state = complete_proof st in
+  Printer.prt `Result "Exiting proof mode.@.";
+  prover_state
+
 let start_proof (ps:state) (check : [`NoCheck | `Check])
   : (string option * state) = 
   match ps.current_goal, ps.goals with
@@ -155,6 +169,13 @@ let start_proof (ps:state) (check : [`NoCheck | `Check])
   | _, [] ->
     (Some "Cannot start a new proof (no goal remaining to prove).",
      ps)
+
+let do_start_proof ?(check=`NoCheck) (st: state) : state =
+  match start_proof st check with
+  | None, ps ->
+    Printer.prt `Goal "%a" (pp_goal ps) ();
+    ps
+  | Some es, _ -> Command.cmd_error (StartProofError es)
 
 (*---------------------    Goals handling  -----------------*)(* {↓{ *)
 let get_current_goal (ps:state) : ProverLib.pending_proof option = ps.current_goal
@@ -195,6 +216,17 @@ let first_goal (ps:state) : ProverLib.pending_proof =
   | [] -> assert false
   | h :: _ -> h
 
+let do_add_goal (st:state) (g:Goal.Parsed.t Location.located) : state =
+  let new_ps = add_new_goal st g in
+  (* for printing new goal ↓ *)
+  let goal,name = match first_goal new_ps with
+    | ProverLib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
+    | _ -> assert false (* should be only ↑ *)
+  in
+  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name Goal.pp_init goal;
+  (* return toplevel state with new prover_state *)
+  new_ps
+
 let add_proof_obl (goal : Goal.t) (ps:state) : state = 
   let goals =  ProverLib.ProofObl (goal) :: ps.goals in
   { ps with goals }
@@ -207,6 +239,14 @@ let add_decls (st:state) (decls : Decl.declarations)
       add_proof_obl goal ps) st proof_obls in
   let ps = set_table ps table in
   { ps with prover_mode = GoalMode }, proof_obls
+
+let do_decls (st:state) (decls : Decl.declarations) : state =
+  let new_prover_state, proof_obls = 
+    add_decls st decls in
+  if proof_obls <> [] then
+    Printer.pr "@[<v 2>proof obligations:@;%a@]"
+      (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
+  new_prover_state
 
 let get_first_subgoal (ps:state) : Goal.t =
   match ps.current_goal, ps.subgoals with
@@ -297,7 +337,14 @@ let tactic_handle (ps:state) = function
  | ProverLib.Brace `Close -> close_brace ps
  | ProverLib.BTactic utac  -> eval_tactic utac ps
 
-let do_tactic ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : state =
+(*---------------- do_* commands handling ------------------*)(* {↓{ *)
+let do_print_goal (st:state) : unit = 
+  match get_mode st with
+  | ProverLib.ProofMode -> 
+    Printer.prt `Goal "%a" (pp_goal st) ();
+  | _ -> ()
+
+let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : state =
   begin match check with
     | `NoCheck -> assert (state.prover_mode = WaitQed)
     | `Check   -> 
@@ -316,6 +363,24 @@ let do_tactic ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : s
             raise e
       end in
     try_complete_proof state
+
+let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf)
+    (l:ProverLib.bulleted_tactics) : state =
+  if not (TConfig.interactive (get_table st)) then 
+  begin
+    let lnum = lex.lex_curr_p.pos_lnum in
+    let b_tacs = List.filter_map 
+      (function ProverLib.BTactic t -> Some t | _ -> None) l
+    in
+    match b_tacs with
+      | [utac] ->
+          Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
+      | _ ->
+          Printer.prt `Prompt "Line %d: ??" lnum
+  end;
+    do_tactic' ~check st l
+
+
 (* }↑} *)
 
 (*----------------------- Search --------------------------*)(* {↓{ *)
@@ -522,3 +587,121 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
+
+exception Unfinished
+
+(* Manage all command *)
+let rec do_command ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
+  let open ProverLib in
+  let pst = st in
+  match command with 
+    (* ↓ touch toplvl_state and history_state ↓ *)
+  | Toplvl Undo _ ->
+        raise (Failure "Toplvl: Trying to Undo without history.")
+  | Prover c -> 
+    let mode = get_mode st in
+    match mode, c with
+    | GoalMode, InputDescr decls -> do_decls st decls
+                                 (* ↓ will print locations ↓ *)
+    | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
+    | _, Print q                 -> 
+        do_print pst q; st
+    | _, Search t                -> 
+        do_search pst t; st
+                                (* ↓ will print stuff and call Prover ↓ *)
+    | WaitQed, Qed               -> do_qed st
+    | GoalMode, Hint h           -> add_hint st h
+                                 (* ↓ touch global config ↓ *)
+    | GoalMode, SetOption sp     -> 
+        set_param st sp
+    | GoalMode, Goal g           -> do_add_goal st g
+    | GoalMode, Proof            -> do_start_proof ~check st
+                                    (* ↓ TODO do not manage stack file yet ↓ *)
+    | GoalMode, Include inc      -> do_include st inc
+    | GoalMode, EOF              -> 
+      (* ↓ If interactive, never end ↓ *)
+      if TConfig.interactive (get_table st) 
+      then st else do_eof st
+    | WaitQed, Abort -> 
+        if test then
+          raise (Failure "Trying to abort a completed proof.");
+        Command.cmd_error AbortIncompleteProof
+    | ProofMode, Abort ->
+      Printer.prt `Result
+        "Exiting proof mode and aborting current proof.@.";
+          abort st
+    | _, Qed ->
+      if test then raise Unfinished;
+      Command.cmd_error Unexpected_command
+    | _, _ -> 
+      Printer.pr "What is this command ? %s" (str_mode mode);
+      Command.cmd_error Unexpected_command
+
+and do_include
+    ?(test=true) (st:state) (i: ProverLib.include_param) : state 
+  =
+  (* `Stdin will add cwd in path with theories *)
+  let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
+  let file = Driver.locate load_paths (Location.unloc i.th_name) in
+  let checkInclude = 
+    if TConfig.checkInclude (get_table st) then `Check else
+      `NoCheck in
+  let st = 
+    try do_all_commands_in ~check:checkInclude ~test st file with
+      x -> Driver.close_chan file.f_chan; raise x 
+  in
+  st
+
+and do_all_commands_in 
+    ~check ~test (st:state) (file:Driver.file) : state 
+  =
+  let interactive = TConfig.interactive (get_table st) in
+  match Driver.next_input_file ~test ~interactive file (get_mode st) with
+  | ProverLib.Prover EOF ->
+      (* ↓ If test or interactive, never end ↓ *)
+      if test || interactive 
+      then st else do_eof st
+  | cmd -> do_all_commands_in ~check ~test
+             (do_command ~test ~check st file cmd) file
+
+and exec_command 
+    ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+  let interactive = TConfig.interactive (get_table st) in
+  let input = Driver.next_input_file 
+      ~test ~interactive (Driver.file_from_str s) (get_mode st) in
+  do_command ~test ~check st (Driver.file_from_str s) input
+
+and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
+  let file_from_string = Driver.file_from_str s in
+  do_all_commands_in ~check ~test st file_from_string 
+
+let init : ?withPrelude:bool -> unit -> state =
+  (* memoise state with prelude *)
+  let state0 : state option ref = ref None in
+  
+  fun ?(withPrelude=true) () : state ->
+    match !state0 with
+    | Some st when withPrelude = true -> st
+    | _ -> 
+      let state = init' () in
+      if withPrelude then begin
+        Printer.pr "With prelude!";
+        let inc =
+          ProverLib.{ th_name = Location.mk_loc Location._dummy "Prelude";
+                      params = []; }
+        in
+        let state = do_include state inc in
+        state0 := Some state;
+        state
+      end
+      else state
+
+(* run entire squirrel file with given path as string *)
+let run ?(test=false) (file_path:string) : unit =
+  match Driver.file_from_path LP_none 
+          (Filename.remove_extension file_path) with
+  | Some file ->
+    let _ : state =
+      do_all_commands_in ~test ~check:`Check (init ()) file
+    in ()
+  | None -> failwith "File not found !" 

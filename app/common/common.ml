@@ -1,27 +1,24 @@
 include Squirrelcore
 include Squirrelprover
-open Squirreltop
-
-module TProver = TopLevel.Make(Prover)
 
 (* Needed to register the tactics *)
 include Squirreltactics
 
-type state = {ps: TProver.state; output: string}
+type state = {ps: Prover.state; output: string}
 
 type stack = state list
 
 (* Loading Prelude will fail since in full JS it can't access file
  * system *)
-let prover_state : TProver.state ref = ref (TProver.init ~withPrelude:false ())
+let prover_state : Prover.state ref = ref (Prover.init ~withPrelude:false ())
 
-let firstOutput = "TProver initial state : Ready to go !"
+let firstOutput = "Prover initial state : Ready to go !"
 
 let prover_stack : (state list) ref = ref [{ps= !prover_state;output=firstOutput}]
 
 let init () =
-  prover_state := TProver.init ~withPrelude:false ();
-  prover_state := TProver.do_set_option 
+  prover_state := Prover.init ~withPrelude:false ();
+  prover_state := Prover.do_set_option 
       !prover_state (TConfig.s_interactive,Config.Param_bool true);
   prover_stack := [{ps= !prover_state; output=firstOutput}]
 
@@ -65,9 +62,9 @@ let get_formatter =
   Printer.get_std ()
 
 let print_goal () = 
-  match TProver.get_mode !prover_state with
+  match Prover.get_mode !prover_state with
   | ProverLib.ProofMode -> 
-      Printer.prthtml `Goal "%a" (TProver.pp_goal !prover_state) ()
+      Printer.prthtml `Goal "%a" (Prover.pp_goal !prover_state) ()
   | _ -> 
       Printer.prthtml `Goal "Nothing to show…"
 
@@ -78,7 +75,7 @@ let get_goal_print () : string =
 (* will return boolean that is true if every thing is ok and output *)
 let exec_sentence ?(check=`Check) s : bool * string = 
   try
-    prover_state := TProver.exec_all ~check !prover_state s;
+    prover_state := Prover.exec_all ~check !prover_state s;
     let info = Format.flush_str_formatter () in
     prover_stack := 
       push {ps= !prover_state; output= get_goal_print ()};
@@ -90,7 +87,7 @@ let exec_sentence ?(check=`Check) s : bool * string =
 
 let exec_command ?(check=`Check) s : string = 
   try
-    let _ = TProver.exec_command ~check s !prover_state in
+    let _ = Prover.exec_command ~check s !prover_state in
     let info = Format.flush_str_formatter () in
     info
   with e -> 
@@ -100,7 +97,7 @@ let exec_command ?(check=`Check) s : string =
 
 let visualisation () : string =
  try begin 
-   match Prover.get_first_subgoal !prover_state.prover_state with
+   match Prover.get_first_subgoal !prover_state with
    | Trace j ->
          Format.asprintf "%a"
            Squirrelhtml.Visualisation.pp j

@@ -8,7 +8,7 @@
   (instrumentation (backend bisect_ppx))
   (inline_tests)
   (preprocess (pps ppx_inline_test))
-  (libraries squirreltop squirrelcore squirreltactics squirrelprover squirrelfront
+  (libraries squirrelcore squirreltactics squirrelprover squirrelfront
              squirrelhtml))
     ; (select smt.ml from
     ;   (why3  -> smt.why3api.ml)

@@ -2,9 +2,6 @@ open Squirrelcore
 open Squirrelfront
 open Squirrelprover
 
-module TopLevel = Squirreltop.TopLevel
-module TProver = TopLevel.Make(Prover)
-
 let term : Term.term Alcotest.testable =
    Alcotest.testable Term.pp_dbg Term.equal
 
@@ -18,7 +15,7 @@ let get_hyp sequent name =
 let formula_of_string st string : Equiv.local_form =
   let lexbuf = Lexing.from_string string in
   let th_tm = Parser.top_formula Lexer.token lexbuf in
-  let env = Env.init ~table:(TProver.get_table st) () in
+  let env = Env.init ~table:(Prover.get_table st) () in
   let tm,ty =
     Theory.convert Theory.{ env ; cntxt = InGoal } th_tm in
   assert (ty = Boolean);
@@ -28,7 +25,7 @@ let tests =
   [
     "project [phi]", `Quick, begin fun () ->
       let st =
-        TProver.exec_all ~test:true (TProver.init ())
+        Prover.exec_all ~test:true (Prover.init ())
           "system null.\n\
            abstract p : bool.\n\
            abstract q : bool.\n\
@@ -37,7 +34,7 @@ let tests =
            intro Hglob. intro Hloc.\n\
            project."
       in
-      let subgoals = Prover.get_subgoals st.prover_state in
+      let subgoals = Prover.get_subgoals st in
       assert (List.length subgoals = 2);
       match List.hd subgoals with
       | Equiv _ -> assert false
