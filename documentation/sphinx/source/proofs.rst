@@ -957,9 +957,9 @@ Common tactics
     Adds the fact that two names have the same
     length. The two arguments must the indeed be a :decl:`name`.
 
-    .. todo:: Charlie: Don't we want to deprecate this one?  Some
-       tests just need to be fixed, but otherwise no more example use
-       this.  
+    .. warning:: This tactic is deprecated. One must use the
+                 :term:`namelength axiom` instead.
+
 
 .. tacn:: rewrite {* @rw_arg} {? in @rw_target}
     
@@ -1069,13 +1069,46 @@ Local tactics
     Turn a local goal on a :term:`multi system` into one goal for each
     single system comprising of the multi-system.
 
-.. tact:: rewrite equiv
+.. tact:: rewrite equiv {? -}@proof_term
     
     Use an equivalence to rewrite a reachability goal.
 
-    .. todo::
-       TODO
+    When called over a proof term proving a formula of the form
+    :g:`equiv(u,v)`, Squirrel tries to find a context :g:`C` that does
+    not contain any name or diff operator such that the current goal
+    :g:`phi` is equal to :g:`C[u]`. If such a context is found, the
+    current goal :g:`phi` is replaced by :g:`C[v]`.
 
+    If a :g:`-` sign is added in front of the hypothesis, the
+    rewriting occurs in the other direction, replacing :g:`v` by
+    :g:`u`.
+
+    .. example:: Hash rewrite
+
+       Consider the following judgment
+
+       .. squirreldoc::
+	  [goal> Focused goal (1/1):
+	  System: default/left (equivalences: left:default/left, right:default/right)
+	  H: equiv(diff(h (a, k), n), diff(h (b, k), m))
+	  U: [a <> b]
+	  ----------------------------------------
+	  h (a, k) <> h (b, k)
+
+       Assuming we have been able to prove that two hashes are
+       indistinguishable from names, we have hypothesis :g:`H`. We
+       then use :g:`H` to replace the hashes by names in our current
+       goal, where we want to prove that the two hashes are not equal.
+
+       Calling :g:`rewrite equiv H` produces the new goal:
+       
+       .. squirreldoc::
+	  [goal> Focused goal (1/1):
+	  System: default/right (equivalences: left:default/left, right:default/right)
+	  H: equiv(diff(h (a, k), n), diff(h (b, k), m))
+	  U: [a <> b]
+	  ----------------------------------------
+	  n <> m
 
 .. tact:: slowsmt
     
@@ -1319,11 +1352,15 @@ Common tactics
    :g:`bf` the biframe, the biframe element is then replaced by
 
    .. squirreldoc::
-      if not(diff(occur(nL,bf,none),occur(n,bf,none))) then
+      if not(diff(occur(nL,bf,i : diff(nL,nR)),occur(nR,bf,i : diff(nL,nR)))) then
         zero
       else
         diff(nL,nR)
 
+   We specify through the occur formula that the only possible
+   occurence of nL is in fact the one we are currently looking at.
+	
+	
    In all cases, the :g:`precise_ts` makes the tactic use
    `precise_occur` instead of `occur`.
 
@@ -1689,15 +1726,21 @@ Global tactics
 
    Latest formal Squirrel description: :cite:`bkl23hal`.
        
-.. tace:: xor
-    
-   Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is
-   fresh.
+.. tace:: xor @position {? , @term_pat} {? , @term_pat}
 
-   Usage: xor i, [m1], [m2]
-    
-   .. todo::    
-      TODO
+   This tactic applies the unconditionally sound one time pad property
+   of the xor operation.
+
+   The tactic applied to a biframe element of the form :g:`i : C[n XOR
+   t]` will replace the XOR term by :g:`if occur(n,biframe, i : C[n
+   XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)`. This new
+   term then allow to drop the old term only if :g:`n` and :g:`t` do
+   have the same length (otherwise the one time pad does not work),
+   and if this is the only occurence of :g:`n` in the biframe.
+
+   When multiple XOR occur in the biframe, one can specify one or two
+   optional term patterns, to specify in any order the name :g:`n` or
+   the full xored term :g:`n XOR t` to target.    
 
    Latest formal Squirrel description: :cite:`bdjkm21sp`.
 
@@ -1724,7 +1767,7 @@ Utility tactics
     
     Print profiling information. 
       
-.. tacn:: show todo
+.. tacn:: show @term_pat
     
     Print the messages given as argument. Can be used to print the values
     matching a pattern. 

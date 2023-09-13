@@ -24,6 +24,15 @@ Names are used to model random samplings.
   A name declaration :n:`name @name_id : {? @type__i ->} @type__s` adds a
   new name symbol :n:`@name_id` optionally indexed by :n:`@type__i` and
   sampling values of type :n:`@type__s`.
+
+  Whenever a name :g:`n` is defined, a corresponding
+  :gdef:`namelength axiom` is declared as:
+  
+  .. squirreldoc::
+     axiom [any] namelength_n : [len (n) = namelength_message]
+
+  It states that all name have the same length, given by a fixed
+  constant.
   
   It is required that the indexing type :n:`@type__i` is a
   :term:`finite` type, but there are no restrictions over sampling type
