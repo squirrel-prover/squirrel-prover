@@ -184,8 +184,8 @@ let intctxt
     (* copied from old euf, handles the composition goals *)
   let tag_s =
     let f =
-      (* XXX depends on Prover_state *)
-      Oracle.get_oracle_tag_formula (Symbols.to_string enc_f) (TS.table s)
+      let loc_enc_f = L.mk_loc (L.loc h) (Symbols.to_string enc_f) in
+      Oracle.get_oracle_tag_formula loc_enc_f (TS.table s)
     in
     (* if the hash is not tagged, the formula is False, and we don't create
        another goal. *)

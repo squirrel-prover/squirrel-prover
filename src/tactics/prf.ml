@@ -556,10 +556,9 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   (* copied from old prf for the composition stuff *)
   (* not sure how this works *)
 
-  (* XXX This get options refs from Prover 
-   * → it depends on Prover state *)
+  let loc_hash_f = L.mk_loc loc (Symbols.to_string hash_f) in
   let oracle_formula =
-    Oracle.get_oracle_tag_formula (Symbols.to_string hash_f) (ES.table
+    Oracle.get_oracle_tag_formula loc_hash_f (ES.table
       equiv_sequent)
   in
 

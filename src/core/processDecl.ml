@@ -175,7 +175,7 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Theory.term) :
        begin
          match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           Oracle.add_oracle ((L.unloc h),form) table
+           Oracle.add_oracle (h,form) table
          | _ ->
            ProverLib.error (L.loc fm) 
              "The tag formula must be of the form forall

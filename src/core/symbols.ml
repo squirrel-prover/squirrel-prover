@@ -585,7 +585,7 @@ module Oracle = Make (struct
 
   let namespace = NOracle
 
-  let group = default_group
+  let group = "oracle"
   let construct d = Oracle d
   let deconstruct ~loc s = match s with
     | Exists (Oracle d) -> d
