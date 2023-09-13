@@ -1628,12 +1628,64 @@ Global tactics
    
    Latest formal Squirrel description::cite:`bdjkm21sp`.
       
-.. tacn:: prf @position
+.. tacn:: prf @position {? , @term_pat}
    :name: prf
 
-   .. todo::        
-      TODO why optional message in Squirrel tactic; also fix help in tool    
-       
+   This tactic applies the PRF assumption (see
+   .e.g. :cite:`goldwasser1996lecture`).
+
+   It requires a :term:`hash function` declaration.
+
+   This tactic applied to a biframe element containg a hash
+   application :g:`h(m,k)` tries to replace the hash value by a fresh
+   name, under the conditions that it is the first time that this
+   specific hash value is hashed and that the key is correctly used.
+
+
+   Formally, when called over a biframe element :g:`i : C[h(m,k)]`,
+   the tactic replaces in the current goal the element by :g:`i :
+   C[nPRF]` where :g:`nPRF` a newly generated unique name. It in
+   additions produces subgoal requiring to prove the side
+   conditions. It notably produces a goal asking to prove that the key
+   is only used in key position, that is that
+   :g:`occur(k,biframe,h(_,k))` is false (see the definition of the
+   :term:`occurence formula`). In addition, it creates for each
+   occurences of :g:`h(t,k)` within the biframe (that may occur under
+   macros) a subgoal asking to prove that :g:`t <> m`, that is, that
+   :g:`m` was never hashed before. Such subgoals may need to be
+   created separately for both projections of the biframe.
+
+   .. example:: Basic PRF application
+
+      Consider the following system:
+
+      .. squirreldoc::
+	 channel c
+	 hash h
+	 name k : message
+	 name n :message
+	 name m :message
+	 name p :message
+	 system (A: out(c,h(n,k)) | B: out(c,h(m,k))).
+
+      When trying to prove that :g:`[happens(A)] ->
+      equiv(frame@pred(A),diff(output@A,p))`, one may call the tactic
+      prf on the biframe element corresponding to the
+      :g:`diff(output@A,p)`, which after expanding output is
+      :g:`diff(h(n,k),p)`.
+
+      This replaces in the current goal the hash occurence by
+      :g:`diff(n_PRf,p)`, and creates a subgoal asking to prove that
+      the hash message :g:`n` is different from any possible
+      previously hashed message. Here, the only other possible hash
+      would occur in :g:`frame@pred(A)`, in the output of :g:`B` if it
+      occured before :g:`A`. The created subgoal then ask to prove
+      that :g:`[B < A => n <> m]`.
+
+
+   If multiple occurences of hashes occur in the biframe element, the
+   first one is targeted by default. Calling the tactic with an
+   optional :n:`@term_pat` allows to target a specific hash occurence.
 
    Latest formal Squirrel description: :cite:`bkl23hal`.
        
