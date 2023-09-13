@@ -1273,7 +1273,7 @@ Common tactics
    In a local goal, called over an hypothesis of the form :g:`t=n` for
    some name :g:`n` over a current goal formula :g:`phi`, turns the
    goal into a formula :g:`occur(n,t,none) => phi` (see the
-   definition of the :term:`occurence formula`)
+   definition of the :term:`occurence formula`).
 
    If one can then prove that :g:`n` cannot occur in :g:`t`, that is
    that :g:`occur(n,t,none)` is false, it then allows to close
@@ -1381,14 +1381,16 @@ Local tactics
    signatures. (see e.g. :cite:`goldwasser1996lecture`)
 
    For a hash function :g:`h(x,k)`, one may call :g:`euf M` over a
-   message equality :g:`M` of the form :g:`t = h(m,k)` or :g:`h(m,k)=t`.  The
-   tactic then create a first new subgoal asking to prove that the key
-   is only used in correct position, that is a goal with conclusion
-   :g:`not(occur(k,goal,h(_,k))`.  The tactics then collects all
-   possible occurence of honest hash :g:`h(u,k)` inside :g:`t`, and
-   for each of them, creates a subgoal with a new hypothesis stating
-   that :g:`m=u`. If such an occurence happens under a macro, the goal
-   will state that the computation must have happened before.
+   message equality :g:`M` of the form :g:`t = h(m,k)` or
+   :g:`h(m,k)=t`.  The tactic then create a first new subgoal asking
+   to prove that the key is only used in correct position, that is a
+   goal with conclusion :g:`not(occur(k,goal,h(_,k))` (see the
+   definition of the :term:`occurence formula`).  The tactics then
+   collects all possible occurence of honest hash :g:`h(u,k)` inside
+   :g:`t`, and for each of them, creates a subgoal with a new
+   hypothesis stating that :g:`m=u`. If such an occurence happens
+   under a macro, the goal will state that the computation must have
+   happened before.
 
    .. example:: Basic hashing
 		
@@ -1465,7 +1467,8 @@ Local tactics
 
     The key :g:`k` must only be used in key position, so a subgoal
     asking to prove that :g:`not(occur(k,c,(enc(_,_,k),dec(_,k)))` is
-    created (when it is not trivially true).
+    created when it is not trivially true (see the definition of the
+    :term:`occurence formula`).
 
     In additition, a goal asking to prove that all randomness used for
     encryption are disjoint and fresh (when it is not trivially true).
@@ -1504,9 +1507,9 @@ Global tactics
 
    In addition, the tactic creates a subgoal asking to prove that all
    occurences of the key and encryptions are correct. Notably, one
-   must prove that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is
-   false (or :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the
-   asymmetric case).
+   must prove that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` (see
+   the definition of the :term:`occurence formula`) is false (or
+   :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
 
    In addition, in the asymetric case, a subgoal is created to prove the
    freshness of the random used in the encryption, with the conclusion
@@ -1611,7 +1614,8 @@ Global tactics
 
 
    To apply the enckp tactic, the key :g:`k` must be such that
-   :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` is trivially false. (or
+   :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` (see the definition of
+   the :term:`occurence formula`) is trivially false. (or
    :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
 
    When it is not trivially true, a subgoal is created to prove the
