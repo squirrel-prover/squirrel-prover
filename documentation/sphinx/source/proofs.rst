@@ -448,8 +448,12 @@ Common errors
 
 .. exn:: Out of range position.
 
-     Argument does not correspond to a valid equivalence item.
+   Argument does not correspond to a valid equivalence item.
 
+.. exn:: Assumption not over valid system
+
+   Trying to use a proof term that does not apply to the current system.
+	 
 
 Tactics
 =======
@@ -902,7 +906,12 @@ Common tactics
     
     If the second action depends on the first action, and if the second
     action happened, add the corresponding timestamp
-    inequality.       
+    inequality.
+
+    .. exn:: Not dependent
+
+       The two actions are not dependent, i.e. were not derived
+       from two outputs in sequence in the source process.
 
 .. tacn:: expand {+, @macro_id | @macro_application }
     
@@ -1003,15 +1012,15 @@ Common tactics
 
    .. exn:: rule bad systems
    
-        Rewrite item applies to a system which is not compatible with the rewrite target.
+      Rewrite item applies to a system which is not compatible with the rewrite target.
     
    .. exn:: nothing to rewrite
    
-        No instance of the rewrite rule were found
+      No instance of the rewrite rule were found
     
    .. exn:: maxed nested rewriting
     
-        There were too many nested rewriting. This is to avoid infinite rewriting loops.
+      There were too many nested rewriting. This is to avoid infinite rewriting loops.
 
       
 Local tactics
@@ -1123,9 +1132,14 @@ Local tactics
 .. tact:: subst @term, @term
 
     Replaces all occurences of a variable by a value it must be equal
-    to.  Call as :g:`subst x, t`, if :g:`x = t` where :g:`x` is a
+    to.  Called as :g:`subst x, t`, if :g:`x = t` where :g:`x` is a
     variable, substitute all occurences of :g:`x` by :g:`t` and remove
     :g:`x` from the :term:`logical variables <logical_var>`.
+
+    .. exn:: Unequal arguments
+
+       Terms given as arrgument are not equal.
+       
     
     
 Global tactics
