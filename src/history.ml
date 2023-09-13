@@ -6,14 +6,6 @@ open Squirrelcore
 module type TOPLEVELPROVER = sig
   type state
   val init : ?withPrelude:bool -> unit -> state
-
-  (* TODO This is ugly ! Remove Config from globals ! Or only the
-   * params that are ``historiable'' (that can change during
-   * computation) *)
-  val get_params : state -> Config.params
-  val set_params : state -> Config.params -> state
-  val get_option_defs : state -> ProverLib.option_def list
-  val set_option_defs : state -> ProverLib.option_def list -> state
 end
 
 (* This module manage history with global configs *)
@@ -40,8 +32,6 @@ module Make (P : TOPLEVELPROVER) = struct
     {pt_history=init_history;pt_history_stack=[]}
 
   let save_state' (pt_history:history) (st: state) : history =
-    let st = P.set_params st (Config.get_params ()) in
-    let st = P.set_option_defs st !ProverLib.option_defs in
     st::pt_history
 
   let save_state (hs:history_state) (st: state) : history_state =
@@ -50,8 +40,6 @@ module Make (P : TOPLEVELPROVER) = struct
   (* TODO should be deprecated since we do not save in ref…
    * Only Config and options params are to be reset globally here *)
   let reset_from_state (st: state) : state =
-    ProverLib.option_defs := P.get_option_defs st;
-    let _ = Config.set_params (P.get_params st) in 
     st
 
   (* Since we still have Config and option params that are global 

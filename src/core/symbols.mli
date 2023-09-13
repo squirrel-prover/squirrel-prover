@@ -39,6 +39,7 @@ val tag : table -> int
 (*------------------------------------------------------------------*)
 type _channel
 type _config
+type _oracle
 type _name
 type _action
 type _fname
@@ -51,6 +52,7 @@ type _lemma
   
 type channel = _channel t
 type config  = _config  t
+type oracle  = _oracle  t
 type name    = _name    t
 type action  = _action  t
 type fname   = _fname   t
@@ -65,6 +67,7 @@ type lemma   = _lemma   t
 type namespace =
   | NChannel
   | NConfig
+  | NOracle
   | NName
   | NAction
   | NFunction
@@ -146,12 +149,16 @@ type [@warning "-37"] param_kind =
   | PString
   | PInt
 
+type [@warning "-37"] oracle_kind =
+  | PTerm
+
 (*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.
     Integers refer to the index arity of symbols. *)
 type _ def =
   | Channel  : unit      -> _channel def
-  | Config   : param_kind-> _config def
+  | Config   : param_kind -> _config def
+  | Oracle   : oracle_kind -> _oracle def
   | Name     : name_def  -> _name    def
   | Action   : int       -> _action  def
   | Macro    : macro_def -> _macro   def
@@ -289,6 +296,7 @@ module type Namespace = sig
 end
 
 module Config   : Namespace with type def = param_kind with type ns = _config
+module Oracle   : Namespace with type def = oracle_kind with type ns = _oracle
 module Channel  : Namespace with type def = unit       with type ns = _channel
 module BType    : Namespace with type def = bty_infos  with type ns = _btype
 module Action   : Namespace with type def = int        with type ns = _action

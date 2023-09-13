@@ -6,46 +6,6 @@ type pending_proof =
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
-(*--------------- Options are still global refs --------------------*)(* {↓{ *)
-(** {2 Options}
-
-    TODO [option_defs] is not directly related to
-    this module and should be moved elsewhere, e.g. [Main] could
-    deal with them through the table. *)
-
-type option_name =
-  | Oracle_for_symbol of string
-
-type option_val =
-  | Oracle_formula of Term.term
-
-type option_def = option_name * option_val
-
-let option_defs : option_def list ref = ref []
-
-let reset_option_defs () = option_defs := []
-
-(*------------------------------------------------------------------*)
-(** Options Management **)
-
-exception Option_already_defined
-
-let get_option opt_name =
-  try Some (List.assoc opt_name !option_defs)
-  with Not_found -> None
-
-let add_option ((opt_name,opt_val):option_def) =
-  if List.mem_assoc opt_name !option_defs then
-    raise Option_already_defined
-  else
-    option_defs := (opt_name,opt_val) :: (!option_defs)
-
-let get_oracle_tag_formula h =
-  match get_option (Oracle_for_symbol h) with
-  | Some (Oracle_formula f) -> f
-  | None -> Term.mk_false
-(* }↑} *)
-
 (** {2 User printing query} *)
 (** User printing query *)
 type print_query = (* [None] means current system *)

@@ -559,7 +559,8 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   (* XXX This get options refs from Prover 
    * → it depends on Prover state *)
   let oracle_formula =
-    ProverLib.get_oracle_tag_formula (Symbols.to_string hash_f)
+    Oracle.get_oracle_tag_formula (Symbols.to_string hash_f) (ES.table
+      equiv_sequent)
   in
 
   let tag_f =

@@ -13,6 +13,7 @@ type symb_type = [ `Prefix | `Infix of assoc ]
 type namespace =
   | NChannel
   | NConfig
+  | NOracle
   | NName
   | NAction
   | NFunction
@@ -26,6 +27,7 @@ type namespace =
 let pp_namespace fmt = function
   | NChannel  -> Fmt.pf fmt "channel"
   | NConfig   -> Fmt.pf fmt "config"
+  | NOracle   -> Fmt.pf fmt "oracle"
   | NName     -> Fmt.pf fmt "name"
   | NAction   -> Fmt.pf fmt "action"
   | NFunction -> Fmt.pf fmt "function"
@@ -148,6 +150,7 @@ type name_def = {
 (*------------------------------------------------------------------*)
 type _channel
 type _config
+type _oracle
 type _name
 type _action
 type _fname
@@ -160,6 +163,7 @@ type _lemma
 
 type channel = _channel t
 type config  = _config  t
+type oracle  = _oracle  t
 type name    = _name    t
 type action  = _action  t
 type fname   = _fname   t
@@ -174,11 +178,15 @@ type [@warning "-37"] param_kind =
   | PBool
   | PString
   | PInt
+
+type [@warning "-37"] oracle_kind =
+  | PTerm
     
 (*------------------------------------------------------------------*)
 type _ def =
   | Channel  : unit      -> _channel def
   | Config   : param_kind -> _config def
+  | Oracle   : oracle_kind -> _oracle def
   | Name     : name_def  -> _name    def
   | Action   : int       -> _action  def
   | Macro    : macro_def -> _macro   def
@@ -259,6 +267,7 @@ let edef_namespace : edef -> namespace = fun e ->
   match e with
   | Exists (Channel  _) -> NChannel
   | Exists (Config  _)  -> NConfig
+  | Exists (Oracle  _)  -> NOracle
   | Exists (Name     _) -> NName
   | Exists (Action   _) -> NAction
   | Exists (Function _) -> NFunction
@@ -567,6 +576,19 @@ module Config = Make (struct
   let construct d = Config d
   let deconstruct ~loc s = match s with
     | Exists (Config d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
+module Oracle = Make (struct
+  type ns = _oracle
+  type local_def = oracle_kind
+
+  let namespace = NOracle
+
+  let group = default_group
+  let construct d = Oracle d
+  let deconstruct ~loc s = match s with
+    | Exists (Oracle d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
 

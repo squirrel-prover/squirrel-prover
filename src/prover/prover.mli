@@ -22,10 +22,12 @@
 
 open Squirrelcore
 
+exception Unfinished
+
 type state
 
 (** Set the proof_state to its initial state. *)
-val init : unit -> state
+val init' : unit -> state
 
 (** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
@@ -54,7 +56,7 @@ val set_table : state -> Symbols.table -> state
 val tactic_handle : state -> ProverLib.bulleted_tactic -> state
 
 (** do tactic with or without check of parsed input *)
-val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+val do_tactic' : ?check:[`Check | `NoCheck] -> state ->
   ProverLib.bulleted_tactics -> state
 
 val is_proof_completed : state -> bool
@@ -68,8 +70,6 @@ val do_eof : state -> state
 
 (** Return the name of the goal currently being proved, if any. *)
 val current_goal_name : state -> string option
-
-val pp_goal : state -> Format.formatter -> unit -> unit
 
 val pp_subgoals : state -> Format.formatter -> unit -> unit
 
@@ -110,3 +110,51 @@ val do_search : state -> ProverLib.search_query -> unit
 (** Get the first subgoal.
     @raise Not_found if there is no subgoal or current goal. *)
 val get_first_subgoal : state -> Goal.t
+
+
+(** Print goal *)
+val pp_goal : state -> Format.formatter -> unit -> unit
+
+(** Return Toplevel.PROVER in init state *)
+val init : ?withPrelude:bool -> unit -> state
+
+(** do tactics ! *)
+val do_tactic : ?check:[`Check | `NoCheck] -> state ->
+  Lexing.lexbuf -> ProverLib.bulleted_tactics ->  state
+
+(** print current goal *)
+val do_print_goal : state -> unit
+
+(** Start a proof : initialize the prover state and set
+ * prover_state regarding to a given `Check mode *)
+val do_start_proof : ?check:[ `Check | `NoCheck ] -> state ->
+  state
+
+(** Add given parsed goal and print it out *)
+val do_add_goal : state -> Goal.Parsed.t Location.located ->
+  state
+
+(** set param/option from Config (Alias for set_param) *)
+val do_set_option : state -> Config.p_set_param -> state
+
+(** Complete the proofs, resetting the current goal to None and
+ * print exiting proof *)
+val do_qed : state -> state
+
+(** Add declarations to the table and print new proof obligations *)
+val do_decls : state -> Decl.declarations -> state
+
+(** Evaluate the given input and return new state *)
+val do_command : ?test:bool -> ?check:[`Check | `NoCheck] -> state ->
+  Driver.file -> ProverLib.input -> state
+
+(** Execute the given sentence and return new state *)
+val exec_command : ?check:[`Check | `NoCheck] -> ?test:bool ->
+  string -> state -> state 
+
+(** Execute the given string and return new state *)
+val exec_all : ?check:[`Check | `NoCheck] -> ?test:bool -> state
+  -> string -> state
+
+(** Run the given squirrel file *)
+val run : ?test:bool -> string -> unit

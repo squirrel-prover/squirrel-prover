@@ -12,29 +12,6 @@ type pending_proof =
   | UnprovedLemma of Goal.statement * Goal.t
   (** lemma remaining to be proved *)
 
-(** Option management **)
-type option_name =
-  | Oracle_for_symbol of string
-
-type option_val =
-  | Oracle_formula of Term.term
-
-type option_def = option_name * option_val
-
-val reset_option_defs : unit -> unit
-
-exception Option_already_defined
-
-val get_option : option_name -> option_val option
-
-val add_option : option_def -> unit
-
-(** From the name of the function, returns the corresponding formula. If no tag
-   formula was defined, returns False. *)
-val get_oracle_tag_formula : string -> Term.term
-
-val option_defs : option_def list ref
-
 (*------------------------------------------------------------------*)
 (** {2 Printing infos} *)
 

@@ -3,4 +3,4 @@
   (modes byte native)
   (flags :standard -w -39)
   (library_flags (:standard -linkall))
-  (libraries squirrelhtml squirreltop squirrelprover squirrelcore squirreltactics js_of_ocaml-compiler))
+  (libraries squirrelhtml squirrelprover squirrelcore squirreltactics js_of_ocaml-compiler))

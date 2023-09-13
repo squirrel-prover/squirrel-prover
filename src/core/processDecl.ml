@@ -165,7 +165,8 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
     ) ctys
 
 (*------------------------------------------------------------------*)
-let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
+let define_oracle_tag_formula (h : lsymb) table (fm : Theory.term) :
+  Symbols.table =
   let env = Env.init ~table () in
   let conv_env = Theory.{ env; cntxt = InGoal; } in
   let form, _ = Theory.convert conv_env ~ty:Type.Boolean fm in
@@ -174,16 +175,17 @@ let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
        begin
          match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           ProverLib.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
+           Oracle.add_oracle ((L.unloc h),form) table
          | _ ->
            ProverLib.error (L.loc fm) 
-             "The tag formula must be of the form forall (m:message,sk:message)"
+             "The tag formula must be of the form forall
+             (m:message,sk:message)"
        end
 
      | _ -> 
        ProverLib.error (L.loc fm)
-         "The tag formula must be of the form forall (m:message,sk:message)"
-
+         "The tag formula must be of the form forall
+         (m:message,sk:message)"
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
@@ -232,7 +234,9 @@ let declare table decl : Symbols.table * Goal.t list =
      Theory.declare_dh table h ?group_ty ?exp_ty g ex om, []
 
   | Decl.Decl_hash (n, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
+    let table = match tagi with
+      | Some t -> define_oracle_tag_formula n table t
+      | None -> table in
 
     let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
     let m_ty = List.assoc_opt  "m" ctys
@@ -302,7 +306,9 @@ let declare table decl : Symbols.table * Goal.t list =
     Theory.declare_senc_joint_with_hash table senc sdec h, []
 
   | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
+    let table = match tagi with
+      | Some t -> define_oracle_tag_formula sign table t
+      | None -> table in
 
     let ctys = parse_ctys table ctys ["m"; "sig"; "sk"; "pk"] in
     let m_ty     = List.assoc_opt "m"     ctys

@@ -1,5 +1,4 @@
 open Squirrelprover
-open Squirreltop
 open Squirreltactics
 open Squirrelhtml
 open Driver
@@ -20,13 +19,12 @@ end
 
 let usage = Fmt.str "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
-module ToplevelProver = TopLevel.Make(Prover)
-module HistoryTP = History.Make(ToplevelProver)
+module HistoryTP = History.Make(Prover)
 
 (** State of the main loop. *)
 type driver_state = {
-  toplvl_state : ToplevelProver.state;
-  (* toplvl_state : ToplevelProver.state = {
+  toplvl_state : Prover.state;
+  (* toplvl_state : Prover.state = {
       prover_state : Prover.state = {
         goals        : ProverLib.pending_proof list;
         table        : Symbols.table; 
@@ -62,27 +60,27 @@ type driver_state = {
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) : ProverLib.input =
   Driver.next_input_file ~test ~interactive:!interactive state.file
-    (ToplevelProver.get_mode state.toplvl_state)
+    (Prover.get_mode state.toplvl_state)
 
 (*---------------- Main --------------------------------------------*)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, toplvl_state =
   HistoryTP.reset_state state.history_state nb_undo in
-  let () = match ToplevelProver.get_mode toplvl_state with
-    | ProofMode -> Printer.prt `Goal "%a" (ToplevelProver.pp_goal
+  let () = match Prover.get_mode toplvl_state with
+    | ProofMode -> Printer.prt `Goal "%a" (Prover.pp_goal
                      toplvl_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
-                    (ToplevelProver.get_table toplvl_state)
+                    (Prover.get_table toplvl_state)
     | WaitQed -> ()
     | AllDone -> assert false in
   { state with toplvl_state; history_state; }
 
 (*----------Part can be done here and tactic handling in Prover ----*)
 (* let _do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : *)
-(*   ToplevelProver.state = *)
+(*   Prover.state = *)
 (*   let saved_ps = state.toplvl_state in *)
 (*   try *)  
-(*     ToplevelProver.do_tactic ~check:state.check_mode *)
+(*     Prover.do_tactic ~check:state.check_mode *)
 (*       state.toplvl_state state.file.f_lexbuf l *)
 (*       with *)
 (*         (1* FIXME should be handle by main loop ! *1) *)
@@ -93,16 +91,16 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
 
 (* XXX Touch global Config that has to be recorded in History *)
 (* let _do_set_option (state : driver_state) (sp : Config.p_set_param) : *)
-(*   ToplevelProver.state = *)
+(*   Prover.state = *)
 (*   (1* FIXME we still have variables in global config ? *1) *)
 (*   match Config.set_param sp with *)
 (*   | `Failed _ -> (1* TODO should be only ↓ *1) *)
-(*                 ToplevelProver.do_set_option state.toplvl_state sp *)
+(*                 Prover.do_set_option state.toplvl_state sp *)
 (*   | `Success -> state.toplvl_state *)
 
 let rec do_include
     ~(test : bool) (state : driver_state) (i : ProverLib.include_param)
-  : ToplevelProver.state 
+  : Prover.state 
   =
   let file = 
     include_get_file state.file_stack state.load_paths i.th_name 
@@ -158,7 +156,7 @@ and do_command
   | Toplvl Undo nb_undo          -> do_undo state nb_undo
   | Prover c -> 
     let st = state.toplvl_state in
-    let mode = ToplevelProver.get_mode st in
+    let mode = Prover.get_mode st in
     let check = state.check_mode in
     let toplvl_state = 
       match mode, c with
@@ -169,11 +167,11 @@ and do_command
       (* | GoalMode, SetOption sp     -> do_set_option state sp *)
       | GoalMode, Include inc      -> do_include ~test state inc
       (* | GoalMode, EOF              -> assert (state.file_stack = []); *)
-      (*                                 ToplevelProver.do_eof st *)
+      (*                                 Prover.do_eof st *)
 
       (* ↓ handle default behaviour ↓ *)
-      | _, _ -> ToplevelProver.do_command ~check ~test st state.file command
-      (* let toplvl_state = ToplevelProver.do_command ~test st state.file command *)
+      | _, _ -> Prover.do_command ~check ~test st state.file command
+      (* let toplvl_state = Prover.do_command ~test st state.file command *)
     in
     { state with toplvl_state; }
 
@@ -209,9 +207,9 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
     let new_state = do_command ~test state cmd in
 
     if !html then
-      Server.update new_state.toplvl_state.prover_state;
+      Server.update new_state.toplvl_state;
 
-    new_state, ToplevelProver.get_mode new_state.toplvl_state
+    new_state, Prover.get_mode new_state.toplvl_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
@@ -257,7 +255,7 @@ let start_main_loop
    * and "option_defs" values do not change in the program *)
   let state = {
     (* XXX ↓ impure ↓ XXX Configs and option_defs are reset here *)
-    toplvl_state = ToplevelProver.init ();
+    toplvl_state = Prover.init ();
 
     history_state = HistoryTP.init_history_state;
 
@@ -275,7 +273,7 @@ let start_main_loop
   in
   (* add interactive option to the table *)
   let toplvl_state = 
-    ToplevelProver.do_set_option 
+    Prover.do_set_option 
       state.toplvl_state (TConfig.s_interactive,Config.Param_bool !interactive) 
   in
   let state = { state with toplvl_state; } in
