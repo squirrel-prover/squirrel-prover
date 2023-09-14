@@ -1170,7 +1170,8 @@ Global tactics
       :undocumented:
 
 .. tace:: deduce {? @position}
-    
+   :name: deduce
+
     :g:`deduce i` removes the ith element from the biframe when it can
     be computed from the rest of the biframe. Without any argument, it
     will remove the first equivalence that can be dropped, if it

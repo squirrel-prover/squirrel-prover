@@ -15,9 +15,30 @@ or get the source code of the tool from
 
 You are reading the user's documentation. This documentation is not
 meant as a first introduction to Squirrel; a linear read for people
-unfamiliar with all the high level concepts will be difficult. For a
-first introduction, we recommend to start with the :ref:`tutorial
-<tutorial>`.
+unfamiliar with all the high level concepts will be difficult.
+To discover Squirrel, there are several materials available:
+
+* For a first high-level introduction to the core
+  concept, we recommend to start with the :ref:`tutorial <tutorial>`.
+* Going through the reference manual after or in parallel to this tutorial is then possible.
+* In the squirrel repository, an `example repository
+  <https://github.com/squirrel-prover/squirrel-prover/tree/master/examples>`_
+  contain some documented examples.
+* A long `tutorial
+  <https://github.com/squirrel-prover/squirrel-prover/tree/master/examples/tutorial>`_
+  with exercices and a step by step approach is also available there.
+
+.. note::
+
+   Installation instructions are given in the README.md of the
+   `repository
+   <https://github.com/squirrel-prover/squirrel-prover/>`_. The
+   easiest however to discover Squirrel is to run it in the browser
+   via the javascript application at TODO.
+
+.. todo::
+
+   Link to javascript ref after it is availble in the github repo
 
 In this documention, the languages used in Squirrel are introduced in
 distinct sections:
