@@ -1,0 +1,18 @@
+; (rule
+;  (target editor.bundle.js)
+;  (deps (source_tree %{project_root}/app/client/editor.mjs)
+;   (source_tree %{project_root}/node_modules))
+;  (action
+;   (run
+;    %{project_root}/node_modules/.bin/rollup 
+;    %{dep:../../client/editor.mjs}
+;    -f iife 
+;    -p @rollup/plugin-node-resolve
+;    -o %{target})))
+
+(rule 
+  (alias client.bc.js)
+  (deps (source_tree %{project_root}/app/www)
+    (source_tree %{project_root}/app/client/client.bc.js))
+  (action (copy %{project_root}/app/client/client.bc.js
+                client.bc.js)))

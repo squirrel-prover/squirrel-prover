@@ -7,7 +7,7 @@ export default {
   input: "./client/editor.mjs",
   output: [
     {
-      file: "./static/editor.bundle.js", 
+      file: "./www/static/editor.bundle.js", 
       format: "iife", 
       name:"MyBundle"
     }

@@ -54,7 +54,7 @@ export class SquirrelWorkerConfig {
      * from which this script is loaded.
      */
     static determineWorkerPath(basePath: string | URL): URL {
-        return new URL("static/client.js", basePath);
+        return new URL("static/client.bc.js", basePath);
     }
 
     getPreloads(basePath: string | URL) {

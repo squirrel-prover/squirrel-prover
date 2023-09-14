@@ -4,6 +4,6 @@
 
 (rule
  (targets server.ml)
- (deps server.eml.ml ../static/editor.bundle.js)
+ (deps server.eml.ml ../www/static/editor.bundle.js)
  (action (run dream_eml %{deps} --workspace %{workspace_root})))
 

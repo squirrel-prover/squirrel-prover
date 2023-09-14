@@ -15,7 +15,7 @@ import { SquirrelWorker } from "./squirrel-worker.ts"
 import { Squirrel } from "./lang-squirrel/src/index.ts"
 
 let worker = new 
-  SquirrelWorker(fileManager,new URL('./client.js', window.location));
+  SquirrelWorker(fileManager,new URL('./client.bc.js', window.location));
 
 // Bind worker and fileManager
 fileManager.bindWorker(worker);
@@ -25,14 +25,14 @@ function squirrelKeymap(view) {
   return keymap.of([{
     key: "Ctrl-Enter",
     any(view,e) { 
-      if (e.key == "Enter" && e.ctrlKey) {
+      if (e.key == "Enter" && e.ctrlKey) {
         return worker.execToCursor(view)
       }
-      if (e.key == "ArrowUp" && e.ctrlKey) {
+      if (e.key == "ArrowUp" && e.ctrlKey) {
         worker.undo(1)
         return true
       }
-      if (e.key == "ArrowDown" && e.ctrlKey) {
+      if (e.key == "ArrowDown" && e.ctrlKey) {
         return worker.execNextSentence(view)
       }
       return false 

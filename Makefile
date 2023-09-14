@@ -361,19 +361,19 @@ start: jsquirrel bundle ## Serve the application with a local HTTP server
 
 # TODO in dune !
 jsquirrel: 
-	rm -f $(APPDIR)client/client.bc.js
-	dune build $(APPDIR)client/client.bc.js
-	mkdir -p $(APPDIR)static
-	rm -f $(APPDIR)static/client.js
-	mv _build/default/$(APPDIR)client/client.bc.js $(APPDIR)static/client.js
+	rm -f app/www/static/client.bc.js
+	dune build app/www/static/client.bc.js
 
 bundle:
-	mkdir -p $(APPDIR)static
-	rm -f $(APPDIR)static/editor.bundle.js
-	cd $(APPDIR)
-	# node_modules/.bin/rollup $(APPDIR)client/editor.mjs -f iife --output.name MyBundle \
-	# -o $(APPDIR)static/editor.bundle.js -p @rollup/plugin-node-resolve
+	mkdir -p $(APPDIR)www/static
+	# rm -f app/www/static/editor.bundle.js
+	# dune build app/www/static/editor.bundle.js
 	npm run prepare --prefix app/
+
+zipsquirrel: jsquirrel bundle 
+	rm -f _build/default/app/jsquirrel.zip
+	cd _build/default/app
+	zip -r jsquirrel.zip www
 
 .PHONY: watch
 watch: ## Watch for the filesystem and rebuild on every change
