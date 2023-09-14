@@ -21,7 +21,7 @@ Messages
 Messages computed and exchanged by a protocol and sent over the
 network are modelled using *terms*.
 
-Concretely, a message is built from
+Concretely, a term is built from
 
  * a name :g:`n` used to model a random sampling;
  * applications of functions :g:`f(m_1,...,m_k)`.
@@ -33,7 +33,7 @@ equality testing, to conditional branching, to encryption funcitions.
 In **Squirrel**, a function symbol without any assumption can be defined with:
 
 
-.. squirreltop::  none
+.. squirreltop::  in
 
    abstract ok : message
    abstract ko : message
@@ -43,7 +43,9 @@ In **Squirrel**, a function symbol without any assumption can be defined with:
 
 When using such function symbols inside a protocol, we are effectively
 saying that those function symbol may be in practice instantiated by
-any function of the correct type. This is notably usefull to model a constant `ok`
+any function of the correct type. This is notably usefull to model a
+constant `ok`, without giving any specific concrete value to this
+constant.
 
 `ok` and `ko` are constants, and `f1` is a function that expects a message, and
 then return a message. `f2` is then a function symbol of arity two, and function
@@ -52,27 +54,70 @@ symbols of any arity can be defined this way.
 
 A name `n` allows to model secret keys, or some random challenge. As we wish to
 be able to refer to an unbounded number of session, we allow names to be
-indexed, each value of the index yielding a fresh independent random. We denote
+indexed, each value of the index yielding a fresh independent random value. We denote
 by `n[i]` an indexed name, with variable `i` as an index. Names can be indexed
 by any number of indices.
 
 In the tool, one can declare names and indexed names with the following.
 
-.. squirreltop::  all
+.. squirreltop::  in
 
    name n : message
    name n1 : index -> message
    name n2 : index * index -> message.
 
 
+Compare to game based cryptography, one can think about names as
+picking at the begining of the protocol execution all possible random
+values that will be needed, and store them within indexed cells, which
+are our names.
+   
 To model a setting where multiple people each have their own secret key,
 one could declare an indexed name as follows.
 
 
-.. squirreltop::  all
+.. squirreltop::  in
 
    name key : index -> message.
 
+
+Basic assumption   
+++++++++++++++++
+
+
+We can declare axioms over our abstract function symbols, for instance
+to state that the two abstarct constant :g:`ok` and :g:`ko` are not
+equal.
+
+
+
+.. squirreltop::  in
+		  
+   axiom [any] ok_not_ko: ok <> ko.
+
+Axioms are formulas in a high-order logic, for instance allowing free
+variables, universal and existential quantification, implications,
+etc. Here, we define the axiom as true over :g:`any` protocol.
+
+Another axiom that could be useful to prove the security of a protocl
+is for instance that :g:`ko` can never be equal to any pair
+:g:`<x,y>`.
+
+.. squirreltop::  in
+		  
+   axiom [any] ok_not_pair (x,y:message): <x,y> <> fail.
+
+
+Going back to the name declaration, if we now display the Squirrel output after a declaration, we see the following:
+
+.. squirreltop::  all
+
+   name skey : index -> message.
+
+This means that whenever a new name is declared, we also create a
+dedicated axiom stating that the length of the name (which is a random
+bitstring) is equal to some constant, which means that all names have
+the same length.
 
 Cryptographic assumptions
 +++++++++++++++++++++++++
@@ -89,7 +134,7 @@ The possible sorts and corresponding assumptions are:
 
 Each are declared in the following way.
 
-.. squirreltop::  all
+.. squirreltop::  in
 
    signature sign,checksign,pk
    hash h
@@ -101,19 +146,20 @@ Protocols
 
 Protocols are described inside a pi-calculus. It is based on the following constructs:
 
- *  :g:`new n` id used to instantiate a fresh name;
+ *  :g:`new n` id used to declare a fresh name; (this is optional, and equivalent to declaring the names as seen begore)
  * :g:`out(c,m)` is used to send the term `m` over the channel `c`;
  * :g:`in(c,x)` is used to receive some value from channel `c`, bound to the variable `x`;
-
-* :g:`act; P` correspond to the sequential composition of action `act` with process `P`;
-
-  .. todo:: Charlie:some missing constructs
+ * :g:`act; P` correspond to the sequential composition of action `act` with process `P`;
+ * :g:`process name(vars) = ...` allors to declare a process with a name, in which case using `name(vars)` inside another process unfold the process definition;
+ * :g:`P | Q` is a parallel composition of two processes;
+ * :g:`if phi then P else Q` is a conditional branching;  
+ * :g:`try find vars such that phi in P else Q` is a global lookup over indices, it can be seen as a lookup inside a database.   
+   
 
 As an example, we use a small *RFID* based protocol, with a tag and a reader,
-called the basic hash protocol:
+called the basic hash protocol :cite:`bruso2010formal`.
 
-* Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
-  Verification of Privacy for RFID Systems. pages 75–88, July 2010.
+
 
 .. example:: Basic Hash
 	     
