@@ -1,22 +1,33 @@
 image: python3.7-alpine
 
 before_script:
- - opam update
- - opam switch -y remove gitrunner ||  echo "Opam environment clean up"
- - opam switch -y create gitrunner ocaml-base-compiler.5.0.0
- - opam install . -y --deps-only
- - eval $(opam env)
- - pip3 install -U pip
- - pip3 install sphinx
- - pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
+  - opam update
+  - opam switch -y remove gitrunner ||  echo "Opam environment clean up"
+  - opam switch -y create gitrunner ocaml-base-compiler.5.0.0
+  - opam install . -y --deps-only
+  - eval $(opam env)
+
+build:
+  stage: build
+  script:
+    - make test
+
+docbuild:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /deploy-doc/
+  before_script:
+    - pip3 install -U pip
+    - pip3 install sphinx
+    - pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
 pages:
   stage: deploy
+  rules:
+   - if: $CI_COMMIT_TITLE =~ /deploy-doc/
   script:
-  - make
   - make install
   - make deploy-html
   artifacts:
     paths:
     - public
-
