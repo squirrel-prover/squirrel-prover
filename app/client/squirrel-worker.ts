@@ -71,13 +71,15 @@ export class SquirrelWorker {
   // No reason to access the worker
   protected worker: Worker;
 
-  protected pos: number;
   protected cursor: TreeCursor | null;
   protected view: EditorView | null;
   protected tree: Tree | null;
   protected scriptNode: any;
+  // Sentences sent to worker in wait for answer
   protected curSentences: Array<SyntaxNode>;
+  // Queued sentences
   protected queueSentences: Array<SyntaxNode>;
+  // Executed sentences
   protected executedSentences: Array<SyntaxNode>;
 
   private load_progress: (ratio: number, ev: ProgressEvent) => void;
@@ -100,7 +102,6 @@ export class SquirrelWorker {
     this.config.path = scriptPath || this.config.path;
 
     this.observers = [this];
-    this.pos = 0;
     this.cursor = null;
     this.scriptNode = null;
     this.curSentences = [];
@@ -177,7 +178,6 @@ export class SquirrelWorker {
 
   reset(view:EditorView) {
     this.init();
-    this.cursor = null;
     removeMarks(view,0,view.state.doc.length);
   }
 
@@ -187,6 +187,10 @@ export class SquirrelWorker {
    * @memberof SquirrelWorker
    */
   async init() {
+    this.cursor = null;
+    this.curSentences = [];
+    this.queueSentences = [];
+    this.executedSentences = [];
     this.sendCommand(["Reset"]);
     this.exec([await this.fileManager.getFileString("Prelude.sp")])
   }

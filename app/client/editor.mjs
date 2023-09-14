@@ -3,7 +3,7 @@ import {EditorView, basicSetup } from "codemirror"
 import { keymap } from "@codemirror/view"
 
 // Custom extensions
-import { toggleFile, markField, sentenceHover } from "./cm-extensions"
+import { markField, sentenceHover } from "./cm-extensions"
 
 // FileManager
 import { fileManager, filePanelExt } from "./fileManager.ts"
