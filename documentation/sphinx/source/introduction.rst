@@ -23,10 +23,10 @@ To discover Squirrel, there are several materials available:
 * Going through the reference manual after or in parallel to this tutorial is then possible.
 * In the squirrel repository, an `example repository
   <https://github.com/squirrel-prover/squirrel-prover/tree/master/examples>`_
-  contain some documented examples.
+  contains some documented examples.
 * A long `tutorial
   <https://github.com/squirrel-prover/squirrel-prover/tree/master/examples/tutorial>`_
-  with exercices and a step by step approach is also available there.
+  with exercises and a step by step approach is also available there.
 
 .. note::
 
