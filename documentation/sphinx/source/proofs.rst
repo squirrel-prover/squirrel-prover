@@ -145,8 +145,9 @@ A more comprehensive and detailed guide to introduction patterns, see
 Note however that Squirrel supports only a sub-set of SSReflect intro
 patterns, and that behavior may vary in small ways.
 
-Introduction patterns behavior depends on the tactic they are being
-used in (:tacn:`intro`, :tacn:`have`, :tacn:`destruct`, ...). Nonetheless, 
+Introduction patterns take a different meaning depending
+on the tactic in which they are used
+(:tacn:`intro`, :tacn:`have`, :tacn:`destruct`, ...). Nonetheless,
 a introduction pattern always applies to a set of
 focused sub-goals (sometimes taken in a sequent, with a full
 proof-context) which they modify. A introduction pattern may create or
@@ -915,7 +916,7 @@ Common tactics
 
 .. tacn:: expand {+, @macro_id | @macro_application }
     
-    Expand all occurences of the given macros in both the goal and the
+    Expand all occurrences of the given macros in both the goal and the
     hypotheses, either fully specified with an action or simply a type
     of macro.
     
@@ -1131,9 +1132,9 @@ Local tactics
 
 .. tact:: subst @term, @term
 
-    Replaces all occurences of a variable by a value it must be equal
+    Replaces all occurrences of a variable by a value it must be equal
     to.  Called as :g:`subst x, t`, if :g:`x = t` where :g:`x` is a
-    variable, substitute all occurences of :g:`x` by :g:`t` and remove
+    variable, substitute all occurrences of :g:`x` by :g:`t` and remove
     :g:`x` from the :term:`logical variables <logical_var>`.
 
     .. exn:: Unequal arguments
@@ -1220,16 +1221,16 @@ Several reasonings imply to be able to track how a given name is
 used. For instance, if the name :g:`n` does not ocurr at all in term
 :g:`t`, then :g:`n=t` is false with overwelming probability. To apply
 a cryptographic assumption that needs a secret key, one need to check
-that all occurences of the secret key are valid ones, e.g. only used
+that all occurrences of the secret key are valid ones, e.g. only used
 in key position of the corresponding primitive.
 
-Over macro-free terms, collecting occurences is simply equivalent to
+Over macro-free terms, collecting occurrences is simply equivalent to
 looking at the subterms. However, if some macros occur in :g:`t`,
 typically :g:`input@ts` or :g:`output@ts`, we need to look through all
 the actions that may have happened before :g:`ts` and may depend on
 :g:`n`.
 
-We define here how to build an :gdef:`occurence formula` that will be
+We define here how to build an :gdef:`occurrence formula` that will be
 reused in several tactics description. For any name :g:`n`, any term
 :g:`t` and a set of allowed patterns :g:`pats` (patterns built over
 the name :g:`n` and function applications), we define the formula
@@ -1237,13 +1238,13 @@ the name :g:`n` and function applications), we define the formula
 is possible that :g:`n` occurs in :g:`t` without following one of the
 allowed pattern of `pats`:
 
-* whenever :g:`t` contains as a subterm an occurence :g:`n` that does not follow any of the allowed patterns :g:`pats`, the formula is :g:`true`.
+* whenever :g:`t` contains as a subterm an occurrence :g:`n` that does not follow any of the allowed patterns :g:`pats`, the formula is :g:`true`.
 * whenever :g:`t` contains a :ref:`system-defined macro<section-system-macros>`, :g:`macro@ts`, if `ts` is a concrete action, we simply unfold the definition of the macro, and whenever is it not concrete, we collect all actions of the form :g:`A1` such that :g:`n` occurs in the definition of the action not as an allowed pattern, and the formula :g:`A1<=ts` is added to the conjunction of :g:`occurs(n,t,pats)`.
 
 Occurs is of course generally defined for indiced names that may
 occured in index actions.
 
-.. example:: Basic name occurence
+.. example:: Basic name occurrence
 	     
    Consider the following process:
 
@@ -1278,7 +1279,7 @@ occured in index actions.
    
 This formula may be imprecise, for example due to states.
 
-.. example:: Imprecise state occurence
+.. example:: Imprecise state occurrence
 
    .. squirreldoc:: 
       name n : message
@@ -1292,17 +1293,17 @@ This formula may be imprecise, for example due to states.
    Here, :g:`n` occurs only inside the :g:`init` action, where the
    mutable state is initialized with value :g:`n`. The formula
    :g:`occurs(n,input@B,none)` is then equal to :g:`init < B`.
-   However, the occurence can happen only if :g:`A` did occur between
+   However, the occurrence can happen only if :g:`A` did occur between
    :g:`init` and :g:`B` to reveal the value of the state.
 
 
 We define a precise variant :g:`precise_occurs(n,t,pats)`, that tracks
 more precisly the usages of the states, and also adds the condition
 that the correct value of the state is revealed if a state can contain
-an occurence of :g:`n`.
+an occurrence of :g:`n`.
 
 We also generalize occur to allow for collecting multiple name
-occurences at once, useful when we want to allow patterns depending on
+occurrences at once, useful when we want to allow patterns depending on
 two names at once (see e.g. :tacn:`gdh` or :tacn:`ddh`).
    
 Common tactics
@@ -1321,7 +1322,7 @@ Common tactics
    In a local goal, called over an hypothesis of the form :g:`t=n` for
    some name :g:`n` over a current goal formula :g:`phi`, turns the
    goal into a formula :g:`occur(n,t,none) => phi` (see the
-   definition of the :term:`occurence formula`).
+   definition of the :term:`occurrence formula`).
 
    If one can then prove that :g:`n` cannot occur in :g:`t`, that is
    that :g:`occur(n,t,none)` is false, it then allows to close
@@ -1373,7 +1374,7 @@ Common tactics
         diff(nL,nR)
 
    We specify through the occur formula that the only possible
-   occurence of nL is in fact the one we are currently looking at.
+   occurrence of nL is in fact the one we are currently looking at.
 	
 	
    In all cases, the :g:`precise_ts` makes the tactic use
@@ -1397,7 +1398,7 @@ Local tactics
    :g:`^`, calling :g:`cdh M, g` over a message equality :g:`M` of the
    form `t=g^{a b}` will replace the current goal :g:`phi` by
    :g:`occur(a,t,g^a) || occur(b,t,g^b) => phi` (see the
-   definition of the :term:`occurence formula`). If :g:`a`
+   definition of the :term:`occurrence formula`). If :g:`a`
    and :g:`b` only occur as :g:`g^a` and :g:`g^b`, the goal is then
    closed automatically.
     
@@ -1437,10 +1438,10 @@ Local tactics
    :g:`h(m,k)=t`.  The tactic then create a first new subgoal asking
    to prove that the key is only used in correct position, that is a
    goal with conclusion :g:`not(occur(k,goal,h(_,k))` (see the
-   definition of the :term:`occurence formula`).  The tactics then
-   collects all possible occurence of honest hash :g:`h(u,k)` inside
+   definition of the :term:`occurrence formula`).  The tactics then
+   collects all possible occurrence of honest hash :g:`h(u,k)` inside
    :g:`t`, and for each of them, creates a subgoal with a new
-   hypothesis stating that :g:`m=u`. If such an occurence happens
+   hypothesis stating that :g:`m=u`. If such an occurrence happens
    under a macro, the goal will state that the computation must have
    happened before.
 
@@ -1496,7 +1497,7 @@ Local tactics
    The behaviour of the tactic is similar to :tacn:`cdh`, expect that
    the current goal :g:`phi` is replaced by a more permissive formula
    :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
-   (see the definition of the :term:`occurence formula`).
+   (see the definition of the :term:`occurrence formula`).
 
     .. warning::
        This is a work in progress, a formal description of the rule is pending.       
@@ -1520,7 +1521,7 @@ Local tactics
     The key :g:`k` must only be used in key position, so a subgoal
     asking to prove that :g:`not(occur(k,c,(enc(_,_,k),dec(_,k)))` is
     created when it is not trivially true (see the definition of the
-    :term:`occurence formula`).
+    :term:`occurrence formula`).
 
     In additition, a goal asking to prove that all randomness used for
     encryption are disjoint and fresh (when it is not trivially true).
@@ -1552,15 +1553,15 @@ Global tactics
 	:g:`enc`.    
 
 
-   The tactic will then replace the encryption occurence by an
+   The tactic will then replace the encryption occurrence by an
    encryption of zeroes, yielding :g:`C[enc(zeroes( len(n)), r,
    pk(k))]`.
 
 
    In addition, the tactic creates a subgoal asking to prove that all
-   occurences of the key and encryptions are correct. Notably, one
+   occurrences of the key and encryptions are correct. Notably, one
    must prove that :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` (see
-   the definition of the :term:`occurence formula`) is false (or
+   the definition of the :term:`occurrence formula`) is false (or
    :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
 
    In addition, in the asymetric case, a subgoal is created to prove the
@@ -1589,7 +1590,7 @@ Global tactics
    terms of the form :g:`diff(g^(ab),g^(c)))`. The tactic will close
    the goal if the formula
    :g:`occur((a,b,c),goal,(g^a,g^b,diff(g^(ab),c)))` instantly reduces
-   to false (see the definition of the :term:`occurence formula`).
+   to false (see the definition of the :term:`occurrence formula`).
 
    Latest formal Squirrel description: :cite:`bdjkm21sp`.
        
@@ -1667,7 +1668,7 @@ Global tactics
 
    To apply the enckp tactic, the key :g:`k` must be such that
    :g:`occur(k,biframe,(enc(_,_,k), dec(_,k))` (see the definition of
-   the :term:`occurence formula`) is trivially false. (or
+   the :term:`occurrence formula`) is trivially false. (or
    :g:`occur(k,biframe,(pk(k), dec(_,k))`) for the asymmetric case).
 
    When it is not trivially true, a subgoal is created to prove the
@@ -1701,8 +1702,8 @@ Global tactics
    conditions. It notably produces a goal asking to prove that the key
    is only used in key position, that is that
    :g:`occur(k,biframe,h(_,k))` is false (see the definition of the
-   :term:`occurence formula`). In addition, it creates for each
-   occurences of :g:`h(t,k)` within the biframe (that may occur under
+   :term:`occurrence formula`). In addition, it creates for each
+   occurrences of :g:`h(t,k)` within the biframe (that may occur under
    macros) a subgoal asking to prove that :g:`t <> m`, that is, that
    :g:`m` was never hashed before. Such subgoals may need to be
    created separately for both projections of the biframe.
@@ -1726,7 +1727,7 @@ Global tactics
       :g:`diff(output@A,p)`, which after expanding output is
       :g:`diff(h(n,k),p)`.
 
-      This replaces in the current goal the hash occurence by
+      This replaces in the current goal the hash occurrence by
       :g:`diff(n_PRf,p)`, and creates a subgoal asking to prove that
       the hash message :g:`n` is different from any possible
       previously hashed message. Here, the only other possible hash
@@ -1735,9 +1736,9 @@ Global tactics
       that :g:`[B < A => n <> m]`.
 
 
-   If multiple occurences of hashes occur in the biframe element, the
+   If multiple occurrences of hashes occur in the biframe element, the
    first one is targeted by default. Calling the tactic with an
-   optional :n:`@term_pat` allows to target a specific hash occurence.
+   optional :n:`@term_pat` allows to target a specific hash occurrence.
 
    Latest formal Squirrel description: :cite:`bkl23hal`.
        
@@ -1751,7 +1752,7 @@ Global tactics
    XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)`. This new
    term then allow to drop the old term only if :g:`n` and :g:`t` do
    have the same length (otherwise the one time pad does not work),
-   and if this is the only occurence of :g:`n` in the biframe.
+   and if this is the only occurrence of :g:`n` in the biframe.
 
    When multiple XOR occur in the biframe, one can specify one or two
    optional term patterns, to specify in any order the name :g:`n` or
