@@ -19,6 +19,8 @@ help:
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
+# This remove comments from tutorial so that it can be used as is 
+# in the documentation TODO add directives squirreltop
 tutorial:
 	cp ../../examples/basic-tutorial/tutorial.sp ./source/tutorial.md
 	sed -i 's/(\*//g' ./source/tutorial.md
