@@ -152,11 +152,12 @@ Introduction patterns take a different meaning depending
 on the tactic in which they are used
 (:tacn:`intro`, :tacn:`have`, :tacn:`destruct`, ...). Nonetheless,
 a introduction pattern always applies to a set of
-focused sub-goals (sometimes taken in a sequent, with a full
+focused formulas (sometimes taken in a judgement, with a full
 proof-context) which they modify. A introduction pattern may create or
-close sub-goals. Most introduction patterns act only on the top-most
-variables or assumptions of the goal (e.g. if the goal is `forall x. G` or `H =>
-G` then the pattern will start by acting on `x` or `H`).
+remove focused formulas. Most introduction patterns act only on the top-most
+variables or assumptions of the focused formulas (e.g. if the formula
+is :g:`forall x. G` or :g:`H => G` then the pattern will start by acting on
+:g:`x` or :g:`H`).
 
 .. prodn::
    naming_ip ::= {| _ | ? | @ident }
@@ -169,8 +170,8 @@ G` then the pattern will start by acting on `x` or `H`).
    intro_pat ::= @simpl_ip | @s_item | @expand_ip | @clear_switch | * | >
   
 A :gdef:`naming introduction pattern<naming ip>` :n:`@naming_ip` pops
-the top-most variable or assumption of the goal and names it according
-to the pattern:
+the top-most assumption or universally quantified variable of the
+focused formula and names it according to the pattern:
 
 * :n:`@ident`: using the name :n:`@ident` provided, which fails if
   :n:`@ident` is already in use;
@@ -181,16 +182,16 @@ to the pattern:
   :n:`@hypothesis_id`, several assumption may be named :n:`_`.
 
 A :gdef:`and/or introduction pattern<and or ip>` :n:`@and_or_ip` will,
-for each focused sub-goals, destruct the top assumption of the goal:
+for each focused formulas, destruct the top assumption of the formula:
 
-* :n:`[ @simpl_ip ... @simpl_ip ]`: the top assumption of the goal must
+* :n:`[ @simpl_ip ... @simpl_ip ]`: the top assumption of the formula must
   be a conjunction with as many conjunct as provided simple
   patterns. Destruct the conjunction, handling each conjunct according
   to the corresponding :n:`@simpl_ip`.
 
-* :n:`[ @simpl_ip | ... | @simpl_ip ]`: the top assumption of the goal
+* :n:`[ @simpl_ip | ... | @simpl_ip ]`: the top assumption of the formula
   must be a disjunction with as many disjunct as provided simple
-  patterns. Destruct the disjunction, creating one new sub-goal for
+  patterns. Destruct the disjunction, creating a formula for
   each disjunct and handling each of them according to the
   corresponding :n:`@simpl_ip`.
 
@@ -202,19 +203,20 @@ for each focused sub-goals, destruct the top assumption of the goal:
   destruct the existentially quantified hypothesis during its introduction.
 
 A :gdef:`simplification items<simplification item>` :n:`@s_item`
-simplifies the goals in focus of the pattern:
+simplifies the focused formulas:
 
-* :g:`//` applies :g:`try auto` to the focused goals;
-* :g:`/=` applies :tacn:`simpl` to the focused goals;
+* :g:`//` removes all formulas on which :g:`auto` concludes;
+* :g:`/=` simplifies all formulas using :tacn:`simpl`;
 * :g:`//=` is short-hand for :g:`// /=`;
 
-A :gdef:`rewrite intro pattern item<rewrite ip item>` :n:`@rewrite_ip` uses the top assumption to rewrite
-the focused goals. The top assumption is cleared after rewriting. 
+A :gdef:`rewrite intro pattern item<rewrite ip item>` :n:`@rewrite_ip`
+uses the top assumption to rewrite the focused formulas. The top
+assumption is cleared after rewriting.
 
 * :g:`->` reads the top assumption as a left-to-right rewrite rule.
 * :g:`<-` reads the top assumption as a right-to-left rewrite rule.
 
-An :gdef:`expansion item<expansion item>` :n:`@expand_ip` expands definitions in the focused goals:
+An :gdef:`expansion item<expansion item>` :n:`@expand_ip` expands definitions in the focused formulas:
 
 * :n:`@/@macro_id` expands the applications of the macro symbol
   :n:`@macro_id` whenever it is applied to a time-point that can be
@@ -261,15 +263,15 @@ resolved into a local or global formula as follows:
 * First, the proof-term head :n:`@ident` is resolved as a :n:`@local_formula`
   or :n:`@global_formula` :g:`F`.
 
-* Then, this local or global formula :g:`F` is successively modified
+* Then, this local or global formula :n:`F` is successively modified
   by applying to it the arguments :n:`@pt_arg__1 ... @pt_arg__n`, in
   order, as follows:
 
   + :n:`@sterm_pat`: the top-most element of
-    :n:`F` must be a variable, which is then substituted by :n:`@sterm_pat`,
-    e.g. :n:`forall x, F0` is replaced by :n:`(F0{x -> @sterm})`. 
-    Moreover, a new term unification variable is created for
-    each hole :n:`_` in :n:`@sterm_pat`.
+    :n:`F` must be a universally quantified variable, which is then
+    substituted by :n:`@sterm_pat`, e.g. :n:`forall x, F0` is replaced
+    by :n:`(F0{x -> @sterm})`.  Moreover, a new term unification
+    variable is created for each hole :n:`_` in :n:`@sterm_pat`.
 
   + :n:`@ident`: the top-most element of :n:`F`
     must be an assumption, which is popped and unified with the formula
@@ -280,7 +282,7 @@ resolved into a local or global formula as follows:
     :n:`@proof_term` is recursively resolved into a formula, which is
     then unified with the top-most element of :n:`F`.
 
-  + :n:`_`: if :n:`F`'s top-most element is a variable
+  + :n:`_`: if :n:`F`'s top-most element is a universally quantified variable
     then a new unification variable is created and applied to :n:`F`.
     If :n:`F`'s top-most element is an assumption :n:`H`, a new sub-goal
     requiring to prove :n:`H` is created and discharged to the user.
@@ -415,44 +417,44 @@ Tacticals
 The full syntax of tactic combinations is as follows:
 
 .. prodn::
-   tactical ::=  @tactical; {*, @natural } @tactical
-   | @tactical + @tactical
-   | by @tactical   
-   | nosimpl @tactical
-   | try @tactical
-   | repeat @tactical
-   | @tactical => {+ @intro_pat}
+   tactic ::=  @tactic; {*, @natural } @tactic
+   | @tactic + @tactic
+   | by @tactic   
+   | nosimpl @tactic
+   | try @tactic
+   | repeat @tactic
+   | @tactic => {+ @intro_pat}
    
 The semi-column :g:`;` is used for judgemential composition. The second tactical is then applied to all sub-goals created by the first one, unless number of sub-goals are specified. The :g:`+` performs a or-else when the first tactical fails.
 
 The reminder behaves as follows:
 
-.. tacn:: by @tactical
+.. tacn:: by @tactic
     
    Fails unless the tactical closes the goal.
 
-.. tacn:: nosimpl @tactical
+.. tacn:: nosimpl @tactic
 
   Call tactic without the subjudgement implicit use of simplications.
   This can be useful to understand what's going on step by step.
   This is also necessary in rare occasions where simplifications are
   actually undesirable to complete the proof.
 
-.. tacn:: try @tactical
+.. tacn:: try @tactic
 
   Try to apply the given tactic. If it fails, succeed with the
   sub-goal left unchanged.
 
-.. tacn:: repeat @tactical
+.. tacn:: repeat @tactic
 
   Apply the given tactic, and recursively apply it again on the
   generated sub-goals, until it fails.
 
-.. tacn:: @tactical => @intro_pat_list
+.. tacn:: @tactic => @intro_pat_list
 
    .. prodn:: intro_pat_list ::= {* @intro_pat}
 
-   :n:`@tactical => @intro_pat_list` is equivalent to :n:`@tactical; intro @intro_pat_list`
+   :n:`@tactic => @intro_pat_list` is equivalent to :n:`@tactic; intro @intro_pat_list`
   
 Common errors
 -------------
@@ -514,9 +516,9 @@ Common tactics
    - :n:`@hypothesis_id`: create on sub-goal for each disjunct of
      :n:`@hypothesis_id`;
    - :n:`@term_pat` a term of type :g:`timestamp`: create one sub-goal
-     for each possible :term:`action constructor<action constructor>` of the sequent current
+     for each possible :term:`action constructor<action constructor>` of the judgement current
      system
-     (all systems appearing in a sequent have the same set of actions,
+     (all systems appearing in a judgement have the same set of actions,
      as they must be be compatible).
       
 
@@ -760,8 +762,9 @@ Common tactics
 
 .. tacn:: intro {+ @intro_pat}
     
-    Introduce the top-most variables and assumptions of the goal as
-    specified by the given introduction patterns.
+    Introduce the top-most assumptions and universally quantified
+    variables of the conclusion as specified by the given introduction
+    patterns.
 
 .. tacn:: clear {* @hypothesis_id}
     
@@ -1094,7 +1097,7 @@ Local tactics
 
 .. tact:: project
     
-    Turn a local goal on a :term:`multi system` into one goal for each
+    Turn a local goal on a :term:`multi-system` into one goal for each
     single system in the multi-system.
 
 .. tact:: rewrite equiv {? -}@proof_term

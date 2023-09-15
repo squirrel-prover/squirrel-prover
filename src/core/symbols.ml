@@ -707,8 +707,10 @@ module TyInfo = struct
 (*------------------------------------------------------------------*)
   let get_bty_infos table (ty : Type.ty) : bty_infos =
     match ty with
-    | Type.Boolean -> []
-    | Type.Message -> [Large; Name_fixed_length]
+    | Type.Index | Type.Timestamp | Type.Boolean ->
+      [Fixed; Finite; Well_founded]
+      
+    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
     | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
     | _ -> []
 
@@ -720,32 +722,33 @@ module TyInfo = struct
   (** See `.mli` *)
   let is_finite table ty : bool =
     let rec check : Type.ty -> bool = function
-      | Boolean | Index | Timestamp -> true
+      | TVar _ | TUnivar _ -> false
       | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> check t1 && check t2
+      | Fun (t1, t2) -> check t1 && check t2                          
+      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
       | TBase _ as ty -> check_bty_info table ty Finite
-      | _ -> false
     in 
     check ty
 
   (** See `.mli` *)
   let is_fixed table ty : bool = 
     let rec check : Type.ty -> bool = function
-      | Boolean | Message | Index | Timestamp -> true
+      | TVar _ | TUnivar _ -> false
       | Tuple l -> List.for_all check  l
       | Fun (t1, t2) -> check t1 && check t2
+      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
       | TBase _ as ty -> check_bty_info table ty Fixed
-      | _ -> false
     in 
     check ty
 
   (** See `.mli` *)
   let is_well_founded table ty : bool = 
     let rec check : Type.ty -> bool = function
-      | Boolean | Index | Timestamp | Message -> true
+      | TVar _ | TUnivar _ -> false
+      | Fun _ -> false
       | Tuple l -> List.for_all check l
+      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
       | TBase _ as ty -> check_bty_info table ty Well_founded
-      | _ -> false
     in 
     check ty
 end

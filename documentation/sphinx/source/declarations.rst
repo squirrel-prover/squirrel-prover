@@ -32,8 +32,7 @@ Names are used to model random samplings.
   .. squirreldoc::
      axiom [any] namelength_n : [len (n) = namelength_message]
 
-  It states that all name have the same length, given by a fixed
-  constant.
+  It states that all name have the same length, given by a constant.
   
   It is required that the indexing type :n:`@type__i` is a
   :term:`finite` type, but there are no restrictions over the sampling type
@@ -41,9 +40,7 @@ Names are used to model random samplings.
    
   The sampling *distribution* used over the sampling type :n:`@type__s`
   is usually arbitrary --- though it can be restricted using 
-  :term:`type tags<type tag>` --- except for the
-  :g:`message` type, over which sampling is done uniformly at
-  random over bit-strings of length exactly :math:`\eta`.
+  :term:`type tags<type tag>`.
 
 Two distinct applied name symbols, or the same name symbol applied to
 two different index values, denote **independent** random samplings
@@ -81,17 +78,11 @@ declaration).
 
 .. example:: 
              
-   Equality is defined in Squirrel as a polymorphic abstract function:
+   Equality is defined in Squirrel as an axiomatized polymorphic
+   abstract function:
 
    .. squirreldoc::
       abstract (=) ['a] : 'a -> 'a -> bool
-..
-  Adrien: I removed the sentence below, which seemed too specific and not
-  clear enough.
-  
-  When declaring :term:`axioms <axiom>` over such function symbols
-  can easily lead to contradictions, as for instance one may assume
-  that all types contain a single element, or are infinite, ....
 
 Operators
 ---------
@@ -162,44 +153,83 @@ Squirrel allows to declare functions modeling standard
 :gdef:`cryptographic functions <cryptographic function>` with
 associated cryptographic assumptions.
 
-.. decl:: hash @fun_id 
+.. prodn::
+   crypto_ty_arg ::= @ident : @type
+   
+Types over which the cryptographic functions operate can be specified
+using :n:`@crypto_ty_arg`, where :n:`@ident:@type` state that argument
+named :n:`@ident` is of type :n:`@type`. See the declarations below for 
+a description of which argument names can be provided for each tactic.
+If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
 
-   :g:`hash h` declares a keyed :gdef:`hash function <hash function>`
-   :g:`h(m,k)` satisfying PRF and known-key collision resistance
-   assumptions, enabling the use of :tacn:`prf`, :tacn:`euf` and
-   :tacn:`collision`.
+.. decl:: hash @fun_id {? where {+ @crypto_ty_arg}}
 
-.. decl:: signature @fun_id, @fun_id, @fun_id
+   .. squirreldoc::
+      hash h where m:tym h:tyh k:tyk
 
-   :g:`signature sig, ver, pk` declares a :gdef:`signature scheme`
-   that is unforgeable against chosen message attacks (EUF-CMA)
-   satisfying the equation
-   :g:`ver(sig(m,sk),m,pk(sk)) = true`. Enables the use of :tacn:`euf`.
+   declares a keyed :gdef:`hash function <hash function>` with types
+   :g:`tyk` for keys, :g:`tym` for messages and :g:`tyh` for hash
+   digests.
+   It is assumed to satisfy the PRF and known-key collision
+   resistance assumptions.
 
-.. decl:: aenc @fun_id, @fun_id, @fun_id
+   Enables the use of :tacn:`prf`, :tacn:`euf` and :tacn:`collision`.   
+         
+.. decl:: signature @fun_id, @fun_id, @fun_id {? where {+ @crypto_ty_arg}}
 
-   :g:`aenc enc, dec, pk` declares an IND-CPA and INT-CTXT :gdef:`asymmetric encryption`
-   scheme satisfying the equation
-   :g:`dec(enc(m,pk(sk)),sk) = m`. Enables the use of :tacn:`cca1`, :tacn:`enckp`.
+   .. squirreldoc::
+      signature sig, ver, pk where m:tym sig:tysig sk:tysk pk:typk
+      
+   declares a :gdef:`signature scheme` with types :g:`tym` for
+   messages to be signed, :g:`tysig` for signatures, :g:`tysk` for
+   secret keys and :g:`typk` for public keys.
+   It is assumed unforgeable against
+   chosen message attacks (EUF-CMA) and satisfying the equation
+   :g:`ver(sig(m,sk),m,pk(sk)) = true`.
+
+   Enables the use of :tacn:`euf`.
+
+.. decl:: aenc @fun_id, @fun_id, @fun_id {? where {+ @crypto_ty_arg}}
+
+   .. squirreldoc::
+      aenc enc, dec, pk where ptxt:typtxt ctxt:tyctxt rnd:tyrnd sk:tysk pk:typk
+     
+   declares an :gdef:`asymmetric encryption` scheme with types
+   :g:`typtxt` for plain-texts, :g:`tyctxt` for cipher-texts,
+   :g:`tyrnd` for encryption randomness, :g:`typk` for public keys and
+   :g:`typk` for public keys.
+   It is assumed IND-CCA1 and ENC-KP, and satisfying the equation
+   :g:`dec(enc(m,pk(sk)),sk) = m`.
+      
+   Enables the use of :tacn:`cca1` and :tacn:`enckp`.
    
 
-.. decl:: senc @fun_id, @fun_id, @fun_id
+.. decl:: senc @fun_id, @fun_id, @fun_id {? where {+ @crypto_ty_arg}}
 
-   :g:`senc enc, dec` declares an IND-CPA and INT-CTXT
-   :gdef:`symmetric encryption` scheme satisfying the equation
-   :g:`dec(enc(m,sk),sk) = m`. Enables the use of :tacn:`cca1`,
-   :tacn:`intctxt` and :tacn:`enckp`.
+   .. squirreldoc::
+      senc enc, dec where ptxt:typtxt ctxt:tyctxt rnd:tyrnd k:tyk
 
-.. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id where group:@type exponents:@type
+   declares a :gdef:`symmetric encryption` scheme with types
+   :g:`typtxt` for plain-texts, :g:`tyctxt` for cipher-texts,
+   :g:`tyrnd` for encryption randomness and :g:`tyk` for keys.
+   It is assumed IND-CPA and INT-CTXT, and satisfying the equation
+   :g:`dec(enc(m,sk),sk) = m`.
+      
+   Enables the use of :tacn:`cca1`, :tacn:`intctxt` and :tacn:`enckp`.
 
-   The :gdef:`group declaration`
-   :g:`ddh g, (^) where group:tyg exponents:tye` declares a group with
-   generator :g:`g` and exponentation :g:`(^)`.
-   The group is assumed to satisfy the DDH assumption when declared
-   with :g:`ddh`, the CDH assumption with :g:`cdh`, and the Gap-DH
-   assumption with :g:`gdh`.  Enables the use of :tacn:`cdh`,
-   :tacn:`gdh` and :tacn:`ddh`.
+.. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id {? ,@fun_id} {? where {+ @crypto_ty_arg}}
 
+   The :gdef:`group declaration`:
+   
+   .. squirreldoc::
+      ddh g, (^), ( ** ) where group:tyg exponents:tye
+
+   declares a group with generator :g:`g`, exponentation :g:`(^)` and
+   exponent multiplication :g:`( ** )`.  The group is assumed to
+   satisfy the DDH assumption when declared with :g:`ddh`, the CDH
+   assumption with :g:`cdh`, and the Gap-DH assumption with g:`gdh`.
+   
+   Enables the use of :tacn:`cdh`, :tacn:`gdh` and :tacn:`ddh`.
 
 .. _section-processes:
 
@@ -246,9 +276,10 @@ Processes in Squirrel can use mutable states.
 
 .. decl:: mutable @state_id @binders {? : @type} = @term
   
-   Declares a memory cell named :n:`@state_id` indexed by arguments
-   :n:`@binders` --- which must be of :term:`finite` type --- and initialized
-   to :n:`term`.
+   Declares a memory cell named :n:`state_id` indexed by arguments
+   :n:`@binders` and initialized to :n:`term`.
+   Due to technical limitations, Squirrel currently only supports
+   :n:`@binders` of :term:`finite` type.
 
    The return type :n:`@type` can be provided, or left to be
    automatically inferred by Squirrel.
@@ -340,7 +371,7 @@ using a process featuring multi-terms.
 
    Declare a :gdef:`bi-system` whose actions are obtained by
    translating :n:`@process`, which may use bi-terms.
-   The obtained single systems can be referred to as
+   The obtained :gdef:`single systems<single system>` can be referred to as
    :g:`system_id/left` and :g:`system_id/right`.
    The left (resp. right) single system corresponds to the process
    obtained by taking the left (resp. right) projections of all bi-terms
@@ -436,7 +467,7 @@ component of the :term:`bi-system` named :n:`@system_id`.
 A system expression may be generic (:g:`any`, corresponding to any system,
 already declared or not) or specify a fixed list of system, each
 of which coming with a label identifying it.
-When :n:`@system_id` is a multi-system,
+When :n:`@system_id` is a :gdef:`multi-system`,
 the system expression :n:`@system_id` corresponds to the list of
 its single systems, with the labels that they carry in this multi-system.
 A system expression can also be explicitly formed as

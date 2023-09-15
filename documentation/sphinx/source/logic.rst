@@ -42,8 +42,8 @@ using the following declaration:
 
   Tags have the following semantics:
 
-  * a type is :gdef:`well-founded` when the :term:`built-in` function symbol :g:`<` is well-founded
-    on that type, for any :math:`\eta`;
+  * a type is :gdef:`well-founded` when the :term:`built-in` function
+    symbol :g:`<` is well-founded on that type, for any :math:`\eta`;
   * a type is :gdef:`finite` if
     it has a finite cardinal for each :math:`\eta`;
   * a type is :gdef:`fixed` if its interpretation does not depend on :math:`\eta`;
@@ -54,7 +54,15 @@ using the following declaration:
     over that type sample values of the same length (for a given
     :math:`\eta`).
 
-The parameter :math:`\eta` corresponds to the underlying security parameter used in security proofs.
+  Built-ins types come with the following type tags:
+  
+  * :n:`message` is :g:`fixed, well_founded, named_fixed_length`
+    and :g:`large`;
+  * :n:`bool`, :n:`timestamp` and :n:`index` are
+    :g:`fixed, finite` and :g:`well_founded`.
+
+The parameter :math:`\eta` corresponds to the underlying security
+parameter used in security proofs.
 
 .. note:: A finite type is still unbounded:
           the semantics for the type can be any finite set.
@@ -65,7 +73,7 @@ The parameter :math:`\eta` corresponds to the underlying security parameter used
 Type variables and polymorphism
 -------------------------------
 
-Squirrel supports :gdef:`parametric type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<operator>`, :term:`goals<goal>`, ...).
+Squirrel supports :gdef:`type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<op>`, :term:`goals<goal>`, ...).
 Type variables are identifier preceded by a
 single apostrophe, e.g. :g:`'x`.
 
@@ -155,9 +163,6 @@ which will have to be be inferred by Squirrel.
           to declare a function :term:`abstraction` with a :g:`const`
           tag, as in :g:`fun(x:int[const])=>t`.
 
-.. note:: Binding twice the same variable name yields two distinct
-          variables (there is a hidden unique identifier).
-
 Terms
 =====
 
@@ -200,7 +205,7 @@ A term can be
   the :n:`else` branch can be omitted, which stands for :n:`else zero`);
 - a term with binders, see :token:`term_with_binders`;
 - a identifier, which must be bound by the context, and can refer to
-  a :term:`logical variable <logical_var>`, an :decl:`operator` or
+  a :term:`logical variable <logical_var>`, an :decl:`operator<op>` or
   :decl:`abstract function<abstract>` symbol;
 - a :term:`diff-term` representing several probabilistic values which depend
   on the system;
@@ -334,7 +339,7 @@ in which it is interpreted:
 * its semantics over a :term:`single system`, depends on the system
   definition, see the :ref:`system-defined macros section <section-system-macros>`.
 
-* over a :term:`multi-system<multi system>` :n:`S__1,...,S__n`, it
+* over a :term:`multi-system` :n:`S__1,...,S__n`, it
   represents a :n:`n` multi-term, whose :n:`i`-th component corresponds to
   the interpretation of the macro over the single system :n:`S__i`.
 
