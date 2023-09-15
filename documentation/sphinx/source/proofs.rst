@@ -6,14 +6,14 @@
 Proofs
 ------
 
-The proof of a goal is given after the goal
+The proof of a lemma is given after the lemma declaration,
 between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
 tactic modifies the proof state, which contains a list of goals to prove.
 Each goal is displayed as a judgement displaying its current state.
 Initially, the proof state consists of a single goal, as declared by the
 user. Each tactic then reduces the first goal of the proof state to
-an arbitrary number of new subgoals. When no goal is left, the proof
+an arbitrary number of new sub-goals. When no goal is left, the proof
 is completed and :g:`Qed` can be used.
 
 The complete list of tactics can be found in the corresponding
@@ -478,11 +478,10 @@ Tactics are organized in three categories:
  - :ref:`cryptographic <section-crypto-tactics>`, that rely on
    cryptographic assumptions.
 
-In addition, they are also split between tactics applicable to
-:term:`local goals <local goal>` only, :term:`global goals <global
-goal>` only, or tactics common to both types of goals. Remark that
-applying a tactic to a local goal may produce a global sub-goal, and
-conversely.
+In addition, they are also split between tactics applicable to local
+goals only, global goals only, or tactics common to both types of
+goals. Remark that applying a tactic to a local goal may produce a
+global sub-goal, and conversely.
 
 Additionaly, we also have a few :ref:`utility tactics <section-utility-tactics>` listed at the end.
 
@@ -566,7 +565,7 @@ Common tactics
        induction and case, yielding as many goals as there are actions
        in the protocol, plus one additional goal for the
        initialization. Assuming an action :g:`A` is in the protocol,
-       that has a total of 3 actions, a corresponding created subgoal
+       that has a total of 3 actions, a corresponding created sub-goal
        will look like
 
        .. squirreldoc::
@@ -1013,7 +1012,7 @@ Common tactics
    removing the head function symbol, as follows:
    
    * in a local goal with conclusion :g:`f u = f v`, the conclusion is
-     replaced with :g:`u=v`. This produces as many subgoals as argument
+     replaced with :g:`u=v`. This produces as many sub-goals as argument
      of the head function symbol. For a local goal, the tactic takes no
      arguments.
    * in a global goal, replace :g:`f(u1,...,un)` with :g:`u1,...,un`.
@@ -1510,12 +1509,12 @@ Local tactics
 
    For a hash function :g:`h(x,k)`, one may call :g:`euf M` over a
    message equality :g:`M` of the form :g:`t = h(m,k)` or
-   :g:`h(m,k)=t`.  The tactic then create a first new subgoal asking
+   :g:`h(m,k)=t`.  The tactic then create a first new sub-goal asking
    to prove that the key is only used in correct position, that is a
    goal with conclusion :g:`not(occur(k,goal,h(_,k))` (see the
    definition of the :term:`occurrence formula`).  The tactics then
    collects all possible occurrence of honest hash :g:`h(u,k)` inside
-   :g:`t`, and for each of them, creates a subgoal with a new
+   :g:`t`, and for each of them, creates a sub-goal with a new
    hypothesis stating that :g:`m=u`. If such an occurrence happens
    under a macro, the goal will state that the computation must have
    happened before.
@@ -1547,8 +1546,8 @@ Local tactics
    over an hypothesis of the form :g:`check(s,m,pk(k))`. The behaviour
    is then similar to the hash case, honest signatures that may occur
    in s will be collected, and :g:`m` must be equal to one of the
-   honestly signed message. A subgoal for each possible honest signing
-   case is created, as well as a subgoal specifying that the key is
+   honestly signed message. A sub-goal for each possible honest signing
+   case is created, as well as a sub-goal specifying that the key is
    correctly used, that is, a goal with conclusion
    :g:`not(occur(k,goal,sign(_,k), pk(k))`.
     
@@ -1570,7 +1569,7 @@ Local tactics
    with key :g:`k`, and produce a subogal corresponding to each case
    where :g:`c` is equal to one of those honest encryptions.
 
-   The key :g:`k` must only be used in key position, so a subgoal
+   The key :g:`k` must only be used in key position, so a sub-goal
    asking to prove that :g:`not(occur(k,c,(enc(_,_,k),dec(_,k)))` is
    created when it is not trivially true (see the definition of the
    :term:`occurrence formula`).
@@ -1609,17 +1608,17 @@ Global tactics
    pk(k))]`.
 
 
-   In addition, the tactic creates a subgoal asking to prove that all
+   In addition, the tactic creates a sub-goal asking to prove that all
    occurrences of the key and encryptions are correct. Notably, one
    must prove that :g:`occur(k,bi-frame,(enc(_,_,k), dec(_,k))` (see
    the definition of the :term:`occurrence formula`) is false (or
    :g:`occur(k,bi-frame,(pk(k), dec(_,k))`) for the asymmetric case).
 
-   In addition, in the asymmetric case, a subgoal is created to prove the
+   In addition, in the asymmetric case, a sub-goal is created to prove the
    freshness of the random used in the encryption, with the conclusion
    :g:`occur(r,bi-frame,enc(n,r,m))`.
 
-   In the symmetric case, an additional subgoal is created ensuring
+   In the symmetric case, an additional sub-goal is created ensuring
    that all encryptions are made with distinct fresh randoms (and not
    that just the encryption we are looking at is fresh).
 
@@ -1722,7 +1721,7 @@ Global tactics
    the :term:`occurrence formula`) is trivially false. (or
    :g:`occur(k,bi-frame,(pk(k), dec(_,k))`) for the asymmetric case).
 
-   When it is not trivially true, a subgoal is created to prove the
+   When it is not trivially true, a sub-goal is created to prove the
    freshness of the random used in the encryption, with the conclusion
    :g:`occur(r,bi-frame,enc(n,r,m))`.
 
@@ -1749,14 +1748,14 @@ Global tactics
    Formally, when called over a bi-frame element :g:`i : C[h(m,k)]`,
    the tactic replaces in the current goal the element by :g:`i :
    C[nPRF]` where :g:`nPRF` a newly generated unique name. It in
-   additions produces subgoal requiring to prove the side
+   additions produces sub-goal requiring to prove the side
    conditions. It notably produces a goal asking to prove that the key
    is only used in key position, that is that
    :g:`occur(k,bi-frame,h(_,k))` is false (see the definition of the
    :term:`occurrence formula`). In addition, it creates for each
    occurrences of :g:`h(t,k)` within the bi-frame (that may occur under
-   macros) a subgoal asking to prove that :g:`t <> m`, that is, that
-   :g:`m` was never hashed before. Such subgoals may need to be
+   macros) a sub-goal asking to prove that :g:`t <> m`, that is, that
+   :g:`m` was never hashed before. Such sub-goals may need to be
    created separately for both projections of the bi-frame.
 
    .. example:: Basic PRF application
@@ -1779,11 +1778,11 @@ Global tactics
       :g:`diff(h(n,k),p)`.
 
       This replaces in the current goal the hash occurrence by
-      :g:`diff(n_PRf,p)`, and creates a subgoal asking to prove that
+      :g:`diff(n_PRf,p)`, and creates a sub-goal asking to prove that
       the hash message :g:`n` is different from any possible
       previously hashed message. Here, the only other possible hash
       would occur in :g:`frame@pred(A)`, in the output of :g:`B` if it
-      occured before :g:`A`. The created subgoal then ask to prove
+      occured before :g:`A`. The created sub-goal then ask to prove
       that :g:`[B < A => n <> m]`.
 
 

@@ -1027,7 +1027,7 @@ axiom [idealized3/left,idealized3/left] multprf (i,j,k:index,m:message):
   F1(m,n_PRF(i,j,k)) = F1(m,n_PRF2(i,j,k)).
 
 (* In idealized, we prove that at the end of I, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] resp_key (i,j,k:index[param]):
+global lemma [idealized3/left,idealized3/left] resp_key (i,j,k:index[param]):
  [happens(FI(i,j,k))] -> 
  [exec@FI(i,j,k)] -> 
  equiv(frame@FI(i,j,k), diff(sIR i j k@FI(i,j,k), ikIR(i,j,k))) .
@@ -1072,7 +1072,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] init_key (i,j,k:index[param]):
+global lemma [idealized3/left,idealized3/left] init_key (i,j,k:index[param]):
  [happens(SR(j,k,i))] -> 
  [exec@SR(j,k,i)] -> 
  equiv(frame@SR(j,k,i), diff(sRI i j k@SR(j,k,i), ikIR(j,k,i))).

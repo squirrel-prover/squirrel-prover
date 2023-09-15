@@ -17,7 +17,7 @@ global axiom case_int (i : int[const]) :
   [i = i0] \/ 
   Exists (j : int[const]), [i = succi j].
 
-global goal hybrid ['a] 
+global lemma hybrid ['a] 
  (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
  (* Inductive case of the hybrid proof *)
  (Forall (N0 : int[const]), 

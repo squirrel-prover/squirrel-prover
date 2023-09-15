@@ -580,7 +580,7 @@ axiom  [Ror3, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) 
 
 
 (* By transitivity, we inherit the lemma on Ror to Ror2 *)
-global goal [Ror/left,Ror2] helper_wa_equiv (i, j:index[param]):
+global lemma [Ror/left,Ror2] helper_wa_equiv (i, j:index[param]):
   [happens(R1(j,i))] ->
   equiv(
     exec@R1(j,i) =>
@@ -621,7 +621,7 @@ Qed.
 
 
 
-global goal [Ror2,Ror3] helper_wa_equiv1 (i, j:index[param]):
+global lemma [Ror2,Ror3] helper_wa_equiv1 (i, j:index[param]):
   [happens(R1(j,i))] ->
    equiv(
   exec@R1(j,i) =>
@@ -678,7 +678,7 @@ Qed.
 
 
 (* We now export helper wa 2 all the way to Ror3 *)
-global goal [Ror/left,Ror2] helper_wa_equiv_2 :
+global lemma [Ror/left,Ror2] helper_wa_equiv_2 :
   Forall (i,j:index[param]),
   [happens(I1(i,j))] ->
   equiv(
@@ -714,7 +714,7 @@ Proof.
   by use helper_wa2 with i, j.
 Qed.
 
-global goal [Ror2,Ror3] helper_wa_equiv_3 :
+global lemma [Ror2,Ror3] helper_wa_equiv_3 :
   Forall (i,j:index[param]),
     [happens(I1(i,j))] ->
     equiv(

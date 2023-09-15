@@ -238,7 +238,7 @@ Qed.
 name nfresh : message.
 
 (* Strong forward secrecy of A's key as long. *)
-global goal [set:default/left; equiv:default/left, default/left]
+global lemma [set:default/left; equiv:default/left, default/left]
   kA_strong_forward_secrecy (t, t0 : timestamp[const], A,B,i:index[const]) :
   [t = A2(A,B,i)] ->
   [t <= t0] ->

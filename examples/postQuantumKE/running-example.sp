@@ -137,7 +137,7 @@ Qed.
 
 (* Equivalence between the real and ideal systems,
    with some extra messages given to the distinguisher. *)
-global goal [set: real/left; equiv: real/left, ideal/left] ideal_real :
+global lemma [set: real/left; equiv: real/left, ideal/left] ideal_real :
   Forall (tau:timestamp[const]),
   [happens(tau)] -> equiv(frame@tau, pk(skR), pk(skI), kI, s, skI).
 Proof.
@@ -165,7 +165,7 @@ Qed.
 (* Strong secrecy for the ideal system,
    expressed using a fresh ideal key ikIR. *)
 name ikIR : message.
-global goal [ideal/left, ideal/left] strong_ideal (tau:timestamp[const]) :
+global lemma [ideal/left, ideal/left] strong_ideal (tau:timestamp[const]) :
   [happens(tau)] ->
   equiv(frame@tau,if tau = Initiator1 then diff(sIR@tau,ikIR)).
 Proof.
@@ -187,7 +187,7 @@ Qed.
 
 (* The final strong secrecy result is the consequence of the previous
    lemmas by transitivity. *)
-global goal [set: real/left;
+global lemma [set: real/left;
              equiv: real/left,real/left] SSec_real (tau:timestamp[const]) :
   [happens(tau)] ->
   equiv(frame@tau,if tau = Initiator1 then diff(sIR@tau,ikIR)).

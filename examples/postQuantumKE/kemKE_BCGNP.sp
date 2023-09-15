@@ -368,7 +368,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
+global lemma [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
   [happens(R2(i,j,k))] -> 
   equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))).
 Proof.
@@ -390,7 +390,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key (i,j,k:index[const]):
+global lemma [idealized/left,idealized/left] right_key (i,j,k:index[const]):
   [happens(I1(i,j,k))] ->
   equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), ikIR(i,j,k))) .
 Proof.

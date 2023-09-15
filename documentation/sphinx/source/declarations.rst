@@ -499,15 +499,14 @@ A :n:`@system_id` :g:`S` can also be used as a system context:
 it stands for :g:`set:S; equiv:S/left,S/right`.
 
    
-Axioms and Goals
-================
+Axioms and Lemmas
+=================
 
-Squirrel supports two kinds of :gdef:`goals<goal>` (usually called
-*lemmas* in proof-assistants), one for each kind of formulas:
-:gdef:`local goals<local goal>` for :term:`local formulas<local formula>` and
-:gdef:`global goals<global goal>` for :term:`global formulas<global formula>`.
+Squirrel supports two kinds of :gdef:`lemmas<lemma>`, one for each kind of formulas:
+:gdef:`local lemmas<local lemma>` for :term:`local formulas<local formula>` and
+:gdef:`global lemmas<global lemma>` for :term:`global formulas<global formula>`.
 Similarly, there are local and global
-:gdef:`axioms<axiom>`. The only difference between a goal and an axiom
+:gdef:`axioms<axiom>`. The only difference between a lemma and an axiom
 declaration is that the former creates a proof-obligation that must be
 discharged by the user through a :ref:`proof<section-proofs>`.
 
@@ -536,15 +535,15 @@ Unnamed (local and global) statements can be declared using an
 underscore :g:`_` instead of a statement identifier
 :n:`@statement_id`.
                       
-.. decl:: {? local} {| goal | axiom } @local_statement
+.. decl:: {? local} {| lemma | axiom } @local_statement
    
-   Declares a new local :g:`goal` or :g:`axiom`.
+   Declares a new local :g:`lemma` or :g:`axiom`.
 
-.. decl:: global {| goal | axiom} @global_statement
+.. decl:: global {| lemma | axiom} @global_statement
 
-   Declares a new global :g:`goal` or :g:`axiom`.
+   Declares a new global :g:`lemma` or :g:`axiom`.
 
-.. example:: Local axioms and goals
+.. example:: Local axioms and lemmas
        
    We declare an axiom stating
    that in any system, a pair has a negligible probability of
@@ -559,21 +558,21 @@ underscore :g:`_` instead of a statement identifier
    .. squirreldoc::
       axiom no_repeat t t' : happens(t,t') => t <> t' => input@t <> input@t'
 
-   Finally, the following unnammed local goal states that, for the
+   Finally, the following unnammed local lemma states that, for the
    single system :g:`myProtocol/left`,
    action :g:`A2` can execute only if the adversary sends the message
    :g:`ok` at time-point `A1`:
 
    .. squirreldoc::
-      goal [myProtocol/left] _ : cond@A2 => input@A1 = ok
+      lemma [myProtocol/left] _ : cond@A2 => input@A1 = ok
 
-.. example:: Global goals
+.. example:: Global lemmas
 
-  The next (typical) global goal states that the two projections
+  The next (typical) global lemma states that the two projections
   of the bi-system :g:`myProtocol` are observationally equivalent:
 
   .. squirreldoc::
-     global goal [myProtocol] obs_equiv (t:timestamp[const]) : [happens(t)] -> equiv(frame@t)
+     global lemma [myProtocol] obs_equiv (t:timestamp[const]) : [happens(t)] -> equiv(frame@t)
 
   As a slight variant,
   we now state that :g:`real/left` and :g:`ideal/right`
@@ -583,5 +582,5 @@ underscore :g:`_` instead of a statement identifier
   actions):
 
   .. squirreldoc::
-     global goal [set: real/left; equiv: real/left,ideal/right] ideal_real_equiv :
+     global lemma [set: real/left; equiv: real/left,ideal/right] ideal_real_equiv :
        Forall (tau:timestamp[const]), [happens(tau)] -> equiv(frame@tau)
