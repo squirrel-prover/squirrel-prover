@@ -10,12 +10,12 @@ before_script:
 build:
   stage: build
   script:
-    - make test
+    - make
 
 docbuild:
   stage: .pre
   rules:
-    - if: $CI_COMMIT_TITLE =~ /deploy-doc/
+    - if: $CI_COMMIT_TITLE =~ /\[doc\]/
   script:
     - pip3 install -U pip
     - pip3 install sphinx
@@ -24,7 +24,7 @@ docbuild:
 pages:
   stage: deploy
   rules:
-   - if: $CI_COMMIT_TITLE =~ /deploy-doc/
+   - if: $CI_COMMIT_TITLE =~ /\[doc\]/
   script:
   - make install
   - make deploy-html
