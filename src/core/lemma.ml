@@ -25,7 +25,7 @@ let pp fmt lem =
     | Equiv.Global _ -> "global "
     | Equiv.Local  _ -> ""
   in
-  Fmt.pf fmt "@[<2>%stmt_kind_str%a %a@]"
+  Fmt.pf fmt "@[<2>%s%a %a@]"
     stmt_kind_str
     pp_kind lem.kind Goal.pp_statement lem.stmt
 
