@@ -10,7 +10,7 @@ The proof of a goal is given after the goal
 between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invokation of each
 tactic modifies the proof state, which contains a list of goals to prove.
-Each goal is displayed as a judgment displaying its current state.
+Each goal is displayed as a judgement displaying its current state.
 Initially, the proof state consists of a single goal, as declared by the
 user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new subgoals. When no goal is left, the proof
@@ -24,43 +24,42 @@ The complete list of tactics can be found in the corresponding
 Judgements
 ==========
 
-Squirrel features two kind of judgements: local judgement and global judgement.
+Squirrel features two kinds of judgements:
+local judgements and global judgements.
 
 Logical variables
 -----------------
 
-:gdef:`Logical variable <logical_var>` are free variables in a current goal. Such variables are implicitly quantified based on their type and tag.
+:gdef:`Logical variables<logical_var>` are free variables in a current goal. Such variables are implicitly quantified universally based on their type and tag.
 
 Hypotheses
 ----------
 
+Hypotheses are referred to by an hypothesis identifier :n:`@hypothesis_id`.
+
 .. prodn:: hypothesis_id ::= @ident
 
-Hypotheses are referred to by an hypothesis identifier :n:`@hypothesis_id`
-   
 Local judgement
 ---------------
 
 The general layout for a local judgement is as follows:
 
 .. squirreldoc::
-   [goal> Focused goal (x/N):
    System: currentSystem
    Type variables: tvars
    Variables: vars
-   H_1: formula_1
+   H_1: hypothesis_1
    ...
-   H_k: formula_k
+   H_k: hypothesis_k
    ——————————————
-   goal
+   conclusion
 
-The goal is the formula displayed below the horizontal line, while
-everything above the line is the proof-context.
+The judgement asserts that the conclusion below the line holds
+in the context given above the line.
 We now describe the various components of the judgement:
 
-* we are proving the goal number :g:`x` out of :g:`N` goals;
-
-* the system :g:`currentSystem` of the current judgement is a :n:`@system_expr`;
+* the system :g:`currentSystem` is a :n:`@system_expr` in which the
+  judgement's formulas should be understood;
 
 * :g:`tvars` are the judgement's :ref:`type variables<section-polymorphism>`; 
 
@@ -71,7 +70,7 @@ We now describe the various components of the judgement:
   a :term:`global formula` or a local hypothesis whose body is a
   :term:`local formula`;
 
-* the goal :g:`conc` is a :term:`local formula`.
+* :g:`conclusion` is a :term:`local formula`.
 
 
 Global judgement
@@ -87,7 +86,7 @@ When the goal is a single :n:`equiv(@term,...,@term)` predicate,
 all the bi-terms that need to be proved equivalent are displayed as a
 numbered list.
 
-.. example:: Initial judgment for observational equivalence
+.. example:: Initial judgement for observational equivalence
 
    Consider a goal for observational equivalence, where the
    frame is enriched with some public key, as follows:
@@ -116,15 +115,15 @@ Generalities
 Tactic arguments
 ----------------
 
-Tactics that apply to judgement whose goal is an equivalence may take a natural number
-as argument to identify one item in the equivalence. This is represented
-using the :token:`position` token.
+Tactics that apply to judgements whose conclusion is an equivalence
+may take a natural number as argument to identify one item in the equivalence.
+This is represented using the :token:`position` token.
 
 .. prodn::
   position ::= @natural
 
 Many tactics expecting a term support term :gdef:`patterns<pattern>`,
-which are underspecified term that can includ term holes
+which are underspecified terms that can include term holes
 :g:`_`. Often-times, the tactic will match the pattern against
 sub-terms of the goal until it manages to infer values for the term
 holes.
@@ -142,9 +141,9 @@ Intro patterns
 ~~~~~~~~~~~~~~
   
 Introduction patterns are the principal tool used to do proof-context
-`book-keeping <https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#bookkeeping>`_,
-which are used in Squirrel with a SSReflect inspired syntax.
-A more comprehensive and detailed guide to introduction patterns, see
+`book-keeping <https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#bookkeeping>`_.
+They are used in Squirrel with an SSReflect-inspired syntax.
+For a more comprehensive and detailed guide to introduction patterns, see
 `here <https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#introduction-in-the-context>`_.
 Note however that Squirrel supports only a sub-set of SSReflect intro
 patterns, and that their behavior in Squirrel may vary in small ways.
@@ -169,8 +168,8 @@ G` then the pattern will start by acting on `x` or `H`).
    clear_switch ::= %{ {+ @hypothesis_id} %}
    intro_pat ::= @simpl_ip | @s_item | @expand_ip | @clear_switch | * | >
   
-A :gdef:`naming introduction pattern<naming ip>` :n:`@naming_ip` pop
-the top-most variable or assumption of the goal and name it according
+A :gdef:`naming introduction pattern<naming ip>` :n:`@naming_ip` pops
+the top-most variable or assumption of the goal and names it according
 to the pattern:
 
 * :n:`@ident`: using the name :n:`@ident` provided, which fails if
@@ -178,7 +177,7 @@ to the pattern:
 * :n:`?`: using a name automatically choosen by Squirrel;
 * :n:`_`: using an automatically choosen name for variables, and the
   name :n:`_` for assumptions, which is a special name that can never
-  by referred to by the user. Note that, contrary to other
+  be referred to by the user. Note that, contrary to other
   :n:`@hypothesis_id`, several assumption may be named :n:`_`.
 
 A :gdef:`and/or introduction pattern<and or ip>` :n:`@and_or_ip` will,
@@ -195,18 +194,25 @@ for each focused sub-goals, destruct the top assumption of the goal:
   each disjunct and handling each of them according to the
   corresponding :n:`@simpl_ip`.
 
+.. note::
+  Existentials are viewed as conjunctions in intro pattern.
+  Hence, when the conclusion is of the form :g:`(exists x, phi) => psi`,
+  the tactic `intro [x H]` will introduce a variable `x` and hypothesis
+  `H : phi`. Here, the conjunctive intro pattern has been used to
+  destruct the existentially quantified hypothesis during its introduction.
+
 A :gdef:`simplification items<simplification item>` :n:`@s_item`
 simplifies the goals in focus of the pattern:
 
 * :g:`//` applies :g:`try auto` to the focused goals;
 * :g:`/=` applies :tacn:`simpl` to the focused goals;
-* :g:`//=` is syntactic equivalent to :g:`// /=`;
+* :g:`//=` is short-hand for :g:`// /=`;
 
-A :gdef:`rewrite ip item<rewrite ip item>` :n:`@rewrite_ip` uses the top assumption to rewrite
+A :gdef:`rewrite intro pattern item<rewrite ip item>` :n:`@rewrite_ip` uses the top assumption to rewrite
 the focused goals. The top assumption is cleared after rewriting. 
 
-* :g:`->` reads the top assumption as a left-to-right rewrite rule
-* :g:`<-` reads the top assumption as a right-to-left rewrite rule
+* :g:`->` reads the top assumption as a left-to-right rewrite rule.
+* :g:`<-` reads the top assumption as a right-to-left rewrite rule.
 
 An :gdef:`expansion item<expansion item>` :n:`@expand_ip` expands definitions in the focused goals:
 
@@ -225,7 +231,7 @@ Proof terms
 
 Proof terms are used by several tactics (see e.g. :tacn:`have` or
 :tacn:`apply`) as a convenient way to combine and (partially) apply
-hypothesis, axioms or proven goals, in order to derive new facts.
+hypotheses, axioms or proved goals, in order to derive new facts.
 
 .. prodn::
    proof_term ::= @ident {* @pt_arg}
@@ -233,7 +239,7 @@ hypothesis, axioms or proven goals, in order to derive new facts.
 
 In a :n:`@proof_term` or a :n:`@pt_arg`, an identifier :n:`@ident` must
 refer to an hypothesis in the current proof context, an axiom or a
-previously proven goal.
+previously proved goal.
 
 Note that the grammar for proof term arguments :token:`pt_arg` is
 ambiguous (because of the :token:`ident` and :token:`sterm`
@@ -256,7 +262,7 @@ resolved into a local or global formula as follows:
   or :n:`@global_formula` :g:`F`.
 
 * Then, this local or global formula :g:`F` is successively modified
-  by applying it the the arguments :n:`@pt_arg__1 ... @pt_arg__n`, in
+  by applying to it the arguments :n:`@pt_arg__1 ... @pt_arg__n`, in
   order, as follows:
 
   + :n:`@sterm_pat`: the top-most element of
@@ -267,11 +273,11 @@ resolved into a local or global formula as follows:
 
   + :n:`@ident`: the top-most element of :n:`F`
     must be an assumption, which is popped and unified with the formula
-    corresponding to the hypothesis, axiom or proven goal identified
+    corresponding to the hypothesis, axiom or proved goal identified
     by :n:`@ident`.
 
   + :n:`(% @proof_term)`: the proof-term argument
-    :n:`@proof_term` is (recursively resolved) intro a formula, which is
+    :n:`@proof_term` is recursively resolved into a formula, which is
     then unified with the top-most element of :n:`F`.
 
   + :n:`_`: if :n:`F`'s top-most element is a variable
@@ -290,23 +296,23 @@ resolved into a local or global formula as follows:
   
 
 In practice, the application of a proof-term argument is more complex
-that described above, for several reasons:
+than described above, for several reasons:
 
-* checks must be perfomed to ensure that the systems formulas apply-to
-  can be made compatible, e.g. apply an axiom over system :g:`[any]`
+* checks must be perfomed to ensure that compatibility of the systems
+  corresponding to the applied formulas,
+  e.g. apply an axiom over system :g:`[any]`
   to a formula applying over system :g:`[default]` is valid, but the
   converse is not;
 
 * some formula manipulation occurs when trying to mix global and local
   formulas, e.g. when applying a global formula to a local formula.
 
-
 .. _reduction:
 
 Reduction
 ---------
 
-Several tactics (e.g., :tacn:`simpl` and :tacn:`auto`) rely on an
+Several tactics (e.g., :tacn:`simpl` and :tacn:`auto`) rely on a
 reduction engine. This engine repeatedly applies several
 transformations, corresponding to the following flags.
 
@@ -335,8 +341,8 @@ rules added to the rewriting database using the :cmd:`hint rewrite`
 command.
 
 
-Automatic simplifications tactics
----------------------------------
+Automatic simplification tactics
+--------------------------------
 
 There are three automated tactics. The :tacn:`autosimpl` tactic is
 called automatically after each tactic, unless the tactical
@@ -465,9 +471,9 @@ Tactics
 
 Tactics are organized in three categories:
 
- - :ref:`generique <section-generic-tactics>`, that rely on generic logical reasoning;
+ - :ref:`generic <section-generic-tactics>`, that rely on generic logical reasoning;
  - :ref:`structural <section-structural-tactics>`, that rely on properties of protocols and equality;
- - :ref:`cryptographic <section-crypto-tactics>`, that rely on some
+ - :ref:`cryptographic <section-crypto-tactics>`, that rely on
    cryptographic assumptions.
 
 In addition, they are also split between tactics applicable to
@@ -496,7 +502,7 @@ Common tactics
 .. tacn:: assumption {? @hypothesis_id}
    :name: assump
       
-    Concludes if the goal or false appears in the hypotheses. The
+    Concludes if the goal (or :g:`false`) appears in the hypotheses. The
     hypothesis to be checked against may be directly specified using
     :n:`@hypothesis_id`.
 
@@ -589,7 +595,7 @@ Common tactics
     (existantial quantification, disjunction or conjunction), 
     applying the simple introduction pattern :n:`@simpl_ip` to it.
 
-    :n:`@simpl_ip` defaults to :n:`?` if not pattern is provided by the user.
+    :n:`@simpl_ip` defaults to :n:`?` if no pattern is provided by the user.
     
     .. example:: Destruct 
        
@@ -600,8 +606,9 @@ Common tactics
           destruct H as [H1 | [H2 H3]]
           
 
-       removes the :g:`H` hypothesis and create two sub-goal, one with the hypothesis :g:`H1:A`, the other
-       with the hypotheses :g:`H2:B, H3:C`.
+       removes the :g:`H` hypothesis and creates two sub-goal,
+       one with the hypothesis :g:`H1:A`,
+       the other with the hypotheses :g:`H2:B, H3:C`.
     
 .. tacn:: exists {* @term}
     
@@ -741,7 +748,7 @@ Common tactics
    
       No instance of the rewrite rule were found
     
-   .. exn:: maxed nested rewriting
+   .. exn:: max nested rewriting reached
     
       There were too many nested rewriting. This is to avoid infinite rewriting loops.
 
@@ -821,7 +828,7 @@ Local tactics
 .. tact:: true
    :name: true    
     
-   Closes a goal when the conclusion is true. 
+   Closes a goal when the conclusion is (syntactically) :g:`true`. 
 
       
 Global tactics
@@ -1107,7 +1114,7 @@ Local tactics
 
     .. example:: Hash rewrite
 
-       Consider the following judgment
+       Consider the following judgement
 
        .. squirreldoc::
           [goal> Focused goal (1/1):
@@ -1227,24 +1234,24 @@ Global tactics
 Cryptographic tactics
 ---------------------
 
-Cryptographic tactics enables reasoning over cryptographic and
+Cryptographic tactics enable reasoning over cryptographic and
 probabilistic properties of random samplings and primitives.
 
 Occurrence formula
 ~~~~~~~~~~~~~~~~~~
 
 Several reasonings imply to be able to track how a given name is
-used. For instance, if the name :g:`n` does not ocurr at all in term
+used. For instance, if the name :g:`n` does not occur at all in term
 :g:`t`, then :g:`n=t` is false with overwelming probability. To apply
-a cryptographic assumption that needs a secret key, one need to check
-that all occurrences of the secret key are valid ones, e.g. only used
-in key position of the corresponding primitive.
+a cryptographic assumption relying on a secret key, one needs to check
+that all occurrences of the secret key are valid (i.e. correspond
+to the key argument of the corresponding primitive).
 
 Over macro-free terms, collecting occurrences is simply equivalent to
 looking at the subterms. However, if some macros occur in :g:`t`,
 typically :g:`input@ts` or :g:`output@ts`, we need to look through all
-the actions that may have happened before :g:`ts` and may depend on
-:g:`n`.
+the actions that may have happened before :g:`ts` to look for our
+occurrences.
 
 We define here how to build an :gdef:`occurrence formula` that will be
 reused in several tactics description. For any name :g:`n`, any term
@@ -1265,8 +1272,8 @@ allowed pattern of `pats`:
   pattern, and the formula :g:`A1<=ts` is added to the conjunction of
   :g:`occurs(n,t,pats)`.
 
-Occurs is of course generally defined for indiced names that may
-occured in index actions.
+Occurs is of course generally defined for indexed names that may
+occur in indexed actions.
 
 .. example:: Basic name occurrence
 
@@ -1379,7 +1386,7 @@ Common tactics
       n`. Intuitively, this holds as :g:`n` is only revealed after
       :g:`A` has occured.
 
-      The judgment corresponding to this proof will look like this:
+      The judgement corresponding to this proof will look like this:
 
       .. squirreldoc::
          [goal> Focused goal (1/1):
@@ -1389,7 +1396,7 @@ Common tactics
          ----------------------------------------
          false
 
-      And calling :g:`fresh Eq` turns the judgment into:
+      And calling :g:`fresh Eq` turns the judgement into:
 
       .. squirreldoc::
          [goal> Focused goal (1/1):
