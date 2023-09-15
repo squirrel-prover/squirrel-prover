@@ -1447,7 +1447,29 @@ Local tactics
 
    .. todo::
       why is it WIP?
-            
+
+.. tact:: gdh @hypothesis_id, @term
+   :name: gdh
+
+   This tactic applies the gap Diffie-Hellman assumption (see
+   e.g. :cite:`okamoto2001gap`), which is similar to CDH over :math:`g^a`
+   and :math:`g^b` but the attacker is also allowed to access an oracle
+   testing equality to :math:`g^{ab}`. It also includes the square GDH
+   variant (see :cite:`fujioka2011designing`), equivalent to the GDH
+   assumption for prime order groups, where the attacker can also test
+   equality to :math:`g^{aa}` and :math:`g^{bb}`.
+
+   A gdh :term:`group declaration <group declaration>` must have been
+   specified.
+
+   The behaviour of the tactic is similar to :tacn:`cdh`, expect that
+   the current goal :g:`phi` is replaced by a more permissive formula
+   :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
+   (see the definition of the :term:`occurrence formula`).
+
+   .. warning::
+      This is a work in progress, a formal description of the rule is pending.       
+
 .. tact:: collision
    :name: collision
     
@@ -1521,28 +1543,6 @@ Local tactics
    :g:`not(occur(k,goal,sign(_,k), pk(k))`.
     
    Latest formal Squirrel description: :cite:`bkl23hal`.
-       
-.. tact:: gdh @hypothesis_id, @term
-   :name: gdh
-
-   This tactic applies the gap Diffie-Hellman assumption (see
-   e.g. :cite:`okamoto2001gap`), which is similar to CDH over :g:`g^a`
-   and :g:`g^b` but the attacker is also allowed to access an oracle
-   testing equality to :g:`g^ab`. It also includes the square GDH
-   variant (see :cite:`fujioka2011designing`), equivalent to the GDH
-   assumption for prime order groups, where the attacker can also test
-   equality to :g:`g^aa` and :g:`g^bb`.
-
-   A gdh :term:`group declaration <group declaration>` must have been
-   specified.
-
-   The behaviour of the tactic is similar to :tacn:`cdh`, expect that
-   the current goal :g:`phi` is replaced by a more permissive formula
-   :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
-   (see the definition of the :term:`occurrence formula`).
-
-   .. warning::
-      This is a work in progress, a formal description of the rule is pending.       
 
 .. tact:: intctxt @hypothesis_id
    :name: intctxt
@@ -1605,7 +1605,7 @@ Global tactics
    the definition of the :term:`occurrence formula`) is false (or
    :g:`occur(k,bi-frame,(pk(k), dec(_,k))`) for the asymmetric case).
 
-   In addition, in the asymetric case, a subgoal is created to prove the
+   In addition, in the asymmetric case, a subgoal is created to prove the
    freshness of the random used in the encryption, with the conclusion
    :g:`occur(r,bi-frame,enc(n,r,m))`.
 
@@ -1621,8 +1621,8 @@ Global tactics
 
    This tactic applies the Decisional Diffie-Helman assumption (see
    e.g. :cite:`okamoto2001gap`), stating that given two groups elents
-   :g:`g^a` and :g:`g^b` it is difficult to distinguish :g:`g^(ab)`
-   from a fresh :g:`g^c`.
+   :math:`g^a` and :math:`g^b` it is difficult to distinguish :math:`g^{ab}`
+   from a fresh :math:`g^c`.
 
    A ddh :term:`group declaration <group declaration>` must have been
    specified.
