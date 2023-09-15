@@ -372,7 +372,7 @@ bundle:
 
 zipsquirrel: jsquirrel bundle 
 	rm -f _build/default/app/jsquirrel.zip
-	cd _build/default/app
+	cd _build/default/app && \
 	zip -r jsquirrel.zip www
 
 .PHONY: watch
