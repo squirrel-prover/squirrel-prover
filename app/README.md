@@ -30,9 +30,35 @@ In root directory of Squirrel :
 make; make start
 ```
 
-Then visit [http://localhost:8080](http://localhost:8080)…
+## Generate `jsquirrel.zip`
+To generate a standalone jsquirrel in zip you can,
+in root directory of Squirrel :
+```bash
+make zipsquirrel
+```
+
+The zip file is in _build/default/app/jsquirrel.zip
+
+# How to use `jsquirrel` from zip file
+
+First unzip `jsquirrel.zip` anywhere you want with
+```bash
+unzip jsquirrel.zip
+```
+
+Then go in the newly extracted `www` directory and serve with your
+favorite light server like `python http.server`
+```bash
+cd www; python3 -m http.server
+```
+
+This should serve `jsquirrel` into `localhost:8000` by default.
+Open your browser at `localhost:8000`…
 
 ## Usage
 
 At this point only `ctrl-enter`, `ctrl-↑`, `ctrl-↓`  (resp. exec to
 cursor, undo, exec next sentence commands) are bound.
+
+`ctrl-o` will open/close a dialog to open a file. `ctrl-s` will open/close a
+dialog to save the file.
