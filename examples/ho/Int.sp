@@ -29,7 +29,7 @@ abstract i1 : int.
 
 axiom [any] i0_lub (i : int) : i <= i0 <=> i = i0.
 
-goal [any] i0_min (i : int) : i0 <= i.
+lemma [any] i0_min (i : int) : i0 <= i.
 Proof.
   have [H|H] := le_linear_i i0 i.
   + assumption.
@@ -38,7 +38,7 @@ Proof.
     apply le_refl_i.
 Qed.
 
-goal [any] not_lt_i0 (i : int) : not (i < i0).
+lemma [any] not_lt_i0 (i : int) : not (i < i0).
 Proof.
   intro A.
   by rewrite lt_charac i0_lub in A.
@@ -51,7 +51,7 @@ op succi (i : int) = i ++ i1.
 axiom [any] succi_le (i : int) : i < succi i.
 axiom [any] succi_le0 (i,j : int) : i < succi j <=> i <= j.
 
-goal [any] lt_succ (i, j : int) :
+lemma [any] lt_succ (i, j : int) :
   (i < succi j) <=>
   (i <> succi j && i <= succi j).
 Proof.

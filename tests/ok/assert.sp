@@ -11,19 +11,19 @@ axiom ax : a=b.
 (*------------------------------------------------------------------*)
 (* old syntax *)
 
-goal _ (i:message) : a=b.
+lemma _ (i:message) : a=b.
 Proof.
   assert (i=i) as T; 1: auto.
   by apply ax.
 Qed.
 
-goal _ (i:message) : a=b.
+lemma _ (i:message) : a=b.
 Proof.
   have T: i=i by auto.
   by apply ax.
 Qed.
 
-goal _ (i:index) : a=b.
+lemma _ (i:index) : a=b.
 Proof.
   assert (i=i); 1: auto.
   by apply ax.
@@ -32,20 +32,20 @@ Qed.
 (*------------------------------------------------------------------*)
 (* new syntax *)
 
-goal _ (i:message) : a=b.
+lemma _ (i:message) : a=b.
 Proof.
   have T: i=i; 1: auto.
   by apply ax.
 Qed.
 
-goal _ (i:message) : a=b.
+lemma _ (i:message) : a=b.
 Proof.
   have T: i=i by auto.
   by apply ax.
 Qed.
 
 (* assert a local goal in a global judgement *)
-global goal _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
+global lemma _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
 Proof.
   intro H.
   have T: a = b. {
@@ -56,7 +56,7 @@ Proof.
 Qed.
 
 (* assert a global goal in a global judgement *)
-global goal _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
+global lemma _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
 Proof.
   intro H.
   have T: [a = b]; 
@@ -66,7 +66,7 @@ Proof.
 Qed.
 
 (* assert a global goal in a local judgement *)
-goal _ (i:message) : b = c => a = c.
+lemma _ (i:message) : b = c => a = c.
 Proof.
   intro H.
   have T: [a = b];
@@ -76,7 +76,7 @@ Proof.
 Qed.
 
 (* assert a global goal in a local judgement *)
-goal _ (i:message) : output@init = empty => b = c => a = c.
+lemma _ (i:message) : output@init = empty => b = c => a = c.
 Proof.
   intro H1 H2.
   have T: [a = b]. 
@@ -97,7 +97,7 @@ name n : message.
 name m : message. 
 
 (* test a global assert followed by a rewrite equiv *)
-global goal [set:default/left; equiv:default] _ : 
+global lemma [set:default/left; equiv:default] _ : 
   [a <> b] -> [h(a,k) <> h(b,k)].
 Proof.
   intro U.

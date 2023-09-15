@@ -14,7 +14,7 @@ abstract u : message
 
 system (out(c,sign(m,k)) | ( in(c,x); if checksign(n,x,pk(k)) then out(c,x))).
 
-goal _ (tau:timestamp): happens(A1) => cond@A1 => False.
+lemma _ (tau:timestamp): happens(A1) => cond@A1 => False.
 Proof.
   intro Hap Hcond.
   expand cond@A1.

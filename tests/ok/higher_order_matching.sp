@@ -8,7 +8,7 @@ axiom [any] foo (g : index -> message) :
   (fun (i : index) => g i) = F.  
 
 (* basic check that higher-order matching works  *)
-goal [any] _ (f : index * index -> message) :
+lemma [any] _ (f : index * index -> message) :
   (fun (i : index) => f (i,i)) = fun (i : index) => empty.
 Proof.
   rewrite foo. admit.
@@ -19,7 +19,7 @@ Qed.
 (*------------------------------------------------------------------*)
 
 (* prove some lemma with higher-order arguments, used later *)
-goal [any] try_find_simpl
+lemma [any] try_find_simpl
   (t0       : timestamp, 
    a0       : index,
    phi      : timestamp -> index -> bool,
@@ -72,7 +72,7 @@ channel c.
 system [Sys] !_A T: out(c,empty).
 
 (*------------------------------------------------------------------*)
-goal [Sys] _ (t : timestamp, A : index) :
+lemma [Sys] _ (t : timestamp, A : index) :
   (try find (t0:timestamp) such that
      (exists (A0:index),
         t0 = T(A0) &&

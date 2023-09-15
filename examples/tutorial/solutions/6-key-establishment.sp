@@ -106,7 +106,7 @@ print exec_cond.
 
 (* In the real protocol, the key obtained after checking the signature
    is sk as expected. *)
-goal [default/left] correct_key :
+lemma [default/left] correct_key :
   happens(Bout) => exec@Bout =>
   asym_dec(fst(input@Brecv),skB) = sk.
 Proof.
@@ -134,7 +134,7 @@ Qed.
    the left and right frames.
    Adding more things can make the proof simpler, and also results in
    a stronger lemma that will be useful in the rest of the file. *)
-global goal [default] idealize_key_exchange (t:timestamp[const]) :
+global lemma [default] idealize_key_exchange (t:timestamp[const]) :
   [happens(t)] ->
   equiv((*<*)enc_pk(skB), sskA, sk, rr,(*>*)frame@t).
 Proof.
@@ -178,9 +178,9 @@ abstract g : message -> message.
 name n1 : message.
 name n2 : message.
 
-(* In this goal we use the same system on the left and right
+(* In this lemma we use the same system on the left and right
    so that, intuitively, systems do not matter anymore. *)
-global goal [default/left,default/left] rewrite_equiv_0 (x,y,z:message) :
+global lemma [default/left,default/left] rewrite_equiv_0 (x,y,z:message) :
   equiv(x,diff(y,z)) -> [g(z) = f(x)] -> [f(x) = g(y)].
 Proof.
   intro H1 H2.
@@ -189,7 +189,7 @@ Proof.
 Qed.
 
 (* As with `rewrite` we can use `rewrite equiv -H`. *)
-global goal [default/left,default/left] rewrite_equiv_1 (x,y,z:message) :
+global lemma [default/left,default/left] rewrite_equiv_1 (x,y,z:message) :
   equiv(x,diff(y,z)) -> [g(y) = f(x)] -> [f(x) = g(z)].
 Proof.
   intro H1 H2.
@@ -201,7 +201,7 @@ Qed.
    You'll have to introduce an intermediate step using `have`.
    Warning: incorrectly using `rewrite equiv` does not cause a failure
    but can result in an unprovable goal. *)
-global goal [default/left,default/left] rewrite_equiv_2 :
+global lemma [default/left,default/left] rewrite_equiv_2 :
   equiv(n1,diff(n1,n2)) -> [False].
 Proof.
   (* BEGIN EXO *)
@@ -225,16 +225,16 @@ name k : message.
 
 
 (* We recall the `hash_5_lemma` we proved in `1-crypto-hash` *)
-global goal hash_5_lemma : equiv(diff(h(a,k),n1),n2).
+global lemma hash_5_lemma : equiv(diff(h(a,k),n1),n2).
 Proof.
   prf 0.
   by fresh 0.
 Qed.
 
-(* In `1-crypto-hash`, we proved that the following goal using `euf`.
+(* In `1-crypto-hash`, we proved the following lemma using `euf`.
    But actually, this also follows from `prf`. 
    Try proving it without euf but using `hash_5_lemma` instead! *)
-goal [default/left] hash_7 : h(a,k) <> n2.
+lemma [default/left] hash_7 : h(a,k) <> n2.
 Proof.
   (* BEGIN EXO *)
   rewrite equiv hash_5_lemma.
@@ -242,8 +242,8 @@ Proof.
   (* END EXO *)
 Qed.
 
-(* Similarly, prove the next goal without euf or collision. *)
-global goal [set:default/left; equiv:default] hash_6 : 
+(* Similarly, prove the next lemma without euf or collision. *)
+global lemma [set:default/left; equiv:default] hash_6 : 
   [a <> b] -> [h(a,k) <> h(b,k)].
 Proof.
   (* BEGIN EXO *)
@@ -269,7 +269,7 @@ Qed.
    holds afterwards, but the proof would be more difficult.
    Proving this would be trivial for default/right... use rewrite
    equiv to show that this change is justified! *)
-goal [default/left] _ (tau:timestamp[glob,const]) :
+lemma [default/left] _ (tau:timestamp[glob,const]) :
   happens(pred(tau)) =>
   not(Bout < tau) =>
   not(input@tau = sk).
@@ -289,7 +289,7 @@ Qed.
    of the annotation does not change the meaning of the formula but should
    ease the proof. These annoying details are due to excessive rigidity
    in the current version of the tool. *)
-global goal [set: default; equiv: default/left,default/left] _ :
+global lemma [set: default; equiv: default/left,default/left] _ :
   [happens(Bout)] ->
   equiv(frame@pred(Bout),sym_enc(diff(input@Bout,zeroes(input@Bout)),rr,sk)).
 Proof.

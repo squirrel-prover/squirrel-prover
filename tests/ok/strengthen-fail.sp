@@ -18,7 +18,7 @@ system !_i P(i).
 
 
 (* check that frame strenghtening does not deduce cond@t from frame@t *)
-global goal _ (t :timestamp) :
+global lemma _ (t :timestamp) :
   [happens(t)] -> 
   equiv(frame@t) -> equiv(frame@t, cond@t).
 Proof. 
@@ -28,7 +28,7 @@ Abort.
 (*------------------------------------------------------------------*)
 (* check that frame@t -> exec@t *)
 
-global goal _ (t :timestamp) :
+global lemma _ (t :timestamp) :
   [happens(t)] ->
   equiv(frame@t) -> equiv(frame@t, exec@t).
 Proof. 

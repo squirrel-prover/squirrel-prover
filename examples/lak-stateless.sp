@@ -37,7 +37,7 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
-goal executable_R1 (t:timestamp) (j,i:index) :
+lemma executable_R1 (t:timestamp) (j,i:index) :
   happens(t) => exec@t => R1(j,i)<=t => exec@R1(j,i) && cond@R1(j,i).
 Proof.
   intro Hh He Hle.
@@ -45,7 +45,7 @@ Proof.
   by use He' with R1(j,i).
 Qed.
 
-goal no_confusion :
+lemma no_confusion :
   forall (t:timestamp,i,j,jj:index),
   t = R1(j,i) =>
   happens(R1(j,i)) => exec@R1(j,i) => R1(jj,i)<R1(j,i) =>
@@ -89,7 +89,7 @@ Proof.
     by fresh Hfresh.
 Qed.
 
-goal wa :
+lemma wa :
   forall (i:index,j:index),
   happens(R1(j,i)) => exec@R1(j,i) =>
   exists (ii:index,k:index),

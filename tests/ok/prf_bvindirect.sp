@@ -15,7 +15,7 @@ abstract one : message.
 system !_i out(c,<h(<zero,n(i)>,k),seq(i:index => h(<one,n(i)>,k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
-global goal _ (tau:timestamp[param],i:index[param]) : 
+global lemma _ (tau:timestamp[param],i:index[param]) : 
   [(diff(
          forall (i0:index), (A(i0) <= tau => n(i) <> <zero,n(i0)>),
          forall (i0:index), (A(i0) <= tau => m(i) <> <zero,n(i0)>)) &&
@@ -40,7 +40,7 @@ Qed.
 system [bis] !_i out(c,<h(<one,n(i)>,k),seq(i:index => h(<one,n(i)>,k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
-global goal [bis] _ (tau:timestamp[param],i:index[param]) :
+global lemma [bis] _ (tau:timestamp[param],i:index[param]) :
   [(forall (i1,i0:index), 
      diff(
      (A(i0) <= tau => n(i) <> <one,n(i1)>),

@@ -2,7 +2,7 @@ system null.
 
 global axiom foo (i : index[const]) : [false].
 
-global goal _ (i : index) : [i = i] -> [false].
+global lemma _ (i : index) : [i = i] -> [false].
 Proof. 
   intro H.
   (* `i` is not constant because it appears in `H` *)
@@ -17,7 +17,7 @@ global axiom bar (i : index) : [i = i] -> [false].
 
 abstract a : index.
 
-global goal _ (i : index) : [i = a] -> [false].
+global lemma _ (i : index) : [i = a] -> [false].
 Proof. 
   intro H.
   (* `H` is localized by `const` *)

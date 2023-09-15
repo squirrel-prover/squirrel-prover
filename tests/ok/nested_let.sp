@@ -8,7 +8,7 @@ system A: !_i
        let a = f(x) in
        let b = ff(a) in
        out(c,b).
-goal _ (i:index): happens(A(i)) => output@A(i) = ff(f(input@A(i))).
+lemma _ (i:index): happens(A(i)) => output@A(i) = ff(f(input@A(i))).
 Proof.
   auto.
 Qed.

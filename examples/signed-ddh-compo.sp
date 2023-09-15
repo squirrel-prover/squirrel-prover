@@ -136,7 +136,7 @@ process S2 =
 system [secret] ( P2 | S2).
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [auth] S1_charac :
+lemma [auth] S1_charac :
   happens(S1,S4) => cond@S1 => (cond@S4 => False).
 Proof.
   intro Hap Hcond1 Hcond4.
@@ -153,7 +153,7 @@ Qed.
 
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [auth] P1_charac :
+lemma [auth] P1_charac :
    happens(P1,P4) => cond@P1 => (cond@P4 => False).
 Proof.
   intro Hap Hcond1 Hcond4.

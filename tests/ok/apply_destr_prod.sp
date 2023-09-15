@@ -4,7 +4,7 @@ abstract P : boolean.
 abstract Q : boolean.
 
 (*------------------------------------------------------------------*)
-goal _ : (P => Q) => P => Q. 
+lemma _ : (P => Q) => P => Q. 
 Proof. 
   intro H U. 
   apply H.
@@ -12,21 +12,21 @@ Proof.
   assumption.
 Qed.
 
-goal _ : (P => Q) => P => Q. 
+lemma _ : (P => Q) => P => Q. 
 Proof. 
   intro H. 
   apply H.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal _ (a,b : index): (P => a <> b) => P => (a <> b). 
+lemma _ (a,b : index): (P => a <> b) => P => (a <> b). 
 Proof. 
   intro H U. 
   apply H.
   assumption.
 Qed.
 
-goal _ (a,b : index): (P => a <> b) => P => (a <> b). 
+lemma _ (a,b : index): (P => a <> b) => P => (a <> b). 
 Proof. 
   intro H. 
   apply H.

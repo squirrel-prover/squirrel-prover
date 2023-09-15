@@ -19,7 +19,7 @@ system PP = [default/left]
 print system [PP].
 
 (* global macros in mutually exclusive branches re-use the same name *)
-goal [PP] _ : 
+lemma [PP] _ : 
   happens(P) => 
   x@P = 
   try find t such that
@@ -37,7 +37,7 @@ print system [PP].
 
 
 (* global macros in mutually exclusive branches re-use the same name *)
-goal [PP] _ (i : index): 
+lemma [PP] _ (i : index): 
   happens(Q) => 
   x@Q = 
   try find t such that

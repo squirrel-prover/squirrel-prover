@@ -1,6 +1,6 @@
 system null.
 
-goal _: False => exists (x : index), x<>x.
+lemma _: False => exists (x : index), x<>x.
 Proof.
   auto.
 Qed.

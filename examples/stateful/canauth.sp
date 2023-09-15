@@ -82,10 +82,10 @@ include Basic.
 
 (* f_apply *)
 
-goal fst_apply (x,y : message) : x = y => fst(x) = fst(y).
+lemma fst_apply (x,y : message) : x = y => fst(x) = fst(y).
 Proof. auto. Qed.
 
-goal snd_apply (x,y : message) : x = y => snd(x) = snd(y).
+lemma snd_apply (x,y : message) : x = y => snd(x) = snd(y).
 Proof. auto. Qed.
 
 (* AXIOMS *)
@@ -102,7 +102,7 @@ axiom orderEqSucc (n1,n2:message):
 
 (* HELPING LEMMAS *)
 
-goal orderBetween (n1,n2:message) :
+lemma orderBetween (n1,n2:message) :
  (n1 ~< n2) => (n2 ~< mySucc(n1)) => false.
 Proof.
   intro Ord1 Ord2. 
@@ -117,7 +117,7 @@ Qed.
 (* The counter cellA(i) strictly increases 
    at each action SenderA(i,j) / ReceiverA(i,j). *)
 
-goal counterIncreaseUpdateSA(i,j:index):
+lemma counterIncreaseUpdateSA(i,j:index):
   happens(SenderA(i,j)) =>
   cond@SenderA(i,j) =>
   cellA(i)@pred(SenderA(i,j)) ~< cellA(i)@SenderA(i,j).
@@ -126,7 +126,7 @@ Proof.
   by apply orderSucc.
 Qed.
 
-goal counterIncreaseUpdateRA(i,j:index):
+lemma counterIncreaseUpdateRA(i,j:index):
   happens(ReceiverA(i,j)) =>
   cond@ReceiverA(i,j) =>
   cellA(i)@pred(ReceiverA(i,j)) ~< cellA(i)@ReceiverA(i,j).
@@ -139,7 +139,7 @@ Qed.
 (* The counter cellB(i) strictly increases
    at each action SenderB(i,j) / ReceiveB(i,j). *)
 
-goal counterIncreaseUpdateSB(i,j:index):
+lemma counterIncreaseUpdateSB(i,j:index):
   happens(SenderB(i,j)) =>
   cond@SenderB(i,j) =>
   cellB(i)@pred(SenderB(i,j)) ~< cellB(i)@SenderB(i,j).
@@ -148,7 +148,7 @@ Proof.
   by apply orderSucc. 
 Qed.
 
-goal counterIncreaseUpdateRB(i,j:index):
+lemma counterIncreaseUpdateRB(i,j:index):
   happens(ReceiverB(i,j)) =>
   cond@ReceiverB(i,j) =>
   cellB(i)@pred(ReceiverB(i,j)) ~< cellB(i)@ReceiverB(i,j).
@@ -161,7 +161,7 @@ Qed.
 (* The counter cellB(i) at t is either equal to cellB(i)@pred(t) or +1,
    and similarly for cellA(i). *)
 
-goal ScounterIncreasePredB(t:timestamp, i:index):
+lemma ScounterIncreasePredB(t:timestamp, i:index):
   happens(t) =>
   t > init =>
   exec@t =>
@@ -180,7 +180,7 @@ Proof.
 Qed.
 
 
-goal ScounterIncreasePredA(t:timestamp, i:index):
+lemma ScounterIncreasePredA(t:timestamp, i:index):
   happens(t) =>
   t > init =>
   exec@t =>
@@ -202,7 +202,7 @@ Qed.
 
 (* The counter increases (not strictly) between t and pred(t). *)
 
-goal counterIncreasePredA(t:timestamp, i:index):
+lemma counterIncreasePredA(t:timestamp, i:index):
   happens(t) => (t > init && exec@t) =>
     ( cellA(i)@pred(t) ~< cellA(i)@t
       || cellA(i)@pred(t) = cellA(i)@t ).
@@ -215,7 +215,7 @@ Proof.
 Qed.
 
 
-goal counterIncreasePredB(t:timestamp, i:index):
+lemma counterIncreasePredB(t:timestamp, i:index):
   happens(t) => (t > init && exec@t) =>
     ( cellB(i)@pred(t) ~< cellB(i)@t
       || cellB(i)@pred(t) = cellB(i)@t ).
@@ -229,7 +229,7 @@ Qed.
 
 (* The counter increases (not strictly) between t' and t when t' < t. *)
 
-goal counterIncreaseA (t, t':timestamp, i:index):
+lemma counterIncreaseA (t, t':timestamp, i:index):
   happens(t) =>
   exec@t =>
   t' < t =>
@@ -259,7 +259,7 @@ Proof.
 Qed.
 
 
-goal counterIncreaseB (t, t':timestamp, i:index):
+lemma counterIncreaseB (t, t':timestamp, i:index):
   happens(t) =>
   exec@t =>
   t' < t =>
@@ -288,7 +288,7 @@ Qed.
 (* The counter cellA(i) strictly increases between t and t'
    when t < t' and (t' = SenderA(i,j1) or t' = ReceiverA(i,j1)). *)
 
-goal counterIncreaseStrictSA(i,j1:index, t:timestamp):
+lemma counterIncreaseStrictSA(i,j1:index, t:timestamp):
   happens(SenderA(i,j1)) =>
     (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@SenderA(i,j1).
@@ -305,7 +305,7 @@ Proof.
  by apply orderTrans _ (cellA(i)@pred(SenderA(i,j1))).
 Qed.
 
-goal counterIncreaseStrictRA (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
   happens(ReceiverA(i,j1)) =>
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
@@ -325,7 +325,7 @@ Qed.
 (* The counter cellB(i) strictly increases between t and t'
    when t < t' and (t' = SenderB(i,j1) or t' = ReceiverB(i,j1)). *)
 
-goal counterIncreaseStrictSB (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictSB (i,j1:index, t:timestamp):
   happens(SenderB(i,j1)) =>
     (t < SenderB(i,j1) && exec@SenderB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@SenderB(i,j1).
@@ -342,7 +342,7 @@ Proof.
  by apply orderTrans _ (cellB(i)@pred(SenderB(i,j1))).
 Qed.
 
-goal counterIncreaseStrictRB (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
   happens(ReceiverB(i,j1)) =>
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
@@ -372,7 +372,7 @@ Qed.
    2nd property (injectivity). *)
 
 
-goal authA (i,j:index) :
+lemma authA (i,j:index) :
   happens(ReceiverA(i,j)) => exec@ReceiverA(i,j) =>
   (exists (j':index),
     SenderB(i,j') < ReceiverA(i,j)
@@ -397,7 +397,7 @@ Qed.
 
 
 (* 1st property w.r.t. B *)
-goal authB(i,j:index) :
+lemma authB(i,j:index) :
   happens(ReceiverB(i,j)) => exec@ReceiverB(i,j) =>
   (exists (j':index),
      SenderA(i,j') < ReceiverB(i,j)
@@ -422,7 +422,7 @@ Qed.
 
 
 (* 2nd property w.r.t A and A *)
-goal injectivity(i,j,j':index) :
+lemma injectivity(i,j,j':index) :
   happens(ReceiverA(i,j)) && happens(ReceiverA(i,j')) =>
   exec@ReceiverA(i,j) && exec@ReceiverA(i,j') =>
   (fst(fst(input@ReceiverA(i,j))) = fst(fst(input@ReceiverA(i,j')))
@@ -466,7 +466,7 @@ Qed.
 
 
 (* 2nd property w.r.t A and B *)
-goal injectivityAB(i,j,j':index) :
+lemma injectivityAB(i,j,j':index) :
   happens(ReceiverA(i,j)) && happens(ReceiverB(i,j')) =>
   exec@ReceiverA(i,j) && exec@ReceiverB(i,j') =>
   (fst(fst(input@ReceiverA(i,j))) = fst(fst(input@ReceiverB(i,j')))

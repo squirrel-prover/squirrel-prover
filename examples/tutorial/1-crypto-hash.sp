@@ -29,7 +29,7 @@ hash h.
     the PRF assumption: it is a family of pseudorandom functions.
     Our functions also satisfy collision resistance, which
     enables the `collision` tactic. *)
-goal _ : h(a,k) = h(b,k) => a = b.
+lemma _ : h(a,k) = h(b,k) => a = b.
 Proof.
   intro H.
   (* The collision tactic applies to an equality
@@ -41,14 +41,14 @@ Proof.
   auto.
 Qed.
 
-goal hash_1 : h(h(a,k),k) = h(h(b,k),k) => a = b.
+lemma hash_1 : h(h(a,k),k) = h(h(b,k),k) => a = b.
 Proof.
   admit. (* TODO *)
 Qed.
 
 (** PRF also implies EUF (unforgeability).
     This is expressed through the `euf` tactic. *)
-goal _ : <h(b,k), h(c,k)> = h(a,k) => a = b || a = c.
+lemma _ : <h(b,k), h(c,k)> = h(a,k) => a = b || a = c.
 Proof.
   intro H.
   (* The euf tactic must be invoked on an assumption
@@ -64,12 +64,12 @@ Proof.
   + auto.
 Qed.
 
-goal hash_2 : h(a,k) <> a. (* We could similarly prove `h(a,k) <> b`. *)
+lemma hash_2 : h(a,k) <> a. (* We could similarly prove `h(a,k) <> b`. *)
 Proof.
   admit. (* TODO *)
 Qed.
 
-goal hash_3 : h(a,k) = h(h(a,k),k) => h(a,k) = a.
+lemma hash_3 : h(a,k) = h(h(a,k),k) => h(a,k) = a.
 Proof.
   (* This is easily proved using `collision`.
      Try doing it with EUF only!
@@ -81,14 +81,14 @@ Qed.
 (* The euf tactic also reasons about indices.
    For the equality `u = h(v,k(i))`, it needs to consider all possibles
    hashes `h(w,k(j))`, under the assumption that `i = j`.
-   This allows to prove the next goal. *)
-goal hash_4 (i,j:index) : h(a, k'(i)) = h(a, k'(j)) => i = j.
+   This allows to prove the next lemma. *)
+lemma hash_4 (i,j:index) : h(a, k'(i)) = h(a, k'(j)) => i = j.
 Proof.
   admit. (* TODO *)
 Qed.
 
 
-global goal hash_5_lemma : equiv(diff(h(a,k),n),m).
+global lemma hash_5_lemma : equiv(diff(h(a,k),n),m).
 Proof.
   prf 0.
   (* The `prf` tactic replaced the hash `h(a,k)` with a fresh name.
@@ -97,7 +97,7 @@ Proof.
   by fresh 0.
 Qed.
 
-global goal hash_6 :
+global lemma hash_6 :
   [a <> b] -> 
   equiv(diff(h(a,k),n),diff(h(b,k),m)). 
 Proof.

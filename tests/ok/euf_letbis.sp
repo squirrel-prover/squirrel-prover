@@ -12,7 +12,7 @@ channel c
 system in(c,x);out(c,x);
        let s = h(n,k) in out(c,s).
 
-goal collision_absurd (tau:timestamp[param]):
+lemma collision_absurd (tau:timestamp[param]):
   happens(tau) => output@tau <> h(m,k).
 
 Proof.

@@ -104,7 +104,7 @@ In the proof of strong secrecy for the system `secretP`, we will use
 the following property, stating that whenever P accepts a message from S,
 this message is of the form `<<_,x>,_>` where `x = g^b(j)`.
 *)
-goal  P_charac (i:index):
+lemma  P_charac (i:index):
   happens(Pchall1(i)) =>
     cond@Pchall1(i) =>
       exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).

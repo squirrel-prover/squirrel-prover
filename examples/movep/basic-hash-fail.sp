@@ -61,7 +61,7 @@ print system [BasicHash].
     hold for single-session system.
     The statement (or rather, its projections) is proved for both
     the left and right projections of the `BasicHash` system. *)
-goal [BasicHash] wa_R :
+lemma [BasicHash] wa_R :
   forall (tau:timestamp),
     happens(tau) =>
     ((exists (i,k:index),

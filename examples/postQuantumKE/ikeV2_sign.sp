@@ -225,7 +225,7 @@ system core3 = [core2] with rename Forall (l,k,i,j:index), equiv(diff( n_PRF(l,k
 
 
 
-goal [core3,core/right] authR (i,j:index[param]):
+lemma [core3,core/right] authR (i,j:index[param]):
        happens(FR(i,j)) => exec@FR(i,j) =>
            exists (l:index), SI(j,l) < FR(i,j) &&
                       fst(input@R(i,j)) = exp(g,xi(j,l)) &&
@@ -245,7 +245,7 @@ Proof.
   by case H2; depends R(i,j),FR(i,j).
 Qed.
 
-goal [core3,core/right] authI (i,j:index[param]):
+lemma [core3,core/right] authI (i,j:index[param]):
        happens(FI(i,j)) => exec@FI(i,j) =>
                       SR(j,i) < FI(i,j) &&
                       fst(input@SI(i,j)) = exp(g,xr(j,i)) &&

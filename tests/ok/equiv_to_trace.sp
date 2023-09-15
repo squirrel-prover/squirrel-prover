@@ -3,7 +3,7 @@ abstract a : message
 
 system null.
 
-global goal [default/left,default/left] _ (x:message) : 
+global lemma [default/left,default/left] _ (x:message) : 
   [x=empty] -> 
   ([x=empty] -> equiv(diff(false,true))) -> 
   [False].

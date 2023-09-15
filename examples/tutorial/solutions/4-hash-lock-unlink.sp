@@ -86,7 +86,7 @@ system (
 (* Sometimes, we do not need to make a distinction between the left and 
    right system. For example the first output of the reader is always
    `nR(j)`, in both the MANY-session and SINGLE-session scenarios. *)
-goal project_0 (j : index) :
+lemma project_0 (j : index) :
   happens(R(j)) =>
   output@R(j) = nR(j).
 Proof. 
@@ -100,7 +100,7 @@ Qed.
 
    For example, the tag does not use the same hash key in the 
    MANY-session and SINGLE-session scenario. *)
-goal project_1 (i, k : index) :
+lemma project_1 (i, k : index) :
   happens(T(i,k)) =>
   output@T(i,k) = 
   diff(< nT(i,k), h(<input@T(i,k), nT(i,k)>, key (i  )) >,
@@ -122,7 +122,7 @@ Qed.
    
    Note: the `diff` operator below is obviously spurious, and only here 
          for the sake of the exercise.  *)
-goal project_2 (i, k : index) :
+lemma project_2 (i, k : index) :
   happens(T(i,k)) =>
   forall (j : index),
     R1(j) < T(i,k) =>
@@ -140,11 +140,11 @@ Qed.
 (** ## authentication lemma, useful for the unlinkability proof *)
 
 (* Well-authentication for both `R1(j)` and `R2(j)`. 
-   This goal is similar to the goal in file `2-hash-lock-auth.sp`, except 
+   This lemma is similar to the lemma in file `2-hash-lock-auth.sp`, except 
    that it applies to both  `R1(j)` and `R2(j)`, and to both the 
    MANY-session and SINGLE-session scenarios. 
    We admit it (the proof is very similar to the proof in the previous file). *)
-goal wa_R1_R2 (tau:timestamp,j:index):
+lemma wa_R1_R2 (tau:timestamp,j:index):
   happens(tau,R(j)) =>
   (exists (i,k:index),
      snd(input@tau) = h(<nR(j),fst(input@tau)>,diff(key(i),keyS(i,k))))
@@ -192,7 +192,7 @@ Qed.
    Recall that the `deduce` tactic can be useful to simplify 
    equivalence goals (syntax: `deduce i` where `i` is an integer indicating 
    the frame element you want to get rid of). *)
-global goal unlinkability (t : timestamp[const]) :
+global lemma unlinkability (t : timestamp[const]) :
   [happens(t)] -> equiv(frame@t).
 Proof.
   (* BEGIN EXO *)

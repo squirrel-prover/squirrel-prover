@@ -5,7 +5,7 @@ include Basic.
 system null.
 
 (*------------------------------------------------------------------*)
-global goal bar ['a 'b 'c] (b : bool, d: 'b, x : 'a, y : 'b, z : 'c) : 
+global lemma bar ['a 'b 'c] (b : bool, d: 'b, x : 'a, y : 'b, z : 'c) : 
   equiv (x, b, if b then y else d, if not b then y else d, z) ->
   equiv (x, y, z).
 Proof.
@@ -24,7 +24,7 @@ axiom r ['a] (x : 'a) : x = x => x = x.
 
 axiom ax_bool_loc (x : bool[const]) : x.
 
-global goal foo (x,y,z : message, t : timestamp) : equiv (x,y,z).
+global lemma foo (x,y,z : message, t : timestamp) : equiv (x,y,z).
 Proof.
   have ? := r x.
   have ? := p x.
@@ -53,26 +53,26 @@ Abort.
 (*------------------------------------------------------------------*)
 global axiom foo (b : bool) : [b].
 
-global goal _ (b1,b2: bool) : [b1].
+global lemma _ (b1,b2: bool) : [b1].
 Proof.
   (* succeed, [b] instantiated by [b1] *)
   nosimpl(have A := foo b1).
   assumption A.
 Qed.
 
-global goal _ (b1,b2: bool) : [b1].
+global lemma _ (b1,b2: bool) : [b1].
 Proof.
   (* idem with an apply, check that matching verifies tags *)
   apply foo.
 Qed.
 
-global goal _ (b1,b2: bool) : [diff(b1,b2)].
+global lemma _ (b1,b2: bool) : [diff(b1,b2)].
 Proof.
   (* should fail since we cannot instantiate [b] in [foo] by a diff. *)
   checkfail have A := foo (diff(b1,b2)) exn Failure.
 Abort.
 
-global goal _ (b1,b2: bool) : [diff(b1,b2)].
+global lemma _ (b1,b2: bool) : [diff(b1,b2)].
 Proof.
   (* idem with an apply *)
   checkfail apply foo exn Failure.

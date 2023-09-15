@@ -134,7 +134,7 @@ system test_ok2G = [test_ok2/left] with gprf, h(ok,k).
 
 axiom [test_ok2G] ok_ok2 : ok = ok2.
 
-goal [test_ok2G] _ :
+lemma [test_ok2G] _ :
   happens(A) =>
   ok = ok2 =>
   output@A = <ok, <n_PRF2,n_PRF2>>.
@@ -144,7 +144,7 @@ Proof.
   by case (try find such that _ in n_PRF2 else _) => [_ _].
 Qed.
 
-goal [test_ok2G] _ :
+lemma [test_ok2G] _ :
   happens(A) =>
   ok <> ok2 =>
   output@A = <ok, <n_PRF2,h(ok2, k)>>.

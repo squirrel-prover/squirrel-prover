@@ -1,9 +1,9 @@
-goal [any] _ (x,y : message) : (x, y)#1 = x.
+lemma [any] _ (x,y : message) : (x, y)#1 = x.
 Proof.
   auto. 
 Qed.
 
-goal [any] _ (x,y : message) : (x, y)#2 = y.
+lemma [any] _ (x,y : message) : (x, y)#2 = y.
 Proof.
   auto. 
 Qed.
@@ -14,12 +14,12 @@ Qed.
 type T.
 type T'.
 
-goal [any] _ (x : T, y : T') : (x, y)#1 = x.
+lemma [any] _ (x : T, y : T') : (x, y)#1 = x.
 Proof.
   auto. 
 Qed.
 
-goal [any] _ (x : T, y : T') : (x, y)#2 = y.
+lemma [any] _ (x : T, y : T') : (x, y)#2 = y.
 Proof.
   auto. 
 Qed.
@@ -27,12 +27,12 @@ Qed.
 (*------------------------------------------------------------------*)
 type T''.
 
-goal [any] _ (x : T, y : T', z : T'') : (x, y,z)#3 = z.
+lemma [any] _ (x : T, y : T', z : T'') : (x, y,z)#3 = z.
 Proof.
   auto. 
 Qed.
 
-goal [any] _ (x : T, y : T', z : bool) : z => (x, y,z)#3.
+lemma [any] _ (x : T, y : T', z : bool) : z => (x, y,z)#3.
 Proof.
   auto. 
 Qed.
@@ -41,10 +41,10 @@ Qed.
 (*------------------------------------------------------------------*)
 
 (* typer sanity check *)
-goal [any] _ (x : T * T) : x#1 = x#2.
+lemma [any] _ (x : T * T) : x#1 = x#2.
 Proof. Abort. 
 
 (* typer sanity check *)
-goal [any] _ (x,y : T * T') : x#1 = y#1.
+lemma [any] _ (x,y : T * T') : x#1 = y#1.
 Proof. Abort. 
 

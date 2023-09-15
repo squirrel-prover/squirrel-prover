@@ -10,7 +10,7 @@ system
   s := <s,x>;
   out(c,s).
 
-goal _ (a:index): happens(A(a)) => s@A(a) = <s@pred(A(a)),input@A(a)>.
+lemma _ (a:index): happens(A(a)) => s@A(a) = <s@pred(A(a)),input@A(a)>.
 Proof.
  auto.
 Qed.

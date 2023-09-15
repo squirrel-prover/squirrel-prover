@@ -107,7 +107,7 @@ system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
     Note that we express our correspondence property on each projection of the
     pair. Indeed, for some implementations of the pairing primitive, the
     equality of projections does not imply the equality of pairs. *)
-goal [BasicHash] wa_R :
+lemma [BasicHash] wa_R :
   forall (tau:timestamp),
     happens(tau) =>
     ((exists (i,k:index),

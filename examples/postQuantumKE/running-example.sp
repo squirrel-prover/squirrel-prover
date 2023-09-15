@@ -129,7 +129,7 @@ system [ideal] out(cI,s); (Responder | InitiatorCCA).
 (**********)
 
 (* Technical lemma about lengths. *)
-goal [real/left,ideal/left] lengths :
+lemma [real/left,ideal/left] lengths :
   len(diff(kI,kfresh)) = namelength_message.
 Proof.
   project. by rewrite namelength_kI. by rewrite namelength_kfresh.
@@ -180,7 +180,7 @@ Proof.
 Qed.
 
 (* Technical lemma. *)
-goal [real/left, ideal/left] diff_refl (x:message) : diff(x,x) = x.
+lemma [real/left, ideal/left] diff_refl (x:message) : diff(x,x) = x.
 Proof.
   by project.
 Qed.

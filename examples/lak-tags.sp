@@ -56,7 +56,7 @@ include Basic.
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R1_R2 (tau:timestamp,k:index):
+lemma wa_R1_R2 (tau:timestamp,k:index):
   happens(tau) =>
   (exists (i,j:index),
      snd(input@tau) = h(<<nR(k),fst(input@tau)>,tag1>,diff(key(i),key'(i,j))))
@@ -103,7 +103,7 @@ Qed.
     lemmas are almost identical, but their statements differ in the treatment
     of index k, and they deal with distinct systems. *)
 
-goal [default/left] wa_R1_left (i,k:index):
+lemma [default/left] wa_R1_left (i,k:index):
   happens(R1(k)) =>
   (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key(i)))
   =
@@ -127,7 +127,7 @@ Proof.
    |3: by depends R(k),R2(k)].
 Qed.
 
-goal [default/right] wa_R1_right (i,j,k:index):
+lemma [default/right] wa_R1_right (i,j,k:index):
   happens(R1(k)) =>
   (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key'(i,j)))
   =
@@ -151,7 +151,7 @@ Qed.
 
 (** Equality used to rewrite the try-find in R1
     so that its condition can be discharged using deduce. *)
-goal wa_R1_tryfind (k:index) : happens(R1(k)) =>
+lemma wa_R1_tryfind (k:index) : happens(R1(k)) =>
   (if exec@pred(R1(k)) && cond@R1(k) then
    try find i j such that
      snd(input@R1(k)) =

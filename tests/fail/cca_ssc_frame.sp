@@ -6,7 +6,7 @@ name sk : message.
 name n : message.
 
 name eta : message.
-goal [any] len_n : len(n) = len(eta).
+lemma [any] len_n : len(n) = len(eta).
 Proof. by namelength n, eta. Qed.
 
 channel c.
@@ -20,7 +20,7 @@ system [S] P.
 
 include Basic.
 
-global goal [S] ideal (t:timestamp[const]) :
+global lemma [S] ideal (t:timestamp[const]) :
   [happens(t)] ->
   equiv(frame@t, sk, eta).
 Proof.

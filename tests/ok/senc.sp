@@ -10,7 +10,7 @@ name r : message
 name k : message
 
 system null.
-goal ssenc : dec(enc(n,r,k),k) = n.
+lemma ssenc : dec(enc(n,r,k),k) = n.
 Proof.
 auto.
 Qed.

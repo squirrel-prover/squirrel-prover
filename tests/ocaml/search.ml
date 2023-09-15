@@ -12,7 +12,7 @@ let search_unify () =
       let st = try Prover.exec_all ~test:true st
         "channel c
         system [T] (S : !_i !_i new n; out(c,n)).
-        goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
+        lemma [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
         Proof.
         admit.
         Qed.
@@ -53,7 +53,7 @@ let search_about_1 () =
         "channel c
         system [T] (S : !_i new n; out(c,n))." st
     |> Prover.exec_command ~test:true
-         "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
+         "lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
   |> Prover.exec_command ~test:true "Proof."
   |> Prover.exec_command ~test:true "search happens(_)."
   in
@@ -97,7 +97,7 @@ let search_about_2 () =
     name n : index->message
     system [S] (A : out(c,diff(zero,empty))).
 
-    goal [S] foo (i:index) : happens(A) => output@A = diff(zero,zero).
+    lemma [S] foo (i:index) : happens(A) => output@A = diff(zero,zero).
     Proof.
       admit.
     Qed."
@@ -122,7 +122,7 @@ let search_about_2 () =
   let _ = Prover.exec_command ~test:true "search <_,_>." st in
   let _ = Prover.exec_command ~test:true "search (_,_)." st in
   let st = Prover.exec_all ~test:true st
-    "global goal [S] myeq : equiv(true).
+    "global lemma [S] myeq : equiv(true).
     Proof.
       admit.
     Qed."
@@ -230,7 +230,7 @@ let include_search () =
         "include Basic.
         channel c
         system [T] (S : !_i new n; out(c,n)).
-        goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
+        lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
         Proof."
   in
   let matches = Prover.search_about st
@@ -273,7 +273,7 @@ let include_ite () =
   let st = 
     Prover.exec_all ~test:true st
         "
-        goal [any] if_true ['a] (b : boolean, x,y : 'a):
+        lemma [any] if_true ['a] (b : boolean, x,y : 'a):
          b => if b then x else y = x.
         Proof.
           intro *.
@@ -282,14 +282,14 @@ let include_ite () =
           + intro [HH _]. by use HH.
         Qed.
 
-        goal [any] if_true0 ['a] (x,y : 'a):
+        lemma [any] if_true0 ['a] (x,y : 'a):
          if true then x else y = x.
         Proof.
           by rewrite if_true. 
         Qed.
         hint rewrite if_true0.
 
-        goal [any] if_false ['a] (b : boolean, x,y : 'a):
+        lemma [any] if_false ['a] (b : boolean, x,y : 'a):
          (not b) => if b then x else y = y.
         Proof. 
           intro *; case (if b then x else y).
@@ -298,7 +298,7 @@ let include_ite () =
           + auto.
         Qed.
 
-        goal [any] if_false0 ['a] (x,y : 'a):
+        lemma [any] if_false0 ['a] (x,y : 'a):
          if false then x else y = y.
         Proof.
           by rewrite if_false.
@@ -307,7 +307,7 @@ let include_ite () =
 
         channel c
         system [T] (S : !_i new n; out(c,n)).
-        goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
+        lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
         Proof.
          admit.
         Qed."

@@ -7,14 +7,14 @@ name m : message
 
 system null.
 
-goal one :
+lemma one :
   h(m,k) <> h(n,k).
 
 Proof.
   by intro Heq; euf Heq; auto.
 Qed.
 
-goal two :
+lemma two :
   n <> h(n,k).
 
 Proof.

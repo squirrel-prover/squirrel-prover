@@ -9,18 +9,18 @@ process A(i : index) =
 
 system !_i A(i).
 
-goal _ (i : index) :
+lemma _ (i : index) :
   happens(A(i)) =>
   f@A(i) = fun (x : message) => <x, input@A(i)>.
 Proof. auto. Qed.
 
-goal _ (i,j : index) :
+lemma _ (i,j : index) :
   happens(A(i)) =>
   f@A(i) = fun (x : message) => <x, input@A(j)>.
 Proof. checkfail auto exn GoalNotClosed. Abort.
 
 (*------------------------------------------------------------------*)
-goal _ (i : index, z : message) :
+lemma _ (i : index, z : message) :
   happens(A(i)) =>
   (f@A(i)) z = <z, input@A(i)>.
 Proof. auto. Qed.

@@ -67,7 +67,7 @@ print system [BasicHash].
     The same holds for `R1` (the else branch of the reader) but with a negation.
     We will prove once and for all a property that is generalized for any
     `tau`, which will be useful later for `tau = R(j)` and `tau = R1(j)`. *)
-goal [BasicHash] wa_R :
+lemma [BasicHash] wa_R :
   forall (tau:timestamp),
     happens(tau) =>
     ((exists (i:index),

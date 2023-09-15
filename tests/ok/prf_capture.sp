@@ -16,7 +16,7 @@ system !_j tag(j).
 
 axiom no_repeat (i, j:timestamp): i < j => kT@j <> kT@i.
 
-global goal foo (t: timestamp[param]) :
+global lemma foo (t: timestamp[param]) :
   [forall (j, j0:index), (T(j0) < T(j) => kT@pred(T(j)) <> kT@T(j0))] ->
   [happens(t)] ->
   equiv(frame@t).

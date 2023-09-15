@@ -47,7 +47,7 @@ system t2 = [t/left] with gprf time, H(_, k).
 
 print system [t2].
 
-goal [t2] _ (i : index) : 
+lemma [t2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
     seq(j:index =>
@@ -87,7 +87,7 @@ system p2 = [p/left] with gprf time, H(_, k).
 
 print system [p2].
 
-goal [p2] _ (i : index) : 
+lemma [p2] _ (i : index) : 
   happens(U(i)) => 
   m1(i)@U(i) = 
   (try find t such that
@@ -107,7 +107,7 @@ system q2 = [q/left] with gprf time, H(_, k).
 
 print system [q2].
 
-goal [q2] _ (i : index) : 
+lemma [q2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
   (try find t such that
@@ -127,7 +127,7 @@ Proof.
   auto.
 Qed.
 
-goal [q2] _ (i : index) : 
+lemma [q2] _ (i : index) : 
   happens(U(i)) => 
   mq(i)@U(i) = 
   (try find t such that

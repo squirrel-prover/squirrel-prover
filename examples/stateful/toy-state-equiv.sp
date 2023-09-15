@@ -40,7 +40,7 @@ include Basic.
 (* HELPING LEMMAS *)
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
-goal lastUpdate : forall (t:timestamp) (i:index),
+lemma lastUpdate : forall (t:timestamp) (i:index),
   happens(t) =>
   ((kT(i)@t = kT(i)@init && forall (j':index), happens(T(i,j')) => t < T(i,j')) ||
     (exists j,
@@ -85,7 +85,7 @@ Proof.
             by case Hap'.
 Qed.
 
-goal stateInequality :
+lemma stateInequality :
   forall (t:timestamp),
   (forall (t':timestamp) (i,j,i':index),
      happens(t) =>
@@ -126,7 +126,7 @@ Proof.
           - by use Hind with T(i,j1),pred(T(i,j0)),i,j1,i.
 Qed.
 
-goal stateInequalityHelpful :
+lemma stateInequalityHelpful :
 forall (i,j,j':index),
   happens(T(i,j)) =>
     ( T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j')) ).

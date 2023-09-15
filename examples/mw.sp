@@ -60,7 +60,7 @@ axiom len_id' (i,t:index): len(id'(i,t)) = namelength_message.
 axiom tags_neq : tag0 <> tag1.
 
 (* Well-authentication for R1 and R2's condition. *)
-goal wa_R1_R2 (tau:timestamp,r:index):
+lemma wa_R1_R2 (tau:timestamp,r:index):
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t))) (snd(input@tau)) =
    H(<tag0,<nr(r),fst(input@tau)>>,diff(key(i),key'(i,t))))
@@ -104,7 +104,7 @@ Qed.
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [default/left] wa_R1_left (i,r:index):
+lemma [default/left] wa_R1_left (i,r:index):
   (xor(id(i)) (snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,key(i)))
   =
@@ -124,7 +124,7 @@ Proof.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [default/right] wa_R1_right (i,t,r:index):
+lemma [default/right] wa_R1_right (i,t,r:index):
   (xor(id'(i,t)) (snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t)))
   =
@@ -146,7 +146,7 @@ Qed.
     so that its condition can be discharged using deduce:
     change condition to honest transcript formula,
     and insert exec conjunct. *)
-goal wa_R1_tryfind (r:index) : happens(R1(r)) =>
+lemma wa_R1_tryfind (r:index) : happens(R1(r)) =>
   (if exec@pred(R1(r)) && cond@R1(r) then
    try find i t such that
      xor(diff(id(i),id'(i,t))) (snd(input@R1(r))) =

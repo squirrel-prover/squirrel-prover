@@ -35,7 +35,7 @@ process I(i:index) =
 system [main] out(c,s);( !_i R : R(i) | !_j T : T(j) | !_k !_l B : B(k,l)| !_l I : I(l)).
 
 (*------------------------------------------------------------------*)
-global goal [main] _ (r,i,t :index[const]) :
+global lemma [main] _ (r,i,t :index[const]) :
  [happens(T(r))] ->
  equiv( frame@pred(T(r)),
   exec@pred(T(r)) &&  B(i,t) < T(r) && output@B(i,t) = input@T(r)).
@@ -45,7 +45,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal [main]  _ (r:index[const]) : 
+global lemma [main]  _ (r:index[const]) : 
   [happens(T(r))] -> 
   equiv(frame@pred(T(r)),
    exec@pred(T(r)) && 
@@ -59,7 +59,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal [main] _ (r:index[const]) : 
+global lemma [main] _ (r:index[const]) : 
   [happens(T(r))] -> 
   equiv(frame@pred(T(r)),
    exec@pred(T(r)) && 
@@ -73,7 +73,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal [main] _ (r:index[const]) : 
+global lemma [main] _ (r:index[const]) : 
   [happens(T(r))] -> 
   equiv(frame@pred(T(r)),
    exec@pred(T(r)) && 

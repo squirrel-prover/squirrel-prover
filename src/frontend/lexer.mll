@@ -137,7 +137,8 @@ rule token = parse
 | "memseq"            { MEMSEQ }
 | "remember"          { REMEMBER }
 | "dependent"         { DEPENDENT }
-| "goal"              { GOAL }
+| "lemma"             { LEMMA }
+| "theorem"           { THEOREM }
 | "local"             { LOCAL }
 | "global"            { GLOBAL }
 | "equiv"             { EQUIV }

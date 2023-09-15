@@ -28,7 +28,7 @@ process Tag(i:index,j:index) =
 
 system (!_i !_j Tag(i,j)).
 
-goal stateSemantics1 (i,j:index):
+lemma stateSemantics1 (i,j:index):
     happens(T(i,j)) => 
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof. 
@@ -39,7 +39,7 @@ Qed.
 
 
 (* wrong timestamp happening *)
-goal stateSemantics1F (i,j:index):
+lemma stateSemantics1F (i,j:index):
     happens(T1(i,j)) => 
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof.
@@ -48,7 +48,7 @@ Proof.
   auto.
 Qed.
 
-goal stateSemantics (i,j:index):
+lemma stateSemantics (i,j:index):
     happens(T1(i,j)) =>
     output@T1(i,j) =
       < h(k1(i)@pred(T1(i,j)),key(i)),
@@ -57,7 +57,7 @@ Proof.
 auto.
 Qed.
 
-goal stateSemantics3 (i,j:index):
+lemma stateSemantics3 (i,j:index):
   happens(T2(i,j)) => 
   output@T2(i,j) = 
   <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
@@ -65,7 +65,7 @@ Proof.
 auto.
 Qed.
 
-goal stateSemantics4 (i,j:index):
+lemma stateSemantics4 (i,j:index):
   happens(T3(i,j)) => 
   output@T3(i,j) = <h(k1(i)@pred(T3(i,j)),key(i)),<k1(i)@pred(T3(i,j)),k2(i)@pred(T3(i,j))>>.
 Proof.

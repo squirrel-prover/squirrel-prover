@@ -2,7 +2,7 @@ system null.
 
 name n : message.
 
-global goal [set: default/left; equiv: default] _ :
+global lemma [set: default/left; equiv: default] _ :
   equiv(<empty,empty>,diff(n,<n,n>),empty) ->
   equiv(<empty,empty>,<diff(n,<n,n>),empty>).
 Proof.

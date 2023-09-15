@@ -4,7 +4,7 @@ axiom [default] toto : diff(true,false) = true.
 
 axiom [default] tutu : false = true.
 
-goal [default/right] _ : false = true.
+lemma [default/right] _ : false = true.
 Proof.
   by rewrite tutu. 
 Qed.
@@ -16,7 +16,7 @@ abstract d : message.
 
 axiom foo : diff(a,b) = c.
 
-goal _ : 
+lemma _ : 
   <a, diff(d, c)> = empty => 
   <a, diff(d, b)> = empty.
 Proof.
@@ -25,7 +25,7 @@ Proof.
   assumption.
 Qed.
 
-goal [default/right] _ : false = true.
+lemma [default/right] _ : false = true.
 Proof.
   rewrite toto.
   auto.

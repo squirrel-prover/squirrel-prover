@@ -3,13 +3,13 @@
 channel c
 system in(c,x);out(c,x);in(c,x);out(c,x).
 
-goal test :
+lemma test :
   happens(A1) => output@A1 = input@A1.
 Proof.
  auto.
 Qed.
 
-goal test2 :
+lemma test2 :
   output@A1 = input@A1.
 Proof.
  checkfail auto exn GoalNotClosed.

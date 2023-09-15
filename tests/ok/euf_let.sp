@@ -10,7 +10,7 @@ system let s = h(n,k) in out(c,s).
  * have the right number of parameters even in case of
  * a dummy input in the action. *)
 
-goal _ (tau:timestamp[param]):
+lemma _ (tau:timestamp[param]):
   happens(tau) => output@tau <> h(m,k).
 
 Proof.
@@ -20,7 +20,7 @@ Proof.
 Qed.
 
 (* Testing that macro support computation does not ignore let bindings *)
-goal _ (tau:timestamp[param]):
+lemma _ (tau:timestamp[param]):
   happens(tau) => s@tau <> h(n,k).
 
 Proof.

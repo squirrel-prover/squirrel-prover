@@ -490,7 +490,7 @@ axiom [idealized3/left,idealized2] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))
 axiom [idealized3/left,idealized2] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k))) =  att(frame@pred(DI1(i,j,k))).
 
 
-goal  [idealized3/left,idealized2] trans_eq (i,j,k:index):
+lemma  [idealized3/left,idealized2] trans_eq (i,j,k:index):
 xor(try find il jl kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -582,7 +582,7 @@ Proof.
 Qed.
 
 
-goal  [idealized3/left,idealized2] trans_eqD (i,j,k:index):
+lemma  [idealized3/left,idealized2] trans_eqD (i,j,k:index):
 xor(try find il jl kl such that
       (fst(snd(att(frame@pred(DI1(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -675,7 +675,7 @@ axiom [idealized3/left,idealized2]  fasign :
   s1=s2 => checksign(m1,s1,k) => checksign(m2,s2,k) => m1 = m2.
 
 
-goal  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
+lemma  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
 xor(try find il jl kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -778,7 +778,7 @@ Qed.
 
 
 
-goal  [idealized3/left,idealized2] trans_eq2D (i,j,k:index):
+lemma  [idealized3/left,idealized2] trans_eq2D (i,j,k:index):
 xor(try find il jl kl such that
       (fst(snd(att(frame@pred(DFI(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -927,7 +927,7 @@ axiom [idealized3] xorconcel : forall (m1,m2,m3:message), m1=m2 =>
 axiom [idealized3] rcheck :
  forall (m1,m2,sk:message), m1=m2 => checksign(m1, sign(m2,sk),spk(sk)).
 
-goal [idealized3/left] auth :  forall (i,j,l:index) ,
+lemma [idealized3/left] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
         exec@FI(i,j,l) =>
         exists (k:index),

@@ -7,7 +7,7 @@ name m1 : index -> message
 
 system null.
 
-goal function (i:index,j:index) :
+lemma function (i:index,j:index) :
   i = j =>
   m1(i) = m1(j).
 Proof.

@@ -223,12 +223,12 @@ axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 
 (* Utilities for simplifying some diff expressions. *)
 
-goal len_diff (x,y:message) : len(diff(x,y)) = diff(len(x),len(y)).
+lemma len_diff (x,y:message) : len(diff(x,y)) = diff(len(x),len(y)).
 Proof.
   by project.
 Qed.
 
-goal diff_refl (x:message) : diff(x,x) = x.
+lemma diff_refl (x:message) : diff(x,x) = x.
 Proof.
   by project.
 Qed.
@@ -238,12 +238,12 @@ Qed.
 
 include Basic.
 
-goal [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+lemma [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
 (* instances of f_apply *)
-goal [any] dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
+lemma [any] dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
 
 (*------------------------------------------------------------------*)
@@ -252,7 +252,7 @@ Proof. auto. Qed.
 (* The counter SCtr(j) strictly increases when t is an action Server
 performed by the server with tag j. *)
 
-goal counterIncreaseStrictly (pid,j:index):
+lemma counterIncreaseStrictly (pid,j:index):
    happens(Server(pid,j)) =>
    cond@Server(pid,j) =>
    SCtr(pid)@pred(Server(pid,j)) ~< SCtr(pid)@Server(pid,j).
@@ -260,7 +260,7 @@ Proof.
   auto.
 Qed.
 
-goal counterIncrease (t:timestamp, pid : index) :
+lemma counterIncrease (t:timestamp, pid : index) :
   happens(t) =>
   t > init && exec@t =>
     SCtr(pid)@pred(t) ~< SCtr(pid)@t ||
@@ -278,7 +278,7 @@ Qed.
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t
 when t' < t. *)
-goal counterIncreaseBis:
+lemma counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (pid:index),
     happens(t) =>
     exec@t && t' < t =>
@@ -315,7 +315,7 @@ These two properties are proved directly on the real system, since they do not
 rely on the intctxt tactic.
 ------------------------------------------------------------------------------*)
 
-goal noreplayInv (j, j', pid:index):
+lemma noreplayInv (j, j', pid:index):
    happens(Server(pid,j),Server(pid,j')) =>
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
@@ -337,7 +337,7 @@ Proof.
     by rewrite H2 in *.
 Qed.
 
-goal noreplay (j, j', pid:index):
+lemma noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
   exec@Server(pid,j') =>
   Server(pid,j) <= Server(pid,j') =>
@@ -355,7 +355,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal monotonicity (j, j', pid:index):
+lemma monotonicity (j, j', pid:index):
   happens(Server(pid,j'),Server(pid,j)) =>
   exec@Server(pid,j') && exec@Server(pid,j) &&
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
@@ -387,11 +387,11 @@ SECURITY PROPERTY 2 (injective correspondence)
 The proof of this property is done in 2 steps.
 - We first establish the equivalence between the real system and the ideal one
   (in which the key inside the AEAD are replaced by a dummy one).
-  This corresponds to the goal injective_correspondence_equiv.
+  This corresponds to the lemma injective_correspondence_equiv.
 - Then, we use the rule REACH-EQUIV (through the tactic rewrite equiv) in order
   to replace the real system by the ideal one, so that we only have to prove the
   security property on the ideal system.
-  This corresponds to the goal injective_correspondence.
+  This corresponds to the lemma injective_correspondence.
 
 Beforehand, we prove some helping lemmas:
 - valid_decode, in order to characterize when the AEAD decoding process is valid;
@@ -402,7 +402,7 @@ between the real system and an ideal one, using sequences to enrich the frame.
 
 (*------------------------------------------------------------------*)
 (* First property of AEAD decoding. *)
-goal valid_decode (t : timestamp) (pid,j : index):
+lemma valid_decode (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
   (aead_dec(pid,j)@t <> fail) =
@@ -430,7 +430,7 @@ Qed.
 
 (* Using the `valid_decode` lemma, we can characterize when the full
    decoding check goes through. *)
-goal valid_decode_charac (t : timestamp) (pid,j : index):
+lemma valid_decode_charac (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
   ( aead_dec(pid,j)@t <> fail &&
@@ -467,7 +467,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* Auxiliary simple lemma, used to rewrite one of the conditional
    equality in the then branch. *)
-goal if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
+lemma if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
    if b && (x = y && b0) && b1 then
      snd(dec(z,diff(fst(dec(y,u)),v))) =
    if b && (x = y && b0) && b1 then
@@ -484,7 +484,7 @@ set showStrengthenedHyp=true.
 name keyFresh : message.
 
 (*------------------------------------------------------------------*)
-global goal equiv_real_ideal_enrich (t : timestamp[const]):
+global lemma equiv_real_ideal_enrich (t : timestamp[const]):
   [happens(t)] ->
   equiv(
     frame@t,
@@ -612,7 +612,7 @@ axiom max_ts :
   happens(tmax) &&
   (forall (t : timestamp), happens(t) => t <= tmax).
 
-global goal equiv_real_ideal_enrich_tmax0 :
+global lemma equiv_real_ideal_enrich_tmax0 :
   ([happens(tmax)] /\
    [forall (t' : timestamp), happens(t') => t' <= tmax] /\
     equiv(
@@ -641,7 +641,7 @@ abstract exec_dflt : boolean.
 axiom exec_nhap (t' : timestamp) :
    not (happens(t')) => exec@t' = exec_dflt.
 
-global goal equiv_real_ideal_enrich_tmax :
+global lemma equiv_real_ideal_enrich_tmax :
   ([happens(tmax)] /\
    [forall (t' : timestamp), happens(t') => t' <= tmax] /\
     equiv(
@@ -691,7 +691,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global goal injective_correspondence_equiv (pid, j:index[const]):
+global lemma injective_correspondence_equiv (pid, j:index[const]):
    [happens(Server(pid,j))] ->
    equiv(
      exec@Server(pid,j) =>
@@ -710,7 +710,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* The final proof of injective correspondence. *)
-goal [default/left] injective_correspondence (j, pid:index[glob]):
+lemma [default/left] injective_correspondence (j, pid:index[glob]):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),

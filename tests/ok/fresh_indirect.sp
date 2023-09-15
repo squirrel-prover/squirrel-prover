@@ -4,7 +4,7 @@ system A : !_i new a; !_j new b; out(c,b).
 
 include Basic.
 
-global goal test (i,j,ii,jj:index[const]) :
+global lemma test (i,j,ii,jj:index[const]) :
   [happens(A(i,j))] -> [happens(A(ii,jj))] ->
   equiv(diff(output@pred(A(i,j)), output@pred(A(ii,jj)))) ->
   equiv(diff(output@pred(A(i,j)),output@pred(A(ii,jj))),

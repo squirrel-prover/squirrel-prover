@@ -17,10 +17,16 @@ type Symbols.data += Lemma of lemma
 (*------------------------------------------------------------------*)
 let pp_kind fmt = function
   | `Axiom -> Printer.kw `Goal fmt "axiom"
-  | `Lemma -> Printer.kw `Goal fmt "goal"
+  | `Lemma -> Printer.kw `Goal fmt "lemma"
 
 let pp fmt lem =
-  Fmt.pf fmt "@[<2>%a %a@]"
+  let stmt_kind_str =
+    match lem.stmt.formula with
+    | Equiv.Global _ -> "global "
+    | Equiv.Local  _ -> ""
+  in
+  Fmt.pf fmt "@[<2>%stmt_kind_str%a %a@]"
+    stmt_kind_str
     pp_kind lem.kind Goal.pp_statement lem.stmt
 
 (*------------------------------------------------------------------*)

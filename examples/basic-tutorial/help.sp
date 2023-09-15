@@ -1,7 +1,7 @@
 system null.
 
 
-goal dummy : True.
+lemma dummy : True.
 Proof.
   help.
   help concise.

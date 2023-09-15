@@ -28,7 +28,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global goal _ (f : message * message -> message) : equiv (diff(f(a,b),f(a,a))).
+global lemma _ (f : message * message -> message) : equiv (diff(f(a,b),f(a,a))).
 Proof.
   fa 0.                         (* f is not ptime computable *)
   checkfail fa 0 exn Failure.

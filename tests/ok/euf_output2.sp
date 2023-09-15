@@ -12,7 +12,7 @@ name m : message
 
 system !_a out(c,h(n,k)).
 
-goal unforgeable (tau:timestamp[param]):
+lemma unforgeable (tau:timestamp[param]):
   happens(tau) => output@tau <> h(m,k).
 
 Proof.

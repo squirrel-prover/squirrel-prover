@@ -89,7 +89,7 @@ include Basic.
 
 (* HELPING LEMMAS *)
 
-goal noUpdateTag (t:timestamp, i,j:index):
+lemma noUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
       (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
@@ -125,7 +125,7 @@ Qed.
 
 (* SECURITY PROPERTIES *)
 
-goal auth_R1_induction (t:timestamp, jj,ii:index):
+lemma auth_R1_induction (t:timestamp, jj,ii:index):
   happens(R1(jj,ii)) =>
     t = R1(jj,ii) && exec@t (* exec@t (not only cond@t) is needed *)
     =>
@@ -160,7 +160,7 @@ Proof.
     by rewrite /output (noUpdateTag (pred(T1(ii,j)))).
 Qed.
 
-goal auth_T1_induction (t:timestamp, i,j:index):
+lemma auth_T1_induction (t:timestamp, i,j:index):
   happens(t) =>
     t = T1(i,j) && exec@t (* exec@t (not only cond@t) is needed *)
     =>

@@ -5,7 +5,7 @@ type T[finite]
 name n : T -> message.
 
 (* fails because `i` is unknown to the adversary *)
-global goal _ (i:T) :
+global lemma _ (i:T) :
  equiv(seq(j:T => n(j))) -> equiv (n(i)).
 Proof.
   intro H.
@@ -13,7 +13,7 @@ Proof.
 Abort.
 
 (* succeeds, `i` computable by the adversary *)
-global goal _ (i:T[adv]) :
+global lemma _ (i:T[adv]) :
   equiv(seq(j:T => n j)) -> equiv (n i).
 Proof.
   intro H.
@@ -26,7 +26,7 @@ type F[finite, fixed].
 name m : F -> message.
 
 (* succeeds, `i` constant over a fixed+finite hence computable *)
-global goal _ (i:F[const]) :
+global lemma _ (i:F[const]) :
   equiv(seq(j:F => m j)) -> equiv (m i).
 Proof.
   intro H.

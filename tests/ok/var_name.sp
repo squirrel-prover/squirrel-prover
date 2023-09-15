@@ -4,7 +4,7 @@ system null.
 
 (* check that variable naming allows to use any available variable name *)
 
-goal _ (i0: index) :
+lemma _ (i0: index) :
   (exists (i : index), false) => false.
 Proof. 
   intro B.
@@ -12,7 +12,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (i1: index) :
+lemma _ (i1: index) :
   (exists (i : index), false) => false.
 Proof. 
   intro B.

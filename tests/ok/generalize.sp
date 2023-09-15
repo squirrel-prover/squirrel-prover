@@ -15,7 +15,7 @@ abstract even : message -> boolean.
 (*------------------------------------------------------------------*)
 (* reach *)
 
-goal _ :
+lemma _ :
  (forall (x,y : message), x = a || y = b) =>
  (forall (y,x : message), x = a || y = b).
 Proof.
@@ -24,7 +24,7 @@ Proof.
   assumption Ass.
 Qed.
 
-goal _ :
+lemma _ :
  (forall (u,v : message), u = a || v = b) =>
  (forall (y,x : message), x = a || y = b).
 Proof.
@@ -33,7 +33,7 @@ Proof.
   assumption Ass.
 Qed.
 
-goal _ :
+lemma _ :
  (forall (x,y : message), x = a || y = b) =>
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
@@ -42,7 +42,7 @@ Proof.
   assumption Ass.
 Qed.
 
-goal _ :
+lemma _ :
  (forall (x,y : message), x = a || y = b) =>
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
@@ -51,7 +51,7 @@ Proof.
   assumption Ass.
 Qed.
 
-goal _ :
+lemma _ :
  (forall (x,y : message), x = a || y = b) =>
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
@@ -60,7 +60,7 @@ Proof.
   assumption Ass.
 Qed.
 
-goal _ (z : message) :
+lemma _ (z : message) :
  (forall (x,z:message), (forall (y:message), y = z) => even(x)) =>
  (forall (y : message), y = z) =>
  (forall (x : message), even(x)).
@@ -76,14 +76,14 @@ abstract P : message -> bool.
 
 axiom foo (x : message[const]) : P x.
 
-global goal _ (z : message[const]) : [P z].
+global lemma _ (z : message[const]) : [P z].
 Proof.
   byequiv. 
   apply foo.
 Qed.
 
 (* check that local sequent loose tags when generalizing a local quantifier  *)
-global goal _ (z : message[const]) : [P z].
+global lemma _ (z : message[const]) : [P z].
 Proof.
   byequiv. 
   generalize z => z.

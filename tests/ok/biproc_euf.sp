@@ -13,13 +13,13 @@ system (A(h(ok,k)) | in(c,x)).
 system [toto] (A(h(ko,k)) | in(c,x)).
 
 
-goal test : input@A1 <> h(ko,k).
+lemma test : input@A1 <> h(ko,k).
 Proof.
   intro Hm.
   euf Hm; auto.
 Qed.
 
-goal [toto/left] _:  input@A1 <> h(ok,k).
+lemma [toto/left] _:  input@A1 <> h(ok,k).
 Proof.
   intro Hm.
   euf Hm; auto.

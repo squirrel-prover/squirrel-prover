@@ -8,7 +8,7 @@ system
       try find j such that x=k(j) in
       out(c,ok) else out(c,x)).
 
-goal not_else (i:index,j:index):
+lemma not_else (i:index,j:index):
  happens(A1(i)) => cond@A1(i) => output@A1(i) <> k(j).
 Proof.
   intro Hap C Heq.
@@ -51,7 +51,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal _ : zero = try find (t,t' : timestamp) such that t <= t' in zero else zero.
+lemma _ : zero = try find (t,t' : timestamp) such that t <= t' in zero else zero.
 Proof. 
   by case try find (t,t' : timestamp) such that _ in _.
 Qed.

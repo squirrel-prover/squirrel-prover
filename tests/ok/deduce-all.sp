@@ -20,13 +20,13 @@ system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
 system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
-global goal _ : equiv(m1) -> equiv(m1).
+global lemma _ : equiv(m1) -> equiv(m1).
 Proof.
   nosimpl(intro H).
   apply H.
 Qed.
 
-global goal _ : equiv(m1) -> equiv(m1).
+global lemma _ : equiv(m1) -> equiv(m1).
 Proof.
   nosimpl(intro H).
   auto.
@@ -34,7 +34,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* small tests with a `set` containing a single system *)
-global goal [set:default/left; equiv:default] _ : 
+global lemma [set:default/left; equiv:default] _ : 
   equiv(diff(empty,zero), diff(zero,empty)).
 Proof. 
   checkfail by deduce exn GoalNotClosed.

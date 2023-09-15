@@ -14,7 +14,7 @@ axiom [s1/right] ax1r : a=b.
 axiom [s2/left] ax2l : a=b.
 axiom [s2/right] ax2r : a=b.
 
-goal [s1/right] _ : a=b.
+lemma [s1/right] _ : a=b.
 Proof. 
   checkfail use ax2 exn NoAssumpSystem.
   checkfail use ax1l exn NoAssumpSystem.
@@ -22,7 +22,7 @@ Proof.
   assumption.
 Qed.
 
-global goal [s1/right,s1/left] _ : [a=b].
+global lemma [s1/right,s1/left] _ : [a=b].
 Proof.
   byequiv.
   checkfail use ax2 exn NoAssumpSystem.
@@ -31,7 +31,7 @@ Proof.
   assumption.
 Qed.
 
-global goal [s1/right,s1/left] _ : [a=b].
+global lemma [s1/right,s1/left] _ : [a=b].
 Proof.
   byequiv.
   checkfail use ax2 exn NoAssumpSystem.
@@ -43,7 +43,7 @@ Proof.
       apply ax1l.
 Qed.
 
-global goal [s1/right,s1/left] _ (x:message) : [x=a] -> equiv(diff(x,b)).
+global lemma [s1/right,s1/left] _ (x:message) : [x=a] -> equiv(diff(x,b)).
 Proof.
   intro H.
   use ax1 as HH.

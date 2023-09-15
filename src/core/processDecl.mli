@@ -13,7 +13,7 @@ type error_i =
   | NonDetOp
   | Failure of string
 
-type dkind = KDecl | KGoal
+type dkind = KDecl | KLemma
 
 type error =  L.t * dkind * error_i
 

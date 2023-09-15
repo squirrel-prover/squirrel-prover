@@ -1,6 +1,6 @@
 system null.
 
-global goal _ ['a] (x,y,z : 'a) : [x = y] -> [x = z => false].
+global lemma _ ['a] (x,y,z : 'a) : [x = y] -> [x = z => false].
 Proof. 
   intro H. 
   intro G. 

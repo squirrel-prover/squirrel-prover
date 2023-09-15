@@ -342,7 +342,7 @@ axiom [auth] difftags :
 
 
 
-goal [auth] P_charac :
+lemma [auth] P_charac :
   happens(Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
   intro Hap He Hc.
@@ -379,7 +379,7 @@ Qed.
 
 
 (* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
-goal [auth] S_charac :
+lemma [auth] S_charac :
    happens(Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
   intro Hap He Hc.

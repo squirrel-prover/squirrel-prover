@@ -38,7 +38,7 @@ Proof.
 Qed.
 
 
-global goal test_depends_att : equiv(frame@A) -> equiv(input@A1).
+global lemma test_depends_att : equiv(frame@A) -> equiv(input@A1).
 Proof.
   intro H.
   checkfail (deduce 0) exn  ApplyMatchFailure.

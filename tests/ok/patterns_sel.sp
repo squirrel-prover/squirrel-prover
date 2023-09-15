@@ -10,7 +10,7 @@ channel c
 system !_i out(c,<a(n(i)),a(m)>).
 
 (* The main test, with a non-empty list of bound variables. *)
-goal bar : forall (tau, tau' : timestamp, i:index),
+lemma bar : forall (tau, tau' : timestamp, i:index),
   output@tau = try find (i : index) such that true in output@tau else a(m).
 Proof.
   intro tau tau' i0.
@@ -23,7 +23,7 @@ Proof.
   by use H with i0.
 Qed.
 
-goal foo : forall (tau, tau' : timestamp, i:index),
+lemma foo : forall (tau, tau' : timestamp, i:index),
   output@tau = try find i such that n(i)=n(i) in output@tau else a(m).
 Proof.
   intro tau tau' i0.

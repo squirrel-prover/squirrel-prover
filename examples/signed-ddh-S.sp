@@ -79,7 +79,7 @@ In the proof of strong secrecy for the system `secretS`, we will use
 the following property, stating that whenever S accepts a message from P,
 this message is of the form `<<_,x>,_>` where `x = g^a(i)`.
 *)
-goal  S_charac (j:index):
+lemma  S_charac (j:index):
   happens(Schall1(j)) =>
     exec@Schall1(j) =>
       exists (i:index), snd(input@Schall(j)) = g^a(i).

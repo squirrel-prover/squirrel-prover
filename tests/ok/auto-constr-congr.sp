@@ -4,7 +4,7 @@ name n : index -> message.
 
 system !_i in(c,x);out(c,x).
 
-goal foobar : 
+lemma foobar : 
   forall (i,j:index),
   happens(A(i),A(j)) => A(i) = A(j) => n(i) = n(j).
 Proof. 

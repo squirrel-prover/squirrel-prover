@@ -11,7 +11,7 @@ axiom [any] lem1 (x:a, y:b): p x y.
 print lem.
 
 (* check that variables order is not inversed when instanciating a lemma *)
-goal [any] _ : false.
+lemma [any] _ : false.
 Proof. 
 have H := lem.
 have H1:= lem1.

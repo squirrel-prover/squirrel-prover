@@ -68,7 +68,7 @@ system (
    the session `j` of the reader for the action `R1`, *if* the action
    `R1(j)` did occur in the protocol execution (which is captured by
    the predicate `happens(R1(j))`). *)
-goal macro_0 (j : index) : 
+lemma macro_0 (j : index) : 
   happens(R1(j)) =>
   output@R1(j) = ok.
 Proof.
@@ -91,7 +91,7 @@ Qed.
 (* In the reader process, we see that the action `R1(j)` always 
    occur after the action `R(j)`.
    Such execution dependencies can be exploited by the `depends` tactic. *)
-goal macro_1 (j : index) : 
+lemma macro_1 (j : index) : 
   happens(R1(j)) => happens(R(j)).
 Proof.
   intro Hap.
@@ -100,7 +100,7 @@ Qed.
 
 (* Prove the following lemma *without* relying on `auto`.
    Hint: first prove that `R(j)` happens with `have`. *)
-goal macro_2 (j : index) : 
+lemma macro_2 (j : index) : 
   happens(R1(j)) =>
   output@R(j) = nR(j).
 Proof.
@@ -124,7 +124,7 @@ Qed.
 
      `R(j) < T(i,k)`   
 *)
-goal fresh_nR (i, j, k : index) :
+lemma fresh_nR (i, j, k : index) :
   happens(T(i,k)) =>
   input@T(i,k) = nR(j) =>
   R(j) < T(i,k).
@@ -156,7 +156,7 @@ Qed.
      - the initial reader output has been correctly forwarded to the tag: 
          `input@T(i,k) = output@R(j))` 
 *)
-goal wa_R1 (j:index):
+lemma wa_R1 (j:index):
   happens(R1(j)) =>
   cond@R1(j)
   <=>
@@ -194,7 +194,7 @@ Qed.
 
    QUESTION 3:
      Does the Basic-Hash protocol seen in the slides satisfy this property? *)
-goal injective_auth (j:index):
+lemma injective_auth (j:index):
   happens(R1(j)) =>
   cond@R1(j) =>
     (exists (i,k:index),

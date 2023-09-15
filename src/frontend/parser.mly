@@ -31,8 +31,9 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
+%token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
-%token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
+%token EXISTS FORALL QUANTIF EQUIV DARROW DEQUIVARROW AXIOM
 %token UEXISTS UFORALL
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
@@ -1103,18 +1104,22 @@ obs_equiv_statement:
      Goal.Parsed.{ name = n; system; ty_vars = []; vars = [];
                    formula = Goal.Parsed.Obs_equiv } }
 
-goal_i:
-|        GOAL s=local_statement  DOT { s }
-|  LOCAL GOAL s=local_statement  DOT { s }
-| GLOBAL GOAL s=global_statement DOT { s }
-| EQUIV  s=obs_equiv_statement   DOT { s }
+lemma_head:
+| LEMMA   {}
+| THEOREM {}
+ 
+lemma_i:
+|        lemma_head s=local_statement  DOT { s }
+|  LOCAL lemma_head s=local_statement  DOT { s }
+| GLOBAL lemma_head s=global_statement DOT { s }
+| EQUIV  s=obs_equiv_statement         DOT { s }
 | EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) DOT
     { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
-goal:
-| goal=loc(goal_i) { goal }
+lemma:
+| l=loc(lemma_i) { l }
 
 (*------------------------------------------------------------------*)
 option_param:
@@ -1164,7 +1169,7 @@ interactive:
 | PROOF              { ProverLib.Prover Proof }
 | i=p_include        { ProverLib.Prover (Include i) }
 | RESET              { ProverLib.Prover Reset }
-| g=goal             { ProverLib.Prover (Goal g) }
+| g=lemma            { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }
 | EOF                { ProverLib.Prover EOF }
 

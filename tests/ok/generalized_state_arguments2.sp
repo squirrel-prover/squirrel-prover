@@ -20,7 +20,7 @@ print system [Q].
 
 (* -------------------------------------------------- *)
 (* check that [s] is well-formed *)
-goal [Q] _ (i, j : index) : 
+lemma [Q] _ (i, j : index) : 
   happens (O i) => 
   s j@O i = 
   if j = toI (k (i, i0)) then 
@@ -33,7 +33,7 @@ Proof.
   apply eq_refl.
 Qed.
 
-goal [Q] _ (j : index) : 
+lemma [Q] _ (j : index) : 
   s j@init = n j. 
 Proof.
   rewrite /s.

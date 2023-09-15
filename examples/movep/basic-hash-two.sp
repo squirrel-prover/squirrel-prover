@@ -39,7 +39,7 @@ include Basic.
    going to prove (phi ~ true). Logical connectives in phi
    are thus the dotted connectives, i.e. function symbols
    representing boolean operations. *)
-goal authentication :
+lemma authentication :
   (* Assume tag T1 has run a session with nonce nt,
      and T2 with nonce nt'. *)
   (

@@ -8,7 +8,7 @@ name k : index * index -> message
 
 system !_i out(c,h(n,k(i,i))).
 
-goal _ (tau:timestamp[param],a,b:index[param]):
+lemma _ (tau:timestamp[param],a,b:index[param]):
   happens(tau) => output@tau = h(n,k(a,b)) =>
   a = b.
 Proof.

@@ -41,7 +41,7 @@ process S =
 
 system (P | S).
 
-goal charac :
+lemma charac :
  happens (OutFalse) => exec@OutFalse => False.
 Proof.
  intro Hap He.

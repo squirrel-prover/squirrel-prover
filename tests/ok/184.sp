@@ -6,7 +6,7 @@ name k : message.
 
 system null.
 
-global goal _ (x:message) : equiv(g^x).
+global lemma _ (x:message) : equiv(g^x).
 Proof.
   ddh g, a, b, k.
 Qed.

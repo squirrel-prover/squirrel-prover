@@ -57,7 +57,7 @@ axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 
 (* See `running-ex.sp` for more details about lastupdate_XXX lemmas. *)
 
-goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
+lemma lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j, happens(A(i,j)) => A(i,j)>tau) ||
   (exists j, happens(A(i,j)) && A(i,j)<=tau
     && forall jj, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
@@ -98,7 +98,7 @@ Proof.
         by right; exists j.
 Qed.
 
-global goal lastupdate_pure_glob :
+global lemma lastupdate_pure_glob :
   Forall (i:index[const], tau:timestamp[const]),
   [happens(tau)] -> (
     [forall (j:index), happens(A(i,j)) => A(i,j)>tau] \/
@@ -142,7 +142,7 @@ Proof.
         by split.
 Qed.
 
-goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
+lemma lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j, happens(A(i,j)) => A(i,j)>tau))
   => s(i)@tau = s(i)@init.
 
@@ -177,7 +177,7 @@ Proof.
 Qed.
 
 
-goal lastupdate_A: forall (i:index, j:index, tau:timestamp),
+lemma lastupdate_A: forall (i:index, j:index, tau:timestamp),
   (happens(tau) &&
    A(i,j)<=tau &&
    forall jj, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
@@ -216,7 +216,7 @@ Proof.
 Qed.
 
 
-goal lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
+lemma lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
   (s(i)@tau = s(i)@init && forall j, happens(A(i,j)) => A(i,j)>tau) ||
   (exists j,
     s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau
@@ -235,7 +235,7 @@ Qed.
 
 (** The contents of distinct memory cells never coincide. *)
 
-goal disjoint_chains :
+lemma disjoint_chains :
   forall (tau',tau:timestamp,i',i:index), happens(tau',tau) =>
   i<>i' =>
   s(i)@tau <> s(i')@tau'.
@@ -257,7 +257,7 @@ Qed.
 
 (** Values do not repeat inside the same chain of hashes. *)
 
-goal monotonic_chain :
+lemma monotonic_chain :
   forall (tau,tau':timestamp,i,j:index), happens(tau,A(i,j)) => (
     (s(i)@tau = s(i)@A(i,j) && tau' < A(i,j) && A(i,j) <= tau)
     => s(i)@tau' <> s(i)@tau).
@@ -283,7 +283,7 @@ Qed.
 
 name m : message.
 
-global goal [default/left,default/left]
+global lemma [default/left,default/left]
   strong_secrecy (tau:timestamp[const]) : 
   Forall (i':index[const],tau':timestamp[const]),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s(i')@tau',m)).

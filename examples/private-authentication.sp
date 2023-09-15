@@ -111,7 +111,7 @@ include Basic.
 axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 
 (** Helper lemma for pushing conditionals under the `len(_)` function. *)
-goal if_len (b : boolean, y,z:message):
+lemma if_len (b : boolean, y,z:message):
   len(if b then y else z) =
   (if b then len(y) else len(z)).
 Proof.
@@ -119,7 +119,7 @@ Proof.
 Qed.
 
 (* Helper lemma *)
-goal if_same_branch (x,y,z : message, b : boolean):
+lemma if_same_branch (x,y,z : message, b : boolean):
   (b => y = x) =>
   (not b => z = x) =>
   (if b then y else z) = x.

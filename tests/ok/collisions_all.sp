@@ -8,7 +8,7 @@ abstract y : message
 
 system null.
 
-goal _ :
+lemma _ :
   h(a,k)=x => h(b,k)=y => y=h(c,k) => b=c.
 Proof.
   intro _ _ _. 

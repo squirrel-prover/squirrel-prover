@@ -343,7 +343,7 @@ system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 (* We now prove the authentication on this ideal system. *)
 
-goal [Ideal2] wa_1 (i,j:index[param]):
+lemma [Ideal2] wa_1 (i,j:index[param]):
     happens(I1(i,j)) =>
     cond@I1(i,j) =>
     (exists (i0:index), happens(R(j,i0)) && R(j,i0) < I1(i,j) &&
@@ -384,7 +384,7 @@ Proof.
        use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 Qed.
 
-goal [Ideal2] wa_2 (i,j:index[param]):
+lemma [Ideal2] wa_2 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
      happens(I(i)) &&
@@ -502,7 +502,7 @@ axiom [Ror] ddhnotuple : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
 
 (* we first prove two small authentication lemmas, so that if we reach the ideal key computation, we now we have the correct parameters. *)
 
-goal [Ror] helper_wa (i,j:index[param]):
+lemma [Ror] helper_wa (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     fst(snd(input@R(j,i))) = Ni(i) &&
@@ -541,7 +541,7 @@ Qed.
 
 
 
-goal [Ror] helper_wa2 (i,j:index[param]):
+lemma [Ror] helper_wa2 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
 
@@ -605,7 +605,7 @@ Proof.
       by fresh 1.
 Qed.
 
-goal [Ror2] helper_wa_aux3 (i,j:index[param]):
+lemma [Ror2] helper_wa_aux3 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     input@R1(j,i) = input@R1(j,i) &&
@@ -646,7 +646,7 @@ Proof.
 Qed.
 
 
-goal [Ror3] helper_wa_aux4 (i,j:index[param]):
+lemma [Ror3] helper_wa_aux4 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
      input@R1(j,i) = input@R1(j,i) &&
@@ -662,7 +662,7 @@ Proof.
 Qed.
 
 
-goal [Ror3, Ror/right] helper_wa3 (i,j:index[param]):
+lemma [Ror3, Ror/right] helper_wa3 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     fst(snd(input@R(j,i))) = Ni(i) &&
@@ -701,7 +701,7 @@ Proof.
 Qed.
 
 
-goal [Ror2] helper_wa_aux2 (i,j:index[param]):
+lemma [Ror2] helper_wa_aux2 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
       Nr(j) = fst(snd(input@I1(i,j))) &&
@@ -736,7 +736,7 @@ Proof.
       by fresh 1.
 Qed.
 
-goal [Ror3] helper_wa_aux5 (i,j:index[param]):
+lemma [Ror3] helper_wa_aux5 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
 
@@ -752,7 +752,7 @@ Proof.
 Qed.
 
 
-goal [Ror3, Ror/right] helper_wa4 (i,j:index[param]):
+lemma [Ror3, Ror/right] helper_wa4 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
       Nr(j) = fst(snd(input@I1(i,j))) &&

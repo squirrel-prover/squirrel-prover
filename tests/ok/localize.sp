@@ -5,7 +5,7 @@ axiom [any] ax : a = b => False.
 
 system null.
 
-global goal _ (x:message) : [x = a || x = b] -> [False].
+global lemma _ (x:message) : [x = a || x = b] -> [False].
 Proof.
   intro H.
   checkfail destruct H as [_|_] exn Failure.

@@ -3,7 +3,7 @@ system null.
 abstract a : index -> message.
 abstract b : index -> message.
 
-goal _ : 
+lemma _ : 
  (forall (i : index), a(i) = b(i)) => 
  seq(i : index => a(i)) = seq(i : index => b(i)).
 Proof.
@@ -12,7 +12,7 @@ Proof.
   by rewrite H.
 Qed.
 
-goal _ : 
+lemma _ : 
  (forall (i : index), a(i) = b(i)) => 
  seq(i : index => a(i)) = seq(t : timestamp => zero).
 Proof.
@@ -20,7 +20,7 @@ Proof.
   checkfail (try fa; rewrite H); auto exn GoalNotClosed.
 Abort.
 
-goal _ : 
+lemma _ : 
  (forall (i : index), a(i) = b(i)) => 
  seq(i : index => a(i)) = seq(i : index, j : index => b(i)).
 Proof.

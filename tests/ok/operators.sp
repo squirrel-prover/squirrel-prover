@@ -15,14 +15,14 @@ system null.
 axiom [any] gpair_ax (x,y : message) : gpair x y = <x,y>.
 
 (*------------------------------------------------------------------*)
-goal _ (a,b,c : message) : gtriple a b c = triple a b c.
+lemma _ (a,b,c : message) : gtriple a b c = triple a b c.
 Proof.
   rewrite /gtriple /triple !gpair_ax. 
   auto.
 Qed.
 
 (* same goal with [any] *)
-goal [any] _ (a,b,c : message) : gtriple a b c = triple a b c.
+lemma [any] _ (a,b,c : message) : gtriple a b c = triple a b c.
 Proof.
   rewrite /gtriple /triple !gpair_ax. 
   auto.
@@ -33,39 +33,39 @@ Qed.
 
 op (~<) (x : message, y : message) : message = zero.
 
-goal _ (x, y : message) : x ~< y = zero.
+lemma _ (x, y : message) : x ~< y = zero.
 Proof. by rewrite /(~<). Qed.
 
 (* same goal with [any] *)
-goal [any] _ (x, y : message) : x ~< y = zero.
+lemma [any] _ (x, y : message) : x ~< y = zero.
 Proof. by rewrite /(~<). Qed.
 
 (*------------------------------------------------------------------*)
 op fst_p ((x,y) : message * message) = x.
 op snd_p ((x,y) : message * message) = y.
 
-goal [any] fst_p_charac (x, y : message) : fst_p (x,y) = x.
+lemma [any] fst_p_charac (x, y : message) : fst_p (x,y) = x.
 Proof. auto. Qed.
 
-goal [any] snd_p_charac (x, y : message) : snd_p (x,y) = y.
+lemma [any] snd_p_charac (x, y : message) : snd_p (x,y) = y.
 Proof. auto. Qed.
 
 (* sanity check *)
-goal [any] _ (x, y : message) : fst_p (x,y) = y.
+lemma [any] _ (x, y : message) : fst_p (x,y) = y.
 Proof. checkfail auto exn GoalNotClosed. Abort.
 
 (* sanity check *)
-goal [any] _ (x, y : message) : snd_p (x,y) = x.
+lemma [any] _ (x, y : message) : snd_p (x,y) = x.
 Proof. checkfail auto exn GoalNotClosed. Abort.
 
 
 (*------------------------------------------------------------------*)
 op third_triple ((x,y,z) : message * message * message) = z.
 
-goal [any] _ (a,b,c : message) : third_triple (a,b,c) = c.
+lemma [any] _ (a,b,c : message) : third_triple (a,b,c) = c.
 Proof. auto. Qed.
 
 (* sanity check *)
-goal [any] _ (a,b,c : message) : third_triple (a,b,c) = b.
+lemma [any] _ (a,b,c : message) : third_triple (a,b,c) = b.
 Proof. checkfail auto exn GoalNotClosed. Abort.
 

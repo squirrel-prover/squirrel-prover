@@ -168,7 +168,7 @@ T(i,k).
 
 ```*)
 
-goal wa :
+lemma wa :
   forall (i:index, j:index),
   happens(R(j,i)) =>
      cond@R(j,i) =>

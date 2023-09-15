@@ -14,7 +14,7 @@ abstract f : message -> message.
 
 
 (*------------------------------------------------------------------*)
-global goal _ : 
+global lemma _ : 
   (equiv(diff(a,b), diff(c,d))) ->
   equiv(f(diff(a,b)), f(diff(c,d))).
 Proof. 
@@ -28,7 +28,7 @@ Qed.
 abstract g0 : message -> message -> message.
 
 (*------------------------------------------------------------------*)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g0 (f a) (f b), g0 (f a) b, diff(a,b)).
 Proof.
@@ -41,7 +41,7 @@ Proof.
 Qed.
 
 (* same with more restrictive patterns *)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g0 (f a) (f b), g0 (f a) b, diff(a,b)).
 Proof.
@@ -60,7 +60,7 @@ Qed.
 abstract g : message * message -> message.
 
 (*------------------------------------------------------------------*)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g(f(a), f(b)), g(f(a), b), diff(a,b)).
 Proof.
@@ -73,7 +73,7 @@ Proof.
 Qed.
 
 (* same with more restrictive patterns *)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g(f(a), f(b)), g(f(a), b), diff(a,b)).
 Proof.
@@ -87,7 +87,7 @@ Proof.
 Qed.
 
 (* same but chaining FAs *)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g(f(a), f(b)), g(f(a), b), diff(a,b)).
 Proof.
@@ -97,7 +97,7 @@ Proof.
 Qed.
 
 (* same with multiplicities *)
-global goal _ : 
+global lemma _ : 
   equiv (a,b,diff(a,b)) ->
   equiv(f(a), g(f(a), f(b)), g(f(a), b), diff(a,b)).
 Proof.
@@ -106,7 +106,7 @@ Proof.
   apply H.
 Qed.
 
-global goal _ (t : timestamp): equiv(frame@t).
+global lemma _ (t : timestamp): equiv(frame@t).
 Proof.
   try fa frame@_.
 Abort.

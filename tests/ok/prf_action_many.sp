@@ -13,7 +13,7 @@ system !_i !_j out(c,h(<n(i),n(j)>,k)).
 
 
 (* only directy cases *)
-global goal _ (i:index[param]) : 
+global lemma _ (i:index[param]) : 
 [(diff(n(i),m(i)) <> <n(i),n(i)>) = true] ->
 [happens(A(i,i))] -> 
 equiv(output@A(i,i), h(diff(n(i),m(i)),k)).
@@ -26,7 +26,7 @@ Qed.
 
 
 (* This time with `frame`, which yields (only) indirect cases *)
-global goal _ (i:index[param]) : 
+global lemma _ (i:index[param]) : 
 [(diff(n(i),m(i)) <> <n(i),n(i)>) = true] ->
 [(forall (i0,j:index),
   diff(

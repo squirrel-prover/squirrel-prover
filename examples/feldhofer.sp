@@ -23,7 +23,7 @@ assumptions INT-CTXT and ENC-KP on our symmetric encryption.
 
 We add tags for simplicity, and conjecture that the results hold
 for the protocol without tags, though at the cost of a proof by
-induction for wa_* goals.
+induction for wa_* lemmas.
 
 This is a "light" model without the last check of T.
 
@@ -85,7 +85,7 @@ axiom tags_neq : tagR <> tagT
 
 axiom fail_not_pair (x,y:message): fail <> <x,y>.
 
-goal wa_Reader1 (k:index):
+lemma wa_Reader1 (k:index):
   happens(Reader1(k)) =>
     (exec@Reader1(k)
      <=>
@@ -125,7 +125,7 @@ Proof.
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
-goal wa_Reader2 (k:index):
+lemma wa_Reader2 (k:index):
   happens(Reader2(k)) =>
     (exec@Reader2(k)
      <=>
@@ -167,7 +167,7 @@ Qed.
     Unfortunately the proof argument involves intctxt and thus requires a
     projection.
     The two subproofs are almost identical. *)
-goal unique_outputs (i,j,i0,j0:index[const]):
+lemma unique_outputs (i,j,i0,j0:index[const]):
   happens(Tag(i,j),Tag(i0,j0)) =>
      output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.

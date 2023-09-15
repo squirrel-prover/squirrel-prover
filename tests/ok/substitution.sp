@@ -16,7 +16,7 @@ system O: out(ch,cst); (
 ).
 
 set debugConstr=true.
-goal unforgeable_1 (a : index, b : index, c : index):
+lemma unforgeable_1 (a : index, b : index, c : index):
   happens (A(b)) => b <> a && c=a=>
   output@A(b) <> h(na(c),k).
 

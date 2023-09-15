@@ -87,7 +87,7 @@ axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 
 We first show that the counter increases strictly at each update.
 *)
-goal counterIncreasePred (t:timestamp):
+lemma counterIncreasePred (t:timestamp):
   t > init => d@pred(t) ~< d@t.
 Proof.
   intro Hc.
@@ -102,7 +102,7 @@ here that the counter strictly increases between two distinct timestamps.
 The proof is done by induction, and relies on the previous result
 counterIncreasePred.
 *)
-goal counterIncrease (t,t':timestamp):
+lemma counterIncrease (t,t':timestamp):
    t' < t => d@t' ~< d@t.
 Proof.
   induction t => t Hind Ht.
@@ -137,7 +137,7 @@ mean that the attacker has been able to forge the message `h(<d,secret>,key)`
 with `d` corresponding to the value of the counter at timepoint `B(j)`, because
 all messages outputted so far correspond to older values of `d`.
 *)
-goal secretReach (j:index):
+lemma secretReach (j:index):
   happens(B(j)) => cond@B(j) => false.
 Proof.
   (** We start by introducing the hypotheses and expanding the `cond` macro. *)

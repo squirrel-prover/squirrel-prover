@@ -20,7 +20,7 @@ include Basic.
     from the part that involves message equalities. 
     The pure part is proven both as a local lemma and a global lemma. *)
 
-goal lastupdate_pure : forall tau,
+lemma lastupdate_pure : forall tau,
   happens(tau) => (
     (forall j, happens(A(j)) => A(j)>tau) ||
     (exists i, happens(A(i)) && A(i) <=tau &&
@@ -51,7 +51,7 @@ Proof.
     repeat split => //).
 Qed.
 
-global goal lastupdate_pure_glob :
+global lemma lastupdate_pure_glob :
   Forall (tau:timestamp[const]),
   [happens(tau)] -> (
     [forall (j:index), happens(A(j)) => A(j)>tau] \/
@@ -87,7 +87,7 @@ Proof.
     repeat split => //).
 Qed.
 
-goal lastupdate_init :
+lemma lastupdate_init :
   forall tau,
   happens(tau) =>
   (forall j, happens(A(j)) => A(j)>tau) =>
@@ -106,7 +106,7 @@ Proof.
     by use Htau with i.
 Qed.
 
-goal lastupdate_A :
+lemma lastupdate_A :
   forall (tau:timestamp,i:index),
   happens(A(i)) && A(i)<=tau &&
   (forall j, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
@@ -127,7 +127,7 @@ Proof.
     assert i=j; [2: auto | 1: by use Hsup with j].
 Qed.
 
-goal lastupdate :
+lemma lastupdate :
   forall tau,
   happens(tau) =>
     (s@tau = s@init && forall j, happens(A(j)) => A(j)>tau) ||
@@ -146,7 +146,7 @@ Qed.
 
 (** The contents of the memory cell never repeats. *)
 
-goal non_repeating :
+lemma non_repeating :
   forall (beta,alpha:timestamp), happens(beta) =>
   (exists i, alpha < A(i) && A(i) <= beta) =>
   s@alpha <> s@beta.
@@ -173,7 +173,7 @@ axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 
 name m : message.
 
-global goal [set:default/left; equiv:default/left,default/left]
+global lemma [set:default/left; equiv:default/left,default/left]
   strong_secrecy (tau:timestamp[const]) : 
     Forall (tau':timestamp[const]),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s@tau',m)).

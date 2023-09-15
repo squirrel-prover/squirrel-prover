@@ -21,7 +21,7 @@ axiom foog (x : message) : gg(x,b) = c.
 
 (*------------------------------------------------------------------*)
 (* rewrite all instances of only the first occurrence found. *)
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   (a = z && a = y && (f(z) = z || z = y)) =>
   (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
@@ -31,7 +31,7 @@ Proof.
 Qed.
 
 (* rewrite the first occurrence found. *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (a = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
@@ -40,13 +40,13 @@ Proof.
   assumption.
 Qed.
 
-goal foo_lem (x : message) : f(x) = a.
+lemma foo_lem (x : message) : f(x) = a.
 Proof. 
   by use foo with x.
 Qed.
 
 (* same but through an already proved goal. *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (a = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
@@ -57,7 +57,7 @@ Qed.
 
 (* same, but through an hypothesis (we changed `a` into `b` to check that
    hypotheses have priority over lemmas and axioms). *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (forall (x : message), f(x) = d) =>
 (d = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
@@ -69,7 +69,7 @@ Qed.
 
 (* same goal as above, by with a premise obtained from the conclusion by
    rewriting the second occurrence (hence it should fail).*)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 ((f(x) = z && f(x) = y) && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
@@ -80,7 +80,7 @@ Abort.
 
 (*------------------------------------------------------------------*)
 (* can rewrite all instances using ! *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (a = z && a = y && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
@@ -90,7 +90,7 @@ Proof.
 Qed.
 
 (* can also rewrite all instances using ? (including zero instances) *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (a = z && a = y && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
@@ -101,7 +101,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* new goal using `g` and `foog` *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (c = z && c = y && (c = z || z = y)) =>
 (gg(x,b) = z && gg(x,b) = y && (gg(z,b) = z || z = y)).
 Proof.
@@ -111,21 +111,21 @@ Proof.
 Qed.
 
 (* rewrite fails if no instances to rewrite *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof. 
   checkfail rewrite foog exn NothingToRewrite.
 Abort.
 
 (* ! fails if no instances to rewrite *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof.
   checkfail rewrite !foog exn NothingToRewrite.
 Abort.
 
 (* ? does not fails if no instances to rewrite *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)) =>
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof.
@@ -136,7 +136,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* can rewrite in the other direction *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 a = b => c = d =>
 (gg(b,b) = gg(b,b) && gg(c,c) = gg(c,c)) =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
@@ -148,7 +148,7 @@ Proof.
 Qed.
 
 (* same goal, but proved chaining rewrites. *)
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 a = b => c = d =>
 (gg(b,b) = gg(b,b) && gg(c,c) = gg(c,c)) =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
@@ -165,7 +165,7 @@ Qed.
 (* same goal, but proved chaining rewrites. *)
 axiom fooA (t : message) : f(a) = t.
 
-goal _ (x, y, z : message) : 
+lemma _ (x, y, z : message) : 
 f(a) = b.
 Proof.
   checkfail rewrite fooA exn BadRewriteRule.
@@ -173,7 +173,7 @@ Abort.
 
 
 (*------------------------------------------------------------------*)
-goal [bis] _ (x, y, z : message, i : index) :
+lemma [bis] _ (x, y, z : message, i : index) :
 (input@A(i) = a => f(a) = c) =>
  happens(A(i)) => b = c => cond@A(i) => f(a) = b.
 Proof.
@@ -190,7 +190,7 @@ system [terce]
    if x = a then out(ch,t').
 
 (*------------------------------------------------------------------*)
-goal [terce] _ (x : message, i : index) :
+lemma [terce] _ (x : message, i : index) :
 (* (input@A(i) = a => f(a) = c) => *)
  happens(A(i)) => x = input@A(i) => output@A(i) = <<a,x>,<a,x>>.
 Proof.
@@ -200,7 +200,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* rewrite rule with premisses *)
-goal _ (x : message) : 
+lemma _ (x : message) : 
  (forall (u,v : message), u = f(a) => <u,v> = <b,v>) =>
  x = f(a) => 
  <x,c> = <b,c>.
@@ -211,7 +211,7 @@ Proof.
 Qed.
 
 (* several occurences *)
-goal _ (x : message) : 
+lemma _ (x : message) : 
  (forall (u,v : message), u = f(a) => <f0(u),v> = <b,v>) =>
  x = f(a) => 
  f(x) = f(a) => 
@@ -224,7 +224,7 @@ Proof.
 Qed.
 
 (* same with !H *)
-goal _ (x : message) : 
+lemma _ (x : message) : 
  (forall (u,v : message), u = f(a) => <f0(u),v> = <b,v>) =>
  x = f(a) => 
  f(x) = f(a) => 
@@ -243,7 +243,7 @@ axiom mif_true ['a] (b : boolean, x,y : 'a):
 axiom mif_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
 
-goal _ (b,b' : boolean, x,y : message) : 
+lemma _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
  intro Hb Hb'.
@@ -251,7 +251,7 @@ Proof.
 Qed.
 
 (* same with an type variable *)
-goal _ ['a] (b,b' : boolean, x,y : 'a) : 
+lemma _ ['a] (b,b' : boolean, x,y : 'a) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
  intro Hb Hb'.
@@ -259,7 +259,7 @@ Proof.
 Qed.
 
 (* rewriting not at the root. *)
-goal _ ['a] (b,b' : boolean, x,y : 'a) : 
+lemma _ ['a] (b,b' : boolean, x,y : 'a) : 
   b => ((if b then x else y = x) || False).
 Proof.
  intro Hb.
@@ -267,7 +267,7 @@ Proof.
 Qed.
 
 (* check simplification item /= *)
-goal _ (b,b' : boolean, x,y : message) : 
+lemma _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
  intro Hb Hb'.
@@ -279,7 +279,7 @@ Proof.
 Qed.
 
 (* check simplification item // *)
-goal _ (b,b' : boolean, x,y : message) : 
+lemma _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
  intro Hb Hb'.
@@ -292,7 +292,7 @@ Qed.
 abstract p : message -> boolean.
 abstract pi : index -> boolean.
 
-goal _ (z : message) :
+lemma _ (z : message) :
   (forall (u : message), p (u)) =>
   (forall (i : index), pi (i)) =>
   (exists (j : message),
@@ -313,7 +313,7 @@ Qed.
 
 abstract P : message * message -> boolean.
 
-goal _ (z : message) :
+lemma _ (z : message) :
   (forall (x,y : message), P(x,y) => f(y) = x) =>
    P(a, z) => <f(z),b> = <a, b>.
 Proof.
@@ -324,7 +324,7 @@ Proof.
 Qed.
 
 (* same but we also give a (useless) pattern hole *)
-goal _ (z : message) :
+lemma _ (z : message) :
   (forall (x,y : message), P(x,y) => f(y) = x) =>
    P(a, z) => <f(z),b> = <a, b>.
 Proof.
@@ -339,7 +339,7 @@ Qed.
 
 axiom diff_ax ['a] (x : 'a) : diff(x,x) = x.
 
-global goal _ (x,y,z : message) : 
+global lemma _ (x,y,z : message) : 
   equiv(x, z) ->
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(diff(f(<x,y>),x), x, diff(f(<z,z>), z)).
@@ -350,7 +350,7 @@ Proof.
 Qed.
 
 (* same renaming variables *)
-global goal _ (u,v,z : message) : 
+global lemma _ (u,v,z : message) : 
   equiv(u, z) ->
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(diff(f(<u,v>),u), u, diff(f(<z,z>), z)).
@@ -361,7 +361,7 @@ Proof.
 Qed.
 
 (* same with variable conflict *)
-global goal _ (x,v,z : message) : 
+global lemma _ (x,v,z : message) : 
   equiv(x, z) ->
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(diff(f(<x,v>),x), x, diff(f(<z,z>), z)).
@@ -371,7 +371,7 @@ Proof.
   apply Hx.
 Qed.
 
-global goal _ (x : message) : 
+global lemma _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(x).
 Proof.
@@ -380,7 +380,7 @@ Proof.
 Abort.
 
 
-global goal _ (x : message) : 
+global lemma _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(x).
 Proof.
@@ -388,7 +388,7 @@ Proof.
   checkfail try(rewrite H in 1); auto exn GoalNotClosed.
 Abort.
 
-global goal _ (x : message) : 
+global lemma _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(x).
 Proof.
@@ -397,7 +397,7 @@ Proof.
 Abort.
 
 
-global goal _ (x,y,z : message) :
+global lemma _ (x,y,z : message) :
   equiv(x, y) ->
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(f(<x,f(z)>), y).
@@ -411,35 +411,35 @@ Qed.
 (* test failures when rewriting in global formulas *)
 
 (* rewrite fails if no instances to rewrite *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 [gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
 Proof. 
   checkfail rewrite foog exn NothingToRewrite.
 Abort.
 
 (* idem with an equiv *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 equiv(x, gg(x,c)).
 Proof. 
   checkfail rewrite foog exn NothingToRewrite.
 Abort.
 
 (* ! fails if no instances to rewrite *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 [gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
 Proof.
   checkfail rewrite !foog exn NothingToRewrite.
 Abort.
 
 (* idem with an equiv *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 equiv(x, gg(x,c)).
 Proof. 
   checkfail rewrite !foog exn NothingToRewrite.
 Abort.
 
 (* ? does not fails if no instances to rewrite *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 [gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)] ->
 [gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
 Proof.
@@ -449,7 +449,7 @@ Proof.
 Qed.
 
 (* idem with an equiv *)
-global goal _ (x, y, z : message) : 
+global lemma _ (x, y, z : message) : 
 equiv(x, gg(x,c)) -> equiv(gg(x,c)).
 Proof. 
   intro H.
@@ -458,7 +458,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal _ : (<f(a),b> = c) => (a = f(a)) => <a,b> = c.
+lemma _ : (<f(a),b> = c) => (a = f(a)) => <a,b> = c.
 Proof.
   intro H ->.
   assumption.
@@ -467,29 +467,29 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test type infer in matching *)
 
-goal [any] _ : (exists (i : index), false) = false.
+lemma [any] _ : (exists (i : index), false) = false.
 Proof. by rewrite exists_false1. Qed.
 
-goal [any] _ : (exists (i : message), false) = false.
+lemma [any] _ : (exists (i : message), false) = false.
 Proof. by rewrite exists_false1. Qed.
 
-goal [any] _ : (exists (i : timestamp), false) = false.
+lemma [any] _ : (exists (i : timestamp), false) = false.
 Proof. by rewrite exists_false1. Qed.
 
-goal [any] _ ['a] : (exists (i : 'a), false) = false.
+lemma [any] _ ['a] : (exists (i : 'a), false) = false.
 Proof. by rewrite exists_false1. Qed.
 
 (*------------------------------------------------------------------*)
 (* check that `rewrite` exploits conditions when rewriting *)
 
-goal [any] _ (b : boolean, x, y, z : message) : 
+lemma [any] _ (b : boolean, x, y, z : message) : 
   (b => x = y) => if b then x else z = if b then y else z.
 Proof.
   intro H.
   by rewrite H.
 Qed.
 
-goal [any] _ (b : boolean, x, y, z : message) : 
+lemma [any] _ (b : boolean, x, y, z : message) : 
   (not b => z = y) => if b then x else z = if b then x else y.
 Proof.
   intro H.
@@ -497,7 +497,7 @@ Proof.
 Qed.
 
 (* check that `rewrite` does not exploits too much *)
-goal [any] _ (b : boolean, x, y, z : message) : 
+lemma [any] _ (b : boolean, x, y, z : message) : 
   (b => x = y) => if b then x else x = if b then y else y.
 Proof.
   intro H.
@@ -514,7 +514,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* rewrite n times *)
 
-goal [any] _ ['a] (f : 'a -> 'a, a,b,c,d,z : 'a, y : 'a) : 
+lemma [any] _ ['a] (f : 'a -> 'a, a,b,c,d,z : 'a, y : 'a) : 
   (forall (x : 'a), f x = y) => 
   (f a = z) =>
   (f b = z) => 
@@ -538,7 +538,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* rewrite a negation *)
 
-goal _ ['a] (x, y : 'a, p,q : bool) : not (x = y) => ((x = y) || p) => (false || p).
+lemma _ ['a] (x, y : 'a, p,q : bool) : not (x = y) => ((x = y) || p) => (false || p).
 Proof.
   intro H H1.
   checkfail (assumption H1) exn NotHypothesis.

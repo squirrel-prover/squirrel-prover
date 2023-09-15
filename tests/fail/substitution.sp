@@ -17,7 +17,7 @@ system O: out(ch,cst); (
   | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
-goal unforgeable_1 :
+lemma unforgeable_1 :
   forall (a : index, b : index, c : index),
   b <> a && c=a=>
   output@A(b) <> h(na(c),k).

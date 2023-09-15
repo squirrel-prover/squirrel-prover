@@ -25,7 +25,7 @@ axiom autre (x1:message): sign(x1,ok) = x1.
 
 set timeout=1.
 
-goal mygoal: False.
+lemma mygoal: False.
 
 Proof.
  nosimpl(use mycheck with ok, ok).

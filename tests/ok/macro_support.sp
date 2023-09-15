@@ -51,13 +51,13 @@ system [P3] (!_i A(i) | !_i Leak2(i) | !_i Dum  (i) | !_i Leak1(i)).
 system [P4] (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i)).
 system [P5] (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i) | !_i Leak1B(i)).
 
-goal [P] _ (t : timestamp) : happens(t) => output@t <> n1.
+lemma [P] _ (t : timestamp) : happens(t) => output@t <> n1.
 Proof.
   intro Hap Eq.
   fresh ~precise_ts Eq.                     (* s1,s2 not leaked *)
 Qed.
 
-goal [P0] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P0] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1,s2 leaked by Leak2 *)
 
@@ -77,7 +77,7 @@ Proof.
     assumption A.
 Qed.
 
-goal [P1] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P1] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1,s2 leaked by Leak2, BLeak2 *)
 
@@ -99,7 +99,7 @@ Proof.
     assumption A.
 Qed.
 
-goal [P2] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P2] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1 leaked by Leak1, 
      s2 not leaked *)
@@ -115,7 +115,7 @@ Proof.
   + by fresh ~precise_ts Eq.                     
 Qed.
 
-goal [P3] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P3] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1 leaked by Leak1, Leak2,
      s2 leaked by Leak2 *)
@@ -137,7 +137,7 @@ Proof.
     assumption A.
 Qed.
 
-goal [P4] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P4] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1 leaked by Leak1, Leak2, Leak2B, 
      s2 leaked by Leak2, Leak2B *)
@@ -161,7 +161,7 @@ Proof.
     assumption A.
 Qed.
 
-goal [P5] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
+lemma [P5] _ (t : timestamp) : happens(t) => (output@t <> n1 && output@t <> n2).
 Proof.
   (* s1 leaked by Leak1, Leak1B, Leak2, Leak2B
      s2 leaked by Leak2, Leak2B *)

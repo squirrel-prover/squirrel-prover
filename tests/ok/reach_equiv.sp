@@ -13,12 +13,12 @@ global axiom [default/left,default/left] ax_ground_left : equiv(frame@pred(A),di
 axiom [default/left] check_left : True.
 axiom [default/right] check_right : True.
 
-goal m_fresh (tau:timestamp) : input@tau <> m.
+lemma m_fresh (tau:timestamp) : input@tau <> m.
 Proof.
   intro H; by fresh H.
 Qed.
 
-goal [default] _ : happens(A) => input@A = s@B => False.
+lemma [default] _ : happens(A) => input@A = s@B => False.
 Proof.
   checkfail rewrite equiv ax_ground exn Rewrite_equiv_system_mismatch.
   checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
@@ -26,21 +26,21 @@ Proof.
 Abort.
 
 (* Check that timestamp atoms are not dropped by rewrite equiv. *)
-goal [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
+lemma [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
 Proof. 
   const tau.
   rewrite equiv ax_ground.
   intro H; assumption.
 Qed.
 
-goal [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
   rewrite equiv ax_ground_left.
   by use m_fresh with A.
 Qed.
 
-goal [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
   rewrite equiv ax_ground.
@@ -48,7 +48,7 @@ Proof.
   by use m_fresh with A.
 Qed.
 
-goal [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
   rewrite equiv -ax_ground_rev.
@@ -56,7 +56,7 @@ Proof.
   by use m_fresh with A.
 Qed.
 
-goal [default/right] _ : happens(A) => input@A = s@B => False.
+lemma [default/right] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
   checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
@@ -65,7 +65,7 @@ Proof.
   by use m_fresh with A.
 Qed.
 
-goal [default] _ : happens(A) => input@A = s@B => False.
+lemma [default] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
   checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
@@ -75,7 +75,7 @@ Qed.
 
 (* Same as above but without an axiom. *)
 
-global goal [default/left,default/left] _ :
+global lemma [default/left,default/left] _ :
   [happens(A)] -> equiv(frame@pred(A),diff(s@B,m)) -> [not(input@A = s@B)].
 Proof.
   intro Hap H.

@@ -11,7 +11,7 @@ let reset_test () =
     Prover.exec_all st
         "channel c
         system S : !_i new n; out(c,n).
-        goal foo (i:index) : happens(S(i)) => output@S(i) = n(i).
+        lemma foo (i:index) : happens(S(i)) => output@S(i) = n(i).
         Proof.
           auto."
   in
@@ -42,7 +42,7 @@ let some_print () =
     "include Basic.\n\
      channel c\n\
      system [T] (S : !_i !_i new n; out(c,n)).\n\
-     goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).\n\
+     lemma [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).\n\
      Proof.\n\
        admit.\n\
      Qed.\n\

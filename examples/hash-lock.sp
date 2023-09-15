@@ -45,7 +45,7 @@ axiom injective_pairing (x,y : message) :
   fst (x) = fst (y) => snd (x) = snd (y) => x = y.
 
 (* Well-authentication for R1 and R2. *)
-goal wa_R1_R2 (tau:timestamp,j:index):
+lemma wa_R1_R2 (tau:timestamp,j:index):
   happens(tau,R(j)) =>
   (exists (i,k:index),
      snd(input@tau) = h(<nR(j),fst(input@tau)>,diff(key(i),key'(i,k))))
@@ -87,7 +87,7 @@ Proof.
 Qed.
 
 (** Variant of previous lemma that is needed to be able to rewrite in some cases. *)
-goal wa_R1 (j:index):
+lemma wa_R1 (j:index):
   happens(R1(j)) =>
   cond@R1(j) =
   (exists (i,k:index),
@@ -145,7 +145,7 @@ Qed.
 (* In the real-world system, we go further and prove injective
    authentication.  *)
 
-goal [default/left] injective_auth (j:index):
+lemma [default/left] injective_auth (j:index):
 
   happens(R1(j)) =>
   cond@R1(j) =>

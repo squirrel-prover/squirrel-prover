@@ -21,7 +21,7 @@ system O: out(ch,cst); out(ch,k); (
 axiom name_not_pair (ma : message, mb : message, a:index):
 na(a) <>  <ma, mb>.
 
-goal unforgeable_1 :
+lemma unforgeable_1 :
   forall (a : index, b : index),
   b <> a =>
   output@A(b) <> h(na(a),k).

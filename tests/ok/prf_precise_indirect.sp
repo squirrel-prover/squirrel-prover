@@ -12,7 +12,7 @@ process A(i : index) =
 
 system !_i A(i).
 
-global goal _ (j : index[const]) :
+global lemma _ (j : index[const]) :
 [(zero <> input@A(j)) = true] ->
 [(forall (i:index), (A(i) < A(j) => test(i) => zero <> input@A(i))) = true] ->
 [happens(A(j))] ->

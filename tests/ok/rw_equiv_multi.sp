@@ -9,7 +9,7 @@ global axiom [default] ax : equiv(diff(n1,m1),diff(n2,m2)).
 axiom [default/right] ax1 : m1 = empty.
 axiom [default/right] ax2 : m2 = empty.
 
-goal [default/left,default/left] _ : diff(n1,n2) = empty.
+lemma [default/left,default/left] _ : diff(n1,n2) = empty.
 Proof.
   rewrite equiv ax.
   project.

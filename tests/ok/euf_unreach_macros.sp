@@ -18,7 +18,7 @@ process P (i : index) =
 system !_i P (i).
 
 (* starting from [frame], euf find no collision *)
-goal _ (t : timestamp[param]) :
+lemma _ (t : timestamp[param]) :
  happens(t) => output@t = h(n,k) => false.
 Proof.
  intro Hap H.
@@ -26,7 +26,7 @@ Proof.
 Qed.
 
 (* starting from [s], there are collision *)
-goal _ (t : timestamp[param]) :
+lemma _ (t : timestamp[param]) :
  happens(t) => s@t = h(n,k) => false.
 Proof.
  intro Hap H. 
@@ -34,7 +34,7 @@ Proof.
 Abort.
 
 (* same goal, but testing more precisely the condition generated *)
-goal _ (t : timestamp[param]) :
+lemma _ (t : timestamp[param]) :
  happens(t) => s@t = h(n,k) => exists(i:index), P(i) <= t && s@pred(P(i)) = n.
 Proof.
  intro Hap H. 
@@ -52,7 +52,7 @@ process Q(i:index) =
 
 system [second] (!_i Q(i)).
 
-goal [second] _ (t : timestamp[param]) (j : index[param]):
+lemma [second] _ (t : timestamp[param]) (j : index[param]):
  happens(t) => output@t = h(nonce(j),k) => false.
 Proof.
  intro Hap H. 
@@ -70,7 +70,7 @@ process R(i:index) =
 
 system [third] (!_i R(i)).
 
-goal [third] _ (t : timestamp[param]) (j : index[param]):
+lemma [third] _ (t : timestamp[param]) (j : index[param]):
  happens(t) => output@t = h(nonce(j),k) => false.
 Proof.
  intro Hap H. 

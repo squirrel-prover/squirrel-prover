@@ -40,7 +40,7 @@ let case_study_fail () =
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
-       global goal _ : equiv(if true then diff(n,m)).\n\
+       global lemma _ : equiv(if true then diff(n,m)).\n\
        Proof."
   in
   try
@@ -72,7 +72,7 @@ let case_study_fail' () =
       "name n : message.\n\
        name m : message.\n\
        system null.\n\
-       global goal _ :\n\
+       global lemma _ :\n\
          equiv(if true then diff(n,m), if n=m then diff(n,m)).\n\
        Proof."
   in
@@ -98,7 +98,7 @@ let case_study () =
         name nfresh : message.
         system null.
 
-        global goal _ : equiv(if true then zero else empty).
+        global lemma _ : equiv(if true then zero else empty).
         Proof."
   in
 
@@ -132,7 +132,7 @@ let case_study () =
         name n : message.
         name m : message.
 
-        global goal _ : equiv(if true then zero else empty, if true then n else m).
+        global lemma _ : equiv(if true then zero else empty, if true then n else m).
         Proof."
   in
   (* Attention, simpl va trivialiser ce but. *)
@@ -174,7 +174,7 @@ let case_study () =
   let st = Prover.exec_all ~test:true st
         "Abort.
 
-        global goal _ : 
+        global lemma _ : 
           equiv(
                 if true then zero else empty, 
                 if true then n else m
@@ -236,7 +236,7 @@ let case_study () =
         "Abort.
 
         abstract f : message->message.
-        global goal _ : equiv(f(if true then diff(n,m) else empty)).
+        global lemma _ : equiv(f(if true then diff(n,m) else empty)).
         Proof."
   in
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
@@ -277,7 +277,7 @@ let case_study () =
 
   let st = Prover.exec_all ~test:true st
         "Abort.
-        global goal _ : equiv(f(diff(if true then n else empty,if true then m else empty))).
+        global lemma _ : equiv(f(diff(if true then n else empty,if true then m else empty))).
         Proof."
   in
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
@@ -321,7 +321,7 @@ let case_study () =
         abstract x : message.
         abstract y : message.
 
-        global goal _ (x,y:message,tau,tau':timestamp) :
+        global lemma _ (x,y:message,tau,tau':timestamp) :
           equiv(
             exec@tau, 
             frame@tau, 
@@ -341,7 +341,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
@@ -355,7 +355,7 @@ let case_study () =
     ~expected:(x);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
@@ -370,7 +370,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 1 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
@@ -385,7 +385,7 @@ let case_study () =
   let st = Prover.exec_all ~test:true st
         "Abort.
 
-        global goal _ (x,y:message,tau,tau':timestamp) :
+        global lemma _ (x,y:message,tau,tau':timestamp) :
           equiv(
             exec@tau, 
             frame@tau, 
@@ -402,7 +402,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -418,7 +418,7 @@ let case_study () =
     ~expected:(x);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -435,7 +435,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 1 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -451,7 +451,7 @@ let case_study () =
     ~expected:(y);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -470,7 +470,7 @@ let case_study () =
   let st = Prover.exec_all ~test:true st
         "Abort.
 
-        global goal _ (x,y:message,tau,tau':timestamp) :
+        global lemma _ (x,y:message,tau,tau':timestamp) :
           equiv(
             exec@tau, 
             frame@tau, 
@@ -487,7 +487,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -504,7 +504,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 1 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -523,7 +523,7 @@ let case_study () =
   let st = Prover.exec_all ~test:true st
         "Abort.
 
-        global goal _ (x,y:message,tau,tau':timestamp) :
+        global lemma _ (x,y:message,tau,tau':timestamp) :
           equiv(
             exec@tau, 
             frame@tau, 
@@ -540,7 +540,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -557,7 +557,7 @@ let case_study () =
 
   let terms = get_seq_in_nth_goal st 1 in
   Alcotest.(check' term_testable) 
-    ~msg:"global goal _ (tau,tau':timestamp) :
+    ~msg:"global lemma _ (tau,tau':timestamp) :
     equiv(
       exec@tau, 
       frame@tau, 
@@ -580,7 +580,7 @@ let namelength () =
         name n : message.
         name m : message.
 
-        goal _ : True.
+        lemma _ : true.
         Proof.
         " in
   Printer.pr "%a@." (Prover.pp_subgoals st) ();
@@ -643,7 +643,7 @@ let namelength2 () =
         system null.
         name n : message * message.
 
-        goal _ : True.
+        lemma _ : True.
         Proof.
         " in
   Printer.pr "%a@." (Prover.pp_subgoals st) ();

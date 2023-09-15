@@ -4,7 +4,7 @@ hash h.
 name k1 : message.
 name k2 : message.
 system null.
-global goal _ : equiv(len(h(zero,k1)),len(h(zero,k2))).
+global lemma _ : equiv(len(h(zero,k1)),len(h(zero,k2))).
 Proof.
   prf 0.
   prf 1.

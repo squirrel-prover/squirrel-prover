@@ -16,7 +16,7 @@ global axiom s (x : bool[adv]) : [x] -> [x].
 axiom r ['a] (x : 'a[adv]) : x = x => x = x.
 
 (* tests the `have` tactic *)
-global goal foo
+global lemma foo
  ( x, y, z : message     ,  t : timestamp     ) 
  (dx,dy,dz : message[adv], dt : timestamp[adv]) : 
   equiv (x,y,z).
@@ -58,7 +58,7 @@ Abort.
 
 global axiom fooM (x,y : message[adv]) : [x = y].
 
-global goal _ (x : message,y,z: message[adv]) : [x = y] /\ [ y = z].
+global lemma _ (x : message,y,z: message[adv]) : [x = y] /\ [ y = z].
 Proof.
   split. 
   + checkfail apply fooM exn Failure.
@@ -70,7 +70,7 @@ Qed.
 (* works on `bool`, as `bool` is a finite fixed-size type *)
 global axiom fooB (b : bool[adv]) : [b].
 
-global goal _ (b1,b2 : bool) : [b1] /\ [b2].
+global lemma _ (b1,b2 : bool) : [b1] /\ [b2].
 Proof.
   split. 
   + apply fooB.

@@ -22,7 +22,7 @@ system ( !_i A : a(i)).
 
 (*------------------------------------------------------------------*)
 (* simple first scenario with apply *)
-global goal _ (i:index[const]) :
+global lemma _ (i:index[const]) :
   equiv(seq(j:index => n(j))) -> equiv(seq(j:index => n(j)), n(i)).
 Proof.
   intro H.
@@ -30,7 +30,7 @@ Proof.
 Qed.
 
 (* same using the `deduce` tactic *)
-global goal _ (i:index[const]) :
+global lemma _ (i:index[const]) :
  equiv(seq(j:index => n(j))) ->
  equiv(seq(j:index => n(j)), n(i)).
 Proof.
@@ -41,7 +41,7 @@ Proof.
 Qed.
 
 (* check failure of the above without the `const` assumption *)
-global goal _ (i:index) :
+global lemma _ (i:index) :
  equiv( 
   seq(j:index => n(j)),
   n(i)).
@@ -51,7 +51,7 @@ Abort.
 
 (*------------------------------------------------------------------*)
 (*Testing deduce can compute an element of a sequence. Many sequences added to test complexity, on small but non trivial instances.*)
-global goal _ (i:index[const]) :
+global lemma _ (i:index[const]) :
  equiv( 
   seq(j:index => n(j)),
   seq(j:index => n1(j)),
@@ -70,7 +70,7 @@ Proof.
   admit.
 Qed.
 
-global goal _ (i:index[const]) :
+global lemma _ (i:index[const]) :
  equiv( 
   seq(j:index => n1(j)),
   seq(j:index => n2(j)),

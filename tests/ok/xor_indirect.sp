@@ -11,7 +11,7 @@ system A : !_i new a; !_j out(c,b(i,j)).
 
 axiom len_ok (i,j:index): len(ok) = len(b(i,j)).
 
-global goal test (i,j,ii,jj:index[const]) :
+global lemma test (i,j,ii,jj:index[const]) :
   (* [happens(A(i,j))] -> *)
   (* [happens(A(ii,jj))] -> *)
   [happens(A(i,j),A(ii,jj))] ->
@@ -30,7 +30,7 @@ Proof.
   admit. (* Induction hypothesis.*)
 Qed.
 
-global goal test2 (i,j,ii,jj:index[const]) :
+global lemma test2 (i,j,ii,jj:index[const]) :
   [happens(A(i,j),A(ii,jj))] ->
   equiv(
     diff(output@pred(A(i,j)),output@pred(A(ii,jj))),

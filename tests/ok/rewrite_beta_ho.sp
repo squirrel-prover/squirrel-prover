@@ -6,10 +6,10 @@ system [real] null.
 
 name skR : index -> message.
 
-goal [real] rw (y:index) : forall x, x = y => skR x = skR y. Proof. auto. Qed.
+lemma [real] rw (y:index) : forall x, x = y => skR x = skR y. Proof. auto. Qed.
 
 (* manual proof, instantiating the lemma by hand *)
-goal [real] _ (j:index) :
+lemma [real] _ (j:index) :
   (try find i:index such that i = j in skR i) = (skR j).
 Proof.
   rewrite (rw j) //. 
@@ -18,7 +18,7 @@ Proof.
 Qed.
 
 (* higher-order matching + beta-reduction *)
-goal [real] _ (j:index) :
+lemma [real] _ (j:index) :
   (try find i:index such that i = j in skR i) = (skR j).
 Proof.
   rewrite (rw j) // (try_choose _ (fun _ => skR j) _ j) //.

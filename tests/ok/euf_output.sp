@@ -9,7 +9,7 @@ name n : index->message
 
 system !_a out(c,h(n(a),k)).
 
-goal unforgeable (a:index, b:index):
+lemma unforgeable (a:index, b:index):
   happens(A(b)) => b <> a => output@A(b) <> h(n(a),k).
 
 Proof.

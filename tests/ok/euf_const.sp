@@ -10,7 +10,7 @@ system !_i out(c,h(n,k(i,i))).
 
 (*------------------------------------------------------------------*)
 (* fails if [x] is not constant *)
-goal _ (tau:timestamp, x : message, a,b:index[const]):
+lemma _ (tau:timestamp, x : message, a,b:index[const]):
   happens(tau) => <x,output@tau> = h(n,k(a,b)) =>
   a = b.
 Proof.
@@ -21,7 +21,7 @@ Abort.
 
 (*------------------------------------------------------------------*)
 (* fails if [a] or [b] is not a parameter *)
-goal _ (tau:timestamp, x : message, a:index[const], b:index):
+lemma _ (tau:timestamp, x : message, a:index[const], b:index):
   happens(tau) => <x,output@tau> = h(n,k(a,b)) =>
   a = b.
 Proof.
@@ -30,7 +30,7 @@ Proof.
   (* Failure: terms contain a non-ptime variable: b *)
 Abort.
 
-goal _ (tau:timestamp, x : message, a:index, b:index[const]):
+lemma _ (tau:timestamp, x : message, a:index, b:index[const]):
   happens(tau) => <x,output@tau> = h(n,k(a,b)) =>
   a = b.
 Proof.
@@ -39,7 +39,7 @@ Proof.
   (* Failure: terms contain a non-ptime variable: a *)
 Abort.
 
-goal _ (tau:timestamp, x : message, a,b:index):
+lemma _ (tau:timestamp, x : message, a,b:index):
   happens(tau) => <x,output@tau> = h(n,k(a,b)) =>
   a = b.
 Proof.

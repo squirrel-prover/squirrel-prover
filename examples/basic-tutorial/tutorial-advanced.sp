@@ -33,43 +33,43 @@ In the most basic setting, an intro patten simply provide names, either for vari
 abstract h : message -> boolean.
 
 
-goal _ : f => false.
+lemma _ : f => false.
 Proof. intro *.   (* names can be given automaticaly *)
 Abort.
 
-goal _ : f => false.
+lemma _ : f => false.
 Proof. intro H.   (* hypotheses can be named manually *)
 Abort.
 
-goal _ : forall x:message, h(x) => false.
+lemma _ : forall x:message, h(x) => false.
 Proof. intro y. (* variables can be named manually *)
 Abort.
 
 
-goal _ : f => g => (forall x:message, h(x) => false).
+lemma _ : f => g => (forall x:message, h(x) => false).
 Proof. intro Hf Hg y *.   (* the introductions are chained *)
 Abort.
 (* Patterns also allow to directly split more complex formulas. *)
 
 
-goal _ : (f && g) => false.
+lemma _ : (f && g) => false.
 Proof. intro Hconj.  (* Here, without further infos, we obtain two hypothesis named by default *)
 Abort.
 
-goal _ : (f && g) =>false.
+lemma _ : (f && g) =>false.
 Proof. intro [Hf Hg].   (* the pattern [f1 ... fs] allows to name hypotheses for a formula f1 && ... && fs *)
 Abort.
 
 
-goal _ : (f || g) =>false.
-Proof. intro [Hf | Hg].   (* the pattern [f1 | ... | fs] allows to name hypotheses for all the subgoals created by splitting f1 || ... || fs *)
+lemma _ : (f || g) =>false.
+Proof. intro [Hf | Hg].   (* the pattern [f1 | ... | fs] allows to name hypotheses for all the sublemmas created by splitting f1 || ... || fs *)
 Abort.
 
-goal _ : ((f || g) && f) =>false.
+lemma _ : ((f || g) && f) =>false.
 Proof. intro [[Hf | Hg] Hf2].   (* patterns can be nested *)
 Abort.
 
-goal _ : ((f || g) && f) => false.
+lemma _ : ((f || g) && f) => false.
 Proof. intro [[Hf | Hg] _].   (* names can be dropped if useless, with _ *)
 Abort.
 
@@ -79,7 +79,7 @@ Abort.
 include Basic.
 
 (* The library notably contains an equation allowing to simplify a trivial if. *)
-goal _ (x,y:message): if true then x else y=x.
+lemma _ (x,y:message): if true then x else y=x.
 Proof.
 rewrite if_true.
 auto.
@@ -97,19 +97,19 @@ Some syntactic sugar allow to quickly combine intros, rewrites and macro expansi
 For instance, `tactic; intros PAT`, applies the intro pattern `PAT` to every subgoal created by `tactic`. This can be written more concisely using `tactic => PAT`.
 *)
 
-goal _ (x,y:message): (x=y => false) || (x<> y => false) .
+lemma _ (x,y:message): (x=y => false) || (x<> y => false) .
 Proof.
-case x=y => XY.  (* the hypothesis introduced by the case is introduced in both subgoals as XY *)
+case x=y => XY.  (* the hypothesis introduced by the case is introduced in both sublemmas as XY *)
 by right.
 by left.
 Qed.
 
 
-(* Tactics can be applied only to a subset of the new subgoals, by selecting subgoals using their number. *)
+(* Tactics can be applied only to a subset of the new sublemmas, by selecting sublemmas using their number. *)
 
-goal _ (x,y:message): (x=y => false) || (x<> y => false) .
+lemma _ (x,y:message): (x=y => false) || (x<> y => false) .
 Proof.
-case x=y => XY; 1: by right.  (* Apply by right to the first subgoal created *)
+case x=y => XY; 1: by right.  (* Apply by right to the first sublemma created *)
 
 by left.
 Qed.
@@ -122,7 +122,7 @@ Additionally, special symbols in pattern allow to perform automatic simplificati
  - `//=` combines `//` and `/=`.
 *)
 
-goal _ (x,y,z:message): true => true .
+lemma _ (x,y,z:message): true => true .
 Proof.
 intro _ => //.
 Qed.
@@ -133,7 +133,7 @@ These simplification patterns can be chained and combined with introduction patt
 
 abstract m : message->message.
 
-goal _ (x,y:message): m(x) = x => if true then x else y= m(x).
+lemma _ (x,y:message): m(x) = x => if true then x else y= m(x).
 Proof.
 rewrite if_true => //= t.
 Qed.
@@ -145,7 +145,7 @@ Qed.
 Sometimes, instead of introducing an equation, we want to apply it instantly to the conclusion and then clear it (i.e. forget it). *)
 
 (* Typically, in the following example, we do not need Hxy after the rewriting. *)
-goal _ (x,y:message): h(x)=h(y) => h(x) = g.
+lemma _ (x,y:message): h(x)=h(y) => h(x) = g.
 Proof.
 intro Hxy.
 rewrite Hxy.
@@ -153,7 +153,7 @@ clear Hxy.
 Abort.
 
 (* This is achieved more concisely using ->. *)
-goal _ (x,y:message): h(x)=h(y) => h(x) = g.
+lemma _ (x,y:message): h(x)=h(y) => h(x) = g.
 Proof.
 intro ->.
 Abort.
@@ -164,7 +164,7 @@ Abort.
  During an intro pattern, it can be useful to expand a macro before continuing the introduction. E.g., in the following example, expanding cond in the middle of intro allow to detruct directly the condition.  *)
 abstract ko:message.
 
-goal unforgeable:
+lemma unforgeable:
   happens(A) =>  cond@A => ko <> ok => output@A <> ko.
 Proof.
   intro Hap Hcond Hdiff.
@@ -172,8 +172,8 @@ Proof.
   destruct Hcond as [Hf Hg].
 Abort.
 
-(* All those operations can be done using a single intro pattern, using the intro pattern @/sym, which expands the sym macro in the goal. Note that sym is only expanded in the goal, not the hypotheses. *)
-goal unforgeable:
+(* All those operations can be done using a single intro pattern, using the intro pattern @/sym, which expands the sym macro in the lemma. Note that sym is only expanded in the lemma, not the hypotheses. *)
+lemma unforgeable:
   happens(A) =>  cond@A => ko <> ok => output@A <> ko.
 Proof.
   intro Hap @/cond [Hf Hg] Hdiff.
@@ -195,7 +195,7 @@ By default, rewrite acts on the goal. The syntax `rewrite H in C1,...,C2` allows
 
 abstract test : message -> message.
 
-goal _ (x,y:message): h(x) = h(y) => h(x) = h(x) => false.
+lemma _ (x,y:message): h(x) = h(y) => h(x) = h(x) => false.
 Proof.
 intro eq.
 rewrite eq.
@@ -225,7 +225,7 @@ abstract P : message * message -> boolean.
 abstract k : message -> message.
 abstract a : message.
 abstract b : message.
-goal _ (z : message) :
+lemma _ (z : message) :
   (forall (x,y : message), P(x,y) => k(y) = x) =>
    P(a, z) => <k(z),b> = <a, b>.
 Proof.
@@ -238,7 +238,7 @@ Qed.
 
 (* If the variable we want to instantiate is not the first one, we can use _ to leave some variables free. *)
 
-goal _ (z : message) :
+lemma _ (z : message) :
   (forall (x,y : message), P(y,x) => k(x) = y) =>
    P(a, z) => <k(z),b> = <a, b>.
 Proof.
@@ -263,7 +263,7 @@ axiom [any] split_k (x,y : message) :  k (<x,y>) = x.
 
 hint rewrite split_k.
 
-goal _ (a,b,c : message) : a = c => k(<a,b>) = c.
+lemma _ (a,b,c : message) : a = c => k(<a,b>) = c.
 Proof.
  intro H.
  (* simpl will now automatically apply the rewrite rule of split_k *)

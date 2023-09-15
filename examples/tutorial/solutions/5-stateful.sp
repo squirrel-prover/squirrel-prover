@@ -34,7 +34,7 @@ name r : message.
 
 system [example] null.
 
-goal [example] _ : 
+lemma [example] _ : 
   dec(att(enc(a,r,k)), k) <> fail => 
   att(enc(a,r,k)) = enc(a,r,k).
 Proof.
@@ -115,13 +115,13 @@ axiom [any] order_incr (n1,n2:message):
 op (~~<) (x : message, y : message) : boolean = x ~< y || x = y.
 
 (* We now prove a few properties of `~~<` and `~<` *)
-goal [any] tt_le_lt (n1,n2 : message):
+lemma [any] tt_le_lt (n1,n2 : message):
   n1 ~< n2 => n1 ~~< n2.
 Proof. 
   by intro ?; rewrite /(~~<); left. 
 Qed.
 
-goal [any] tt_le_lt_trans (n1,n2,n3 : message):
+lemma [any] tt_le_lt_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -130,7 +130,7 @@ Proof.
   + by rewrite H1. 
 Qed.
 
-goal [any] tt_lt_le_trans (n1,n2,n3 : message):
+lemma [any] tt_lt_le_trans (n1,n2,n3 : message):
   n1 ~< n2 => n2 ~~< n3 => n1 ~< n3.
 Proof.
   rewrite !/(~~<) => H1 H2.
@@ -141,7 +141,7 @@ Qed.
 
 (* Prove, using `order_trans`, that `~~<` is also
    a transitive relation. *)
-goal [any] tt_le_trans (n1,n2,n3 : message):
+lemma [any] tt_le_trans (n1,n2,n3 : message):
   n1 ~~< n2 => n2 ~~< n3 => n1 ~~< n3.
 Proof. 
   (* BEGIN EXO *) 
@@ -190,7 +190,7 @@ system (
 
 (* prove that our protocol satisfies the following authentication 
    property *)
-goal authentication_R (j, i : index[const]) :
+lemma authentication_R (j, i : index[const]) :
   happens(R(j,i)) =>
   cond@R(j,i) <=>
   exists (k : index),
@@ -222,7 +222,7 @@ Qed.
 (** ## Some counter properties *)
 
  (* The tag counter is not decreasing *)
-goal counter_increaseT (i : index, tau1, tau2 : timestamp):
+lemma counter_increaseT (i : index, tau1, tau2 : timestamp):
   tau1 <= tau2 => 
   cpt(i)@tau1 ~~< cpt(i)@tau2.
 Proof. 
@@ -254,7 +254,7 @@ Proof.
 Qed.
 
 (* the tag counter is strictly increasing when a tag session occurs. *)
-goal counter_increaseT_strict (tau1, tau2 : timestamp, i,k : index):
+lemma counter_increaseT_strict (tau1, tau2 : timestamp, i,k : index):
   tau1 < T(i,k) => 
   T(i,k) <= tau2 =>
   cpt(i)@tau1 ~< cpt(i)@tau2.
@@ -271,7 +271,7 @@ Proof.
 Qed.
 
  (* The reader counter is not decreasing *)
-goal counter_increaseR (i : index, tau1, tau2 : timestamp):
+lemma counter_increaseR (i : index, tau1, tau2 : timestamp):
   tau1 <= tau2 => 
   exec@tau2 =>
   Rcpt(i)@tau1 ~~< Rcpt(i)@tau2.
@@ -312,7 +312,7 @@ Qed.
    then `k = k1`. 
    Hint: do a case analysis on the order in which `T(i,k)` and 
    `T(i,k1)` occur. *)
-goal tag_cpt_strict (i, k, k1: index) :
+lemma tag_cpt_strict (i, k, k1: index) :
   happens(T(i,k1), T(i,k)) =>
   cpt(i)@T(i,k) = cpt(i)@T(i,k1) =>
   k = k1.
@@ -334,7 +334,7 @@ Qed.
 (* Show using the `intctxt` tactic that if two tags outputs are equal, 
    then they must have the same identities.
    Hint: you may use the `incr_ne_fail` axiom above *)
-goal tag_output_collision (i, i1, k, k1: index[const]) :
+lemma tag_output_collision (i, i1, k, k1: index[const]) :
   happens(T(i,k), T(i1,k1)) =>
   output@T(i1,k1) = output@T(i,k) =>
   i = i1.
@@ -356,7 +356,7 @@ Qed.
 
 (* [Advanced] Show that our protocol provides injective authentication using 
    the lemmas above. *)
-goal injective_authentication (j, i, j1, i1 : index[const]) :
+lemma injective_authentication (j, i, j1, i1 : index[const]) :
   R(j,i) < R(j1,i1) =>
   exec@R(j,i) =>
   exec@R(j1,i1) =>

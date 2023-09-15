@@ -25,21 +25,21 @@ system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
 (* set debugConstr=true. *)
 
-goal _ (t,t' : timestamp):
+lemma _ (t,t' : timestamp):
   happens(t) && t=t' => (t<=t').
 Proof.
   constraints.
 Qed.
 
 (* simple sanity check *)
-goal _ (t,t' : timestamp):
+lemma _ (t,t' : timestamp):
   happens(t) && t=t' => (t' < t).
 Proof.
   checkfail constraints exn Failure.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal _ (t,t' :timestamp[const]) :
+global lemma _ (t,t' :timestamp[const]) :
   [happens(t)] -> 
   equiv(frame@t) -> 
   equiv(if t=t' then frame@t' else frame@t).
@@ -48,7 +48,7 @@ Proof.
   apply H.
 Qed.
 
-global goal _ (t,t' :timestamp[const]) :
+global lemma _ (t,t' :timestamp[const]) :
   [happens(t)] -> 
   equiv(frame@t) -> 
   equiv(if t<>t' then frame@t' else frame@t).
@@ -58,7 +58,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal _ (t:timestamp[const]) :
+global lemma _ (t:timestamp[const]) :
   [happens(t)] -> 
   equiv(frame@t) -> 
   equiv(frame@pred(t),exec@pred(t)).
@@ -67,7 +67,7 @@ Proof.
   apply H.
 Qed.
 
-global goal _ (t:timestamp[const]) :
+global lemma _ (t:timestamp[const]) :
   [happens(t)] -> 
   equiv(frame@t) -> 
   equiv(frame@pred(t),exec@pred(t) && empty=output@pred(t)).

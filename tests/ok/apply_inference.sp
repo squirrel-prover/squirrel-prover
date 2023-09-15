@@ -6,7 +6,7 @@ abstract nt ['a] : 'a -> 'a.
 abstract ft ['a] : 'a * 'a -> 'a.
 abstract gt ['a] : 'a * 'a -> bool.
 
-goal _ (x, y : message) : 
+lemma _ (x, y : message) : 
     (forall (z : message), gt(nt(x),z) => false) => 
     gt(nt(x),nt(y)) => 
     false.
@@ -16,7 +16,7 @@ Proof.
 Qed.
 
 (* same with a type variable *)
-goal _ ['a] (x, y : 'a) : 
+lemma _ ['a] (x, y : 'a) : 
     (forall (z : 'a), gt(nt(x),z) => false) => 
     gt(nt(x),nt(y)) => 
     false.
@@ -25,7 +25,7 @@ Proof.
   by have G := H _ A.
 Qed.
 
-goal _ ['a] (x, y : 'a) : 
+lemma _ ['a] (x, y : 'a) : 
     (forall (z : 'a), gt(nt(x),z) => false) => 
     gt(nt(y),nt(y)) => 
     false.
@@ -39,7 +39,7 @@ abstract P : message -> boolean.
 abstract Q : message -> boolean.
 abstract (++) : message -> message -> message.
 
-goal _ (y : message) :
+lemma _ (y : message) :
   (forall (x : message), P (x) => Q (x)) =>
   (P(y ++ zero)) =>
   Q (y ++ zero).
@@ -49,7 +49,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (y : message) :
+lemma _ (y : message) :
   (forall (x : message), P (x ++ x) => Q (x)) =>
   (P((y ++ zero) ++ (y ++ zero))) =>
   Q (y ++ zero).
@@ -63,7 +63,7 @@ Qed.
 abstract f : message -> message.
 abstract g : message -> message.
 
-goal _ (y,z : message) :
+lemma _ (y,z : message) :
  (forall (x : message), P (x) => g (x) = f (x)) =>
  (forall (x : message), P (x)) =>
  (f(y) = f(<y,z>)) =>
@@ -75,7 +75,7 @@ Proof.
   assumption F.
 Qed.
 
-goal _ (y,z : message) :
+lemma _ (y,z : message) :
  (forall (x : message), P (x) => g (x) = f (x)) =>
  (forall (x : message), P (x)) =>
  g (<y,z>) = f (<y,z>).
@@ -92,7 +92,7 @@ name b : message.
 name c : message.
 name d : message.
 
-global goal _ :
+global lemma _ :
   (Forall (t : timestamp), [happens(t)] -> equiv(diff(a,b), t)) ->
   equiv(diff(a,b)).
 Proof.

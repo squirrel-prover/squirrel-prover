@@ -15,7 +15,7 @@ system [B] !_i O: (in(c,x); out(c, a)).
 axiom [any] fst_pair (x, y: message) : fst (<x, y>) = x.
 hint rewrite fst_pair.
 
-goal [A] _ (t : timestamp, i : index) : 
+lemma [A] _ (t : timestamp, i : index) : 
   happens(t) => t = O(i) => input@t = b => fst(output@t) = b.
 Proof. 
   intro Hap H U /=.
@@ -25,7 +25,7 @@ Proof.
   assumption.
 Qed.
 
-goal [B] _ (t : timestamp, i : index) : 
+lemma [B] _ (t : timestamp, i : index) : 
   happens(t) => t = O(i) => input@t = b => fst(output@t) = b.
 Proof. 
   intro Hap H U /=.
@@ -33,7 +33,7 @@ Proof.
   checkfail assumption exn NotHypothesis.
 Abort.
 
-goal [A] _ (t : timestamp, i : index) :
+lemma [A] _ (t : timestamp, i : index) :
   (seq (t : timestamp => happens(t) => t = O(i) => input@t = b) 
    = empty)
   =>

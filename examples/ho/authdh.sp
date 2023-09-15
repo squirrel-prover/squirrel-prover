@@ -105,7 +105,7 @@ include Lib.
 
 (*------------------------------------------------------------------*)
 (* We prove the secrecy of the key derived by A. *)
-goal [default] kA_secret (A,B,i:index, t:timestamp):
+lemma [default] kA_secret (A,B,i:index, t:timestamp):
   happens(t) =>
   not (happens(corrupt(B))) =>
   happens(A2(A,B,i)) =>
@@ -130,7 +130,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* We prove the weak forward secrecy of the key derived by A. *)
-goal [default] kA_weak_forward_secret (A,B,i:index, t:timestamp):
+lemma [default] kA_weak_forward_secret (A,B,i:index, t:timestamp):
   happens(t) =>
   not (corrupt(B) < A2(A,B,i)) =>
   happens(A2(A,B,i)) =>
@@ -155,7 +155,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* Agreement of A holds whenever B has not been corrupted before A's execution *)
-goal [default] A_agreement (A,B,i:index):
+lemma [default] A_agreement (A,B,i:index):
    happens(A2(A,B,i)) =>
    not (corrupt(B) < A2(A,B,i)) =>
    (cond@A2(A,B,i) <=>
@@ -193,7 +193,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* Agreement of B holds whenever A has not been corrupted before B's execution *)
-goal [default] B_agreement (A,B,i:index):
+lemma [default] B_agreement (A,B,i:index):
    happens(B2(A,B,i)) =>
    not (corrupt(A) < B2(A,B,i)) =>
    cond@B2(A,B,i) =>
@@ -216,7 +216,7 @@ Proof.
       by rewrite eq_sym tag_neq in U. 
 Qed.
 
-goal [any] aux (t, t' : timestamp) : (t <= pred t' && t <= t') <=> t <= pred t'.
+lemma [any] aux (t, t' : timestamp) : (t <= pred t' && t <= t') <=> t <= pred t'.
 Proof. auto. Qed.
 
 (*------------------------------------------------------------------*)
@@ -227,7 +227,7 @@ Proof. auto. Qed.
 axiom [any] ofG_toG (x:message) : ofG(toG(x)) = x.
 
 (* => is from toG_ofG, <= from ofG_toG *)
-goal [any] ofG_swap (x:message, y:G) : (x = ofG(y)) = (toG(x) = y).
+lemma [any] ofG_swap (x:message, y:G) : (x = ofG(y)) = (toG(x) = y).
 Proof.
  rewrite eq_iff; split.
  by rewrite (f_apply toG x (ofG(y))). 

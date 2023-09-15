@@ -44,7 +44,7 @@ system ((!_k R: reader) | (!_i !_j T: tag(i))).
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R (k,i:index[param]):
+lemma wa_R (k,i:index[param]):
   happens(R1(k,i)) =>
   cond@R1(k,i) =>
   exists (j:index),
@@ -80,7 +80,7 @@ Proof.
     - by depends R(k), R2(k).
 Qed.
 
-goal executable_R1 (t:timestamp) (k,i:index) :
+lemma executable_R1 (t:timestamp) (k,i:index) :
   happens(t) => exec@t => R1(k,i)<=t => exec@R1(k,i) && cond@R1(k,i).
 Proof.
   intro _ _ _.
@@ -88,7 +88,7 @@ Proof.
   by use He with R1(k,i).
 Qed.
 
-goal wa_T (i,j:index[param]):
+lemma wa_T (i,j:index[param]):
   happens(T1(i,j)) =>
   exec@T1(i,j) =>
 

@@ -65,14 +65,14 @@ system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 axiom tags_neq : tag0 <> tag1.
 
-goal tags_neq0 : tag0 = tag1 => False.
+lemma tags_neq0 : tag0 = tag1 => False.
 Proof.
   use tags_neq; auto.
 Qed.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
-goal wa_R1 (r:index) :
+lemma wa_R1 (r:index) :
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t))) (snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
@@ -110,7 +110,7 @@ Qed.
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [default/left] wa_R1_left (i,r:index):
+lemma [default/left] wa_R1_left (i,r:index):
   xor(id(i)) (snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
@@ -130,7 +130,7 @@ Proof.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [default/right] wa_R1_right (i,t,r:index):
+lemma [default/right] wa_R1_right (i,t,r:index):
   xor(id'(i,t)) (snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>

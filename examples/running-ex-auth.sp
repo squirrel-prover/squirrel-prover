@@ -19,7 +19,7 @@ process reader(j:index) =
 system (!_j R: reader(j) | !_i !_j T: tag(i,j)).
 
 
-goal auth (i:index, j:index):
+lemma auth (i:index, j:index):
   happens(R(j,i)) =>
   cond@R(j,i) =>
   exists (j':index), T(i,j') < R(j,i) &&

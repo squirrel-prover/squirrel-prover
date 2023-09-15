@@ -12,7 +12,7 @@ axiom [a] ax (tau:timestamp) : diff(tau = init,False) => input@tau = diff(c,d).
 
 axiom [any] refl (x:message) : x = x.
 
-goal [a/left] _ (tau:timestamp) : tau = init => input@tau = c.
+lemma [a/left] _ (tau:timestamp) : tau = init => input@tau = c.
 Proof.
   intro H.
   rewrite ax.

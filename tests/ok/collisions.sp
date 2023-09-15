@@ -16,14 +16,14 @@ system O: out(ch,cst); (
 ).
 
 
-goal dummy (tau1 : timestamp, tau2 : timestamp, a : index, b: message) :
+lemma dummy (tau1 : timestamp, tau2 : timestamp, a : index, b: message) :
   tau1 = tau2 =>
   output@tau1= output@tau2.
 Proof.
  auto.
 Qed.
 
-goal unforgeable_1 (a : index, b : index) :
+lemma unforgeable_1 (a : index, b : index) :
  happens(A(b)) => 
   b <> a =>
   output@A(b) <> h(na(a),k).
@@ -35,7 +35,7 @@ Proof.
  auto.
 Qed.
 
-goal unforgeable_2 (a, b : index[glob]):
+lemma unforgeable_2 (a, b : index[glob]):
  happens(B(b)) => 
   output@B(b) <> h(na(a),k).
 Proof.
@@ -47,7 +47,7 @@ Proof.
 Qed.
 
 
-goal unforgeable_3 (a, b: index[glob]):
+lemma unforgeable_3 (a, b: index[glob]):
  happens(C(b)) => 
   output@C(b) <> h(na(a),k).
 

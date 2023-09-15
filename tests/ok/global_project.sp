@@ -7,7 +7,7 @@ system out(c,diff(a,b)).
 
 axiom [any] refl (x:message) : x = x.
 
-global goal _ :
+global lemma _ :
   [happens(A)] ->
   [output@A = a] ->
   ([output@A = a] -> equiv(diff(true,false))) ->

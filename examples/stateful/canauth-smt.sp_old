@@ -84,11 +84,11 @@ include Basic.
 
 (* f_apply *)
 
-goal fst_apply (x,y : message) : x = y => fst(x) = fst(y).
+lemma fst_apply (x,y : message) : x = y => fst(x) = fst(y).
 Proof. auto. Qed.
 
 
-goal snd_apply (x,y : message) : x = y => snd(x) = snd(y).
+lemma snd_apply (x,y : message) : x = y => snd(x) = snd(y).
 Proof. auto. Qed.
 
 (* AXIOMS *)
@@ -110,7 +110,7 @@ hint smt orderEqSucc.
 
 (* The counter increases (not strictly) between t' and t when t' < t. *)
 
-goal counterIncreaseA (t, t':timestamp, i:index):
+lemma counterIncreaseA (t, t':timestamp, i:index):
   happens(t) =>
   exec@t =>
   t' < t =>
@@ -122,7 +122,7 @@ Proof.
 Qed.
 
 
-goal counterIncreaseB (t, t':timestamp, i:index):
+lemma counterIncreaseB (t, t':timestamp, i:index):
   happens(t) =>
   exec@t =>
   t' < t =>
@@ -133,7 +133,7 @@ Proof.
   case t => // [i_ j_ _];  revert IH0 Hexec; smt.
 Qed.
 
-goal counterIncreaseStrictRA (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
   happens(ReceiverA(i,j1)) =>
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
@@ -145,7 +145,7 @@ Qed.
 (* The counter cellB(i) strictly increases between t and t'
    when t < t' and (t' = SenderB(i,j1) or t' = ReceiverB(i,j1)). *)
 
-goal counterIncreaseStrictSB (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictSB (i,j1:index, t:timestamp):
   happens(SenderB(i,j1)) =>
     (t < SenderB(i,j1) && exec@SenderB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@SenderB(i,j1).
@@ -154,7 +154,7 @@ Proof.
   use counterIncreaseB as CIB. revert CIB. smt.
 Qed.
 
-goal counterIncreaseStrictRB (i,j1:index, t:timestamp):
+lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
   happens(ReceiverB(i,j1)) =>
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
@@ -173,7 +173,7 @@ Qed.
    Moreover, we use this 1st property (authentication) to prove the
    2nd property (injectivity). *)
 
-goal authA (i,j:index) :
+lemma authA (i,j:index) :
   happens(ReceiverA(i,j)) => exec@ReceiverA(i,j) =>
   (exists (j':index),
     SenderB(i,j') < ReceiverA(i,j)
@@ -190,7 +190,7 @@ Proof.
 Qed.
 
 (* 1st property w.r.t. B *)
-goal authB(i,j:index) :
+lemma authB(i,j:index) :
   happens(ReceiverB(i,j)) => exec@ReceiverB(i,j) =>
   (exists (j':index),
      SenderA(i,j') < ReceiverB(i,j)
@@ -208,7 +208,7 @@ Qed.
 
 
 (* 2nd property w.r.t A and A *)
-goal injectivity(i,j,j':index) :
+lemma injectivity(i,j,j':index) :
   happens(ReceiverA(i,j)) && happens(ReceiverA(i,j')) =>
   exec@ReceiverA(i,j) && exec@ReceiverA(i,j') =>
   (fst(fst(input@ReceiverA(i,j))) = fst(fst(input@ReceiverA(i,j')))
@@ -251,7 +251,7 @@ Qed.
 
 
 (* 2nd property w.r.t A and B *)
-goal injectivityAB(i,j,j':index) :
+lemma injectivityAB(i,j,j':index) :
   happens(ReceiverA(i,j)) && happens(ReceiverB(i,j')) =>
   exec@ReceiverA(i,j) && exec@ReceiverB(i,j') =>
   (fst(fst(input@ReceiverA(i,j))) = fst(fst(input@ReceiverB(i,j')))

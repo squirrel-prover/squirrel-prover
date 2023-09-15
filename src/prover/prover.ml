@@ -5,7 +5,7 @@ module Sv = Vars.Sv
 (** {2 Prover state}
     The term "goal" refers to two things below:
 
-    - A toplevel goal declaration (i.e. a lemma)
+    - A toplevel lemma declaration
       which is represented (with some redundancy) by a [Goal.statement]
       and a [Goal.t] which is the associated sequent that has to be
       proved, i.e. the root of the required proof tree.
@@ -108,7 +108,7 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
 
 let try_complete_proof (ps:state) : state =
   if is_proof_completed ps then begin
-    Printer.prt `Goal "Goal %s is proved@."
+    Printer.prt `Goal "lemma %s is proved@."
       (Utils.oget (current_goal_name ps));
     { ps with prover_mode = WaitQed }
   end

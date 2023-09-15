@@ -11,7 +11,7 @@ channel c
 system !_k A: out(c,try find k such that mtest(k) in n(k, k)).
 
 (* The main test, with a non-empty list of bound variables. *)
-goal _ (tau:timestamp) (i,j:index) :
+lemma _ (tau:timestamp) (i,j:index) :
   happens(tau) => output@tau = n(i, j) => i = j.
 Proof.
   intro H H1.

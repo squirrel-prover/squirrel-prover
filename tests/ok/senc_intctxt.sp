@@ -12,7 +12,7 @@ abstract u : message
 
 system (out(c,enc(m,r,k)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
 
-goal _: happens(A1) => output@A1 <> fail => output@A1 = m.
+lemma _: happens(A1) => output@A1 <> fail => output@A1 = m.
 Proof.
   intro Hap Hneq.
   rewrite /output /y in Hneq.
@@ -23,7 +23,7 @@ Qed.
 (*------------------------------------------------------------------*)
 system [Bis] (out(c,diff(enc(m,r,k),empty)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
 
-goal [Bis] _: happens(A1) => output@A1 <> fail => output@A1 = m.
+lemma [Bis] _: happens(A1) => output@A1 <> fail => output@A1 = m.
 Proof.
   intro Hap Hneq.
   rewrite /output /y1 in Hneq.

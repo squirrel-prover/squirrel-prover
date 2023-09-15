@@ -196,7 +196,7 @@ axiom [auth] freshindex : exists (l:index), True.
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [auth] P_charac :
+lemma [auth] P_charac :
   happens(Pfail) => cond@Pok => (cond@Pfail => False) .
 Proof.
   intro Hap HcOk HcFail.
@@ -223,7 +223,7 @@ Proof.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [auth] S_charac :
+lemma [auth] S_charac :
   happens(Sfail) => cond@Sok => (cond@Sfail => False).
 Proof.
   intro Hap HcOk HcFail.

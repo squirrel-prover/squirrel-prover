@@ -10,7 +10,7 @@ name nfresh : message.
 channel c
 system !_i in(c,x);out(c,h(x,k)).
 
-goal _ (t:timestamp[param]): happens(t) => input@t <> k.
+lemma _ (t:timestamp[param]): happens(t) => input@t <> k.
 Proof.
   intro _ _.
   assert h(nfresh,input@t) = h(nfresh,k) as Heuf; 1: auto.

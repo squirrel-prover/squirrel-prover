@@ -4,7 +4,7 @@ abstract f : message->message
 
 system null.
 
-goal _: n = f(m) => False.
+lemma _: n = f(m) => False.
 Proof.
   nosimpl(intro Heq).
   nosimpl(fresh Heq).

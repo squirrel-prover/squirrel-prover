@@ -41,20 +41,20 @@ len(nn(i)) = len(empty) && len(nn(j)) = len(nt(j)) => i = j.
 
 (*------------------------------------------------------------------*)
 (* check the [large] type info  *)
-goal _ (i,j : index) : nn(i) = nn(j) => i = j.
+lemma _ (i,j : index) : nn(i) = nn(j) => i = j.
 Proof. auto. Qed.
 
-goal _ (i,j : index) : nt(i) = nt(j) => i = j.
+lemma _ (i,j : index) : nt(i) = nt(j) => i = j.
 Proof. checkfail auto exn GoalNotClosed. Abort.
 
 (*------------------------------------------------------------------*)
 (* check the [named_fixed_length] type info  *)
-goal _ (i,j : index) : len(nfl(i)) = len(nfl(j)).
+lemma _ (i,j : index) : len(nfl(i)) = len(nfl(j)).
 Proof.
 by namelength nfl(i), nfl(j).
 Qed.
 
-goal _ (i,j : index) : len(nn(i)) = len(nn(j)).
+lemma _ (i,j : index) : len(nn(i)) = len(nn(j)).
 Proof. 
 checkfail (try namelength nn(i), nn(j); auto) exn GoalNotClosed.
 Abort.
@@ -65,7 +65,7 @@ Abort.
 type NFL2 [name_fixed_length]
 name nfl2 : index -> NFL2.
 
-goal _ (i,j : index) : len(nfl(i)) = len(nfl2(j)).
+lemma _ (i,j : index) : len(nfl(i)) = len(nfl2(j)).
 Proof.
 checkfail (by (try namelength nfl(i), nfl2(j))) exn GoalNotClosed.
 Abort.

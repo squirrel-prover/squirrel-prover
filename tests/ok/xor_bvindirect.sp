@@ -18,7 +18,7 @@ axiom len_ko (i:index): len(ko XOR m(i)) = len(n(i))
 axiom len_ko_ok (i:index): len(ko XOR ok) = len(n(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
-global goal _ (tau:timestamp[const],i:index[const]) : 
+global lemma _ (tau:timestamp[const],i:index[const]) : 
   [(forall (i0,i1:index), A(i0)<=tau => i1 <> i) = true] ->
   equiv(output@tau) ->
   equiv(output@tau, n(i) XOR diff(ok,m(i))).
@@ -35,7 +35,7 @@ Proof.
 Qed.
 
 (* The same test, but giving the fresh name as argument to the xor tactic. *)
-global goal _ (tau:timestamp[const],i:index[const]) : 
+global lemma _ (tau:timestamp[const],i:index[const]) : 
   [(forall (i0,i1:index), A(i0)<=tau => i1 <> i) = true] ->
   equiv(output@tau) ->
   equiv(output@tau, n(i) XOR diff(ok,m(i))).

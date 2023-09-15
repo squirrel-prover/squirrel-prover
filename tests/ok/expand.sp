@@ -11,7 +11,7 @@ abstract d : message
 system ((B: !_j in(c,x); if x = ok(j) then out(c,<x,ok(j)>)) |
         (C: !_j in(c,x); if x = ko(j) then out(c,<x,ko(j)>))).
 
-goal _ (t, t', t'' : timestamp, i, j: index) :
+lemma _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
   (<input@t,ok(i)> = b =>
    <input@t,ok(i)> = d =>
@@ -29,7 +29,7 @@ Proof.
 Qed.
 
 (* Same, but choosing the expand timestamps manually *)
-goal _ (t, t', t'' : timestamp, i, j: index) :
+lemma _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
   (<input@t,ok(i)> = b =>
    <input@t,ok(i)> = d =>
@@ -47,7 +47,7 @@ Proof.
 Qed.
 
 (* Same, but expanding only one timestamp *)
-goal _ (t, t', t'' : timestamp, i, j: index) :
+lemma _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
   (<input@t,ok(i)> = b =>
    <input@t,ok(i)> = d =>

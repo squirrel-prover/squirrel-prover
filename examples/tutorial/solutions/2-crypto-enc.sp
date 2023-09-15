@@ -55,7 +55,7 @@ hint rewrite len_b.
 
 (* The following lemma state that `diff` and `len` commutes.
    We will use it later. *)
-goal len_diff (x,y : message) : len(diff(x,y)) = diff(len(x), len(y)).
+lemma len_diff (x,y : message) : len(diff(x,y)) = diff(len(x), len(y)).
 Proof.  
   project. 
   - auto.
@@ -79,7 +79,7 @@ name r1 : message.
 
 (* The `cca1` tactic allows to exploit the IND-CCA1 assumption.
    Check how we use it below. *)
-global goal enc_0 : 
+global lemma enc_0 : 
   equiv(
     pk(n), 
     diff(enc(a, r0, pk(n)), enc(b, r0, pk(n)))
@@ -95,7 +95,7 @@ Qed.
    For each formula, explain why it is a consequence of the 
    IND-CCA1 game, or why the IND-CCA1 game does not apply.
    Then, if the former case, prove it using the `cca1` tactic.  *)
-global goal enc_1 : 
+global lemma enc_1 : 
   equiv(
     pk(n), 
     diff(enc(a, r0, pk(n)), enc(b, r0, pk(n))),
@@ -110,7 +110,7 @@ Proof.
   (* END EXO *)
 Qed.
 
-global goal enc_2 : 
+global lemma enc_2 : 
   equiv(
     pk(n), 
     diff(enc(a, r0, pk(n)), enc(b, r0, pk(n))),
@@ -128,7 +128,7 @@ Proof.
   (* END EXO *)
 Qed.
 
-global goal enc_3 : 
+global lemma enc_3 : 
   equiv(
     pk(n), 
     diff(enc(a, r0, pk(n)), (* *) enc(n, r0, pk(n)))

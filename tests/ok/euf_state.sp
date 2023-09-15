@@ -8,7 +8,7 @@ channel c
 
 system s:= h(n,k); out(c,s).
 
-goal collision_absurd (tau:timestamp[param]):
+lemma collision_absurd (tau:timestamp[param]):
  happens(tau) => output@tau <> h(m,k).
 
 Proof.

@@ -17,7 +17,7 @@ process Q =
 
 system (P | Q).
 
-goal _: happens(Q) => z@Q=a.
+lemma _: happens(Q) => z@Q=a.
 Proof. 
  intro Hap. 
  expand z@Q.

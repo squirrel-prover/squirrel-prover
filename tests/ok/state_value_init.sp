@@ -26,13 +26,13 @@ system (!_i !_j T: tag(i,j)).
 (*------------------------------------------------------------------*)
 (* output and cond *)
 
-goal outputAtInit:
+lemma outputAtInit:
   output@init = empty.
 Proof.
 auto.
 Qed.
 
-goal condAtInit:
+lemma condAtInit:
   cond@init.
 Proof.
 by expand cond@init.
@@ -41,13 +41,13 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test simple update *)
 
-goal _ (i,j:index): kT i j@init = n0(i,j).
+lemma _ (i,j:index): kT i j@init = n0(i,j).
 Proof.
  auto.
 Qed.
 
 (* same but changing the indices names *)
-goal _ (k,l:index): kT k l@init = n0(k,l).
+lemma _ (k,l:index): kT k l@init = n0(k,l).
 Proof.
  auto.
 Qed.
@@ -55,13 +55,13 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test other update, where indices are reversed *)
 
-goal _ (k,l:index): kTbis k l@init = n0(l,k).
+lemma _ (k,l:index): kTbis k l@init = n0(l,k).
 Proof.
  auto.
 Qed.
 
 (* same but changing the indices names *)
-goal _ (i,j:index): kTbis i j@init = n0(j,i).
+lemma _ (i,j:index): kTbis i j@init = n0(j,i).
 Proof. 
  auto.
 Qed.
@@ -69,7 +69,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test update with different types. *)
 
-goal _ (u : index): state u@init = a.
+lemma _ (u : index): state u@init = a.
 Proof. 
  auto.
 Qed.

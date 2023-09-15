@@ -10,7 +10,7 @@ system !_i out(c,<n(i),seq(i:index => n(i))>).
 include Basic.
 
 (* The main test, with a non-empty list of bound variables. *)
-global goal nonempty (tau:timestamp[const],i:index[const]) :
+global lemma nonempty (tau:timestamp[const],i:index[const]) :
   [(forall (i1,i0:index), (A(i0) <= tau => i <> i1))
    = true ] ->
   equiv(output@tau) ->

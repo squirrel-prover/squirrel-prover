@@ -15,14 +15,14 @@ abstract ( -- ) : T -> T -> boolean.
 
 axiom mtrans (x,y,z : T) : x -- y => y -- z => x -- z.
 
-goal trans2 (x,y,z : T) : x -- y => y -- z => x -- z.
+lemma trans2 (x,y,z : T) : x -- y => y -- z => x -- z.
 Proof. admit. Qed.
 
 (*------------------------------------------------------------------*)
 print mtrans.
 print trans2.
 
-goal _ : false.
+lemma _ : false.
 Proof.
   print mtrans.
   print trans2.
@@ -41,7 +41,7 @@ Qed.
 
 
 (* The main test, with a non-empty list of bound variables. *)
-goal bar : forall (tau, tau' : timestamp),
+lemma bar : forall (tau, tau' : timestamp),
   output@tau = a(output@tau').
 Proof.
   (* print in trace sequent *)

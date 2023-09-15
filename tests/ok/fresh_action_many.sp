@@ -8,7 +8,7 @@ system !_i !_j out(c,<n(i),n(j)>).
 
 include Basic.
 
-global goal test (k:index[const]) : 
+global lemma test (k:index[const]) : 
   [((exec@A(k,k) => k <> k) && 
     (forall (i,j:index), A(i,j)<A(k,k) => k<>i) &&
     (forall (i,j:index), A(i,j)<A(k,k) => k<>j)) = true] ->

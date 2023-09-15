@@ -74,7 +74,7 @@ axiom corruptleak (i,j:index) :
 axiom corruptleak2 (i,j:index) :
   happens(L(i,j)) => corrupted(j) = true.
 
-goal [default/left] test_gdh (t:timestamp[glob,const]) (i,j : index[glob,const]) :
+lemma [default/left] test_gdh (t:timestamp[glob,const]) (i,j : index[glob,const]) :
   corrupted(i) = false =>
   corrupted(j) = false =>
   happens(I(i), R(j)) =>
@@ -93,7 +93,7 @@ Qed.
 
 
 
-goal [default/left] test_cdh (t:timestamp) (i,j : index) :
+lemma [default/left] test_cdh (t:timestamp) (i,j : index) :
   corrupted(i) = false =>
   happens(I(i), R(j)) =>
   att(frame@t) = g ^ a(i) ^ b(j) =>
@@ -105,7 +105,7 @@ Proof.
 Abort.
 
 
-goal [default/left] test_gdh2 (t:timestamp) (i,j : index) :
+lemma [default/left] test_gdh2 (t:timestamp) (i,j : index) :
   att(frame@t) = gg ^^ a(i) ^^ b(j) =>
   false.
 Proof.
@@ -151,7 +151,7 @@ system [system3] protocol3.
 axiom [system3] corruptleak4 (i:index) :
   happens(B(i)) => corrupted(i) = true.
 
-goal [system2/left] test_cdh2 (t:timestamp) (i,j : index) :
+lemma [system2/left] test_cdh2 (t:timestamp) (i,j : index) :
   corrupted(i) = false =>
   happens(I(i), R(j)) =>
   att(frame@t) = gg ^^ a(i) ^^ b(j) =>
@@ -165,7 +165,7 @@ Proof.
 Qed.
 
 
-goal [system3/left] test_cdh3 (t:timestamp) (i,j : index) :
+lemma [system3/left] test_cdh3 (t:timestamp) (i,j : index) :
   not(happens(B(i))) =>
   happens(I(i), R(j)) =>
   att(frame@t) = gg ^^ a(i) ^^ b(j) =>

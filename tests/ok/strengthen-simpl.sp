@@ -22,7 +22,7 @@ system !_i P(i).
 
 set showStrengthenedHyp=true.
 
-global goal _ (t : timestamp[const]) : equiv(empty) -> equiv(s0@t).
+global lemma _ (t : timestamp[const]) : equiv(empty) -> equiv(s0@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -30,7 +30,7 @@ Proof.
 Qed.
 
 (* using [na], we can deduce [s1] *)
-global goal _ (t : timestamp[const], i : index[const]) : 
+global lemma _ (t : timestamp[const], i : index[const]) : 
   equiv(na) -> equiv(s1(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
@@ -39,7 +39,7 @@ Proof.
 Qed.
 
 (* [nb] does not allow to conclude *)
-global goal _ (t : timestamp[const], i : index[const]) : 
+global lemma _ (t : timestamp[const], i : index[const]) : 
   equiv(nb) -> equiv(s0@t, s1(i)@t).
 Proof. 
  checkfail (intro H; apply H) exn ApplyMatchFailure.
@@ -47,7 +47,7 @@ Proof.
 Abort.
 
 (* of course, both are simultaneously deducible *)
-global goal _ (t : timestamp[const], i : index[const]) : 
+global lemma _ (t : timestamp[const], i : index[const]) : 
   equiv(na) -> equiv(s0@t, s1(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
@@ -56,7 +56,7 @@ Proof.
 Qed.
 
 (* we can also deduce the sequence of all s1(i) *)
-global goal _ (t : timestamp[const]) : 
+global lemma _ (t : timestamp[const]) : 
   equiv(na) -> equiv(seq(i:index => s1(i)@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
@@ -66,7 +66,7 @@ Qed.
 
 (* or even a try-find, since we can deduce all the tests, the then branches 
   and the else branch *)
-global goal _ (t : timestamp[const]) : 
+global lemma _ (t : timestamp[const]) : 
   equiv(na) -> 
   equiv(try find i such that s1(i)@t=zero in s1(i)@t else s0@t).
 Proof.
@@ -76,7 +76,7 @@ Proof.
 Qed.
 
 (* this fails if we give `nb` instead of `na` *)
-global goal _ (t : timestamp[const]) : 
+global lemma _ (t : timestamp[const]) : 
   equiv(nb) -> 
   equiv(try find i such that s1(i)@t=zero in s1(i)@t else s0@t).
 Proof.
@@ -87,13 +87,13 @@ Abort.
 (*------------------------------------------------------------------*)
 (* from [frame@pred(t)], we can deduce [input@t] *)
 
-global goal _ (t : timestamp[const]) : 
+global lemma _ (t : timestamp[const]) : 
   [happens(t)] -> equiv(frame@pred(t)) -> equiv(input@t).
 Proof. 
  intro Hap H; apply ~inductive H.
 Qed.
 
-global goal _ (t : timestamp[const]) : 
+global lemma _ (t : timestamp[const]) : 
   [happens(t)] -> equiv(frame@pred(pred(t))) -> equiv(input@t).
 Proof. 
  intro Hap H.

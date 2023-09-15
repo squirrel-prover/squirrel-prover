@@ -5,12 +5,12 @@ system A: if True then out(c,ok).
 
 include Basic.
 
-goal _: true || false.
+lemma _: true || false.
 Proof.
 by left.
 Qed.
 
-goal _: false || true.
+lemma _: false || true.
 Proof.
 by right.
 Qed.

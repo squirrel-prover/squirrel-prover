@@ -136,17 +136,17 @@ reasoning. *)
 
 include Basic.
 
-goal [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
-goal [any]  fst_apply (x,y : message) : x = y => fst(x) = fst(y).
+lemma [any]  fst_apply (x,y : message) : x = y => fst(x) = fst(y).
 Proof. auto. Qed.
 
-goal [any]  snd_apply (x,y : message) : x = y => snd(x) = snd(y).
+lemma [any]  snd_apply (x,y : message) : x = y => snd(x) = snd(y).
 Proof. auto. Qed.
 
-goal dec_apply (x,y,x1,y1 : message) :
+lemma dec_apply (x,y,x1,y1 : message) :
  x = y => x1 = y1 => dec(x,x1) = dec(y,y1).
 Proof. auto. Qed.
 
@@ -172,7 +172,7 @@ in the proofs of the security properties.
 
 (** The counter `SCpt(i)` strictly increases at each action `S` performed
 by the server with tag `i`. *)
-goal counterIncreaseStrictly (ii,i:index):
+lemma counterIncreaseStrictly (ii,i:index):
   happens(S(ii,i)) =>
     cond@S(ii,i) =>
       SCpt(i)@pred(S(ii,i)) ~< SCpt(i)@S(ii,i) = orderOk.
@@ -181,7 +181,7 @@ Proof. auto. Qed.
 
 (** The counter `SCpt(i)` increases (not strictly) between `pred(t)`
 and `t`. *)
-goal counterIncrease (t:timestamp, i : index) :
+lemma counterIncrease (t:timestamp, i : index) :
   happens(t) =>
     (t > init && exec@t) =>
       (SCpt(i)@pred(t) ~< SCpt(i)@t = orderOk) ||
@@ -218,7 +218,7 @@ Qed.
 
 (** The counter `SCpt(i)` increases (not strictly) between `t'` and `t`
 when `t' < t`. *)
-goal counterIncreaseBis:
+lemma counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (i:index),
     happens(t) =>
       exec@t && t' < t =>
@@ -229,7 +229,7 @@ Proof.
   induction.
   intro t IH0 t' i Hap [Hexec Ht'].
   (** We introduce a case disjunction `t'`. Since we already have that
-  `t' < t` then the `constraints` tactic allows to close the goal showing
+  `t' < t` then the `constraints` tactic allows to close the lemma showing
   that `(t' = pred(t) || t' < pred(t))` is indeed satisfied. *)
   assert (t' = pred(t) || t' < pred(t)) as H0;
     1: constraints.
@@ -295,7 +295,7 @@ This intermediate lemma states that whenever the server accepts for a given
 YubiKey (represented by the index `i`), the counter value must have increased
 compared to the last time the server accepted for this YubiKey.
 *)
-goal noreplayInv (ii, ii1, i:index):
+lemma noreplayInv (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
   exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
   SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
@@ -315,7 +315,7 @@ Proof.
       by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
 Qed.
 
-goal noreplay (ii, ii1, i:index):
+lemma noreplay (ii, ii1, i:index):
   happens(S(ii1,i)) =>
     exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) =>
       ii = ii1.
@@ -343,7 +343,7 @@ involved in another successful login.
 Proving this property requires to reason on counter values, but also requires
 the use of the INT-CTXT cryptographic assumption.
 *)
-goal injective_correspondence (ii,i:index):
+lemma injective_correspondence (ii,i:index):
   happens(S(ii,i)) =>
   exec@S(ii,i) =>
   exists (j:index),
@@ -447,7 +447,7 @@ monotonically increasing in time.
 Note that proving this property does not rely on any assumption on cryptographic
 primitives: it relies only on reasonings about counter values.
 *)
-goal monotonicity (ii, ii1, i:index):
+lemma monotonicity (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
     exec@S(ii1,i) && exec@S(ii,i)
       && SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk =>

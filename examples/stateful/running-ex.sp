@@ -84,7 +84,7 @@ This lemma brings together all previous lemmas. For any timestamp tau:
 - or there exists an action T(i,j) such that T(i,j) is the last action of the
 form T(i,_) that happens before tau, in that case sT(i)@tau = sT(i)@T(i,j). *)
 
-goal lastupdate_pure_tag (i:index,tau:timestamp):
+lemma lastupdate_pure_tag (i:index,tau:timestamp):
    happens(tau) => (
     (forall j, happens(T(i,j)) => T(i,j)>tau) ||
     (exists j, happens(T(i,j)) && T(i,j)<=tau &&
@@ -134,7 +134,7 @@ Proof.
 Qed.
 
 
-goal lastupdate_pure_reader (ii:index,tau:timestamp):
+lemma lastupdate_pure_reader (ii:index,tau:timestamp):
   happens(tau) => (
     (forall jj, happens(R(jj,ii)) => R(jj,ii)>tau) ||
     (exists jj, happens(R(jj,ii)) && R(jj,ii)<=tau &&
@@ -186,7 +186,7 @@ Proof.
       by apply H2.
 Qed.
 
-goal lastupdate_init_tag (i:index,tau:timestamp):
+lemma lastupdate_init_tag (i:index,tau:timestamp):
   happens(tau) => (
     (forall j, happens(T(i,j)) => T(i,j)>tau))
       => sT(i)@tau = sT(i)@init.
@@ -229,7 +229,7 @@ Proof.
     by use Hyp with j.
 Qed.
 
-goal lastupdate_init_reader (ii:index,tau:timestamp):
+lemma lastupdate_init_reader (ii:index,tau:timestamp):
   happens(tau) => (
     (forall jj, happens(R(jj,ii)) => R(jj,ii)>tau))
       => sR(ii)@tau = sR(ii)@init.
@@ -267,7 +267,7 @@ Proof.
     by use Hyp with jj0.
 Qed.
 
-goal lastupdate_T (i:index, j:index, tau:timestamp):
+lemma lastupdate_T (i:index, j:index, tau:timestamp):
     (happens(tau) && T(i,j)<=tau &&
       forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))
     => sT(i)@tau = sT(i)@T(i,j).
@@ -307,7 +307,7 @@ Proof.
     by apply Hyp.
 Qed.
 
-goal lastupdate_R (ii:index, jj:index, tau:timestamp):
+lemma lastupdate_R (ii:index, jj:index, tau:timestamp):
     (happens(tau) && R(jj,ii)<=tau &&
       forall jj',
         happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))
@@ -348,7 +348,7 @@ Proof.
     by apply Hyp.
 Qed.
 
-goal lastupdateTag (i:index,tau:timestamp):
+lemma lastupdateTag (i:index,tau:timestamp):
   happens(tau) => (
     (sT(i)@tau = sT(i)@init && forall j, happens(T(i,j)) => T(i,j)>tau) ||
     (exists j,
@@ -366,7 +366,7 @@ Proof.
     by apply lastupdate_T.
 Qed.
 
-goal lastupdateReader (ii:index,tau:timestamp):
+lemma lastupdateReader (ii:index,tau:timestamp):
   happens(tau) => (
     (sR(ii)@tau = sR(ii)@init &&
       forall jj, happens(R(jj,ii)) => R(jj,ii)>tau) ||
@@ -389,7 +389,7 @@ Qed.
 (* The following lemma states that values of different memory cells do not
 overlap, relying on the collision resistance of the hash function. *)
 
-goal disjoint_chains (tau',tau:timestamp,i',i:index) :
+lemma disjoint_chains (tau',tau:timestamp,i',i:index) :
   happens(tau',tau) =>
     i<>i' => sT(i)@tau <> sR(i')@tau'.
 Proof.
@@ -412,7 +412,7 @@ Qed.
 
 (* SECURITY PROPERTIES *)
 
-goal authentication (jj,ii:index):
+lemma authentication (jj,ii:index):
    happens(R(jj,ii)) =>
    cond@R(jj,ii) =>
    exists (j:index), T(ii,j) < R(jj,ii) && output@T(ii,j) = input@R(jj,ii).

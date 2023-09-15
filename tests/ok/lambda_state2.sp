@@ -9,7 +9,7 @@ process A(i : index) =
 
 system !_i A(i).
 
-goal _ (i : index) :
+lemma _ (i : index) :
   happens(A(i)) =>
   f(i)@A(i) = fun (x : message) => (<x, input@A(i)>,i).
 Proof. 
@@ -17,7 +17,7 @@ Proof.
   auto. 
 Qed.
 
-goal _ (i,j : index) :
+lemma _ (i,j : index) :
   happens(A(i)) =>
 f(i)@A(i) = fun (x : message) => (<x, input@A(i)>,j).
 Proof. 
@@ -26,7 +26,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-goal _ (i : index, z : message) :
+lemma _ (i : index, z : message) :
   happens(A(i)) =>
   (f(i)@A(i)) z = (<z, input@A(i)>,i).
 Proof.

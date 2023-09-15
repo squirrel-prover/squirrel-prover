@@ -8,7 +8,7 @@ system A: in(c,x);out(c,zero);
 
 
 
-goal trivial_if : happens(B) => cond@B => False.
+lemma trivial_if : happens(B) => cond@B => False.
 Proof.
 intro Hap Hcond.
 by expand cond@B.

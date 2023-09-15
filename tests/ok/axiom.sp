@@ -10,17 +10,17 @@ system null.
 axiom dummy_false_axiom (ma : message):
 exists (m:message), m=k && ma=k.
 
-goal [default/left] dummy (ma : message) : ma=k.
+lemma [default/left] dummy (ma : message) : ma=k.
 Proof.
  by use dummy_false_axiom with ma. 
 Qed.
 
-goal [default/right] _ (ma : message): ma=k.
+lemma [default/right] _ (ma : message): ma=k.
 Proof.
  by use dummy_false_axiom with ma.
 Qed.
 
-goal _ (ma : message) : ma=k.
+lemma _ (ma : message) : ma=k.
 Proof.
  by use dummy_false_axiom with ma.
 Qed.

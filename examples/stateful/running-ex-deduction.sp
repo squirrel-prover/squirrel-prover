@@ -59,7 +59,7 @@ axiom h_unique (i,i',j,j':index):
 global axiom fresh_names :
   equiv(seq(i:index=>diff(s0(i),s0b(i)))).
 
-global goal fresh_names_k :
+global lemma fresh_names_k :
   equiv(k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
   fresh 0; 1:auto.
@@ -71,7 +71,7 @@ Qed.
 (* Observational equivalence with seeds and k as extra data:
    the proof would be the same without the extra data (except for the easy base case)
    which does not depend on t. *)
-global goal equiv_with_seed (t : timestamp[const]):
+global lemma equiv_with_seed (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
@@ -96,7 +96,7 @@ Qed.
 
 (* With apply ~inductive we easily obtain all the past values of sT
    from the seeds and k. *)
-global goal equiv_with_states_inductive (t : timestamp[const]):
+global lemma equiv_with_states_inductive (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.
@@ -107,13 +107,13 @@ Qed.
 (* We now illustrate how the proof could go without the use of
    `apply ~inductive`. *)
 
-goal neq_leq_lemma (t,t':timestamp): ((not(t=t')) && t<=t') = (t<=pred(t')).
+lemma neq_leq_lemma (t,t':timestamp): ((not(t=t')) && t<=t') = (t<=pred(t')).
 Proof.
  rewrite eq_iff.
  by case t.
 Qed.
 
-global goal equiv_with_states_manual (t : timestamp[const]):
+global lemma equiv_with_states_manual (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.

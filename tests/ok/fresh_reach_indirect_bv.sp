@@ -10,7 +10,7 @@ system !_i
   then out(c,n(i,i))
   else out(c,n(i,i)).
 
-goal test (i,j:index):
+lemma test (i,j:index):
   i <> j =>
   h(fst(output@A(i)),k) <> n(i,j).
 

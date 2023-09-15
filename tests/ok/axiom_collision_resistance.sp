@@ -11,7 +11,7 @@ system !_a out(c,h(n(a),k)).
 axiom collision_resistance ( ma : message, mb : message):
 h(ma,k)=h(mb,k) => ma = mb.
 
-goal unforgeable (a:index, b:index) :
+lemma unforgeable (a:index, b:index) :
   happens(A(b)) => b <> a => output@A(b) <> h(n(a),k).
 
 Proof.

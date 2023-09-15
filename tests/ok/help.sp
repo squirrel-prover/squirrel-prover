@@ -1,6 +1,6 @@
 system null.
 
-goal _ : False.
+lemma _ : False.
 Proof.
   help induction.
   help use.

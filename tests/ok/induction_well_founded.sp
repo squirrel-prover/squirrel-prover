@@ -4,12 +4,12 @@ system null.
 
 type T.
 
-global goal _ (x, y:message) : [x = y].
+global lemma _ (x, y:message) : [x = y].
 Proof. 
   induction x.                  (* WF *)
 Abort.
 
-global goal _ (x, y:timestamp) : [x = y].
+global lemma _ (x, y:timestamp) : [x = y].
 Proof. 
   (* note: due to legacy tactics,
      global `induction` on `timestamp` also does a case analysis on `x`, 
@@ -19,12 +19,12 @@ Proof.
   dependent induction x.                  (* WF *)
 Abort.
 
-global goal _ (x, y:index) : [x = y].
+global lemma _ (x, y:index) : [x = y].
 Proof. 
   induction x.                  (* WF *)
 Abort.
 
-global goal _ (x, y:T) : [x = y].
+global lemma _ (x, y:T) : [x = y].
 Proof. 
   checkfail induction x exn Failure. (* not WF *)
 Abort.

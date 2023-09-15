@@ -8,7 +8,7 @@ system null.
 
 axiom stateReaderInit : forall (i:index), kR(i)@init = n(i).
 
-goal absurdity (i : index[const]) : false.
+lemma absurdity (i : index[const]) : false.
 Proof.
   use stateReaderInit with i.
   (* It should not be possible to conclude using fresh,

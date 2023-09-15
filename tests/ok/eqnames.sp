@@ -9,12 +9,12 @@ name m2 : index->message
 
 system null.
 
-goal different : n1 <> n2.
+lemma different : n1 <> n2.
 Proof.
  auto.
 Qed.
 
-goal injectivity :
+lemma injectivity :
 forall (i:index,j:index),
 i <> j =>
  m1(i) <> m1(j).

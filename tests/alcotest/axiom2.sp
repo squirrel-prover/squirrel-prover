@@ -6,7 +6,7 @@ system A: in(c,x);out(c,x);
 system [test] null.
 axiom [test] triv_false : False.
 
-goal [default/left] test_left_bis : False.
+lemma [default/left] test_left_bis : False.
 Proof.
   use triv_false.
 Qed.

@@ -8,7 +8,7 @@ undo 1.
 
 channel c
 system in(c,x);out(c,<x,x>).
-goal test :
+lemma test :
   happens(A) => output@A = <input@A,input@A>.
 Proof.
  auto.

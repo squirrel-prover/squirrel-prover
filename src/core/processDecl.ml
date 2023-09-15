@@ -16,13 +16,13 @@ type error_i =
   | NonDetOp
   | Failure of string
 
-type dkind = KDecl | KGoal
+type dkind = KDecl | KLemma
 
 type error =  L.t * dkind * error_i
 
 let pp_error_i fmt = function
   | BadEquivForm ->
-    Fmt.pf fmt "equivalence goal ill-formed"
+    Fmt.pf fmt "equivalence lemma ill-formed"
 
   | InvalidCtySpace kws ->
     Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
@@ -38,8 +38,8 @@ let pp_error_i fmt = function
       
 let pp_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
-    | KDecl -> Fmt.pf fmt "declaration"
-    | KGoal -> Fmt.pf fmt "goal declaration" in
+    | KDecl  -> Fmt.pf fmt "declaration"
+    | KLemma -> Fmt.pf fmt "lemma declaration" in
 
   Fmt.pf fmt "%a@[<hov 2>%a failed: %a@]"
     pp_loc_err loc

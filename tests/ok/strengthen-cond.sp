@@ -39,7 +39,7 @@ system !_i (U | !_j server(j)).
 set showStrengthenedHyp=true.
 
 (*------------------------------------------------------------------*)
-global goal _ (t : timestamp[const]):
+global lemma _ (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, seq(pid:index => k(pid))) ->
   equiv(
@@ -54,7 +54,7 @@ Proof.
 Qed.
 
 (* fails if `t` is non-det *)
-global goal _ (t : timestamp):
+global lemma _ (t : timestamp):
   [happens(t)] ->
   equiv(frame@t, seq(pid:index => k(pid))) ->
   equiv(
@@ -69,7 +69,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-global goal _ (t : timestamp[const]):
+global lemma _ (t : timestamp[const]):
   [happens(t)] -> 
   equiv(
     frame@t,
@@ -99,7 +99,7 @@ Proof.
     by apply ~inductive Hind (pred(t)).
 Qed.
 
-global goal _ (t : timestamp[const]):
+global lemma _ (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t) ->
   equiv(

@@ -29,7 +29,7 @@ let tests =
           "system null.\n\
            abstract p : bool.\n\
            abstract q : bool.\n\
-           global goal _ : [diff(p,q)] -> [diff(p,q) => false].\n\
+           global lemma _ : [diff(p,q)] -> [diff(p,q) => false].\n\
            Proof.\n\
            intro Hglob. intro Hloc.\n\
            project."

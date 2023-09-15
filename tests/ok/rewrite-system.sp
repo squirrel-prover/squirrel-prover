@@ -17,7 +17,7 @@ system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
 axiom [any] foo (x : message) : f(x) = a.
 
 (*------------------------------------------------------------------*)
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<a,<f(y),a>>, e) = d =>
   diff(<f(x), <f(y), f(x)>>, e) = d.
 Proof.
@@ -26,7 +26,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<f(x),<a,f(x)>>, e) = d =>
   diff(<f(x), <f(y), f(x)>>, e) = d.
 Proof.
@@ -39,7 +39,7 @@ Qed.
 (* when doing a *single* rewrite and an occurrence has been found
    below a diff, occurrences below a different diff projection are not
    rewritten. *)
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<a,<f(y),a>>, a) = d =>
   diff(<f(x), <f(y), f(x)>>, f(x)) = d.
 Proof.
@@ -49,7 +49,7 @@ Proof.
 Abort.
 
 (* same as above, but valid. *)
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<a,<f(y),a>>, f(x)) = d =>
   diff(<f(x), <f(y), f(x)>>, f(x)) = d.
 Proof.
@@ -62,7 +62,7 @@ Qed.
 
 axiom [default/left] foo_left (x : message) : f(x) = a.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(a, f(x)) = d =>
   diff(f(x), f(x)) = d.
 Proof.
@@ -71,7 +71,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<a,<f(y),a>>, e) = d =>
   diff(<f(x), <f(y), f(x)>>, e) = d.
 Proof.
@@ -80,7 +80,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(<f(x),<a,f(x)>>, e) = d =>
   diff(<f(x), <f(y), f(x)>>, e) = d.
 Proof.
@@ -92,7 +92,7 @@ Qed.
 (*------------------------------------------------------------------*)
 axiom [default/right] foo_right (x : message) : f(x) = a.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(f(x), a) = d =>
   diff(f(x), f(x)) = d.
 Proof.
@@ -102,7 +102,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(a, a) = d =>
   diff(f(x), f(x)) = d.
 Proof.
@@ -111,7 +111,7 @@ Proof.
   assumption.
 Qed.
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(a, a) = d =>
   diff(f(x), f(x)) = d.
 Proof.
@@ -121,7 +121,7 @@ Proof.
 Qed.
 
 
-goal _ (x, y, z : message) :
+lemma _ (x, y, z : message) :
   diff(a, a) = d =>
   diff(f(x), f(x)) = d.
 Proof.

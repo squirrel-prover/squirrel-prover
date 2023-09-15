@@ -83,7 +83,7 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 (* SECURITY PROPERTIES *)
 
-goal auth_R1 (jj,ii:index):
+lemma auth_R1 (jj,ii:index):
   happens(R1(jj,ii)) =>
   cond@R1(jj,ii) =>
   exists (j:index),
@@ -95,7 +95,7 @@ Proof.
   by exists j.
 Qed.
 
-goal auth_T1 (i,j:index):
+lemma auth_T1 (i,j:index):
   happens(T1(i,j)) =>
   cond@T1(i,j) =>
   exists (jj:index),

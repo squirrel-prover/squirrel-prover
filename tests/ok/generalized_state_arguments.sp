@@ -15,7 +15,7 @@ system [P0] !_i !_j A0(i,i).
 print system [P0].
 
 (* check that [s] is well-formed *)
-goal [P0] _ (i0, i1, j : index) : 
+lemma [P0] _ (i0, i1, j : index) : 
   happens (A1 (i0,i1)) => 
   s j@A1 (i0,i1) = 
   if j = i0 then 
@@ -45,7 +45,7 @@ system [P1] !_i A1: A1(i0).
 print system [P1].
 
 (* check that [s] is well-formed *)
-goal [P1] _ (i, j : index) : 
+lemma [P1] _ (i, j : index) : 
   happens (A2 i) => 
   s j@A2 i = 
   if j = i0 then 
@@ -64,7 +64,7 @@ system [P1bis] !_i A1: A1(i).
 print system [P1].
 
 (* check that [s] is well-formed *)
-goal [P1bis] _ (i, j : index) : 
+lemma [P1bis] _ (i, j : index) : 
   happens (A2 i) => 
   s j@A2 i = 
   if j = i then 
@@ -86,7 +86,7 @@ system [P2] !_i A2(i).
 print system [P2].
 
 (* check that [s] is well-formed *)
-goal [P2] _ (i, j : index) : 
+lemma [P2] _ (i, j : index) : 
   happens (A2 i) => 
   s j@A2 i = 
   if j = i0 then 

@@ -4,7 +4,7 @@ channel c
 
 system !_i out(c,n(i)).
 
-goal _ (j:index,t:timestamp) : n(j) = input@t => A(j) < t.
+lemma _ (j:index,t:timestamp) : n(j) = input@t => A(j) < t.
 Proof.
   intro Heq.
   fresh Heq.
@@ -13,7 +13,7 @@ Proof.
 Qed.
 
 (* we check that this implies that A(j) happened. *)
-goal _ (j:index,t:timestamp) : n(j) = input@t => happens(A(j)).
+lemma _ (j:index,t:timestamp) : n(j) = input@t => happens(A(j)).
 Proof.
   intro Heq.
   fresh Heq.
