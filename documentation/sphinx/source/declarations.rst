@@ -102,7 +102,7 @@ An operator's semantics must be *deterministic*.
 .. prodn::
    operator_id ::= @ident | (@infix_op)
 
-.. decl:: operator ::= op @operator_id {? [@tvar_params] } @binders {? : @type } = @term
+.. decl:: op @operator_id {? [@tvar_params] } @binders {? : @type } = @term
 
    Declares an operator named :n:`@op_id`, with arguments :n:`@binders` and
    returning :n:`@term`.
@@ -197,7 +197,7 @@ associated cryptographic assumptions.
    generator :g:`g` and exponentation :g:`(^)`.
    The group is assumed to satisfy the DDH assumption when declared
    with :g:`ddh`, the CDH assumption with :g:`cdh`, and the Gap-DH
-   assumption with g:`gdh`.  Enables the use of :tacn:`cdh`,
+   assumption with :g:`gdh`.  Enables the use of :tacn:`cdh`,
    :tacn:`gdh` and :tacn:`ddh`.
 
 
@@ -246,7 +246,7 @@ Processes in Squirrel can use mutable states.
 
 .. decl:: mutable @state_id @binders {? : @type} = @term
   
-   Declares a memory cell named :n:`state_id` indexed by arguments
+   Declares a memory cell named :n:`@state_id` indexed by arguments
    :n:`@binders` --- which must be of :term:`finite` type --- and initialized
    to :n:`term`.
 
@@ -461,7 +461,7 @@ A *concrete system context* :g:`set:S; equiv:P` comprises:
 * a multi-system specified by :g:`S` used to interpret
   :term:`reachability atoms<reachability atom>`;
 
-* a pair of systems (i.e. a mutli-system with two elements) :g:`P`
+* a pair of systems (i.e. a multi-system with two elements) :g:`P`
   used to interpret :term:`equivalence atoms<equivalence atom>`.
 
 A :n:`@system_id` :g:`S` can also be used as a system context:

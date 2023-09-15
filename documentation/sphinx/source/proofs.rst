@@ -124,7 +124,7 @@ This is represented using the :token:`position` token.
 
 Many tactics expecting a term support term :gdef:`patterns<pattern>`,
 which are underspecified terms that can include term holes
-:g:`_`. Often-times, the tactic will match the pattern against
+:g:`_`. Most tactic will match the pattern against
 sub-terms of the goal until it manages to infer values for the term
 holes.
 
@@ -154,14 +154,14 @@ on the tactic in which they are used
 a introduction pattern always applies to a set of
 focused sub-goals (sometimes taken in a sequent, with a full
 proof-context) which they modify. A introduction pattern may create or
-close sub-goals. Most introduction pattern act only on the top-most
-variables or assumptions of the goal (e.g. if the goal is `x => G` or `H =>
+close sub-goals. Most introduction patterns act only on the top-most
+variables or assumptions of the goal (e.g. if the goal is `forall x. G` or `H =>
 G` then the pattern will start by acting on `x` or `H`).
 
 .. prodn::
-   naming_ip ::= {| _ | ? | @idend }
-   and_or_ip ::= {| [] | [ {+ @simpl_ip } ] | [{+| @simpl_ip } }]
-   simpl_ip ::= {| @naming_pat | @and_or_ip | @rewrite_ip }
+   naming_ip ::= {| _ | ? | @ident }
+   and_or_ip ::= {| [] | [ {+ @simpl_ip } ] | [ {+| @simpl_ip } ] }
+   simpl_ip ::= {| @naming_ip | @and_or_ip | @rewrite_ip }
    s_item ::= {| // | /= | //= }
    rewrite_ip ::= {| -> | <- }
    expand_ip ::= @/{| @macro_id | @operator_id }
@@ -621,17 +621,17 @@ Common tactics
 .. tacn:: generalize {+ @term_pat} {? as {+ @variable}}
    :name: generalize    
 
-    :n:`generalize @term_pat` looks for an instance :n:`@term` of
-    :n:`@term_pat` in the goal. Then, replace all occurrences of :n:`@term`
-    by a fresh universally quantified variable
-    (automatically named, or :n:`@variable` if provided).
+   :n:`generalize @term_pat` looks for an instance :n:`@term` of
+   :n:`@term_pat` in the goal. Then, replace all occurrences of :n:`@term`
+   by a fresh universally quantified variable
+   (automatically named, or :n:`@variable` if provided).
 
 .. tacn:: generalize dependent {+ @term_pat} {? as {+ @variable}}
    :name: generalize dependent
     
-    Same as :n:`generalize`, but also generalize in the proof context.
-    All hypotheses in which generalization occured are pushed back into the
-    goal before the newly added quantified variables.
+   Same as :n:`generalize`, but also generalize in the proof context.
+   All hypotheses in which generalization occured are pushed back into the
+   goal before the newly added quantified variables.
 
 .. tacn:: have @have_ip : {|@term|@global_formula}
    
@@ -1796,11 +1796,15 @@ Global tactics
    of the xor operation.
 
    The tactic applied to a bi-frame element of the form :g:`i : C[n XOR
-   t]` will replace the XOR term by :g:`if occur(n,bi-frame, i : C[n
-   XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)`. This new
-   term then allow to drop the old term only if :g:`n` and :g:`t` do
-   have the same length (otherwise the one time pad does not work),
-   and if this is the only occurrence of :g:`n` in the bi-frame.
+   t]` will replace the XOR term by
+
+   .. squirreldoc::
+      if occur(n,bi-frame, i : C[n XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)
+
+   This new term then allow to drop the old term only if :g:`n` and
+   :g:`t` do have the same length (otherwise the one time pad does not
+   work), and if this is the only occurrence of :g:`n` in the
+   bi-frame.
 
    When multiple XOR occur in the bi-frame, one can specify one or two
    optional term patterns, to specify in any order the name :g:`n` or
