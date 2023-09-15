@@ -1079,6 +1079,7 @@ Interactive[@name=Sentence] {
 | P_include
 | Goal
 | Hint
+| HELP
 /* | EOF DO NOT USE WITH TESTS ! */
 }
 

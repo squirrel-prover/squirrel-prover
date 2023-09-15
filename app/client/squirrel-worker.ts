@@ -211,8 +211,22 @@ export class SquirrelWorker {
     this.sendCommand(["Exec", sentences]);
   }
 
+  /**
+   * Same as exec but without checking proofs
+   * @param {Array<string>} sentences
+   */
   execNoCheck(sentences:Array<string>) {
     this.sendCommand(["NoCheck", sentences]);
+  }
+
+  /**
+   * Will ask worker to run the given sentence
+   * but this will not change the state of the prover
+   * usefull for printing infos
+   * @param {Array<string>} sentences
+   */
+  run(sentence:string) {
+    this.sendCommand(["Run", sentence]);
   }
 
   /**

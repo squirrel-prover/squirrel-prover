@@ -106,4 +106,13 @@ buttonDown.onclick = function() {
   return worker.execNextSentence(myview);
 }
 
+
+var runInput = document.getElementById('runinput');
+runInput.addEventListener("keypress", function(event) {
+  // If the user presses the "Enter" key on the keyboard
+  if (event.key === "Enter") {
+    return worker.run(runInput.value.toString())
+  }
+});
+
 worker.launch()

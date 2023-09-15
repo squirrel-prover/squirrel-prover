@@ -191,6 +191,24 @@ body.jsquirrel-main .CodeMirror-linenumber {
   overflow: hidden;
 }
 
+.flex-panel-visu {
+  display: flex;
+  flex-direction: column;
+  flex: auto;
+  justify-content: flex-end;
+  overflow: hidden;
+  transition: flex-grow 0.5s ease-in-out;
+}
+
+.flex-panel-run {
+  display: flex;
+  flex-direction: column;
+  flex: auto;
+  justify-content: flex-end;
+  overflow: hidden;
+  transition: flex-grow 0.5s ease-in-out;
+}
+
 .flex-panel {
   display: flex;
   flex-direction: column;

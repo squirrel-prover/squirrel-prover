@@ -93,7 +93,7 @@ let exec_command ?(check=`Check) s : string =
   with e -> 
     Printer.prthtml `Error "Run failed: %a"
       (Errors.pp_toplevel_error ~test:false (Driver.file_from_str s)) e;
-    raise e
+    Format.flush_str_formatter () (* will print the exception info *)
 
 let visualisation () : string =
  try begin 
