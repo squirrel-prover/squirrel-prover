@@ -499,7 +499,7 @@ For the case where :g:`t = R2(j)`, we start by expanding the macros and splittin
 
 .. squirreltop:: all
 		 
-   expand frame, exec, output.
+   expand frame, exec, output.   
    fa !<_,_>.
 
 Using the authentication goal :g:`wa_R` previously proved, we replace
@@ -514,7 +514,7 @@ tactic.
 
 .. squirreltop:: all
 		 	
-    rewrite /cond (wa_R (R1 j)) //.
+    rewrite /cond (wa_R (R2 j)) //.
 
 We are now able to remove this formula from the frame because the
 attacker is able to compute it using information obtained in the
@@ -529,7 +529,8 @@ In the case where :g:`t = R1(j)`, it is similar to the previous one.
 
 .. squirreltop:: all
 		       
-  expand frame, exec, output. fa !<_,_>.
+  expand frame, exec, output.
+  fa !<_,_>.
   rewrite /cond (wa_R (R1 j)) //.
   by deduce 1.
 
@@ -537,7 +538,7 @@ Finally, for the case where t = T(i,k), we start by expanding the macros and spl
 
 .. squirreltop:: all
 		   
-  + expand frame, exec, cond, output.
+    expand frame, exec, cond, output.
     fa !<_,_>, if _ then _, <_,_>.
     
 We now apply the :tacn:`prf` tactic, in order to replace the hash by a fresh
