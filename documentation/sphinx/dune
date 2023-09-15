@@ -1,0 +1,7 @@
+(rule
+ (targets public)
+ (alias refman-html)
+ (deps
+  (source_tree source))
+ (action
+  (run sphinx-build -b html source/. %{targets})))

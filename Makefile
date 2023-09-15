@@ -2,6 +2,7 @@ GITHASH := $(shell scripts/git-hash)
 CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
 
 PREFIX = ~/.local
+SQUIRRELBIN = $(PREFIX)/bin
 
 ECHO = /bin/echo
 
@@ -175,6 +176,7 @@ clean: ## Call dune clean and remove executable and coverage
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
+	rm -rf public
 
 # Clean last bench
 .PHONY: clean_bench
@@ -216,13 +218,22 @@ coverage: ## Generates coverage report in _coverage/index.html
 # The install target should probably be changed to using dune,
 # so that dune exec could work.
 install: squirrel
-	cp -f squirrel $(PREFIX)/bin/squirrel
-	\cp -r theories $(PREFIX)/bin/
+	cp -f squirrel $(SQUIRRELBIN)
+	cp -r theories $(SQUIRRELBIN)
+	export SQUIRRELBIN=$(SQUIRRELBIN)
 
 .PHONY: doc
 doc: ## Build generated API documentation
 	dune build @doc
 	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
+
+refman-html:
+	dune build --no-buffer @refman-html
+	@$(ECHO) "Documentation available: _build/default/documentation/sphinx/public/index.html"
+
+deploy-html: refman-html
+	mkdir public
+	cp -r _build/default/documentation/sphinx/public .
 
 # If this touch commit.ml for inserting same hash dune will rebuild for nothing
 version:

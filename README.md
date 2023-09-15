@@ -21,6 +21,8 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
+The documentation for users may be built with `make refman-html`.
+
 ### Installing the Proof General mode for Emacs (optional, recommended)
 
 The required `.el` files are inside the `utils` folder. 

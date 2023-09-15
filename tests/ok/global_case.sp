@@ -1,4 +1,4 @@
-(* check global case over timestamps: deterministic is necessary *)
+(* check global case over timestamps: constant+si is necessary *)
 
 channel c
 

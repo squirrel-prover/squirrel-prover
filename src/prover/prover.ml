@@ -31,7 +31,7 @@ let init' () : state =
   current_goal  = None;
   bullets       = Bullets.empty_path;
   subgoals      = [];
-  prover_mode   = GoalMode;
+  prover_mode   = ProverLib.GoalMode;
 }
 
 let get_table (ps:state) : Symbols.table =
@@ -66,7 +66,7 @@ let abort (ps:state) : state =
   { ps with current_goal  = None; 
             bullets       = Bullets.empty_path;
             subgoals      = [];
-            prover_mode   = GoalMode;
+            prover_mode   = ProverLib.GoalMode;
   }
 
 let is_proof_completed (ps:state) : bool =
@@ -132,7 +132,7 @@ let complete_proof (ps:state) : state =
             bullets = Bullets.empty_path;
             subgoals = [];
             table = table;
-            prover_mode = GoalMode
+            prover_mode = ProverLib.GoalMode
   }
 
 let do_qed (st : state) : state =
@@ -237,7 +237,7 @@ let add_decls (st:state) (decls : Decl.declarations)
   let ps : state = List.fold_left (fun ps goal ->
       add_proof_obl goal ps) st proof_obls in
   let ps = set_table ps table in
-  { ps with prover_mode = GoalMode }, proof_obls
+  { ps with prover_mode = ProverLib.GoalMode }, proof_obls
 
 let do_decls (st:state) (decls : Decl.declarations) : state =
   let new_prover_state, proof_obls = 
@@ -599,6 +599,7 @@ let rec do_command ?(main_mode=`Stdin) ?(file_stack=[]) ?(test=false) ?(check=`C
   | Prover c -> 
     let mode = get_mode st in
     match mode, c with
+    | _, Reset                   -> init' ()
     | GoalMode, InputDescr decls -> do_decls st decls
     | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
     | _, Print q                 -> do_print pst q; st

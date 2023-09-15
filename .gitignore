@@ -15,7 +15,6 @@ output.tex
 *.toc
 *.synctex.gz
 *.out
-./squirrel.exe
 squirrel
 sanity
 /tex/auto/*.el
@@ -34,8 +33,11 @@ node_modules/
 *.exrc
 *.\#*.sp
 .venv/
+documentation/sphinx/build/
+# *.py[cod]
+*__pycache__/
+documentation/sphinx/public/
 *.bc.js
-*.bc-for-jsoo
 package-lock.json
 app/www/static/client.js
 app/www/static/editor.bundle.js
