@@ -14,20 +14,18 @@ type proc_ty = (string * Type.ty) list
 (*------------------------------------------------------------------*)
 type lsymb = Theory.lsymb
 
-type term = Theory.term
-
 (*------------------------------------------------------------------*)
 type process_i =
   | Null
   | New      of lsymb * Theory.p_ty * process
   | In       of Channel.p_channel * lsymb * process
-  | Out      of Channel.p_channel * term * process
+  | Out      of Channel.p_channel * Theory.term * process
   | Parallel of process * process
-  | Set      of lsymb * term list * term * process
-  | Let      of lsymb * term * Theory.p_ty option * process
+  | Set      of lsymb * Theory.term list * Theory.term * process
+  | Let      of lsymb * Theory.term * Theory.p_ty option * process
   | Repl     of lsymb * process
-  | Exists   of lsymb list * term * process * process
-  | Apply    of lsymb * term list
+  | Exists   of lsymb list * Theory.term * process * process
+  | Apply    of lsymb * Theory.term list
   | Alias    of process * lsymb
 
 and process = process_i L.located
@@ -177,7 +175,8 @@ type Symbols.data += Process_data of proc_ty * Term.projs * process
 let declare_nocheck table (name : Theory.lsymb) (args : proc_ty) (projs : Term.projs) proc =
     let data = Process_data (args,projs,proc) in
     let def = () in
-    Symbols.Process.declare_exact table name ~data def
+    let table, _ = Symbols.Process.declare_exact table name ~data def in
+    table
 
 let find_process table pname =
   match Symbols.Process.get_all pname table with
@@ -196,7 +195,7 @@ let check_channel table (s : lsymb) =
 (** Type checking for processes *)
 let check_proc
     table ~(args:Theory.bnds) (projs : Term.projs) (process : process) 
-  : proc_ty * process
+  : proc_ty 
   =
   let rec check_p (ty_env : Type.Infer.env) (env : Env.t) proc =
     let loc = L.loc proc in
@@ -304,8 +303,29 @@ let check_proc
     List.map (fun v -> Vars.name v, Vars.ty v) args 
   in
 
-  args, process
+  args
 
+(*------------------------------------------------------------------*)
+let pp_process_declaration
+    ~(id : lsymb) ~(args : (string * Type.ty) list) ~(projs : Term.projs)
+    (proc : process)
+  : unit
+  =
+  let pp_args fmt =
+    if args = [] then () else
+      Fmt.pf fmt "%a"
+        (Fmt.list ~sep:(Fmt.any "") (fun fmt (v,ty) -> Fmt.pf fmt "(%s : %a)@ " v Type.pp ty))
+        args
+  in
+  let pp_projs fmt =
+    if projs = [] || projs = [Term.left_proj; Term.right_proj] then () else
+      Fmt.pf fmt "@[<:%a>@]@ " Term.pp_projs projs
+  in
+  Printer.pr "@[<v 2>@[%a%t %s %t@]=@ @[%a@]@]@." 
+    (Printer.kws `ProcessName) "process"
+    pp_projs (L.unloc id) pp_args 
+    pp_process proc
+    
 (*------------------------------------------------------------------*)
 let declare
     (table : Symbols.table)
@@ -315,9 +335,13 @@ let declare
   let projs = Theory.parse_projs projs in
 
   (* type-check and declare *)
-  let args, _ = check_proc table ~args projs proc in
+  let args = check_proc table ~args projs proc in
 
-  let table, _ = declare_nocheck table id args projs proc in
+  let table = declare_nocheck table id args projs proc in
+
+  (* notify the user of the processus declaration *)
+  pp_process_declaration ~id ~args ~projs proc;
+
   table
 
 (*------------------------------------------------------------------*)
@@ -570,9 +594,10 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let table,a' = Action.fresh_symbol penv.env.table ~exact a in
 
     let action = List.rev penv.action in
-    let in_ch, in_var = match penv.inputs with
-    | (c,v) :: _ -> c, Vars.name v
-    | _ -> assert false
+    let in_ch, in_var =
+      match penv.inputs with
+      | (c,v) :: _ -> c, Vars.name v
+      | _ -> assert false
     in
     let indices = List.rev penv.indices in
     let action_term = Term.mk_action a' (Term.mk_vars indices) in
@@ -580,22 +605,24 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let in_tm = Term.mk_macro Term.in_macro [] action_term in
 
     (* substitute the special timestamp variable [ts], since at this point
-     * we know the action *)
+       we know the action *)
     let subst_ts = [ Term.ESubst (Term.mk_var ts, action_term) ] in
 
     (* override previous term substitution for input variable
-    * to use the known action *)
+       to use the known action *)
     let subst_input =
       try [Term.ESubst (snd (list_assoc in_var penv.msubst), in_tm)]
       with Not_found -> []
     in
 
     let msubst' = try
-        let x, _, _ = List.find (fun (_,x_th,_) ->
-            match Theory.destr_var x_th with
-            | Some x -> L.unloc x = in_var
-            | None -> false)
-            penv.msubst in
+        let x, _, _ =
+          List.find (fun (_,x_th,_) ->
+              match Theory.destr_var x_th with
+              | Some x -> L.unloc x = in_var
+              | None -> false)
+            penv.msubst
+        in
         (x,in_th,in_tm) :: penv.msubst
       (* in case of Not_found, it means it is a dummy input,
          which cannot be used in the terms, so we don't need a substitution *)
@@ -781,9 +808,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (*------------------------------------------------------------------*)
   (* treatment of Let(x,t,p) constructs
-   * the boolean [in_update] indicates whether we are in the update phase:
-   * In that case, we have to search in [t] if there are some get terms for 
-   * state macros that have already been updated *)
+     the boolean [in_update] indicates whether we are in the update phase:
+     In that case, we have to search in [t] if there are some get terms for 
+     state macros that have already been updated *)
   let p_let ?(in_update=false) ~(penv : p_env) proc = match L.unloc proc with
 
   | Let (x,t,ptyo,p) ->
@@ -902,9 +929,10 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let penv,x' = make_fresh `Shadow penv Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.mk_var x' in
-      let penv = { penv with
-                   inputs = (ch,x')::penv.inputs ;
-                   msubst = (L.unloc x, in_th, in_tm) :: penv.msubst }
+      let penv = {
+        penv with
+        inputs = (ch,x')::penv.inputs ;
+        msubst = (L.unloc x, in_th, in_tm) :: penv.msubst }
       in
 
       let par_choice = pos, List.rev pos_indices in
@@ -970,9 +998,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let cond' = Theory.subst cond (to_tsubst penv_p) in
 
       (* No state updates have been done yet in the current
-       * action. We thus have to substitute [ts] by [pred(ts)] for all state
-       * macros appearing in [t]. This is why we call [Term.subst_macros_ts]
-       * with the empty list. *)
+         action. We thus have to substitute [ts] by [pred(ts)] for all state
+         macros appearing in [t]. This is why we call [Term.subst_macros_ts]
+         with the empty list. *)
       let fact =
         Term.subst_macros_ts penv.env.table [] (Term.mk_var ts)
           (conv_term penv_p (Term.mk_var ts) cond Type.Boolean)
@@ -1004,9 +1032,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     | _ ->
       (* We are done processing conditionals, let's prepare
-       * for the next step, i.e. updates and output.
-       * At this point we know which action will be used,
-       * but we don't have the action symbol yet. *)
+         for the next step, i.e. updates and output.
+         At this point we know which action will be used,
+         but we don't have the action symbol yet. *)
       let vars = List.rev penv.evars in
       let penv =
         { penv with
