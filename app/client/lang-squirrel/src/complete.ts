@@ -82,10 +82,10 @@ const interactive_completions: readonly Completion[] = [//{↓{
     detail: "[pat] [in sys]",
     info: `Search lemmas containing a given pattern.`
   }),
-  snip("goal ${Name} : ${Term}.", {
-    label: "goal",
+  snip("lemma ${Name} : ${Term}.", {
+    label: "lemma",
     detail: "[sys] Name (t: ty, …) : Term.",
-    info: `Define goal of given Name with given term of formula`
+    info: `Define lemma of given Name with given term of formula`
   }),
   snip("equiv ${Name} : ${Biframe}.", {
     label: "equiv",
@@ -501,7 +501,7 @@ function inType(node:SyntaxNode): boolean {
 }
 
 const typesInteractive = new Set([
-   "Declaration", "Infos", "P_include", "Goal", "Hint"
+   "Declaration", "Infos", "P_include", "Lemma", "Hint"
   ])
 
 function getChildNodeOfTypes(types:Set<string>, node:SyntaxNode): SyntaxNode | null {

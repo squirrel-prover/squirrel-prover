@@ -56,7 +56,7 @@ let myview = new EditorView({
   doc:"include Basic.\n"
 +"system null.type T.\n"
 +"op yo : T -> T = fun(x : T) => x.\n"
-+"goal foo : empty <> empty.\n"
++"lemma foo : empty <> empty.\n"
 +"Proof.\n"
 +" congruence.\n"
 +" admit.\n"

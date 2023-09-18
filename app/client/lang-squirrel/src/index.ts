@@ -36,7 +36,7 @@ export const SquirrelLanguage = LRLanguage.define({
         'Fun_symb!': t.meta,
 
         //glob keywords
-        "GOAL! INCLUDE! SET! AXIOM! GLOBAL! LOCAL! EQUIV!": t.strong,
+        "THEOREM! LEMMA! INCLUDE! SET! AXIOM! GLOBAL! LOCAL! EQUIV!": t.strong,
 
         //operators keywords
         "operator!": t.operator,

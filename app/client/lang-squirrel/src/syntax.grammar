@@ -126,7 +126,8 @@ kw<Term> { @specialize[@name={Term}]<ID, Term> }
   MEMSEQ[@name=tackeyw] { kw<"memseq"> }
   REMEMBER[@name=tackeyw] { kw<"remember"> }
   DEPENDENT[@name=tackeyw] { kw<"dependent"> }
-  GOAL { kw<"goal"> }
+  LEMMA { kw<"lemma"> }
+  THEOREM { kw<"theorem"> }
   LOCAL { kw<"local"> }
   GLOBAL { kw<"global"> }
   GLOB { kw<"glob"> }
@@ -1029,10 +1030,15 @@ obs_equiv_statement {
   System_annot Statement_name
 }
 
-Goal {
-         GOAL Local_statement  DOT
-|  LOCAL GOAL Local_statement  DOT
-| GLOBAL GOAL Global_statement DOT
+Lemma_head {
+  LEMMA
+| THEOREM
+}
+
+Lemma {
+         Lemma_head Local_statement  DOT
+|  LOCAL Lemma_head Local_statement  DOT
+| GLOBAL Lemma_head Global_statement DOT
 | EQUIV  obs_equiv_statement   DOT
 | EQUIV System_annot Statement_name Bnds_tagged COLON biframe DOT
 }
@@ -1077,7 +1083,7 @@ Interactive[@name=Sentence] {
 | Infos
 | prof
 | P_include
-| Goal
+| Lemma
 | Hint
 | HELP
 /* | EOF DO NOT USE WITH TESTS ! */
