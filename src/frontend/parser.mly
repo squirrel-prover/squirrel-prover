@@ -92,7 +92,7 @@
 %type <Theory.term> top_formula
 %type <Theory.global_formula> top_global_formula
 %type <SystemExpr.Parse.t> system_expr
-%type <Process.process> top_process
+%type <Process.Parse.t> top_process
 %type <ProverLib.input> interactive
 %type <ProverLib.input> top_proofmode
 
@@ -330,53 +330,53 @@ colon_ty:
 | COLON t=ty { t }
 
 process_i:
-| NULL                             { Process.Null }
+| NULL                             { Process.Parse.Null }
 | LPAREN ps=processes_i RPAREN     { ps }
-| id=lsymb terms=term_list         { Process.Apply (id,terms) }
-| id=lsymb COLON p=process         { Process.Alias (p,id) }
+| id=lsymb terms=term_list         { Process.Parse.Apply (id,terms) }
+| id=lsymb COLON p=process         { Process.Parse.Alias (p,id) }
 
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with
         | Some ty -> ty
         | None -> L.mk_loc (L.loc id) Theory.P_message
       in
-      Process.New (id,ty,p) }
+      Process.Parse.New (id,ty,p) }
 
 | IN LPAREN c=lsymb COMMA id=lsymb RPAREN p=process_cont
-    { Process.In (c,id,p) }
+    { Process.Parse.In (c,id,p) }
 
 | OUT LPAREN c=lsymb COMMA t=term RPAREN p=process_cont
-    { Process.Out (c,t,p) }
+    { Process.Parse.Out (c,t,p) }
 
 | IF f=term THEN p=process p0=else_process
-    { Process.Exists ([],f,p,p0) }
+    { Process.Parse.Exists ([],f,p,p0) }
 
 | FIND is=opt_indices SUCHTHAT f=term IN p=process p0=else_process
-    { Process.Exists (is,f,p,p0) }
+    { Process.Parse.Exists (is,f,p,p0) }
 
 | LET id=lsymb ty=colon_ty? EQ t=term IN p=process
-    { Process.Let (id,t,ty,p) }
+    { Process.Parse.Let (id,t,ty,p) }
 
 | id=lsymb args=term_list COLONEQ t=term p=process_cont
-    { Process.Set (id,args,t,p) }
+    { Process.Parse.Set (id,args,t,p) }
 
-| s=loc(BANG) p=process { Process.Repl (s,p) }
+| s=loc(BANG) p=process { Process.Parse.Repl (s,p) }
 
 process:
 | p=loc(process_i) { p }
 
 processes_i:
 | p=process_i                             { p }
-| p=process PARALLEL ps=loc(processes_i)  { Process.Parallel (p,ps) }
+| p=process PARALLEL ps=loc(processes_i)  { Process.Parse.Parallel (p,ps) }
 
 process_cont:
 |                                { let loc = L.make $startpos $endpos in
-                                   L.mk_loc loc Process.Null }
+                                   L.mk_loc loc Process.Parse.Null }
 | SEMICOLON p=process            { p }
 
 else_process:
 | %prec empty_else               { let loc = L.make $startpos $endpos in
-                                   L.mk_loc loc Process.Null }
+                                   L.mk_loc loc Process.Parse.Null }
 | ELSE p=process                 { p }
 
 opt_indices:

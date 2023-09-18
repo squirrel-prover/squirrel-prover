@@ -244,7 +244,7 @@ val subst_var : subst -> Vars.var -> Vars.var
 val subst_vars : subst -> Vars.vars -> Vars.vars
 
 (** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
-  * if [ts] is applied to a state macro whose name is NOT in [l]. *)
+    if [ts] is applied to a state macro whose name is NOT in [l]. *)
 val subst_macros_ts : Symbols.table -> string list -> term -> term -> term
 
 val subst_projs : (proj * proj) list -> term -> term 

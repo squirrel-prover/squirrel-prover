@@ -223,7 +223,7 @@ let descr_of_shape table expr shape =
 
 let descr_of_action table expr (a : Action.action) : Action.descr * Term.subst =
   let descr = descr_of_shape table expr (Action.get_shape a) in
-  assert (Action.check_descr descr);
+  Action.check_descr descr;
   let d_indices = descr.indices in
   let a_indices = Action.get_args a in
   let subst =

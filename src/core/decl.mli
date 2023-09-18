@@ -62,10 +62,8 @@ type bty_decl = {
 type system_decl = {
   sname    : Theory.lsymb option;
   sprojs   : lsymb list option;
-  sprocess : Process.process;
+  sprocess : Process.Parse.t;
 }
-
-val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (*------------------------------------------------------------------*)
 (** Information for a system declaration using a global modifier    *)
@@ -104,7 +102,7 @@ type proc_decl = {
   id    : lsymb;
   projs : lsymb list option;
   args  : Theory.bnds;
-  proc  : Process.process;
+  proc  : Process.Parse.t;
 }
 
 (*------------------------------------------------------------------*)

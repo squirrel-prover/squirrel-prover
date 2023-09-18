@@ -1499,7 +1499,7 @@ let empty loc = mk_symb (L.mk_loc loc "empty")
 
 (*------------------------------------------------------------------*)
 let check
-    (env : Env.t) ?(local=false) ?(pat=false) 
+    (env : Env.t) ?(pat=false) 
     (ty_env : Type.Infer.env)
     (projs : Term.projs)
     (t : term) (s : Type.ty) 
@@ -1509,7 +1509,7 @@ let check
     Term.mk_var
       (snd (Vars.make `Approx Vars.empty_env s "#dummy" (Vars.Tag.make Vars.Local)))
   in
-  let cntxt = if local then InProc (projs, (dummy_var Type.Timestamp)) else InGoal in
+  let cntxt = InProc (projs, (dummy_var Type.Timestamp)) in
   
   let state = mk_state ~type_checking:true env cntxt pat ty_env in
   ignore (convert state t s : Term.term)
@@ -1686,34 +1686,6 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
     [Term.left_proj; Term.right_proj]
     (List.map (Term.proj_from_string -| L.unloc))
     p_projs
-
-(*------------------------------------------------------------------*)
-let find_app_terms t (names : string list) =
-  let rec aux (name : string) acc t = 
-    match L.unloc t with
-    | Symb x' ->
-      if L.unloc x' = name then L.unloc x'::acc else acc
-
-    | App (t1,l) ->
-      aux_list name acc (t1 :: l)
-
-    | AppAt (t,ts) ->
-      aux_list name acc [t;ts]
-
-    | Diff (t1, t2) -> aux_list name acc [t1;t2]
-    | Tuple l -> aux_list name acc l
-
-    | Proj (_,t')
-    | Quant (_,_,t') -> aux name acc t'
-
-    | Find (_,t1,t2,t3) -> aux_list name acc [t1;t2;t3]
-
-    | Tpat             -> acc
-
-  and aux_list name acc l = List.fold_left (aux name) acc l in
-
-  let acc = List.fold_left (fun acc name -> aux name acc t) [] names in
-  List.sort_uniq Stdlib.compare acc
 
 (*------------------------------------------------------------------*)
 (** {2 Apply arguments} *)
