@@ -72,11 +72,11 @@ Commands
   Shows definition of given :n:`@ident` if it is a lemma, function, name, macro or system.
   :g:`print` without :n:`@idendifier` shows the current system.
 
-  .. example:: printing a goal
+  .. example:: printing a lemma
 
     .. squirreltop:: in
 
-        goal [any] foo : true.
+        lemma [any] foo : true.
         Proof.
           admit.
         Qed.

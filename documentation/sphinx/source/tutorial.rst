@@ -271,7 +271,7 @@ reader, and such the input of the reader corresonds to the name of
 
 .. squirreltop::  all
 
-   goal wa :
+   lemma wa :
      forall (i:index, j:index),
      happens(R(j,i)) =>
         cond@R(j,i) =>
@@ -377,7 +377,7 @@ previous proof on the bi-system directly:
 
 .. squirreltop:: all
 		 
-   goal [BasicHash] wa_R :
+   lemma [BasicHash] wa_R :
      forall (tau:timestamp),
        happens(tau) =>
        ((exists (i,k:index),

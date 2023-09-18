@@ -102,7 +102,7 @@ def main():
     with SquirrelTop() as squirreltop:
         for _ in range(200):
             print(repr(squirreltop.sendone("Check nat.")))
-        sendmany("goal _ : False.", "Proof.", "admit", "Qed.")
+        sendmany("lemma _ : False.", "Proof.", "admit", "Qed.")
 
 if __name__ == '__main__':
     main()

@@ -284,13 +284,13 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-       .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
+       .. decl:: _lemma @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
           This command is equivalent to
 
    .. tab:: Produces
 
-    .. decl:: _goal @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
+    .. decl:: _lemma @string : @one_term {? ( {+, @syntax_modifier } ) } {? : @ident }
 
        This command is equivalent to
 
@@ -641,7 +641,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
             name n:message.
             name s:message.
             hash h.
-            goal [any] toto : true=>true.
+            lemma [any] toto : true=>true.
             Proof.
                admit.
             Qed.
@@ -655,7 +655,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
          name n:message.
          name s:message.
          hash h.
-         goal [any] toto : true=>true.
+         lemma [any] toto : true=>true.
          Proof.
             admit.
          Qed.
@@ -692,7 +692,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
          .. squirreltop:: abort all
 
-            goal [any] tutu : true=>true.
+            lemma [any] tutu : true=>true.
             Proof.
 
          .. squirreltop:: all
@@ -708,7 +708,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
          .. squirreltop:: abort all
 
-            goal [any] tutu : true=>true.
+            lemma [any] tutu : true=>true.
             Proof.
 
          .. squirreltop:: all
@@ -766,7 +766,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
                system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
-               goal [BasicHash] wa_R :
+               lemma [BasicHash] wa_R :
                  forall (tau:timestamp),
                    happens(tau) =>
                    ((exists (i,k:index),
@@ -810,7 +810,7 @@ In addition to the objects above, the ``squirreldomain`` Sphinx plugin defines t
 
                system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
-               goal [BasicHash] wa_R :
+               lemma [BasicHash] wa_R :
                  forall (tau:timestamp),
                    happens(tau) =>
                    ((exists (i,k:index),
@@ -1107,11 +1107,11 @@ The ``.. squirreltop::`` directive does *not* reset Squirrel after running its c
 
    .. squirreltop:: all
 
-      goal l1: 1 + 1 = 2.
+      lemma l1: 1 + 1 = 2.
 
    .. squirreltop:: all
 
-      goal l2: 2 + 2 <> 1.
+      lemma l2: 2 + 2 <> 1.
 
 Add either ``abort`` to the first block or ``reset`` to the second block to avoid nesting lemmas.
 

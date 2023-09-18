@@ -93,9 +93,9 @@ numbered list.
 
    .. squirreldoc::
 
-      global goal [myProtocol] obs_equiv t : [happens(t)] -> equiv(frame@t, pk(sk))
+      global lemma [myProtocol] obs_equiv t : [happens(t)] -> equiv(frame@t, pk(sk))
 
-   When starting its proof, after doing :g:`intro H`, the goal is
+   When starting its proof, after doing :g:`intro H`, the lemma is
    displayed as:
 
    .. squirreldoc::
