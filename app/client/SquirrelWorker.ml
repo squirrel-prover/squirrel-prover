@@ -21,7 +21,7 @@ let rec json_to_obj (cobj : < .. > Js.t) (json : Yojson.Safe.t) : < .. > Js.t =
 type jsquirrel_answer =
   | Info      of string
   | Goal      of string * string
-  | Ok        of int * string
+  | Ok        of int * string * string
   | Ko        of int * string
   [@@deriving to_yojson]
 
@@ -91,7 +91,10 @@ let show_info (info:string) : unit =
 (* send OK with number of sentence well executed *)
 let send_ok (n:int) : unit =
   let visu : string = Common.visualisation () in
-  Worker.post_message (answer_to_jsobj (Ok (n,visu)))
+  (* let goal_output = Common.str_goal () in *)
+  Common.print_goal (); (* will printout the current goal *)
+  let goal_output = Format.flush_str_formatter () in
+  Worker.post_message (answer_to_jsobj (Ok (n,goal_output,visu)))
 
 let send_ko (n:int) : unit =
   let visu : string = Common.visualisation () in

@@ -62,6 +62,8 @@ export class SquirrelWorkerConfig {
     }
 }
 
+type Sentence = { node: SyntaxNode; output: string; visu: string };
+
 // XXX: not sure we want to allow subclassing of the worker method,
 // use case is pretty small to actually expose the internals here.
 export class SquirrelWorker {
@@ -80,7 +82,8 @@ export class SquirrelWorker {
   // Queued sentences
   protected queueSentences: Array<SyntaxNode>;
   // Executed sentences
-  protected executedSentences: Array<SyntaxNode>;
+  //
+  protected executedSentences: Array<Sentence>;
 
   private load_progress: (ratio: number, ev: ProgressEvent) => void;
 
@@ -268,7 +271,7 @@ export class SquirrelWorker {
         this.cursor = null;
         removeMarks(this.view,0,this.view.state.doc.length);
       } else {
-        this.cursor = this.executedSentences[this.executedSentences.length-1].cursor();
+        this.cursor = (this.executedSentences[this.executedSentences.length-1]).node.cursor();
         removeMarks(this.view,(this.cursor.to)+1,this.view.state.doc.length);
       }
     }
@@ -298,13 +301,6 @@ export class SquirrelWorker {
   async execNodes(view:EditorView,nodes:Array<SyntaxNode>) {
     if(nodes.length > 0){
       let viewState = view.state;
-      // highlight with pending background
-      highlightNodes(view,nodes,"squirrel-eval-pending")
-      let cursorPos = nodes[nodes.length - 1].to;
-      view.dispatch({selection: {anchor: cursorPos, head: cursorPos},
-                    effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
-      });
-
       if (this.curSentences.length != 0){
         this.queueSentences = this.queueSentences.concat(nodes)
       } else {
@@ -348,6 +344,12 @@ export class SquirrelWorker {
           this.exec(sentences);
         }
       }
+      // highlight with pending background
+      highlightNodes(view,nodes,"squirrel-eval-pending")
+      let cursorPos = nodes[nodes.length - 1].to;
+      view.dispatch({selection: {anchor: cursorPos, head: cursorPos},
+                    effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
+      });
     }
   }
 
@@ -419,7 +421,7 @@ export class SquirrelWorker {
    * @param {number} posChange
    */
   getLastExecutedBeforeChange(viewState:EditorState,posChange:number) : SyntaxNode {
-    let lastExecuted = this.executedSentences[this.executedSentences.length - 1];
+    let lastExecuted = this.executedSentences[this.executedSentences.length - 1].node;
     // If changes are done after the lastExecuted node
     if (posChange > lastExecuted.to){
       return lastExecuted
@@ -428,13 +430,31 @@ export class SquirrelWorker {
       let index = (this.executedSentences.length - 1);
       // The lastExecuted at least has changed, then start by the
       // previous one
-      let sentenceChanged = this.executedSentences[index--];
+      let sentenceChanged = this.executedSentences[index--].node;
       while(posChange < sentenceChanged.from && index>0){
-        sentenceChanged = this.executedSentences[index--]
+        sentenceChanged = this.executedSentences[index--].node
       }
       // Take the previous one if it exists
-      return this.executedSentences[index] ? this.executedSentences[index] :
+      return this.executedSentences[index] ? this.executedSentences[index].node :
         this.getInnerFirstSentence(syntaxTree(viewState).topNode);
+    }
+  }
+
+  updatePointer(coords) {
+    if (this.curSentences.length == 0 
+        && this.queueSentences.length == 0
+        && this.executedSentences.length > 1) {
+      let pos = this.view.posAtCoords(coords,false);
+      let sentence = this.executedSentences.find(
+        (v) => v.node && (v.node.from <= pos) && (pos <= v.node.to)
+      );
+      if (sentence){
+        // Show recorded goal in goal panel
+        this.changeHtmlOf("goal-text",sentence.output);
+
+        // TODO update HighlightStyle of viewed sentence
+        // highlightNodes(this.view,[sentence.node],"squirrel-showed-goal");
+      }
     }
   }
 
@@ -468,7 +488,7 @@ export class SquirrelWorker {
 
         //Since cursor must be over a Sentence node, it must have a Script parent
         let index = this.executedSentences.findIndex(
-          (v) => v.to == cursorNode!.to
+          (v) => v.node.to == cursorNode!.to
         );
         let nbToUndo = this.executedSentences.length - (index+1)
 
@@ -477,7 +497,7 @@ export class SquirrelWorker {
           console.log("Index of this sentence : ",index);
           console.log("siblings to undo : ");
           childs.forEach((n) => {
-            this.printSentence(update.startState,n);
+            this.printSentence(update.startState,n.node);
           });
           console.log("Size : ",childs.length)
           console.log(nbToUndo)
@@ -656,27 +676,35 @@ export class SquirrelWorker {
       case "Ok":
         if(DEBUG){
         console.log("Ok for ",msg[1]);
-        console.log("visu ",msg[2]);
+        console.log("goal ",msg[2]);
+        console.log("visu ",msg[3]);
       }
-      let sentence = this.curSentences[msg[1]];
+      let sentence = {
+        node: this.curSentences[msg[1]],
+        output: msg[2],
+        visu: msg[3]
+      };
 
       if (sentence) {
         // Add this sentence to the list of executedSentences
         this.executedSentences.push(sentence);
 
         // Update cursor
-        this.cursor = sentence.cursor();
+        this.cursor = sentence.node.cursor();
 
         // Send update with visu data
         e = 
-          new CustomEvent("update", {"detail": JSON.parse(msg[2])});
+          new CustomEvent("update", {"detail": JSON.parse(msg[3])});
         document.getElementById("body")?.dispatchEvent(e);
 
+        // Show info in goal panel
+        this.changeHtmlOf("goal-text",msg[2]);
+
         // Remove previous mark
-        removeMarks(this.view!,sentence.from,sentence.to);
+        removeMarks(this.view!,sentence.node.from,sentence.node.to);
         // Add evaluated mark on the sentence
         this.view!.dispatch({
-          effects: addMarks.of([evaluatedMark.range(sentence.from, sentence.to)])
+          effects: addMarks.of([evaluatedMark.range(sentence.node.from, sentence.node.to)])
         });
       }
 
@@ -696,15 +724,15 @@ export class SquirrelWorker {
         console.error("Ko for ",msg[1]);
         console.log("visu ",msg[2]);
       }
-      sentence = this.curSentences[msg[1]];
+      let sentenceNode = this.curSentences[msg[1]];
       let lastSentence = this.curSentences[this.curSentences.length-1];
 
       // Remove previous mark
-      removeMarks(this.view!,sentence.from,lastSentence.to);
+      removeMarks(this.view!,sentenceNode.from,lastSentence.to);
 
-      // Add error mark on the sentence
+      // Add error mark on the sentenceNode
       this.view!.dispatch({
-        effects: addMarks.of([errorMark.range(sentence.from, sentence.to)])
+        effects: addMarks.of([errorMark.range(sentenceNode.from, sentenceNode.to)])
       });
       this.curSentences = [];
       this.queueSentences = [];

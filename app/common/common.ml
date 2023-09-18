@@ -68,6 +68,20 @@ let print_goal () =
   | _ -> 
       Printer.prthtml `Goal "Nothing to show…"
 
+(* FIXME ↓ this removes html style compare to print_goal, why ? *)
+let str_goal () : string =
+  let buff = Buffer.create 16 in
+  let formatter = Format.formatter_of_buffer buff in
+  let _ = match Prover.get_mode !prover_state with
+  | ProverLib.ProofMode -> 
+      Printer.prthtml_out formatter `Goal "%a" (Prover.pp_goal
+                                                  !prover_state) ()
+  | _ -> 
+    Printer.prthtml_out formatter `Goal "Nothing to show…" 
+  in
+  Format.pp_print_flush formatter ();
+  Buffer.contents buff
+
 let get_goal_print () : string = 
     print_goal (); (* will printout the current goal *)
     Format.flush_str_formatter ()

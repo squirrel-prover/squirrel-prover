@@ -106,6 +106,9 @@ buttonDown.onclick = function() {
   return worker.execNextSentence(myview);
 }
 
+input.onclick = (event) => {
+  worker.updatePointer({x:event.x, y:event.y})
+};
 
 var runInput = document.getElementById('runinput');
 runInput.addEventListener("keypress", function(event) {

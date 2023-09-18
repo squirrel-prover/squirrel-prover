@@ -63,6 +63,10 @@ body.jssquirrel-main #document {
   background-color: #fc6;
 }
 
+.squirrel-showed-goal {
+  background-color: #88bd8a;
+}
+
 .squirrel-eval-failed {
   background-color: rgba(255, 00, 50, 0.2);
 }
