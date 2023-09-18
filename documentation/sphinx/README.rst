@@ -28,6 +28,23 @@ Build
 ``make latex`` Build latex version then go in ``build/latex/`` and
    type ``make`` to generate pdf.
 
+Pygments
+--------
+
+To update pygments in the ci.
+First connect to ci : 
+```sh
+ssh root@squirrel-slave.ci
+```
+
+Then connect as `ci` with `su ci`.
+Go to the `pygments` directory in `home`.
+Then,
+```sh
+git pull
+python3.8 -m pip install -e .
+```
+
 Help
 ----
 
