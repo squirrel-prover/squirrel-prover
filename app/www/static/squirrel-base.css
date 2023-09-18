@@ -187,7 +187,7 @@ body.jsquirrel-main .CodeMirror-linenumber {
 .flex-container {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 36px);  /* 36px = height of toolbar */
+  height: calc(100% - 45px);  /* 36px = height of toolbar */
   overflow: hidden;
 }
 

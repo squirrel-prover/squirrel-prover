@@ -1159,6 +1159,12 @@ search_query:
 | SEARCH   t=any_term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }
 | SEARCH   t=any_term DOT { ProverLib.Srch_term t }
 
+help_query:
+| HELP DOT               { [] }
+| HELP i=lsymb DOT       { [TacticsArgs.String_name i] }
+| HELP h=help_tac DOT    { [TacticsArgs.String_name h] }
+
+
 (*------------------------------------------------------------------*)
 interactive:
 | set=set_option     { ProverLib.Prover (SetOption set) }
@@ -1171,6 +1177,7 @@ interactive:
 | RESET              { ProverLib.Prover Reset }
 | g=lemma            { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }
+| h=help_query       { ProverLib.Prover (Help h) }
 | EOF                { ProverLib.Prover EOF }
 
 bullet:

@@ -72,6 +72,7 @@ type prover_input =
   | Hint of Hint.p_hint
   | EOF
   | Include of include_param
+  | Help of TacticsArgs.parser_args 
 
 type input =
   | Prover of prover_input

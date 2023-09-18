@@ -587,6 +587,14 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
 
+let do_help (args: TacticsArgs.parser_args) :unit = 
+  match args with
+  | [] -> 
+      ProverTactics.get_help (Location.mk_loc Location._dummy "")
+  | [TacticsArgs.String_name tac_name] -> 
+      ProverTactics.get_help tac_name
+  | _ -> ProverTactics.bad_args ()
+
 exception Unfinished
 
 (* Manage all command *)
@@ -604,6 +612,7 @@ let rec do_command ?(main_mode=`Stdin) ?(file_stack=[]) ?(test=false) ?(check=`C
     | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
     | _, Print q                 -> do_print pst q; st
     | _, Search t                -> do_search pst t; st
+    | _, Help t                  -> do_help t; st
     | WaitQed, Qed               -> do_qed st
     | GoalMode, Hint h           -> add_hint st h
     | GoalMode, SetOption sp     -> set_param st sp

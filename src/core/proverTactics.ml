@@ -263,7 +263,10 @@ let get_help (tac_name : Theory.lsymb) =
   else if Location.unloc tac_name = "concise" then
     Printer.prt `Result "%a" pp_list ()
   else
-    Printer.prt `Result "%a" (pp true) tac_name;
+    Printer.prt `Result "%a" (pp true) tac_name
+
+let get_help' (tac_name : Theory.lsymb) =
+  get_help tac_name;
   Tactics.id
 (* }↑} *)
 
@@ -304,8 +307,8 @@ let () =
                   tactic_group = Logical}
     ~pq_sound:true
     (function
-      | [] -> get_help (Location.mk_loc Location._dummy "")
-      | [String_name tac_name]-> get_help tac_name
+      | [] -> get_help' (Location.mk_loc Location._dummy "")
+      | [String_name tac_name]-> get_help' tac_name
       | _ ->  bad_args ())
 
 let () =

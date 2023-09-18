@@ -76,3 +76,5 @@ val pp : bool -> Format.formatter -> Theory.lsymb -> unit
 val pps : Format.formatter -> unit -> unit
 val pp_list : Format.formatter -> unit -> unit
 val pp_list_count : string -> unit
+
+val get_help : Theory.lsymb -> unit

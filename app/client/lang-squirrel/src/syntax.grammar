@@ -285,9 +285,9 @@ tac {
   | SPLITSEQ INT COLON LPAREN Term RPAREN sterm?
   | CONSTSEQ INT COLON emptySep1<constseq_arg>
   | MEMSEQ INT INT
-  | DDH ~ddhambig Lsymb COMMA Lsymb COMMA Lsymb COMMA Lsymb
-  | CDH ~cdhambig tac_term COMMA tac_term
-  | GDH ~gdhambig tac_term COMMA tac_term
+  | DDH Lsymb COMMA Lsymb COMMA Lsymb COMMA Lsymb
+  | CDH tac_term COMMA tac_term
+  | GDH tac_term COMMA tac_term
   | euf Lsymb
   | executable Term
   | CASE Term
@@ -295,9 +295,6 @@ tac {
   | collision Term 
   | enrich Term (COMMA Term)*
   | EXPAND commaSep1<Term>
-  | HELP
-  | HELP Lsymb
-  | HELP Help_tac
   | byequiv
   | diffeq
   | eqnames
@@ -368,7 +365,7 @@ Help_tac_i {
 | SPLITSEQ   
 | CONSTSEQ   
 | MEMSEQ     
-| DDH        
+| DDH
 | GDH        
 | CDH        
 | PRINT      
@@ -895,9 +892,9 @@ bnds {
 }
 
 dh_flag {
-  DDH ~ddhambig
-| CDH ~cdhambig
-| GDH ~gdhambig 
+  DDH
+| CDH
+| GDH
 }
 
 dh_flags {
@@ -1074,6 +1071,8 @@ blockProof { StartProof Bulleted_tactic+ EndProof }
 Infos[@name=Sentence] {
  PRINT pr_query
  | Search_query
+ | HELP ~help DOT
+ | HELP ~help Help_tac DOT
 }
 
 Interactive[@name=Sentence] {
@@ -1085,7 +1084,6 @@ Interactive[@name=Sentence] {
 | P_include
 | Lemma
 | Hint
-| HELP
 /* | EOF DO NOT USE WITH TESTS ! */
 }
 
