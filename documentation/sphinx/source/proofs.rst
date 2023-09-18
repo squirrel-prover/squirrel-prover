@@ -1066,7 +1066,6 @@ Local tactics
    and must not appear in any global hypothesis (some global
    hypotheses may be localized (see :tacn:`localize`) if necessary.
 
-      
 .. tact:: eqnames
     
     Add index constraints resulting from names equalities,
@@ -1076,11 +1075,11 @@ Local tactics
     equality entailed by the current context.
 
 .. tact:: eqtrace
-    
+
     Add terms constraints resulting from timestamp and index
     equalities. 
 
-    Whenver :g:`i=j` or :g:`ts=ts'`, we can substitute one by another
+    Whenever :g:`i=j` or :g:`ts=ts'`, we can substitute one by another
     in the other terms.
 
 .. tact:: executable @term
@@ -1484,7 +1483,7 @@ Local tactics
     
    Requires a :term:`hash function declaration <hash function>`.
 
-   This tactis applies the known key collision resistance assumption
+   This tactic applies the known-key collision resistance assumption
    (see e.g. the cr2-kk assumption from
    :cite:`goldwasser1996lecture`).
     
