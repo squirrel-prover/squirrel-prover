@@ -11,7 +11,6 @@ between the :g:`Proof` and :g:`Qed` markers.
 It consists in a list of tactics. The invocation of each
 tactic modifies the proof state, which contains a list of goals to prove.
 Each goal is displayed as a judgement.
-.. displaying its current state.
 Initially, the proof state consists of a single goal, as declared by the
 user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new sub-goals. When no goal is left, the proof
@@ -438,7 +437,7 @@ The remainder behaves as follows:
 
 .. tacn:: nosimpl @tactic
 
-  Call the given tactic without the subjudgement implicit use of simplications.
+  Call the given tactic without the subjudgement implicit use of simplifications.
   This can be useful to understand what's going on step by step.
   This is also necessary in rare occasions where simplifications are
   actually undesirable to complete the proof.
@@ -1817,7 +1816,7 @@ Global tactics
       the hash message :g:`n` is different from any possible
       previously hashed message. Here, the only other possible hash
       would occur in :g:`frame@pred(A)`, in the output of :g:`B` if it
-      occured before :g:`A`. The created sub-goal then asks to prove
+      occurred before :g:`A`. The created sub-goal then asks to prove
       that :g:`[B < A => n <> m]`.
 
 
