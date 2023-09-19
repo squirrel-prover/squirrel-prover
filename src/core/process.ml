@@ -1,7 +1,9 @@
 open Utils
 
 module L = Location
+module Sv = Vars.Sv
 
+(*------------------------------------------------------------------*)
 let dum : L.t = L._dummy
 
 (** We use dummy locations for intermediary term we build, which do not come
@@ -45,6 +47,24 @@ type proc =
   | Apply    of Symbols.process * Term.term list
   | Alias    of proc * lsymb
 
+(*------------------------------------------------------------------*)
+(* does not recurse *)
+let tfold (f : 'a -> proc -> 'a) (a : 'a) (proc : proc) : 'a =
+  match proc with
+  | Apply _ 
+  | Null    -> a
+    
+  | New   (_,_,p  ) 
+  | Out   (_,_,p  ) 
+  | In    (_,_,p  )
+  | Set   (_,_,_,p)
+  | Let   (_,_,_,p)
+  | Repl  (_,p    )
+  | Alias (p,_    ) -> f a p
+
+  | Parallel (p1,p2    ) 
+  | Exists   (_,_,p1,p2) -> f (f a p1) p2
+
 (* does not recurse *)
 let tmap f proc =
   match proc with
@@ -59,7 +79,77 @@ let tmap f proc =
   | Exists   (v,t,p1,p2 ) -> Exists   (v,t,f p1,f p2)
   | Apply    (id,args   ) -> Apply    (id, args     )
   | Alias    (p,a       ) -> Alias    (f p,a        )
-  
+
+(*------------------------------------------------------------------*)
+(** Free term variable *)
+let fv (proc : proc) : Sv.t =
+  let rec doit (fv : Sv.t) (proc : proc) =
+    match proc with
+    | New  (v,_,p)
+    | In   (_,v,p)
+    | Repl (v,p  ) -> Sv.remove v (doit fv p) 
+                            
+    | Out (_,t,p) -> doit (Sv.union fv (Term.fv t)) p
+                            
+    | Parallel (p1,p2) -> doit (doit fv p1) p2
+      
+    | Set (_,l,t,p) -> doit (Sv.union fv (Term.fvs (t :: l))) p
+                         
+    | Let (v,t,_,p) ->
+      doit (Sv.union fv (Term.fv t)) p |>
+      Sv.remove v
+
+    | Exists (vs,t,p1,p2) ->
+      let fv = doit (doit fv p1) p2 in
+      let fv = Sv.union fv (Term.fv t) in
+      List.fold_left ((^~) Sv.remove) fv vs
+      
+    | Apply (_,args) -> Sv.union fv (Term.fvs args)
+
+    | Null | Alias _ -> tfold doit fv proc
+  in
+  doit Sv.empty proc
+
+(*------------------------------------------------------------------*)
+(** Term variable substitution *)
+let subst (ts : Term.subst) proc =
+  let rec doit ts p =
+    match p with
+    | New (v, ty, p) -> New (Term.subst_var ts v, ty, doit ts p)
+
+    | In  (c, v , p) ->
+      let v, ts = Term.subst_binding v ts in
+      In  (c, v, doit ts p)
+        
+    | Out (c, t , p) -> Out (c, Term.subst ts t, doit ts p)
+
+    | Set (m, args, t, p) ->
+      Set (m, List.map (Term.subst ts) args, Term.subst ts t, doit ts p)
+
+    | Let (v, t, ty, p) ->
+      let v, ts = Term.subst_binding v ts in
+      Let (Term.subst_var ts v, Term.subst ts t, ty, doit ts p)
+
+    | Repl (v, p) ->
+      let v, ts = Term.subst_binding v ts in
+      Repl (v, doit ts p)
+
+    | Exists (vs, t, p1, p2) ->
+      let ts1, vs =
+        List.map_fold (fun ts v ->
+            let v, ts = Term.subst_binding v ts in
+            ts, v
+          ) ts vs
+      in
+      Exists (vs, Term.subst ts1 t, doit ts1 p1, doit ts p2)
+
+    | Apply (id,args) -> Apply (id, List.map (Term.subst ts) args) 
+    | Alias _ | Null | Parallel _ -> tmap (doit ts) p
+  in
+  doit ts proc
+
+(*------------------------------------------------------------------*)
+(** Type variable substitution *)
 let tsubst (ts : Type.tsubst) proc =
   let rec doit p =
     match p with
