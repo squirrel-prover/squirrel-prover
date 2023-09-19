@@ -31,7 +31,7 @@ export class FileManager {
       this.reset = () => {console.log("not implemented yet !")};
       this.worker = undefined
       this.base_path = base_path;
-      this.file_store = localforage.createInstance({'name': 'SquirrelWorker.file_store'});
+      // this.file_store = localforage.createInstance({'name': 'SquirrelWorker.file_store'});
 
       this.theories_dir = new URL("static/theories/", base_path);
 
@@ -48,7 +48,8 @@ export class FileManager {
         })
         .then((blob) => { 
           if(blob) {
-            this.file_store.setItem(fname,blob.text());
+            console.warn("Setting "+fname+" in localforage !");
+            localforage.setItem(fname,blob.text());
           }
           return blob.text();
         });
@@ -56,11 +57,15 @@ export class FileManager {
     }
 
   async getFileString(fname:string): Promise<string> {
-    return this.file_store.keys().then(async (keys) => {
-      if (fname in keys){
-        return this.file_store.getItem(fname)
+    return localforage.keys().then(async (keys) => {
+      console.warn(keys);
+      console.warn("is "+fname+" in ?");
+      if (keys.includes(fname)){
+        console.warn("Found "+fname+" in localforage !");
+        return localforage.getItem(fname)
         .then((text:string) => text);
       } else {
+        console.warn("Didn't find "+fname+" in localforage !");
         console.log("Downloading "+this.theories_dir+fname)
         return fetch(this.theories_dir+fname)
         .then((res) => {
@@ -73,7 +78,8 @@ export class FileManager {
         })
         .then((blob) => { 
           if(blob) {
-            this.file_store.setItem(fname,blob.text());
+            console.warn("Setting "+fname+" in file_store !");
+            localforage.setItem(fname,blob.text());
             return blob.text();
           }
           else return null;
@@ -94,7 +100,8 @@ export class FileManager {
     })
     .then((blob) => { 
       if(blob) {
-        this.file_store.setItem(fname,blob.text());
+        console.warn("Setting "+fname+" in file_store !");
+        localforage.setItem(fname,blob.text());
       } else {
         console.error("Error when downloading "+fname);
       }
@@ -148,8 +155,7 @@ export class FileManager {
     let filename = fname || this.filename;
 
     if (filename) {
-      var file_store = this.getLocalFileStore();
-      return file_store!.getItem(filename).
+      return localforage!.getItem(filename).
         then((text:string) =>
              { this.load(text || "", filename,view); return text; });
     }
@@ -162,13 +168,13 @@ export class FileManager {
     if (filename) this.filename = filename;
 
     if (this.filename) {
-      var file_store = this.getLocalFileStore();
-      file_store.setItem(this.filename, view.state.doc.toString());
+      console.warn("Setting "+this.filename+" in file_store !");
+      localforage.setItem(this.filename, view.state.doc.toString());
       this.dirty = false;
     }
   }
 
-  getLocalFileStore() { return this.file_store; }
+  getLocalFileStore() { return localforage; }
 
   // Save/load UI
   

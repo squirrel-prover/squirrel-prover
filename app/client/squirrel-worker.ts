@@ -674,7 +674,7 @@ export class SquirrelWorker {
   /**
    * @param { data: any; } evt
    */
-  squirrel_handler(evt) {
+  squirrel_handler(evt:any) {
     var msg     = evt.data;
     if(DEBUG)
       console.log(msg)
@@ -711,7 +711,7 @@ export class SquirrelWorker {
         visu: msg[3]
       };
 
-      if (sentence) {
+      if (sentence.node) {
         // Add this sentence to the list of executedSentences
         this.executedSentences.push(sentence);
 
