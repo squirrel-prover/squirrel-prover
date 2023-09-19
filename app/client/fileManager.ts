@@ -58,7 +58,7 @@ export class FileManager {
   async getFileString(fname:string): Promise<string> {
     return this.file_store.keys().then(async (keys) => {
       if (fname in keys){
-      return this.file_store.getItem(fname)
+        return this.file_store.getItem(fname)
         .then((text:string) => text);
       } else {
         console.log("Downloading "+this.theories_dir+fname)

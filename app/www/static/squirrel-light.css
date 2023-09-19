@@ -63,8 +63,12 @@ body.jssquirrel-main #document {
   background-color: #fc6;
 }
 
-.squirrel-showed-goal {
-  background-color: #88bd8a;
+.squirrel-eval-ok .squirrel-focus-goal {
+  background-color: #88bd8a !important;
+}
+
+.squirrel-focus-goal .squirrel-eval-ok {
+  background-color: #88bd8a !important;
 }
 
 .squirrel-eval-failed {
@@ -77,9 +81,9 @@ body.jssquirrel-main #document {
   text-decoration-color: red;
 }
 
-.squirrel-eval-ok.CodeMirror-selectedtext,
-.squirrel-eval-pending.CodeMirror-selectedtext,
-.squirrel-eval-failed.CodeMirror-selectedtext {
+.squirrel-eval-ok.cm-focused,
+.squirrel-eval-pending.cm-focused,
+.squirrel-eval-failed.cm-focused {
   background-color: none;
 }
 

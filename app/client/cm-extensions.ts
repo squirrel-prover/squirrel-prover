@@ -50,6 +50,15 @@ export function removeHoverMarks(view:EditorView) {
   })
 }
 
+export function removeClassMarks(view:EditorView, className:string) {
+  view.dispatch({
+    effects: filterMarks.of((_from, _to, value) => 
+      {
+       return value.spec.class != className}
+    )
+  })
+}
+
 export function removeMarks(view:EditorView, a:number, b:number) {
   view.dispatch({
     effects: filterMarks.of((from, to, _value) => to <= a || from >= b)

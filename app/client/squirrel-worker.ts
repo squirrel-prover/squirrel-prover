@@ -13,7 +13,7 @@ import { FileManager } from "./fileManager"
 
 const DEBUG = true;
 
-import { addMarks, removeMarks, removeHoverMarks, highlightNodes } from "./cm-extensions"
+import { addMarks, removeClassMarks, removeMarks, removeHoverMarks, highlightNodes } from "./cm-extensions"
 
 //TODO move on ./squirrel.ts because related to syntax and lezer
 import { getSentenceFromNode } from "./cm-extensions"
@@ -27,6 +27,8 @@ const errorMark = Decoration.mark({
 const evaluatedMark = Decoration.mark({
   class: "squirrel-eval-ok"
 })
+
+const focusedMark = "squirrel-focus-goal"
 
 /**
  * Main squirrel Worker Class
@@ -81,9 +83,11 @@ export class SquirrelWorker {
   protected curSentences: Array<SyntaxNode>;
   // Queued sentences
   protected queueSentences: Array<SyntaxNode>;
-  // Executed sentences
-  //
+  // Executed sentences with recorded output and visu
   protected executedSentences: Array<Sentence>;
+  // Focused sentence (meaning printed out into goal and visu panel)
+  // This is one of the executedSentences
+  protected focusedSentence: Sentence;
 
   private load_progress: (ratio: number, ev: ProgressEvent) => void;
 
@@ -111,6 +115,7 @@ export class SquirrelWorker {
     this.queueSentences = [];
     this.executedSentences = [];
     this.view = null;
+    this.focusedSentence = null;
 
     this.load_progress = (ratio, ev) => {};
 
@@ -440,6 +445,31 @@ export class SquirrelWorker {
     }
   }
 
+  // Set focus on given sentence
+  setFocus(sentence:Sentence){
+    if (DEBUG){
+      console.log("Focus on :")
+      console.log(sentence)
+      this.printSentence(this.view.state,sentence.node);
+    }
+    // Show recorded goal in goal panel
+    this.changeHtmlOf("goal-text",sentence.output);
+    // Show recorded visu in visu panel
+    let e = new CustomEvent("update", 
+                            {"detail": JSON.parse(sentence.visu)});
+    document.getElementById("body")?.dispatchEvent(e);
+    
+    // Remove old focus marks
+    if (this.focusedSentence){
+      removeClassMarks(this.view,focusedMark)
+    }
+    removeHoverMarks(this.view)
+    // Highligh new focus mark
+    highlightNodes(this.view,[sentence.node],focusedMark);
+    this.focusedSentence = sentence;
+  }
+
+  // Triggered when click on sentence
   updatePointer(coords) {
     if (this.curSentences.length == 0 
         && this.queueSentences.length == 0
@@ -449,11 +479,7 @@ export class SquirrelWorker {
         (v) => v.node && (v.node.from <= pos) && (pos <= v.node.to)
       );
       if (sentence){
-        // Show recorded goal in goal panel
-        this.changeHtmlOf("goal-text",sentence.output);
-
-        // TODO update HighlightStyle of viewed sentence
-        // highlightNodes(this.view,[sentence.node],"squirrel-showed-goal");
+        this.setFocus(sentence)
       }
     }
   }
@@ -488,7 +514,7 @@ export class SquirrelWorker {
 
         //Since cursor must be over a Sentence node, it must have a Script parent
         let index = this.executedSentences.findIndex(
-          (v) => v.node.to == cursorNode!.to
+          (v) => v.node && v.node.to == cursorNode!.to
         );
         let nbToUndo = this.executedSentences.length - (index+1)
 
@@ -692,20 +718,14 @@ export class SquirrelWorker {
         // Update cursor
         this.cursor = sentence.node.cursor();
 
-        // Send update with visu data
-        e = 
-          new CustomEvent("update", {"detail": JSON.parse(msg[3])});
-        document.getElementById("body")?.dispatchEvent(e);
-
-        // Show info in goal panel
-        this.changeHtmlOf("goal-text",msg[2]);
-
         // Remove previous mark
         removeMarks(this.view!,sentence.node.from,sentence.node.to);
         // Add evaluated mark on the sentence
         this.view!.dispatch({
           effects: addMarks.of([evaluatedMark.range(sentence.node.from, sentence.node.to)])
         });
+
+        this.setFocus(sentence);
       }
 
       // If it's last send queued sentences
