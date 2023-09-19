@@ -16,10 +16,10 @@ or get the source code of the tool from
 You are reading the user's documentation. This documentation is not
 meant as a first introduction to Squirrel; a linear read for people
 unfamiliar with all the high level concepts will be difficult.
-To discover Squirrel, there are several materials available:
+To discover Squirrel, several materials are  available:
 
 * For a first high-level introduction to the core
-  concept, we recommend to start with the :ref:`tutorial <tutorial>`.
+  concepts, we recommend to start with the :ref:`tutorial <tutorial>`.
 * Going through the reference manual after or in parallel to this tutorial is then possible.
 * In the squirrel repository, an `example repository
   <https://github.com/squirrel-prover/squirrel-prover/tree/master/examples>`_
@@ -33,7 +33,7 @@ To discover Squirrel, there are several materials available:
    Installation instructions are given in the README.md of the
    `repository
    <https://github.com/squirrel-prover/squirrel-prover/>`_. The
-   easiest however to discover Squirrel is to run it in the browser
+   easiest way to discover Squirrel, however, is to run it in the browser
    via the javascript application at TODO.
 
 .. todo::
@@ -57,7 +57,7 @@ the prover state:
 
 - :ref:`declarations <section-declarations>`,
   which introduce new function symbols, cryptographic
-  assumptions, processes, systems, and goals (i.e. lemmas or theorems);
+  assumptions, processes, systems, and lemmas/theorems;
 - :ref:`commands <section-commands>`,
   which are used to enter or exit the proof mode,
   query the current state of the prover
