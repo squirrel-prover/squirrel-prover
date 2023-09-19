@@ -86,89 +86,92 @@ let tsubst (ts : Type.tsubst) proc =
 (*------------------------------------------------------------------*)
 (** Pretty-printer *)
 (* TODO: capture not avoid in printing *)
-let rec _pp ~dbg ppf (process : proc) = 
-  let open Fmt in
-  match process with
-  | Null -> Printer.kws `ProcessName ppf "null"
+let _pp ~dbg ppf (process : proc) = 
+  let rec doit ppf (process : proc) = 
+    let open Fmt in
+    match process with
+    | Null -> Printer.kws `ProcessName ppf "null"
 
-  | Apply (s,l) ->
+    | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
         (Printer.kws `ProcessName) (Symbols.to_string s)
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ~dbg)) l
 
-  | Alias (p,a) ->
+    | Alias (p,a) ->
       pf ppf "@[%s:@ %a@]"
         (L.unloc a)
-        (_pp ~dbg) p
+        doit p
 
-  | Repl (s, p) ->
-    pf ppf "@[<hov 2>!_%a@ @[%a@]@]"
-      (Vars._pp ~dbg) s (_pp ~dbg) p
+    | Repl (s, p) ->
+      pf ppf "@[<hov 2>!_%a@ @[%a@]@]"
+        (Vars._pp ~dbg) s doit p
 
-  | Set (s, args, t, p) ->
-    pf ppf "@[<hov>%s%a %a@ %a;@ @[%a@]@]"
-      (Symbols.to_string s)
-      (Utils.pp_list Term.pp) args
-      (Printer.kws `ProcessKeyword) ":="
-      (Term._pp ~dbg) t
-      (_pp ~dbg) p
+    | Set (s, args, t, p) ->
+      pf ppf "@[<hov>%s%a %a@ %a;@]@ %a"
+        (Symbols.to_string s)
+        (Utils.pp_list Term.pp) args
+        (Printer.kws `ProcessKeyword) ":="
+        (Term._pp ~dbg) t
+        doit p
 
-  | New (s, ty, p) ->
-    pf ppf "@[<hov>%a %a : %a;@ @[%a@]@]"
-      (Printer.kws `ProcessKeyword) "new"
-      (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
-      Type.pp ty
-      (_pp ~dbg) p
+    | New (s, ty, p) ->
+      pf ppf "@[<hov>%a %a : %a;@]@ %a"
+        (Printer.kws `ProcessKeyword) "new"
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        Type.pp ty
+        doit p
 
-  | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
-      (Printer.kws `ProcessInOut) "in"
-      (Printer.kws `ProcessChannel) (Symbols.to_string c)
-      (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
-      (_pp ~dbg) p
+    | In (c, s, p) ->
+      pf ppf "@[<hov>%a(%a,@,%a);@]@ %a"
+        (Printer.kws `ProcessInOut) "in"
+        (Printer.kws `ProcessChannel) (Symbols.to_string c)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        doit p
 
-  | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
-      (Printer.kws `ProcessInOut) "out"
-      (Printer.kws `ProcessChannel) (Symbols.to_string c)
-      (Term._pp ~dbg) t
-      (_pp ~dbg) p
+    | Out (c, t, p) ->
+      pf ppf "@[<hov 2>%a(%a,@,@[%a@]);@]@ %a"
+        (Printer.kws `ProcessInOut) "out"
+        (Printer.kws `ProcessChannel) (Symbols.to_string c)
+        (Term._pp ~dbg) t
+        doit p
 
-  | Parallel (p1, p2) ->
-    pf ppf "@[<hv>@[(%a)@] |@ @[(%a)@]@]"
-      (_pp ~dbg) p1
-      (_pp ~dbg) p2
+    | Parallel (p1, p2) ->
+      pf ppf "@[<hov>@[(%a)@] |@ @[(%a)@]@]"
+        doit p1
+        doit p2
 
-  | Let (s, t, ty, p) ->   
-    pf ppf "@[<v>@[<2>%a %a : %a =@ @[%a@] %a@]@ %a@]"
-      (Printer.kws `ProcessKeyword) "let"
-      (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
-      Type.pp ty
-      (Term._pp ~dbg) t
-      (Printer.kws `ProcessKeyword) "in"
-      (_pp ~dbg) p
+    | Let (s, t, ty, p) ->   
+      pf ppf "@[<v>@[<hov 2>%a %a : %a =@ @[%a@] %a@]@]@ %a"
+        (Printer.kws `ProcessKeyword) "let"
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        Type.pp ty
+        (Term._pp ~dbg) t
+        (Printer.kws `ProcessKeyword) "in"
+        doit p
 
-  | Exists (ss, f, p1, p2) ->
-    if ss = [] then
-      pf ppf "@[<hov>%a %a %a@;<1 2>%a"
-        (Printer.kws `ProcessCondition) "if"
-        (Term._pp ~dbg) f
-        (Printer.kws `ProcessCondition) "then"
-        (_pp ~dbg) p1
-    else
-      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
-        (Printer.kws `ProcessCondition) "find"
-        (Utils.pp_list (Vars._pp ~dbg)) ss
-        (Printer.kws `ProcessCondition) "such that"
-        (Term._pp ~dbg) f
-        (Printer.kws `ProcessCondition) "in"
-        (_pp ~dbg) p1 ;
-    if p2 <> Null then
-      pf ppf "@ %a@;<1 2>%a@]"
-      (Printer.kws `ProcessCondition) "else"
-      (_pp ~dbg) p2
-    else
-      pf ppf "@]"
+    | Exists (ss, f, p1, p2) ->
+      if ss = [] then
+        pf ppf "@[<hov>%a %a %a@;<1 2>%a"
+          (Printer.kws `ProcessCondition) "if"
+          (Term._pp ~dbg) f
+          (Printer.kws `ProcessCondition) "then"
+          doit p1
+      else
+        pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
+          (Printer.kws `ProcessCondition) "find"
+          (Utils.pp_list (Vars._pp ~dbg)) ss
+          (Printer.kws `ProcessCondition) "such that"
+          (Term._pp ~dbg) f
+          (Printer.kws `ProcessCondition) "in"
+          doit p1 ;
+      if p2 <> Null then
+        pf ppf "@ %a@;<1 2>%a@]"
+          (Printer.kws `ProcessCondition) "else"
+          doit p2
+      else
+        pf ppf "@]"
+  in  
+  Fmt.pf ppf "@[<hv 0>%a@]" doit process
 
 let pp_dbg = _pp ~dbg:true
 let pp     = _pp ~dbg:false
