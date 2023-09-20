@@ -115,6 +115,10 @@ export class FileManager {
 
   load(text:string, filename:string, view:EditorView, dirty=false) {
     if (this.autosave && this.dirty) this.saveLocal(view);
+
+    // Save the loaded file into localforage
+    localforage.setItem(filename,text);
+
     // clear marks ↓
     this.worker.reset(view);
 
@@ -193,7 +197,7 @@ export class FileManager {
     input = myJquery('<input>').attr('list', list_id),
     list = myJquery('<datalist>').attr('id', list_id);
 
-    this.getLocalFileStore().keys().then((keys) => {
+    localforage.keys().then((keys) => {
       for (let key of keys) {
         list.append(myJquery('<option>').val(key));
       }
@@ -215,7 +219,7 @@ export class FileManager {
     input = myJquery('<input>').attr('list', list_id),
     list = myJquery('<datalist>').attr('id', list_id);
 
-    this.getLocalFileStore().keys().then((keys) => {
+    localforage.keys().then((keys) => {
       for (let key of keys) {
         list.append(myJquery('<option>').val(key));
       }
@@ -238,7 +242,7 @@ export class FileManager {
     input = myJquery('<input>').attr('list', list_id),
     list = myJquery('<datalist>').attr('id', list_id);
 
-    this.getLocalFileStore().keys().then((keys) => {
+    localforage.keys().then((keys) => {
       for (let key of keys) {
         list.append(myJquery('<option>').val(key));
       }
@@ -309,9 +313,43 @@ export class FileManager {
     return span[0];
   }
 
+  openFilePanel(view:EditorView):HTMLElement {
+    var list_id = 'squirrel-local-files';
+    var list = myJquery('<ul>');
+
+    localforage.keys().then((keys) => {
+      for (let key of keys) {
+        console.log("Add "+key);
+        var li = myJquery("<li><a class='fileLink'>"+key+"</a></li>")
+        .on('click', _ => { 
+          this.openLocal(key.toString(),view);
+          view.focus();
+        });
+        list.append(li);
+      }
+    });
+
+    let addButton = myJquery("<button id='plus' name='plus'>").on("click", _ => {
+       this.openFileDialog(view);
+    });
+
+    let span = myJquery('<div>').attr('id',list_id).append(list).append(addButton);
+
+    return span[0];
+  }
+
 }
 
 export var fileManager = new FileManager(window.location.toString());
+
+function createFilePanel(view: EditorView): Panel {
+  var dom = fileManager.openLocalDialog(view) ;
+  dom.className = "cm-file-panel"
+
+  return {
+    top: true, 
+    dom};
+}
 
 function createOpenFilePanel(view: EditorView): Panel {
   var dom = fileManager.openLocalDialog(view) ;

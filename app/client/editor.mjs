@@ -106,6 +106,11 @@ buttonDown.onclick = function() {
   return worker.execNextSentence(myview);
 }
 
+var buttonFile = document.getElementById('file');
+buttonFile.onclick = function() { 
+  return worker.openFilePanel(myview);
+}
+
 input.onclick = (event) => {
   worker.updatePointer({x:event.x, y:event.y})
 };

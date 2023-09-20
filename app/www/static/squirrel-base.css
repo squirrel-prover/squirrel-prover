@@ -115,7 +115,7 @@ a, a:link, a:visited, a:active {
   opacity: 0.65;
 }
 
-.jsquirrel.CodeMirror .CodeMirror-dialog a.dialog-link {
+a.fileLink {
   cursor: pointer;
   text-decoration: underline;
   font-family: sans-serif;
@@ -477,7 +477,28 @@ body.jsquirrel-main .CodeMirror-linenumber {
   margin-top: 5px;
 }
 
+#buttons-right {
+  display: inline-block;
+  float: right;
+  text-align: right;
+  transition: opacity 500ms ease;
+  vertical-align: middle;
+  margin-top: 5px;
+}
+
+
 #buttons button {
+  background: none;
+  border: none;
+  width: 25px;
+  height: 25px;
+  background-size: 100%;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: opacity 1s ease;
+}
+
+#buttons-right button {
   background: none;
   border: none;
   width: 25px;
@@ -526,6 +547,21 @@ body.jsquirrel-main .CodeMirror-linenumber {
   background-image: url(./images/log-info.png);
 }
 
+#buttons-right button[name=file] {
+  background-image: url(./images/file.svg);
+}
+
+#squirrel-local-files button[name=plus] {
+  background: none;
+  border: none;
+  width: 25px;
+  height: 25px;
+  background-size: 100%;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: opacity 1s ease;
+  background-image: url(./images/plus.svg);
+}
 
 /* Proper  */
 
@@ -541,76 +577,6 @@ body.jsquirrel-main .CodeMirror-linenumber {
 
 #document .CodeMirror {
   margin-bottom: 0.5em;
-}
-
-#packages-panel div.package-row {
-  padding-top: 1px;
-  padding-bottom: 1px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-#packages-panel div.package-row > button {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-  outline: none;
-  margin-right: 4px;
-  vertical-align: bottom;
-  cursor: pointer;
-}
-
-#packages-panel div.package-row.has-chunks {
-  overflow: hidden;
-}
-
-#packages-panel div.package-row > div.package-row {
-  padding-left: 20px;
-  position: relative;
-  top: 0;
-  height: 22px;
-  transition-property: top, height, opacity, padding;
-  transition-duration: .5s;
-}
-
-#packages-panel div.package-row:not(.expanded) > div.package-row {
-  height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  top: -20px;
-  pointer-events: none;
-  opacity: 0;
-}
-
-#packages-panel div.package-row > .loaded-chunks {
-  margin-left: 2em;
-  color: #888;
-  font-size: 80%;
-}
-
-#packages-panel div.package-row > .loaded-chunks::before,
-#packages-panel div.package-row > .loaded-chunks::after,
-#packages-panel div.package-row > .loaded-chunks > span:not(:last-child)::after {
-  font-family: Helvetica, Geneva, Swiss, Arial, SunSans-Regular, sans-serif;
-}
-
-#packages-panel div.package-row > .loaded-chunks::before { content: "["; }
-#packages-panel div.package-row > .loaded-chunks::after { content: "]"; }
-
-#packages-panel div.package-row > .loaded-chunks > span:not(:last-child)::after {
-  content: ",";
-  margin-right: 0.1em;
-}
-
-button.download-icon {
-  width: 25px;
-  height: 20px;
-  background-image: url("./images/dl.png");
-  background-repeat: no-repeat;
-}
-
-button.download-icon.checked {
-  background-image: url("./images/checked.png");
 }
 
 .rel-pos {

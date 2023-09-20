@@ -351,10 +351,17 @@ export class SquirrelWorker {
       }
       // highlight with pending background
       highlightNodes(view,nodes,"squirrel-eval-pending")
-      let cursorPos = nodes[nodes.length - 1].to;
-      view.dispatch({selection: {anchor: cursorPos, head: cursorPos},
-                    effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
-      });
+      this.printSentence(viewState,nodes[nodes.length-1]);
+      if(nodes.length > 0){
+        let cursorPos = nodes[nodes.length - 1].to;
+        view.dispatch({
+          selection: {
+          anchor: cursorPos, 
+          head: cursorPos
+          }, 
+          effects: EditorView.scrollIntoView(cursorPos, {y: 'center'})
+        });
+      }
     }
   }
 
@@ -768,6 +775,13 @@ export class SquirrelWorker {
     let element = document.getElementById(id)!;
     element.innerHTML = inner;
     element.scrollTop = element.scrollHeight;
+  }
+
+  openFilePanel(view){
+    let dom : HTMLElement = this.fileManager.openFilePanel(view);
+    let goalPanel = document.getElementById("goal-text");
+    goalPanel.innerHTML = ''
+    goalPanel.appendChild(dom)
   }
 
   // Initialize the worker
