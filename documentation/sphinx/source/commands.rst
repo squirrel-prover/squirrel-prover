@@ -56,7 +56,7 @@ Commands
    ====================== ============================================ ======================
    Option identifier      Description                                  Default value
    ====================== ============================================ ======================
-   timeout                Timeout for the solver in seconds            2
+   timeout                Timeout for the solver in seconds            10
    printTRSEquations      Print equations of the TRS                   false
    debugConstr            Debug information for the constraint checker false
    debugCompletion        Debug information for the completion checker false
@@ -67,6 +67,7 @@ Commands
    autoFADup              Automatic FA Dup                             true
    newInduction           New equivalence induction principle (FIXME)  false
    postQuantumSound       Post-quantum soundness                       false
+   checkInclude           Include will check proofs                    true
    ====================== ============================================ ======================
 
 .. cmd:: print {? @ident}
