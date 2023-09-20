@@ -253,7 +253,9 @@ val subst_projs : (proj * proj) list -> term -> term
 val refresh_vars        : (Vars.var     ) list -> (Vars.var     ) list * subst
 val refresh_vars_w_info : (Vars.var * 'a) list -> (Vars.var * 'a) list * subst
 
-(** Add variables in an existing environment, renaming them if necessary. *)
+(** [add_vars_env env vs] adds the variables [vs] to [env],
+    possibly renaming variables [vs] into [vs'] to avoir name clashes.
+    Also returns the substitution [vs -> vs']. *)
 val add_vars_env :
   'a Vars.genv -> (Vars.var * 'a) list ->
   'a Vars.genv * Vars.var list * esubst list

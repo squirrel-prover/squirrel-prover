@@ -175,7 +175,6 @@ let tsubst (ts : Type.tsubst) proc =
   
 (*------------------------------------------------------------------*)
 (** Pretty-printer *)
-(* TODO: capture not avoid in printing *)
 let _pp ~dbg ppf (process : proc) = 
   let rec doit ppf (process : proc) = 
     let open Fmt in
@@ -192,9 +191,16 @@ let _pp ~dbg ppf (process : proc) =
         (L.unloc a)
         doit p
 
-    | Repl (s, p) ->
+    | Repl (v, p) ->
+      let _, v, s = (* rename quantified var. to avoid name clashes *)
+        let fv = Sv.remove v (fv p) in
+        Term.add_vars_simpl_env (Vars.of_set fv) [v]
+      in
+      let v = as_seq1 v in
+      let p = subst s p in
+      
       pf ppf "@[<hov 2>!_%a@ @[%a@]@]"
-        (Vars._pp ~dbg) s doit p
+        (Vars._pp ~dbg) v doit p
 
     | Set (s, args, t, p) ->
       pf ppf "@[<hov>%s%a %a@ %a;@]@ %a"
@@ -204,18 +210,32 @@ let _pp ~dbg ppf (process : proc) =
         (Term._pp ~dbg) t
         doit p
 
-    | New (s, ty, p) ->
+    | New (v, ty, p) ->
+      let _, v, s = (* rename quantified var. to avoid name clashes *)
+        let fv = Sv.remove v (fv p) in
+        Term.add_vars_simpl_env (Vars.of_set fv) [v]
+      in
+      let v = as_seq1 v in
+      let p = subst s p in
+
       pf ppf "@[<hov>%a %a : %a;@]@ %a"
         (Printer.kws `ProcessKeyword) "new"
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
         Type.pp ty
         doit p
 
-    | In (c, s, p) ->
+    | In (c, v, p) ->
+      let _, v, s = (* rename quantified var. to avoid name clashes *)
+        let fv = Sv.remove v (fv p) in
+        Term.add_vars_simpl_env (Vars.of_set fv) [v]
+      in
+      let v = as_seq1 v in
+      let p = subst s p in
+
       pf ppf "@[<hov>%a(%a,@,%a);@]@ %a"
         (Printer.kws `ProcessInOut) "in"
         (Printer.kws `ProcessChannel) (Symbols.to_string c)
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
         doit p
 
     | Out (c, t, p) ->
@@ -230,17 +250,32 @@ let _pp ~dbg ppf (process : proc) =
         doit p1
         doit p2
 
-    | Let (s, t, ty, p) ->   
+    | Let (v, t, ty, p) ->
+      let _, v, s = (* rename quantified var. to avoid name clashes *)
+        let fv = Sv.remove v (Sv.union (Term.fv t) (fv p)) in
+        Term.add_vars_simpl_env (Vars.of_set fv) [v]
+      in
+      let v = as_seq1 v in
+      let p, t = subst s p, Term.subst s t in
+
       pf ppf "@[<v>@[<hov 2>%a %a : %a =@ @[%a@] %a@]@]@ %a"
         (Printer.kws `ProcessKeyword) "let"
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) s)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
         Type.pp ty
         (Term._pp ~dbg) t
         (Printer.kws `ProcessKeyword) "in"
         doit p
 
-    | Exists (ss, f, p1, p2) ->
-      if ss = [] then
+    | Exists (vs, f, p1, p2) ->
+      let _, vs, s = (* rename quantified var. to avoid name clashes *)
+        let fv =
+          List.fold_left ((^~) Sv.remove) (Sv.union (fv p1) (Term.fv f)) vs
+        in
+        Term.add_vars_simpl_env (Vars.of_set fv) vs
+      in
+      let p1, f = subst s p1, Term.subst s f in
+      
+      if vs = [] then
         pf ppf "@[<hov>%a %a %a@;<1 2>%a"
           (Printer.kws `ProcessCondition) "if"
           (Term._pp ~dbg) f
@@ -249,7 +284,7 @@ let _pp ~dbg ppf (process : proc) =
       else
         pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
           (Printer.kws `ProcessCondition) "find"
-          (Utils.pp_list (Vars._pp ~dbg)) ss
+          (Utils.pp_list (Vars._pp ~dbg)) vs
           (Printer.kws `ProcessCondition) "such that"
           (Term._pp ~dbg) f
           (Printer.kws `ProcessCondition) "in"
