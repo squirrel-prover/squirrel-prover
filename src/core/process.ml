@@ -53,7 +53,7 @@ let tfold (f : 'a -> proc -> 'a) (a : 'a) (proc : proc) : 'a =
   match proc with
   | Apply _ 
   | Null    -> a
-    
+
   | New   (_,_,p  ) 
   | Out   (_,_,p  ) 
   | In    (_,_,p  )
@@ -88,13 +88,13 @@ let fv (proc : proc) : Sv.t =
     | New  (v,_,p)
     | In   (_,v,p)
     | Repl (v,p  ) -> Sv.remove v (doit fv p) 
-                            
+
     | Out (_,t,p) -> doit (Sv.union fv (Term.fv t)) p
-                            
+
     | Parallel (p1,p2) -> doit (doit fv p1) p2
-      
+
     | Set (_,l,t,p) -> doit (Sv.union fv (Term.fvs (t :: l))) p
-                         
+
     | Let (v,t,_,p) ->
       doit (Sv.union fv (Term.fv t)) p |>
       Sv.remove v
@@ -103,7 +103,7 @@ let fv (proc : proc) : Sv.t =
       let fv = doit (doit fv p1) p2 in
       let fv = Sv.union fv (Term.fv t) in
       List.fold_left ((^~) Sv.remove) fv vs
-      
+
     | Apply (_,args) -> Sv.union fv (Term.fvs args)
 
     | Null | Alias _ -> tfold doit fv proc
@@ -120,7 +120,7 @@ let subst (ts : Term.subst) proc =
     | In  (c, v , p) ->
       let v, ts = Term.subst_binding v ts in
       In  (c, v, doit ts p)
-        
+
     | Out (c, t , p) -> Out (c, Term.subst ts t, doit ts p)
 
     | Set (m, args, t, p) ->
@@ -167,12 +167,12 @@ let tsubst (ts : Type.tsubst) proc =
 
     | Exists (vs, t, p1, p2) ->
       Exists (List.map (Vars.tsubst ts) vs, Term.tsubst ts t, doit p1, doit p2)
-        
+
     | Apply (id,args) -> Apply (id, List.map (Term.tsubst ts) args) 
     | Alias _ | Null | Parallel _ -> tmap doit p
   in
   doit proc
-  
+
 (*------------------------------------------------------------------*)
 (** Pretty-printer *)
 let _pp ~dbg ppf (process : proc) = 
@@ -198,8 +198,8 @@ let _pp ~dbg ppf (process : proc) =
       in
       let v = as_seq1 v in
       let p = subst s p in
-      
-      pf ppf "@[<hov 2>!_%a@ @[%a@]@]"
+
+      pf ppf "@[<hv 2>!_%a@ %a@]"
         (Vars._pp ~dbg) v doit p
 
     | Set (s, args, t, p) ->
@@ -246,7 +246,7 @@ let _pp ~dbg ppf (process : proc) =
         doit p
 
     | Parallel (p1, p2) ->
-      pf ppf "@[<hov>@[(%a)@] |@ @[(%a)@]@]"
+      pf ppf "@[<hv>@[<hv>(%a)@] |@ @[<hv>(%a)@]@]"
         doit p1
         doit p2
 
@@ -258,7 +258,7 @@ let _pp ~dbg ppf (process : proc) =
       let v = as_seq1 v in
       let p, t = subst s p, Term.subst s t in
 
-      pf ppf "@[<v>@[<hov 2>%a %a : %a =@ @[%a@] %a@]@]@ %a"
+      pf ppf "@[<hov 2>%a %a : %a =@ @[%a@] %a@]@ %a"
         (Printer.kws `ProcessKeyword) "let"
         (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
         Type.pp ty
@@ -274,15 +274,15 @@ let _pp ~dbg ppf (process : proc) =
         Term.add_vars_simpl_env (Vars.of_set fv) vs
       in
       let p1, f = subst s p1, Term.subst s f in
-      
+
       if vs = [] then
-        pf ppf "@[<hov>%a %a %a@;<1 2>%a"
+        pf ppf "@[<hv>%a %a %a@;<1 2>%a"
           (Printer.kws `ProcessCondition) "if"
           (Term._pp ~dbg) f
           (Printer.kws `ProcessCondition) "then"
           doit p1
       else
-        pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
+        pf ppf "@[<hv>%a %a %a %a %a@;<1 2>%a"
           (Printer.kws `ProcessCondition) "find"
           (Utils.pp_list (Vars._pp ~dbg)) vs
           (Printer.kws `ProcessCondition) "such that"
@@ -296,8 +296,11 @@ let _pp ~dbg ppf (process : proc) =
       else
         pf ppf "@]"
   in  
-  Fmt.pf ppf "@[<hv 0>%a@]" doit process
+  Fmt.pf ppf "@[<hv>%a@]" doit process
 
+(* box [_pp]'s output *)
+let _pp ~dbg fmt p = Fmt.pf fmt "@[<hov> %a@]" (_pp ~dbg) p
+    
 let pp_dbg = _pp ~dbg:true
 let pp     = _pp ~dbg:false
 
@@ -355,16 +358,16 @@ type proc_decl = {
 type Symbols.data += Process_data of proc_decl
 
 let declare_nocheck table (name : Theory.lsymb) (pdecl : proc_decl) =
-    let data = Process_data pdecl in
-    let def = () in
-    let table, _ = Symbols.Process.declare_exact table name ~data def in
-    table
+  let data = Process_data pdecl in
+  let def = () in
+  let table, _ = Symbols.Process.declare_exact table name ~data def in
+  table
 
 let find_process table pname =
   match Symbols.Process.get_all pname table with
   | (), Process_data pdecl -> pdecl
   | _ -> assert false
-  (* The data associated to a process must be a [Process_data _]. *)
+(* The data associated to a process must be a [Process_data _]. *)
 
 let find_process_lsymb table (lsymb : lsymb) =
   let name = Symbols.Process.of_lsymb lsymb table in
@@ -376,7 +379,7 @@ let parse
     table ~(args : Theory.bnds) (projs : Term.projs) (process : Parse.t) 
   : proc_decl
   =
-  
+
   (* open a typing environment *)
   let ty_env = Type.Infer.mk_env () in
 
@@ -392,7 +395,7 @@ let parse
   in
   let cntxt = Theory.InProc (projs, Term.mk_var time) in
   let mk_cenv env = Theory.{ env; cntxt; } in
-  
+
   let rec doit (ty_env : Type.Infer.env) (env : Env.t) (proc : Parse.t) : proc =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -419,7 +422,7 @@ let parse
       let m, _ =
         Theory.convert ~ty_env ~ty:Type.tmessage (mk_cenv env) m 
       in
-      
+
       let p = doit ty_env env p in
       begin
         match L.unloc proc with
@@ -433,7 +436,7 @@ let parse
     | Parse.Set (s, l, m, p) ->
       let ty = Theory.check_state env.table s (List.length l) in
       let s = Symbols.Macro.of_lsymb s env.table in
-      
+
       let l =
         List.map (fun x ->
             fst @@ Theory.convert ~ty_env ~ty:Type.tindex (mk_cenv env) x
@@ -490,7 +493,7 @@ let parse
           )
           p.args args
       in
-      
+
       Apply (id, args)
   in
 
@@ -523,7 +526,7 @@ let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
     (Printer.kws `ProcessName) "process"
     pp_projs (L.unloc id) pp_args 
     pp_dbg pdecl.proc           (* TODO: dbg *)
-    
+
 (*------------------------------------------------------------------*)
 let declare
     (table : Symbols.table)
@@ -550,13 +553,13 @@ type p_env = {
 
   projs : Term.projs;
   (* valid projections for the process being parsed *)
-  
+
   alias : lsymb ;
   (* current alias used for action names in the process *)
 
   time : Vars.var;
   (* term variable representing the current time-point *)
-  
+
   indices : Vars.var list ;
   (* current list of bound indices (coming from Repl or Exists constructs) *)
 
@@ -615,7 +618,7 @@ let mk_namelength_statement
   let tvars = Term.mk_vars vars in
   (* build name term n *)
   let tn = Term.mk_name (Term.mk_symb n tyn) tvars in
-  
+
   (* cst hash is built from hash of output type of n : tyn *)
   let cst = Type.to_string tyn in
   let cst_hash = "namelength_" ^ cst in
@@ -727,12 +730,12 @@ let process_system_decl
     let free_unis = Vars.free_univars_list vs in
     let tsubst = tsubst_of_unis ?loc ty_env free_unis in
     List.map (Vars.tsubst tsubst) vs
-   in
-  
+  in
+
   (*------------------------------------------------------------------*)
   (* Register an action, when we arrive at the end of a block
      (input / condition / update / output). *)
-   (* FIXME: loc *)
+  (* FIXME: loc *)
   let register_action a output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = TConfig.strict_alias_mode (penv.env.table) in
@@ -782,7 +785,7 @@ let process_system_decl
 
           let close_univars = term_close_univars (* ~loc:(L.loc s) *) penv.ty_env  in
           (* FIXME: loc *)
-          
+
           (* close unification variables *)
           let t = close_univars t in
           let args = List.map close_univars args in
@@ -796,8 +799,8 @@ let process_system_decl
       | Some (c,t) ->
         let t = subst t in
         (* FIXME: old *)
-          (* Term.subst subst *)
-          (*   (conv_term penv action_term t Type.Message)  *)
+        (* Term.subst subst *)
+        (*   (conv_term penv action_term t Type.Message)  *)
 
         (* close unification variables *)
         let t = term_close_univars (* ~loc:(L.loc ti) *) penv.ty_env t in
@@ -829,7 +832,7 @@ let process_system_decl
     let table =
       if new_a <> a' then Symbols.Action.release table a' else table
     in
-    
+
     let new_action_term = 
       Term.mk_action new_a (Term.mk_vars action_descr.indices) 
     in
@@ -879,11 +882,11 @@ let process_system_decl
       let subst = 
         Term.ESubst (Term.mk_var pdecl.time, Term.mk_var ts) :: subst
       in
-      
+
       let penv =
         { penv with env = { penv.env with vars; };
-          alias = mk_dum a' ;   (* FIXME: loc *)
-          subst = subst }
+                    alias = mk_dum a' ;   (* FIXME: loc *)
+                    subst = subst }
       in
       (penv, pdecl.proc)
 
@@ -922,7 +925,6 @@ let process_system_decl
       (penv,p)
 
     | _ -> assert false
-
   in
 
   (*------------------------------------------------------------------*)
@@ -1283,7 +1285,7 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
   in
 
   let table = Lemma.add_depends_mutex_lemmas table system_name in
-  
+
   Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_dbg proc ;(* TODO: dbg *)
   Printer.pr "%a" System.pp_systems table;
   table
