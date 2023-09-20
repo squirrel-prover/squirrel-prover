@@ -321,7 +321,7 @@ let pp_error pp_loc_err fmt (loc,e) =
 
 exception Error of error
 
-let error ?loc e = raise (Error (odflt L._dummy loc,e)) (* FIXME: loc *)
+let error ?loc e = raise (Error (odflt L._dummy loc,e)) 
 
 (*------------------------------------------------------------------*)
 type proc_decl = {
@@ -702,9 +702,7 @@ let subst_macros_ts table l ts t =
         | _ -> Term.mk_macro is terms ts'
       end
 
-    | Name _ | Action _ | Var _ -> t
-
-    (* FIXME: use tmap in all cases *)
+    | Name _ | Action _ | Var _ 
     | App _ | Diff _ | Fun _ | Find _ | Quant _ 
     | Tuple _ | Proj _ -> Term.tmap doit t
   in
@@ -731,7 +729,6 @@ let process_system_decl
   (*------------------------------------------------------------------*)
   (* Register an action, when we arrive at the end of a block
      (input / condition / update / output). *)
-  (* FIXME: loc *)
   let register_action a output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = TConfig.strict_alias_mode (penv.env.table) in
@@ -786,9 +783,6 @@ let process_system_decl
         globals = penv.globals; 
         condition; updates; output; } 
     in
-
-    (* DBG *)
-    Fmt.epr "descr = %a@." Action.pp_descr_dbg action_descr ;
 
     Action.check_descr action_descr;
 
@@ -852,8 +846,8 @@ let process_system_decl
 
       let penv =
         { penv with env = { penv.env with vars; };
-                    alias = mk_dum a' ;   (* FIXME: loc *)
-                    subst = subst }
+                    alias = mk_dum a' ; 
+                    subst = subst; }
       in
       (penv, pdecl.proc)
 
@@ -863,7 +857,8 @@ let process_system_decl
 
       (* declare a new name symbol *)
       let table, nsymb =
-        let n_lsymb = mk_dum (Vars.name n_var) in (* FIXME: loc *)
+        let n_lsymb = mk_dum (Vars.name n_var) in
+        (* location not useful, declaration cannot fail *)
         Symbols.Name.declare penv.env.table n_lsymb ndef
       in
 
@@ -923,7 +918,8 @@ let process_system_decl
       let table, x' =
         let suffix = if in_update then `Large else `Strict in
         Macros.declare_global penv.env.table system_name
-          (L.mk_loc L._dummy (Vars.name x)) (* FIXME: loc *)
+          (L.mk_loc L._dummy (Vars.name x)) 
+          (* location not useful, declaration cannot fail *)
           ~suffix
           ~action:shape ~inputs:invars
           ~indices:(List.rev penv.indices) ~ts body ty
@@ -1211,9 +1207,6 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
       output    = (Symbols.dummy_channel, Term.empty);
       globals   = []; }
   in
-  (* DBG *)
-  Fmt.epr "descr = %a@." Action.pp_descr_dbg init_descr ;
-
   let table, _, _ =
     System.register_action table system_name init_descr
   in
