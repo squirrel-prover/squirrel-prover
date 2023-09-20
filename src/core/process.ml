@@ -554,8 +554,6 @@ let declare
 
 (** Type for data we store while translating a process as a set of actions. *)
 type p_env = {
-  ty_env : Type.Infer.env;
-
   projs : Term.projs;
   (** valid projections for the process being parsed *)
 
@@ -715,7 +713,7 @@ let subst_macros_ts table l ts t =
 
 (*------------------------------------------------------------------*)
 let process_system_decl
-    proc_loc (system_name : System.t) (init_table : Symbols.table)
+    _proc_loc (system_name : System.t) (init_table : Symbols.table)
     (init_projs : Term.projs) (ts, init_proc : Vars.var * proc)
   : proc * Symbols.table
   =
@@ -728,34 +726,6 @@ let process_system_decl
     let env = Vars.add_var ts Vars.Tag.ltag env in
     let env,dummy_in = Vars.make_local `Shadow env Type.Message "$dummy" in
     env,dummy_in
-  in
-
-  (* Close all type unification variables un [unis]. *)
-  let tsubst_of_unis ?loc ty_env (unis : Ident.Sid.t) : Type.tsubst =
-    Ident.Sid.fold (fun (u : Ident.t) tsubst ->
-        let ty = 
-          match Type.Infer.norm ty_env (Type.TUnivar (Type.to_univar u)) with
-          | Type.TUnivar _ -> 
-            let loc = odflt proc_loc loc in
-            error ~loc Freetyunivar
-          | ty -> ty
-        in
-        Type.tsubst_add_univar tsubst (Type.to_univar u) ty
-      ) unis Type.tsubst_empty
-  in
-
-  (* Close all type unification variables in term [t]. *)
-  let term_close_univars ?loc ty_env (t : Term.term) : Term.term =
-    let free_unis = Term.free_univars t in
-    let tsubst = tsubst_of_unis ?loc ty_env free_unis in
-    Term.tsubst tsubst t
-  in
-
-  (* Close all type unification variables in variables [vs]. *)
-  let vars_close_univars ?loc ty_env (vs : Vars.vars) : Vars.vars =
-    let free_unis = Vars.free_univars_list vs in
-    let tsubst = tsubst_of_unis ?loc ty_env free_unis in
-    List.map (Vars.tsubst tsubst) vs
   in
 
   (*------------------------------------------------------------------*)
@@ -794,46 +764,17 @@ let process_system_decl
        the process *)
     let condition =
       let vars = List.rev penv.evars in
-      let t = 
-        subst (Term.mk_ands penv.facts) 
-      in
-
-      (* close unification variables *)
-      let t = term_close_univars penv.ty_env t in
-      let vars = vars_close_univars penv.ty_env vars in
-
+      let t = subst (Term.mk_ands penv.facts) in
       (vars,t)
     in
 
     let updates =
-      List.map (fun (ms,args,t) ->
-          let t = subst t in
-
-          let close_univars = term_close_univars (* ~loc:(L.loc s) *) penv.ty_env  in
-          (* FIXME: loc *)
-
-          (* close unification variables *)
-          let t = close_univars t in
-          let args = List.map close_univars args in
-
-          ( ms, args, t)
-        ) penv.updates
+      List.map (fun (ms,args,t) -> ms, args, subst t) penv.updates
     in
 
     let output : Symbols.channel * Term.term =
       match output with
-      | Some (c,t) ->
-        let t = subst t in
-        (* FIXME: old *)
-        (* Term.subst subst *)
-        (*   (conv_term penv action_term t Type.Message)  *)
-
-        (* close unification variables *)
-        let t = term_close_univars (* ~loc:(L.loc ti) *) penv.ty_env t in
-        (* FIXME: loc *)
-
-        (c, t)
-
+      | Some (c,t) -> c, subst t
       | None -> Symbols.dummy_channel, Term.empty
     in
 
@@ -917,7 +858,6 @@ let process_system_decl
       (penv, pdecl.proc)
 
     | New (n_var, ty, p) ->
-      (* TODO: check that `ty` is closed, or stuff will break *)
       let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
       let ndef = Symbols.{ n_fty } in
 
@@ -977,17 +917,6 @@ let process_system_decl
       let body : Term.term =
         subst_macros_ts penv.env.table updated_states (Term.mk_var ts) t'
       in
-
-      (* TODO: this is insufficient, may remain type variable deeper *)
-      (* We check that we could infer ty by parsing [t] *)
-      let ty = match Type.Infer.norm penv.ty_env ty with
-        | Type.TUnivar _ -> error Freetyunivar
-        | _ as ty -> ty
-      in
-
-      (* Close all type unification variables un [body]. *)
-      let body = term_close_univars penv.ty_env body in
-      (* FIXME: used to be `~loc:(L.loc t)` *)
 
       let invars = List.map snd penv.inputs in
       let shape = Action.get_shape_v (List.rev penv.action) in
@@ -1227,8 +1156,7 @@ let process_system_decl
 
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =
-    { ty_env   = Type.Infer.mk_env ();
-      projs    = init_projs;
+    { projs    = init_projs;
       alias    = L.mk_loc L._dummy "A" ;
       indices  = [] ;
       time     = ts;
@@ -1245,10 +1173,6 @@ let process_system_decl
   let proc,_,table =
     p_in ~table:init_table ~penv ~pos:0 ~pos_indices:[] init_proc
   in
-
-  (* I believe this test is not useful *)
-  if not (Type.Infer.is_closed penv.ty_env) then 
-    error ~loc:proc_loc Freetyunivar;
 
   (proc, table)
 
