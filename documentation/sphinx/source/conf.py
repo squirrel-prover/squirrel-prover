@@ -31,7 +31,9 @@ extensions = [
     'sphinx_tabs.tabs', # Needs `pip install sphinx-tabs`
     'myst_parser', # Needs `pip install myst-parser`
     'sphinxcontrib.bibtex',
-    'squirreldomain'
+    'squirreldomain',
+    'sphinxcontrib.jquery',
+    'sphinx_search.extension'
 ]
 
 latex_additional_files = [

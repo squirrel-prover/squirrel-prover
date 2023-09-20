@@ -176,7 +176,6 @@ clean: ## Call dune clean and remove executable and coverage
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
-	rm -rf public
 
 # Clean last bench
 .PHONY: clean_bench

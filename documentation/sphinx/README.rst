@@ -14,7 +14,7 @@ for alternatives).
 Then with pip :
 
 .. code::
-   pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs\
+   pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs readthedocs-sphinx-search\
    antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
 You may want syntax coloration included in your generated

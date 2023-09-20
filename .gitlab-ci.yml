@@ -26,7 +26,7 @@ docbuild:
   script:
     - pip3 install -U pip
     - pip3 install sphinx
-    - pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
+    - pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser readthedocs-sphinx-search
 
 pages:
   stage: deploy
