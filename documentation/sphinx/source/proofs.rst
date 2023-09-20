@@ -411,23 +411,36 @@ called automatically after each tactic, unless the tactical
      if it determines that :g:`v` is deducible.
 
          
-.. _section-tacticals:
+.. _section-tactics:
 
-Tacticals
----------
+Tactics
+-------
 
 The full syntax of tactic combinations is as follows:
 
 .. prodn::
-   tactic ::=  @tactic; {*, @natural } @tactic
+   tactic ::=  @tactic; {? tac_selector} @tactic
+   | @tactic; [ {*| tac_selector @tactic} ]
    | @tactic + @tactic
    | by @tactic   
    | nosimpl @tactic
    | try @tactic
    | repeat @tactic
    | @tactic => {+ @intro_pat}
-   
-The semi-column :g:`;` is used for judgemential composition. The second tactic is applied to all sub-goals created by the first one, unless the indices of some sub-goals are specified. The :g:`+` combinator performs an or-else, i.e. tries applying the first tactic, and if that fails, applies the second one.
+   tac_selector ::= {*, @natural } :
+
+Tactic combinators behaves as follows:
+
+- the semi-column :g:`;` is used for judgemential composition. The
+  second tactic is applied to all sub-goals created by the first one,
+  unless the indices of some sub-goals are specified using a
+  :n:`@tac_selector`.
+- A different tactic can be applied to different sub-goals, for
+  example :n:`@tactic; [1: @tactic__1 | 3,4: @tactic__2]` applies
+  :n:`@tactic__1` to the first created sub-goal, and :n:`@tactic__2`
+  to the third and fourth sub-goals.
+- The :g:`+` combinator performs an or-else, i.e. tries applying the
+  first tactic, and if that fails, applies the second one.
 
 The remainder behaves as follows:
 
@@ -437,7 +450,7 @@ The remainder behaves as follows:
 
 .. tacn:: nosimpl @tactic
 
-  Call the given tactic without the subjudgement implicit use of simplifications.
+  Call the given tactic without the implicit use of simplifications.
   This can be useful to understand what's going on step by step.
   This is also necessary in rare occasions where simplifications are
   actually undesirable to complete the proof.
@@ -590,9 +603,9 @@ Common tactics
     generalized in the dependent variant (see :tacn:`generalize
     dependent`) before proceeding with the induction.
 
-    This tactic always behaves identically to the
-    induction tactic in the reachability goal
-    setting (also for equivalence goals),
+    This tactic always uses a strong induction principle (as opposed
+    to the :tacn:`induction` tactic, which performs a weak induction
+    when the conclusion is an equivalences).
   
 .. tacn:: destruct @hypothesis_id {? as @simpl_ip}
     
@@ -766,7 +779,7 @@ Common tactics
 .. tacn:: id
 
    The identity tactic, which does nothing. Sometimes useful when
-   using :ref:`tactic combinators<section-tacticals>`.
+   using :ref:`tactic combinators<section-tactics>`.
     
 
 .. tacn:: intro {+ @intro_pat}
@@ -1002,13 +1015,13 @@ Common tactics
 
 .. tacn:: expand {+, @macro_id | @macro_application }
     
-    Expand all occurences of the given macros in both the conclusion and hypotheses
-    of the goal, either fully specified with an action or simply a type
-    of macro.
+    Expand all occurences of the given macros in both the conclusion
+    and proof-context, either fully specified with an action or simply
+    a type of macro.
     
 .. tacn:: expandall
     
-    Expand all possible macros in the current goal's hypotheses and conclusion. 
+    Expand all possible macros in the current proof-context and conclusion. 
              
 
 .. tacn:: fa {|@position | {+, @fa_arg}}
@@ -1207,27 +1220,27 @@ Global tactics
 .. tace:: deduce {? @position}
    :name: deduce
 
-    :g:`deduce i` removes the :g:`i`'th element from the bi-frame when it can
-    be computed from the rest of the bi-frame. Without any argument, it
-    will remove the first element that can be dropped, if it
-    exists.
+   :g:`deduce i` removes the :g:`i`'th element from the bi-frame when it can
+   be computed from the rest of the bi-frame. Without any argument, it
+   will remove the first element that can be dropped, if it
+   exists.
 
-    Here, the fact that the bi-frame element :g:`u` can be computed
-    from the other bi-frame elements :g:`x,y,...` means that there
-    exists a context :g:`C` made of function applications such that
-    :g:`u` is equal to :g:`C[x,y,..]`.
+   Here, the fact that the bi-frame element :g:`u` can be computed
+   from the other bi-frame elements :g:`x,y,...` means that there
+   exists a context :g:`C` made of function applications such that
+   :g:`u` is equal to :g:`C[x,y,..]`.
 
-    This relies on some heuristical automated reasoning. Some properties on
-    macros are automatically exploited, e.g. that for any
-    timestamp :g:`t`, :g:`frame@pred(t)` allows to deduce
-    :g:`input@t`, all :g:`frame@t'` for :g:`t' < pred(t)`, as well as
-    the :g:`output@t'` for whenever :g:`exec@t'` is true.
+   This relies on some heuristical automated reasoning. Some properties on
+   macros are automatically exploited, e.g. that for any
+   timestamp :g:`t`, :g:`frame@pred(t)` allows to deduce
+   :g:`input@t`, all :g:`frame@t'` for :g:`t' < pred(t)`, as well as
+   the :g:`output@t'` for whenever :g:`exec@t'` is true.
 
-    .. todo::
-       Charlie: do we want an exhaustive description of the deduce algo?
-       
-       Adrien: without arguments, it removes all elements that can be
-       dropped I think.
+   .. todo::
+      Charlie: do we want an exhaustive description of the deduce algo?
+      
+      Adrien: without arguments, it removes all elements that can be
+      dropped I think.
 
 .. tace:: diffeq
     
@@ -1478,10 +1491,8 @@ Local tactics
    definition of the :term:`occurrence formula`). If both occurrence formulas are
    trivially false, then the goal is closed automatically.
     
-   .. warning::
-      A formal description of this tactic has not yet been given in any published work.
-
-
+   A formal description of this tactic has not yet been given in any
+   published work.
 
 .. tact:: gdh @hypothesis_id, @term
    :name: gdh
@@ -1502,8 +1513,8 @@ Local tactics
    :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
    (see the definition of the :term:`occurrence formula`).
 
-   .. warning::
-      A formal description of this tactic has not yet been given in any published work.
+   A formal description of this tactic has not yet been given in any
+   published work.
 
 .. tact:: collision
    :name: collision
