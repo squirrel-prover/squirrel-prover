@@ -48,7 +48,7 @@ using the following declaration:
     it has a finite cardinal for each :math:`\eta`;
   * a type is :gdef:`fixed` if its interpretation does not depend on :math:`\eta`;
   * a type is :gdef:`large` when random samplings over that type
-    (using :decl:`names <name>`) are such that two
+    (declared using :decl:`name <name>`) are such that two
     distinct names have a negligible probability of collision;
   * a type is :gdef:`name_fixed_length` if all :decl:`names<name>`
     over that type sample values of the same length (for a given
@@ -56,10 +56,10 @@ using the following declaration:
 
   Built-ins types come with the following type tags:
   
-  * :n:`message` is :g:`fixed, well_founded, named_fixed_length`
+  * :n:`message` is :g:`fixed`, :g:`well_founded`, :g:`name_fixed_length`
     and :g:`large`;
   * :n:`bool`, :n:`timestamp` and :n:`index` are
-    :g:`fixed, finite` and :g:`well_founded`.
+    :g:`fixed`, :g:`finite` and :g:`well_founded`.
 
 The parameter :math:`\eta` corresponds to the underlying security
 parameter used in security proofs.
@@ -73,8 +73,8 @@ parameter used in security proofs.
 Type variables and polymorphism
 -------------------------------
 
-Squirrel supports :gdef:`type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<op>`, :term:`goals<goal>`, ...).
-Type variables are identifier preceded by a
+Squirrel supports :gdef:`type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<op>`, :term:`lemmas<lemma>`, ...).
+Type variables are identifiers preceded by a
 single apostrophe, e.g. :g:`'x`.
 
 .. prodn::
@@ -121,7 +121,7 @@ in various ways.
   tag ::= const | glob | adv
   
 Currently, only a few different tags are supported. A tagged bound
-variable :g:`(x : t[tag])` restricts :g:`x` instantiations according
+variable :g:`(x : t[tag])` restricts :g:`x`'s instantiations according
 to :g:`tag`:
 
 - Tag :gdef:`const` requires that :g:`x` is a constant random variable,
@@ -132,9 +132,9 @@ to :g:`tag`:
   variable ; for example, this excludes any :term:`diff-term`
   (e.g. :g:`diff(s,t)`), or any term with system-specific macros
   (e.g. :g:`output@tau`).
-- Tag :gdef:`adv` forces the variable to be computable by a PTTM with
+- Tag :gdef:`adv` forces :g:`x` to be computable by a probabilistic polynomial Turing Machine (PPTM) with
   access to a dedicated randomness tape. This tag is used to define
-  adversarial functions, that can be seen as probabilist polynomial
+  adversarial functions, that can be seen as probabilistic polynomial
   time attackers.
 
 .. note::
@@ -149,7 +149,7 @@ Squirrel uses the following syntax for binders:
   binders ::= {* @binder }
 
 A bound variable :g:`x` without any attached type (i.e. using directly a
-:n:`@var_or_hole`) amounts to use a type hole :g:`(x:_)`,
+:n:`@var_or_hole`) amounts to using a type hole :g:`(x:_)`,
 which will have to be be inferred by Squirrel.
 
 .. note::
@@ -199,12 +199,12 @@ A term can be
 - the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
   (:n:`@term` must be a tuple with sufficiently many elements);
 - a macro term, see :term:`macro`;
-- an conditional :n:`if @term__b then @term__0 else @term__1` where
+- a conditional :n:`if @term__b then @term__0 else @term__1` where
   :n:`@term__b` must be of type :g:`bool`, and :n:`@term__0` and
   :n:`@term__1` must have the same type (for a conditional over messages,
   the :n:`else` branch can be omitted, which stands for :n:`else zero`);
 - a term with binders, see :token:`term_with_binders`;
-- a identifier, which must be bound by the context, and can refer to
+- an identifier, which must be bound by the context, and can refer to
   a :term:`logical variable <logical_var>`, an :decl:`operator<op>` or
   :decl:`abstract function<abstract>` symbol;
 - a :term:`diff-term` representing several probabilistic values which depend
@@ -217,8 +217,8 @@ enclosing a :token:`term` in parentheses yields a
 :token:`sterm`.
 
 .. note::
-   Since :cite:`bkl23hal`, terms do not necessarily represents
-   computable values.
+   Since :cite:`bkl23hal`, terms no longer necessarily represent
+   (PTIME) computable values.
    An example of a non PTIME-computable term is
    :g:`forall (x:message), x = f(x)`
    which tests whether :g:`f` is idempotent, something that is not
@@ -239,7 +239,7 @@ For example,
 :n:`fun (x:@type) => @term__body` is the function that maps a value
 :n:`x` of type :n:`type` to :n:`@term__body`.
 
-Universal or existential *quantification* are of the form 
+Universal or existential *quantifications* are of the form 
 :n:`@quantif @binders, @term`
 where :n:`@term` must be of type :g:`bool`.
 For example, one can write :g:`exists (x:message), fst(x) = zero`.
@@ -249,10 +249,10 @@ multiple nested constructs, e.g. :n:`fun x y => @term` stands for
 :n:`fun x => (fun y => @term)`.
 
 A :n:`find` performs a look-up through all values of a type, filtered
-according to some predicate, and returning some computation. E.g. if
+according to some predicate, and returning some computation. For instance, if
 :n:`@term__b` is of type :g:`bool` and :n:`@term__i` and :n:`@term__e`
 have the same type, then 
-:n:`find(x:@type)such that @term__b in @term__i else @term__e` 
+:n:`find (x:@type) such that @term__b in @term__i else @term__e` 
 looks for some :n:`x` of type :n:`type` such that
 :n:`@term__b`: if such a value exists, it returns :n:`@term__b`,
 otherwise it returns :n:`@term__e` (terms :n:`@term__b` and
@@ -278,7 +278,7 @@ In order to factorize common parts of such collections of alternatives,
 and factorize reasoning over them, Squirrel makes use of
 :gdef:`multi-terms<multi-term>`.
 A k-multi-term is a single syntactic object used to represent
-k alternative terms. The common parts of the terms is simply written
+k alternative terms. The common part of the terms is simply written
 as a term, and the distinct parts are expressed using the
 the :n:`diff` construct, see :term:`diff-terms<diff-term>`.
 The i-th :gdef:`projection` of a multi-term :g:`t` is obtained from :g:`t`
@@ -289,12 +289,12 @@ A :gdef:`bi-term` is a 2-multi-term.
 
 .. note::
   Currently, multi-terms are restricted to 2-multi-terms in most
-  parts of the system.
+  parts of Squirrel.
 
 There is no syntactic separation between terms and multi-terms: any
-Squirrel term can be a multi-terms (though syntactic checks are
-performed in some places when it is necessary that the user provides a
-single term to Squirrel).
+Squirrel term can be a multi-term (though syntactic checks are
+performed in some places, when it is necessary that the user provides a
+single term).
 
 Squirrel heavily uses multi-terms. Most notably, the equivalence
 between two terms :n:`t__1` and :n:`t__2` is written
@@ -310,9 +310,9 @@ Diff-terms
    diff_term ::= diff(@term, @term)
 
 :n:`diff(@term__1,@term__2)` is a :gdef:`diff-term <diff-term>`
-representing a diverging behavior between the *left* component
+representing a diverging behaviour between the *left* component
 :n:`@term__1` and the *right* component :n:`@term__2`.
-Currently, diff-terms can only have two components, hence can only be
+Currently, diff-terms can only have two components, hence they can only be
 used in bi-terms. 
 
 
@@ -329,7 +329,7 @@ Applied macros can occur in terms as follows:
    macro_application ::= @macro_id {* @term} @ @term
 
 The term :n:`@macro_id @term__1 ... @term_n @ @term__t` represents the
-application of macro symbol :n:`@macro_id` which arguments
+application of macro symbol :n:`@macro_id` to arguments
 :n:`@term__1 ... @term_n` at a time-point :n:`@term__t` (of type
 :g:`timestamp`).
 
@@ -355,7 +355,7 @@ Local formulas
 
 :gdef:`Local formulas <local formula>` are :term:`terms <term>` of
 type :g:`bool`. They correspond to the embedding of a lower-level
-logic inside using terms.  They can in particular be constructed using
+logic inside using terms. They can in particular be constructed using
 the following (standard and Squirrel-specific) logical constructs:
 
 .. prodn::
@@ -363,7 +363,7 @@ the following (standard and Squirrel-specific) logical constructs:
     | happens({+, @term}) 
 
 Boolean connectives for *local* formulas are :n:`&&, ||, =>, not`,
-where :n:`&&, ||, =>` are used with a right infix notation.
+where :n:`&&, ||, =>` are used with a right-associative infix notation.
 Concretely, these are all :term:`built-in<built-in>` function symbols.
    
 Not all time-points are actually scheduled in an execution trace.
@@ -402,7 +402,7 @@ A :gdef:`reachability atom` :n:`[@term]` holds if :n:`@term` evaluates to true w
 
 An :gdef:`equivalence atom` :n:`@equiv(@term__1,...,@term__n)` is formed
 from a sequence of 2-diff-terms. Its meaning is that the sequence of
-left projection of the diff-terms is computationally indistinguishable from
+left projections of the diff-terms is computationally indistinguishable from
 the sequence of right projections, i.e. any PPTM adversary has
 at most a negligible probability of distinguishing them.
 

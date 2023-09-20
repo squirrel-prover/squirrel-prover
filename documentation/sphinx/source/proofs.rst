@@ -8,9 +8,9 @@ Proofs
 
 The proof of a lemma is given after the lemma declaration,
 between the :g:`Proof` and :g:`Qed` markers.
-It consists in a list of tactics. The invokation of each
+It consists in a list of tactics. The invocation of each
 tactic modifies the proof state, which contains a list of goals to prove.
-Each goal is displayed as a judgement displaying its current state.
+Each goal is displayed as a judgement.
 Initially, the proof state consists of a single goal, as declared by the
 user. Each tactic then reduces the first goal of the proof state to
 an arbitrary number of new sub-goals. When no goal is left, the proof
@@ -30,12 +30,12 @@ local judgements and global judgements.
 Logical variables
 -----------------
 
-:gdef:`Logical variables<logical_var>` are free variables in a current goal. Such variables are implicitly quantified universally based on their type and tag.
+:gdef:`Logical variables<logical_var>` are free variables in a current goal. Such variables are implicitly quantified universally based on their type and tags.
 
 Hypotheses
 ----------
 
-Hypotheses are referred to by an hypothesis identifier :n:`@hypothesis_id`.
+Hypotheses are referred to by a hypothesis identifier :n:`@hypothesis_id`.
 
 .. prodn:: hypothesis_id ::= @ident
 
@@ -66,8 +66,8 @@ We now describe the various components of the judgement:
 * :g:`vars` are the judgement's term variables with their types and :term:`tags<tag>`;
 
 * each hypothesis is identified by its hypothesis identifier
-  (e.g. :g:`H_1, H_2`) and is either a global hypothesis whose body is
-  a :term:`global formula` or a local hypothesis whose body is a
+  (e.g. :g:`H_1, H_2`) and is either a global hypothesis, whose body is
+  a :term:`global formula`, or a local hypothesis, whose body is a
   :term:`local formula`;
 
 * :g:`conclusion` is a :term:`local formula`.
@@ -80,23 +80,22 @@ The general layout for a global judgement is similar to the local one except tha
 
  * :g:`currentSystem` is a :n:`@system_context`;
 
- * all hypotheses, as well as the goal, are :term:`global formulas<global formula>`.
+ * all hypotheses, as well as the conclusion, are :term:`global formulas<global formula>`.
 
-When the goal is a single :n:`equiv(@term,...,@term)` predicate,
+When the conclusion is a single :n:`equiv(@term,...,@term)` predicate,
 all the bi-terms that need to be proved equivalent are displayed as a
 numbered list.
 
 .. example:: Initial judgement for observational equivalence
 
-   Consider a goal for observational equivalence, where the
+   Consider a lemma for observational equivalence, where the
    frame is enriched with some public key, as follows:
 
    .. squirreldoc::
 
       global lemma [myProtocol] obs_equiv t : [happens(t)] -> equiv(frame@t, pk(sk))
 
-   When starting its proof, after doing :g:`intro H`, the lemma is
-   displayed as:
+   When starting its proof, after doing :g:`intro H`, the goal that the user must prove is displayed as:
 
    .. squirreldoc::
 
@@ -124,8 +123,8 @@ This is represented using the :token:`position` token.
 
 Many tactics expecting a term support term :gdef:`patterns<pattern>`,
 which are underspecified terms that can include term holes
-:g:`_`. Most tactic will match the pattern against
-sub-terms of the goal until it manages to infer values for the term
+:g:`_`. Most tactics will match the pattern against
+sub-terms of the current goal until it manages to infer values for the term
 holes.
 
 Term patterns are produced by appending to the production of
@@ -146,7 +145,7 @@ They are used in Squirrel with an SSReflect-inspired syntax.
 For a more comprehensive and detailed guide to introduction patterns, see
 `here <https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#introduction-in-the-context>`_.
 Note however that Squirrel supports only a sub-set of SSReflect intro
-patterns, and that their behavior in Squirrel may vary in small ways.
+patterns, and that their behaviour in Squirrel may vary in small ways.
 
 Introduction patterns take a different meaning depending
 on the tactic in which they are used
@@ -171,38 +170,41 @@ is :g:`forall x. G` or :g:`H => G` then the pattern will start by acting on
   
 A :gdef:`naming introduction pattern<naming ip>` :n:`@naming_ip` pops
 the top-most assumption or universally quantified variable of the
-focused formula and names it according to the pattern:
+focused formula and introduces it in the proof context,
+with a name chosen according to the pattern:
 
 * :n:`@ident`: using the name :n:`@ident` provided, which fails if
   :n:`@ident` is already in use;
-* :n:`?`: using a name automatically choosen by Squirrel;
-* :n:`_`: using an automatically choosen name for variables, and the
+* :n:`?`: using a name chosen automatically by Squirrel;
+* :n:`_`: using an automatically chosen name for variables, and the
   name :n:`_` for assumptions, which is a special name that can never
   be referred to by the user. Note that, contrary to other
-  :n:`@hypothesis_id`, several assumption may be named :n:`_`.
+  :n:`@hypothesis_id`, several hypotheses may be named :n:`_`.
 
 A :gdef:`and/or introduction pattern<and or ip>` :n:`@and_or_ip` will,
-for each focused formulas, destruct the top assumption of the formula:
+for each focused formula, destruct the top-most assumption of the formula:
 
-* :n:`[ @simpl_ip ... @simpl_ip ]`: the top assumption of the formula must
-  be a conjunction with as many conjunct as provided simple
-  patterns. Destruct the conjunction, handling each conjunct according
+* :n:`[ @simpl_ip ... @simpl_ip ]`: the top-most assumption of the formula must
+  be a conjunction with as many conjuncts as simple
+  patterns are provided.
+  Destruct the conjunction, handling each conjunct according
   to the corresponding :n:`@simpl_ip`.
 
-* :n:`[ @simpl_ip | ... | @simpl_ip ]`: the top assumption of the formula
-  must be a disjunction with as many disjunct as provided simple
-  patterns. Destruct the disjunction, creating a formula for
+* :n:`[ @simpl_ip | ... | @simpl_ip ]`: the top-most assumption of the formula
+  must be a disjunction with as many disjuncts as simple
+  patterns are provided.
+  Destruct the disjunction, creating a formula for
   each disjunct and handling each of them according to the
   corresponding :n:`@simpl_ip`.
 
 .. note::
-  Existentials are viewed as conjunctions in intro pattern.
+  Existentials are viewed as conjunctions in intro patterns.
   Hence, when the conclusion is of the form :g:`(exists x, phi) => psi`,
   the tactic `intro [x H]` will introduce a variable `x` and hypothesis
   `H : phi`. Here, the conjunctive intro pattern has been used to
   destruct the existentially quantified hypothesis during its introduction.
 
-A :gdef:`simplification items<simplification item>` :n:`@s_item`
+A :gdef:`simplification item<simplification item>` :n:`@s_item`
 simplifies the focused formulas:
 
 * :g:`//` removes all formulas on which :g:`auto` concludes;
@@ -210,15 +212,15 @@ simplifies the focused formulas:
 * :g:`//=` is short-hand for :g:`// /=`;
 
 A :gdef:`rewrite intro pattern item<rewrite ip item>` :n:`@rewrite_ip`
-uses the top assumption to rewrite the focused formulas. The top
+uses the top-most assumption to rewrite the focused formulas. The top
 assumption is cleared after rewriting.
 
-* :g:`->` reads the top assumption as a left-to-right rewrite rule.
-* :g:`<-` reads the top assumption as a right-to-left rewrite rule.
+* :g:`->` reads the top-most assumption as a left-to-right rewrite rule.
+* :g:`<-` reads the top-most assumption as a right-to-left rewrite rule.
 
 An :gdef:`expansion item<expansion item>` :n:`@expand_ip` expands definitions in the focused formulas:
 
-* :n:`@/@macro_id` expands the applications of the macro symbol
+* :n:`@/@macro_id` expands the applications of the macro symbol;
   :n:`@macro_id` whenever it is applied to a time-point that can be
   shown to happen;
 * :n:`@/@operator_id` expands the operator :n:`@operator_id`,
@@ -233,15 +235,15 @@ Proof terms
 
 Proof terms are used by several tactics (see e.g. :tacn:`have` or
 :tacn:`apply`) as a convenient way to combine and (partially) apply
-hypotheses, axioms or proved goals, in order to derive new facts.
+hypotheses, axioms or proved lemmas, in order to derive new facts.
 
 .. prodn::
    proof_term ::= @ident {* @pt_arg}
    pt_arg ::= @sterm_pat | @ident | (% @proof_term) | _
 
 In a :n:`@proof_term` or a :n:`@pt_arg`, an identifier :n:`@ident` must
-refer to an hypothesis in the current proof context, an axiom or a
-previously proved goal.
+refer to a hypothesis in the current proof context, an axiom or a
+previously proved lemma.
 
 Note that the grammar for proof term arguments :token:`pt_arg` is
 ambiguous (because of the :token:`ident` and :token:`sterm`
@@ -269,13 +271,13 @@ resolved into a local or global formula as follows:
 
   + :n:`@sterm_pat`: the top-most element of
     :n:`F` must be a universally quantified variable, which is then
-    substituted by :n:`@sterm_pat`, e.g. :n:`forall x, F0` is replaced
-    by :n:`(F0{x -> @sterm})`.  Moreover, a new term unification
+    substituted with :n:`@sterm_pat`, e.g. :n:`forall x, F0` is replaced
+    with :n:`(F0{x -> @sterm})`.  Moreover, a new term unification
     variable is created for each hole :n:`_` in :n:`@sterm_pat`.
 
   + :n:`@ident`: the top-most element of :n:`F`
     must be an assumption, which is popped and unified with the formula
-    corresponding to the hypothesis, axiom or proved goal identified
+    corresponding to the hypothesis, axiom or lemma identified
     by :n:`@ident`.
 
   + :n:`(% @proof_term)`: the proof-term argument
@@ -285,11 +287,11 @@ resolved into a local or global formula as follows:
   + :n:`_`: if :n:`F`'s top-most element is a universally quantified variable
     then a new unification variable is created and applied to :n:`F`.
     If :n:`F`'s top-most element is an assumption :n:`H`, a new sub-goal
-    requiring to prove :n:`H` is created and discharged to the user.
+    requiring to prove :n:`H` is created and must be discharged by the user.
 
 * Finally, depending on which tactic uses the proof-term, Squirrel
   checks that the term unification variables can all be inferred,
-  generalizes the term unification variables that remains, or leave
+  generalizes the term unification variables that remain, or leaves
   the term unification environment unclosed.
 
 .. todo::
@@ -300,13 +302,13 @@ resolved into a local or global formula as follows:
 In practice, the application of a proof-term argument is more complex
 than described above, for several reasons:
 
-* checks must be perfomed to ensure that compatibility of the systems
+* checks must be perfomed to ensure the compatibility of the systems
   corresponding to the applied formulas,
-  e.g. apply an axiom over system :g:`[any]`
-  to a formula applying over system :g:`[default]` is valid, but the
+  e.g. applying an axiom over system :g:`[any]`
+  to a formula over system :g:`[default]` is valid, but the
   converse is not;
 
-* some formula manipulation occurs when trying to mix global and local
+* some formula manipulations occur when trying to mix global and local
   formulas, e.g. when applying a global formula to a local formula.
 
 .. _reduction:
@@ -328,12 +330,12 @@ specified transformations are applied, as described next:
   - :g:`rw`: perform user-defined rewriting;
   - :g:`beta`: perform beta-reductions;
   - :g:`proj`: compute tuple projections;
-  - :g:`delta`: replace macros and operators by their definitions;
+  - :g:`delta`: replace macros and operators with their definitions;
   - :g:`constr`: automatically simplify trace formulas using
     constraint reasoning.
 
 The :g:`constr` transformation replaces trace (sub-)formulas that
-are provably equal to :g:`true` or :g:`false` by this value.
+are provably equal to :g:`true` or :g:`false` with that value.
 When doing so, the constraint solver takes into account
 the current hypotheses but also the conditionals that surround
 the trace formula.
@@ -353,7 +355,7 @@ called automatically after each tactic, unless the tactical
      
 .. tacn:: auto {? @simpl_flags}
 
-     Attempt to automatically prove a goal using the hypothesis.
+     Attempt to automatically prove a goal using the hypotheses.
 
      The tactic uses the :ref:`reduction engine <reduction>`
      with the provided flags (defaults to :g:`rw,beta,proj`).
@@ -375,16 +377,16 @@ called automatically after each tactic, unless the tactical
     The tactic uses the :ref:`reduction engine <reduction>`
     with the flags :g:`rw,beta,proj`.
 
-    When the conclusion of the goal is a conjuction, it splits this
+    When the conclusion of the goal is a conjunction, it splits the
     goal into several sub-goals, automatically closing only the trivial
-    goals closed by :tacn:`true` and :tacn:`assump`.
+    goals proved by :tacn:`true` and :tacn:`assump`.
 
     When the conclusion of the goal is a global formula which only contains
     a local formula, the goal is then turned into a local formula. Otherwise
-    this does nothing.
+    the tactic does nothing.
     
     Additionaly If the :term:`option` :g:`autoIntro` is set to true, introductions
-    are also made automically.
+    are also made automatically.
 
 
 
@@ -405,7 +407,7 @@ called automatically after each tactic, unless the tactical
      When the conclusion of the goal is an equivalence, the tactic
      will automatically perform :tacn:`fa` when at most one of the remaining
      sub-terms is non-deducible. It may thus remove a deducible item
-     from the equivalence, or replace an item :g:`<u,v>` by :g:`u`
+     from the equivalence, or replace an item :g:`<u,v>` with :g:`u`
      if it determines that :g:`v` is deducible.
 
          
@@ -425,17 +427,17 @@ The full syntax of tactic combinations is as follows:
    | repeat @tactic
    | @tactic => {+ @intro_pat}
    
-The semi-column :g:`;` is used for judgemential composition. The second tactical is then applied to all sub-goals created by the first one, unless number of sub-goals are specified. The :g:`+` performs a or-else when the first tactical fails.
+The semi-column :g:`;` is used for judgemential composition. The second tactic is applied to all sub-goals created by the first one, unless the indices of some sub-goals are specified. The :g:`+` combinator performs an or-else, i.e. tries applying the first tactic, and if that fails, applies the second one.
 
-The reminder behaves as follows:
+The remainder behaves as follows:
 
 .. tacn:: by @tactic
     
-   Fails unless the tactical closes the goal.
+   Fail unless the tactic closes the goal.
 
 .. tacn:: nosimpl @tactic
 
-  Call tactic without the subjudgement implicit use of simplications.
+  Call the given tactic without the subjudgement implicit use of simplifications.
   This can be useful to understand what's going on step by step.
   This is also necessary in rare occasions where simplifications are
   actually undesirable to complete the proof.
@@ -473,9 +475,9 @@ Tactics
 
 Tactics are organized in three categories:
 
- - :ref:`generic <section-generic-tactics>`, that rely on generic logical reasoning;
- - :ref:`structural <section-structural-tactics>`, that rely on properties of protocols and equality;
- - :ref:`cryptographic <section-crypto-tactics>`, that rely on
+ - :ref:`generic tactics <section-generic-tactics>`, that rely on generic logical reasoning;
+ - :ref:`structural tactics <section-structural-tactics>`, that rely on properties of protocols and equality;
+ - :ref:`cryptographic tactics <section-crypto-tactics>`, that rely on
    cryptographic assumptions.
 
 In addition, they are also split between tactics applicable to local
@@ -483,7 +485,7 @@ goals only, global goals only, or tactics common to both types of
 goals. Remark that applying a tactic to a local goal may produce a
 global sub-goal, and conversely.
 
-Additionaly, we also have a few :ref:`utility tactics <section-utility-tactics>` listed at the end.
+Additionally, there are a few :ref:`utility tactics <section-utility-tactics>` listed at the end.
 
 .. _section-generic-tactics:
 
@@ -503,7 +505,7 @@ Common tactics
 .. tacn:: assumption {? @hypothesis_id}
    :name: assump
       
-    Concludes if the goal (or :g:`false`) appears in the hypotheses. The
+    Conclude if the conclusion of the current goal (or :g:`false`) appears in the hypotheses. The
     hypothesis to be checked against may be directly specified using
     :n:`@hypothesis_id`.
 
@@ -512,11 +514,11 @@ Common tactics
     
    Perform a case analysis over the given argument:
    
-   - :n:`@hypothesis_id`: create on sub-goal for each disjunct of
+   - :n:`@hypothesis_id`: create one sub-goal for each disjunct of
      :n:`@hypothesis_id`;
    - :n:`@term_pat` a term of type :g:`timestamp`: create one sub-goal
-     for each possible :term:`action constructor<action constructor>` of the judgement current
-     system
+     for each possible :term:`action constructor<action constructor>` of the
+     current goal's system
      (all systems appearing in a judgement have the same set of actions,
      as they must be be compatible).
       
@@ -524,8 +526,8 @@ Common tactics
 .. tacn:: induction {? @term_pat}
 
    Apply the induction scheme to the conclusion. There are
-   several behaviours depending on the current type of the goal
-   and whether an argument given.
+   several behaviours depending on the type of the current goal
+   and whether an argument is given.
 
    For a reachability goal, if no argument is specified, the
    conclusion must start with a universal quantification over a
@@ -539,10 +541,10 @@ Common tactics
    and,
    
     - if a timestamp variable is given then, a weak induction is
-      performed over this variable as well as a case over all
+      performed over this variable as well as a case disjunction over all
       possible actions;
     - for any other term argument, the
-      tactic behave as in the reachability case.
+      tactic behaves as in the reachability case.
 
    The weak induction variant is in fact the most widely used tactic
    in current Squirrel examples to prove the observational equivalence
@@ -561,12 +563,13 @@ Common tactics
           ----------------------------------------
           0: frame@t
 
-       Calling :g:`induction t` will behave in apply the weak
-       induction and case, yielding as many goals as there are actions
+       Calling :g:`induction t` will apply the weak
+       induction and case disjunction,
+       yielding as many goals as there are actions
        in the protocol, plus one additional goal for the
        initialization. Assuming an action :g:`A` is in the protocol,
-       that has a total of 3 actions, a corresponding created sub-goal
-       will look like
+       that has a total of 3 actions, a sub-goal created for the case of :g:`A`
+       looks like
 
        .. squirreldoc::
 
@@ -587,13 +590,14 @@ Common tactics
     generalized in the dependent variant (see :tacn:`generalize
     dependent`) before proceeding with the induction.
 
-    This always behaves as the induction in the reachability goal
+    This tactic always behaves identically to the
+    induction tactic in the reachability goal
     setting (also for equivalence goals),
   
 .. tacn:: destruct @hypothesis_id {? as @simpl_ip}
     
-    Destruct an hypothesis based on its top-most connective
-    (existantial quantification, disjunction or conjunction), 
+    Destruct a hypothesis based on its top-most connective
+    (existential quantification, disjunction or conjunction), 
     applying the simple introduction pattern :n:`@simpl_ip` to it.
 
     :n:`@simpl_ip` defaults to :n:`?` if no pattern is provided by the user.
@@ -607,23 +611,23 @@ Common tactics
           destruct H as [H1 | [H2 H3]]
           
 
-       removes the :g:`H` hypothesis and creates two sub-goal,
+       removes the :g:`H` hypothesis and creates two sub-goals,
        one with the hypothesis :g:`H1:A`,
        the other with the hypotheses :g:`H2:B, H3:C`.
     
 .. tacn:: exists {* @term}
     
     :n:`exists @term__1 ... @term__n` uses the terms :n:`@term__1 ... @term__n` 
-    as witnesses to prove an existentially quantified goal.
+    as witnesses to prove an existentially quantified conclusion.
 
-    For example, :g:`exists t` transform a goal
+    For example, :g:`exists t` transforms the conclusion of a goal
     :n:`(exists x, phi)` into :n:`(phi{x -> t})`.
     
 .. tacn:: generalize {+ @term_pat} {? as {+ @variable}}
    :name: generalize    
 
    :n:`generalize @term_pat` looks for an instance :n:`@term` of
-   :n:`@term_pat` in the goal. Then, replace all occurrences of :n:`@term`
+   :n:`@term_pat` in the goal. Then, it replaces all occurrences of :n:`@term`
    by a fresh universally quantified variable
    (automatically named, or :n:`@variable` if provided).
 
@@ -631,8 +635,8 @@ Common tactics
    :name: generalize dependent
     
    Same as :n:`generalize`, but also generalize in the proof context.
-   All hypotheses in which generalization occured are pushed back into the
-   goal before the newly added quantified variables.
+   All hypotheses in which generalization occurred are pushed back into the
+   conclusion before the newly added quantified variables.
 
 .. tacn:: have @have_ip : {|@term|@global_formula}
    
@@ -645,13 +649,13 @@ Common tactics
 
    If :n:`@have_ip` is the introduction pattern :n:`@s_item__pre @simpl_ip @s_item__post` then:
 
-   * the simplification item :n:`@s_item__pre` is applied to the *goal*
+   * the simplification item :n:`@s_item__pre` is applied to the *conclusion*
      before adding the hypothesis;
 
    * the simple intro-pattern :n:`@simpl_ip` is applied to introduce the
      *new hypothesis* :n:`F`;
 
-   * the simplification item :n:`@s_item__post` is applied to the *goals*
+   * the simplification item :n:`@s_item__post` is applied to the *conclusions*
      after adding the hypothesis.
 
    It there are mutliple pre or post simplification items, they are
@@ -667,7 +671,7 @@ Common tactics
 
    :n:`have @have_ip := @proof_term` :ref:`resolves <section-pt-resolution>` 
    :n:`@proof_term` --- requiring that the term unification
-   enviroment is closed --- and process the resulting formula using introduction
+   enviroment is closed --- and processes the resulting formula using introduction
    pattern :n:`@have_ip`.
         
 .. tacn:: apply @proof_term
@@ -676,29 +680,34 @@ Common tactics
    Backward reasoning tactic.
    First, :n:`@proof_term` is :ref:`resolved <section-pt-resolution>` as a
    formula :n:`F__pt`
-   --- without closing the term unification enviroment. 
-   Then, unify it with the goal, and finally closes the term
-   unification environment.
+   --- without closing the term unification environment. 
+   Then, it is unified with the conclusion, and finally the term
+   unification environment is closed.
 
-   If the unification of :n:`F__pt` with the goal fails, introduces
-   the top-most element of :n:`F__pt` as described below and then try again to unify with
-   the goal:
+   If the unification of :n:`F__pt` with the conclusion fails, the tactic
+   introduces
+   the top-most element of :n:`F__pt` as described below, and then tries
+   again to unify with
+   the conclusion:
    
-   * if it is a variable (i.e. :n:`F__pt = forall x, F`), introduces a new term
-     unification variable :n:`x` and continue from :n:`F`;
+   * if it is a variable (i.e. :n:`F__pt = forall x, F`), it
+     introduces a new term
+     unification variable :n:`x` and continues from :n:`F`;
 
-   * if it is an assumption (i.e. :n:`F__pt = G => F`), discharge the
-     assumption :n:`G` as a new sub-goal and continue from :n:`F`.
+   * if it is an assumption (i.e. :n:`F__pt = G => F`), the
+     assumption :n:`G` is discharged as a new sub-goal,
+     and the tactic continues from :n:`F`.
 
 .. tacn:: apply @proof_term in @hypothesis_id
 
    Forward reasoning variant of :tacn:`apply`, which unifies the
    premisses of :n:`@proof_term` against the conclusion of
-   :n:`@hypothesis_id`, replacing :n:`@hypothesis_id` content by
-   :n:`@proof_term` conclusion.
+   :n:`@hypothesis_id`, replacing :n:`@hypothesis_id` content with
+   :n:`@proof_term`'s conclusion.
 
-   E.g., if :n:`H1:A=>B` and :n:`H2:A` then :g:`apply H1 in H2` replaces
-   :n:`H2:A` by :n:`H2:B`. 
+   For instance, if :n:`H1:A=>B` and :n:`H2:A`, then :g:`apply H1 in H2`
+   replaces
+   :n:`H2:A` with :n:`H2:B`. 
 
 .. tacn:: rewrite {* @rw_arg} {? in @rw_target}
     
@@ -706,12 +715,13 @@ Common tactics
                rw_item ::= {? {| {? @natural} ! | ?}} {? <-} {| (@proof_term) | /@ident | /( @infix_op) | /*}
                rw_target ::= {| @hypothesis_id | *}
        
-   Applies a sequence of :term:`rewriting <rewrite ip item>` and :term:`simplification
+   Apply a sequence of :term:`rewriting <rewrite ip item>`
+   and :term:`simplification
    <simplification item>` items to the rewrite target, which is:
     
    * the hypothesis :n:`@hypothesis_id` if :n:`rw_target = @hypothesis_id`;
    * all hypotheses if :n:`rw_target = @hypothesis_id`;
-   * the goal if no specific rewrite target is given.
+   * the conclusion if no specific rewrite target is given.
 
    :gdef:`Rewrite items <rewrite item>` are applied as follows:
 
@@ -726,18 +736,18 @@ Common tactics
      + Then, Squirrel tries to unify :n:`l` with a sub-term of the
        rewrite target, where :n:`x1...xn` are handled as term
        unification variables. If it succeeds, all occurrences of the
-       matched instance of :n:`l` are replaced by the corresponding
+       matched instance of :n:`l` are replaced with the corresponding
        instantiation of :n:`r`.
       
      + The term unification environment is closed, and new sub-goals are created 
        for the instantiated assumptions :n:`H1,...,Hn`.
 
-   * expansion items :n:`/@ident` and :n:`/( @infix_op)`: try to expand the corresponding
+   * expansion items :n:`/@ident` and :n:`/( @infix_op)` tries to expand the corresponding
      symbol (see :term:`expansion item`), while :n:`/*` tries to
      expand all possible symbols;
 
-   * :n:`!` apply the rewrite item as many times as possible, but at least once,
-     while :n:`(@natural !)` apply the rewrite item exactly :n:`@natural` times.
+   * :n:`!` applies the rewrite item as many times as possible, but at least once,
+     while :n:`(@natural !)` applies the rewrite item *exactly* :n:`@natural` times.
      :n:`?` behaves as :n:`!`, except that the rewrite item may be applied zero times.
      Otherwise, the rewrite item must be applied exactly once.
 
@@ -747,7 +757,7 @@ Common tactics
     
    .. exn:: nothing to rewrite
    
-      No instance of the rewrite rule were found
+      No instance of the rewrite rule were found.
     
    .. exn:: max nested rewriting reached
     
@@ -756,7 +766,7 @@ Common tactics
 .. tacn:: id
 
    The identity tactic, which does nothing. Sometimes useful when
-   writing :ref:`tacticals<section-tacticals>`.
+   using :ref:`tactic combinators<section-tacticals>`.
     
 
 .. tacn:: intro {+ @intro_pat}
@@ -771,9 +781,9 @@ Common tactics
 
 .. tacn:: reduce {? @simpl_flags}
 
-     Reduce all terms in a sub-goal, working on both hypotheses and conclusion.
+     Reduce all terms in a goal, working on both hypotheses and conclusion.
      
-     This tactic always succeeds, replacing the initial sub-goal with a
+     This tactic always succeeds, replacing the initial goal with a
      unique sub-goal (which may be identical to the initial one).
 
      The tactic uses the :ref:`reduction engine <reduction>`
@@ -782,14 +792,14 @@ Common tactics
 .. tacn:: remember @term_pat
 
     :tacn:`remember` behaves as :tacn:`generalize`, except that it adds
-    as an hypothesis the equality between the generalized term and the
+    as a hypothesis the equality between the generalized term and the
     new variable.
       
        
 .. tacn:: revert {* @hypothesis_id}
     
     Remove the hypotheses from the proof context, and add them back
-    into the goal.
+    into the conclusion of the goal.
 
     For example, running :n:`revert H` on the judgement
     :n:`H : F, Γ ⊢ conc` yields :n:`Γ ⊢ F => conc`.
@@ -809,8 +819,8 @@ Common tactics
 .. tacn:: split
     
     Split a conjunction goal, creating one sub-goal per conjunct.
-    For example, :tacn:`split` replace the goal :n:`⊢ F && G && H`
-    by the three goals :n:`⊢ F`, :n:`⊢ G` and :n:`⊢ H`.
+    For example, :tacn:`split` replaces the goal :n:`⊢ F && G && H`
+    with the three goals :n:`⊢ F`, :n:`⊢ G` and :n:`⊢ H`.
        
 .. tacn:: use @hypothesis_id {? with {+ @term}} {? as @simpl_ip}
    :name: use     
@@ -820,7 +830,7 @@ Common tactics
    new hypothesis.
 
    .. warning::
-      This tactics is a deprecated (and less powerful) variant of the
+      This tactic is a deprecated (and less powerful) variant of the
       :tacn:`have` tactic (with the :n:`have @have_ip := @proof_term`
       form).
       
@@ -830,7 +840,7 @@ Local tactics
 .. tact:: true
    :name: true    
     
-   Closes a goal when the conclusion is (syntactically) :g:`true`. 
+   Close a goal when the conclusion is (syntactically) :g:`true`. 
 
       
 Global tactics
@@ -838,30 +848,30 @@ Global tactics
 
 .. tace:: byequiv
     
-   Transform an global judgement :n:`⊢ [F]` into a local judgement
+   Transform a global judgement :n:`⊢ [F]` into a local judgement
    :n:`⊢ F`.
 
 .. tace:: constseq @position: {+ (fun @binders => @term) @term}
 
-   Simplifies a sequence at the given :n:`@position` when it only
+   Simplify a sequence at the given :n:`@position` when it only
    contains a finite number of possible values :g:`v_1`,..., :g:`v_i`
    depending on the value of the sequence variable.
 
    Given a sequence over a variable of a given type, the arguments
    passed must be of the form :g:`(fun_1 v_1) ... (fun_i v_i)`, where
-   all the :g:`fun` function must be binders over the sequence type
+   all the :g:`fun` functions must be binders over the sequence type
    and must return a boolean.  This tactic creates two sub-goals
    asking to prove the two required properties of the arguments and
    sequence:
 
-   * All the functions must be such that over an input element one
-     and only one of the function return true.
+   * All the functions must be such that for any given input element,
+     exactly one of the functions returns true.
    * The sequence is then expected to be equal to the value of `v_i`
      for all input elements such that fun_i is true.
 
    .. example::  Constseq one or zero
 
-      Consider the following conclusion goal :g:`0:
+      Consider the following conclusion for a global goal :g:`0:
       seq(t':timestamp=>(if (t' < t) then one))` (assuming that
       :g:`t'` is a free :g:`timestamp` variable).
 
@@ -895,8 +905,8 @@ Global tactics
              
 .. tace:: enrich {+, @term}
     
-    Enrich the equivalence goal with the given terms.
-    Note that this changes the number of items in the equivalence, and
+    Enrich the conclusion of an equivalence goal with the given terms.
+    Note that this changes the positions of items in the equivalence, and
     if added before other tactics may break later references.
 
 .. tacn:: localize @hypothesis as @simpl_ip
@@ -905,7 +915,7 @@ Global tactics
     :n:`[@term]` to a local hypothesis :n:`@term`, and applies the
     given simple introduction pattern :n:`@simpl_ip` to the new hypothesis.
 
-    For example, turns :n:`[F],G ⊢ H` into :n:`F,G ⊢ H`.
+    For example, the tactic turns :n:`[F],G ⊢ H` into :n:`F,G ⊢ H`.
        
 .. tace:: memseq
     
@@ -918,9 +928,9 @@ Global tactics
 
 .. tace:: refl
     
-    Closes a symmetric goal. Cannot apply if the goal contains
+    Close a goal by reflexivity. Cannot apply if the goal contains
     variable or macros, as those may have different left and right
-    behaviors.
+    behaviours.
 
 .. tace:: sym
     
@@ -935,23 +945,23 @@ Global tactics
 
 .. tace:: splitseq @position: (fun @binders => @term)
     
-   Splits a sequence according to some boolean test, replacing the
-   sequence by two subsequence.
+   Split a sequence according to some boolean test, replacing the
+   sequence with two subsequences.
 
-   The function passed as argument must be a function taking as
-   argument a variable of the same type as the sequence and must
+   The function passed as argument must be take as
+   argument a variable of the same type as the sequence, and must
    return a boolean.
 
    .. example:: Splitting a sequence
       
-      Called over a conclusion of the form :g:`0: seq(x:message =>
+      Called in a goal with a conclusion of the form :g:`0: seq(x:message =>
       value)`, the tactic:
 
       .. squirreldoc::
 
          splitseq 0: (fun y:message => some_test)
 
-      replaces the conclusion by:
+      replaces the conclusion with:
 
       .. squirreldoc::
 
@@ -975,7 +985,7 @@ Common tactics
 
      Attempt to conclude by automated reasoning on trace literals.
      Literals are collected from hypotheses, both local and global,
-     after the destruction of conjunctions (but no case analyses are
+     after the destruction of conjunctions (but no case analysis is
      performed to handle conjunctive hypotheses). If the conclusion
      is a trace literal then it is taken into account as well.
 
@@ -983,8 +993,7 @@ Common tactics
 .. tacn:: depends @timestamp, @timestamp
     
     If the second action depends on the first action, and if the second
-    action happened, add the corresponding timestamp
-    inequality.
+    action happens, then add the corresponding timestamp inequality.
 
     .. exn:: Not dependent
 
@@ -993,13 +1002,13 @@ Common tactics
 
 .. tacn:: expand {+, @macro_id | @macro_application }
     
-    Expand all occurences of the given macros in both the goal and the
-    proof context, either fully specified with an action or simply a type
+    Expand all occurences of the given macros in both the conclusion and hypotheses
+    of the goal, either fully specified with an action or simply a type
     of macro.
     
 .. tacn:: expandall
     
-    Expand all possible macros in the judgement. 
+    Expand all possible macros in the current goal's hypotheses and conclusion. 
              
 
 .. tacn:: fa {|@position | {+, @fa_arg}}
@@ -1008,20 +1017,20 @@ Common tactics
    .. prodn::
       fa_arg ::= {? {| ! | ?}} @term_pat
 
-   Applying the function application rule, simplifying the goal by
+   Apply the function application rule, simplifying the goal by
    removing the head function symbol, as follows:
    
    * in a local goal with conclusion :g:`f u = f v`, the conclusion is
-     replaced with :g:`u=v`. This produces as many sub-goals as argument
+     replaced with :g:`u=v`. This produces as many sub-goals as there are arguments
      of the head function symbol. For a local goal, the tactic takes no
      arguments.
-   * in a global goal, replace :g:`f(u1,...,un)` with :g:`u1,...,un`.
+   * in a global goal, :g:`f(u1,...,un)` is replaced with :g:`u1,...,un`.
 
      
    In the global goal setting, the target can be selected with its
    :n:`@position`, or using a :n:`@fa_arg`, which behave as follow:
 
-   * :g:`fa` :n:`@term_pat` selection the first position in the equivalence
+   * :g:`fa` :n:`@term_pat` selects the first position in the equivalence
      that matches :n:`@term_pat`.
    * :g:`fa !t` repeats the function application as many times
      as possible, but at least once.
@@ -1054,8 +1063,8 @@ Local tactics
 
    Attempt to conclude by automated reasoning on message (dis)-equalities.
    Equalities and disequalities are collected from hypotheses, both local 
-   and global, after the destruction of conjunctions (but no case analyses 
-   are performed to handle conjunctive hypotheses). If the conclusion
+   and global, after the destruction of conjunctions (but no case analysis 
+   is performed to handle conjunctive hypotheses). If the conclusion
    is a message (dis)-equality then it is taken into account as well.
 
 .. tact:: const @variable
@@ -1064,7 +1073,7 @@ Local tactics
 
    The variable must be of a finite and fixed (η-independent) type,
    and must not appear in any global hypothesis (some global
-   hypotheses may be localized (see :tacn:`localize`) if necessary.
+   hypotheses may be localised (see :tacn:`localize`) if necessary.
 
 .. tact:: eqnames
     
@@ -1076,7 +1085,7 @@ Local tactics
 
 .. tact:: eqtrace
 
-    Add terms constraints resulting from timestamp and index
+    Add term constraints resulting from timestamp and index
     equalities. 
 
     Whenever :g:`i=j` or :g:`ts=ts'`, we can substitute one by another
@@ -1088,9 +1097,9 @@ Local tactics
     timestamps. 
 
     Given as input a timestamp :g:`ts`, this tactic produces two new
-    sub-goal, requiring to prove that :g:`happens(ts)` holds and that
+    sub-goals, requiring to prove that :g:`happens(ts)` holds and that
     :g:`exec@ts` also holds. The fact that :g:`(forall (t:timestamp),
-    t <= ts => exec@t)` is added to the current goal.
+    t <= ts => exec@t)` is added as a hypothesis to the current goal.
 
 
 .. tact:: project
@@ -1103,19 +1112,19 @@ Local tactics
     Use an equivalence to rewrite a reachability goal.
 
     First, try to resolve :n:`@proof_term` as an equivalence
-    :g:`equiv (diff(u,v))`. Then, Squirrel tries to find a context :g:`C`
+    :g:`equiv (diff(u,v))`. Then, try to find a context :g:`C`
     that does not contain any :decl:`names<name>`, :term:`diff-terms<diff-term>`
     or :term:`macro terms<macro>` such that the current local goal :g:`phi` is
     convertible with :g:`C[u]`. If such a context is found, the current goal is
     is changed to :g:`C[v]`.
 
     If a :g:`-` sign is added in front of :n:`@proof_term`, the
-    rewriting occurs in the other direction, replacing :g:`v` by
+    rewriting occurs in the other direction, replacing :g:`v` with
     :g:`u`.
 
     .. example:: Hash rewrite
 
-       Consider the following judgement
+       Consider the following goal.
 
        .. squirreldoc::
           [goal> Focused goal (1/1):
@@ -1127,8 +1136,8 @@ Local tactics
 
        Assuming we have been able to prove that two hashes are
        indistinguishable from names, we have hypothesis :g:`H`. We
-       then use :g:`H` to replace the hashes by names in our current
-       goal, where we want to prove that the two hashes are not equal.
+       then use :g:`H` to replace the hashes with names in the conclusion
+       of the goal, where we want to prove that the two hashes are not equal.
 
        Calling :g:`rewrite equiv H` produces the new goal:
        
@@ -1147,18 +1156,18 @@ Local tactics
 .. tact:: smt
    :name: smt    
     
-    Tries to discharge the current goal using an SMT solver. 
+    Try to discharge the current goal using an SMT solver. 
       
 
 .. tact:: subst @term, @term
 
     If :g:`x = t` where :g:`x` is a variable, then :g:`subst x, t`
-    substitutes all occurences of :g:`x` by :g:`t` and remove :g:`x`
+    substitutes all occurrences of :g:`x` with :g:`t` and removes :g:`x`
     from the :term:`logical variables <logical_var>`.
 
     .. exn:: Unequal arguments
 
-       Terms given as arrgument are not equal.
+       Terms given as argument are not equal.
        
     
     
@@ -1208,7 +1217,7 @@ Global tactics
     exists a context :g:`C` made of function applications such that
     :g:`u` is equal to :g:`C[x,y,..]`.
 
-    This rely on some heuristical automated reasoning. Some properties on
+    This relies on some heuristical automated reasoning. Some properties on
     macros are automatically exploited, e.g. that for any
     timestamp :g:`t`, :g:`frame@pred(t)` allows to deduce
     :g:`input@t`, all :g:`frame@t'` for :g:`t' < pred(t)`, as well as
@@ -1222,9 +1231,9 @@ Global tactics
 
 .. tace:: diffeq
     
-   Closes a reflexive goal up to equality. That is, if all diff-term
-   whitin the global goal always evaluate to the same value in all
-   systems, the diff-equivalence holds. For each diff-term, a
+   Close a reflexive goal up to equality. That is, if all diff-term
+   whitin the global goal's conclusion always evaluate to the same value in all
+   systems, the equivalence holds. For each diff-term, a
    dedicated sub-goal is created.
       
    .. warning:: This tactic is still at an experimental development
@@ -1241,9 +1250,9 @@ probabilistic properties of random samplings and primitives.
 Occurrence formula
 ~~~~~~~~~~~~~~~~~~
 
-Several reasonings imply to be able to track how a given name is
+Several reasoning techniques require tracking how a given name is
 used. For instance, if the name :g:`n` does not occur at all in term
-:g:`t`, then :g:`n=t` is false with overwelming probability. To apply
+:g:`t`, then :g:`n=t` is false with overwhelming probability. To apply
 a cryptographic assumption relying on a secret key, one needs to check
 that all occurrences of the secret key are valid (i.e. correspond
 to the key argument of the corresponding primitive).
@@ -1251,7 +1260,7 @@ to the key argument of the corresponding primitive).
 Over macro-free terms, collecting occurrences is simply equivalent to
 looking at the subterms. However, if some macros occur in :g:`t`,
 typically :g:`input@ts` or :g:`output@ts`, we need to look through all
-the actions that may have happened before :g:`ts` to look for our
+the actions that may have happened before :g:`ts` to look for
 occurrences.
 
 We define here how to build an :gdef:`occurrence formula` that will be
@@ -1263,7 +1272,7 @@ is possible that :g:`n` occurs in :g:`t` without following one of the
 allowed pattern of `pats`:
 
 * whenever :g:`t` contains as a subterm an occurrence :g:`n` that does
-  not follow any of the allowed patterns :g:`pats`, the formula is
+  not match any of the allowed patterns :g:`pats`, the formula is
   :g:`true`.
 * whenever :g:`t` contains a :ref:`system-defined
   macro<section-system-macros>`, :g:`macro@ts`, if `ts` is a concrete
@@ -1273,7 +1282,7 @@ allowed pattern of `pats`:
   pattern, and the formula :g:`A1<=ts` is added to the conjunction of
   :g:`occurs(n,t,pats)`.
 
-Occurs is of course generally defined for indexed names that may
+:g:`occurs` is of course generally defined for indexed names that may
 occur in indexed actions.
 
 .. example:: Basic name occurrence
@@ -1333,19 +1342,19 @@ This formula may be imprecise, for example due to states.
 
 
 We define a precise variant :g:`precise_occurs(n,t,pats)`, that tracks
-more precisly the usages of the states, and also adds the condition
+more precisely the usages of the states, and also adds the condition
 that the correct value of the state is revealed if a state can contain
 an occurrence of :g:`n`.
 
 We also generalize occur to allow for collecting multiple name
-occurrences at once, useful when we want to allow patterns depending on
+occurrences at once, which is useful when we want to allow patterns depending on
 two names at once (see e.g. :tacn:`gdh` or :tacn:`ddh`).
 
 .. todo::
    Adrien: how name occurrences are computed is quite complicated, and
    more involved than what is described here I think (conditions,
    source terms, occurrences below bound variables, fold-macro-support
-   shenanigans, ...)
+   shenanigans and tomfoolery, ...)
 
    I think we need to settle ourselves for an intuitive description
    with examples, while making clear that this is a partial
@@ -1368,14 +1377,19 @@ Common tactics
       Adrien: could not finish reading. A note:
       I see no mention of the `large` assumption on types.
    
-   In a local goal, called over an hypothesis of the form :g:`t=n` for
-   some name :g:`n` over a current goal formula :g:`phi`, turns the
-   goal into a formula :g:`occur(n,t,none) => phi` (see the
+   In a local goal with conclusion :g:`phi`,
+   the tactic may be called on a hypothesis of the form :g:`t=n` for
+   some name :g:`n` sampled over a type with tag :g:`large`.
+   For such a sampling, if term :g:`t` is computed without knowing :g:`n`,
+   this equality can only hold with negligible probability.
+   We may thus assume that :g:`n` occurs in :g:`t`.
+   Accordingly, the tactic turns the conclusion
+   into the formula :g:`occur(n,t,none) => phi` (see the
    definition of the :term:`occurrence formula`).
 
    If one can then prove that :g:`n` cannot occur in :g:`t`, that is
-   that :g:`occur(n,t,none)` is false, it then allows to close
-   the goal. If :g:`occur(n,t,none)` is trivially false, e.g. if
+   that :g:`occur(n,t,none)` is false, that new conclusion trivially holds.
+   If :g:`occur(n,t,none)` is trivially false, e.g. if
    :g:`t` is a macro-free term without :g:`n` as a subterm, the goal
    will be directly closed.
 
@@ -1383,11 +1397,11 @@ Common tactics
    .. example:: Name leak
 
       Consider a small process :g:`in(c,x); A : out(c,x);in(c,x); B:
-      out(c,n)`, where we want to prove that :g:`input@A <>
+      out(c,n)`, where we wish to prove that :g:`input@A <>
       n`. Intuitively, this holds as :g:`n` is only revealed after
-      :g:`A` has occured.
+      :g:`A` has occurred.
 
-      The judgement corresponding to this proof will look like this:
+      The goal corresponding to this proof will look like this:
 
       .. squirreldoc::
          [goal> Focused goal (1/1):
@@ -1397,7 +1411,7 @@ Common tactics
          ----------------------------------------
          false
 
-      And calling :g:`fresh Eq` turns the judgement into:
+      Calling :g:`fresh Eq` turns the goal into:
 
       .. squirreldoc::
          [goal> Focused goal (1/1):
@@ -1409,12 +1423,19 @@ Common tactics
 
       Here, Squirrel automatically deduced that :g:`n` can only occur
       inside :g:`input@A` if the output of :g:`B` happened before
-      :g:`A`. Here, one would conclude by using the fact that in the
+      :g:`A`. One would conclude by using the fact, according to the
       process definition, this is impossible.
       
-   In an equivalence goal, the tactic must be applied to a bi-frame
-   element :g:`i` of the form :g:`diff(nL,nR)`.  If we denote by
-   :g:`bf` the bi-frame, the bi-frame element is then replaced by
+   In an equivalence goal, on the other hand, the tactic must be applied to a bi-frame
+   element :g:`i` of the form :g:`diff(nL,nR)`, where :g:`nL`, :g:`nR` are names
+   sampled over the same type.
+   Since samplings are independent, the two names are indistinguishable,
+   unless some information on them is revealed by the rest of the bi-frame.
+   Note that, contrary to the local case, that property holds even if the type
+   is not :g:`large`.
+
+   If we let :g:`bf` denote the bi-frame, the :g:ì`th 
+   bi-frame element is replaced by the tactic with
 
    .. squirreldoc::
       if not(diff(occur(nL,bf,i : diff(nL,nR)),occur(nR,bf,i : diff(nL,nR)))) then
@@ -1422,8 +1443,8 @@ Common tactics
       else
         diff(nL,nR)
 
-   We specify through the occur formula that the only possible
-   occurrence of nL is in fact the one we are currently looking at.
+   We specify through the occurrence formula that the only possible
+   occurrence of :g:`nL` is in fact the one we are currently looking at.
 
    In all cases, the :g:`precise_ts` makes the tactic use
    `precise_occur` instead of `occur`.
@@ -1437,46 +1458,52 @@ Local tactics
 .. tact:: cdh @hypothesis_id, @term
    :name: cdh
 
-   This tactic applies the Computational Diffie-Helman assumption (see
-   e.g. :cite:`okamoto2001gap`), stating that given two groups elents
-   :math:`g^a` and :math:`g^b` it is difficult to compute :math:`g^{ab}`.
+   This tactic applies the Computational Diffie-Hellman assumption (see
+   e.g. :cite:`okamoto2001gap`), stating
+   for a generator :math:`g` and randomly sampled exponents :math:`a` and :math:`b`,
+   it is computationally hard to compute :math:`g^{ab}`
+   when only :math:`g^a` and :math:`g^b` are known.
 
-   A cdh, ddh or gdh :term:`group declaration <group declaration>` must have been
-   specified. For a group with generator :g:`g` and exponentiation
-   :g:`^`, calling :g:`cdh M, g` over a message equality :g:`M` of the
-   form `t=g^{a b}` will replace the current goal :g:`phi` by
+   A :g:`cdh`, :g:`ddh` or :g:`gdh`
+   :term:`group declaration <group declaration>` must have been
+   specified (the DDH or GDH assumptions indeed both imply the CDH assumption).
+   For a group with generator :g:`g` and exponentiation
+   :g:`^`, the tactic :g:`cdh M, g` may be called in a local goal on
+   a message equality hypothesis :g:`M` of the form `t=g^{a b}`.
+   Following the CDH assumption, :g:`M` can only hold if :g:`t`
+   accesses :g:`a` or :g:`b` in some way other than :g:`g^a` and :g:`g^b`.
+
+   Therefore, the tactic will replace in the current goal the conclusion :g:`phi` with
    :g:`occur(a,t,g^a) || occur(b,t,g^b) => phi` (see the
-   definition of the :term:`occurrence formula`). If :g:`a`
-   and :g:`b` only occur as :g:`g^a` and :g:`g^b`, the goal is then
-   closed automatically.
+   definition of the :term:`occurrence formula`). If both occurrence formulas are
+   trivially false, then the goal is closed automatically.
     
    .. warning::
-      This is a work in progress, a formal description of the rule is pending.
+      A formal description of this tactic has not yet been given in any published work.
 
-   .. todo::
-      why is it WIP?
+
 
 .. tact:: gdh @hypothesis_id, @term
    :name: gdh
 
-   This tactic applies the gap Diffie-Hellman assumption (see
+   This tactic applies the Gap Diffie-Hellman assumption (see
    e.g. :cite:`okamoto2001gap`), which is similar to CDH over :math:`g^a`
-   and :math:`g^b` but the attacker is also allowed to access an oracle
-   testing equality to :math:`g^{ab}`. It also includes the square GDH
-   variant (see :cite:`fujioka2011designing`), equivalent to the GDH
+   and :math:`g^b`, except that the attacker is additionally allowed to access an oracle
+   testing equality to :math:`g^{ab}`. It also includes the Square-GDH
+   variant (see :cite:`fujioka2011designing`), which is equivalent to the GDH
    assumption for prime order groups, where the attacker can also test
    equality to :math:`g^{aa}` and :math:`g^{bb}`.
 
-   A gdh :term:`group declaration <group declaration>` must have been
+   A :g:`gdh` :term:`group declaration <group declaration>` must have been
    specified.
 
-   The behaviour of the tactic is similar to :tacn:`cdh`, expect that
-   the current goal :g:`phi` is replaced by a more permissive formula
+   The behaviour of this tactic is similar to :tacn:`cdh`, expect that
+   the current goal's conclusion :g:`phi` is replaced with a more permissive formula
    :g:`occur((a,b),t,(g^a,g^b,_=g^(ab), _=g^(bb), _=g^(aa)) => phi`
    (see the definition of the :term:`occurrence formula`).
 
    .. warning::
-      This is a work in progress, a formal description of the rule is pending.       
+      A formal description of this tactic has not yet been given in any published work.
 
 .. tact:: collision
    :name: collision
@@ -1487,13 +1514,13 @@ Local tactics
    (see e.g. the cr2-kk assumption from
    :cite:`goldwasser1996lecture`).
     
-   Collects all equalities between hashes occurring at toplevel in
-   message hypotheses, that is all hypothesis of the form
-   :g:`h(u,k)=h(v,k)`, and for each such hypothesis it adds as new
+   It collects all equalities between hashes occurring at top-level in
+   message hypotheses, that is all hypotheses of the form
+   :g:`h(u,k)=h(v,k)`, and for each such hypothesis adds as new
    hypothesis :g:`u=v`.
 
-   As this supports the known-key variant of collision resistance,
-   there is no side condition checked here over the hash key.
+   As this implements the known-key variant of the collision resistance assumption,
+   no side condition is checked on the hash key.
 
    Latest formal Squirrel description: :cite:`bkl23hal` (only as an example).       
 
@@ -1503,20 +1530,23 @@ Local tactics
    Requires either a :term:`hash function` or a :term:`signature
    scheme` declaration.
 
-   This tactic applies the UF-CMA axiom, either for keyed-hashes or
+   This tactic applies the EUF-CMA axiom in a local goal, either for keyed-hashes or
    signatures. (see e.g. :cite:`goldwasser1996lecture`)
 
    For a hash function :g:`h(x,k)`, one may call :g:`euf M` over a
    message equality :g:`M` of the form :g:`t = h(m,k)` or
-   :g:`h(m,k)=t`.  The tactic then create a first new sub-goal asking
-   to prove that the key is only used in correct position, that is a
-   goal with conclusion :g:`not(occur(k,goal,h(_,k))` (see the
-   definition of the :term:`occurrence formula`).  The tactics then
-   collects all possible occurrence of honest hash :g:`h(u,k)` inside
-   :g:`t`, and for each of them, creates a sub-goal with a new
-   hypothesis stating that :g:`m=u`. If such an occurrence happens
-   under a macro, the goal will state that the computation must have
-   happened before.
+   :g:`h(m,k)=t`. EUF-CMA then states that, provided
+   the key :g:`k` is always used in correct position,
+   :g:`M` can only hold if computing :g:`t` requires already knowing the hash of :g:`m`.
+   Accordingly, the tactic creates a first new sub-goal asking
+   to prove that the key is only used in correct position, i.e.
+   a sub-goal with conclusion :g:`not(occur(k,goal,h(_,k))` (see the
+   definition of the :term:`occurrence formula`).
+   The tactic then collects all possible occurrence of a honest hash :g:`h(u,k)` inside
+   :g:`t`, and for each of them, creates a sub-goal with the original conclusion
+   and a new hypothesis stating that :g:`m=u`. Moreover, if the occurrence is
+   under a macro, additional new hypotheses will state that these macros must be taken
+   at an earlier timestamp than :g:`t`.
 
    .. example:: Basic hashing
     
@@ -1531,23 +1561,23 @@ Local tactics
       
          system (!_i out(c,h(n,k)) | in(c,x);out(c,x)).
 
-      Calling :g:`euf` over an hypothesis of the form :g:`input@tau <>
-      h(m,k)` would add n the fact that :g:`h(m,k)` needs to be equal
+      Calling :g:`euf` over a hypothesis of the form :g:`input@tau <>
+      h(m,k)` would add the fact that :g:`h(m,k)` needs to be equal
       to one of the honestly computed hashes appearing in
       :g:`input@tau`, which are all of the form :g:`h(n,k)`. The new
-      hypothesis would then be equal to
+      hypothesis would then be:
 
       .. squirreldoc::
         (exists (i:index), A(i) < tau && m = n)
    
    For a signature function :g:`sign(x,r,k)`, public key :g:`pk(k)`
-   and check function :g:`check(s,m,pub)`, :g:`euf` must be called
-   over an hypothesis of the form :g:`check(s,m,pk(k))`. The behaviour
-   is then similar to the hash case, honest signatures that may occur
-   in s will be collected, and :g:`m` must be equal to one of the
-   honestly signed message. A sub-goal for each possible honest signing
+   and verification function :g:`check(s,m,pub)`, :g:`euf` must be called
+   on a hypothesis of the form :g:`check(s,m,pk(k))`. The behaviour
+   is then similar to the hash case: honest signatures that may occur
+   in :g:`s` will be collected, and :g:`m` must be equal to one of the
+   honestly signed messages. A sub-goal for each possible honest signing
    case is created, as well as a sub-goal specifying that the key is
-   correctly used, that is, a goal with conclusion
+   correctly used, i.e. with conclusion
    :g:`not(occur(k,goal,sign(_,k), pk(k))`.
     
    Latest formal Squirrel description: :cite:`bkl23hal`.
@@ -1555,16 +1585,20 @@ Local tactics
 .. tact:: intctxt @hypothesis_id
    :name: intctxt
     
-   This tactics applies the INT-CTXT assumption (see
-   e.g. :cite:`bellare2000authenticated`).
+   This tactic applies the INT-CTXT assumption (see
+   e.g. :cite:`bellare2000authenticated`) in a local goal.
 
-   It requires the declaration of a :term:`symmetric encryption`.
+   It requires the declaration of a :term:`symmetric encryption` scheme.
    
-   It can be applied to an hypothesis either of the form
+   It can be applied to a hypothesis either of the form
    :g:`dec(c,k)<>fail` or :g:`dec(c,k) = t` (in the latter case,
-   generates as an additional goal that `t <> fail`).
+   it will generate as an additional proof obligation that `t <> fail`).
 
-   In both cases, Squirrel will collect all honest encryptions made
+   The INT-CTXT assumption then states that, provided the key :g:`k`
+   is correctly used, such a decryption may only succeed if
+   :g:`c` was produced by an honest encryption.
+
+   In both cases, Squirrel will thus collect all honest encryptions made
    with key :g:`k`, and produce a subogal corresponding to each case
    where :g:`c` is equal to one of those honest encryptions.
 
@@ -1573,7 +1607,7 @@ Local tactics
    created when it is not trivially true (see the definition of the
    :term:`occurrence formula`).
 
-   In additition, a goal asking to prove that all randomness used for
+   In addition, a goal asking to prove that all randomness used for
    encryption are disjoint and fresh (when it is not trivially true).
 
    Latest formal Squirrel description: :cite:`bdjkm21sp`.      
@@ -1585,26 +1619,25 @@ Global tactics
 .. tace:: cca1 @position
    :name: cca1
     
-   This tactics applies the IND-CCA assumption (see
-   e.g. :cite:`bellare2000authenticated`).
+   This tactic applies the IND-CCA assumption (see
+   e.g. :cite:`bellare2000authenticated`) in a global goal.
 
    It requires the declaration of a :term:`symmetric encryption` or
-   an :term:`asymmetric encryption`.
+   :term:`asymmetric encryption` scheme.
 
-   The tactic can be called over a bi-frame element containing a term of
+   The tactic may be called over a bi-frame element containing a term of
    the form :g:`C[enc(n, r, m)]`, where
         
-   • :g:`r` must be a name which is fresh;
-   • there is no decryption in :g:`C`
-   • there is no universal message variable that occurs
-   • :g:`m` is  a key  or a public key such that the key
-     only appear in key position, under :g:`pk`, :g:`dec` or
+   • :g:`r` must be a fresh name;
+   • there is no decryption in :g:`C`;
+   • no universal message variable occurs;
+   • :g:`m` is  a key  or a public key that 
+     only appears in key position, i.e. under :g:`pk`, :g:`dec` or
      :g:`enc`.    
 
-
    The tactic will then replace the encryption occurrence by an
-   encryption of zeroes, yielding :g:`C[enc(zeroes( len(n)), r,
-   pk(k))]`.
+   encryption of a bitstring of zeroes of the correct length,
+   yielding :g:`C[enc(zeroes(len(n)), r, pk(k))]`.
 
 
    In addition, the tactic creates a sub-goal asking to prove that all
@@ -1619,7 +1652,7 @@ Global tactics
 
    In the symmetric case, an additional sub-goal is created ensuring
    that all encryptions are made with distinct fresh randoms (and not
-   that just the encryption we are looking at is fresh).
+   just the the encryption we are looking at).
 
    Latest formal Squirrel description::cite:`bkl23hal`.  
     
@@ -1628,11 +1661,13 @@ Global tactics
 
 
    This tactic applies the Decisional Diffie-Helman assumption (see
-   e.g. :cite:`okamoto2001gap`), stating that given two groups elents
-   :math:`g^a` and :math:`g^b` it is difficult to distinguish :math:`g^{ab}`
-   from a fresh :math:`g^c`.
+   e.g. :cite:`okamoto2001gap`), stating that for a generator :math:`g`,
+   and randomly sampled exponents :math:`a`, :math:`b`, :math:`c`, it
+   is computationally hard to distinguish :math:`g^{ab}` from :math:`g^c`,
+   when only :math:`g^a` and :math:`g^b` are known.
+   
 
-   A ddh :term:`group declaration <group declaration>` must have been
+   A :g:`ddh` :term:`group declaration <group declaration>` must have been
    specified.
 
    When calling, :g:`ddh g,a,b,k`, the goal must contain only diff
@@ -1651,20 +1686,20 @@ Global tactics
    used to encrypt the plaintext. It is based on the IK-CPA notion of
    :cite:`bellare2001key`.
 
-   The tactic can be called over a bi-frame element containing a term of
+   The tactic can be called on a bi-frame element containing a term of
    the form :g:`C[enc(n, r, m)]`, where
         
-   • :g:`r` must be a name which is fresh;
-   • there is no decryption in :g:`C`
-   • there is no universal message variable that occurs
-   • :g:`m` is either a key or the diff of two keys, such that the
-     keys only appear in key position, under :g:`pk`, :g:`dec` or
-     :g:`enc`.
-   • If :g:`m` is a key, and a key has been given as argument to the
-     tactic, this key must also occur only in key position.
+   • :g:`r` must be a fresh name;
+   • there is no decryption in :g:`C`;
+   • no universal message variable occurs;
+   • :g:`m` is either a key or the diff of two keys, that
+     only appear in key position, i.e. under :g:`pk`, :g:`dec` or
+     :g:`enc`;
+   • if :g:`m` is a key, and a second key has been given as argument to the
+     tactic, that key must also occur only in key position.
 
-   When :g:`m` is the diff of a key, the diff is simplified by keeping
-   only the key on the left. When :g:`m` is just a key, a new key by
+   When :g:`m` is the diff of two keys, the diff is simplified by keeping
+   only the key on the left. When :g:`m` is just one key, a new key with
    which it is replaced can be specified as arugment.
    
    .. example:: Basic ENC-KP application
@@ -1680,11 +1715,11 @@ Global tactics
       .. squirreldoc::
          i: enc(n,r,pk(k1))
 
-   The tactic expects as argument:
+   The tactic expects as arguments:
    
-   • the number identifying the bi-frame element;
-   • optional: the encryption term over which to apply the tactic;
-   • optional: the new key by which to replace the key.
+   • the position identifying the bi-frame element;
+   • optional: the encryption term on which to apply the tactic;
+   • optional: the new key with which to replace the key.
 
 
    .. example:: Switching key with ENC-KP
@@ -1720,13 +1755,13 @@ Global tactics
    the :term:`occurrence formula`) is trivially false. (or
    :g:`occur(k,bi-frame,(pk(k), dec(_,k))`) for the asymmetric case).
 
-   When it is not trivially true, a sub-goal is created to prove the
+   When it is not trivially true, a sub-goal is created, asking to prove the
    freshness of the random used in the encryption, with the conclusion
    :g:`occur(r,bi-frame,enc(n,r,m))`.
 
    In the symmetric case, an additional check is performed ensuring
    that all encryptions are made with distinct fresh randoms (and not
-   that just the encryption we are looking at is fresh).
+   just the encryption we are looking at).
    
    Latest formal Squirrel description::cite:`bdjkm21sp`.
       
@@ -1734,25 +1769,25 @@ Global tactics
    :name: prf
 
    This tactic applies the PRF assumption (see
-   .e.g. :cite:`goldwasser1996lecture`).
+   e.g. :cite:`goldwasser1996lecture`).
 
    It requires a :term:`hash function` declaration.
 
    This tactic applied to a bi-frame element containg a hash
-   application :g:`h(m,k)` tries to replace the hash value by a fresh
-   name, under the conditions that it is the first time that this
-   specific hash value is hashed and that the key is correctly used.
+   application :g:`h(m,k)` tries to replace the hash value with a fresh
+   name, under the condition that :g:`m` has never been hashed before,
+   and that the key :g:`k` is correctly used.
 
 
    Formally, when called over a bi-frame element :g:`i : C[h(m,k)]`,
-   the tactic replaces in the current goal the element by :g:`i :
-   C[nPRF]` where :g:`nPRF` a newly generated unique name. It in
-   additions produces sub-goal requiring to prove the side
-   conditions. It notably produces a goal asking to prove that the key
-   is only used in key position, that is that
+   the tactic replaces in the current goal the element with :g:`i :
+   C[nPRF]` where :g:`nPRF` is a newly generated unique name. It in
+   addition produces sub-goals requiring to prove the side
+   conditions described above. It notably produces a goal asking to prove that the key
+   is only used in key position, i.e. that
    :g:`occur(k,bi-frame,h(_,k))` is false (see the definition of the
    :term:`occurrence formula`). In addition, it creates for each
-   occurrences of :g:`h(t,k)` within the bi-frame (that may occur under
+   occurrence of :g:`h(t,k)` within the bi-frame (that may occur under
    macros) a sub-goal asking to prove that :g:`t <> m`, that is, that
    :g:`m` was never hashed before. Such sub-goals may need to be
    created separately for both projections of the bi-frame.
@@ -1776,12 +1811,12 @@ Global tactics
       :g:`diff(output@A,p)`, which after expanding output is
       :g:`diff(h(n,k),p)`.
 
-      This replaces in the current goal the hash occurrence by
+      This replaces in the current goal the hash occurrence with
       :g:`diff(n_PRf,p)`, and creates a sub-goal asking to prove that
       the hash message :g:`n` is different from any possible
       previously hashed message. Here, the only other possible hash
       would occur in :g:`frame@pred(A)`, in the output of :g:`B` if it
-      occured before :g:`A`. The created sub-goal then ask to prove
+      occurred before :g:`A`. The created sub-goal then asks to prove
       that :g:`[B < A => n <> m]`.
 
 
@@ -1802,14 +1837,14 @@ Global tactics
    .. squirreldoc::
       if occur(n,bi-frame, i : C[n XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)
 
-   This new term then allow to drop the old term only if :g:`n` and
-   :g:`t` do have the same length (otherwise the one time pad does not
-   work), and if this is the only occurrence of :g:`n` in the
+   This new term then allows us to drop the old term only if :g:`n` and
+   :g:`t` do have the same length (as the one time pad does not work otherwise),
+   and if this is the only occurrence of :g:`n` in the
    bi-frame.
 
    When multiple XOR occur in the bi-frame, one can specify one or two
    optional term patterns, to specify in any order the name :g:`n` or
-   the full xored term :g:`n XOR t` to target.    
+   the full XOR-ed term :g:`n XOR t` to target.    
 
    Latest formal Squirrel description: :cite:`bdjkm21sp`.
 
@@ -1821,14 +1856,14 @@ Utility tactics
 
 .. tacn:: help {? {|@tacn|concise}}
     
-    When used without argument, display all available commands. It can
-    also display the details for the given tactic name, or display or
-    more concise list. It is a tactic and not a command, it can only
+    When used without arguments, display all available commands.
+    The tactic can  also display the details for a given tactic name, or display or
+    more concise list. It is a tactic and not a command, and as such can only
     be used inside proofs.
 
 .. tacn:: lemmas
     
-    Print all axioms and proved goals. This is usefull to know which lemmas can
+    Print all axioms and proved lemmas. This is useful to know which lemmas can
     be used through the :tacn:`use` or :tacn:`apply` tactics.
 
 

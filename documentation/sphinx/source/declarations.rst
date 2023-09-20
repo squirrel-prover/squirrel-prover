@@ -32,7 +32,7 @@ Names are used to model random samplings.
   .. squirreldoc::
      axiom [any] namelength_n : [len (n) = namelength_message]
 
-  It states that all name have the same length, given by a constant.
+  It states that all names have the same length, given by a constant.
   
   It is required that the indexing type :n:`@type__i` is a
   :term:`finite` type, but there are no restrictions over the sampling type
@@ -65,7 +65,7 @@ If needed, their behaviour can be restricted further through
 
 .. decl:: abstract @fun_id {? [@tvar_params]} : @type
 
-  Declares a deterministic and polynomial-type computable abstract
+  Declares a deterministic and polynomial-time computable abstract
   function of type :n:`@type` and named :n:`@fun_id`.
 
   The function can be :ref:`polymorphic<section-polymorphism>` 
@@ -129,7 +129,7 @@ with built-in axiomatizations.
   as a built-in.
 * :n:`happens(@term)`, :n:`pred(@term)` and :n:`init` are three
   function symbols dealing with the :term:`timestamp` type. Each model
-  instantiates the set of timestamps by specifying which one happens
+  instantiates the set of timestamps by specifying which ones actually happen
   on the given trace, and for all the ones that happen, their total
   ordering, :n:`init` refering to a fixed first timestamp and
   :n:`pred` being the predecessor function.
@@ -143,13 +143,13 @@ with built-in axiomatizations.
 * The successor function over natural numbers `succ`.
 * The pairing function :n:`pair` (also noted :n:`<x,y>`) with
   its projection functions :n:`fst` and :n:`snd`.
-* A length function for the number of bits in messages, :n:`len`, as well as a function producing a bitstring of zeroes of the same length as the input, :n:`zeroes`.
+* A length function for the number of bits in a message, :n:`len`, as well as a function producing a bitstring of zeroes of the same length as its input, :n:`zeroes`.
    
 
 Cryptographic functions
 -----------------------
 
-Squirrel allows to declare functions modeling standard
+Squirrel allows to declare functions modelling standard
 :gdef:`cryptographic functions <cryptographic function>` with
 associated cryptographic assumptions.
 
@@ -157,7 +157,7 @@ associated cryptographic assumptions.
    crypto_ty_arg ::= @ident : @type
    
 Types over which the cryptographic functions operate can be specified
-using :n:`@crypto_ty_arg`, where :n:`@ident:@type` state that argument
+using :n:`@crypto_ty_arg`, where :n:`@ident:@type` states that the argument
 named :n:`@ident` is of type :n:`@type`. See the declarations below for 
 a description of which argument names can be provided for each tactic.
 If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
@@ -182,7 +182,7 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
       
    declares a :gdef:`signature scheme` with types :g:`tym` for
    messages to be signed, :g:`tysig` for signatures, :g:`tysk` for
-   secret keys and :g:`typk` for public keys.
+   secret signing keys and :g:`typk` for public verification keys.
    It is assumed unforgeable against
    chosen message attacks (EUF-CMA) and satisfying the equation
    :g:`ver(sig(m,sk),m,pk(sk)) = true`.
@@ -196,8 +196,8 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
      
    declares an :gdef:`asymmetric encryption` scheme with types
    :g:`typtxt` for plain-texts, :g:`tyctxt` for cipher-texts,
-   :g:`tyrnd` for encryption randomness, :g:`typk` for public keys and
-   :g:`typk` for public keys.
+   :g:`tyrnd` for encryption randomness, :g:`tysk` for secret decryption keys and
+   :g:`typk` for public encryption keys.
    It is assumed IND-CCA1 and ENC-KP, and satisfying the equation
    :g:`dec(enc(m,pk(sk)),sk) = m`.
       
@@ -323,7 +323,7 @@ declaration.
 
 Processes are then built from prefixes using parallel composition,
 (indexed) replication and conditionals, as well as other common
-construct:
+constructs:
 
 ..  prodn::
     process_id ::= @ident
@@ -339,7 +339,7 @@ construct:
     | @process_id {? ({*, @term}) }
     | @alias : @process
 
-The construct :g:`A : proc` does not have any semantical impact: it is
+The construct :g:`A : proc` does not have any semantic impact: it is
 only used to give an alias to this location in the process.
 
 .. decl:: process @process_id @binders = @proc
@@ -355,7 +355,7 @@ Squirrel's logic only deals with systems, which are obtained
 by translating protocols. Systems are (partially ordered) sets of actions,
 which correspond to atomic execution steps of a protocol comprising:
 
-* the reception of a input message from the (malicious) network;
+* the reception of a message input from the (malicious) network;
 * the verification of an executability condition;
 * and, if the action is executable, the output of a message to the network.
 
@@ -385,7 +385,7 @@ Actions are referred to through identifiers:
 .. prodn::
    action_id ::= @ident
 
-When translating processes into sets of action, fresh action
+When translating processes into sets of actions, fresh action
 identifiers are automatically generated to name created
 actions. Alternatively, the user can give a naming hint using the
 :n:`@alias` process construct. Note however that Squirrel may not
@@ -431,7 +431,7 @@ System-defined macros
 Declaring a system provides a meaning to several macros for the
 system's actions. Given an action :g:`A(indices)`
 with output value :g:`o(x)` and condition :g:`c(x)` over the input :g:`x`,
-the follow holds:
+the following holds:
 
 * :g:`output@A(indices) = o(input@A(indices))`;
 * :g:`cond@A(indices) = c(input@A(indices))`;
@@ -456,7 +456,7 @@ We first introduce single system expressions:
 .. prodn::
    single_system_expr ::= @system_id/left | @system_id/right
 
-Here, :n:`@system_id/proj` is an unlabeled single system 
+Here, :n:`@system_id/proj` is an unlabelled single system 
 representing the left (if :n:`proj = left`) or right (if :n:`proj = right`)
 component of the :term:`bi-system` named :n:`@system_id`.
 
@@ -465,8 +465,8 @@ component of the :term:`bi-system` named :n:`@system_id`.
    system_expr ::= any | @system_id | {*, @single_system_expr}
 
 A system expression may be generic (:g:`any`, corresponding to any system,
-already declared or not) or specify a fixed list of system, each
-of which coming with a label identifying it.
+already declared or not) or specify a fixed list of systems, each
+of them coming with a label identifying it.
 When :n:`@system_id` is a :gdef:`multi-system`,
 the system expression :n:`@system_id` corresponds to the list of
 its single systems, with the labels that they carry in this multi-system.
@@ -519,7 +519,7 @@ A local statement as described above expresses that
 the local formula :n:`forall @binders, @formula` holds
 in the context :n:`[@system_expr]` (which
 defaults to :n:`[default]`).
-The statement is named :n:`@statement_id` for future references.
+The statement is named :n:`@statement_id` for future reference.
 
 Similarly,
 a global statement expresses that
@@ -553,7 +553,7 @@ underscore :g:`_` instead of a statement identifier
       axiom [any] fail_not_pair (x,y:message): <x,y> <> fail
 
    Next, we state that in system :g:`[default]`,
-   the adversary never sent a message twice.
+   the adversary never sends the same message twice.
 
    .. squirreldoc::
       axiom no_repeat t t' : happens(t,t') => t <> t' => input@t <> input@t'

@@ -7,11 +7,11 @@ Commands
 .. cmd:: Proof
 
   Enter proof mode with a unique subgoal
-  corresponding to the previous unproved :n:`@goal`.
+  corresponding to the previous unproved :n:`@lemma`.
 
 .. cmd:: Qed
 
-   Close the current :n:`@goal` if it's completed.
+   Close the current proof, if it's completed (i.e. has no remaining unclosed goal).
 
 .. cmd:: Abort
 
@@ -19,8 +19,8 @@ Commands
 
 .. cmd:: undo {? @natural}
 
-   :g:`undo n` undo the :g:`n` (default 1) last sentence(s). 
-   Concretely takes :g:`n`:math:`^{th}` previous prover state
+   :g:`undo n` undoes the :g:`n` (default 1) last sentence(s). 
+   Concretely, the tactic restores the :g:`n`:math:`^{th}` previous prover state
    as the current one.
 
    In general :cmd:`undo` commands are not used in `Squirrel` scripts but used for
@@ -29,11 +29,13 @@ Commands
 .. cmd:: Reset
 
    Reset the prover state. This command can be undone with :cmd:`undo` since it does not clear
-   the history of state.
+   the prover state history.
 
 .. cmd:: Include @file
 
-   Loads the theories/:n:`@file`.sp. 
+   Attempt to find file :n:`@file`.sp,
+   first in the same directory as the current Squirrel file,
+   and then in the theories directory.
 
      .. example:: Including theories/Basic.sp
 
@@ -43,7 +45,7 @@ Commands
 
    If you
    install squirrel (with ``make install``) and not running it from root directory of its
-   sources, this directory is located in ``~/.local/bin``.
+   sources, the theories directory is located in ``~/.local/bin``.
 
 
    
@@ -55,7 +57,7 @@ Commands
    Option identifier      Description                                  Default value
    ====================== ============================================ ======================
    timeout                Timeout for the solver in seconds            2
-   printTRSEquations      Print equations of the TRS system            false
+   printTRSEquations      Print equations of the TRS                   false
    debugConstr            Debug information for the constraint checker false
    debugCompletion        Debug information for the completion checker false
    debugTactics           Debug information for tactics                false
@@ -69,7 +71,7 @@ Commands
 
 .. cmd:: print {? @ident}
 
-  Shows definition of given :n:`@ident` if it is a lemma, function, name, macro or system.
+  Show the definition of a given :n:`@ident` if it is a lemma, function, name, macro or system.
   :g:`print` without :n:`@idendifier` shows the current system.
 
   .. example:: printing a lemma
@@ -87,10 +89,10 @@ Commands
 
 .. cmd:: search @term {? in [{| @system_id | @system_exp }] }
 
-   Search lemmas containing a given :n:`@term` (that can contains
+   Search lemmas containing a given :n:`@term` (that can contain
    holes ``_`` as specified in :n:`@sterm`). 
-   A :n:`{| @system_id | @system_expr }` can be specified otherwise it is searched in :n:`@any`
-   systems.
+   A :n:`{| @system_id | @system_expr }` can be specified, otherwise the command searches in :n:`@any`
+   system.
 
   .. example:: searching axioms with included patterns
 
@@ -115,7 +117,7 @@ Commands
 
   The goal will be used to rewrite occurrences of :n:`u` into the
   corresponding occurrences of :n:`v`, assuming the conditions
-  :n:`phi_1, ..., phi_n` reduces to :n:`true` (using :ref:`reduction`).
+  :n:`phi_1, ..., phi_n` reduce to :n:`true` (using :ref:`reduction`).
 
   .. example:: add rewriting rule
 
