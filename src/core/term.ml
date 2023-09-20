@@ -1093,40 +1093,6 @@ and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
     else ( var, s ) in
 
   var, s
-  
-(*------------------------------------------------------------------*)
-let subst_macros_ts table l ts t =
-  let rec subst_term (t : term) : term = match t with
-    | Macro (is, terms, ts') ->
-      let terms' = List.map subst_term terms in
-      begin match Symbols.Macro.get_all is.s_symb table with
-      | Symbols.State _, _ ->
-        if (List.mem (Symbols.to_string is.s_symb) l && ts=ts')
-        then Macro(is, terms', ts')
-        else Macro(is, terms', mk_pred ts')
-
-      | _ -> Macro(is, terms', ts')
-      end
-
-    | Diff (Explicit l) ->
-      Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst_term tm) l))
-
-    | Fun (f,fty) -> Fun (f, fty)
-
-    | Find (vs, b, t, e) ->
-      Find (vs, subst_term b, subst_term t, subst_term e)
-                              
-    | Quant (q, vs, b) ->
-      Quant (q, vs, subst_term b)
-                            
-    | Name _ | Action _ | Var _ -> t
-
-    (* FIXME: use tmap in all cases *)
-    | App _
-    | Tuple _ | Proj _ -> tmap subst_term t
-  in
-
-  subst_term t
 
 (*------------------------------------------------------------------*)
 let subst_projs (s : (proj * proj) list) (t : term) : term = 

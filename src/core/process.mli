@@ -73,8 +73,11 @@ type proc =
   | Exists   of Vars.vars * Term.term * proc * proc
   | Apply    of Symbols.process * Term.term list
   | Alias    of proc * lsymb
-                
-val pp : Format.formatter -> proc -> unit
+
+(*------------------------------------------------------------------*)
+val _pp    : dbg:bool -> Format.formatter -> proc -> unit
+val pp     :             Format.formatter -> proc -> unit
+val pp_dbg :             Format.formatter -> proc -> unit
                  
 (*------------------------------------------------------------------*)
 type proc_decl = {

@@ -318,18 +318,19 @@ type descr = {
 
 (** Validation function for action description: checks for free variables. *)
 let check_descr d =
-  if d.name = Symbols.init_action then ();
+  if d.name = Symbols.init_action then () else
+    begin
+      let _, cond = d.condition
+      and _, outp = d.output in
 
-  let _, cond = d.condition
-  and _, outp = d.output in
+      let dfv = Sv.of_list d.indices in
 
-  let dfv = Sv.of_list d.indices in
-  
-  assert (Sv.subset (Term.fv cond) dfv);
-  assert (Sv.subset (Term.fv outp) dfv);
-  List.iter (fun (_, args, state) ->
-        assert (Sv.subset (Sv.union (Term.fv state) (Term.fvs args)) dfv)
-    ) d.updates
+      assert (Sv.subset (Term.fv cond) dfv);
+      assert (Sv.subset (Term.fv outp) dfv);
+      List.iter (fun (_, args, state) ->
+          assert (Sv.subset (Sv.union (Term.fv state) (Term.fvs args)) dfv)
+        ) d.updates
+    end
 
 (*------------------------------------------------------------------*)
 (** Apply a substitution to an action description.

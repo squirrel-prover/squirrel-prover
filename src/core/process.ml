@@ -3,6 +3,7 @@ open Utils
 module L = Location
 module Sv = Vars.Sv
 
+
 (*------------------------------------------------------------------*)
 let dum : L.t = L._dummy
 
@@ -12,25 +13,6 @@ let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
 type lsymb = Theory.lsymb
-
-(*------------------------------------------------------------------*)
-module Parse = struct
-  (** A parsed process *)
-  type cnt =
-    | Null
-    | New      of lsymb * Theory.p_ty * t
-    | In       of Channel.p_channel * lsymb * t
-    | Out      of Channel.p_channel * Theory.term * t
-    | Parallel of t * t
-    | Set      of lsymb * Theory.term list * Theory.term * t
-    | Let      of lsymb * Theory.term * Theory.p_ty option * t
-    | Repl     of lsymb * t
-    | Exists   of lsymb list * Theory.term * t * t
-    | Apply    of lsymb * Theory.term list
-    | Alias    of t * lsymb
-
-  and t = cnt L.located
-end
 
 (*------------------------------------------------------------------*)
 (** A typed process *)
@@ -187,7 +169,7 @@ let _pp ~dbg ppf (process : proc) =
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ~dbg)) l
 
     | Alias (p,a) ->
-      pf ppf "@[%s:@ %a@]"
+      pf ppf "%s: %a"
         (L.unloc a)
         doit p
 
@@ -199,7 +181,7 @@ let _pp ~dbg ppf (process : proc) =
       let v = as_seq1 v in
       let p = subst s p in
 
-      pf ppf "@[<hv 2>!_%a@ %a@]"
+      pf ppf "@[<hv 2>!_%a(@ @[<hv>%a@])@]"
         (Vars._pp ~dbg) v doit p
 
     | Set (s, args, t, p) ->
@@ -276,13 +258,13 @@ let _pp ~dbg ppf (process : proc) =
       let p1, f = subst s p1, Term.subst s f in
 
       if vs = [] then
-        pf ppf "@[<hv>%a %a %a@;<1 2>%a"
+        pf ppf "@[<hv>%a %a %a@;<1 2>@[<hv>%a@]"
           (Printer.kws `ProcessCondition) "if"
           (Term._pp ~dbg) f
           (Printer.kws `ProcessCondition) "then"
           doit p1
       else
-        pf ppf "@[<hv>%a %a %a %a %a@;<1 2>%a"
+        pf ppf "@[<hv>%a %a %a %a %a@;<1 2>@[<hv>%a@]"
           (Printer.kws `ProcessCondition) "find"
           (Utils.pp_list (Vars._pp ~dbg)) vs
           (Printer.kws `ProcessCondition) "such that"
@@ -290,7 +272,7 @@ let _pp ~dbg ppf (process : proc) =
           (Printer.kws `ProcessCondition) "in"
           doit p1 ;
       if p2 <> Null then
-        pf ppf "@ %a@;<1 2>%a@]"
+        pf ppf "@ %a@;<1 2>@[<hv>%a@]@]"
           (Printer.kws `ProcessCondition) "else"
           doit p2
       else
@@ -303,10 +285,6 @@ let _pp ~dbg fmt p = Fmt.pf fmt "@[<hov> %a@]" (_pp ~dbg) p
     
 let pp_dbg = _pp ~dbg:true
 let pp     = _pp ~dbg:false
-
-(*------------------------------------------------------------------*)
-let is_out_i = function Parse.Out _ -> true | _ -> false
-let is_out p = is_out_i (L.unloc p)
 
 (*------------------------------------------------------------------*)
 type error_i =
@@ -373,7 +351,32 @@ let find_process_lsymb table (lsymb : lsymb) =
   let name = Symbols.Process.of_lsymb lsymb table in
   name, find_process table name
 
+
 (*------------------------------------------------------------------*)
+(** {2 Process parsing} *)
+
+module Parse = struct
+  (** A parsed process *)
+  type cnt =
+    | Null
+    | New      of lsymb * Theory.p_ty * t
+    | In       of Channel.p_channel * lsymb * t
+    | Out      of Channel.p_channel * Theory.term * t
+    | Parallel of t * t
+    | Set      of lsymb * Theory.term list * Theory.term * t
+    | Let      of lsymb * Theory.term * Theory.p_ty option * t
+    | Repl     of lsymb * t
+    | Exists   of lsymb list * Theory.term * t * t
+    | Apply    of lsymb * Theory.term list
+    | Alias    of t * lsymb
+
+  and t = cnt L.located
+end
+
+(*------------------------------------------------------------------*)
+let is_out_i = function Parse.Out _ -> true | _ -> false
+let is_out p = is_out_i (L.unloc p)
+
 (** Type checking for processes *)
 let parse
     table ~(args : Theory.bnds) (projs : Term.projs) (process : Parse.t) 
@@ -389,7 +392,7 @@ let parse
   (* create a variable holding the current time-point *)
   let env, time =
     let vars, time =
-      Vars.make `Approx env.vars Type.ttimestamp "#time" Vars.Tag.ltag
+      Vars.make `Approx env.vars Type.ttimestamp "τ" Vars.Tag.ltag
     in
     { env with vars; }, time
   in
@@ -514,7 +517,7 @@ let parse
 let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
   let pp_args fmt =
     if pdecl.args = [] then () else
-      Fmt.pf fmt "%a" Vars.pp_typed_list pdecl.args
+      Fmt.pf fmt "(%a) " Vars.pp_typed_list pdecl.args
   in
   let pp_projs fmt =
     if pdecl.projs = [] ||
@@ -525,9 +528,10 @@ let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
   Printer.pr "@[<v 2>@[%a%t %s %t@]=@ @[%a@]@]@." 
     (Printer.kws `ProcessName) "process"
     pp_projs (L.unloc id) pp_args 
-    pp_dbg pdecl.proc           (* TODO: dbg *)
+    pp pdecl.proc
 
 (*------------------------------------------------------------------*)
+(** Declare a new declared process. *)
 let declare
     (table : Symbols.table)
     ~(id : lsymb) ~(args : Theory.bnds) ~(projs : lsymb list option)
@@ -546,49 +550,50 @@ let declare
   table
 
 (*------------------------------------------------------------------*)
-(* Type for data we store while parsing the process, needed to compute
- * the corresponding set of actions. *)
+(** {2 Process translation as systems} *)
+
+(** Type for data we store while translating a process as a set of actions. *)
 type p_env = {
   ty_env : Type.Infer.env;
 
   projs : Term.projs;
-  (* valid projections for the process being parsed *)
+  (** valid projections for the process being parsed *)
 
   alias : lsymb ;
-  (* current alias used for action names in the process *)
+  (** current alias used for action names in the process *)
 
   time : Vars.var;
-  (* term variable representing the current time-point *)
+  (** term variable representing the current time-point *)
 
   indices : Vars.var list ;
-  (* current list of bound indices (coming from Repl or Exists constructs) *)
+  (** current list of bound indices (coming from Repl or Exists constructs) *)
 
   env : Env.t ;
-  (* environment *)
+  (** environment *)
 
   subst : Term.esubst list ;
-  (* substitution built along the way *)
+  (** substitution built along the way *)
 
   inputs : (Channel.t * Vars.var) list ;
-  (* bound input variables *)
+  (** bound input variables *)
 
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.var list ;
-  (* variables bound by existential quantification *)
+  (** variables bound by existential quantification *)
 
   action : Action.action_v ;
-  (* the type [Action.action] describes the execution point in the protocol
+  (** the type [Action.action] describes the execution point in the protocol
      stored reversed *)
 
   facts : Term.term list ;
-  (* list of formulas to create the condition term of the action *)
+  (** list of formulas to create the condition term of the action *)
 
   updates : (Symbols.macro * Term.terms * Term.term) list ;
-  (* List of updates performed in the action of the form [(s, args, body)].
+  (** List of updates performed in the action of the form [(s, args, body)].
      See [updates] in [Action.descr] for a description of the semantics. *)
 
   globals : Symbols.macro list;
-  (* list of global macros declared at [action] *)
+  (** list of global macros declared at [action] *)
 }
 
 (*------------------------------------------------------------------*)
@@ -653,39 +658,60 @@ let mk_namelength_statement
 let add_namelength_axiom 
     ?(loc = L._dummy)
     (table:Symbols.table) (s:lsymb) (ftype:Type.ftype)
-    : Symbols.table =
+  : Symbols.table =
   let name = "namelength_" ^ (L.unloc s) in
   (* if already defined just return actual table *)
   if Symbols.Lemma.mem_lsymb (L.mk_loc loc name) table 
   then table
   else
-  let table, stmt = 
-    mk_namelength_statement name table s ftype in
-  Lemma.add_lemma `Axiom stmt table
+    let table, stmt = 
+      mk_namelength_statement name table s ftype in
+    Lemma.add_lemma `Axiom stmt table
 
 (*------------------------------------------------------------------*)
-(** [find_app_terms t names] returns the sublist of [names] for which there
-    exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
-    term [t]. *)
-let _find_app_terms (_t : Term.term) (_names : string list) : Symbols.macro list =
-  assert false                  (* TODO *)
-  (* let rec aux (name : string) acc t =  *)
-  (*   match t with *)
-  (*   | Symb x' -> *)
-  (*     if L.unloc x' = name then L.unloc x'::acc else acc *)
+(** [find_app_terms t macros] returns the sublist of [macros] for which there
+    exists a subterm [Macro(m,_,_)] with [m ∈ macros] *)
+let find_app_terms (t : Term.term) (names : string list) : Symbols.macro list =
+  let rec aux (name : string) t acc =
+    match t with
+    | Term.Macro (m, _, _) ->
+      let ms = m.s_symb in
+      let acc = if Symbols.to_string ms = name then ms :: acc else acc in
+      Term.tfold (aux name) t acc
 
-  (*   | App (t1,l) -> *)
-  (*     aux_list name acc (t1 :: l) *)
+    | _ -> Term.tfold (aux name) t acc
+  in
 
-  (*   | AppAt (t,ts) -> *)
-  (*     aux_list name acc [t;ts] *)
+  let acc = List.fold_left (fun acc name -> aux name t acc) [] names in
+  List.sort_uniq Stdlib.compare acc
 
-  (*   | _ -> Term.tfold (aux name) t *)
-      
-  (* and aux_list name acc l = List.fold_left (aux name) acc l in *)
+(*------------------------------------------------------------------*)
+(** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
+    if [ts] is applied to a state macro whose name is NOT in [l]. *)
+let subst_macros_ts table l ts t =
+  let rec doit (t : Term.term) : Term.term =
+    match t with
+    | Macro (is, terms, ts0') ->
+      let terms = List.map doit terms in
+      let ts' = doit ts0' in
+      begin
+        match Symbols.Macro.get_all is.s_symb table with
+        | Symbols.State _, _ ->
+          if (List.mem is.s_symb l && Term.equal ts ts0')
+          then Term.mk_macro is terms ts'
+          else Term.mk_macro is terms (Term.mk_pred ts')
 
-  (* let acc = List.fold_left (fun acc name -> aux name acc t) [] names in *)
-  (* List.sort_uniq Stdlib.compare acc *)
+        | _ -> Term.mk_macro is terms ts'
+      end
+
+    | Name _ | Action _ | Var _ -> t
+
+    (* FIXME: use tmap in all cases *)
+    | App _ | Diff _ | Fun _ | Find _ | Quant _ 
+    | Tuple _ | Proj _ -> Term.tmap doit t
+  in
+
+  doit t
 
 (*------------------------------------------------------------------*)
 let process_system_decl
@@ -850,7 +876,7 @@ let process_system_decl
   in
 
   (*------------------------------------------------------------------*)
-  (* common treatment of Apply, Alias and Parse.New constructs *)
+  (* common treatment of Apply, Alias and New constructs *)
   let p_common ~(penv : p_env) (proc : proc) =
     match proc with
     | Apply (id,args)
@@ -941,19 +967,15 @@ let process_system_decl
 
       let t' = Term.subst penv.subst t in
 
-      let _updated_states : string list =
-        []            (* TODO *)
-        (* if in_update then *)
-        (*   let apps = List.map (fun (s,_,_,_) -> L.unloc s) penv.updates in *)
-        (*   find_app_terms t' apps *)
-        (* else [] *)
+      let updated_states : Symbols.macro list =
+        if in_update then
+          let apps = List.map (fun (s,_,_) -> s) penv.updates in
+          find_app_terms t' (List.map Symbols.to_string apps)
+        else []
       in
 
       let body : Term.term =
-        (* TODO: restore, old code *)
-        (* Term.subst_macros_ts penv.env.table updated_states (Term.mk_var ts) *)
-        (*   (conv_term penv (Term.mk_var ts) t ty) *)
-        t'
+        subst_macros_ts penv.env.table updated_states (Term.mk_var ts) t'
       in
 
       (* TODO: this is insufficient, may remain type variable deeper *)
@@ -994,7 +1016,7 @@ let process_system_decl
 
   in
 
-  (* Parse process, looking for an input action.
+  (* Translate a process, looking for an input action.
      Maintains the position [pos] in parallel compositions,
      together with the indices [pos_indices] associated to replications:
      these two components will form the [par_choice] part of an
@@ -1079,15 +1101,11 @@ let process_system_decl
       let cond' = Term.subst penv_p.subst cond in
 
       (* No state updates have been done yet in the current
-         action. We thus have to substitute [ts] by [pred(ts)] for all state
-         macros appearing in [t]. This is why we call [Term.subst_macros_ts]
-         with the empty list. *)
+         action. We thus substitute [ts] by [pred(ts)] for all state
+         macros in [t].
+         Consequently, [Term.subst_macros_ts] is called on the empty list. *)
       let fact =
-        (* TODO: restore *)
-        (* Term.subst_macros_ts penv.env.table [] (Term.mk_var ts) *)
-        (*   (conv_term penv_p (Term.mk_var ts) cond Type.Boolean) *)
-        cond
-        (* TODO: cond, or cond'? *)
+        subst_macros_ts penv.env.table [] (Term.mk_var ts) cond
       in
       let facts_p = fact :: penv.facts in
       let facts_q =
@@ -1151,19 +1169,13 @@ let process_system_decl
 
       let t' = Term.subst penv.subst t in
       let l' = List.map (Term.subst penv.subst) l in      
-      let _updated_states =
-        (* TODO: restore *)
-        (* let apps = List.map (fun (s,_,_,_) -> s) penv.updates in *)
+      let updated_states =
+        let apps = List.map (fun (s,_,_) -> Symbols.to_string s) penv.updates in
         (* dummy term containing [t'] and [l'] to use [find_app_terms] *)
-        (* let dt = L.mk_loc L._dummy (Theory.App (t', l')) in *)
-        (* find_app_terms dt apps *)
-        []
+        find_app_terms (Term.mk_tuple (t' :: l')) apps
       in
       let t'_tm =
-        (* TODO: restore *)
-        (* Term.subst_macros_ts penv.env.table updated_states (Term.mk_var ts) *)
-        (*   (conv_term penv (Term.mk_var ts) t ty) *)
-        Term.subst penv.subst t 
+        subst_macros_ts penv.env.table updated_states (Term.mk_var ts) t'
       in
       let penv =
         { penv with updates = (s,l',t'_tm) :: penv.updates }
@@ -1243,7 +1255,7 @@ let process_system_decl
 (*------------------------------------------------------------------*)
 (** {2 System declaration } *)
 
-(* TODO: fix user-defined projections miss-used *)
+(* FIXME: fix user-defined projections miss-used *)
 let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
   (* type-check the processus *)
   let time, p =
@@ -1254,9 +1266,9 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
 
   Printer.pr
     "@[<v 2>Typed-check process:@;@;@[%a@]@]@.@."
-    pp_dbg p ;   (* TODO: dbg *)
+    pp p ;
 
-  (* TODO: do not use hard coded projections *)
+  (* FIXME: do not use hard coded projections *)
   let projections = [Term.left_proj; Term.right_proj] in
   let system_name = match system_name with
     | Some lsymb -> lsymb
@@ -1275,17 +1287,20 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
       output    = (Symbols.dummy_channel, Term.empty);
       globals   = []; }
   in
+  (* DBG *)
+  Fmt.epr "descr = %a@." Action.pp_descr_dbg init_descr ;
+
   let table, _, _ =
     System.register_action table system_name init_descr
   in
 
-  (* parse the processus *)
+  (* translate the process *)
   let proc,table =
     process_system_decl (L.loc proc) system_name table projs (time,p)
   in
 
   let table = Lemma.add_depends_mutex_lemmas table system_name in
 
-  Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_dbg proc ;(* TODO: dbg *)
+  Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp proc ;
   Printer.pr "%a" System.pp_systems table;
   table

@@ -1,11 +1,11 @@
-
-
 include Basic.
 
-mutable s(i:index): message = empty
-abstract f : message->message
+mutable s(i:index): message = empty.
+abstract f : message -> message.
 
-system !_i s(i):=f(s(i)).
+process F = !_i A: s(i):=f(s(i)).
+
+system F.
 
 lemma update (i:index):
   happens(A(i)) => s(i)@A(i) = f(s(i)@pred(A(i))).
