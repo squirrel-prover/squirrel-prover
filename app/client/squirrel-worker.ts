@@ -1,4 +1,4 @@
-import { Future, PromiseFeedbackRoute } from './future';
+// import { Future, PromiseFeedbackRoute } from './future';
 
 // CodeMirror6
 import { EditorView } from "codemirror"
@@ -6,7 +6,7 @@ import { ViewUpdate, Decoration } from "@codemirror/view"
 import { Tree, TreeCursor, SyntaxNode } from '@lezer/common';
 import { syntaxTree } from "@codemirror/language"
 import { linter } from "@codemirror/lint"
-import { EditorState } from "@codemirror/state"
+import { EditorState, Transaction } from "@codemirror/state"
 
 // FileManager
 import { FileManager } from "./fileManager"
@@ -256,7 +256,7 @@ export class SquirrelWorker {
         // TODO manage that case with promises ?
         console.warn("Try to undo an already sent sentence !")
         this.changeHtmlOf("query-panel",
-          "<div class='err'>Please wait… impossible to undo a sentence that is being executed !</div>");
+          "<div class='err'>Please wait ! impossible to undo a sentence that is being executed !</div>");
         return false;
       }
       if (this.executedSentences.length >= n){
@@ -461,6 +461,7 @@ export class SquirrelWorker {
     }
     // Show recorded goal in goal panel
     this.changeHtmlOf("goal-text",sentence.output);
+
     // Show recorded visu in visu panel
     let e = new CustomEvent("update", 
                             {"detail": JSON.parse(sentence.visu)});
@@ -487,6 +488,38 @@ export class SquirrelWorker {
       );
       if (sentence){
         this.setFocus(sentence)
+      }
+    }
+  }
+
+  isExecuting(){
+    return this.curSentences.length > 0
+  }
+
+  /**
+   * Will filter transactions regarding to worker state.
+   * Sentences sent to worker should not be changed during execution…
+   * TODO we can fix this by stopping execution of Prover !
+   * @param {Transaction} tr
+   */
+  filterTransaction(tr:Transaction){
+    if(!this.isExecuting()){
+      return tr
+    }
+    else if(!tr.docChanged){
+      return tr
+    } else {
+      let roTo = this.queueSentences.length > 0 ? 
+        this.queueSentences[this.queueSentences.length-1].to : 
+        this.curSentences[this.curSentences.length-1].to
+      let block = false
+      tr.changes.iterChangedRanges((chFrom, _) => {
+        if (chFrom <= roTo) block = true;
+      })
+      if (block) {
+        this.changeHtmlOf("query-panel",
+          "<div class='err'>Please wait ! impossible to undo a sentence that is being executed !</div>");
+        return []
       }
     }
   }
@@ -551,6 +584,8 @@ export class SquirrelWorker {
           removeMarks(view,(this.cursor.to)+1,view.state.doc.length);
         else 
           removeMarks(view,0,view.state.doc.length);
+
+        return true
       }
       //If no cursor the first `exec` will init it
     }

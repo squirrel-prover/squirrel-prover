@@ -1,6 +1,7 @@
 // import * as autocomplete from "@codemirror/autocomplete"
 import {EditorView, basicSetup } from "codemirror"
 import { keymap } from "@codemirror/view"
+import { EditorState } from "@codemirror/state"
 
 // Custom extensions
 import { markField, sentenceHover } from "./cm-extensions"
@@ -46,8 +47,13 @@ let updateListenerExtension = EditorView.updateListener.of((update) => {
     //Boolean for system file
     fileManager.dirty = true; 
     //call updateCursor when the document has changed
-    worker.updateCursor(update)
+    return worker.updateCursor(update)
   }
+});
+
+// Extension for filtering changes
+let readOnlyTransactionFilter = EditorState.transactionFilter.of((tr) => {
+  return worker.filterTransaction(tr)
 });
 
 // Create CodeMirror6 View ↓
@@ -64,6 +70,7 @@ let myview = new EditorView({
   ,
   extensions: [
     updateListenerExtension,
+    readOnlyTransactionFilter,
     worker.simpleLezerLinter(),
     squirrelKeymap(),
     sentenceHover,
