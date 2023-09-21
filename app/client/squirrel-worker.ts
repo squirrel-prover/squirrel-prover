@@ -524,24 +524,7 @@ export class SquirrelWorker {
     }
   }
 
-  /**
-   * Will undo and remove highlight over modified previous sentences
-   * This will also update the local variables :
-   * this.executedSentences
-   * this.cursor
-   * @param {ViewUpdate} update
-   */
-  updateCursor(update:ViewUpdate) {
-    //Do this only when doc changed
-    let view = update.view;
-
-    //Remove hover mark if there was one
-    removeHoverMarks(view);
-
-    //Find the upper change position in doc 
-    let posChange = view.state.doc.length;
-    update.changes.iterChanges((fa,_ta,_fb,_tb) => { posChange = fa < posChange ? fa : posChange });
-
+  undoToPos(view:EditorView,posChange:number){
     if (this.cursor) {
       let cursorNode = this.getLastExecutedBeforeChange(view.state,posChange);
       if(DEBUG){
@@ -563,7 +546,7 @@ export class SquirrelWorker {
           console.log("Index of this sentence : ",index);
           console.log("siblings to undo : ");
           childs.forEach((n) => {
-            this.printSentence(update.startState,n.node);
+            this.printSentence(view.state,n.node);
           });
           console.log("Size : ",childs.length)
           console.log(nbToUndo)
@@ -588,7 +571,29 @@ export class SquirrelWorker {
         return true
       }
       //If no cursor the first `exec` will init it
+      return false
     }
+    return false
+  }
+
+  /**
+   * Will undo and remove highlight over modified previous sentences
+   * This will also update the local variables :
+   * this.executedSentences
+   * this.cursor
+   * @param {ViewUpdate} update
+   */
+  updateCursor(update:ViewUpdate) {
+    //Do this only when doc changed
+    let view = update.view;
+
+    //Remove hover mark if there was one
+    removeHoverMarks(view);
+
+    //Find the upper change position in doc 
+    let posChange = view.state.doc.length;
+    update.changes.iterChanges((fa,_ta,_fb,_tb) => { posChange = fa < posChange ? fa : posChange });
+    return this.undoToPos(view,posChange);
   }
 
   isSentence(node:SyntaxNode) {
@@ -646,35 +651,42 @@ export class SquirrelWorker {
   execToCursor(view:EditorView): boolean{
     this.view = view
     let viewState = view.state;
-    let tree = syntaxTree(viewState);
-    let firstSentence = this.getNextSentence(view);
-    if (!firstSentence) {
-      console.warn("Nothing todo !")
-      return false;
-    }
-    if(DEBUG) {
-      console.log("FirstSentence ",firstSentence);
-      this.printSentence(viewState,firstSentence)
-    }
     let pos = viewState.selection.main.head;
-    // Get node at pos or the one before if it's in btwn 2 nodes
-    let node = tree.resolveInner(pos,-1);
-    let underCursorNode = getSentenceFromNode(node);
-    if(DEBUG) {
-      console.log("under cursor : ",underCursorNode);
-      this.printSentence(viewState,underCursorNode)
-    }
+
+    // Cursor before last executed sentence
     if (this.cursor && 
-        this.cursor.node.from == underCursorNode.from) {
-      console.warn("Already evaluated to this node !")
-    return false;
+        pos < this.cursor.node.to) {
+      return this.undoToPos(view,pos);
+    } else { // Cursor further executed sentences
+      let tree = syntaxTree(viewState);
+      let firstSentence = this.getNextSentence(view);
+      if (!firstSentence) {
+        console.warn("Nothing todo !")
+        return false;
+      }
+      if(DEBUG) {
+        console.log("FirstSentence ",firstSentence);
+        this.printSentence(viewState,firstSentence)
+      }
+      // Get node at pos or the one before if it's in btwn 2 nodes
+      let node = tree.resolveInner(pos,-1);
+      let underCursorNode = getSentenceFromNode(node);
+      if(DEBUG) {
+        console.log("under cursor : ",underCursorNode);
+        this.printSentence(viewState,underCursorNode)
+      }
+      if (this.cursor && 
+          this.cursor.node.from == underCursorNode.from) {
+        console.warn("Already evaluated to this node !")
+      return false;
+      }
+      let nodes = new Array();
+      // Get sentences btwn firstSentence and cursor
+      this.sentencesFromTo(firstSentence,underCursorNode,nodes);
+      // Ask worker to exec the given nodes
+      this.execNodes(view,nodes);
+      return true;
     }
-    let nodes = new Array();
-    // Get sentences btwn firstSentence and cursor
-    this.sentencesFromTo(firstSentence,underCursorNode,nodes);
-    // Ask worker to exec the given nodes
-    this.execNodes(view,nodes);
-    return true;
   }
 
   /**
