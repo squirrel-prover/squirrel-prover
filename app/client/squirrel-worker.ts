@@ -452,6 +452,18 @@ export class SquirrelWorker {
     }
   }
 
+  // Focus on Nth relative sentence from actual focusedSentence if it exists
+  focusRelativeN(n:number){
+    if (this.focusedSentence) {
+      let index = this.executedSentences.findIndex(
+        (v) => v.node && v.node.to == this.focusedSentence.node.to
+      );
+      let sentence = this.executedSentences[index+n];
+      if (sentence)
+        this.setFocus(sentence)
+    }
+  }
+
   // Set focus on given sentence
   setFocus(sentence:Sentence){
     if (DEBUG){

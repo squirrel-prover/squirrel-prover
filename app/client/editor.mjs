@@ -26,13 +26,26 @@ function squirrelKeymap(view) {
   return keymap.of([{
     key: "Ctrl-Enter",
     any(view,e) { 
+      // Exec/Undo to cursor 
       if (e.key == "Enter" && e.ctrlKey) {
         return worker.execToCursor(view)
       }
+      // Move focus up
+      if (e.key == "ArrowUp" && e.ctrlKey && e.shiftKey) {
+        worker.focusRelativeN(-1)
+        return true
+      }
+      // Move focus down
+      if (e.key == "ArrowDown" && e.ctrlKey && e.shiftKey) {
+        worker.focusRelativeN(1)
+        return true
+      }
+      // Undo one sentence
       if (e.key == "ArrowUp" && e.ctrlKey) {
         worker.undo(1)
         return true
       }
+      // Exec next sentence
       if (e.key == "ArrowDown" && e.ctrlKey) {
         return worker.execNextSentence(view)
       }
