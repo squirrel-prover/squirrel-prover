@@ -59,7 +59,7 @@ They both access to the mutable state `d`. *)
 process A =
   let m = h(<d,secret>,key) in
   d := mySucc(d);
-  out(cA, m)
+  out(cA, m).
 
 process B =
   in(cA,y);
@@ -68,7 +68,7 @@ process B =
     out(cB,secret)
   else
     d := mySucc(d);
-    out(cB,error)
+    out(cB,error).
 
 system ((!_i A) | (!_j B)).
 

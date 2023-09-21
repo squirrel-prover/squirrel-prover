@@ -27,14 +27,14 @@ abstract tag2 : message
 name key : index -> message
 name key': index * index -> message
 
-channel cT
-channel cR
+channel cT.
+channel cR.
 
 process tag(i,j:index) =
   new nT;
   in(cR,nR);
   let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,j))) in
-  out(cT,<nT,m2>)
+  out(cT,<nT,m2>).
 
 process reader =
   new nR;
@@ -48,7 +48,7 @@ process reader =
             in
               h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
   else
-    out(cR,ko)
+    out(cR,ko).
 
 system ((!_k R: reader) | (!_i !_j T: tag(i,j))).
 

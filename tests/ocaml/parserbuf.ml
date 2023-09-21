@@ -77,7 +77,7 @@ let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
   let projs = [ Term.left_proj; Term.right_proj; ] in
   if typecheck then 
-    ignore (Process.check_proc table ~args:[] projs p) ;
+    ignore (Process.parse table ~args:[] projs p) ;
   p
 
 (** Testing process parsing. *)
@@ -86,27 +86,27 @@ let process_parsing =
     Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
   [
     "Null", `Quick, begin fun () ->
-      ignore (parse_process table "null" : Process.process)
+      ignore (parse_process table "null" : Process.Parse.t)
     end ;
     "Simple", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,x);null" : Process.process) ;
-      ignore (parse_process table "in(c,x);out(c,x)" : Process.process) ;
+      ignore (parse_process table "in(c,x);out(c,x);null" : Process.Parse.t) ;
+      ignore (parse_process table "in(c,x);out(c,x)" : Process.Parse.t) ;
       Alcotest.check_raises "fails" Parser.Error
         (fun () ->
-           ignore (parse_process table "in(c,x) then null" : Process.process)) ;
+           ignore (parse_process table "in(c,x) then null" : Process.Parse.t)) ;
       begin
         match
           Location.unloc (parse_process table "(in(c,x);out(c,x) | in(c,x))")
         with
-        | Process.Parallel _ -> ()
+        | Process.Parse.Parallel _ -> ()
         | _ -> assert false
       end ;
       ignore (parse_process table
                 "if u=true then if true then null else null else null"
-              : Process.process)
+              : Process.Parse.t)
     end ;
     "Pairs", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
+      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.Parse.t)
     end ;
     "If", `Quick, begin fun () ->
       let table, _ =
@@ -120,7 +120,7 @@ let process_parsing =
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl in
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
-              : Process.process)
+              : Process.Parse.t)
     end ;
     "Try", `Quick, begin fun () ->
       let table, _ =
@@ -152,12 +152,12 @@ let process_parsing =
                  try find i such that x = x in \
                  out(c,ok)\
                  else out(c,error)"
-              : Process.process) ;
+              : Process.Parse.t) ;
       ignore (parse_process table
                 "in(c,x); \
                  out(c, try find i such that x = x in ok \
                  else error)"
-              : Process.process)
+              : Process.Parse.t)
     end
   ]
 

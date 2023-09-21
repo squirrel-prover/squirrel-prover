@@ -84,7 +84,7 @@ let pp_systems fmt table =
 (*------------------------------------------------------------------*)
 let add_action table system descr =
   (* Sanity check *)
-  assert (Action.check_descr descr);
+  Action.check_descr descr;
 
   let shape = Action.get_shape_v descr.action in
   let { actions } as data = get_data table system in
@@ -97,7 +97,7 @@ let add_action table system descr =
 let descr_of_shape table system shape =
   let {actions} = get_data table system in
   let descr = Msh.find shape actions in
-  assert (Action.check_descr descr);
+  Action.check_descr descr;
 
   Action.refresh_descr descr
 
@@ -134,7 +134,7 @@ let register_action table system_symb (descr : Action.descr) =
     error Shape_error
 
   | Some (symb2, is) ->
-    assert (Action.check_descr descr);
+    Action.check_descr descr;
 
     let subst_action =
       List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
@@ -181,6 +181,6 @@ module Single = struct
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in
     let descr = Action.project_descr projection multi_descr in
-    assert (Action.check_descr descr);
+    Action.check_descr descr;
     descr
 end

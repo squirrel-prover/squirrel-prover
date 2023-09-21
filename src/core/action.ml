@@ -318,17 +318,17 @@ type descr = {
 
 (** Validation function for action description: checks for free variables. *)
 let check_descr d =
-  if d.name = Symbols.init_action then true else
+  if d.name = Symbols.init_action then () else
     begin
       let _, cond = d.condition
       and _, outp = d.output in
 
       let dfv = Sv.of_list d.indices in
 
-      Sv.subset (Term.fv cond) dfv &&
-      Sv.subset (Term.fv outp) dfv &&
-      List.for_all (fun (_, args, state) ->
-          Sv.subset (Sv.union (Term.fv state) (Term.fvs args)) dfv 
+      assert (Sv.subset (Term.fv cond) dfv);
+      assert (Sv.subset (Term.fv outp) dfv);
+      List.iter (fun (_, args, state) ->
+          assert (Sv.subset (Sv.union (Term.fv state) (Term.fvs args)) dfv)
         ) d.updates
     end
 
@@ -349,8 +349,7 @@ let subst_descr subst (descr : descr) =
   in
   let output = fst descr.output, Term.subst subst (snd descr.output) in
   let descr = { descr with action; indices; condition; updates; output; } in
-
-  assert (check_descr descr);
+  check_descr descr;
   descr
 
 (*------------------------------------------------------------------*)
@@ -406,16 +405,14 @@ let descr_map
   let output = fst descr.output, f Symbols.out (snd descr.output) in
 
   let descr = { descr with condition; updates; output;  } in
-  assert (check_descr descr);
-
+  check_descr descr;
   descr
 
 (*------------------------------------------------------------------*)
 let refresh_descr descr =
   let _, s = Term.refresh_vars descr.indices in
   let descr = subst_descr s descr in
-  assert (check_descr descr);
-
+  check_descr descr;
   descr
   
 let project_descr (s : Term.proj) d =

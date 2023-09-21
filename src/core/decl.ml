@@ -50,16 +50,8 @@ type bty_decl = {
 type system_decl = {
   sname    : Theory.lsymb option;
   sprojs   : lsymb list option;
-  sprocess : Process.process;
+  sprocess : Process.Parse.t;
 }
-
-let pp_system_decl fmt sys =
-  let name = match sys.sname with
-    | Some s -> L.unloc s
-    | None -> "default" in
-  Fmt.pf fmt "@[<hov 2>system %s =@ %a@]"
-    name
-    Process.pp_process sys.sprocess
 
 (*------------------------------------------------------------------*)
 type global_rule =
@@ -91,7 +83,7 @@ type proc_decl = {
   id    : lsymb;
   projs : lsymb list option;
   args  : Theory.bnds;
-  proc  : Process.process;
+  proc  : Process.Parse.t;
 }
 
 (*------------------------------------------------------------------*)

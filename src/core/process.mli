@@ -5,88 +5,112 @@
   * of conditionals, since it is not necessary for correspondences. We will
   * do it separately for equivalences. *)
 
-
+module L = Location
+  
 (*------------------------------------------------------------------*)
 (** Processes, using terms and facts from [Theory] *)
 
-type term = Theory.term
-
 type lsymb = Theory.lsymb
-
-type proc_ty = (string * Type.ty) list
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end processes}
-  * The computational semantics is action-deterministic
-  * (e.g. existential lookup is arbitrarily made deterministic) but in the tool
-  * some constructs may be non-deterministic: we are reasoning over unknown
-  * determinizations.
-  *
-  * It may be useful in the future to check for sources of non-determinism
-  * other than existential choices. They may be useful, though, e.g. to
-  * model mixnets. *)
-
-(** Process types *)
-type process_i =
-  | Null                                       (** Null process *)
-  | New of lsymb * Theory.p_ty * process       (** Name creation *)
-  | In  of Channel.p_channel * lsymb * process (** Input *)
-  | Out of Channel.p_channel * term * process  (** Output *)
-  | Parallel of process * process              (** Parallel composition *)
+    The computational semantics is action-deterministic
+    (e.g. existential lookup is arbitrarily made deterministic) but in the tool
+    some constructs may be non-deterministic: we are reasoning over unknown
+    determinizations.
   
-  | Set of lsymb * term list * term * process
-  (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
-      FIXME: for now, we only allow argument of type index. *)
-           
-  | Let of lsymb * term * Theory.p_ty option * process 
-  (** Local definition, optional type information *)
-  
-  | Repl of lsymb * process
-      (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
-        * for all indices [i]. *)
-  
-  | Exists of lsymb list * term * process * process
-      (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
-        * if there exists [indices] such that [test[vars:=indices]]
-        * is true, and [q] otherwise. Note that this construct
-        * subsumes the common conditional construct. *)
-  
-  | Apply of lsymb * term list
-      (** Process invocation: [Apply (p,ts)] gets expanded
-        * to [p(ts)]. *)
-  
-  | Alias of process * lsymb
-      (** [Alias (p,i)] behaves as [p] but [i] will be used
-        * as a naming prefix for its actions. *)
-
-and process = process_i Location.located
-
-val pp_process : Format.formatter -> process -> unit
+    It may be useful in the future to check for sources of non-determinism
+    other than existential choices. They may be useful, though, e.g. to
+    model mixnets. *)
 
 (*------------------------------------------------------------------*)
+module Parse : sig
+  (** A parsed process *)
+  type cnt =
+    | Null                                       (** Null process *)
+    | New of lsymb * Theory.p_ty * t       (** Name creation *)
+    | In  of Channel.p_channel * lsymb * t (** Input *)
+    | Out of Channel.p_channel * Theory.term * t  (** Output *)
+    | Parallel of t * t              (** Parallel composition *)
+
+    | Set of lsymb * Theory.term list * Theory.term * t
+    (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
+        FIXME: for now, we only allow argument of type index. *)
+
+    | Let of lsymb * Theory.term * Theory.p_ty option * t 
+    (** Local definition, optional type information *)
+
+    | Repl of lsymb * t
+    (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
+        for all indices [i]. *)
+
+    | Exists of lsymb list * Theory.term * t * t
+    (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
+        if there exists [indices] such that [test[vars:=indices]]
+        is true, and [q] otherwise. Note that this construct
+        subsumes the common conditional construct. *)
+
+    | Apply of lsymb * Theory.term list
+    (** Process call: [Apply (p,ts)] calls [p(ts)]. *)
+
+    | Alias of t * lsymb
+    (** [Alias (p,i)] behaves as [p] but [i] will be used
+        as a naming prefix for its actions. *)
+
+  and t = cnt L.located
+end
+
+(*------------------------------------------------------------------*)
+type proc =
+  | Null
+  | New      of Vars.var * Type.ty * proc
+  | In       of Symbols.channel * Vars.var * proc
+  | Out      of Symbols.channel * Term.term * proc
+  | Parallel of proc * proc
+  | Set      of Symbols.macro * Term.term list * Term.term * proc
+  | Let      of Vars.var * Term.term * Type.ty * proc
+  | Repl     of Vars.var * proc
+  | Exists   of Vars.vars * Term.term * proc * proc
+  | Apply    of Symbols.process * Term.term list
+  | Alias    of proc * lsymb
+
+(*------------------------------------------------------------------*)
+val _pp    : dbg:bool -> Format.formatter -> proc -> unit
+val pp     :             Format.formatter -> proc -> unit
+val pp_dbg :             Format.formatter -> proc -> unit
+                 
+(*------------------------------------------------------------------*)
+type proc_decl = {
+  args  : Vars.vars;
+  projs : Term.projs;
+  time  : Vars.var;             (* type timestamp *)
+  proc  : proc;
+}
+(*------------------------------------------------------------------*)
 (** Check that a process is well-typed. *)
-val check_proc : 
+val parse : 
   Symbols.table ->
-  args:Theory.bnds -> Term.projs -> process -> proc_ty * process
+  args:Theory.bnds -> Term.projs -> Parse.t -> proc_decl
 
-
+(*------------------------------------------------------------------*)
 (** Declare a named process. The body of the definition is type-checked. *)
 val declare :
   Symbols.table -> 
-  id:lsymb -> args:Theory.bnds -> projs:(lsymb list option) -> process ->
+  id:lsymb -> args:Theory.bnds -> projs:(lsymb list option) -> Parse.t ->
   Symbols.table
 
+(*------------------------------------------------------------------*)
 val add_namelength_axiom : 
   ?loc:Location.t -> Symbols.table -> lsymb -> Type.ftype ->
   Symbols.table
 
 (*------------------------------------------------------------------*)
 (** Final declaration of the system under consideration,
-  * which triggers the computation of its internal representation
-  * as a set of actions. In that process, name creations are compiled away.
-  * Other constructs are grouped into action descriptions. *)
+    which triggers the computation of its internal representation
+    as a set of actions. In that process, name creations are compiled away.
+    Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> lsymb option -> Term.projs -> process -> Symbols.table
+  Symbols.table -> lsymb option -> Term.projs -> Parse.t -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)

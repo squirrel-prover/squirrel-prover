@@ -183,7 +183,7 @@ type descr = {
 }
 
 (** Check that an action description is well-formed. *)
-val check_descr : descr -> bool
+val check_descr : descr -> unit
 
 (** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr

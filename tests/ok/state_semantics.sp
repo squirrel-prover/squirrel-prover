@@ -1,13 +1,13 @@
 set processStrictAliasMode=true.
 
-hash h
+hash h.
 
-name key : index->message
+name key : index -> message.
 
-mutable k1(i:index): message = empty
-mutable k2(i:index): message = empty
+mutable k1(i:index): message = empty.
+mutable k2(i:index): message = empty.
 
-channel c
+channel c.
 
 process Tag(i:index,j:index) =
   k1(i) := h(k1(i),key(i));

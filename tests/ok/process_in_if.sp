@@ -1,7 +1,10 @@
-channel c
+channel c.
+
 system
   in(c,x) ;
   if x = x then in(c,x) else out(c,x).
+
+print system [default].
 
 lemma testA :
   happens(A) => output@A = empty.

@@ -296,7 +296,7 @@ val pp_error :
   Format.formatter -> conversion_error -> unit
 
 val check : 
-  Env.t -> ?local:bool -> ?pat:bool ->
+  Env.t -> ?pat:bool ->
   Type.Infer.env -> Term.projs ->
   term -> Type.ty ->
   unit
@@ -398,11 +398,6 @@ val convert_any : conv_env -> any_term -> Equiv.any_form
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
-
-(** [find_app_terms t names] returns the sublist of [names] for which there
-    exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
-    term [t]. *)
-val find_app_terms : term -> string list -> string list
 
 val parse_projs : lsymb list option -> Term.projs 
 

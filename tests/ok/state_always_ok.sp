@@ -1,8 +1,9 @@
-
-
 abstract ok : message.
+
 mutable s : message = ok.
-channel c
+
+channel c.
+
 system !_i in(c,x);s:=s;out(c,x).
 
 lemma _ (t:timestamp): happens(t) => s@t = ok.
