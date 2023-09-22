@@ -506,15 +506,26 @@ axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
     each type as, namely as (choose (fun _ => false)). *)
 abstract choose ['a] : ('a -> bool) -> 'a.
 
-axiom [any] choose_spec ['a] (phi:'a->bool) (x:'a) :
-  phi x =>
-  phi (choose phi).
-
-(* This axiom should imply the previous one, but the proof is not
-   convenient due to limitations of the case tactic. *)
 axiom [any] try_carac_1 ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) :
   (try find x such that phi x in f x else g) =
   (if exists x, phi x then f (choose phi) else g).
+
+lemma [any] choose_spec ['a] (phi:'a->bool) (x:'a) :
+  phi x =>
+  phi (choose phi).
+Proof.
+  intro H.
+  assert
+    phi (choose phi) = if exists x, phi x then phi (choose phi) else false
+    as ->.
+  {.
+    rewrite if_true => //. by exists x.
+  }.
+  rewrite -(try_carac_1 phi phi false).
+  case_struct (try find x such that phi x in phi x else false).
+  + auto.
+  + intro [HH _]; by use HH with x.
+Qed.
 
 (** The try find construct chooses witnesses following the choose function. *)
 lemma [any] try_choose ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) (x:'a) :

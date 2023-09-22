@@ -318,9 +318,14 @@ let () =
     (LT.genfun_of_efun_arg trans_tac)
 
 (*------------------------------------------------------------------*)
-let do_case_tac (args : Args.parser_arg list) s : ES.t list =
+let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : ES.t list =
+  let structure_based, type_based = match mode with
+    | `Any -> true,true
+    | `Structure_based -> true,false
+    | `Type_based -> false,true
+  in
   match Args.convert_as_lsymb args with
-  | Some str when Hyps.mem_name (L.unloc str) s ->
+  | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
     let id, _ = Hyps.by_name str s in
     List.map
       (fun (EquivLT.CHyp _, ss) -> ss)
@@ -331,7 +336,7 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
     | Args.Arg (Term (ty, f, loc)) ->
       begin
         match ty with
-        | Type.Timestamp ->
+        | Type.Timestamp when type_based ->
           let env = ES.env s in
           if not (HighTerm.is_constant     env f &&
                   HighTerm.is_system_indep env f   ) then
@@ -345,9 +350,8 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
       end
     | _ -> bad_args ()
 
-
-let case_tac (args : Args.parser_args) : LT.etac =
-  wrap_fail (do_case_tac args)
+let case_tac ?mode (args : Args.parser_args) : LT.etac =
+  wrap_fail (do_case_tac ?mode args)
 
 (*------------------------------------------------------------------*)
 (** Apply the entailment (i.e. bi-frame inclusion) and left-false rule.

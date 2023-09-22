@@ -115,16 +115,15 @@ let boolean_case b s : sequent list =
   [ do_one b Term.mk_true;
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
 
-(* [ty] must be the type of [m] *)
-let message_case (t : Term.term) ty s : sequent list =
-  match ty with
-  | Type.Boolean -> boolean_case t s
-  | _ -> conditional_case t s
-
 (*------------------------------------------------------------------*)
-let do_case_tac (args : Args.parser_arg list) s : sequent list =
+let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : sequent list =
+  let structure_based, type_based = match mode with
+    | `Any -> true,true
+    | `Structure_based -> true,false
+    | `Type_based -> false,true
+  in
   match Args.convert_as_lsymb args with
-  | Some str when Hyps.mem_name (L.unloc str) s ->
+  | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
     let id, _ = Hyps.by_name str s in
     List.map
       (fun (TraceLT.CHyp _, ss) -> ss)
@@ -135,14 +134,15 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     | Args.Arg (Term (ty, f, _)) ->
       begin
         match ty with
-        | Type.Timestamp -> TraceLT.timestamp_case f s
-        | Type.Index -> bad_args ()
-        | _ -> message_case f ty s
+        | Type.Timestamp when type_based -> TraceLT.timestamp_case f s
+        | Type.Boolean   when type_based -> boolean_case   f s
+        | _ when structure_based -> conditional_case f s
+        | _ -> bad_args ()
       end
+
     | _ -> bad_args ()
 
-
-let case_tac args = wrap_fail (do_case_tac args)
+let case_tac ?mode args = wrap_fail (do_case_tac ?mode args)
 
 (*------------------------------------------------------------------*)
 
