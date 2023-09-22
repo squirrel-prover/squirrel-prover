@@ -93,6 +93,12 @@ let file_from_stdin () : file =
     f_path = `Stdin;
     f_lexbuf = Lexing.from_channel stdin; }
 
+let dummy_file () : file =
+  { f_chan = Channel stdin;
+    f_name = "#dummy";
+    f_path = `Stdin;
+    f_lexbuf = Lexing.from_channel stdin; }
+
 let file_from_str (s:string) : file =
   { f_chan = String s;
     f_name = "#str";
@@ -105,7 +111,11 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
   try
     let path = match dir with
       | LP_none    -> partial_path_ext
-      | LP_dir dir -> Filename.concat dir partial_path_ext
+      | LP_dir dir -> 
+        Printer.pr "In dir : %s ?@." dir;
+        let out = Filename.concat dir partial_path_ext in
+        Printer.pr "Concat : %s ?@." out;
+        out
     in
 
     let chan = Stdlib.open_in path in
@@ -119,15 +129,14 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
   | Sys_error _ -> None
 
 (*------ TOMOVE in Utils or Commandline ? --------------------------*)
-(* let valid_theory_regexp = Str.regexp "[a-zA-Z][[a-zA-Z0-9]*" *)
 let valid_theory_regexp = Str.regexp {|[a-zA-Z][[a-zA-Z0-9]*|}
 
 (** try to locate a file according to some loading paths *) 
-let locate (lds : load_paths) (name : string) : file =
-  (* if not (Str.string_match valid_theory_regexp name 0) then *)
-  (*   Command.cmd_error (InvalidTheoryName name);  (1* FIXME: location *1) *)  
-  if not (Str.string_partial_match valid_theory_regexp name 0) then
-    Command.cmd_error (InvalidTheoryName name);  (* FIXME: location *)  
+let locate ?(is_name=true) (lds : load_paths) (name : string) : file =
+  (* FIXME is it relevant ↓ ? *)
+  if is_name && 
+     not (Str.string_partial_match valid_theory_regexp name 0) then
+    Command.cmd_error (InvalidTheoryName name);
 
   let rec try_dirs (dirs : load_paths) : file =
     match dirs with
@@ -140,9 +149,15 @@ let locate (lds : load_paths) (name : string) : file =
   try_dirs lds
 
 let include_get_file (file_stack : file list)
-    (load_paths:load_paths) (name : Theory.lsymb) : file =
-  check_cycle file_stack (L.unloc name);
-  locate load_paths (L.unloc name)
+    (load_paths:load_paths) (path : ProverLib.lpath) : file =
+  match path with
+  | Name name ->
+    check_cycle file_stack (L.unloc name);
+    locate load_paths (L.unloc name)
+  | Path name -> 
+    check_cycle file_stack (Filename.basename (L.unloc name));
+    locate ~is_name:false load_paths 
+      (Filename.chop_extension (L.unloc name))
 
 let mk_load_paths ~main_mode () : load_paths =
   let exec_dir = Filename.dirname Sys.executable_name in

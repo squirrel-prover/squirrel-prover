@@ -39,7 +39,13 @@ let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [>
   let okfails = List.map (fun f -> 
     f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
       begin fun () ->
-        runner ~test:true f;
+        (try runner ~test:true f
+        with e -> begin
+          Squirrelcore.Printer.prt `Error "%a"
+            (Squirrelprover.Errors.pp_toplevel_error ~test:true
+               (Squirrelprover.Driver.dummy_file ())) e;
+            raise e
+        end);
         raise Ok
       end
     end

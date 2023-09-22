@@ -64,7 +64,15 @@ let run_test () =
     )
 
 (*------------------------------------------------------------------*)
+let some_include () =
+  let st = Prover.init () in
+  Prover.exec_all ~test:true st
+    "include \"./Basic.sp\"."
+  |> ignore
+
+(*------------------------------------------------------------------*)
 let tests = [
-   ("some_print",         `Quick, some_print);
-   ("run_test",           `Quick, run_test);
+   ("some_print",         `Quick, Util.catch_error some_print);
+   ("some_include",       `Quick, Util.catch_error some_include);
+   ("run_test",           `Quick, Util.catch_error run_test);
 ]

@@ -37,6 +37,8 @@ commaSep1<content> {
 
 Lsymb { ID }
 
+Lpath { PATH }
+
 empty { "" }
 
 kw<Term> { @specialize[@name={Term}]<ID, Term> }
@@ -1053,6 +1055,7 @@ include_params {
 
 include_name[@name=include_name] {
   Lsymb
+| QUOTE Lpath QUOTE
 }
 
 P_include {
@@ -1171,6 +1174,10 @@ Interactive[@name=Sentence] {
   identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
   ID { @asciiLetter (identifierChar | @digit )* TICK* }
 
+  QUOTE { "\"" }
+
+  PATH { "./" (identifierChar | @digit | SLASH | DOT | MINUS )+ }
+
   space { @whitespace+ }
 
   BlockComment { "(*" blockCommentRest }
@@ -1180,6 +1187,7 @@ Interactive[@name=Sentence] {
   blockCommentAfterStar { ")" | "*" blockCommentAfterStar | ![)*] blockCommentRest }
 
   @precedence {
+    PATH,
     PROOF ,
     QED ,
     ABORT ,
@@ -1234,6 +1242,7 @@ Interactive[@name=Sentence] {
     TILDE ,
     PLUS ,
     TICK ,
+    QUOTE ,
     PERCENT,
 
     ID

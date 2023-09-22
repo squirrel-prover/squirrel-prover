@@ -19,6 +19,7 @@
 }
 
 let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
+let path = '.' '/' ['a'-'z' 'A'-'Z' '0'-'9' '_' '.' '-' '/']+ '.' 's' 'p'
 let int = ['0'-'9'] ['0'-'9']*
 
 
@@ -46,6 +47,7 @@ rule token = parse
 | "not"               { NOT }
 | "True"              { TRUE }
 | "False"             { FALSE }
+| '"'                 { QUOTE }
 | '<'                 { LANGLE }
 | '>'                 { RANGLE }
 | '['                 { LBRACKET }
@@ -182,6 +184,7 @@ rule token = parse
 | "smt"               { SMT }
 | "print"             { PRINT }
 | "search"            { SEARCH }
+| path as n           { PATH n }
 | name as n           { ID n }
 | eof                 { EOF }
 

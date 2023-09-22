@@ -6,6 +6,15 @@ open Squirrelfront
  * TODO is this an OCaml bug?! *)
 module Prover = Squirrelprover.Prover
 
+let catch_error (f:unit -> unit) () : unit  =
+  try 
+    f ();()
+  with e ->
+    Squirrelcore.Printer.prt `Error "%a"
+      (Squirrelprover.Errors.pp_toplevel_error ~test:true
+         (Squirrelprover.Driver.dummy_file ())) e;
+    raise e
+
 let term_from_string (s:string) =
   Theory.Local 
     (Parser.top_formula Lexer.token (Lexing.from_string s))

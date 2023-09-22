@@ -291,8 +291,21 @@ export class SquirrelWorker {
   async getStringOfNode(x:SyntaxNode, viewState:EditorState): Promise<string> {
     if(this.isInclude(x)){
       let include_name = x.firstChild.getChild("include_name");
-      let name = viewState.sliceDoc(include_name.from, include_name.to);
-      return await this.fileManager.getFileString(name+".sp");
+      // console.warn("include_name : "+include_name);
+      // If there is a path node it is QUOTE PATH QUOTE include
+      let path = include_name.getChild("Lpath");
+      if (path) {
+        // console.warn("path : "+path);
+        let name = viewState.sliceDoc(path.from, path.to);
+        // For the moment there is no subdirectories so juste take the
+        // basename ↓
+        var filename = name.replace(/^.*[\\\/]/, '');
+        // console.warn("filename : "+path);
+        return await this.fileManager.getFileString(filename);
+      } else {
+        let name = viewState.sliceDoc(include_name.from, include_name.to);
+        return await this.fileManager.getFileString(name+".sp");
+      }
     } else {
       return viewState.sliceDoc(x.from, x.to);
     }
@@ -351,8 +364,8 @@ export class SquirrelWorker {
       }
       // highlight with pending background
       highlightNodes(view,nodes,"squirrel-eval-pending")
-      this.printSentence(viewState,nodes[nodes.length-1]);
       if(nodes.length > 0){
+        // this.printSentence(viewState,nodes[nodes.length-1]);
         let cursorPos = nodes[nodes.length - 1].to;
         view.dispatch({
           selection: {

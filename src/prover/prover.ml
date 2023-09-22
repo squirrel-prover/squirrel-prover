@@ -598,7 +598,14 @@ let do_help (args: TacticsArgs.parser_args) :unit =
 exception Unfinished
 
 (* Manage all command *)
-let rec do_command ?(main_mode=`Stdin) ?(file_stack=[]) ?(test=false) ?(check=`Check) (st:state) (file:Driver.file) (command:ProverLib.input) : state =
+let rec do_command 
+    ?(main_mode=`Stdin) 
+    ?(file_stack=[]) 
+    ?(test=false) 
+    ?(check=`Check) 
+    (st:state) 
+    (file:Driver.file) 
+    (command:ProverLib.input) : state =
   let open ProverLib in
   let pst = st in
   match command with 
@@ -661,7 +668,7 @@ and do_include
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
       let err_mess fmt =
         Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
-          (Location.unloc i.th_name)
+          (Location.unloc (ProverLib.get_pathlsymb i.th_name))
           (Errors.pp_toplevel_error ~interactive:interactive ~test file) e
       in
       Driver.close_chan file.f_chan;
@@ -706,7 +713,8 @@ let init : ?withPrelude:bool -> unit -> state =
       if withPrelude then begin
         Printer.pr "With prelude!";
         let inc =
-          ProverLib.{ th_name = Location.mk_loc Location._dummy "Prelude";
+          ProverLib.{ th_name = Name (Location.mk_loc Location._dummy
+                          "Prelude");
                       params = []; }
         in
         let state = do_include ~main_mode:(`File "Prelude") state inc in

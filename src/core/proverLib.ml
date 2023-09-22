@@ -44,8 +44,17 @@ let unnamed_goal =
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
-type include_param = { th_name : Theory.lsymb; 
+type lpath = 
+  | Name of string Location.located
+  | Path of string Location.located
+
+let get_pathlsymb = function
+  | Name s
+  | Path s -> s
+
+type include_param = { th_name : lpath; 
                        params : Theory.lsymb list }
+
 
 type bulleted_tactic =
   | Bullet of string

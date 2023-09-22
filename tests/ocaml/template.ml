@@ -40,5 +40,5 @@ let template_test () =
   Alcotest.(check some_testable) "Goal name" 
     (Prover.current_goal_name st) (None)
 
-let tests = [ ("template", `Quick, template_test);
+let tests = [ ("template", `Quick, Util.catch_error template_test);
             ]

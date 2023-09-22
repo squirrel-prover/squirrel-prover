@@ -177,26 +177,27 @@ function caml_unix_open() {
   return 0;
 }
 
+//FIXME This is the way it should be done ↓
 //Provides: caml_foo
 //Requires: caml_string_of_jsstring
-async function caml_foo() {
-  console.warn("Opening:")
-  console.log(arguments[0])
-  let fname = "theories/"+arguments[0]+".sp";
-  let text = await fetch(fname)
-    .then((r) => {
-      if (r.ok) {
-        return r.text();
-      } 
-      else console.error("KO : Bad file name ? "+fname);
-    })
-    .catch((error) => {console.error(error+" : Couldn't load "+arguments[0])})
-  console.log(text);
-  // FIXME This send too late the text to ocaml…
-  return caml_string_of_jsstring(text)
-  //caml_raise_with_string, caml_global_data
-  // caml_raise_with_string (caml_global_data.Sys_error, text);
-}
+//async function caml_foo() {
+//  console.warn("Opening:")
+//  console.log(arguments[0])
+//  let fname = "theories/"+arguments[0]+".sp";
+//  let text = await fetch(fname)
+//    .then((r) => {
+//      if (r.ok) {
+//        return r.text();
+//      } 
+//      else console.error("KO : Bad file name ? "+fname);
+//    })
+//    .catch((error) => {console.error(error+" : Couldn't load "+arguments[0])})
+//  console.log(text);
+//  // FIXME This send too late the text to ocaml…
+//  return caml_string_of_jsstring(text)
+//  //caml_raise_with_string, caml_global_data
+//  // caml_raise_with_string (caml_global_data.Sys_error, text);
+//}
 
 //Provides: caml_unix_opendir
 //Requires: caml_unix_ll

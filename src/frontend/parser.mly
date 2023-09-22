@@ -14,6 +14,7 @@
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
+%token <string> PATH   /* general purpose path */
 %token <string> LEFTINFIXSYMB    /* left infix function symbols */
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
@@ -22,6 +23,7 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
+%token QUOTE
 %token LANGLE RANGLE
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
@@ -140,6 +142,9 @@ dh_flags:
 
 lsymb:
 | id=loc(ID) { id }
+
+lpath:
+| id=loc(PATH) { id }
 
 %inline infix_s:
 | EQ               { "=" , `Left }
@@ -1145,8 +1150,10 @@ include_params:
 |                                         { [] }
 
 p_include:
+| INCLUDE l=include_params QUOTE th=lpath QUOTE DOT
+    { ProverLib.{ th_name = ProverLib.Path th; params = l; } }
 | INCLUDE l=include_params th=lsymb DOT
-    { ProverLib.{ th_name = th; params = l; } }
+    { ProverLib.{ th_name = ProverLib.Name th; params = l; } }
 
 (*------------------------------------------------------------------*)
 /* print query */

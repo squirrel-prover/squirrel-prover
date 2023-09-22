@@ -685,8 +685,8 @@ let namelength2 () =
     (stmt_n.formula)
 
 let tests =
-  [ ("case_study", `Quick, case_study) ;
-    ("namelength", `Quick, namelength);
-    ("namelength2", `Quick, namelength2);
-    ("case_study_fail", `Quick, case_study_fail) ;
-    ("case_study_fail'", `Quick, case_study_fail') ]
+  [ ("case_study", `Quick, Util.catch_error case_study) ;
+    ("namelength", `Quick, Util.catch_error namelength);
+    ("namelength2", `Quick, Util.catch_error namelength2);
+    ("case_study_fail", `Quick, Util.catch_error case_study_fail) ;
+    ("case_study_fail'", `Quick, Util.catch_error case_study_fail') ]

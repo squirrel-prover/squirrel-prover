@@ -46,7 +46,13 @@ val unnamed_goal : unit -> Theory.lsymb
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
-type include_param = { th_name : Theory.lsymb; params : Theory.lsymb list }
+type lpath = 
+  | Name of string Location.located
+  | Path of string Location.located
+
+val get_pathlsymb : lpath -> string Location.located
+
+type include_param = { th_name : lpath; params : Theory.lsymb list }
 
 type bulleted_tactic =
   | Bullet of string

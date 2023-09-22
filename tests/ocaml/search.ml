@@ -326,11 +326,11 @@ let include_ite () =
 
 
 (*------------------------------------------------------------------*)
-let tests = [ ("search_about1",      `Quick, search_about_1);
-              ("search_about2",      `Quick, search_about_2);
-              ("search_type_holes1", `Quick, search_about_type_holes_1);
-              ("search_type_holes2", `Quick, search_about_type_holes_2);
-              ("include_search",     `Quick, include_search);
-              ("include_ite",        `Quick, include_ite);
-              ("search_unify",       `Quick, search_unify);
+let tests = [ ("search_about1",      `Quick, Util.catch_error search_about_1);
+              ("search_about2",      `Quick, Util.catch_error search_about_2);
+              ("search_type_holes1", `Quick, Util.catch_error search_about_type_holes_1);
+              ("search_type_holes2", `Quick, Util.catch_error search_about_type_holes_2);
+              ("include_search",     `Quick, Util.catch_error include_search);
+              ("include_ite",        `Quick, Util.catch_error include_ite);
+              ("search_unify",       `Quick, Util.catch_error search_unify);
             ]
