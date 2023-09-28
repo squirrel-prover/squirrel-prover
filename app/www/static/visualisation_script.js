@@ -71,6 +71,7 @@
 /* -------------------------------------------------------------------------- */
     
 /** Store variables common to all elements of the visualisation
+  * @property {boolean} is server mode ?
   * @property {string} address - Address of the local server.
   * @property {number} margin - Margin between nodes.
   * @property {number} padding - Margin used inside nodes.
@@ -78,13 +79,15 @@
   * @property {number} clickDuration - Duration of the expansion induced by a click on a line.
   */
 class Configuration {
-  /** @param {string} address - Address of the local server.
+  /** @param {boolean} is server mode ?
+    * @param {string} address - Address of the local server.
     * @param {number} margin - Margin between nodes.
     * @param {number} padding - Margin used inside nodes.
     * @param {number} lineBreakWidth - Maximum node width before a soft line break.
     * @param {number} clickDuration - Duration of the expansion induced by a click on a line.
     */
-  constructor(address, margin, padding, lineBreakWidth, clickDuration) {
+  constructor(isServer, address, margin, padding, lineBreakWidth, clickDuration) {
+    this.isServer = isServer;
     this.address = address;
     this.margin = margin;
     this.padding = padding;
@@ -96,12 +99,15 @@ class Configuration {
 /* -------------------------------------------------------------------------- */
 
 /** Read data on the local server.
+  * @property {boolean} is server mode ?
   * @property {string} address - Address of the local server.
   */
 class Reader {
-  /** @param {string} address - Address of the local server.
+  /** @param {boolean} is server mode ?
+   * @param {string} address - Address of the local server.
     */
-  constructor(address) {
+  constructor(isServer, address) {
+    this.isServer = isServer;
     this.address = address;
   }
   
@@ -110,13 +116,17 @@ class Reader {
     */
   get data() {
     let result = null;
-    let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", this.address, false);
-    xmlhttp.send();
-    if (xmlhttp.status==200) {
-      result = JSON.parse(xmlhttp.responseText);
+    if (this.isServer){
+      let xmlhttp = new XMLHttpRequest();
+      xmlhttp.open("GET", this.address, false);
+      xmlhttp.send();
+      if (xmlhttp.status==200) {
+        result = JSON.parse(xmlhttp.responseText);
+      } else {
+        result = { "error": "Server not connected" };
+      }
     } else {
-      result = { "error": "Server not connected" };
+      result = { "error": "Waitting for prover data visualization." };
     }
     return result;
   }
@@ -611,7 +621,7 @@ class Visualisation {
       .append("h3");
     this.scene = null;
 
-    this.reader = new Reader(config.address);
+    this.reader = new Reader(config.isServer,config.address);
     this.importData();
     
     this.es = new EventSource("events");
@@ -662,5 +672,5 @@ class Visualisation {
 
 /* -------------------------------------------------------------------------- */
 
-const config = new Configuration("http://localhost:8080/dump.json", 10, 5, "40em", 200);
+const config = new Configuration(false, "http://localhost:8080/dump.json", 10, 5, "40em", 200);
 const visu = new Visualisation(config);
