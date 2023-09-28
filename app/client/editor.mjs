@@ -143,4 +143,34 @@ runInput.addEventListener("keypress", function(event) {
   }
 });
 
+function panelClickHandler(evt) {
+
+  var target = evt.target;
+
+  if(target.classList.contains('caption') &&
+
+    target.parentNode.classList.contains('flex-panel')) {
+
+    var panel = target.parentNode;
+
+    if(panel.classList.contains('collapsed')) {
+
+      panel.classList.remove('collapsed');
+
+    } else {
+
+      var panels_cpt = document.getElementsByClassName('flex-panel').length;
+      var collapsed_panels_cpt = document.getElementsByClassName('collapsed').length;
+
+      if(collapsed_panels_cpt + 1 >= panels_cpt) // at least one panel opened
+        return;
+
+      panel.classList.add('collapsed');
+    }
+  }
+}
+
+var flex_container = document.getElementsByClassName('flex-container')[0];
+flex_container.addEventListener('click', evt => { panelClickHandler(evt); });
+
 worker.launch()
