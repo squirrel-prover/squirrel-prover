@@ -637,21 +637,23 @@ struct
          3) using [Match.Pos.fold_shallow], to recurse on subterms
             at depth 1. *)
   let fold_bad_occs
-      (get_bad_occs : f_fold_occs)
-      ~(fv          : Vars.vars)
-      (info         : expand_info)
-      (t            : Term.term) 
+      (get_bad_occs     : f_fold_occs)
+      ~(fv              : Vars.vars)
+      ((occtype,trctxt) : expand_info)
+      (t                : Term.term) 
     : simple_occs
     =
     let rec get (pi : pos_info) (t:Term.term) : simple_occs =
       let se = SE.to_arbitrary pi.pi_trctxt.system in
+
       (* the continuation to be passed to get_bad_occs for cases it does
          not handle *)
       let retry_on_subterms () : simple_occs =
         match t with
         | Macro _ -> (* expand if possible *)
           begin
-            match expand_macro_check_once info t with
+            let trctxt = {trctxt with system = SE.to_fset se} in
+            match expand_macro_check_once (occtype, trctxt) t with
             | Some t' -> get pi t'
             | None -> []
             (* if we can't expand, do nothing.
@@ -662,10 +664,10 @@ struct
         | _ ->
           MP.fold_shallow
             (fun t' se fv cond p acc ->
-               let new_contx = {(snd info) with system = SE.to_fset se} in
+               let trctxt = {trctxt with system = SE.to_fset se} in
                let new_st = if Term.is_binder t then t' else pi.pi_subterm in
                let pi =
-                 {pi_pos=p; pi_occtype=pi.pi_occtype; pi_trctxt=new_contx;
+                 {pi_pos=p; pi_occtype=pi.pi_occtype; pi_trctxt=trctxt;
                   pi_vars=fv; pi_cond=cond; pi_subterm = new_st}
                in
                let newacc = get pi t' in
@@ -675,7 +677,7 @@ struct
       get_bad_occs retry_on_subterms get pi t
     in
     let pi0 =
-      {pi_pos=MP.root; pi_occtype=fst info; pi_trctxt=snd info;
+      {pi_pos=MP.root; pi_occtype=occtype; pi_trctxt=trctxt;
        pi_vars=fv; pi_cond=[]; pi_subterm=t}
     in
     get pi0 t
