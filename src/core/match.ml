@@ -142,6 +142,7 @@ module Pos = struct
         sel_e sp ~projs ~vars ~conds ~p:(0 :: p) t0
 
       | Equiv.Atom (Reach t) ->
+        (* FIXME: do not use built-in projections *)
         let projs = Some [Term.left_proj; Term.right_proj] in
         sel fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) t
 
@@ -153,7 +154,8 @@ module Pos = struct
       | Equiv.Or   (f1, f2) -> 
         sel_e_l sp ~projs ~vars ~conds ~p [f1; f2]
 
-    and sel_e_l (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+    and sel_e_l (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Equiv.form list) =
+      (* FIXME: do not use built-in projections *)
       List.foldi (fun i sp t -> sel_e sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
     in 
 

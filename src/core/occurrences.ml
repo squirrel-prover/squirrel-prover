@@ -471,8 +471,9 @@ let get_expand_info (pi : pos_info) : expand_info =
 
 
 (** Exported (see `.mli`) *)
-let expand_macro_check_once ((ot, c):expand_info) (t : Term.term)
-  : Term.term option =
+let expand_macro_check_once
+    ((ot, c):expand_info) (t : Term.term) : Term.term option
+  =
   match t with
   | Macro (m, l, ts) ->
     if match ot with
@@ -503,7 +504,6 @@ let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
   | None -> t
 
 
-
 (** Exported (see `.mli`) *)
 let get_actions_ext
     (t : Term.term)
@@ -511,9 +511,9 @@ let get_actions_ext
     (info:expand_info)
   : ts_occs =
   let ot, contx = info in
-  assert (ot = EI_direct); (* sanity check: this function is meant
-                              to be called on the initial direct terms,
-                              not inside indirect occs *)
+  (* sanity check: this function is meant to be called on the initial
+     direct terms, not inside indirect occs *)
+  assert (ot = EI_direct); 
   let system = contx.system in
   let se = (SE.reachability_context system).set in
   let rec get (t : Term.term)
