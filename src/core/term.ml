@@ -206,7 +206,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
     | Proj (i,t) -> 
       begin
-        match ty t with
+        match Type.Infer.norm ty_env (ty t) with
         | Type.Tuple tys -> List.nth tys (i - 1)
         | _ -> assert false
       end
