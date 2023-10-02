@@ -6,12 +6,13 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 module NO = NameOccs
-
+module O = Occurrences
+  
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
 
-module Name = NameOccs.Name
+module Name = O.Name
 
 type sequent = TS.sequent
 
@@ -94,11 +95,11 @@ val get_bad_occs_and_ciphertexts :
   (fv:Vars.vars ->
    cond:terms ->
    p:MP.pos ->
-   info:NO.expand_info ->
+   info:O.expand_info ->
    st:term ->
    term ->
    NO.n_occs * ctxt_occs) ->
-  info:NO.expand_info ->
+  info:O.expand_info ->
   fv:Vars.vars ->
   cond:terms ->
   p:MP.pos ->
@@ -124,11 +125,11 @@ val get_bad_randoms :
   (fv:Vars.vars ->
    cond:terms ->
    p:MP.pos ->
-   info:NO.expand_info ->
+   info:O.expand_info ->
    st:term ->
    term ->
    NO.n_occs * rand_occs) ->
-  info:NO.expand_info ->
+  info:O.expand_info ->
   fv:Vars.vars ->
   cond:terms ->
   p:MP.pos ->

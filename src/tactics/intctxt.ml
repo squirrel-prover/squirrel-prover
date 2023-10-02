@@ -7,11 +7,12 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 module NO = NameOccs
+module O = Occurrences
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
 
-module Name = NameOccs.Name
+module Name = O.Name
 
 type sequent = TS.sequent
 
@@ -55,16 +56,16 @@ let intctxt_param
          "can only be applied on an hypothesis of the form \
           dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
   in
-  let info = NO.EI_direct, contx in
+  let info = O.EI_direct, contx in
   let table = contx.table in
 
   (* try to write t as dec(c,k) *)
   let try_t (t:term) : intctxt_param option =
-    let t = NO.expand_macro_check_all info t in
+    let t = O.expand_macro_check_all info t in
     match t with
     | App (Fun (dec, _), [Tuple [m; tk]]) ->
       begin
-        match NO.expand_macro_check_all info tk with
+        match O.expand_macro_check_all info tk with
         | Name _ as k when Symbols.is_ftype dec Symbols.SDec table ->
           begin
             match Symbols.Function.get_data dec table with

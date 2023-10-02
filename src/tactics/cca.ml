@@ -12,7 +12,7 @@ module ES = EquivSequent
 module LT = LowTactics
 module T = ProverTactics
 
-module Name = NameOccs.Name
+module Name = Occurrences.Name
 
 type sequent = ES.sequent
 

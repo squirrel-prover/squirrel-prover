@@ -1,6 +1,6 @@
 open Utils
 
-module Name = NameOccs.Name
+module Name = Occurrences.Name
                 
 module SE = SystemExpr
 module L  = Location
@@ -327,7 +327,7 @@ let global_prf
     | Term.App (Fun (h_fn, applied_fty), [Tuple [h_cnt; Name (key, key_args)]]) ->
       (* crypto function cannot use polymorphism *)
       assert (applied_fty.ty_args = []);
-      (h_fn, h_cnt, NameOccs.Name.{ symb = key; args = key_args; })      
+      (h_fn, h_cnt, Name.{ symb = key; args = key_args; })      
     | _ -> Tactics.soft_failure Tactics.Bad_SSC
   in
 
@@ -907,7 +907,7 @@ let global_prf_t
     | Term.App (Fun (h_fn, applied_fty), [Tuple [_; Name (key, key_args)]]) ->
       (* crypto function cannot use polymorphism *)
       assert (applied_fty.ty_args = []);
-      (h_fn, applied_fty.fty, NameOccs.Name.{ symb = key; args = key_args; })      
+      (h_fn, applied_fty.fty, Name.{ symb = key; args = key_args; })      
     | _ -> Tactics.soft_failure Tactics.Bad_SSC
   in
 

@@ -36,6 +36,11 @@ module MP = Match.Pos
 *)
 
 (*------------------------------------------------------------------*)
+(** Interprets [phi] as [phi_1 /\ … /\ phi_n]
+    and reconstructs it to simplify trivial equalities. *)
+val clear_trivial_equalities : Term.term -> Term.term
+
+(*------------------------------------------------------------------*)
 (** {2 Occurrence contents} *)
 
 (** Module containing the type of the contents of occurrences
@@ -189,22 +194,20 @@ end
 (** Functor to produce a SimpleOcc module from an OccContent *)
 module MakeSO : functor (OC:OccContent) -> (SimpleOcc with module OC = OC)
 
-
-(** Module for timestamp occurrences *)
+(*------------------------------------------------------------------*)
+(** module for timestamp occurrences *)
 module TSOcc : (SimpleOcc with module OC = TSContent)
 
-type ts_occ = TSOcc.simple_occ
+type ts_occ  = TSOcc.simple_occ
 type ts_occs = TSOcc.simple_occs
 
+(*------------------------------------------------------------------*)
 (** module for empty simple occurrences
     (used as dummy parameter when they are not needed). *)
 module EmptyOcc : (SimpleOcc with module OC = EmptyContent)
 
-type empty_occ = EmptyOcc.simple_occ
+type empty_occ  = EmptyOcc.simple_occ
 type empty_occs = EmptyOcc.simple_occs
-
-
-
 
 (*------------------------------------------------------------------*)
 (** {2 Extended occurrences} *)
@@ -262,8 +265,6 @@ module MakeEO :
   functor (SO:SimpleOcc) -> (ExtOcc with module SO = SO)
 
 
-
-
 (*------------------------------------------------------------------*)
 (** {2 Macro expansion}
     Functions handling macro expansion in terms, when allowed. *)
@@ -297,12 +298,6 @@ val expand_macro_check_once : expand_info -> Term.term -> Term.term option
 (** Expands term as much as possible, recursively
     (only at toplevel, not in subterms). *)
 val expand_macro_check_all : expand_info -> Term.term -> Term.term
-
-(** Returns all timestamps occuring in macros in a list of terms.
-    Should only be used when sources are directly occurring,
-    not themselves produced by unfolding macros. *)
-val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
-
 
 
 (*------------------------------------------------------------------*)
@@ -366,8 +361,6 @@ end
 module MakeSearch :
   functor (OC:OccContent) -> (OccurrenceSearch with module EO.SO.OC = OC)
 
-
-
 (*------------------------------------------------------------------*)
 (** {2 Formula construction and simplification} *)
 
@@ -379,10 +372,6 @@ sig
 
   type ext_occ
   type ext_occs = ext_occ list
-
-  (** Interprets [phi] as [phi_1 /\ … /\ phi_n]
-      and reconstructs it to simplify trivial equalities. *)
-  val clear_trivial_equalities : Term.term -> Term.term
 
   (** [time_formula τ ts_occs] constructs the formula:
 
@@ -422,7 +411,6 @@ end
 module MakeFormulas :
   functor (EO:ExtOcc) ->
     (OccurrenceFormulas with type ext_occ = EO.ext_occ)
-
 
 
 (*------------------------------------------------------------------*)

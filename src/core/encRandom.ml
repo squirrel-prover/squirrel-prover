@@ -9,12 +9,13 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 module NO = NameOccs
-
+module O = Occurrences
+  
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
 
-module Name = NameOccs.Name
+module Name = O.Name
 
 type sequent = TS.sequent
 
@@ -62,11 +63,11 @@ let mk_ctxt_occ
     (c:term) (ccoll:term)
     (m:term) (r:Name.t)
     (k1:Name.t) (kcoll:Name.t)
-    (fv:Vars.vars) (cond:terms) (ot:NO.occ_type) (st:term) :
+    (fv:Vars.vars) (cond:terms) (ot:O.occ_type) (st:term) :
   ctxt_occ =
   let fv, sigma = refresh_vars fv in
   let cond = List.map (Term.subst sigma) cond in
-  let ot = NO.subst_occtype sigma ot in
+  let ot = O.subst_occtype sigma ot in
   let c = Term.subst sigma c in
   let m = Term.subst sigma m in
   let r = Name.subst sigma r in
@@ -90,13 +91,13 @@ type rand_occs = rand_occ list
 
 let mk_rand_occ
     (r:Name.t) (co:ectxt_occ) (p:(term * Name.t) option)
-    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : rand_occ 
+    (cond:terms) (fv:Vars.vars) (ot:O.occ_type) (st:term) : rand_occ 
   =
   let fv, sigma = refresh_vars fv in
   let r = Name.subst sigma r in
   let p = Option.map (fun (m,k) -> subst sigma m, Name.subst sigma k) p in
   let cond = List.map (subst sigma) cond in
-  let ot = NO.subst_occtype sigma ot in
+  let ot = O.subst_occtype sigma ot in
   let st = Term.subst sigma st in
   let rcoll = NO.(co.eo_occ.so_ad.ca_r) in 
   NO.mk_simple_occ r rcoll (co, p)
@@ -151,11 +152,11 @@ let get_bad_occs_and_ciphertexts
        (fv:Vars.vars ->
         cond:terms ->
         p:MP.pos ->
-        info:NO.expand_info ->
+        info:O.expand_info ->
         st:term ->
         term ->
         NO.n_occs * ctxt_occs))
-    ~(info:NO.expand_info)
+    ~(info:O.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)
@@ -269,11 +270,11 @@ let get_bad_randoms
        (fv:Vars.vars ->
         cond:terms ->
         p:MP.pos ->
-        info:NO.expand_info ->
+        info:O.expand_info ->
         st:term ->
         term ->
         NO.n_occs * rand_occs))
-    ~(info:NO.expand_info)
+    ~(info:O.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)

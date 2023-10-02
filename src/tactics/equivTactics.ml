@@ -19,7 +19,8 @@ module ES   = EquivSequent
 module Hyps = ES.Hyps
 
 module NO = NameOccs
-module Name = NO.Name
+module O  = Occurrences
+module Name = O.Name
 
 module LT = LowTactics
   

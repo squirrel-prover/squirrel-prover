@@ -8,6 +8,34 @@ module PathCond = Iter.PathCond
 (** See description of the module in the `.mli` *)
 
 (*------------------------------------------------------------------*)
+(** Exported (see `.mli`) *)
+let clear_trivial_equalities (phi : Term.term) : Term.term =
+  let phis = Term.decompose_ands phi in
+  let phis =
+    List.filter_map (fun x -> x)
+      (List.map
+         (fun phi' ->
+            let phis' = Term.decompose_ors phi' in
+            let phis' =
+              List.filter_map (fun x -> x)
+                (List.map
+                   (fun t ->
+                      match Term.destr_neq t with
+                      | Some (u, v) when u = v -> None
+                      | None when t = Term.mk_false -> None
+                      | _ -> Some t)
+                   phis')
+            in
+            let phi' = Term.mk_ors ~simpl:true phis' in
+            match Term.destr_eq phi' with
+            | Some (u, v) when u = v -> None
+            | None when phi' = Term.mk_true -> None
+            | _ -> Some phi')
+         phis)
+  in
+  Term.mk_ands ~simpl:true phis
+
+(*------------------------------------------------------------------*)
 (** Occurrence content *)
 
 (** Exported (see `.mli`) *)
@@ -533,8 +561,7 @@ let get_actions_ext
             TSOcc.mk_simple_occ
               ts
               (Term.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp)
-              (* unused, so always set
-                 to some arbitrary value *)
+              (* unused, so always set to some arbitrary value *)
               () (* unused *)
               (List.rev fv) (* rev nicer for printing *)
               cond
@@ -556,7 +583,9 @@ let get_actions_ext
   get t ~fv ~cond:[] ~p:MP.root ~se
 
 
-(** Exported (see `.mli`) *)
+(** Returns all timestamps occuring in macros in a list of terms.
+    Should only be used when sources are directly occurring,
+    not themselves produced by unfolding macros. *)
 let get_macro_actions
     (contx : Constr.trace_cntxt)
     (sources : Term.terms) : ts_occs
@@ -836,7 +865,6 @@ module type OccurrenceFormulas = sig
   type ext_occ
   type ext_occs = ext_occ list
 
-  val clear_trivial_equalities : Term.term -> Term.term
   val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
   val occurrence_formula :
     ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
@@ -990,35 +1018,6 @@ struct
            | _ -> e)
         sigma' in
     sigma' @ sigma
-
-
-  (** Exported (see `.mli`) *)
-  let clear_trivial_equalities (phi : Term.term) : Term.term =
-    let phis = Term.decompose_ands phi in
-    let phis =
-      List.filter_map (fun x -> x)
-        (List.map
-           (fun phi' ->
-              let phis' = Term.decompose_ors phi' in
-              let phis' =
-                List.filter_map (fun x -> x)
-                  (List.map
-                     (fun t ->
-                        match Term.destr_neq t with
-                        | Some (u, v) when u = v -> None
-                        | None when t = Term.mk_false -> None
-                        | _ -> Some t)
-                     phis')
-              in
-              let phi' = Term.mk_ors ~simpl:true phis' in
-              match Term.destr_eq phi' with
-              | Some (u, v) when u = v -> None
-              | None when phi' = Term.mk_true -> None
-              | _ -> Some phi')
-           phis)
-    in
-    Term.mk_ands ~simpl:true phis
-
 
 
   (** Exported (see `.mli`) *)

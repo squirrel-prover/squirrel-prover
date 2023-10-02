@@ -1,11 +1,10 @@
 module PathCond = Iter.PathCond
-
+module O = Occurrences
+  
 (*------------------------------------------------------------------*)
 (** Generic functions to search illegal occurrences of names,
     and generate the appropriate proof obligations,
     For use when writing tactics, e.g. gdh or fresh. *)
-
-open Term
 
 (** {1 Types and functions to handle generic occurrences}
 
@@ -18,34 +17,25 @@ open Term
     - This is probably somewhat redundant with {!Iter.occ}…
       but more specific to the use case here. *)
 
-(** Tag indicating whether an occurrence is direct,
-    or indirectly caused by some action given as a {!Term.term}. *)
-type occ_type =
-  | EI_direct
-  | EI_indirect of term
-
-(** Applies a substitution to an {!occ_type}. *)
-val subst_occtype : subst -> occ_type -> occ_type
-
 (** Simple occurrence of an element of type ['a],
     with additional data of type ['b]. *)
 type ('a, 'b) simple_occ =
-  {so_cnt     : 'a;        (** content of the occurrence *)
-   so_coll    : 'a;        (** thing it potentially collides with *)
-   so_ad      : 'b;        (** additional data, if needed *)
-   so_vars    : Vars.vars; (** variables bound above the occurrence *)
-   so_cond    : terms;     (** condition above the occurrence *)
-   so_occtype : occ_type;  (** occurrence type *)
-   so_subterm : term;      (** a subterm where the occurrence was found (for printing) *)
+  {so_cnt     : 'a;         (** content of the occurrence *)
+   so_coll    : 'a;         (** thing it potentially collides with *)
+   so_ad      : 'b;         (** additional data, if needed *)
+   so_vars    : Vars.vars;  (** variables bound above the occurrence *)
+   so_cond    : Term.terms; (** condition above the occurrence *)
+   so_occtype : O.occ_type; (** occurrence type *)
+   so_subterm : Term.term;  (** a subterm where the occurrence was found (for printing) *)
   }
 
 (** Constructs a simple occurrence. *)
-val mk_simple_occ : 'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type -> term -> ('a, 'b) simple_occ
+val mk_simple_occ : 'a -> 'a -> 'b -> Vars.vars -> Term.terms -> O.occ_type -> Term.term -> ('a, 'b) simple_occ
 
 (** {2 Derived occurrence types} *)
 
 (** Type of a timestamp occurrence. *)
-type ts_occ = (term, unit) simple_occ
+type ts_occ = (Term.term, unit) simple_occ
 
 (** Type of empty simple occurrences
     (used as dummy parameter when they are not needed). *)
@@ -62,8 +52,8 @@ type empty_occs = empty_occ list
 (** Occurrence with additional info about where it was found. *)
 type ('a, 'b) ext_occ = {
   eo_occ       : ('a, 'b) simple_occ;
-  eo_source    : terms;     (** Original terms where the occurrence was found. *)
-  eo_source_ts : ts_occs;   (** Timestamps occurring in the source terms. *)
+  eo_source    : Term.terms;     (** Original terms where the occurrence was found. *)
+  eo_source_ts : ts_occs;        (** Timestamps occurring in the source terms. *)
 
   eo_path_cond : Iter.PathCond.t;
   (** Path condition on the timestamps [τ] at which the occurrence can occur:
@@ -87,42 +77,11 @@ type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
     (if o1 generates a particular case of o2 then it is subsumed;
     {b TODO} clarify this comment). *)
 type ('a, 'b) occ_formula =
-  negate:bool -> 'a -> 'a -> 'b -> term
-
-(*------------------------------------------------------------------*)
-
-(** {1 Macro expansion}
-    Functions handling macro expansion in terms, when allowed. *)
-
-(** Information used to check if a macro can be expanded in a term:
-    - a tag indicating the occurrence type (and provenance);
-    - the trace context. *)
-type expand_info = occ_type * Constr.trace_cntxt
-
-(** Expands a term [t] if it is a macro
-    and we can check that its timestamp happens
-    using [info] (not recursively).
-    Returns [Some t'] if [t] expands to [t'],
-    [None] if no expansion has been performed. *)
-val expand_macro_check_once : expand_info -> term -> term option
-
-(** Expands term as much as possible, recursively
-    (only at toplevel, not in subterms). *)
-val expand_macro_check_all : expand_info -> term -> term
-
-(** Returns all timestamps occuring in macros in a list of terms.
-    Should only be used when sources are directly occurring,
-    not themselves produced by unfolding macros. *)
-val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
-
+  negate:bool -> 'a -> 'a -> 'b -> Term.term
 
 (*------------------------------------------------------------------*)
 
 (** {1 Formula construction and simplification} *)
-
-(** Interprets [phi] as [phi_1 /\ … /\ phi_n]
-    and reconstructs it to simplify trivial equalities. *)
-val clear_trivial_equalities : term -> term
 
 (** [time_formula τ ts_occs] constructs the formula:
     
@@ -130,54 +89,35 @@ val clear_trivial_equalities : term -> term
 
     where [vi], [tsi] are the variables and content of [ts_occ]. 
     (for example, [path_cond x y] can be [x ≤ y]). *)
-val time_formula : term -> ?path_cond:PathCond.t -> ts_occs -> term
+val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
 
 
 (*------------------------------------------------------------------*)
 
 (** {1 Name occurrences} *)
 
-module Name : sig
-  (** An applied named [symb(args)] *)
-  type t = { symb : Term.nsymb; args : Term.terms; }
-
-  val pp : Format.formatter -> t -> unit
-
-  val of_term : Term.t -> t
-
-  val to_term : t -> Term.t
-
-  val subst : Term.subst -> t -> t
-
-  (** looks for a name with the same symbol in the list *)
-  val exists_name : t -> t list -> bool
-
-  (** finds all names with the same symbol in the list *)
-  val find_name : t -> t list -> t list
-end
-
-type n_occ = (Name.t, unit) simple_occ
+type n_occ = (O.Name.t, unit) simple_occ
 type n_occs = n_occ list
 
-type name_occ = (Name.t, unit) ext_occ
+type name_occ = (O.Name.t, unit) ext_occ
 type name_occs = name_occ list
 
 (** Constructs a name occurrence. *)
 val mk_nocc :
-  Name.t ->      (* name *)
-  Name.t ->      (* name it collides with *)
-  Vars.vars -> (* vars bound above *)
-  terms ->     (* condition above *)
-  occ_type ->  (* occurrence type *)
-  term ->      (* subterm (for printing) *)
+  O.Name.t ->      (* name *)
+  O.Name.t ->      (* name it collides with *)
+  Vars.vars ->   (* vars bound above *)
+  Term.terms ->  (* condition above *)
+  O.occ_type ->  (* occurrence type *)
+  Term.term ->   (* subterm (for printing) *)
   n_occ
 
 
 (** Finds all names with the same symbol in the list, returns the
     corresponding n_occs *)
 val find_name_occ :
-  Name.t -> Name.t list ->
-  Vars.vars -> Term.terms -> occ_type -> Term.term ->
+  O.Name.t -> O.Name.t list ->
+  Vars.vars -> Term.terms -> O.occ_type -> Term.term ->
   n_occs
 
   
@@ -215,18 +155,18 @@ val find_name_occ :
 type ('a, 'b) f_fold_occs =
   (unit -> n_occs * ('a, 'b) simple_occs) ->
   (fv:Vars.vars ->
-   cond:terms ->
+   cond:Term.terms ->
    p:Match.Pos.pos ->
-   info:expand_info ->
-   st:term ->
-   term ->
+   info:O.expand_info ->
+   st:Term.term ->
+   Term.term ->
    n_occs * ('a, 'b) simple_occs)->
-  info:expand_info ->
+  info:O.expand_info ->
   fv:Vars.vars ->
-  cond:terms ->
+  cond:Term.terms ->
   p:Match.Pos.pos ->
-  st:term ->
-  term ->
+  st:Term.term ->
+  Term.term ->
   n_occs * ('a, 'b) simple_occs
 
 
@@ -237,7 +177,7 @@ val find_all_occurrences :
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
   Env.t ->
-  terms ->
+  Term.terms ->
   name_occs * ('a, 'b) ext_occs
 
 (*------------------------------------------------------------------*)
@@ -267,8 +207,8 @@ val occurrence_formulas :
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
   Env.t ->
-  terms ->
-  terms * terms
+  Term.terms ->
+  Term.terms * Term.terms
 
 (** Instance of {!occurrence_formulas} for when we only look for names.
     It is used for the [fresh] and [dh] tactics. *)
@@ -280,8 +220,8 @@ val name_occurrence_formulas :
   (unit, unit) f_fold_occs ->
   Constr.trace_cntxt ->
   Env.t ->
-  terms ->
-  terms
+  Term.terms ->
+  Term.terms
 
 (** Returns all found occurrences as well as the formulas,
     for more complex use cases (eg. [intctxt]).
@@ -295,5 +235,5 @@ val occurrence_formulas_with_occs :
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
   Env.t ->
-  terms ->
-  terms * terms * name_occs * ('a, 'b) ext_occs
+  Term.terms ->
+  Term.terms * Term.terms * name_occs * ('a, 'b) ext_occs
