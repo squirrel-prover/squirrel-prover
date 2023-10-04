@@ -3,25 +3,26 @@
 .. Gentle introduction to Squirrel
 
 This tutorial provides a very quick introduction to the main concepts
-of Squirrel. It can be used to ease its discovery and to get an
+of **Squirrel**. It can be used to ease its discovery and to get an
 intuitive grasp of the multiple concepts by going through a concrete
 example. The reference manual provides a more extensive presentation
 of all the concepts.
 
 In many cases, the concept introduced here are also direct clickable
-reference to the more extensive presentation of the reference manual.
+references to the more extensive presentation in the reference manual.
 
 Protocol modelling
 --------------------
 
-Squirrel allows to perform proofs of security for communication
-protocols. It works whitin a high-order logic, and a first step is to
-be able to model all the components of a protocol inside a logic.
+Squirrel allows performing proofs of security for communication
+protocols relying on cryptography. It works within a high-order logic,
+and a first step is to be able to model all the components of a
+protocol inside a logic.
 
 Messages
 ++++++++
 
-Messages computed and exchanged by a protocol and sent over the
+Messages computed by a protocol and sent over the
 network are modelled using :ref:`terms <term>`.
 
 Concretely, a term is built from
@@ -29,9 +30,9 @@ Concretely, a term is built from
  * a name :g:`n` used to model a random sampling;
  * applications of functions :g:`f(m_1,...,m_k)`.
 
-Notice that this allow to effectively model any computation, as one
+This allows effectively modeling any computation, as one
 can have function symbols modeling any sort of computations, from
-equality testing, to conditional branching, to encryption funcitions.
+equality testing to conditional branching or encryption functions.
 
 In **Squirrel**, a function symbol without any assumption can be defined with:
 
@@ -46,17 +47,18 @@ In **Squirrel**, a function symbol without any assumption can be defined with:
 
 When using such function symbols inside a protocol, we are effectively
 saying that those function symbol may be in practice instantiated by
-any function of the correct type. This is notably usefull to model a
-constant `ok`, without giving any specific concrete value to this
-constant.
+any function of the correct type. And a proof in such a model holds
+for any possible implementation of those functions. This is notably
+useful to model a constant `ok`, without giving any specific concrete
+value to this constant.
 
 `ok` and `ko` are constants, and `f1` is a function that expects a message, and
 then return a message. `f2` is then a function symbol of arity two, and function
 symbols of any arity can be defined this way.
 
 
-A name `n` allows to model secret keys, or some random challenge. As we wish to
-be able to refer to an unbounded number of session, we allow names to be
+A name `n` typically allows modeling secret keys or nounces. As we wish to
+be able to refer to an unbounded number of sessions, we allow names to be
 indexed, each value of the index yielding a fresh independent random value. We denote
 by `n[i]` an indexed name, with variable `i` as an index. Names can be indexed
 by any number of indices.
@@ -70,9 +72,9 @@ In the tool, one can declare names and indexed names with the following.
    name n2 : index * index -> message.
 
 
-Compare to game based cryptography, one can think about names as
-picking at the begining of the protocol execution all possible random
-values that will be needed, and store them within indexed cells, which
+Compared to usual game based cryptography, one can think about names as
+sampling at the beginning of the protocol execution all possible random
+values that will ever be needed, and store them within indexed cells, which
 are our names.
    
 To model a setting where multiple people each have their own secret key,
@@ -89,7 +91,7 @@ Basic assumption
 
 
 We can declare axioms over our abstract function symbols, for instance
-to state that the two abstarct constant :g:`ok` and :g:`ko` are not
+to state that the two abstract constant :g:`ok` and :g:`ko` are not
 equal.
 
 
@@ -98,11 +100,15 @@ equal.
 		  
    axiom [any] ok_not_ko: ok <> ko.
 
+A proof over such model would then apply to any concrete
+implementation in which :g:`ok` and :g:`ko` are given two concrete
+values as long as those two values are distinct.
+   
 Axioms are formulas in a high-order logic, for instance allowing free
 variables, universal and existential quantification, implications,
 etc. Here, we define the axiom as true over :g:`any` protocol.
 
-Another axiom that could be useful to prove the security of a protocl
+Another axiom that could be useful to prove the security of a protocol
 is for instance that :g:`ko` can never be equal to any pair
 :g:`<x,y>`.
 
@@ -111,7 +117,8 @@ is for instance that :g:`ko` can never be equal to any pair
    axiom [any] ok_not_pair (x,y:message): <x,y> <> fail.
 
 
-Going back to the name declaration, if we now display the Squirrel output after a declaration, we see the following:
+Going back to the name declaration, if we now display the **Squirrel**
+output after a declaration, we see the following:
 
 .. squirreltop::  all
 
@@ -129,7 +136,7 @@ Symbol functions can be defined as being an encryption, or a hash function, or a
 signature, or... The tool will then assume that such functions satisfy some
 classical cryptographic assumptions.
 
-The possible sorts and corresponding assumptions are:
+Some possible primitives and corresponding assumptions are:
 
  * encryption,  **CCA1** & **INT-CTXT**, symmetric and asymmetric
  * signatures, **EUF-CMA**
@@ -149,11 +156,11 @@ Protocols
 
 Protocols are described inside a pi-calculus as :ref:`processes <section-processes>`. It is based on the following constructs:
 
- *  :g:`new n` id used to declare a fresh name; (this is optional, and equivalent to declaring the names as seen begore)
+ *  :g:`new n` id used to declare a fresh name; (this is optional, and equivalent to declaring the names as seen before)
  * :g:`out(c,m)` is used to send the term `m` over the channel `c`;
  * :g:`in(c,x)` is used to receive some value from channel `c`, bound to the variable `x`;
  * :g:`act; P` correspond to the sequential composition of action `act` with process `P`;
- * :g:`process name(vars) = ...` allors to declare a process with a name, in which case using `name(vars)` inside another process unfold the process definition;
+ * :g:`process name(vars) = ...` allows declaring a process with a name, in which case using `name(vars)` inside another process unfold the process definition;
  * :g:`P | Q` is a parallel composition of two processes;
  * :g:`if phi then P else Q` is a conditional branching;  
  * :g:`try find vars such that phi in P else Q` is a global lookup over indices, it can be seen as a lookup inside a database.   
@@ -171,6 +178,11 @@ called the basic hash protocol :cite:`bruso2010formal`.
    
    R --> T : ok
 
+Here, a tag :g:`T` sends to the reader :g:`R` a fresh challenge
+:g:`nT`, authenticated via a MAC over the challenge using the key tag
+:g:`kT`. Each tag has a distinct :g:`kT`, and the reader has a
+database containing all of them.
+   
 
 We first declare the channels used by the protocol. Remark that channels are
 mostly byproducts of the theory, and do not play a big role.
@@ -181,7 +193,7 @@ mostly byproducts of the theory, and do not play a big role.
    channel cR.
 
 
-We then define a first process of a protocol, which may correspond to
+We then define the first process for the tags, which may correspond to
 multiple identies, and thus depend on some index variable `i`.
 
 .. squirreltop::  in
@@ -195,7 +207,7 @@ We can then declare the reader.
 
 .. squirreltop::  in
 
-   process reader(j:index) =
+   process reader =
      in(cT,x);
      try find i such that snd(x) = h(fst(x),key(i)) in
        R : out(cR,ok)
@@ -203,31 +215,31 @@ We can then declare the reader.
       R1 : out(cR,ko).
 
 And we finally declare the final system. We instantiate multiple copies
-of the reader, and for each value `i`, we also instantiate multilpe copies of
-:g:`tag(i)` with the replicaiton over `k`.
+of the reader, and for each value `i`, we also instantiate multiple copies of
+:g:`tag(i)` with the replication over `k`.
 
 .. squirreltop::  all
 
-   system ((!_j reader(j)) | (!_i !_k tag(i))).
+   system ((!_j reader) | (!_i !_k tag(i))).
 
 
 We see that when declaring such a system, in the final system after
 processing, all outputs have been given name, each output then
-correspond to a possible action that can be triggered by the
+corresponds to a possible action that can be triggered by the
 attacker. Here, the possible actions are :g:`(init,R,R1,T)`, and
 many axioms are created, corresponding to the fact that for instance
 actions :g:`R1` and :g:`R` are mutually exclusive as both
-correspond to exclusiv branches; this is the
+correspond to exclusive branches; this is the
 :g:`mutex_default_R1_R` axiom, stating that for any possible
-execution, one of the two actions must not happen in the tracec.
+execution, one of the two actions must not happen in the trace.
    
 A system declared this way is given the name `default`. Other systems can
-be defined and given an epxlicit name. For instance, the following declare the
+be defined and given an explicit name. For instance, the following declare the
 system `simple`, where each tag can only be executed once for each identity.
 
 .. squirreltop::  in
 
-   system [simple] ((!_j reader(j)) | (!_i tag(i))).
+   system [simple] ((!_j reader) | (!_i tag(i))).
 
 
 Reachability properties
@@ -235,7 +247,7 @@ Reachability properties
 
 We express reachabilities formulas, that is, properties that talk
 about what is possible or not for all traces, inside a first-order
-logic. In Squirrel, such formulas are formaly called
+logic. In **Squirrel**, such formulas are formally called
 :term:`local formulas <local formula>`.
 
 In this logic, terms can be of type :g:`message`, :g:`boolean`,
@@ -243,7 +255,7 @@ In this logic, terms can be of type :g:`message`, :g:`boolean`,
 true for all possible traces of the protocol, and for all possible
 values of the variable given this trace.
 
-For instance, a timestamp variable `t` allows to talk about a given
+For instance, a timestamp variable `t` allows talking about a given
 point inside a trace. `t` will intuitively have to take the value of
 some concrete action, e.g., `T(i)` or `R(j)` in our example.
 
@@ -256,7 +268,7 @@ To discuss about the value of the output performed at some timestamp, we use mac
  * :g:`output@t` is the output performed by action at t;
  * :g:`cond@t` is the executability condition at t;
  * :g:`frame@t` is the sequence of all previous outputs up to t;
- * :g:`exec@t` is the conjonction of all executability conditions up to t.
+ * :g:`exec@t` is the conjunction of all executability conditions up to t.
 
 Formulas
 ++++++++
@@ -265,8 +277,8 @@ It is then possible to write formulas that capture properties
 satisfied by all executions of the protocol. For instance, the
 following formula describes that the executability execution of the
 reader in fact implies some authentication property, in the sense that
-there must exists an action :g:`T(i,k)` that was executed before the
-reader, and such the input of the reader corresonds to the name of
+there must exist an action :g:`T(i,k)` that was executed before the
+reader, and such the input of the reader corresponds to the name of
 :g:`T(i,k)`.
 
 .. squirreltop::  all
@@ -291,13 +303,15 @@ Once inside a proof context, delimited by `Proof.` and `Qed.`, it is
 possible to get the list of available tactics by typing `help.`, and
 details about any tactic with `help tacticname.`
 
+We now start the proof.
+
 .. squirreltop::  all
 
    Proof.
 
-After the :g:`Proof` command, Squirrel displays the current
-judgement. It contains the number of goal that remain to prove (here,
-one, but subogals may be created by tactics), the system we are
+After the :g:`Proof` command, **Squirrel** displays the current
+judgement. It contains the number of goal that remains to be proved
+(here, one, but subogals may be created by tactics), the system we are
 working in, and the formula to be proved.
    
 .. squirreltop::  all
@@ -306,7 +320,7 @@ working in, and the formula to be proved.
 
 We have performed an introduction with the :tacn:`intro` tactic. This
 pushes universal quantifications inside the judgment context, where
-the universal quantified variable become free variable. This allow us
+the universal quantified variable become free variable. This allows us
 to then push the left-hand side of the implications as hypothesis of
 the judgment, that we can then reason on. The free variables and
 assumptions are named according to the names passed as argument.
@@ -326,33 +340,40 @@ proof. This cryptographic axiom is applied thanks to the :tacn:`euf`
 tactic.
      
 .. squirreltop::  all
-		  
+   
      euf Hc.
+
+To conclude, we just have to use the :g:`k` introduced by the
+:tacn:`euf` tactic as a witness for the existential :g:`k` we have to
+find.
+     
+.. squirreltop::  all
+		  
      intro [k _].
      by exists k.
    Qed.
-
-The :g:`euf` tactic then directly state our goal.
 
 
 Equivalence properties
 ----------------------
 
 More complex properties based on equivalence can be
-expressed. Intuitivaly, two processes are equivalent if the attacker
-cannot know whether it is interacting with one or another.
+expressed. Intuitively, two processes are equivalent if the attacker
+cannot know whether it is interacting with one or another. This is a
+generic security property used in the computational model to prove
+many distinct flavours of security.
 
-We can declare in Squirrel two variants of a protocol at once using
-the :g:`diff(t1,t2)` operator. A process contianing such diff-term is
+We can declare in **Squirrel** two variants of a protocol at once using
+the :g:`diff(t1,t2)` operator. A process containing diff-terms is
 called a bi-process, as it can lead to two distinct processes when
 projecting on the left or the right of the diff. This allows to easily
 model some security properties.
 
-For instance, we can decalre a bi-process :g:`tagD` that models the
-fact the on one side each tag may be called many times and use always
+For instance, we can declare a bi-process :g:`tagD` that models the
+fact the on one side each tag may be called many times and always use
 there own key, this is the real world, while on the right side, we in
-fact use a new fresh key every time a tag is called. If those two
-world are equivalent, then tags cannot be tracked.
+fact use a new fresh independent key every time a tag is called. If
+those two world are equivalent, then tags cannot be tracked.
 
 .. squirreltop::  all
 		  
@@ -446,18 +467,19 @@ directly be obtained from the hypotheses.
 
 
 We now prove an equivalence property expressing unlinkability of the
-protocol. This property is expressed by the logic formula :g:`forall
+protocol. This property is expressed by the logical formula :g:`forall
 t:timestamp, [happens(t)] -> equiv(frame@t)` where :g:`frame@t` is
 actually a bi-frame. This state that for any trace (the quantification
 is implicit over all traces), for any point that happens in the trace,
 the two frames (based on the diff operator) are equivalent. Square
-brackets contain local formulas, and such a formula mixing both local formulas and equivalence is called a :term:`global formula`.
+brackets contain local formulas, and such a formula mixing both local
+formulas and equivalences is called a :term:`global formula`.
 
-Here, we will have to prove that the left projection of `:g:frame@t` (_i.e._
+Here, we will have to prove that the left projection of :g:`frame@t` (*i.e.*
 the real system) is indistinguishable from the right projection of
-:g:`frame@t` (_i.e._ the ideal system).
+:g:`frame@t` (*i.e* the ideal system).
 
-As this goal is a frequent one, a shortcut allows to declare this goal
+As this goal is a frequent one, a shortcut allows declaring this goal
 without writing the full formula.
 
 .. squirreltop:: all
@@ -466,10 +488,11 @@ without writing the full formula.
    Proof.
 
 An equivalence judgment contains the list of hypothesis, as
-before. The conclusion is however different to the reachiability
+before. The conclusion is however different to the reachability
 case. Now, we have a numbered list of diff-terms, we must prove that
-each of them is indistinguishable. We refer to this sequence of diff
-terms as the biframe of the goal.
+for each of them, the left projection and the right projection are
+indistinguishable. We refer to this sequence of diff terms as the
+biframe of the goal.
 		    
 The high-level idea of the proof is as follows:
 
@@ -484,9 +507,11 @@ The high-level idea of the proof is as follows:
 
 The proof is done by induction over the timestamp :g:`t`.  The
 `induction` tactic also automatically introduces a case analysis over
-all the possible values for :g:`t`.  The first case, where :g:`t = init`, is
-trivial, we direclty close it with :tacn:`auto`.  The other cases correspond to the 3 different actions of the
-protocol.
+all the possible values for :g:`t`.  The first case, where :g:`t =
+init` corresponds to first point of the execution trace where no
+protocol action happened, is trivial, we directly close it with
+:tacn:`auto`.  The other cases correspond to the 3 different actions
+of the protocol.
 
 
 .. squirreltop:: all
@@ -495,7 +520,11 @@ protocol.
    auto.
 
   
-For the case where :g:`t = R2(j)`, we start by expanding the macros and splitting the pairs. Splitting the pairs is done by using the :tacn:`fa` tactic, which when applied to all pairs thanks to the pattern :g:`!<_,_>` splits a bi-frame element containing a pair into two biframe elements for each element of the pair.
+For the case where :g:`t = R2(j)`, we start by expanding the macros
+and splitting the pairs. Splitting the pairs is done by using the
+:tacn:`fa` tactic, which when applied to all pairs thanks to the
+pattern :g:`!<_,_>` splits a bi-frame element containing a pair into
+two biframe elements for each element of the pair.
 
 .. squirreltop:: all
 		 
@@ -506,7 +535,7 @@ Using the authentication goal :g:`wa_R` previously proved, we replace
 the formula :g:`cond@R2(j)` by an equivalent formula expressing the
 fact that a tag :g:`T(i,k)` has played before and that the output of
 this tag is the message inputted by the reader. This is one of the
-strength of Squirrel, we can finely reuse previously proved goals to
+strength of **Squirrel**, we can finely reuse previously proved goals to
 simplify a current goal. Here, as we can see the :g:`wa_R` tactic as a
 rewriting rule over boolean formulas, we use the :tacn:`rewrite`
 tactic.
@@ -534,7 +563,8 @@ In the case where :g:`t = R1(j)`, it is similar to the previous one.
   rewrite /cond (wa_R (R1 j)) //.
   by deduce 1.
 
-Finally, for the case where t = T(i,k), we start by expanding the macros and splitting the pairs.
+Finally, for the case where t = T(i,k), we start by expanding the
+macros and splitting the pairs.
 
 .. squirreltop:: all
 		   
@@ -549,7 +579,8 @@ The goal is now to prove that this condition always evaluates to `true`.
 		 	
     prf 2.
     
-Several conjuncts must now be proved, the same tactic can be used on all of them. Here are representative cases:
+Several conjuncts must now be proved, the same tactic can be used on
+all of them. Here are representative cases:
 
   - In one case, :g:`nT(i,k)` cannot occur in :g:`input@R2(j)`
     because :g:`R2(j) < T(i,k)`.
@@ -559,7 +590,7 @@ Several conjuncts must now be proved, the same tactic can be used on all of them
 In both cases, the reasoning is performed by the fresh tactic on the
 message equality hypothesis :g:`Meq` whose negation must initially be
 proved.  To be able to use (split and) fresh, we first project the
-goal into into one goal for the left projection and one goal for the
+goal into one goal for the left projection and one goal for the
 right projection of the initial bi-system. 
 
 .. squirreltop:: all
