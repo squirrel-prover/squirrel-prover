@@ -18,7 +18,8 @@ module PT : sig
     form   : Equiv.any_form;
   }
 
-  val pp : Format.formatter -> t -> unit
+  val pp     : Format.formatter -> t -> unit
+  val pp_dbg : Format.formatter -> t -> unit
 end
 
 (*------------------------------------------------------------------*) 

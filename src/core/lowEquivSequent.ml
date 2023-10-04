@@ -8,6 +8,8 @@ module TopHyps = Hyps           (* alias, as we define another [Hyps] later *)
 module SE = SystemExpr
 module TS = LowTraceSequent
 
+module Sid = Ident.Sid
+
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
 
@@ -58,14 +60,19 @@ let fv (s : t) : Vars.Sv.t =
   in
   Vars.Sv.union h_vars (Equiv.fv s.goal)
 
-let sanity_check (s : t) : unit =
-  Vars.sanity_check s.env.Env.vars;
-  assert (Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars))
+(*------------------------------------------------------------------*)
+let ty_fv (s : t) : Type.Fv.t =
+  let h_vars =
+    H.fold (fun _ f vars ->
+        Type.Fv.union (Equiv.ty_fv f) vars
+      ) s.hyps Type.Fv.empty
+  in
+  Type.Fv.union h_vars (Equiv.ty_fv s.goal)
 
 (*------------------------------------------------------------------*)
-let _pp_goal ~dbg fmt = function
+let _pp_goal ~dbg ~context fmt = function
   | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ~dbg) fmt e
-  | _  as f -> Equiv._pp ~dbg fmt f
+  | _  as f -> Equiv._pp ~dbg ~context fmt f
 
 (*------------------------------------------------------------------*)
 let _pp ~dbg ppf j =
@@ -80,11 +87,11 @@ let _pp ~dbg ppf j =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) j.env.vars ;
 
-  H._pp ~dbg ppf j.hyps ;
+  H._pp ~dbg ~context:j.env.system ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]" (_pp_goal ~dbg) j.goal
+  Fmt.pf ppf "@;%a@]" (_pp_goal ~dbg ~context:j.env.system) j.goal
 
 let pp     = _pp ~dbg:false
 let pp_dbg = _pp ~dbg:true
@@ -95,6 +102,24 @@ let pp_init ppf j =
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
   Fmt.pf ppf "%a" Equiv.pp j.goal
 
+(*------------------------------------------------------------------*)
+let sanity_check (s : t) : unit =
+  Vars.sanity_check s.env.Env.vars;
+
+  (* all term variables are bound *)
+  if not ((Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars))) then
+    let () =
+      Fmt.epr "Anomaly in LowEquivSequent.sanity_check:@.%a@.@." pp_dbg s
+    in
+    assert false
+  else ();
+      
+  let tyfv = ty_fv s in
+  (* all type variables are bound *)
+  assert (Sid.subset tyfv.tv
+            (Sid.of_list (List.map Type.ident_of_tvar s.env.ty_vars)));
+  (* no univars remaining *)
+  assert (Sid.subset tyfv.uv Sid.empty)
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses functions} *)
@@ -161,9 +186,9 @@ module Hyps
 
   let clear_triv s = { s with hyps = H.clear_triv s.hyps }
 
-  let pp          fmt s = H.pp          fmt s.hyps
-  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
-  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
+  let pp          fmt s = H.pp                                fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg                            fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -321,7 +346,7 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~env ?hyp goal =
+let init ?(no_sanity_check=false) ~env ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
@@ -329,7 +354,7 @@ let init ~env ?hyp goal =
         snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
   let new_sequent = { env; hyps; goal } in
-  sanity_check new_sequent;
+  if not no_sanity_check then sanity_check new_sequent;
 
   if TConfig.post_quantum (env.table) then
    check_pq_sound_sequent new_sequent

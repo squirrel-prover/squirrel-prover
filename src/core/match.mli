@@ -33,7 +33,7 @@ module Pos : sig
       If [f t vars conds = `Select], we found a position.
       If [f t vars conds = `Continue], we keep looking for positions downwards. *)
   type f_sel =
-    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
+    Term.term -> Vars.vars -> Term.term list ->
     [`Select | `Continue]
 
   (*------------------------------------------------------------------*)
@@ -77,13 +77,25 @@ module Pos : sig
 
   (*------------------------------------------------------------------*)
   (** Similar to [f_map_fold], but for over [Equiv.form] sub-terms. 
-      
       - [SE.context] is the context applying to the current sub-term. *)
   type 'a f_map_fold_g =
     Equiv.form ->
     SE.context -> Vars.vars -> pos ->
     'a ->
     'a * [`Map of Equiv.form | `Continue]
+
+  (** Same as [f_map_fold_g], but just for a map. *)
+  type f_map_g =
+    Equiv.form ->
+    SE.context -> Vars.vars -> pos -> 
+    [`Map of Equiv.form | `Continue]
+
+  (** Same as [f_map_fold_g], but just for a fold. *)
+  type 'a f_fold_g =
+    Equiv.form ->
+    SE.context -> Vars.vars -> pos ->
+    'a ->
+    'a
 
   (*------------------------------------------------------------------*)
   (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
@@ -166,6 +178,16 @@ module Pos : sig
   val map_fold_g :
     ?mode:[ `BottomUp | `TopDown of bool ] ->
     'a f_map_fold_g -> SE.context -> 'a -> Equiv.form -> 'a * bool * Equiv.form
+
+  (** Same as [map], but for [Equiv.form] sub-terms *)
+  val map_g :
+    ?mode:[ `BottomUp | `TopDown of bool ] ->
+    f_map_g -> SE.context -> Equiv.form -> bool * Equiv.form
+
+  (** Same as [fold], but for [Equiv.form] sub-terms *)
+  val fold_g :
+    ?mode:[ `BottomUp | `TopDown of bool ] ->
+    'a f_fold_g -> SE.context -> 'a -> Equiv.form -> 'a
 end
 
 (*------------------------------------------------------------------*)
@@ -218,7 +240,9 @@ module Mvar : sig
   (** Checks that all arguments of [pat] have been inferred in [mv]. *)
   val check_args_inferred : 'a Term.pat_op -> t -> unit 
 
-  val pp : Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp     :             Format.formatter -> t -> unit
+  val pp_dbg :             Format.formatter -> t -> unit
 end
 
 (*------------------------------------------------------------------*)

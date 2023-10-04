@@ -1,5 +1,3 @@
-
-
 hash h
 
 name n : index * index -> message

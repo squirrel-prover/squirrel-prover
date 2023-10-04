@@ -17,9 +17,9 @@ let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 module type Hyp = sig 
   type t 
 
-  val pp_hyp     :             Format.formatter -> t -> unit
-  val _pp_hyp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp_hyp_dbg :             Format.formatter -> t -> unit
+  val pp_hyp     : Format.formatter -> t -> unit
+  val pp_hyp_dbg : Format.formatter -> t -> unit
+  val _pp_hyp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
 
   (** Chooses a name for a formula, depending on the formula shape. *)
   val choose_name : t -> string
@@ -105,13 +105,13 @@ module type S1 = sig
   val clear_triv : hyps -> hyps
 
   (*------------------------------------------------------------------*)
-  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
+  val pp_ldecl : ?dbg:bool -> ?context:SE.context -> Format.formatter -> ldecl -> unit
 
-  val pp_hyp   : Format.formatter -> hyp  -> unit
+  val pp_hyp : Format.formatter -> hyp  -> unit
 
-  val pp       :             Format.formatter -> hyps -> unit
-  val _pp      : dbg:bool -> Format.formatter -> hyps -> unit
-  val pp_dbg   :             Format.formatter -> hyps -> unit
+  val pp     : Format.formatter -> hyps -> unit
+  val pp_dbg : Format.formatter -> hyps -> unit
+  val _pp    : dbg:bool -> Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)
@@ -119,6 +119,7 @@ end
 module type S = sig
   include S1
   val empty : hyps
+  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)
@@ -137,18 +138,18 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
 
   let pp_hyp = Hyp.pp_hyp
                  
-  let pp_ldecl ?(dbg=false) ppf (id,hyp) =
+  let pp_ldecl ?(dbg=false) ?context ppf (id,hyp) =
     Fmt.pf ppf "%a: %a@;"
       (if dbg then Ident.pp_full else Ident.pp) id
-      (Hyp._pp_hyp ~dbg) hyp
+      (Hyp._pp_hyp ~dbg ?context) hyp
 
-  let _pp ~dbg ppf hyps =
+  let _pp ~dbg ?context ppf hyps =
     let pp_sep ppf () = Fmt.pf ppf "" in
     Fmt.pf ppf "@[<v 0>%a@]"
-      (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg)) (Mid.bindings hyps)
+      (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg ?context)) (Mid.bindings hyps)
 
-  let pp     = _pp ~dbg:false
-  let pp_dbg = _pp ~dbg:true
+  let pp     = _pp ~dbg:false ?context:None
+  let pp_dbg = _pp ~dbg:true  ?context:None
       
   let find_opt func hyps =
     let exception Found of Ident.t * hyp in
@@ -316,8 +317,8 @@ let get_ord (at : Term.Lit.xatom ) : Term.Lit.ord =
 module TraceHyps = Mk(struct
     type t = Equiv.any_form
     let pp_hyp     = Equiv.Any.pp
-    let _pp_hyp    = Equiv.Any._pp
     let pp_hyp_dbg = Equiv.Any.pp_dbg
+    let _pp_hyp    = Equiv.Any._pp
 
     let htrue = Equiv.Local Term.mk_true
 
@@ -438,16 +439,15 @@ let setup_change_hyps_context
             | None -> true);
 
   (* Flags indicating which parts of the context are changed. *)
-  (* For the set, use SE.equal, which ignores the labels of the systems
-     and compares the sets as sets (i.e. double inclusion) *)
-  (* For the pair, the labels must be the same, so use equality *)
   let set_unchanged = SE.equal table new_context.SE.set old_context.SE.set in
-  let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
+  let pair_unchanged = 
+    oequal (SE.equal table) new_context.SE.pair old_context.SE.pair 
+  in
 
   (* Can we project formulas from the old to the new context? *)
   let set_projections : (Term.term -> Term.term) option =
     if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
-      if SE.subset table new_context.set old_context.set then
+      if SE.subset_modulo table new_context.set old_context.set then
         match SE.(to_projs (to_fset new_context.set)) with
           | projs -> Some (fun f -> Term.project projs f)
           | exception SE.(Error Expected_fset) -> assert false
@@ -474,7 +474,9 @@ let setup_change_hyps_context
       + Reachability atoms are unconstrained if the set annotation
         has not changed. Otherwise they must be pure trace formulas.
       + Equivalence atoms are only allowed if the trace annotation has
-        not changed. *)
+        not changed. 
+      + General predicates can always be kept, as their semantics 
+        does not depend on the system annotation of the sequent *)
   let rec can_keep_global env = function
     | Equiv.Quant (_,vars,f) ->
       let env = { env with Env.vars = Vars.add_vars vars env.Env.vars } in
@@ -485,6 +487,8 @@ let setup_change_hyps_context
 
     | Atom (Equiv _) -> pair_unchanged
 
+    | Atom (Pred _) -> true
+      
     | Atom (Reach a) ->
       (HighTerm.is_constant     env a &&
        HighTerm.is_system_indep env a)
@@ -547,7 +551,7 @@ let change_equiv_hyps_context
   : EquivHyps.hyps
   =
   let _update_local,update_global =
-    setup_change_hyps_context 
+    setup_change_hyps_context
       ~old_context ~new_context ~vars ~table
   in
   EquivHyps.fold

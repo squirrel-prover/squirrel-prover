@@ -65,7 +65,6 @@ module type S = sig
   val is_false  :               form -> bool
   val is_true   :               form -> bool
   val is_not    :               form -> bool
-  val is_zero   :               form -> bool
   val is_and    :               form -> bool
   val is_or     : ?env:Env.t -> form -> bool
   val is_impl   : ?env:Env.t -> form -> bool

@@ -41,6 +41,7 @@
   "senc"
   "abstract"
   "op"
+  "predicate"
   "system"
   "type"
   "name"

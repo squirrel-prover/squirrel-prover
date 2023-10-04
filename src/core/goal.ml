@@ -181,7 +181,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
     match formula with
     | Local f ->
       let f,_ = Theory.convert ~ty_env conv_env ~ty:Type.Boolean f in
-      let s = TS.init ~env f in
+      let s = TS.init ~no_sanity_check:true ~env f in
 
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
          - [vs = vs_glob @ vs_loc]
@@ -215,7 +215,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
 
     | Global f ->
       let f = Theory.convert_global_formula ~ty_env conv_env f in
-      let s = ES.init ~env f in
+      let s = ES.init ~no_sanity_check:true ~env f in
       let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Equiv s
 

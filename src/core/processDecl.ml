@@ -3,7 +3,8 @@ open Utils
 module L    = Location
 module Args = TacticsArgs
 module SE   = SystemExpr
-
+module Mv   = Vars.Mv
+                
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -80,7 +81,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     decl.name decl.symb_type
 
 (*------------------------------------------------------------------*)
-let parse_operator_decl table (decl : Decl.operator_decl) =
+let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     let name = L.unloc decl.op_name in
 
     let ty_vars = List.map (fun l ->
@@ -103,7 +104,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
 
     let body, out_ty = 
-      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
+      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } decl.op_body 
     in
     let body = Term.subst subst body in
 
@@ -123,10 +124,9 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
     let ftype = Operator.ftype data in
 
-    let in_tys = List.map Vars.ty args in
-
     (* sanity checks on infix symbols *)
-    Theory.check_fun_symb table in_tys decl.op_name decl.op_symb_type;
+    let in_tys = List.length args in (* number of arguments *)
+    Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
     
     let table, _ = 
       Symbols.Function.declare_exact 
@@ -137,6 +137,136 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
 
     Printer.prt `Result "@[<v 2>new operator:@;%a@]" 
       Operator.pp_operator data;
+
+    table
+
+(*------------------------------------------------------------------*)
+let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
+    let name = L.unloc decl.pred_name in
+
+    let ty_vars = List.map (fun l ->
+        Type.mk_tvar (L.unloc l)
+      ) decl.pred_tyargs
+    in
+
+    (* open a typing environment *)
+    let ty_env = Type.Infer.mk_env () in
+
+    let env = 
+      let system = SE.{
+          set  = var SE.Var.set; 
+          pair = Some (SE.to_pair (var SE.Var.pair)); } 
+      in
+      Env.init ~system ~table ~ty_vars () 
+    in
+
+    (* parse the system variables declared and build the
+       system variables environment *)
+    let se_env : SE.Var.env =
+      List.fold_left (fun se_env (lv, infos) ->
+          let name = L.unloc lv in
+
+          let infos =
+            List.map (fun info ->
+                match L.unloc info with
+                | "pair" -> SE.Var.Pair
+                | _ -> error (L.loc info) KDecl (Failure "unknown system information");
+              ) infos
+          in
+          (* ["equiv"] is always a [Pair] *)
+          let infos = if name = "equiv" then SE.Var.Pair :: infos else infos in
+
+          if Ms.mem name se_env then
+            error (L.loc lv) KDecl (Failure "duplicated system name");
+
+          let var = 
+            match name with
+            | "set"   -> SE.Var.set
+            | "equiv" -> SE.Var.pair
+            | _ -> SE.Var.of_ident (Ident.create name) 
+          in
+          Ms.add name (var, infos) se_env
+        ) SE.Var.init_env decl.pred_se_args
+    in
+    
+    (* parse binders for multi-term variables *)
+    let (se_info, env), multi_args =
+      List.map_fold
+        (fun (se_info,env) (se_v,bnds) ->
+           let se_v : SE.t =
+             let se_name = L.unloc se_v in
+             
+             if not (Ms.mem se_name se_env) then
+               error (L.loc se_v) KDecl (Failure "unknown system variable");
+             
+             SE.var (fst (Ms.find se_name se_env))
+           in
+           let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env bnds in
+           let se_info = Mv.add_list (List.map (fun v -> v, se_v) args) se_info in
+           (se_info, env), (se_v, args)
+        ) (Mv.empty, env) decl.pred_multi_args
+    in
+    (* parse binders for simple variables *)
+    let env, simpl_args =
+      Theory.convert_bnds ~ty_env ~mode:NoTags env decl.pred_simpl_args
+    in
+    
+    let body = 
+      match decl.pred_body with
+      | None -> Predicate.Abstract
+      | Some b ->
+        let b =
+          Theory.convert_global_formula
+            ~ty_env ~system_info:se_info
+            { env; cntxt = InGoal; } b
+        in
+        Predicate.Concrete b
+    in
+
+    (* check that the typing environment is closed *)
+    if not (Type.Infer.is_closed ty_env) then
+      begin
+        let loc = 
+          match decl.pred_body with Some b -> L.loc b | None -> L.loc decl.pred_name 
+        in
+        error loc KDecl (Failure "some types could not be inferred")
+      end;
+
+    (* close the typing environment and substitute *)
+    let tsubst = Type.Infer.close ty_env in
+    let multi_args =
+      List.map (fun (info, args) ->
+          info, List.map (Vars.tsubst tsubst) args
+        ) multi_args
+    in
+    let simpl_args = List.map (Vars.tsubst tsubst) simpl_args in
+    let body = Predicate.tsubst_body tsubst body in
+
+    let se_vars =
+      List.map (fun (_, (se_v,infos)) ->
+          (se_v, infos)
+        ) (Ms.bindings se_env)
+    in    
+    let args = Predicate.{ multi = multi_args; simple = simpl_args; } in
+    let data = Predicate.mk ~name ~se_vars ~ty_vars ~args ~body in
+
+    (* sanity checks on infix symbols *)
+    let in_tys =
+      List.fold_left
+        (fun in_tys (_, args) -> in_tys + List.length args)
+        (List.length simpl_args) multi_args      
+    in
+    Theory.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
+    
+    let table, _ = 
+      Symbols.Predicate.declare_exact 
+        table decl.pred_name
+        ~data:(Predicate.Predicate data)
+        ()
+    in
+
+    Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]" 
+      Predicate.pp data;
 
     table
 
@@ -320,8 +450,9 @@ let declare table decl : Symbols.table * Goal.t list =
       ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk,
     []
 
-  | Decl.Decl_abstract decl -> parse_abstract_decl table decl, []
-  | Decl.Decl_operator decl -> parse_operator_decl table decl, []
+  | Decl.Decl_abstract  decl -> parse_abstract_decl table decl,  []
+  | Decl.Decl_operator  decl -> parse_operator_decl table decl,  []
+  | Decl.Decl_predicate decl -> parse_predicate_decl table decl, []
 
   | Decl.Decl_bty bty_decl ->
     let table, _ =

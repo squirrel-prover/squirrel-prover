@@ -4,6 +4,7 @@ module L    = Location
 module SE   = SystemExpr
 module Args = TacticsArgs
 module Sv   = Vars.Sv
+module Sid  = Ident.Sid
 
 (*------------------------------------------------------------------*)
 type hyp_form = Equiv.any_form
@@ -41,6 +42,7 @@ module S : sig
   val pp_dbg :             Format.formatter -> t -> unit
 
   val init_sequent :
+    no_sanity_check:bool ->
     env:Env.t ->
     conclusion:Term.term ->
     t
@@ -62,7 +64,7 @@ end = struct
     conclusion : Term.term;
   }
   
-let _pp ~dbg ppf s =
+  let _pp ~dbg ppf s =
     let open Fmt in
     pf ppf "@[<v 0>" ;
     pf ppf "@[System: %a@]@;"
@@ -76,7 +78,7 @@ let _pp ~dbg ppf s =
       pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
 
     (* Print hypotheses *)
-    H._pp ~dbg ppf s.hyps ;
+    H._pp ~dbg ~context:s.env.system ppf s.hyps ;
 
     (* Print separation between hyps and conclusion *)
     Printer.kws `Separation ppf (String.make 40 '-') ;
@@ -94,19 +96,36 @@ let _pp ~dbg ppf s =
     in
     Vars.Sv.union h_vars (Term.fv s.conclusion)
 
+  let ty_fv (s : t) : Type.Fv.t =
+    let h_vars =
+      H.fold (fun _ f vars ->
+          Type.Fv.union (Equiv.Any.ty_fv f) vars
+        ) s.hyps Type.Fv.empty
+    in
+    Type.Fv.union h_vars (Term.ty_fv s.conclusion)
+
   let sanity_check s : unit =
     Vars.sanity_check s.env.Env.vars;
+
     if not (Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars)) then
       let () =
-        Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@."
-          pp_dbg s
+        Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@." pp_dbg s
       in
       assert false
+    else ();
 
-  let init_sequent ~(env : Env.t) ~conclusion =
+    let tyfv = ty_fv s in
+    (* all type variables are bound *)
+    assert (Sid.subset tyfv.tv
+              (Sid.of_list (List.map Type.ident_of_tvar s.env.ty_vars)));
+    (* no univars remaining *)
+    assert (Sid.subset tyfv.uv Sid.empty)
+
+
+  let init_sequent ~no_sanity_check ~(env : Env.t) ~conclusion =
     let hyps = H.empty in
     let s = { env ; hyps; conclusion; } in
-    sanity_check s;
+    if not no_sanity_check then sanity_check s;
     s
 
   let update ?env ?hyps ?conclusion t =
@@ -246,9 +265,9 @@ module AnyHyps
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
 
-  let pp          fmt s = H.pp          fmt s.hyps
-  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
-  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
+  let pp          fmt s = H.pp                                fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg                            fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -310,8 +329,8 @@ let pi projection s =
     s
 
 (*------------------------------------------------------------------*)
-let init ~env conclusion =
-  init_sequent ~env ~conclusion
+let init ?(no_sanity_check = false) ~env conclusion =
+  init_sequent ~no_sanity_check ~env ~conclusion
 
 let goal s = s.conclusion
 
@@ -438,7 +457,7 @@ module LocalHyps
 
   let pp_hyp = Term.pp
 
-  let pp_ldecl ?dbg fmt (id,h) = AnyHyps.pp_ldecl ?dbg fmt (id,Local h)
+  let pp_ldecl ?dbg ?context fmt (id,h) = AnyHyps.pp_ldecl ?dbg ?context fmt (id,Local h)
 
   let fresh_id = AnyHyps.fresh_id
   let fresh_ids = AnyHyps.fresh_ids

@@ -106,12 +106,21 @@ exception NotConv
 
 let not_conv () = raise NotConv
 
+(*------------------------------------------------------------------*)
 let conv_ty (ty1 : Type.ty) (ty2 : Type.ty) : unit =
   if not (Type.equal ty1 ty2) then not_conv ()
 
 let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
   List.iter2 conv_ty tys1 tys2
 
+(*------------------------------------------------------------------*)
+let conv_system table (se1 : SE.t) (se2 : SE.t) : unit =
+  if not (SE.equal table se1 se2) then not_conv ()
+
+let conv_systems table (l1 : SE.t list) (l2 : SE.t list) : unit =
+  List.iter2 (conv_system table) l1 l2
+
+(*------------------------------------------------------------------*)
 let conv_applied_ftype
     (ft1 : Term.applied_ftype) (ft2 : Term.applied_ftype) 
   : unit 
@@ -125,10 +134,12 @@ let conv_applied_ftype
 
   conv_tys ft1.ty_args ft2.ty_args
 
+(*------------------------------------------------------------------*)
 let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
-  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
+  conv_ty (Vars.ty v1) (Vars.ty v2);
   if not (Vars.equal (Term.subst_var st.subst v1) v2) then not_conv ()
 
+(*------------------------------------------------------------------*)
 let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
   { st with subst = Term.ESubst (Term.mk_var v1, Term.mk_var v2) :: st.subst }
@@ -136,9 +147,16 @@ let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
 let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
   List.fold_left2 conv_bnd st vs1 vs2
 
-let conv_tagged_bnds (st : cstate) (vs1 : Vars.tagged_vars) (vs2 : Vars.tagged_vars) : cstate =
-  List.fold_left2 (fun st (v1, _) (v2, _) -> conv_bnd st v1 v2) st vs1 vs2
+(*------------------------------------------------------------------*)
+let conv_tagged_bnds
+    (st : cstate) (vs1 : Vars.tagged_vars) (vs2 : Vars.tagged_vars) : cstate 
+  =
+  List.fold_left2 (fun st (v1, tag1) (v2, tag2) -> 
+      if tag1 <> tag2 then not_conv ();
+      conv_bnd st v1 v2
+    ) st vs1 vs2
 
+(*------------------------------------------------------------------*)
 let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
   match t1, t2 with
   | Term.Fun (fs1, app_fty1), Term.Fun (fs2, app_fty2)
@@ -205,6 +223,19 @@ let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
   | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
   | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
     conv_e_l st [el1; er1] [el2; er2]
+
+  | Equiv.Atom (Pred p1), Equiv.Atom (Pred p2) when p1.psymb = p2.psymb ->
+    conv_tys p1.ty_args p2.ty_args;
+    conv_systems st.table p1.se_args p2.se_args;
+
+    List.iter2 (fun (se1,l1) (se2,l2) ->
+        assert (SE.equal st.table se1 se2);
+        let system = SE.{set = (se1 :> SE.t); pair = None; } in
+        conv_l { st with system } l1 l2
+      ) p1.multi_args p2.multi_args;
+
+    let system = SE.{set = (SE.of_list [] :> SE.t); pair = None; } in
+    conv_l { st with system } p1.simpl_args p2.simpl_args
 
   | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
     let system = SE.{set = st.system.set; pair = None; } in
@@ -591,7 +622,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
     =
     let system = odflt (S.system s) system in
-    
+      
     let rec reduce_e (env : Vars.env) (e : Equiv.form) : Equiv.form =
       match e with
       | Equiv.Quant (q, vs, e) -> 
@@ -621,11 +652,25 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         Equiv.Atom (Reach f)
 
       | Equiv.Atom (Equiv e) ->
-        let e_se = (oget system.pair :> SE.arbitrary) in
+        let e_se = (oget system.pair :> SE.t) in
         let state = mk_state ~expand_context ~se:e_se env param s in
 
         let e = List.map (fst -| reduce state) e in
         Equiv.Atom (Equiv.Equiv e)
+
+      | Equiv.Atom (Pred pa) ->
+        let simpl_args =
+          let se = (SE.of_list [] :> SE.t) in
+          let state = mk_state ~expand_context ~se env param s in
+          List.map (fst -| reduce state) pa.simpl_args
+        in
+        let multi_args =
+          List.map (fun (se,args) ->
+              let state = mk_state ~expand_context ~se env param s in
+              ( se, List.map (fst -| reduce state) args )
+            ) pa.multi_args
+        in
+        Equiv.Atom (Equiv.Pred { pa with simpl_args; multi_args; })
     in
     reduce_e (S.vars s) e
       

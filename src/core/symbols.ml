@@ -23,20 +23,22 @@ type namespace =
   | NBType      (** type declarations *)
   | NHintDB
   | NLemma
+  | NPredicate
 
 let pp_namespace fmt = function
-  | NChannel  -> Fmt.pf fmt "channel"
-  | NConfig   -> Fmt.pf fmt "config"
-  | NOracle   -> Fmt.pf fmt "oracle"
-  | NName     -> Fmt.pf fmt "name"
-  | NAction   -> Fmt.pf fmt "action"
-  | NFunction -> Fmt.pf fmt "function"
-  | NMacro    -> Fmt.pf fmt "macro"
-  | NSystem   -> Fmt.pf fmt "system"
-  | NProcess  -> Fmt.pf fmt "process"
-  | NBType    -> Fmt.pf fmt "type"
-  | NHintDB   -> Fmt.pf fmt "hint database"
-  | NLemma    -> Fmt.pf fmt "lemma"
+  | NChannel   -> Fmt.pf fmt "channel"
+  | NConfig    -> Fmt.pf fmt "config"
+  | NOracle    -> Fmt.pf fmt "oracle"
+  | NName      -> Fmt.pf fmt "name"
+  | NAction    -> Fmt.pf fmt "action"
+  | NFunction  -> Fmt.pf fmt "function"
+  | NMacro     -> Fmt.pf fmt "macro"
+  | NSystem    -> Fmt.pf fmt "system"
+  | NProcess   -> Fmt.pf fmt "process"
+  | NBType     -> Fmt.pf fmt "type"
+  | NHintDB    -> Fmt.pf fmt "hint database"
+  | NLemma     -> Fmt.pf fmt "lemma"
+  | NPredicate -> Fmt.pf fmt "predicate"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
@@ -160,19 +162,21 @@ type _process
 type _btype
 type _hintdb
 type _lemma
+type _predicate
 
-type channel = _channel t
-type config  = _config  t
-type oracle  = _oracle  t
-type name    = _name    t
-type action  = _action  t
-type fname   = _fname   t
-type macro   = _macro   t
-type system  = _system  t
-type process = _process t
-type btype   = _btype   t
-type hintdb  = _hintdb  t
-type lemma   = _lemma   t
+type channel   = _channel   t
+type config    = _config    t
+type oracle    = _oracle  t
+type name      = _name      t
+type action    = _action    t
+type fname     = _fname     t
+type macro     = _macro     t
+type system    = _system    t
+type process   = _process   t
+type btype     = _btype     t
+type hintdb    = _hintdb    t
+type lemma     = _lemma     t
+type predicate = _predicate t
 
 type [@warning "-37"] param_kind =
   | PBool
@@ -184,18 +188,19 @@ type [@warning "-37"] oracle_kind =
     
 (*------------------------------------------------------------------*)
 type _ def =
-  | Channel  : unit      -> _channel def
-  | Config   : param_kind -> _config def
-  | Oracle   : oracle_kind -> _oracle def
-  | Name     : name_def  -> _name    def
-  | Action   : int       -> _action  def
-  | Macro    : macro_def -> _macro   def
-  | System   : unit      -> _system  def
-  | Process  : unit      -> _process def
-  | BType    : bty_infos -> _btype   def
-  | HintDB   : unit      -> _hintdb  def
-  | Lemma    : unit      -> _lemma   def
-        
+  | Channel   : unit        -> _channel   def
+  | Config    : param_kind  -> _config    def
+  | Oracle    : oracle_kind -> _oracle    def
+  | Name      : name_def    -> _name      def
+  | Action    : int         -> _action    def
+  | Macro     : macro_def   -> _macro     def
+  | System    : unit        -> _system    def
+  | Process   : unit        -> _process   def
+  | BType     : bty_infos   -> _btype     def
+  | HintDB    : unit        -> _hintdb    def
+  | Lemma     : unit        -> _lemma     def
+  | Predicate : unit        -> _predicate def
+
   | Function : (Type.ftype * function_def) -> _fname def
 
 type edef =
@@ -265,18 +270,19 @@ let fresh ?(group=default_group) name table =
 (*------------------------------------------------------------------*)
 let edef_namespace : edef -> namespace = fun e ->
   match e with
-  | Exists (Channel  _) -> NChannel
-  | Exists (Config  _)  -> NConfig
-  | Exists (Oracle  _)  -> NOracle
-  | Exists (Name     _) -> NName
-  | Exists (Action   _) -> NAction
-  | Exists (Function _) -> NFunction
-  | Exists (Macro    _) -> NMacro
-  | Exists (System   _) -> NSystem
-  | Exists (Process  _) -> NProcess
-  | Exists (BType    _) -> NBType
-  | Exists (HintDB   _) -> NHintDB
-  | Exists (Lemma    _) -> NLemma
+  | Exists (Channel   _) -> NChannel
+  | Exists (Config    _) -> NConfig
+  | Exists (Oracle    _) -> NOracle
+  | Exists (Name      _) -> NName
+  | Exists (Action    _) -> NAction
+  | Exists (Function  _) -> NFunction
+  | Exists (Macro     _) -> NMacro
+  | Exists (System    _) -> NSystem
+  | Exists (Process   _) -> NProcess
+  | Exists (BType     _) -> NBType
+  | Exists (HintDB    _) -> NHintDB
+  | Exists (Lemma     _) -> NLemma
+  | Exists (Predicate _) -> NPredicate
   | Reserved n          -> n
 
 let get_namespace ?(group=default_group) (table : table) s =
@@ -689,6 +695,19 @@ module Lemma = Make (struct
     | _ as c -> namespace_err loc c namespace
 end)
 
+module Predicate = Make (struct
+  type ns = _predicate
+  type local_def = unit
+
+  let namespace = NPredicate
+
+  let group = "predicate"
+  let construct d = Predicate d
+  let deconstruct ~loc s = match s with
+    | Exists (Predicate d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
 (*------------------------------------------------------------------*)
 (** {2 Type information} *)
 
@@ -780,14 +799,26 @@ let is_infix (s : fname t) : bool =
    Indeed, if we wanted symbols to have an optional associativity, we would 
    have to record it in the symbol table. This would require the 
    pretty-printer to take the table as argument, which is cumbersome. *)
-let infix_assoc (s : fname t) : assoc =
-  assert (is_infix s);
-  let s = to_string s in
+let infix_assoc_str (s : string) : assoc =
+  assert (is_infix_str s);
   if s = "=" || s = "<>" || s = "<=" || 
      s = "<" || s = ">=" || s = ">" || s = "<=>" then `NonAssoc
   else if is_right_infix_str s then `Right
   else if is_left_infix_str s then `Left
   else assert false
+
+let infix_assoc (s : fname t) : assoc =
+  let s = to_string s in
+  infix_assoc_str s
+
+(*------------------------------------------------------------------*)
+let is_infix_predicate (s : predicate) : bool =
+  let s = to_string s in
+  is_infix_str s
+
+let infix_assoc_predicate (s : predicate) : assoc =
+  let s = to_string s in
+  infix_assoc_str s
 
 (*------------------------------------------------------------------*)
 let is_global : macro_def -> bool = function Global _ -> true | _ -> false

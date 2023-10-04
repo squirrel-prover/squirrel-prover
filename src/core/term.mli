@@ -207,8 +207,9 @@ val fv  : term -> Sv.t
 val fvs : terms -> Sv.t
 
 (*------------------------------------------------------------------*)
-(** Free unification variables of a term *)
-val free_univars : term -> Ident.Sid.t 
+(** Free type variables of a term *)
+val ty_fv  : term  -> Type.Fv.t
+val ty_fvs : terms -> Type.Fv.t
 
 (*------------------------------------------------------------------*)
 val f_triv : term -> bool
@@ -229,13 +230,18 @@ val is_var_subst : subst -> bool
 
 val subst_support : subst -> Sv.t
 
-val subst_binding : Vars.var -> subst -> Vars.var * subst
+(*------------------------------------------------------------------*)
+(** Add new binding(s) to a substitution *)
+                               
+val subst_add_binding   : subst -> Vars.var  -> term      -> subst
+val subst_add_bindings  : subst -> Vars.vars -> terms     -> subst
+val subst_add_bindings0 : subst -> (Vars.var * term) list -> subst
 
+(*------------------------------------------------------------------*)
 (** term substitution *)
 val subst : subst -> term -> term
 
-(** substitute type variables *)
-val tsubst : Type.tsubst -> term -> term
+val subst_binding : Vars.var -> subst -> Vars.var * subst
 
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
     and [v] if the variable is not in the domain of the substitution. *)
@@ -243,6 +249,11 @@ val subst_var : subst -> Vars.var -> Vars.var
 
 val subst_vars : subst -> Vars.vars -> Vars.vars
 
+(*------------------------------------------------------------------*)
+(** substitute type variables *)
+val tsubst : Type.tsubst -> term -> term
+
+(*------------------------------------------------------------------*)
 val subst_projs : (proj * proj) list -> term -> term 
 
 (*------------------------------------------------------------------*)
@@ -377,7 +388,6 @@ module Smart : sig
   val is_false  : term -> bool
   val is_true   : term -> bool
   val is_not    : term -> bool
-  val is_zero   : term -> bool
   val is_and    : term -> bool
   val is_or     : term -> bool
   val is_impl   : term -> bool
@@ -570,6 +580,12 @@ val combine : (proj * term) list -> term
 (** All projections of the term are names. *)
 val diff_names : term -> bool
 
+(** Check that a term is a single term, i.e. can semantically represents a
+    single (η-index sequence of) random variable.
+    This is to be opposed to multi-terms, which can use diff terms and 
+    macros. *)
+val is_single_term : Vars.env -> term -> bool 
+  
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)
 

@@ -102,6 +102,7 @@ rule token = parse
 | "abstract"          { ABSTRACT }
 | "action"            { ACTION }
 | "op"                { OP }
+| "predicate"         { PREDICATE }
 | "fun"               { FUN }
 | "type"              { TYPE }
 | "name"              { NAME }

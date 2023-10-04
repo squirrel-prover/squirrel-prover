@@ -31,7 +31,8 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP TYPE FUN
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
+%token TYPE FUN
 %token MUTABLE SYSTEM SET
 %token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
@@ -170,11 +171,11 @@ sterm_i:
 | id=lsymb                      { Theory.Symb id }
 | UNDERSCORE                    { Theory.Tpat }
 
-/* formula */
-
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
 
-| SEQ LPAREN vs=bnd_group_list(lval,ty_tagged) DARROW t=term RPAREN { Theory.Quant (Seq,vs,t) }
+| SEQ LPAREN 
+  vs=bnd_group_list(lval,ty_tagged) 
+  DARROW t=term RPAREN                    { Theory.Quant (Seq,vs,t) }
 
 | l=loc(NOT) f=sterm
     { let fsymb = L.mk_loc (L.loc l) "not" in
@@ -283,6 +284,13 @@ bnds:
 | l=bnd_group_list(simpl_lval,ty) { l }
 
 (*------------------------------------------------------------------*)
+multi_term_bnd:
+| LBRACE se_v=se_var COLON l=bnds RBRACE { se_v, l }
+
+multi_term_bnds:
+| l=slist(multi_term_bnd, empty) { l }
+
+(*------------------------------------------------------------------*)
 /* variable tags */
 var_tags:
 |                                             { []   }
@@ -317,6 +325,7 @@ bnds_tagged:
 /* Many binder declarations with tags (see bnds_strict). */
 ext_bnds_tagged_strict:
 | l=slist(ext_bnd_tagged, empty)   { List.flatten l }
+
 ext_bnds_tagged:
 | ext_bnds_tagged_strict           { $1 }
 | v=simpl_lval COLON ty=ty_tagged  { [Theory.L_var v, ty] }
@@ -396,8 +405,15 @@ opt_indices:
 | id=lsymb                          { [id] }
 | id=lsymb COMMA ids=opt_indices    { id::ids }
 
+/* type variable */
 ty_var:
 | TICK id=lsymb     { id }
+
+/* system expression variable */
+se_var:
+| ll=lloc(SET)   { L.mk_loc ll "set" }
+| ll=lloc(EQUIV) { L.mk_loc ll "equiv" }
+| id=lsymb       { id }
 
 (*------------------------------------------------------------------*)
 /* general types */
@@ -425,6 +441,18 @@ ty:
 | ty=loc(ty_i) { ty }
 
 (*------------------------------------------------------------------*)
+se_info:
+| i=lsymb { i }
+
+se_bnd:
+| v=se_var                                          { v, [] }
+| v=se_var LBRACKET l=slist(se_info,empty) RBRACKET { v, l  }
+
+%inline se_bnds:
+/* |                                        { [] } */
+| LBRACE ids=slist(se_bnd,empty) RBRACE { ids }
+
+(*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
 | l=lsymb COLON ty=ty { Decl.{ cty_space = l;
@@ -436,7 +464,7 @@ c_tys:
 |                                { [] }
 
 ty_args:
-|                                          { [] }
+|                                            { [] }
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
 
 bty_info:
@@ -457,6 +485,9 @@ lsymb_decl:
 %inline projs:
 |                                     { None }
 | LBRACE l=slist(lsymb, empty) RBRACE { Some l }
+
+predicate_body:
+| EQ form=global_formula { form }
 
 system_modifier:
 | RENAME gf=global_formula
@@ -524,6 +555,21 @@ declaration_i:
                 ty_args   = a;
                 abs_tys   = t; }) }
 
+
+| PREDICATE e=lsymb_decl
+  tyargs=ty_args sebnds=se_bnds
+  multi_args=multi_term_bnds
+  simpl_args=bnds
+  body=predicate_body? 
+    { let symb_type, name = e in
+      Decl.(Decl_predicate
+              { pred_name       = name;
+                pred_symb_type  = symb_type;
+                pred_tyargs     = tyargs;
+                pred_se_args    = sebnds;
+                pred_multi_args = multi_args;
+                pred_simpl_args = simpl_args;
+                pred_body       = body; }) }
 
 | OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged_strict tyo=colon_ty? EQ t=term
     { let symb_type, name = e in
@@ -1034,9 +1080,14 @@ biframe:
 | ei=term                   { [ei] }
 | ei=term COMMA eis=biframe { ei::eis }
 
+/* ----------------------------------------------------------------------- */
 %inline quant:
 | UFORALL { Theory.PForAll }
 | UEXISTS { Theory.PExists }
+
+se_args:
+| LBRACE l=slist(system_expr,empty) RBRACE { l  }
+|                                          { [] }
 
 global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }
@@ -1049,15 +1100,25 @@ global_formula_i:
 | q=quant vs=bnds_tagged COMMA f=global_formula %prec QUANTIF
                                    { Theory.PQuant (q,vs,f)  }
 
-/* rule for a single binder, with no COMMA separating it from the formula. 
-   Removed for now, it was used only once. */
-/* | q=quant vs=bnd_tagged f=global_formula %prec QUANTIF */
-/*                                    { Theory.PQuant (q,vs,f)  } */
-
 | f1=global_formula GAND f2=global_formula
                                    { Theory.PAnd (f1, f2) }
 | f1=global_formula GOR f2=global_formula
                                    { Theory.POr (f1, f2) }
+
+| DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
+
+/* ambiguous global formula, in the sens that it can be confused 
+   with a local term */
+a_global_formula_i:
+| name=lsymb se_args=se_args args=slist(sterm, empty)
+    { Theory.PPred Theory.{ name; se_args; args; }  }
+
+| t=sterm name=loc(infix_s0) se_args=se_args t0=sterm 
+    { Theory.PPred Theory.{ name; se_args; args = [t; t0]; }  }
+
+/* ----------------------------------------------------------------------- */
+/* a_global_formula: */
+/* | f=loc(a_global_formula_i) { f } */
 
 global_formula:
 | f=loc(global_formula_i) { f }

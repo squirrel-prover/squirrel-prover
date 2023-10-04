@@ -1,5 +1,7 @@
 (** This modules provides the types used to type variables and terms. *)
 
+module Sid = Ident.Sid
+
 (*------------------------------------------------------------------*)
 (** Type variables *)
 
@@ -48,7 +50,9 @@ type ty =
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
-val pp : Format.formatter -> ty -> unit
+val _pp    : dbg:bool -> Format.formatter -> ty -> unit
+val pp     :             Format.formatter -> ty -> unit
+val pp_dbg :             Format.formatter -> ty -> unit
 
 (** Encoding of a type as a string without discontinuity nor
     parenthesis. *)
@@ -62,9 +66,32 @@ val is_tuni : ty -> bool
 (** Are the element of the type all encodable as bit-strings *)
 val is_bitstring_encodable : ty -> bool
 
+
 (*------------------------------------------------------------------*)
-val free_univars      : ty      -> Ident.Sid.t 
-val free_univars_list : ty list -> Ident.Sid.t 
+(** Free variables in types *)
+
+module Fv : sig
+  type t = { tv : Sid.t; uv : Sid.t; }
+
+  val pp : Format.formatter -> t -> unit
+
+  val empty : t
+  val union : t -> t -> t
+  val diff : t -> t -> t
+
+  val add_tv : univar -> t -> t
+  val add_uv : univar -> t -> t
+
+  val rem_tv : tvar   -> t -> t
+  val rem_uv : univar -> t -> t
+
+  val rem_tvs : tvar   list -> t -> t
+  val rem_uvs : univar list -> t -> t
+end
+
+(*------------------------------------------------------------------*)
+val fv  : ty      -> Fv.t
+val fvs : ty list -> Fv.t
 
 (*------------------------------------------------------------------*)
 val tboolean   : ty
@@ -154,7 +181,7 @@ val pp_ftype    : Format.formatter -> ftype    -> unit
 val pp_ftype_op : Format.formatter -> ftype_op -> unit
 
 (*------------------------------------------------------------------*)
-val ftype_free_univars : ftype -> Ident.Sid.t
+val ftype_fv : ftype -> Fv.t
  
 val tsubst_ftype : tsubst -> ftype -> ftype 
 

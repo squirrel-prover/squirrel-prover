@@ -18,7 +18,7 @@ include LowSequent.S with
     equivalence goals.
     For more general cases, the global meta-formula used as conclusion
     can include implications. *)
-val init : env:Env.t-> ?hyp:Equiv.form -> Equiv.form -> t
+val init : ?no_sanity_check:bool -> env:Env.t-> ?hyp:Equiv.form -> Equiv.form -> t
 
 (** Special pretty-printer for initial sequents.
     It does not display hypotheses, which might be misleading. *)

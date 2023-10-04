@@ -79,6 +79,17 @@ type operator_decl = {
 }
 
 (*------------------------------------------------------------------*)
+type predicate_decl = { 
+  pred_name       : Theory.lsymb;
+  pred_symb_type  : Symbols.symb_type;
+  pred_tyargs     : lsymb list;
+  pred_se_args    : (lsymb * lsymb list) list;
+  pred_multi_args : (lsymb * Theory.bnds) list;
+  pred_simpl_args : Theory.bnds;
+  pred_body       : Theory.global_formula option;
+}
+
+(*------------------------------------------------------------------*)
 type proc_decl = {
   id    : lsymb;
   projs : lsymb list option;
@@ -110,13 +121,13 @@ type declaration_i =
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_action   of action_decl
-
-  | Decl_name     of lsymb * Theory.p_ty
-  | Decl_state    of macro_decl
-  | Decl_operator of operator_decl
-  | Decl_abstract of abstract_decl
-  | Decl_bty      of bty_decl
+  | Decl_action    of action_decl
+  | Decl_name      of lsymb * Theory.p_ty
+  | Decl_state     of macro_decl
+  | Decl_operator  of operator_decl
+  | Decl_predicate of predicate_decl
+  | Decl_abstract  of abstract_decl
+  | Decl_bty       of bty_decl
 
 type declaration = declaration_i Location.located
 

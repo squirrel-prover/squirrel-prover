@@ -380,6 +380,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
               List.exists (ES.Reduce.conv_term s elem)
                 equiv
             ) goal
+        | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false)
 
     else (fun at -> ES.Reduce.conv_equiv s (Equiv.Atom at) goal)
@@ -448,7 +449,11 @@ let rec tautology f s = match f with
     tautology f0 s || tautology f1 s
 
   | Equiv.Quant _ -> false
+
+  | Equiv.(Atom (Pred _)) -> false
+    
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
+
   | Equiv.(Atom (Reach _)) ->
     let s = ES.set_goal f s in
     let trace_s = ES.to_trace_sequent s in

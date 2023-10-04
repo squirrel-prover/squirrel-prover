@@ -2,9 +2,10 @@
   * functions to type-check them, and convert them to proper
   * terms and formulas of the logic. *)
 
-module L = Location
+module L  = Location
 module SE = SystemExpr
-
+module Mv = Vars.Mv
+              
 type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
@@ -111,6 +112,13 @@ val equal_i : term_i -> term_i -> bool
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
+(** global predicate application *)
+type pred_app = {
+  name    : lsymb;              (** predicate symbol *)
+  se_args : SE.Parse.t list;    (** system arguments *)
+  args    : term list;          (** multi-term and term arguments *)
+}
+
 type equiv = term list 
 
 type pquant = PForAll | PExists
@@ -120,6 +128,7 @@ type global_formula = global_formula_i Location.located
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of term
+  | PPred   of pred_app
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
@@ -233,8 +242,7 @@ val declare_abstract :
 
 (** Sanity checks for a function symbol declaration. *)
 val check_fun_symb :
-  Symbols.table ->
-  Type.ty list -> 
+  int ->                        (* number of arguments *)
   lsymb -> Symbols.symb_type -> unit
   
 (*------------------------------------------------------------------*)
@@ -296,7 +304,9 @@ val pp_error :
   Format.formatter -> conversion_error -> unit
 
 val check : 
-  Env.t -> ?pat:bool ->
+  Env.t ->
+  ?local:bool -> ?pat:bool ->
+  ?system_info:SE.t Mv.t ->
   Type.Infer.env -> Term.projs ->
   term -> Type.ty ->
   unit
@@ -333,6 +343,7 @@ type conv_cntxt =
   | InProc of Term.projs * Term.term
   | InGoal
 
+(*------------------------------------------------------------------*)
 type conv_env = { 
   env   : Env.t;
   cntxt : conv_cntxt; 
@@ -343,11 +354,16 @@ type conv_env = {
 
 (** Converts and infers the type.
     Only the [set] part of the [SE.context] inside the environment
-    is useful. *)
+    is useful. 
+
+    System expression optionally associated to each variable.
+    If [v] is associated to [se], then [v] is a multi-term variable over
+    [se]'s single systems. *)
 val convert : 
   ?ty:Type.ty ->
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
+  ?system_info:SE.t Mv.t ->
   conv_env -> 
   term ->
   Term.term * Type.ty
@@ -388,10 +404,14 @@ val convert_ext_bnds :
 
 (** Converts and infers the type.
     Each part of the [SE.context] inside the environment
-    is used when converting the corresponding kind of atom. *)
+    is used when converting the corresponding kind of atom.
+    
+    [system_info] is allows to control variable usage in 
+    mutli-terms (see [convert]). *)
 val convert_global_formula : 
   ?ty_env:Type.Infer.env -> 
-  ?pat:bool -> 
+  ?pat:bool ->
+  ?system_info:SE.t Mv.t ->
   conv_env -> global_formula -> Equiv.form
 
 val convert_any : conv_env -> any_term -> Equiv.any_form

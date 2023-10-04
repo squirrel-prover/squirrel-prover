@@ -1,5 +1,7 @@
 (** Equivalence formulas.  *)
 
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
@@ -20,12 +22,31 @@ val fv_equiv : equiv -> Vars.Sv.t
 (*------------------------------------------------------------------*)
 (** {2 Equivalence atoms} *)
 
-type atom = 
+type pred_app = {
+  psymb      : Symbols.predicate;        (** Predicate symbol *)
+  ty_args    : Type.ty list;             (** Type arguments *)
+  se_args    : SE.t list;                (** System expression arguments *)  
+  multi_args : (SE.t * Term.terms) list;
+  (** Multi-term args with their system expression. *)
+  simpl_args : Term.terms;               (** Simple arguments *)
+}
+
+(** Global formula atom, to be interpreted relatively to a 
+    system context (e.g. specified by the sequent). *)
+type atom =
   | Equiv of equiv
-  (** Equiv u corresponds to (u)^left ~ (u)^right *)
+  (** Equiv u corresponds to (u)^left ~ (u)^right
+      where the systems [left, right] are given by the [pair] component 
+      of the system context. *)
 
   | Reach of Term.term
-  (** Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
+  (** Reach(φ) corresponds to [[φ]_{P1} ∧ [φ]_(P2) ∧ …]
+      where the systems [Pi] are given by the [set] component of 
+      the system context. *)
+
+  | Pred of pred_app
+  (** Fully applied predicate. Interpretation does not depend on the 
+      system context, as all system arguments are explicit. *)
 
 val pp_atom : Format.formatter -> atom -> unit
 
@@ -47,9 +68,13 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-val pp     :             Format.formatter -> form -> unit
-val _pp    : dbg:bool -> Format.formatter -> form -> unit
-val pp_dbg :             Format.formatter -> form -> unit
+val pp     : Format.formatter -> form -> unit
+val pp_dbg : Format.formatter -> form -> unit
+
+(** Full pretty printer.
+    The [context] arguments allows to avoir printing some system expressions
+    which are equal [context.set] or [context.pair]. *)
+val _pp : dbg:bool -> ?context:SE.context -> Format.formatter -> form -> unit
 
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
@@ -74,18 +99,26 @@ val get_terms : form -> Term.term list
 (*------------------------------------------------------------------*)
 (** Project the reachability formulas in a global formula. *)
 val project : Term.proj list -> form -> form 
-  
+
+(*------------------------------------------------------------------*)
+(** Checks if a formula is independent of the system context,
+    i.e. does not contain reachability or equivalence atoms. *)
+val is_system_context_indep : form -> bool
+
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
-val subst : Term.subst -> form -> form
-
-val tsubst : Type.tsubst -> form -> form
-
+val subst       : Term.subst                   -> form -> form
+val tsubst      : Type.tsubst                  -> form -> form
 val subst_projs : (Term.proj * Term.proj) list -> form -> form
-  
+val se_subst    : SE.subst                     -> form -> form
+
 (** Free variables *)
 val fv : form -> Vars.Sv.t
+
+(** Free type variables *)
+val ty_fv  : form      -> Type.Fv.t
+val ty_fvs : form list -> Type.Fv.t
 
 (*------------------------------------------------------------------*)
 (** {2 Generalized formuals} *)
@@ -113,16 +146,17 @@ val kind_equal : 'a f_kind -> 'b f_kind -> bool
 module Any : sig
   type t = any_form
 
-  val pp     :             Format.formatter -> t -> unit
-  val _pp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp_dbg :             Format.formatter -> t -> unit
+  val pp     : Format.formatter -> t -> unit
+  val pp_dbg : Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
 
   val subst  : Term.subst  -> t -> t
   val tsubst : Type.tsubst -> t -> t
 
-  val fv : t -> Vars.Sv.t
+  val fv    : t -> Vars.Sv.t
+  val ty_fv : t -> Type.Fv.t
 
   val project : Term.proj list -> t -> t
     

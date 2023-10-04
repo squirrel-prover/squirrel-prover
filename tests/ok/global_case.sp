@@ -16,5 +16,7 @@ Proof.
   case t => ?.
   + by left. 
   + by right; left. 
-  + by right; right. 
+  + right; right. 
+    destruct H as [i _]. 
+    by exists i.
 Qed.

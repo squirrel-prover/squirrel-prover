@@ -1,8 +1,9 @@
 open Utils
 
 module SE = SystemExpr
-module L = Location
-
+module L  = Location
+module Mv = Vars.Mv
+              
 type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
@@ -324,6 +325,13 @@ let pp_i = pp_term_i
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
+(** global predicate application *)
+type pred_app = {
+  name    : lsymb;              (** predicate symbol *)
+  se_args : SE.Parse.t list;    (** system arguments *)
+  args    : term list;          (** multi-term and term arguments *)
+}
+
 type equiv = term list
 
 type pquant = PForAll | PExists
@@ -333,6 +341,7 @@ type global_formula = global_formula_i Location.located
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of term
+  | PPred   of pred_app
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
@@ -669,12 +678,14 @@ type conv_cntxt =
 
 let is_in_proc = function InProc _ -> true | InGoal -> false
 
+(*------------------------------------------------------------------*)
 (** Exported conversion environments. *)
 type conv_env = { 
   env   : Env.t;
   cntxt : conv_cntxt; 
 }
 
+(*------------------------------------------------------------------*)
 (** Internal conversion states, containing:
     - all the fields of a [conv_env]
     - free type variables
@@ -682,20 +693,26 @@ type conv_env = {
     - a variable substitution  *)
 type conv_state = {
   env           : Env.t;
+  system_info   : SE.t Mv.t;
+  (** see description in `.mli` for type [conv_env] *)
+  
   cntxt         : conv_cntxt;
-  allow_pat     : bool;
 
+  allow_pat     : bool;
   type_checking : bool;
-  (* if [true], we are only type-checking the term *)
+  (** if [true], we are only type-checking the term *)
 
   ty_env        : Type.Infer.env;
 }
 
-let mk_state ?(type_checking=false) env cntxt allow_pat ty_env =
-  { cntxt; env; allow_pat; ty_env; type_checking; }
+let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
+  { cntxt; env; allow_pat; ty_env; type_checking; system_info; }
 
 (*------------------------------------------------------------------*)
-(** {2 Types} *)
+(** {2 Various checks} *)
+  
+(*------------------------------------------------------------------*)
+(** {3 Types} *)
 
 let ty_error ty_env tm ~(got : Type.ty) ~(expected : Type.ty) =
   let got      = Type.Infer.norm ty_env got in
@@ -712,7 +729,7 @@ let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
   check_ty_eq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
-(** {2 System projections} *)
+(** {3 System projections} *)
 
 (** check that projection alive at a given subterm w.r.t. projections
     used in a diff operator application. *)
@@ -739,6 +756,23 @@ let proj_state (projs : Term.projs) (state : conv_state) : conv_state =
   | InProc (_, ts) -> { state with cntxt = InProc (projs, ts) }
   | InGoal -> { state with env = Env.projs_set projs state.env }
 
+(*------------------------------------------------------------------*)
+(** {3 System expressions and multi-terms} *)
+
+let check_system (state : conv_state) (loc : L.t) (v : Vars.var) : unit =
+  match Mv.find v state.system_info with
+  | se ->
+    let state_se = state.env.system.set in
+    if not (SE.equal state.env.table state_se se) then
+      let err_msg =
+        Fmt.str "variable %a (over systems %a) cannot be used in mutli-term over systems %a"
+          Vars.pp v
+          SE.pp se
+          SE.pp state_se
+      in
+      conv_err loc (Failure err_msg) 
+        
+  | exception Not_found -> ()   (* no information => no restrictions *)
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol dis-ambiguation} *)
@@ -759,7 +793,7 @@ type app_cntxt =
   | At      of Term.term   (* for explicit timestamp, e.g. [s@ts] *)
   | MaybeAt of Term.term   (* for potentially implicit timestamp,
                                    e.g. [s] in a process parsing. *)
-  | NoTS                        (* when there is no timestamp, even implicit. *)
+  | NoTS                   (* when there is no timestamp, even implicit. *)
 
 (*------------------------------------------------------------------*)
 let is_at = function At _ -> true | _ -> false
@@ -801,14 +835,15 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
 
       | Symbols.Action _ -> Taction
 
-      | Symbols.Channel _
-      | Symbols.Config _
-      | Symbols.Oracle _
-      | Symbols.BType _
-      | Symbols.HintDB _
-      | Symbols.Lemma  _ 
-      | Symbols.Process _
-      | Symbols.System  _ ->
+      | Symbols.Predicate _
+      | Symbols.Channel   _
+      | Symbols.Config    _
+      | Symbols.Oracle    _
+      | Symbols.BType     _
+      | Symbols.HintDB    _
+      | Symbols.Lemma     _ 
+      | Symbols.Process   _
+      | Symbols.System    _ ->
         let s = L.unloc lsymb in
         conv_err loc (BadNamespace (s,
                                     oget(Symbols.get_namespace table s)))
@@ -819,24 +854,23 @@ let make_app loc (state : conv_state) cntxt (lsymb : lsymb) : app =
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
 
-let convert_var 
-    (state : conv_state)
-    (st    : lsymb)
-    (ty    : Type.ty) 
-  : Term.term
-  =
+let convert_var (state : conv_state) (symb : lsymb) (ty : Type.ty) : Term.term =
   try
-    let v, _ = as_seq1 (Vars.find state.env.vars (L.unloc st)) in
+    let v, _ = as_seq1 (Vars.find state.env.vars (L.unloc symb)) in
     (* cannot have two variables with the same name since previous 
        definitions must have been shadowed *)
 
-    let of_t = var_of_lsymb st in
+    let of_t = var_of_lsymb symb in
 
+    (* check the variable type *)
     check_ty_eq state ~of_t (Vars.ty v) ty;
+
+    (* check that the variable is used in a multi-term on compatible systems *)
+    check_system state (L.loc symb) v;
 
     Term.mk_var v
   with
-  | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
+  | Not_found -> conv_err (L.loc symb) (Undefined (L.unloc symb))
 
 
 (*------------------------------------------------------------------*)
@@ -1132,6 +1166,7 @@ and convert0
     t_proj
 
   | Diff (l,r) ->
+    (* FIXME: projections should not be hard-coded to be [left, right] *)
     check_system_projs loc state [Term.left_proj; Term.right_proj];
     
     let statel = proj_state [Term.left_proj ] state in
@@ -1466,14 +1501,13 @@ let declare_name table s ndef =
 (*------------------------------------------------------------------*)
 (** Sanity checks for a function symbol declaration. *)
 let check_fun_symb
-    _table
-    (in_tys : Type.ty list) 
+    (in_tys : int) 
     (s : lsymb) (f_info : Symbols.symb_type) : unit
   =
   match f_info with
   | `Prefix -> ()
   | `Infix _side ->
-    if not (List.length in_tys = 2) then
+    if not (in_tys = 2) then
       conv_err (L.loc s) BadInfixDecl
 
 let declare_abstract 
@@ -1481,7 +1515,7 @@ let declare_abstract
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
-  check_fun_symb table in_tys s f_info;
+  check_fun_symb (List.length in_tys) s f_info;
 
   let ftype = Type.mk_ftype ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
@@ -1494,12 +1528,200 @@ let declare_abstract
 let empty loc = mk_symb (L.mk_loc loc "empty")
 
 (*------------------------------------------------------------------*)
-(** {2 Exported conversion and type-checking functions} *)
+(** {2 Convert equiv formulas} *)
 
+let parse_se_subst
+    (pred_loc : L.t) 
+    (env      : Env.t)
+    (se_vars  : (SE.Var.t * SE.Var.info list) list)
+    (se_args  : SE.Parse.t list) 
+  : SE.subst 
+  =
+  (** check that a system expression satisfies some properties *)
+  let check_se_info ~loc (se : SE.t) (se_infos : SE.Var.info list) : unit =
+    let check1 se_info =
+      match se_info with
+      | SE.Var.Pair ->
+        if not (SE.is_fset se &&
+                List.length (SE.to_list (SE.to_fset se)) = 2) then
+          conv_err loc (Failure "does not satisfies system restrictions: \
+                                 is not a pair");
+    in
+    List.iter check1 se_infos
+  in
+
+  (* parse system arguments given as input *)
+  let se_args =
+    List.map (fun p_se -> L.loc p_se, SE.Parse.parse env.table p_se) se_args
+  in
+
+  (* implicit system arguments:
+     complete input using [set] and [equiv] if necessary *)
+  let se_args =
+    let len_se_vars = List.length se_vars in
+    let len_se_args = List.length se_args in
+
+    if len_se_vars = len_se_args then 
+      se_args
+    else if len_se_vars = len_se_args + 1 then 
+      (L._dummy, env.system.set) :: 
+      se_args
+    else if len_se_vars = len_se_args + 2 && env.system.pair <> None then 
+      (L._dummy,                 env.system.set) :: 
+      (L._dummy, (oget env.system.pair :> SE.t)) :: 
+      se_args
+    else
+      conv_err pred_loc 
+        (Failure 
+           (Fmt.str "not enough system arguments: \
+                     expected %d (up-to -2 with implicits), \
+                     got %d"
+              (List.length se_vars)
+              (List.length se_args)));
+  in
+
+  List.map2 (fun (se_v, se_infos) (loc, se) ->
+      (* check that system argument restrictions are satisfied *)
+      check_se_info ~loc se se_infos;
+      (se_v, se)
+    ) se_vars se_args
+
+
+(** Internal *)
+let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
+  let table = st.env.table in
+  let psymb = Symbols.Predicate.of_lsymb ppa.name table in
+  let pred = Predicate.get table psymb in
+
+  (* refresh all type variables in [pred.ty_vars] and substitute *)
+  let ty_args, ts = Type.Infer.open_tvars st.ty_env pred.ty_vars in
+  let pred_args_multi =
+    List.map (fun (se, args) -> se, List.map (Vars.tsubst ts) args) pred.args.multi
+  in
+  let pred_args_simple = List.map (Vars.tsubst ts) pred.args.simple in
+
+  (* substitute system expression variables by their arguments *)
+  let se_subst = 
+    parse_se_subst
+      (L.loc ppa.name) st.env
+      pred.Predicate.se_vars ppa.se_args 
+  in
+  let se_args = List.map snd se_subst in
+  let pred_args_multi =
+    List.map (fun (se, args) -> SE.subst se_subst se, args) pred_args_multi
+  in
+  
+  (* parse arguments, complicated because we need to group them
+     according to the system they refer to *)
+  let rec parse_multi_args multi_vars_l p_args =
+    match multi_vars_l with
+    | [] -> [], p_args
+    | (se, vars) :: multi_args' ->
+      if (List.length p_args < List.length vars) then
+        conv_err (L.loc ppa.name) (Failure "not enough arguments");
+
+      let system = SE.{ set = (se :> SE.t) ; pair = None } in
+      let env = Env.update ~system st.env in
+      let st = { st with env } in
+
+      let p_args, p_args' = List.takedrop (List.length vars) p_args in
+
+      let args =
+        List.fold_right2 (fun var p_arg acc ->
+            let arg = convert st p_arg (Vars.ty var) in
+            arg :: acc
+          ) vars p_args []
+      in
+      let parsed_multi_args, rem_p_args =
+        parse_multi_args multi_args' p_args'
+      in
+      (se, args) :: parsed_multi_args, rem_p_args
+  in
+
+  (* [rem_p_args] are the arguments remaining to be parsed *)
+  let multi_args, rem_p_args =
+    parse_multi_args pred_args_multi ppa.args
+  in
+
+  if List.length rem_p_args > List.length pred_args_simple then
+    conv_err (L.loc ppa.name) (Failure "too many arguments");
+  if List.length rem_p_args < List.length pred_args_simple then
+    conv_err (L.loc ppa.name) (Failure "not enough arguments");
+
+  let simpl_args =
+    List.fold_right2 (fun var p_arg acc ->
+        let system = SE.{ set = (SE.of_list [] :> SE.t) ; pair = None } in
+        let env = Env.update ~system st.env in
+        let st = { st with env } in
+        let arg = convert st p_arg (Vars.ty var) in
+
+        if not (Term.is_single_term env.vars arg) then
+          conv_err (L.loc p_arg) (Failure "should not be a multi-term");
+
+        arg :: acc
+      ) pred_args_simple rem_p_args []
+  in
+
+  Equiv.{
+    psymb;
+    ty_args = List.map (fun x -> Type.TUnivar x) ty_args;
+    se_args;
+    multi_args; simpl_args;
+  }
+    
+  
+(** Internal *)
+let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
+  match L.unloc p with
+  | PImpl (f1, f2) -> Equiv.Impl (convert_g st f1, convert_g st f2)
+  | PAnd  (f1, f2) -> Equiv.And  (convert_g st f1, convert_g st f2)
+  | POr   (f1, f2) -> Equiv.Or   (convert_g st f1, convert_g st f2)
+
+  | PEquiv p_e ->
+    begin match st.env.system with
+      | SE.{ pair = Some p } ->
+        let system = SE.{ set = (p :> SE.t) ; pair = None } in
+        let env = Env.update ~system st.env in
+        let st = { st with env } in
+        let e =
+          List.map (fun t ->
+              let ty = Type.TUnivar (Type.Infer.mk_univar st.ty_env) in
+              convert st t ty
+            ) p_e
+        in
+        Equiv.Atom (Equiv.Equiv e)
+      | _ ->
+        conv_err (L.loc p) MissingSystem
+    end
+
+  | PReach f ->
+    let f = convert st f Type.tboolean in
+    Equiv.Atom (Equiv.Reach f)
+
+  | PPred ppa ->
+    Equiv.Atom (Equiv.Pred (convert_pred_app st ppa))
+
+  | PQuant (q, bnds, e) ->
+    let env, evs =
+      convert_bnds_tagged ~ty_env:st.ty_env ~mode:(DefaultTag Vars.Tag.gtag) st.env bnds 
+    in
+    let st = { st with env } in
+    let e = convert_g st e in
+    let q = match q with
+      | PForAll -> Equiv.ForAll
+      | PExists -> Equiv.Exists
+    in
+    Equiv.mk_quant_tagged q evs e
 
 (*------------------------------------------------------------------*)
+(** {2 Exported conversion and type-checking functions} *)
+
+(*------------------------------------------------------------------*)
+(** Exported *)
 let check
-    (env : Env.t) ?(pat=false) 
+    (env : Env.t)
+    ?(local=false) ?(pat=false)
+    ?(system_info = Mv.empty)
     (ty_env : Type.Infer.env)
     (projs : Term.projs)
     (t : term) (s : Type.ty) 
@@ -1509,16 +1731,17 @@ let check
     Term.mk_var
       (snd (Vars.make `Approx Vars.empty_env s "#dummy" (Vars.Tag.make Vars.Local)))
   in
-  let cntxt = InProc (projs, (dummy_var Type.Timestamp)) in
+  let cntxt = if local then InProc (projs, (dummy_var Type.Timestamp)) else InGoal in
   
-  let state = mk_state ~type_checking:true env cntxt pat ty_env in
+  let state = mk_state ~type_checking:true ~system_info env cntxt pat ty_env in
   ignore (convert state t s : Term.term)
 
-(** exported outside Theory.ml *)
+(** Exported *)
 let convert 
     ?(ty     : Type.ty option)
     ?(ty_env : Type.Infer.env option) 
     ?(pat    : bool = false)
+    ?(system_info = Mv.empty)
     (cenv    : conv_env) 
     (tm      : term) 
   : Term.term * Type.ty
@@ -1531,7 +1754,7 @@ let convert
     | None    -> Type.TUnivar (Type.Infer.mk_univar ty_env) 
     | Some ty -> ty 
   in
-  let state = mk_state cenv.env cenv.cntxt pat ty_env in
+  let state = mk_state ~system_info cenv.env cenv.cntxt pat ty_env in
   let t = convert state tm ty in
 
   if must_close then
@@ -1548,57 +1771,32 @@ let convert
 (*------------------------------------------------------------------*)
 (** {3 Global formulas conversion} *)
 
-let convert_equiv 
-    ?(ty_env : Type.Infer.env option) 
-    ?(pat    : bool = false)
-    cenv (e : equiv) =
-  let convert_el el : Term.term =
-    let t, _ = convert ?ty_env ~pat cenv el in
-    t
-  in
-  List.map convert_el e
-
+(** Exported *)
 let convert_global_formula 
     ?(ty_env : Type.Infer.env option) 
     ?(pat    : bool = false)
-    (cenv : conv_env) (p : global_formula) =
-  let rec conve (cenv : conv_env) p =
-    let conve ?(env=cenv.env) p = conve { cenv with env } p in
-
-    match L.unloc p with
-    | PImpl (f1, f2) -> Equiv.Impl (conve f1, conve f2)
-    | PAnd  (f1, f2) -> Equiv.And  (conve f1, conve f2)
-    | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
-
-    | PEquiv e ->
-      begin match cenv.env.system with
-      | SE.{ pair = Some p } ->
-        let system = SE.{ set = (p :> SE.t) ; pair = None } in
-        let env = Env.update ~system cenv.env in
-        let cenv = { cenv with env } in
-        Equiv.Atom (Equiv.Equiv (convert_equiv ?ty_env ~pat cenv e))
-      | _ ->
-        conv_err (L.loc p) MissingSystem
-      end
-
-    | PReach f ->
-      let f, _ = convert ?ty_env ~pat ~ty:Type.tboolean cenv f in
-      Equiv.Atom (Equiv.Reach f)
-
-
-    | PQuant (q, bnds, e) ->
-      let env, evs = 
-        convert_bnds_tagged ?ty_env ~mode:(DefaultTag Vars.Tag.gtag) cenv.env bnds 
-      in
-      let e = conve ~env e in
-      let q = match q with
-        | PForAll -> Equiv.ForAll
-        | PExists -> Equiv.Exists
-      in
-      Equiv.mk_quant_tagged q evs e
+    ?(system_info = Mv.empty)
+    (cenv : conv_env)
+    (p : global_formula)
+  : Equiv.form
+  =
+  let must_close, ty_env = match ty_env with
+    | None        -> true, Type.Infer.mk_env ()
+    | Some ty_env -> false, ty_env
   in
+  let state = mk_state ~system_info cenv.env cenv.cntxt pat ty_env in
+  let t = convert_g state p in
 
-  conve cenv p
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc p) Freetyunivar;
+
+      let tysubst = Type.Infer.close ty_env in
+      Equiv.tsubst tysubst t
+    end
+  else
+    t
 
 (*------------------------------------------------------------------*)
 (** {2 Convert any} *)

@@ -336,3 +336,15 @@ global lemma _ (t:timestamp) :
 Proof.
   intro H; apply H.
 Qed.
+
+(* ========================================================= *)
+global axiom myax  ['a] (x, y : 'a) : equiv(x,y) -> [x = y].
+global axiom myax1 ['a] (x, y : 'a) : equiv(x,y).
+
+global lemma _ ['a] (x,y : 'a) : [x = y]. 
+Proof. 
+  apply myax _ _ _. 
+  have A := myax1 x y.
+  assumption A.
+Qed. 
+

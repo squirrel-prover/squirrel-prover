@@ -49,19 +49,21 @@ type _process
 type _btype
 type _hintdb
 type _lemma
+type _predicate
   
-type channel = _channel t
-type config  = _config  t
-type oracle  = _oracle  t
-type name    = _name    t
-type action  = _action  t
-type fname   = _fname   t
-type macro   = _macro   t
-type system  = _system  t
-type process = _process t
-type btype   = _btype   t
-type hintdb  = _hintdb  t
-type lemma   = _lemma   t
+type channel   = _channel   t
+type config    = _config    t
+type oracle    = _oracle    t
+type name      = _name      t
+type action    = _action    t
+type fname     = _fname     t
+type macro     = _macro     t
+type system    = _system    t
+type process   = _process   t
+type btype     = _btype     t
+type hintdb    = _hintdb    t
+type lemma     = _lemma     t
+type predicate = _predicate t
     
 (*------------------------------------------------------------------*)
 type namespace =
@@ -77,6 +79,7 @@ type namespace =
   | NBType      (** type declarations *)
   | NHintDB
   | NLemma
+  | NPredicate
     
 val pp_namespace : Format.formatter -> namespace -> unit
 
@@ -156,17 +159,18 @@ type [@warning "-37"] oracle_kind =
 (** Information about symbol definitions, depending on the namespace.
     Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel  : unit      -> _channel def
-  | Config   : param_kind -> _config def
-  | Oracle   : oracle_kind -> _oracle def
-  | Name     : name_def  -> _name    def
-  | Action   : int       -> _action  def
-  | Macro    : macro_def -> _macro   def
-  | System   : unit      -> _system  def
-  | Process  : unit      -> _process def
-  | BType    : bty_infos -> _btype   def
-  | HintDB   : unit      -> _hintdb  def
-  | Lemma    : unit      -> _lemma   def
+  | Channel   : unit        -> _channel   def
+  | Config    : param_kind  -> _config    def
+  | Oracle    : oracle_kind -> _oracle    def
+  | Name      : name_def    -> _name      def
+  | Action    : int         -> _action    def
+  | Macro     : macro_def   -> _macro     def
+  | System    : unit        -> _system    def
+  | Process   : unit        -> _process   def
+  | BType     : bty_infos   -> _btype     def
+  | HintDB    : unit        -> _hintdb    def
+  | Lemma     : unit        -> _lemma     def
+  | Predicate : unit        -> _predicate def
         
   | Function : (Type.ftype * function_def) -> _fname def
         
@@ -295,15 +299,16 @@ module type Namespace = sig
   val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
-module Config   : Namespace with type def = param_kind with type ns = _config
-module Oracle   : Namespace with type def = oracle_kind with type ns = _oracle
-module Channel  : Namespace with type def = unit       with type ns = _channel
-module BType    : Namespace with type def = bty_infos  with type ns = _btype
-module Action   : Namespace with type def = int        with type ns = _action
-module System   : Namespace with type def = unit       with type ns = _system
-module Process  : Namespace with type def = unit       with type ns = _process
-module HintDB   : Namespace with type def = unit       with type ns = _hintdb
-module Lemma    : Namespace with type def = unit       with type ns = _lemma
+module Config    : Namespace with type def = param_kind  with type ns = _config
+module Oracle    : Namespace with type def = oracle_kind with type ns = _oracle
+module Channel   : Namespace with type def = unit        with type ns = _channel
+module BType     : Namespace with type def = bty_infos   with type ns = _btype
+module Action    : Namespace with type def = int         with type ns = _action
+module System    : Namespace with type def = unit        with type ns = _system
+module Process   : Namespace with type def = unit        with type ns = _process
+module HintDB    : Namespace with type def = unit        with type ns = _hintdb
+module Lemma     : Namespace with type def = unit        with type ns = _lemma
+module Predicate : Namespace with type def = unit        with type ns = _predicate
                                                            
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = _fname
@@ -362,6 +367,11 @@ val is_infix_str : string  -> bool
 
 val infix_assoc : fname -> assoc
 
+(*------------------------------------------------------------------*)
+val is_infix_predicate : predicate -> bool 
+val infix_assoc_predicate : predicate -> assoc
+
+(*------------------------------------------------------------------*)
 val is_global : macro_def -> bool
 
 (*------------------------------------------------------------------*)

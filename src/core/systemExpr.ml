@@ -23,44 +23,116 @@ let pp_error fmt = function
   | Expected_pair -> Format.fprintf fmt "expected a pair expr"
 
 (*------------------------------------------------------------------*)
-(** {2 Expressions} *)
+(** {2 System expression variables} *)
 
-type t =
+module Var = struct
+  type t = Ident.t
+
+  type info = Pair
+
+  (*------------------------------------------------------------------*)
+  let pp = Ident.pp
+
+  let pp_info fmt = function
+    | Pair -> Fmt.pf fmt "pair"
+
+  (*------------------------------------------------------------------*)
+  let equal = Ident.equal
+
+  (*------------------------------------------------------------------*)                
+  let of_ident s = s
+  let to_ident s = s
+
+  (*------------------------------------------------------------------*)
+  let set  = Ident.create "set"
+  let pair = Ident.create "equiv"
+
+  (*------------------------------------------------------------------*)
+  type env = (t * info list) Ms.t
+
+  let init_env : env = Ms.empty
+end
+
+(*------------------------------------------------------------------*)
+(** {2 System expressions} *)
+
+type cnt =
+  | Var of Var.t
+  (** Represents a (named) set of compatible single systems. *)
   | Any
   | Any_compatible_with of System.t
   | List of (Term.proj * System.Single.t) list
-      (** Each single system is identified by a label.
-          The list cannot be empty. All single systems are compatible. *)
+  (** Each single system is identified by a label. Can be empty.
+      All single systems are compatible. *)
 
-type 'a expr = t
+type 'a expr = { 
+  cnt  : cnt; 
+  name : string option;         (** optional short name, for printing *)
+}
 
 type arbitrary  = < > expr
 type compatible = < symbols : unit > expr
 type fset       = < symbols : unit ; fset : unit > expr
 type pair       = < symbols : unit ; fset : unit ; pair : unit > expr
 
-type equiv_t = pair expr
+type t = < > expr
+type equiv_t = pair 
 
 (*------------------------------------------------------------------*)
-let hash : 'a expr -> int = Hashtbl.hash
+let hash (x : 'a expr) : int = Hashtbl.hash x.cnt
+
+let mk ?name cnt = { cnt; name; }
+
+let force (se : 'a expr) : 'b expr = { cnt = se.cnt; name = se.name; }
 
 (*------------------------------------------------------------------*)
-let any = Any
+(** {2 Substitutions} *)
 
-let any_compatible_with s = Any_compatible_with s
+type subst = (Var.t * t) list
+
+let subst (type a) (s : subst) (se : a expr) : a expr = 
+  match se.cnt with
+  | Var v -> if List.mem_assoc v s then force (List.assoc v s) else se
+  | (Any | Any_compatible_with _ | List _) -> se
 
 (*------------------------------------------------------------------*)
-let is_fset : t -> bool = function List _ -> true | _ -> false
+let subst_projs (s : (Term.proj * Term.proj) list) (t : 'a expr) : 'a expr =
+  match t.cnt with
+  | Var _ -> t                  (* FIXME: unclear what should be done here *)
+  | Any | Any_compatible_with _ -> t
+  | List l ->
+    mk (List (List.map (fun (p,single) -> List.assoc_dflt p p s, single) l))
 
-let is_any_or_any_comp : t -> bool = function
+(*------------------------------------------------------------------*)
+(** {2 Conversions} *)
+
+(*------------------------------------------------------------------*)
+let var v = mk (Var v)
+  
+(*------------------------------------------------------------------*)
+let any = mk Any
+
+let any_compatible_with s = mk (Any_compatible_with s)
+
+(*------------------------------------------------------------------*)
+let is_fset (se : t) : bool = 
+  match se.cnt with List _ -> true | _ -> false
+
+let is_any_or_any_comp (se : t) : bool = 
+  match se.cnt with
   | Any | Any_compatible_with _ -> true
   | _ -> false
 
 (*------------------------------------------------------------------*)
-let pp fmt : 'a expr -> unit = function
-  | Any -> Format.fprintf fmt "any"
-  | Any_compatible_with s -> Format.fprintf fmt "any/%a" Symbols.pp s
-  | List l ->
+let pp fmt (se : 'a expr) : unit = 
+  if se.name <> None then
+    Fmt.pf fmt "%s" (oget se.name)
+  else
+    match se.cnt with
+    | Var v -> Fmt.pf fmt "%a" Var.pp v
+    | Any -> Format.fprintf fmt "any"
+    | Any_compatible_with s -> Format.fprintf fmt "any/%a" Symbols.pp s
+    | List l ->
       Fmt.list
         ~sep:Fmt.comma
         (fun fmt (label,single_sys) ->
@@ -74,27 +146,57 @@ let pp fmt : 'a expr -> unit = function
         l
 
 (*------------------------------------------------------------------*)
-let to_arbitrary : type a. a expr -> arbitrary expr = fun x -> x
+let to_arbitrary (type a) (x : a expr) : arbitrary = force x
 
-let to_compatible = function
-  | Any -> error Expected_compatible
-  | x -> x
+let to_compatible (type a) (se : a expr) : compatible = 
+  match se.cnt with
+  | Var _ | Any -> error Expected_compatible
+  | _ -> force se
 
-let to_fset = function
-  | List _ as x -> x
+let to_fset (type a) (se : a expr) : fset =
+  match se.cnt with
+  | List _ -> force se
   | _ -> error Expected_fset
 
-let to_pair = function
-  | List [_;_] as x -> x
+let to_pair (type a) (se : a expr) : pair =
+  match se.cnt with
+  | List [_;_] -> mk ?name:se.name se.cnt
+  | Var _      -> mk ?name:se.name se.cnt
+  (* FIXME: I broke the interface there I think *)
+
   | _ -> error Expected_pair
 
 (*------------------------------------------------------------------*)
-let subset table e1 e2 = match e1,e2 with
+let subset table e1 e2 : bool =
+  match e1.cnt, e2.cnt with
+  | Var v1, Var v2 -> Var.equal v1 v2
+    
   | Any_compatible_with s1, Any_compatible_with s2 ->
     System.compatible table s1 s2
       
   | List l, Any_compatible_with s ->
-    System.compatible table (snd (List.hd l)).system s
+    l = [] || System.compatible table (snd (List.hd l)).system s
+      
+  | List l1, List l2 ->
+    List.for_all (fun s1 -> List.exists (fun s2 -> s1 = s2) l2) l1
+      
+  | _, Any -> true
+  | _ -> false
+
+let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
+
+let equal0 s1 s2 = s1.cnt = s2.cnt
+
+(*------------------------------------------------------------------*)
+let subset_modulo table e1 e2 : bool =
+  match e1.cnt, e2.cnt with
+  | Var v1, Var v2 -> Var.equal v1 v2
+    
+  | Any_compatible_with s1, Any_compatible_with s2 ->
+    System.compatible table s1 s2
+      
+  | List l, Any_compatible_with s ->
+    l = [] || System.compatible table (snd (List.hd l)).system s
       
   | List l1, List l2 ->
     List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
@@ -102,19 +204,19 @@ let subset table e1 e2 = match e1,e2 with
   | _, Any -> true
   | _ -> false
 
-(*------------------------------------------------------------------*)
-let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
+let equal_modulo table s1 s2 = subset_modulo table s1 s2 && subset_modulo table s2 s1
 
 (*------------------------------------------------------------------*)
 (** Get system that is compatible with all systems of an expresion. *)
-let get_compatible_sys = function
-  | Any -> None
+let get_compatible_sys (se : 'a expr) : Symbols.system option = 
+  match se.cnt with
+  | Var _ | Any -> None
   | Any_compatible_with s -> Some s
   | List ((_,s)::_) -> Some s.System.Single.system
-  | List [] -> assert false
+  | List [] -> assert false     (* FIXME *)
 
 (** Check that all systems in [e1] are compatible with all systems in [e2]. *)
-let compatible table e1 e2 =
+let compatible table (e1 : 'a expr) (e2 : 'b expr) =
   match get_compatible_sys e1, get_compatible_sys e2 with
     | Some s1, Some s2 -> System.compatible table s1 s2
     | _ -> false
@@ -122,48 +224,48 @@ let compatible table e1 e2 =
 (*------------------------------------------------------------------*)
 (** {2 Finite sets} *)
 
-let to_list = function
+let to_list se = 
+  match se.cnt with
   | List l -> l
   | _ -> assert false
 
-let of_list l = List l
+let of_list l = mk (List l)
 
-let to_projs t = List.map fst (to_list t)
+let to_projs (t : _) = List.map fst (to_list t)
 
 (*------------------------------------------------------------------*)    
 let to_list_any (t : _ expr) : (Term.proj * System.Single.t) list option =
-  match t with
+  match t.cnt with
   | List l -> Some l
-  | Any | Any_compatible_with _ -> None
+  | Var _ | Any | Any_compatible_with _ -> None
 
 let to_projs_any (t : _ expr) : Term.projs option =
-  match t with
+  match t.cnt with
   | List l -> Some (List.map fst l)
-  | Any | Any_compatible_with _ -> None
+  | Var _ | Any | Any_compatible_with _ -> None
 
 (*------------------------------------------------------------------*)
-let project_opt (projs : Term.projs option) (t : fset) : fset =
-  match t, projs with
+let project_opt (projs : Term.projs option) (t : 'a expr) =
+  match t.cnt, projs with
   | List l, Some projs ->
     (* we only project over a subset of [l]'s projs *)
     assert (List.for_all (fun x -> List.mem_assoc x l) projs);
 
-    List (List.filter (fun (x,_) -> List.mem x projs) l)
+    mk (List (List.filter (fun (x,_) -> List.mem x projs) l))
 
-  | (Any | Any_compatible_with _), Some _projs -> assert false
-  (* should this be [List projs] ? *)
+  | (Any | Any_compatible_with _ | Var _), Some _projs -> assert false
 
   | _, None -> t
     
 let project (projs : Term.projs) t = project_opt (Some projs) t
 
 (*------------------------------------------------------------------*)  
-let singleton s = List [Term.proj_from_string "ε",s]
+let singleton s = mk (List [Term.proj_from_string "ε",s])
 
-let of_system table s : t =
+let of_system table s : _ =
   let projections = System.projections table s in
-  List
-    (List.map (fun proj -> proj, System.Single.make table s proj) projections)
+  let l = List.map (fun proj -> proj, System.Single.make table s proj) projections in
+  mk ~name:(Symbols.to_string s) (List l)
 
 (*------------------------------------------------------------------*)
 let default_labels : int -> Term.proj list = function
@@ -172,10 +274,10 @@ let default_labels : int -> Term.proj list = function
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
 (*------------------------------------------------------------------*)
-let make_fset table ~labels (l : System.Single.t list) : t =
+let make_fset table ~labels (l : System.Single.t list) : _ =
   (* Check for compatibility. *)
   let () = match l with
-    | [] -> assert false
+    | [] -> ()
     | { System.Single.system = hd_system } :: tl ->
       List.iter
         (fun {System.Single.system} ->
@@ -195,12 +297,13 @@ let make_fset table ~labels (l : System.Single.t list) : t =
       (default_labels len)
       labels
   in
-  List (List.combine labels l)
+  mk (List (List.combine labels l))
 
 (*------------------------------------------------------------------*)
 (** Action symbols and terms *)
 
-let symbs table = function
+let symbs table se = 
+  match se.cnt with
   | List ((_,{System.Single.system})::_) -> System.symbs table system
   | _ -> assert false
 
@@ -233,7 +336,7 @@ let descr_of_action table expr (a : Action.action) : Action.descr * Term.subst =
   in
   descr, subst
 
-let descrs table (se:fset expr) : Action.descr System.Msh.t =
+let descrs table (se : _ expr) : Action.descr System.Msh.t =
   let symbs = symbs table se in
   System.Msh.mapi
     (fun shape _ -> descr_of_shape table se shape)
@@ -249,7 +352,7 @@ let map_descrs (f : Action.descr -> 'a) table system : 'a list =
   let m = System.Msh.map f (descrs table system) in
   List.map snd (System.Msh.bindings m)
 
-let actions table system : 'a list =
+let actions table (system : _ expr) : 'a list =
   let f Action.{action;name;indices} = (action,name,indices) in
   let m = System.Msh.map f (descrs table system) in
   List.map snd (System.Msh.bindings m)
@@ -260,7 +363,7 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
 
 (*------------------------------------------------------------------*)
 
-let pp_descrs (table : Symbols.table) ppf (system : t) =
+let pp_descrs (table : Symbols.table) ppf (system : _) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
     Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
@@ -270,13 +373,15 @@ let pp_descrs (table : Symbols.table) ppf (system : t) =
 (*------------------------------------------------------------------*)
 (* Pairs *)
 
-let make_pair a b = List [Term.left_proj,a; Term.right_proj,b]
+let make_pair a b = mk (List [Term.left_proj,a; Term.right_proj,b])
 
-let fst = function
+let fst se = 
+  match se.cnt with
   | List [x;_] -> x
   | _ -> assert false
 
-let snd = function
+let snd se =
+  match se.cnt with
   | List [_;x] -> x
   | _ -> assert false
 
@@ -284,8 +389,8 @@ let snd = function
 (** {2 Contexts} *)
 
 type context = {
-  set  : arbitrary expr ;
-  pair : pair expr option
+  set  : arbitrary ;
+  pair : pair option
 }
 
 let context_any = { set = any ; pair = None }
@@ -294,19 +399,20 @@ let equivalence_context ?set pair =
   let set = match set with
     | Some s -> s
     | None ->
-       begin match pair with
+       begin match pair.cnt with
          | List ((_,ss)::_) -> any_compatible_with ss.system
          | _ -> assert false
        end
   in
+  let set, pair = force set, force pair in
   { pair = Some pair ; set }
 
-let reachability_context set = { set ; pair = None }
+let reachability_context set = { set = force set ; pair = None }
 
 let pp_context fmt = function
   | { set; pair = None   } -> pp fmt set
   | { set; pair = Some p } ->
-      if set = p then
+      if set.cnt = p.cnt then
         Format.fprintf fmt "%a@ (same for equivalences)" pp set
       else
         Format.fprintf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
@@ -314,8 +420,8 @@ let pp_context fmt = function
 let pp_context fmt c = Format.fprintf fmt "@[%a@]" pp_context c
 
 let get_compatible_expr = function
-  | { set = Any } -> None
-  | { set = expr } -> Some expr
+  | { set = { cnt = Any } } -> None
+  | { set = expr } -> Some (force expr)
 
 let project_set (projs : Term.projs) (c : context) : context =
   { c with set = project projs c.set }
@@ -403,8 +509,9 @@ let is_single_system (se : context) : bool =
     in
     let set_fsets = List.map Stdlib.snd (to_list (to_fset se.set)) in
     let fsets = pair_fsets @ set_fsets in
-    let single = List.hd fsets in
-    List.for_all (fun single' -> single = single') fsets
+    match fsets with
+    | [] -> false
+    | single :: _ -> List.for_all (fun single' -> single = single') fsets
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing} *)
@@ -431,7 +538,8 @@ module Parse = struct
     | Some p ->
       System.Single.make table sys (Term.proj_from_string (L.unloc p))
 
-  let parse table p = match L.unloc p with
+  let parse table p : arbitrary = 
+    match L.unloc p with
     | [] ->
       (* Default system annotation. We might make it mean "any" eventually
          but for now "default" avoids changing most files. *)

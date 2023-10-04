@@ -47,17 +47,17 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   type f_sel =
-    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
+    Term.term -> Vars.vars -> Term.term list ->
     [`Select | `Continue]
 
   (*------------------------------------------------------------------*)
   (* [p] is the current position *)
   let rec sel
       (fsel : f_sel) (sp : Sp.t)
-      ~projs ~vars ~conds ~(p : pos)
+      ~vars ~conds ~(p : pos)
       (t : Term.term)
     = 
-    match fsel t projs vars conds with
+    match fsel t vars conds with
     | `Select -> Sp.add p sp
     | `Continue -> 
       match t with
@@ -65,45 +65,45 @@ module Pos = struct
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
-        let sp = sel fsel sp ~projs ~vars ~conds         ~p:(0 :: p) c in
-        let sp = sel fsel sp ~projs ~vars ~conds:conds_t ~p:(1 :: p) t in
-        (*    *) sel fsel sp ~projs ~vars ~conds:conds_e ~p:(2 :: p) e 
+        let sp = sel fsel sp ~vars ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~vars ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~vars ~conds:conds_e ~p:(2 :: p) e 
 
       (* FIXME: add missing cases for &&, ||, => *)
 
       | Term.Fun (_, _) -> sp
 
       | Term.App (t1, l) ->
-        sel_l fsel sp ~projs ~vars ~conds ~p (t1 :: l)
+        sel_l fsel sp ~vars ~conds ~p (t1 :: l)
 
       | Term.Name (_ns,l) ->
-        sel_l fsel sp ~projs ~vars ~conds ~p l
+        sel_l fsel sp ~vars ~conds ~p l
 
       | Term.Macro (_ms, terms, ts) ->
         let l = terms @ [ts] in
-        sel_l fsel sp ~projs ~vars ~conds ~p l
+        sel_l fsel sp ~vars ~conds ~p l
 
       | Term.Action (_, l) ->
-        sel_l fsel sp ~projs ~vars ~conds ~p l
+        sel_l fsel sp ~vars ~conds ~p l
 
       | Term.Var _ -> sp
 
       | Term.Tuple ts ->
-        sel_l fsel sp ~projs ~vars ~conds ~p ts
+        sel_l fsel sp ~vars ~conds ~p ts
 
       | Term.Proj (_, t) ->
-        sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
+        sel fsel sp ~vars ~conds ~p:(0 :: p) t
 
       | Term.Diff (Explicit l) ->
-        List.foldi (fun i sp (label,t) ->
-            sel fsel sp ~projs:(Some [label]) ~vars ~conds ~p:(i :: p) t
+        List.foldi (fun i sp (_label,t) ->
+            sel fsel sp ~vars ~conds ~p:(i :: p) t
           ) sp l
 
       | Term.Quant (_, is, t) -> 
         let is, subst = Term.refresh_vars is in
         let t = Term.subst subst t in
         let vars = List.rev_append is vars in
-        sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
+        sel fsel sp ~vars ~conds ~p:(0 :: p) t
 
       | Term.Find (is, c, t, e) ->
         let is, subst = Term.refresh_vars is in
@@ -115,51 +115,61 @@ module Pos = struct
         let conds_t = c :: conds in
         let conds_e = Term.mk_forall is (Term.mk_not c) :: conds in
 
-        let sp = sel fsel sp ~projs ~vars:vars1 ~conds         ~p:(0 :: p) c in
-        let sp = sel fsel sp ~projs ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
-        (*    *) sel fsel sp ~projs ~vars       ~conds:conds_e ~p:(2 :: p) e 
+        let sp = sel fsel sp ~vars:vars1 ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~vars       ~conds:conds_e ~p:(2 :: p) e 
 
-  and sel_l fsel (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Term.term list) = 
-    List.foldi (fun i sp t -> sel fsel sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
+  and sel_l fsel (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Term.term list) = 
+    List.foldi (fun i sp t -> sel fsel sp ~vars ~conds ~p:(i :: p) t) sp l 
 
 
   (** Exported *)
   let select (fsel : f_sel) (t : Term.term) : Sp.t =
-    sel fsel Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
+    sel fsel Sp.empty ~vars:[] ~conds:[] ~p:[] t
 
   (*------------------------------------------------------------------*)
   (** Exported *)
   let select_e (fsel : f_sel) (t : Equiv.form) : Sp.t =
 
     (* [p] is the current position *)
-    let rec sel_e (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (t : Equiv.form) =  
+    let rec sel_e (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Equiv.form) =  
       match t with
       | Equiv.Quant (_q, is, t0) ->
         let is, subst = Term.refresh_vars_w_info is in
         let t0 = Equiv.subst subst t0 in
         let vars = List.rev_append (List.map fst is) vars in
         (* FEATURE: add tags in Fold.map *)
-        sel_e sp ~projs ~vars ~conds ~p:(0 :: p) t0
+        sel_e sp ~vars ~conds ~p:(0 :: p) t0
 
       | Equiv.Atom (Reach t) ->
-        (* FIXME: do not use built-in projections *)
-        let projs = Some [Term.left_proj; Term.right_proj] in
-        sel fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) t
+        sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t
 
       | Equiv.Atom (Equiv e) -> 
-        sel_l fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) e
+        sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e
 
+      | Equiv.Atom (Pred pa) ->
+        let p = 0 :: 0 :: p in
+
+        (* select in [pa.multi_args] *)
+        let sp =
+          List.foldi
+            (fun i sp (_,args) -> sel_l fsel sp ~vars ~conds ~p:(i :: p) args) sp
+            pa.multi_args
+        in
+
+        (* select in [pa.simpl_args] *)
+        sel_l fsel sp ~vars ~conds ~p:(List.length pa.multi_args :: p) pa.simpl_args
+ 
       | Equiv.Impl (f1, f2)
       | Equiv.And  (f1, f2)
       | Equiv.Or   (f1, f2) -> 
-        sel_e_l sp ~projs ~vars ~conds ~p [f1; f2]
+        sel_e_l sp ~vars ~conds ~p [f1; f2]
 
-    and sel_e_l (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Equiv.form list) =
-      (* FIXME: do not use built-in projections *)
-      List.foldi (fun i sp t -> sel_e sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
+    and sel_e_l (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+      List.foldi (fun i sp t -> sel_e sp ~vars ~conds ~p:(i :: p) t) sp l 
     in 
 
-    sel_e Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
+    sel_e Sp.empty ~vars:[] ~conds:[] ~p:[] t
 
 
   (*------------------------------------------------------------------*)
@@ -186,6 +196,17 @@ module Pos = struct
     SE.context -> Vars.vars -> pos ->
     'a ->
     'a * [`Map of Equiv.form | `Continue]
+
+  type f_map_g =
+    Equiv.form ->
+    SE.context -> Vars.vars -> pos -> 
+    [`Map of Equiv.form | `Continue]
+
+  type 'a f_fold_g =
+    Equiv.form ->
+    SE.context -> Vars.vars -> pos ->
+    'a ->
+    'a
 
   (*------------------------------------------------------------------*)
   (* TODO: explicit system in terms: conds below may not be in the correct 
@@ -457,6 +478,28 @@ module Pos = struct
       let ti' = Equiv.Atom (Equiv l) in
       acc, found, if found then ti' else ti
 
+    | Equiv.Atom (Pred pa) ->
+      let p = 0 :: 0 :: p in
+      
+      let (acc, found0), multi_args =
+        List.mapi_fold (fun i (acc, found) (se, args) ->
+            let acc, found', args =
+              map_fold_l func mode ~se ~vars ~conds ~p:(i :: p) ~acc args
+            in
+            (acc, found || found'), (se, args)
+          ) (acc, false) pa.multi_args
+      in
+
+      let acc, found1, simpl_args =
+        let se = (SE.of_list [] :> SE.t) in (* empty system expression *)
+        let p = List.length pa.multi_args :: p in
+        map_fold_l func mode ~se ~vars ~conds ~p ~acc pa.simpl_args
+      in
+
+      let found = found0 || found1 in
+      let ti' = Equiv.Atom (Pred { pa with multi_args; simpl_args; }) in
+      acc, found, if found then ti' else ti
+        
     | Equiv.Impl (f1, f2)
     | Equiv.And  (f1, f2)
     | Equiv.Or   (f1, f2) -> 
@@ -598,6 +641,21 @@ module Pos = struct
     in
     found, t
 
+  (** Exported *)
+  let map_g
+      ?(mode=`TopDown false) 
+      (func : f_map_g)
+      (system : SE.context) 
+      (t : Equiv.form) 
+    =
+    let func : unit f_map_fold_g = 
+      fun t projs vars p () -> (), func t projs vars p 
+    in
+    let (), found, t =
+      map_fold_g func mode ~system ~vars:[] ~p:[] ~acc:() t
+    in
+    found, t
+
   (*------------------------------------------------------------------*)
   (** Exported *)
   let fold
@@ -624,6 +682,20 @@ module Pos = struct
     in   
     let a, _, _ = map_fold_e f mode ~system ~vars:[] ~conds:[] ~p:[] ~acc t in
     a
+
+  (** Exported *)
+  let fold_g
+      ?(mode=`TopDown false) 
+      (func : 'a f_fold_g)
+      (system : SE.context) 
+      (acc : 'a) (t : Equiv.form) 
+    =
+    let f:'a f_map_fold_g =
+      fun t se v p acc -> (func t se v p acc, `Continue)
+    in   
+    let a, _, _ = map_fold_g f mode ~system ~vars:[] ~p:[] ~acc t in
+    a
+
   (*------------------------------------------------------------------*)
   (** Exported *)
   let fold_shallow
@@ -662,13 +734,12 @@ module Pos = struct
     =
     map_fold_e func mode ~system ~vars:[] ~conds:[] ~p:[] ~acc t
 
-  (*------------------------------------------------------------------*)
   (** Exported *)
   let map_fold_g
-        ?(mode=`TopDown false) 
-        (func : 'a f_map_fold_g)
-        (system : SE.context) 
-        (acc : 'a) (t : Equiv.form) 
+      ?(mode=`TopDown false) 
+      (func : 'a f_map_fold_g)
+      (system : SE.context) 
+      (acc : 'a) (t : Equiv.form) 
     =
     map_fold_g func mode ~system ~vars:[] ~p:[] ~acc t
 end
@@ -723,7 +794,9 @@ module Mvar : sig[@warning "-32"]
   (** Checks that all arguments of [pat] have been inferred in [mv]. *)
   val check_args_inferred : 'a Term.pat_op -> t -> unit 
 
-  val pp : Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp     :             Format.formatter -> t -> unit
+  val pp_dbg :             Format.formatter -> t -> unit
 end = struct
   (** [id] is a unique identifier used to do memoisation. *)
   type t = {
@@ -735,13 +808,18 @@ end = struct
   let cpt = ref 0
   let make subst = incr cpt; { id = !cpt; subst }
 
-  let pp fmt (mv : t) : unit =
+  let _pp ~dbg fmt (mv : t) : unit =
     let pp_binding fmt (v, (tag,system,t)) =
       Fmt.pf fmt "@[%a[%a]{%a} → %a@]"
-        Vars.pp v Vars.Tag.pp tag SE.pp system Term.pp t 
+        (Vars._pp ~dbg) v
+        Vars.Tag.pp tag SE.pp system 
+        (Term._pp ~dbg) t 
     in
     Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
       (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
+
+  let pp     = _pp ~dbg:false
+  let pp_dbg = _pp ~dbg:true
 
   let empty = make Mv.empty
 
@@ -1286,6 +1364,15 @@ module T (* : S with type t = Term.term *) = struct
     List.iter2 (unif_ty st) tys1 tys2
 
   (*------------------------------------------------------------------*)
+  let unif_system (st : unif_state) (se : SE.t) (se' : SE.t) : unit =
+    if not (SE.equal st.table se se') then
+      no_unif ()
+    else ()
+
+  let unif_systems (st : unif_state) (se_l : SE.t list) (se_l' : SE.t list) : unit =
+    List.iter2 (unif_system st) se_l se_l'
+
+  (*------------------------------------------------------------------*)
   (* Invariants:
      - [st.mv] supports in included in [p.pat_vars].
      - [st.bvs] is the set of variables bound above [t].
@@ -1424,7 +1511,7 @@ module T (* : S with type t = Term.term *) = struct
         if pat_red then tunif t pat st
         else no_unif ()
 
-    | (Macro _ | Fun _ | App (Fun _, _)), _ -> 
+    | (Macro _ | Fun _ | App (Fun _, _)), _  -> 
       let t, t_red = m_expand_head_once st t in
       if t_red then tunif t pat st
       else no_unif ()
@@ -2639,11 +2726,14 @@ module E = struct
     | `Contravar -> `Covar
 
   (*------------------------------------------------------------------*)
-  (** [term_match ?vars term pat st] match [term] with [pat] w.r.t.
-      variables [vars]. *)
   (* FIXME: remove *)
   let term_unif term pat st : Mvar.t =
     try T.tunif term pat st with
+    | NoMatch _ -> no_unif ()  (* FIXME: why throw away match info? *)
+
+  (* FIXME: remove *)
+  let term_unif_l terms pats st : Mvar.t =
+    try T.tunif_l terms pats st with
     | NoMatch _ -> no_unif ()  (* FIXME: why throw away match info? *)
 
   (*------------------------------------------------------------------*)
@@ -2942,8 +3032,9 @@ module E = struct
 
   (*------------------------------------------------------------------*)
   (** Match two [Equiv.form] *)
-  let rec e_unif ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state)
-    : Mvar.t =
+  let rec e_unif
+      ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state) : Mvar.t 
+    =
     match t, pat with
     | Impl (t1, t2), Impl (pat1, pat2) ->
       let mv = e_unif ~mode:(flip mode) t1 pat1 st in
@@ -2959,6 +3050,29 @@ module E = struct
       in
       let st = st_change_context st system in
       tunif_e ~mode es pat_es st
+
+    | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
+      (* unify types *)
+      unif_tys st p.ty_args ppat.ty_args;
+
+      (* unify system arguments *)
+      unif_systems st p.se_args ppat.se_args;
+
+      (* unify multi-term arguments *)
+      let mv = 
+        List.fold_left2 (fun mv (set, args) (set', args') ->
+            assert (SE.equal st.table set set');
+            let st = { st with mv; system = SE.{set; pair = None; } } in
+            term_unif_l args args' st            
+          ) st.mv p.multi_args ppat.multi_args
+      in
+
+      (* unify terms *)
+      let st = 
+        { st with mv;
+                  system = SE.{ set = (SE.of_list [] :> SE.t); pair = None; } } 
+      in
+      term_unif_l p.simpl_args ppat.simpl_args st
 
     | Quant (q,es,t), Quant (q',es',t') when q = q' ->
       let s, s', st = unif_tagged_bnds es es' st in

@@ -72,10 +72,12 @@ module Tag : sig
   val gtag : t
 
   (*------------------------------------------------------------------*)
-  (** Attached local information to a variable *)
-  val local_vars : ?const:bool -> ?adv:bool -> vars -> (var * t) list
+  (** Attached local information to a variable.
+      [const] and [adv] default to [false]. *)
+  val local_vars : ?const:bool -> ?adv:bool -> vars -> (var * t) list 
 
-  (** Attached global information to a variable *)
+  (** Attached global information to a variable.
+      [const] and [adv] default to [false]. *)
   val global_vars : ?const:bool -> ?adv:bool -> vars -> (var * t) list
 end
 
@@ -129,9 +131,9 @@ val norm_ty : Type.Infer.env -> var -> var
 
 val tsubst  : Type.tsubst -> var -> var
 
-(** Free unification variables of a term *)
-val free_univars      : var  -> Ident.Sid.t 
-val free_univars_list : vars -> Ident.Sid.t 
+(** Free type variables of a term *)
+val ty_fv  : var  -> Type.Fv.t
+val ty_fvs : vars -> Type.Fv.t
 
 val equal : var -> var -> bool
 

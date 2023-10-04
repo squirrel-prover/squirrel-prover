@@ -22,6 +22,12 @@ type Symbols.data += Operator of operator
 let pp_op_body fmt (Single body) = Fmt.pf fmt "%a" Term.pp body
 
 let pp_operator fmt op =
+  let pp_op_name fmt s =
+    if Symbols.is_infix_str s then
+      (Fmt.parens Fmt.string) fmt s 
+    else
+      Fmt.string fmt s
+  in
   let pp_tyvars fmt tyvars =
     if tyvars = [] then () 
     else
@@ -33,8 +39,8 @@ let pp_operator fmt op =
       Fmt.pf fmt "(%a) " Vars.pp_typed_list args
   in
 
-  Fmt.pf fmt "@[<hov 2>@[op %s %a%a: %a @]=@ @[%a@]@]"
-    op.name
+  Fmt.pf fmt "@[<hov 2>@[op %a %a%a: %a @]=@ @[%a@]@]"
+    pp_op_name op.name
     pp_tyvars op.ty_vars
     pp_args op.args
     Type.pp op.out_ty

@@ -34,6 +34,39 @@ let pp_univar fmt u = Fmt.pf fmt "%a" Ident.pp_full u
 let to_univar u = u
 
 (*------------------------------------------------------------------*)
+(** Free variables in types *)
+
+module Fv = struct
+  type t = { tv : Sid.t; uv : Sid.t; }
+           
+  let pp fmt t = 
+    Fmt.pf fmt "@[<v 0>{ tv: @[%a@];@ uv: @[%a@] }@]" 
+      (Fmt.list Ident.pp_full) (Sid.elements t.tv)
+      (Fmt.list Ident.pp_full) (Sid.elements t.uv)
+
+  let empty = { tv = Sid.empty; uv = Sid.empty; }
+
+  let union t1 t2 = { 
+    tv = Sid.union t1.tv t2.tv; 
+    uv = Sid.union t1.uv t2.uv; 
+  }
+
+  let diff t1 t2 = { 
+    tv = Sid.diff t1.tv t2.tv; 
+    uv = Sid.diff t1.uv t2.uv; 
+  }
+
+  let add_tv tv t = { t with tv = Sid.add tv t.tv }
+  let add_uv uv t = { t with uv = Sid.add uv t.uv }
+
+  let rem_tv tv t = { t with tv = Sid.remove tv t.tv }
+  let rem_uv tv t = { t with uv = Sid.remove tv t.uv }
+
+  let rem_tvs tvs t = List.fold_left (fun t v -> rem_tv v t) t tvs 
+  let rem_uvs uvs t = List.fold_left (fun t v -> rem_uv v t) t uvs
+end
+
+(*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
   | Message
@@ -92,24 +125,27 @@ let rec equal (a : ty) (b : ty) : bool =
    | _ -> false
 
 (*------------------------------------------------------------------*)
-let rec pp (ppf : Format.formatter) : ty -> unit = function
+let rec _pp ~dbg (ppf : Format.formatter) : ty -> unit = function
   | Message   -> Fmt.pf ppf "message"
   | Index     -> Fmt.pf ppf "index"
   | Timestamp -> Fmt.pf ppf "timestamp"
   | Boolean   -> Fmt.pf ppf "bool"
   | TBase s   -> Fmt.pf ppf "%s" s
-  | TVar id   -> pp_tvar ppf id
+  | TVar id   -> _pp_tvar ~dbg ppf id
   | TUnivar u -> pp_univar ppf u
 
-  | Tuple tys -> Fmt.list ~sep:(Fmt.any " * ") pp ppf tys
+  | Tuple tys -> Fmt.list ~sep:(Fmt.any " * ") (_pp ~dbg) ppf tys
 
   | Fun (t1, t2) ->
-    Fmt.pf ppf "%a -> %a" pp_chain_left t1 pp t2
+    Fmt.pf ppf "%a -> %a" (pp_chain_left ~dbg) t1 (_pp ~dbg) t2
 
-and pp_chain_left ppf (t : ty) : unit =
+and pp_chain_left ~dbg ppf (t : ty) : unit =
   match t with
-  | Fun (_, _) -> Fmt.pf ppf "(%a)" pp t
-  | _          -> Fmt.pf ppf "%a"   pp t
+  | Fun (_, _) -> Fmt.pf ppf "(%a)" (_pp ~dbg) t
+  | _          -> Fmt.pf ppf "%a"   (_pp ~dbg) t
+
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
 
 (** Encoding of a type as a string without discontinuity nor
     parenthesis. *)
@@ -150,25 +186,25 @@ let rec is_bitstring_encodable = function
   | Fun _ | TVar _ | TUnivar _ -> false
 
 (*------------------------------------------------------------------*)
-let free_univars (t : ty) : Sid.t = 
+let fv (t : ty) : Fv.t = 
   let rec fuvs acc t =
     match t with
     | Message
     | Boolean
     | Index  
     | Timestamp
-    | TVar _ 
     | TBase _  -> acc
       
-    | TUnivar ui -> Sid.add ui acc
+    | TUnivar ui -> Fv.add_uv ui acc
+    | TVar    ti -> Fv.add_tv ti acc
 
     | Tuple tys -> List.fold_left fuvs acc tys
     | Fun (t1, t2) -> fuvs (fuvs acc t1) t2
   in
-  fuvs Sid.empty t
+  fuvs Fv.empty t
                
-let free_univars_list l =
-  List.fold_left (fun uvs v -> Sid.union uvs (free_univars v)) Sid.empty l
+let fvs l =
+  List.fold_left (fun uvs v -> Fv.union uvs (fv v)) Fv.empty l
 
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
@@ -464,13 +500,13 @@ let pp_ftype    = pp_ftype_g pp_univar
 let pp_ftype_op = pp_ftype_g pp_tvar
 
 (*------------------------------------------------------------------*)
-let ftype_free_univars (f : ftype) : Ident.Sid.t =
+let ftype_fv (f : ftype) : Fv.t =
   (* [f.fty_vars] are not free in [f], and must not be added. *)
-  Sid.diff
-    (Sid.union
-       (free_univars_list f.fty_args)
-       (free_univars f.fty_out)) 
-    (Sid.of_list f.fty_vars)
+  Fv.rem_tvs
+    f.fty_vars
+    (Fv.union
+       (fvs f.fty_args)
+       (fv f.fty_out)) 
 
 (*------------------------------------------------------------------*)
 let tsubst_ftype (ts : tsubst) (fty : ftype) : ftype = { 

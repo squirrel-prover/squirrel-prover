@@ -8,9 +8,9 @@ module Args = TacticsArgs
 module type Hyp = sig 
   type t 
 
-  val pp_hyp     :             Format.formatter -> t -> unit
-  val _pp_hyp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp_hyp_dbg :             Format.formatter -> t -> unit
+  val pp_hyp     : Format.formatter -> t -> unit
+  val pp_hyp_dbg : Format.formatter -> t -> unit
+  val _pp_hyp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
 
   (** Chooses a name for a formula, depending on the formula shape. *)
   val choose_name : t -> string
@@ -96,13 +96,13 @@ module type S1 = sig
   val clear_triv : hyps -> hyps
 
   (*------------------------------------------------------------------*)
-  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
+  val pp_ldecl : ?dbg:bool -> ?context:SE.context -> Format.formatter -> ldecl -> unit
 
-  val pp_hyp   : Format.formatter -> hyp  -> unit
+  val pp_hyp : Format.formatter -> hyp  -> unit
 
-  val pp       :             Format.formatter -> hyps -> unit
-  val _pp      : dbg:bool -> Format.formatter -> hyps -> unit
-  val pp_dbg   :             Format.formatter -> hyps -> unit
+  val pp     : Format.formatter -> hyps -> unit
+  val pp_dbg : Format.formatter -> hyps -> unit
+  val _pp    : dbg:bool -> Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)
@@ -110,11 +110,12 @@ end
 module type S = sig
   include S1
   val empty : hyps
+  val _pp : dbg:bool -> ?context:SE.context -> Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)
 (** Functor for building an implementation of contexts
-  * for a particular kind of hypotheses. *)
+    for a particular kind of hypotheses. *)
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 
 

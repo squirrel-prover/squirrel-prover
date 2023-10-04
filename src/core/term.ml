@@ -105,6 +105,7 @@ type term =
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
   | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
+
   | Macro  of msymb * term list * term
 
   | Action of Symbols.action * term list
@@ -671,8 +672,6 @@ module SmartDestructors = struct
   let destr_false f = oas_seq0 (destr_app ~fs:f_false f)
   let destr_true  f = oas_seq0 (destr_app ~fs:f_true  f)
 
-  let destr_zero f = oas_seq0 (destr_app ~fs:f_zero f)
-
   let destr_not  f = oas_seq1 (destr_app ~fs:f_not f)
 
   let destr_or f = oas_seq2 (destr_app ~fs:f_or   f)
@@ -758,8 +757,6 @@ module SmartDestructors = struct
 
   let is_not f = destr_not f <> None
 
-  let is_zero f = destr_zero f <> None
-
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
@@ -802,11 +799,24 @@ type esubst = ESubst of term * term
 type subst = esubst list
 
 (*------------------------------------------------------------------*)
-let rec assoc (subst : subst) (term : term) : term =
-  match subst with
-  | [] -> term
-  | ESubst (t1,t2)::q ->
-    if term = t1 then t2 else assoc q term
+let assoc (subst : subst) (term : term) : term =
+  let rec assoc_var subst var =
+    match subst with
+    | [] -> term
+    | ESubst (Var v1,t2)::q ->
+      if Vars.equal v1 var then t2 else assoc_var q var
+    | ESubst (_, _)::q -> assoc_var q var
+  in
+  let rec assoc_term subst term =
+    match subst with
+    | [] -> term
+    | ESubst (t1,t2)::q ->
+      if equal term t1 then t2 else assoc_term q term
+  in
+  match term with
+  | Var v -> assoc_var  subst v
+  | _     -> assoc_term subst term
+
 
 let subst_var (subst : subst) (var : Vars.var) : Vars.var =
   match assoc subst (Var var) with
@@ -815,6 +825,16 @@ let subst_var (subst : subst) (var : Vars.var) : Vars.var =
 
 let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
   List.map (subst_var subst) vs
+
+(*------------------------------------------------------------------*)
+let subst_add_binding subst v t =
+  ESubst (mk_var v, t) :: subst
+
+let subst_add_bindings subst vars terms =
+  List.fold_left2 subst_add_binding subst vars terms
+
+let subst_add_bindings0 subst l =
+  List.fold_left (fun subst (v,t) -> subst_add_binding subst v t) subst l
 
 (*------------------------------------------------------------------*)
 let rec fv (t : term) : Sv.t = 
@@ -944,25 +964,25 @@ let tforall (f : term -> bool) (t : term) : bool =
   tfold (fun t b -> f t && b) t true
 
 (*------------------------------------------------------------------*)
-let isymb_free_univars (s : 'a isymb) : Sid.t = 
-  Type.free_univars s.s_typ
+let isymb_ty_fv (s : 'a isymb) : Type.Fv.t = 
+  Type.fv s.s_typ
 
-let free_univars (t : term) : Sid.t = 
+let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t = 
   let rec doit acc t =
     match t with
-    | Var tv -> Sid.union (Vars.free_univars tv) acc
+    | Var tv -> Type.Fv.union (Vars.ty_fv tv) acc
     | Fun (_, { fty; ty_args; }) -> 
-      let acc = Sid.union (Type.ftype_free_univars fty) acc in
-      Sid.union (Type.free_univars_list ty_args) acc 
+      let acc = Type.Fv.union (Type.ftype_fv fty) acc in
+      Type.Fv.union (Type.fvs ty_args) acc 
 
     | App (t, l) -> doit_list acc (t :: l)
 
     | Macro (s, l, ts) ->
-      let acc = Sid.union (isymb_free_univars s) acc in
+      let acc = Type.Fv.union (isymb_ty_fv s) acc in
       doit_list acc (ts :: l)
 
     | Name (s,l) ->
-      let acc = Sid.union (isymb_free_univars s) acc in
+      let acc = Type.Fv.union (isymb_ty_fv s) acc in
       doit_list acc l
 
     | Tuple l
@@ -973,16 +993,20 @@ let free_univars (t : term) : Sid.t =
     | Diff (Explicit l) -> doit_list acc (List.map snd l)
 
     | Find (vs, a, b, c) ->
-      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      let acc = Type.Fv.union acc (Vars.ty_fvs vs) in
       doit_list acc [a; b; c]
 
     | Quant (_, vs, b) -> 
-      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      let acc = Type.Fv.union acc (Vars.ty_fvs vs) in
       doit acc b
         
   and doit_list acc l = List.fold_left doit acc l in
 
-  doit Sid.empty t
+  doit acc t
+
+(** Exported *)
+let ty_fvs l = List.fold_left (fun acc t -> ty_fv ~acc t) Type.Fv.empty l 
+let ty_fv t = ty_fv ?acc:None t
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -1453,16 +1477,16 @@ and pp_and_happens info ppf f =
   pp_happens info ppf (collect [] f)
 
 (*------------------------------------------------------------------*)
-let[@warning "-27"] pp_toplevel
-    ~dbg (info : pp_info) (fmt : Format.formatter) (t : term) : unit
+let pp_toplevel
+    (info : pp_info) (fmt : Format.formatter) (t : term) : unit
   =
   pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
 
 (** Exported *)
-let pp_with_info = pp_toplevel ~dbg:false
-let pp           = pp_toplevel ~dbg:false default_pp_info
-let _pp ~dbg     = pp_toplevel ~dbg:false { default_pp_info with dbg }
-let pp_dbg       = pp_toplevel ~dbg:false { default_pp_info with dbg = true }
+let pp_with_info = pp_toplevel
+let pp           = pp_toplevel default_pp_info
+let _pp ~dbg     = pp_toplevel { default_pp_info with dbg }
+let pp_dbg       = pp_toplevel { default_pp_info with dbg = true }
 
 (*------------------------------------------------------------------*)
 let pp_esubst ppf (ESubst (t1,t2)) =
@@ -1680,7 +1704,12 @@ let tsubst (ts : Type.tsubst) (t : term) : term =
     | Fun (fn, fty_app) -> 
       Fun (fn, tsubst_applied_ftype ts fty_app)
 
-    (* TODO: types: substitute in Name and Macro *)
+    | Name (n,args) -> Name ({ n with s_typ = Type.tsubst ts n.s_typ}, 
+                             List.map tsubst args)
+
+    | Macro (m,args,arg) -> Macro ({ m with s_typ = Type.tsubst ts m.s_typ}, 
+                                   List.map tsubst args,
+                                   tsubst arg)
 
     | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
 
@@ -1926,6 +1955,22 @@ let rec diff_names = function
   | Name _ -> true
   | Diff (Explicit l) -> List.for_all (fun (_,tm) -> diff_names tm) l
   | _ -> false
+
+(*------------------------------------------------------------------*)
+(** See `.mli` *)
+let is_single_term (venv : Vars.env) (t : term) : bool =
+  let rec doit = function
+    | Diff _ | Macro _ -> false
+    | Var v ->
+      begin
+        try
+          let info = Vars.get_info v venv in
+          info.system_indep
+        with Not_found -> false
+      end
+    | t -> tforall doit t
+  in
+  doit t
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

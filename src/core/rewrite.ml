@@ -162,7 +162,7 @@ let rw_inst
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
 
-    if not (SE.subset table se s.rl_system) then 
+    if not (SE.subset_modulo table se s.rl_system) then 
       s, `Continue
     else 
       match s.found_instance with
@@ -170,7 +170,7 @@ let rw_inst
         (* we already found the rewrite instance earlier *)
 
         (* check if the same system apply to the subterm *)
-        if not (SE.subset table se inst.system) then 
+        if not (SE.subset_modulo table se inst.system) then 
           s, `Continue 
         else
           let context = SE.reachability_context se in

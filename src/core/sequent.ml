@@ -51,14 +51,28 @@ module PT = struct
       subgs  = List.map do_proj pt.subgs;
       form   = do_proj pt.form; }
 
-  let pp fmt (pt : t) : unit =
+  let _pp ~dbg fmt (pt : t) : unit =
+    let pp_subgoals_and_mv fmt =
+      if not dbg then () 
+      else 
+        Fmt.pf fmt "@[<v 2>subgoals:@ @[%a@]@]@;\
+                    @[<v 2>mv:@ @[%a@]@]@;"
+          (Fmt.list (Equiv.Any._pp ~dbg ?context:None))
+          pt.subgs
+          (Mvar._pp ~dbg) pt.mv
+    in        
     Fmt.pf fmt "@[<v 0>\
-                  @[%a@]@;\
-                system : @[%a@]@;\
-                vars: @[%a@]@]"
-      Equiv.Any.pp pt.form
+                @[%a@]@;\
+                @[system : @[%a@]@]@;\
+                %t\
+                @[vars: @[%a@]@]@]"
+      (Equiv.Any._pp ~dbg ?context:None) pt.form  
       SE.pp_context pt.system
-      Vars.pp_typed_tagged_list (List.rev pt.args)
+      pp_subgoals_and_mv
+      (Vars._pp_typed_tagged_list ~dbg) (List.rev pt.args) 
+
+  let pp     = _pp ~dbg:false
+  let pp_dbg = _pp ~dbg:true
 end
 
 (*------------------------------------------------------------------*)
@@ -138,11 +152,14 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
        or [SE.any_compatible_with].
        In that case, no projection needed in terms: simply uses 
        [system.set]. *)
-    else { pt with system }
+    else
+      let () = assert (SE.is_any_or_any_comp pt.system.set) in
+      { pt with system }
   else
     (* [system.set] is [SE.any] or [SE.any_compatible_with].
        [pt.system.set] must be in the same case. *)
-    let () = assert (SE.is_any_or_any_comp pt.system.set) in
+    let () = assert (SE.is_any_or_any_comp    system.set &&
+                     SE.is_any_or_any_comp pt.system.set   ) in
     { pt with system }
 
 (*------------------------------------------------------------------*)
@@ -156,25 +173,43 @@ let no_equiv_any : Equiv.any_form -> bool = function
   | Equiv.Local  _ -> true
   | Equiv.Global f -> no_equiv f
 
+let is_system_context_indep : Equiv.any_form -> bool = function
+  | Equiv.Local  _ -> false
+  | Equiv.Global f -> Equiv.is_system_context_indep f
+
 (** Check if [pt] is general enough for [system]. 
     Note that we do not use this function in [pt_unify_systems], 
-    because it must do more complicated checks. *)
-let pt_compatible_with table (pt : PT.t) (system : SE.context) : bool =
-  (* Check equivalence systems in [system.pair]. *)
-  let comp_pair =
-    (* if [pt] has no equivalences, it is compatible. *)
-    ( no_equiv_any pt.form && (List.for_all no_equiv_any pt.subgs) ) ||
+    because it must do more complicated checks.
+    Result: 
+    - [`ContextIndep] if there are no system-context dependent formulas in 
+      the proof-term
+    - [`Subset] if there may be system-context dependent formulas, but the 
+      system context of the proof-term contains the target system context 
+    - [`Failed] if everything else failed. *)
+let pt_compatible_with
+    table (pt : PT.t) (system : SE.context) 
+  : [`Subset | `ContextIndepPT | `Failed] 
+  =
+  if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
+    `ContextIndepPT
+  else 
+    begin
+    (* Check equivalence systems in [system.pair]. *)
+    let comp_pair =
+      (* if [pt] has no equivalences, it is compatible. *)
+      ( List.for_all no_equiv_any (pt.form :: pt.subgs) ) ||
 
-    (* if the target system has no system pair, it is compatible. *)
-    system.pair = None ||
+      (* if the target system has no system pair, it is compatible. *)
+      system.pair = None ||
 
-    (* or if both system pair are identical *)
-    oequal (SE.equal table) system.pair pt.system.pair
-  in
-  let comp_set =
-    SE.subset table system.set pt.system.set
-  in
-  comp_pair && comp_set 
+      (* or if both system pair are identical *)
+      oequal (SE.equal_modulo table) system.pair pt.system.pair
+    in
+    let comp_set =
+      SE.subset_modulo table system.set pt.system.set
+    in
+    if comp_pair && comp_set then `Subset else `Failed
+  end
 
 (*------------------------------------------------------------------*)
 let pt_unify_warning_systems ~(pt : PT.t) ~(arg : PT.t) : unit =
@@ -194,24 +229,30 @@ let pt_unify_systems
     ~(pt : PT.t) ~(arg : PT.t)
   : PT.t * PT.t
   =
-  (* Check equivalence systems in [system.pair].
-     Fails if not compatible. *)
-  let arg_pair, pt_pair = arg.system.pair, pt.system.pair in
-  if pt_pair <> None && not (oequal (SE.equal table) pt_pair arg_pair) then
-    failed ()
+  if List.for_all is_system_context_indep (arg.form :: arg.subgs) then 
+    pt, { arg with system = pt.system; }
+  else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
+    { pt with system = arg.system; }, arg
   else
+    begin
+      (* Check equivalence systems in [system.pair].
+         Fails if not compatible. *)
+      let arg_pair, pt_pair = arg.system.pair, pt.system.pair in
+      if pt_pair <> None && not (oequal (SE.equal_modulo table) pt_pair arg_pair) then
+        failed ()
+      else
 
-    (* Unify reachability systems in [system.set]. *)
-    let pt_set, arg_set = pt.system.set, arg.system.set in
-    if SE.subset table pt_set arg_set then
-      pt, pt_project_system_set arg pt.system 
-    else
-    if SE.subset table arg_set pt_set then begin
-      pt_unify_warning_systems ~pt ~arg;
-      pt_project_system_set pt arg.system, arg
+        (* Unify reachability systems in [system.set]. *)
+        let pt_set, arg_set = pt.system.set, arg.system.set in
+        if SE.subset_modulo table pt_set arg_set then
+          pt, pt_project_system_set arg pt.system 
+        else
+        if SE.subset_modulo table arg_set pt_set then begin
+          pt_unify_warning_systems ~pt ~arg;
+          pt_project_system_set pt arg.system, arg
+        end
+        else failed ()
     end
-    else failed ()
-
 
 (*------------------------------------------------------------------*)
 (** {2 Module type for sequents -- after Prover} *)
@@ -685,7 +726,7 @@ module Mk (Args : MkArgs) : S with
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
     in
     let mv = match match_res with
-      | Match.NoMatch _  -> pt_apply_error arg ()     
+      | Match.NoMatch _  -> pt_apply_error arg () 
       | Match.Match   mv -> mv
     in
 
@@ -847,14 +888,16 @@ module Mk (Args : MkArgs) : S with
     let pt =
       if not check_compatibility then
         pt
-      else if pt_compatible_with (S.table s) pt (S.system s) then
-        pt_project_system_set pt (S.system s)
       else 
-        error_pt_bad_system p_pt.p_pt_loc pt 
+        match pt_compatible_with (S.table s) pt (S.system s) with
+        | `Subset         -> pt_project_system_set pt (S.system s)
+        | `ContextIndepPT -> { pt with system = S.system s; }
+        | `Failed         -> error_pt_bad_system p_pt.p_pt_loc pt 
     in
-    
+
     (* close the proof-term by inferring as many pattern variables as possible *)
     let pt = close p_pt.p_pt_loc (S.table s) (S.vars s) pt in
+    assert (pt.mv = Mvar.empty);
 
     (* pattern variable remaining, and not allowed *)
     if close_pats && not (pt.args = []) then

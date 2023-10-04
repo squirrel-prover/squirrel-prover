@@ -1,4 +1,42 @@
+open Utils
+
 module L = Location
+
+(*------------------------------------------------------------------*)
+(** {2 System expression variables} *)
+
+module Var : sig
+  type t
+
+  (*------------------------------------------------------------------*)
+  type info =
+    | Pair                        (** multi-system of cardinal two *)
+
+  (*------------------------------------------------------------------*)
+  val pp : Format.formatter -> t -> unit
+
+  val pp_info : Format.formatter -> info -> unit
+    
+  (*------------------------------------------------------------------*)
+  val equal : t -> t -> bool
+    
+  val of_ident : Ident.t -> t
+  val to_ident : t -> Ident.t
+
+  (*------------------------------------------------------------------*)
+  (** variable corresponding to the [set] in a sequent *)
+  val set  : t
+  (** variable corresponding to the [pair] in a sequent *)
+  val pair : t
+
+  (*------------------------------------------------------------------*)
+  type env = (t * info list) Ms.t
+
+  val init_env : env
+end
+
+(*------------------------------------------------------------------*)
+(** {2 System expressions} *)
 
 (** A system expression is used to indicate to which systems a formula
     applies. Some formulas apply to any system, others apply to any number of
@@ -9,15 +47,15 @@ module L = Location
     When a local formula is annotated with one such expression
     it means that it holds for all systems in the set.
 
-    An [arbitrary expr] can be any set, it practice we use it only
+    An [arbitrary expr] can be any set, in practice we use it only
     to denote the set of all systems.
 
     A [compatible expr] denotes a set of compatible systems,
     which makes it possible to interpret formulas with actions.
 
     Formulas with macros can only be interpreted in finite sets,
-    represented by an [fset expr]. These sets are actually labelled,
-    ordered and non-empty.
+    represented by an [fset expr]. These sets are actually labelled
+    and ordered.
 
     An equivalence must be annotated with a [pair expr], representing
     an ordered and labelled pair. *)
@@ -38,6 +76,21 @@ val hash : 'a expr -> int
 
 val pp : Format.formatter -> 'a expr -> unit
 
+(** [subset s1 s2] iff [s1] is included in [s2]. *)
+val subset : Symbols.table -> 'a expr -> 'a expr -> bool
+
+(*------------------------------------------------------------------*)
+(** Use equality over systems ([equal] or [equal0]) and not [Stdlib.(=)]! *)
+val equal  : Symbols.table -> 'a expr -> 'a expr -> bool
+val equal0 :                  'a expr -> 'a expr -> bool
+
+(*------------------------------------------------------------------*)
+(** [subset s1 s2] iff [s1] is included in [s2] modulo renaming projections *)
+val subset_modulo : Symbols.table -> 'a expr -> 'a expr -> bool
+
+val equal_modulo  : Symbols.table -> 'a expr -> 'a expr -> bool
+
+(*------------------------------------------------------------------*)
 (** System expression denoting all possible systems.
     It is typically used for axioms or lemmas about primitives. *)
 val any : arbitrary
@@ -46,11 +99,10 @@ val any : arbitrary
     compatible with a given system. *)
 val any_compatible_with : System.t -> compatible
 
-(** [subset s1 s2] iff [s1] is included in [s2]. *)
-val subset : Symbols.table -> 'a expr -> 'a expr -> bool
-
-val equal : Symbols.table -> 'a expr -> 'a expr -> bool
-
+(** Create a system expression from a system expression variable. *)
+val var : Var.t -> arbitrary
+  
+(*------------------------------------------------------------------*)
 val is_fset : t -> bool
 
 val is_any_or_any_comp : t -> bool
@@ -72,6 +124,13 @@ type error =
 exception Error of error
 
 val pp_error : Format.formatter -> error -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 Substitutions} *)
+
+type subst = (Var.t * t) list
+
+val subst : subst -> 'a expr -> 'a expr
 
 (*------------------------------------------------------------------*)
 (** {2 Conversions} *)
@@ -155,7 +214,7 @@ val pp_descrs : Symbols.table -> Format.formatter -> <fset:unit;..> expr -> unit
 (** A set containing only a single system. *)
 val singleton : System.Single.t -> fset
 
-(** Create a set expression from a non-empty list of compatible single systems.
+(** Create a set expression from a list of compatible single systems.
     The list of projections must be of the same length
     as the list of systems: these projections will be used to label the
     single systems as part of the newly formed system expression.
@@ -178,7 +237,7 @@ val of_system : Symbols.table -> System.t -> fset
 val of_list : (Term.proj * System.Single.t) list -> fset
 
 (*------------------------------------------------------------------*)
-(** List of labelled elements of a set. Guaranteed to be non-empty.
+(** List of labelled elements of a set. 
     Fails if expression does not correspond to a finite set. *)
 val to_list : <fset:unit;..> expr -> (Term.proj * System.Single.t) list
 
@@ -259,6 +318,12 @@ val mk_proj_subst :
   strict:bool -> src:t  -> dst:t ->
   Term.projs option * (Term.proj * Term.proj) list
 
+(** Substitute the projection naming the single systems in a system expression.
+    E.g. substituting [p] by [p0] into [p: default/q; q: default/q] 
+    yields [p0: default/q; q: default/q] (observe that we did not substitute 
+    into the single systems). *)
+val subst_projs : (Term.proj * Term.proj) list -> 'a expr -> 'a expr
+    
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
   

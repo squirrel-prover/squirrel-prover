@@ -77,10 +77,10 @@ let hash v = v.id.tag
 let ty   v = v.ty
 
 (*------------------------------------------------------------------*)
-let free_univars v = Type.free_univars v.ty
+let ty_fv v = Type.fv v.ty
                
-let free_univars_list l =
-  List.fold_left (fun uvs v -> Ident.Sid.union uvs (free_univars v)) Ident.Sid.empty l
+let ty_fvs l =
+  List.fold_left (fun uvs v -> Type.Fv.union uvs (ty_fv v)) Type.Fv.empty l
 
 (*------------------------------------------------------------------*)
 let norm_ty (env : Type.Infer.env) (v : var) : var =
@@ -93,9 +93,9 @@ let tsubst s v = { v with ty = Type.tsubst s v.ty }
 
 let _pp ~dbg ppf v = 
   if dbg then
-    Fmt.pf ppf "%s/%d" (name v) (hash v)
+    Fmt.pf ppf "%s<%a>/%d" (name v) Type.pp_dbg v.ty (hash v)
   else
-    Fmt.pf ppf "%s" (name v)
+    Fmt.pf ppf "%s" (name v) 
 
 let _pp_list ~dbg ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
