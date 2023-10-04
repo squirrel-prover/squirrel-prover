@@ -550,6 +550,7 @@ let get_actions_ext
     match t with
     | Macro (m, l, ts) ->
       begin
+        let info = fst info, { (snd info) with system = SE.to_fset se } in
         match expand_macro_check_once info t with
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
