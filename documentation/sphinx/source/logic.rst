@@ -49,7 +49,8 @@ using the following declaration:
   * a type is :gdef:`fixed` if its interpretation does not depend on :math:`\eta`;
   * a type is :gdef:`large` when random samplings over that type
     (declared using :decl:`name <name>`) are such that two
-    distinct names have a negligible probability of collision;
+    distinct names have a negligible probability of collision
+    w.r.t to :math:`\eta`;
   * a type is :gdef:`name_fixed_length` if all :decl:`names<name>`
     over that type sample values of the same length (for a given
     :math:`\eta`).
@@ -132,15 +133,29 @@ to :g:`tag`:
   variable ; for example, this excludes any :term:`diff-term`
   (e.g. :g:`diff(s,t)`), or any term with system-specific macros
   (e.g. :g:`output@tau`).
-- Tag :gdef:`adv` forces :g:`x` to be computable by a probabilistic polynomial Turing Machine (PPTM) with
-  access to a dedicated randomness tape. This tag is used to define
-  adversarial functions, that can be seen as probabilistic polynomial
-  time attackers.
+- Tag :gdef:`adv` forces :g:`x` to be computable by a probabilistic
+  polynomial Turing Machine (PPTM) with access to a dedicated
+  randomness tape. Such machines run in polynomial time w.r.t. to the
+  security parameter and their input length. This tag is used to
+  define adversarial functions, that can be seen as probabilistic
+  polynomial time attackers.
 
-.. note::
-   Squirrel includes a built-in function symbol :g:`att :
-   message -> message [adv]` that can be used to refer to an
-   adversary.
+
+Abstract function declarations cannot rely on tags, but we can declare
+free variables of axioms using tags, as well as globally quantify
+using tags.
+
+.. example:: No guessing of large names
+
+   If we assume that :g:`n` is a name over type :g:`message`, as
+   :g:`message` is :g:`large`, it is a random value long enough
+   w.r.t. to :math:`\eta` so that it can at best be guessed with
+   negligible probability. A formula modeling that any function symbol
+   computable by a PPTM cannot return the value of :g:`n` is expressed
+   as :g:`Forall att : message -> message [adv], [att(0)=n]`. This is
+   in fact a valid global axiom of the logic. We can also express the axiom
+   by using the tag over the free variable of a local axiom, yielding
+   :g:`axiom [any] test (att : message -> message [adv]) : att(r)=n`.
  
 Squirrel uses the following syntax for binders:
 
