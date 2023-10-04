@@ -231,9 +231,9 @@ A term can be
   :n:`@term__1` must have the same type (for a conditional over messages,
   the :n:`else` branch can be omitted, which stands for :n:`else zero`);
 - a term with binders, see :token:`term_with_binders`;
-- an identifier, which must be bound by the context, and can refer to
-  a :term:`logical variable <logical_var>`, an :decl:`operator<op>` or
-  :decl:`abstract function<abstract>` symbol;
+- an identifier, which must be bound by the context (it can for instance refer to
+  a :term:`logical variable <logical_var>`, an :decl:`operator<op>` or an
+  :decl:`abstract function<abstract>` symbol);
 - a :term:`diff-term` representing several probabilistic values which depend
   on the system;
 - a tuple :n:`(@term__1,...,@term__n)`.
