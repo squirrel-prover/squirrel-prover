@@ -656,14 +656,16 @@ let () =
 (** Function application *)
 
 (** Select a frame element matching a pattern. *)
-let fa_select_felems (pat : Term.term Term.pat_op) (s : ES.t) : int option =
+let fa_select_felems ~ty_env (pat : Term.term Term.pat_op) (s : ES.t) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
     | Some p -> SE.reachability_context p
   in
   List.find_mapi (fun i e ->
-      match Match.T.try_match ~option ~env:(ES.vars s) (ES.table s) system e pat with
+      match 
+        Match.T.try_match ~ty_env ~option ~env:(ES.vars s) (ES.table s) system e pat 
+      with
       | NoMatch _ -> None
       | Match _   -> Some i
     ) (ES.goal_as_equiv s)
@@ -772,41 +774,53 @@ let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
     soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
 
 let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
-  let args =
+
+  (* parsing context for [fa_arg] *)
+  let cntxt = 
     let env =
       let env = ES.env s in
       let pair = Utils.oget env.system.pair in
       Env.set_system env
         SE.{ set = (pair:>SE.arbitrary) ; pair = None }
     in
-    let cntxt = Theory.{ env; cntxt = InGoal; } in
-    List.map (fun (mult, tpat) ->
-        let t, _ty = Theory.convert ~pat:true cntxt tpat in
-        let vars =
-          Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
-        in
-        let pat = Term.{
-            pat_op_tyvars = [];
-            pat_op_vars   = Vars.Tag.local_vars vars;
-            (* local inforation, since we allow to match diff operators *)
-            
-            pat_op_term   = t; }
-        in
-        (mult, L.loc tpat, pat)
-      ) args 
+    Theory.{ env; cntxt = InGoal; } 
   in
 
-  let rec do1 
-      (s : ES.t) 
-      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat_op)
-    : ES.t 
+  (* parse one [fa_arg] *)
+  let parse_fa_arg_pat
+      ty_env (tpat : Theory.term)
+    : L.t * Term.term Term.pat_op
     =
+    let t, _ty = Theory.convert ~ty_env ~pat:true cntxt tpat in
+    let vars =
+      Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
+    in
+    let pat = Term.{
+        pat_op_tyvars = [];
+        pat_op_vars   = Vars.Tag.local_vars vars;
+        (* local inforation, since we allow to match diff operators *)
+
+        pat_op_term   = t; }
+    in
+    (L.loc tpat, pat)
+  in
+
+  let rec do1 (s : ES.t) (mult, arg_pat : Args.fa_arg) : ES.t =
+    (* Create a new type unification environement.
+       Remark: we will never close it, as it is only used to selection a
+       matching element in the bi-frame. *)
+    let ty_env = Type.Infer.mk_env () in
+
+    (* parse the function  *)
+    let loc, pat = parse_fa_arg_pat ty_env arg_pat in
+
     if mult = Args.Exact 0 then s else
-      match fa_select_felems pat s with
+      match fa_select_felems ~ty_env pat s with
       | None -> 
         if mult = Args.Any 
         then s
         else soft_failure ~loc (Failure "FA not applicable")
+
       | Some i ->
         (* useless loc, as we know [i] is in range *)
         let i = L.mk_loc L._dummy i in
@@ -819,9 +833,9 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
         match mult with
         | Args.Once | Args.Exact 1 -> s
 
-        | Args.Any | Args.Many -> do1 s (Args.Any, loc, pat)
+        | Args.Any | Args.Many -> do1 s (Args.Any, arg_pat)
 
-        | Args.Exact i -> do1 s (Args.Exact (i - 1), loc, pat)
+        | Args.Exact i -> do1 s (Args.Exact (i - 1), arg_pat)
   in
   [List.fold_left do1 s args]
 

@@ -111,3 +111,21 @@ Proof.
   try fa frame@_.
 Abort.
 
+(*------------------------------------------------------------------*)
+global lemma _ : 
+  equiv(  diff(a,b), diff(c,d)  ) ->
+  equiv( (diff(a,b), diff(c,d)) ).
+Proof.
+  intro H.
+  fa (_,_).
+  assumption H.
+Qed.
+
+global lemma _ : 
+  equiv(  diff(a,b), diff(c,d)  ) ->
+  equiv( (diff(a,b), diff(c,d)), (diff(a,b), diff(c,d))  ).
+Proof.
+  intro H.
+  fa 2!(_,_).
+  assumption H.
+Qed.
