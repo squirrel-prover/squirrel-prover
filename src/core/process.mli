@@ -72,7 +72,7 @@ type proc =
   | Repl     of Vars.var * proc
   | Exists   of Vars.vars * Term.term * proc * proc
   | Apply    of Symbols.process * Term.term list
-  | Alias    of proc * lsymb
+  | Alias    of proc * string
 
 (*------------------------------------------------------------------*)
 val _pp    : dbg:bool -> Format.formatter -> proc -> unit

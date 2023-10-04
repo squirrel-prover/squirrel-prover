@@ -22,7 +22,6 @@ let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
 let path = '.' '/' ['a'-'z' 'A'-'Z' '0'-'9' '_' '.' '-' '/']+ '.' 's' 'p'
 let int = ['0'-'9'] ['0'-'9']*
 
-
 (* Hard-coded in Symbols.ml ! Do not change. *)
 let right_infix_char_first = ['+' '-' '*' '|' '&' '~']
 let  left_infix_char_first = ['^']
@@ -59,6 +58,7 @@ rule token = parse
 | "!"                 { BANGU }
 | '.'                 { DOT }
 | '#'                 { SHARP }
+| '$'                 { DOLLAR }
 | ':'                 { COLON }
 | ":="                { COLONEQ }
 | ';'                 { SEMICOLON }

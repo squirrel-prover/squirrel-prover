@@ -39,7 +39,7 @@
 %token UEXISTS UFORALL
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
-%token SHARP
+%token SHARP DOLLAR
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
@@ -334,11 +334,18 @@ top_process:
 colon_ty:
 | COLON t=ty { t }
 
+
+(* identifier with '$' allowed at the beginning or end *) 
+%inline alias_name:
+| s=ID { s }
+| DOLLAR s=ID { "$" ^ s }
+| s=ID DOLLAR { "$" ^ s }
+
 process_i:
-| NULL                             { Process.Parse.Null }
-| LPAREN ps=processes_i RPAREN     { ps }
-| id=lsymb terms=term_list         { Process.Parse.Apply (id,terms) }
-| id=lsymb COLON p=process         { Process.Parse.Alias (p,id) }
+| NULL                               { Process.Parse.Null }
+| LPAREN ps=processes_i RPAREN       { ps }
+| id=lsymb terms=term_list           { Process.Parse.Apply (id,terms) }
+| id=loc(alias_name) COLON p=process { Process.Parse.Alias (p,id) }
 
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with

@@ -27,7 +27,7 @@ type proc =
   | Repl     of Vars.var * proc
   | Exists   of Vars.vars * Term.term * proc * proc
   | Apply    of Symbols.process * Term.term list
-  | Alias    of proc * lsymb
+  | Alias    of proc * string
 
 (*------------------------------------------------------------------*)
 (* does not recurse *)
@@ -156,6 +156,16 @@ let tsubst (ts : Type.tsubst) proc =
   doit proc
 
 (*------------------------------------------------------------------*)
+(** Alias name substitution *)
+let alias_subst (f : string -> string) proc =
+  let rec doit p =
+    match p with
+    | Alias (p,a) -> Alias (doit p, f a)
+    | _ -> tmap doit p
+  in
+  doit proc
+
+(*------------------------------------------------------------------*)
 (** Pretty-printer *)
 let _pp ~dbg ppf (process : proc) = 
   let rec doit ppf (process : proc) = 
@@ -169,9 +179,7 @@ let _pp ~dbg ppf (process : proc) =
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ~dbg)) l
 
     | Alias (p,a) ->
-      pf ppf "%s: %a"
-        (L.unloc a)
-        doit p
+      pf ppf "%s: %a" a doit p
 
     | Repl (v, p) ->
       let _, v, s = (* rename quantified var. to avoid name clashes *)
@@ -429,12 +437,12 @@ let parse
       let p = doit ty_env env p in
       begin
         match L.unloc proc with
-        | Alias (_, a) -> Alias (Out (c, m, p), a)
+        | Alias (_, a) -> Alias (Out (c, m, p), L.unloc a)
         | Out _        -> Out (c, m, p)
         | _ -> assert false
       end
 
-    | Parse.Alias (p,a) -> Alias (doit ty_env env p, a)
+    | Parse.Alias (p,a) -> Alias (doit ty_env env p, L.unloc a)
 
     | Parse.Set (s, l, m, p) ->
       let ty = Theory.check_state env.table s (List.length l) in
@@ -557,7 +565,10 @@ type alias_name =
   | Hint     of string (** naming hint, e.g. obtained from a process name *)
   | None
 
-(*------------------------------------------------------------------*)
+let string_of_alias_name = function
+  | None -> "A"
+  | UserName s | Hint s -> s
+
 let is_user_name = function
   | UserName _ -> true
   | Hint     _ -> false
@@ -747,10 +758,7 @@ let process_system_decl
 
     let table,name =
       let loc = odflt L._dummy loc in 
-      let name = match name with
-        | None -> "A"
-        | UserName s | Hint s -> s
-      in
+      let name = string_of_alias_name name in
       Action.fresh_symbol penv.env.table ~exact (L.mk_loc loc name)
     in
 
@@ -835,14 +843,6 @@ let process_system_decl
     match proc with
     | Apply (id,args)
     | Alias (Apply (id,args), _) ->
-      (* Use [id] as alias naming hint, if no alias is provided or
-         already present. *)
-      let alias =
-        match proc with
-        | Alias (_,a) -> UserName (L.unloc a)
-        | _ when is_user_name penv.alias -> penv.alias
-        | _ -> Hint (Symbols.to_string id)
-      in
       let pdecl = find_process penv.env.table id in
 
       if penv.projs <> pdecl.projs then
@@ -865,12 +865,35 @@ let process_system_decl
         Term.ESubst (Term.mk_var pdecl.time, Term.mk_var ts) :: subst
       in
 
+      (* Use [id] as alias naming hint, if no alias is provided or
+         already present. *)
+      let alias =
+        match proc with
+        | Alias (_,name) -> UserName name
+        | _ when is_user_name penv.alias -> penv.alias
+        | _ -> Hint (Symbols.to_string id)
+      in
+
+      (* substitute in every user-proveded alias in [proc] the 
+         character ['$'] by [sub_alias] *)
+      let proc = 
+        let sub_alias = 
+          match alias with
+          | None | Hint _ -> ""
+          | UserName s -> s
+        in
+        alias_subst (fun name -> 
+            String.split_on_char '$' name |>
+            String.concat sub_alias
+          ) pdecl.proc 
+      in
+
       let penv =
         { penv with env = { penv.env with vars; };
                     alias ; 
                     subst = subst; }
       in
-      (penv, pdecl.proc)
+      (penv, proc)
 
     | New (n_var, ty, p) ->
       let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
@@ -902,9 +925,7 @@ let process_system_decl
       in
       (penv,p)
 
-    | Alias (p,a) ->
-      let penv = { penv with alias = UserName (L.unloc a) } in
-      (penv,p)
+    | Alias (p,n) -> ({ penv with alias = UserName n }, p )
 
     | _ -> assert false
   in
@@ -1143,13 +1164,13 @@ let process_system_decl
       (* The same location re-used twice, as both sub-processes come from the
          same initial process. *)
       let p' = Out (ch,t',p') in
-      let a' = mk_dum (Symbols.to_string a') in
+      let a' = Symbols.to_string a' in
 
       ( Alias (p', a'), pos', table )
 
     | Null ->
       let penv,a' = register_action (* loc *) penv.alias None penv in
-      let a' = mk_dum (Symbols.to_string a') in
+      let a' = Symbols.to_string a' in
 
       ( Alias (Null, a'), 0, penv.env.table)
 
@@ -1166,7 +1187,7 @@ let process_system_decl
       let c_dummy = Symbols.dummy_channel in
 
       let p' = Out (c_dummy, Term.empty, p') in
-      let a' = mk_dum (Symbols.to_string a') in
+      let a' = Symbols.to_string a' in
 
       ( Alias (p', a'), pos', table )
   in
