@@ -219,7 +219,10 @@ A term can be
   corresponds to :n:`(...(@term__1 @term__2) ... @term__n)`;
 - the application of an infix operator :n:`@term__1 @infix_op @term__2`, 
   which corresponds to :n:`(@infix_op) @term__1 @term__2`;
-- a name term application :n:`@name_id {? @term__i}`, see :decl:`names<name>`;
+- a name term application :n:`@name_id {? @term__i}`, see
+  :decl:`names<name>` (compared to the previous term application, here
+  we must pass as many indices as the arity of the name, that is, the
+  name must be fully instantiated);
 - the projection :n:`@term # i` of :n:`@term` over its :n:`i`-th component
   (:n:`@term` must be a tuple with sufficiently many elements);
 - a macro term, see :term:`macro`;
