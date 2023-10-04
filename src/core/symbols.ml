@@ -738,38 +738,32 @@ module TyInfo = struct
     List.mem info infos
 
   (*------------------------------------------------------------------*)
+
+  let check_info_on_closed_term allow_funs table ty def : bool =
+      let rec check : Type.ty -> bool = function
+      | TVar _ | TUnivar _ -> false
+      | Tuple l -> List.for_all check l
+      | Fun (t1, t2) -> allow_funs && check t1 && check t2                          
+      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
+      | TBase _ as ty -> check_bty_info table ty def
+    in 
+    check ty
+
   (** See `.mli` *)
   let is_finite table ty : bool =
-    let rec check : Type.ty -> bool = function
-      | TVar _ | TUnivar _ -> false
-      | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> check t1 && check t2                          
-      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-      | TBase _ as ty -> check_bty_info table ty Finite
-    in 
-    check ty
+    check_info_on_closed_term true table ty Finite
 
   (** See `.mli` *)
-  let is_fixed table ty : bool = 
-    let rec check : Type.ty -> bool = function
-      | TVar _ | TUnivar _ -> false
-      | Tuple l -> List.for_all check  l
-      | Fun (t1, t2) -> check t1 && check t2
-      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-      | TBase _ as ty -> check_bty_info table ty Fixed
-    in 
-    check ty
+  let is_fixed table ty : bool =
+    check_info_on_closed_term true table ty Fixed
+
+  (** See `.mli` *)  
+  let is_name_fixed_length table ty : bool =
+    check_info_on_closed_term false table ty Name_fixed_length
 
   (** See `.mli` *)
-  let is_well_founded table ty : bool = 
-    let rec check : Type.ty -> bool = function
-      | TVar _ | TUnivar _ -> false
-      | Fun _ -> false
-      | Tuple l -> List.for_all check l
-      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-      | TBase _ as ty -> check_bty_info table ty Well_founded
-    in 
-    check ty
+  let is_well_founded table ty : bool =
+    check_info_on_closed_term false table ty Well_founded
 end
 
 (*------------------------------------------------------------------*)

@@ -352,7 +352,10 @@ module TyInfo : sig
   (** Is the type is a fixed set (independent from the security 
       parameter η.
       (e.g. [Index], [Timestamp] and [Message]) *)
-  val is_fixed : table -> Type.ty -> bool 
+  val is_fixed : table -> Type.ty -> bool
+
+  (** Are the names all of the same length. *)
+  val is_name_fixed_length : table -> Type.ty -> bool
 
   (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp] 
       or [Message]. *)

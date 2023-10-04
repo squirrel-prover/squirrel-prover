@@ -675,19 +675,23 @@ let mk_namelength_statement
            formula = Equiv.Global f }
 
 (*------------------------------------------------------------------*)
-(** Add namelength axiom of given name of symbol s with type ftype *)
+(** Add namelength axiom of given name of symbol s with type ftype,
+    provided that the type is Name_fixed_length *)
 let add_namelength_axiom 
     ?(loc = L._dummy)
     (table:Symbols.table) (s:lsymb) (ftype:Type.ftype)
   : Symbols.table =
-  let name = "namelength_" ^ (L.unloc s) in
-  (* if already defined just return actual table *)
-  if Symbols.Lemma.mem_lsymb (L.mk_loc loc name) table 
-  then table
+  if not @@ Symbols.TyInfo.is_name_fixed_length table ftype.fty_out then
+    table
   else
-    let table, stmt = 
-      mk_namelength_statement name table s ftype in
-    Lemma.add_lemma `Axiom stmt table
+    let name = "namelength_" ^ (L.unloc s) in
+    (* if already defined just return actual table *)
+    if Symbols.Lemma.mem_lsymb (L.mk_loc loc name) table 
+    then table
+    else
+      let table, stmt = 
+        mk_namelength_statement name table s ftype in
+      Lemma.add_lemma `Axiom stmt table
 
 (*------------------------------------------------------------------*)
 (** [find_app_terms t macros] returns the sublist of [macros] for which there
