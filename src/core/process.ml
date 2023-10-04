@@ -552,12 +552,24 @@ let declare
 (*------------------------------------------------------------------*)
 (** {2 Process translation as systems} *)
 
+type alias_name = 
+  | UserName of string (** user-provided name *)
+  | Hint     of string (** naming hint, e.g. obtained from a process name *)
+  | None
+
+(*------------------------------------------------------------------*)
+let is_user_name = function
+  | UserName _ -> true
+  | Hint     _ -> false
+  | None       -> false
+
+(*------------------------------------------------------------------*)
 (** Type for data we store while translating a process as a set of actions. *)
 type p_env = {
   projs : Term.projs;
   (** valid projections for the process being parsed *)
 
-  alias : lsymb ;
+  alias : alias_name ;
   (** current alias used for action names in the process *)
 
   time : Vars.var;
@@ -729,10 +741,18 @@ let process_system_decl
   (*------------------------------------------------------------------*)
   (* Register an action, when we arrive at the end of a block
      (input / condition / update / output). *)
-  let register_action a output (penv : p_env) =
+  let register_action ?loc (name : alias_name) output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = TConfig.strict_alias_mode (penv.env.table) in
-    let table,a' = Action.fresh_symbol penv.env.table ~exact a in
+
+    let table,name =
+      let loc = odflt L._dummy loc in 
+      let name = match name with
+        | None -> "A"
+        | UserName s | Hint s -> s
+      in
+      Action.fresh_symbol penv.env.table ~exact (L.mk_loc loc name)
+    in
 
     let action = List.rev penv.action in
     let in_ch, in_var =
@@ -741,7 +761,7 @@ let process_system_decl
       | _ -> assert false
     in
     let indices = List.rev penv.indices in
-    let action_term = Term.mk_action a' (Term.mk_vars indices) in
+    let action_term = Term.mk_action name (Term.mk_vars indices) in
     let in_tm = Term.mk_macro Term.in_macro [] action_term in
 
     (* substitute:
@@ -776,8 +796,7 @@ let process_system_decl
     in
 
     let action_descr = Action.{ 
-        name    = a';
-        action;
+        name; action;
         input   = in_ch;
         indices = indices;
         globals = penv.globals; 
@@ -786,16 +805,16 @@ let process_system_decl
 
     Action.check_descr action_descr;
 
-    let table, new_a, _ =
+    let table, new_name, _ =
       System.register_action table system_name action_descr
     in
 
     let table =
-      if new_a <> a' then Symbols.Action.release table a' else table
+      if new_name <> name then Symbols.Action.release table name else table
     in
 
     let new_action_term = 
-      Term.mk_action new_a (Term.mk_vars action_descr.indices) 
+      Term.mk_action new_name (Term.mk_vars action_descr.indices) 
     in
     let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let penv =
@@ -807,7 +826,7 @@ let process_system_decl
         (* pending globals have been registered with the previous action. *)
         globals = []; }
     in
-    ({ penv with env = { penv.env with table } }, new_a)
+    ({ penv with env = { penv.env with table } }, new_name)
   in
 
   (*------------------------------------------------------------------*)
@@ -816,11 +835,13 @@ let process_system_decl
     match proc with
     | Apply (id,args)
     | Alias (Apply (id,args), _) ->
-      (* Keep explicit alias if there is one, otherwise use [id]. *)
-      let a' =
+      (* Use [id] as alias naming hint, if no alias is provided or
+         already present. *)
+      let alias =
         match proc with
-        | Alias (_,a) -> L.unloc a
-        | _ -> Symbols.to_string id
+        | Alias (_,a) -> UserName (L.unloc a)
+        | _ when is_user_name penv.alias -> penv.alias
+        | _ -> Hint (Symbols.to_string id)
       in
       let pdecl = find_process penv.env.table id in
 
@@ -846,7 +867,7 @@ let process_system_decl
 
       let penv =
         { penv with env = { penv.env with vars; };
-                    alias = mk_dum a' ; 
+                    alias ; 
                     subst = subst; }
       in
       (penv, pdecl.proc)
@@ -882,7 +903,7 @@ let process_system_decl
       (penv,p)
 
     | Alias (p,a) ->
-      let penv = { penv with alias = a } in
+      let penv = { penv with alias = UserName (L.unloc a) } in
       (penv,p)
 
     | _ -> assert false
@@ -1153,7 +1174,7 @@ let process_system_decl
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =
     { projs    = init_projs;
-      alias    = L.mk_loc L._dummy "A" ;
+      alias    = None ;
       indices  = [] ;
       time     = ts;
       env;

@@ -116,7 +116,7 @@ process S =
   if checksign(sidS, dec(encP,gP^b1), pk(kP)) then
     Sok : out(cS,ok)
 
-system [fullSSH] K: ( P | S).
+system [fullSSH] ( P | S).
 
 (* The secret is expected to hold at the end of P0 *)
 
@@ -187,7 +187,7 @@ process Sauth =
      else
        Sfail :  out(cS,diff(ok,ko))
 
-system [auth]  K: (Pauth | Sauth).
+system [auth]  (Pauth | Sauth).
 
 axiom [auth] hashnotfor (x1,x2:message): h(x1,hKey) <> <forwarded,x2>
 
