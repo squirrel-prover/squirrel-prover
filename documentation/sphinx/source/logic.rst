@@ -94,7 +94,8 @@ be left unspecified using a type hole :g:`_`, which must then be
 inferred by Squirrel.
 
 .. prodn::
-  type ::= _ | @type_variable | @base_type | @type -> @type | (@type * ... * @type)
+  explicit_type ::= @type_variable | @base_type | @type -> @type | (@type * ... * @type)
+  type ::= _ | @explicit_type
 
 The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b` where :g:`b1,...,bn` and :g:`b` are base types.
 
@@ -159,13 +160,9 @@ using tags.
  
 Squirrel uses the following syntax for binders:
 
-.. prodn::
+.. prodn::  
   binder ::= @var_or_hole | ({+, {+, @var_or_hole } : @type {? [{+ @tag}]} }) 
   binders ::= {* @binder }
-
-A bound variable :g:`x` without any attached type (i.e. using directly a
-:n:`@var_or_hole`) amounts to using a type hole :g:`(x:_)`,
-which will have to be be inferred by Squirrel.
 
 .. note::
   Tags actually correspond to predicates in the logic: for instance,
@@ -177,6 +174,18 @@ which will have to be be inferred by Squirrel.
 .. note:: Not all binders support tags, e.g. it would be meaningless
           to declare a function :term:`abstraction` with a :g:`const`
           tag, as in :g:`fun(x:int[const])=>t`.
+
+A binding declaration :g:`x` without any attached type (i.e. using directly a
+:n:`@var_or_hole`) amounts to using a type hole :g:`(x:_)`,
+which will have to be be inferred by Squirrel.
+
+.. example:: Type inference for bound variables
+
+   In the formula :g:`forall (z:message), exists x y, z =x && x=y`,
+   which is a valid **Squirrel** formula, the existential
+   quantification uses the binder :g:`x y`, which is in fact
+   equivalent to :g:`x:_ y:_` or :g:`(x,y:_)`. Here, **Squirrel**
+   automatically infer the type of the variables from the equalities.
 
 Terms
 =====
