@@ -125,24 +125,40 @@ let rec equal (a : ty) (b : ty) : bool =
    | _ -> false
 
 (*------------------------------------------------------------------*)
-let rec _pp ~dbg (ppf : Format.formatter) : ty -> unit = function
-  | Message   -> Fmt.pf ppf "message"
-  | Index     -> Fmt.pf ppf "index"
-  | Timestamp -> Fmt.pf ppf "timestamp"
-  | Boolean   -> Fmt.pf ppf "bool"
-  | TBase s   -> Fmt.pf ppf "%s" s
-  | TVar id   -> _pp_tvar ~dbg ppf id
-  | TUnivar u -> pp_univar ppf u
+let toplevel_prec = 0
 
-  | Tuple tys -> Fmt.list ~sep:(Fmt.any " * ") (_pp ~dbg) ppf tys
+let fun_fixity   = 10, `Infix `Right
+let tuple_fixity = 20, `NonAssoc
 
-  | Fun (t1, t2) ->
-    Fmt.pf ppf "%a -> %a" (pp_chain_left ~dbg) t1 (_pp ~dbg) t2
+let _pp ~dbg : Format.formatter -> ty -> unit = 
+  let rec _pp 
+      ((outer,side) : ('b * fixity) * assoc)
+      (ppf : Format.formatter) (t : ty) : unit 
+    = 
+    match t with
+    | Message   -> Fmt.pf ppf "message"
+    | Index     -> Fmt.pf ppf "index"
+    | Timestamp -> Fmt.pf ppf "timestamp"
+    | Boolean   -> Fmt.pf ppf "bool"
+    | TBase s   -> Fmt.pf ppf "%s" s
+    | TVar id   -> _pp_tvar ~dbg ppf id
+    | TUnivar u -> pp_univar ppf u
 
-and pp_chain_left ~dbg ppf (t : ty) : unit =
-  match t with
-  | Fun (_, _) -> Fmt.pf ppf "(%a)" (_pp ~dbg) t
-  | _          -> Fmt.pf ppf "%a"   (_pp ~dbg) t
+    | Tuple tys -> 
+      let pp ppf () =
+        Fmt.list ~sep:(Fmt.any " * ") (_pp (tuple_fixity,`Left)) ppf tys
+      in
+      maybe_paren ~outer ~side ~inner:tuple_fixity pp ppf ()
+
+    | Fun (t1,t2) -> 
+      let pp ppf () =
+        Fmt.pf ppf "@[<0>%a ->@ %a@]"
+          (_pp (fun_fixity, `Left )) t1
+          (_pp (fun_fixity, `Right)) t2
+      in
+      maybe_paren ~outer ~side ~inner:fun_fixity pp ppf ()
+  in
+  _pp ((toplevel_prec, `NoParens), `NonAssoc) 
 
 let pp     = _pp ~dbg:false
 let pp_dbg = _pp ~dbg:true
