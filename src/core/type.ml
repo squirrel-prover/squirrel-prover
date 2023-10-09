@@ -481,20 +481,16 @@ type ftype_op = univar ftype_g
 
 (*------------------------------------------------------------------*)
 let pp_ftype_g pp_g fmt fty =
-  let pp_args fmt args =
-    if args = [] then () else
-      Fmt.pf fmt "%a -> "
-        (Fmt.list ~sep:(Fmt.any " ->@ ") pp) args
+  let pp_ty fmt =
+    Fmt.pf fmt "%a" pp (fun_l fty.fty_args fty.fty_out)
   in
   if fty.fty_vars = [] then
-    Fmt.pf fmt "@[<hov 2>%a%a@]"
-      pp_args fty.fty_args
-      pp fty.fty_out
+    Fmt.pf fmt "@[<hov 2>%t@]"
+      pp_ty
   else
-    Fmt.pf fmt "@[<hov 2>[%a] %a%a@]"
+    Fmt.pf fmt "@[<hov 2>[%a] %t@]"
       (Fmt.list ~sep:Fmt.comma pp_g) fty.fty_vars
-      pp_args fty.fty_args
-      pp fty.fty_out
+      pp_ty
     
 let pp_ftype    = pp_ftype_g pp_univar
 let pp_ftype_op = pp_ftype_g pp_tvar
