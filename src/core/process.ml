@@ -235,10 +235,11 @@ let _pp ~dbg ppf (process : proc) =
         (Term._pp ~dbg) t
         doit p
 
-    | Parallel (p1, p2) ->
-      pf ppf "@[<hv>@[<hv>(%a)@] |@ @[<hv>(%a)@]@]"
-        doit p1
-        doit p2
+    | Parallel _ ->
+      pf ppf "@[<hv 0>%a@]" doit_chained_parallel process     
+      (* pf ppf "@[<hv>@[<hv 2>( %a )@] |@ @[<hv 2>( %a )@]@]" *)
+      (*   doit p1 *)
+      (*   doit p2 *)
 
     | Let (v, t, ty, p) ->
       let _, v, s = (* rename quantified var. to avoid name clashes *)
@@ -285,6 +286,17 @@ let _pp ~dbg ppf (process : proc) =
           doit p2
       else
         pf ppf "@]"
+
+  (* Printing in a [hv 0] box. *)
+  and doit_chained_parallel ppf (process : proc) =
+    match process with
+    | Parallel (p1,p2) ->
+      Fmt.pf ppf "@[<hov 2>( %a )@] |@ %a"
+        doit                  p1
+        doit_chained_parallel p2
+      
+    | _ -> Fmt.pf ppf "@[<hov 2>%a@]" doit process
+    
   in  
   Fmt.pf ppf "@[<hv>%a@]" doit process
 
