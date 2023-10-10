@@ -1395,11 +1395,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
 
     (* compute tags of [v] *)
-    let tag =
-      let const = HighTerm.is_constant                  (S.env s) term in
-      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) term in
-      { S.var_info with const; adv }
-    in
+    let tag = HighTerm.tag_of_term (S.env s) term in
     (v,tag), S.set_goal goal s
 
   (** [terms] and [n_ips] must be of the same length *)
@@ -2026,8 +2022,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let remember (id : Theory.lsymb) (term : Theory.term) (s : S.t) =
     let t, ty = convert s term in
+    let tag = HighTerm.tag_of_term (S.env s) t in
     let env, x =
-      make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) S.var_info
+      make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) tag
     in
     let subst = [Term.ESubst (t, Term.mk_var x)] in
 

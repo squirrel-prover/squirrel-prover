@@ -177,3 +177,12 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
   in
   is_adv env.vars t &&
   (not si || is_system_indep env t) 
+
+(*------------------------------------------------------------------*)
+let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
+  let const        = is_constant                  env t in
+  let adv          = is_ptime_deducible ~si:false env t in
+  let system_indep = is_system_indep              env t in
+  (* latter test checks if [t] is a single system term *)
+  { system_indep; const; adv }
+  

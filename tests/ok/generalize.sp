@@ -74,12 +74,12 @@ Qed.
 (*------------------------------------------------------------------*)
 abstract P : message -> bool.
 
-axiom foo (x : message[const]) : P x.
+axiom foo_const (x : message[const]) : P x.
 
 global lemma _ (z : message[const]) : [P z].
 Proof.
   byequiv. 
-  apply foo.
+  apply foo_const.
 Qed.
 
 (* check that local sequent loose tags when generalizing a local quantifier  *)
@@ -87,5 +87,20 @@ global lemma _ (z : message[const]) : [P z].
 Proof.
   byequiv. 
   generalize z => z.
-  checkfail apply foo exn Failure.
+  checkfail apply foo_const exn Failure.
+Abort.
+
+(*------------------------------------------------------------------*)
+axiom foo_glob (x : message[glob]) : P x.
+
+global lemma _ x : [P x].
+Proof.
+  generalize x => x.
+  apply foo_glob.
+Qed.
+
+global lemma _ t : [P (frame@t)].
+Proof. 
+  generalize (frame@t) => x.
+  checkfail apply foo_glob exn Failure. (* bad variabe instantiation *)
 Abort.

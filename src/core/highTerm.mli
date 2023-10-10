@@ -25,3 +25,5 @@ val is_constant : Env.t -> Term.term -> bool
 val is_ptime_deducible : 
   si:bool -> Env.t -> Term.term -> bool
 
+(** Compute the tag satisfied by a term *)
+val tag_of_term : Env.t -> Term.term -> Vars.Tag.t
