@@ -165,7 +165,7 @@ let fresh_trace
          TS.set_goal (Term.mk_impl ~simpl:false phi g) s)
       phis
   with
-  | SE.(Error Expected_fset) ->
+  | SE.(Error (_,Expected_fset)) ->
     soft_failure Underspecified_system
 
 

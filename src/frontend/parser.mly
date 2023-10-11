@@ -1141,13 +1141,16 @@ system_item_list:
 system_expr:
 | LBRACKET s=loc(system_item_list) RBRACKET   { s }
 
-system_annot:
+system_annot_cnt:
 |                                             { SE.Parse.NoSystem }
 | LBRACKET l=loc(system_item_list) RBRACKET   { SE.Parse.System l }
 | LBRACKET
     SET COLON s=loc(system_item_list) SEMICOLON
   EQUIV COLON p=loc(system_item_list)
   RBRACKET                                    { SE.Parse.Set_pair (s,p) }
+
+system_annot:
+| a=loc(system_annot_cnt) { a }
 
 /* -----------------------------------------------------------------------
  * Statements and goals

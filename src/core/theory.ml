@@ -630,7 +630,7 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
         ignore (SE.action_to_term env.table system action : Term.term)
       with
       | Not_found
-      | SE.Error Expected_compatible ->
+      | SE.Error (_,Expected_compatible) ->
         let loc = if in_proc then L._dummy else L.loc s in
         conv_err loc (UndefInSystem (L.unloc s, env.system.set))
     end

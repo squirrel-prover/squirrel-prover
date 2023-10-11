@@ -363,7 +363,7 @@ let get_definition_in_sequent
   : def_result
   =
   match SE.to_fset cntxt.system with
-  | exception SE.(Error Expected_fset) -> `MaybeDef
+  | exception SE.(Error (_,Expected_fset)) -> `MaybeDef
   | system ->
     (* Try to find an action equal to [ts] in [cntxt]. *)
     let ts_action =

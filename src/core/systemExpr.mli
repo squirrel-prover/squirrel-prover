@@ -113,7 +113,7 @@ val compatible : Symbols.table -> 'a expr -> 'b expr -> bool
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type error =
+type error_i =
   | Invalid_projection
   | Missing_projection
   | Incompatible_systems
@@ -121,9 +121,13 @@ type error =
   | Expected_fset
   | Expected_pair
 
+type error = L.t option * error_i
+
 exception Error of error
 
-val pp_error : Format.formatter -> error -> unit
+val pp_error : 
+  (Format.formatter -> Location.t option -> unit) ->
+  Format.formatter -> error -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -140,15 +144,15 @@ val to_arbitrary : 'a expr -> arbitrary
 
 (** Cast expression to fset if possible,
     fail with [Error Expected_compatible] otherwise. *)
-val to_compatible : 'a expr -> compatible
+val to_compatible : ?loc:L.t -> 'a expr -> compatible
 
 (** Cast expression to fset if possible,
     fail with [Error Expected_fset] otherwise. *)
-val to_fset : 'a expr -> fset
+val to_fset : ?loc:L.t -> 'a expr -> fset
 
 (** Convert expression to fset if possible,
     fail with [Error Expected_pair] otherwise. *)
-val to_pair : 'a expr -> pair
+val to_pair : ?loc:L.t -> 'a expr -> pair
 
 (*------------------------------------------------------------------*)
 (** {2 Actions symbols} *)
@@ -225,10 +229,11 @@ val singleton : System.Single.t -> fset
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
 val make_fset :
-    Symbols.table ->
-    labels:Term.proj option list ->
-    System.Single.t list ->
-    fset
+  ?loc:L.t -> 
+  Symbols.table ->
+  labels:Term.proj option list ->
+  System.Single.t list ->
+  fset
 
 (** Finite set of all projections of a system. *)
 val of_system : Symbols.table -> System.t -> fset
@@ -358,7 +363,7 @@ module Parse : sig
     | System   of t
     | Set_pair of t * t
 
-  type sys = [`Local | `Global] * sys_cnt
+  type sys = [`Local | `Global] * sys_cnt L.located
 
   val parse_sys : Symbols.table -> sys -> context
 end

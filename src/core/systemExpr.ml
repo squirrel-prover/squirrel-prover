@@ -2,7 +2,7 @@ open Utils
 
 module L = Location
 
-type error =
+type error_i =
   | Invalid_projection
   | Missing_projection
   | Incompatible_systems
@@ -10,17 +10,24 @@ type error =
   | Expected_fset
   | Expected_pair
 
+type error = L.t option * error_i
+
 exception Error of error
 
-let error e = raise (Error e)
+let error ?loc e = raise (Error (loc,e))
 
-let pp_error fmt = function
-  | Invalid_projection -> Format.fprintf fmt "invalid projection"
-  | Missing_projection -> Format.fprintf fmt "missing projection"
-  | Incompatible_systems -> Format.fprintf fmt "incompatible systems"
-  | Expected_compatible -> Format.fprintf fmt "expected a compatible expr"
-  | Expected_fset -> Format.fprintf fmt "expected a finite set expr"
-  | Expected_pair -> Format.fprintf fmt "expected a pair expr"
+let pp_error_i fmt = function
+  | Invalid_projection -> Fmt.pf fmt "invalid system projection"
+  | Missing_projection -> Fmt.pf fmt "missing system projection"
+  | Incompatible_systems -> Fmt.pf fmt "incompatible systems"
+  | Expected_compatible -> Fmt.pf fmt "expected a compatible system expression"
+  | Expected_fset -> Fmt.pf fmt "expected a finite system set expression"
+  | Expected_pair -> Fmt.pf fmt "expected a system expression pair"
+
+let pp_error pp_loc_err_opt fmt (loc,e) =
+  Fmt.pf fmt "%aSystem error: %a"
+    pp_loc_err_opt loc
+    pp_error_i e
 
 (*------------------------------------------------------------------*)
 (** {2 System expression variables} *)
@@ -130,8 +137,8 @@ let pp fmt (se : 'a expr) : unit =
   else
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
-    | Any -> Format.fprintf fmt "any"
-    | Any_compatible_with s -> Format.fprintf fmt "any/%a" Symbols.pp s
+    | Any -> Fmt.pf fmt "any"
+    | Any_compatible_with s -> Fmt.pf fmt "any/%a" Symbols.pp s
     | List l ->
       Fmt.list
         ~sep:Fmt.comma
@@ -139,7 +146,7 @@ let pp fmt (se : 'a expr) : unit =
            if Term.proj_to_string label = "ε" then
              System.Single.pp fmt single_sys
            else
-             Format.fprintf fmt "%a:%a"
+             Fmt.pf fmt "%a:%a"
                Term.pp_proj label
                System.Single.pp single_sys)
         fmt
@@ -148,23 +155,23 @@ let pp fmt (se : 'a expr) : unit =
 (*------------------------------------------------------------------*)
 let to_arbitrary (type a) (x : a expr) : arbitrary = force x
 
-let to_compatible (type a) (se : a expr) : compatible = 
+let to_compatible (type a) ?loc (se : a expr) : compatible = 
   match se.cnt with
-  | Var _ | Any -> error Expected_compatible
+  | Var _ | Any -> error ?loc Expected_compatible
   | _ -> force se
 
-let to_fset (type a) (se : a expr) : fset =
+let to_fset (type a) ?loc (se : a expr) : fset =
   match se.cnt with
   | List _ -> force se
-  | _ -> error Expected_fset
+  | _ -> error ?loc Expected_fset
 
-let to_pair (type a) (se : a expr) : pair =
+let to_pair (type a) ?loc (se : a expr) : pair =
   match se.cnt with
   | List [_;_] -> mk ?name:se.name se.cnt
   | Var _      -> mk ?name:se.name se.cnt
   (* FIXME: I broke the interface there I think *)
 
-  | _ -> error Expected_pair
+  | _ -> error ?loc Expected_pair
 
 (*------------------------------------------------------------------*)
 let subset table e1 e2 : bool =
@@ -274,7 +281,7 @@ let default_labels : int -> Term.proj list = function
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
 (*------------------------------------------------------------------*)
-let make_fset table ~labels (l : System.Single.t list) : _ =
+let make_fset ?loc table ~labels (l : System.Single.t list) : _ =
   (* Check for compatibility. *)
   let () = match l with
     | [] -> ()
@@ -282,7 +289,7 @@ let make_fset table ~labels (l : System.Single.t list) : _ =
       List.iter
         (fun {System.Single.system} ->
            if not (System.compatible table hd_system system) then
-             error Incompatible_systems)
+             error ?loc Incompatible_systems)
         tl
   in
   (* Build labelled list using a mix of default and provided labels. *)
@@ -413,11 +420,11 @@ let pp_context fmt = function
   | { set; pair = None   } -> pp fmt set
   | { set; pair = Some p } ->
       if set.cnt = p.cnt then
-        Format.fprintf fmt "%a@ (same for equivalences)" pp set
+        Fmt.pf fmt "%a@ (same for equivalences)" pp set
       else
-        Format.fprintf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
+        Fmt.pf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
 
-let pp_context fmt c = Format.fprintf fmt "@[%a@]" pp_context c
+let pp_context fmt c = Fmt.pf fmt "@[%a@]" pp_context c
 
 let get_compatible_expr = function
   | { set = { cnt = Any } } -> None
@@ -493,7 +500,7 @@ let print_system (table : Symbols.table) (system : _ expr) : unit =
     Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@]%!"
       pp system
       (pp_descrs table) system
-  with Error Expected_fset ->
+  with Error (_,Expected_fset) ->
     Printer.prt `Result "@[No action descriptions for system %a@]%!"
       pp system
 
@@ -564,7 +571,7 @@ module Parse = struct
       let l =
         List.map (fun i -> parse_single table { i with alias = None }) l
       in
-      make_fset table ~labels l
+      make_fset ~loc:(L.loc p) table ~labels l
 
   (*------------------------------------------------------------------*)
   type sys_cnt =
@@ -572,12 +579,13 @@ module Parse = struct
     | System   of t
     | Set_pair of t * t
 
-  type sys = [`Local | `Global] * sys_cnt
+  type sys = [`Local | `Global] * sys_cnt L.located
 
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])
 
-  let parse_local_context table : sys_cnt -> context = function
+  let parse_local_context table (c : sys_cnt L.located) : context = 
+    match L.unloc c with
     | NoSystem ->
       { set = parse table empty ; pair = None }
     | System s ->
@@ -585,21 +593,22 @@ module Parse = struct
       { set ; pair = None }
     | Set_pair (s,p) ->
       let set = parse table s in
-      let pair = Some (to_pair (parse table p)) in
+      let pair = Some (to_pair ~loc:(L.loc c) (parse table p)) in
       { set ; pair }
 
-  let parse_global_context table : sys_cnt -> context = function
+  let parse_global_context table (c : sys_cnt L.located) : context = 
+    match L.unloc c with
     | NoSystem ->
       let set = parse table empty in
-      let pair = to_pair set in
+      let pair = to_pair ~loc:(L.loc c) set in
       { set ; pair = Some pair }
     | System s ->
       let set = parse table s in
-      let pair = to_pair set in
+      let pair = to_pair ~loc:(L.loc c) set in
       { set ; pair = Some pair }
     | Set_pair (s,p) ->
       let set = parse table s in
-      let pair = Some (to_pair (parse table p)) in
+      let pair = Some (to_pair ~loc:(L.loc c) (parse table p)) in
       { set ; pair }
 
   let parse_sys table ((k,p_system) : sys) : context =

@@ -450,7 +450,7 @@ let setup_change_hyps_context
       if SE.subset_modulo table new_context.set old_context.set then
         match SE.(to_projs (to_fset new_context.set)) with
           | projs -> Some (fun f -> Term.project projs f)
-          | exception SE.(Error Expected_fset) -> assert false
+          | exception SE.(Error (_,Expected_fset)) -> assert false
       else
         None
   in

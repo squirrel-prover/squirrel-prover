@@ -60,8 +60,8 @@ let pp_toplevel_error
   | System.Error e when not test ->
     Format.fprintf fmt "System error: %a" System.pp_error e
 
-  | SystemExpr.Error e when not test ->
-    Format.fprintf fmt "System error: %a" SystemExpr.pp_error e
+  | SystemExpr.Error (l,e) when not test ->
+    (SystemExpr.pp_error pp_loc_error_opt) fmt (l,e)
 
   | Tactics.Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"

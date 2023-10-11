@@ -113,7 +113,6 @@ module Parsed = struct
     system  : SE.Parse.sys;
     formula : contents
   }
-
 end
 
 (*------------------------------------------------------------------*)
