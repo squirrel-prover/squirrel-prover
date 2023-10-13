@@ -70,7 +70,7 @@ Qed.
 
 ==>
 
-Script(Sentence(PROOF),Sentence(Tactic(tackeyw(help),DOT)),Sentence(Tactic(tackeyw(help),Help_tac(Help_tac_i(tackeyw(intro))),DOT)),Sentence(Tactic(tackeyw(intro),ID,ID,ID,ID,DOT)),Sentence(Tactic(tackeyw(expand),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(Tactic(tackeyw(euf),Lsymb(ID),DOT)),Sentence(Tactic(tackeyw(intro),STAR,Tacticals,closing(by),EXISTS(exists),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(QED))
+Script(Sentence(PROOF),Sentence(Infos(tackeyw(help),DOT)),Sentence(Infos(tackeyw(help),Help_tac(Help_tac_i(tackeyw(intro))),DOT)),Sentence(Tactic(tackeyw(intro),ID,ID,ID,ID,DOT)),Sentence(Tactic(tackeyw(expand),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(Tactic(tackeyw(euf),Lsymb(ID),DOT)),Sentence(Tactic(tackeyw(intro),STAR,Tacticals,closing(by),EXISTS(exists),Term(Sterm_i(Lsymb(ID))),DOT)),Sentence(QED))
 
 # stuffedlemma
 
@@ -201,7 +201,7 @@ print n.
 
 ==>
 
-Script(Sentence(Sentence(tackeyw(print),Lsymb(ID),DOT)))
+Script(Sentence(Infos(tackeyw(print),Lsymb(ID),DOT)))
 
 # search
 
@@ -209,7 +209,7 @@ search if _ then _ else _.
 
 ==>
 
-Script(Sentence(Sentence(Search_query(tackeyw(search),Term(IF(if),Term(Sterm_i(UNDERSCORE)),THEN(then),Term(Sterm_i(UNDERSCORE)),ELSE(else),Term(Sterm_i(UNDERSCORE))),DOT))))
+Script(Sentence(Infos(Search_query(tackeyw(search),Term(IF(if),Term(Sterm_i(UNDERSCORE)),THEN(then),Term(Sterm_i(UNDERSCORE)),ELSE(else),Term(Sterm_i(UNDERSCORE))),DOT))))
 
 # channel
 
@@ -267,7 +267,7 @@ search input@_.
 
 ==>
 
-Script(Sentence(Sentence(Search_query(tackeyw(search),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Sterm_i(UNDERSCORE))),DOT))))
+Script(Sentence(Infos(Search_query(tackeyw(search),Term(Macro(Term(Sterm_i(Lsymb(ID)))),operator,Term(Sterm_i(UNDERSCORE))),DOT))))
 
 
 # searchinput2
@@ -375,4 +375,4 @@ Qed.
 
 ==> 
 
-Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),operator,Process(FIND(Tacticals(try),find),Lsymb(ID),SUCHTHAT(such,that),Term(Sterm_i(Lsymb(ID))),IN(in),Process(LPAREN,Process(IF(if),Term(Sterm_i(Lsymb(ID))),THEN(then),Process(NULL(null))),RPAREN))),DOT)))
+Script(Sentence(PROOF),Sentence(Tactic(tackeyw(intro),ID,ID,DOT)),BlockComment,Sentence(Tactic(tackeyw(rewrite),Lsymb(ID),DOT)),Sentence(Tactic(tackeyw(rewrite),Lsymb(ID),DOT)),BlockComment,Sentence(Infos(tackeyw(print),Lsymb(ID),DOT)),Sentence(Tactic(tackeyw(apply),Lsymb(ID),DOT)),Sentence(QED))

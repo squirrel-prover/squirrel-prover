@@ -1071,7 +1071,7 @@ StartProof[@name=Sentence] { PROOF }
 
 blockProof { StartProof Bulleted_tactic+ EndProof }
 
-Infos[@name=Sentence] {
+Infos {
  PRINT pr_query
  | Search_query
  | HELP ~help DOT
