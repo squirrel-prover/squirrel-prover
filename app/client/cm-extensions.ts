@@ -1,6 +1,7 @@
 import { EditorView } from "codemirror"
-import { StateField, StateEffect, Range } from "@codemirror/state"
-import { Decoration, hoverTooltip } from "@codemirror/view"
+import { Extension, Compartment, StateField, 
+  StateEffect, Range } from "@codemirror/state"
+import { keymap, Decoration, hoverTooltip } from "@codemirror/view"
 import {syntaxTree } from "@codemirror/language"
 
 // Could move in squirrel lang all function manipulating Squirrel syntax
@@ -183,3 +184,17 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
   } catch (e) {console.warn(e)}
 })
 
+export function toggleWith(key: string, extension: Extension) {
+  let myCompartment = new Compartment
+  function toggle(view: EditorView) {
+    let on = myCompartment.get(view.state) == extension
+    view.dispatch({
+      effects: myCompartment.reconfigure(on ? [] : extension)
+    })
+    return true
+  }
+  return [
+    myCompartment.of([]),
+    keymap.of([{key, run: toggle}])
+  ]
+}

@@ -9,6 +9,8 @@
     "codemirror": "^6.0.1",
     "@lezer/highlight": "^1.0.0",
     "@lezer/lr": "^1.0.0",
+    "@replit/codemirror-emacs": "^6.0.1",
+    "@replit/codemirror-vim": "^6.0.14",
     "@types/localforage": "^0.0.34",
     "jquery": "^3.7.0",
     "localforage": "^1.10.0"

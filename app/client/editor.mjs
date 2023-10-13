@@ -2,9 +2,11 @@
 import {EditorView, basicSetup } from "codemirror"
 import { keymap } from "@codemirror/view"
 import { EditorState } from "@codemirror/state"
+import { vim } from "@replit/codemirror-vim"
+import { emacs } from "@replit/codemirror-emacs"
 
 // Custom extensions
-import { markField, sentenceHover } from "./cm-extensions"
+import { toggleWith, markField, sentenceHover } from "./cm-extensions"
 
 // FileManager
 import { fileManager, filePanelExt } from "./fileManager.ts"
@@ -87,6 +89,8 @@ let myview = new EditorView({
     worker.simpleLezerLinter(),
     squirrelKeymap(),
     sentenceHover,
+    toggleWith("F1", vim()),
+    toggleWith("F2", emacs()),
     basicSetup,
     markField,
     filePanelExt(),
