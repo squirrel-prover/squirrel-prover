@@ -355,3 +355,24 @@ process coucou = try find i such that true in (if true then null).
 ==> 
 
 Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),operator,Process(FIND(Tacticals(try),find),Lsymb(ID),SUCHTHAT(such,that),Term(Sterm_i(Lsymb(ID))),IN(in),Process(LPAREN,Process(IF(if),Term(Sterm_i(Lsymb(ID))),THEN(then),Process(NULL(null))),RPAREN))),DOT)))
+
+# infoinproof
+
+Proof.
+  intro H1 H2.
+
+  (* An equality hypothesis `H : u = v` can be used to replace
+     occurrences of `u` by `v`, using `rewrite H`. *)
+  rewrite H1.
+  rewrite H2.
+
+  (* To conclude, we can use the `eq_refl` lemma, which is part of the
+     standard library.
+     You can print the lemma's statement using `print`. *)
+  print eq_refl.
+  apply eq_refl.
+Qed.
+
+==> 
+
+Script(Sentence(Declarations(Declaration(decl(process),Lsymb(ID),operator,Process(FIND(Tacticals(try),find),Lsymb(ID),SUCHTHAT(such,that),Term(Sterm_i(Lsymb(ID))),IN(in),Process(LPAREN,Process(IF(if),Term(Sterm_i(Lsymb(ID))),THEN(then),Process(NULL(null))),RPAREN))),DOT)))

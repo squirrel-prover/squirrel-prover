@@ -630,6 +630,8 @@ export class SquirrelWorker {
       return node.nextSibling
     else if(node.nextSibling) 
       return this.nextSiblingSentence(node.nextSibling)
+    else if (node.parent)
+      return this.nextSiblingSentence(node.parent)
     else 
       return null
   }
@@ -652,6 +654,9 @@ export class SquirrelWorker {
     let node = tree.resolveInner(pos);
     node = getSentenceFromNode(node);
     if (DEBUG) {
+      console.warn("Pos : "+ pos.toString());
+      console.warn("Actual sentence :");
+      this.printSentence(view.state,node);
       console.warn("Sentence to execute :");
       this.printSentence(view.state,this.nextSiblingSentence(node));
     }
