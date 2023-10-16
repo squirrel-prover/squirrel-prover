@@ -1,3 +1,7 @@
+/** Style for visualisation
+  * @author Clément Hérouard
+  */
+
 rect.cond, rect.state, rect.output {
   fill: #eeeeee;
 }

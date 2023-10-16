@@ -1,4 +1,5 @@
-/* taken from jsquirrel <3 */
+/* adapted from jscoq <3 */
+
 body {
   overscroll-behavior-y: none;
   --header-bg: #4b525f87;

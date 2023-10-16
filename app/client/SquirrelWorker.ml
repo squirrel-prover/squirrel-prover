@@ -1,8 +1,23 @@
+(* Squirrel JavaScript API.
+ *
+ * Part of this code was taken from Jscoq project with ↓
+ * Copyright (C) 2016-2019 Emilio J. Gallego Arias, Mines ParisTech, Paris.
+ * Copyright (C) 2018-2021 Shachar Itzhaky, Technion
+ * Copyright (C) 2019-2021 Emilio J. Gallego Arias, INRIA
+ *
+ * Now adapted by ↓
+ * Copyright (C) 2022-2023 Thomas Rubiano, CNRS
+ * LICENSE: GPLv3+
+ *
+ * We provide a message-based asynchronous API for communication with
+ * Squirrel.
+ *)
+
 open Js_of_ocaml
-(* open Js_of_ocaml_lwt *)
 open Jsquirrel
 module Html = Dom_html
 
+(* taken from jscoq *)
 let rec json_to_obj (cobj : < .. > Js.t) (json : Yojson.Safe.t) : < .. > Js.t =
   let open Js.Unsafe in
   let ofresh j = json_to_obj (obj [||]) j in
@@ -22,10 +37,8 @@ type jsquirrel_answer =
   | Info      of string
   | Goal      of string * string
   | Ok        of int * string * string
-  | Ko        of int * string
+  | Ko        of int
   [@@deriving to_yojson]
-
-(* let cast = Js_of_ocaml_tyxml.Tyxml_js.To_dom.of_element *)
 
 type jsquirrel_cmd =
   | Undo    of int (* undo n sentences → set current state as
@@ -42,28 +55,12 @@ type jsquirrel_cmd =
   | Info (* will show current state output *)
   [@@deriving yojson]
 
+(* make given message an unsafe json obj *)
 let answer_to_jsobj msg =
   let json_msg = jsquirrel_answer_to_yojson msg       in
   json_to_obj (Js.Unsafe.obj [||]) json_msg
 
-(* let output_node () = *) 
-(*       Firebug.console##warn "query-panel not found ?" *)
-let output_node () = 
-  match Html.getElementById_opt "query-panel" with
-  | Some e -> e
-  | None -> 
-      Firebug.console##warn "query-panel not found ?";
-      Html.getElementById "query-panel"
-
-let goal_node () = 
-      Firebug.console##warn "goal-text not found ?"
-(* let goal_node () = *) 
-(*   match Html.getElementById_opt "goal-text" with *)
-(*   | Some e -> e *)
-(*   | None -> *) 
-(*       Firebug.console##warn "goal-text not found ?"; *)
-(*       Html.getElementById "goal-text" *)
-
+(* send string formatted of actual goal with visualisation *)
 let show_goal () =
   Common.print_goal (); (* will printout the current goal *)
   let goal_output = Format.flush_str_formatter () in
@@ -71,34 +68,28 @@ let show_goal () =
 
   let visu : string = Common.visualisation () in
   Worker.post_message (answer_to_jsobj (Goal (goal_output,visu)))
-  (* let newgoal = H.raw goal_output in () *)
-  (* H.replace_child (goal_node ()) (H.cast newgoal) *)
 
+(* send given string to output in goal panel *)
 let show_in_goal (goal_output:string) =
   Firebug.console##log goal_output;
   let visu : string = Common.visualisation () in
   Worker.post_message (answer_to_jsobj (Goal (goal_output,visu)))
-  (* let newgoal = H.raw goal_output in *)
-  (* H.replace_child (goal_node ()) (H.cast newgoal) *)
 
+(* send given string to output in info panel *)
 let show_info (info:string) : unit =
   Firebug.console##log info;
   Worker.post_message (answer_to_jsobj (Info info))
 
-  (* let newpreview = raw info in *)
-  (* replace_child (output_node ()) (cast newpreview) *)
-
 (* send OK with number of sentence well executed *)
 let send_ok (n:int) : unit =
   let visu : string = Common.visualisation () in
-  (* let goal_output = Common.str_goal () in *)
   Common.print_goal (); (* will printout the current goal *)
   let goal_output = Format.flush_str_formatter () in
   Worker.post_message (answer_to_jsobj (Ok (n,goal_output,visu)))
 
+(* send worker that nth sentence fails to execute *)
 let send_ko (n:int) : unit =
-  let visu : string = Common.visualisation () in
-  Worker.post_message (answer_to_jsobj (Ko (n,visu)))
+  Worker.post_message (answer_to_jsobj (Ko (n)))
 
 let rec execute_all' ?(check=`Check) (sentences:string list) (nb:int) (info:string) : string
 =
@@ -115,20 +106,28 @@ let rec execute_all' ?(check=`Check) (sentences:string list) (nb:int) (info:stri
         execute_all' t (nb+1) (info ^ info'))
       else (send_ko nb; (info ^ info'))
 
-(* return the concatened infos *)
+(* execute list of sentences and return the concatened infos 
+ * Ok or Ko messages can be sent during the process *)
 let execute_all ?(check=`Check) (sentences:string list) : string =
   execute_all' ~check sentences 0 ""
 
 let execute_cmd (cmd:jsquirrel_cmd) : unit = 
   match cmd with 
+    (* will pop n state from stack and show actual goal *)
     | Undo n -> let _ = Common.popn n in show_goal ()
+    (* execute a list of sentences and show concatened infos *)
     | Exec sentences -> 
         let info = execute_all sentences in
         show_info info; show_goal ()
+    (* same as Exec but without checking proofs *)
     | NoCheck sentences -> 
         let info = execute_all ~check:`NoCheck sentences in
         show_info info; show_goal ()
+    (* show nth state goal DEPRECATED *)
     | Show n -> show_in_goal (Common.shown n)
+    (* show actual goal *)
     | Info -> show_in_goal (Common.show ())
+    (* Run one given command *)
     | Run s -> show_info (Common.exec_command s)
+    (* Reset prover *)
     | Reset -> Common.init (); show_goal ()

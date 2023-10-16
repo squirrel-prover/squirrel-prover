@@ -11,6 +11,7 @@ import { SyntaxNode } from '@lezer/common';
   // Mark Utils
   // ==========
 
+// Need to match css classes
 const strikeMark = Decoration.mark({
   class: "squirrel-hover"
 })
@@ -18,6 +19,16 @@ const strikeMark = Decoration.mark({
 const syntaxErrorMark = Decoration.mark({
   class: "squirrel-syntax-error"
 })
+
+export const errorMark = Decoration.mark({
+  class: "squirrel-eval-failed"
+})
+
+export const evaluatedMark = Decoration.mark({
+  class: "squirrel-eval-ok"
+})
+
+export const focusedMark = "squirrel-focus-goal"
 
 // Effects can be attached to transactions to communicate with the extension
 export const addMarks = StateEffect.define<Range<Decoration>[]>();
@@ -140,7 +151,7 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
   //     }
 
   if(node.type.name === "BlockComment") return {pos: start, end, above: false, 
-    create(view) {
+    create(_) {
       let dom = document.createElement("div")
       dom.textContent = "Comments…"
       return {dom}
@@ -175,7 +186,7 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
       pos: start,
       end,
       above: true,
-      create(view) {
+      create(_) {
         let dom = document.createElement("div")
         dom.textContent = type
         return {dom}

@@ -1,3 +1,9 @@
+(* A Dream server to easily serve the client
+ *
+ * TODO :
+ * - a start for client-server squirrel on browser
+ *)
+
 let () =
   Dream.run
   @@ Dream.logger
