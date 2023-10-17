@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="./static/squirrel-light.css">
     <link rel="stylesheet" href="./static/ide-base.css">
     <link rel="stylesheet" href="./static/visualisation_style.css">
+    <link rel="stylesheet" href="./static/help.css">
+    <link rel="stylesheet" href="./static/kbd.css">
     <script src="https://d3js.org/d3.v5.min.js"></script>
 
     <div id="ide-wrapper" class="jsquirrel-ide layout-flex goals-active">
@@ -30,7 +32,20 @@
             <button id="file" name="file" alt="File manager" 
             title="File Manager"></button>
           </span>
+          <span id="buttons-right">
+            <button id="help" name="help" alt="Quick Help" 
+            title="Quick Help"></button>
+          </span>
         </div>
+
+        <div id="quick-help" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <div w3-include-html="./static/quick-help.html"></div>
+        </div>
+      </div>
+
         <div class="flex-container">
           <div id="goal-panel" class="flex-panel">
             <div class="caption">Goals</div>
@@ -54,5 +69,37 @@
       </div>
     </div>
     <script id="bundle" src="./static/editor.bundle.js"></script>
+    <script>
+      function includeHTML() {
+        var z, i, elmnt, file, xhttp;
+        /* Loop through a collection of all HTML elements: */
+        z = document.getElementsByTagName("*");
+        for (i = 0; i < z.length; i++) {
+          elmnt = z[i];
+          /*search for elements with a certain atrribute:*/
+          file = elmnt.getAttribute("w3-include-html");
+          if (file) {
+            /* Make an HTTP request using the attribute value as the file name: */
+            xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+              if (this.readyState == 4) {
+                if (this.status == 200) {elmnt.innerHTML = this.responseText;}
+                if (this.status == 404) {elmnt.innerHTML = "Page not found.";}
+                /* Remove the attribute, and call this function once more: */
+                elmnt.removeAttribute("w3-include-html");
+                includeHTML();
+              }
+            }
+            xhttp.open("GET", file, true);
+            xhttp.send();
+            /* Exit the function: */
+            return;
+          }
+        }
+      }
+    </script>
+    <script>
+    includeHTML();
+    </script>
   </body>
 </html>
