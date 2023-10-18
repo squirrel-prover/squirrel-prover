@@ -59,6 +59,18 @@ of splitting is allowed.
 Each grammatical rule starting with uppercase character will be
 visible in the CM6 language extension.
 
+## The completion
+
+The completion is described in `./src/complete.ts`. For the moment all
+tips are written by hand regarding to internal `help` from squirrel
+interactive mode.
+
+It is a bit context aware since it knows when it is located in a
+proof. That way it can either complete with tactics or declarations.
+
+It is also aware of declarations names in the current file (but not
+from included onces).
+
 ## One Advice 
 
 Keep maintained the tests in `./test/cases.txt` by running `npm

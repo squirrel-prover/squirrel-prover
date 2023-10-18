@@ -59,8 +59,13 @@ Open your browser at `http://localhost:8000`…
 
 The following keyboard shortcuts are available:
 
-- `ctrl-enter`   execute until cursor
-- `ctrl-↑`       undo
-- `ctrl-↓`       execute next sentence
-- `ctrl-o`       open/close a dialog to open a file
-- `ctrl-s`       open/close a dialog to save the file
+| Mapping          | Action                               |
+| ---              | ---                                  |
+| `ctrl-enter`     | execute until cursor                 |
+| `ctrl-↑/k`       | undo                                 |
+| `ctrl-↓/j`       | execute next sentence                |
+| `ctrl-shift-↑/↓` | move focus                           |
+| `ctrl-s`         | open/close a dialog to save the file |
+| `ctrl-S`         | save the file in disk                |
+
+See the help (?) provided.
