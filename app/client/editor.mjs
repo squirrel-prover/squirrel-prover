@@ -33,22 +33,32 @@ function squirrelKeymap(view) {
         return worker.execToCursor(view)
       }
       // Move focus up
-      if (e.key == "ArrowUp" && e.ctrlKey && e.shiftKey) {
-        worker.focusRelativeN(-1)
-        return true
+      if (
+        (e.key == "ArrowUp" || e.key == "K") &&
+        e.ctrlKey &&
+        e.shiftKey
+      ) {
+        worker.focusRelativeN(-1);
+        return true;
       }
       // Move focus down
-      if (e.key == "ArrowDown" && e.ctrlKey && e.shiftKey) {
-        worker.focusRelativeN(1)
-        return true
+      if (
+        (e.key == "ArrowDown" || e.key == "J") &&
+        e.ctrlKey &&
+        e.shiftKey
+      ) {
+        worker.focusRelativeN(1);
+        return true;
       }
       // Undo one sentence
-      if (e.key == "ArrowUp" && e.ctrlKey) {
+      if ((e.key == "ArrowUp" || e.key == "k") &&
+        e.ctrlKey) {
         worker.undo(1)
         return true
       }
       // Exec next sentence
-      if (e.key == "ArrowDown" && e.ctrlKey) {
+      if ((e.key == "ArrowDown" || e.key == "j") &&
+        e.ctrlKey) {
         return worker.execNextSentence(view)
       }
       return false 
@@ -72,9 +82,8 @@ let readOnlyTransactionFilter = EditorState.transactionFilter.of((tr) => {
 });
 
 // Create CodeMirror6 View ↓
-
 let myview = new EditorView({
-  doc:"",
+  doc:"(* writte your squirrel script here *)",
   extensions: [
     updateListenerExtension,
     readOnlyTransactionFilter,
@@ -127,10 +136,13 @@ buttonFile.onclick = function() {
   return worker.openFilePanel(myview);
 }
 
+// Clicking somewhere on doc will update pointer and focus
 input.onclick = (event) => {
   worker.updatePointer({x:event.x, y:event.y})
 };
 
+// Run input is the textarea under info panel able to run one command
+// without altering the prover state
 var runInput = document.getElementById('runinput');
 runInput.addEventListener("keypress", function(event) {
   // If the user presses the "Enter" key on the keyboard
@@ -165,6 +177,7 @@ window.onclick = function(event) {
   }
 }
 
+// Function that handles the folding of flex panels
 function panelClickHandler(evt) {
 
   var target = evt.target;
@@ -195,4 +208,5 @@ function panelClickHandler(evt) {
 var flex_container = document.getElementsByClassName('flex-container')[0];
 flex_container.addEventListener('click', evt => { panelClickHandler(evt); });
 
+// Will initiate the worker ↓
 worker.launch()
