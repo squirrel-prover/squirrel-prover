@@ -35,7 +35,17 @@ export class FileManager {
 
       this.theories_dir = new URL("static/theories/", base_path);
 
-      let fnames = ["Basic.sp", "Prelude.sp"];
+      let tuto = [
+        "0-logic.sp",
+        "1-crypto-hash.sp",
+        "2-crypto-enc.sp",
+        "3-hash-lock-auth.sp",
+        "4-hash-lock-unlink.sp",
+        "5-stateful.sp",
+        "6-key-establishment.sp",
+      ];
+      let lib = ["Basic.sp", "Prelude.sp"];
+      let fnames = lib.concat(tuto);
       fnames.forEach((fname) => {
         fetch(this.theories_dir+fname)
         .then((res) => {
