@@ -74,15 +74,7 @@ let readOnlyTransactionFilter = EditorState.transactionFilter.of((tr) => {
 // Create CodeMirror6 View ↓
 
 let myview = new EditorView({
-  doc:"include Basic.\n"
-+"system null.type T.\n"
-+"op yo : T -> T = fun(x : T) => x.\n"
-+"lemma foo : empty <> empty.\n"
-+"Proof.\n"
-+" congruence.\n"
-+" admit.\n"
-+"Qed."
-  ,
+  doc:"",
   extensions: [
     updateListenerExtension,
     readOnlyTransactionFilter,
