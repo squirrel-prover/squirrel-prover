@@ -83,7 +83,9 @@ let readOnlyTransactionFilter = EditorState.transactionFilter.of((tr) => {
 
 // Create CodeMirror6 View ↓
 let myview = new EditorView({
-  doc:"(* write your squirrel script here *)",
+  doc:`\n
+(** Write your squirrel script here or start with a pre-loaded tutorial.\n
+    You can find them by clicking the file icon near the (?) icon *)\n`,
   extensions: [
     updateListenerExtension,
     readOnlyTransactionFilter,
