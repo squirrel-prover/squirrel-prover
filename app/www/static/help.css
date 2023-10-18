@@ -1,6 +1,6 @@
 @import url('kbd.css');
 
-body {
+.helpbody {
   font-family: Helvetica, Geneva, Swiss, Arial, SunSans-Regular, sans-serif;
   font-size: 10.5pt;
   --bs-font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -8,7 +8,7 @@ body {
   padding-bottom: 4em;
 }
 
-body[theme=dark] {
+.helpbody[theme=dark] {
   color: #ddd;
 }
 
