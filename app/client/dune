@@ -14,9 +14,6 @@
          ; --pretty
          ; --disable shortvar 
          ; --debug-info
-         ; ↓ FIXME ↓
-         ; -I /home/thomas/.opam/default/lib/cmdliner
-         ; -I `opam var lib`/cmdliner
          --extern-fs
          --setenv PATH=/bin))
  (link_flags -linkall -no-check-prims)

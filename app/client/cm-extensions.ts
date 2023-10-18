@@ -123,7 +123,7 @@ function isErrorSentence(sentence:SyntaxNode, view:EditorView){
 }
 
   /**
-   * Extension of hoverTooltip (on mouse hover )
+   * Extension of hoverTooltip (show info, on mouse hover)
    * @param {EditorView} view
    * @param {number} pos
    * @param {number} side
@@ -136,19 +136,6 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
   // Node at pos
   let node = syntaxTree(viewState).resolveInner(pos);
   let type = node.type.name;
-
-  // if (node.type.isError)
-  //   highlightNodes(node,"")
-
-  //     while (node) {
-  //       const text = viewState.sliceDoc(node.from, node.to);
-  //       let parent = node.parent;
-  //       type = parent!.type.name;
-  //       start = node.from;
-  //       end = node.to;
-  //       console.log("Groupe of "+text+":"+type)
-  //       node = parent!;
-  //     }
 
   if(node.type.name === "BlockComment") return {pos: start, end, above: false, 
     create(_) {
@@ -195,6 +182,7 @@ export const sentenceHover = hoverTooltip((view, pos, side) => {
   } catch (e) {console.warn(e)}
 })
 
+// Creates a extension to toggle the given extension with the given key 
 export function toggleWith(key: string, extension: Extension) {
   let myCompartment = new Compartment
   function toggle(view: EditorView) {

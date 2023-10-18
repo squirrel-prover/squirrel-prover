@@ -11,6 +11,7 @@ import { StateField, StateEffect } from "@codemirror/state"
 export const toggleOpenFile = StateEffect.define<boolean>()
 export const toggleSaveFile = StateEffect.define<boolean>()
 
+// Class of file manager
 export class FileManager {
   reset: (view:EditorView) => void;
   worker : SquirrelWorker
@@ -35,6 +36,7 @@ export class FileManager {
 
       this.theories_dir = new URL("static/theories/", base_path);
 
+      // By default we can add the tutorial to the file storage
       let tuto = [
         "0-logic.sp",
         "1-crypto-hash.sp",
@@ -47,35 +49,19 @@ export class FileManager {
       let lib = ["Basic.sp", "Prelude.sp"];
       let fnames = lib.concat(tuto);
       fnames.forEach((fname) => {
-        fetch(this.theories_dir+fname)
-        .then((res) => {
-          if (res.ok)
-            return res.blob();
-          else {
-            console.error("couldn't find ")
-            return null;
-          }
-        })
-        .then((blob) => { 
-          if(blob) {
-            console.warn("Setting "+fname+" in localforage !");
-            localforage.setItem(fname,blob.text());
-          }
-          return blob.text();
-        });
+        this.getFileString(fname);
       })
     }
 
+  // get the file of given name
   async getFileString(fname:string): Promise<string> {
     return localforage.keys().then(async (keys) => {
-      console.warn(keys);
-      console.warn("is "+fname+" in ?");
       if (keys.includes(fname)){
-        console.warn("Found "+fname+" in localforage !");
+        console.log("Found "+fname+" in localforage !");
         return localforage.getItem(fname)
         .then((text:string) => text);
       } else {
-        console.warn("Didn't find "+fname+" in localforage !");
+        console.log("Didn't find "+fname+" in localforage !");
         console.log("Downloading "+this.theories_dir+fname)
         return fetch(this.theories_dir+fname)
         .then((res) => {
@@ -88,7 +74,7 @@ export class FileManager {
         })
         .then((blob) => { 
           if(blob) {
-            console.warn("Setting "+fname+" in file_store !");
+            console.log("Setting "+fname+" in file_store !");
             localforage.setItem(fname,blob.text());
             return blob.text();
           }
@@ -98,6 +84,7 @@ export class FileManager {
     });
   }
 
+  // Downloading file from theories directory
   async downloadFile(fname:string) {
     console.log("Downloading "+this.theories_dir+fname)
     return fetch(this.theories_dir+fname)
@@ -120,7 +107,6 @@ export class FileManager {
 
   bindWorker(worker:SquirrelWorker) {
     this.worker = worker
-    // this.reset = worker.reset
   }
 
   load(text:string, filename:string, view:EditorView, dirty=false) {
@@ -201,29 +187,6 @@ export class FileManager {
     })
   }
 
-  // TODO remove duplicated
-  makeOpenFileDialog(text:string,view:EditorView) {
-    var list_id = 'cm-provider-local-files',
-    input = myJquery('<input>').attr('list', list_id),
-    list = myJquery('<datalist>').attr('id', list_id);
-
-    localforage.keys().then((keys) => {
-      for (let key of keys) {
-        list.append(myJquery('<option>').val(key));
-      }
-    });
-
-    this.setupTabCompletion(input, list);
-
-    return myJquery('<span>').text(text).append(input, list)
-    .on('keypress', (e) => {
-      if (e.which == 13 ){
-        this.openLocal(input.val().toString(),view);
-        view.focus();
-      }
-    });
-  }
-
   makeSaveFileDialog(text:string,view:EditorView) {
     var list_id = 'cm-provider-local-files',
     input = myJquery('<input>').attr('list', list_id),
@@ -239,30 +202,11 @@ export class FileManager {
 
     return myJquery('<span>').text(text).append(input, list)
     .on('keypress', (e) => {
-      if (e.which == 13 ){
+      if (e.which == 13 ){ // This is enter
         this.saveLocal(view,input.val().toString());
         view.focus();
       }
     });
-  }
-
-  // FIXME why does it not work ?
-  makeFileDialog(text:string,handler,view:EditorView) {
-    var list_id = 'cm-provider-local-files',
-    input = myJquery('<input>').attr('list', list_id),
-    list = myJquery('<datalist>').attr('id', list_id);
-
-    localforage.keys().then((keys) => {
-      for (let key of keys) {
-        list.append(myJquery('<option>').val(key));
-      }
-    });
-
-    this.setupTabCompletion(input, list);
-
-    return myJquery('<span>').text(text).append(input, list)
-    .on('done', () => {handler(input.val().toString(),view);
-        view.focus()});
   }
 
   makeDialogLink(text, handler, className="dialog-link") {
@@ -306,7 +250,6 @@ export class FileManager {
                       a[0].click();
   }
 
-  // TODO remove deplicated code with an handler !
   saveLocalDialog(view:EditorView) {
     var span = this.makeSaveFileDialog("Save file: ",view),
     a1 = this.makeDialogLink('To disk...', () => this.saveToFile(view));
@@ -315,14 +258,7 @@ export class FileManager {
     return span[0];
   }
 
-  openLocalDialog(view:EditorView) {
-    var span = this.makeOpenFileDialog("Open file: ",view),
-    a = this.makeDialogLink('From disk...', () => this.openFileDialog(view));
-
-    span.append(a);
-    return span[0];
-  }
-
+  // Used for the + button in file panel
   openFilePanel(view:EditorView):HTMLElement {
     var list_id = 'squirrel-local-files';
     var list = myJquery('<ul>');
@@ -352,24 +288,6 @@ export class FileManager {
 
 export var fileManager = new FileManager(window.location.toString());
 
-function createFilePanel(view: EditorView): Panel {
-  var dom = fileManager.openLocalDialog(view) ;
-  dom.className = "cm-file-panel"
-
-  return {
-    top: true, 
-    dom};
-}
-
-function createOpenFilePanel(view: EditorView): Panel {
-  var dom = fileManager.openLocalDialog(view) ;
-  dom.className = "cm-file-panel"
-
-  return {
-    top: true, 
-    dom};
-}
-
 function createSaveFilePanel(view: EditorView): Panel {
   var dom = fileManager.saveLocalDialog(view) ;
   dom.className = "cm-file-panel"
@@ -378,15 +296,6 @@ function createSaveFilePanel(view: EditorView): Panel {
     top: true, 
     dom};
 }
-
-const fileOpenPanelState = StateField.define<boolean>({
-  create: () => false,
-  update(value, tr) {
-    for (let e of tr.effects) if (e.is(toggleOpenFile)) value = e.value
-    return value
-  },
-  provide: f => showPanel.from(f, on => on ? createOpenFilePanel : null)
-})
 
 const fileSavePanelState = StateField.define<boolean>({
   create: () => false,
@@ -400,14 +309,6 @@ const fileSavePanelState = StateField.define<boolean>({
 import { keymap } from "@codemirror/view"
 
 const fileKeymap = keymap.of([{
-  key: "Ctrl-o",
-  run(view) {
-    view.dispatch({
-      effects: toggleOpenFile.of(!view.state.field(fileOpenPanelState))
-    })
-    return true
-  }
-},{
   key: "Ctrl-s",
   run(view) {
     view.dispatch({
@@ -424,4 +325,4 @@ const fileKeymap = keymap.of([{
 }])
 
 export function filePanelExt() { 
-  return [fileSavePanelState, fileOpenPanelState, fileKeymap] }
+  return [fileSavePanelState, fileKeymap] }
