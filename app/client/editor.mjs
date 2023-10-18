@@ -15,7 +15,10 @@ import { fileManager, filePanelExt } from "./fileManager.ts"
 import { SquirrelWorker } from "./squirrel-worker.ts"
 
 // Load language syntax
-import { Squirrel } from "./lang-squirrel/src/index.ts"
+import {
+  Squirrel,
+  // myAutocomp
+} from "./lang-squirrel/src/index.ts";
 
 let worker = new 
   SquirrelWorker(fileManager,new URL('./client.bc.js', window.location));
@@ -83,8 +86,7 @@ let readOnlyTransactionFilter = EditorState.transactionFilter.of((tr) => {
 
 // Create CodeMirror6 View ↓
 let myview = new EditorView({
-  doc:`\n
-(** Write your squirrel script here or start with a pre-loaded tutorial.\n
+  doc:`(** Write your squirrel script here or start with a pre-loaded tutorial.
     You can find them by clicking the file icon near the (?) icon *)\n`,
   extensions: [
     updateListenerExtension,
@@ -97,7 +99,8 @@ let myview = new EditorView({
     basicSetup,
     markField,
     filePanelExt(),
-    Squirrel()
+    Squirrel(),
+    // myAutocomp
   ],
   parent: input
 })

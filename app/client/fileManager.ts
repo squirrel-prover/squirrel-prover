@@ -1,3 +1,15 @@
+/** The in browser file Manager
+ *
+ * Inspired by Jscoq ↓
+ * Copyright (C) 2016-2019 Emilio J. Gallego Arias, Mines ParisTech, Paris.
+ * Copyright (C) 2018-2021 Shachar Itzhaky, Technion
+ * Copyright (C) 2019-2021 Emilio J. Gallego Arias, INRIA
+
+ * Now adapted by ↓
+ * Copyright (C) 2022-2023 Thomas Rubiano, CNRS
+ * LICENSE: GPLv3+
+ */
+
 import * as localforage from "localforage";
 import {EditorView } from "codemirror";
 import { showPanel, Panel } from "@codemirror/view";
