@@ -1,5 +1,5 @@
 import {NodeWeakMap, SyntaxNodeRef, SyntaxNode, IterMode} from "@lezer/common"
-import {Completion, CompletionContext, CompletionResult, completeFromList, ifNotIn,
+import {Completion, CompletionContext, CompletionResult, completeFromList, ifNotIn, autocompletion,
         snippetCompletion as snip} from "@codemirror/autocomplete"
 import {syntaxTree} from "@codemirror/language"
 import {Text} from "@codemirror/state"
@@ -609,4 +609,24 @@ export const snippets: readonly Completion[] = [
 
 /// Autocompletion for built-in Python globals and keywords.
 export const globalCompletion = ifNotIn(dontComplete, completeFromList(globals.concat(snippets)))
+
+// const docurl = "https://squirrel.gitlabpages.inria.fr/squirrel-prover/"
+
+const config = {
+  addToOptions: [{
+    render: (completion:Completion,_) => {
+      // To get tactic :
+      // if(completion.type == "function")
+      // $('#squirrel:tacn.'+completion.label).load(docurl+"proofs.html");
+      // var div = document.createElement("iframe");
+      // div.src = docurl+"proofs.html#squirrel:tacn."+completion.label
+      var div = document.createElement("div");
+      div.innerHTML = "html here : "+completion.label;
+      return div;
+    },
+    position:200
+  }]
+}
+
+export const myAutocompletion = autocompletion(config)
 
