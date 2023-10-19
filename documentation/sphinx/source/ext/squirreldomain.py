@@ -367,6 +367,7 @@ class TacticTraceObject(TacticObject):
           Solves a goal when the conclusion is true.
 
     """
+    # subdomain = "tact"
     index_suffix = "(trace tactic)"
     annotation = "TraceTactic"
 
@@ -378,13 +379,14 @@ class TacticEquivObject(TacticObject):
 
     Example::
 
-       .. tact:: deduce
+       .. tace:: deduce
 
           `deduce i` removes the ith element from the biframe when it can be
            computed from the rest of the bi-frame.
           `deduce` try to deduce the biframe with the first equivalence in the hypotheses it finds.
 
     """
+    # subdomain = "tace"
     index_suffix = "(equiv tactic)"
     annotation = "EquivTactic"
 
@@ -1141,6 +1143,9 @@ class SquirrelVernacIndex(SquirrelSubdomainsIndex):
 class SquirrelTacticIndex(SquirrelSubdomainsIndex):
     name, localname, shortname, subdomains = "tacindex", "Tactic Index", "tactics", ["tacn"]
 
+# class SquirrelEquivTacticIndex(SquirrelSubdomainsIndex):
+#     name, localname, shortname, subdomains = "etacindex", "EquivTactic Index", "Equivtactics", ["tace"]
+
 class SquirrelAttributeIndex(SquirrelSubdomainsIndex):
     name, localname, shortname, subdomains = "attrindex", "Attribute Index", "attributes", ["attr"]
 
@@ -1269,7 +1274,10 @@ class SquirrelDomain(Domain):
         'g': SquirrelCodeRole
     }
 
-    indices = [SquirrelDeclIndex, SquirrelVernacIndex, SquirrelTacticIndex, SquirrelOptionIndex, SquirrelGallinaIndex, SquirrelExceptionIndex, SquirrelAttributeIndex]
+    indices = [SquirrelDeclIndex, SquirrelVernacIndex,
+               SquirrelTacticIndex, SquirrelOptionIndex,
+               SquirrelGallinaIndex, SquirrelExceptionIndex,
+               SquirrelAttributeIndex]
 
     data_version = 1
     initial_data = {

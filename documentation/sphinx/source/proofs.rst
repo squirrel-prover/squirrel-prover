@@ -828,7 +828,7 @@ Common tactics
     Reduce a goal with a disjunction conclusion into the goal where the
     conclusion has been replaced with the second disjunct. 
     That is, :tacn:`right` turns :n:`Γ ⊢ F || G` into :n:`Γ ⊢ G`.
-    
+
 .. tacn:: split
     
     Split a conjunction goal, creating one sub-goal per conjunct.
@@ -860,11 +860,13 @@ Global tactics
 ~~~~~~~~~~~~~~
 
 .. tace:: byequiv
+   :name: byequiv
     
    Transform a global judgement :n:`⊢ [F]` into a local judgement
    :n:`⊢ F`.
 
 .. tace:: constseq @position: {+ (fun @binders => @term) @term}
+   :name: constseq
 
    Simplify a sequence at the given :n:`@position` when it only
    contains a finite number of possible values :g:`v_1`,..., :g:`v_i`
@@ -906,7 +908,7 @@ Global tactics
          forall (t':timestamp),
            (fun (t':timestamp) => t' < t) t'
            || (fun (t':timestamp) => not (t' < t)) t'
-          
+
 
       .. squirreldoc::
 
@@ -914,50 +916,56 @@ Global tactics
            (fun (t':timestamp) => t' < t) t' => if (t' < t) then one = one) &&
         forall (t':timestamp),
            (fun (t':timestamp) => not (t' < t)) t' => if (t' < t) then one = zero
-    
-             
+
+
 .. tace:: enrich {+, @term}
-    
+   :name: enrich
+
     Enrich the conclusion of an equivalence goal with the given terms.
     Note that this changes the positions of items in the equivalence, and
     if added before other tactics may break later references.
 
 .. tacn:: localize @hypothesis as @simpl_ip
-    
+
     Change a global hypothesis containing a reachability formula
     :n:`[@term]` to a local hypothesis :n:`@term`, and applies the
     given simple introduction pattern :n:`@simpl_ip` to the new hypothesis.
 
     For example, the tactic turns :n:`[F],G ⊢ H` into :n:`F,G ⊢ H`.
-       
+
 .. tace:: memseq
-    
+   :name: memseq
+
     Prove that a bi-frame element appears in a sequence of the bi-frame. 
 
     .. todo::
        Charlie: hum. There are no examples nor test for this function.
        It should be tested before being documented (don't know who did it)
-       
+
 
 .. tace:: refl
-    
+   :name: refl
+
     Close a goal by reflexivity. Cannot apply if the goal contains
     variable or macros, as those may have different left and right
     behaviours.
 
 .. tace:: sym
-    
+   :name: sym
+
     Swap the left and right system of the equivalence goal.
 
 .. tace:: trans
-    
+   :name: trans
+
     Prove an equivalence by transitivity.
 
     .. todo::
        Adrien: this deserves an explanation, the tactic actually does a lot.
 
 .. tace:: splitseq @position: (fun @binders => @term)
-    
+   :name: splitseq
+
    Split a sequence according to some boolean test, replacing the
    sequence with two subsequences.
 
@@ -966,7 +974,7 @@ Global tactics
    return a boolean.
 
    .. example:: Splitting a sequence
-      
+
       Called in a goal with a conclusion of the form :g:`0: seq(x:message =>
       value)`, the tactic:
 
@@ -983,7 +991,7 @@ Global tactics
                           value))
          1: seq(x:message=>
                   (if not ((fun y:message => some_test) x) then
-                          value))        
+                          value))
 
 
 .. _section-structural-tactics:
@@ -1002,9 +1010,9 @@ Common tactics
      performed to handle conjunctive hypotheses). If the conclusion
      is a trace literal then it is taken into account as well.
 
-    
+
 .. tacn:: depends @timestamp, @timestamp
-    
+
     If the second action depends on the first action, and if the second
     action happens, then add the corresponding timestamp inequality.
 
@@ -1081,6 +1089,7 @@ Local tactics
    is a message (dis)-equality then it is taken into account as well.
 
 .. tact:: const @variable
+   :name: const
     
    Add the `const` tag to a variable.
 
@@ -1089,6 +1098,7 @@ Local tactics
    hypotheses may be localised (see :tacn:`localize`) if necessary.
 
 .. tact:: eqnames
+   :name: eqnames
     
     Add index constraints resulting from names equalities,
     modulo the known equalities.
@@ -1097,6 +1107,7 @@ Local tactics
     equality entailed by the current context.
 
 .. tact:: eqtrace
+   :name: eqtrace
 
     Add term constraints resulting from timestamp and index
     equalities. 
@@ -1105,6 +1116,7 @@ Local tactics
     in the other terms.
 
 .. tact:: executable @term
+   :name: executable
     
     Assert that :g:`exec@_` implies :g:`exec@_` for all previous
     timestamps. 
@@ -1116,11 +1128,13 @@ Local tactics
 
 
 .. tact:: project
+   :name: project
     
     Turn a local goal on a :term:`multi-system` into one goal for each
     single system in the multi-system.
 
 .. tact:: rewrite equiv {? -}@proof_term
+   :name: rewrite_equiv
     
     Use an equivalence to rewrite a reachability goal.
 
@@ -1163,16 +1177,18 @@ Local tactics
           n <> m
 
 .. tact:: slowsmt
+   :name: slowsmt
     
     Version of the :tacn:`smt` tactic with higher time limit. 
       
 .. tact:: smt
-   :name: smt    
+   :name: smt
     
     Try to discharge the current goal using an SMT solver. 
       
 
 .. tact:: subst @term, @term
+   :name: subst
 
     If :g:`x = t` where :g:`x` is a variable, then :g:`subst x, t`
     substitutes all occurrences of :g:`x` with :g:`t` and removes :g:`x`
@@ -1243,12 +1259,13 @@ Global tactics
       dropped I think.
 
 .. tace:: diffeq
-    
+   :name: diffeq
+
    Close a reflexive goal up to equality. That is, if all diff-term
    whitin the global goal's conclusion always evaluate to the same value in all
    systems, the equivalence holds. For each diff-term, a
    dedicated sub-goal is created.
-      
+
    .. warning:: This tactic is still at an experimental development
        stage. We do not recommend its usage.     
 
@@ -1776,7 +1793,7 @@ Global tactics
    
    Latest formal Squirrel description::cite:`bdjkm21sp`.
       
-.. tacn:: prf @position {? , @term_pat}
+.. tace:: prf @position {? , @term_pat}
    :name: prf
 
    This tactic applies the PRF assumption (see
@@ -1836,8 +1853,9 @@ Global tactics
    optional :n:`@term_pat` allows to target a specific hash occurrence.
 
    Latest formal Squirrel description: :cite:`bkl23hal`.
-       
+
 .. tace:: xor @position {? , @term_pat} {? , @term_pat}
+   :name: xor
 
    This tactic applies the unconditionally sound one time pad property
    of the xor operation.
