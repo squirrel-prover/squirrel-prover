@@ -16,8 +16,7 @@ import { SquirrelWorker } from "./squirrel-worker.ts"
 
 // Load language syntax
 import {
-  Squirrel,
-  // myAutocomp
+  Squirrel
 } from "./lang-squirrel/src/index.ts";
 
 let worker = new 
@@ -99,8 +98,7 @@ let myview = new EditorView({
     basicSetup,
     markField,
     filePanelExt(),
-    Squirrel(),
-    // myAutocomp
+    Squirrel()
   ],
   parent: input
 })
@@ -116,12 +114,6 @@ buttonToCursor.onclick = function() {
 var buttonReset = document.getElementById('reset');
 buttonReset.onclick = function() { 
   worker.reset(myview);
-  return false; 
-}
-
-var buttonInfo = document.getElementById('info');
-buttonInfo.onclick = function() { 
-  worker.info();
   return false; 
 }
 

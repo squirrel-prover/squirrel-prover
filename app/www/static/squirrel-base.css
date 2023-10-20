@@ -5,6 +5,12 @@
  * For details, see http://www.apache.org/licenses/LICENSE-2.0.
  */
 
+.iframeSnip {
+  position:relative;
+  height: auto;
+  width: auto;
+}
+
  /* The Modal (background) */
 .modal {
   display: none; /* Hidden by default */

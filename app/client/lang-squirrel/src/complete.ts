@@ -3,8 +3,74 @@ import {Completion, CompletionContext, CompletionResult, completeFromList, ifNot
         snippetCompletion as snip} from "@codemirror/autocomplete"
 import {syntaxTree} from "@codemirror/language"
 import {Text} from "@codemirror/state"
+import $ from "jquery";
 
 const cache = new NodeWeakMap<readonly Completion[]>()
+
+const docurl = window.location.origin+"/public/";
+// const docurl = "/public/";
+
+const pagesTypes: {[type:string]: string}  = {}
+pagesTypes["function"] = "proofs.html";
+pagesTypes["property"] = "declarations.html";
+
+function makeDocIfram(completion:Completion): Node {
+  var div = document.createElement("iframe");
+  div.classList.add("iframeSnip")
+  // div.setAttribute("scrolling","no");
+  div.setAttribute("frameborder","0");
+
+  let page = pagesTypes[completion.type];
+  let tactype = "tacn";
+  let label = completion.label.replace(' ','-')
+
+  console.log("get page :"+docurl+page);
+
+  let test = $('<div>').load(docurl+page+' #squirrel\\:tacn\\.'+label)
+  console.warn(test)
+  console.warn(test[0])
+  console.warn(test.text())
+
+  $.get(docurl+page,function(html){
+    console.log(html);
+    if(html){
+      console.warn("try finding "+'#squirrel:tacn.'+label);
+      let elem = $(html).find('#squirrel\\:tacn\\.'+label);
+      console.warn(elem)
+      console.warn(elem[0])
+      console.warn(elem.text())
+      if(!elem[0]) {
+        tactype = "tace";
+        console.warn("try finding "+'#squirrel:tace.'+label);
+        elem = $(html).find('#squirrel\\:tace\\.'+label);
+        console.warn(elem[0]);
+      }
+      if(!elem[0]) {
+        tactype = "tact";
+        console.warn("try finding "+'#squirrel:tact.'+label);
+        elem = $(html).find('#squirrel\\:tact\\.'+label);
+        console.warn(elem[0]);
+      }
+      if(!elem[0]) {
+        tactype = "tacv";
+      }
+    }
+  }).done(()=>{
+    console.log(
+      "iframe from " +
+        docurl +
+        page +
+        "#squirrel:" +
+        tactype +
+        "." +
+        label
+    );
+    div.src = docurl+page+"#squirrel:"+tactype+"."+label;
+    return div;
+  }).fail(function(){console.warn("No documentation found !")});
+
+  return div;
+}
 
 const declaration_completions: readonly Completion[] = [//{↓{
   
@@ -60,7 +126,9 @@ const declaration_completions: readonly Completion[] = [//{↓{
   {label:"mutable",detail:"${Name} : ${Type} = ${Term}",info:``}),
   snip("process ${Name} = ${Process}", 
   {label:"process",detail:"${Name} = ${Process}",info:`Declare process of given name`})
-].map(t => {t.type = "property"; t.boost = 50;return t});//}↑}
+].map(t => {t.type = "property"; t.boost = 50;
+      t.info = makeDocIfram;
+      return t});//}↑}
 //
 const interactive_completions: readonly Completion[] = [//{↓{
   
@@ -348,7 +416,10 @@ const tactics_completions: readonly Completion[] = [//{↓{
     info:`Admit goal.`},
   {label:"diffeq",detail:"",
     info:`Closes a reflexive goal up to equality`}
-].map(t => {t.type = "function"; t.boost = 50;return t});//}↑}
+].map(t => {t.type = "function"; t.boost = 50;
+      t.info = makeDocIfram;
+      return t});//}↑}
+
 //
 const types_completion: readonly Completion[] = [
   "index",
@@ -609,24 +680,3 @@ export const snippets: readonly Completion[] = [
 
 /// Autocompletion for built-in Python globals and keywords.
 export const globalCompletion = ifNotIn(dontComplete, completeFromList(globals.concat(snippets)))
-
-// const docurl = "https://squirrel.gitlabpages.inria.fr/squirrel-prover/"
-
-const config = {
-  addToOptions: [{
-    render: (completion:Completion,_) => {
-      // To get tactic :
-      // if(completion.type == "function")
-      // $('#squirrel:tacn.'+completion.label).load(docurl+"proofs.html");
-      // var div = document.createElement("iframe");
-      // div.src = docurl+"proofs.html#squirrel:tacn."+completion.label
-      var div = document.createElement("div");
-      div.innerHTML = "html here : "+completion.label;
-      return div;
-    },
-    position:200
-  }]
-}
-
-export const myAutocompletion = autocompletion(config)
-

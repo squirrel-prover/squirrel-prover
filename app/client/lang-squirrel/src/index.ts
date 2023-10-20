@@ -9,7 +9,7 @@ import {
   delimitedIndent,
 } from "@codemirror/language";
 import {styleTags, tags as t} from "@lezer/highlight"
-import { globalCompletion, localCompletionSource, myAutocompletion } from "./complete";
+import { globalCompletion, localCompletionSource } from "./complete";
 
 
 export const SquirrelLanguage = LRLanguage.define({
@@ -77,8 +77,6 @@ export const SquirrelLanguage = LRLanguage.define({
   }),
 });
 
-
-export const myAutocomp = myAutocompletion;
 
 export function Squirrel() {
   return new LanguageSupport(SquirrelLanguage, [
