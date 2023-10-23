@@ -5,6 +5,26 @@
  * For details, see http://www.apache.org/licenses/LICENSE-2.0.
  */
 
+/* autocomplete max-width: 700px + info max-width: 300px */
+/* @media screen and (max-width: 1000px) { */
+
+/*   .cm-tooltip.cm-completionInfo { */
+/*     position: absolute; */
+/*     padding: 0px 0px; */
+/*     width: max-content; */
+/*     max-width: 1000px; */
+/*     box-sizing: border-box; */
+/*   } */
+
+/*   .cm-tooltip.cm-tooltip-autocomplete > ul { */
+/*     max-width: 500px !important; */
+/*   } */
+
+/*   .cm-tooltip.cm-tooltip-autocomplete { */
+/*     max-width: 500px !important; */
+/*   } */
+/* } */
+
 .iframeSnip {
   position:relative;
   height: auto;
@@ -125,39 +145,6 @@ a, a:link, a:visited, a:active {
 /*   background-color: #fc6; */
 /* } */
 
-/* CodeMirror */
-
-.jsquirrel.CodeMirror {
-  font-size: var(--base-font-size);
-  height: 100%;  /* auto-size to fit content */
-  line-height: initial;
-}
-
-.jsquirrel.CodeMirror span[role=presentation] {
-  line-height: 12px;  /* because some characters are too tall (due to alternative font glyph rendering) */
-  font-family: monospace, times, 'Arial Unicode MS';
-}
-
-.jsquirrel.CodeMirror .CodeMirror-crosshair {
-  cursor: text; /* overrides CodeMirror (normally set when Alt is held) */
-}
-
-.jsquirrel.CodeMirror .CodeMirror-dialog {
-  padding: .75em;
-}
-
-.jsquirrel.CodeMirror .CodeMirror-dialog span.dialog-share {
-  display: inline-block;
-  padding: 0 1em 0 .2em;
-  margin-left: 2em;
-  border: 1px solid #d8d8d8;
-}
-
-.jsquirrel.CodeMirror .CodeMirror-dialog span.dialog-share > img {
-  vertical-align: middle;
-  width: 20px;
-  opacity: 0.65;
-}
 
 a.fileLink {
   cursor: pointer;
@@ -165,14 +152,6 @@ a.fileLink {
   font-family: sans-serif;
   font-size: 80%;
   padding-left: 2em;
-}
-
-body.jsquirrel-main .CodeMirror-scroll,
-body.jsquirrel-main .CodeMirror-sizer,
-body.jsquirrel-main .CodeMirror-gutter,
-body.jsquirrel-main .CodeMirror-gutters,
-body.jsquirrel-main .CodeMirror-linenumber {
-  box-sizing: content-box;  /* need to override `jsquirrel-main > *` */
 }
 
 /*
@@ -200,10 +179,6 @@ body.jsquirrel-main .CodeMirror-linenumber {
 
   font-family: Helvetica, Geneva, Swiss, Arial, SunSans-Regular, sans-serif;
   font-size: var(--base-font-size);
-}
-
-.CodeMirror-hints {
-  z-index: 21 !important;
 }
 
 #panel-wrapper * {
@@ -598,22 +573,6 @@ body.jsquirrel-main .CodeMirror-linenumber {
   background-image: url(./images/plus.svg);
 }
 
-/* Proper  */
-
-#document {
-  margin: auto;
-  position: relative;
-  padding: 15px;
-}
-
-#document code {
-  white-space: pre;
-}
-
-#document .CodeMirror {
-  margin-bottom: 0.5em;
-}
-
 .rel-pos {
   position: relative;
   height:0;
@@ -626,31 +585,6 @@ body.jsquirrel-main .CodeMirror-linenumber {
   position:relative;
   top: -2px;
   width:0;
-}
-
-.progress-egg {
-  background-image: url("./images/egg.png");
-  background-size: contain;
-  position: absolute;
-  top: -19px;
-  right: 0;
-  height: 18px;
-  width: 18px;
-}
-
-.jsquirrel-ide #outline-pane {
-  width: 0;
-  flex-grow: 0 !important;
-  flex-shrink: 0 !important;
-  transition: width 0.2s ease-in-out;
-}
-
-.jsquirrel-ide.outline-active #outline-pane {
-  width: 15%;
-}
-
-.jsquirrel-ide.goals-active.outline-active #outline-pane {
-  width: 9%;
 }
 
 /* Pretty-printing hacks */
@@ -716,62 +650,6 @@ div.Pp_box .Pp_break > span.indent { color: red; }
   margin-bottom: 1em;
 }
 
-.squirrel-hypothesis {
-  margin-bottom: 2px;
-}
-
-.squirrel-hypothesis > label {
-  font-weight: normal;  /* override bootstrap */
-  margin: 0;
-}
-
-.squirrel-hypothesis > label::after {
-  content: ",";
-  margin-right: 0.25em;
-}
-
-.squirrel-hypothesis > label:last-of-type::after,
-.squirrel-hypothesis > span.def::after {
-  content: ":";
-  margin: 0 .5em;
-}
-
-.squirrel-hypothesis.squirrel-has-def > label:last-of-type::after {
-  content: ":=";
-  margin: 0 .5em;
-  color: #777;
-}
-
-.squirrel-hypothesis > label ~ div {
-  display: inline-table;  /* this is used to indent hypothesis at their labels */
-  table-layout: fixed;
-}
-
-.squirrel-env hr {
-  margin: 0.5em 0;
-  border: 1px inset;
-}
-
-.squirrel-subgoal-pending {
-  margin: 1em 0;
-}
-
-.squirrel-subgoal-pending > label {
-  display: block;
-  margin-bottom: .2em;
-  color: #777;
-}
-.squirrel-subgoal-pending > label::before {
-  content: "subgoal ";
-}
-.squirrel-subgoal-pending > label::after {
-  content: " is:"
-}
-
-.squirrel-subgoal-pending > .Pp_box {
-  margin-left: .8em;
-}
-
 /* Contextual info */
 
 #goal-panel div.contextual-info {
@@ -804,9 +682,6 @@ div.hint-package {
   position: relative;
   top: 1px;  /* this is safer than padding or margin, for floats */
 }
-.CodeMirror-hint-active div.hint-package {
-  color: #ddd;
-}
 
 .scroll-shadow {
   position: absolute;
@@ -820,26 +695,6 @@ div.hint-package {
 .scroll-shadow--bottom {
   bottom: 0;
   background: linear-gradient(0deg, rgba(255, 255, 255, 1), transparent);
-}
-
-/* company-squirrel */
-
-.company-squirrel-sub {
-  font-size: 70%;
-  position: relative;
-  top: 0.1em;
-  /* using position: relative prevents line-height increase */
-  padding-top: 0.4em;
-  /* the padding is to align the background with the rest of the line;
-     not pixel-accurate :\ */
-}
-
-.company-squirrel-hidden {
-  display: inline-block;
-  height: 0;
-  width: 0;
-  overflow: hidden;
-  font-size: 1pt;
 }
 
 /* Printing options */

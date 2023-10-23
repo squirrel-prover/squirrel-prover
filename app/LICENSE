@@ -1,0 +1,43 @@
+Upstream-Name: JSquirrel
+Upstream-Contact: Squirrel team <https://squirrel-prover.github.io/>
+Source: https://github.com/squirrel-prover/squirrel-prover/
+License: GPLv3+
+Copyright: 2023 CNRS Université Rennes 1
+
+Authors: Thomas Rubiano
+         David Baelde
+
+Files: www/static/images/reset.png
+License: CC-BY 3.0
+Comment: Hali Gali Harun, IT, via TheNounProject
+
+Files: www/static/images/{up,down}.png
+Licence: CC-BY 3.0
+Comment: Dean Mocha, TW
+
+Files: www/static/images/to-cursor.png
+Licence: CC-BY 3.0
+Comments: Derived work from those of Dean Mocha, TW & Icon 54, via TheNounProject
+
+Files: www/static/images/*
+License: MIT
+Comment: Other icons are from Bootstrap.com
+
+# Regarding Squirrel and derivatives:
+
+Files: client/js_stub/*, client/squirrel-worker.ts, client/fileManager.ts, client/client.ml, 
+License: GPLv3+
+Comments: were originally inspired by JsCoq's source at some point.
+
+Files: client/lang-squirrel/*
+License: MIT
+Comments: taken from codemirror lezer grammar example.
+
+This project depends on Squirrel libs that are under MIT License:
+
+ - common/common.ml depends on Squirrel libs and builds an equivalent js
+   bytecode using js_of_ocaml that is GPLv2 (Copyright CNRS Paris
+   Diderot)
+
+ - www/static/theories/* are tutorials and squirrel-libs directly taken from the
+   squirrel-prover project to facilitate user experience.

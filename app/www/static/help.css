@@ -1,3 +1,4 @@
+/* taken from jscoq <3 */
 @import url('kbd.css');
 
 .helpbody {
@@ -6,10 +7,6 @@
   --bs-font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.4;
   padding-bottom: 4em;
-}
-
-.helpbody[theme=dark] {
-  color: #ddd;
 }
 
 h1 {
@@ -74,11 +71,4 @@ table.doc-actions th {
   
 table.doc-actions td {
   padding-bottom: .25em;
-}
-
-[theme=dark] img.power-button {
-  background: #aaa;
-}
-[theme=dark] img.symbol-mouse {
-  filter: invert(1);
 }
