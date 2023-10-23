@@ -380,10 +380,13 @@ bundle:
 	# dune build app/www/static/editor.bundle.js
 	npm run prepare --prefix app/
 
-zipsquirrel: jsquirrel bundle 
-	rm -f _build/default/app/jsquirrel.zip
-	cd _build/default/app && \
-	zip -r jsquirrel.zip www
+zipsquirrel: jsquirrel bundle refman-html
+	rm -rf _build/default/zipdir
+	mkdir _build/default/zipdir
+	cp -r _build/default/documentation/sphinx/public _build/default/zipdir/documentation
+	cp -r _build/default/app/www/* _build/default/zipdir/.
+	cd _build/default/zipdir && \
+	zip -r jsquirrel.zip *
 
 .PHONY: watch
 watch: ## Watch for the filesystem and rebuild on every change
