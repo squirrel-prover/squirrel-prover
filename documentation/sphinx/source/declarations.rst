@@ -536,10 +536,12 @@ underscore :g:`_` instead of a statement identifier
 :n:`@statement_id`.
                       
 .. decl:: {? local} {| lemma | axiom } @local_statement
+   :name: lemma
    
    Declares a new local :g:`lemma` or :g:`axiom`.
 
 .. decl:: global {| lemma | axiom} @global_statement
+   :name: global
 
    Declares a new global :g:`lemma` or :g:`axiom`.
 

@@ -7,12 +7,13 @@ import $ from "jquery";
 
 const cache = new NodeWeakMap<readonly Completion[]>()
 
+// This is hard coded ↓ FIXME
 const docurl = window.location.origin+"/documentation/";
-// const docurl = "/public/";
 
 const pagesTypes: {[type:string]: string}  = {}
 pagesTypes["function"] = "proofs.html";
 pagesTypes["property"] = "declarations.html";
+pagesTypes["class"] = "commands.html";
 
 function makeDocIfram(completion:Completion): Node {
   var div = document.createElement('div');
@@ -67,7 +68,16 @@ function makeDocIfram(completion:Completion): Node {
       console.warn("No documentation found !")
       div.innerHTML = "Couldn't find documentation at "+docurl+page;
     });
-  } else {
+  } else if (completion.type== "class") {
+    let tactype = "cmd";
+    var iframe = document.createElement("iframe");
+    iframe.classList.add("iframeSnip")
+    // iframe.setAttribute("scrolling","no");
+    iframe.setAttribute("frameborder","0");
+    iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
+    div.append(iframe)
+  }
+  else {
     let tactype = "decl";
     var iframe = document.createElement("iframe");
     iframe.classList.add("iframeSnip")
@@ -130,34 +140,6 @@ const declaration_completions: readonly Completion[] = [//{↓{
   snip("channel ${Name}", 
   {label:"channel",detail:"Name",
     info:`Declare channel with given name`}),
-  snip("mutable ${Name} : ${Type} = ${Term}", 
-  {label:"mutable",detail:"${Name} : ${Type} = ${Term}",info:``}),
-  snip("process ${Name} = ${Process}", 
-  {label:"process",detail:"${Name} = ${Process}",info:`Declare process of given name`})
-].map(t => {t.type = "property"; t.boost = 50;
-      t.info = makeDocIfram;
-      return t});//}↑}
-//
-const interactive_completions: readonly Completion[] = [//{↓{
-  
-  snip("print", {
-    label: "print",
-    detail: "[system] [symb]",
-    info: `Shows def of given symbol (lemma, function, name or macro) in given system.
-           By default shows current system.`
-  }),
-  {label:"prof",detail:"",
-    info:"prof."},
-  snip("include ${File}", {
-      label: "include",
-      detail: " File",
-      info: "include 'File.sp'"
-    }),
-  snip("search ${pat} in ${sys}.", {
-    label: "search",
-    detail: "[pat] [in sys]",
-    info: `Search lemmas containing a given pattern.`
-  }),
   snip("lemma ${Name} : ${Term}.", {
     label: "lemma",
     detail: "[sys] Name (t: ty, …) : Term.",
@@ -168,12 +150,53 @@ const interactive_completions: readonly Completion[] = [//{↓{
     detail: "[sys] Name ((t: ty, …) : Biframe)?",
     info: `Define equivalence of given Name with given Biframe`
   }),
+  snip("mutable ${Name} : ${Type} = ${Term}", 
+  {label:"mutable",detail:"${Name} : ${Type} = ${Term}",info:``}),
+  snip("process ${Name} = ${Process}", 
+  {label:"process",detail:"${Name} = ${Process}",info:`Declare process of given name`})
+].map(t => {t.type = "property"; t.boost = 50;
+      t.info = makeDocIfram;
+      return t});//}↑}
+
+
+const interactive_completions: readonly Completion[] = [//{↓{
+  
+  snip("print", {
+    label: "print",
+    detail: "[system] [symb]",
+    info: `Shows def of given symbol (lemma, function, name or macro) in given system.
+           By default shows current system.`
+  }),
+  {label:"Abort",detail:"",
+    info:"Abort proof."},
+  {label:"Proof",detail:"",
+    info:"Enter proof."},
+  {label:"Qed",detail:"",
+    info:"Finish proof."},
+  snip("include ${File}", {
+      label: "include",
+      detail: " File",
+      info: "include 'File.sp'"
+    }),
+  snip("search ${pat} in ${sys}.", {
+    label: "search",
+    detail: "[pat] [in sys]",
+    info: `Search lemmas containing a given pattern.`
+  }),
+  snip("set ${ident} = ${val}.", {
+    label: "set",
+    detail: "",
+    info: `Set squirrel option`
+  }),
   snip("hint rewrite ${Name}.", {
     label: "hint",
     detail: "Name",
     info: `Add given axiom to hints`
   })
-].map(t => {t.type = "property"; t.boost = 50;return t});//}↑}
+].map(t => {t.type = "class"; t.boost = 50;
+      t.info = makeDocIfram;
+      return t});//}↑}
+
 
 const process_completions: readonly Completion[] = [//{↓{
   snip("if ${Term} then (${Process}) else (${Process})", {
@@ -233,6 +256,8 @@ const tactics_completions: readonly Completion[] = [//{↓{
     info:"Instantiate a lemma or hypothesis on some arguments."},
   {label:"trans",detail:"i1: t1, ..., in : tn",
     info:"Prove an equivalence by transitivity."},
+  {label:"prof",detail:"",
+    info:"prof."},
   {label:"sym",detail:"",info:"Prove an equivalence by symmetry."},
   {label:"have",detail:"H := H0 _ i2",info:"Add a new hypothesis."},
   {label:"case",detail:"Term",info:"Perform a case analysis."},
