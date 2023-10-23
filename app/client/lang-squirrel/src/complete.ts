@@ -17,55 +17,65 @@ pagesTypes["property"] = "declarations.html";
 function makeDocIfram(completion:Completion): Node {
   var div = document.createElement('div');
   let page = pagesTypes[completion.type];
-  let tactype = "tacn";
   let label = completion.label.replace(' ','-')
 
   console.log("get page :"+docurl+page);
 
-  $.get(docurl+page,function(html){
-    console.log(html);
-    if(html){
-      console.warn("try finding "+'#squirrel:tacn.'+label);
-      let elem = $(html).find('#squirrel\\:tacn\\.'+label);
-      console.warn(elem)
-      console.warn(elem[0])
-      console.warn(elem.text())
-      if(!elem[0]) {
-        tactype = "tace";
-        console.warn("try finding "+'#squirrel:tace.'+label);
-        elem = $(html).find('#squirrel\\:tace\\.'+label);
-        console.warn(elem[0]);
+  if(completion.type== "function"){
+    let tactype = "tacn";
+    $.get(docurl+page,function(html){
+      console.log(html);
+      if(html){
+        console.warn("try finding "+'#squirrel:tacn.'+label);
+        let elem = $(html).find('#squirrel\\:tacn\\.'+label);
+        console.warn(elem)
+        console.warn(elem[0])
+        console.warn(elem.text())
+        if(!elem[0]) {
+          tactype = "tace";
+          console.warn("try finding "+'#squirrel:tace.'+label);
+          elem = $(html).find('#squirrel\\:tace\\.'+label);
+          console.warn(elem[0]);
+        }
+        if(!elem[0]) {
+          tactype = "tact";
+          console.warn("try finding "+'#squirrel:tact.'+label);
+          elem = $(html).find('#squirrel\\:tact\\.'+label);
+          console.warn(elem[0]);
+        }
+        if(!elem[0]) {
+          tactype = "tacv";
+        }
       }
-      if(!elem[0]) {
-        tactype = "tact";
-        console.warn("try finding "+'#squirrel:tact.'+label);
-        elem = $(html).find('#squirrel\\:tact\\.'+label);
-        console.warn(elem[0]);
-      }
-      if(!elem[0]) {
-        tactype = "tacv";
-      }
-    }
-  }).done(()=>{
-    console.log(
-      "iframe from " +
-        docurl +
-        page +
-        "#squirrel:" +
-        tactype +
-        "." +
-        label
-    );
+    }).done(()=>{
+      console.log(
+        "iframe from " +
+          docurl +
+          page +
+          "#squirrel:" +
+          tactype +
+          "." +
+          label
+      );
+      var iframe = document.createElement("iframe");
+      iframe.classList.add("iframeSnip")
+      // iframe.setAttribute("scrolling","no");
+      iframe.setAttribute("frameborder","0");
+      iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
+      div.append(iframe)
+    }).fail(function(){
+      console.warn("No documentation found !")
+      div.innerHTML = "Couldn't find documentation at "+docurl+page;
+    });
+  } else {
+    let tactype = "decl";
     var iframe = document.createElement("iframe");
     iframe.classList.add("iframeSnip")
     // iframe.setAttribute("scrolling","no");
     iframe.setAttribute("frameborder","0");
     iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
     div.append(iframe)
-  }).fail(function(){
-    console.warn("No documentation found !")
-    div.innerHTML = "Couldn't find documentation at "+docurl+page;
-  });
+  }
 
   return div;
 }
