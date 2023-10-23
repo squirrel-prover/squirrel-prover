@@ -36,7 +36,7 @@ Comments: taken from codemirror lezer grammar example.
 This project depends on Squirrel libs that are under MIT License:
 
  - common/common.ml depends on Squirrel libs and builds an equivalent js
-   bytecode using js_of_ocaml that is GPLv2 (Copyright CNRS Paris
+   bytecode using js_of_ocaml that is LGPLv2 (Copyright CNRS Paris
    Diderot)
 
  - www/static/theories/* are tutorials and squirrel-libs directly taken from the
