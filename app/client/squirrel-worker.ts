@@ -188,7 +188,9 @@ export class SquirrelWorker {
    */
   reset(view: EditorView) {
     this.init();
-    removeMarks(view, 0, view.state.doc.length);
+    if(view){
+      removeMarks(view, 0, view.state.doc.length);
+    }
   }
 
   /**
@@ -905,12 +907,20 @@ export class SquirrelWorker {
     goalPanel.appendChild(dom);
   }
 
+  async loadFile(filename:string,view:EditorView) {
+    let content = await this.fileManager.getFileString(filename);
+    this.fileManager.load(content, filename, view);
+  }
+
   // Initialize the worker
-  async launch() {
+  async launch(filename:string,view:EditorView) {
     try {
       await this.when_created;
       this.init();
       this.info();
+      if(filename !== undefined){
+        await this.loadFile(filename,view);
+      }
     } catch (e) {
       console.error(e);
     }

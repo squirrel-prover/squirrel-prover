@@ -206,4 +206,13 @@ var flex_container = document.getElementsByClassName('flex-container')[0];
 flex_container.addEventListener('click', evt => { panelClickHandler(evt); });
 
 // Will initiate the worker ↓
-worker.launch()
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+if (urlParams.has('open')){
+  const file = urlParams.get('open')
+  console.warn("loading "+file);
+  worker.launch(file,myview);
+} else {
+  worker.launch();
+}
+
