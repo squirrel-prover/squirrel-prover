@@ -6,7 +6,7 @@ import { vim } from "@replit/codemirror-vim"
 import { emacs } from "@replit/codemirror-emacs"
 
 // Custom extensions
-import { toggleWith, markField, sentenceHover } from "./cm-extensions"
+import { toggleWith, markField } from "./cm-extensions"
 
 // FileManager
 import { fileManager, filePanelExt } from "./fileManager.ts"
@@ -92,7 +92,7 @@ let myview = new EditorView({
     readOnlyTransactionFilter,
     worker.simpleLezerLinter(),
     squirrelKeymap(),
-    sentenceHover,
+    // sentenceHover,
     toggleWith("F1", vim()),
     toggleWith("F2", emacs()),
     basicSetup,
