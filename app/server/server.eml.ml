@@ -14,4 +14,7 @@ let () =
 
     Dream.get "/static/**"
       (Dream.static "_build/default/app/www/static");
+
+    Dream.get "/documentation/**"
+      (Dream.static "_build/default/documentation/sphinx/public");
   ]

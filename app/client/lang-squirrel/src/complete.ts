@@ -7,7 +7,7 @@ import $ from "jquery";
 
 const cache = new NodeWeakMap<readonly Completion[]>()
 
-const docurl = window.location.origin+"/public/";
+const docurl = window.location.origin+"/documentation/";
 // const docurl = "/public/";
 
 const pagesTypes: {[type:string]: string}  = {}
@@ -15,21 +15,12 @@ pagesTypes["function"] = "proofs.html";
 pagesTypes["property"] = "declarations.html";
 
 function makeDocIfram(completion:Completion): Node {
-  var div = document.createElement("iframe");
-  div.classList.add("iframeSnip")
-  // div.setAttribute("scrolling","no");
-  div.setAttribute("frameborder","0");
-
+  var div = document.createElement('div');
   let page = pagesTypes[completion.type];
   let tactype = "tacn";
   let label = completion.label.replace(' ','-')
 
   console.log("get page :"+docurl+page);
-
-  let test = $('<div>').load(docurl+page+' #squirrel\\:tacn\\.'+label)
-  console.warn(test)
-  console.warn(test[0])
-  console.warn(test.text())
 
   $.get(docurl+page,function(html){
     console.log(html);
@@ -65,9 +56,16 @@ function makeDocIfram(completion:Completion): Node {
         "." +
         label
     );
-    div.src = docurl+page+"#squirrel:"+tactype+"."+label;
-    return div;
-  }).fail(function(){console.warn("No documentation found !")});
+    var iframe = document.createElement("iframe");
+    iframe.classList.add("iframeSnip")
+    // iframe.setAttribute("scrolling","no");
+    iframe.setAttribute("frameborder","0");
+    iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
+    div.append(iframe)
+  }).fail(function(){
+    console.warn("No documentation found !")
+    div.innerHTML = "Couldn't find documentation at "+docurl+page;
+  });
 
   return div;
 }
