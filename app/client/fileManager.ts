@@ -248,9 +248,13 @@ export class FileManager {
   }
 
   openFileDialog(view:EditorView) {
-    var input = myJquery('<input>').attr('type', 'file') as JQuery<HTMLInputElement>;
+    var input = myJquery('<input multiple>').attr('type', 'file').attr('multiple','multiple') as JQuery<HTMLInputElement>;
     input.on('change', () => {
-      if (input[0].files![0]) this.openFile(input[0].files![0],view);
+      var names = [];
+      for (var i = 0; i < input[0].files.length; ++i) {
+        console.log("loading " + input[0].files![i].name);
+        if (input[0].files![i]) this.openFile(input[0].files![i],view);
+      }
     });
     input.trigger('click');
   }
