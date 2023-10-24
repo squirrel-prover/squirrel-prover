@@ -31,7 +31,7 @@ Commands
    Reset the prover state. This command can be undone with :cmd:`undo` since it does not clear
    the prover state history.
 
-.. cmd:: Include @file
+.. cmd:: include @file
 
    Attempt to find file :n:`@file`.sp,
    first in the same directory as the current Squirrel file,
