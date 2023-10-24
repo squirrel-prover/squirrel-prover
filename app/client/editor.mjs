@@ -16,7 +16,8 @@ import { SquirrelWorker } from "./squirrel-worker.ts"
 
 // Load language syntax
 import {
-  Squirrel
+  Squirrel,
+  myAutoCompConfig
 } from "./lang-squirrel/src/index.ts";
 
 let worker = new 
@@ -98,7 +99,8 @@ let myview = new EditorView({
     basicSetup,
     markField,
     filePanelExt(),
-    Squirrel()
+    Squirrel(),
+    myAutoCompConfig
   ],
   parent: input
 })

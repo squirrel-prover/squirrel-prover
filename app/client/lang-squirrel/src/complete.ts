@@ -17,6 +17,7 @@ pagesTypes["class"] = "commands.html";
 
 function makeDocIfram(completion:Completion): Node {
   var div = document.createElement('div');
+  div.classList.add("iframeSnip")
   let page = pagesTypes[completion.type];
   let label = completion.label.replace(' ','-')
 
@@ -24,7 +25,8 @@ function makeDocIfram(completion:Completion): Node {
 
   if(completion.type== "function"){
     let tactype = "tacn";
-    $.get(docurl+page,function(html){
+    $.get({url:docurl+page,cache:true})
+    .then(function(html){
       console.log(html);
       if(html){
         console.warn("try finding "+'#squirrel:tacn.'+label);
@@ -59,8 +61,7 @@ function makeDocIfram(completion:Completion): Node {
           label
       );
       var iframe = document.createElement("iframe");
-      iframe.classList.add("iframeSnip")
-      // iframe.setAttribute("scrolling","no");
+      iframe.classList.add("iframeClass")
       iframe.setAttribute("frameborder","0");
       iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
       div.append(iframe)
@@ -71,8 +72,7 @@ function makeDocIfram(completion:Completion): Node {
   } else if (completion.type== "class") {
     let tactype = "cmd";
     var iframe = document.createElement("iframe");
-    iframe.classList.add("iframeSnip")
-    // iframe.setAttribute("scrolling","no");
+    iframe.classList.add("iframeClass")
     iframe.setAttribute("frameborder","0");
     iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
     div.append(iframe)
@@ -80,8 +80,7 @@ function makeDocIfram(completion:Completion): Node {
   else {
     let tactype = "decl";
     var iframe = document.createElement("iframe");
-    iframe.classList.add("iframeSnip")
-    // iframe.setAttribute("scrolling","no");
+    iframe.classList.add("iframeClass")
     iframe.setAttribute("frameborder","0");
     iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
     div.append(iframe)
@@ -713,3 +712,9 @@ export const snippets: readonly Completion[] = [
 
 /// Autocompletion for built-in Python globals and keywords.
 export const globalCompletion = ifNotIn(dontComplete, completeFromList(globals.concat(snippets)))
+
+const config = {
+  closeOnBlur: false
+}
+
+export const myConfig = autocompletion(config)

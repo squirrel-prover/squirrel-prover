@@ -28,7 +28,19 @@
 .iframeSnip {
   position:relative;
   height: auto;
-  width: auto;
+  width: 100%;
+}
+
+.iframeClass {
+  width: 40em;
+  height: 15em;
+}
+
+.cm-tooltip.cm-completionInfo {
+  position: absolute;
+  padding: 0 !important;
+  width: 100%;
+  max-width: 100%;
 }
 
  /* The Modal (background) */
