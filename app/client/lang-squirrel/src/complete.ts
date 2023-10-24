@@ -7,59 +7,39 @@ import $ from "jquery";
 
 const cache = new NodeWeakMap<readonly Completion[]>()
 
-// This is hard coded ↓ FIXME
+// Ugly ↓ This is hard coded ↓ FIXME
 const docurl = window.location.origin+"/documentation/";
-
 const pagesTypes: {[type:string]: string}  = {}
 pagesTypes["function"] = "proofs.html";
 pagesTypes["property"] = "declarations.html";
 pagesTypes["class"] = "commands.html";
 
+// dynlink info box to documentation TODO optimize me !
 function makeDocIfram(completion:Completion): Node {
   var div = document.createElement('div');
   div.classList.add("iframeSnip")
   let page = pagesTypes[completion.type];
   let label = completion.label.replace(' ','-')
 
-  console.log("get page :"+docurl+page);
-
   if(completion.type== "function"){
     let tactype = "tacn";
     $.get({url:docurl+page,cache:true})
     .then(function(html){
-      console.log(html);
       if(html){
-        console.warn("try finding "+'#squirrel:tacn.'+label);
         let elem = $(html).find('#squirrel\\:tacn\\.'+label);
-        console.warn(elem)
-        console.warn(elem[0])
-        console.warn(elem.text())
         if(!elem[0]) {
           tactype = "tace";
-          console.warn("try finding "+'#squirrel:tace.'+label);
           elem = $(html).find('#squirrel\\:tace\\.'+label);
-          console.warn(elem[0]);
         }
         if(!elem[0]) {
           tactype = "tact";
-          console.warn("try finding "+'#squirrel:tact.'+label);
           elem = $(html).find('#squirrel\\:tact\\.'+label);
-          console.warn(elem[0]);
         }
         if(!elem[0]) {
           tactype = "tacv";
         }
       }
     }).done(()=>{
-      console.log(
-        "iframe from " +
-          docurl +
-          page +
-          "#squirrel:" +
-          tactype +
-          "." +
-          label
-      );
       var iframe = document.createElement("iframe");
       iframe.classList.add("iframeClass")
       iframe.setAttribute("frameborder","0");
@@ -85,12 +65,11 @@ function makeDocIfram(completion:Completion): Node {
     iframe.src = docurl+page+"#squirrel:"+tactype+"."+label;
     div.append(iframe)
   }
-
   return div;
 }
 
+// completions for declarations
 const declaration_completions: readonly Completion[] = [//{↓{
-  
   snip("aenc ${enc},${dec},${pk}", 
   {label:"aenc",detail:"enc,dec,pk",
     info:`declares an IND-CCA2 asymmetric encryption with the equation dec(enc(m,pk(sk)),sk)=m`}),
@@ -158,8 +137,8 @@ const declaration_completions: readonly Completion[] = [//{↓{
       return t});//}↑}
 
 
+// Completion for commands
 const interactive_completions: readonly Completion[] = [//{↓{
-  
   snip("print", {
     label: "print",
     detail: "[system] [symb]",
@@ -197,6 +176,7 @@ const interactive_completions: readonly Completion[] = [//{↓{
       return t});//}↑}
 
 
+// Completion for process TODO make it context aware
 const process_completions: readonly Completion[] = [//{↓{
   snip("if ${Term} then (${Process}) else (${Process})", {
     label: "if",
@@ -249,6 +229,7 @@ const process_completions: readonly Completion[] = [//{↓{
   })
 ]//}↑}
 
+// Completion for tactics
 const tactics_completions: readonly Completion[] = [//{↓{
 
   {label:"use",detail:"H with v1 (, …, vn)? as intro_pat",
@@ -452,7 +433,7 @@ const tactics_completions: readonly Completion[] = [//{↓{
       t.info = makeDocIfram;
       return t});//}↑}
 
-//
+// completion for types FIXME make it more context aware
 const types_completion: readonly Completion[] = [
   "index",
   "message",
@@ -463,10 +444,12 @@ const types_completion: readonly Completion[] = [
   "name_fixed_length"
 ].map(n => ({label: n, type: "type"}))
 
+// Nodes in which we can look for other def to add in completions list
 const ScopeNodes = new Set([
  "Script", "Interactive", "Declaration", "Local_statement", "Global_statement", "Hint"
 ])
 
+// Add definition to completions
 function defID(type: string) {
   return (node: SyntaxNodeRef, def: (node: SyntaxNodeRef, type: string) => void, outer: boolean) => {
     if (outer) return false
@@ -486,9 +469,11 @@ function getLsymb_decl(node: SyntaxNodeRef,def: (node: SyntaxNodeRef, type: stri
       def(child, "variable")
 }
 
+// Gather more completions reading the doc
 const gatherCompletions: {
   [node: string]: (node: SyntaxNodeRef, def: (node: SyntaxNodeRef, type: string) => void, outer: boolean) => void | boolean
 } = {
+  // When seeing this node, add definition as variable
   Simpl_lval: defID("variable"),
   Lval(node, def) {
     for (let child = node.node.firstChild; child; child = child.nextSibling) {
@@ -533,6 +518,7 @@ const gatherCompletions: {
   Bty_info: defID("type")
 }
 
+// Gather variables in doc for completion
 function getScope(doc: Text, node: SyntaxNode) {
   let cached = cache.get(node)
   if (cached) return cached
@@ -542,6 +528,7 @@ function getScope(doc: Text, node: SyntaxNode) {
     let name = doc.sliceString(node.from, node.to)
     completions.push({label: name, type})
   }
+  // This iterates over nodes in scope
   node.cursor(IterMode.IncludeAnonymous).iterate(node => {
     if (node.name) {
       let gather = gatherCompletions[node.name]
@@ -560,9 +547,11 @@ function getScope(doc: Text, node: SyntaxNode) {
 
 // const Identifier = /^[\w\xa1-\uffff][\w\d\xa1-\uffff]*$/
 
+// Don't care of node of type ↓
 const dontComplete = ["BlockComment"]
 
 
+// Return true if given node is in given node type
 function inNodeType(types:Set<string>,node:SyntaxNode | null):boolean {
   do{
     if (types.has(node!.type.name))
@@ -573,6 +562,7 @@ function inNodeType(types:Set<string>,node:SyntaxNode | null):boolean {
   return false
 }
 
+// Return true if given node is in a Bulleted_tactic or tactic
 function inBulletedTac(node:SyntaxNode | null):boolean {
   const set = new Set([
    "Bulleted_tactic", "Tactic"
@@ -580,6 +570,7 @@ function inBulletedTac(node:SyntaxNode | null):boolean {
   return (inNodeType(set,node))
 }
 
+// Return true if given node is in a Process
 function inProcess(node:SyntaxNode | null):boolean {
   const set = new Set([
    "Process"
@@ -587,7 +578,7 @@ function inProcess(node:SyntaxNode | null):boolean {
   return (inNodeType(set,node))
 }
 
-
+// Return true if given node is first word of sentence
 function isFirstWord(node:SyntaxNode): boolean {
   return !node.prevSibling //If there is no prevSibling => it's first node
 }
@@ -596,6 +587,7 @@ function inLsymb(node:SyntaxNode): boolean {
   return inNodeType(new Set(["Lsymb"]),node)
 }
 
+// Return true if given node is in type tag
 function inType(node:SyntaxNode): boolean {
   const typeNames = new Set([
    "Ty", "Ty_tagged", "Colon_ty"
@@ -607,6 +599,7 @@ const typesInteractive = new Set([
    "Declaration", "Infos", "P_include", "Lemma", "Hint"
   ])
 
+// Return first child of given type or null if it does not exists
 function getChildNodeOfTypes(types:Set<string>, node:SyntaxNode): SyntaxNode | null {
   do{
     if (types.has(node.type.name))
@@ -619,6 +612,7 @@ function getChildNodeOfTypes(types:Set<string>, node:SyntaxNode): SyntaxNode | n
   return node
 }
 
+// gather scope in givent context starting by inner node
 function getScopeFrom(context:  CompletionContext, inner:SyntaxNode) : Completion[] {
   // || inner.to - inner.from < 20 && Identifier.test(context.state.sliceDoc(inner.from, inner.to))
   // if (!isWord && !context.explicit) return null
@@ -661,7 +655,6 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
     options = options.concat(process_completions);
   }
   else { // Interactive mode
-    console.log("Interactive mode !")
     let interacNode = getChildNodeOfTypes(typesInteractive,inner);
     if(!interacNode || (interacNode && isFirstWord(interacNode))){
       options = options.concat(declaration_completions);
@@ -674,6 +667,7 @@ export function localCompletionSource(context: CompletionContext): CompletionRes
   }
 }
 
+// Global queywords (TODO dynlink to documentation)
 const globals: readonly Completion[] = [
   "false", "null", "true"
 ].map(n => ({label: n, type: "constant"})).concat([
@@ -690,8 +684,9 @@ const globals: readonly Completion[] = [
   "xor"
 ].map(n => ({label: n, type: "function"})))
 
+// General snippets
 export const snippets: readonly Completion[] = [
-  snip("if ${Term} then (${Term}) else (${Term})", {
+  snip("if ${Term1} then (${Term2}) else (${Term3})", {
     label: "if",
     detail: " ${Term} then (${Term}) else (${Term})",
     info: "Term of form if _ then _ else _",
@@ -713,7 +708,9 @@ export const snippets: readonly Completion[] = [
 /// Autocompletion for built-in Python globals and keywords.
 export const globalCompletion = ifNotIn(dontComplete, completeFromList(globals.concat(snippets)))
 
+// Can customize more autocompletion
 const config = {
+  // Do not close tooltip when loose focus (usefull for debug)
   closeOnBlur: false
 }
 

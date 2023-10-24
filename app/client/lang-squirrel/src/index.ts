@@ -1,4 +1,3 @@
-// import * as autocomplete from "@codemirror/autocomplete"
 import {parser} from "./syntax.grammar"
 import {
   LRLanguage,
@@ -11,7 +10,16 @@ import {
 import {styleTags, tags as t} from "@lezer/highlight"
 import { globalCompletion, localCompletionSource, myConfig } from "./complete";
 
+// import {parseMixed} from "@lezer/common"
+// import {markdownLanguage} from "@codemirror/lang-markdown"
 
+// import {HighlightStyle, syntaxHighlighting} from "@codemirror/language";
+// Test of custom highlight FIXME do not work
+// const markdownHighlightStyles = HighlightStyle.define([
+//   {tag: t.content, color: "#940"}],
+//   {all:'color: #940;', scope:markdownLanguage});
+
+// Define Squirrel Language extension
 export const SquirrelLanguage = LRLanguage.define({
   parser: parser.configure({
     props: [
@@ -74,10 +82,15 @@ export const SquirrelLanguage = LRLanguage.define({
         "include_name!": t.namespace,
       }),
     ],
+    // Can mix with markdown in comment FIXME
+    // wrap: parseMixed(node => {
+    //   return node.type.name == "BlockComment" ? 
+    //     {parser:markdownLanguage.parser} : null;
+    // })
   }),
 });
 
-
+// Add local and global completion to squirrel language extension
 export function Squirrel() {
   return new LanguageSupport(SquirrelLanguage, [
     SquirrelLanguage.data.of({autocomplete: localCompletionSource}),
@@ -86,11 +99,3 @@ export function Squirrel() {
 }
 
 export const myAutoCompConfig = myConfig
-
-// import {defaultHighlightStyle, syntaxHighlighting, HighlightStyle} from "@codemirror/language";
-
-// Test of custom highlight
-// const myHighlightStyle = HighlightStyle.define([
-//   {tag: t.emphasis, color: "#fc6", fontStyle: "italic"}
-// ])
-// let sh = syntaxHighlighting(myHighlightStyle)
