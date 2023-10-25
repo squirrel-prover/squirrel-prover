@@ -18,7 +18,7 @@ pagesTypes["class"] = "commands.html";
 function makeDocIfram(completion:Completion): Node {
   var div = document.createElement('div');
   div.classList.add("iframeSnip")
-  let page = pagesTypes[completion.type];
+  let page = pagesTypes[completion.type!];
   let label = completion.label.replace(' ','-')
 
   if(completion.type== "function"){
