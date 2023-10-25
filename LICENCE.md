@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (C) 2023 CNRS & Inria
+Copyright (C) 2023 CNRS Rennes 1, Inria & ENS Paris-Saclay.
 
 Files: `src/core/puf.ml`, `src/core/puf.mli` 
 License: LGPLv2
