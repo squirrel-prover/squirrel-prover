@@ -5,26 +5,6 @@
  * For details, see http://www.apache.org/licenses/LICENSE-2.0.
  */
 
-/* autocomplete max-width: 700px + info max-width: 300px */
-/* @media screen and (max-width: 1000px) { */
-
-/*   .cm-tooltip.cm-completionInfo { */
-/*     position: absolute; */
-/*     padding: 0px 0px; */
-/*     width: max-content; */
-/*     max-width: 1000px; */
-/*     box-sizing: border-box; */
-/*   } */
-
-/*   .cm-tooltip.cm-tooltip-autocomplete > ul { */
-/*     max-width: 500px !important; */
-/*   } */
-
-/*   .cm-tooltip.cm-tooltip-autocomplete { */
-/*     max-width: 500px !important; */
-/*   } */
-/* } */
-
 .iframeSnip {
   position:relative;
   height: 100%;
