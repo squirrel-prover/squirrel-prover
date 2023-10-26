@@ -373,7 +373,7 @@ start: jsquirrel bundle ## Serve the application with a local HTTP server
 jsquirrel: 
 	rm -f app/www/static/client.bc.js
 	dune build app/www/static/client.bc.js
-	mkdir app/www/static/theories
+	mkdir -p app/www/static/theories
 	cp ./theories/*.sp app/www/static/theories/.
 	cp ./examples/tutorial/*.sp app/www/static/theories/.
 
