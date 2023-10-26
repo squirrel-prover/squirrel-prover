@@ -89,7 +89,7 @@ html_context = {
     'github_user': 'squirrel-prover',
     'github_repo': 'squirrel-prover',
     'github_version': 'master',
-    'conf_py_path': '/documentation/sphinx/'
+    'conf_py_path': '/documentation/sphinx/source'
 }
 
 # -- Options for LaTeX output ---------------------------------------------
