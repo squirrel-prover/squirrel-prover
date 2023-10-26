@@ -1,5 +1,20 @@
 # Squirrel Prover
 
+## Try it
+
+Online version of `Squirrel` is available with a complete tutorial
+[here](https://squirrel-prover.github.io/jsquirrel/?open=0-logic.sp).
+
+You can find more examples in the `examples` directory.
+
+## Reference Manual
+
+The manual is available online
+[here](https://squirrel-prover.github.io/documentation/).
+
+For more information, the presentation site is on
+[github.io](https://squirrel-prover.github.io/).
+
 ## Build
 
 You need OCaml version 4.10 or more (tested up to 4.13.1).
