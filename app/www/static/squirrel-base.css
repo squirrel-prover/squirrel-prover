@@ -27,16 +27,24 @@
 
 .iframeSnip {
   position:relative;
-  height: auto;
+  height: 100%;
   width: 100%;
 }
 
 .iframeClass {
+  -ms-zoom: 0.75;
+  -moz-transform: scale(0.75);
+  -moz-transform-origin: 0 0;
+  -o-transform: scale(0.75);
+  -o-transform-origin: 0 0;
+  -webkit-transform: scale(0.75);
+  -webkit-transform-origin: 0 0;
   width: 40em;
-  height: 15em;
+  height: 25em;
 }
 
 .cm-tooltip.cm-completionInfo {
+  height: 100% !important;
   position: absolute;
   padding: 0 !important;
   width: 100%;
