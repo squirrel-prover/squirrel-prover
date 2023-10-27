@@ -2,6 +2,7 @@ type cmd_error =
   | Unexpected_command
   | AbortIncompleteProof
   | InvalidExtention  of string
+  | FileNotFound      of string
   | StartProofError   of string
   | InvalidTheoryName of string
   | IncludeCycle      of string
@@ -15,6 +16,8 @@ let pp_cmd_error fmt = function
   | Unexpected_command   -> Fmt.pf fmt "Unexpected command."
 
   | StartProofError s    -> Fmt.pf fmt "%s" s
+
+  | FileNotFound s       -> Fmt.pf fmt "File %s.sp not found" s
 
   | AbortIncompleteProof -> Fmt.pf fmt "Trying to abort a completed proof."
 
