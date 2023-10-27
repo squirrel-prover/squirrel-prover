@@ -1241,6 +1241,11 @@ let reduce_proj1 (t : Term.term) : Term.term * bool =
 (*------------------------------------------------------------------*)
 (* let reduction *)
 
+let can_reduce_let (t : Term.term) : bool =
+  match t with
+  | Term.Let _ -> true
+  | _ -> false
+
 let reduce_let1 (t : Term.term) : Term.term * bool =
   match t with
   | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
@@ -1643,55 +1648,51 @@ module T (* : S with type t = Term.term *) = struct
 
 
   and m_reduce_delta1 (st : unif_state) (t : term) : term * bool =
-    reduce_delta1
+    reduce_delta1 ~delta:delta_full
       ~mode:st.expand_context st.table st.system.set st.hyps t 
 
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
-    match t, pat with
-    (* delta-reduction *)
-    | (Macro _ | Fun _ | App (Fun _, _)), 
-      (Macro _ | Fun _ | App (Fun _, _)) ->
-      let t, t_red = m_reduce_delta1 st t in
-
-      if t_red then tunif t pat st 
-      else
-        let pat, pat_red = m_reduce_delta1 st pat in
-        if pat_red then tunif t pat st
-        else no_unif ()
-
-    | (Macro _ | Fun _ | App (Fun _, _)), _  -> 
-      let t, t_red = m_reduce_delta1 st t in
-      if t_red then tunif t pat st
-      else no_unif ()
-
-    | _, (Macro _ | Fun _ | App (Fun _, _)) -> 
-      let pat, pat_red = m_reduce_delta1 st pat in
-      if pat_red then tunif t pat st
-      else no_unif ()
-
-    | _, _ when can_reduce_beta t ->
-      let t, _ = reduce_beta1 t in
+    let t, has_red = m_reduce_delta1 st t in
+    if has_red then 
       tunif t pat st
+    else
+      let pat, has_red = m_reduce_delta1 st pat in
+      if has_red then
+        tunif t pat st
+      else begin
+        match t, pat with
+        | _, _ when can_reduce_beta t ->
+          let t, _ = reduce_beta1 t in
+          tunif t pat st
 
-    | _, _ when can_reduce_beta pat ->
-      let pat, _ = reduce_beta1 pat in
-      tunif t pat st
+        | _, _ when can_reduce_beta pat ->
+          let pat, _ = reduce_beta1 pat in
+          tunif t pat st
 
-    | _, _ when can_reduce_proj t ->
-      let t, _ = reduce_proj1 t in
-      tunif t pat st
+        | _, _ when can_reduce_let t ->
+          let t, _ = reduce_let1 t in
+          tunif t pat st
 
-    | _, _ when can_reduce_proj pat ->
-      let pat, _ = reduce_proj1 pat in
-      tunif t pat st
+        | _, _ when can_reduce_let pat ->
+          let pat, _ = reduce_let1 pat in
+          tunif t pat st
 
-    (* other *)
-    | Var _, _ -> no_unif ()   (* FEATURE *)
-    | _, Var v when not (List.mem_assoc v st.support) -> no_unif () (* FEATURE *)
-    | _ -> no_unif ()
+        | _, _ when can_reduce_proj t ->
+          let t, _ = reduce_proj1 t in
+          tunif t pat st
 
+        | _, _ when can_reduce_proj pat ->
+          let pat, _ = reduce_proj1 pat in
+          tunif t pat st
+
+        (* other *)
+        | Var _, _ -> no_unif ()   (* FEATURE *)
+        | _, Var v when not (List.mem_assoc v st.support) -> no_unif () (* FEATURE *)
+        | _ -> no_unif ()
+      end
+      
   (* Return: left subst, right subst, match state *)
   and unif_bnds
       (vs : Vars.vars) (vs' : Vars.vars) (st : unif_state)
