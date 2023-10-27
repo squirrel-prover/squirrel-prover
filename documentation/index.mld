@@ -2,35 +2,49 @@
 
 This is the documentation for Squirrel's source code.
 
-All modules are grouped in {!module-Squirrellib}: head there for
-an exhaustive list.
+It is composed of 6 modules :
+
+  - {!module-Squirrelcore}: All core modules.
+  - {!module-Squirrelfront}: Frontend composed of
+    {{!module-Squirrelfront.Lexer}Lexer} and {{!module-Squirrelfront.Parser}Parser}.
+  - {!module-Squirreltactics}: Modules corresponding of tactics.
+  - {!module-Squirrelprover}: System and
+    {{!module-Squirrelprover.Prover}Prover} drivers.
+  - {!module-Squirrelhtml}: An extension to visualize Squirrel proofs
+    in html also used in Jsquirrel
+  - {!module-Squirrellib}: The {{!module-Squirrellib}Main} module is
+    used to manage Squirrel as command line with interactive mode.
 
 {1 Core infrastructure}
 
 Our code relies on a general notion of symbol
-(see {{!module-Squirrellib.Symbols}Symbols})
+(see {{!module-Squirrelcore.Symbols}Symbols})
 used for channels, processes, function symbols, etc.
 Symbols are often attached to a location
-(see {{!module-Squirrellib.Location}Location})
+(see {{!module-Squirrelcore.Location}Location})
 for error-reporting.
 
-The {{!module-Squirrellib.Vars}Vars} module is used to handle variables,
+The {{!module-Squirrelcore.Vars}Vars} module is used to handle variables,
 which are organized in environments with functionalities such as fresh
 variable generation.
 
 
 {1 Syntax and semantics}
 
-  - {{!module-Squirrellib.Term}Term}:
+  - {{!module-Squirrelcore.Term}Term}:
     syntax of terms and formulas of the meta-logic
-  - {{!module-Squirrellib.System}System}: systems
-  - {{!module-Squirrellib.Action}Action}: actions
-  - {{!module-Squirrellib.SystemExpr}SystemExpr}: system expressions
+  - {{!module-Squirrelcore.System}System}: systems
+  - {{!module-Squirrelcore.Action}Action}: actions
+  - {{!module-Squirrelcore.SystemExpr}SystemExpr}: system expressions
     are used to refer to one or several systems.
 
-The representation of actions is defined in {!module-Squirrellib.Action}. Maybe
+The representation of actions is defined in {!module-Squirrelcore.Action}. Maybe
 say something about the list of series/parallel choices.
 
 {1 Proof systems}
 
+See the {{!module-Squirrelprover.Prover}Prover} module.
+
 {1 Front-end}
+
+See the {{!module-Squirrelfront}Frontend} lib.

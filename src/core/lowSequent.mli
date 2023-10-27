@@ -9,7 +9,7 @@
   *
   * The signature defined here does not include functionalities
   * relying on the list of the already proved goals, to avoid
-  * any dependency on {!Prover}. Such functionalities will be
+  * any dependency on Prover. Such functionalities will be
   * added in {!Sequent}. *)
 
 module L = Location

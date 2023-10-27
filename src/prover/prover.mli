@@ -1,12 +1,12 @@
 (** {2 Prover state} 
- * is composed by :
- * - goals proofs obligation and lemma remaining to be proved
- * - table of symbols
- * - current_goal if there is one
- * - subgoals associated sequent that has to be proved (i.e. the
- * root of the required proof tree)
- * - bullets (path trough a proof tree under contstruction)
- *
+   is composed by :
+   - goals proofs obligation and lemma remaining to be proved
+   - table of symbols
+   - current_goal if there is one
+   - subgoals associated sequent that has to be proved (i.e. the
+   root of the required proof tree)
+   - bullets (path trough a proof tree under contstruction)
+  
     The term "goal" refers to two things below:
 
     - A toplevel goal declaration (i.e. a lemma)
