@@ -711,7 +711,6 @@ let init : ?withPrelude:bool -> unit -> state =
     | _ -> 
       let state = init' () in
       if withPrelude then begin
-        Printer.pr "With prelude!";
         let inc =
           ProverLib.{ th_name = Name (Location.mk_loc Location._dummy
                           "Prelude");

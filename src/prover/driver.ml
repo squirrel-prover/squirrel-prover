@@ -111,11 +111,7 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
   try
     let path = match dir with
       | LP_none    -> partial_path_ext
-      | LP_dir dir -> 
-        Printer.pr "In dir : %s ?@." dir;
-        let out = Filename.concat dir partial_path_ext in
-        Printer.pr "Concat : %s ?@." out;
-        out
+      | LP_dir dir -> Filename.concat dir partial_path_ext
     in
 
     let chan = Stdlib.open_in path in
