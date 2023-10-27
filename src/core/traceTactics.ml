@@ -18,7 +18,8 @@ module LT = LowTactics
 
 module TS = TraceSequent
 
-module Hyps = TS.LocalHyps
+module TopHyps = Hyps
+(* module Hyps = TS.LocalHyps *)
 
 type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
@@ -123,8 +124,12 @@ let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : sequent list =
     | `Type_based -> false,true
   in
   match Args.convert_as_lsymb args with
-  | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
-    let id, _ = Hyps.by_name str s in
+  | Some str when TS.Hyps.mem_name (L.unloc str) s && structure_based ->
+    let id, f = TS.Hyps.by_name_k str Hyp s in
+
+    (* check that [str] is a local hypothesis *)
+    check_local ~loc:(L.loc str) f;
+    
     List.map
       (fun (TraceLT.CHyp _, ss) -> ss)
       (TraceLT.hypothesis_case ~nb:`Any id s)
@@ -146,38 +151,47 @@ let case_tac ?mode args = wrap_fail (do_case_tac ?mode args)
 
 (*------------------------------------------------------------------*)
 
-let rec simpl_left s =
-  let func _ f = match f with
-    | Fun (fs, _) when fs = Term.f_false || fs = Term.f_and -> true
-    | Term.Quant (Exists, _, _) -> true
-    | _ -> false
+let rec simpl_left (s : TS.t) =
+  let func (id,ldc) =
+    match ldc with
+    | TopHyps.LHyp (Equiv.Local (Fun (fs, _) as t))
+      when fs = Term.f_false || fs = Term.f_and ->
+      Some (id,t)
+    | TopHyps.LHyp (Equiv.Local (Term.Quant (Exists, _, _) as t)) -> Some (id,t)
+    | _ -> None
+    (* legacy behavior: global hypotheses are not modified *)
   in
 
-  match Hyps.find_opt func s with
+  match TS.Hyps.find_map func s with
   | None -> Some s
-  | Some (id,f) ->
-    match f with
-    | tf when tf = Term.mk_false -> None
+  | Some (id, f) ->
+    begin
+      match f with
+      | tf when tf = Term.mk_false -> None
 
-    | Term.Quant (Exists,vs,f) ->
-      let s = Hyps.remove id s in
-      let env = ref @@ TS.vars s in
-      let subst =
-        List.map
-          (fun v ->
-             Term.ESubst (Term.mk_var v,
-                          Term.mk_var (Vars.make_approx_r env v (Vars.Tag.make Vars.Local))))
-          vs
-      in
-      let f = Term.subst subst f in
-      simpl_left (Hyps.add Args.AnyName f (TS.set_vars !env s))
+      | Term.Quant (Exists,vs,f) ->
+        let s = TS.Hyps.remove id s in
+        let env = ref @@ TS.vars s in
+        let subst =
+          List.map
+            (fun v ->
+               Term.ESubst (Term.mk_var v,
+                            Term.mk_var (Vars.make_approx_r env v (Vars.Tag.make Vars.Local))))
+            vs
+        in
+        let f = Term.subst subst f in
+        simpl_left (TS.Hyps.add Args.AnyName (LHyp (Local f)) (TS.set_vars !env s))
 
-    | _ as form ->
-      let f, g = oget (Term.destr_and form) in
-      let s = Hyps.remove id s in
-      simpl_left (Hyps.add_list [(Args.AnyName, f); (Args.AnyName, g)] s)
-
-let simpl_left_tac s = match simpl_left s with
+      | _ as form ->
+        let f, g = oget (Term.destr_and form) in
+        let s = TS.Hyps.remove id s in
+        simpl_left
+          (TS.Hyps.add_list [(Args.AnyName, LHyp (Local f));
+                             (Args.AnyName, LHyp (Local g))] s)
+    end
+    
+let simpl_left_tac s =
+  match simpl_left s with
   | None -> []
   | Some s -> [s]
 
@@ -187,17 +201,17 @@ let simpl_left_tac s = match simpl_left s with
     If [hyp = Some id], only checks for hypothesis [id]. *)
 let assumption ?hyp (s : TS.t) = 
   let goal = TS.goal s in
-  let assumption_entails id f = 
+  let assumption_entails (id, f) = 
     (hyp = None || hyp = Some id) &&
     match f with
-    | Equiv.Global (Equiv.Atom (Reach f))
-    | Equiv.Local f ->
+    | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach f)))
+    | TopHyps.LHyp (Equiv.Local f) ->
       TS.Reduce.conv_term s goal f ||
       List.exists (fun f ->
           TS.Reduce.conv_term s goal f ||
           TS.Reduce.conv_term s f Term.mk_false
         ) (decompose_ands f)
-    | Equiv.Global _ -> false
+    | TopHyps.LHyp (Equiv.Global _) | TopHyps.LDef _ -> false
   in
   if goal = Term.mk_true ||
      TS.Hyps.exists assumption_entails s
@@ -206,10 +220,10 @@ let assumption ?hyp (s : TS.t) =
     []
   end else soft_failure Tactics.NotHypothesis
 
-let do_assumption_tac args s : TS.t list =
+let do_assumption_tac args (s : TS.t) : TS.t list =
   let hyp =
     match Args.convert_as_lsymb args with
-    | Some str -> Some (fst (Hyps.by_name str s))
+    | Some str -> Some (fst (TS.Hyps.by_name_k str Hyp s))
     | None -> None 
   in
   assumption ?hyp s
@@ -223,9 +237,9 @@ let assumption_tac args = wrap_fail (do_assumption_tac args)
     The generated subgoal is identical to [s] but with a new local
     hypothesis [h'] corresponding to that atom. *)
 let localize h h' s =
-  match TS.Hyps.by_name h s with
+  match TS.Hyps.by_name_k h Hyp s with
     | _,Global (Equiv.Atom (Reach f)) ->
-        [TS.Hyps.add h' (Local f) s]
+        [TS.Hyps.add h' (LHyp (Local f)) s]
     | _ ->
         Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
     | exception Not_found ->
@@ -269,7 +283,7 @@ let congruence (s : TS.t) : bool =
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
-        Hyps.add Args.Unnamed f s
+        TS.Hyps.add Args.Unnamed (LHyp (Local f)) s
       ) s term_conclusions
     in
     TS.eq_atoms_valid s
@@ -302,7 +316,11 @@ let constraints (s : TS.t) =
   match simpl_left s with
   | None -> true
   | Some s ->
-    let s = Hyps.add Args.Unnamed (Term.mk_not (TS.goal s)) (TS.set_goal Term.mk_false s) in
+    let s =
+      TS.Hyps.add Args.Unnamed
+        (LHyp (Local (Term.mk_not (TS.goal s))))
+        (TS.set_goal Term.mk_false s)
+    in
     TS.constraints_valid s
 
 (** [constraints s] proves the sequent using its trace formulas. *)
@@ -333,11 +351,12 @@ let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
   if Symbols.TyInfo.is_finite table (Vars.ty v) && 
      Symbols.TyInfo.is_fixed  table (Vars.ty v) then
 
-    (* check that [v] does not appear in any global hypothesis *)
+    (* check that [v] does not appear in any global hypothesis or definitions *)
     TS.Hyps.fold (fun _ hyp b ->
         match hyp with
-        | Equiv.Local _ -> b
-        | Equiv.Global f -> 
+        | LHyp (Equiv.Local _) -> b
+        | LDef (_,t) -> b && not (Sv.mem v (Term.fv t))
+        | LHyp (Equiv.Global f) -> 
           b && not (Sv.mem v (Equiv.fv f))
       ) s true
 
@@ -372,17 +391,26 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
   let to_lower = 
     TS.Hyps.fold (fun id hyp to_lower -> 
         match hyp with
-        | Equiv.Local _ -> to_lower
+        | LHyp (Equiv.Local _) -> to_lower
 
-        | Equiv.(Global (Atom (Reach hyp))) -> 
+        | LHyp (Equiv.(Global (Atom (Reach hyp)))) -> 
           if Sv.mem v (Term.fv hyp) then (id, hyp) :: to_lower else to_lower
 
-        | Equiv.Global hyp -> 
+        | LHyp (Equiv.Global hyp) -> 
           if Sv.mem v (Equiv.fv hyp) then 
             soft_failure ~loc
               (Failure 
                  (Fmt.str "%a appears in non-localizable hypothesis %a \
                            (clear the hypothesis?)"
+                    Vars.pp v Ident.pp id))
+          else to_lower
+
+        | LDef (_,t) -> 
+          if Sv.mem v (Term.fv t) then 
+            soft_failure ~loc
+              (Failure 
+                 (Fmt.str "%a appears in definition %a \
+                           (revert it?)"
                     Vars.pp v Ident.pp id))
           else to_lower
       ) s []
@@ -393,11 +421,11 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
       "@[<hov 2>localize:@ %a@]" 
       (Fmt.list ~sep:Fmt.sp Ident.pp) (List.map fst to_lower);
 
-  let s = TS.Hyps.filter (fun id _ -> not (List.mem_assoc id to_lower)) s in
+  let s = TS.Hyps.filter (fun (id, _) -> not (List.mem_assoc id to_lower)) s in
   let s = 
     let to_lower = 
       List.map
-        (fun (id,hyp) -> (Args.Named (Ident.name id), Equiv.Local hyp) ) 
+        (fun (id,hyp) -> (Args.Named (Ident.name id), TopHyps.LHyp (Equiv.Local hyp)) ) 
         to_lower 
     in
     TS.Hyps.add_list to_lower s
@@ -500,7 +528,7 @@ let eq_names (s : TS.t) =
 
   let add_hyp s c =
     let () = dbg "new equalities (eqnames): %a" Term.pp c in
-    Hyps.add Args.Unnamed c s
+    TS.Hyps.add Args.Unnamed (LHyp (Local c)) s
   in
 
   (* we now collect equalities between timestamp implied by equalities between
@@ -575,7 +603,7 @@ let eq_trace (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new trace equality: %a" Term.pp c in
-        Hyps.add Args.Unnamed c s
+        TS.Hyps.add Args.Unnamed (LHyp (Local c)) s
       ) s facts
   in
   [s]
@@ -794,37 +822,43 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let autosubst s =
+let autosubst (s : TS.t) : TS.t list =
   (* autosubst is only used for timestamp and index variables. *)
   let check_type (x : Vars.var) : bool = 
     Vars.ty x = Type.Timestamp || 
     Vars.ty x = Type.Index
   in
+  (* TODO: let: fix autosubst bug: simplifies a local equality in a global one *)
   let id, l = match
-      Hyps.find_map
-        (fun id f -> 
-           match Term.destr_eq f with
-           | Some (Term.Var x, Term.Var y) when check_type x ->
-             Some (id, [x,y])
+      TS.Hyps.find_map
+        (fun (id,ldc) ->
+           match ldc with
+           | LHyp (Global _) | LDef _ -> None
+           | LHyp (Local f) ->
+             begin
+               match Term.destr_eq f with
+               | Some (Term.Var x, Term.Var y) when check_type x ->
+                 Some (id, [x,y])
 
-           | Some (Term.Tuple l1, Term.Tuple l2) 
-             when List.exists (function Var x -> check_type x | _ -> false) l1 ->
-             let l = List.map2 (fun t1 t2 -> t1,t2) l1 l2 in
-             let l = 
-               List.filter_map (fun (t1,t2) ->
-                   match t1,t2 with
-                   | Var x, Var y -> Some (x,y)
-                   | _            -> None
-                 ) l
-             in
-             Some (id, l)
+               | Some (Term.Tuple l1, Term.Tuple l2) 
+                 when List.exists (function Var x -> check_type x | _ -> false) l1 ->
+                 let l = List.map2 (fun t1 t2 -> t1,t2) l1 l2 in
+                 let l = 
+                   List.filter_map (fun (t1,t2) ->
+                       match t1,t2 with
+                       | Var x, Var y -> Some (x,y)
+                       | _            -> None
+                     ) l
+                 in
+                 Some (id, l)
 
-           | _ -> None)
+               | _ -> None
+             end)
         s
     with | Some (id,f) -> id, f
-         | None -> Tactics.(soft_failure (Failure "no equality found"))
+         | None -> Tactics.soft_failure (Failure "no equality found")
   in
-  let s = Hyps.remove id s in
+  let s = TS.Hyps.remove id s in
 
   let process1 s (x,y : Vars.var * Vars.var) : TS.t =
     let vars = TS.vars s in
@@ -1043,7 +1077,7 @@ let new_simpl ~red_param ~congr ~constr s =
   let goals = Term.decompose_ands (TS.goal s) in
   let s = TS.set_goal Term.mk_false s in
   let goals = List.filter_map (fun goal ->
-      if Hyps.is_hyp goal s || Term.f_triv goal then None
+      if TS.Hyps.is_hyp (Local goal) s || Term.f_triv goal then None
       else match Term.Lit.form_to_xatom goal with
         | None -> Some goal
         | Some at ->
@@ -1068,7 +1102,7 @@ let new_simpl ~red_param ~congr ~constr s =
 (*------------------------------------------------------------------*)
 (** Automated goal simplification *)
 
-let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
+let clear_triv s sk fk = sk [TS.Hyps.clear_triv s] fk
 
 (** Simplify goal. *)
 let _simpl ~red_param ~close ~strong ~auto_intro =
@@ -1277,12 +1311,13 @@ let top_level_hashes s =
     - if [arg = Some h], collision in hypothesis [j]
     - if [arg = None], collects all equalities between hashes that occur at
     toplevel in message hypotheses. *)
-let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
-
-  let hash_eqs = match arg with
+let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) = 
+  let hash_eqs =
+    match arg with
     | None -> top_level_hashes s
-    | Some (String h) ->
-      let _, h = Hyps.by_name h s in
+    | Some (String p_h) ->
+      let _, h = TS.Hyps.by_name_k p_h Hyp s in
+      let h = as_local ~loc:(L.loc p_h) h in
       match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
         let cntxt = TS.mk_trace_cntxt s in
@@ -1403,7 +1438,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
-      | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
+      | _ -> Tactics.soft_failure (Failure "invalid assumption")
     in aux ass
   in
 
@@ -1417,11 +1452,15 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   let s' =
     s |>
     TS.Hyps.filter
-      (fun _ -> function
-         | Local f -> 
+      (fun (_,ldc) ->
+         match ldc with
+         | LDef _ -> true
+         (* definition have their own local context, hence their semantics remain unchanged *)
+           
+         | LHyp (Local f) -> 
            HighTerm.is_constant     (TS.env s) f &&
            HighTerm.is_system_indep (TS.env s) f
-         | Global  _ -> true)
+         | LHyp (Global _) -> true)
   in
   let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in
 

@@ -105,20 +105,14 @@ type term =
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
   | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
-
   | Macro  of msymb * term list * term
-
   | Action of Symbols.action * term list
-
   | Var of Vars.var
-
+  | Let of Vars.var * term * term
   | Tuple of term list
   | Proj of int * term
-
   | Diff of term diff_args
-
   | Find of Vars.var list * term * term * term 
-
   | Quant of quant * Vars.var list * term 
 
 type t = term
@@ -170,6 +164,9 @@ let rec hash : term -> int = function
     let h = hcombine_list hash (Symbols.hash s) is in
     hcombine 11 h
 
+  | Let (x,t1,t2) ->
+    hcombine 11 (hash_l [t1; t2] (Vars.hash x))
+    
 and hash_l (l : term list) (h : int) : int = 
     hcombine_list hash h l
 
@@ -219,14 +216,17 @@ let ty ?ty_env (t : term) : Type.ty =
     | Find (_, _, c, _)    -> ty c
 
     | Quant (q, vs, t) ->
-      match q with
-      | ForAll | Exists -> Type.Boolean
-      | Seq             -> Type.Message
-      | Lambda          -> 
-        let tys = List.map Vars.ty vs in
-        let ty_out = ty t in
-        Type.fun_l tys ty_out
+      begin
+        match q with
+        | ForAll | Exists -> Type.Boolean
+        | Seq             -> Type.Message
+        | Lambda          -> 
+          let tys = List.map Vars.ty vs in
+          let ty_out = ty t in
+          Type.fun_l tys ty_out
+      end
 
+    | Let (_,_,t) -> ty t
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
@@ -600,7 +600,7 @@ let oas_seq2 = omap as_seq2
 (*------------------------------------------------------------------*)
 (** {3 For first-order formulas} *)
 
-(** Smart destrucrots.
+(** Smart destructoers.
     The module is included after its definition. *)
 module SmartDestructors = struct
 
@@ -692,6 +692,11 @@ module SmartDestructors = struct
   let destr_lt  f = oas_seq2 (destr_app ~fs:f_leq f)
 
   (*------------------------------------------------------------------*)
+  let destr_let : term -> (Vars.var * term * term) option = function
+    | Let (v,t1,t2) -> Some (v,t1,t2)
+    | _ -> None
+
+  (*------------------------------------------------------------------*)
   (** for [fs] of arity 2, left associative *)
   let[@warning "-32"] mk_destr_many_left fs =
     let rec destr l f =
@@ -767,9 +772,12 @@ module SmartDestructors = struct
   let is_forall f = destr_forall f <> None
 
   let is_eq  f = destr_eq  f <> None
-  let is_neq f = destr_neq  f <> None
+  let is_neq f = destr_neq f <> None
   let is_leq f = destr_leq f <> None
   let is_lt  f = destr_lt  f <> None
+
+  let is_let t = destr_let t <> None
+
 end
 
 include SmartDestructors
@@ -861,6 +869,8 @@ let rec fv (t : term) : Sv.t =
 
   | Quant (_, a, b) -> Sv.diff (fv b) (Sv.of_list a)
 
+  | Let (v,t1,t2) -> Sv.union (fv t1) (Sv.remove v (fv t2))
+                   
 and fvs (terms : term list) : Sv.t = 
   List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
 
@@ -937,6 +947,8 @@ let tmap (func : term -> term) (t : term) : term =
 
   | Quant (q, vs, b) -> Quant (q, vs, func b)
 
+  | Let (v,t1,t2) -> Let (v, func t1, func t2)
+    
 let tmap_fold (func : 'b -> term -> 'b * term) (b : 'b) (t : term) : 'b * term =
   let bref = ref b in
   let g t =
@@ -999,7 +1011,11 @@ let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t =
     | Quant (_, vs, b) -> 
       let acc = Type.Fv.union acc (Vars.ty_fvs vs) in
       doit acc b
-        
+
+    | Let (v,t1,t2) ->
+      let acc = Type.Fv.union acc (Vars.ty_fv v) in
+      doit_list acc [t1;t2]
+      
   and doit_list acc l = List.fold_left doit acc l in
 
   doit acc t
@@ -1085,9 +1101,17 @@ let rec subst (s : subst) (t : term) : term =
 
         let v, s = subst_binding v s in
         let f = subst s (Find (vs, b, c, dummy)) in
-        match f with
-        | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d)
-        | _ -> assert false
+        begin
+          match f with
+          | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d)
+          | _ -> assert false
+        end
+
+      | Let (v,t1,t2) ->
+        let t1 = subst s t1 in
+        let v, s = subst_binding v s in
+        let t2 = subst s t2 in
+        Let (v,t1,t2)
     in
     assoc s new_term
 
@@ -1164,6 +1188,7 @@ let toplevel_prec = 0
 let quant_fixity = 5  , `Prefix
 
 (* binary *)
+let let_in_fixity      = 5  , `Prefix
 let impl_fixity        = 10 , `Infix `Right
 let iff_fixity         = 12 , `Infix `Right
 let pair_fixity        = 20 , `NoParens
@@ -1283,6 +1308,22 @@ and _pp
           (pp (app_fixity, `Right)) a
     in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+
+  | Let (v,t1,t2) ->
+    let _, v, s = (* rename quantified var. to avoid name clashes *)
+      let fv_ts = Sv.remove v (fvs [t2]) in
+      add_vars_simpl_env (Vars.of_set fv_ts) [v]
+    in
+    let v = as_seq1 v in
+    let t2 = subst s t2 in
+    
+    let pp ppf () =
+      Fmt.pf ppf "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
+        (Vars._pp ~dbg:info.dbg) v
+        (pp (let_in_fixity, `NonAssoc)) t1
+        (pp (let_in_fixity, `NonAssoc)) t2
+    in
+    maybe_paren ~outer ~side ~inner:let_in_fixity pp ppf ()
 
   | Macro (m, l, ts) ->
     let pp ppf () =
@@ -1669,7 +1710,7 @@ let mk_quant ?(simpl=false) q l f =
 
 let mk_seq    ?simpl = mk_quant ?simpl Seq
 let mk_lambda ?simpl = mk_quant ?simpl Lambda
-    
+
 (*------------------------------------------------------------------*)
 module Smart = struct
   include SmartConstructors
@@ -1685,6 +1726,11 @@ module Smart = struct
   let mk_exists_tagged ?simpl vs =
     let vs = List.map (fun (v,t) -> assert (t = Vars.Tag.ltag); v) vs in
     mk_quant ?simpl Exists vs
+
+  let mk_let ?(simpl = false) v t1 t2 =
+    if simpl && not (Sv.mem v (fv t2))
+    then t2
+    else Let (v,t1,t2)
 end
 
 include Smart
@@ -1715,8 +1761,11 @@ let tsubst (ts : Type.tsubst) (t : term) : term =
 
     | Find (vs, a,b,c) ->
       Find (List.map (Vars.tsubst ts) vs, tsubst a, tsubst b, tsubst c)
-        
-    | _ as term -> tmap (fun t -> tsubst t) term
+
+    | Let (v, t1, t2) -> Let (Vars.tsubst ts v, tsubst t1, tsubst t2)
+                           
+    | App (_, _) | Action (_, _)  | Tuple _ | Proj (_, _) | Diff _ as term ->
+      tmap (fun t -> tsubst t) term
   in
 
   tsubst t
@@ -2033,6 +2082,7 @@ type term_head =
   | HDiff
   | HVar
   | HAction
+  | HLet
 
 let pp_term_head fmt = function
   | HApp      -> Fmt.pf fmt "App"
@@ -2049,7 +2099,8 @@ let pp_term_head fmt = function
   | HDiff     -> Fmt.pf fmt "Diff"
   | HVar      -> Fmt.pf fmt "Var"
   | HAction   -> Fmt.pf fmt "Action"
-
+  | HLet      -> Fmt.pf fmt "Let"
+                   
 let get_head : term -> term_head = function
   | App _                -> HApp
   | Quant (Exists, _, _) -> HExists
@@ -2066,6 +2117,7 @@ let get_head : term -> term_head = function
   | Diff _         -> HDiff
   | Var _          -> HVar
   | Action _       -> HAction
+  | Let _          -> HLet
 
 module Hm = Map.Make(struct
     type t = term_head

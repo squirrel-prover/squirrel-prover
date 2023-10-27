@@ -1,4 +1,6 @@
-(** Generic hypotheses, used in all kinds of sequents. *)
+(** Generic proof-context, used in all kinds of sequents.
+    Contains hypotheses and definitions (let binders).
+    Named [Hyps] for legacy reasons. *)
 
 module SE = SystemExpr
 module Args = TacticsArgs
@@ -18,78 +20,114 @@ module type Hyp = sig
   val htrue : t
 end
 
+(** The system expression plays two role, giving:
+    - the multi-term arity of the definition 
+    - the systems used to interpret the macros in the term *)
+type def = SE.t * Term.term
+
+(** Local declaration kind -- general constructor.
+    Type argument ['hyp] will be instanciated by the type of hypotheses *)
+type ('hyp,_) gkind =
+  | Hyp : ('hyp, 'hyp) gkind
+  | Def : ('hyp,  def) gkind
+      
+(** Local declaration content -- general constructor. *)
+type 'a gldecl_cnt = 
+  | LHyp of 'a     (** hypothesis, with its name *)                  
+  | LDef of def    (** a defined variable (e.g. from a let binding *)
+
 (*------------------------------------------------------------------*) 
 module type S1 = sig
   (** Hypothesis *)
   type hyp 
 
-  (** Local declaration *)
-  type ldecl = Ident.t * hyp
+  (** Local declaration kind *)
+  type 'a kind = (hyp,'a) gkind
+
+  (** Local declaration content *)
+  type ldecl_cnt = hyp gldecl_cnt
+
+  (** Local declaration content *)
+  type ldecl = Ident.t * ldecl_cnt
 
   type hyps
 
   (*------------------------------------------------------------------*) 
-  (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
-  val by_id : Ident.t -> hyps -> hyp
+  (** [by_id id s] returns the local declaration named [id] in [s]. *)
+  val by_id   : Ident.t ->            hyps -> ldecl_cnt
+  val by_id_k : Ident.t -> 'a kind -> hyps -> 'a
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
-  val by_name : Theory.lsymb -> hyps -> ldecl
+  val by_name   : Theory.lsymb ->            hyps -> Ident.t * ldecl_cnt
+  val by_name_k : Theory.lsymb -> 'a kind -> hyps -> Ident.t * 'a
 
   (*------------------------------------------------------------------*) 
   val fresh_id  : ?approx:bool -> string      -> hyps -> Ident.t
   val fresh_ids : ?approx:bool -> string list -> hyps -> Ident.t list
 
   (*------------------------------------------------------------------*) 
-  val _add : force:bool -> Ident.t -> hyp -> hyps -> Ident.t * hyps
+  val _add : force:bool -> Ident.t -> ldecl_cnt -> hyps -> Ident.t * hyps
 
-  (** Adds a hypothesis, and name it according to a naming pattern. *)
-  val add : Args.naming_pat -> hyp -> hyps -> hyps
+  (** Adds a local declaration, and name it according to a naming pattern. *)
+  val add : Args.naming_pat -> ldecl_cnt -> hyps -> hyps
   
-  (** Same as [add], but also returns the ident of the added hypothesis. *)
-  val add_i : Args.naming_pat -> hyp -> hyps -> Ident.t * hyps
+  (** Same as [add], but also returns the ident of the new local declaration. *)
+  val add_i : Args.naming_pat -> ldecl_cnt -> hyps -> Ident.t * hyps
   
   val add_i_list :
-    (Args.naming_pat * hyp) list -> hyps -> Ident.t list * hyps
+    (Args.naming_pat * ldecl_cnt) list -> hyps -> Ident.t list * hyps
   
-  val add_list   : (Args.naming_pat * hyp) list -> hyps -> hyps
+  val add_list : (Args.naming_pat * ldecl_cnt) list -> hyps -> hyps
 
   (*------------------------------------------------------------------*)
   (** Find the first local declaration satisfying a predicate. *)
-  val find_opt : (Ident.t -> hyp -> bool) -> hyps -> ldecl option
-  val find_all : (Ident.t -> hyp -> bool) -> hyps -> ldecl list
+  val find_opt : (ldecl -> bool) -> hyps -> ldecl option
+  val find_all : (ldecl -> bool) -> hyps -> ldecl list
 
   (** Exceptionless. *)
-  val find_map : (Ident.t -> hyp -> 'a option) -> hyps -> 'a option
+  val find_map : (ldecl -> 'a option) -> hyps -> 'a option
 
   (** Find if there exists a local declaration satisfying a predicate. *)
-  val exists : (Ident.t -> hyp -> bool) -> hyps -> bool
+  val exists : (ldecl -> bool) -> hyps -> bool
 
   (** Removes a formula. *)
   val remove : Ident.t -> hyps -> hyps
 
-  val filter : (Ident.t -> hyp -> bool) -> hyps -> hyps
+  val filter : (ldecl -> bool) -> hyps -> hyps
 
   val to_list : hyps -> ldecl list
 
   (*------------------------------------------------------------------*)
-  (** [mem_id id s] returns true if there is an hypothesis with id [id] 
+  (** [mem_id id s] returns true if there is a local declaration with id [id] 
       in [s]. *)
   val mem_id : Ident.t -> hyps -> bool
 
   (** Same as [mem_id], but does a look-up by name. *)  
   val mem_name : string  -> hyps -> bool
-
+    
   (*------------------------------------------------------------------*)  
   (** [is_hyp f s] returns true if the formula appears inside the hypotesis
       of the sequent [s].  *)
   val is_hyp : hyp -> hyps -> bool
 
   (*------------------------------------------------------------------*)
-  val map  :  (hyp ->  hyp) -> hyps -> hyps
-  val mapi :  (Ident.t -> hyp ->  hyp) -> hyps -> hyps
+  val map : ?hyp:(hyp -> hyp) -> ?def:(def -> def) -> hyps -> hyps
 
-  val fold : (Ident.t -> hyp -> 'a -> 'a) -> hyps -> 'a -> 'a
+  val mapi :
+    ?hyp:(Ident.t -> hyp -> hyp) ->
+    ?def:(Ident.t -> def -> def) ->
+    hyps -> hyps
+
+  (*------------------------------------------------------------------*)
+  val filter_map :
+    ?hyp:(Ident.t -> hyp -> hyp option) -> 
+    ?def:(Ident.t -> def -> def option) -> 
+    hyps -> hyps
+
+  (*------------------------------------------------------------------*)
+  val fold      : (Ident.t -> ldecl_cnt -> 'a -> 'a) -> hyps -> 'a -> 'a
+  val fold_hyps : (Ident.t -> hyp       -> 'a -> 'a) -> hyps -> 'a -> 'a
 
   (*------------------------------------------------------------------*)
   (** Clear trivial hypotheses *)
@@ -133,7 +171,7 @@ val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals
 val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
 val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
 val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list
-val get_list_of_hyps   : TraceHyps.hyps lazy_t -> Term.term list
+val get_list_of_hyps   : TraceHyps.hyps -> Term.term list
 
 (*------------------------------------------------------------------*)
 (** {2 Changing the context of a set of hypotheses} *)

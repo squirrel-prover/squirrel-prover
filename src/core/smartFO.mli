@@ -29,6 +29,8 @@ module type S = sig
   val mk_forall_tagged : ?simpl:bool -> Vars.tagged_vars -> form -> form
   val mk_exists_tagged : ?simpl:bool -> Vars.tagged_vars -> form -> form
 
+  val mk_let : ?simpl:bool -> Vars.var -> Term.term -> form -> form
+
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
@@ -62,6 +64,9 @@ module type S = sig
   val destr_exists1 : ?env:Env.t -> form -> (Vars.var  * form) option
 
   (*------------------------------------------------------------------*)
+  val destr_let : form -> (Vars.var * Term.term * form) option
+
+  (*------------------------------------------------------------------*)
   val is_false  :               form -> bool
   val is_true   :               form -> bool
   val is_not    :               form -> bool
@@ -71,13 +76,14 @@ module type S = sig
   val is_iff    :               form -> bool
   val is_forall :               form -> bool
   val is_exists : ?env:Env.t -> form -> bool
+  val is_let    :               form -> bool
 
   (*------------------------------------------------------------------*)
   val is_neq : form -> bool
   val is_eq  : form -> bool
   val is_leq : form -> bool
   val is_lt  : form -> bool
-
+   
   (*------------------------------------------------------------------*)
   (** left-associative *)
   val destr_ands  :               int -> form -> form list option

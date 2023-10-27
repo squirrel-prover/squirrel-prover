@@ -10,8 +10,6 @@ module SE = SystemExpr
 
 module TS = TraceSequent
 
-module Hyps = TS.LocalHyps
-
 type sequent = TS.sequent
 
 type lsymb = Theory.lsymb
@@ -299,7 +297,8 @@ let cgdh
     (s : sequent)
   : sequent list
   =
-  let _, hyp = Hyps.by_name m s in
+  let _, hyp = TS.Hyps.by_name_k m Hyp s in
+  let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
   let contx = TS.mk_trace_cntxt s in
   let env = TS.env s in
 

@@ -289,9 +289,13 @@ let rec is_simple (t : Term.term) : bool =
   match t with
   | Var _
   | Fun (_, _)  -> true
+    
   | App (t, l) -> are_simple (t :: l)
+
   | Tuple l                       
-  | Name (_,l) -> are_simple l                      
+  | Name (_,l) -> are_simple l 
+
+  | Let _
   | Macro (_, _, _) 
   | Action (_,_) 
   | Proj (_, _) 
@@ -1292,11 +1296,11 @@ let do_rw_item
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
-    let _, t = TLT.expand_term ~mode:expand_context arg s (Local t) in
+    let _, t = TLT.expand_term ~mode:expand_context arg s (Local t) (TS.system s) in
     Equiv.any_to_reach t, []
   
   | Rw_expandall _ ->
-    let _, t = TLT.expand_term ~mode:expand_context `Any s (Local t) in
+    let _, t = TLT.expand_term ~mode:expand_context `Any s (Local t) (TS.system s) in
     Equiv.any_to_reach t, []    
 
 let do_s_item
@@ -1366,9 +1370,9 @@ let global_rewrite
     let s = TS.init ~env Term.mk_false in
 
     (* hypothesis: the timestamp the macro is at happens *)
-    let hyp_hap = Term.mk_happens ts in
-    (* add hyp_hap as hypothesis, so it's available when do_rewrite tries to rewrite *)
-    let (hyp_hap_id, s_hap) = TS.LocalHyps.add_i AnyName hyp_hap s in 
+    let hyp_hap = Equiv.Local (Term.mk_happens ts) in
+    (* add [hyp_hap] as hypothesis, so it's available when [do_rewrite] tries to rewrite *)
+    let (hyp_hap_id, s_hap) = TS.Hyps.add_i AnyName (LHyp hyp_hap) s in 
 
     (* hypothesis for global macros: ts is one of the shapes where the action is 
        defined *)
@@ -1386,8 +1390,8 @@ let global_rewrite
                ex)
              ac_descrs
          in
-         let hyp_hap2 = Term.mk_ors ~simpl:true lex in
-         let (hyp_hap2_id, s_hap2) = TS.LocalHyps.add_i AnyName hyp_hap2 s_hap in
+         let hyp_hap2 = Equiv.Local (Term.mk_ors ~simpl:true lex) in
+         let (hyp_hap2_id, s_hap2) = TS.Hyps.add_i AnyName (LHyp hyp_hap2) s_hap in
          (Some hyp_hap2_id, s_hap2)
       | _ -> (None, s_hap)
     in

@@ -30,9 +30,14 @@ open Utils
 (** {2 Variables} *)
 
 (** Type of variables of sort ['a]. *)
-type var 
+type var = private { 
+  id : Ident.t;
+  ty : Type.ty;
+}
 
 type vars = var list
+
+val mk : Ident.t -> Type.ty -> var
 
 (*------------------------------------------------------------------*)
 (** {2 Variable scope} *)

@@ -28,7 +28,7 @@
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK
-%token LET IN IF THEN ELSE FIND SUCHTHAT
+%token LLET LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
@@ -54,6 +54,7 @@
 %token SMT
 %token EOF
 
+%nonassoc IN
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW 
@@ -223,6 +224,9 @@ term_i:
 
 | q=quantif vs=ext_bnds_tagged COMMA f=term %prec QUANTIF
                                  { Theory.Quant (q,vs,f)  }
+
+| LET v=lsymb ty=colon_ty? EQ t1=term IN t2=term
+    { Theory.Let (v,t1,ty,t2) }
 
 /* non-ambiguous term */
 %inline else_term:
@@ -680,7 +684,7 @@ single_target:
 
 in_target:
 |                                  { `Goal }
-| IN l=slist1(single_target,COMMA) { `Hyps l }
+| IN l=slist1(single_target,COMMA) { `HypsOrDefs l }
 | IN STAR                          { `All }
 
 (*------------------------------------------------------------------*)
@@ -1105,6 +1109,9 @@ global_formula_i:
 | f1=global_formula GOR f2=global_formula
                                    { Theory.POr (f1, f2) }
 
+| LLET v=lsymb ty=colon_ty? EQ t=term IN f=global_formula
+    { Theory.PLet (v,t,ty,f) }
+  
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
 /* ambiguous global formula, in the sens that it can be confused 

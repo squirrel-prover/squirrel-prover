@@ -741,6 +741,7 @@ let subst_macros_ts table l ts t =
         | _ -> Term.mk_macro is terms ts'
       end
 
+    | Let _
     | Name _ | Action _ | Var _ 
     | App _ | Diff _ | Fun _ | Find _ | Quant _ 
     | Tuple _ | Proj _ -> Term.tmap doit t

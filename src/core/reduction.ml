@@ -11,25 +11,28 @@ let rev_subst subst =
 
 (*------------------------------------------------------------------*)
 type red_param = { 
-  rewrite : bool;   (** user-defined rewriting rules *)
-  delta   : bool;   (** replace defined variables by their body *)
-  beta    : bool;   (** β-reduction *)
-  proj    : bool;   (** reduce projections *)
-  constr  : bool;   (** reduce tautologies over timestamps *)
+  rewrite : bool;         (** user-defined rewriting rules *)
+  delta   : Match.delta;  (** replace defined variables by their body *)
+  beta    : bool;         (** β-reduction *)
+  proj    : bool;         (** reduce projections *)
+  lett    : bool;         (** let reduction *)
+  constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
 let rp_empty = { 
   rewrite = false;
   beta    = false; 
-  delta   = false; 
-  proj    = false; 
+  delta   = Match.delta_empty; 
+  proj    = false;
+  lett    = false;
   constr  = false; 
 }
 
 let rp_default = { 
   rewrite = true;
   beta    = true; 
-  delta   = false; 
+  delta   = Match.delta_default;
+  lett    = true;
   proj    = true; 
   constr  = false; 
 }
@@ -37,7 +40,8 @@ let rp_default = {
 let rp_full = { 
   rewrite = true;
   beta    = true; 
-  delta   = true; 
+  delta   = Match.delta_full;
+  lett    = true;
   proj    = true; 
   constr  = false; 
 }
@@ -49,9 +53,16 @@ let parse_simpl_args
     match tag with
     | L.{ pl_desc = "rw"     } -> { param with rewrite = true; }
     | L.{ pl_desc = "beta"   } -> { param with beta    = true; }
-    | L.{ pl_desc = "delta"  } -> { param with delta   = true; }
+    | L.{ pl_desc = "lett"   } -> { param with lett    = true; }
     | L.{ pl_desc = "proj"   } -> { param with proj    = true; }
     | L.{ pl_desc = "constr" } -> { param with constr  = true; }
+    | L.{ pl_desc = "delta"  } -> { param with delta   = Match.delta_full; }
+    | L.{ pl_desc = "def"    } ->
+      { param with delta   = { param.delta with def = true;} }
+    | L.{ pl_desc = "op"     } ->
+      { param with delta   = { param.delta with op = true;} }
+    | L.{ pl_desc = "macro"  } ->
+      { param with delta   = { param.delta with macro = true;} }
 
     | l -> Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
   in
@@ -206,23 +217,52 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
   | Term.Proj (i1, t1), Term.Proj (i2, t2) ->
     if i1 <> i2 then not_conv ();
     conv st t1 t2
-    
-  | _, _ -> not_conv ()
+
+  | Term.Let (v1,t1,s1), Term.Let (v2,t2,s2) ->
+    let st' = conv_bnd st v1 v2 in
+    conv st  t1 t2;
+    conv st' s1 s2
+
+  (* FEATURE: reduce head when conversion fails *)
+  | Term.Fun    _, _
+  | Term.Name   _, _
+  | Term.Action _, _
+  | Term.Diff   _, _
+  | Term.Macro  _, _
+  | Term.Quant  _, _
+  | Term.Find   _, _
+  | Term.Var    _, _
+  | Term.App    _, _
+  | Term.Tuple  _, _
+  | Term.Proj   _, _
+
+  | _, Term.Fun    _
+  | _, Term.Name   _
+  | _, Term.Action _
+  | _, Term.Diff   _
+  | _, Term.Macro  _
+  | _, Term.Quant  _
+  | _, Term.Find   _
+  | _, Term.Var    _
+  | _, Term.App    _
+  | _, Term.Tuple  _
+  | _, Term.Proj   _ ->
+    not_conv ()
 
 and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
   List.iter2 (conv st) ts1 ts2
 
-let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
+let rec conv_g (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
   match e1, e2 with
   | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
     if List.length vs1 <> List.length vs2 then not_conv ();
     let st = conv_tagged_bnds st vs1 vs2 in
-    conv_e st e1 e2
+    conv_g st e1 e2
 
   | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
   | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
   | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
-    conv_e_l st [el1; er1] [el2; er2]
+    conv_g_l st [el1; er1] [el2; er2]
 
   | Equiv.Atom (Pred p1), Equiv.Atom (Pred p2) when p1.psymb = p2.psymb ->
     conv_tys p1.ty_args p2.ty_args;
@@ -247,12 +287,24 @@ let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
     in
     conv_l { st with system } ts1 ts2
 
-  | _, _ -> not_conv ()
+  | Equiv.Let (v1,t1,f1), Equiv.Let (v2,t2,f2) ->
+    let st' = conv_bnd st v1 v2 in
+    conv   st  t1 t2;
+    conv_g st' f1 f2
 
-and conv_e_l
+  (* FEATURE: reduce head when conversion fails *)
+  | Equiv.Atom (Pred _ | Reach _ | Equiv _), _
+  | Equiv.Quant _, _
+  | Equiv.Impl  _, _
+  | Equiv.Or    _, _
+  | Equiv.And   _, _
+  | Equiv.Let   _, _ ->
+    not_conv ()
+
+and conv_g_l
     (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
   =
-  List.iter2 (conv_e st) es1 es2
+  List.iter2 (conv_g st) es1 es2
 
 
 (*------------------------------------------------------------------*)
@@ -261,8 +313,8 @@ let conv (s : cstate) (t1 : Term.term) (t2 : Term.term) : bool =
   try conv s t1 t2; true with NotConv -> false
 
 (** Exported *)
-let conv_e (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
-  try conv_e s t1 t2; true with NotConv -> false
+let conv_g (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+  try conv_g s t1 t2; true with NotConv -> false
 
 (*------------------------------------------------------------------*)
 module type S = sig
@@ -275,7 +327,7 @@ module type S = sig
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> red_param -> t -> Term.term -> Term.term     
 
-  val reduce_equiv : 
+  val reduce_global : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> red_param -> t -> Equiv.form -> Equiv.form
 
@@ -286,12 +338,12 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
 
-  val expand_head_once_term :
+  val reduce_head1_term :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
     red_param -> t -> Term.term -> Term.term * bool
                                    
-  val expand_head_once :
+  val reduce_head1 :
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
@@ -311,14 +363,14 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 conversion } *)
 
-  val conv_term  :
+  val conv_term :
     ?expand_context:Macros.expand_context -> 
     ?se:SE.t -> 
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool
 
-  val conv_equiv : 
+  val conv_global : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->
@@ -348,7 +400,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (*------------------------------------------------------------------*)
   let add_hyp (f : Term.term) hyps : THyps.hyps =
-    THyps.add TacticsArgs.AnyName (Local f) hyps
+    THyps.add TacticsArgs.AnyName (LHyp (Local f)) hyps
 
   (*------------------------------------------------------------------*)  
   (** Internal *)
@@ -358,7 +410,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
      Return: reduced term, reduction occurred *)
   (* FEATURE: memoisation? *)
   let rec reduce (st : state) (t : Term.term) : Term.term * bool = 
-    let t, has_red = reduce_head_once st t in
+    let t, has_red = reduce_head1 st t in
 
     if has_red then fst (reduce st t), true
     else
@@ -367,7 +419,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       else t, false
 
   (* Reduce once at head position *)
-  and reduce_head_once (st : state) (t : Term.term) : Term.term * bool = 
+  and reduce_head1 (st : state) (t : Term.term) : Term.term * bool = 
     let rec try_red red_funcs =
       match red_funcs with
       | [] -> t, false
@@ -376,22 +428,27 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         if has_red then t, true
         else try_red red_funcs
     in
-    try_red [expand_head_once st;  (* δ *)
-             rewrite_head_once st; (* user rewriting rules *)
-             reduce_beta st;       (* β *)
-             reduce_proj st;       (* proj *)
-             reduce_constr st; ]   (* constr *)
+    try_red [reduce_delta1     st;     (* δ *)
+             rewrite_head_once st;     (* user rewriting rules *)
+             reduce_beta1      st;     (* β *)
+             reduce_proj1      st;     (* proj *)
+             reduce_let1       st;     (* let *)
+             reduce_constr1    st; ]   (* constr *)
 
-  and reduce_beta (st : state) (t : Term.term) : Term.term * bool =
+  and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.param.beta then t, false
-    else Match.reduce_beta t
+    else Match.reduce_beta1 t
 
-  and reduce_proj (st : state) (t : Term.term) : Term.term * bool =
+  and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
+    if not st.param.lett then t, false
+    else Match.reduce_let1 t
+
+  and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.param.proj then t, false
-    else Match.reduce_proj t
+    else Match.reduce_proj1 t
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
-  and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
+  and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.param.constr ||
        Term.ty t <> Type.Boolean ||
        Term.equal t Term.mk_false ||
@@ -408,14 +465,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       with NoExp -> (t,false)
                     
   (* Expand once at head position *)
-  and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    if not st.param.delta then t, false 
-    else 
-      try 
-        Match.expand_head_once 
-          ~mode:st.expand_context ~exn:NoExp
-          st.table st.sexpr (lazy st.hyps) t
-      with NoExp -> t, false
+  and reduce_delta1 (st : state) (t : Term.term) : Term.term * bool = 
+    Match.reduce_delta1
+      ~delta:st.param.delta
+      ~mode:st.expand_context st.table st.sexpr st.hyps t
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
@@ -427,7 +480,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       let rule = List.find_map (fun Hint.{ rule } ->
           match 
             Rewrite.rewrite_head
-              st.table st.env st.expand_context (lazy st.hyps) st.sexpr 
+              st.table st.env st.expand_context st.hyps st.sexpr 
               rule t 
           with
           | None -> None
@@ -542,6 +595,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       in
       Term.mk_diff l, has_red
 
+    | Term.Let    _
     | Term.Proj   _
     | Term.App    _ 
     | Term.Tuple  _
@@ -561,7 +615,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (*------------------------------------------------------------------*)
   (** [se] is the system of the term being reduced. *)
   (* computation must be fast *)
-  let mk_state ~expand_context ~se (env : Vars.env) (param : red_param) (s : S.t) : state = 
+  let mk_state
+      ~expand_context ~se (env : Vars.env) (param : red_param) (s : S.t)
+    : state
+    = 
     { table = S.table s;
       sexpr = se;
       env;
@@ -571,7 +628,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (*------------------------------------------------------------------*)
   (** Exported. *)
-  let expand_head_once_term
+  let reduce_head1_term
       ?(expand_context : Macros.expand_context = InSequent)
       ?(se : SE.arbitrary option)
       (param : red_param) (s : S.t)
@@ -579,12 +636,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     = 
     let se = odflt (S.system s).set se in
     let state = mk_state ~expand_context ~se (S.vars s) param s in
-    expand_head_once state t
+    reduce_head1 state t
 
   (*------------------------------------------------------------------*)
   (** Exported.
       We need type introspection here. *)
-  let expand_head_once (type a) 
+  let reduce_head1 (type a) 
       ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       (param : red_param) (s : S.t)
@@ -592,12 +649,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     =
     let se = omap (fun system -> system.SE.set) system in
     match k with
-    | Local_t  -> expand_head_once_term ~expand_context ?se param s x
+    | Local_t  -> reduce_head1_term ~expand_context ?se param s x
     | Global_t -> x, false
     | Any_t ->
       match x with
       | Local  x -> 
-        let x, has_red = expand_head_once_term ~expand_context ?se param s x in
+        let x, has_red = reduce_head1_term ~expand_context ?se param s x in
         Local x, has_red
 
       | Global _ -> x, false
@@ -616,44 +673,71 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     t
 
   (** Exported. *)
-  let reduce_equiv
+  let reduce_global
       ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
     =
     let system = odflt (S.system s) system in
+    let env = { (S.env s) with system; } in
       
-    let rec reduce_e (env : Vars.env) (e : Equiv.form) : Equiv.form =
+    let rec reduce_g (vars : Vars.env) (e : Equiv.form) : Equiv.form =
       match e with
       | Equiv.Quant (q, vs, e) -> 
         let _, subst = Term.refresh_vars_w_info vs in
         let e = Equiv.subst subst e in
         let red_e =
-          let env = Vars.add_vars vs env in
-          reduce_e env e
+          let vars = Vars.add_vars vs vars in
+          reduce_g vars e
         in
 
         let r_subst = rev_subst subst in
         let red_e = Equiv.subst r_subst red_e in
         Equiv.Quant (q, vs, red_e)
 
+      | Equiv.Let (v,t,f) ->
+        if param.lett then
+          let e, _ = Match.reduce_glet1 e in
+          reduce_g vars e
+        else
+          begin
+            (* reduce [f] *)
+            let vtag = v, HighTerm.tag_of_term env t in
+            let _, subst = Term.refresh_vars_w_info [vtag] in
+            let f = Equiv.subst subst f in
+            let f =
+              let vars = Vars.add_vars [vtag] vars in
+              reduce_g vars f
+            in
+
+            let r_subst = rev_subst subst in
+            let f = Equiv.subst r_subst f in
+
+            (* reduce [t] *)
+            let e_se = (oget system.pair :> SE.t) in (* [t] is w.r.t. [pair] *)
+            let state = mk_state ~expand_context ~se:e_se vars param s in
+            let t = fst (reduce state t) in
+            
+            Equiv.Let (v,t,f)
+          end
+
       | Equiv.And (e1, e2) ->
-        Equiv.And (reduce_e env e1, reduce_e env e2)
+        Equiv.And (reduce_g vars e1, reduce_g vars e2)
 
       | Equiv.Or (e1, e2) ->
-        Equiv.Or (reduce_e env e1, reduce_e env e2)
+        Equiv.Or (reduce_g vars e1, reduce_g vars e2)
 
       | Equiv.Impl (e1, e2) ->
-        Equiv.Impl (reduce_e env e1, reduce_e env e2)
+        Equiv.Impl (reduce_g vars e1, reduce_g vars e2)
 
       | Equiv.Atom (Reach f) ->
-        let state = mk_state ~expand_context ~se:system.set env param s in
+        let state = mk_state ~expand_context ~se:system.set vars param s in
         let f, _ = reduce state f in
         Equiv.Atom (Reach f)
 
       | Equiv.Atom (Equiv e) ->
         let e_se = (oget system.pair :> SE.t) in
-        let state = mk_state ~expand_context ~se:e_se env param s in
+        let state = mk_state ~expand_context ~se:e_se vars param s in
 
         let e = List.map (fst -| reduce state) e in
         Equiv.Atom (Equiv.Equiv e)
@@ -661,18 +745,18 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Equiv.Atom (Pred pa) ->
         let simpl_args =
           let se = (SE.of_list [] :> SE.t) in
-          let state = mk_state ~expand_context ~se env param s in
+          let state = mk_state ~expand_context ~se vars param s in
           List.map (fst -| reduce state) pa.simpl_args
         in
         let multi_args =
           List.map (fun (se,args) ->
-              let state = mk_state ~expand_context ~se env param s in
+              let state = mk_state ~expand_context ~se vars param s in
               ( se, List.map (fst -| reduce state) args )
             ) pa.multi_args
         in
         Equiv.Atom (Equiv.Pred { pa with simpl_args; multi_args; })
     in
-    reduce_e (S.vars s) e
+    reduce_g (S.vars s) e
       
   (** We need type introspection there *)
   let reduce (type a) 
@@ -682,12 +766,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     =
     let se = omap (fun system -> system.SE.set) system in
     match k with
-    | Local_t  -> reduce_term  ~expand_context ?se     param s x
-    | Global_t -> reduce_equiv ~expand_context ?system param s x
+    | Local_t  -> reduce_term   ~expand_context ?se     param s x
+    | Global_t -> reduce_global ~expand_context ?system param s x
     | Any_t ->
       match x with
-      | Local x   -> Local (reduce_term  ~expand_context ?se     param s x)
-      | Global x -> Global (reduce_equiv ~expand_context ?system param s x)
+      | Local  x -> Local  (reduce_term   ~expand_context ?se     param s x)
+      | Global x -> Global (reduce_global ~expand_context ?system param s x)
 
   (*------------------------------------------------------------------*)
   (* Destruct [x] according to an arbitrary destruct function [destr_f], 
@@ -702,7 +786,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match destr_f x with
       | Some _ as res -> res
       | None ->
-        let x, has_red = expand_head_once_term ?se rp_full s x in
+        let x, has_red = reduce_head1_term ?se rp_full s x in
         if not has_red then 
           None                  (* did not reduce, failed *)
         else
@@ -732,7 +816,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match destr_t0 x with
       | Some _ as res -> res
       | None ->
-        let x, has_red = expand_head_once_term ?se rp_full s x in
+        let x, has_red = reduce_head1_term ?se rp_full s x in
         if not has_red then 
           None               (* did not reduce, failed *)
         else
@@ -819,7 +903,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     conv state t1 t2
 
   (** Exported. *)
-  let conv_equiv
+  let conv_global
       ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
@@ -828,7 +912,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     =
     let system = odflt (S.system s) system in
     let state = cstate_of_seq expand_context system param s in
-    conv_e state e1 e2
+    conv_g state e1 e2
 
   (** We need type introspection there *)
   let conv_kind (type a) 
@@ -840,12 +924,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     =
     let se = omap (fun system -> system.SE.set) system in
     match k with
-    | Local_t  -> conv_term  ~expand_context ?se     ~param s x1 x2
-    | Global_t -> conv_equiv ~expand_context ?system ~param s x1 x2
+    | Local_t  -> conv_term   ~expand_context ?se     ~param s x1 x2
+    | Global_t -> conv_global ~expand_context ?system ~param s x1 x2
     | Any_t ->
       match x1, x2 with
-      | Local  x1, Local  x2 -> conv_term  ~expand_context ?se     ~param s x1 x2
-      | Global x1, Global x2 -> conv_equiv ~expand_context ?system ~param s x1 x2
+      | Local  x1, Local  x2 -> conv_term   ~expand_context ?se     ~param s x1 x2
+      | Global x1, Global x2 -> conv_global ~expand_context ?system ~param s x1 x2
       | _, _ -> false
 
 end

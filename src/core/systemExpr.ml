@@ -128,7 +128,7 @@ let is_fset (se : t) : bool =
 let is_any_or_any_comp (se : t) : bool = 
   match se.cnt with
   | Any | Any_compatible_with _ -> true
-  | _ -> false
+  | _ -> false 
 
 (*------------------------------------------------------------------*)
 let pp fmt (se : 'a expr) : unit = 
@@ -444,52 +444,48 @@ let mk_proj_subst
     ~(src: t) ~(dst: t)
   : Term.projs option * (Term.proj * Term.proj) list
   =
-  let psubst : (Term.proj * Term.proj) list option = 
-    if is_any_or_any_comp dst || is_any_or_any_comp src then
-      None
+  match dst.cnt, src.cnt with
+  | (Any | Any_compatible_with _), _
+  | _, (Any | Any_compatible_with _) -> None, []
 
-    else begin
-      let dst = to_list (to_fset dst) in
-      (* [src] may not apply to all systems in [dst] *)
-      let src_systems = to_list (to_fset src) in
+  | Var _, _ | _, Var _ -> assert false (* only concrete systems are supported *)
 
-      if dst = src_systems then None else
-        (* [l] contains tuples [(p,q), single] where:
-           - [p] is a projection of [src] for [single]
-           - [q] is a projection of [dst] for [single] *)
-        let l =
-          List.filter_map (fun (p, single) ->
-              let res =
-                List.find_map (fun (p_src, src_single) -> 
-                    if single = src_single then
-                      Some ((p_src,p), single)
-                    else None
-                  ) src_systems
-              in
-              if strict then assert (res <> None);
-              res
-            ) dst
-        in
+  | List dst, List src ->
+    (* [src] may not apply to all systems in [dst] *)
 
-        (* If two projections of [src] applies to the
-           same element in [dst], there is an ambiguity
-           about which rewriting to apply.
-           In that case, we raise an error. *)
-        if List.exists (fun ((p_src, p), single) ->
-            List.exists (fun ((p_src', p'), single') ->
-                p_src <> p_src' && p = p' && single = single'
-              ) l
-          ) l then
-          Printer.prt `Warning "system projection ambiguity";
+    (* FIXME: if [dst=src], empty substitution is normal, but why [None]? *)
+    if dst = src then None, [] else
+      (* [l] contains tuples [(p,q), single] where:
+         - [p] is a projection of [src] for [single]
+         - [q] is a projection of [dst] for [single] *)
+      let l =
+        List.filter_map (fun (p, single) ->
+            let res =
+              List.find_map (fun (p_src, src_single) -> 
+                  if single = src_single then
+                    Some ((p_src,p), single)
+                  else None
+                ) src
+            in
+            if strict then assert (res <> None);
+            res
+          ) dst
+      in
 
-        Some (List.map Stdlib.fst l)
-    end
-  in
+      (* If two projections of [src] applies to the
+         same element in [dst], there is an ambiguity
+         about which rewriting to apply.
+         In that case, we raise an error. *)
+      if List.exists (fun ((p_src, p), single) ->
+          List.exists (fun ((p_src', p'), single') ->
+              p_src <> p_src' && p = p' && single = single'
+            ) l
+        ) l then
+        Printer.prt `Warning "system projection ambiguity";
 
-  let projs = omap (List.map Stdlib.snd) psubst in
-  let psubst = odflt [] psubst in
-
-  projs, psubst
+      let psubst = List.map Stdlib.fst l in
+      let projs = List.map Stdlib.snd psubst in
+      Some projs, psubst
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)

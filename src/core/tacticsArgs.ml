@@ -9,14 +9,14 @@ type lsymb = Theory.lsymb
 type in_target = [
   | `Goal
   | `All
-  | `Hyps of lsymb list         (* hypotheses, or frame elements *)
+  | `HypsOrDefs of lsymb list         (* hypotheses, definitions, or frame elements *)
 ]
 
 let pp_in_target ppf (in_t : in_target) =
   match in_t with
   | `Goal      -> ()
   | `All -> Fmt.pf ppf " in *"
-  | `Hyps symb ->
+  | `HypsOrDefs symb ->
     Fmt.pf ppf " in %a"
       (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
 
@@ -204,8 +204,9 @@ let pp_intro_pats fmt args =
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
   | `Hyp of Ident.t
+  | `Def of Vars.tagged_var (* Careful, the variable is not added to the env *)
 ]
 
 (*------------------------------------------------------------------*)

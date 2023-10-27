@@ -184,6 +184,7 @@ let pp_quant fmt = function
 
 type form =
   | Quant of quant * Vars.tagged_vars * form
+  | Let   of Vars.var * Term.term * form
   | Atom  of atom
   | Impl  of form * form
   | And   of form * form
@@ -199,6 +200,7 @@ let rec fv = function
   | Or   (f, f0)
   | Impl (f, f0) -> Sv.union (fv f) (fv f0)
   | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list (List.map fst evs))
+  | Let (v,t,f) -> Sv.union (Term.fv t) (Sv.remove v (fv f))
 
 (*------------------------------------------------------------------*)
 (** Free type variables. *)
@@ -209,7 +211,8 @@ let rec ty_fv = function
   | Impl (f, f0) -> Type.Fv.union (ty_fv f) (ty_fv f0)
   | Quant (_, evs, b) -> 
     Type.Fv.diff (ty_fv b) (Vars.ty_fvs (List.map fst evs))
-
+  | Let (v,t,f) -> Type.Fv.union (Vars.ty_fv v) (Type.Fv.union (Term.ty_fv t) (ty_fv f))
+                     
 let ty_fvs l = List.fold_left (fun fv e -> Type.Fv.union fv (ty_fv e)) Type.Fv.empty l
 
 (*------------------------------------------------------------------*)
@@ -242,7 +245,7 @@ let tmap (func : form -> form) (t : form) : form =
 
   let tmap = function
     | Quant (q, vs, b) -> Quant (q, vs, func b)
-
+    | Let (v,t,f) -> Let (v, t, func f)
     | Impl (f1, f2) -> Impl (func f1, func f2)
     | And  (f1, f2) -> And  (func f1, func f2)
     | Or   (f1, f2) -> Or   (func f1, func f2)
@@ -251,6 +254,9 @@ let tmap (func : form -> form) (t : form) : form =
   in
   tmap t
 
+(*------------------------------------------------------------------*)
+(* FIXME: perf *)
+    
 let tmap_fold : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form =
   fun func b t ->
   let bref = ref b in
@@ -288,6 +294,7 @@ let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
 
+(* FIXME: perf *)
 let rec subst s (f : form) =
   if s = [] ||
      (Term.is_var_subst s &&
@@ -303,6 +310,12 @@ let rec subst s (f : form) =
       let f = subst s (Quant (q, evs,b)) in
       mk_quant0_tagged q [v,tag] f
 
+    | Let (v,t,f) ->
+      let t = Term.subst s t in
+      let v, s = Term.subst_binding v s in
+      let f = subst s f in
+      Let (v,t,f)
+      
     | _ -> tmap (subst s) f
 
 (*------------------------------------------------------------------*)
@@ -352,7 +365,10 @@ let tsubst_atom (ts : Type.tsubst) (at : atom) =
 
 let tsubst (ts : Type.tsubst) (t : form) =
   let rec tsubst = function
-    | Quant (q, vs, f) -> Quant (q, List.map (fst_bind (Vars.tsubst ts)) vs, tsubst f)
+    | Quant (q, vs, f) ->
+      Quant (q, List.map (fst_bind (Vars.tsubst ts)) vs, tsubst f)
+    | Let (v, t, f) ->
+      Let (Vars.tsubst ts v, Term.tsubst ts t, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
     | _ as term -> tmap tsubst term
   in
@@ -387,10 +403,11 @@ let se_subst (s : SE.subst) (t : form) =
 (** {2 Pretty printing} *)
 
 let toplevel_prec = 0
-let quant_fixity = 5   , `NonAssoc
-let impl_fixity  = 10  , `Infix `Right
-let or_fixity    = 20  , `Infix `Right
-let and_fixity   = 25  , `Infix `Right
+let quant_fixity  = 5  , `Prefix
+let let_in_fixity = 5  , `Prefix
+let impl_fixity   = 10 , `Infix `Right
+let or_fixity     = 20 , `Infix `Right
+let and_fixity    = 25 , `Infix `Right
 
 (** Internal *)
 let pp ~(dbg:bool) ?context = 
@@ -423,6 +440,22 @@ let pp ~(dbg:bool) ?context =
             (pp (or_fixity, `Right)) f
         in
         maybe_paren ~outer ~side ~inner:or_fixity pp fmt ()
+
+      | Let (v,t,f) ->
+        let _, v, s = (* rename quantified var. to avoid name clashes *)
+          let fv_ts = Sv.remove v (fv f) in
+          Term.add_vars_simpl_env (Vars.of_set fv_ts) [v]
+        in
+        let v = as_seq1 v in
+        let f = subst s f in
+
+        let pp ppf () =
+          Fmt.pf ppf "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
+            (Vars._pp ~dbg) v
+            (Term._pp ~dbg) t
+            (pp (let_in_fixity, `NonAssoc)) f
+        in
+        maybe_paren ~outer ~side ~inner:let_in_fixity pp fmt ()
 
       | Quant (bd, vs0, f) ->
         let _, vs, s = (* rename quantified vars. to avoid name clashes *)
@@ -471,7 +504,7 @@ let rec get_terms = function
   | And  (e1, e2)
   | Or   (e1, e2)
   | Impl (e1, e2) -> get_terms e1 @ get_terms e2
-  | Quant _ -> []
+  | Let _ | Quant _ -> []
 
 (*------------------------------------------------------------------*)
 let rec is_system_context_indep (f : form) : bool =
@@ -557,6 +590,12 @@ module Smart : SmartFO.S with type form = _form = struct
   let mk_gt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_gt  ?simpl f1 f2))
 
   (*------------------------------------------------------------------*)
+  let mk_let ?(simpl = false) v t f =
+    if simpl && not (Sv.mem v (fv f))
+    then f
+    else Let (v,t,f)
+
+  (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
   let destr_quant_tagged ?env q = function
@@ -588,7 +627,7 @@ module Smart : SmartFO.S with type form = _form = struct
 
   let destr_exists ?env f =
     omap (fun (vs, f) -> List.map fst vs, f) (destr_quant_tagged ?env Exists f)
-
+  
   (*------------------------------------------------------------------*)
   let destr_quant1_tagged ?env q = function
     | Quant (q', (v,tag) :: es, f) when q = q' ->
@@ -622,6 +661,11 @@ module Smart : SmartFO.S with type form = _form = struct
       
   let destr_exists1 ?env f =
     omap (fun (vs, f) -> fst vs, f) (destr_quant1_tagged ?env Exists f)
+
+  (*------------------------------------------------------------------*)
+  let destr_let = function
+    | Let (v,t,f) -> Some (v,t,f)
+    | _ -> None
 
   (*------------------------------------------------------------------*)
   let destr_false _f = todo ()
@@ -720,11 +764,12 @@ module Smart : SmartFO.S with type form = _form = struct
   let is_false _f = todo ()
   let is_true  _f = todo ()
   let is_not   _f = false       (* FIXME *)
-  let is_and   f     = destr_and       f <> None
+  let is_and       f = destr_and       f <> None
   let is_or   ?env f = destr_or   ?env f <> None
   let is_impl ?env f = destr_impl ?env f <> None
-  let is_iff   f     = destr_iff       f <> None
-
+  let is_iff       f = destr_iff       f <> None
+  let is_let       f = destr_let       f <> None
+  
   let is_forall      f = destr_forall      f <> None
   let is_exists ?env f = destr_exists ?env f <> None
                   
@@ -757,10 +802,21 @@ module Smart : SmartFO.S with type form = _form = struct
   let decompose_exists f =
     let vs, f = decompose_quant_tagged Exists f in
     List.map fst vs, f
-
+ 
   (*------------------------------------------------------------------*)
-  let decompose_ands _f = todo ()
-  let decompose_ors  _f = todo ()
+  let decompose_ands (f : form) : form list  =
+    let rec doit acc = function
+      | And (f1,f2) -> doit (doit acc f2) f1
+      | _ as f -> f :: acc
+    in
+    doit [] f
+
+  let decompose_ors (f : form) : form list  =
+    let rec doit acc = function
+      | Or (f1,f2) -> doit (doit acc f2) f1
+      | _ as f -> f :: acc
+    in
+    doit [] f
 
   let decompose_impls f =
     let rec decompose f = match destr_impl f with
@@ -812,6 +868,10 @@ let any_to_equiv (f : any_form) : form =
   match f with
   | Global f -> f
   | Local _ -> assert false
+
+let is_local = function
+  | Local  _ -> true
+  | Global _ -> false
 
 (*------------------------------------------------------------------*)
 type local_form = Term.term
@@ -881,10 +941,6 @@ module PreAny = struct
 end
 
 module Babel = struct
-
-  type mapper = {
-    call : 'a. 'a f_kind -> 'a -> 'a
-  }
 
   let convert (type a b) ?loc ~(src:a f_kind) ~(dst:b f_kind) (f : a) : b
     = 
@@ -1042,6 +1098,11 @@ module Any = struct
     let mk_gt  ?simpl f g = Local (Term.Smart.mk_gt  ?simpl f g)
 
     (*------------------------------------------------------------------*)
+    let mk_let ?simpl v t1 = function
+      | Local  t2 -> Local  (Term.Smart.mk_let ?simpl v t1 t2)
+      | Global t2 -> Global (     Smart.mk_let ?simpl v t1 t2)
+
+    (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function
       | Local  f -> Local  (Term.Smart.mk_forall ?simpl vs f)
       | Global f -> Global (     Smart.mk_forall ?simpl vs f)
@@ -1172,6 +1233,10 @@ module Any = struct
       | Local  f -> Term.Smart.is_exists      f
       | Global f ->      Smart.is_exists ?env f
 
+    let is_let = function
+      | Local  f -> Term.Smart.is_let f
+      | Global f ->      Smart.is_let f
+
     let is_eq = function
       | Local  f -> Term.Smart.is_eq f
       | Global f ->      Smart.is_eq f
@@ -1189,6 +1254,12 @@ module Any = struct
       | Global f ->      Smart.is_lt f
 
     (*------------------------------------------------------------------*)
+    let destr_let = function
+      | Local  f ->
+        omap (fun (v,t1,t2) -> v,t1, Local  t2) (Term.Smart.destr_let f)
+      | Global f ->
+        omap (fun (v,t1,t2) -> v,t1, Global t2) (     Smart.destr_let f)
+
     let destr_ands i = function
       | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
