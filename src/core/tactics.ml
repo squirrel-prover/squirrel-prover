@@ -226,7 +226,7 @@ let pp_tac_error_i ppf = function
     Fmt.pf ppf "an hypothesis named %s already exists" s
 
   | HypUnknown s ->
-    Fmt.pf ppf "unknown hypothesis %s" s
+    Fmt.pf ppf "unknown local definition %s" s
 
   | NoCollision ->
     Fmt.pf ppf "no collision found"

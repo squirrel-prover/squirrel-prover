@@ -91,6 +91,7 @@ rule token = parse
 | "then"              { THEN }
 | "else"              { ELSE }
 | "let"               { LET }
+| "Let"               { LLET }
 | "XOR"               { XOR }
 | "by"                { BY }
 | "in"                { IN }

@@ -4,6 +4,7 @@
 
 (defvar squirrel-prog-keywords '(
   "let"
+  "Let"
   "in"
   "out"
   "if"

@@ -75,20 +75,16 @@ type term_i =
   | Tpat  
   | Diff  of term * term
   | Find  of bnds * term * term * term
-
   | Tuple of term list
   | Proj of int L.located * term
-
+  | Let of lsymb * term * p_ty option * term
   | Symb of lsymb 
-
   | App of term * term list
   (** Application of a term to another. 
       [AppTerm (t, [t1 ... tn])] is [t t1 ... tn]. *)
-
   | AppAt of term * term
   (** An application of a symbol to special timestamp arguments.
       [AppAt(t1, t2)] is [t1 \@ t2] *)
-
   | Quant of quant * ext_bnds * term
 
 and term = term_i L.located
@@ -133,7 +129,7 @@ and global_formula_i =
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds_tagged * global_formula
-
+  | PLet    of lsymb * term * p_ty option * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Any term: local or global} *)
@@ -318,15 +314,6 @@ val check_state : Symbols.table -> lsymb -> int -> Type.ty
    corresponding signature. Else, returnes None. *)
 val check_signature :
   Symbols.table -> Symbols.fname -> Symbols.fname -> Symbols.fname option
-
-(*------------------------------------------------------------------*)
-(** {2 Substitutions} *)
-
-val subst : term -> (string * term_i) list -> term
-
-type esubst = ESubst : string * Term.term -> esubst
-
-type subst = esubst list
 
 (*------------------------------------------------------------------*)
 (** {2 Conversions}

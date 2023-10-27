@@ -6,8 +6,6 @@ open Utils
 module TS = TraceSequent
 module ES = EquivSequent
 
-module Hyps = TS.LocalHyps
-
 module MP = Match.Pos
 module Sp = Match.Pos.Sp
 
@@ -138,7 +136,8 @@ let fresh_trace
   =
   let use_path_cond = p_fresh_arg opt_args in
 
-  let _, hyp = Hyps.by_name m s in
+  let _, hyp = TS.Hyps.by_name_k m Hyp s in
+  let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
   try
     let contx = TS.mk_trace_cntxt s in
     let env = TS.env s in

@@ -13,8 +13,6 @@ module O = Occurrences
   
 module TS = TraceSequent
 
-module Hyps = TS.LocalHyps
-
 module Name = O.Name
 
 type sequent = TS.sequent

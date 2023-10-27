@@ -13,6 +13,13 @@ let dbg ?(force=false) s =
   else Printer.prt `Ignore s
 
 (*------------------------------------------------------------------*)
+type delta = { def : bool; macro : bool; op : bool; }
+
+let delta_full    = { def = true ; macro = true ; op = true ; }
+let delta_empty   = { def = false; macro = false; op = false; }
+let delta_default = delta_empty
+  
+(*------------------------------------------------------------------*)
 (** {2 Positions} *)
 
 module Pos = struct
@@ -99,6 +106,17 @@ module Pos = struct
             sel fsel sp ~vars ~conds ~p:(i :: p) t
           ) sp l
 
+      | Term.Let (v,t1,t2) ->
+        let v, subst = Term.refresh_vars [v] in
+        let t1 = Term.subst subst t1 in
+        let t2 = Term.subst subst t2 in
+        let v = as_seq1 v in
+
+        let ceq = Term.mk_eq (Term.mk_var v) t1 in
+
+        let sp = sel fsel sp ~vars ~conds ~p:(0 :: p) t1 in
+        sel fsel sp ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) t2 
+
       | Term.Quant (_, is, t) -> 
         let is, subst = Term.refresh_vars is in
         let t = Term.subst subst t in
@@ -129,18 +147,29 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let select_e (fsel : f_sel) (t : Equiv.form) : Sp.t =
+  let select_g (fsel : f_sel) (t : Equiv.form) : Sp.t =
 
     (* [p] is the current position *)
-    let rec sel_e (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Equiv.form) =  
+    let rec sel_g (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Equiv.form) =  
       match t with
       | Equiv.Quant (_q, is, t0) ->
         let is, subst = Term.refresh_vars_w_info is in
         let t0 = Equiv.subst subst t0 in
         let vars = List.rev_append (List.map fst is) vars in
         (* FEATURE: add tags in Fold.map *)
-        sel_e sp ~vars ~conds ~p:(0 :: p) t0
+        sel_g sp ~vars ~conds ~p:(0 :: p) t0
 
+      | Equiv.Let (v,t,f) ->
+        let v, subst = Term.refresh_vars [v] in
+        let v = as_seq1 v in
+        let f = Equiv.subst subst f in
+        let vars = v :: vars in
+
+        let ceq = Term.mk_eq (Term.mk_var v) t in
+        
+        let sp = sel fsel sp ~vars ~conds ~p:(0 :: p) t in
+        sel_g sp ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) f
+        
       | Equiv.Atom (Reach t) ->
         sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t
 
@@ -163,13 +192,13 @@ module Pos = struct
       | Equiv.Impl (f1, f2)
       | Equiv.And  (f1, f2)
       | Equiv.Or   (f1, f2) -> 
-        sel_e_l sp ~vars ~conds ~p [f1; f2]
+        sel_g_l sp ~vars ~conds ~p [f1; f2]
 
-    and sel_e_l (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
-      List.foldi (fun i sp t -> sel_e sp ~vars ~conds ~p:(i :: p) t) sp l 
+    and sel_g_l (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+      List.foldi (fun i sp t -> sel_g sp ~vars ~conds ~p:(i :: p) t) sp l 
     in 
 
-    sel_e Sp.empty ~vars:[] ~conds:[] ~p:[] t
+    sel_g Sp.empty ~vars:[] ~conds:[] ~p:[] t
 
 
   (*------------------------------------------------------------------*)
@@ -341,6 +370,25 @@ module Pos = struct
         let ti' = Term.mk_proj i t in
         acc, found, if found then ti' else ti
 
+      | Term.Let (v,t1,t2) ->
+        let v, subst = Term.refresh_vars [v] in
+        let t1 = Term.subst subst t1 in
+        let t2 = Term.subst subst t2 in
+        let v = as_seq1 v in
+
+        let ceq = Term.mk_eq (Term.mk_var v) t1 in
+
+        let acc, found1, t1 =
+          map_fold ~se ~vars             ~conds                ~p:(0 :: p) ~acc t1
+        in
+        let acc, found2, t2 =
+          map_fold ~se ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) ~acc t2
+        in
+        let found = found1 || found2 in
+        let ti' = Term.mk_let v t1 t2 in
+        acc, found, if found then ti' else ti
+
+
       | Term.Quant (q, is, t0) -> 
         let is, subst = Term.refresh_vars is in
         let t0 = Term.subst subst t0 in
@@ -462,6 +510,24 @@ module Pos = struct
       let ti' = Equiv.mk_quant_tagged q is t0 in
       acc, found, if found then ti' else ti
 
+    | Equiv.Let (v,t,f) ->
+      let v, subst = Term.refresh_vars [v] in
+      let v = as_seq1 v in
+      let f = Equiv.subst subst f in
+      let ceq = Term.mk_eq (Term.mk_var v) t in
+
+      let acc, found1, t =
+        let se = (oget system.pair :> SE.t) in
+        map_fold func mode ~se ~vars ~conds ~p:(0 :: p) ~acc t
+      in
+      let acc, found2, f =
+        map_fold_e ~system ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) ~acc f
+      in
+      let found = found1 || found2 in
+      let ti' = Equiv.Smart.mk_let v t f in
+      acc, found, if found then ti' else ti
+
+
     | Equiv.Atom (Reach t) -> 
       let se = system.set in
       let acc, found, t =
@@ -471,7 +537,7 @@ module Pos = struct
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
-      let se = (oget system.pair :> SE.arbitrary) in
+      let se = (oget system.pair :> SE.t) in
       let acc, found, l = 
         map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
       in
@@ -561,6 +627,14 @@ module Pos = struct
         let acc, found, t0 = map_fold_g ~vars ~p:(0 :: p) ~acc t0 in
 
         let ti' = Equiv.mk_quant_tagged q is t0 in
+        acc, found, if found then ti' else ti
+
+      | Equiv.Let (v,t,f) ->
+        let v, subst = Term.refresh_vars [v] in
+        let v = as_seq1 v in
+        let f = Equiv.subst subst f in
+        let acc, found, f = map_fold_g ~vars:(v :: vars) ~p:(1 :: p) ~acc f in
+        let ti' = Equiv.Smart.mk_let v t f in
         acc, found, if found then ti' else ti
 
       | Equiv.Atom _ -> acc, false, ti
@@ -1042,49 +1116,108 @@ let no_unif ?infos () = raise (NoMatch infos)
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
-(** Expand once at head position. 
-    Throw [exn] in case of failure. *)
-let expand_head_once
-    ~(exn : exn) 
+(*------------------------------------------------------------------*)
+(** {3 Term reduction utilities} *)
+
+(**  Perform δ-reduction once for macro at head position. *)
+let reduce_delta_macro1
     ~(mode : Macros.expand_context)
-    (table : Symbols.table) (sexpr : SE.t) 
-    (hyps : Hyps.TraceHyps.hyps Lazy.t)
+    (table : Symbols.table) (sexpr : SE.t)
+    (hyps : Hyps.TraceHyps.hyps)
+    (t : Term.term)
+  : Term.term * bool
+  =
+  let exception Failed in
+  try
+    match t with
+    | Term.Macro (ms, l, ts) ->
+      let models =
+        let lits = Hyps.TraceHyps.fold (fun _ f acc ->
+            match f with
+            | LHyp (Local f)
+            | LHyp (Global Equiv.(Atom (Reach f))) -> f :: acc
+            | LHyp (Global _) -> acc
+            | LDef _ -> acc       (* FEATURE: translate definition *)
+          ) hyps []
+        in
+        Constr.models_conjunct (TConfig.solver_timeout table) ~exn:Failed lits
+      in
+      let cntxt () =
+        let se = try SE.to_fset sexpr with SE.Error _ -> raise Failed in
+        Constr.{
+          table; system = se;
+          models = Some models; }
+      in
+      if Constr.query ~precise:true models [`Pos, Happens ts] then
+        match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts with
+        | `Def mdef -> mdef, true
+        | _ -> t, false
+      else t, false
+
+    | _ -> t, false
+  with Failed -> t, false
+
+
+(** Perform δ-reduction once at head position
+    (definition unrolling). *)
+let reduce_delta_def1
+    (table : Symbols.table) (se : SE.t) 
+    (hyps : Hyps.TraceHyps.hyps)
+    (t : Term.term) 
+  : Term.term * bool 
+  =
+  match t with
+  | Var v ->
+    let t' =
+      Hyps.TraceHyps.find_map (function
+          | v', LDef (se',t') ->
+            if Ident.equal v' v.id &&
+               SE.subset_modulo table se se'
+            then
+              let projs, subst = SE.mk_proj_subst ~strict:false ~src:se' ~dst:se in
+              let t' = Term.subst_projs subst t' in
+              let t' = omap_dflt t' (fun projs -> Term.project projs t') projs in
+              Some t'
+            else None
+          | _, LHyp _ -> None
+        ) hyps
+    in
+    begin
+      match t' with
+      | Some t' -> t', true
+      | None    -> t , false
+    end
+
+  | _ -> t, false
+
+(** Perform δ-reduction once at head position
+    (macro, operator and definition unrolling). *)
+let reduce_delta1
+    ?(delta = delta_full)
+    ~(mode : Macros.expand_context)
+    (table : Symbols.table) (se : SE.t) 
+    (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * bool 
   = 
-  let models = (* evaluates the models only if needed *)
-    lazy (
-      let lits = Hyps.TraceHyps.fold (fun _ f acc ->
-          match f with
-          | Local f
-          | Global Equiv.(Atom (Reach f)) -> f :: acc
-          | Global _ -> acc
-        ) (Lazy.force hyps) [] 
-      in
-      Constr.models_conjunct (TConfig.solver_timeout table) ~exn lits)
-  in 
-  let cntxt () = 
-    let se = try SE.to_fset sexpr with SE.Error _ -> raise exn in
-    Constr.{ 
-      table; system = se; 
-      models = Some (Lazy.force models);
-    } in
   match t with
-  | Term.Macro (ms, l, ts) ->
+  (* macro *)
+  | Macro _ when delta.macro ->
+    reduce_delta_macro1 ~mode table se hyps t
 
-    if Constr.query ~precise:true (Lazy.force models) [`Pos, Happens ts] then
-      match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts with
-      | `Def mdef -> mdef, true
-      | _ -> raise exn 
-    else raise exn 
+  (* definition *)
+  | Var   _ when delta.def ->
+    reduce_delta_def1 table se hyps t
 
+  (* operator *)
   | Fun (fs, { ty_args })
-  | App (Fun (fs, { ty_args }), _) when Operator.is_operator table fs -> 
+  | App (Fun (fs, { ty_args }), _)
+    when delta.op && Operator.is_operator table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
-    let t = Operator.unfold table sexpr fs ty_args args in
+    let t = Operator.unfold table se fs ty_args args in
     t, true
-
-  | _ -> raise exn
+    
+  | _ -> t, false
 
 (*------------------------------------------------------------------*)
 (* projection reduction *)
@@ -1094,7 +1227,7 @@ let can_reduce_proj (t : Term.term) : bool =
   | Term.Proj (_, Term.Tuple _) -> true
   | _ -> false
 
-let reduce_proj (t : Term.term) : Term.term * bool =
+let reduce_proj1 (t : Term.term) : Term.term * bool =
   match t with
   | Term.Proj (i, t) ->
     begin
@@ -1106,6 +1239,14 @@ let reduce_proj (t : Term.term) : Term.term * bool =
   | _ -> t, false
 
 (*------------------------------------------------------------------*)
+(* let reduction *)
+
+let reduce_let1 (t : Term.term) : Term.term * bool =
+  match t with
+  | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
+  | _ -> t, false
+
+(*------------------------------------------------------------------*)
 (* β-reduction *)
 
 let can_reduce_beta (t : Term.term) : bool =
@@ -1113,7 +1254,7 @@ let can_reduce_beta (t : Term.term) : bool =
   | Term.App (Quant (Lambda, _ :: _, _), _ :: _) -> true
   | _ -> false
 
-let reduce_beta (t : Term.term) : Term.term * bool =
+let reduce_beta1 (t : Term.term) : Term.term * bool =
   match t with
   | Term.App (t, arg :: args) -> 
     begin
@@ -1128,6 +1269,17 @@ let reduce_beta (t : Term.term) : Term.term * bool =
     end 
 
   | _ -> t, false
+
+(*------------------------------------------------------------------*)
+(** {3 Global formulas reduction utilities} *)
+
+(*------------------------------------------------------------------*)
+(* let reduction *)
+
+let reduce_glet1 (f : Equiv.form) : Equiv.form * bool =
+  match f with
+  | Equiv.Let (v,t0,f) -> Equiv.subst [Term.ESubst (Term.mk_var v, t0)] f, true
+  | _ -> f, false
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
@@ -1152,7 +1304,7 @@ type unif_state = {
   table   : Symbols.table;
   system  : SE.context; (** system context applying at the current position *)
 
-  hyps : Hyps.TraceHyps.hyps Lazy.t;
+  hyps : Hyps.TraceHyps.hyps;
 
   use_fadup     : bool;
   allow_capture : bool;
@@ -1168,8 +1320,7 @@ let st_change_context (st : unif_state) (new_context : SE.context) : unif_state 
       ~table:st.table
       hyps
   in
-  let hyps = Lazy.map change_hyps st.hyps in
-  { st with system = new_context; hyps; }
+  { st with system = new_context; hyps = change_hyps st.hyps; }
 
 (*------------------------------------------------------------------*)
 let env_of_unif_state (st : unif_state) : Env.t =
@@ -1217,7 +1368,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?env:Vars.env ->
     ?ty_env:Type.Infer.env ->
-    ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
+    ?hyps:Hyps.TraceHyps.hyps ->
     ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context ->
@@ -1250,7 +1401,7 @@ let unif_gen (type a)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
     ?(ty_env : Type.Infer.env option)
-    ?(hyps   : Hyps.TraceHyps.hyps Lazy.t = lazy (Hyps.TraceHyps.empty))
+    ?(hyps   : Hyps.TraceHyps.hyps = Hyps.TraceHyps.empty)
     ?(expand_context : Macros.expand_context = InSequent)
     (table   : Symbols.table)
     (system  : SE.context)
@@ -1491,10 +1642,9 @@ module T (* : S with type t = Term.term *) = struct
       | _ -> try_reduce_head1 t (Term.mk_app f' l') st
 
 
-  and m_expand_head_once (st : unif_state) (t : term) : term * bool =
-    expand_head_once
-      ~mode:st.expand_context ~exn:(NoMatch None) 
-      st.table st.system.set st.hyps t 
+  and m_reduce_delta1 (st : unif_state) (t : term) : term * bool =
+    reduce_delta1
+      ~mode:st.expand_context st.table st.system.set st.hyps t 
 
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
@@ -1503,38 +1653,38 @@ module T (* : S with type t = Term.term *) = struct
     (* delta-reduction *)
     | (Macro _ | Fun _ | App (Fun _, _)), 
       (Macro _ | Fun _ | App (Fun _, _)) ->
-      let t, t_red = m_expand_head_once st t in
+      let t, t_red = m_reduce_delta1 st t in
 
       if t_red then tunif t pat st 
       else
-        let pat, pat_red = m_expand_head_once st pat in
+        let pat, pat_red = m_reduce_delta1 st pat in
         if pat_red then tunif t pat st
         else no_unif ()
 
     | (Macro _ | Fun _ | App (Fun _, _)), _  -> 
-      let t, t_red = m_expand_head_once st t in
+      let t, t_red = m_reduce_delta1 st t in
       if t_red then tunif t pat st
       else no_unif ()
 
     | _, (Macro _ | Fun _ | App (Fun _, _)) -> 
-      let pat, pat_red = m_expand_head_once st pat in
+      let pat, pat_red = m_reduce_delta1 st pat in
       if pat_red then tunif t pat st
       else no_unif ()
 
     | _, _ when can_reduce_beta t ->
-      let t, _ = reduce_beta t in
+      let t, _ = reduce_beta1 t in
       tunif t pat st
 
     | _, _ when can_reduce_beta pat ->
-      let pat, _ = reduce_beta pat in
+      let pat, _ = reduce_beta1 pat in
       tunif t pat st
 
     | _, _ when can_reduce_proj t ->
-      let t, _ = reduce_proj t in
+      let t, _ = reduce_proj1 t in
       tunif t pat st
 
     | _, _ when can_reduce_proj pat ->
-      let pat, _ = reduce_proj pat in
+      let pat, _ = reduce_proj1 pat in
       tunif t pat st
 
     (* other *)
@@ -2761,9 +2911,8 @@ module E = struct
     (* adding [cterm.cond] as hypohtesis before matching *)
     let st =
       let hyps =
-        Lazy.map
-          (TraceHyps.add TacticsArgs.AnyName (Equiv.Local cterm.cond))
-          st.hyps
+        TraceHyps.add
+          TacticsArgs.AnyName (LHyp (Equiv.Local cterm.cond)) st.hyps
       in
       { st with hyps }
     in

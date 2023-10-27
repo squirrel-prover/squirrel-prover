@@ -2,14 +2,15 @@ module SE = SystemExpr
 module Args = TacticsArgs
 
 module THyps = Hyps.TraceHyps
-  
+
 (*------------------------------------------------------------------*)
 type red_param = { 
-  rewrite : bool;   (** user-defined rewriting rules *)
-  delta   : bool;   (** replace defined variables by their body *)
-  beta    : bool;   (** β-reduction *)
-  proj    : bool;   (** reduce projections *)
-  constr  : bool;   (** reduce tautologies over timestamps *)
+  rewrite : bool;         (** user-defined rewriting rules *)
+  delta   : Match.delta;  (** replace defined variables by their body *)
+  beta    : bool;         (** β-reduction *)
+  proj    : bool;         (** reduce projections *)
+  lett    : bool;         (** let reduction *)
+  constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
 val rp_default : red_param
@@ -33,7 +34,7 @@ val mk_cstate :
 
 (** Conversion functions using a [cstate] *)
 val conv   : cstate -> Term.term  -> Term.term  -> bool 
-val conv_e : cstate -> Equiv.form -> Equiv.form -> bool 
+val conv_g : cstate -> Equiv.form -> Equiv.form -> bool 
 
 (*------------------------------------------------------------------*)
 module type S = sig
@@ -47,7 +48,7 @@ module type S = sig
     ?se:SE.t -> 
     red_param -> t -> Term.term -> Term.term     
 
-  val reduce_equiv : 
+  val reduce_global : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> Equiv.form -> Equiv.form
@@ -60,12 +61,12 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
     
-  val expand_head_once_term :
+  val reduce_head1_term :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
     red_param -> t -> Term.term -> Term.term * bool
                                    
-  val expand_head_once :
+  val reduce_head1 :
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
@@ -92,7 +93,7 @@ module type S = sig
     t ->
     Term.term -> Term.term -> bool
 
-  val conv_equiv : 
+  val conv_global : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->

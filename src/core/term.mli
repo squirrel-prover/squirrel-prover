@@ -94,21 +94,15 @@ type term = private
   | Fun    of Symbols.fname * applied_ftype
   (** An applied function type, instantiating type variable when [f] 
       is polymorphique. *)
-
   | Name   of nsymb * term list             (** [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
-
   | Action of Symbols.action * term list
-
   | Var of Vars.var
-
+  | Let of Vars.var * term * term
   | Tuple of term list
   | Proj of int * term
-
   | Diff of term diff_args
-
   | Find of Vars.var list * term * term * term 
-
   | Quant of quant * Vars.var list * term 
              
 type t = term
@@ -347,6 +341,8 @@ module Smart : sig
   val mk_forall : ?simpl:bool -> Vars.vars -> term -> term
   val mk_exists : ?simpl:bool -> Vars.vars -> term -> term
 
+  val mk_let : ?simpl:bool -> Vars.var -> term -> term -> term
+
   (** Local terms do not take tags.
       By convention, we require that the tag [Vars.Tag.ltag] is 
       used for local terms. *)
@@ -385,6 +381,9 @@ module Smart : sig
   val destr_exists1 : term -> (Vars.var  * term) option
 
   (*------------------------------------------------------------------*)
+  val destr_let : term -> (Vars.var * term * term) option 
+
+  (*------------------------------------------------------------------*)
   val is_false  : term -> bool
   val is_true   : term -> bool
   val is_not    : term -> bool
@@ -395,6 +394,7 @@ module Smart : sig
   val is_pair   : term -> bool
   val is_forall : term -> bool
   val is_exists : term -> bool
+  val is_let    : term -> bool
 
   (*------------------------------------------------------------------*)
   val is_neq : term -> bool
@@ -449,7 +449,7 @@ val mk_diff  : (proj * term) list -> term
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
 val mk_quant : ?simpl:bool -> quant -> Vars.vars -> term -> term
-  
+ 
 val mk_iff : ?simpl:bool -> term -> term -> term
   
 (*------------------------------------------------------------------*)
@@ -620,6 +620,7 @@ type term_head =
   | HDiff
   | HVar
   | HAction
+  | HLet
 
 val pp_term_head : Format.formatter -> term_head -> unit
 

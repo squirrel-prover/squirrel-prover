@@ -9,8 +9,7 @@ type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** Tactic target. *)
-type in_target = [`Goal | `All | `Hyps of lsymb list]
-
+type in_target = [`Goal | `All | `HypsOrDefs of lsymb list]
 
 (*------------------------------------------------------------------*)
 (** {2 Tactics named arguments} *)
@@ -124,8 +123,9 @@ val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
   | `Hyp of Ident.t
+  | `Def of Vars.tagged_var (* Careful, the variable is not added to the env *)
 ]
 
 (*------------------------------------------------------------------*)

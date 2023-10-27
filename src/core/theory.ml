@@ -74,15 +74,12 @@ type term_i =
   | Tpat
   | Diff of term * term (* TODO generalize *)
   | Find of bnds * term * term * term
-
   | Tuple of term list
   | Proj of int L.located * term
-
+  | Let of lsymb * term * p_ty option * term
   | Symb of lsymb
-
   | App of term * term list
   | AppAt of term * term
-
   | Quant of quant * ext_bnds * term
 
 and term = term_i L.located
@@ -286,6 +283,12 @@ let rec pp_term_i ppf t = match t with
   | Proj (i,t) ->
     Fmt.pf ppf "proj %d (%a)" (L.unloc i) pp_term t
 
+  | Let (v,t1,_,t2) ->
+    Fmt.pf ppf "@[<hov 0>%a %s =@;<1 2>@[%a@]@ in@ %a@]"
+      (Printer.kws `TermQuantif) "let"
+      (L.unloc v)
+      pp_term t1 pp_term t2
+
   | AppAt (t1, t2) ->
     Fmt.pf ppf "%a@@%a"
       pp_term t1 pp_term t2
@@ -346,7 +349,8 @@ and global_formula_i =
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds_tagged * global_formula
-
+  | PLet    of lsymb * term * p_ty option * global_formula
+           
 (*------------------------------------------------------------------*)
 (** {2 Any term: local or global} *)
 
@@ -634,35 +638,6 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
         let loc = if in_proc then L._dummy else L.loc s in
         conv_err loc (UndefInSystem (L.unloc s, env.system.set))
     end
-
-(*------------------------------------------------------------------*)
-(** {2 Substitution} *)
-
-type esubst = ESubst : string * Term.term -> esubst
-
-type subst = esubst list
-
-(** Apply a partial substitution to a term.
-  * This is meant for formulas and local terms in processes,
-  * and does not support optional timestamps.
-  * TODO substitution does not avoid capture. *)
-let subst t (s : (string * term_i) list) =
-  let rec aux_i = function
-    (* Variable *)
-    | Symb x as t -> List.assoc_dflt t (L.unloc x) s 
-
-    | Tpat            -> Tpat
-    | App (t1, l)     -> App (aux t1, List.map aux l)
-    | AppAt (t,ts)    -> AppAt (aux t, aux ts)
-    | Tuple l         -> Tuple (List.map aux l)
-    | Proj (i,t)      -> Proj (i, aux t)
-    | Quant (q, vs,f) -> Quant (q, vs, aux f)
-    | Diff (l,r)      -> Diff (aux l, aux r)
-    | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
-
-  and aux t = L.mk_loc (L.loc t) (aux_i (L.unloc t))
-
-  in aux t
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion contexts and states} *)
@@ -1165,6 +1140,19 @@ and convert0
     in
     t_proj
 
+  | Let (v,t1,pty,t2) ->
+    let pty =                   (* [pty] default to `_` if not provided *)
+      let loc = omap_dflt (L.loc v) L.loc pty in
+      L.mk_loc loc (omap_dflt P_ty_pat L.unloc pty)
+    in
+    let env, v =
+      convert_bnds ~ty_env:state.ty_env ~mode:NoTags state.env [v,pty]
+    in
+    let v = as_seq1 v in
+    let t1 = conv (Vars.ty v) t1 in
+    let t2 = conv ~env ty t2 in
+    Term.mk_let v t1 t2
+      
   | Diff (l,r) ->
     (* FIXME: projections should not be hard-coded to be [left, right] *)
     check_system_projs loc state [Term.left_proj; Term.right_proj];
@@ -1703,7 +1691,8 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
 
   | PQuant (q, bnds, e) ->
     let env, evs =
-      convert_bnds_tagged ~ty_env:st.ty_env ~mode:(DefaultTag Vars.Tag.gtag) st.env bnds 
+      convert_bnds_tagged
+        ~ty_env:st.ty_env ~mode:(DefaultTag Vars.Tag.gtag) st.env bnds
     in
     let st = { st with env } in
     let e = convert_g st e in
@@ -1712,6 +1701,20 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
       | PExists -> Equiv.Exists
     in
     Equiv.mk_quant_tagged q evs e
+
+  | PLet (v,t,pty,f) ->
+    let pty =                   (* [pty] default to `_` if not provided *)
+      let loc = omap_dflt (L.loc v) L.loc pty in
+      L.mk_loc loc (omap_dflt P_ty_pat L.unloc pty)
+    in
+    let env, v =
+      convert_bnds
+        ~ty_env:st.ty_env ~mode:(DefaultTag Vars.Tag.gtag) st.env [v,pty]
+    in
+    let v = as_seq1 v in
+    let t = convert st t (Vars.ty v) in
+    let f = convert_g { st with env } f in
+    Equiv.Smart.mk_let v t f
 
 (*------------------------------------------------------------------*)
 (** {2 Exported conversion and type-checking functions} *)

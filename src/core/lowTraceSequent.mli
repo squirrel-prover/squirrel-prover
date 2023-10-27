@@ -4,10 +4,10 @@
 
 type trace_sequent
 
-(** Wrapper for manipulating local hypotheses only. *)
-module LocalHyps : Hyps.S1
-  with type hyp = Equiv.local_form
-   and type hyps := trace_sequent
+(* (\** Wrapper for manipulating local hypotheses only. *\) *)
+(* module LocalHyps : Hyps.S1 *)
+(*   with type hyp = Equiv.local_form *)
+(*    and type hyps := trace_sequent *)
 
 (*------------------------------------------------------------------*)  
 include LowSequent.S
@@ -24,15 +24,15 @@ val init : ?no_sanity_check:bool -> env:Env.t -> Term.term -> sequent
 val sanity_check : trace_sequent -> unit
 
 (** Project diff-operators occurring in a sequent;
-  * only makes sense when a sequent for a bi-system has just
-  * been narrowed to a projected system. *)
+    only makes sense when a sequent for a bi-system has just
+    been narrowed to a projected system. *)
 val pi : Term.proj -> sequent -> sequent
  
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning}
-  *
-  * All these functions only consider local formula hypotheses.
-  * It could make sense to extend some of them in the future. *)
+
+    All these functions only consider local formula hypotheses.
+    It could make sense to extend some of them in the future. *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
     equalities between messages. It can be used to check if an equality is
