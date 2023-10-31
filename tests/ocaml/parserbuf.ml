@@ -11,7 +11,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 
 let parse_theory_test ?(test=false) filename =
   let chan = Stdlib.open_in filename in
-  let lexbuf = Lexing.from_channel chan in
+  let lexbuf = Sedlexing.Utf8.from_channel chan in
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
     ProcessDecl.declare_list (TConfig.reset_params

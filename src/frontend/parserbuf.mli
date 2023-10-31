@@ -10,5 +10,5 @@ val parse_from_buf :
   ?test:bool ->
   ?interactive:bool ->
   ((Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a) ->
-  Lexing.lexbuf -> filename:string -> 
+  Sedlexing.lexbuf -> filename:string -> 
   'a

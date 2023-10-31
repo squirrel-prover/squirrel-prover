@@ -363,11 +363,12 @@ let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : 
       end in
     try_complete_proof state
 
-let do_tactic ?(check=`Check) (st : state) (lex:Lexing.lexbuf)
+let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
     (l:ProverLib.bulleted_tactics) : state =
   if not (TConfig.interactive (get_table st)) then 
-  begin
-    let lnum = lex.lex_curr_p.pos_lnum in
+    begin
+      let (_, curr_p) = Sedlexing.lexing_positions lex in
+      let lnum = curr_p.pos_lnum in
     let b_tacs = List.filter_map 
       (function ProverLib.BTactic t -> Some t | _ -> None) l
     in
