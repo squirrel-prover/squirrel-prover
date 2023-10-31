@@ -8,7 +8,30 @@ let alpha = [%sedlex.regexp? 'a' .. 'z' | 'A' .. 'Z']
 let digit = [%sedlex.regexp? '0' .. '9']
 let alphanum = [%sedlex.regexp? alpha | digit]
 let whitespace = [%sedlex.regexp? zs]
-let name = [%sedlex.regexp? alpha, Star (alphanum | '_' | '\'')]
+
+let emoji =
+  [%sedlex.regexp?
+    ( 0x00A9 | 0x00AE | 0x203C | 0x2049 | 0x20E3 | 0x2122 | 0x2139
+    | 0x2194 .. 0x2199
+    | 0x21A9 .. 0x21AA
+    | 0x231A | 0x231B | 0x2328 | 0x23CF
+    | 0x23E9 .. 0x23F3
+    | 0x23F8 .. 0x23FA
+    | 0x24C2 | 0x25AA | 0x25AB | 0x25B6 | 0x25C0
+    | 0x25FB .. 0x25FE
+    | 0x2600 .. 0x27EF
+    | 0x2934 | 0x2935
+    | 0x2B00 .. 0x2BFF
+    | 0x3030 | 0x303D | 0x3297 | 0x3299
+    | 0x1F000 .. 0x1F02F
+    | 0x1F0A0 .. 0x1F0FF
+    | 0x1F100 .. 0x1F64F
+    | 0x1F680 .. 0x1F6FF
+    | 0x1F910 .. 0x1F96B
+    | 0x1F980 .. 0x1F9E0 )]
+
+let name =
+  [%sedlex.regexp? (ll | emoji), Star (ll | emoji | digit | lu | '_' | '\'')]
 
 let path =
   [%sedlex.regexp? '.', '/', Plus (alphanum | '_' | '.' | '-' | '/'), ".sp"]
