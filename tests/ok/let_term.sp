@@ -18,6 +18,14 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
+lemma [any] _ x : let y = <x,x> in (y = <x,x>).
+Proof.
+  intro y.
+  reduce ~flags:[def].
+  apply eq_refl.
+Qed.
+
+(*------------------------------------------------------------------*)
 (* intro *)
 
 lemma [any] _ x y (z : index): 
@@ -40,8 +48,8 @@ lemma [any] _ x y (z : index):
   let z = <z,<x,y>> in
   z = <<x,y>,<x,y>>.
 Proof.  
-  intro ??. 
-  reduce.
+  intro ??.
+  reduce ~def.
   true.
 Qed.
 
@@ -103,7 +111,7 @@ global lemma _ x y (z : index):
   [z = <<x,y>,<x,y>>].
 Proof.  
   intro ??. 
-  reduce.
+  reduce ~def.
   true.
 Qed.
 
