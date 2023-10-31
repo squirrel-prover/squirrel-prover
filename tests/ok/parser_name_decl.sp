@@ -1,5 +1,3 @@
-
-
 system null.
 
 include Basic.
@@ -20,7 +18,7 @@ name m1 : timestamp -> message.
 lemma _ (tau,tau' : timestamp) : m1(tau) = m1(tau') => tau = tau'.
 Proof. 
   intro H. 
-  fresh H => U. 
+  fresh H => ->. 
   apply eq_refl.
 Qed.
 

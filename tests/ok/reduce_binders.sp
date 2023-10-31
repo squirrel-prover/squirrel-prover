@@ -26,7 +26,7 @@ Proof.
  by left.
 
  repeat destruct Heq as [_ Heq]. 
- reduce.
+ rewrite /S.
  case u = i => /= _. 
  by right; exists j.
  by apply Hind.
