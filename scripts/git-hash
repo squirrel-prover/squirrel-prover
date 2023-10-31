@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 # --------------------------------------------------------------------
 hash=$(head -n 1 <(git rev-parse HEAD 2>/dev/null))
