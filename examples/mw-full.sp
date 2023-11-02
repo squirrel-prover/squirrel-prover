@@ -16,8 +16,7 @@ This is a "full" model with the last check of T, but our tool lacks a notion of
 induction over sequences to complete the proof.
 *******************************************************************************)
 
-set postQuantumSound = true.
-
+include Basic.
 
 hash H
 

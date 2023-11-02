@@ -578,6 +578,17 @@ let setup_change_hyps_context
     oequal (SE.equal table) new_context.SE.pair old_context.SE.pair 
   in
 
+  let pair_sym =
+    (* DBG *)
+    if new_context.SE.pair = None || old_context.SE.pair = None then false
+    else
+      let new_pair = oget new_context.SE.pair in
+      let new_left, new_right = snd (SE.fst new_pair), snd (SE.snd new_pair) in
+      let old_pair = oget old_context.SE.pair in
+      let old_left, old_right = snd (SE.fst old_pair), snd (SE.snd old_pair) in
+      new_left = old_right && new_right = old_left
+  in
+  
   (* Can we project formulas from the old to the new context? *)
   let set_projections : (Term.term -> Term.term) option =
     if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
@@ -593,6 +604,11 @@ let setup_change_hyps_context
      the new system, when it exists. *)
   let update_local f =
     Utils.omap (fun project -> project f) set_projections
+  in
+
+  let rec no_diff = function
+    | Term.Diff _ -> false
+    | t -> Term.tforall no_diff t
   in
 
   (* Environment used to analyze [Reach _] atoms in hypotheses
@@ -628,7 +644,9 @@ let setup_change_hyps_context
     | Impl (f,g) | Equiv.And (f,g) | Or (f,g) ->
       can_keep_global env f && can_keep_global env g
 
-    | Atom (Equiv _) -> pair_unchanged
+    | Atom (Equiv e) ->
+      (pair_sym && List.for_all no_diff e) ||
+      pair_unchanged
 
     | Atom (Pred _) -> true
       

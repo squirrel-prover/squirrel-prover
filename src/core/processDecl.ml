@@ -135,10 +135,22 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
         (ftype, Symbols.Operator)
     in
 
-    Printer.prt `Result "@[<v 2>new operator:@;%a@]" 
+    Printer.prt `Result "%a" 
       Operator.pp_operator data;
 
     table
+
+(*------------------------------------------------------------------*)
+let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
+  let g = Crypto.Parse.parse loc table decl in
+  
+  Printer.prt `Result "%a" 
+    Crypto.pp_game g;
+
+  let table, _ = 
+    Symbols.Game.declare_exact table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) () 
+  in
+  table
 
 (*------------------------------------------------------------------*)
 let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
@@ -376,21 +388,21 @@ let declare table decl : Symbols.table * Goal.t list =
     Theory.declare_hash table ?m_ty ?h_ty ?k_ty n, []
 
   | Decl.Decl_aenc (enc, dec, pk, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "r"; "sk"; "pk"] in
     let ptxt_ty = List.assoc_opt "ptxt" ctys
     and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
+    and rnd_ty  = List.assoc_opt "r"    ctys
     and sk_ty   = List.assoc_opt "sk"   ctys
     and pk_ty   = List.assoc_opt "pk"   ctys in
 
     Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk, []
 
   | Decl.Decl_senc (senc, sdec, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "r"; "k"] in
     let ptxt_ty = List.assoc_opt "ptxt" ctys
     and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and k_ty    = List.assoc_opt  "k"   ctys in
+    and rnd_ty  = List.assoc_opt "r"    ctys
+    and k_ty    = List.assoc_opt "k"    ctys in
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
@@ -462,6 +474,8 @@ let declare table decl : Symbols.table * Goal.t list =
         (List.map Symbols.TyInfo.parse bty_decl.bty_infos)
     in
     table, []
+
+  | Decl.Decl_game game -> parse_game_decl (L.loc decl) table game, []
 
 let declare_list table decls =
   let table, subgs = 

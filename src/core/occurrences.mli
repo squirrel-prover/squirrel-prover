@@ -299,6 +299,10 @@ val expand_macro_check_once : expand_info -> Term.term -> Term.term option
     (only at toplevel, not in subterms). *)
 val expand_macro_check_all : expand_info -> Term.term -> Term.term
 
+(** Returns all timestamps occuring in macros in a list of terms.
+    Should only be used when sources are directly occurring,
+    not themselves produced by unfolding macros. *)
+val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Occurrence search} *)
@@ -361,6 +365,14 @@ end
 module MakeSearch :
   functor (OC:OccContent) -> (OccurrenceSearch with module EO.SO.OC = OC)
 
+(** [time_formula τ ts_occs] constructs the formula:
+
+      [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
+
+    where [vi], [tsi] are the variables and content of [ts_occ]. 
+    (for example, [path_cond x y] can be [x ≤ y]). *)
+val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
+
 (*------------------------------------------------------------------*)
 (** {2 Formula construction and simplification} *)
 
@@ -372,14 +384,6 @@ sig
 
   type ext_occ
   type ext_occs = ext_occ list
-
-  (** [time_formula τ ts_occs] constructs the formula:
-
-        [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
-
-      where [vi], [tsi] are the variables and content of [ts_occ]. 
-      (for example, [path_cond x y] can be [x ≤ y]). *)
-  val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
 
   (** Constructs the formula
       "exists free vars.

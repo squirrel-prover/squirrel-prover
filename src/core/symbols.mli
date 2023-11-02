@@ -47,13 +47,15 @@ type _macro
 type _system
 type _process
 type _btype
+type _game
 type _hintdb
 type _lemma
 type _predicate
-  
+type _theory
+
 type channel   = _channel   t
 type config    = _config    t
-type oracle    = _oracle    t
+type oracle    = _oracle  t
 type name      = _name      t
 type action    = _action    t
 type fname     = _fname     t
@@ -61,9 +63,11 @@ type macro     = _macro     t
 type system    = _system    t
 type process   = _process   t
 type btype     = _btype     t
+type game      = _game    t
 type hintdb    = _hintdb    t
 type lemma     = _lemma     t
 type predicate = _predicate t
+type theory    = _theory  t
     
 (*------------------------------------------------------------------*)
 type namespace =
@@ -77,9 +81,11 @@ type namespace =
   | NSystem
   | NProcess
   | NBType      (** type declarations *)
+  | NGame
   | NHintDB
   | NLemma
   | NPredicate
+  | NTheory
     
 val pp_namespace : Format.formatter -> namespace -> unit
 
@@ -129,6 +135,7 @@ type bty_info =
   | Finite              (** finite for all η *)
   | Fixed               (** independent from η *)
   | Well_founded        (** well-founded for all η *)
+  | Enum                (** enumerable in poly time  *)
     
 type bty_infos = bty_info list
 
@@ -156,8 +163,7 @@ type [@warning "-37"] oracle_kind =
   | PTerm
 
 (*------------------------------------------------------------------*)
-(** Information about symbol definitions, depending on the namespace.
-    Integers refer to the index arity of symbols. *)
+(** Information about symbol definitions, depending on the namespace. *)
 type _ def =
   | Channel   : unit        -> _channel   def
   | Config    : param_kind  -> _config    def
@@ -168,10 +174,12 @@ type _ def =
   | System    : unit        -> _system    def
   | Process   : unit        -> _process   def
   | BType     : bty_infos   -> _btype     def
+  | Game      : unit        -> _game      def
   | HintDB    : unit        -> _hintdb    def
   | Lemma     : unit        -> _lemma     def
+  | Theory    : unit        -> _theory    def
   | Predicate : unit        -> _predicate def
-        
+
   | Function : (Type.ftype * function_def) -> _fname def
         
 type edef =
@@ -260,8 +268,8 @@ module type Namespace = sig
   val is_reserved : ns t -> table -> bool
 
   (** [mem s table] checks if [s] exists in this namespace. *)
-  val mem       : ns t -> table -> bool
-  val mem_lsymb : lsymb -> table -> bool
+  val mem       : string -> table -> bool
+  val mem_lsymb : lsymb  -> table -> bool
 
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
       @raise Unbound_identifier otherwise. *)
@@ -303,11 +311,13 @@ module Config    : Namespace with type def = param_kind  with type ns = _config
 module Oracle    : Namespace with type def = oracle_kind with type ns = _oracle
 module Channel   : Namespace with type def = unit        with type ns = _channel
 module BType     : Namespace with type def = bty_infos   with type ns = _btype
+module Game      : Namespace with type def = unit        with type ns = _game
 module Action    : Namespace with type def = int         with type ns = _action
 module System    : Namespace with type def = unit        with type ns = _system
 module Process   : Namespace with type def = unit        with type ns = _process
 module HintDB    : Namespace with type def = unit        with type ns = _hintdb
 module Lemma     : Namespace with type def = unit        with type ns = _lemma
+module Theory    : Namespace with type def = unit        with type ns = _theory
 module Predicate : Namespace with type def = unit        with type ns = _predicate
                                                            
 module Function : Namespace
@@ -349,10 +359,13 @@ module TyInfo : sig
   (** Is the type a finite type, e.g. [Index] and [Timestamp] *)
   val is_finite : table -> Type.ty -> bool 
 
-  (** Is the type is a fixed set (independent from the security 
+  (** Is the type a fixed set (independent from the security 
       parameter η.
       (e.g. [Index], [Timestamp] and [Message]) *)
   val is_fixed : table -> Type.ty -> bool
+
+  (** Is the type enumerable in polynomial time *) 
+  val is_enum : table -> Type.ty -> bool
 
   (** Are the names all of the same length. *)
   val is_name_fixed_length : table -> Type.ty -> bool

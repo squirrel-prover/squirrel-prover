@@ -690,7 +690,8 @@ module SmartDestructors = struct
   let destr_eq  f = oas_seq2 (destr_app ~fs:f_eq  f)
   let destr_leq f = oas_seq2 (destr_app ~fs:f_leq f)
   let destr_lt  f = oas_seq2 (destr_app ~fs:f_leq f)
-
+  
+  
   (*------------------------------------------------------------------*)
   let destr_let : term -> (Vars.var * term * term) option = function
     | Let (v,t1,t2) -> Some (v,t1,t2)
@@ -775,9 +776,7 @@ module SmartDestructors = struct
   let is_neq f = destr_neq f <> None
   let is_leq f = destr_leq f <> None
   let is_lt  f = destr_lt  f <> None
-
   let is_let t = destr_let t <> None
-
 end
 
 include SmartDestructors
@@ -1028,7 +1027,7 @@ let ty_fv t = ty_fv ?acc:None t
 (** {2 Substitutions} *)
 
 (** given a variable [x] and a subst [s], remove from [s] all
-    substitution [v->_]. *)
+    substitution [t->_] where [v ∈ fv(t)]. *)
 let filter_subst (var:Vars.var) (s:subst) =
   let s =
     List.fold_left (fun acc (ESubst (x, y)) ->
@@ -1044,6 +1043,10 @@ let is_var_subst s =
   List.for_all (fun (ESubst (t,_)) -> match t with
       | Var _ -> true
       | _ -> false) s
+(** Create a subst from a list a tupl of terms. FIXME : No sanity checks**)
+let rec mk_subst l = match l with
+    | [] -> []
+    | (t1,t2)::l -> ESubst (t1,t2) :: mk_subst l
 
 (** Returns the variables appearing in a substitution LHS. *)
 let subst_support s =
@@ -1530,12 +1533,18 @@ let _pp ~dbg     = pp_toplevel { default_pp_info with dbg }
 let pp_dbg       = pp_toplevel { default_pp_info with dbg = true }
 
 (*------------------------------------------------------------------*)
-let pp_esubst ppf (ESubst (t1,t2)) =
-  Fmt.pf ppf "%a->%a" pp t1 pp t2
+let _pp_esubst ~dbg ppf (ESubst (t1,t2)) =
+  Fmt.pf ppf "%a->%a" (_pp ~dbg) t1 (_pp ~dbg) t2
 
-let pp_subst ppf s =
+(* let pp_esubst = _pp_esubst ~dbg:false *)
+(* let pp_esubst_dbg = _pp_esubst ~dbg:true *)
+
+let _pp_subst ~dbg ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") (_pp_esubst ~dbg)) s
+
+let pp_subst = _pp_subst ~dbg:false
+let pp_subst_dbg = _pp_subst ~dbg:true
 
 (*------------------------------------------------------------------*)
 (** {2 Literals.} *)
@@ -2143,6 +2152,11 @@ type 'a pat_op = {
   pat_op_vars   : (Vars.var * Vars.Tag.t) list;
   pat_op_term   : 'a;
 }
+
+let pp_pat_term_op fmt (pat : term pat_op):unit =
+  Fmt.pf fmt "( %a | %a)"
+    pp pat.pat_op_term
+    (Fmt.list ~sep:Fmt.comma Vars.pp) (List.map fst pat.pat_op_vars)
 
 let project_tpat (projs : projs) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }

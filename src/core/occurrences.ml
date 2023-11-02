@@ -866,11 +866,34 @@ module type OccurrenceFormulas = sig
   type ext_occ
   type ext_occs = ext_occ list
 
-  val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
   val occurrence_formula :
     ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
+
+
+(** Exported (see `.mli`) *)
+let time_formula
+    (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : Term.term 
+  =
+  let phis =
+    List.map (fun (ti:ts_occ) ->
+        (* refresh probably not necessary, but doesn't hurt *)
+        let tivs, s = Term.refresh_vars ti.so_vars in
+        let ticnt   = Term.subst s ti.so_cnt in
+        let ticond  = List.map (Term.subst s) ti.so_cond in
+
+        Term.mk_exists ~simpl:true
+          tivs
+          (Term.mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
+          (* in the simplest cases (when [path_cond = PathCond.Top]), 
+               [PathCond.apply path_cond a ticnt] 
+             is just
+               [Term.mk_timestamp_leq a ticnt] 
+          *)
+      ) ts
+  in
+  Term.mk_ors ~simpl:true phis
 
 (** Exported (see `.mli`) *)
 module MakeFormulas (EO:ExtOcc) :
@@ -1019,31 +1042,6 @@ struct
            | _ -> e)
         sigma' in
     sigma' @ sigma
-
-
-  (** Exported (see `.mli`) *)
-  let time_formula
-      (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : Term.term 
-    =
-    let phis =
-      List.map (fun (ti:ts_occ) ->
-          (* refresh probably not necessary, but doesn't hurt *)
-          let tivs, s = Term.refresh_vars ti.so_vars in
-          let ticnt   = Term.subst s ti.so_cnt in
-          let ticond  = List.map (Term.subst s) ti.so_cond in
-
-          Term.mk_exists ~simpl:true
-            tivs
-            (Term.mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
-            (* in the simplest cases (when [path_cond = PathCond.Top]), 
-                 [PathCond.apply path_cond a ticnt] 
-               is just
-                 [Term.mk_timestamp_leq a ticnt] 
-            *)
-        ) ts
-    in
-    Term.mk_ors ~simpl:true phis
-
 
   (** Exported (see `.mli`) *)
   let occurrence_formula
