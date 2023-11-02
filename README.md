@@ -84,6 +84,15 @@ export PATH=$PATH:/path/to/squirrel
 emacs examples/<file>.sp
 ```
 
+### Unicode support in Emacs (Proof General) (optional)
+
+If you are missing some Unicode fonts in Emacs, you can try installing the Symbola font.
+For example, on a Debian distribution:
+```
+ apt-get install -y fonts-symbola 
+```
+should do the trick.
+
 ### Dependencies for the `smt` tactic (optional)
 
 (If those dependencies are not installed, Squirrel will still compile, but the
