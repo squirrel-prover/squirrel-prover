@@ -171,12 +171,16 @@ Proof.
   case t => // [i0 j _]. 
     (* Receiver *)
     + case (i = i0) => _. 
-      - left. auto.
-      - right. by rewrite /cellB if_false. 
+      - left.
+        by rewrite /cellB if_true. 
+      - right. 
+        by rewrite /cellB if_false. 
     (* Sender *) 
     + case (i = i0) => _. 
-      - left. auto.
-      - right. by rewrite /cellB if_false. 
+      - left. 
+        by rewrite /cellB if_true. 
+      - right. 
+        by rewrite /cellB if_false. 
 Qed.
 
 
@@ -190,14 +194,17 @@ Proof.
   case t => // [i0 j _].
   (* Receiver *)
     + case (i = i0) => _.
-      - left. auto.
-      - right. by rewrite /cellA if_false.
+      - left.
+        by rewrite /cellA if_true. 
+      - right. 
+        by rewrite /cellA if_false. 
   (* Sender *)
     + case (i = i0) => _.
-      - left. auto.
-      - right. by rewrite /cellA if_false.
+      - left. 
+        by rewrite /cellA if_true. 
+      - right. 
+        by rewrite /cellA if_false. 
 Qed.
-
 
 
 (* The counter increases (not strictly) between t and pred(t). *)

@@ -204,14 +204,14 @@ Proof.
       (** The case `i = i0` corresponds to the left disjunct, which is a
       direct consequence of the condition of the action `SCpt(i)`.
       This is done automatically by Squirrel. *)
-    + by left.
+    + by rewrite if_true //. 
       (** The case `i <> i0` corresponds to the right disjunct. When expanding
       the macro `SCpt(i)@t`, we notice that it is an `if _ then _ else _` term
       with a condition that is always false. This can be simplified using the
       `rewrite` tactic with lemma `if_false` (which is included in the `Basic`
       library. *)
     + right.
-      expand SCpt(i)@t. by rewrite if_false.
+      by rewrite if_false.
     (** The two previous tactics can be merged into a single one:
     by rewrite /SCpt if_false. *)
 Qed.

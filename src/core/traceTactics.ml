@@ -822,66 +822,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let autosubst (s : TS.t) : TS.t list =
-  (* autosubst is only used for timestamp and index variables. *)
-  let check_type (x : Vars.var) : bool = 
-    Vars.ty x = Type.Timestamp || 
-    Vars.ty x = Type.Index
-  in
-  (* TODO: let: fix autosubst bug: simplifies a local equality in a global one *)
-  let id, l = match
-      TS.Hyps.find_map
-        (fun (id,ldc) ->
-           match ldc with
-           | LHyp (Global _) | LDef _ -> None
-           | LHyp (Local f) ->
-             begin
-               match Term.destr_eq f with
-               | Some (Term.Var x, Term.Var y) when check_type x ->
-                 Some (id, [x,y])
-
-               | Some (Term.Tuple l1, Term.Tuple l2) 
-                 when List.exists (function Var x -> check_type x | _ -> false) l1 ->
-                 let l = List.map2 (fun t1 t2 -> t1,t2) l1 l2 in
-                 let l = 
-                   List.filter_map (fun (t1,t2) ->
-                       match t1,t2 with
-                       | Var x, Var y -> Some (x,y)
-                       | _            -> None
-                     ) l
-                 in
-                 Some (id, l)
-
-               | _ -> None
-             end)
-        s
-    with | Some (id,f) -> id, f
-         | None -> Tactics.soft_failure (Failure "no equality found")
-  in
-  let s = TS.Hyps.remove id s in
-
-  let process1 s (x,y : Vars.var * Vars.var) : TS.t =
-    let vars = TS.vars s in
-    (* Just remove the equality if x and y are the same variable, or if 
-       one of them as already been removed. *)
-    if x = y || not (Vars.mem vars x) || not (Vars.mem vars y) then s else
-      (* Otherwise substitute the newest variable by the oldest one,
-       * and remove it from the environment. *)
-      let x,y =
-        if Vars.compare x y <= 0 then y,x else x,y
-      in
-
-      let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
-
-      let s = TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s in
-      TS.set_vars (Vars.rm_var x (TS.vars s)) s
-  in
-  let process (l : (Vars.var * Vars.var) list) =
-    List.fold_left process1 s l
-  in
-  [process l]
-
-(*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Message (a,_)) s =
   let _,var = Vars.make `Approx (TS.vars s) Type.Timestamp "t" TS.var_info in
@@ -1138,11 +1078,9 @@ let _simpl ~red_param ~close ~strong ~auto_intro =
     expand_all @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
-     * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
+     * otherwise this creates e.g. j=i from n(j)=n(i). *)
     (* (if intro then [wrap eq_trace] else []) @ *)
     (if strong then [wrap_fail eq_names] else []) @
-    (* Simplify equalities using substitution. *)
-    (repeat ~cut:true (wrap_fail autosubst)) ::
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @
     [clear_triv]

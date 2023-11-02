@@ -176,16 +176,25 @@ Proof.
 
   + assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> as Meq0;
     1: by expand output, cipher.
-    intctxt Meq0; try auto.
+    intctxt Meq0; try auto; clear Meq0.
     - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
     - (* problem w/ randomness condition *) admit.
-    - intro [j1 [_ _]]. 
+    - intro [j1 [? ?]]. 
       assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
-      intctxt Meq2; try auto. 
+      intctxt Meq2; clear Meq2; try auto.
       * by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
-      * (* pb w/ randomness condition *) admit.
-
+      * intro [i1 k ?] /=. 
+        have A : j1 = j0 by auto.
+        rewrite A in *; clear A. 
+        rewrite -Meq in *. 
+        admit. (* pb w/ randomness condition *) 
+      * intro [? ?] /=. 
+        have A : j1 = j0 by auto.
+        rewrite A in *; clear A. 
+        have A : j2 = j by auto.
+        rewrite A in *; clear A. 
+        auto.
 
   + assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
     as Meq0;

@@ -343,54 +343,63 @@ Proof.
           simpl.
           case output@R1(r) => Meq1.
           ++ destruct Meq1 as [_ _ [Meq1 ->]].
-             by (euf Meq1 => [r0 A0]).
+             (have C : i = i1 by auto); rewrite C in *; clear C.
+             (have C : r0 = t by auto); rewrite C in *; clear C.
+             by (euf Meq1 => [? ?]). 
 
           ++ destruct Meq1 as [H0 _].
              by use H0 with i,t.
            
           intro [t0 [Ctrace A]].
-          assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
-          case Ctrace; by depends T(i,t), T1(i,t).
+          assert (nt(i,t) = nt(i,t0)); [1:auto]. 
+          (have C : t = t0 by auto); rewrite C in *.
+          case Ctrace; try by depends T(i,t), T1(i,t). 
 
           intro [t0 [Ctrace A]].
-          assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
+          revert H => H.        (* localize H *)
+          assert (nt(i,t) = nt(i,t0)); [1:auto]. 
+          (have C : t0 = t by auto); rewrite C in *; clear C. 
           case Ctrace.
-          by depends T(i,t), T2(i,t).
-          use mutex_default_T2_T1 with i, t as H1; by case H1.
+          ++ by depends T(i,t), T2(i,t).
+          ++ use mutex_default_T2_T1 with i, t as H1. 
+             by case H1.
 
         (* Right *)
         - euf Meq0; [2:auto].
-          simpl.
-          intro [r [Ctrace A B]].
-          assert R1(r) < T1(i,t) as Clt.
-          by case Ctrace; depends T(i,t),T1(i,t).
-          clear Ctrace.
-          assert cond@R1(r) as Hcond. {
-            executable pred(T1(i,t)); 1,2: auto.
-            by intro Hex; use Hex with R1(r); 1: expand exec.
-          }
-          expand cond.
-          destruct Hcond as [i1 t1 Hcond].
-          euf Hcond => [r0 HH]; try auto. 
-          exists r; simpl.
-          assert R(r) < T(i,t) as _. {
-            assert nr(r) = input@T(i,t) as HF; 1:auto.
-            fresh HF => C;
-            [3: by depends R(r),R2(r)];
-            auto.
-          }
-          simpl.
-          case output@R1(r) => Meq1.
-          -- destruct Meq1 as [_ _ [Meq1 ->]].
-             by euf Meq1 => A0 [A1 _] [_ _].
-          -- destruct Meq1 as [H0 _].
-             by use H0 with i,t.
+          ++ simpl.
+             intro [r [Ctrace A B]].
+             assert R1(r) < T1(i,t) as Clt.
+             by case Ctrace; depends T(i,t),T1(i,t).
+             clear Ctrace.
+             assert cond@R1(r) as Hcond. {
+               executable pred(T1(i,t)); 1,2: auto.
+               by intro Hex; use Hex with R1(r); 1: expand exec.
+             }
+             expand cond.
+             destruct Hcond as [i1 t1 Hcond].
+             euf Hcond => [r0 HH]; try auto. 
+             exists r; simpl.
+             revert H => H.        (* localize H *)
+             (have C : i1 = i by auto); rewrite C in *; clear C.
+             (have C : t1 = t by auto); rewrite C in *; clear C.
+             assert R(r) < T(i,t) as _. {
+               assert nr(r) = input@T(i,t) as HF; 1:auto.
+               fresh HF => C;
+               [3: by depends R(r),R2(r)];
+               auto.
+             }
+             simpl.
+             case output@R1(r) => Meq1.
+             -- destruct Meq1 as [_ _ [Meq1 ->]].
+                by euf Meq1 => A0 [A1 _] [_ _].
+             -- destruct Meq1 as [H0 _].
+                by use H0 with i,t.
        
-          by depends T(i,t), T1(i,t).
+          ++ by depends T(i,t), T1(i,t).
 
-          intro HH.
-          case HH. by depends T(i,t), T2(i,t).
-          use mutex_default_T2_T1 with i,t as H3; by case H3.
+          ++ intro HH.
+             case HH. by depends T(i,t), T2(i,t).
+             use mutex_default_T2_T1 with i,t as H3; by case H3.
 
       (* Honest => Cond *)
       * intro [_ [r H1]]; simpl.
@@ -442,76 +451,80 @@ Proof.
 
         (* Left *)
         * euf Meq0 => [r [Ct _]]; try auto.
-          assert R1(r) < T2(i,t) as _.
-            by case Ct; try depends T(i,t),T2(i,t).
-          clear Ct.
-          assert cond@R1(r) as Hcond. {
-            executable pred(T2(i,t)); 1,2: auto.
-            by intro He; use He with R1(r); 1: expand exec.
-          }
-          expand cond.
-          destruct Hcond as [i1 t1 Hcond].
-          euf Hcond => [_ [_ _]]; try auto.
-          exists r; simpl.
-          assert R(r) < T(i,t). {
-            assert nr(r) = input@T(i,t) as HF; 1: auto.
-            fresh HF => C;
-            [3: by depends R(r),R2(r)];
-            auto.
-          }
-          simpl.
-          case output@R1(r) => Meq1.
-          -- destruct Meq1 as [_ _ [Meq1 ->]].
-             by (euf Meq1 => [? ?]).
-          -- destruct Meq1 as [H0 _].
-             by use H0 with i,t.
+          ++ assert R1(r) < T2(i,t) as _.
+               by case Ct; try depends T(i,t),T2(i,t).
+             clear Ct.
+             assert cond@R1(r) as Hcond. {
+               executable pred(T2(i,t)); 1,2: auto.
+               by intro He; use He with R1(r); 1: expand exec.
+             }
+             expand cond.
+             destruct Hcond as [i1 t1 Hcond].
+             euf Hcond => [_ [_ _]]; try auto.
+             exists r; simpl.
+             (have C : i1 = i by auto); rewrite C in *; clear C.
+             (have C : t2 = t by auto); rewrite C in *; clear C.
+             assert R(r) < T(i,t). {
+               assert nr(r) = input@T(i,t) as HF; 1: auto.
+               fresh HF => C;
+               [3: by depends R(r),R2(r)];
+               auto.
+             }
+             simpl.
+             case output@R1(r) => Meq1.
+             -- destruct Meq1 as [_ _ [Meq1 ->]].
+                by (euf Meq1 => [? ?]).
+             -- destruct Meq1 as [H0 _].
+                by use H0 with i,t.
 
-         assert (nt(i,t)=nt(i,r)); [1:auto].
-         case Ct. 
-         by depends T(i,t), T1(i,t). print mutex_default_T1_T2.
-         use mutex_default_T1_T2 with i,t as HH; by case HH.
+         ++ assert (nt(i,t)=nt(i,r)); [1:auto].
+             (have C : r = t by auto); rewrite C in *; clear C.
+            case Ct. 
+            by depends T(i,t), T1(i,t). print mutex_default_T1_T2.
+            use mutex_default_T1_T2 with i,t as HH; by case HH.
 
-         assert (nt(i,t)=nt(i,r)); [1:auto].
-         case Ct;
-         by depends T(i,t), T2(i,t).
+         ++ assert (nt(i,t)=nt(i,r)); [1:auto].
+            (have C : r = t by auto); rewrite C in *; clear C.
+            case Ct;
+            by depends T(i,t), T2(i,t).
 
         (* Right *)
         * euf Meq0; 2:auto.
-          intro [r [Ct _]].
-          assert R1(r) < T2(i,t) as _.
-            by case Ct; depends T(i,t),T2(i,t).
-          clear Ct.
-          assert cond@R1(r) as Hcond. {
-            executable pred(T2(i,t)); 1,2: auto => He.
-            by use He with R1(r); 1: expand exec.
-          }
-          expand cond.
-          destruct Hcond as [i1 t1 Hcond].
-          euf Hcond; try auto. 
-          intro [_ _].
-          exists r; simpl.
-          assert R(r) < T(i,t) as _. {
-            assert nr(r) = input@T(i,t) as HF; 1: auto.
-            fresh HF => C;
-            [3: by depends R(r),R2(r)];
-            auto.
-          }
-          simpl.
-
-          case output@R1(r) => Meq1.
-          -- destruct Meq1 as [_ _ [Meq1 ->]].
-             by euf Meq1.
-          -- destruct Meq1 as [H0 _].
-             by use H0 with i,t.
-        
-          intro H2. case H2.
-          by depends T(i,t), T1(i,t).
-          use mutex_default_T1_T2 with i,t as HH; by case HH.
-
-          by depends T(i,t), T2(i,t).
-
+          ++ intro [r [Ct _]].
+             assert R1(r) < T2(i,t) as _.
+               by case Ct; depends T(i,t),T2(i,t).
+             clear Ct.
+             assert cond@R1(r) as Hcond. {
+               executable pred(T2(i,t)); 1,2: auto => He.
+               by use He with R1(r); 1: expand exec.
+             }
+             expand cond.
+             destruct Hcond as [i1 t1 Hcond].
+             euf Hcond; try auto. 
+             intro [_ _].
+             exists r; simpl.
+             (have C : i1 = i by auto); rewrite C in *; clear C.
+             (have C : t1 = t by auto); rewrite C in *; clear C.
+             assert R(r) < T(i,t) as _. {
+               assert nr(r) = input@T(i,t) as HF; 1: auto.
+               fresh HF => C;
+               [3: by depends R(r),R2(r)];
+               auto.
+             }
+             simpl.
+             
+             case output@R1(r) => Meq1.
+             -- destruct Meq1 as [_ _ [Meq1 ->]].
+                by euf Meq1.
+             -- destruct Meq1 as [H0 _].
+                by use H0 with i,t.
+             
+          ++ intro H2. case H2.
+             by depends T(i,t), T1(i,t).
+             use mutex_default_T1_T2 with i,t as HH; by case HH.
+             
+          ++ by depends T(i,t), T2(i,t).
     }
     fa 6.
     by deduce 5.
-
 Qed.

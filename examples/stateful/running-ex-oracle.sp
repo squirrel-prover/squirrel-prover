@@ -203,10 +203,9 @@ Proof.
       case (i=i0) => //.
         - intro Eqi.
           use Hyp with j0.
-            * case (j=j0) => //.
+            * case (j=j0); [1: by rewrite if_true | 2:auto].
             * auto.
         - intro Neqi.
-          expand s(i)@A(i0,j0).
           rewrite if_false.
             * auto.
             * use IH with pred(A(i0,j0)) => //.

@@ -283,7 +283,7 @@ Proof.
     case (i=i0).
     + intro Eqi.
       use Hyp with j0 => //.
-      by case (j=j0).
+      case (j=j0); [1: by rewrite if_true | 2:auto].
 
     + intro Neqi.
       expand sT(i)@T(i0,j0).
@@ -330,9 +330,9 @@ Proof.
   - intro [jj0 ii0 H]; rewrite H in *.
     case (ii=ii0) => //.
     + intro Eqii.
-      use Hyp with jj0.
-      case (jj=jj0) => //.
-      auto.
+      have ? := Hyp jj0 _; 1:auto.
+      case (jj=jj0); [1: by rewrite if_true | 2:auto].
+
     + intro Neqii.
       expand sR.
       rewrite if_false //.
