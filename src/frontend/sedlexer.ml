@@ -31,7 +31,7 @@ let emoji =
     | 0x1F980 .. 0x1F9E0 )]
 
 let name =
-  [%sedlex.regexp? (ll | emoji), Star (ll | emoji | digit | lu | '_' | '\'')]
+  [%sedlex.regexp? (ll | lu | emoji), Star (ll | lu | emoji | digit | '_' | '\'')]
 
 let path =
   [%sedlex.regexp? '.', '/', Plus (alphanum | '_' | '.' | '-' | '/'), ".sp"]
