@@ -770,12 +770,13 @@ end
 (** {2 Miscellaneous} *)
 
 (*------------------------------------------------------------------*)
-(* Must be synchronized with the corresponding code in [Sedlexer.ml]! *)
-let right_infix_char_first = [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>'))]
+(* Must be synchronized with the corresponding code in [Symbols.ml]! *)
+let right_infix_char_first = 
+  [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>' | '='))]
 let left_infix_char_first = [%sedlex.regexp? '^']
 
 let infix_char =
-  [%sedlex.regexp? right_infix_char_first | left_infix_char_first | '<' | '>']
+  [%sedlex.regexp? right_infix_char_first | left_infix_char_first | math]
 
 let left_infix_symb =
   [%sedlex.regexp?

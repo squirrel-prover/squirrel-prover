@@ -41,11 +41,12 @@ let drop_n_first_chars ~n s = String.sub s n (String.length s - 2)
 
 (*------------------------------------------------------------------*)
 (* Must be synchronized with the corresponding code in [Symbols.ml]! *)
-let right_infix_char_first = [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>'))]
+let right_infix_char_first = 
+  [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>' | '='))]
 let left_infix_char_first = [%sedlex.regexp? '^']
 
 let infix_char =
-  [%sedlex.regexp? right_infix_char_first | left_infix_char_first | '<' | '>']
+  [%sedlex.regexp? right_infix_char_first | left_infix_char_first | math]
 
 let left_infix_symb =
   [%sedlex.regexp?
