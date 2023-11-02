@@ -13,8 +13,7 @@ let get_hyp sequent name =
 
 (* Utility to parse formulas from strings. *)
 let formula_of_string st string : Equiv.local_form =
-  let lexbuf = Lexing.from_string string in
-  let th_tm = Parser.top_formula Lexer.token lexbuf in
+  let th_tm = Util.parse_from_string Parser.top_formula string in
   let env = Env.init ~table:(Prover.get_table st) () in
   let tm,ty =
     Theory.convert Theory.{ env ; cntxt = InGoal } th_tm in
