@@ -1113,6 +1113,75 @@ exception NoMatch of (term list * match_infos) option
 
 let no_unif ?infos () = raise (NoMatch infos)
 
+
+(*------------------------------------------------------------------*)
+(** {2 Matching and unification internal states} *)
+
+(** (Descending) state used during matching or unification. *)
+type unif_state = {
+  mode : [`Match | `Unif];
+
+  mv  : Mvar.t;           (** inferred variable assignment *)
+  bvs : Vars.tagged_vars; (** bound variables "above" the current position *)
+
+  subst_vs : Sv.t;
+  (** vars already substituted (for cycle detection during unification) *)
+
+  support : Vars.tagged_vars; (** free variable which we are trying to match *)
+  env     : Vars.env;         (** rigid free variables (disjoint from [support]) *)
+
+  expand_context : Macros.expand_context; 
+  (** expantion mode for macros. See [Macros.expand_context]. *)
+
+  ty_env  : Type.Infer.env;
+  table   : Symbols.table;
+  system  : SE.context; (** system context applying at the current position *)
+
+  hyps : Hyps.TraceHyps.hyps;
+
+  use_fadup     : bool;
+  allow_capture : bool;
+}
+
+let mk_unif_state
+    (env : Vars.env)
+    (table : Symbols.table)
+    (system : SE.context)
+    (hyps:Hyps.TraceHyps.hyps)
+    (support : Vars.vars): unif_state
+  =
+  { mode           = `Unif;
+    mv             = Mvar.empty;
+    bvs            = [];
+    subst_vs       = Sv.empty;
+    support        = Vars.Tag.local_vars support;
+    env;
+    expand_context = Macros.InSequent;
+    ty_env         = Type.Infer.mk_env () ;
+    table;
+    system;
+    hyps;
+    use_fadup      = false;
+    allow_capture  = false
+  }
+
+(*------------------------------------------------------------------*)
+let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
+  let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
+    Hyps.change_trace_hyps_context
+      ~old_context:st.system
+      ~new_context
+      ~vars:st.env
+      ~table:st.table
+      hyps
+  in
+  { st with system = new_context; hyps = change_hyps st.hyps; }
+
+(*------------------------------------------------------------------*)
+let env_of_unif_state (st : unif_state) : Env.t =
+  let vars = Vars.add_vars st.bvs st.env in
+  Env.init ~table:st.table ~vars ~system:st.system () 
+
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
@@ -1287,75 +1356,36 @@ let reduce_glet1 (f : Equiv.form) : Equiv.form * bool =
   | _ -> f, false
 
 (*------------------------------------------------------------------*)
-(** {2 Matching and unification internal states} *)
+(** {3 Higher-level reduction utility} *)
 
-(** (Descending) state used during matching or unification. *)
-type unif_state = {
-  mode : [`Match | `Unif];
+  (* Reduce once at head position.
+     Only use the following reduction rules:
+       [δ, β, proj, let ] *)
+let reduce_head1
+    ?delta
+    ~(mode : Macros.expand_context)
+    (table : Symbols.table) (se : SE.t) 
+    (hyps : Hyps.TraceHyps.hyps)
+    (t : Term.term) 
+  : Term.term * bool 
+  = 
+  let t, has_red = reduce_delta1 ?delta ~mode table se hyps t in
+  if has_red then t, true
+  else
+    match t with
+    | _ when can_reduce_beta t ->
+      let t, _ = reduce_beta1 t in
+      t, true
 
-  mv  : Mvar.t;           (** inferred variable assignment *)
-  bvs : Vars.tagged_vars; (** bound variables "above" the current position *)
+    | _ when can_reduce_let t ->
+      let t, _ = reduce_let1 t in
+      t, true
 
-  subst_vs : Sv.t;
-  (** vars already substituted (for cycle detection during unification) *)
+    | _ when can_reduce_proj t ->
+      let t, _ = reduce_proj1 t in
+      t, true
 
-  support : Vars.tagged_vars; (** free variable which we are trying to match *)
-  env     : Vars.env;         (** rigid free variables (disjoint from [support]) *)
-
-  expand_context : Macros.expand_context; 
-  (** expantion mode for macros. See [Macros.expand_context]. *)
-
-  ty_env  : Type.Infer.env;
-  table   : Symbols.table;
-  system  : SE.context; (** system context applying at the current position *)
-
-  hyps : Hyps.TraceHyps.hyps;
-
-  use_fadup     : bool;
-  allow_capture : bool;
-}
-
-let mk_unif_state
-    (env : Vars.env)
-    (table : Symbols.table)
-    (system : SE.context)
-    (hyps:Hyps.TraceHyps.hyps)
-    (support : Vars.vars): unif_state
-  =
-  { mode = `Unif;
-    mv = Mvar.empty;
-    bvs = [];
-    subst_vs = Sv.empty;
-    support = Vars.Tag.local_vars support;
-    env;
-    expand_context = Macros.InSequent;
-    ty_env= Type.Infer.mk_env () ;
-    table;
-    system;
-    hyps;
-    use_fadup = false;
-    allow_capture = false
-  }
-  
-    
-
-  
-(*------------------------------------------------------------------*)
-let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
-  let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
-    Hyps.change_trace_hyps_context
-      ~old_context:st.system
-      ~new_context
-      ~vars:st.env
-      ~table:st.table
-      hyps
-  in
-  { st with system = new_context; hyps = change_hyps st.hyps; }
-
-(*------------------------------------------------------------------*)
-let env_of_unif_state (st : unif_state) : Env.t =
-  let vars = Vars.add_vars st.bvs st.env in
-  Env.init ~table:st.table ~vars ~system:st.system () 
+    | _ -> t, false
 
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
@@ -1419,7 +1449,7 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 
-(** Exported 
+(** Internal.
     Generic matching (or unification) function, built upon [Term.term] or [Equiv.form] 
     matching (or unification). *)
 let unif_gen (type a)
@@ -1671,52 +1701,23 @@ module T (* : S with type t = Term.term *) = struct
 
       | _ -> try_reduce_head1 t (Term.mk_app f' l') st
 
-
-  and m_reduce_delta1 (st : unif_state) (t : term) : term * bool =
-    reduce_delta1 ~delta:delta_full
-      ~mode:st.expand_context st.table st.system.set st.hyps t 
-
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
-    let t, has_red = m_reduce_delta1 st t in
+    let t, has_red = 
+      reduce_head1 ~delta:delta_full
+        ~mode:st.expand_context st.table st.system.set st.hyps t 
+    in
     if has_red then 
       tunif t pat st
     else
-      let pat, has_red = m_reduce_delta1 st pat in
+      let pat, has_red = 
+        reduce_head1 ~delta:delta_full
+          ~mode:st.expand_context st.table st.system.set st.hyps pat
+      in
       if has_red then
         tunif t pat st
-      else begin
-        match t, pat with
-        | _, _ when can_reduce_beta t ->
-          let t, _ = reduce_beta1 t in
-          tunif t pat st
-
-        | _, _ when can_reduce_beta pat ->
-          let pat, _ = reduce_beta1 pat in
-          tunif t pat st
-
-        | _, _ when can_reduce_let t ->
-          let t, _ = reduce_let1 t in
-          tunif t pat st
-
-        | _, _ when can_reduce_let pat ->
-          let pat, _ = reduce_let1 pat in
-          tunif t pat st
-
-        | _, _ when can_reduce_proj t ->
-          let t, _ = reduce_proj1 t in
-          tunif t pat st
-
-        | _, _ when can_reduce_proj pat ->
-          let pat, _ = reduce_proj1 pat in
-          tunif t pat st
-
-        (* other *)
-        | Var _, _ -> no_unif ()   (* FEATURE *)
-        | _, Var v when not (List.mem_assoc v st.support) -> no_unif () (* FEATURE *)
-        | _ -> no_unif ()
-      end
+      else no_unif ()
       
   (* Return: left subst, right subst, match state *)
   and unif_bnds
