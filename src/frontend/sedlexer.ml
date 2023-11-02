@@ -39,8 +39,9 @@ let path =
 let int = [%sedlex.regexp? Plus digit]
 let drop_n_first_chars ~n s = String.sub s n (String.length s - 2)
 
-(* Hard-coded in Symbols.ml ! Do not change. *)
-let right_infix_char_first = [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~']
+(*------------------------------------------------------------------*)
+(* Must be synchronized with the corresponding code in [Symbols.ml]! *)
+let right_infix_char_first = [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>'))]
 let left_infix_char_first = [%sedlex.regexp? '^']
 
 let infix_char =
@@ -53,6 +54,7 @@ let left_infix_symb =
 let right_infix_symb =
   [%sedlex.regexp?
     right_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
+(*------------------------------------------------------------------*)
 
 let rec token buf =
   match%sedlex buf with
