@@ -2150,3 +2150,22 @@ let () = T.register_general "ddh"
           Args.String_name v3] ->
          LT.gentac_of_etac (ddh gen v1 v2 v3)
        | _ -> bad_args ())
+
+(*------------------------------------------------------------------*)
+let crypto (game : lsymb) (args : Args.crypto_args) (s : ES.t) =
+  let frame = ES.goal_as_equiv s in
+  let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
+  List.map (fun subg -> ES.set_reach_goal subg s) subgs
+  
+let crypto_tac args (s : ES.t) =
+  match args with
+  | [Args.Crypto (game, args)] -> wrap_fail (crypto game args) s
+  | _ -> bad_args ()
+
+let () = T.register_general "crypto"
+    ~tactic_help:
+      {general_help = "Applies a cryptographic game";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Cryptographic}
+    (LT.gentac_of_etac_arg crypto_tac)

@@ -127,7 +127,11 @@ rule token = parse
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "seq"               { SEQ }
+| "rnd"               { RND }
+| "var"               { VAR }
+| "return"            { RETURN }
 | "oracle"            { ORACLE }
+| "game"              { GAME }
 | "with"              { WITH }
 | "where"             { WHERE }
 | "time"              { TIME }
@@ -164,6 +168,7 @@ rule token = parse
 | "auto"              { AUTO }
 | "simpl"             { SIMPL }
 | "exn"               { EXN }
+| "crypto"            { CRYPTO }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
 | "trans"             { TRANS }

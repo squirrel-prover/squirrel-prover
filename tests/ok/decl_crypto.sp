@@ -1,5 +1,3 @@
-
-
 channel c.
 
 type T
@@ -29,7 +27,7 @@ process Hash =
 (*------------------------------------------------------------------*)
 (* Asymmetric encryption *)
 
-aenc enc, dec, pkgen where ptxt:T ctxt:C rnd:R pk:LP sk:L.
+aenc enc, dec, pkgen where ptxt:T ctxt:C r:R pk:LP sk:L.
 
 process Aenc =
  in(c,m);
@@ -44,7 +42,7 @@ process Aenc =
 (*------------------------------------------------------------------*)
 (* Symmetric encryption *)
 
-senc sencr, sdecr where ptxt:T ctxt:C rnd:R k:L.
+senc sencr, sdecr where ptxt:T ctxt:C r:R k:L.
 
 process Senc =
  in(c,m);

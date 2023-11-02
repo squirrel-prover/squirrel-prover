@@ -185,4 +185,3 @@ let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
   let system_indep = is_system_indep              env t in
   (* latter test checks if [t] is a single system term *)
   { system_indep; const; adv }
-  

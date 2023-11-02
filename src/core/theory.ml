@@ -810,15 +810,7 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
 
       | Symbols.Action _ -> Taction
 
-      | Symbols.Predicate _
-      | Symbols.Channel   _
-      | Symbols.Config    _
-      | Symbols.Oracle    _
-      | Symbols.BType     _
-      | Symbols.HintDB    _
-      | Symbols.Lemma     _ 
-      | Symbols.Process   _
-      | Symbols.System    _ ->
+      | _ ->
         let s = L.unloc lsymb in
         conv_err loc (BadNamespace (s,
                                     oget(Symbols.get_namespace table s)))

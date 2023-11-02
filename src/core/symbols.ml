@@ -21,9 +21,11 @@ type namespace =
   | NSystem
   | NProcess
   | NBType      (** type declarations *)
+  | NGame
   | NHintDB
   | NLemma
   | NPredicate
+  | NTheory
 
 let pp_namespace fmt = function
   | NChannel   -> Fmt.pf fmt "channel"
@@ -36,9 +38,11 @@ let pp_namespace fmt = function
   | NSystem    -> Fmt.pf fmt "system"
   | NProcess   -> Fmt.pf fmt "process"
   | NBType     -> Fmt.pf fmt "type"
+  | NGame      -> Fmt.pf fmt "type"
   | NHintDB    -> Fmt.pf fmt "hint database"
   | NLemma     -> Fmt.pf fmt "lemma"
   | NPredicate -> Fmt.pf fmt "predicate"
+  | NTheory    -> Fmt.pf fmt "theory"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
@@ -141,6 +145,7 @@ type bty_info =
   | Finite
   | Fixed
   | Well_founded
+  | Enum
 
 type bty_infos = bty_info list
 
@@ -160,9 +165,11 @@ type _macro
 type _system
 type _process
 type _btype
+type _game
 type _hintdb
 type _lemma
 type _predicate
+type _theory
 
 type channel   = _channel   t
 type config    = _config    t
@@ -174,9 +181,11 @@ type macro     = _macro     t
 type system    = _system    t
 type process   = _process   t
 type btype     = _btype     t
+type game      = _game    t
 type hintdb    = _hintdb    t
 type lemma     = _lemma     t
 type predicate = _predicate t
+type theory    = _theory  t
 
 type [@warning "-37"] param_kind =
   | PBool
@@ -197,8 +206,10 @@ type _ def =
   | System    : unit        -> _system    def
   | Process   : unit        -> _process   def
   | BType     : bty_infos   -> _btype     def
+  | Game      : unit        -> _game      def
   | HintDB    : unit        -> _hintdb    def
   | Lemma     : unit        -> _lemma     def
+  | Theory    : unit        -> _theory    def
   | Predicate : unit        -> _predicate def
 
   | Function : (Type.ftype * function_def) -> _fname def
@@ -280,9 +291,11 @@ let edef_namespace : edef -> namespace = fun e ->
   | Exists (System    _) -> NSystem
   | Exists (Process   _) -> NProcess
   | Exists (BType     _) -> NBType
+  | Exists (Game      _) -> NGame
   | Exists (HintDB    _) -> NHintDB
   | Exists (Lemma     _) -> NLemma
   | Exists (Predicate _) -> NPredicate
+  | Exists (Theory    _) -> NTheory
   | Reserved n          -> n
 
 let get_namespace ?(group=default_group) (table : table) s =
@@ -338,8 +351,8 @@ module type Namespace = sig
 
   val is_reserved : ns t -> table -> bool
 
-  val mem       : ns t  -> table -> bool
-  val mem_lsymb : lsymb -> table -> bool
+  val mem       : string -> table -> bool
+  val mem_lsymb : lsymb  -> table -> bool
 
   val of_lsymb     : lsymb -> table -> ns t
   val of_lsymb_opt : lsymb -> table -> ns t option
@@ -440,9 +453,10 @@ module Make (N:S) : Namespace
     | Exists _, _ -> false
     | exception Not_found -> false
 
-  let mem (name : ns t) (table : table) : bool =
+  let mem (name : string) (table : table) : bool =
+    (* let _ =Fmt.epr "Trying to find %s" name  *)
     try
-      ignore (N.deconstruct ~loc:None (fst (Msymb.find name table.cnt))) ;
+      ignore (N.deconstruct ~loc:None (fst (Msymb.find { group; name;} table.cnt))) ;
       true
     with
     | Error (_,Incorrect_namespace _)
@@ -611,6 +625,19 @@ module BType = Make (struct
     | _ as c -> namespace_err loc c namespace
 end)
 
+module Game = Make (struct
+  type ns = _game
+  type local_def = unit
+
+  let namespace = NGame
+
+  let group = "game"
+  let construct d = Game d
+  let deconstruct ~loc s = match s with
+    | Exists (Game d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
 module System = Make (struct
   type ns = _system
   type local_def = unit
@@ -695,6 +722,19 @@ module Lemma = Make (struct
     | _ as c -> namespace_err loc c namespace
 end)
 
+module Theory = Make (struct
+  type ns = _theory
+  type local_def = unit
+
+  let namespace = NTheory
+
+  let group = "theory"
+  let construct d = Theory d
+  let deconstruct ~loc s = match s with
+    | Exists (Theory d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
 module Predicate = Make (struct
   type ns = _predicate
   type local_def = unit
@@ -721,6 +761,7 @@ module TyInfo = struct
     | "well_founded"      -> Well_founded 
     | "fixed"             -> Fixed
     | "finite"            -> Finite
+    | "enum"              -> Enum 
     | _ -> symb_err (L.loc info) (Failure "unknown type information")
 
 (*------------------------------------------------------------------*)
@@ -762,6 +803,17 @@ module TyInfo = struct
     check_info_on_closed_term false table ty Name_fixed_length
 
   (** See `.mli` *)
+  let is_enum table ty : bool = 
+    let rec check : Type.ty -> bool = function
+      | Boolean | Index | Timestamp -> true
+      | Message -> false
+      | Tuple l -> List.for_all check  l
+      | Fun (t1, t2) -> check t1 && check t2
+      | TBase _ as ty -> check_bty_info table ty Enum
+      | _ -> false
+    in 
+    check ty  
+
   let is_well_founded table ty : bool =
     check_info_on_closed_term false table ty Well_founded
 end

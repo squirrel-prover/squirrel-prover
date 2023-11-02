@@ -1315,6 +1315,31 @@ type unif_state = {
   allow_capture : bool;
 }
 
+let mk_unif_state
+    (env : Vars.env)
+    (table : Symbols.table)
+    (system : SE.context)
+    (hyps:Hyps.TraceHyps.hyps)
+    (support : Vars.vars): unif_state
+  =
+  { mode = `Unif;
+    mv = Mvar.empty;
+    bvs = [];
+    subst_vs = Sv.empty;
+    support = Vars.Tag.local_vars support;
+    env;
+    expand_context = Macros.InSequent;
+    ty_env= Type.Infer.mk_env () ;
+    table;
+    system;
+    hyps;
+    use_fadup = false;
+    allow_capture = false
+  }
+  
+    
+
+  
 (*------------------------------------------------------------------*)
 let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
   let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
@@ -1894,6 +1919,9 @@ type known_set = {
   cond : Term.term;
 }
 
+
+let mk_known_set term cond vars: known_set = {term;vars;cond}
+
 (** association list sorting [known_sets] by the head of the term *)
 type known_sets = (term_head * known_set list) list
 
@@ -2352,12 +2380,13 @@ let mset_list_inter
           ) acc mset_l1
       ) [] mset_l2
   in
-  mset_list_simplify table system mset_l
+  mset_list_simplify table system mset_l  
 
 (*------------------------------------------------------------------*)
 (** [{term; cond;}] is the term [term] whenever [cond] holds. *)
 type cond_term = { term : Term.term; cond : Term.term }
 
+let mk_cond_term (term:Term.term) (cond:Term.term) :cond_term = {term;cond}
 
 (*------------------------------------------------------------------*)
 (** {3 Equiv matching and unification} *)
@@ -2370,26 +2399,33 @@ module E = struct
   type t = Equiv.form
 
   (*------------------------------------------------------------------*)
-  exception Fail
-  
-  (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology by 
-      satisfiability under the global hypothesis.
-      Return [true] if [hyp => cond] is a tautology and [false] when it fails to show it.
-      The function is_tautology is defined in the module [Constr]. *)
-  let known_set_check_impl_sat
-      (table : Symbols.table)
-      (full_hyps : Term.term list)
-      (cond : Term.term)
+  let known_set_check_impl_alpha
+      (_table : Symbols.table) 
+      (global_hyps : Term.term list)
+      (hyp : Term.term)
+      (cond : Term.term) : bool
     =
+    (* slow, we are re-doing all of this at each call *)
+    let hyps = List.concat_map Term.decompose_ands (hyp :: global_hyps) in
+    List.exists (fun hyp ->
+        Term.alpha_conv cond hyp
+      ) hyps
+
+  (*------------------------------------------------------------------*)
+  (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
+      w.r.t. to the theory of trace constraints
+      Rely on the module [Constr]. *)
+  let known_set_check_impl_sat
+      (table : Symbols.table) (hyps : Term.term list) (cond : Term.term)
+    =
+    let exception Fail in
     let timeout = TConfig.solver_timeout table in
-    let hyp = Term.mk_ands (full_hyps) in 
+    let hyp = Term.mk_ands hyps in 
     let t_impl = Term.mk_impl hyp cond in
-    try
-      Constr.(is_tautology ~exn:Fail timeout t_impl)
-    with
-    | Fail -> false
+    try Constr.(is_tautology ~exn:Fail timeout t_impl) with Fail -> false
    
 
+  (*------------------------------------------------------------------*)
   let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
     let rec leq t t' =
       match t,t' with
@@ -2405,7 +2441,6 @@ module E = struct
       | _ -> false
     in
     leq t t'
-
   
   (** Check that [hyp] implies [cond] for the special case when [cond] is 
       an inequalitie between function of time stamps or actions.
@@ -2415,8 +2450,8 @@ module E = struct
       is returned. Otherwise [false] is returned. *)
   let known_set_check_impl_auto
       (table : Symbols.table)
-      (hyp : Term.term)
-      (cond:Term.term) : bool
+      (hyp : Term.term) (cond : Term.term)
+    : bool
     =
     let hyps = Term.decompose_ands hyp
     in
@@ -2447,49 +2482,47 @@ module E = struct
   (** Check that [hyp] implies [cond] for the special case when [cond] is [exec@t]. 
       Return [true] when it can proved [hyp => cond], and [false] otherwise. *)  
   let known_set_check_exec_case
-      (table :Symbols.table) 
-      (global_hyps : Term.term list)
-      (cond : Term.term) : bool
+      (table : Symbols.table) (hyps : Term.terms) (cond : Term.term) : bool
     =
+    let exception Fail in
     let timeout = TConfig.solver_timeout table in
     match cond with
     | Term.Macro (ms', _ ,ts') when ms' = Term.exec_macro ->
       let find_greater_exec hyp = match hyp with
         | Term.Macro (ms, _, ts) when ms = Term.exec_macro ->
           begin
-            let term_impl = Term.mk_impl (Term.mk_ands global_hyps) (Term.mk_atom `Leq ts' ts)
+            let term_impl = Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
             in
-            try
-              Constr.is_tautology ~exn:Fail timeout term_impl
-            with
-            | Fail -> false
+            try Constr.is_tautology ~exn:Fail timeout term_impl with Fail -> false
           end
         | _ -> false 
       in
-      List.exists find_greater_exec (List.concat_map Term.decompose_ands global_hyps)
+      List.exists find_greater_exec (List.concat_map Term.decompose_ands hyps)
     | _ -> false
-  
-  
+ 
   (** Check that [hyp] implies [cond], trying the folowing methods:
-   - satifiability
-   - ad hock reasonning for inequalities of time stamps
-   - ad hock reasonning for exec macro
-   FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
-          as hypothesis. *)
+      - satifiability
+      - ad hoc reasonning for inequalities of time stamps
+      - ad hoc reasonning for exec macro
+      FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
+      as hypothesis. *)
   let known_set_check_impl
       (table : Symbols.table)
-      (global_hyps :Term.term list)
+      (global_hyps : Term.terms)
       (hyp   : Term.term)
       (cond  : Term.term) : bool
     =
     let check_one cond = 
-      let check1 =
-        known_set_check_impl_sat table global_hyps cond
-      and check2 =
+      let check0 =              (* alpha-renaming *)
+        known_set_check_impl_alpha table global_hyps hyp cond
+      and check1 =              (* constraints *)
+        known_set_check_impl_sat table (hyp :: global_hyps) cond
+      and check2 =              (* ad hoc inequality reasoning *)
         known_set_check_impl_auto table hyp cond
-      and check3 = 
-        known_set_check_exec_case table global_hyps cond
-      in check1 || check2 || check3
+      and check3 =              (* ad hoc reasoning on [exec] *)
+        known_set_check_exec_case table (hyp :: global_hyps) cond
+      in
+      check0 || check1 || check2 || check3
     in
     List.for_all check_one (Term.decompose_ands cond)
     
@@ -2897,7 +2930,6 @@ module E = struct
     let known = refresh_known_set known in
 
     let known_cond, e_pat = pat_of_known_set known in
-
     assert (
       Sv.disjoint
         (Sv.of_list (List.map fst known.vars))
@@ -2928,11 +2960,12 @@ module E = struct
           (* Fmt.epr "bad instantiation: %t@." _pp_err; *) 
           no_unif ()
       in
+
       let known_cond = Term.subst subst known_cond in
       let global_hyps = Hyps.get_list_of_hyps st.hyps in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
       if not (known_set_check_impl st.table global_hyps cterm.cond known_cond) then None
-      else                      (* clear [known.var] from the binding *)
+      else (* clear [known.var] from the binding *)
         Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
     with NoMatch _ -> None
 
@@ -2962,9 +2995,11 @@ module E = struct
     match _deduce_mem_one cterm known st with
     | Some mv -> Some mv
     | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
-      let env = Vars.add_vars st.bvs st.env in
-      let st = { st with bvs = []; support = []; env; } in
-      _deduce_mem_one cterm known st
+      if st.bvs = [] && st.support = [] then None
+      else
+        let env = Vars.add_vars st.bvs st.env in
+        let st = { st with bvs = []; support = []; env; } in
+        _deduce_mem_one cterm known st
 
 
   (** Try to match [term] as an element of a sequence in [elems]. *)

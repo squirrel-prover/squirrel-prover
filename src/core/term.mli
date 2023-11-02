@@ -219,8 +219,14 @@ type esubst = ESubst of term * term
 type subst = esubst list
 
 val pp_subst : Format.formatter -> subst -> unit
+val pp_subst_dbg : Format.formatter -> subst -> unit
+  
 
 val is_var_subst : subst -> bool
+
+val mk_subst : (term * term) list -> subst
+
+val filter_subst : Vars.var -> subst -> subst
 
 val subst_support : subst -> Sv.t
 
@@ -647,6 +653,8 @@ type 'a pat_op = {
   pat_op_vars   : (Vars.var * Vars.Tag.t) list;
   pat_op_term   : 'a;
 }
+
+val pp_pat_term_op : Format.formatter -> term pat_op -> unit 
 
 val project_tpat        : projs        -> term pat -> term pat
 val project_tpat_opt    : projs option -> term pat -> term pat

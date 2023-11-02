@@ -1111,7 +1111,8 @@ let _fold_macro_support
   in
 
   SE.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb _a_is ~args ~body acc ->
+      fold_descr ~globals:true
+        (fun (msymb : Symbols.macro) _a_is ~(args : Term.term list) ~(body : Term.term) acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 
@@ -1120,7 +1121,7 @@ let _fold_macro_support
                [t] on the indices of the macro set in [mset]. *)
             let subst =
               List.map2 (fun arg j ->
-                  (* Remark:  [arg] may be an arbitrary term. *)
+                  (* Remark: [arg] may be an arbitrary term. *)
                   Term.ESubst (arg, Term.mk_var j)
                 ) args args'
             in
