@@ -1694,12 +1694,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* Check that [pat] entails [S.goal s]. *)
       match match_res with
       (* match failed but [pat] is a product: retry with the rhs *)
-      | NoMatch _ when S.Conc.is_impl pat.pat_op_term ->
-        let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
-        try_apply (t1 :: subs) { pat with pat_op_term = t2 }
+      | NoMatch minfos ->
+        if S.Conc.is_impl pat.pat_op_term then
+          let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
+          try_apply (t1 :: subs) { pat with pat_op_term = t2 }
+        else
+          let t, has_red =
+            S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind pat.pat_op_term
+          in
+          if not has_red then
+            (* match failed and [pat] cannot be reduced: user-level error *)
+            soft_failure (ApplyMatchFailure minfos)
+          else
+            (* [pat] reduced, try again *)
+            try_apply subs { pat with pat_op_term = t }
 
-      (* match failed, [pat] is not a product: user-level error *)
-      | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+      (* failed succeeded but incomplete type inference. *)
       | Match _ when not (Type.Infer.is_closed ty_env) -> 
         soft_failure (Failure "all type variables could not be inferred")
           

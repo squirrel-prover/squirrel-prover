@@ -252,3 +252,80 @@ Proof.
   rewrite /output.
   assumption A.
 Qed.
+
+(*------------------------------------------------------------------*)
+lemma [any] choose_or_not ['a] (x,y : 'a) :
+  (y <> x) =>
+  let b = (fun z => (z = x || z = y)&& z <> x) in
+  (choose b = y).
+Proof.
+  intro H b.
+  assert (forall z, b z => (z = y)). {
+    intro z Heq.
+    rewrite /b /= in Heq. 
+    destruct Heq.
+    by case H0.
+  }.
+  apply H0.
+  
+  by rewrite /* (choose_spec (fun z => (z = x || z = y) && z <> x) y) /=.
+Qed. 
+
+global lemma _ (x,y : index): 
+  [x <> y] -> equiv(true).
+Proof.
+  intro H.
+  assert choose (fun t => (t = x || t = y) && t <> x) = y.
+
+  have A /= := choose_or_not x y.
+  by apply A.
+  auto.
+Qed.
+
+global lemma _ (x,y : index): 
+  [x <> y] -> equiv(true).
+Proof.
+  intro H.
+  assert choose (fun t => (t = x || t = y) && t <> x) = y.
+  by apply choose_or_not.
+  auto.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* same as `choose_or_not`, inversing the `let` and `=>` *)
+lemma [any] choose_or_not2 ['a] (x,y : 'a) :
+  let b = (fun z => (z = x || z = y)&& z <> x) in
+  (y <> x) =>
+  (choose b = y).
+Proof.
+  intro b H.
+  assert (forall z, b z => (z = y)). {
+    intro z Heq.
+    rewrite /b /= in Heq. 
+    destruct Heq.
+    by case H0.
+  }.
+  apply H0.
+  
+  by rewrite /* (choose_spec (fun z => (z = x || z = y) && z <> x) y) /=.
+Qed. 
+
+global lemma _ (x,y : index): 
+  [x <> y] -> equiv(true).
+Proof.
+  intro H.
+  assert choose (fun t => (t = x || t = y) && t <> x) = y.
+
+  have A /= := choose_or_not2 x y.
+  by apply A.
+  auto.
+Qed.
+
+global lemma _ (x,y : index): 
+  [x <> y] -> equiv(true).
+Proof.
+  intro H.
+  assert choose (fun t => (t = x || t = y) && t <> x) = y.
+  by apply choose_or_not2.
+  auto.
+Qed.

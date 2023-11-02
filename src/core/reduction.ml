@@ -418,7 +418,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       if has_red then fst (reduce st t), true
       else t, false
 
-  (* Reduce once at head position *)
+  (* Reduce once at head position.
+     May use all reduction rules:
+       [δ, user rewriting rules, β, proj, let, constr ] *)
   and reduce_head1 (st : state) (t : Term.term) : Term.term * bool = 
     let rec try_red red_funcs =
       match red_funcs with
