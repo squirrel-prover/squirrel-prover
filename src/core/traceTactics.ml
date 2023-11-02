@@ -545,7 +545,10 @@ let eq_names (s : TS.t) =
             add_hyp s Term.mk_false
           else            
             List.fold_left2 (fun s t1 t2 ->
-                add_hyp s (Term.mk_eq t1 t2)
+                match t1, t2 with
+                | Tuple l1, Tuple l2 ->
+                  List.fold_left add_hyp s (List.map2 Term.mk_eq l1 l2)
+                | _ -> add_hyp s (Term.mk_eq t1 t2)
               ) s l1 l2
         else 
           s

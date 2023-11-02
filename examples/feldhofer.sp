@@ -189,12 +189,6 @@ Proof.
         rewrite A in *; clear A. 
         rewrite -Meq in *. 
         admit. (* pb w/ randomness condition *) 
-      * intro [? ?] /=. 
-        have A : j1 = j0 by auto.
-        rewrite A in *; clear A. 
-        have A : j2 = j by auto.
-        rewrite A in *; clear A. 
-        auto.
 
   + assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
     as Meq0;

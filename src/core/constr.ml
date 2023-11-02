@@ -292,6 +292,16 @@ module Form = struct
       | `Neg, Happens t -> [Lit (`Eq,  term_to_ut memo t, uundef)]
       | `Pos, Happens t -> [Lit (`Neq, term_to_ut memo t, uundef)]
 
+      (* rule for tuples: equality *)
+      | `Pos, (Comp (`Eq, Tuple l1, Tuple l2)) -> 
+        let lits = List.map2 (fun t1 t2 -> `Pos, (Term.Lit.Comp (`Eq, t1, t2))) l1 l2 in
+        List.concat_map doit lits
+
+      (* rule for tuples: equality *)
+      | `Pos, (Comp (`Neq, Tuple l1, Tuple l2)) -> 
+        let lits = List.map2 (fun t1 t2 -> `Pos, (Term.Lit.Comp (`Neq, t1, t2))) l1 l2 in
+        [disj (List.concat_map doit lits)]
+
       | `Pos, (Comp ((_, _, _) as atom)) -> _mk atom
 
       (* We rewrite the negative literal as a positive literal, and recurse. *)
