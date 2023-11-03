@@ -771,6 +771,8 @@ end
 
 (*------------------------------------------------------------------*)
 (* Must be synchronized with the corresponding code in [Symbols.ml]! *)
+
+(* `<`,`>` and `=` are manually added after-ward. *)
 let right_infix_char_first = 
   [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>' | '='))]
 let left_infix_char_first = [%sedlex.regexp? '^']
@@ -796,6 +798,7 @@ let is_left_infix_str (s : string) : bool =
 let is_right_infix_str (s : string) : bool =
   let lexbuf = Sedlexing.Utf8.from_string s in
   match%sedlex lexbuf with
+  | '<' | '>' | '=' -> true
   | right_infix_symb -> true
   | _ -> false
 
