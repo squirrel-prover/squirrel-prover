@@ -170,7 +170,6 @@ Proof.
   (* Currently, we cannot expand `z`, as we are in the 
      wrong system (`P1`) *)
 
-  rewrite /output in z. 
   (* apply eq_ref. *)
 Abort.
 
@@ -185,7 +184,6 @@ Proof.
   rewrite /z in H1.
   checkfail auto exn GoalNotClosed.
   rewrite /z.  
-  rewrite /output in z.  
   rewrite /output.
 Abort.
 
@@ -198,7 +196,6 @@ global lemma [set:P0; equiv:P0] _ :
 Proof.
   intro H z H0 H1.
   rewrite /z in H1.
-  rewrite /output in z.  
   rewrite /z.
   apply eq_refl.
 Qed.
@@ -248,7 +245,6 @@ Proof.
   checkfail clear A; auto exn GoalNotClosed.
   rewrite /z. 
   checkfail clear A; by rewrite /output exn GoalNotClosed.
-  rewrite /output in z.  
   rewrite /output.
   assumption A.
 Qed.
@@ -329,3 +325,11 @@ Proof.
   by apply choose_or_not2.
   auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+lemma [any] _ : let x = empty in x = empty.
+Proof. 
+  intro x. 
+  have A : x = empty. auto. 
+  checkfail rewrite -A in x exn Failure. (* cannot target definitions *)
+Abort.

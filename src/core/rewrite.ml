@@ -315,7 +315,7 @@ let do_rewrite
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec _rewrite (mult : Args.rw_count) (f : Equiv.any_form) 
+  let rec do_rewrite1 (mult : Args.rw_count) (f : Equiv.any_form) 
     : Equiv.any_form * (SE.t * Term.term) list
     =
     check_max_rewriting ();
@@ -364,17 +364,17 @@ let do_rewrite
       let inst_subgs = subgoals_of_found inst in
       if i = 1 then f, inst_subgs 
       else
-        let f, rsubs' = _rewrite Args.(Exact (i - 1)) f in
+        let f, rsubs' = do_rewrite1 Args.(Exact (i - 1)) f in
         f, List.rev_append inst_subgs rsubs'
 
     | (Args.Many | Args.Any), `Found inst  ->
       let inst_subgs = subgoals_of_found inst in
-      let f, rsubs' = _rewrite Args.Any f in
+      let f, rsubs' = do_rewrite1 Args.Any f in
       f, List.rev_append inst_subgs rsubs'
   in
 
   let f, subs = 
-    if mult = Args.Exact 0 then (target, []) else _rewrite mult target 
+    if mult = Args.Exact 0 then (target, []) else do_rewrite1 mult target 
   in
   let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
   f, subs

@@ -148,7 +148,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
   type target =
     | T_conc              (** conclusion *)
     | T_hyp   of Ident.t  (** hypothesis *)
-    | T_def   of Ident.t  (** definition *)
     | T_felem of int      (** element in conclusion biframe *)
 
   type targets = target list
@@ -166,9 +165,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let target_all s : target list =
     T_conc :: 
-    List.map (function
-        | (id, TopHyps.LHyp _) -> T_hyp id
-        | (id, TopHyps.LDef _) -> T_def id
+    List.concat_map (function
+        | (id, TopHyps.LHyp _) -> [T_hyp id]
+        | (_ , TopHyps.LDef _) -> []
       ) (Hyps.to_list s)
 
   let make_single_target (symb : lsymb) (s : S.sequent) : target =
@@ -183,7 +182,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       begin
         match Hyps.by_name symb s with
         | id, LHyp _ -> T_hyp id
-        | id, LDef _ -> T_def id
+        | _, LDef _ ->
+          soft_failure ~loc:(L.loc symb)
+            (Tactics.Failure ("cannot target definitions"))
       end
     else
       match int_of_string_opt name with
@@ -215,9 +216,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | T_hyp id ->
         let f = Hyps.by_id_k id Hyp s in
         S.wrap_hyp  f, Hyps.remove id s, S.system s, Some id
-      | T_def id ->
-        let se, f = Hyps.by_id_k id Def s in
-        Equiv.Local f, Hyps.remove id s, SE.reachability_context se, Some id
       | T_felem i ->
           let f = Equiv.Global (Equiv.Atom (Equiv [S.get_felem i s])) in
           f, s, S.system s, None
@@ -235,10 +233,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_hyp id, _ ->
       let ldc = TopHyps.LHyp (S.unwrap_hyp f) in
       Hyps.add (Args.Named (Ident.name id)) ldc s, subs
-    | T_def id, Local f ->
-      let ldc = TopHyps.LDef (system.set,f) in
-      let _, hyps = Hyps._add ~force:true id ldc s in
-      hyps, subs
     | T_felem i, Global (Atom (Equiv [f])) -> S.change_felem i [f] s, subs
     | _ -> assert false
 
@@ -1893,7 +1887,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match target with
       | T_conc    -> do_apply    ~use_fadup (subgs, pat) s
       | T_hyp id  -> do_apply_in ~use_fadup (subgs, pat) id s
-      | T_def _ | T_felem _ -> assert false (* impossible *)
+      | T_felem _ -> assert false (* impossible *)
     in
 
     subgs'
