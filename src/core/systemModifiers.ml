@@ -1312,7 +1312,7 @@ let do_s_item
   | Args.Simplify _loc, args -> 
     let param = Reduction.rp_default in
     let param = Reduction.parse_simpl_args param args in
-    TS.Reduce.reduce_term ~expand_context param s t 
+    Reduction.reduce_term (TS.Reduce.to_state ~expand_context param s) t 
 
   | Args.Tryauto loc, _ | Args.Tryautosimpl loc, _ ->
     soft_failure ~loc (Failure "cannot use // or //= in a global rewriting")

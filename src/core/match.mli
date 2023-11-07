@@ -363,26 +363,31 @@ val reduce_beta1    : Term.term -> Term.term * bool
 (** let reduction *)
 val reduce_glet1 : Equiv.form -> Equiv.form * bool
 
+(*------------------------------------------------------------------*)
+(** {2 Internals} *)
+
+(*------------------------------------------------------------------*)
 type unif_state
 
 val mk_unif_state :
-  Vars.env -> Symbols.table -> SE.context -> Hyps.TraceHyps.hyps
-  -> Vars.vars -> unif_state
+  Vars.env -> Symbols.table -> SE.context -> Hyps.TraceHyps.hyps -> Vars.vars -> 
+  unif_state
 
+(*------------------------------------------------------------------*)
 type cond_term
 
 val mk_cond_term : Term.term -> Term.term -> cond_term 
 
+(*------------------------------------------------------------------*)
+type known_set
+
+val mk_known_set : Term.term ->  Term.term -> Vars.tagged_vars -> known_set
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 module T : S with type t = Term.term
 
-
-type known_set
-
-val  mk_known_set : Term.term ->  Term.term -> Vars.tagged_vars -> known_set
-
+(*------------------------------------------------------------------*)
 module E : sig
   include S with type t = Equiv.form
 
