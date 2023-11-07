@@ -2911,15 +2911,27 @@ module E = struct
     | `Contravar -> `Covar
 
   (*------------------------------------------------------------------*)
-  (* FIXME: remove *)
   let term_unif term pat st : Mvar.t =
     try T.tunif term pat st with
-    | NoMatch _ -> no_unif ()  (* FIXME: why throw away match info? *)
+    | NoMatch _ -> no_unif ()   
+  (* throw away match infos, which have no meaning when unifying *)
 
-  (* FIXME: remove *)
   let term_unif_l terms pats st : Mvar.t =
     try T.tunif_l terms pats st with
-    | NoMatch _ -> no_unif ()  (* FIXME: why throw away match info? *)
+    | NoMatch _ -> no_unif ()  
+  (* throw away match infos, which have no meaning when unifying *)
+
+  (*------------------------------------------------------------------*)
+  let get_local_of_hyps (hyps : TraceHyps.hyps) =
+    let hyps =
+      TraceHyps.fold_hyps (fun _ hyp acc ->
+          match hyp with
+          | Equiv.Local f
+          | Equiv.(Global Atom( (Reach f))) ->
+            f:: acc
+          | _ -> acc 
+        ) hyps []
+    in hyps
 
   (*------------------------------------------------------------------*)
   (** Try to match [cterm] as an element of [known]. *)
@@ -2963,7 +2975,7 @@ module E = struct
       in
 
       let known_cond = Term.subst subst known_cond in
-      let global_hyps = Hyps.get_list_of_hyps st.hyps in
+      let global_hyps = get_local_of_hyps st.hyps in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
       if not (known_set_check_impl st.table global_hyps cterm.cond known_cond) then None
       else (* clear [known.var] from the binding *)
@@ -3217,7 +3229,7 @@ module E = struct
       match_equiv_incl terms pat_terms st
 
   (*------------------------------------------------------------------*)
-  (** Match two [Equiv.form] *)
+  (** Unifies two [Equiv.form] *)
   let rec e_unif
       ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state) : Mvar.t 
     =

@@ -534,17 +534,6 @@ let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
   in
   List.filter_map do1 (get_atoms_of_hyps hyps)
 
-let get_list_of_hyps (hyps : TraceHyps.hyps) =
-  let hyps =
-    TraceHyps.fold_hyps (fun _ hyp acc ->
-        match hyp with
-        | Equiv.Local f
-        | Equiv.(Global Atom( (Reach f))) ->
-          f:: acc
-        | _ -> acc 
-      ) hyps []
-  in hyps
-
 (*------------------------------------------------------------------*) 
 (** {2 Changing the context of a set of hypotheses} *)
 
