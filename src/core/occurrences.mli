@@ -4,18 +4,18 @@ module MP = Match.Pos
 
 
 (** Overview:
-    The Occurrences module provides ways to easily search for occurrences
+    The [Occurrences] module provides ways to easily search for occurrences
     of anything in a term.
 
-    - Users need to provide a module of type OccContent,
+    - Users need to provide a module of type [OccContent],
       containing the type of the things they want to search for, and a few
       operations on this type.
 
     - The MakeSearch functor will take that module as a parameter,
-      and produce a module of type OccurrenceSearch,
-      containing a function find_all_occurrences.
+      and produce a module of type [OccurrenceSearch],
+      containing a function [find_all_occurrences].
 
-    - Users need to provide that function with a get_bad_occs function.
+    - Users need to provide that function with a [get_bad_occs] function.
       This function does not need to worry about unfolding macros, iterating
       through the term, or looking for indirect occurrences. 
       It only looks for the occurrences at top level in a term.
@@ -25,11 +25,11 @@ module MP = Match.Pos
       * a second one, more precise, asks to be called recursively on
         some of the subterms only, for more complex cases.
 
-    - find_all_occurrences will then take care of iterating through all
+    - [find_all_occurrences] will then take care of iterating through all
       direct and indirect terms, and return all found occurrences.
 
-    - A second functor, MakeFormulas, will take a module of type ExtOcc
-      (that is built by MakeSearch), and provide a function to generate
+    - A second functor, [MakeFormulas], will take a module of type [ExtOcc]
+      (that is built by [MakeSearch]), and provide a function to generate
       the proof goals associated to the list of occurrences found.
       Users may of course decide to only call that function on some of the
       found occurrences.
@@ -45,8 +45,7 @@ val clear_trivial_equalities : Term.term -> Term.term
 
 (** Module containing the type of the contents of occurrences
     we will look for, and some operations on this type. *)
-module type OccContent =
-sig
+module type OccContent = sig
   (** Type of the thing for which we want occurrences *)
   type content
 
@@ -81,15 +80,17 @@ sig
 
 end
 
-
-(** Predefined instance of OccContent for timestamps,
+(*------------------------------------------------------------------*)
+(** Predefined instance of [OccContent] for timestamps,
     plus a dummy occurrence with no content *)
-module TSContent : OccContent with type content = Term.term
-                               and type data = unit
 
-module EmptyContent : OccContent with type content = unit
-                                  and type data = unit
+module TSContent : OccContent 
+  with type content = Term.term
+   and type data = unit
 
+module EmptyContent : OccContent 
+  with type content = unit
+   and type data = unit
 
 (*------------------------------------------------------------------*)
 (** {2 Simple occurrences} *)
@@ -103,16 +104,14 @@ type occ_type =
 (** Applies a substitution to an {!occ_type}. *)
 val subst_occtype : Term.subst -> occ_type -> occ_type
 
-
-
+(*------------------------------------------------------------------*)
 (** Signature of a module for simple occurrences.
     Contains an OccContent submodule, defining what types occurrences contain.
     They contain a content, and a value of the same type with which it
     could collide (that value is the one we search occurrences of).
     They also store additional information such as the variables
     bound above the occurrence. *)
-module type SimpleOcc =
-sig
+module type SimpleOcc = sig
 
   (** The content occurrences store *)
   module OC : OccContent
@@ -120,7 +119,6 @@ sig
   type content = OC.content
 
   type data = OC.data
-
 
   (* Remarks:
      - We could store a position in the term where the occ was, as in Iter.occ,
@@ -146,7 +144,7 @@ sig
 
   type simple_occs = simple_occ list
 
-
+  (*------------------------------------------------------------------*)
   (** Constructs a simple occurrence.
       alpha-renames the variables given in parameters, to avoid confusion. 
       Hence it is assumed fv contains all variables occurring in the content
@@ -156,7 +154,7 @@ sig
     Vars.vars -> Term.terms -> occ_type -> Term.term ->
     simple_occ
 
-
+  (*------------------------------------------------------------------*)
   (** Auxiliary function to check if all instances of [o1]
       are instances of [o2]. 
       Returns the matching substitution, so that it can be reused for 
@@ -222,7 +220,7 @@ type empty_occs = EmptyOcc.simple_occs
     they only need to construct simple occurrences. *)
 module type ExtOcc = sig
 
-  (** Submodule: the SimpleOcc we extend *)
+  (** Submodule: the [SimpleOcc] we extend *)
   module SO : SimpleOcc
 
   type simple_occ = SO.simple_occ
@@ -230,14 +228,15 @@ module type ExtOcc = sig
   (** Occurrence with additional info about where it was found. *)
   type ext_occ = {
     eo_occ       : simple_occ;
-    eo_source    : Term.terms;     (** Original terms where
-                                        the occurrence was found. *)
-    eo_source_ts : ts_occs;         (** Timestamps occurring in the source terms. *)
-    eo_path_cond : Iter.PathCond.t; (** Path condition on the timestamps [τ]
-                                        at which the occurrence can occur:
-                                        for any source timestamp [τ_src]
-                                        (in [eo_sources_ts]),
-                                        [path_cond τ τ_src] *)
+    eo_source    : Term.terms;     
+    (** Original terms where the occurrence was found. *)
+    eo_source_ts : ts_occs; 
+    (** Timestamps occurring in the source terms. *)
+    eo_path_cond : Iter.PathCond.t; 
+    (** Path condition on the timestamps [τ] at which the occurrence
+        can occur: 
+        for any source timestamp [τ_src] (in [eo_sources_ts]), 
+        [path_cond τ τ_src] *)
   }
 
   type ext_occs = ext_occ list
@@ -271,13 +270,12 @@ module MakeEO :
 
 (** Information on a position when iterating through a term *)
 type pos_info =
-  { pi_pos     : MP.pos;             (* the position *)
-    pi_occtype : occ_type;           (* are we in a direct or indirect term *)
-    pi_trctxt  : Constr.trace_cntxt; (* system+table at the position *)
-    pi_vars    : Vars.vars;          (* variables bound above the position *)
-    pi_cond    : Term.terms;         (* conditions above the position *)
-    pi_subterm : Term.term;          (* subterm where the position is located
-                                        (for printing) *)
+  { pi_pos     : MP.pos;             (** the position *)
+    pi_occtype : occ_type;           (** are we in a direct or indirect term *)
+    pi_trctxt  : Constr.trace_cntxt; (** system+table at the position *)
+    pi_vars    : Vars.vars;          (** variables bound above the position *)
+    pi_cond    : Term.terms;         (** conditions above the position *)
+    pi_subterm : Term.term;          (** subterm of the position (for printing) *)
   }
 
 (** Information used to check if a macro can be expanded in a term:
@@ -310,9 +308,8 @@ val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
 (** Module containing functions to search for occurrences of the given type
     in a term, iterating through the term and indirect occurrences,
     unfolding macros. *)
-module type OccurrenceSearch =
-sig
-  (** Submodule: the ExtOcc we look for *)
+module type OccurrenceSearch = sig
+  (** Submodule: the [ExtOcc] we look for *)
   module EO : ExtOcc
 
   type simple_occ = EO.simple_occ
@@ -349,11 +346,8 @@ sig
       Takes care of macro expansion and going through all terms,
       using [fold_macro_support] and [map_fold]. *)
   val find_all_occurrences :
-    mode:Iter.allowed_constants -> (* allowed sub-terms without
-                                      further checks *)
-    (* TODO document the "mode" option *)
-    ?pp_ns:unit Fmt.t option -> (* function printing what we're searching
-                                   occurrences of *)
+    mode:Iter.allowed_constants -> (* allowed sub-terms without further checks *)
+    ?pp_ns:unit Fmt.t option -> (* printing searched for occurrences *)
     f_fold_occs ->
     Constr.trace_cntxt ->
     Env.t ->
@@ -379,9 +373,7 @@ val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
 (** Module to containing functions to produce formulas (proof goals)
     expressing that extended occurrences of the given type are
     indeed collisions (or alternately, that they are not) *)
-module type OccurrenceFormulas =
-sig
-
+module type OccurrenceFormulas = sig
   type ext_occ
   type ext_occs = ext_occ list
 
@@ -444,18 +436,21 @@ sig
   val has_name : t -> Term.term -> bool
 end
 
-
-(** OccurrenceContent, OccurrenceSearch, OccurrenceFormulas
+(*------------------------------------------------------------------*)
+(** [OccurrenceContent], [OccurrenceSearch], [OccurrenceFormulas]
     for occurrences of names *)
-module NameOC : OccContent with type content = Name.t
-                            and type data = unit
 
-module NameOccSearch : OccurrenceSearch with module EO.SO.OC = NameOC
-                                               
-module NameOccFormulas :
-  OccurrenceFormulas with type ext_occ = NameOccSearch.ext_occ
-                                               
+module NameOC : OccContent 
+  with type content = Name.t
+   and type data = unit
 
+module NameOccSearch : OccurrenceSearch 
+  with module EO.SO.OC = NameOC
+                                               
+module NameOccFormulas : OccurrenceFormulas 
+  with type ext_occ = NameOccSearch.ext_occ
+                                               
+(*------------------------------------------------------------------*)
 (** Utility:
     finds all names in the list with the same symbol as the given name,
     returns the corresponding simple occs *)

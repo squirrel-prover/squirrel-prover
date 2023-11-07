@@ -52,13 +52,15 @@ let rec factors (mult:Symbols.fname option) (info:O.expand_info)
     end
   | _ -> [t]
 
-
+(*------------------------------------------------------------------*)
 (** Returns (m, [p1,…,pn]) such that t = m ^ (p1*…*pn)
     and m is not itself an exponential.
     (unfolds the macros when possible) *) 
-let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
-    (info:O.expand_info)
-    (t:term) : term * (term list) =
+let rec powers
+    (exp : Symbols.fname) (mult : Symbols.fname option)
+    (info : O.expand_info)
+    (t : term) : term * (term list) 
+  =
   match t with
   | App (Fun (f, _), [t1; t2]) when f = exp ->
     let (m, ps) = powers exp mult info t1 in
@@ -72,7 +74,7 @@ let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
     end
   | _ -> (t, [])
 
-
+(*------------------------------------------------------------------*)
 (** Separate pows between occs of elements in nab and the rest *)
 let partition_powers
     (nab:Name.t list) (pows:term list) : (Name.t list) * (term list) 
@@ -91,32 +93,31 @@ let partition_powers
 (* future work: return a tree of and/or of name_occs and generate
    the goals accordingly *)
 
-(** A NOS.f_fold_occs function.
-    Looks for occurrences of names in nab not allowed by CDH or GDH
-    (depending on gdh_oracles).
-    Finds all possible occurrences of nab in t (ground), except
-    1) in g ^ p1…pn: one pi is allowed to be a or b
-    2) in u^p1…pn = v^q1…qm: if GDH, one pi and one qi are allowed to be a or b
-    If t is of the form something^something, looks directly for occurrences
-    in t,
+(** A [NOS.f_fold_occs] function.
+    Looks for occurrences of names in [nab] not allowed by CDH or GDH
+    (depending on [gdh_oracles]).
+    Finds all possible occurrences of [nab] in [t] (ground), except
+    1) in [g ^ p1…pn]: one [pi] is allowed to be [a] or [b]
+    2) in [u^p1…pn = v^q1…qm]: if GDH, one [pi] and one [qi] are allowed to be [a] or [b]
+    If [t] is of the form [something^something], looks directly for occurrences
+    in [t],
     and uses the provided continuation for the rec calls on its subterms.
-    Otherwise, gives up, and asks occurrence_goals to be called
+    Otherwise, gives up, and asks [occurrence_goals] to be called
     again on subterms. *)
 let get_bad_occs
     (env : Env.t)            (* initial environment  *)
-    (gdh_oracles:bool) (g:term) (exp:Symbols.fname) (mult:Symbols.fname option)
-    (nab:Name.t list) 
+    (gdh_oracles : bool) (g : term) (exp : Symbols.fname) (mult : Symbols.fname option)
+    (nab : Name.t list) 
     (retry_on_subterms : unit -> NOS.simple_occs)
     (rec_call_on_subterms : O.pos_info -> Term.term -> NOS.simple_occs)
-    (info:O.pos_info)
-    (t:Term.term)
+    (info : O.pos_info)
+    (t : Term.term)
   : NOS.simple_occs
   =
   (* get all bad occurrences in m ^ (p1 * … * pn) *)
   (* st is the current subterm, to be recorded in the occurrence *)
   let get_illegal_powers
-      (m:Term.term) (pows:Term.terms)
-      (info:O.pos_info)
+      (m : Term.term) (pows : Term.terms) (info : O.pos_info) 
     : NOS.simple_occs 
     =
     if m <> g then (* all occs in m, pows are bad *)
