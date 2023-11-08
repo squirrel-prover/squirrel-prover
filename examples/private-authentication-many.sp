@@ -71,8 +71,10 @@ Proof.
  by intro *; case b.
 Qed.
 
-equiv unlinkability.
+global lemma unlinkability (t : timestamp[const]) :
+  [happens(t)] -> equiv(frame@t).
 Proof.
+  intro Hap. 
   enrich
     seq(A:index          => pk( kA    (A  ) )),
     seq(A:index, i:index => pk( kAbis (A,i) )),
@@ -81,29 +83,27 @@ Proof.
   induction t.
 
    (* init *)
-  auto.
+  * auto.
 
   (* Case A *)
-  expandall => /=.
-  by apply IH.
-
+  * rewrite /* /=.
+    by apply IH.
+    
   (* Case A1 *)
-  expandall.
-  fa 3; fa 4; fa 4; fa 4; fa 4.
-  fresh 6; 1:auto.
-  by fresh 5.
-
-  (* Case B *)
-  rewrite /frame /output /exec /cond /dmess /=.
-  fa 3; fa 4; fa 4.
-  enckp 4; 1: auto.
-  enrich pk(kA(A)).
-  cca1 5.
-  + auto.
-  + (* Pushing conditional underneath len(_) *)
-  rewrite if_len !length_pair.
-  rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
-  fa 5; fa 5; fa 5; fa 5.
-  fresh 5; 1:auto.
-  by fresh 5.
+  * rewrite /* /=.
+    fa !<_,_>, if _ then _ else _, enc _, <_,_>.
+    fresh 6; 1:auto.
+    by fresh 5.
+    
+  * (* Case B *)
+    rewrite /frame /output /exec /cond /dmess /=.
+    fa 3; fa 4; fa 4.
+    enckp 4; 1: auto.
+    cca1 4. 
+    + auto.
+    + rewrite if_len !length_pair.
+      rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
+      fa enc _, zeroes _, _ ++ _, len _.
+      fresh 5; 1:auto.
+      by fresh 4.
 Qed.
