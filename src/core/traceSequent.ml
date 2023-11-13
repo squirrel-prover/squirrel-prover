@@ -15,16 +15,18 @@ include Sequent.Mk(struct
         ES.init ~env:(S.env s) Equiv.Smart.mk_false
       in
       let es =
-        S.Hyps.fold (fun id hyp es ->
-            match hyp with
-            | Global f -> ES.Hyps.add (Args.Named (Ident.name id)) f es
-            | Local f ->
+        S.Hyps.fold (fun id ld es ->
+            match ld with
+            | LHyp (Global f) -> ES.Hyps.add (Args.Named (Ident.name id)) (LHyp f) es
+            | LHyp (Local f) ->
               if HighTerm.is_constant     (env s) f &&
                  HighTerm.is_system_indep (env s) f 
               then
                 ES.Hyps.add
-                  (Args.Named (Ident.name id)) (Equiv.mk_reach_atom f) es
+                  (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
               else es
+            | LDef (se,t) -> 
+              ES.Hyps.add (Args.Named (Ident.name id)) (LDef (se,t)) es
           ) s es
       in
       es

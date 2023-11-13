@@ -16,7 +16,7 @@ val rewrite_head :
   Symbols.table ->
   Vars.env ->
   Macros.expand_context ->
-  Hyps.TraceHyps.hyps Lazy.t ->
+  Hyps.TraceHyps.hyps ->
   SE.t ->
   rw_rule ->
   Term.term ->

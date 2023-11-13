@@ -10,6 +10,19 @@ val dbg : ?force:bool -> ('a, Format.formatter, unit) format -> 'a
 (*------------------------------------------------------------------*)
 (** {3 Miscellaneous} *)
 
+(** Check if a formula is a [Equiv.Local _] *)
+val check_local : loc:L.t -> Equiv.any_form -> unit
+
+(** Open an [Equiv.Local _] formula *)
+val as_local : ?loc:L.t -> Equiv.any_form -> Term.term
+
+(** Check if a formula is a [Equiv.Global _] *)
+val check_global : loc:L.t -> Equiv.any_form -> unit
+
+(** Open an [Equiv.Global _] formula *)
+val as_global : ?loc:L.t -> Equiv.any_form -> Equiv.form
+
+(*------------------------------------------------------------------*)
 val bad_args : unit -> 'a
 
 val check_ty_eq  : ?loc:L.t -> Type.ty  -> Type.ty  -> unit
@@ -120,6 +133,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     | `Fsymb of Symbols.fname 
     | `Psymb of Symbols.predicate
     | `Mterm of Term.term
+    | `Def   of Ident.t
     | `Any
   ]
 
@@ -128,7 +142,9 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val expand_term :
     ?m_rec:bool -> 
     mode:Macros.expand_context ->
-    expand_kind -> S.sequent -> Equiv.any_form -> 
+    expand_kind -> S.sequent ->
+    Equiv.any_form ->           (* term being expanded *)
+    SE.context ->               (* system context of the term *)
     bool * Equiv.any_form
 
   (*------------------------------------------------------------------*)
@@ -159,7 +175,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (*------------------------------------------------------------------*)
   (** {3 Other tactics} *)
 
-  val revert : Ident.ident -> S.t -> S.t
+  val revert : ?loc:L.t -> Ident.ident -> S.t -> S.t
 
   (** Correponds to `intro *`, to use in automated tactics. *)
   val intro_all : S.t -> S.t list

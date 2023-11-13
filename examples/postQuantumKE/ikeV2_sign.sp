@@ -269,12 +269,16 @@ Proof.
   expand cond.
   destruct H3 as [? H4].
   case H2.
-  + euf H4 => [?[?[?[??]]]]. 
+  + euf H4 => [?[?[?[??]]]] /=. 
+    clear H4. 
+    (have A : i = l by auto); rewrite A in *; clear A.
+    (have A : j0 = j by auto); rewrite A in *; clear A.
+    constraints. 
+  + euf H4 => [?[?[?[??]]]] /=. 
     clear H4.
-    auto. 
-  + euf H4 => [?[?[?[??]]]]. 
-    clear H4.
-    auto. 
+    (have A : i = l by auto); rewrite A in *; clear A.
+    (have A : j0 = j by auto); rewrite A in *; clear A.
+    constraints.
 Qed.
 
 axiom [core3,core/right] ddhcommu (i,j,k,l:index):

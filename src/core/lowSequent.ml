@@ -92,8 +92,6 @@ module type S = sig
   (*------------------------------------------------------------------*) 
   (** {2 Misc} *)
 
-  val map : Equiv.Babel.mapper -> t -> t
-
   module Hyp : SmartFO.S with type form = hyp_form
 
   module Conc : SmartFO.S with type form = conc_form

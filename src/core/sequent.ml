@@ -487,7 +487,7 @@ module Mk (Args : MkArgs) : S with
     : ghyp * PT.t
     =
     if Hyps.mem_name (L.unloc name) s then
-      let id, f = Hyps.by_name name s in
+      let id, f = Hyps.by_name_k name Hyp s in
       let f : Equiv.any_form =
         match S.hyp_kind with
         | Equiv.Any_t -> f

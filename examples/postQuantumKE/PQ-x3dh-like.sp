@@ -957,8 +957,8 @@ Proof.
            use uniqepk with vkI(i),vkI(i0) => //.
            exists k.
            depends I(i,j,l), FI(i,j,l) => //.
-           intro OrdIFI.
-           simpl.
+           intro OrdIFI /=.
+           (have A : i0 = i by auto); rewrite A in *; clear A.
            use sufcma with sid10(i,j,l)@FI(i,j,l), (xor(ktilde10(i,j,l)@FI(i,j,l)) (snd(snd(input@FI(i,j,l)))))  ,  skR(j); try auto .
            expand output.
 

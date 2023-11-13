@@ -42,7 +42,7 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
       Term.tforall (is_det env) t
         
     (* recurse *)
-    | App _ |Fun _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | Let _ | App _ |Fun _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_det venv) t
   in
   is_det env.vars t
@@ -76,7 +76,7 @@ let is_constant (env : Env.t) (t : Term.term) : bool =
         Term.tforall (is_const venv) t
         
     (* recurse *)
-    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | Let _ | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_const venv) t
   in
   is_const env.vars t
@@ -115,7 +115,7 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
     (* recurse *)
     (* notice that [Action _] is allowed, since we check the independence of the system 
        among all compatible systems. *)
-    | Name _ | App _ | Action _ | Tuple _ | Proj _ as t ->
+    | Let _ | Name _ | App _ | Action _ | Tuple _ | Proj _ as t ->
       Term.tforall (is_si env) t
   in
   (* a term is system-independent if it applies to a single system (for 
@@ -172,7 +172,7 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
         Term.tforall (is_adv venv) t
         
     (* recurse *)
-    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | Let _ | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_adv venv) t
   in
   is_adv env.vars t &&
@@ -185,4 +185,3 @@ let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
   let system_indep = is_system_indep              env t in
   (* latter test checks if [t] is a single system term *)
   { system_indep; const; adv }
-  

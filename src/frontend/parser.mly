@@ -28,7 +28,7 @@
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK
-%token LET IN IF THEN ELSE FIND SUCHTHAT
+%token LLET LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
@@ -41,19 +41,21 @@
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token SHARP DOLLAR
+%token GAME VAR RND RETURN
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
 %token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
 %token SPLITSEQ CONSTSEQ MEMSEQ
-%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION
+%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO
 %token PROOF QED RESET UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH
 %token SMT
 %token EOF
 
+%nonassoc IN
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW 
@@ -223,6 +225,9 @@ term_i:
 
 | q=quantif vs=ext_bnds_tagged COMMA f=term %prec QUANTIF
                                  { Theory.Quant (q,vs,f)  }
+
+| LET v=lsymb ty=colon_ty? EQ t1=term IN t2=term
+    { Theory.Let (v,t1,ty,t2) }
 
 /* non-ambiguous term */
 %inline else_term:
@@ -486,9 +491,11 @@ lsymb_decl:
 |                                     { None }
 | LBRACE l=slist(lsymb, empty) RBRACE { Some l }
 
+(*------------------------------------------------------------------*)
 predicate_body:
 | EQ form=global_formula { form }
 
+(*------------------------------------------------------------------*)
 system_modifier:
 | RENAME gf=global_formula
     { Decl.Rename gf }
@@ -505,7 +512,7 @@ system_modifier:
 | REWRITE p=rw_args
     { Decl.Rewrite p }
 
-
+(*------------------------------------------------------------------*)
 declaration_i:
 | HASH e=lsymb ctys=c_tys
                           { Decl.Decl_hash (e, None, ctys) }
@@ -609,6 +616,8 @@ declaration_i:
                 modifier;
                 name = id}) }
 
+ | g=game { Decl.Decl_game g }
+
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
 
@@ -622,6 +631,68 @@ declaration_list:
 declarations:
 | decls=declaration_list DOT { decls }
 
+(*------------------------------------------------------------------*)
+/* games */
+
+/* random samplings declarations (global or oracle) */
+game_var_rnd:
+| RND v=lsymb COLON ty=ty SEMICOLON
+    { Crypto.Parse.{ vr_name = v; vr_ty = ty; } } 
+
+game_var_rnds:
+| l=slist(game_var_rnd, empty ) { l }
+
+/* variable declarations (in global (mutable) or oracle (non-mutable))  */
+game_var_decl:
+| VAR v=lsymb ty=colon_ty? EQ t=term SEMICOLON
+    { Crypto.Parse.{ vd_name = v; vd_ty = ty; vd_init = t; } } 
+
+game_var_decls:
+| l=slist(game_var_decl, empty) { l }
+
+/* an update in an oracle */
+game_update:
+| id=lsymb COLONEQ t=term SEMICOLON { (id,t) }
+
+game_updates:
+| l=slist(game_update, empty) { l }
+
+oracle_ret:
+| RETURN ret=term SEMICOLON? { ret }
+
+oracle_body:
+| rnds=game_var_rnds vars=game_var_decls updates=game_updates ret=oracle_ret?
+{ Crypto.Parse.{ 
+    bdy_rnds    = rnds; 
+    bdy_lvars   = vars; 
+    bdy_updates = updates; 
+    bdy_ret     = ret; 
+  } 
+}
+
+/* an oracle declaration */
+oracle_decl:
+| ORACLE n=lsymb args=bnds_strict ty=colon_ty? EQ LBRACE body=oracle_body RBRACE
+    { Crypto.Parse.{ o_name = n; o_args = args; o_tyout = ty; o_body = body; } }
+
+oracle_decls:
+| l=slist(oracle_decl, empty) { l }
+
+game:
+| GAME n=lsymb EQ LBRACE
+    rnds=game_var_rnds
+    vars=game_var_decls 
+    orcls=oracle_decls 
+  RBRACE
+    { Crypto.Parse.{ 
+        g_name    = n; 
+        g_rnds    = rnds; 
+        g_gvar    = vars; 
+        g_oracles = orcls;
+      } 
+    }
+
+(*------------------------------------------------------------------*)
 tactic_param:
 | f=term %prec tac_prec  { TacticsArgs.Theory f }
 | i=loc(INT)             { TacticsArgs.Int_parsed i }
@@ -680,7 +751,7 @@ single_target:
 
 in_target:
 |                                  { `Goal }
-| IN l=slist1(single_target,COMMA) { `Hyps l }
+| IN l=slist1(single_target,COMMA) { `HypsOrDefs l }
 | IN STAR                          { `All }
 
 (*------------------------------------------------------------------*)
@@ -843,6 +914,17 @@ have_ip:
     { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
 
 (*------------------------------------------------------------------*)
+/* crypto arguments */
+
+crypto_arg_extra:
+| COLON bnds=bnds_strict COMMA term=term { bnds, term }
+
+crypto_arg:
+| LPAREN glob_sample=lsymb COLON term=term extra=crypto_arg_extra? RPAREN
+    { let bnds, cond = Utils.omap_dflt (None,None) (fun (x,y) -> Some x, Some y) extra in
+      TacticsArgs.{glob_sample ; term; bnds; cond; } }
+
+(*------------------------------------------------------------------*)
 /* tactics named arguments */
 
 named_arg:
@@ -869,6 +951,10 @@ tac:
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
+
+  (* Crypto tactic *)
+  | l=lloc(CRYPTO) game=lsymb args=slist(crypto_arg,empty)
+    { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
@@ -1047,7 +1133,7 @@ help_tac_i:
 | REDUCE     { "reduce"     }
 | SIMPL      { "simpl"      }
 | AUTO       { "auto"       }
-| ASSERT     { "have"       }
+| ASSERT     { "have"       }   /* assert is an alias to have */
 | HAVE       { "have"       }
 | USE        { "use"        }
 | REWRITE    { "rewrite"    }
@@ -1056,6 +1142,7 @@ help_tac_i:
 | APPLY      { "apply"      }
 | SPLITSEQ   { "splitseq"   }
 | CONSTSEQ   { "constseq"   }
+| CRYPTO     { "crypto"     }
 | MEMSEQ     { "memseq"     }
 | DDH        { "ddh"        }
 | GDH        { "gdh"        }
@@ -1105,6 +1192,9 @@ global_formula_i:
 | f1=global_formula GOR f2=global_formula
                                    { Theory.POr (f1, f2) }
 
+| LLET v=lsymb ty=colon_ty? EQ t=term IN f=global_formula
+    { Theory.PLet (v,t,ty,f) }
+  
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
 /* ambiguous global formula, in the sens that it can be confused 

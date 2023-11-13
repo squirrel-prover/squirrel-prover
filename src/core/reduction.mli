@@ -2,16 +2,18 @@ module SE = SystemExpr
 module Args = TacticsArgs
 
 module THyps = Hyps.TraceHyps
-  
+
 (*------------------------------------------------------------------*)
 type red_param = { 
-  rewrite : bool;   (** user-defined rewriting rules *)
-  delta   : bool;   (** replace defined variables by their body *)
-  beta    : bool;   (** β-reduction *)
-  proj    : bool;   (** reduce projections *)
-  constr  : bool;   (** reduce tautologies over timestamps *)
+  rewrite : bool;         (** user-defined rewriting rules *)
+  delta   : Match.delta;  (** replace defined variables by their body *)
+  beta    : bool;         (** β-reduction *)
+  proj    : bool;         (** reduce projections *)
+  lett    : bool;         (** let reduction *)
+  constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
+val rp_empty   : red_param
 val rp_default : red_param
 val rp_full    : red_param
 
@@ -33,75 +35,103 @@ val mk_cstate :
 
 (** Conversion functions using a [cstate] *)
 val conv   : cstate -> Term.term  -> Term.term  -> bool 
-val conv_e : cstate -> Equiv.form -> Equiv.form -> bool 
+val conv_g : cstate -> Equiv.form -> Equiv.form -> bool 
+
+(*------------------------------------------------------------------*)
+(** {2 Reduction functions} *)
+
+(** Reduction state *)
+type state
+
+(*------------------------------------------------------------------*)
+(** Make a reduction state directly *)
+val mk_state :
+  ?expand_context:Macros.expand_context ->
+  ?hyps:THyps.hyps ->
+  se:SE.arbitrary -> 
+  vars:Vars.env -> 
+  param:red_param -> 
+  Symbols.table -> 
+  state
+
+(*------------------------------------------------------------------*)
+(** Fully reduces a term *)
+val reduce_term : state -> Term.term -> Term.term 
+
+(** Try to reduce once at head position (bool <=> reduction occured) *)
+val reduce_head1_term : state -> Term.term -> Term.term * bool
+
+(** Reduces once at head position *)
+val whnf_term : state -> Term.term -> Term.term
+
+(*------------------------------------------------------------------*)
+(** {2 Reduction functions from a sequent} *)
 
 (*------------------------------------------------------------------*)
 module type S = sig
-  type t                        (* type of sequent *)
+  type t                        (** sequent type *)
 
   (*------------------------------------------------------------------*)
-  (** {2 reduction } *)
-    
-  val reduce_term  :
-    ?expand_context:Macros.expand_context -> 
-    ?se:SE.t -> 
-    red_param -> t -> Term.term -> Term.term     
+  (** Build a conversion state from a sequent.  
+      [se] is the system of the term being reduced. *)
+  val to_state :
+    ?expand_context:Macros.expand_context  ->
+    ?se:SE.t ->
+    ?vars:Vars.env ->
+    red_param -> t -> state
 
-  val reduce_equiv : 
+  (*------------------------------------------------------------------*)
+  val reduce_global :
     ?expand_context:Macros.expand_context ->
-    ?system:SE.context -> 
+    ?system:SE.context ->
     red_param -> t -> Equiv.form -> Equiv.form
 
-  val reduce : 
+  val reduce :
     ?expand_context:Macros.expand_context ->
-    ?system:SE.context -> 
+    ?system:SE.context ->
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
-  (*------------------------------------------------------------------*)
-  (** {2 expantion and destruction modulo } *)
-    
-  val expand_head_once_term :
+  (** Reduces once at head position *)
+  val reduce_head1 :
     ?expand_context:Macros.expand_context ->
-    ?se:SE.t -> 
-    red_param -> t -> Term.term -> Term.term * bool
-                                   
-  val expand_head_once :
-    ?expand_context:Macros.expand_context ->
-    ?system:SE.context -> 
+    ?system:SE.context ->
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
 
-  val destr_eq : 
+  (*------------------------------------------------------------------*)
+  (** {2 Expantion and destruction modulo } *)
+
+  val destr_eq :
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
-  val destr_not : 
+  val destr_not :
     t -> 'a Equiv.f_kind -> 'a -> Term.term option
 
-  val destr_or : 
+  val destr_or :
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
-  val destr_and : 
+  val destr_and :
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   (*------------------------------------------------------------------*)
-  (** {2 conversion from a sequent } *)
+  (** {2 Conversion from a sequent } *)
 
   val conv_term :
-    ?expand_context:Macros.expand_context -> 
-    ?se:SE.t -> 
+    ?expand_context:Macros.expand_context ->
+    ?se:SE.t ->
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool
 
-  val conv_equiv : 
+  val conv_global :
     ?expand_context:Macros.expand_context ->
-    ?system:SE.context -> 
+    ?system:SE.context ->
     ?param:red_param ->
     t ->
     Equiv.form -> Equiv.form -> bool
 
-  val conv_kind : 
+  val conv_kind :
     ?expand_context:Macros.expand_context ->
-    ?system:SE.context -> 
+    ?system:SE.context ->
     ?param:red_param ->
     t -> 'a Equiv.f_kind ->
     'a -> 'a -> bool

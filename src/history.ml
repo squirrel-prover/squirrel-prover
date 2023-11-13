@@ -1,6 +1,6 @@
 open Squirrelcore
 (*----------------- History ----------------------------------*)(* {↓{ *)
-(** {History Functor}
+(** {2 History Functor}
  * Historiable is the signature of the state that can be saved and
  * restored *)
 module type TOPLEVELPROVER = sig

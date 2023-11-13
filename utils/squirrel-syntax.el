@@ -4,6 +4,7 @@
 
 (defvar squirrel-prog-keywords '(
   "let"
+  "Let"
   "in"
   "out"
   "if"
@@ -13,6 +14,12 @@
   "new"
   "try find"
   "such that"
+
+  "var"
+  "rnd"
+  "oracle"
+  "game"
+  "return"
 ))
 
 (defvar squirrel-global-keywords '(
@@ -113,6 +120,7 @@
   "induction"
   "intro"
   "apply"
+  "crypto"
   "generalize"
   "dependent"
   "revert"

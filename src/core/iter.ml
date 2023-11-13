@@ -21,6 +21,8 @@ class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
 
     | Proj (_, t) -> self#visit_message t
 
+    | Let (_, t1, t2) -> self#visit_message t1; self#visit_message t2
+
     | Macro (ms,l,ts) ->
       (* no need to fold over [l] or [ts], since we expand the macro *)
       begin
@@ -57,6 +59,9 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | App (t, l) -> List.fold_left self#fold_message x (t :: l)
 
     | Proj (_, t) -> self#fold_message x t
+
+    | Let (_, t1, t2) ->
+      self#fold_message (self#fold_message x t1) t2
 
     | Macro (ms,l,ts) ->
       (* no need to fold over [l] or [ts], since we expand the macro *)
@@ -207,6 +212,18 @@ let tfold_occ (type a)
     func ~fv ~cond c acc |>
     func ~fv ~cond:(c :: cond) t |>
     func ~fv ~cond:(Term.mk_not c :: cond) e
+
+  | Term.Let (v,t1,t2) ->
+    let v, subst = Term.refresh_vars [v] in
+    let t1 = Term.subst subst t1 in
+    let t2 = Term.subst subst t2 in
+    let v = as_seq1 v in
+    
+    let fv2 = v :: fv in
+    let ceq = Term.mk_eq (Term.mk_var v) t1 in
+    
+    func ~fv     ~cond               t1 acc |>
+    func ~fv:fv2 ~cond:(ceq :: cond) t2 
 
   | Term.Find (is, c, t, e) ->
     let is, subst = Term.refresh_vars is in
@@ -1094,7 +1111,8 @@ let _fold_macro_support
   in
 
   SE.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb _a_is ~args ~body acc ->
+      fold_descr ~globals:true
+        (fun (msymb : Symbols.macro) _a_is ~(args : Term.term list) ~(body : Term.term) acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 
@@ -1103,7 +1121,7 @@ let _fold_macro_support
                [t] on the indices of the macro set in [mset]. *)
             let subst =
               List.map2 (fun arg j ->
-                  (* Remark:  [arg] may be an arbitrary term. *)
+                  (* Remark: [arg] may be an arbitrary term. *)
                   Term.ESubst (arg, Term.mk_var j)
                 ) args args'
             in

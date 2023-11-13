@@ -142,15 +142,15 @@ val subst : subst -> 'a expr -> 'a expr
 (** Cast expr to arbitrary. Always succeeds. *)
 val to_arbitrary : 'a expr -> arbitrary
 
-(** Cast expression to fset if possible,
+(** Cast expression to [compatible] if possible,
     fail with [Error Expected_compatible] otherwise. *)
 val to_compatible : ?loc:L.t -> 'a expr -> compatible
 
-(** Cast expression to fset if possible,
+(** Cast expression to [fset] if possible,
     fail with [Error Expected_fset] otherwise. *)
 val to_fset : ?loc:L.t -> 'a expr -> fset
 
-(** Convert expression to fset if possible,
+(** Convert expression to [pair] if possible,
     fail with [Error Expected_pair] otherwise. *)
 val to_pair : ?loc:L.t -> 'a expr -> pair
 
@@ -286,7 +286,7 @@ val snd : <pair:unit;..> expr -> Term.proj * System.Single.t
     the API.
 
     Invariant: if [pair<>None] then [set<>any]. Indeed we must ensure
-    that all systems in [pair] and [set] are compatible. *)
+    that all systems in [pair] and [set] are compatible. *)
 type context = {
   set  : arbitrary ;
   pair : pair option

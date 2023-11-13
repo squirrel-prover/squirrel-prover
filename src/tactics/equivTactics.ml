@@ -15,6 +15,8 @@ module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
 
+module TopHyps = Hyps
+  
 module ES   = EquivSequent
 module Hyps = ES.Hyps
 
@@ -364,8 +366,8 @@ let case_tac ?mode (args : Args.parser_args) : LT.etac =
 let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
   let goal = ES.goal s in
 
-  let is_false : Equiv.form -> bool = function
-    | Equiv.Atom (Equiv.Reach f) -> ES.Reduce.conv_term s f Term.mk_false
+  let is_false = function
+    | Equiv.Reach f -> ES.Reduce.conv_term s f Term.mk_false
     | _ -> false
   in
 
@@ -383,15 +385,15 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
         | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false)
 
-    else (fun at -> ES.Reduce.conv_equiv s (Equiv.Atom at) goal)
+    else (fun at -> ES.Reduce.conv_global s (Equiv.Atom at) goal)
   in
 
-  let in_hyp id f = 
+  let in_hyp (id,ldc) =
     (hyp = None || hyp = Some id) &&
-    ( is_false f ||
-      (match f with
-       | Equiv.Atom at -> in_atom at
-       | _ as f -> ES.Reduce.conv_equiv s f goal))
+    ( match ldc with
+      | TopHyps.LHyp (Equiv.Atom at) -> is_false at || in_atom at
+      | TopHyps.LHyp f -> ES.Reduce.conv_global s f goal
+      | TopHyps.LDef _ -> false)
   in
 
   if Hyps.exists in_hyp s
@@ -437,9 +439,10 @@ let constraints_tac args : LT.etac =
 
 (*------------------------------------------------------------------*)
 (** [tautology f s] tries to prove that [f] is always true in [s]. *)
-let rec tautology f s = match f with
+let rec tautology (f : Equiv.form) (s : ES.t) : bool =
+  match f with
   | Equiv.Impl (f0,f1) ->
-    let s = Hyps.add Args.AnyName f0 s in
+    let s = Hyps.add Args.AnyName (LHyp f0) s in
     tautology f1 s
 
   | Equiv.And (f0,f1) ->
@@ -448,7 +451,7 @@ let rec tautology f s = match f with
   | Equiv.Or (f0,f1) ->
     tautology f0 s || tautology f1 s
 
-  | Equiv.Quant _ -> false
+  | Equiv.Let _ | Equiv.Quant _ -> false
 
   | Equiv.(Atom (Pred _)) -> false
     
@@ -462,16 +465,20 @@ let rec tautology f s = match f with
 
 (** [form_simpl_impl f s] simplifies the formula [f] in [s], by trying to
     prove [f]'s hypotheses in [s]. *)
-let rec form_simpl_impl f s = match f with
+let rec form_simpl_impl (f : Equiv.form) (s : ES.t) : Equiv.form =
+  match f with
   | Equiv.Impl (f0, f1) ->
     if tautology f0 s then form_simpl_impl f1 s else f
   | _ -> f
 
-let simpl_impl s =
-  Hyps.mapi (fun id f ->
-      let s_minus = Hyps.remove id s in
-      form_simpl_impl f s_minus
-    ) s
+let simpl_impl (s : ES.t) : ES.t =
+  Hyps.mapi
+    ~hyp:(fun id f ->
+        let s_minus = Hyps.remove id s in
+        form_simpl_impl f s_minus
+      )
+    ~def:(fun _ (se,t) -> se,t) (* leave definitions un-simplified here (for now) *)
+    s
 
 
 (*------------------------------------------------------------------*)
@@ -483,27 +490,38 @@ let[@warning "-27"] simpl_ident : LT.f_simpl =
 (*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
-    Also returns a function that introduces back the generalized hypothesis.*)
-let generalize (ts : Term.term) s =
-  let ts = match ts with
+    Also returns a function that introduces back the generalized 
+    hypotheses or definitions.*)
+let generalize (ts : Term.term) (s : ES.t) : (ES.t -> ES.t) * ES.t =
+  let ts =
+    match ts with
     | Var t -> t
-    | _ -> hard_failure (Failure "timestamp is not a var") in
+    | _ -> hard_failure (Failure "timestamp is not a var")
+  in
 
-  let gen_hyps = Hyps.fold (fun id f gen_hyps ->
-      if Sv.mem ts (Equiv.fv f)
-      then id :: gen_hyps
-      else gen_hyps
-    ) s [] in
+  let togen =
+    Hyps.fold (fun id ldc togen ->
+        let fv =
+          match ldc with
+          | LHyp f     -> Equiv.fv f
+          | LDef (_,t) -> Term.fv  t
+        in
+        if Sv.mem ts fv
+        then id :: togen
+        else togen
+      ) s []
+  in
 
   (* Generalized sequent *)
-  let s = List.fold_left (fun s id -> EquivLT.revert id s) s gen_hyps in
+  let s = List.fold_left (fun s id -> EquivLT.revert id s) s togen in
+  (* FIXME: location for [revert] *)
 
-  (* Function introducing back generalized hypotheses *)
+  (* Function introducing back generalized hypotheses or definitions *)
   let intro_back (s : ES.t) : ES.t =
     let ips = List.rev_map (fun id ->
         let ip = Args.Named (Ident.name id) in
         Args.(Simpl (SNamed ip))
-      ) gen_hyps
+      ) togen
     in
     match LT.do_intros_ip simpl_ident ips (Goal.Equiv s) with
     | [Goal.Equiv s] -> s
@@ -552,7 +570,7 @@ let old_induction Args.(Message (ts,_)) s =
     (* Introduce back generalized hypotheses. *)
     let induc_s = intro_back s in
     (* Introduce induction hypothesis. *)
-    let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") ind_hyp induc_s in
+    let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") (LHyp ind_hyp) induc_s in
 
     let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
     let init_s = ES.set_goal init_goal s in
@@ -891,8 +909,9 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
 let fa_dup (s : ES.t) : ES.t list =
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp =
-    Hyps.find_map (fun _id hyp -> match hyp with
-        | Equiv.(Atom (Equiv e)) -> Some e
+    Hyps.find_map (fun (_, hyp) ->
+        match hyp with
+        | TopHyps.LHyp (Equiv.Atom (Equiv e)) -> Some e
         | _ -> None) s
   in
 
@@ -912,7 +931,7 @@ let fa_dup (s : ES.t) : ES.t list =
 (** Deduce recursively removed all elements of a biframe that are deducible from the other ones.*)
 let deduce_all (s:ES.t) =  
     let table,system = ES.table s, ES.system s in
-    let hyps = lazy (ES.get_trace_hyps s) in
+    let hyps = ES.get_trace_hyps s in
     let option = { Match.default_match_option with mode = `EntailRL } in
     let rec _deduce_all res goals =
       match goals with
@@ -944,7 +963,7 @@ let deduce_int (i : int L.located) s =
   let before, _, after = split_equiv_goal i s in
   let biframe_without_e = List.rev_append before after in
   let option = { Match.default_match_option with mode = `EntailRL } in
-  let hyps = lazy (ES.get_trace_hyps s) in 
+  let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
   let pat = Term.{
       pat_op_vars   = [];
@@ -2131,3 +2150,22 @@ let () = T.register_general "ddh"
           Args.String_name v3] ->
          LT.gentac_of_etac (ddh gen v1 v2 v3)
        | _ -> bad_args ())
+
+(*------------------------------------------------------------------*)
+let crypto (game : lsymb) (args : Args.crypto_args) (s : ES.t) =
+  let frame = ES.goal_as_equiv s in
+  let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
+  List.map (fun subg -> ES.set_reach_goal subg s) subgs
+  
+let crypto_tac args (s : ES.t) =
+  match args with
+  | [Args.Crypto (game, args)] -> wrap_fail (crypto game args) s
+  | _ -> bad_args ()
+
+let () = T.register_general "crypto"
+    ~tactic_help:
+      {general_help = "Applies a cryptographic game";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Cryptographic}
+    (LT.gentac_of_etac_arg crypto_tac)

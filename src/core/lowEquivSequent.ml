@@ -16,10 +16,16 @@ module Sid = Ident.Sid
 module H = Hyps.EquivHyps
 
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
-  H.map (Equiv.subst subst) hyps
+  H.map
+    ~hyp:(Equiv.subst subst) 
+    ~def:(fun (se,t) -> se, Term.subst subst t) 
+    hyps
 
 let tsubst_hyps (tsubst : Type.tsubst) (hyps : H.hyps) : H.hyps =
-  H.map (Equiv.tsubst tsubst) hyps
+  H.map
+    ~hyp:(Equiv.tsubst tsubst) 
+    ~def:(fun (se,t) -> se, Term.tsubst tsubst t) 
+    hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
@@ -30,21 +36,21 @@ type conc_form = Equiv.form
 let hyp_kind = Equiv.Global_t
 let conc_kind = Equiv.Global_t
 
-(* default variable information of the sequent *)
+(** default variable information of the sequent *)
 let var_info = Vars.Tag.gtag
     
 (** An equivalence sequent features:
-  * - two frames given as a single [goal] containing bi-terms
-  *   of sort boolean or message;
-  * - an environment [env] listing all free variables with their types;
-  * - identifiers for the left and right systems.
-  * The corresponding equivalence is obtained by projecting the bi-frame
-  * to two frames, interpreting macros wrt the left and right systems
-  * respectively. *)
+    - two frames given as a single [goal] containing bi-terms
+      of sort boolean or message;
+    - an environment [env] listing all free variables with their types;
+    - identifiers for the left and right systems.
+    The corresponding equivalence is obtained by projecting the bi-frame
+    to two frames, interpreting macros wrt the left and right systems
+    respectively. *)
 type t = {
-  env     : Env.t;
-  hyps    : H.hyps;
-  goal    : Equiv.form;
+  env           : Env.t;
+  proof_context : H.hyps;
+  goal          : Equiv.form;
 }
 
 type sequent = t
@@ -54,18 +60,22 @@ type sequents = sequent list
 (*------------------------------------------------------------------*)
 let fv (s : t) : Vars.Sv.t =
   let h_vars =
-    H.fold (fun _ f vars ->
-        Vars.Sv.union (Equiv.fv f) vars
-      ) s.hyps Vars.Sv.empty
+    H.fold (fun _ ld vars ->
+        match ld with
+        | LHyp f     -> Vars.Sv.union (Equiv.fv f) vars
+        | LDef (_,t) -> Vars.Sv.union (Term.fv  t) vars
+      ) s.proof_context Vars.Sv.empty
   in
   Vars.Sv.union h_vars (Equiv.fv s.goal)
 
 (*------------------------------------------------------------------*)
 let ty_fv (s : t) : Type.Fv.t =
   let h_vars =
-    H.fold (fun _ f vars ->
-        Type.Fv.union (Equiv.ty_fv f) vars
-      ) s.hyps Type.Fv.empty
+    H.fold (fun _ ld vars ->
+        match ld with
+        | LHyp f     -> Type.Fv.union (Equiv.ty_fv f) vars
+        | LDef (_,t) -> Type.Fv.union (Term.ty_fv  t) vars
+      ) s.proof_context Type.Fv.empty
   in
   Type.Fv.union h_vars (Equiv.ty_fv s.goal)
 
@@ -76,6 +86,13 @@ let _pp_goal ~dbg ~context fmt = function
 
 (*------------------------------------------------------------------*)
 let _pp ~dbg ppf j =
+  let env_without_defined_vars =
+    H.fold (fun id ld env ->
+        match ld with
+        | LDef (_,t) -> Vars.rm_var (Vars.mk id (Term.ty t)) env
+        | _ -> env
+      ) j.proof_context j.env.vars
+  in
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
@@ -85,9 +102,10 @@ let _pp ~dbg ppf j =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
   if j.env.vars <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) j.env.vars ;
+    Fmt.pf ppf "@[<hv 2>Variables:@ @[%a@]@]@;"
+      (Vars._pp_env ~dbg) env_without_defined_vars ;
 
-  H._pp ~dbg ~context:j.env.system ppf j.hyps ;
+  H._pp ~dbg ~context:j.env.system ppf j.proof_context ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
@@ -126,69 +144,79 @@ let sanity_check (s : t) : unit =
 
 (** Built on top of [H] *)
 module Hyps
-  : Hyps.S1 with type hyp = Equiv.form and type hyps := t
- = struct
-  type hyp = Equiv.form
-
-  type ldecl = Ident.t * hyp
-
-  type sequent = t
-    
+  : Hyps.S1 with type hyp  = Equiv.form 
+             and type hyps := t
+= struct
+  
+  type hyp       = Equiv.form 
+  type 'a kind   = 'a H.kind
+  type ldecl_cnt = H.ldecl_cnt
+  type ldecl     = Ident.ident * ldecl_cnt
+                 
+  (*------------------------------------------------------------------*)  
   let pp_hyp = Equiv.pp
 
   let pp_ldecl = H.pp_ldecl
 
-  let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
-  let fresh_ids ?approx names s = H.fresh_ids ?approx names s.hyps
+  (*------------------------------------------------------------------*)  
+  let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.proof_context
+  let fresh_ids ?approx names s = H.fresh_ids ?approx names s.proof_context
 
-  let is_hyp f s = H.is_hyp f s.hyps
+  let is_hyp f s = H.is_hyp f s.proof_context
 
-  let by_id   id s = H.by_id   id s.hyps
-  let by_name id s = H.by_name id s.hyps
+  let by_id id s = H.by_id id s.proof_context
+  let by_id_k id k s = H.by_id_k id k s.proof_context
 
-  let mem_id   id s = H.mem_id   id s.hyps
-  let mem_name id s = H.mem_name id s.hyps
+  let by_name id s = H.by_name id s.proof_context
+  let by_name_k id k s = H.by_name_k id k s.proof_context
 
-  let find_opt func s = H.find_opt func s.hyps
+  let mem_id   id s = H.mem_id   id s.proof_context
+  let mem_name id s = H.mem_name id s.proof_context
 
-  let find_map func s = H.find_map func s.hyps
+  let find_opt func s = H.find_opt func s.proof_context
 
-  let find_all func s = H.find_all func s.hyps
+  let find_map func s = H.find_map func s.proof_context
+
+  let find_all func s = H.find_all func s.proof_context
       
-  let to_list s = H.to_list s.hyps
+  let to_list s = H.to_list s.proof_context
 
-  let exists func s = H.exists func s.hyps
+  let exists func s = H.exists func s.proof_context
 
   let _add ~(force:bool) id hyp s =
-    let id, hyps = H._add ~force id hyp s.hyps in
-    id, { s with hyps }
+    let id, proof_context = H._add ~force id hyp s.proof_context in
+    id, { s with proof_context }
 
   let add_i npat f s =
-    let id, hyps = H.add_i npat f s.hyps in
-    id, { s with hyps }
+    let id, proof_context = H.add_i npat f s.proof_context in
+    id, { s with proof_context }
 
-  let add npat (f : hyp) s : sequent = { s with hyps = H.add npat f s.hyps }
+  let add npat f s = { s with proof_context = H.add npat f s.proof_context }
 
   let add_i_list l (s : sequent) =
-    let ids, hyps = H.add_i_list l s.hyps in
-    ids, { s with hyps }
+    let ids, proof_context = H.add_i_list l s.proof_context in
+    ids, { s with proof_context }
 
-  let add_list l s = { s with hyps = H.add_list l s.hyps }
+  let add_list l s = { s with proof_context = H.add_list l s.proof_context }
 
-  let remove id s = { s with hyps = H.remove id s.hyps }
+  let remove id s = { s with proof_context = H.remove id s.proof_context }
 
-  let fold func s init = H.fold func s.hyps init
+  let fold      func s init = H.fold      func s.proof_context init
+  let fold_hyps func s init = H.fold_hyps func s.proof_context init
 
-  let map  f s = { s with hyps = H.map f s.hyps }
-  let mapi f s = { s with hyps = H.mapi f s.hyps }
+  let map  ?hyp ?def s = { s with proof_context = H.map  ?hyp ?def s.proof_context }
+  let mapi ?hyp ?def s = { s with proof_context = H.mapi ?hyp ?def s.proof_context }
 
-  let filter f s = { s with hyps = H.filter f s.hyps }
+  let filter_map ?hyp ?def s =
+    { s with proof_context = H.filter_map ?hyp ?def s.proof_context }
 
-  let clear_triv s = { s with hyps = H.clear_triv s.hyps }
+  let filter f s = { s with proof_context = H.filter f s.proof_context }
 
-  let pp          fmt s = H.pp                                fmt s.hyps
-  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.hyps
-  let pp_dbg      fmt s = H.pp_dbg                            fmt s.hyps
+  let clear_triv s = { s with proof_context = H.clear_triv s.proof_context }
+
+  let pp          fmt s = H.pp                                fmt s.proof_context
+  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.proof_context
+  let pp_dbg      fmt s = H.pp_dbg                            fmt s.proof_context
 end
 
 (*------------------------------------------------------------------*)
@@ -196,9 +224,9 @@ end
 
 let update ?table ?ty_vars ?vars ?hyps ?goal t =
   let env  = Env.update ?table ?ty_vars ?vars t.env
-  and hyps = Utils.odflt t.hyps hyps
+  and proof_context = Utils.odflt t.proof_context hyps
   and goal = Utils.odflt t.goal goal in
-  { env; hyps; goal; } 
+  { env; proof_context; goal; } 
 
 let env j = j.env
 
@@ -217,17 +245,17 @@ let set_goal_in_context ?update_local system conc s =
   if system = s.env.system then { s with goal = conc } else
 
     (* Update hypotheses. *)
-    let hyps =
+    let proof_context =
       TopHyps.change_equiv_hyps_context
         ~table:s.env.table
         ~vars:s.env.vars
         ~old_context:s.env.system
         ~new_context:system
-        s.hyps
+        s.proof_context
     in
     (* Change the context in the sequent's environment. *)
     let env = Env.update ~system s.env in
-    let s = { s with env; hyps } in
+    let s = { s with env; proof_context } in
 
     (* Finally set the new conclusion. *)
     { s with goal = conc }
@@ -251,7 +279,7 @@ let get_frame proj j = match j.goal with
 (*------------------------------------------------------------------*)
 let subst subst s =
   { s with goal = Equiv.subst subst s.goal;
-           hyps = subst_hyps subst s.hyps; }
+           proof_context = subst_hyps subst s.proof_context; }
 
 (*------------------------------------------------------------------*)
 let tsubst (tsubst : Type.tsubst) s =
@@ -259,7 +287,7 @@ let tsubst (tsubst : Type.tsubst) s =
     let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
     { env  = Env.update ~vars s.env;
       goal = Equiv.tsubst tsubst s.goal;
-      hyps = tsubst_hyps tsubst s.hyps; }
+      proof_context = tsubst_hyps tsubst s.proof_context; }
 
 (*------------------------------------------------------------------*)
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
@@ -296,9 +324,14 @@ let to_trace_sequent s =
 
   let trace_s = TS.init ~env goal in
   Hyps.fold
-    (fun id hyp trace_s ->
-        TS.Hyps.add (Args.Named (Ident.name id)) (Global hyp) trace_s)
-    s trace_s
+    (fun id ld trace_s ->
+       match ld with
+       | TopHyps.LHyp hyp ->
+         TS.Hyps.add (Args.Named (Ident.name id)) (TopHyps.LHyp (Global hyp)) trace_s
+       | TopHyps.LDef (se,t) -> 
+         let _, trace_s = TS.Hyps._add ~force:true id (LDef (se,t)) trace_s in
+         trace_s
+    ) s trace_s
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s =
@@ -346,14 +379,14 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ?(no_sanity_check=false) ~env ?hyp goal =
-  let hyps = H.empty in
-  let hyps = match hyp with
-    | None -> hyps
+let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) goal =
+  let proof_context = H.empty in
+  let proof_context = match hyp with
+    | None -> proof_context
     | Some h ->
-        snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
+        snd (H._add ~force:false (H.fresh_id "H" proof_context) (LHyp h) proof_context)
   in
-  let new_sequent = { env; hyps; goal } in
+  let new_sequent = { env; proof_context; goal } in
   if not no_sanity_check then sanity_check new_sequent;
 
   if TConfig.post_quantum (env.table) then
@@ -384,12 +417,6 @@ let get_system_pair t = oget (system t).pair
 let get_system_pair_projs t : Term.proj * Term.proj =
   let p = get_system_pair t in
   fst (SE.fst p), fst (SE.snd p)
-
-(*------------------------------------------------------------------*)
-let map f s : sequent =
-  let f x = f.Equiv.Babel.call Equiv.Global_t x in
-  set_goal (f (goal s)) (Hyps.map f s)
-
 
 (*------------------------------------------------------------------*)
 let mk_pair_trace_cntxt (s : sequent) : Constr.trace_cntxt =

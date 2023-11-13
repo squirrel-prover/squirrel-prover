@@ -21,6 +21,8 @@
 *)
 
 (* Declare a hash function h that satisfies PRF, hence EUF. *)
+include Basic.
+
 hash h.
 
 (* Keys for tags T1 and T2. *)
@@ -31,9 +33,39 @@ name k2 : message.
 name nt  : message.
 name nt' : message.
 
+(*dummy nones for the proof*)
+name n1 : message.
+name n2 : message.
+
+(* Pseudo-random function game *)
+
+game PRF = {
+  rnd key : message;
+  var lhash = empty_set;
+  var lchal = empty_set;
+
+  oracle ohash x = {
+    lhash := add x lhash;
+    return if mem x lchal then zero else h(x,key) 
+  }
+
+  oracle challenge x = {
+    rnd r : message;
+   (* the list before update *)
+    var old_lchal = lchal;
+    lchal := add x lchal;
+
+    return if mem x old_lchal || mem x lhash  then zero else diff(r, h(x,key))
+  }
+}.
+
+print PRF.
+
+
+
+
 (* Please ignore the next lines... *)
 system null.
-include Basic.
 
 (* Declaring a goal phi as done next means that we are
    going to prove (phi ~ true). Logical connectives in phi
@@ -61,13 +93,10 @@ Proof.
   intro H. (* the inference ---- is like a local-formula implication *)
   case H.
   (* Reader recognizes valid input from T1. *)
-  + euf H.
-    - intro Heuf. left. auto.
-    - intro Heuf. left. auto.
+  + euf H. intro Heuf. left. auto.
   (* Reader recognizes valid input from T2. *)
-  + euf H.
-    - intro Heuf. right. auto.
-    - intro Heuf. right. auto.
+  + euf H. intro Heuf. right. auto.
+  
 Qed.
 
 (* To prove an equivalence we use a global goal.
@@ -77,16 +106,16 @@ global goal privacy :
   equiv(<nt,h(nt,k1)>,
         diff(<nt',h(nt',k1)>,
              <nt',h(nt',k2)>)).
+
+
 Proof.
   (* First break the pairs. *)
   fa 0.
   fa 2.
-  (* Then show that the second hashes look like randomness. *)
-  prf 3.
-  rewrite if_true.
-  project.
-  + auto.
-  + auto.
-  (* Conclude by reflexivity -- fresh may also be used. *)
-  refl.
+
+  trans 3 : n1 ;1: sym; trans 3: n2.
+  (* Apply transitivity, replacing hashes by dummy. *)
+  + by fresh 3.
+  + by crypto PRF .
+  + by crypto PRF (key : k2).
 Qed.

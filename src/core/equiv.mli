@@ -63,6 +63,8 @@ type quant = ForAll | Exists
 
 type form = 
   | Quant of quant * Vars.tagged_vars * form
+  | Let   of Vars.var * Term.term * form
+  (** The system context of the [term] is [pair] *)
   | Atom  of atom
   | Impl  of form * form
   | And   of form * form
@@ -132,6 +134,8 @@ type any_form = Global of form | Local of Term.term
 
 val pp_any_form : Format.formatter -> any_form -> unit
 
+val is_local : any_form -> bool
+
 val any_to_reach : any_form -> Term.term 
 val any_to_equiv : any_form -> form 
 
@@ -172,11 +176,8 @@ module Any : sig
 end
 
 (** Conversions between formula kinds and generic functionalities
-  * over all formula kinds. *)
+    over all formula kinds. *)
 module Babel : sig
-  type mapper = {
-    call : 'a. 'a f_kind -> 'a -> 'a
-  }
   val convert : ?loc:Location.t -> src:'a f_kind -> dst:'b f_kind -> 'a -> 'b
 
   val subst  : 'a f_kind -> Term.subst  -> 'a -> 'a

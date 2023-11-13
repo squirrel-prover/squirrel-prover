@@ -1,3 +1,6 @@
+(** {1 Config Table} 
+   This is the Squirrel parameters set in the table *)
+
 (*------------------------------------------------------------------*)
 (** {2 parameter state} *)
 val reset_params : Symbols.table -> Symbols.table

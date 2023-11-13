@@ -7,6 +7,7 @@ type var = {
 
 type vars = var list
 
+let mk id ty = { id; ty; }
 
 (*------------------------------------------------------------------*)
 (** {2 Variable scope} *)
@@ -281,7 +282,6 @@ let to_simpl_env (env : 'a genv) : simpl_env =
 
 (*------------------------------------------------------------------*)
 let rm_var v (e : 'a genv) : 'a genv =
-  if not (mem e v) then Fmt.epr "VAR: %a@." pp_dbg v;
   assert (mem e v);
   let v_name = name v in
   let l = Ms.find_dflt [] v_name e in

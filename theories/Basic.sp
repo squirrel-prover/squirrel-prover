@@ -187,6 +187,12 @@ lemma [any] impl_true_l (b: boolean) : (true => b) = b.
 Proof. by rewrite eq_iff. Qed.
 hint rewrite impl_true_l.
 
+lemma [any] impl_contra (b,c:boolean) : (b => c) = (not c => not b).
+Proof.
+  rewrite !impl_charac /=.
+  by rewrite or_comm.
+Qed.
+
 (*------------------------------------------------------------------*)
 (* not: more lemmas *)
 
@@ -315,6 +321,10 @@ Proof.
   by intro ->; case b'.
 Qed.
 hint rewrite if_else_not.
+
+lemma [any] if_app ['a 'b] (f:'a->'b) (c:bool) (x,y:'a) :
+  f (if c then x else y) = if c then f x else f y.
+Proof. by case c. Qed.
 
 (*------------------------------------------------------------------*)
 (* some functional properties *)
@@ -620,3 +630,20 @@ lemma [any] neq_le_pred_le (t, t' : timestamp):
 Proof. by rewrite eq_iff. Qed.
 
 axiom [any] le_lt ['a] (x, x' : 'a): x <> x' => (x <= x') = (x < x').
+
+
+(*------------------------------------------------------------------*)
+(* lists : mem and append *)
+
+type mset.
+
+abstract empty_set : mset.
+
+abstract mem : message -> mset -> bool.
+
+abstract add : message -> mset -> mset.
+
+axiom [any] empty_set_is_empty (x:message) : not (mem x empty_set).
+
+
+ 

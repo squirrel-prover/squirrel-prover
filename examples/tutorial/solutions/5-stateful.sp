@@ -375,14 +375,15 @@ Proof.
 
   (* since the tag outputs collide, we know that they have the
      same identities. *)
-  have ? : i = i1 by apply tag_output_collision i i1 k k1. 
-  simpl.
+  have A : i = i1 by apply tag_output_collision i i1 k k1. 
+  rewrite -A /= in *; clear A.  
 
   (* consequence of `counter_increaseT` *)
   have ?: cpt(i)@T(i,k) = cpt(i)@T(i,k1) by auto.
-  have ?: k = k1. {. 
+  have A: k = k1. {. 
     by apply tag_cpt_strict i k k1.
   }.
+  rewrite -A in *; clear A.
 
   have B := counter_increaseR i (R(j,i)) (pred(R(j1,i))) _ _; 1,2:auto.
   have A : Rcpt(i)@R(j,i) = cpt(i)@T(i,k) by auto.

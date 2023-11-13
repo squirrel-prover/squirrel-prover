@@ -271,9 +271,9 @@ Proof.
   try (intro *; by right).
 
   intro [pid0 j0 E].
-  case (pid = pid0) => Eq; 1: by left.
-
-  by right; expand SCtr; rewrite if_false.
+  case (pid = pid0) => Eq.
+  + by rewrite if_true. 
+  + by right; rewrite if_false.
 Qed.
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t

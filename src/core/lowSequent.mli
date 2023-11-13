@@ -9,7 +9,7 @@
   *
   * The signature defined here does not include functionalities
   * relying on the list of the already proved goals, to avoid
-  * any dependency on {!Prover}. Such functionalities will be
+  * any dependency on Prover. Such functionalities will be
   * added in {!Sequent}. *)
 
 module L = Location
@@ -53,14 +53,18 @@ module type S = sig
   module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
   (** {2 Access to sequent components}
-    *
-    * Each sequent consist of
-    * a system, table, environment, type variables,
-    * goal formula, and hypotheses. *)
+
+      Each sequent consist of
+      a system, table, environment, type variables,
+      goal formula, and a proof-context containing 
+      hypotheses and definitions (called [hyps] for legacy reasons). *)
 
   val env : t -> Env.t
   val set_env : Env.t -> t -> t
 
+  (** Return the variable environment of the sequent. This includes
+      declared (free) variables, as well as defined variables (which
+      also appear in the proof-context [hyps]). *)
   val vars : t -> Vars.env
   val set_vars : Vars.env -> t -> t
 
@@ -140,8 +144,6 @@ module type S = sig
 
   (*------------------------------------------------------------------*) 
   (** {2 Misc} *)
-
-  val map : Equiv.Babel.mapper -> t -> t
 
   (** Smart constructors and destructors for hypotheses. *)
   module Hyp : SmartFO.S with type form = hyp_form

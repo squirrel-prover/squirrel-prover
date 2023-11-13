@@ -17,6 +17,7 @@ let is_toplevel_error ?(interactive=true) ~test (e : exn) : bool =
   | Symbols.Error                   _
   | System.Error                    _
   | SystemExpr.Error                _
+  | Crypto.Parse.Error              _
   | Tactics.Tactic_soft_failure     _
   | Tactics.Tactic_hard_failure     _ -> not test
 
@@ -62,6 +63,9 @@ let pp_toplevel_error
 
   | SystemExpr.Error (l,e) when not test ->
     (SystemExpr.pp_error pp_loc_error_opt) fmt (l,e)
+
+  | Crypto.Parse.Error e when not test ->
+    Crypto.Parse.pp_error pp_loc_error fmt e
 
   | Tactics.Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"

@@ -154,7 +154,16 @@ let start_main_loop
   interactive := main_mode = `Stdin;
   let file = match main_mode with
     | `Stdin -> file_from_stdin ()
-    | `File fname -> locate [LP_none] fname
+    | `File fname -> begin
+      match file_from_path LP_none 
+                        (Filename.remove_extension fname) with
+      | Some f -> f
+      | None -> 
+        Printer.prt `Error "%a ; start reading stdin…" 
+          Command.pp_cmd_error (FileNotFound fname);
+        file_from_stdin ()
+    end
+
   in
   let state = {
     prover_state = Prover.init ();

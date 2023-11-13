@@ -5,6 +5,13 @@ module Sv = Vars.Sv
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
+type delta = { def : bool; macro : bool; op : bool; }
+
+val delta_default : delta
+val delta_full    : delta
+val delta_empty   : delta
+
+(*------------------------------------------------------------------*)
 (** {2 Positions} *)
 
 module Pos : sig
@@ -42,7 +49,7 @@ module Pos : sig
 
   (** Same as [select], except that is acts on [Equiv.form]. Note that we 
       can only select [Term.term] positions. *)
-  val select_e : f_sel -> Equiv.form -> Sp.t
+  val select_g : f_sel -> Equiv.form -> Sp.t
 
   (*------------------------------------------------------------------*)
   (** [f] of type ['a f_map_fold] is a function that, given 
@@ -296,7 +303,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
     ?ty_env:Type.Infer.env ->
-    ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
+    ?hyps:Hyps.TraceHyps.hyps ->
     ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context -> 
@@ -320,29 +327,78 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
-(** Expand once at head position. 
-    Throw [exn] in case of failure. *)
-val expand_head_once :
-  exn:exn -> 
+(*------------------------------------------------------------------*)
+(** {3 Term reduction utilities} *)
+
+(** Perform δ-reduction once at head position
+    (definition unrolling). *)
+val reduce_delta_def1 :
+  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
+  Term.term ->
+  Term.term * bool 
+
+(** Perform δ-reduction once at head position
+    (macro, operator and definition unrolling). *)
+val reduce_delta1 :
+  ?delta:delta ->
   mode:Macros.expand_context ->
-  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps Lazy.t ->
+  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool 
 
 (** projection reduction *)
 val can_reduce_proj : Term.term -> bool 
-val     reduce_proj : Term.term -> Term.term * bool 
+val reduce_proj1    : Term.term -> Term.term * bool 
 
+(** let reduction *)
+val reduce_let1 : Term.term -> Term.term * bool
+  
 (** β-reduction *)
 val can_reduce_beta : Term.term -> bool 
-val     reduce_beta : Term.term -> Term.term * bool 
+val reduce_beta1    : Term.term -> Term.term * bool 
+
+(*------------------------------------------------------------------*)
+(** {3 Global formulas reduction utilities} *)
+
+(** let reduction *)
+val reduce_glet1 : Equiv.form -> Equiv.form * bool
+
+(*------------------------------------------------------------------*)
+(** {2 Internals} *)
+
+(*------------------------------------------------------------------*)
+type unif_state
+
+val mk_unif_state :
+  Vars.env -> Symbols.table -> SE.context -> Hyps.TraceHyps.hyps -> Vars.vars -> 
+  unif_state
+
+(*------------------------------------------------------------------*)
+type cond_term
+
+val mk_cond_term : Term.term -> Term.term -> cond_term 
+
+(*------------------------------------------------------------------*)
+type known_set
+
+val mk_known_set : Term.term ->  Term.term -> Vars.tagged_vars -> known_set
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 module T : S with type t = Term.term
 
+(*------------------------------------------------------------------*)
 module E : sig
   include S with type t = Equiv.form
+
+  val deduce_mem_one : 
+      cond_term ->
+      known_set ->
+      unif_state -> Mvar.t option
+
+  val known_set_check_impl :
+    Symbols.table ->
+    Term.term list ->  Term.term -> Term.term -> bool
 
   (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 

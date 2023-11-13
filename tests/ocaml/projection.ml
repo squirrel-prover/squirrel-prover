@@ -9,7 +9,7 @@ let any_form : Equiv.any_form Alcotest.testable =
   Alcotest.testable Equiv.Any.pp_dbg Equiv.Any.equal
 
 let get_hyp sequent name =
-  snd (TraceSequent.Hyps.by_name (Location.(mk_loc _dummy) name) sequent)
+  snd (TraceSequent.Hyps.by_name_k (Location.(mk_loc _dummy) name) Hyp sequent) 
 
 (* Utility to parse formulas from strings. *)
 let formula_of_string st string : Equiv.local_form =

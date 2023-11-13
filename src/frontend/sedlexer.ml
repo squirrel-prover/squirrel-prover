@@ -122,6 +122,7 @@ let rec token buf =
   | "then" -> THEN
   | "else" -> ELSE
   | "let" -> LET
+  | "Let" -> LLET
   | "XOR" -> XOR
   | "by" -> BY
   | "in" -> IN
@@ -157,7 +158,11 @@ let rec token buf =
   | "timestamp" -> TIMESTAMP
   | "null" -> NULL
   | "seq" -> SEQ
+  | "rnd" -> RND
+  | "var" -> VAR
+  | "return" -> RETURN
   | "oracle" -> ORACLE
+  | "game" -> GAME
   | "with" -> WITH
   | "where" -> WHERE
   | "time" -> TIME
@@ -194,6 +199,7 @@ let rec token buf =
   | "auto" -> AUTO
   | "simpl" -> SIMPL
   | "exn" -> EXN
+  | "crypto" -> CRYPTO
   | "use" -> USE
   | "rewrite" -> REWRITE
   | "trans" -> TRANS

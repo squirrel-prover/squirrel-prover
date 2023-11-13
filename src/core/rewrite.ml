@@ -100,10 +100,10 @@ let mk_state
   let () = match projs with
     | None -> ()
     | Some projs ->
-      let left  = Term.subst_projs psubst left in
+      let left  = Term.subst_projs psubst left  in
       let right = Term.subst_projs psubst right in
       List.iter (fun proj ->
-          let left = Term.project1 proj left in
+          let left  = Term.project1 proj left  in
           let right = Term.project1 proj right in
           check_rule { rule with rw_rw = left, right }
         ) projs
@@ -134,11 +134,9 @@ let mk_state
 
 (*------------------------------------------------------------------*)
 let hyps_add_conds hyps (conds : Term.terms) =
-  Lazy.map (fun hyps ->
-      List.fold_left (fun hyps cond ->
-          Hyps.TraceHyps.add AnyName (Local cond) hyps
-        ) hyps conds
-    ) hyps
+  List.fold_left (fun hyps cond ->
+      Hyps.TraceHyps.add AnyName (LHyp (Local cond)) hyps
+    ) hyps conds
 
 (*------------------------------------------------------------------*)
 (** If there is a match (with [mv]), substitute [occ] by [right] where
@@ -147,7 +145,7 @@ let hyps_add_conds hyps (conds : Term.terms) =
     the generated sub-goals. *)
 let rw_inst
     (expand_context : Macros.expand_context)
-    (table : Symbols.table) (env : Vars.env) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
+    (table : Symbols.table) (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
   : rw_state Pos.f_map_fold 
   = 
   let doit
@@ -272,7 +270,7 @@ let rewrite_head
     (table : Symbols.table)
     (env : Vars.env)
     (expand_context : Macros.expand_context)
-    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
+    (hyps  : Hyps.TraceHyps.hyps)
     (sexpr : SE.t)
     (rule  : rw_rule)
     (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
@@ -314,12 +312,10 @@ let do_rewrite
       incr cpt_occ;
   in
 
-  let hyps = lazy hyps in
-
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec _rewrite (mult : Args.rw_count) (f : Equiv.any_form) 
+  let rec do_rewrite1 (mult : Args.rw_count) (f : Equiv.any_form) 
     : Equiv.any_form * (SE.t * Term.term) list
     =
     check_max_rewriting ();
@@ -368,17 +364,17 @@ let do_rewrite
       let inst_subgs = subgoals_of_found inst in
       if i = 1 then f, inst_subgs 
       else
-        let f, rsubs' = _rewrite Args.(Exact (i - 1)) f in
+        let f, rsubs' = do_rewrite1 Args.(Exact (i - 1)) f in
         f, List.rev_append inst_subgs rsubs'
 
     | (Args.Many | Args.Any), `Found inst  ->
       let inst_subgs = subgoals_of_found inst in
-      let f, rsubs' = _rewrite Args.Any f in
+      let f, rsubs' = do_rewrite1 Args.Any f in
       f, List.rev_append inst_subgs rsubs'
   in
 
   let f, subs = 
-    if mult = Args.Exact 0 then (target, []) else _rewrite mult target 
+    if mult = Args.Exact 0 then (target, []) else do_rewrite1 mult target 
   in
   let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
   f, subs
@@ -433,7 +429,7 @@ let high_rewrite
     (t       : Term.term)
   : Term.term 
   =
-  let hyps = lazy Hyps.TraceHyps.empty in
+  let hyps = Hyps.TraceHyps.empty in
 
   let rw_inst : Pos.f_map = 
     fun occ se vars conds p ->

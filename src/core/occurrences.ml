@@ -51,7 +51,7 @@ sig
   val pp_data : Format.formatter -> data -> unit
 end
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module TSContent : OccContent with type content = Term.term
                                and type data = unit =
@@ -77,7 +77,7 @@ struct
     Fmt.pf fmt ""
 end
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module EmptyContent : OccContent with type content = unit
                                   and type data = unit =
@@ -97,8 +97,6 @@ struct
   let pp_data = pp_content
 end
 
-
-
 (*------------------------------------------------------------------*)
 (** Simple occurrences *)
 
@@ -114,7 +112,7 @@ let subst_occtype (sigma : Term.subst) (ot : occ_type) : occ_type =
   | EI_direct -> EI_direct
   | EI_indirect a -> EI_indirect (Term.subst sigma a)
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module type SimpleOcc = sig
   module OC : OccContent
@@ -150,7 +148,7 @@ module type SimpleOcc = sig
   val pp : Format.formatter -> simple_occ -> unit
 end
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
 struct
@@ -319,7 +317,7 @@ struct
 
 end
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module TSOcc : (SimpleOcc with module OC = TSContent) =
 struct
@@ -374,9 +372,6 @@ type empty_occ = EmptyOcc.simple_occ
 type empty_occs = EmptyOcc.simple_occs
 
 
-
-
-
 (*------------------------------------------------------------------*)
 (** Extended occurrences *)
 
@@ -406,7 +401,7 @@ module type ExtOcc = sig
 end
 
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module MakeEO (SO:SimpleOcc) : (ExtOcc with module SO = SO) =
 struct
@@ -599,12 +594,8 @@ let get_macro_actions
   let system = contx.system in
   TSOcc.clear_subsumed table system actions
 
-
-
-
 (*------------------------------------------------------------------*)
 (** Occurrence search *)
-
 
 (** Exported (see `.mli`) *)
 module type OccurrenceSearch = sig
@@ -646,6 +637,7 @@ struct
   type ext_occ = EO.ext_occ
   type ext_occs = ext_occ list
 
+  (*------------------------------------------------------------------*)
   (** Exported (see `.mli`) *)
   type f_fold_occs =
     (unit -> simple_occs) ->
@@ -654,18 +646,18 @@ struct
     Term.term ->
     simple_occs
 
-
+  (*------------------------------------------------------------------*)
   (** Internal.
       Given a [f_fold_occs] function [get_bad_occs],
       calls [get_bad_occs], is called again when [get_bad_occs] asks
       for recursive calls on subterms, and handles the case where
-      get_bad_occs calls its first continuation (ie gives up)
-      by 1) unfolding the term, if it's a macro that can be unfolded
-         2) doing nothing, if it's a macro that can't be unfolded
-            (in that case, fold_macro_support will generate a separate iocc
-            for that)
-         3) using [Match.Pos.fold_shallow], to recurse on subterms
-            at depth 1. *)
+      get_bad_occs calls its first continuation (ie gives up) by 
+      - 1) unfolding the term, if it's a macro that can be unfolded
+      - 2) doing nothing, if it's a macro that can't be unfolded
+           (in that case, [fold_macro_support] will generate a separate 
+           [iocc] for that)
+      - 3) using [Match.Pos.fold_shallow], to recurse on subterms
+         at depth 1. *)
   let fold_bad_occs
       (get_bad_occs     : f_fold_occs)
       ~(fv              : Vars.vars)
@@ -673,10 +665,11 @@ struct
       (t                : Term.term) 
     : simple_occs
     =
-    let rec get (pi : pos_info) (t:Term.term) : simple_occs =
+    (* instantiation of [get_bad_occs] on its continuation *)
+    let rec get (pi : pos_info) (t : Term.term) : simple_occs =
       let se = SE.to_arbitrary pi.pi_trctxt.system in
 
-      (* the continuation to be passed to get_bad_occs for cases it does
+      (* recursing continuation of [get_bad_occs] for cases it does
          not handle *)
       let retry_on_subterms () : simple_occs =
         match t with
@@ -704,37 +697,37 @@ struct
                acc @ newacc)
             ~se ~fv:pi.pi_vars ~p:pi.pi_pos ~cond:pi.pi_cond [] t
       in
+
       get_bad_occs retry_on_subterms get pi t
     in
+
+    (* initial position information *)
     let pi0 =
       {pi_pos=MP.root; pi_occtype=occtype; pi_trctxt=trctxt;
        pi_vars=fv; pi_cond=[]; pi_subterm=t}
     in
     get pi0 t
 
-
-  (** Internal.
-      Given a function find_occs that generates a list of occurrences
-      found in a term,
-      expanding macros when possible according to expand_info but
+  (*------------------------------------------------------------------*)
+  (** Exported.
+      Given a function [find_occs] that generates a list of occurrences
+      found in a term (obtained from [get_bad_occs]),
+      expanding macros when possible according to [expand_info] but
       not otherwise (undef and maybedef macros will be handled by
-      fold_macro_support);
+      [fold_macro_support]);
       computes the list of all occurrences in the list of source terms.
-      Relies on fold_macro_support to look through all macros in the term. *)
-  let find_occurrences
-      ~(mode : Iter.allowed_constants)   (* allowed sub-terms
-                                            without further checks *)
-      ?(pp_ns    : unit Fmt.t option = None)
-      (find_occs :
-         (fv : Vars.vars ->
-          expand_info    ->
-          Term.term      ->
-          simple_occs))
+      Relies on [fold_macro_support] to look through all macros in the term. *)
+  let find_all_occurrences
+      ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
+      ?(pp_ns : unit Fmt.t option = None)
+      (get_bad_occs : f_fold_occs)
       (contx   : Constr.trace_cntxt)
       (env     : Env.t)
       (sources : Term.terms) 
     : ext_occs
     =
+    let find_occs = fold_bad_occs get_bad_occs in
+
     let system = contx.system in
     let table = contx.table in
 
@@ -839,24 +832,7 @@ struct
     if pp_ns <> None then
       Printer.pr "@;@]";
     occs
-
-
-  (** Exported (see `.mli`) *)
-  let find_all_occurrences
-      ~(mode : Iter.allowed_constants)
-      ?(pp_ns       : (unit Fmt.t) option=None)
-      (get_bad_occs : f_fold_occs)
-      (contx        : Constr.trace_cntxt)
-      (env          : Env.t)
-      (sources      : Term.terms) 
-    : ext_occs
-    =
-    find_occurrences ~mode ~pp_ns (fold_bad_occs get_bad_occs) contx env sources
 end
-
-
-
-
 
 (*------------------------------------------------------------------*)
 (** Formula construction and simplification *)
@@ -866,12 +842,35 @@ module type OccurrenceFormulas = sig
   type ext_occ
   type ext_occs = ext_occ list
 
-  val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
   val occurrence_formula :
     ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
+(*------------------------------------------------------------------*)
+(** Exported (see `.mli`) *)
+let time_formula
+    (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : Term.term 
+  =
+  let phis =
+    List.map (fun (ti:ts_occ) ->
+        (* refresh probably not necessary, but doesn't hurt *)
+        let tivs, s = Term.refresh_vars ti.so_vars in
+        let ticnt   = Term.subst s ti.so_cnt in
+        let ticond  = List.map (Term.subst s) ti.so_cond in
 
+        Term.mk_exists ~simpl:true
+          tivs
+          (Term.mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
+          (* in the simplest cases (when [path_cond = PathCond.Top]), 
+               [PathCond.apply path_cond a ticnt] 
+             is just
+               [Term.mk_timestamp_leq a ticnt] 
+          *)
+      ) ts
+  in
+  Term.mk_ors ~simpl:true phis
+
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module MakeFormulas (EO:ExtOcc) :
   (OccurrenceFormulas with type ext_occ = EO.ext_occ) =
@@ -880,8 +879,10 @@ struct
   type ext_occ = EO.ext_occ
   type ext_occs = ext_occ list
 
+  (*------------------------------------------------------------------*)
   (** Utilities to build the proof-obligations *)
 
+  (*------------------------------------------------------------------*)
   (** Internal.
       Saturates a substitution sigma.
       ie returns sigma' = [u1 -> v1, …, un -> vn] such that
@@ -958,7 +959,6 @@ struct
          | _ -> assert false)
       sigma []
 
-
   (*------------------------------------------------------------------*)
   (** Internal.
       Interprets phi as phi_1 /\ … /\ phi_n,
@@ -1020,31 +1020,7 @@ struct
         sigma' in
     sigma' @ sigma
 
-
-  (** Exported (see `.mli`) *)
-  let time_formula
-      (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : Term.term 
-    =
-    let phis =
-      List.map (fun (ti:ts_occ) ->
-          (* refresh probably not necessary, but doesn't hurt *)
-          let tivs, s = Term.refresh_vars ti.so_vars in
-          let ticnt   = Term.subst s ti.so_cnt in
-          let ticond  = List.map (Term.subst s) ti.so_cond in
-
-          Term.mk_exists ~simpl:true
-            tivs
-            (Term.mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
-            (* in the simplest cases (when [path_cond = PathCond.Top]), 
-                 [PathCond.apply path_cond a ticnt] 
-               is just
-                 [Term.mk_timestamp_leq a ticnt] 
-            *)
-        ) ts
-    in
-    Term.mk_ors ~simpl:true phis
-
-
+  (*------------------------------------------------------------------*)
   (** Exported (see `.mli`) *)
   let occurrence_formula
       ?(use_path_cond = false)
@@ -1109,10 +1085,7 @@ struct
         Term.mk_exists ~simpl:true fv phi_cond_cnt
       else
         Term.mk_forall ~simpl:true fv phi_cond_cnt
-
 end 
-
-
 
 (*------------------------------------------------------------------*)
 (** Instantiation of all modules for searching name occurrences *)
@@ -1152,7 +1125,7 @@ struct
 
 end
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module NameOC : OccContent with type content = Name.t
                             and type data = unit =
@@ -1184,7 +1157,7 @@ module NameOccSearch = MakeSearch (NameOC)
 
 module NameOccFormulas = MakeFormulas (NameOccSearch.EO)
 
-
+(*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 let find_name_occ (n:Name.t) (ns:Name.t list) (info:pos_info)
   : NameOccSearch.simple_occs =

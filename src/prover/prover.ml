@@ -562,6 +562,13 @@ let print_macro table (l:Theory.lsymb) : bool =
     true
   with _ -> false
 
+let print_game table (l:Theory.lsymb) : bool =
+  try
+    let g = Crypto.find table l in
+    Printer.prt `Default "%a@." Crypto.pp_game g; 
+    true
+  with _ -> false
+
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     match q with
     | Pr_system s_opt -> print_system st s_opt
@@ -572,6 +579,7 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
           print_lemma;    (* first try printing lemma *)
           print_function; (* then try printing function *)
           print_name;     (* then try printing name *)
+          print_game;     (* then try printing games *)
           print_macro;    (* FIXME then try printing macro *)
         ] in
         
@@ -664,8 +672,18 @@ and do_include
     end in
   let new_file_stack = file :: file_stack in
   let st = 
-    try do_all_commands_in ~main_mode ~file_stack:new_file_stack 
-          ~check:checkInclude ~test st file 
+    try 
+      let st = 
+        do_all_commands_in
+          ~main_mode ~file_stack:new_file_stack ~check:checkInclude ~test st file 
+      in
+
+      (*Adding the file as included library in table theories' symbols *)
+      let table, _ = 
+        let name = match i.th_name with Name s -> s | Path s -> s in
+        Symbols.Theory.declare_exact st.table name () in
+      { st with table }
+
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
       let err_mess fmt =
         Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
@@ -712,7 +730,6 @@ let init : ?withPrelude:bool -> unit -> state =
     | _ -> 
       let state = init' () in
       if withPrelude then begin
-        Printer.pr "With prelude!";
         let inc =
           ProverLib.{ th_name = Name (Location.mk_loc Location._dummy
                           "Prelude");

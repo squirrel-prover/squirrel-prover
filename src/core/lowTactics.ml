@@ -13,6 +13,8 @@ module ES = EquivSequent
 module St = Term.St
 module Sv = Vars.Sv
 
+module TopHyps = Hyps
+  
 type lsymb = Theory.lsymb
 
 
@@ -28,6 +30,29 @@ let soft_failure = Tactics.soft_failure
 (*------------------------------------------------------------------*)
 (** {3 Miscellaneous} *)
 
+(*------------------------------------------------------------------*)
+let as_local ?loc = function
+  | Equiv.Local  f -> f
+  | Equiv.Global _ ->
+    soft_failure ?loc (Failure "expected a local formula")
+
+let check_local ~loc = function
+  | Equiv.Local  _ -> ()
+  | Equiv.Global _ ->
+    soft_failure ~loc (Failure "expected a local formula")
+
+(*------------------------------------------------------------------*)
+let as_global ?loc = function
+  | Equiv.Global f -> f
+  | Equiv.Local _ ->
+    soft_failure ?loc (Failure "expected a global formula")
+
+let check_global ~loc = function
+  | Equiv.Global  _ -> ()
+  | Equiv.Local _ ->
+    soft_failure ~loc (Failure "expected a global formula")
+
+(*------------------------------------------------------------------*)
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
@@ -49,11 +74,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     include S
 
-    let wrap_conc x = Equiv.Any.convert_from S.conc_kind x
-    let unwrap_conc x = Equiv.Any.convert_to S.conc_kind x
+    let wrap_conc   x = Equiv.Any.convert_from S.conc_kind x
+    let unwrap_conc x = Equiv.Any.convert_to   S.conc_kind x
 
-    let wrap_hyp x = Equiv.Any.convert_from S.hyp_kind x
-    let unwrap_hyp x = Equiv.Any.convert_to S.hyp_kind x
+    let wrap_hyp   x = Equiv.Any.convert_from S.hyp_kind x
+    let unwrap_hyp x = Equiv.Any.convert_to   S.hyp_kind x
 
     let hyp_to_conc = Equiv.Babel.convert ~src:S.hyp_kind ~dst:S.conc_kind
     let hyp_of_conc = Equiv.Babel.convert ~dst:S.hyp_kind ~src:S.conc_kind
@@ -121,14 +146,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Targets} *)
 
   type target =
-    | T_conc              (** Conclusion. *)
-    | T_hyp   of Ident.t  (** Hypothesis. *)
-    | T_felem of int      (** Element in conclusion biframe. *)
+    | T_conc              (** conclusion *)
+    | T_hyp   of Ident.t  (** hypothesis *)
+    | T_felem of int      (** element in conclusion biframe *)
 
   type targets = target list
 
+  (** Input: 
+      - formula, 
+      - its system context, 
+      - optional ident of the hypothesis or definition containing the formula
+      Output:
+      - modified formula
+      - proof obligations, with their context *)
+  type do_target_func =
+    (Equiv.any_form * SE.context * Ident.t option) ->
+    (Equiv.any_form * (SE.context * S.conc_form) list)
+
   let target_all s : target list =
-    T_conc :: List.map (fun ldecl -> T_hyp (fst ldecl)) (Hyps.to_list s)
+    T_conc :: 
+    List.concat_map (function
+        | (id, TopHyps.LHyp _) -> [T_hyp id]
+        | (_ , TopHyps.LDef _) -> []
+      ) (Hyps.to_list s)
 
   let make_single_target (symb : lsymb) (s : S.sequent) : target =
     let name = L.unloc symb in
@@ -139,7 +179,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     if Hyps.mem_name name s then
-      T_hyp (fst (Hyps.by_name symb s))
+      begin
+        match Hyps.by_name symb s with
+        | id, LHyp _ -> T_hyp id
+        | _, LDef _ ->
+          soft_failure ~loc:(L.loc symb)
+            (Tactics.Failure ("cannot target definitions"))
+      end
     else
       match int_of_string_opt name with
       | Some i ->
@@ -148,46 +194,51 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let make_in_targets (in_t : Args.in_target) (s : S.sequent) : targets * bool =
     match in_t with
-    | `Hyps symbs ->
+    | `HypsOrDefs symbs ->
       List.map (fun symb -> make_single_target symb s) symbs, false
     | `All -> target_all s, true
     | `Goal -> [T_conc], false
 
   (** Apply some function [doit] to a single target. *)
   let do_target
-      (doit : (
-          (Equiv.any_form * Ident.t option) ->
-          (Equiv.any_form * (SE.context * S.conc_form) list)))
-      (s : S.sequent) (t : target)
+      (doit : do_target_func) (s : S.sequent) (tgt : target)
     : S.sequent * S.sequent list
     =
-    let f, s, tgt_id = match t with
+    (* - [f]: formula [doit] will act upon
+       - [s]: sequent
+       - [se]: system context of [f]
+       - [tgt_id]: hypothesis ident if [f] (if applicable) *)
+    let f, s, system, tgt_id = 
+      match tgt with
       | T_conc ->
-          let f = S.wrap_conc (S.goal s) in
-          f, s, None
+        let f = S.wrap_conc (S.goal s) in
+        f, s, S.system s, None
       | T_hyp id ->
-          let f = S.wrap_hyp (Hyps.by_id id s) in
-          f, Hyps.remove id s, Some id
+        let f = Hyps.by_id_k id Hyp s in
+        S.wrap_hyp  f, Hyps.remove id s, S.system s, Some id
       | T_felem i ->
           let f = Equiv.Global (Equiv.Atom (Equiv [S.get_felem i s])) in
-          f, s, None
+          f, s, S.system s, None
     in
 
-    let f,subs = doit (f,tgt_id) in
+    let f,subs = doit (f,system,tgt_id) in
     let subs : S.sequent list =
       List.map
         (fun (sub_system, sub) -> S.set_goal_in_context sub_system sub s)
         subs
     in
 
-    match t, f with
-    | T_conc, f -> S.set_goal (S.unwrap_conc f) s, subs
-    | T_hyp id, f ->
-      Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
+    match tgt, f with
+    | T_conc  , _ -> S.set_goal (S.unwrap_conc f) s, subs
+    | T_hyp id, _ ->
+      let ldc = TopHyps.LHyp (S.unwrap_hyp f) in
+      Hyps.add (Args.Named (Ident.name id)) ldc s, subs
     | T_felem i, Global (Atom (Equiv [f])) -> S.change_felem i [f] s, subs
     | _ -> assert false
 
-  let do_targets doit (s : S.sequent) (targets : target list)
+  (** Apply some function [doit] to many targets. *)
+  let do_targets
+      (doit : do_target_func) (s : S.sequent) (targets : target list)
     : S.sequent * S.sequent list
     =
     let s, subs =
@@ -206,14 +257,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
       The sequent [s] is used to discharge Happens subgoals.
       If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
   let unfold_term_exn
-      ?(mode : Macros.expand_context option)
+      ?(mode : Macros.expand_context = InSequent)
       ?(force_happens=false)
       (t     : Term.term)
       (se    : SE.arbitrary)
       (s     : S.sequent)
     : Term.term
     =
+    let failed () = soft_failure (Tactics.Failure "nothing to expand") in    
     match t with
+    (* we do not use [Match.reduce_delta1] for macros, to have sensible error
+       messages. *)
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
@@ -224,16 +278,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
             (Tactics.Failure "nothing to expand: the system is too general")
       in
 
-      Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
+      Macros.get_definition_exn ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
 
-    | Fun (fs, { ty_args })
-    | App (Fun (fs, { ty_args }), _)
-      when Operator.is_operator (S.table s) fs ->
-      let args = match t with App (_,args) -> args | _ -> [] in
-      Operator.unfold (S.table s) se fs ty_args args 
+    | Fun _ | App _ | Var _ ->
+      let t, has_red =
+        Match.reduce_delta1
+          ~delta:Match.delta_full ~mode (S.table s) se (S.get_trace_hyps s) t
+      in      
+      if has_red then t else failed ()
       
-    | _ ->
-      soft_failure (Tactics.Failure "nothing to expand")
+    | _ -> failed ()
 
   (** If [strict] is true, the unfolding must succeed. *)
   let unfold_local
@@ -253,35 +307,43 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Msymb mname -> ms.Term.s_symb = mname
     | `Mterm t     -> occ = t
     | `Any         -> true
-    | `Fsymb _     -> false
-    | `Psymb _     -> false
+    | `Fsymb _ | `Psymb _ | `Def   _ -> false
 
   let found_occ_fun target fs =
     match target with
     | `Any         -> true
     | `Fsymb fname -> fs = fname
-    | `Psymb _ | `Msymb _ | `Mterm _ -> false
+    | `Def _ | `Psymb _ | `Msymb _ | `Mterm _ -> false
 
   let found_occ_pred target ps =
     match target with
     | `Any         -> true
     | `Psymb pname -> ps = pname
-    | `Fsymb _ | `Msymb _ | `Mterm _ -> false
+    | `Def _ | `Fsymb _ | `Msymb _ | `Mterm _ -> false
 
+  let found_occ_def target id =
+    match target with
+    | `Any     -> true
+    | `Def id' -> id = id'
+    | `Fsymb _ | `Psymb _ | `Msymb _ | `Mterm _ -> false
+ 
   type expand_kind = [
     | `Msymb of Symbols.macro
     | `Fsymb of Symbols.fname
     | `Psymb of Symbols.predicate
+    | `Def   of Ident.t         (* defined variable in the proof-context *)
     | `Mterm of Term.term
     | `Any
   ]
 
   let expand_term
       ?(m_rec = false)
-      ~(mode : Macros.expand_context)
+      ~(mode  : Macros.expand_context)
       (target : expand_kind)
-      (s : S.sequent)
-      (f : Equiv.any_form) : bool * Equiv.any_form
+      (s      : S.sequent)
+      (f      : Equiv.any_form) (* term being expanded *)
+      (system : SE.context)     (* system context of [f] *)
+    : bool * Equiv.any_form
     =
     let found1 = ref false in
 
@@ -290,11 +352,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let strict =
       match target with
       | `Mterm _ -> true
-      | `Psymb _ | `Fsymb _ | `Msymb _ | `Any -> false
+      | `Def _ | `Psymb _ | `Fsymb _ | `Msymb _ | `Any -> false
     in
 
     (* unfold in local sub-terms *)
-    let unfold_term (se : SE.arbitrary) occ s =
+    let unfold_term (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
       match unfold_local ~mode ~strict occ se s with
       | None -> `Continue
       | Some t ->
@@ -302,7 +364,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         `Map t
     in
     (* unfold in global sub-terms *)
-    let unfold_predicate ~context (pa : Equiv.pred_app) s =
+    let unfold_predicate ~(context : SE.context) (pa : Equiv.pred_app) s =
       match 
         Predicate.unfold
           (S.table s) context pa.psymb
@@ -322,13 +384,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
           if found_occ_macro target ms occ then
             let s = (* adds [conds] in [s], only useful for macros *)
               List.fold_left (fun s cond ->
-                  S.Hyps.add AnyName (S.unwrap_hyp (Local cond)) s
+                  S.Hyps.add AnyName (LHyp (S.unwrap_hyp (Local cond))) s
                 ) s conds
             in
             unfold_term se occ s
           else
             `Continue
 
+        | Term.Var v ->
+          if found_occ_def target v.id then
+            unfold_term se occ s
+          else
+            `Continue
+          
         | Term.Fun (f, _) 
         | Term.App (Fun (f, _), _) ->
           if found_occ_fun target f then
@@ -356,18 +424,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Global f ->
       let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown m_rec) expand_inst   (S.system s) f 
+          ~mode:(`TopDown m_rec) expand_inst   system f 
       in
       let _, f =
         Match.Pos.map_g
-          ~mode:(`TopDown m_rec) expand_inst_g (S.system s) f
+          ~mode:(`TopDown m_rec) expand_inst_g system f
       in
       !found1, Global f
 
     | Local f ->
       let _, f =
         Match.Pos.map
-          ~mode:(`TopDown m_rec) expand_inst (S.system s).set f
+          ~mode:(`TopDown m_rec) expand_inst system.set f
       in
       !found1, Local f
 
@@ -382,13 +450,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let found1 = ref false in
 
     (* applies [doit] to all subterms of the target [f] *)
-    let doit
-        ((f,_) : Equiv.any_form * Ident.t option)
-      : Equiv.any_form * (SE.context * S.conc_form) list
-      =
-      let found1', f = expand_term ~mode:Macros.InSequent ~m_rec target s f in
-      found1 := found1' || !found1;
-      f, []
+    let doit : do_target_func =
+      fun (f,system,_) ->
+        let found1', f =
+          expand_term ~mode:Macros.InSequent ~m_rec target s f system
+        in
+        found1 := found1' || !found1;
+        f, []
     in
 
     let s, subs = do_targets doit s targets in
@@ -411,7 +479,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           begin
             let s =             (* add [conds] in [s] *)
               List.fold_left (fun s cond ->
-                  S.Hyps.add AnyName (S.unwrap_hyp (Local cond)) s
+                  S.Hyps.add AnyName (LHyp (S.unwrap_hyp (Local cond))) s
                 ) s conds
             in
             match
@@ -444,15 +512,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
-      if Symbols.Macro.mem_lsymb m tbl then
-        `Msymb (Symbols.Macro.of_lsymb m tbl)
-      else if Symbols.Function.mem_lsymb m tbl then
-        `Fsymb (Symbols.Function.of_lsymb m tbl)
-      else if Symbols.Predicate.mem_lsymb m tbl then
-        `Psymb (Symbols.Predicate.of_lsymb m tbl)
-      else
-        soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");
-
+      begin
+        if Symbols.Macro.mem_lsymb m tbl then
+          `Msymb (Symbols.Macro.of_lsymb m tbl)
+        else if Symbols.Function.mem_lsymb m tbl then
+          `Fsymb (Symbols.Function.of_lsymb m tbl)
+        else if Symbols.Predicate.mem_lsymb m tbl then
+          `Psymb (Symbols.Predicate.of_lsymb m tbl)
+        else 
+          let ms = L.unloc m in
+          match
+            S.Hyps.find_map (fun (id,ldc) ->
+                if id.name = ms &&
+                   match ldc with LDef _ -> true | _ -> false
+                then Some id
+                else None
+              ) s
+          with
+          | Some id -> `Def id
+          | None ->
+            soft_failure ~loc:(L.loc arg)
+              (Failure "not a macro, operator or definition");
+      end
+      
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
       | Args.Arg (Args.Message (f, _)) -> `Mterm f
@@ -546,26 +628,24 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let mult, id_opt, rw_erule = rw in
 
-    let doit_tgt
-        (f,tgt_id : Equiv.any_form * Ident.t option)
-      : Equiv.any_form * (SE.context * S.conc_form) list
-      =
-      if hyp_is_same id_opt tgt_id
-      then f, []
-      else
-        match
-          Rewrite.rewrite_exn
-            ~loc (S.table s) (S.vars s) (S.system s) InSequent
-            (S.get_trace_hyps s)
-            mult rw_erule f
-        with
-        | f, subs ->
-          found := true;
-          f, List.map (fun (se, l) -> se, S.unwrap_conc (Local l)) subs
+    let doit_tgt : do_target_func =
+      fun (f,system,tgt_id) ->
+        if hyp_is_same id_opt tgt_id
+        then f, []
+        else
+          match
+            Rewrite.rewrite_exn
+              ~loc (S.table s) (S.vars s) system InSequent
+              (S.get_trace_hyps s)
+              mult rw_erule f
+          with
+          | f, subs ->
+            found := true;
+            f, List.map (fun (se, l) -> se, S.unwrap_conc (Local l)) subs
 
-        | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
-          if all then f, []
-          else soft_failure ~loc Tactics.NothingToRewrite
+          | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
+            if all then f, []
+            else soft_failure ~loc Tactics.NothingToRewrite
     in
 
     let s, subs = do_targets doit_tgt s targets in
@@ -806,14 +886,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | None       -> form :: acc 
     in
 
-    let rec doit_cases (form : S.hyp_form) =
+    let rec doit_cases (form : S.hyp_form) : S.hyp_form list =
       match nb with
       | `Any -> doit_case [] form
       | `Some l -> 
         match S.Hyp.destr_ors ~env:(S.env s) l form with
         | None -> 
           let form, has_red = 
-            S.Reduce.expand_head_once Reduction.rp_full s S.hyp_kind form 
+            S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
           in
           if has_red then 
             doit_cases form
@@ -821,7 +901,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | Some cases -> cases
     in
 
-    let form = Hyps.by_id id s in
+    (* FEATURE: let: case analys on definitions *)
+    let form = Hyps.by_id_k id Hyp s in
     let s = Hyps.remove id s in
 
     let cases = doit_cases form in
@@ -830,7 +911,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     List.map (fun g ->
         let ng = Ident.name id in
-        let idg, sg = Hyps.add_i (Args.Named ng) g s in
+        let idg, sg = Hyps.add_i (Args.Named ng) (LHyp g) s in
         ( CHyp idg, sg )
       ) cases
 
@@ -839,10 +920,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Reduce the full sequent *)
   let reduce_sequent param s =
-    let mapper k f =
-      S.Reduce.reduce param s k f
-    in
-      S.map { call = mapper } s
+    let reduce ?system k f = S.Reduce.reduce ?system param s k f in
+    let goal = reduce S.conc_kind (S.goal s) in
+    S.Hyps.map
+      ~hyp:(reduce S.hyp_kind)
+      ~def:(fun (se,t) ->
+          se, reduce ~system:(SE.reachability_context se) Equiv.Local_t t
+        )
+      (S.set_goal goal s)
 
   (** Reduce the goal *)
   let reduce_goal param s =
@@ -851,8 +936,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let reduce_args args s : S.t list =
     let red_param = 
       match args with
-      | [] -> Reduction.rp_full
-      | [Args.Reduce n] -> Reduction.parse_simpl_args Reduction.rp_full n
+      | [] -> Reduction.rp_default
+      | [Args.Reduce n] -> Reduction.parse_simpl_args Reduction.rp_default n
       | _ -> bad_args ()
     in
     [reduce_goal red_param s]
@@ -862,11 +947,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Clear} *)
 
-  let clear (hid : Ident.t) s = Hyps.remove hid s
+  let clear ?loc (hid : Ident.t) s = 
+    match Hyps.by_id hid s with
+    | LHyp _ -> Hyps.remove hid s
+    | LDef _ ->
+      if Sv.exists (fun v -> v.id = hid) (S.fv s) then
+        soft_failure ?loc
+          (Failure "cannot clear definition: used in the sequent");
+      Hyps.remove hid s
 
-  let clear_str (hyp_name : lsymb) s : S.t =
-    let hid,_ = Hyps.by_name hyp_name s in
-    clear hid s
+
+  let clear_str (name : lsymb) s : S.t =
+    let hid,_ = Hyps.by_name name s in
+    clear ~loc:(L.loc name) hid s
 
   let clear_tac_args (args : Args.parser_arg list) s : S.t list =
     let s =
@@ -881,15 +974,50 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Revert} *)
 
-  let revert (hid : Ident.t) (s : S.t) : S.t =
-    let f = Hyps.by_id hid s in
-    let f = S.hyp_to_conc f in
-    let s = Hyps.remove hid s in
-    S.set_goal (S.Conc.mk_impl ~simpl:false f (S.goal s)) s
+  let revert ?loc (hid : Ident.t) (s : S.t) : S.t =
 
-  let revert_str (hyp_name : lsymb) s : S.t =
-    let hid,_ = Hyps.by_name hyp_name s in
-    revert hid s
+    match Hyps.by_id hid s with
+    | LDef (se,t) ->                          
+      let s_system = S.system s in
+      (* We check that [se] is equal to both [set] and [pair].
+         This is because [hid] may appear in reachability or equivalence 
+         atoms. This could test could be finer, by looking at which 
+         atoms [hid] appears in.  *)
+      if not (SE.equal (S.table s) se s_system.set &&
+              (s_system.pair = None ||
+               SE.equal (S.table s) se (oget s_system.pair :> SE.t))) then
+        soft_failure ?loc
+          (Failure "cannot revert definition: systems not compatible") ;
+
+      let v0 = Vars.mk hid (Term.ty t) in
+      
+      let fv = S.fv (S.set_goal S.Conc.mk_false s) in
+      if Sv.mem v0 fv then 
+        soft_failure ?loc
+          (Failure "cannot revert definition: variable bound in proof-context") ;
+
+      let s = Hyps.remove hid s in
+      let s = S.set_vars (Vars.rm_var v0 (S.vars s)) s in
+
+      let name = if Ident.name hid = "_" then "x" else Ident.name hid in
+      let v = Vars.make_fresh (Term.ty t) name in
+
+      let goal =
+        S.subst_conc [Term.ESubst (Term.mk_var v0, Term.mk_var v)] (S.goal s) |>
+        S.Conc.mk_let ~simpl:false v t 
+      in
+      
+      S.set_goal goal s 
+
+    | LHyp f ->
+      let s = Hyps.remove hid s in
+      let f = S.hyp_to_conc f in
+      let goal = S.Conc.mk_impl ~simpl:false f (S.goal s) in
+      S.set_goal goal s
+
+  let revert_str (name : lsymb) s : S.t =
+    let hid,_ = Hyps.by_name name s in
+    revert ~loc:(L.loc name) hid s
 
   let revert_args (args : Args.parser_arg list) s : S.t list =
     let s =
@@ -932,6 +1060,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* FIXME: we substitute everywhere. This is inefficient. *)
       S.subst subst (S.set_vars env s)
 
+    | `Def (v,tag) ->
+      let env, v' =
+        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) tag (S.vars s)
+      in
+      let def = Hyps.by_id v.id s in
+      let s = Hyps.remove v.id s in
+
+      let _, s = Hyps._add ~force:true v'.id def s in
+
+      let subst = [Term.ESubst (Term.mk_var v, Term.mk_var v')] in
+      
+      (* FIXME: we substitute everywhere. This is inefficient. *)
+      S.subst subst (S.set_vars env s)
+
     | `Hyp hid ->
       let f = Hyps.by_id hid s in
       let s = Hyps.remove hid s in
@@ -941,7 +1083,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Apply a And pattern (this is a destruct) of length [l].
       Note that variables in handlers have not been added to the env yet. *)
-  let do_and_pat (hid : Ident.t) (len : int) s : Args.ip_handler list * S.t =
+  let do_and_pat (hid : Ident.t) (len : int) (s : S.t) : Args.ip_handler list * S.t =
     let destr_fail pp_err =
       soft_failure
         (Tactics.Failure (Fmt.str "@[<hv 2>cannot destruct:@ @[%t@]@]" pp_err))
@@ -955,7 +1097,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = S.env s in
     assert (len > 0);
     if len = 1 then ([`Hyp hid], s) else
-      let form = Hyps.by_id hid s in
+      let form = Hyps.by_id_k hid Hyp s in
       let s = Hyps.remove hid s in
 
       (* local exception for failed destructions *)
@@ -969,7 +1111,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let eqs = List.map2 Term.mk_eq l1 l2 in
 
           let forms =
-            List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) eqs
+            List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) eqs
           in
           let ids, s = Hyps.add_i_list forms s in
           List.map (fun id -> `Hyp id) ids, s
@@ -981,7 +1123,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           and f2 = Term.mk_eq a2 b2 in
 
           let forms =
-            List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) [f1;f2]
+            List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) [f1;f2]
           in
           let ids, s = Hyps.add_i_list forms s in
           List.map (fun id -> `Hyp id) ids, s
@@ -995,7 +1137,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             let ands =
               get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands len form)
             in
-            let ands = List.map (fun x -> Args.Unnamed, x) ands in
+            let ands = List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) ands in
             let ids, s = Hyps.add_i_list ands s in
             List.map (fun id -> `Hyp id) ids, s
           end
@@ -1012,7 +1154,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             in
             let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
             let forms =
-              List.map (fun x -> Args.Unnamed, x) forms
+              List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) forms
             in
             let ids, s = Hyps.add_i_list forms s in
             List.map (fun id -> `Hyp id) ids, s
@@ -1037,7 +1179,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             let f = S.Hyp.mk_exists_tagged vs' f in
             let f = S.subst_hyp subst f in
 
-            let idf, s = Hyps.add_i Args.Unnamed f s in
+            let idf, s = Hyps.add_i Args.Unnamed (TopHyps.LHyp f) s in
 
             ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
           end
@@ -1064,7 +1206,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
         | [] ->
           let form, has_red = 
-            S.Reduce.expand_head_once Reduction.rp_full s S.hyp_kind form 
+            S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
           in
           if has_red then 
             doit form init_destr_list (* start again *)
@@ -1125,7 +1267,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         ) ss
 
   (** Apply an simple pattern a handler. *)
-  and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : S.t list =
+  and do_simpl_pat
+      (h : Args.ip_handler) (ip : Args.simpl_pat) (s : S.t) : S.t list
+    =
     match h, ip with
     | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
 
@@ -1134,7 +1278,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | `Hyp id, Args.Srewrite dir ->
       let loc = L.loc dir in
-      let hyp = Hyps.by_id id s in
+      let hyp = Hyps.by_id_k id Hyp s in
       let f =
         Equiv.Babel.convert ~loc
           ~src:S.hyp_kind
@@ -1152,7 +1296,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       subgoals @ [s]
 
-    | `Var _, (Args.SAndOr _ | Args.Srewrite _) ->
+    | (`Def _| `Var _), (Args.SAndOr _ | Args.Srewrite _) ->
       hard_failure (Failure "intro pattern not applicable")
 
 
@@ -1200,7 +1344,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       else
         let form, has_red = 
-          S.Reduce.expand_head_once Reduction.rp_full s S.conc_kind form 
+          S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
         in
         if has_red then 
           doit form
@@ -1229,7 +1373,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         begin
           let lhs, rhs = oget (S.Conc.destr_impl ~env form) in
           let lhs = S.hyp_of_conc lhs in
-          let id, s = Hyps.add_i Args.Unnamed lhs s in
+          let id, s = Hyps.add_i Args.Unnamed (LHyp lhs) s in
           let s = S.set_goal rhs s in
           `Hyp id, s
         end
@@ -1238,7 +1382,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         begin
           let f = oget (S.Conc.destr_not form) in
           let f = S.hyp_of_conc f in
-          let id, s = Hyps.add_i Args.Unnamed f s in
+          let id, s = Hyps.add_i Args.Unnamed (LHyp f) s in
           let s = S.set_goal S.Conc.mk_false s in
           `Hyp id, s
         end
@@ -1248,14 +1392,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let u, v = oget (S.Conc.destr_neq form) in
           let h = Term.mk_atom `Eq u v in
           let h = S.unwrap_hyp (Local h) in
-          let id, s = Hyps.add_i Args.Unnamed h s in
+          let id, s = Hyps.add_i Args.Unnamed (LHyp h) s in
           let s = S.set_goal S.Conc.mk_false s in
           `Hyp id, s
         end
 
+      else if S.Conc.is_let form then
+        begin
+          let v, t1, t2 = oget (S.Conc.destr_let form) in
+          let se =
+            match S.conc_kind with
+            | Equiv.Local_t  -> (S.system s).set
+            | Equiv.Global_t -> (oget ((S.system s).pair) :> SE.t)
+            (* default to [pair] for global judgements *)
+            | Equiv.Any_t -> assert false
+          in
+          let id, s = Hyps.add_i (Args.Named (Vars.name v)) (LDef (se,t1)) s in
+          let v' = Vars.mk id (Vars.ty v) in
+          let subst = Term.ESubst (Term.mk_var v, Term.mk_var v') in
+          let t2 = S.subst_conc [subst] t2 in
+          let s = S.set_goal t2 s in
+          `Def (v',HighTerm.tag_of_term (S.env s) t1), s
+        end
+
       else 
         let form, has_red = 
-          S.Reduce.expand_head_once Reduction.rp_full s S.conc_kind form 
+          S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
         in
         if has_red then 
           doit form
@@ -1381,22 +1543,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
     
     (* if [dependent = true], introduce back hypotheses where [pat] was 
        found. *)
-    let gen_hyps, s =
+    let s =
       if not dependent
-      then [], s
+      then s
       else
-        Hyps.fold (fun id f (gen_hyps, s) ->
-            if Sv.mem v (S.fv_hyp f)
-            then S.hyp_to_conc f :: gen_hyps, Hyps.remove id s
-            else gen_hyps, s
-          ) s ([], s)
+        Hyps.fold (fun id ldc s ->
+            let fv = 
+              match ldc with LHyp f -> S.fv_hyp f | LDef (_,t) -> Term.fv t
+            in
+            if Sv.mem v fv then revert ?loc id s else s (* note that [revert] may fail *)
+          ) s s
     in
 
-    let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
-
-    (* compute tags of [v] *)
+    (* compute tag of [v] *)
     let tag = HighTerm.tag_of_term (S.env s) term in
-    (v,tag), S.set_goal goal s
+    (v,tag), s
 
   (** [terms] and [n_ips] must be of the same length *)
   let generalize
@@ -1499,7 +1660,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
     let table, system, goal = S.table s, S.system s, S.goal s in
-    let hyps = lazy (S.get_trace_hyps s) in
+    let hyps = S.get_trace_hyps s in
 
     (* open an type unification environment *)
     let ty_env = Type.Infer.mk_env () in
@@ -1527,12 +1688,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* Check that [pat] entails [S.goal s]. *)
       match match_res with
       (* match failed but [pat] is a product: retry with the rhs *)
-      | NoMatch _ when S.Conc.is_impl pat.pat_op_term ->
-        let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
-        try_apply (t1 :: subs) { pat with pat_op_term = t2 }
+      | NoMatch minfos ->
+        if S.Conc.is_impl pat.pat_op_term then
+          let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
+          try_apply (t1 :: subs) { pat with pat_op_term = t2 }
+        else
+          let t, has_red =
+            S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind pat.pat_op_term
+          in
+          if not has_red then
+            (* match failed and [pat] cannot be reduced: user-level error *)
+            soft_failure (ApplyMatchFailure minfos)
+          else
+            (* [pat] reduced, try again *)
+            try_apply subs { pat with pat_op_term = t }
 
-      (* match failed, [pat] is not a product: user-level error *)
-      | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+      (* failed succeeded but incomplete type inference. *)
       | Match _ when not (Type.Infer.is_closed ty_env) -> 
         soft_failure (Failure "all type variables could not be inferred")
           
@@ -1581,7 +1752,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_op_term in
 
-    let h = Hyps.by_id hyp s in
+    let h = Hyps.by_id_k hyp Hyp s in
     let h = S.hyp_to_conc h in
     let hprems, hconcl = S.Conc.decompose_impls_last h in
 
@@ -1642,7 +1813,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let goal1 =
         let s = Hyps.remove hyp s in
-        Hyps.add (Args.Named (Ident.name hyp)) (S.hyp_of_conc fconcl) s
+        Hyps.add (Args.Named (Ident.name hyp)) (LHyp (S.hyp_of_conc fconcl)) s
       in
 
       let new_subgs =
@@ -1697,8 +1868,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let use_fadup = p_apply_faduparg nargs in
 
     let target = match in_opt with
-      | Some lsymb -> T_hyp (fst (Hyps.by_name lsymb s))
       | None       -> T_conc
+      | Some lsymb -> T_hyp (fst (Hyps.by_name_k lsymb Hyp s))
     in
     use_fadup, subgs, pat, target
 
@@ -1716,7 +1887,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match target with
       | T_conc    -> do_apply    ~use_fadup (subgs, pat) s
       | T_hyp id  -> do_apply_in ~use_fadup (subgs, pat) id s
-      | T_felem _ -> assert false
+      | T_felem _ -> assert false (* impossible *)
     in
 
     subgs'
@@ -1878,7 +2049,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       else
         begin
-          let idf, s0 = Hyps.add_i Args.AnyName (S.hyp_of_conc form) s in
+          let idf, s0 = Hyps.add_i Args.AnyName (LHyp (S.hyp_of_conc form)) s in
           let s0 = match ip with
             | None -> [s0]
             | Some ip -> do_simpl_pat (`Hyp idf) ip s0
@@ -1896,10 +2067,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Have tactic} *)
 
   (** [have_form f j sk fk] generates two subgoals, one where [f] needs
-    * to be proved, and the other where [f] is assumed.
-    * We only consider the case here where [f] is a local formula
-    * (which is then converted to conclusion and hypothesis formulae)
-    * more general forms should be allowed here or elsewhere. *)
+      to be proved, and the other where [f] is assumed.
+      We only consider the case here where [f] is a local formula
+      (which is then converted to conclusion and hypothesis formulae)
+      more general forms should be allowed here or elsewhere. *)
   let have_form
       (ip : Args.simpl_pat option)
       (f : Theory.any_term)
@@ -1936,8 +2107,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* add [f] as an hypothesis *)
     let f_hyp =
-      Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.hyp_kind in
-    let id, s2 = Hyps.add_i Args.AnyName f_hyp s in
+      Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.hyp_kind
+    in
+    let id, s2 = Hyps.add_i Args.AnyName (LHyp f_hyp) s in
     let s2 = match ip with
       | Some ip -> do_simpl_pat (`Hyp id) ip s2
       | None -> [s2]
