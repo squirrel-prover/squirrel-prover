@@ -450,7 +450,7 @@ let pp ~(dbg:bool) ?context =
         let f = subst s f in
 
         let pp ppf () =
-          Fmt.pf ppf "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
+          Fmt.pf ppf "@[<hov 0>Let %a =@;<1 2>@[%a@]@ in@ %a@]"
             (Vars._pp ~dbg) v
             (Term._pp ~dbg) t
             (pp (let_in_fixity, `NonAssoc)) f
