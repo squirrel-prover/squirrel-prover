@@ -11,7 +11,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 
 let parse_theory_test ?(test=false) filename =
   let chan = Stdlib.open_in filename in
-  let lexbuf = Lexing.from_channel chan in
+  let lexbuf = Sedlexing.Utf8.from_channel chan in
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
     ProcessDecl.declare_list (TConfig.reset_params
@@ -21,14 +21,13 @@ let parse_theory_test ?(test=false) filename =
   assert (subgs = []);
   table
 
-let parse parser parser_name string =
-  let lexbuf = Lexing.from_string string in
+let parse parse_fun parser_name string =
   try
-    parser Lexer.token lexbuf
+    Util.parse_from_string parse_fun string
   with Parser.Error as e ->
     Format.printf
-      "Cannot parse %s before %S at position TODO."
-      parser_name (Lexing.lexeme lexbuf) ;
+      "Cannot parse %s in %s." 
+      parser_name string ;
     raise e
 
 (** Testing term parsing. *)

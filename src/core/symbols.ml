@@ -821,21 +821,41 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-let right_infix_fist_chars =  ['+'; '-'; '*'; '|'; '&'; '='; '>'; '<'; '~']
-let left_infix_fist_chars  =  ['^']
-let infix_fist_chars = left_infix_fist_chars @ right_infix_fist_chars
+(*------------------------------------------------------------------*)
+(* Must be synchronized with the corresponding code in [Symbols.ml]! *)
 
-let is_infix_str (s : string) : bool =
-  let first = String.get s 0  in
-  List.mem first infix_fist_chars
+(* `<`,`>` and `=` are manually added after-ward. *)
+let right_infix_char_first = 
+  [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>' | '='))]
+let left_infix_char_first = [%sedlex.regexp? '^']
+
+let infix_char =
+  [%sedlex.regexp? right_infix_char_first | left_infix_char_first | math]
+
+let left_infix_symb =
+  [%sedlex.regexp?
+    left_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
+
+let right_infix_symb =
+  [%sedlex.regexp?
+    right_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
+(*------------------------------------------------------------------*)
 
 let is_left_infix_str (s : string) : bool =
-  let first = String.get s 0  in
-  List.mem first left_infix_fist_chars
+  let lexbuf = Sedlexing.Utf8.from_string s in
+  match%sedlex lexbuf with
+  | left_infix_symb -> true
+  | _ -> false
 
 let is_right_infix_str (s : string) : bool =
-  let first = String.get s 0  in
-  List.mem first right_infix_fist_chars
+  let lexbuf = Sedlexing.Utf8.from_string s in
+  match%sedlex lexbuf with
+  | '<' | '>' | '=' -> true
+  | right_infix_symb -> true
+  | _ -> false
+
+let is_infix_str (s : string) : bool =
+  is_left_infix_str s || is_right_infix_str s
 
 let is_infix (s : fname t) : bool =
   let s = to_string s in

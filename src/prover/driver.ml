@@ -22,22 +22,23 @@ type file = {
   f_chan   : t_chan;                 (** channel *)
   f_name   : string;                     (** short name, no extention *)
   f_path   : [`Str | `Stdin | `File of string]; (** file path *)
-  f_lexbuf : Lexing.lexbuf;
+  f_lexbuf : Sedlexing.lexbuf;
 }
 
 (** Print precise location error (to be caught by emacs) *)
 let pp_loc_error (file:file) ppf loc =
   match file.f_path with
   | `Str ->
-    let lexbuf = file.f_lexbuf in
-    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    let (_, curr_p) = Sedlexing.lexing_positions file.f_lexbuf in
+    let startpos = curr_p.pos_cnum in
     Fmt.pf ppf
       "[error-%d-%d]@;"
       (max 0 (loc.Location.loc_bchar - startpos))
       (max 0 (loc.Location.loc_echar - startpos))
   | `Stdin ->
-    let lexbuf = Lexing.from_channel stdin in
-    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    let lexbuf = Sedlexing.Utf8.from_channel stdin in
+    let (_, curr_p) = Sedlexing.lexing_positions lexbuf in
+    let startpos = curr_p.pos_cnum in
     Fmt.pf ppf
       "[error-%d-%d]@;"
       (max 0 (loc.Location.loc_bchar - startpos))
@@ -56,9 +57,9 @@ let check_cycle (file_stack : file list) (name : string) : unit =
   in
   if has_cycle then Command.cmd_error (IncludeCycle name)
 
-let get_lexbuf (file : file) : string * Lexing.lexbuf = 
+let get_lexbuf (file : file) : string * Sedlexing.lexbuf = 
   let lexbuf = match file.f_path with
-    | `Stdin -> Lexing.from_channel stdin
+    | `Stdin -> Sedlexing.Utf8.from_channel stdin
     (* we need to re-compute the lexer buffer from the input channel, or error
        messages are not acurate afterward. I do not understand why exactly (the
        lexer buffer positions must not be properly updated somewhere). *)
@@ -68,7 +69,7 @@ let get_lexbuf (file : file) : string * Lexing.lexbuf =
   file.f_name ^ ".sp", lexbuf
 
 (** Get the next input from lexing buffer. Driver *)
-let next_input ~test ~interactive ~filename (lexbuf:Lexing.lexbuf) (p_mode:
+let next_input ~test ~interactive ~filename (lexbuf:Sedlexing.lexbuf) (p_mode:
   ProverLib.prover_mode) =
   Parserbuf.parse_from_buf
     ~test ~interactive
@@ -91,19 +92,19 @@ let file_from_stdin () : file =
   { f_chan = Channel stdin;
     f_name = "#stdin";
     f_path = `Stdin;
-    f_lexbuf = Lexing.from_channel stdin; }
+    f_lexbuf = Sedlexing.Utf8.from_channel stdin; }
 
 let dummy_file () : file =
   { f_chan = Channel stdin;
     f_name = "#dummy";
     f_path = `Stdin;
-    f_lexbuf = Lexing.from_channel stdin; }
+    f_lexbuf = Sedlexing.Utf8.from_channel stdin; }
 
 let file_from_str (s:string) : file =
   { f_chan = String s;
     f_name = "#str";
     f_path = `Str;
-    f_lexbuf = Lexing.from_string s; }
+    f_lexbuf = Sedlexing.Utf8.from_string s; }
     
 (*--------------- Driver -------------------------------------------*)
 let file_from_path (dir : load_path) (partial_path : string) : file option =
@@ -115,7 +116,7 @@ let file_from_path (dir : load_path) (partial_path : string) : file option =
     in
 
     let chan = Stdlib.open_in path in
-    let lexbuf = Lexing.from_channel chan in
+    let lexbuf = Sedlexing.Utf8.from_channel chan in
 
     Some { f_chan   = Channel chan;
            f_name   = partial_path;

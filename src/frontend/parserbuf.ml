@@ -34,41 +34,46 @@ let pp_error pp_loc pp_pref_loc e = match e with
 
 (** Pretty-printer for parsing locations. *)
 let pp_loc interactive filename lexbuf ppf () =
+  let (_, curr_p) = Sedlexing.lexing_positions lexbuf in
+  let lexeme = Sedlexing.Utf8.lexeme lexbuf in
+  let line = curr_p.Lexing.pos_lnum in
+  let col = curr_p.Lexing.pos_cnum -
+              curr_p.Lexing.pos_bol in
   if not interactive then
     Fmt.pf ppf
       "in %s @,\
        at line %d char %d @,\
        before %S"
       filename
-      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf)
+      line
+      col
+      lexeme
   else
     Fmt.pf ppf
       "at line %d char %d of this input @,\
        before %S"
-      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf)
+      line
+      col
+      lexeme
 
 let pp_pref_loc interactive lexbuf ppf () =
   if interactive then
+    let (start_p, end_p) = Sedlexing.lexing_positions lexbuf in
     Fmt.pf ppf
       "[error-%d-%d]@;"
-      (Lexing.lexeme_start_p lexbuf).pos_cnum
-      (Lexing.lexeme_end_p lexbuf).pos_cnum
-
+      start_p.pos_cnum
+      end_p.pos_cnum
 
 let parse_from_buf
     ?(test=false)
     ?(interactive=false) 
     (parse_fun : (Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a)
-    (lexbuf    : Lexing.lexbuf)
+    (lexbuf    : Sedlexing.lexbuf)
     ~(filename  : string) : 'a 
   =
-  try parse_fun Lexer.token lexbuf with e ->
+  let lexer = Sedlexing.with_tokenizer Sedlexer.token lexbuf in
+  let parse_fun = MenhirLib.Convert.Simplified.traditional2revised parse_fun in
+  try parse_fun lexer with e ->
     let pp_loc = pp_loc interactive filename lexbuf in
     let pp_pref_loc = pp_pref_loc interactive lexbuf in
     match pp_error pp_loc pp_pref_loc e with

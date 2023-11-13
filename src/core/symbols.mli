@@ -6,13 +6,11 @@ type lsymb = string Location.located
 
 (*------------------------------------------------------------------*)
 (** Type of a function symbol (Prefix or Infix)
-    - infix symbols must start by a character in [infix_first_chars]
+    - infix symbols must start by an allowed character (see the lexer)
     - infix symbols must be without index parameters *)
 
 type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
-
-val infix_fist_chars : char list
 
 (*------------------------------------------------------------------*)
 (** ['a t] is the type of symbols of namespace ['a]. *)

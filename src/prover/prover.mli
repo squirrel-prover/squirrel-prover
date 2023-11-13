@@ -120,7 +120,7 @@ val init : ?withPrelude:bool -> unit -> state
 
 (** do tactics ! *)
 val do_tactic : ?check:[`Check | `NoCheck] -> state ->
-  Lexing.lexbuf -> ProverLib.bulleted_tactics ->  state
+  Sedlexing.lexbuf -> ProverLib.bulleted_tactics ->  state
 
 (** print current goal *)
 val do_print_goal : state -> unit

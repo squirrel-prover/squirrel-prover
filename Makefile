@@ -4,7 +4,7 @@ CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
 PREFIX = ~/.local
 SQUIRRELBIN = $(PREFIX)/bin
 
-ECHO = /bin/echo
+ECHO = /usr/bin/env echo
 
 default: squirrel
 

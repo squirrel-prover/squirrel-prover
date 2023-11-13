@@ -7,15 +7,9 @@
   (library_flags (:standard -linkall))
   (instrumentation (backend bisect_ppx))
   (inline_tests)
-  (preprocess (pps ppx_inline_test))
-  (libraries squirrelcore))
+  (preprocess (pps ppx_inline_test sedlex.ppx))
+  (libraries squirrelcore sedlex))
 
-;; Adding -ml option to ocamllex : have no limit size for automaton
-(rule
- (target lexer.ml)
- (deps   lexer.mll)
- (action (chdir %{workspace_root}
-          (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
 (menhir
   (modules parser)
    (flags --table --explain))
