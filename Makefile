@@ -36,7 +36,17 @@ NC=\033[0m
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/basic-tutorial/*.sp) $(wildcard examples/stateful/*.sp) $(wildcard examples/postQuantumKE/*.sp) $(wildcard examples/ho/authdh.sp) $(wildcard examples/ho/hybrid.sp) $(wildcard examples/crypto/*.sp)
+
+PROVER_EXAMPLES =\
+  $(wildcard examples/*.sp)                     \
+  $(wildcard examples/tutorial/*.sp)            \
+  $(wildcard examples/tutorial/solutions/*.sp)  \
+  $(wildcard examples/basic-tutorial/*.sp)      \
+  $(wildcard examples/stateful/*.sp)            \
+  $(wildcard examples/postQuantumKE/*.sp)       \
+  $(wildcard examples/ho/authdh.sp)             \
+  $(wildcard examples/ho/hybrid.sp)             \
+  $(wildcard examples/crypto/*.sp)
 
 BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
@@ -79,7 +89,7 @@ tac_count_examples: squirrel
 # README → /usr/bin/time is not always installed by default in your OS !
 # In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
-	@$(ECHO) "Running bench onCounting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp and examples/crypto/*.sp."
+	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp and examples/crypto/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for example in $(PROVER_EXAMPLES); do \
