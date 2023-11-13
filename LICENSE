@@ -1,16 +1,16 @@
 Upstream-Name: Squirrel
 Upstream-Contact: Squirrel team <https://squirrel-prover.github.io/>
 Source: https://github.com/squirrel-prover/squirrel-prover/
-Lisence: MIT
+License: MIT
 Comment: Squirrel is under the MIT License. 
-         The terms of the MIT license are available in `license/MIT`
-Copyright: 2023, CNRS Rennes 1, Inria & ENS Paris-Saclay.
+         The terms of the MIT license are available in `licenses/MIT`
+Copyright: 2023, CNRS, Université Rennes 1, Inria & ENS Paris-Saclay.
 
 Files: `src/core/puf.ml`, `src/core/puf.mli` 
 License: LGPLv2
 Comment: distributed under the terms of the GNU Library General Public 
          License version 2.1, with the special exception on linking 
-         described in file `license/LGPL-2.1`.
+         described in file `licenses/LGPL-2.1`.
 
 Files: `src/core/location.ml`, `src/core/location.mli`
 License: CeCILL-C-V1
@@ -20,9 +20,9 @@ Files: `documentation/sphinx/source/ext/*, documentation/sphinx/source/static/*`
 License: LGPLv2
 Comment: This is heavily borrowed from Coq domain extension for sphinx.
          The code that generates the documentation is mainly sphinx's
-         that is BSD Licensed.
+         that is BSD licensed.
 
 Files: `app/**/*`
 License: mostly GPLv3+
 Comment: Contains the JSquirrel sources.
-         Detailed license are described in `app/LICENSE`.
+         Detailed licenses are described in `app/LICENSE`.
