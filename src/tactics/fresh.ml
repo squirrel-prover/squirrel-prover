@@ -67,9 +67,11 @@ let get_bad_occs
   in
 
   match t with
-  (* for freshness, we can ignore **constant** subterms
-     FIXME: we could allow sub-terms depending only on the adversarial randomness. *)
-  | _ when HighTerm.is_constant env t -> []
+  (* for freshness, we can ignore **adversarial** subterms
+     FIXME: we do not need the fact that [t] is ptime-computable, only that 
+     it does not use the honest randomness. We could use a more precise check 
+     here. *)
+  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
 
   (* the fresh tactic does not apply to terms with non-constant variables *)
   | Var v ->
@@ -151,7 +153,7 @@ let fresh_trace
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
 
     let occs =
-      NOS.find_all_occurrences ~mode:Iter.Const ~pp_ns:(Some pp_n)
+      NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_ns:(Some pp_n)
         get_bad contx env (t::n.args)
     in
     Printer.pr "@]@;";
@@ -219,7 +221,7 @@ let equiv_fresh_phi_proj
   let get_bad : NOS.f_fold_occs = get_bad_occs env n in
 
   let occs =
-    NOS.find_all_occurrences ~mode:Iter.Const ~pp_ns:(Some pp_n)
+    NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_ns:(Some pp_n)
       get_bad contx env (frame @ n.args)
   in
   let phis  =
