@@ -90,6 +90,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let subst_hyp  = Equiv.Babel.subst S.hyp_kind
 
     let tsubst_conc = Equiv.Babel.tsubst S.conc_kind
+    let tsubst_hyp  = Equiv.Babel.tsubst S.hyp_kind
 
     let terms_of_conc = Equiv.Babel.get_terms S.conc_kind
     let terms_of_hyp  = Equiv.Babel.get_terms S.hyp_kind
@@ -1771,7 +1772,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     try_apply [] opat
 
   (*------------------------------------------------------------------*)
-  (* TODO: have: move to [S.hyp_kind] *)
   (** [apply_in (sub,f) hyp s] tries to match a premise of [f] with the conclusion of
       [hyp], and replaces [hyp] by the conclusion of [f].
       It generates a new subgoal for any remaining premises of [f], plus all
@@ -1783,37 +1783,51 @@ module MkCommonLowTac (S : Sequent.S) = struct
       `H2 : A` by `H2 : B`. *)
   let do_apply_in
       ~loc ~use_fadup
-      ((subgs_pat, pat) : Equiv.any_form list * S.conc_form Term.pat)
+      ((subgs_pat, pat) : Equiv.any_form list * S.hyp_form Term.pat)
       (hyp : Ident.t)
       (s : S.t) : Goal.t list
     =
     (* open an type unification environment *)
     let ty_env = Type.Infer.mk_env () in
-    let tsubst, pat = Pattern.open_pat S.conc_kind ty_env pat in
+    let tsubst, pat = Pattern.open_pat S.hyp_kind ty_env pat in
     let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
 
-    let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_op_term in
+    let fprems, fconcl = S.Hyp.decompose_impls_last pat.pat_op_term in
 
     let h = Hyps.by_id_k hyp Hyp s in
-    let h = S.hyp_to_conc h in
-    let hprems, hconcl = S.Conc.decompose_impls_last h in
+    let hprems, hconcl = S.Hyp.decompose_impls_last h in
 
-    let try1 (fprem : S.conc_form) : (Match.Mvar.t * Type.tsubst) option =
+    let try1 (fprem : S.hyp_form) : (Match.Mvar.t * Type.tsubst) option =
       let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
-      if not (Sv.subset pat_vars (S.fv_conc fprem)) then None
+      if not (Sv.subset pat_vars (S.fv_hyp fprem)) then None
       else
-        let pat = { pat with pat_op_term = fprem } in
         let option =
           Match.{ default_match_option with mode = `EntailLR; use_fadup}
         in
 
-        let table = S.table s in
+        let table  = S.table  s in
         let system = S.system s in
-        let match_res =
-          match S.conc_kind with
-          | Local_t  -> Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
-          | Global_t -> Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
-          | Any_t -> assert false (* cannot happen *)
+        let match_res = (* case analysis on the pattern and hypothesis kinds *)
+          match S.hyp_kind, hconcl, fprem with
+          | Local_t, _, _ ->
+            let pat = { pat with pat_op_term = fprem } in
+            Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+              
+          | Any_t, Local hconcl, Local fprem ->
+            let pat = { pat with pat_op_term = fprem } in
+            Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+              
+          | Any_t, Global hconcl, Global fprem ->
+            let pat = { pat with pat_op_term = fprem } in
+            Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+
+          | Any_t, Global _, Local _ ->
+            soft_failure ~loc (Failure "cannot match a global lemma in a local hypothesis")
+
+          | Any_t, Local _, Global _ ->
+            soft_failure ~loc (Failure "cannot match a local lemma in a global hypothesis")
+
+          | Global_t, _, _ -> assert false (* cannot happen *)
         in
 
         (* Check that [hconcl] entails [pat]. *)
@@ -1849,27 +1863,25 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       
       (* instantiate the inferred variables everywhere *)
-      let fprems_other = List.map (S.tsubst_conc tsubst -| S.subst_conc subst) fsubgoals in
-      let fconcl = S.tsubst_conc tsubst (S.subst_conc subst fconcl) in
+      let fprems_other = List.map (S.tsubst_hyp tsubst -| S.subst_hyp subst) fsubgoals in
+      let fconcl = S.tsubst_hyp tsubst (S.subst_hyp subst fconcl) in
       let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
 
       let goal1 =
         let s = Hyps.remove hyp s in
-        Hyps.add (Args.Named (Ident.name hyp)) (LHyp (S.hyp_of_conc fconcl)) s
+        Hyps.add (Args.Named (Ident.name hyp)) (LHyp fconcl) s
       in
-
-      (* discharge subgoals (i.e. creates judgements from subgoals) *)
-      let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
-
       let new_subgs =
         List.map
-          (fun prem -> S.set_goal prem s |> S.to_general_sequent)
+          (Equiv.Babel.convert ~loc ~src:S.hyp_kind ~dst:Equiv.Any_t)
           (hprems @               (* remaining premises of [hyp] *)
            fprems_other)          (* remaining premises of [form] *)
-        @
-        [S.to_general_sequent goal1]
       in
-      subgs_pat @ new_subgs
+      
+      (* discharge subgoals (i.e. creates judgements from subgoals) *)
+      let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
+      let new_subgs = List.map ((^~) (pt_discharge_subgoal ~loc) s) new_subgs in
+      subgs_pat @ new_subgs @ [S.to_general_sequent goal1]
 
   (*------------------------------------------------------------------*)
   (** for now, there is only one named optional arguments to `apply` *)
@@ -1927,7 +1939,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         do_apply ~loc ~use_fadup (subgs, pat) s
           
       | T_hyp id ->
-        let subgs, pat = p_pt_as_pat ~dst:S.conc_kind p_pt s in
+        let subgs, pat = p_pt_as_pat ~dst:S.hyp_kind p_pt s in
         do_apply_in ~loc ~use_fadup (subgs, pat) id s
                        
       | T_felem _ -> assert false (* impossible *)
@@ -2086,7 +2098,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let loc = p_pt.p_pt_loc in
 
-    (* TODO: have: start pt_process_subgoal *)
     let _, tyvars, pt = S.convert_pt p_pt s in
     assert (pt.mv = Match.Mvar.empty);
     (* [subgs_pt]: subgoals resulting from the convertion of the proof term [pt] *)
@@ -2151,7 +2162,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* all subgoals: [subgs_pt] + [subgs_extra] *)
     let subgs_pt    = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pt    in
     let subgs_extra = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_extra in
-    (* TODO: have: end pt_process_subgoal *)
 
     (*------------------------------------------------------------------*)
     (* applies [ip] on [conc] *)

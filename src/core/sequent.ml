@@ -665,7 +665,7 @@ module Mk (Args : MkArgs) : S with
 
     let apply_kind_error () = error_pt_apply_bad_kind loc_arg ~pt ~arg in
 
-    (* Try to case [arg] to the appripriate kind (local or global), 
+    (* Try to case [arg] to the appropriate kind (local or global), 
        depending on [f1] kind. 
        If the cast fails, we raise a user-level error. *)
     let pt, arg =
@@ -802,7 +802,7 @@ module Mk (Args : MkArgs) : S with
       in
 
       match pt_impl_arg with
-      | `Subgoal ->
+      | `Subgoal ->             (* discharge the subgoal *)
         { system = pt.system;
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;

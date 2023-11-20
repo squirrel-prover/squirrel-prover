@@ -385,3 +385,12 @@ Proof.
 
   apply bar x y _ _; [1: apply foo1 | 2: apply foo2].
 Qed. 
+(* `apply`, in a forward style *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : equiv(x,y) -> [q x y].
+Proof.
+  intro H.
+
+  apply bar x y in H. 
+  (have H0 := H _; 1: apply foo1); clear H.
+  assumption H0.
+Qed.
