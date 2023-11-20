@@ -348,3 +348,40 @@ Proof.
   assumption A.
 Qed. 
 
+(* ========================================================= *)
+(* three proofs of the same goal, using an axiom mixing local and 
+   global hypotheses *)
+
+abstract p ['a] : 'a -> 'a -> bool.
+abstract q ['a] : 'a -> 'a -> bool.
+
+global axiom bar ['a] (x,y : 'a) : equiv(x,y) -> [p x y => q x y].
+
+axiom        foo1 ['a] (x,y : 'a) : p x y.
+global axiom foo2 ['a] (x,y : 'a) : equiv(x,y).
+
+(* using `have` *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+Proof. 
+  byequiv.
+
+  have A := bar x y _ _; [1: apply foo1 | 2: apply foo2].
+  assumption A.
+Qed. 
+
+(* using `apply` *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+Proof. 
+  byequiv.
+
+  apply bar x y; 1: apply foo2.
+  apply foo1.
+Qed. 
+
+(* using `apply` with discharge *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+Proof. 
+  byequiv.
+
+  apply bar x y _ _; [1: apply foo1 | 2: apply foo2].
+Qed. 

@@ -659,20 +659,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let pt_to_pat (type a) 
       ~failed (loc : L.t) 
       (kind : a Equiv.f_kind) (tyvars : Type.tvars) 
-      (pt : Sequent.PT.t) : a list * a Term.pat
+      (pt : Sequent.PT.t) : Equiv.any_form list * a Term.pat
     =
     assert (pt.mv = Match.Mvar.empty);
     let pt = Sequent.pt_try_cast ~failed kind pt in
 
-    (* convert to the appropriate kinds. Cannot fail thanks to [pt_try_cast]. *)
-    let convert = Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind in
+    (* convert the conclusion to the appropriate kinds. 
+       Cannot fail thanks to [pt_try_cast]. *)
+    let pat_term =
+      Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind pt.form
+    in
     let pat = Term.{
         pat_tyvars = tyvars;
         pat_vars   = pt.args;
-        
-        pat_term   = convert pt.form; }
+        pat_term; }
     in
-    let subgs = List.map convert pt.subgs in
+    let subgs = pt.subgs in
     subgs, pat
 
   (*------------------------------------------------------------------*)
@@ -698,15 +700,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match pt.form with Global _ -> Rewrite.GlobalEq | Local _ -> Rewrite.LocalEq 
       in
 
-      (* TODO: allow equivalences as subgoals by changing [subgs] type 
-         to [Equiv.any_form] *)
+      let loc = p_pt.p_pt_loc in
       let subgs, pat = 
-        let loc = p_pt.p_pt_loc in
         pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Equiv.Local_t tyvars pt
       in
 
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
+      (* TODO: allow equivalences as subgoals by changing [subgs] type 
+         to [Equiv.any_form] *)
+      let subgs =
+        List.map (Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:Equiv.Local_t) subgs
+      in
+      
       subgs, pat_to_rw_rule s pt.system.set kind dir pat, id_opt
     in
 
@@ -1643,18 +1649,45 @@ module MkCommonLowTac (S : Sequent.S) = struct
       In local and global sequents, we can apply an hypothesis
       to derive the goal or to derive the conclusion of an hypothesis.
       The former corresponds to [apply] below and the latter corresponds
-      to [apply_in].
+      to [apply_in]. *)
+  
+  (*------------------------------------------------------------------*)
+  (** Discharge an [any_form] subgoal in a sequent [s]. 
+      - Fail if a local subgoal must be discharged in a global sequent
+          (it would be unsound).
+      - Drop local hypotheses if global subgoal is discharged in a local sequent. *)
+  let pt_discharge_subgoal ~loc (subg : Equiv.any_form) (s : S.t) : Goal.t =
+    match S.conc_kind, subg with
+    (* local sequent, local sub-goal *)
+    | Equiv.Local_t, Equiv.Local subg ->
+      S.set_goal subg s |> S.to_general_sequent
 
-      We impose in both that the hypotheses involved here are of the same
-      kind as conclusion formulas: this is immediate for global sequents
-      and, in the case of local sequents, means that we only consider
-      local hypotheses. This might be generalized later, or complemented
-      with other tactics that would have to generate global sequents
-      as premisses. *)
+    (* local sequent, global sub-goal *)
+    | Equiv.Local_t, Equiv.Global subg ->
+      Printer.prt `Warning
+        "Discharged a global subgoal in a local sequent,@ \
+         moved to a global sequent@ \
+         (all local hypotheses have been dropped)";
+      let s = S.to_global_sequent s in
+      ES.set_goal subg s |> ES.to_general_sequent
 
+    (* global sequent, global sub-goal *)
+    | Equiv.Global_t, Equiv.Global subg ->
+      S.set_goal subg s |> S.to_general_sequent
+
+    (* global sequent, local sub-goal *)
+    | Equiv.Global_t, Equiv.Local _ ->
+      soft_failure ~loc
+        (Failure "cannot discharge a local subgoal in a global judgement")
+
+    | Equiv.Any_t, _ -> assert false (* cannot happen *)
+
+  (*------------------------------------------------------------------*)
   (** [subgs_pat] are the sub-goals that must be established to have [pat]. *)
   let do_apply
-      ~use_fadup ((subgs_pat, pat) : S.t list * S.conc_form Term.pat) (s : S.t) : S.t list
+      ~loc ~use_fadup
+      ((subgs_pat, pat) : Equiv.any_form list * S.conc_form Term.pat) (s : S.t)
+    : Goal.t list
     =
     let option =
       { Match.default_match_option with mode = `EntailRL; use_fadup }
@@ -1665,12 +1698,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* open an type unification environment *)
     let ty_env = Type.Infer.mk_env () in
     let tsubst, opat = Pattern.open_pat S.conc_kind ty_env pat in
-    let subgs_pat = List.map (S.tsubst tsubst) subgs_pat in
-
+    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
+   
     (* Try to apply [pat] to [goal] by matching [pat] with [goal].
        In case of failure, try to destruct [pat] into a product [lhs -> rhs], and 
        recursively try to apply [rhs] to [goal] ([lhs] is accumulated as a sub-goal). *)
-    let rec try_apply (subs : S.conc_form list) (pat : S.conc_form Term.pat_op) =
+    let rec try_apply
+        (subs : S.conc_form list) (pat : S.conc_form Term.pat_op)
+      : Goal.t list
+      =
       if 
         let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
         not (Sv.subset pat_vars (S.fv_conc pat.pat_op_term)) 
@@ -1719,17 +1755,23 @@ module MkCommonLowTac (S : Sequent.S) = struct
           | `BadInst pp_err ->
             soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
         in
-        let subgs_pat = List.map (S.tsubst tsubst -| S.subst subst) subgs_pat in
-
+        let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
         let goals =
           List.map (S.tsubst_conc tsubst -| S.subst_conc subst) (List.rev subs) 
         in
-        let new_subgs = List.map (fun g -> S.set_goal g s) goals in
+        
+        (* discharge subgoals (i.e. creates judgements from subgoals) *)
+        let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
+        let new_subgs =
+          List.map (fun g -> S.set_goal g s |> S.to_general_sequent) goals
+        in
         
         subgs_pat @ new_subgs
     in
     try_apply [] opat
 
+  (*------------------------------------------------------------------*)
+  (* TODO: have: move to [S.hyp_kind] *)
   (** [apply_in (sub,f) hyp s] tries to match a premise of [f] with the conclusion of
       [hyp], and replaces [hyp] by the conclusion of [f].
       It generates a new subgoal for any remaining premises of [f], plus all
@@ -1740,15 +1782,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
       `H2 : A` by `H2 : B`. *)
   let do_apply_in
-      ~use_fadup
-      ((subgs_pat, pat) : S.t list * S.conc_form Term.pat)
+      ~loc ~use_fadup
+      ((subgs_pat, pat) : Equiv.any_form list * S.conc_form Term.pat)
       (hyp : Ident.t)
-      (s : S.t) : S.t list
+      (s : S.t) : Goal.t list
     =
     (* open an type unification environment *)
     let ty_env = Type.Infer.mk_env () in
     let tsubst, pat = Pattern.open_pat S.conc_kind ty_env pat in
-    let subgs_pat = List.map (S.tsubst tsubst) subgs_pat in
+    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
 
     let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_op_term in
 
@@ -1809,25 +1851,27 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* instantiate the inferred variables everywhere *)
       let fprems_other = List.map (S.tsubst_conc tsubst -| S.subst_conc subst) fsubgoals in
       let fconcl = S.tsubst_conc tsubst (S.subst_conc subst fconcl) in
-      let subgs_pat = List.map (S.tsubst tsubst -| S.subst subst) subgs_pat in
+      let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
 
       let goal1 =
         let s = Hyps.remove hyp s in
         Hyps.add (Args.Named (Ident.name hyp)) (LHyp (S.hyp_of_conc fconcl)) s
       in
 
+      (* discharge subgoals (i.e. creates judgements from subgoals) *)
+      let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
+
       let new_subgs =
         List.map
-          (fun prem ->
-             S.set_goal prem s)
+          (fun prem -> S.set_goal prem s |> S.to_general_sequent)
           (hprems @               (* remaining premises of [hyp] *)
            fprems_other)          (* remaining premises of [form] *)
         @
-        [goal1]
+        [S.to_general_sequent goal1]
       in
       subgs_pat @ new_subgs
 
-
+  (*------------------------------------------------------------------*)
   (** for now, there is only one named optional arguments to `apply` *)
   let p_apply_faduparg (nargs : Args.named_args) : bool =
     match nargs with
@@ -1839,55 +1883,53 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | [] -> false
 
+  (*------------------------------------------------------------------*)  
   let bad_apply_pt loc () =
     (* FIXME: error message *)
     soft_failure ~loc
       (Failure "cannot apply: this proof-term is not of the correct kind")
 
-  (** Parse apply tactic arguments. *)
-  let p_apply_args
-      (args : Args.parser_arg list)
-      (s : S.sequent)
-    : bool * S.conc_form list * S.conc_form Term.pat * target
+  (*------------------------------------------------------------------*)
+  (** Convert an untyped proof-term into a proof-term of kind [dst]. *)
+  let p_pt_as_pat (type a)
+      ~(dst : a Equiv.f_kind)
+      (p_pt : Theory.p_pt) (s : S.t) : Equiv.any_form list * a Term.pat
     =
-    let nargs, subgs, pat, in_opt =
+    let loc = p_pt.p_pt_loc in
+    let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
+    assert (pt.mv = Match.Mvar.empty);
+    let subgs, pat = 
+      pt_to_pat loc ~failed:(bad_apply_pt loc) dst tyvars pt 
+    in
+    subgs, pat
+    
+  (*------------------------------------------------------------------*)
+  let apply_tac_args (args : Args.parser_arg list) (s : S.t) : Goal.t list =
+    let named_args, p_pt, in_opt =
       match args with
-      | [Args.ApplyIn (nargs, p_pt,in_opt)] ->
-        let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
-        assert (pt.mv = Match.Mvar.empty);
-
-        let loc = p_pt.p_pt_loc in
-        let subgs, pat = 
-          pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
-        in
-
-        nargs, subgs, pat, in_opt
-
+      | [Args.ApplyIn (named_args,p_pt,in_opt)] -> named_args,p_pt,in_opt
       | _ -> bad_args ()
     in
-
-    let use_fadup = p_apply_faduparg nargs in
+    let use_fadup = p_apply_faduparg named_args in
 
     let target = match in_opt with
       | None       -> T_conc
       | Some lsymb -> T_hyp (fst (Hyps.by_name_k lsymb Hyp s))
     in
-    use_fadup, subgs, pat, target
-
-
-  let apply_tac_args (args : Args.parser_arg list) s : S.t list =
-    let use_fadup, subgs, pat, target = p_apply_args args s in
-
-    (* sub-goals resulting from the convertion of the proof term 
-       in [args] *)
-    let subgs = List.map (fun g -> S.set_goal g s) subgs in
-
+    let loc = p_pt.p_pt_loc in
+    
     (* [subgs'] is [subgs] extended with subg-goals from the 
        application itself *)
     let subgs' = 
       match target with
-      | T_conc    -> do_apply    ~use_fadup (subgs, pat) s
-      | T_hyp id  -> do_apply_in ~use_fadup (subgs, pat) id s
+      | T_conc ->
+        let subgs, pat = p_pt_as_pat ~dst:S.conc_kind p_pt s in
+        do_apply ~loc ~use_fadup (subgs, pat) s
+          
+      | T_hyp id ->
+        let subgs, pat = p_pt_as_pat ~dst:S.conc_kind p_pt s in
+        do_apply_in ~loc ~use_fadup (subgs, pat) id s
+                       
       | T_felem _ -> assert false (* impossible *)
     in
 
@@ -2029,37 +2071,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Equiv.Global f
 
   (*------------------------------------------------------------------*)
-  (** Discharge an [any_form] subgoal in a sequent [s]. 
-      - Fail if a local subgoal must be discharged in a global sequent
-          (it would be unsound).
-      - Drop local hypotheses if global subgoal is discharged in a local sequent. *)
-  let pt_discharge_subgoal ~loc (subg : Equiv.any_form) (s : S.t) : Goal.t =
-    match S.conc_kind, subg with
-    (* local sequent, local sub-goal *)
-    | Equiv.Local_t, Equiv.Local subg ->
-      S.set_goal subg s |> S.to_general_sequent
-
-    (* local sequent, global sub-goal *)
-    | Equiv.Local_t, Equiv.Global subg ->
-      Printer.prt `Warning
-        "Discharged a global subgoal in a local sequent,@ \
-         moved to a global sequent@ \
-         (all local hypotheses have been dropped)";
-      let s = S.to_global_sequent s in
-      ES.set_goal subg s |> ES.to_general_sequent
-
-    (* global sequent, global sub-goal *)
-    | Equiv.Global_t, Equiv.Global subg ->
-      S.set_goal subg s |> S.to_general_sequent
-
-    (* global sequent, local sub-goal *)
-    | Equiv.Global_t, Equiv.Local _ ->
-      soft_failure ~loc
-        (Failure "cannot discharge a local subgoal in a global judgement")
-
-    | Equiv.Any_t, _ -> assert false (* cannot happen *)
-
-  (*------------------------------------------------------------------*)
   (** [have_pt ip name ths s] applies the formula named [name] in sequent [s],
       eliminating its universally quantified variables using [ths],
       eliminating implications (and negations) underneath.
@@ -2073,11 +2084,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (p_pt : Theory.p_pt) (s : S.t)
     : Goal.t list 
     =
-    let _, tyvars, pt = S.convert_pt p_pt s in
-    assert (pt.mv = Match.Mvar.empty);
+    let loc = p_pt.p_pt_loc in
 
     (* TODO: have: start pt_process_subgoal *)
-    let loc = p_pt.p_pt_loc in
+    let _, tyvars, pt = S.convert_pt p_pt s in
+    assert (pt.mv = Match.Mvar.empty);
     (* [subgs_pt]: subgoals resulting from the convertion of the proof term [pt] *)
     let subgs_pt, pat = 
       pt_to_pat loc ~failed:(bad_apply_pt loc) Equiv.Any_t tyvars pt 
@@ -2897,7 +2908,7 @@ let () =
       usages_sorts=[];
       tactic_group=Structural}
     ~pq_sound:true
-    (gentac_of_any_tac_arg TraceLT.apply_tac EquivLT.apply_tac)
+    (genfun_of_any_fun_arg TraceLT.apply_tac EquivLT.apply_tac)
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "dependent induction"
