@@ -1189,6 +1189,7 @@ let styled_opt (err : Printer.keyword option) printer =
 let toplevel_prec = 0
 
 let quant_fixity = 5  , `Prefix
+let fun_fixity   = 10 , `Infix `Right
 
 (* binary *)
 let let_in_fixity      = 5  , `Prefix
@@ -1423,7 +1424,7 @@ and _pp
             (Vars._pp_typed_list ~dbg:info.dbg) vs
             (pp (quant_fixity, `Right)) b
         in
-        maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
+        maybe_paren ~outer ~side ~inner:quant_fixity pp ppf ()
 
       | Seq ->
         Fmt.pf ppf "@[<hov 2>seq(%a=>@,%a)@]"
@@ -1432,9 +1433,10 @@ and _pp
       | Lambda ->
         let pp ppf () =
           Fmt.pf ppf "@[<hov 2>fun (@[%a@]) =>@ %a@]"
-            (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (quant_fixity, `Right)) b
+            (Vars._pp_typed_list ~dbg:info.dbg) vs
+            (pp (fun_fixity, `Right)) b
         in
-        maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
+        maybe_paren ~outer ~side ~inner:fun_fixity pp ppf ()
     end
 
 (* if-then-else pretty-printer *)
