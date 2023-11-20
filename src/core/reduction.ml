@@ -15,7 +15,7 @@ type red_param = {
   delta   : Match.delta;  (** replace defined variables by their body *)
   beta    : bool;         (** β-reduction *)
   proj    : bool;         (** reduce projections *)
-  lett    : bool;         (** let reduction *)
+  zeta    : bool;         (** let reduction *)
   constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
@@ -24,7 +24,7 @@ let rp_empty = {
   beta    = false; 
   delta   = Match.delta_empty; 
   proj    = false;
-  lett    = false;
+  zeta    = false;
   constr  = false; 
 }
 
@@ -32,7 +32,7 @@ let rp_default = {
   rewrite = true;
   beta    = true; 
   delta   = Match.delta_default;
-  lett    = true;
+  zeta    = true;
   proj    = true; 
   constr  = false; 
 }
@@ -41,7 +41,7 @@ let rp_full = {
   rewrite = true;
   beta    = true; 
   delta   = Match.delta_full;
-  lett    = true;
+  zeta    = true;
   proj    = true; 
   constr  = false; 
 }
@@ -53,7 +53,7 @@ let parse_simpl_args
     match tag with
     | L.{ pl_desc = "rw"     } -> { param with rewrite = true; }
     | L.{ pl_desc = "beta"   } -> { param with beta    = true; }
-    | L.{ pl_desc = "lett"   } -> { param with lett    = true; }
+    | L.{ pl_desc = "zeta"   } -> { param with zeta    = true; }
     | L.{ pl_desc = "proj"   } -> { param with proj    = true; }
     | L.{ pl_desc = "constr" } -> { param with constr  = true; }
     | L.{ pl_desc = "delta"  } -> { param with delta   = Match.delta_full; }
@@ -389,7 +389,7 @@ and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
   else Match.reduce_beta1 t
 
 and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
-  if not st.param.lett then t, false
+  if not st.param.zeta then t, false
   else Match.reduce_let1 t
 
 and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
@@ -708,7 +708,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         Equiv.Quant (q, vs, red_e)
 
       | Equiv.Let (v,t,f) ->
-        if param.lett then
+        if param.zeta then
           let e, _ = Match.reduce_glet1 e in
           reduce_g vars e
         else

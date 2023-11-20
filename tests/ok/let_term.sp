@@ -7,13 +7,13 @@ Qed.
 
 lemma [any] _ (x : message) y : let x = y in <x,y> = <y,y>.
 Proof.
-  reduce ~flags:[lett].
+  reduce ~flags:[zeta].
   apply eq_refl.
 Qed.
 
 lemma [any] _ x : (let x = <x,x> in let x = <x,x> in x) = <<x,x>,<x,x>>.
 Proof.
-  reduce ~flags:[lett].
+  reduce ~flags:[zeta].
   apply eq_refl.
 Qed.
 

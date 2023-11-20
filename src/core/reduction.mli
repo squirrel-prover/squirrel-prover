@@ -9,7 +9,7 @@ type red_param = {
   delta   : Match.delta;  (** replace defined variables by their body *)
   beta    : bool;         (** β-reduction *)
   proj    : bool;         (** reduce projections *)
-  lett    : bool;         (** let reduction *)
+  zeta    : bool;         (** let reduction *)
   constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
