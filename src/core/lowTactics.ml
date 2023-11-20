@@ -654,23 +654,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     s, subs
 
-  let bad_rw_pt loc () =
-    soft_failure ~loc
-      (Failure "cannot rewrite: this proof-term does not prove a local formula")
-
-  (** Convert a proof-term to a pattern + subgoals *)
+  (*------------------------------------------------------------------*)
+  (** Convert a proof-term to a pattern + subgoals of the given kind. *)
   let pt_to_pat (type a) 
       ~failed (loc : L.t) 
       (kind : a Equiv.f_kind) (tyvars : Type.tvars) 
       (pt : Sequent.PT.t) : a list * a Term.pat
     =
     assert (pt.mv = Match.Mvar.empty);
-    let pt = Sequent.pt_try_cast ~failed S.conc_kind pt in
+    let pt = Sequent.pt_try_cast ~failed kind pt in
 
     (* convert to the appropriate kinds. Cannot fail thanks to [pt_try_cast]. *)
-    let convert =
-      Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind
-    in
+    let convert = Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind in
     let pat = Term.{
         pat_tyvars = tyvars;
         pat_vars   = pt.args;
@@ -679,6 +674,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     let subgs = List.map convert pt.subgs in
     subgs, pat
+
+  (*------------------------------------------------------------------*)
+  let bad_rw_pt loc () =
+    soft_failure ~loc
+      (Failure "cannot rewrite: this proof-term does not prove a local formula")
 
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
@@ -702,7 +702,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
          to [Equiv.any_form] *)
       let subgs, pat = 
         let loc = p_pt.p_pt_loc in
-        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Local_t tyvars pt
+        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Equiv.Local_t tyvars pt
       in
 
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
@@ -1847,7 +1847,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse apply tactic arguments. *)
   let p_apply_args
       (args : Args.parser_arg list)
-      (s : S.sequent) : bool * S.conc_form list * S.conc_form Term.pat * target
+      (s : S.sequent)
+    : bool * S.conc_form list * S.conc_form Term.pat * target
     =
     let nargs, subgs, pat, in_opt =
       match args with
@@ -1994,74 +1995,179 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Have Proof-Term} *)
 
+  (*------------------------------------------------------------------*)
+  (** Inputs: tagged variables [vars] and a formula [f].
+      Output: a formula which is equi-satisfiable to [∀ vars, f].
+      May require to change [f] to a global formula, if some variables 
+      in [vars] have tags. *)
+  let smart_mk_forall_tagged
+      (vars : Vars.tagged_vars) (f : Equiv.any_form) : Equiv.any_form
+    =
+    match f with
+    | Equiv.Local f ->
+      if List.for_all (fun (_, t) -> t = Vars.Tag.ltag) vars then
+        let f =
+          Term.mk_forall_tagged ~simpl:true vars f
+        in
+        Equiv.Local f
+      else (* variables are tagged, use a global formula to keep the tags *)
+        let () =
+          Printer.prt `Warning
+            "Some variables are tagged, moved to a global formula \
+             (all local hypotheses have been dropped)"
+        in
+        let f =
+          Equiv.Smart.mk_forall_tagged ~simpl:true
+            vars (Equiv.mk_reach_atom f)
+        in
+        Equiv.Global f
+
+    | Equiv.Global f -> 
+      let f =
+        Equiv.Smart.mk_forall_tagged ~simpl:true vars f
+      in
+      Equiv.Global f
+
+  (*------------------------------------------------------------------*)
+  (** Discharge an [any_form] subgoal in a sequent [s]. 
+      - Fail if a local subgoal must be discharged in a global sequent
+          (it would be unsound).
+      - Drop local hypotheses if global subgoal is discharged in a local sequent. *)
+  let pt_discharge_subgoal ~loc (subg : Equiv.any_form) (s : S.t) : Goal.t =
+    match S.conc_kind, subg with
+    (* local sequent, local sub-goal *)
+    | Equiv.Local_t, Equiv.Local subg ->
+      S.set_goal subg s |> S.to_general_sequent
+
+    (* local sequent, global sub-goal *)
+    | Equiv.Local_t, Equiv.Global subg ->
+      Printer.prt `Warning
+        "Discharged a global subgoal in a local sequent,@ \
+         moved to a global sequent@ \
+         (all local hypotheses have been dropped)";
+      let s = S.to_global_sequent s in
+      ES.set_goal subg s |> ES.to_general_sequent
+
+    (* global sequent, global sub-goal *)
+    | Equiv.Global_t, Equiv.Global subg ->
+      S.set_goal subg s |> S.to_general_sequent
+
+    (* global sequent, local sub-goal *)
+    | Equiv.Global_t, Equiv.Local _ ->
+      soft_failure ~loc
+        (Failure "cannot discharge a local subgoal in a global judgement")
+
+    | Equiv.Any_t, _ -> assert false (* cannot happen *)
+
+  (*------------------------------------------------------------------*)
   (** [have_pt ip name ths s] applies the formula named [name] in sequent [s],
-    * eliminating its universally quantified variables using [ths],
-    * eliminating implications (and negations) underneath.
-    * If given an introduction pattern [ip], applies it to the generated
-    * hypothesis.
-    * As with apply, we require that the hypothesis (or lemma) is
-    * of the kind of conclusion formulas: for local sequents this means
-    * that we cannot use a global hypothesis or lemma. *)
+      eliminating its universally quantified variables using [ths],
+      eliminating implications (and negations) underneath.
+      If given an introduction pattern [ip], applies it to the generated
+      hypothesis.
+      As with apply, we require that the hypothesis (or lemma) is
+      of the kind of conclusion formulas: for local sequents this means
+      that we cannot use a global hypothesis or lemma. *)
   let have_pt
-      ~(mode:[`IntroImpl | `None]) ip (p_pt : Theory.p_pt) (s : S.t) : S.t list 
+      ~(mode:[`IntroImpl | `None]) (ip : Args.simpl_pat option)
+      (p_pt : Theory.p_pt) (s : S.t)
+    : Goal.t list 
     =
     let _, tyvars, pt = S.convert_pt p_pt s in
     assert (pt.mv = Match.Mvar.empty);
 
+    (* TODO: have: start pt_process_subgoal *)
     let loc = p_pt.p_pt_loc in
-    let subgs, pat = 
-      pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
+    (* [subgs_pt]: subgoals resulting from the convertion of the proof term [pt] *)
+    let subgs_pt, pat = 
+      pt_to_pat loc ~failed:(bad_apply_pt loc) Equiv.Any_t tyvars pt 
     in
 
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;
 
-    (* rename cleanly the variables *)
-    let do_rename form =
-      let _, vars, subst =
-        let pat_vars = List.map fst pat.pat_vars in
-        Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
+    (* rename cleanly the variables and add universal quantifiers *)
+    let _, vars, subst =
+      Term.add_vars_env (S.vars s) pat.pat_vars
+    in
+    (* variables of [pat_vars], after renaming *)
+    let tagged_vars = 
+      List.map2 (fun v v' -> v, snd v') vars pat.pat_vars
+    in
+    let subgs_pt =
+      List.map (fun subg ->
+          Equiv.Any.subst subst subg |>
+          smart_mk_forall_tagged tagged_vars
+        ) subgs_pt
+    in
+    let conc =
+      Equiv.Any.subst subst pat.pat_term |>
+      smart_mk_forall_tagged tagged_vars
+    in
+
+    (*------------------------------------------------------------------*)
+    (* Legacy behavior, when [mode = `IntroImpl], introduce additional 
+       implications on the left.  *)
+    let subgs_extra, conc =
+      (*------------------------------------------------------------------*)
+      (* Decomposes [f] into a list [ [f1;...;fn] ] and a conclusion [conc] s.t.
+         [f] is [f1 => ... => fn => conc] 
+         [conc = None] corresponds to [⊥] *)
+      let rec legacy_destruct
+          (form : Equiv.any_form) : Equiv.any_form list * Equiv.any_form option
+        =
+        if Equiv.Any.Smart.is_impl ~env:(S.env s) form then
+          begin
+            let h, c = oget (Equiv.Any.Smart.destr_impl ~env:(S.env s) form) in
+            let subgs_extra, conc = legacy_destruct c in
+            h :: subgs_extra, conc
+          end
+
+        else if Equiv.Any.Smart.is_not form then
+          begin
+            let h = oget (Equiv.Any.Smart.destr_not form) in
+            [h], None
+          end
+
+        else
+          [], Some form
       in
-      S.Conc.mk_forall ~simpl:true vars (S.subst_conc subst form)
-    in
-    let subgs = List.map do_rename subgs in
-    let f = do_rename pat.pat_term in
 
-    (* sub-goals resulting from the convertion of the proof term [pt] *)
-    let subgs = List.map (fun g -> S.set_goal g s) subgs in
-
-    (* If [mode=`IntroImpl], compute subgoals by introducing implications
-       on the left. *)
-    let rec aux subgoals form : S.t list =
-      if S.Conc.is_impl form && mode = `IntroImpl then
-        begin
-          let h, c = oget (S.Conc.destr_impl ~env:(S.env s) form) in
-          let s' = S.set_goal h s in
-          aux (s'::subgoals) c
-        end
-
-      else if S.Conc.is_not form && mode = `IntroImpl then
-        begin
-          let h = oget (S.Conc.destr_not form) in
-          let s' = S.set_goal h s in
-          List.rev (s'::subgoals)
-        end
-
-      else
-        begin
-          let idf, s0 = Hyps.add_i Args.AnyName (LHyp (S.hyp_of_conc form)) s in
-          let s0 = match ip with
-            | None -> [s0]
-            | Some ip -> do_simpl_pat (`Hyp idf) ip s0
-          in
-
-          match mode with
-          | `None -> (List.rev subgoals) @ s0
-          | `IntroImpl -> s0 @ List.rev subgoals (* legacy behavior *)
-        end
+      (*------------------------------------------------------------------*)
+      if mode = `IntroImpl then legacy_destruct conc else [], Some conc
     in
 
-    subgs @ (aux [] f)
+    (* all subgoals: [subgs_pt] + [subgs_extra] *)
+    let subgs_pt    = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pt    in
+    let subgs_extra = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_extra in
+    (* TODO: have: end pt_process_subgoal *)
+
+    (*------------------------------------------------------------------*)
+    (* applies [ip] on [conc] *)
+    let s_conc_l =
+      match conc with
+      | None -> []              (* [None] means [⊥], hence no new subgoal *)
+      | Some conc ->
+        let form : S.hyp_form =
+          match S.hyp_kind, conc with
+          | Any_t   ,           _ -> conc   (* local sequent , any    form *)
+          | Global_t, Global conc -> conc   (* global sequent, global form *)
+          | Global_t, Local     _ ->        (* global sequent, local  form *)
+            soft_failure ~loc
+              (Failure "cannot introduce a local hypothesis in a global judgement")
+
+          | Equiv.Local_t, _ -> assert false (* cannot happen *)
+        in
+
+        let idf, s_conc = Hyps.add_i Args.AnyName (LHyp form) s in
+        let s_conc_l = match ip with
+          | None -> [s_conc]
+          | Some ip -> do_simpl_pat (`Hyp idf) ip s_conc
+        in
+        List.map S.to_general_sequent s_conc_l
+    in
+
+    subgs_pt @ s_conc_l @ subgs_extra
 
   (*------------------------------------------------------------------*)
   (** {3 Have tactic} *)
@@ -2120,9 +2226,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let do_have (ip : Args.simpl_pat option) arg (s : S.t) : Goal.t list =
     match arg with
-    | `HavePt (pt, mode) ->
-      List.map S.to_general_sequent (have_pt ~mode ip pt s)
-    | `Have f -> have_form ip f s
+    | `HavePt (pt, mode) -> have_pt ~mode ip pt s
+    | `Have   f          -> have_form ip f s
 
   (*------------------------------------------------------------------*)
   (** {3 Depends} *)
@@ -2163,7 +2268,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Args.(Pair (Message (tn, tyn), Message (tm, tym)))
       (s : S.t) : S.t list
     =
-
     Printer.prt
       `Warning
       "The namelength tactic is deprecated! It will disappear soon.\n\

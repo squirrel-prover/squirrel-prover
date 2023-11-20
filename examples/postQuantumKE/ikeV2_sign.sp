@@ -291,7 +291,9 @@ Proof.
   
   (* I part *)
   + intro i j; intro H0 H1 Hap Hap0.
-    use authI with i,j as [Clt Meq0 Meq]; 2,3: auto.
+    have A := authI i j.
+    localize A as A0; clear A.
+    (have [Clt Meq0 Meq] := A0 _ _; 1,2: auto); clear A0.
     
     case try find il jl kl ll such that _ in idealkeys(il,jl,kl,ll) else _.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
@@ -308,7 +310,11 @@ Proof.
   
   (* R part *)
   + intro k l; intro H0 H1 Hap Hap0.
-    use authR with k,l as [l0 [Clt Meq0 Meq]]; 2,3: auto.
+
+    have A := authR k l.
+    localize A as A0; clear A.
+    (have [l0 [Clt Meq0 Meq]] := A0 _ _; 1,2: auto); clear A0.
+
     case try find il jl kl ll such that _
      in  idealkeys(il,jl,kl,ll)
      else _.

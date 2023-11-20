@@ -105,18 +105,21 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   doit pt
 
 (*------------------------------------------------------------------*)
-(** Try to cast [pt] as a [kind] proof-term conclusion. 
-    Raise [failed] in case of failure. *)
+(** Try to cast [pt] as a [dst] proof-term conclusion. 
+    Call [failed ()] in case of failure. *)
 let pt_try_cast (type a)
     ~(failed : unit -> 'b)
-    (kind : a Equiv.f_kind) (pt : PT.t) : PT.t
+    (dst : a Equiv.f_kind) (pt : PT.t) : PT.t
   =
-  match kind, pt.form with
+  match dst, pt.form with
   | Equiv.Local_t , Local  _ -> pt
   | Equiv.Global_t, Global _ -> pt
 
   | Equiv.Local_t , Global _ -> pt_try_localize  ~failed pt
   | Equiv.Global_t, Local  _ -> failed ()
+  (* Casting [pt.form] as a [Reach form] may be unsound if [pt] has
+     (discharged) local subgoals
+     (FIXME: we could check it and cast if there are no local subgoals). *)
 
   | Equiv.Any_t, _ -> pt
 

@@ -120,7 +120,7 @@ Proof.
 
   (* Direction <= *)
   + simpl.
-    exists i,j.
+    exists i,j. 
     by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 Qed.
 
@@ -273,10 +273,12 @@ Proof.
           intro [j1 _]; by exists j1.
 
         (* find condB => condA *)
-        - intro _.
-          use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
-          use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
-          by expand output, cipher.
+        - intro _. 
+          have A := unique_outputs i j i0 j0. 
+          localize A as A0; clear A.
+          (have [A1 A2] := A0 _ _; 1,2: auto); clear A0.
+          use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+          auto.
 
       * fa => //.
         (* find condA => condB *)
@@ -288,9 +290,11 @@ Proof.
 
         (* find condB => condA *)
         - intro _.
-          use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
-            use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
-            by expand output, cipher.
+          have A := unique_outputs i j i0 j0. 
+          localize A as A0; clear A.
+          (have [A1 A2] := A0 _ _; 1,2: auto); clear A0.
+          use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+          auto.
     }.
 
     fa 3; deduce 3.

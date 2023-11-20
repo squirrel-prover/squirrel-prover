@@ -77,3 +77,11 @@ Proof.
   (* idem with an apply *)
   checkfail apply foo exn Failure.
 Abort.
+
+(*------------------------------------------------------------------*)
+lemma _ : false.
+Proof. 
+  have ? := ax_bool true.
+  have ? := q empty. 
+  have ? := q empty _; 1: auto. 
+Abort.
