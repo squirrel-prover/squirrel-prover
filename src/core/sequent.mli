@@ -65,7 +65,7 @@ module type S = sig
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
-    Theory.p_pt -> 
+    Theory.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 
@@ -73,7 +73,7 @@ module type S = sig
       the sequent. *)
   val convert_pt :
     ?close_pats:bool ->
-    Theory.p_pt -> 
+    Theory.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 end

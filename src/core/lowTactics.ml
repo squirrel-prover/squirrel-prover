@@ -686,7 +686,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
     let p_rw_rule
-        dir (p_pt : Theory.p_pt) 
+        dir (p_pt : Theory.pt) 
       : Term.term list * Rewrite.rw_rule * Ident.t option 
       =
       let ghyp, tyvars, pt =
@@ -701,9 +701,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match pt.form with Global _ -> Rewrite.GlobalEq | Local _ -> Rewrite.LocalEq 
       in
 
-      let loc = p_pt.p_pt_loc in
+      let loc = L.loc p_pt in
       let subgs, pat = 
-        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Equiv.Local_t tyvars pt
+        pt_to_pat loc ~failed:(bad_rw_pt loc) Equiv.Local_t tyvars pt
       in
 
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
@@ -723,7 +723,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let dir = L.unloc rw_arg.rw_dir in
           (* (rewrite rule, subgols, hyp id) if applicable *)
           let subgs, rule, id_opt = p_rw_rule dir f in
-          Rw_rw { loc = f.p_pt_loc; subgs; hyp_id = id_opt; rule }
+          Rw_rw { loc = L.loc f; subgs; hyp_id = id_opt; rule }
 
         | `Expand s ->
           if L.unloc rw_arg.rw_dir <> `LeftToRight then
@@ -796,7 +796,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       assert (pt.mv = Match.Mvar.empty);
 
       let pt = 
-        Sequent.pt_try_cast ~failed:(bad_rw_equiv_pt p_pt.p_pt_loc) Global_t pt 
+        Sequent.pt_try_cast ~failed:(bad_rw_equiv_pt (L.loc p_pt)) Global_t pt 
       in
 
       if tyvars <> [] then
@@ -1822,10 +1822,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
             Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
 
           | Any_t, Global _, Local _ ->
-            soft_failure ~loc (Failure "cannot match a global lemma in a local hypothesis")
+            soft_failure ~loc (Failure "cannot match a local lemma in a global hypothesis")
 
           | Any_t, Local _, Global _ ->
-            soft_failure ~loc (Failure "cannot match a local lemma in a global hypothesis")
+            soft_failure ~loc (Failure "cannot match a global lemma in a local hypothesis")
 
           | Global_t, _, _ -> assert false (* cannot happen *)
         in
@@ -1905,9 +1905,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Convert an untyped proof-term into a proof-term of kind [dst]. *)
   let p_pt_as_pat (type a)
       ~(dst : a Equiv.f_kind)
-      (p_pt : Theory.p_pt) (s : S.t) : Equiv.any_form list * a Term.pat
+      (p_pt : Theory.pt) (s : S.t) : Equiv.any_form list * a Term.pat
     =
-    let loc = p_pt.p_pt_loc in
+    let loc = L.loc p_pt in
     let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
     assert (pt.mv = Match.Mvar.empty);
     let subgs, pat = 
@@ -1928,7 +1928,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | None       -> T_conc
       | Some lsymb -> T_hyp (fst (Hyps.by_name_k lsymb Hyp s))
     in
-    let loc = p_pt.p_pt_loc in
+    let loc = L.loc p_pt in
     
     (* [subgs'] is [subgs] extended with subg-goals from the 
        application itself *)
@@ -2093,10 +2093,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
       that we cannot use a global hypothesis or lemma. *)
   let have_pt
       ~(mode:[`IntroImpl | `None]) (ip : Args.simpl_pat option)
-      (p_pt : Theory.p_pt) (s : S.t)
+      (p_pt : Theory.pt) (s : S.t)
     : Goal.t list 
     =
-    let loc = p_pt.p_pt_loc in
+    let loc = L.loc p_pt in
 
     let _, tyvars, pt = S.convert_pt p_pt s in
     assert (pt.mv = Match.Mvar.empty);

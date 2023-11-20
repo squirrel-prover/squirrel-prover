@@ -728,7 +728,7 @@ rw_item:
                                                      rw_type = t; } }
 
 rw_equiv_item:
-| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = TacticsArgs.Once;
+| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = TacticsArgs.Once;
                                          rw_dir = d;
                                          rw_type = `Rw pt; } }
 
@@ -831,34 +831,56 @@ as_n_ips:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
-p_pt_arg:
-| t=sterm                        { Theory.PT_term t }
-/* Note: some terms parsed as [sterm] may be resolved as [PT_sub]
+(*------------------------------------------------------------------*)
+pt_arg:
+| t=sterm                        { Theory.PTA_term t }
+/* Note: some terms parsed as [sterm] may be resolved as [PTA_sub]
    later, using the judgement hypotheses. */
 
-| LPAREN PERCENT pt=p_pt RPAREN  { Theory.PT_sub pt }
+| LPAREN PERCENT pt=pt RPAREN  { Theory.PTA_sub pt }
 
-p_pt:
-| head=lsymb args=slist(p_pt_arg,empty)
-    { let p_pt_loc = L.make $startpos $endpos in
-      Theory.{ p_pt_head = head; p_pt_args = args; p_pt_loc; } }
+(*------------------------------------------------------------------*)
+pt_cnt:
+| head=lsymb args=slist(pt_arg,empty)
+    { let pta_loc = L.make $startpos $endpos in
+      let app = Theory.{ pta_head = head; pta_args = args; pta_loc; } in
+      Theory.PT_app app }
 
-/* legacy syntax for use tactic */
-pt_use_tac:
+| PERCENT LOCAL LPAREN pt=pt RPAREN { Theory.PT_localize pt }
+
+pt:
+| pt=loc(pt_cnt) { pt }
+
+(*------------------------------------------------------------------*)
+/* non-ambiguous pt, built on top of the [pt_cnt] production */
+spt_cnt:
 | hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
-| hid=lsymb WITH args=slist1(tac_term,COMMA)
-    { let p_pt_loc = L.make $startpos $endpos in
-      let args = List.map (fun x -> Theory.PT_term x) args in
-      Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
+    { let app = Theory.{ pta_head = hid; pta_args = []; pta_loc = L.loc hid; } in
+      Theory.PT_app app }
 
-/* non-ambiguous pt */
-spt:
-| hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
-| LPAREN pt=p_pt RPAREN
+| LPAREN pt=pt_cnt RPAREN
     { pt }
 
+spt:
+| pt=loc(spt_cnt) { pt }
+
+(*------------------------------------------------------------------*)
+/* legacy syntax for use tactic */
+pt_use_tac_cnt:
+| hid=lsymb
+    { let app = Theory.{ pta_head = hid; pta_args = []; pta_loc = L.loc hid; } in
+      Theory.PT_app app }
+
+| hid=lsymb WITH args=slist1(tac_term,COMMA)
+    { let pta_loc = L.make $startpos $endpos in
+      let args = List.map (fun x -> Theory.PTA_term x) args in
+      let app = Theory.{ pta_head = hid; pta_args = args; pta_loc; } in
+      Theory.PT_app app }
+
+pt_use_tac:
+| pt=loc(pt_use_tac_cnt) { pt }
+
+(*------------------------------------------------------------------*)
 constseq_arg:
 | LPAREN b=term RPAREN t=sterm { (b,t) }
 
@@ -1053,7 +1075,7 @@ tac:
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
-  | l=lloc(HAVE) ip=have_ip? COLONEQ pt=p_pt 
+  | l=lloc(HAVE) ip=have_ip? COLONEQ pt=pt 
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
@@ -1078,7 +1100,7 @@ tac:
   | l=lloc(rewrite_equiv) p=rw_equiv_item
     { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
 
-  | l=lloc(APPLY) a=named_args t=p_pt w=apply_in
+  | l=lloc(APPLY) a=named_args t=pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=term RPAREN dflt=sterm?

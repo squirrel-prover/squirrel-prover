@@ -1881,19 +1881,27 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
     p_projs
 
 (*------------------------------------------------------------------*)
-(** {2 Apply arguments} *)
+(** {2 Proof-terms} *)
 
-(** proof term *)
-type p_pt = {
-  p_pt_head : lsymb;
-  p_pt_args : p_pt_arg list;
-  p_pt_loc  : L.t;
+type pt_cnt =
+  | PT_app      of pt_app
+  | PT_localize of pt
+
+(** a proof-term *)
+and pt = pt_cnt L.located
+    
+(*------------------------------------------------------------------*)
+(** proof term application *)
+and pt_app = {
+  pta_head : lsymb; (* FIXME: allow [pta_head] to be an arbitrary proof-term *)
+  pta_args : pt_app_arg list;
+  pta_loc  : L.t;
 }
 
-(** proof term argument *)
-and p_pt_arg =
-  | PT_term of term
-  | PT_sub  of p_pt             (* sub proof term *)
+(** proof term application argument *)
+and pt_app_arg =
+  | PTA_term of term
+  | PTA_sub  of pt             (** sub proof-term *)
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

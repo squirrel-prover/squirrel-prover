@@ -52,7 +52,7 @@ type 'a rw_item_g = {
 
 (** Rewrite or expand item *)
 type rw_item = [
-  | `Rw        of Theory.p_pt
+  | `Rw        of Theory.pt
   | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
@@ -65,7 +65,7 @@ type expnd_item = [
 
 (** Rewrite equiv item *)
 type rw_equiv_item = [
-  | `Rw of Theory.p_pt
+  | `Rw of Theory.pt
 ] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item *)
@@ -149,7 +149,7 @@ type trans_arg =
 type have_ip = s_item list * simpl_pat * s_item list
 
 type have_arg    = have_ip option * Theory.any_term
-type have_pt_arg = Theory.p_pt * have_ip option * [`IntroImpl | `None]
+type have_pt_arg = Theory.pt * have_ip option * [`IntroImpl | `None]
 
 (*------------------------------------------------------------------*)
 (** {2 Crypto tactic arguments} *)
@@ -186,7 +186,7 @@ type parser_arg =
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
-  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | ApplyIn      of named_args * Theory.pt * apply_in
   | Have         of have_arg
   | HavePt       of have_pt_arg
   | Reduce       of named_args

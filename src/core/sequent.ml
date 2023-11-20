@@ -282,13 +282,13 @@ module type S = sig
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
-    Theory.p_pt -> 
+    Theory.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 
   val convert_pt :
     ?close_pats:bool ->
-    Theory.p_pt -> 
+    Theory.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 end
@@ -389,41 +389,43 @@ module Mk (Args : MkArgs) : S with
   
   (*------------------------------------------------------------------*)
   (** Return the location of a proof term argument. *)
-  let pt_arg_loc (p_arg : Theory.p_pt_arg) : L.t =
+  let pt_arg_loc (p_arg : Theory.pt_app_arg) : L.t =
     match p_arg with
-    | PT_term t -> L.loc t
-    | PT_sub pt -> pt.p_pt_loc
+    | PTA_term  t -> L.loc t
+    | PTA_sub  pt -> L.loc pt
 
-  let pt_arg_as_term (p_arg : Theory.p_pt_arg) : Theory.term =
+  let pt_app_arg_as_term (p_arg : Theory.pt_app_arg) : Theory.term =
     match p_arg with
-    | Theory.PT_term t -> t
+    | Theory.PTA_term t -> t
     | _ ->
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
 
   (** A proof term with type [f1 -> f2] argument is either:
       - another proof term whose type [f'] must match [f1] 
       - an underscore, which generates a subgaol for [f1] *)
-  type pt_impl_arg = [`Pt of Theory.p_pt | `Subgoal]
+  type pt_impl_arg = [`Pt of Theory.pt | `Subgoal]
 
   (** Try to interpret a proof term argument as a proof term. *)
-  let pt_arg_as_pt (p_arg : Theory.p_pt_arg) : [`Pt of Theory.p_pt | `Subgoal] =
+  let pt_app_arg_as_pt (p_arg : Theory.pt_app_arg) : [`Pt of Theory.pt | `Subgoal] =
     match p_arg with
-    | Theory.PT_sub pt -> `Pt pt
+    | Theory.PTA_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Theory.PT_term ({ pl_desc = Symb head } as t) 
-    | Theory.PT_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
+    | Theory.PTA_term ({ pl_desc = Symb head } as t) 
+    | Theory.PTA_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
       let f, terms = Theory.decompose_app t in
       assert (Theory.equal_i (Theory.Symb head) (L.unloc f));
+      let loc = L.loc t in
+      let pt_cnt = 
+        Theory.PT_app {
+          pta_head = head;
+          pta_args = List.map (fun x -> Theory.PTA_term x) terms ;
+          pta_loc  = loc;
+        } 
+      in 
+      `Pt (L.mk_loc loc pt_cnt)
 
-      let pt = Theory.{
-          p_pt_head = head;
-          p_pt_args = List.map (fun x -> PT_term x) terms ;
-          p_pt_loc  = L.loc t;
-        } in 
-      `Pt pt
-
-    | Theory.PT_term { pl_desc = Theory.Tpat } -> `Subgoal
+    | Theory.PTA_term { pl_desc = Theory.Tpat } -> `Subgoal
 
     | _ ->
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
@@ -454,30 +456,40 @@ module Mk (Args : MkArgs) : S with
 
 
   (** Solve parser ambiguities, e.g. in [H (G x)], the sub-element [(G x)] is
-      parsed as a term (i.e. a [PT_term]. We resolve it as a [PT_sub] using
+      parsed as a term (i.e. a [PTA_term]. We resolve it as a [PTA_sub] using
       the context. *)
-  let rec resolve_pt_arg (s : S.t) (pt_arg : Theory.p_pt_arg) : Theory.p_pt_arg =
+  let rec resolve_pt_arg (s : S.t) (pt_arg : Theory.pt_app_arg) : Theory.pt_app_arg =
     match pt_arg with
-    | Theory.PT_sub sub -> PT_sub (resolve_pt s sub)
-    | Theory.PT_term t  ->
+    | Theory.PTA_sub sub -> PTA_sub (resolve_pt s sub)
+    | Theory.PTA_term t  ->
       match L.unloc t with
       | Theory.App ({ pl_desc = Theory.Symb h}, args) ->
         if S.Hyps.mem_name (L.unloc h) s then
-          let p_pt_args =
-            List.map (fun a -> resolve_pt_arg s (Theory.PT_term a)) args
+          let pta_args =
+            List.map (fun a -> resolve_pt_arg s (Theory.PTA_term a)) args
           in
-          let pt = Theory.{
-            p_pt_head = h;
-            p_pt_args;
-            p_pt_loc = last_loc (L.loc h) args;
-          } in
-          PT_sub pt
+          let loc = last_loc (L.loc h) args in
+          let pt_cnt = 
+            Theory.PT_app {
+              pta_head = h;
+              pta_args;
+              pta_loc = loc;
+            } 
+          in
+          PTA_sub (L.mk_loc loc pt_cnt)
         else pt_arg
 
       | _ -> pt_arg
 
-  and resolve_pt (s : S.t) (pt : Theory.p_pt) : Theory.p_pt =
-    Theory.{ pt with p_pt_args = List.map (resolve_pt_arg s) pt.p_pt_args }
+  and resolve_pt (s : S.t) (pt : Theory.pt) : Theory.pt =
+    let loc = L.loc pt in
+    match L.unloc pt with
+    | PT_localize sub_pt -> 
+      L.mk_loc loc (Theory.PT_localize (resolve_pt s sub_pt))
+
+    | PT_app app ->
+      let app = Theory.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } in
+      L.mk_loc loc (Theory.PT_app app)
 
   (*------------------------------------------------------------------*)      
   (** Internal 
@@ -740,7 +752,6 @@ module Mk (Args : MkArgs) : S with
 
     { subgs; mv; args; form = f2; system = pt.system; }
 
-
   (*------------------------------------------------------------------*)
   let error_pt_cannot_apply loc (pt : PT.t) =
     let err_str =
@@ -748,19 +759,44 @@ module Mk (Args : MkArgs) : S with
         PT.pp pt
     in
     soft_failure ~loc (Failure err_str)
+
+  (*------------------------------------------------------------------*)
+  let error_pt_cannot_localize loc (pt : PT.t) () =
+    let err_str =
+      Fmt.str "@[<v 0>cannot localize the proof term:@;  @[%a@]@;@]"
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
       
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let rec _convert_pt_gen 
+  let rec do_convert_pt_gen 
+      (ty_env : Type.Infer.env)
+      (mv : Mvar.t)
+      (p_pt : Theory.pt)
+      (s : S.t) : ghyp * PT.t
+    =
+    match L.unloc p_pt with
+    | Theory.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
+    | Theory.PT_localize p_sub_pt -> 
+      let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
+      let pt = 
+        pt_try_localize
+          ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt) 
+          sub_pt 
+      in
+      ghyp, pt
+
+  and do_convert_pt_app
       (ty_env : Type.Infer.env)
       (init_mv : Mvar.t)
-      (p_pt : Theory.p_pt)
+      (pt_app : Theory.pt_app)
       (s : S.t) : ghyp * PT.t
     =
     let table, env = S.table s, S.vars s in
 
     let lem_name, init_pt =
-      pt_of_assumption ~table ty_env p_pt.p_pt_head s 
+      pt_of_assumption ~table ty_env pt_app.pta_head s 
     in
     assert (init_pt.mv = Mvar.empty);
     let init_pt = { init_pt with mv = init_mv; } in
@@ -771,7 +807,7 @@ module Mk (Args : MkArgs) : S with
     let do_var (pt : PT.t) (p_arg : Theory.term) : PT.t =
       match destr_forall1_tagged_k Equiv.Any_t pt.form with
       | None ->
-        error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
+        error_pt_cannot_apply (L.loc pt_app.pta_head) pt
 
       | Some ((f_arg, _), _) ->
         let ty = Vars.ty f_arg in
@@ -794,11 +830,11 @@ module Mk (Args : MkArgs) : S with
         | None ->
           (* destruct failed, applying the pending substitution and try to 
              destruct again *)
-          let subst = subst_of_pt ~loc:p_pt.p_pt_loc table (S.vars s) pt in
+          let subst = subst_of_pt ~loc:pt_app.pta_loc table (S.vars s) pt in
           match destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form) with
           | Some (f1, f2) -> f1, f2
           | None ->
-            error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
+            error_pt_cannot_apply (L.loc pt_app.pta_head) pt
       in
 
       match pt_impl_arg with
@@ -810,9 +846,9 @@ module Mk (Args : MkArgs) : S with
           form   = f2; }
 
       | `Pt p_arg ->
-        let _, pt_arg = _convert_pt_gen ty_env pt.mv p_arg s in
+        let _, pt_arg = do_convert_pt_gen ty_env pt.mv p_arg s in
         pt_apply_var_impl
-          ~loc_arg:p_arg.p_pt_loc
+          ~loc_arg:(L.loc p_arg)
           ty_env s
           pt pt_arg
     in
@@ -821,12 +857,12 @@ module Mk (Args : MkArgs) : S with
        instantiating [f] along the way, 
        and accumulating proof obligations. *)
     let pt =
-      List.fold_left (fun (pt : PT.t) (p_arg : Theory.p_pt_arg) ->
+      List.fold_left (fun (pt : PT.t) (p_arg : Theory.pt_app_arg) ->
           if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
-            do_impl pt (pt_arg_as_pt p_arg) 
+            do_impl pt (pt_app_arg_as_pt p_arg) 
           else
-            do_var pt (pt_arg_as_term p_arg) 
-        ) init_pt p_pt.p_pt_args
+            do_var pt (pt_app_arg_as_term p_arg) 
+        ) init_pt pt_app.pta_args
     in
 
     lem_name, pt
@@ -874,19 +910,20 @@ module Mk (Args : MkArgs) : S with
   let convert_pt_gen
       ~check_compatibility
       ?(close_pats=true)
-      (p_pt : Theory.p_pt)
+      (p_pt : Theory.pt)
       (s    : S.t)
     : ghyp * Type.tvars * PT.t
     =
     (* resolve (to some extent) parser ambiguities in [s] *)
     let p_pt = resolve_pt s p_pt in
+    let loc = L.loc p_pt in
 
     (* create a fresh unienv and matching env *)
     let ty_env = Type.Infer.mk_env () in
     let mv = Mvar.empty in
 
     (* convert the proof term *)
-    let name, pt = _convert_pt_gen ty_env mv p_pt s in
+    let name, pt = do_convert_pt_gen ty_env mv p_pt s in
 
     let pt =
       if not check_compatibility then
@@ -895,11 +932,11 @@ module Mk (Args : MkArgs) : S with
         match pt_compatible_with (S.table s) pt (S.system s) with
         | `Subset         -> pt_project_system_set pt (S.system s)
         | `ContextIndepPT -> { pt with system = S.system s; }
-        | `Failed         -> error_pt_bad_system p_pt.p_pt_loc pt 
+        | `Failed         -> error_pt_bad_system loc pt 
     in
 
     (* close the proof-term by inferring as many pattern variables as possible *)
-    let pt = close p_pt.p_pt_loc (S.table s) (S.vars s) pt in
+    let pt = close loc (S.table s) (S.vars s) pt in
     assert (pt.mv = Mvar.empty);
 
     (* pattern variable remaining, and not allowed *)
@@ -928,7 +965,7 @@ module Mk (Args : MkArgs) : S with
   (** Exported. *)
   let convert_pt
       ?close_pats
-      (pt :  Theory.p_pt)
+      (pt :  Theory.pt)
       (s : S.t)
     : ghyp * Type.tvars * PT.t
     =

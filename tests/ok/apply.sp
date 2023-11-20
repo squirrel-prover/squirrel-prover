@@ -385,6 +385,38 @@ Proof.
 
   apply bar x y _ _; [1: apply foo1 | 2: apply foo2].
 Qed. 
+
+(* ========================================================= *)
+(* `apply`, in a forward style *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
+Proof.
+  intro H.
+
+  have A  := %local(bar x y); 1: apply foo2. 
+
+  checkfail apply A in H exn Failure. 
+  (* Failure: cannot match a local lemma in a global hypothesis  *)
+ 
+  localize H as H0; clear H.
+  apply A in H0.
+  assumption H0.
+Qed.
+
+(* `apply`, in a forward style *)
+global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
+Proof.
+  intro H.
+
+  have A := %local(bar x y _); 1: apply foo2.  
+
+  checkfail apply A in H exn Failure. 
+  (* Failure: cannot match a local lemma in a global hypothesis  *)
+ 
+  localize H as H0; clear H.
+  apply A in H0.
+  assumption H0.
+Qed.
+
 (* `apply`, in a forward style *)
 global lemma _ ['a] (x,y : 'a[const,glob]) : equiv(x,y) -> [q x y].
 Proof.
