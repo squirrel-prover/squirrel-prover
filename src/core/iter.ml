@@ -1,5 +1,6 @@
 open Utils
 
+(*------------------------------------------------------------------*)
 module Pos = Match.Pos
                
 module Sv = Vars.Sv
@@ -7,6 +8,9 @@ module Sp = Pos.Sp
 
 module SE = SystemExpr
 
+module TraceHyps = Hyps.TraceHyps
+                     
+(*------------------------------------------------------------------*)
 let pp_dbg = false
   
 (*------------------------------------------------------------------*)
@@ -507,17 +511,31 @@ let get_macro_occs
     ~(mode  : allowed_constants )   (* allowed sub-terms without further checks *)
     ~(expand_mode : [`FullDelta | `Delta ])
     ~(env   : Env.t)
-    ~(fv    : Vars.vars)  (* additional [fv] not in [env.vars] *)
+    ~(hyps  : TraceHyps.hyps)      (* initial hypotheses *)
+    ~(fv    : Vars.vars)           (* additional [fv] not in [env.vars] *)
     (constr : Constr.trace_cntxt)
     (t      : Term.term)
   : macro_occs
-  =
+  =  
   let env fv =
     Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
   in
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : macro_occs =
+  
+  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : macro_occs =
     let env = env fv in
     assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
+
+    (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
+       Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
+    let t =
+      let se = env.system.set in
+      let param = Reduction.rp_crypto in
+      (* FIXME: add tag information in [fv] *)
+      let vars = Vars.of_list (Vars.Tag.local_vars fv) in
+      let st = Reduction.mk_state ~hyps ~se ~vars ~param constr.table in
+      Reduction.whnf_term st t
+    in
+
 
     match t with
     | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
@@ -937,7 +955,8 @@ let mset_of_macro_occ (env : Sv.t) ~(path_cond : PathCond.t) (occ : macro_occ) :
     in any trace model. *)
 let macro_support
     ~(mode : allowed_constants)   (* allowed sub-terms without further checks *)
-    ~(env  : Env.t) 
+    ~(env  : Env.t)
+    ~(hyps : TraceHyps.hyps)      (* initial hypotheses *)
     (cntxt : Constr.trace_cntxt)
     (term  : Term.term)
   : MsetAbs.t
@@ -951,8 +970,10 @@ let macro_support
     =
     assert (Sv.subset (Term.fv term) (Sv.union (Vars.to_vars_set env.vars) (Sv.of_list fv)));
 
-    let occs = get_macro_occs ~expand_mode ~mode ~env ~fv cntxt term in
-    let msets = List.map (mset_of_macro_occ (Vars.to_vars_set env.vars) ~path_cond) occs in
+    let occs = get_macro_occs ~expand_mode ~mode ~env ~hyps ~fv cntxt term in
+    let msets =
+      List.map (mset_of_macro_occ (Vars.to_vars_set env.vars) ~path_cond) occs
+    in
     List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
   in
 
@@ -1081,6 +1102,7 @@ let _fold_macro_support
     (func  : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
+    (hyps  : TraceHyps.hyps)      (* initial hypotheses *)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
@@ -1088,7 +1110,7 @@ let _fold_macro_support
 
   (* association list of terms and their macro support *)
   let sm : (Term.term * MsetAbs.t) list =
-    List.map (fun src -> (src, macro_support ~mode ~env cntxt src)) terms
+    List.map (fun src -> (src, macro_support ~mode ~env ~hyps cntxt src)) terms
   in
 
   if pp_dbg then                (* debug printing, turned-off  *)
@@ -1155,10 +1177,11 @@ let fold_macro_support
     (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
+    (hyps  : TraceHyps.hyps)      (* initial hypotheses *)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
-  _fold_macro_support ?mode (fun _ -> func) cntxt env terms init
+  _fold_macro_support ?mode (fun _ -> func) cntxt env hyps terms init
 
 
 (** Less precise version of [fold_macro_support], which does not track 
@@ -1168,9 +1191,10 @@ let fold_macro_support1
     (func  : (Action.descr -> Term.term -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
+    (hyps  : TraceHyps.hyps)      (* initial hypotheses *)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
   _fold_macro_support ?mode (fun descr iocc acc ->
       func (descr ()) iocc.iocc_cnt acc
-    ) cntxt env terms init
+    ) cntxt env hyps terms init

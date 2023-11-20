@@ -4,11 +4,6 @@
 
 type trace_sequent
 
-(* (\** Wrapper for manipulating local hypotheses only. *\) *)
-(* module LocalHyps : Hyps.S1 *)
-(*   with type hyp = Equiv.local_form *)
-(*    and type hyps := trace_sequent *)
-
 (*------------------------------------------------------------------*)  
 include LowSequent.S
   with type hyp_form = Equiv.any_form

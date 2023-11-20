@@ -1,7 +1,8 @@
 module Sv = Vars.Sv
-
 module SE = SystemExpr
 
+module TraceHyps = Hyps.TraceHyps
+                     
 (*------------------------------------------------------------------*)
 (** Fold over all subterms.
     Bound variables are represented as newly generated fresh variables.
@@ -287,7 +288,8 @@ val fold_macro_support :
   ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (iocc -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
-  Env.t -> 
+  Env.t ->
+  TraceHyps.hyps ->
   Term.term list -> 
   'a -> 
   'a
@@ -298,7 +300,8 @@ val fold_macro_support1 :
   ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (Action.descr -> Term.term -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
-  Env.t -> 
+  Env.t ->
+  TraceHyps.hyps ->
   Term.term list -> 
   'a -> 
   'a

@@ -209,6 +209,8 @@ let[@warning "-27"] mk_rule
       key_indices = List.map (Term.subst subst) is ; 
       env = !env }
   in
+
+  let empty_hyps = Hyps.TraceHyps.empty in (* FIXME: get hyps from sequent *)
   
   (* TODO: we are using the less precise version of [fold_macro_support] *)
   let hash_cases =
@@ -221,7 +223,7 @@ let[@warning "-27"] mk_rule
         let new_hashes = iter#get_occurrences in
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
-      ) cntxt env (mess :: sign :: elems) []
+      ) cntxt env empty_hyps (mess :: sign :: elems) []
   in
   
   (* we keep only actions in which the name occurs *)

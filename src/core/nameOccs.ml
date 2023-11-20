@@ -569,6 +569,8 @@ let find_occurrences
       sources
   in
 
+  let hyps = Hyps.TraceHyps.empty in (* FIXME: get hyps from sequent *)
+  
   (* indirect occurrences *)
   let ind_occs, ind_acc =
     Iter.fold_macro_support ~mode (fun iocc (ind_occs, ind_acc) ->
@@ -613,7 +615,7 @@ let find_occurrences
             ) acc
         in
         ind_occs @ occs, ind_acc @ acc)
-      contx env sources ([], [])
+      contx env hyps sources ([], [])
   in
   
   (* printing *)

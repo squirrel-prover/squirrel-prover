@@ -1,8 +1,10 @@
-module PathCond = Iter.PathCond
 module SE = SystemExpr
 module MP = Match.Pos
 
+module TraceHyps = Hyps.TraceHyps
+module PathCond  = Iter.PathCond
 
+(*------------------------------------------------------------------*)
 (** Overview:
     The [Occurrences] module provides ways to easily search for occurrences
     of anything in a term.
@@ -349,6 +351,7 @@ module type OccurrenceSearch = sig
     mode:Iter.allowed_constants -> (* allowed sub-terms without further checks *)
     ?pp_ns:unit Fmt.t option -> (* printing searched for occurrences *)
     f_fold_occs ->
+    TraceHyps.hyps ->
     Constr.trace_cntxt ->
     Env.t ->
     Term.terms ->

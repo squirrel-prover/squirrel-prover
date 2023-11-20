@@ -1796,7 +1796,8 @@ let notify_bideduction_subgoals ~direct ~recursive : unit =
     Note that in practice, these subgoals are tailored to Squirrel
     macros, and may be of a different form than the sub-goal above. *)
 let derecursify
-    ?(consts = []) (env : Env.t) (targets : Term.terms) (game : game) hyps
+    ?(consts = []) (env : Env.t) (targets : Term.terms)
+    (game : game) (hyps : TraceHyps.hyps)
   : (Vars.vars * state * CondTerm.t list ) list * (state * CondTerm.t list)
   =
   let system = (oget env.system.pair :> SE.fset) in
@@ -1859,7 +1860,7 @@ let derecursify
         let goal, output = mk_bideduction_goal ~form iocc.iocc_cnt in
         let togen = Sv.elements iocc.iocc_vars in
         (togen, goal, output) :: goals
-      ) trace_context env targets []
+      ) trace_context env hyps targets []
   in
 
   (* notify the user *)

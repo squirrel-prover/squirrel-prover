@@ -154,7 +154,8 @@ let fresh_trace
 
     let occs =
       NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_ns:(Some pp_n)
-        get_bad contx env (t::n.args)
+      get_bad
+      (TS.get_trace_hyps s) contx env (t::n.args)
     in
     Printer.pr "@]@;";
 
@@ -189,6 +190,7 @@ let equiv_fresh_phi_proj
     ~(use_path_cond : bool)
     (loc            : L.t)
     (contx          : Constr.trace_cntxt)
+    (hyps           : Hyps.TraceHyps.hyps)
     (venv           : Vars.env)
     (t              : Term.term)
     (biframe        : Term.terms)
@@ -198,8 +200,14 @@ let equiv_fresh_phi_proj
   let table = contx.table in
   let system = SE.project [proj] contx.system in
   let contx = { contx with system } in
-  let env = Env.init ~table ~system:(SE.reachability_context system) ~vars:venv () in
+  let system_context = SE.reachability_context system in
+  let env = Env.init ~table ~system:system_context ~vars:venv () in
   let info = (O.EI_direct, contx) in
+  let hyps =
+    Hyps.change_trace_hyps_context
+      ~old_context:(SE.reachability_context contx.system) ~new_context:system_context
+      ~vars:env.vars ~table:env.table hyps
+  in
 
   let t = O.expand_macro_check_all info (Term.project1 proj t) in
   let n : Name.t = 
@@ -222,7 +230,8 @@ let equiv_fresh_phi_proj
 
   let occs =
     NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_ns:(Some pp_n)
-      get_bad contx env (frame @ n.args)
+    get_bad
+    hyps contx env (frame @ n.args)
   in
   let phis  =
     List.map (NOF.occurrence_formula ~use_path_cond ~negate:true) occs
@@ -256,10 +265,18 @@ let fresh_equiv
   
   (* compute the freshness conditions *)
   Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
-  let phi_l = equiv_fresh_phi_proj ~use_path_cond loc contx env t biframe proj_l in
+  let phi_l =
+    equiv_fresh_phi_proj
+      ~use_path_cond
+      loc contx (ES.get_trace_hyps s) env t biframe proj_l
+  in
 
   Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
-  let phi_r = equiv_fresh_phi_proj ~use_path_cond loc contx env t biframe proj_r in
+  let phi_r =
+    equiv_fresh_phi_proj
+      ~use_path_cond
+      loc contx (ES.get_trace_hyps s) env t biframe proj_r
+  in
 
   Printer.pr "@]@]@;";
 

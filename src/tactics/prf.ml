@@ -12,15 +12,11 @@ module T = ProverTactics
 
 type sequent = ES.sequent
 
-
 module MP = Match.Pos
 module Sp = MP.Sp
 
-
 (*------------------------------------------------------------------*)
-
 let soft_failure = Tactics.soft_failure
-
 
 (*------------------------------------------------------------------*)
 (** Instantiating the occurrence search module *)
@@ -386,25 +382,29 @@ let phi_proj
     (loc     : L.t)
     (env     : Env.t)
     (contx   : Constr.trace_cntxt)
+    (hyps    : Hyps.TraceHyps.hyps)
     (hash_f  : Symbols.fname)
     (biframe : Term.terms)
     (cc_nprf : Term.term)
     (m       : Term.term)
     (k       : Term.term)
     (nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
-    (proj    : proj)
+    (proj    : Term.proj)
   : Term.terms
   =
   (* project everything *)
   let system_p = SE.project [proj] contx.system in
-  let env =
-    Env.update
-      ~system:{ env.system with set = (system_p :> SE.arbitrary); }
-      env
-  in
+  let new_context = { env.system with set = (system_p :> SE.arbitrary); } in
+  let env = Env.update ~system:new_context env in
   let contx_p = { contx with system = system_p } in
   let cc_nprf_p = Term.project1 proj cc_nprf in
   let m_p = Term.project1 proj m in
+
+  let hyps =
+    Hyps.change_trace_hyps_context
+      ~old_context:env.system ~new_context:new_context
+      ~vars:env.vars ~table:env.table hyps
+  in
 
   (* check that the key, once projected, is a name. *)
   let k_p = 
@@ -429,7 +429,8 @@ let phi_proj
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
   let occs = IOS.find_all_occurrences ~mode:PTimeSI ~pp_ns:(Some pp_k)
-      get_bad contx_p env (cc_nprf_p :: m_p :: k_p.args @ frame_p)
+      get_bad
+      hyps contx_p env (cc_nprf_p :: m_p :: k_p.args @ frame_p)
   in
   (* sort the occurrences: first the key occs, then the hash occs *)
   let occs_key, occs_hash =
@@ -470,7 +471,6 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let before, e, after = LT.split_equiv_goal i s in
   let biframe = List.rev_append before after in
 
-
   (* get the parameters, enforcing that
      cc does not contain diffs or binders above xc.
      (at least the diff part could maybe be relaxed?) *)
@@ -485,7 +485,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
     Term.pp (Term.mk_fun contx.table hash_f [Term.mk_tuple [m;k]]);  
   let phi_proj =
     phi_proj ~use_path_cond:false loc
-      env contx_nprf hash_f biframe cc_nprf m k nprf 
+      env contx_nprf (ES.get_trace_hyps s) hash_f biframe cc_nprf m k nprf 
       (* FEATURE: allow the user to set [use_path_cond] to true *)
   in
 

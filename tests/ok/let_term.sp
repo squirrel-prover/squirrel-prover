@@ -333,3 +333,33 @@ Proof.
   have A : x = empty. auto. 
   checkfail rewrite -A in x exn Failure. (* cannot target definitions *)
 Abort.
+
+(*------------------------------------------------------------------*)
+hash h.
+
+name k : message.
+
+lemma [P0] _ (m : _[adv]): 
+  let x = h(zero, k) in 
+  let y = h(one , k) in 
+  att(<x,y>) = h(m,k) => m = zero || m = one.
+Proof.
+  intro x y H.
+  euf H.
+  + auto. 
+  + auto.
+Qed.
+
+lemma [P0] _ (m : _[adv]): 
+  let x = h(zero, k) in 
+  let y = h(<one,x>,  k) in 
+  att(<x,y>) = h(m,k) => m = zero || m = <one,x>.
+Proof.
+  intro x y H.
+  euf H.
+  + auto. 
+  + auto.
+Qed.
+
+
+

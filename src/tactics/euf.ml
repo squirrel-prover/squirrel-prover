@@ -100,24 +100,24 @@ let mk_simple_occ = IOS.EO.SO.mk_simple_occ
 (*------------------------------------------------------------------*)
 (* Look for occurrences using the Occurrences module *)
 
-(** A IOS.f_fold_occs function.
+(** A [IOS.f_fold_occs] function.
     Looks for
-    1) bad occurrences of the key k: places where a key with the same symbol
-       as k is used other than in key position
+    1) bad occurrences of the key [k]: places where a key with the same symbol
+       as [k] is used other than in key position
     2) occurrences of protected (signed/hashed) messages, with a key that has
-       the same symbol as k. *)
+       the same symbol as [k]. *)
 let get_bad_occs
     (env : Env.t)
-    (m:Term.term)
-    (k:name)
-    (int_f:Symbols.fname) (* function with integrity (hash, signature) *)
-    ?(pk_f:Symbols.fname option=None) (* public key function.
-                                         Must be None iff hash *)
+    (m : Term.term)
+    (k : name)
+    (int_f : Symbols.fname) (* function with integrity (hash, signature) *)
+    ?(pk_f : Symbols.fname option=None) (* public key function. Must be None iff hash *)
     (retry_on_subterms : unit -> IOS.simple_occs)
     (rec_call_on_subterms : O.pos_info -> Term.term -> IOS.simple_occs)
-    (info:O.pos_info)
-    (t:term) 
-  :IOS.simple_occs =
+    (info : O.pos_info)
+    (t : term) 
+  : IOS.simple_occs
+  =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
 
@@ -144,14 +144,14 @@ let get_bad_occs
     (* generate an occ, and also recurse on kargs' *)
     let occs1 = List.concat_map (rec_call_on_subterms info) kargs' in
     let oc =
-      (mk_simple_occ
-         (BadKey (Name.of_term k'))
-         (BadKey k)
-         ()
-         info.pi_vars
-         info.pi_cond
-         info.pi_occtype
-         info.pi_subterm)
+      mk_simple_occ
+        (BadKey (Name.of_term k'))
+        (BadKey k)
+        ()
+        info.pi_vars
+        info.pi_cond
+        info.pi_occtype
+        info.pi_subterm
     in
     oc :: occs1
 
@@ -166,7 +166,6 @@ let get_bad_occs
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
 
-
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', kargs', but do not record
      m' as a hash occurrence. *)
@@ -176,7 +175,6 @@ let get_bad_occs
       (rec_call_on_subterms {info with pi_subterm=t}) (* we change the
                                                          subterm *)
       (u :: m' :: kargs')
-
 
   (* hash verification oracle (converse case h(m', k) = u). *)
   | App (Fun (f, _), [App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]]); u])
@@ -280,11 +278,7 @@ let euf_param
 
 
 (*------------------------------------------------------------------*)
-let euf
-    (h : lsymb)
-    (s : sequent)
-  : sequent list
-  =
+let euf (h : lsymb) (s : sequent) : sequent list =
   (* find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
@@ -308,7 +302,8 @@ let euf
   (* get all occurrences *)
   let occs =
     IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
-      get_bad contx env (t :: m :: k.Name.args)
+      get_bad
+      (TS.get_trace_hyps s) contx env (t :: m :: k.Name.args)
   in
 
   (* sort the occurrences: first the key occs, then the integrity occs *)

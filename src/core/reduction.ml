@@ -19,6 +19,7 @@ type red_param = {
   constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
+(*------------------------------------------------------------------*)
 let rp_empty = { 
   rewrite = false;
   beta    = false; 
@@ -46,6 +47,15 @@ let rp_full = {
   constr  = false; 
 }
 
+let rp_crypto = {
+  rp_empty with 
+  delta = { op = false; macro = true; def = true; };
+  beta = true; 
+  proj = true; 
+  zeta = true;
+}
+
+(*------------------------------------------------------------------*)
 let parse_simpl_args
     (param : red_param) (args : Args.named_args) : red_param
   =

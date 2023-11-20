@@ -693,6 +693,7 @@ let deprecated_add_fresh_cases
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let deprecated_mk_fresh_indirect_cases
     (cntxt : Constr.trace_cntxt)
+    (hyps : Hyps.TraceHyps.hyps)      (* initial hypotheses *)
     (venv : Vars.env)
     (ns : Term.nsymb)
     (ns_args : Term.terms)
@@ -737,7 +738,7 @@ let deprecated_mk_fresh_indirect_cases
           (fun l ->
              deprecated_add_fresh_cases cntxt.table cntxt.system new_cases l
           ) macro_cases
-      ) cntxt env terms []
+      ) cntxt env hyps terms []
   in
   (* we keep only action names in which the name occurs *)
   List.filter (fun (_, occs) -> occs <> []) macro_cases

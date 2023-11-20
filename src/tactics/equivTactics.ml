@@ -1119,6 +1119,7 @@ let deprecated_fresh_mk_indirect
 (** Construct the formula expressing freshness for some projection. *)
 let deprecated_mk_phi_proj
     (cntxt : Constr.trace_cntxt)
+    (hyps : TopHyps.TraceHyps.hyps)      (* initial hypotheses *)
     (venv : Vars.env)
     ((n,n_args) : Term.nsymb * Term.terms)
     (proj : Term.proj)
@@ -1140,7 +1141,7 @@ let deprecated_mk_phi_proj
     let frame_actions : OldFresh.deprecated_ts_occs = OldFresh.deprecated_get_macro_actions cntxt frame in
 
     let macro_cases =
-      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt venv n n_args biframe
+      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt hyps venv n n_args biframe
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -1172,6 +1173,7 @@ let deprecated_mk_phi_proj
 let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt = mk_pair_trace_cntxt s in
   let env = ES.vars s in
+  let hyps = ES.get_trace_hyps s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
   let n_left, n_left_args, n_right, n_right_args =
@@ -1184,13 +1186,13 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left =
-    deprecated_mk_phi_proj cntxt_left env (n_left, n_left_args) l_proj biframe 
+    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) l_proj biframe 
   in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = 
-    deprecated_mk_phi_proj cntxt_right env (n_right, n_right_args) r_proj biframe 
+    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) r_proj biframe 
   in
 
   let cstate = Reduction.mk_cstate cntxt.table in
@@ -1724,7 +1726,8 @@ let enckp arg (s : ES.t) =
       with Oldcca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
-      s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent in
+      s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent
+    in
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =
@@ -1818,6 +1821,7 @@ let mk_xor_phi_base (s : ES.t) biframe
     ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) =
   let cntxt = mk_pair_trace_cntxt s in
   let env   = ES.vars  s in
+  let hyps  = ES.get_trace_hyps s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
   let biframe =
@@ -1827,13 +1831,13 @@ let mk_xor_phi_base (s : ES.t) biframe
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left = 
-    deprecated_mk_phi_proj cntxt_left env (n_left, n_left_args) l_proj biframe 
+    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) l_proj biframe 
   in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = 
-    deprecated_mk_phi_proj cntxt_right env (n_right, n_right_args) r_proj biframe 
+    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) r_proj biframe 
   in
 
   let len_left =

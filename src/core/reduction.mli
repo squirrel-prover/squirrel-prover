@@ -16,6 +16,7 @@ type red_param = {
 val rp_empty   : red_param
 val rp_default : red_param
 val rp_full    : red_param
+val rp_crypto  : red_param      (** used in cryptographic tactics *)
 
 val parse_simpl_args : red_param -> Args.named_args -> red_param 
 

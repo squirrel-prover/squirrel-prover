@@ -315,7 +315,8 @@ let cgdh
 
   let occs =
     NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_nab)
-      get_bad contx env [t]
+      get_bad
+      (TS.get_trace_hyps s) contx env [t]
   in
 
   let phis = List.map (NOF.occurrence_formula ~negate:false) occs in

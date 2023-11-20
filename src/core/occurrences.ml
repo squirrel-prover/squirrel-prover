@@ -1,11 +1,13 @@
+(** See description of the module in the `.mli` *)
+
+(*------------------------------------------------------------------*)
 open Utils
 
 module MP = Match.Pos
 module SE = SystemExpr
 
-module PathCond = Iter.PathCond
-
-(** See description of the module in the `.mli` *)
+module TraceHyps = Hyps.TraceHyps
+module PathCond  = Iter.PathCond
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
@@ -617,6 +619,7 @@ module type OccurrenceSearch = sig
     mode:Iter.allowed_constants ->
     ?pp_ns:unit Fmt.t option ->
     f_fold_occs ->
+    TraceHyps.hyps ->
     Constr.trace_cntxt ->
     Env.t ->
     Term.terms ->
@@ -659,15 +662,28 @@ struct
       - 3) using [Match.Pos.fold_shallow], to recurse on subterms
          at depth 1. *)
   let fold_bad_occs
-      (get_bad_occs     : f_fold_occs)
-      ~(fv              : Vars.vars)
-      ((occtype,trctxt) : expand_info)
-      (t                : Term.term) 
+      (get_bad_occs     : f_fold_occs)         (* bad occurrence function *)
+      ~(fv              : Vars.vars)           (* initial free variables *)
+      (hyps             : TraceHyps.hyps)      (* initial hypotheses *)
+      ((occtype,trctxt) : expand_info)         (* initial trace context *)
+      (t                : Term.term)           (* initial term *)
     : simple_occs
     =
+    let table = trctxt.table in
+
     (* instantiation of [get_bad_occs] on its continuation *)
     let rec get (pi : pos_info) (t : Term.term) : simple_occs =
       let se = SE.to_arbitrary pi.pi_trctxt.system in
+
+      (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
+       Must be synchronized with corresponding code in [Iter.fold_macro_support]. *)
+      let t =
+        let param = Reduction.rp_crypto in
+        (* FIXME: add tag information in [pos_info] *)
+        let vars = Vars.of_list (Vars.Tag.local_vars pi.pi_vars) in
+        let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
+        Reduction.whnf_term st t
+      in
 
       (* recursing continuation of [get_bad_occs] for cases it does
          not handle *)
@@ -718,12 +734,13 @@ struct
       computes the list of all occurrences in the list of source terms.
       Relies on [fold_macro_support] to look through all macros in the term. *)
   let find_all_occurrences
-      ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
-      ?(pp_ns : unit Fmt.t option = None)
+      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
+      ?(pp_ns       : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
-      (contx   : Constr.trace_cntxt)
-      (env     : Env.t)
-      (sources : Term.terms) 
+      (hyps         : TraceHyps.hyps)
+      (contx        : Constr.trace_cntxt)
+      (env          : Env.t)
+      (sources      : Term.terms) 
     : ext_occs
     =
     let find_occs = fold_bad_occs get_bad_occs in
@@ -746,7 +763,7 @@ struct
            (* timestamps occurring in t *)
            let ts = get_macro_actions contx [t] in
            (* name occurrences in t *)
-           let occs = find_occs ~fv:[] (EI_direct, contx) t in
+           let occs = find_occs ~fv:[] hyps (EI_direct, contx) t in
            (* add the info to the occurrences *)
            let occs = 
              List.map
@@ -787,7 +804,7 @@ struct
           let ts = get_macro_actions contx src in
           (* indirect occurrences in iocc *)
           let occs =
-            find_occs ~fv:(Vars.Sv.elements sfv) (EI_indirect a, contx) t
+            find_occs ~fv:(Vars.Sv.elements sfv) hyps (EI_indirect a, contx) t
           in
           (* add the info *)
           let occs = 
@@ -801,7 +818,7 @@ struct
               occs
           in
           ind_occs @ occs)
-        contx env sources []
+        contx env hyps sources []
     in
 
     (* printing *)
