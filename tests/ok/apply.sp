@@ -426,3 +426,14 @@ Proof.
   (have H0 := H _; 1: apply foo1); clear H.
   assumption H0.
 Qed.
+
+(* ========================================================= *)
+global axiom foog t : [happens(t)] -> equiv(t).
+
+(* `apply`, in a forward style *)
+global lemma _ t : [happens(t)] -> equiv(t).
+Proof.
+  intro H.
+  apply foog in H.
+  assumption H.
+Qed.

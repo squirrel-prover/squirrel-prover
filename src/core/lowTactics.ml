@@ -1809,9 +1809,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let system = S.system s in
         let match_res = (* case analysis on the pattern and hypothesis kinds *)
           match S.hyp_kind, hconcl, fprem with
-          | Local_t, _, _ ->
+          | Global_t, _, _ ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+            Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
               
           | Any_t, Local hconcl, Local fprem ->
             let pat = { pat with pat_op_term = fprem } in
@@ -1827,7 +1827,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           | Any_t, Local _, Global _ ->
             soft_failure ~loc (Failure "cannot match a global lemma in a local hypothesis")
 
-          | Global_t, _, _ -> assert false (* cannot happen *)
+          | Local_t, _, _ -> assert false (* cannot happen *)
         in
 
         (* Check that [hconcl] entails [pat]. *)
