@@ -258,8 +258,8 @@ let get_deepest_table (st:state) : Symbols.table =
     let goal = get_first_subgoal st
     in
     begin match goal with
-      | Trace j -> (LowTraceSequent.env j).table
-      | Equiv j -> (LowEquivSequent.env j).table
+      | Goal.Local  j -> (LowTraceSequent.env j).table
+      | Goal.Global j -> (LowEquivSequent.env j).table
     end
   | _ -> get_table st
   end
@@ -392,8 +392,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
       let goal = get_first_subgoal st
       in
       begin match goal with
-        | Trace j -> LowTraceSequent.env j
-        | Equiv j -> LowEquivSequent.env j
+        | Goal.Local  j -> LowTraceSequent.env j
+        | Goal.Global j -> LowEquivSequent.env j
       end
     | _ -> 
       begin match q with 

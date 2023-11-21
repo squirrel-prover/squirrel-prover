@@ -3230,13 +3230,13 @@ module E = struct
 
   (*------------------------------------------------------------------*)
   (** Unifies two [Equiv.form] *)
-  let rec e_unif
+  let rec unif_global
       ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state) : Mvar.t 
     =
     match t, pat with
     | Impl (t1, t2), Impl (pat1, pat2) ->
-      let mv = e_unif ~mode:(flip mode) t1 pat1 st in
-      e_unif ~mode t2 pat2 { st with mv }
+      let mv = unif_global ~mode:(flip mode) t1 pat1 st in
+      unif_global ~mode t2 pat2 { st with mv }
 
     | Atom (Reach t), Atom (Reach pat) ->
       (* no need to change the system, we already have the correct context *)
@@ -3276,7 +3276,7 @@ module E = struct
       let s, s', st = unif_tagged_bnds es es' st in
       let t  = Equiv.subst s  t  in
       let t' = Equiv.subst s' t' in
-      e_unif ~mode t t' st
+      unif_global ~mode t t' st
 
     | _ -> no_unif ()
 
@@ -3291,7 +3291,7 @@ module E = struct
     =
     unif_gen
        Equiv.Global_t `Match
-       e_unif
+       unif_global
 
       (* repeat arguments, wrapping [t1] in a pattern *)
       ?option ?mv ?env ?ty_env ?hyps ?expand_context table system

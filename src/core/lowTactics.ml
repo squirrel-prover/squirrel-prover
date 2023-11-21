@@ -2237,7 +2237,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let f_conc =
           Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:ES.conc_kind
         in
-        Goal.Equiv (ES.set_goal f_conc es)
+        Goal.Global (ES.set_goal f_conc es)
     in
 
     (* add [f] as an hypothesis *)
@@ -2377,7 +2377,7 @@ type 'a efun = ES.t -> 'a
   * (user-level failure when the goal is not a trace sequent). *)
 let genfun_of_tfun (t : 'a tfun) : 'a genfun = fun s ->
   match s with
-  | Goal.Trace s -> t s
+  | Goal.Local s -> t s
   | _ -> soft_failure (Tactics.Failure "local sequent expected")
 
 (** As [genfun_of_tfun], but with an extra argument. *)
@@ -2387,7 +2387,7 @@ let genfun_of_tfun_arg
     (s : Goal.t) : 'a
   =
   match s with
-  | Goal.Trace s -> t arg s
+  | Goal.Local s -> t arg s
   | _ -> soft_failure (Tactics.Failure "local sequent expected")
 
 (*------------------------------------------------------------------*)
@@ -2395,7 +2395,7 @@ let genfun_of_tfun_arg
   * (user-level failure when the goal is not an equivalence sequent). *)
 let genfun_of_efun (t : 'a efun) : 'a genfun = fun s ->
   match s with
-  | Goal.Equiv s -> t s
+  | Goal.Global s -> t s
   | _ -> soft_failure (Tactics.Failure "global sequent expected")
 
 (** As [genfun_of_efun], but with an extra argument. *)
@@ -2405,14 +2405,14 @@ let genfun_of_efun_arg
     (s : Goal.t) : 'a
   =
   match s with
-  | Goal.Equiv s -> t arg s
+  | Goal.Global s -> t arg s
   | _ -> soft_failure (Tactics.Failure "global sequent expected")
 
 (*------------------------------------------------------------------*)
 let genfun_of_any_fun (tt : 'a tfun) (et : 'a efun) : 'a genfun = fun s ->
   match s with
-  | Goal.Trace s -> tt s
-  | Goal.Equiv s -> et s
+  | Goal.Local  s -> tt s
+  | Goal.Global s -> et s
 
 let genfun_of_any_fun_arg
     (tt : 'b -> 'a tfun)
@@ -2421,8 +2421,8 @@ let genfun_of_any_fun_arg
     (s : Goal.t) : 'a
   =
   match s with
-  | Goal.Trace s -> tt arg s
-  | Goal.Equiv s -> et arg s
+  | Goal.Local  s -> tt arg s
+  | Goal.Global s -> et arg s
 
 (*------------------------------------------------------------------*)
 (** Function expecting and returning trace sequents. *)
@@ -2433,7 +2433,7 @@ let genfun_of_pure_tfun
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_tfun t s in
-  List.map (fun s -> Goal.Trace s) res
+  List.map (fun s -> Goal.Local s) res
 
 let genfun_of_pure_tfun_arg
     (t : 'a -> pure_tfun)
@@ -2441,7 +2441,7 @@ let genfun_of_pure_tfun_arg
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_tfun_arg t arg s in
-  List.map (fun s -> Goal.Trace s) res
+  List.map (fun s -> Goal.Local s) res
 
 (*------------------------------------------------------------------*)
 (** Function expecting and returning equivalence sequents. *)
@@ -2452,7 +2452,7 @@ let genfun_of_pure_efun
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_efun t s in
-  List.map (fun s -> Goal.Equiv s) res
+  List.map (fun s -> Goal.Global s) res
 
 let genfun_of_pure_efun_arg
     (t : 'a -> pure_efun)
@@ -2460,7 +2460,7 @@ let genfun_of_pure_efun_arg
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_efun_arg t arg s in
-  List.map (fun s -> Goal.Equiv s) res
+  List.map (fun s -> Goal.Global s) res
 
 (*------------------------------------------------------------------*)
 let genfun_of_any_pure_fun
@@ -2469,8 +2469,8 @@ let genfun_of_any_pure_fun
   =
   fun s ->
   match s with
-  | Goal.Trace s -> List.map (fun s -> Goal.Trace s) (tt s)
-  | Goal.Equiv s -> List.map (fun s -> Goal.Equiv s) (et s)
+  | Goal.Local  s -> List.map (fun s -> Goal.Local  s) (tt s)
+  | Goal.Global s -> List.map (fun s -> Goal.Global s) (et s)
 
 let genfun_of_any_pure_fun_arg
     (tt : 'a -> pure_tfun)
@@ -2479,8 +2479,8 @@ let genfun_of_any_pure_fun_arg
     (s : Goal.t) : Goal.t list
   =
   match s with
-  | Goal.Trace s -> List.map (fun s -> Goal.Trace s) (tt arg s)
-  | Goal.Equiv s -> List.map (fun s -> Goal.Equiv s) (et arg s)
+  | Goal.Local  s -> List.map (fun s -> Goal.Local  s) (tt arg s)
+  | Goal.Global s -> List.map (fun s -> Goal.Global s) (et arg s)
 
 (*------------------------------------------------------------------*)
 (** General tactic *)
@@ -2496,14 +2496,14 @@ type etac = ES.t Tactics.tac
 (** Lift a [ttac] to a [gentac]. *)
 let gentac_of_ttac (t : ttac) : gentac = fun s sk fk ->
   let t' s sk fk =
-    t s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+    t s (fun l fk -> sk (List.map (fun s -> Goal.Local s) l) fk) fk
   in
   genfun_of_tfun t' s sk fk
 
 (** As [gentac_of_etac], but with an extra arguments. *)
 let gentac_of_ttac_arg (t : 'a -> ttac) (a : 'a) : gentac = fun s sk fk ->
   let t' s sk fk =
-    t a s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+    t a s (fun l fk -> sk (List.map (fun s -> Goal.Local s) l) fk) fk
   in
   genfun_of_tfun t' s sk fk
 
@@ -2511,25 +2511,25 @@ let gentac_of_ttac_arg (t : 'a -> ttac) (a : 'a) : gentac = fun s sk fk ->
 (** Lift an [etac] to a [gentac]. *)
 let gentac_of_etac (t : etac) : gentac = fun s sk fk ->
   let t' s sk fk =
-    t s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+    t s (fun l fk -> sk (List.map (fun s -> Goal.Global s) l) fk) fk
   in
   genfun_of_efun t' s sk fk
 
 (** As [gentac_of_etac], but with an extra arguments. *)
 let gentac_of_etac_arg (t : 'a -> etac) (a : 'a) : gentac = fun s sk fk ->
   let t' s sk fk =
-    t a s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+    t a s (fun l fk -> sk (List.map (fun s -> Goal.Global s) l) fk) fk
   in
   genfun_of_efun t' s sk fk
 
 (*------------------------------------------------------------------*)
 let gentac_of_any_tac (tt : ttac) (et : etac) : gentac = fun s sk fk ->
   match s with
-  | Goal.Trace s ->
-    tt s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+  | Goal.Local s ->
+    tt s (fun l fk -> sk (List.map (fun s -> Goal.Local s) l) fk) fk
 
-  | Goal.Equiv s ->
-    et s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+  | Goal.Global s ->
+    et s (fun l fk -> sk (List.map (fun s -> Goal.Global s) l) fk) fk
 
 let gentac_of_any_tac_arg
     (tt : 'a -> ttac)
@@ -2538,11 +2538,11 @@ let gentac_of_any_tac_arg
   =
   fun s sk fk ->
   match s with
-  | Goal.Trace s ->
-    tt arg s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+  | Goal.Local s ->
+    tt arg s (fun l fk -> sk (List.map (fun s -> Goal.Local s) l) fk) fk
 
-  | Goal.Equiv s ->
-    et arg s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+  | Goal.Global s ->
+    et arg s (fun l fk -> sk (List.map (fun s -> Goal.Global s) l) fk) fk
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -2649,22 +2649,22 @@ let do_intro_pat (ip : Args.simpl_pat) : Goal.t -> Goal.t list =
 (* lifting to [Goal.t] *)
 let do_intro (s : Goal.t) : ip_handler * Goal.t =
   match s with
-  | Goal.Trace s ->
+  | Goal.Local s ->
     let handler, s = TraceLT.do_intro s in
-    handler, Goal.Trace s
-  | Goal.Equiv s ->
+    handler, Goal.Local s
+  | Goal.Global s ->
     let handler, s = EquivLT.do_intro s in
-    handler, Goal.Equiv s
+    handler, Goal.Global s
 
 (* lifting to [Goal.t] *)
 let do_intro_var (s : Goal.t) : ip_handler * Goal.t =
   match s with
-  | Goal.Trace s ->
+  | Goal.Local s ->
     let handler, s = TraceLT.do_intro_var s in
-    handler, Goal.Trace s
-  | Goal.Equiv s ->
+    handler, Goal.Local s
+  | Goal.Global s ->
     let handler, s = EquivLT.do_intro_var s in
-    handler, Goal.Equiv s
+    handler, Goal.Global s
 
 (* lifting to [Goal.t] *)
 let do_naming_pat
@@ -2764,10 +2764,10 @@ let () =
         begin
           fun s sk fk ->
             match s with
-            | Goal.Trace _ -> bad_args ()
-            | Goal.Equiv s ->
+            | Goal.Local _ -> bad_args ()
+            | Goal.Global s ->
               let e = ES.change_felem ~loc:(L.loc i) (L.unloc i) [] s in
-              sk [Goal.Equiv e] fk
+              sk [Goal.Global e] fk
         end
       | _ -> bad_args ())
 
@@ -3057,8 +3057,8 @@ let have_tac (simpl : f_simpl) args (s : Goal.t) : Goal.t list =
     (* core tactic application *)
     let s : Goal.t list =
       match s with
-      | Goal.Trace s -> TraceLT.do_have ip0 arg s
-      | Goal.Equiv s -> EquivLT.do_have ip0 arg s
+      | Goal.Local  s -> TraceLT.do_have ip0 arg s
+      | Goal.Global s -> EquivLT.do_have ip0 arg s
     in
 
     (* apply [s_items] after the core tactic application *)

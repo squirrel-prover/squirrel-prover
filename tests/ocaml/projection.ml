@@ -36,8 +36,8 @@ let tests =
       let subgoals = Prover.get_subgoals st in
       assert (List.length subgoals = 2);
       match List.hd subgoals with
-      | Equiv _ -> assert false
-      | Trace s ->
+      | Goal.Global _ -> assert false
+      | Goal.Local s ->
           Alcotest.check any_form
             "global hypothesis should be projected"
             (Global (Atom (Reach (formula_of_string st "p"))))

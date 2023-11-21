@@ -56,8 +56,8 @@ end = struct
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp  ppf (LowTraceSequent.goal j)
-    | Goal.Equiv j -> Equiv.pp ppf (LowEquivSequent.goal j)
+    | Goal.Local  j -> Term.pp  ppf (LowTraceSequent.goal j)
+    | Goal.Global j -> Equiv.pp ppf (LowEquivSequent.goal j)
 end
 (* }↑} *)
 
@@ -122,9 +122,9 @@ let register_general id ~tactic_help ?(pq_sound=false) f =
 let convert_args j parser_args tactic_type =
   let env, conc =
     match j with
-    | Goal.Trace t -> LowTraceSequent.env t, Equiv.Local (LowTraceSequent.goal t)
+    | Goal.Local t -> LowTraceSequent.env t, Equiv.Local (LowTraceSequent.goal t)
 
-    | Goal.Equiv e -> 
+    | Goal.Global e -> 
       LowEquivSequent.env e, Equiv.Global (LowEquivSequent.goal e)
   in
   HighTacticsArgs.convert_args env parser_args tactic_type conc

@@ -46,8 +46,8 @@ let find_in_sys_from_string s st =
         | Some (UnprovedLemma (_, g)) -> g
       in
       begin match goal with
-        | Trace j -> LowTraceSequent.env j
-        | Equiv j -> LowEquivSequent.env j
+        | Goal.Local  j -> LowTraceSequent.env j
+        | Goal.Global j -> LowEquivSequent.env j
       end
     | _ -> assert false
     end

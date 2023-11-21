@@ -54,7 +54,7 @@ let check_goal_is_equiv = ES.check_goal_is_equiv
 (** Build the sequent showing that a timestamp happens. *)
 let[@warning "-32"] happens_premise (s : ES.t) (a : Term.term) =
   let s = ES.(to_trace_sequent (set_reach_goal (Term.mk_happens a) s)) in
-  Goal.Trace s
+  Goal.Local s
 
 (*------------------------------------------------------------------*)
 let check_no_macro_or_var (env : Env.t) ~refl_system (t : Term.term) =
@@ -132,7 +132,7 @@ let sym_tac (s : ES.t) : Goal.t list =
     SE.make_pair (snd (SE.snd old_pair)) (snd (SE.fst old_pair)) in
   let new_context = { old_context with pair = Some new_pair } in
   let diff l r = Term.combine [l_proj,l; r_proj,r] in
-  [ Goal.Equiv
+  [ Goal.Global
       (ES.set_goal_in_context
          new_context
          (Atom (Equiv (List.map2 diff equiv_right equiv_left)))
@@ -208,7 +208,7 @@ let transitivity_systems new_context s =
   in
   let s2 = ES.set_goal_in_context new_context (ES.goal s) s in
 
-  [Goal.Equiv s1;Goal.Equiv s2;Goal.Equiv s3]
+  [Goal.Global s1;Goal.Global s2;Goal.Global s3]
 
 (* Term transitivity, on the right:
    u ~_{L,R} w -> 
@@ -270,7 +270,7 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
   let goal2 = ES.set_goal_in_context context2 (Atom (Equiv equiv2)) s in
 
 
-  [Goal.Equiv goal1; Goal.Equiv goal2 ]
+  [Goal.Global goal1; Goal.Global goal2 ]
           
 
 let trans_tac args s =
@@ -411,7 +411,7 @@ let do_assumption_tac args s : ES.t list =
 let assumption_tac args = wrap_fail (do_assumption_tac args)
 
 (*------------------------------------------------------------------*)
-let byequiv s = Goal.Trace (ES.to_trace_sequent s)
+let byequiv s = Goal.Local (ES.to_trace_sequent s)
 
 let byequiv_tac s = [byequiv s]
 
@@ -523,8 +523,8 @@ let generalize (ts : Term.term) (s : ES.t) : (ES.t -> ES.t) * ES.t =
         Args.(Simpl (SNamed ip))
       ) togen
     in
-    match LT.do_intros_ip simpl_ident ips (Goal.Equiv s) with
-    | [Goal.Equiv s] -> s
+    match LT.do_intros_ip simpl_ident ips (Goal.Global s) with
+    | [Goal.Global s] -> s
     | _ -> assert false
   in
 
@@ -1215,20 +1215,20 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
   let rec auto_rec s sk fk =
     let open Tactics in
     match s with
-    | Goal.Trace t ->
-      let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
+    | Goal.Local t ->
+      let sk l fk = sk (List.map (fun s -> Goal.Local s) l) fk in
       TraceTactics.simpl ~red_param ~close ~strong ~auto_intro t sk fk
 
-    | Goal.Equiv s when goal_is_reach s ->
+    | Goal.Global s when goal_is_reach s ->
       auto_rec (byequiv s) sk fk
 
-    | Goal.Equiv s ->
+    | Goal.Global s ->
       let sk l _ =
-        sk (List.map (fun s -> Goal.Equiv s) l) fk
+        sk (List.map (fun s -> Goal.Global s) l) fk
       and fk _ =
         if close
         then fk (None, GoalNotClosed)
-        else sk [Equiv s] fk
+        else sk [Goal.Global s] fk
       in
       (* old school fadup, simplifying the goal *)
       let wfadup s sk fk =
@@ -1372,7 +1372,7 @@ let global_diff_eq (s : ES.t) =
           Term.project1 p2
             (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
-        Goal.Equiv
+        Goal.Global
           (ES.set_goal
              (* TODO: we assume that the variables are global and constant. 
                 It is not clear that this is correct: check this when the tactic 
@@ -1501,11 +1501,11 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
         (Term.mk_atom `Eq t seq_term)
     in
     let trace_s = ES.to_trace_sequent (ES.set_reach_goal form s) in
-    Goal.Trace trace_s
+    Goal.Local trace_s
   in
 
   let frame = List.rev_append before after in
-  [subgoal; Goal.Equiv (ES.set_equiv_goal frame s)]
+  [subgoal; Goal.Global (ES.set_equiv_goal frame s)]
 
 let mem_seq_args args s : Goal.t list =
   match args with
@@ -1589,9 +1589,9 @@ let const_seq
   let terms = List.map snd b_t_terms in
   let frame = List.rev_append before (terms @ after) in
 
-  [ Goal.Trace subg1;
-    Goal.Trace subg2;
-    Goal.Equiv (ES.set_equiv_goal frame s) ]
+  [ Goal.Local subg1;
+    Goal.Local subg2;
+    Goal.Global (ES.set_equiv_goal frame s) ]
 
 let const_seq_args args s : Goal.t list =
   match args with
@@ -1738,8 +1738,8 @@ let enckp arg (s : ES.t) =
     in
     let biframe = (List.rev_append before (new_elem @ after)) in
 
-    [Goal.Trace fresh_goal;
-     Goal.Equiv (ES.set_equiv_goal biframe s)]
+    [Goal.Local fresh_goal;
+     Goal.Global (ES.set_equiv_goal biframe s)]
 
   in
 

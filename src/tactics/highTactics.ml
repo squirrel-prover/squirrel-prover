@@ -135,24 +135,24 @@ let tac_autosimpl args s sk fk =
     | _ -> hard_failure (Tactics.Failure "no argument allowed")
   in
   match s with
-  | Goal.Trace s ->
+  | Goal.Local s ->
     let sk l fk =
-      sk (List.map (fun s -> Goal.Trace s) l) fk
+      sk (List.map (fun s -> Goal.Local s) l) fk
     in
     TraceTactics.trace_autosimpl s sk fk
-  | Goal.Equiv _ -> EquivTactics.equiv_autosimpl s sk fk
+  | Goal.Global _ -> EquivTactics.equiv_autosimpl s sk fk
 
 (*------------------------------------------------------------------*)
 (* [auto] and [simpl] *)
 let auto : LowTactics.f_simpl =
   fun ~red_param ~strong ~close s sk fk -> 
   match s with
-  | Goal.Trace s ->
+  | Goal.Local s ->
     let sk l fk =
-      sk (List.map (fun s -> Goal.Trace s) l) fk
+      sk (List.map (fun s -> Goal.Local s) l) fk
     in
     TraceTactics.trace_auto ~red_param ~close ~strong s sk fk
-  | Goal.Equiv _ -> EquivTactics.equiv_auto ~red_param ~close ~strong s sk fk
+  | Goal.Global _ -> EquivTactics.equiv_auto ~red_param ~close ~strong s sk fk
 
 let tac_auto (args : 'a list) ~(strong:bool) ~(close:bool) : Goal.t Tactics.tac =
   fun s sk fk -> 

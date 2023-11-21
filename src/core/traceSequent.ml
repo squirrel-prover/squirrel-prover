@@ -11,7 +11,7 @@ include LowTraceSequent
 include Sequent.Mk(struct
     module S = LowTraceSequent
 
-    let to_general_sequent s = Goal.Trace s
+    let to_general_sequent s = Goal.Local s
         
     let to_global_sequent  s =
       (* The new system of the global sequent. If no system is provided for `pair`,

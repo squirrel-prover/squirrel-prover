@@ -6,7 +6,7 @@ module ES = LowEquivSequent
 (*------------------------------------------------------------------*)
 (** A goal (in the sense of proof obligation)
     consists of one of our two kinds of sequents. *)
-type t = Trace of TS.t | Equiv of ES.t
+type t = Local of TS.t | Global of ES.t
 
 (*------------------------------------------------------------------*)
 val pp : Format.formatter -> t -> unit

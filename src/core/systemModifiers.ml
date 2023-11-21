@@ -1430,7 +1430,7 @@ let global_rewrite
     clone_system_map table old_single_system sdecl.Decl.name fmap
   in 
 
-  let subgs = List.map (fun s -> Goal.Trace s) !subgs in
+  let subgs = List.map (fun s -> Goal.Local s) !subgs in
   None, subgs, table
 
 

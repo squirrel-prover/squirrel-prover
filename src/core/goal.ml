@@ -12,44 +12,44 @@ module Sv = Vars.Sv
 (*------------------------------------------------------------------*)
 (** {2 Goals} *)
 
-type t = Trace of TS.t | Equiv of ES.t
+type t = Local of TS.t | Global of ES.t
 
 let vars = function
-  | Trace j -> TS.vars j
-  | Equiv j -> ES.vars j
+  | Local  j -> TS.vars j
+  | Global j -> ES.vars j
 
 let system = function
-  | Trace j -> TS.system j
-  | Equiv j -> ES.system j
+  | Local  j -> TS.system j
+  | Global j -> ES.system j
 
 let table = function
-  | Trace j -> TS.table j
-  | Equiv j -> ES.table j
+  | Local  j -> TS.table j
+  | Global j -> ES.table j
 
 (*------------------------------------------------------------------*)
 (* when printing, we run some well-formedness checks on the sequents *)
 let pp ch = function
-  | Trace j -> TS.sanity_check j; TS.pp ch j
-  | Equiv j -> ES.sanity_check j; ES.pp ch j
+  | Local  j -> TS.sanity_check j; TS.pp ch j
+  | Global j -> ES.sanity_check j; ES.pp ch j
 
 let pp_init ch = function
-  | Trace j -> Term.pp ch (TS.goal j)
-  | Equiv j -> ES.pp_init ch j
+  | Local  j -> Term.pp ch (TS.goal j)
+  | Global j -> ES.pp_init ch j
 
 (*------------------------------------------------------------------*)
 let map ft fe = function
-  | Trace t -> Trace (ft t)
-  | Equiv e -> Equiv (fe e)
+  | Local  t -> Local  (ft t)
+  | Global e -> Global (fe e)
 
 let map_list ft fe = function
-  | Trace s ->
-    List.map (fun s -> Trace s) (ft s)
-  | Equiv s ->
-    List.map (fun s -> Equiv s) (fe s)
+  | Local  s ->
+    List.map (fun s -> Local  s) (ft s)
+  | Global s ->
+    List.map (fun s -> Global s) (fe s)
 
 let bind ft fe = function
-  | Trace t -> ft t
-  | Equiv e -> fe e
+  | Local  t -> ft t
+  | Global e -> fe e
 
 (*------------------------------------------------------------------*)
 type ('a,'b) abstract_statement = {
@@ -83,12 +83,12 @@ let pp_statement fmt (g : statement) : unit =
 let is_local_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
   match stmt.formula with
   | Global _ -> false
-  | Local _ -> true
+  | Local  _ -> true
 
 let is_global_statement stmt : bool =
   match stmt.formula with
   | Equiv.Global _ -> true
-  | Equiv.Local _ -> false
+  | Equiv.Local  _ -> false
 
 let to_local_statement ?loc stmt =
   { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Local_t stmt.formula }
@@ -150,7 +150,7 @@ let make_obs_equiv ?(enrich=[]) table system =
   
   Equiv.Global
     (Equiv.Smart.mk_forall_tagged [ts, ts_tag] (Equiv.(Impl (hyp,goal)))),
-  Equiv s
+  Global s
 
 
 (*------------------------------------------------------------------*)
@@ -169,7 +169,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let env, vs =
     let var_tag =
       match formula with
-      | Local _ -> Vars.Tag.make Vars.Local
+      | Local  _ -> Vars.Tag.make Vars.Local
       | Global _ | Obs_equiv -> Vars.Tag.gtag
     in
     Theory.convert_bnds_tagged ~ty_env ~mode:(DefaultTag var_tag) env vars
@@ -210,13 +210,13 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
                vs_glob
                (Equiv.Atom (Equiv.Reach (Term.mk_forall_tagged vs_loc f))))
       in
-      formula, Trace s
+      formula, Local s
 
     | Global f ->
       let f = Theory.convert_global_formula ~ty_env conv_env f in
       let s = ES.init ~no_sanity_check:true ~env f in
       let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
-      formula, Equiv s
+      formula, Global s
 
     | Obs_equiv ->
       assert (vs = [] && ty_vars = []) ;
