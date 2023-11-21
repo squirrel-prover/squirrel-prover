@@ -850,11 +850,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Global _ -> None
 
   (*------------------------------------------------------------------*)
-  (* Similar to [mk_destr], but with a dependent return type and
-     two different destruct functions. *)
+  (** Similar to [mk_destr], but with a dependent return type and
+      two different destruct functions. *)
   let mk_destr_k (type a)
       (destr_t0 : Term.term  -> (Term.term  * Term.term ) option)
-      (destr_e  : Equiv.form -> (Equiv.form * Equiv.form) option)
+      (destr_e0 : Equiv.form -> (Equiv.form * Equiv.form) option)
       ?(se : SE.arbitrary option)
       (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (a * a) option
@@ -868,6 +868,16 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           None               (* did not reduce, failed *)
         else
           destr_t x          (* reduced, recurse to try again *)
+    in
+    let rec destr_e (x : Equiv.form) =
+      match destr_e0 x with
+      | Some _ as res -> res
+      | None ->
+        let x, has_red = reduce_head1_global (to_state ?se rp_full s) x in
+        if not has_red then 
+          None               (* did not reduce, failed *)
+        else
+          destr_e x          (* reduced, recurse to try again *)
     in
 
     match k with
