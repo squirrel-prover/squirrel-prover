@@ -1350,17 +1350,22 @@ let reduce_beta1 (t : Term.term) : Term.term * bool =
 (*------------------------------------------------------------------*)
 (* let reduction *)
 
-let reduce_glet1 (f : Equiv.form) : Equiv.form * bool =
-  match f with
-  | Equiv.Let (v,t0,f) -> Equiv.subst [Term.ESubst (Term.mk_var v, t0)] f, true
-  | _ -> f, false
+let can_reduce_glob_let (t : Equiv.form) : bool =
+  match t with
+  | Equiv.Let _ -> true
+  | _ -> false
+
+let reduce_glob_let1 (t : Equiv.form) : Equiv.form * bool =
+  match t with
+  | Equiv.Let (v,t1,t2) -> Equiv.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
+  | _ -> t, false
 
 (*------------------------------------------------------------------*)
 (** {3 Higher-level reduction utility} *)
 
-  (* Reduce once at head position.
-     Only use the following reduction rules:
-       [δ, β, proj, let ] *)
+(** Reduce once at head position.
+    Only use the following reduction rules:
+    [δ, β, proj, zeta] *)
 let reduce_head1
     ?delta
     ~(mode : Macros.expand_context)
@@ -1386,6 +1391,17 @@ let reduce_head1
       t, true
 
     | _ -> t, false
+
+(** Reduce once at head position in a global formula.
+    Only use the following reduction rules:
+    [zeta] *)
+let reduce_glob_head1 (f : Equiv.form) : Equiv.form * bool = 
+  match f with
+  | _ when can_reduce_glob_let f ->
+    let f, _ = reduce_glob_let1 f in
+    f, true
+
+  | _ -> f, false
 
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
@@ -3278,7 +3294,21 @@ module E = struct
       let t' = Equiv.subst s' t' in
       unif_global ~mode t t' st
 
-    | _ -> no_unif ()
+    | _, _ -> try_reduce_glob_head1 ~mode t pat st
+
+  (* try to reduce one step at head position in [t] or [pat], 
+     and resume matching *)
+  and try_reduce_glob_head1
+      ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state) : Mvar.t 
+    =
+    let t, has_red = reduce_glob_head1 t in
+    if has_red then 
+      unif_global ~mode t pat st
+    else
+      let pat, has_red = reduce_glob_head1 pat in
+      if has_red then
+        unif_global ~mode t pat st
+      else no_unif ()
 
   (*------------------------------------------------------------------*)
   (** Exported. *)

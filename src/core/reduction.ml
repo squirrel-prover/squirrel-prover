@@ -377,7 +377,7 @@ let rec reduce_term (st : state) (t : Term.term) : Term.term * bool =
 
 (** Reduce once at head position.
     May use all reduction rules:
-     [δ, user rewriting rules, β, proj, let, constr ] *)
+     [δ, user rewriting rules, β, proj, zeta, constr ] *)
 and reduce_head1_term (st : state) (t : Term.term) : Term.term * bool = 
   let rec try_red red_funcs =
     match red_funcs with
@@ -391,7 +391,7 @@ and reduce_head1_term (st : state) (t : Term.term) : Term.term * bool =
            rewrite_head_once st;     (* user rewriting rules *)
            reduce_beta1      st;     (* β *)
            reduce_proj1      st;     (* proj *)
-           reduce_let1       st;     (* let *)
+           reduce_let1       st;     (* zeta *)
            reduce_constr1    st; ]   (* constr *)
 
 and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
@@ -581,6 +581,29 @@ let rec whnf_term (st : state) (t : Term.term) : Term.term =
   if has_red then whnf_term st t else t
 
 (*------------------------------------------------------------------*)
+(** {2 Global formula reduction} *)
+
+(*------------------------------------------------------------------*)
+let reduce_glob_let1 (st : state) (t : Equiv.form) : Equiv.form * bool =
+  if not st.param.zeta then t, false
+  else Match.reduce_glob_let1 t
+
+(*------------------------------------------------------------------*)
+(** Reduce once at head position in a global formula.
+    May use all reduction rules:
+     [zeta ] *)
+let reduce_head1_global (st : state) (t : Equiv.form) : Equiv.form * bool = 
+  let rec try_red red_funcs =
+    match red_funcs with
+    | [] -> t, false
+    | red_f :: red_funcs ->
+      let t, has_red = red_f t in
+      if has_red then t, true
+      else try_red red_funcs
+  in
+  try_red [reduce_glob_let1 st; ]     (* zeta *)
+    
+(*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)
 
 (*------------------------------------------------------------------*)
@@ -683,15 +706,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let se = omap (fun system -> system.SE.set) system in
     let st = to_state ?expand_context ?se param s in
     match k with
-    | Local_t  -> reduce_head1_term st x
-    | Global_t -> x, false
+    | Local_t  -> reduce_head1_term   st x
+    | Global_t -> reduce_head1_global st x
     | Any_t ->
       match x with
       | Local  x -> 
         let x, has_red = reduce_head1_term st x in
         Local x, has_red
 
-      | Global _ -> x, false
+      | Global x -> 
+        let x, has_red = reduce_head1_global st x in
+        Global x, has_red
 
   (*------------------------------------------------------------------*)
   (** Exported. *)
@@ -719,7 +744,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       | Equiv.Let (v,t,f) ->
         if param.zeta then
-          let e, _ = Match.reduce_glet1 e in
+          let e, _ = Match.reduce_glob_let1 e in
           reduce_g vars e
         else
           begin
@@ -852,7 +877,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Global_t -> destr_e x
     | Any_t ->
       match x with
-      | Local x  -> omap (fun (a,b) -> Equiv.Local  a, Equiv.Local  b) (destr_t x)
+      | Local  x -> omap (fun (a,b) -> Equiv.Local  a, Equiv.Local  b) (destr_t x)
       | Global x -> omap (fun (a,b) -> Equiv.Global a, Equiv.Global b) (destr_e x)
 
   (*------------------------------------------------------------------*)

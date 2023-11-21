@@ -857,10 +857,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 (** [fa s] handles some goals whose conclusion formula is of the form
-  * [C(u_1..u_N) = C(v_1..v_N)] and reduced them to the subgoals with
-  * conclusions [u_i=v_i]. We only implement it for the constructions
-  * [C] that congruence closure does not support: conditionals,
-  * sequences, etc. *)
+    [C(u_1..u_N) = C(v_1..v_N)] and reduced them to the subgoals with
+    conclusions [u_i=v_i]. We only implement it for the constructions
+    [C] that congruence closure does not support: conditionals,
+    sequences, etc. *)
 let fa s =
   let table = TS.table s in
 

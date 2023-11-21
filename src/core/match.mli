@@ -361,7 +361,8 @@ val reduce_beta1    : Term.term -> Term.term * bool
 (** {3 Global formulas reduction utilities} *)
 
 (** let reduction *)
-val reduce_glet1 : Equiv.form -> Equiv.form * bool
+val can_reduce_glob_let : Equiv.form -> bool
+val reduce_glob_let1    : Equiv.form -> Equiv.form * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Internals} *)

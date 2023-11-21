@@ -386,5 +386,32 @@ Proof.
   + auto.
 Qed.
 
+(*------------------------------------------------------------------*)
+global axiom ax : 
+  Let y = false in 
+  equiv(y).
 
+(* check that matching is modulo `let` reduction *)
+global lemma _ : 
+  equiv(false).
+Proof.
+  apply ax.
+Qed.
 
+(*------------------------------------------------------------------*)
+
+global axiom ax1 : 
+  Let y = false in 
+  ( Let x = true in
+    equiv(diff(x,false))       ) -> 
+  equiv(y).
+
+(* check that matching is modulo `let` reduction *)
+global lemma _ : 
+  equiv(diff(true,false)) ->
+  equiv(false).
+Proof.
+  intro H.
+  apply ax1.
+  apply H.
+Qed.
