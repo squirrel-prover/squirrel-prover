@@ -1315,14 +1315,19 @@ module Game = struct
         abstract_boolean state.env state.hyps state.env.table  
           {term =  Term.subst subst oracle_cond; conds =  List.map (Term.subst subst) term.conds } state.mem
       in
-      let _ = Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. under cond %a@.and subst @[%a@] @] @. "
-          (Fmt.option (Fmt.list Term.pp)) subgoals
-          oracle.name
-          Term.pp (Term.subst subst oracle_cond)
-          (Fmt.list Term.pp_dbg) (List.map (Term.subst subst) term.conds)
-         Term.pp_subst_dbg subst
+      (* let _ = *)
+      (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. under cond %a@.and subst @[%a@] @] @. " *)
+      (*     (Fmt.option (Fmt.list Term.pp)) subgoals *)
+      (*     oracle.name *)
+      (*     Term.pp (Term.subst subst oracle_cond) *)
+      (*     (Fmt.list Term.pp) (List.map (Term.subst subst) term.conds) *)
+      (*    Term.pp_subst subst *)
+      (* in *)
+      let mem =
+        update
+          state.env state.hyps mv subst
+          ( List.map (Term.subst subst) term.conds) oracle.updates state.mem
       in
-      let mem = update state.env state.hyps mv subst ( List.map (Term.subst subst) term.conds) oracle.updates state.mem in
       match subgoals with
       | Some subgoals ->
         assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
@@ -1442,9 +1447,9 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
   | _ -> None
 
 and bideduce1_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
-  Fmt.epr
-    "@[<2>Deduction of term@ %a@ in state@ %a.@]@."
-    CondTerm.pp_dbg output pp_state_dbg state;
+  (* Fmt.epr *)
+  (*   "@[<2>Deduction of term@ %a@ in state@ %a.@]@." *)
+  (*   CondTerm.pp output pp_state_dbg state; *)
   assert (AbstractSet.well_formed state.env state.mem);
 
   (* [output] trivially ptime-computable *)
@@ -1605,17 +1610,9 @@ and bideduce_fp ?loc
         let gen_consts = Const.generalize togen state.consts in (* final constraints [∀ x, C] *)
         let gen_subgoals = List.map (Term.mk_forall ~simpl:true togen) state.subgoals in
         Some (gen_post, gen_consts, gen_subgoals)
-      else begin
-        Format.eprintf "SUBSEQ FAILED (pre = gen_pos: %b, post = gen_post %b):\
-                        @.mem:@.%a@.post:@.%a@.gen_post:@.%a@.@."
-          (AbstractSet.is_eq env hyps pre  gen_post)
-          (AbstractSet.is_eq env hyps post gen_post)
-          AbstractSet.pp_mem_dbg pre
-          AbstractSet.pp_mem_dbg post
-          AbstractSet.pp_mem_dbg gen_post;
+      else
         let pre = AbstractSet.widening env hyps pre gen_post in
         compute_fp pre 
-      end
     | None ->
       let err_str =
         Fmt.str "@[<v 2>failed to apply the game:@;\
@@ -1968,7 +1965,7 @@ let prove
 
   let initial_consts, initial_name_args = parse_crypto_args env game args in
 
-  (*FIXME : initial_name_args are bidedcue with an empty C*)
+  (*FIXME : initial_name_args are bideduce with an empty C*)
   let init_state =
     { consts = []; env; mem = initial_mem; game; hyps; allow_oracle = true;
       inputs = [];
@@ -2009,18 +2006,17 @@ let prove
 
   let consts_subgs    = Const.to_subgoals game final_consts in
 
-  (* REM *)
-  Fmt.epr
+  Printer.pr
     "@[<2>Constraints are:@ @[<v 0>%a@]@."
     (Fmt.list ~sep:Fmt.cut Const.pp) final_consts;
-  Fmt.epr
-    "@[<2>Constraint subgoals are:@ @[<v 0>%a@]@]@."
+  Printer.pr
+    "@[<2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
     (Fmt.list ~sep:Fmt.cut Term.pp) consts_subgs;
-  Fmt.epr
+  Printer.pr
     "@[<2>Oracle subgoals are:@ %a@]@."
     (Fmt.list ~sep:Fmt.cut Term.pp)
     oracle_subgoals;
-  Fmt.epr "@[<2>Final memory is:@ %a@]@." AbstractSet.pp_mem final_mem;
+  Printer.pr "@[<2>Final memory is:@ %a@]@." AbstractSet.pp_mem final_mem;
 
   let cstate = Reduction.mk_cstate ~hyps ~system:env.system env.table in
   List.remove_duplicate (Reduction.conv cstate) (consts_subgs @ oracle_subgoals)
