@@ -823,8 +823,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Global x -> Global (reduce_global ?expand_context ?system param s x)
 
   (*------------------------------------------------------------------*)
-  (* Destruct [x] according to an arbitrary destruct function [destr_f], 
-     using [s] to reduce [x] if necessary. *)
+  (** Destruct [x] according to an arbitrary destruct function [destr_f], 
+      using [s] to reduce [x] if necessary. *)
   let mk_destr (type a)
       (destr_f : Term.term -> 'b option)
       ?(se : SE.arbitrary option)
@@ -841,15 +841,13 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         else
           destr_term x          (* reduced, recurse to try again *)
     in
-    let destr_equiv (x : Equiv.form) = obind destr_term (Equiv.destr_reach x) in
-
     match k with
     | Local_t  -> destr_term  x
-    | Global_t -> destr_equiv x
+    | Global_t -> None
     | Any_t ->
       match x with
-      | Local x  -> destr_term  x
-      | Global x -> destr_equiv x
+      | Local  x -> destr_term  x
+      | Global _ -> None
 
   (*------------------------------------------------------------------*)
   (* Similar to [mk_destr], but with a dependent return type and
