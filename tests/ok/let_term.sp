@@ -335,6 +335,20 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
+lemma [P0] _ :
+  let y = zero in 
+  let y = y    in
+  let y = y    in
+  y = zero.
+Proof.
+  intro y y1 y2. 
+  rewrite /y2 /y1 /y.
+  apply eq_refl.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* Test crypto *)
+
 hash h.
 
 name k : message.
@@ -353,7 +367,18 @@ Qed.
 lemma [P0] _ (m : _[adv]): 
   let x = h(zero, k) in 
   let y = h(<one,x>,  k) in 
-  att(<x,y>) = h(m,k) => m = zero || m = <one,x>.
+  att(<y,x>) = h(m,k) => m = zero || m = <one,x>.
+Proof.
+  intro x y H.
+  euf H.
+  + auto. 
+  + auto.
+Qed.
+
+lemma [P0] _ (m : _[adv]): 
+  let x = h(zero, k) in 
+  let y = h(<one,x>,  k) in 
+  att(y) = h(m,k) => m = zero || m = <one,x>.
 Proof.
   intro x y H.
   euf H.

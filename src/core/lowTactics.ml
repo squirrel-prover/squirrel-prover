@@ -64,6 +64,14 @@ let check_ty_eq ?loc ty1 ty2 =
   ()
 
 (*------------------------------------------------------------------*)
+(** handler for intro pattern application *)
+type ip_handler = [
+  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
+  | `Hyp of Ident.t
+  | `Def of Vars.var * string * Vars.Tag.t  (* variable is added to the env *)
+]
+
+(*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
 
 module MkCommonLowTac (S : Sequent.S) = struct
@@ -1053,7 +1061,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Apply a naming pattern to a variable or hypothesis. *)
   let do_naming_pat
-      (ip_handler : Args.ip_handler)
+      (ip_handler : ip_handler)
       (n_ip : Args.naming_pat)
       (s : S.t) : S.t
     =
@@ -1067,9 +1075,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* FIXME: we substitute everywhere. This is inefficient. *)
       S.subst subst (S.set_vars env s)
 
-    | `Def (v,tag) ->
+    | `Def (v,name,tag) ->
       let env, v' =
-        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) tag (S.vars s)
+        var_of_naming_pat n_ip ~dflt_name:name (Vars.ty v) tag (S.vars s)
       in
       let def = Hyps.by_id v.id s in
       let s = Hyps.remove v.id s in
@@ -1090,7 +1098,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Apply a And pattern (this is a destruct) of length [l].
       Note that variables in handlers have not been added to the env yet. *)
-  let do_and_pat (hid : Ident.t) (len : int) (s : S.t) : Args.ip_handler list * S.t =
+  let do_and_pat (hid : Ident.t) (len : int) (s : S.t) : ip_handler list * S.t =
     let destr_fail pp_err =
       soft_failure
         (Tactics.Failure (Fmt.str "@[<hv 2>cannot destruct:@ @[%t@]@]" pp_err))
@@ -1275,7 +1283,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Apply an simple pattern a handler. *)
   and do_simpl_pat
-      (h : Args.ip_handler) (ip : Args.simpl_pat) (s : S.t) : S.t list
+      (h : ip_handler) (ip : Args.simpl_pat) (s : S.t) : S.t list
     =
     match h, ip with
     | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
@@ -1309,7 +1317,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** introduces the topmost variable of the goal. *)
-  let do_intro_var (s : S.t) : Args.ip_handler * S.t =
+  let do_intro_var (s : S.t) : ip_handler * S.t =
     let form = S.goal s in
     let table = S.table s in
 
@@ -1361,7 +1369,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     doit form
 
   (** Introduce the topmost element of the goal. *)
-  let do_intro (s : S.t) : Args.ip_handler * S.t =
+  let do_intro (s : S.t) : ip_handler * S.t =
     let form = S.goal s in
     let env = S.env s in
     
@@ -1414,12 +1422,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
             (* default to [pair] for global judgements *)
             | Equiv.Any_t -> assert false
           in
-          let id, s = Hyps.add_i (Args.Named (Vars.name v)) (LDef (se,t1)) s in
+          let id, s = Hyps.add_i Args.Unnamed (LDef (se,t1)) s in
           let v' = Vars.mk id (Vars.ty v) in
           let subst = Term.ESubst (Term.mk_var v, Term.mk_var v') in
           let t2 = S.subst_conc [subst] t2 in
           let s = S.set_goal t2 s in
-          `Def (v',HighTerm.tag_of_term (S.env s) t1), s
+          `Def (v', Vars.name v, HighTerm.tag_of_term (S.env s) t1), s
         end
 
       else 
@@ -2639,7 +2647,7 @@ let do_intro_pat (ip : Args.simpl_pat) : Goal.t -> Goal.t list =
   Goal.map_list (TraceLT.do_intro_pat ip) (EquivLT.do_intro_pat ip)
 
 (* lifting to [Goal.t] *)
-let do_intro (s : Goal.t) : Args.ip_handler * Goal.t =
+let do_intro (s : Goal.t) : ip_handler * Goal.t =
   match s with
   | Goal.Trace s ->
     let handler, s = TraceLT.do_intro s in
@@ -2649,7 +2657,7 @@ let do_intro (s : Goal.t) : Args.ip_handler * Goal.t =
     handler, Goal.Equiv s
 
 (* lifting to [Goal.t] *)
-let do_intro_var (s : Goal.t) : Args.ip_handler * Goal.t =
+let do_intro_var (s : Goal.t) : ip_handler * Goal.t =
   match s with
   | Goal.Trace s ->
     let handler, s = TraceLT.do_intro_var s in
@@ -2660,7 +2668,7 @@ let do_intro_var (s : Goal.t) : Args.ip_handler * Goal.t =
 
 (* lifting to [Goal.t] *)
 let do_naming_pat
-    (ip_handler : Args.ip_handler)
+    (ip_handler : ip_handler)
     (n_ip : Args.naming_pat) : Goal.t -> Goal.t
   =
   Goal.map

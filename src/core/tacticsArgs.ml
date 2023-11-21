@@ -202,14 +202,6 @@ let pp_intro_pats fmt args =
     (Fmt.list ~sep:pp_sep pp_intro_pat) args
 
 (*------------------------------------------------------------------*)
-(** handler for intro pattern application *)
-type ip_handler = [
-  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
-  | `Hyp of Ident.t
-  | `Def of Vars.tagged_var (* Careful, the variable is not added to the env *)
-]
-
-(*------------------------------------------------------------------*)
 (** {2 Fresh tactic arguments} *)
 
 type fresh_arg =

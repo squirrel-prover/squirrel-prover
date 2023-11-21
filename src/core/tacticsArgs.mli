@@ -119,15 +119,6 @@ val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
 val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
 val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
 
-
-(*------------------------------------------------------------------*)
-(** handler for intro pattern application *)
-type ip_handler = [
-  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
-  | `Hyp of Ident.t
-  | `Def of Vars.tagged_var (* Careful, the variable is not added to the env *)
-]
-
 (*------------------------------------------------------------------*)
 (** {2 Fresh tactic arguments} *)
 
