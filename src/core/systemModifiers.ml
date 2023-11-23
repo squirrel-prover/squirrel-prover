@@ -753,7 +753,7 @@ end = struct
 end
 
 (** Strict pre-ordering over hash occurrences, resulting from the 
-    pre-order underlying the protocol well-foundness *)
+    pre-order underlying the protocol well-foundedness *)
 let xo_lt
     (table : Symbols.table) (system : SE.fset)
     (x : XO.t) (y : XO.t)

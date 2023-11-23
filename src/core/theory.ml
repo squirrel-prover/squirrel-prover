@@ -1052,16 +1052,17 @@ and convert0
   (* end of special cases *)
   (*------------------------------------------------------------------*)
 
-  | AppAt ({ pl_desc = Symb f} as tapp, ts) 
-  | AppAt ({ pl_desc = App ({ pl_desc = Symb f},_)} as tapp, ts)
+  | AppAt ({ pl_desc = Symb f } as tapp, ts) 
+  | AppAt ({ pl_desc = App ({ pl_desc = Symb f },_)} as tapp, ts)
     when not (Vars.mem_s state.env.vars (L.unloc f)) ->
     let f', terms = decompose_app tapp in
     assert (equal_i (Symb f) (L.unloc f'));
 
     if is_in_proc state.cntxt then 
       Printer.prt `Warning 
-        "potential well-foundness issue: \
-         a macro used an explicit timestamps in a procedure declaration";
+        "Potential well-foundedness issue: \
+         macro %a with explicit timestamp in process declaration."
+        pp tm;
       (* conv_err loc ExplicitTSInProc; *)
 
     let app_cntxt = At (conv Type.Timestamp ts) in

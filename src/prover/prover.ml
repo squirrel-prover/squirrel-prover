@@ -686,7 +686,7 @@ and do_include
 
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
       let err_mess fmt =
-        Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
+        Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
           (Location.unloc (ProverLib.get_pathlsymb i.th_name))
           (Errors.pp_toplevel_error ~interactive:interactive ~test file) e
       in
@@ -694,7 +694,7 @@ and do_include
       Command.cmd_error (IncludeFailed err_mess)
   in
   Driver.close_chan file.f_chan;
-  Printer.prt `Warning "loaded: %s.sp" file.f_name;
+  Printer.prt `Warning "Loaded \"%s.sp\"." file.f_name;
   st
 
 and do_all_commands_in ~main_mode ?(file_stack=[]) 
