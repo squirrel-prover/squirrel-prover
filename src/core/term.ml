@@ -1359,7 +1359,7 @@ and _pp
       (List.map snd l) (* TODO labels *)
 
   | Tuple ts ->
-    Fmt.pf ppf "@[<hov 1>(%a)@]"
+    Fmt.pf ppf "@[<hv 1>(%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
          (Fmt.box (pp (tuple_fixity, `NonAssoc))))
       ts
@@ -1428,7 +1428,7 @@ and _pp
 
       | Seq ->
         Fmt.pf ppf "@[<hov 2>seq(%a=>@,%a)@]"
-          (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
+          (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `Right)) b
 
       | Lambda ->
         let pp ppf () =
