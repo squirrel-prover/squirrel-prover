@@ -1302,16 +1302,16 @@ and _pp
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   | Name (n,l) ->
-    let pp ppf () =
       if l = [] then
-        pp_nsymb ppf n 
+        pp_nsymb ppf n
       else
-        let a = as_seq1 l in    (* [l] of length at most 1. *)
-        Fmt.pf ppf "@[<hov 2>%a %a@]"
-          pp_nsymb n 
-          (pp (app_fixity, `Right)) a
-    in
-    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+        let pp ppf () =
+          let a = as_seq1 l in    (* [l] of length at most 1. *)
+          Fmt.pf ppf "@[<hov 2>%a %a@]"
+            pp_nsymb n 
+            (pp (app_fixity, `Right)) a
+        in
+        maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   | Let (v,t1,t2) ->
     let _, v, s = (* rename quantified var. to avoid name clashes *)
