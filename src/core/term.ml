@@ -1293,7 +1293,7 @@ and _pp
 
   | App (t, l) ->
     let pp ppf () =
-      Fmt.pf ppf "@[<hov 2>%a %a@]"
+      Fmt.pf ppf "@[<hv 2>%a@ %a@]"
         (pp (app_fixity, `Left)) t
         (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
            (pp (app_fixity, `Right)))
