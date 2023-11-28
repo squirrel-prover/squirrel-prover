@@ -312,7 +312,8 @@ type error_i =
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
-  | ProjsMismatch    of Term.projs * Term.projs
+  | ProjsMismatch of Term.projs * Term.projs
+  | ActionUndef of Symbols.action
 
 type error = L.t * error_i
 
@@ -334,6 +335,10 @@ let pp_error_i fmt = function
       Term.pp_projs ps1
       Term.pp_projs ps2
 
+  | ActionUndef a ->
+    Fmt.pf fmt "action %a used in the system but not defined"
+      Symbols.pp a
+    
 let pp_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aProcess error: @[%a@]."
     pp_loc_err loc
@@ -1232,6 +1237,40 @@ let process_system_decl
   (proc, table)
 
 (*------------------------------------------------------------------*)
+(** Collect the set of actions appearing in a process without pending
+    applications. *)
+let collect_actions (p : proc) =
+  let rec doit acc : proc -> _ = function
+    | Alias _ | Null | New _ | In _ | Repl _ as p -> tfold doit acc p
+
+    | Let (_,t,_,p)
+    | Out (_,t,p) -> doit (doit_term acc t) p
+                       
+    | Parallel (p1,p2) -> doit (doit acc p1) p2
+    | Set (_,l,t,p) -> doit (doit_terms acc (t :: l)) p
+    | Exists (_,t,p1,p2) -> doit (doit (doit_term acc t) p1) p2
+    | Apply _ -> assert false
+
+  and doit_term acc : Term.term -> _ = function
+    | Term.Action (a,_) -> if not (List.mem a acc) then a :: acc else acc
+    | _ as t -> Term.tfold ((^~) doit_term) t acc 
+
+  and doit_terms acc l =
+    List.fold_left doit_term acc l
+  in
+  doit [] p
+
+(** Check that the system only uses defined actions
+    (i.e. any action declared using `action A : i` has been 
+    defined in the system). *)
+let check_actions_all_def table (p : proc) =
+  let actions = collect_actions p in
+  List.iter (fun a ->
+      if not (Action.is_def a table) then
+        error (ActionUndef a)
+    ) actions
+  
+(*------------------------------------------------------------------*)
 (** {2 System declaration } *)
 
 (* FIXME: fix user-defined projections miss-used *)
@@ -1275,6 +1314,8 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
     process_system_decl (L.loc proc) system_name table projs (time,p)
   in
 
+  check_actions_all_def table proc;
+  
   let table = Lemma.add_depends_mutex_lemmas table system_name in
 
   Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp proc ;

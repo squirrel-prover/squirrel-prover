@@ -169,6 +169,12 @@ let arity (s : Symbols.action) table =
   | Decl a     -> a
 
 (*------------------------------------------------------------------*)
+let is_def (s : Symbols.action) table : bool =
+  if Symbols.Action.is_reserved s table then false
+  else
+    match get_data s table with Decl _ -> false | Def _ -> true
+
+(*------------------------------------------------------------------*)
 let is_decl (s : Symbols.action) table : bool =
   if Symbols.Action.is_reserved s table then false
   else

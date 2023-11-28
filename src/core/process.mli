@@ -120,7 +120,8 @@ type error_i =
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
-  | ProjsMismatch    of Term.projs * Term.projs
+  | ProjsMismatch of Term.projs * Term.projs
+  | ActionUndef of Symbols.action
   
 type error = Location.t * error_i
 

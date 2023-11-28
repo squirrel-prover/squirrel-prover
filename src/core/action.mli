@@ -140,6 +140,7 @@ val define_symbol :
   Symbols.table
 
 (*------------------------------------------------------------------*)
+val is_def  : Symbols.action -> Symbols.table -> bool
 val is_decl : Symbols.action -> Symbols.table -> bool 
 
 (*------------------------------------------------------------------*)
