@@ -1341,16 +1341,16 @@ and _pp
     maybe_paren ~outer ~side ~inner:macro_fixity pp ppf ()
       
   | Action (symb,indices) ->
-    let pp ppf () =
-      if indices = [] then
-        Printer.kw `GoalAction ppf "%s" 
-          (Symbols.to_string symb)
-      else
+    if indices = [] then
+      Printer.kw `GoalAction ppf "%s" 
+        (Symbols.to_string symb)
+    else
+      let pp ppf () =
         Printer.kw `GoalAction ppf "%s(%a)" 
           (Symbols.to_string symb)
           (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) indices
-    in
-    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+      in
+      maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
     
   | Diff (Explicit l) ->
     Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
