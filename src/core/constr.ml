@@ -878,15 +878,17 @@ let build_graph (uf : Uuf.t) neqs leqs =
       |> bg uf leqs in          (* case i) *)
 
   let add_preds_and_init g =
-    UtG.fold_vertex (fun v g ->
-        let g = match v.cnt with
-          | UPred u ->
-            (* case ii) *)
-            if is_def uf neqs u then UtG.add_edge g v u else g
-          | _ -> g in
+    UtG.fold_vertex (fun u g ->
+        let g =
+          match u.cnt with
+          | UPred v ->
+            (* case ii), check that happens(u) (and not that happens(v)!) *)
+            if is_def uf neqs u then UtG.add_edge g u v else g
+          | _ -> g
+        in
 
         (* case iii) *)
-        if is_def uf neqs v then UtG.add_edge g uinit v else g
+        if is_def uf neqs u then UtG.add_edge g uinit u else g
       ) g g in
 
   let uf, g = bg uf leqs UtG.empty in
