@@ -122,3 +122,37 @@ lemma _ (t,t':timestamp): t >= t' => happens(t,t').
 Proof.
   constraints.
 Qed.
+
+(*------------------------------------------------------------------*)
+lemma [any] _ (t,t':timestamp) :
+  pred t <= t' =>
+  not (pred t = t') =>
+  not (t <= t') =>
+  false.
+Proof.
+  intro *.
+  constraints.
+Qed.
+
+lemma [any] _ (t,t':timestamp) :
+  pred (pred t) <= t' =>
+  not (pred (pred t) = t') =>
+  not (pred t = t') =>
+  not (t <= t') =>
+  false.
+Proof.
+  intro *.
+  constraints.
+Qed.
+
+lemma [any] _ (t,t':timestamp) :
+  pred (pred (pred t)) <= t' =>
+  not (pred (pred (pred t)) = t') =>
+  not (pred (pred t) = t') =>
+  not (pred t = t') =>
+  not (t <= t') =>
+  false.
+Proof.
+  intro *.
+  constraints. 
+Qed.

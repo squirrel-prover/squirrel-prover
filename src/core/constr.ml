@@ -883,7 +883,17 @@ let build_graph (uf : Uuf.t) neqs leqs =
           match u.cnt with
           | UPred v ->
             (* case ii), check that happens(u) (and not that happens(v)!) *)
-            if is_def uf neqs u then UtG.add_edge g u v else g
+            if is_def uf neqs u then
+              (* since u = P^k(t) and u <> undef, adds 
+                    P^k(t) <= P^{k-1}(t), P^k(t) <= P^{k-2}(t), ..., P^k(t) <= t *)
+              let rec add_all g v =
+                let g = UtG.add_edge g u v in
+                match v.cnt with 
+                | UPred v' -> add_all g v'
+                | _ -> g
+              in
+              add_all g v
+            else g
           | _ -> g
         in
 
