@@ -435,17 +435,17 @@ module Const = struct
       let pp_vars_and_cond fmt =
         if vars = [] && cond = [] then ()
         else if vars = [] then
-          Fmt.pf fmt "| @[%a@] "
+          Fmt.pf fmt "|@ @[%a@] "
             (Term._pp ~dbg) (Term.mk_ands cond)
         else if cond = [] then
-          Fmt.pf fmt "| ∀ @[%a@] "
+          Fmt.pf fmt "|@ @[∀ %a@] "
             (Vars._pp_list ~dbg) vars
         else
-          Fmt.pf fmt "| ∀ @[%a@] : @[%a@] "
+          Fmt.pf fmt "|@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] "
             (Vars._pp_list ~dbg) vars
             (Term._pp ~dbg) (Term.mk_ands cond)
       in          
-      Fmt.pf fmt "@[{ %a @[%a@], %s %t}@]"
+      Fmt.pf fmt "@[<hv 4>{ %a @[%a@], %s %t}@]"
         Term.pp_nsymb const.name
         (Fmt.list (Term._pp ~dbg)) term
         (Tag.tostring const.tag)
@@ -712,8 +712,13 @@ module TSet = struct
     in
     let term  = Term.subst sbst tset.term in
     let conds = List.map (Term.subst sbst) tset.conds in
-    
-    Fmt.pf fmt "@[{ %a | ∀ @[%a@] : @[%a@]  }@]"
+
+    if vars = [] then
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
+      (Term._pp ~dbg) term
+      (Term._pp ~dbg)(Term.mk_ands conds)
+    else
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
       (Term._pp ~dbg) term
       (Vars._pp_list ~dbg) vars
       (Term._pp ~dbg)(Term.mk_ands conds)
