@@ -73,8 +73,8 @@ let compatible table s1 s2 =
 let pp_system table fmt s =
   let {actions} = get_data table s in
   let descrs = Msh.bindings actions in
-  Format.fprintf fmt
-    "System %a registered with actions %a.@."
+  Fmt.pf fmt
+    "@[<hv 2>System %a registered with actions@ @[%a@].@]@."
     Symbols.pp s
     (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
 
