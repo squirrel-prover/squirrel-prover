@@ -1100,6 +1100,8 @@ type state = {
       In particuler, it does not know [φ v]. *)
   
   subgoals : Term.terms;
+  (** TODO: all these subgoals must be always true, not simply almost always true. 
+      Currently, we cannot create such subgoals in Squirrel. *)
 }
 
 let subst_state (subst : Term.subst) (st : state) : state =
@@ -1240,27 +1242,20 @@ module Game = struct
     in
     List.for_all  (check_names_subst subst) (oracle_pat.loc_names@oracle_pat.glob_names)
 
-  (** The function try_match_oracle try to finds terms [inputs] and names [n=n_1\,t1,...,n_i\,ti] 
-      such that [term] matches a given oracle output pattern [oracle_pat].
-      
-      The final function retrun the list for each oracle patter the tuples [inputs,n,oracle_pat] 
-      returned when try_match succeded.*)
-                 
-  let match_oracle
-      ?(oracle_hyp =Term.mk_true)
-      (state : state)
-      (term : CondTerm.t)
-    =
+  (* ----------------------------------------------------------------- *)
+  (** Return the list for each oracle pattern of the tuple
+      [inputs,n,oracle_pat] returned when matching succeded.*)
+  let match_oracle (state : state) (term : CondTerm.t) = 
     let env = state.env in
     
+    (** The function [try_match_oracle] try to finds terms [inputs]
+        and names [n=n_1\,t1,...,n_i\,ti] such that [term] matches a
+        given oracle output pattern [oracle_pat]. *)
     let try_match_oracle
-        (oracle:oracle)
-        (oracle_pat : oracle_pat)
-        (term:CondTerm.t)
+        (oracle : oracle) (oracle_pat : oracle_pat) (term : CondTerm.t)
       =
       let match_res =
-        match_known_set env state.hyps
-          ~target:term.term ~known:oracle_pat  
+        match_known_set env state.hyps ~target:term.term ~known:oracle_pat  
       in
       match match_res with
       | Some mv when subst_check mv oracle_pat->
@@ -1282,26 +1277,37 @@ module Game = struct
         in
           
         let inputs =
-          CondTerm.{term=oracle_hyp; conds = term.conds} :: oracle_inputs @ name_inputs
+          CondTerm.{term=Term.mk_true; conds = term.conds} :: oracle_inputs @ name_inputs
         in
         some (mv,inputs,oracle_pat,oracle)
       | _ ->  None
     in
-    let match_one_oracle (oracle:oracle) =
+    let match_one_oracle (oracle : oracle) =
       let outputs = oracle_to_term_and_cond env state.mem state.game oracle in
-      List.filter (fun x -> x <> None)
-        (List.map (fun output -> try_match_oracle oracle output term) outputs)
+      List.filter_map (fun output -> try_match_oracle oracle output term) outputs
     in
     List.concat_map match_one_oracle state.game.oracles
       
-
-  let call_oracle 
+  (* ----------------------------------------------------------------- *)
+  type call_oracle_res = {
+    new_consts   : Const.t list;    (** new name constraints *)
+    index_cond   : Term.terms;
+    (** Case under which we use the oracle. 
+        E.g. if we call [enc(m,k j)] and we have 
+        the constraint that the encryption key is [k i] then
+        [index_cond] is [i = j]. *)
+    post         : mem;             (** post memory *)
+    mem_subgoals : Term.terms;      (** memory subgoals *)
+  }
+  
+  let call_oracle
       ?(fixed_global_names = true)
-      (state : state)
-      (term : CondTerm.t)
-      (mv : Match.Mvar.t)
+      (state      : state)
+      (term       : CondTerm.t)
+      (mv         : Match.Mvar.t)
       (oracle_pat : oracle_pat)
-      (oracle : oracle)
+      (oracle     : oracle)
+    : call_oracle_res option
     =
     let arg_not_used = List.filter (fun x -> not (Mvar.mem x mv)) oracle.args in
     let mv =
@@ -1312,8 +1318,11 @@ module Game = struct
     in
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
+    
     try
-      let consts,subst = Const.constraints_terms_from_subst ~fixed_global_names state.game oracle state.consts term.conds mv in
+      let consts,subst =
+        Const.constraints_terms_from_subst ~fixed_global_names state.game oracle state.consts term.conds mv
+      in
       let eqs = List.map (fun  (t1,t2) -> Term.mk_eq t1 t2) subst in
       let subst = Term.mk_subst subst in
       let subgoals =
@@ -1336,7 +1345,12 @@ module Game = struct
       match subgoals with
       | Some subgoals ->
         assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
-        Some (consts,eqs,mem,subgoals)
+        Some {
+          new_consts = consts;
+          index_cond = eqs;
+          post = mem;
+          mem_subgoals = subgoals;
+        } 
       | None -> None
     with Const.InvalidConstraints -> None 
         
@@ -1415,10 +1429,12 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
     let outputs = [t0;t1] in
     bideduce state outputs
         
-  | Term.(App (Fun _ as fs,t))
-      when HighTerm.is_ptime_deducible ~si:true state.env fs ->
-    let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
-    bideduce state t
+  | Term.(App (Fun _ as fs,l))
+    when HighTerm.is_ptime_deducible ~si:true state.env fs ->
+    (* TODO: if [l] is empty, we seem not to be checking that [conds]
+       is bi-deducible? *)
+    let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
+    bideduce state l
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
@@ -1457,89 +1473,84 @@ and bideduce1_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
   (*   CondTerm.pp output pp_state_dbg state; *)
   assert (AbstractSet.well_formed state.env state.mem);
 
-  (* [output] trivially ptime-computable *)
-  if HighTerm.is_ptime_deducible ~si:true state.env output.term then
+  if
+    (* [output] trivially ptime-computable *)
+    HighTerm.is_ptime_deducible ~si:true state.env output.term ||
+    (* [output ∈ inputs] *)
+    knowledge_mem state.env state.hyps output state.inputs
+  then                          (* deduce conditions *)
     if output.conds = [] then Some state 
     else bideduce_term state CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
         
-  (* [output ∈ inputs] *)
-  else if knowledge_mem state.env state.hyps output state.inputs then
-    if output.conds = [] then Some state 
-    else bideduce_term state CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
-    (* some state *)
-
   (* [output ∈ rec_inputs] *)
   else
     match knowledge_mem_tsets state.env state.hyps output state.rec_inputs with
     | Some args ->
       if output.conds =  [] then  bideduce state (List.map CondTerm.mk_simpl args)
-      else  bideduce state
-          (CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}::(List.map CondTerm.mk_simpl args))
+      else
+        bideduce state
+          (CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}::
+           (List.map CondTerm.mk_simpl args))
 
     | None ->  bideduction_suite state output
 
 
-and bideduce_oracle
-    (state : state)
-    (output_term : CondTerm.t)
-  =
+and bideduce_oracle (state : state) (output_term : CondTerm.t) =
   let old_state = state in
-   let rec try_one_match all_match state = match all_match with
-     | [] -> bideduce_term_strict old_state output_term
-     | None :: _ -> assert false
-     | Some (mv,inputs,oracle_pat,oracle) :: other_match ->
-       let state = bideduce state inputs in
-       begin
-         match state with
-         | None -> try_one_match other_match old_state
-         | Some state ->
-           let match_res = Game.call_oracle ~fixed_global_names:true state output_term mv oracle_pat oracle in
-           begin
-            match match_res with
-            | None -> try_one_match other_match old_state
-            | Some (consts,eqs,mem,memory_subgoals) ->
-              let deducing_subgoals =
-                List.map (fun x -> CondTerm.{term = x; conds = output_term.conds})
-                  (memory_subgoals@eqs)
-              in
+  let rec find_match all_match state = match all_match with
+    | [] -> bideduce_term_strict old_state output_term
+    | (mv,inputs,oracle_pat,oracle) :: other_matchs ->
+      (* check that inputs are bi-deducible *)
+      let state = bideduce state inputs in
+      match state with
+      | None -> find_match other_matchs old_state
+      | Some state ->
+        let match_res =
+          Game.call_oracle ~fixed_global_names:true state output_term mv oracle_pat oracle
+        in
+        match match_res with
+        | None -> find_match other_matchs old_state
+        | Some { new_consts = consts; index_cond = eqs; post = mem; mem_subgoals; } ->
+          let deducing_subgoals =
+            List.map
+              (fun x -> CondTerm.{term = x; conds = output_term.conds})
+              ( mem_subgoals @ eqs )
+          in
+          let state =
+            bideduce {state with allow_oracle = false} deducing_subgoals
+          in
+          match state with
+          | None -> find_match other_matchs old_state
+          | Some state ->
+            let state = {state with allow_oracle = true} in
+            let mem_subgoals =
+              List.map (Term.mk_impl (Term.mk_ands output_term.conds)) mem_subgoals
+            in
+            (* TODO: why are we adding `mem_subgoals` to `subgoals` *)
+            let subgoals = mem_subgoals@state.subgoals in
+            match eqs with
+            | [] ->
+              let consts = consts@(state.consts) in
+              some {state with consts;mem;subgoals}      
+            | eqs ->
+              let cond = Term.mk_ands eqs in
+              let consts = Const.add_condition cond consts in
+              let consts = consts@state.consts in
+              let const_loc, consts =
+                List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts in
+              let state = {state with consts;mem;subgoals} in
               let state =
-                bideduce {state with allow_oracle = false} deducing_subgoals
+                bideduce_term ~bideduction_suite:(bideduce_term_strict) state
+                  { output_term with conds = (Term.mk_not cond)::output_term.conds}
               in
-               begin
-                 match state with
-                 | None -> try_one_match other_match old_state
-                 | Some state ->
-                   let state = {state with allow_oracle = true} in
-                   begin
-                       let memory_subgoals = List.map (Term.mk_impl (Term.mk_ands output_term.conds)) memory_subgoals in
-                       let subgoals = memory_subgoals@state.subgoals in
-                       match eqs with
-                       | [] ->
-                         let consts = consts@(state.consts) in
-                         some {state with consts;mem;subgoals}      
-                       | eqs ->
-                         let cond = Term.mk_ands eqs in
-                         let consts = Const.add_condition cond consts in
-                         let consts = consts@state.consts in
-                         let const_loc, consts =
-                           List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts in
-                         let state = {state with consts;mem;subgoals} in
-                         let state = bideduce_term ~bideduction_suite:(bideduce_term_strict) state
-                             { output_term with conds = (Term.mk_not cond)::output_term.conds} in
-                         begin
-                           match state with
-                           | None -> try_one_match other_match old_state
-                           | Some state ->
-                             some {state with consts = const_loc @state.consts}
-                      end
-                  end
-              end
-          end
-      end 
+              match state with
+              | None -> find_match other_matchs old_state
+              | Some state ->
+                some {state with consts = const_loc @state.consts}
   in
   if state.allow_oracle then 
-  let all_match = Game.match_oracle state output_term in
-  try_one_match all_match old_state
+    let all_matchs = Game.match_oracle state output_term in
+    find_match all_matchs old_state
   else bideduce_term_strict old_state output_term
 
 and bideduce_term
