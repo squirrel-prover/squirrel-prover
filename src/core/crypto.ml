@@ -1326,7 +1326,8 @@ module Game = struct
       let subst = Term.mk_subst subst in
       let subgoals =
         abstract_boolean state.env state.hyps state.env.table  
-          {term =  Term.subst subst oracle_cond; conds =  List.map (Term.subst subst) term.conds } state.mem
+          {term =  Term.subst subst oracle_cond;
+           conds =  List.map (Term.subst subst) term.conds } state.mem
       in
       (* let _ = *)
       (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. under cond %a@.and subst @[%a@] @] @. " *)
@@ -1339,7 +1340,9 @@ module Game = struct
       let mem =
         update
           state.env state.hyps mv subst
-          ( List.map (Term.subst subst) term.conds) oracle.updates state.mem
+          ( List.map (Term.subst subst) term.conds)
+          (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
+          state.mem
       in
       match subgoals with
       | Some subgoals ->
