@@ -2516,7 +2516,20 @@ module E = struct
       in
       List.exists find_greater_exec (List.concat_map Term.decompose_ands hyps)
     | _ -> false
- 
+
+
+    (*------------------------------------------------------------------*)
+  let get_local_of_hyps (hyps : TraceHyps.hyps) =
+    let hyps =
+      TraceHyps.fold_hyps (fun _ hyp acc ->
+          match hyp with
+          | Equiv.Local f
+          | Equiv.(Global Atom( (Reach f))) ->
+            f:: acc
+          | _ -> acc 
+        ) hyps []
+    in hyps
+
   (** Check that [hyp] implies [cond], trying the folowing methods:
       - satifiability
       - ad hoc reasonning for inequalities of time stamps
@@ -2525,10 +2538,11 @@ module E = struct
       as hypothesis. *)
   let known_set_check_impl
       (table : Symbols.table)
-      (global_hyps : Term.terms)
+      (global_hyps : TraceHyps.hyps)
       (hyp   : Term.term)
       (cond  : Term.term) : bool
     =
+    let global_hyps = get_local_of_hyps global_hyps in
     let check_one cond = 
       let check0 =              (* alpha-renaming *)
         known_set_check_impl_alpha table global_hyps hyp cond
@@ -2569,7 +2583,7 @@ module E = struct
       let known_cond = Term.subst subst known_cond
       and c_cond     = Term.subst subst c_cond in
 
-      if not (known_set_check_impl table [] c_cond known_cond) then None
+      if not (known_set_check_impl table (Hyps.TraceHyps.empty) c_cond known_cond) then None
       else
         let cand =
           { term = cand.term;
@@ -2938,18 +2952,6 @@ module E = struct
   (* throw away match infos, which have no meaning when unifying *)
 
   (*------------------------------------------------------------------*)
-  let get_local_of_hyps (hyps : TraceHyps.hyps) =
-    let hyps =
-      TraceHyps.fold_hyps (fun _ hyp acc ->
-          match hyp with
-          | Equiv.Local f
-          | Equiv.(Global Atom( (Reach f))) ->
-            f:: acc
-          | _ -> acc 
-        ) hyps []
-    in hyps
-
-  (*------------------------------------------------------------------*)
   (** Try to match [cterm] as an element of [known]. *)
   let _deduce_mem_one
       (cterm : cond_term)
@@ -2991,7 +2993,7 @@ module E = struct
       in
 
       let known_cond = Term.subst subst known_cond in
-      let global_hyps = get_local_of_hyps st.hyps in
+      let global_hyps = st.hyps in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
       if not (known_set_check_impl st.table global_hyps cterm.cond known_cond) then None
       else (* clear [known.var] from the binding *)

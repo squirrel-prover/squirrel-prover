@@ -4,6 +4,8 @@ module Sv = Vars.Sv
 
 module SE = SystemExpr
 
+module TraceHyps = Hyps.TraceHyps
+
 (*------------------------------------------------------------------*)
 type delta = { def : bool; macro : bool; op : bool; }
 
@@ -399,7 +401,7 @@ module E : sig
 
   val known_set_check_impl :
     Symbols.table ->
-    Term.term list ->  Term.term -> Term.term -> bool
+    TraceHyps.hyps ->  Term.term -> Term.term -> bool
 
   (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 

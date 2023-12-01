@@ -342,7 +342,6 @@ let never_equal_subgoals (env : Env.t) (hyps : TraceHyps.hyps)
 
 
 let match_known_set
-    ?(_check_cond = false)
     (env:Env.t)
     (hyps:TraceHyps.hyps)
     ~(target:Term.term)
@@ -1467,7 +1466,7 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
 
   | _ -> None
 
-and bideduce1_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
+and bideduce_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
   (* Fmt.epr *)
   (*   "@[<2>Deduction of term@ %a@ in state@ %a.@]@." *)
   (*   CondTerm.pp output pp_state_dbg state; *)
@@ -1481,6 +1480,13 @@ and bideduce1_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
   then                          (* deduce conditions *)
     if output.conds = [] then Some state 
     else bideduce_term state CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
+  (* [cond] = false *)
+  else if
+    output.conds <> [] &&
+    Match.E.known_set_check_impl state.env.table (state.hyps)
+      (Term.mk_ands output.conds) Term.mk_false
+  then 
+    Some state 
         
   (* [output ∈ rec_inputs] *)
   else
@@ -1558,7 +1564,7 @@ and bideduce_term
     (state : state)
     (output_term : CondTerm.t)
   =
-  bideduce1_simpl bideduction_suite state output_term
+  bideduce_simpl bideduction_suite state output_term
 
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
 and bideduce (state : state) (outputs : CondTerm.t list) =
