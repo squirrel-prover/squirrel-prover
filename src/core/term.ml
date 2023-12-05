@@ -1258,9 +1258,14 @@ and _pp
 
   | App (Fun (s,_),[a]) when s = f_happens -> pp_happens info ppf [a]
 
-  (* if-then-else,  *)
-  | App (Fun (s,_),[b;c;d]) when s = f_ite ->
-    Fmt.pf ppf "%a" (pp_ite info (outer, side)) (b,c,d)
+  (* if-then-else with arguments: [(if b then c else d) args] *)
+  | App (Fun (s,fs), b :: c :: d :: (_ :: _ as args)) when s = f_ite ->
+    let t = App (Fun (s,fs), [b;c;d]) in
+    pp_app info (outer, side) ppf (t,args)
+
+  (* if-then-else, normal *)
+  | App (Fun (s,_), [b; c; d]) when s = f_ite ->
+    pp_ite info (outer, side) ppf (b,c,d)
 
   (* pair *)
   | App (Fun (s,_),terms) when s = f_pair ->
@@ -1272,8 +1277,7 @@ and _pp
       terms
 
   (* happens *)
-  | _ as f when is_and_happens f ->
-    pp_and_happens info ppf f
+  | _ as f when is_and_happens f -> pp_and_happens info ppf f
 
   (* infix *)
   | App (Fun (s,fty_app),[bl;br]) when Symbols.is_infix s ->
@@ -1291,16 +1295,10 @@ and _pp
   | Fun (f, fty_app) ->
     Fmt.pf ppf "@[<hov 2>%a@]" (pp_funname ~dbg:info.dbg) (f,fty_app)
 
-  | App (t, l) ->
-    let pp ppf () =
-      Fmt.pf ppf "@[<hv 2>%a@ %a@]"
-        (pp (app_fixity, `Left)) t
-        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
-           (pp (app_fixity, `Right)))
-        l
-    in
-    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+  (* application *)
+  | App (t, args) -> pp_app info (outer,side) ppf (t,args)
 
+  (* name *)
   | Name (n,l) ->
       if l = [] then
         pp_nsymb ppf n
@@ -1313,6 +1311,7 @@ and _pp
         in
         maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
+  (* let binder *)
   | Let (v,t1,t2) ->
     let _, v, s = (* rename quantified var. to avoid name clashes *)
       let fv_ts = Sv.remove v (fvs [t2]) in
@@ -1329,6 +1328,7 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:let_in_fixity pp ppf ()
 
+  (* macro *)
   | Macro (m, l, ts) ->
     let pp ppf () =
       Fmt.pf ppf "@[%a%a@%a@]"
@@ -1339,7 +1339,8 @@ and _pp
         (pp (macro_fixity, `NonAssoc)) ts
     in
     maybe_paren ~outer ~side ~inner:macro_fixity pp ppf ()
-      
+
+  (* action *)
   | Action (symb,indices) ->
     if indices = [] then
       Printer.kw `GoalAction ppf "%s" 
@@ -1351,19 +1352,22 @@ and _pp
           (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) indices
       in
       maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
-    
+
+  (* diff *)
   | Diff (Explicit l) ->
     Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
          (pp (diff_fixity, `NonAssoc)))
       (List.map snd l) (* TODO labels *)
 
+  (* tuple *)
   | Tuple ts ->
     Fmt.pf ppf "@[<hv 1>(%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
          (Fmt.box (pp (tuple_fixity, `NonAssoc))))
       ts
-      
+
+  (* projection *)
   | Proj (i, t) -> 
     let pp ppf () =
       Fmt.pf ppf "@[<hov 2>%a#%d@]"
@@ -1438,6 +1442,26 @@ and _pp
         in
         maybe_paren ~outer ~side ~inner:fun_fixity pp ppf ()
     end
+
+(* application pretty-printer *)
+and pp_app
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    ((t,args)     : term * term list) 
+  : unit
+  =
+  let pp ppf () =
+    if args = [] then
+      pp info (outer, side) ppf t
+    else 
+      Fmt.pf ppf "@[<hv 2>%a@ %a@]"
+        (pp info (app_fixity, `Left)) t
+        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
+           (pp info (app_fixity, `Right)))
+        args
+  in
+  maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
 (* if-then-else pretty-printer *)
 and pp_ite
