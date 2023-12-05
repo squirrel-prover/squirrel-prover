@@ -80,8 +80,13 @@ module Pos = struct
 
       | Term.Fun (_, _) -> sp
 
-      | Term.App (t1, l) ->
-        sel_l fsel sp ~vars ~conds ~p (t1 :: l)
+      | Term.App (t1, args) ->
+        let args0, last = List.takedrop (List.length args - 1) args in
+        let last = as_seq1 last in
+        let s = Term.mk_app t1 args0 in (* [t1 args = s last] *)
+
+        let sp = sel fsel sp ~vars ~conds ~p:(0 :: p) s    in
+        (*    *) sel fsel sp ~vars ~conds ~p:(1 :: p) last
 
       | Term.Name (_ns,l) ->
         sel_l fsel sp ~vars ~conds ~p l
@@ -322,25 +327,30 @@ module Pos = struct
         let ti' = Term.mk_fun0 fs fty [t1; t2] in
         acc, found, if found then ti' else ti
 
-      (* [Fun _], general case *)
+      (* function symbol, general case *)
       | Fun _ -> acc, false, ti
 
-      | Term.App (t1, l) ->
-        let acc, found, t1_l = map_fold_l ~se ~p ~acc (t1 :: l) in
-
-        let t1, l = List.takedrop 1 t1_l in
-        let t1 = as_seq1 t1 in
-
-        let ti' = Term.mk_app t1 l in
+      (* application, general case *)
+      | Term.App (t1, args) ->
+        let args0, last = List.takedrop (List.length args - 1) args in
+        let last = as_seq1 last in
+        let s = Term.mk_app t1 args0 in (* [t1 args = s last] *)
+        
+        let acc, found1, s    = map_fold ~se ~conds ~p:(0 :: p) ~acc s    in
+        let acc, found2, last = map_fold ~se ~conds ~p:(1 :: p) ~acc last in
+        let found = found1 || found2 in
+        
+        let ti' = Term.mk_app s [last] in
         acc, found, if found then ti' else ti
 
-
+      (* name *)
       | Term.Name (ns,l) ->
         let acc, found, l = map_fold_l ~se ~p ~acc l in
 
         let ti' = Term.mk_name ns l in
         acc, found, if found then ti' else ti
 
+      (* macro *)
       | Term.Macro (ms, terms, ts) ->
         let l = terms @ [ts] in
 
@@ -352,24 +362,29 @@ module Pos = struct
         let ti' = Term.mk_macro ms l1 ts in
         acc, found, if found then ti' else ti
 
+      (* action *)
       | Term.Action (a, l) ->
         let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
 
         let ti' = Term.mk_action a l in
         acc, found, if found then ti' else ti
 
+      (* variable *)
       | Term.Var _ -> acc, false, ti
 
+      (* tuple *)
       | Term.Tuple l ->
         let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
         let ti' = Term.mk_tuple l in
         acc, found, if found then ti' else ti
 
+      (* projection *)
       | Term.Proj (i,t) ->
         let acc, found, t = map_fold ~se ~vars ~conds ~p:(0 :: p) ~acc t in
         let ti' = Term.mk_proj i t in
         acc, found, if found then ti' else ti
 
+      (* let binder *)
       | Term.Let (v,t1,t2) ->
         let v, subst = Term.refresh_vars [v] in
         let t1 = Term.subst subst t1 in
@@ -388,7 +403,7 @@ module Pos = struct
         let ti' = Term.mk_let v t1 t2 in
         acc, found, if found then ti' else ti
 
-
+      (* quantifier *)
       | Term.Quant (q, is, t0) -> 
         let is, subst = Term.refresh_vars is in
         let t0 = Term.subst subst t0 in
@@ -400,6 +415,7 @@ module Pos = struct
 
         acc, found, if found then ti' else ti
 
+      (* diff-term *)
       | Term.Diff (Explicit l) ->
         let acc, found, l' =
           map_fold_l ~se ~p ~acc ~projlabels:(List.map fst l) (List.map snd l)
@@ -408,6 +424,7 @@ module Pos = struct
         let ti' = Term.mk_diff l in
         acc, found, if found then ti' else ti
 
+      (* try-find construct *)
       | Term.Find (is, c, t, e) ->
         let is, subst = Term.refresh_vars is in
         let c = Term.subst subst c in
