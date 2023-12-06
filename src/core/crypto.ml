@@ -1185,20 +1185,19 @@ module Game = struct
 
   (*-------------------------------------------------------------------*)
   let rec term_and_cond
-      (env : Env.t)
-      (mem : mem)
-      (output : Term.term)
+      (env : Env.t) (mem : mem) (output : Term.term)
+    : (Term.term * Term.terms) list
     =
     match output with
     | Term.App (Term.Fun(f,_),[t0;t1;t2] ) when f=Term.f_ite ->
       if not (boolean_abstraction_supported env mem t0)
       then [output,[]]
       else
-      let l1 = term_and_cond env mem t1 in
-      let l2 = term_and_cond env mem t2 in
-      let ll1 = List.map (fun (t,conds) -> t, t0::conds ) l1 in
-      let ll2 = List.map (fun (t,conds) -> t, Term.mk_not t0::conds) l2 in
-      ll1 @ ll2
+        let l1 = term_and_cond env mem t1 in
+        let l2 = term_and_cond env mem t2 in
+        let ll1 = List.map (fun (t,conds) -> t, t0::conds ) l1 in
+        let ll2 = List.map (fun (t,conds) -> t, Term.mk_not t0::conds) l2 in
+        ll1 @ ll2
     | _ -> [ output,[] ]
 
   (*-------------------------------------------------------------------*)
@@ -1207,12 +1206,12 @@ module Game = struct
      be chooose if the pattern matching doesn't take conds into account *)
   let oracle_to_term_and_cond
       (env : Env.t)
-      (mem :mem)
+      (mem : mem)
       (game : game)
       (oracle : oracle) : oracle_pat list 
     =
     let output = subst_loc oracle oracle.output  in
-    let outputs = term_and_cond env mem  output in
+    let outputs = term_and_cond env mem output in
     let build_fresh_set (term,cond) : oracle_pat =
       let term_vars = Term.get_vars term in
       let cond_vars = List.concat_map Term.get_vars cond in
@@ -1222,7 +1221,7 @@ module Game = struct
       let args = List.filter (fun x -> List.mem x oracle.args) vars in
       { term; cond; glob_names ; loc_names ; args; }
     in
-    List.map (build_fresh_set) outputs
+    List.map build_fresh_set outputs
 
   (* ----------------------------------------------------------------- *)
   (** Checks that the substitution maps samplings to names. *)
@@ -1255,8 +1254,8 @@ module Game = struct
   }
 
   (* ----------------------------------------------------------------- *)
-  (** Return the list for each oracle pattern of the tuple
-      [inputs,n,oracle_pat,oracle] returned when matching succeded.*)
+  (** Return the list for each oracle pattern of the successful oracle
+      matches. *)
   let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
     let env = state.env in
     
@@ -1277,7 +1276,7 @@ module Game = struct
         let name_indices_inputs =
           let used_names =
             List.filter
-              (fun x -> (Mvar.mem x mv))
+              (fun x -> Mvar.mem x mv)
               ( oracle.loc_smpls @ state.game.glob_smpls )
           in
           let mk_cinput_name n =
@@ -1331,6 +1330,8 @@ module Game = struct
   }
   
   (* ----------------------------------------------------------------- *)
+  (** If a successful match has been found, does the actual symbolic call 
+      to the oracle *)
   let call_oracle
       ?(fixed_global_names = true)
       (state      : state)
@@ -1392,9 +1393,7 @@ module Game = struct
         
   let get_initial_pre env hyps (game : game) : mem =
     init env hyps game.glob_vars
-
 end 
-
 
 (*------------------------------------------------------------------------*)
 (** Generalized checksMvar.empty that a term is in the knowledge or not.*)
@@ -1417,6 +1416,7 @@ let knowledge_mem
   in
   List.exists eq_implies inputs
 
+(*------------------------------------------------------------------------*)
 (** Check if [output] is included in [inputs]. In case of success,
     returns the instanciation of the arguments, which must be computed
     by the adversary to obtain the needed value. *)
@@ -1504,7 +1504,12 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
 
   | _ -> None
 
-and bideduce_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
+(*------------------------------------------------------------------*)
+and bideduce_term
+    ?(bideduction_suite = bideduce_oracle) 
+    (state  : state) (output : CondTerm.t)
+  : state option
+  =
   (* Fmt.epr *)
   (*   "@[<2>Deduction of term@ %a@ in state@ %a.@]@." *)
   (*   CondTerm.pp output pp_state_dbg state; *)
@@ -1539,15 +1544,17 @@ and bideduce_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
           (CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}::
            (List.map CondTerm.mk_simpl args))
 
-    | None ->  bideduction_suite state output
+    | None -> bideduction_suite state output
 
-
+(*------------------------------------------------------------------*)
+(** Try to show that [output_term] is bi-deducible using an oracle call.
+    Fall-back to the main-loop in case of failure. *)
 and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
 
   (* Given an oracle match, check whether the full inputs
      (standard inputs + randomness indices + conditions) are
      bi-deducible *)
-  let find_match (oracle_match : Game.oracle_match) : state option =
+  let find_valid_match (oracle_match : Game.oracle_match) : state option =
     let exception Failed in     (* return [None] if [Failed] is raised *)
 
     try
@@ -1558,16 +1565,22 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
         bideduce state full_inputs |> oget_exn ~exn:Failed
       in
 
-      let Game.{ new_consts = consts; index_cond = eqs; post = mem; mem_subgoals; } =
+      let Game.{ new_consts = consts; index_cond; post; mem_subgoals; } =
         Game.call_oracle
           ~fixed_global_names:true state output_term mv oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
 
+      (* We check that some terms are bi-deducible:
+         - [mem_subgoal]: the memory condition under which the adversary knows 
+           that the oracle answer is what it wants. 
+         - [index_cond]: indices conditions guaranteeing that the mapping
+             `logical names <-> local and global game samplings`
+           is the wanted one.  *)
       let deducing_subgoals =
         List.map
-          (fun x -> CondTerm.{term = x; conds = output_term.conds})
-          ( mem_subgoals @ eqs )
+          (fun x -> CondTerm.{ term = x; conds = output_term.conds })
+          ( mem_subgoals @ index_cond )
       in
       let state =
         bideduce {state with allow_oracle = false} deducing_subgoals
@@ -1575,50 +1588,49 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
       in
       let state = {state with allow_oracle = true} in
 
+      (* Add subgoals needed for the oracle call to be correct *)
       let mem_subgoals =
         List.map (Term.mk_impl (Term.mk_ands output_term.conds)) mem_subgoals
       in
       (* TODO: why are we adding `mem_subgoals` to `subgoals` *)
-      let subgoals = mem_subgoals@state.subgoals in
+      let subgoals = mem_subgoals @ state.subgoals in
 
-      match eqs with
-      | [] ->
-        let consts = consts@(state.consts) in
-        some {state with consts;mem;subgoals}      
-      | _ ->
-        let cond = Term.mk_ands eqs in
-        let consts = Const.add_condition cond consts in
+      (* We know that [output_term] is bi-deducible when [index_cond] holds.
+         It remains to check that it is also the case when [¬ index_cond] *)
+      if index_cond = [] then
+        (* nothing to do since [index_cond = ⊤] *)
         let consts = consts @ state.consts in
-        let const_loc, consts =
-          List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts
-        in
-        let state = {state with consts;mem;subgoals} in
-        let state =
-          bideduce_term ~bideduction_suite:(bideduce_term_strict) state
-            { output_term with conds = Term.mk_not cond :: output_term.conds }
-          |> oget_exn ~exn:Failed
-        in
-        Some {state with consts = const_loc @ state.consts}
-    with
-    | Failed -> None
+        Some {state with consts; mem = post; subgoals; }
+      else
+        begin
+          let index_cond = Term.mk_ands index_cond in
+          let consts = Const.add_condition index_cond consts in
+          let consts = consts @ state.consts in
+          let const_loc, consts =
+            List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts
+          in
+          let state = {state with consts; mem = post ; subgoals; } in
+
+          let state =
+            bideduce_term ~bideduction_suite:bideduce_term_strict state
+              { output_term with conds = Term.mk_not index_cond :: output_term.conds }
+            |> oget_exn ~exn:Failed
+          in
+          Some { state with consts = const_loc @ state.consts; }
+        end
+    with Failed -> None         (* not a valid oracle match *)
   in
 
   if state.allow_oracle then 
     let all_matches = Game.match_oracle state output_term in
-    match List.find_map find_match all_matches with
+    match List.find_map find_valid_match all_matches with
     | Some _ as res -> res      
     | None -> bideduce_term_strict state output_term
     (* oracle match failed, we recurse *)
   else
     bideduce_term_strict state output_term
 
-and bideduce_term
-    ?(bideduction_suite = bideduce_oracle) 
-    (state : state)
-    (output_term : CondTerm.t)
-  =
-  bideduce_simpl bideduction_suite state output_term
-
+(*------------------------------------------------------------------*)
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
 and bideduce (state : state) (outputs : CondTerm.t list) =
   match outputs with
