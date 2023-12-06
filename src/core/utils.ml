@@ -335,9 +335,11 @@ module Ss = Set.Make (String)
 
 let some x = Some x
 
-let oget = function
+let oget_exn ~exn = function
   | Some u -> u
-  | None -> raise Not_found
+  | None -> raise exn
+
+let oget u = oget_exn ~exn:Not_found u
 
 let odflt dflt = function
   | Some u -> u

@@ -31,20 +31,6 @@ type oracle = {
   output    : Term.term ;
 }
 
-(** An oracle output pattern, returned when [cond] is true. It has three type of variables :
- variable of [loc_names] should be intanciated with local samplings, 
- variable of [glob_names] should be intanciated with global samplings, and
- variable of [args] are input variable, and can be intanciated with any term.
-*)
-
-type oracle_pat = {
-  term : Term.term;
-  loc_names : Vars.vars;
-  glob_names : Vars.vars;
-  args : Vars.vars;
-  cond : Term.terms
-}
-
 (** A cryptographic game *)
 type game = {
   name       : string ;
@@ -56,7 +42,7 @@ type game = {
 (*------------------------------------------------------------------*)
 type Symbols.data += Game of game
 
-let find table (name : Theory.lsymb) = 
+let find table (name : Theory.lsymb) : game = 
   match Symbols.Game.data_of_lsymb name table with
   | Game g -> g
   | _ -> assert false
@@ -340,12 +326,25 @@ let never_equal_subgoals (env : Env.t) (hyps : TraceHyps.hyps)
                                     (Term.mk_neq target.term known.term)))
 
 
+(* ----------------------------------------------------------------- *)
+(** An oracle output pattern, which returns [term] when [cond] is true.
+    It has three type of arguments:
+    - [loc_names] should be intantiated with local samplings.
+    - [glob_names] should be intantiated with global samplings.
+    - [args] are standard input, and can be intantiated with any term. *)
+type oracle_pat = {
+  term       : Term.term;
+  loc_names  : Vars.vars;
+  glob_names : Vars.vars;
+  args       : Vars.vars;
+  cond       : Term.terms
+}
 
+(* ----------------------------------------------------------------- *)
 let match_known_set
-    (env:Env.t)
-    (hyps:TraceHyps.hyps)
-    ~(target:Term.term)
-    ~(known: oracle_pat)
+    (env : Env.t) (hyps : TraceHyps.hyps)
+    ~(target : Term.term) ~(known : oracle_pat)
+  : Mvar.t option
   =
   let vars = known.loc_names @ known.glob_names @ known.args in
   let pat =
@@ -377,10 +376,7 @@ let exact_eq_under_cond
     let system = SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; } in
     Match.mk_unif_state env.vars env.table system hyps unif_vars
   in 
-  let mv = Match.E.deduce_mem_one cterm known_set unif_state in
-  match mv with
-  | Some mv ->  Some mv
-  | None ->  None
+  Match.E.deduce_mem_one cterm known_set unif_state 
 
 (*------------------------------------------------------------------*)
 
@@ -542,13 +538,13 @@ module Const = struct
       Some (subst_with_open_tuple terms const.term)
     | _ ->  raise InvalidConstraints      
 
-  (**Once a oracle pattern is matched, the matching return a mapping of names variables to terms.
-     [constraints_terms_from_subst] build the constraints associated to it.
-     The option [fixed_global_names] is set to true if global name constraints are always 
-     set to any variables and branching.
-     The function return the generated constraints and a set of equalities that should hold,
-     to ensure validity of the constraint system.
-  *)
+  (** Once a oracle pattern is matched, the matching return a mapping 
+      of names variables to terms.
+      [constraints_terms_from_subst] build the constraints associated to it.
+      The option [fixed_global_names] is set to true if global name constraints 
+      are always set to any variables and branching.
+      The function return the generated constraints and a set of equalities 
+      that should hold, to ensure validity of the constraint system. *)
   let constraints_terms_from_subst
       ?(fixed_global_names = true)
       (game : game)
@@ -566,7 +562,7 @@ module Const = struct
       with Not_found -> []
     in
 
-    let get_glob_smpls (eqs,const_acc) (v:Vars.var) =
+    let get_glob_smpls (eqs,const_acc) (v : Vars.var) =
       try 
         let name = Mvar.find v subst in
         match name with
@@ -577,7 +573,8 @@ module Const = struct
             | None -> eqs, (create otag n ~term:t ~cond:[])::const_acc
             | Some subst -> subst@eqs, const_acc
           end
-        | Term.Name (n,t) when not (fixed_global_names)-> [],(create (Tag.game_glob v game) n ~term:t ~cond)::const_acc
+        | Term.Name (n,t) when not (fixed_global_names)->
+          [],(create (Tag.game_glob v game) n ~term:t ~cond)::const_acc
         | _ -> assert false
       with Not_found -> [],[]
     in
@@ -1166,11 +1163,11 @@ let[@warning "-32"] pp_state     = _pp_state ~dbg:false
 let[@warning "-32"] pp_state_dbg = _pp_state ~dbg:true
 
 (*-------------------------------------------------------------------*)
-
 module Game = struct
 
   include AbstractSet
 
+  (*-------------------------------------------------------------------*)
   (** Build a substitution for locable non-mutable variable 
       and replace this variable by their values in output term of oracle.*)
   let subst_loc (oracle : oracle) (term : Term.term) =
@@ -1186,7 +1183,7 @@ module Game = struct
     let subst = List.fold_left mk_subst subst oracle.updates in
     Term.subst subst term
 
-  
+  (*-------------------------------------------------------------------*)
   let rec term_and_cond
       (env : Env.t)
       (mem : mem)
@@ -1204,9 +1201,10 @@ module Game = struct
       ll1 @ ll2
     | _ -> [ output,[] ]
 
+  (*-------------------------------------------------------------------*)
   (** Get conditions and associated pattern from one oracle *)
-  (* FIXME : what happens when same pattern at the end (the first one will always be chooose if 
-      the pattern matching doesn't take conds into account *)
+  (* FIXME : what happens when same pattern at the end (the first one will always
+     be chooose if the pattern matching doesn't take conds into account *)
   let oracle_to_term_and_cond
       (env : Env.t)
       (mem :mem)
@@ -1226,12 +1224,9 @@ module Game = struct
     in
     List.map (build_fresh_set) outputs
 
-
+  (* ----------------------------------------------------------------- *)
   (** Checks that the substitution maps samplings to names. *)
-  let[@warning "-32"]  subst_check
-      (subst : Mvar.t )
-      (oracle_pat : oracle_pat )
-    =
+  let subst_check (subst : Mvar.t ) (oracle_pat : oracle_pat) : bool =
     let check_names_subst subst var =
       try 
         match Mvar.find var subst with
@@ -1239,12 +1234,30 @@ module Game = struct
         | _ -> false
       with Not_found -> true
     in
-    List.for_all  (check_names_subst subst) (oracle_pat.loc_names@oracle_pat.glob_names)
+    List.for_all
+      (check_names_subst subst)
+      ( oracle_pat.loc_names @ oracle_pat.glob_names )
+
+  (* ----------------------------------------------------------------- *)
+  (** The result of a tentative oracle match. *)
+  type oracle_match = {
+    mv : Mvar.t;            (** assignments *)
+
+    full_inputs : CondTerm.t list;
+    (** Values that must be computed by the adversary for the call to succeed:
+        - the condition under which the oracle must be called
+        - standard inputs of the oracles, i.e. values of [oracle.args]
+        - indices of the names matched to local ([oracle.loc_smpls]) 
+          or global randomness ([game.glob_smpls]) of the oracle. *)
+
+    oracle_pat : oracle_pat;    (** the oracle pattern *)
+    oracle : oracle;            (** the oracle called *)
+  }
 
   (* ----------------------------------------------------------------- *)
   (** Return the list for each oracle pattern of the tuple
-      [inputs,n,oracle_pat] returned when matching succeded.*)
-  let match_oracle (state : state) (term : CondTerm.t) = 
+      [inputs,n,oracle_pat,oracle] returned when matching succeded.*)
+  let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
     let env = state.env in
     
     (** The function [try_match_oracle] try to finds terms [inputs]
@@ -1252,39 +1265,57 @@ module Game = struct
         given oracle output pattern [oracle_pat]. *)
     let try_match_oracle
         (oracle : oracle) (oracle_pat : oracle_pat) (term : CondTerm.t)
+      : oracle_match option
       =
       let match_res =
-        match_known_set env state.hyps ~target:term.term ~known:oracle_pat  
+        match_known_set env state.hyps ~target:term.term ~known:oracle_pat
       in
       match match_res with
       | Some mv when subst_check mv oracle_pat->
-        let used_names = List.filter (fun x -> (Mvar.mem x mv))
-            (oracle.loc_smpls@state.game.glob_smpls)
-        in
-        let mk_cinput_name n =
-          match n with
-          | Term.Name (_,t) ->
-            List.map (fun x -> CondTerm.{term = x;conds=term.conds}) t
-          | _ -> assert false
-        in 
-        let name_inputs = List.concat_map mk_cinput_name
+        (* indices of logical names mapped to local and global randomness 
+           (which must be provided, hence computed, by the adversary) *)
+        let name_indices_inputs =
+          let used_names =
+            List.filter
+              (fun x -> (Mvar.mem x mv))
+              ( oracle.loc_smpls @ state.game.glob_smpls )
+          in
+          let mk_cinput_name n =
+            match n with
+            | Term.Name (_,n_args) ->
+              List.map (fun x -> CondTerm.{term = x;conds=term.conds}) n_args
+            | _ -> assert false
+          in 
+          List.concat_map
+            mk_cinput_name
             (List.map (fun v -> Mvar.find v mv ) used_names)
         in
+
+        (* inputs of the oracle, provided by the adversary *)
         let oracle_inputs =
           List.map (fun t -> CondTerm.mk ~term:t ~conds:term.conds)
-            (List.concat_map (fun v -> try [Mvar.find v mv] with Not_found ->[] ) oracle.args)
+            (List.concat_map
+               (fun v -> try [Mvar.find v mv] with Not_found -> [] )
+               oracle.args)
         in
+
+        (* full inputs = condition + names indices + standard inputs *)
+        let full_inputs =
+          CondTerm.{term=Term.mk_true; conds = term.conds} ::
+          oracle_inputs @
+          name_indices_inputs
+        in
+
+        Some { mv; full_inputs; oracle_pat; oracle; }
           
-        let inputs =
-          CondTerm.{term=Term.mk_true; conds = term.conds} :: oracle_inputs @ name_inputs
-        in
-        some (mv,inputs,oracle_pat,oracle)
       | _ ->  None
     in
+    
     let match_one_oracle (oracle : oracle) =
       let outputs = oracle_to_term_and_cond env state.mem state.game oracle in
       List.filter_map (fun output -> try_match_oracle oracle output term) outputs
     in
+    
     List.concat_map match_one_oracle state.game.oracles
       
   (* ----------------------------------------------------------------- *)
@@ -1299,6 +1330,7 @@ module Game = struct
     mem_subgoals : Term.terms;      (** memory subgoals *)
   }
   
+  (* ----------------------------------------------------------------- *)
   let call_oracle
       ?(fixed_global_names = true)
       (state      : state)
@@ -1320,7 +1352,8 @@ module Game = struct
     
     try
       let consts,subst =
-        Const.constraints_terms_from_subst ~fixed_global_names state.game oracle state.consts term.conds mv
+        Const.constraints_terms_from_subst
+          ~fixed_global_names state.game oracle state.consts term.conds mv
       in
       let eqs = List.map (fun  (t1,t2) -> Term.mk_eq t1 t2) subst in
       let subst = Term.mk_subst subst in
@@ -1330,7 +1363,8 @@ module Game = struct
            conds =  List.map (Term.subst subst) term.conds } state.mem
       in
       (* let _ = *)
-      (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. under cond %a@.and subst @[%a@] @] @. " *)
+      (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. \*)
+      (*            under cond %a@.and subst @[%a@] @] @. " *)
       (*     (Fmt.option (Fmt.list Term.pp)) subgoals *)
       (*     oracle.name *)
       (*     Term.pp (Term.subst subst oracle_cond) *)
@@ -1377,7 +1411,8 @@ let knowledge_mem
       let term = Term.subst subst term in
       let conds = List.map (Term.subst subst) input.conds in
       let input_term = CondTerm.{ term ; conds } in
-      exact_eq_under_cond ~unif_vars:es env hyps ~target:output ~known:input_term <> None
+      exact_eq_under_cond
+        ~unif_vars:es env hyps ~target:output ~known:input_term <> None
     | _ -> exact_eq_under_cond env hyps ~target:output ~known:input <> None
   in
   List.exists eq_implies inputs
@@ -1482,7 +1517,10 @@ and bideduce_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
     knowledge_mem state.env state.hyps output state.inputs
   then                          (* deduce conditions *)
     if output.conds = [] then Some state 
-    else bideduce_term state CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
+    else
+      bideduce_term
+        state
+        CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
   (* [cond] = false *)
   else if
     output.conds <> [] &&
@@ -1504,63 +1542,75 @@ and bideduce_simpl bideduction_suite (state  : state) (output : CondTerm.t) =
     | None ->  bideduction_suite state output
 
 
-and bideduce_oracle (state : state) (output_term : CondTerm.t) =
-  let old_state = state in
-  let rec find_match all_match state = match all_match with
-    | [] -> bideduce_term_strict old_state output_term
-    | (mv,inputs,oracle_pat,oracle) :: other_matchs ->
+and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
+
+  (* Given an oracle match, check whether the full inputs
+     (standard inputs + randomness indices + conditions) are
+     bi-deducible *)
+  let find_match (oracle_match : Game.oracle_match) : state option =
+    let exception Failed in     (* return [None] if [Failed] is raised *)
+
+    try
+      let Game.{ mv; full_inputs; oracle_pat; oracle; } = oracle_match in
+
       (* check that inputs are bi-deducible *)
-      let state = bideduce state inputs in
-      match state with
-      | None -> find_match other_matchs old_state
-      | Some state ->
-        let match_res =
-          Game.call_oracle ~fixed_global_names:true state output_term mv oracle_pat oracle
+      let state =
+        bideduce state full_inputs |> oget_exn ~exn:Failed
+      in
+
+      let Game.{ new_consts = consts; index_cond = eqs; post = mem; mem_subgoals; } =
+        Game.call_oracle
+          ~fixed_global_names:true state output_term mv oracle_pat oracle
+        |> oget_exn ~exn:Failed
+      in
+
+      let deducing_subgoals =
+        List.map
+          (fun x -> CondTerm.{term = x; conds = output_term.conds})
+          ( mem_subgoals @ eqs )
+      in
+      let state =
+        bideduce {state with allow_oracle = false} deducing_subgoals
+        |> oget_exn ~exn:Failed
+      in
+      let state = {state with allow_oracle = true} in
+
+      let mem_subgoals =
+        List.map (Term.mk_impl (Term.mk_ands output_term.conds)) mem_subgoals
+      in
+      (* TODO: why are we adding `mem_subgoals` to `subgoals` *)
+      let subgoals = mem_subgoals@state.subgoals in
+
+      match eqs with
+      | [] ->
+        let consts = consts@(state.consts) in
+        some {state with consts;mem;subgoals}      
+      | _ ->
+        let cond = Term.mk_ands eqs in
+        let consts = Const.add_condition cond consts in
+        let consts = consts @ state.consts in
+        let const_loc, consts =
+          List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts
         in
-        match match_res with
-        | None -> find_match other_matchs old_state
-        | Some { new_consts = consts; index_cond = eqs; post = mem; mem_subgoals; } ->
-          let deducing_subgoals =
-            List.map
-              (fun x -> CondTerm.{term = x; conds = output_term.conds})
-              ( mem_subgoals @ eqs )
-          in
-          let state =
-            bideduce {state with allow_oracle = false} deducing_subgoals
-          in
-          match state with
-          | None -> find_match other_matchs old_state
-          | Some state ->
-            let state = {state with allow_oracle = true} in
-            let mem_subgoals =
-              List.map (Term.mk_impl (Term.mk_ands output_term.conds)) mem_subgoals
-            in
-            (* TODO: why are we adding `mem_subgoals` to `subgoals` *)
-            let subgoals = mem_subgoals@state.subgoals in
-            match eqs with
-            | [] ->
-              let consts = consts@(state.consts) in
-              some {state with consts;mem;subgoals}      
-            | eqs ->
-              let cond = Term.mk_ands eqs in
-              let consts = Const.add_condition cond consts in
-              let consts = consts@state.consts in
-              let const_loc, consts =
-                List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts in
-              let state = {state with consts;mem;subgoals} in
-              let state =
-                bideduce_term ~bideduction_suite:(bideduce_term_strict) state
-                  { output_term with conds = (Term.mk_not cond)::output_term.conds}
-              in
-              match state with
-              | None -> find_match other_matchs old_state
-              | Some state ->
-                some {state with consts = const_loc @state.consts}
+        let state = {state with consts;mem;subgoals} in
+        let state =
+          bideduce_term ~bideduction_suite:(bideduce_term_strict) state
+            { output_term with conds = Term.mk_not cond :: output_term.conds }
+          |> oget_exn ~exn:Failed
+        in
+        Some {state with consts = const_loc @ state.consts}
+    with
+    | Failed -> None
   in
+
   if state.allow_oracle then 
-    let all_matchs = Game.match_oracle state output_term in
-    find_match all_matchs old_state
-  else bideduce_term_strict old_state output_term
+    let all_matches = Game.match_oracle state output_term in
+    match List.find_map find_match all_matches with
+    | Some _ as res -> res      
+    | None -> bideduce_term_strict state output_term
+    (* oracle match failed, we recurse *)
+  else
+    bideduce_term_strict state output_term
 
 and bideduce_term
     ?(bideduction_suite = bideduce_oracle) 
@@ -1582,11 +1632,11 @@ and bideduce (state : state) (outputs : CondTerm.t list) =
     match state_op with
     | None -> None
     | Some state ->
-      let inputs = term::state.inputs in
+      let inputs = term :: state.inputs in
       let state = bideduce { state with inputs} outputs in
       match state with
       | None -> None
-      | Some state -> some {state with consts = const_loc@state.consts}
+      | Some state -> some {state with consts = const_loc @ state.consts}
 
 
 (** Assume [togen = x] of type [τ] and [outputs=v] which is [finite] and [well_founded],
