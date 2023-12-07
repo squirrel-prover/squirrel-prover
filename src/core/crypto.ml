@@ -296,7 +296,8 @@ let equal_term_name_eq
   let mv = Match.E.deduce_mem_one cterm known_set unif_state in
   match mv with
   | Some mv ->
-    (*If the matching found a substitution, get all equalities in name the substitution yield*)
+    (* If the matching found a substitution, get all equalities in name the 
+       substitution yield*)
     let subst_res = Mvar.to_subst ~mode:`Unif env.table env.vars mv in
     begin
       match subst_res with
@@ -379,7 +380,6 @@ let exact_eq_under_cond
   Match.E.deduce_mem_one cterm known_set unif_state 
 
 (*------------------------------------------------------------------*)
-
 (** Name contraints module.*)
 module Const = struct 
   (** Inner declaration of [Const], to have a private type [t].
@@ -498,9 +498,9 @@ module Const = struct
       in
       List.map generalize_one consts
 
-    (** Given a name [name(terms)] and a multiset of constrainsts, search whether is is
-        compatible with this set, up to some variables equalities, to associate [name(terms)] to 
-        the tag [otag].  *)
+    (** Given a name [name(terms)] and a multiset of constrainsts, 
+        search whether is is compatible with this set, up to some variables 
+        equalities, to associate [name(terms)] to the tag [otag].  *)
 
     let add_condition (cond : Term.term) (consts : t list) =
       let doit (const : t) =
@@ -513,8 +513,10 @@ module Const = struct
 
   exception InvalidConstraints
 
-  (** [retrieve_global_name] try to retrieve a constraint associated to a global name [name] tagged by [otag] which holds
-      for any branching and variables. Fails it it cannot be found or if such constraint is not unique.*)
+  (** [retrieve_global_name] try to retrieve a constraint associated to 
+      a global name [name] tagged by [otag] which holds for any branching and 
+      variables. 
+      Fails it it cannot be found or if such constraint is not unique. *)
   let retrieve_global_name
       (otag : Tag.t)
       (const : t list)
@@ -545,13 +547,13 @@ module Const = struct
       are always set to any variables and branching.
       The function return the generated constraints and a set of equalities 
       that should hold, to ensure validity of the constraint system. *)
-  let constraints_terms_from_subst
+  let constraints_terms_from_mv
       ?(fixed_global_names = true)
-      (game : game)
+      (game   : game)
       (oracle : oracle)
-      (const : t list)
-      (cond : Term.terms)
-      (subst : Mvar.t)
+      (const  : t list)
+      (cond   : Term.terms)
+      (subst  : Mvar.t)
     =
     let get_loc_smpls (v:Vars.var) =
       try 
@@ -580,8 +582,7 @@ module Const = struct
     in
     let global_const = List.fold_left get_glob_smpls ([],[]) game.glob_smpls in
     let subst = fst global_const in
-    List.concat_map get_loc_smpls oracle.loc_smpls @ snd(global_const) ,subst
-
+    List.concat_map get_loc_smpls oracle.loc_smpls @ snd(global_const), subst
 
 
   let function_formula (const1:t) (const2:t) =
@@ -634,13 +635,16 @@ module Const = struct
     =
     match const with
     | [] -> []
-    | const1::q -> List.map (function_formula const1) const @(function_all_formulas q)
+    | const1::q ->
+      List.map (function_formula const1) const @ function_all_formulas q
 
   let rec fresh_all_formulas (const : t list) =
     match const with
     | [] -> []
-    | const1::q ->fresh_one_const const1 :: (List.map (fresh_formula const1) q @(fresh_all_formulas q))
-
+    | const1::q ->
+      fresh_one_const const1 ::
+      List.map (fresh_formula const1) q @
+      fresh_all_formulas q
 
   let global_formula (const1 : t) (const2 : t) (otag : Tag.t) =
     if const1.name = const2.name
@@ -651,7 +655,9 @@ module Const = struct
       let const2 = refresh const2 in
       let term_equal = Term.mk_eqs const1.term const2.term in
       let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      Term.mk_forall (const1.vars @ const2.vars) (Term.mk_impl const_conjunction term_equal)
+      Term.mk_forall
+        (const1.vars @ const2.vars)
+        (Term.mk_impl const_conjunction term_equal)
     else Term.mk_true
 
 
@@ -670,7 +676,9 @@ module Const = struct
     let global = global_all_formulas game consts in
     let functional = function_all_formulas consts in
     let freshness = fresh_all_formulas consts in
-    List.filter (fun x -> not (Term.Smart.is_true x)) (global@functional@freshness)  
+    List.filter
+      (fun x -> not (Term.Smart.is_true x))
+      (global @ functional @ freshness)  
 end
 
 
@@ -767,13 +775,15 @@ module TSet = struct
     if tset1.vars <> [] then false
     else if Term.equal tset1.term tset2.term
     then
-      let term1 = CondTerm.{term=(Term.mk_ands tset1.conds);conds = []} in
-      let term2 = CondTerm.{term=(Term.mk_ands tset2.conds);conds = []} in
-      let res = exact_eq_under_cond env hyps ~unif_vars:tset2.vars
-          ~target:term1 ~known:term2 in
+      let term1 = CondTerm.{term = Term.mk_ands tset1.conds; conds = []} in
+      let term2 = CondTerm.{term = Term.mk_ands tset2.conds; conds = []} in
+      let res =
+        exact_eq_under_cond env hyps ~unif_vars:tset2.vars
+          ~target:term1 ~known:term2
+      in
       res <> None
-      else false
-      
+    else false
+
         
   (** Check if [tset1 ⊆ tset2] *)
   let is_leq env hyps tset1 tset2 =  
@@ -809,7 +819,8 @@ module AbstractSet = struct
 
   let fv_t set = match set with
     | Top -> Vars.Sv.empty
-    | Sets tl -> List.fold_left  (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
+    | Sets tl ->
+      List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
 
   let subst sbst = function
     | Top -> Top
@@ -822,9 +833,9 @@ module AbstractSet = struct
     | _,Top -> true
     | Sets tl1,Sets tl2 ->
       List.for_all
-        (fun tset1 -> (List.exists (fun tset2 -> TSet.is_leq env hyps tset1 tset2) tl2))
+        (fun tset1 -> List.exists (fun tset2 -> TSet.is_leq env hyps tset1 tset2) tl2)
         tl1
-
+        
   let normalize env hyps (s : t) : t =
     match s with
     | Top -> Top
@@ -838,22 +849,23 @@ module AbstractSet = struct
       in 
       Sets lnorm
 
-  let union env hyps (s1 : t) (s2 : t) =
+  let union env hyps (s1 : t) (s2 : t) : t=
     match s1,s2 with
-    | (Sets tl1), Sets tl2 -> normalize env hyps (Sets (tl1 @tl2))
+    | (Sets tl1), Sets tl2 -> normalize env hyps (Sets (tl1 @ tl2))
     | _ -> Top
 
-  let generalize_set (vars:Vars.vars) (set:t) = match set with
+  let generalize_set (vars : Vars.vars) (set : t) : t=
+    match set with
     | Top -> Top
     | Sets tl -> Sets (List.map (TSet.generalize vars) tl)
 
   let not_in_tset_under_cond
-      (env : Env.t)
-      (hyps : TraceHyps.hyps)
-      (term : CondTerm.t)
-      (tsets  : TSet.t list )
+      (env   : Env.t)
+      (hyps  : TraceHyps.hyps)
+      (term  : CondTerm.t)
+      (tsets : TSet.t list) : bool * Term.terms
     =
-    let rec not_in_tset (tsets : TSet.t list) (subgoals:Term.terms)  =
+    let rec not_in_tset (tsets : TSet.t list) (subgoals : Term.terms)  =
       match tsets with
       | [] -> Some subgoals
       | tset::q ->
@@ -933,9 +945,11 @@ module AbstractSet = struct
     =
     let rec doit = function
       | Term.Var v when mem v assertion  -> (find v assertion)
-      | Term.App (Term.Fun (add,_), [t1;t2] ) when add = Library.Basic.fs_add env.table ->
+      | Term.App (Term.Fun (add,_), [t1;t2] )
+        when add = Library.Basic.fs_add env.table ->
         union env hyps (doit t2) (Sets [(TSet.singleton t1  conds)])
-      | Term.Fun(empty_set,_) when empty_set = Library.Basic.const_emptyset env.table -> Sets [] 
+      | Term.Fun(empty_set,_)
+        when empty_set = Library.Basic.const_emptyset env.table -> Sets [] 
       | _ -> Top
     in
     doit term
@@ -987,13 +1001,17 @@ module AbstractSet = struct
     =
     match bool_term with
     | Term.Var(v) when mem v assertion -> true
-    | Term.Fun(empty_set,_) when empty_set = Library.Basic.const_emptyset env.table -> true
+    | Term.Fun(empty_set,_)
+      when empty_set = Library.Basic.const_emptyset env.table -> true
     | t when t = Term.mk_false || t = Term.mk_true -> true
-    | Term.App (Term.Fun (f_mem,_),[_;_]) when f_mem = Library.Basic.fs_mem env.table->
+    | Term.App (Term.Fun (f_mem,_),[_;_])
+      when f_mem = Library.Basic.fs_mem env.table->
       true
-    | Term.App (Term.Fun (add,_), [_;_] ) when add = Library.Basic.fs_add env.table ->
+    | Term.App (Term.Fun (add,_), [_;_] )
+      when add = Library.Basic.fs_add env.table ->
       true   
-    | Term.App (Term.Fun(f_not, _),[t]) when Term.f_not = f_not ->  boolean_abstraction_supported env assertion t
+    | Term.App (Term.Fun(f_not, _),[t])
+      when Term.f_not = f_not ->  boolean_abstraction_supported env assertion t
     | Term.App (Term.Fun(f_and, _),[t1;t2]) when f_and = Term.f_and ->
       let b1 = boolean_abstraction_supported env assertion t1 in
       let b2 = boolean_abstraction_supported env assertion t2 in
@@ -1015,7 +1033,8 @@ module AbstractSet = struct
     =
     let rec abstract_boolean_and_not (term:Term.term) = 
       match term with
-      | Term.App ( Term.Fun (f_mem,_),[t_el;t_set]) when f_mem = Library.Basic.fs_mem table->
+      | Term.App ( Term.Fun (f_mem,_),[t_el;t_set])
+        when f_mem = Library.Basic.fs_mem table->
         let set = abstract_term env hyps t_set bool_term.conds mem in
         begin
           match set with
@@ -1300,7 +1319,7 @@ module Game = struct
 
         (* full inputs = condition + names indices + standard inputs *)
         let full_inputs =
-          CondTerm.{term=Term.mk_true; conds = term.conds} ::
+          CondTerm.{ term = Term.mk_true; conds = term.conds} ::
           oracle_inputs @
           name_indices_inputs
         in
@@ -1326,14 +1345,13 @@ module Game = struct
         the constraint that the encryption key is [k i] then
         [index_cond] is [i = j]. *)
     post         : mem;             (** post memory *)
-    mem_subgoals : Term.terms;      (** memory subgoals *)
+    mem_subgoals : Term.terms;      (** (exact) memory subgoals *)
   }
   
   (* ----------------------------------------------------------------- *)
   (** If a successful match has been found, does the actual symbolic call 
       to the oracle *)
   let call_oracle
-      ?(fixed_global_names = true)
       (state      : state)
       (term       : CondTerm.t)
       (mv         : Match.Mvar.t)
@@ -1341,27 +1359,22 @@ module Game = struct
       (oracle     : oracle)
     : call_oracle_res option
     =
-    let arg_not_used = List.filter (fun x -> not (Mvar.mem x mv)) oracle.args in
-    let mv =
-      List.fold_left (fun mv var -> 
-          Mvar.add (var,Vars.Tag.ltag) SE.any
-            (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv
-        ) mv arg_not_used 
-    in
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
-    
+
     try
-      let consts,subst =
-        Const.constraints_terms_from_subst
-          ~fixed_global_names state.game oracle state.consts term.conds mv
+      let consts,eqs =
+        Const.constraints_terms_from_mv
+          ~fixed_global_names:true state.game oracle state.consts term.conds mv
       in
-      let eqs = List.map (fun  (t1,t2) -> Term.mk_eq t1 t2) subst in
-      let subst = Term.mk_subst subst in
-      let subgoals =
+      let subst_eqs = Term.mk_subst eqs in
+      let eqs = List.map (fun  (t1,t2) -> Term.mk_eq t1 t2) eqs in
+      let conds = List.map (Term.subst subst_eqs) term.conds in
+      let oracle_conds = Term.subst subst_eqs oracle_cond in
+      let mem_subgoals =
         abstract_boolean state.env state.hyps state.env.table  
-          {term =  Term.subst subst oracle_cond;
-           conds =  List.map (Term.subst subst) term.conds } state.mem
+          { term  = oracle_conds;
+            conds; } state.mem
       in
       (* let _ = *)
       (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. \*)
@@ -1374,19 +1387,19 @@ module Game = struct
       (* in *)
       let mem =
         update
-          state.env state.hyps mv subst
-          ( List.map (Term.subst subst) term.conds)
+          state.env state.hyps mv subst_eqs
+          conds
           (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
           state.mem
       in
-      match subgoals with
-      | Some subgoals ->
-        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
+      match mem_subgoals with
+      | Some mem_subgoals ->
+        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
         Some {
           new_consts = consts;
           index_cond = eqs;
           post = mem;
-          mem_subgoals = subgoals;
+          mem_subgoals;
         } 
       | None -> None
     with Const.InvalidConstraints -> None 
@@ -1567,7 +1580,7 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
 
       let Game.{ new_consts = consts; index_cond; post; mem_subgoals; } =
         Game.call_oracle
-          ~fixed_global_names:true state output_term mv oracle_pat oracle
+          state output_term mv oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
 

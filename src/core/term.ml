@@ -1043,10 +1043,9 @@ let is_var_subst s =
   List.for_all (fun (ESubst (t,_)) -> match t with
       | Var _ -> true
       | _ -> false) s
-(** Create a subst from a list a tupl of terms. FIXME : No sanity checks**)
-let rec mk_subst l = match l with
-    | [] -> []
-    | (t1,t2)::l -> ESubst (t1,t2) :: mk_subst l
+
+(** Create a subst from a list a tupl of terms. **)
+let mk_subst l = List.map (fun (t1,t2) -> ESubst (t1,t2)) l
 
 (** Returns the variables appearing in a substitution LHS. *)
 let subst_support s =
