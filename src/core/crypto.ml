@@ -1269,7 +1269,8 @@ module Game = struct
           or global randomness ([game.glob_smpls]) of the oracle. *)
 
     oracle_pat : oracle_pat;    (** the oracle pattern *)
-    oracle : oracle;            (** the oracle called *)
+    oracle     : oracle;        (** the oracle called *)
+    subgoals   : Term.terms;    (** (exact) subgoals under which match applies *)
   }
 
   (* ----------------------------------------------------------------- *)
@@ -1278,11 +1279,11 @@ module Game = struct
   let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
     let env = state.env in
     
-    (** The function [try_match_oracle] try to finds terms [inputs]
+    (** The function [try_match_oracle0] try to finds terms [inputs]
         and names [n=n_1\,t1,...,n_i\,ti] such that [term] matches a
         given oracle output pattern [oracle_pat]. *)
-    let try_match_oracle
-        (oracle : oracle) (oracle_pat : oracle_pat) (term : CondTerm.t)
+    let try_match_oracle0
+        (oracle : oracle) (subgoals : Term.terms) (oracle_pat : oracle_pat)
       : oracle_match option
       =
       let match_res =
@@ -1324,14 +1325,48 @@ module Game = struct
           name_indices_inputs
         in
 
-        Some { mv; full_inputs; oracle_pat; oracle; }
+        (* complete [mv] with a default [witness] value for all (standard) 
+           oracle inputs that are not needed *)
+        let arg_not_used = List.filter (fun x -> not (Mvar.mem x mv)) oracle.args in
+        let mv =
+          List.fold_left (fun mv var -> 
+              Mvar.add (var,Vars.Tag.ltag) SE.any
+                (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv
+            ) mv arg_not_used 
+        in
+
+        Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
           
       | _ ->  None
     in
-    
-    let match_one_oracle (oracle : oracle) =
+
+    let rec try_match_oracle
+        (oracle : oracle) ~(subgoals : Term.terms) (oracle_pat : oracle_pat) 
+      : oracle_match list
+      =
+      match try_match_oracle0 oracle subgoals oracle_pat with
+      | Some res -> [res]
+      | None ->
+        begin
+          (* matching failed, try again discharging some subgoals to the user:
+             if the oracle is [if b then t1 else t2], try to prove that [b] 
+             (resp. [not b]) is always true, and match [t1] (resp. [t2]) *)
+          match oracle_pat.term with
+          | Term.App (Term.Fun(f,_),[b;t1;t2] ) when f=Term.f_ite ->
+            let oracle_pat1 = { oracle_pat with term = t1; } in
+            let subgs1 = b :: subgoals in
+            let oracle_pat2 = { oracle_pat with term = t2; } in
+            let subgs2 = Term.mk_not b :: subgoals in
+            try_match_oracle oracle ~subgoals:subgs2 oracle_pat1 @
+            try_match_oracle oracle ~subgoals:subgs1 oracle_pat2
+          | _ -> []
+        end
+      (* | None -> [] *)
+    in
+
+    let match_one_oracle (oracle : oracle) : oracle_match list =
       let outputs = oracle_to_term_and_cond env state.mem state.game oracle in
-      List.filter_map (fun output -> try_match_oracle oracle output term) outputs
+      List.concat_map (try_match_oracle oracle ~subgoals:[]) outputs
     in
     
     List.concat_map match_one_oracle state.game.oracles
@@ -1346,6 +1381,7 @@ module Game = struct
         [index_cond] is [i = j]. *)
     post         : mem;             (** post memory *)
     mem_subgoals : Term.terms;      (** (exact) memory subgoals *)
+    subgoals     : Term.terms;      (** (exact) additional subgoals *)    
   }
   
   (* ----------------------------------------------------------------- *)
@@ -1355,13 +1391,15 @@ module Game = struct
       (state      : state)
       (term       : CondTerm.t)
       (mv         : Match.Mvar.t)
+      ~(subgoals  : Term.terms)
       (oracle_pat : oracle_pat)
       (oracle     : oracle)
     : call_oracle_res option
     =
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
-
+    let subgoals = List.map (Term.subst subst) subgoals in
+    
     try
       let consts,eqs =
         Const.constraints_terms_from_mv
@@ -1392,6 +1430,10 @@ module Game = struct
           (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
           state.mem
       in
+
+      (* creating the implication is better than substituting *)
+      let subgoals = List.map (Term.mk_impls eqs) subgoals in
+      
       match mem_subgoals with
       | Some mem_subgoals ->
         assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
@@ -1400,6 +1442,7 @@ module Game = struct
           index_cond = eqs;
           post = mem;
           mem_subgoals;
+          subgoals;
         } 
       | None -> None
     with Const.InvalidConstraints -> None 
@@ -1570,19 +1613,22 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
   let find_valid_match (oracle_match : Game.oracle_match) : state option =
     let exception Failed in     (* return [None] if [Failed] is raised *)
 
-    try
-      let Game.{ mv; full_inputs; oracle_pat; oracle; } = oracle_match in
-
+    let Game.{ mv; full_inputs; oracle_pat; oracle; subgoals; } =
+      oracle_match
+    in
+    try     
       (* check that inputs are bi-deducible *)
       let state =
         bideduce state full_inputs |> oget_exn ~exn:Failed
       in
 
-      let Game.{ new_consts = consts; index_cond; post; mem_subgoals; } =
-        Game.call_oracle
-          state output_term mv oracle_pat oracle
+      let Game.{ new_consts = consts; index_cond; post; mem_subgoals; subgoals; } =
+        Game.call_oracle state output_term mv ~subgoals oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
+
+      (* add the subgoals required by the [oracle_match] to the state *)
+      let state = { state with subgoals = subgoals @ state.subgoals; } in
 
       (* We check that some terms are bi-deducible:
          - [mem_subgoal]: the memory condition under which the adversary knows 
@@ -1973,11 +2019,12 @@ let bideduce_recursive_subgoals
   =
   let step (mem : AbstractSet.mem) =
     List.fold_left (fun (mem, consts, subgs) (togen, state, outputs) ->
-        let mem, consts, subgs =
+        let mem, (* new_consts *) consts, subgs =
           bideduce_fp ~loc
-            togen { state with consts; mem; subgoals = subgs } outputs
+            (* togen { state with mem; subgoals = subgs } outputs *)
+            togen { state with mem; consts; subgoals = subgs } outputs
         in
-        mem, consts, subgs
+        mem, consts(* Const.union consts new_consts *), subgs
       )
       (mem, init_consts, [])      (* restart from initial constraints and (local) subgoals *)
       bided_subgoals

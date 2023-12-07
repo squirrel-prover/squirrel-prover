@@ -16,19 +16,21 @@ game Foo = {
 
 
 game Foo2 = {
-oracle foo (x:message) = {
-rnd k : message;
-var res = <x,x>;
-res:=fst(res);
-return if res = x then <k,res> else k}}.
+  oracle foo (x:message) = {
+    rnd k : message;
+    var res = <x,x>;
+    res:=fst(res);
+    return if res = x then <k,res> else k
+  }
+}.
 
 name key : message.
-global lemma [E] _ :
-equiv(<key,<a,a>>).
-Proof.
-crypto Foo2.
-Qed.
 
+global lemma [E] _ : equiv(<key,<a,a>>).
+Proof.
+  crypto Foo2.
+  auto.
+Qed.
 
 
 (* `x` is in `l`, hence we cannot call the oracle  *)
