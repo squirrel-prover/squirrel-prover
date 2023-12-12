@@ -87,6 +87,57 @@ type ty =
   | Fun of ty * ty
 
 (*------------------------------------------------------------------*)
+(** {2 Iterators, do not recurse} *)
+           
+let fold (f : ty -> 'a -> 'a) (ty : ty) (acc : 'a) : 'a =
+  match ty with 
+  | Message | Boolean | Index | Timestamp
+  | TBase _ | TVar _ | TUnivar _ ->
+    acc
+    
+  | Tuple l -> List.fold_left ((^~) f) acc l
+                 
+  | Fun (ty1, ty2) -> f ty1 (f ty2 acc) 
+
+let map (f : ty -> ty) (ty : ty) : ty =
+  match ty with 
+  | Message | Boolean | Index | Timestamp
+  | TBase _ | TVar _ | TUnivar _ ->
+    ty
+    
+  | Tuple l -> Tuple (List.map f l)
+                 
+  | Fun (ty1, ty2) -> Fun (f ty1, f ty2)
+
+let map_fold (f : ty -> 'a -> ty * 'a) (ty : ty) (acc : 'a) : ty * 'a =
+  match ty with 
+  | Message | Boolean | Index | Timestamp
+  | TBase _ | TVar _ | TUnivar _ ->
+    ty, acc
+    
+  | Tuple l ->
+    let acc, l =
+      List.fold_left_map
+        (fun acc ty -> let acc, ty = f ty acc in ty, acc)
+        acc l
+    in
+    Tuple l, acc
+                 
+  | Fun (ty1, ty2) ->
+    let ty1, acc = f ty1 acc in
+    let ty2, acc = f ty2 acc in
+    Fun (ty1, ty2), acc
+
+let iter (f : ty -> unit) (ty : ty) : unit =
+  fold (fun ty () -> f ty) ty () 
+
+let forall (f : ty -> bool) (ty : ty) : bool =
+  fold (fun ty b -> b && f ty) ty true
+
+let exists (f : ty -> bool) (ty : ty) : bool =
+  fold (fun ty b -> b || f ty) ty false 
+
+(*------------------------------------------------------------------*)
 let tboolean   = Boolean
 let tmessage   = Message
 let ttimestamp = Timestamp
@@ -188,7 +239,9 @@ let to_string (ty : ty) : string =
   Fmt.str "%a" doit ty
   
 (*------------------------------------------------------------------*)
-let is_tuni = function TUnivar _ -> true | _ -> false
+let rec contains_tuni = function
+  | TUnivar _ -> true
+  | _ as ty -> exists contains_tuni ty
 
 let rec is_bitstring_encodable = function 
   | Message

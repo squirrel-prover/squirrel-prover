@@ -963,7 +963,9 @@ let process_system_decl
     =
     match proc with
     | Let (x,t,ty,p) ->
-
+      (* sanity check: type is correct + type is fully inferred. *)
+      assert (Type.equal (Term.ty t) ty && not (Type.contains_tuni ty));
+      
       let t' = Term.subst penv.subst t in
 
       let updated_states : Symbols.macro list =

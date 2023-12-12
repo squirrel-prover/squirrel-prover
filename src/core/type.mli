@@ -48,6 +48,16 @@ type ty =
   (** arrow type [t1 -> t2] *)
 
 (*------------------------------------------------------------------*)
+(** {2 Iterators, do not recurse} *)
+           
+val map_fold : (ty -> 'a -> ty * 'a) -> ty -> 'a -> ty * 'a 
+val map      : (ty ->            ty) -> ty       -> ty
+val fold     : (ty -> 'a ->      'a) -> ty -> 'a -> 'a
+val iter     : (ty ->          unit) -> ty       -> unit
+val forall   : (ty ->          bool) -> ty       -> bool
+val exists   : (ty ->          bool) -> ty       -> bool
+    
+(*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
 val _pp    : dbg:bool -> Format.formatter -> ty -> unit
@@ -61,7 +71,7 @@ val to_string : ty -> string
 (** Equality relation *)
 val equal : ty -> ty -> bool
 
-val is_tuni : ty -> bool
+val contains_tuni : ty -> bool
 
 (** Are the element of the type all encodable as bit-strings *)
 val is_bitstring_encodable : ty -> bool

@@ -107,8 +107,10 @@ let get_body table (system : SE.fset) (data : global_data) : Term.term =
 (*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global
-      table system macro ~suffix ~action ~inputs ~indices ~ts body ty =
-  assert (not (Type.is_tuni ty));
+    table system macro ~suffix ~action ~inputs ~indices ~ts body ty
+    : Symbols.table * Symbols.macro
+  =
+  assert (not (Type.contains_tuni ty));
   let bodies =
     List.map
       (fun projection ->
