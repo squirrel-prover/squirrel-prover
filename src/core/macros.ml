@@ -58,6 +58,9 @@ type global_data = {
 
   bodies : (System.Single.t * Term.term) list;
   (** Definitions of macro body for single systems where it is defined. *)
+
+  ty : Type.ty;
+  (** The type of the macro, which does not depends on the system. *)
 }
 
 (*------------------------------------------------------------------*)
@@ -88,16 +91,17 @@ let pp fmt (g : global_data) : unit =
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
-let get_single_body (single : S.Single.t) (data : global_data) : Term.term =
+let get_single_body table (single : S.Single.t) (data : global_data) : Term.term =
   try List.assoc single data.bodies with
-  | Not_found -> Term.empty
+  | Not_found -> Term.Prelude.mk_witness table ~ty_arg:data.ty
+  (* undefined macros default to witness *)
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a system expression. *)
-let get_body (system : SE.fset) (data : global_data) : Term.term =
+let get_body table (system : SE.fset) (data : global_data) : Term.term =
   Term.combine
     (List.map
-       (fun (lbl,single_system) -> lbl, get_single_body single_system data)
+       (fun (lbl,single_system) -> lbl, get_single_body table single_system data)
        (SE.to_list system))
 
 (*------------------------------------------------------------------*)
@@ -115,7 +119,7 @@ let declare_global
   let data =
     Global_data
       {action = (suffix, action);
-       inputs; indices; ts; bodies}
+       inputs; indices; ts; bodies; ty}
   in
   let def = Symbols.Global (List.length indices, ty) in
   Symbols.Macro.declare table macro ~data def
@@ -175,7 +179,7 @@ let get_def_glob_internal
     | Global_data data -> data 
     | _ -> assert false 
   in
-  let body = get_body system data in
+  let body = get_body table system data in
   let prefix_inputs = List.take (List.length data.inputs) inputs in
   let subst =
     List.map2
@@ -236,7 +240,7 @@ let get_def_glob
       data.inputs
   in
 
-  let t = Term.subst subst (get_body system data) in
+  let t = Term.subst subst (get_body table system data) in
   Term.simple_bi_term t 
 
 (*------------------------------------------------------------------*)
@@ -264,9 +268,10 @@ let get_definition_nocntxt
   in
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
-    init_or_generic Term.empty (fun a ->
-        Term.mk_fun table Symbols.fs_att 
-          [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
+    init_or_generic Term.empty
+      (fun a ->
+         Term.mk_fun table Symbols.fs_att 
+           [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
   | Symbols.Output, _ ->
     `Def (Term.subst descr_subst (snd unapplied_descr.output))
@@ -480,7 +485,7 @@ let update_global_data
     assert (not (List.mem_assoc new_system data.bodies));
     let body = 
       (* old body *)
-      let body = get_single_body old_system data in
+      let body = get_single_body table old_system data in
       (* find all actions in the old system that have a shape where
          the macro is defined *)
       let actions_map = System.descrs table old_system.system in
