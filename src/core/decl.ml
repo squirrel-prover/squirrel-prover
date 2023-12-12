@@ -109,7 +109,7 @@ type declaration_i =
   | Decl_system_modifier  of system_modifier
 
   | Decl_dh of Symbols.dh_hyp list * lsymb *
-               (lsymb * Symbols.symb_type) * 
+               (lsymb * Symbols.symb_type) *
                (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of lsymb * orcl_tag_info option * c_tys
@@ -128,7 +128,8 @@ type declaration_i =
   | Decl_predicate of predicate_decl
   | Decl_abstract  of abstract_decl
   | Decl_bty       of bty_decl
-  | Decl_game      of Crypto.Parse.game_decl 
+  | Decl_game      of Crypto.Parse.game_decl
+  | Tactic         of lsymb * ProverTactics.AST.t
 
 type declaration = declaration_i Location.located
 

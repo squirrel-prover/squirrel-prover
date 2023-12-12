@@ -68,15 +68,11 @@ let rec token buf =
   | "(*" ->
       comment buf;
       token buf
-  | "True" -> TRUE
   | "!_", name -> BANG (Utf8.lexeme buf |> drop_n_first_chars ~n:2)
   | "&&" -> AND
   | "/\\" -> GAND
   | "\\/" -> GOR
   | "||" -> OR
-  | "not" -> NOT
-  | "True" -> TRUE
-  | "False" -> FALSE
   | '"' -> QUOTE
   | '<' -> LANGLE
   | '>' -> RANGLE
@@ -118,110 +114,118 @@ let rec token buf =
   | '\'' -> TICK
   | '%' -> PERCENT
   | int -> INT (Utf8.lexeme buf |> int_of_string)
-  | "if" -> IF
-  | "then" -> THEN
-  | "else" -> ELSE
-  | "let" -> LET
-  | "Let" -> LLET
-  | "XOR" -> XOR
-  | "by" -> BY
-  | "in" -> IN
-  | "out" -> OUT
-  | "new" -> NEW
-  | "try find" -> FIND
-  | "such that" -> SUCHTHAT
-  | "process" -> PROCESS
+
+  | "Proof." -> PROOF
+  | "Qed." -> QED
+  | "Abort." -> ABORT
+  | "Reset." -> RESET
+
   | "abstract" -> ABSTRACT
   | "action" -> ACTION
-  | "op" -> OP
-  | "predicate" -> PREDICATE
-  | "fun" -> FUN
-  | "type" -> TYPE
-  | "name" -> NAME
-  | "mutable" -> MUTABLE
-  | "system" -> SYSTEM
-  | "set" -> SET
-  | "hash" -> HASH
   | "aenc" -> AENC
-  | "senc" -> SENC
-  | "signature" -> SIGNATURE
-  | "intro" -> INTRO
-  | "destruct" -> DESTRUCT
-  | "fa" -> FA
-  | "cs" -> CS
-  | "as" -> AS
-  | "index" -> INDEX
-  | "message" -> MESSAGE
-  | "channel" -> CHANNEL
-  | "boolean" -> BOOLEAN
-  | "bool" -> BOOL
-  | "timestamp" -> TIMESTAMP
-  | "null" -> NULL
-  | "seq" -> SEQ
-  | "rnd" -> RND
-  | "var" -> VAR
-  | "return" -> RETURN
-  | "oracle" -> ORACLE
-  | "game" -> GAME
-  | "with" -> WITH
-  | "where" -> WHERE
-  | "time" -> TIME
-  | "diff" -> DIFF
-  | "forall" -> FORALL
-  | "exists" -> EXISTS
-  | "Forall" -> UFORALL
-  | "Exists" -> UEXISTS
-  | "splitseq" -> SPLITSEQ
-  | "constseq" -> CONSTSEQ
-  | "memseq" -> MEMSEQ
-  | "remember" -> REMEMBER
-  | "dependent" -> DEPENDENT
-  | "lemma" -> LEMMA
-  | "theorem" -> THEOREM
-  | "local" -> LOCAL
-  | "global" -> GLOBAL
-  | "equiv" -> EQUIV
-  | "axiom" -> AXIOM
-  | "Proof." -> PROOF
-  | "hint" -> HINT
-  | "Qed." -> QED
-  | "Reset." -> RESET
-  | "Abort." -> ABORT
-  | "help" -> HELP
-  | "cycle" -> CYCLE
-  | "undo" -> UNDO
-  | "try" -> TRY
-  | "repeat" -> REPEAT
-  | "assert" -> ASSERT
-  | "localize" -> LOCALIZE
-  | "have" -> HAVE
-  | "reduce" -> REDUCE
-  | "auto" -> AUTO
-  | "simpl" -> SIMPL
-  | "exn" -> EXN
-  | "crypto" -> CRYPTO
-  | "use" -> USE
-  | "rewrite" -> REWRITE
-  | "trans" -> TRANS
-  | "fresh" -> FRESH
   | "apply" -> APPLY
-  | "revert" -> REVERT
-  | "generalize" -> GENERALIZE
-  | "induction" -> INDUCTION
-  | "depends" -> DEPENDS
-  | "clear" -> CLEAR
-  | "ddh" -> DDH
+  | "as" -> AS
+  | "assert" -> ASSERT
+  | "auto" -> AUTO
+  | "axiom" -> AXIOM
+  | "bool" -> BOOL
+  | "boolean" -> BOOLEAN
+  | "by" -> BY
+  | "case" -> CASE
   | "cdh" -> CDH
-  | "gdh" -> GDH
-  | "nosimpl" -> NOSIMPL
-  | "rename" -> RENAME
-  | "gprf" -> GPRF
-  | "gcca" -> GCCA
+  | "channel" -> CHANNEL
   | "checkfail" -> CHECKFAIL
+  | "clear" -> CLEAR
+  | "constseq" -> CONSTSEQ
+  | "crypto" -> CRYPTO
+  | "cs" -> CS
+  | "cycle" -> CYCLE
+  | "ddh" -> DDH
+  | "dependent" -> DEPENDENT
+  | "depends" -> DEPENDS
+  | "destruct" -> DESTRUCT
+  | "diff" -> DIFF
+  | "else" -> ELSE
+  | "equiv" -> EQUIV
+  | "exists" -> EXISTS
+  | "Exists" -> UEXISTS
+  | "exn" -> EXN
+  | "fa" -> FA
+  | "False" -> FALSE
+  | "forall" -> FORALL
+  | "Forall" -> UFORALL
+  | "fresh" -> FRESH
+  | "fun" -> FUN
+  | "game" -> GAME
+  | "gcca" -> GCCA
+  | "gdh" -> GDH
+  | "generalize" -> GENERALIZE
+  | "global" -> GLOBAL
+  | "gprf" -> GPRF
+  | "hash" -> HASH
+  | "have" -> HAVE
+  | "help" -> HELP
+  | "hint" -> HINT
+  | "if" -> IF
   | "include" -> INCLUDE
-  | "smt" -> SMT
+  | "index" -> INDEX
+  | "induction" -> INDUCTION
+  | "in" -> IN
+  | "intro" -> INTRO
+  | "lemma" -> LEMMA
+  | "let" -> LET
+  | "Let" -> LLET
+  | "localize" -> LOCALIZE
+  | "local" -> LOCAL
+  | "memseq" -> MEMSEQ
+  | "message" -> MESSAGE
+  | "mutable" -> MUTABLE
+  | "name" -> NAME
+  | "new" -> NEW
+  | "nosimpl" -> NOSIMPL
+  | "not" -> NOT
+  | "null" -> NULL
+  | "op" -> OP
+  | "oracle" -> ORACLE
+  | "out" -> OUT
+  | "predicate" -> PREDICATE
   | "print" -> PRINT
+  | "process" -> PROCESS
+  | "reduce" -> REDUCE
+  | "remember" -> REMEMBER
+  | "rename" -> RENAME
+  | "repeat" -> REPEAT
+  | "return" -> RETURN
+  | "revert" -> REVERT
+  | "rewrite" -> REWRITE
+  | "rnd" -> RND
   | "search" -> SEARCH
+  | "senc" -> SENC
+  | "seq" -> SEQ
+  | "set" -> SET
+  | "signature" -> SIGNATURE
+  | "simpl" -> SIMPL
+  | "smt" -> SMT
+  | "splitseq" -> SPLITSEQ
+  | "such that" -> SUCHTHAT
+  | "system" -> SYSTEM
+  | "tactic" -> TACTIC
+  | "then" -> THEN
+  | "theorem" -> THEOREM
+  | "timestamp" -> TIMESTAMP
+  | "time" -> TIME
+  | "trans" -> TRANS
+  | "True" -> TRUE
+  | "try find" -> FIND
+  | "try" -> TRY
+  | "type" -> TYPE
+  | "undo" -> UNDO
+  | "use" -> USE
+  | "var" -> VAR
+  | "where" -> WHERE
+  | "with" -> WITH
+  | "XOR" -> XOR
+
   | path -> PATH (Utf8.lexeme buf)
   | name -> ID (Utf8.lexeme buf)
   | eof -> EOF

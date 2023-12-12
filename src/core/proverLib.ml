@@ -59,7 +59,7 @@ type include_param = { th_name : lpath;
 type bulleted_tactic =
   | Bullet of string
   | Brace of [`Open | `Close]
-  | BTactic of TacticsArgs.parser_arg Tactics.ast
+  | BTactic of ProverTactics.AST.t
 
 type bulleted_tactics = bulleted_tactic list
 

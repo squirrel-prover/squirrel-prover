@@ -9,7 +9,8 @@
     let loc = L.make startpos endpos in
     L.mk_loc loc s
 
-  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
+  let mk_abstract loc s args =
+    Tactics.Abstract (L.mk_loc loc s, args)
 %}
 
 %token <int> INT
@@ -31,7 +32,8 @@
 %token LLET LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
+%token CHANNEL PROCESS
+%token HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
 %token TYPE FUN
 %token MUTABLE SYSTEM SET
 %token LEMMA THEOREM
@@ -46,10 +48,11 @@
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
 %token REDUCE SIMPL AUTO
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO
 %token PROOF QED RESET UNDO ABORT HINT
+%token TACTIC
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH
 %token SMT
@@ -100,6 +103,7 @@
 %type <Process.Parse.t> top_process
 %type <ProverLib.input> interactive
 %type <ProverLib.input> top_proofmode
+%type <ProverTactics.AST.t> tac
 
 %%
 
@@ -618,14 +622,18 @@ declaration_i:
 
  | g=game { Decl.Decl_game g }
 
-declaration:
-| ldecl=loc(declaration_i)                  { ldecl }
+declaration_no_concat_i:
+| TACTIC lsymb EQ tac                     { Decl.Tactic ($2,$4) }
 
-(* declaration_eof: *)
-(* | ldecl=loc(declaration_i) EOF              { ldecl } *)
+declaration:
+| ldecl=loc(declaration_i)                { ldecl }
+
+declaration_no_concat:
+| ldecl=loc(declaration_no_concat_i)      { ldecl }
 
 declaration_list:
 | decl=declaration                        { [decl] }
+| decl=declaration_no_concat              { [decl] }
 | decl=declaration decls=declaration_list { decl :: decls }
 
 declarations:
@@ -977,6 +985,19 @@ tac:
   (* Crypto tactic *)
   | l=lloc(CRYPTO) game=lsymb args=slist(crypto_arg,empty)
     { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
+
+  | id=loc(CASE) t=tactic_params
+    { mk_abstract (L.loc id) "case" t }
+  | id=loc(CASE) TILDE TYPE t=tac_term
+    { let mode = `Type_based in
+      mk_abstract (L.loc id) "case" TacticsArgs.[Case_mode mode; Theory t] }
+  | id=loc(CASE) TILDE mode=lsymb t=tac_term
+    { let mode =
+        match L.unloc mode with
+        | "struct" -> `Structure_based
+        | _ -> failwith "invalid flag"
+      in
+      mk_abstract (L.loc id) "case" TacticsArgs.[Case_mode mode; Theory t] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term

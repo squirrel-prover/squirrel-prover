@@ -9,12 +9,13 @@ type lsymb = Theory.lsymb
 type in_target = [
   | `Goal
   | `All
-  | `HypsOrDefs of lsymb list         (* hypotheses, definitions, or frame elements *)
+  | `HypsOrDefs of lsymb list
+    (** Hypotheses, definitions, or frame elements. *)
 ]
 
 let pp_in_target ppf (in_t : in_target) =
   match in_t with
-  | `Goal      -> ()
+  | `Goal -> ()
   | `All -> Fmt.pf ppf " in *"
   | `HypsOrDefs symb ->
     Fmt.pf ppf " in %a"
@@ -87,7 +88,7 @@ type rw_equiv_item = [
   | `Rw of Theory.pt
 ] rw_item_g
 
-(** Rewrite argument, which is a rewrite or simplification item*)
+(** Rewrite argument, which is a rewrite or simplification item. *)
 type rw_arg =
   | R_item   of rw_item
   | R_s_item of s_item
@@ -269,6 +270,7 @@ type parser_arg =
   | Fa           of fa_arg list
   | TermPat      of int * Theory.term
   | Crypto       of lsymb * crypto_args
+  | Case_mode    of [`Structure_based|`Type_based]
 
 type parser_args = parser_arg list
 

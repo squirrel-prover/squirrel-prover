@@ -117,11 +117,11 @@ let boolean_case b s : sequent list =
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
 
 (*------------------------------------------------------------------*)
-let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : sequent list =
-  let structure_based, type_based = match mode with
-    | `Any -> true,true
-    | `Structure_based -> true,false
-    | `Type_based -> false,true
+let do_case_tac (args : Args.parser_arg list) s : sequent list =
+  let structure_based, type_based, args = match args with
+    | Args.Case_mode `Structure_based :: args -> true,false,args
+    | Args.Case_mode `Type_based :: args -> false,true,args
+    | _ -> true,true,args
   in
   match Args.convert_as_lsymb args with
   | Some str when TS.Hyps.mem_name (L.unloc str) s && structure_based ->
@@ -147,7 +147,7 @@ let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : sequent list =
 
     | _ -> bad_args ()
 
-let case_tac ?mode args = wrap_fail (do_case_tac ?mode args)
+let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
 

@@ -532,7 +532,7 @@ Proof.
     rewrite if_true => //. by exists x.
   }.
   rewrite -(try_carac_1 phi phi false).
-  case_struct (try find x such that phi x in phi x else false).
+  case ~struct (try find x such that phi x in phi x else false).
   + auto.
   + intro [HH _]; by use HH with x.
 Qed.

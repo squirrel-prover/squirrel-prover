@@ -194,7 +194,7 @@ let start_main_loop
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;
   if Filename.extension filename <> ".sp" then
-    Command.cmd_error (InvalidExtention filename);
+    Command.cmd_error (InvalidExtension filename);
   Html.init filename html_filename;
   let name = Filename.chop_extension filename in
   html := true;
@@ -219,11 +219,11 @@ let run ?(test=false) (filename : string) : unit =
     Printer.init Printer.File;
 
   if Filename.extension filename <> ".sp" then
-    Command.cmd_error (InvalidExtention filename);
+    Command.cmd_error (InvalidExtension filename);
 
   if (!stat_filename <> "") && 
      (Filename.extension !stat_filename <> ".json") then
-    Command.cmd_error (InvalidExtention !stat_filename);
+    Command.cmd_error (InvalidExtension !stat_filename);
 
   let name = Filename.chop_extension filename in
 

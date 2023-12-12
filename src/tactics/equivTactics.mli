@@ -4,9 +4,7 @@ module Args = HighTacticsArgs
 module LT   = LowTactics
   
 (*------------------------------------------------------------------*)
-val case_tac :
-  ?mode:[`Any|`Type_based|`Structure_based] ->
-  Args.parser_args -> LT.etac
+val case_tac        : Args.parser_args -> LT.etac
 val fa_tac          : Args.parser_args -> LT.etac 
 val assumption_tac  : Args.parser_args -> LT.etac 
 val constraints_tac : Args.parser_args -> LT.etac

@@ -4,7 +4,7 @@ module L    = Location
 module Args = TacticsArgs
 module SE   = SystemExpr
 module Mv   = Vars.Mv
-                
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -36,7 +36,7 @@ let pp_error_i fmt = function
 
   | Failure s ->
     Fmt.pf fmt "%s" s
-      
+
 let pp_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl  -> Fmt.pf fmt "declaration"
@@ -58,7 +58,7 @@ let rec split_ty (ty : Theory.p_ty) : Theory.p_ty list =
   match L.unloc ty with
   | Theory.P_fun (t1, t2) -> t1 :: split_ty t2
   | _ -> [ty]
-         
+
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
   let in_tys, out_ty =
     let tys = split_ty decl.abs_tys in
@@ -94,7 +94,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
-      Theory.convert_ext_bnds 
+      Theory.convert_ext_bnds
         ~ty_env ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) env decl.op_args
       (* assume global constant variables to properly check that the
          body represents a deterministic computations later
@@ -103,13 +103,13 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
 
-    let body, out_ty = 
-      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } decl.op_body 
+    let body, out_ty =
+      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } decl.op_body
     in
     let body = Term.subst subst body in
 
     (* check that the typing environment is closed *)
-    if not (Type.Infer.is_closed ty_env) then 
+    if not (Type.Infer.is_closed ty_env) then
       error (L.loc decl.op_body) KDecl (Failure "some types could not be inferred");
 
     (* close the typing environment and substitute *)
@@ -127,15 +127,15 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     (* sanity checks on infix symbols *)
     let in_tys = List.length args in (* number of arguments *)
     Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
-    
-    let table, _ = 
-      Symbols.Function.declare_exact 
+
+    let table, _ =
+      Symbols.Function.declare_exact
         table decl.op_name
         ~data:(Operator.Operator data)
         (ftype, Symbols.Operator)
     in
 
-    Printer.prt `Result "%a" 
+    Printer.prt `Result "%a"
       Operator.pp_operator data;
 
     table
@@ -143,12 +143,12 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 (*------------------------------------------------------------------*)
 let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
   let g = Crypto.Parse.parse loc table decl in
-  
-  Printer.prt `Result "%a" 
+
+  Printer.prt `Result "%a"
     Crypto.pp_game g;
 
-  let table, _ = 
-    Symbols.Game.declare_exact table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) () 
+  let table, _ =
+    Symbols.Game.declare_exact table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) ()
   in
   table
 
@@ -164,12 +164,12 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     (* open a typing environment *)
     let ty_env = Type.Infer.mk_env () in
 
-    let env = 
+    let env =
       let system = SE.{
-          set  = var SE.Var.set; 
-          pair = Some (SE.to_pair (var SE.Var.pair)); } 
+          set  = var SE.Var.set;
+          pair = Some (SE.to_pair (var SE.Var.pair)); }
       in
-      Env.init ~system ~table ~ty_vars () 
+      Env.init ~system ~table ~ty_vars ()
     in
 
     (* parse the system variables declared and build the
@@ -191,26 +191,26 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
           if Ms.mem name se_env then
             error (L.loc lv) KDecl (Failure "duplicated system name");
 
-          let var = 
+          let var =
             match name with
             | "set"   -> SE.Var.set
             | "equiv" -> SE.Var.pair
-            | _ -> SE.Var.of_ident (Ident.create name) 
+            | _ -> SE.Var.of_ident (Ident.create name)
           in
           Ms.add name (var, infos) se_env
         ) SE.Var.init_env decl.pred_se_args
     in
-    
+
     (* parse binders for multi-term variables *)
     let (se_info, env), multi_args =
       List.map_fold
         (fun (se_info,env) (se_v,bnds) ->
            let se_v : SE.t =
              let se_name = L.unloc se_v in
-             
+
              if not (Ms.mem se_name se_env) then
                error (L.loc se_v) KDecl (Failure "unknown system variable");
-             
+
              SE.var (fst (Ms.find se_name se_env))
            in
            let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env bnds in
@@ -222,8 +222,8 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let env, simpl_args =
       Theory.convert_bnds ~ty_env ~mode:NoTags env decl.pred_simpl_args
     in
-    
-    let body = 
+
+    let body =
       match decl.pred_body with
       | None -> Predicate.Abstract
       | Some b ->
@@ -238,8 +238,8 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     (* check that the typing environment is closed *)
     if not (Type.Infer.is_closed ty_env) then
       begin
-        let loc = 
-          match decl.pred_body with Some b -> L.loc b | None -> L.loc decl.pred_name 
+        let loc =
+          match decl.pred_body with Some b -> L.loc b | None -> L.loc decl.pred_name
         in
         error loc KDecl (Failure "some types could not be inferred")
       end;
@@ -258,7 +258,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
       List.map (fun (_, (se_v,infos)) ->
           (se_v, infos)
         ) (Ms.bindings se_env)
-    in    
+    in
     let args = Predicate.{ multi = multi_args; simple = simpl_args; } in
     let data = Predicate.mk ~name ~se_vars ~ty_vars ~args ~body in
 
@@ -266,24 +266,24 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let in_tys =
       List.fold_left
         (fun in_tys (_, args) -> in_tys + List.length args)
-        (List.length simpl_args) multi_args      
+        (List.length simpl_args) multi_args
     in
     Theory.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
-    
-    let table, _ = 
-      Symbols.Predicate.declare_exact 
+
+    let table, _ =
+      Symbols.Predicate.declare_exact
         table decl.pred_name
         ~data:(Predicate.Predicate data)
         ()
     in
 
-    Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]" 
+    Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]"
       Predicate.pp data;
 
     table
 
 (*------------------------------------------------------------------*)
-(** Parse additional type information for procedure declarations 
+(** Parse additional type information for procedure declarations
     (enc, dec, hash, ...) *)
 let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   (* check for duplicate *)
@@ -319,12 +319,12 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Theory.term) :
          | Type.(Message, Message) ->
            Oracle.add_oracle (h,form) table
          | _ ->
-           ProverLib.error (L.loc fm) 
+           ProverLib.error (L.loc fm)
              "The tag formula must be of the form forall
              (m:message,sk:message)"
        end
 
-     | _ -> 
+     | _ ->
        ProverLib.error (L.loc fm)
          "The tag formula must be of the form forall
          (m:message,sk:message)"
@@ -333,11 +333,11 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Theory.term) :
 (** {2 Declaration processing} *)
 
 
-let declare table decl : Symbols.table * Goal.t list = 
+let declare table decl : Symbols.table * Goal.t list =
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
 
-  | Decl.Decl_process { id; projs; args; proc} ->   
+  | Decl.Decl_process { id; projs; args; proc} ->
     Process.declare table ~id ~args ~projs proc, []
 
   | Decl.Decl_action a ->
@@ -362,7 +362,7 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table =
-      SystemModifiers.declare_system table sdecl 
+      SystemModifiers.declare_system table sdecl
     in
     let table = omap_dflt table (Lemma.add_lemma `Lemma ^~ table) new_lemma in
     table, proof_obls
@@ -409,9 +409,9 @@ let declare table decl : Symbols.table * Goal.t list =
   | Decl.Decl_name (s, p_ty) ->
     let env = Env.init ~table () in
 
-    let p_args_tys, p_out_ty = 
+    let p_args_tys, p_out_ty =
       match p_ty with
-      | { pl_desc = 
+      | { pl_desc =
             Theory.P_fun (
               { pl_desc = Theory.P_tuple p_args_ty},
               p_out_ty
@@ -419,7 +419,7 @@ let declare table decl : Symbols.table * Goal.t list =
         } ->
         p_args_ty, p_out_ty
 
-      | { pl_desc = Theory.P_fun (p_arg_ty, p_out_ty)} -> 
+      | { pl_desc = Theory.P_fun (p_arg_ty, p_out_ty)} ->
         [p_arg_ty], p_out_ty
 
       | _ -> [], p_ty
@@ -427,17 +427,17 @@ let declare table decl : Symbols.table * Goal.t list =
 
     let args_tys = List.map (Theory.convert_ty env) p_args_tys in
     let out_ty = Theory.convert_ty env p_out_ty in
-    
+
     let n_fty = Type.mk_ftype_tuple [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
-        (* necessary to ensure that a term semantics is always a random variables 
-           (indeed, this guarantees that the set of tapes is finite, and can be 
+        (* necessary to ensure that a term semantics is always a random variables
+           (indeed, this guarantees that the set of tapes is finite, and can be
            equipped with the discrete sigma-algebra and the uniform distribution) *)
         if not (Symbols.TyInfo.is_finite table ty) then
           error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
-    
+
     let table = Theory.declare_name table s Symbols.{ n_fty } in
     Process.add_namelength_axiom table s n_fty, []
 
@@ -477,8 +477,12 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_game game -> parse_game_decl (L.loc decl) table game, []
 
+  | Decl.Tactic (id,ast) ->
+    ProverTactics.register_macro (L.unloc id) ast ;
+    table, []
+
 let declare_list table decls =
-  let table, subgs = 
+  let table, subgs =
     List.map_fold (fun table d -> declare table d) table decls
   in
   table, List.flatten subgs
@@ -486,7 +490,7 @@ let declare_list table decls =
 (*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : lsymb) db =
   let lem = Lemma.find_stmt_local s table in
-  
+
   if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(L.loc s)
       (Failure "rewrite hints must apply to any system");

@@ -2,52 +2,40 @@
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
 
+(** Tactic groups. *)
+type tactic_group =
+  | Logical       (** Sequent calculus logical properties. *)
+  | Structural    (** Properties inherent to protocol,
+                      names or builtin functions. *)
+  | Cryptographic (** Cryptographic assumptions. *)
+  | None          (** No group for user-defined tactics, i.e. macros. *)
 
-(* Define formats of help informations for tactics *)
-type tactic_groups =
-  | Logical       (* A logic tactic is a tactic that relies on the sequence calculus
-                     logical properties. *)
-  | Structural    (* A structural tactic relies on properties inherent to protocol,
-                     on equality between messages, behaviour of ifthenelse,
-                     action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions *)
+(** Tactic metadata and documentation. *)
+type tactic_help = {
+  general_help  : string;
+  detailed_help : string;
+  usages_sorts  : TacticsArgs.esort list;
+  tactic_group  : tactic_group
+}
 
-(* The record for a detailed help tactic. *)
-type tactic_help = { general_help : string;
-                     detailed_help : string;
-                     usages_sorts : TacticsArgs.esort list;
-                     tactic_group : tactic_groups}
-
-val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 val dbg : ('a, Format.formatter, unit) format -> 'a
 val bad_args : unit -> 'a
 
-module AST : sig
-  type arg = TacticsArgs.parser_arg
-  type judgment = Goal.t
-  type t = arg Tactics.ast
-  val eval : bool -> string list -> t -> judgment Tactics.tac
-  val eval_judgment : bool -> t -> judgment -> judgment list
-  val pp : Format.formatter -> t -> unit
-end
-
-(** Registry for tactics on some kind of judgment *)
 type judgment = Goal.t
 type tac = judgment Tactics.tac
 
-  (* Allows to register a general tactic. Used when the arguments of the tactic
-     are complex. *)
+module AST : Tactics.AST_sig
+  with type arg = TacticsArgs.parser_arg
+  with type judgment = judgment
 
+(** General-purpose tactic registration function. *)
 val register_general :
   string -> tactic_help:tactic_help ->
   ?pq_sound:bool ->
   (TacticsArgs.parser_arg list -> tac) -> unit
 
-(* Register a macro, built using the AST. FIXME never used ? *)
-(* val register_macro : *)
-(*   string -> ?modifiers:string list -> tactic_help:tactic_help -> *)
-(*       ?pq_sound:bool -> *)
-(*   TacticsArgs.parser_arg Tactics.ast -> unit *)
+(* Register a macro, built using the AST. *)
+val register_macro : string -> AST.t -> unit
 
 (* The remaining functions allow to easily register a tactic,
    without having to manage type conversions, or worry about the
@@ -62,7 +50,7 @@ val register : string -> tactic_help:tactic_help ->
 
 val register_typed :
   string ->  general_help:string ->  detailed_help:string ->
-  tactic_group:tactic_groups ->
+  tactic_group:tactic_group ->
   ?pq_sound:bool ->
   ?usages_sorts : TacticsArgs.esort list ->
   ('a TacticsArgs.arg -> judgment -> judgment list) ->

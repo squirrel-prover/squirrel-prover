@@ -297,7 +297,7 @@ let run : 'a tac -> 'a -> 'a list = fun tac a ->
 type selector = int list
 
 let check_sel sel_tacs l =
-  (* check that there a no selector for non-existing goal *)
+  (* Check that there is no selector for non-existing goal. *)
   let max_list l = match l with
     | [] -> assert false
     | a :: l -> List.fold_left max a l
@@ -309,7 +309,7 @@ let check_sel sel_tacs l =
   if max_sel > List.length l then
     hard_failure (Failure ("no goal " ^ string_of_int max_sel));
 
-  (* check that selectors are disjoint *)
+  (* Check that selectors are disjoint. *)
   let all_sel = List.fold_left (fun all (s,_) -> s @ all) [] sel_tacs in
   let _ =
     List.fold_left (fun acc s ->
@@ -581,23 +581,11 @@ let () =
 
 (** Generic tactic syntax trees *)
 
-module type S = sig
-
-  type arg
-  val pp_arg : Format.formatter -> arg -> unit
-
-  type judgment
-
-  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
-end
-
-(** AST for tactics, with abstract leaves corresponding to prover-specific
-  * tactics, with prover-specific arguments. Modifiers have no internal
-  * semantics: they are printed, but ignored during evaluation -- they
-  * can only be used for cheap tricks now, but may be used to guide tactic
-  * evaluation in richer ways in the future. *)
+(** AST for tactics, with abstract atomic leaves.
+    Modifiers have no specific semantics and are simply propagated
+    to impact the evaluation of atoms. *)
 type 'a ast =
-  | Abstract of lsymb * 'a list
+  | Abstract   : lsymb * 'a list -> 'a ast
   | AndThen    : 'a ast list -> 'a ast
   | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
@@ -609,6 +597,14 @@ type 'a ast =
   | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 
+module type S = sig
+  type arg
+  type judgment
+  val pp_arg : Format.formatter -> arg -> unit
+  (* TODO post-quantum flag probably shouldn't be here *)
+  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
+end
+
 module type AST_sig = sig
 
   type arg
@@ -616,36 +612,39 @@ module type AST_sig = sig
   type t = arg ast
 
   val eval : bool -> string list -> t -> judgment tac
-
   val eval_judgment : bool -> t -> judgment -> judgment list
-
   val pp : Format.formatter -> t -> unit
 
 end
 
-module AST (M:S) = struct
+(** Concrete tactic ASTs that can be evaluated as tactics. *)
+module AST (M:S) :
+  AST_sig with type arg = M.arg
+          with type judgment = M.judgment
+=
+struct
 
   open M
 
-  (** AST for tactics, with abstract leaves corresponding to prover-specific
-    * tactics, with prover-specific arguments. *)
   type t = arg ast
 
   type arg = M.arg
   type judgment = M.judgment
 
   let rec eval (post_quantum:bool) modifiers = function
-    | Abstract (id,args)  -> eval_abstract post_quantum modifiers id args
-    | AndThen tl          -> andthen_list (List.map (eval post_quantum modifiers) tl)
-    | AndThenSel (t,tl)   ->
-      let tl = List.map (fun (s,t') -> s, (eval post_quantum modifiers t')) tl in
+    | Abstract (id,args) -> eval_abstract post_quantum modifiers id args
+    | AndThen tl -> andthen_list (List.map (eval post_quantum modifiers) tl)
+    | AndThenSel (t,tl) ->
+      let tl =
+        List.map (fun (s,t') -> s, (eval post_quantum modifiers t')) tl in
       andthen_sel (eval post_quantum modifiers t) tl
-
-    | OrElse tl           -> orelse_list (List.map (eval post_quantum modifiers) tl)
-    | Try t               -> try_tac (eval post_quantum modifiers t)
-    | By (t,loc)                ->
+    | OrElse tl ->
+      orelse_list (List.map (eval post_quantum modifiers) tl)
+    | Try t -> try_tac (eval post_quantum modifiers t)
+    | By (t,loc) ->
       andthen_list [eval post_quantum modifiers t;
-                    eval post_quantum modifiers (Abstract (L.mk_loc loc "auto",[]))]
+                    eval post_quantum modifiers
+                      (Abstract (L.mk_loc loc "auto",[]))]
 
     | Repeat t            -> repeat (eval post_quantum modifiers t)
     | Ident               -> id
@@ -663,7 +662,8 @@ module AST (M:S) = struct
       let i = L.unloc i in
       if args = [] then Fmt.string ppf i else
         Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
-          
+
+
     | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
 
     | AndThen ts ->
@@ -719,6 +719,3 @@ module AST (M:S) = struct
     try ignore (tac j sk fk) ; assert false with Return l -> l
 
 end
-
-
-

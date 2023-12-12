@@ -158,6 +158,7 @@ type declaration_i =
   | Decl_abstract  of abstract_decl
   | Decl_bty       of bty_decl
   | Decl_game      of Crypto.Parse.game_decl
+  | Tactic         of lsymb * ProverTactics.AST.t
 
 type declaration = declaration_i L.located
 

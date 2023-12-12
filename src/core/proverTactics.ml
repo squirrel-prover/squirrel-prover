@@ -1,20 +1,26 @@
-type tactic_groups =
+type tactic_group =
   | Logical
-  (** Sequence calculus logical properties. *)
-
   | Structural
-  (** Properties inherent to protocol, on equality between messages, behaviour 
-     of if _ then _ else _, action dependencies... *)
-
   | Cryptographic
-  (** Cryptographic assumptions. *)
+  | None
 
-(** The record for a detailed help tactic. *)
-type tactic_help = { general_help  : string;
-                     detailed_help : string;
-                     usages_sorts  : TacticsArgs.esort list;
-                     tactic_group  : tactic_groups;
-                   }
+let str_cat = function
+  | Logical -> "Logical"
+  | Structural -> "Structural"
+  | Cryptographic -> "Cryptographic"
+  | None -> "None"
+
+type tactic_help = {
+  general_help  : string;
+  detailed_help : string;
+  usages_sorts  : TacticsArgs.esort list;
+  tactic_group  : tactic_group;
+}
+
+let dummy_help =
+  let sorry = "No help available." in
+   { general_help = sorry ; detailed_help = sorry ;
+     usages_sorts = [] ; tactic_group = None }
 
 type 'a tac_infos = {
   maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
@@ -24,9 +30,7 @@ type 'a tac_infos = {
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
 
-(*------------- Basic Tactic tables, without registration-----------*)(* {↓{ *)
-(** Basic tactic tables, without registration *)
-
+(** Basic tactic tables, without registration. *)
 module TacTable : sig
   val table : Goal.t table
   val tac_count_table : (string, int) Hashtbl.t
@@ -59,9 +63,8 @@ end = struct
     | Goal.Local  j -> Term.pp  ppf (LowTraceSequent.goal j)
     | Goal.Global j -> Equiv.pp ppf (LowEquivSequent.goal j)
 end
-(* }↑} *)
 
-(** AST evaluators for general judgment. *)(* {↓{ *)
+(** AST evaluators for general judgments, i.e. [Goal.t]. *)
 module AST :
   (Tactics.AST_sig
    with type arg = TacticsArgs.parser_arg
@@ -69,7 +72,6 @@ module AST :
 = Tactics.AST(struct
 
   type arg = TacticsArgs.parser_arg
-
   type judgment = Goal.t
 
   let pp_arg = TacticsArgs.pp_parser_arg
@@ -89,17 +91,15 @@ module AST :
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
       | _ -> assert false
+
 end)
-(* }↑} *)
 
-let pp_ast fmt t = AST.pp fmt t
+(* ----------------------------------------------------------------------- *)
 
-(*-------- ProverTactics --------------------------------------*)(* {↓{ *)
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 let bad_args () = Tactics.hard_failure (Failure "improper arguments")
 
-(* ProverTactics *)(* {↓{ *)
 include TacTable
 
 type judgment = Goal.t
@@ -119,12 +119,22 @@ let register_general id ~tactic_help ?(pq_sound=false) f =
                help = tactic_help;
                pq_sound}
 
+let register_macro id ast =
+  register_general id ~tactic_help:dummy_help
+  (fun args ->
+    if args <> [] then
+      let msg =
+        Format.sprintf "tactic %S does not accept any argument." id in
+      Tactics.(hard_failure (Failure msg))
+    else
+      AST.eval true [] ast)
+
 let convert_args j parser_args tactic_type =
   let env, conc =
     match j with
-    | Goal.Local t -> LowTraceSequent.env t, Equiv.Local (LowTraceSequent.goal t)
-
-    | Goal.Global e -> 
+    | Goal.Local t ->
+      LowTraceSequent.env t, Equiv.Local (LowTraceSequent.goal t)
+    | Goal.Global e ->
       LowEquivSequent.env e, Equiv.Global (LowEquivSequent.goal e)
   in
   HighTacticsArgs.convert_args env parser_args tactic_type conc
@@ -203,11 +213,6 @@ let pps fmt () =
   let filter_cat helps cat =
     List.filter (fun (_,x) -> x.tactic_group = cat) helps
   in
-  let str_cat = function
-    | Logical -> "Logical"
-    | Structural -> "Structural"
-    | Cryptographic -> "Cryptographic"
-  in
   List.iter (fun cat ->
       Printer.kw `HelpType fmt "\n%s"
         (str_cat cat^" tactics:");
@@ -240,11 +245,6 @@ let pp_list fmt () =
     |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
   in
   let filter_cat helps cat = List.filter (fun (_,x) -> x.tactic_group = cat) helps in
-  let str_cat = function
-    | Logical -> "Logical"
-    | Structural -> "Structural"
-    | Cryptographic -> "Cryptographic"
-  in
   List.iter (fun cat ->
       Printer.kw `HelpType fmt "\n%s"
         (str_cat cat^" tactics:\n");
@@ -255,7 +255,6 @@ let pp_list fmt () =
         (filter_cat helps cat);
     )
     [Logical; Structural; Cryptographic]
-(* }↑} *)
 
 let get_help (tac_name : Theory.lsymb) =
   if Location.unloc tac_name = "" then
@@ -268,9 +267,8 @@ let get_help (tac_name : Theory.lsymb) =
 let get_help' (tac_name : Theory.lsymb) =
   get_help tac_name;
   Tactics.id
-(* }↑} *)
 
-(*-------- Declare Tactics here ! TOMOVE ! TODO ---------------*)(* {↓{ *)
+(*-------- Declare Tactics here ! TODO move as commands ---------------*)
 let () =
   register_general "lemmas"
     ~tactic_help:{general_help = "Print all proved lemmas.";
@@ -319,4 +317,3 @@ let () =
                   tactic_group = Logical}
     ~pq_sound:true
     (fun _ -> Tactics.id)
-(* }↑} *)

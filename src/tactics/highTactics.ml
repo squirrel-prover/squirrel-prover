@@ -35,32 +35,7 @@ let () =
                        Sort Args.Message;];
        tactic_group = Logical}
     ~pq_sound:true
-    (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac);
-  T.register_general "case_struct"
-    ~tactic_help:
-      {general_help = "Perform a structure-based case analysis.";
-       detailed_help = "";
-       usages_sorts = [Sort Args.String;
-                       Sort Args.Timestamp;
-                       Sort Args.Boolean;
-                       Sort Args.Message]; (* Actually any sort works *)
-       tactic_group = Logical}
-    ~pq_sound:true
-    (LT.gentac_of_any_tac_arg
-       (TraceTactics.case_tac ~mode:`Structure_based)
-       (EquivTactics.case_tac ~mode:`Structure_based));
-  T.register_general "case_type"
-    ~tactic_help:
-      {general_help = "Perform a type-based case analysis.";
-       detailed_help = "";
-       usages_sorts = [Sort Args.Timestamp;
-                       Sort Args.Boolean];
-       tactic_group = Logical}
-    ~pq_sound:true
-    (LT.gentac_of_any_tac_arg
-       (TraceTactics.case_tac ~mode:`Type_based)
-       (EquivTactics.case_tac ~mode:`Type_based))
-
+    (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac)
 
 (*------------------------------------------------------------------*)
 let () =

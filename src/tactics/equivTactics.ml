@@ -321,11 +321,11 @@ let () =
     (LT.genfun_of_efun_arg trans_tac)
 
 (*------------------------------------------------------------------*)
-let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : ES.t list =
-  let structure_based, type_based = match mode with
-    | `Any -> true,true
-    | `Structure_based -> true,false
-    | `Type_based -> false,true
+let do_case_tac (args : Args.parser_arg list) s : ES.t list =
+  let structure_based, type_based, args = match args with
+    | Args.Case_mode `Structure_based :: args -> true,false,args
+    | Args.Case_mode `Type_based :: args -> false,true,args
+    | _ -> true,true,args
   in
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
@@ -353,8 +353,8 @@ let do_case_tac ?(mode=`Any) (args : Args.parser_arg list) s : ES.t list =
       end
     | _ -> bad_args ()
 
-let case_tac ?mode (args : Args.parser_args) : LT.etac =
-  wrap_fail (do_case_tac ?mode args)
+let case_tac (args : Args.parser_args) : LT.etac =
+  wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
 (** Apply the entailment (i.e. bi-frame inclusion) and left-false rule.
@@ -1061,7 +1061,6 @@ let () =
        equiv(phi, t1, u1) and equiv(phi, t2, u2)."
    ~tactic_group:Structural
    (LT.genfun_of_pure_efun_arg case_study) Args.(Pair(Message,Opt Int))
-
 
 (*------------------------------------------------------------------*)
 (** Fresh *)

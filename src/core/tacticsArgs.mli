@@ -190,6 +190,7 @@ type parser_arg =
   | Fa           of fa_arg list
   | TermPat      of int * Theory.term
   | Crypto       of lsymb * crypto_args
+  | Case_mode    of [`Structure_based|`Type_based]
 
 type parser_args = parser_arg list
 

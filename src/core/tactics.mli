@@ -99,18 +99,23 @@ exception Tactic_hard_failure of tac_error
 
 val pp_tac_error_i : Format.formatter -> tac_error_i -> unit
 
-(** Purely abstract type "returned" by continuations and tactics *)
+(** Purely abstract type "returned" by continuations and tactics. *)
 type a
 
 type fk = tac_error -> a
 
 type 'a sk = 'a -> fk -> a
 
-(** A properly implemented tactic should always have its ['a]
-  * parameter unconstrained. *)
+(** A ['a tac] is a tactic working on judgments of type ['a],
+    which can be seen as a non-deterministic computation
+    taking a judgment as input and returning a list of judgments.
+    This computation is performed in continuation-passing style,
+    the possible results are passed to the [sk] continuation
+    successively, and [fk] is called when no (more) result is available. *)
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
-(** Run a tactic that does not fail  *)
+(** Run a tactic and return its first result.
+    The tactic must not fail. *)
 val run : 'a tac -> 'a -> 'a list
 
 (*------------------------------------------------------------------*)
@@ -140,25 +145,13 @@ val try_tac : 'a tac -> 'a tac
 (*------------------------------------------------------------------*)
 (** {2 Generic tactic syntax trees} *)
 
-module type S = sig
-
-  type arg
-  val pp_arg : Format.formatter -> arg -> unit
-
-  type judgment
-
-  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
-end
-
 type selector = int list
 
-(** AST for tactics, with abstract leaves corresponding to prover-specific
-  * tactics, with prover-specific arguments. Modifiers have no internal
-  * semantics: they are printed, but ignored during evaluation -- they
-  * can only be used for cheap tricks now, but may be used to guide tactic
-  * evaluation in richer ways in the future. *)
+(** AST for tactics, with abstract atomic leaves.
+    Modifiers have no specific semantics and are simply propagated
+    to impact the evaluation of atoms. *)
 type 'a ast =
-  | Abstract of lsymb * 'a list
+  | Abstract   : lsymb * 'a list -> 'a ast
   | AndThen    : 'a ast list -> 'a ast
   | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
@@ -170,14 +163,28 @@ type 'a ast =
   | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 
+(** Operations required to evaluate any [arg ast] as [judgment tac]:
+    we must be able to display arguments and evaluate abstract leaves. *)
+module type S = sig
+  type arg
+  type judgment
+  val pp_arg : Format.formatter -> arg -> unit
+  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
+end
+
 module type AST_sig = sig
 
   type arg
   type judgment
   type t = arg ast
 
+  (** [eval post_quantum modifiers ast] evaluates an AST as a tactic,
+      given a [post_quantum] flag and a list of modifiers.
+      TODO ideally, drop PQ flag as this module should be Squirrel-agnostic *)
   val eval : bool -> string list -> t -> judgment tac
 
+  (* TODO document; this is the only place where hard/soft failures matter
+     so it may be beneficial to move this to ProverTactics *)
   val eval_judgment : bool -> t -> judgment -> judgment list
 
   val pp : Format.formatter -> t -> unit
@@ -196,4 +203,3 @@ val soft_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Raise a hard failure. *)
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
-

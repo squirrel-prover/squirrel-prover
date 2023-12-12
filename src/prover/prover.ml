@@ -77,7 +77,7 @@ let current_goal_name (ps:state) : string option =
       | ProverLib.UnprovedLemma (stmt,_) -> stmt.Goal.name
       | ProofObl _ -> "proof obligation" ) ps.current_goal
 
-(*--------------------- Printings         ------------------*)(* {↓{ *)
+(*--------------------- Printings         ------------------*)
 let str_mode = function
   | ProverLib.GoalMode -> "GoalMode"
   | ProverLib.ProofMode -> "ProofMode"
@@ -104,7 +104,6 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       Goal.pp sg
     ) subgoals
   | _ -> assert false
-(* }↑} *)
 
 let try_complete_proof (ps:state) : state =
   if is_proof_completed ps then begin
@@ -176,7 +175,7 @@ let do_start_proof ?(check=`NoCheck) (st: state) : state =
     ps
   | Some es, _ -> Command.cmd_error (StartProofError es)
 
-(*---------------------    Goals handling  -----------------*)(* {↓{ *)
+(*---------------------    Goals handling  -----------------*)
 let get_current_goal (ps:state) : ProverLib.pending_proof option = ps.current_goal
 
 let get_current_system (ps:state) : SystemExpr.context option =
@@ -263,9 +262,8 @@ let get_deepest_table (st:state) : Symbols.table =
     end
   | _ -> get_table st
   end
-(* }↑} *)
 
-(*--------------------- Tactics evaluation -----------------*)(* {↓{ *)
+(*--------------------- Tactics evaluation -----------------*)
 (** [eval_tactic_focus tac] applies [tac] to the focused goal. *)
 let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state = 
   match ps.subgoals with
@@ -297,9 +295,10 @@ let cycle i_l l =
   if i < 0 then cyc [] (List.length l + i) l
   else cyc [] i l
 
-let eval_tactic (utac:TacticsArgs.parser_arg Tactics.ast) (ps:state) : state = 
+let eval_tactic (utac:ProverTactics.AST.t) (ps:state) : state =
   match utac with
-  | Tactics.Abstract (Location.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
+  | Tactics.Abstract
+      (Location.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
     (* TODO do something more for bullets?
        Cycling the list of subgoals does not change its length so
        nothing will break (fail) wrt bullets, but the result will
@@ -308,9 +307,8 @@ let eval_tactic (utac:TacticsArgs.parser_arg Tactics.ast) (ps:state) : state =
        reflect cycles. *)
     { ps with subgoals = cycle i ps.subgoals }
   | _ -> eval_tactic_focus utac ps
-(* }↑} *)
 
-(*----------------------- Bullets --------------------------*)(* {↓{ *)
+(*----------------------- Bullets --------------------------*)
 (** Insert a bullet in the proof script. *)
 let open_bullet (ps:state) (bullet : string) : state =
   assert (bullet <> "");
@@ -336,7 +334,7 @@ let tactic_handle (ps:state) = function
  | ProverLib.Brace `Close -> close_brace ps
  | ProverLib.BTactic utac  -> eval_tactic utac ps
 
-(*---------------- do_* commands handling ------------------*)(* {↓{ *)
+(*---------------- do_* commands handling ------------------*)
 let do_print_goal (st:state) : unit = 
   match get_mode st with
   | ProverLib.ProofMode -> 
@@ -348,7 +346,7 @@ let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : 
     | `NoCheck -> assert (state.prover_mode = WaitQed)
     | `Check   -> 
       if state.prover_mode <> ProverLib.ProofMode then
-        Command.cmd_error Unexpected_command;
+        Command.cmd_error UnexpectedCommand;
   end;
 
   match check with
@@ -374,16 +372,13 @@ let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
     in
     match b_tacs with
       | [utac] ->
-          Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
+          Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.AST.pp utac
       | _ ->
           Printer.prt `Prompt "Line %d: ??" lnum
   end;
     do_tactic' ~check st l
 
-
-(* }↑} *)
-
-(*----------------------- Search --------------------------*)(* {↓{ *)
+(*----------------------- Search --------------------------*)
 let search_about (st:state) (q:ProverLib.search_query) : 
   (Lemma.lemma * Equiv.any_form list) list =
   let env = 
@@ -591,7 +586,6 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
         if not found then
         Printer.prt `Default "%s not found@." (Location.unloc l)
       end
-(* }↑} *)
 
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
@@ -649,10 +643,10 @@ let rec do_command
           abort st
     | _, Qed ->
       if test then raise Unfinished;
-      Command.cmd_error Unexpected_command
+      Command.cmd_error UnexpectedCommand
     | _, _ -> 
       Printer.pr "What is this command ? %s" (str_mode mode);
-      Command.cmd_error Unexpected_command
+      Command.cmd_error UnexpectedCommand
 
 and do_include
     ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i: ProverLib.include_param) : state 
