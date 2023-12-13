@@ -134,7 +134,7 @@ let tac_auto (args : 'a list) ~(strong:bool) ~(close:bool) : Goal.t Tactics.tac 
   let red_param =
     match args with
     | [] -> Reduction.rp_default
-    | [Args.Auto n] -> Reduction.parse_simpl_args Reduction.rp_default n
+    | [Args.Named_args n] -> Reduction.parse_simpl_args Reduction.rp_default n
     | _ -> bad_args ()
   in
   auto ~red_param ~strong ~close s sk fk

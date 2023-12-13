@@ -958,9 +958,13 @@ crypto_arg:
 /* tactics named arguments */
 
 named_arg:
-| TILDE l=lsymb         { TacticsArgs.NArg l }
-| TILDE l=lsymb COLON LBRACKET ll=slist(lsymb,COMMA) RBRACKET
+| TILDE l=label         { TacticsArgs.NArg l }
+| TILDE l=label COLON LBRACKET ll=slist(label,COMMA) RBRACKET
                         { TacticsArgs.NList (l,ll) }
+
+label:
+| l=lsymb { l }
+| l=loc(TYPE) { L.mk_loc (L.loc l) "type" }
 
 named_args:
 | args=slist(named_arg, empty) { args }
@@ -986,18 +990,8 @@ tac:
   | l=lloc(CRYPTO) game=lsymb args=slist(crypto_arg,empty)
     { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
 
-  | id=loc(CASE) t=tactic_params
-    { mk_abstract (L.loc id) "case" t }
-  | id=loc(CASE) TILDE TYPE t=tac_term
-    { let mode = `Type_based in
-      mk_abstract (L.loc id) "case" TacticsArgs.[Case_mode mode; Theory t] }
-  | id=loc(CASE) TILDE mode=lsymb t=tac_term
-    { let mode =
-        match L.unloc mode with
-        | "struct" -> `Structure_based
-        | _ -> failwith "invalid flag"
-      in
-      mk_abstract (L.loc id) "case" TacticsArgs.[Case_mode mode; Theory t] }
+  | id=loc(CASE) a=named_args t=tac_term
+    { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Theory t] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
@@ -1107,13 +1101,13 @@ tac:
     { mk_abstract l "fresh" [TacticsArgs.Fresh (a,arg)] }
 
   | l=lloc(AUTO) a=named_args 
-    { mk_abstract l "auto" [TacticsArgs.Auto a] }
+    { mk_abstract l "auto" [TacticsArgs.Named_args a] }
 
   | l=lloc(SIMPL) a=named_args 
-    { mk_abstract l "simpl" [TacticsArgs.Auto a] } /* same [TacticsArgs] as `auto` */
+    { mk_abstract l "simpl" [TacticsArgs.Named_args a] }
 
   | l=lloc(REDUCE) a=named_args 
-    { mk_abstract l "reduce" [TacticsArgs.Reduce a] }
+    { mk_abstract l "reduce" [TacticsArgs.Named_args a] }
 
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }

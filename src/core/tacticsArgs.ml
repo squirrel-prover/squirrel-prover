@@ -260,8 +260,7 @@ type parser_arg =
   | ApplyIn      of named_args * Theory.pt * apply_in
   | Have         of have_arg
   | HavePt       of have_pt_arg
-  | Reduce       of named_args
-  | Auto         of named_args  (* used by `auto` and `simpl` *)
+  | Named_args   of named_args
   | SplitSeq     of int L.located * Theory.term * Theory.term option
   | ConstSeq     of int L.located * (Theory.term * Theory.term) list
   | MemSeq       of int L.located * int L.located
@@ -270,7 +269,6 @@ type parser_arg =
   | Fa           of fa_arg list
   | TermPat      of int * Theory.term
   | Crypto       of lsymb * crypto_args
-  | Case_mode    of [`Structure_based|`Type_based]
 
 type parser_args = parser_arg list
 
@@ -291,8 +289,7 @@ let pp_parser_arg ppf = function
   | RewriteEquiv _rw_arg ->
     Fmt.pf ppf "..."
 
-  | Reduce _
-  | Auto   _
+  | Named_args  _
   | Fresh  _ 
   | Trans  _ ->
     Fmt.pf ppf "..."

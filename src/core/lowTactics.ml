@@ -952,7 +952,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let red_param = 
       match args with
       | [] -> Reduction.rp_default
-      | [Args.Reduce n] -> Reduction.parse_simpl_args Reduction.rp_default n
+      | [Args.Named_args n] ->
+        Reduction.parse_simpl_args Reduction.rp_default n
       | _ -> bad_args ()
     in
     [reduce_goal red_param s]

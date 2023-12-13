@@ -323,9 +323,13 @@ let () =
 (*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : ES.t list =
   let structure_based, type_based, args = match args with
-    | Args.Case_mode `Structure_based :: args -> true,false,args
-    | Args.Case_mode `Type_based :: args -> false,true,args
-    | _ -> true,true,args
+    | Args.(Named_args [NArg {L.pl_desc="struct"}])::args -> true,false,args
+    | Args.(Named_args [NArg {L.pl_desc="type"}])::args -> false,true,args
+    | Args.Named_args [] :: args -> true,true,args
+    | Args.(Named_args ((NArg s | NList (s,_))::_)) :: _ ->
+      Tactics.(hard_failure ~loc:(L.loc s) (Failure "invalid argument"))
+    | _ ->
+      Tactics.(hard_failure (Failure "incorrect case arguments"))
   in
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
