@@ -13,7 +13,7 @@ It may ask you to install `libev-devel` with your OS's package-manager.
 
 This should install `js_of_ocaml >= 5.2.0`.
 
-Then that you need `node` to [be installed](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
+Then you need `node` to [be installed](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
 
 Finally, install `npm` dependencies by running,
 from the `app/` subdirectory:

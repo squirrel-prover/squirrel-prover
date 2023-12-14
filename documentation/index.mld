@@ -6,7 +6,7 @@ It is composed of 6 modules :
 
   - {!module-Squirrelcore}: All core modules.
   - {!module-Squirrelfront}: Frontend composed of
-    {{!module-Squirrelfront.Lexer}Lexer} and {{!module-Squirrelfront.Parser}Parser}.
+    {{!module-Squirrelfront.Sedlexer}Sedlexer} and {{!module-Squirrelfront.Parser}Parser}.
   - {!module-Squirreltactics}: Modules corresponding of tactics.
   - {!module-Squirrelprover}: System and
     {{!module-Squirrelprover.Prover}Prover} drivers.

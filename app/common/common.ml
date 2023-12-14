@@ -146,7 +146,7 @@ let exec_command ?(check=`Check) s : string =
 let visualisation () : string =
  try begin 
    match Prover.get_first_subgoal !prover_state with
-   | Trace j ->
+   | Local j ->
          Format.asprintf "%a"
            Squirrelhtml.Visualisation.pp j
    | _ | exception _ -> 
