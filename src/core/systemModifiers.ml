@@ -1300,7 +1300,7 @@ let do_rw_item
     Equiv.any_to_reach t, []
   
   | Rw_expandall _ ->
-    let _, t = TLT.expand_term ~mode:expand_context `Any s (Local t) (TS.system s) in
+    let _, t = TLT.expand_term ~mode:expand_context Any s (Local t) (TS.system s) in
     Equiv.any_to_reach t, []    
 
 let do_s_item

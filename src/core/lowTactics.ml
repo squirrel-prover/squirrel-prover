@@ -311,39 +311,34 @@ module MkCommonLowTac (S : Sequent.S) = struct
     try Some (unfold_term_exn ~force_happens ?mode t se s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
-  let found_occ_macro target ms occ =
-    match target with
-    | `Msymb mname -> ms.Term.s_symb = mname
-    | `Mterm t     -> occ = t
-    | `Any         -> true
-    | `Fsymb _ | `Psymb _ | `Def   _ -> false
+  type expand_kind = 
+    | Lsymb of lsymb      (** operator, predicate, macro or definition *)
+    | Mterm of Term.term
+    | Any
 
-  let found_occ_fun target fs =
+  let found_occ_macro (target : expand_kind) ms occ =
     match target with
-    | `Any         -> true
-    | `Fsymb fname -> fs = fname
-    | `Def _ | `Psymb _ | `Msymb _ | `Mterm _ -> false
+    | Lsymb mname -> Symbols.to_string ms.Term.s_symb = L.unloc mname
+    | Mterm t     -> occ = t
+    | Any         -> true
 
-  let found_occ_pred target ps =
+  let found_occ_fun (target : expand_kind) fs =
     match target with
-    | `Any         -> true
-    | `Psymb pname -> ps = pname
-    | `Def _ | `Fsymb _ | `Msymb _ | `Mterm _ -> false
+    | Any         -> true
+    | Lsymb fname -> Symbols.to_string fs = L.unloc fname
+    | Mterm _     -> false
 
-  let found_occ_def target id =
+  let found_occ_pred (target : expand_kind) ps =
     match target with
-    | `Any     -> true
-    | `Def id' -> id = id'
-    | `Fsymb _ | `Psymb _ | `Msymb _ | `Mterm _ -> false
- 
-  type expand_kind = [
-    | `Msymb of Symbols.macro
-    | `Fsymb of Symbols.fname
-    | `Psymb of Symbols.predicate
-    | `Def   of Ident.t         (* defined variable in the proof-context *)
-    | `Mterm of Term.term
-    | `Any
-  ]
+    | Any         -> true
+    | Lsymb pname -> Symbols.to_string ps = L.unloc pname
+    | Mterm _     -> false
+
+  let found_occ_def (target : expand_kind) id =
+    match target with
+    | Any       -> true
+    | Lsymb id' -> Ident.name id = L.unloc id'
+    | Mterm _   -> false
 
   let expand_term
       ?(m_rec = false)
@@ -360,8 +355,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
        specific term *)
     let strict =
       match target with
-      | `Mterm _ -> true
-      | `Def _ | `Psymb _ | `Fsymb _ | `Msymb _ | `Any -> false
+      | Mterm _       -> true
+      | Lsymb _ | Any -> false
     in
 
     (* unfold in local sub-terms *)
@@ -508,7 +503,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** expand all macro of some targets in a sequent *)
   let expand_all targets (s : S.sequent) : S.sequent =
-    let _, s = expand ~m_rec:true targets `Any s in
+    let _, s = expand ~m_rec:true targets Any s in
     s
 
   (** exported *)
@@ -521,32 +516,25 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
-      begin
-        if Symbols.Macro.mem_lsymb m tbl then
-          `Msymb (Symbols.Macro.of_lsymb m tbl)
-        else if Symbols.Function.mem_lsymb m tbl then
-          `Fsymb (Symbols.Function.of_lsymb m tbl)
-        else if Symbols.Predicate.mem_lsymb m tbl then
-          `Psymb (Symbols.Predicate.of_lsymb m tbl)
-        else 
-          let ms = L.unloc m in
-          match
-            S.Hyps.find_map (fun (id,ldc) ->
-                if id.name = ms &&
-                   match ldc with LDef _ -> true | _ -> false
-                then Some id
-                else None
-              ) s
-          with
-          | Some id -> `Def id
-          | None ->
-            soft_failure ~loc:(L.loc arg)
-              (Failure "not a macro, operator or definition");
-      end
+      let ms = L.unloc m in
+      let mem_def =
+        S.Hyps.exists (fun (id,ldc) ->
+            id.name = ms &&
+            (match ldc with LDef _ -> true | _ -> false)
+          ) s
+      in
+      if mem_def                           ||
+         Symbols.Macro.mem_lsymb     m tbl ||
+         Symbols.Function.mem_lsymb  m tbl ||
+         Symbols.Predicate.mem_lsymb m tbl
+      then
+        Lsymb m
+      else 
+        soft_failure ~loc:(L.loc arg) (Failure "not a macro, operator, predicate or definition")
       
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
-      | Args.Arg (Args.Message (f, _)) -> `Mterm f
+      | Args.Arg (Args.Message (f, _)) -> Mterm f
 
       | _ ->
         hard_failure ~loc:(L.loc arg)
