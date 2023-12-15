@@ -575,10 +575,9 @@ and mk_neq0 ~simpl ~simpl_tuples (t1 : term) (t2 : term) : term =
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
-let destr_app ?fs = function
-  | App (_, l) when fs = None     -> Some l
-  | App (Fun (fs', _), l) when fs = Some fs' -> Some l
-  | Fun (fs', _) when fs = Some fs' -> Some []
+let destr_app ~fs ~arity = function
+  | App (Fun (fs', _), l) when fs = fs' && List.length l = arity -> Some l
+  | Fun (fs', _) when fs = fs' && arity = 0 -> Some []
   | _ -> None
 
 let destr_tuple = function
@@ -669,27 +668,27 @@ module SmartDestructors = struct
   let decompose_exists_tagged = decompose_quant_tagged Exists
 
   (*------------------------------------------------------------------*)
-  let destr_false f = oas_seq0 (destr_app ~fs:f_false f)
-  let destr_true  f = oas_seq0 (destr_app ~fs:f_true  f)
+  let destr_false f = oas_seq0 (destr_app ~fs:f_false ~arity:0 f)
+  let destr_true  f = oas_seq0 (destr_app ~fs:f_true ~arity:0  f)
 
-  let destr_not  f = oas_seq1 (destr_app ~fs:f_not f)
+  let destr_not  f = oas_seq1 (destr_app ~fs:f_not ~arity:1 f)
 
-  let destr_or f = oas_seq2 (destr_app ~fs:f_or   f)
+  let destr_or f = oas_seq2 (destr_app ~fs:f_or ~arity:2 f)
       
-  let destr_and  f = oas_seq2 (destr_app ~fs:f_and  f)
-  let destr_iff  f = oas_seq2 (destr_app ~fs:f_iff f)
-  let destr_pair f = oas_seq2 (destr_app ~fs:f_pair f)
+  let destr_and  f = oas_seq2 (destr_app ~fs:f_and  ~arity:2 f)
+  let destr_iff  f = oas_seq2 (destr_app ~fs:f_iff  ~arity:2 f)
+  let destr_pair f = oas_seq2 (destr_app ~fs:f_pair ~arity:2 f)
 
   let destr_impl f = 
-    match oas_seq2 (destr_app ~fs:f_impl f) with
+    match oas_seq2 (destr_app ~fs:f_impl ~arity:2 f) with
     | Some _ as res -> res
     | None -> omap (fun f -> (f, mk_false)) (destr_not f)
 
   (*------------------------------------------------------------------*)
-  let destr_neq f = oas_seq2 (destr_app ~fs:f_neq f)
-  let destr_eq  f = oas_seq2 (destr_app ~fs:f_eq  f)
-  let destr_leq f = oas_seq2 (destr_app ~fs:f_leq f)
-  let destr_lt  f = oas_seq2 (destr_app ~fs:f_leq f)
+  let destr_neq f = oas_seq2 (destr_app ~fs:f_neq ~arity:2 f)
+  let destr_eq  f = oas_seq2 (destr_app ~fs:f_eq  ~arity:2 f)
+  let destr_leq f = oas_seq2 (destr_app ~fs:f_leq ~arity:2 f)
+  let destr_lt  f = oas_seq2 (destr_app ~fs:f_leq ~arity:2 f)
   
   
   (*------------------------------------------------------------------*)
@@ -703,7 +702,7 @@ module SmartDestructors = struct
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
-      else match destr_app ~fs f with
+      else match destr_app ~fs ~arity:2 f with
         | None -> None
         | Some [f;g] -> omap (fun l -> l @ [g]) (destr (l-1) f)
         | _ -> assert false
@@ -715,7 +714,7 @@ module SmartDestructors = struct
     let rec destr l f =
       assert (l > 0);
       if l = 1 then Some [f]
-      else match destr_app ~fs f with
+      else match destr_app ~fs ~arity:2 f with
         | None -> None
         | Some [f;g] -> omap (fun l -> f :: l) (destr (l-1) g)
         | _ -> assert false
@@ -727,19 +726,19 @@ module SmartDestructors = struct
   let destr_impls = mk_destr_many_right f_impl
 
   (*------------------------------------------------------------------*)
-  (** for any associative [fs] *)
+  (** for any associative [fs] of arity 2 *)
   let mk_decompose fs =
-    let rec decompose f = match destr_app ~fs f with
+    let rec decompose f = match destr_app ~fs ~arity:2 f with
       | None -> [f]
       | Some l -> List.concat_map decompose l
     in
     decompose
 
-  let decompose_ors   = mk_decompose f_or
-  let decompose_ands  = mk_decompose f_and
+  let decompose_ors  = mk_decompose f_or
+  let decompose_ands = mk_decompose f_and
 
   let decompose_impls f =
-    let rec decompose f = match destr_app ~fs:f_impl f with
+    let rec decompose f = match destr_app ~fs:f_impl ~arity:2 f with
       | None -> [f]
       | Some [f;g] -> f :: decompose g
       | _ -> assert false
@@ -1162,7 +1161,7 @@ let _pp_indices ~dbg ppf l =
 
 let rec is_and_happens = function
   | App (Fun (f, _), [_]) when f = f_happens -> true
-  | _ as f ->  match destr_and f with
+  | _ as f -> match destr_and f with
     | Some (l,r) -> is_and_happens l && is_and_happens r
     | _ -> false
 
