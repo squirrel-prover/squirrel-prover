@@ -74,8 +74,6 @@ Proof. intro [[Hf | Hg] _].   (* names can be dropped if useless, with _ *)
 Abort.
 
 
-(** Include basic standard library, important helper lemmas and
-    setting proof mode to autoIntro=false. *)
 include Basic.
 
 (* The library notably contains an equation allowing to simplify a trivial if. *)

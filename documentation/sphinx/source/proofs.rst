@@ -384,10 +384,6 @@ called automatically after each tactic, unless the tactical
     When the conclusion of the goal is a global formula which only contains
     a local formula, the goal is then turned into a local formula. Otherwise
     the tactic does nothing.
-    
-    Additionaly If the :term:`option` :g:`autoIntro` is set to true, introductions
-    are also made automatically.
-
 
 
 .. tacn:: simpl {? @simpl_flags}

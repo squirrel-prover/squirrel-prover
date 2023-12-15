@@ -63,7 +63,6 @@ Commands
    debugTactics           Debug information for tactics                false
    processStrictAliasMode Strict alias mode for processus              false
    showStrengthenedHyp    Show hypothesis after strengthening          false
-   autoIntro              Automatic introductions                      false
    autoFADup              Automatic FA Dup                             true
    newInduction           New equivalence induction principle (FIXME)  false
    postQuantumSound       Post-quantum soundness                       false

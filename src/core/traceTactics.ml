@@ -927,22 +927,21 @@ let new_simpl ~red_param ~congr ~constr s =
 let clear_triv s sk fk = sk [TS.Hyps.clear_triv s] fk
 
 (** Simplify goal. *)
-let _simpl ~red_param ~close ~strong ~auto_intro =
+let _simpl ~red_param ~close ~strong =
   let open Tactics in
-  let intro = auto_intro in
 
   let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
 
   let strengthen_const_vars s sk fk = sk [strengthen_const_vars s] fk in
 
   let new_simpl ~congr ~constr =
-    if strong && not intro
+    if strong
     then [wrap_fail (new_simpl ~red_param ~congr ~constr)] @ assumption
     else []
   in
 
   let expand_all =
-    (if strong && close && not intro
+    (if strong && close
      then [wrap_fail (TraceLT.expand_all_l `All)] @ assumption
      else [])
   in
@@ -954,8 +953,8 @@ let _simpl ~red_param ~close ~strong ~auto_intro =
        * of doing it after introductions. *)
     assumption @
     (new_simpl ~congr:false ~constr:false) @
-    (if close || intro then [wrap_fail TraceLT.intro_all;
-                             wrap_fail simpl_left_tac] else []) @
+    (if close then [wrap_fail TraceLT.intro_all;
+                    wrap_fail simpl_left_tac] else []) @
     assumption @
     expand_all @
     (if strong then [wrap_fail eq_names] else []) @
@@ -975,18 +974,17 @@ let do_conclude =
 
 (* If [close] then tries to automatically prove the goal,
  * otherwise it may also be reduced to a single subgoal. *)
-let simpl ~red_param ~strong ~close ~auto_intro : TS.t Tactics.tac =
+let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
   let rec simpl_aux ~close = 
     let open Tactics in
     let (>>) = andthen ~cut:true in
     (* if [close], we introduce as much as possible to help. *)
-    _simpl ~red_param ~strong ~close ~auto_intro >>
+    _simpl ~red_param ~strong ~close >>
 
     if not strong
     then (fun g sk fk -> sk [g] fk)
     else
-      (* FIXME what diff here btwn auto_intro and ~strong ? *)
-      (if close || auto_intro
+      (if close
        then try_tac do_conclude else Tactics.id) >>
       fun g sk fk ->
       (* If we still have a goal, we can try to split a conjunction
@@ -1015,14 +1013,14 @@ let simpl ~red_param ~strong ~close ~auto_intro : TS.t Tactics.tac =
   simpl_aux ~close
     
 let trace_auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
-  let auto_intro = (TConfig.auto_intro (LowTraceSequent.table s)) in
-  simpl ~red_param ~close ~strong ~auto_intro s sk fk
+  simpl ~red_param ~close ~strong s sk fk
 
 let trace_autosimpl s =
   trace_auto
     ~red_param:Reduction.rp_default
     ~close:false
-    ~strong:(TConfig.auto_intro (LowTraceSequent.table s)) s
+    ~strong:false
+    s
 
 
 (* tries to close the goal with simpl *)
@@ -1031,10 +1029,9 @@ let tryauto_closes (g:sequent) : bool =
   (* exception to get out of the continuations *)
   let exception Res of bool in
   let red_param = Reduction.rp_default in
-  let auto_intro = (TConfig.auto_intro (LowTraceSequent.table g)) in
   try
     let _:Tactics.a =
-      simpl ~red_param ~strong:true ~close:true ~auto_intro g
+      simpl ~red_param ~strong:true ~close:true g
         (* if simpl succeeds: it closes the goal, so l = [] *)
         (fun l _ -> assert (l = []); raise (Res true)) 
         (* otherwise: leave the goal unchanged *)

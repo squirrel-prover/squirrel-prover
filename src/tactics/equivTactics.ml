@@ -1214,13 +1214,12 @@ let goal_is_reach s =
   | _ -> false
 
 let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
-  let auto_intro = TConfig.auto_intro (Goal.table s) in
   let rec auto_rec s sk fk =
     let open Tactics in
     match s with
     | Goal.Local t ->
       let sk l fk = sk (List.map (fun s -> Goal.Local s) l) fk in
-      TraceTactics.simpl ~red_param ~close ~strong ~auto_intro t sk fk
+      TraceTactics.simpl ~red_param ~close ~strong t sk fk
 
     | Goal.Global s when goal_is_reach s ->
       auto_rec (byequiv s) sk fk
@@ -1249,8 +1248,7 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
       in
 
       let conclude s sk fk  =
-        if close || auto_intro then
-          let fk = if auto_intro then fun _ -> sk [s] fk else fk in
+        if close then
           andthen_list ~cut:true
             [wrap_fail (EquivLT.expand_all_l `All);
              try_tac wdeduce;

@@ -1,5 +1,3 @@
-set autoIntro = false.
-
 name n: index -> message
 
 mutable kR(i:index) : message = n(i)

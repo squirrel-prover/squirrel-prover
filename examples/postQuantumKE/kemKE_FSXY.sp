@@ -83,7 +83,6 @@ party could potentially compute the key.
 set postQuantumSound = true.
 
 include Basic.
-set autoIntro=true.
 
 hash F
 
@@ -335,7 +334,7 @@ Proof.
   enrich seq(i,j,k:index=> kI(i,j,k)).
 
   (* enrich of the dishonest randoms *)
-  enrich seq(j,k:index=> DkT(j,k)); 
+  enrich seq(j,k:index=> DkT(j,k));
   enrich seq(j,k:index=>DrTI(j,k));
   enrich seq(j,k:index=> DkR(j,k));
   enrich seq(j,k:index=> DrR(j,k));
@@ -344,12 +343,12 @@ Proof.
   enrich seq(i:index=>dkR(i)).
 
   induction t => //.
-    + expandall. 
+    + expandall.
       by fa 14.
 
     + expandall.
       by fa 14.
-      
+
     + (* First output of R *)
       expandall.
       fa 14.
@@ -368,21 +367,22 @@ Proof.
     + (* Second output of R *)
       expandall.
       fa 14.
+      by apply IH.
 
     + (* First output of R with dishonnest talker *)
-       expandall.
-       fa 14.
-       fa 15.
-       fa 16.    
-       deduce 15.
-       repeat fa 15.
-       fa 17.
-       prf 16, F (sk2R _, _); [1:auto].
-       xor 16, n_PRF.
-       rewrite if_true // in 16.
-       by rewrite len_F namelength_n_PRF.
-       fresh 16; 1: auto.
-       by apply IH.
+      expandall.
+      fa 14.
+      fa 15.
+      fa 16.
+      deduce 15.
+      repeat fa 15.
+      fa 17.
+      prf 16, F (sk2R _, _); [1:auto].
+      xor 16, n_PRF.
+      rewrite if_true // in 16.
+      by rewrite len_F namelength_n_PRF.
+      fresh 16; 1: auto.
+      by apply IH.
 
     + (* Second output of R with dishonnest talker *)
       expandall.
@@ -407,8 +407,6 @@ Proof.
       expandall.
       by fa 14.
 
-
-
     + (* First output of DI *)
       expandall.
       fa 14.
@@ -426,6 +424,8 @@ Proof.
     + (* Second output of DI *)
       expandall.
       fa 14.
+      by apply IH.
+
 Qed.
 
 (* From [main_rand/right], we can now use cca to hide the two main random seeds, kR and kI *)
@@ -566,56 +566,76 @@ Proof.
   diffeq => * //.
 
     + case try find il jl kl such that _ in kR(il,jl,kl) else _.
-      ++ case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-         have U :
-          decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) = 
-          decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)).
-         rewrite tf in U.     
-         by fresh U.
-         destruct H2 as [H3 H4].
-         by use H3 with il,jl,kl.
-      ++ case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-         destruct H1 as [H3 H4].
-         by use H3 with il,jl,kl.
+      ++ intro [il jl kl H1].
+         case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         * intro [il0 jl0 kl0 H2].
+           have U :
+            decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) =
+            decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)) by auto.
+           rewrite tf in U.
+           by fresh U.
+         * intro [H2 _].
+           destruct H1 as [H3 H4].
+           by use H2 with il,jl,kl.
+      ++ intro [H1 _] *.
+         case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         * intro [il jl kl Ht].
+           by use H1 with il,jl,kl.
+         * auto.
 
     + case try find il jl kl such that _ in kR(il,jl,kl) else _.
-      ++ case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-         have U :
-          decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) = 
-          decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)).
-         rewrite tf in U.     
-         by fresh U.
-         destruct H2 as [H3 H4].
-         by use H3 with il,jl,kl.
-      ++ case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-         destruct H1 as [H3 H4].
-         by use H3 with il,jl,kl.
+      ++ intro [il jl kl _].
+         case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         * intro [il0 jl0 kl0 _].
+           have U :
+           decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) =
+           decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)) by auto.
+           rewrite tf in U.
+           by fresh U.
+         * intro [H1 _].
+           by use H1 with il,jl,kl.
+      ++ intro [H1 _].
+         case try find il jl kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         * intro [il jl kl _].
+           by use H1 with il,jl,kl.
+         * auto.
 
     + case try find il jl kl such that _ in kI(il,jl,kl) else _.
-      ++ case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-         have U :
-          decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) = 
-          decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
-         rewrite tf in U.     
-         by fresh U.
-         destruct H2 as [H3 H4].
-         by use H3 with il,jl,kl.
-      ++ case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-         destruct H1 as [H3 H4].
-         by use H3 with il,jl,kl.
+      ++ intro [il jl kl _].
+         case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         * intro [il0 jl0 kl0 _].
+           have U :
+            decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) =
+            decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
+           auto.
+           rewrite tf in U.
+           by fresh U.
+         * intro [H1 _].
+           by use H1 with il,jl,kl.
+      ++ intro [H1 _].
+         case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         * intro [il jl kl _].
+           by use H1 with il,jl,kl.
+         * auto.
 
     + case try find il jl kl such that _ in kI(il,jl,kl) else _.
-      ++ case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-         have U :
-          decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) = 
-          decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
-         rewrite tf in U.     
-         by fresh U.
-         destruct H2 as [H3 H4].
-         by use H3 with il,jl,kl.
-      ++ case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-         destruct H1 as [H3 H4].
-         by use H3 with il,jl,kl.
+      ++ intro [il jl kl _].
+         case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         * intro [il0 jl0 kl0 _].
+           have U :
+            decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) =
+            decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
+           auto.
+           rewrite tf in U.
+           by fresh U.
+         * intro [H1 _].
+           by use H1 with il,jl,kl.
+      ++ intro [H1 _].
+         case try find il jl kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         * intro [il jl kl _].
+           by use H1 with il,jl,kl.
+         * auto.
+
 Qed.
 
 equiv [idealized/left,idealized/left] reflex.
@@ -629,15 +649,15 @@ Qed.
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global lemma [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
- [happens(R2(i,j,k))] -> 
+ [happens(R2(i,j,k))] ->
  equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), kIR(i,j,k))) .
 Proof.
   intro Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kR(k,i,j)); [1:auto]. 
-  prf 1, G(_,n_PRF); [1:auto]. 
-  xor 1,  xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
+  prf 1, kdf(s,kR(k,i,j)).
+  prf 1, G(_,n_PRF).
+  xor 1, xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
   by rewrite len_G namelength_n_PRF1.
   xor 1,  n_XOR; rewrite if_true // in 1.
   by rewrite len_G namelength_n_XOR.
@@ -650,14 +670,14 @@ Qed.
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global lemma [idealized/left,idealized/left] right_key (i,j,k:index[const]):
-  [happens(I1(i,j,k))] -> 
+  [happens(I1(i,j,k))] ->
   equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), kIR(i,j,k))) .
 Proof.
   intro Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kI(i,j,k)); [1:auto]. 
-  prf 1, G(_, n_PRF); [1:auto]. 
+  prf 1, kdf(s,kI(i,j,k)).
+  prf 1, G(_, n_PRF).
   xor 1, n_PRF1; rewrite if_true // in 1.
   rewrite len_xor.
   by rewrite !len_G.

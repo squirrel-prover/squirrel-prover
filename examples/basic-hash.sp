@@ -31,8 +31,6 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
     also sound for quantum attackers. *)
 set postQuantumSound=true.
 
-(** Include basic standard library, important helper lemmas and
-    setting proof mode to autoIntro=false. *)
 include Basic.
 
 (** We start by declaring the function symbol `h` for the hash function,

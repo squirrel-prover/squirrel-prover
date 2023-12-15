@@ -1,17 +1,5 @@
-(*------------------------------------------------------------------*)
-(* parser types *)
-
-(*------------------------------------------------------------------*)
-(* table with config namespace *)
-include Symbols.Config
-(* type config = ns Symbols.t *)
-(* type t = config *)
-
 type param_kind = Symbols.param_kind
-
 type p_param_val = Config.p_param_val
-
-
 type Symbols.data += Config_data of p_param_val
 
 let def_of_param = function
@@ -57,9 +45,6 @@ let v_strict_alias_mode = Config.Param_bool false
 let s_show_strengthened_hyp = "showStrengthenedHyp"
 let v_show_strengthened_hyp = Config.Param_bool false
 
-let s_auto_intro = "autoIntro"
-let v_auto_intro = Config.Param_bool false
-
 let s_auto_fadup = "autoFADup"
 let v_auto_fadup = Config.Param_bool true
 
@@ -85,7 +70,6 @@ let reset_params (table:Symbols.table) : Symbols.table =
   |>  decl s_debug_tactics Symbols.PBool v_debug_tactics
   |>  decl s_strict_alias_mode Symbols.PBool v_strict_alias_mode
   |>  decl s_show_strengthened_hyp Symbols.PBool v_show_strengthened_hyp
-  |>  decl s_auto_intro Symbols.PBool v_auto_intro
   |>  decl s_auto_fadup Symbols.PBool v_auto_fadup
   |>  decl s_new_ind Symbols.PBool v_new_ind
   |>  decl s_post_quantum Symbols.PBool v_post_quantum
@@ -109,31 +93,17 @@ let [@warning "-32"] get_string s table : string =
   | Config_data (Config.Param_string s) -> s
   | _ -> assert false
 
-    (*OK*)
 let solver_timeout = get_int s_timeout
-    (*OK*)
 let print_trs_equations = get_bool s_print_equ
-    (*OK*)
 let interactive = get_bool s_interactive
-    (*OK*)
 let checkInclude = get_bool s_CheckInclude
-    (* a real global variable ? *)
 let debug_constr = get_bool s_debug_constr
-    (* a real global variable ? *)
 let debug_completion = get_bool s_debug_completion
-    (* a real global variable ? *)
 let debug_tactics = get_bool s_debug_tactics
-    (*OK*)
 let strict_alias_mode = get_bool s_strict_alias_mode
-    (*OK*)
 let show_strengthened_hyp = get_bool s_show_strengthened_hyp
-    (*OK*)
-let auto_intro = get_bool s_auto_intro
-    (*OK*)
 let auto_fadup = get_bool s_auto_fadup
-    (* FIXME never used ? *)
 let new_ind = get_bool s_new_ind
-    (*OK*)
 let post_quantum = get_bool s_post_quantum
 
 let set_param (s,p:string*p_param_val) table = 
