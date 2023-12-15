@@ -6,21 +6,24 @@ module SE = SystemExpr
 type models
 
 (*------------------------------------------------------------------*)
-(** [models_conunct ?exn l] returns the list of minimal models of 
-    the conjunction of atoms.
-    - [exn] is thrown if the tactic timeout.
+(** [models_conjunct max ?exn l] returns the list of minimal models of
+    the conjunction of atoms, if this can be computed in less than [max]
+    seconds.
+    - [exn] is thrown if the tactic runs out of time.
       Default to [Tactics.Tactic_hard_failure TacTimeout]. *)
 val models_conjunct : int -> ?exn:exn -> Term.terms -> models 
 
 val m_is_sat : models -> bool
 
-(** [is_tautology t] check whether [t] is a tautology. *)
+(** [is_tautology max ?exn t] check whether [t] is a tautology.
+    The [max] and [exn] paramaters have the same meaning as in
+    [models_conjunct].  *)
 val is_tautology : ?exn:exn -> int -> Term.term -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
     is always true in [models].
     This is an under-approximation (i.e. correct but not complete).
-    Because we under-approximate, we are very unprecise on dis-equalities
+    Because we under-approximate, we are very imprecise on disequalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
 val query : precise:bool -> models -> Term.Lit.literals -> bool
 
@@ -35,9 +38,6 @@ val maximal_elems :
     of timespoints [ts], gives back the classes for equality in all models. *)
 val get_ts_equalities :
   precise:bool -> models -> Term.terms -> Term.terms list
-
-val get_ind_equalities :
-  precise:bool -> models -> Vars.vars -> Vars.vars list
 
 (** [find_eq_action models t] looks for an action [ts] equal to [t]. *)
 val find_eq_action : models -> Term.term -> Term.term option

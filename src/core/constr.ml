@@ -1517,12 +1517,6 @@ let get_ts_equalities ~precise (models : models) ts =
     ) ts
 
 (** Exported *)
-let get_ind_equalities ~precise (models : models) inds =
-  Utils.classes (fun i j ->
-      query ~precise models [`Pos, Comp (`Eq,Term.mk_var i,Term.mk_var j)]
-    ) inds
-
-(** Exported *)
 let find_eq_action (models : models) (t : Term.term) =
   let memo, models_list = models in
   

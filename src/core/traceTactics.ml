@@ -292,7 +292,8 @@ let congruence (s : TS.t) : bool =
     in
     TS.eq_atoms_valid s
 
-(** [constraints s] proves the sequent using its trace formulas. *)
+(** [congruence s] proves the sequent using its message equalities,
+    up to equational theories. *)
 let congruence_tac (s : TS.t) =
   match congruence s with
   | true ->
@@ -448,78 +449,6 @@ let () =
     Args.((Term : _ sort))
 
 (*------------------------------------------------------------------*)
-(* SMT-based combination of constraints and congruence *)
-
-let smt (s : TS.t) =
-  (* let's avoid massaging the goal beforehand
-   * so that we can send it as it is to the SMT solver
-   * (in the current implementation, the goal is preserved while
-   *  only the trace literals and equality atoms are sent among the hypotheses)
-   * NOTE: this means that in principle this will sometimes be less powerful
-   *       than calling constraints/congruence *)
-  (* match simpl_left s with
-   * | None -> true
-   * | Some s ->
-   *   let conclusions =
-   *     Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
-   *   in
-   *   let term_conclusions =
-   *     List.fold_left (fun acc conc -> match conc with
-   *         | `Pos, (#generic_atom as at) ->
-   *           let at = (at :> Term.generic_atom) in
-   *           Term.(mk_not (mk_atom1 at)) :: acc
-   *         | `Neg, (#generic_atom as at) ->
-   *           Term.mk_atom1 at :: acc)
-   *       []
-   *       conclusions
-   *   in
-   *   let s = List.fold_left (fun s f ->
-   *       Hyps.add Args.AnyName f s
-   *     ) s term_conclusions
-   *   in *)
-    TS.literals_unsat_smt s
-
-let smt_tac (s : TS.t) =
-  (* let s = as_seq1 (TraceLT.intro_all s) in *)
-  match smt s with
-  | true ->
-    let () = dbg "closed by smt" in
-    []
-
-  | false ->
-   let () = dbg "smt failed" in
-   soft_failure (Tactics.Failure "smt did not return unsat")
-
-let () = T.register "smt"
-    ~tactic_help:
-      {general_help = "Tries to discharge goal using an SMT solver.";
-       detailed_help = "implements a combination of congruence, constraints, \
-                        eqnames and macroexpansion, plus first-order reasoning";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
-    (LowTactics.genfun_of_pure_tfun smt_tac)
-
-let slowsmt_tac (s : TS.t) =
-  match TS.literals_unsat_smt ~slow:true s with
-  | true ->
-    let () = dbg "closed by smt" in
-    []
-
-  | false ->
-   let () = dbg "smt failed" in
-   soft_failure (Tactics.Failure "smt did not return unsat")
-
-let () = T.register "slowsmt"
-    ~tactic_help:
-      {general_help = "Version of smt tactic with higher time limit.";
-       detailed_help = "";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
-    (LowTactics.genfun_of_pure_tfun slowsmt_tac)
-
-
-
-(*------------------------------------------------------------------*)
 (** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
@@ -571,61 +500,6 @@ let () = T.register "eqnames"
        tactic_group = Structural}
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_names)
-
-(*------------------------------------------------------------------*)
-(** Add terms constraints resulting from timestamp and index equalities. *)
-let eq_trace (s : TS.t) =
-  let ts_classes = TS.get_ts_equalities ~precise:false s
-  in
-  let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
-  let ts_subst =
-    let rec asubst e = function
-        [] -> []
-      | p::q -> Term.ESubst (p,e) :: (asubst e q)
-    in
-    List.map (function [] -> [] | p::q -> asubst p q) ts_classes
-    |> List.flatten
-  in
-  let ind_classes = TS.get_ind_equalities ~precise:false s
-  in
-  let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
-  let ind_subst =
-    let rec asubst e = function
-        [] -> []
-      | p::q -> Term.ESubst (Term.mk_var p,Term.mk_var e) :: (asubst e q)
-    in
-    (List.map (function [] -> [] | p::q -> asubst p q) ind_classes)
-    |> List.flatten
-  in
-  let terms = TS.get_all_messages s in
-  let facts =
-    List.fold_left
-      (fun acc t ->
-         let normt : Term.term = Term.subst (ts_subst @ ind_subst) t in
-         if normt = t
-         then acc
-         else Term.mk_atom `Eq t normt ::acc)
-      [] terms
-  in
-  let s =
-    List.fold_left (fun s c ->
-        let () = dbg "new trace equality: %a" Term.pp c in
-        TS.Hyps.add Args.Unnamed (LHyp (Local c)) s
-      ) s facts
-  in
-  [s]
-
-let () = T.register "eqtrace"
-    ~tactic_help:
-      {general_help = "Add terms constraints resulting from timestamp \
-                       and index equalities.";
-       detailed_help = "Whenver i=j or ts=ts', we can substitute one \
-                        by another in the other terms.";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun eq_trace)
-
 
 (*------------------------------------------------------------------*)
 (* no longer used for fresh. 
@@ -1084,10 +958,6 @@ let _simpl ~red_param ~close ~strong ~auto_intro =
                              wrap_fail simpl_left_tac] else []) @
     assumption @
     expand_all @
-    (* Learn new term equalities from constraints before
-     * learning new index equalities from term equalities,
-     * otherwise this creates e.g. j=i from n(j)=n(i). *)
-    (* (if intro then [wrap eq_trace] else []) @ *)
     (if strong then [wrap_fail eq_names] else []) @
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @

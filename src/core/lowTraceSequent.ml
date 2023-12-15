@@ -200,12 +200,6 @@ let get_ts_equalities ~precise s =
              |>  Atom.trace_atoms_ts in
   Constr.get_ts_equalities ~precise models ts
 
-let get_ind_equalities ~precise s =
-  let models = get_models s in
-  let inds = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.proof_context)
-             |> Atom.trace_atoms_ind in
-  Constr.get_ind_equalities ~precise models inds
-
 let constraints_valid s =
   let models = get_models s in
   not (Constr.m_is_sat models)
@@ -424,20 +418,6 @@ let eq_atoms_valid s =
             Term.pp a Term.pp b in
         false)
     neqs
-
-let literals_unsat_smt ?(slow=false) s =
-  Smt.literals_unsat ~slow
-    s.env.table
-    (SystemExpr.to_fset s.env.system.set) (* TODO handle failure *)
-    (Vars.to_vars_list s.env.vars)
-    (get_message_atoms s.proof_context)
-    (get_trace_literals s.proof_context)
-    (* TODO: now that we can pass more general formulas than lists of atoms,
-     * we don't actually need to decompose message atoms / trace literals *)
-    (* since we didn't move the conclusion into the premises,
-     * handle it here *)
-    (Term.mk_not s.conclusion :: Hint.get_smt_db s.env.table)
-
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt ?se s =
