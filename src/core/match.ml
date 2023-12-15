@@ -1407,8 +1407,11 @@ let reduce_head1
       let t, _ = reduce_proj1 t in
       t, true
 
-    | _ -> t, false
+    | _ ->
+      let t', red = Term.head_normal_biterm0 t in
+      if red then t', true else t, false
 
+(*------------------------------------------------------------------*)
 (** Reduce once at head position in a global formula.
     Only use the following reduction rules:
     [zeta] *)
@@ -2102,7 +2105,8 @@ let pp_known_sets fmt (ks : known_sets) =
   Fmt.pf fmt "@]"
 
 let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
-  List.assoc_up_dflt (get_head k.term) [] (fun ks_l -> k :: ks_l) ks
+  List.assoc_up_dflt
+    (get_head (Term.head_normal_biterm k.term)) [] (fun ks_l -> k :: ks_l) ks
 
 let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
   let s = List.fold_left (fun s (head, k_l) ->
@@ -2164,7 +2168,7 @@ let known_set_add_frame (k : known_set) : known_set list =
     - for all i, [ki] is deducible from [k]
     - [k] is deducible from [(k1, ..., kn)] *)
 let rec known_set_decompose (k : known_set) : known_set list =
-  match k.term with
+  match Term.head_normal_biterm k.term with
   (* Exploit the pair symbol injectivity.
       If [k] is a pair, we can replace [k] by its left and right
       composants w.l.o.g. *)
@@ -2177,8 +2181,8 @@ let rec known_set_decompose (k : known_set) : known_set list =
   | Term.Fun (f, _, [b;t1;t2]) when f = Term.f_ite ->
     let kl  = { k with term = t1 ; cond = Term.mk_and k.cond b}
     and kr =  { k with term = t2 ; cond = Term.mk_and k.cond (Term.mk_not b)}
-    in List.concat_map known_set_decompose (kl::[kr])
-*)
+    in List.concat_map known_set_decompose (kl::[kr]) *)
+
   (* Idem for tuples. *)
   | Term.Tuple l ->
     let kl = List.map (fun a -> { k with term = a; } ) l in
@@ -2625,7 +2629,7 @@ module E = struct
       (cand   : cand_set)
       (known_sets : known_sets) : cand_sets
     =
-    let cand_head = get_head cand.term in
+    let cand_head = Term.get_head cand.term in
     let cands =
       List.fold_left (fun acc (head, known_list) ->
           if cand_head = HVar || head = HVar || cand_head = head then
@@ -3056,7 +3060,8 @@ module E = struct
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
     =
-    let elems_head = List.assoc_dflt [] (get_head cterm.term) elems in
+    let term = head_normal_biterm cterm.term in
+    let elems_head = List.assoc_dflt [] (Term.get_head term) elems in
     List.find_map (fun elem -> deduce_mem_one cterm elem st) elems_head
  
   (*------------------------------------------------------------------*)
@@ -3069,7 +3074,7 @@ module E = struct
     =
     let env = env_of_unif_state st in  
 
-    match cterm.term with
+    match Term.head_normal_biterm cterm.term with
     | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)

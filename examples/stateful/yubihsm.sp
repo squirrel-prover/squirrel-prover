@@ -228,11 +228,6 @@ Proof.
   by project.
 Qed.
 
-lemma diff_refl (x:message) : diff(x,x) = x.
-Proof.
-  by project.
-Qed.
-
 (*------------------------------------------------------------------*)
 (* LIBRAIRIES *)
 
@@ -536,9 +531,10 @@ Proof.
         rewrite /AEAD in 4.
         rewrite /* in 0.
         cca1 2; [1:auto].
-        rewrite !len_pair len_diff in 2.
-        rewrite namelength_k namelength_k_dummy diff_refl in 2.
-
+        rewrite !len_pair in 2.
+        rewrite len_diff in 2.
+        rewrite namelength_k namelength_k_dummy in 2. 
+        simpl ~diffr. 
         remember
           zeroes (namelength_message ++ (len (mpid pid) ++ len (sid pid) ++ c_pair) ++ c_pair)
           as tlen => Eq_len.
@@ -550,8 +546,8 @@ Proof.
              enc (tlen, rinit(pid), keyFresh))
            =
            enc (tlen, rinit(pid), diff(mkey,keyFresh))
-          by project.
-          rewrite Eq_len;
+          by project. 
+          rewrite Eq_len.
             enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh;
             1: auto.
 
@@ -586,7 +582,7 @@ Proof.
     fa 2.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
-    rewrite diff_refl => /=.
+    simpl ~diffr.
     rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //.
     by apply Hind (pred(t)).
 

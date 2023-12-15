@@ -94,10 +94,6 @@ system (let pkB = enc_pk(skB) in
 
 include Basic.
 
-(* This axiom holds for any bi-system.
-   It cannot be stated for [any] hence it is not in the standard library. *)
-axiom [default] diff_refl (x:message) : diff(x,x) = x.
-
 (* ------------------------------------------------------------------- *)
 
 (* Useful lemmas for the next proof. *)
@@ -151,8 +147,7 @@ Proof.
     apply IH.
   + (* Bout *)
     expandall; fa !<_,_>.
-    rewrite correct_key //.
-    rewrite diff_refl.
+    rewrite correct_key; 1,2:auto.
     apply IH.
   (* END EXO *)
 Qed.

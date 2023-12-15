@@ -126,6 +126,6 @@ lemma _ (x, y, z : message) :
   diff(f(x), f(x)) = d.
 Proof.
   intro H.
-  rewrite foo foo.
-  assumption.
+  rewrite foo. 
+  apply H. 
 Qed.
