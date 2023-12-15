@@ -1941,88 +1941,113 @@ let head_pi_term (s : proj) (t : term) : term =
   | _ -> t
 
 let diff a b =
-  if a = b then a else
+  if equal a b then a else
     Diff (Explicit [left_proj,a; right_proj,b])
 
-let rec make_normal_biterm
+let make_normal_biterm
     (dorec : bool) ?(alpha_find = true)
-    (s : subst) (t : term) : term
-  =  
-  (* [s] is a pending substitution from [t'] variables to [t] variables. *)
-  let mdiff (s : subst) (t : term) (t' : term) : term = 
-    if dorec then make_normal_biterm dorec ~alpha_find s (diff t t')
-    else diff t (subst s t')
-  in
-  let t1 = head_pi_term left_proj t
-  and t2 = head_pi_term right_proj t in
-
+    (s : subst) (t : term) : term * bool
+  =
+  let reduced = ref false in
+  
   let check_alpha s l l' =
     List.iter2 (fun t t' ->
         if not (alpha_conv ~subst:s t t') then raise AlphaFailed 
       ) l l'
   in
 
-  let doit () =
-    (* TODO generalize to non-binary diff *)
-    match t1, t2 with
-    (* FIXME: if the head function symb. could be not SI, then this would not work *)
-    | App (Fun _ as t, l), App (Fun _ as t', l') ->
-      if alpha_conv t t' then
-        App (t, List.map2 (mdiff s) l l')
-      else 
-        diff t1 (subst s t2)
+  let rec normalize (s : subst) (t : term) : term =
+    let check_reduced () = reduced := (match t with Diff _ -> true | _ -> false) in
+    
+    (* [s] is a pending substitution from [t'] variables to [t] variables. *)
+    let mdiff (s : subst) (t : term) (t' : term) : term = 
+      if dorec then normalize s (diff t t')
+      else diff t (subst s t')
+    in
+    let t1 = head_pi_term left_proj t
+    and t2 = head_pi_term right_proj t in
 
-    | Fun _ as t, (Fun _ as t') when alpha_conv t t' -> t
+    let doit () =
+      (* TODO generalize to non-binary diff *)
+      match t1, t2 with
+      (* FIXME: if the head function symb. could be not SI, then this would not work *)
+      | App (Fun _ as t, l), App (Fun _ as t', l') ->
+        if alpha_conv t t' then
+          let () = check_reduced () in
+          App (t, List.map2 (mdiff s) l l')
+        else 
+          diff t1 (subst s t2)
 
-    | Proj (i, t), Proj (i', t') when i = i' -> Proj (i, mdiff s t t')
+      | Fun _ as t, (Fun _ as t') when alpha_conv t t' ->
+        check_reduced ();
+        t
 
-    | Tuple l, Tuple l' when List.length l = List.length l' -> 
-      Tuple (List.map2 (mdiff s) l l')
+      | Proj (i, t), Proj (i', t') when i = i' ->
+        check_reduced ();
+        Proj (i, mdiff s t t')
 
-    | App (f, l), App (f', l') when List.length l = List.length l' ->
-      mk_app (mdiff s f f') (List.map2 (mdiff s) l l')
+      | Tuple l, Tuple l' when List.length l = List.length l' ->
+        check_reduced ();
+        Tuple (List.map2 (mdiff s) l l')
 
-    | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
-      check_alpha s l l';
-      Name (n, l)
+      | App (f, l), App (f', l') when List.length l = List.length l' ->
+        check_reduced ();
+        mk_app (mdiff s f f') (List.map2 (mdiff s) l l')
+
+      | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
+        check_alpha s l l';
+        check_reduced ();
+        Name (n, l)
       (* Name (n, List.map2 (mdiff s) l l' *)
 
-    | Macro (m,l,ts), Macro (m',l',ts')
-      when m.s_symb = m'.s_symb && ts = subst s ts' ->
-      assert (List.length l = List.length l');
-      check_alpha s l l';
-      Macro (m, l, ts)
+      | Macro (m,l,ts), Macro (m',l',ts')
+        when m.s_symb = m'.s_symb && ts = subst s ts' ->
+        assert (List.length l = List.length l');
+        check_alpha s l l';
+        check_reduced ();
+        Macro (m, l, ts)
       (* Macro (m, List.map2 (mdiff s) l l', ts) *)
 
-    | Action (a,is), Action (a',is') when a = a' ->
-      check_alpha s is is';
-      Action (a,is)
+      | Action (a,is), Action (a',is') when a = a' ->
+        check_alpha s is is';
+        check_reduced ();
+        Action (a,is)
       (* Action (a,List.map2 (mdiff s) is is') *)
 
-    | Var x, Var x' ->
-      alpha_var s x x';
-      Var x
+      | Var x, Var x' ->
+        alpha_var s x x';
+        check_reduced ();
+        Var x
 
-    | Find (is,c,t,e), Find (is',c',t',e')
-      when List.length is = List.length is' && alpha_find ->
-      let s' = alpha_bnds s is is' in
-      Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
+      | Find (is,c,t,e), Find (is',c',t',e')
+        when List.length is = List.length is' && alpha_find ->
+        let s' = alpha_bnds s is is' in
+        check_reduced ();
+        Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
 
-    | Quant (q,vs,f), Quant (q',vs',f')
-      when q = q' && List.length vs = List.length vs'->
-      let s = alpha_bnds s vs vs' in
-      Quant (q, vs, mdiff s f f')
+      | Quant (q,vs,f), Quant (q',vs',f')
+        when q = q' && List.length vs = List.length vs'->
+        let s = alpha_bnds s vs vs' in
+        check_reduced ();
+        Quant (q, vs, mdiff s f f')
 
-    | t1,t2 -> diff t1 (subst s t2)
+      | t1,t2 -> diff t1 (subst s t2)
+    in
+    try doit () with AlphaFailed -> diff t1 (subst s t2)
   in
-  try doit () with AlphaFailed -> diff t1 (subst s t2)
 
-let simple_bi_term     : term -> term = make_normal_biterm true  []
-let head_normal_biterm : term -> term = make_normal_biterm false []
+  let t = normalize s t in
+  (t, !reduced)
+  
+let simple_bi_term     : term -> term = fst -| make_normal_biterm true  []
+let head_normal_biterm : term -> term = fst -| make_normal_biterm false []
+
+let simple_bi_term0     : term -> term * bool = make_normal_biterm true  []
+let head_normal_biterm0 : term -> term * bool = make_normal_biterm false []
 
 (* Ad-hoc fix to keep diffeq tactic working properly. *)
 let simple_bi_term_no_alpha_find : term -> term =
-  make_normal_biterm true ~alpha_find:false []
+  fst -| make_normal_biterm true ~alpha_find:false []
     
 (*------------------------------------------------------------------*)
 let combine = function

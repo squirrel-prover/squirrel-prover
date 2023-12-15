@@ -10,6 +10,7 @@ type red_param = {
   beta    : bool;         (** β-reduction *)
   proj    : bool;         (** reduce projections *)
   zeta    : bool;         (** let reduction *)
+  diff    : bool;         (** diff terms reduction *)
   constr  : bool;         (** reduce tautologies over timestamps *)
 }
 

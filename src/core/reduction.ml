@@ -16,6 +16,7 @@ type red_param = {
   beta    : bool;         (** β-reduction *)
   proj    : bool;         (** reduce projections *)
   zeta    : bool;         (** let reduction *)
+  diff    : bool;         (** diff terms reduction *)
   constr  : bool;         (** reduce tautologies over timestamps *)
 }
 
@@ -26,6 +27,7 @@ let rp_empty = {
   delta   = Match.delta_empty; 
   proj    = false;
   zeta    = false;
+  diff    = false;
   constr  = false; 
 }
 
@@ -34,7 +36,8 @@ let rp_default = {
   beta    = true; 
   delta   = Match.delta_default;
   zeta    = true;
-  proj    = true; 
+  proj    = true;
+  diff    = false;
   constr  = false; 
 }
 
@@ -43,7 +46,8 @@ let rp_full = {
   beta    = true; 
   delta   = Match.delta_full;
   zeta    = true;
-  proj    = true; 
+  proj    = true;
+  diff    = true;
   constr  = false; 
 }
 
@@ -66,6 +70,7 @@ let parse_simpl_args
     | L.{ pl_desc = "zeta"   } -> { param with zeta    = true; }
     | L.{ pl_desc = "proj"   } -> { param with proj    = true; }
     | L.{ pl_desc = "constr" } -> { param with constr  = true; }
+    | L.{ pl_desc = "diffr"  } -> { param with diff    = true; }
     | L.{ pl_desc = "delta"  } -> { param with delta   = Match.delta_full; }
     | L.{ pl_desc = "def"    } ->
       { param with delta   = { param.delta with def = true;} }
@@ -391,6 +396,7 @@ and reduce_head1_term (st : state) (t : Term.term) : Term.term * bool =
            rewrite_head_once st;     (* user rewriting rules *)
            reduce_beta1      st;     (* β *)
            reduce_proj1      st;     (* proj *)
+           reduce_diff1      st;     (* diff *)
            reduce_let1       st;     (* zeta *)
            reduce_constr1    st; ]   (* constr *)
 
@@ -405,6 +411,10 @@ and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
 and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
   if not st.param.proj then t, false
   else Match.reduce_proj1 t
+
+and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
+  if not st.param.diff then t, false
+  else Term.head_normal_biterm0 t 
 
 (* Try to show using [Constr] that [t] is [false] or [true] *)
 and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
