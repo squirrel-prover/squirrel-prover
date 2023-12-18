@@ -602,7 +602,10 @@ module type S = sig
   type judgment
   val pp_arg : Format.formatter -> arg -> unit
   (* TODO post-quantum flag probably shouldn't be here *)
-  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
+  val eval_abstract :
+    post_quantum:bool ->
+    modifiers:string list ->
+    lsymb -> arg list -> judgment tac
 end
 
 module type AST_sig = sig
@@ -611,8 +614,8 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : bool -> string list -> t -> judgment tac
-  val eval_judgment : bool -> t -> judgment -> judgment list
+  val eval : post_quantum:bool -> modifiers:string list -> t -> judgment tac
+  val eval_judgment : post_quantum:bool -> t -> judgment -> judgment list
   val pp : Format.formatter -> t -> unit
 
 end
@@ -632,7 +635,7 @@ struct
   type judgment = M.judgment
 
   let rec eval (post_quantum:bool) modifiers = function
-    | Abstract (id,args) -> eval_abstract post_quantum modifiers id args
+    | Abstract (id,args) -> eval_abstract ~post_quantum ~modifiers id args
     | AndThen tl -> andthen_list (List.map (eval post_quantum modifiers) tl)
     | AndThenSel (t,tl) ->
       let tl =
@@ -652,6 +655,8 @@ struct
     | CheckFail (e,t)     -> checkfail_tac e (eval post_quantum modifiers t)
     | Time t              -> check_time (eval post_quantum modifiers t)
 
+  let eval ~post_quantum ~modifiers ast = eval post_quantum modifiers ast
+
   let pp_args fmt l =
     Fmt.list
       ~sep:(fun ppf () -> Fmt.pf ppf ",@ ")
@@ -662,7 +667,6 @@ struct
       let i = L.unloc i in
       if args = [] then Fmt.string ppf i else
         Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
-
 
     | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
 
@@ -710,8 +714,8 @@ struct
       A soft failure should be formatted inside the [Tactic_Soft_Failure] exception.
       A hard failure inside [Tactic_hard_failure]. 
       Those exceptions are caught inside the interactive loop. *)
-  let eval_judgment (post_quantum:bool) ast j =
-    let tac = eval post_quantum [] ast in
+  let eval_judgment ~post_quantum ast j =
+    let tac = eval ~post_quantum ~modifiers:[] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
     let fk (loc,tac_error) = soft_failure ?loc tac_error in

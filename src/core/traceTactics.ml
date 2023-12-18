@@ -44,10 +44,6 @@ let goal_true_intro (s : TS.t) =
 
 let () =
   T.register "true"
-     ~tactic_help:{general_help = "Solves a goal when the conclusion is true.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                   tactic_group = Logical}
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun goal_true_intro)
 
@@ -251,12 +247,6 @@ let localize h h' s =
 
 let () =
   T.register_general "localize"
-    ~tactic_help:
-      {general_help = "Change a global hypothesis containing a reachability \
-                       formula to a local hypothesis.";
-       detailed_help = "";
-       usages_sorts = [Sort (Pair (String, String))];
-       tactic_group = Logical}
     ~pq_sound:true
     (function
        | TacticsArgs.[String_name h; NamingPat h'] ->
@@ -306,13 +296,6 @@ let congruence_tac (s : TS.t) =
 
 let () =
   T.register "congruence"
-    ~tactic_help:
-      {general_help = "Tries to derive false from the messages equalities.";
-       detailed_help = "It relies on the reflexivity, transitivity \
-                        and stability by function application \
-                        (f(u)=f(v) <=> u=v).";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun congruence_tac)
 
@@ -439,11 +422,6 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
 
 let () =
   T.register_typed "const"
-    ~general_help:"Add the `const` tag to a variable."
-    ~detailed_help:"The variable must be of a finite and fixed (η-independent) type, \
-                      and must not appear in any global hypothesis (some global \
-                      hypotheses may be localized if necessary)."
-    ~tactic_group:Structural
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg const_tac)
     Args.((Term : _ sort))
@@ -489,15 +467,8 @@ let eq_names (s : TS.t) =
   in
   [s]
 
-let () = T.register "eqnames"
-    ~tactic_help:
-      {general_help = "Add index constraints resulting from names equalities, \
-                       modulo the known equalities.";
-       detailed_help = "If n[i] = n[j] then i = j. \
-                        This is checked on all name equality entailed \
-                        by the current context.";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
+let () =
+  T.register "eqnames"
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_names)
 
@@ -691,17 +662,9 @@ let substitute_tac arg s =
 
 let () =
   T.register_typed "subst"
-    ~general_help:"If i = t where i is a variable, substitute all occurences \
-                   of i by t and remove i from the context variables."
-    ~detailed_help:""
-    ~tactic_group:Structural
-    ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
-                   Args.(Sort (Pair (Timestamp, Timestamp)));
-                   Args.(Sort (Pair (Message, Message)))]
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg substitute_tac)
     Args.(Pair (Term, Term))
-
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
@@ -723,11 +686,6 @@ let exec (Args.Message (a,_)) s =
 
 let () =
   T.register_typed "executable"
-    ~general_help:"Assert that exec@_ implies exec@_ for all \
-                   previous timestamps."
-    ~detailed_help:"This is by definition of exec, which is the conjunction of \
-                    all conditions before this timestamp."
-    ~tactic_group:Structural
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg exec)
     Args.Timestamp
@@ -1062,13 +1020,6 @@ let project s =
 
 let () =
   T.register "project"
-     ~tactic_help:{
-       general_help = "Turn a goal on a bi-system into \
-                       one goal for each projection of the bi-system.";
-       detailed_help = "This tactic will project all occurrences of \
-                        diff operators in local formulas.";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
     ~pq_sound:true
      (LowTactics.genfun_of_pure_tfun project)
 
@@ -1159,17 +1110,8 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
   let goal = Term.mk_impl ~simpl:false f_coll (TS.goal s) in
   [TS.set_goal goal s]
 
-let () = T.register_typed "collision"
-    ~general_help:"Collects all equalities between hashes \
-                   occurring at toplevel in \
-                   message hypotheses, and adds the equalities \
-                   between messages that have the same hash with \
-                   the same valid key."
-    ~detailed_help:"A key is valid if it is only used in a key \
-                    position. Remark that this could be relaxed, \
-                    as CR holds for any valid key, even known to \
-                    the attacker."
-    ~tactic_group:Cryptographic
+let () =
+  T.register_typed "collision"
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg collision_resistance)
     Args.(Opt String)
@@ -1337,19 +1279,5 @@ let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)
 
 let () =
   T.register_general "rewrite equiv"
-    ~tactic_help:{
-      general_help =
-        "Use an equivalence to rewrite a reachability goal.";
-      detailed_help =
-        "The tactic argument should be a proof term corresponding to an \
-         assumption which concludes with an equivalence atom, i.e. a biframe. \
-         If the assumption has premises, new subgoals are created.\
-         \n\n\
-         When applied, all occurrences of left elements of the biframe \
-         are rewritten by their corresponding right elements. \
-         All macros in the goal must be rewritten, or the tactic fails. \
-         Default direction is left-to-right (can be changed using `-`).";
-      tactic_group = Structural;
-      usages_sorts = [] }
     ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)

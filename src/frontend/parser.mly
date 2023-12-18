@@ -95,6 +95,8 @@
 %start top_process
 %start interactive
 %start top_proofmode
+%start interactive_or_undo
+%start top_proofmode_or_undo
 %start top_global_formula
 %type <Decl.declarations> declarations
 %type <Theory.term> top_formula
@@ -103,6 +105,8 @@
 %type <Process.Parse.t> top_process
 %type <ProverLib.input> interactive
 %type <ProverLib.input> top_proofmode
+%type <ProverLib.input_or_undo> interactive_or_undo
+%type <ProverLib.input_or_undo> top_proofmode_or_undo
 %type <ProverTactics.AST.t> tac
 
 %%
@@ -1144,56 +1148,6 @@ tac:
          [TacticsArgs.Theory i1;
           TacticsArgs.Theory g] }
 
-  | l=lloc(HELP)
-    { mk_abstract l "help" [] }
-
-  | l=lloc(HELP) i=lsymb
-    { mk_abstract l "help" [TacticsArgs.String_name i] }
-
-  | l=lloc(HELP) h=help_tac
-   { mk_abstract l "help" [TacticsArgs.String_name h] }
-
-(* A few special cases for tactics whose names are not parsed as ID
- * because they are reserved. *)
-help_tac_i:
-| FA         { "fa"         }
-| CS         { "cs"         }
-| INTRO      { "intro"      }
-| DESTRUCT   { "destruct"   }
-| DEPENDS    { "depends"    }
-| REMEMBER   { "remember"   }
-| EXISTS     { "exists"     }
-| REVERT     { "revert"     }
-| GENERALIZE { "generalize" }
-| INDUCTION  { "induction"  }
-| CLEAR      { "clear"      }
-| REDUCE     { "reduce"     }
-| SIMPL      { "simpl"      }
-| AUTO       { "auto"       }
-| ASSERT     { "have"       }   /* assert is an alias to have */
-| HAVE       { "have"       }
-| USE        { "use"        }
-| REWRITE    { "rewrite"    }
-| TRANS      { "trans"      }
-| FRESH      { "fresh"      }
-| APPLY      { "apply"      }
-| SPLITSEQ   { "splitseq"   }
-| CONSTSEQ   { "constseq"   }
-| CRYPTO     { "crypto"     }
-| MEMSEQ     { "memseq"     }
-| DDH        { "ddh"        }
-| GDH        { "gdh"        }
-| CDH        { "cdh"        }
-| PRINT      { "print"      }
-| SEARCH     { "search"     }
-
-| DEPENDENT INDUCTION  { "dependent induction"}
-| GENERALIZE DEPENDENT { "generalize dependent"}
-| REWRITE EQUIV        { "rewrite equiv"}
-
-help_tac:
-| l=loc(help_tac_i) { l }
-
 undo:
 | UNDO i=INT DOT                      { i }
 
@@ -1354,36 +1308,33 @@ p_include:
     { ProverLib.{ th_name = ProverLib.Name th; params = l; } }
 
 (*------------------------------------------------------------------*)
-/* print query */
-pr_query:
-| SYSTEM l=system_expr DOT { ProverLib.Pr_system (Some l) }
-| l=lsymb DOT { ProverLib.Pr_any l }
-|         DOT { ProverLib.Pr_system None }
-
-search_query:
-| SEARCH   t=any_term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }
-| SEARCH   t=any_term DOT { ProverLib.Srch_term t }
-
-help_query:
-| HELP DOT               { [] }
-| HELP i=lsymb DOT       { [TacticsArgs.String_name i] }
-| HELP h=help_tac DOT    { [TacticsArgs.String_name h] }
-
+query:
+(* print *)
+| PRINT SYSTEM l=system_expr DOT { ProverLib.(Print (Pr_system (Some l))) }
+| PRINT l=lsymb DOT              { ProverLib.(Print (Pr_any l)) }
+| PRINT DOT                      { ProverLib.(Print (Pr_system None)) }
+(* search *)
+| SEARCH t=any_term IN s=system_expr DOT
+                                 { ProverLib.(Search (Srch_inSys (t,s))) }
+| SEARCH t=any_term DOT          { ProverLib.(Search (Srch_term t)) }
+(* help *)
+| HELP DOT                       { ProverLib.Help }
 
 (*------------------------------------------------------------------*)
+interactive_or_undo:
+| u=undo             { ProverLib.Undo u }
+| i=interactive      { ProverLib.Input i }
+
 interactive:
-| set=set_option     { ProverLib.Prover (SetOption set) }
-| decls=declarations { ProverLib.Prover (InputDescr decls) }
-| u=undo             { ProverLib.Toplvl (Undo u) }
-| PRINT q=pr_query   { ProverLib.Prover (Print q) }
-| t=search_query     { ProverLib.Prover (Search t) }
-| PROOF              { ProverLib.Prover Proof }
-| i=p_include        { ProverLib.Prover (Include i) }
-| RESET              { ProverLib.Prover Reset }
-| g=lemma            { ProverLib.Prover (Goal g) }
-| h=hint             { ProverLib.Prover (Hint h) }
-| h=help_query       { ProverLib.Prover (Help h) }
-| EOF                { ProverLib.Prover EOF }
+| decls=declarations { ProverLib.(InputDescr decls) }
+| set=set_option     { ProverLib.(SetOption set) }
+| h=hint             { ProverLib.(Hint h) }
+| q=query            { q }
+| i=p_include        { ProverLib.(Include i) }
+| g=lemma            { ProverLib.(Goal g) }
+| PROOF              { ProverLib.Proof }
+| RESET              { ProverLib.Reset }
+| EOF                { ProverLib.EOF }
 
 bullet:
 | MINUS              { "-" }
@@ -1402,12 +1353,14 @@ bulleted_tactic:
 | tactic                 { [ ProverLib.BTactic $1 ] }
 | DOT                    { [] }
 
+top_proofmode_or_undo:
+| u=undo                 { ProverLib.Undo u }
+| i=top_proofmode        { ProverLib.Input i }
+
 top_proofmode:
-| PRINT q=pr_query   { ProverLib.Prover (Print q) }
-| t=search_query     { ProverLib.Prover (Search t) }
-| bulleted_tactic    { ProverLib.Prover (Tactic $1) }
-| u=undo             { ProverLib.Toplvl (Undo u) }
-| ABORT              { ProverLib.Prover Abort }
-| QED                { ProverLib.Prover Qed }
-| RESET              { ProverLib.Prover Reset }
-| EOF                { ProverLib.Prover EOF }
+| q=query            { q }
+| t=bulleted_tactic  { ProverLib.(Tactic t) }
+| ABORT              { ProverLib.Abort }
+| QED                { ProverLib.Qed }
+| RESET              { ProverLib.Reset }
+| EOF                { ProverLib.EOF }

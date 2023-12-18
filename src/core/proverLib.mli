@@ -39,20 +39,18 @@ val pp_error :
   (Format.formatter -> Location.t -> unit) -> 
   Format.formatter -> error -> unit
 
-
-(* TOMOVE in prover.ml cpt in state TODO !*)
 val unnamed_goal : unit -> Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
-type lpath = 
+type load_path = 
   | Name of string Location.located
   | Path of string Location.located
 
-val get_pathlsymb : lpath -> string Location.located
+val lsymb_of_load_path : load_path -> Theory.lsymb
 
-type include_param = { th_name : lpath; params : Theory.lsymb list }
+type include_param = { th_name : load_path; params : Theory.lsymb list }
 
 type bulleted_tactic =
   | Bullet of string
@@ -61,16 +59,13 @@ type bulleted_tactic =
 
 type bulleted_tactics = bulleted_tactic list
 
-(*------------------------------------------------------------------*)
-type toplevel_input =
-  | Undo    of int
-
-type prover_input = 
+type input = 
   | InputDescr of Decl.declarations
   | SetOption  of Config.p_set_param
   | Tactic of bulleted_tactics
   | Print   of print_query
   | Search of search_query
+  | Help
   | Reset
   | Goal    of Goal.Parsed.t Location.located
   | Proof
@@ -79,10 +74,7 @@ type prover_input =
   | Hint of Hint.p_hint
   | EOF
   | Include of include_param
-  | Help of TacticsArgs.parser_args 
 
-type input =
-  | Prover of prover_input
-  | Toplvl of toplevel_input
-
-val get_prover_command : input -> prover_input
+type input_or_undo =
+  | Input of input  (** Execute one input. *)
+  | Undo of int     (** Undo some number of previous inputs. *)

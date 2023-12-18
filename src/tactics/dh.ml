@@ -344,21 +344,8 @@ let cdh_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "cdh"
-    ~tactic_help:{
-      general_help =
-        "Usage: cdh H, g.\nApplies the CDH assumption (including \
-         square-CDH) on H using generator g.";
-      detailed_help =
-        "Local sequent:\n\
-         Given a message equality M of the form t=g^{a b}, \
-         close the goal if we can  prove that a and b are \
-         correctly used nonces w.r.t. CDH (i.e. they occur only \
-         in g^a and g^b in the term t).";
-      usages_sorts = [];
-      tactic_group = Cryptographic }
     ~pq_sound:false
     (LowTactics.gentac_of_ttac_arg cdh_tac)
-
 
 (*------------------------------------------------------------------*)
 let gdh_tac args s =
@@ -377,17 +364,5 @@ let gdh_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "gdh"
-    ~tactic_help:{
-      general_help =
-        "Usage: gdh H, g.\nApplies the GDH assumption (including \
-         square-GDH) on H with generator g.";
-      detailed_help =
-        "Local sequent:\n\
-         Given a message equality M of the form t=g^{a b}, \
-         close the goal if we can  prove that a and b are \
-         correctly used nonces w.r.t. GDH (i.e. they occur only \
-         in g^a and g^b, or in tests u = v^a and u = v^b, in the term t).";
-      usages_sorts = [];
-      tactic_group = Cryptographic }
     ~pq_sound:false
     (LowTactics.gentac_of_ttac_arg gdh_tac)

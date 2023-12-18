@@ -228,15 +228,5 @@ let intctxt_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "intctxt"
-    ~tactic_help:{
-      general_help =
-        "Apply the INT-CTXT axiom to the given hypothesis name.";          
-      detailed_help =
-        "applies to a hypothesis of the form dec(c,k)<>fail, \
-or dec(c,k) = t (in the latter case, generates as an additional goal \
-that t <> fail)";
-      usages_sorts = [];
-      tactic_group = Cryptographic }
     ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg intctxt_tac)
-

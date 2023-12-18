@@ -109,12 +109,6 @@ let refl_tac (s : ES.t) =
 
 let () =
   T.register "refl"
-    ~tactic_help:{general_help = "Closes a reflexive goal.";
-                  detailed_help = "Closes the goal when the left and right \
-                                   terms identical. Requires to check that \
-                                   macros do not contain diffs.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     ~pq_sound:true
     (LT.genfun_of_efun refl_tac)
 
@@ -139,18 +133,8 @@ let sym_tac (s : ES.t) : Goal.t list =
          s) ]
 
 let () =
-  let tactic_help = ProverTactics.{
-      general_help = "Prove an equivalence by symmetry.";
-      detailed_help =
-        "Turn a goal whose conclusion is an equivalence \
-         into a subgoal whose conclusion is the symmetric equivalence.\
-         \n\n\
-         As a side effect the system annotation must be changed, \
-         which might cause the dropping of some hypotheses.";
-      usages_sorts = [Sort None];
-      tactic_group = Logical }
-  in
-  T.register "sym" ~tactic_help ~pq_sound:true
+  T.register "sym"
+    ~pq_sound:true
     (LT.genfun_of_efun sym_tac)
 
 (*------------------------------------------------------------------*)
@@ -293,31 +277,8 @@ let trans_tac args s =
   | _ -> bad_args ()
 
 let () =
-  let tactic_help = ProverTactics.{
-    general_help = "Prove an equivalence by transitivity.";
-    detailed_help =
-      "With a system: When trying to prove an equivalence with respect to an initial \
-       pair of systems, the tactic `trans [new_annotation]` will reduce \
-       the goal to three new subgoals. Each subgoal will have as conclusion \
-       an equivalence, and by transitivity the three equivalences imply \
-       the initial equivalence. \
-       The second subgoal will establish an equivalence that is syntactically \
-       identical to the initial one, but understood with respect to \
-       the new system annotation.\
-       \n\n\
-       With a terms: the tactic `trans i1: t1, ..., in : tn` uses transitivity \
-       reasoning w.r.t. the intermediate equivalence obtained by replacing the \
-       terms i1 to in on the right by the terms t1 to tn.\
-       \n\n\
-       In both cases, the subgoals will in general have different \
-       system annotations than the initial goal, which might force dropping \
-       some hypotheses.";
-    usages_sorts = [];
-    tactic_group = Logical }
-  in
-
   T.register_general "trans"
-    ~tactic_help ~pq_sound:true
+    ~pq_sound:true
     (LT.genfun_of_efun_arg trans_tac)
 
 (*------------------------------------------------------------------*)
@@ -421,11 +382,6 @@ let byequiv_tac s = [byequiv s]
 
 let () =
   T.register "byequiv"
-    ~tactic_help:{general_help = "transform an equivalence goal into a \
-                                  reachability goal.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     (LT.genfun_of_efun byequiv_tac)
 
 (*------------------------------------------------------------------*)
@@ -660,13 +616,6 @@ let enrich_tac args s sk fk =
 
 let () =
   T.register_general "enrich"
-    ~tactic_help:{
-      general_help  = "Enrich the goal with the given term.";
-      detailed_help = "This is usually called before the induction, to enrich the \
-                       induction hypothesis, and then allow to solve multiple cases \
-                       more simply.";
-      tactic_group  = Logical;
-      usages_sorts  = [Sort Args.Message; Sort Args.Boolean]; }
     ~pq_sound:true
     (LT.gentac_of_etac_arg enrich_tac)
 
@@ -991,17 +940,9 @@ let deduce Args.(Opt (Int, p)) s : ES.sequents =
 
 
 let () =
- T.register_typed "deduce"
-   ~general_help:"`deduce i` removes the ith element from the biframe when it can be \
-                  computed from the rest of the bi-frame.\n\
-                  `deduce` try to deduce the biframe with the first equivalence \
-                  in the hypotheses it finds."
-   ~detailed_help:"When applied on an the ith element u of the biframe, \
-                   `deduce i` removes u if the biframe without u allows to bi-deduce \
-                   the whole biframe."
-   ~tactic_group:Structural
-   ~pq_sound:true
-   (LT.genfun_of_pure_efun_arg deduce) Args.(Opt Int)
+  T.register_typed "deduce"
+    ~pq_sound:true
+    (LT.genfun_of_pure_efun_arg deduce) Args.(Opt Int)
 
 
 (*------------------------------------------------------------------*)
@@ -1052,19 +993,7 @@ let case_study arg s : ES.sequents =
 
 let () =
   T.register_typed "cs"
-    ~general_help:
-      "Performs case study on conditionals inside an equivalence."
-    ~detailed_help:
-      "Without a specific target, \"cs phi\" will project all conditionals \
-       on phi in the equivalence. With a specific target, \"cs phi in i\" \
-       will only project conditionals in the i-th item of the equivalence.\n\
-       \n\
-       Example: when proving an equivalence \n\
-       equiv(if phi then t1 else t2, if phi then u1 else u2)\n\
-       invoking \"nosimpl cs phi\" results in two subgoals: \
-       equiv(phi, t1, u1) and equiv(phi, t2, u2)."
-   ~tactic_group:Structural
-   (LT.genfun_of_pure_efun_arg case_study) Args.(Pair(Message,Opt Int))
+    (LT.genfun_of_pure_efun_arg case_study) Args.(Pair(Message,Opt Int))
 
 (*------------------------------------------------------------------*)
 (** Fresh *)
@@ -1394,13 +1323,6 @@ let global_diff_eq (s : ES.t) =
 
 let () =
   T.register "diffeq"
-        ~tactic_help:{general_help = "Closes a reflexive goal up to equality";
-                      detailed_help = "A goal is reflexive when the left and \
-                                       right frame corresponding to the bi-terms \
-                                       are identical. For all diff(s1,s2), one \
-                                       needs to prove that s1=s2 holds";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
     ~pq_sound:true
     (LT.genfun_of_efun global_diff_eq)
 
@@ -1472,10 +1394,6 @@ let split_seq_tac args = wrap_fail (split_seq_args args)
 
 let () =
   T.register_general "splitseq"
-    ~tactic_help:{general_help = "splits a sequence according to some boolean";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
     (LT.gentac_of_etac_arg split_seq_tac)
 
 (*------------------------------------------------------------------*)
@@ -1517,11 +1435,6 @@ let mem_seq_tac args = wrap_fail (mem_seq_args args)
 
 let () =
   T.register_general "memseq"
-    ~tactic_help:{general_help = "prove that an biframe element appears in a \
-                                 sequence of the biframe.";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
     (LT.genfun_of_efun_arg mem_seq_tac)
 
 (*------------------------------------------------------------------*)
@@ -1603,10 +1516,6 @@ let const_seq_tac args = wrap_fail (const_seq_args args)
 
 let () =
   T.register_general "constseq"
-    ~tactic_help:{general_help = "simplifies a constant sequence";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
     (LT.genfun_of_efun_arg const_seq_tac)
 
 
@@ -1797,13 +1706,6 @@ let enckp arg (s : ES.t) =
 
 let () =
   T.register_typed "enckp"
-    ~general_help:"Key-privacy changes the key in some encryption subterm."
-    ~detailed_help:"Key-privacy captures the property of an encryption to provide \
-                    confidentiality of the encryption key. \
-                    The term and new key can be passed as arguments, \
-                    otherwise the tactic applies to the first subterm of the form \
-                    enc(_,r,k) where r is a name and k features a diff operator."
-    ~tactic_group:Cryptographic
     ~pq_sound:true
     (LT.genfun_of_efun_arg enckp)
     Args.(Pair (Int, Pair (Opt Message,Opt Message)))
@@ -1994,10 +1896,6 @@ let xor arg (s : ES.t) =
 
 let () =
   T.register_typed "xor"
-   ~general_help:"Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is fresh."
-   ~detailed_help:"This yields the same freshness condition on the name as the \
-                   fresh tactic."
-   ~tactic_group:Cryptographic
    ~pq_sound:true
    (LT.genfun_of_pure_efun_arg xor)
    Args.(Pair (Int, Pair (Opt Message, Opt Message)))
@@ -2132,22 +2030,8 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
    cannot use the typed registering, as a is parsed as a name identifier, which
    then does not have the correct arity. *)
 
-let () = T.register_general "ddh"
-    ~tactic_help:
-      {general_help = "Closes the current system, if it is an \
-                       instance of a context of ddh.";
-       detailed_help = "It must be called on (generator, a, b, c) where \
-                        (a,b,c) are strings that corresponds \
-                        to names, but without any indices. It then \
-                        applies ddh to all the copies of the names, \
-                        and checks that all actions of the protocol \
-                        uses the names in a correct way. Can be used \
-                        in collaboration with some transitivity to \
-                        obtain a system where ddh can be applied.";
-                  usages_sorts = [Sort (Pair (String, 
-                                              Pair (String, 
-                                                    Pair( String, String))))];
-                  tactic_group = Cryptographic}
+let () =
+  T.register_general "ddh"
     (function
        | [Args.String_name gen;
           Args.String_name v1;
@@ -2167,10 +2051,6 @@ let crypto_tac args (s : ES.t) =
   | [Args.Crypto (game, args)] -> wrap_fail (crypto game args) s
   | _ -> bad_args ()
 
-let () = T.register_general "crypto"
-    ~tactic_help:
-      {general_help = "Applies a cryptographic game";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Cryptographic}
+let () =
+  T.register_general "crypto"
     (LT.gentac_of_etac_arg crypto_tac)

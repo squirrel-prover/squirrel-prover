@@ -2,12 +2,11 @@ open Squirrelcore
 open Squirrelfront
 module L = Location
 
-(*--TOMOVE in Config ?-------- Command flags ------------------*)(* {↓{ *)
+(*--TOMOVE in Config ?-------- Command flags ------------------*)
 let interactive = ref false
 let verbose = ref false
 let html = ref false
 let stat_filename = ref ""
-(* }↑} *)
 
 (** A loading path: directory to lookup during includes *)
 type load_path =
@@ -68,9 +67,12 @@ let get_lexbuf (file : file) : string * Sedlexing.lexbuf =
   in
   file.f_name ^ ".sp", lexbuf
 
-(** Get the next input from lexing buffer. Driver *)
-let next_input ~test ~interactive ~filename (lexbuf:Sedlexing.lexbuf) (p_mode:
-  ProverLib.prover_mode) =
+(** Get the next input from lexing buffer. *)
+let next_input
+      ~test ~interactive ~filename (lexbuf:Sedlexing.lexbuf)
+      (p_mode:ProverLib.prover_mode)
+    : ProverLib.input
+=
   Parserbuf.parse_from_buf
     ~test ~interactive
     (* ↓ can also be WaitQed since the parser can read intern tactics
@@ -81,11 +83,40 @@ let next_input ~test ~interactive ~filename (lexbuf:Sedlexing.lexbuf) (p_mode:
        Parser.interactive)
     lexbuf ~filename
 
-(** Get the next input from the current file. Driver *)
-let next_input_file ~test ~interactive (file : file) (p_mode: ProverLib.prover_mode) :
-ProverLib.input =
-  let filename, lexbuf = get_lexbuf file in
-  next_input ~test ~interactive ~filename lexbuf p_mode
+(** Get the next input or undo from lexing buffer. *)
+let next_input_or_undo
+      ~test ~interactive ~filename (lexbuf:Sedlexing.lexbuf)
+      (p_mode:ProverLib.prover_mode)
+    : ProverLib.input_or_undo
+=
+  Parserbuf.parse_from_buf
+    ~test ~interactive
+    (* ↓ can also be WaitQed since the parser can read intern tactics
+       and the prover will ignore them anyway in `NoCheck mode *)
+    (if (p_mode = ProverLib.ProofMode) || (p_mode = ProverLib.WaitQed) then
+       Parser.top_proofmode_or_undo
+     else
+       Parser.interactive_or_undo)
+    lexbuf ~filename
+
+(** Get next inputs from current file. *)
+module FromFile = struct
+
+  let next_input
+        ~test ~interactive (file : file) (p_mode: ProverLib.prover_mode)
+    : ProverLib.input
+  =
+    let filename, lexbuf = get_lexbuf file in
+    next_input ~test ~interactive ~filename lexbuf p_mode
+
+  let next_input_or_undo
+        ~test ~interactive (file : file) (p_mode: ProverLib.prover_mode)
+    : ProverLib.input_or_undo
+  =
+    let filename, lexbuf = get_lexbuf file in
+    next_input_or_undo ~test ~interactive ~filename lexbuf p_mode
+
+end
 
 (*--------------- Driver -------------------------------------------*)
 let file_from_stdin () : file =
@@ -146,7 +177,7 @@ let locate ?(is_name=true) (lds : load_paths) (name : string) : file =
   try_dirs lds
 
 let include_get_file (file_stack : file list)
-    (load_paths:load_paths) (path : ProverLib.lpath) : file =
+    (load_paths:load_paths) (path : ProverLib.load_path) : file =
   match path with
   | Name name ->
     check_cycle file_stack (L.unloc name);

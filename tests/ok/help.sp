@@ -1,17 +1,5 @@
-system null.
-
-lemma _ : False.
+help.
+lemma [any] _ : true.
 Proof.
-  help induction.
-  help use.
-  help rewrite.
-  help rewrite equiv.
-  help dependent induction.
-  help generalize dependent.
-  help have.
-  help assert.
-  help trans.
-  help sym.
-  help apply.
-  help use.
+  help.
 Abort.

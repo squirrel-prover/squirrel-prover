@@ -2740,12 +2740,6 @@ let intro_tac (simpl : f_simpl) args : gentac =
 
 let () =
   T.register_general "admit"
-    ~tactic_help:{
-      general_help = "Admit the current goal, or admit an element \
-                      from a  bi-frame.";
-      detailed_help = "This tactic, of course, is not sound";
-      usages_sorts = [Sort Args.Int];
-      tactic_group = Logical}
     ~pq_sound:true
     (function
       | [] -> fun _ sk fk -> sk [] fk
@@ -2766,163 +2760,72 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "clear"
-    ~tactic_help:{
-      general_help = "Clear an hypothesis.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.clear_tac EquivLT.clear_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "revert"
-    ~tactic_help:{
-      general_help = "Take an hypothesis H, and turns the conclusion C into \
-                      the implication H => C.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.revert_tac EquivLT.revert_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "remember"
-    ~tactic_help:{
-      general_help = "substitute a term by a fresh variable";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
     (gentac_of_any_tac_arg TraceLT.remember_tac EquivLT.remember_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "generalize"
-    ~tactic_help:{
-      general_help = "Generalize the goal on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
     (gentac_of_any_tac_arg
        (TraceLT.generalize_tac ~dependent:false)
        (EquivLT.generalize_tac ~dependent:false))
 
 let () =
   T.register_general "generalize dependent"
-    ~tactic_help:{
-      general_help = "Generalize the goal and hypotheses on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
     (gentac_of_any_tac_arg
        (TraceLT.generalize_tac ~dependent:true)
        (EquivLT.generalize_tac ~dependent:true))
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "reduce"
-    ~tactic_help:{general_help = "Reduce the sequent.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
+let () =
+  T.register_general "reduce"
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.reduce_tac EquivLT.reduce_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "destruct"
-    ~tactic_help:{
-      general_help = "Destruct an hypothesis. An optional And/Or \
-                      introduction pattern can be given.\n\n\
-                      Usages: destruct H.\n\
-                     \        destruct H as [A | [B C]]";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.destruct_tac EquivLT.destruct_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "left"
-    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
-                                  into the goal where the conclusion has been \
-                                  replaced with the first disjunct.";
-                  detailed_help = "G => A v B yields G => A";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.left_tac EquivLT.left_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "right"
-    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
-                                  into the goal where the conclusion has been \
-                                  replaced with the second disjunct.";
-                  detailed_help = "G => A v B yields G => B";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.right_tac EquivLT.right_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "exists"
-    ~tactic_help:{
-      general_help = "Introduce the existentially quantified \
-                      variables in the conclusion of the judgment, \
-                      using the arguments as existential witnesses.\
-                      \n\nUsage: exists v1, v2, ...";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.exists_intro_tac EquivLT.exists_intro_tac)
-
-
-(*------------------------------------------------------------------*)
-(* The `use` tacitcs now rely on the same code as the `assert` tactic.
-   We still register a tactic to have the tactic help working correctly. *)
-let () =
-  T.register_general "use"
-    ~tactic_help:
-      {general_help = "Instantiate a lemma or hypothesis on some arguments.\n\n\
-                       Usage:\n\
-                       \  use H with v1, ..., vn.\n\
-                       \  use H with v1 as intro_pat.";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    ~pq_sound:true
-    (fun _ _ _ -> assert false)
-
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "apply"
-    ~tactic_help:{
-      general_help=
-        "Matches the goal with the conclusion of the formula F provided \
-         (F can be an hypothesis, a lemma, an axiom, or a proof term), trying \
-         to instantiate F variables by matching. \
-         Creates one subgoal for each premises of F.\n\
-         Usage:\n\
-         \  apply H.\n\
-         \  apply lemma.\n\
-         \  apply axiom.";
-      detailed_help="";
-      usages_sorts=[];
-      tactic_group=Structural}
     ~pq_sound:true
     (genfun_of_any_fun_arg TraceLT.apply_tac EquivLT.apply_tac)
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "dependent induction"
-    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "Only supports induction over finite types.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
+let () =
+  T.register_general "dependent induction"
     (gentac_of_any_tac_arg
        (TraceLT.induction_tac ~dependent:true)
        (EquivLT.induction_tac ~dependent:true))
@@ -2931,79 +2834,43 @@ let () = T.register_general "dependent induction"
 (* we are only registering the help here *)
 let () =
   T.register "print"
-    ~tactic_help:{general_help = "Shows def of given symbol or system. \
-                                  By default shows current system.";
-                  detailed_help = "print [system] [symb]";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     ~pq_sound:true
     (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
 
 (*------------------------------------------------------------------*)
 let () =
   T.register "search"
-    ~tactic_help:{general_help = "Search lemmas containing a given pattern.";
-                  detailed_help = "search [pat] [in sys]";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
     ~pq_sound:true
     (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "show"
-    ~tactic_help:{
-      general_help  = "Print the messages given as argument. Can be used to \
-                       print the values matching a pattern.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts  = [Sort Args.Message]; }
+let () =
+  T.register_general "show"
     (gentac_of_any_tac_arg TraceLT.print_messages_tac EquivLT.print_messages_tac)
-
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_typed "depends"
-    ~general_help:"If the second action depends on the first \
-                   action, and if the second \
-                   action happened, \
-                   add the corresponding timestamp inequality."
-    ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
-                    occurs in the trace, we can add A1[i]. "
-    ~tactic_group:Structural
     ~pq_sound:true
     (genfun_of_any_pure_fun_arg TraceLT.depends EquivLT.depends)
     Args.(Pair (Timestamp, Timestamp))
 
-
 (*------------------------------------------------------------------*)
 let () =
   T.register_typed "namelength"
-    ~general_help:"Adds the fact that two names have the same length."
-    ~detailed_help:""
-    ~tactic_group:Structural
     ~pq_sound:true
     (genfun_of_any_pure_fun_arg TraceLT.namelength EquivLT.namelength)
     Args.(Pair (Message, Message))
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "expand"
-    ~tactic_help:{
-      general_help  = "Expand all occurences of the given macro inside the \
-                       goal.";
-      detailed_help = "Can only be called over macros with fully defined \
-                       timestamps.";
-      tactic_group  = Structural;
-      usages_sorts  = [Sort Args.String; Sort Args.Message; Sort Args.Boolean]; }
+let () =
+  T.register_general "expand"
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.expand_tac EquivLT.expand_tac)
 
 (*------------------------------------------------------------------*)
-let () = T.register "expandall"
-    ~tactic_help:{
-      general_help  = "Expand all possible macros in the sequent.";
-      detailed_help = "";
-      tactic_group  = Structural;
-      usages_sorts  = []; }
+let () =
+  T.register "expandall"
     ~pq_sound:true
     (genfun_of_any_pure_fun
        (TraceLT.expand_all_l `All)
@@ -3011,12 +2878,8 @@ let () = T.register "expandall"
 (* FIXME: allow user to specify targets *)
 
 (*------------------------------------------------------------------*)
-let () = T.register "split"
-    ~tactic_help:{general_help = "Split a conjunction conclusion, creating one \
-                                  subgoal per conjunct.";
-                  detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
+let () =
+  T.register "split"
     ~pq_sound:true
     (genfun_of_any_pure_fun
        TraceLT.goal_and_right

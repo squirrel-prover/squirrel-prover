@@ -377,18 +377,5 @@ let euf_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "euf"
-    ~tactic_help:{
-      general_help =
-        "Apply the euf axiom to the given hypothesis name.";          
-      detailed_help =
-        "If the hash has been declared with a tag formula, applies \
-         the tagged version.  given tag. Tagged eufcma, with a tag T, \
-         says that, under the syntactic side condition, a hashed \
-         message either satisfies the tag T, or was honestly \
-         produced. The tag T must refer to a previously defined axiom \
-         f(mess,sk), of the form forall (m:message,sk:message).";
-      usages_sorts = [];
-      tactic_group = Cryptographic }
     ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg euf_tac)
-

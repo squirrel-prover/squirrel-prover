@@ -1,22 +1,6 @@
-(*------------------------------------------------------------------*)
-(** {2 Tactics syntax trees} *)
+(** {2 Squirrel tactics} *)
+
 (** Prover tactics, and tables for storing them. *)
-
-(** Tactic groups. *)
-type tactic_group =
-  | Logical       (** Sequent calculus logical properties. *)
-  | Structural    (** Properties inherent to protocol,
-                      names or builtin functions. *)
-  | Cryptographic (** Cryptographic assumptions. *)
-  | None          (** No group for user-defined tactics, i.e. macros. *)
-
-(** Tactic metadata and documentation. *)
-type tactic_help = {
-  general_help  : string;
-  detailed_help : string;
-  usages_sorts  : TacticsArgs.esort list;
-  tactic_group  : tactic_group
-}
 
 val dbg : ('a, Format.formatter, unit) format -> 'a
 val bad_args : unit -> 'a
@@ -30,7 +14,7 @@ module AST : Tactics.AST_sig
 
 (** General-purpose tactic registration function. *)
 val register_general :
-  string -> tactic_help:tactic_help ->
+  string ->
   ?pq_sound:bool ->
   (TacticsArgs.parser_arg list -> tac) -> unit
 
@@ -44,25 +28,19 @@ val register_macro : string -> AST.t -> unit
    either without arguments (for [register])
    or with typed arguments (for [register_typed]). *)
 
-val register : string -> tactic_help:tactic_help ->
+val register : string ->
   ?pq_sound:bool ->
   (judgment -> judgment list) -> unit
 
 val register_typed :
-  string ->  general_help:string ->  detailed_help:string ->
-  tactic_group:tactic_group ->
+  string ->
   ?pq_sound:bool ->
-  ?usages_sorts : TacticsArgs.esort list ->
   ('a TacticsArgs.arg -> judgment -> judgment list) ->
   'a TacticsArgs.sort  -> unit
 
-val get : bool -> Location.t -> string -> TacticsArgs.parser_arg list -> tac
-val pp : bool -> Format.formatter -> Theory.lsymb -> unit
+val get :
+  post_quantum:bool -> loc:Location.t ->
+  string -> TacticsArgs.parser_arg list -> tac
 
-(* Print all tactics with their help. Do not print tactics without help
-   string. *)
-val pps : Format.formatter -> unit -> unit
-val pp_list : Format.formatter -> unit -> unit
+(** Print usage count for all tactics. *)
 val pp_list_count : string -> unit
-
-val get_help : Theory.lsymb -> unit

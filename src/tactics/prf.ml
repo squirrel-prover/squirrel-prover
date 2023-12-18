@@ -602,13 +602,6 @@ let prf_tac arg =
 
 let () =
   T.register_typed "prf"
-    ~general_help: "Apply the PRF axiom."
-    ~detailed_help: "It allows to replace a hash h(m,k) by a name,\
-                     provided a proof obligation stating that the key k is only\
-                     used as a hash key, and m is not hashed anywhere else.\
-                     Behaves similarly to the fresh tactic."
-    ~usages_sorts: []
-    ~tactic_group: Cryptographic
     ~pq_sound:true
     (LT.genfun_of_pure_efun_arg prf_tac)
     Args.(Pair (Int, Opt Message))

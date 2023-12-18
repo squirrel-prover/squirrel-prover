@@ -472,16 +472,5 @@ let indcca1_tac args =
 
 let () =
   T.register_general "cca1"
-    ~tactic_help:{
-      general_help =
-        "Apply the cca1 axiom on all instances of a ciphertext.";
-      detailed_help =
-        "Whenever an encryption does not occur under a decryption \
-         symbol and uses a valid fresh random, we can specify that it \
-         hides the message.\
-         Encryptions are replaced by the \
-         encryption of the length of the plaintexts.";
-      usages_sorts = [];
-      tactic_group = Cryptographic }
    ~pq_sound:true
    (LT.gentac_of_etac_arg indcca1_tac)

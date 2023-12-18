@@ -273,7 +273,7 @@ let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state =
       Tactics.hard_failure (Failure "bullet needed before tactic");
     
     let post_quantum = TConfig.post_quantum (ps.table) in
-    let new_j = ProverTactics.AST.eval_judgment post_quantum tac judge in
+    let new_j = ProverTactics.AST.eval_judgment ~post_quantum tac judge in
     begin
       try
         let bullets = Bullets.expand_goal (List.length new_j)
@@ -590,17 +590,9 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
 
-let do_help (args: TacticsArgs.parser_args) :unit = 
-  match args with
-  | [] -> 
-      ProverTactics.get_help (Location.mk_loc Location._dummy "")
-  | [TacticsArgs.String_name tac_name] -> 
-      ProverTactics.get_help tac_name
-  | _ -> ProverTactics.bad_args ()
-
 exception Unfinished
 
-(* Manage all command *)
+(* Manage all commands. *)
 let rec do_command 
     ?(main_mode=`Stdin) 
     ?(file_stack=[]) 
@@ -611,18 +603,16 @@ let rec do_command
     (command:ProverLib.input) : state =
   let open ProverLib in
   let pst = st in
-  match command with 
-  | Toplvl Undo _ ->
-        raise (Failure "Prover: Trying to Undo without history.")
-  | Prover c -> 
-    let mode = get_mode st in
-    match mode, c with
+  let mode = get_mode st in
+  match mode, command with
     | _, Reset                   -> init' ()
     | GoalMode, InputDescr decls -> do_decls st decls
     | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
     | _, Print q                 -> do_print pst q; st
     | _, Search t                -> do_search pst t; st
-    | _, Help t                  -> do_help t; st
+    | _, Help ->
+      Format.printf "See <https://squirrel-prover.github.io/documentation/>.";
+      st
     | WaitQed, Qed               -> do_qed st
     | GoalMode, Hint h           -> add_hint st h
     | GoalMode, SetOption sp     -> set_param st sp
@@ -649,8 +639,9 @@ let rec do_command
       Command.cmd_error UnexpectedCommand
 
 and do_include
-    ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i: ProverLib.include_param) : state 
-  =
+      ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i: ProverLib.include_param)
+    : state
+=
   (* if main_mode = `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode () in
   let file = Driver.include_get_file file_stack load_paths
@@ -681,7 +672,7 @@ and do_include
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
       let err_mess fmt =
         Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
-          (Location.unloc (ProverLib.get_pathlsymb i.th_name))
+          (Location.unloc (ProverLib.lsymb_of_load_path i.th_name))
           (Errors.pp_toplevel_error ~interactive:interactive ~test file) e
       in
       Driver.close_chan file.f_chan;
@@ -695,18 +686,20 @@ and do_all_commands_in ~main_mode ?(file_stack=[])
     ~check ~test (st:state) (file:Driver.file) : state 
   =
   let interactive = TConfig.interactive (get_table st) in
-  match Driver.next_input_file ~test ~interactive file (get_mode st) with
-  | ProverLib.Prover EOF ->
+  match Driver.FromFile.next_input ~test ~interactive file (get_mode st) with
+  | EOF ->
       (* ↓ If test or interactive, never end ↓ *)
       if test || interactive 
       then st else do_eof st
-  | cmd -> do_all_commands_in ~main_mode ~file_stack ~check ~test
-             (do_command ~main_mode ~file_stack ~test ~check st file cmd) file
+  | cmd ->
+     do_all_commands_in ~main_mode ~file_stack ~check ~test
+       (do_command ~main_mode ~file_stack ~test ~check st file cmd) file
 
 and exec_command 
     ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
   let interactive = TConfig.interactive (get_table st) in
-  let input = Driver.next_input_file 
+  let input =
+    Driver.FromFile.next_input
       ~test ~interactive (Driver.file_from_str s) (get_mode st) in
   do_command ~test ~check st (Driver.file_from_str s) input
 
