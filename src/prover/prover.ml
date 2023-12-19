@@ -611,7 +611,8 @@ let rec do_command
     | _, Print q                 -> do_print pst q; st
     | _, Search t                -> do_search pst t; st
     | _, Help ->
-      Format.printf "See <https://squirrel-prover.github.io/documentation/>.";
+      Format.printf
+        "See <https://squirrel-prover.github.io/documentation/>.@.";
       st
     | WaitQed, Qed               -> do_qed st
     | GoalMode, Hint h           -> add_hint st h

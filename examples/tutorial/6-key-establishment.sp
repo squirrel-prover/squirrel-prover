@@ -241,6 +241,5 @@ Proof.
   (* As before it would be easier to prove this on default/right...
      This time rewrite requiv is not relevant, but we can just use
      plain transitivity. *)
-  help trans.
   admit. (* TODO *)
 Qed.

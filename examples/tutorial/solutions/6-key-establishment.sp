@@ -291,7 +291,6 @@ Proof.
   (* As before it would be easier to prove this on default/right...
      This time rewrite requiv is not relevant, but we can just use
      plain transitivity. *)
-  help trans.
   (* BEGIN EXO *)
   intro _.
   trans [default/right,default/right].
