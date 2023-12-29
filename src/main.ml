@@ -1,30 +1,20 @@
 open Squirrelprover
-open Squirreltactics
 open Squirrelhtml
 
-(* not necessary ↓ Only for do_include *)
 open Squirrelcore
 module L = Location
 
-(* maybe just include Squirreltactics for registering ? *)
-module Initialization = struct
-  (* Opening these modules is only useful for their side effects,
-   * e.g. registering tactics - hence the use of "open!" *)
-  open! LowTactics
-  open! TraceTactics
-  open! EquivTactics
-  open! HighTactics
-end
+(* ---------------------------------------------------------------- *)
 
-let usage = Fmt.str "Usage: %s filename" (Filename.basename Sys.argv.(0))
+(** State of the main loop,
+    with support for both history and includes. *)
 
 module HistoryTP = History.Make(Prover)
 
-(** State of the main loop. *)
 type driver_state = {
   prover_state : Prover.state;
 
-  (** History of prover_state. *)
+  (** History of prover_states. *)
   history_state : HistoryTP.history_state;
 
   (** Check mode for includes. *)
@@ -46,8 +36,6 @@ let next_input_or_undo ~test (state : driver_state) : ProverLib.input_or_undo =
     ~test ~interactive:!Driver.interactive state.file
     (Prover.get_mode state.prover_state)
 
-(*---------------- Main --------------------------------------------*)
-
 (** Undo [nb_undo] previous commands. *)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, prover_state =
@@ -60,7 +48,7 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
     | WaitQed -> ()
     | AllDone -> assert false
   end;
-  { state with prover_state; history_state; }
+  { state with prover_state; history_state }
 
 (** One step of main loop: execute one command. *)
 let do_command
@@ -90,10 +78,9 @@ let rec main_loop ~main_mode ~test ?(save=true) (state : driver_state) : unit =
    * In practice we save except after errors and the first call. *)
   let state =
     if save then
-      {state with
-       history_state =
-         HistoryTP.save_state state.history_state state.prover_state
-      }
+      { state with
+        history_state =
+          HistoryTP.save_state state.history_state state.prover_state }
     else state
   in
 
@@ -143,7 +130,7 @@ and main_loop_error ~main_mode ~test (state : driver_state) : unit =
 let start_main_loop
     ?(test=false) ~(main_mode : [`Stdin | `File of string]) () : unit
   =
-  (* interactive is only set here *)
+  (* Interactive is only set here. *)
   Driver.interactive := main_mode = `Stdin;
   let file = match main_mode with
     | `Stdin -> Driver.file_from_stdin ()
@@ -159,31 +146,23 @@ let start_main_loop
     end
 
   in
-  let state = {
-    prover_state = Prover.init ();
-
-    history_state = HistoryTP.init_history_state;
-
-    (* The check_mode can be changed regarding to includes main.ml:426 *)
-    check_mode = `Check;
-
-    (* load_paths set here once for all … *)
-    load_paths = Driver.mk_load_paths ~main_mode ();
-
-    (* current file can be changed regarding to includes main.ml:426 *)
-    file;
-
-    (* file_stack can be changed regarding to includes main.ml:426 *)
-    file_stack = []; }
+  let state =
+    {
+      prover_state = Prover.init ();
+      history_state = HistoryTP.init_history_state;
+      load_paths = Driver.mk_load_paths ~main_mode ();
+      check_mode = `Check;
+      file;
+      file_stack = []
+    }
   in
-  (* add interactive option to the table *)
+  (* Add interactive option to the prover state. *)
   let prover_state =
     Prover.do_set_option
       state.prover_state
       (TConfig.s_interactive, Config.Param_bool !Driver.interactive)
   in
-  let state = { state with prover_state; } in
-
+  let state = { state with prover_state } in
   main_loop ~main_mode ~test state
 
 let generate_html (filename : string) (html_filename : string) =
@@ -226,8 +205,11 @@ let run ?(test=false) (filename : string) : unit =
   Driver.html := false;
   start_main_loop ~test ~main_mode:(`File name) ()
 
-(* parse command line and check values before `run`ning *)
+(* Parse command line and run accordingly. *)
 let main () =
+  let usage =
+    Fmt.str "Usage: %s [OPTION]... [FILENAME]" (Filename.basename Sys.argv.(0))
+  in
   let args = ref [] in
   let html_filename = ref "" in
   let speclist = [
@@ -236,22 +218,27 @@ let main () =
      "Interactive mode (e.g, for proof general)");
     ("--html",
      Arg.Set_string html_filename,
-     "<file.html> Output in HTML file (incompatible with -i)");
+     "<HTML_FILE> Output in HTML file (incompatible with -i)");
     ("-v", Arg.Set Driver.verbose, "Display more information");
     ("--stat",
      Arg.Set_string Driver.stat_filename,
-     "<stat.json> Output tactic usage counts in JSON file");
+     "<JSON_FILE> Output tactic usage counts in JSON file");
   ] in
-
+  let error str =
+    Arg.usage speclist usage;
+    Format.eprintf "Command-line error: %s@." str
+  in
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
   Driver.html := !html_filename <> "";
   if !Driver.interactive && !Driver.html then
-    Arg.usage speclist usage
+    error "Cannot use both --html and -i."
   else if List.length !args = 0 && not !Driver.interactive then
-    Arg.usage speclist usage
+    error "Filename needed when not in interactive mode."
   else if List.length !args > 0 && !Driver.interactive then
-    Printer.pr "No file arguments accepted when running in interactive mode.@."
+    error "No file argument accepted when running in interactive mode."
+  else if List.length !args > 1 then
+    error "Cannot specify more than one filename."
   else if !Driver.interactive then
     interactive_prover ()
   else if !Driver.html then
