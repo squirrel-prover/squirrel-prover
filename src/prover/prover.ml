@@ -614,6 +614,9 @@ let rec do_command
       Format.printf
         "See <https://squirrel-prover.github.io/documentation/>.@.";
       st
+    | _, Prof ->
+      Printer.prt `Dbg "%a" Prof.print ();
+      st
     | WaitQed, Qed               -> do_qed st
     | GoalMode, Hint h           -> add_hint st h
     | GoalMode, SetOption sp     -> set_param st sp
@@ -625,18 +628,18 @@ let rec do_command
       if TConfig.interactive (get_table st) 
       then st else do_eof st
     | WaitQed, Abort -> 
-        if test then
-          raise (Failure "Trying to abort a completed proof.");
-        Command.cmd_error AbortIncompleteProof
+      if test then
+        raise (Failure "Trying to abort a completed proof.");
+      Command.cmd_error AbortIncompleteProof
     | ProofMode, Abort ->
       Printer.prt `Result
         "Exiting proof mode and aborting current proof.@.";
-          abort st
+      abort st
     | _, Qed ->
       if test then raise Unfinished;
       Command.cmd_error UnexpectedCommand
     | _, _ -> 
-      Printer.pr "What is this command ? %s" (str_mode mode);
+      Printer.pr "Unexpected command while in mode %s." (str_mode mode);
       Command.cmd_error UnexpectedCommand
 
 and do_include

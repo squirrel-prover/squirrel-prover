@@ -167,13 +167,6 @@ let () =
        sk [s] fk)
 
 let () =
-  register_general "prof"
-    ~pq_sound:true
-    (fun _ s sk fk ->
-       Printer.prt `Dbg "%a" Prof.print ();
-       sk [s] fk)
-
-let () =
   register_general "id"
     ~pq_sound:true
     (fun _ -> Tactics.id)

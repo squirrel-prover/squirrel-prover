@@ -4,11 +4,11 @@ open Utils
 
 let lrec = ref []
 
-let record s =
-  let () = assert (not (List.mem_assoc s !lrec)) in
-  lrec := (s,(0,0.)) :: !lrec
-
 let is_recorded s = List.mem_assoc s !lrec
+
+let record s =
+  assert (not (is_recorded s));
+  lrec := (s,(0,0.)) :: !lrec
 
 let call s t =
   lrec := List.assoc_up s (fun (x,t') -> (x + 1,t +. t')) !lrec
@@ -16,13 +16,16 @@ let call s t =
 let reset_all () = lrec := []
 
 let print fmt () =
-  let pp_el fmt (a, (b,f)) =
-    Format.fprintf fmt "%10d %s : %1f seconds" b a f in
-
-  Format.fprintf fmt "@[<v>Statistiques:@;@[<v>%a@]@]@."
-    (pp_list pp_el) (List.sort (fun (a,(_,f)) (a',(_,f')) ->
-        if a = a' then 0
-        else if f > f' then -1 else 1) !lrec)
+  let pp_el fmt (name,(nb_calls,duration)) =
+    Format.fprintf fmt "%10d %s : %1f seconds" nb_calls name duration
+  in
+  Format.fprintf fmt "Statistics:@.@[<v>%a@]@."
+    (pp_list pp_el)
+    (List.sort
+      (fun (name,(_,duration)) (name',(_,duration')) ->
+          if name = name' then 0
+          else if duration > duration' then -1 else 1)
+      !lrec)
 
 let mk_unary s f =
   let () = record s in

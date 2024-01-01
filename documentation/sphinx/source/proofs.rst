@@ -1891,11 +1891,6 @@ Utility tactics
     Print all axioms and proved lemmas. This is useful to know which lemmas can
     be used through the :tacn:`use` or :tacn:`apply` tactics.
 
-
-.. tacn:: prof
-    
-    Print profiling information. 
-      
 .. tacn:: show @term_pat
     
     Print the messages given as argument. Can be used to print the values

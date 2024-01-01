@@ -191,6 +191,7 @@ let rec token buf =
   | "predicate" -> PREDICATE
   | "print" -> PRINT
   | "process" -> PROCESS
+  | "prof" -> PROF
   | "reduce" -> REDUCE
   | "remember" -> REMEMBER
   | "rename" -> RENAME

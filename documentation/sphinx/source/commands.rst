@@ -126,3 +126,6 @@ Commands
         axiom [any] and_true_l (b : boolean) : (true && b) = b.
         hint rewrite and_true_l.
 
+.. cmd:: prof
+
+    Print profiling information.

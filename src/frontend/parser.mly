@@ -54,7 +54,7 @@
 %token PROOF QED RESET UNDO ABORT HINT
 %token TACTIC
 %token RENAME GPRF GCCA
-%token INCLUDE PRINT SEARCH
+%token INCLUDE PRINT SEARCH PROF
 %token SMT
 %token EOF
 
@@ -1309,6 +1309,8 @@ p_include:
 
 (*------------------------------------------------------------------*)
 query:
+| HELP DOT                       { ProverLib.Help }
+| PROF DOT                       { ProverLib.Prof }
 (* print *)
 | PRINT SYSTEM l=system_expr DOT { ProverLib.(Print (Pr_system (Some l))) }
 | PRINT l=lsymb DOT              { ProverLib.(Print (Pr_any l)) }
@@ -1317,8 +1319,6 @@ query:
 | SEARCH t=any_term IN s=system_expr DOT
                                  { ProverLib.(Search (Srch_inSys (t,s))) }
 | SEARCH t=any_term DOT          { ProverLib.(Search (Srch_term t)) }
-(* help *)
-| HELP DOT                       { ProverLib.Help }
 
 (*------------------------------------------------------------------*)
 interactive_or_undo:

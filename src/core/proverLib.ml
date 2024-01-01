@@ -48,6 +48,7 @@ type input =
   | Tactic of bulleted_tactics
   | Print of print_query
   | Search of search_query
+  | Prof
   | Help
   | Reset
   | Goal of Goal.Parsed.t Location.located
