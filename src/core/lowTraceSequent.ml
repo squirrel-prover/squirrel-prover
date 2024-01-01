@@ -204,6 +204,10 @@ let constraints_valid s =
   let models = get_models s in
   not (Constr.m_is_sat models)
 
+let constraints_valid =
+  let profiler = Prof.mk "constraints_valid" in
+  fun s -> profiler.call (fun () -> constraints_valid s)
+
 (*------------------------------------------------------------------*)  
 module Hyps
   : Hyps.S1 with type hyp  = Equiv.any_form 

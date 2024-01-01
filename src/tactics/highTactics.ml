@@ -62,8 +62,7 @@ let () = T.register_general "induction"
 (* Remark: EquivTactics and TraceTactics implementation of [tac_autosimpl]
    slightly differ, because the [strong] flag is always [true]
    in [TraceTactics.tac_autosimpl] when [Config.auto_intro ()] is [true].
-   Because of this, there is some code replication below, to reflect this
-   asymmetry. *)
+   Because of this asymmetry, there is some code replication below. *)
 
 let tac_autosimpl args s sk fk = 
   let () =

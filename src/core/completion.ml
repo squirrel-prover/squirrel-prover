@@ -1304,7 +1304,7 @@ let rec normalize_csts state t = match t.cnt with
 (** {2 Completion} *)
 
 (* Finalize the completion, by normalizing all ground and erules using the xor
-    rules. This handles critical pair of the form:
+    rules. This handles critical pairs of the form:
     (R1) : a + b + c -> 0, where a > b,c
     (R2) : f(a) -> d
     Then the critical pair:
@@ -1328,7 +1328,7 @@ let finalize_completion state =
                 grnd_rules = grnds;
                 e_rules = erules;
                 completed = true } in
-  dbg "@[<v 0>Finaled state:@; %a@]" pp_state state;   
+  dbg "@[<v 0>Finalized state:@; %a@]" pp_state state;
   state
   
 let rec complete_state state =

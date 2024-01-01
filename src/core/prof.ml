@@ -27,26 +27,24 @@ let print fmt () =
           else if duration > duration' then -1 else 1)
       !lrec)
 
-let mk_unary s f =
+type profiler = { call : 'a. (unit -> 'a) -> 'a }
+
+let mk s =
   let () = record s in
-  fun x ->
-    let t = Sys.time () in
-    let r = f x in
-    let () = call s (Sys.time () -. t) in
-    r
+  { call = fun f ->
+      let t = Sys.time () in
+      let r = f () in
+      let () = call s (Sys.time () -. t) in
+      r }
+
+let mk_unary s f =
+  let profiler = mk s in
+  fun x -> profiler.call (fun () -> f x)
 
 let mk_binary s f =
-  let () = record s in
-  fun x y ->
-    let t = Sys.time () in
-    let r = f x y in
-    let () = call s (Sys.time () -. t) in
-    r
+  let profiler = mk s in
+  fun x y -> profiler.call (fun () -> f x y)
 
 let mk_ternary s f =
-  let () = record s in
-  fun x y z ->
-    let t = Sys.time () in
-    let r = f x y z in
-    let () = call s (Sys.time () -. t) in
-    r
+  let profiler = mk s in
+  fun x y z -> profiler.call (fun () -> f x y z)

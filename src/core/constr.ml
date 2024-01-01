@@ -1368,13 +1368,13 @@ let models_conjunct =
       res
 
 (** Exported.
-    [models_conjunct] with time-out. *)
-let models_conjunct
-    (time_out : int)
-    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
-    (terms : Term.terms) : models
-  = 
-  Utils.timeout exn time_out models_conjunct terms
+    [models_conjunct] with timeout and profiling. *)
+let models_conjunct =
+  let prof = Prof.mk "Constr.models_conjunct" in
+  fun (time_out : int)
+      ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+      (terms : Term.terms) ->
+    prof.call (fun () -> Utils.timeout exn time_out models_conjunct terms)
 
 (*------------------------------------------------------------------*)
 (** Exported. *)
