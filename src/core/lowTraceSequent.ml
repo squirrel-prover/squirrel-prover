@@ -171,7 +171,7 @@ let get_all_messages (s : sequent) =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let _get_models table (proof_context : H.hyps) =
+let get_models table (proof_context : H.hyps) =
   let proof_context = 
     H.fold_hyps (fun _ f acc ->
         match f with
@@ -182,7 +182,7 @@ let _get_models table (proof_context : H.hyps) =
   in
   Constr.models_conjunct (TConfig.solver_timeout table) proof_context
 
-let get_models (s : sequent) = _get_models s.env.table s.proof_context
+let get_models (s : sequent) = get_models s.env.table s.proof_context
 
 let query ~precise s q =
   let models = get_models s in

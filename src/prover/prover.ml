@@ -648,8 +648,9 @@ and do_include
 =
   (* if main_mode = `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode () in
-  let file = Driver.include_get_file file_stack load_paths
-      i.th_name  in
+  let file =
+    Driver.include_get_file file_stack load_paths i.th_name
+  in
   let interactive = TConfig.interactive (get_table st) in
   let checkInclude = 
     if TConfig.checkInclude (get_table st) then `Check 

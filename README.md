@@ -338,7 +338,14 @@ We refer the reader to `CONTRIBUTING.md` for coding conventions.
 
 # Documentation
 
-It can be generated through:
+## Sphinx documentation
+
+The user doc relies on the Sphinx framework.
+See `documentation/sphinx/README.rst` for how to build and use.
+
+## Developper documentation
+
+The code's documentation can be generated through:
 ```
 $ make doc
 ```

@@ -446,7 +446,7 @@ hint rewrite len_zeroes.
 (* exec and cond *)
 
 (* Squirrel can only expand exec for specific actions.
-   This action allows to go beyond this. It would be provable
+   This axiom allows to go beyond this. It would be provable
    in any system, by performing a case analysis on tau. *)
 axiom [any] exec_not_init (tau:timestamp) :
   init < tau => exec@tau = (exec@pred(tau) && cond@tau).

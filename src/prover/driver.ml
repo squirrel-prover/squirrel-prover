@@ -189,10 +189,7 @@ let include_get_file (file_stack : file list)
 
 let mk_load_paths ~main_mode () : load_paths =
   let exec_dir = Filename.dirname Sys.executable_name in
-  (* let exec_dir = Filename.dirname (Sys.argv.(0)) in *)
-  let theory_dir =
-    Filename.(concat exec_dir "theories")
-  in
+  let theory_dir = Filename.concat exec_dir "theories" in
   let theory_load_path = LP_dir theory_dir in
   let top_load_path =
     match main_mode with

@@ -36,9 +36,8 @@ type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
-(** [get_definition context macro ~args ts] returns the expansion of 
-    [macro(args)] at [ts],
-    if the macro can be expanded.
+(** [get_definition context macro ~args ~ts] returns the expansion of
+    [macro(args)] at [ts], if the macro can be expanded.
     Does *not* check that the timestamp happens!
     The [context] is only used to determine whether [ts] is equal
     to some action in the trace model.
@@ -73,8 +72,8 @@ val get_definition_nocntxt :
   [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
-    [get_definition se table m li] return a term which resembles the one that
-    would be obtained with [get_definition m li ts] for some [ts],
+    [get_dummy_definition table se m ~args:li] returns a term which resembles
+    the one that would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
   Symbols.table -> SE.fset -> Term.msymb -> args:Term.term list -> Term.term
