@@ -188,6 +188,13 @@ let query ~precise s q =
   let models = get_models s in
   Constr.query ~precise models q
 
+let query =
+  let prof_precise = Prof.mk "TS.query [precise]" in
+  let prof_imprecise = Prof.mk "TS.query [imprecise]" in
+  fun ~precise s q ->
+    let prof = if precise then prof_precise else prof_imprecise in
+    prof (fun () -> query ~precise s q)
+
 let query_happens ~precise s a = query ~precise s [`Pos, Happens a]
 
 let maximal_elems ~precise s tss =
@@ -206,6 +213,16 @@ let constraints_valid s =
 
 let constraints_valid =
   Prof.mk_unary "constraints_valid" constraints_valid
+
+(** Variant of [get_models] with profiling for external use.
+    We do not profile internal calls, performed e.g. through
+    query.
+    Note that [get_models] relies on [Constr.models_conjunct]
+    which is independently profiled.
+    We do not profile [maximal_elems] and [get_ts_equalities]
+    although they do use [get_models],
+    but the underlying functions in [Constr] are profiled. *)
+let get_models = Prof.mk_unary "TS.get_models" get_models
 
 (*------------------------------------------------------------------*)  
 module Hyps
