@@ -205,8 +205,7 @@ let constraints_valid s =
   not (Constr.m_is_sat models)
 
 let constraints_valid =
-  let profiler = Prof.mk "constraints_valid" in
-  fun s -> profiler.call (fun () -> constraints_valid s)
+  Prof.mk_unary "constraints_valid" constraints_valid
 
 (*------------------------------------------------------------------*)  
 module Hyps

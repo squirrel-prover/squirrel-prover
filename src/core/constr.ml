@@ -1374,7 +1374,7 @@ let models_conjunct =
   fun (time_out : int)
       ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
       (terms : Term.terms) ->
-    prof.call (fun () -> Utils.timeout exn time_out models_conjunct terms)
+    prof (fun () -> Utils.timeout exn time_out models_conjunct terms)
 
 (*------------------------------------------------------------------*)
 (** Exported. *)
