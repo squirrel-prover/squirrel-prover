@@ -490,10 +490,6 @@ let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) =
 
   | Form.Conj l -> List.fold_left (add_form ~extend) inst l
 
-(** Add formulas to a constraint solving instance *)
-let add_forms inst forms =
-  List.fold_left add_form inst forms
-
 (*------------------------------------------------------------------*)
 (** Make the initial constraint solving instance. *)
 let mk_instance memo (l : Form.form list) : constr_instance =
@@ -1456,13 +1452,19 @@ let query ~precise (models : models) (ats : Term.Lit.literals) =
     then true
     else if not precise then false
     else
-      let forms =
-        List.map (fun at -> Form.mk memo (Term.Lit.neg at)) ats
-        |> List.flatten
+      (* M ⊧ (⋀ atᵢ)   iff.   M, (⋁ ¬ atᵢ) ⊧ ⊥ *)
+      (* compute [form = (⋁ ¬ atᵢ)] *)
+      let form =
+        List.map (fun at ->
+            Form.conj (Form.mk memo (Term.Lit.neg at))
+          ) ats
+        |> Form.disj
       in
-      let insts = List.map (fun model ->
-          add_forms model.inst forms
-        ) models in
+      (* compute [M' = M, (⋁ ¬ atᵢ)] *)
+      let insts =
+        List.map (fun model -> add_form model.inst form) models
+      in
+      (* check if [M' ⊧ ⊥], for every model [M'] *)
       List.for_all (fun inst -> split_models inst = []) insts
   with Unsupported -> false
 
