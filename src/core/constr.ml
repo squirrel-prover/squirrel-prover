@@ -661,19 +661,25 @@ let is_undef uf ut = snd (mgu uf ut) = uundef
 let is_def ?explain:(explain=false) uf neqs ut =
   let uf, ut = mgu uf ut in
 
-  let is_init = ut_equal ut uinit in
-  if explain && is_init then
-    dbg "is_def(%a): is equal to %a" pp_ut ut pp_ut uinit;
+  (* Check whether [ut] is init. *)
+  if ut_equal ut uinit then begin
+    if explain then
+      dbg "is_def(%a): is equal to %a" pp_ut ut pp_ut uinit;
+    true
+  end else
 
-  let init_is_kpred = is_kpred uf uinit ut in
-  if explain && init_is_kpred then
-    dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit;
+  (* Check whether init is k-predecessor of [ut]. *)
+  if is_kpred uf uinit ut then begin
+    if explain then
+      dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit;
+    true
+  end else
 
   (* Remark: we cannot use [uf] alone, as it is an under-approximation.
      Instead, we look for a contradiction in the conjunction of [uf] and
      known inequalities [neqs]. *)
   let swap u v = if ut_equal u uundef then v, u else u, v in
-  let in_neqs = List.exists (fun (u,v) ->
+  List.exists (fun (u,v) ->
       let uf,u = mgu uf u
       and _, v = mgu uf v in
       let u, v = swap u v in
@@ -685,8 +691,6 @@ let is_def ?explain:(explain=false) uf neqs ut =
           pp_ut ut pp_ut u pp_ut u pp_ut uundef;
       b
     ) neqs
-
-  in is_init || init_is_kpred || in_neqs
 
 
 (*------------------------------------------------------------------*)
@@ -1405,14 +1409,14 @@ let query_lit (model : model) (ord, ut1, ut2 : Form.lit) : bool =
   | `Eq -> ut_equal u v
   | `Leq -> UtG.mem_edge model.tr_graph u v
   | `Neq ->
-    if ut_equal ut1 uundef || ut_equal ut2 uundef then
-      (* when querying a happens, use the more precise [is_def] function *)
-      let ut = if ut_equal ut1 uundef then ut2 else ut1 in
-      is_def model.inst.uf model.inst.neqs ut
-
+    (* When querying a happens, use the more precise [is_def] function. *)
+    if ut_equal ut1 uundef then
+      is_def model.inst.uf model.inst.neqs ut2
+    else if ut_equal ut2 uundef then
+      is_def model.inst.uf model.inst.neqs ut1
+    (* Otherwise, we are very unprecise, as we only check whether
+       the inequality already appeared, modulo known equalities. *)
     else
-      (* In that case, we are very unprecise, as we only check whether
-         the inequality already appeared, modulo known equalities. *)
       List.exists (fun (a,b) ->
           let na, nb = mgu model.inst.uf a |> snd,
                        mgu model.inst.uf b |> snd in
