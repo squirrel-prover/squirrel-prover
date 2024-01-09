@@ -145,8 +145,8 @@ report_undocumented_squirrel_objects = "warning"
 # The encoding of source files.
 source_encoding = 'utf-8-sig'
 
-# TODO pass it to False for publishing
-todo_include_todos = True
+# TODO pass it to True/False for debugging/publishing
+todo_include_todos = False
 
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = 'sphinx'
