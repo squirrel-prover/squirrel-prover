@@ -34,7 +34,9 @@ To discover Squirrel, several materials are  available:
    `repository
    <https://github.com/squirrel-prover/squirrel-prover/>`_. The
    easiest way to discover Squirrel, however, is to run it in the browser
-   via the javascript application at TODO.
+   via the javascript application 
+   `here
+   <https://squirrel-prover.github.io/jsquirrel/?open=0-logic.sp>`_.
 
 .. todo::
 
