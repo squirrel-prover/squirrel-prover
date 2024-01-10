@@ -80,7 +80,7 @@ end
 let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   let rec doit (pt : PT.t) : PT.t =
     match pt.form with
-    | Local _ -> assert false
+    | Local _ -> pt
     | Global (Atom (Reach f)) -> { pt with form = Local f; }
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
