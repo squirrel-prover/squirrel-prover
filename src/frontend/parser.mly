@@ -849,27 +849,26 @@ pt_arg:
 /* Note: some terms parsed as [sterm] may be resolved as [PTA_sub]
    later, using the judgement hypotheses. */
 
-| LPAREN PERCENT pt=pt RPAREN  { Theory.PTA_sub pt }
+| PERCENT LPAREN pt=pt RPAREN  { Theory.PTA_sub pt }
 
 (*------------------------------------------------------------------*)
+/* ambiguous pt */
 pt_cnt:
-| head=lsymb args=slist(pt_arg,empty)
+| pt=spt_cnt  { pt }
+
+| head=spt args=slist1(pt_arg,empty)
     { let pta_loc = L.make $startpos $endpos in
       let app = Theory.{ pta_head = head; pta_args = args; pta_loc; } in
       Theory.PT_app app }
-
-| PERCENT LOCAL LPAREN pt=pt RPAREN { Theory.PT_localize pt }
 
 pt:
 | pt=loc(pt_cnt) { pt }
 
 (*------------------------------------------------------------------*)
-/* non-ambiguous pt, built on top of the [pt_cnt] production */
+/* non-ambiguous pt */
 spt_cnt:
-| hid=lsymb
-    { let app = Theory.{ pta_head = hid; pta_args = []; pta_loc = L.loc hid; } in
-      Theory.PT_app app }
-
+| head=lsymb   { Theory.PT_symb head }
+| PERCENT LOCAL LPAREN pt=pt RPAREN { Theory.PT_localize pt }
 | LPAREN pt=pt_cnt RPAREN
     { pt }
 
@@ -878,19 +877,14 @@ spt:
 
 (*------------------------------------------------------------------*)
 /* legacy syntax for use tactic */
-pt_use_tac_cnt:
-| hid=lsymb
-    { let app = Theory.{ pta_head = hid; pta_args = []; pta_loc = L.loc hid; } in
-      Theory.PT_app app }
+pt_use_tac:
+| pt=spt { pt }
 
-| hid=lsymb WITH args=slist1(tac_term,COMMA)
+| head=spt WITH args=slist1(tac_term,COMMA)
     { let pta_loc = L.make $startpos $endpos in
       let args = List.map (fun x -> Theory.PTA_term x) args in
-      let app = Theory.{ pta_head = hid; pta_args = args; pta_loc; } in
-      Theory.PT_app app }
-
-pt_use_tac:
-| pt=loc(pt_use_tac_cnt) { pt }
+      let app = Theory.{ pta_head = head; pta_args = args; pta_loc; } in
+      L.mk_loc pta_loc (Theory.PT_app app) }
 
 (*------------------------------------------------------------------*)
 constseq_arg:

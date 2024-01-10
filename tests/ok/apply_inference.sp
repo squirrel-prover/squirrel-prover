@@ -70,8 +70,8 @@ lemma _ (y,z : message) :
  g (y) = g (<y,z>).
 Proof.
   intro H G F.
-  rewrite (H _ (%G (<_,_>))).
-  rewrite (H _ (%G y)). 
+  rewrite (H _ %(G (<_,_>))).
+  rewrite (H _ %(G y)). 
   assumption F.
 Qed.
 
@@ -81,7 +81,7 @@ lemma _ (y,z : message) :
  g (<y,z>) = f (<y,z>).
 Proof.
   intro H G.
-  have U := H _ (%G (<y,z>)).
+  have U := H _ %(G (<y,z>)).
   assumption U.
 Qed.
 

@@ -418,7 +418,7 @@ module Mk (Args : MkArgs) : S with
       let loc = L.loc t in
       let pt_cnt = 
         Theory.PT_app {
-          pta_head = head;
+          pta_head = L.mk_loc (L.loc head) (Theory.PT_symb head);
           pta_args = List.map (fun x -> Theory.PTA_term x) terms ;
           pta_loc  = loc;
         } 
@@ -471,7 +471,7 @@ module Mk (Args : MkArgs) : S with
           let loc = last_loc (L.loc h) args in
           let pt_cnt = 
             Theory.PT_app {
-              pta_head = h;
+              pta_head = L.mk_loc (L.loc h) (Theory.PT_symb h);
               pta_args;
               pta_loc = loc;
             } 
@@ -484,11 +484,15 @@ module Mk (Args : MkArgs) : S with
   and resolve_pt (s : S.t) (pt : Theory.pt) : Theory.pt =
     let loc = L.loc pt in
     match L.unloc pt with
+    | PT_symb _ -> pt
+
     | PT_localize sub_pt -> 
       L.mk_loc loc (Theory.PT_localize (resolve_pt s sub_pt))
 
     | PT_app app ->
-      let app = Theory.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } in
+      let app = 
+        Theory.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } 
+      in
       L.mk_loc loc (Theory.PT_app app)
 
   (*------------------------------------------------------------------*)      
@@ -777,6 +781,7 @@ module Mk (Args : MkArgs) : S with
       (s : S.t) : ghyp * PT.t
     =
     match L.unloc p_pt with
+    | Theory.PT_symb symb -> do_convert_symb ty_env mv symb s
     | Theory.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
     | Theory.PT_localize p_sub_pt -> 
       let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
@@ -787,6 +792,19 @@ module Mk (Args : MkArgs) : S with
       in
       ghyp, pt
 
+  and do_convert_symb
+      (ty_env  : Type.Infer.env)
+      (init_mv : Mvar.t)
+      (symb    : Theory.lsymb)
+      (s       : S.t) 
+    : ghyp * PT.t
+    =
+    let table = S.table s in
+    let lem_name, pt = pt_of_assumption ~table ty_env symb s in
+    assert (pt.mv = Mvar.empty);
+    let pt = { pt with mv = init_mv; } in
+    lem_name, pt
+
   and do_convert_pt_app
       (ty_env : Type.Infer.env)
       (init_mv : Mvar.t)
@@ -795,11 +813,9 @@ module Mk (Args : MkArgs) : S with
     =
     let table, env = S.table s, S.vars s in
 
-    let lem_name, init_pt =
-      pt_of_assumption ~table ty_env pt_app.pta_head s 
+    let lem_name, init_pt = 
+      do_convert_pt_gen ty_env init_mv pt_app.pta_head s 
     in
-    assert (init_pt.mv = Mvar.empty);
-    let init_pt = { init_pt with mv = init_mv; } in
 
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
 

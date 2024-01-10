@@ -412,6 +412,7 @@ val parse_projs : lsymb list option -> Term.projs
 (** {2 Proof-terms} *)
 
 type pt_cnt =
+  | PT_symb     of lsymb
   | PT_app      of pt_app
   | PT_localize of pt
 
@@ -421,7 +422,7 @@ and pt = pt_cnt L.located
 (*------------------------------------------------------------------*)
 (** proof term application *)
 and pt_app = {
-  pta_head : lsymb;
+  pta_head : pt;
   pta_args : pt_app_arg list;
   pta_loc  : L.t;
 }
