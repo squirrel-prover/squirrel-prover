@@ -53,7 +53,8 @@ type pred_app = {
   se_args    : SE.t list;                (** System expression arguments *)  
   multi_args : (SE.t * Term.terms) list;
   (** Multi-term args with their system expression. *)
-  simpl_args : Term.terms;               (** Simple arguments *)
+  simpl_args : Term.terms;
+  (** Simple arguments, not a multi-term. *)
 }
 
 (** See `.mli` *)
@@ -321,25 +322,38 @@ let rec subst s (f : form) =
 (*------------------------------------------------------------------*)
 (** Projection substitution *)
 
-let subst_projs_atom (s : (Term.proj * Term.proj) list) (at : atom) : atom =
+let subst_projs_atom 
+    (target : [`Equiv | `Reach]) 
+    (s : (Term.proj * Term.proj) list) (at : atom) : atom 
+  =
   match at with
-  | Reach t -> Reach (Term.subst_projs s t)
-  | Equiv e -> Equiv (List.map (Term.subst_projs s) e)
-  | Pred { psymb; ty_args; se_args; multi_args; simpl_args } ->
-    Pred {
-      psymb; ty_args;
-      se_args = List.map (SE.subst_projs s) se_args;
-      multi_args =
-        List.map (fun (se,args) ->
-            ( SE.subst_projs s se,
-              List.map (Term.subst_projs s) args)
-          ) multi_args;
-      simpl_args = List.map (Term.subst_projs s) simpl_args;
-    }
+  | Reach t -> 
+    if target = `Reach then Reach (Term.subst_projs s t) else at
 
-let subst_projs (s : (Term.proj * Term.proj) list) (t : form) : form =
+  | Equiv e -> 
+    if target = `Equiv then Equiv (List.map (Term.subst_projs s) e) else at
+
+  (* FIXME: allow to substitute projections in predicates *)
+  (* | Pred { psymb; ty_args; se_args; multi_args; simpl_args } -> *)
+  (*   Pred { *)
+  (*     psymb; ty_args; *)
+  (*     se_args = List.map (SE.subst_projs s) se_args; *)
+  (*     multi_args = *)
+  (*       List.map (fun (se,args) -> *)
+  (*           ( SE.subst_projs s se, *)
+  (*             List.map (Term.subst_projs s) args) *)
+  (*         ) multi_args; *)
+  (*     simpl_args = List.map (Term.subst_projs s) simpl_args; *)
+  (*   } *)
+
+  | Pred _ -> at
+
+let subst_projs
+    (target : [`Equiv | `Reach]) 
+    (s : (Term.proj * Term.proj) list) (t : form) : form 
+  =
   let rec doit = function
-    | Atom at -> Atom (subst_projs_atom s at)
+    | Atom at -> Atom (subst_projs_atom target s at)
     | _ as term -> tmap doit term
   in
 
@@ -919,9 +933,13 @@ module PreAny = struct
     | Local  f -> Local  (Term.tsubst s f)
     | Global f -> Global (     tsubst s f)
 
-  let subst_projs s = function
-    | Local  f -> Local  (Term.subst_projs s f)
-    | Global f -> Global (     subst_projs s f)
+  let subst_projs target s = function
+    | Local f -> 
+      if target = `Reach then 
+        Local (Term.subst_projs s f) 
+      else 
+        Local f
+    | Global f -> Global (subst_projs target s f)
 
   let fv = function
     | Local  f -> Term.fv f
@@ -981,12 +999,14 @@ module Babel = struct
     | Global_t -> subst
     | Any_t    -> PreAny.subst
 
-  let subst_projs 
-    : type a. a f_kind -> (Term.proj * Term.proj) list -> a -> a 
-    = function
-      | Local_t  -> Term.subst_projs
-      | Global_t -> subst_projs
-      | Any_t    -> PreAny.subst_projs
+  let subst_projs : 
+    type a. a f_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> a -> a 
+    =
+    fun kind target s f ->
+    match kind with
+    | Local_t  ->   Term.subst_projs        s f
+    | Global_t ->        subst_projs target s f
+    | Any_t    -> PreAny.subst_projs target s f
 
   let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
     | Local_t  -> Term.tsubst

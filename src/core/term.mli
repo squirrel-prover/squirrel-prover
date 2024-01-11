@@ -572,16 +572,16 @@ val project_opt : projs option -> term -> term
     constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
     will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
     [Macro(m,l,Diff(ts,ts'))]. *)
-val head_normal_biterm  : term -> term
-val head_normal_biterm0 : term -> term * bool (* bool = reduction occurred *)
+val head_normal_biterm  : projs -> term -> term
+val head_normal_biterm0 : projs -> term -> term * bool (* bool = reduction occurred *)
   
-val simple_bi_term  : term -> term
-val simple_bi_term0 : term -> term * bool (* bool = reduction occurred *)
+val simple_bi_term  : projs -> term -> term
+val simple_bi_term0 : projs -> term -> term * bool (* bool = reduction occurred *)
 
 (** Same as [simple_bi_term], but does not try to normalize try-finds. 
     Ad-hoc fix to keep diffeq tactic working properly. 
     FIXME: remove it. *)
-val simple_bi_term_no_alpha_find : term -> term
+val simple_bi_term_no_alpha_find : projs -> term -> term
 
 val combine : (proj * term) list -> term
 

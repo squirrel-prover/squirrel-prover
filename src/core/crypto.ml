@@ -285,12 +285,16 @@ let equal_term_name_eq
     ~(target : CondTerm.t)
     ~(known : CondTerm.t)
   =
+  let se_pair = oget env.system.pair in
+  let system = SE.{ set = (se_pair :> SE.t) ; pair = None; } in
+
   let term,subst = constant_name_to_var env known in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds)  in
   let name_vars = support_subst subst  in
-  let known_set = Match.mk_known_set term.term (Term.mk_ands term.conds) [] in
+  let known_set = 
+    Match.mk_known_set ~term:term.term ~cond:(Term.mk_ands term.conds) [] (se_pair :> SE.t)
+  in
   let unif_state =
-    let system = SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; } in
     Match.mk_unif_state env.vars env.table system hyps (name_vars)
   in 
   let mv = Match.E.deduce_mem_one cterm known_set unif_state in
@@ -371,8 +375,12 @@ let exact_eq_under_cond
     ~(target    : CondTerm.t)
     ~(known     : CondTerm.t)
   =
+  let se_pair = oget env.system.pair in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
-  let known_set = Match.mk_known_set known.term (Term.mk_ands known.conds) [] in
+  let known_set = 
+    Match.mk_known_set
+      ~term:known.term ~cond:(Term.mk_ands known.conds) [] (se_pair :> SE.t)
+  in
   let unif_state =
     let system = SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; } in
     Match.mk_unif_state env.vars env.table system hyps unif_vars

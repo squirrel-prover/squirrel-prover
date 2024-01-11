@@ -124,6 +124,29 @@ let pt_try_cast (type a)
   | Equiv.Any_t, _ -> pt
 
 (*------------------------------------------------------------------*)
+(** Rename projections in [pt] to use [pt_pair]'s projections, if necessary. *)
+let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
+  match pt.system.pair, system_pair with
+  | None, _ | _, None -> pt
+  | Some pt_pair, Some system_pair ->
+    (* Use [system_pair] projections in [pt], by renaming [pt]'s projections to 
+       projections in [system_pair] for the same single systems. *)
+    let _, proj_subst =
+      SE.mk_proj_subst ~strict:true
+        ~src:(pt_pair :> SE.t) ~dst:(system_pair :> SE.t)
+    in
+    let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Equiv proj_subst in
+    let system = 
+      let pt_pair = SE.subst_projs proj_subst pt_pair in
+      { pt.system with pair = Some pt_pair };
+    in
+    { pt with 
+      subgs = List.map psubst pt.subgs;
+      form  = psubst pt.form;
+      system; } 
+
+
+(*------------------------------------------------------------------*)
 (** Projects [pt] onto [system], projecting diffs in terms if necessary.
     Projection must be possible. *)
 let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
@@ -136,7 +159,7 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
       let _, proj_subst =
         SE.mk_proj_subst ~strict:true ~src:pt.system.set ~dst:system.set 
       in
-      let psubst = Equiv.Babel.subst_projs Equiv.Any_t proj_subst in
+      let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Reach proj_subst in
       let pt = 
         { pt with subgs = List.map psubst pt.subgs;
                   form  = psubst pt.form;
@@ -244,6 +267,8 @@ let pt_unify_systems
       if pt_pair <> None && not (oequal (SE.equal_modulo table) pt_pair arg_pair) then
         failed ()
       else
+        (* Unify projections of [system.pair] for [arg] and [pt]. *)
+        let arg = pt_rename_system_pair arg pt_pair in
 
         (* Unify reachability systems in [system.set]. *)
         let pt_set, arg_set = pt.system.set, arg.system.set in

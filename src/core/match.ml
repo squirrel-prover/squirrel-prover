@@ -1183,6 +1183,12 @@ let mk_unif_state
   }
 
 (*------------------------------------------------------------------*)
+(** [st.system.set] must be a system pair. *)
+let get_system_set_pair_projs (st : unif_state) : Term.proj * Term.proj =
+  let se = st.system.set |> SE.to_pair in
+  fst (SE.fst se), fst (SE.snd se)
+
+(*------------------------------------------------------------------*)
 let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
   let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
     Hyps.change_trace_hyps_context
@@ -1408,7 +1414,13 @@ let reduce_head1
       t, true
 
     | _ ->
-      let t', red = Term.head_normal_biterm0 t in
+      let t', red = 
+        if SE.is_fset se then
+          let se = SE.to_fset se in
+          Term.head_normal_biterm0 (SE.to_projs se) t 
+        else 
+          t, false
+      in
       if red then t', true else t, false
 
 (*------------------------------------------------------------------*)
@@ -1942,6 +1954,19 @@ type cand_tuple_set = Term.terms cand_set_g
 type cand_sets       = cand_set       list
 type cand_tuple_sets = cand_tuple_set list
 
+let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
+  let pp_subst fmt mv =
+    Fmt.pf fmt "[%a]" Mvar.pp mv
+  in
+
+  let vars = cand.vars in
+
+  Fmt.pf fmt "@[<hv 2>{ @[%a@]@[%a@] |@ @[%a@]@ @[%a@]}@]"
+    pp_term cand.term
+    pp_subst cand.subst
+    (Fmt.list ~sep:Fmt.comma Vars.pp) vars
+    Term.pp cand.cond
+
 (*------------------------------------------------------------------*)
 (** Set of terms over some variables of sort index or timestamp,
     under a condition.
@@ -1949,18 +1974,152 @@ type cand_tuple_sets = cand_tuple_set list
          vars    = vars;
          cond    = ψ; }]
     represents the set of terms [\{t | ∀ vars, s.t. ψ \}].
-Invariant : Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible*)
+    Invariant: Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible *)
 type known_set = {
   term : Term.term;
-  vars : Vars.tagged_vars;            (* sort index or timestamp *)
+  vars : Vars.tagged_vars;      (* sort index or timestamp *)
   cond : Term.term;
+  se   : SE.t;                  (* system kind *)
 }
 
 
-let mk_known_set term cond vars: known_set = {term;vars;cond}
+let mk_known_set ~term ~cond vars se : known_set = { term; vars; cond; se }
 
-(** association list sorting [known_sets] by the head of the term *)
+(** Association list sorting [known_sets] by the head of the term,
+    in diff-head normal form. *)
 type known_sets = (term_head * known_set list) list
+
+
+(*------------------------------------------------------------------*)
+let pp_known_set fmt (known : known_set) =
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
+    Term.pp known.term
+    Vars.pp_typed_tagged_list known.vars
+    Term.pp known.cond
+
+let pp_known_sets fmt (ks : known_sets) =
+  Fmt.pf fmt "@[<v>";
+  List.iter (fun (head, k_l) ->
+      Fmt.pf fmt "head: %a@;@[<v>%a@]"
+        pp_term_head head
+        (Fmt.list ~sep:Fmt.cut pp_known_set) k_l;
+      Fmt.cut fmt ();
+    ) ks;
+  Fmt.pf fmt "@]"
+
+let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
+  (* get [k.term] head symbol if the system kind allows it *)
+  let term = 
+    match SE.to_projs_any k.se with
+    | None       -> k.term
+    | Some projs -> Term.head_normal_biterm projs k.term
+  in
+  List.assoc_up_dflt (get_head term) [] (fun ks_l -> k :: ks_l) ks
+
+let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
+  let s = List.fold_left (fun s (head, k_l) ->
+      let k_l' = List.assoc_dflt [] head s2 in
+      (head, k_l' @ k_l) :: s
+    ) [] s1
+  in
+  List.fold_left (fun s (head', k_l') ->
+      if List.mem_assoc head' s1 then s
+      else (head', k_l') :: s
+    ) s s2
+
+(*------------------------------------------------------------------*)
+let known_set_of_term (se : SE.t) (term : Term.term) : known_set =
+  { term = term;
+    vars = [];
+    cond = Term.mk_true;
+    se; }
+
+(** Special treatment of `frame`, to account for the fact
+    that it contains all its prefix frame and exec, and inputs.
+    Remark: this is correct even if [ts] does not happens. Indeed, in that case,
+    the condition [ts' ≤ ts] is never satisfied. *)
+let known_set_add_frame (k : known_set) : known_set list =
+  match k.term with
+  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
+    assert (l = []);
+    let tv' = Vars.make_fresh Type.Timestamp "t" in
+    let ts' = Term.mk_var tv' in
+    (* [const] is set to **false**, as knowing [frame@t] implies that we known
+       [input@t'] for any [t' <= t], even if [t'] is non-constant. 
+       Furthermore, this implies that we known [t]. 
+       Idem for the [adv] tag. *)
+    let vars = (tv', Vars.Tag.make ~const:false ~adv:false Vars.Global) :: k.vars in
+
+    let term_frame = Term.mk_macro ms [] ts' in
+    let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
+    let term_input = Term.mk_macro Term.in_macro [] ts' in
+    let term_output = Term.mk_macro Term.out_macro [] ts' in
+
+    let mk_and = Term.mk_and ~simpl:true in
+
+    { term = term_frame; 
+      vars; se = k.se;
+      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
+    { term = term_exec;
+      vars; se = k.se;
+      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
+    { term = term_output;
+      vars; se = k.se;
+      cond =mk_and ( mk_and (Term.mk_atom `Leq ts' ts)  term_exec) k.cond; }::
+    [{ term = term_input;       (* input is know one step further *)
+       vars; se = k.se;
+       cond = mk_and (Term.mk_atom `Leq (Term.mk_pred ts') ts) k.cond; }]
+
+  | _ -> []
+
+(** Give a set of known terms [k], decompose it as a set of set of know 
+    termes [k1, ..., kn] such that:
+    - for all i, [ki] is deducible from [k]
+    - [k] is deducible from [(k1, ..., kn)] *)
+let rec known_set_decompose (k : known_set) : known_set list =
+  (* get [k.term] head symbol if the system kind allows it *)
+  let term = 
+    match SE.to_projs_any k.se with
+    | None       -> k.term
+    | Some projs -> Term.head_normal_biterm projs k.term
+  in
+  match term with
+  (* Exploit the pair symbol injectivity.
+      If [k] is a pair, we can replace [k] by its left and right
+      composants w.l.o.g. *)
+  | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
+    let kl = { k with term = a; }
+    and kr = { k with term = b; } in
+    List.concat_map known_set_decompose (kl :: [kr])
+
+  (* Idem for tuples. *)
+  | Term.Tuple l ->
+    let kl = List.map (fun a -> { k with term = a; } ) l in
+    List.concat_map known_set_decompose kl
+
+  | Quant ((Seq | Lambda), vars, term) ->
+    let vars, s = Term.refresh_vars vars in
+    let term = Term.subst s term in
+    let k = 
+      { term; 
+        se = k.se;
+        vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
+        cond = k.cond }
+    in
+    known_set_decompose k
+
+  | _ -> [k]
+
+(** Given a term, return some corresponding [known_sets].  *)
+let known_set_list_of_term (se : SE.t) (term : Term.term) : known_set list =
+  let k = known_set_of_term se term in
+  let k_dec = known_set_decompose k in
+  let k_dec_seq = List.concat_map known_set_add_frame k_dec in
+  k_dec @ k_dec_seq
+
+let known_sets_of_terms (se : SE.t) (terms : Term.term list) : known_sets =
+  let ks_l = List.concat_map (known_set_list_of_term se) terms in
+  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
 
 (*------------------------------------------------------------------*)
 module MCset : sig[@warning "-32"]
@@ -2074,150 +2233,9 @@ let pp_msets fmt (msets : msets) =
   MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
-let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
-  let pp_subst fmt mv =
-    Fmt.pf fmt "[%a]" Mvar.pp mv
-  in
-
-  let vars = cand.vars in
-
-  Fmt.pf fmt "@[<hv 2>{ @[%a@]@[%a@] |@ @[%a@]@ @[%a@]}@]"
-    pp_term cand.term
-    pp_subst cand.subst
-    (Fmt.list ~sep:Fmt.comma Vars.pp) vars
-    Term.pp cand.cond
-
-(*------------------------------------------------------------------*)
-let pp_known_set fmt (known : known_set) =
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
-    Term.pp known.term
-    Vars.pp_typed_tagged_list known.vars
-    Term.pp known.cond
-
-let pp_known_sets fmt (ks : known_sets) =
-  Fmt.pf fmt "@[<v>";
-  List.iter (fun (head, k_l) ->
-      Fmt.pf fmt "head: %a@;@[<v>%a@]"
-        pp_term_head head
-        (Fmt.list ~sep:Fmt.cut pp_known_set) k_l;
-      Fmt.cut fmt ();
-    ) ks;
-  Fmt.pf fmt "@]"
-
-let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
-  List.assoc_up_dflt
-    (get_head (Term.head_normal_biterm k.term)) [] (fun ks_l -> k :: ks_l) ks
-
-let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
-  let s = List.fold_left (fun s (head, k_l) ->
-      let k_l' = List.assoc_dflt [] head s2 in
-      (head, k_l' @ k_l) :: s
-    ) [] s1
-  in
-  List.fold_left (fun s (head', k_l') ->
-      if List.mem_assoc head' s1 then s
-      else (head', k_l') :: s
-    ) s s2
-
-(*------------------------------------------------------------------*)
-let known_set_of_term (term : Term.term) : known_set =
-  { term = term;
-    vars = [];
-    cond = Term.mk_true; }
-
-(** Special treatment of `frame`, to account for the fact
-    that it contains all its prefix frame and exec, and inputs.
-    Remark: this is correct even if [ts] does not happens. Indeed, in that case,
-    the condition [ts' ≤ ts] is never satisfied. *)
-let known_set_add_frame (k : known_set) : known_set list =
-  match k.term with
-  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
-    assert (l = []);
-    let tv' = Vars.make_fresh Type.Timestamp "t" in
-    let ts' = Term.mk_var tv' in
-    (* [const] is set to **false**, as knowing [frame@t] implies that we known
-       [input@t'] for any [t' <= t], even if [t'] is non-constant. 
-       Furthermore, this implies that we known [t]. 
-       Idem for the [adv] tag. *)
-    let vars = (tv', Vars.Tag.make ~const:false ~adv:false Vars.Global) :: k.vars in
-
-    let term_frame = Term.mk_macro ms [] ts' in
-    let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
-    let term_input = Term.mk_macro Term.in_macro [] ts' in
-    let term_output = Term.mk_macro Term.out_macro [] ts' in
-
-    let mk_and = Term.mk_and ~simpl:true in
-
-    { term = term_frame;
-      vars;
-      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
-    { term = term_exec;
-      vars;
-      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
-    { term = term_output;
-      vars;
-      cond =mk_and ( mk_and (Term.mk_atom `Leq ts' ts)  term_exec) k.cond; }::
-    [{ term = term_input;       (* input is know one step further *)
-       vars;
-       cond = mk_and (Term.mk_atom `Leq (Term.mk_pred ts') ts) k.cond; }]
-
-  | _ -> []
-
-(** Give a set of known terms [k], decompose it as a set of set of know 
-    termes [k1, ..., kn] such that:
-    - for all i, [ki] is deducible from [k]
-    - [k] is deducible from [(k1, ..., kn)] *)
-let rec known_set_decompose (k : known_set) : known_set list =
-  match Term.head_normal_biterm k.term with
-  (* Exploit the pair symbol injectivity.
-      If [k] is a pair, we can replace [k] by its left and right
-      composants w.l.o.g. *)
-  | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
-    let kl = { k with term = a; }
-    and kr = { k with term = b; } in
-    List.concat_map known_set_decompose (kl :: [kr])
-
-(* FIXME : This rule is false, but something to decontruct ite could be added
-  | Term.Fun (f, _, [b;t1;t2]) when f = Term.f_ite ->
-    let kl  = { k with term = t1 ; cond = Term.mk_and k.cond b}
-    and kr =  { k with term = t2 ; cond = Term.mk_and k.cond (Term.mk_not b)}
-    in List.concat_map known_set_decompose (kl::[kr]) *)
-
-  (* Idem for tuples. *)
-  | Term.Tuple l ->
-    let kl = List.map (fun a -> { k with term = a; } ) l in
-    List.concat_map known_set_decompose kl
-
-  | Quant ((Seq | Lambda), vars, term) ->
-    let vars, s = Term.refresh_vars vars in
-    let term = Term.subst s term in
-    let k = 
-      { term;
-        vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
-        cond = k.cond }
-    in
-    known_set_decompose k
-
-  | _ -> [k]
-
-(** Given a term, return some corresponding [known_sets].  *)
-let known_set_list_of_term (term : Term.term) : known_set list =
-  let k = known_set_of_term term in
-  let k_dec = known_set_decompose k in
-  let k_dec_seq = List.concat_map known_set_add_frame k_dec in
-  k_dec @ k_dec_seq
-
-let known_sets_of_terms (terms : Term.term list) : known_sets =
-  let ks_l = List.concat_map known_set_list_of_term terms in
-  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
-
-(*------------------------------------------------------------------*)
 (** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add
     an additional constraint [t ≤ ts']. *)
-let known_set_of_mset
-    ?extra_cond_le
-    (mset : MCset.t) : known_set
-  =
+let known_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : known_set =
   let t = Vars.make_fresh Type.Timestamp "t" in
   let term = Term.mk_macro mset.msymb mset.args (Term.mk_var t) in
   let cond =
@@ -2233,16 +2251,14 @@ let known_set_of_mset
     in
     Term.mk_and ~simpl:true cond_le extra_cond_le
   in
-  { term = term;
-    vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices);
-    cond; }
+  { term; se; cond;
+    vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices); }
 
 let known_sets_of_mset_l
-    ?extra_cond_le
-    (msets : MCset.t list) : known_sets
+    ?extra_cond_le (se : SE.t) (msets : MCset.t list) : known_sets 
   =
   List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
-      let new_ks = known_set_of_mset ?extra_cond_le mset in
+      let new_ks = known_set_of_mset ?extra_cond_le se mset in
       known_sets_add new_ks known_sets
     ) [] msets
 
@@ -2267,7 +2283,7 @@ let pat_of_known_set (known : known_set) : Term.term * Term.term pat_op =
 (*------------------------------------------------------------------*)
 let refresh_known_set (known : known_set) : known_set =
   let vars, subst = Term.refresh_vars_w_info known.vars in
-  { vars;
+  { vars; se = known.se;
     term = Term.subst subst known.term;
     cond = Term.subst subst known.cond; }
 
@@ -2799,7 +2815,9 @@ module E = struct
         (* we instantiate the known terms at time [ts] *)
         let all_known_sets =
           (* we assume we know all terms in [known_sets] at time [ts] *)
-          let known_sets = known_sets_of_mset_l ~extra_cond_le:ts known_sets in
+          let known_sets = 
+            known_sets_of_mset_l ~extra_cond_le:ts (system :> SE.t) known_sets 
+          in
           known_sets_union init_terms known_sets
         in
         let ded_sets = deduce table env system cand_set all_known_sets in
@@ -2919,7 +2937,7 @@ module E = struct
     dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
 
     (* initially known terms *)
-    let init_terms = known_sets_of_terms init_terms in
+    let init_terms = known_sets_of_terms (system :> SE.t) init_terms in
 
     dbg "init_terms:@.%a@." pp_known_sets init_terms;
 
@@ -3053,14 +3071,14 @@ module E = struct
         let st = { st with bvs = []; support = []; env; } in
         _deduce_mem_one cterm known st
 
-
   (** Try to match [term] as an element of a sequence in [elems]. *)
   let deduce_mem
       (cterm : cond_term)
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
     =
-    let term = head_normal_biterm cterm.term in
+    let l_proj, r_proj = get_system_set_pair_projs st in
+    let term = head_normal_biterm [l_proj; r_proj] cterm.term in
     let elems_head = List.assoc_dflt [] (Term.get_head term) elems in
     List.find_map (fun elem -> deduce_mem_one cterm elem st) elems_head
  
@@ -3073,8 +3091,9 @@ module E = struct
       (st    : unif_state) : (unif_state * cond_term) list option
     =
     let env = env_of_unif_state st in  
+    let l_proj, r_proj = get_system_set_pair_projs st in
 
-    match Term.head_normal_biterm cterm.term with
+    match Term.head_normal_biterm [l_proj; r_proj] cterm.term with
     | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)
@@ -3197,17 +3216,20 @@ module E = struct
 
   (*------------------------------------------------------------------*)
   (** Greedily check entailment through an inclusion check of [terms] in
-      [pat_terms]. *)
+      [pat_terms]. 
+      [terms] and [pat_terms] are over [st.system.set]. *)
   let match_equiv_incl
       (terms     : Term.term list)
       (pat_terms : Term.term list)
       (st        : unif_state) : Mvar.t
     =
+    let se = st.system.set in
+
     (* If [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =
-      if st.support = [] && st.use_fadup then
-        let system = SE.to_fset st.system.set in
+      if st.support = [] && st.use_fadup && SE.is_fset se then
+        let system = SE.to_fset se in
         let msets = strengthen st.table system st.env pat_terms in
         msets_to_list msets
       else []
@@ -3218,8 +3240,8 @@ module E = struct
 
     let pat_terms =
       known_sets_union
-        (known_sets_of_mset_l mset_l)
-        (known_sets_of_terms pat_terms)
+        (known_sets_of_mset_l se mset_l)
+        (known_sets_of_terms se pat_terms)
     in
     let mv, minfos =
       List.fold_left (fun (mv, minfos) term ->

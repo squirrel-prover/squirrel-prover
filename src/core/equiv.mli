@@ -110,10 +110,13 @@ val is_system_context_indep : form -> bool
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
-val subst       : Term.subst                   -> form -> form
-val tsubst      : Type.tsubst                  -> form -> form
-val subst_projs : (Term.proj * Term.proj) list -> form -> form
-val se_subst    : SE.subst                     -> form -> form
+val subst       : Term.subst  -> form -> form
+val tsubst      : Type.tsubst -> form -> form
+val se_subst    : SE.subst    -> form -> form
+
+(** Substitute projections in [Equiv] or [Reach] atoms. *)
+val subst_projs :
+  [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> form -> form
 
 (** Free variables *)
 val fv : form -> Vars.Sv.t
@@ -183,7 +186,8 @@ module Babel : sig
   val subst  : 'a f_kind -> Term.subst  -> 'a -> 'a
   val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
 
-  val subst_projs : 'a f_kind -> (Term.proj * Term.proj) list -> 'a -> 'a
+  val subst_projs : 
+    'a f_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> 'a -> 'a
 
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
 

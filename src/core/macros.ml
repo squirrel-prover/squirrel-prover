@@ -243,7 +243,7 @@ let get_def_glob
   in
 
   let t = Term.subst subst (get_body table system data) in
-  Term.simple_bi_term t 
+  Term.simple_bi_term (SE.to_projs system) t
 
 (*------------------------------------------------------------------*)
 (** Exported *)

@@ -1352,11 +1352,15 @@ and _pp
       maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   (* diff *)
-  | Diff (Explicit l) ->
+  | Diff (Explicit list) ->
+    let pp_elem ppf (label,term) =
+      Fmt.pf ppf "%s%a" 
+        (if info.dbg then label ^ ":" else "")
+        (pp (diff_fixity, `NonAssoc)) term
+    in
     Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
-      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
-         (pp (diff_fixity, `NonAssoc)))
-      (List.map snd l) (* TODO labels *)
+      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp_elem)
+      list
 
   (* tuple *)
   | Tuple ts ->
@@ -1940,32 +1944,37 @@ let head_pi_term (s : proj) (t : term) : term =
   | Diff (Explicit l) -> List.assoc s l
   | _ -> t
 
-let diff a b =
-  if equal a b then a else
-    Diff (Explicit [left_proj,a; right_proj,b])
-
-let make_normal_biterm
-    (dorec : bool) ?(alpha_find = true)
-    (s : subst) (t : term) : term * bool
+(*------------------------------------------------------------------*)
+(** Normalize a term of system kind [lproj,rproj]. *)
+let make_normal_biterm_pair
+    ~(dorec : bool) ~(alpha_find : bool)
+    ~(lproj : proj) ~(rproj : proj)
+    (t : term) : term * bool
   =
   let reduced = ref false in
-  
+
   let check_alpha s l l' =
     List.iter2 (fun t t' ->
         if not (alpha_conv ~subst:s t t') then raise AlphaFailed 
       ) l l'
   in
 
+  let diff a b =
+    if equal a b then a else
+      Diff (Explicit [lproj,a; rproj,b])
+  in
+  
+  let check_reduced () = reduced := (match t with Diff _ -> true | _ -> false) in
+
   let rec normalize (s : subst) (t : term) : term =
-    let check_reduced () = reduced := (match t with Diff _ -> true | _ -> false) in
-    
     (* [s] is a pending substitution from [t'] variables to [t] variables. *)
     let mdiff (s : subst) (t : term) (t' : term) : term = 
       if dorec then normalize s (diff t t')
-      else diff t (subst s t')
+      else diff t (subst s t') 
     in
-    let t1 = head_pi_term left_proj t
-    and t2 = head_pi_term right_proj t in
+
+    let t1 = head_pi_term lproj t
+    and t2 = head_pi_term rproj t in
 
     let doit () =
       (* TODO generalize to non-binary diff *)
@@ -2036,24 +2045,37 @@ let make_normal_biterm
     try doit () with AlphaFailed -> diff t1 (subst s t2)
   in
 
-  let t = normalize s t in
+  let t = normalize [] t in
   (t, !reduced)
-  
-let simple_bi_term     : term -> term = fst -| make_normal_biterm true  []
-let head_normal_biterm : term -> term = fst -| make_normal_biterm false []
 
-let simple_bi_term0     : term -> term * bool = make_normal_biterm true  []
-let head_normal_biterm0 : term -> term * bool = make_normal_biterm false []
+(*------------------------------------------------------------------*)
+let make_normal_biterm
+    (dorec : bool) ?(alpha_find = true)
+    (projs : projs)
+    (t : term) : term * bool
+  =
+  match projs with
+  | [] -> t, false
+  | [lproj;rproj] -> 
+    make_normal_biterm_pair ~dorec ~alpha_find ~lproj ~rproj t 
+  | _ -> t, false         (* TODO: support more than two projections *)
+
+(*------------------------------------------------------------------*)
+let simple_bi_term     projs t : term = fst @@ make_normal_biterm  true projs t
+let head_normal_biterm projs t : term = fst @@ make_normal_biterm false projs t 
+
+let simple_bi_term0     projs t : term * bool = make_normal_biterm  true projs t
+let head_normal_biterm0 projs t : term * bool = make_normal_biterm false projs t
 
 (* Ad-hoc fix to keep diffeq tactic working properly. *)
-let simple_bi_term_no_alpha_find : term -> term =
-  fst -| make_normal_biterm true ~alpha_find:false []
+let simple_bi_term_no_alpha_find projs t : term =
+  fst @@ make_normal_biterm true ~alpha_find:false projs t
     
 (*------------------------------------------------------------------*)
 let combine = function
   | [_,t] -> t
   | ["left",_;"right",_] as l -> 
-    simple_bi_term (Diff (Explicit l))
+    simple_bi_term [left_proj; right_proj] (Diff (Explicit l))
 
   | _ -> assert false
 
@@ -2231,8 +2253,9 @@ let () =
       let ts = mkvar "ts" Type.Timestamp in
       let ts' = mkvar "ts'" Type.Timestamp in
       let m = in_macro in
-      let t = diff (Macro (m,[],ts)) (Macro (m,[],ts')) in
-      let r = head_normal_biterm t in
+      let t = mk_diff [left_proj,  Macro (m,[],ts);
+                       right_proj, Macro (m,[],ts')] in
+      let r = head_normal_biterm [left_proj; right_proj] t in
       assert (r = t)
     end ;
     "Boolean operator", `Quick, begin fun () ->
@@ -2240,7 +2263,11 @@ let () =
       let g = mkvar "g" Type.Boolean in
       let f' = mkvar "f'" Type.Boolean in
       let g' = mkvar "g'" Type.Boolean in
-      let t = diff (mk_and f g) (mk_and f' g') in
-        assert (head_normal_biterm t = mk_and (diff f f') (diff g g'))
+      let t = mk_diff [left_proj,  mk_and f g; 
+                       right_proj, mk_and f' g'] in
+        assert (head_normal_biterm [left_proj; right_proj] t = 
+                mk_and
+                  (mk_diff [left_proj, f; right_proj, f']) 
+                  (mk_diff [left_proj, g; right_proj, g']))
     end ;
   ] 

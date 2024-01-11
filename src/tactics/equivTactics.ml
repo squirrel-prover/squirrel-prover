@@ -241,7 +241,9 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
         match List.find_opt (fun (j,_) -> i = L.unloc j) args with
         | None ->
           t, 
-          Term.simple_bi_term (Term.mk_diff [(l_proj, t2); (r_proj,    t2)])
+          Term.simple_bi_term
+            [l_proj; r_proj]
+            (Term.mk_diff [(l_proj, t2); (r_proj,    t2)])
             
         | Some (_,new_t) ->
           Term.mk_diff [(l_proj,    t1); (r_proj, new_t) ],
@@ -652,8 +654,9 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
         HighTerm.is_ptime_deducible ~si:true env t
       ) l
   in
+  let l_proj, r_proj = ES.get_system_pair_projs s in
   let l =
-    match Term.head_normal_biterm t with
+    match Term.head_normal_biterm [l_proj; r_proj] t with
     | Tuple l ->
       if is_deducible_vars l then [] else l
 
@@ -946,20 +949,25 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** Recursively project [if b then t1 else t2] to [f (t1,t2)].
-    Does not project inside the branches of the projected conditionals.
-    Returns the projected term, together with [found && p] where [p = true]
-    iff some projection has been performed. *)
-let rec cs_proj f (b:Term.term) (found:bool) (t:Term.term) :
-  bool * Term.term =
-  let head = Term.head_normal_biterm t in
-  match head with
-  | Term.App (Term.Fun (sy,_),[phi;t1;t2]) when phi = b
-    && sy = Symbols.fs_ite ->
-    true, f (t1,t2)
-  | _ -> Term.tmap_fold (cs_proj f b) found t
-
 let case_study arg s : ES.sequents =
+  let l_proj, r_proj = ES.get_system_pair_projs s in
+
+  (* Recursively project [if b then t1 else t2] to [f (t1,t2)].
+     Does not project inside the branches of the projected conditionals.
+     Returns the projected term, together with [found && p] where [p = true]
+     iff some projection has been performed. *)
+  let rec cs_proj
+      f (b:Term.term) (found:bool) (t:Term.term) 
+    : bool * Term.term 
+    =
+    let head = Term.head_normal_biterm [l_proj; r_proj] t in
+    match head with
+    | Term.App (Term.Fun (sy,_),[phi;t1;t2]) when phi = b
+                                               && sy = Symbols.fs_ite ->
+      true, f (t1,t2)
+    | _ -> Term.tmap_fold (cs_proj f b) found t
+  in
+
   let li, b =
     match arg with
     | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
@@ -1229,7 +1237,7 @@ let global_diff_eq (s : ES.t) =
     let t = Term.mk_diff [l_proj, Term.project1 l_proj t;
                           r_proj, Term.project1 r_proj t] in
     ocs := ( List.map (fun u -> (x,y,u))
-               (Iter.get_diff ~cntxt (Term.simple_bi_term_no_alpha_find t)))
+               (Iter.get_diff ~cntxt (Term.simple_bi_term_no_alpha_find [l_proj; r_proj] t)))
            @ !ocs 
   in
   List.iter (iter [] []) frame;
@@ -1535,6 +1543,7 @@ let enckp arg (s : ES.t) =
   let cntxt = mk_pair_trace_cntxt s in
   let table = cntxt.table in
   let env = ES.env s in
+  let l_proj, r_proj = ES.get_system_pair_projs s in
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
@@ -1548,9 +1557,9 @@ let enckp arg (s : ES.t) =
       ~(m       : 'b)
       ~(r       : Name.t)
       ~(k       : Term.term)
-    : Goal.t list =
-
-    let k = Term.head_normal_biterm k in
+    : Goal.t list 
+    =
+    let k = Term.head_normal_biterm [l_proj; r_proj] k in
     (* Verify that key is well-formed, depending on whether the encryption is
      * symmetric or not. Return the secret key and appropriate SSC. *)
     let ssc, wrap_pk, sk =

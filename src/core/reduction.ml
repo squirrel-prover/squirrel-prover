@@ -413,8 +413,10 @@ and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
   else Match.reduce_proj1 t
 
 and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
-  if not st.param.diff then t, false
-  else Term.head_normal_biterm0 t 
+  if not st.param.diff || not (SE.is_fset st.se) then t, false
+  else
+    let se = SE.to_fset st.se in
+    Term.head_normal_biterm0 (SE.to_projs se) t 
 
 (* Try to show using [Constr] that [t] is [false] or [true] *)
 and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
