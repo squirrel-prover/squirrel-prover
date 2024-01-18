@@ -1365,11 +1365,10 @@ module Game = struct
             let subgs1 = b :: subgoals in
             let oracle_pat2 = { oracle_pat with term = t2; } in
             let subgs2 = Term.mk_not b :: subgoals in
-            try_match_oracle oracle ~subgoals:subgs2 oracle_pat1 @
-            try_match_oracle oracle ~subgoals:subgs1 oracle_pat2
+            try_match_oracle oracle ~subgoals:subgs1 oracle_pat1 @
+            try_match_oracle oracle ~subgoals:subgs2 oracle_pat2
           | _ -> []
         end
-      (* | None -> [] *)
     in
 
     let match_one_oracle (oracle : oracle) : oracle_match list =
@@ -1422,15 +1421,6 @@ module Game = struct
           { term  = oracle_conds;
             conds; } state.mem
       in
-      (* let _ = *)
-      (*   Fmt.epr "@[Generating subgoals : @[%a@] in call @[ %s | %a @. \*)
-      (*            under cond %a@.and subst @[%a@] @] @. " *)
-      (*     (Fmt.option (Fmt.list Term.pp)) subgoals *)
-      (*     oracle.name *)
-      (*     Term.pp (Term.subst subst oracle_cond) *)
-      (*     (Fmt.list Term.pp) (List.map (Term.subst subst) term.conds) *)
-      (*    Term.pp_subst subst *)
-      (* in *)
       let mem =
         update
           state.env state.hyps mv subst_eqs
@@ -1445,6 +1435,12 @@ module Game = struct
       match mem_subgoals with
       | Some mem_subgoals ->
         assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
+        let mem_subgoals =
+          List.map (Term.mk_impl (Term.mk_ands term.conds)) mem_subgoals
+        in
+        let subgoals =
+          List.map (Term.mk_impl (Term.mk_ands term.conds)) subgoals
+        in
         Some {
           new_consts = consts;
           index_cond = eqs;
@@ -1510,7 +1506,14 @@ let knowledge_mem_tsets
 
 let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
   let conds = output_term.conds in
-  match output_term.term with
+  let reduction_state =
+    Reduction.mk_state ~hyps:state.hyps
+      ~se:state.env.system.set ~vars:state.env.vars
+      ~param:Reduction.{rp_crypto with diff = true}
+      state.env.table
+  in
+  let term = Reduction.whnf_term reduction_state output_term.term in
+  match term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
     let t0 = CondTerm.{ term = t0; conds =             b :: conds } in
     let t1 = CondTerm.{ term = t1; conds = Term.mk_not b :: conds } in
@@ -1532,10 +1535,9 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
         
   | Term.(App (Fun _ as fs,l))
     when HighTerm.is_ptime_deducible ~si:true state.env fs ->
-    (* TODO: if [l] is empty, we seem not to be checking that [conds]
-       is bi-deducible? *)
-    let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
-    bideduce state l
+      assert (l <> []);
+      let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
+      bideduce state l
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
@@ -1566,6 +1568,9 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
     in
     some {state with mem = post;consts;subgoals}
 
+  | Term.Proj (_,l) ->
+    bideduce_term state {output_term with term = l}
+
   | _ -> None
 
 (*------------------------------------------------------------------*)
@@ -1574,9 +1579,6 @@ and bideduce_term
     (state  : state) (output : CondTerm.t)
   : state option
   =
-  (* Fmt.epr *)
-  (*   "@[<2>Deduction of term@ %a@ in state@ %a.@]@." *)
-  (*   CondTerm.pp output pp_state_dbg state; *)
   assert (AbstractSet.well_formed state.env state.mem);
 
   if
@@ -1634,7 +1636,6 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
         Game.call_oracle state output_term mv ~subgoals oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
-
       (* add the subgoals required by the [oracle_match] to the state *)
       let state = { state with subgoals = subgoals @ state.subgoals; } in
 
@@ -1654,12 +1655,6 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
         |> oget_exn ~exn:Failed
       in
       let state = {state with allow_oracle = true} in
-
-      (* Add subgoals needed for the oracle call to be correct *)
-      let mem_subgoals =
-        List.map (Term.mk_impl (Term.mk_ands output_term.conds)) mem_subgoals
-      in
-      (* TODO: why are we adding `mem_subgoals` to `subgoals` *)
       let subgoals = mem_subgoals @ state.subgoals in
 
       (* We know that [output_term] is bi-deducible when [index_cond] holds.
@@ -2138,7 +2133,6 @@ let prove
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms game hyps
   in
-
   let inv, consts, rec_subgs =
     bideduce_recursive_subgoals 
       (L.loc pgame) env hyps game

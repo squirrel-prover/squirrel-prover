@@ -14,21 +14,45 @@ game Foo = {
   }
 }.
 
+name k0 : message.
 
 game Foo2 = {
+  rnd k0 :message;
   oracle foo (x:message) = {
     rnd k : message;
-    var res = <x,x>;
-    res:=fst(res);
-    return if res = x then <k,res> else k
+    return if x = x then <k0,x> else empty
   }
 }.
+
+
+abstract b1 : bool.
+abstract b2 : bool.
+
+game Foo3 = {
+  oracle foo = {
+   return if b1 then diff(a,b) else empty
+  }
+}.
+
+global lemma [E] _ : [b1] -> equiv(diff(a,b)).
+Proof.
+  intro *.
+  crypto Foo3.
+  auto.
+Qed.
+
+global lemma [E] _ :[b2 => b1] -> equiv(if b2 then diff(a,b)).
+Proof.
+ intro *.
+ crypto Foo3.
+ auto.
+Qed.
 
 name key : message.
 
 global lemma [E] _ : equiv(<key,<a,a>>).
 Proof.
-  crypto Foo2.
+  crypto Foo2 (k0:key).
   auto.
 Qed.
 
