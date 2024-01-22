@@ -212,7 +212,7 @@ Qed.
 (* if *)
 
 lemma [any] if_true ['a] (b : boolean, x,y : 'a):
- b => if b then x else y = x.
+  b => if b then x else y = x.
 Proof.
   intro *.
   case (if b then x else y).
@@ -221,14 +221,14 @@ Proof.
 Qed.
 
 lemma [any] if_true0 ['a] (x,y : 'a):
- if true then x else y = x.
+  if true then x else y = x.
 Proof.
   by rewrite if_true. 
 Qed.
 hint rewrite if_true0.
 
 lemma [any] if_false ['a] (b : boolean, x,y : 'a):
- (not b) => if b then x else y = y.
+  (not b) => if b then x else y = y.
 Proof. 
   intro *; case (if b then x else y).
   + intro [H1 H2]. 
@@ -237,7 +237,7 @@ Proof.
 Qed.
 
 lemma [any] if_false0 ['a] (x,y : 'a):
- if false then x else y = y.
+  if false then x else y = y.
 Proof.
   by rewrite if_false.
 Qed.
