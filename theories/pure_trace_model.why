@@ -1,0 +1,30 @@
+(*Theory imported for pure trace formulas*)
+(*Timestamps are represented by integers*)
+theory Pure_trace_model
+
+  use int.Int
+
+  (*Type declarations*)
+
+  type index
+  type timestamp = int
+
+  (*Definition and specification of functions on timestamps*)
+
+  constant  init : timestamp
+  constant max_int : int
+  axiom val_max_int : max_int>=0
+
+  predicate happens (t : timestamp) = t >= 0 /\ max_int>=t
+  predicate (~~)  (t : timestamp) (t' : timestamp) =
+    (happens t \/ happens t') -> t = t'
+  predicate (<~)  (t : timestamp) (t' : timestamp) =
+    happens t /\ happens t' /\ t <= t'
+
+  axiom act_init : init=0
+
+  function pred (t : timestamp) : timestamp = if happens t then t - 1 else t
+
+
+
+end

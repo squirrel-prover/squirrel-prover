@@ -1,0 +1,101 @@
+(*Theory imported when timestamps are represented by an abstract type*)
+theory Trace_model_abs
+
+  (*Type declarations*) 
+
+  type index
+  type timestamp
+  type message 
+
+  (*Functions on timestamps*)
+
+  constant  init : timestamp
+  predicate happens (t : timestamp)
+  predicate (~~)  (t : timestamp) (t' : timestamp)
+  predicate (<~)  (t : timestamp) (t' : timestamp) 
+  function pred (t : timestamp) : timestamp 
+
+  (*Specification of these functions*)
+
+  axiom sym_eq : forall t1 t2 : timestamp. (t1 ~~ t2) <-> (t2 ~~ t1) 
+  axiom refl_eq : forall t  : timestamp.  t ~~ t 
+  axiom trans_eq : forall t1 t2 t3 : timestamp. 
+    ((t1 ~~ t2)/\(t2 ~~ t3)) -> (t1 ~~ t3)
+  axiom eq_nothapp : forall t1 t2 : timestamp. 
+    (not (happens t1) /\ not (happens t2)) -> (t1 ~~ t2)
+  axiom eq_happ : forall t1 t2 : timestamp. 
+    ((happens t1) /\ (t1 ~~ t2)) -> (happens t2)
+
+  axiom order_happ : forall t1 t2 : timestamp. 
+    (t1 <~ t2) -> (happens t1 /\ happens t2)
+  axiom orderpred : forall t : timestamp. 
+    (happens (pred t ))-> ((pred t) <~ t) 
+  axiom ordertrans : forall t1 t2 t3 : timestamp. 
+    ((t1 <~ t2) /\ (t2 <~ t3)) -> (t1 <~ t3)
+  axiom ordermin : forall t : timestamp. (happens t) -> (init <~ t) 
+  axiom total_order : forall t1 t2 : timestamp. 
+    (happens t1 /\ happens t2) -> ((t1 <~ t2) \/ (t2 <~ t1))
+  axiom anti_symmetry : forall t1 t2 : timestamp. 
+    (happens t1 /\ happens t2 /\ (not (t1 ~~ t2))) -> 
+      not ((t1 <~ t2) /\ (t2 <~ t1))
+ 
+
+  axiom pred_undef : forall t1 : timestamp. 
+    (not (happens t1)) -> (not (happens (pred t1))) 
+  axiom pred_def : forall t : timestamp. 
+    (happens (pred t)) -> 
+      (forall t2 : timestamp. ((t2 <~ (pred t) )\/ (t <~ t2)\/(not happens t2)))
+  axiom pred_def2 : forall t : timestamp. (happens t) -> not ((pred t) ~~ t) 
+  axiom eq_pred : forall t1 t2 : timestamp. (t1~~t2) -> ((pred t1) ~~ (pred t2))
+  axiom happ_pred : forall t : timestamp. 
+    (happens t /\ (not (t ~~ init))) -> happens (pred t)
+
+  axiom eq_leq : forall t1 t2 t3 : timestamp. (t1<~t2 /\ t3~~t1) -> t3<~t2
+  axiom eq_geq : forall t1 t2 t3 : timestamp. (t1<~t2 /\ t3~~t2) -> t1<~t3
+
+  axiom happ_init : happens init
+
+  (*Definition and specification of various functions*)
+
+  function xoxo message message : message 
+  axiom xor_assoc : forall x y z : message.
+    xoxo x (xoxo y z) = xoxo (xoxo x y) z
+  axiom xor_comm : forall x y : message. xoxo x y = xoxo y x
+  axiom xor_nil : forall x y : message. xoxo (xoxo x x) y = y
+  predicate msg_is_true message
+  constant empty : message
+  function pair message message : message 
+  function fst message : message 
+  function snd message : message 
+  axiom axiom_pair : forall x : message, y:message. 
+    fst (pair x y) = x /\ snd (pair x y)= y
+  function att message : message 
+  function of_bool bool : message
+ 
+  (*Definition and specificatoin of macros*)
+
+  predicate macro_cond timestamp
+  predicate macro_exec timestamp
+  function input timestamp : message
+  function frame timestamp : message 
+  function output timestamp : message 
+
+  axiom macro_cond_happens : forall t : timestamp. macro_cond t -> happens t
+  axiom macro_cond_init    : macro_cond ( init )
+
+  axiom macro_exec_def : forall t : timestamp.
+    macro_exec t <-> (t =  init  \/ (macro_cond t /\ macro_exec (pred t)))
+
+  axiom input_init : forall t : timestamp. 
+    ((not (happens t) )\/ t = init) -> input t = empty   
+  axiom expand_input :  forall t : timestamp. 
+    (happens t /\ not t = init) -> input t = att (frame (pred t))
+
+  axiom frame_init : forall t : timestamp. 
+    ((not (happens t) )\/ t = init) -> frame t = empty   
+  axiom expand_frame : forall t : timestamp. 
+    (happens t /\ not t = init) -> frame t = (pair 
+      (of_bool (macro_exec t)) 
+      (pair (if (macro_exec t) then (output t) else (empty)) (frame (pred t))))
+
+end

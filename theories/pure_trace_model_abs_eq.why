@@ -1,0 +1,51 @@
+(*Theory imported for pure trace formulas*)
+(*Timestamps are represented by an abstract type*)
+(*The equality between timestamps is represented with "="*)
+theory Pure_trace_model_abs_eq
+
+  (*Type declarations*)
+
+  type index
+  type timestamp
+
+  (*Functions on timestamps*)
+
+  constant  init : timestamp
+  predicate happens (t : timestamp)
+  predicate (<~)  (t : timestamp) (t' : timestamp) 
+  function pred (t : timestamp) : timestamp 
+
+  (*Specification of these functions*)
+
+  axiom eq_nothapp : forall t1 t2 : timestamp. 
+    (not (happens t1) /\ not (happens t2)) -> (t1 = t2)
+  axiom eq_happ : forall t1 t2 : timestamp. 
+    ((happens t1) /\ (t1 = t2)) -> (happens t2)
+
+  axiom order_happ : forall t1 t2 : timestamp. 
+    (t1 <~ t2) -> (happens t1 /\ happens t2)
+  axiom orderpred : forall t : timestamp. 
+    (happens (pred t ))-> ((pred t) <~ t) 
+  axiom ordertrans : forall t1 t2 t3 : timestamp. 
+    ((t1 <~ t2) /\ (t2 <~ t3)) -> (t1 <~ t3)
+  axiom ordermin : forall t : timestamp. 
+    (happens t) -> (init <~ t) 
+  axiom total_order : forall t1 t2 : timestamp. 
+    (happens t1 /\ happens t2) -> ((t1 <~ t2) \/ (t2 <~ t1))
+  axiom anti_symmetry : forall t1 t2 : timestamp. 
+    (happens t1 /\ happens t2 /\ (not (t1 = t2))) -> 
+      not ((t1 <~ t2) /\ (t2 <~ t1))
+
+  axiom pred_undef : forall t1 : timestamp. 
+    (not (happens t1)) -> (not (happens (pred t1))) 
+  axiom pred_def : forall t : timestamp. 
+    (happens (pred t)) -> 
+      (forall t2 : timestamp. ((t2 <~ (pred t) )\/ (t <~ t2)\/(not happens t2)))
+  axiom pred_def2 : forall t : timestamp. (happens t) -> not ((pred t) = t)
+  axiom eq_pred : forall t1 t2 : timestamp. (t1=t2) -> ((pred t1) =(pred t2))
+  axiom happ_pred : forall t : timestamp. 
+    (happens t /\ (not (t = init))) -> happens (pred t)
+  
+  axiom happ_init : happens init
+
+end

@@ -959,6 +959,8 @@ named_arg:
 | TILDE l=label         { TacticsArgs.NArg l }
 | TILDE l=label COLON LBRACKET ll=slist(label,COMMA) RBRACKET
                         { TacticsArgs.NList (l,ll) }
+| TILDE l=label COLON a=label
+                        { TacticsArgs.NList (l,[a]) }
 
 label:
 | l=lsymb { l }
@@ -988,8 +990,13 @@ tac:
   | l=lloc(CRYPTO) game=lsymb args=slist(crypto_arg,empty)
     { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
 
+  (* Case *)
   | id=loc(CASE) a=named_args t=tac_term
     { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Theory t] }
+
+  (* SMT *)
+  | id=loc(SMT) a=named_args
+    { mk_abstract (L.loc id) "smt" [TacticsArgs.Named_args a] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
@@ -1073,8 +1080,6 @@ tac:
   | l=lloc(CLEAR) ids=slist1(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
-
-  | l=lloc(SMT) { mk_abstract l "smt" [] }
 
   (*------------------------------------------------------------------*)
   /* assert that we have a formula */
