@@ -1,6 +1,3 @@
-GITHASH := $(shell scripts/git-hash)
-CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
-
 PREFIX = ~/.local
 SQUIRRELBIN = $(PREFIX)/bin
 
@@ -245,14 +242,20 @@ deploy-html: refman-html
 	mkdir public
 	cp -r _build/default/documentation/sphinx/public .
 
-# If this touch commit.ml for inserting same hash dune will rebuild for nothing
+# -----------------------------------------------------------------------
+# Handling of src/commit.ml
+# -----------------------------------------------------------------------
+
+.PHONY: version
 version:
-	@if [ $(CURHASH) = $(GITHASH) ]; then \
-		echo "Already $(CURHASH)"; \
-	else \
-		rm -f src/commit.ml; \
-		sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml; \
-	fi
+	@echo Regenerating src/commit.ml...
+	@cat src/commit.ml.in \
+	  | sed 's/GITHASH/$(shell scripts/git-hash)/' \
+	  > src/commit.ml
+
+# -----------------------------------------------------------------------
+# Benchmarking examples over revisions
+# -----------------------------------------------------------------------
 
 HEAD:=$(shell git rev-parse --short HEAD)
 GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
