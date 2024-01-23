@@ -1181,7 +1181,7 @@ let sequent_is_valid ~prover ~timestamp_style (s:TraceSequent.t) =
          | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
   in
-  let conclusion = LowTraceSequent.goal s in
+  let conclusion = LowTraceSequent.conclusion s in
   is_valid ~timestamp_style ~slow:false ~pure:false ~prover
     table system evars hypotheses conclusion
 

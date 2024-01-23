@@ -40,17 +40,14 @@ let conc_kind = Equiv.Global_t
 let var_info = Vars.Tag.gtag
     
 (** An equivalence sequent features:
-    - two frames given as a single [goal] containing bi-terms
-      of sort boolean or message;
-    - an environment [env] listing all free variables with their types;
-    - identifiers for the left and right systems.
-    The corresponding equivalence is obtained by projecting the bi-frame
-    to two frames, interpreting macros wrt the left and right systems
-    respectively. *)
+    - a global formula as [conclusion];
+    - a [proof_context] containing global formula hypotheses;
+    - an environment [env] listing all free variables,
+      and the systems to be used for interpreting formulas. *)
 type t = {
   env           : Env.t;
   proof_context : H.hyps;
-  goal          : Equiv.form;
+  conclusion    : Equiv.form;
 }
 
 type sequent = t
@@ -66,7 +63,7 @@ let fv (s : t) : Vars.Sv.t =
         | LDef (_,t) -> Vars.Sv.union (Term.fv  t) vars
       ) s.proof_context Vars.Sv.empty
   in
-  Vars.Sv.union h_vars (Equiv.fv s.goal)
+  Vars.Sv.union h_vars (Equiv.fv s.conclusion)
 
 (*------------------------------------------------------------------*)
 let ty_fv (s : t) : Type.Fv.t =
@@ -77,10 +74,10 @@ let ty_fv (s : t) : Type.Fv.t =
         | LDef (_,t) -> Type.Fv.union (Term.ty_fv  t) vars
       ) s.proof_context Type.Fv.empty
   in
-  Type.Fv.union h_vars (Equiv.ty_fv s.goal)
+  Type.Fv.union h_vars (Equiv.ty_fv s.conclusion)
 
 (*------------------------------------------------------------------*)
-let _pp_goal ~dbg ~context fmt = function
+let _pp_conclusion ~dbg ~context fmt = function
   | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ~dbg) fmt e
   | _  as f -> Equiv._pp ~dbg ~context fmt f
 
@@ -109,7 +106,8 @@ let _pp ~dbg ppf j =
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]" (_pp_goal ~dbg ~context:j.env.system) j.goal
+  Fmt.pf ppf "@;%a@]"
+    (_pp_conclusion ~dbg ~context:j.env.system) j.conclusion
 
 let pp     = _pp ~dbg:false
 let pp_dbg = _pp ~dbg:true
@@ -118,7 +116,7 @@ let pp_dbg = _pp ~dbg:true
 let pp_init ppf j =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
-  Fmt.pf ppf "%a" Equiv.pp j.goal
+  Fmt.pf ppf "%a" Equiv.pp j.conclusion
 
 (*------------------------------------------------------------------*)
 let sanity_check (s : t) : unit =
@@ -222,11 +220,11 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
 
-let update ?table ?ty_vars ?vars ?hyps ?goal t =
+let update ?table ?ty_vars ?vars ?hyps ?conclusion t =
   let env  = Env.update ?table ?ty_vars ?vars t.env
   and proof_context = Utils.odflt t.proof_context hyps
-  and goal = Utils.odflt t.goal goal in
-  { env; proof_context; goal; } 
+  and conclusion = Utils.odflt t.conclusion conclusion in
+  { env; proof_context; conclusion; } 
 
 let env j = j.env
 
@@ -238,11 +236,11 @@ let set_vars vars j = update ~vars j
 
 let system j = j.env.system
 
-let set_goal_in_context ?update_local system conc s =
+let set_conclusion_in_context ?update_local system conc s =
 
   assert (update_local = None);
 
-  if system = s.env.system then { s with goal = conc } else
+  if system = s.env.system then { s with conclusion = conc } else
 
     (* Update hypotheses. *)
     let proof_context =
@@ -258,27 +256,27 @@ let set_goal_in_context ?update_local system conc s =
     let s = { s with env; proof_context } in
 
     (* Finally set the new conclusion. *)
-    { s with goal = conc }
+    { s with conclusion = conc }
 
 let table j = j.env.table
 let set_table table j = update ~table j
 
-let goal j = j.goal
+let conclusion j = j.conclusion
 
 let ty_vars j = j.env.ty_vars
 
-let set_goal goal j = { j with goal }
+let set_conclusion conclusion j = { j with conclusion }
 
-let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
+let set_reach_conclusion f s = set_conclusion Equiv.(Atom (Reach f)) s
 
-let get_frame proj j = match j.goal with
+let get_frame proj j = match j.conclusion with
   | Equiv.Atom (Equiv.Equiv e) ->
     Some (List.map (Term.project1 proj) e)
   | _ -> None
 
 (*------------------------------------------------------------------*)
 let subst subst s =
-  { s with goal = Equiv.subst subst s.goal;
+  { s with conclusion = Equiv.subst subst s.conclusion;
            proof_context = subst_hyps subst s.proof_context; }
 
 (*------------------------------------------------------------------*)
@@ -286,7 +284,7 @@ let tsubst (tsubst : Type.tsubst) s =
   if tsubst == Type.tsubst_empty then s else
     let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
     { env  = Env.update ~vars s.env;
-      goal = Equiv.tsubst tsubst s.goal;
+      conclusion = Equiv.tsubst tsubst s.conclusion;
       proof_context = tsubst_hyps tsubst s.proof_context; }
 
 (*------------------------------------------------------------------*)
@@ -300,11 +298,11 @@ let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
              s.env;}
 
 (*------------------------------------------------------------------*)
-let goal_is_equiv s = match goal s with
+let conclusion_is_equiv s = match conclusion s with
   | Atom (Equiv.Equiv _) -> true
   | _ -> false
 
-let goal_as_equiv s = match goal s with
+let conclusion_as_equiv s = match conclusion s with
   | Atom (Equiv.Equiv e) -> e
   | _ ->
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
@@ -315,14 +313,14 @@ let goal_as_equiv s = match goal s with
 let to_trace_sequent s =
   let env = s.env in
 
-  let goal = match s.goal with
+  let conclusion = match s.conclusion with
     | Equiv.Atom (Equiv.Reach f) -> f
     | _ ->
       Tactics.soft_failure
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~env goal in
+  let trace_s = TS.init ~env conclusion in
   Hyps.fold
     (fun id ld trace_s ->
        match ld with
@@ -335,11 +333,11 @@ let to_trace_sequent s =
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s =
-  TS.get_trace_hyps (to_trace_sequent (set_reach_goal Term.mk_false s))
+  TS.get_trace_hyps (to_trace_sequent (set_reach_conclusion Term.mk_false s))
 
 (*------------------------------------------------------------------*)
 let get_models (s : t) =
-  let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
+  let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.get_models s
 
 let mk_trace_cntxt ?(se : SE.fset option) (s : t) =
@@ -352,12 +350,12 @@ let mk_trace_cntxt ?(se : SE.fset option) (s : t) =
 
 (*------------------------------------------------------------------*)
 let query_happens ~precise (s : t) (a : Term.term) =
-  let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
+  let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.query_happens ~precise s a
 
 
 let check_pq_sound_sequent s =
-  match goal s with
+  match conclusion s with
   | Atom (Equiv.Equiv e) ->
       let models = get_models s in
       let cntxt = Constr.{
@@ -372,21 +370,21 @@ let check_pq_sound_sequent s =
   | _ -> s
 
 (*------------------------------------------------------------------*)
-let set_equiv_goal e j =
-  let new_sequent = set_goal Equiv.(Atom (Equiv e)) j in
+let set_equiv_conclusion e j =
+  let new_sequent = set_conclusion Equiv.(Atom (Equiv e)) j in
   if TConfig.post_quantum (table j) then
    check_pq_sound_sequent new_sequent
   else new_sequent
 
 
-let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) goal =
+let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) conclusion =
   let proof_context = H.empty in
   let proof_context = match hyp with
     | None -> proof_context
     | Some h ->
         snd (H._add ~force:false (H.fresh_id "H" proof_context) (LHyp h) proof_context)
   in
-  let new_sequent = { env; proof_context; goal } in
+  let new_sequent = { env; proof_context; conclusion } in
   if not no_sanity_check then sanity_check new_sequent;
 
   if TConfig.post_quantum (env.table) then
@@ -394,20 +392,20 @@ let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) goal =
   else new_sequent
 
 let mem_felem i s =
-  goal_is_equiv s &&
-  i < List.length (goal_as_equiv s)
+  conclusion_is_equiv s &&
+  i < List.length (conclusion_as_equiv s)
 
 let change_felem ?loc i elems s =
   try
-    let before, _, after = List.splitat i (goal_as_equiv s) in
-    set_equiv_goal (List.rev_append before (elems @ after)) s
+    let before, _, after = List.splitat i (conclusion_as_equiv s) in
+    set_equiv_conclusion (List.rev_append before (elems @ after)) s
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
 
 let get_felem ?loc i s =
   try
-    let _, t, _ = List.splitat i (goal_as_equiv s) in t
+    let _, t, _ = List.splitat i (conclusion_as_equiv s) in t
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
@@ -423,10 +421,9 @@ let mk_pair_trace_cntxt (s : sequent) : Constr.trace_cntxt =
   let se = (Utils.oget ((env s).system.pair) :> SE.fset) in
   mk_trace_cntxt ~se s 
 
-let check_goal_is_equiv (s : sequent) : unit =
-  if not (Equiv.is_equiv (goal s)) then
+let check_conclusion_is_equiv (s : sequent) : unit =
+  if not (Equiv.is_equiv (conclusion s)) then
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
-
 
 (*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart

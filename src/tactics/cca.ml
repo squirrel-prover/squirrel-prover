@@ -416,7 +416,7 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
 
-  let before, e, after = LT.split_equiv_goal i s in
+  let before, e, after = LT.split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
   
   
@@ -459,7 +459,7 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let phi = Term.mk_ands ~simpl:true phis in
   let new_t = subst_name xc c_len cc in
   let new_biframe = List.rev_append before (new_t::after) in
-  [ES.set_reach_goal phi s; ES.set_equiv_goal new_biframe s]
+  [ES.set_reach_conclusion phi s; ES.set_equiv_conclusion new_biframe s]
 
   
 

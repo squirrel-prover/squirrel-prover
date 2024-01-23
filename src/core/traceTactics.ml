@@ -37,15 +37,15 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-let goal_true_intro (s : TS.t) =
-  match TS.goal s with
+let true_intro (s : TS.t) =
+  match TS.conclusion s with
   | tt when tt = Term.mk_true -> []
   | _ -> soft_failure (Tactics.Failure "Cannot introduce true")
 
 let () =
   T.register "true"
     ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun goal_true_intro)
+    (LowTactics.genfun_of_pure_tfun true_intro)
 
 (*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
@@ -71,12 +71,12 @@ let case_cond orig vars c t e s : sequent list =
            (Term.mk_atom `Eq orig case_t))
     in
 
-    let case_goal =
+    let case_conclusion =
       Term.mk_impl ~simpl:false
         prem
-        (Term.subst case_subst (TS.goal s))
+        (Term.subst case_subst (TS.conclusion s))
     in
-    TS.set_goal case_goal s
+    TS.set_conclusion case_conclusion s
   in
 
   [ mk_case vars then_t then_c;
@@ -106,8 +106,8 @@ let conditional_case (m : Term.term) s : sequent list =
 
 let boolean_case b s : sequent list =
   let do_one b_case b_val =
-    let g = Term.subst [Term.ESubst (b, b_val)] (TS.goal s) in
-    TS.set_goal (Term.mk_impl ~simpl:false b_case g) s
+    let g = Term.subst [Term.ESubst (b, b_val)] (TS.conclusion s) in
+    TS.set_conclusion (Term.mk_impl ~simpl:false b_case g) s
   in
   [ do_one b Term.mk_true;
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
@@ -200,23 +200,23 @@ let simpl_left_tac s =
     can be proved using the axiom rule (plus some other minor rules). 
     If [hyp = Some id], only checks for hypothesis [id]. *)
 let assumption ?hyp (s : TS.t) = 
-  let goal = TS.goal s in
+  let conclusion = TS.conclusion s in
   let assumption_entails (id, f) = 
     (hyp = None || hyp = Some id) &&
     match f with
     | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach f)))
     | TopHyps.LHyp (Equiv.Local f) ->
-      TS.Reduce.conv_term s goal f ||
+      TS.Reduce.conv_term s conclusion f ||
       List.exists (fun f ->
-          TS.Reduce.conv_term s goal f ||
+          TS.Reduce.conv_term s conclusion f ||
           TS.Reduce.conv_term s f Term.mk_false
         ) (decompose_ands f)
     | TopHyps.LHyp (Equiv.Global _) | TopHyps.LDef _ -> false
   in
-  if goal = Term.mk_true ||
+  if conclusion = Term.mk_true ||
      TS.Hyps.exists assumption_entails s
   then begin
-    dbg "assumption %a" Term.pp goal;
+    dbg "assumption %a" Term.pp conclusion;
     []
   end else soft_failure Tactics.NotHypothesis
 
@@ -268,7 +268,7 @@ let congruence (s : TS.t) : bool =
   | None -> true
   | Some s ->
     let conclusions =
-      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.goal s))
+      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.conclusion s))
     in
 
     let term_conclusions =
@@ -306,8 +306,8 @@ let constraints (s : TS.t) =
   | Some s ->
     let s =
       TS.Hyps.add Args.Unnamed
-        (LHyp (Local (Term.mk_not (TS.goal s))))
-        (TS.set_goal Term.mk_false s)
+        (LHyp (Local (Term.mk_not (TS.conclusion s))))
+        (TS.set_conclusion Term.mk_false s)
     in
     TS.constraints_valid s
 
@@ -679,10 +679,10 @@ let exec (Args.Message (a,_)) s =
   in
   [TraceLT.happens_premise s a ;
 
-   TS.set_goal (Term.mk_macro exec_macro [] a) s;
+   TS.set_conclusion (Term.mk_macro exec_macro [] a) s;
 
-    TS.set_goal
-      (Term.mk_impl ~simpl:false formula (TS.goal s)) s]
+    TS.set_conclusion
+      (Term.mk_impl ~simpl:false formula (TS.conclusion s)) s]
 
 let () =
   T.register_typed "executable"
@@ -715,7 +715,7 @@ let fa s =
       soft_failure (Failure "FA: sequences with different types");
   in
 
-  let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
+  let u, v = match TS.Reduce.destr_eq s Local_t (TS.conclusion s) with
     | Some (u,v) -> u, v
     | None -> unsupported ()
   in
@@ -724,15 +724,15 @@ let fa s =
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
       let open TraceSequent in
-      [ s |> set_goal (Term.mk_impl c c') ;
+      [ s |> set_conclusion (Term.mk_impl c c') ;
 
-        s |> set_goal (Term.mk_impl c' c) ;
+        s |> set_conclusion (Term.mk_impl c' c) ;
 
-        s |> set_goal (Term.mk_impls
+        s |> set_conclusion (Term.mk_impls
                          (if TS.Reduce.conv_term s c c' then [c] else [c;c'])
                          (Term.mk_atom `Eq t t'));
 
-        s |> set_goal (Term.mk_impls
+        s |> set_conclusion (Term.mk_impls
                          [Term.mk_not c;
                           Term.mk_not c']
                          (Term.mk_atom `Eq e e')) ]
@@ -772,7 +772,7 @@ let fa s =
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
     let subgoals =
-      [ TS.set_goal (Term.mk_atom `Eq t t') s ]
+      [ TS.set_conclusion (Term.mk_atom `Eq t t') s ]
     in
     subgoals
 
@@ -830,14 +830,14 @@ let fa s =
 
     let subgoals =
       let open TraceSequent in
-      [ set_goal (Term.mk_impl c (Term.mk_exists unused c')) s ;
+      [ set_conclusion (Term.mk_impl c (Term.mk_exists unused c')) s ;
 
-        set_goal (Term.mk_impl c' c) s;
+        set_conclusion (Term.mk_impl c' c) s;
 
-        set_goal (Term.mk_impls [c;c']
+        set_conclusion (Term.mk_impls [c;c']
                     (mk_atom `Eq t t')) s;
 
-        set_goal (Term.mk_atom `Eq e e') s]
+        set_conclusion (Term.mk_atom `Eq e e') s]
     in
     subgoals
 
@@ -854,8 +854,8 @@ let new_simpl ~red_param ~congr ~constr s =
   let s = TraceLT.reduce_sequent red_param s in
   let s = strengthen_const_vars s in
 
-  let goals = Term.decompose_ands (TS.goal s) in
-  let s = TS.set_goal Term.mk_false s in
+  let goals = Term.decompose_ands (TS.conclusion s) in
+  let s = TS.set_conclusion Term.mk_false s in
   let goals = List.filter_map (fun goal ->
       if TS.Hyps.is_hyp (Local goal) s || Term.f_triv goal then None
       else match Term.Lit.form_to_xatom goal with
@@ -876,7 +876,7 @@ let new_simpl ~red_param ~congr ~constr s =
 
           | _ -> Some goal
     ) goals in
-  [TS.set_goal (Term.mk_ands goals) s]
+  [TS.set_conclusion (Term.mk_ands goals) s]
 
 
 (*------------------------------------------------------------------*)
@@ -953,7 +953,7 @@ let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
         then fun _ -> fk (None, GoalNotClosed)
         else fun _ -> sk [g] fk
       in
-      (wrap_fail TraceLT.goal_and_right) g
+      (wrap_fail TraceLT.and_right) g
         (fun l _ -> match l with
            | [g1;g2] ->
              simpl_aux ~close g1
@@ -1107,8 +1107,8 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
 
   if f_coll = Term.mk_true then soft_failure Tactics.NoCollision;
 
-  let goal = Term.mk_impl ~simpl:false f_coll (TS.goal s) in
-  [TS.set_goal goal s]
+  let goal = Term.mk_impl ~simpl:false f_coll (TS.conclusion s) in
+  [TS.set_conclusion goal s]
 
 let () =
   T.register_typed "collision"
@@ -1217,7 +1217,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
            HighTerm.is_system_indep (TS.env s) f
          | LHyp (Global _) -> true)
   in
-  let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in
+  let subgoals = List.map (fun f -> TS.set_conclusion f s') subgoals in
 
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
@@ -1258,12 +1258,12 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   in
 
   let goal =
-    TS.set_goal_in_context
+    TS.set_conclusion_in_context
       ~update_local:rewrite
       updated_context
-      (match rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
+      (match rewrite_equiv_transform ~src ~dst ~s biframe (TS.conclusion s) with
        | Some t -> t
-       | None -> warn_unsupported (TS.goal s); Term.mk_false)
+       | None -> warn_unsupported (TS.conclusion s); Term.mk_false)
       s
   in
   subgoals @ [goal]

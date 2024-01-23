@@ -321,9 +321,9 @@ let cgdh
 
   let phis = List.map (NOF.occurrence_formula ~negate:false) occs in
 
-  let g = TS.goal s in
+  let g = TS.conclusion s in
   List.map
-    (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+    (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
     phis
 
 

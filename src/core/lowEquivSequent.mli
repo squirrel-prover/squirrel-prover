@@ -38,7 +38,7 @@ val get_system_pair_projs : t -> Term.proj * Term.proj
     Equivalence sequents are global sequents whose conclusion
     is an equivalence atom. *)
 
-val set_equiv_goal : Equiv.equiv -> t -> t
+val set_equiv_conclusion : Equiv.equiv -> t -> t
 
 (** Get one of the projections of the biframe,
     as a list of terms where diff operators have been fully
@@ -46,15 +46,15 @@ val set_equiv_goal : Equiv.equiv -> t -> t
     @return [None] if the conclusion is not an equivalence atom. *)
 val get_frame : Term.proj -> t -> Equiv.equiv option
 
-val goal_is_equiv : t -> bool
+val conclusion_is_equiv : t -> bool
 
-val goal_as_equiv : t -> Equiv.equiv
+val conclusion_as_equiv : t -> Equiv.equiv
 
 (*------------------------------------------------------------------*)
 (** {2 Trace sequents and reachability goals} *)
 
-(** Change sequent goal to some reachability atom. *)
-val set_reach_goal : Term.term -> t -> t
+(** Change sequent conclusion to some reachability atom. *)
+val set_reach_conclusion : Term.term -> t -> t
 
 (** Convert a global sequent whose conclusion is a reachability
     atom to a trace sequent.
@@ -68,8 +68,8 @@ val query_happens : precise:bool -> t -> Term.term -> bool
 
 (** Utility *)
 
-(* Constructs the trace context for the pair of systems *)
+(* Constructs the trace context for the pair of systems. *)
 val mk_pair_trace_cntxt : sequent -> Constr.trace_cntxt
 
-(* Fails if the goal is not an equivalence *)
-val check_goal_is_equiv : sequent -> unit
+(* Fails if the goal is not an equivalence. *)
+val check_conclusion_is_equiv : sequent -> unit

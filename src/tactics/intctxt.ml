@@ -173,10 +173,10 @@ let intctxt
   
   let phis = phi_t @ phis_bad_k @ phis_bad_r @ phis_ctxt in
 
-  let g = TS.goal s in 
+  let g = TS.conclusion s in 
   let ciphertext_goals =
     List.map
-    (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+    (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
     phis
   in
 
@@ -202,8 +202,8 @@ let intctxt
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.mk_var uvarm,c);
           ESubst (Term.mk_var uvarkey, Name.to_term k);] f in
-        [TS.set_goal
-           (Term.mk_impl f (TS.goal s)) s]
+        [TS.set_conclusion
+           (Term.mk_impl f (TS.conclusion s)) s]
 
       | _ -> assert false 
   in

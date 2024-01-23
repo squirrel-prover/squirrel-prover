@@ -324,12 +324,12 @@ let set_table table s =
   S.update ~env s
 
 (*------------------------------------------------------------------*)
-let set_goal a s = S.update ~conclusion:a s 
+let set_conclusion a s = S.update ~conclusion:a s 
 
 (** See `.mli` *)
-let set_goal_in_context ?update_local system conc s =
+let set_conclusion_in_context ?update_local system conc s =
   if system = s.env.system && update_local = None then
-    set_goal conc s
+    set_conclusion conc s
   else
 
   (* Update hypotheses. *)
@@ -347,7 +347,7 @@ let set_goal_in_context ?update_local system conc s =
   let s = S.update ~env ~proof_context s in
 
   (* Finally set the new conclusion. *)
-  set_goal conc s
+  set_conclusion conc s
 
 (** [pi proj s] returns the projection of [s] along [proj].
     Fails if [s.system.set] cannot be projected. *)
@@ -358,7 +358,7 @@ let pi projection s =
     let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
     { context with set = new_set }
   in
-  set_goal_in_context
+  set_conclusion_in_context
     new_context
     (Term.project1 projection s.conclusion)
     s
@@ -367,7 +367,7 @@ let pi projection s =
 let init ?(no_sanity_check = false) ~env conclusion =
   init_sequent ~no_sanity_check ~env ~conclusion
 
-let goal s = s.conclusion
+let conclusion s = s.conclusion
 
 (*------------------------------------------------------------------*)
 let subst subst s =

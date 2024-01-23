@@ -4,7 +4,7 @@
   *
   * A sequent is made of:
   * - a set of hypotheses;
-  * - a goal formula;
+  * - a conclusion formula;
   * - an environment containing the sequent free variables.
   *
   * The signature defined here does not include functionalities
@@ -56,7 +56,7 @@ module type S = sig
 
       Each sequent consist of
       a system, table, environment, type variables,
-      goal formula, and a proof-context containing 
+      conclusion formula, and a proof-context containing 
       hypotheses and definitions (called [hyps] for legacy reasons). *)
 
   val env : t -> Env.t
@@ -68,8 +68,8 @@ module type S = sig
   val vars : t -> Vars.env
   val set_vars : Vars.env -> t -> t
 
-  val goal : t -> conc_form
-  val set_goal : conc_form -> t -> t
+  val conclusion : t -> conc_form
+  val set_conclusion : conc_form -> t -> t
 
   val system : t -> SystemExpr.context
 
@@ -85,7 +85,7 @@ module type S = sig
       The optional [update_local] function can be used to override the
       treatment of local hypotheses, i.e. to determine when they can be
       kept (possibly with modifications) or if they should be dropped. *)
-  val set_goal_in_context :
+  val set_conclusion_in_context :
     ?update_local:(Term.term -> Term.term option) ->
     SystemExpr.context -> conc_form -> t -> t
 
@@ -126,7 +126,7 @@ module type S = sig
   (** {2 Substitution} *)
 
   (** [subst subst s] returns the sequent [s] where the substitution has
-      been applied to all hypotheses and the goal.
+      been applied to all hypotheses and the conclusion.
       It removes trivial equalities (e.g x=x). *)
   val subst : Term.subst -> t -> t
 

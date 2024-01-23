@@ -22,7 +22,7 @@ let get_seq_in_nth_goal st i =
   let subgoals = Prover.get_subgoals st in
   let g = List.nth subgoals i in
   match g with
-  | Goal.Global j -> ES.goal_as_equiv j
+  | Goal.Global j -> ES.conclusion_as_equiv j
   | _ -> assert false
 
 let mk c = L.mk_loc L._dummy c

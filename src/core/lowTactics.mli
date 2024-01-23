@@ -165,8 +165,8 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (** {3 Reduce} *)
 
   (** Reduce the full sequent *)
-  val reduce_sequent : Reduction.red_param -> S.t -> S.t
-  val reduce_goal    : Reduction.red_param -> S.t -> S.t
+  val reduce_sequent    : Reduction.red_param -> S.t -> S.t
+  val reduce_conclusion : Reduction.red_param -> S.t -> S.t
 
   (*------------------------------------------------------------------*)
   (** {3 Other tactics} *)
@@ -182,7 +182,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     S.t Tactics.tac
 
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
-  val goal_and_right : S.t -> S.t list
+  val and_right : S.t -> S.t list
 end
 
 (*------------------------------------------------------------------*)
@@ -276,14 +276,14 @@ val gentac_of_any_tac_arg : ('a -> ttac) -> ('a -> etac) -> 'a -> gentac
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-(** same as [CommonLT.wrap_fail], but for goals *)
+(** Same as [CommonLT.wrap_fail], but for goals. *)
 val wrap_fail :
   ('a -> 'b) ->
   'a ->
   ('b -> (Tactics.tac_error -> 'c) -> 'c) ->
   (Tactics.tac_error -> 'c) -> 'c
 
-val split_equiv_goal :
+val split_equiv_conclusion :
   int L.located -> 
   ES.t -> 
   Term.term list * Term.term * Term.term list

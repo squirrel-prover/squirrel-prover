@@ -161,10 +161,10 @@ let fresh_trace
 
     let phis = List.map (NOF.occurrence_formula ~negate:false ~use_path_cond) occs in
 
-    let g = TS.goal s in
+    let g = TS.conclusion s in
     List.map
       (fun phi ->
-         TS.set_goal (Term.mk_impl ~simpl:false phi g) s)
+         TS.set_conclusion (Term.mk_impl ~simpl:false phi g) s)
       phis
   with
   | SE.(Error (_,Expected_fset)) ->
@@ -260,7 +260,7 @@ let fresh_equiv
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
 
-  let before, t, after = split_equiv_goal i s in
+  let before, t, after = split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
   
   (* compute the freshness conditions *)
@@ -289,8 +289,8 @@ let fresh_equiv
 
   let phi = Term.mk_ands ~simpl:true phis in
   let new_biframe = List.rev_append before after in
-  [ES.set_reach_goal phi s;
-   ES.set_equiv_goal new_biframe s]
+  [ES.set_reach_conclusion phi s;
+   ES.set_equiv_conclusion new_biframe s]
 
 
 (** fresh equiv tactic *)
