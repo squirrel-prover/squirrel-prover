@@ -616,8 +616,7 @@ let substitute_mess (m1, m2) s =
 
 let substitute_ts (ts1, ts2) s =
   let subst =
-      let models = TS.get_models s in
-      if Constr.query ~precise:true models [(`Pos, Comp (`Eq,ts1,ts2))] then
+      if TS.query ~precise:true s [(`Pos, Comp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -635,8 +634,7 @@ let substitute_idx (i1 , i2 : Term.term * Term.term) s =
   in
 
   let subst =
-    let models = TS.get_models s in
-    if Constr.query ~precise:true models [(`Pos, Comp (`Eq,i1,i2))] then
+    if TS.query ~precise:true s [(`Pos, Comp (`Eq,i1,i2))] then
       [Term.ESubst (i1,i2)]
     else
       soft_failure Tactics.NotEqualArguments
@@ -864,7 +862,7 @@ let new_simpl ~red_param ~congr ~constr s =
           match at, Term.Lit.ty_xatom at with
           | _, Type.Index | _, Type.Timestamp -> 
             let lit = `Pos, (at :> Term.Lit.xatom) in
-            if constr && Constr.query ~precise:true (TS.get_models s) [lit]
+            if constr && TS.query ~precise:true s [lit]
             then None
             else Some goal
 

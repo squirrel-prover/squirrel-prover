@@ -38,6 +38,25 @@ val get_trs : sequent -> Completion.state
 (** See [Constr.query] *)
 val query : precise:bool -> t -> Term.Lit.literals -> bool
 
+module Benchmark : sig
+
+    (** [register_query_alternative name f] adds an alternative method
+        for solving queries (in a form that subsumes query and
+        constraints_valid) which will be benchmarked against the default
+        implementation.
+        For each call to [query ~precise s q], [f ~precise s (Some q)]
+        will be ran and timed and its result (including potential errors)
+        will be logged.
+        For each call to [constraints_valid s q], [f ~precise:true s None]
+        will be similarly executed. *)
+    val register_query_alternative :
+      string -> (precise:bool -> t -> Term.Lit.literals option -> bool) -> unit
+
+    (** Set position information for benchmark logging purposes. *)
+    val set_position : string -> unit
+
+end
+
 val query_happens : precise:bool -> t -> Term.term -> bool
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
