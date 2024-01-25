@@ -995,7 +995,7 @@ tac:
     { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Theory t] }
 
   (* SMT *)
-  | id=loc(SMT) a=named_args
+  | id=loc(SMT) a=named_args 
     { mk_abstract (L.loc id) "smt" [TacticsArgs.Named_args a] }
 
   (* Case_Study, equiv tactic, patterns *)

@@ -67,7 +67,7 @@ let create_call ?limit_opt prover table config_prover task :
       prover.Why3.Whyconf.prover_name Why3.Exn_printer.exn_printer e;
       None
 
-let run_one ~slow prover table task =
+(*let run_one ~slow prover table task =
   let timer = start_timer () in
   try
     let prover,config_prover =
@@ -85,8 +85,8 @@ let run_one ~slow prover table task =
       timer ();Some r
       |None -> None
   with Not_found -> Format.printf "SMT: %s prover not found\n" prover; None
-  
-let run_all_async ~slow table task =
+*) 
+let run_all_async ~slow ~prover table task =
   Why3.Prove_client.set_max_running_provers 4;
   let timer = start_timer () in
   let calls :
@@ -94,13 +94,15 @@ let run_all_async ~slow table task =
     Why3.Whyconf.Mprover.t
   =
     Why3.Whyconf.Mprover.mapi_filter
-      (fun prover config_prover -> 
-        let call = if slow 
-          then create_call ~limit_opt:60 prover table config_prover task
-          else create_call prover table config_prover task
-        in match call with 
-          |Some call -> Some (prover,call)
-          |None -> None
+      (fun p config_prover -> 
+        if List.mem (p.Why3.Whyconf.prover_name) prover then 
+          let call = if slow 
+            then create_call ~limit_opt:60 p table config_prover task
+            else create_call p table config_prover task
+          in match call with 
+            |Some call -> Some (p,call)
+            |None -> None
+        else None
       )
       provers
   in
@@ -284,10 +286,10 @@ let rec convert_type context = function
 (** {2 Translation} *)
 
 open Why3.Term
-let index_to_wterm context i = Hashtbl.find context.vars_tbl (Vars.hash i) 
-let ilist_to_wterm_ts context l = List.map (index_to_wterm context) l 
+let index_var_to_wterm context i = Hashtbl.find context.vars_tbl (Vars.hash i) 
+let ilist_to_wterm_ts context l = List.map (index_var_to_wterm context) l 
 
-let rec timestamp_to_wterm context = function
+(*let rec timestamp_to_wterm context = function
   | Term.App (Fun (fs, _), [ts]) when fs = Term.f_pred ->
     t_app_infer context.pred_symb [timestamp_to_wterm context ts]
   | Term.Action (a, indices) ->
@@ -306,7 +308,7 @@ let rec timestamp_to_wterm context = function
   | Diff _ -> 
     failwith "diff of timestamps to why3 term not implemented"
   | _ -> assert false
-
+*)
 let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
   let handle_eq_atom rec_call = match atom with
     | Comp (`Eq, x, y)  -> t_equ (rec_call x) (rec_call y) 
@@ -322,7 +324,7 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
   match Term.Lit.ty_xatom atom with
   | Type.Timestamp -> begin match atom with
       | Comp (comp,ts1,ts2) ->
-        let listargs = List.map (timestamp_to_wterm context) [ts1;ts2] in
+        let listargs = List.map (msg_to_wterm context) [ts1;ts2] in
         let t1,t2 = List.nth listargs 0, List.nth listargs 1 in 
         begin match comp with
           | `Eq  -> ts_equ context t1 t2 
@@ -336,11 +338,11 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
               (t_not @@ ts_equ context t1 t2 )
         end
       | Happens ts -> Why3.Term.t_app_infer 
-        context.happens_symb [timestamp_to_wterm context ts]
+        context.happens_symb [msg_to_wterm context ts]
       | Atom _ -> assert false (* cannot happen *)
     end
   | Type.Index -> handle_eq_atom (function
-      | Term.Var i -> index_to_wterm context i
+      | Term.Var i -> index_var_to_wterm context i
       | _          -> assert false)
   | _          -> if context.pure 
     then raise (Unsupported (Term.Lit.xatom_to_form atom)) 
@@ -358,6 +360,8 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
 
   | App (Fun (f,_),terms) ->
     begin match terms with
+      | [ts] when f = Term.f_pred -> 
+          t_app_infer context.pred_symb [msg_to_wterm context ts]
       | [t1; t2] when f = Symbols.fs_xor ->
         t_app_infer 
         (Option.get context.xor_symb)
@@ -376,27 +380,37 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
         (find_fn context f) 
         (List.map (msg_to_wterm context) terms)
     end
+  | Action (a,indices) -> 
+    (match indices with 
+      |[Tuple ind_list] -> 
+        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a))) 
+        (List.map (msg_to_wterm context) ind_list)
 
+      |_ -> 
+        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a)))
+        (List.map (msg_to_wterm context) indices)
+      
+    )
   | Macro (ms,l,ts) -> 
     (match l with 
       |[Tuple l_list] ->t_app_infer
         (Hashtbl.find context.macros_tbl (Symbols.to_string ms.s_symb))
-        (List.map (index_to_wterm context -| oget -| Term.destr_var) l_list @
-        [timestamp_to_wterm context ts])
+        (List.map (msg_to_wterm context) l_list @
+        [msg_to_wterm context ts])
       |_ ->t_app_infer
         (Hashtbl.find context.macros_tbl (Symbols.to_string ms.s_symb))
-        (List.map (index_to_wterm context -| oget -| Term.destr_var) l @
-        [timestamp_to_wterm context ts])
+        (List.map (msg_to_wterm context) l @
+        [msg_to_wterm context ts])
     )
     
   | Name (ns,args) ->
       (match args with 
       |[Tuple args_list] -> t_app_infer
         (Hashtbl.find context.names_tbl (Symbols.to_string ns.s_symb))
-        (ilist_to_wterm_ts context (List.map (oget -| Term.destr_var) args_list))
+        (List.map (msg_to_wterm context) args_list)
       |_ -> t_app_infer
       (Hashtbl.find context.names_tbl (Symbols.to_string ns.s_symb))
-      (ilist_to_wterm_ts context (List.map (oget -| Term.destr_var) args))
+      (List.map (msg_to_wterm context) args)
     )
 
   | Diff _ -> failwith "diff of timestamps to why3 term not implemented"
@@ -427,11 +441,11 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
     | Macro (ms,[],ts),false when ms.s_symb = Symbols.cond ->
       t_app_infer 
         (Option.get context.macro_cond_symb)
-        [timestamp_to_wterm context ts]
+        [msg_to_wterm context ts]
     | Macro (ms,[],ts),false when ms.s_symb = Symbols.exec ->
       t_app_infer 
         (Option.get context.macro_exec_symb) 
-        [timestamp_to_wterm context ts]
+        [msg_to_wterm context ts]
     | _ -> match Term.Lit.form_to_xatom fmla with 
       | Some at -> atom_to_fmla context at
       | None -> assert false
@@ -920,7 +934,7 @@ let add_macro_axioms context =
           * that the index variables be in scope *)
         let ts = t_app_infer
           (fst(Hashtbl.find context.actions_tbl name_str)) 
-          (ilist_to_wterm_ts context descr.indices) in
+          (ilist_to_wterm_ts context descr.indices) in (*AFAIRESTAN comprendre + généraliser*)
         (* special handling for cond@ because it's a boolean
           * -> translated to formula, not term of type message unlike other macros
           * happens(A(i,...)) => (cond@A(i,...) <=> <the definition>) *)
@@ -956,7 +970,7 @@ let add_macro_axioms context =
                   | `Undef   -> None
                   | `Def msg ->
                     Some (macro_wterm_eq
-                            (List.map (index_to_wterm context) m_idx)
+                            (List.map (index_var_to_wterm context) m_idx) (*AFAIRESTAN comprendre ça, à généralsier*)
                             (msg_to_wterm context msg))
                 end
               | Symbols.State (arity,_) ->
@@ -1144,7 +1158,9 @@ let is_valid
       evars hypotheses conclusion 
       theory 
     in Format.printf "Task is:@;%a@." Why3.Pretty.print_task task;
-    if prover="" then run_all_async ~slow table task else 
+    run_all_async ~slow ~prover table task  
+    
+    (*if prover="" then run_all_async ~slow table task else 
     begin match 
       run_one ~slow prover table task 
     with  
@@ -1157,6 +1173,7 @@ let is_valid
         pr_answer ;
       pr_answer = Why3.Call_provers.Valid
     end
+    *)
   with
     | Unsupported t ->
       Format.printf "smt: cannot translate term %a@." Term.pp t;
@@ -1194,13 +1211,30 @@ let default_parameters = {
   timestamp_style = Nat;
   provers = []
 }
-let parse_arg parameters = function
+let rec parse_arg parameters = function
   | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract_ax"}]) ->
     { parameters with timestamp_style = Abstract }
   | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="nat"}]) ->
     { parameters with timestamp_style = Nat }
   | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract_eq"}]) ->
     { parameters with timestamp_style = Abstract_eq }
+  | TacticsArgs.NArg ({Location.pl_desc="prover"}) -> (*Faireun nlist avec liste vide*)
+      parameters
+  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"} as p,{Location.pl_desc="cvc4"}::t) ->
+    (parse_arg 
+      {parameters with provers = "CVC4"::parameters.provers} 
+      (TacticsArgs.NList (p,t))
+    )
+  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},{Location.pl_desc="z3"}::t) ->
+    (parse_arg 
+      {parameters with provers = "Z3"::parameters.provers} 
+      (TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},t))
+    )
+  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},{Location.pl_desc="ae"}::t) ->
+    (parse_arg 
+      {parameters with provers = "Alt-Ergo"::parameters.provers} 
+      (TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},t))
+    )
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
   
 let parse_args args =
@@ -1220,7 +1254,7 @@ let () =
        let parameters = parse_args args in
        let is_valid =
          sequent_is_valid
-           ~prover:(match parameters.provers with [] -> "CVC4" | hd::_ -> hd)
+           ~prover:(match parameters.provers with [] -> ["CVC4"] | l -> l)
            ~timestamp_style:parameters.timestamp_style
            s
        in
