@@ -36,7 +36,7 @@ open LowTactics
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-let split_equiv_goal = LT.split_equiv_goal
+let split_equiv_conclusion = LT.split_equiv_conclusion
 
 (*------------------------------------------------------------------*)
 let wrap_fail = EquivLT.wrap_fail
@@ -47,13 +47,13 @@ let soft_failure = Tactics.soft_failure
 (*------------------------------------------------------------------*)
 let mk_pair_trace_cntxt = ES.mk_pair_trace_cntxt
 
-let check_goal_is_equiv = ES.check_goal_is_equiv
+let check_conclusion_is_equiv = ES.check_conclusion_is_equiv
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
 (** Build the sequent showing that a timestamp happens. *)
 let[@warning "-32"] happens_premise (s : ES.t) (a : Term.term) =
-  let s = ES.(to_trace_sequent (set_reach_goal (Term.mk_happens a) s)) in
+  let s = ES.(to_trace_sequent (set_reach_conclusion (Term.mk_happens a) s)) in
   Goal.Local s
 
 (*------------------------------------------------------------------*)
@@ -102,7 +102,7 @@ let refl (e : Equiv.equiv) (s : ES.t) =
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl_tac (s : ES.t) =
-  match refl (ES.goal_as_equiv s) s with
+  match refl (ES.conclusion_as_equiv s) s with
     | `True           -> []
     | `NoRefl         -> soft_failure (Tactics.NoRefl)
     | `NoReflMacroVar -> soft_failure (Tactics.NoReflMacroVar)
@@ -114,7 +114,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 let sym_tac (s : ES.t) : Goal.t list =
-  check_goal_is_equiv s;
+  check_conclusion_is_equiv s;
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
@@ -127,7 +127,7 @@ let sym_tac (s : ES.t) : Goal.t list =
   let new_context = { old_context with pair = Some new_pair } in
   let diff l r = Term.combine [l_proj,l; r_proj,r] in
   [ Goal.Global
-      (ES.set_goal_in_context
+      (ES.set_conclusion_in_context
          new_context
          (Atom (Equiv (List.map2 diff equiv_right equiv_left)))
          s) ]
@@ -153,7 +153,7 @@ let () =
     For convenience a new context is passed and not just a new pair.
     This allows to change the set annotations for s2 by the way. *)
 let transitivity_systems new_context s =
-  check_goal_is_equiv s;
+  check_conclusion_is_equiv s;
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
@@ -174,23 +174,24 @@ let transitivity_systems new_context s =
      matter for soundness but the choice below seems most natural
      to understand the chain of transitivities, and it also maximizes
      the chances that the context does not change in new sequents,
-     which will allow set_goal_in_context to keep a maximum of hypotheses. *)
+     which will allow set_conclusion_in_context to keep a maximum of
+     hypotheses. *)
   let left_systems = SE.make_pair (snd (SE.fst old_pair)) new_left in
   let right_systems = SE.make_pair new_right (snd (SE.snd old_pair)) in
 
   let s1 =
-    ES.set_goal_in_context
+    ES.set_conclusion_in_context
       { old_context with pair = Some left_systems }
       (Atom (Equiv equiv_left))
       s
   in
   let s3 =
-    ES.set_goal_in_context
+    ES.set_conclusion_in_context
       { old_context with pair = Some right_systems }
       (Atom (Equiv equiv_right))
       s
   in
-  let s2 = ES.set_goal_in_context new_context (ES.goal s) s in
+  let s2 = ES.set_conclusion_in_context new_context (ES.conclusion s) s in
 
   [Goal.Global s1;Goal.Global s2;Goal.Global s3]
 
@@ -214,7 +215,7 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
 
   let args = List.map (fun (i,t) -> i, fst (Theory.convert cenv t)) args in
 
-  let equiv = ES.goal_as_equiv s in
+  let equiv = ES.conclusion_as_equiv s in
 
   let context = ES.system s in
 
@@ -252,8 +253,8 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
     |> List.split
   in
   
-  let goal1 = ES.set_goal_in_context context1 (Atom (Equiv equiv1)) s in
-  let goal2 = ES.set_goal_in_context context2 (Atom (Equiv equiv2)) s in
+  let goal1 = ES.set_conclusion_in_context context1 (Atom (Equiv equiv1)) s in
+  let goal2 = ES.set_conclusion_in_context context2 (Atom (Equiv equiv2)) s in
 
 
   [Goal.Global goal1; Goal.Global goal2 ]
@@ -331,7 +332,7 @@ let case_tac (args : Args.parser_args) : LT.etac =
 
     If [hyp = Some id], only checks for hypothesis [id]. *)
 let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
-  let goal = ES.goal s in
+  let conclusion = ES.conclusion s in
 
   let is_false = function
     | Equiv.Reach f -> ES.Reduce.conv_term s f Term.mk_false
@@ -341,25 +342,25 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
   let in_atom : Equiv.atom -> bool =
     (* For equivalence goals, we look for inclusion of the goal in
        an existing equivalence hypothesis *)
-    if ES.goal_is_equiv s then
-      let goal = ES.goal_as_equiv s in
+    if ES.conclusion_is_equiv s then
+      let conclusion = ES.conclusion_as_equiv s in
       (function
         | Equiv.Equiv equiv  ->
           List.for_all (fun elem ->
               List.exists (ES.Reduce.conv_term s elem)
                 equiv
-            ) goal
+            ) conclusion
         | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false)
 
-    else (fun at -> ES.Reduce.conv_global s (Equiv.Atom at) goal)
+    else (fun at -> ES.Reduce.conv_global s (Equiv.Atom at) conclusion)
   in
 
   let in_hyp (id,ldc) =
     (hyp = None || hyp = Some id) &&
     ( match ldc with
       | TopHyps.LHyp (Equiv.Atom at) -> is_false at || in_atom at
-      | TopHyps.LHyp f -> ES.Reduce.conv_global s f goal
+      | TopHyps.LHyp f -> ES.Reduce.conv_global s f conclusion
       | TopHyps.LDef _ -> false)
   in
 
@@ -388,10 +389,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 let constraints (s : ES.t) : ES.t list =
-  let s = ES.set_goal (Equiv.Atom (Equiv.Reach (Term.mk_false))) s in
+  let s = ES.set_conclusion (Equiv.Atom (Equiv.Reach (Term.mk_false))) s in
   let trace_s = ES.to_trace_sequent s in
   List.map (fun s_t -> 
-      ES.set_goal (Equiv.Atom (Equiv.Reach (TS.goal s_t))) s
+      ES.set_conclusion (Equiv.Atom (Equiv.Reach (TS.conclusion s_t))) s
     ) (TraceTactics.constraints_ttac trace_s)
 
 let constraints_tac args : LT.etac = 
@@ -420,7 +421,7 @@ let rec tautology (f : Equiv.form) (s : ES.t) : bool =
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
 
   | Equiv.(Atom (Reach _)) ->
-    let s = ES.set_goal f s in
+    let s = ES.set_conclusion f s in
     let trace_s = ES.to_trace_sequent s in
     (* TODO: improve automation by doing more than just constraint solving ? *)
     TraceTactics.constraints trace_s
@@ -451,7 +452,7 @@ let[@warning "-27"] simpl_ident : LT.f_simpl =
 
 (*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
-    by introducing them in the goal.
+    by introducing them in the conclusion.
     Also returns a function that introduces back the generalized 
     hypotheses or definitions.*)
 let generalize (ts : Term.term) (s : ES.t) : (ES.t -> ES.t) * ES.t =
@@ -526,21 +527,21 @@ let old_induction Args.(Message (ts,_)) s =
         | None -> soft_failure (Failure "underspecified system")
     in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
-    let goal = ES.goal s in
+    let conclusion = ES.conclusion s in
 
-    let ind_hyp = Equiv.subst subst goal in
+    let ind_hyp = Equiv.subst subst conclusion in
     (* Introduce back generalized hypotheses. *)
     let induc_s = intro_back s in
     (* Introduce induction hypothesis. *)
     let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") (LHyp ind_hyp) induc_s in
 
-    let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
-    let init_s = ES.set_goal init_goal s in
+    let init_conclusion = Equiv.subst [Term.ESubst(ts,Term.init)] conclusion in
+    let init_s = ES.set_conclusion init_conclusion s in
     let init_s = intro_back init_s in
 
     let const = HighTerm.is_constant env ts in
     
-    (* Creates the goal corresponding to the case
+    (* Creates the conclusion corresponding to the case
        where [t] is instantiated by [action]. *)
     let case_of_action (action,_symbol,indices) =
       let env = ref @@ ES.vars induc_s in
@@ -563,11 +564,11 @@ let old_induction Args.(Message (ts,_)) s =
         Some (case_of_action ((Action.to_action action),symbol,indices))
     in
 
-    let goals =
+    let conclusions =
       List.filter_map case_of_action (SE.actions table system) 
     in
 
-    List.map simpl_impl (init_s :: goals)
+    List.map simpl_impl (init_s :: conclusions)
 
   | _  ->
     soft_failure
@@ -594,7 +595,7 @@ let old_or_new_induction args : etac =
 
 (*------------------------------------------------------------------*)
 let enrich _ty f _loc (s : ES.t) =
-  ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
+  ES.set_equiv_conclusion (f :: ES.conclusion_as_equiv s) s
 
 let enrich_a arg s =
   match 
@@ -604,7 +605,7 @@ let enrich_a arg s =
            system = SE.{set = (ES.get_system_pair s :> SE.arbitrary);
                         pair = None;} }
     in
-    Args.convert_args env [arg] Args.(Sort Term) (Global (ES.goal s)) 
+    Args.convert_args env [arg] Args.(Sort Term) (Global (ES.conclusion s)) 
   with
   | Args.Arg (Term (ty, t, loc)) -> enrich ty t loc s
   | _ -> bad_args ()
@@ -641,7 +642,7 @@ let fa_select_felems ~ty_env (pat : Term.term Term.pat_op) (s : ES.t) : int opti
       with
       | NoMatch _ -> None
       | Match _   -> Some i
-    ) (ES.goal_as_equiv s)
+    ) (ES.conclusion_as_equiv s)
 
 (*------------------------------------------------------------------*)
 exception No_FA of [`HeadDiff | `HeadNoFun]
@@ -700,7 +701,7 @@ let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
       
 (** Applies Function Application on a given frame element *)
 let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
-  let before, e, after = split_equiv_goal i s in
+  let before, e, after = split_equiv_conclusion i s in
   (* Special case for try find, otherwise we use fa_expand *)
   match e with
   | Find (vars,c,t,e) ->
@@ -723,7 +724,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
 
     let c_seq = Term.mk_seq vars c in
     let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
-    ES.set_vars !env (ES.set_equiv_goal biframe s) 
+    ES.set_vars !env (ES.set_equiv_conclusion biframe s) 
 
   | Quant ((Seq | Lambda),vars,t) ->
     (* this rules applies to [Seq] and [Lambda] over arbitrary types *)
@@ -733,11 +734,11 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
         before
         ((List.map (fun t' -> Term.mk_seq ~simpl:true vars t') terms) @ after)
     in
-    ES.set_equiv_goal biframe s 
+    ES.set_equiv_conclusion biframe s 
 
   | _ ->
     let biframe = List.rev_append before (fa_expand s e @ after) in
-    ES.set_equiv_goal biframe s 
+    ES.set_equiv_conclusion biframe s 
 
 (** [do_fa_felem] with user-level errors *)
 let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
@@ -874,11 +875,11 @@ let fa_dup (s : ES.t) : ES.t list =
   let hyp = Utils.odflt [] hyp in
 
   let biframe =
-    ES.goal_as_equiv s
+    ES.conclusion_as_equiv s
     |> List.rev
     |> filter_fa_dup s hyp
   in
-  [ES.set_equiv_goal biframe s]
+  [ES.set_equiv_conclusion biframe s]
 
 (*------------------------------------------------------------------*)
 (** Deduce. 
@@ -895,7 +896,7 @@ let deduce_all (s:ES.t) =
       | e::after ->
         let biframe = List.rev_append res goals in
         let biframe_without_e = List.rev_append res after in
-        let goal = (Equiv.mk_equiv_atom biframe)  in
+        let goal = Equiv.mk_equiv_atom biframe in
         let pat = Term.{
           pat_op_vars   = [];
           pat_op_tyvars = [];
@@ -910,13 +911,13 @@ let deduce_all (s:ES.t) =
           assert (Match.Mvar.is_empty mv);
           _deduce_all res after
     in
-    let new_goal = List.rev (_deduce_all [] (ES.goal_as_equiv s)) in
-    [ES.set_equiv_goal new_goal s]
+    let new_conclusion = List.rev (_deduce_all [] (ES.conclusion_as_equiv s)) in
+    [ES.set_equiv_conclusion new_conclusion s]
 
 (** Check whether the i^th element of the biframe is bideductible from the other ones, and 
     remove it if its the case. *)
 let deduce_int (i : int L.located) s =
-  let before, _, after = split_equiv_goal i s in
+  let before, _, after = split_equiv_conclusion i s in
   let biframe_without_e = List.rev_append before after in
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
@@ -926,15 +927,15 @@ let deduce_int (i : int L.located) s =
       pat_op_tyvars = [];
       pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
     } in
-  let goal = ES.goal s in
+  let conclusion = ES.conclusion s in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    [ES.set_equiv_goal biframe_without_e s]
+    [ES.set_equiv_conclusion biframe_without_e s]
 
 let deduce Args.(Opt (Int, p)) s : ES.sequents =
   match p with
@@ -980,24 +981,24 @@ let case_study arg s : ES.sequents =
     (* Project in all items. *)
     let founds,e1 =
       List.split
-        (List.map (cs_proj fst b false) (ES.goal_as_equiv s)) in
+        (List.map (cs_proj fst b false) (ES.conclusion_as_equiv s)) in
     let e2 =
-      List.map (fun t -> snd (cs_proj snd b false t)) (ES.goal_as_equiv s) in
+      List.map (fun t -> snd (cs_proj snd b false t)) (ES.conclusion_as_equiv s) in
     if not (List.exists (fun x -> x) founds) then
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
-    [ES.set_equiv_goal (e1@[b]) s; ES.set_equiv_goal (e2@[b]) s]
+    [ES.set_equiv_conclusion (e1@[b]) s; ES.set_equiv_conclusion (e2@[b]) s]
 
   | Some (Args.Int i) ->
     (* Project in i-th item. *)
-    let before, e, after = split_equiv_goal i s in
+    let before, e, after = split_equiv_conclusion i s in
     let found,e1 = cs_proj fst b false e in
     let _,e2 = cs_proj snd b false e in
     if not found then
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
-    [ES.set_equiv_goal (before@b::[e1]@after) s;
-     ES.set_equiv_goal (before@b::[e2]@after) s]
+    [ES.set_equiv_conclusion (before@b::[e1]@after) s;
+     ES.set_equiv_conclusion (before@b::[e2]@after) s]
 
 let () =
   T.register_typed "cs"
@@ -1145,8 +1146,8 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
-let goal_is_reach s =
-  match ES.goal s with
+let conclusion_is_reach s =
+  match ES.conclusion s with
   | Equiv.Atom (Reach _) -> true
   | _ -> false
 
@@ -1158,7 +1159,7 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
       let sk l fk = sk (List.map (fun s -> Goal.Local s) l) fk in
       TraceTactics.simpl ~red_param ~close ~strong t sk fk
 
-    | Goal.Global s when goal_is_reach s ->
+    | Goal.Global s when conclusion_is_reach s ->
       auto_rec (byequiv s) sk fk
 
     | Goal.Global s ->
@@ -1223,7 +1224,7 @@ let equiv_autosimpl s =
 
 
 let global_diff_eq (s : ES.t) =
-  let frame = ES.goal_as_equiv s in
+  let frame = ES.conclusion_as_equiv s in
   let system = Utils.oget (ES.system s).pair in
   let cntxt = mk_pair_trace_cntxt s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
@@ -1311,7 +1312,7 @@ let global_diff_eq (s : ES.t) =
             (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
         Goal.Global
-          (ES.set_goal
+          (ES.set_conclusion
              (* TODO: we assume that the variables are global and constant. 
                 It is not clear that this is correct: check this when the tactic 
                 is reworked. *)
@@ -1339,7 +1340,7 @@ let () =
 (** implement the SplitSeq rule of CSF'21, modified when moving
     to the higher-order logic. *)
 let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.sequent =
-  let before, t, after = split_equiv_goal li s in
+  let before, t, after = split_equiv_conclusion li s in
   let i = L.unloc li in
 
   (* no differences between seq and lambda, except that we keep using a sequence 
@@ -1391,7 +1392,7 @@ let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.se
 
   let frame = List.rev_append before ([mk_seq_or_lambda is ti_t;
                                        mk_seq_or_lambda is ti_f] @ after) in
-  ES.set_equiv_goal frame s
+  ES.set_equiv_conclusion frame s
 
 let split_seq_args args s : ES.sequent list =
   match args with
@@ -1406,8 +1407,8 @@ let () =
 
 (*------------------------------------------------------------------*)
 let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
-  let before, t, after = split_equiv_goal i_l s in
-  let _, seq, _ = split_equiv_goal j_l s in
+  let before, t, after = split_equiv_conclusion i_l s in
+  let _, seq, _ = split_equiv_conclusion j_l s in
 
   let seq_vars, seq_term = match seq with
     | Quant ((Seq | Lambda), vs, t) -> vs, t
@@ -1427,12 +1428,12 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
       Term.mk_exists ~simpl:true seq_vars
         (Term.mk_atom `Eq t seq_term)
     in
-    let trace_s = ES.to_trace_sequent (ES.set_reach_goal form s) in
+    let trace_s = ES.to_trace_sequent (ES.set_reach_conclusion form s) in
     Goal.Local trace_s
   in
 
   let frame = List.rev_append before after in
-  [subgoal; Goal.Global (ES.set_equiv_goal frame s)]
+  [subgoal; Goal.Global (ES.set_equiv_conclusion frame s)]
 
 let mem_seq_args args s : Goal.t list =
   match args with
@@ -1451,7 +1452,7 @@ let const_seq
     ((li, b_t_terms) : int L.located * (Theory.term * Theory.term) list)
     (s : ES.t) : Goal.t list
   =
-  let before, e, after = split_equiv_goal li s in
+  let before, e, after = split_equiv_conclusion li s in
   let i = L.unloc li in
 
   let e_is, e_ti = match e with
@@ -1496,7 +1497,7 @@ let const_seq
   (* first sub-goal: (∀ e_is, ∨ᵢ bᵢ *)
   let cases = Term.mk_ors ~simpl:true (List.map fst b_t_terms) in
   let cond1 = Term.mk_forall ~simpl:true e_is cases in
-  let subg1 = ES.set_reach_goal cond1 s |> ES.to_trace_sequent in
+  let subg1 = ES.set_reach_conclusion cond1 s |> ES.to_trace_sequent in
 
   (* second sub-goal: (∧ᵢ (∀ e_is, bᵢ → tᵢ = e_ti) *)
   let eqs = List.map (fun (t_bool, term) ->
@@ -1505,7 +1506,7 @@ let const_seq
     ) b_t_terms
   in
   let cond2 = Term.mk_ands ~simpl:true eqs in
-  let subg2 = ES.set_reach_goal cond2 s |> ES.to_trace_sequent in
+  let subg2 = ES.set_reach_conclusion cond2 s |> ES.to_trace_sequent in
 
   (* third sub-goal *)
   let terms = List.map snd b_t_terms in
@@ -1513,7 +1514,7 @@ let const_seq
 
   [ Goal.Local subg1;
     Goal.Local subg2;
-    Goal.Global (ES.set_equiv_goal frame s) ]
+    Goal.Global (ES.set_equiv_conclusion frame s) ]
 
 let const_seq_args args s : Goal.t list =
   match args with
@@ -1537,7 +1538,7 @@ let enckp arg (s : ES.t) =
       i, m1, m2
     | _ -> assert false
   in
-  let before, e, after = split_equiv_goal i s in
+  let before, e, after = split_equiv_conclusion i s in
 
   let biframe = List.rev_append before after in
   let cntxt = mk_pair_trace_cntxt s in
@@ -1572,7 +1573,7 @@ let enckp arg (s : ES.t) =
 
              Oldcca.deprecated_symenc_key_ssc
                ~cntxt fnenc fndec
-               ~elems:(ES.goal_as_equiv s) sk.Name.symb.s_symb;
+               ~elems:(ES.conclusion_as_equiv s) sk.Name.symb.s_symb;
              Oldcca.deprecated_symenc_rnd_ssc
                ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args biframe),
           (fun x -> x),
@@ -1587,7 +1588,7 @@ let enckp arg (s : ES.t) =
              let errors =
                (* TODO: set globals to true *)
                OldEuf.key_ssc ~globals:false
-                 ~cntxt ~elems:(ES.goal_as_equiv s)
+                 ~cntxt ~elems:(ES.conclusion_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.Name.symb.s_symb
              in
              if errors <> [] then
@@ -1645,7 +1646,7 @@ let enckp arg (s : ES.t) =
       with Oldcca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
-      s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent
+      s |> ES.set_reach_conclusion random_fresh_cond |> ES.to_trace_sequent
     in
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
@@ -1658,7 +1659,7 @@ let enckp arg (s : ES.t) =
     let biframe = (List.rev_append before (new_elem @ after)) in
 
     [Goal.Local fresh_goal;
-     Goal.Global (ES.set_equiv_goal biframe s)]
+     Goal.Global (ES.set_equiv_conclusion biframe s)]
 
   in
 
@@ -1814,7 +1815,7 @@ let xor arg (s : ES.t) =
                 "The optional arguments of xor can only be a name and/or \
                  the target xored term.")
   in
-  let before, e, after = split_equiv_goal i s in
+  let before, e, after = split_equiv_conclusion i s in
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
@@ -1900,7 +1901,7 @@ let xor arg (s : ES.t) =
     Equiv.subst_equiv [Term.ESubst (t,if_term)] [e]
   in
   let biframe = List.rev_append before (new_elem @ after) in
-  [ES.set_equiv_goal biframe s]
+  [ES.set_equiv_conclusion biframe s]
 
 
 let () =
@@ -2030,7 +2031,8 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
 
   let cntxt = mk_pair_trace_cntxt s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  if is_ddh_context ~gen ~exp ~cntxt ~l_proj ~r_proj na nb nc (ES.goal_as_equiv s)
+  if is_ddh_context ~gen ~exp ~cntxt ~l_proj ~r_proj
+       na nb nc (ES.conclusion_as_equiv s)
   then sk [] fk
   else soft_failure Tactics.NotDDHContext
 
@@ -2051,9 +2053,9 @@ let () =
 
 (*------------------------------------------------------------------*)
 let crypto (game : lsymb) (args : Args.crypto_args) (s : ES.t) =
-  let frame = ES.goal_as_equiv s in
+  let frame = ES.conclusion_as_equiv s in
   let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
-  List.map (fun subg -> ES.set_reach_goal subg s) subgs
+  List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
   
 let crypto_tac args (s : ES.t) =
   match args with

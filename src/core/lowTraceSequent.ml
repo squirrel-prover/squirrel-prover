@@ -184,18 +184,77 @@ let get_models table (proof_context : H.hyps) =
 
 let get_models (s : sequent) = get_models s.env.table s.proof_context
 
+(*------------------------------------------------------------------*)
+(** General version of query, which subsumes the functions
+    constraints_valid and query that will eventually be exported,
+    and provides joint benchmarking support. *)
+
+let query ~precise s = function
+  | None -> not (Constr.m_is_sat (get_models s))
+  | Some q -> Constr.query ~precise (get_models s) q
+
+module Benchmark = struct
+
+  let query_methods = ref ["Constr",query]
+  let register_query_alternative name f =
+    query_methods := !query_methods @ [name,f]
+  let query_id = ref 0
+  let query_pos = ref ""
+  let set_position pos = query_pos := pos
+  let log_chan =
+    Lazy.from_fun (fun () ->
+      match Sys.getenv_opt "BENCHMARK_DIR" with
+      | None -> None
+      | Some temp_dir ->
+        let fname = Filename.temp_file ~temp_dir "squirrel_bench_" ".txt" in
+        Some (Format.formatter_of_out_channel (open_out fname)))
+  let pp_result ch = function
+    | Error _ -> Format.fprintf ch "failure"
+    | Ok b -> Format.fprintf ch "%b" b
+  let log (name,query,result,time) =
+    match Lazy.force log_chan with
+    | None -> ()
+    | Some ch ->
+      let query =
+        match query with
+        | None -> "false"
+        | Some q -> Format.asprintf "%a" Term.Lit.pps q
+      in
+      Format.fprintf ch
+        "%d:%s:%s:%S:%a:%f@."
+        !query_id
+        !query_pos
+        name
+        query
+        pp_result result
+        time
+  let get_result ~precise s q (name,f) =
+    let t0 = Unix.gettimeofday () in
+    match f ~precise s q with
+    | r -> name, q, Ok r, Unix.gettimeofday () -. t0
+    | exception e -> name, q, Error e, Unix.gettimeofday () -. t0
+end
+
 let query ~precise s q =
-  let models = get_models s in
-  Constr.query ~precise models q
+  let open Benchmark in
+  incr Benchmark.query_id;
+  let results = List.map (get_result ~precise s q) !query_methods in
+  List.iter log results;
+  match List.hd results with
+  | _,_,Error e,_ -> raise e
+  | _,_,Ok r,_ -> r
 
-let query =
-  let prof_precise = Prof.mk "TS.query [precise]" in
-  let prof_imprecise = Prof.mk "TS.query [imprecise]" in
-  fun ~precise s q ->
-    let prof = if precise then prof_precise else prof_imprecise in
-    prof (fun () -> query ~precise s q)
+(** Exported versions of query and its alternatives. *)
 
-let query_happens ~precise s a = query ~precise s [`Pos, Happens a]
+let query_happens ~precise s a =
+   query ~precise s (Some [`Pos, Happens a])
+let constraints_valid s =
+  (* The precise flag is irrelevant in that case. *)
+  query ~precise:true s None
+let query ~precise s q =
+   query ~precise s (Some q)
+
+(** Other uses of Constr *)
 
 let maximal_elems ~precise s tss =
   let models = get_models s in
@@ -207,16 +266,8 @@ let get_ts_equalities ~precise s =
              |>  Atom.trace_atoms_ts in
   Constr.get_ts_equalities ~precise models ts
 
-let constraints_valid s =
-  let models = get_models s in
-  not (Constr.m_is_sat models)
-
-let constraints_valid =
-  Prof.mk_unary "constraints_valid" constraints_valid
-
-(** Variant of [get_models] with profiling for external use.
-    We do not profile internal calls, performed e.g. through
-    query.
+(** Variant of [get_models] with separate profiling to track
+    uses other than those above.
     Note that [get_models] relies on [Constr.models_conjunct]
     which is independently profiled.
     We do not profile [maximal_elems] and [get_ts_equalities]
@@ -324,12 +375,12 @@ let set_table table s =
   S.update ~env s
 
 (*------------------------------------------------------------------*)
-let set_goal a s = S.update ~conclusion:a s 
+let set_conclusion a s = S.update ~conclusion:a s 
 
 (** See `.mli` *)
-let set_goal_in_context ?update_local system conc s =
+let set_conclusion_in_context ?update_local system conc s =
   if system = s.env.system && update_local = None then
-    set_goal conc s
+    set_conclusion conc s
   else
 
   (* Update hypotheses. *)
@@ -347,7 +398,7 @@ let set_goal_in_context ?update_local system conc s =
   let s = S.update ~env ~proof_context s in
 
   (* Finally set the new conclusion. *)
-  set_goal conc s
+  set_conclusion conc s
 
 (** [pi proj s] returns the projection of [s] along [proj].
     Fails if [s.system.set] cannot be projected. *)
@@ -358,7 +409,7 @@ let pi projection s =
     let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
     { context with set = new_set }
   in
-  set_goal_in_context
+  set_conclusion_in_context
     new_context
     (Term.project1 projection s.conclusion)
     s
@@ -367,7 +418,7 @@ let pi projection s =
 let init ?(no_sanity_check = false) ~env conclusion =
   init_sequent ~no_sanity_check ~env ~conclusion
 
-let goal s = s.conclusion
+let conclusion s = s.conclusion
 
 (*------------------------------------------------------------------*)
 let subst subst s =

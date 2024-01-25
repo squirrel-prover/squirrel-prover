@@ -1269,7 +1269,7 @@ let do_rewrite
   | Local t, subs ->
     let subs =
       List.map (fun (sub_system, sub) -> 
-          TS.set_goal_in_context sub_system sub s
+          TS.set_conclusion_in_context sub_system sub s
         ) subs
     in
     t, subs
@@ -1289,7 +1289,7 @@ let do_rw_item
 
   match rw_arg with
   | Rw_rw {loc; subgs; rule} -> 
-    let subgs = List.map (fun x -> TS.set_goal x s) subgs in
+    let subgs = List.map (fun x -> TS.set_conclusion x s) subgs in
 
     let t, subgs' = do_rewrite ~loc expand_context (rw_c, rule) s t in
     t, subgs @ subgs'

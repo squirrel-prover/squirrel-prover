@@ -39,8 +39,8 @@ end = struct
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let pp_goal_concl ppf j = match j with
-    | Goal.Local  j -> Term.pp  ppf (LowTraceSequent.goal j)
-    | Goal.Global j -> Equiv.pp ppf (LowEquivSequent.goal j)
+    | Goal.Local  j -> Term.pp  ppf (LowTraceSequent.conclusion j)
+    | Goal.Global j -> Equiv.pp ppf (LowEquivSequent.conclusion j)
 end
 
 (** AST evaluators for general judgments, i.e. [Goal.t]. *)
@@ -110,9 +110,9 @@ let convert_args j parser_args tactic_type =
   let env, conc =
     match j with
     | Goal.Local t ->
-      LowTraceSequent.env t, Equiv.Local (LowTraceSequent.goal t)
+      LowTraceSequent.env t, Equiv.Local (LowTraceSequent.conclusion t)
     | Goal.Global e ->
-      LowEquivSequent.env e, Equiv.Global (LowEquivSequent.goal e)
+      LowEquivSequent.env e, Equiv.Global (LowEquivSequent.conclusion e)
   in
   HighTacticsArgs.convert_args env parser_args tactic_type conc
 

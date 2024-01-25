@@ -468,7 +468,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
 
-  let before, e, after = LT.split_equiv_goal i s in
+  let before, e, after = LT.split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
 
   (* get the parameters, enforcing that
@@ -530,27 +530,27 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   let left = (SE.of_list [SE.fst oldpair] :> SE.arbitrary) in
   let left_sequent =
-    ES.set_goal_in_context {oldcontext with set=left} (Equiv.mk_reach_atom phi_l) s
+    ES.set_conclusion_in_context {oldcontext with set=left} (Equiv.mk_reach_atom phi_l) s
   in
 
   let right = (SE.of_list [SE.snd oldpair] :> SE.arbitrary) in
   let right_sequent =
-    ES.set_goal_in_context {oldcontext with set=right} (Equiv.mk_reach_atom phi_r) s
+    ES.set_conclusion_in_context {oldcontext with set=right} (Equiv.mk_reach_atom phi_r) s
   in
   let leftright = (oldpair :> SE.arbitrary) in
   let leftright_sequent =
-    ES.set_goal_in_context {oldcontext with set=leftright} (Equiv.mk_reach_atom phi_lr) s
+    ES.set_conclusion_in_context {oldcontext with set=leftright} (Equiv.mk_reach_atom phi_lr) s
   in
 
   (* remove trivial goals *)
   let tracegoals = 
     List.filter 
-      (fun x -> ES.goal x <> Equiv.mk_reach_atom Term.mk_true)
+      (fun x -> ES.conclusion x <> Equiv.mk_reach_atom Term.mk_true)
       [left_sequent; leftright_sequent; right_sequent]
   in
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
-  let equiv_sequent = ES.set_equiv_goal new_biframe (ES.set_table table_nprf s) in
+  let equiv_sequent = ES.set_equiv_conclusion new_biframe (ES.set_table table_nprf s) in
 
 
   (* copied from old prf for the composition stuff *)
@@ -579,7 +579,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
             ESubst (Term.mk_var uvarkey, k);] f
         in
 
-        [ES.set_goal_in_context
+        [ES.set_conclusion_in_context
            {oldcontext with set=leftright}
            (Equiv.mk_reach_atom (Term.mk_not f)) s]
 

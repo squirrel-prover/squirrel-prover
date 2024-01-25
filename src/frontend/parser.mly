@@ -953,18 +953,27 @@ crypto_arg:
       TacticsArgs.{glob_sample ; term; bnds; cond; } }
 
 (*------------------------------------------------------------------*)
-/* tactics named arguments */
+/* Named arguments for tactics */
+/* Here we use a "lexical feedback" hack to make it possible to
+   parse keywords as lsymbs. */
+
+enable_kwd_as_id:
+| { Feedback.enable_keywords_as_ids () }
+disable_kwd_as_id:
+| { Feedback.disable_keywords_as_ids () }
 
 named_arg:
-| TILDE l=label         { TacticsArgs.NArg l }
-| TILDE l=label COLON LBRACKET ll=slist(label,COMMA) RBRACKET
-                        { TacticsArgs.NList (l,ll) }
-| TILDE l=label COLON a=label
-                        { TacticsArgs.NList (l,[a]) }
+| enable_kwd_as_id TILDE l=label disable_kwd_as_id
+  { TacticsArgs.NArg l }
+| enable_kwd_as_id TILDE l=label COLON
+  LBRACKET ll=slist(label,COMMA) RBRACKET
+  disable_kwd_as_id
+  { TacticsArgs.NList (l,ll) }
+| enable_kwd_as_id TILDE l=label COLON a=label disable_kwd_as_id
+  { TacticsArgs.NList (l,[a]) }
 
 label:
 | l=lsymb { l }
-| l=loc(TYPE) { L.mk_loc (L.loc l) "type" }
 
 named_args:
 | args=slist(named_arg, empty) { args }

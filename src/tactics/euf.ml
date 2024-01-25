@@ -321,10 +321,10 @@ let euf (h : lsymb) (s : sequent) : sequent list =
   let phis = List.map (IOF.occurrence_formula ~negate:false) occs in
 
   (* finally generate all corresponding goals *)
-  let g = TS.goal s in 
+  let g = TS.conclusion s in 
   let integrity_goals =
     List.map
-      (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+      (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
       phis
   in
 
@@ -353,8 +353,8 @@ let euf (h : lsymb) (s : sequent) : sequent list =
             ESubst (Term.mk_var uvarkey, Term.mk_name k.symb k.args);]
             f 
         in
-        [TS.set_goal
-           (Term.mk_impl f (TS.goal s)) s]
+        [TS.set_conclusion
+           (Term.mk_impl f (TS.conclusion s)) s]
 
       | _ -> assert false 
   in

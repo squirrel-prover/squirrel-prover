@@ -1198,7 +1198,7 @@ let sequent_is_valid ~prover ~timestamp_style (s:TraceSequent.t) =
          | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
   in
-  let conclusion = LowTraceSequent.goal s in
+  let conclusion = LowTraceSequent.conclusion s in
   is_valid ~timestamp_style ~slow:false ~pure:false ~prover
     table system evars hypotheses conclusion
 
@@ -1259,3 +1259,22 @@ let () =
            s
        in
        if is_valid then sk [] fk else fk (None, Tactics.Failure "SMT cannot prove sequent"))
+
+let () =
+  if Sys.getenv_opt "BENCHMARK_SMT" <> None then
+    (* TODO benchmark several provers and styles, runnning each one separately,
+       and restrict to reasoning on pure formulas *)
+    TraceSequent.Benchmark.register_query_alternative
+      "Smt"
+      (fun ~precise:_ s q ->
+        let s =
+          match q with
+          | None -> s
+          | Some q ->
+            let conclusion = Term.mk_ands (List.map Term.Lit.lit_to_form q) in
+            TraceSequent.set_conclusion conclusion s
+        in
+        sequent_is_valid
+          ~prover:"CVC4"
+          ~timestamp_style:Nat
+          s)

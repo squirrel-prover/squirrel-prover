@@ -604,6 +604,13 @@ let rec do_command
   let open ProverLib in
   let pst = st in
   let mode = get_mode st in
+  TraceSequent.Benchmark.set_position
+    (let _,pos = Sedlexing.lexing_positions file.f_lexbuf in
+     Format.sprintf
+       "%s:%d"
+       (match file.f_path with
+        | `File s -> s | `Stdin -> "stdin" | `Str -> "str")
+       pos.pos_lnum);
   match mode, command with
     | _, Reset                   -> init' ()
     | GoalMode, InputDescr decls -> do_decls st decls
@@ -643,7 +650,7 @@ let rec do_command
       Command.cmd_error UnexpectedCommand
 
 and do_include
-      ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i: ProverLib.include_param)
+      ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i:ProverLib.include_param)
     : state
 =
   (* if main_mode = `Stdin will add cwd in path with theories *)

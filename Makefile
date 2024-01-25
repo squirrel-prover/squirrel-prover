@@ -1,23 +1,39 @@
-GITHASH := $(shell scripts/git-hash)
-CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
-
 PREFIX = ~/.local
 SQUIRRELBIN = $(PREFIX)/bin
 
 ECHO = /usr/bin/env echo
 
-default: squirrel
-
-all: squirrel test
+default: squirrel ## By default, just build Squirrel.
 
 .PHONY: test
-test: alcotest_full example ## Run alcotests (see ./test.ml) then the examples
+test: alcotest_full example ## Run alcotests (see ./test.ml) and examples.
 
-.PHONY: bench
-bench: bench_example ## Perform benchmarks (cf. wikis/Dev-README on gitlab)
+all: squirrel test ## Build Squirrel and run tests.
+
+.PHONY: doc
+doc: ## Generate user manual and API documentation.
+	dune build @refman-html
+	dune build @doc
+	@$(ECHO) "API doc available: _build/default/_doc/_html/squirrel/index.html"
+	@$(ECHO) "User manual available: _build/default/documentation/sphinx/public/index.html"
+
+.PHONY: start
+start: jsquirrel bundle ## Start JSquirrel on a local HTTP server.
+	dune exec $(APPDIR)server/server.exe
+
+.PHONY: help
+help: ## Print this help message.
+	@echo "List of available make commands:";
+	@echo "";
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}';
+	@echo "";
 
 # squirrel is not PHONY here, it exists as executable
 .PHONY: okfail okfail_end example examples_end alcotest alcotest_full
+
+# -----------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
@@ -182,15 +198,19 @@ alcotest_full: version
 		else echo "${GRE}Alcotests passed successfully !${NC}" ; \
 	fi
 
+# -----------------------------------------------------------------------
+# Cleaning
+# -----------------------------------------------------------------------
+
 .PHONY: clean
-clean: ## Call dune clean and remove executable and coverage
+clean: ## Call dune clean and remove executable and coverage data.
 	dune clean
 	@rm -f squirrel
 	rm -rf _coverage
 
 # Clean last bench
 .PHONY: clean_bench
-clean_bench: ## Clean previous bench
+clean_bench: ## Clean previous benchmark data.
 	rm -f $(BENCHDIR)/*.json
 
 # Clean previous local bench
@@ -199,13 +219,17 @@ clean_prev_bench:
 
 # Clean all local bench
 .PHONY: clean_all_bench
-clean_all_bench: ## Clean all benchs
+clean_all_bench: ## Clean all benchmark data.
 	rm -rf $(BENCHDIR)
 
 # We have to "touch" ./squirrel executable for other recipes
 squirrel: version
 	dune build squirrel.exe
 	@cp -f _build/default/squirrel.exe squirrel
+
+# -----------------------------------------------------------------------
+# Misc
+# -----------------------------------------------------------------------
 
 # Run tests (forcing a re-run) with bisect_ppx instrumentation on
 # to get coverage files, and generate an HTML report from them.
@@ -217,7 +241,7 @@ squirrel: version
 #    Makefile, which would render instrumentation available and would
 #    also avoid re-runnning tests when unnecessary.
 .PHONY: coverage
-coverage: ## Generates coverage report in _coverage/index.html
+coverage: ## Generates coverage report in _coverage/index.html.
 	rm -rf _coverage
 	dune runtest --force --instrument-with bisect_ppx
 	find . -name '*.coverage' | \
@@ -232,11 +256,7 @@ install: squirrel
 	cp -r theories $(SQUIRRELBIN)
 	export SQUIRRELBIN=$(SQUIRRELBIN)
 
-.PHONY: doc
-doc: ## Build generated API documentation
-	dune build @doc
-	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
-
+.PHONY: refman-html
 refman-html:
 	dune build --no-buffer @refman-html
 	@$(ECHO) "Documentation available: _build/default/documentation/sphinx/public/index.html"
@@ -245,14 +265,20 @@ deploy-html: refman-html
 	mkdir public
 	cp -r _build/default/documentation/sphinx/public .
 
-# If this touch commit.ml for inserting same hash dune will rebuild for nothing
+# -----------------------------------------------------------------------
+# Handling of src/commit.ml
+# -----------------------------------------------------------------------
+
+.PHONY: version
 version:
-	@if [ $(CURHASH) = $(GITHASH) ]; then \
-		echo "Already $(CURHASH)"; \
-	else \
-		rm -f src/commit.ml; \
-		sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml; \
-	fi
+	@echo Regenerating src/commit.ml...
+	@cat src/commit.ml.in \
+	  | sed 's/GITHASH/$(shell scripts/git-hash)/' \
+	  > src/commit.ml
+
+# -----------------------------------------------------------------------
+# Benchmarking examples over revisions
+# -----------------------------------------------------------------------
 
 HEAD:=$(shell git rev-parse --short HEAD)
 GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
@@ -262,15 +288,18 @@ LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
 PLOT=./scripts/plot.py
 STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
+.PHONY: bench
+bench: bench_example ## Perform benchmarks (cf. wikis/Dev-README on gitlab).
+
 # This plot tactics statistics
 .PHONY: plot
-plot: ## Call plot script (by default plots the last bench)
+plot: ## Plot data from last benchmark.
 	python3 $(PLOT)
 
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
 .PHONY: plot_all
-plot_all: ## Draw a graph that compare the mean of all previous bench with the last one
+plot_all: ## Compare all benchmarks with last one.
 	rm -f $(BENCHDIR)/all/last.json
 	$(MAKE) $(BENCHDIR)/all/last.json
 	python3 $(PLOT) $(BENCHDIR)/all/last.json
@@ -278,21 +307,21 @@ plot_all: ## Draw a graph that compare the mean of all previous bench with the l
 # This shows you the last benchmark compared to previous one
 # Needs `matplotlib` (pip install)
 .PHONY: plot_diff_last
-plot_diff_last: ## Plots comparison graph btwn last bench and previous one
+plot_diff_last: ## Compare between last two benchmarks.
 	@echo "Compare ${ORA}$(LAST2)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST2) $(LAST) 
 
 # This shows you the last benchmark compared to the most recent commit bench
 # Needs `matplotlib` (pip install)
 .PHONY: plot_diff_commit
-plot_diff_commit: ## Plots last benchmark compared to the most recent commit bench
+plot_diff_commit: ## Compare last benchmark with most recent commit benchmark.
 	@echo "Compare ${ORA}$(LAST_COMMIT)${NC} with ${GRE}$(LAST)${NC}"
 	python3 $(PLOT) $(LAST_COMMIT) $(LAST)
 
 # compare bench of current work with a specified commit in GITCOMMIT
 # GITCOMMIT is by default to HEAD~1
 .PHONY: bench_compare
-bench_compare: bench_preamble $(BENCH_OUT) ## Compare bench with given commit (cf Dev-README)
+bench_compare: bench_preamble $(BENCH_OUT) ## Compare benchmark with given commit (cf. Dev-README).
 	@echo "↑ Bench ${GRE}master with current work${NC} ↑"
 	@echo "Verify $(BENCH_OUT) and copy in $(BENCHDIR)/prev/$(NOW).json…"
 	@if python3 -m json.tool $(BENCH_OUT) > $(BENCHDIR)/prev/$(NOW).json \
@@ -367,18 +396,11 @@ $(BENCHDIR)/commits/%.json:
 		echo "No work pop back from stash"; \
 	fi
 
-.PHONY: help
-help: ## Print this help message
-	@echo "List of available make commands";
-	@echo "";
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}';
-	@echo "";
+# -----------------------------------------------------------------------
+# JSquirrel
+# -----------------------------------------------------------------------
 
 APPDIR=app/
-
-.PHONY: start refman-html
-start: jsquirrel bundle ## Serve the application with a local HTTP server
-	dune exec $(APPDIR)server/server.exe
 
 # TODO in dune !
 jsquirrel: 
@@ -401,9 +423,3 @@ zipsquirrel: jsquirrel bundle refman-html
 	cp -r _build/default/app/www/* _build/default/zipdir/.
 	cd _build/default/zipdir && \
 	zip -r jsquirrel.zip *
-
-.PHONY: watch
-watch: ## Watch for the filesystem and rebuild on every change
-	$(DUNE) build @@default --watch
-
-.PHONY: version clean

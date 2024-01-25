@@ -42,12 +42,12 @@ module type S = sig
   val vars : t -> Vars.env
   val set_vars : Vars.env -> t -> t
 
-  val goal : t -> conc_form
-  val set_goal : conc_form -> t -> t
+  val conclusion : t -> conc_form
+  val set_conclusion : conc_form -> t -> t
 
   val system : t -> SystemExpr.context
 
-  val set_goal_in_context :
+  val set_conclusion_in_context :
     ?update_local:(Term.term -> Term.term option) ->
     SystemExpr.context -> conc_form -> t -> t
 

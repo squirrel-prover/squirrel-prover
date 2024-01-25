@@ -33,7 +33,7 @@ let pp ch = function
   | Global j -> ES.sanity_check j; ES.pp ch j
 
 let pp_init ch = function
-  | Local  j -> Term.pp ch (TS.goal j)
+  | Local  j -> Term.pp ch (TS.conclusion j)
   | Global j -> ES.pp_init ch j
 
 (*------------------------------------------------------------------*)
