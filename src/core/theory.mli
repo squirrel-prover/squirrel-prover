@@ -317,9 +317,7 @@ val check_signature :
 
 (*------------------------------------------------------------------*)
 (** {2 Conversions}
-  * Convert terms inside the theory to terms of the prover. *)
-
-val parse_subst : Env.t -> Vars.var list -> term list -> Term.subst
+    Convert terms inside the theory to terms of the prover. *)
 
 (** Conversion contexts.
     - [InGoal]: converting a term in a goal (or tactic). All

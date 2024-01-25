@@ -2027,14 +2027,45 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** [conc_exists_intro judge ths] introduces the existentially
       quantified variables in the conclusion of the judgment,
       using [ths] as existential witnesses. *)
-  let exists_intro  ths (s : S.t) =
-    let vs, f = S.Conc.decompose_exists (S.conclusion s) in
+  let exists_intro (terms : Theory.term list) (s : S.t) =
+    let env = S.env s in
+    let vs, f = S.Conc.decompose_exists_tagged (S.conclusion s) in
+    let vs, f =
+      let vs,subst = Term.refresh_vars_w_info vs in
+      vs, S.subst_conc subst f
+    in
 
-    if not (List.length ths = List.length vs) then
-      soft_failure (Tactics.Failure "cannot introduce exists");
+    if List.length terms > List.length vs then
+      soft_failure (Tactics.Failure "too many arguments");
 
-    let nu = Theory.parse_subst (S.env s) vs ths in
-    let new_formula = S.subst_conc nu f in
+    let vs0,vs1 = List.takedrop (List.length terms) vs in
+    let f = S.Conc.mk_exists_tagged vs1 f in
+    
+    let subst =
+      let conv_env = Theory.{ env; cntxt = InGoal; } in
+      List.map2 (fun pt ((v,tag) : Vars.tagged_var) ->
+          let t, _ = Theory.convert ~ty:(Vars.ty v) conv_env pt in
+          let tag' = HighTerm.tag_of_term env t in
+
+          (* check tags, if applicable *)
+          let () =
+            if tag.system_indep && not tag'.system_indep then
+              soft_failure ~loc:(L.loc pt)
+                (Tactics.Failure "term should be system independent");
+
+            if tag.adv && not tag'.adv then
+              soft_failure ~loc:(L.loc pt)
+                (Tactics.Failure "term should be adversarial");
+
+            if tag.const && not tag'.const then
+              soft_failure ~loc:(L.loc pt)
+                (Tactics.Failure "term should be constant");
+          in
+          
+          Term.ESubst (Term.mk_var v, t)
+        ) terms vs0
+    in
+    let new_formula = S.subst_conc subst f in
     [S.set_conclusion new_formula s]
 
   let exists_intro_args args s =

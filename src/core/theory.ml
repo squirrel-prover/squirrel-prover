@@ -1865,15 +1865,6 @@ let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
     
-let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
-  : Term.subst =
-  let conv_env = { env; cntxt = InGoal; } in
-  let f t u =
-    let t, _ = convert ~ty:(Vars.ty u) conv_env t in
-    Term.ESubst (Term.mk_var u, t)
-  in
-  List.map2 f ts uvars
-
 (*------------------------------------------------------------------*)
 let parse_projs (p_projs : lsymb list option) : Term.projs =
   omap_dflt

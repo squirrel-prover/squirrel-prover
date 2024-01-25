@@ -640,15 +640,14 @@ module Mk (Args : MkArgs) : S with
       List.rev_append (List.map (fun x -> x, f_arg_tag) (Sv.elements new_p_vs)) pt.args
     in
 
-    (* check system-independence, if applicable *)
+    (* check tags, if applicable *)
     let () =
       let venv = Vars.add_vars args env in
       let env = Env.init ~table ~system:pt.system ~vars:venv () in
-      (* check a variable instantiation *)
+      
       if f_arg_tag.system_indep && not (HTerm.is_system_indep env pt_arg) then
         error_pt_apply_not_system_indep arg_loc ~pt ~arg:pt_arg;
 
-      (* check a variable instantiation *)
       if f_arg_tag.adv && not (HTerm.is_ptime_deducible ~si:false env pt_arg) then
         error_pt_apply_not_adv arg_loc ~pt ~arg:pt_arg;
 
