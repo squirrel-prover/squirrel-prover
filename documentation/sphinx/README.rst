@@ -45,6 +45,18 @@ git pull
 python3.8 -m pip install -e .
 ```
 
+Deployement
+-----------
+
+The documentation is manually deployed as part of the [Squirrel github
+page](https://github.com/squirrel-prover/Squirrel-Prover.github.io).
+
+The submodule for the squirrel-prover should be updated, and then
+`make doc` inside the page updates it.
+
+In addition, an independent check on the inria gitlab page is launched
+for any commit with the tag `[doc]` inside its title.
+
 Help
 ----
 
