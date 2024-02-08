@@ -529,13 +529,12 @@ let get_macro_occs
        Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
     let t =
       let se = env.system.set in
-      let param = Reduction.rp_crypto in
+      let param = { Reduction.rp_crypto with diff = true } in
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in
       let st = Reduction.mk_state ~hyps ~se ~vars ~param constr.table in
-      Reduction.whnf_term st t
+      fst (Reduction.whnf_term st t)
     in
-
 
     match t with
     | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []

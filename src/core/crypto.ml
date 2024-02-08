@@ -735,7 +735,8 @@ module TSet = struct
       (Vars._pp_list ~dbg) vars
       (Term._pp ~dbg)(Term.mk_ands conds)
 
-  let[@warning "-32"] pp = _pp ~dbg:true
+  let[@warning "-32"] pp     = _pp ~dbg:false
+  let[@warning "-32"] pp_dbg = _pp ~dbg:true
 
   let normalize tset = 
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -1512,7 +1513,7 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
       ~param:Reduction.{rp_crypto with diff = true}
       state.env.table
   in
-  let term = Reduction.whnf_term reduction_state output_term.term in
+  let term, _ = Reduction.whnf_term reduction_state output_term.term in
   match term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
     let t0 = CondTerm.{ term = t0; conds =             b :: conds } in
@@ -1793,11 +1794,23 @@ type rec_call_occ = rec_call Iter.occ
 
 let derecursify_term
     ~(expand_mode : [`FullDelta | `Delta ])
-    (constr : Constr.trace_cntxt) (system : SE.arbitrary) (t : Term.term)
+    (hyps : TraceHyps.hyps)
+    (* (vars : Vars.vars) *)
+    (constr : Constr.trace_cntxt) (system : SE.arbitrary) (t_init : Term.term)
   : rec_call_occ list * Term.term
   =
+  let table = constr.table in
+  
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
+      let t, has_red =
+        let param = { Reduction.rp_crypto with diff = true } in
+        (* FIXME: add tag information in [fv] *)
+        let vars = Vars.of_list (Vars.Tag.local_vars vars) in
+        let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
+        Reduction.whnf_term st t
+      in
+
       match t with
       | Term.Macro (ms,l,ts) -> (* [m l @ ts] *)
         let mk_rec_call () =
@@ -1808,18 +1821,20 @@ let derecursify_term
               occ_pos  = Sp.singleton p;
             } in
 
-          rec_occ :: acc, `Continue
+          rec_occ :: acc, if has_red then `Map t else `Continue 
         in
         if expand_mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
           match Macros.get_definition { constr with system = SE.to_fset se } ms ~args:l ~ts with
           | `Def t -> acc, `Map t
           | `Undef | `MaybeDef -> mk_rec_call ()
         else mk_rec_call ()
-
-      | _ -> acc, `Continue
+            
+      | _ -> acc, if has_red then `Map t else `Continue 
   in
-  let acc, _, t = Match.Pos.map_fold ~mode:(`TopDown true) t_fold system [] t in
-  acc, t
+  let acc, _, _ = 
+    Match.Pos.map_fold ~mode:(`TopDown true) t_fold system [] t_init
+  in
+  acc, t_init
 
 (*------------------------------------------------------------------*)
 (* FIXME factorize with corresponding function in [Match] *)
@@ -1951,11 +1966,11 @@ let derecursify
     Constr.make_context ~table:env.table ~system:system
   in
 
-  let mk_bideduction_goal ?form (* ?at_time *) (output : Term.term) =
+  let mk_bideduction_goal hyps ?form (* ?at_time *) (output : Term.term) =
     let rec_term_occs, output =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta trace_context (system :> SE.t) output
+        ~expand_mode:`FullDelta hyps trace_context (system :> SE.t) output
     in
 
     let extra_cond = odflt Term.mk_true form in
@@ -1985,7 +2000,7 @@ let derecursify
     (* let ts_occs = Occurrences.get_macro_actions trace_context [t] in *)
     (* TODO: see EI_direct in occurrences (mk_exists ...) *)
 
-    mk_bideduction_goal (* ~at_time:?? *) t
+    mk_bideduction_goal hyps t
   in
 
   (* indirect bi-deduction goals for recursive calls *)
@@ -2003,7 +2018,22 @@ let derecursify
         in
         let form = Occurrences.time_formula ts ~path_cond ts_occs in
 
-        let goal, output = mk_bideduction_goal ~form iocc.iocc_cnt in
+        let hyps =
+          TraceHyps.add TacticsArgs.AnyName (LHyp (Local (Term.mk_happens ts))) hyps
+        in
+        let output =  
+          (* let red_state = *)
+          (*   let param = { Reduction.rp_crypto with diff = true } in *)
+          (*   (* FIXME: add tag information in [fv] *) *)
+          (*   let vars =  *)
+          (*     Vars.of_list (Vars.Tag.local_vars @@ Sv.elements iocc.iocc_vars)  *)
+          (*   in *)
+          (*   Reduction.mk_state ~hyps ~se:(system :> SE.t) ~vars ~param env.table  *)
+          (* in *)
+          (* Reduction.reduce_term red_state  *)
+            iocc.iocc_cnt
+        in
+        let goal, output = mk_bideduction_goal hyps ~form output in
         let togen = Sv.elements iocc.iocc_vars in
         (togen, goal, output) :: goals
       ) trace_context env hyps targets []

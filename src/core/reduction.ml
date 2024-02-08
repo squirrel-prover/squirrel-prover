@@ -588,9 +588,15 @@ let reduce_term (st : state) (t : Term.term) : Term.term = fst (reduce_term st t
 
 (*------------------------------------------------------------------*)
 (** Weak head normal form *)
-let rec whnf_term (st : state) (t : Term.term) : Term.term =
+let whnf_term (st : state) (t : Term.term) : Term.term * bool =
+  (* reduce in head position as-much as possible *)
+  let rec doit t =
+    let t, has_red = reduce_head1_term st t in
+    if has_red then doit t else t
+  in
+  
   let t, has_red = reduce_head1_term st t in
-  if has_red then whnf_term st t else t
+  if has_red then doit t, true else t, false
 
 (*------------------------------------------------------------------*)
 (** {2 Global formula reduction} *)

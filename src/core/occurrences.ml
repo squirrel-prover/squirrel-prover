@@ -682,7 +682,7 @@ struct
         (* FIXME: add tag information in [pos_info] *)
         let vars = Vars.of_list (Vars.Tag.local_vars pi.pi_vars) in
         let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
-        Reduction.whnf_term st t
+        fst (Reduction.whnf_term st t)
       in
 
       (* recursing continuation of [get_bad_occs] for cases it does

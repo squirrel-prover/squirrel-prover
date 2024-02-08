@@ -64,7 +64,7 @@ val reduce_term : state -> Term.term -> Term.term
 val reduce_head1_term : state -> Term.term -> Term.term * bool
 
 (** Reduces once at head position *)
-val whnf_term : state -> Term.term -> Term.term
+val whnf_term : state -> Term.term -> Term.term * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)
