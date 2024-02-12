@@ -83,7 +83,7 @@ one could declare an indexed name as follows.
 
 .. squirreltop::  in
 
-   name key : index -> message.
+   name kT : index -> message.
 
 
 Basic assumption   
@@ -296,7 +296,7 @@ reader, and such the input of the reader corresponds to the name of
 
 We write below the simple proof of this statement. The high-level
 idea of the proof is to use the **EUF** cryptographic axiom:
-only the tag `T(i,k)` can compute `h(nT(i,k),key(i))` because the
+only the tag `T(i,k)` can compute `h(nT(i,k),kT(i))` because the
 secret key is not known by the attacker. Therefore, any message
 accepted by the reader must come from a tag that has played before.
 The converse implication is trivial, because any honest tag output is
@@ -337,7 +337,7 @@ condition of :g:`R`, we get an equality between a hash and some other
 term :g:`snd (input@R(j, i))`. We then use the unforgeability of the
 hash function, the **EUF** assumption, to get that the hashed value
 :g:`fst (input@R(j, i))` must be equal to some honestly hashed value
-in :g:`snd (input@R(j, i))`, since the key :g:`key` is secret. All
+in :g:`snd (input@R(j, i))`, since the key :g:`kT` is secret. All
 honestly hashes are produced by the tag, which will then conclude our
 proof. This cryptographic axiom is applied thanks to the :tacn:`euf`
 tactic.
@@ -383,15 +383,15 @@ that tags cannot be tracked.
 
 .. squirreltop::  all
 		  
-   name key': index * index -> message
+   name kT': index * index -> message
 
    process tagD(i:index,k:index) =
      new nT;
-     out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>).
+     out(cT, <nT, h(nT,diff(kT(i),kT'(i,k)))>).
 
    process readerD(j:index) =
      in(cT,x);
-     if exists (i,k:index), snd(x) = h(fst(x),diff(key(i),key'(i,k))) then
+     if exists (i,k:index), snd(x) = h(fst(x),diff(kT(i),kT'(i,k))) then
        out(cR,ok)
      else
        out(cR,ko)
@@ -408,7 +408,7 @@ previous proof directly on the bi-system:
      forall (tau:timestamp),
        happens(tau) =>
        ((exists (i,k:index),
-          snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
+          snd(input@tau) = h(fst(input@tau),diff(kT(i),kT'(i,k))))
         <=>
         (exists (i,k:index), T(i,k) < tau &&
           fst(output@T(i,k)) = fst(input@tau) &&
