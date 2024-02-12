@@ -29,7 +29,7 @@ let load_theory ~timestamp_style ~pure env =
     let theory = (if pure then "pure_" else "")^
                   "trace_model"^
                   (match timestamp_style with 
-                    |Abstract -> "__abs" | Abstract_eq -> "_abs_eq" | _ ->"") in
+                    |Abstract -> "_abs" | Abstract_eq -> "_abs_eq" | _ ->"") in
     Some (Why3.Env.read_theory env [theory] (String.capitalize_ascii theory))
   with
     | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
@@ -198,7 +198,7 @@ let id_fresh context name =
 let mk_const_symb context x ty =
   Why3.Term.create_fsymbol (id_fresh context x) [] (ty)
 
-exception Unsupported of Term.term
+(*exception Unsupported of Term.term*)
 exception InternalError
 
 
@@ -313,7 +313,7 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
   let handle_eq_atom rec_call = match atom with
     | Comp (`Eq, x, y)  -> t_equ (rec_call x) (rec_call y) 
     | Comp (`Neq, x, y) -> t_neq (rec_call x) (rec_call y)
-    |Atom x -> if context.pure then assert false 
+    |Atom x -> if context.pure then  assert false
       else begin let t = rec_call x in 
         match (t_type t) with 
           |ty when ty=(Option.get context.msg_ty) -> assert false
@@ -343,9 +343,18 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
     end
   | Type.Index -> handle_eq_atom (function
       | Term.Var i -> index_var_to_wterm context i
-      | _          -> assert false)
+      | _          -> assert false (*TODO ?*)
+    )
   | _          -> if context.pure 
-    then raise (Unsupported (Term.Lit.xatom_to_form atom)) 
+    then (*ex unsupported*)
+      let symb =  mk_const_symb context "unsupp" Why3.Ty.ty_bool in 
+      Hashtbl.add context.vars_tbl 
+        (Hashtbl.hash ("unsupp"^(string_of_int !(context.fresh)))) 
+        (Why3.Term.t_app_infer symb []);
+      context.uc := Why3.Theory.add_decl_with_tuples 
+        !(context.uc) 
+        (Why3.Decl.create_param_decl symb);
+      (Why3.Term.to_prop (Why3.Term.t_app_infer symb []))
     else handle_eq_atom (msg_to_wterm context)
 and _lit_to_fmla context : Term.Lit.literal -> Why3.Term.term = function
   | (`Pos, x) ->        atom_to_fmla context x
@@ -417,8 +426,7 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
 
   | Var v -> 
     begin try Hashtbl.find context.vars_tbl (Vars.hash v) with
-      | Not_found ->
-        raise InternalError
+      | Not_found -> raise InternalError
     end
 
   | Tuple l -> t_tuple (List.map (msg_to_wterm context) l)
@@ -426,8 +434,8 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
 
 and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   match fmla,context.pure with 
-    | Term.App (Fun (symb,_),_),_ when symb = Term.f_false -> t_false
-    | Term.App (Fun (symb,_),_),_ when symb = Term.f_true -> t_true
+    | Term.Fun  (symb,_),_ when symb = Term.f_false -> t_false
+    | Term.Fun (symb,_),_ when symb = Term.f_true ->  t_true
     | Term.App (Fun (symb,_),[f]),_ when symb = Term.f_not ->
       t_not (msg_to_fmla context f)
     | Term.App (Fun (symb,_),[f1;f2]),_ when symb = Term.f_and ->
@@ -446,9 +454,9 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
       t_app_infer 
         (Option.get context.macro_exec_symb) 
         [msg_to_wterm context ts]
-    | _ -> match Term.Lit.form_to_xatom fmla with 
+    | _ ->  match Term.Lit.form_to_xatom fmla with 
       | Some at -> atom_to_fmla context at
-      | None -> assert false
+      | None -> assert false 
     
 and msg_to_fmla_q context quantifier vs f =
   let i_vs = filter_ty  Type.Index     vs
@@ -1009,7 +1017,7 @@ let add_macro_axioms context =
                 Some (t_forall_close quantified_indices []
                         (macro_wterm_eq indices expansion))
               | _ -> None (* input/frame, see earlier TODO *)
-            end with Unsupported _ -> None
+            end with _ -> None
             in
             match ax_option with
             | None -> ()
@@ -1116,11 +1124,11 @@ let build_task ~timestamp_style ~pure table system
         (Why3.Term.t_and_l
           (List.filter_map
             (fun h ->
-              try Some (msg_to_fmla context h) with Unsupported _ -> None)
+              try Some (msg_to_fmla context h) with InternalError -> None)
             (convert_hypotheses hypotheses)))
         (Why3.Term.t_not 
           (try msg_to_fmla context conclusion with 
-            Unsupported _ -> Why3.Term.t_false))))
+            InternalError -> Why3.Term.t_false))))
   in
   let uc : Why3.Theory.theory_uc =
     let module Mid = Why3.Ident.Mid in
@@ -1142,49 +1150,37 @@ let build_task ~timestamp_style ~pure table system
 
 
        (* }}} *)
-
+let id_unique = ref 1
 let is_valid
     ~timestamp_style ~pure ~slow ~prover
     table system evars hypotheses conclusion
   =
-  try
     let theory = match load_theory ~timestamp_style ~pure env with 
       |Some theory -> theory
-      |None -> raise InternalError
+      |None -> Format.printf "Load theory failed@."; raise InternalError
     in  
     let task = build_task 
       ~timestamp_style ~pure 
       table system 
       evars hypotheses conclusion 
       theory 
-    in Format.printf "Task is:@;%a@." Why3.Pretty.print_task task;
-    run_all_async ~slow ~prover table task  
+    in if Sys.getenv_opt "BENCHMARK_SMT" =Some "verbose" then begin
+      (let oc = open_out_gen [Open_append;Open_creat] 1411 "/home/striou/Documents/temps_exec/logmoche.txt" in 
+      let ppf = Format.formatter_of_out_channel (oc) in 
+      Format.fprintf ppf "Id %d@." !id_unique;
+      id_unique:=!id_unique+1;
+      Format.fprintf ppf "%a@." Why3.Pretty.print_task task;
+       close_out oc
+      )
+    end;
+    let res  = run_all_async ~slow ~prover table task  in 
+    Format.printf "Task is %a@." Why3.Pretty.print_task task;
+    res
     
-    (*if prover="" then run_all_async ~slow table task else 
-    begin match 
-      run_one ~slow prover table task 
-    with  
-    | None ->
-      Format.printf "Answer: None.@." ;
-      false
-    | Some Why3.Call_provers.{pr_answer} ->
-      Format.printf "Answer: %a@."
-        Why3.Call_provers.print_prover_answer
-        pr_answer ;
-      pr_answer = Why3.Call_provers.Valid
-    end
-    *)
-  with
-    | Unsupported t ->
-      Format.printf "smt: cannot translate term %a@." Term.pp t;
-      false
-    | InternalError ->
-      Format.printf "smt: internal error@.";
-      false
-      
+    
 (* Tactic registration *)
 
-let sequent_is_valid ~prover ~timestamp_style (s:TraceSequent.t) =
+let sequent_is_valid ~timestamp_style ~slow ~pure ~prover (s:TraceSequent.t) =
   let env = TraceSequent.env s in
   let table = env.table in
   let system = SystemExpr.to_fset env.system.set in
@@ -1199,28 +1195,35 @@ let sequent_is_valid ~prover ~timestamp_style (s:TraceSequent.t) =
       (LowTraceSequent.Hyps.to_list s)
   in
   let conclusion = LowTraceSequent.conclusion s in
-  is_valid ~timestamp_style ~slow:false ~pure:false ~prover
+  Format.printf "%a@." TraceSequent.pp s;
+  try is_valid ~timestamp_style ~slow ~pure ~prover
     table system evars hypotheses conclusion
+  with 
+    |e -> raise e
 
 type parameters = {
   timestamp_style : timestamp_style;
+  slow : bool;
+  pure : bool;
   provers : string list
 }
 
 let default_parameters = {
   timestamp_style = Nat;
+  slow = false;
+  pure = false ;
   provers = []
 }
 let rec parse_arg parameters = function
-  | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract_ax"}]) ->
+  | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract"}]) ->
     { parameters with timestamp_style = Abstract }
   | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="nat"}]) ->
     { parameters with timestamp_style = Nat }
   | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract_eq"}]) ->
     { parameters with timestamp_style = Abstract_eq }
-  | TacticsArgs.NArg ({Location.pl_desc="prover"}) -> (*Faireun nlist avec liste vide*)
-      parameters
-  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"} as p,{Location.pl_desc="cvc4"}::t) ->
+  | TacticsArgs.NList ({Location.pl_desc="prover"} ,[]) ->
+    parameters
+  | TacticsArgs.NList ({Location.pl_desc="prover"} as p,{Location.pl_desc="cvc4"}::t) ->
     (parse_arg 
       {parameters with provers = "CVC4"::parameters.provers} 
       (TacticsArgs.NList (p,t))
@@ -1235,6 +1238,14 @@ let rec parse_arg parameters = function
       {parameters with provers = "Alt-Ergo"::parameters.provers} 
       (TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},t))
     )
+  | TacticsArgs.NList ({Location.pl_desc="slow"},[{Location.pl_desc="true"}]) ->
+    {parameters with slow=true}
+  | TacticsArgs.NList ({Location.pl_desc="slow"},[{Location.pl_desc="false"}]) ->
+    {parameters with slow=false}
+  | TacticsArgs.NList ({Location.pl_desc="pure"},[{Location.pl_desc="true"}]) ->
+    {parameters with pure=true}
+  | TacticsArgs.NList ({Location.pl_desc="pure"},[{Location.pl_desc="false"}]) ->
+    {parameters with pure=false}  
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
   
 let parse_args args =
@@ -1254,8 +1265,11 @@ let () =
        let parameters = parse_args args in
        let is_valid =
          sequent_is_valid
-           ~prover:(match parameters.provers with [] -> ["CVC4"] | l -> l)
-           ~timestamp_style:parameters.timestamp_style
+          ~timestamp_style:parameters.timestamp_style
+          ~slow:parameters.slow 
+          ~pure:parameters.pure
+          ~prover:(match parameters.provers with [] -> ["CVC4"] | l -> l)
+        
            s
        in
        if is_valid then sk [] fk else fk (None, Tactics.Failure "SMT cannot prove sequent"))
@@ -1274,7 +1288,14 @@ let () =
             let conclusion = Term.mk_ands (List.map Term.Lit.lit_to_form q) in
             TraceSequent.set_conclusion conclusion s
         in
+        let ts = match Sys.getenv_opt "BENCHMARK_SMT" with
+          |Some "Abs" -> Abstract 
+          |Some "Abs_Eq" -> Abstract_eq
+          | _ -> Nat 
+        in 
         sequent_is_valid
-          ~prover:"CVC4"
-          ~timestamp_style:Nat
+          ~timestamp_style:ts
+          ~slow:false 
+          ~pure:true
+          ~prover:["CVC4"]
           s)
