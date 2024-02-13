@@ -212,7 +212,6 @@ let[@warning "-27"] mk_rule
 
   let empty_hyps = Hyps.TraceHyps.empty in (* FIXME: get hyps from sequent *)
   
-  (* TODO: we are using the less precise version of [fold_macro_support] *)
   let hash_cases =
     Iter.fold_macro_support1 (fun descr t hash_cases ->
         let iter =

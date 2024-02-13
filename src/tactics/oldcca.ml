@@ -2,7 +2,6 @@ open Squirrelcore
 (** Old utilities for CCA-based tactics.
     will disappear soon, only left here for enc-kp *)
 
-(* TODO: better error message, see [OldEuf] *)
 exception Bad_ssc
 
 class deprecated_check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)

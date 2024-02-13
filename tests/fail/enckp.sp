@@ -1,5 +1,3 @@
-
-
 channel c
 
 senc enc,dec
