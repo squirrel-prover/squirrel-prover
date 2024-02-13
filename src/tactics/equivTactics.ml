@@ -1059,15 +1059,17 @@ let deprecated_fresh_mk_indirect
 (* kept for enckp and xor. *)
 (** Construct the formula expressing freshness for some projection. *)
 let deprecated_mk_phi_proj
-    (cntxt : Constr.trace_cntxt)
-    (hyps : TopHyps.TraceHyps.hyps)      (* initial hypotheses *)
-    (venv : Vars.env)
+    (cntxt      : Constr.trace_cntxt)
+    (hyps       : TopHyps.TraceHyps.hyps)      (* initial hypotheses *)
+    (venv       : Vars.env)
     ((n,n_args) : Term.nsymb * Term.terms)
-    (proj : Term.proj)
-    (biframe : Term.term list) : Term.term list
+    (frame      : Term.terms)
+  : Term.terms
   =
-  let env = Env.init ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv () in
-  let frame = List.map (Term.project1 proj) biframe in
+  let env =
+    Env.init
+      ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv ()
+  in
   try
     let frame_indices : OldFresh.deprecated_name_occs =
       List.fold_left (fun acc t ->
@@ -1079,10 +1081,12 @@ let deprecated_mk_phi_proj
     (* direct cases (for explicit occurrences of [name] in the frame) *)
     let phi_frame = List.map (deprecated_fresh_mk_direct (n,n_args)) frame_indices in
 
-    let frame_actions : OldFresh.deprecated_ts_occs = OldFresh.deprecated_get_macro_actions cntxt frame in
+    let frame_actions : OldFresh.deprecated_ts_occs =
+      OldFresh.deprecated_get_macro_actions cntxt frame
+    in
 
     let macro_cases =
-      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt hyps venv n n_args biframe
+      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt hyps venv n n_args frame
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -1115,25 +1119,27 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt = mk_pair_trace_cntxt s in
   let env = ES.vars s in
   let hyps = ES.get_trace_hyps s in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
+  let lproj, rproj = ES.get_system_pair_projs s in
   
   let n_left, n_left_args, n_right, n_right_args =
-    match Term.project1 l_proj  t,
-          Term.project1 r_proj t with
+    match Term.project1 lproj  t,
+          Term.project1 rproj t with
     | Name (nl, ll), Name (nr,lr) -> nl, ll, nr, lr
     | _ -> raise OldFresh.Deprecated_Not_name
   in
 
-  let system_left = SE.project [l_proj] cntxt.system in
+  let system_left = SE.project [lproj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left =
-    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) l_proj biframe 
+    let frame = List.map (Term.project1 lproj) biframe in
+    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) frame 
   in
 
-  let system_right = SE.project [r_proj] cntxt.system in
+  let system_right = SE.project [rproj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = 
-    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) r_proj biframe 
+  let phi_right =
+    let frame = List.map (Term.project1 rproj) biframe in
+    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
   in
 
   let cstate = Reduction.mk_cstate cntxt.table in
@@ -1733,24 +1739,26 @@ let remove_name_occ (n,a) l = match l with
 let mk_xor_phi_base (s : ES.t) biframe
     ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) =
   let cntxt = mk_pair_trace_cntxt s in
-  let env   = ES.vars  s in
+  let env   = ES.vars s in
   let hyps  = ES.get_trace_hyps s in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
+  let lproj, rproj = ES.get_system_pair_projs s in
   
   let biframe =
-    Term.mk_diff [l_proj,l_left;r_proj,l_right] :: biframe
+    Term.mk_diff [lproj,l_left;rproj,l_right] :: biframe
   in
 
-  let system_left = SE.project [l_proj] cntxt.system in
+  let system_left = SE.project [lproj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = 
-    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) l_proj biframe 
+  let phi_left =
+    let frame = List.map (Term.project1 lproj) biframe in
+    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) frame
   in
 
-  let system_right = SE.project [r_proj] cntxt.system in
+  let system_right = SE.project [rproj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = 
-    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) r_proj biframe 
+  let phi_right =
+    let frame = List.map (Term.project1 rproj) biframe in
+    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
   in
 
   let len_left =
