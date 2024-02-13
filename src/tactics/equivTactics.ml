@@ -1117,12 +1117,12 @@ let deprecated_mk_phi_proj
 
 let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt = mk_pair_trace_cntxt s in
-  let env = ES.vars s in
-  let hyps = ES.get_trace_hyps s in
+  let env   = ES.vars s in
+  let hyps  = ES.get_trace_hyps s in
   let lproj, rproj = ES.get_system_pair_projs s in
   
   let n_left, n_left_args, n_right, n_right_args =
-    match Term.project1 lproj  t,
+    match Term.project1 lproj t,
           Term.project1 rproj t with
     | Name (nl, ll), Name (nr,lr) -> nl, ll, nr, lr
     | _ -> raise OldFresh.Deprecated_Not_name
@@ -1550,7 +1550,7 @@ let enckp arg (s : ES.t) =
   let cntxt = mk_pair_trace_cntxt s in
   let table = cntxt.table in
   let env = ES.env s in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
+  let lproj, rproj = ES.get_system_pair_projs s in
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
@@ -1566,22 +1566,26 @@ let enckp arg (s : ES.t) =
       ~(k       : Term.term)
     : Goal.t list 
     =
-    let k = Term.head_normal_biterm [l_proj; r_proj] k in
+    let k = Term.head_normal_biterm [lproj; rproj] k in
     (* Verify that key is well-formed, depending on whether the encryption is
      * symmetric or not. Return the secret key and appropriate SSC. *)
     let ssc, wrap_pk, sk =
       if Symbols.is_ftype fnenc Symbols.SEnc table then
         match Symbols.Function.get_data fnenc table with
         | Symbols.AssociatedFunctions [fndec] ->
-          (fun (sk,system) ->
+          (fun (sk,proj,system) ->
              let cntxt = Constr.{ cntxt with system } in
-             let env = Env.update ~system:SE.{ set = (system :> SE.t); pair = None } env in
-
+             let env =
+               Env.update ~system:SE.{ set = (system :> SE.t); pair = None } env
+             in
+             let frame = List.map (Term.project1 proj) biframe in
+             
              Oldcca.deprecated_symenc_key_ssc
                ~cntxt fnenc fndec
-               ~elems:(ES.conclusion_as_equiv s) sk.Name.symb.s_symb;
+               ~elems:(List.map (Term.project1 proj) (ES.conclusion_as_equiv s))
+               sk.Name.symb.s_symb;
              Oldcca.deprecated_symenc_rnd_ssc
-               ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args biframe),
+               ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args frame),
           (fun x -> x),
           k
         | _ -> assert false
@@ -1589,12 +1593,13 @@ let enckp arg (s : ES.t) =
       else
         match Symbols.Function.get_data fnenc table with
         | Symbols.AssociatedFunctions [fndec;fnpk] ->
-          (fun (sk,system) ->
+          (fun (sk,proj,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let errors =
                (* TODO: set globals to true *)
                OldEuf.key_ssc ~globals:false
-                 ~cntxt ~elems:(ES.conclusion_as_equiv s)
+                 ~cntxt
+                 ~elems:(List.map (Term.project1 proj) (ES.conclusion_as_equiv s))
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.Name.symb.s_symb
              in
              if errors <> [] then
@@ -1637,14 +1642,16 @@ let enckp arg (s : ES.t) =
         (* For each key we actually only need to verify the SSC
          * wrt. the appropriate projection of the system. *)
         let system = Utils.oget (ES.system s).pair in
-        let l_proj, r_proj = ES.get_system_pair_projs s in
-        let sysl = SE.(project [l_proj] system) in
-        let sysr = SE.(project [r_proj] system) in
-        List.iter (fun (ns, system) ->
-            ssc (ns, (system :> SE.fset))
+        let lsys = SE.(project [lproj] system) in
+        let rsys = SE.(project [rproj] system) in
+        List.iter (fun (ns, proj, system) ->
+            ssc (ns, proj, (system :> SE.fset))
           )
           (List.sort_uniq Stdlib.compare
-             [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
+             [(skl    , lproj, lsys);
+              (skr    , rproj, rsys);
+              (new_skl, lproj, lsys);
+              (new_skr, rproj, rsys)]) ;
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
