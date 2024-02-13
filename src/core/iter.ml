@@ -533,7 +533,8 @@ let get_macro_occs
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in
       let st = Reduction.mk_state ~hyps ~se ~vars ~param constr.table in
-      fst (Reduction.whnf_term st t)
+      let strat = Reduction.(MayRedSub rp_full) in
+      fst (Reduction.whnf_term ~strat st t)
     in
 
     match t with

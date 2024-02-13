@@ -57,14 +57,28 @@ val mk_state :
   state
 
 (*------------------------------------------------------------------*)
+(** reduction strategy for head normalization *)
+type red_strat =
+  | Std
+  (** only reduce at head position *)
+  | MayRedSub of red_param
+  (** may put strict subterms in whnf w.r.t. [red_param] if it allows to
+      reduce at head position *)
+
+(*------------------------------------------------------------------*)
 (** Fully reduces a term *)
 val reduce_term : state -> Term.term -> Term.term 
 
-(** Try to reduce once at head position (bool <=> reduction occured) *)
-val reduce_head1_term : state -> Term.term -> Term.term * bool
+(** Try to reduce once at head position (bool=reduction occured),
+    according to [strat] (default to [Std]). *)
+val reduce_head1_term :
+  ?strat:red_strat ->
+  state -> Term.term -> Term.term * bool
 
-(** Reduces once at head position *)
-val whnf_term : state -> Term.term -> Term.term * bool
+(** Weak head normal form according to [strat] (default to [Std]) *) 
+val whnf_term :
+  ?strat:red_strat ->
+  state -> Term.term -> Term.term * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)

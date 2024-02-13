@@ -1513,7 +1513,10 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
       ~param:Reduction.{rp_crypto with diff = true}
       state.env.table
   in
-  let term, _ = Reduction.whnf_term reduction_state output_term.term in
+  let term, _ =
+    let strat = Reduction.(MayRedSub rp_full) in
+    Reduction.whnf_term ~strat reduction_state output_term.term
+  in
   match term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
     let t0 = CondTerm.{ term = t0; conds =             b :: conds } in
@@ -1808,7 +1811,8 @@ let derecursify_term
         (* FIXME: add tag information in [fv] *)
         let vars = Vars.of_list (Vars.Tag.local_vars vars) in
         let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
-        Reduction.whnf_term st t
+        let strat = Reduction.(MayRedSub rp_full) in
+        Reduction.whnf_term ~strat st t
       in
 
       match t with
@@ -2021,19 +2025,7 @@ let derecursify
         let hyps =
           TraceHyps.add TacticsArgs.AnyName (LHyp (Local (Term.mk_happens ts))) hyps
         in
-        let output =  
-          (* let red_state = *)
-          (*   let param = { Reduction.rp_crypto with diff = true } in *)
-          (*   (* FIXME: add tag information in [fv] *) *)
-          (*   let vars =  *)
-          (*     Vars.of_list (Vars.Tag.local_vars @@ Sv.elements iocc.iocc_vars)  *)
-          (*   in *)
-          (*   Reduction.mk_state ~hyps ~se:(system :> SE.t) ~vars ~param env.table  *)
-          (* in *)
-          (* Reduction.reduce_term red_state  *)
-            iocc.iocc_cnt
-        in
-        let goal, output = mk_bideduction_goal hyps ~form output in
+        let goal, output = mk_bideduction_goal hyps ~form iocc.iocc_cnt in
         let togen = Sv.elements iocc.iocc_vars in
         (togen, goal, output) :: goals
       ) trace_context env hyps targets []
