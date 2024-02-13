@@ -442,7 +442,10 @@ and reduce_head1_term
     let t', has_red_sub =
       reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with param; } t
     in
-    if has_red_sub then red_head1 t' else t, false
+    if has_red_sub then
+      let t', has_red = red_head1 t' in
+      if has_red then t', true else t, false
+    else t, false
   
 and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
   if not st.param.beta then t, false
