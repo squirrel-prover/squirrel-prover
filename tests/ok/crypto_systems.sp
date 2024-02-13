@@ -1,6 +1,3 @@
-(* small test on `crypto` on a system expression different
-   from the default one. *)
-
 type E[large, finite].
 
 gdh g, (^), ( ** ) where group:message exponents:E.
@@ -23,16 +20,27 @@ name b : index -> E.
 
 channel c.
 
-process A (i : index) = A: out(c, <g^ (a i), g^(b i)>).
+process A (i : index) = A: in(c,x); out(c, <x, <g^ (a i), g^(b i)>>).
 
 system !_i A(i).
 
-
-global lemma _ (f0 : message -> message[adv], i : index[adv]): [true].
+global lemma _ (f0 : E -> message[adv], i,i0 : index[adv]): 
+  [i <> i0] -> [true].
 Proof.
-  simpl. 
-  have H : 
-    equiv( diff(f0 (output@A(i)) <> g^ (a i ** b i), true) ).
-  by crypto CDH.
+  intro A. 
+  have H : equiv( diff(f0 (a i0) <> g^ (a i ** b i), true) ). {
+    crypto CDH.
+    by apply A.
+  }.
   true.
 Qed.
+
+(* FIXME *)
+(* global lemma _ (f0 : message -> message[adv], i : index[adv]): *)
+(*   [true]. *)
+(* Proof. *)
+(*   have H :  *)
+(*     equiv( diff(f0 (frame@A(i)) <> g^ (a i ** b i), true) ). *)
+(*   by crypto CDH. *)
+(*   true. *)
+(* Qed. *)
