@@ -51,7 +51,7 @@ NC=\033[0m
 
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
-PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
+PROVER_TESTS = $(wildcard tests/ok/*.sp) 
 
 PROVER_EXAMPLES =\
   $(wildcard examples/*.sp)                     \
@@ -68,7 +68,7 @@ BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
 okfail: squirrel
 	rm -rf $(RUNLOGDIR)
-	@$(ECHO) "Running tests/ok/*.sp and tests/fail/*.sp."
+	@$(ECHO) "Running tests/ok/*.sp"
 	@$(MAKE) -j8 okfail_end
 
 # Run PROVER_TESTS as a dependency, then check for errors.

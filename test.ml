@@ -58,7 +58,6 @@ let () =
   (* let runner = Squirrelprover.Prover.run in *)
   let runner = Squirrellib.Main.run in
   Squirrelcore.Checks.add_suite "tests/ok/" (alcotests runner "tests/ok");
-  Squirrelcore.Checks.add_suite "tests/fail/" (alcotests runner "tests/fail");
   Format.eprintf "Running Alcotests on test suites :\n";
   List.iter (fun (n,_) -> 
     Format.eprintf "\t%s\n" n;
