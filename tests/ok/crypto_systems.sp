@@ -35,12 +35,13 @@ Proof.
   true.
 Qed.
 
-(* FIXME *)
-(* global lemma _ (f0 : message -> message[adv], i : index[adv]): *)
-(*   [true]. *)
-(* Proof. *)
-(*   have H :  *)
-(*     equiv( diff(f0 (frame@A(i)) <> g^ (a i ** b i), true) ). *)
-(*   by crypto CDH. *)
-(*   true. *)
-(* Qed. *)
+global lemma _ (f0 : message -> message[adv], i : index[adv]):
+  [happens(A(i))] ->
+  [true].
+Proof.
+  intro Hap.
+  have H :
+    equiv( diff(f0 (frame@A(i)) <> g^ (a i ** b i), true) ).
+  by crypto CDH (a : a i) (b : b i).
+  true.
+Qed.
