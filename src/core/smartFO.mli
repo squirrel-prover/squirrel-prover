@@ -5,15 +5,15 @@ module type S = sig
   type form
 
   (** {3 Constructors} *)
-  val mk_true  : form
-  val mk_false : form
+  val mk_true  : ?e:Term.term option -> unit -> form
+  val mk_false : ?e:Term.term option -> unit -> form
 
-  val mk_eq  : ?simpl:bool -> Term.term -> Term.term -> form
-  val mk_neq : ?simpl:bool -> Term.term -> Term.term -> form
-  val mk_leq :                Term.term -> Term.term -> form
-  val mk_geq :                Term.term -> Term.term -> form
-  val mk_lt  : ?simpl:bool -> Term.term -> Term.term -> form
-  val mk_gt  : ?simpl:bool -> Term.term -> Term.term -> form
+  val mk_eq  : ?simpl:bool -> ?e:Term.term option -> Term.term -> Term.term -> form
+  val mk_neq : ?simpl:bool -> ?e:Term.term option -> Term.term -> Term.term -> form
+  val mk_leq :                ?e:Term.term option -> Term.term -> Term.term -> form
+  val mk_geq :                ?e:Term.term option ->Term.term -> Term.term -> form
+  val mk_lt  : ?simpl:bool -> ?e:Term.term option -> Term.term -> Term.term -> form
+  val mk_gt  : ?simpl:bool -> ?e:Term.term option -> Term.term -> Term.term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form
