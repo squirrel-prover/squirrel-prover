@@ -25,7 +25,7 @@ include Sequent.Mk(struct
       in
       let es =
         let env = { (S.env s) with system; } in
-        ES.init ~env Equiv.Smart.mk_false
+        ES.init ~env (Equiv.Smart.mk_false ())
       in
       let es =
         S.Hyps.fold (fun id ld es ->

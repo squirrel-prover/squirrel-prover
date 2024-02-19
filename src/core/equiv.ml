@@ -30,7 +30,7 @@ let _pp_equiv_numbered ppe fmt (l : equiv) =
   List.iteri (fun i elem ->
     Fmt.pf fmt "%i: @[%a@]@;" i (Term._pp ppe) elem
     ) l.terms ;
-  Option.iter (Fmt.pf fmt "bound: @[%a@]@:" (Term._pp ppe)) l.bound
+  Option.iter (Fmt.pf fmt "bound: @[%a@]@;" (Term._pp ppe)) l.bound
 
 let pp_equiv_numbered = _pp_equiv_numbered (default_ppe ~dbg:false ())
 
@@ -59,13 +59,12 @@ let fv_equiv e : Sv.t =
 (** Free type variables of an [equiv]. *)
 let ty_fv_equiv e : Type.Fv.t =
   Type.Fv.union
-  (List.fold_left (fun sv elem ->
+    (List.fold_left (fun sv elem ->
       Type.Fv.union sv (Term.ty_fv elem)
-    ) Type.Fv.empty e.terms)
-  (Option.value (Option.map Term.ty_fv e.bound)
-  ~default:Type.Fv.empty)
+     ) Type.Fv.empty e.terms)
+    (Option.value (Option.map Term.ty_fv e.bound)
+      ~default:Type.Fv.empty)
 
-let is_concrete_equiv e : bool = e.bound <> None
 (*------------------------------------------------------------------*)
 (** {2 Formula with potential upper bound} *)
 
@@ -93,7 +92,6 @@ let ty_fv_bform f : Type.Fv.t =
   Type.Fv.union (Term.ty_fv f.formula)
     (Option.value (Option.map Term.ty_fv f.bound) ~default:Type.Fv.empty)
 
-let is_concrete_bform f : bool = f.bound <> None
 (*------------------------------------------------------------------*)
 (** {2 Equivalence atoms} *)
 
@@ -267,7 +265,8 @@ let rec ty_fv = function
 let ty_fvs l = List.fold_left (fun fv e -> Type.Fv.union fv (ty_fv e)) Type.Fv.empty l
 
 (*------------------------------------------------------------------*)
-let mk_quant0_tagged q (evs : Vars.tagged_vars) f = match evs, f with
+let mk_quant0_tagged q (evs : Vars.tagged_vars) f =
+  match evs, f with
   | [], _ -> f
   | _, Quant (q', evs', f) when q = q' -> Quant (q, evs @ evs', f)
   | _, _ -> Quant (q, evs, f)
@@ -582,7 +581,7 @@ let rec is_system_context_indep (f : form) : bool =
 (*------------------------------------------------------------------*)
 let rec project (projs : Term.proj list) (f : form) : form =
   match f with
-  | Atom (Reach f) -> Atom (Reach (proj_bform f))
+  | Atom (Reach f) -> Atom (Reach (proj_bform projs f))
 
   | _ -> tmap (project projs) f
     
@@ -607,8 +606,8 @@ module Smart : SmartFO.S with type form = _form = struct
   let todo () = Tactics.soft_failure (Failure "not implemented")
   (*TODO:Concrete: Find a way to add the optional bound for mk_true mk_false  *)
   (** {3 Constructors} *)
-  let mk_true  ?(e = None) () = Atom (Reach {formula = Term.mk_true; bound = e})
-  let mk_false ?(e = None) () = Atom (Reach {formula = Term.mk_false; bound = e})
+  let mk_true = Atom (Reach {formula = Term.mk_true; bound = None})
+  let mk_false = Atom (Reach {formula = Term.mk_false; bound = None})
 
   let[@warning "-27"] mk_not ?simpl f = todo ()
 
@@ -617,7 +616,7 @@ module Smart : SmartFO.S with type form = _form = struct
 
   let[@warning "-27"] rec mk_ands ?(simpl = false) forms =
     match forms with
-    | [] -> mk_true ()
+    | [] -> mk_true
     | [f0] -> f0
     | f0 :: forms -> 
       And (f0, mk_ands forms)
@@ -627,7 +626,7 @@ module Smart : SmartFO.S with type form = _form = struct
 
   let[@warning "-27"] rec mk_ors ?simpl forms =
     match forms with
-    | [] -> mk_false ()
+    | [] -> mk_false
     | [f0] -> f0
     | f0 :: forms -> Or (f0, mk_ors forms)
 
@@ -649,12 +648,13 @@ module Smart : SmartFO.S with type form = _form = struct
     mk_quant_tagged ?simpl Exists (List.map (fun v -> v, Vars.Tag.gtag) vs)
 
   (*------------------------------------------------------------------*)
-  let mk_eq  ?simpl ?(e=None) f1 f2  = Atom (Reach {formula = (Term.Smart.mk_eq  ?simpl f1 f2); bound = e})
-  let mk_neq ?simpl ?(e=None) f1 f2  = Atom (Reach {formula = (Term.Smart.mk_neq ?simpl f1 f2); bound = e})
-  let mk_leq        ?(e=None) f1 f2 = Atom (Reach {formula = (Term.Smart.mk_leq f1 f2); bound = e})
-  let mk_geq        ?(e=None) f1 f2 = Atom (Reach {formula = (Term.Smart.mk_geq f1 f2); bound = e})
-  let mk_lt  ?simpl ?(e=None) f1 f2  = Atom (Reach {formula = (Term.Smart.mk_lt  ?simpl f1 f2); bound = e})
-  let mk_gt  ?simpl ?(e=None) f1 f2 = Atom (Reach {formula = (Term.Smart.mk_gt  ?simpl f1 f2); bound = e})
+   (*TODO:Concrete : Check if it is necessary to add a bound on those constructor*)
+  let mk_eq  ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_eq  ?simpl f1 f2); bound = None})
+  let mk_neq ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_neq ?simpl f1 f2); bound = None})
+  let mk_leq        f1 f2 = Atom (Reach {formula = (Term.Smart.mk_leq f1 f2); bound = None})
+  let mk_geq        f1 f2 = Atom (Reach {formula = (Term.Smart.mk_geq f1 f2); bound = None})
+  let mk_lt  ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_lt  ?simpl f1 f2); bound = None})
+  let mk_gt  ?simpl f1 f2 = Atom (Reach {formula = (Term.Smart.mk_gt  ?simpl f1 f2); bound = None})
 
   (*------------------------------------------------------------------*)
   let mk_let ?(simpl = false) v t f =
@@ -671,6 +671,8 @@ module Smart : SmartFO.S with type form = _form = struct
     (* case [f = ∃es. f0], check that:
        - [f] is constant
        - [f0] is system-independant *)
+    (*TODO : kind, check this for multiterms*)
+    (*TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists && is_constant ?env f ->
         begin match Term.Smart.destr_exists_tagged f with
           | Some (es,f) when is_system_indep ?env f ->
@@ -678,6 +680,7 @@ module Smart : SmartFO.S with type form = _form = struct
           | _ -> None
         end
 
+    (*TODO : kind, check this for multiterms*)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
         begin match Term.Smart.destr_forall_tagged f with
           | Some (es,f) -> Some (es, Atom (Reach {formula = f; bound}))
@@ -703,6 +706,7 @@ module Smart : SmartFO.S with type form = _form = struct
     (* case [f = ∃es. f0], check that:
        - [f] is constant
        - [f0] is system-independant *)
+    (*TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists && is_constant ?env f ->
         begin match Term.Smart.destr_exists1_tagged f with
           | Some (es,f) when is_system_indep ?env f ->
@@ -739,16 +743,20 @@ module Smart : SmartFO.S with type form = _form = struct
   let destr_true  _f = todo ()
   let destr_not   _f = todo ()
 
+  (*TODO:Concrete : Check if valid of concrete*)
   let destr_and = function
     | And (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound = None}) ->
         begin match Term.Smart.destr_and f with
-          | Some (f1,f2) -> Some (Atom (Reach {formula = f1; bound = None}),
-                                  Atom (Reach {formula = f2; bound = None}))
+          | Some (f1,f2) ->
+             Some
+               (Atom (Reach {formula = f1; bound = None}),
+                Atom (Reach {formula = f2; bound = None}))
           | None -> None
         end
     | _ -> None
 
+  (*TODO:Concrete : Check if valid of concrete*)
   let destr_or ?env = function
     | Or (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound}) ->
@@ -762,6 +770,7 @@ module Smart : SmartFO.S with type form = _form = struct
        end
     | _ -> None
 
+  (*TODO:Concrete : Check if valid of concrete*)
   let destr_impl ?env = function
     | Impl (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound}) ->
@@ -773,6 +782,7 @@ module Smart : SmartFO.S with type form = _form = struct
        end
     | _ -> None
 
+  (*TODO:Concrete : Check if valid of concrete*)
   let destr_iff = function
     | Atom (Reach {formula = f; bound}) ->
        begin match Term.Smart.destr_iff f with
@@ -812,6 +822,7 @@ module Smart : SmartFO.S with type form = _form = struct
 
   let destr_impls i f = mk_destr_right destr_impl i f
 
+  (*TODO:Concrete : Check if it is necessary to add the bounded case*)
   let destr_eq = function
     | Atom (Reach {formula = f; bound = None}) -> Term.destr_eq f
     | _ -> None
@@ -829,6 +840,7 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
+  (*TODO:Concrete : Not valid for concrete*)
   let is_false _f = todo ()
   let is_true  _f = todo ()
   let is_not   _f = false       (* FIXME *)
@@ -840,7 +852,7 @@ module Smart : SmartFO.S with type form = _form = struct
   
   let is_forall      f = destr_forall      f <> None
   let is_exists ?env f = destr_exists ?env f <> None
-                  
+
   let is_eq  f = destr_eq  f <> None
   let is_neq f = destr_neq f <> None
   let is_leq f = destr_leq f <> None
@@ -906,13 +918,13 @@ module Smart : SmartFO.S with type form = _form = struct
 end
 
 let destr_reach = function
-  | Atom (Reach {formula = f; bound = None}) -> Some f
+  | Atom (Reach f) -> Some f
   | _ -> None
 
 let is_reach f = destr_reach f <> None
                  
 let destr_equiv = function
-  | Atom (Equiv {terms = t; bound = None}) -> Some t
+  | Atom (Equiv t) -> Some t
   | _ -> None
 
 let is_equiv f = destr_equiv f <> None
@@ -920,12 +932,12 @@ let is_equiv f = destr_equiv f <> None
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 
-type any_form = Global of form | Local of bform
+type any_form = Global of form | Local of Term.term
 
 let _pp_any_form ppe fmt (f : any_form) =
   match f with
   | Global e -> _pp ppe fmt e
-  | Local {formula = f; bound = None} -> Term._pp ppe fmt f
+  | Local f -> Term._pp ppe fmt f
   | _ -> assert false
 
 let pp_any_form     = _pp_any_form (default_ppe ~dbg:false ()) 
@@ -934,8 +946,7 @@ let pp_any_form_dbg = _pp_any_form (default_ppe ~dbg:true ())
 let any_to_reach (f : any_form) : Term.term =
   match f with
   | Global _ -> assert false
-  | Local {formula = f; bound = None} -> f
-  | _ -> assert false
+  | Local f -> f
 
 let any_to_equiv (f : any_form) : form =
   match f with
@@ -947,7 +958,7 @@ let is_local = function
   | Global _ -> false
 
 (*------------------------------------------------------------------*)
-type local_form = bform
+type local_form = Term.term
 type global_form = form
 
 type _ f_kind =
@@ -968,53 +979,52 @@ module PreAny = struct
   type t = any_form
 
   let pp fmt = function
-    | Local  f -> Term.pp fmt f.formula
-    | Global f ->      pp fmt f
+    | Local  f -> Term.pp fmt f
+    | Global f ->        pp fmt f
 
   let _pp ?context ppe fmt = function
-    | Local  f -> Term._pp ppe          fmt f.formula
+    | Local  f -> Term._pp ppe          fmt f
     | Global f ->      _pp ppe ?context fmt f
 
   let pp_dbg fmt = function
-    | Local  f -> Term.pp_dbg fmt f.formula
+    | Local  f -> Term.pp_dbg fmt f
     | Global f ->      pp_dbg fmt f
 
   let equal x y = match x,y with
-    | Local {formula = f; bound = e},
-      Local {formula = g; bound = r}  -> Term.equal f g && (Option.equal Term.equal e r)
+    | Local f, Local g  -> Term.equal f g
     | Global f, Global g ->  equal f g
     | _ -> false
 
   let subst s = function
-    | Local  f -> Local (subst_bform s f)
+    | Local  f -> Local  (Term.subst s f)
     | Global f -> Global (     subst s f)
 
   let tsubst s = function
-    | Local  f -> Local  (tsubst_bform s f)
+    | Local  f -> Local  (Term.tsubst s f)
     | Global f -> Global (     tsubst s f)
 
   let subst_projs target s = function
     | Local f -> 
       if target = `Reach then 
-        Local (subst_projs_bform s f)
+        Local (Term.subst_projs s f)
       else 
         Local f
     | Global f -> Global (subst_projs target s f)
 
   let fv = function
-    | Local  f -> fv_bform f
+    | Local  f -> Term.fv f
     | Global f -> fv f
 
   let ty_fv = function
-    | Local  f -> ty_fv_bform f
+    | Local  f -> Term.ty_fv f
     | Global f -> ty_fv f
 
   let get_terms = function
-    | Local f -> f.formula :: (Option.to_list f.bound)
+    | Local f -> [f]
     | Global f -> get_terms f
 
   let project p = function
-    | Local f -> Local (proj_bform p f)
+    | Local f -> Local (Term.project p f)
     | Global f -> Global (     project p f)
 end
 
@@ -1035,7 +1045,7 @@ module Babel = struct
       (* Inverses of the injections. *)
       | Any_t, Local_t ->
         begin match f with
-          | Global (Atom (Reach f)) -> f
+          | Global (Atom (Reach f)) -> f.formula
           | Local f -> f
           | _ -> Tactics.soft_failure ?loc CannotConvert
         end
@@ -1043,19 +1053,19 @@ module Babel = struct
       | Any_t, Global_t ->
         begin match f with
           | Global f -> f
-          | Local f -> Atom (Reach f)
+          | Local f -> Atom (Reach {formula = f; bound = None})
         end
 
       (* Conversions between local and global formulas. *)
-      | Local_t,  Global_t -> Atom (Reach f)
+      | Local_t,  Global_t -> Atom (Reach {formula = f; bound = None})
       | Global_t, Local_t  ->
         begin match f with
-          | Atom (Reach f) -> f
+          | Atom (Reach f) -> f.formula
           | _ -> Tactics.soft_failure ?loc CannotConvert
         end
 
   let subst : type a. a f_kind -> Term.subst -> a -> a = function
-    | Local_t  -> subst_bform
+    | Local_t  -> Term.subst
     | Global_t -> subst
     | Any_t    -> PreAny.subst
 
@@ -1064,38 +1074,38 @@ module Babel = struct
     =
     fun kind target s f ->
     match kind with
-    | Local_t  ->                subst_bform s f
+    | Local_t  ->                Term.subst_projs s f
     | Global_t ->        subst_projs target s f
     | Any_t    -> PreAny.subst_projs target s f
 
   let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
-    | Local_t  -> tsubst_bform
+    | Local_t  -> Term.tsubst
     | Global_t -> tsubst
     | Any_t    -> PreAny.tsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
-    | Local_t  -> fv_bform
+    | Local_t  -> Term.fv
     | Global_t -> fv
     | Any_t    -> PreAny.fv
 
 
   let get_terms : type a. a f_kind -> a -> Term.term list = function
-    | Local_t  -> fun f -> f.formula::(Option.to_list f.bound)
+    | Local_t  -> fun f -> [f]
     | Global_t -> get_terms
     | Any_t    -> PreAny.get_terms
 (*TODO:Concrete : Do the pretty printer for local formula*)
   let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
-    | Local_t  -> fun fmt f -> Term.pp fmt f.formula
+    | Local_t  -> Term.pp
     | Global_t -> pp
     | Any_t    -> PreAny.pp
 
   let pp_dbg : type a. a f_kind -> Format.formatter -> a -> unit = function
-    | Local_t  -> fun fmt f -> Term.pp_dbg fmt f.formula
+    | Local_t  -> Term.pp_dbg
     | Global_t -> pp_dbg
     | Any_t    -> PreAny.pp_dbg
 
   let project : type a. a f_kind -> Term.proj list -> a -> a = function
-    | Local_t  -> proj_bform
+    | Local_t  -> Term.project
     | Global_t -> project
     | Any_t    -> PreAny.project
 
@@ -1114,324 +1124,279 @@ module Any = struct
   module Smart : SmartFO.S with type form = any_form = struct
     type form = any_form
 
-    let mk_true  ?(e=None) () = Local {formula = Term.mk_true; bound = e}
-    let mk_false ?(e=None) () = Local {formula = Term.mk_false; bound = e}
+    let mk_true  = Local (Term.mk_true)
+    let mk_false = Local (Term.mk_false)
 
     let mk_not ?simpl f =
       match f with
-        | Local {formula = f; bound = None} -> Local {formula = Term.Smart.mk_not ?simpl f; bound = None}
+        | Local f -> Local (Term.Smart.mk_not ?simpl f)
         | Global f -> Global (Smart.mk_not ?simpl f)
-        | _ -> assert false
 
     let mk_and ?simpl f g =
       match f,g with
-        | Local {formula = f; bound = None}, Local {formula = g; bound = None} ->
-          Local {formula = Term.Smart.mk_and ?simpl f g; bound = None}
+        | Local f, Local g -> Local (Term.Smart.mk_and ?simpl f g)
         | Global f, Global g -> Global (Smart.mk_and ?simpl f g)
         | _ -> assert false
 
     let mk_or ?simpl f g =
       match f,g with
-        | Local {formula = f; bound = None},
-          Local {formula = g; bound = None} -> Local {formula = Term.Smart.mk_or ?simpl f g; bound = None}
+        | Local f, Local g -> Local (Term.Smart.mk_or ?simpl f g)
         | Global f, Global g -> Global (Smart.mk_or ?simpl f g)
         | _ -> assert false
 
     let mk_impl ?simpl f g : any_form =
       match f,g with
-        | Local {formula = f; bound = None},
-          Local {formula = g; bound = None} -> Local {formula = Term.Smart.mk_impl ?simpl f g; bound = None}
+        | Local f, Local g -> Local (Term.Smart.mk_impl ?simpl f g)
         | Global f, Global g -> Global (Smart.mk_impl ?simpl f g)
         | _ -> assert false
 
     let mk_ands ?simpl = function
-      | [] -> Local {formula  = Term.Smart.mk_ands ?simpl []; bound = None}
+      | [] -> Local (Term.Smart.mk_ands ?simpl [])
       | (Local _ :: _) as l ->
-          let l = List.map (function Local {formula = f; bound = None} -> f | _ -> assert false) l in
-          Local {formula = Term.Smart.mk_ands ?simpl l; bound = None}
+          let l = List.map (function Local f -> f | _ -> assert false) l in
+          Local (Term.Smart.mk_ands ?simpl l)
       | (Global _ :: _) as l ->
           let l = List.map (function Global f -> f | _ -> assert false) l in
           Global (Smart.mk_ands ?simpl l)
 
     let mk_ors ?simpl = function
-      | [] -> Local {formula = Term.Smart.mk_ors ?simpl []; bound = None}
+      | [] -> Local (Term.Smart.mk_ors ?simpl [])
       | (Local _ :: _) as l ->
-          let l = List.map (function Local {formula = f; bound = None} -> f | _ -> assert false) l in
-          Local {formula = Term.Smart.mk_ors ?simpl l; bound = None}
+          let l = List.map (function Local f -> f | _ -> assert false) l in
+          Local (Term.Smart.mk_ors ?simpl l)
       | (Global _ :: _) as l ->
           let l = List.map (function Global f -> f | _ -> assert false) l in
           Global (Smart.mk_ors ?simpl l)
 
     let mk_impls ?simpl l f = match l,f with
-      | [],Local f -> Local {formula = Term.Smart.mk_impls ?simpl [] f.formula; bound = f.bound}
+      | [],Local f -> Local(Term.Smart.mk_impls ?simpl [] f)
       | [],Global f -> Global (Smart.mk_impls ?simpl [] f)
       | (Local _ :: _) as l, Local f ->
-          let l = List.map (function Local {formula = f; bound = None} -> f | _ -> assert false) l in
-          Local {formula = (Term.Smart.mk_impls ?simpl l f); bound = None}
+          let l = List.map (function Local f -> f | _ -> assert false) l in
+          Local (Term.Smart.mk_impls ?simpl l f)
       | (Global _ :: _) as l, Global f ->
           let l = List.map (function Global f -> f | _ -> assert false) l in
           Global (Smart.mk_impls ?simpl l f)
       | _ -> assert false
 
-    let mk_eq  ?simpl ?(e=None) f g = Local {formula = Term.Smart.mk_eq  ?simpl f g; bound = e}
-    let mk_neq ?simpl ?(e=None) f g = Local {formula = Term.Smart.mk_neq ?simpl f g; bound = e}
-    let mk_leq        ?(e=None) f g = Local {formula = Term.Smart.mk_leq        f g; bound = e}
-    let mk_geq        ?(e=None) f g = Local {formula = Term.Smart.mk_geq        f g; bound = e}
-    let mk_lt  ?simpl ?(e=None) f g = Local {formula = Term.Smart.mk_lt  ?simpl f g; bound = e}
-    let mk_gt  ?simpl ?(e=None) f g = Local {formula = Term.Smart.mk_gt  ?simpl f g; bound = e}
+    let mk_eq  ?simpl f g = Local (Term.Smart.mk_eq  ?simpl f g)
+    let mk_neq ?simpl f g = Local (Term.Smart.mk_neq ?simpl f g)
+    let mk_leq        f g = Local (Term.Smart.mk_leq        f g)
+    let mk_geq       f g = Local (Term.Smart.mk_geq        f g)
+    let mk_lt  ?simpl f g = Local (Term.Smart.mk_lt  ?simpl f g)
+    let mk_gt  ?simpl f g = Local (Term.Smart.mk_gt  ?simpl f g)
 
     (*------------------------------------------------------------------*)
     let mk_let ?simpl v t1 = function
-      | Local {formula = t2; bound = None} -> Local {formula = Term.Smart.mk_let ?simpl v t1 t2; bound = None}
+      | Local t2 -> Local (Term.Smart.mk_let ?simpl v t1 t2)
       | Global t2 -> Global (     Smart.mk_let ?simpl v t1 t2)
-      | _ -> assert false
 
     (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function
-      | Local {formula = f; bound = None} -> Local {formula = Term.Smart.mk_forall ?simpl vs f; bound = None}
+      | Local f -> Local (Term.Smart.mk_forall ?simpl vs f)
       | Global f -> Global (     Smart.mk_forall ?simpl vs f)
-      | _ -> assert false
 
     let mk_exists ?simpl vs = function
-      | Local {formula = f; bound = None} -> Local {formula = Term.Smart.mk_exists ?simpl vs f; bound = None}
+      | Local f -> Local (Term.Smart.mk_exists ?simpl vs f)
       | Global f -> Global (     Smart.mk_exists ?simpl vs f)
-      | _ -> assert false
 
     (*------------------------------------------------------------------*)
     let mk_forall_tagged ?simpl vs = function
-      | Local {formula = f; bound = None} -> Local {formula = Term.Smart.mk_forall_tagged ?simpl vs f; bound = None}
+      | Local f -> Local (Term.Smart.mk_forall_tagged ?simpl vs f)
       | Global f -> Global (     Smart.mk_forall_tagged ?simpl vs f)
-      | _ -> assert false
 
     let mk_exists_tagged ?simpl vs = function
-      | Local  {formula = f; bound = None} -> Local  {formula = Term.Smart.mk_exists_tagged ?simpl vs f; bound = None}
+      | Local f -> Local (Term.Smart.mk_exists_tagged ?simpl vs f)
       | Global f -> Global (     Smart.mk_exists_tagged ?simpl vs f)
-      | _ -> assert false
 
     (*------------------------------------------------------------------*)
     let destr_forall1 = function
-      | Local {formula = f; bound = None} -> omap
-                                               (fun (vs,f) -> vs, Local {formula = f; bound = None})
-                                               (Term.Smart.destr_forall1 f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall1 f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1 f)
-      | _ -> assert false
 
     let destr_exists1 ?env = function
-      | Local {formula = f; bound = None} -> omap (fun (vs,f) -> vs, Local {formula = f; bound = None})
-                                               (Term.Smart.destr_exists1      f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists1      f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1 ?env f)
-      | _ -> assert false
 
     let destr_forall = function
-      | Local {formula = f; bound = None} -> omap (fun (vs,f) -> vs, Local {formula = f; bound = None})
-                                               (Term.Smart.destr_forall f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall f)
-      | _ -> assert false
 
     let destr_exists ?env = function
-      | Local {formula = f; bound = None} -> omap (fun (vs,f) -> vs, Local  {formula = f; bound = None})
-                                               (Term.Smart.destr_exists      f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists      f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists ?env f)
-      | _ -> assert false
 
     (*------------------------------------------------------------------*)
     let destr_forall1_tagged = function
-      | Local {formula = f; bound = None} -> omap (fun (vs,f) -> vs, Local {formula = f; bound = None})
-                                               (Term.Smart.destr_forall1_tagged f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall1_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1_tagged f)
-      | _ -> assert false
 
     let destr_exists1_tagged ?env = function
-      | Local {formula = f; bound = None} ->
-        omap (fun (vs,f) -> vs, Local  {formula = f; bound = None})
-          (Term.Smart.destr_exists1_tagged      f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists1_tagged      f)
       | Global f ->
         omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1_tagged ?env f)
-      | _ -> assert false
 
     let destr_forall_tagged = function
-      | Local {formula = f; bound = None} -> omap (fun (vs,f) -> vs, Local {formula = f; bound = None})
-                                               (Term.Smart.destr_forall_tagged f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall_tagged f)
-      | _ -> assert false
 
     let destr_exists_tagged ?env = function
-      | Local {formula = f; bound = None} ->
-        omap (fun (vs,f) -> vs, Local {formula = f; bound = None})
-          (Term.Smart.destr_exists_tagged      f)
+      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists_tagged      f)
       | Global f ->
         omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists_tagged ?env f)
-      | _ -> assert false
-                      
+
     (*------------------------------------------------------------------*)
     let destr_false = function
-      | Local {formula = f; bound = None} -> Term.Smart.destr_false f
+      | Local f -> Term.Smart.destr_false f
       | Global f ->      Smart.destr_false f
-      | _ -> assert false
 
     let destr_true = function
-      | Local {formula = f; bound = None} -> Term.Smart.destr_true f
+      | Local f -> Term.Smart.destr_true f
       | Global f ->      Smart.destr_true f
-      | _ -> assert false
 
     let destr_not = function
-      | Local {formula = f; bound = None} -> omap (fun f -> Local {formula = f; bound = None})
-                                               (Term.Smart.destr_not f)
+      | Local f -> omap (fun f -> Local f) (Term.Smart.destr_not f)
       | Global f -> omap (fun f -> Global f) (     Smart.destr_not f)
-      | _ -> assert false
 
     let destr_and = function
-      | Local {formula = f; bound = None} ->
-          omap (fun (x,y) -> Local {formula = f; bound = None}, Local {formula = f; bound = None})
-            (Term.Smart.destr_and f)
+      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_and f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and f)
-      | _ -> assert false
 
     let destr_or ?env = function
-      | Local f ->
-          omap (fun (x,y) -> Local {formula = x; bound = f.bound}, Local {formula = y; bound = f.bound})
-            (Term.Smart.destr_or      f)
+      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_or      f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (     Smart.destr_or ?env f)
 
     let destr_impl ?env = function
-      | Local {formula = f; bound = None} ->
-          omap (fun (x,y) -> Local {formula = x; bound = None}, Local {formula = y; bound = None})
-            (Term.Smart.destr_impl f)
+      | Local f ->
+          omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_impl f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (Smart.destr_impl ?env f)
-      | _ -> assert false
 
     let destr_iff =  function
-      | Local {formula = f; bound = None} ->
-          omap (fun (x,y) -> Local {formula = x; bound = None}, Local {formula = y; bound = None})
-            (Term.Smart.destr_iff f)
+      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_iff f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (Smart.destr_iff f)
-      | _ -> assert false
 
 
     (*------------------------------------------------------------------*)
     let is_false = function
-      | Local  f -> Term.Smart.is_false f.formula
+      | Local  f -> Term.Smart.is_false f
       | Global f ->      Smart.is_false f
 
     let is_true = function
-      | Local  f -> Term.Smart.is_true f.formula
+      | Local  f -> Term.Smart.is_true f
       | Global f ->      Smart.is_true f
 
     let is_not = function
-      | Local  f -> Term.Smart.is_not f.formula
+      | Local  f -> Term.Smart.is_not f
       | Global f ->      Smart.is_not f
 
     let is_and = function
-      | Local  f -> Term.Smart.is_and f.formula
+      | Local  f -> Term.Smart.is_and f
       | Global f ->      Smart.is_and f
 
     let is_or ?env = function
-      | Local  f -> Term.Smart.is_or      f.formula
+      | Local  f -> Term.Smart.is_or      f
       | Global f ->      Smart.is_or ?env f
 
     let is_impl ?env = function
-      | Local  f -> Term.Smart.is_impl      f.formula
+      | Local  f -> Term.Smart.is_impl      f
       | Global f ->      Smart.is_impl ?env f
 
     let is_iff = function
-      | Local  f -> Term.Smart.is_iff f.formula
+      | Local  f -> Term.Smart.is_iff f
       | Global f ->      Smart.is_iff f
 
     let is_forall = function
-      | Local  f -> Term.Smart.is_forall f.formula
+      | Local  f -> Term.Smart.is_forall f
       | Global f ->      Smart.is_forall f
 
     let is_exists ?env = function
-      | Local  f -> Term.Smart.is_exists      f.formula
+      | Local  f -> Term.Smart.is_exists      f
       | Global f ->      Smart.is_exists ?env f
 
     let is_let = function
-      | Local  f -> Term.Smart.is_let f.formula
+      | Local  f -> Term.Smart.is_let f
       | Global f ->      Smart.is_let f
 
     let is_eq = function
-      | Local  f -> Term.Smart.is_eq f.formula
+      | Local  f -> Term.Smart.is_eq f
       | Global f ->      Smart.is_eq f
 
     let is_neq = function
-      | Local  f -> Term.Smart.is_neq f.formula
+      | Local  f -> Term.Smart.is_neq f
       | Global f ->      Smart.is_neq f
 
     let is_leq = function
-      | Local  f -> Term.Smart.is_leq f.formula
+      | Local  f -> Term.Smart.is_leq f
       | Global f ->      Smart.is_leq f
 
     let is_lt = function
-      | Local  f -> Term.Smart.is_lt f.formula
+      | Local  f -> Term.Smart.is_lt f
       | Global f ->      Smart.is_lt f
 
     (*------------------------------------------------------------------*)
     let destr_let = function
       | Local f ->
-        omap (fun (v,t1,t2) -> v,t1, Local {formula = t2; bound = f.bound}) (Term.Smart.destr_let f.formula)
+        omap (fun (v,t1,t2) -> v,t1, Local t2) (Term.Smart.destr_let f)
       | Global f ->
         omap (fun (v,t1,t2) -> v,t1, Global t2) (     Smart.destr_let f)
 
     let destr_ands i = function
-      | Local {formula = f; bound = None} ->
-          omap (fun l -> List.map (fun x -> Local {formula = x; bound = None}) l)
+      | Local f ->
+          omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_ands i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
             (Smart.destr_ands i f)
-      | _ -> assert false
 
     let destr_ors ?env i = function
-      | Local {formula = f; bound = None} ->
+      | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_ors i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
             (Smart.destr_ors ?env i f)
-      | _ -> assert false
 
     let destr_impls i = function
-      | Local {formula = f; bound = None} ->
+      | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_impls i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
             (Smart.destr_impls i f)
-      | _ -> assert false
 
     let destr_eq = function
-      | Local  f -> Term.Smart.destr_eq f.formula
+      | Local  f -> Term.Smart.destr_eq f
       | Global f ->      Smart.destr_eq f
 
     let destr_neq = function
-      | Local  f -> Term.Smart.destr_neq f.formula
+      | Local  f -> Term.Smart.destr_neq f
       | Global f ->      Smart.destr_neq f
 
     let destr_leq = function
-      | Local  f -> Term.Smart.destr_leq f.formula
+      | Local  f -> Term.Smart.destr_leq f
       | Global f ->      Smart.destr_leq f
 
     let destr_lt = function
-      | Local  f -> Term.Smart.destr_lt f.formula
+      | Local  f -> Term.Smart.destr_lt f
       | Global f ->      Smart.destr_lt f
 
     (*------------------------------------------------------------------*)
     let decompose_forall = function
       | Local f ->
-        let vs,ff = Term.Smart.decompose_forall f.formula in
-        vs, Local {formula = ff; bound = f.bound}
+        let vs,f = Term.Smart.decompose_forall f in
+        vs, Local f
       | Global f ->
         let vs,f = Smart.decompose_forall f in
         vs, Global f
 
     let decompose_forall_tagged = function
       | Local f ->
-        let vs,ff = Term.Smart.decompose_forall_tagged f.formula in
-        vs, Local {formula = ff; bound = f.bound}
+        let vs,f = Term.Smart.decompose_forall_tagged f in
+        vs, Local f
       | Global f ->
         let vs,f = Smart.decompose_forall_tagged f in
         vs, Global f
@@ -1439,48 +1404,40 @@ module Any = struct
     (*------------------------------------------------------------------*)
     let decompose_exists = function
       | Local f ->
-        let vs,ff = Term.Smart.decompose_exists f.formula in
-        vs, Local {formula = ff; bound = f.bound}
+        let vs,f = Term.Smart.decompose_exists f in
+        vs, Local f
       | Global f ->
         let vs,f = Smart.decompose_exists f in
         vs, Global f
-      | _ -> assert false
 
     let decompose_exists_tagged = function
       | Local f ->
-        let vs,ff = Term.Smart.decompose_exists_tagged f.formula in
-        vs, Local {formula = ff; bound = f.bound}
+        let vs,f = Term.Smart.decompose_exists_tagged f in
+        vs, Local f
       | Global f ->
         let vs,f = Smart.decompose_exists_tagged f in
         vs, Global f
 
     (*------------------------------------------------------------------*)
     let decompose_ands = function
-      | Local {formula = f; bound = None} -> List.map (fun x -> Local {formula = x; bound = None} )
-                                               (Term.Smart.decompose_ands f)
+      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_ands f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ands f)
-      | _ -> assert false
 
     let decompose_ors = function
-      | Local {formula = f; bound = None} -> List.map (fun x -> Local {formula  = x; bound = None} )
-                                               (Term.Smart.decompose_ors f)
+      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_ors f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ors f)
-      | _ -> assert false
 
     let decompose_impls = function
-      | Local {formula = f; bound = None} -> List.map (fun x -> Local {formula = x; bound = None} )
-                                               (Term.Smart.decompose_impls f)
+      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_impls f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_impls f)
-      | _ -> assert false
 
     let decompose_impls_last = function
-      | Local {formula = f; bound = None} ->
+      | Local f ->
           let l,f = Term.Smart.decompose_impls_last f in
-            List.map (fun x -> Local {formula = x; bound = None}) l, Local {formula = x; bound = None}
+            List.map (fun x -> Local x) l, Local f
       | Global f ->
           let l,f = Smart.decompose_impls_last f in
             List.map (fun x -> Global x) l, Global f
-      | _ -> assert false
   end
 
 end

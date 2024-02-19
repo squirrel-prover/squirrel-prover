@@ -9,7 +9,7 @@ module SE = SystemExpr
 (** {2 Equivalence} *)
 
 (*------------------------------------------------------------------*)
-type equiv = Term.term list
+type equiv = {terms : Term.term list; bound : Term.term option}
 
 val pp_equiv : equiv formatter
 
@@ -23,6 +23,10 @@ val subst_equiv : Term.subst -> equiv -> equiv
 val fv_equiv : equiv -> Vars.Sv.t
 
 (*------------------------------------------------------------------*)
+(** {2 Formula with potential upper bound} *)
+type bform = {formula : Term.term; bound : Term.term option}
+
+ (*------------------------------------------------------------------*)
 (** {2 Equivalence atoms} *)
 
 type pred_app = {
@@ -42,7 +46,7 @@ type atom =
       where the systems [left, right] are given by the [pair] component 
       of the system context. *)
 
-  | Reach of Term.term
+  | Reach of bform
   (** Reach(φ) corresponds to [[φ]_{P1} ∧ [φ]_(P2) ∧ …]
       where the systems [Pi] are given by the [set] component of 
       the system context. *)
@@ -84,8 +88,8 @@ val _pp : ?context:SE.context -> form formatter_p
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
-val mk_reach_atom : Term.term -> form
-val mk_equiv_atom : Term.term list -> form
+val mk_reach_atom : ?e:Term.term option -> Term.term -> form
+val mk_equiv_atom : ?e:Term.term option -> Term.term list -> form
 
 (*------------------------------------------------------------------*)
 (** Does not recurse. *)
@@ -208,7 +212,7 @@ end
 (** {2 Smart constructors and destructots} *)
 module Smart : SmartFO.S with type form = global_form
 
-val destr_reach : form -> Term.term option
+val destr_reach : form -> bform option
 val destr_equiv : form -> equiv option
   
 val is_equiv : form -> bool

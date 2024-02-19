@@ -1036,7 +1036,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let v0 = Vars.mk hid (Term.ty t) in
       
-      let fv = S.fv (S.set_conclusion S.Conc.mk_false s) in
+      let fv = S.fv (S.set_conclusion (S.Conc.mk_false ()) s) in
       if Sv.mem v0 fv then 
         soft_failure ?loc
           (Failure "cannot revert definition: variable bound in proof-context") ;
@@ -1429,7 +1429,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let f = oget (S.Conc.destr_not form) in
           let f = S.hyp_of_conc f in
           let id, s = Hyps.add_i Args.Unnamed (LHyp f) s in
-          let s = S.set_conclusion S.Conc.mk_false s in
+          let s = S.set_conclusion (S.Conc.mk_false ()) s in
           `Hyp id, s
         end
 
@@ -1439,7 +1439,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let h = Term.mk_atom `Eq u v in
           let h = S.unwrap_hyp (Local h) in
           let id, s = Hyps.add_i Args.Unnamed (LHyp h) s in
-          let s = S.set_conclusion S.Conc.mk_false s in
+          let s = S.set_conclusion (S.Conc.mk_false ()) s in
           `Hyp id, s
         end
 
