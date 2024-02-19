@@ -1731,6 +1731,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
         if S.Conc.is_impl pat.pat_op_term then
           let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
           try_apply (t1 :: subs) { pat with pat_op_term = t2 }
+        else if S.Conc.is_forall pat.pat_op_term then
+          let v, t = oget (S.Conc.destr_forall1_tagged pat.pat_op_term) in
+          let v, subst = Term.refresh_vars_w_info [v] in
+          let t = S.subst_conc subst t in
+          let pat_op_vars = as_seq1 v :: pat.pat_op_vars in
+          try_apply subs { pat with pat_op_vars; pat_op_term = t }
         else
           let t, has_red =
             S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind pat.pat_op_term
