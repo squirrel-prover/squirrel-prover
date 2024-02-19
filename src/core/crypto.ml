@@ -388,6 +388,7 @@ let exact_eq_under_cond
   Match.E.deduce_mem_one cterm known_set unif_state 
 
 (*------------------------------------------------------------------*)
+exception UnknowGlobalSmplsAssign
 (** Name contraints module.*)
 module Const = struct 
   (** Inner declaration of [Const], to have a private type [t].
@@ -417,6 +418,8 @@ module Const = struct
 
     val generalize : Vars.vars -> t list -> t list
     val add_condition : Term.term -> t list -> t list
+
+    val get_global : Vars.var -> t list -> game -> Term.term
   end = struct
 
     type t = {
@@ -515,7 +518,15 @@ module Const = struct
         let const = refresh const in
         { const with cond = cond::const.cond }
       in
-      List.map doit consts 
+      List.map doit consts
+
+    let rec get_global (x:Vars.var) (consts : t list) (game: game) =
+      match consts with
+      | [] -> raise UnknowGlobalSmplsAssign
+      | c::_ when c.tag = Tag.game_glob x game && c.vars = [] && c.cond = [] ->
+         Term.mk_name c.name c.term
+      | _::q -> get_global x q game
+                  
   end
   include Const
 
@@ -1283,6 +1294,49 @@ module Game = struct
   }
 
   (* ----------------------------------------------------------------- *)
+  (** Try to infer variables association to un-matched variable in oracle call*)
+  exception LocSmplToInfer
+  
+  let infer_args_and_name
+      (state      : state)
+      (mv         : Match.Mvar.t)
+      (oracle_pat : oracle_pat)
+      (oracle     : oracle)
+      (subgoals : Term.terms)
+    =
+    (* For any oracle input not apperaing in output, associate it to witness*)
+    let arg_not_used =
+      List.filter (fun x -> not (Mvar.mem x mv)) oracle.args
+    in
+    let mv =
+      List.fold_left (fun mv var -> 
+          Mvar.add (var,Vars.Tag.ltag) SE.any
+            (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
+        mv arg_not_used
+    in
+    let smpls_not_used =
+      List.filter
+        (fun x -> not (Mvar.mem x mv) && (Sv.mem x (Term.fvs (oracle_pat.cond@subgoals))))
+                    state.game.glob_smpls
+    in
+    Fmt.epr "Infering name %a@." (Fmt.list Vars.pp) smpls_not_used;
+    let rec infer_with_constraints smpls mv = match smpls with
+      | [] -> mv
+      | r::q ->
+          let n = Const.get_global r state.consts state.game in
+          let mv =Mvar.add (r,Vars.Tag.ltag) SE.any n mv in
+          infer_with_constraints q mv
+    in
+    let mv = infer_with_constraints smpls_not_used mv in
+    let loc_smpls =
+      List.filter
+        (fun x -> not (Mvar.mem x mv) && (Sv.mem x (Term.fvs (oracle_pat.cond@subgoals))))
+        oracle.loc_smpls
+    in
+    if loc_smpls = [] then mv else raise LocSmplToInfer
+          
+        
+  
   (** Return the list for each oracle pattern of the successful oracle
       matches. *)
   let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
@@ -1335,16 +1389,15 @@ module Game = struct
         in
 
         (* complete [mv] with a default [witness] value for all (standard) 
-           oracle inputs that are not needed *)
-        let arg_not_used = List.filter (fun x -> not (Mvar.mem x mv)) oracle.args in
-        let mv =
-          List.fold_left (fun mv var -> 
-              Mvar.add (var,Vars.Tag.ltag) SE.any
-                (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv
-            ) mv arg_not_used 
-        in
-
-        Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
+           oracle inputs that are not needed and try to infer global name with constraints*)
+        begin
+          try 
+            let mv = infer_args_and_name state mv oracle_pat oracle subgoals in
+            Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
+          with
+          | UnknowGlobalSmplsAssign -> None
+          | LocSmplToInfer -> None
+        end
           
       | _ ->  None
     in
@@ -1393,6 +1446,8 @@ module Game = struct
   }
   
   (* ----------------------------------------------------------------- *)
+
+  
   (** If a successful match has been found, does the actual symbolic call 
       to the oracle *)
   let call_oracle
@@ -1407,7 +1462,6 @@ module Game = struct
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
     let subgoals = List.map (Term.subst subst) subgoals in
-    
     try
       let consts,eqs =
         Const.constraints_terms_from_mv
@@ -1429,19 +1483,19 @@ module Game = struct
           (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
           state.mem
       in
-
       (* creating the implication is better than substituting *)
       let subgoals = List.map (Term.mk_impls eqs) subgoals in
       
       match mem_subgoals with
       | Some mem_subgoals ->
-        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
         let mem_subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) mem_subgoals
         in
         let subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) subgoals
         in
+        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
+        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
         Some {
           new_consts = consts;
           index_cond = eqs;
