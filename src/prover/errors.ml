@@ -29,12 +29,12 @@ let is_toplevel_error ?(interactive=true) ~test (e : exn) : bool =
 let pp_toplevel_error
     ?(interactive=true)
     ~test
-    (file : file)
+    (driver : Driver.t)
     (fmt : Format.formatter)
     (e : exn) : unit
   =
-  let pp_loc_error     = pp_loc_error     file in
-  let pp_loc_error_opt = pp_loc_error_opt file in
+  let pp_loc_error     = pp_loc_error     driver in
+  let pp_loc_error_opt = pp_loc_error_opt driver in
 
   match e with
   | Parserbuf.Error s ->

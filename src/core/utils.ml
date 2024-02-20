@@ -1,7 +1,7 @@
 let hcombine acc n = acc * 65599 + n
 
 let hcombine_list fhash hash l =
-  List.fold_left (fun hash x -> 
+  List.fold_left (fun hash x ->
       hcombine hash (fhash x)
     ) hash l
 
@@ -9,8 +9,8 @@ let hcombine_list fhash hash l =
 module Hashtbl = struct
   include Hashtbl
 
-  let to_list (tbl : ('a, 'b) Hashtbl.t) : ('a * 'b) list = 
-    Hashtbl.fold 
+  let to_list (tbl : ('a, 'b) Hashtbl.t) : ('a * 'b) list =
+    Hashtbl.fold
       (fun x y acc -> (x,y) :: acc)
       tbl
       []
@@ -56,7 +56,7 @@ module List = struct
 
   let rec split3 = function
     | [] -> ([], [], [])
-    | (x,y,z)::l -> 
+    | (x,y,z)::l ->
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
   let inclusion a b =
@@ -64,7 +64,7 @@ module List = struct
 
   let diff a b =
     List.filter (fun x -> not (List.mem x b)) a
-                            
+
   let rec assoc_up s f = function
     | [] -> raise Not_found
     | (a,b) :: t ->
@@ -143,7 +143,7 @@ module List = struct
 
   (*------------------------------------------------------------------*)
   exception Out_of_range
-    
+
   let splitat i l =
     let rec aux i acc = function
       | [] -> raise Out_of_range
@@ -152,12 +152,12 @@ module List = struct
 
   (*------------------------------------------------------------------*)
   let remove_duplicate cmp l =
-    let l_rev = 
+    let l_rev =
       List.fold_left (fun l el ->
           if List.exists (cmp el) l then l else el :: l
         ) [] l
     in
-    List.rev l_rev  
+    List.rev l_rev
 
 
   (** Removes from l all elements that are subsumed by another.
@@ -193,18 +193,18 @@ module List = struct
       | a::t -> aux t (map2 cons a ll)
     in
     let ini =
-      match l with 
+      match l with
       | [] -> []
       | a::_ -> init (List.length a) (fun _ -> [])
     in
     aux (rev l) ini
-     
+
   (*------------------------------------------------------------------*)
-  let mapi_fold 
-      (f  : int -> 'a -> 'b -> 'a * 'c) 
+  let mapi_fold
+      (f  : int -> 'a -> 'b -> 'a * 'c)
       (a  : 'a)
-      (xs : 'b list) 
-    : 'a * 'c list 
+      (xs : 'b list)
+    : 'a * 'c list
     =
     let a  = ref a in
     let xs = List.mapi (fun i b ->
@@ -212,25 +212,25 @@ module List = struct
       xs
     in (!a, xs)
 
-  let map_fold 
-      (f  : 'a -> 'b -> 'a * 'c) 
+  let map_fold
+      (f  : 'a -> 'b -> 'a * 'c)
       (a  : 'a)
-      (xs : 'b list) 
-    : 'a * 'c list 
+      (xs : 'b list)
+    : 'a * 'c list
     =
     mapi_fold (fun (_ : int) x -> f x) a xs
 
   let foldi (f : (int -> 'a -> 'b -> 'a)) (acc : 'a) (l : 'b list) : 'a =
-    let acc, _ = 
-      List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l 
+    let acc, _ =
+      List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l
     in
     acc
 
   let find_mapi (type b) (f : int -> 'a -> b option) (l : 'a list) : b option =
     let exception Found of b option in
-    try ignore (mapi (fun i e ->  
+    try ignore (mapi (fun i e ->
         match f i e with
-        | None -> () 
+        | None -> ()
         | Some _ as res -> raise (Found res)
       ) l);
       None
@@ -274,14 +274,14 @@ module Map = struct
   module type S = sig
     include Map.S
 
-    val add_list : (key * 'a) list -> 'a t -> 'a t 
+    val add_list : (key * 'a) list -> 'a t -> 'a t
     val find_dflt : 'a -> key -> 'a t -> 'a
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
     include Map.Make(O)
 
-    let add_list (l : (key * 'a) list) (m : 'a t) : 'a t = 
+    let add_list (l : (key * 'a) list) (m : 'a t) : 'a t =
       List.fold_left (fun m (k,v) -> add k v m) m l
 
     let find_dflt dflt k (m : 'a t) : 'a =
@@ -296,20 +296,20 @@ module Set = struct
   module type S = sig
     include Set.S
 
-    val add_list : elt list -> t -> t 
+    val add_list : elt list -> t -> t
     val map_fold : ('a -> elt -> 'a * elt) -> 'a -> t -> 'a * t
   end
 
   module Make(O : OrderedType) : S with type elt = O.t = struct
     include Set.Make(O)
 
-    let add_list (l : elt list) (s : t) : t = 
+    let add_list (l : elt list) (s : t) : t =
       List.fold_left (fun m v -> add v m) s l
 
-    let map_fold 
-        (f  : 'a -> elt -> 'a * elt) 
+    let map_fold
+        (f  : 'a -> elt -> 'a * elt)
         (a  : 'a)
-        (xs : t) 
+        (xs : t)
       : 'a * t
       =
       let a  = ref a in
@@ -367,6 +367,10 @@ let oequal eq a b =
   | Some a, Some b -> eq a b
   | _ -> false
 
+let get_result = function
+  | Ok r -> r
+  | Error e -> raise e
+
 (*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
@@ -410,7 +414,7 @@ end = struct
     for i = 0 to t.max_size - 1 do
       let ri = Puf.find t.uf i in
       Fmt.pf ppf "@[%d->%d @]"
-        i ri           
+        i ri
     done
 
   let extend t =
@@ -440,23 +444,23 @@ module Uf (Ord: Ordered) = struct
   type v = Ord.t
   module Vmap = Map.Make(Ord)
 
-  module Smart : sig 
+  module Smart : sig
     (** [rmap] is the inverse of map.
         [cpt] counts the number of non-trivial unions .
         [id] is guaranteed to be different for different union-find structures. *)
-    type t = private { 
+    type t = private {
       map : int Vmap.t;
       rmap : v Mi.t;
       puf : Vuf.t;
       cpt : int;
-      id : int; 
+      id : int;
     }
 
-    val mk : 
+    val mk :
       ?map:(int Vmap.t) ->
       ?rmap:(v Mi.t) ->
       ?puf:Vuf.t ->
-      ?cpt:int -> 
+      ?cpt:int ->
       t ->
       t
 
@@ -471,13 +475,13 @@ module Uf (Ord: Ordered) = struct
 
     let cpt_id = ref 0
     let mk_id () = incr cpt_id; !cpt_id
-    
+
     let empty d = {
-      map = Vmap.empty; 
-      rmap = Mi.empty; 
-      puf = Vuf.create d; 
+      map = Vmap.empty;
+      rmap = Mi.empty;
+      puf = Vuf.create d;
       cpt = 0;
-      id = mk_id (); 
+      id = mk_id ();
     }
 
     let mk ?map ?rmap ?puf ?cpt t =
@@ -514,7 +518,7 @@ module Uf (Ord: Ordered) = struct
       let i, uf = Vuf.extend t.puf in
       Smart.mk ~puf:uf
                ~map:(Vmap.add v i t.map)
-               ~rmap:(Mi.add i v t.rmap) 
+               ~rmap:(Mi.add i v t.rmap)
                t
 
   let find t u =
@@ -529,17 +533,17 @@ module Uf (Ord: Ordered) = struct
       ~map:(Vmap.add u i' t.map
             |> Vmap.add u' i)
       ~rmap:(Mi.add i u' t.rmap
-             |> Mi.add i' u) 
+             |> Mi.add i' u)
       t
 
   let union t u u' =
     let iu, iu' = Vmap.find u t.map, Vmap.find u' t.map in
     let ri, ri' = Vuf.find t.puf iu, Vuf.find t.puf iu' in
-    let t' = 
-      if ri <> ri' 
+    let t' =
+      if ri <> ri'
       then Smart.mk
         ~puf:(Vuf.union t.puf iu iu')
-        ~cpt:(t.cpt + 1) 
+        ~cpt:(t.cpt + 1)
         t
       else t
     in
@@ -576,13 +580,13 @@ module Uf (Ord: Ordered) = struct
   module Memo = Ephemeron.K1.Make(MemoV)
   module Memo2 (H2:Hashtbl.HashedType) = Ephemeron.K2.Make (MemoV) (H2)
 
-  let memo_cl = Memo.create 256 
+  let memo_cl = Memo.create 256
 
   (* memoisation *)
   let classes t = try Memo.find memo_cl t with
     | Not_found ->
       let cs = comp_classes t in
-      Memo.add memo_cl t cs; 
+      Memo.add memo_cl t cs;
       cs
 
   (** [union_count t] is the number of non-trivial unions done building [t] *)
@@ -629,7 +633,7 @@ let pp_list pp_item ppf l =
 let fst3 (a, _, _) = a
 
 (*------------------------------------------------------------------*)
- let timeout exn timeout f x = 
+ let timeout exn timeout f x =
   assert (timeout > 0);
 
   let exception Timeout in
@@ -637,7 +641,7 @@ let fst3 (a, _, _) = a
   let old_handler = Sys.signal Sys.sigalrm
     (Sys.Signal_handle (fun _ -> raise Timeout)) in
 
-  let finish () =   
+  let finish () =
     (* Cancels the alarm:
      * "If seconds is zero, any pending alarm is canceled."
      * see: man 2 alarm *)
@@ -687,7 +691,7 @@ let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
 
 (** Parenthesis rules.
     N.B.: the rule for infix left-associative symbols is only valid if,
-    in the parser, all prefix symbols are reduction-favored over 
+    in the parser, all prefix symbols are reduction-favored over
     shifting the infix symbol. *)
 let maybe_paren
     ~(inner : 'a * fixity)
@@ -703,7 +707,7 @@ let maybe_paren
       match fix_in, side with
       | `Postfix     , `Left     -> true
       | `Prefix      , `Right    -> true
-      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left 
+      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left
       | `Infix `Right, `Right    -> prio_in = prio_out && fix_out = `Infix `Right
       | _            , `NonAssoc -> prio_in = prio_out && fix_out = fix_in
       | _            , _         -> false
@@ -713,6 +717,6 @@ let maybe_paren
 (*------------------------------------------------------------------*)
 module Lazy = struct
   include Lazy
-      
+
   let map f x = lazy (f (Lazy.force x))
 end

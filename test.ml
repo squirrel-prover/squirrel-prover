@@ -29,29 +29,24 @@ let test_suites : unit Alcotest.test list =
   ]
 
 let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
-  let exception Ok in
-  let get_sp_from_dir s =
-      Sys.readdir s
-      |> Array.to_list
-      |> List.filter (fun x -> Filename.extension x = ".sp")
-      |> List.map (fun f -> Format.sprintf "%s/%s" s f) in
-
-  let list_sp = get_sp_from_dir path in
-  let okfails = List.map (fun f -> 
-    f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
-      begin fun () ->
-        (try runner ~test:true f
-        with e -> begin
-          Squirrelcore.Printer.prt `Error "%a"
-            (Squirrelprover.Errors.pp_toplevel_error ~test:true
-               (Squirrelprover.Driver.dummy_file ())) e;
-            raise e
-        end);
-        raise Ok
-      end
+  let list_sp =
+    Sys.readdir path
+    |> Array.to_list
+    |> List.filter (fun x -> Filename.extension x = ".sp")
+    |> List.map (fun f -> Filename.concat path f)
+  in
+  let make_test filename =
+    filename, `Quick, begin fun () ->
+      try runner ~test:true filename with e ->
+        Squirrelcore.Printer.prt `Error "%a"
+          (Squirrelprover.Errors.pp_toplevel_error
+             ~test:true
+             Squirrelprover.Driver.dummy)
+          e;
+        raise e
     end
-    ) (list_sp) in
-  okfails
+  in
+  List.map make_test list_sp
 
 let () =
   List.iter (fun (s,t) -> Squirrelcore.Checks.add_suite s t) test_suites;

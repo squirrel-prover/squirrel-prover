@@ -46,11 +46,8 @@ let get_subgoals (ps:state) : Goal.t list =
 let set_table (ps:state) (table: Symbols.table) : state =
   { ps with table }
 
-let set_param (ps:state) (sp: Config.p_set_param) : state =
-  { ps with table = TConfig.set_param sp ps.table }
-
 let do_set_option (st:state) (sp:Config.p_set_param) : state =
-  set_param st sp
+  { st with table = TConfig.set_param sp st.table }
 
 let add_hint (ps:state) (h: Hint.p_hint) : state =
   let table = 
@@ -178,7 +175,7 @@ let do_start_proof ?(check=`NoCheck) (st: state) : state =
 (*---------------------    Goals handling  -----------------*)
 let get_current_goal (ps:state) : ProverLib.pending_proof option = ps.current_goal
 
-let get_current_system (ps:state) : SystemExpr.context option =
+let get_system (ps:state) : SystemExpr.context option =
   match get_current_goal (ps) with
   | None -> None
   | Some (ProofObl g)
@@ -363,10 +360,9 @@ let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : 
 
 let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
     (l:ProverLib.bulleted_tactics) : state =
-  if not (TConfig.interactive (get_table st)) then 
-    begin
-      let (_, curr_p) = Sedlexing.lexing_positions lex in
-      let lnum = curr_p.pos_lnum in
+  if not (TConfig.interactive (get_table st)) then begin
+    let (_, curr_p) = Sedlexing.lexing_positions lex in
+    let lnum = curr_p.pos_lnum in
     let b_tacs = List.filter_map 
       (function ProverLib.BTactic t -> Some t | _ -> None) l
     in
@@ -376,7 +372,7 @@ let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
       | _ ->
           Printer.prt `Prompt "Line %d: ??" lnum
   end;
-    do_tactic' ~check st l
+  do_tactic' ~check st l
 
 (*----------------------- Search --------------------------*)
 let search_about (st:state) (q:ProverLib.search_query) : 
@@ -493,7 +489,7 @@ let print_system (st:state) (s_opt:SystemExpr.Parse.t option)
   let system = 
     begin match s_opt with
       | None   -> 
-        begin match get_current_system st with
+        begin match get_system st with
           | Some s -> s.set
           | None -> Tactics.hard_failure 
                       (Failure "no default system");
@@ -594,30 +590,28 @@ exception Unfinished
 
 (* Manage all commands. *)
 let rec do_command 
-    ?(main_mode=`Stdin) 
-    ?(file_stack=[]) 
+    ?(driver_stack=[])
     ?(test=false) 
     ?(check=`Check) 
     (st:state) 
-    (file:Driver.file) 
+    (driver:Driver.t)
     (command:ProverLib.input) : state =
   let open ProverLib in
   let mode = get_mode st in
   Benchmark.set_position
-    (let _,pos = Sedlexing.lexing_positions file.f_lexbuf in
+    (let _,pos = Sedlexing.lexing_positions (Driver.get_lexbuf driver) in
      Format.asprintf
        "%s:%d:%s:%a"
-       (match file.f_path with
-        | `File s -> s | `Stdin -> "stdin" | `Str -> "str")
+       (Driver.name driver)
        pos.pos_lnum
        (Utils.odflt "_" (current_goal_name st))
        Bullets.pp st.bullets);
   match mode, command with
-    | _, Reset                   -> init' ()
+    | _, Reset -> init' ()
     | GoalMode, InputDescr decls -> do_decls st decls
-    | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
-    | _, Print q                 -> do_print st q; st
-    | _, Search t                -> do_search st t; st
+    | _, Tactic t -> do_tactic ~check st (Driver.get_lexbuf driver) t
+    | _, Print q  -> do_print st q; st
+    | _, Search t -> do_search st t; st
     | _, Help ->
       Format.printf
         "See <https://squirrel-prover.github.io/documentation/>.@.";
@@ -625,16 +619,16 @@ let rec do_command
     | _, Prof ->
       Printer.prt `Dbg "%a" Prof.print ();
       st
-    | WaitQed, Qed               -> do_qed st
-    | GoalMode, Hint h           -> add_hint st h
-    | GoalMode, SetOption sp     -> set_param st sp
-    | GoalMode, Goal g           -> do_add_goal st g
-    | GoalMode, Proof            -> do_start_proof ~check st
-    | GoalMode, Include inc      -> do_include ~main_mode ~file_stack st inc
-    | GoalMode, EOF              -> 
-      (* ↓ If interactive, never end ↓ *)
-      if TConfig.interactive (get_table st) 
-      then st else do_eof st
+    | WaitQed, Qed -> do_qed st
+    | GoalMode, Hint h       -> add_hint st h
+    | GoalMode, SetOption sp -> do_set_option st sp
+    | GoalMode, Goal g       -> do_add_goal st g
+    | GoalMode, Proof        -> do_start_proof ~check st
+    | GoalMode, Include inc ->
+      do_include ~dirname:(Driver.dirname driver) ~driver_stack st inc
+    | GoalMode, EOF ->
+      (* If interactive, never end. *)
+      if TConfig.interactive (get_table st) then st else do_eof st
     | WaitQed, Abort -> 
       if test then
         raise (Failure "Trying to abort a completed proof.");
@@ -651,13 +645,12 @@ let rec do_command
       Command.cmd_error UnexpectedCommand
 
 and do_include
-      ?(test=true) ?(main_mode=`Stdin) ?(file_stack=[]) (st:state) (i:ProverLib.include_param)
+      ?(test=true) ?(driver_stack=[]) (st:state) ~dirname (i:ProverLib.include_param)
     : state
 =
-  (* if main_mode = `Stdin will add cwd in path with theories *)
-  let load_paths = Driver.mk_load_paths ~main_mode () in
-  let file =
-    Driver.include_get_file file_stack load_paths i.th_name
+  let load_paths = Driver.mk_load_paths dirname in
+  let driver =
+    Driver.from_include driver_stack load_paths i.th_name
   in
   let interactive = TConfig.interactive (get_table st) in
   let checkInclude = 
@@ -668,16 +661,15 @@ and do_include
       then `NoCheck
       else `Check
     end in
-  let new_file_stack = file :: file_stack in
+  let new_driver_stack = driver :: driver_stack in
   let st = 
     try 
       let st = 
         do_all_commands_in
-          ~main_mode ~file_stack:new_file_stack ~check:checkInclude ~test st file 
+          ~driver_stack:new_driver_stack ~check:checkInclude ~test st driver
       in
-
-      (*Adding the file as included library in table theories' symbols *)
-      let table, _ = 
+      (* Adding included library in table's theory symbols. *)
+      let table, _ =
         let name = match i.th_name with Name s -> s | Path s -> s in
         Symbols.Theory.declare_exact st.table name () in
       { st with table }
@@ -686,68 +678,67 @@ and do_include
       let err_mess fmt =
         Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
           (Location.unloc (ProverLib.lsymb_of_load_path i.th_name))
-          (Errors.pp_toplevel_error ~interactive:interactive ~test file) e
+          (Errors.pp_toplevel_error ~interactive:interactive ~test driver) e
       in
-      Driver.close_chan file.f_chan;
+      Driver.close driver;
       Command.cmd_error (IncludeFailed err_mess)
   in
-  Driver.close_chan file.f_chan;
-  Printer.prt `Warning "Loaded \"%s.sp\"." file.f_name;
+  Driver.close driver;
+  Printer.prt `Warning "Loaded \"%s.sp\"." (Driver.name driver);
   st
 
-and do_all_commands_in ~main_mode ?(file_stack=[]) 
-    ~check ~test (st:state) (file:Driver.file) : state 
+and do_all_commands_in ?(driver_stack=[])
+    ~check ~test (st:state) (driver:Driver.t) : state
   =
   let interactive = TConfig.interactive (get_table st) in
-  match Driver.FromFile.next_input ~test ~interactive file (get_mode st) with
+  match Driver.next_input ~test ~interactive driver (get_mode st) with
   | EOF ->
       (* ↓ If test or interactive, never end ↓ *)
       if test || interactive 
       then st else do_eof st
   | cmd ->
-     do_all_commands_in ~main_mode ~file_stack ~check ~test
-       (do_command ~main_mode ~file_stack ~test ~check st file cmd) file
+     do_all_commands_in ~driver_stack ~check ~test
+       (do_command ~driver_stack ~test ~check st driver cmd) driver
 
 and exec_command 
     ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
   let interactive = TConfig.interactive (get_table st) in
   let input =
-    Driver.FromFile.next_input
-      ~test ~interactive (Driver.file_from_str s) (get_mode st) in
-  do_command ~test ~check st (Driver.file_from_str s) input
+    Driver.next_input
+      ~test ~interactive (Driver.from_string s) (get_mode st) in
+  do_command ~test ~check st (Driver.from_string s) input
 
-and exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) = 
-  let file_from_string = Driver.file_from_str s in
-  do_all_commands_in ~main_mode:`Stdin ~check ~test st file_from_string 
+(** Execute all commands from a string. *)
+let exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) =
+  let driver = Driver.from_string s in
+  do_all_commands_in ~check ~test st driver
 
-let init : ?withPrelude:bool -> unit -> state =
-  (* memoise state with prelude *)
+let init : ?with_prelude:bool -> unit -> state =
+  (* Memoise state with prelude. *)
   let state0 : state option ref = ref None in
-  
-  fun ?(withPrelude=true) () : state ->
+  fun ?(with_prelude=true) () : state ->
     match !state0 with
-    | Some st when withPrelude = true -> st
+    | Some st when with_prelude = true -> st
     | _ -> 
       let state = init' () in
-      if withPrelude then begin
+      if with_prelude then begin
         let inc =
-          ProverLib.{ th_name = Name (Location.mk_loc Location._dummy
-                          "Prelude");
+          ProverLib.{ th_name =
+                        Name (Location.mk_loc Location._dummy "Prelude");
                       params = []; }
         in
-        let state = do_include ~main_mode:(`File "Prelude") state inc in
+        let state = do_include ~dirname:Driver.theory_dir state inc in
         state0 := Some state;
         state
       end
       else state
 
-(* run entire squirrel file with given path as string *)
+(* Run entire Squirrel file with given path as string. *)
 let run ?(test=false) (file_path:string) : unit =
-  match Driver.file_from_path LP_none 
-          (Filename.remove_extension file_path) with
-  | Some file ->
-    let name = Filename.remove_extension file.f_name in
+  match Driver.from_file file_path with
+  | Ok driver ->
     let _ : state =
-      do_all_commands_in ~main_mode:(`File name) ~file_stack:[file] ~test ~check:`Check (init ()) file
+      do_all_commands_in
+        ~driver_stack:[driver] ~test ~check:`Check (init ()) driver
     in ()
-  | None -> failwith "File not found !" 
+  | Error _ -> failwith "File not found!"

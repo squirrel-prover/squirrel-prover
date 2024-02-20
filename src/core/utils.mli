@@ -196,6 +196,9 @@ val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
 val oiter     : ('a -> unit) -> 'a option -> unit
 val oequal    : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 
+(** Get result, raise exception otherwise. *)
+val get_result : ('a,exn) Result.t -> 'a
+
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
     assuming [f_eq] is an equivalence relation. *)

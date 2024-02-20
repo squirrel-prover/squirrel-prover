@@ -2,12 +2,11 @@
 
 open Squirrelcore
 open Squirrelfront
-open Parserbuf
 
 module L = Location
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  parse_from_buf ~test Parser.declarations lexbuf ~filename
+  Parserbuf.parse_from_buf ~test Parser.declarations lexbuf ~filename
 
 let parse_theory_test ?(test=false) filename =
   let chan = Stdlib.open_in filename in

@@ -1,17 +1,21 @@
-(*------------------------------------------------------------------*)
-(** {2 parser types} *)
+(** Parameters
 
-(** Parser parameter values *)
+    This module manages user-definable parameters,
+    as well as a few application parameters controlling how
+    Squirrel runs. *)
+
+(** {2 Types} *)
+
+(** Parameter value *)
 type p_param_val =
   | Param_bool   of bool
   | Param_string of string
   | Param_int    of int
 
-(** Parser parameter set *)
+(** Parameter setting *)
 type p_set_param = string * p_param_val
 
-(*------------------------------------------------------------------*)
-(** {2 parameter state} *)
+(** {2 Global parameter state} *)
 
 type params
 
@@ -21,8 +25,7 @@ val get_params : unit -> params
 
 val set_params : params -> unit
 
-(*------------------------------------------------------------------*)
-(** {2 look-up functions} *)
+(** {2 Getters} *)
 
 (** Debug information for the constraint checker. *)
 val debug_constr : unit -> bool
@@ -33,7 +36,6 @@ val debug_completion : unit -> bool
 (** Debug information for tactics. *)
 val debug_tactics : unit -> bool
 
-(*------------------------------------------------------------------*)
-(** {2  set functions} *)
+(** {2 Setters} *)
 
 val set_param : p_set_param -> [`Failed of string | `Success]

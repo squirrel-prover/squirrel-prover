@@ -56,12 +56,7 @@ let some_print () =
   |> ignore
 
 let run_test () = 
-  let exception Ok in
-  Alcotest.check_raises "run test" Ok
-    (fun () ->
-       let _ = Prover.run ~test:true "tests/ok/test.sp" in
-       raise Ok
-    )
+  Prover.run ~test:true "tests/ok/test.sp"
 
 (*------------------------------------------------------------------*)
 let some_include () =
@@ -72,7 +67,18 @@ let some_include () =
 
 (*------------------------------------------------------------------*)
 let tests = [
-   ("some_print",         `Quick, Util.catch_error some_print);
-   ("some_include",       `Quick, Util.catch_error some_include);
-   ("run_test",           `Quick, Util.catch_error run_test);
+   ("Print",            `Quick, Util.catch_error some_print);
+   ("Include",          `Quick, Util.catch_error some_include);
+   ("Include",          `Quick, Util.catch_error some_include);
+   ("tests/ok/test.sp", `Quick, Util.catch_error run_test);
+   ("Cycle by name", `Quick, Util.catch_error begin fun () ->
+       Alcotest.check_raises "run test"
+         (Squirrelcore.Command.Cmd_error (IncludeCycle "cyclename"))
+         (fun () -> Prover.run ~test:true "tests/alcotest/cyclename.sp")
+    end);
+   ("Cycle by path", `Quick, Util.catch_error begin fun () ->
+       Alcotest.check_raises "run test"
+         (Squirrelcore.Command.Cmd_error (IncludeCycle "cyclepath"))
+         (fun () -> Prover.run ~test:true "tests/alcotest/cyclepath.sp")
+    end);
 ]
