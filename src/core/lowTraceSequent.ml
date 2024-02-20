@@ -193,56 +193,28 @@ let query ~precise s = function
   | None -> not (Constr.m_is_sat (get_models s))
   | Some q -> Constr.query ~precise (get_models s) q
 
-module Benchmark = struct
-
-  let query_methods = ref ["Constr",query]
-  let register_query_alternative name f =
-    query_methods := !query_methods @ [name,f]
-  let query_id = ref 0
-  let query_pos = ref ""
-  let set_position pos = query_pos := pos
-  let log_chan =
-    Lazy.from_fun (fun () ->
-      match Sys.getenv_opt "BENCHMARK_DIR" with
-      | None -> None
-      | Some temp_dir ->
-        let fname = Filename.temp_file ~temp_dir "squirrel_bench_" ".txt" in
-        Some (Format.formatter_of_out_channel (open_out fname)))
+module ConstrBenchmark = Benchmark.Make(struct
+  type input = bool * sequent * Term.Lit.literals option
+  type output = bool
+  let default =
+    "Constr",
+    (fun (precise,s,q) -> query ~precise s q)
+  let basename = "squirrel_bench_constr_"
+  let pp_input ch (_,_,q) = match q with
+    | None -> Format.fprintf ch "false"
+    | Some q -> Term.Lit.pps ch q
   let pp_result ch = function
-    | Error _ -> Format.fprintf ch "failure"
     | Ok b -> Format.fprintf ch "%b" b
-  let log (name,query,result,time) =
-    match Lazy.force log_chan with
-    | None -> ()
-    | Some ch ->
-      let query =
-        match query with
-        | None -> "false"
-        | Some q -> Format.asprintf "%a" Term.Lit.pps q
-      in
-      Format.fprintf ch
-        "%d:%s:%s:%S:%a:%f@."
-        !query_id
-        !query_pos
-        name
-        query
-        pp_result result
-        time
-  let get_result ~precise s q (name,f) =
-    let t0 = Unix.gettimeofday () in
-    match f ~precise s q with
-    | r -> name, q, Ok r, Unix.gettimeofday () -. t0
-    | exception e -> name, q, Error e, Unix.gettimeofday () -. t0
-end
+    | Error _ -> Format.fprintf ch "fail"
+end)
+
+let register_query_alternative name alt =
+  ConstrBenchmark.register_alternative
+    name
+    (fun (precise,s,q) -> alt ~precise s q)
 
 let query ~precise s q =
-  let open Benchmark in
-  incr Benchmark.query_id;
-  let results = List.map (get_result ~precise s q) !query_methods in
-  List.iter log results;
-  match List.hd results with
-  | _,_,Error e,_ -> raise e
-  | _,_,Ok r,_ -> r
+  ConstrBenchmark.run (precise,s,q)
 
 (** Exported versions of query and its alternatives. *)
 

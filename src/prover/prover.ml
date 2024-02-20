@@ -602,21 +602,22 @@ let rec do_command
     (file:Driver.file) 
     (command:ProverLib.input) : state =
   let open ProverLib in
-  let pst = st in
   let mode = get_mode st in
-  TraceSequent.Benchmark.set_position
+  Benchmark.set_position
     (let _,pos = Sedlexing.lexing_positions file.f_lexbuf in
-     Format.sprintf
-       "%s:%d"
+     Format.asprintf
+       "%s:%d:%s:%a"
        (match file.f_path with
         | `File s -> s | `Stdin -> "stdin" | `Str -> "str")
-       pos.pos_lnum);
+       pos.pos_lnum
+       (Utils.odflt "_" (current_goal_name st))
+       Bullets.pp st.bullets);
   match mode, command with
     | _, Reset                   -> init' ()
     | GoalMode, InputDescr decls -> do_decls st decls
     | _, Tactic t                -> do_tactic ~check st file.f_lexbuf t
-    | _, Print q                 -> do_print pst q; st
-    | _, Search t                -> do_search pst t; st
+    | _, Print q                 -> do_print st q; st
+    | _, Search t                -> do_search st t; st
     | _, Help ->
       Format.printf
         "See <https://squirrel-prover.github.io/documentation/>.@.";

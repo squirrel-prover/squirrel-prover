@@ -1156,38 +1156,79 @@ let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
   in
   simpl_aux ~close
 
-let trace_auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
-  simpl ~red_param ~close ~strong s sk fk
-
-let trace_autosimpl s =
-  trace_auto
-    ~red_param:Reduction.rp_default
-    ~close:false
-    ~strong:false
-    s
-
-
-(* tries to close the goal with simpl *)
-(* returns true if the goal was closed, false otherwise *)
-let tryauto_closes (g:sequent) : bool =
-  (* exception to get out of the continuations *)
-  let exception Res of bool in
-  let red_param = Reduction.rp_default in
-  try
-    let _:Tactics.a =
-      simpl ~red_param ~strong:true ~close:true g
-        (* if simpl succeeds: it closes the goal, so l = [] *)
-        (fun l _ -> assert (l = []); raise (Res true))
-        (* otherwise: leave the goal unchanged *)
-        (fun _ -> raise (Res false))
-    in
-    (* impossible: simpl never returns, it runs its continuations *)
-    assert false
+(* Wrap above tactic in direct style. *)
+let simpl_direct ~red_param ~strong ~close s =
+  let exception Ret of (sequent list, Tactics.tac_error) Result.t in
+  match
+    simpl ~red_param ~strong ~close s
+      (fun l _ -> raise (Ret (Result.Ok l)))
+      (fun e -> raise (Ret (Result.Error e)))
   with
-  | Res b -> b
+  | exception Ret e -> e
+  | _ -> assert false
 
+(** Benchmark for "auto", that is [simpl] with [strong=close=true].
+    Result is a boolean (true if sequent was proved). *)
+module AutoBenchmark = Benchmark.Make(struct
+  let basename = "squirrel_bench_auto_"
+  type input = Reduction.red_param * sequent
+  type output = bool
+  let default =
+    "TraceTactics",
+    fun (red_param,sequent) ->
+      match simpl_direct ~red_param ~strong:true ~close:true sequent with
+      | Ok [] -> true
+      | Error _ -> false
+      | Ok _ -> assert false
+  let pp_input ch _ = Format.fprintf ch "_"
+  let pp_result ch = function
+    | Error _ -> Format.fprintf ch "fail"
+    | Ok b -> Format.fprintf ch "%b" b
+end)
 
-(* returns gs without the goals that can be closed automatically *)
+(** Benchmark for "autosimpl", that is [simpl] with [strong=close=false].
+    Result is a boolean indicating if sequent was proved,
+    together with an optional simplification that can be given
+    otherwise. The simplified sequent is only useful for the
+    default implementation. *)
+module AutoSimplBenchmark = Benchmark.Make(struct
+  let basename = "squirrel_bench_autosimpl_"
+  type input = sequent
+  type output = bool * sequent option
+  let default =
+    "TraceTactics",
+    fun sequent ->
+      let red_param = Reduction.rp_default in
+      match simpl_direct ~red_param ~strong:false ~close:false sequent with
+      | Ok [] -> true, None
+      | Ok [s] -> false, Some s
+      | _ -> assert false
+  let pp_input ch _ = Format.fprintf ch "_"
+  let pp_result ch = function
+    | Error _ -> Format.fprintf ch "fail"
+    | Ok (b,_) -> Format.fprintf ch "%b" b
+end)
+
+let trace_auto ~red_param ~strong ~close sequent sk (fk : Tactics.fk) =
+  if strong && close then
+    match AutoBenchmark.run (red_param,sequent) with
+    | true -> sk [] fk
+    | false -> fk (None,Tactics.GoalNotClosed)
+  else
+    simpl ~red_param ~strong ~close sequent sk fk
+
+let trace_autosimpl s sk fk =
+  match AutoSimplBenchmark.run s with
+  | false, Some s -> sk [s] fk
+  | true, None -> sk [] fk
+  | _ -> assert false
+
+(* Return true iff the given sequent can be proved by auto. *)
+let tryauto_closes (g:sequent) : bool =
+  AutoBenchmark.run (Reduction.rp_default,g)
+
+(** Given a list of sequents,
+    filter out those that can be proved by auto. *)
 let tryauto (gs:sequent list) : sequent list =
   List.filter (fun g -> not (tryauto_closes g)) gs
 
