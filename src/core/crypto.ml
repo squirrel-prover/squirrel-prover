@@ -419,7 +419,6 @@ module Const = struct
     val generalize : Vars.vars -> t list -> t list
     val add_condition : Term.term -> t list -> t list
 
-    val get_global : Vars.var -> t list -> game -> Term.term
   end = struct
 
     type t = {
@@ -512,25 +511,24 @@ module Const = struct
     (** Given a name [name(terms)] and a multiset of constrainsts, 
         search whether is is compatible with this set, up to some variables 
         equalities, to associate [name(terms)] to the tag [otag].  *)
-
     let add_condition (cond : Term.term) (consts : t list) =
       let doit (const : t) =
         let const = refresh const in
         { const with cond = cond::const.cond }
       in
       List.map doit consts
-
-    let rec get_global (x:Vars.var) (consts : t list) (game: game) =
-      match consts with
-      | [] -> raise UnknowGlobalSmplsAssign
-      | c::_ when c.tag = Tag.game_glob x game && c.vars = [] && c.cond = [] ->
-         Term.mk_name c.name c.term
-      | _::q -> get_global x q game
                   
   end
   include Const
 
   exception InvalidConstraints
+
+  let rec get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
+    match consts with
+    | [] -> raise UnknowGlobalSmplsAssign
+    | c::_ when c.tag = Tag.game_glob x game && c.vars = [] && c.cond = [] ->
+      Term.mk_name c.name c.term
+    | _::q -> get_global x q game
 
   (** [retrieve_global_name] try to retrieve a constraint associated to 
       a global name [name] tagged by [otag] which holds for any branching and 
@@ -1302,9 +1300,11 @@ module Game = struct
       (mv         : Match.Mvar.t)
       (oracle_pat : oracle_pat)
       (oracle     : oracle)
-      (subgoals : Term.terms)
+      (subgoals   : Term.terms)
+    : Mvar.t
     =
-    (* For any oracle input not apperaing in output, associate it to witness*)
+    (* For any oracle input not appearing in output, associate it to
+       witness. *)
     let arg_not_used =
       List.filter (fun x -> not (Mvar.mem x mv)) oracle.args
     in
@@ -1314,28 +1314,34 @@ module Game = struct
             (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
         mv arg_not_used
     in
-    let smpls_not_used =
+
+    (* For any global sample not appearing in the output, associate it
+       to the a name according to the current constraints. *)
+    let glob_smpls_not_used =
       List.filter
-        (fun x -> not (Mvar.mem x mv) && (Sv.mem x (Term.fvs (oracle_pat.cond@subgoals))))
-                    state.game.glob_smpls
+        (fun x ->
+           not (Mvar.mem x mv) && Sv.mem x (Term.fvs (oracle_pat.cond @ subgoals)))
+        state.game.glob_smpls
     in
-    Fmt.epr "Infering name %a@." (Fmt.list Vars.pp) smpls_not_used;
-    let rec infer_with_constraints smpls mv = match smpls with
+    let rec infer_with_constraints smpls mv =
+      match smpls with
       | [] -> mv
-      | r::q ->
-          let n = Const.get_global r state.consts state.game in
-          let mv =Mvar.add (r,Vars.Tag.ltag) SE.any n mv in
-          infer_with_constraints q mv
+      | r :: q ->
+        let n = Const.get_global r state.consts state.game in
+        let mv = Mvar.add (r, Vars.Tag.ltag) SE.any n mv in
+        infer_with_constraints q mv
     in
-    let mv = infer_with_constraints smpls_not_used mv in
+    let mv = infer_with_constraints glob_smpls_not_used mv in
+
+    (* If there are local samples that do not appear in the output,
+       raise an error. *)
     let loc_smpls =
       List.filter
         (fun x -> not (Mvar.mem x mv) && (Sv.mem x (Term.fvs (oracle_pat.cond@subgoals))))
         oracle.loc_smpls
     in
     if loc_smpls = [] then mv else raise LocSmplToInfer
-          
-        
+
   
   (** Return the list for each oracle pattern of the successful oracle
       matches. *)
