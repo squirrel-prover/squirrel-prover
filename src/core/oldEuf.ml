@@ -73,8 +73,9 @@ let err_msg_of_msymb table a (ms : Symbols.macro) : Tactics.ssc_error_c =
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
-    ~globals ?(messages=[]) ?(elems=[]) ~allow_functions
-    ~cntxt head_fn key_n =
+    ~globals ?(messages=[]) ?(elems={Equiv.terms = []; bound = None})
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    ~allow_functions ~cntxt head_fn key_n =
   let ssc =
     new check_key ~allow_functions ~cntxt head_fn key_n
   in
@@ -86,7 +87,8 @@ let key_ssc
   in
       
   let errors1 = List.filter_map (check E_message) messages in
-  let errors2 = List.filter_map (check E_elem) elems in
+  let errors2 = List.filter_map (check E_elem) elems.terms in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   let errors3 =
     SystemExpr.fold_descrs (fun descr acc ->
@@ -156,7 +158,8 @@ let pp_euf_rule ppf rule =
 
 (** Exported *)
 let[@warning "-27"] mk_rule 
-    ~elems ~drop_head ~fun_wrap_key
+    ~(elems : Equiv.equiv) ~drop_head ~fun_wrap_key
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~allow_functions ~cntxt ~(env : Env.t) ~mess ~sign ~head_fn ~key_n ~key_is 
   =
 
@@ -222,7 +225,8 @@ let[@warning "-27"] mk_rule
         let new_hashes = iter#get_occurrences in
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
-      ) cntxt env empty_hyps (mess :: sign :: elems) []
+      ) cntxt env empty_hyps (mess :: sign :: (elems.terms)) []
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   
   (* we keep only actions in which the name occurs *)
@@ -256,7 +260,8 @@ let[@warning "-27"] mk_rule
       in
       iter#visit_message mess ;
       iter#visit_message sign ;
-      List.iter iter#visit_message elems ;
+      List.iter iter#visit_message elems.terms ;
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       iter#get_occurrences
     in
     List.map

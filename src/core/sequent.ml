@@ -81,7 +81,8 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   let rec doit (pt : PT.t) : PT.t =
     match pt.form with
     | Local _ -> pt
-    | Global (Atom (Reach f)) -> { pt with form = Local f; }
+    | Global (Atom (Reach f)) -> { pt with form = Local f.formula; }
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
     | Global (Equiv.Quant (Equiv.ForAll, vs, f)) ->
@@ -595,7 +596,8 @@ module Mk (Args : MkArgs) : S with
         | Equiv.Local_t, _ -> form
 
         (* in global sequent, we use it as a global formula  *)
-        | Equiv.Global_t, Equiv.Local f -> Equiv.Global (Atom (Reach f))
+        | Equiv.Global_t, Equiv.Local f -> Equiv.Global (Atom (Reach {formula = f; bound = None}))
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
         | Equiv.Global_t, Equiv.Global _ -> form
           
         | Equiv.Any_t, _ -> assert false (* impossible *)

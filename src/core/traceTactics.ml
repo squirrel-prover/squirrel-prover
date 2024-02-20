@@ -224,7 +224,8 @@ let assumption ?hyp (s : TS.t) =
   let assumption_entails (id, f) =
     (hyp = None || hyp = Some id) &&
     match f with
-    | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach f)))
+    | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound = None})))
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     | TopHyps.LHyp (Equiv.Local f) ->
       TS.Reduce.conv_term s conclusion f ||
       List.exists (fun f ->
@@ -260,7 +261,8 @@ let assumption_tac args = wrap_fail (do_assumption_tac args)
 let localize h h' s =
   match TS.Hyps.by_name_k h Hyp s with
     | _,Global (Equiv.Atom (Reach f)) ->
-        [TS.Hyps.add h' (LHyp (Local f)) s]
+        [TS.Hyps.add h' (LHyp (Local f.formula)) s]
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     | _ ->
         Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
     | exception Not_found ->
@@ -598,7 +600,8 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
         | LHyp (Equiv.Local _) -> to_lower
 
         | LHyp (Equiv.(Global (Atom (Reach hyp)))) ->
-          if Sv.mem v (Term.fv hyp) then (id, hyp) :: to_lower else to_lower
+          if Sv.mem v (Term.fv hyp.formula) then (id, hyp) :: to_lower else to_lower
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
         | LHyp (Equiv.Global hyp) ->
           if Sv.mem v (Equiv.fv hyp) then
@@ -629,9 +632,9 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
   let s =
     let to_lower =
       List.map
-        (fun (id,hyp) ->
-           (Args.Named (Ident.name id), TopHyps.LHyp (Equiv.Local hyp)))
-        to_lower
+        (fun (id,hyp) -> (Args.Named (Ident.name id), TopHyps.LHyp (Equiv.Local hyp.Equiv.formula)) )
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        to_lower 
     in
     TS.Hyps.add_list to_lower s
   in

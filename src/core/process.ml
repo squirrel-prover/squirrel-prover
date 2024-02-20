@@ -722,7 +722,8 @@ let mk_namelength_statement
   (* len(n) = cst *)
   let eq = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
   (* forall i_: len(n(i_)) = cst *)
-  let f = Equiv.Atom (Reach (Term.mk_forall vars eq)) in
+  let f = Equiv.Atom (Reach {formula = (Term.mk_forall vars eq); bound = None}) in
+  (*TODO:Concrete : Put bound at zero here (exact) by default and then use it  as is, probably a bit of  inference to do*)
 
   (* build statement with name given in arg (often namelength_s with s the
      symbol of the name) *)

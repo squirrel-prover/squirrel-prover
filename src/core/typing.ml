@@ -1451,14 +1451,16 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
               convert st t ty
             ) p_e
         in
-        Equiv.Atom (Equiv.Equiv e)
+        Equiv.Atom (Equiv.Equiv {terms = e; bound = None})
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       | _ ->
         conv_err (L.loc p) MissingSystem
     end
 
   | PReach f ->
     let f = convert st f Type.tboolean in
-    Equiv.Atom (Equiv.Reach f)
+    Equiv.Atom (Equiv.Reach {formula = f; bound = None})
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   | PPred ppa ->
     Equiv.Atom (Equiv.Pred (convert_pred_app st ppa))

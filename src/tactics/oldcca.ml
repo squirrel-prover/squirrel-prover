@@ -167,4 +167,5 @@ let deprecated_symenc_rnd_ssc ~cntxt env head_fn ~key ~key_is elems =
       ~head_fn ~key_n:key.Term.s_symb ~key_is
   in
   deprecated_check_encryption_randomness ~cntxt
-    rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems
+    rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems.terms
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)

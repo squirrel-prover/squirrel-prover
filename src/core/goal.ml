@@ -130,7 +130,8 @@ let make_obs_equiv ?(enrich=[]) table system =
   in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
-  let goal = Equiv.(Atom (Equiv (term :: enrich))) in
+  let goal = Equiv.(Atom (Equiv {terms = (term :: enrich); bound = None})) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   (* refresh free variables in [enrich], and add them to the environment *)
   let vars,_,subst = 
@@ -143,10 +144,12 @@ let make_obs_equiv ?(enrich=[]) table system =
   let enrich_s = List.map (Term.subst subst) enrich in
   (* alternative version of [goal], where [enrich] free vars have been 
      renamed. *)
-  let goal_s = Equiv.(Atom (Equiv (term :: enrich_s))) in
-  
+  let goal_s = Equiv.(Atom (Equiv ({terms = term :: enrich_s; bound = None}))) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+
   let happens = Term.mk_happens (Term.mk_var ts) in
-  let hyp = Equiv.(Atom (Reach happens)) in
+  let hyp = Equiv.(Atom (Reach {formula = happens; bound = None})) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   
   let env = Env.init ~system ~table ~vars () in
   
@@ -212,7 +215,8 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
           Equiv.Global
             (Equiv.Smart.mk_forall_tagged
                vs_glob
-               (Equiv.Atom (Equiv.Reach (Term.mk_forall_tagged vs_loc f))))
+               (Equiv.Atom (Equiv.Reach ({formula = Term.mk_forall_tagged vs_loc f; bound = None}))))
+               (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in
       formula, Local s
 

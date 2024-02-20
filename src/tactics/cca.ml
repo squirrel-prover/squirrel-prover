@@ -215,7 +215,8 @@ let indcca_param
 
                secontx InSequent hyps TacticsArgs.Once
                rule
-               Equiv.(Global (Atom (Equiv [t])))
+               Equiv.(Global (Atom (Equiv {terms = [t]; bound = None})))
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
            in
            begin
              match res with
@@ -251,7 +252,8 @@ let indcca_param
     (* get the context *)
     let cc =
       match Equiv.any_to_equiv ccc with
-      | Equiv.(Atom (Equiv [cc])) -> cc
+      | Equiv.(Atom (Equiv {terms = [cc]; bound = None})) -> cc
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       | _ -> assert false
     in
                   
@@ -465,7 +467,8 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let phi = Term.mk_ands ~simpl:true phis in
   let new_t = subst_name xc c_len cc in
   let new_biframe = List.rev_append before (new_t::after) in
-  [ES.set_reach_conclusion phi s; ES.set_equiv_conclusion new_biframe s]
+  [ES.set_reach_conclusion phi s; ES.set_equiv_conclusion {terms = new_biframe; bound = None} s]
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   
 

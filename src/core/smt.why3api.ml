@@ -1411,7 +1411,8 @@ let sequent_is_valid ~timestamp_style ~slow ~pure ~provers (s:TraceSequent.t) =
     List.filter_map
       (function
          | _, Hyps.LHyp (Equiv.Local h) -> Some h
-         | _, Hyps.LHyp (Equiv.(Global Atom (Reach f))) -> Some f
+         | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = None}))) -> Some f
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
          | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
   in

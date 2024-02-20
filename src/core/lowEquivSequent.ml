@@ -276,11 +276,13 @@ let ty_vars j = j.env.ty_vars
 
 let set_conclusion conclusion j = { j with conclusion }
 
-let set_reach_conclusion f s = set_conclusion Equiv.(Atom (Reach f)) s
+let set_reach_conclusion f s = set_conclusion Equiv.(Atom (Reach {formula = f; bound = None})) s
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let get_frame proj j = match j.conclusion with
   | Equiv.Atom (Equiv.Equiv e) ->
-    Some (List.map (Term.project1 proj) e)
+    Some ({Equiv.terms = List.map (Term.project1 proj) e.terms; bound = None})
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   | _ -> None
 
 (*------------------------------------------------------------------*)
@@ -312,7 +314,8 @@ let conclusion_is_equiv s = match conclusion s with
   | _ -> false
 
 let conclusion_as_equiv s = match conclusion s with
-  | Atom (Equiv.Equiv e) -> e
+  | Atom (Equiv.Equiv e) when e.bound = None -> e
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   | _ ->
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
@@ -324,7 +327,7 @@ let to_trace_sequent s =
 
   let conclusion =
     match s.conclusion with
-    | Equiv.Atom (Equiv.Reach f) -> f
+    | Equiv.Atom (Equiv.Reach f) -> f.formula
     | _ ->
       Tactics.soft_failure
         (Tactics.GoalBadShape "expected a reachability formula")
@@ -377,7 +380,8 @@ let check_pq_sound_sequent s =
         system = (Utils.oget s.env.system.pair:>SystemExpr.fset);
         models = Some (get_models s)
       } in
-      if not (PostQuantum.is_attacker_call_synchronized cntxt models e) then
+      if not (PostQuantum.is_attacker_call_synchronized cntxt models e.terms) then
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
         Tactics.hard_failure Tactics.GoalNotPQSound
       else
         s
@@ -407,19 +411,23 @@ let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) conclusion =
 
 let mem_felem i s =
   conclusion_is_equiv s &&
-  i < List.length (conclusion_as_equiv s)
+  i < List.length (conclusion_as_equiv s).terms
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let change_felem ?loc i elems s =
   try
-    let before, _, after = List.splitat i (conclusion_as_equiv s) in
-    set_equiv_conclusion (List.rev_append before (elems @ after)) s
+    let before, _, after = List.splitat i (conclusion_as_equiv s).terms in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    set_equiv_conclusion {terms = (List.rev_append before (elems @ after)); bound = None} s
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
 
 let get_felem ?loc i s =
   try
-    let _, t, _ = List.splitat i (conclusion_as_equiv s) in t
+    let _, t, _ = List.splitat i (conclusion_as_equiv s).terms in t
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 

@@ -295,13 +295,13 @@ let rec conv_g (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
 
   | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
     let system = SE.{set = st.system.set; pair = None; } in
-    conv { st with system } f1 f2
+    conv { st with system } f1.formula f2.formula
 
   | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
     let system =
       SE.{set = (oget st.system.pair :> SE.arbitrary); pair = None; }
     in
-    conv_l { st with system } ts1 ts2
+    conv_l { st with system } ts1.terms ts2.terms
 
   | Equiv.Let (v1,t1,f1), Equiv.Let (v2,t2,f2) ->
     let st' = conv_bnd st v1 v2 in
@@ -839,15 +839,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       | Equiv.Atom (Reach f) ->
         let state = to_state ?expand_context ~se:system.set ~vars param s in
-        let f = reduce_term state f in
-        Equiv.Atom (Reach f)
+        let f = reduce_term state f.formula in
+        Equiv.Atom (Reach {formula =f; bound = None})
+       (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Equiv e) ->
         let e_se = (oget system.pair :> SE.t) in
         let state = to_state ?expand_context ~se:e_se ~vars param s in
 
-        let e = List.map (reduce_term state) e in
-        Equiv.Atom (Equiv.Equiv e)
+        let e = List.map (reduce_term state) e.terms in
+        Equiv.Atom (Equiv.Equiv {terms = e; bound = None})
+       (*TODO:Concrete : Probably something to do with the reduction of the bound*)
 
       | Equiv.Atom (Pred pa) ->
         let simpl_args =

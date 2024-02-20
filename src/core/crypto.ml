@@ -2893,7 +2893,8 @@ let prove
   let query_start = transitivity_get_next_query query0 init_output res0 in
   let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
-    derecursify env terms game hyps
+    derecursify env terms.terms game hyps
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   let rec_bided_subgs_goals =
     List.map (fun ((goal,form):goal*Term.term):goal -> 

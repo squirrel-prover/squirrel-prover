@@ -234,7 +234,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let f = Hyps.by_id_k id Hyp s in
         S.wrap_hyp  f, Hyps.remove id s, S.system s, Some id
       | T_felem i ->
-          let f = Equiv.Global (Equiv.Atom (Equiv [S.get_felem i s])) in
+          let f = Equiv.Global (Equiv.Atom (Equiv {terms = [S.get_felem i s]; bound = None})) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
           f, s, S.system s, None
     in
 
@@ -250,7 +251,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_hyp id, _ ->
       let ldc = TopHyps.LHyp (S.unwrap_hyp f) in
       Hyps.add (Args.Named (Ident.name id)) ldc s, subs
-    | T_felem i, Global (Atom (Equiv [f])) -> S.change_felem i [f] s, subs
+    | T_felem i, Global (Atom (Equiv {terms = [f]; bound = None})) -> S.change_felem i [f] s, subs
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     | _ -> assert false
 
   (** Apply some function [doit] to many targets. *)
@@ -1036,7 +1038,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let v0 = Vars.mk hid (Term.ty t) in
       
-      let fv = S.fv (S.set_conclusion (S.Conc.mk_false ()) s) in
+      let fv = S.fv (S.set_conclusion (S.Conc.mk_false) s) in
       if Sv.mem v0 fv then 
         soft_failure ?loc
           (Failure "cannot revert definition: variable bound in proof-context") ;
@@ -1429,7 +1431,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let f = oget (S.Conc.destr_not form) in
           let f = S.hyp_of_conc f in
           let id, s = Hyps.add_i Args.Unnamed (LHyp f) s in
-          let s = S.set_conclusion (S.Conc.mk_false ()) s in
+          let s = S.set_conclusion S.Conc.mk_false s in
           `Hyp id, s
         end
 
@@ -1439,7 +1441,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let h = Term.mk_atom `Eq u v in
           let h = S.unwrap_hyp (Local h) in
           let id, s = Hyps.add_i Args.Unnamed (LHyp h) s in
-          let s = S.set_conclusion (S.Conc.mk_false ()) s in
+          let s = S.set_conclusion S.Conc.mk_false s in
           `Hyp id, s
         end
 
@@ -2588,7 +2590,8 @@ let gentac_of_any_tac_arg
 (** {2 Utilities} *)
 
 let split_equiv_conclusion (i : int L.located) (s : ES.t) =
-  try List.splitat (L.unloc i) (ES.conclusion_as_equiv s)
+  try List.splitat (L.unloc i) (ES.conclusion_as_equiv s).terms
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   with List.Out_of_range ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "out of range position")
 

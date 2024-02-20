@@ -550,7 +550,8 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   in
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
-  let equiv_sequent = ES.set_equiv_conclusion new_biframe (ES.set_table table_nprf s) in
+  let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table_nprf s) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 
   (* copied from old prf for the composition stuff *)

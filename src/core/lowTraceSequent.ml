@@ -184,7 +184,8 @@ let get_models table (proof_context : H.hyps) =
     H.fold (fun _ f acc ->
         match f with
         | LHyp (Local f)
-        | LHyp (Global Equiv.(Atom (Reach f))) -> f :: acc
+        | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None}))) -> f :: acc
+        (*TODO:Concrete : Probably something to do to create a bounded goal*)
         | LHyp (Global _) -> acc
         | LDef (_se, _t) -> acc
         (* FIXME: we cannot translate definitions, as doing so

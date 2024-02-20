@@ -445,7 +445,7 @@ module EquivHyps = Mk
 
       let choose_name _f = "H"
 
-      let htrue = Equiv.Atom (Equiv.Equiv [])
+      let htrue = Equiv.Atom (Equiv.Equiv {terms = []; bound = None})
     end)
 
 
@@ -499,7 +499,7 @@ let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
   TraceHyps.fold_hyps (fun _ f acc ->
       match f with
       | Local f
-      | Global Equiv.(Atom (Reach f)) ->
+      | Global Equiv.(Atom (Reach {formula = f; bound = None})) ->
         begin match Term.Lit.form_to_literals f with
           | `Entails lits | `Equiv lits -> lits @ acc
         end
@@ -649,14 +649,14 @@ let setup_change_hyps_context
       can_keep_global env f && can_keep_global env g
 
     | Atom (Equiv e) ->
-      (pair_sym && List.for_all no_diff e) ||
+      (pair_sym && List.for_all no_diff e.terms) ||
       pair_unchanged
 
     | Atom (Pred _) -> true
       
     | Atom (Reach a) ->
-      (HighTerm.is_constant     env a &&
-       HighTerm.is_system_indep env a)
+      (HighTerm.is_constant     env a.formula &&
+       HighTerm.is_system_indep env a.formula)
       || set_unchanged
            (* in this case, the set of systems is the same,
               but the labels may need to be renamed later *)
@@ -680,9 +680,11 @@ let setup_change_hyps_context
       Some (update_glob_aux f)
     else 
       match f with
-      | Equiv.Atom (Reach f) ->
-         Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
-      | _ -> None
+        | Equiv.Atom (Reach f) ->
+            Utils.omap
+              (fun f -> Equiv.Atom (Reach {formula = f; bound = None}))
+              (update_local f.formula)
+        | _ -> None
   in
 
   update_local, update_global

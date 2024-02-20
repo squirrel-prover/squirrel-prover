@@ -177,10 +177,12 @@ module Pos = struct
         sel_g sp ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) f
         
       | Equiv.Atom (Reach t) ->
-        sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t
+        sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t.formula
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Equiv e) -> 
-        sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e
+        sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e.terms
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Pred pa) ->
         let p = 0 :: 0 :: p in
@@ -549,17 +551,21 @@ module Pos = struct
     | Equiv.Atom (Reach t) -> 
       let se = system.set in
       let acc, found, t =
-        map_fold func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
+        map_fold func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t.formula
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in
-      let ti' = Equiv.Atom (Reach t) in
+      let ti' = Equiv.Atom (Reach {formula = t; bound = None}) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
       let se = (oget system.pair :> SE.t) in
       let acc, found, l = 
-        map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
+        map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e.terms
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in
-      let ti' = Equiv.Atom (Equiv l) in
+      let ti' = Equiv.Atom (Equiv {terms = l; bound = None}) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Pred pa) ->
@@ -2606,7 +2612,8 @@ module E = struct
       TraceHyps.fold_hyps (fun _ hyp acc ->
           match hyp with
           | Equiv.Local f
-          | Equiv.(Global Atom( (Reach f))) ->
+          | Equiv.(Global Atom( (Reach {formula = f; bound = None}))) ->
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
             f:: acc
           | _ -> acc 
         ) hyps []
@@ -3358,14 +3365,16 @@ module E = struct
 
     | Atom (Reach t), Atom (Reach pat) ->
       (* no need to change the system, we already have the correct context *)
-      term_unif t pat st
+      term_unif t.formula pat.formula st
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       let system : SE.context = 
         SE.{ set = ((oget st.system.pair) :> SE.t); pair = None; } 
       in
       let st = st_change_context st system in
-      tunif_e ~mode es pat_es st
+      tunif_e ~mode es.terms pat_es.terms st
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)

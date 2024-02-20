@@ -40,7 +40,8 @@ let tests =
       | Goal.Local s ->
           Alcotest.check any_form
             "global hypothesis should be projected"
-            (Global (Atom (Reach (formula_of_string st "p"))))
+            (Global (Atom (Reach {formula = (formula_of_string st "p"); bound = None})))
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
             (get_hyp s "Hglob");
           Alcotest.check any_form
             "local hypothesis should be projected"

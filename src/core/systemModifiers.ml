@@ -199,8 +199,9 @@ let global_rename
   let _ns1, ns2, n1, n2 =
     match f with
     |  Atom
-        (Equiv ([Term.Diff (Explicit [_,(Term.Name _ as ns1);
-                                      _, (Term.Name _ as ns2)])]))
+        (Equiv ({terms = [Term.Diff (Explicit [_,(Term.Name _ as ns1);
+                                      _, (Term.Name _ as ns2)])]; bound = None}))
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       ->
       Name.of_term ns1, Name.of_term ns2, ns1, ns2
 
@@ -272,9 +273,10 @@ let global_rename
         Equiv.Smart.mk_forall_tagged
           (Vars.Tag.global_vars ~const:true evars)
           (* FIXME: unclear what tags should be used here *)
-          (Atom (Equiv [Term.mk_var fresh_x_var;
-                        Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]])),
+          (Atom (Equiv {terms = [Term.mk_var fresh_x_var;
+                        Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]]; bound = None})),
         equiv)
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     in
     Equiv.Global (Equiv.Smart.mk_forall [fresh_x_var] fimpl)
   in
@@ -344,7 +346,8 @@ let global_prf
   (* Check syntactic side condition. *)
   let errors =
     OldEuf.key_ssc ~globals:true
-      ~elems:[] ~allow_functions:(fun _ -> false)
+      ~elems:{terms = []; bound = None} ~allow_functions:(fun _ -> false)
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       ~cntxt h_fn h_key.symb.s_symb
   in
   if errors <> [] then
@@ -424,12 +427,12 @@ let global_prf
   let make_conclusion equiv =
     let atom =
       Equiv.Atom (
-        Equiv [Term.mk_var fresh_x_var;
+        Equiv {terms = [Term.mk_var fresh_x_var;
                Term.mk_diff
                  [Term.left_proj, Name.to_term h_key;
                   Term.right_proj,
                   Term.mk_name_with_tuple_args
-                    (Term.mk_symb n Message) (Term.mk_vars is)]])
+                    (Term.mk_symb n Message) (Term.mk_vars is)]]; bound = None})
     in
     let concl = 
       Equiv.Smart.mk_forall [fresh_x_var]
@@ -917,7 +920,8 @@ let global_prf_t
      We iter over global macros too ! *)
   let errors =
     OldEuf.key_ssc ~globals:true
-      ~elems:[] ~allow_functions:(fun _ -> false)
+      ~elems:{terms = []; bound = None} ~allow_functions:(fun _ -> false)
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       ~cntxt h_fn h_key.symb.s_symb
   in
   if errors <> [] then

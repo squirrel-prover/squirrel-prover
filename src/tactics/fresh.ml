@@ -292,7 +292,7 @@ let fresh_equiv
   let phi = Term.mk_ands ~simpl:true phis in
   let new_biframe = List.rev_append before after in
   [ES.set_reach_conclusion phi s;
-   ES.set_equiv_conclusion new_biframe s]
+   ES.set_equiv_conclusion {terms = new_biframe; bound = None} s]
 
 
 (** fresh equiv tactic *)
