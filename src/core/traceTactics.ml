@@ -377,8 +377,8 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
      for simplicity. *)
   let subgoals, biframe =
     let rec aux = function
-      | Equiv.(Atom (Equiv bf)) -> [],bf
-      | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
+      | Equiv.(Atom (Equiv bf)) -> [],bf.terms
+      | Impl (Atom (Reach f),g) -> let s,bf = aux g in f.formula::s,bf
       | _ -> Tactics.soft_failure (Failure "invalid assumption")
     in aux ass
   in
