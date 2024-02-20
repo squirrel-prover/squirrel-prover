@@ -178,6 +178,8 @@ val path : npath -> 'a t -> 'a path
 (*------------------------------------------------------------------*)
 (** {2 Symbol tables} *)
 
+val status_of_lsymb : ?group:group -> lsymb -> table -> status
+
 (*------------------------------------------------------------------*)
 (** In addition to their definition data, some more data can be attached
     to symbols. This is used for data that is defined in modules that

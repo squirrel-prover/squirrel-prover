@@ -404,7 +404,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
            HighTerm.is_system_indep (TS.env s) f
          | LHyp (Global _) -> true)
   in
-  let subgoals = List.map (fun f -> TS.set_conclusion f s') subgoals in
+  let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
 
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
@@ -442,7 +442,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
    * be applied we can simply drop the hypothesis rather
    * than failing completely. *)
   let rewrite (h : Term.term) : Term.term option =
-    match rewrite_equiv_transform ~src ~dst ~s biframe h with
+    match rewrite_equiv_transform ~src ~dst ~s biframe.terms h with
     | None -> warn_unsupported h; None
     | x -> x
   in
@@ -452,7 +452,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
       ~update_local:rewrite
       updated_context
       (match
-         rewrite_equiv_transform ~src ~dst ~s biframe (TS.conclusion s)
+         rewrite_equiv_transform ~src ~dst ~s biframe.terms (TS.conclusion s)
        with
        | Some t -> t
        | None -> warn_unsupported (TS.conclusion s); Term.mk_false)

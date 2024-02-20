@@ -18,3 +18,13 @@ let add_oracle ((opt_name, v: Symbols.lsymb * Term.term)) table =
   let table, _ = Symbols.Oracle.declare ~approx:false table opt_name ~data:data in
   table
 
+(** From the name of the function, returns the corresponding formula. If no tag
+   formula was defined, returns False. *)
+(* val get_oracle_tag_formula : string -> Symbols.table  -> Term.term *)
+let get_oracle_tag_formula h table =
+  try match get_oracle h table with
+  | Some f -> f
+  | None -> Term.mk_false
+  with Symbols.Error _ -> Term.mk_false (* if symbol error it's just
+                                           that it didn't find it *)
+
