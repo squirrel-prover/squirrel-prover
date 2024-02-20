@@ -283,7 +283,7 @@ let pt_unify_systems
     end
 
 (*------------------------------------------------------------------*)
-(** {2 Module type for sequents -- after Prover} *)
+(** {2 Module type for sequents} *)
 
 type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
