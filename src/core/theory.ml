@@ -363,7 +363,7 @@ type conversion_error_i =
   | Arity_error          of string * int * int
   | Untyped_symbol       of string
   | Undefined            of string
-  | UndefinedOfKind      of string * Symbols.namespace
+  | UndefinedOfKind      of string * Symbols.symbol_kind
   | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of term
   | Timestamp_unexpected of term
@@ -372,7 +372,7 @@ type conversion_error_i =
   | Int_expected         of term_i
   | Tactic_type          of string
   | Assign_no_state      of string
-  | BadNamespace         of string * Symbols.namespace
+  | BadSymbolKind        of string * Symbols.symbol_kind
   | Freetyunivar
   | UnknownTypeVar       of string
   | BadPty               of Type.ty list
@@ -407,7 +407,7 @@ let pp_error_i ppf = function
   | Undefined s -> Fmt.pf ppf "symbol %s is undefined" s
 
   | UndefinedOfKind (s,n) ->
-    Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
+    Fmt.pf ppf "%a %s is undefined" Symbols.pp_symbol_kind n s
 
   | Type_error (s, ty_expected, ty) ->
     Fmt.pf ppf "@[<hov 0>\
@@ -448,9 +448,9 @@ let pp_error_i ppf = function
     Fmt.pf ppf "Only mutables can be assigned values, and the \
                 symbols %s is not a mutable" s
 
-  | BadNamespace (s,n) ->
+  | BadSymbolKind (s,n) ->
     Fmt.pf ppf "Kind error: %s has kind %a" s
-      Symbols.pp_namespace n
+      Symbols.pp_symbol_kind n
 
   | Freetyunivar -> Fmt.pf ppf "some type variable(s) could not \
                                        be instantiated"
@@ -812,8 +812,8 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
 
       | _ ->
         let s = L.unloc lsymb in
-        conv_err loc (BadNamespace (s,
-                                    oget(Symbols.get_namespace table s)))
+        conv_err loc (BadSymbolKind (s,
+                                     oget(Symbols.get_symbol_kind table s)))
 
 let make_app loc (state : conv_state) cntxt (lsymb : lsymb) : app =
   L.mk_loc loc (make_app_i state cntxt lsymb)

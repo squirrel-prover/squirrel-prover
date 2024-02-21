@@ -260,7 +260,7 @@ type conversion_error_i =
   | Arity_error          of string*int*int
   | Untyped_symbol       of string
   | Undefined            of string
-  | UndefinedOfKind      of string * Symbols.namespace
+  | UndefinedOfKind      of string * Symbols.symbol_kind
   | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of term
   | Timestamp_unexpected of term
@@ -269,7 +269,7 @@ type conversion_error_i =
   | Int_expected         of term_i
   | Tactic_type          of string
   | Assign_no_state      of string
-  | BadNamespace         of string * Symbols.namespace
+  | BadSymbolKind        of string * Symbols.symbol_kind
   | Freetyunivar
   | UnknownTypeVar       of string
   | BadPty               of Type.ty list

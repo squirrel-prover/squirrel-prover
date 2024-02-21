@@ -1,4 +1,4 @@
-type param_kind = Symbols.param_kind
+type param_kind = Symbols.param_info
 type p_param_val = Config.p_param_val
 type Symbols.data += Config_data of p_param_val
 

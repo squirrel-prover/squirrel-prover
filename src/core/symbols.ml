@@ -10,7 +10,7 @@ type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
 
 (*------------------------------------------------------------------*)
-type namespace =
+type symbol_kind =
   | NChannel
   | NConfig
   | NOracle
@@ -27,7 +27,7 @@ type namespace =
   | NPredicate
   | NTheory
 
-let pp_namespace fmt = function
+let pp_symbol_kind fmt = function
   | NChannel   -> Fmt.pf fmt "channel"
   | NConfig    -> Fmt.pf fmt "config"
   | NOracle    -> Fmt.pf fmt "oracle"
@@ -45,13 +45,8 @@ let pp_namespace fmt = function
   | NTheory    -> Fmt.pf fmt "theory"
 
 (*------------------------------------------------------------------*)
-(** Type of symbols.
-    The group should be understood as a namespace,
-    though it does not correspond to the (poorly named) namespace type
-    below. *)
 type symb = { group: string; name: string }
 
-(** Symbols of type ['a t] are symbols of namespace ['a]. *)
 type 'a t = symb
 
 type group = string
@@ -106,21 +101,21 @@ type macro_def =
 
 type error_i =
   | Unbound_identifier    of string
-  | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string * namespace * group
+  | Incorrect_kind        of symbol_kind * symbol_kind (* expected, got *)
+  | Multiple_declarations of string * symbol_kind * group
   | Failure of string
 
 type error = L.t * error_i
 
 let pp_error_i fmt = function
   | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
-  | Incorrect_namespace (n1, n2) ->
+  | Incorrect_kind (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"
-      pp_namespace n1 pp_namespace n2
+      pp_symbol_kind n1 pp_symbol_kind n2
 
   | Multiple_declarations (s, n, g) ->
     Fmt.pf fmt "%a symbol %s already declared (%s group)"
-      pp_namespace n s g
+      pp_symbol_kind n s g
 
   | Failure s ->
     Fmt.pf fmt "%s" s
@@ -173,7 +168,7 @@ type _theory
 
 type channel   = _channel   t
 type config    = _config    t
-type oracle    = _oracle  t
+type oracle    = _oracle    t
 type name      = _name      t
 type action    = _action    t
 type fname     = _fname     t
@@ -181,25 +176,26 @@ type macro     = _macro     t
 type system    = _system    t
 type process   = _process   t
 type btype     = _btype     t
-type game      = _game    t
+type game      = _game      t
 type hintdb    = _hintdb    t
 type lemma     = _lemma     t
 type predicate = _predicate t
-type theory    = _theory  t
+type theory    = _theory    t
 
-type [@warning "-37"] param_kind =
+(*------------------------------------------------------------------*)
+type [@warning "-37"] param_info =
   | PBool
   | PString
   | PInt
 
-type [@warning "-37"] oracle_kind =
+type [@warning "-37"] oracle_info =
   | PTerm
     
 (*------------------------------------------------------------------*)
 type _ def =
   | Channel   : unit        -> _channel   def
-  | Config    : param_kind  -> _config    def
-  | Oracle    : oracle_kind -> _oracle    def
+  | Config    : param_info  -> _config    def
+  | Oracle    : oracle_info -> _oracle    def
   | Name      : name_def    -> _name      def
   | Action    : int         -> _action    def
   | Macro     : macro_def   -> _macro     def
@@ -216,7 +212,7 @@ type _ def =
 
 type edef =
   | Exists : 'a def -> edef
-  | Reserved of namespace
+  | Reserved of symbol_kind
 
 type data = ..
 type data += Empty
@@ -279,7 +275,7 @@ let fresh ?(group=default_group) name table =
   find i0
 
 (*------------------------------------------------------------------*)
-let edef_namespace : edef -> namespace = fun e ->
+let edef_kind : edef -> symbol_kind = fun e ->
   match e with
   | Exists (Channel   _) -> NChannel
   | Exists (Config    _) -> NConfig
@@ -298,13 +294,13 @@ let edef_namespace : edef -> namespace = fun e ->
   | Exists (Theory    _) -> NTheory
   | Reserved n          -> n
 
-let get_namespace ?(group=default_group) (table : table) s =
+let get_symbol_kind ?(group=default_group) (table : table) s =
   let s = { group; name=s } in
-  let f (x,_) = edef_namespace x in
+  let f (x,_) = edef_kind x in
   omap f (Msymb.find_opt s table.cnt)
 
 (*------------------------------------------------------------------*)
-(** {2 Namespaces} *)
+(** {2 Symbol kinds} *)
 
 let def_of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
   let t = { group; name = L.unloc s } in
@@ -332,7 +328,7 @@ let of_lsymb_opt ?(group=default_group) (s : lsymb) (table : table) =
   with Not_found -> None
 
 (*------------------------------------------------------------------*)
-module type Namespace = sig
+module type SymbolKind = sig
   type ns
   type def
 
@@ -374,13 +370,13 @@ module type S = sig
   type ns
   type local_def
 
-  val namespace : namespace
+  val kind : symbol_kind
   val group : string
   val construct   : local_def -> ns def
   val deconstruct : loc:(L.t option) -> edef -> local_def
 end
 
-module Make (N:S) : Namespace
+module Make (N:S) : SymbolKind
   with type ns = N.ns with type def = N.local_def = struct
 
   type ns = N.ns
@@ -393,16 +389,16 @@ module Make (N:S) : Namespace
     
   let reserve (table : table) (name : lsymb) =
     let symb = fresh ~group (L.unloc name) table.cnt in
-    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
+    let table_c = Msymb.add symb (Reserved N.kind,Empty) table.cnt in
     mk table_c, symb
 
   let reserve_exact (table : table) (name : lsymb) =
     let symb = { group; name = L.unloc name } in
     if Msymb.mem symb table.cnt then
       symb_err (L.loc name)
-        (Multiple_declarations (L.unloc name, N.namespace, group));
+        (Multiple_declarations (L.unloc name, N.kind, group));
 
-    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
+    let table_c = Msymb.add symb (Reserved N.kind,Empty) table.cnt in
     mk table_c, symb
 
   let release (table : table) (name : ns t) : table =
@@ -410,7 +406,7 @@ module Make (N:S) : Namespace
     mk (Msymb.remove name table.cnt)
     
   let define (table : table) symb ?(data=Empty) value =
-    assert (fst (Msymb.find symb table.cnt) = Reserved N.namespace) ;
+    assert (fst (Msymb.find symb table.cnt) = Reserved N.kind) ;
     let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
     mk table_c
 
@@ -430,7 +426,7 @@ module Make (N:S) : Namespace
     let symb = { group; name = L.unloc name } in
     if Msymb.mem symb table.cnt then
       symb_err (L.loc name)
-        (Multiple_declarations (L.unloc name, N.namespace, group));
+        (Multiple_declarations (L.unloc name, N.kind, group));
     
     let table_c =
       table_add table.cnt symb (Exists (N.construct value), data)
@@ -449,7 +445,7 @@ module Make (N:S) : Namespace
 
   let is_reserved (name : ns t) (table : table) : bool =
     match Msymb.find name table.cnt with
-    | Reserved n, _ -> n = N.namespace
+    | Reserved n, _ -> n = N.kind
     | Exists _, _ -> false
     | exception Not_found -> false
 
@@ -459,7 +455,7 @@ module Make (N:S) : Namespace
       ignore (N.deconstruct ~loc:None (fst (Msymb.find { group; name;} table.cnt))) ;
       true
     with
-    | Error (_,Incorrect_namespace _)
+    | Error (_,Incorrect_kind _)
     | Not_found -> false
 
   let mem_lsymb (name : lsymb) (table : table) : bool =
@@ -470,7 +466,7 @@ module Make (N:S) : Namespace
                 (fst (Msymb.find symb table.cnt))) ;
       true
     with
-    | Error (_,Incorrect_namespace _)
+    | Error (_,Incorrect_kind _)
     | Not_found -> false
 
   let of_lsymb (name : lsymb) (table : table) =
@@ -502,7 +498,7 @@ module Make (N:S) : Namespace
   let data_of_lsymb (name : lsymb) (table : table) =
     try
       let def,data = Msymb.find { group; name = L.unloc name } table.cnt in
-        (* Check that we are in the current namespace
+        (* Check that we are in the current kind
          * before returning the associated data. *)
         ignore (N.deconstruct ~loc:(Some (L.loc name)) def) ;
         data
@@ -513,7 +509,7 @@ module Make (N:S) : Namespace
     Msymb.iter
       (fun s (def,data) ->
          try f s (N.deconstruct ~loc:None def) data with
-           | Error (_,Incorrect_namespace _) -> ())
+           | Error (_,Incorrect_kind _) -> ())
       table.cnt
 
   let fold f acc (table : table) =
@@ -522,7 +518,7 @@ module Make (N:S) : Namespace
          try
            let def = N.deconstruct ~loc:None def in
            f s def data acc
-         with Error (_,Incorrect_namespace _) -> acc)
+         with Error (_,Incorrect_kind _) -> acc)
       table.cnt acc
 
   let map (f : ns t -> def -> data -> (def * data)) (table : table) : table =
@@ -533,30 +529,30 @@ module Make (N:S) : Namespace
              let def = N.deconstruct ~loc:None def in
              let def, data = f s def data in
              Exists (N.construct def), data
-           with Error (_,Incorrect_namespace _) -> (def,data)
+           with Error (_,Incorrect_kind _) -> (def,data)
         ) table.cnt
     in
     mk table
 end
 
-let namespace_err (l : L.t option) c n =
+let kind_err (l : L.t option) c n =
   let l = match l with
     | None   -> L._dummy
     | Some l -> l
   in
-  symb_err l (Incorrect_namespace (edef_namespace c, n))
+  symb_err l (Incorrect_kind (edef_kind c, n))
 
 module Action = Make (struct
   type ns = _action
   type local_def = int
 
-  let namespace = NAction
+  let kind = NAction
 
   let group = default_group
   let construct d = Action d
   let deconstruct ~loc = function
     | Exists (Action d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 
 end)
 
@@ -564,117 +560,117 @@ module Name = Make (struct
   type ns = _name
   type local_def = name_def
 
-  let namespace = NName
+  let kind = NName
 
   let group = default_group
   let construct d = Name d
   let deconstruct ~loc s = match s with
     | Exists (Name d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Channel = Make (struct
   type ns = _channel
   type local_def = unit
 
-  let namespace = NChannel
+  let kind = NChannel
 
   let group = default_group
   let construct d = Channel d
   let deconstruct ~loc s = match s with
     | Exists (Channel d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Config = Make (struct
   type ns = _config
-  type local_def = param_kind
+  type local_def = param_info
 
-  let namespace = NConfig
+  let kind = NConfig
 
   let group = default_group
   let construct d = Config d
   let deconstruct ~loc s = match s with
     | Exists (Config d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Oracle = Make (struct
   type ns = _oracle
-  type local_def = oracle_kind
+  type local_def = oracle_info
 
-  let namespace = NOracle
+  let kind = NOracle
 
   let group = "oracle"
   let construct d = Oracle d
   let deconstruct ~loc s = match s with
     | Exists (Oracle d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module BType = Make (struct
   type ns = _btype
   type local_def = bty_infos
 
-  let namespace = NBType
+  let kind = NBType
 
   let group = "type"
   let construct d = BType d
   let deconstruct ~loc s = match s with
     | Exists (BType d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Game = Make (struct
   type ns = _game
   type local_def = unit
 
-  let namespace = NGame
+  let kind = NGame
 
   let group = "game"
   let construct d = Game d
   let deconstruct ~loc s = match s with
     | Exists (Game d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module System = Make (struct
   type ns = _system
   type local_def = unit
 
-  let namespace = NSystem
+  let kind = NSystem
 
   let group = default_group
   let construct d = System d
   let deconstruct ~loc s = match s with
     | Exists (System d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Process = Make (struct
   type ns = _process
   type local_def = unit
 
-  let namespace = NProcess
+  let kind = NProcess
 
   let group = "process"
   let construct d = Process d
   let deconstruct ~loc s = match s with
     | Exists (Process d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Function = Make (struct
   type ns = _fname
   type local_def = Type.ftype * function_def
 
-  let namespace = NFunction
+  let kind = NFunction
 
   let group = default_group
   let construct d = Function d
   let deconstruct ~loc s = match s with
     | Exists (Function d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 let is_ftype s ftype table =
@@ -687,65 +683,65 @@ module Macro = Make (struct
   type ns = _macro
   type local_def = macro_def
 
-  let namespace = NMacro
+  let kind = NMacro
 
   let group = default_group
   let construct d = Macro d
   let deconstruct ~loc s = match s with
     | Exists (Macro d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module HintDB = Make (struct
   type ns = _hintdb
   type local_def = unit
 
-  let namespace = NHintDB
+  let kind = NHintDB
 
   let group = "hint-db"
   let construct d = HintDB d
   let deconstruct ~loc s = match s with
     | Exists (HintDB d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Lemma = Make (struct
   type ns = _lemma
   type local_def = unit
 
-  let namespace = NLemma
+  let kind = NLemma
 
   let group = "lemma"
   let construct d = Lemma d
   let deconstruct ~loc s = match s with
     | Exists (Lemma d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Theory = Make (struct
   type ns = _theory
   type local_def = unit
 
-  let namespace = NTheory
+  let kind = NTheory
 
   let group = "theory"
   let construct d = Theory d
   let deconstruct ~loc s = match s with
     | Exists (Theory d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 module Predicate = Make (struct
   type ns = _predicate
   type local_def = unit
 
-  let namespace = NPredicate
+  let kind = NPredicate
 
   let group = "predicate"
   let construct d = Predicate d
   let deconstruct ~loc s = match s with
     | Exists (Predicate d) -> d
-    | _ as c -> namespace_err loc c namespace
+    | _ as c -> kind_err loc c kind
 end)
 
 (*------------------------------------------------------------------*)
@@ -1061,13 +1057,13 @@ let ftype_builtin f = ftype builtins_table f
 (*------------------------------------------------------------------*)
 type 'a _t = 'a t
 
-module Ss (S : Namespace) : Set.S with type elt := S.ns t =
+module Ss (S : SymbolKind) : Set.S with type elt := S.ns t =
   Set.Make(struct
     type t = S.ns _t
     let compare = Stdlib.compare
   end)
 
-module Ms (S : Namespace) : Map.S with type key := S.ns t =
+module Ms (S : SymbolKind) : Map.S with type key := S.ns t =
   Map.Make(struct
     type t = S.ns _t
     let compare = Stdlib.compare

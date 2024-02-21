@@ -1,6 +1,8 @@
-(** This module defines a notion of symbol with a global table of symbols,
-    separated into namespaces, and where each symbol is attached to a
-    definition whose type depends on the namespace. *)
+(** This module defines a notion of symbol with a global table of
+    symbols.
+    Each symbol has a symbol kind (e.g. an operator and a channel
+    have different kinds), and each symbol is attached to a
+    definition whose Ocaml type depends on the kind. *)
 
 type lsymb = string Location.located
 
@@ -13,15 +15,14 @@ type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
 
 (*------------------------------------------------------------------*)
-(** ['a t] is the type of symbols of namespace ['a]. *)
+(** ['a t] is the type of symbols of kind ['a]. *)
 type 'a t
 
 val hash : 'a t -> int
 
-(** Symbol groups:
-    symbols with the same name can exist in different groups.
-    Groups are usually called namespaces, but what we (improperly)
-    call namespaces here is different: it's more of a name kind. *)
+(** Symbol kind groups:
+    symbols with the same name can exist in different symbol kind 
+    groups. *)
 type group
 
 (** Type of tables of persistent symbol definitions.
@@ -31,7 +32,7 @@ type table
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
-(** Each possible namespace is represented by an abstract datatype.
+(** Each possible symbol kind is represented by an abstract datatype.
     Their names are descriptive; [fname] is for function symbols. *)
 
 (*------------------------------------------------------------------*)
@@ -53,7 +54,7 @@ type _theory
 
 type channel   = _channel   t
 type config    = _config    t
-type oracle    = _oracle  t
+type oracle    = _oracle    t
 type name      = _name      t
 type action    = _action    t
 type fname     = _fname     t
@@ -61,14 +62,14 @@ type macro     = _macro     t
 type system    = _system    t
 type process   = _process   t
 type btype     = _btype     t
-type game      = _game    t
+type game      = _game      t
 type hintdb    = _hintdb    t
 type lemma     = _lemma     t
 type predicate = _predicate t
-type theory    = _theory  t
+type theory    = _theory    t
     
 (*------------------------------------------------------------------*)
-type namespace =
+type symbol_kind =
   | NChannel
   | NConfig
   | NOracle
@@ -85,15 +86,15 @@ type namespace =
   | NPredicate
   | NTheory
     
-val pp_namespace : Format.formatter -> namespace -> unit
+val pp_symbol_kind : Format.formatter -> symbol_kind -> unit
 
-val get_namespace : ?group:group -> table -> string -> namespace option
+val get_symbol_kind : ?group:group -> table -> string -> symbol_kind option
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol definitions}
 
     Each symbol is defined by some data,
-    whose type depends on the namespace. *)
+    whose type depends on the kind. *)
 
 (*------------------------------------------------------------------*)
 (** Different variants on the Diffie-Hellman crypto assumption      *)
@@ -152,20 +153,20 @@ type macro_def =
         They are indexed. *)
 
 (*------------------------------------------------------------------*)
-type [@warning "-37"] param_kind =
+type [@warning "-37"] param_info =
   | PBool
   | PString
   | PInt
 
-type [@warning "-37"] oracle_kind =
+type [@warning "-37"] oracle_info =
   | PTerm
 
 (*------------------------------------------------------------------*)
-(** Information about symbol definitions, depending on the namespace. *)
+(** Information about symbol definitions, depending on the kind. *)
 type _ def =
   | Channel   : unit        -> _channel   def
-  | Config    : param_kind  -> _config    def
-  | Oracle    : oracle_kind -> _oracle    def
+  | Config    : param_info  -> _config    def
+  | Oracle    : oracle_info -> _oracle    def
   | Name      : name_def    -> _name      def
   | Action    : int         -> _action    def
   | Macro     : macro_def   -> _macro     def
@@ -182,7 +183,7 @@ type _ def =
         
 type edef =
   | Exists : 'a def -> edef
-  | Reserved of namespace
+  | Reserved of symbol_kind
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
@@ -198,7 +199,7 @@ type data += Empty
 type data += AssociatedFunctions of fname list
 
 (*------------------------------------------------------------------*)
-(** {2 Basic namespace-independent operations} *)
+(** {2 Basic kind-independent operations} *)
 
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string
@@ -224,15 +225,15 @@ val of_lsymb : ?group:group -> lsymb -> table -> wrapped
 val of_lsymb_opt : ?group:group -> lsymb -> table -> wrapped option
 
 (*------------------------------------------------------------------*)
-(** {2 Namespaces} *)
+(** {2 Symbol kinds} *)
 
-(** Signature for namespaces. *)
-module type Namespace = sig
+(** Signature for symbol kinds. *)
+module type SymbolKind = sig
 
-  (** Abstract type representing this namespace. *)
+  (** Abstract type representing this kind. *)
   type ns
 
-  (** Type of values defining the symbols of this namespace. *)
+  (** Type of values defining the symbols of this kind. *)
   type def
 
   val remove : table -> ns t -> table
@@ -265,16 +266,16 @@ module type Namespace = sig
 
   val is_reserved : ns t -> table -> bool
 
-  (** [mem s table] checks if [s] exists in this namespace. *)
+  (** [mem s table] checks if [s] exists for this kind. *)
   val mem       : string -> table -> bool
   val mem_lsymb : lsymb  -> table -> bool
 
-  (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
+  (** [of_lsymb s] returns [s] as a symbol, if it exists for this kind.
       @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists in this
-      namespace, and None otherwise. *)
+  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists for
+      this kind, and None otherwise. *)
   val of_lsymb_opt : lsymb -> table -> ns t option
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
@@ -295,42 +296,42 @@ module type Namespace = sig
   (** [data_of_lsymb s] is equivalent to [get_data (of_lsymb s)]. *)
   val data_of_lsymb : lsymb -> table -> data
 
-  (** Iterate on the defined symbols of this namespace. *)
+  (** Iterate on the defined symbols of this kind. *)
   val iter : (ns t -> def -> data -> unit) -> table -> unit
 
-  (** Fold over the defined symbols of this namespace. *)
+  (** Fold over the defined symbols of this kind. *)
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 
-  (** Map over the defined symbols of this namespace. *)
+  (** Map over the defined symbols of this kind. *)
   val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
-module Config    : Namespace with type def = param_kind  with type ns = _config
-module Oracle    : Namespace with type def = oracle_kind with type ns = _oracle
-module Channel   : Namespace with type def = unit        with type ns = _channel
-module BType     : Namespace with type def = bty_infos   with type ns = _btype
-module Game      : Namespace with type def = unit        with type ns = _game
-module Action    : Namespace with type def = int         with type ns = _action
-module System    : Namespace with type def = unit        with type ns = _system
-module Process   : Namespace with type def = unit        with type ns = _process
-module HintDB    : Namespace with type def = unit        with type ns = _hintdb
-module Lemma     : Namespace with type def = unit        with type ns = _lemma
-module Theory    : Namespace with type def = unit        with type ns = _theory
-module Predicate : Namespace with type def = unit        with type ns = _predicate
+module Config    : SymbolKind with type def = param_info  with type ns = _config
+module Oracle    : SymbolKind with type def = oracle_info with type ns = _oracle
+module Channel   : SymbolKind with type def = unit        with type ns = _channel
+module BType     : SymbolKind with type def = bty_infos   with type ns = _btype
+module Game      : SymbolKind with type def = unit        with type ns = _game
+module Action    : SymbolKind with type def = int         with type ns = _action
+module System    : SymbolKind with type def = unit        with type ns = _system
+module Process   : SymbolKind with type def = unit        with type ns = _process
+module HintDB    : SymbolKind with type def = unit        with type ns = _hintdb
+module Lemma     : SymbolKind with type def = unit        with type ns = _lemma
+module Theory    : SymbolKind with type def = unit        with type ns = _theory
+module Predicate : SymbolKind with type def = unit        with type ns = _predicate
                                                            
-module Function : Namespace
+module Function : SymbolKind
   with type def = Type.ftype * function_def with type ns = _fname
 
-module Macro    : Namespace with type def = macro_def with type ns = _macro
-module Name     : Namespace with type def = name_def with type ns = _name
+module Macro    : SymbolKind with type def = macro_def with type ns = _macro
+module Name     : SymbolKind with type def = name_def with type ns = _name
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 
 type error_i = 
   | Unbound_identifier    of string
-  | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string * namespace * group
+  | Incorrect_kind        of symbol_kind * symbol_kind (* expected, got *)
+  | Multiple_declarations of string * symbol_kind * group
   | Failure of string
 
 type error = Location.t * error_i
@@ -486,5 +487,5 @@ val fs_empty  : fname
 val fs_len    : fname
 
 (*------------------------------------------------------------------*)
-module Ss (S : Namespace) : Set.S with type elt := S.ns t 
-module Ms (S : Namespace) : Map.S with type key := S.ns t 
+module Ss (S : SymbolKind) : Set.S with type elt := S.ns t 
+module Ms (S : SymbolKind) : Map.S with type key := S.ns t 
