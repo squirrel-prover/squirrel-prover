@@ -221,7 +221,7 @@ module Benchmark = struct
         | Some q -> Format.asprintf "%a" Term.Lit.pps q
       in
       Format.fprintf ch
-        "%d:%s:%s:%S:%a:%f@."
+        "%d:;%s:;%s:;%S:;%a:;%f@."
         !query_id
         !query_pos
         name

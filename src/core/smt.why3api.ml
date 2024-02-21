@@ -309,6 +309,14 @@ let ilist_to_wterm_ts context l = List.map (index_var_to_wterm context) l
     failwith "diff of timestamps to why3 term not implemented"
   | _ -> assert false
 *)
+let rec is_pure_tuple l = List.fold_left 
+  (fun acc t -> match t with 
+    |Type.Index | Type.Timestamp -> true && acc
+    |Type.Tuple l -> (is_pure_tuple l) && acc 
+    | _ -> false
+  )
+  true l 
+   
 let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
   let handle_eq_atom rec_call = match atom with
     | Comp (`Eq, x, y)  -> t_equ (rec_call x) (rec_call y) 
@@ -345,6 +353,7 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
       | Term.Var i -> index_var_to_wterm context i
       | _          -> assert false (*TODO ?*)
     )
+  |Type.Tuple l when (is_pure_tuple l) -> handle_eq_atom (msg_to_wterm context) 
   | _          -> if context.pure 
     then (*ex unsupported*)
       let symb =  mk_const_symb context "unsupp" Why3.Ty.ty_bool in 
@@ -422,7 +431,14 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
       (List.map (msg_to_wterm context) args)
     )
 
-  | Diff _ -> failwith "diff of timestamps to why3 term not implemented"
+  | Diff  _-> let symb =  mk_const_symb context "unsupp_diff" (convert_type context (Term.ty c)) in 
+    Hashtbl.add context.vars_tbl 
+      (Hashtbl.hash ("unsupp_diff"^(string_of_int !(context.fresh)))) 
+      (Why3.Term.t_app_infer symb []);
+    context.uc := Why3.Theory.add_decl_with_tuples 
+      !(context.uc) 
+      (Why3.Decl.create_param_decl symb);
+    (Why3.Term.t_app_infer symb [])
 
   | Var v -> 
     begin try Hashtbl.find context.vars_tbl (Vars.hash v) with
@@ -430,6 +446,16 @@ and msg_to_wterm context : Term.term -> Why3.Term.term = fun c ->
     end
 
   | Tuple l -> t_tuple (List.map (msg_to_wterm context) l)
+
+  | Find (_, _, t1, _) -> let symb =  mk_const_symb context "unsupp_find" (convert_type context (Term.ty t1)) in 
+    Hashtbl.add context.vars_tbl 
+      (Hashtbl.hash ("unsupp_find"^(string_of_int !(context.fresh)))) 
+      (Why3.Term.t_app_infer symb []);
+    context.uc := Why3.Theory.add_decl_with_tuples 
+      !(context.uc) 
+      (Why3.Decl.create_param_decl symb);
+    (Why3.Term.t_app_infer symb [])
+
   | _ -> assert false
 
 and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
@@ -540,12 +566,17 @@ let add_functions context =
     (* special treatment of xor for two reasons:
      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
      *   - allows us to declare the equations for xor in the .why file *)
-    if (
-      fname <> Symbols.fs_xor && fname <> Symbols.fs_pair && 
-      fname <> Symbols.fs_fst && fname <> Symbols.fs_snd && 
-      fname <>Symbols.fs_att && fname<>Symbols.fs_of_bool && 
-      fname<>Symbols.fs_empty && fname<>Symbols.fs_pred && 
-      fname<>Symbols.fs_happens
+    if (not (List.mem fname [
+        Symbols.fs_xor; Symbols.fs_pair;  
+        Symbols.fs_fst; Symbols.fs_snd;  
+        Symbols.fs_att; Symbols.fs_of_bool;  
+        Symbols.fs_empty; Symbols.fs_pred; 
+        Symbols.fs_happens; Symbols.fs_or;
+        Symbols.fs_and; Symbols.fs_true;
+        Symbols.fs_false; Symbols.fs_iff;
+        Symbols.fs_impl; Symbols.fs_not;
+        Symbols.fs_diff
+      ])
     ) then
     (* TODO can't declare polymorphic symbols... yet? *)
     if ftype.Type.fty_vars <> [] then
