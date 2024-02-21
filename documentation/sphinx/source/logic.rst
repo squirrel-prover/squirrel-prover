@@ -327,7 +327,7 @@ Squirrel heavily uses multi-terms. Most notably, the equivalence
 between two terms :n:`t__1` and :n:`t__2` is written
 :term:`equivalence atom` :n:`equiv(@term__bi)`,
 where :n:`@term__bi` is any bi-term (i.e. a 2 multi-term) such that
-its left (resp. right) projection is :n:`t__1` (resp. :n:`t__1`).
+its left (resp. right) projection is :n:`t__1` (resp. :n:`t__2`).
    
 
 Diff-terms

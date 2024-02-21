@@ -1,5 +1,6 @@
+(** Utility for running parsers on lexing buffers. *)
+
 open Squirrelcore
-(** Module instantiating parsing from buffers. *)
 
 let () = Printexc.record_backtrace true
 

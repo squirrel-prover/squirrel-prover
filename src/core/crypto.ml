@@ -388,6 +388,7 @@ let exact_eq_under_cond
   Match.E.deduce_mem_one cterm known_set unif_state 
 
 (*------------------------------------------------------------------*)
+exception UnknowGlobalSmplsAssign
 (** Name contraints module.*)
 module Const = struct 
   (** Inner declaration of [Const], to have a private type [t].
@@ -417,6 +418,7 @@ module Const = struct
 
     val generalize : Vars.vars -> t list -> t list
     val add_condition : Term.term -> t list -> t list
+
   end = struct
 
     type t = {
@@ -509,17 +511,24 @@ module Const = struct
     (** Given a name [name(terms)] and a multiset of constrainsts, 
         search whether is is compatible with this set, up to some variables 
         equalities, to associate [name(terms)] to the tag [otag].  *)
-
     let add_condition (cond : Term.term) (consts : t list) =
       let doit (const : t) =
         let const = refresh const in
         { const with cond = cond::const.cond }
       in
-      List.map doit consts 
+      List.map doit consts
+                  
   end
   include Const
 
   exception InvalidConstraints
+
+  let rec get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
+    match consts with
+    | [] -> raise UnknowGlobalSmplsAssign
+    | c::_ when c.tag = Tag.game_glob x game && c.vars = [] && c.cond = [] ->
+      Term.mk_name c.name c.term
+    | _::q -> get_global x q game
 
   (** [retrieve_global_name] try to retrieve a constraint associated to 
       a global name [name] tagged by [otag] which holds for any branching and 
@@ -735,7 +744,8 @@ module TSet = struct
       (Vars._pp_list ~dbg) vars
       (Term._pp ~dbg)(Term.mk_ands conds)
 
-  let[@warning "-32"] pp = _pp ~dbg:true
+  let[@warning "-32"] pp     = _pp ~dbg:false
+  let[@warning "-32"] pp_dbg = _pp ~dbg:true
 
   let normalize tset = 
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -1282,6 +1292,57 @@ module Game = struct
   }
 
   (* ----------------------------------------------------------------- *)
+  (** Try to infer variables association to un-matched variable in oracle call*)
+  exception LocSmplToInfer
+  
+  let infer_args_and_name
+      (state      : state)
+      (mv         : Match.Mvar.t)
+      (oracle_pat : oracle_pat)
+      (oracle     : oracle)
+      (subgoals   : Term.terms)
+    : Mvar.t
+    =
+    (* For any oracle input not appearing in output, associate it to
+       witness. *)
+    let arg_not_used =
+      List.filter (fun x -> not (Mvar.mem x mv)) oracle.args
+    in
+    let mv =
+      List.fold_left (fun mv var -> 
+          Mvar.add (var,Vars.Tag.ltag) SE.any
+            (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
+        mv arg_not_used
+    in
+
+    (* For any global sample not appearing in the output, associate it
+       to the a name according to the current constraints. *)
+    let glob_smpls_not_used =
+      List.filter
+        (fun x ->
+           not (Mvar.mem x mv) && Sv.mem x (Term.fvs (oracle_pat.cond @ subgoals)))
+        state.game.glob_smpls
+    in
+    let rec infer_with_constraints smpls mv =
+      match smpls with
+      | [] -> mv
+      | r :: q ->
+        let n = Const.get_global r state.consts state.game in
+        let mv = Mvar.add (r, Vars.Tag.ltag) SE.any n mv in
+        infer_with_constraints q mv
+    in
+    let mv = infer_with_constraints glob_smpls_not_used mv in
+
+    (* If there are local samples that do not appear in the output,
+       raise an error. *)
+    let loc_smpls =
+      List.filter
+        (fun x -> not (Mvar.mem x mv) && (Sv.mem x (Term.fvs (oracle_pat.cond@subgoals))))
+        oracle.loc_smpls
+    in
+    if loc_smpls = [] then mv else raise LocSmplToInfer
+
+  
   (** Return the list for each oracle pattern of the successful oracle
       matches. *)
   let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
@@ -1334,16 +1395,15 @@ module Game = struct
         in
 
         (* complete [mv] with a default [witness] value for all (standard) 
-           oracle inputs that are not needed *)
-        let arg_not_used = List.filter (fun x -> not (Mvar.mem x mv)) oracle.args in
-        let mv =
-          List.fold_left (fun mv var -> 
-              Mvar.add (var,Vars.Tag.ltag) SE.any
-                (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv
-            ) mv arg_not_used 
-        in
-
-        Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
+           oracle inputs that are not needed and try to infer global name with constraints*)
+        begin
+          try 
+            let mv = infer_args_and_name state mv oracle_pat oracle subgoals in
+            Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
+          with
+          | UnknowGlobalSmplsAssign -> None
+          | LocSmplToInfer -> None
+        end
           
       | _ ->  None
     in
@@ -1392,6 +1452,8 @@ module Game = struct
   }
   
   (* ----------------------------------------------------------------- *)
+
+  
   (** If a successful match has been found, does the actual symbolic call 
       to the oracle *)
   let call_oracle
@@ -1406,7 +1468,6 @@ module Game = struct
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
     let subgoals = List.map (Term.subst subst) subgoals in
-    
     try
       let consts,eqs =
         Const.constraints_terms_from_mv
@@ -1428,19 +1489,19 @@ module Game = struct
           (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
           state.mem
       in
-
       (* creating the implication is better than substituting *)
       let subgoals = List.map (Term.mk_impls eqs) subgoals in
       
       match mem_subgoals with
       | Some mem_subgoals ->
-        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
         let mem_subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) mem_subgoals
         in
         let subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) subgoals
         in
+        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
+        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
         Some {
           new_consts = consts;
           index_cond = eqs;
@@ -1512,7 +1573,10 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
       ~param:Reduction.{rp_crypto with diff = true}
       state.env.table
   in
-  let term = Reduction.whnf_term reduction_state output_term.term in
+  let term, _ =
+    let strat = Reduction.(MayRedSub rp_full) in
+    Reduction.whnf_term ~strat reduction_state output_term.term
+  in
   match term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
     let t0 = CondTerm.{ term = t0; conds =             b :: conds } in
@@ -1793,11 +1857,24 @@ type rec_call_occ = rec_call Iter.occ
 
 let derecursify_term
     ~(expand_mode : [`FullDelta | `Delta ])
-    (constr : Constr.trace_cntxt) (system : SE.arbitrary) (t : Term.term)
+    (hyps : TraceHyps.hyps)
+    (* (vars : Vars.vars) *)
+    (constr : Constr.trace_cntxt) (system : SE.arbitrary) (t_init : Term.term)
   : rec_call_occ list * Term.term
   =
+  let table = constr.table in
+  
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
+      let t, has_red =
+        let param = { Reduction.rp_crypto with diff = true } in
+        (* FIXME: add tag information in [fv] *)
+        let vars = Vars.of_list (Vars.Tag.local_vars vars) in
+        let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
+        let strat = Reduction.(MayRedSub rp_full) in
+        Reduction.whnf_term ~strat st t
+      in
+
       match t with
       | Term.Macro (ms,l,ts) -> (* [m l @ ts] *)
         let mk_rec_call () =
@@ -1808,18 +1885,20 @@ let derecursify_term
               occ_pos  = Sp.singleton p;
             } in
 
-          rec_occ :: acc, `Continue
+          rec_occ :: acc, if has_red then `Map t else `Continue 
         in
         if expand_mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
           match Macros.get_definition { constr with system = SE.to_fset se } ms ~args:l ~ts with
           | `Def t -> acc, `Map t
           | `Undef | `MaybeDef -> mk_rec_call ()
         else mk_rec_call ()
-
-      | _ -> acc, `Continue
+            
+      | _ -> acc, if has_red then `Map t else `Continue 
   in
-  let acc, _, t = Match.Pos.map_fold ~mode:(`TopDown true) t_fold system [] t in
-  acc, t
+  let acc, _, _ = 
+    Match.Pos.map_fold ~mode:(`TopDown true) t_fold system [] t_init
+  in
+  acc, t_init
 
 (*------------------------------------------------------------------*)
 (* FIXME factorize with corresponding function in [Match] *)
@@ -1951,11 +2030,11 @@ let derecursify
     Constr.make_context ~table:env.table ~system:system
   in
 
-  let mk_bideduction_goal ?form (* ?at_time *) (output : Term.term) =
+  let mk_bideduction_goal hyps ?form (* ?at_time *) (output : Term.term) =
     let rec_term_occs, output =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta trace_context (system :> SE.t) output
+        ~expand_mode:`FullDelta hyps trace_context (system :> SE.t) output
     in
 
     let extra_cond = odflt Term.mk_true form in
@@ -1985,7 +2064,7 @@ let derecursify
     (* let ts_occs = Occurrences.get_macro_actions trace_context [t] in *)
     (* TODO: see EI_direct in occurrences (mk_exists ...) *)
 
-    mk_bideduction_goal (* ~at_time:?? *) t
+    mk_bideduction_goal hyps t
   in
 
   (* indirect bi-deduction goals for recursive calls *)
@@ -2003,7 +2082,10 @@ let derecursify
         in
         let form = Occurrences.time_formula ts ~path_cond ts_occs in
 
-        let goal, output = mk_bideduction_goal ~form iocc.iocc_cnt in
+        let hyps =
+          TraceHyps.add TacticsArgs.AnyName (LHyp (Local (Term.mk_happens ts))) hyps
+        in
+        let goal, output = mk_bideduction_goal hyps ~form iocc.iocc_cnt in
         let togen = Sv.elements iocc.iocc_vars in
         (togen, goal, output) :: goals
       ) trace_context env hyps targets []

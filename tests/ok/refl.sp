@@ -1,5 +1,3 @@
-
-
 channel c
 
 abstract ok : message

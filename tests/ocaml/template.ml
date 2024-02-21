@@ -5,7 +5,7 @@ module Prover = Squirrelprover.Prover
 module ProverLib = Squirrelcore.ProverLib
 
 let template_test () =
-  let st = Prover.init ~withPrelude:false () in
+  let st = Prover.init ~with_prelude:false () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_all ~check:`Check ~test:true st

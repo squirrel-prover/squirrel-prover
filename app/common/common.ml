@@ -21,7 +21,7 @@ type stack = state list
  * Loading Prelude.sp will fail since in full JS it can't access file
  * system *)
 let prover_state : Prover.state ref = 
-  ref (Prover.init ~withPrelude:false ())
+  ref (Prover.init ~with_prelude:false ())
 
 let firstOutput = "Prover initial state : Ready to go !"
 
@@ -32,7 +32,7 @@ let prover_stack : (state list) ref =
 
 (* function that re-init state and history *)
 let init () =
-  prover_state := Prover.init ~withPrelude:false ();
+  prover_state := Prover.init ~with_prelude:false ();
   prover_state := Prover.do_set_option 
       !prover_state (TConfig.s_interactive,Config.Param_bool true);
   prover_stack := [{ps= !prover_state; output=firstOutput}]
@@ -125,7 +125,7 @@ let exec_sentence ?(check=`Check) s : bool * string =
   with e -> 
     Printer.prthtml `Error "Exec failed: %a"
       (Errors.pp_toplevel_error ~test:false 
-         (Driver.file_from_str s)) e;
+         (Driver.from_string s)) e;
     (false,
      (* return the exception info as string *)
      Format.flush_str_formatter ())
@@ -139,7 +139,7 @@ let exec_command ?(check=`Check) s : string =
   with e -> 
     Printer.prthtml `Error "Run failed: %a"
       (Errors.pp_toplevel_error ~test:false 
-         (Driver.file_from_str s)) e;
+         (Driver.from_string s)) e;
     Format.flush_str_formatter () (* will print the exception info *)
 
 (* return visualisation as string *)

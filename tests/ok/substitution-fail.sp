@@ -1,5 +1,3 @@
-
-
 hash h
 name k:message
 name cst:message
@@ -11,21 +9,18 @@ name nb : index -> message
 name nc : index -> message
 name mc : index -> message
 
-
-system O: out(ch,cst); out(ch,k); (
+system O: out(ch,cst); (
     (A: !_a out(ch,h(na(a),k)))
   | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
   | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
-axiom name_not_pair (ma : message, mb : message, a:index):
-na(a) <>  <ma, mb>.
-
 lemma unforgeable_1 :
-  forall (a : index, b : index),
-  b <> a =>
-  output@A(b) <> h(na(a),k).
+  forall (a : index, b : index, c : index),
+  b <> a && c=a=>
+  output@A(b) <> h(na(c),k).
 
 Proof.
-  checkfail collision exn NoSSC.
+ nosimpl(intro a b c H).
+ checkfail subst a, b exn NotEqualArguments.
 Abort.

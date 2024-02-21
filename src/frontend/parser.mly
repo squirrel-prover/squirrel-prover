@@ -1334,12 +1334,12 @@ interactive_or_undo:
 | i=interactive      { ProverLib.Input i }
 
 interactive:
-| decls=declarations { ProverLib.(InputDescr decls) }
-| set=set_option     { ProverLib.(SetOption set) }
-| h=hint             { ProverLib.(Hint h) }
+| decls=declarations { ProverLib.InputDescr decls }
+| set=set_option     { ProverLib.SetOption set }
+| h=hint             { ProverLib.Hint h }
 | q=query            { q }
-| i=p_include        { ProverLib.(Include i) }
-| g=lemma            { ProverLib.(Goal g) }
+| i=p_include        { ProverLib.Include i }
+| g=lemma            { ProverLib.Goal g }
 | PROOF              { ProverLib.Proof }
 | RESET              { ProverLib.Reset }
 | EOF                { ProverLib.EOF }

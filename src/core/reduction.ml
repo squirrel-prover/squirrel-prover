@@ -48,7 +48,7 @@ let rp_full = {
   zeta    = true;
   proj    = true;
   diff    = true;
-  constr  = false; 
+  constr  = false;   (* [constr] is not enabled in [rp_full] *)
 }
 
 let rp_crypto = {
@@ -335,6 +335,18 @@ let conv_g (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions} *)
 
+
+(*------------------------------------------------------------------*)
+(** reduction strategy for head normalization *)
+type red_strat =
+  | Std
+  (** only reduce at head position *)
+  | MayRedSub of red_param
+  (** may put strict subterms in whnf if it allows to reduce at head
+      position *)
+
+(*------------------------------------------------------------------*)
+(** reduction state *)
 type state = { 
   table : Symbols.table;
   vars  : Vars.env;         (* used to get variable tags *)
@@ -376,30 +388,65 @@ let rec reduce_term (st : state) (t : Term.term) : Term.term * bool =
 
   if has_red then fst (reduce_term st t), true
   else
-    let t, has_red = reduce_subterms st t in
+    let t, has_red = reduce_subterms ~f_red:reduce_term st t in
     if has_red then fst (reduce_term st t), true
     else t, false
-
+    
+(*------------------------------------------------------------------*)
+(** Exported.
+    Weak head normal form. *)
+and whnf_term
+    ?(strat : red_strat = Std)
+    (st : state) (t : Term.term) : Term.term * bool
+  =
+  (* reduce in head position as much as possible *)
+  let rec doit t =
+    let t, has_red = reduce_head1_term ~strat st t in
+    if has_red then doit t else t
+  in
+  
+  let t, has_red = reduce_head1_term ~strat st t in
+  if has_red then doit t, true else t, false
+  
 (** Reduce once at head position.
     May use all reduction rules:
-     [δ, user rewriting rules, β, proj, zeta, constr ] *)
-and reduce_head1_term (st : state) (t : Term.term) : Term.term * bool = 
-  let rec try_red red_funcs =
-    match red_funcs with
-    | [] -> t, false
-    | red_f :: red_funcs ->
-      let t, has_red = red_f t in
-      if has_red then t, true
-      else try_red red_funcs
+     [δ, user rewriting rules, β, proj, diff, zeta, constr] *)
+and reduce_head1_term
+    ?(strat : red_strat = Std)
+    (st : state) (t : Term.term) : Term.term * bool
+  =
+  (* reduce once at head position *)
+  let red_head1 (t : Term.term) =
+    let rec try_red red_funcs =
+      match red_funcs with
+      | [] -> t, false
+      | red_f :: red_funcs ->
+        let t, has_red = red_f t in
+        if has_red then t, true
+        else try_red red_funcs
+    in
+    try_red [reduce_delta1     st;     (* δ *)
+             rewrite_head_once st;     (* user rewriting rules *)
+             reduce_beta1      st;     (* β *)
+             reduce_proj1      st;     (* proj *)
+             reduce_diff1      st;     (* diff *)
+             reduce_let1       st;     (* zeta *)
+             reduce_constr1    st; ]   (* constr *)
   in
-  try_red [reduce_delta1     st;     (* δ *)
-           rewrite_head_once st;     (* user rewriting rules *)
-           reduce_beta1      st;     (* β *)
-           reduce_proj1      st;     (* proj *)
-           reduce_diff1      st;     (* diff *)
-           reduce_let1       st;     (* zeta *)
-           reduce_constr1    st; ]   (* constr *)
-
+  
+  let t, has_red = red_head1 t in
+  match strat, has_red with
+  | Std, _ | MayRedSub _, true -> t, has_red
+  | MayRedSub param, false ->
+    (* put strict subterms in whnf and try to reduce at head position again *)
+    let t', has_red_sub =
+      reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with param; } t
+    in
+    if has_red_sub then
+      let t', has_red = red_head1 t' in
+      if has_red then t', true else t, false
+    else t, false
+  
 and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
   if not st.param.beta then t, false
   else Match.reduce_beta1 t
@@ -416,7 +463,7 @@ and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
   if not st.param.diff || not (SE.is_fset st.se) then t, false
   else
     let se = SE.to_fset st.se in
-    Term.head_normal_biterm0 (SE.to_projs se) t 
+    Term.head_normal_biterm0 (SE.to_projs se) t
 
 (* Try to show using [Constr] that [t] is [false] or [true] *)
 and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
@@ -471,15 +518,19 @@ and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool =
     | None -> t, false
     | Some red_t -> red_t, true
 
-(* Reduce all strict subterms *)
-and reduce_subterms (st : state) (t : Term.term) : Term.term * bool = 
+(** Reduce all strict subterms according to [f_red] *)
+and reduce_subterms
+    ~(f_red : state -> Term.term -> Term.term * bool)
+    (st : state) (t : Term.term)
+  : Term.term * bool
+  =
   match t with
   | Term.Quant (q, evs, t0) -> 
     let _, subst = Term.refresh_vars evs in
     let t0 = Term.subst subst t0 in
     let red_t0, has_red =
       let vars = Vars.add_vars (Vars.Tag.local_vars evs) st.vars in
-      reduce_term { st with vars } t0
+      f_red { st with vars } t0
     in
 
     if not has_red then t, false
@@ -491,13 +542,13 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
 
   (* if-then-else *)
   | Term.App (Fun (fs, fty), [c;t;e]) when fs = Term.f_ite -> 
-    let c, has_red0 = reduce_term st c in
+    let c, has_red0 = f_red st c in
 
     let hyps_t = add_hyp c st.hyps in
     let hyps_f = add_hyp (Term.mk_not ~simpl:true c) st.hyps in
 
-    let t, has_red1 = reduce_term { st with hyps = hyps_t } t in
-    let e, has_red2 = reduce_term { st with hyps = hyps_f } e in
+    let t, has_red1 = f_red { st with hyps = hyps_t } t in
+    let e, has_red2 = f_red { st with hyps = hyps_f } e in
 
     Term.mk_fun0 fs fty [c; t; e],
     has_red0 || has_red1 || has_red2
@@ -506,8 +557,8 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
   | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_impl -> 
     let hyps2 = add_hyp f1 st.hyps in
 
-    let f1, has_red1 = reduce_term st f1 in
-    let f2, has_red2 = reduce_term { st with hyps = hyps2 } f2 in      
+    let f1, has_red1 = f_red st f1 in
+    let f2, has_red2 = f_red { st with hyps = hyps2 } f2 in      
 
     Term.mk_fun0 fs fty [f1;f2],
     has_red1 || has_red2
@@ -516,8 +567,8 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
   | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_and -> 
     let hyps2 = add_hyp f1 st.hyps in
 
-    let f1, has_red1 = reduce_term st f1 in
-    let f2, has_red2 = reduce_term { st with hyps = hyps2 } f2 in      
+    let f1, has_red1 = f_red st f1 in
+    let f2, has_red2 = f_red { st with hyps = hyps2 } f2 in      
 
     Term.mk_fun0 fs fty [f1;f2],
     has_red1 || has_red2
@@ -526,8 +577,8 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
   | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_or -> 
     let hyps2 = add_hyp (Term.mk_not f1) st.hyps in
 
-    let f1, has_red1 = reduce_term st f1 in
-    let f2, has_red2 = reduce_term { st with hyps = hyps2 } f2 in      
+    let f1, has_red1 = f_red st f1 in
+    let f2, has_red2 = f_red { st with hyps = hyps2 } f2 in      
 
     Term.mk_fun0 fs fty [f1;f2],
     has_red1 || has_red2
@@ -540,15 +591,15 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
       { st with vars }
     in
 
-    let c, has_red0 = reduce_term st1 c in
+    let c, has_red0 = f_red st1 c in
 
     let hyps_t = add_hyp c st.hyps in
     let hyps_f =
       add_hyp (Term.mk_forall is (Term.mk_not ~simpl:true c)) st.hyps
     in
 
-    let t, has_red1 = reduce_term { st1 with hyps = hyps_t } t in
-    let e, has_red2 = reduce_term { st  with hyps = hyps_f } e in
+    let t, has_red1 = f_red { st1 with hyps = hyps_t } t in
+    let e, has_red2 = f_red { st  with hyps = hyps_f } e in
 
     let r_subst = rev_subst subst in
     let c, t = Term.subst r_subst c, Term.subst r_subst t in
@@ -560,7 +611,7 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
     let has_red, l = 
       List.map_fold (fun has_red (label,t) -> 
           let st = { st with se = SE.project [label] st.se } in
-          let t, has_red' = reduce_term st t in
+          let t, has_red' = f_red st t in
           has_red || has_red', (label, t)
         ) false l
     in
@@ -577,20 +628,15 @@ and reduce_subterms (st : state) (t : Term.term) : Term.term * bool =
   | Term.Var    _ -> 
     let has_red, t = 
       Term.tmap_fold (fun has_red t -> 
-          let t, has_red' = reduce_term st t in
+          let t, has_red' = f_red st t in
           has_red || has_red', t
         ) false t
     in
     t, has_red
 
+(*------------------------------------------------------------------*)
 (** Exported. *)
 let reduce_term (st : state) (t : Term.term) : Term.term = fst (reduce_term st t)
-
-(*------------------------------------------------------------------*)
-(** Weak head normal form *)
-let rec whnf_term (st : state) (t : Term.term) : Term.term =
-  let t, has_red = reduce_head1_term st t in
-  if has_red then whnf_term st t else t
 
 (*------------------------------------------------------------------*)
 (** {2 Global formula reduction} *)

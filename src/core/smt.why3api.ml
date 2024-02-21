@@ -1293,23 +1293,25 @@ let () =
          | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
          | Goal.Local s -> s
        in
-       let parameters = parse_args args in
-       let is_valid =
+       let {timestamp_style;slow;pure;provers} = parse_args args in
+       if
          sequent_is_valid
-          ~timestamp_style:parameters.timestamp_style
-          ~slow:parameters.slow 
-          ~pure:parameters.pure
-          ~prover:(match parameters.provers with [] -> ["CVC4"] | l -> l)
-        
-           s
-       in
-       if is_valid then sk [] fk else fk (None, Tactics.Failure "SMT cannot prove sequent"))
+          ~timestamp_style ~slow ~pure
+          ~prover:(match provers with [] -> ["CVC4"] | l -> l)
+          s
+       then
+         sk [] fk
+       else
+         fk (None, Tactics.Failure "SMT cannot prove sequent"))
 
 let () =
   if Sys.getenv_opt "BENCHMARK_SMT" <> None then
-    (* TODO benchmark several provers and styles, runnning each one separately,
-       and restrict to reasoning on pure formulas *)
-    TraceSequent.Benchmark.register_query_alternative
+    let timestamp_style = match Sys.getenv_opt "BENCHMARK_SMT" with
+      | Some "Abs" -> Abstract
+      | Some "Abs_Eq" -> Abstract_eq
+      | _ -> Nat
+    in
+    TraceSequent.register_query_alternative
       "Smt"
       (fun ~precise:_ s q ->
         let s =
@@ -1319,14 +1321,28 @@ let () =
             let conclusion = Term.mk_ands (List.map Term.Lit.lit_to_form q) in
             TraceSequent.set_conclusion conclusion s
         in
-        let ts = match Sys.getenv_opt "BENCHMARK_SMT" with
-          |Some "Abs" -> Abstract 
-          |Some "Abs_Eq" -> Abstract_eq
-          | _ -> Nat 
-        in 
         sequent_is_valid
-          ~timestamp_style:ts
-          ~slow:false 
+          ~timestamp_style
+          ~slow:false
           ~pure:true
+          ~prover:["CVC4"]
+          s) ;
+    TraceTactics.AutoSimplBenchmark.register_alternative
+      "Smt"
+      (fun s ->
+        sequent_is_valid
+          ~timestamp_style
+          ~slow:false
+          ~pure:false
+          ~prover:["CVC4"]
+          s,
+        None) ;
+    TraceTactics.AutoBenchmark.register_alternative
+      "Smt"
+      (fun (_,s) ->
+        sequent_is_valid
+          ~timestamp_style
+          ~slow:true
+          ~pure:false
           ~prover:["CVC4"]
           s)

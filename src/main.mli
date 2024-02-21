@@ -1,6 +1,6 @@
-(** Main Module, instantiate both an interactive or a file mode. *)
+(** Main module *)
 
-(** Run the prover on an input file *)
+(** Run the prover on an input file. *)
 val run : ?test:bool -> string -> unit
 
 (** Executable entry point. Parses arguments and behaves accordingly. *)

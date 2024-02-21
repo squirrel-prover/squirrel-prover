@@ -8,7 +8,7 @@ let search_unify () =
   let exception Ok in
   Alcotest.check_raises "unify Names with special arity when search" Ok
     (fun () ->
-      let st = Prover.init ~withPrelude:false () in
+      let st = Prover.init ~with_prelude:false () in
       let st = try Prover.exec_all ~test:true st
         "channel c
         system [T] (S : !_i !_i new n; out(c,n)).
@@ -46,7 +46,7 @@ let search_unify () =
 
 (*------------------------------------------------------------------*)
 let search_about_1 () =
-  let st = Prover.init ~withPrelude:false () in
+  let st = Prover.init ~with_prelude:false () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_command ~test:true 
@@ -90,7 +90,7 @@ let search_about_1 () =
 let search_about_2 () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init ~withPrelude:false () in
+  let st = Prover.init ~with_prelude:false () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = Prover.exec_all ~test:true st 
     "channel c
@@ -149,7 +149,7 @@ let search_about_type_holes_1 () =
   let exception Ok in
   Alcotest.check_raises "search with type holes 1" Ok
     (fun () ->
-      let st = Prover.init ~withPrelude:false () in
+      let st = Prover.init ~with_prelude:false () in
       let st = try Prover.exec_all ~test:true st
         "axiom [any] bar1 ['a] : exists (x : 'a), true.
          axiom [any] bar2 ['a] : exists (x : 'a -> 'a), true."
@@ -177,7 +177,7 @@ let search_about_type_holes_2 () =
   let exception Ok in
     Alcotest.check_raises "search with type holes 2" Ok
     (fun () ->
-      let st = Prover.init ~withPrelude:false () in
+      let st = Prover.init ~with_prelude:false () in
       let st = try Prover.exec_all ~test:true st
         "axiom [any] foo ['a] (phi:'a -> bool) :
          (not (exists (a:'a), (phi a))) = (forall (a:'a), not (phi a)).
@@ -268,7 +268,7 @@ let include_search () =
 
 (*------------------------------------------------------------------*)
 let include_ite () =
-  let st = Prover.init ~withPrelude:false () in
+  let st = Prover.init ~with_prelude:false () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_all ~test:true st

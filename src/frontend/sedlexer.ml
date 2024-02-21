@@ -68,9 +68,7 @@ let rec token buf =
   in
   match%sedlex buf with
   | whitespace | '\t' -> token buf
-  | '\n' ->
-      new_line buf;
-      token buf
+  | '\n' -> token buf
   | "(*" ->
       comment buf;
       token buf
@@ -243,12 +241,8 @@ let rec token buf =
 and comment buf =
   match%sedlex buf with
   | "*)" -> ()
-  | "(*" ->
-      comment buf;
-      comment buf
-  | "\n" ->
-      new_line buf;
-      comment buf
+  | "(*" -> comment buf; comment buf
+  | "\n" -> comment buf
   | eof -> unterminated_comment ()
   | any -> comment buf
   | _ -> failwith "Unexpected character"

@@ -6,6 +6,14 @@ module L = Location
 
 (* ---------------------------------------------------------------- *)
 
+(** Application parameters *)
+
+let interactive = ref false
+let html = ref false
+let stat_filename = ref ""
+
+(* ---------------------------------------------------------------- *)
+
 (** State of the main loop,
     with support for both history and includes. *)
 
@@ -24,16 +32,17 @@ type driver_state = {
   load_paths : Driver.load_paths;
 
   (* Current file, changed for includes. *)
-  file : Driver.file;
+  driver : Driver.t;
 
-  (** File stack can be changed with includes. *)
-  file_stack : Driver.file list;
+  (** File stack can be changed with includes.
+      Invariant: [List.hd file_stack = file]. *)
+  file_stack : Driver.t list;
 }
 
 (** Get the next input from the current file. *)
 let next_input_or_undo ~test (state : driver_state) : ProverLib.input_or_undo =
-  Driver.FromFile.next_input_or_undo
-    ~test ~interactive:!Driver.interactive state.file
+  Driver.next_input_or_undo
+    ~test ~interactive:!interactive state.driver
     (Prover.get_mode state.prover_state)
 
 (** Undo [nb_undo] previous commands. *)
@@ -52,7 +61,6 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
 
 (** One step of main loop: execute one command. *)
 let do_command
-    ~main_mode
     ~(test : bool)
     (state : driver_state)
     (command : ProverLib.input_or_undo) : driver_state
@@ -63,16 +71,16 @@ let do_command
     let st = state.prover_state in
     let check = state.check_mode in
     let prover_state =
-       Prover.do_command ~main_mode
-         ~file_stack:[state.file] ~check ~test st state.file input in
+       Prover.do_command
+         ~driver_stack:[state.driver] ~check ~test st state.driver input in
     { state with prover_state }
 
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
     [save] allows to specify if the current state must be saved, so that
     one can backtrack. *)
-let rec main_loop ~main_mode ~test ?(save=true) (state : driver_state) : unit =
-  if !Driver.interactive then Printer.prt `Prompt "";
+let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
+  if !interactive then Printer.prt `Prompt "";
 
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
@@ -86,73 +94,55 @@ let rec main_loop ~main_mode ~test ?(save=true) (state : driver_state) : unit =
 
   match
     let cmd = next_input_or_undo ~test state in
-    let new_state = do_command ~main_mode ~test state cmd in
+    let new_state = do_command ~test state cmd in
 
-    if !Driver.html then
+    if !html then
       Server.update new_state.prover_state;
 
     new_state, Prover.get_mode new_state.prover_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
-    if !Driver.stat_filename <> "" then
-      ProverTactics.pp_list_count !Driver.stat_filename;
-    Driver.close_chan state.file.f_chan;
-    if not test && not !Driver.html then exit 0;
+    if !stat_filename <> "" then
+      ProverTactics.pp_list_count !stat_filename;
+    Driver.close state.driver;
+    if not test && not !html then exit 0;
 
   (* loop *)
   | new_state, _ ->
-    if !Driver.html then Html.pp ();
-    (main_loop[@tailrec]) ~main_mode ~test new_state
+    if !html then Html.pp ();
+    (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
   | exception e
-    when Errors.is_toplevel_error ~interactive:!Driver.interactive ~test e ->
+    when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
     Printer.prt `Error "%a"
       (Errors.pp_toplevel_error
-         ~interactive:!Driver.interactive ~test state.file) e;
-    main_loop_error ~main_mode ~test state
+         ~interactive:!interactive ~test state.driver) e;
+    main_loop_error ~test state
 
-and main_loop_error ~main_mode ~test (state : driver_state) : unit =
-  if !Driver.interactive
+and main_loop_error ~test (state : driver_state) : unit =
+  if !interactive
   then begin (* at top-level, query again *)
-    assert (state.file.f_path = `Stdin);
-    (main_loop[@tailrec]) ~main_mode ~test ~save:false state
+    assert (Driver.path state.driver = None);
+    (main_loop[@tailrec]) ~test ~save:false state
   end
-  else if !Driver.html then
+  else if !html then
     Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n"
-      state.file.f_name
+      (Driver.name state.driver)
   else begin
-    Driver.close_chan state.file.f_chan;
+    Driver.close state.driver;
     if not test then exit 1
   end
 
-let start_main_loop
-    ?(test=false) ~(main_mode : [`Stdin | `File of string]) () : unit
-  =
-  (* Interactive is only set here. *)
-  Driver.interactive := main_mode = `Stdin;
-  let file = match main_mode with
-    | `Stdin -> Driver.file_from_stdin ()
-    | `File fname -> begin
-      match
-        Driver.file_from_path LP_none (Filename.remove_extension fname)
-      with
-      | Some f -> f
-      | None ->
-        Printer.prt `Error "%a ; start reading stdin…"
-          Command.pp_cmd_error (FileNotFound fname);
-        Driver.file_from_stdin ()
-    end
-
-  in
+let start_main_loop ?(test=false) driver : unit =
   let state =
     {
       prover_state = Prover.init ();
       history_state = HistoryTP.init_history_state;
-      load_paths = Driver.mk_load_paths ~main_mode ();
+      load_paths = Driver.mk_load_paths (Driver.dirname driver);
       check_mode = `Check;
-      file;
+      driver = driver;
       file_stack = []
     }
   in
@@ -160,19 +150,18 @@ let start_main_loop
   let prover_state =
     Prover.do_set_option
       state.prover_state
-      (TConfig.s_interactive, Config.Param_bool !Driver.interactive)
+      (TConfig.s_interactive, Config.Param_bool !interactive)
   in
   let state = { state with prover_state } in
-  main_loop ~main_mode ~test state
+  main_loop ~test state
 
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;
   if Filename.extension filename <> ".sp" then
     Command.cmd_error (InvalidExtension filename);
   Html.init filename html_filename;
-  let name = Filename.chop_extension filename in
-  Driver.html := true;
-  start_main_loop ~test:false ~main_mode:(`File name) ();
+  html := true;
+  start_main_loop ~test:false (Utils.get_result (Driver.from_file filename));
   Html.close html_filename
 
 let interactive_prover () =
@@ -180,8 +169,8 @@ let interactive_prover () =
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.init Printer.Interactive;
   Server.start ();
-  Driver.html := false;
-  try start_main_loop ~main_mode:`Stdin ()
+  html := false;
+  try start_main_loop (Driver.from_stdin ())
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
 let run ?(test=false) (filename : string) : unit =
@@ -195,15 +184,13 @@ let run ?(test=false) (filename : string) : unit =
   if Filename.extension filename <> ".sp" then
     Command.cmd_error (InvalidExtension filename);
 
-  if !Driver.stat_filename <> "" &&
-     Filename.extension !Driver.stat_filename <> ".json"
+  if !stat_filename <> "" &&
+     Filename.extension !stat_filename <> ".json"
   then
-    Command.cmd_error (InvalidExtension !Driver.stat_filename);
+    Command.cmd_error (InvalidExtension !stat_filename);
 
-  let name = Filename.chop_extension filename in
-
-  Driver.html := false;
-  start_main_loop ~test ~main_mode:(`File name) ()
+  html := false;
+  start_main_loop ~test (Utils.get_result (Driver.from_file filename))
 
 (* Parse command line and run accordingly. *)
 let main () =
@@ -214,14 +201,13 @@ let main () =
   let html_filename = ref "" in
   let speclist = [
     ("-i",
-     Arg.Set Driver.interactive,
+     Arg.Set interactive,
      "Interactive mode (e.g, for proof general)");
     ("--html",
      Arg.Set_string html_filename,
      "<HTML_FILE> Output in HTML file (incompatible with -i)");
-    ("-v", Arg.Set Driver.verbose, "Display more information");
     ("--stat",
-     Arg.Set_string Driver.stat_filename,
+     Arg.Set_string stat_filename,
      "<JSON_FILE> Output tactic usage counts in JSON file");
   ] in
   let error str =
@@ -230,18 +216,18 @@ let main () =
   in
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
-  Driver.html := !html_filename <> "";
-  if !Driver.interactive && !Driver.html then
+  html := !html_filename <> "";
+  if !interactive && !html then
     error "Cannot use both --html and -i."
-  else if List.length !args = 0 && not !Driver.interactive then
+  else if List.length !args = 0 && not !interactive then
     error "Filename needed when not in interactive mode."
-  else if List.length !args > 0 && !Driver.interactive then
+  else if List.length !args > 0 && !interactive then
     error "No file argument accepted when running in interactive mode."
   else if List.length !args > 1 then
     error "Cannot specify more than one filename."
-  else if !Driver.interactive then
+  else if !interactive then
     interactive_prover ()
-  else if !Driver.html then
+  else if !html then
     let filename = List.hd !args in
     generate_html filename !html_filename
   else
