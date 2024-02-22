@@ -85,6 +85,7 @@ val pp_dbg : form formatter
     which are equal [context.set] or [context.pair]. *)
 val _pp : ?context:SE.context -> form formatter_p
 
+val _pp_conclusion : dbg:bool -> ?context:SE.context -> Format.formatter -> form -> unit
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 

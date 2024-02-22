@@ -1178,7 +1178,8 @@ let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
         then fun _ -> fk (None, GoalNotClosed)
         else fun _ -> sk [g] fk
       in
-      (wrap_fail TraceLT.and_right) g
+      (wrap_fail (TraceLT.and_right None)) g
+        (*TODO:Concrete : Check if is possible to do better*)
         (fun l _ -> match l with
            | [g1;g2] ->
              simpl_aux ~close g1

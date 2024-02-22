@@ -35,7 +35,10 @@ module S : sig
     
     proof_context : H.hyps;
     (** Hypotheses *)
-    
+
+    bound : Term.term option;
+    (** Upper-bound *)
+
     conclusion : Term.term;
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
@@ -47,6 +50,7 @@ module S : sig
   val init_sequent :
     no_sanity_check:bool ->
     env:Env.t ->
+    bound : Term.term option ->
     conclusion:Term.term ->
     t
 
@@ -57,14 +61,16 @@ module S : sig
   val update :
     ?env:Env.t ->
     ?proof_context:H.hyps ->
+    ?bound : Term.term option ->
     ?conclusion:Term.term ->
     t -> t
 
 end = struct
   type t = {
-    env           : Env.t;
-    proof_context : H.hyps;
-    conclusion    : Term.term;
+    env              : Env.t;
+    proof_context   : H.hyps;
+    bound : Term.term option;
+    conclusion   : Term.term;
   }
 
   (** The pretty-printing environment table [ppe.table] is always
@@ -95,8 +101,11 @@ end = struct
 
     (* Print separation between proof_context and conclusion *)
     Printer.kws `Separation fmt (String.make 40 '-') ;
-    (* Print conclusion formula and close box. *)
-    Fmt.pf fmt "@;%a@]" (Term._pp ppe) s.conclusion
+   (* Print conclusion formula and close box. *)
+    match s.bound with
+    | None -> Fmt.pf fmt "@;%a@]" (Term._pp ppe) s.conclusion
+    | Some ve ->
+      Fmt.pf fmt "@;%a@;bound : %a@]" (Term._pp ppe) s.conclusion (Term._pp ppe) ve
 
   let pp     = _pp (default_ppe ~dbg:false ())
   let pp_dbg = _pp (default_ppe ~dbg:true ())
@@ -109,7 +118,9 @@ end = struct
           | LDef (_,t) -> Vars.Sv.union (Term.fv      t) vars
         ) s.proof_context Vars.Sv.empty
     in
-    Vars.Sv.union h_vars (Term.fv s.conclusion)
+    Vars.Sv.union
+      (Vars.Sv.union h_vars (Term.fv s.conclusion))
+      (omap_dflt Vars.Sv.empty Term.fv s.bound)
 
   let ty_fv (s : t) : Type.Fv.t =
     let h_vars =
@@ -119,8 +130,11 @@ end = struct
           | LDef (_,t) -> Type.Fv.union (Term.ty_fv      t) vars
         ) s.proof_context Type.Fv.empty
     in
-    Type.Fv.union h_vars (Term.ty_fv s.conclusion)
+    Type.Fv.union
+      (Type.Fv.union h_vars (Term.ty_fv s.conclusion))
+      (omap_dflt Type.Fv.empty Term.ty_fv s.bound)
 
+  (**TODO:Concrete: check that the possible variable in the bound are taken into account*)
   let sanity_check s : unit =
     Vars.sanity_check s.env.Env.vars;
 
@@ -143,17 +157,18 @@ end = struct
     assert (Sid.subset tyfv.uv Sid.empty)
 
 
-  let init_sequent ~no_sanity_check ~(env : Env.t) ~conclusion =
+  let init_sequent ~no_sanity_check ~(env : Env.t) ~bound ~conclusion =
     let proof_context = H.empty in
-    let s = { env ; proof_context; conclusion; } in
+    let s = { env ; proof_context; bound; conclusion; } in
     if not no_sanity_check then sanity_check s;
     s
 
-  let update ?env ?proof_context ?conclusion t =
+  let update ?env ?proof_context ?bound ?conclusion t =
     let env           = Utils.odflt t.env env
     and proof_context = Utils.odflt t.proof_context proof_context
+    and bound = Utils.odflt t.bound bound
     and conclusion    = Utils.odflt t.conclusion conclusion in
-    { env; proof_context; conclusion; } 
+    { env; proof_context; bound; conclusion; }
 end
 
 include S
@@ -164,6 +179,7 @@ type sequents = sequent list
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
   let atoms = List.map snd (Hyps.get_atoms_of_hyps s.proof_context) in
+  (*TODO:Concrete : Probably something to here but not sure for now*)
   let atoms =
     match Term.Lit.form_to_xatom s.conclusion with
       | Some at -> at :: atoms
@@ -184,8 +200,8 @@ let get_models table (proof_context : H.hyps) =
     H.fold (fun _ f acc ->
         match f with
         | LHyp (Local f)
-        | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None}))) -> f :: acc
-        (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = _}))) -> f :: acc
+        (*TODO:Concrete : Make sure it is right*)
         | LHyp (Global _) -> acc
         | LDef (_se, _t) -> acc
         (* FIXME: we cannot translate definitions, as doing so
@@ -370,18 +386,19 @@ let set_table table s =
 
 (*------------------------------------------------------------------*)
 let set_conclusion a s = S.update ~conclusion:a s 
+let set_bound b s = S.update ~bound:b s
 
-(** See `.mli` *)
-let set_conclusion_in_context ?update_local system conc s =
+ (** See `.mli` *)
+let set_conclusion_in_context ?update_local ?(bound = None) system conc s =
   if system = s.env.system && update_local = None then
-    set_conclusion conc s
+    let s = set_conclusion conc s in set_bound bound s
   else
 
   (* Update hypotheses. *)
   let proof_context =
     change_trace_hyps_context
       ?update_local
-      ~table:s.env.table
+    ~table:s.env.table
       ~old_context:s.env.system
       ~new_context:system
       ~vars:s.env.vars
@@ -389,7 +406,7 @@ let set_conclusion_in_context ?update_local system conc s =
   in
   (* Change the context in the sequent's environment. *)
   let env = Env.update ~system s.env in
-  let s = S.update ~env ~proof_context s in
+  let s = S.update ~env ~proof_context ~bound s in
 
   (* Finally set the new conclusion. *)
   set_conclusion conc s
@@ -409,10 +426,11 @@ let pi projection s =
     s
 
 (*------------------------------------------------------------------*)
-let init ?(no_sanity_check = false) ~env conclusion =
-  init_sequent ~no_sanity_check ~env ~conclusion
+let init ?(no_sanity_check = false) ~env ?(bound = None) conclusion =
+  init_sequent ~no_sanity_check ~env ~bound ~conclusion
 
 let conclusion s = s.conclusion
+let bound s = s.bound
 
 (*------------------------------------------------------------------*)
 let subst subst s =
@@ -425,6 +443,7 @@ let subst subst s =
     in
     S.update
       ~proof_context
+      ~bound:(omap (Term.subst subst) s.bound)
       ~conclusion:(Term.subst subst s.conclusion)
       s 
 
@@ -441,6 +460,7 @@ let tsubst (tsubst : Type.tsubst) s =
     S.update
       ~env:(Env.update ~vars s.env)
       ~proof_context
+      ~bound:(omap (Term.tsubst tsubst) s.bound)
       ~conclusion:(Term.tsubst tsubst s.conclusion)
       s 
 

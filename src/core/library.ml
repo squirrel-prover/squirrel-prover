@@ -6,6 +6,10 @@ module L = Location
 let get_fsymb (p : Symbols.s_path) : Symbols.fname =
   Symbols.Operator.of_s_path p 
 
+let get_btype table (s : string) : Symbols.btype =
+  try Symbols.BType.of_lsymb (L.mk_loc L._dummy s) table with
+  | Symbols.Error _ -> assert false
+
 (*------------------------------------------------------------------*)
 module Prelude = struct
   (*------------------------------------------------------------------*)
@@ -37,6 +41,30 @@ module Basic = struct
   let fs_mem table = get_fsymb table "mem"
   let fs_add table = get_fsymb table "add"
   let const_emptyset table = get_fsymb table "empty_set"
-
-  
 end  
+
+module Real = struct
+
+  let check_load table =
+    if not (Symbols.Theory.mem "Real" table) then
+      Tactics.hard_failure (Failure "theory Real is not loaded")
+
+  let get_fsymb table s =
+    check_load table;
+    get_fsymb ([],s)
+
+  let get_btype table s =
+    check_load table;
+    get_btype table s
+
+  let real table = Type.TBase (Symbols.to_string (get_btype table "real"))
+  let leq table = get_fsymb table "leq"
+  let add table = get_fsymb table "addr"
+  let minus table = get_fsymb table "minus"
+  let zero table = get_fsymb table "z_r"
+
+  let mk_minus table x = Term.mk_fun table (minus table) [x]
+  let mk_add table x y = Term.mk_fun table (add table) [x;y]
+  let mk_leq table x y = Term.mk_fun table (leq table) [x;y]
+  let mk_zero table    = Term.mk_fun table (zero table) []
+end

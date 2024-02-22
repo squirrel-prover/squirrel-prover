@@ -184,7 +184,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     S.t Tactics.tac
 
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
-  val and_right : S.t -> S.t list
+  val and_right : Term.term option -> S.t ->  S.t list
 end
 
 (*------------------------------------------------------------------*)

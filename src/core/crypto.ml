@@ -1171,10 +1171,10 @@ module AbstractSet = struct
     let rec doit = function
       | Term.Var v when mem v assertion  -> (find v assertion)
       | Term.App (Term.Fun (add,_), [t1;t2] )
-        when add = Library.Basic.fs_add env.table ->
+        when add = Library.Basic.add env.table ->
         union env hyps (doit t2) (Sets [(TSet.singleton t1  conds)])
       | Term.Fun(empty_set,_)
-        when empty_set = Library.Basic.const_emptyset env.table -> Sets [] 
+        when empty_set = Library.Basic.emptyset env.table -> Sets []
       | _ -> Top
     in
     doit term
@@ -1227,13 +1227,13 @@ module AbstractSet = struct
     match bool_term with
     | Term.Var(v) when mem v assertion -> true
     | Term.Fun(empty_set,_)
-      when empty_set = Library.Basic.const_emptyset env.table -> true
+      when empty_set = Library.Basic.emptyset env.table -> true
     | t when t = Term.mk_false || t = Term.mk_true -> true
     | Term.App (Term.Fun (f_mem,_),[_;_])
-      when f_mem = Library.Basic.fs_mem env.table->
+      when f_mem = Library.Basic.mem env.table->
       true
     | Term.App (Term.Fun (add,_), [_;_] )
-      when add = Library.Basic.fs_add env.table ->
+      when add = Library.Basic.add env.table ->
       true   
     | Term.App (Term.Fun(f_not, _),[t])
       when Term.f_not = f_not ->  boolean_abstraction_supported env assertion t
@@ -1259,7 +1259,7 @@ module AbstractSet = struct
     let rec abstract_boolean_and_not (term:Term.term) = 
       match term with
       | Term.App ( Term.Fun (f_mem,_),[t_el;t_set])
-        when f_mem = Library.Basic.fs_mem table->
+        when f_mem = Library.Basic.mem table->
         let set = abstract_term env hyps t_set bool_term.conds mem in
         begin
           match set with

@@ -35,9 +35,15 @@ let _pp ppe fmt = function
 
 let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
-    
+
 let pp_init ppe fmt = function
-  | Local  j -> Term._pp ppe fmt (TS.conclusion j)
+  | Local  j ->
+    begin
+      match TS.bound j with
+        | None -> Term._pp ppe fmt (TS.conclusion j)
+        | Some e ->  Fmt.pf fmt "@[%a@; bound : %a@]"
+                       Term.pp (TS.conclusion j) Term.pp e
+    end
   | Global j -> ES.pp_init ppe fmt j
 
 (*------------------------------------------------------------------*)
@@ -106,7 +112,7 @@ let to_global_statement ?loc stmt =
 module Parsed = struct
 
   type contents =
-    | Local     of Typing.term
+    | Local     of Typing.term * Typing.term option
     | Global    of Typing.global_formula
     | Obs_equiv   (** All the information is in the system expression. *)
 
@@ -185,9 +191,15 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let conv_env = Typing.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
-    | Local f ->
+    | Local (f,e) ->
       let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.Boolean f in
-      let s = TS.init ~no_sanity_check:true ~env f in
+      let e =
+           match e with
+            | None -> None
+            | Some e ->
+              let e, _ = Typing.convert ~ty_env conv_env ~ty:(Library.Real.real conv_env.env.table) e in Some e
+      in
+      let s = TS.init ~no_sanity_check:true ~env ?bound:(Some e) f in
 
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
          - [vs = vs_glob @ vs_loc]

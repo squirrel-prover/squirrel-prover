@@ -2391,13 +2391,44 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
-  let and_right (s : S.t) : S.t list =
-    match S.Reduce.destr_and s S.conc_kind (S.conclusion s) with
-    | Some (lformula, rformula) ->
+  let and_right (bound : Term.term option) (s : S.t) : S.t list =
+    let sbound = try S.bound s with | _ -> None in
+    match S.Reduce.destr_and s S.conc_kind (S.conclusion s),bound, sbound with
+    | Some (lformula, rformula),None,None ->
       [ S.set_conclusion lformula s ;
         S.set_conclusion rformula s ]
+    | Some(lformula,rformula), None, Some ve when Term.equal ve (Library.Real.mk_zero (S.table s)) ->
+      [ S.set_conclusion lformula s ;
+        S.set_conclusion rformula s ]
+    | Some (lformula, rformula), Some e, Some ve ->
+      begin
+       let s1 = S.set_conclusion lformula s in
+        let s2 = S.set_conclusion rformula s in
+       [S.set_bound (Some e) s1;
+        S.set_bound
+          (Some (Library.Real.mk_add (S.table s) ve
+                     (Library.Real.mk_minus (S.table s) e))) s2]
+       end
+    | Some(lformula,rformula), None, Some App(Fun(e,_),x::[y])
+       when e = (Library.Real.add (S.table s)) ->
+        let s1 = S.set_conclusion lformula s in
+        let s2 = S.set_conclusion rformula s in
+         [S.set_bound (Some x) s1;
+          S.set_bound (Some y ) s2]
+    | Some(_), None, Some _ -> soft_failure (Failure "not possible to split the upper-bound")
+    | Some(_),Some _, None -> soft_failure (Failure "not a concrete local judgement")
 
-    | None -> soft_failure (Failure "not a conjunction")
+
+
+    | None,_,_ -> soft_failure (Failure "not a conjunction")
+
+let and_right_args args s =
+  match args with
+  | [TacticsArgs.Theory e] -> let e,_ = convert s e in and_right (Some e) s
+  | [] -> and_right None s
+  | _ -> soft_failure (Failure "Not a correct term given to split")
+
+let wrap_and_split args = wrap_fail (and_right_args args)
 
 end
 
@@ -2908,11 +2939,11 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register "split"
+  T.register_general "split"
     ~pq_sound:true
-    (genfun_of_any_pure_fun
-       TraceLT.and_right
-       EquivLT.and_right)
+    (gentac_of_any_tac_arg
+       TraceLT.wrap_and_split
+       EquivLT.wrap_and_split)
 
 (*------------------------------------------------------------------*)
     

@@ -245,9 +245,10 @@ let set_vars vars j = update ~vars j
 
 let system j = j.env.system
 
-let set_conclusion_in_context ?update_local system conc s =
+let set_conclusion_in_context ?update_local ?(bound = None) system conc s =
 
   assert (update_local = None);
+ assert (bound = None);
 
   if system = s.env.system then { s with conclusion = conc } else
 
@@ -271,6 +272,8 @@ let table j = j.env.table
 let set_table table j = update ~table j
 
 let conclusion j = j.conclusion
+let bound _ = assert false
+let set_bound _ = assert false
 
 let ty_vars j = j.env.ty_vars
 

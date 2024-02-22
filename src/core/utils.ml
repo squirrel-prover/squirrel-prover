@@ -416,6 +416,14 @@ let omap_dflt dflt f a = match a with
   | None -> dflt
   | Some x -> f x
 
+let oproj1 a = match a with
+  | None -> None
+  | Some (a,_) -> Some a
+
+let oproj2 a = match a with
+  | None -> None
+  | Some (_,a) -> Some a
+
 let oiter f a = match a with
   | None -> ()
   | Some x -> f x

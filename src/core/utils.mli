@@ -198,6 +198,8 @@ val odflt     : 'a -> 'a option -> 'a
 val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option
 val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
+val oproj1    : ('a * 'b) option -> 'a option
+val oproj2    : ('a * 'b) option -> 'b option
 val oiter     : ('a -> unit) -> 'a option -> unit
 val oequal    : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 

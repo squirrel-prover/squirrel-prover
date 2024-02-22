@@ -111,8 +111,8 @@ type pquant = PForAll | PExists
 type global_formula = global_formula_i Location.located
 
 and global_formula_i =
-  | PEquiv  of equiv
-  | PReach  of term
+  | PEquiv  of equiv * term option
+  | PReach  of term * term option
   | PPred   of pred_app
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
@@ -1439,7 +1439,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
   | PAnd  (f1, f2) -> Equiv.And  (convert_g st f1, convert_g st f2)
   | POr   (f1, f2) -> Equiv.Or   (convert_g st f1, convert_g st f2)
 
-  | PEquiv p_e ->
+  | PEquiv (p_e, p_t) ->
     begin match st.env.system with
       | SE.{ pair = Some p } ->
         let system = SE.{ set = (p :> SE.t) ; pair = None } in
@@ -1451,16 +1451,24 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
               convert st t ty
             ) p_e
         in
-        Equiv.Atom (Equiv.Equiv {terms = e; bound = None})
+        let b =
+          match p_t with
+            | None -> None
+            | Some b -> Some (convert st b (Library.Real.real st.env.table))
+        in
+        Equiv.Atom (Equiv.Equiv {terms = e; bound = b})
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
       | _ ->
         conv_err (L.loc p) MissingSystem
     end
 
-  | PReach f ->
+  | PReach (f,e) ->
     let f = convert st f Type.tboolean in
-    Equiv.Atom (Equiv.Reach {formula = f; bound = None})
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    let e =
+        match e with
+          | None -> None
+          | Some e -> Some (convert st e (Library.Real.real st.env.table)) in
+    Equiv.Atom (Equiv.Reach {formula = f; bound = e})
 
   | PPred ppa ->
     Equiv.Atom (Equiv.Pred (convert_pred_app st ppa))

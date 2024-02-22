@@ -61,7 +61,7 @@ val to_global_statement : ?loc:Location.t -> statement -> global_statement
 module Parsed : sig
 
   type contents =
-  | Local     of Typing.term
+  | Local     of Typing.term * Typing.term option
   | Global    of Typing.global_formula
   | Obs_equiv   (** All the information is in the system expression. *)
 

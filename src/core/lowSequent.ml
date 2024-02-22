@@ -32,6 +32,7 @@ module type S = sig
   (** Type of formulas used for sequent conclusions. *)
   type conc_form
 
+  type bound_type := Term.term option
   (** The kinds of hypothesis and conclusion formulas. *)
 
   val hyp_kind : hyp_form Equiv.f_kind
@@ -48,12 +49,9 @@ module type S = sig
   val _pp    : t formatter_p
 
   (*------------------------------------------------------------------*)
-  (** {2 Access to sequent components}
+  module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
-      Each sequent consists of
-      a system, table, environment, type variables,
-      conclusion formula, and a proof-context containing
-      hypotheses and definitions (called [hyps] for legacy reasons). *)
+  (** {2 Access to sequent components} *)
 
   val env : t -> Env.t
   val set_env : Env.t -> t -> t
@@ -67,9 +65,11 @@ module type S = sig
   val conclusion : t -> conc_form
   val set_conclusion : conc_form -> t -> t
 
+  val bound : t -> bound_type
+  val set_bound : bound_type -> t -> t
+
   val system : t -> SystemExpr.context
 
-  module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t
@@ -93,6 +93,7 @@ module type S = sig
       kept (possibly with modifications) or if they should be dropped. *)
   val set_conclusion_in_context :
     ?update_local:(Term.term -> Term.term option) ->
+    ?bound : bound_type ->
     SystemExpr.context -> conc_form -> t -> t
 
   (*------------------------------------------------------------------*)

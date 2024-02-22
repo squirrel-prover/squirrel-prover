@@ -114,8 +114,8 @@ type pquant = PForAll | PExists
 type global_formula = global_formula_i Location.located
 
 and global_formula_i =
-  | PEquiv  of equiv
-  | PReach  of term
+  | PEquiv  of equiv * term option
+  | PReach  of term * term option
   | PPred   of pred_app
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
