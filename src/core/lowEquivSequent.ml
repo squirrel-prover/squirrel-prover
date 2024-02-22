@@ -77,10 +77,6 @@ let ty_fv (s : t) : Type.Fv.t =
   in
   Type.Fv.union h_vars (Equiv.ty_fv s.conclusion)
 
-(*------------------------------------------------------------------*)
-let _pp_conclusion ppe ~context fmt = function
-  | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ppe) fmt e
-  | _  as f -> Equiv._pp ppe ~context fmt f
 
 (*------------------------------------------------------------------*)
 (** The pretty-printing environment table [ppe.table] is always
@@ -111,7 +107,7 @@ let _pp ppe fmt j =
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation fmt (String.make 40 '-') ;
   Fmt.pf fmt "@;%a@]"
-    (_pp_conclusion ppe ~context:j.env.system) j.conclusion
+    (Equiv._pp_conclusion ppe ~context:j.env.system) j.conclusion
 
 let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())

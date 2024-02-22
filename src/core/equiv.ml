@@ -71,6 +71,14 @@ let ty_fv_equiv e : Type.Fv.t =
 type bform = {formula : Term.term; bound : Term.term option}
 
 (*------------------------------------------------------------------*)
+let _pp_bform_conclusion ppe fmt = function
+  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a@]@;bound : @[%a@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
+
+let _pp_bform ppe fmt = function
+  | {formula; bound = Some ve} -> Fmt.pf fmt "@[[%a : %a]@]" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = None} -> Fmt.pf fmt "@[[%a]@]" (Term._pp ppe) formula
+
 let subst_bform (subst : Term.subst) (f : bform) : bform =
   {formula = Term.subst subst f.formula; bound = Option.map (Term.subst subst) f.bound}
 
@@ -105,83 +113,40 @@ type pred_app = {
   (** Simple arguments, not a multi-term. *)
 }
 
-
 (*------------------------------------------------------------------*)
-(** {2 Equivalence atoms} *)
-
- (** See `.mli` *)
-type atom =
-  | Equiv of equiv
-  | Reach of bform
-  | Pred of pred_app
-    
-(*------------------------------------------------------------------*)
-(** Print the system arguments of a predicate application 
-    ([context.set] and [context.pair] are implicit and ignored 
+(** Print the system arguments of a predicate application
+    ([context.set] and [context.pair] are implicit and ignored
     when possible). *)
-let pp_se_args ?context fmt se_args =
-  (* Tedious.
-     Remove up-to the first two arguments, if they are equal 
-     to [set] or [equiv] *)
-  let se_args =
-    match context with
-    | None -> se_args
-    | Some context ->
-      match se_args, context.SE.pair with
-      | [set; equiv], Some pair ->
-        if SE.equal0 set   context.SE.set &&
-           SE.equal0 equiv (pair :> SE.t) then [] else se_args
-      | [set], _ ->
-        if SE.equal0 set context.SE.set then [] else [set]
-      | se_args, _ -> se_args
+
+let _pp_pred_app ?context ppe fmt p =
+  let pp_se_args ?context fmt se_args =
+    (* Tedious.
+       Remove up-to the first two arguments, if they are equal
+       to [set] or [equiv] *)
+    let se_args =
+      match context with
+      | None -> se_args
+      | Some context ->
+        match se_args, context.SE.pair with
+        | [set; equiv], Some pair ->
+          if SE.equal0 set   context.SE.set &&
+             SE.equal0 equiv (pair :> SE.t) then [] else se_args
+        | [set], _ ->
+          if SE.equal0 set context.SE.set then [] else [set]
+        | se_args, _ -> se_args
+    in
+    if se_args = [] then () else
+      Fmt.pf fmt "{%a}"
+        (Fmt.list ~sep:(Fmt.any "@ ") (Fmt.brackets SE.pp))
+        se_args
   in
-  if se_args = [] then () else 
-    Fmt.pf fmt "{%a}" 
-      (Fmt.list ~sep:(Fmt.any "@ ") (Fmt.brackets SE.pp))
-      se_args
-
-let pp_ty_args ppe fmt ty_args =
-  if not ppe.dbg || ty_args = [] then () else
-    Fmt.pf fmt "@[<hov 2><%a>@]"
-      (Fmt.list ~sep:Fmt.comma Type.pp) ty_args
-
-let _pp_atom_conclusion ?context ppe fmt (l : atom) =
-  match l with
-  | Equiv e -> _pp_equiv_numbered ppe fmt e
-  | Reach {formula; bound = Some ve} -> Fmt.pf fmt "@[%a@]@; bound : @[%a@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
-  | Reach {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
-  (* infix *)
-  | Pred { psymb; ty_args; se_args; multi_args; simpl_args }
-    when Symbols.is_infix_predicate psymb ->
-    let bl,br = as_seq2 (List.concat_map snd multi_args @ simpl_args) in
-    let pp fmt () =
-      Fmt.pf fmt "@[<0>$(%a %a%a%a@ %a)@]"
-        (Term._pp ppe) bl
-        Symbols.pp psymb
-        (pp_ty_args ppe) ty_args
-        (pp_se_args ?context) se_args
-        (Term._pp ppe) br
-    in
-    pp fmt ()
-
-  | Pred { psymb; ty_args; se_args; multi_args; simpl_args } ->
-    let pp_args fmt =
-      let all_args = List.concat_map snd multi_args @ simpl_args in
-      Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ppe) fmt all_args
-    in
-    Fmt.pf fmt "@[$(%a%a%a %t)@]"
-      Symbols.pp psymb
-      (pp_ty_args ppe) ty_args
-      (pp_se_args ?context) se_args
-      pp_args
-
-
-let _pp_atom ?context ppe fmt = function
-  | Equiv e -> _pp_equiv ppe fmt e
-  | Reach {formula; bound = Some ve} -> Fmt.pf fmt "@[[%a]@] <: %a" (Term._pp ppe) formula (Term._pp ppe) ve
-  | Reach {formula; bound = None} -> Fmt.pf fmt "@[[%a]@]" (Term._pp ppe) formula
-  (* infix *)
-  | Pred { psymb; ty_args; se_args; multi_args; simpl_args } 
+  let pp_ty_args ppe fmt ty_args =
+    if not ppe.dbg || ty_args = [] then () else
+      Fmt.pf fmt "@[<hov 2><%a>@]"
+        (Fmt.list ~sep:Fmt.comma Type.pp) ty_args
+  in
+  match p with
+  | { psymb; ty_args; se_args; multi_args; simpl_args }
     when Symbols.is_infix_predicate psymb ->
     let bl,br = as_seq2 (List.concat_map snd multi_args @ simpl_args) in
     let pp fmt () =
@@ -191,10 +156,10 @@ let _pp_atom ?context ppe fmt = function
         (pp_ty_args ppe) ty_args
         (pp_se_args ?context) se_args
         (Term._pp ppe) br
-      in
-      pp fmt ()
-    
-  | Pred { psymb; ty_args; se_args; multi_args; simpl_args } ->
+    in
+    pp fmt ()
+
+  | { psymb; ty_args; se_args; multi_args; simpl_args } ->
     let pp_args fmt =
       let all_args = List.concat_map snd multi_args @ simpl_args in
       Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ppe) fmt all_args
@@ -205,11 +170,6 @@ let _pp_atom ?context ppe fmt = function
         (pp_se_args ?context) se_args
         pp_args 
 
-
-
-let pp_atom = _pp_atom (default_ppe ~dbg:false ()) ?context:None
-
-(*------------------------------------------------------------------*)
 let subst_pred_app (subst : Term.subst) (pa : pred_app) : pred_app = {
   psymb      = pa.psymb;
   ty_args    = pa.ty_args;
@@ -219,6 +179,56 @@ let subst_pred_app (subst : Term.subst) (pa : pred_app) : pred_app = {
   simpl_args = List.map (Term.subst subst) pa.simpl_args;
 }
 
+let fv_pred_app (pa : pred_app) =
+  let fv =
+    List.fold_left (fun fv (_,args) ->
+        Sv.union fv (Term.fvs args)
+      ) Sv.empty pa.multi_args
+  in
+  Sv.union fv (Term.fvs pa.simpl_args)
+
+let ty_fv_pred_app (pa : pred_app) =
+  let fv =
+    List.fold_left (fun fv (_,args) ->
+        Type.Fv.union fv (Term.ty_fvs args)
+      ) Type.Fv.empty pa.multi_args
+  in
+  Type.Fv.union fv (Term.ty_fvs pa.simpl_args)
+
+let tsubst_pred_app (ts : Type.tsubst) (pa : pred_app) : pred_app = {
+  psymb      = pa.psymb;
+  ty_args    = List.map (Type.tsubst ts) pa.ty_args;
+  se_args    = pa.se_args;
+  multi_args =
+    List.map (fun (se,args) -> se, List.map (Term.tsubst ts) args) pa.multi_args;
+  simpl_args = List.map (Term.tsubst ts) pa.simpl_args;
+}
+
+ (*------------------------------------------------------------------*)
+(** {2 Equivalence atoms} *)
+
+ (** See `.mli` *)
+type atom =
+  | Equiv of equiv
+  | Reach of bform
+  | Pred of pred_app
+    
+
+let _pp_atom_conclusion ?context ppe fmt (l : atom) =
+  match l with
+  | Equiv e -> _pp_equiv_numbered ppe fmt e
+  | Reach f -> _pp_bform_conclusion ppe fmt f
+  | Pred p -> _pp_pred_app ?context ppe fmt p
+
+
+let _pp_atom ?context ppe fmt = function
+  | Equiv e -> _pp_equiv ppe fmt e
+  | Reach f -> _pp_bform ppe fmt f
+  | Pred p -> _pp_pred_app ?context ppe fmt p
+
+let pp_atom = _pp_atom (default_ppe ~dbg:false ()) ?context:None
+
+(*------------------------------------------------------------------*)
 
 let subst_atom (subst : Term.subst) (a : atom) : atom =
   match a with
@@ -227,13 +237,6 @@ let subst_atom (subst : Term.subst) (a : atom) : atom =
   | Pred  pa -> Pred  (subst_pred_app subst pa)
 
 (*------------------------------------------------------------------*)
-let fv_pred_app (pa : pred_app) =
-  let fv =
-    List.fold_left (fun fv (_,args) ->
-        Sv.union fv (Term.fvs args)  
-      ) Sv.empty pa.multi_args
-  in
-  Sv.union fv (Term.fvs pa.simpl_args)  
 
 (** Free variables of an [atom]. *)
 let fv_atom = function
@@ -241,15 +244,7 @@ let fv_atom = function
   | Reach f -> fv_bform f
   | Pred  pa -> fv_pred_app pa
 
-
 (*------------------------------------------------------------------*)
-let ty_fv_pred_app (pa : pred_app) =
-  let fv =
-    List.fold_left (fun fv (_,args) ->
-        Type.Fv.union fv (Term.ty_fvs args)  
-      ) Type.Fv.empty pa.multi_args
-  in
-  Type.Fv.union fv (Term.ty_fvs pa.simpl_args)  
 
 (** Free type variables of an [atom]. *)
 let ty_fv_atom = function
@@ -257,6 +252,13 @@ let ty_fv_atom = function
   | Reach f -> ty_fv_bform f
   | Pred  pa -> ty_fv_pred_app pa
 
+
+(** Type substitution of an [atom]*)
+let tsubst_atom (ts : Type.tsubst) (at : atom) =
+  match at with
+  | Equiv e -> Equiv (tsubst_equiv ts e)
+  | Reach f -> Reach (tsubst_bform ts f)
+  | Pred  pa -> Pred  (tsubst_pred_app ts pa)
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 (** We only support a small fragment for now *)
@@ -451,20 +453,6 @@ let subst_projs
 (*------------------------------------------------------------------*)
 (** Type substitutions *)
 
-let tsubst_pred_app (ts : Type.tsubst) (pa : pred_app) : pred_app = {
-  psymb      = pa.psymb;
-  ty_args    = List.map (Type.tsubst ts) pa.ty_args;
-  se_args    = pa.se_args;
-  multi_args =
-    List.map (fun (se,args) -> se, List.map (Term.tsubst ts) args) pa.multi_args;
-  simpl_args = List.map (Term.tsubst ts) pa.simpl_args;
-}
-
-let tsubst_atom (ts : Type.tsubst) (at : atom) =
-  match at with
-  | Equiv e -> Equiv (tsubst_equiv ts e)
-  | Reach f -> Reach (tsubst_bform ts f)
-  | Pred  pa -> Pred  (tsubst_pred_app ts pa)
 
 let tsubst (ts : Type.tsubst) (t : form) =
   let rec tsubst = function
