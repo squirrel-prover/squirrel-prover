@@ -521,6 +521,11 @@ system_modifier:
     { Decl.Rewrite p }
 
 (*------------------------------------------------------------------*)
+%inline abstract_or_op:
+| ABSTRACT {}
+| OP       {}
+       
+(*------------------------------------------------------------------*)
 declaration_i:
 | HASH e=lsymb ctys=c_tys
                           { Decl.Decl_hash (e, None, ctys) }
@@ -562,7 +567,7 @@ declaration_i:
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
-| ABSTRACT e=lsymb_decl a=ty_args COLON t=ty
+| abstract_or_op e=lsymb_decl a=ty_args COLON t=ty
     { let symb_type, name = e in
       Decl.(Decl_abstract
               { name      = name;

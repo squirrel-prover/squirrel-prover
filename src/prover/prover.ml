@@ -517,7 +517,6 @@ let print_function table (l:Theory.lsymb) : bool =
   match Symbols.Operator.of_lsymb_opt l table with
   | None -> false
   | Some f ->
-    Fmt.epr "got f@."; 
     let { ftype; def; } = get_data f table in
     begin
       match def with
