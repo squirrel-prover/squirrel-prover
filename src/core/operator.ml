@@ -3,25 +3,22 @@ open Utils
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
-(** operator body *)
 type body = Term.term
-
-type op_body = Single of body
   
-type operator = {
+type concrete_operator = {
   name    : string;
   ty_vars : Type.tvar list;
   args    : Vars.var list;
   out_ty  : Type.ty;
-  body    : op_body;
+  body    : body;
 }
 
-type Symbols.data += Operator of operator
+type Symbols.OpData.concrete_def += Val of concrete_operator
 
 (*------------------------------------------------------------------*)
-let pp_op_body fmt (Single body) = Fmt.pf fmt "%a" Term.pp body
+let pp_op_body fmt body = Fmt.pf fmt "%a" Term.pp body
 
-let pp_operator fmt op =
+let pp_concrete_operator fmt op =
   let pp_op_name fmt s =
     if Symbols.is_infix_str s then
       (Fmt.parens Fmt.string) fmt s 
@@ -47,27 +44,26 @@ let pp_operator fmt op =
     pp_op_body op.body
 
 (*------------------------------------------------------------------*)
-let mk ~name ~ty_vars ~args ~out_ty ~body = 
-  { name; ty_vars; args; out_ty; body = Single body }
-
-let ftype (op : operator) : Type.ftype = 
+let concrete_ftype (op : concrete_operator) : Type.ftype = 
   Type.mk_ftype op.ty_vars (List.map Vars.ty op.args) op.out_ty
 
-let is_operator (table : Symbols.table) (fsymb : Symbols.fname) : bool =
-  match Symbols.Function.get_data fsymb table with
-  | Operator _ -> true
-  | _ -> false
+let get_concrete_data (table : Symbols.table) (fsymb : Symbols.fname) : concrete_operator =
+  match Symbols.OpData.get_data fsymb table with
+  | { def = Concrete (Val data) } -> data
+  | _ -> assert false
+
+let is_concrete_operator (table : Symbols.table) (fsymb : Symbols.fname) : bool =
+  match (Symbols.OpData.get_data fsymb table).def with
+  | Concrete _ -> true
+  | Abstract _ -> false
 
 (*------------------------------------------------------------------*)
 let is_system_indep (table : Symbols.table) (fsymb : Symbols.fname) : bool =
-  match Symbols.Function.get_data fsymb table with
-  | Operator op ->
-    (* for now, we only have system-independent operators so this check is 
-       superfluous. *)
-    begin
-      match op.body with Single _ -> true
-    end
-  | _ -> true
+  match (Symbols.OpData.get_data fsymb table).def with
+  | Concrete _ -> true
+  (* for now, we only have system-independent operators so this check is 
+     superfluous. *)
+  | Abstract _ -> true
 
 (*------------------------------------------------------------------*)
 let unfold 
@@ -78,20 +74,14 @@ let unfold
     (args   : Term.term list)
   : Term.term
   =
-  let op = 
-    match Symbols.Function.get_data opsymb table with
-    | Operator op -> op
-    | _ -> assert false
-  in
+  let op = get_concrete_data table opsymb in
 
   (* apply type argument type variables *)
   let ts =
     List.fold_left2 Type.tsubst_add_tvar Type.tsubst_empty op.ty_vars tyargs
   in
   let op_args = List.map (Vars.tsubst ts) op.args in
-  let op_body =
-    match op.body with Single body -> Term.tsubst ts body
-  in
+  let op_body = Term.tsubst ts op.body in
 
   let i = min (List.length op_args) (List.length args) in
 

@@ -121,22 +121,21 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     if not (HighTerm.is_deterministic env body) then
       error (L.loc decl.op_body) KDecl NonDetOp;
 
-    let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
-    let ftype = Operator.ftype data in
+    let data = Operator.{ name; ty_vars; args; out_ty; body; } in
+    let ftype = Operator.concrete_ftype data in
 
     (* sanity checks on infix symbols *)
     let in_tys = List.length args in (* number of arguments *)
     Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
 
     let table, _ =
-      Symbols.Function.declare_exact
+      Symbols.Operator.declare ~approx:false
         table decl.op_name
-        ~data:(Operator.Operator data)
-        (ftype, Symbols.Operator)
+        ~data:(Symbols.OpData.Operator {def = Concrete (Operator.Val data); ftype; })
     in
 
     Printer.prt `Result "%a"
-      Operator.pp_operator data;
+      Operator.pp_concrete_operator data;
 
     table
 
@@ -148,7 +147,8 @@ let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
     Crypto.pp_game g;
 
   let table, _ =
-    Symbols.Game.declare_exact table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) ()
+    Symbols.Game.declare ~approx:false
+      table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) 
   in
   table
 
@@ -271,10 +271,9 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     Theory.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
 
     let table, _ =
-      Symbols.Predicate.declare_exact
+      Symbols.Predicate.declare ~approx:false
         table decl.pred_name
         ~data:(Predicate.Predicate data)
-        ()
     in
 
     Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]"
@@ -341,7 +340,7 @@ let declare table decl : Symbols.table * Goal.t list =
     Process.declare table ~id ~args ~projs proc, []
 
   | Decl.Decl_action a ->
-    let table, symb = Symbols.Action.reserve_exact table a.a_name in
+    let table, symb = Symbols.Action.reserve ~approx:false table a.a_name in
     Action.declare_symbol table symb a.a_arity, []
 
   | Decl.Decl_axiom pgoal ->
@@ -468,10 +467,11 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_bty bty_decl ->
     let table, _ =
-      Symbols.BType.declare_exact
+      let ty_infos = List.map Symbols.TyInfo.parse bty_decl.bty_infos in
+      Symbols.BType.declare ~approx:false
         table
         bty_decl.bty_name
-        (List.map Symbols.TyInfo.parse bty_decl.bty_infos)
+        ~data:(Symbols.TyInfo.Type ty_infos)
     in
     table, []
 

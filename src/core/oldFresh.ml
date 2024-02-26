@@ -41,7 +41,8 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (_self)
   method get_actions = actions
 
   method visit_macro mn _args a =
-    let cleara, a' = match Symbols.Macro.get_def mn.s_symb cntxt.table with
+    let cleara, a' =
+      match Symbols.get_macro_data mn.s_symb cntxt.table with
       | Symbols.Input -> true,  Term.mk_pred a
       | _             -> false, a
     in
@@ -180,7 +181,8 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
     match t with
     | Term.Macro (m, l, ts) ->
       let get_macro_default () =
-        let ts = match Symbols.Macro.get_def m.s_symb constr.table with
+        let ts =
+          match Symbols.get_macro_data m.s_symb constr.table with
           | Symbols.Input -> Term.mk_pred ts
           | _             -> ts
         in

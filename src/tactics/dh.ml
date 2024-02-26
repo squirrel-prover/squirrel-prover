@@ -216,14 +216,14 @@ let get_bad_occs
 
 (** Checks whether g has an associated CDH/GDH assumption *)
 let has_cgdh (gdh_oracles : bool) (g : lsymb) (table : Symbols.table) : bool =
-  let gen_n = Symbols.Function.of_lsymb g table in
-  match gdh_oracles, Symbols.Function.get_def gen_n table with
-  | false, (_, Symbols.DHgen l) ->
+  let gen_n = Symbols.Operator.of_lsymb g table in
+  match gdh_oracles, Symbols.OpData.get_abstract_data gen_n table with
+  | false, (Symbols.OpData.DHgen l, _) ->
     List.exists
       (fun x -> List.mem x l)
-      Symbols.[DH_CDH; DH_GDH; DH_DDH]
-  | true, (_, Symbols.DHgen l) ->
-    List.mem Symbols.DH_GDH l
+      Symbols.OpData.[DH_CDH; DH_GDH; DH_DDH]
+  | true, (Symbols.OpData.DHgen l, _) ->
+    List.mem Symbols.OpData.DH_GDH l
   | _ -> false
 
 
@@ -245,7 +245,7 @@ let dh_param
   let einfo = O.EI_direct, contx in
   let table = contx.table in
   (* get generator *)
-  let gen_n = Symbols.Function.of_lsymb g table in
+  let gen_n = Symbols.Operator.of_lsymb g table in
   let gen = Term.mk_fun table gen_n [] in
 
   (* check DH assumption *)
@@ -256,9 +256,10 @@ let dh_param
        (Tactics.Failure ("DH group generator: no " ^ dh ^ " assumption")));
 
   (* get exponentiation and (if defined) multiplication *)
-  let (exp_n, mult_n) = match Symbols.Function.get_data gen_n table with
-    | Symbols.AssociatedFunctions [e] -> (e, None)
-    | Symbols.AssociatedFunctions [e ; m] -> (e, Some m)
+  let exp_n, mult_n =
+    match Symbols.OpData.get_abstract_data gen_n table with
+    | _, [e] -> (e, None)
+    | _, [e ; m] -> (e, Some m)
     | _ -> assert false (* not possible since gen is a dh generator *)
   in
 

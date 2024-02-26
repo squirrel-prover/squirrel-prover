@@ -363,7 +363,7 @@ let mk_fun0 fname (app_fty : applied_ftype) terms =
   mk_app (Fun (fname, app_fty)) terms
 
 let mk_fun table fname ?(ty_args = []) terms =
-  let fty = Symbols.ftype table fname in
+  let fty = Symbols.OpData.ftype table fname in
   assert (List.length ty_args = List.length fty.fty_vars);
   mk_app (Fun (fname, { fty; ty_args; })) terms
 
@@ -375,7 +375,7 @@ let mk_fun_tuple table fname ?ty_args terms =
 let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
   let ty_env = Type.Infer.mk_env () in
 
-  let fty = Symbols.ftype table fname in
+  let fty = Symbols.OpData.ftype table fname in
   let opened_fty = Type.open_ftype ty_env fty in 
 
   (* decompose [fty]'s type  *)
@@ -503,7 +503,7 @@ module Prelude = struct
 
   (** Get a prelude-defined symbol *)
   let get_prelude_fsymb table (s : string) : Symbols.fname =
-    try Symbols.Function.of_lsymb (L.mk_loc L._dummy s) table with
+    try Symbols.Operator.of_lsymb (L.mk_loc L._dummy s) table with
     | Symbols.Error _ -> assert false
 
   (*------------------------------------------------------------------*)

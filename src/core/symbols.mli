@@ -32,10 +32,10 @@ type table
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
+(*------------------------------------------------------------------*)
 (** Each possible symbol kind is represented by an abstract datatype.
     Their names are descriptive; [fname] is for function symbols. *)
 
-(*------------------------------------------------------------------*)
 type _channel
 type _config
 type _oracle
@@ -70,120 +70,33 @@ type theory    = _theory    t
     
 (*------------------------------------------------------------------*)
 type symbol_kind =
-  | NChannel
-  | NConfig
-  | NOracle
-  | NName
-  | NAction
-  | NFunction
-  | NMacro
-  | NSystem
-  | NProcess
-  | NBType      (** type declarations *)
-  | NGame
-  | NHintDB
-  | NLemma
-  | NPredicate
-  | NTheory
+  | Channel
+  | Config
+  | Oracle
+  | Name
+  | Action
+  | Operator   (** abtract and concrete operators *)
+  | Macro
+  | System
+  | Process
+  | BType      (** type declarations *)
+  | Game
+  | HintDB
+  | Lemma
+  | Predicate
+  | Theory
     
 val pp_symbol_kind : Format.formatter -> symbol_kind -> unit
 
-val get_symbol_kind : ?group:group -> table -> string -> symbol_kind option
-
+val kind_of_string : ?group:group -> table -> string -> symbol_kind option
+  
 (*------------------------------------------------------------------*)
-(** {2 Symbol definitions}
-
-    Each symbol is defined by some data,
-    whose type depends on the kind. *)
-
-(*------------------------------------------------------------------*)
-(** Different variants on the Diffie-Hellman crypto assumption      *)
-                          
-type dh_hyp =
-  | DH_DDH
-  | DH_CDH
-  | DH_GDH
-
-type function_def =
-  | Hash
-  | DHgen of dh_hyp list
-  | AEnc
-  | ADec
-  | SEnc
-  | SDec
-  | Sign
-  | CheckSign
-  | PublicKey
-  | Abstract of symb_type
-  | Operator                    (* definition in associated data *)
-
-val pp_function_def : Format.formatter -> function_def -> unit
-
-(** Indicates if a function symbol has been defined with
-    the specified definition. *)
-val is_ftype : fname -> function_def -> table -> bool
-
-(*------------------------------------------------------------------*)
-(** {2 Type information: Ocaml type declaration}  *)
-
-(** Type information associated to base types. 
-    Restrict the instantiation domain of a type. *)
-type bty_info =
-  | Large               (** collision probabiliy between names is negligible *)
-  | Name_fixed_length   (** for any η, all names have the same length *)
-  | Finite              (** finite for all η *)
-  | Fixed               (** independent from η *)
-  | Well_founded        (** well-founded for all η *)
-  | Enum                (** enumerable in poly time  *)
-    
-type bty_infos = bty_info list
-
-(*------------------------------------------------------------------*)
-type name_def = {
-  n_fty : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
-}
-
-(*------------------------------------------------------------------*)
-type macro_def =
-  | Input | Output | Cond | Exec | Frame
-  | State of int * Type.ty
-    (** Macro that expands to the content of a state at a given timestamp. *)
-  | Global of int * Type.ty
-    (** Global macros are used to encapsulate let-definitions.
-        They are indexed. *)
-
-(*------------------------------------------------------------------*)
-type [@warning "-37"] param_info =
-  | PBool
-  | PString
-  | PInt
-
-type [@warning "-37"] oracle_info =
-  | PTerm
-
-(*------------------------------------------------------------------*)
-(** Information about symbol definitions, depending on the kind. *)
-type _ def =
-  | Channel   : unit        -> _channel   def
-  | Config    : param_info  -> _config    def
-  | Oracle    : oracle_info -> _oracle    def
-  | Name      : name_def    -> _name      def
-  | Action    : int         -> _action    def
-  | Macro     : macro_def   -> _macro     def
-  | System    : unit        -> _system    def
-  | Process   : unit        -> _process   def
-  | BType     : bty_infos   -> _btype     def
-  | Game      : unit        -> _game      def
-  | HintDB    : unit        -> _hintdb    def
-  | Lemma     : unit        -> _lemma     def
-  | Theory    : unit        -> _theory    def
-  | Predicate : unit        -> _predicate def
-
-  | Function : (Type.ftype * function_def) -> _fname def
-        
-type edef =
-  | Exists : 'a def -> edef
+(** The status of a symbol. *)
+type status =
+  | Defined  of symbol_kind
   | Reserved of symbol_kind
+
+val status_of_lsymb : ?group:group -> lsymb -> table -> status
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
@@ -196,7 +109,6 @@ type edef =
     at least avoids having multiple hashtables for symbols. *)
 type data = ..
 type data += Empty
-type data += AssociatedFunctions of fname list
 
 (*------------------------------------------------------------------*)
 (** {2 Basic kind-independent operations} *)
@@ -207,62 +119,37 @@ val to_string : 'a t -> string
 (** Pretty-print a symbol. *)
 val pp : Format.formatter -> 'a t -> unit
 
-(** [def_of_lsymb s] returns the definition of the symbol named [s].
-    @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_lsymb : ?group:group -> lsymb -> table -> edef
-
 val is_defined : ?group:group -> string -> table -> bool
-
-type wrapped = Wrapped : 'a t * 'a def -> wrapped
-
-(** [of_lsymb s] returns the symbol associated to [s]
-    together with its defining data.
-    @raise Unbound_identifier if no such symbol has been defined. *)
-val of_lsymb : ?group:group -> lsymb -> table -> wrapped
-
-(** [of_lsymb_opt s] is the same as [of_lsymb_opt s], but return [None]
-    if [s] is not defined. *)
-val of_lsymb_opt : ?group:group -> lsymb -> table -> wrapped option
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol kinds} *)
 
-(** Signature for symbol kinds. *)
+(** Signature a new kind of symbols. *)
 module type SymbolKind = sig
 
   (** Abstract type representing this kind. *)
   type ns
-
-  (** Type of values defining the symbols of this kind. *)
-  type def
-
+    
   val remove : table -> ns t -> table
     
-  (** Reserve a fresh symbol name, resembling the given string. *)
-  val reserve : table -> lsymb -> table * ns t
-
   (** Reserve a fresh symbol name. *)
-  val reserve_exact : table -> lsymb -> table * ns t
+  val reserve : approx:bool -> table -> lsymb -> table * ns t
 
   (** Release a reserved symbol. *)
   val release : table -> ns t -> table
     
   (** Define a symbol name that has been previously reserved
       using [fresh]. *)
-  val define : table -> ns t -> ?data:data -> def -> table
+  val define : table -> ?data:data -> ns t -> table
 
   (** Redefine a symbol name that has been previously defined. *)
-  val redefine : table -> ns t -> ?data:data -> def -> table
+  val redefine : table -> ?data:data -> ns t -> table
 
-  (** Declare a new symbol, with a name resembling the given string,
-      defined by the given value. *)
+  (** Declare a new symbol.
+      @raise Multiple_declarations if the name is not available 
+      and [not approx] holds. *)
   val declare :
-    table -> lsymb -> ?data:data -> def -> table * ns t
-
-  (** Like declare, but use the exact string as symbol name.
-      @raise Multiple_declarations if the name is not available. *)
-  val declare_exact :
-    table -> lsymb -> ?data:data -> def -> table * ns t
+    approx:bool -> table -> ?data:data -> lsymb -> table * ns t
 
   val is_reserved : ns t -> table -> bool
 
@@ -274,21 +161,11 @@ module type SymbolKind = sig
       @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists for
-      this kind, and None otherwise. *)
+  (** Same as [of_lsymb_opt s] but using an option type *)
   val of_lsymb_opt : lsymb -> table -> ns t option
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
-
-  (** Get definition and data at once. *)
-  val get_all : ns t -> table -> def * data
-
-  (** Get definition associated to some symbol. *)
-  val get_def : ns t -> table -> def
-
-  (** [def_of_lsymb s] is equivalent to [get_def (of_lsymb s)]. *)
-  val def_of_lsymb : lsymb -> table -> def
 
   (** Get data associated to some symbol. *)
   val get_data : ns t -> table -> data
@@ -297,33 +174,31 @@ module type SymbolKind = sig
   val data_of_lsymb : lsymb -> table -> data
 
   (** Iterate on the defined symbols of this kind. *)
-  val iter : (ns t -> def -> data -> unit) -> table -> unit
+  val iter : (ns t -> data -> unit) -> table -> unit
 
   (** Fold over the defined symbols of this kind. *)
-  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val fold : (ns t -> data -> 'a -> 'a) -> 'a -> table -> 'a
 
   (** Map over the defined symbols of this kind. *)
-  val map : (ns t -> def -> data -> (def * data)) -> table -> table
+  val map : (ns t -> data -> data) -> table -> table
 end
 
-module Config    : SymbolKind with type def = param_info  with type ns = _config
-module Oracle    : SymbolKind with type def = oracle_info with type ns = _oracle
-module Channel   : SymbolKind with type def = unit        with type ns = _channel
-module BType     : SymbolKind with type def = bty_infos   with type ns = _btype
-module Game      : SymbolKind with type def = unit        with type ns = _game
-module Action    : SymbolKind with type def = int         with type ns = _action
-module System    : SymbolKind with type def = unit        with type ns = _system
-module Process   : SymbolKind with type def = unit        with type ns = _process
-module HintDB    : SymbolKind with type def = unit        with type ns = _hintdb
-module Lemma     : SymbolKind with type def = unit        with type ns = _lemma
-module Theory    : SymbolKind with type def = unit        with type ns = _theory
-module Predicate : SymbolKind with type def = unit        with type ns = _predicate
-                                                           
-module Function : SymbolKind
-  with type def = Type.ftype * function_def with type ns = _fname
-
-module Macro    : SymbolKind with type def = macro_def with type ns = _macro
-module Name     : SymbolKind with type def = name_def with type ns = _name
+(*------------------------------------------------------------------*)
+module Config    : SymbolKind with type ns = _config
+module Oracle    : SymbolKind with type ns = _oracle
+module Channel   : SymbolKind with type ns = _channel
+module BType     : SymbolKind with type ns = _btype
+module Game      : SymbolKind with type ns = _game
+module Action    : SymbolKind with type ns = _action
+module System    : SymbolKind with type ns = _system
+module Process   : SymbolKind with type ns = _process
+module HintDB    : SymbolKind with type ns = _hintdb
+module Lemma     : SymbolKind with type ns = _lemma
+module Theory    : SymbolKind with type ns = _theory
+module Predicate : SymbolKind with type ns = _predicate
+module Operator  : SymbolKind with type ns = _fname
+module Macro     : SymbolKind with type ns = _macro
+module Name      : SymbolKind with type ns = _name
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
@@ -343,13 +218,144 @@ val pp_error :
 exception Error of error
 
 (*------------------------------------------------------------------*)
-(** {2 Type information} *)
+(** {2 Sets and maps} *)
+
+module Ss (S : SymbolKind) : Set.S with type elt := S.ns t 
+module Ms (S : SymbolKind) : Map.S with type key := S.ns t 
+
+(*------------------------------------------------------------------*)
+(** {2 Some data definitions}
+
+    Each symbol is defined by some data,
+    whose type depends on the kind. *)
+
+(*------------------------------------------------------------------*)
+(** {3 Data definitions for operators (abstract and concrete)} 
+
+    Contain the data definitions for concrete and abstract operators,
+    except for some fields of concrete operators that are post-poned 
+    after the definition of terms. *)
+    
+module OpData : sig
+
+  (*------------------------------------------------------------------*)
+  (** Different variants on the Diffie-Hellman crypto assumption *)                          
+  type dh_hyp =
+    | DH_DDH
+    | DH_CDH
+    | DH_GDH
+
+  (** Definition on an abstract operator *)
+  type abstract_def =
+    | Hash
+    | DHgen of dh_hyp list
+    | AEnc
+    | ADec
+    | SEnc
+    | SDec
+    | Sign
+    | CheckSign
+    | PublicKey
+    | Abstract of symb_type
+
+  type associated_fun = fname list
+
+  (*------------------------------------------------------------------*)
+  (** Extensible type for concrete operators:
+      see to [operator.ml] for the single constructor of [concrete_def].
+      (the type is postponed because its definition uses terms,
+      which are defined after the [Symbols] module).  *)
+  type concrete_def = ..
+
+  (*------------------------------------------------------------------*)
+  type def =
+    | Abstract of abstract_def * associated_fun
+    | Concrete of concrete_def
+
+  type op_data = {
+    ftype : Type.ftype;
+    def   : def;
+  }
+        
+  type data += Operator of op_data
+
+  (*------------------------------------------------------------------*)
+  val pp_abstract_def : Format.formatter -> abstract_def -> unit
+        
+  (*------------------------------------------------------------------*)
+  val get_data : fname -> table -> op_data
+
+  val get_abstract_data : fname -> table -> abstract_def * associated_fun
+    
+  val ftype : table -> fname -> Type.ftype
+
+  (*------------------------------------------------------------------*)
+  val is_abstract : fname -> table -> bool
+ 
+  (** Indicates if an abstract function symbol has been defined with
+      the specified definition. *)
+  val is_abstract_with_ftype : fname -> abstract_def -> table -> bool
+end
+
+(*------------------------------------------------------------------*)
+(** {3 Macro data}  *)
+
+(** Extensible type for global macros:
+    see to [macros.ml] for the single constructor of [global_macro_def].
+    (the type is postponed because its definition uses terms, 
+    which are defined after the [Symbols] module).  *)
+type global_macro_def = ..
+
+(** Extensible type for global macros:
+    see to [macros.ml] for the single constructor of [global_macro_def].
+    (the type is postponed because its definition uses terms, 
+    which are defined after the [Symbols] module).  *)
+type state_macro_def = ..
+
+type macro_data =
+  | Input | Output | Cond | Exec | Frame
+  | State  of int * Type.ty * state_macro_def
+  (** Stateful cells. *)
+  | Global of int * Type.ty * global_macro_def
+  (** Global macros are used to encapsulate let-definitions. *)
+  
+type data += Macro of macro_data
+
+val get_macro_data : macro -> table -> macro_data
+
+(*------------------------------------------------------------------*)
+(** {3 Name data} *)
+
+type name_data = {
+  n_fty : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
+}
+
+type data += Name of name_data
+
+val get_name_data : name -> table -> name_data
+  
+(*------------------------------------------------------------------*)
+(** {3 Type information: Ocaml type declaration}  *)
 
 module TyInfo : sig
-  type t = bty_info
+  (** Type information associated to base types. 
+      Restrict the instantiation domain of a type. *)
+  type t =
+    | Large               (** collision probabiliy between names is negligible *)
+    | Name_fixed_length   (** for any η, all names have the same length *)
+    | Finite              (** finite for all η *)
+    | Fixed               (** independent from η *)
+    | Well_founded        (** well-founded for all η *)
+    | Enum                (** enumerable in poly time  *)
 
+  type data += Type of t list
+        
+  (*------------------------------------------------------------------*)
   val parse : lsymb -> t
 
+  (*------------------------------------------------------------------*)
+  val get_data : btype -> table -> t list
+    
   (*------------------------------------------------------------------*)
   val get_bty_infos  : table -> Type.ty -> t list 
   val check_bty_info : table -> Type.ty -> t -> bool
@@ -387,18 +393,12 @@ val is_infix_predicate : predicate -> bool
 val infix_assoc_predicate : predicate -> assoc
 
 (*------------------------------------------------------------------*)
-val is_global : macro_def -> bool
-
-(*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 
 val builtins_table : table
 
 (** Returns the type of a builtin function *)
 val ftype_builtin : fname -> Type.ftype
-
-(** Returns the type of a function *)
-val ftype : table -> fname -> Type.ftype
 
 (*------------------------------------------------------------------*)
 (** {3 Action builtins} *)
@@ -421,7 +421,7 @@ val dummy_channel_lsymb : lsymb
 val dummy_channel : channel
 
 (*------------------------------------------------------------------*)
-(** {3 Function symbols builtins} *)
+(** {3 Abstract operator symbols builtins} *)
 
 val fs_diff : fname
 
@@ -485,7 +485,3 @@ val fs_empty  : fname
 (** Length *)
 
 val fs_len    : fname
-
-(*------------------------------------------------------------------*)
-module Ss (S : SymbolKind) : Set.S with type elt := S.ns t 
-module Ms (S : SymbolKind) : Map.S with type key := S.ns t 

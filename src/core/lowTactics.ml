@@ -525,7 +525,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       if mem_def                           ||
          Symbols.Macro.mem_lsymb     m tbl ||
-         Symbols.Function.mem_lsymb  m tbl ||
+         Symbols.Operator.mem_lsymb  m tbl ||
          Symbols.Predicate.mem_lsymb m tbl
       then
         Lsymb m
@@ -2340,7 +2340,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (tyn = tym) then
         Tactics.soft_failure (Failure "names are not of the same types");
 
-      if not Symbols.TyInfo.(check_bty_info table n.s_typ Symbols.Name_fixed_length) then
+      if not Symbols.TyInfo.(check_bty_info table n.s_typ Symbols.TyInfo.Name_fixed_length) then
         Tactics.soft_failure
           (Failure "names are of a type that is not [name_fixed_length]");
 

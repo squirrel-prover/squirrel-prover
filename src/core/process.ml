@@ -362,13 +362,12 @@ type Symbols.data += Process_data of proc_decl
 
 let declare_nocheck table (name : Theory.lsymb) (pdecl : proc_decl) =
   let data = Process_data pdecl in
-  let def = () in
-  let table, _ = Symbols.Process.declare_exact table name ~data def in
+  let table, _ = Symbols.Process.declare ~approx:false table name ~data in
   table
 
 let find_process table pname =
-  match Symbols.Process.get_all pname table with
-  | (), Process_data pdecl -> pdecl
+  match Symbols.Process.get_data pname table with
+  | Process_data pdecl -> pdecl
   | _ -> assert false
 (* The data associated to a process must be a [Process_data _]. *)
 
@@ -668,11 +667,17 @@ let mk_namelength_statement
   let lsy = L.mk_loc L._dummy (cst_hash) in
 
   (* find or build cst function namelength_hashS *)
-  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
     | Some fn -> table, fn
-    | None -> 
-      let ft = Type.mk_ftype [] [] Message in
-      Symbols.Function.declare_exact table lsy (ft,Symbols.Abstract `Prefix)
+    | None ->
+      let open Symbols.OpData in
+      let ftype = Type.mk_ftype [] [] Message in
+      let data =
+        Operator {
+          ftype; def = Abstract (Abstract `Prefix, [])
+        }
+      in
+      Symbols.Operator.declare ~approx:false table lsy ~data 
   in
   let cst = Term.mk_fun table fname [] in
   (* len(n) = cst *)
@@ -737,8 +742,8 @@ let subst_macros_ts table l ts t =
       let terms = List.map doit terms in
       let ts' = doit ts0' in
       begin
-        match Symbols.Macro.get_all is.s_symb table with
-        | Symbols.State _, _ ->
+        match Symbols.get_macro_data is.s_symb table with
+        | Symbols.State _ ->
           if (List.mem is.s_symb l && Term.equal ts ts0')
           then Term.mk_macro is terms ts'
           else Term.mk_macro is terms (Term.mk_pred ts')
@@ -919,13 +924,13 @@ let process_system_decl
 
     | New (n_var, ty, p) ->
       let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
-      let ndef = Symbols.{ n_fty } in
 
       (* declare a new name symbol *)
       let table, nsymb =
         let n_lsymb = mk_dum (Vars.name n_var) in
+        let data = Symbols.Name { n_fty } in
         (* location not useful, declaration cannot fail *)
-        Symbols.Name.declare penv.env.table n_lsymb ndef
+        Symbols.Name.declare ~approx:true penv.env.table n_lsymb ~data
       in
 
       (* add name length axioms *)

@@ -313,7 +313,8 @@ let get_actions_ext
         match O.expand_macro_check_once info t with
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
-          let ts = match Symbols.Macro.get_def m.s_symb contx.table with
+          let ts =
+            match Symbols.get_macro_data m.s_symb contx.table with
             | Symbols.Input -> Term.mk_pred ts
             | _             -> ts
           in

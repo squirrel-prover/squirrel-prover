@@ -141,9 +141,9 @@
 (*------------------------------------------------------------------*)
 (* DH flags *)
 dh_flag:
-| DDH { Symbols.DH_DDH }
-| CDH { Symbols.DH_CDH }
-| GDH { Symbols.DH_GDH }
+| DDH { Symbols.OpData.DH_DDH }
+| CDH { Symbols.OpData.DH_CDH }
+| GDH { Symbols.OpData.DH_GDH }
 
 dh_flags:
 | l=slist1(dh_flag, COMMA) { l }

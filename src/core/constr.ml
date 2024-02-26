@@ -1609,7 +1609,10 @@ and tau4  = mk_var_term Type.ttimestamp "tau"
 and i     = mk_var_term Type.tindex "i"
 and i'    = mk_var_term Type.tindex "i"
 
-let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
+let _, a =
+  Symbols.Action.declare ~approx:false
+    Symbols.builtins_table (L.mk_loc L._dummy "a")
+    (* ~data:(Action.ActionData 1) *)
 
 let pb_eq1 = (Comp (`Eq,tau, mk_pred tau'))
              :: (Comp (`Eq,tau', mk_pred tau''))

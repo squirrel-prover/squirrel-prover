@@ -140,7 +140,7 @@ type any_term = Global of global_formula | Local of term
 (** {2 Declaration of new symbols} *)
 
 
-(** Declare a new function symbol of type message->message->message, * which
+(** Declare a new function symbol of type message->message->message, which
     satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash :
   Symbols.table ->
@@ -150,10 +150,11 @@ val declare_hash :
   lsymb ->
   Symbols.table
 
-(** DH assumption given by h on a group with generator gen, exponentiation exp, optionnally multiplication mult. *)
+(** DH assumption given by h on a group with generator gen, exponentiation exp, 
+    optionnally multiplication mult. *)
 val declare_dh :
   Symbols.table ->
-  Symbols.dh_hyp list ->
+  Symbols.OpData.dh_hyp list ->
   ?group_ty:Type.ty ->
   ?exp_ty:Type.ty ->
   lsymb ->
@@ -211,7 +212,7 @@ val declare_signature :
 
 (** [declare_name n ndef] declares a new name of type
   * [index^i -> message]. *)
-val declare_name : Symbols.table -> lsymb -> Symbols.name_def -> Symbols.table
+val declare_name : Symbols.table -> lsymb -> Symbols.name_data -> Symbols.table
 
 (** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
     a new state symbol of type [s1->...->sn->s]

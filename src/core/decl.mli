@@ -137,9 +137,10 @@ type declaration_i =
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
 
-  | Decl_dh of Symbols.dh_hyp list * lsymb * 
-               (lsymb * Symbols.symb_type) * 
-               (lsymb * Symbols.symb_type) option * c_tys
+  | Decl_dh of
+      Symbols.OpData.dh_hyp list * lsymb * 
+      (lsymb * Symbols.symb_type) * 
+      (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of lsymb * orcl_tag_info option * c_tys
 

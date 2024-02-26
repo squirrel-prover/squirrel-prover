@@ -1301,10 +1301,10 @@ let reduce_delta1
   | Var   _ when delta.def ->
     reduce_delta_def1 table se hyps t
 
-  (* operator *)
+  (* concrete operators *)
   | Fun (fs, { ty_args })
   | App (Fun (fs, { ty_args }), _)
-    when delta.op && Operator.is_operator table fs -> 
+    when delta.op && Operator.is_concrete_operator table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
     let t = Operator.unfold table se fs ty_args args in
     t, true
@@ -2907,8 +2907,9 @@ module E = struct
     in
 
     let init_fixpoint : msets =
-      Symbols.Macro.fold (fun mn def _ msets ->
-          match def with
+      Symbols.Macro.fold (fun mn data msets ->
+          let data = match data with Symbols.Macro data -> data | _ -> assert false in
+          match data with
           | Symbols.Global _
           | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec -> msets
 
@@ -2916,11 +2917,12 @@ module E = struct
              all timestamps, so we won't find a deduction invariant with
              them. *)
           | _ ->
-            let ty, indices = match def with
+            let ty, indices =
+              match data with
               | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec
               | Symbols.Global _ -> assert false
 
-              | Symbols.State (i, ty) ->
+              | Symbols.State (i, ty,_) ->
                 ty, List.init i (fun _ -> Vars.make_fresh Type.Index "i")
 
               | Symbols.Cond ->

@@ -1,25 +1,34 @@
+(** {1 Operators (mostly for concrete operators)}
+
+    Finishes the definition of data-type started in [Symbols] that
+    could not be fully done (to avoid circular dependencies) *)
+
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
-type operator
+(** concrete operator body *)
+type body = Term.term
+  
+type concrete_operator = {
+  name    : string;
+  ty_vars : Type.tvar list;
+  args    : Vars.var list;
+  out_ty  : Type.ty;
+  body    : body;
+}
 
-val pp_operator : Format.formatter -> operator -> unit
-
-type Symbols.data += Operator of operator
-
-(*------------------------------------------------------------------*)
-val mk : 
-  name:string ->
-  ty_vars:Type.tvars -> 
-  args:Vars.vars -> 
-  out_ty:Type.ty -> 
-  body:Term.term -> 
-  operator
-
-val ftype : operator -> Type.ftype
+type Symbols.OpData.concrete_def += Val of concrete_operator
 
 (*------------------------------------------------------------------*)
-val is_operator : Symbols.table -> Symbols.fname -> bool
+val pp_concrete_operator : Format.formatter -> concrete_operator -> unit
+
+(*------------------------------------------------------------------*)
+val concrete_ftype : concrete_operator -> Type.ftype
+
+val get_concrete_data : Symbols.table -> Symbols.fname -> concrete_operator
+  
+(*------------------------------------------------------------------*)
+val is_concrete_operator : Symbols.table -> Symbols.fname -> bool
 
 (*------------------------------------------------------------------*)
 (** Is an operator body system-independent. *)

@@ -6,7 +6,7 @@ module L = Location
 type channel = ns Symbols.t
 type t = channel
 
-let declare table s = fst (declare_exact table s ())
+let declare table s = fst (declare ~approx:false table s)
 
 let pp_channel ppf c =
   (Printer.kws `ProcessChannel) ppf (Symbols.to_string c)

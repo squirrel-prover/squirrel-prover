@@ -64,14 +64,14 @@ let intctxt_param
     | App (Fun (dec, _), [Tuple [m; tk]]) ->
       begin
         match O.expand_macro_check_all info tk with
-        | Name _ as k when Symbols.is_ftype dec Symbols.SDec table ->
+        | Name _ as k when Symbols.OpData.(is_abstract_with_ftype dec SDec table) ->
           begin
-            match Symbols.Function.get_data dec table with
-            | Symbols.AssociatedFunctions [enc] ->
+            match Symbols.OpData.get_abstract_data dec table with
+            | _, [enc] ->
               Some {ip_enc=enc; ip_dec=dec; ip_hash=None;
                     ip_c=m; ip_k= Name.of_term k; ip_t=None}
 
-            | Symbols.AssociatedFunctions [enc; h] ->
+            | _, [enc; h] ->
               Some {ip_enc=enc; ip_dec=dec; ip_hash=Some h;
                     ip_c=m; ip_k=Name.of_term k; ip_t=None}
             | _ -> assert false (* sanity check *)

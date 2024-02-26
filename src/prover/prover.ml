@@ -423,7 +423,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
     (* allow capture of bound variables when matching *)
     let option = { Match.default_match_option with allow_capture = true; } in
     
-    Symbols.Lemma.fold begin fun _ _ data acc -> 
+    Symbols.Lemma.fold begin fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
@@ -457,7 +457,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
     (* allow capture of bound variables when matching *)
     let option = { Match.default_match_option with allow_capture = true; } in
 
-    Symbols.Lemma.fold (fun _ _ data acc -> 
+    Symbols.Lemma.fold (fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
@@ -491,93 +491,94 @@ let print_system (st:state) (s_opt:SystemExpr.Parse.t option)
       | None   -> 
         begin match get_system st with
           | Some s -> s.set
-          | None -> Tactics.hard_failure 
-                      (Failure "no default system");
+          | None -> Tactics.hard_failure (Failure "no default system");
         end
-      | Some s -> SystemExpr.Parse.parse 
-                    (get_table st) s
+      | Some s -> SystemExpr.Parse.parse (get_table st) s
     end
   in
-  SystemExpr.print_system 
-    (get_table st) system;
+  SystemExpr.print_system (get_table st) system;
 
-  if TConfig.print_trs_equations 
-      (get_table st)
+  if TConfig.print_trs_equations (get_table st)
   then
     Printer.prt `Result "@[<v>@;%a@;@]%!"
       Completion.print_init_trs 
       (get_table st)
 
-let print_lemma table (l:Theory.lsymb) : bool = 
-  try
+let print_lemma table (l:Theory.lsymb) : bool =
+  (Lemma.mem l table) &&
+  begin
     let lem = Lemma.find l table in
     Printer.prt `Default "%a@." Lemma.pp lem;
     true
-  with _ -> false
+  end
 
 let print_function table (l:Theory.lsymb) : bool =
-  try
-    let f = Symbols.Function.of_lsymb l table in
-    let ftype, fdef = Symbols.Function.get_def f table in
-    let _ = 
-      begin match fdef with
-        | Symbols.Operator -> 
-          let func = Symbols.Function.get_data f table in
-          begin match func with
-            | Operator.Operator op ->
-              Printer.prt `Default "%a@." Operator.pp_operator op
-            | _ -> assert false
-          end
-        | func_def -> 
-          Printer.prt `Default "fun %s : %a : %a@." 
-            (Location.unloc l)
-            Type.pp_ftype ftype 
-            Symbols.pp_function_def func_def 
-      end in
+  let open Symbols.OpData in
+  match Symbols.Operator.of_lsymb_opt l table with
+  | None -> false
+  | Some f ->
+    Fmt.epr "got f@."; 
+    let { ftype; def; } = get_data f table in
+    begin
+      match def with
+      | Concrete _ ->
+        let data = Operator.get_concrete_data table f in
+        Printer.prt `Default "%a@." Operator.pp_concrete_operator data
+
+      | Abstract _ ->
+        let data, _ = get_abstract_data f table in
+        Printer.prt `Default "fun %s : %a : %a@." 
+          (Location.unloc l)
+          Type.pp_ftype ftype 
+          pp_abstract_def data
+    end;
     true
-  with _ -> false
 
 let print_name table (l:Theory.lsymb) : bool =
-  try
-    let fty = (Symbols.Name.def_of_lsymb l table).n_fty in
+  match Symbols.Name.of_lsymb_opt l table with
+  | None -> false
+  | Some ls ->
+    let fty = (Symbols.get_name_data ls table).n_fty in
     Printer.prt `Default "%s:%a@." (Location.unloc l) Type.pp_ftype
       fty; 
     true
-  with _ -> false
 
-let print_macro table (l:Theory.lsymb) : bool =
-  try
-    let m = (Symbols.Macro.of_lsymb l table) in
+let print_global_macro table (l:Theory.lsymb) : bool =
+  match Symbols.Macro.of_lsymb_opt l table with
+  | Some m when Macros.is_global table m ->
     let macro = Symbols.Macro.get_data m table in
-    Printer.prt `Default "%a@." Macros.pp (Macros.as_macro macro);
+    Printer.prt `Default "%a@." Macros.pp (Macros.as_global_macro macro);
     true
-  with _ -> false
-
+  | _ -> false
+    
 let print_game table (l:Theory.lsymb) : bool =
-  try
+  (Symbols.Game.mem_lsymb l table) &&
+  begin
     let g = Crypto.find table l in
     Printer.prt `Default "%a@." Crypto.pp_game g; 
     true
-  with _ -> false
+  end
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     match q with
     | Pr_system s_opt -> print_system st s_opt
     | Pr_any l -> 
       begin
-        let table = (get_deepest_table st) in
+        let table = get_deepest_table st in
         let searchs_in = [
-          print_lemma;    (* first try printing lemma *)
-          print_function; (* then try printing function *)
-          print_name;     (* then try printing name *)
-          print_game;     (* then try printing games *)
-          print_macro;    (* FIXME then try printing macro *)
+          print_lemma;
+          print_function;
+          print_name;
+          print_game;
+          print_global_macro;    (* FIXME: do not print only global macros *)
         ] in
         
-        let found = List.fold_left 
+        let found =
+          List.fold_left 
             (fun found f -> found || f table l) 
             false
-            searchs_in in
+            searchs_in
+        in
 
         if not found then
         Printer.prt `Default "%s not found@." (Location.unloc l)
@@ -671,7 +672,7 @@ and do_include
       (* Adding included library in table's theory symbols. *)
       let table, _ =
         let name = match i.th_name with Name s -> s | Path s -> s in
-        Symbols.Theory.declare_exact st.table name () in
+        Symbols.Theory.declare ~approx:false st.table name in
       { st with table }
 
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->

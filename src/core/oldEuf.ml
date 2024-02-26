@@ -58,7 +58,7 @@ end
 (*------------------------------------------------------------------*)
 let err_msg_of_msymb table a (ms : Symbols.macro) : Tactics.ssc_error_c =
   let k = 
-    match Symbols.Macro.get_def ms table with
+    match Symbols.get_macro_data ms table with
     | Symbols.Output   -> `Output
     | Symbols.Cond     -> `Cond
     | Symbols.Global _ -> `Global ms

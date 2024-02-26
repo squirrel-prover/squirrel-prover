@@ -106,7 +106,7 @@ class deprecated_iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) =
   val mutable checked_macros = []
 
   method visit_macro (ms : Term.msymb) (args : Term.terms) (a : Term.term) : unit = 
-    match Symbols.Macro.get_def ms.s_symb cntxt.table with
+    match Symbols.get_macro_data ms.s_symb cntxt.table with
     | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
     | Symbols.Global _ ->
       if exact then
@@ -282,19 +282,19 @@ type mess_occ = Term.term occ
 type mess_occs = mess_occ list
 
 type fsymb_matcher =
-  | Type of Symbols.function_def
+  | Type of Symbols.OpData.abstract_def
   | Symbol of Symbols.fname
 
 let matching table fn = function
   | Symbol fsymb -> fsymb = fn
-  | Type symtype -> Symbols.is_ftype fn symtype table
+  | Type symtype -> Symbols.OpData.is_abstract_with_ftype fn symtype table
 
 
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...) or with the given head.
     Does not recurse below terms whose head is excluded by [excludesymtype]. *)
 let get_f 
-    ?(excludesymtype : Symbols.function_def option)
+    ?(excludesymtype : Symbols.OpData.abstract_def option)
     ?(allow_diff=false)
     (table           : Symbols.table)
     (symtype         : fsymb_matcher)
@@ -320,7 +320,7 @@ let get_f
       in
 
       let rec_occs = match excludesymtype with
-        | Some ex when Symbols.is_ftype fn ex table -> []
+        | Some ex when Symbols.OpData.is_abstract_with_ftype fn ex table -> []
         | _ -> occs ()
       in
 
@@ -348,16 +348,16 @@ let get_f
 
 
 let get_ftypes 
-    ?(excludesymtype : Symbols.function_def option)
+    ?(excludesymtype : Symbols.OpData.abstract_def option)
     (table           : Symbols.table)
-    (symtype         : Symbols.function_def)
+    (symtype         : Symbols.OpData.abstract_def)
     (t               : Term.term) 
   : mess_occs 
   = 
   get_f ?excludesymtype table (Type symtype) t
 
 let get_fsymb 
-    ?(excludesymtype : Symbols.function_def option)
+    ?(excludesymtype : Symbols.OpData.abstract_def option)
     ?(allow_diff     : bool option)
     (table           : Symbols.table)
     (symtype         : Symbols.fname)
@@ -616,8 +616,9 @@ let fold_descr
 
     (* fold over global macros in scope of [descr.action] *)
     List.fold_left (fun mval (mg : Symbols.macro) ->
-        let is_arr, ty = match Symbols.Macro.get_def mg table with
-          | Global (is,ty) -> is, ty
+        let is_arr, ty =
+          match Symbols.get_macro_data mg table with
+          | Global (is,ty,_) -> is, ty
           | _ -> assert false
         in
         let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
@@ -698,11 +699,6 @@ end
 
 module Ss = Symbols.Ss(Symbols.Macro)
 module Ms = Symbols.Ms(Symbols.Macro)
-
-let is_glob table ms =
-  match Symbols.Macro.get_def ms table with
-  | Symbols.Global _ -> true
-  | _ -> false
 
 (*------------------------------------------------------------------*)
 module Mset : sig[@warning "-32"]
@@ -1056,7 +1052,7 @@ let macro_support
      possible *)
 
   let s_reach_no_globs =
-    List.filter (fun (ms,_) -> not (is_glob cntxt.table ms)) s_reach
+    List.filter (fun (ms,_) -> not (Macros.is_global cntxt.table ms)) s_reach
   in
   (* [s_reach'] are macros reachable from non-global macros in [s_reach] *)
   let s_reach' = Utils.fpt abs_incl do1 s_reach_no_globs in
@@ -1065,7 +1061,7 @@ let macro_support
 
   (* global macros reachable from s_reach' *)
   let s_reach'_glob =
-    List.filter (fun (ms, _) -> is_glob cntxt.table ms) s_reach'
+    List.filter (fun (ms, _) -> Macros.is_global cntxt.table ms) s_reach'
   in
 
   (* we remove from [s_reach] all global macros reachable from non-global

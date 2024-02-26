@@ -123,7 +123,7 @@ let fresh_trace_param
                           the form t=n or n=t")
   in
   let ty = n.Name.symb.s_typ in
-  if not Symbols.TyInfo.(check_bty_info table ty Symbols.Large) then
+  if not Symbols.TyInfo.(check_bty_info table ty Large) then
     Tactics.soft_failure
       (Failure "the type of this term is not [large]");
 
@@ -218,7 +218,7 @@ let equiv_fresh_phi_proj
   in
 
   let ty = n.Name.symb.s_typ in
-  if not Symbols.TyInfo.(check_bty_info table ty Symbols.Large) then
+  if not Symbols.TyInfo.(check_bty_info table ty Large) then
     Tactics.soft_failure ~loc
       (Tactics.Failure "the type of this term is not [large]");
 

@@ -5,9 +5,7 @@ type p_oracle_val =
 
 type Symbols.data += Oracle_data of p_oracle_val
 
-let def_of_oracle = function
-  | Oracle_term _ -> Symbols.PTerm
-
+(*------------------------------------------------------------------*)
 let get_oracle (s:Symbols.lsymb) table : Term.term option = 
   let ns = Symbols.Oracle.of_lsymb s table in
   match Symbols.Oracle.get_data ns table with
@@ -28,8 +26,7 @@ let add_oracle ((opt_name,opt_val:Symbols.lsymb*Term.term)) table =
     else 
       let v = (Oracle_term opt_val) in
       let data = Oracle_data v in
-      let table = fst (Symbols.Oracle.declare_exact table opt_name ~data:data
-                         (def_of_oracle v)) in
+      let table, _ = Symbols.Oracle.declare ~approx:false table opt_name ~data:data in
       table
 
 (** From the name of the function, returns the corresponding formula. If no tag

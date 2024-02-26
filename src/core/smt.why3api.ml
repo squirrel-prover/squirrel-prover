@@ -535,7 +535,7 @@ let add_var context =
     context.msgvars)
 
 let add_functions context = 
-  Symbols.Function.iter (fun fname (ftype, _) _ ->
+  Symbols.Operator.iter (fun fname (ftype, _) _ ->
     let str = Symbols.to_string fname in
     (* special treatment of xor for two reasons:
      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
@@ -832,13 +832,13 @@ let add_equational_axioms context =
   
   let equational_axioms =
     let open Symbols in
-    Function.fold (fun fname def data acc ->
+    Operator.fold (fun fname def data acc ->
         match (snd def), data with
         (* cases taken from Completion.init_erules *)
         | AEnc, AssociatedFunctions [f1; f2] ->
           let dec, pk = (* from Completion.dec_pk *)
-            match Function.get_def f1 context.table,
-                  Function.get_def f2 context.table with
+            match Operator.get_def f1 context.table,
+                  Operator.get_def f2 context.table with
             | (_, ADec), (_, PublicKey) -> f1, f2
             | (_, PublicKey), (_, ADec) -> f2, f1
             | _ -> assert false
@@ -885,8 +885,8 @@ let add_equational_axioms context =
           end
         | CheckSign, AssociatedFunctions [f1; f2] ->
           let msig, pk = (* from Completion.sig_pk *)
-            match Function.get_def f1 context.table,
-                  Function.get_def f2 context.table with
+            match Operator.get_def f1 context.table,
+                  Operator.get_def f2 context.table with
             | (_, Sign), (_, PublicKey) -> f1, f2
             | (_, PublicKey), (_, Sign) -> f2, f1
             | _ -> assert false
