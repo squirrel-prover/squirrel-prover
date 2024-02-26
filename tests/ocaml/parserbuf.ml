@@ -109,11 +109,13 @@ let process_parsing =
     "If", `Quick, begin fun () ->
       let table, _ =
         let decl_i =
-          Decl.Decl_abstract {
-            name = L.mk_loc L._dummy "error";
-            symb_type = `Prefix;
-            ty_args = [];
-            abs_tys = L.mk_loc L._dummy Theory.P_message; }
+          Decl.Decl_operator {
+            op_name      = L.mk_loc L._dummy "error";
+            op_symb_type = `Prefix;
+            op_tyargs    = [];
+            op_args      = [];
+            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_body      = `Abstract; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl in
@@ -123,11 +125,13 @@ let process_parsing =
     "Try", `Quick, begin fun () ->
       let table, _ =
         let decl_i =
-          Decl.Decl_abstract
-            { name = L.mk_loc L._dummy "ok";
-              symb_type = `Prefix;
-              ty_args = [];
-              abs_tys = L.mk_loc L._dummy Theory.P_message; }
+          Decl.Decl_operator {
+            op_name      = L.mk_loc L._dummy "ok";
+            op_symb_type = `Prefix;
+            op_tyargs    = [];
+            op_args      = [];
+            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_body      = `Abstract; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl
@@ -135,11 +139,13 @@ let process_parsing =
       
       let table, _ =
         let decl_i =
-          Decl.Decl_abstract
-            { name = L.mk_loc L._dummy "error";
-              symb_type = `Prefix;
-              ty_args = [];
-              abs_tys = L.mk_loc L._dummy Theory.P_message; }
+          Decl.Decl_operator {
+            op_name      = L.mk_loc L._dummy "error";
+            op_symb_type = `Prefix;
+            op_tyargs    = [];
+            op_args      = [];
+            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_body      = `Abstract; }
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in

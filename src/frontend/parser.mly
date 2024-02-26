@@ -521,9 +521,9 @@ system_modifier:
     { Decl.Rewrite p }
 
 (*------------------------------------------------------------------*)
-%inline abstract_or_op:
-| ABSTRACT {}
-| OP       {}
+%inline op_body:
+| EQ t=term { `Concrete t }
+|           { `Abstract   }
        
 (*------------------------------------------------------------------*)
 declaration_i:
@@ -567,14 +567,25 @@ declaration_i:
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
-| abstract_or_op e=lsymb_decl a=ty_args COLON t=ty
+| ABSTRACT e=lsymb_decl tyargs=ty_args COLON tyo=ty
     { let symb_type, name = e in
-      Decl.(Decl_abstract
-              { name      = name;
-                symb_type = symb_type;
-                ty_args   = a;
-                abs_tys   = t; }) }
+      Decl.(Decl_operator
+              { op_name      = name;
+                op_symb_type = symb_type;
+                op_tyargs    = tyargs;
+                op_args      = [];
+                op_tyout     = Some tyo;
+                op_body      = `Abstract }) }
 
+| OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged_strict tyo=colon_ty? body=op_body
+    { let symb_type, name = e in
+      Decl.(Decl_operator
+              { op_name      = name;
+                op_symb_type = symb_type;
+                op_tyargs    = tyargs;
+                op_args      = args;
+                op_tyout     = tyo;
+                op_body      = body; }) }
 
 | PREDICATE e=lsymb_decl
   tyargs=ty_args sebnds=se_bnds
@@ -590,16 +601,6 @@ declaration_i:
                 pred_multi_args = multi_args;
                 pred_simpl_args = simpl_args;
                 pred_body       = body; }) }
-
-| OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged_strict tyo=colon_ty? EQ t=term
-    { let symb_type, name = e in
-      Decl.(Decl_operator
-              { op_name      = name;
-                op_symb_type = symb_type;
-                op_tyargs    = tyargs;
-                op_args      = args;
-                op_tyout     = tyo;
-                op_body      = t; }) }
 
 | MUTABLE name=lsymb args=bnds_strict out_ty=colon_ty? EQ init_body=term
                           { Decl.Decl_state {name; args; out_ty; init_body; }}
