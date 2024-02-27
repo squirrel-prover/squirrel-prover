@@ -529,7 +529,7 @@ let get_macro_occs
        Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
     let t =
       let se = env.system.set in
-      let param = { Reduction.rp_crypto with diff = true } in
+      let param = Reduction.rp_crypto in
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in
       let st = Reduction.mk_state ~hyps ~se ~vars ~param constr.table in

@@ -54,6 +54,7 @@ let rp_full = {
 let rp_crypto = {
   rp_empty with 
   delta = { op = false; macro = true; def = true; };
+  diff = true;
   beta = true; 
   proj = true; 
   zeta = true;
