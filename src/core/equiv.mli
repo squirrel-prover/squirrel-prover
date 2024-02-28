@@ -210,7 +210,7 @@ module Babel : sig
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Smart constructors and destructots} *)
+(** {2 Smart constructors and destructors} *)
 module Smart : SmartFO.S with type form = global_form
 
 val destr_reach : form -> bform option
@@ -219,3 +219,69 @@ val destr_equiv : form -> equiv option
 val is_equiv : form -> bool
 val is_reach : form -> bool
 
+
+(*------------------------------------------------------------------*)
+(** {2 Generalized statements} *)
+
+type any_statement = GlobalS of form | LocalS of bform
+
+val pp_any_statement : Format.formatter -> any_statement -> unit
+
+val is_local_statement : any_statement -> bool
+
+val any_statement_to_reach : any_statement -> bform
+val any_statement_to_equiv : any_statement -> form
+
+(*------------------------------------------------------------------*)
+type _ s_kind =
+  | Local_s  : bform  s_kind
+  | Global_s : form s_kind
+  | Any_s    : any_statement    s_kind
+
+val s_kind_equal : 'a s_kind -> 'b s_kind -> bool
+
+module Any_statement : sig
+  type t = any_statement
+
+  val pp     : Format.formatter -> t -> unit
+  val pp_dbg : Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val subst  : Term.subst  -> t -> t
+  val tsubst : Type.tsubst -> t -> t
+
+  val fv    : t -> Vars.Sv.t
+  val ty_fv : t -> Type.Fv.t
+
+  val project : Term.proj list -> t -> t
+
+  (** Convert any formula kind to [any_form]. *)
+  val convert_from : 'a s_kind -> 'a -> t
+
+  (** Convert [any_form] to any formula kind.
+    * Issue a soft failure (with the provided location, if any)
+    * when the input formula is not of the right kind. *)
+  val convert_to : ?loc:Location.t -> 'a s_kind -> t -> 'a
+end
+(** Conversions between formula kinds and generic functionalities
+    over all formula kinds. *)
+module Babel_statement : sig
+  val convert : ?loc:Location.t -> src:'a s_kind -> dst:'b s_kind -> 'a -> 'b
+
+  val subst  : 'a s_kind -> Term.subst  -> 'a -> 'a
+  val tsubst : 'a s_kind -> Type.tsubst -> 'a -> 'a
+
+  val subst_projs :
+    'a s_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> 'a -> 'a
+
+  val fv     : 'a s_kind -> 'a -> Vars.Sv.t
+
+  val get_terms : 'a s_kind -> 'a -> Term.term list
+
+  val pp     : 'a s_kind -> Format.formatter -> 'a -> unit
+  val pp_dbg : 'a s_kind -> Format.formatter -> 'a -> unit
+
+  val project : 'a s_kind -> Term.proj list -> 'a -> 'a
+end

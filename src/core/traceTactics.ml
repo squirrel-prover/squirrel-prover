@@ -260,9 +260,18 @@ let assumption_tac args = wrap_fail (do_assumption_tac args)
     hypothesis [h'] corresponding to that atom. *)
 let localize h h' s =
   match TS.Hyps.by_name_k h Hyp s with
-    | _,Global (Equiv.Atom (Reach f)) ->
-        [TS.Hyps.add h' (LHyp (Local f.formula)) s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    | _,Global (Equiv.Atom (Reach {formula = f; bound = b})) ->
+          let b =
+            match b, TS.bound s with
+            | Some b, Some sb -> Some(Library.Real.mk_add (TS.table s) sb (Library.Real.mk_minus (TS.table s) b))
+            | None, None -> None
+            | Some _, None ->
+              Tactics.(soft_failure(Failure "cannot localize a concrete hypothesis in a asymptotic goal"))
+            | None, Some _ ->
+              Tactics.(soft_failure(Failure "cannot localize a asymptotic hypothesis in a concrete goal"))
+          in
+          let s = TS.set_bound b s in
+          [TS.Hyps.add h' (LHyp (Local f)) s]
     | _ ->
         Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
     | exception Not_found ->
@@ -377,8 +386,8 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
      for simplicity. *)
   let subgoals, biframe =
     let rec aux = function
-      | Equiv.(Atom (Equiv bf)) -> [],bf.terms
-      | Impl (Atom (Reach f),g) -> let s,bf = aux g in f.formula::s,bf
+      | Equiv.(Atom (Equiv bf)) -> [],bf
+      | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
       | _ -> Tactics.soft_failure (Failure "invalid assumption")
     in aux ass
   in

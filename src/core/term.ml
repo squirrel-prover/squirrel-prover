@@ -813,6 +813,8 @@ module SmartDestructors = struct
     in
     decompose f
 
+ (*decompose_impls_last send back the list of premisse and  the conclusion of a implication.
+    for example, if f = (A => B => C), it send back [A;B],C *)
   let decompose_impls_last f =
     let forms = decompose_impls f in
     let rec last = function

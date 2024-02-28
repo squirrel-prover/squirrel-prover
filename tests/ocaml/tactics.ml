@@ -638,8 +638,8 @@ let namelength () =
     (stmt_n.system.set);
   
   (* Should be of same length ↓ *)
-  Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
-  Printer.pr "Term m: %a@." Term.pp stmt_m.formula;
+  Printer.pr "Term n: %a@." Term.pp stmt_n.formula.formula;
+  Printer.pr "Term m: %a@." Term.pp stmt_m.formula.formula;
 
   let n = Symbols.Name.convert_path (mk_p "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
@@ -655,9 +655,9 @@ let namelength () =
   Alcotest.(check (term_testable)) 
     "axiom namelength_n → len(n) = namelength_message"
     (f)
-    (stmt_n.formula);
+    (stmt_n.formula.formula);
 
-  let _ = match stmt_m.formula, stmt_n.formula with
+  let _ = match stmt_m.formula.formula, stmt_n.formula.formula with
   | Term.App (Fun (sy ,_),[_t1;t2]),
     Term.App (Fun (sy',_),[_t1';t2'])
     when sy = Symbols.fs_eq && sy' = Symbols.fs_eq -> 
@@ -695,7 +695,7 @@ let namelength2 () =
     (stmt_n.system.set);
   
   (* Should be of same length ↓ *)
-  Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
+  Printer.pr "Term n: %a@." Term.pp stmt_n.formula.formula;
 
   let n = Symbols.Name.convert_path (mk_p "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
@@ -711,7 +711,7 @@ let namelength2 () =
   Alcotest.(check (term_testable)) 
     "axiom namelength_n → len(n) = namelength_message•message"
     (f)
-    (stmt_n.formula)
+    (stmt_n.formula.formula)
 
 let tests =
   [ ("case_study", `Quick, Util.catch_error case_study) ;

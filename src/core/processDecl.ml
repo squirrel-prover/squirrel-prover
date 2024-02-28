@@ -572,17 +572,26 @@ let declare_list table decls =
 let add_hint_rewrite table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
 
+  if lem.Goal.formula.bound <> None then
+    Tactics.hard_failure ~loc:(L.loc s)
+      (Failure "rewrite hints must be asymptotic");
+
   if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "rewrite hints must apply to any system");
 
-  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
+  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula.formula db
 
 let add_hint_smt table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
+
+  if lem.Goal.formula.bound <> None then
+    Tactics.hard_failure ~loc:(L.loc s)
+      (Failure "smt hints must be asymptotic");
 
   if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints must apply to any system");
 
-  Hint.add_hint_smt lem.Goal.formula db
+  Hint.add_hint_smt lem.Goal.formula.formula db
+(**TODO:Concrete: Check if how to add a bound to a hint after the adapation of the rewrite rule*)

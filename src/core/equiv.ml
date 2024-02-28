@@ -76,8 +76,14 @@ let _pp_bform_conclusion ppe fmt = function
   | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
 let _pp_bform ppe fmt = function
-  | {formula; bound = Some ve} -> Fmt.pf fmt "@[[%a : %a]@]" (Term._pp ppe) formula (Term._pp ppe) ve
-  | {formula; bound = None} -> Fmt.pf fmt "@[[%a]@]" (Term._pp ppe) formula
+  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a : %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
+
+let equal_bform (f : bform) (g : bform) : bool =
+  match f.bound, g.bound with
+  | Some e, Some ve -> Term.equal f.formula g.formula && Term.equal e ve
+  | None, None -> Term.equal f.formula g.formula
+  | _ -> false
 
 let subst_bform (subst : Term.subst) (f : bform) : bform =
   {formula = Term.subst subst f.formula; bound = Option.map (Term.subst subst) f.bound}
@@ -223,10 +229,10 @@ let _pp_atom_conclusion ?context ppe fmt (l : atom) =
 
 let _pp_atom ?context ppe fmt = function
   | Equiv e -> _pp_equiv ppe fmt e
-  | Reach f -> _pp_bform ppe fmt f
+  | Reach f ->  Fmt.pf fmt "[%a]" (_pp_bform ppe) f
   | Pred p -> _pp_pred_app ?context ppe fmt p
 
-let pp_atom = _pp_atom (default_ppe ~dbg:false ()) ?context:None
+let pp_atom = _pp_atom ?context:None (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 
@@ -631,7 +637,6 @@ module Smart : SmartFO.S with type form = _form = struct
   type form = _form
 
   let todo () = Tactics.soft_failure (Failure "not implemented")
-  (*TODO:Concrete: Find a way to add the optional bound for mk_true mk_false  *)
   (** {3 Constructors} *)
   let mk_true = Atom (Reach {formula = Term.mk_true; bound = None})
   let mk_false = Atom (Reach {formula = Term.mk_false; bound = None})
@@ -675,7 +680,6 @@ module Smart : SmartFO.S with type form = _form = struct
     mk_quant_tagged ?simpl Exists (List.map (fun v -> v, Vars.Tag.gtag) vs)
 
   (*------------------------------------------------------------------*)
-   (*TODO:Concrete : Check if it is necessary to add a bound on those constructor*)
   let mk_eq  ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_eq  ?simpl f1 f2); bound = None})
   let mk_neq ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_neq ?simpl f1 f2); bound = None})
   let mk_leq        f1 f2 = Atom (Reach {formula = (Term.Smart.mk_leq f1 f2); bound = None})
@@ -1467,4 +1471,189 @@ module Any = struct
             List.map (fun x -> Global x) l, Global f
   end
 
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Generalized statement} *)
+
+type any_statement = GlobalS of form | LocalS of bform
+
+let pp_any_statement fmt (f : any_statement) =
+  match f with
+  | GlobalS e -> pp fmt e
+  | LocalS f -> _pp_bform ~dbg:false fmt f
+
+let any_statement_to_reach (f : any_statement) : bform =
+  match f with
+  | GlobalS _ -> assert false
+  | LocalS f -> f
+
+let any_statement_to_equiv (f : any_statement) : form =
+  match f with
+  | GlobalS f -> f
+  | LocalS _ -> assert false
+
+let is_local_statement = function
+  | LocalS  _ -> true
+  | GlobalS _ -> false
+
+(*------------------------------------------------------------------*)
+type _ s_kind =
+  | Local_s  : bform  s_kind
+  | Global_s : form s_kind
+  | Any_s    : any_statement s_kind
+
+let s_kind_equal (type a b) (k1 : a s_kind) (k2 : b s_kind) : bool =
+  match k1, k2 with
+  | Local_s,  Local_s  -> true
+  | Global_s, Global_s -> true
+  | Any_s, Any_s       -> true
+  | _ -> false
+
+(** Module Any without conversion functions. *)
+module PreAny_statement = struct
+
+  type t = any_statement
+
+  let pp fmt = function
+    | LocalS  f -> _pp_bform ~dbg:false fmt f
+    | GlobalS f ->        pp fmt f
+
+  let _pp ~dbg ?context fmt = function
+    | LocalS  f -> _pp_bform ~dbg          fmt f
+    | GlobalS f ->      _pp  ~dbg ?context fmt f
+
+  let pp_dbg fmt = function
+    | LocalS  f -> _pp_bform ~dbg:true fmt f
+    | GlobalS f ->      pp_dbg fmt f
+
+  let equal x y = match x,y with
+    | LocalS f, LocalS g  -> equal_bform f g
+    | GlobalS f, GlobalS g ->  equal f g
+    | _ -> false
+
+  let subst s = function
+    | LocalS  f -> LocalS (subst_bform s f)
+    | GlobalS f -> GlobalS (     subst s f)
+
+  let tsubst s = function
+    | LocalS  f -> LocalS  (tsubst_bform s f)
+    | GlobalS f -> GlobalS (     tsubst s f)
+
+  let subst_projs target s = function
+    | LocalS f ->
+      if target = `Reach then
+        LocalS (subst_projs_bform s f)
+      else
+        LocalS f
+    | GlobalS f -> GlobalS (subst_projs target s f)
+
+  let fv = function
+    | LocalS  f -> fv_bform f
+    | GlobalS f -> fv f
+
+  let ty_fv = function
+    | LocalS  f -> ty_fv_bform f
+    | GlobalS f -> ty_fv f
+
+  let get_terms = function
+    | LocalS f -> f.formula::(Option.to_list f.bound)
+    | GlobalS f -> get_terms f
+
+  let project p = function
+    | LocalS f -> LocalS (proj_bform p f)
+    | GlobalS f -> GlobalS (     project p f)
+end
+
+module Babel_statement = struct
+
+  let convert (type a b) ?loc ~(src:a s_kind) ~(dst:b s_kind) (s : a) : b
+    =
+    match src,dst with
+      (* Identity cases *)
+      | Local_s,  Local_s  -> s
+      | Global_s, Global_s -> s
+      | Any_s,    Any_s    -> s
+
+      (* Injections into [any_form] *)
+      | Local_s,  Any_s -> LocalS s
+      | Global_s, Any_s -> GlobalS s
+
+      (* Inverses of the injections. *)
+      | Any_s, Local_s ->
+        begin match s with
+          | GlobalS (Atom (Reach s)) -> s
+          | LocalS s -> s
+          | _ -> Tactics.soft_failure ?loc CannotConvert
+        end
+
+      | Any_s, Global_s ->
+        begin match s with
+          | GlobalS f -> f
+          | LocalS f -> Atom (Reach f)
+        end
+
+      (* Conversions between local and global formulas. *)
+      | Local_s,  Global_s -> Atom (Reach s)
+      | Global_s, Local_s  ->
+        begin match s with
+          | Atom (Reach s) -> s
+          | _ -> Tactics.soft_failure ?loc CannotConvert
+        end
+
+  let subst : type a. a s_kind -> Term.subst -> a -> a = function
+    | Local_s  -> subst_bform
+    | Global_s -> subst
+    | Any_s    -> PreAny_statement.subst
+
+  let subst_projs :
+    type a. a s_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> a -> a
+    =
+    fun kind target s f ->
+    match kind with
+    | Local_s  ->                subst_projs_bform s f
+    | Global_s ->        subst_projs target s f
+    | Any_s    -> PreAny_statement.subst_projs target s f
+
+  let tsubst : type a. a s_kind -> Type.tsubst -> a -> a = function
+    | Local_s  -> tsubst_bform
+    | Global_s -> tsubst
+    | Any_s    -> PreAny_statement.tsubst
+
+  let fv : type a. a s_kind -> a -> Vars.Sv.t = function
+    | Local_s  -> fv_bform
+    | Global_s -> fv
+    | Any_s    -> PreAny_statement.fv
+
+
+  let get_terms : type a. a s_kind -> a -> Term.term list = function
+    | Local_s  -> fun f -> f.formula::(Option.to_list f.bound)
+    | Global_s -> get_terms
+    | Any_s    -> PreAny_statement.get_terms
+
+  let pp : type a. a s_kind -> Format.formatter -> a -> unit = function
+    | Local_s  -> _pp_bform ~dbg:false
+    | Global_s -> pp
+    | Any_s    -> PreAny_statement.pp
+
+  let pp_dbg : type a. a s_kind -> Format.formatter -> a -> unit = function
+    | Local_s  -> _pp_bform ~dbg:true
+    | Global_s -> pp_dbg
+    | Any_s    -> PreAny_statement.pp_dbg
+
+  let project : type a. a s_kind -> Term.proj list -> a -> a = function
+    | Local_s  -> proj_bform
+    | Global_s -> project
+    | Any_s    -> PreAny_statement.project
+
+end
+
+module Any_statement = struct
+  include PreAny_statement
+
+  let convert_from k f =
+    Babel_statement.convert ~src:k ~dst:Any_s f
+
+  let convert_to ?loc k f =
+    Babel_statement.convert ?loc ~dst:k ~src:Any_s f
 end

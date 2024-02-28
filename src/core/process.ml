@@ -730,7 +730,7 @@ let mk_namelength_statement
   table, { name; 
            system  = SystemExpr.context_any; 
            ty_vars = ftype.fty_vars; 
-           formula = Equiv.Global f }
+           formula = Equiv.GlobalS f }
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)

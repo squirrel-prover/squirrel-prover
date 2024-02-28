@@ -61,7 +61,7 @@ module S : sig
   val update :
     ?env:Env.t ->
     ?proof_context:H.hyps ->
-    ?bound : Term.term option ->
+    ?bound:Term.term ->
     ?conclusion:Term.term ->
     t -> t
 
@@ -166,7 +166,11 @@ end = struct
   let update ?env ?proof_context ?bound ?conclusion t =
     let env           = Utils.odflt t.env env
     and proof_context = Utils.odflt t.proof_context proof_context
-    and bound = Utils.odflt t.bound bound
+    and bound = match t.bound, bound with
+      | Some _, Some _ -> bound
+      | Some _, None -> t.bound
+      | None, None -> None
+      | _ -> Tactics.soft_failure (Failure "Not a concrete local judement")
     and conclusion    = Utils.odflt t.conclusion conclusion in
     { env; proof_context; bound; conclusion; }
 end
@@ -386,10 +390,10 @@ let set_table table s =
 
 (*------------------------------------------------------------------*)
 let set_conclusion a s = S.update ~conclusion:a s 
-let set_bound b s = S.update ~bound:b s
+let set_bound b s = S.update ?bound:b s
 
  (** See `.mli` *)
-let set_conclusion_in_context ?update_local ?(bound = None) system conc s =
+let set_conclusion_in_context ?update_local ?bound system conc s =
   if system = s.env.system && update_local = None then
     let s = set_conclusion conc s in set_bound bound s
   else
@@ -406,7 +410,7 @@ let set_conclusion_in_context ?update_local ?(bound = None) system conc s =
   in
   (* Change the context in the sequent's environment. *)
   let env = Env.update ~system s.env in
-  let s = S.update ~env ~proof_context ~bound s in
+  let s = S.update ~env ~proof_context ?bound s in
 
   (* Finally set the new conclusion. *)
   set_conclusion conc s
@@ -426,7 +430,7 @@ let pi projection s =
     s
 
 (*------------------------------------------------------------------*)
-let init ?(no_sanity_check = false) ~env ?(bound = None) conclusion =
+let init ?(no_sanity_check = false) ~env ?bound conclusion =
   init_sequent ~no_sanity_check ~env ~bound ~conclusion
 
 let conclusion s = s.conclusion
@@ -443,7 +447,7 @@ let subst subst s =
     in
     S.update
       ~proof_context
-      ~bound:(omap (Term.subst subst) s.bound)
+      ?bound:(omap (Term.subst subst) s.bound)
       ~conclusion:(Term.subst subst s.conclusion)
       s 
 
@@ -460,7 +464,7 @@ let tsubst (tsubst : Type.tsubst) s =
     S.update
       ~env:(Env.update ~vars s.env)
       ~proof_context
-      ~bound:(omap (Term.tsubst tsubst) s.bound)
+      ?bound:(omap (Term.tsubst tsubst) s.bound)
       ~conclusion:(Term.tsubst tsubst s.conclusion)
       s 
 

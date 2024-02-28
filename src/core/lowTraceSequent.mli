@@ -13,7 +13,7 @@ include LowSequent.S
 (*------------------------------------------------------------------*)
 (** {2 Sequent type and basic operations} *)
 
-val init : ?no_sanity_check:bool -> env:Env.t -> ?bound:Term.term option -> Term.term -> sequent
+val init : ?no_sanity_check:bool -> env:Env.t -> ?bound:Term.term -> Term.term -> sequent
   
 (** Free variables + var env **toplevel** sanity check *)
 val sanity_check : trace_sequent -> unit

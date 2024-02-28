@@ -261,6 +261,7 @@ end
 type match_res =
   | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
+(*TODO:Concrete: see if add subgoal to do weaking is necesary*)
 
 (** matching algorithm options *)
 type match_option = {

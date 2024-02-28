@@ -180,18 +180,20 @@ let indcca_param
      rw_system = SE.to_arbitrary sys;
      rw_vars   = Vars.Tag.local_vars [xm; xr; xk];
      (* local information, since we allow to match diff operators *)
-     
+
      rw_conds  = [mk_eq ~simpl:false
                    (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
                    (Library.Prelude.mk_witness table ~ty_arg:(Type.tuple [mty; rty; kty]))];
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
                  (Name.to_term xc);
      rw_kind   = GlobalEq;
+     rw_bound = None;
     },
+  (*TODO:Concrete : Probably something to do to create a bounded rewrite*)
     table,
     xc
   in
-  
+
   (* go through all encryption functions, try to find a ciphertext *)
   let res = Symbols.Operator.fold
       (fun f _ x -> (* for all functions:*)

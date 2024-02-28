@@ -32,8 +32,6 @@ module type S = sig
   (** Type of formulas used for sequent conclusions. *)
   type conc_form
 
-  type bound_type := Term.term option
-  (** The kinds of hypothesis and conclusion formulas. *)
 
   val hyp_kind : hyp_form Equiv.f_kind
   val conc_kind : conc_form Equiv.f_kind
@@ -65,8 +63,8 @@ module type S = sig
   val conclusion : t -> conc_form
   val set_conclusion : conc_form -> t -> t
 
-  val bound : t -> bound_type
-  val set_bound : bound_type -> t -> t
+  val bound : t -> Term.term option
+  val set_bound : Term.term option -> t -> t
 
   val system : t -> SystemExpr.context
 
@@ -93,7 +91,7 @@ module type S = sig
       kept (possibly with modifications) or if they should be dropped. *)
   val set_conclusion_in_context :
     ?update_local:(Term.term -> Term.term option) ->
-    ?bound : bound_type ->
+    ?bound :Term.term ->
     SystemExpr.context -> conc_form -> t -> t
 
   (*------------------------------------------------------------------*)

@@ -41,16 +41,16 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type statement        = (string, Equiv.any_form) abstract_statement
+type statement        = (string, Equiv.any_statement) abstract_statement
 type global_statement = (string, Equiv.form    ) abstract_statement
-type local_statement  = (string, Term.term     ) abstract_statement
+type local_statement  = (string, Equiv.bform     ) abstract_statement
 
 (*------------------------------------------------------------------*)
 val _pp_statement : statement formatter_p
 
 (*------------------------------------------------------------------*)
-val is_local_statement  : (_, Equiv.any_form) abstract_statement -> bool
-val is_global_statement : (_, Equiv.any_form) abstract_statement -> bool
+val is_local_statement  : (_, Equiv.any_statement) abstract_statement -> bool
+val is_global_statement : (_, Equiv.any_statement) abstract_statement -> bool
 
 val to_local_statement  : ?loc:Location.t -> statement -> local_statement
 val to_global_statement : ?loc:Location.t -> statement -> global_statement
@@ -82,6 +82,6 @@ val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
   SE.context ->
-  Equiv.any_form * t
+  Equiv.any_statement * t
 
 val make : Symbols.table -> Parsed.t -> statement * t

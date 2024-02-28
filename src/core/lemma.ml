@@ -21,8 +21,8 @@ let pp_kind fmt = function
 let _pp ppe fmt lem =
   let stmt_kind_str =
     match lem.stmt.formula with
-    | Equiv.Global _ -> "global "
-    | Equiv.Local  _ -> ""
+    | Equiv.GlobalS _ -> "global "
+    | Equiv.LocalS  _ -> ""
   in
   Fmt.pf fmt "@[<2>%s%a %a@]"
     stmt_kind_str
@@ -88,7 +88,7 @@ let add_lemma
 let print_all fmt table : unit =
   Symbols.Lemma.iter (fun _ data ->
       let g = as_lemma data in
-      Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any.pp g.stmt.formula
+      Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any_statement.pp g.stmt.formula
     ) table
 
 
@@ -126,8 +126,9 @@ let mk_depends_lemma
     name;
     ty_vars = [];
     system = SystemExpr.(reachability_context any);
-    formula = Equiv.Local form;
+    formula = Equiv.LocalS {formula = form; bound = None};
   } 
+(*TODO:Concrete : Check what this fonction does*)
 
 (*------------------------------------------------------------------*)
 (** Build the mutual exlusivity lemma between [descr] and [descr']. *)
@@ -149,7 +150,7 @@ let mk_mutex_lemma
   let a  = Term.mk_action descr.name  (Term.mk_vars (is_common @ is_rem))  in
   let a' = Term.mk_action descr'.name (Term.mk_vars (is_common @ is_rem')) in
 
-  let form =
+  let formula =
     Term.mk_forall ~simpl:false (is_common @ is_rem @ is_rem')
       (Term.mk_or
          (Term.mk_not (Term.mk_happens a))
@@ -164,8 +165,9 @@ let mk_mutex_lemma
     name;
     ty_vars = [];
     system = SystemExpr.(reachability_context any);
-    formula = Equiv.Local form;
+    formula = Equiv.LocalS {formula; bound = None};
   }
+(*TODO:Concrete : Check what this fonction does*)
 
 (*------------------------------------------------------------------*)
 (** Compute the sequential dependency and mutual exclusion lemmas

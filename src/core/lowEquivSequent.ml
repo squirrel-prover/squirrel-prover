@@ -241,7 +241,7 @@ let set_vars vars j = update ~vars j
 
 let system j = j.env.system
 
-let set_conclusion_in_context ?update_local ?(bound = None) system conc s =
+let set_conclusion_in_context ?update_local ?bound system conc s =
 
   assert (update_local = None);
  assert (bound = None);
@@ -320,32 +320,29 @@ let conclusion_as_equiv s = match conclusion s with
 
 (*------------------------------------------------------------------*)
 (** Convert global sequent to local sequent, assuming
-    that the conclusion of the input sequent is a local formula. *)
+    that the conclusion of the input sequent is a reachability formula. *)
 let to_trace_sequent s =
   let env = s.env in
 
-  let conclusion =
-    match s.conclusion with
-    | Equiv.Atom (Equiv.Reach f) -> f.formula
+  let conclusion,bound = match s.conclusion with
+    | Equiv.Atom (Equiv.Reach f) -> f.formula,f.bound
     | _ ->
       Tactics.soft_failure
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~env conclusion in
+  let trace_s = TS.init ~env ?bound conclusion in
   let trace_s =
-    Hyps.fold
-      (fun id ld trace_s ->
-         match ld with
-         | TopHyps.LHyp hyp ->
-           TS.Hyps.add (Args.Named (Ident.name id)) (TopHyps.LHyp (Global hyp)) trace_s
-         | TopHyps.LDef (se,t) -> 
-           let id', trace_s = TS.Hyps._add ~force:true id (LDef (se,t)) trace_s in
-           assert (Ident.equal id' id);
-           trace_s
-      ) s trace_s
-  in
-  trace_s
+  Hyps.fold
+    (fun id ld trace_s ->
+       match ld with
+       | TopHyps.LHyp hyp ->
+         TS.Hyps.add (Args.Named (Ident.name id)) (TopHyps.LHyp (Global hyp)) trace_s
+       | TopHyps.LDef (se,t) -> 
+         let id', trace_s = TS.Hyps._add ~force:true id (LDef (se,t)) trace_s in
+         assert (Ident.equal id' id);
+         trace_s
+    ) s trace_s
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s =

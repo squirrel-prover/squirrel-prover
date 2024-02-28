@@ -15,6 +15,7 @@ type rw_rule = {
   rw_conds  : Term.term list; 
   rw_rw     : Term.term * Term.term; 
   rw_kind   : rw_kind;
+  rw_bound : Term.term option;
 }
 
 let pp_rw_rule fmt (rw : rw_rule) =
@@ -55,12 +56,12 @@ let pat_to_rw_rule ?loc
     (system    : SE.arbitrary) 
     (rw_kind   : rw_kind)
     (dir       : [< `LeftToRight | `RightToLeft ])
-    (p         : Term.term Term.pat) 
+    (p         : (Term.term*Term.term option) Term.pat)
   : rw_rule 
   =
   let _ = loc in                (* unused *)
-
-  let subs, f = Term.decompose_impls_last p.pat_term in
+  let formula, rw_bound = p.pat_term in
+  let subs, f = Term.decompose_impls_last formula in
 
   let e = match destr_eq f with
     | Some (t1, t2) -> t1,t2
@@ -84,6 +85,7 @@ let pat_to_rw_rule ?loc
     rw_conds  = subs;
     rw_rw     = e;
     rw_kind;
+    rw_bound;
   } in
   
   (* We check that the rule is valid *)

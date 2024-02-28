@@ -157,7 +157,7 @@ let mk_equiv_statement
   let context = SE.equivalence_context ~set:new_system new_system in
   let formula =
     fst (Goal.make_obs_equiv ~enrich table context)
-    |> Equiv.any_to_equiv
+    |> Equiv.any_statement_to_equiv
   in
   let formula = make_conclusion formula in
   Goal.{ name    = new_axiom_name; 
@@ -247,6 +247,7 @@ let global_rename
       rw_conds  = [];
       rw_rw     = n1', n2';
       rw_kind   = GlobalEq;
+      rw_bound = None;
     }
   in
 
@@ -278,7 +279,7 @@ let global_rename
         equiv)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
     in
-    Equiv.Global (Equiv.Smart.mk_forall [fresh_x_var] fimpl)
+    Equiv.GlobalS (Equiv.Smart.mk_forall [fresh_x_var] fimpl)
   in
   let lemma =
     mk_equiv_statement
@@ -405,6 +406,7 @@ let global_prf
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
       rw_kind   = GlobalEq;
+      rw_bound = None;
     }
   in
 
@@ -433,6 +435,7 @@ let global_prf
                   Term.right_proj,
                   Term.mk_name_with_tuple_args
                     (Term.mk_symb n Message) (Term.mk_vars is)]]; bound = None})
+        (*TODO:Concrete: Probably something to bound to create a bounded goal*)
     in
     let concl = 
       Equiv.Smart.mk_forall [fresh_x_var]
@@ -442,7 +445,7 @@ let global_prf
               (Vars.Tag.global_vars ~const:true is) atom)
            equiv)
     in
-    Equiv.Global concl
+    Equiv.GlobalS concl
   in
 
   let lemma =
@@ -580,6 +583,7 @@ let global_cca
       rw_conds  = [];
       rw_rw     = enc, new_enc;
       rw_kind   = GlobalEq;
+      rw_bound = None;
     }
   in
   let dec_rw_rule =
@@ -594,6 +598,7 @@ let global_cca
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
       rw_kind   = GlobalEq;
+      rw_bound = None;
     }
   in
 
@@ -1226,6 +1231,7 @@ let global_prf_t
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target tau0 xocc); 
           rw_kind   = GlobalEq;
+          rw_bound = None;
         }
       in
       Some rule

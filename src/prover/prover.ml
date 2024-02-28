@@ -382,6 +382,7 @@ let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
   do_tactic' ~check st l
 
 (*----------------------- Search --------------------------*)
+
 let search_about (st:state) (q:ProverLib.search_query) : 
   (Lemma.lemma * Equiv.any_form list) list =
   let env = 
@@ -434,8 +435,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find ~option env.table sys pat f
-        | Local  f -> Match.T.find ~option env.table sys pat f
+        | GlobalS f -> Match.E.find ~option env.table sys pat f
+        | LocalS  f -> Match.T.find ~option env.table sys pat f.formula
         end in
         begin match res with
           | [] -> acc
@@ -468,8 +469,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find_glob ~option env.table sys pat f
-        | Local  _ -> [] (* can't find Equiv.form in
+        | GlobalS f -> Match.E.find_glob ~option env.table sys pat f
+        | LocalS  _ -> [] (* can't find Equiv.form in
                                       Term.term ? *)
         end in
         begin match res with

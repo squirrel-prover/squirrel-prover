@@ -3365,17 +3365,26 @@ module E = struct
 
     | Atom (Reach t), Atom (Reach pat) ->
       (* no need to change the system, we already have the correct context *)
-      term_unif t.formula pat.formula st
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-
+      begin
+        match t.bound, pat.bound with
+        | None, None ->  term_unif t.formula pat.formula st
+        | Some e, Some ve ->
+          let  mv = term_unif t.formula pat.formula st
+          in term_unif e ve {st with mv}
+        | _ -> Tactics.soft_failure (Failure "Cannot unify a asymptotic formula with a explicit formula")
+      end
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       let system : SE.context = 
         SE.{ set = ((oget st.system.pair) :> SE.t); pair = None; } 
       in
       let st = st_change_context st system in
-      tunif_e ~mode es.terms pat_es.terms st
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-
+      let mv  = tunif_e ~mode es.terms pat_es.terms st in
+      begin
+        match es.bound, pat_es.bound with
+        | None, None -> mv
+        | Some e, Some ve -> term_unif e ve {st with mv}
+        | _ -> Tactics.soft_failure (Failure "Cannot unify a asymptotic formula with a explicit formula")
+      end
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)
       unif_tys st p.ty_args ppat.ty_args;

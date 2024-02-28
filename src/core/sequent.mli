@@ -17,6 +17,7 @@ module PT : sig
 
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
+    bound : Term.term option;
     form   : Equiv.any_form;
   }
 
@@ -29,7 +30,7 @@ end
     Raise [failed] in case of failure. *)
 val pt_try_cast :
   failed:(unit -> PT.t) ->
-  'a Equiv.f_kind -> 
+  'a Equiv.f_kind ->
   PT.t -> PT.t
 
 (*------------------------------------------------------------------*) 

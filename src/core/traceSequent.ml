@@ -32,12 +32,18 @@ include Sequent.Mk(struct
             match ld with
             | LHyp (Global f) -> ES.Hyps.add (Args.Named (Ident.name id)) (LHyp f) es
             | LHyp (Local f) ->
-              if HighTerm.is_constant     (env s) f &&
-                 HighTerm.is_system_indep (env s) f 
-              then
-                ES.Hyps.add
-                  (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
-              else es
+              begin
+                match (bound s) with
+                | None ->
+                  if HighTerm.is_constant     (env s) f &&
+                     HighTerm.is_system_indep (env s) f
+                  then
+                    ES.Hyps.add
+                      (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
+                  else es
+                | Some _ -> es
+                  (**TODO:Concrete allow to keep the local hypothesis with bound 0 when the bound of the conclusion is more than 0*)
+              end
             | LDef (se,t) -> 
               let id', es = ES.Hyps._add ~force:true id (LDef (se,t)) es in
               assert (Ident.equal id' id);

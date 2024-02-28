@@ -70,9 +70,9 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type statement        = (string, Equiv.any_form) abstract_statement
+type statement        = (string, Equiv.any_statement) abstract_statement
 type global_statement = (string, Equiv.form    ) abstract_statement
-type local_statement  = (string, Term.term     ) abstract_statement
+type local_statement  = (string, Equiv.bform     ) abstract_statement
 
 (*------------------------------------------------------------------*)
 let _pp_statement ppe fmt (g : statement) : unit =
@@ -82,29 +82,29 @@ let _pp_statement ppe fmt (g : statement) : unit =
       Fmt.pf fmt " [%a]"
         (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
-  Fmt.pf fmt "@[[%a] %s%a :@]@ %a"
-    SE.pp_context g.system
-    g.name
-    pp_tyvars g.ty_vars
-    (Equiv._pp_any_form ppe) g.formula
+    Fmt.pf fmt "@[[%a] %s%a :@]@ %a"
+      SE.pp_context g.system
+      g.name
+      pp_tyvars g.ty_vars
+      (Equiv.pp_any_statement ppe) g.formula
 
 (*------------------------------------------------------------------*)
 
-let is_local_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
+let is_local_statement (stmt : (_, Equiv.any_statement) abstract_statement) : bool =
   match stmt.formula with
-  | Global _ -> false
-  | Local  _ -> true
+  | GlobalS _ -> false
+  | LocalS  _ -> true
 
 let is_global_statement stmt : bool =
   match stmt.formula with
-  | Equiv.Global _ -> true
-  | Equiv.Local  _ -> false
+  | Equiv.GlobalS _ -> true
+  | Equiv.LocalS  _ -> false
 
 let to_local_statement ?loc stmt =
-  { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Local_t stmt.formula }
+  { stmt with formula = Equiv.Any_statement.convert_to ?loc Equiv.Local_s stmt.formula }
 
 let to_global_statement ?loc stmt =
-  { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Global_t stmt.formula }
+  { stmt with formula = Equiv.Any_statement.convert_to ?loc Equiv.Global_s stmt.formula }
 
 (*------------------------------------------------------------------*)
 (** {2 Parsed goals} *)
@@ -137,7 +137,6 @@ let make_obs_equiv ?(enrich=[]) table system =
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
   let goal = Equiv.(Atom (Equiv {terms = (term :: enrich); bound = None})) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   (* refresh free variables in [enrich], and add them to the environment *)
   let vars,_,subst = 
@@ -151,17 +150,15 @@ let make_obs_equiv ?(enrich=[]) table system =
   (* alternative version of [goal], where [enrich] free vars have been 
      renamed. *)
   let goal_s = Equiv.(Atom (Equiv ({terms = term :: enrich_s; bound = None}))) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach {formula = happens; bound = None})) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-  
+
   let env = Env.init ~system ~table ~vars () in
   
   let s = ES.init ~env ~hyp goal_s in
   
-  Equiv.Global
+  Equiv.GlobalS
     (Equiv.Smart.mk_forall_tagged [ts, ts_tag] (Equiv.(Impl (hyp,goal)))),
   Global s
 
@@ -199,7 +196,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
             | Some e ->
               let e, _ = Typing.convert ~ty_env conv_env ~ty:(Library.Real.real conv_env.env.table) e in Some e
       in
-      let s = TS.init ~no_sanity_check:true ~env ?bound:(Some e) f in
+      let s = TS.init ~no_sanity_check:true ~env ?bound:e f in
 
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
          - [vs = vs_glob @ vs_loc]
@@ -222,20 +219,19 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       (* we build the formula, only putting local variable in the local quantification. *)
       let formula =
         if vs_glob = [] then
-          Equiv.Local (Term.mk_forall_tagged vs_loc f)
+          Equiv.LocalS ({formula = Term.mk_forall_tagged vs_loc f;bound =e })
         else
-          Equiv.Global
+          Equiv.GlobalS
             (Equiv.Smart.mk_forall_tagged
                vs_glob
-               (Equiv.Atom (Equiv.Reach ({formula = Term.mk_forall_tagged vs_loc f; bound = None}))))
-               (*TODO:Concrete : Probably something to do to create a bounded goal*)
+             (Equiv.Atom (Equiv.Reach ({formula = Term.mk_forall_tagged vs_loc f; bound = e}))))
       in
       formula, Local s
 
     | Global f ->
       let f = Typing.convert_global_formula ~ty_env conv_env f in
       let s = ES.init ~no_sanity_check:true ~env f in
-      let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
+      let formula = Equiv.GlobalS (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Global s
 
     | Obs_equiv ->
@@ -250,7 +246,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   (* close the typing environment and substitute *)
   let tsubst = Type.Infer.close ty_env in
 
-  let formula = Equiv.Any.tsubst tsubst formula in
+  let formula = Equiv.Any_statement.tsubst tsubst formula in
   let goal = map (TS.tsubst tsubst) (ES.tsubst tsubst) goal in
 
   { name; system; ty_vars; formula },

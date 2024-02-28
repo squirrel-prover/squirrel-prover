@@ -25,6 +25,7 @@ module PT = struct
     
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
+    bound : Term.term option;
     form   : Equiv.any_form;
   }
 
@@ -49,6 +50,7 @@ module PT = struct
       mv     = Match.Mvar.map do_t_proj pt.mv; 
       system = SE.project_set projs pt.system ;
       subgs  = List.map do_proj pt.subgs;
+      bound = omap (Term.project projs) pt.bound;
       form   = do_proj pt.form; }
 
   let _pp ppe fmt (pt : t) : unit =
@@ -81,8 +83,9 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   let rec doit (pt : PT.t) : PT.t =
     match pt.form with
     | Local _ -> pt
-    | Global (Atom (Reach f)) -> { pt with form = Local f.formula; }
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    | Global (Atom (Reach f)) ->
+        assert(pt.bound = None);
+        { pt with form = Local f.formula; bound = f.bound }
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
     | Global (Equiv.Quant (Equiv.ForAll, vs, f)) ->
@@ -144,6 +147,7 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
     { pt with 
       subgs = List.map psubst pt.subgs;
       form  = psubst pt.form;
+      bound = omap (Term.subst_projs proj_subst) pt.bound;
       system; } 
 
 
@@ -163,6 +167,7 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
       let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Reach proj_subst in
       let pt = 
         { pt with subgs = List.map psubst pt.subgs;
+                  bound = omap (Term.subst_projs proj_subst) pt.bound;
                   form  = psubst pt.form;
                   system = { pt.system with set = system.set };
                   (* we already set [pt.system] to [system.set], even though 
@@ -556,6 +561,7 @@ module Mk (Args : MkArgs) : S with
         subgs  = [];
         mv     = Mvar.empty;
         args   = [];
+        bound= None;
         form   = f; }
 
     else
@@ -588,7 +594,26 @@ module Mk (Args : MkArgs) : S with
         end;
       
       let form = Equiv.Babel.tsubst Equiv.Any_t tsubst lem.formula in
+      if Equiv.is_local_statement form
+      then
+        (* a local lemma or axiom is actually a global reachability formula *)
+        let form, bound =
+          match S.conc_kind, form with
+          (* we already downgrade it for local sequents *)
+          | Equiv.Local_t, Equiv.LocalS f -> Equiv.Local f.formula, f.bound
+          (* in global sequent, we use it as a global formula  *)
+          | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f)), None
+          | _ -> assert false (* impossible *)
+        in
 
+        `Lemma lem.Goal.name,
+        { system = lem.system;
+          mv     = Mvar.empty;
+          subgs  = [];
+          args   = [];
+          bound;
+          form; }
+      else
       (* a local lemma or axiom is actually a global reachability formula *)
       let form = 
         match S.conc_kind, form with
@@ -603,12 +628,13 @@ module Mk (Args : MkArgs) : S with
         | Equiv.Any_t, _ -> assert false (* impossible *)
       in
 
-      `Lemma lem.Goal.name,
-      { system = lem.system;
-        mv     = Mvar.empty;
-        subgs  = [];
-        args   = [];
-        form; }
+        `Lemma lem.Goal.name,
+        { system = lem.system;
+          mv     = Mvar.empty;
+          subgs  = [];
+          args   = [];
+          bound = None;
+          form; }
 
   (*------------------------------------------------------------------*)
   (** Extend a variable environment with the variables of [pt] *)
@@ -691,7 +717,7 @@ module Mk (Args : MkArgs) : S with
     let mv =
       Mvar.add (f_arg, f_arg_tag) pt.system.set pt_arg pt.mv
     in
-    { subgs = pt.subgs; args; mv; form = f; system = pt.system }
+    { subgs = pt.subgs; args; mv; form = f; bound = pt.bound; system = pt.system }
 
   (*------------------------------------------------------------------*)
   let pt_downgrade_warning ~(pt : PT.t) ~(arg : PT.t) : unit =
@@ -711,8 +737,18 @@ module Mk (Args : MkArgs) : S with
         PT.pp pt
     in
     soft_failure ~loc (Failure err_str)
-  
+
   (*------------------------------------------------------------------*)
+  let error_pt_apply_asymptotic_concrete () =
+    soft_failure
+      (Failure "cannot apply a concrete implication with an asymptotic hypothesis")
+
+  (*------------------------------------------------------------------*)
+  let error_pt_apply_concrete_asymptotic () =
+    soft_failure
+      (Failure "cannot apply a asymptotic implication with an concrete hypothesis")
+
+   (*------------------------------------------------------------------*)
   let subst_of_pt ~loc table (vars : Vars.env) (pt : PT.t) : Term.subst = 
     let pt_venv = venv_of_pt vars pt in
     match Mvar.to_subst ~mode:`Unif table pt_venv pt.mv with
@@ -755,7 +791,6 @@ module Mk (Args : MkArgs) : S with
         let down_pt = pt_try_localize ~failed:apply_kind_error pt in
         pt_downgrade_warning ~pt ~arg;
         down_pt, arg
-        
     in
 
     let f1, f2 =
@@ -794,6 +829,7 @@ module Mk (Args : MkArgs) : S with
           table pt.system f_arg pat_f1
 
       | Global f1, Global f_arg  ->
+        assert(pt.bound = None && arg.bound = None);
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
           ~ty_env ~mv:arg.mv ~env
@@ -810,8 +846,17 @@ module Mk (Args : MkArgs) : S with
        the proof term [p_arg]. *)
     let args = List.rev_append arg.args pt.args in
     let subgs = arg.subgs @ pt.subgs in
-
-    { subgs; mv; args; form = f2; system = pt.system; }
+    let bound =
+      match pt.bound, arg.bound with
+      | Some b, Some sb ->
+        Some(Library.Real.mk_add (S.table s) sb (Library.Real.mk_minus (S.table s) b))
+      | None, None -> None
+      | Some _, None ->
+        error_pt_apply_asymptotic_concrete ()
+      | None, Some _ ->
+        error_pt_apply_concrete_asymptotic ()
+    in
+    { subgs; mv; args; form = f2; bound; system = pt.system; }
 
   (*------------------------------------------------------------------*)
   let error_pt_cannot_apply loc (pt : PT.t) =
@@ -844,7 +889,7 @@ module Mk (Args : MkArgs) : S with
       let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
       let pt = 
         pt_try_localize
-          ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt) 
+          ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt)
           sub_pt 
       in
       ghyp, pt
@@ -919,6 +964,9 @@ module Mk (Args : MkArgs) : S with
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;
           args   = pt.args;
+          bound = if Equiv.is_local f2 && (S.bound s) <> None
+            then  Some (Library.Real.mk_zero (S.table s))
+            else None;
           form   = f2; }
 
       | `Pt p_arg ->
