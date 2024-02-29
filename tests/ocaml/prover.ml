@@ -69,7 +69,6 @@ let some_include () =
 let tests = [
    ("Print",            `Quick, Util.catch_error some_print);
    ("Include",          `Quick, Util.catch_error some_include);
-   ("Include",          `Quick, Util.catch_error some_include);
    ("tests/ok/test.sp", `Quick, Util.catch_error run_test);
    ("Cycle by name", `Quick, Util.catch_error begin fun () ->
        Alcotest.check_raises "run test"

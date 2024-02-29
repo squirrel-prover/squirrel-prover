@@ -139,8 +139,6 @@ let locate (dirs : load_paths) (filename : string) =
   match
     List.find_map
       (fun dir ->
-         Format.eprintf "Try %S...@."
-           (Filename.concat dir filename);
          Result.to_option
            (from_file (Filename.concat dir filename)))
       dirs

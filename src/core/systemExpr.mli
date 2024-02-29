@@ -225,7 +225,8 @@ val singleton : System.Single.t -> fset
 
     The table is used to check that all systems in the list are compatible.
 
-    For example, [make_fset tbl ~labels:["left";"right"] [(s,"right");(s,"left")]]
+    For example,
+    [make_fset tbl ~labels:["left";"right"] [(s,"right");(s,"left")]]
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
 val make_fset :
