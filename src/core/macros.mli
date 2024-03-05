@@ -1,7 +1,7 @@
 (** Declaring and unfolding macros *)
 
 module SE = SystemExpr
-
+  
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
@@ -87,6 +87,8 @@ type system_map_arg =
    is defined *)
 
 (*------------------------------------------------------------------*)
+type global_data
+
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
     existing definition of [ns] in the old system, applies [f] to the
@@ -95,15 +97,12 @@ type system_map_arg =
 val update_global_data :
   Symbols.table -> 
   Symbols.macro -> 
-  Symbols.macro_def -> 
   System.Single.t ->
   System.Single.t ->
   (system_map_arg -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
 
-type global_data
-
-val as_macro : Symbols.data -> global_data
+val as_global_macro : Symbols.data -> global_data
     
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)

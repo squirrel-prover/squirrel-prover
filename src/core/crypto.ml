@@ -1570,7 +1570,7 @@ let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
   let reduction_state =
     Reduction.mk_state ~hyps:state.hyps
       ~se:state.env.system.set ~vars:state.env.vars
-      ~param:Reduction.{rp_crypto with diff = true}
+      ~param:Reduction.rp_crypto
       state.env.table
   in
   let term, _ =
@@ -1867,7 +1867,7 @@ let derecursify_term
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
       let t, has_red =
-        let param = { Reduction.rp_crypto with diff = true } in
+        let param = Reduction.rp_crypto in
         (* FIXME: add tag information in [fv] *)
         let vars = Vars.of_list (Vars.Tag.local_vars vars) in
         let st = Reduction.mk_state ~hyps ~se ~vars ~param table in

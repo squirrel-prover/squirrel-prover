@@ -21,14 +21,6 @@ type macro_decl = {
 }
 
 (*------------------------------------------------------------------*)
-type abstract_decl = {
-  name      : lsymb;
-  symb_type : Symbols.symb_type;
-  ty_args   : lsymb list;          (** type variables *)
-  abs_tys   : Theory.p_ty;
-}
-
-(*------------------------------------------------------------------*)
 type name_decl = {
   n_name : lsymb ;
   n_ty   : Theory.p_ty list;
@@ -75,7 +67,7 @@ type operator_decl = {
   op_tyargs    : lsymb list;
   op_args      : Theory.ext_bnds;
   op_tyout     : Theory.p_ty option;
-  op_body      : Theory.term;
+  op_body      : [`Concrete of Theory.term | `Abstract];
 }
 
 (*------------------------------------------------------------------*)
@@ -108,9 +100,10 @@ type declaration_i =
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
 
-  | Decl_dh of Symbols.dh_hyp list * lsymb *
-               (lsymb * Symbols.symb_type) *
-               (lsymb * Symbols.symb_type) option * c_tys
+  | Decl_dh of
+      Symbols.OpData.dh_hyp list * lsymb *
+      (lsymb * Symbols.symb_type) *
+      (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of lsymb * orcl_tag_info option * c_tys
 
@@ -126,7 +119,6 @@ type declaration_i =
   | Decl_state     of macro_decl
   | Decl_operator  of operator_decl
   | Decl_predicate of predicate_decl
-  | Decl_abstract  of abstract_decl
   | Decl_bty       of bty_decl
   | Decl_game      of Crypto.Parse.game_decl
   | Tactic         of lsymb * ProverTactics.AST.t

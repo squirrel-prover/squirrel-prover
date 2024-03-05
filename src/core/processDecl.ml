@@ -54,33 +54,8 @@ let error loc k e = raise (Error (loc,k,e))
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
-let rec split_ty (ty : Theory.p_ty) : Theory.p_ty list =
-  match L.unloc ty with
-  | Theory.P_fun (t1, t2) -> t1 :: split_ty t2
-  | _ -> [ty]
-
-let parse_abstract_decl table (decl : Decl.abstract_decl) =
-  let in_tys, out_ty =
-    let tys = split_ty decl.abs_tys in
-    List.takedrop (List.length tys - 1) tys
-  in
-  let p_out_ty = as_seq1 out_ty in
-
-  let ty_args = List.map (fun l ->
-      Type.mk_tvar (L.unloc l)
-    ) decl.ty_args
-  in
-
-  let env = Env.init ~table ~ty_vars:ty_args () in
-  let in_tys = List.map (Theory.convert_ty env) in_tys in
-
-  let out_ty = Theory.convert_ty env p_out_ty in
-
-  Theory.declare_abstract table
-    ~ty_args ~in_tys ~out_ty
-    decl.name decl.symb_type
-
 (*------------------------------------------------------------------*)
+(** Parse an abstract or concrete operator declaration. *)
 let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     let name = L.unloc decl.op_name in
 
@@ -92,53 +67,74 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     (* open a typing environment *)
     let ty_env = Type.Infer.mk_env () in
 
+    (* translate arguments *)
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
       Theory.convert_ext_bnds
-        ~ty_env ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) env decl.op_args
-      (* assume global constant variables to properly check that the
-         body represents a deterministic computations later
-         (as constant => deterministic). *)
+        ~ty_env ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) 
+        env decl.op_args
+        (* assume global constant variables to properly check that the
+           body represents a deterministic computations later
+           (as constant => deterministic). *)
     in
 
     let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
 
+    (* translate body *)
     let body, out_ty =
-      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } decl.op_body
+      match decl.op_body with
+      | `Abstract ->
+        if out_ty = None then 
+          error (L.loc decl.op_name) KDecl (Failure "abstract operator must be typed");
+        
+        let out_ty = oget out_ty in
+        let in_tys, out_ty = Type.decompose_funs out_ty in
+        `Abstract in_tys, out_ty
+
+      | `Concrete body ->
+        let body, out_ty = Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body in
+        let body = Term.subst subst body in
+        `Concrete body, out_ty
     in
-    let body = Term.subst subst body in
 
     (* check that the typing environment is closed *)
     if not (Type.Infer.is_closed ty_env) then
-      error (L.loc decl.op_body) KDecl (Failure "some types could not be inferred");
+      error (L.loc decl.op_name) KDecl (Failure "some types could not be inferred");
 
     (* close the typing environment and substitute *)
     let tsubst = Type.Infer.close ty_env in
     let args = List.map (Vars.tsubst tsubst) args in
     let out_ty = Type.tsubst tsubst out_ty in
-    let body = Term.tsubst tsubst body in
+    (* substitue in [body] below, in the concrete case *)
 
-    if not (HighTerm.is_deterministic env body) then
-      error (L.loc decl.op_body) KDecl NonDetOp;
+    match body with
+    | `Abstract in_tys ->       (* abstract declaration *)
+      Theory.declare_abstract table
+        ~ty_args:ty_vars ~in_tys ~out_ty
+        decl.op_name decl.op_symb_type
 
-    let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
-    let ftype = Operator.ftype data in
+    | `Concrete body ->         (* concrete declaration *)
+      let body = Term.tsubst tsubst body in
 
-    (* sanity checks on infix symbols *)
-    let in_tys = List.length args in (* number of arguments *)
-    Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
+      if not (HighTerm.is_deterministic env body) then
+        error (L.loc decl.op_name) KDecl NonDetOp;
 
-    let table, _ =
-      Symbols.Function.declare_exact
-        table decl.op_name
-        ~data:(Operator.Operator data)
-        (ftype, Symbols.Operator)
-    in
+      let data = Operator.{ name; ty_vars; args; out_ty; body; } in
+      let ftype = Operator.concrete_ftype data in
 
-    Printer.prt `Result "%a"
-      Operator.pp_operator data;
+      (* sanity checks on infix symbols *)
+      let in_tys = List.length args in (* number of arguments *)
+      Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
 
-    table
+      let table, _ =
+        Symbols.Operator.declare ~approx:false
+          table decl.op_name
+          ~data:(Symbols.OpData.Operator {def = Concrete (Operator.Val data); ftype; })
+      in
+
+      Printer.prt `Result "%a" Operator.pp_concrete_operator data;
+
+      table
 
 (*------------------------------------------------------------------*)
 let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
@@ -148,7 +144,8 @@ let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
     Crypto.pp_game g;
 
   let table, _ =
-    Symbols.Game.declare_exact table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) ()
+    Symbols.Game.declare ~approx:false
+      table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) 
   in
   table
 
@@ -271,10 +268,9 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     Theory.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
 
     let table, _ =
-      Symbols.Predicate.declare_exact
+      Symbols.Predicate.declare ~approx:false
         table decl.pred_name
         ~data:(Predicate.Predicate data)
-        ()
     in
 
     Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]"
@@ -341,7 +337,7 @@ let declare table decl : Symbols.table * Goal.t list =
     Process.declare table ~id ~args ~projs proc, []
 
   | Decl.Decl_action a ->
-    let table, symb = Symbols.Action.reserve_exact table a.a_name in
+    let table, symb = Symbols.Action.reserve ~approx:false table a.a_name in
     Action.declare_symbol table symb a.a_arity, []
 
   | Decl.Decl_axiom pgoal ->
@@ -462,16 +458,16 @@ let declare table decl : Symbols.table * Goal.t list =
       ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk,
     []
 
-  | Decl.Decl_abstract  decl -> parse_abstract_decl table decl,  []
   | Decl.Decl_operator  decl -> parse_operator_decl table decl,  []
   | Decl.Decl_predicate decl -> parse_predicate_decl table decl, []
 
   | Decl.Decl_bty bty_decl ->
     let table, _ =
-      Symbols.BType.declare_exact
+      let ty_infos = List.map Symbols.TyInfo.parse bty_decl.bty_infos in
+      Symbols.BType.declare ~approx:false
         table
         bty_decl.bty_name
-        (List.map Symbols.TyInfo.parse bty_decl.bty_infos)
+        ~data:(Symbols.TyInfo.Type ty_infos)
     in
     table, []
 

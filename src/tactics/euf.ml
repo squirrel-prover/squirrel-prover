@@ -243,7 +243,7 @@ let euf_param
       | App (Fun (f, _), [Tuple [m; tk]]) ->
         begin
           match O.expand_macro_check_all einfo tk with
-          | Name _ as k when Symbols.is_ftype f Symbols.Hash table ->
+          | Name _ as k when Symbols.OpData.(is_abstract_with_ftype f Hash table) ->
             Some {ep_key=Name.of_term k; ep_intmsg=m; ep_term=t';
                   ep_int_f=f; ep_pk_f=None}
           | _ -> None

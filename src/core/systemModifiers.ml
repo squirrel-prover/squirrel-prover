@@ -103,11 +103,9 @@ let clone_system_map
   let old_new_pair = SE.make_pair system new_single_system in
 
   let global_macro_fold
-      (ns : Symbols.macro) (dec_def : Symbols.macro_def) 
-      (_ : Symbols.data) (table : Symbols.table)
-    : Symbols.table 
+      (ns : Symbols.macro) _ (table : Symbols.table) : Symbols.table
     =
-    Macros.update_global_data table ns dec_def system new_single_system fmap
+    Macros.update_global_data table ns system new_single_system fmap
   in
 
   let table = Symbols.Macro.fold global_macro_fold table table in
@@ -368,10 +366,9 @@ let global_prf
   (* Instantiation of the fresh name *)
   let ty_args = List.map Vars.ty is in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
-  let ndef = Symbols.{ n_fty } in
+  let ndef = Symbols.Name { n_fty } in
   let s = (L.mk_loc L._dummy "n_PRF") in
-  let table,n =
-    Symbols.Name.declare table s ndef in
+  let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
   let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
   let table = Process.add_namelength_axiom table real_name n_fty in
   
@@ -474,8 +471,8 @@ let global_cca
     | Term.App (Fun (fnenc, _),
                 [Tuple [m; Term.Name _ as r;
                         Term.App (Fun (fnpk, _), [Term.Name _ as sk])]])
-      when Symbols.is_ftype fnpk Symbols.PublicKey table &&
-           Symbols.is_ftype fnenc Symbols.AEnc table ->
+      when Symbols.OpData.(is_abstract_with_ftype fnpk  PublicKey table) &&
+           Symbols.OpData.(is_abstract_with_ftype fnenc AEnc      table) ->
       fnenc, Name.of_term sk, m, fnpk, Name.of_term r
 
     | _ ->
@@ -485,10 +482,10 @@ let global_cca
   in
 
   let dec_fn =
-    match Symbols.Function.get_data enc_fn table with
+    match Symbols.OpData.get_abstract_data enc_fn table with
     (* we check that the encryption function is used with the associated
        public key *)
-    | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = enc_pk ->
+    | _, [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
         OldEuf.key_ssc ~globals:true
@@ -530,12 +527,10 @@ let global_cca
   (* Instantiation of the fresh replacement *)
   let ty_args = List.map Term.ty enc_rnd.args in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
-  let ndef =
-    Symbols.{ n_fty }
-  in
+  let ndef = Symbols.Name { n_fty } in
   let s = (L.mk_loc L._dummy "n_CCA") in
   let table,n =
-    Symbols.Name.declare table s ndef
+    Symbols.Name.declare ~approx:true table s ~data:ndef
   in
   let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
   let table = Process.add_namelength_axiom table real_name n_fty in
@@ -618,9 +613,8 @@ let global_cca
   let ty_args = List.map Vars.ty is in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
   let table, r =
-    let rdef = Symbols.{ n_fty }
-    in
-    Symbols.Name.declare table s rdef
+    let rdef = Symbols.Name { n_fty } in
+    Symbols.Name.declare ~approx:true table s ~data:rdef
   in
   let real_name = L.mk_loc L._dummy (Symbols.to_string r) in
   let table = Process.add_namelength_axiom table real_name n_fty in
@@ -955,9 +949,9 @@ let global_prf_t
     with Not_found ->
       let ty_args = List.map Vars.ty occ.Iter.occ_vars in
       let n_fty = Type.mk_ftype_tuple [] ty_args m_ty in
-      let ndef = Symbols.{ n_fty } in
-      let s = (L.mk_loc L._dummy "n_PRF") in
-      let table, ns = Symbols.Name.declare table s ndef in
+      let ndef = Symbols.Name { n_fty } in
+      let s = L.mk_loc L._dummy "n_PRF" in
+      let table, ns = Symbols.Name.declare ~approx:true table s ~data:ndef in
       let real_name = L.mk_loc L._dummy (Symbols.to_string ns) in
       let table = Process.add_namelength_axiom table real_name n_fty in
       table,ns
@@ -1124,10 +1118,14 @@ let global_prf_t
       ] 
   in
 
-  let table, err_fs = 
+  let table, err_fs =
+    let open Symbols.OpData in
     let ftype = Type.mk_ftype [] [] m_ty in
-    Symbols.Function.declare
-      table (L.mk_loc L._dummy "error") (ftype,Symbols.Abstract `Prefix)
+    let data = Operator {
+        ftype; def = Abstract (Abstract `Prefix, []);
+      }
+    in
+    Symbols.Operator.declare ~approx:true table (L.mk_loc L._dummy "error") ~data
   in
   let err_t = Term.mk_fun table err_fs [] in
     

@@ -51,7 +51,10 @@ let rec check_nodiffbind (n:Name.t) (t:term) : bool =
 
 (** Returns true iff f is a symmetric or asymmetric encryption function. *)
 let is_enc (table:Symbols.table) (f:Symbols.fname) =
-  Symbols.(is_ftype f AEnc table || is_ftype f SEnc table)
+  Symbols.OpData.(
+    is_abstract_with_ftype f AEnc table ||
+    is_abstract_with_ftype f SEnc table
+  )
 
 (** Returns true iff t contains an encryption function.
     Does not unfold macros. *)
@@ -162,10 +165,10 @@ let indcca_param
       (cty:Type.ty) (mty:Type.ty) (rty:Type.ty) (kty:Type.ty) :
     Rewrite.rw_rule * Symbols.table * Name.t =
     let n_fty = Type.mk_ftype [] [] cty in
-    let xcdef = Symbols.{n_fty} in
-    let s = (L.mk_loc L._dummy "X") in
+    let xcdef = Symbols.Name {n_fty} in
+    let s = L.mk_loc L._dummy "X" in
     let table, xcs =
-      Symbols.Name.declare table s xcdef
+      Symbols.Name.declare ~approx:true table s ~data:xcdef
     in
 
     let xc = Name.{symb=Term.mk_symb xcs cty; args=[]} in
@@ -189,12 +192,12 @@ let indcca_param
   in
   
   (* go through all encryption functions, try to find a ciphertext *)
-  let res = Symbols.Function.fold
-      (fun f _ _ x -> (* for all functions:*)
+  let res = Symbols.Operator.fold
+      (fun f _ x -> (* for all functions:*)
          match x with
          | None when is_enc table f ->
            (* f is an encryption symbol: try to find a ctxt *)
-           let fty, _ = Symbols.Function.get_def f table in
+           let fty = Symbols.OpData.ftype table f in
            let cty = fty.fty_out in
            let mty, rty, kty =
              match fty.fty_args with
@@ -229,24 +232,24 @@ let indcca_param
       
   | Some (enc_f, (ccc, [(_, l)]), table, xc) -> (* a ciphertext was found *)
     let dec_f, pk_f = (* get the associated dec and pk functions *)
-      match Symbols.Function.get_data enc_f table with
-      | Symbols.AssociatedFunctions [dec_f] -> (* sym enc *)
+      match Symbols.OpData.get_abstract_data enc_f table with
+      | _, [dec_f] -> (* sym enc *)
         (* sanity checks *)
-        assert (Symbols.is_ftype enc_f Symbols.SEnc table);
-        assert (Symbols.is_ftype dec_f Symbols.SDec table);
+        assert Symbols.OpData.(is_abstract_with_ftype enc_f SEnc table);
+        assert Symbols.OpData.(is_abstract_with_ftype dec_f SDec table);
         dec_f, None
-      | Symbols.AssociatedFunctions [dec_f; pk_f] -> (* asym enc *)
+      | _, [dec_f; pk_f] -> (* asym enc *)
         (* sanity checks *)
-        assert (Symbols.is_ftype enc_f Symbols.AEnc table);
-        assert (Symbols.is_ftype dec_f Symbols.ADec table);
-        assert (Symbols.is_ftype pk_f Symbols.PublicKey table);
+        assert Symbols.OpData.(is_abstract_with_ftype enc_f AEnc      table);
+        assert Symbols.OpData.(is_abstract_with_ftype dec_f ADec      table);
+        assert Symbols.OpData.(is_abstract_with_ftype pk_f  PublicKey table);
         dec_f, (Some pk_f)
       | _ -> assert false
     in
 
     (* get the context *)
     let cc =
-      match (Equiv.any_to_equiv ccc) with
+      match Equiv.any_to_equiv ccc with
       | Equiv.(Atom (Equiv [cc])) -> cc
       | _ -> assert false
     in
@@ -339,7 +342,8 @@ let phi_proj
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   let dummy_cipher =              (* dummy ciphertext, needed by [EncRandom] *)
-    Prelude.mk_witness env.table ~ty_arg:(Symbols.ftype env.table enc_f).Type.fty_out
+    Prelude.mk_witness env.table
+      ~ty_arg:(Symbols.OpData.ftype env.table enc_f).Type.fty_out
   in
   (* get the bad key and randomness occs, and the ciphertexts,
      in frame + m + kargs + rargs. There, decryption with k is allowed. *) 

@@ -1,3 +1,9 @@
+(* declares an abstract operator *)
+op abs_op : message.
+
+(*------------------------------------------------------------------*)
+(* test concrete operators *)
+
 op triple (x, y, z : message) : message = <x, <y, z>>.
 
 (* implicit return type *)

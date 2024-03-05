@@ -363,7 +363,7 @@ type conversion_error_i =
   | Arity_error          of string * int * int
   | Untyped_symbol       of string
   | Undefined            of string
-  | UndefinedOfKind      of string * Symbols.namespace
+  | UndefinedOfKind      of string * Symbols.symbol_kind
   | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of term
   | Timestamp_unexpected of term
@@ -372,7 +372,7 @@ type conversion_error_i =
   | Int_expected         of term_i
   | Tactic_type          of string
   | Assign_no_state      of string
-  | BadNamespace         of string * Symbols.namespace
+  | BadSymbolKind        of string * Symbols.symbol_kind
   | Freetyunivar
   | UnknownTypeVar       of string
   | BadPty               of Type.ty list
@@ -400,18 +400,18 @@ let conv_err loc e = raise (Conv (loc,e))
 
 let pp_error_i ppf = function
   | Arity_error (s,i,j) ->
-    Fmt.pf ppf "Symbol %s given %i arguments, but has arity %i" s i j
+    Fmt.pf ppf "symbol %s given %i arguments, but has arity %i" s i j
 
   | Untyped_symbol s -> Fmt.pf ppf "symbol %s is not typed" s
 
   | Undefined s -> Fmt.pf ppf "symbol %s is undefined" s
 
   | UndefinedOfKind (s,n) ->
-    Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
+    Fmt.pf ppf "%a %s is undefined" Symbols.pp_symbol_kind n s
 
   | Type_error (s, ty_expected, ty) ->
     Fmt.pf ppf "@[<hov 0>\
-                Term@;<1 2>@[%a@]@ \
+                term@;<1 2>@[%a@]@ \
                 of type@ @[%a@]@ \
                 is not of type @[%a@]\
                 @]"
@@ -420,10 +420,10 @@ let pp_error_i ppf = function
       Type.pp ty_expected
 
   | Timestamp_expected t ->
-    Fmt.pf ppf "The term %a must be given a timestamp" pp t
+    Fmt.pf ppf "the term %a must be given a timestamp" pp t
 
   | Timestamp_unexpected t ->
-    Fmt.pf ppf "The term %a must not be given a timestamp" pp t
+    Fmt.pf ppf "the term %a must not be given a timestamp" pp t
 
   | Unsupported_ord t ->
     Fmt.pf ppf
@@ -433,27 +433,26 @@ let pp_error_i ppf = function
 
   | String_expected t ->
     Fmt.pf ppf
-      "The term %a cannot be seen as a string"
+      "the term %a cannot be seen as a string"
       pp_i t
 
   | Int_expected t ->
     Fmt.pf ppf
-      "The term %a cannot be seen as a int"
+      "the term %a cannot be seen as a int"
       pp_i t
 
   | Tactic_type s ->
-    Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+    Fmt.pf ppf "the tactic arguments could not be parsed: %s" s
 
   | Assign_no_state s ->
-    Fmt.pf ppf "Only mutables can be assigned values, and the \
-                symbols %s is not a mutable" s
+    Fmt.pf ppf "assignment to non-mutable symbol %s" s
 
-  | BadNamespace (s,n) ->
-    Fmt.pf ppf "Kind error: %s has kind %a" s
-      Symbols.pp_namespace n
+  | BadSymbolKind (s,n) ->
+    Fmt.pf ppf "kind error: %s has kind %a" s
+      Symbols.pp_symbol_kind n
 
-  | Freetyunivar -> Fmt.pf ppf "some type variable(s) could not \
-                                       be instantiated"
+  | Freetyunivar ->
+    Fmt.pf ppf "some type variable(s) could not be instantiated"
 
   | UnknownTypeVar ty ->
     Fmt.pf ppf "undefined type variable %s" ty
@@ -560,6 +559,7 @@ let check_arity
   if arity_error then
     conv_err (L.loc lsymb) (Arity_error (L.unloc lsymb, actual, expected))
 
+(*------------------------------------------------------------------*)
 (** Type of a macro *)
 type mtype = Type.ty list * Type.ty (* args, out *)
 
@@ -575,40 +575,48 @@ let mf_type_arity (ty : mf_type) =
   | `Macro (l,_) -> List.length l
 
 (** Get the kind of a function or macro definition.
-  * In the latter case, the timestamp argument is not accounted for. *)
+    In the latter case, the timestamp argument is not accounted for. *)
 let function_kind table (f : lsymb) : mf_type =
-  let open Symbols in
-  match def_of_lsymb f table with
+  match Symbols.status_of_lsymb f table with
   (* we should never encounter a situation where we
      try to type a reserved symbol. *)
   | Reserved _ -> assert false
-
-  | Exists d -> match d with
-    | Function (fty, _) -> `Fun fty
-
-    | Macro (Global (arity, ty)) ->
-      let targs = (List.init arity (fun _ -> Type.tindex)) in
-      let arg_ty = if arity = 0 then [] else [Type.tuple targs] in
-      `Macro (arg_ty, ty)
-
-    | Macro (Input|Output|Frame) ->
-      `Macro ([], Type.tmessage)
-
-    | Macro (Cond|Exec) ->
-      `Macro ([], Type.tboolean)
-
+  | Defined d ->
+    match d with
+    | Operator ->
+      let fs = Symbols.Operator.of_lsymb f table in
+      `Fun ((Symbols.OpData.get_data fs table).ftype)
+        
+    | Macro ->
+      let ms = Symbols.Macro.of_lsymb f table in
+      let data = Symbols.get_macro_data ms table in
+      begin
+        match data with
+        | Global (arity, ty, _) ->
+          let targs = (List.init arity (fun _ -> Type.tindex)) in
+          let arg_ty = if arity = 0 then [] else [Type.tuple targs] in
+          `Macro (arg_ty, ty)
+        
+        | Input | Output | Frame -> `Macro ([], Type.tmessage)
+        | Cond | Exec -> `Macro ([], Type.tboolean)
+        | State _ -> assert false (* TODO: symbols: missing case? *)
+      end
+      
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
-let check_state table (s : lsymb) n : Type.ty =
-  match Symbols.Macro.def_of_lsymb s table with
-  | Symbols.State (arity,ty) ->
-    check_arity ~mode:`Full s ~actual:n ~expected:arity ;
+let check_state table (ls : lsymb) n : Type.ty =
+  let s = Symbols.Macro.of_lsymb ls table in
+  match Symbols.get_macro_data s table with
+  | Symbols.State (arity,ty,_) ->
+    check_arity ~mode:`Full ls ~actual:n ~expected:arity ;
     ty
 
-  | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
+  | _ -> conv_err (L.loc ls) (Assign_no_state (L.unloc ls))
 
 let check_name table (s : lsymb) n : Type.ftype =
-  let fty = (Symbols.Name.def_of_lsymb s table).n_fty in
+  let fty =
+    (Symbols.get_name_data (Symbols.Name.of_lsymb s table) table).n_fty
+  in
   let arity = List.length fty.fty_args in
   if arity <> n then conv_err (L.loc s) (Arity_error (L.unloc s,n,arity));
   fty
@@ -756,8 +764,8 @@ let check_system (state : conv_state) (loc : L.t) (v : Vars.var) : unit =
 type app_i =
   | Name    (** A name *)
   | Get     (** Reads the contents of memory cell *)
-  | Fun     (** Function symbol application. *)
-  | Macro   (** Function symbol application. *)
+  | Fun     (** Operator symbol application. *)
+  | Macro   (** Macro symbol application. *)
   | Taction
   | AVar 
 
@@ -785,35 +793,30 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
 
   if Vars.mem_s state.env.vars (L.unloc lsymb) then AVar
   else
-    match Symbols.def_of_lsymb lsymb table with
+    match Symbols.status_of_lsymb lsymb table with
     | Symbols.Reserved _ -> assert false
-
-    | Symbols.Exists d ->
+    | Symbols.Defined d ->
       match d with
-      | Symbols.Function _ ->
+      | Symbols.Operator ->
         if is_at cntxt then ts_unexpected ();
         Fun
-
-      | Symbols.Name _ ->
+      | Symbols.Name ->
         if is_at cntxt then ts_unexpected ();
         Name
-
-      | Symbols.Macro (Symbols.Global (_,_)) -> Macro
-        
-      | Symbols.Macro (Symbols.State _) -> Get
-
-      | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
-                      |Symbols.Frame) ->
-        if cntxt = NoTS then
-          conv_err loc (Timestamp_expected (mk_app (mk_symb lsymb) []));
-        Macro
-
-      | Symbols.Action _ -> Taction
-
+      | Symbols.Macro ->
+        begin
+          match Symbols.get_macro_data (Symbols.Macro.of_lsymb lsymb table) table with
+          | Global _ -> Macro
+          | State  _ -> Get            
+          | Input | Output | Cond | Exec | Frame ->
+            if cntxt = NoTS then
+              conv_err loc (Timestamp_expected (mk_app (mk_symb lsymb) []));
+            Macro
+        end
+      | Symbols.Action -> Taction
       | _ ->
         let s = L.unloc lsymb in
-        conv_err loc (BadNamespace (s,
-                                    oget(Symbols.get_namespace table s)))
+        conv_err loc (BadSymbolKind (s, oget(Symbols.kind_of_string table s)))
 
 let make_app loc (state : conv_state) cntxt (lsymb : lsymb) : app =
   L.mk_loc loc (make_app_i state cntxt lsymb)
@@ -976,28 +979,28 @@ let convert_ext_bnds
 (** {3 Local formula conversion conversion} *)
 
 let get_fun table lsymb =
-  match Symbols.Function.of_lsymb_opt lsymb table with
+  match Symbols.Operator.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NFunction))
+    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Operator))
 
 let get_name table lsymb =
   match Symbols.Name.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NName))
+    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Name))
 
 let get_action (env : Env.t) lsymb =
   match Symbols.Action.of_lsymb_opt lsymb env.table with
   | Some n -> n
   | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NAction))
+    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Action))
 
 let get_macro (env : Env.t) lsymb =
   match Symbols.Macro.of_lsymb_opt lsymb env.table with
   | Some n -> n
   | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
+    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Macro))
 
 (*------------------------------------------------------------------*)
 
@@ -1287,7 +1290,7 @@ and conv_app
 
     let t =
       Term.mk_fun0
-        (Symbols.Function.of_lsymb f state.env.table) applied_fty messages
+        (Symbols.Operator.of_lsymb f state.env.table) applied_fty messages
     in
 
     (* additional type check between the type of [t] and the output
@@ -1305,14 +1308,14 @@ and conv_app
       ~actual:(List.length terms) ~expected:(mf_type_arity mfty);
 
     let s = Symbols.Macro.of_lsymb f state.env.table in
-    let macro = Symbols.Macro.get_def s state.env.table in
+    let macro = Symbols.get_macro_data s state.env.table in
     let _, ty_out =
       match mfty with `Macro x -> x | _ -> assert false
     in
     begin match macro with
       | Symbols.State _ -> assert false
 
-      | Symbols.Global (arity, _) ->
+      | Symbols.Global (arity, _, _) ->
         let indices =
           match terms with
           | [] -> []
@@ -1374,7 +1377,7 @@ and conv_app
       (List.map (conv Type.tindex) terms)
 
 (*------------------------------------------------------------------*)
-(** {2 Function declarations} *)
+(** {2 Operator declarations} *)
 
 
 let[@warning "-32"] mk_ftype vars args out =
@@ -1389,34 +1392,46 @@ let mk_ftype_tuple vars args out =
   let args = List.map mdflt args in
   Type.mk_ftype_tuple vars args (mdflt out)
 
+let mk_abstract_op ?(associated_functions = []) ftype abstract_def =
+  Symbols.OpData.Operator {
+    ftype; def = Abstract (abstract_def, associated_functions);
+  }
+
+(*------------------------------------------------------------------*)
 let declare_dh
       (table : Symbols.table)
-      (h : Symbols.dh_hyp list)
+      (h : Symbols.OpData.dh_hyp list)
       ?group_ty ?exp_ty
       (gen : lsymb)
       ((exp, f_info) : lsymb * Symbols.symb_type)
       (omult : (lsymb * Symbols.symb_type) option)
     : Symbols.table =
-  let open Symbols in
+  let open Symbols.OpData in
   let gen_fty = mk_ftype [] [] group_ty in
   let exp_fty = mk_ftype [] [group_ty; exp_ty] group_ty in
-  let table, exp = Function.declare_exact table exp (exp_fty, Abstract f_info) in
-  let (table, af) = match omult with
+  let exp_data = mk_abstract_op exp_fty (Abstract f_info) in
+  let table, exp = Symbols.Operator.declare ~approx:false table exp ~data:exp_data in
+  let (table, af) =
+    match omult with
     | None -> (table, [exp])
     | Some (mult, mf_info) ->
-       let mult_fty = mk_ftype [] [exp_ty; exp_ty] exp_ty in
-       let (table, mult) =
-         Function.declare_exact table mult (mult_fty, Abstract mf_info)
-       in
-       (table, [exp; mult])
+      let mult_fty = mk_ftype [] [exp_ty; exp_ty] exp_ty in
+      let mult_data = mk_abstract_op mult_fty (Abstract mf_info) in
+      let table, mult =
+        Symbols.Operator.declare ~approx:false table mult ~data:mult_data
+      in
+      (table, [exp; mult])
   in
-  let data = AssociatedFunctions af in
-  fst (Function.declare_exact table ~data gen (gen_fty, DHgen h))
+  let gen_data =
+    mk_abstract_op gen_fty ~associated_functions:af (Symbols.OpData.DHgen h)
+  in
+  Symbols.Operator.declare ~approx:false table gen ~data:gen_data
+  |> fst
 
 let declare_hash table ?m_ty ?k_ty ?h_ty s =
   let ftype = mk_ftype_tuple [] [m_ty; k_ty] h_ty in
-  let def = ftype, Symbols.Hash in
-  fst (Symbols.Function.declare_exact table s def)
+  let data = mk_abstract_op ftype (Symbols.OpData.Hash) in
+  fst (Symbols.Operator.declare ~approx:false table s ~data)
 
 let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
   let open Symbols in
@@ -1424,32 +1439,50 @@ let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
   let enc_fty = mk_ftype_tuple [] [ptxt_ty; rnd_ty; pk_ty] ctxt_ty in
   let pk_fty  = mk_ftype_tuple [] [sk_ty] pk_ty in
 
-  let table, pk = Function.declare_exact table pk (pk_fty,PublicKey) in
-  let dec_data = AssociatedFunctions [Function.cast_of_string (L.unloc enc); pk] in
-  let table, dec = Function.declare_exact table dec ~data:dec_data (dec_fty,ADec) in
-  let data = AssociatedFunctions [dec; pk] in
-  fst (Function.declare_exact table enc ~data (enc_fty,AEnc))
+  let pk_data = mk_abstract_op pk_fty PublicKey in
+  let table, pk = Operator.declare ~approx:false table pk ~data:pk_data in
+
+  let dec_data =
+    mk_abstract_op dec_fty ADec
+      ~associated_functions:[Operator.cast_of_string (L.unloc enc); pk]
+  in
+  let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
+
+  let enc_data =
+    mk_abstract_op enc_fty AEnc ~associated_functions:[dec; pk]
+  in
+  fst (Operator.declare ~approx:false table enc ~data:enc_data)
 
 let declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
   let dec_fty = mk_ftype_tuple [] [ctxt_ty; k_ty] ptxt_ty in
   let enc_fty = mk_ftype_tuple [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
 
-  let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
-  let data = AssociatedFunctions [dec] in
-  fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
+  let dec_data =
+    mk_abstract_op dec_fty SDec
+      ~associated_functions:[Operator.cast_of_string (L.unloc enc)]
+  in
+  let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
+
+  let enc_data =
+    mk_abstract_op enc_fty SEnc ~associated_functions:[dec]
+  in
+  fst (Operator.declare ~approx:false table enc ~data:enc_data)
 
 let declare_senc_joint_with_hash
     table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec h =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
-                                  get_fun table h] in
   let dec_fty = mk_ftype_tuple [] [ctxt_ty; k_ty] ptxt_ty in
   let enc_fty = mk_ftype_tuple [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
-  let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
-  let data = AssociatedFunctions [dec] in
-  fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
+
+  let dec_data =
+    mk_abstract_op dec_fty SDec
+      ~associated_functions:[Operator.cast_of_string (L.unloc enc); get_fun table h]
+  in
+  let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
+
+  let enc_data = mk_abstract_op enc_fty SEnc ~associated_functions:[dec] in
+  fst (Operator.declare ~approx:false table enc ~data:enc_data)
 
 let declare_signature table
     ?m_ty ?sig_ty ?sk_ty ?pk_ty
@@ -1459,25 +1492,33 @@ let declare_signature table
   let check_fty = mk_ftype_tuple [] [m_ty; sig_ty; pk_ty] (Some Type.tboolean) in
   let pk_fty    = mk_ftype_tuple [] [sk_ty              ] pk_ty                in
 
-  let table,sign = Function.declare_exact table sign (sig_fty, Sign) in
-  let table,pk = Function.declare_exact table pk (pk_fty,PublicKey) in
-  let data = AssociatedFunctions [sign; pk] in
-  fst (Function.declare_exact table checksign ~data (check_fty,CheckSign))
+  let sign_data = mk_abstract_op sig_fty Sign in
+  let table,sign = Operator.declare ~approx:false table sign ~data:sign_data in
+
+  let pk_data = mk_abstract_op pk_fty PublicKey in
+  let table,pk = Operator.declare ~approx:false table pk ~data:pk_data in
+
+  let check_data =
+    mk_abstract_op check_fty CheckSign ~associated_functions:[sign; pk]
+  in
+  fst (Operator.declare ~approx:false table checksign ~data:check_data)
 
 let check_signature table checksign pk =
-  let def x = Symbols.Function.get_def x table in
-  let correct_type = match def checksign, def pk  with
-    | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
+  let def x = Symbols.OpData.get_abstract_data x table in
+  let correct_type =
+    match def checksign, def pk with
+    | (CheckSign, _), (PublicKey, _) -> true
     | _ -> false
   in
   if correct_type then
-    match Symbols.Function.get_data checksign table with
-      | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk -> Some sign
+    match Symbols.OpData.get_abstract_data checksign table with
+      | _, [sign; pk2] when pk2 = pk -> Some sign
       | _ -> None
   else None
 
+(*------------------------------------------------------------------*)
 let declare_name table s ndef =
-  fst (Symbols.Name.declare_exact table s ndef)
+  fst (Symbols.Name.declare ~approx:false table s ~data:(Symbols.Name ndef))
 
 (*------------------------------------------------------------------*)
 (** Sanity checks for a function symbol declaration. *)
@@ -1499,8 +1540,8 @@ let declare_abstract
   check_fun_symb (List.length in_tys) s f_info;
 
   let ftype = Type.mk_ftype ty_args in_tys out_ty in
-  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
-
+  let data = mk_abstract_op ftype (Abstract f_info) in
+  fst (Symbols.Operator.declare ~approx:false table s ~data)
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
@@ -1805,7 +1846,8 @@ let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
 (*------------------------------------------------------------------*)
 (** {2 Mutable state} *)
 
-type Symbols.data += StateInit_data of Vars.var list * Term.term
+(** See description in [symbols.mli]. *)
+type Symbols.state_macro_def += StateInit_data of Vars.var list * Term.term
 
 let declare_state
     (table      : Symbols.table)
@@ -1845,18 +1887,16 @@ let declare_state
         conv_err (L.loc pty) (BadPty [Type.tindex])
     ) args typed_args;
 
-  let data = StateInit_data (args,t) in
-  let table, _ =
-    Symbols.Macro.declare_exact table
-      s
-      ~data
-      (Symbols.State (List.length typed_args,out_ty)) in
+  let data =
+    Symbols.Macro (State (List.length typed_args,out_ty, StateInit_data (args,t)))
+  in
+  let table, _ = Symbols.Macro.declare ~approx:false table s ~data in
   table
 
 let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
-  Symbols.Macro.fold (fun s def data acc ->
-      match (def,data) with
-      | ( Symbols.State (_arity,kind), StateInit_data (l,t) ) ->
+  Symbols.Macro.fold (fun s data acc ->
+      match data with
+      | Symbols.Macro (State (_arity,kind,StateInit_data (l,t))) ->
         assert (Type.equal kind (Term.ty t));
         (s,List.map Term.mk_var l,t) :: acc
       | _ -> acc

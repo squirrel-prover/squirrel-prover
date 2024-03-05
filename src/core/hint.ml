@@ -62,12 +62,12 @@ let set_hint_db (table : Symbols.table) (db : hint_db) : Symbols.table =
   match Symbols.HintDB.of_lsymb_opt default_hint_symb table with 
   | None ->
     let table, _ =
-      Symbols.HintDB.declare_exact table default_hint_symb () ~data
+      Symbols.HintDB.declare ~approx:false table default_hint_symb ~data
     in
     table
 
   | Some default_name ->
-    Symbols.HintDB.redefine table default_name ~data ()
+    Symbols.HintDB.redefine table default_name ~data 
       
 (*------------------------------------------------------------------*)
 let get_rewrite_db table = (hint_db table).db_rewrite

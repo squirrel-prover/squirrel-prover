@@ -244,7 +244,7 @@ let case_study () =
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let terms = get_seq_in_nth_goal st 0 in
-  let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
+  let f = Symbols.Operator.of_lsymb (mk "f") (Prover.get_table st) in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     true,
@@ -284,7 +284,7 @@ let case_study () =
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
-  let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
+  let f = Symbols.Operator.of_lsymb (mk "f") (Prover.get_table st) in
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
@@ -613,7 +613,7 @@ let namelength () =
   let name_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (name_hash) in
 
-  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
     | Some fn -> table, fn
     | None -> assert false
   in
@@ -672,7 +672,7 @@ let namelength2 () =
   let name_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (name_hash) in
 
-  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
     | Some fn -> table, fn
     | None -> assert false
   in

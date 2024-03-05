@@ -179,6 +179,7 @@ type context = {
   functions_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   macros_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   names_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
+  unsupp_tbl : (Term.term, Why3.Term.lsymbol) Hashtbl.t;
 
   uc : Why3.Theory.theory_uc ref;
 
@@ -255,6 +256,7 @@ let context_init ~timestamp_style ~pure tm_theory evars table system =
     functions_tbl = Hashtbl.create 12;
     macros_tbl = Hashtbl.create 12;
     names_tbl = Hashtbl.create 12;
+    unsupp_tbl = Hashtbl.create 12;
 
     uc = uc;
     timestamp_style = timestamp_style;
@@ -474,16 +476,22 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
       (prop_list_to_bool context args)
     )
 
-  | Diff  _,_->
-    let symb =  
-      mk_const_symb context "unsupp_diff" (convert_type context (Term.ty fmla)) in 
-    Hashtbl.add context.vars_tbl 
-      (Hashtbl.hash ("unsupp_diff"^(string_of_int !(context.fresh)))) 
-      (Why3.Term.t_app_infer symb []);
-    context.uc := Why3.Theory.add_decl_with_tuples 
-      !(context.uc) 
-      (Why3.Decl.create_param_decl symb);
-    (Why3.Term.t_app_infer symb [])
+  | Diff  _,_ | Find _,_ -> 
+    let var_list = Hashtbl.fold (fun _ x acc -> x::acc) context.vars_tbl [] in
+    let symb = try Hashtbl.find context.unsupp_tbl fmla 
+    with Not_found -> begin let s =  
+      Why3.Term.create_fsymbol
+          (id_fresh context "unsupp")
+          (List.map t_type var_list)
+          (convert_type context (Term.ty fmla))
+      in Hashtbl.add context.unsupp_tbl fmla s;
+      context.uc := Why3.Theory.add_decl_with_tuples 
+        !(context.uc) 
+        (Why3.Decl.create_param_decl s);
+      s 
+      end
+    in
+    (Why3.Term.t_app_infer symb var_list)
 
   | Var v,_ -> 
     begin try Hashtbl.find context.vars_tbl (Vars.hash v) with
@@ -492,16 +500,6 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
 
   | Tuple l,_ -> t_tuple (List.map (msg_to_fmla context) l)
 
-  | Find (_, _, t1, _),_ -> 
-    let symb =  
-      mk_const_symb context "unsupp_find" (convert_type context (Term.ty t1)) in 
-    Hashtbl.add context.vars_tbl 
-      (Hashtbl.hash ("unsupp_find"^(string_of_int !(context.fresh)))) 
-      (Why3.Term.t_app_infer symb []);
-    context.uc := Why3.Theory.add_decl_with_tuples 
-      !(context.uc) 
-      (Why3.Decl.create_param_decl symb);
-    (Why3.Term.t_app_infer symb [])
   | _ -> match Term.Lit.form_to_xatom fmla with 
     | Some at -> atom_to_fmla context at
     | None -> assert false 
@@ -584,7 +582,9 @@ let add_var context =
     context.msgvars)
 
 let add_functions context = 
-  Symbols.Function.iter (fun fname (ftype, _) _ ->
+  Symbols.Operator.iter (fun fname _ ->
+    let data = Symbols.OpData.get_data fname context.table in
+    let ftype = data.ftype in
     let str = Symbols.to_string fname in
     (* special treatment of xor for two reasons:
      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
@@ -633,12 +633,13 @@ let add_functions context =
 
 
 let add_macros context = 
-  Symbols.Macro.iter (fun mn def _ ->
+  Symbols.Macro.iter (fun mn _ ->
+    let def = Symbols.get_macro_data mn context.table in
     let str = Symbols.to_string mn in
     let indices = match def with
       | Input | Output | Cond | Exec | Frame -> 0
-      | State (i,_) -> i
-      | Global (i,_) -> i
+      | State (i,_,_) -> i
+      | Global (i,_,_) -> i
     in
     let indices = List.init indices (fun _ -> context.index_ty) in
     let symb ty =
@@ -659,7 +660,7 @@ let add_macros context =
       |"frame" ->Hashtbl.add context.macros_tbl str
                   (Option.get context.frame_symb)
       |_ -> let ty = match def with 
-        |State(_,t) | Global(_,t) -> convert_type context t 
+        |State(_,t,_) | Global(_,t,_) -> convert_type context t 
         |_ -> assert false 
       in
       Hashtbl.add context.macros_tbl str (symb ty)
@@ -681,7 +682,8 @@ let rec calc_arity l = match l with
     |t -> [convert_type context t]
 
 let add_names context = 
-  Symbols.Name.iter (fun name def _ ->
+  Symbols.Name.iter (fun name _ ->
+    let def = Symbols.get_name_data name context.table in
     let str = Symbols.to_string name in
     let symb =
       Why3.Term.create_fsymbol
@@ -886,90 +888,108 @@ let add_equational_axioms context =
           (t_var v))
     |> t_and_l
     |> t_forall_close [vx; vy] [] in
-  
+
+  let add_axiom
+      (fname      : Symbols.fname)
+      (def        : Symbols.OpData.abstract_def)
+      (assoc_funs : Symbols.OpData.associated_fun)
+    : (string * term) option
+    =
+    match def, assoc_funs with
+    (* cases taken from Completion.init_erules *)
+    | AEnc, [f1; f2] ->
+      let dec, pk = (* from Completion.dec_pk *)
+        match Symbols.OpData.get_abstract_data f1 context.table,
+              Symbols.OpData.get_abstract_data f2 context.table with
+        | (ADec     , _), (PublicKey, _) -> f1, f2
+        | (PublicKey, _), (ADec     , _) -> f2, f1
+        | _ -> assert false
+      in
+      (* we omit the check_zero_arities from Completion *)
+      (* dec(enc(m, r, pk(k)), k) -> m *)
+      let vars =
+        List.map (fun str ->
+            Why3.(Term.create_vsymbol (Ident.id_fresh str)
+                    (Ty.ty_app 
+                       (Option.get context.msg_symb) []
+                    )
+                 )
+          ) ["m"; "r"; "k"]
+      in
+      let (vm, vr, vk) = as_seq3 vars in
+      let term =
+        t_equ (t_app_infer (find_fn context dec) 
+                 [t_app_infer (find_fn context fname) (* fname = enc *)
+                    [t_var vm; t_var vr;
+                     t_app_infer (find_fn context pk)
+                       [t_var vk]];
+                  t_var vk])
+          (t_var vm) |> t_forall_close vars []
+      in
+      Some ("axiom_aenc", term)
+
+    | SEnc, [sdec] ->
+      (* dec(enc(m, r, k), k) -> m *)
+      let vars =
+        List.map (fun str ->
+            Why3.(Term.create_vsymbol (Ident.id_fresh str)
+                    (Ty.ty_app 
+                       (Option.get context.msg_symb) []
+                    )
+                 )
+          ) ["m"; "r"; "k"]
+      in
+      let vm, vr, vk = as_seq3 vars in
+      let term =
+        t_equ (t_app_infer (find_fn context sdec)
+                 [t_app_infer (find_fn context fname)
+                    [t_var vm; t_var vr; t_var vk];
+                  t_var vk])
+          (t_var vm) |> t_forall_close vars []
+      in
+      Some ("axiom_senc", term)
+
+    | CheckSign, [f1; f2] ->
+      let msig, pk = (* from Completion.sig_pk *)
+        match Symbols.OpData.get_abstract_data f1 context.table,
+              Symbols.OpData.get_abstract_data f2 context.table with
+        | (Sign     , _), (PublicKey, _) -> f1, f2
+        | (PublicKey, _), (Sign     , _) -> f2, f1
+        | _ -> assert false
+      in
+      (* mcheck(msig(m, k), pk(k)) -> true *)
+      let vars =
+        List.map (fun str ->
+            Why3.(Term.create_vsymbol (Ident.id_fresh str)
+                    (Ty.ty_app 
+                       (Option.get context.msg_symb) 
+                       []
+                    )
+                 )
+          ) ["m"; "k"]
+      in
+      let vm, vk = as_seq2 vars in
+      let term =
+        t_equ (t_app_infer (find_fn context fname)
+                 [t_app_infer (find_fn context msig)
+                    [t_var vm; t_var vk];
+                  t_app_infer (find_fn context pk)
+                    [t_var vk]])
+          (t_app_infer (find_fn context Symbols.fs_true) [])
+        |> t_forall_close vars []
+      in
+      Some ("axiom_sig", term)
+
+    | _ -> None
+  in
+
   let equational_axioms =
     let open Symbols in
-    Function.fold (fun fname def data acc ->
-        match (snd def), data with
-        (* cases taken from Completion.init_erules *)
-        | AEnc, AssociatedFunctions [f1; f2] ->
-          let dec, pk = (* from Completion.dec_pk *)
-            match Function.get_def f1 context.table,
-                  Function.get_def f2 context.table with
-            | (_, ADec), (_, PublicKey) -> f1, f2
-            | (_, PublicKey), (_, ADec) -> f2, f1
-            | _ -> assert false
-          in
-          (* we omit the check_zero_arities from Completion *)
-          (* dec(enc(m, r, pk(k)), k) -> m *)
-          begin match List.map (fun str ->
-              Why3.(Term.create_vsymbol (Ident.id_fresh str)
-                      (Ty.ty_app 
-                        (Option.get context.msg_symb) []
-                      )
-                    )
-          ) ["m"; "r"; "k"] with
-            | [vm; vr; vk] as vars ->
-              ("axiom_aenc",
-                t_equ (t_app_infer (find_fn context dec) 
-                        [t_app_infer (find_fn context fname) (* fname = enc *)
-                            [t_var vm; t_var vr;
-                            t_app_infer (find_fn context pk)
-                              [t_var vk]];
-                          t_var vk])
-                  (t_var vm) |> t_forall_close vars [])
-              :: acc
-            | _ -> assert false
-          end
-        | SEnc, AssociatedFunctions [sdec] ->
-          (* dec(enc(m, r, k), k) -> m *)
-          begin match List.map (fun str ->
-              Why3.(Term.create_vsymbol (Ident.id_fresh str)
-                      (Ty.ty_app 
-                        (Option.get context.msg_symb) []
-                      )
-                    )
-          ) ["m"; "r"; "k"] with
-            | [vm; vr; vk] as vars ->
-              ("axiom_senc",
-                t_equ (t_app_infer (find_fn context sdec)
-                        [t_app_infer (find_fn context fname)
-                            [t_var vm; t_var vr; t_var vk];
-                          t_var vk])
-                  (t_var vm) |> t_forall_close vars [])
-              :: acc
-            | _ -> assert false
-          end
-        | CheckSign, AssociatedFunctions [f1; f2] ->
-          let msig, pk = (* from Completion.sig_pk *)
-            match Function.get_def f1 context.table,
-                  Function.get_def f2 context.table with
-            | (_, Sign), (_, PublicKey) -> f1, f2
-            | (_, PublicKey), (_, Sign) -> f2, f1
-            | _ -> assert false
-          in
-          (* mcheck(msig(m, k), pk(k)) -> true *)
-          begin match List.map (fun str ->
-              Why3.(Term.create_vsymbol (Ident.id_fresh str)
-                      (Ty.ty_app 
-                        (Option.get context.msg_symb) 
-                        []
-                      )
-                    )
-          ) ["m"; "k"] with
-            | [vm; vk] as vars ->
-              ("axiom_sig",
-                t_equ (t_app_infer (find_fn context fname)
-                        [t_app_infer (find_fn context msig)
-                            [t_var vm; t_var vk];
-                          t_app_infer (find_fn context pk)
-                            [t_var vk]])
-                  (t_app_infer (find_fn context Symbols.fs_true) [])
-                |> t_forall_close vars [])
-              :: acc
-            | _ -> assert false
-          end
-        | _ -> acc
+    Operator.fold (fun fname _ acc ->
+        if OpData.is_abstract fname context.table then
+          let def, assoc_funs = OpData.get_abstract_data fname context.table in
+          Option.to_list (add_axiom fname def assoc_funs) @ acc
+        else acc
       ) [("axiom_pair", axiom_pair)] context.table 
   in
   context.uc:=List.fold_left 
@@ -1011,12 +1031,15 @@ let add_macro_axioms context =
         macro_axioms := ("expand_cond_" ^ name_str,
                           t_forall_close quantified_vars [] ax_cond) ::
                         !macro_axioms;
-        Symbols.Macro.iter (fun mn mdef _mdata ->
+        
+        Symbols.Macro.iter (fun mn _ ->
+            let mdef = Symbols.get_macro_data mn context.table in
             let m_str  = Symbols.to_string mn in
             let m_symb = Hashtbl.find context.macros_tbl m_str in
             let macro_wterm_eq indices msg =
               t_equ (t_app_infer m_symb (indices@[ts])) msg in
-            let ax_option = try begin match mdef with
+            let ax_option =
+              try begin match mdef with
               (* cond@ already handled above; exec@ defined in .why file *)
               | Symbols.Cond | Symbols.Exec -> None
               | Symbols.Output ->
@@ -1024,7 +1047,7 @@ let add_macro_axioms context =
                 Some (macro_wterm_eq
                         []
                         (msg_to_fmla context (snd descr.Action.output)))
-              | Symbols.Global (arity, gty) -> begin
+              | Symbols.Global (arity, gty, _) -> begin
                   (* for now, handle only the case where the indices of the macro
                       coincide with those of the action TODO *)
                   let m_idx = Utils.List.take arity descr.indices in
@@ -1046,7 +1069,7 @@ let add_macro_axioms context =
                             )
                           )
                 end
-              | Symbols.State (arity,sty) -> 
+              | Symbols.State (arity,sty, _) ->
                 (* TODO: could probably be treated by calling
                     Macros.get_definition_nocntxt, instead of copying its code
                     (but it would be annoying to handle fresh index variables)*)
@@ -1084,10 +1107,10 @@ let add_macro_axioms context =
                   with Not_found -> same_as_pred in
                 Some (t_forall_close quantified_indices []
                         (macro_wterm_eq indices expansion))
-              | _ -> None 
-            end with _ -> Format.printf "PAF %s@." m_str;None
+              | _ -> None (* input/frame, see earlier TODO *)
+              end with _ -> None
+              (* TODO: do not do an exception catch-all *)
             in
-            Format.printf "Macro %s option %a@." m_str (Format.pp_print_option Why3.Pretty.print_term) ax_option;
             match ax_option with
             | None -> ()
             | Some ax ->
@@ -1117,16 +1140,18 @@ let add_macro_axioms context =
     !(context.uc) (!macro_axioms)
 
 let add_name_axioms context = 
-  let name_inj_axioms = Symbols.Name.fold (fun n1 def1 _ acc1 ->
-    Symbols.Name.fold (fun n2 def2 _ acc2 ->
+  let name_inj_axioms =
+    Symbols.Name.fold (fun n1 _ acc1 ->
+      let def1 = Symbols.get_name_data n1 context.table in
+      Symbols.Name.fold (fun n2 _ acc2 ->
+        let def2 = Symbols.get_name_data n2 context.table in
         if (
           (def1.n_fty.fty_out = def2.n_fty.fty_out) && 
           (Symbols.TyInfo.check_bty_info context.table def1.n_fty.fty_out Large)
         ) then begin 
         let ar1,ar2 = calc_arity def1.n_fty.fty_args,
           calc_arity def2.n_fty.fty_args 
-        in
-        if n1 > n2 then acc2 else (* to avoid redundancy *)
+        in if n1 > n2 then acc2 else (* to avoid redundancy *)
         let l1,l2 = 
           vsymbol_list context "i" (List.init ar1 (fun _ -> context.index_ty)), 
           vsymbol_list context "j" (List.init ar2 (fun _ -> context.index_ty)) 
@@ -1246,7 +1271,6 @@ let is_valid
     end;
     let res  = run_all_async ~slow ~prover table task  in 
     Format.printf "Task is %a@." Why3.Pretty.print_task task;
-    Format.printf "Res is %b@." res;
     res
     
     
@@ -1270,7 +1294,6 @@ let sequent_is_valid ~timestamp_style ~slow ~pure ~prover (s:TraceSequent.t) =
       (LowTraceSequent.Hyps.to_list s)
   in
   let conclusion = LowTraceSequent.conclusion s in
-  Format.printf "%a@." TraceSequent.pp s;
   try is_valid ~timestamp_style ~slow ~pure ~prover
     table system evars hypotheses conclusion
   with 

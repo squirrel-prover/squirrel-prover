@@ -132,7 +132,7 @@ type data =
     | Def  of Vars.var list * action
     (** A defined action, with an associated shape.
         Actions in sequent must always be defined. *)
-
+  
 (** Action data in the symbol table *)
 type Symbols.data += ActionData of data
 
@@ -192,29 +192,27 @@ let fresh_symbol
   if is_decl_lsymb name table then
     (* symbol is declared but not yet defined *)
     table, Symbols.Action.of_lsymb name table 
-  else if exact 
-  then Symbols.Action.reserve_exact table name
-  else Symbols.Action.reserve       table name
+  else Symbols.Action.reserve ~approx:(not exact) table name
 
 (*------------------------------------------------------------------*)
 let declare_symbol table (symb : Symbols.action) arity : Symbols.table =
   let data = ActionData (Decl arity) in
-  Symbols.Action.define table symb ~data arity
+  Symbols.(Action.define table symb ~data)
 
 let define_symbol table (symb : Symbols.action) args action : Symbols.table =
   let data = ActionData (Def (args,action)) in
   if not (Symbols.Action.is_reserved symb table) && is_decl symb table then
     (* [symb] was declared but not yet defined, define it *)
-    Symbols.Action.redefine table symb ~data (List.length args)
+    Symbols.Action.redefine table symb ~data 
   else 
     (* [symb] was reserved, define it *)
-    Symbols.Action.define   table symb ~data (List.length args)
+    Symbols.Action.define   table symb ~data 
 
 (*------------------------------------------------------------------*)
 (** Iters over defined action (ignored declared actions). *)
 let iter_def_table f table =
   Symbols.Action.iter
-    (fun s _ -> function
+    (fun s -> function
        | ActionData (Def (args,action)) -> f s args action
        | ActionData (Decl _) -> ()
        | _ -> assert false)

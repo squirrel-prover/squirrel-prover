@@ -100,16 +100,18 @@ type mess_occ = Term.term occ
 
 type mess_occs = mess_occ list
 
-type fsymb_matcher = Type of Symbols.function_def | Symbol of Symbols.fname
+type fsymb_matcher =
+  | Type of Symbols.OpData.abstract_def
+  | Symbol of Symbols.fname
 
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...).
     Does not recurse below terms whose head is excluded by [excludesymtype]. 
     Incomplete. *)
 val get_ftypes :
-  ?excludesymtype:Symbols.function_def ->
+  ?excludesymtype:Symbols.OpData.abstract_def ->
   Symbols.table -> 
-  Symbols.function_def -> 
+  Symbols.OpData.abstract_def -> 
   Term.term -> 
   mess_occs
 
@@ -117,7 +119,7 @@ val get_ftypes :
     Does not recurse below terms whose head is excluded by [excludesymtype]. 
     Incomplete. *)
 val get_fsymb :
-  ?excludesymtype:Symbols.function_def ->
+  ?excludesymtype:Symbols.OpData.abstract_def ->
   ?allow_diff:bool -> 
   Symbols.table -> 
   Symbols.fname -> 

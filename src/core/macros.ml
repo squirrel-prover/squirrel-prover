@@ -7,30 +7,30 @@ let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
-
+ 
 let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
-  match Symbols.Macro.get_def ms table with
-    | Symbols.Global (_, ty) -> ty
+  match Symbols.get_macro_data ms table with
+    | Symbols.Global (_, ty, _) -> ty
 
     | Input | Output | Frame -> Type.tmessage
 
     | Cond | Exec -> Type.tboolean
 
-    | Symbols.State (_,ty) -> ty
+    | Symbols.State (_,ty,_) -> ty
 
 let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
-  match Symbols.Macro.get_def ms table with
-    | Symbols.Global (arity, _) ->
+  match Symbols.get_macro_data ms table with
+    | Symbols.Global (arity, _, _) ->
       List.init arity (fun _ -> Type.tindex)
 
     | Input | Output | Frame | Cond | Exec -> []
 
-    | Symbols.State (arity,_) ->
+    | Symbols.State (arity,_,_) ->
       List.init arity (fun _ -> Type.tindex)
 
 let is_global table (ms : Symbols.macro) : bool =
-  match Symbols.Macro.get_def ms table with
-  | Symbols.Global (_, _) -> true
+  match Symbols.get_macro_data ms table with
+  | Symbols.Global (_, _, _) -> true
   | _ -> false
 
 (*------------------------------------------------------------------*)
@@ -50,7 +50,7 @@ type global_data = {
   indices : Vars.var list;
   (** Free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro. *)
-  (* TODO: ast_gen : clarify documentation *)
+  (* FIXME: clarify documentation *)
 
   ts : Vars.var;
   (** Free timestamp variable of the macro, which can only be instantiated
@@ -64,12 +64,12 @@ type global_data = {
 }
 
 (*------------------------------------------------------------------*)
-type Symbols.data += Global_data of global_data
+type Symbols.global_macro_def += Global_data of global_data
 
-let as_macro : Symbols.data -> global_data = function
-  | Global_data s -> s
-  | _ -> assert false
+let data_of_global_data (d : global_data) : Symbols.data =
+  Symbols.Macro (Global (List.length d.indices, d.ty, Global_data d))
 
+(*------------------------------------------------------------------*)
 let pp fmt (g : global_data) : unit =
   let pp_strict fmt = function
     | `Strict -> Fmt.pf fmt "Strict"
@@ -88,6 +88,15 @@ let pp fmt (g : global_data) : unit =
     (Fmt.list ~sep:Fmt.cut
        (Fmt.parens (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)))
     g.bodies
+
+(*------------------------------------------------------------------*)
+let get_global_data : Symbols.global_macro_def -> global_data = function
+  | Global_data g -> g
+  | _ -> assert false
+    
+let as_global_macro : Symbols.data -> global_data = function
+  | Symbols.Macro (Global (_, _, g)) -> get_global_data g
+  | _ -> assert false
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
@@ -118,13 +127,11 @@ let declare_global
          Term.project1 projection body)
       (System.projections table system)
   in
-  let data =
-    Global_data
-      {action = (suffix, action);
-       inputs; indices; ts; bodies; ty}
-  in
-  let def = Symbols.Global (List.length indices, ty) in
-  Symbols.Macro.declare table macro ~data def
+  let glob_data =
+    {action = (suffix, action); inputs; indices; ts; bodies; ty}
+  in  
+  let data = data_of_global_data glob_data in
+  Symbols.Macro.declare ~approx:true table macro ~data 
 
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
@@ -142,27 +149,26 @@ let is_prefix strict a b =
 (** Check is not done modulo equality.
     Not exported. *)
 let is_defined (name : Symbols.macro) (a : Term.term) table =
-  match Symbols.Macro.get_all name table with
-    | Symbols.(Input | Output | Cond | State _), _ ->
-      (* We can expand the definitions of input@A, output@A, cond@A and
-         state@A when A is an action name. We cannot do so for a variable
-         or a predecessor. *)
-      is_action a
+  match Symbols.get_macro_data name table with
+  | Input | Output | Cond | State _ ->
+    (* We can expand the definitions of input@A, output@A, cond@A and
+       state@A when A is an action name. We cannot do so for a variable
+       or a predecessor. *)
+    is_action a
 
-    | Symbols.(Exec | Frame), _ ->
-      is_action a
+  | Exec | Frame -> is_action a
 
-    | Symbols.Global _, Global_data {action = (strict,a0) } ->
-      (* We can only expand a global macro when [a0] is a prefix of [a],
-       * because a global macro m(...)@A refer to inputs of A and
-       * its sequential predecessors. *)
-      if not (is_action a) then false
-      else
-        let asymb = get_action_symb a in
-        let _, action = Action.get_def asymb table in
-        is_prefix strict a0 (Action.get_shape action)
+  | Global (_, _, Global_data {action = (strict,a0) }) ->
+    (* We can only expand a global macro when [a0] is a prefix of [a],
+     * because a global macro m(...)@A refer to inputs of A and
+     * its sequential predecessors. *)
+    if not (is_action a) then false
+    else
+      let asymb = get_action_symb a in
+      let _, action = Action.get_def asymb table in
+      is_prefix strict a0 (Action.get_shape action)
 
-    | Symbols.Global _, _ -> assert false
+  | Global _ -> assert false    (* impossible *)
 
 (*------------------------------------------------------------------*)
 (** Give the **internal** definition of a global macro. 
@@ -176,11 +182,7 @@ let get_def_glob_internal
   =
   assert (is_global table symb.s_symb);
 
-  let data = 
-    match Symbols.Macro.get_data symb.s_symb table with
-    | Global_data data -> data 
-    | _ -> assert false 
-  in
+  let data = as_global_macro (Symbols.Macro.get_data symb.s_symb table) in
   let body = get_body table system data in
   let prefix_inputs = List.take (List.length data.inputs) inputs in
   let subst =
@@ -268,26 +270,26 @@ let get_definition_nocntxt
   let unapplied_descr, descr_subst =
     SE.descr_of_action table system action
   in
-  match Symbols.Macro.get_all symb.s_symb table with
-  | Symbols.Input, _ ->
+  match Symbols.get_macro_data symb.s_symb table with
+  | Input ->
     init_or_generic Term.empty
       (fun a ->
          Term.mk_fun table Symbols.fs_att 
            [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
-  | Symbols.Output, _ ->
+  | Output ->
     `Def (Term.subst descr_subst (snd unapplied_descr.output))
 
-  | Symbols.Cond, _ ->
+  | Cond ->
     `Def (Term.subst descr_subst (snd unapplied_descr.condition))
 
-  | Symbols.Exec, _ ->
+  | Exec ->
     init_or_generic Term.mk_true (fun a ->
         Term.mk_and
           (Term.mk_macro symb [] (Term.mk_pred a))
           (Term.mk_macro Term.cond_macro [] a))
 
-  | Symbols.Frame, _ ->
+  | Frame ->
     init_or_generic Term.mk_zero (fun a ->
         Term.mk_pair
           (Term.mk_macro symb [] (Term.mk_pred a))
@@ -298,7 +300,7 @@ let get_definition_nocntxt
                 (Term.mk_macro Term.out_macro [] a)
                 Term.mk_zero)))
 
-  | Symbols.State _, _ ->
+  | State _ ->
     `Def begin
       try
         (* Look for an update of the state macro [name] in the updates
@@ -346,14 +348,12 @@ let get_definition_nocntxt
         Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))
     end
 
-  | Symbols.Global _,
-    Global_data ({action = (strict, glob_a)} as global_data ) ->
+  | Global (_,_,gdata) ->
+    let {action = (strict, glob_a)} as gdata = get_global_data gdata in
     if is_prefix strict glob_a (Action.get_shape action)
     then `Def (get_def_glob ~allow_dummy:false system table
-                 symb ~args ~ts:(Term.mk_action asymb aidx) action global_data)
+                 symb ~args ~ts:(Term.mk_action asymb aidx) action gdata)
     else `Undef
-
-  |  _ -> assert false
 
 (*------------------------------------------------------------------*)
 type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
@@ -434,28 +434,26 @@ let get_dummy_definition
     ~(args : Term.term list)
   : Term.term
   =
-  match Symbols.Macro.get_all symb.s_symb table with
-  | Symbols.Global _,
-    Global_data ({action = (strict,action)} as gdata) ->
-    (* [dummy_action] is a dummy strict suffix of [action]. *)
-    let dummy_action =
-      let prefix = Action.dummy action in
-      match strict with
-      | `Large -> prefix
-      | `Strict ->
-        let dummy_end  =
-          Action.{ par_choice = 0,[] ; sum_choice = 0,[] }
-        in
-        prefix @ [dummy_end]
-    in
+  let { action = strict,action; } as gdata =
+    as_global_macro (Symbols.Macro.get_data symb.s_symb table)
+  in
+  (* [dummy_action] is a dummy strict suffix of [action]. *)
+  let dummy_action =
+    let prefix = Action.dummy action in
+    match strict with
+    | `Large -> prefix
+    | `Strict ->
+      let dummy_end  =
+        Action.{ par_choice = 0,[] ; sum_choice = 0,[] }
+      in
+      prefix @ [dummy_end]
+  in
 
-    let tvar = Vars.make_fresh Type.Timestamp "dummy" in
-    let ts = Term.mk_var tvar in
+  let tvar = Vars.make_fresh Type.Timestamp "dummy" in
+  let ts = Term.mk_var tvar in
 
-    get_def_glob ~allow_dummy:true
-      system table symb ~args ~ts dummy_action gdata
-
-  | _ -> assert false
+  get_def_glob ~allow_dummy:true
+    system table symb ~args ~ts dummy_action gdata
 
 (*------------------------------------------------------------------*)
 type system_map_arg =
@@ -472,7 +470,6 @@ type system_map_arg =
 let update_global_data
     (table      : Symbols.table)
     (ms         : Symbols.macro)
-    (dec_def    : Symbols.macro_def)
     (old_system : System.Single.t)
     (new_system : System.Single.t)
     (func       : 
@@ -482,38 +479,40 @@ let update_global_data
         Term.term))
   : Symbols.table
   =
-  match Symbols.Macro.get_data ms table with
-  | Global_data data when List.mem_assoc old_system data.bodies ->
-    assert (not (List.mem_assoc new_system data.bodies));
-    let body = 
-      (* old body *)
-      let body = get_single_body table old_system data in
-      (* find all actions in the old system that have a shape where
-         the macro is defined *)
-      let actions_map = System.descrs table old_system.system in
-      let strict, prefix_shape = data.action in
-      let possible_actions = 
-        S.Msh.fold
-          (fun shape act acs->
-            let right_shape = is_prefix strict prefix_shape shape in
-            if right_shape then act::acs else acs)
-        actions_map
-        []
-      in
-      let aglob = AGlobal { 
-          is = data.indices; 
-          ts = data.ts; 
-          ac_descrs = possible_actions;
-          inputs = data.inputs ;
-        } in
-      func aglob ms body 
-    in
-    let data =
-      Global_data { data with
-                    bodies = (new_system, body) :: data.bodies }
-    in
-    Symbols.Macro.redefine table ~data ms dec_def
+  if not (is_global table ms) then table
+  else
+    let data = Symbols.Macro.get_data ms table in
+    let gdata = as_global_macro data in
+    if not (List.mem_assoc old_system gdata.bodies) then table
+    else
+      begin
+        assert (not (List.mem_assoc new_system gdata.bodies));
+        let body = 
+          (* old body *)
+          let body = get_single_body table old_system gdata in
+          (* find all actions in the old system that have a shape where
+             the macro is defined *)
+          let actions_map = System.descrs table old_system.system in
+          let strict, prefix_shape = gdata.action in
+          let possible_actions = 
+            S.Msh.fold
+              (fun shape act acs->
+                 let right_shape = is_prefix strict prefix_shape shape in
+                 if right_shape then act::acs else acs)
+              actions_map
+              []
+          in
+          let aglob = AGlobal { 
+              is = gdata.indices; 
+              ts = gdata.ts; 
+              ac_descrs = possible_actions;
+              inputs = gdata.inputs ;
+            } in
+          func aglob ms body 
+        in
+        let data =
+          data_of_global_data { gdata with bodies = (new_system, body) :: gdata.bodies }
+        in
+        Symbols.Macro.redefine table ~data ms 
+      end
 
-  | _ -> table
-
-  

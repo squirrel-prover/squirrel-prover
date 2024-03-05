@@ -1,38 +1,38 @@
 (** Actions are the basis of our internal semantics for protocols.
-  * In the theory, an action is an indexed symbol with a semantics
-  * (given through conditional, update and output terms) and
-  * actions are equipped with a sequential dependency relation
-  * (and perhaps a conflict relation). Things are a bit different
-  * in the implementation:
-  *  - Type [action] below refers to execution points, which yield
-  *    dependency and conflict relations. Execution points are one
-  *    possible implementation of our abstract notion of action,
-  *    that is convenient for our translation from the applied
-  *    pi-calculus.
-  *  - We associate to each such action an "action description"
-  *    (type [descr]) which carries the semantics of the action.
-  *  - Finally, we have action symbols (type [Symbols.action]).
-  *
-  * Our prover allows to declare and reason about several systems.
-  * Actions and symbols exist independently of a system, but descriptions
-  * are given relative to a (bi)system. *)
+    In the theory, an action is an indexed symbol with a semantics
+    (given through conditional, update and output terms) and
+    actions are equipped with a sequential dependency relation
+    (and perhaps a conflict relation). Things are a bit different
+    in the implementation:
+     - Type [action] below refers to execution points, which yield
+       dependency and conflict relations. Execution points are one
+       possible implementation of our abstract notion of action,
+       that is convenient for our translation from the applied
+       pi-calculus.
+     - We associate to each such action an "action description"
+       (type [descr]) which carries the semantics of the action.
+     - Finally, we have action symbols (type [Symbols.action]).
+   
+    Our prover allows to declare and reason about several systems.
+    Actions and symbols exist independently of a system, but descriptions
+    are given relative to a (bi)system. *)
 
 (** {2 Execution points}
-  *
-  * Actions uniquely describe execution points in a protocol.
-  * They consist of a list of items describing a position
-  * among a (possibly infinite) parallel composition, followed
-  * by a choice in a (possibly infinite) branching conditional.
-  *
-  * In the process (A | !_i B(i) | C), actions of A have parallel
-  * choice 0, actions of C have parallel choice 2, and those of B
-  * have parallel choice (1,i) which will later be instantiated to
-  * (1,i_1), (1,i_2), etc.
-  *
-  * Then, in a process (if cond then P else Q), the branching position 0
-  * will denote a success of the conditional, while 1 will denote a failure.
-  * Finally, in (find i such that ... in ..) the indexed position (0,i)
-  * will correspond to the success branches. *)
+   
+    Actions uniquely describe execution points in a protocol.
+    They consist of a list of items describing a position
+    among a (possibly infinite) parallel composition, followed
+    by a choice in a (possibly infinite) branching conditional.
+   
+    In the process (A | !_i B(i) | C), actions of A have parallel
+    choice 0, actions of C have parallel choice 2, and those of B
+    have parallel choice (1,i) which will later be instantiated to
+    (1,i_1), (1,i_2), etc.
+   
+    Then, in a process (if cond then P else Q), the branching position 0
+    will denote a success of the conditional, while 1 will denote a failure.
+    Finally, in (find i such that ... in ..) the indexed position (0,i)
+    will correspond to the success branches. *)
 
 type 'a item = {
   par_choice : int * 'a ;
@@ -105,13 +105,14 @@ val dummy : shape -> action
 
 (*------------------------------------------------------------------*)
 (** {2 Action symbols}
-  *
-  * Action symbols are used to refer to actions in a concise manner.
-  * They are indexed and are associated to an action using the argument
-  * indices. *)
+  
+    Action symbols are used to refer to actions in a concise manner.
+    They are indexed and are associated to an action using the argument
+    indices. *)
 
 (*------------------------------------------------------------------*)
 (** Data associated to an action symbol *)
+
 type data = 
     | Decl of int
     (** A declared but undefined action with its arity: no shape available yet.
@@ -120,6 +121,9 @@ type data =
     | Def  of Vars.var list * action
     (** A defined action, with an associated shape.
         Actions in sequent must always be defined. *)
+  
+(** Action data in the symbol table *)
+type Symbols.data += ActionData of data
 
 (*------------------------------------------------------------------*)
 (** Get a fresh symbol whose name starts with the given prefix.
@@ -132,7 +136,7 @@ val fresh_symbol :
     associated to it yet. *)
 val declare_symbol : Symbols.table ->  Symbols.action -> int -> Symbols.table
 
-(** defined an action symbol, that is either Reserved or declared in
+(** defined an action symbol, that is either reserved or declared in
     the symbol table. *)
 val define_symbol :
   Symbols.table ->

@@ -35,9 +35,8 @@ type Symbols.data += System_data of data
 let declare_empty table system_name projections =
   assert (List.length (List.sort_uniq Stdlib.compare projections) =
           List.length projections);
-  let def = () in
   let data = System_data {projections;actions=Msh.empty} in
-  Symbols.System.declare_exact table system_name ~data def
+  Symbols.System.declare ~approx:false table system_name ~data 
 
 let get_data table (s_symb : Symbols.system) =
   match Symbols.System.get_data s_symb table with
@@ -79,7 +78,7 @@ let pp_system table fmt s =
     (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
 
 let pp_systems fmt table =
-  Symbols.System.iter (fun sys _ _ -> pp_system table fmt sys) table
+  Symbols.System.iter (fun sys _ -> pp_system table fmt sys) table
 
 (*------------------------------------------------------------------*)
 let add_action table system descr =
@@ -91,7 +90,7 @@ let add_action table system descr =
   assert (not (Msh.mem shape actions));
   let actions = Msh.add shape descr actions in
   let data = System_data { data with actions } in
-  Symbols.System.redefine table system ~data ()
+  Symbols.System.redefine table system ~data 
 
 (*------------------------------------------------------------------*)
 let descr_of_shape table system shape =
@@ -107,7 +106,7 @@ let descr_of_shape table system shape =
 let find_shape table shape =
   let exception Found of Symbols.action * Vars.var list in
   try
-    Symbols.System.iter (fun _system () data ->
+    Symbols.System.iter (fun _system data ->
       let descrs = match data with
         | System_data {actions} -> actions
         | _ -> assert false

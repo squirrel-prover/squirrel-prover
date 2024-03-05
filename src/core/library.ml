@@ -2,7 +2,7 @@ module L = Location
 
 (*------------------------------------------------------------------*)
 let get_fsymb table (s : string) : Symbols.fname =
-  try Symbols.Function.of_lsymb (L.mk_loc L._dummy s) table with
+  try Symbols.Operator.of_lsymb (L.mk_loc L._dummy s) table with
   | Symbols.Error _ -> assert false
 
 module Basic = struct

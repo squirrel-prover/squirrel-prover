@@ -1570,9 +1570,9 @@ let enckp arg (s : ES.t) =
     (* Verify that key is well-formed, depending on whether the encryption is
      * symmetric or not. Return the secret key and appropriate SSC. *)
     let ssc, wrap_pk, sk =
-      if Symbols.is_ftype fnenc Symbols.SEnc table then
-        match Symbols.Function.get_data fnenc table with
-        | Symbols.AssociatedFunctions [fndec] ->
+      if Symbols.OpData.(is_abstract_with_ftype fnenc SEnc table) then
+        match Symbols.OpData.get_abstract_data fnenc table with
+        | _, [fndec] ->
           (fun (sk,proj,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let env =
@@ -1591,8 +1591,8 @@ let enckp arg (s : ES.t) =
         | _ -> assert false
 
       else
-        match Symbols.Function.get_data fnenc table with
-        | Symbols.AssociatedFunctions [fndec;fnpk] ->
+        match Symbols.OpData.get_abstract_data fnenc table with
+        | _, [fndec;fnpk] ->
           (fun (sk,proj,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let errors =
@@ -1698,8 +1698,9 @@ let enckp arg (s : ES.t) =
                          r is a name"))
   | None ->
     let encs =
-      Iter.get_ftypes ~excludesymtype:Symbols.ADec table Symbols.AEnc e @
-      Iter.get_ftypes ~excludesymtype:Symbols.SDec table Symbols.SEnc e
+      let open Symbols.OpData in
+      Iter.get_ftypes ~excludesymtype:ADec table AEnc e @
+      Iter.get_ftypes ~excludesymtype:SDec table SEnc e
     in
     (* Run [apply] on first item in [encs] that is well-formed
      * and has a diff in its key.
@@ -1896,10 +1897,10 @@ let xor arg (s : ES.t) =
       ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term)
   in
   let n_fty = Type.mk_ftype [] [] Message in
-  let ndef = Symbols.{ n_fty } in
-  let sym = (L.mk_loc L._dummy "n_XOR") in
+  let sym = L.mk_loc L._dummy "n_XOR" in
   let table,n =
-    Symbols.Name.declare (ES.table s) sym ndef
+    let data = Symbols.Name { n_fty } in
+    Symbols.Name.declare ~approx:true (ES.table s) sym ~data
   in
   let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
   let table = 
@@ -1936,7 +1937,7 @@ class ddh_context
  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms args a =
-    match Symbols.Macro.get_def ms.s_symb cntxt.table with
+    match Symbols.get_macro_data ms.s_symb cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | _ -> super#visit_macro ms args a
 
@@ -1978,7 +1979,7 @@ class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms args a =
-    match Symbols.Macro.get_def ms.s_symb cntxt.table with
+    match Symbols.get_macro_data ms.s_symb cntxt.table with
     | Symbols.(Input | Output | State _ | Cond | Exec | Frame) ->
       raise Macro_found
     | _ -> self#visit_macro ms args a
@@ -2022,22 +2023,25 @@ let is_ddh_context
 
 (*------------------------------------------------------------------*)
 let is_ddh_gen tbl gen =
-  match Symbols.Function.get_def gen tbl with
-  | _, Symbols.DHgen l -> List.mem Symbols.DH_DDH l
-  | _ -> false
+  if Symbols.OpData.is_abstract gen tbl then
+    match Symbols.OpData.get_abstract_data gen tbl with
+    | Symbols.OpData.DHgen l, _ -> List.mem Symbols.OpData.DH_DDH l
+    | _ -> false
+  else false
 
 (*------------------------------------------------------------------*)
 let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
   let tbl = ES.table s in
-  let gen_symb = Symbols.Function.of_lsymb lgen tbl in
+  let gen_symb = Symbols.Operator.of_lsymb lgen tbl in
 
   if not (is_ddh_gen tbl gen_symb) then
     soft_failure ~loc:(L.loc lgen)
       (Failure "no DDH assumption on this generator");
 
-  let exp_symb = match Symbols.Function.get_data gen_symb tbl with
-    | Symbols.AssociatedFunctions [exp       ] -> exp
-    | Symbols.AssociatedFunctions [exp; _mult] -> exp
+  let exp_symb =
+    match Symbols.OpData.get_abstract_data gen_symb tbl with
+    | _, [exp       ] -> exp
+    | _, [exp; _mult] -> exp
     | _ -> assert false
   in
 

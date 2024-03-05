@@ -115,9 +115,7 @@ let rec no_binders_above (n:Name.t) (t:term) : bool =
 
 (** Returns true iff f is declared as a hash function *)
 let is_hash (table:Symbols.table) (f:Symbols.fname) =
-  Symbols.(is_ftype f Hash table)
-
-
+  Symbols.OpData.(is_abstract_with_ftype f Hash table)
 
 (*------------------------------------------------------------------*)
 (** Look for occurrences using the Occurrences module *)
@@ -316,10 +314,10 @@ let prf_param_pattern
 
   (* generate a new name n_PRF to replace the hash with *)
   let n_fty = Type.mk_ftype [] [] hty in
-  let nprfdef = Symbols.{n_fty} in
-  let sn_prf = (L.mk_loc L._dummy "n_PRF") in
+  let nprfdef = Symbols.Name {n_fty} in
+  let sn_prf = L.mk_loc L._dummy "n_PRF" in
   let table, nprfs =
-    Symbols.Name.declare table sn_prf nprfdef
+    Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
   in
   let real_name = L.mk_loc L._dummy (Symbols.to_string nprfs) in
   let table = Process.add_namelength_axiom table real_name n_fty in

@@ -77,14 +77,14 @@ let add_lemma
   let lem = { stmt = gconcl; kind } in
   let data = Lemma lem in
   let table, _ =
-    Symbols.Lemma.declare_exact table (L.mk_loc loc gconcl.Goal.name) ~data ()
+    Symbols.Lemma.declare ~approx:false table (L.mk_loc loc gconcl.Goal.name) ~data 
   in
   Printer.pr "%a@;" pp lem;
   table
 
 (*------------------------------------------------------------------*)
 let print_all fmt table : unit =
-  Symbols.Lemma.iter (fun _ _ data ->
+  Symbols.Lemma.iter (fun _ data ->
       let g = as_lemma data in
       Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any.pp g.stmt.formula
     ) table

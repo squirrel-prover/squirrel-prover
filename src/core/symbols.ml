@@ -10,48 +10,43 @@ type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
 
 (*------------------------------------------------------------------*)
-type namespace =
-  | NChannel
-  | NConfig
-  | NOracle
-  | NName
-  | NAction
-  | NFunction
-  | NMacro
-  | NSystem
-  | NProcess
-  | NBType      (** type declarations *)
-  | NGame
-  | NHintDB
-  | NLemma
-  | NPredicate
-  | NTheory
+type symbol_kind =
+  | Channel
+  | Config
+  | Oracle
+  | Name
+  | Action
+  | Operator   (** abtract and concrete operators *)
+  | Macro
+  | System
+  | Process
+  | BType      (** type declarations *)
+  | Game
+  | HintDB
+  | Lemma
+  | Predicate
+  | Theory
 
-let pp_namespace fmt = function
-  | NChannel   -> Fmt.pf fmt "channel"
-  | NConfig    -> Fmt.pf fmt "config"
-  | NOracle    -> Fmt.pf fmt "oracle"
-  | NName      -> Fmt.pf fmt "name"
-  | NAction    -> Fmt.pf fmt "action"
-  | NFunction  -> Fmt.pf fmt "function"
-  | NMacro     -> Fmt.pf fmt "macro"
-  | NSystem    -> Fmt.pf fmt "system"
-  | NProcess   -> Fmt.pf fmt "process"
-  | NBType     -> Fmt.pf fmt "type"
-  | NGame      -> Fmt.pf fmt "type"
-  | NHintDB    -> Fmt.pf fmt "hint database"
-  | NLemma     -> Fmt.pf fmt "lemma"
-  | NPredicate -> Fmt.pf fmt "predicate"
-  | NTheory    -> Fmt.pf fmt "theory"
+let pp_symbol_kind fmt = function
+  | Channel   -> Fmt.pf fmt "channel"
+  | Config    -> Fmt.pf fmt "config"
+  | Oracle    -> Fmt.pf fmt "oracle"
+  | Name      -> Fmt.pf fmt "name"
+  | Action    -> Fmt.pf fmt "action"
+  | Operator  -> Fmt.pf fmt "operator"
+  | Macro     -> Fmt.pf fmt "macro"
+  | System    -> Fmt.pf fmt "system"
+  | Process   -> Fmt.pf fmt "process"
+  | BType     -> Fmt.pf fmt "type"
+  | Game      -> Fmt.pf fmt "type"
+  | HintDB    -> Fmt.pf fmt "hint database"
+  | Lemma     -> Fmt.pf fmt "lemma"
+  | Predicate -> Fmt.pf fmt "predicate"
+  | Theory    -> Fmt.pf fmt "theory"
 
 (*------------------------------------------------------------------*)
-(** Type of symbols.
-    The group should be understood as a namespace,
-    though it does not correspond to the (poorly named) namespace type
-    below. *)
 type symb = { group: string; name: string }
 
-(** Symbols of type ['a t] are symbols of namespace ['a]. *)
 type 'a t = symb
 
 type group = string
@@ -60,67 +55,35 @@ let default_group = "default"
 let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
 
 (*------------------------------------------------------------------*)
-(** Different variants on the Diffie-Hellman crypto assumption      *)
-                          
-type dh_hyp =
-  | DH_DDH
-  | DH_CDH
-  | DH_GDH
+(** The status of a symbol. *)
+type status =
+  | Defined  of symbol_kind
+  | Reserved of symbol_kind
 
-(*------------------------------------------------------------------*)
-type function_def =
-  | Hash
-  | DHgen of dh_hyp list
-  | AEnc
-  | ADec
-  | SEnc
-  | SDec
-  | Sign
-  | CheckSign
-  | PublicKey
-  | Abstract of symb_type
-  | Operator                    (* definition in associated data *)
-
-(*------------------------------------------------------------------*)
-let pp_function_def fmt = function
-  | Hash                  -> Fmt.pf fmt "Hash"
-  | DHgen _               -> Fmt.pf fmt "DHgen"
-  | AEnc                  -> Fmt.pf fmt "AEnc"
-  | ADec                  -> Fmt.pf fmt "ADec"
-  | SEnc                  -> Fmt.pf fmt "SEnc"
-  | SDec                  -> Fmt.pf fmt "SDec"
-  | Sign                  -> Fmt.pf fmt "Sign"
-  | CheckSign             -> Fmt.pf fmt "CheckSig"
-  | PublicKey             -> Fmt.pf fmt "PublicKey"
-  | Abstract _            -> Fmt.pf fmt "Abstract"
-  | Operator              -> Fmt.pf fmt "Operator"
-
-(*------------------------------------------------------------------*)
-type macro_def =
-  | Input | Output | Cond | Exec | Frame
-  | State  of int * Type.ty
-  | Global of int * Type.ty
+(** Extensible data type *)
+type data = ..
+type data += Empty
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 
 type error_i =
   | Unbound_identifier    of string
-  | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string * namespace * group
+  | Incorrect_kind        of symbol_kind * symbol_kind (* expected, got *)
+  | Multiple_declarations of string * symbol_kind * group
   | Failure of string
 
 type error = L.t * error_i
 
 let pp_error_i fmt = function
   | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
-  | Incorrect_namespace (n1, n2) ->
+  | Incorrect_kind (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"
-      pp_namespace n1 pp_namespace n2
+      pp_symbol_kind n1 pp_symbol_kind n2
 
   | Multiple_declarations (s, n, g) ->
     Fmt.pf fmt "%a symbol %s already declared (%s group)"
-      pp_namespace n s g
+      pp_symbol_kind n s g
 
   | Failure s ->
     Fmt.pf fmt "%s" s
@@ -133,26 +96,6 @@ let pp_error pp_loc_err fmt (loc,e) =
 exception Error of error
 
 let symb_err l e = raise (Error (l,e))
-
-(*------------------------------------------------------------------*)
-(** {2 Type information: Ocaml type declaration}  *)
-
-(** Type information associated to base types. 
-    Restrict the instantiation domain of a type. *)
-type bty_info =
-  | Large
-  | Name_fixed_length
-  | Finite
-  | Fixed
-  | Well_founded
-  | Enum
-
-type bty_infos = bty_info list
-
-(*------------------------------------------------------------------*)
-type name_def = {
-  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
-}
 
 (*------------------------------------------------------------------*)
 type _channel
@@ -173,7 +116,7 @@ type _theory
 
 type channel   = _channel   t
 type config    = _config    t
-type oracle    = _oracle  t
+type oracle    = _oracle    t
 type name      = _name      t
 type action    = _action    t
 type fname     = _fname     t
@@ -181,47 +124,11 @@ type macro     = _macro     t
 type system    = _system    t
 type process   = _process   t
 type btype     = _btype     t
-type game      = _game    t
+type game      = _game      t
 type hintdb    = _hintdb    t
 type lemma     = _lemma     t
 type predicate = _predicate t
-type theory    = _theory  t
-
-type [@warning "-37"] param_kind =
-  | PBool
-  | PString
-  | PInt
-
-type [@warning "-37"] oracle_kind =
-  | PTerm
-    
-(*------------------------------------------------------------------*)
-type _ def =
-  | Channel   : unit        -> _channel   def
-  | Config    : param_kind  -> _config    def
-  | Oracle    : oracle_kind -> _oracle    def
-  | Name      : name_def    -> _name      def
-  | Action    : int         -> _action    def
-  | Macro     : macro_def   -> _macro     def
-  | System    : unit        -> _system    def
-  | Process   : unit        -> _process   def
-  | BType     : bty_infos   -> _btype     def
-  | Game      : unit        -> _game      def
-  | HintDB    : unit        -> _hintdb    def
-  | Lemma     : unit        -> _lemma     def
-  | Theory    : unit        -> _theory    def
-  | Predicate : unit        -> _predicate def
-
-  | Function : (Type.ftype * function_def) -> _fname def
-
-type edef =
-  | Exists : 'a def -> edef
-  | Reserved of namespace
-
-type data = ..
-type data += Empty
-type data += AssociatedFunctions of (fname t) list
-
+type theory    = _theory    t
 
 (*------------------------------------------------------------------*)
 let to_string (s : symb) : string = s.name
@@ -232,7 +139,7 @@ module Msymb = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
 (*------------------------------------------------------------------*)
 module Table : sig
-  type table_c = (edef * data) Msymb.t
+  type table_c = (status * data) Msymb.t
 
   type table = private {
     cnt : table_c;
@@ -242,7 +149,7 @@ module Table : sig
   val mk : table_c -> table
   val tag : table -> int
 end = struct
-  type table_c = (edef * data) Msymb.t
+  type table_c = (status * data) Msymb.t
 
   type table = {
     cnt : table_c;
@@ -258,13 +165,13 @@ end = struct
 end
 
 include Table
-
+    
 (*------------------------------------------------------------------*)
+(** Approximated string creation *)
+    
 let empty_table : table = mk Msymb.empty
 
 let prefix_count_regexp = Str.regexp {|\([^0-9]*\)\([0-9]*\)|}
-
-let table_add table name d = Msymb.add name d table
 
 let fresh ?(group=default_group) name table =
   let _ = Str.search_forward prefix_count_regexp name 0 in
@@ -274,39 +181,22 @@ let fresh ?(group=default_group) name table =
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
     let symb = {group;name=s} in
-    if Msymb.mem symb table then find (i+1) else symb
+    if Msymb.mem symb table.cnt then find (i+1) else symb
   in
   find i0
 
 (*------------------------------------------------------------------*)
-let edef_namespace : edef -> namespace = fun e ->
+let kind_of_status : status -> symbol_kind = fun e ->
   match e with
-  | Exists (Channel   _) -> NChannel
-  | Exists (Config    _) -> NConfig
-  | Exists (Oracle    _) -> NOracle
-  | Exists (Name      _) -> NName
-  | Exists (Action    _) -> NAction
-  | Exists (Function  _) -> NFunction
-  | Exists (Macro     _) -> NMacro
-  | Exists (System    _) -> NSystem
-  | Exists (Process   _) -> NProcess
-  | Exists (BType     _) -> NBType
-  | Exists (Game      _) -> NGame
-  | Exists (HintDB    _) -> NHintDB
-  | Exists (Lemma     _) -> NLemma
-  | Exists (Predicate _) -> NPredicate
-  | Exists (Theory    _) -> NTheory
-  | Reserved n          -> n
+  | Defined  n -> n
+  | Reserved n -> n
 
-let get_namespace ?(group=default_group) (table : table) s =
+let kind_of_string ?(group=default_group) (table : table) (s : string) =
   let s = { group; name=s } in
-  let f (x,_) = edef_namespace x in
+  let f (x,_) = kind_of_status x in
   omap f (Msymb.find_opt s table.cnt)
 
-(*------------------------------------------------------------------*)
-(** {2 Namespaces} *)
-
-let def_of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
+let status_of_lsymb ?(group=default_group) (s : lsymb) (table : table) : status =
   let t = { group; name = L.unloc s } in
   try fst (Msymb.find t table.cnt) with Not_found ->
     symb_err (L.loc s) (Unbound_identifier (L.unloc s))
@@ -314,40 +204,23 @@ let def_of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
 let is_defined ?(group=default_group) name (table : table) =
   Msymb.mem {group;name} table.cnt
 
-type wrapped = Wrapped : 'a t * 'a def -> wrapped
-
-let of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
-  let t = { group ; name = L.unloc s } in
-  match Msymb.find t table.cnt with
-  | Exists d, _ -> Wrapped (t,d)
-  | exception Not_found
-  | Reserved _, _ ->
-      symb_err (L.loc s) (Unbound_identifier (L.unloc s))
-
-let of_lsymb_opt ?(group=default_group) (s : lsymb) (table : table) =
-  let t = { group; name = L.unloc s } in
-  try match Msymb.find t table.cnt with
-    | Exists d, _ -> Some (Wrapped (t,d))
-    | Reserved _, _ -> None
-  with Not_found -> None
+(*------------------------------------------------------------------*)
+(** {2 Symbol kinds} *)
 
 (*------------------------------------------------------------------*)
-module type Namespace = sig
+module type SymbolKind = sig
   type ns
-  type def
 
   val remove : table -> ns t -> table
-    
-  val reserve       : table -> lsymb -> table * data t
-  val reserve_exact : table -> lsymb -> table * ns t
+
+  val reserve : approx:bool -> table -> lsymb -> table * ns t
 
   val release : table -> ns t -> table
 
-  val define   : table -> data t -> ?data:data -> def -> table
-  val redefine : table -> data t -> ?data:data -> def -> table
+  val define   : table -> ?data:data -> data t -> table
+  val redefine : table -> ?data:data -> data t -> table
 
-  val declare       : table -> lsymb -> ?data:data -> def -> table * ns t
-  val declare_exact : table -> lsymb -> ?data:data -> def -> table * ns t
+  val declare : approx:bool -> table -> ?data:data -> lsymb -> table * ns t
 
   val is_reserved : ns t -> table -> bool
 
@@ -359,464 +232,248 @@ module type Namespace = sig
 
   val cast_of_string : string -> ns t
 
-  val get_all       : ns t   -> table -> def * data
-  val get_def       : ns t   -> table -> def
-  val def_of_lsymb  : lsymb  -> table -> def
   val get_data      : ns t   -> table -> data
   val data_of_lsymb : lsymb  -> table -> data
 
-  val iter : (ns t -> def -> data -> unit) -> table -> unit
-  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
-  val map  : (ns t -> def -> data -> (def * data)) -> table -> table
+  val iter : (ns t -> data -> unit) -> table -> unit
+  val fold : (ns t -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val map  : (ns t -> data -> data) -> table -> table
 end
 
+(*------------------------------------------------------------------*)
+let kind_err ~loc:(l : L.t option) ~get:c ~expect:n =
+  let l = odflt L._dummy l in
+  symb_err l (Incorrect_kind (kind_of_status c, n))
+
+(*------------------------------------------------------------------*)
 module type S = sig
   type ns
-  type local_def
 
-  val namespace : namespace
+  val kind  : symbol_kind
   val group : string
-  val construct   : local_def -> ns def
-  val deconstruct : loc:(L.t option) -> edef -> local_def
 end
 
-module Make (N:S) : Namespace
-  with type ns = N.ns with type def = N.local_def = struct
-
+module Make (N:S) : SymbolKind with type ns = N.ns = struct
   type ns = N.ns
-  type def = N.local_def
-
   let group = N.group
 
+  
+  (*------------------------------------------------------------------*)
+  let make_name ~(approx : bool) (table : table) (name : lsymb) : symb =
+    let symb =
+      if approx then fresh ~group (L.unloc name) table
+      else { group; name = L.unloc name }
+    in
+    if not approx && Msymb.mem symb table.cnt then
+      symb_err (L.loc name)
+        (Multiple_declarations (L.unloc name, N.kind, group));
+    symb
+
+  let check_kind ~(loc : L.t option) kind : unit =
+    if kind <> Defined N.kind then kind_err ~loc ~get:kind ~expect:N.kind
+
+  (*------------------------------------------------------------------*)    
   let remove (table : table) (symb : ns t) : table =
     mk (Msymb.remove symb table.cnt)
-    
-  let reserve (table : table) (name : lsymb) =
-    let symb = fresh ~group (L.unloc name) table.cnt in
-    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
-    mk table_c, symb
 
-  let reserve_exact (table : table) (name : lsymb) =
-    let symb = { group; name = L.unloc name } in
-    if Msymb.mem symb table.cnt then
-      symb_err (L.loc name)
-        (Multiple_declarations (L.unloc name, N.namespace, group));
-
-    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
+  let reserve ~(approx : bool) (table : table) (name : lsymb) =
+    let symb = make_name ~approx table name in
+    let table_c = Msymb.add symb (Reserved N.kind,Empty) table.cnt in
     mk table_c, symb
 
   let release (table : table) (name : ns t) : table =
     assert (Msymb.mem name table.cnt);
     mk (Msymb.remove name table.cnt)
     
-  let define (table : table) symb ?(data=Empty) value =
-    assert (fst (Msymb.find symb table.cnt) = Reserved N.namespace) ;
-    let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
+  let define (table : table) ?(data=Empty) symb =
+    assert (fst (Msymb.find symb table.cnt) = Reserved N.kind) ;
+    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
     mk table_c
 
-  let redefine (table : table) symb ?(data=Empty) value =
+  let redefine (table : table) ?(data=Empty) symb =
     assert (Msymb.mem symb table.cnt) ;
-    let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
+    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
     mk table_c
 
-  let declare (table : table) (name : lsymb) ?(data=Empty) value =
-    let symb = fresh ~group (L.unloc name) table.cnt in
-    let table_c =
-      table_add table.cnt symb (Exists (N.construct value), data)
-    in
+  let declare ~(approx : bool) (table : table) ?(data=Empty) (name : lsymb) =
+    let symb = make_name ~approx table name in
+    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
     mk table_c, symb
-
-  let declare_exact (table : table) (name : lsymb) ?(data=Empty) value =
-    let symb = { group; name = L.unloc name } in
-    if Msymb.mem symb table.cnt then
-      symb_err (L.loc name)
-        (Multiple_declarations (L.unloc name, N.namespace, group));
     
-    let table_c =
-      table_add table.cnt symb (Exists (N.construct value), data)
-    in
-    mk table_c, symb
-
-  let get_all (name:ns t) (table : table) =
-    (* We know that [name] is bound in [table]. *)
-    let def,data = Msymb.find name table.cnt in
-    N.deconstruct ~loc:None def, data
-
-  let get_def name (table : table) = fst (get_all name table)
-  let get_data name (table : table) = snd (get_all name table)
+  let get_data (name:ns t) (table : table) =
+    let kind,data = Msymb.find name table.cnt in
+    check_kind ~loc:None kind;
+    data
 
   let cast_of_string name = {group;name}
 
   let is_reserved (name : ns t) (table : table) : bool =
     match Msymb.find name table.cnt with
-    | Reserved n, _ -> n = N.namespace
-    | Exists _, _ -> false
+    | Reserved n, _ -> n = N.kind
+    | Defined _, _ -> false
     | exception Not_found -> false
 
+  (*------------------------------------------------------------------*)
   let mem (name : string) (table : table) : bool =
-    (* let _ =Fmt.epr "Trying to find %s" name  *)
     try
-      ignore (N.deconstruct ~loc:None (fst (Msymb.find { group; name;} table.cnt))) ;
-      true
+      let kind, _ = Msymb.find { group; name;} table.cnt in
+      kind = Defined N.kind
     with
-    | Error (_,Incorrect_namespace _)
     | Not_found -> false
 
-  let mem_lsymb (name : lsymb) (table : table) : bool =
-    let symb = { group; name = L.unloc name } in
-    try
-      ignore (N.deconstruct
-                ~loc:(Some (L.loc name))
-                (fst (Msymb.find symb table.cnt))) ;
-      true
-    with
-    | Error (_,Incorrect_namespace _)
-    | Not_found -> false
+  let mem_lsymb (name : lsymb) (table : table) : bool = mem (L.unloc name) table
 
-  let of_lsymb (name : lsymb) (table : table) =
+  (*------------------------------------------------------------------*)
+  let all_of_lsymb (name : lsymb) (table : table) : ns t * data =
     let symb = { group; name = L.unloc name } in
     try
-      ignore (N.deconstruct
-                ~loc:(Some (L.loc name))
-                (fst (Msymb.find symb table.cnt))) ;
-      symb
+      let kind, data = Msymb.find symb table.cnt in
+      check_kind ~loc:(L.loc name |> some) kind;
+      symb, data
     with Not_found ->
       symb_err (L.loc name) (Unbound_identifier (L.unloc name))
+
+  let of_lsymb (name : lsymb) (table : table) : ns t =
+    fst (all_of_lsymb name table)
+
+  let data_of_lsymb (name : lsymb) (table : table) : data =
+    snd (all_of_lsymb name table)
 
   let of_lsymb_opt (name : lsymb) (table : table) =
-    let symb = { group; name = L.unloc name } in
-    try
-      ignore (N.deconstruct
-                ~loc:(Some (L.loc name))
-                (fst (Msymb.find symb table.cnt))) ;
-      Some symb
-    with Not_found -> None
+    try Some (of_lsymb name table) with
+    | Error (_, (Unbound_identifier _ | Incorrect_kind _)) -> None
 
-  let def_of_lsymb (name : lsymb) (table : table) =
-    try
-      N.deconstruct ~loc:(Some (L.loc name))
-        (fst (Msymb.find { group; name = L.unloc name } table.cnt))
-    with Not_found ->
-      symb_err (L.loc name) (Unbound_identifier (L.unloc name))
-
-  let data_of_lsymb (name : lsymb) (table : table) =
-    try
-      let def,data = Msymb.find { group; name = L.unloc name } table.cnt in
-        (* Check that we are in the current namespace
-         * before returning the associated data. *)
-        ignore (N.deconstruct ~loc:(Some (L.loc name)) def) ;
-        data
-    with Not_found ->
-      symb_err (L.loc name) (Unbound_identifier (L.unloc name))
-
+  (*------------------------------------------------------------------*)
   let iter f (table : table) =
     Msymb.iter
-      (fun s (def,data) ->
-         try f s (N.deconstruct ~loc:None def) data with
-           | Error (_,Incorrect_namespace _) -> ())
+      (fun s (kind,data) -> if kind = Defined N.kind then f s data else ())
       table.cnt
 
   let fold f acc (table : table) =
     Msymb.fold
-      (fun s (def,data) acc ->
-         try
-           let def = N.deconstruct ~loc:None def in
-           f s def data acc
-         with Error (_,Incorrect_namespace _) -> acc)
+      (fun s (kind,data) acc ->
+         if kind = Defined N.kind then f s data acc else acc)
       table.cnt acc
 
-  let map (f : ns t -> def -> data -> (def * data)) (table : table) : table =
+  let map (f : ns t -> data -> data) (table : table) : table =
     let table =
       Msymb.mapi
-        (fun s (def,data) ->
-           try
-             let def = N.deconstruct ~loc:None def in
-             let def, data = f s def data in
-             Exists (N.construct def), data
-           with Error (_,Incorrect_namespace _) -> (def,data)
-        ) table.cnt
+        (fun s (kind,data) ->
+           if kind = Defined N.kind then (kind, f s data) else (kind, data))
+        table.cnt
     in
     mk table
 end
 
-let namespace_err (l : L.t option) c n =
-  let l = match l with
-    | None   -> L._dummy
-    | Some l -> l
-  in
-  symb_err l (Incorrect_namespace (edef_namespace c, n))
-
+(*------------------------------------------------------------------*)
 module Action = Make (struct
-  type ns = _action
-  type local_def = int
-
-  let namespace = NAction
-
+  type ns   = _action
+  let kind  = Action
   let group = default_group
-  let construct d = Action d
-  let deconstruct ~loc = function
-    | Exists (Action d) -> d
-    | _ as c -> namespace_err loc c namespace
-
 end)
 
 module Name = Make (struct
-  type ns = _name
-  type local_def = name_def
-
-  let namespace = NName
-
+  type ns   = _name
+  let kind  = Name
   let group = default_group
-  let construct d = Name d
-  let deconstruct ~loc s = match s with
-    | Exists (Name d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Channel = Make (struct
-  type ns = _channel
-  type local_def = unit
-
-  let namespace = NChannel
-
+  type ns   = _channel
+  let kind  = Channel
   let group = default_group
-  let construct d = Channel d
-  let deconstruct ~loc s = match s with
-    | Exists (Channel d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Config = Make (struct
-  type ns = _config
-  type local_def = param_kind
-
-  let namespace = NConfig
-
+  type ns   = _config
+  let kind  = Config
   let group = default_group
-  let construct d = Config d
-  let deconstruct ~loc s = match s with
-    | Exists (Config d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Oracle = Make (struct
-  type ns = _oracle
-  type local_def = oracle_kind
-
-  let namespace = NOracle
-
+  type ns   = _oracle
+  let kind  = Oracle
   let group = "oracle"
-  let construct d = Oracle d
-  let deconstruct ~loc s = match s with
-    | Exists (Oracle d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module BType = Make (struct
-  type ns = _btype
-  type local_def = bty_infos
-
-  let namespace = NBType
-
+  type ns   = _btype
+  let kind  = BType
   let group = "type"
-  let construct d = BType d
-  let deconstruct ~loc s = match s with
-    | Exists (BType d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Game = Make (struct
-  type ns = _game
-  type local_def = unit
-
-  let namespace = NGame
-
+  type ns   = _game
+  let kind  = Game
   let group = "game"
-  let construct d = Game d
-  let deconstruct ~loc s = match s with
-    | Exists (Game d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module System = Make (struct
-  type ns = _system
-  type local_def = unit
-
-  let namespace = NSystem
-
+  type ns   = _system
+  let kind  = System
   let group = default_group
-  let construct d = System d
-  let deconstruct ~loc s = match s with
-    | Exists (System d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Process = Make (struct
-  type ns = _process
-  type local_def = unit
-
-  let namespace = NProcess
-
+  type ns   = _process
+  let kind  = Process
   let group = "process"
-  let construct d = Process d
-  let deconstruct ~loc s = match s with
-    | Exists (Process d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
-module Function = Make (struct
-  type ns = _fname
-  type local_def = Type.ftype * function_def
-
-  let namespace = NFunction
-
+(** Abtract and concrete operators *)
+module Operator = Make (struct
+  type ns   = _fname
+  let kind  = Operator
   let group = default_group
-  let construct d = Function d
-  let deconstruct ~loc s = match s with
-    | Exists (Function d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
-
-let is_ftype s ftype table =
-  match Function.get_def s table with
-    | _,t when t = ftype -> true
-    | _ -> false
-    | exception Not_found -> assert false
 
 module Macro = Make (struct
-  type ns = _macro
-  type local_def = macro_def
-
-  let namespace = NMacro
-
+  type ns   = _macro
+  let kind  = Macro
   let group = default_group
-  let construct d = Macro d
-  let deconstruct ~loc s = match s with
-    | Exists (Macro d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module HintDB = Make (struct
-  type ns = _hintdb
-  type local_def = unit
-
-  let namespace = NHintDB
-
+  type ns   = _hintdb
+  let kind  = HintDB
   let group = "hint-db"
-  let construct d = HintDB d
-  let deconstruct ~loc s = match s with
-    | Exists (HintDB d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Lemma = Make (struct
-  type ns = _lemma
-  type local_def = unit
-
-  let namespace = NLemma
-
+  type ns   = _lemma
+  let kind  = Lemma
   let group = "lemma"
-  let construct d = Lemma d
-  let deconstruct ~loc s = match s with
-    | Exists (Lemma d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Theory = Make (struct
-  type ns = _theory
-  type local_def = unit
-
-  let namespace = NTheory
-
+  type ns   = _theory
+  let kind  = Theory
   let group = "theory"
-  let construct d = Theory d
-  let deconstruct ~loc s = match s with
-    | Exists (Theory d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
 module Predicate = Make (struct
-  type ns = _predicate
-  type local_def = unit
-
-  let namespace = NPredicate
-
+  type ns   = _predicate
+  let kind  = Predicate
   let group = "predicate"
-  let construct d = Predicate d
-  let deconstruct ~loc s = match s with
-    | Exists (Predicate d) -> d
-    | _ as c -> namespace_err loc c namespace
 end)
 
-(*------------------------------------------------------------------*)
-(** {2 Type information} *)
-
-module TyInfo = struct
-  type t = bty_info
-
-  let parse (info : lsymb) : t =
-    match L.unloc info with
-    | "name_fixed_length" -> Name_fixed_length 
-    | "large"             -> Large 
-    | "well_founded"      -> Well_founded 
-    | "fixed"             -> Fixed
-    | "finite"            -> Finite
-    | "enum"              -> Enum 
-    | _ -> symb_err (L.loc info) (Failure "unknown type information")
 
 (*------------------------------------------------------------------*)
-  let get_bty_infos table (ty : Type.ty) : bty_infos =
-    match ty with
-    | Type.Index | Type.Timestamp | Type.Boolean ->
-      [Fixed; Finite; Well_founded]
-      
-    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
-    | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
-    | _ -> []
+(** {2 Sets and maps} *)
+    
+type 'a _t = 'a t
 
-  let check_bty_info table (ty : Type.ty) (info : t) : bool =
-    let infos = get_bty_infos table ty in
-    List.mem info infos
+module Ss (S : SymbolKind) : Set.S with type elt := S.ns t =
+  Set.Make(struct
+    type t = S.ns _t
+    let compare = Stdlib.compare
+  end)
 
-  (*------------------------------------------------------------------*)
-
-  let check_info_on_closed_term allow_funs table ty def : bool =
-      let rec check : Type.ty -> bool = function
-      | TVar _ | TUnivar _ -> false
-      | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> allow_funs && check t1 && check t2                          
-      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-      | TBase _ as ty -> check_bty_info table ty def
-    in 
-    check ty
-
-  (** See `.mli` *)
-  let is_finite table ty : bool =
-    check_info_on_closed_term true table ty Finite
-
-  (** See `.mli` *)
-  let is_fixed table ty : bool =
-    check_info_on_closed_term true table ty Fixed
-
-  (** See `.mli` *)  
-  let is_name_fixed_length table ty : bool =
-    check_info_on_closed_term false table ty Name_fixed_length
-
-  (** See `.mli` *)
-  let is_enum table ty : bool = 
-    let rec check : Type.ty -> bool = function
-      | Boolean | Index | Timestamp -> true
-      | Message -> false
-      | Tuple l -> List.for_all check  l
-      | Fun (t1, t2) -> check t1 && check t2
-      | TBase _ as ty -> check_bty_info table ty Enum
-      | _ -> false
-    in 
-    check ty  
-
-  let is_well_founded table ty : bool =
-    check_info_on_closed_term false table ty Well_founded
-end
+module Ms (S : SymbolKind) : Map.S with type key := S.ns t =
+  Map.Make(struct
+    type t = S.ns _t
+    let compare = Stdlib.compare
+  end)
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
@@ -887,7 +544,212 @@ let infix_assoc_predicate (s : predicate) : assoc =
   infix_assoc_str s
 
 (*------------------------------------------------------------------*)
-let is_global : macro_def -> bool = function Global _ -> true | _ -> false
+(** {2 Some symbol definitions} *)
+
+(*------------------------------------------------------------------*)
+(** {3 Data definitions for operators (abstract and concrete)} *)
+
+module OpData = struct
+  (*------------------------------------------------------------------*)
+  (** Different variants on the Diffie-Hellman crypto assumption *)                          
+  type dh_hyp =
+    | DH_DDH
+    | DH_CDH
+    | DH_GDH
+
+  (** Definition on an abstract operator *)
+  type abstract_def =
+    | Hash
+    | DHgen of dh_hyp list
+    | AEnc
+    | ADec
+    | SEnc
+    | SDec
+    | Sign
+    | CheckSign
+    | PublicKey
+    | Abstract of symb_type
+
+  type associated_fun = fname list
+
+  (*------------------------------------------------------------------*)
+  (** See `.mli` *)
+  type concrete_def = ..
+
+  (*------------------------------------------------------------------*)
+  type def =
+    | Abstract of abstract_def * associated_fun
+    | Concrete of concrete_def
+
+  type op_data = {
+    ftype : Type.ftype;
+    def   : def;
+  }
+        
+  type data += Operator of op_data
+
+  (*------------------------------------------------------------------*)
+  let pp_abstract_def fmt = function
+    | Hash       -> Fmt.pf fmt "Hash"
+    | DHgen _    -> Fmt.pf fmt "DHgen"
+    | AEnc       -> Fmt.pf fmt "AEnc"
+    | ADec       -> Fmt.pf fmt "ADec"
+    | SEnc       -> Fmt.pf fmt "SEnc"
+    | SDec       -> Fmt.pf fmt "SDec"
+    | Sign       -> Fmt.pf fmt "Sign"
+    | CheckSign  -> Fmt.pf fmt "CheckSig"
+    | PublicKey  -> Fmt.pf fmt "PublicKey"
+    | Abstract _ -> Fmt.pf fmt "Abstract"
+
+  (*------------------------------------------------------------------*)
+  let get_data s table =
+    match Operator.get_data s table with
+    | Operator data -> data
+    | _ -> assert false
+ 
+  let get_abstract_data s table =
+    match (get_data s table).def with
+    | Abstract (def,assoc) -> def, assoc
+    | _ -> assert false
+
+  (*------------------------------------------------------------------*)
+  let ftype table f = (get_data f table).ftype 
+
+  (*------------------------------------------------------------------*)
+  let is_abstract s table =
+    match (get_data s table).def with
+    | Abstract _ -> true
+    | Concrete _ -> false
+  
+  let is_abstract_with_ftype s ftype table =
+    let data = get_data s table in
+    match data.def with
+    | Abstract (def,_) when def = ftype -> true
+    | Abstract _ -> false
+    | Concrete _ -> false
+    | exception Not_found -> assert false
+end
+
+
+(*------------------------------------------------------------------*)
+(** Macro data *)
+
+(** See `.mli` *)
+type global_macro_def = ..
+
+(** See `.mli` *)
+type state_macro_def = ..
+
+type macro_data =
+  | Input | Output | Cond | Exec | Frame
+  | State  of int * Type.ty * state_macro_def
+  | Global of int * Type.ty * global_macro_def
+  
+type data += Macro of macro_data
+
+let get_macro_data (ms : macro) (table : table) : macro_data =
+  match Macro.get_data ms table with
+  | Macro data -> data
+  | _ -> assert false           (* impossible *)
+
+(*------------------------------------------------------------------*)
+(** Name data *)
+
+type name_data = {
+  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
+}
+
+type data += Name of name_data
+
+let get_name_data (ms : macro) (table : table) : name_data =
+  match Name.get_data ms table with
+  | Name data -> data
+  | _ -> assert false           (* impossible *)
+
+(*------------------------------------------------------------------*)
+(** {2 Type information} *)
+
+module TyInfo = struct
+  (** Type information associated to base types. 
+      Restrict the instantiation domain of a type. *)
+  type t =
+    | Large
+    | Name_fixed_length
+    | Finite
+    | Fixed
+    | Well_founded
+    | Enum
+
+  type data += Type of t list
+
+  (*------------------------------------------------------------------*)
+  let parse (info : lsymb) : t =
+    match L.unloc info with
+    | "name_fixed_length" -> Name_fixed_length 
+    | "large"             -> Large 
+    | "well_founded"      -> Well_founded 
+    | "fixed"             -> Fixed
+    | "finite"            -> Finite
+    | "enum"              -> Enum 
+    | _ -> symb_err (L.loc info) (Failure "unknown type information")
+
+  (*------------------------------------------------------------------*)
+  let get_data (s : btype) table : t list =
+    match BType.get_data s table with Type l -> l | _ -> assert false
+  
+  (*------------------------------------------------------------------*)
+  let get_bty_infos table (ty : Type.ty) : t list =
+    match ty with
+    | Type.Index | Type.Timestamp | Type.Boolean ->
+      [Fixed; Finite; Well_founded]
+      
+    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
+    | Type.TBase b -> get_data (BType.cast_of_string b) table
+    | _ -> []
+
+  let check_bty_info table (ty : Type.ty) (info : t) : bool =
+    let infos = get_bty_infos table ty in
+    List.mem info infos
+
+  (*------------------------------------------------------------------*)
+
+  let check_info_on_closed_term allow_funs table ty def : bool =
+      let rec check : Type.ty -> bool = function
+      | TVar _ | TUnivar _ -> false
+      | Tuple l -> List.for_all check l
+      | Fun (t1, t2) -> allow_funs && check t1 && check t2                          
+      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
+      | TBase _ as ty -> check_bty_info table ty def
+    in 
+    check ty
+
+  (** See `.mli` *)
+  let is_finite table ty : bool =
+    check_info_on_closed_term true table ty Finite
+
+  (** See `.mli` *)
+  let is_fixed table ty : bool =
+    check_info_on_closed_term true table ty Fixed
+
+  (** See `.mli` *)  
+  let is_name_fixed_length table ty : bool =
+    check_info_on_closed_term false table ty Name_fixed_length
+
+  (** See `.mli` *)
+  let is_enum table ty : bool = 
+    let rec check : Type.ty -> bool = function
+      | Boolean | Index | Timestamp -> true
+      | Message -> false
+      | Tuple l -> List.for_all check  l
+      | Fun (t1, t2) -> check t1 && check t2
+      | TBase _ as ty -> check_bty_info table ty Enum
+      | _ -> false
+    in 
+    check ty  
+
+  let is_well_founded table ty : bool =
+    check_info_on_closed_term false table ty Well_founded
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
@@ -895,28 +757,33 @@ let is_global : macro_def -> bool = function Global _ -> true | _ -> false
 (* reference used to build the table. Must not be exported in the .mli *)
 let builtin_ref = ref empty_table
 
-(** {Action builtins} *)
+(*------------------------------------------------------------------*)
+(** {3 Action builtins} *)
 
 let mk_action a =
-  let table, a = Action.reserve_exact !builtin_ref (L.mk_loc L._dummy a) in
+  let table, a = Action.reserve ~approx:false !builtin_ref (L.mk_loc L._dummy a) in
   builtin_ref := table;
   a
 
 let init_action = mk_action "init"
 
+(*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
-let mk_macro m def =
-  let table, m = Macro.declare_exact !builtin_ref (L.mk_loc L._dummy m) def in
+let mk_macro m data =
+  let table, m =
+    Macro.declare ~approx:false !builtin_ref (L.mk_loc L._dummy m) ~data
+  in
   builtin_ref := table;
   m
 
-let inp   = mk_macro "input"  Input
-let out   = mk_macro "output" Output
-let cond  = mk_macro "cond"   Cond
-let exec  = mk_macro "exec"   Exec
-let frame = mk_macro "frame"  Frame
+let inp   = mk_macro "input"  (Macro Input )
+let out   = mk_macro "output" (Macro Output)
+let cond  = mk_macro "cond"   (Macro Cond  )
+let exec  = mk_macro "exec"   (Macro Exec  )
+let frame = mk_macro "frame"  (Macro Frame )
 
+(*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
 (** The symbol for the dummy channel may be displayed,
@@ -928,9 +795,10 @@ let frame = mk_macro "frame"  Frame
     and would easily be declared equivalent. *)
 let dummy_channel_lsymb = L.mk_loc L._dummy "ø"
 let table,dummy_channel =
-  Channel.declare_exact !builtin_ref dummy_channel_lsymb ()
+  Channel.declare ~approx:false !builtin_ref dummy_channel_lsymb 
 let () = builtin_ref := table
 
+(*------------------------------------------------------------------*)
 (** {3 Function symbols builtins} *)
 
 (** makes simple function types of [ty^arity] to [ty] *)
@@ -938,12 +806,21 @@ let mk_fty arity (ty : Type.ty) =
   Type.mk_ftype [] (List.init arity (fun _ -> ty)) ty
 
 let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) (f : string) arity =
-  let fty = match fty with
-    | None -> mk_fty arity (if bool then Type.Boolean else Type.Message)
-    | Some fty -> fty in
-  let info = fty, Abstract f_info in
+  let fty =
+    match fty with
+    | None -> mk_fty arity (if bool then Type.tboolean else Type.tmessage)
+    | Some fty -> fty
+  in
+  let data =
+    OpData.(
+      Operator {
+        ftype = fty;
+        def = Abstract (Abstract f_info, []);
+      }
+    )
+  in
   let table, f =
-    Function.declare_exact !builtin_ref (L.mk_loc L._dummy f) info
+    Operator.declare ~approx:false !builtin_ref (L.mk_loc L._dummy f) ~data
   in
   builtin_ref := table;
   f
@@ -1048,27 +925,10 @@ let fs_len =
   let fty = Type.mk_ftype [tyv] [tyvar] Type.Message
   in
   mk_fsymb ~fty "len" 1
+    
+(*------------------------------------------------------------------*)
 (** {3 Builtins table} *)
 
 let builtins_table = !builtin_ref
 
-let ftype table f =
-  match Function.get_def f table with
-  | fty, _ -> fty
-
-let ftype_builtin f = ftype builtins_table f
-
-(*------------------------------------------------------------------*)
-type 'a _t = 'a t
-
-module Ss (S : Namespace) : Set.S with type elt := S.ns t =
-  Set.Make(struct
-    type t = S.ns _t
-    let compare = Stdlib.compare
-  end)
-
-module Ms (S : Namespace) : Map.S with type key := S.ns t =
-  Map.Make(struct
-    type t = S.ns _t
-    let compare = Stdlib.compare
-  end)
+let ftype_builtin f = OpData.ftype builtins_table f

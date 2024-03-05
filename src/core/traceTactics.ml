@@ -1259,7 +1259,7 @@ let () =
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
   | Term.App (Fun (hash, _), [Tuple [_msg; Name (_key, _)]]) ->
-    Symbols.is_ftype hash Symbols.Hash cntxt.table
+    Symbols.OpData.(is_abstract_with_ftype hash Hash cntxt.table)
 
   | _ -> false
 

@@ -194,7 +194,7 @@ let ccst (c : Cst.t) = make (Ccst c)
 (** For monomorphique functions (hence no type variable to instantiate). 
     Must provide a symbol table if the function is not a built-in. *)
 let ct_monomorph_fname ?(table = Symbols.builtins_table) fs =
-  let fty = Symbols.ftype table fs in
+  let fty = Symbols.OpData.ftype table fs in
   ccst (Cst.of_fname fs { fty; ty_args = []} )
 
 let ct_xor  : cterm = ct_monomorph_fname Symbols.fs_xor
@@ -414,7 +414,7 @@ let is_lname ?of_ty table t =
   else
     let nty = name_ty t in    
     let of_ty = odflt nty of_ty in
-    Symbols.TyInfo.check_bty_info table nty Symbols.Large &&
+    Symbols.TyInfo.check_bty_info table nty Symbols.TyInfo.Large &&
     nty = of_ty
 
 
@@ -1354,23 +1354,31 @@ let rec complete_state state =
 let complete_state = Prof.mk_unary "complete_state" complete_state
 
 let dec_pk table f1 f2 =
-  match Symbols.Function.get_def f1 table, Symbols.Function.get_def f2 table with
-  | (_, Symbols.ADec), (_, Symbols.PublicKey) -> f1, f2
-  | (_, Symbols.PublicKey), (_, Symbols.ADec) -> f2, f1
+  match Symbols.OpData.get_abstract_data f1 table,
+        Symbols.OpData.get_abstract_data f2 table with
+  | (ADec,      _), (PublicKey, _) -> f1, f2
+  | (PublicKey, _), (ADec,      _) -> f2, f1
   | _ -> assert false
 
 let sig_pk table f1 f2 =
-  match Symbols.Function.get_def f1 table, Symbols.Function.get_def f2 table with
-  | (_, Symbols.Sign), (_, Symbols.PublicKey) -> f1, f2
-  | (_, Symbols.PublicKey), (_, Symbols.Sign) -> f2, f1
+  match Symbols.OpData.get_abstract_data f1 table, Symbols.OpData.get_abstract_data f2 table with
+  | (Symbols.OpData.Sign,      _), (Symbols.OpData.PublicKey, _) -> f1, f2
+  | (Symbols.OpData.PublicKey, _), (Symbols.OpData.Sign,      _) -> f2, f1
   | _ -> assert false
 
 let is_sdec table f =
-  assert (snd (Symbols.Function.get_def f table) = Symbols.SDec)
+  assert (fst (Symbols.OpData.get_abstract_data f table) = Symbols.OpData.SDec)
 
 let init_erules table =
-  Symbols.Function.fold (fun fname def data erules -> match def, data with
-      | (_, Symbols.AEnc), Symbols.AssociatedFunctions [f1; f2] ->
+  Symbols.Operator.fold (fun fname data erules ->
+      let data =
+        match data with
+        | Symbols.OpData.Operator data -> data
+        | _ -> assert false
+      in
+      match data.def with
+      | Concrete _ -> erules
+      | Abstract (AEnc, [f1; f2]) ->
         let dec, pk = dec_pk table f1 f2 in
         add_erule
           erules 
@@ -1379,12 +1387,12 @@ let init_erules table =
              (ct_monomorph_fname ~table dec)
              (ct_monomorph_fname ~table pk)) 
 
-      | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
+      | Abstract (Symbols.OpData.SEnc, [sdec]) ->
         is_sdec table sdec;
         add_erule erules 
           (Theories.mk_senc (ct_monomorph_fname ~table fname) (ct_monomorph_fname ~table sdec)) 
 
-      | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
+      | Abstract (Symbols.OpData.CheckSign, [f1; f2]) ->
         let msig, pk = sig_pk table f1 f2 in
         add_erule 
           erules
@@ -1627,11 +1635,16 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
-       let fi = Type.mk_ftype [] [] Type.Message, Symbols.Abstract `Prefix in
+       let open Symbols.OpData in
+       let ftype = Type.mk_ftype [] [] Type.Message in
+       let data = Operator {
+           ftype; def = Abstract (Abstract `Prefix, []);
+         }
+       in
        let table,ffs =
-         Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
+         Symbols.Operator.declare ~approx:false Symbols.builtins_table (mk "f") ~data in
        let table,hfs =
-         Symbols.Function.declare_exact table (mk "h") fi in
+         Symbols.Operator.declare ~approx:false table (mk "h") ~data in
        let ffs,hfs = ct_monomorph_fname ~table ffs, ct_monomorph_fname ~table hfs in
        let f a b = cfun ffs [a;b] in
        let h a b = cfun hfs [a;b] in
