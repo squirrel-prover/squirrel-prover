@@ -356,10 +356,7 @@ let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
       | Atom _ -> assert false (* cannot happen *)
     end
   |Type.Boolean -> handle_eq_atom (msg_to_fmla context)
-  | Type.Index -> handle_eq_atom (function
-      | Term.Var i -> index_var_to_wterm context i
-      | _          -> assert false (*TODO ?*)
-    )
+  |Type.Index -> handle_eq_atom (msg_to_fmla context)
   |Type.Tuple l when (is_pure_tuple l) -> handle_eq_atom (msg_to_fmla context) 
   | _          -> if context.pure 
     then (*ex unsupported*)
