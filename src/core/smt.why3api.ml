@@ -919,11 +919,11 @@ let add_equational_axioms context =
       let (vm, vr, vk) = as_seq3 vars in
       let term =
         t_equ (t_app_infer (find_fn context dec) 
-                 [t_app_infer (find_fn context fname) (* fname = enc *)
-                    [t_var vm; t_var vr;
+                 [Why3.Term.t_tuple [t_app_infer (find_fn context fname) (* fname = enc *)
+                    [Why3.Term.t_tuple [t_var vm; t_var vr;
                      t_app_infer (find_fn context pk)
-                       [t_var vk]];
-                  t_var vk])
+                       [t_var vk]]];
+                  t_var vk]])
           (t_var vm) |> t_forall_close vars []
       in
       Some ("axiom_aenc", term)
@@ -942,9 +942,9 @@ let add_equational_axioms context =
       let vm, vr, vk = as_seq3 vars in
       let term =
         t_equ (t_app_infer (find_fn context sdec)
-                 [t_app_infer (find_fn context fname)
-                    [t_var vm; t_var vr; t_var vk];
-                  t_var vk])
+                 [Why3.Term.t_tuple [t_app_infer (find_fn context fname)
+                    [Why3.Term.t_tuple [t_var vm; t_var vr; t_var vk]];
+                  t_var vk]])
           (t_var vm) |> t_forall_close vars []
       in
       Some ("axiom_senc", term)
@@ -971,10 +971,10 @@ let add_equational_axioms context =
       let vm, vk = as_seq2 vars in
       let term =
         t_equ (t_app_infer (find_fn context fname)
-                 [t_app_infer (find_fn context msig)
-                    [t_var vm; t_var vk];
+                 [Why3.Term.t_tuple [t_app_infer (find_fn context msig)
+                    [Why3.Term.t_tuple [t_var vm; t_var vk]];
                   t_app_infer (find_fn context pk)
-                    [t_var vk]])
+                    [t_var vk]]])
           (t_app_infer (find_fn context Symbols.fs_true) [])
         |> t_forall_close vars []
       in
