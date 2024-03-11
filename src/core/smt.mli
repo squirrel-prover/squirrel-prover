@@ -16,7 +16,7 @@ val is_valid :
   slow:bool ->
   prover:string list->
   Symbols.table ->
-  SystemExpr.fset ->
+  SystemExpr.fset option ->
   Vars.var list ->
   Term.term list ->
   Term.term ->

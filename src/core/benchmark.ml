@@ -30,13 +30,13 @@ module Make (M:S) = struct
   let log (name,input,result,time) =
     match Lazy.force log_chan with
     | None -> ()
-    | Some ch ->
+    | Some ch -> if input=input then 
       Format.fprintf ch
-        "%d:%s:%s:%a:%a:%f@."
+        "%d:;%s:;%s:;input:;%a:;%f@."
         !query_id
         !query_pos
         name
-        M.pp_input input
+        (*M.pp_input input*)
         M.pp_result result
         time
 
