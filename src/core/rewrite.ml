@@ -168,7 +168,7 @@ let rw_inst
         (* we already found the rewrite instance earlier *)
 
         (* check if the same system apply to the subterm *)
-        if not (SE.subset_modulo table se inst.system) then 
+        if not (SE.equal table se inst.system) then 
           s, `Continue 
         else
           let context = SE.reachability_context se in
