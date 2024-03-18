@@ -1171,17 +1171,21 @@ Local tactics
           U: [a <> b]
           ----------------------------------------
           n <> m
-
-.. tact:: slowsmt
-   :name: slowsmt
-    
-    Version of the :tacn:`smt` tactic with higher time limit. 
       
-.. tact:: smt
+.. tact:: smt {? ~prover} {? ~slow} {?~ pure} {? ~style}
    :name: smt
     
     Try to discharge the current goal using an SMT solver. 
-      
+
+    The provers called can be chosen using the flag `~prover`, any combination 
+    of CVC4 (`cvc4``) Z3 (`z3`) and Alt-Ergo (`ae`) can be used.
+    The time before the timeout can be increased by setting the flag `~slow` to 
+    `true`.
+    We can restrict the tactic to pure trace formulas by setting the flag
+    `~pure` to `true`.
+    The theory used to translate timestamps is chosen using the flag `~style`. 
+    We can chose to translate timestamps to integers (`nat`) or to an abstract 
+    type with the usual equality (`abstract_eq`) or not (`abstract`).
 
 .. tact:: subst @term, @term
    :name: subst
