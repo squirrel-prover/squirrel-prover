@@ -72,9 +72,11 @@ let parse_from_buf
     (lexbuf    : Sedlexing.lexbuf)
     ~(filename  : string) : 'a 
   =
+  assert (not (Feedback.keywords_as_ids ()));
   let lexer = Sedlexing.with_tokenizer Sedlexer.token lexbuf in
   let parse_fun = MenhirLib.Convert.Simplified.traditional2revised parse_fun in
   try parse_fun lexer with e ->
+    Feedback.disable_keywords_as_ids ();
     let pp_loc = pp_loc interactive filename lexbuf in
     let pp_pref_loc = pp_pref_loc interactive lexbuf in
     match pp_error pp_loc pp_pref_loc e with
