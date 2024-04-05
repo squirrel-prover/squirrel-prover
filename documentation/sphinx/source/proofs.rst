@@ -1099,7 +1099,7 @@ Local tactics
     Add index constraints resulting from names equalities,
     modulo the known equalities.
      
-    If :g:`n[i] = n[j]` then :g:`i = j`. This is checked on all name
+    If :g:`n(i) = n(j)` then :g:`i = j`. This is checked on all name
     equality entailed by the current context.
 
 .. tact:: eqtrace

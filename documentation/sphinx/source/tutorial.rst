@@ -60,7 +60,7 @@ symbols of any arity can be defined similarly.
 A name `n` typically allows to model secret keys or nonces. As we wish to
 be able to refer to an unbounded number of sessions, we allow names to be
 indexed, each value of the index yielding a fresh independent random value. An indexed
-name is denoted by `n[i]`, with variable `i` as an index. Names can be indexed
+name is denoted by `n(i)`, with variable `i` as an index. Names can be indexed
 by any number of indices.
 
 In the tool, one can declare names and indexed names as follows.
