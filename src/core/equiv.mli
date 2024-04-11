@@ -89,8 +89,8 @@ val _pp_conclusion : dbg:bool -> ?context:SE.context -> Format.formatter -> form
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
-val mk_reach_atom : ?e:Term.term option -> Term.term -> form
-val mk_equiv_atom : ?e:Term.term option -> Term.term list -> form
+val mk_reach_atom : ?e:Term.term -> Term.term -> form
+val mk_equiv_atom : ?e:Term.term -> Term.term list -> form
 
 (*------------------------------------------------------------------*)
 (** Does not recurse. *)

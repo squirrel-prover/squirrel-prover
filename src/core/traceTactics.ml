@@ -221,18 +221,33 @@ let simpl_left_tac s =
     If [hyp = Some id], only checks for hypothesis [id]. *)
 let assumption ?hyp (s : TS.t) =
   let conclusion = TS.conclusion s in
-  let assumption_entails (id, f) =
+  let sbound = TS.bound s in
+  let conv_bound sb b =
+    match sb,b with
+    | None, None -> true
+    | Some ve, Some e -> TS.Reduce.conv_term s ve e
+    | _ -> false
+  in
+  let rec assumption_entails (id, f) =
     (hyp = None || hyp = Some id) &&
     match f with
-    | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound = None})))
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound}))) ->
+      conv_bound sbound bound &&
+      (TS.Reduce.conv_term s conclusion f  ||
+       List.exists (fun f ->
+           TS.Reduce.conv_term s conclusion f ||
+           TS.Reduce.conv_term s f Term.mk_false
+         ) (decompose_ands f))
     | TopHyps.LHyp (Equiv.Local f) ->
-      TS.Reduce.conv_term s conclusion f ||
+      TS.Reduce.conv_term s conclusion f  ||
       List.exists (fun f ->
           TS.Reduce.conv_term s conclusion f ||
           TS.Reduce.conv_term s f Term.mk_false
         ) (decompose_ands f)
-    | TopHyps.LHyp (Equiv.Global _) | TopHyps.LDef _ -> false
+    | TopHyps.LHyp (Equiv.Global f) ->
+      List.exists (fun f -> assumption_entails (id,TopHyps.LHyp (Equiv.Global f)))
+        (Equiv.Smart.decompose_ands f)
+    | TopHyps.LDef _ -> false
   in
   if conclusion = Term.mk_true ||
      TS.Hyps.exists assumption_entails s

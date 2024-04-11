@@ -371,6 +371,9 @@ val f_len    : Symbols.fname
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
 
+val destr_app : fs:Symbols.fname -> arity:int -> term -> term list option
+val oas_seq2 : term list option -> (term * term) option
+
 module Smart : sig
   (** {3 Constructors} *)
   val mk_true  : term

@@ -15,7 +15,7 @@ type rw_rule = {
   rw_conds  : Term.term list; 
   rw_rw     : Term.term * Term.term; 
   rw_kind   : rw_kind;
-  rw_bound : Term.term option;
+  rw_bound : Concrete.bound;
 }
 
 let pp_rw_rule fmt (rw : rw_rule) =
@@ -56,7 +56,7 @@ let pat_to_rw_rule ?loc
     (system    : SE.arbitrary) 
     (rw_kind   : rw_kind)
     (dir       : [< `LeftToRight | `RightToLeft ])
-    (p         : (Term.term*Term.term option) Term.pat)
+    (p         : (Term.term*Concrete.bound) Term.pat)
   : rw_rule 
   =
   let _ = loc in                (* unused *)

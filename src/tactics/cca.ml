@@ -187,7 +187,7 @@ let indcca_param
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
                  (Name.to_term xc);
      rw_kind   = GlobalEq;
-     rw_bound = None;
+     rw_bound = Concrete.Glob;
     },
   (*TODO:Concrete : Probably something to do to create a bounded rewrite*)
     table,

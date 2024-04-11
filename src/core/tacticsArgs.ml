@@ -139,6 +139,24 @@ type trans_arg =
   | TransTerms  of (int L.located * Typing.term) list
 
 (*------------------------------------------------------------------*)
+(** {2 Weak tactic arguments} *)
+
+type weak_ip =
+|  Weak_pt   of Typing.pt
+|  Weak_term of Typing.term
+
+type weak_arg = weak_ip * apply_in
+
+(*------------------------------------------------------------------*)
+(** {2 Weak tactic arguments} *)
+
+type weak_ip =
+|  Weak_pt   of Theory.pt
+|  Weak_term of Theory.term
+
+type weak_arg = weak_ip * apply_in
+
+(*------------------------------------------------------------------*)
 (** {3 Have tactic arguments} *)
 
 (** before, simpl pat for produced hypothesis, after *)
@@ -195,6 +213,7 @@ type parser_arg =
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
   | ApplyIn      of named_args * Typing.pt * apply_in
+  | Weak         of weak_arg
   | Have         of have_arg
   | HavePt       of have_pt_arg
   | Named_args   of named_args

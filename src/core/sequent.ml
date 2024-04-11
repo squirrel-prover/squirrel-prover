@@ -22,12 +22,13 @@ module PT = struct
     system : SE.context;
     args   : (Vars.var * Vars.Tag.t) list;
     (** in reversed order w.r.t. introduction *)
-    
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
-    bound : Term.term option;
+    bound : Concrete.bound;
     form   : Equiv.any_form;
   }
+
+
 
   (** Project the [set] of all systems in a proof-term. *)
   let projs_set_in_local (projs : Term.projs) (pt : t) : t =
@@ -50,7 +51,7 @@ module PT = struct
       mv     = Match.Mvar.map do_t_proj pt.mv; 
       system = SE.project_set projs pt.system ;
       subgs  = List.map do_proj pt.subgs;
-      bound = omap (Term.project projs) pt.bound;
+      bound = Concrete.bound_projs projs pt.bound;
       form   = do_proj pt.form; }
 
   let _pp ppe fmt (pt : t) : unit =
@@ -84,8 +85,10 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
     match pt.form with
     | Local _ -> pt
     | Global (Atom (Reach f)) ->
-        assert(pt.bound = None);
-        { pt with form = Local f.formula; bound = f.bound }
+      assert(pt.bound = Glob || pt.bound = LocAsym);
+      let bound =
+        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound) in
+      { pt with form = Local f.formula; bound = bound }
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
     | Global (Equiv.Quant (Equiv.ForAll, vs, f)) ->
@@ -128,7 +131,8 @@ let pt_try_cast (type a)
   | Equiv.Any_t, _ -> pt
 
 (*------------------------------------------------------------------*)
-(** Rename projections in [pt] to use [pt_pair]'s projections, if necessary. *)
+
+ (** Rename projections in [pt] to use [pt_pair]'s projections, if necessary. *)
 let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
   match pt.system.pair, system_pair with
   | None, _ | _, None -> pt
@@ -147,7 +151,7 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
     { pt with 
       subgs = List.map psubst pt.subgs;
       form  = psubst pt.form;
-      bound = omap (Term.subst_projs proj_subst) pt.bound;
+      bound = Concrete.bound_subst_projs proj_subst pt.bound;
       system; } 
 
 
@@ -167,7 +171,7 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
       let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Reach proj_subst in
       let pt = 
         { pt with subgs = List.map psubst pt.subgs;
-                  bound = omap (Term.subst_projs proj_subst) pt.bound;
+                  bound = Concrete.bound_subst_projs proj_subst pt.bound;
                   form  = psubst pt.form;
                   system = { pt.system with set = system.set };
                   (* we already set [pt.system] to [system.set], even though 
@@ -549,19 +553,21 @@ module Mk (Args : MkArgs) : S with
     let top, sub = fst p, snd p in
     if top = [] && Hyps.mem_name (L.unloc sub) s then
       let id, f = Hyps.by_name_k sub Hyp s in
-      let f : Equiv.any_form =
+      let g : (Equiv.any_form * Concrete.bound) =
         match S.hyp_kind with
-        | Equiv.Any_t -> f
-        | src ->
-          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f
-      in
-      
+        | Equiv.Any_t -> f, if Equiv.is_local f then Concrete.LocHyp else Glob
+        | Equiv.Local_t as src ->
+          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, LocHyp
+        | Equiv.Global_t as src ->
+          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, Glob
+      in let f, bound = g in
+
       `Hyp id,
       { system = S.system s;
         subgs  = [];
         mv     = Mvar.empty;
         args   = [];
-        bound= None;
+        bound= bound;
         form   = f; }
 
     else
@@ -600,9 +606,12 @@ module Mk (Args : MkArgs) : S with
         let form, bound =
           match S.conc_kind, form with
           (* we already downgrade it for local sequents *)
-          | Equiv.Local_t, Equiv.LocalS f -> Equiv.Local f.formula, f.bound
+          | Equiv.Local_t, Equiv.LocalS {formula; bound = Some ve} ->
+            Equiv.Local formula, Concrete.LocConc ve
+          | Equiv.Local_t, Equiv.LocalS {formula; bound = None} ->
+            Equiv.Local formula, Concrete.LocAsym
           (* in global sequent, we use it as a global formula  *)
-          | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f)), None
+          | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f)), Glob
           | _ -> assert false (* impossible *)
         in
 
@@ -633,7 +642,7 @@ module Mk (Args : MkArgs) : S with
           mv     = Mvar.empty;
           subgs  = [];
           args   = [];
-          bound = None;
+          bound = Glob;
           form; }
 
   (*------------------------------------------------------------------*)
@@ -744,9 +753,9 @@ module Mk (Args : MkArgs) : S with
       (Failure "cannot apply a concrete implication with an asymptotic hypothesis")
 
   (*------------------------------------------------------------------*)
-  let error_pt_apply_concrete_asymptotic () =
-    soft_failure
-      (Failure "cannot apply a asymptotic implication with an concrete hypothesis")
+  (* let error_pt_apply_concrete_asymptotic () = *)
+  (*   soft_failure *)
+  (*     (Failure "cannot apply a asymptotic implication with an concrete hypothesis") *)
 
    (*------------------------------------------------------------------*)
   let subst_of_pt ~loc table (vars : Vars.env) (pt : PT.t) : Term.subst = 
@@ -829,7 +838,7 @@ module Mk (Args : MkArgs) : S with
           table pt.system f_arg pat_f1
 
       | Global f1, Global f_arg  ->
-        assert(pt.bound = None && arg.bound = None);
+        assert(pt.bound = Glob && arg.bound = Glob);
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
           ~ty_env ~mv:arg.mv ~env
@@ -848,13 +857,15 @@ module Mk (Args : MkArgs) : S with
     let subgs = arg.subgs @ pt.subgs in
     let bound =
       match pt.bound, arg.bound with
-      | Some b, Some sb ->
-        Some(Library.Real.mk_add (S.table s) sb (Library.Real.mk_minus (S.table s) b))
-      | None, None -> None
-      | Some _, None ->
+      | LocConc b, LocConc sb ->
+        Concrete.LocConc (Library.Real.mk_add (S.table s) sb (Library.Real.mk_minus (S.table s) b))
+      | f, g when f = g  -> f
+      | LocAsym, LocHyp -> LocAsym
+      | LocHyp, LocAsym -> LocAsym
+      | LocHyp, LocConc _ -> arg.bound
+      | LocConc _, LocHyp -> pt.bound
+      | _ ->
         error_pt_apply_asymptotic_concrete ()
-      | None, Some _ ->
-        error_pt_apply_concrete_asymptotic ()
     in
     { subgs; mv; args; form = f2; bound; system = pt.system; }
 
@@ -965,8 +976,8 @@ module Mk (Args : MkArgs) : S with
           mv     = pt.mv;
           args   = pt.args;
           bound = if Equiv.is_local f2 && (S.bound s) <> None
-            then  Some (Library.Real.mk_zero (S.table s))
-            else None;
+            then  LocConc (Library.Real.mk_zero (S.table s))
+            else LocAsym;
           form   = f2; }
 
       | `Pt p_arg ->

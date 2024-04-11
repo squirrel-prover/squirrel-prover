@@ -49,7 +49,7 @@
 %token GAME VAR RND RETURN
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE
 %token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -1284,6 +1284,14 @@ tac:
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
+
+  | l=lloc(WEAK) COLONEQ pt=pt i=apply_in
+    { mk_abstract l "weak" [TacticsArgs.Weak (Weak_pt pt,i)] }
+
+  | l=lloc(WEAK) COLON t=term i=apply_in
+    { mk_abstract l "weak" [TacticsArgs.Weak (Weak_term t,i)] }
+
+(*------------------------------------------------------------------*)
   | l=lloc(TRANS) arg=trans_arg
     { mk_abstract l "trans" [TacticsArgs.Trans arg] }
 

@@ -25,7 +25,7 @@ type rw_rule = {
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
   rw_kind   : rw_kind;
-  rw_bound : Term.term option;
+  rw_bound : Concrete.bound;
 }
 
 val pp_rw_rule : rw_rule formatter
@@ -40,5 +40,5 @@ val pat_to_rw_rule :
   SE.t ->
   rw_kind ->
   [< `LeftToRight | `RightToLeft ] ->
-  (Term.term*Term.term option) Term.pat ->
+  (Term.term*Concrete.bound) Term.pat ->
   rw_rule

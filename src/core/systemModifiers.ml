@@ -247,7 +247,7 @@ let global_rename
       rw_conds  = [];
       rw_rw     = n1', n2';
       rw_kind   = GlobalEq;
-      rw_bound = None;
+      rw_bound = Glob;
     }
   in
 
@@ -406,7 +406,7 @@ let global_prf
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
       rw_kind   = GlobalEq;
-      rw_bound = None;
+      rw_bound = Glob;
     }
   in
 
@@ -583,7 +583,7 @@ let global_cca
       rw_conds  = [];
       rw_rw     = enc, new_enc;
       rw_kind   = GlobalEq;
-      rw_bound = None;
+      rw_bound = Glob;
     }
   in
   let dec_rw_rule =
@@ -598,7 +598,7 @@ let global_cca
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
       rw_kind   = GlobalEq;
-      rw_bound = None;
+      rw_bound = Glob;
     }
   in
 
@@ -1231,7 +1231,7 @@ let global_prf_t
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target tau0 xocc); 
           rw_kind   = GlobalEq;
-          rw_bound = None;
+          rw_bound = Glob;
         }
       in
       Some rule

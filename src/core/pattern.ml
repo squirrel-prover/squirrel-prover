@@ -1,16 +1,17 @@
 module Sv = Vars.Sv
-              
+module C = Concrete
 (*------------------------------------------------------------------*)
+
 let open_pat (type a )
     (f_kind : a Equiv.f_kind)
     (ty_env : Type.Infer.env)
-    (p      : (a*Term.term option) Term.pat)
-  : Type.tsubst *  (a*Term.term option) Term.pat_op
+    (p      : (a*C.bound) Term.pat)
+  : Type.tsubst *  (a*C.bound) Term.pat_op
   =
   let univars, tsubst = Type.Infer.open_tvars ty_env p.pat_tyvars in
   let conclusion,bound = p.pat_term in
   let conclusion = Equiv.Babel.tsubst f_kind tsubst conclusion in
-  let bound = Utils.omap (Term.tsubst tsubst) bound in
+  let bound = C.bound_tsubst tsubst bound in
   let vars = List.map (fun (v,t) -> Vars.tsubst tsubst v, t) p.pat_vars in
   ( tsubst,
     Term.{ 

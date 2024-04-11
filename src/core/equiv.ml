@@ -328,8 +328,8 @@ let%test_unit _ =
             |> mk_quant0_tagged Exists v1 =
           Quant (Exists,v1,Quant (ForAll,v2,f)))
 
-let mk_reach_atom ?(e = None) f = Atom (Reach {formula = f; bound = e } )
-let mk_equiv_atom ?(e = None) f = Atom (Equiv {terms = f; bound = e } )
+let mk_reach_atom ?e f = Atom (Reach {formula = f; bound = e } )
+let mk_equiv_atom ?e f = Atom (Equiv {terms = f; bound = e } )
                              
 (*------------------------------------------------------------------*)
 (** {2 Map (does not recurse) } *)
@@ -804,11 +804,11 @@ module Smart : SmartFO.S with type form = _form = struct
   (*TODO:Concrete : Check if valid of concrete*)
   let destr_impl ?env = function
     | Impl (f1, f2) -> Some (f1, f2)
-    | Atom (Reach {formula = f; bound}) ->
+    | Atom (Reach {formula = f; bound = None}) ->
        begin match Term.Smart.destr_impl f with
          | Some (f1,f2) when
              is_constant ?env f1 && is_system_indep ?env f1 ->
-             Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
+             Some (Atom (Reach {formula = f1; bound = None}), Atom (Reach {formula = f2; bound = None}))
          | _ -> None
        end
     | _ -> None

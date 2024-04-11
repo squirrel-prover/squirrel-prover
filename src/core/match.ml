@@ -3371,7 +3371,7 @@ module E = struct
         | Some e, Some ve ->
           let  mv = term_unif t.formula pat.formula st
           in term_unif e ve {st with mv}
-        | _ -> Tactics.soft_failure (Failure "Cannot unify a asymptotic formula with a explicit formula")
+        | _ -> no_unif ()
       end
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       let system : SE.context = 
@@ -3383,7 +3383,7 @@ module E = struct
         match es.bound, pat_es.bound with
         | None, None -> mv
         | Some e, Some ve -> term_unif e ve {st with mv}
-        | _ -> Tactics.soft_failure (Failure "Cannot unify a asymptotic formula with a explicit formula")
+        | _ -> no_unif ()
       end
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)

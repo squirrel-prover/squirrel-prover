@@ -82,7 +82,8 @@ type p_hint =
 let add_hint_rewrite (s : Symbols.p_path) tyvars form table : Symbols.table =
   let db = hint_db table in
   let pat = Pattern.pat_of_form form in
-  let pat = Term.{ pat with pat_tyvars = tyvars; pat_term = (pat.pat_term,None) } in
+  let pat = Term.{ pat with pat_tyvars = tyvars; pat_term = (pat.pat_term,Concrete.LocHyp) } in
+  (* TODO:Concrete : placeholder for now but almost sure there is something to do here *)
   let rule = 
     LowRewrite.pat_to_rw_rule
       ~loc:(Symbols.p_path_loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
