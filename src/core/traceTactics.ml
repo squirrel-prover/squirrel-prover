@@ -228,7 +228,7 @@ let assumption ?hyp (s : TS.t) =
     | Some ve, Some e -> TS.Reduce.conv_term s ve e
     | _ -> false
   in
-  let rec assumption_entails (id, f) =
+  let assumption_entails (id, f) =
     (hyp = None || hyp = Some id) &&
     match f with
     | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound}))) ->
@@ -244,10 +244,7 @@ let assumption ?hyp (s : TS.t) =
           TS.Reduce.conv_term s conclusion f ||
           TS.Reduce.conv_term s f Term.mk_false
         ) (decompose_ands f)
-    | TopHyps.LHyp (Equiv.Global f) ->
-      List.exists (fun f -> assumption_entails (id,TopHyps.LHyp (Equiv.Global f)))
-        (Equiv.Smart.decompose_ands f)
-    | TopHyps.LDef _ -> false
+    | TopHyps.LHyp (Equiv.Global _) | TopHyps.LDef _ -> false
   in
   if conclusion = Term.mk_true ||
      TS.Hyps.exists assumption_entails s
