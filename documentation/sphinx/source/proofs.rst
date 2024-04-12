@@ -379,7 +379,7 @@ called automatically after each tactic, unless the tactical
 
     When the conclusion of the goal is a conjunction, it splits the
     goal into several sub-goals, automatically closing only the trivial
-    goals proved by :tacn:`true` and :tacn:`assump`.
+    goals proved by :tacn:`true` and :tacn:`assumption`.
 
     When the conclusion of the goal is a global formula which only contains
     a local formula, the goal is then turned into a local formula. Otherwise
@@ -512,7 +512,7 @@ Common tactics
 
 
 .. tacn:: assumption {? @hypothesis_id}
-   :name: assump
+   :name: assumption
       
     Conclude if the conclusion of the current goal (or :g:`false`) appears in the hypotheses. The
     hypothesis to be checked against may be directly specified using
