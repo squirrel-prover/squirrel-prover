@@ -419,8 +419,8 @@ Internally, an action is defined by:
   
    The provided process yields a system with three actions:
    
-   * action :n:`A[i]`, which on input :g:`x` checks whether :g:`x=zero` and outputs :g:`n(i)`;
-   * action :n:`B[i]`,  which on input :g:`x` checks whether :g:`x<>zero` and outputs :g:`x`;
+   * action :n:`A(i)`, which on input :g:`x` checks whether :g:`x=zero` and outputs :g:`n(i)`;
+   * action :n:`B(i)`,  which on input :g:`x` checks whether :g:`x<>zero` and outputs :g:`x`;
    * and action :n:`A1` (automatically named) which checks whether :g:`true` and outputs :g:`empty`.  
 
 .. _section-system-macros:
@@ -435,7 +435,7 @@ the following holds:
 
 * :g:`output@A(indices) = o(input@A(indices))`;
 * :g:`cond@A(indices) = c(input@A(indices))`;
-* :g:`input@A[indices] = att(frame@pred(A(indices)))`.
+* :g:`input@A(indices) = att(frame@pred(A(indices)))`.
 
 Other macros have a meaning that does not depend on the specific
 action:
@@ -502,7 +502,7 @@ it stands for :g:`set:S; equiv:S/left,S/right`.
 Axioms and Lemmas
 =================
 
-Squirrel supports two kinds of :gdef:`lemmas<lemma>`, one for each kind of formulas:
+Squirrel supports two kinds of :gdef:`lemmas`, one for each kind of formulas:
 :gdef:`local lemmas<local lemma>` for :term:`local formulas<local formula>` and
 :gdef:`global lemmas<global lemma>` for :term:`global formulas<global formula>`.
 Similarly, there are local and global
