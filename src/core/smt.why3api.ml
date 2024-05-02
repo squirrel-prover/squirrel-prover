@@ -95,6 +95,7 @@ let run_all_async ~slow ~prover table task =
   =
     Why3.Whyconf.Mprover.mapi_filter
       (fun p config_prover -> 
+        Format.printf "compelte %s@." (Why3.Whyconf.get_complete_command config_prover ~with_steps:true);
         if List.mem (p.Why3.Whyconf.prover_name) prover then 
           let call = if slow 
             then create_call ~limit_opt:60 p table config_prover task
@@ -1101,8 +1102,17 @@ let add_macro_axioms context =
               | Symbols.Global (arity, gty, _) -> begin 
                   (* for now, handle only the case where the indices of the macro
                       coincide with those of the action TODO *)
-                  let m_idx = Utils.List.take arity descr.indices in
-                  match
+                  let m_idx = List.init arity (fun _ -> 
+                    Vars.make_fresh Type.Index "i") in
+                  let quantified_indices = List.map 
+                    (fun v -> 
+                      let vsymb = create_vsymbol (id_fresh context (Vars.name v))
+                      (Why3.Ty.ty_app context.index_symb []) 
+                      in
+                      Hashtbl.add context.vars_tbl (Vars.hash v) (t_var vsymb);
+                      vsymb
+                    )m_idx in
+                  let ax = match
                     Macros.get_definition_nocntxt 
                       (Option.get context.system) context.table
                       (Term.mk_symb mn gty) ~args:(Term.mk_vars m_idx)
@@ -1110,7 +1120,7 @@ let add_macro_axioms context =
                   with
                   | `Undef   -> None
                   | `Def msg ->
-                    Some (macro_wterm_eq
+                    Some (t_forall_close quantified_indices [] (macro_wterm_eq
                             (List.map (index_var_to_wterm context) m_idx) 
                             (
                               (if gty=Type.Boolean 
@@ -1118,7 +1128,12 @@ let add_macro_axioms context =
                               )
                               (msg_to_fmla context msg)
                             )
-                          )
+                          ))
+                in 
+                List.iter 
+                  (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) 
+                  m_idx;
+                ax
                 end
               | Symbols.State (arity,sty, _) -> 
                 (* TODO: could probably be treated by calling
@@ -1179,9 +1194,6 @@ let add_macro_axioms context =
                         expansion_ok
                         same_as_pred)
                   with Not_found -> same_as_pred in
-                List.iter 
-                  (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) 
-                  descr.indices;
                 Some (t_forall_close quantified_indices []
                         (macro_wterm_eq indices expansion))
               | _ -> None (* input/frame, see earlier TODO *)
@@ -1332,7 +1344,6 @@ let is_valid
     let ppf = Format.formatter_of_out_channel (oc) in 
     Format.fprintf ppf " --- @.";
     close_out oc;*)
-    if Sys.getenv_opt "BENCHMARK_SMT"=Some "fake" then true else begin
     let theory = match load_theory ~timestamp_style ~pure env with 
       |Some theory -> theory
       |None -> Format.printf "Load theory failed@."; raise InternalError
@@ -1342,8 +1353,8 @@ let is_valid
       table system 
       evars hypotheses conclusion 
       theory 
-    in if Sys.getenv_opt "BENCHMARK_SMT" =Some "verbose" then begin
-      (let oc = open_out_gen [Open_append;Open_creat] 1411 "/home/striou/Documents/temps_exec/logmoche.txt" in 
+    in if Sys.getenv_opt "BENCHMARK_VERBOSE" <>None then begin
+      (let oc = open_out_gen [Open_append;Open_creat] 1411 "BENCHMARK_VERBOSE" in 
       let ppf = Format.formatter_of_out_channel (oc) in 
       Format.fprintf ppf "Id %d@." !id_unique;
       id_unique:=!id_unique+1;
@@ -1354,7 +1365,6 @@ let is_valid
     let res  = run_all_async ~slow ~prover table task  in 
     Format.printf "Task is %a@." Why3.Pretty.print_task task;
     res
-  end
     
     
 (* Tactic registration *)
@@ -1462,7 +1472,7 @@ let () =
       | _ -> Nat
     in
     List.iter (fun pr -> 
-    (*TraceSequent.register_query_alternative
+    TraceSequent.register_query_alternative
       ("Smt"^pr)
       (fun ~precise:_ s q ->
         let s =
@@ -1477,8 +1487,8 @@ let () =
           ~slow:false
           ~pure:false
           ~prover:[pr]
-          s) ;*)
-    TraceTactics.AutoSimplBenchmark.register_alternative
+          s) ;
+    (*TraceTactics.AutoSimplBenchmark.register_alternative
       ("Smt"^pr)
       (fun s ->
         sequent_is_valid
@@ -1487,7 +1497,7 @@ let () =
           ~pure:false
           ~prover:[pr]
           s,
-        None) (*;
+        None)*) (*;
     TraceTactics.AutoBenchmark.register_alternative
       ("Smt"^pr)
       (fun (_,s) ->
