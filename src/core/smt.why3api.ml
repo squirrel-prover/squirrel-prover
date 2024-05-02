@@ -568,7 +568,6 @@ and msg_to_fmla_q context quantifier vs f =
       create_vsymbol
         (id_fresh context (Vars.name v))
         (Why3.Ty.ty_app symb []) in
-    assert (not (Hashtbl.mem tbl (Vars.hash v)));
     Hashtbl.add tbl (Vars.hash v) (t_var vsymb);
     vsymb
   and rem_var tbl v = Hashtbl.remove tbl (Vars.hash v) in
