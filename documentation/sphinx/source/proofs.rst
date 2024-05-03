@@ -1178,7 +1178,10 @@ Local tactics
     Try to discharge the current goal using an SMT solver. 
 
     The provers called can be chosen using the flag `~prover`, any combination 
-    of CVC4 (`cvc4``) Z3 (`z3`) and Alt-Ergo (`ae`) can be used.
+    of CVC4 (`CVC4`) Z3 (`Z3`) and Alt-Ergo (`AltErgo`) can be used. 
+    The alternative counterexamples can be used by adding (`_counterexamples`) 
+    after the name of the prover. The same goes with alternatives (`_BV`) for 
+    Alt-Ergo and (`_noBV`) for Z3.
     The time before the timeout can be increased by setting the flag `~slow` to 
     `true`.
     We can restrict the tactic to pure trace formulas by setting the flag

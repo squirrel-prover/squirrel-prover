@@ -95,8 +95,7 @@ let run_all_async ~slow ~prover table task =
   =
     Why3.Whyconf.Mprover.mapi_filter
       (fun p config_prover -> 
-        Format.printf "compelte %s@." (Why3.Whyconf.get_complete_command config_prover ~with_steps:true);
-        if List.mem (p.Why3.Whyconf.prover_name) prover then 
+        if List.mem (p.Why3.Whyconf.prover_name,p.Why3.Whyconf.prover_altern) prover then 
           let call = if slow 
             then create_call ~limit_opt:60 p table config_prover task
             else create_call p table config_prover task
@@ -111,7 +110,7 @@ let run_all_async ~slow ~prover table task =
   let n = ref @@ Why3.Whyconf.Mprover.cardinal calls in
   Format.eprintf "Waiting for new results...@.";
   let res = ref false in
-  while !n>0 do
+  while !n>0 && not !res do
     let l = Why3.Call_provers.get_new_results ~blocking:true in
     timer ();
     res := List.fold_left
@@ -137,7 +136,9 @@ let run_all_async ~slow ~prover table task =
            Format.eprintf "Other@.";acc)
       false l || !res;
   done;
-  timer ();!res
+  timer ();
+  Why3.Whyconf.Mprover.iter (fun _ (_,c) -> Why3.Call_provers.interrupt_call ~config:main c) calls;
+  !res
   
 (** Context for SMT translation, providing information on:
     - the Squirrel formulas being translated (e.g. table, system expression);
@@ -1395,7 +1396,7 @@ type parameters = {
   timestamp_style : timestamp_style;
   slow : bool;
   pure : bool;
-  provers : string list
+  provers : (string*string) list
 }
 
 let default_parameters = {
@@ -1413,20 +1414,16 @@ let rec parse_arg parameters = function
     { parameters with timestamp_style = Abstract_eq }
   | TacticsArgs.NList ({Location.pl_desc="prover"} ,[]) ->
     parameters
-  | TacticsArgs.NList ({Location.pl_desc="prover"} as p,{Location.pl_desc="cvc4"}::t) ->
+  | TacticsArgs.NList ({Location.pl_desc="prover"} as p,{Location.pl_desc=prover_alt}::t) ->
+    let add_dash s = if s="AltErgo" then "Alt-Ergo" else s in 
+    let pr, alt = match (String.split_on_char '_' prover_alt) with 
+      |[p;alt] -> (add_dash p),alt 
+      |[p] -> (add_dash p),""
+      |_ -> Tactics.(hard_failure (Failure "unrecognized argument"))
+    in 
     (parse_arg 
-      {parameters with provers = "CVC4"::parameters.provers} 
+      {parameters with provers = (pr,alt)::parameters.provers} 
       (TacticsArgs.NList (p,t))
-    )
-  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},{Location.pl_desc="z3"}::t) ->
-    (parse_arg 
-      {parameters with provers = "Z3"::parameters.provers} 
-      (TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},t))
-    )
-  | TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},{Location.pl_desc="ae"}::t) ->
-    (parse_arg 
-      {parameters with provers = "Alt-Ergo"::parameters.provers} 
-      (TacticsArgs.NList ({Location.pl_loc=loc;Location.pl_desc="prover"},t))
     )
   | TacticsArgs.NList ({Location.pl_desc="slow"},[{Location.pl_desc="true"}]) ->
     {parameters with slow=true}
@@ -1456,7 +1453,7 @@ let () =
        if
          sequent_is_valid
           ~timestamp_style ~slow ~pure
-          ~prover:(match provers with [] -> ["CVC4"] | l -> l)
+          ~prover:(match provers with [] -> ["CVC4",""] | l -> l)
           s
        then
          sk [] fk
@@ -1469,10 +1466,14 @@ let () =
       | Some "Abs" -> Abstract
       | Some "Abs_Eq" -> Abstract_eq
       | _ -> Nat
+    and prover = match Sys.getenv_opt "BENCHMARK_PROVER", Sys.getenv_opt "BENCHMARK_ALTERN" with
+      |None, None -> ["CVC4",""]
+      |None, Some alt -> ["CVC4",alt]
+      |Some p, None -> [p, ""]
+      |Some p, Some alt -> [p,alt]  
     in
-    List.iter (fun pr -> 
     TraceSequent.register_query_alternative
-      ("Smt"^pr)
+      ("Smt"^(fst(List.hd prover))^(snd(List.hd prover)))
       (fun ~precise:_ s q ->
         let s =
           match q with
@@ -1485,8 +1486,8 @@ let () =
           ~timestamp_style
           ~slow:false
           ~pure:false
-          ~prover:[pr]
-          s) ;
+          ~prover
+          s) 
     (*TraceTactics.AutoSimplBenchmark.register_alternative
       ("Smt"^pr)
       (fun s ->
@@ -1506,4 +1507,4 @@ let () =
           ~pure:false
           ~prover:[pr]
           s)*)
-    ) ["CVC4"(*;"Z3";"Alt-Ergo"*)]
+    
