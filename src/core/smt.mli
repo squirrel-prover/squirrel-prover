@@ -14,7 +14,7 @@ val is_valid :
   timestamp_style:timestamp_style ->
   pure:bool ->
   slow:bool ->
-  prover:(string*string) list->
+  provers:(string*string) list->
   Symbols.table ->
   SystemExpr.fset option ->
   Vars.var list ->

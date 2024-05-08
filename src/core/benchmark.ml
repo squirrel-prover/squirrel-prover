@@ -32,11 +32,11 @@ module Make (M:S) = struct
     | None -> ()
     | Some ch -> if input=input then 
       Format.fprintf ch
-        "%d:;%s:;%s:;input:;%a:;%f@."
+        "%d:;%s:;%s:;%a:;%a:;%f@."
         !query_id
         !query_pos
         name
-        (*M.pp_input input*)
+        M.pp_input input
         M.pp_result result
         time
 

@@ -1,5 +1,7 @@
 open Utils
 
+let smt_debug = Sys.getenv_opt "SMT_DEBUG" <> None
+
 (** Style for translating timestamps. *)
 type timestamp_style =
   | Abstract     (** Abstract with specific ~~ for comparison. *)
@@ -7,16 +9,14 @@ type timestamp_style =
   | Nat          (** Natural numbers. *)
 
 let start_timer () =
-  Format.printf "<< TOP CHRONO >>@.";
   let t0 = Unix.gettimeofday () in
-  fun () ->
-    Format.printf "<< ELAPSED %.3fs >>@." (Unix.gettimeofday () -. t0)
+  fun () -> Unix.gettimeofday () -. t0
     
 let config = Why3.Whyconf.init_config None
 
 let main = Why3.Whyconf.get_main config
 
-let provers = Why3.Whyconf.get_provers config
+let why3_provers = Why3.Whyconf.get_provers config
 
 let env = 
   let exec_dir = Filename.dirname Sys.executable_name in
@@ -45,48 +45,32 @@ let create_call ?limit_opt prover table config_prover task :
   Format.eprintf
     "Creating prover task for %s (version:%s altern:%S)...@."
     prover.Why3.Whyconf.prover_name
-    prover.Why3.Whyconf.prover_version 
+    prover.Why3.Whyconf.prover_version
     prover.Why3.Whyconf.prover_altern;
-  try 
+  try
     let driver =
       Why3.Driver.load_driver_for_prover
         main
         env
         config_prover
     in
-    Some (Why3.Driver.prove_task
-      ~config:main
-      ~command:config_prover.command
-      ~limit:
-        { Why3.Call_provers.empty_limit with limit_time = float_of_int limit }
-      driver
-      task)
+    let limit =
+      { Why3.Call_provers.empty_limit with limit_time = float_of_int limit }
+    in
+    Some
+      (Why3.Driver.prove_task
+        ~config:main
+        ~command:config_prover.command
+        ~limit
+        driver
+        task)
   with e ->
     Format.printf
       "SMT: %s driver failed to load: %a@.\n"
       prover.Why3.Whyconf.prover_name Why3.Exn_printer.exn_printer e;
       None
 
-(*let run_one ~slow prover table task =
-  let timer = start_timer () in
-  try
-    let prover,config_prover =
-    Why3.Whyconf.(Mprover.max_binding
-                    (filter_provers config
-                    (parse_filter_prover prover)))
-    in
-    let call =
-      if slow 
-      then create_call ~limit_opt:60 prover table config_prover task 
-      else create_call prover table config_prover task
-    in 
-    match call with 
-      |Some call -> let r = Why3.Call_provers.wait_on_call call in
-      timer ();Some r
-      |None -> None
-  with Not_found -> Format.printf "SMT: %s prover not found\n" prover; None
-*) 
-let run_all_async ~slow ~prover table task =
+let run_all_async ~slow ~provers table task =
   Why3.Prove_client.set_max_running_provers 4;
   let timer = start_timer () in
   let calls :
@@ -94,27 +78,34 @@ let run_all_async ~slow ~prover table task =
     Why3.Whyconf.Mprover.t
   =
     Why3.Whyconf.Mprover.mapi_filter
-      (fun p config_prover -> 
-        if List.mem (p.Why3.Whyconf.prover_name,p.Why3.Whyconf.prover_altern) prover then 
-          let call = if slow 
+      (fun p config_prover ->
+        if List.mem Why3.Whyconf.(p.prover_name,p.prover_altern) provers then
+          let call =
+            if slow
             then create_call ~limit_opt:60 p table config_prover task
             else create_call p table config_prover task
-          in match call with 
-            |Some call -> Some (p,call)
-            |None -> None
-        else None
-      )
-      provers
+          in
+          match call with
+          | Some call -> Some (p,call)
+          | None -> None
+        else None)
+      why3_provers
   in
+  if Why3.Whyconf.Mprover.is_empty calls then
+    Format.printf "No available prover among specified options!@.";
   (* Number of calls for which we still need a result. *)
   let n = ref @@ Why3.Whyconf.Mprover.cardinal calls in
-  Format.eprintf "Waiting for new results...@.";
+  if smt_debug then Format.eprintf "Waiting for new results...@.";
   let res = ref false in
   while !n>0 && not !res do
-    let l = Why3.Call_provers.get_new_results ~blocking:true in
-    timer ();
-    res := List.fold_left
-      (fun acc (prover_call,prover_update) ->
+    let results = Why3.Call_provers.get_new_results ~blocking:true in
+    if smt_debug then
+      Format.printf
+        "%d result(s) obtained after %.2fs.@."
+        (List.length results)
+        (timer ());
+    List.iter
+      (fun (prover_call,prover_update) ->
          match prover_update with
          | Why3.Call_provers.ProverFinished r ->
            decr n;
@@ -128,16 +119,18 @@ let run_all_async ~slow ~prover table task =
                     prover.Why3.Whyconf.prover_altern)
              calls;
            Format.eprintf
-            "Result: @[%a.@]@."
-            (Why3.Call_provers.print_prover_result ~json:false)
+             "Result: @[%a.@]@."
+             (Why3.Call_provers.print_prover_result ~json:false)
             r;
-            (r.pr_answer = Why3.Call_provers.Valid) || acc
-        | _ ->
-           Format.eprintf "Other@.";acc)
-      false l || !res;
+           res := !res || (r.pr_answer = Why3.Call_provers.Valid)
+         | _ -> if smt_debug then Format.eprintf "Other@.")
+      results
   done;
-  timer ();
-  Why3.Whyconf.Mprover.iter (fun _ (_,c) -> Why3.Call_provers.interrupt_call ~config:main c) calls;
+  if smt_debug then
+    Format.printf "Finished in %.2fs.@." (timer ());
+  (* Interrupt remaining calls. *)
+  Why3.Whyconf.Mprover.iter
+    (fun _ (_,c) -> Why3.Call_provers.interrupt_call ~config:main c) calls;
   !res
   
 (** Context for SMT translation, providing information on:
@@ -201,10 +194,7 @@ let id_fresh context name =
 let mk_const_symb context x ty =
   Why3.Term.create_fsymbol (id_fresh context x) [] (ty)
 
-(*exception Unsupported of Term.term*)
 exception InternalError
-
-
 
 let context_init ~timestamp_style ~pure tm_theory evars table system = 
   let tm_export = tm_theory.Why3.Theory.th_export 
@@ -293,85 +283,6 @@ open Why3.Term
 let index_var_to_wterm context i = Hashtbl.find context.vars_tbl (Vars.hash i) 
 let ilist_to_wterm_ts context l = List.map (index_var_to_wterm context) l 
 
-(*let rec timestamp_to_wterm context = function
-  | Term.App (Fun (fs, _), [ts]) when fs = Term.f_pred ->
-    t_app_infer context.pred_symb [timestamp_to_wterm context ts]
-  | Term.Action (a, indices) ->
-    (match indices with 
-      |[Tuple ind_list] -> 
-        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a))) 
-        (ilist_to_wterm_ts context (List.map (oget -| Term.destr_var) ind_list))
-
-      |_ -> 
-        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a)))
-        (ilist_to_wterm_ts context (List.map (oget -| Term.destr_var) indices))
-      
-    )
-    
-  | Var v -> Hashtbl.find context.vars_tbl (Vars.hash v)
-  | Diff _ -> 
-    failwith "diff of timestamps to why3 term not implemented"
-  | _ -> assert false
-*)
-(*let rec is_pure_tuple l = List.fold_left 
-  (fun acc t -> match t with 
-    |Type.Index | Type.Timestamp -> true && acc
-    |Type.Tuple l -> (is_pure_tuple l) && acc 
-    | _ -> false
-  )
-  true l 
-
-let rec atom_to_fmla context : Term.Lit.xatom -> Why3.Term.term = fun atom ->
-  let handle_eq_atom rec_call = match atom with
-    | Comp (`Eq, x, y)  -> if Term.ty x = Type.Boolean then
-                            t_iff (rec_call x) (rec_call y) else 
-                            t_equ (rec_call x) (rec_call y) 
-    | Comp (`Neq, x, y) -> if Term.ty x = Type.Boolean then
-                            t_not (t_iff (rec_call x) (rec_call y)) else 
-                            t_neq (rec_call x) (rec_call y) 
-    |Atom x -> if context.pure then  assert false
-      else begin let t = rec_call x in 
-        match (t_type t) with 
-          |ty when ty=(Option.get context.msg_ty) -> assert false
-          | _ -> Why3.Term.to_prop t
-      end
-    | _ -> assert false
-  in
-  match Term.Lit.ty_xatom atom with
-  | Type.Timestamp -> begin match atom with
-      | Comp (comp,ts1,ts2) ->
-        let listargs = List.map (msg_to_fmla context) [ts1;ts2] in
-        let t1,t2 = List.nth listargs 0, List.nth listargs 1 in 
-        begin match comp with
-          | `Eq  -> ts_equ context t1 t2 
-          | `Neq -> t_not (ts_equ context t1 t2 )
-          | `Leq -> t_app_infer context.leq_symb listargs
-          | `Geq -> t_app_infer context.leq_symb (List.rev listargs)
-          | `Lt  -> t_and (t_app_infer context.leq_symb listargs)
-                      (t_not @@ ts_equ context t1 t2 )
-          | `Gt  -> let listargs = List.rev listargs in
-            t_and (t_app_infer context.leq_symb listargs)
-              (t_not @@ ts_equ context t1 t2 )
-        end
-      | Happens ts -> Why3.Term.t_app_infer 
-        context.happens_symb [msg_to_fmla context ts]
-      | Atom _ -> assert false (* cannot happen *)
-    end
-  |Type.Boolean -> handle_eq_atom (msg_to_fmla context)
-  |Type.Index -> handle_eq_atom (msg_to_fmla context)
-  |Type.Tuple l when (is_pure_tuple l) -> handle_eq_atom (msg_to_fmla context) 
-  | _          -> if context.pure 
-    then (*ex unsupported*)
-      let symb =  mk_const_symb context "unsupp" Why3.Ty.ty_bool in 
-      Hashtbl.add context.vars_tbl 
-        (Hashtbl.hash ("unsupp"^(string_of_int !(context.fresh)))) 
-        (Why3.Term.t_app_infer symb []);
-      context.uc := Why3.Theory.add_decl_with_tuples 
-        !(context.uc) 
-        (Why3.Decl.create_param_decl symb);
-      (Why3.Term.to_prop (Why3.Term.t_app_infer symb []))
-    else handle_eq_atom (msg_to_fmla context)
-*)
 let find_fn context f = Hashtbl.find context.functions_tbl (Symbols.to_string f)
 
 let bool_to_prop t = 
@@ -465,22 +376,28 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           t_if (msg_to_fmla context cond) 
             (msg_to_fmla context f1) 
             (msg_to_fmla context f2)
-      | [_] when (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> [] -> 
-        let var_list = Hashtbl.fold (fun _ x acc -> x::acc) context.vars_tbl [] in
-        let symb = try Hashtbl.find context.unsupp_tbl (fmla, List.length var_list) 
-        with Not_found -> begin let s =  
-          Why3.Term.create_fsymbol
-              (id_fresh context "unsupp_poly")
-              (List.map t_type var_list)
-              (convert_type context (Term.ty fmla))
-          in Hashtbl.add context.unsupp_tbl (fmla, List.length var_list) s;
-          context.uc := Why3.Theory.add_decl_with_tuples 
-            !(context.uc) 
-            (Why3.Decl.create_param_decl s);
-          s 
-          end
+      | [_] when
+          (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> [] ->
+        let var_list =
+          Hashtbl.fold (fun _ x acc -> x::acc) context.vars_tbl [] in
+        let symb =
+          try
+            Hashtbl.find context.unsupp_tbl (fmla, List.length var_list)
+          with Not_found ->
+            let s =
+              Why3.Term.create_fsymbol
+                  (id_fresh context "unsupp_poly")
+                  (List.map t_type var_list)
+                  (convert_type context (Term.ty fmla))
+            in
+            Hashtbl.add context.unsupp_tbl (fmla, List.length var_list) s;
+            context.uc :=
+              Why3.Theory.add_decl_with_tuples
+                !(context.uc)
+                (Why3.Decl.create_param_decl s);
+            s
         in
-        (Why3.Term.t_app_infer symb var_list)
+        Why3.Term.t_app_infer symb var_list
       | _ -> 
         let f = find_fn context symb in 
         t_app_infer
@@ -590,26 +507,29 @@ and msg_to_fmla_q context quantifier vs f =
 
 
 (*Fill symbol tables*)
-let add_actions context = 
-SystemExpr.iter_descrs context.table (Option.get context.system)
-  (fun descr -> 
-    if descr.name <> Symbols.init_action then
-      let str = Symbols.to_string descr.name in
-      let symb_act = Why3.Term.create_fsymbol
-          (id_fresh context str)
-          (List.init (List.length descr.indices) (fun _ -> context.index_ty))
-          context.ts_ty
-        in
-        Hashtbl.add context.actions_tbl str (symb_act,List.length descr.indices)
-  );
-context.uc:=Hashtbl.fold 
-  (fun _ (symb,_) uc ->
-    Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb)) 
-  context.actions_tbl !(context.uc);
-Hashtbl.add 
-  context.actions_tbl 
-  Symbols.(to_string init_action) 
-  (context.init_symb,0)
+let add_actions context =
+  SystemExpr.iter_descrs context.table (Option.get context.system)
+    (fun descr ->
+      if descr.name <> Symbols.init_action then
+        let str = Symbols.to_string descr.name in
+        let symb_act = Why3.Term.create_fsymbol
+            (id_fresh context str)
+            (List.init (List.length descr.indices) (fun _ -> context.index_ty))
+            context.ts_ty
+          in
+          Hashtbl.add
+            context.actions_tbl
+            str
+            (symb_act,List.length descr.indices));
+  context.uc :=
+    Hashtbl.fold
+      (fun _ (symb,_) uc ->
+         Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb))
+      context.actions_tbl !(context.uc);
+  Hashtbl.add
+    context.actions_tbl
+    Symbols.(to_string init_action)
+    (context.init_symb,0)
 
 let add_var context = 
   let add_tbl_var tbl ty uc var=
@@ -633,8 +553,7 @@ let add_var context =
     ) 
     context.msgvars)
 
-(*TODO comprendre pourquoi len n'est pas trouvé. Bah c'est polymorphe...*)
-let add_functions context = 
+let add_functions context =
   Symbols.Operator.iter (fun fname _ ->
     let data = Symbols.OpData.get_data fname context.table in
     let ftype = data.ftype in
@@ -642,47 +561,52 @@ let add_functions context =
     (* special treatment of xor for two reasons:
      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
      *   - allows us to declare the equations for xor in the .why file *)
-    if (not (List.mem fname [
-        Symbols.fs_xor; Symbols.fs_pair;  
-        Symbols.fs_fst; Symbols.fs_snd;  
-        Symbols.fs_att; Symbols.fs_of_bool;  
-        Symbols.fs_empty; Symbols.fs_pred; 
+    let predeclared_symbols =
+      [
+        Symbols.fs_xor; Symbols.fs_pair;
+        Symbols.fs_fst; Symbols.fs_snd;
+        Symbols.fs_att; Symbols.fs_of_bool;
+        Symbols.fs_empty; Symbols.fs_pred;
         Symbols.fs_happens; Symbols.fs_or;
         Symbols.fs_and; Symbols.fs_true;
         Symbols.fs_false; Symbols.fs_iff;
         Symbols.fs_impl; Symbols.fs_not;
         Symbols.fs_diff
-      ])
-    ) then
-    (* TODO can't declare polymorphic symbols... yet? *)
-    if ftype.Type.fty_vars <> [] then
-      Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
-    else begin 
-      let symb =
-        Why3.Term.create_fsymbol
-          (id_fresh context str)
-          (List.map (convert_type context) ftype.fty_args)
-          (convert_type context ftype.fty_out)
-      in
-      Hashtbl.add context.functions_tbl str (symb)
-    end;
-    ) context.table;
-    context.uc:= Hashtbl.fold 
-    (fun _ (symb) uc ->
-       Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb)
-    ) context.functions_tbl !(context.uc);
-    List.iter (fun (fname,symb) ->
-      Hashtbl.add context.functions_tbl 
-        (Symbols.to_string fname) 
-        (symb)
-      ) 
-      [(Symbols.fs_pair,(Option.get context.pair_symb));
-        (Symbols.fs_fst,(Option.get context.fst_symb));
-        (Symbols.fs_snd,(Option.get context.snd_symb));
-        (Symbols.fs_att,(Option.get context.att_symb));
-        (Symbols.fs_of_bool,(Option.get context.of_bool_symb));
-        (Symbols.fs_empty,(Option.get context.empty_symb));
       ]
+    in
+    if not (List.mem fname predeclared_symbols) then
+      if ftype.Type.fty_vars <> [] then
+        begin if smt_debug then
+          Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
+        end
+      else begin
+        let symb =
+          Why3.Term.create_fsymbol
+            (id_fresh context str)
+            (List.map (convert_type context) ftype.fty_args)
+            (convert_type context ftype.fty_out)
+        in
+        Hashtbl.add context.functions_tbl str (symb)
+      end)
+    context.table;
+  context.uc :=
+    Hashtbl.fold
+      (fun _ (symb) uc ->
+         Why3.Theory.add_decl_with_tuples uc
+           (Why3.Decl.create_param_decl symb))
+      context.functions_tbl !(context.uc);
+  List.iter
+    (fun (fname,symb) ->
+       Hashtbl.add context.functions_tbl
+         (Symbols.to_string fname)
+         (symb))
+    [(Symbols.fs_pair,(Option.get context.pair_symb));
+     (Symbols.fs_fst,(Option.get context.fst_symb));
+     (Symbols.fs_snd,(Option.get context.snd_symb));
+     (Symbols.fs_att,(Option.get context.att_symb));
+     (Symbols.fs_of_bool,(Option.get context.of_bool_symb));
+     (Symbols.fs_empty,(Option.get context.empty_symb));
+    ]
 
 
 let add_macros context = 
@@ -1333,43 +1257,40 @@ let build_task ~timestamp_style ~pure table system
   Why3.Task.add_decl task decl
 
 
-       (* }}} *)
-let id_unique = ref 1
+let unique_id =
+  let id = ref 0 in
+  fun () -> incr id ; !id
+
 let is_valid
-    ~timestamp_style ~pure ~slow ~prover
+    ~timestamp_style ~pure ~slow ~provers
     table system evars hypotheses conclusion
   =
-    (*let oc = open_out_gen [Open_append;Open_creat] 1411 "/home/sriou/Documents/temps_exec/memory_limit.txt" in 
-    Gc.print_stat oc;
-    let ppf = Format.formatter_of_out_channel (oc) in 
-    Format.fprintf ppf " --- @.";
-    close_out oc;*)
-    let theory = match load_theory ~timestamp_style ~pure env with 
-      |Some theory -> theory
-      |None -> Format.printf "Load theory failed@."; raise InternalError
-    in  
-    let task = build_task 
-      ~timestamp_style ~pure 
-      table system 
-      evars hypotheses conclusion 
-      theory 
-    in if Sys.getenv_opt "BENCHMARK_VERBOSE" <>None then begin
-      (let oc = open_out_gen [Open_append;Open_creat] 1411 "BENCHMARK_VERBOSE" in 
-      let ppf = Format.formatter_of_out_channel (oc) in 
-      Format.fprintf ppf "Id %d@." !id_unique;
-      id_unique:=!id_unique+1;
+  let theory = match load_theory ~timestamp_style ~pure env with
+    | Some theory -> theory
+    | None -> Format.printf "Load theory failed@."; raise InternalError
+  in
+  let task = build_task
+    ~timestamp_style ~pure
+    table system
+    evars hypotheses conclusion
+    theory
+  in
+  begin match Sys.getenv_opt "SMT_VERBOSE" with
+    | None -> ()
+    | Some filename ->
+      let oc = open_out_gen [Open_append;Open_creat] 0o644 filename in
+      let ppf = Format.formatter_of_out_channel oc in
+      Format.fprintf ppf "Id %d@." (unique_id ());
       Format.fprintf ppf "%a@." Why3.Pretty.print_task task;
-       close_out oc
-      )
-    end;
-    let res  = run_all_async ~slow ~prover table task  in 
-    Format.printf "Task is %a@." Why3.Pretty.print_task task;
-    res
-    
-    
+      close_out oc
+  end;
+  if smt_debug then
+    Format.printf "%a@." Why3.Pretty.print_task task;
+  run_all_async ~slow ~provers table task
+
 (* Tactic registration *)
 
-let sequent_is_valid ~timestamp_style ~slow ~pure ~prover (s:TraceSequent.t) =
+let sequent_is_valid ~timestamp_style ~slow ~pure ~provers (s:TraceSequent.t) =
   let env = TraceSequent.env s in
   let table = env.table in
   let system = match SystemExpr.to_fset env.system.set with 
@@ -1387,7 +1308,7 @@ let sequent_is_valid ~timestamp_style ~slow ~pure ~prover (s:TraceSequent.t) =
       (LowTraceSequent.Hyps.to_list s)
   in
   let conclusion = LowTraceSequent.conclusion s in
-  try is_valid ~timestamp_style ~slow ~pure ~prover
+  try is_valid ~timestamp_style ~slow ~pure ~provers
     table system evars hypotheses conclusion
   with 
     |e -> raise e
@@ -1403,41 +1324,57 @@ let default_parameters = {
   timestamp_style = Nat;
   slow = false;
   pure = false ;
-  provers = []
+  provers = ["CVC5",""]
 }
-let rec parse_arg parameters = function
-  | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract"}]) ->
+
+let parse_prover_arg prover_alt =
+  let add_dash s = if s = "AltErgo" then "Alt-Ergo" else s in
+  match String.split_on_char '_' prover_alt with
+    | [p;alt] -> add_dash p, alt
+    | [p] -> add_dash p, ""
+    | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
+
+let parse_arg parameters = function
+
+  (* Translation style for timestamps *)
+  | TacticsArgs.NList ({Location.pl_desc="style"},
+                       [{Location.pl_desc="abstract"}]) ->
     { parameters with timestamp_style = Abstract }
-  | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="nat"}]) ->
+  | TacticsArgs.NList ({Location.pl_desc="style"},
+                       [{Location.pl_desc="nat"}]) ->
     { parameters with timestamp_style = Nat }
-  | TacticsArgs.NList ({Location.pl_desc="style"},[{Location.pl_desc="abstract_eq"}]) ->
+  | TacticsArgs.NList ({Location.pl_desc="style"},
+                       [{Location.pl_desc="abstract_eq"}]) ->
     { parameters with timestamp_style = Abstract_eq }
-  | TacticsArgs.NList ({Location.pl_desc="prover"} ,[]) ->
-    parameters
-  | TacticsArgs.NList ({Location.pl_desc="prover"} as p,{Location.pl_desc=prover_alt}::t) ->
-    let add_dash s = if s="AltErgo" then "Alt-Ergo" else s in 
-    let pr, alt = match (String.split_on_char '_' prover_alt) with 
-      |[p;alt] -> (add_dash p),alt 
-      |[p] -> (add_dash p),""
-      |_ -> Tactics.(hard_failure (Failure "unrecognized argument"))
-    in 
-    (parse_arg 
-      {parameters with provers = (pr,alt)::parameters.provers} 
-      (TacticsArgs.NList (p,t))
-    )
-  | TacticsArgs.NList ({Location.pl_desc="slow"},[{Location.pl_desc="true"}]) ->
-    {parameters with slow=true}
-  | TacticsArgs.NList ({Location.pl_desc="slow"},[{Location.pl_desc="false"}]) ->
-    {parameters with slow=false}
-  | TacticsArgs.NList ({Location.pl_desc="pure"},[{Location.pl_desc="true"}]) ->
-    {parameters with pure=true}
-  | TacticsArgs.NList ({Location.pl_desc="pure"},[{Location.pl_desc="false"}]) ->
-    {parameters with pure=false}  
+
+  (* Provers *)
+  | TacticsArgs.NList ({Location.pl_desc="prover"},l)
+  | TacticsArgs.NList ({Location.pl_desc="provers"},l) ->
+    let process_prover provers {Location.pl_desc=prover_alt} =
+      parse_prover_arg prover_alt :: provers
+    in
+    { parameters with provers = List.fold_left process_prover [] l }
+
+  (* Other flags *)
+  | TacticsArgs.NArg {Location.pl_desc="slow"}
+  | TacticsArgs.NList ({Location.pl_desc="slow"},
+                       [{Location.pl_desc="true"}]) ->
+    { parameters with slow=true }
+  | TacticsArgs.NList ({Location.pl_desc="slow"},
+                       [{Location.pl_desc="false"}]) ->
+    { parameters with slow=false }
+  | TacticsArgs.NArg {Location.pl_desc="pure"}
+  | TacticsArgs.NList ({Location.pl_desc="pure"},
+                       [{Location.pl_desc="true"}]) ->
+    { parameters with pure=true }
+  | TacticsArgs.NList ({Location.pl_desc="pure"},
+                       [{Location.pl_desc="false"}]) ->
+    { parameters with pure=false }
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
-  
+
 let parse_args args =
   List.fold_left parse_arg default_parameters args
-  
+
 let () =
   ProverTactics.register_general "smt" ~pq_sound:true
     (fun args s sk fk ->
@@ -1453,7 +1390,7 @@ let () =
        if
          sequent_is_valid
           ~timestamp_style ~slow ~pure
-          ~prover:(match provers with [] -> ["CVC4",""] | l -> l)
+          ~provers
           s
        then
          sk [] fk
@@ -1461,50 +1398,67 @@ let () =
          fk (None, Tactics.Failure "SMT cannot prove sequent"))
 
 let () =
-  if Sys.getenv_opt "BENCHMARK_SMT" <> None then
-    let timestamp_style = match Sys.getenv_opt "BENCHMARK_SMT" with
-      | Some "Abs" -> Abstract
-      | Some "Abs_Eq" -> Abstract_eq
-      | _ -> Nat
-    and prover = match Sys.getenv_opt "BENCHMARK_PROVER", Sys.getenv_opt "BENCHMARK_ALTERN" with
-      |None, None -> ["CVC4",""]
-      |None, Some alt -> ["CVC4",alt]
-      |Some p, None -> [p, ""]
-      |Some p, Some alt -> [p,alt]  
-    in
-    TraceSequent.register_query_alternative
-      ("Smt"^(fst(List.hd prover))^(snd(List.hd prover)))
-      (fun ~precise:_ s q ->
-        let s =
-          match q with
-          | None -> s
-          | Some q ->
-            let conclusion = Term.mk_ands (List.map Term.Lit.lit_to_form q) in
-            TraceSequent.set_conclusion conclusion s
-        in
-        sequent_is_valid
-          ~timestamp_style
-          ~slow:false
-          ~pure:false
-          ~prover
-          s) 
-    (*TraceTactics.AutoSimplBenchmark.register_alternative
-      ("Smt"^pr)
-      (fun s ->
-        sequent_is_valid
-          ~timestamp_style
-          ~slow:false
-          ~pure:false
-          ~prover:[pr]
-          s,
-        None)*) (*;
-    TraceTactics.AutoBenchmark.register_alternative
-      ("Smt"^pr)
-      (fun (_,s) ->
-        sequent_is_valid
-          ~timestamp_style
-          ~slow:false
-          ~pure:false
-          ~prover:[pr]
-          s)*)
-    
+  let provers =
+    match Sys.getenv_opt "SMT_PROVERS" with
+    | None -> ["CVC5",""]
+    | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
+  in
+  let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with
+    | Some "Abs" -> Abstract
+    | Some "Abs_Eq" -> Abstract_eq
+    | _ -> Nat
+  in
+  let benchmarks =
+    match Sys.getenv_opt "SMT_BENCHMARKS" with
+    | None -> []
+    | Some s -> String.split_on_char ':' s
+  in
+  let bench_name prover alt = Format.sprintf "SMT_%s_%s" prover alt in
+  if List.mem "constr" benchmarks then
+    List.iter
+      (fun (prover,alt) ->
+         TraceSequent.register_query_alternative
+           (bench_name prover alt)
+           (fun ~precise:_ s q ->
+              let s =
+                match q with
+                | None -> s
+                | Some q ->
+                  let conclusion =
+                    Term.mk_ands (List.map Term.Lit.lit_to_form q) in
+                  TraceSequent.set_conclusion conclusion s
+              in
+              sequent_is_valid
+                ~timestamp_style
+                ~slow:false
+                ~pure:false
+                ~provers:[prover,alt]
+                s))
+      provers;
+  if List.mem "autosimpl" benchmarks then
+    List.iter
+      (fun (prover,alt) ->
+         TraceTactics.AutoSimplBenchmark.register_alternative
+           (bench_name prover alt)
+           (fun s ->
+              sequent_is_valid
+                ~timestamp_style
+                ~slow:false
+                ~pure:false
+                ~provers:[prover,alt]
+                s,
+              None))
+      provers;
+  if List.mem "auto" benchmarks then
+    List.iter
+      (fun (prover,alt) ->
+         TraceTactics.AutoBenchmark.register_alternative
+           (bench_name prover alt)
+           (fun (_,s) ->
+              sequent_is_valid
+                ~timestamp_style
+                ~slow:false
+                ~pure:false
+                ~provers:[prover,alt]
+                s))
+      provers
