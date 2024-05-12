@@ -1404,16 +1404,24 @@ let () =
     | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
   in
   let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with
-    | Some "Abs" -> Abstract
-    | Some "Abs_Eq" -> Abstract_eq
-    | _ -> Nat
+    | Some "AbsNoEq" -> Abstract
+    | Some "Abs" -> Abstract_eq
+    | Some "Nat" | Some "" | None -> Nat
+    | _ ->
+      Format.eprintf "Unknown timestamp style!@.";
+      Format.eprintf "If set and non-empty, \
+                      SMT_STYLE must be Nat, Abs, or AbsNoEq.@.";
+      exit 1
   in
   let benchmarks =
     match Sys.getenv_opt "SMT_BENCHMARKS" with
     | None -> []
     | Some s -> String.split_on_char ':' s
   in
-  let bench_name prover alt = Format.sprintf "SMT_%s_%s" prover alt in
+  let bench_name prover alt =
+    let alt = if alt = "" then alt else "_" ^ alt in
+    Format.sprintf "SMT_%s%s" prover alt
+  in
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
