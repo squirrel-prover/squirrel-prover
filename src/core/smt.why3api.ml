@@ -287,7 +287,7 @@ let rec convert_type context = function
   | Type.Index -> Why3.Ty.ty_app context.index_symb []
   | TBase t when  t = "int" -> context.int_ty
   | TBase t -> Why3.Ty.(ty_var (tv_of_string t))
-  | TVar _ -> context.ts_ty 
+  | TVar _ -> assert false
   | Fun (t1,t2) -> Why3.Ty.ty_func (convert_type context t1)
                    (convert_type context t2)
   | TUnivar ty ->
@@ -1364,7 +1364,6 @@ let is_valid
     evars hypotheses conclusion
     theory
   in
-  Format.printf "Task %a@." Why3.Pretty.print_task task;
   begin match Sys.getenv_opt "SMT_VERBOSE" with
     | None -> ()
     | Some filename ->
@@ -1490,7 +1489,7 @@ let () =
 let () =
   let provers =
     match Sys.getenv_opt "SMT_PROVERS" with
-    | None -> ["CVC4","counterexamples"]
+    | None -> ["CVC5",""]
     | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
   in
   let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with
