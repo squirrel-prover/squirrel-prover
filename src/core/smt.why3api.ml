@@ -433,7 +433,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           t_if (msg_to_fmla context cond) 
             (msg_to_fmla context f1) 
             (msg_to_fmla context f2)
-      | [_] when
+      | _ when
           (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> [] ->
         let var_list = 
           List.sort
@@ -1023,7 +1023,7 @@ let add_equational_axioms context =
         | (PublicKey, _), (Sign     , _) -> f2, f1
         | _ -> assert false
       in
-      (* mcheck(msig(m, k), pk(k)) -> true *)
+      (* mcheck(m,msig(m, k), pk(k)) -> true *)
       let vars =
         List.map (fun str ->
             Why3.(Term.create_vsymbol (Ident.id_fresh str)
@@ -1544,7 +1544,15 @@ let () =
                 ~pure:false
                 ~provers:[prover,alt]
                 s,
-              None))
+              None);
+          TraceTactics.AutoSimplBenchmark.register_alternative
+            ("AutoSimpl")
+            (fun s -> 
+              match TraceTactics.simpl_direct ~red_param:Reduction.rp_default ~strong:true ~close:true s with
+                | Ok [] -> true,None
+                | Error _ -> false,None
+                | Ok _ -> assert false)
+              )
       provers;
   if List.mem "auto" benchmarks then
     List.iter
