@@ -39,7 +39,7 @@ let load_theory ~timestamp_style ~pure env =
 let create_call ?limit_opt prover table config_prover task :
   Why3.Call_provers.prover_call option =
   let limit = match limit_opt with
-    | None   -> TConfig.solver_timeout (table)
+    | None   -> TConfig.solver_timeout (table) 
     | Some x -> x
   in
   Format.eprintf
@@ -144,12 +144,12 @@ type context = {
   index_symb : Why3.Ty.tysymbol;
   msg_symb : Why3.Ty.tysymbol option;
   ts_symb : Why3.Ty.tysymbol;
-  int_symb : Why3.Ty.tysymbol;
+  (* int_symb : Why3.Ty.tysymbol; *)
   eqv_symb : Why3.Term.lsymbol option;
-  int_leq_symb : Why3.Term.lsymbol;
+  (* int_leq_symb : Why3.Term.lsymbol;
   int_geq_symb : Why3.Term.lsymbol;
   int_lt_symb : Why3.Term.lsymbol;
-  int_gt_symb : Why3.Term.lsymbol; 
+  int_gt_symb : Why3.Term.lsymbol;  *)
   leq_symb : Why3.Term.lsymbol;
   happens_symb : Why3.Term.lsymbol;
   init_symb : Why3.Term.lsymbol;
@@ -169,7 +169,7 @@ type context = {
   msg_ty : Why3.Ty.ty option;
   ts_ty : Why3.Ty.ty;
   index_ty : Why3.Ty.ty;
-  int_ty : Why3.Ty.ty;
+  (* int_ty : Why3.Ty.ty; *)
 
   indices : Vars.var list;
   tsvars : Vars.var list;
@@ -207,15 +207,15 @@ let ty_to_string t = match t.Why3.Ty.ty_node with
 exception InternalError
 
 let context_init ~timestamp_style ~pure tm_theory evars table system = 
-  let int_theory = Why3.Env.read_theory env ["int"] "Int"in
+  (* let int_theory = Why3.Env.read_theory env ["int"] "Int"in *)
   let tm_export = tm_theory.Why3.Theory.th_export 
-  and int_export = int_theory.Why3.Theory.th_export 
+  (* and int_export = int_theory.Why3.Theory.th_export  *)
   and none_if_pure why3find tm symb = if pure then None 
                                       else Some (why3find tm symb) in 
   let index_symb = Why3.Theory.ns_find_ts tm_export ["index"]
   and msg_symb = none_if_pure Why3.Theory.ns_find_ts tm_export ["message"]
   and ts_symb = Why3.Theory.ns_find_ts tm_export ["timestamp"]
-  and int_symb = Why3.Theory.ns_find_ts int_export ["int"];
+  (* and int_symb = Why3.Theory.ns_find_ts int_export ["int"]; *)
   and uc = ref (Why3.Theory.use_export 
     (Why3.Theory.create_theory (Why3.Ident.id_fresh "MyTheory")) 
     tm_theory
@@ -229,11 +229,11 @@ let context_init ~timestamp_style ~pure tm_theory evars table system =
     ts_symb      = ts_symb;
     eqv_symb     =  if (timestamp_style=Abstract_eq) then None 
                     else Some (Why3.Theory.ns_find_ls tm_export ["infix ~~"]); 
-    int_symb = int_symb;
-    int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
+    (* int_symb = int_symb; *)
+    (* int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
     int_geq_symb = Why3.Theory.ns_find_ls int_export ["infix >="];
     int_lt_symb = Why3.Theory.ns_find_ls int_export ["infix <"];
-    int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"];
+    int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"]; *)
     leq_symb     = Why3.Theory.ns_find_ls tm_export ["infix <~"];
     happens_symb = Why3.Theory.ns_find_ls tm_export ["happens"];
     init_symb    = Why3.Theory.ns_find_ls tm_export ["init"];
@@ -257,7 +257,7 @@ let context_init ~timestamp_style ~pure tm_theory evars table system =
         Some (Why3.Ty.ty_app (Option.get msg_symb) []);
     ts_ty    = Why3.Ty.ty_app ts_symb [];
     index_ty = Why3.Ty.ty_app index_symb [];
-    int_ty = Why3.Ty.ty_app int_symb [];
+    (* int_ty = Why3.Ty.ty_app int_symb []; *)
     indices = filter_ty Type.Index evars;
     tsvars = filter_ty Type.Timestamp evars;
     msgvars = filter_msg evars;
@@ -285,7 +285,7 @@ let rec convert_type context = function
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
   | Type.Index -> Why3.Ty.ty_app context.index_symb []
-  | TBase t when  t = "int" -> context.int_ty
+  (* | TBase t when  t = "int" -> context.int_ty *)
   | TBase t -> Why3.Ty.(ty_var (tv_of_string t))
   | TVar _ -> assert false
   | Fun (t1,t2) -> Why3.Ty.ty_func (convert_type context t1)
@@ -410,9 +410,9 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
               (t_not @@ ts_equ context 
                 (msg_to_fmla context t2) (msg_to_fmla context t1)
               )
-      | [t1;t2] when symb = f_leq ->
+      (* | [t1;t2] when symb = f_leq ->
         t_app_infer 
-          context.leq_symb 
+          context.int_leq_symb 
           [msg_to_fmla context t1;msg_to_fmla context t2]
       | [t1;t2] when symb = f_geq ->
         t_app_infer 
@@ -425,7 +425,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
       | [t1;t2] when symb = f_gt ->
         t_app_infer 
           context.int_gt_symb
-          [msg_to_fmla context t1;msg_to_fmla context t2]
+          [msg_to_fmla context t1;msg_to_fmla context t2] *)
 
       | [t1] when symb = f_happens -> 
           t_app_infer context.happens_symb [msg_to_fmla context t1]
@@ -1490,6 +1490,9 @@ let () =
   let provers =
     match Sys.getenv_opt "SMT_PROVERS" with
     | None -> ["CVC5",""]
+    | Some s when s="All" -> List.map 
+      (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern)) 
+      (Why3.Whyconf.Mprover.keys why3_provers)
     | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
   in
   let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with

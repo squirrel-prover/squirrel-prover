@@ -13,17 +13,16 @@ theory Trace_model
 
   constant  init : timestamp
   constant max_int : int
-  axiom val_max_int : max_int>=0
 
-  predicate happens (t : timestamp) = t >= 0 /\ max_int>=t
+  predicate happens (t : timestamp) = t >= 1 /\ max_int>=t
   predicate (~~)  (t : timestamp) (t' : timestamp) =
     (happens t \/ happens t') -> t = t'
   predicate (<~)  (t : timestamp) (t' : timestamp) =
     happens t /\ happens t' /\ t <= t'
 
-  axiom act_init :  init  = 0
+  axiom act_init :  init  = 1
 
-  function pred (t : timestamp) : timestamp = if happens t then t - 1 else t
+  function pred (t : timestamp) : timestamp = if happens t then t - 1 else 0
 
   (*Definition and specification of various functions*)
 

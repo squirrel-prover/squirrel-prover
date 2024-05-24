@@ -18,29 +18,26 @@ theory Trace_model_abs_eq
   (*Specification of these functions*)
 
   axiom eq_nothapp : forall t1 t2 : timestamp.  
-    (not (happens t1) /\ not (happens t2)) -> (t1 = t2)
+    (happens t1) \/ (happens t2) \/ (t1 = t2)
 
-  axiom order_happ : forall t1 t2 : timestamp. 
-    (t1 <~ t2) -> (happens t1 /\ happens t2)
   axiom orderpred : forall t : timestamp. (happens (pred t ))-> ((pred t) <~ t) 
   axiom ordertrans : forall t1 t2 t3 : timestamp. 
     ((t1 <~ t2) /\ (t2 <~ t3)) -> (t1 <~ t3)
   axiom ordermin : forall t : timestamp. (happens t) -> (init <~ t) 
   axiom total_order : forall t1 t2 : timestamp. 
-    (happens t1 /\ happens t2) -> ((t1 <~ t2) \/ (t2 <~ t1))
+    (happens t1 /\ happens t2) <-> ((t1 <~ t2) \/ (t2 <~ t1))
 
  
   axiom anti_symmetry : forall t1 t2 : timestamp. 
     ((t1 <~ t2) /\ (t2 <~ t1)) -> (t1 = t2) 
-  axiom pred_undef : forall t1 : timestamp. 
-    (happens (pred t1)) -> (happens t1)
-  axiom pred_def : forall t : timestamp. 
-    (happens (pred t)) -> 
-      (forall t2 : timestamp. ((t2 <~ (pred t) )\/ (t <~ t2)\/(not happens t2))) 
+
+  axiom pred_def : forall t1 t2 : timestamp. 
+    (happens (pred t1)) -> (happens t2) ->
+      ((t2 <~ (pred t1) )\/ (t1 <~ t2))
   axiom pred_def2 : forall t : timestamp. (happens t) -> not ((pred t) = t)
 
   axiom happ_pred : forall t : timestamp. 
-    (happens t /\ (not (t = init))) -> happens (pred t)
+    (happens t) -> (happens (pred t)) \/ (t=init)
   
   axiom happ_init : happens init
 
