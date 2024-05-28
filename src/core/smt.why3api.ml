@@ -29,7 +29,7 @@ let load_theory ~timestamp_style ~pure env =
     let theory = (if pure then "pure_" else "")^
                   "trace_model"^
                   (match timestamp_style with 
-                    |Abstract -> "_abs" | Abstract_eq -> "_abs_eq" | _ ->"") in
+                    |Abstract -> "_abs_noeq" | Abstract_eq -> "_abs" | _ ->"") in
     Some (Why3.Env.read_theory env [theory] (String.capitalize_ascii theory))
   with
     | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
@@ -1202,8 +1202,8 @@ let add_macro_axioms context =
                       (assert (List.inclusion (ns_args) (Term.mk_vars descr.indices));
                       t_if
                         (t_equ
-                            (t_tuple indices)
-                            (t_tuple (List.map (msg_to_fmla context) ns_args)))
+                          (t_tuple indices)
+                          (t_tuple (List.map (msg_to_fmla context) ns_args)))
                         expansion_ok
                         same_as_pred)
                   with Not_found -> same_as_pred in
@@ -1427,13 +1427,13 @@ let parse_arg parameters = function
 
   (* Translation style for timestamps *)
   | TacticsArgs.NList ({Location.pl_desc="style"},
-                       [{Location.pl_desc="abstract"}]) ->
+                       [{Location.pl_desc="abstract_noeq"}]) ->
     { parameters with timestamp_style = Abstract }
   | TacticsArgs.NList ({Location.pl_desc="style"},
                        [{Location.pl_desc="nat"}]) ->
     { parameters with timestamp_style = Nat }
   | TacticsArgs.NList ({Location.pl_desc="style"},
-                       [{Location.pl_desc="abstract_eq"}]) ->
+                       [{Location.pl_desc="abstract"}]) ->
     { parameters with timestamp_style = Abstract_eq }
 
   (* Provers *)
