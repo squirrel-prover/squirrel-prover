@@ -74,7 +74,8 @@ type ty =
   | Index  
   | Timestamp
     
-  | TBase of string
+  (* FIXME: use a type-safe [Symbols.path] *)
+  | TBase of string list * string (* namespace path, name *)
   (** User-defined types *)
         
   | TVar of tvar
@@ -143,7 +144,7 @@ let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
 
-let base s   = TBase s
+let base np s = TBase (np,s)
 
 let rec fun_l tys tyout : ty =
   match tys with
@@ -163,7 +164,7 @@ let rec equal (a : ty) (b : ty) : bool =
                                
    | TVar s, TVar s'  -> Ident.equal s s'
 
-   | TBase s, TBase s' -> s = s'
+   | TBase (np,s), TBase (np',s') -> np = np' && s = s'
 
    | TUnivar u, TUnivar u' -> Ident.equal u u'
 
@@ -191,7 +192,8 @@ let _pp ~dbg : Format.formatter -> ty -> unit =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TBase s   -> Fmt.pf ppf "%s" s
+    | TBase (np,s) -> 
+      Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
     | TVar id   -> _pp_tvar ~dbg ppf id
     | TUnivar u -> pp_univar ppf u
 
@@ -222,7 +224,8 @@ let to_string (ty : ty) : string =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TBase s   -> Fmt.pf ppf "%s" s
+    | TBase (np,s) -> 
+      Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
     | TVar id   -> pp_tvar ppf id
     | TUnivar u -> pp_univar ppf u
 
@@ -302,12 +305,7 @@ let tsubst_add_univar s tu ty = { s with ts_univar = Mid.add tu ty s.ts_univar; 
   
 let rec tsubst (s : tsubst) (t : ty) : ty = 
   match t with
-  | Message   -> Message
-  | Boolean   -> Boolean
-  | Index     -> Index
-  | Timestamp -> Timestamp
-
-  | TBase str -> TBase str
+  | Message | Boolean | Index | Timestamp | TBase _ -> t
 
   | TVar id -> Mid.find_dflt t id s.ts_tvar
 

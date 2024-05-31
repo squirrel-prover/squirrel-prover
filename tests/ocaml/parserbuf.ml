@@ -204,7 +204,7 @@ let models =
            try
              ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
                      : Symbols.table )
-           with Symbols.Error (_, Multiple_declarations ("c",_,_)) ->
+           with Symbols.Error (_, Multiple_declarations (_,"c",_,_)) ->
              raise Ok)
     end ;
     "Let in actions", `Quick, begin fun () ->
@@ -262,7 +262,7 @@ let models =
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                        : Symbols.table )
-           with Symbols.Error (_, Symbols.Unbound_identifier "D") -> raise Ok)
+           with Symbols.Error (_, Symbols.Unbound_identifier (_,"D")) -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -270,7 +270,7 @@ let models =
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
            with Symbols.Error (_,
-                                   Symbols.Multiple_declarations ("C",_,_)) ->
+                                   Symbols.Multiple_declarations (_,"C",_,_)) ->
              raise Ok)
     end ;
     "Duplicated State Update", `Quick, begin fun () ->

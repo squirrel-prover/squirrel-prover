@@ -652,7 +652,7 @@ Proof.
   split; 1: auto.
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
     {intro t'; rewrite eq_iff.
-    by split; 2: intro _; apply C.}
+    by split; 2: intro _; apply C. }
   rewrite !Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) => happens(t')).

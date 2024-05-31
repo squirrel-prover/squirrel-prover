@@ -75,7 +75,7 @@ let clone_system
 let clone_system_map
     (table    : Symbols.table)
     (system   : System.Single.t)
-    (new_name : Theory.lsymb)
+    (new_name : Symbols.lsymb)
     (fmap     :
        ( system_map_arg ->
          Symbols.macro ->
@@ -250,7 +250,7 @@ let global_rename
   in 
   
   let axiom_name =
-    let old_system_name = Symbols.to_string old_single_system.system in
+    let old_system_name = Symbols.path_to_string old_single_system.system in
     "rename_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
@@ -369,8 +369,7 @@ let global_prf
   let ndef = Symbols.Name { n_fty } in
   let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
-  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
-  let table = Process.add_namelength_axiom table real_name n_fty in
+  let table = Process.add_namelength_axiom table n n_fty in
   
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
@@ -407,7 +406,7 @@ let global_prf
   in 
   
   let axiom_name =
-    let old_system_name = Symbols.to_string old_single_system.system in
+    let old_system_name = Symbols.path_to_string old_single_system.system in
     "prf_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
@@ -528,14 +527,9 @@ let global_cca
   let ty_args = List.map Term.ty enc_rnd.args in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
   let ndef = Symbols.Name { n_fty } in
-  let s = (L.mk_loc L._dummy "n_CCA") in
-  let table,n =
-    Symbols.Name.declare ~approx:true table s ~data:ndef
-  in
-  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
-  let table = Process.add_namelength_axiom table real_name n_fty in
-  (*     Type.Message in *)
-  (* let table = Lemma.add_lemma `Axiom stmt table in *)
+  let s = L.mk_loc L._dummy "n_CCA" in
+  let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
+  let table = Process.add_namelength_axiom table n n_fty in
   
   let mess_replacement =
     if Term.is_name plaintext then
@@ -603,7 +597,7 @@ let global_cca
 
   (* Note: the added lemma was bugged, commented out for now. *)
   (* let axiom_name =
-   *   let old_system_name = Symbols.to_string old_single_system.system in
+   *   let old_system_name = Symbols.path_to_string old_single_system.system in
    *   "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
    * in *)
 
@@ -616,8 +610,7 @@ let global_cca
     let rdef = Symbols.Name { n_fty } in
     Symbols.Name.declare ~approx:true table s ~data:rdef
   in
-  let real_name = L.mk_loc L._dummy (Symbols.to_string r) in
-  let table = Process.add_namelength_axiom table real_name n_fty in
+  let table = Process.add_namelength_axiom table r n_fty in
 
   (* let enrich = [Term.mk_var fresh_x_var] in
    * let make_conclusion equiv =
@@ -684,10 +677,10 @@ let pp_x_hash_occ fmt (x : x_hash_occ) : unit =
   Fmt.pf fmt "@[<v>action: %a(%a) :- %a@;\
               fresh name: %a@;\
               %a@]"
-    Symbols.pp x.x_a
+    Symbols.pp_path x.x_a
     Vars.pp_list x.x_a_is
-    Symbols.pp x.x_msymb
-    Symbols.pp x.x_nsymb
+    Symbols.pp_path x.x_msymb
+    Symbols.pp_path x.x_nsymb
     Iter.pp_hash_occ x.x_occ
 
 let subst_xocc (s : Term.subst) (o : x_hash_occ) : x_hash_occ =
@@ -952,8 +945,7 @@ let global_prf_t
       let ndef = Symbols.Name { n_fty } in
       let s = L.mk_loc L._dummy "n_PRF" in
       let table, ns = Symbols.Name.declare ~approx:true table s ~data:ndef in
-      let real_name = L.mk_loc L._dummy (Symbols.to_string ns) in
-      let table = Process.add_namelength_axiom table real_name n_fty in
+      let table = Process.add_namelength_axiom table ns n_fty in
       table,ns
   in
 

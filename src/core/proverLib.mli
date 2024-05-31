@@ -17,9 +17,10 @@ type pending_proof =
 
 (** User printing query *)
 type print_query =
-  | Pr_system    of SystemExpr.Parse.t option (* [None] means current system *)
-  | Pr_any of Theory.lsymb (* print any lemma, function, name or macro
-                              with given lsymb *)
+  | Pr_system    of SystemExpr.Parse.t option
+  (** system printing query ([None] means current system) *)
+  | Pr_any of Symbols.p_path   
+  (** print query in in all kinds of symbols *)
 
 (** User search query *)
 type search_query =
@@ -39,7 +40,7 @@ val pp_error :
   (Format.formatter -> Location.t -> unit) -> 
   Format.formatter -> error -> unit
 
-val unnamed_goal : unit -> Theory.lsymb
+val unnamed_goal : unit -> Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
@@ -48,9 +49,9 @@ type load_path =
   | Name of string Location.located
   | Path of string Location.located
 
-val lsymb_of_load_path : load_path -> Theory.lsymb
+val lsymb_of_load_path : load_path -> Symbols.lsymb
 
-type include_param = { th_name : load_path; params : Theory.lsymb list }
+type include_param = { th_name : load_path; params : Symbols.lsymb list }
 
 type bulleted_tactic =
   | Bullet of string

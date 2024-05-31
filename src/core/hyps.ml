@@ -8,7 +8,7 @@ module SE = SystemExpr
 module Args = TacticsArgs
   
 (*------------------------------------------------------------------*)  
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)  
 let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
@@ -67,8 +67,8 @@ module type S1 = sig
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
-  val by_name   : Theory.lsymb ->            hyps -> Ident.t * ldecl_cnt
-  val by_name_k : Theory.lsymb -> 'a kind -> hyps -> Ident.t * 'a
+  val by_name   : Symbols.lsymb ->            hyps -> Ident.t * ldecl_cnt
+  val by_name_k : Symbols.lsymb -> 'a kind -> hyps -> Ident.t * 'a
 
   (*------------------------------------------------------------------*) 
   val fresh_id  : ?approx:bool -> string      -> hyps -> Ident.t

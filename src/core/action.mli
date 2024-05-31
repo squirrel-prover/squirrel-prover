@@ -17,6 +17,7 @@
     Actions and symbols exist independently of a system, but descriptions
     are given relative to a (bi)system. *)
 
+(*------------------------------------------------------------------*)
 (** {2 Execution points}
    
     Actions uniquely describe execution points in a protocol.
@@ -136,7 +137,7 @@ val fresh_symbol :
     associated to it yet. *)
 val declare_symbol : Symbols.table ->  Symbols.action -> int -> Symbols.table
 
-(** defined an action symbol, that is either reserved or declared in
+(** Define an action symbol that is either reserved or declared in
     the symbol table. *)
 val define_symbol :
   Symbols.table ->
@@ -148,24 +149,19 @@ val is_def  : Symbols.action -> Symbols.table -> bool
 val is_decl : Symbols.action -> Symbols.table -> bool 
 
 (*------------------------------------------------------------------*)
-val data_of_lsymb : Symbols.lsymb  -> Symbols.table -> data
-val get_data      : Symbols.action -> Symbols.table -> data
+val get_def : Symbols.action -> Symbols.table -> Vars.var list * action 
 
 (*------------------------------------------------------------------*)
-val def_of_lsymb : Symbols.lsymb  -> Symbols.table -> Vars.var list * action
-val get_def      : Symbols.action -> Symbols.table -> Vars.var list * action 
-
-(*------------------------------------------------------------------*)
-val of_lsymb : Symbols.lsymb -> Symbols.table -> Symbols.action
+val convert : Symbols.p_path -> Symbols.table -> Symbols.action
 
 (*------------------------------------------------------------------*)
 val arity : Symbols.action -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}
-  *
-  * Describe the behavior of an action: it consists of an input, followed by a
-  * condition, then state updates and an output. *)
+  
+    Describe the behavior of an action: it consists of an input, followed by a
+    condition, then state updates and an output. *)
 
 (** Type of action descriptions. *)
 type descr = {

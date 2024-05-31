@@ -181,17 +181,12 @@ let intctxt
   in
 
 
-    (* copied from old euf, handles the composition goals *)
+  (* copied from old euf, handles the composition goals *)
   let tag_s =
-    let f =
-      let loc_enc_f = L.mk_loc (L.loc h) (Symbols.to_string enc_f) in
-      Oracle.get_oracle_tag_formula loc_enc_f (TS.table s)
-    in
-    (* if the hash is not tagged, the formula is False, and we don't create
-       another goal. *)
-    if f = Term.mk_false
-    then []
-    else
+    match Oracle.get_oracle enc_f (TS.table s) with
+    (* if the hash is not tagged, we don't create another goal. *)
+    | None -> []
+    | Some f ->
       (* else, we create a goal where m,sk satisfy the axiom *)
       let uvarm, uvarkey,f = match f with
         | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f

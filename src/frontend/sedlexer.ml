@@ -7,7 +7,7 @@ let unterminated_comment () = raise (Lexical_error "unterminated comment")
 let alpha = [%sedlex.regexp? 'a' .. 'z' | 'A' .. 'Z']
 let digit = [%sedlex.regexp? '0' .. '9']
 let alphanum = [%sedlex.regexp? alpha | digit]
-let whitespace = [%sedlex.regexp? zs]
+let whitespace = [%sedlex.regexp? zs | '\t']
 
 let emoji =
   [%sedlex.regexp?
@@ -30,10 +30,15 @@ let emoji =
     | 0x1F910 .. 0x1F96B
     | 0x1F980 .. 0x1F9E0 )]
 
-let name =
-  [%sedlex.regexp? (ll | lu | emoji), Star (ll | lu | emoji | digit | '_' | '\'')]
+(* identifier starting by a lower-case character *)
+let lid =
+  [%sedlex.regexp? (ll | emoji), Star (ll | lu | emoji | digit | '_' | '\'')]
 
-let path =
+(* identifier starting by an upper-case character *)
+let uid =
+  [%sedlex.regexp? (lu), Star (ll | lu | emoji | digit | '_' | '\'')]
+
+let filepath =
   [%sedlex.regexp? '.', '/', Plus (alphanum | '_' | '.' | '-' | '/'), ".sp"]
 
 let int = [%sedlex.regexp? Plus digit]
@@ -62,17 +67,18 @@ let right_infix_symb =
 let rec token buf =
   let (!?) token =
     if Feedback.keywords_as_ids () then
-      ID (Utf8.lexeme buf)
+      let str = Utf8.lexeme buf in
+      if Char.lowercase_ascii str.[0] = str.[0] then LID str else UID str
     else
       token
   in
   match%sedlex buf with
-  | whitespace | '\t' -> token buf
+  | whitespace -> token buf
   | '\n' -> token buf
   | "(*" ->
       comment buf;
       token buf
-  | "!_", name -> BANG (Utf8.lexeme buf |> drop_n_first_chars ~n:2)
+  | "!_", (lid | uid) -> BANG (Utf8.lexeme buf |> drop_n_first_chars ~n:2)
   | "&&" -> AND
   | "/\\" -> GAND
   | "\\/" -> GOR
@@ -87,7 +93,6 @@ let rec token buf =
   | '?' -> QMARK
   | ',' -> COMMA
   | "!" -> BANGU
-  | '.' -> DOT
   | '#' -> SHARP
   | '$' -> DOLLAR
   | ':' -> COLON
@@ -153,7 +158,8 @@ let rec token buf =
   | "equiv" -> !?EQUIV
   | "exists" -> !?EXISTS
   | "Exists" -> !?UEXISTS
-  | "exn" -> !?EXN
+  | "end" -> !?END
+  | "exn" -> !?EXN               
   | "fa" -> !?FA
   | "False" -> !?FALSE
   | "forall" -> !?FORALL
@@ -185,11 +191,13 @@ let rec token buf =
   | "message" -> !?MESSAGE
   | "mutable" -> !?MUTABLE
   | "name" -> !?NAME
+  | "namespace" -> !?NAMESPACE
   | "new" -> !?NEW
   | "nosimpl" -> !?NOSIMPL
   | "not" -> !?NOT
   | "null" -> !?NULL
   | "op" -> !?OP
+  | "open" -> !?OPEN
   | "oracle" -> !?ORACLE
   | "out" -> !?OUT
   | "predicate" -> !?PREDICATE
@@ -231,8 +239,13 @@ let rec token buf =
   | "with" -> !?WITH
   | "XOR" -> !?XOR
 
-  | path -> PATH (Utf8.lexeme buf)
-  | name -> ID (Utf8.lexeme buf)
+  (* terminal symbol, delimiting a sentence to be parsed. *)
+  | '.', (whitespace | '\n' | eof) -> TERMINAL
+  | '.' -> DOT
+
+  | filepath -> FILEPATH (Utf8.lexeme buf)
+  | uid -> UID (Utf8.lexeme buf)
+  | lid -> LID (Utf8.lexeme buf)
   | eof -> EOF
   | left_infix_symb -> LEFTINFIXSYMB (Utf8.lexeme buf)
   | right_infix_symb -> RIGHTINFIXSYMB (Utf8.lexeme buf)

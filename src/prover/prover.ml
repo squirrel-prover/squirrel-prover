@@ -1,4 +1,6 @@
 open Squirrelcore
+
+module L  = Location
 module Sv = Vars.Sv
 
 (*------------------ Prover ----------------------------------*)
@@ -181,14 +183,15 @@ let get_system (ps:state) : SystemExpr.context option =
   | Some (ProofObl g)
   | Some (UnprovedLemma (_, g)) -> Some (Goal.system g )
 
-let add_new_goal_i (table:Symbols.table) (parsed_goal:Goal.Parsed.t) 
-    (ps:state) : state  =
+let add_new_goal_i
+    (table : Symbols.table) (parsed_goal : Goal.Parsed.t) (ps : state) : state  
+  =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> ProverLib.unnamed_goal ()
     | Some s -> s
   in
-  if Lemma.mem name table then
-    ProverLib.error (Location.loc name) 
+  if Symbols.Lemma.mem_s (Symbols.scope table) (L.unloc name) table then
+    ProverLib.error (L.loc name) 
       "a goal or axiom with this name already exists";
 
   let parsed_goal = 
@@ -198,12 +201,12 @@ let add_new_goal_i (table:Symbols.table) (parsed_goal:Goal.Parsed.t)
   { ps with goals }
 
 let add_new_goal (ps:state)  
-    (parsed_goal:Goal.Parsed.t Location.located) : state =
+    (parsed_goal:Goal.Parsed.t L.located) : state =
   if ps.goals <> [] then
-    ProverLib.error (Location.loc parsed_goal) 
+    ProverLib.error (L.loc parsed_goal) 
       "cannot add new goal: proof obligations remaining";
 
-  let parsed_goal = Location.unloc parsed_goal in
+  let parsed_goal = L.unloc parsed_goal in
   add_new_goal_i ps.table parsed_goal ps
 
 let first_goal (ps:state) : ProverLib.pending_proof =
@@ -211,7 +214,7 @@ let first_goal (ps:state) : ProverLib.pending_proof =
   | [] -> assert false
   | h :: _ -> h
 
-let do_add_goal (st:state) (g:Goal.Parsed.t Location.located) : state =
+let do_add_goal (st:state) (g:Goal.Parsed.t L.located) : state =
   let new_ps = add_new_goal st g in
   (* for printing new goal ↓ *)
   let goal,name = match first_goal new_ps with
@@ -282,7 +285,7 @@ let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state =
     end
 
 let cycle i_l l =
-  let i, loc = Location.unloc i_l, Location.loc i_l in
+  let i, loc = L.unloc i_l, L.loc i_l in
   let rec cyc acc i = function
     | [] -> Tactics.hard_failure ~loc (Tactics.Failure "cycle error")
     | a :: l ->
@@ -295,7 +298,7 @@ let cycle i_l l =
 let eval_tactic (utac:ProverTactics.AST.t) (ps:state) : state =
   match utac with
   | Tactics.Abstract
-      (Location.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
+      (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
     (* TODO do something more for bullets?
        Cycling the list of subgoals does not change its length so
        nothing will break (fail) wrt bullets, but the result will
@@ -504,60 +507,66 @@ let print_system (st:state) (s_opt:SystemExpr.Parse.t option)
       Completion.print_init_trs 
       (get_table st)
 
-let print_lemma table (l:Theory.lsymb) : bool =
-  (Lemma.mem l table) &&
-  begin
-    let lem = Lemma.find l table in
-    Printer.prt `Default "%a@." Lemma.pp lem;
-    true
-  end
+(*------------------------------------------------------------------*)
+let print_lemmas table (p:Symbols.p_path) : bool =
+  let print1 (_path,data) =
+    let data = Lemma.as_lemma data in
+    Printer.prt `Default "%a@." Lemma.pp data;
+  in
+  try List.iter print1 (Symbols.Lemma.convert p table); true
+  with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
 
-let print_function table (l:Theory.lsymb) : bool =
-  let open Symbols.OpData in
-  match Symbols.Operator.of_lsymb_opt l table with
-  | None -> false
-  | Some f ->
-    let { ftype; def; } = get_data f table in
-    begin
-      match def with
-      | Concrete _ ->
-        let data = Operator.get_concrete_data table f in
-        Printer.prt `Default "%a@." Operator.pp_concrete_operator data
+(*------------------------------------------------------------------*)
+let print_functions table (p : Symbols.p_path) : bool =
+  let print1 (path,_) =
+    let Symbols.OpData.{ ftype; def;} = Symbols.OpData.get_data path table in
+    match def with
+    | Concrete _ ->
+      let data = Operator.get_concrete_data table path in
+      Printer.prt `Default "%a@." Operator.pp_concrete_operator data
 
-      | Abstract _ ->
-        let data, _ = get_abstract_data f table in
-        Printer.prt `Default "fun %s : %a : %a@." 
-          (Location.unloc l)
-          Type.pp_ftype ftype 
-          pp_abstract_def data
-    end;
-    true
+    | Abstract _ ->
+      let data, _ = Symbols.OpData.get_abstract_data path table in
+      Printer.prt `Default "fun %s : %a : %a@." 
+        (Symbols.p_path_to_string p)
+        Type.pp_ftype ftype 
+        Symbols.OpData.pp_abstract_def data
+  in
+  try List.iter print1 (Symbols.Operator.convert p table); true
+  with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
 
-let print_name table (l:Theory.lsymb) : bool =
-  match Symbols.Name.of_lsymb_opt l table with
-  | None -> false
-  | Some ls ->
+(*------------------------------------------------------------------*)
+let print_names table (p:Symbols.p_path) : bool =
+  let print1 (ls,_) =
     let fty = (Symbols.get_name_data ls table).n_fty in
-    Printer.prt `Default "%s:%a@." (Location.unloc l) Type.pp_ftype
+    Printer.prt `Default "%s:%a@." 
+      (Symbols.p_path_to_string p) Type.pp_ftype
       fty; 
-    true
+  in
+  try List.iter print1 (Symbols.Name.convert p table); true
+  with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
 
-let print_global_macro table (l:Theory.lsymb) : bool =
-  match Symbols.Macro.of_lsymb_opt l table with
-  | Some m when Macros.is_global table m ->
-    let macro = Symbols.Macro.get_data m table in
-    Printer.prt `Default "%a@." Macros.pp (Macros.as_global_macro macro);
-    true
-  | _ -> false
-    
-let print_game table (l:Theory.lsymb) : bool =
-  (Symbols.Game.mem_lsymb l table) &&
-  begin
-    let g = Crypto.find table l in
-    Printer.prt `Default "%a@." Crypto.pp_game g; 
-    true
-  end
+(*------------------------------------------------------------------*)
+let print_macros table (p:Symbols.p_path) : bool =
+  let print1 (path,_data) =
+    (* FIXME: do not print only global macros *)
+    if Macros.is_global table path then 
+      let macro = Symbols.Macro.get_data path table in
+      Printer.prt `Default "%a@." Macros.pp (Macros.as_global_macro macro)
+  in
+  try List.iter print1 (Symbols.Macro.convert p table); true
+  with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
 
+(*------------------------------------------------------------------*)    
+let print_games table (p:Symbols.p_path) : bool =
+  let print1 (_, data) =
+    let data = Crypto.data_as_game data in
+    Printer.prt `Default "%a@." Crypto.pp_game data
+  in
+  try List.iter print1 (Symbols.Game.convert p table); true
+  with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
+
+(*------------------------------------------------------------------*)
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     match q with
     | Pr_system s_opt -> print_system st s_opt
@@ -565,11 +574,11 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
       begin
         let table = get_deepest_table st in
         let searchs_in = [
-          print_lemma;
-          print_function;
-          print_name;
-          print_game;
-          print_global_macro;    (* FIXME: do not print only global macros *)
+          print_lemmas;
+          print_functions;
+          print_names;
+          print_games;
+          print_macros; 
         ] in
         
         let found =
@@ -580,7 +589,7 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
         in
 
         if not found then
-        Printer.prt `Default "%s not found@." (Location.unloc l)
+        Printer.prt `Default "%s not found@." (Symbols.p_path_to_string l)
       end
 
 let do_eof (st:state) : state = 
@@ -657,7 +666,7 @@ and do_include
     if TConfig.checkInclude (get_table st) then `Check 
     else begin
       if List.exists 
-          (fun x -> Location.unloc x = "admit") i.ProverLib.params 
+          (fun x -> L.unloc x = "admit") i.ProverLib.params 
       then `NoCheck
       else `Check
     end in
@@ -668,16 +677,16 @@ and do_include
         do_all_commands_in
           ~driver_stack:new_driver_stack ~check:checkInclude ~test st driver
       in
-      (* Adding included library in table's theory symbols. *)
+      (* Adding imported file in the symbol table. *)
       let table, _ =
         let name = match i.th_name with Name s -> s | Path s -> s in
-        Symbols.Theory.declare ~approx:false st.table name in
+        Symbols.Import.declare ~approx:false st.table name in
       { st with table }
 
     with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
       let err_mess fmt =
         Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
-          (Location.unloc (ProverLib.lsymb_of_load_path i.th_name))
+          (L.unloc (ProverLib.lsymb_of_load_path i.th_name))
           (Errors.pp_toplevel_error ~interactive:interactive ~test driver) e
       in
       Driver.close driver;
@@ -724,7 +733,7 @@ let init : ?with_prelude:bool -> unit -> state =
       if with_prelude then begin
         let inc =
           ProverLib.{ th_name =
-                        Name (Location.mk_loc Location._dummy "Prelude");
+                        Name (L.mk_loc L._dummy "Prelude");
                       params = []; }
         in
         let state = do_include ~dirname:Driver.theory_dir state inc in

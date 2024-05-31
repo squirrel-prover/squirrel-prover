@@ -1,8 +1,6 @@
 module L = Location
 module SE = SystemExpr
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
@@ -36,5 +34,7 @@ val declare_list :
   Symbols.table * Goal.t list (* new table, proof obligation *)
 
 (*------------------------------------------------------------------*)
-val add_hint_rewrite : Symbols.table -> lsymb -> Symbols.table -> Symbols.table
-val add_hint_smt     : Symbols.table -> lsymb -> Symbols.table -> Symbols.table
+val add_hint_rewrite :
+  Symbols.table -> Symbols.p_path -> Symbols.table -> Symbols.table
+val add_hint_smt     :
+  Symbols.table -> Symbols.p_path -> Symbols.table -> Symbols.table

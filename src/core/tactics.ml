@@ -18,10 +18,10 @@ let pp_ssc_error fmt (t, e) =
   | E_elem    -> Fmt.pf fmt "frame element"
   | E_indirect (a, case) ->
     match case with
-    | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp a
-    | `Output    -> Fmt.pf fmt "%a output" Symbols.pp a
-    | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp a Symbols.pp st
-    | `Global m  -> Fmt.pf fmt "%a, global: %a" Symbols.pp a Symbols.pp m
+    | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp_path a
+    | `Output    -> Fmt.pf fmt "%a output" Symbols.pp_path a
+    | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp_path a Symbols.pp_path st
+    | `Global m  -> Fmt.pf fmt "%a, global: %a" Symbols.pp_path a Symbols.pp_path m
   in
   Fmt.pf fmt "%a %a" pp_ssc_error_c e Term.pp t
 
@@ -600,7 +600,7 @@ type 'a ast =
 module type S = sig
   type arg
   type judgment
-  val pp_arg : Format.formatter -> arg -> unit
+
   (* TODO post-quantum flag probably shouldn't be here *)
   val eval_abstract :
     post_quantum:bool ->
@@ -657,16 +657,8 @@ struct
 
   let eval ~post_quantum ~modifiers ast = eval post_quantum modifiers ast
 
-  let pp_args fmt l =
-    Fmt.list
-      ~sep:(fun ppf () -> Fmt.pf ppf ",@ ")
-      pp_arg fmt l
-
   let rec pp ppf = function
-    | Abstract (i,args) ->
-      let i = L.unloc i in
-      if args = [] then Fmt.string ppf i else
-        Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
+    | Abstract (i,_args) -> Fmt.pf ppf "@[(%s)@]" (L.unloc i)
 
     | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
 

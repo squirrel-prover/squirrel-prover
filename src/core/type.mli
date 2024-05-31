@@ -32,7 +32,8 @@ type ty =
   | Index  
   | Timestamp
 
-  | TBase of string
+  (* FIXME: use a type-safe [Symbols.path] *)
+  | TBase of string list * string (* namespace path, name *)
   (** user-defined types *)
         
   | TVar of tvar
@@ -152,7 +153,7 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Constructors and destructors} *)
-val base : string -> ty   
+val base : string list -> string -> ty   
 
 val fun_l : ty list -> ty -> ty
 

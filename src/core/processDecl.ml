@@ -5,7 +5,7 @@ module Args = TacticsArgs
 module SE   = SystemExpr
 module Mv   = Vars.Mv
 
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** {Error handling} *)
@@ -148,6 +148,13 @@ let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
       table decl.Crypto.Parse.g_name ~data:(Crypto.Game g) 
   in
   table
+
+(*------------------------------------------------------------------*)
+let parse_namespace_cmd table (cmd : Decl.namespace_info) : Symbols.table =
+  match cmd with
+  | Decl.Enter n -> Symbols.namespace_enter table n
+  | Decl.Exit  n -> Symbols.namespace_exit  table n
+  | Decl.Open  n -> Symbols.namespace_open  table (Symbols.convert_npath n table)
 
 (*------------------------------------------------------------------*)
 let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
@@ -434,8 +441,11 @@ let declare table decl : Symbols.table * Goal.t list =
           error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
 
-    let table = Theory.declare_name table s Symbols.{ n_fty } in
-    Process.add_namelength_axiom table s n_fty, []
+    let table, n =
+      let data = Symbols.Name Symbols.{ n_fty } in
+      Symbols.Name.declare ~approx:false table s ~data
+    in
+    Process.add_namelength_axiom table n n_fty, []
 
   | Decl.Decl_state { name; args; out_ty; init_body; } ->
     Theory.declare_state table name args out_ty init_body, []
@@ -477,6 +487,8 @@ let declare table decl : Symbols.table * Goal.t list =
     ProverTactics.register_macro (L.unloc id) ast ;
     table, []
 
+  | Decl.Namespace_cmd cmd -> parse_namespace_cmd table cmd, []
+
 let declare_list table decls =
   let table, subgs =
     List.map_fold (fun table d -> declare table d) table decls
@@ -484,20 +496,20 @@ let declare_list table decls =
   table, List.flatten subgs
 
 (*------------------------------------------------------------------*)
-let add_hint_rewrite table (s : lsymb) db =
+let add_hint_rewrite table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
 
   if not (SE.subset table SE.any lem.system.set) then
-    Tactics.hard_failure ~loc:(L.loc s)
+    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "rewrite hints must apply to any system");
 
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
 
-let add_hint_smt table (s : lsymb) db =
+let add_hint_smt table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
 
   if not (SE.subset table SE.any lem.system.set) then
-    Tactics.hard_failure ~loc:(L.loc s)
-      (Failure "rewrite hints must apply to any system");
+    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
+      (Failure "smt hints must apply to any system");
 
   Hint.add_hint_smt lem.Goal.formula db

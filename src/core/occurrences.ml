@@ -1119,10 +1119,10 @@ struct
 
   let pp fmt (n : t) =
     if n.args = [] then
-      Fmt.pf fmt "%a" Symbols.pp n.symb.s_symb
+      Fmt.pf fmt "%a" Symbols.pp_path n.symb.s_symb
     else
       Fmt.pf fmt "%a(%a)"
-        Symbols.pp n.symb.s_symb
+        Symbols.pp_path n.symb.s_symb
         (Fmt.list ~sep:Fmt.comma Term.pp) n.args
 
   let of_term : Term.term -> t = function

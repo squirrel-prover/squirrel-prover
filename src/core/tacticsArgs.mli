@@ -5,7 +5,7 @@ module L = Location
 
 module SE = SystemExpr
 
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** Tactic target. *)
@@ -53,13 +53,13 @@ type 'a rw_item_g = {
 (** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.pt
-  | `Expand    of lsymb
+  | `Expand    of Symbols.p_path
   | `ExpandAll of Location.t
 ] rw_item_g
 
 (** Expand item *)
 type expnd_item = [
-  | `Expand    of lsymb
+  | `Expand    of Symbols.p_path
   | `ExpandAll of Location.t
 ] rw_item_g
 
@@ -113,13 +113,6 @@ type intro_pattern =
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
-val pp_naming_pat : Format.formatter -> naming_pat         -> unit
-val pp_and_or_pat : Format.formatter -> and_or_pat         -> unit
-val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
-val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
-val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
-
-(*------------------------------------------------------------------*)
 (** {2 Fresh tactic arguments} *)
 
 type fresh_arg =
@@ -141,6 +134,17 @@ type have_ip = s_item list * simpl_pat * s_item list
 
 type have_arg    = have_ip option * Theory.any_term
 type have_pt_arg = Theory.pt * have_ip option * [`IntroImpl | `None]
+
+(*------------------------------------------------------------------*)
+(** {2 Diffie-Hellman tactics arguments} *)
+
+type dh_arg =
+  | CDH of { hyp : Symbols.lsymb; gen : Symbols.p_path; }
+  | GDH of { hyp : Symbols.lsymb; gen : Symbols.p_path; }
+  | DDH of { gen : Symbols.p_path;
+             na  : Symbols.p_path;
+             nb  : Symbols.p_path;
+             nc  : Symbols.p_path; }
 
 (*------------------------------------------------------------------*)
 (** {2 Crypto tactic arguments} *)
@@ -188,7 +192,8 @@ type parser_arg =
   | Generalize   of Theory.term list * naming_pat list option
   | Fa           of fa_arg list
   | TermPat      of int * Theory.term
-  | Crypto       of lsymb * crypto_args
+  | DH           of dh_arg
+  | Crypto       of Symbols.p_path * crypto_args
 
 type parser_args = parser_arg list
 
@@ -228,9 +233,6 @@ type _ arg =
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
 (*------------------------------------------------------------------*)
-val pp_parser_arg : Format.formatter -> parser_arg -> unit
-
-(*------------------------------------------------------------------*)
 type esort = Sort : ('a sort) -> esort
 
 type earg = Arg : ('a arg) -> earg
@@ -239,7 +241,4 @@ type earg = Arg : ('a arg) -> earg
 exception Uncastable
 
 val cast:  'a sort -> 'b arg -> 'a arg
-
-(*------------------------------------------------------------------*)
-val pp_esort : Format.formatter -> esort -> unit
 

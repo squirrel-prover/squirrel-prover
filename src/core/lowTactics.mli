@@ -128,8 +128,8 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val p_rw_item : Args.rw_item -> S.t -> rw_earg 
 
   (*------------------------------------------------------------------*)
-  type expand_kind = 
-    | Lsymb of Theory.lsymb   (** operator, predicate, macro or definition *)
+  type expand_kind =
+    | Ppath of Symbols.p_path      (** operator, predicate, macro or definition *)
     | Mterm of Term.term
     | Any
 

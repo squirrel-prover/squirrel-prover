@@ -1,16 +1,16 @@
 (** This module defines bi-processes and an internal representation that is
-  * useful to perform backward reachability analysis on them. It is
-  * independent of whether we perform this analysis to check correspondence or
-  * reachability properties. In particular we do not perform the folding
-  * of conditionals, since it is not necessary for correspondences. We will
-  * do it separately for equivalences. *)
+    useful to perform backward reachability analysis on them. It is
+    independent of whether we perform this analysis to check correspondence or
+    reachability properties. In particular we do not perform the folding
+    of conditionals, since it is not necessary for correspondences. We will
+    do it separately for equivalences. *)
 
 module L = Location
   
 (*------------------------------------------------------------------*)
 (** Processes, using terms and facts from [Theory] *)
 
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end processes}
@@ -27,13 +27,13 @@ type lsymb = Theory.lsymb
 module Parse : sig
   (** A parsed process *)
   type cnt =
-    | Null                                       (** Null process *)
-    | New of lsymb * Theory.p_ty * t       (** Name creation *)
-    | In  of Channel.p_channel * lsymb * t (** Input *)
-    | Out of Channel.p_channel * Theory.term * t  (** Output *)
-    | Parallel of t * t              (** Parallel composition *)
+    | Null                                        (** Null process *)
+    | New of lsymb * Theory.p_ty * t              (** Name creation *)
+    | In  of Symbols.p_path * lsymb * t           (** Input *)
+    | Out of Symbols.p_path * Theory.term * t     (** Output *)
+    | Parallel of t * t                           (** Parallel composition *)
 
-    | Set of lsymb * Theory.term list * Theory.term * t
+    | Set of Symbols.p_path * Theory.term list * Theory.term * t
     (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
         FIXME: for now, we only allow argument of type index. *)
 
@@ -50,7 +50,7 @@ module Parse : sig
         is true, and [q] otherwise. Note that this construct
         subsumes the common conditional construct. *)
 
-    | Apply of lsymb * Theory.term list
+    | Apply of Symbols.p_path * Theory.term list
     (** Process call: [Apply (p,ts)] calls [p(ts)]. *)
 
     | Alias of t * lsymb
@@ -100,8 +100,11 @@ val declare :
   Symbols.table
 
 (*------------------------------------------------------------------*)
+(** Add a name length axiom (in the current scope) named using [name] 
+    for symbol [n] with type [ftype], provided that the type 
+    is [Name_fixed_length]. *)
 val add_namelength_axiom : 
-  ?loc:Location.t -> Symbols.table -> lsymb -> Type.ftype ->
+  ?loc:Location.t -> Symbols.table -> Symbols.name -> Type.ftype ->
   Symbols.table
 
 (*------------------------------------------------------------------*)

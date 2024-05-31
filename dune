@@ -27,7 +27,7 @@
    (progn
     (with-outputs-to tests.output 
      ;; keep going anyway to enrich tests.output
-          (with-accepted-exit-codes (or 0 1)
+          (with-accepted-exit-codes (or 0 1 2)
             (run ./test.exe)))
     ))
   )

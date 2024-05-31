@@ -31,7 +31,6 @@ module NOF = O.NameOccFormulas
 let wrap_fail = TraceLT.wrap_fail
 
 let soft_failure = Tactics.soft_failure
-let hard_failure = Tactics.hard_failure
 
 (*------------------------------------------------------------------*)
 (* Utility functions to put a term in a sort of normal form *)
@@ -215,8 +214,10 @@ let get_bad_occs
 (** {2 CDH/GDH tactic} *)
 
 (** Checks whether g has an associated CDH/GDH assumption *)
-let has_cgdh (gdh_oracles : bool) (g : lsymb) (table : Symbols.table) : bool =
-  let gen_n = Symbols.Operator.of_lsymb g table in
+let has_cgdh
+    (gdh_oracles : bool) (g : Symbols.p_path) (table : Symbols.table) : bool 
+  =
+  let gen_n = Symbols.Operator.convert_path g table in
   match gdh_oracles, Symbols.OpData.get_abstract_data gen_n table with
   | false, (Symbols.OpData.DHgen l, _) ->
     List.exists
@@ -233,26 +234,26 @@ let has_cgdh (gdh_oracles : bool) (g : lsymb) (table : Symbols.table) : bool =
     Also checks the group has the CDH (if gdh_oracles = false) or GDH 
     (if true) assumption. *)
 let dh_param
-    ~(hyp_loc : L.t)
+    ~(hyp_loc    : L.t)
     (gdh_oracles : bool)
-    (contx : Constr.trace_cntxt)
-    (hyp : term)
-    (g : lsymb)
-    (s : TS.sequent)
+    (contx       : Constr.trace_cntxt)
+    (hyp         : term)
+    (g           : Symbols.p_path)
+    (s           : TS.sequent)
   : term * Symbols.fname * Symbols.fname option * term * Name.t * Name.t
   =
 
   let einfo = O.EI_direct, contx in
   let table = contx.table in
   (* get generator *)
-  let gen_n = Symbols.Operator.of_lsymb g table in
+  let gen_n = Symbols.Operator.convert_path g table in
   let gen = Term.mk_fun table gen_n [] in
 
   (* check DH assumption *)
   if not (has_cgdh gdh_oracles g table) then
     (let dh = if gdh_oracles then "GDH" else "CDH" in
      soft_failure
-       ~loc:(L.loc g)
+       ~loc:(Symbols.p_path_loc g)
        (Tactics.Failure ("DH group generator: no " ^ dh ^ " assumption")));
 
   (* get exponentiation and (if defined) multiplication *)
@@ -295,7 +296,7 @@ let dh_param
 let cgdh
     (gdh_oracles : bool)
     (m : lsymb)
-    (g : lsymb)
+    (g : Symbols.p_path)
     (s : sequent)
   : sequent list
   =
@@ -330,16 +331,8 @@ let cgdh
 
 (*------------------------------------------------------------------*)
 let cdh_tac args s =
-  let hyp, gen = match args with
-    | hyp :: [gen] -> hyp, gen
-    | _ -> 
-      hard_failure
-        (Failure "cdh requires two arguments: hypothesis, generator")
-  in
-  match TraceLT.convert_args s [hyp] (Args.Sort Args.String),
-        TraceLT.convert_args s [gen] (Args.Sort Args.String) with
-  | Args.Arg (Args.String hyp),
-    Args.Arg (Args.String gen) -> wrap_fail (cgdh false hyp gen) s
+  match args with
+  | [Args.DH (CDH { hyp; gen; })] -> wrap_fail (cgdh false hyp gen) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
@@ -350,16 +343,8 @@ let () =
 
 (*------------------------------------------------------------------*)
 let gdh_tac args s =
-  let hyp, gen = match args with
-    | hyp :: [gen] -> hyp, gen
-    | _ -> 
-      hard_failure
-        (Failure "gdh requires two arguments: hypothesis, generator")
-  in
-  match TraceLT.convert_args s [hyp] (Args.Sort Args.String),
-        TraceLT.convert_args s [gen] (Args.Sort Args.String) with
-  | Args.Arg (Args.String hyp),
-    Args.Arg (Args.String gen) -> wrap_fail (cgdh true hyp gen) s
+  match args with
+  | [Args.DH (GDH { hyp; gen; })] -> wrap_fail (cgdh true hyp gen) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)

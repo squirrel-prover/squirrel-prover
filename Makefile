@@ -159,7 +159,7 @@ $(BENCHDIR)/all/last.json:
 	@echo
 
 example: squirrel
-	@rm -rf `$(RUNLOGDIR)/examples`
+	@rm -rf `$(RUNLOGDIR)/examples` tests/tests.ko
 	@$(ECHO) "================== EXAMPLES ======================"
 	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp,  examples/postQuantumKE/*.sp and examples/crypto/*.sp."
 	@$(MAKE) -j4 examples_end
@@ -177,8 +177,8 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@if ./squirrel $(@:.ok=.sp) \
 	  > $(RUNLOGDIR)/$(@:.ok=.sp) \
 	  2> $(RUNLOGDIR)/$(@:.ok=.sp.stderr) \
-	 ; then $(ECHO) -n . ; \
-	 else $(ECHO) "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; $(ECHO) -n '!' ; fi
+	 ; then $(ECHO) "[ OK ] $(@:.ok=.sp)" ; \
+	 else $(ECHO) "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; $(ECHO) "[FAIL] $(@:.ok=.sp)" ; fi
 
 # Rebuild and run tests.
 # Only executes tests if dependencies have changed (?)

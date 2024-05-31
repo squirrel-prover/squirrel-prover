@@ -1,5 +1,6 @@
 open Utils
 
+module L  = Location
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
@@ -142,25 +143,17 @@ let as_def : data -> Vars.var list * action = function
   | Def (l,a) -> l, a
 
 (*------------------------------------------------------------------*)
-let data_of_lsymb (lsymb : Symbols.lsymb) table : data =
-  match Symbols.Action.data_of_lsymb lsymb table with
-    | ActionData data -> data
-    | _ -> assert false
-
 let get_data (s : Symbols.action) table : data =
   match Symbols.Action.get_data s table with
-    | ActionData data -> data
-    | _ -> assert false
+  | ActionData data -> data
+  | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let def_of_lsymb (lsymb : Symbols.lsymb) table : Vars.var list * action =
-  as_def (data_of_lsymb lsymb table)
-
 let get_def (s : Symbols.action) table : Vars.var list * action =
   as_def (get_data s table)
 
 (*------------------------------------------------------------------*)
-let of_lsymb lsymb table : Symbols.action = Symbols.Action.of_lsymb lsymb table 
+let convert p table : Symbols.action = fst (Symbols.Action.convert1 p table)
 
 (*------------------------------------------------------------------*)
 let arity (s : Symbols.action) table =
@@ -180,18 +173,24 @@ let is_decl (s : Symbols.action) table : bool =
   else
     match get_data s table with Decl _ -> true | Def _ -> false
     
-let is_decl_lsymb (lsymb : Symbols.lsymb) table : bool =
-  if Symbols.Action.mem_lsymb lsymb table then
-    match data_of_lsymb lsymb table with Decl _ -> true | Def _ -> false
-  else false
-
 let fresh_symbol
-    table ~exact (name : Symbols.lsymb) 
-  : Symbols.table * Symbols.action 
+    table ~exact (name : Symbols.lsymb) : Symbols.table * Symbols.action 
   =
-  if is_decl_lsymb name table then
-    (* symbol is declared but not yet defined *)
-    table, Symbols.Action.of_lsymb name table 
+  let name_s = L.unloc name in
+  let scope = Symbols.scope table in
+  (* may be an invalid path if [name] is not yet in the table *)
+  let name_p = Symbols.Action.of_string scope name_s in 
+
+  (* check if [name] is declared and not defined in the current scope *)
+  let is_decl = 
+    if Symbols.Action.mem_s scope name_s table then
+      let data = get_data name_p table in
+      match data with Decl _ -> true | Def _ -> false
+    else false
+  in
+
+  if is_decl then 
+    table, name_p (* symbol is declared but not yet defined *) 
   else Symbols.Action.reserve ~approx:(not exact) table name
 
 (*------------------------------------------------------------------*)
@@ -218,6 +217,7 @@ let iter_def_table f table =
        | _ -> assert false)
     table
 
+(*------------------------------------------------------------------*)
 (** Pretty-printing *)
 
 (** Print integers in action shapes. *)
@@ -381,11 +381,11 @@ let pp_descr ~dbg ppf descr =
           ~sep:(Fmt.any ";@ ")
           (fun ppf (s, args, t) ->             
              Fmt.pf ppf "@[%a@[(%a)@] :=@ %a@]" 
-               Symbols.pp s (Fmt.list (Term._pp ~dbg)) args 
+               Symbols.pp_path s (Fmt.list (Term._pp ~dbg)) args 
                (Term._pp ~dbg) t)))
     descr.updates
     (Utils.pp_ne_list "@[<hv 2>globals:@ @[<hv>%a@]@]@;"
-       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp))
+       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp_path))
     descr.globals
     (Term._pp ~dbg) (snd descr.output)
 
@@ -516,13 +516,13 @@ let pp_actions ppf table =
        if !comma then Fmt.pf ppf ",@;" ;
        comma := true ;
        if debug then
-         Fmt.pf ppf "%s%a=%a"
-           (Symbols.to_string symbol)
+         Fmt.pf ppf "%a%a=%a"
+           Symbols.pp_path symbol
            pp_indices indices
            pp_action_structure action
        else
-         Fmt.pf ppf "%s%a"
-           (Symbols.to_string symbol)
+         Fmt.pf ppf "%a%a"
+           Symbols.pp_path symbol
            pp_indices indices)
     table;
   Fmt.pf ppf "@]@]@."

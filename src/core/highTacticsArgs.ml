@@ -3,7 +3,8 @@ include TacticsArgs
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
-let convert_as_lsymb parser_args = match parser_args with
+let as_p_path parser_args =
+  match parser_args with
   | [Theory (L.{ pl_desc = Symb p } )] ->
     Some p
   | _ -> None
@@ -80,17 +81,17 @@ let convert_args env parser_args tactic_type conc =
       in
       Arg et
 
-    | [Theory (L.{ pl_desc = Symb p } )], Sort String ->
+    | [Theory (L.{ pl_desc = Symb ([],p) } )], Sort String ->
       Arg (String p)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
 
     | [Theory t], Sort String ->
-      raise Theory.(Conv (L.loc t, String_expected (L.unloc t)))
+      raise Theory.(Conv (L.loc t, Failure "expected a string"))
 
     | [Theory t], Sort Int ->
-      raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
+      raise Theory.(Conv (L.loc t, Failure "expected an integer"))
 
     | [Theory p], Sort Index ->
       let f = 

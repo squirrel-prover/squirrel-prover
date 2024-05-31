@@ -60,8 +60,8 @@ module Parsed : sig
   | Obs_equiv   (** All the information is in the system expression. *)
 
   type t = {
-    name    : Theory.lsymb option;
-    ty_vars : Theory.lsymb list;
+    name    : Symbols.lsymb option;
+    ty_vars : Symbols.lsymb list;
     vars    : Theory.bnds_tagged;
     system  : SE.Parse.sys;
     formula : contents

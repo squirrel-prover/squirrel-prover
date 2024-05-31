@@ -35,7 +35,7 @@ module List = struct
   let rec last ?e = function
     | [x] -> x
     | _ :: l -> last l
-    | [] -> match e with Some e -> raise e | None -> raise (Failure "List.last")
+    | [] -> match e with Some e -> raise e | None -> raise Not_found
 
   let init n f =
     if n < 0 then raise (Failure "List.init")
@@ -89,6 +89,17 @@ module List = struct
     | (_, _) -> invalid_arg "List.iteri2"
 
   let iteri2 f l1 l2 = iteri2 0 f l1 l2
+
+  (*------------------------------------------------------------------*)
+  let rec find2 f l1 l2 =
+    match l1, l2 with
+    | [], [] -> raise Not_found
+    | a1::l1, a2::l2 -> if f a1 a2 then (a1,a2) else find2 f l1 l2
+    | (_, _) -> invalid_arg "List.find2"
+
+  (*------------------------------------------------------------------*)
+  let find2_opt f l1 l2 =
+    try Some (find2 f l1 l2) with Not_found -> None
 
   (*------------------------------------------------------------------*)
   let rec drop0 i l =
@@ -274,6 +285,7 @@ module Map = struct
   module type S = sig
     include Map.S
 
+    val add_to_list : key -> 'a -> 'a list t -> 'a list t
     val add_list : (key * 'a) list -> 'a t -> 'a t
     val find_dflt : 'a -> key -> 'a t -> 'a
   end
@@ -287,6 +299,10 @@ module Map = struct
     let find_dflt dflt k (m : 'a t) : 'a =
       try find k m with
       | Not_found -> dflt
+
+    let add_to_list key data m =
+      let l = find_dflt [] key m in
+      add key (data :: l) m
   end
 end
 

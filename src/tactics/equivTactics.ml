@@ -7,9 +7,10 @@
       assumed.
 *)
 open Squirrelcore
-
+open LowTactics
 open Utils
 
+(*------------------------------------------------------------------*)
 module T    = ProverTactics
 module Args = HighTacticsArgs
 module L    = Location
@@ -27,11 +28,6 @@ module Name = O.Name
 module LT = LowTactics
   
 module Sv = Vars.Sv
-              
-type lsymb = Theory.lsymb
-
-(*------------------------------------------------------------------*)
-open LowTactics
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -295,8 +291,8 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
     | _ ->
       Tactics.(hard_failure (Failure "incorrect case arguments"))
   in
-  match Args.convert_as_lsymb args with
-  | Some str when Hyps.mem_name (L.unloc str) s && structure_based ->
+  match Args.as_p_path args with
+  | Some ([],str) when Hyps.mem_name (L.unloc str) s && structure_based ->
     let id, _ = Hyps.by_name str s in
     List.map
       (fun (EquivLT.CHyp _, ss) -> ss)
@@ -370,8 +366,9 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
 
 let do_assumption_tac args s : ES.t list =
   let hyp =
-    match Args.convert_as_lsymb args with
-    | Some str -> Some (fst (Hyps.by_name str s))
+    match Args.as_p_path args with
+    | Some (    [], str) -> Some (fst (Hyps.by_name str s))
+    | Some (_ :: _,   _) -> bad_args ()
     | None -> None 
   in
   assumption ?hyp s
@@ -1902,9 +1899,7 @@ let xor arg (s : ES.t) =
     let data = Symbols.Name { n_fty } in
     Symbols.Name.declare ~approx:true (ES.table s) sym ~data
   in
-  let real_name = L.mk_loc L._dummy (Symbols.to_string n) in
-  let table = 
-    Process.add_namelength_axiom table real_name n_fty in
+  let table = Process.add_namelength_axiom table n n_fty in
 
   let ns = Term.mk_symb n Message in
   let s = ES.set_table table s in
@@ -1993,9 +1988,9 @@ let is_ddh_context
     ~(cntxt : Constr.trace_cntxt)
     ~l_proj ~r_proj
     ~gen ~exp a b c elem_list =
-  let a,b,c = Symbols.Name.of_lsymb a cntxt.table,
-              Symbols.Name.of_lsymb b cntxt.table,
-              Symbols.Name.of_lsymb c cntxt.table in
+  let a,b,c = Symbols.Name.convert_path a cntxt.table,
+              Symbols.Name.convert_path b cntxt.table,
+              Symbols.Name.convert_path c cntxt.table in
   let iter = new ddh_context ~cntxt ~l_proj ~r_proj ~gen ~exp false a b c in
   let iterfm = new find_macros ~cntxt false in
   let exists_macro =
@@ -2030,12 +2025,15 @@ let is_ddh_gen tbl gen =
   else false
 
 (*------------------------------------------------------------------*)
-let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
+let ddh
+    (lgen : Symbols.p_path) (na : Symbols.p_path) (nb : Symbols.p_path) (nc : Symbols.p_path)
+    s sk fk
+  =
   let tbl = ES.table s in
-  let gen_symb = Symbols.Operator.of_lsymb lgen tbl in
+  let gen_symb = Symbols.Operator.convert_path lgen tbl in
 
   if not (is_ddh_gen tbl gen_symb) then
-    soft_failure ~loc:(L.loc lgen)
+    soft_failure ~loc:(Symbols.p_path_loc lgen)
       (Failure "no DDH assumption on this generator");
 
   let exp_symb =
@@ -2055,6 +2053,7 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
   then sk [] fk
   else soft_failure Tactics.NotDDHContext
 
+(*------------------------------------------------------------------*)
 (* DDH is called on strings that correspond to names, put potentially without
    the correct arity. E.g, with name a(i), we need to write ddh a, .... Thus, we
    cannot use the typed registering, as a is parsed as a name identifier, which
@@ -2063,15 +2062,11 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
 let () =
   T.register_general "ddh"
     (function
-       | [Args.String_name gen;
-          Args.String_name v1;
-          Args.String_name v2;
-          Args.String_name v3] ->
-         LT.gentac_of_etac (ddh gen v1 v2 v3)
+       | [Args.DH (DDH { gen; na; nb; nc; })] -> LT.gentac_of_etac (ddh gen na nb nc)
        | _ -> bad_args ())
 
 (*------------------------------------------------------------------*)
-let crypto (game : lsymb) (args : Args.crypto_args) (s : ES.t) =
+let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
   let frame = ES.conclusion_as_equiv s in
   let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs

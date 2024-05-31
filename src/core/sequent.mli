@@ -44,9 +44,9 @@ module type S = sig
 
   (*------------------------------------------------------------------*) 
   (** An assumption can be an hypothesis, an axiom, or a proved goal. *)
-  val is_assumption        : Theory.lsymb -> t -> bool
-  val is_global_assumption : Theory.lsymb -> t -> bool
-  val is_local_assumption  : Theory.lsymb -> t -> bool
+  val is_assumption        : Symbols.p_path -> t -> bool
+  val is_global_assumption : Symbols.p_path -> t -> bool
+  val is_local_assumption  : Symbols.p_path -> t -> bool
 
   (*------------------------------------------------------------------*) 
   val to_general_sequent : t -> Goal.t

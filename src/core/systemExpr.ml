@@ -17,12 +17,12 @@ exception Error of error
 let error ?loc e = raise (Error (loc,e))
 
 let pp_error_i fmt = function
-  | Invalid_projection -> Fmt.pf fmt "invalid system projection"
-  | Missing_projection -> Fmt.pf fmt "missing system projection"
+  | Invalid_projection   -> Fmt.pf fmt "invalid system projection"
+  | Missing_projection   -> Fmt.pf fmt "missing system projection"
   | Incompatible_systems -> Fmt.pf fmt "incompatible systems"
-  | Expected_compatible -> Fmt.pf fmt "expected a compatible system expression"
-  | Expected_fset -> Fmt.pf fmt "expected a finite system set expression"
-  | Expected_pair -> Fmt.pf fmt "expected a system expression pair"
+  | Expected_compatible  -> Fmt.pf fmt "expected a compatible system expression"
+  | Expected_fset        -> Fmt.pf fmt "expected a finite system set expression"
+  | Expected_pair        -> Fmt.pf fmt "expected a system expression pair"
 
 let pp_error pp_loc_err_opt fmt (loc,e) =
   Fmt.pf fmt "%aSystem error: %a"
@@ -138,7 +138,7 @@ let pp fmt (se : 'a expr) : unit =
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
     | Any -> Fmt.pf fmt "any"
-    | Any_compatible_with s -> Fmt.pf fmt "any/%a" Symbols.pp s
+    | Any_compatible_with s -> Fmt.pf fmt "any/%a" Symbols.pp_path s
     | List l ->
       Fmt.list
         ~sep:Fmt.comma
@@ -272,7 +272,12 @@ let singleton s = mk (List [Term.proj_from_string "ε",s])
 let of_system table s : _ =
   let projections = System.projections table s in
   let l = List.map (fun proj -> proj, System.Single.make table s proj) projections in
-  mk ~name:(Symbols.to_string s) (List l)
+  mk ~name:(Symbols.path_to_string s) (List l)
+
+(*------------------------------------------------------------------*)
+(* create the bi-system for the empty system declared in the [Prelude] *)
+let empty_system table : pair =
+  of_system table (Symbols.System.of_string Symbols.top_npath "Empty")
 
 (*------------------------------------------------------------------*)
 let default_labels : int -> Term.proj list = function
@@ -521,7 +526,7 @@ let is_single_system (se : context) : bool =
 
 module Parse = struct
   type item = {
-    system     : Symbols.lsymb;
+    system     : Symbols.p_path;
     projection : Symbols.lsymb option;
     alias      : Symbols.lsymb option
   }
@@ -531,7 +536,7 @@ module Parse = struct
   let parse_single table item =
     if item.alias <> None then
       raise (Invalid_argument "SystemExpr.Single.parse");
-    let sys = System.of_lsymb table item.system in
+    let sys = System.convert table item.system in
     match item.projection with
     | None ->
       begin match System.projections table sys with
@@ -547,16 +552,16 @@ module Parse = struct
       (* Default system annotation. We might make it mean "any" eventually
          but for now "default" avoids changing most files. *)
       of_system table
-        (System.of_lsymb table (L.mk_loc L._dummy "default"))
+        (System.convert table ([], L.mk_loc L._dummy "default"))
 
-    | [{ system = { pl_desc = "any" }; projection = None; alias = None}] ->
+    | [{ system = [], { pl_desc = "any" }; projection = None; alias = None}] ->
       any
 
-    | [{ system = { pl_desc = "any" }; projection = Some system}] ->
-      any_compatible_with (System.of_lsymb table system)
+    | [{ system = [], { pl_desc = "any" }; projection = Some system}] ->
+      any_compatible_with (System.convert table ([], system))
 
     | [{ system; projection = None; alias = None}] ->
-      of_system table (System.of_lsymb table system)
+      of_system table (System.convert table system)
 
     | l ->
       let labels =

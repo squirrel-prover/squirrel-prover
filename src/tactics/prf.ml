@@ -319,8 +319,7 @@ let prf_param_pattern
   let table, nprfs =
     Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
   in
-  let real_name = L.mk_loc L._dummy (Symbols.to_string nprfs) in
-  let table = Process.add_namelength_axiom table real_name n_fty in
+  let table = Process.add_namelength_axiom table nprfs n_fty in
   let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
 
   (* replace instances of p with n_PRF, everywhere in t *)
@@ -553,17 +552,10 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   (* copied from old prf for the composition stuff *)
   (* not sure how this works *)
-
-  let loc_hash_f = L.mk_loc loc (Symbols.to_string hash_f) in
-  let oracle_formula =
-    Oracle.get_oracle_tag_formula loc_hash_f (ES.table
-      equiv_sequent)
-  in
-
   let tag_f =
-    if Term.is_false oracle_formula then
-      []
-    else
+    match Oracle.get_oracle hash_f (ES.table equiv_sequent) with
+    | None -> []
+    | Some oracle_formula ->
       let uvarm, uvarkey, f =
         match oracle_formula with
         | Quant (ForAll, [uvarm;uvarkey], f) -> uvarm,uvarkey,f

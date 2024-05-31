@@ -74,6 +74,10 @@ module List : sig
 
   val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
 
+  val find2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a * 'b
+
+  val find2_opt : ('a -> 'b -> bool) -> 'a list -> 'b list -> ('a * 'b) option
+
   val last : ?e:exn -> 'a list -> 'a
 
   val map_fold  : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
@@ -83,7 +87,7 @@ module List : sig
   val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
   val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
-
+                                                          
   val mem_cmp : eq:('a -> 'a -> bool) -> 'a -> 'a list -> bool
 
   exception Out_of_range
@@ -103,6 +107,7 @@ module Map : sig
   module type S = sig
     include Map.S
 
+    val add_to_list : key -> 'a -> 'a list t -> 'a list t
     val add_list : (key * 'a) list -> 'a t -> 'a t 
     val find_dflt : 'a -> key -> 'a t -> 'a
   end

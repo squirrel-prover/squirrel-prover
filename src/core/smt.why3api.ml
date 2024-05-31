@@ -1,5 +1,10 @@
 open Utils
 
+(*------------------------------------------------------------------*)
+(* use [_] instead of [.] in path when building Why3 names *)
+let path_to_string p = Symbols.path_to_string ~sep:"_" p
+
+(*------------------------------------------------------------------*)
 let smt_debug = Sys.getenv_opt "SMT_DEBUG" <> None
 
 (** Style for translating timestamps. *)
@@ -285,9 +290,10 @@ let rec convert_type context = function
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
   | Type.Index -> Why3.Ty.ty_app context.index_symb []
-  (* | TBase t when  t = "int" -> context.int_ty *)
-  | TBase t -> Why3.Ty.(ty_var (tv_of_string t))
-  | TVar _ -> assert false
+  | TBase (ns,t) -> 
+    let s = Symbols.s_path_to_string (ns,t) in
+    Why3.Ty.(ty_var (tv_of_string s))
+  | TVar _ -> assert false 
   | Fun (t1,t2) -> Why3.Ty.ty_func (convert_type context t1)
                    (convert_type context t2)
   | TUnivar ty ->
@@ -302,7 +308,7 @@ open Why3.Term
 let index_var_to_wterm context i = Hashtbl.find context.vars_tbl (Vars.hash i) 
 let ilist_to_wterm_ts context l = List.map (index_var_to_wterm context) l 
 
-let find_fn context f = Hashtbl.find context.functions_tbl (Symbols.to_string f)
+let find_fn context f = Hashtbl.find context.functions_tbl (Symbols.path_to_string f)
 
 let bool_to_prop t = 
   if Term.ty t = Type.Boolean then Why3.Term.to_prop else (fun x -> x)
@@ -478,22 +484,22 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
     | Action (a,indices),_ -> 
     (match indices with 
       |[Tuple ind_list] -> 
-        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a))) 
+        t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a))) 
         (List.map (msg_to_fmla context) ind_list)
 
       |_ -> 
-        t_app_infer (fst(Hashtbl.find context.actions_tbl (Symbols.to_string a)))
+        t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a)))
         (List.map (msg_to_fmla context) indices)
       
     )
   | Macro (ms,l,ts),_ -> 
     (match l with 
       |[Tuple l_list] ->t_app_infer
-        (Hashtbl.find context.macros_tbl (Symbols.to_string ms.s_symb))
+        (Hashtbl.find context.macros_tbl (path_to_string ms.s_symb))
         (List.map (msg_to_fmla context) l_list @
         [msg_to_fmla context ts])
       |_ ->t_app_infer
-        (Hashtbl.find context.macros_tbl (Symbols.to_string ms.s_symb))
+        (Hashtbl.find context.macros_tbl (path_to_string ms.s_symb))
         (List.map (msg_to_fmla context) l @
         [msg_to_fmla context ts])
     )
@@ -501,10 +507,10 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   | Name (ns,args),_ ->
       (match args with 
       |[Tuple args_list] -> t_app_infer
-        (Hashtbl.find context.names_tbl (Symbols.to_string ns.s_symb))
+        (Hashtbl.find context.names_tbl (path_to_string ns.s_symb))
         (prop_list_to_bool context args_list)
       |_ -> t_app_infer
-      (Hashtbl.find context.names_tbl (Symbols.to_string ns.s_symb))
+      (Hashtbl.find context.names_tbl (path_to_string ns.s_symb))
       (prop_list_to_bool context args)
        
     )
@@ -600,7 +606,7 @@ let add_actions context =
     SystemExpr.iter_descrs context.table (Option.get context.system)
       (fun descr ->
         if descr.name <> Symbols.init_action then
-          let str = Symbols.to_string descr.name in
+          let str = Symbols.path_to_string descr.name in
           let symb_act = Why3.Term.create_fsymbol
               (id_fresh context str)
               (List.init (List.length descr.indices) (fun _ -> context.index_ty))
@@ -617,7 +623,7 @@ let add_actions context =
       context.actions_tbl !(context.uc);
   Hashtbl.add
     context.actions_tbl
-    Symbols.(to_string init_action)
+    Symbols.(path_to_string init_action)
     (context.init_symb,0)
 
 let add_var context = 
@@ -646,7 +652,7 @@ let add_functions context =
   Symbols.Operator.iter (fun fname _ ->
     let data = Symbols.OpData.get_data fname context.table in
     let ftype = data.ftype in
-    let str = Symbols.to_string fname in
+    let str = path_to_string fname in
     (* special treatment of xor for two reasons:
      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
      *   - allows us to declare the equations for xor in the .why file *)
@@ -687,7 +693,7 @@ let add_functions context =
   List.iter
     (fun (fname,symb) ->
        Hashtbl.add context.functions_tbl
-         (Symbols.to_string fname)
+         (Symbols.path_to_string fname)
          (symb))
     [(Symbols.fs_pair,(Option.get context.pair_symb));
      (Symbols.fs_fst,(Option.get context.fst_symb));
@@ -701,7 +707,7 @@ let add_functions context =
 let add_macros context = 
   Symbols.Macro.iter (fun mn _ ->
     let def = Symbols.get_macro_data mn context.table in
-    let str = Symbols.to_string mn in
+    let str = path_to_string mn in
     let indices = match def with
       | Input | Output | Cond | Exec | Frame -> 0
       | State (i,_,_) -> i
@@ -750,7 +756,7 @@ let rec calc_arity l = match l with
 let add_names context = 
   Symbols.Name.iter (fun name _ ->
     let def = Symbols.get_name_data name context.table in
-    let str = Symbols.to_string name in
+    let str = path_to_string name in
     let symb =
       Why3.Term.create_fsymbol
         (id_fresh context str)
@@ -901,7 +907,7 @@ let add_timestamp_axioms context =
           in
           let f (d : Action.descr) =
             let symb = 
-              fst (Hashtbl.find context.actions_tbl (Symbols.to_string d.name)) in
+              fst (Hashtbl.find context.actions_tbl (path_to_string d.name)) in
             let indices = List.take (List.length d.indices) descr2.indices in 
             Why3.Term.t_app_infer symb (list_of_index_list indices)
           in
@@ -1071,8 +1077,8 @@ let add_equational_axioms context =
 let add_macro_axioms context = 
   let macro_axioms = ref [] in
     SystemExpr.iter_descrs context.table (Option.get context.system) 
-      (fun descr -> 
-        let name_str = Symbols.to_string descr.name in
+      (fun descr ->
+        let name_str = path_to_string descr.name in
         (* TODO: quantified_vars is a recurring pattern *)
         let quantified_vars = ref (List.map (fun v ->
             let vsymb = create_vsymbol (id_fresh context (Vars.name v))
@@ -1099,7 +1105,7 @@ let add_macro_axioms context =
         
         Symbols.Macro.iter (fun mn _ -> 
             let mdef = Symbols.get_macro_data mn context.table in
-            let m_str  = Symbols.to_string mn in
+            let m_str  = path_to_string mn in
             let m_symb = Hashtbl.find context.macros_tbl m_str in
             let macro_wterm_eq indices msg =
               t_equ (t_app_infer m_symb (indices@[ts])) msg in
@@ -1261,9 +1267,9 @@ let add_name_axioms context =
         let tl1,tl2 = List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 in
           let ineq = t_neq
               (t_app_infer (Hashtbl.find context.names_tbl
-                              (Symbols.to_string n1)) tl1)
+                              (path_to_string n1)) tl1)
               (t_app_infer (Hashtbl.find context.names_tbl
-                              (Symbols.to_string n2)) tl2) in
+                              (path_to_string n2)) tl2) in
           t_forall_close (l1@l2) []
             (if n1 = n2
               then t_implies (t_not (equal_lists context tl1 tl2)) ineq

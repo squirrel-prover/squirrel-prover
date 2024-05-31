@@ -168,7 +168,6 @@ type 'a ast =
 module type S = sig
   type arg
   type judgment
-  val pp_arg : Format.formatter -> arg -> unit
   val eval_abstract :
     post_quantum:bool -> modifiers:string list ->
     lsymb -> arg list -> judgment tac

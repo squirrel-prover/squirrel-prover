@@ -4,7 +4,31 @@
     have different kinds), and each symbol is attached to a
     definition whose Ocaml type depends on the kind. *)
 
-type lsymb = string Location.located
+module L = Location
+
+(*------------------------------------------------------------------*)
+(** A parsed symbol *)
+type lsymb = string L.located
+
+(** A parsed namespace path *)
+type p_npath = string L.located list
+
+(** A parsed symbol path *)
+type p_path = p_npath * string L.located
+
+val p_npath_loc : p_npath -> L.t
+val p_path_loc  : p_path  -> L.t
+
+val p_path_to_string : ?sep:string -> p_path -> string
+
+(*------------------------------------------------------------------*)
+(** An untyped namespace path. Unsafe API. *)
+type s_npath = string list
+
+(** An untyped symbol path [(p,s)] representing [p.s]. Unsafe API. *)
+type s_path = string list * string 
+
+val s_path_to_string : ?sep:string -> s_path -> string
 
 (*------------------------------------------------------------------*)
 (** Type of a function symbol (Prefix or Infix)
@@ -15,22 +39,48 @@ type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
 
 (*------------------------------------------------------------------*)
-(** ['a t] is the type of symbols of kind ['a]. *)
-type 'a t
+type symbol_kind =
+  | Channel
+  | Config
+  | Oracle
+  | Name
+  | Action
+  | Operator   (** abtract and concrete operators *)
+  | Macro
+  | System
+  | Process
+  | BType      (** type declarations *)
+  | Game
+  | HintDB
+  | Lemma
+  | Predicate
+  | Import
+  | Namespace
+    
+val pp_symbol_kind : Format.formatter -> symbol_kind -> unit
 
-val hash : 'a t -> int
+(*------------------------------------------------------------------*)
+(** {3 Symbols} *)
 
+(*------------------------------------------------------------------*)
 (** Symbol kind groups:
     symbols with the same name can exist in different symbol kind 
     groups. *)
 type group
 
-(** Type of tables of persistent symbol definitions.
-    It is currently ineffective. *)
-type table
+val default_group : group
 
-(** Associates a unique tag to a table. For memoisation. *)
-val tag : table -> int
+(*------------------------------------------------------------------*)
+(** ['a t] is the type of symbols of kind ['a]. *)
+type 'a t
+
+val hash : 'a t -> int
+
+(** Converts a symbol to a string, for printing purposes. *)
+val to_string : 'a t -> string
+
+(** Pretty-print a symbol. *)
+val pp : Format.formatter -> 'a t -> unit
 
 (*------------------------------------------------------------------*)
 (** Each possible symbol kind is represented by an abstract datatype.
@@ -50,76 +100,113 @@ type _game
 type _hintdb
 type _lemma
 type _predicate
-type _theory
+type _import
+type _namespace
 
-type channel   = _channel   t
-type config    = _config    t
-type oracle    = _oracle    t
-type name      = _name      t
-type action    = _action    t
-type fname     = _fname     t
-type macro     = _macro     t
-type system    = _system    t
-type process   = _process   t
-type btype     = _btype     t
-type game      = _game      t
-type hintdb    = _hintdb    t
-type lemma     = _lemma     t
-type predicate = _predicate t
-type theory    = _theory    t
-    
+
 (*------------------------------------------------------------------*)
-type symbol_kind =
-  | Channel
-  | Config
-  | Oracle
-  | Name
-  | Action
-  | Operator   (** abtract and concrete operators *)
-  | Macro
-  | System
-  | Process
-  | BType      (** type declarations *)
-  | Game
-  | HintDB
-  | Lemma
-  | Predicate
-  | Theory
-    
-val pp_symbol_kind : Format.formatter -> symbol_kind -> unit
+(** {3 Paths} *)
 
-val kind_of_string : ?group:group -> table -> string -> symbol_kind option
-  
+(** A namespace path is simply a list of namespaces *)
+type npath = private {
+  npath : _namespace t list; 
+  id    : int;                    (** for hash-consing *)
+}
+
+(** A path to a symbol of kind ['a].
+    [{np; s}] represents the path [np.s]. *)
+type 'a path = private { 
+  np : npath;
+  s  : 'a t;
+  id : int;                    (** for hash-consing *)
+}
+
+(*------------------------------------------------------------------*)
+type channel   = _channel   path
+type config    = _config    path
+type oracle    = _oracle    path
+type name      = _name      path
+type action    = _action    path
+type fname     = _fname     path
+type macro     = _macro     path
+type system    = _system    path
+type process   = _process   path
+type btype     = _btype     path
+type game      = _game      path
+type hintdb    = _hintdb    path
+type lemma     = _lemma     path
+type predicate = _predicate path
+type import    = _import    path
+type namespace = _namespace path
+
+(*------------------------------------------------------------------*)
+val pp_npath : Format.formatter -> npath   -> unit
+val pp_path  : Format.formatter -> 'a path -> unit
+ 
+(*------------------------------------------------------------------*)
+val npath_to_string : ?sep:string -> npath   -> string
+val path_to_string  : ?sep:string -> 'a path -> string
+
+(*------------------------------------------------------------------*)
+val npath_id : npath   -> int     (** unique *)
+val path_id  : 'a path -> int     (** unique *)
+
+(*------------------------------------------------------------------*)
+val npath_equal : npath   ->   npath -> bool
+val path_equal  : 'a path -> 'a path -> bool
+
+(*------------------------------------------------------------------*)
+(** Build a namespace path (with hash-consing) *)
+val npath : _namespace t list -> npath
+
+(** Extends a namespace *)
+val npath_app : npath -> _namespace t list -> npath
+    
+(** Build a namespace path from a [s_npath]. Unsafe API. *)
+val of_s_npath : s_npath -> npath
+
+val top_npath : npath
+
+(*------------------------------------------------------------------*)
+(** Build a path (with hash-consing) *)
+val path : npath -> 'a t -> 'a path
+
+(*------------------------------------------------------------------*)
+(** {2 Symbol tables} *)
+
 (*------------------------------------------------------------------*)
 (** The status of a symbol. *)
 type status =
   | Defined  of symbol_kind
   | Reserved of symbol_kind
-
-val status_of_lsymb : ?group:group -> lsymb -> table -> status
-
+ 
 (*------------------------------------------------------------------*)
-(** {2 Data}
-    In addition to their definition data, some more data can be attached
+(** In addition to their definition data, some more data can be attached
     to symbols. This is used for data that is defined in modules that
-    depend on this module, through an extensible datatype. *)
-
-(** Extensible type for data associated to symbols.
-    Due to circular dependencies, this is not type-safe, but
-    at least avoids having multiple hashtables for symbols. *)
+    depend on this module, through an extensible datatype. 
+    Due to circular dependencies, this is not type-safe. *)
 type data = ..
 type data += Empty
 
 (*------------------------------------------------------------------*)
-(** {2 Basic kind-independent operations} *)
+(** A symbol table mapping symbol paths to their definition (=
+    [status] + [data]). *)
+type table
 
-(** Converts a symbol to a string, for printing purposes. *)
-val to_string : 'a t -> string
+(** Associates a unique tag to a table. For memoisation. *)
+val tag : table -> int
 
-(** Pretty-print a symbol. *)
-val pp : Format.formatter -> 'a t -> unit
+(*------------------------------------------------------------------*)
+(** Return the current scope *)
+val scope : table -> npath
 
-val is_defined : ?group:group -> string -> table -> bool
+(*------------------------------------------------------------------*)
+(** Return all the status that can be associated to a [p_path] (for typing). *)
+val status_of_p_path : group:group -> p_path -> table -> status list
+
+(*------------------------------------------------------------------*)
+(** Convert a surface npath to a npath. *)
+val convert_npath : p_npath -> table -> npath
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol kinds} *)
@@ -130,57 +217,77 @@ module type SymbolKind = sig
   (** Abstract type representing this kind. *)
   type ns
     
-  val remove : table -> ns t -> table
+  val remove : ns path -> table -> table
     
-  (** Reserve a fresh symbol name. *)
-  val reserve : approx:bool -> table -> lsymb -> table * ns t
-
-  (** Release a reserved symbol. *)
-  val release : table -> ns t -> table
+  (** Reserve a fresh symbol name in the current namespace. *)
+  val reserve : approx:bool -> table -> lsymb -> table * ns path
     
   (** Define a symbol name that has been previously reserved
       using [fresh]. *)
-  val define : table -> ?data:data -> ns t -> table
+  val define : table -> ?data:data -> ns path -> table
 
   (** Redefine a symbol name that has been previously defined. *)
-  val redefine : table -> ?data:data -> ns t -> table
+  val redefine : table -> ?data:data -> ns path -> table
 
-  (** Declare a new symbol.
+  (** Declare a new symbol in the namespace [scope] (default to the 
+      current namespace [scope table]).
       @raise Multiple_declarations if the name is not available 
       and [not approx] holds. *)
   val declare :
-    approx:bool -> table -> ?data:data -> lsymb -> table * ns t
+    approx:bool -> table -> ?scope:npath -> ?data:data -> lsymb -> table * ns path
 
-  val is_reserved : ns t -> table -> bool
+  val is_reserved : ns path -> table -> bool
 
-  (** [mem s table] checks if [s] exists for this kind. *)
-  val mem       : string -> table -> bool
-  val mem_lsymb : lsymb  -> table -> bool
+  (** Get data associated to some symbol.
+      Always succeed for paths constructed through the type-safe API.
+      @raise Not_found if the path (built from the unsafe API) does 
+      not map to anything. *)
+  val get_data : ns path -> table -> data
 
-  (** [of_lsymb s] returns [s] as a symbol, if it exists for this kind.
-      @raise Unbound_identifier otherwise. *)
-  val of_lsymb : lsymb -> table -> ns t
+  (*------------------------------------------------------------------*)
+  (** [mem_sp p table] checks if [p] exists for this kind in [table]. *)
+  val mem_sp : s_path -> table -> bool
 
-  (** Same as [of_lsymb_opt s] but using an option type *)
-  val of_lsymb_opt : lsymb -> table -> ns t option
+  (** [mem_sp top s table] checks if [top.s] exists for this kind in [table]. *)
+  val mem_s : npath -> string -> table -> bool
 
-  (** [cast_of_string s] always returns [s] as a symbol. *)
-  val cast_of_string : string -> ns t
+  (** [mem_p p table] checks if [p] exists for this kind in [table]. *)
+  val mem_p : p_path -> table -> bool
 
-  (** Get data associated to some symbol. *)
-  val get_data : ns t -> table -> data
+  (*------------------------------------------------------------------*)   
+  (** Build a symbol path from a [s_path]. Unsafe API. *)
+  val of_s_path : s_path -> ns path
 
-  (** [data_of_lsymb s] is equivalent to [get_data (of_lsymb s)]. *)
-  val data_of_lsymb : lsymb -> table -> data
+  (** Build a symbol path from a [npath] and a string. Unsafe API. *)
+  val of_string : npath -> string -> ns path
+
+  (*------------------------------------------------------------------*)
+  (** {3 Typing and conversion} *)
+
+  (*------------------------------------------------------------------*)
+  (** Convert a surface language path (qualified or short) to a path and
+      retrieve the associated data. *)
+     
+  (** Return a single match. *)
+  val convert1 : p_path -> table -> ns path * data
+
+  (** Return all matches. Result list cannot be empty. *)  
+  val convert : p_path -> table -> (ns path * data) list
+
+  (** Get only the path (and ignore additional matches if any). *)
+  val convert_path : p_path -> table -> ns path 
+
+  (*------------------------------------------------------------------*)
+  (** {3 Iterators} *)
 
   (** Iterate on the defined symbols of this kind. *)
-  val iter : (ns t -> data -> unit) -> table -> unit
+  val iter : (ns path -> data -> unit    )       -> table -> unit
 
   (** Fold over the defined symbols of this kind. *)
-  val fold : (ns t -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val fold : (ns path -> data -> 'a -> 'a) -> 'a -> table -> 'a
 
   (** Map over the defined symbols of this kind. *)
-  val map : (ns t -> data -> data) -> table -> table
+  val map : (ns path -> data -> data    )        -> table -> table
 end
 
 (*------------------------------------------------------------------*)
@@ -194,25 +301,40 @@ module System    : SymbolKind with type ns = _system
 module Process   : SymbolKind with type ns = _process
 module HintDB    : SymbolKind with type ns = _hintdb
 module Lemma     : SymbolKind with type ns = _lemma
-module Theory    : SymbolKind with type ns = _theory
+module Import    : SymbolKind with type ns = _import
 module Predicate : SymbolKind with type ns = _predicate
 module Operator  : SymbolKind with type ns = _fname
 module Macro     : SymbolKind with type ns = _macro
 module Name      : SymbolKind with type ns = _name
+module Namespace : SymbolKind with type ns = _namespace
+
+(*------------------------------------------------------------------*)
+(** {2 Namespaces} *)
+
+(** Enter some namespaces (command [namespace N1. ... .NL]) *)
+val namespace_enter : table -> p_npath -> table
+
+(** Exit some namespaces (command [exit N1. ... .NL]) *)
+val namespace_exit : table -> p_npath -> table
+
+(** Open a namespace, bringing its definitions in scope
+    (command [open N1. ... .NL]) *)
+val namespace_open : table -> npath -> table
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 
-type error_i = 
-  | Unbound_identifier    of string
-  | Incorrect_kind        of symbol_kind * symbol_kind (* expected, got *)
-  | Multiple_declarations of string * symbol_kind * group
+type error_i =
+  | Unbound_identifier    of npath option * string
+  (** [string] unknown in optional namespace [npath] *)
+  | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
+  | Multiple_declarations of npath * string * symbol_kind * group
   | Failure of string
 
-type error = Location.t * error_i
+type error = L.t * error_i
 
 val pp_error :
-  (Format.formatter -> Location.t -> unit) ->
+  (Format.formatter -> L.t -> unit) ->
   Format.formatter -> error -> unit
 
 exception Error of error
@@ -220,8 +342,8 @@ exception Error of error
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
 
-module Ss (S : SymbolKind) : Set.S with type elt := S.ns t 
-module Ms (S : SymbolKind) : Map.S with type key := S.ns t 
+module Sp (S : SymbolKind) : Set.S with type elt := S.ns path
+module Mp (S : SymbolKind) : Map.S with type key := S.ns path
 
 (*------------------------------------------------------------------*)
 (** {2 Some data definitions}

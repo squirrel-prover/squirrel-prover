@@ -25,10 +25,10 @@ let get_seq_in_nth_goal st i =
   | Goal.Global j -> ES.conclusion_as_equiv j
   | _ -> assert false
 
-let mk c = L.mk_loc L._dummy c
+let mk_p c = [], L.mk_loc L._dummy c
 
 let mk_message st s =
-  let n = Symbols.Name.of_lsymb (mk s) (Prover.get_table st) in
+  let n = Symbols.Name.convert_path (mk_p s) (Prover.get_table st) in
   Term.mk_name (Term.mk_symb n Message) []
 
 (** Check that case study fails when there is no conditional
@@ -244,7 +244,7 @@ let case_study () =
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let terms = get_seq_in_nth_goal st 0 in
-  let f = Symbols.Operator.of_lsymb (mk "f") (Prover.get_table st) in
+  let f = Symbols.Operator.convert_path (mk_p "f") (Prover.get_table st) in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     true,
@@ -284,7 +284,7 @@ let case_study () =
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
-  let f = Symbols.Operator.of_lsymb (mk "f") (Prover.get_table st) in
+  let f = Symbols.Operator.convert_path (mk_p "f") (Prover.get_table st) in
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
@@ -573,7 +573,7 @@ let case_study () =
     ~expected:(y)
 
 let namelength () =
-  let mk c = L.mk_loc L._dummy c in      
+  let mk_p c = [], L.mk_loc L._dummy c in      
   let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:false ())
         "
         system null.
@@ -592,8 +592,8 @@ let namelength () =
   let axiom_n = "namelength_n" in
   let axiom_m = "namelength_m" in
 
-  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
-  let stmt_m = Lemma.find_stmt_local (mk axiom_m) table in
+  let stmt_n = Lemma.find_stmt_local (mk_p axiom_n) table in
+  let stmt_m = Lemma.find_stmt_local (mk_p axiom_m) table in
 
   let system = SystemExpr.context_any in
 
@@ -606,17 +606,14 @@ let namelength () =
   Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
   Printer.pr "Term m: %a@." Term.pp stmt_m.formula;
 
-  let n = Symbols.Name.of_lsymb (mk "n") table in
+  let n = Symbols.Name.convert_path (mk_p "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
   
   let cst = Type.to_string tyn in
   let name_hash = "namelength_" ^ cst in
-  let lsy = L.mk_loc L._dummy (name_hash) in
+  let lsy = [], L.mk_loc L._dummy (name_hash) in
 
-  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
-    | Some fn -> table, fn
-    | None -> assert false
-  in
+  let fname = Symbols.Operator.convert_path lsy table in
   let cst = Term.mk_fun table fname [] in
   let f = Term.mk_eq (Term.mk_len tn) cst in
 
@@ -637,7 +634,7 @@ let namelength () =
   in ()
 
 let namelength2 () =
-  let mk c = L.mk_loc L._dummy c in      
+  let mk_p c = [], L.mk_loc L._dummy c in      
   let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:false ())
         "
         system null.
@@ -653,7 +650,7 @@ let namelength2 () =
 
   let axiom_n = "namelength_n" in
 
-  let stmt_n = Lemma.find_stmt_local (mk axiom_n) table in
+  let stmt_n = Lemma.find_stmt_local (mk_p axiom_n) table in
 
   let system = SystemExpr.context_any in
 
@@ -665,17 +662,14 @@ let namelength2 () =
   (* Should be of same length ↓ *)
   Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
 
-  let n = Symbols.Name.of_lsymb (mk "n") table in
+  let n = Symbols.Name.convert_path (mk_p "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
   
   let cst = Type.to_string tyn in
   let name_hash = "namelength_" ^ cst in
-  let lsy = L.mk_loc L._dummy (name_hash) in
+  let lsy = [], L.mk_loc L._dummy (name_hash) in
 
-  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
-    | Some fn -> table, fn
-    | None -> assert false
-  in
+  let fname = Symbols.Operator.convert_path lsy table in
   let cst = Term.mk_fun table fname [] in
   let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
 

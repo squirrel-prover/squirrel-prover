@@ -13,4 +13,4 @@ system null.
 
 equiv _ : diff( g^a^b, g^d).
 Proof.
- ddh g,a,b,d.
+ ddh g, a, b, d.

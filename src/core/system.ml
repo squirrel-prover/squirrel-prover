@@ -1,7 +1,7 @@
 type t = Symbols.system 
 
 (*------------------------------------------------------------------*)
-let of_lsymb table s = Symbols.System.of_lsymb s table
+let convert table s = Symbols.System.convert_path s table
 
 (*------------------------------------------------------------------*)
 type error =
@@ -74,8 +74,8 @@ let pp_system table fmt s =
   let descrs = Msh.bindings actions in
   Fmt.pf fmt
     "@[<hv 2>System %a registered with actions@ @[%a@].@]@."
-    Symbols.pp s
-    (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
+    Symbols.pp_path s
+    (Utils.pp_list (fun fmt (_,d) -> Symbols.pp_path fmt d.Action.name)) descrs
 
 let pp_systems fmt table =
   Symbols.System.iter (fun sys _ -> pp_system table fmt sys) table
@@ -171,10 +171,10 @@ module Single = struct
   let pp fmt {system;projection} =
     if Term.proj_to_string projection = "ε" then
       (* Convention typically used for single system. *)
-      Format.fprintf fmt "%a" Symbols.pp system
+      Format.fprintf fmt "%a" Symbols.pp_path system
     else
       Format.fprintf fmt "%a/%a"
-        Symbols.pp system
+        Symbols.pp_path system
         Term.pp_proj projection
 
   let descr_of_shape table {system;projection} shape =

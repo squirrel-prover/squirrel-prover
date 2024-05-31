@@ -1,5 +1,3 @@
-type lsymb = Theory.lsymb
-
 type lemma = { 
   stmt : Goal.statement;
   kind : [`Axiom | `Lemma];
@@ -20,18 +18,18 @@ val print_all : Format.formatter -> Symbols.table -> unit
 (*------------------------------------------------------------------*)
 (** Get proved or assumed statement. *)
 
-val find : lsymb -> Symbols.table -> lemma
+val find : Symbols.p_path -> Symbols.table -> lemma
 
-val find_stmt : lsymb -> Symbols.table -> Goal.statement
-val find_kind : lsymb -> Symbols.table -> [`Axiom | `Lemma] 
+val find_stmt : Symbols.p_path -> Symbols.table -> Goal.statement
+val find_kind : Symbols.p_path -> Symbols.table -> [`Axiom | `Lemma] 
 
-val find_stmt_local  : lsymb -> Symbols.table -> Goal.local_statement
-val find_stmt_global : lsymb -> Symbols.table -> Goal.global_statement
+val find_stmt_local  : Symbols.p_path -> Symbols.table -> Goal.local_statement
+val find_stmt_global : Symbols.p_path -> Symbols.table -> Goal.global_statement
 
 (*------------------------------------------------------------------*)
-val mem        : lsymb -> Symbols.table -> bool
-val mem_local  : lsymb -> Symbols.table -> bool
-val mem_global : lsymb -> Symbols.table -> bool
+val mem        : Symbols.p_path -> Symbols.table -> bool
+val mem_local  : Symbols.p_path -> Symbols.table -> bool
+val mem_global : Symbols.p_path -> Symbols.table -> bool
 
 (*------------------------------------------------------------------*)
 val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit

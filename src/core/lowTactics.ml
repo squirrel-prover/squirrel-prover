@@ -15,7 +15,7 @@ module Sv = Vars.Sv
 
 module TopHyps = Hyps
   
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 
 (*------------------------------------------------------------------*)
@@ -312,33 +312,50 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   type expand_kind = 
-    | Lsymb of lsymb      (** operator, predicate, macro or definition *)
+    | Ppath of Symbols.p_path      (** operator, predicate, macro or definition *)
     | Mterm of Term.term
     | Any
 
   let found_occ_macro (target : expand_kind) ms occ =
     match target with
-    | Lsymb mname -> Symbols.to_string ms.Term.s_symb = L.unloc mname
-    | Mterm t     -> occ = t
     | Any         -> true
+    (* short name, expand if **symbols** are equal *)
+    | Ppath ([],name) -> 
+      Symbols.(to_string ms.Term.s_symb.s) = L.unloc name
+    (* long name, expand if **paths** are equal *)
+    | Ppath p -> 
+      Symbols.path_to_string ms.Term.s_symb = Symbols.p_path_to_string p
+    | Mterm t     -> occ = t
 
   let found_occ_fun (target : expand_kind) fs =
     match target with
     | Any         -> true
-    | Lsymb fname -> Symbols.to_string fs = L.unloc fname
+    (* short name, expand if **symbols** are equal *)
+    | Ppath ([],name) -> 
+      Symbols.(to_string fs.s) = L.unloc name
+    (* long name, expand if **paths** are equal *)
+    | Ppath p -> 
+      Symbols.path_to_string fs = Symbols.p_path_to_string p
     | Mterm _     -> false
 
   let found_occ_pred (target : expand_kind) ps =
     match target with
     | Any         -> true
-    | Lsymb pname -> Symbols.to_string ps = L.unloc pname
+    (* short name, expand if **symbols** are equal *)
+    | Ppath ([],name) -> 
+      Symbols.(to_string ps.s) = L.unloc name
+    (* long name, expand if **paths** are equal *)
+    | Ppath p -> 
+      Symbols.path_to_string ps = Symbols.p_path_to_string p
     | Mterm _     -> false
 
   let found_occ_def (target : expand_kind) id =
     match target with
-    | Any       -> true
-    | Lsymb id' -> Ident.name id = L.unloc id'
-    | Mterm _   -> false
+    | Any               -> true
+    (* short name, expand if symbols are equal *)
+    | Ppath ([],id')    -> Ident.name id = L.unloc id'
+    | Ppath (_ :: _, _) -> false
+    | Mterm _           -> false
 
   let expand_term
       ?(m_rec = false)
@@ -356,7 +373,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let strict =
       match target with
       | Mterm _       -> true
-      | Lsymb _ | Any -> false
+      | Ppath _ | Any -> false
     in
 
     (* unfold in local sub-terms *)
@@ -514,23 +531,27 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** parse a expand argument *)
   let p_rw_expand_arg (s : S.t) (arg : Theory.term) : expand_kind =
     let tbl = S.table s in
-    match Args.convert_as_lsymb [Args.Theory arg] with
+    match Args.as_p_path [Args.Theory arg] with
     | Some m ->
-      let ms = L.unloc m in
       let mem_def =
-        S.Hyps.exists (fun (id,ldc) ->
-            id.name = ms &&
-            (match ldc with LDef _ -> true | _ -> false)
-          ) s
+        match m with
+        | [], ms ->
+          let ms = L.unloc ms in
+          S.Hyps.exists (fun (id,ldc) ->
+              id.name = ms &&
+              (match ldc with LDef _ -> true | _ -> false)
+            ) s
+        | _ -> false
       in
-      if mem_def                           ||
-         Symbols.Macro.mem_lsymb     m tbl ||
-         Symbols.Operator.mem_lsymb  m tbl ||
-         Symbols.Predicate.mem_lsymb m tbl
+      if mem_def                       ||
+         Symbols.Macro.mem_p     m tbl ||
+         Symbols.Operator.mem_p  m tbl ||
+         Symbols.Predicate.mem_p m tbl
       then
-        Lsymb m
+        Ppath m
       else 
-        soft_failure ~loc:(L.loc arg) (Failure "not a macro, operator, predicate or definition")
+        soft_failure ~loc:(L.loc arg) 
+          (Failure "not a macro, operator, predicate or definition")
       
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
@@ -2356,7 +2377,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Remember} *)
 
-  let remember (id : Theory.lsymb) (term : Theory.term) (s : S.t) =
+  let remember (id : Symbols.lsymb) (term : Theory.term) (s : S.t) =
     let t, ty = convert s term in
     let tag = HighTerm.tag_of_term (S.env s) t in
     let env, x =

@@ -53,8 +53,6 @@ module AST :
   type arg = TacticsArgs.parser_arg
   type judgment = Goal.t
 
-  let pp_arg = TacticsArgs.pp_parser_arg
-
   let autosimpl () = TacTable.get ~post_quantum:false ~loc:Location._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 

@@ -1,5 +1,3 @@
-
-
 type E[large].
 
 name a : index -> E

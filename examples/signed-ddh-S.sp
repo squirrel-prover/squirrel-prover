@@ -128,7 +128,8 @@ Proof.
        use Hexec' with Schall1(j) as Hexec1 => //.
        expand exec.
        use S_charac with j as [j0 Hyp] => //.
-       by use Hcond with j0.}
+       by use Hcond with j0. 
+      }
 
   fa 5. fa 6.
   by rewrite if_false.

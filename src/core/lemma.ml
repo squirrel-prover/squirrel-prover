@@ -1,8 +1,6 @@
 open Utils
 
 module L = Location
-
-type lsymb = Theory.lsymb
                
 (*------------------------------------------------------------------*)
 (** An top-level axiom or proved lemma. *)
@@ -35,28 +33,27 @@ let as_lemma : Symbols.data -> lemma = function
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let find gname table : lemma =
-  as_lemma (Symbols.Lemma.data_of_lsymb gname table) 
+let find path table : lemma =
+  as_lemma (snd (Symbols.Lemma.convert1 path table))
 
-let find_opt gname table : lemma option =
-  if not (Symbols.Lemma.mem_lsymb gname table)
-  then None
-  else Some (find gname table)
-
-(*------------------------------------------------------------------*)
-let find_stmt_local gname table =
-  Goal.to_local_statement ~loc:(L.loc gname) (find gname table).stmt
-
-let find_stmt_global gname table =
-  Goal.to_global_statement ~loc:(L.loc gname) (find gname table).stmt
+let find_opt path table : lemma option =
+  if Symbols.Lemma.mem_p path table
+  then Some (find path table)
+  else None
 
 (*------------------------------------------------------------------*)
-let find_stmt gname table : Goal.statement    = (find gname table).stmt
-let find_kind gname table : [`Axiom | `Lemma] = (find gname table).kind
+let find_stmt_local path table =
+  Goal.to_local_statement ~loc:(Symbols.p_path_loc path ) (find path table).stmt
+
+let find_stmt_global path table =
+  Goal.to_global_statement ~loc:(Symbols.p_path_loc path) (find path table).stmt
 
 (*------------------------------------------------------------------*)
-let mem gname table : bool =
-  Symbols.Lemma.mem_lsymb gname table
+let find_stmt path table : Goal.statement    = (find path table).stmt
+let find_kind path table : [`Axiom | `Lemma] = (find path table).kind
+
+(*------------------------------------------------------------------*)
+let mem path table : bool = Symbols.Lemma.mem_p path table
 
 let mem_local gname table : bool =
   match find_opt gname table with
@@ -123,9 +120,9 @@ let mk_depends_lemma
   in
   let name =
     Fmt.str "depends_%s_%s_%s"
-      (Symbols.to_string system)
-      (Symbols.to_string descr.name)
-      (Symbols.to_string descr'.name)
+      (Symbols.path_to_string system)
+      (Symbols.path_to_string descr.name)
+      (Symbols.path_to_string descr'.name)
   in
   Goal.{
     name;
@@ -166,9 +163,9 @@ let mk_mutex_lemma
   in
   let name =
     Fmt.str "mutex_%s_%s_%s"
-      (Symbols.to_string system)
-      (Symbols.to_string descr.name)
-      (Symbols.to_string descr'.name)
+      (Symbols.path_to_string system)
+      (Symbols.path_to_string descr.name)
+      (Symbols.path_to_string descr'.name)
   in
   Goal.{
     name;

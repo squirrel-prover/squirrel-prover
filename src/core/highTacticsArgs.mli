@@ -4,6 +4,6 @@
 include module type of TacticsArgs
 
 (*------------------------------------------------------------------*)
-val convert_as_lsymb : parser_arg list -> lsymb option
+val as_p_path : parser_arg list -> Symbols.p_path option
 
 val convert_args : Env.t -> parser_arg list -> esort -> Equiv.any_form -> earg

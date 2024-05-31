@@ -178,7 +178,7 @@ let rec pp_ut_cnt ppf = function
   | UPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_ut_cnt ts.cnt
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
-      Fmt.string (Symbols.to_string a)
+      Fmt.string (Symbols.path_to_string a)
       (Fmt.list ~sep:Fmt.comma pp_ut_cnt) (List.map (fun x -> x.cnt) is)
   | UInit  -> Fmt.pf ppf "init"
   | UUndef -> Fmt.pf ppf "⊥"

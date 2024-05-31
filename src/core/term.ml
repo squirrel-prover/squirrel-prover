@@ -25,14 +25,14 @@ let mk_symb (s : 'a) (t : Type.ty) =
   { s_symb = s;
     s_typ  = t; }
 
-let hash_isymb s = Symbols.hash s.s_symb (* for now, type is not hashed *)
+let hash_isymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
 
 type nsymb = Symbols.name  isymb
 type msymb = Symbols.macro isymb
 
 (*------------------------------------------------------------------*)
 let pp_nsymb ppf (ns : nsymb) =
-  Printer.kws `GoalName ppf (Symbols.to_string ns.s_symb)
+  Printer.kws `GoalName ppf (Symbols.path_to_string ns.s_symb)
 
 let pp_nsymbs ppf (l : nsymb list) =
   Fmt.pf ppf "@[<hov>%a@]"
@@ -54,15 +54,15 @@ let pp_applied_ftype pf { fty; ty_args; } =
 let pp_funname ~dbg ppf ((fn,fty_app) : Symbols.fname * applied_ftype) = 
   if not dbg || fty_app.ty_args = [] then
     Fmt.pf ppf "%a"
-      (Printer.kws `GoalFunction) (Symbols.to_string fn)
+      (Printer.kws `GoalFunction) (Symbols.path_to_string fn)
   else 
     Fmt.pf ppf "@[<hov 2>%a<%a>@]"
-      (Printer.kws `GoalFunction) (Symbols.to_string fn)
+      (Printer.kws `GoalFunction) (Symbols.path_to_string fn)
       (Fmt.list ~sep:Fmt.sp Type.pp) fty_app.ty_args
 
 (*------------------------------------------------------------------*)
 let pp_msymb_s ppf (ms : Symbols.macro) =
-  Printer.kws `GoalMacro ppf (Symbols.to_string ms)
+  Printer.kws `GoalMacro ppf (Symbols.path_to_string ms)
 
 let pp_msymb ppf (ms : msymb) =
   pp_msymb_s ppf ms.s_symb
@@ -136,7 +136,7 @@ let rec hash : term -> int = function
   | Name (n,l) -> hcombine 0 (hash_l l (hash_isymb n))
 
   | Fun (f,fty) -> 
-    hcombine 1 (hcombine (Symbols.hash f) (Hashtbl.hash fty))
+    hcombine 1 (hcombine (Symbols.path_id f) (Hashtbl.hash fty))
 
   | Macro (m, l, ts)  ->
     let h = hcombine_list hash (hash_isymb m) l in
@@ -161,7 +161,7 @@ let rec hash : term -> int = function
   | Var v -> hcombine 10 (Vars.hash v)
 
   | Action (s, is) ->
-    let h = hcombine_list hash (Symbols.hash s) is in
+    let h = hcombine_list hash (Symbols.path_id s) is in
     hcombine 11 h
 
   | Let (x,t1,t2) ->
@@ -503,7 +503,7 @@ module Prelude = struct
 
   (** Get a prelude-defined symbol *)
   let get_prelude_fsymb table (s : string) : Symbols.fname =
-    try Symbols.Operator.of_lsymb (L.mk_loc L._dummy s) table with
+    try Symbols.Operator.convert_path ([],L.mk_loc L._dummy s) table with
     | Symbols.Error _ -> assert false
 
   (*------------------------------------------------------------------*)
@@ -523,7 +523,7 @@ end
 let mk_zero  = mk_fbuiltin Symbols.fs_zero []
 let mk_fail  = mk_fbuiltin Symbols.fs_fail []
 
-let mk_len term    = mk_fbuiltin Symbols.fs_len    [term]
+let mk_len term   = mk_fbuiltin Symbols.fs_len  [term]
 let mk_pair t0 t1 = mk_fbuiltin Symbols.fs_pair [t0;t1]
 
 let mk_ite ?(simpl=true) c t e =
@@ -1342,11 +1342,11 @@ and _pp
   | Action (symb,indices) ->
     if indices = [] then
       Printer.kw `GoalAction ppf "%s" 
-        (Symbols.to_string symb)
+        (Symbols.path_to_string symb)
     else
       let pp ppf () =
         Printer.kw `GoalAction ppf "%s(%a)" 
-          (Symbols.to_string symb)
+          (Symbols.path_to_string symb)
           (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) indices
       in
       maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
@@ -2173,9 +2173,9 @@ let pp_term_head fmt = function
   | HFind     -> Fmt.pf fmt "Find"
   | HTuple    -> Fmt.pf fmt "Tuple"
   | HProj     -> Fmt.pf fmt "Proj"
-  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
-  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
-  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
+  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp_path f
+  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp_path m
+  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp_path n
   | HDiff     -> Fmt.pf fmt "Diff"
   | HVar      -> Fmt.pf fmt "Var"
   | HAction   -> Fmt.pf fmt "Action"

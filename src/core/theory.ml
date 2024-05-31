@@ -14,27 +14,13 @@ type p_ty_i =
   | P_boolean
   | P_index
   | P_timestamp
-  | P_tbase  of lsymb
+  | P_tbase  of Symbols.p_path
   | P_tvar   of lsymb
   | P_fun    of p_ty * p_ty
   | P_tuple  of p_ty list
   | P_ty_pat
 
 and p_ty = p_ty_i L.located
-
-let rec pp_p_ty_i fmt = function
-  | P_message   -> Fmt.pf fmt "message"
-  | P_boolean   -> Fmt.pf fmt "boolean"
-  | P_index     -> Fmt.pf fmt "index"
-  | P_timestamp -> Fmt.pf fmt "timestamp"
-  | P_tbase s   -> Fmt.pf fmt "%s" (L.unloc s)
-  | P_tvar s    -> Fmt.pf fmt "'%s" (L.unloc s)
-  | P_ty_pat    -> Fmt.pf fmt "_"
-
-  | P_tuple tys -> Fmt.list ~sep:(Fmt.any " * ") pp_p_ty fmt tys
-  | P_fun (t1, t2) -> Fmt.pf fmt "(%a -> %a)" pp_p_ty t1 pp_p_ty t2
-
-and pp_p_ty fmt pty = pp_p_ty_i fmt (L.unloc pty)
   
 (*------------------------------------------------------------------*)
 (** Parsed binder *)
@@ -72,21 +58,21 @@ type quant = Term.quant
 
 type term_i =
   | Tpat
-  | Diff of term * term (* TODO generalize *)
-  | Find of bnds * term * term * term
+  | Diff  of term * term (* TODO generalize *)
+  | Find  of bnds * term * term * term
   | Tuple of term list
-  | Proj of int L.located * term
-  | Let of lsymb * term * p_ty option * term
-  | Symb of lsymb
-  | App of term * term list
+  | Proj  of int L.located * term
+  | Let   of lsymb * term * p_ty option * term
+  | Symb  of Symbols.p_path
+  | App   of term * term list
   | AppAt of term * term
   | Quant of quant * ext_bnds * term
 
 and term = term_i L.located
 
 (*------------------------------------------------------------------*)
-let mk_symb (s : lsymb) : term =
-  L.mk_loc (L.loc s) (Symb s)
+let mk_symb (s : Symbols.p_path) : term =
+  L.mk_loc (Symbols.p_path_loc s) (Symb s)
 
 let mk_app_i (t1 : term) (l : term list) : term_i = App (t1, l)
 
@@ -103,234 +89,16 @@ let rec decompose_app (t : term) : term * term list =
   | _ -> t, []
 
 (*------------------------------------------------------------------*)
-let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
-  | P_message  , P_message
-  | P_boolean  , P_boolean
-  | P_index    , P_index
-  | P_timestamp, P_timestamp -> true
-
-  | P_ty_pat, P_ty_pat -> true
-
-  | P_tbase b, P_tbase b' -> L.unloc b = L.unloc b'
-  | P_tvar v, P_tvar v' -> L.unloc v = L.unloc v'
-
-  | P_tuple tys, P_tuple tys' -> 
-    List.length tys = List.length tys' &&
-    List.for_all2 equal_p_ty tys tys'
-
-  | P_fun (t1, t2), P_fun (t1', t2') ->
-    equal_p_ty t1 t1' && equal_p_ty t2 t2'
-
-  | _, _ -> false
-
-(*------------------------------------------------------------------*)
-let equal_bnds l l' =
-  List.for_all2 (fun (s,k) (s',k') ->
-      L.unloc s = L.unloc s' && equal_p_ty k k'
-    ) l l'
-
-let equal_p_tagged_ty
-    ((k ,sc ) : p_ty * var_tags) 
-    ((k',sc') : p_ty * var_tags) 
-  = 
-  equal_p_ty k k' && sc = sc'
-
-let equal_lval (lv1 : lval) (lv2 : lval) : bool =
-  match lv1,lv2 with
-  | L_var s, L_var s' ->
-    L.unloc s = L.unloc s' 
-
-  | L_tuple l, L_tuple l' ->
-    List.for_all2 (fun s s' ->
-        L.unloc s = L.unloc s'
-      ) l l' 
-  | _ -> false 
-
-let equal_ext_bnds (l : ext_bnds) (l' : ext_bnds) : bool =
-  List.for_all2 (fun (lv1,tty1) (lv2,tty2) ->
-      equal_lval lv1 lv2 && 
-      equal_p_tagged_ty tty1 tty2
-    ) l l'
-
-(*------------------------------------------------------------------*)
-let rec equal t t' = equal_i (L.unloc t) (L.unloc t')
-
-and equal_i t t' = 
-  match t, t' with
-  | Diff (a,b), Diff (a',b') ->
-    equal a a' && equal b b'
-
-  | Quant (q, l, a), Quant (q', l', a') when q = q' ->
-    List.length l = List.length l' &&
-    equal_ext_bnds l l' &&
-    equal a a'
-
-  | Find (l, a, b, c), Find (l', a', b', c') ->
-    List.length l = List.length l' &&
-    equal_bnds l l' &&
-    equals [a; b; c] [a'; b'; c']
-
-  | App (t1, l), App (t1', l') ->
-    equals (t1 :: l) (t1' :: l')
-
-  | AppAt   (t1, t2), AppAt   (t1', t2') ->
-    equals [t1; t2] [t1'; t2']
-
-  | Tpat, Tpat -> true
-
-  | Tuple l, Tuple l' -> equals l l'
-  | Proj (i, t), Proj (i', t') -> i = i' && equal t t'
-
-  | Symb f, Symb f' -> L.unloc f = L.unloc f'
-
-  | _ -> false
-
-and equals l l' = List.for_all2 equal l l'
-
-(*------------------------------------------------------------------*)
-let var_i loc x : term_i = Symb (L.mk_loc loc x)
+let var_i loc x : term_i = Symb ([],L.mk_loc loc x)
 
 let var   loc x : term = L.mk_loc loc (var_i loc x)
-
-let var_of_lsymb s : term = var (L.loc s) (L.unloc s)
-
-let destr_var = function
-  | Symb v -> Some v
-  | _ -> None
-
-(*------------------------------------------------------------------*)
-let pp_var_tags ppf (l : var_tags) =
-  if l = [] then ()
-  else
-    Fmt.pf ppf "@[[%a]@]" (Fmt.list ~sep:Fmt.comma Fmt.string) (List.map L.unloc l)
-  
-(*------------------------------------------------------------------*)
-let pp_var_list ppf (l : bnds_tagged) =
-  let rec aux cur_vars (cur_type_tags : p_ty_i * var_tags) = function
-    | (v, (vty,tags)) :: vs when (L.unloc vty, tags) = cur_type_tags ->
-      aux ((L.unloc v) :: cur_vars) cur_type_tags vs
-    | vs ->
-      if cur_vars <> [] then begin
-        let cur_type, cur_tags = cur_type_tags in
-        Fmt.list
-          ~sep:(Fmt.any ",")
-          Fmt.string ppf (List.rev cur_vars) ;
-        Fmt.pf ppf ":%a%a" pp_p_ty_i cur_type pp_var_tags cur_tags;
-        if vs <> [] then Fmt.pf ppf ",@,"
-      end ;
-      match vs with
-      | [] -> ()
-      | (v, (vty,sc)) :: vs -> aux [L.unloc v] (L.unloc vty, sc) vs
-  in
-  aux [] (P_message, []) l
-
-(* Less clever pretty-printer than [pp_var_list] above: 
-   does not group variable with the same type together *)
-let pp_ext_bnd ppf (ebnd : ext_bnd) =
-  match ebnd with
-  | L_var v, (ty,tags) ->
-    Fmt.pf ppf "%s : %a%a" (L.unloc v) pp_p_ty ty pp_var_tags tags
-
-  | L_tuple l, (ty,tags) ->
-    Fmt.pf ppf "(%a) : %a%a"
-      (Fmt.list ~sep:(Fmt.any ",") Fmt.string) (List.map L.unloc l) 
-      pp_p_ty ty
-      pp_var_tags tags
-    
-let pp_ext_bnds ppf (ebnds : ext_bnds)  =
-  Fmt.pf ppf "@[%a@]" 
-    (Fmt.list ~sep:(Fmt.any ",@ ") pp_ext_bnd) ebnds
-
-(*------------------------------------------------------------------*)
-let rec pp_term_i ppf t = match t with
-  | Tpat -> Fmt.pf ppf "_"
-
-  | Symb f when L.unloc f = "true"  -> Printer.kws `TermBool ppf "true"
-  | Symb f when L.unloc f = "false" -> Printer.kws `TermBool ppf "false"
-  | Symb f -> Fmt.pf ppf "%s" (L.unloc f)
-
-  | Find (vs,c,t,e) ->
-      Fmt.pf ppf
-        "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
-        (Printer.kws `TermCondition) "try find"
-        pp_var_list (List.map (fun (v,ty) -> v, (ty, [])) vs)
-        (* add empty tags beffore printing *)
-        (Printer.kws `TermCondition) "such that"
-        pp_term c
-        (Printer.kws `TermCondition) "in"
-        pp_term t
-        (Printer.kws `TermCondition) "else"
-        pp_term e
-
-  | Diff (l,r) ->
-      Fmt.pf ppf "%a(%a,%a)"
-        (Printer.kws `TermDiff) "diff"
-        pp_term l
-        pp_term r
-
-  | App (t1,l) ->
-    if l = [] then
-      Fmt.pf ppf "%a" pp_term t1
-    else 
-      Fmt.pf ppf "(%a %a)" pp_term t1 (Fmt.list ~sep:Fmt.sp pp_term) l
-
-  | Tuple l when List.length l = 1 -> pp_term ppf (as_seq1 l)
-                                        
-  | Tuple l ->
-    Fmt.pf ppf "@[(%a)@]" 
-      (Fmt.list ~sep:(Fmt.any ",@ ") pp_term) l
-
-  | Proj (i,t) ->
-    Fmt.pf ppf "proj %d (%a)" (L.unloc i) pp_term t
-
-  | Let (v,t1,_,t2) ->
-    Fmt.pf ppf "@[<hov 0>%a %s =@;<1 2>@[%a@]@ in@ %a@]"
-      (Printer.kws `TermQuantif) "let"
-      (L.unloc v)
-      pp_term t1 pp_term t2
-
-  | AppAt (t1, t2) ->
-    Fmt.pf ppf "%a@@%a"
-      pp_term t1 pp_term t2
-
-  | Quant (Seq, vs, b) ->
-      Fmt.pf ppf "@[<hov 2>%a(%a->@,@[%a@])@]"
-        (Printer.kws `TermSeq) "seq"
-        pp_ext_bnds vs
-        pp_term b
-
-  | Quant (ForAll, vs, b) ->
-      Fmt.pf ppf "@[%a (@[%a@]),@ %a@]"
-        (Printer.kws `TermQuantif) "forall"
-        pp_ext_bnds vs
-        pp_term b
-
-  | Quant (Exists, vs, b) ->
-      Fmt.pf ppf "@[%a (@[%a@]),@ %a@]"
-        (Printer.kws `TermQuantif) "exists"
-        pp_ext_bnds vs
-        pp_term b
-
-  | Quant (Lambda, vs, b) ->
-      Fmt.pf ppf "@[(%a (@[%a@]) =>@ %a)@]"
-        (Printer.kws `TermQuantif) "fun"
-        pp_ext_bnds vs
-        pp_term b
-
-
-and pp_term ppf t =
-  Fmt.pf ppf "%a" pp_term_i (L.unloc t)
-
-let pp   = pp_term
-let pp_i = pp_term_i
-
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
 (** global predicate application *)
 type pred_app = {
-  name    : lsymb;              (** predicate symbol *)
+  name    : Symbols.p_path;      (** predicate symbol *)
   se_args : SE.Parse.t list;    (** system arguments *)
   args    : term list;          (** multi-term and term arguments *)
 }
@@ -361,15 +129,11 @@ type any_term = Global of global_formula | Local of term
 
 type conversion_error_i =
   | Arity_error          of string * int * int
-  | Untyped_symbol       of string
-  | Undefined            of string
-  | UndefinedOfKind      of string * Symbols.symbol_kind
-  | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
-  | Timestamp_expected   of term
-  | Timestamp_unexpected of term
-  | Unsupported_ord      of term_i
-  | String_expected      of term_i
-  | Int_expected         of term_i
+  | UndefinedOfKind      of Symbols.npath option * string * Symbols.symbol_kind
+  (** [string] unknown in optional namespace [npath] for kind [kind] *)
+  | Type_error           of Term.term * Type.ty * Type.ty (* expected, got *)
+  | Timestamp_expected   of string
+  | Timestamp_unexpected of string
   | Tactic_type          of string
   | Assign_no_state      of string
   | BadSymbolKind        of string * Symbols.symbol_kind
@@ -402,12 +166,12 @@ let pp_error_i ppf = function
   | Arity_error (s,i,j) ->
     Fmt.pf ppf "symbol %s given %i arguments, but has arity %i" s i j
 
-  | Untyped_symbol s -> Fmt.pf ppf "symbol %s is not typed" s
-
-  | Undefined s -> Fmt.pf ppf "symbol %s is undefined" s
-
-  | UndefinedOfKind (s,n) ->
-    Fmt.pf ppf "%a %s is undefined" Symbols.pp_symbol_kind n s
+  | UndefinedOfKind (top,sub,n) ->
+    Fmt.pf ppf "unknown %a %s%a"
+      Symbols.pp_symbol_kind n sub
+      (fun ppf -> function
+         | None -> ()
+         | Some top -> Symbols.pp_npath ppf top) top
 
   | Type_error (s, ty_expected, ty) ->
     Fmt.pf ppf "@[<hov 0>\
@@ -415,31 +179,15 @@ let pp_error_i ppf = function
                 of type@ @[%a@]@ \
                 is not of type @[%a@]\
                 @]"
-      pp_i s
+      Term.pp s
       Type.pp ty
       Type.pp ty_expected
 
-  | Timestamp_expected t ->
-    Fmt.pf ppf "the term %a must be given a timestamp" pp t
+  | Timestamp_expected s ->
+    Fmt.pf ppf "%s must be given a timestamp" s
 
-  | Timestamp_unexpected t ->
-    Fmt.pf ppf "the term %a must not be given a timestamp" pp t
-
-  | Unsupported_ord t ->
-    Fmt.pf ppf
-      "comparison %a cannot be typed@ \
-       (operands have a type@ for which the comparison is allowed)"
-      pp_i t
-
-  | String_expected t ->
-    Fmt.pf ppf
-      "the term %a cannot be seen as a string"
-      pp_i t
-
-  | Int_expected t ->
-    Fmt.pf ppf
-      "the term %a cannot be seen as a int"
-      pp_i t
+  | Timestamp_unexpected s ->
+    Fmt.pf ppf "%s must not be given a timestamp" s
 
   | Tactic_type s ->
     Fmt.pf ppf "the tactic arguments could not be parsed: %s" s
@@ -526,8 +274,10 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
     TVar tv
 
   | P_tbase tb_l ->
-    let s = Symbols.BType.of_lsymb tb_l env.table in
-    Type.TBase (Symbols.to_string s)
+    let s = Symbols.BType.convert_path tb_l env.table in
+    (* FIXME: namespace: use the safe API *)
+    let top, sub = List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s in
+    Type.TBase (top, sub)
 
   | P_tuple ptys -> Type.Tuple (List.map (convert_ty env) ptys)
 
@@ -547,7 +297,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
    an arity check. *)
 let check_arity
     ~(mode : [`Full | `Partial | `NoCheck])
-    (lsymb : lsymb)
+    (path : Symbols.p_path)
     ~(actual : int) ~(expected : int) : unit
   =
   let arity_error =
@@ -557,7 +307,8 @@ let check_arity
     | `NoCheck -> false
   in
   if arity_error then
-    conv_err (L.loc lsymb) (Arity_error (L.unloc lsymb, actual, expected))
+    conv_err (Symbols.p_path_loc path)
+      (Arity_error (Symbols.p_path_to_string path, actual, expected))
 
 (*------------------------------------------------------------------*)
 (** Type of a macro *)
@@ -576,19 +327,22 @@ let mf_type_arity (ty : mf_type) =
 
 (** Get the kind of a function or macro definition.
     In the latter case, the timestamp argument is not accounted for. *)
-let function_kind table (f : lsymb) : mf_type =
-  match Symbols.status_of_lsymb f table with
+let function_kind table (p : Symbols.p_path) : mf_type =
+  let status = Symbols.status_of_p_path ~group:Symbols.default_group p table in
+  (* FIXME: namespace: for now, we do not support overloading. *)
+  let status = List.hd status in
+  match status with
   (* we should never encounter a situation where we
      try to type a reserved symbol. *)
   | Reserved _ -> assert false
   | Defined d ->
     match d with
     | Operator ->
-      let fs = Symbols.Operator.of_lsymb f table in
+      let fs = Symbols.Operator.convert_path p table in
       `Fun ((Symbols.OpData.get_data fs table).ftype)
         
     | Macro ->
-      let ms = Symbols.Macro.of_lsymb f table in
+      let ms = Symbols.Macro.convert_path p table in
       let data = Symbols.get_macro_data ms table in
       begin
         match data with
@@ -602,30 +356,35 @@ let function_kind table (f : lsymb) : mf_type =
         | State _ -> assert false (* TODO: symbols: missing case? *)
       end
       
-    | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
+    | _ -> conv_err (Symbols.p_path_loc p) (Failure "expected a function or operator symbol")
 
-let check_state table (ls : lsymb) n : Type.ty =
-  let s = Symbols.Macro.of_lsymb ls table in
+let check_state table (path : Symbols.p_path) n : Type.ty =
+  let s = Symbols.Macro.convert_path path table in
   match Symbols.get_macro_data s table with
   | Symbols.State (arity,ty,_) ->
-    check_arity ~mode:`Full ls ~actual:n ~expected:arity ;
+    check_arity ~mode:`Full path ~actual:n ~expected:arity ;
     ty
 
-  | _ -> conv_err (L.loc ls) (Assign_no_state (L.unloc ls))
+  | _ -> conv_err (Symbols.p_path_loc path) (Assign_no_state (Symbols.p_path_to_string path))
 
-let check_name table (s : lsymb) n : Type.ftype =
+let check_name table (path : Symbols.p_path) n : Type.ftype =
   let fty =
-    (Symbols.get_name_data (Symbols.Name.of_lsymb s table) table).n_fty
+    (Symbols.get_name_data (Symbols.Name.convert_path path table) table).n_fty
   in
   let arity = List.length fty.fty_args in
-  if arity <> n then conv_err (L.loc s) (Arity_error (L.unloc s,n,arity));
+  if arity <> n then
+    conv_err (Symbols.p_path_loc path) (Arity_error (Symbols.p_path_to_string path,n,arity));
   fty
 
-let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : unit =
-  let a = Action.of_lsymb s env.table in
-  let arity = Action.arity a env.table in 
+let check_action
+    type_checking in_proc (env : Env.t) (path : Symbols.p_path) (n : int) : unit
+  =
+  let path_loc = Symbols.p_path_loc path in
+  let a = Action.convert path env.table in
+  let arity = Action.arity a env.table in
 
-  if arity <> n then conv_err (L.loc s) (Arity_error (L.unloc s,n,arity));
+  if arity <> n then
+    conv_err path_loc (Arity_error (Symbols.p_path_to_string path,n,arity));
 
   (* do not check that the system is compatible in:
      - type-checking mode
@@ -634,7 +393,7 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
   else
     begin 
       if Action.is_decl a env.table then
-        conv_err (L.loc s) (Failure "action is declared but un-defined");
+        conv_err path_loc (Failure "action is declared but un-defined");
 
       let _, action = Action.get_def a env.table in
       try
@@ -643,8 +402,8 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
       with
       | Not_found
       | SE.Error (_,Expected_compatible) ->
-        let loc = if in_proc then L._dummy else L.loc s in
-        conv_err loc (UndefInSystem (L.unloc s, env.system.set))
+        let loc = if in_proc then L._dummy else path_loc in
+        conv_err loc (UndefInSystem (Symbols.p_path_to_string path, env.system.set))
     end
 
 (*------------------------------------------------------------------*)
@@ -697,19 +456,19 @@ let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
 (*------------------------------------------------------------------*)
 (** {3 Types} *)
 
-let ty_error ty_env tm ~(got : Type.ty) ~(expected : Type.ty) =
+let ty_error ty_env loc (t : Term.term) ~(got : Type.ty) ~(expected : Type.ty) =
   let got      = Type.Infer.norm ty_env got in
   let expected = Type.Infer.norm ty_env expected in
-  Conv (L.loc tm, Type_error (L.unloc tm, expected, got))
+  Conv (loc, Type_error (t, expected, got))
 
-let check_ty_eq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
+let check_ty_eq state ~loc ~(of_t : Term.term) (t_ty : Type.ty) (ty : Type.ty) : unit =
   match Type.Infer.unify_eq state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
-    raise (ty_error state.ty_env of_t ~got:t_ty ~expected:ty)
+    raise (ty_error state.ty_env loc of_t ~got:t_ty ~expected:ty)
 
-let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
-  check_ty_eq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
+let check_term_ty state ~loc ~(of_t : Term.term) (t : Term.term) (ty : Type.ty) : unit =
+  check_ty_eq state ~loc ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
 (** {3 System projections} *)
@@ -783,17 +542,25 @@ let is_at = function At _ -> true | _ -> false
 let get_ts = function At ts | MaybeAt ts -> Some ts | _ -> None
 
 (*------------------------------------------------------------------*)
-let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
-  let loc = L.loc lsymb in
+let make_app_i (state : conv_state) cntxt (p : Symbols.p_path) : app_i =
+  let loc = Symbols.p_path_loc p in
   let table = state.env.table in
   
   let ts_unexpected () =
-    conv_err loc (Timestamp_unexpected (mk_app (mk_symb lsymb) []))
+    conv_err loc (Timestamp_unexpected (Symbols.p_path_to_string p))
+  in
+  let ts_expected () =
+    conv_err loc (Timestamp_expected (Symbols.p_path_to_string p))
   in
 
-  if Vars.mem_s state.env.vars (L.unloc lsymb) then AVar
+  
+  let top, sub = p in
+  if top = [] && Vars.mem_s state.env.vars (L.unloc sub) then AVar
   else
-    match Symbols.status_of_lsymb lsymb table with
+    let status = Symbols.status_of_p_path ~group:Symbols.default_group p table in
+    (* FIXME: namespace: for now, we do not support overloading. *)
+    let status = List.hd status in
+    match status with
     | Symbols.Reserved _ -> assert false
     | Symbols.Defined d ->
       match d with
@@ -805,21 +572,18 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
         Name
       | Symbols.Macro ->
         begin
-          match Symbols.get_macro_data (Symbols.Macro.of_lsymb lsymb table) table with
+          match Symbols.get_macro_data (Symbols.Macro.convert_path p table) table with
           | Global _ -> Macro
           | State  _ -> Get            
           | Input | Output | Cond | Exec | Frame ->
-            if cntxt = NoTS then
-              conv_err loc (Timestamp_expected (mk_app (mk_symb lsymb) []));
+            if cntxt = NoTS then ts_expected ();
             Macro
         end
       | Symbols.Action -> Taction
-      | _ ->
-        let s = L.unloc lsymb in
-        conv_err loc (BadSymbolKind (s, oget(Symbols.kind_of_string table s)))
+      | k -> conv_err loc (BadSymbolKind (Symbols.p_path_to_string p, k))
 
-let make_app loc (state : conv_state) cntxt (lsymb : lsymb) : app =
-  L.mk_loc loc (make_app_i state cntxt lsymb)
+let make_app loc (state : conv_state) cntxt (p : Symbols.p_path) : app =
+  L.mk_loc loc (make_app_i state cntxt p)
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
@@ -830,17 +594,15 @@ let convert_var (state : conv_state) (symb : lsymb) (ty : Type.ty) : Term.term =
     (* cannot have two variables with the same name since previous 
        definitions must have been shadowed *)
 
-    let of_t = var_of_lsymb symb in
-
     (* check the variable type *)
-    check_ty_eq state ~of_t (Vars.ty v) ty;
-
+    check_ty_eq state ~loc:(L.loc symb) ~of_t:(Term.mk_var v) (Vars.ty v) ty;
+    
     (* check that the variable is used in a multi-term on compatible systems *)
     check_system state (L.loc symb) v;
 
     Term.mk_var v
   with
-  | Not_found -> conv_err (L.loc symb) (Undefined (L.unloc symb))
+  | Not_found -> conv_err (L.loc symb) (Failure ("unknown symbol " ^ L.unloc symb))
 
 
 (*------------------------------------------------------------------*)
@@ -978,29 +740,25 @@ let convert_ext_bnds
 (*------------------------------------------------------------------*)
 (** {3 Local formula conversion conversion} *)
 
-let get_fun table lsymb =
-  match Symbols.Operator.of_lsymb_opt lsymb table with
-  | Some n -> n
-  | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Operator))
+let get_fun table path =
+  try Symbols.Operator.convert_path path table with
+  | Symbols.Error (_, Unbound_identifier (np,sub)) ->
+    conv_err (Symbols.p_path_loc path) (UndefinedOfKind (np, sub, Symbols.Operator))
 
-let get_name table lsymb =
-  match Symbols.Name.of_lsymb_opt lsymb table with
-  | Some n -> n
-  | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Name))
+let get_name table path =
+  try Symbols.Name.convert_path path table with
+  | Symbols.Error (_, Unbound_identifier (np,sub)) ->
+    conv_err (Symbols.p_path_loc path) (UndefinedOfKind (np, sub, Symbols.Name))
 
-let get_action (env : Env.t) lsymb =
-  match Symbols.Action.of_lsymb_opt lsymb env.table with
-  | Some n -> n
-  | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Action))
+let get_action table path =
+  try Symbols.Action.convert_path path table with
+  | Symbols.Error (_, Unbound_identifier (np,sub)) ->
+    conv_err (Symbols.p_path_loc path) (UndefinedOfKind (np, sub, Symbols.Action))
 
-let get_macro (env : Env.t) lsymb =
-  match Symbols.Macro.of_lsymb_opt lsymb env.table with
-  | Some n -> n
-  | None ->
-    conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.Macro))
+let get_macro table path =
+  try Symbols.Macro.convert_path path table with
+  | Symbols.Error (_, Unbound_identifier (np,sub)) ->
+    conv_err (Symbols.p_path_loc path) (UndefinedOfKind (np, sub, Symbols.Macro))
 
 (*------------------------------------------------------------------*)
 
@@ -1012,7 +770,7 @@ let rec convert
   : Term.term
   =
   let t = convert0 state tm ty in
-  check_term_ty state ~of_t:tm t ty;
+  check_term_ty state ~loc:(L.loc tm) ~of_t:t t ty;
   t
 
 and convert0 
@@ -1026,7 +784,11 @@ and convert0
     let state = { state with env } in
     convert state t s 
   in
-
+  let is_var (f : Symbols.p_path) =
+    let top, sub = f in
+    top = [] && Vars.mem_s state.env.vars (L.unloc sub)
+  in
+  
   match L.unloc tm with
   | Tpat ->
     if not state.allow_pat then
@@ -1040,13 +802,13 @@ and convert0
   (*------------------------------------------------------------------*)
   (* particular cases for init and happens *)
 
-  | Symb { pl_desc = "init" } ->
+  | Symb ([],{ pl_desc = "init" }) ->
     Term.mk_action Symbols.init_action []
 
   (* happens distributes over its arguments *)
   (* open-up tuples *)
-  | App ({ pl_desc = Symb { pl_desc = "happens" }}, [{pl_desc = Tuple ts}])
-  | App ({ pl_desc = Symb { pl_desc = "happens" }}, ts) ->
+  | App ({ pl_desc = Symb ([],{ pl_desc = "happens" })}, [{pl_desc = Tuple ts}])
+  | App ({ pl_desc = Symb ([],{ pl_desc = "happens" })}, ts) ->
     let atoms = List.map (fun t ->
         Term.mk_happens (conv Type.Timestamp t)
       ) ts in
@@ -1056,36 +818,37 @@ and convert0
   (*------------------------------------------------------------------*)
 
   | AppAt ({ pl_desc = Symb f } as tapp, ts) 
-  | AppAt ({ pl_desc = App ({ pl_desc = Symb f },_)} as tapp, ts)
-    when not (Vars.mem_s state.env.vars (L.unloc f)) ->
-    let f', terms = decompose_app tapp in
-    assert (equal_i (Symb f) (L.unloc f'));
+  | AppAt ({ pl_desc = App ({ pl_desc = Symb f },_)} as tapp, ts) when not (is_var f) ->
+    let _f, terms = decompose_app tapp in
 
+    let app_cntxt = At (conv Type.Timestamp ts) in
+    let t =
+      conv_app state app_cntxt tm
+        (f, terms, make_app loc state app_cntxt f)
+        ty
+    in
     if is_in_proc state.cntxt then 
       Printer.prt `Warning 
         "Potential well-foundedness issue: \
          macro %a with explicit timestamp in process declaration."
-        pp tm;
-      (* conv_err loc ExplicitTSInProc; *)
+        Term.pp t;
+    t
+    
+  | AppAt (t,_) ->              (* failure *)
+    let t = conv ty t in
+    conv_err loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
 
-    let app_cntxt = At (conv Type.Timestamp ts) in
-    conv_app state app_cntxt tm
-      (f, terms, make_app loc state app_cntxt f)
-      ty
-
-  | AppAt _ -> conv_err loc (Timestamp_unexpected tm) 
-
-  | Symb f 
-  | App ({ pl_desc = Symb f},_)
-    when not (Vars.mem_s state.env.vars (L.unloc f)) ->
-    let f', terms = decompose_app tm in
-    assert (equal_i (Symb f) (L.unloc f'));
+  (* application, special case *)
+  | Symb f
+  | App ({ pl_desc = Symb f}, _ (* = _args *) ) when not (is_var f) ->
+    let _top, sub = f in
+    let _f, args = decompose_app tm in (* [args = _args] *)
 
     (* check that we are not in one of the special cases above *)
-    if L.unloc f = "init" || L.unloc f = "happens" then 
-      conv_err loc (Arity_error (L.unloc f, 
-                                 (if L.unloc f = "init" then 0 else 1), 
-                                 List.length terms));
+    if L.unloc sub = "init" || L.unloc sub = "happens" then 
+      conv_err loc (Arity_error (Symbols.p_path_to_string f, 
+                                 (if L.unloc sub = "init" then 0 else 1), 
+                                 List.length args));
 
     let app_cntxt = match state.cntxt with
       | InGoal -> NoTS
@@ -1093,11 +856,14 @@ and convert0
     in
 
     conv_app state app_cntxt tm
-      (f, terms, make_app loc state app_cntxt f)
+      (f, args, make_app loc state app_cntxt f)
       ty
+      
+  | Symb ((top,_) as f) -> 
+    assert(is_var f && top = []); 
+    convert_var state (snd f) ty
 
-  | Symb f -> convert_var state f ty
-
+  (* application, general case *)
   | App (t1, l) -> 
     let l_tys, l =
       List.map (fun t2 ->
@@ -1111,7 +877,7 @@ and convert0
       let ty1 = Type.fun_l l_tys ty in
       conv ty1 t1
     in
-    Term.mk_app t1 l 
+    Term.mk_app t1 l
 
   | Tuple l -> 
     let terms =
@@ -1219,10 +985,11 @@ and conv_app
     (state     : conv_state)
     (app_cntxt : app_cntxt)
     (tm        : term)      (* to have meaningful exceptions. *)
-    ((f, terms, app)  : (lsymb * term list * app))
+    ((f, terms, app)  : (Symbols.p_path * term list * app))
     (ty        : Type.ty) 
   : Term.term
   =
+  let f_top, f_sub = f in
   let loc = L.loc tm in
 
   let conv ?(env=state.env) s t =
@@ -1234,15 +1001,15 @@ and conv_app
     match ts_opt, get_ts app_cntxt with
     | Some ts, _ -> ts
     | None, Some ts -> ts
-    | None, None -> conv_err loc (Timestamp_expected tm)
+    | None, None -> conv_err loc (Timestamp_expected (Symbols.p_path_to_string f))
   in
 
   let ts_opt = get_ts app_cntxt in
   
   match L.unloc app with 
   | AVar ->
-    assert (terms = []); 
-    convert_var state f ty
+    assert (terms = [] && f_top = []); 
+    convert_var state f_sub ty
 
   | Fun ->
     let mfty = function_kind state.env.table f in
@@ -1266,8 +1033,8 @@ and conv_app
       | Some (ty_args, ty_out) -> ty_args, ty_out
       | None ->
         let tys, _ = Type.decompose_funs arrow_ty in
-        conv_err (L.loc f)
-          (Arity_error (L.unloc f, List.length terms, List.length tys))
+        conv_err (Symbols.p_path_loc f)
+          (Arity_error (Symbols.p_path_to_string f, List.length terms, List.length tys))
     in
 
     let rmessages =
@@ -1290,14 +1057,14 @@ and conv_app
 
     let t =
       Term.mk_fun0
-        (Symbols.Operator.of_lsymb f state.env.table) applied_fty messages
+        (Symbols.Operator.convert_path f state.env.table) applied_fty messages
     in
 
     (* additional type check between the type of [t] and the output
        type [ty_out].
        Note that [convert] checks that the type of [t] equals
        [ty], hence we do not need to do it here. *)
-    check_term_ty state ~of_t:tm t ty_out;
+    check_term_ty state ~loc:(L.loc tm) ~of_t:t t ty_out;
 
     t
 
@@ -1307,7 +1074,7 @@ and conv_app
     check_arity ~mode:`NoCheck f
       ~actual:(List.length terms) ~expected:(mf_type_arity mfty);
 
-    let s = Symbols.Macro.of_lsymb f state.env.table in
+    let s = Symbols.Macro.convert_path f state.env.table in
     let macro = Symbols.get_macro_data s state.env.table in
     let _, ty_out =
       match mfty with `Macro x -> x | _ -> assert false
@@ -1330,14 +1097,12 @@ and conv_app
         Term.mk_macro ms indices (get_at ts_opt)
 
       | Input | Output | Frame ->
-        check_arity ~mode:`Full  (L.mk_loc (L.loc f) "input")
-          ~actual:(List.length terms) ~expected:0;
+        check_arity ~mode:`Full f ~actual:(List.length terms) ~expected:0;
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
 
       | Cond | Exec ->
-        check_arity ~mode:`Full (L.mk_loc (L.loc f) "cond")
-          ~actual:(List.length terms) ~expected:0;
+        check_arity ~mode:`Full f ~actual:(List.length terms) ~expected:0;
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
     end
@@ -1346,13 +1111,13 @@ and conv_app
   | Get ->
     let k = check_state state.env.table f (List.length terms) in
     let is = List.map (conv Type.tindex) terms in
-    let f = get_macro state.env f in
+    let fp = get_macro state.env.table f in
     let ts =
       match ts_opt with
       | Some ts -> ts
-      | None -> conv_err loc (Timestamp_expected tm)
+      | None -> conv_err loc (Timestamp_expected (Symbols.p_path_to_string f))
     in
-    let ms = Term.mk_symb f k in
+    let ms = Term.mk_symb fp k in
     Term.mk_macro ms is ts
 
   | Name ->
@@ -1373,14 +1138,14 @@ and conv_app
     let in_proc = match state.cntxt with InProc _ -> true | InGoal -> false in
     check_action state.type_checking in_proc state.env f (List.length terms) ;
     Term.mk_action
-      (get_action state.env f)
+      (get_action state.env.table f)
       (List.map (conv Type.tindex) terms)
 
 (*------------------------------------------------------------------*)
 (** {2 Operator declarations} *)
 
 
-let[@warning "-32"] mk_ftype vars args out =
+let mk_ftype vars args out =
   let mdflt ty = odflt Type.tmessage ty in
   let args = List.map mdflt args in
   Type.mk_ftype vars args (mdflt out)
@@ -1444,7 +1209,7 @@ let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
 
   let dec_data =
     mk_abstract_op dec_fty ADec
-      ~associated_functions:[Operator.cast_of_string (L.unloc enc); pk]
+      ~associated_functions:[Operator.of_string (Symbols.scope table) (L.unloc enc); pk]
   in
   let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
 
@@ -1460,7 +1225,7 @@ let declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec =
 
   let dec_data =
     mk_abstract_op dec_fty SDec
-      ~associated_functions:[Operator.cast_of_string (L.unloc enc)]
+      ~associated_functions:[Operator.of_string (Symbols.scope table) (L.unloc enc)]
   in
   let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
 
@@ -1477,7 +1242,7 @@ let declare_senc_joint_with_hash
 
   let dec_data =
     mk_abstract_op dec_fty SDec
-      ~associated_functions:[Operator.cast_of_string (L.unloc enc); get_fun table h]
+      ~associated_functions:[Operator.of_string (Symbols.scope table) (L.unloc enc); get_fun table h]
   in
   let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
 
@@ -1517,10 +1282,6 @@ let check_signature table checksign pk =
   else None
 
 (*------------------------------------------------------------------*)
-let declare_name table s ndef =
-  fst (Symbols.Name.declare ~approx:false table s ~data:(Symbols.Name ndef))
-
-(*------------------------------------------------------------------*)
 (** Sanity checks for a function symbol declaration. *)
 let check_fun_symb
     (in_tys : int) 
@@ -1547,7 +1308,7 @@ let declare_abstract
 (** {2 Miscellaneous} *)
 
 (** Empty *)
-let empty loc = mk_symb (L.mk_loc loc "empty")
+let empty loc = mk_symb ([],L.mk_loc loc "empty")
 
 (*------------------------------------------------------------------*)
 (** {2 Convert equiv formulas} *)
@@ -1611,8 +1372,9 @@ let parse_se_subst
 
 (** Internal *)
 let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
+  let loc = Symbols.p_path_loc ppa.name in
   let table = st.env.table in
-  let psymb = Symbols.Predicate.of_lsymb ppa.name table in
+  let psymb = Symbols.Predicate.convert_path ppa.name table in
   let pred = Predicate.get table psymb in
 
   (* refresh all type variables in [pred.ty_vars] and substitute *)
@@ -1624,9 +1386,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
 
   (* substitute system expression variables by their arguments *)
   let se_subst = 
-    parse_se_subst
-      (L.loc ppa.name) st.env
-      pred.Predicate.se_vars ppa.se_args 
+    parse_se_subst loc st.env pred.Predicate.se_vars ppa.se_args 
   in
   let se_args = List.map snd se_subst in
   let pred_args_multi =
@@ -1640,7 +1400,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
     | [] -> [], p_args
     | (se, vars) :: multi_args' ->
       if (List.length p_args < List.length vars) then
-        conv_err (L.loc ppa.name) (Failure "not enough arguments");
+        conv_err loc (Failure "not enough arguments");
 
       let system = SE.{ set = (se :> SE.t) ; pair = None } in
       let env = Env.update ~system st.env in
@@ -1666,9 +1426,9 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   in
 
   if List.length rem_p_args > List.length pred_args_simple then
-    conv_err (L.loc ppa.name) (Failure "too many arguments");
+    conv_err loc (Failure "too many arguments");
   if List.length rem_p_args < List.length pred_args_simple then
-    conv_err (L.loc ppa.name) (Failure "not enough arguments");
+    conv_err loc (Failure "not enough arguments");
 
   let simpl_args =
     List.fold_right2 (fun var p_arg acc ->
@@ -1916,7 +1676,7 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
 (** {2 Proof-terms} *)
 
 type pt_cnt =
-  | PT_symb     of lsymb
+  | PT_symb     of Symbols.p_path
   | PT_app      of pt_app
   | PT_localize of pt
 
@@ -1951,7 +1711,7 @@ let () =
         "h cannot be defined twice" Ok
         (fun () ->
            try ignore (declare_hash table (mk "h") : Symbols.table) with
-           | Symbols.Error (_, Multiple_declarations ("h",_,_)) -> raise Ok
+           | Symbols.Error (_, Multiple_declarations (_,"h",_,_)) -> raise Ok
         ) ;
       let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
@@ -1959,7 +1719,7 @@ let () =
         (fun () ->
            try ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk")
                        : Symbols.table) with
-           | Symbols.Error (_, Multiple_declarations ("h",_,_)) -> raise Ok
+           | Symbols.Error (_, Multiple_declarations (_,"h",_,_)) -> raise Ok
         )
     end;
 
@@ -1969,8 +1729,8 @@ let () =
         declare_aenc Symbols.builtins_table (mk "e") (mk "dec") (mk "pk")
       in
       let table = declare_hash table (mk "h") in
-      let x = mk_symb (mk "x") in
-      let y = mk_symb (mk "y") in
+      let x = mk_symb ([],mk "x") in
+      let y = mk_symb ([],mk "y") in
 
       let vars = Vars.empty_env in
       let vars, _ =
@@ -1983,8 +1743,8 @@ let () =
 
       let t_i = 
         mk_app_i
-          (mk_symb (mk "e"))
-          [mk @@ Tuple [mk_app (mk_symb (mk "h")) [mk @@ Tuple [x;y]]; x; y]]
+          (mk_symb ([],mk "e"))
+          [mk @@ Tuple [mk_app (mk_symb ([],mk "h")) [mk @@ Tuple [x;y]]; x; y]]
       in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in

@@ -1,6 +1,3 @@
-type lsymb = Theory.lsymb
-
-(*------------------------------------------------------------------*)
 type rw_hint = { 
   name : string; 
   rule : LowRewrite.rw_rule;
@@ -19,10 +16,10 @@ val get_smt_db     : Symbols.table -> Term.term list
 
 (*------------------------------------------------------------------*)
 type p_hint =
-  | Hint_rewrite of lsymb
-  | Hint_smt     of lsymb
+  | Hint_rewrite of Symbols.p_path
+  | Hint_smt     of Symbols.p_path
 
 val add_hint_rewrite : 
-  lsymb -> Type.tvars -> Term.term -> Symbols.table -> Symbols.table
+  Symbols.p_path -> Type.tvars -> Term.term -> Symbols.table -> Symbols.table
 
 val add_hint_smt : Term.term -> Symbols.table -> Symbols.table

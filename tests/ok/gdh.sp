@@ -159,7 +159,7 @@ lemma [system2/left] test_cdh2 (t:timestamp) (i,j : index) :
 Proof.
   intro HC Hhap H.
   rewrite -HC.
-  checkfail (gdh H,gg) exn Failure.
+  checkfail (gdh H, gg) exn Failure.
   cdh H, gg; intro HH.
   by rewrite corruptleak3.
 Qed.

@@ -16,7 +16,7 @@ type p_ty_i =
   | P_boolean
   | P_index  
   | P_timestamp
-  | P_tbase  of lsymb
+  | P_tbase  of Symbols.p_path
   | P_tvar   of lsymb
   | P_fun    of p_ty * p_ty
   | P_tuple  of p_ty list
@@ -25,8 +25,6 @@ type p_ty_i =
 and p_ty = p_ty_i L.located
     
 val convert_ty : ?ty_env:Type.Infer.env -> Env.t -> p_ty -> Type.ty 
-
-val pp_p_ty : Format.formatter -> p_ty -> unit
 
 (*------------------------------------------------------------------*)
 (** Parsed binder *)
@@ -76,10 +74,10 @@ type term_i =
   | Diff  of term * term
   | Find  of bnds * term * term * term
   | Tuple of term list
-  | Proj of int L.located * term
-  | Let of lsymb * term * p_ty option * term
-  | Symb of lsymb 
-  | App of term * term list
+  | Proj  of int L.located * term
+  | Let   of lsymb * term * p_ty option * term
+  | Symb  of Symbols.p_path
+  | App   of term * term list
   (** Application of a term to another. 
       [AppTerm (t, [t1 ... tn])] is [t t1 ... tn]. *)
   | AppAt of term * term
@@ -90,11 +88,7 @@ type term_i =
 and term = term_i L.located
 
 (*------------------------------------------------------------------*)
-val pp_i : Format.formatter -> term_i -> unit
-val pp   : Format.formatter -> term   -> unit
-
-(*------------------------------------------------------------------*)
-val mk_symb : lsymb -> term 
+val mk_symb : Symbols.p_path -> term 
 
 val mk_app   : term -> term list -> term 
 val mk_app_i : term -> term list -> term_i
@@ -102,15 +96,11 @@ val mk_app_i : term -> term list -> term_i
 val decompose_app : term -> term * term list
 
 (*------------------------------------------------------------------*)
-val equal   : term   -> term   -> bool
-val equal_i : term_i -> term_i -> bool
-
-(*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
 (** global predicate application *)
 type pred_app = {
-  name    : lsymb;              (** predicate symbol *)
+  name    : Symbols.p_path;      (** predicate symbol *)
   se_args : SE.Parse.t list;    (** system arguments *)
   args    : term list;          (** multi-term and term arguments *)
 }
@@ -196,7 +186,7 @@ val declare_senc_joint_with_hash :
   ?ctxt_ty:Type.ty ->
   ?rnd_ty:Type.ty ->
   ?k_ty:Type.ty ->
-  lsymb -> lsymb -> lsymb ->
+  lsymb -> lsymb -> Symbols.p_path ->
   Symbols.table
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
@@ -209,10 +199,6 @@ val declare_signature :
   ?pk_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
-
-(** [declare_name n ndef] declares a new name of type
-  * [index^i -> message]. *)
-val declare_name : Symbols.table -> lsymb -> Symbols.name_data -> Symbols.table
 
 (** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
     a new state symbol of type [s1->...->sn->s]
@@ -250,24 +236,17 @@ val empty : L.t -> term
 (** [var_i x] make a variable represented as [App (x,\[\])] *)
 val var_i        : L.t -> string -> term_i
 val var          : L.t -> string -> term
-val var_of_lsymb : lsymb                -> term
-
-val destr_var : term_i -> lsymb option
 
 (*------------------------------------------------------------------*)
 (** {2 Type-checking} *)
 
 type conversion_error_i =
-  | Arity_error          of string*int*int
-  | Untyped_symbol       of string
-  | Undefined            of string
-  | UndefinedOfKind      of string * Symbols.symbol_kind
-  | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
-  | Timestamp_expected   of term
-  | Timestamp_unexpected of term
-  | Unsupported_ord      of term_i
-  | String_expected      of term_i
-  | Int_expected         of term_i
+  | Arity_error          of string * int * int
+  | UndefinedOfKind      of Symbols.npath option * string * Symbols.symbol_kind
+  (** [string] unknown in optional namespace [npath] for kind [kind] *)
+  | Type_error           of Term.term * Type.ty * Type.ty (* expected, got *)
+  | Timestamp_expected   of string
+  | Timestamp_unexpected of string
   | Tactic_type          of string
   | Assign_no_state      of string
   | BadSymbolKind        of string * Symbols.symbol_kind
@@ -283,11 +262,11 @@ type conversion_error_i =
 
   | BadInfixDecl
   | PatNotAllowed
-  | ExplicitTSInProc 
+  | ExplicitTSInProc
   | UndefInSystem        of string * SE.t
   | MissingSystem
   | BadProjInSubterm     of Term.projs * Term.projs
-                              
+
   | Failure              of string
 
 type conversion_error = L.t * conversion_error_i
@@ -308,7 +287,7 @@ val check :
   term -> Type.ty ->
   unit
 
-val check_state : Symbols.table -> lsymb -> int -> Type.ty
+val check_state : Symbols.table -> Symbols.p_path -> int -> Type.ty
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the
@@ -411,7 +390,7 @@ val parse_projs : lsymb list option -> Term.projs
 (** {2 Proof-terms} *)
 
 type pt_cnt =
-  | PT_symb     of lsymb
+  | PT_symb     of Symbols.p_path
   | PT_app      of pt_app
   | PT_localize of pt
 

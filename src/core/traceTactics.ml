@@ -26,7 +26,7 @@ module TopHyps = Hyps
 (* module Hyps = TS.LocalHyps *)
 
 type tac = TS.t Tactics.tac
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 type sequent = TS.sequent
 
 module Sp = Match.Pos.Sp
@@ -129,8 +129,8 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     | _ ->
       Tactics.(hard_failure (Failure "incorrect case arguments"))
   in
-  match Args.convert_as_lsymb args with
-  | Some str when TS.Hyps.mem_name (L.unloc str) s && structure_based ->
+  match Args.as_p_path args with
+  | Some ([],str) when TS.Hyps.mem_name (L.unloc str) s && structure_based ->
     let id, f = TS.Hyps.by_name_k str Hyp s in
 
     (* check that [str] is a local hypothesis *)
@@ -232,8 +232,9 @@ let assumption ?hyp (s : TS.t) =
 
 let do_assumption_tac args (s : TS.t) : TS.t list =
   let hyp =
-    match Args.convert_as_lsymb args with
-    | Some str -> Some (fst (TS.Hyps.by_name_k str Hyp s))
+    match Args.as_p_path args with
+    | Some (    [], str) -> Some (fst (TS.Hyps.by_name_k str Hyp s))
+    | Some (_ :: _,   _) -> bad_args ()
     | None -> None
   in
   assumption ?hyp s

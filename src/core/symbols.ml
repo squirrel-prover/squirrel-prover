@@ -2,10 +2,35 @@ open Utils
 
 module L = Location
 
+(** A parsed symbol *)
 type lsymb = string L.located
 
+(** A parsed namespace path *)
+type p_npath = string L.located list
+
+(** A parsed symbol path *)
+type p_path = p_npath * string L.located
+
+let p_npath_loc (p : p_npath) : L.t = L.mergeall (List.map L.loc p)
+let p_path_loc  (p : p_path ) : L.t = L.merge (p_npath_loc (fst p)) (L.loc (snd p))
+
 (*------------------------------------------------------------------*)
-(** Type of a function symbol (Prefix or Infix *)
+(** An untyped namespace path *)
+type s_npath = string list
+
+(** An untyped symbol path *)
+type s_path = string list * string
+
+let s_path_to_string ?(sep = ".") ((top,sub) : s_path) =
+  Fmt.str "%a%s%a"
+    (Fmt.list ~sep:(fun fmt () -> Fmt.string fmt sep) Fmt.string) top
+    (if top = [] then "" else sep)
+    Fmt.string sub
+
+let p_path_to_string ?sep ((top,sub) : p_path) =
+  s_path_to_string ?sep (List.map L.unloc top, L.unloc sub)
+
+(*------------------------------------------------------------------*)
 type assoc = [`Right | `Left | `NonAssoc]
 type symb_type = [ `Prefix | `Infix of assoc ]
 
@@ -25,7 +50,8 @@ type symbol_kind =
   | HintDB
   | Lemma
   | Predicate
-  | Theory
+  | Import
+  | Namespace
 
 let pp_symbol_kind fmt = function
   | Channel   -> Fmt.pf fmt "channel"
@@ -42,62 +68,33 @@ let pp_symbol_kind fmt = function
   | HintDB    -> Fmt.pf fmt "hint database"
   | Lemma     -> Fmt.pf fmt "lemma"
   | Predicate -> Fmt.pf fmt "predicate"
-  | Theory    -> Fmt.pf fmt "theory"
+  | Import    -> Fmt.pf fmt "import"
+  | Namespace -> Fmt.pf fmt "namespace"
 
 (*------------------------------------------------------------------*)
-type symb = { group: string; name: string }
+(** {3 Symbols} *)
+
+type group = string
+
+type symb = { group: group; name: string }
 
 type 'a t = symb
 
-type group = string
-let default_group = "default"
+(*------------------------------------------------------------------*)
+let default_group   = "default"
+let namespace_group = "namespace"
 
 let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
 
-(*------------------------------------------------------------------*)
-(** The status of a symbol. *)
-type status =
-  | Defined  of symbol_kind
-  | Reserved of symbol_kind
+let to_string (s : symb) : string = s.name
 
-(** Extensible data type *)
-type data = ..
-type data += Empty
+let pp fmt symb = Fmt.string fmt symb.name
+
+module Msymb = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
 (*------------------------------------------------------------------*)
-(** {2 Error Handling} *)
+(** Phantom type to get some type safety outside of the [Symbols] module *)
 
-type error_i =
-  | Unbound_identifier    of string
-  | Incorrect_kind        of symbol_kind * symbol_kind (* expected, got *)
-  | Multiple_declarations of string * symbol_kind * group
-  | Failure of string
-
-type error = L.t * error_i
-
-let pp_error_i fmt = function
-  | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
-  | Incorrect_kind (n1, n2) ->
-    Fmt.pf fmt "should be a %a but is a %a"
-      pp_symbol_kind n1 pp_symbol_kind n2
-
-  | Multiple_declarations (s, n, g) ->
-    Fmt.pf fmt "%a symbol %s already declared (%s group)"
-      pp_symbol_kind n s g
-
-  | Failure s ->
-    Fmt.pf fmt "%s" s
-
-let pp_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%aError: %a"
-    pp_loc_err loc
-    pp_error_i e
-
-exception Error of error
-
-let symb_err l e = raise (Error (l,e))
-
-(*------------------------------------------------------------------*)
 type _channel
 type _config
 type _oracle
@@ -112,68 +109,280 @@ type _game
 type _hintdb
 type _lemma
 type _predicate
-type _theory
-
-type channel   = _channel   t
-type config    = _config    t
-type oracle    = _oracle    t
-type name      = _name      t
-type action    = _action    t
-type fname     = _fname     t
-type macro     = _macro     t
-type system    = _system    t
-type process   = _process   t
-type btype     = _btype     t
-type game      = _game      t
-type hintdb    = _hintdb    t
-type lemma     = _lemma     t
-type predicate = _predicate t
-type theory    = _theory    t
+type _import
+type _namespace
 
 (*------------------------------------------------------------------*)
-let to_string (s : symb) : string = s.name
+(** {3 Paths} *)
 
-let pp fmt symb = Format.pp_print_string fmt symb.name
+(** A namespace path is simply a list of namespaces *)
+type npath = {
+  npath : _namespace t list; 
+  id    : int;                    (** for hash-consing *)
+}
 
-module Msymb = Map.Make (struct type t = symb let compare = Stdlib.compare end)
+(** A path to any symbol (internal). 
+    [{np; s}] represents the path [np.s]. *)
+type 'a path = { 
+  np : npath;
+  s  : 'a t;
+  id : int;                    (** for hash-consing *)
+}
+
+(** Hide type parameter, which is phantom either way.
+    Unboxed for performances. *)
+type _path = P : 'a path -> _path  [@@unboxed]
+
+(** Forced typed conversion, not to be exported.
+    Relies on the fact that [_path] is unboxed. *)
+external (!>) : _path -> 'a path = "%identity"
+external (!<) : 'a path -> _path = "%identity"
 
 (*------------------------------------------------------------------*)
-module Table : sig
-  type table_c = (status * data) Msymb.t
+type channel   = _channel   path
+type config    = _config    path
+type oracle    = _oracle    path
+type name      = _name      path
+type action    = _action    path
+type fname     = _fname     path
+type macro     = _macro     path
+type system    = _system    path
+type process   = _process   path
+type btype     = _btype     path
+type game      = _game      path
+type hintdb    = _hintdb    path
+type lemma     = _lemma     path
+type predicate = _predicate path
+type import    = _import    path
+type namespace = _namespace path
 
-  type table = private {
-    cnt : table_c;
-    tag : int;
-  }
-
-  val mk : table_c -> table
-  val tag : table -> int
-end = struct
-  type table_c = (status * data) Msymb.t
-
-  type table = {
-    cnt : table_c;
-    tag : int;
-  }
-
-  let mk =
-    let cpt_tag = ref 0 in
-    fun t ->
-      { cnt = t; tag = (incr cpt_tag; !cpt_tag) }
-
-  let tag t = t.tag
+(*------------------------------------------------------------------*)
+module N = struct
+  type t = npath
+  let hash (t : t) : int = hcombine_list hash 0 t.npath
+  let equal (t : t) (t' : t) = 
+    let rec doit l l' =
+      match l, l' with
+      | a :: l, a' :: l' -> a = a' && doit l l'
+      | [], [] -> true
+      | _ -> false
+    in
+    doit t.npath t'.npath
 end
 
-include Table
+(** Create a namespace path. Hash-consed. *)
+let npath : _namespace t list -> npath = 
+  let next_id = ref 0 in
+  let module M = Weak.Make(N)
+  in
+  let m = M.create 256 in
+  fun l -> 
+    let p = { npath = l; id = !next_id; } in
+    try M.find m p with
+    | Not_found -> M.add m p; incr next_id; p
+
+let npath_app (n : npath) (l : _namespace t list) : npath = npath (n.npath @ l)
     
+let of_s_npath (l : s_npath) : npath = 
+  List.map (fun s -> { name = s; group = namespace_group; }) l
+  |> npath
+
+let npath_id (t : npath) = t.id
+
+let npath_equal (n : npath) (n' : npath) = n.id = n'.id
+
+let pp_npath ?(sep = ".") fmt (t : npath) =
+  (Fmt.list ~sep:(fun fmt () -> Fmt.string fmt sep) pp) fmt t.npath
+
+let npath_to_string ?sep = Fmt.str "%a" (pp_npath ?sep)
+
+(*------------------------------------------------------------------*)
+module P = struct
+  type t = _path
+  let hash (P t : t) : int = hcombine t.np.id (hash t.s)
+  let equal (P t : t) (P t' : t) = N.equal t.np t'.np && t.s = t'.s
+end
+
+(** Create a symbol path. Hash-consed. *)
+let path : npath -> 'a t -> 'a path = 
+  let next_id = ref 0 in
+  let module M = Weak.Make(P)
+  in
+  let m = M.create 256 in
+  fun np s -> 
+    let p = { np; s; id = !next_id; } in
+    try !>(M.find m (P p)) with
+    | Not_found -> M.add m (P p); incr next_id; p
+
+let path_id (t : 'a path) = t.id
+
+let path_equal (p : 'a path) (p' : 'a path) = p.id = p'.id
+                               
+let pp_path ?(sep = ".") fmt (t : 'a path) = 
+  Fmt.pf fmt "%a%s%a"
+    (pp_npath ~sep) t.np (if t.np.npath = [] then "" else sep) pp t.s
+
+let path_to_string ?sep p = Fmt.str "%a" (pp_path ?sep) p
+
+let pp_path  fmt p = pp_path  ~sep:"." fmt p
+let pp_npath fmt n = pp_npath ~sep:"." fmt n
+
+(*------------------------------------------------------------------*)
+(** Maps (namespace paths and symbol paths)  *)
+
+module Mn = Map.Make (struct 
+    type t = npath
+    let compare (t : t) (t' : t) = t.id - t'.id 
+  end)
+
+(*------------------------------------------------------------------*)
+(** {2 Error Handling} *)
+
+type error_i =
+  | Unbound_identifier    of npath option * string
+  (** [string] unknown in optional namespace [npath] *)
+  | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
+  | Multiple_declarations of npath * string * symbol_kind * group
+  | Failure of string
+
+type error = L.t * error_i
+
+let pp_error_i fmt = function
+  | Unbound_identifier (None, s) -> Fmt.pf fmt "unknown symbol %s" s 
+  | Unbound_identifier (Some np, s) ->
+    if np.npath = [] then
+      Fmt.pf fmt "unknown symbol %s %a" s pp_npath np
+    else
+      Fmt.pf fmt "unknown symbol %s in %a" s pp_npath np
+
+  | Incorrect_kind (n1, n2) ->
+    Fmt.pf fmt "should be a %a but is a %a"
+      pp_symbol_kind n1 pp_symbol_kind n2
+
+  | Multiple_declarations (np, s, n, g) ->
+    Fmt.pf fmt "%a symbol %s already declared in namespace %a (%s group)"
+      pp_symbol_kind n s pp_npath np g 
+
+  | Failure s ->
+    Fmt.pf fmt "%s" s
+
+let pp_error pp_loc_err fmt (loc,e) =
+  Fmt.pf fmt "%aError: %a"
+    pp_loc_err loc
+    pp_error_i e
+
+exception Error of error
+
+let symb_err l e = raise (Error (l,e))
+
+(*------------------------------------------------------------------*)
+(** {2 Symbol tables} *)
+
+(*------------------------------------------------------------------*)
+(** The status of a symbol. *)
+type status =
+  | Defined  of symbol_kind
+  | Reserved of symbol_kind
+
+(*------------------------------------------------------------------*)
+(** Extensible data type *)
+type data = ..
+type data += Empty
+
+(*------------------------------------------------------------------*)
+(** - [path] is the unique qualified path for this record
+    - [status] is the status of the record
+    - [data] is the data associated to the record *)
+type record = { path : _path; status : status; data : data; }
+
+(*------------------------------------------------------------------*)
+(** Map each symbol [s] to a list of records *)
+type symbol_map = record list Msymb.t
+
+(*------------------------------------------------------------------*)
+(** A symbol table *)
+type table = {
+  scope : npath;                (** current namespace scope *)
+
+  current : symbol_map; 
+  (** Record with the symbols currently in scope. 
+      There may be name conflict between symbols. *)
+
+  stack : symbol_map list;
+  (** History of the past symbols in scope (i.e. [current] field). 
+      Invariant: [List.length stack = List.length scope.npath] *)
+  
+  store : symbol_map Mn.t;
+  (** Map each namespace to the record of symbols declared in it.
+      Each symbol should be declared only once. *)
+
+  tag : int;                    (** unique identifier *)
+}
+
+let table :
+  scope:npath ->
+  current:symbol_map -> stack:symbol_map list ->
+  store:symbol_map Mn.t -> table
+  =
+  let cpt_tag = ref 0 in
+  fun ~scope ~current ~stack ~store ->
+    assert (List.length stack = List.length scope.npath);
+    { scope; current; store; stack; tag = (incr cpt_tag; !cpt_tag) }
+
+let update ?scope ?current ?stack ?store (t : table) : table = 
+  let scope   = odflt t.scope   scope   in
+  let current = odflt t.current current in
+  let stack   = odflt t.stack   stack   in
+  let store   = odflt t.store   store   in
+  table ~scope ~current ~stack ~store
+
+let tag (t : table) = t.tag
+
+(*------------------------------------------------------------------*)
+let scope t = t.scope
+  
+(*------------------------------------------------------------------*)
+let top_npath : npath = npath []
+
+let empty_table : table = 
+  let current = Msymb.empty in
+  (* the empty store contains a single (empty) symbol map for the
+     top-level namespace path *)
+  let store   = Mn.singleton top_npath Msymb.empty in  
+  table ~scope:top_npath ~current ~stack:[] ~store
+
+(*------------------------------------------------------------------*)
+(** For debugging *)
+let[@warning "-32"] pp_symbol_map fmt map =
+  Fmt.pf fmt "@[<v 0>%a@]"
+    (Fmt.list ~sep:Fmt.cut
+       (fun fmt (symb, recs) ->
+          Fmt.pf fmt "@[%s: @[%a@]@]"
+            symb.name
+            (Fmt.list ~sep:Fmt.cut
+               (fun fmt r ->
+                  Fmt.pf fmt "@[%a@]" pp_path !>(r.path)))
+            recs)
+    ) (Msymb.bindings map)
+
+(** For debugging *)
+let[@warning "-32"] pp_store fmt store =
+  Fmt.pf fmt "@[<v 0>%a@]"
+    (Fmt.list ~sep:Fmt.cut 
+       (fun fmt (np, map) ->
+          Fmt.pf fmt "@[%a : @[%a@]@]"
+            pp_npath np pp_symbol_map map
+       )
+    )
+    (Mn.bindings store)
+
 (*------------------------------------------------------------------*)
 (** Approximated string creation *)
-    
-let empty_table : table = mk Msymb.empty
 
 let prefix_count_regexp = Str.regexp {|\([^0-9]*\)\([0-9]*\)|}
 
-let fresh ?(group=default_group) name table =
+(** Create a fresh symbol relatively to a symbol record. *)
+let fresh ~(group:group) (name : string) (r : symbol_map) : symb =
   let _ = Str.search_forward prefix_count_regexp name 0 in
   let prefix = Str.matched_group 1 name in
   let i0 = Str.matched_group 2 name in
@@ -181,7 +390,7 @@ let fresh ?(group=default_group) name table =
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
     let symb = {group;name=s} in
-    if Msymb.mem symb table.cnt then find (i+1) else symb
+    if Msymb.mem symb r then find (i+1) else symb
   in
   find i0
 
@@ -191,18 +400,56 @@ let kind_of_status : status -> symbol_kind = fun e ->
   | Defined  n -> n
   | Reserved n -> n
 
-let kind_of_string ?(group=default_group) (table : table) (s : string) =
-  let s = { group; name=s } in
-  let f (x,_) = kind_of_status x in
-  omap f (Msymb.find_opt s table.cnt)
+(*------------------------------------------------------------------*)
+(** Parsing utilities *)
 
-let status_of_lsymb ?(group=default_group) (s : lsymb) (table : table) : status =
+(** Convert a surface npath to a npath. *)
+let convert_npath (p_n : p_npath) (table : table) : npath = 
+  (* We already converted [top], and needs to convert [sub] to get [top.sub]. *)
+  let rec conv (top : _namespace t list) (sub : p_npath) : npath =
+    match sub with
+    | [] -> npath (List.rev top)
+    | s :: sub -> 
+      let s = { name = L.unloc s; group = namespace_group; } in
+      let np = List.rev (s :: top) in
+      if not (Mn.mem (npath np) table.store) then
+        let loc = p_npath_loc (List.take (List.length np) p_n) in
+        symb_err loc (Failure "unknown namespace")
+      else conv (s :: top) sub
+  in
+  conv [] p_n
+
+(** Internal (as we cannot typed the paths returned).
+    Get all the records that can be associated to (surface syntaxe) symbol path. 
+    If [p] is a qualified path, the return list must be of size [1]. 
+    Also return the namespace path of these records. *)
+let lookup_p_path
+    ~(group : group) ((top,s) : p_path) (table : table) : npath * record list
+  =
+  (* [p] is [top.s], and should be looked-for in [r] *)
+  let r, top =
+    match top with
+    | [] -> table.current, top_npath
+    (* symbols without path are always looked-up in [current] *)
+
+    | _ ->
+      let np = convert_npath top table in
+      let record = Mn.find np table.store in
+      record, np
+  in
+  
   let t = { group; name = L.unloc s } in
-  try fst (Msymb.find t table.cnt) with Not_found ->
-    symb_err (L.loc s) (Unbound_identifier (L.unloc s))
+  let records = 
+    try Msymb.find t r with 
+    | Not_found -> symb_err (L.loc s) (Unbound_identifier (Some top, L.unloc s))
+  in
+  top, records
 
-let is_defined ?(group=default_group) name (table : table) =
-  Msymb.mem {group;name} table.cnt
+(*------------------------------------------------------------------*)
+(** Exported (see `.mli`) *)
+let status_of_p_path ~(group:group) (p : p_path) (table : table) : status list =
+  let _, records = lookup_p_path ~group p table in
+  List.map (fun r -> r.status) records
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol kinds} *)
@@ -211,33 +458,38 @@ let is_defined ?(group=default_group) name (table : table) =
 module type SymbolKind = sig
   type ns
 
-  val remove : table -> ns t -> table
+  val remove : ns path -> table -> table
 
-  val reserve : approx:bool -> table -> lsymb -> table * ns t
+  val reserve : approx:bool -> table -> lsymb -> table * ns path
 
-  val release : table -> ns t -> table
+  val define   : table -> ?data:data -> ns path -> table
+  val redefine : table -> ?data:data -> ns path -> table
 
-  val define   : table -> ?data:data -> data t -> table
-  val redefine : table -> ?data:data -> data t -> table
+  val declare :
+    approx:bool -> table -> ?scope:npath -> ?data:data -> lsymb -> table * ns path
 
-  val declare : approx:bool -> table -> ?data:data -> lsymb -> table * ns t
+  val is_reserved : ns path -> table -> bool
 
-  val is_reserved : ns t -> table -> bool
+  val get_data : ns path -> table -> data
 
-  val mem       : string -> table -> bool
-  val mem_lsymb : lsymb  -> table -> bool
+  (*------------------------------------------------------------------*)
+  val mem_sp : s_path          -> table -> bool
+  val mem_s  : npath -> string -> table -> bool
+  val mem_p  : p_path          -> table -> bool
 
-  val of_lsymb     : lsymb -> table -> ns t
-  val of_lsymb_opt : lsymb -> table -> ns t option
+  (*------------------------------------------------------------------*)
+  val of_s_path : s_path -> ns path
+  val of_string : npath -> string -> ns path
 
-  val cast_of_string : string -> ns t
+  (*------------------------------------------------------------------*)
+  val convert1     : p_path -> table ->  ns path * data
+  val convert      : p_path -> table -> (ns path * data) list
+  val convert_path : p_path -> table ->  ns path 
 
-  val get_data      : ns t   -> table -> data
-  val data_of_lsymb : lsymb  -> table -> data
-
-  val iter : (ns t -> data -> unit) -> table -> unit
-  val fold : (ns t -> data -> 'a -> 'a) -> 'a -> table -> 'a
-  val map  : (ns t -> data -> data) -> table -> table
+  (*------------------------------------------------------------------*)
+  val iter : (ns path -> data -> unit    )       -> table -> unit
+  val fold : (ns path -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val map  : (ns path -> data -> data    )       -> table -> table
 end
 
 (*------------------------------------------------------------------*)
@@ -256,113 +508,188 @@ end
 module Make (N:S) : SymbolKind with type ns = N.ns = struct
   type ns = N.ns
   let group = N.group
-
   
   (*------------------------------------------------------------------*)
-  let make_name ~(approx : bool) (table : table) (name : lsymb) : symb =
+  let new_symb
+      ~(approx : bool) (table : table) (top : npath) (name : lsymb) : ns t
+    =
+    let record = Mn.find top table.store in
     let symb =
-      if approx then fresh ~group (L.unloc name) table
+      if approx then fresh ~group (L.unloc name) record
       else { group; name = L.unloc name }
     in
-    if not approx && Msymb.mem symb table.cnt then
+    if not approx && Msymb.mem symb record then
       symb_err (L.loc name)
-        (Multiple_declarations (L.unloc name, N.kind, group));
+        (Multiple_declarations (top, L.unloc name, N.kind, group));
     symb
 
-  let check_kind ~(loc : L.t option) kind : unit =
-    if kind <> Defined N.kind then kind_err ~loc ~get:kind ~expect:N.kind
+  let check_kind ~(loc : L.t option) (status : status): unit =
+    if status <> Defined N.kind then kind_err ~loc ~get:status ~expect:N.kind
 
   (*------------------------------------------------------------------*)    
-  let remove (table : table) (symb : ns t) : table =
-    mk (Msymb.remove symb table.cnt)
+  (** Remove an element from the table *)
+  let remove (p : ns path) (table : table) : table =
+    let store = 
+      let m = Mn.find p.np table.store in
+      Mn.add p.np (Msymb.remove p.s m) table.store
+    in
+    let current = 
+      let l = Msymb.find p.s table.current in
+      Msymb.add p.s (List.filter (fun r -> not (P.equal !<p r.path)) l) table.current
+    in
+    update table ~current ~store
 
-  let reserve ~(approx : bool) (table : table) (name : lsymb) =
-    let symb = make_name ~approx table name in
-    let table_c = Msymb.add symb (Reserved N.kind,Empty) table.cnt in
-    mk table_c, symb
+  (** Add a new record to the table *)
+  let add (p : ns path) (record : record) (table : table) : table =
+    let store = 
+      let m = Mn.find p.np table.store in
+      assert (not (Msymb.mem p.s m));
+      Mn.add p.np (Msymb.add p.s [record] m) table.store
+    in
+    let current = Msymb.add_to_list p.s record table.current in
+    update table ~current ~store
 
-  let release (table : table) (name : ns t) : table =
-    assert (Msymb.mem name table.cnt);
-    mk (Msymb.remove name table.cnt)
+  (** Modify a record in the table *)
+  let change (p : ns path) (record : record) (table : table) : table =
+    let store = 
+      let m = Mn.find p.np table.store in
+      assert (List.length (Msymb.find p.s m) = 1);
+      Mn.add p.np (Msymb.add p.s [record] m) table.store
+    in
+    let current = 
+      let l = Msymb.find p.s table.current in
+      Msymb.add p.s 
+        (List.map
+           (fun record' -> if P.equal !<p record'.path then record else record')
+           l)
+        table.current
+    in
+    update table ~current ~store
+
+  (** Find a record in the table. *)
+  let find (p : ns path) (table : table) : record =
+    as_seq1 (Msymb.find p.s (Mn.find p.np table.store)) (* should always succeed *)
+
+  (*------------------------------------------------------------------*)    
+  let reserve ~(approx : bool) (table : table) (name : lsymb) : table * ns path =
+    let symb = new_symb ~approx table table.scope name in
+    let p = path table.scope symb in
+    let record = { path = !< p; status = Reserved N.kind; data = Empty; } in
+    add p record table, p
     
-  let define (table : table) ?(data=Empty) symb =
-    assert (fst (Msymb.find symb table.cnt) = Reserved N.kind) ;
-    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
-    mk table_c
+  let define (table : table) ?(data=Empty) (path : ns path) : table =
+    let old_record = find path table in
+    assert (old_record.status = Reserved N.kind) ;
+    let new_record = { old_record with status = Defined N.kind; data; } in
+    change path new_record table
 
-  let redefine (table : table) ?(data=Empty) symb =
-    assert (Msymb.mem symb table.cnt) ;
-    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
-    mk table_c
+  let redefine (table : table) ?(data=Empty) (path : ns path) =
+    let old_record = find path table in
+    assert (old_record.status = Defined N.kind) ;
+    let new_record = { old_record with status = Defined N.kind; data; } in
+    change path new_record table
 
-  let declare ~(approx : bool) (table : table) ?(data=Empty) (name : lsymb) =
-    let symb = make_name ~approx table name in
-    let table_c = Msymb.add symb (Defined N.kind, data) table.cnt in
-    mk table_c, symb
+  let declare
+      ~(approx : bool) (table : table)
+      ?(scope : npath = table.scope) ?(data=Empty)
+      (name : lsymb)
+    = 
+    let symb = new_symb ~approx table table.scope name in
+    let p = path scope symb in
+    let record = { path = !< p; status = Defined N.kind; data; } in
+    add p record table, p
     
-  let get_data (name:ns t) (table : table) =
-    let kind,data = Msymb.find name table.cnt in
-    check_kind ~loc:None kind;
-    data
+  let get_data (path : ns path) (table : table) =
+    let record = find path table in
+    check_kind ~loc:None record.status;
+    record.data
 
-  let cast_of_string name = {group;name}
+  let of_s_path ((np, name) : s_path) = path (of_s_npath np) {group;name}
+  let of_string (npath : npath) (name : string) = path npath {group;name}
 
-  let is_reserved (name : ns t) (table : table) : bool =
-    match Msymb.find name table.cnt with
-    | Reserved n, _ -> n = N.kind
-    | Defined _, _ -> false
+  let is_reserved (path : ns path) (table : table) : bool =
+    match find path table with
+    | { status = Reserved n } -> n = N.kind
+    | { status = Defined  _ } -> false
     | exception Not_found -> false
+    
+  (*------------------------------------------------------------------*)
+  let convert 
+      ( ((_,sub) as p) : p_path) (table : table) 
+    : (ns path * data) list 
+    =
+    (* Fmt.epr "convert: %s@." (p_path_to_string p); *)
+    (* Fmt.epr "store:@.  @[%a@]@." pp_store table.store; *)
+    (* Fmt.epr "current:@.  @[%a@]@." pp_symbol_map table.current; *)
+    (* Fmt.epr "@]@."; *)
+
+    let top, records = lookup_p_path ~group p table in
+    let results = 
+      List.filter_map (fun record -> 
+          if record.status = Defined N.kind 
+          then Some (!> (record.path), record.data) 
+          else None
+        ) records 
+    in
+    if results = [] then
+      symb_err (L.loc sub) (Unbound_identifier (Some top, L.unloc sub));
+    results
+
+  let convert1 (p : p_path) (table : table) = List.hd (convert p table)
+
+  let convert_path (p : p_path) (table : table) = fst (convert1 p table)
 
   (*------------------------------------------------------------------*)
-  let mem (name : string) (table : table) : bool =
+  let mem_s np (name : string) (table : table) : bool =
+    let p = path np { group; name;} in
     try
-      let kind, _ = Msymb.find { group; name;} table.cnt in
-      kind = Defined N.kind
-    with
-    | Not_found -> false
+      let record = find p table in
+      record.status = Defined N.kind
+    with Error (_, Unbound_identifier _) | Not_found -> false
 
-  let mem_lsymb (name : lsymb) (table : table) : bool = mem (L.unloc name) table
+  let mem_sp ((np, name) : s_path) (table : table) : bool = 
+    mem_s (of_s_npath np) name table
 
-  (*------------------------------------------------------------------*)
-  let all_of_lsymb (name : lsymb) (table : table) : ns t * data =
-    let symb = { group; name = L.unloc name } in
-    try
-      let kind, data = Msymb.find symb table.cnt in
-      check_kind ~loc:(L.loc name |> some) kind;
-      symb, data
-    with Not_found ->
-      symb_err (L.loc name) (Unbound_identifier (L.unloc name))
-
-  let of_lsymb (name : lsymb) (table : table) : ns t =
-    fst (all_of_lsymb name table)
-
-  let data_of_lsymb (name : lsymb) (table : table) : data =
-    snd (all_of_lsymb name table)
-
-  let of_lsymb_opt (name : lsymb) (table : table) =
-    try Some (of_lsymb name table) with
-    | Error (_, (Unbound_identifier _ | Incorrect_kind _)) -> None
+  let mem_p (p : p_path) (table : table) : bool = 
+    mem_sp (List.map L.unloc (fst p), L.unloc @@ snd p) table
 
   (*------------------------------------------------------------------*)
   let iter f (table : table) =
-    Msymb.iter
-      (fun s (kind,data) -> if kind = Defined N.kind then f s data else ())
-      table.cnt
+    Mn.iter (fun _ m -> 
+        Msymb.iter (fun _ record -> 
+            let record = as_seq1 record in
+            if record.status = Defined N.kind then
+              f !>(record.path) record.data else ()
+          ) m
+      ) table.store
 
   let fold f acc (table : table) =
-    Msymb.fold
-      (fun s (kind,data) acc ->
-         if kind = Defined N.kind then f s data acc else acc)
-      table.cnt acc
+    Mn.fold (fun _ m acc ->
+        Msymb.fold (fun _ record acc ->
+            let record = as_seq1 record in
+            if record.status = Defined N.kind 
+            then f !>(record.path) record.data acc 
+            else acc
+          ) m acc
+      ) table.store acc
 
-  let map (f : ns t -> data -> data) (table : table) : table =
-    let table =
-      Msymb.mapi
-        (fun s (kind,data) ->
-           if kind = Defined N.kind then (kind, f s data) else (kind, data))
-        table.cnt
+  let map (f : ns path -> data -> data) (table : table) : table =
+    let store = 
+      Mn.map (fun m ->
+          Msymb.map (fun record ->
+              let record = as_seq1 record in
+              if record.status = Defined N.kind 
+              then [{ record with data = f !>(record.path) record.data}]
+              else [record]
+            ) m
+        ) table.store
     in
-    mk table
+    let current = 
+      Msymb.map (fun records ->
+          List.map (fun record -> find !>(record.path) table) records
+        ) table.current
+    in
+    update table ~store ~current
 end
 
 (*------------------------------------------------------------------*)
@@ -445,10 +772,10 @@ module Lemma = Make (struct
   let group = "lemma"
 end)
 
-module Theory = Make (struct
-  type ns   = _theory
-  let kind  = Theory
-  let group = "theory"
+module Import = Make (struct
+  type ns   = _import
+  let kind  = Import
+  let group = "import"
 end)
 
 module Predicate = Make (struct
@@ -457,22 +784,96 @@ module Predicate = Make (struct
   let group = "predicate"
 end)
 
+module Namespace = Make (struct
+  type ns   = _namespace
+  let kind  = Namespace
+  let group = namespace_group
+end)
 
+(*------------------------------------------------------------------*)
+(** {2 Namespace} *)
+
+(*------------------------------------------------------------------*)
+(** Enter some namespaces (command [namespace N1. ... .NL]) *)
+let namespace_enter (table : table) (nl : p_npath): table =
+  let enter1 table (n : lsymb) =
+    let n = { group = namespace_group; name = L.unloc n; } in
+    let scope = npath_app table.scope [n] in
+
+    let store = table.store in
+    let store =
+      if Mn.mem scope store then store else Mn.add scope Msymb.empty store
+    in
+          
+    update table ~scope ~store ~stack:(table.current :: table.stack)
+  in
+  List.fold_left enter1 table nl
+
+(*------------------------------------------------------------------*)
+(** Exit some namespaces (command [exit N1. ... .NL]) *)
+let namespace_exit (t : table) (nl : p_npath): table =
+  let exit1 table (n : lsymb) =
+    let top, n' =
+      let scope = table.scope.npath in
+      try List.takedrop (List.length scope - 1) scope with
+      | Not_found ->
+        symb_err (L.loc n)
+          (Failure ("already at top-level: cannot exit namespace " ^ (L.unloc n)));
+    in
+    let n' = as_seq1 n' in
+
+    if L.unloc n <> n'.name then begin
+      let err_str =
+        Fmt.str "in sub-namespace %s: cannot exit %s" n'.name (L.unloc n)
+      in
+      symb_err (p_npath_loc nl) (Failure err_str)
+    end;
+
+    let current, stack =
+      match table.stack with
+      | current :: stack -> current, stack
+      | []               -> assert false
+    in
+    update t ~scope:(npath top) ~current ~stack
+  in
+  List.fold_left exit1 t (List.rev nl)
+    
+(*------------------------------------------------------------------*)
+(** Open a namespace, bringing its definitions in scope
+    (command [open N1. ... .NL]) *)
+let namespace_open (table : table) (np : npath): table =
+  let store = Mn.find np table.store in
+  let current =
+    Msymb.fold (fun s recs current ->
+        let current_recs = Msymb.find_dflt [] s current in
+        (* remove from [recs] all records already in scope (i.e. in
+           [current_recs]) *)
+        let recs =
+          List.filter (fun r ->
+              not
+                (List.exists
+                   (fun r' -> path_equal !>(r.path) !>(r'.path))
+                   current_recs)
+            ) recs
+        in
+        Msymb.add s (recs @ current_recs) current
+      ) store table.current
+  in
+  { table with current; }
+  
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
     
-type 'a _t = 'a t
-
-module Ss (S : SymbolKind) : Set.S with type elt := S.ns t =
+module Sp (S : SymbolKind) : Set.S with type elt := S.ns path =
   Set.Make(struct
-    type t = S.ns _t
-    let compare = Stdlib.compare
+    type t = S.ns path
+    let compare t t' = t.id - t'.id
   end)
 
-module Ms (S : SymbolKind) : Map.S with type key := S.ns t =
+module Mp (S : SymbolKind) : Map.S with type key := S.ns path =
   Map.Make(struct
-    type t = S.ns _t
-    let compare = Stdlib.compare
+    type t = S.ns path
+    let compare t t' = t.id - t'.id
   end)
 
 (*------------------------------------------------------------------*)
@@ -496,8 +897,8 @@ let left_infix_symb =
 let right_infix_symb =
   [%sedlex.regexp?
     right_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
-(*------------------------------------------------------------------*)
 
+(*------------------------------------------------------------------*)
 let is_left_infix_str (s : string) : bool =
   let lexbuf = Sedlexing.Utf8.from_string s in
   match%sedlex lexbuf with
@@ -514,8 +915,8 @@ let is_right_infix_str (s : string) : bool =
 let is_infix_str (s : string) : bool =
   is_left_infix_str s || is_right_infix_str s
 
-let is_infix (s : fname t) : bool =
-  let s = to_string s in
+let is_infix (p : fname) : bool =
+  let s = to_string p.s in
   is_infix_str s
 
 (* We only have non-associative and right-associative symbols.
@@ -530,17 +931,17 @@ let infix_assoc_str (s : string) : assoc =
   else if is_left_infix_str s then `Left
   else assert false
 
-let infix_assoc (s : fname t) : assoc =
-  let s = to_string s in
+let infix_assoc (p : fname) : assoc =
+  let s = to_string p.s in
   infix_assoc_str s
 
 (*------------------------------------------------------------------*)
-let is_infix_predicate (s : predicate) : bool =
-  let s = to_string s in
+let is_infix_predicate (p : predicate) : bool =
+  let s = to_string p.s in
   is_infix_str s
 
-let infix_assoc_predicate (s : predicate) : assoc =
-  let s = to_string s in
+let infix_assoc_predicate (p : predicate) : assoc =
+  let s = to_string p.s in
   infix_assoc_str s
 
 (*------------------------------------------------------------------*)
@@ -661,7 +1062,7 @@ type name_data = {
 
 type data += Name of name_data
 
-let get_name_data (ms : macro) (table : table) : name_data =
+let get_name_data (ms : name) (table : table) : name_data =
   match Name.get_data ms table with
   | Name data -> data
   | _ -> assert false           (* impossible *)
@@ -704,7 +1105,11 @@ module TyInfo = struct
       [Fixed; Finite; Well_founded]
       
     | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
-    | Type.TBase b -> get_data (BType.cast_of_string b) table
+    | Type.TBase (np,b) -> 
+      (* FIXME: very hacky, but we cannot do better as qualified as
+         [Symbols] depends on [Type] *)
+      let np = of_s_npath np in
+      get_data (BType.of_string np b) table
     | _ -> []
 
   let check_bty_info table (ty : Type.ty) (info : t) : bool =

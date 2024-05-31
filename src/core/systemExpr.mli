@@ -338,6 +338,10 @@ val print_system : Symbols.table -> _ expr -> unit
 
 val is_single_system : context -> bool
 
+(** create the bi-system for the empty system declared in the
+    [Prelude] *)
+val empty_system : Symbols.table -> pair 
+
 (*------------------------------------------------------------------*)
 (** {2 Parsing, printing, and conversions} *)
 
@@ -349,7 +353,7 @@ module Parse : sig
       it may come with an alias identifying the single system as some
       projection of the multisystem in construction. *)
   type item = {
-    system     : Symbols.lsymb;
+    system     : Symbols.p_path;
     projection : Symbols.lsymb option;
     alias      : Symbols.lsymb option
   }

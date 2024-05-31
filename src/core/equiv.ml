@@ -106,7 +106,7 @@ let _pp_atom ~dbg ?context fmt = function
     let pp fmt () =
       Fmt.pf fmt "@[<0>$(%a %a%a%a@ %a)@]"
         (Term._pp ~dbg) bl
-        Symbols.pp psymb
+        Symbols.pp_path psymb
         (pp_ty_args ~dbg) ty_args
         (pp_se_args ?context) se_args
         (Term._pp ~dbg) br
@@ -119,7 +119,7 @@ let _pp_atom ~dbg ?context fmt = function
       Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ~dbg) fmt all_args
     in
     Fmt.pf fmt "@[$(%a%a%a %t)@]"
-      Symbols.pp psymb
+      Symbols.pp_path psymb
       (pp_ty_args ~dbg) ty_args
       (pp_se_args ?context) se_args
       pp_args 

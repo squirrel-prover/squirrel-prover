@@ -6,14 +6,16 @@ type pending_proof =
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
+(*------------------------------------------------------------------*)
 (** {2 User printing query} *)
 (** User printing query *)
-type print_query = (* [None] means current system *)
-  | Pr_system    of SystemExpr.Parse.t option 
-  | Pr_any of Theory.lsymb (* print any lemma, function, name or macro
-                              with given lsymb *)
+type print_query =
+  | Pr_system    of SystemExpr.Parse.t option
+  (** system printing query ([None] means current system) *)
+  | Pr_any of Symbols.p_path   
+  (** print query in in all kinds of symbols *)
 
-
+(*------------------------------------------------------------------*)
 (** {2 User search query} *)
 type search_query = (* [None] means current system *)
   | Srch_term    of Theory.any_term
@@ -30,8 +32,9 @@ let lsymb_of_load_path = function
   | Path s -> s
 
 type include_param = { th_name : load_path; 
-                       params : Theory.lsymb list }
+                       params : Symbols.lsymb list }
 
+(*------------------------------------------------------------------*)
 (** Tactics *)
 
 type bulleted_tactic =
@@ -41,6 +44,7 @@ type bulleted_tactic =
 
 type bulleted_tactics = bulleted_tactic list
 
+(*------------------------------------------------------------------*)
 (** Prover input *)
 type input = 
   | InputDescr of Decl.declarations

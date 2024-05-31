@@ -34,6 +34,9 @@
   "Qed"
   "equiv"
   "any"
+  "open"
+  "end"
+  "namespace"
 ))
 
 (defvar squirrel-dangerous-keywords '(

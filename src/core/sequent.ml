@@ -8,7 +8,6 @@ module Sv = Vars.Sv
 module Mvar = Match.Mvar
 
 module HTerm = HighTerm
-type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
@@ -294,9 +293,9 @@ module type S = sig
   module Reduce : Reduction.S with type t := t
 
   (*------------------------------------------------------------------*)
-  val is_assumption        : lsymb -> t -> bool
-  val is_global_assumption : lsymb -> t -> bool
-  val is_local_assumption  : lsymb -> t -> bool
+  val is_assumption        : Symbols.p_path -> t -> bool
+  val is_global_assumption : Symbols.p_path -> t -> bool
+  val is_local_assumption  : Symbols.p_path -> t -> bool
 
   (*------------------------------------------------------------------*)
   val to_general_sequent : t -> Goal.t
@@ -336,20 +335,20 @@ module Mk (Args : MkArgs) : S with
   include S
 
   let to_general_sequent = Args.to_general_sequent
-  let to_global_sequent = Args.to_global_sequent
+  let to_global_sequent  = Args.to_global_sequent
 
   (*------------------------------------------------------------------*)
-  let is_assumption (name : lsymb) (s : S.t) =
-    Hyps.mem_name (L.unloc name) s ||
-    Lemma.mem name (S.table s)
+  let is_assumption (p : Symbols.p_path) (s : S.t) =
+    (match p with ([],name) -> Hyps.mem_name (L.unloc name) s | _ -> false) ||
+    Lemma.mem p (S.table s)
 
-  let is_global_assumption (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s ||
-    Lemma.mem_global name (S.table s)
+  let is_global_assumption (p : Symbols.p_path) (s : sequent) =
+    (match p with ([],name) -> Hyps.mem_name (L.unloc name) s | _ -> false) ||
+    Lemma.mem_global p (S.table s)
 
-  let is_local_assumption (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s ||
-    Lemma.mem_local name (S.table s)
+  let is_local_assumption (p : Symbols.p_path) (s : sequent) =
+    (match p with ([],name) -> Hyps.mem_name (L.unloc name) s | _ -> false) ||
+    Lemma.mem_local p (S.table s)
 
   (*------------------------------------------------------------------*)
   let destr_impl_k
@@ -438,12 +437,11 @@ module Mk (Args : MkArgs) : S with
     (* if we gave a term, re-interpret it as a proof term *)
     | Theory.PTA_term ({ pl_desc = Symb head } as t) 
     | Theory.PTA_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
-      let f, terms = Theory.decompose_app t in
-      assert (Theory.equal_i (Theory.Symb head) (L.unloc f));
+      let _head, terms = Theory.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
       let pt_cnt = 
         Theory.PT_app {
-          pta_head = L.mk_loc (L.loc head) (Theory.PT_symb head);
+          pta_head = L.mk_loc (Symbols.p_path_loc head) (Theory.PT_symb head);
           pta_args = List.map (fun x -> Theory.PTA_term x) terms ;
           pta_loc  = loc;
         } 
@@ -488,21 +486,21 @@ module Mk (Args : MkArgs) : S with
     | Theory.PTA_sub sub -> PTA_sub (resolve_pt s sub)
     | Theory.PTA_term t  ->
       match L.unloc t with
-      | Theory.App ({ pl_desc = Theory.Symb h}, args) ->
-        if S.Hyps.mem_name (L.unloc h) s then
-          let pta_args =
-            List.map (fun a -> resolve_pt_arg s (Theory.PTA_term a)) args
-          in
-          let loc = last_loc (L.loc h) args in
-          let pt_cnt = 
-            Theory.PT_app {
-              pta_head = L.mk_loc (L.loc h) (Theory.PT_symb h);
-              pta_args;
-              pta_loc = loc;
-            } 
-          in
-          PTA_sub (L.mk_loc loc pt_cnt)
-        else pt_arg
+      | Theory.App ({ pl_desc = Theory.Symb ([],h)}, args)
+        when S.Hyps.mem_name (L.unloc h) s
+        ->
+        let pta_args =
+          List.map (fun a -> resolve_pt_arg s (Theory.PTA_term a)) args
+        in
+        let loc = last_loc (L.loc h) args in
+        let pt_cnt = 
+          Theory.PT_app {
+            pta_head = L.mk_loc (L.loc h) (Theory.PT_symb ([],h));
+            pta_args;
+            pta_loc = loc;
+          } 
+        in
+        PTA_sub (L.mk_loc loc pt_cnt)
 
       | _ -> pt_arg
 
@@ -524,19 +522,20 @@ module Mk (Args : MkArgs) : S with
   (** Internal 
       Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). *)
   let pt_of_assumption
-      ~(table: Symbols.table)
+      ~(table : Symbols.table)
       (ty_env : Type.Infer.env) 
-      (name : lsymb)
-      (s    : t)
+      (p      : Symbols.p_path)
+      (s      : t)
     : ghyp * PT.t
     =
-    if Hyps.mem_name (L.unloc name) s then
-      let id, f = Hyps.by_name_k name Hyp s in
+    let top, sub = fst p, snd p in
+    if top = [] && Hyps.mem_name (L.unloc sub) s then
+      let id, f = Hyps.by_name_k sub Hyp s in
       let f : Equiv.any_form =
         match S.hyp_kind with
         | Equiv.Any_t -> f
         | src ->
-          Equiv.Babel.convert ~loc:(L.loc name) ~src ~dst:Equiv.Any_t f
+          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f
       in
       
       `Hyp id,
@@ -546,12 +545,12 @@ module Mk (Args : MkArgs) : S with
         args   = [];
         form   = f; }
 
-    else if not (Lemma.mem name table) then
-      soft_failure ~loc:(L.loc name)
-        (Failure ("no proved goal named " ^ L.unloc name))
+    else if not (Lemma.mem p table) then
+      soft_failure ~loc:(Symbols.p_path_loc  p)
+        (Failure ("no lemma named " ^ Symbols.p_path_to_string p))
 
     else
-      let lem = Lemma.find_stmt name (S.table s) in
+      let lem = Lemma.find_stmt p (S.table s) in
 
       (* Open the lemma type variables. *)
       let _, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
@@ -805,7 +804,7 @@ module Mk (Args : MkArgs) : S with
       (s : S.t) : ghyp * PT.t
     =
     match L.unloc p_pt with
-    | Theory.PT_symb symb -> do_convert_symb ty_env mv symb s
+    | Theory.PT_symb symb -> do_convert_path ty_env mv symb s
     | Theory.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
     | Theory.PT_localize p_sub_pt -> 
       let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
@@ -816,15 +815,15 @@ module Mk (Args : MkArgs) : S with
       in
       ghyp, pt
 
-  and do_convert_symb
+  and do_convert_path
       (ty_env  : Type.Infer.env)
       (init_mv : Mvar.t)
-      (symb    : Theory.lsymb)
+      (p       : Symbols.p_path)
       (s       : S.t) 
     : ghyp * PT.t
     =
     let table = S.table s in
-    let lem_name, pt = pt_of_assumption ~table ty_env symb s in
+    let lem_name, pt = pt_of_assumption ~table ty_env p s in
     assert (pt.mv = Mvar.empty);
     let pt = { pt with mv = init_mv; } in
     lem_name, pt

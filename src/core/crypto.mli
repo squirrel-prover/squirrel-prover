@@ -30,8 +30,10 @@ type game = {
 (** add game objects in the symbol table *)
 type Symbols.data += Game of game
 
+val data_as_game : Symbols.data -> game
+
 (** find a game in the symbol table *)
-val find : Symbols.table -> Theory.lsymb -> game
+val find : Symbols.table -> Symbols.p_path -> game
 
 (*------------------------------------------------------------------*)
 val tsubst_var_decl : Type.tsubst -> var_decl -> var_decl 
@@ -49,7 +51,7 @@ val pp_game     : Format.formatter -> game                   -> unit
 val prove :
     Env.t                   ->
     Hyps.TraceHyps.hyps     ->
-    Theory.lsymb            ->
+    Symbols.p_path          ->
     TacticsArgs.crypto_args ->
     Equiv.equiv             ->
     Term.terms
@@ -58,7 +60,7 @@ val prove :
 (** {2 Front-end types and parsing} *)
 
 module Parse : sig
-  type lsymb = Theory.lsymb
+  type lsymb = Symbols.lsymb
 
   (*------------------------------------------------------------------*)
   (** {3 Types} *)

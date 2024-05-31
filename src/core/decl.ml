@@ -1,7 +1,7 @@
 module L = Location
 module SE = SystemExpr
 
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
@@ -40,7 +40,7 @@ type bty_decl = {
 
 (*------------------------------------------------------------------*)
 type system_decl = {
-  sname    : Theory.lsymb option;
+  sname    : Symbols.lsymb option;
   sprojs   : lsymb list option;
   sprocess : Process.Parse.t;
 }
@@ -56,13 +56,13 @@ type global_rule =
 type system_modifier = { 
   from_sys : SE.Parse.t;
   modifier : global_rule;
-  name     : Theory.lsymb
+  name     : Symbols.lsymb
 }
             
 
 (*------------------------------------------------------------------*)
 type operator_decl = { 
-  op_name      : Theory.lsymb;
+  op_name      : Symbols.lsymb;
   op_symb_type : Symbols.symb_type;
   op_tyargs    : lsymb list;
   op_args      : Theory.ext_bnds;
@@ -72,7 +72,7 @@ type operator_decl = {
 
 (*------------------------------------------------------------------*)
 type predicate_decl = { 
-  pred_name       : Theory.lsymb;
+  pred_name       : Symbols.lsymb;
   pred_symb_type  : Symbols.symb_type;
   pred_tyargs     : lsymb list;
   pred_se_args    : (lsymb * lsymb list) list;
@@ -89,6 +89,12 @@ type proc_decl = {
   proc  : Process.Parse.t;
 }
 
+(*------------------------------------------------------------------*)
+type namespace_info =
+  | Enter of Symbols.p_npath
+  | Exit  of Symbols.p_npath
+  | Open  of Symbols.p_npath
+               
 (*------------------------------------------------------------------*)
 type orcl_tag_info = Theory.term
 
@@ -110,7 +116,7 @@ type declaration_i =
   | Decl_aenc of lsymb * lsymb * lsymb * c_tys
 
   | Decl_senc             of lsymb * lsymb * c_tys
-  | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
+  | Decl_senc_w_join_hash of lsymb * lsymb * Symbols.p_path
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
@@ -121,6 +127,7 @@ type declaration_i =
   | Decl_predicate of predicate_decl
   | Decl_bty       of bty_decl
   | Decl_game      of Crypto.Parse.game_decl
+  | Namespace_cmd  of namespace_info
   | Tactic         of lsymb * ProverTactics.AST.t
 
 type declaration = declaration_i Location.located

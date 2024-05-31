@@ -4,7 +4,6 @@ open Utils
 module Pos = Match.Pos
                
 module Sv = Vars.Sv
-module Sp = Pos.Sp
 
 module SE = SystemExpr
 
@@ -172,7 +171,7 @@ type 'a occ = {
   occ_cnt  : 'a;
   occ_vars : Vars.vars;  (** variables bound above the occ. *)
   occ_cond : Term.terms; (** conditions above the occ. *)
-  occ_pos  : Sp.t;       (** optional, empty if unused *)
+  occ_pos  : Pos.Sp.t;   (** optional, empty if unused *)
 }
 
 let pp_occ pp_cnt fmt occ =
@@ -315,7 +314,7 @@ let get_f
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
                 occ_cond = cond;
-                occ_pos  = Sp.empty; }]
+                occ_pos  = Pos.Sp.empty; }]
         else []
       in
 
@@ -336,7 +335,7 @@ let get_f
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
                 occ_cond = cond;
-                occ_pos  = Sp.empty; }]
+                occ_pos  = Pos.Sp.empty; }]
         else []
       in
       head_occ @ occs ()
@@ -387,7 +386,7 @@ let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
       [{ occ_cnt  = t;
          occ_vars = List.rev fv;
          occ_cond = cond;
-         occ_pos  = Sp.empty; }]
+         occ_pos  = Pos.Sp.empty; }]
 
     | _ -> occs ()
   in
@@ -438,7 +437,7 @@ let deprecated_get_f_messages_ext
             [{ occ_cnt  = args', ret_m;
                occ_vars = init_fv @ (List.rev fv);
                occ_cond = cond;
-               occ_pos  = Sp.singleton pos; }]
+               occ_pos  = Pos.Sp.singleton pos; }]
           | _ -> []
         in
         occs' @ occs, `Continue
@@ -451,7 +450,7 @@ let deprecated_get_f_messages_ext
             [{ occ_cnt  = args', ret_m;
                occ_vars = init_fv @ (List.rev fv);
                occ_cond = cond;
-               occ_pos  = Sp.singleton pos; }]
+               occ_pos  = Pos.Sp.singleton pos; }]
 
           | Term.App (Term.Fun (f', _), [Term.Name (s', args')]), Some is_pk
             when is_pk f' && s'.s_symb = k ->
@@ -459,7 +458,7 @@ let deprecated_get_f_messages_ext
             [{ occ_cnt  = args', ret_m;
                occ_vars = init_fv @ (List.rev fv);
                occ_cond = cond;
-               occ_pos  = Sp.singleton pos; }]
+               occ_pos  = Pos.Sp.singleton pos; }]
           | _ -> []
         in
         occs' @ occs, `Continue
@@ -555,7 +554,7 @@ let get_macro_occs
         { occ_cnt  = { symb = ms; args = l; } ;
           occ_vars = List.rev fv;
           occ_cond = cond;
-          occ_pos  = Sp.empty; } ::
+          occ_pos  = Pos.Sp.empty; } ::
         rec_strict_subterms t ~fv ~cond
       in
 
@@ -650,7 +649,7 @@ module PathCond = struct
     | Top -> ()
     | Before l -> 
       Fmt.pf fmt " s.t. τ ≤ [@[%a@]]" 
-        (Fmt.list ~sep:Fmt.comma Symbols.pp) (List.map (fun d -> d.Action.name) l)
+        (Fmt.list ~sep:Fmt.comma Symbols.pp_path) (List.map (fun d -> d.Action.name) l)
 
   let incl (p1 : t) (p2 : t) : bool =
     match p1, p2 with
@@ -697,8 +696,8 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Set of macros} *)
 
-module Ss = Symbols.Ss(Symbols.Macro)
-module Ms = Symbols.Ms(Symbols.Macro)
+module Sp = Symbols.Sp(Symbols.Macro)
+module Mp = Symbols.Mp(Symbols.Macro)
 
 (*------------------------------------------------------------------*)
 module Mset : sig[@warning "-32"]
@@ -890,7 +889,7 @@ end = struct
 
   let pp fmt (abs : t) : unit =
     let pp_one fmt (mname, mset) =
-      Fmt.pf fmt "@[<h>%a: %a@]" Symbols.pp mname Mset.pp mset
+      Fmt.pf fmt "@[<h>%a: %a@]" Symbols.pp_path mname Mset.pp mset
     in
     Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_one) abs
 
@@ -1083,7 +1082,7 @@ type iocc = {
 
 let pp_iocc fmt (o : iocc) : unit =
   Fmt.pf fmt "@[<v 2>[@[%a(%a)@]:@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
-    Symbols.pp o.iocc_aname
+    Symbols.pp_path o.iocc_aname
     (Fmt.list ~sep:Fmt.comma Term.pp) (Action.get_args o.iocc_action)
     Term.pp o.iocc_cnt
     (Fmt.list ~sep:Fmt.comma Term.pp) o.iocc_sources
@@ -1115,24 +1114,24 @@ let _fold_macro_support
 
   (* reversing the association map: we want to map macros to
      pairs of possible sources and macro set *)
-  let macro_occs : (Term.term list * Mset.t) Ms.t =
+  let macro_occs : (Term.term list * Mset.t) Mp.t =
     List.fold_left (fun macro_occs ((src, src_macros) : Term.term * MsetAbs.t) ->
         List.fold_left (fun macro_occs (src_macro, mset) ->
-            if Ms.mem src_macro macro_occs
+            if Mp.mem src_macro macro_occs
             then
-              let srcs, mset' = Ms.find src_macro macro_occs in
+              let srcs, mset' = Mp.find src_macro macro_occs in
               let new_mset = Mset.join mset mset' in
-              Ms.add src_macro (src :: srcs, new_mset) macro_occs
-            else Ms.add src_macro ([src], mset) macro_occs
+              Mp.add src_macro (src :: srcs, new_mset) macro_occs
+            else Mp.add src_macro ([src], mset) macro_occs
           ) macro_occs src_macros
-      ) Ms.empty sm
+      ) Mp.empty sm
   in
 
   SE.fold_descrs (fun descr acc ->
       fold_descr ~globals:true
         (fun (msymb : Symbols.macro) _a_is ~(args : Term.term list) ~(body : Term.term) acc ->
-          if Ms.mem msymb macro_occs then
-            let srcs, mset = Ms.find msymb macro_occs in
+          if Mp.mem msymb macro_occs then
+            let srcs, mset = Mp.find msymb macro_occs in
 
             let args' = mset.Mset.args in
             (* we compute the substitution which we will use to instantiate

@@ -22,9 +22,8 @@ val valid_projection : Symbols.table -> t -> Term.proj -> bool
 val compatible : Symbols.table -> t -> t -> bool
 
 (*------------------------------------------------------------------*)
-(** [of_lsymb tbl s] convert [s] to a symbol,
-    if it corresponds to a registered system in [tbl]. *)
-val of_lsymb : Symbols.table -> Symbols.lsymb -> t
+(** Convert a symbol to a system. *)
+val convert : Symbols.table -> Symbols.p_path -> t
 
 (*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
@@ -77,12 +76,12 @@ val declare_empty :
   Symbols.table -> Symbols.lsymb -> Term.proj list-> Symbols.table * t
 
 (** Register an action symbol in a system,
-  * associating it with an action description.
-  * The set of registered actions for this system name will define
-  * the protocol under study.
-  * Returns the updated table and the actual action symbol and description
-  * used (currently the proposed symbol may not be used for technical
-  * reasons that will eventually disappear TODO). *)
+    associating it with an action description.
+    The set of registered actions for this system name will define
+    the protocol under study.
+    Returns the updated table and the actual action symbol and description
+    used (currently the proposed symbol may not be used for technical
+    reasons that will eventually disappear TODO). *)
 val register_action :
   Symbols.table -> t -> Action.descr ->
   Symbols.table * Symbols.action * Action.descr

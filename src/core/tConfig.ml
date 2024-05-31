@@ -1,10 +1,13 @@
+module L = Location
+
+(*------------------------------------------------------------------*)
 type p_param_val = Config.p_param_val
 type Symbols.data += Config_data of p_param_val
 
-let declare table (s:Theory.lsymb) (v:p_param_val) = 
+let declare table (s:Symbols.lsymb) (v:p_param_val) = 
   let data = Config_data v in
-  if Symbols.Config.mem_lsymb s table then
-    let ns = Symbols.Config.of_lsymb s table in
+  if Symbols.Config.mem_sp ([],L.unloc s) table then
+    let ns = Symbols.Config.convert_path ([],s) table in
     Symbols.Config.redefine table ~data ns 
   else 
     fst (Symbols.Config.declare ~approx:false table s ~data )
@@ -70,21 +73,15 @@ let reset_params (table:Symbols.table) : Symbols.table =
 
 
 let get_int s table : int = 
-  let ns = Symbols.Config.of_lsymb (mk s) table in
+  let ns = Symbols.Config.convert_path ([], mk s) table in
   match Symbols.Config.get_data ns table with
   | Config_data (Config.Param_int i) -> i
   | _ -> assert false
 
 let get_bool s table : bool = 
-  let ns = Symbols.Config.of_lsymb (mk s) table in
+  let ns = Symbols.Config.convert_path ([],mk s) table in
   match Symbols.Config.get_data ns table with
   | Config_data (Config.Param_bool i) -> i
-  | _ -> assert false
-
-let [@warning "-32"] get_string s table : string = 
-  let ns = Symbols.Config.of_lsymb (mk s) table in
-  match Symbols.Config.get_data ns table with
-  | Config_data (Config.Param_string s) -> s
   | _ -> assert false
 
 let solver_timeout = get_int s_timeout

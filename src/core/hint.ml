@@ -4,8 +4,6 @@ module SE = SystemExpr
 module L = Location
 module Sv = Vars.Sv
 
-type lsymb = Theory.lsymb
-
 type rw_hint = {
   name : string; 
   rule : LowRewrite.rw_rule;
@@ -39,9 +37,11 @@ type hint_db = { db_rewrite : rewrite_db; db_smt : Term.term list }
 
 type Symbols.data += HintDb of hint_db
 
-let default_hint_symb : Symbols.lsymb = L.mk_loc L._dummy "default"
 (** Default hint database name.
     For now, this is the only database. *)
+let default_hint_str : string         = "default" 
+let default_hint_sp  : Symbols.s_path = [], default_hint_str
+let default_hint_p   : Symbols.hintdb = Symbols.HintDB.of_s_path default_hint_sp
                    
 (*------------------------------------------------------------------*)
 let empty_hint_db = { db_rewrite = empty_rewrite_db; db_smt = [] }
@@ -49,25 +49,26 @@ let empty_hint_db = { db_rewrite = empty_rewrite_db; db_smt = [] }
 (** Get the hint data-base from the table. 
     Use [default_hint_symb] if there are no hint database yet. *)
 let hint_db (table : Symbols.table) : hint_db =
-  if not (Symbols.HintDB.mem_lsymb default_hint_symb table) then
+  if not (Symbols.HintDB.mem_sp default_hint_sp table) then
     empty_hint_db
   else
-    match Symbols.HintDB.data_of_lsymb default_hint_symb table with
+    match Symbols.HintDB.get_data default_hint_p table with
     | HintDb db -> db
     | _ -> assert false         (* impossible *)
 
 (** Set the default hint database in the symbol table *)
 let set_hint_db (table : Symbols.table) (db : hint_db) : Symbols.table =
   let data = HintDb db in
-  match Symbols.HintDB.of_lsymb_opt default_hint_symb table with 
-  | None ->
+  if Symbols.HintDB.mem_sp default_hint_sp table then
+    Symbols.HintDB.redefine table default_hint_p ~data
+  else
     let table, _ =
-      Symbols.HintDB.declare ~approx:false table default_hint_symb ~data
+      Symbols.HintDB.declare
+        ~approx:false table ~scope:Symbols.top_npath
+        (L.mk_loc L._dummy default_hint_str) ~data
     in
     table
 
-  | Some default_name ->
-    Symbols.HintDB.redefine table default_name ~data 
       
 (*------------------------------------------------------------------*)
 let get_rewrite_db table = (hint_db table).db_rewrite
@@ -75,19 +76,20 @@ let get_smt_db     table = (hint_db table).db_smt
 
 (*------------------------------------------------------------------*)
 type p_hint =
-  | Hint_rewrite of lsymb
-  | Hint_smt   of lsymb
+  | Hint_rewrite of Symbols.p_path
+  | Hint_smt     of Symbols.p_path
 
-let add_hint_rewrite (s : lsymb) tyvars form table : Symbols.table =
+let add_hint_rewrite (s : Symbols.p_path) tyvars form table : Symbols.table =
   let db = hint_db table in
   let pat = Pattern.pat_of_form form in
   let pat = Term.{ pat with pat_tyvars = tyvars; } in      
   let rule = 
     LowRewrite.pat_to_rw_rule
-      ~loc:(L.loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
+      ~loc:(Symbols.p_path_loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
       SE.any GlobalEq `LeftToRight pat 
   in
-  let h = { name = L.unloc s; rule; } in
+  let name = Symbols.p_path_to_string ~sep:"_" s in
+  let h = { name; rule; } in
   let head =
     let src, _ = rule.LowRewrite.rw_rw in
     Term.get_head src

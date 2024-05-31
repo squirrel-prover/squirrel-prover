@@ -14,7 +14,7 @@
 (proof-easy-config 'squirrel "Squirrel"
 
  proof-prog-name		                   "squirrel -i"  ;; your program
- proof-terminal-string                 "."            ;; end of commands
+ proof-script-command-end-regexp       "[^\\.]\\.\\(\\s \\|\n\\|$\\)" ;; end of commands
 
  proof-script-comment-start             "(*"	        ;; comments
  proof-script-comment-end               "*)"

@@ -42,9 +42,13 @@ type game = {
 (*------------------------------------------------------------------*)
 type Symbols.data += Game of game
 
-let find table (name : Theory.lsymb) : game = 
-  match Symbols.Game.data_of_lsymb name table with
+let data_as_game = function
   | Game g -> g
+  | _      -> assert false
+
+let find table (name : Symbols.p_path) : game = 
+  match Symbols.Game.convert1 name table with
+  | _, Game g -> g
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -226,7 +230,7 @@ let constant_name_to_var
             with Not_found ->
               let ty = Term.ty term in
               let var =
-                Vars.make_fresh ty ("name_"^ (Symbols.to_string n.s_symb))
+                Vars.make_fresh ty ("name_"^ (Symbols.path_to_string n.s_symb))
               in
               let set = (term,var)::set in
               let term = Term.mk_var var in
@@ -2188,10 +2192,12 @@ let parse_crypto_args
 let prove
     (env   : Env.t)
     (hyps  : TraceHyps.hyps)
-    (pgame : Theory.lsymb)
+    (pgame : Symbols.p_path)
     (args  : TacticsArgs.crypto_args)
     (terms : Equiv.equiv)
   =
+  let game_loc = Symbols.p_path_loc pgame in
+
   let game = find env.table pgame in
   let initial_mem = Game.get_initial_pre env hyps game in
 
@@ -2209,7 +2215,7 @@ let prove
     match bideduce init_state init_output with
     | Some s -> s
     | None ->
-      Tactics.hard_failure ~loc:(L.loc pgame)
+      Tactics.hard_failure ~loc:game_loc
         (Failure "failde to apply the game to user constraints'a argument")
   in
   let rec_bided_subgs, direct_bided_subgs =
@@ -2217,7 +2223,7 @@ let prove
   in
   let inv, consts, rec_subgs =
     bideduce_recursive_subgoals 
-      (L.loc pgame) env hyps game
+      game_loc env hyps game
       init_state.mem (init_state.consts@initial_consts) rec_bided_subgs
   in
   let final_mem, final_consts, direct_subgs =
@@ -2228,8 +2234,7 @@ let prove
       with
       | Some s -> s
       | None ->
-        Tactics.hard_failure ~loc:(L.loc pgame)
-          (Failure "failed to apply the game")
+        Tactics.hard_failure ~loc:game_loc (Failure "failed to apply the game")
     in
     final_state.mem, final_state.consts, final_state.subgoals
   in
@@ -2256,7 +2261,7 @@ let prove
 (** {2 Front-end types and parsing} *)
 
 module Parse = struct
-  type lsymb = Theory.lsymb
+  type lsymb = Symbols.lsymb
 
   (*------------------------------------------------------------------*)
   (** {3 Types} *)
@@ -2421,19 +2426,10 @@ module Parse = struct
     env, List.rev oracles
 
   (*------------------------------------------------------------------*)
-  (* obtain the empty dummy system, defining it if necessary *)
-  let empty_system table : Symbols.table * Symbols.system = 
-    let empty_name = L.mk_loc L._dummy "$empty" in
-    if Symbols.System.mem_lsymb empty_name table then
-      table, Symbols.System.of_lsymb empty_name table
-    else
-      System.declare_empty table empty_name [Term.left_proj; Term.right_proj]
-
   let parse loc table (decl : game_decl) : game = 
     let env = 
-      let table, empty = empty_system table in
-      let set = SE.of_system table empty in
-      let system = SE.{ set = (set :> SE.t) ; pair = None } in
+      let empty = SE.empty_system table in
+      let system = SE.{ set = (empty :> SE.t) ; pair = None } in
       Env.init ~table ~system () 
     in
 

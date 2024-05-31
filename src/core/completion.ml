@@ -43,13 +43,13 @@ type gfname =
 let hash_gfname : gfname -> int = function
   | M (m, _) -> Hashtbl.hash m
   | N (n, _) -> Hashtbl.hash n
-  | _ as gf -> Hashtbl.hash gf
+  | _ as gf  -> Hashtbl.hash gf
 
 let pp_gfname fmt = function
-  | F (f,_) -> Symbols.pp fmt f
-  | N (n,_) -> Symbols.pp fmt n
-  | A a     -> Symbols.pp fmt a 
-  | M (m,_) -> Symbols.pp fmt m 
+  | F (f,_) -> Symbols.pp_path fmt f
+  | N (n,_) -> Symbols.pp_path fmt n
+  | A a     -> Symbols.pp_path fmt a 
+  | M (m,_) -> Symbols.pp_path fmt m 
   | P i     -> Fmt.pf fmt "proj_%d" i
   | T i     -> Fmt.pf fmt "tuple_%d" i
 

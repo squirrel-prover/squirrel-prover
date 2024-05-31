@@ -116,7 +116,7 @@ type euf_schema = {
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Symbols.pp case.action_name
+    Symbols.pp_path case.action_name
     Term.pp case.message
 
 (** Type of a direct euf axiom case.
@@ -145,8 +145,8 @@ let pp_euf_rule ppf rule =
               *key: @[<hov>%a(%a)@]@;\
               *case schemata:@;<1;2>@[<v>%a@]@;\
               *direct cases:@;<1;2>@[<v>%a@]@]"
-    Symbols.pp rule.hash
-    Symbols.pp (fst rule.key) 
+    Symbols.pp_path rule.hash
+    Symbols.pp_path (fst rule.key) 
     (Fmt.list ~sep:Fmt.comma Term.pp) (snd rule.key)
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct

@@ -3,15 +3,12 @@ include Symbols.Channel
 module L = Location
 
 (*------------------------------------------------------------------*)
-type channel = ns Symbols.t
-type t = channel
+type t = Symbols.channel
 
 let declare table s = fst (declare ~approx:false table s)
 
-let pp_channel ppf c =
-  (Printer.kws `ProcessChannel) ppf (Symbols.to_string c)
+let convert table p = fst (Symbols.Channel.convert1 p table)
 
-(*------------------------------------------------------------------*)
-type p_channel = string Location.located
+let pp_channel ppf c =
+  (Printer.kws `ProcessChannel) ppf (Symbols.path_to_string c)
     
-(*------------------------------------------------------------------*)

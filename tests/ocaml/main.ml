@@ -30,7 +30,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Symbols.(Error (_, Unbound_identifier "a1")) -> raise Ok)
+           | Symbols.(Error (_, Unbound_identifier (_,"a1"))) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -94,7 +94,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/axiom3.sp" with
-           | Symbols.Error (_, Symbols.Unbound_identifier "test") ->
+           | Symbols.Error (_, Symbols.Unbound_identifier (_,"test")) ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->

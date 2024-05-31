@@ -206,7 +206,8 @@ Proof.
       intro Hexec' Ord. 
       use Hexec' with P1 as H1 => //.
       expand exec.
-      by use P1_charac.}
+      by use P1_charac.
+     }
 
    by fa 7; rewrite if_false in 7.
 
@@ -238,7 +239,8 @@ Proof.
       intro Hexec' Ord.
       use Hexec' with S1 as H1 => //.
       expand exec.
-      by use S1_charac.}
+      by use S1_charac.
+     }
 
       by fa 6; fa 7; rewrite if_false in 7.
 

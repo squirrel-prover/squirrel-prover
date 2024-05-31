@@ -12,7 +12,7 @@ let dum : L.t = L._dummy
 let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
-type lsymb = Theory.lsymb
+type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 (** A typed process *)
@@ -175,7 +175,7 @@ let _pp ~dbg ppf (process : proc) =
 
     | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
-        (Printer.kws `ProcessName) (Symbols.to_string s)
+        (Printer.kws `ProcessName) (Symbols.path_to_string s)
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ~dbg)) l
 
     | Alias (p,a) ->
@@ -194,7 +194,7 @@ let _pp ~dbg ppf (process : proc) =
 
     | Set (s, args, t, p) ->
       pf ppf "@[<hov>%s%a %a@ %a;@]@ %a"
-        (Symbols.to_string s)
+        (Symbols.path_to_string s)
         (Utils.pp_list Term.pp) args
         (Printer.kws `ProcessKeyword) ":="
         (Term._pp ~dbg) t
@@ -224,14 +224,14 @@ let _pp ~dbg ppf (process : proc) =
 
       pf ppf "@[<hov>%a(%a,@,%a);@]@ %a"
         (Printer.kws `ProcessInOut) "in"
-        (Printer.kws `ProcessChannel) (Symbols.to_string c)
+        (Printer.kws `ProcessChannel) (Symbols.path_to_string c)
         (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
         doit p
 
     | Out (c, t, p) ->
       pf ppf "@[<hov 2>%a(%a,@,@[%a@]);@]@ %a"
         (Printer.kws `ProcessInOut) "out"
-        (Printer.kws `ProcessChannel) (Symbols.to_string c)
+        (Printer.kws `ProcessChannel) (Symbols.path_to_string c)
         (Term._pp ~dbg) t
         doit p
 
@@ -337,7 +337,7 @@ let pp_error_i fmt = function
 
   | ActionUndef a ->
     Fmt.pf fmt "action %a used in the system but not defined"
-      Symbols.pp a
+      Symbols.pp_path a
     
 let pp_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aProcess error: @[%a@]."
@@ -360,20 +360,24 @@ type proc_decl = {
     their types. *)
 type Symbols.data += Process_data of proc_decl
 
-let declare_nocheck table (name : Theory.lsymb) (pdecl : proc_decl) =
+(*------------------------------------------------------------------*)
+let declare_nocheck table (name : Symbols.lsymb) (pdecl : proc_decl) =
   let data = Process_data pdecl in
   let table, _ = Symbols.Process.declare ~approx:false table name ~data in
   table
 
-let find_process table pname =
-  match Symbols.Process.get_data pname table with
-  | Process_data pdecl -> pdecl
+(*------------------------------------------------------------------*)
+let get_process_data table (p : Symbols.process) =
+  match Symbols.Process.get_data p table with
+  | Process_data data -> data
   | _ -> assert false
 (* The data associated to a process must be a [Process_data _]. *)
 
-let find_process_lsymb table (lsymb : lsymb) =
-  let name = Symbols.Process.of_lsymb lsymb table in
-  name, find_process table name
+let convert_process_path table (p : Symbols.p_path) =
+  match Symbols.Process.convert1 p table with
+  | name, Process_data data -> name, data
+  | _ -> assert false
+  (* The data associated to a process must be a [Process_data _]. *)
 
 
 (*------------------------------------------------------------------*)
@@ -384,14 +388,14 @@ module Parse = struct
   type cnt =
     | Null
     | New      of lsymb * Theory.p_ty * t
-    | In       of Channel.p_channel * lsymb * t
-    | Out      of Channel.p_channel * Theory.term * t
+    | In       of Symbols.p_path * lsymb * t
+    | Out      of Symbols.p_path * Theory.term * t
     | Parallel of t * t
-    | Set      of lsymb * Theory.term list * Theory.term * t
+    | Set      of Symbols.p_path * Theory.term list * Theory.term * t
     | Let      of lsymb * Theory.term * Theory.p_ty option * t
     | Repl     of lsymb * t
     | Exists   of lsymb list * Theory.term * t * t
-    | Apply    of lsymb * Theory.term list
+    | Apply    of Symbols.p_path * Theory.term list
     | Alias    of t * lsymb
 
   and t = cnt L.located
@@ -434,13 +438,13 @@ let parse
       New (x, ty, doit ty_env { env with vars } p)
 
     | Parse.In (c,x,p) -> 
-      let c = Channel.of_lsymb c table in
+      let c = Channel.convert env.table c in
       let vars, x = Vars.make_local `Shadow env.vars (Type.Message) (L.unloc x) in
       In (c, x, doit ty_env { env with vars } p)
 
     | Parse.Out (c,m,p)
     | Parse.Alias (L.{ pl_desc = Out (c,m,p) },_) ->
-      let c = Channel.of_lsymb c env.table in 
+      let c = Channel.convert env.table c in 
 
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (TConfig.strict_alias_mode env.table) then
@@ -462,7 +466,7 @@ let parse
 
     | Parse.Set (s, l, m, p) ->
       let ty = Theory.check_state env.table s (List.length l) in
-      let s = Symbols.Macro.of_lsymb s env.table in
+      let s = Symbols.Macro.convert_path s env.table in
 
       let l =
         List.map (fun x ->
@@ -505,14 +509,15 @@ let parse
       Exists (vs, test, p, q)
 
     | Parse.Apply (p_id, args) ->
-      let id, p = find_process_lsymb env.table p_id in
+      let id, p = convert_process_path env.table p_id in
 
       if projs <> p.projs then
         error ~loc:(L.loc proc) (ProjsMismatch (projs, p.projs));
 
       let l1, l2 = List.length args, List.length p.args in
       if l1 <> l2 then
-        error ~loc (Arity_error (L.unloc p_id, l1 , l2));
+        error ~loc:(Symbols.p_path_loc p_id)
+          (Arity_error (L.unloc @@ snd p_id, l1 , l2));
 
       let args = 
         List.map2 (fun v t ->
@@ -639,23 +644,20 @@ let penv_add_var (v : Vars.var) (penv : p_env) : p_env =
   { penv with env = { penv.env with vars; }; }
 
 (*------------------------------------------------------------------*)
-(** Creates an axiom namelength_name with formula : 
-    len(s) = namelength_hashS with hashS depending on out type of name s *)
-let mk_namelength_statement 
-    (name  : string)        (* Statement name → could be namelength_s by default *)
+(** Creates an axiom [namelength_name] stating that: 
+    [len(s) = namelength_hashS] where [hashS] depending on the output type of
+    the name [s] *)
+let mk_namelength_statement
+    (name  : string)        (* statement name → could be [namelength_s] by default *)
     (table : Symbols.table) (* the table *)
-    (s     : lsymb)         (* symbol of targeted name *)
+    (n     : Symbols.name)  (* targeted name *)
     (ftype : Type.ftype)    (* type of name term *)
   : Symbols.table * Goal.statement
   =
-
-  (* take name from table certainly just defined earlier *)
-  let n = Symbols.Name.of_lsymb s table in
   let tyn = ftype.fty_out in
 
   (* create fresh variables regarding to arity of n *)
-  let vars = List.map
-      (fun x -> Vars.make_fresh x "i") ftype.fty_args in
+  let vars = List.map (fun x -> Vars.make_fresh x "i") ftype.fty_args in
 
   let tvars = Term.mk_vars vars in
   (* build name term n *)
@@ -663,17 +665,18 @@ let mk_namelength_statement
 
   (* cst hash is built from hash of output type of n : tyn *)
   let cst = Type.to_string tyn in
-  let cst_hash = "namelength_" ^ cst in
-  let lsy = L.mk_loc L._dummy (cst_hash) in
+  let cst_name = "namelength_" ^ cst in
+  let lsy = L.mk_loc L._dummy cst_name in
 
-  (* find or build cst function namelength_hashS *)
-  let table, fname = match Symbols.Operator.of_lsymb_opt lsy table with
-    | Some fn -> table, fn
-    | None ->
-      let open Symbols.OpData in
+  (* find or build constant function [namelength_hashS] *)
+  let table, fname =
+    if Symbols.Operator.mem_s (Symbols.scope table) cst_name table then
+      let fname = Symbols.Operator.convert_path ([],lsy) table in
+      (table, fname)
+    else
       let ftype = Type.mk_ftype [] [] Message in
       let data =
-        Operator {
+        Symbols.OpData.Operator {
           ftype; def = Abstract (Abstract `Prefix, [])
         }
       in
@@ -681,39 +684,34 @@ let mk_namelength_statement
   in
   let cst = Term.mk_fun table fname [] in
   (* len(n) = cst *)
-  let eq = (Term.mk_atom `Eq (Term.mk_len tn) (cst)) in
-  (* if any variables in n → forall i_: len(n(i_)) = cst *)
-  let teq = match vars with
-    | [] -> eq
-    | _ -> Term.mk_forall vars eq in
-  let f = Equiv.Atom (Reach teq) in
+  let eq = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+  (* forall i_: len(n(i_)) = cst *)
+  let f = Equiv.Atom (Reach (Term.mk_forall vars eq)) in
 
   (* build statement with name given in arg (often namelength_s with s the
      symbol of the name) *)
-  let system = SystemExpr.context_any in
   table, { name; 
-           system; 
+           system  = SystemExpr.context_any; 
            ty_vars = ftype.fty_vars; 
            formula = Equiv.Global f }
 
 (*------------------------------------------------------------------*)
-(** Add namelength axiom of given name of symbol s with type ftype,
-    provided that the type is Name_fixed_length *)
-let add_namelength_axiom 
+(** Exported (see `.mli`) *)
+let add_namelength_axiom
     ?(loc = L._dummy)
-    (table:Symbols.table) (s:lsymb) (ftype:Type.ftype)
-  : Symbols.table =
+    (table : Symbols.table) (n : Symbols.name) (ftype : Type.ftype)
+  : Symbols.table
+  =
   if not @@ Symbols.TyInfo.is_name_fixed_length table ftype.fty_out then
     table
   else
-    let name = "namelength_" ^ (L.unloc s) in
-    (* if already defined just return actual table *)
-    if Symbols.Lemma.mem_lsymb (L.mk_loc loc name) table 
+    let name = "namelength_" ^ (Symbols.to_string n.s) in
+    (* if already defined in current scope, return the table unchanged *)
+    if Symbols.Lemma.mem_s (Symbols.scope table) name table 
     then table
     else
-      let table, stmt = 
-        mk_namelength_statement name table s ftype in
-      Lemma.add_lemma `Axiom stmt table
+      let table, stmt = mk_namelength_statement name table n ftype in
+      Lemma.add_lemma ~loc `Axiom stmt table
 
 (*------------------------------------------------------------------*)
 (** [find_app_terms t macros] returns the sublist of [macros] for which there
@@ -723,7 +721,7 @@ let find_app_terms (t : Term.term) (names : string list) : Symbols.macro list =
     match t with
     | Term.Macro (m, _, _) ->
       let ms = m.s_symb in
-      let acc = if Symbols.to_string ms = name then ms :: acc else acc in
+      let acc = if Symbols.path_to_string ms = name then ms :: acc else acc in
       Term.tfold (aux name) t acc
 
     | _ -> Term.tfold (aux name) t acc
@@ -845,7 +843,7 @@ let process_system_decl
     in
 
     let table =
-      if new_name <> name then Symbols.Action.release table name else table
+      if new_name <> name then Symbols.Action.remove name table else table
     in
 
     let new_action_term = 
@@ -870,7 +868,7 @@ let process_system_decl
     match proc with
     | Apply (id,args)
     | Alias (Apply (id,args), _) ->
-      let pdecl = find_process penv.env.table id in
+      let pdecl = get_process_data penv.env.table id in
 
       if penv.projs <> pdecl.projs then
         error (ProjsMismatch (penv.projs, pdecl.projs));
@@ -898,7 +896,7 @@ let process_system_decl
         match proc with
         | Alias (_,name) -> UserName name
         | _ when is_user_name penv.alias -> penv.alias
-        | _ -> Hint (Symbols.to_string id)
+        | _ -> Hint (Symbols.path_to_string id)
       in
 
       (* substitute in every user-proveded alias in [proc] the 
@@ -934,10 +932,7 @@ let process_system_decl
       in
 
       (* add name length axioms *)
-      let table =
-        let real_name = L.mk_loc L._dummy (Symbols.to_string nsymb) in
-        add_namelength_axiom table real_name n_fty
-      in
+      let table = add_namelength_axiom table nsymb n_fty in
 
       let n_term =
         let nsymb = Term.mk_symb nsymb ty in
@@ -976,7 +971,7 @@ let process_system_decl
       let updated_states : Symbols.macro list =
         if in_update then
           let apps = List.map (fun (s,_,_) -> s) penv.updates in
-          find_app_terms t' (List.map Symbols.to_string apps)
+          find_app_terms t' (List.map Symbols.path_to_string apps)
         else []
       in
 
@@ -1161,12 +1156,12 @@ let process_system_decl
            - either the value at the end of the current action,
            - either the value before the current action.
              There is no in-between value. *)
-        error (DuplicatedUpdate (Symbols.to_string s)); 
+        error (DuplicatedUpdate (Symbols.path_to_string s)); 
 
       let t' = Term.subst penv.subst t in
       let l' = List.map (Term.subst penv.subst) l in      
       let updated_states =
-        let apps = List.map (fun (s,_,_) -> Symbols.to_string s) penv.updates in
+        let apps = List.map (fun (s,_,_) -> Symbols.path_to_string s) penv.updates in
         (* dummy term containing [t'] and [l'] to use [find_app_terms] *)
         find_app_terms (Term.mk_tuple (t' :: l')) apps
       in
@@ -1193,13 +1188,13 @@ let process_system_decl
       (* The same location re-used twice, as both sub-processes come from the
          same initial process. *)
       let p' = Out (ch,t',p') in
-      let a' = Symbols.to_string a' in
+      let a' = Symbols.path_to_string a' in
 
       ( Alias (p', a'), pos', table )
 
     | Null ->
       let penv,a' = register_action (* loc *) penv.alias None penv in
-      let a' = Symbols.to_string a' in
+      let a' = Symbols.path_to_string a' in
 
       ( Alias (Null, a'), 0, penv.env.table)
 
@@ -1216,7 +1211,7 @@ let process_system_decl
       let c_dummy = Symbols.dummy_channel in
 
       let p' = Out (c_dummy, Term.empty, p') in
-      let a' = Symbols.to_string a' in
+      let a' = Symbols.path_to_string a' in
 
       ( Alias (p', a'), pos', table )
   in
