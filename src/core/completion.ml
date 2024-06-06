@@ -193,7 +193,7 @@ let ccst (c : Cst.t) = make (Ccst c)
 
 (** For monomorphique functions (hence no type variable to instantiate). 
     Must provide a symbol table if the function is not a built-in. *)
-let ct_monomorph_fname ?(table = Symbols.builtins_table) fs =
+let ct_monomorph_fname ?(table = Symbols.builtins_table ()) fs =
   let fty = Symbols.OpData.ftype table fs in
   ccst (Cst.of_fname fs { fty; ty_args = []} )
 
@@ -1642,7 +1642,7 @@ let () =
          }
        in
        let table,ffs =
-         Symbols.Operator.declare ~approx:false Symbols.builtins_table (mk "f") ~data in
+         Symbols.Operator.declare ~approx:false (Symbols.builtins_table ()) (mk "f") ~data in
        let table,hfs =
          Symbols.Operator.declare ~approx:false table (mk "h") ~data in
        let ffs,hfs = ct_monomorph_fname ~table ffs, ct_monomorph_fname ~table hfs in

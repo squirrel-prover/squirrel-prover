@@ -402,7 +402,7 @@ let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
 
 (*------------------------------------------------------------------*)
 let mk_fbuiltin (fname : Symbols.fname) (args : terms) : term = 
-  mk_fun_infer_tyargs Symbols.builtins_table fname args
+  mk_fun_infer_tyargs (Symbols.builtins_table ()) fname args
 
 (*------------------------------------------------------------------*)
 (** {3 For first-order formulas} *)

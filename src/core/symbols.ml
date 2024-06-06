@@ -1251,7 +1251,7 @@ let fs_pred =
 (** Boolean connectives *)
 
 let fs_false = mk_fsymb ~bool:true "false" 0
-let fs_true  = mk_fsymb ~bool:true "true" 0
+let fs_true  = mk_fsymb ~bool:true "true"  0
 let fs_and   = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "&&"  2
 let fs_or    = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "||"  2
 let fs_impl  = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "=>"  2
@@ -1270,23 +1270,12 @@ let fs_ite =
 (*------------------------------------------------------------------*)
 (** Comparison *)
 
-let mk_comp name =
-  let tyv = Type.mk_tvar "t" in
-  let tyvar = Type.TVar tyv in
-  let fty = 
-    Type.mk_ftype
-      [tyv]
-      [tyvar; tyvar]
-      Type.Boolean
-  in
-  mk_fsymb ~f_info:(`Infix `NonAssoc) ~fty name (-1)
-
-let fs_eq  = mk_comp "="
-let fs_neq = mk_comp "<>"
-let fs_leq = mk_comp "<="
-let fs_lt  = mk_comp "<"
-let fs_geq = mk_comp ">="
-let fs_gt  = mk_comp ">"
+let fs_eq  = Operator.of_s_path ([], "=" )
+let fs_neq = Operator.of_s_path ([], "<>")
+let fs_leq = Operator.of_s_path ([], "<=")
+let fs_lt  = Operator.of_s_path ([], "<" )
+let fs_geq = Operator.of_s_path ([], ">=")
+let fs_gt  = Operator.of_s_path ([], ">" )
 
 (** Fail *)
 
@@ -1330,10 +1319,12 @@ let fs_len =
   let fty = Type.mk_ftype [tyv] [tyvar] Type.Message
   in
   mk_fsymb ~fty "len" 1
-    
+
 (*------------------------------------------------------------------*)
 (** {3 Builtins table} *)
 
-let builtins_table = !builtin_ref
+let builtins_table () = !builtin_ref
 
-let ftype_builtin f = OpData.ftype builtins_table f
+let set_builtins_table_after_processing_prelude (table : table) = builtin_ref := table
+
+let ftype_builtin f = OpData.ftype (builtins_table ()) f

@@ -29,7 +29,7 @@ type state = {
 (* GoalMode is always the initial prover_mode *)
 let init' () : state = 
 { goals         = [];
-  table         = TConfig.reset_params Symbols.builtins_table;
+  table         = TConfig.reset_params (Symbols.builtins_table ());
   current_goal  = None;
   bullets       = Bullets.empty_path;
   subgoals      = [];
@@ -737,6 +737,7 @@ let init : ?with_prelude:bool -> unit -> state =
                       params = []; }
         in
         let state = do_include ~dirname:Driver.theory_dir state inc in
+        let () = Symbols.set_builtins_table_after_processing_prelude state.table in
         state0 := Some state;
         state
       end

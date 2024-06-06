@@ -1,6 +1,18 @@
 include Basic.
 
 namespace Foo.
+  op ( * )  x y = <x,y>.
+  op ( - )  x y = <x,y>.
+  op ( + )  x y = <x,y>.
+  op ( ++ )   x y = <x,y>.
+  op ( ++1+ ) x y = <x,y>.
+
+  lemma [any] _ x y : x ++1+ y = x ++ y && x ++ y = x * y.
+  Proof. 
+    rewrite /Foo.( * ). 
+    (* rewrite /(++). *)
+  Abort.
+
   op f : message = empty.
   type t.
   abstract a : t.

@@ -1003,8 +1003,8 @@ end = struct
   let to_subst_locals ~(mode:[`Match|`Unif]) (mv : t) : Term.subst =
     match
       to_subst ~mode
-        Symbols.builtins_table    (* default value, which won't be used *)
-        Vars.empty_env            (* idem *)
+        (Symbols.builtins_table ())    (* default value, which won't be used *)
+        Vars.empty_env                 (* idem *)
         mv
     with
     | `Subst s -> s

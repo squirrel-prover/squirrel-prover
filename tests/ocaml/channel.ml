@@ -7,23 +7,23 @@ open Channel
 let channels =
   let mk c = L.mk_loc L._dummy c in      
   let mk_p c = [], mk c in
-  let table_c = declare Symbols.builtins_table (mk "c") in  
+  let table_c = declare (Symbols.builtins_table ()) (mk "c") in  
   let table_cd = declare table_c (mk "d") in
   [
     "Basic", `Quick,
     fun () ->
       let exception Ok in
       
-      ignore (declare (Symbols.builtins_table) (mk "a"));
+      ignore (declare ((Symbols.builtins_table ())) (mk "a"));
 
       Alcotest.check_raises "fails" Ok
         (fun () -> 
-           try ignore(convert Symbols.builtins_table (mk_p "c")) with
+           try ignore(convert (Symbols.builtins_table ()) (mk_p "c")) with
            | Symbols.Error (_, Unbound_identifier (_,"c")) -> raise Ok) ;
 
       Alcotest.check_raises "fails" Ok
         (fun () -> 
-           try ignore (convert Symbols.builtins_table (mk_p "d")) with
+           try ignore (convert (Symbols.builtins_table ()) (mk_p "d")) with
            | Symbols.Error (_,Unbound_identifier (_,"d")) -> raise Ok ) ;
 
       Alcotest.check_raises "fails" Ok 

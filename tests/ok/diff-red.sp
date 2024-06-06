@@ -19,3 +19,23 @@ Proof.
   intro H. 
   auto ~diffr.
 Qed. 
+
+(* ------------------------------------------------------------------- *)
+global lemma _ (x,y : message) : [x = y => diff(x,x) = y].
+Proof.
+  simpl ~diffr.
+  intro H.
+  assumption H.
+Qed. 
+
+global lemma _ (x,y : message) : [x = y => diff(x,x) = y].
+Proof.
+  reduce ~diffr.
+  intro H.
+  assumption H.
+Qed. 
+
+global lemma _ (x,y : message) : [x = y => diff(x,x) = y].
+Proof.
+  auto ~diffr.
+Qed. 

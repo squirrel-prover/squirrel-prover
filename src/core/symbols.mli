@@ -355,7 +355,7 @@ module Mp (S : SymbolKind) : Map.S with type key := S.ns path
 (** {3 Data definitions for operators (abstract and concrete)} 
 
     Contain the data definitions for concrete and abstract operators,
-    except for some fields of concrete operators that are post-poned 
+    except for some fields of concrete operators that are postponed 
     after the definition of terms. *)
     
 module OpData : sig
@@ -517,10 +517,15 @@ val infix_assoc_predicate : predicate -> assoc
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 
-val builtins_table : table
+(** symbols table after processing the prelude *)
+val builtins_table : unit -> table
 
 (** Returns the type of a builtin function *)
 val ftype_builtin : fname -> Type.ftype
+
+(** Set the symbols table after processing the prelude.
+    **Only use once in the toplevel prover.** *)
+val set_builtins_table_after_processing_prelude : table -> unit
 
 (*------------------------------------------------------------------*)
 (** {3 Action builtins} *)

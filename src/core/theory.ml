@@ -1705,15 +1705,15 @@ let () =
     begin fun () ->
       let exception Ok in
       
-      ignore (declare_hash Symbols.builtins_table (mk "h") : Symbols.table);
-      let table = declare_hash Symbols.builtins_table (mk "h") in
+      ignore (declare_hash (Symbols.builtins_table ()) (mk "h") : Symbols.table);
+      let table = declare_hash (Symbols.builtins_table ()) (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice" Ok
         (fun () ->
            try ignore (declare_hash table (mk "h") : Symbols.table) with
            | Symbols.Error (_, Multiple_declarations (_,"h",_,_)) -> raise Ok
         ) ;
-      let table = declare_hash Symbols.builtins_table (mk "h") in
+      let table = declare_hash (Symbols.builtins_table ()) (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice" Ok
         (fun () ->
@@ -1726,7 +1726,7 @@ let () =
     "Type checking", `Quick,
     begin fun () ->
       let table =
-        declare_aenc Symbols.builtins_table (mk "e") (mk "dec") (mk "pk")
+        declare_aenc (Symbols.builtins_table ()) (mk "e") (mk "dec") (mk "pk")
       in
       let table = declare_hash table (mk "h") in
       let x = mk_symb ([],mk "x") in

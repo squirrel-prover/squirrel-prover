@@ -501,11 +501,11 @@ let pp_dbg = pp_toplevel ~dbg:true  ?context:None
 (** {2 Misc} *)
 
 let is_constant ?(env : Env.t option) (t : Term.term) : bool =
-  let env = odflt (Env.init ~table:Symbols.builtins_table ()) env in
+  let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
   HighTerm.is_constant env t
 
 let is_system_indep
-    ?(env : Env.t = Env.init ~table:Symbols.builtins_table ())
+    ?(env : Env.t = Env.init ~table:(Symbols.builtins_table ()) ())
     (t    : Term.term)
   : bool
   =

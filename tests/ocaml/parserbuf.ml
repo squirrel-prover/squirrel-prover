@@ -14,7 +14,7 @@ let parse_theory_test ?(test=false) filename =
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
     ProcessDecl.declare_list (TConfig.reset_params
-                                Symbols.builtins_table) decls
+                                (Symbols.builtins_table ())) decls
   in
   Stdlib.close_in_noerr chan;
   assert (subgs = []);
@@ -81,7 +81,7 @@ let parse_process table ?(typecheck=false) str =
 (** Testing process parsing. *)
 let process_parsing =
   let table =
-    Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
+    Channel.declare (Symbols.builtins_table ()) (L.mk_loc L._dummy "c") in
   [
     "Null", `Quick, begin fun () ->
       ignore (parse_process table "null" : Process.Parse.t)
