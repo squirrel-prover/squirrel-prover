@@ -1,5 +1,3 @@
-
-
 abstract ok : message
 channel c
 system A: out(c,ok).

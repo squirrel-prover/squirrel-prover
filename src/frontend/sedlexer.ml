@@ -57,11 +57,12 @@ let infix_char =
 
 let left_infix_symb =
   [%sedlex.regexp?
-    left_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
+    left_infix_char_first, Star (infix_char | Star '0' .. '9', Plus infix_char)]
 
 let right_infix_symb =
   [%sedlex.regexp?
-    right_infix_char_first, (Star infix_char | Star '0' .. '9', Plus infix_char)]
+    right_infix_char_first, Star (infix_char | Star '0' .. '9', Plus infix_char)]
+
 (*------------------------------------------------------------------*)
 
 let rec token buf =

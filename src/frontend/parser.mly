@@ -88,7 +88,8 @@
 %nonassoc tac_prec
 
 %nonassoc BY
-%left PLUS
+%left PLUS MINUS
+%left STAR
 %right SEMICOLON
 %nonassoc REPEAT
 %nonassoc TRY
@@ -231,6 +232,9 @@ spath:
 (*------------------------------------------------------------------*)
 (* auxiliary definition *)
 %inline _infix_s:
+| PLUS             { "+"   , `Left }
+| MINUS            { "-"   , `Left }
+| STAR             { "*"   , `Left }
 | EQ               { "="   , `Left }
 | NEQ              { "<>"  , `Left }
 | LEQ              { "<="  , `Left }
