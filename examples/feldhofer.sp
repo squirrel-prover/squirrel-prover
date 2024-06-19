@@ -27,6 +27,15 @@ induction for wa_* lemmas.
 
 This is a "light" model without the last check of T.
 
+## UPDATE FOLLOWING THE HIGHER-ORDER EXTENTION
+
+This development was partially broken when Squirrel was extended to a 
+higher-order setting (due to changes in the way cryptographic rules are applied):
+```
+A Higher-Order Indistinguishability Logic for Cryptographic Reasoning. LICS 2023
+```
+Fixing the proof is possible, and will hopefully be done at some
+point. Until then, we decided to keep this file as-is.
 *)
 
 set timeout=10.
@@ -105,7 +114,7 @@ Proof.
 
     (* First projection. *)
     - intctxt H. 
-      (* problem with the randomness conditions *) admit. 
+      (* (LICS'23 changes) problem with the randomness conditions *) admit. 
       (* case 1: in Reader1 *)
         auto.
       (* case 2: in Tag *)
@@ -115,7 +124,7 @@ Proof.
 
     (* Second projection. *)
     - intctxt H.
-      (* problem with the randomness conditions *) admit. 
+      (* (LICS'23 changes) problem with the randomness conditions *) admit. 
       auto. intro _; simpl. by exists i, j.
 
   (* Direction <= *)
@@ -152,13 +161,13 @@ Proof.
     project.
 
     - intctxt H1; simpl.
-      (* problem with randomness condition *) admit.
+      (* (LICS'23 changes) problem with randomness condition *) admit.
       auto.
       intro [j0 _]. 
       by exists i, j0.       
 
     - intctxt H1; simpl.
-      (* problem with randomness condition *) admit.
+      (* (LICS'23 changes) problem with randomness condition *) admit.
       auto. 
       by intro ?; exists i, j.
 Qed.
@@ -178,7 +187,7 @@ Proof.
     1: by expand output, cipher.
     intctxt Meq0; try auto; clear Meq0.
     - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
-    - (* problem w/ randomness condition *) admit.
+    - (* (LICS'23 changes) problem w/ randomness condition *) admit.
     - intro [j1 [? ?]]. 
       assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
@@ -188,19 +197,19 @@ Proof.
         have A : j1 = j0 by auto.
         rewrite A in *; clear A. 
         rewrite -Meq in *. 
-        admit. (* pb w/ randomness condition *) 
+        admit. (* (LICS'23 changes) pb w/ randomness condition *) 
 
   + assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
     as Meq0;
     1: by expand output, cipher.
     intctxt Meq0; try auto. 
     - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
-    - (* pb w/ randomness condition *) admit.
+    - (* (LICS'23 changes) pb w/ randomness condition *) admit.
     - assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
       intctxt Meq2; try auto.
        * by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
-       * (* pb w/ randomness condition *) admit.
+       * (* (LICS'23 changes) pb w/ randomness condition *) admit.
 Qed.
 
 equiv unlinkability.
@@ -268,7 +277,7 @@ Proof.
         (* find condA => condB *)
         - intro [Mneq _ _].
           intctxt Mneq; simpl.
-          (* pb w/ randomness condition *) admit. 
+          (* (LICS'23 changes) pb w/ randomness condition *) admit. 
            by use tags_neq.
           intro [j1 _]; by exists j1.
 
@@ -283,7 +292,7 @@ Proof.
         (* find condA => condB *)
         - intro [Mneq _ _].
           intctxt Mneq; simpl.
-          (* pb w/ randomness condition *) admit. 
+          (* (LICS'23 changes) pb w/ randomness condition *) admit. 
           by use tags_neq.
           auto.
 
