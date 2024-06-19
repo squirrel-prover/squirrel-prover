@@ -819,7 +819,7 @@ let process_system_decl
     in
 
     let updates =
-      List.map (fun (ms,args,t) -> ms, args, subst t) penv.updates
+      List.map (fun (ms,args,t) -> ms, List.map subst args, subst t) penv.updates
     in
 
     let output : Symbols.channel * Term.term =
