@@ -27,15 +27,22 @@ induction for wa_* lemmas.
 
 This is a "light" model without the last check of T.
 
-## UPDATE FOLLOWING THE HIGHER-ORDER EXTENTION
+## UPDATE FOLLOWING THE HIGHER-ORDER EXTENSION
 
-This development was partially broken when Squirrel was extended to a 
-higher-order setting (due to changes in the way cryptographic rules are applied):
+This development was partially broken when Squirrel has been extended to a
+higher-order setting, due to changes in the way cryptographic rules are
+applied:
 ```
 A Higher-Order Indistinguishability Logic for Cryptographic Reasoning. LICS 2023
 ```
-Fixing the proof is possible, and will hopefully be done at some
-point. Until then, we decided to keep this file as-is.
+The problem comes from the fact that the generalized implementation of the
+intctxt tactic lacks precision when checking that randomness usage is correct.
+In a nutshell, the tactic does not see that the random `rr(k)` used in the
+reader process below is only used for a single value of `i,j`, namely the
+value selected by the surrounding try-find construct. The problem can be
+fixed by reformulating this file, but we are also considering a change of the
+tactic's implementation. In the meantime, the file is left as-is with its
+admits.
 *)
 
 set timeout=10.
