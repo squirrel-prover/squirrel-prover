@@ -12,7 +12,10 @@ type p_npath = string L.located list
 type p_path = p_npath * string L.located
 
 let p_npath_loc (p : p_npath) : L.t = L.mergeall (List.map L.loc p)
-let p_path_loc  (p : p_path ) : L.t = L.merge (p_npath_loc (fst p)) (L.loc (snd p))
+let p_path_loc  (p : p_path ) : L.t =
+  let top, sub = p in
+  if top = [] then L.loc sub
+  else L.merge (p_npath_loc top) (L.loc sub)
 
 (*------------------------------------------------------------------*)
 (** An untyped namespace path *)
