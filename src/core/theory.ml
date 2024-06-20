@@ -356,7 +356,9 @@ let function_kind table (p : Symbols.p_path) : mf_type =
         | State _ -> assert false (* TODO: symbols: missing case? *)
       end
       
-    | _ -> conv_err (Symbols.p_path_loc p) (Failure "expected a function or operator symbol")
+    | _ ->
+      conv_err (Symbols.p_path_loc p)
+        (Failure "expected a function or operator symbol")
 
 let check_state table (path : Symbols.p_path) n : Type.ty =
   let s = Symbols.Macro.convert_path path table in
@@ -365,16 +367,8 @@ let check_state table (path : Symbols.p_path) n : Type.ty =
     check_arity ~mode:`Full path ~actual:n ~expected:arity ;
     ty
 
-  | _ -> conv_err (Symbols.p_path_loc path) (Assign_no_state (Symbols.p_path_to_string path))
-
-let check_name table (path : Symbols.p_path) n : Type.ftype =
-  let fty =
-    (Symbols.get_name_data (Symbols.Name.convert_path path table) table).n_fty
-  in
-  let arity = List.length fty.fty_args in
-  if arity <> n then
-    conv_err (Symbols.p_path_loc path) (Arity_error (Symbols.p_path_to_string path,n,arity));
-  fty
+  | _ -> conv_err (Symbols.p_path_loc path)
+           (Assign_no_state (Symbols.p_path_to_string path))
 
 let check_action
     type_checking in_proc (env : Env.t) (path : Symbols.p_path) (n : int) : unit
@@ -1121,12 +1115,30 @@ and conv_app
     Term.mk_macro ms is ts
 
   | Name ->
-    let s_fty = check_name state.env.table f (List.length terms) in
-    assert (s_fty.fty_vars = []);
-    let is = List.map2 conv s_fty.fty_args terms in
+    let table = state.env.table in
+    let fty =
+      (Symbols.get_name_data (Symbols.Name.convert_path f table) table).n_fty
+    in
+    let arity = List.length fty.fty_args in
+    let terms_len = List.length terms in
+    
+    if arity > terms_len then
+      conv_err (Symbols.p_path_loc f)
+        (Arity_error (Symbols.p_path_to_string f,terms_len,arity));
+
+    let terms, terms' = List.takedrop arity terms in
+    
+    assert (fty.fty_vars = []);
+    let terms = List.map2 conv fty.fty_args terms in
+    let terms' =
+      let tys, _ty_out =
+        Type.destr_funs ~ty_env:state.ty_env fty.fty_out (List.length terms')
+      in
+      List.map2 conv tys terms'
+    in
     (* names have always arity 0 or 1 *)
-    let ns = Term.mk_symb (get_name state.env.table f) s_fty.fty_out in
-    Term.mk_name ns is
+    let ns = Term.mk_symb (get_name state.env.table f) fty.fty_out in
+    Term.mk_app (Term.mk_name ns terms) terms'
 
   | Taction ->
     (* open-up tuples *)
