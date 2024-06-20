@@ -431,6 +431,17 @@ let declare table decl : Symbols.table * Goal.t list =
     let args_tys = List.map (Theory.convert_ty env) p_args_tys in
     let out_ty = Theory.convert_ty env p_out_ty in
 
+    if List.length (fst (Type.decompose_funs out_ty)) >= 1 then
+      begin
+        let str_warning =
+          Fmt.str "@[<v>name %s samples functions of type@;\
+                  \  @[%a@]@;\
+                   maybe you wanted to use a non-curryfied type instead?"
+            (L.unloc s) Type.pp out_ty
+        in
+        Printer.prt `Warning "%s" str_warning
+      end;
+    
     let n_fty = Type.mk_ftype_tuple [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
