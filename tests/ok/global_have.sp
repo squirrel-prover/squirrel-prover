@@ -81,7 +81,19 @@ Abort.
 (*------------------------------------------------------------------*)
 lemma _ : false.
 Proof. 
-  have ? := ax_bool true.
-  have ? := q empty. 
-  have ? := q empty _; 1: auto. 
+  have ? := ax_bool true. 
+
+  (* `q` as equivalences, but the current system context does not have
+      a `equiv` field. Thus, it is not possible to add `q` as an hypothesis. *)
+  checkfail have ? := q empty exn NoAssumpSystem.
+  checkfail have ? := q empty _; 1: auto exn NoAssumpSystem.  Abort.
+
+(*------------------------------------------------------------------*)
+(* we can add `q` by manually setting the `equiv` field of the sequent to 
+   the appropriate value *)
+lemma [set:default; equiv:default] _ : false.
+Proof. 
+  have ? := ax_bool true. 
+  have ? := q empty.
+  have ? := q empty _; 1: auto.
 Abort.

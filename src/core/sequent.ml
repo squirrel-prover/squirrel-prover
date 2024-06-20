@@ -224,9 +224,6 @@ let pt_compatible_with
       (* if [pt] has no equivalences, it is compatible. *)
       ( List.for_all no_equiv_any (pt.form :: pt.subgs) ) ||
 
-      (* if the target system has no system pair, it is compatible. *)
-      system.pair = None ||
-
       (* or if both system pair are identical *)
       oequal (SE.equal_modulo table) system.pair pt.system.pair
     in
