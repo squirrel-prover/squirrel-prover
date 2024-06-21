@@ -185,11 +185,11 @@ val pp_dbg :             Format.formatter -> term -> unit
 val pp_with_info : pp_info -> Format.formatter -> term -> unit
 
 (*------------------------------------------------------------------*)
-val ty  : ?ty_env:Type.Infer.env -> term -> Type.ty
+val ty : ?ty_env:Type.Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
-  * The returned list is guaranteed to have no duplicate elements. *)
+    The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : term -> Vars.var list
 
 (** [has_var v t] returns true iff [v] occurs as a free var in [t] *)

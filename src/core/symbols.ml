@@ -1037,10 +1037,11 @@ module OpData = struct
     | Abstract _ -> Fmt.pf fmt "Abstract"
 
   (*------------------------------------------------------------------*)
-  let get_data s table =
-    match Operator.get_data s table with
-    | Operator data -> data
-    | _ -> assert false
+  let as_op_data (data : data) =
+    match data with Operator data -> data | _ -> assert false
+
+  (*------------------------------------------------------------------*)
+  let get_data s table = as_op_data (Operator.get_data s table)
  
   let get_abstract_data s table =
     match (get_data s table).def with

@@ -405,6 +405,8 @@ module OpData : sig
   val pp_abstract_def : Format.formatter -> abstract_def -> unit
         
   (*------------------------------------------------------------------*)
+  val as_op_data : data -> op_data
+    
   val get_data : fname -> table -> op_data
 
   val get_abstract_data : fname -> table -> abstract_def * associated_fun

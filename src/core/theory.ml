@@ -276,7 +276,9 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
   | P_tbase tb_l ->
     let s = Symbols.BType.convert_path tb_l env.table in
     (* FIXME: namespace: use the safe API *)
-    let top, sub = List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s in
+    let top, sub =
+      List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
+    in
     Type.TBase (top, sub)
 
   | P_tuple ptys -> Type.Tuple (List.map (convert_ty env) ptys)
@@ -546,7 +548,6 @@ let make_app_i (state : conv_state) cntxt (p : Symbols.p_path) : app_i =
   let ts_expected () =
     conv_err loc (Timestamp_expected (Symbols.p_path_to_string p))
   in
-
   
   let top, sub = p in
   if top = [] && Vars.mem_s state.env.vars (L.unloc sub) then AVar
@@ -817,7 +818,7 @@ and convert0
 
     let app_cntxt = At (conv Type.Timestamp ts) in
     let t =
-      conv_app state app_cntxt tm
+      conv_app state app_cntxt (L.loc tm)
         (f, terms, make_app loc state app_cntxt f)
         ty
     in
@@ -849,7 +850,7 @@ and convert0
       | InProc (_, ts) -> MaybeAt ts 
     in
 
-    conv_app state app_cntxt tm
+    conv_app state app_cntxt (L.loc tm)
       (f, args, make_app loc state app_cntxt f)
       ty
       
@@ -974,17 +975,15 @@ and convert0
     
     Term.mk_lambda ~simpl:false evs t
    
-(* The term [tm] in argument is here for error messages. *)
-and conv_app 
+and conv_app
     (state     : conv_state)
     (app_cntxt : app_cntxt)
-    (tm        : term)      (* to have meaningful exceptions. *)
+    (loc       : L.t)        (* to have meaningful exceptions. *)
     ((f, terms, app)  : (Symbols.p_path * term list * app))
     (ty        : Type.ty) 
   : Term.term
   =
   let f_top, f_sub = f in
-  let loc = L.loc tm in
 
   let conv ?(env=state.env) s t =
     let state = { state with env } in
@@ -1058,7 +1057,7 @@ and conv_app
        type [ty_out].
        Note that [convert] checks that the type of [t] equals
        [ty], hence we do not need to do it here. *)
-    check_term_ty state ~loc:(L.loc tm) ~of_t:t t ty_out;
+    check_term_ty state ~loc ~of_t:t t ty_out;
 
     t
 
