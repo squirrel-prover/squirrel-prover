@@ -373,7 +373,7 @@ let[@warning "-32"] pp_store fmt store =
   Fmt.pf fmt "@[<v 0>%a@]"
     (Fmt.list ~sep:Fmt.cut 
        (fun fmt (np, map) ->
-          Fmt.pf fmt "@[%a : @[%a@]@]"
+          Fmt.pf fmt "@[<v 2>namespace %a :@ @[%a@]@]"
             pp_npath np pp_symbol_map map
        )
     )
@@ -406,23 +406,50 @@ let kind_of_status : status -> symbol_kind = fun e ->
 (*------------------------------------------------------------------*)
 (** Parsing utilities *)
 
-(** Convert a surface npath to a npath. *)
-let convert_npath (p_n : p_npath) (table : table) : npath = 
+(** Convert a qualified surface npath [top.p_n] to a npath. *)
+let convert_qualified_npath
+    (top : _namespace t list) (p_n : p_npath) (table : table) : npath
+  = 
   (* We already converted [top], and needs to convert [sub] to get [top.sub]. *)
   let rec conv (top : _namespace t list) (sub : p_npath) : npath =
     match sub with
-    | [] -> npath (List.rev top)
+    | [] -> npath top
     | s :: sub -> 
       let s = { name = L.unloc s; group = namespace_group; } in
-      let np = List.rev (s :: top) in
+      let np = top @ [s] in
       if not (Mn.mem (npath np) table.store) then
         let loc = p_npath_loc (List.take (List.length np) p_n) in
         symb_err loc (Failure "unknown namespace")
-      else conv (s :: top) sub
+      else conv np sub
   in
-  conv [] p_n
+  conv top p_n
 
-(** Internal (as we cannot typed the paths returned).
+(** Convert a surface npath to a npath. *)
+let convert_npath (p_n : p_npath) (table : table) : npath =
+  match p_n with
+  | [] -> top_npath
+  | s :: sub ->   (* [p_n = s.sub], where [s] is a single symbol *)
+    let s_symb = { group = namespace_group; name = L.unloc s; } in
+    let s_np : _namespace t list =    
+      let records =
+        try Msymb.find s_symb table.current with
+        | Not_found -> symb_err (L.loc s) (Unbound_identifier (None, L.unloc s))
+      in
+      
+      if List.length records > 1 then
+        symb_err (L.loc s)
+          (Failure (L.unloc s ^ " resolves to multiple namespaces"));
+      
+      let path = !>((List.hd records).path) in
+      path.np.npath @ [path.s] 
+    in
+    (* [s] resolves to the npath [s_np], we have [p_n = s_np.sub] *)
+    
+    (* convert the resolved npath [s_np.sub], which should be a qualified npath *)
+    convert_qualified_npath s_np sub table
+    
+
+(** Internal (as we cannot type the paths returned).
     Get all the records that can be associated to (surface syntaxe) symbol path. 
     If [p] is a qualified path, the return list must be of size [1]. 
     Also return the namespace path of these records. *)
@@ -621,11 +648,6 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       ( ((_,sub) as p) : p_path) (table : table) 
     : (ns path * data) list 
     =
-    (* Fmt.epr "convert: %s@." (p_path_to_string p); *)
-    (* Fmt.epr "store:@.  @[%a@]@." pp_store table.store; *)
-    (* Fmt.epr "current:@.  @[%a@]@." pp_symbol_map table.current; *)
-    (* Fmt.epr "@]@."; *)
-
     let top, records = lookup_p_path ~group p table in
     let results = 
       List.filter_map (fun record -> 
@@ -797,16 +819,25 @@ end)
 (** {2 Namespace} *)
 
 (*------------------------------------------------------------------*)
-(** Enter some namespaces (command [namespace N1. ... .NL]) *)
+(** Enter some namespaces (command [namespace N1. ... .NL]), creating
+    it if necessary. *)
 let namespace_enter (table : table) (nl : p_npath): table =
-  let enter1 table (n : lsymb) =
-    let n = { group = namespace_group; name = L.unloc n; } in
+  let enter1 table (nsymb : lsymb) =   
+    let n = { group = namespace_group; name = L.unloc nsymb; } in
     let scope = npath_app table.scope [n] in
 
-    let store = table.store in
-    let store =
-      if Mn.mem scope store then store else Mn.add scope Msymb.empty store
+    let is_new = not (Mn.mem scope table.store) in
+    let table =
+      if is_new then
+        let table, _np =
+          Namespace.declare ~approx:false table ~data:Empty nsymb
+        in
+        table
+      else table
     in
+
+    let store = table.store in
+    let store = if is_new then Mn.add scope Msymb.empty store else store in
           
     update table ~scope ~store ~stack:(table.current :: table.stack)
   in
