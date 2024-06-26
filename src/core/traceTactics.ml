@@ -307,6 +307,8 @@ let rewrite_equiv_transform
     | t when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* System-independence needed to leave [t] unchanged. *)
 
+    | Term.Tuple l -> Term.mk_tuple (List.map aux l)
+
     | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
 
     | Diff (Explicit l) ->
@@ -397,8 +399,10 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
 
   let warn_unsupported t =
-    Printer.prt `Warning
-      "Cannot transform %a: it will be dropped.@." Term.pp t
+    (* cannot use Emacs code `warning>` because it messes-up the boxes *)
+    Printer.prt `Result
+      "@[<hov 2>Cannot transform@ @[%a@]@]@;\
+       It will be dropped." Term.pp t
   in
 
   (* Attempt to transform. If the transformation can't
