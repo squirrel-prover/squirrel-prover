@@ -361,7 +361,7 @@ type proc_decl = {
 type Symbols.data += Process_data of proc_decl
 
 (*------------------------------------------------------------------*)
-let declare_nocheck table (name : Symbols.lsymb) (pdecl : proc_decl) =
+let declare_typed table (name : Symbols.lsymb) (pdecl : proc_decl) =
   let data = Process_data pdecl in
   let table, _ = Symbols.Process.declare ~approx:false table name ~data in
   table
@@ -571,7 +571,7 @@ let declare
   (* type-check and declare *)
   let pdecl = parse table ~args projs proc in
 
-  let table = declare_nocheck table id pdecl in
+  let table = declare_typed table id pdecl in
 
   (* notify the user of the processus declaration *)
   pp_process_declaration ~id pdecl;
@@ -636,6 +636,10 @@ type p_env = {
 
   globals : Symbols.macro list;
   (** list of global macros declared at [action] *)
+
+  (*------------------------------------------------------------------*)
+  exec_model  : Macros.exec_model;
+  input_macro : Term.msymb;
 }
 
 (*------------------------------------------------------------------*)
@@ -759,7 +763,8 @@ let subst_macros_ts table l ts t =
 
 (*------------------------------------------------------------------*)
 let process_system_decl
-    _proc_loc (system_name : System.t) (init_table : Symbols.table)
+    _proc_loc (system_name : System.t) (exec_model : Macros.exec_model)
+    (init_table : Symbols.table)
     (init_projs : Term.projs) (ts, init_proc : Vars.var * proc)
   : proc * Symbols.table
   =
@@ -795,7 +800,7 @@ let process_system_decl
     in
     let indices = List.rev penv.indices in
     let action_term = Term.mk_action name (Term.mk_vars indices) in
-    let in_tm = Term.mk_macro Term.in_macro [] action_term in
+    let in_tm = Term.mk_macro penv.input_macro [] action_term in
 
     (* substitute:
        - the special timestamp variable [ts], since at this point
@@ -849,7 +854,7 @@ let process_system_decl
     let new_action_term = 
       Term.mk_action new_name (Term.mk_vars action_descr.indices) 
     in
-    let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
+    let new_in_tm = Term.mk_macro penv.input_macro [] new_action_term in
     let penv =
       { penv with
         (* override previous term substitutions for input variable
@@ -983,7 +988,7 @@ let process_system_decl
       let shape = Action.get_shape_v (List.rev penv.action) in
       let table, x' =
         let suffix = if in_update then `Large else `Strict in
-        Macros.declare_global penv.env.table system_name
+        Macros.declare_global penv.env.table system_name Macros.Classical
           (L.mk_loc L._dummy (Vars.name x)) 
           (* location not useful, declaration cannot fail *)
           ~suffix
@@ -1216,6 +1221,11 @@ let process_system_decl
       ( Alias (p', a'), pos', table )
   in
 
+  let input_macro = 
+    match exec_model with
+    | Macros.Classical   -> Term.in_macro
+    | Macros.PostQuantum -> Term.q_in_macro
+  in
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =
     { projs    = init_projs;
@@ -1223,13 +1233,12 @@ let process_system_decl
       indices  = [] ;
       time     = ts;
       env;
-      subst    = [] ;
-      inputs   = [] ;
-      evars    = [] ;
-      action   = [] ;
-      facts    = [] ;
-      updates  = [];
-      globals  = []; }
+      subst    = []; inputs   = []; evars    = [];
+      action   = []; facts    = []; updates  = [];
+      globals  = []; 
+
+      exec_model; input_macro;
+    }
   in
 
   let proc,_,table =
@@ -1276,7 +1285,12 @@ let check_actions_all_def table (p : proc) =
 (** {2 System declaration } *)
 
 (* FIXME: fix user-defined projections miss-used *)
-let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
+let declare_system
+    (table : Symbols.table) (exec_model : Macros.exec_model) 
+    (system_name : lsymb option)
+    (projs : Term.projs) (proc : Parse.t) 
+  : Symbols.table
+  =
   (* type-check the processus *)
   let time, p =
     let pdecl = parse table ~args:[] projs proc in
@@ -1313,7 +1327,7 @@ let declare_system table system_name (projs : Term.projs) (proc : Parse.t) =
 
   (* translate the process *)
   let proc,table =
-    process_system_decl (L.loc proc) system_name table projs (time,p)
+    process_system_decl (L.loc proc) system_name exec_model table projs (time,p)
   in
 
   check_actions_all_def table proc;

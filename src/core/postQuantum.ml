@@ -25,6 +25,8 @@ TODO: call check_att for reachability goals
 *)
 
 
+(* TODO: quantum: update this file *)
+
 (** Sets of terms, intended to store timestamps. *)
 module Sts = Set.Make (Term)
 
@@ -120,9 +122,11 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit [bool] Iter.deprecated_fold ~cntxt as super
 
   method fold_message aux t = match t with
+    (* TODO: quantum: new symbol is [fs_qatt] *)
     | App (Fun (sf, _), [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
       ms = Term.frame_macro && aux
     (* we accept att(frame@t) *)
+    (* TODO: quantum: new symbol is [fs_qatt] *)
     | App (Fun (sf, _), _) when sf = Symbols.fs_att -> false
     (* we reject any other att(x) *)
     | Macro (ms,l,a) ->

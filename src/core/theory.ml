@@ -352,10 +352,19 @@ let function_kind table (p : Symbols.p_path) : mf_type =
           let targs = (List.init arity (fun _ -> Type.tindex)) in
           let arg_ty = if arity = 0 then [] else [Type.tuple targs] in
           `Macro (arg_ty, ty)
-        
-        | Input | Output | Frame -> `Macro ([], Type.tmessage)
-        | Cond | Exec -> `Macro ([], Type.tboolean)
-        | State _ -> assert false (* TODO: symbols: missing case? *)
+
+        | General data -> 
+          begin
+            match Macros.get_general_macro_data data with
+            | Structured data ->
+              (* FIXME: quantum: allow other types than [timestamp] *)
+              assert (Type.equal data.rec_ty Type.ttimestamp);
+              `Macro ([], data.ty)
+            | ProtocolMacro `Output -> `Macro ([], Type.tmessage)
+            | ProtocolMacro `Cond   -> `Macro ([], Type.tboolean)
+          end
+
+        | State _ -> assert false 
       end
       
     | _ ->
@@ -567,12 +576,14 @@ let make_app_i (state : conv_state) cntxt (p : Symbols.p_path) : app_i =
         Name
       | Symbols.Macro ->
         begin
-          match Symbols.get_macro_data (Symbols.Macro.convert_path p table) table with
+          let p = Symbols.Macro.convert_path p table in
+          match Symbols.get_macro_data p table with
           | Global _ -> Macro
-          | State  _ -> Get            
-          | Input | Output | Cond | Exec | Frame ->
+          | State  _ -> Get
+          | General _ when List.mem p Symbols.[inp; out; cond; exec; frame] -> 
             if cntxt = NoTS then ts_expected ();
             Macro
+          | General _ -> assert false (* TODO: quantum: support other macros *)
         end
       | Symbols.Action -> Taction
       | k -> conv_err loc (BadSymbolKind (Symbols.p_path_to_string p, k))
@@ -1089,15 +1100,12 @@ and conv_app
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms indices (get_at ts_opt)
 
-      | Input | Output | Frame ->
+      | General _ when List.mem s Symbols.[inp; out; cond; exec; frame] -> 
         check_arity ~mode:`Full f ~actual:(List.length terms) ~expected:0;
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
 
-      | Cond | Exec ->
-        check_arity ~mode:`Full f ~actual:(List.length terms) ~expected:0;
-        let ms = Term.mk_symb s ty_out in
-        Term.mk_macro ms [] (get_at ts_opt)
+      | General _ -> assert false (* TODO: quantum: support other macros *)
     end
 
 

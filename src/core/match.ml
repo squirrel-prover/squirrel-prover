@@ -8,7 +8,7 @@ module TraceHyps = Hyps.TraceHyps
                      
 module SE = SystemExpr
 
-let dbg ?(force=false) s =
+let dbg ?(force=true) s =
   if force then Printer.prt `Dbg s
   else Printer.prt `Ignore s
 
@@ -2057,6 +2057,7 @@ let known_set_add_frame (k : known_set) : known_set list =
 
     let mk_and = Term.mk_and ~simpl:true in
 
+    (* FIXME: quantum: add ad hoc handling of quantum execution macros *)
     { term = term_frame; 
       vars; se = k.se;
       cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
@@ -2909,31 +2910,31 @@ module E = struct
     let init_fixpoint : msets =
       Symbols.Macro.fold (fun mn data msets ->
           let data = match data with Symbols.Macro data -> data | _ -> assert false in
-          match data with
-          | Symbols.Global _
-          | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec -> msets
+          let in_init = 
+            match data with
+            | Symbols.State _ -> true
+            | _ -> mn = Symbols.cond
+          in
 
-          (* ignore global macros, as they are (usually) not defined at
-             all timestamps, so we won't find a deduction invariant with
-             them. *)
-          | _ ->
-            let ty, indices =
-              match data with
-              | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec
-              | Symbols.Global _ -> assert false
-
-              | Symbols.State (i, ty,_) ->
-                ty, List.init i (fun _ -> Vars.make_fresh Type.Index "i")
-
-              | Symbols.Cond ->
-                Type.Boolean, []
-            in
-            let ms = Term.mk_symb mn ty in
-            let mset = 
-              MCset.mk ~env
-                ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 
-            in
-            msets_add mset msets
+          (* Ignore other macros. Notably, ignore global macros, as
+             they are (usually) not defined at all timestamps, so we
+             won't find a deduction invariant with them. *)
+          if not in_init then msets else
+            begin
+              let ty, indices =
+                match data with
+                | Symbols.State (i, ty,_) ->
+                  ty, List.init i (fun _ -> Vars.make_fresh Type.Index "i")
+                | _ when mn = Symbols.cond -> Type.Boolean, []
+                | _ -> assert false
+              in
+              let ms = Term.mk_symb mn ty in
+              let mset = 
+                MCset.mk ~env
+                  ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 
+              in
+              msets_add mset msets
+            end
         ) [] table
     in
     dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;

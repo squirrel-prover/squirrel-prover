@@ -34,7 +34,7 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
       end
 
     | Name _ | Macro _ -> false
-    | Fun (f, _) when f = Symbols.fs_att -> false
+    | Fun (f, _) when f = Symbols.fs_att || f = Symbols.fs_qatt -> false
 
     | Find (vs, _, _, _) 
     | Quant (_,vs,_) as t ->
@@ -62,8 +62,7 @@ let is_constant (env : Env.t) (t : Term.term) : bool =
 
     | Name _ | Macro _ -> false
 
-    | Fun (f, _) -> 
-      if f = Symbols.fs_att then false else true
+    | Fun (f, _) -> not (f = Symbols.fs_att || f = Symbols.fs_qatt)
 
     | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
       let fixed_type_binders =

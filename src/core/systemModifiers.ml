@@ -536,7 +536,7 @@ let global_cca
       let ns = Term.mk_symb n Message in
       Term.mk_name_with_tuple_args ns enc_rnd.args
     else
-      Term.Prelude.mk_zeroes table (Term.mk_len plaintext) in
+      Library.Prelude.mk_zeroes table (Term.mk_len plaintext) in
 
   let new_enc =
     let t_pk = Term.mk_fun table enc_pk [Name.to_term enc_key]  in
@@ -770,7 +770,7 @@ let xo_lt
     let ms_y_args =
       List.map (fun ty ->
           Term.mk_var (Vars.make_fresh ty "a")
-        ) (Macros.ty_args table y.x_msymb)
+        ) (Macros.deprecated_ty_args table y.x_msymb)
     in
     let a_y = Term.mk_action y.x_a (Term.mk_vars y.x_a_is) in
 

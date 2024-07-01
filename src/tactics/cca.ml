@@ -182,7 +182,7 @@ let indcca_param
      
      rw_conds  = [mk_eq ~simpl:false
                    (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
-                   (Prelude.mk_witness table ~ty_arg:(Type.tuple [mty; rty; kty]))];
+                   (Library.Prelude.mk_witness table ~ty_arg:(Type.tuple [mty; rty; kty]))];
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
                  (Name.to_term xc);
      rw_kind   = GlobalEq;
@@ -342,7 +342,7 @@ let phi_proj
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   let dummy_cipher =              (* dummy ciphertext, needed by [EncRandom] *)
-    Prelude.mk_witness env.table
+    Library.Prelude.mk_witness env.table
       ~ty_arg:(Symbols.OpData.ftype env.table enc_f).Type.fty_out
   in
   (* get the bad key and randomness occs, and the ciphertexts,
@@ -436,7 +436,7 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   (* the ciphertext, and the ciphertext encrypting its length instead of m *)
   let c = Term.(mk_fun table enc_f [mk_tuple [m; r; k]]) in
   let c_len = 
-    Term.(mk_fun table enc_f [mk_tuple [Prelude.mk_zeroes table (mk_len m); r; k]]) 
+    Term.(mk_fun table enc_f [mk_tuple [Library.Prelude.mk_zeroes table (mk_len m); r; k]]) 
   in
 
   let phi_proj =

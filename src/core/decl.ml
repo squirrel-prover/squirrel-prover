@@ -40,9 +40,10 @@ type bty_decl = {
 
 (*------------------------------------------------------------------*)
 type system_decl = {
-  sname    : Symbols.lsymb option;
-  sprojs   : lsymb list option;
-  sprocess : Process.Parse.t;
+  sname      : Symbols.lsymb option;
+  exec_model : Macros.exec_model;
+  sprojs     : lsymb list option;
+  sprocess   : Process.Parse.t;
 }
 
 (*------------------------------------------------------------------*)

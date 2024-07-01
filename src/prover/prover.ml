@@ -736,8 +736,12 @@ let init : ?with_prelude:bool -> unit -> state =
                         Name (L.mk_loc L._dummy "Prelude");
                       params = []; }
         in
+        (* process the prelude file *)
         let state = do_include ~dirname:Driver.theory_dir state inc in
-        let () = Symbols.set_builtins_table_after_processing_prelude state.table in
+        (* define the macros defining the builtin execution models *)
+        let table = Macros.define_execution_models state.table in
+        let () = Symbols.set_builtins_table_after_processing_prelude table in
+        let state = { state with table } in
         state0 := Some state;
         state
       end

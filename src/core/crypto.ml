@@ -1315,7 +1315,7 @@ module Game = struct
     let mv =
       List.fold_left (fun mv var -> 
           Mvar.add (var,Vars.Tag.ltag) SE.any
-            (Term.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
+            (Library.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
         mv arg_not_used
     in
 
@@ -1926,6 +1926,8 @@ let known_set_add_frame (k : TSet.t) : TSet.t list =
 
     let mk_and = Term.mk_and ~simpl:true in
 
+    (* FIXME: quantum: add ad hoc rules (or better, factorize with
+       code in [Match]) *)
     { term = term_frame;
       vars;
       conds = Term.mk_atom `Leq ts' ts :: k.conds; } ::

@@ -277,12 +277,21 @@ val add_vars_simpl_env :
 val empty : term
 val init : term
 
+(*------------------------------------------------------------------*)
 val in_macro    : msymb
 val out_macro   : msymb
 val frame_macro : msymb
 val cond_macro  : msymb
 val exec_macro  : msymb
 
+val q_in_macro    : msymb
+val q_out_macro   : msymb
+val q_frame_macro : msymb
+val q_cond_macro  : msymb
+val q_exec_macro  : msymb
+val q_state_macro : msymb
+
+(*------------------------------------------------------------------*)
 val f_happens : Symbols.fname
 
 val f_pred : Symbols.fname
@@ -307,7 +316,8 @@ val f_diff : Symbols.fname
 
 val f_succ : Symbols.fname
 
-val f_att : Symbols.fname
+val f_att  : Symbols.fname      (* classical *)
+val f_qatt : Symbols.fname      (* quantum *)
 
 val f_fail : Symbols.fname
 
@@ -490,16 +500,6 @@ val mk_fail    : term
 val mk_len     : term -> term
 val mk_of_bool : term -> term
 val mk_pair    : term -> term -> term
-
-(*------------------------------------------------------------------*)
-(** {3 Prelude terms} *)
-
-(** This module contains the term constructors for 
-    symbols declared in Squirrel prelude. *)
-module Prelude : sig
-  val mk_witness : Symbols.table -> ty_arg:Type.ty -> term
-  val mk_zeroes  : Symbols.table -> term -> term
-end
 
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)

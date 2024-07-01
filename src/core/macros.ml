@@ -6,39 +6,270 @@ module SE = SystemExpr
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** {2 Utilities} *)
- 
-let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
-  match Symbols.get_macro_data ms table with
-    | Symbols.Global (_, ty, _) -> ty
+(** {2 General macro definitions} *)
+    
+(*------------------------------------------------------------------*)
+(** A definition of a general structured recursive macro definition:
+    [m = λτ ↦ if not (happens τ) then default
+              else if τ = init then tinit
+              else body τ] *)
+type structed_macro_data = {
+  name    : Symbols.macro;        (** a macro [m] *)
+  default : Term.term;            (** [m@τ] if not [happens(τ)] *)
+  tinit   : Term.term;            (** [m@init] *)
+  body    : Vars.var * Term.term; (** [λτ. m@τ] when [happens(τ) ∧ τ≠init] *)
+  rec_ty  : Type.ty;              (** The type of [τ] *)
+  ty      : Type.ty;              (** The type of the **body** of [m] *)
+}
 
-    | Input | Output | Frame -> Type.tmessage
+(** A general macro definition. *)
+(* FIXME: quantum: move all macro definitions in this type *)
+type general_macro_data = 
+  | Structured of structed_macro_data
+  | ProtocolMacro of [`Output | `Cond] 
+  (** ad hoc macro definitions using action descriptions *)
 
-    | Cond | Exec -> Type.tboolean
+type Symbols.general_macro_def += Macro_data of general_macro_data
 
-    | Symbols.State (_,ty,_) -> ty
+let get_general_macro_data : Symbols.general_macro_def -> general_macro_data = function
+    | Macro_data g -> g
+    | _ -> assert false
+    
+let as_general_macro : Symbols.data -> general_macro_data = function
+  | Symbols.Macro (General g) -> get_general_macro_data g 
+  | _ -> assert false
 
-let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
-  match Symbols.get_macro_data ms table with
-    | Symbols.Global (arity, _, _) ->
-      List.init arity (fun _ -> Type.tindex)
+(*------------------------------------------------------------------*)
+(** {2 Execution models} *)
+    
+type exec_model_def = {
+  np : Symbols.npath;
+  (** namespace where this execution model will define its macros *)
 
-    | Input | Output | Frame | Cond | Exec -> []
+  input_name : Symbols.macro;
+  (** input macro in this execution model *)
 
-    | Symbols.State (arity,_,_) ->
-      List.init arity (fun _ -> Type.tindex)
+  output_name : Symbols.macro;
+  (** output macro in this execution model *)
 
-let is_global table (ms : Symbols.macro) : bool =
-  match Symbols.get_macro_data ms table with
-  | Symbols.Global (_, _, _) -> true
-  | _ -> false
+  cond_name : Symbols.macro;
+  (** condition macro in this execution model *)
+
+  rec_ty : Type.ty;
+  (** type along which the execution takes place (actions, integers, ...) *)
+  
+  macros : (Symbols.macro * general_macro_data) list
+  (** definitions of the execution model macros *)
+}
+
+(*------------------------------------------------------------------*)
+(** {3 Builtin execution models} *)
+
+(** An execution model *)
+type exec_model = Classical | PostQuantum
+
+(*------------------------------------------------------------------*)
+module Classical = struct
+  let model _table =
+    let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
+    let ts   = Term.mk_var ts_v in
+
+    (*------------------------------------------------------------------*)
+    let frame =
+      let body =
+        Term.mk_pair
+          (Term.mk_macro Term.frame_macro [] (Term.mk_pred ts))
+          (Term.mk_pair
+             (Term.mk_of_bool (Term.mk_macro Term.exec_macro [] ts))
+             (Term.mk_ite
+                (Term.mk_macro Term.exec_macro [] ts)
+                (Term.mk_macro Term.out_macro [] ts)
+                Term.mk_zero))
+      in 
+      Structured {
+        name    = Symbols.frame;
+        default = Term.empty;
+        tinit   = Term.mk_zero;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tmessage;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let input =
+      let body =
+        Term.mk_fun0
+          Symbols.fs_att { fty = Symbols.ftype_builtin Symbols.fs_att; ty_args = [] }
+          [Term.mk_macro Term.frame_macro [] (Term.mk_pred ts)]
+      in 
+      Structured {
+        name    = Symbols.inp;
+        default = Term.empty;
+        tinit   = Term.empty;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tmessage;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let exec =
+      let body =
+        Term.mk_and
+          (Term.mk_macro Term.exec_macro [] (Term.mk_pred ts))
+          (Term.mk_macro Term.cond_macro [] ts)
+      in 
+      Structured {
+        name    = Symbols.exec;
+        default = Term.mk_false;
+        tinit   = Term.mk_true;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tboolean;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let output = ProtocolMacro `Output in
+    let cond   = ProtocolMacro `Cond   in
+
+    (*------------------------------------------------------------------*)
+    {
+      np          = Symbols.top_npath;
+      rec_ty      = Type.ttimestamp;
+      input_name  = Symbols.inp;
+      output_name = Symbols.out;
+      cond_name   = Symbols.cond;
+      macros      = [Symbols.frame, frame ;
+                     Symbols.inp  , input ;
+                     Symbols.exec , exec  ;
+                     Symbols.out  , output;
+                     Symbols.cond , cond  ; ];
+    }
+end
+
+(*------------------------------------------------------------------*)
+module PostQuantum = struct
+  let model table =
+    let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
+    let ts   = Term.mk_var ts_v in
+    
+    let qwitness = Library.Prelude.mk_witness table ~ty_arg:(Type.tquantum_message) in
+
+    (*------------------------------------------------------------------*)
+    let frame =
+      let body =
+        Term.mk_pair
+          (Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts))
+          (Term.mk_pair
+             (Term.mk_of_bool (Term.mk_macro Term.q_exec_macro [] ts))
+             (Term.mk_ite
+                (Term.mk_macro Term.q_exec_macro [] ts)
+                (Term.mk_macro Term.q_out_macro [] ts)
+                Term.mk_zero))
+      in 
+      Structured {
+        name    = Symbols.frame;
+        default = Term.empty;
+        tinit   = Term.mk_zero;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tmessage;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let state =
+      let body =
+        Term.mk_proj 2 @@
+        Term.mk_fun0
+          Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
+          [Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts);
+           Term.mk_macro Term.q_state_macro [] (Term.mk_pred ts);]
+      in 
+      Structured {
+        name    = Symbols.inp;
+        default = qwitness;
+        tinit   = qwitness;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tquantum_message;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let input =
+      let body =
+        Term.mk_proj 1 @@
+        Term.mk_fun0
+          Symbols.fs_att { fty = Symbols.ftype_builtin Symbols.fs_att; ty_args = [] }
+          [Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts)]
+      in 
+      Structured {
+        name    = Symbols.inp;
+        default = Term.empty;
+        tinit   = Term.empty;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tmessage;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let exec =
+      let body =
+        Term.mk_and
+          (Term.mk_macro Term.q_exec_macro [] (Term.mk_pred ts))
+          (Term.mk_macro Term.q_cond_macro [] ts)
+      in 
+      Structured {
+        name    = Symbols.exec;
+        default = Term.mk_false;
+        tinit   = Term.mk_true;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = Type.tboolean;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let output = ProtocolMacro `Output in
+    let cond   = ProtocolMacro `Cond   in 
+
+  (*------------------------------------------------------------------*)
+    {
+      np          = Symbols.top_npath;
+      rec_ty      = Type.ttimestamp;
+      input_name  = Symbols.q_inp;
+      output_name = Symbols.q_out;
+      cond_name   = Symbols.q_cond;
+      macros      = [Symbols.q_frame, frame ;
+                     Symbols.q_inp  , input ;
+                     Symbols.q_exec , exec  ;
+                     Symbols.q_out  , output;
+                     Symbols.q_state, state ;
+                     Symbols.q_cond , cond  ; ];
+    }
+end
+
+  (*------------------------------------------------------------------*)
+let builtin_exec_models table = [Classical.model table; PostQuantum.model table]
+
+let define_execution_models table : Symbols.table = 
+  List.fold_left (fun table em ->
+      List.fold_left (fun table (name,data) -> 
+          let data = Symbols.Macro (General (Macro_data data)) in
+          Symbols.Macro.redefine table ~data name
+        ) table em.macros
+    ) table (builtin_exec_models table)
 
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
 (** Data associated with global macro symbols.
     The definition of these macros is not naturally stored as part
-    if action descriptions, but directly in the symbols table. *)
+    of action descriptions, but directly in the symbols table. *)
 type global_data = {
   action : [`Strict | `Large] * Action.shape;
   (** The global macro is defined at any action which has
@@ -59,6 +290,9 @@ type global_data = {
   bodies : (System.Single.t * Term.term) list;
   (** Definitions of macro body for single systems where it is defined. *)
 
+  exec_model : exec_model; 
+  (** The execution model this macro was declared in*)
+  
   ty : Type.ty;
   (** The type of the macro, which does not depends on the system. *)
 }
@@ -95,14 +329,14 @@ let get_global_data : Symbols.global_macro_def -> global_data = function
   | _ -> assert false
     
 let as_global_macro : Symbols.data -> global_data = function
-  | Symbols.Macro (Global (_, _, g)) -> get_global_data g
+  | Symbols.Macro Global (_, _, g) -> get_global_data g 
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
 let get_single_body table (single : S.Single.t) (data : global_data) : Term.term =
   try List.assoc single data.bodies with
-  | Not_found -> Term.Prelude.mk_witness table ~ty_arg:data.ty
+  | Not_found -> Library.Prelude.mk_witness table ~ty_arg:data.ty
   (* undefined macros default to witness *)
 
 (*------------------------------------------------------------------*)
@@ -116,7 +350,7 @@ let get_body table (system : SE.fset) (data : global_data) : Term.term =
 (*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global
-    table system macro ~suffix ~action ~inputs ~indices ~ts body ty
+    table system exec_model macro ~suffix ~action ~inputs ~indices ~ts body ty
     : Symbols.table * Symbols.macro
   =
   assert (not (Type.contains_tuni ty));
@@ -128,10 +362,38 @@ let declare_global
       (System.projections table system)
   in
   let glob_data =
-    {action = (suffix, action); inputs; indices; ts; bodies; ty}
+    {action = (suffix, action); 
+     inputs; indices; ts; bodies; ty; 
+     exec_model; }
   in  
   let data = data_of_global_data glob_data in
   Symbols.Macro.declare ~approx:true table macro ~data 
+
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+ 
+let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
+  match Symbols.get_macro_data ms table with
+    | Symbols.Global (_, ty, _) -> ty
+    | Symbols.State (_,ty,_) -> ty
+    | Symbols.General def ->
+      match get_general_macro_data def with
+      | Structured data -> data.ty
+      | ProtocolMacro `Output -> Type.tmessage
+      | ProtocolMacro `Cond   -> Type.tboolean
+
+let deprecated_ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
+  match Symbols.get_macro_data ms table with
+    | Symbols.Global (arity, _, _) ->
+      List.init arity (fun _ -> Type.tindex)
+    | General _ -> []
+    | Symbols.State (arity,_,_) ->
+      List.init arity (fun _ -> Type.tindex)
+
+let is_global table (ms : Symbols.macro) : bool =
+  match Symbols.get_macro_data ms table with
+  | Symbols.Global (_, _, _) -> true
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
@@ -148,20 +410,22 @@ let is_prefix strict a b =
 
 (** Check is not done modulo equality.
     Not exported. *)
-let is_defined (name : Symbols.macro) (a : Term.term) table =
+let can_expand (name : Symbols.macro) (a : Term.term) table =
   match Symbols.get_macro_data name table with
-  | Input | Output | Cond | State _ ->
-    (* We can expand the definitions of input@A, output@A, cond@A and
-       state@A when A is an action name. We cannot do so for a variable
-       or a predecessor. *)
+  | General _ -> 
+    (* A structed macro [m@A] can be always be expanded if [A] is an action. *)
+    (* FIXME: quantum: this could be relaxed, as only [output] and [cond] can 
+       only be expanded on precise actions. Other structed macros can be 
+       safely expanded for any action that happens (e.g. [frame]). *)
     is_action a
 
-  | Exec | Frame -> is_action a
+  | State _ -> is_action a
+  (* FIXME: quantum: same, this expantion condition can likely be relaxed *)
 
   | Global (_, _, Global_data {action = (strict,a0) }) ->
     (* We can only expand a global macro when [a0] is a prefix of [a],
-     * because a global macro m(...)@A refer to inputs of A and
-     * its sequential predecessors. *)
+       because a global macro m(...)@A refer to inputs of A and
+       its sequential predecessors. *)
     if not (is_action a) then false
     else
       let asymb = get_action_symb a in
@@ -228,6 +492,13 @@ let get_def_glob
     let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
     drop (List.length action - List.length data.inputs) (List.rev action)
   in
+
+  let input_macro = 
+    match data.exec_model with
+    | Classical   -> Term.in_macro
+    | PostQuantum -> Term.q_in_macro
+  in
+
   let subst,_ =
     List.fold_left
       (fun (subst,action_prefix) x ->
@@ -237,7 +508,7 @@ let get_def_glob
            then ts
            else SE.action_to_term table system (List.rev action_prefix)
          in
-         let in_tm = Term.mk_macro Term.in_macro [] a_ts in
+         let in_tm = Term.mk_macro input_macro [] a_ts in
          Term.ESubst (Term.mk_var x, in_tm) :: subst,
          List.tl action_prefix)
       (ts_subst :: idx_subst, rev_action)
@@ -258,10 +529,12 @@ let get_definition_nocntxt
     (asymb  : Symbols.action)
     (aidx   : Term.term list) : [ `Def of Term.term | `Undef ]
   =
-  let init_or_generic init_case f =
+  let init_or_generic ~init ~body =
+    let var, t = body in
+    let subst = Term.ESubst (Term.mk_var var, Term.mk_action asymb aidx) in
     `Def (if asymb = Symbols.init_action
-          then init_case
-          else f (Term.mk_action asymb aidx))
+          then init
+          else Term.subst [subst] t)
   in
   let action = Action.of_term asymb aidx table in
 
@@ -271,34 +544,16 @@ let get_definition_nocntxt
     SE.descr_of_action table system action
   in
   match Symbols.get_macro_data symb.s_symb table with
-  | Input ->
-    init_or_generic Term.empty
-      (fun a ->
-         Term.mk_fun table Symbols.fs_att 
-           [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
-
-  | Output ->
-    `Def (Term.subst descr_subst (snd unapplied_descr.output))
-
-  | Cond ->
-    `Def (Term.subst descr_subst (snd unapplied_descr.condition))
-
-  | Exec ->
-    init_or_generic Term.mk_true (fun a ->
-        Term.mk_and
-          (Term.mk_macro symb [] (Term.mk_pred a))
-          (Term.mk_macro Term.cond_macro [] a))
-
-  | Frame ->
-    init_or_generic Term.mk_zero (fun a ->
-        Term.mk_pair
-          (Term.mk_macro symb [] (Term.mk_pred a))
-          (Term.mk_pair
-             (Term.mk_of_bool (Term.mk_macro Term.exec_macro [] a))
-             (Term.mk_ite
-                (Term.mk_macro Term.exec_macro [] a)
-                (Term.mk_macro Term.out_macro [] a)
-                Term.mk_zero)))
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
+      (* TODO: quantum: quantum outputs *)
+      | ProtocolMacro `Output -> 
+        `Def (Term.subst descr_subst (snd unapplied_descr.output))
+      | ProtocolMacro `Cond ->
+        `Def (Term.subst descr_subst (snd unapplied_descr.condition))
+    end
 
   | State _ ->
     `Def begin
@@ -374,7 +629,7 @@ let get_definition_in_sequent
   | system ->
     (* Try to find an action equal to [ts] in [cntxt]. *)
     let ts_action =
-      if is_defined symb.s_symb ts cntxt.table
+      if can_expand symb.s_symb ts cntxt.table
       then ts
       else
         omap_dflt ts (fun models ->
@@ -511,7 +766,8 @@ let update_global_data
           func aglob ms body 
         in
         let data =
-          data_of_global_data { gdata with bodies = (new_system, body) :: gdata.bodies }
+          data_of_global_data 
+            { gdata with bodies = (new_system, body) :: gdata.bodies }
         in
         Symbols.Macro.redefine table ~data ms 
       end

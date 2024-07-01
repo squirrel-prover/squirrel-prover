@@ -424,26 +424,27 @@ end
 (*------------------------------------------------------------------*)
 (** {3 Macro data}  *)
 
-(** Extensible type for global macros:
-    see to [macros.ml] for the single constructor of [global_macro_def].
-    (the type is postponed because its definition uses terms, 
-    which are defined after the [Symbols] module).  *)
-type global_macro_def = ..
+(* FIXME: quantum: cleanup *)
+(** Extensible type for general, global and state macros:
+    - see [macros.ml] for [global_macro_def].
+    - see [macros.ml] for [general_macro_def].
+    - see [theory.ml] for [state_macro_def].
 
-(** Extensible type for global macros:
-    see to [macros.ml] for the single constructor of [global_macro_def].
-    (the type is postponed because its definition uses terms, 
+    (the types are postponed because their definition uses terms, 
     which are defined after the [Symbols] module).  *)
+type general_macro_def = ..
+type global_macro_def = ..
 type state_macro_def = ..
 
 type macro_data =
-  | Input | Output | Cond | Exec | Frame
+  | General of general_macro_def
+  (** General macro definition. *)
   | State  of int * Type.ty * state_macro_def
   (** Stateful cells. *)
   | Global of int * Type.ty * global_macro_def
   (** Global macros are used to encapsulate let-definitions. *)
-  
-type data += Macro of macro_data
+              
+type data += Macro of macro_data 
 
 val get_macro_data : macro -> table -> macro_data
 
@@ -537,11 +538,27 @@ val init_action : action
 (*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
+(*------------------------------------------------------------------*)
+(** Macros for the classical execution model *)
 val inp   : macro
 val out   : macro
 val cond  : macro
 val exec  : macro
 val frame : macro
+
+(*------------------------------------------------------------------*)
+(** Namepath for the quantum execution model *)
+val quant_npath : npath
+
+(** Macros for the quantum execution model *)
+val q_inp   : macro
+val q_out   : macro
+val q_state : macro
+val q_cond  : macro
+val q_exec  : macro
+val q_frame : macro
+
+val is_quantum_macro : macro -> bool
 
 (*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
@@ -587,7 +604,8 @@ val fs_succ : fname
 
 (** Adversary function *)
 
-val fs_att : fname
+val fs_att  : fname              (** classical attacker *)
+val fs_qatt : fname              (** quantum attacker *)
 
 (** Fail *)
 

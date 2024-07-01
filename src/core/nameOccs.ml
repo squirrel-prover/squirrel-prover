@@ -314,13 +314,16 @@ let get_actions_ext
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
           let ts =
-            match Symbols.get_macro_data m.s_symb contx.table with
-            | Symbols.Input -> Term.mk_pred ts
-            | _             -> ts
+            (* we force on unfolding of the following macros, for a more precise rule *)
+            if m.s_symb = Symbols.inp     || 
+               m.s_symb = Symbols.q_inp   || 
+               m.s_symb = Symbols.q_state 
+            then Term.mk_pred ts
+            else ts
           in
           let occ = {
               so_cnt  = ts;
-              so_coll = Term.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp; 
+              so_coll = Library.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp; 
               (* unused, so always set to some arbitrary value *)
 
               so_ad = (); (* unused *)

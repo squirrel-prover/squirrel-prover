@@ -1,7 +1,69 @@
 (** Declaring and unfolding macros *)
 
 module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
+(** {2 General macro definitions} *)
+    
+(*------------------------------------------------------------------*)
+(** A definition of a general structured recursive macro definition:
+    [m = λτ ↦ if not (happens τ) then default
+              else if τ = init then tinit
+              else body τ] *)
+type structed_macro_data = {
+  name    : Symbols.macro;        (** a macro [m] *)
+  default : Term.term;            (** [m@τ] if not [happens(τ)] *)
+  tinit   : Term.term;            (** [m@init] *)
+  body    : Vars.var * Term.term; (** [λτ. m@τ] when [happens(τ) ∧ τ≠init] *)
+  rec_ty  : Type.ty;              (** The type of [τ] *)
+  ty      : Type.ty;              (** The type of the **body** of [m] *)
+}
+
+(*------------------------------------------------------------------*)
+(** A general macro definition. *)
+type general_macro_data = 
+  | Structured of structed_macro_data
+  | ProtocolMacro of [`Output | `Cond] 
+  (** ad hoc macro definitions using action descriptions *)
+
+(*------------------------------------------------------------------*)
+type Symbols.general_macro_def += Macro_data of general_macro_data
+
+(*------------------------------------------------------------------*)
+val get_general_macro_data : Symbols.general_macro_def -> general_macro_data 
+val as_general_macro : Symbols.data -> general_macro_data 
+
+(*------------------------------------------------------------------*)
+(** {2 Execution models} *)
+
+(** An execution model *)
+type exec_model = Classical | PostQuantum
+
+(** The definition of an execution model *)    
+type exec_model_def = {
+  np : Symbols.npath;
+  (** namespace where this execution model will define its macros *)
+
+  input_name : Symbols.macro;
+  (** input macro in this execution model *)
+
+  output_name : Symbols.macro;
+  (** output macro in this execution model *)
+
+  cond_name : Symbols.macro;
+  (** condition macro in this execution model *)
+
+  rec_ty : Type.ty;
+  (** type along which the execution takes place (actions, integers, ...) *)
   
+  macros : (Symbols.macro * general_macro_data) list
+  (** definitions of the execution model macros *)
+}
+
+val define_execution_models : Symbols.table -> Symbols.table
+
+val builtin_exec_models : Symbols.table -> exec_model_def list
+
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
@@ -13,6 +75,7 @@ module SE = SystemExpr
 val declare_global :
   Symbols.table ->
   System.t ->
+  exec_model ->
   Symbols.lsymb ->
   suffix:[`Large | `Strict] ->
   action:Action.shape ->
@@ -111,7 +174,7 @@ val as_global_macro : Symbols.data -> global_data
 val ty_out : Symbols.table -> Symbols.macro -> Type.ty 
 
 (** Types of the arguments of a macro. *)
-val ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
+val deprecated_ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
 
 val is_global : Symbols.table -> Symbols.macro -> bool
 

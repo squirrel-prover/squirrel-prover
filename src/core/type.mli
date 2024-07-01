@@ -109,6 +109,9 @@ val tboolean   : ty
 val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
+
+val tquantum_message : ty
+  
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
 

@@ -106,7 +106,15 @@ class deprecated_iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) =
 
   method visit_macro (ms : Term.msymb) (args : Term.terms) (a : Term.term) : unit = 
     match Symbols.get_macro_data ms.s_symb cntxt.table with
-    | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
+    | _ when Symbols.is_quantum_macro ms.s_symb ->
+      Tactics.soft_failure (Tactics.Failure "quantum macros unsupported")
+
+    | _ when List.mem ms.s_symb Symbols.[inp; out; cond; exec; frame] -> ()
+    (* no implemented, as this is a depracated function *)
+
+    | Symbols.General _ -> assert false (* FIXME: do we need a clean error-message? *)
+      
+    | Symbols.State _ -> ()
     | Symbols.Global _ ->
       if exact then
         match Macros.get_definition cntxt ms ~args ~ts:a with

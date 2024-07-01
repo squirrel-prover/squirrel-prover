@@ -726,14 +726,18 @@ declaration_i:
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
 | SYSTEM sprojs=projs p=process
-                          { Decl.(Decl_system { sname = None;
-                                                sprojs;
-                                                sprocess = p}) }
+  { Decl.Decl_system { 
+        sname      = None;
+        exec_model = Macros.Classical;
+        sprojs;
+        sprocess   = p; } }
 
-| SYSTEM LBRACKET id=lsymb RBRACKET sprojs=projs p=process
-                          { Decl.(Decl_system { sname = Some id;
-                                                sprojs;
-                                                sprocess = p}) }
+| SYSTEM id=lsymb EQ sprojs=projs p=process
+   { Decl.Decl_system { 
+         sname      = Some id;
+         exec_model = Macros.Classical;
+         sprojs;
+         sprocess   = p} }
 
 | SYSTEM id=lsymb EQ from_sys=system_expr WITH modifier=system_modifier
     { Decl.(Decl_system_modifier

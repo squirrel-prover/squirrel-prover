@@ -698,6 +698,7 @@ let add_functions context =
     [(Symbols.fs_pair,(Option.get context.pair_symb));
      (Symbols.fs_fst,(Option.get context.fst_symb));
      (Symbols.fs_snd,(Option.get context.snd_symb));
+     (* TODO: quantum: add quantum adversarial symbol *)
      (Symbols.fs_att,(Option.get context.att_symb));
      (Symbols.fs_of_bool,(Option.get context.of_bool_symb));
      (Symbols.fs_empty,(Option.get context.empty_symb));
@@ -709,7 +710,7 @@ let add_macros context =
     let def = Symbols.get_macro_data mn context.table in
     let str = path_to_string mn in
     let indices = match def with
-      | Input | Output | Cond | Exec | Frame -> 0
+      | General _ -> 0
       | State (i,_,_) -> i
       | Global (i,_,_) -> i
     in
@@ -731,11 +732,22 @@ let add_macros context =
                   (Option.get context.output_symb)
       |"frame" ->Hashtbl.add context.macros_tbl str
                   (Option.get context.frame_symb)
-      |_ -> let ty = match def with 
-        |State(_,t,_) | Global(_,t,_) -> convert_type context t 
-        |_ -> assert false 
-      in
-      Hashtbl.add context.macros_tbl str (symb ty)
+      |_ ->
+        let ty = match def with
+          | General d ->
+            begin
+              match Macros.get_general_macro_data d with
+              | Structured d ->
+                (* for now, only support recurrence over timestamps *)
+                assert (Type.equal d.rec_ty Type.ttimestamp);
+                convert_type context d.ty
+              | ProtocolMacro `Output -> convert_type context Type.tmessage
+              | ProtocolMacro `Cond   -> convert_type context Type.tboolean
+            end
+              
+          |State(_,t,_) | Global(_,t,_) -> convert_type context t 
+        in
+        Hashtbl.add context.macros_tbl str (symb ty)
   ) context.table;
   context.uc:= Hashtbl.fold (fun _ (symb) uc ->
     begin try 
@@ -1111,9 +1123,10 @@ let add_macro_axioms context =
               t_equ (t_app_infer m_symb (indices@[ts])) msg in
             let ax_option =
               begin match mdef with
+              (* FIXME: quantum: translate quantum macros *)
               (* cond@ already handled above; exec@ defined in .why file *)
-              | Symbols.Cond | Symbols.Exec -> None
-              | Symbols.Output ->
+              | _ when mn = Symbols.cond || mn = Symbols.exec -> None
+              | _ when mn = Symbols.out ->
                 (* output@A(i1,...) = output *)
                 Some (macro_wterm_eq
                         []

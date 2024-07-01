@@ -361,7 +361,7 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_system sdecl ->
     let projs = Theory.parse_projs sdecl.sprojs in
-    Process.declare_system table sdecl.sname projs sdecl.sprocess, []
+    Process.declare_system table sdecl.exec_model sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table =

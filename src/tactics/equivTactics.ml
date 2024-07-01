@@ -1385,7 +1385,7 @@ let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.se
       match Term.ty ti with
       | Type.Message -> Term.mk_zero
       | Type.Boolean -> Term.mk_false
-      | ty           -> Term.Prelude.mk_witness (ES.table s) ~ty_arg:ty
+      | ty           -> Library.Prelude.mk_witness (ES.table s) ~ty_arg:ty
   in
 
   let ti_t = Term.mk_ite cond               ti else_branch in
@@ -1933,8 +1933,13 @@ class ddh_context
 
   method visit_macro ms args a =
     match Symbols.get_macro_data ms.s_symb cntxt.table with
-      | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
-      | _ -> super#visit_macro ms args a
+    | _ when Symbols.is_quantum_macro ms.s_symb ->
+      soft_failure (Failure "DDH is unsupported for quantum adversaries")
+
+    | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) -> ()
+    | Symbols.State _ -> ()
+
+    | _ -> super#visit_macro ms args a
 
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
      appears only as g^a, g^b and g^c. *)
@@ -1975,8 +1980,14 @@ class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
 
   method visit_macro ms args a =
     match Symbols.get_macro_data ms.s_symb cntxt.table with
-    | Symbols.(Input | Output | State _ | Cond | Exec | Frame) ->
+    | _ when Symbols.is_quantum_macro ms.s_symb ->
+      soft_failure (Failure "DDH is unsupported for quantum adversaries")
+
+    | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) ->
       raise Macro_found
+
+    | Symbols.State _ -> raise Macro_found
+                                  
     | _ -> self#visit_macro ms args a
 end
 

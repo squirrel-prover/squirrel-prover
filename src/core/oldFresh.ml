@@ -42,9 +42,12 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (_self)
 
   method visit_macro mn _args a =
     let cleara, a' =
-      match Symbols.get_macro_data mn.s_symb cntxt.table with
-      | Symbols.Input -> true,  Term.mk_pred a
-      | _             -> false, a
+      if mn.s_symb = Symbols.inp then
+        true,  Term.mk_pred a
+
+      (* no implemented, as this is a depracated function *)
+      else if Symbols.is_quantum_macro mn.s_symb then assert false
+      else false, a
     in
     if not (List.mem a' actions) then
       actions <- a' :: actions;
@@ -182,9 +185,10 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
     | Term.Macro (m, l, ts) ->
       let get_macro_default () =
         let ts =
-          match Symbols.get_macro_data m.s_symb constr.table with
-          | Symbols.Input -> Term.mk_pred ts
-          | _             -> ts
+          if m.s_symb = Symbols.inp then Term.mk_pred ts
+          (* not implmented, as this is deprecated code *)
+          else if Symbols.is_quantum_macro m.s_symb then assert false
+          else ts
         in
         let occ = Iter.{
             occ_cnt  = ts;

@@ -144,6 +144,8 @@ let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
 
+let tquantum_message   = TBase ([], "quantum_message")
+  
 let base np s = TBase (np,s)
 
 let rec fun_l tys tyout : ty =

@@ -1071,17 +1071,20 @@ end
 (** Macro data *)
 
 (** See `.mli` *)
+type general_macro_def = ..
+
+(** See `.mli` *)
 type global_macro_def = ..
 
 (** See `.mli` *)
 type state_macro_def = ..
 
 type macro_data =
-  | Input | Output | Cond | Exec | Frame
-  | State  of int * Type.ty * state_macro_def
-  | Global of int * Type.ty * global_macro_def
-  
-type data += Macro of macro_data
+  | General of general_macro_def
+  | State   of int * Type.ty * state_macro_def
+  | Global  of int * Type.ty * global_macro_def
+
+type data += Macro of macro_data 
 
 let get_macro_data (ms : macro) (table : table) : macro_data =
   match Macro.get_data ms table with
@@ -1210,19 +1213,41 @@ let init_action = mk_action "init"
 (*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
-let mk_macro m data =
+let mk_macro ~scope m data =
   let table, m =
-    Macro.declare ~approx:false !builtin_ref (L.mk_loc L._dummy m) ~data
+    Macro.declare ~scope ~approx:false !builtin_ref (L.mk_loc L._dummy m) ~data
   in
   builtin_ref := table;
   m
 
-let inp   = mk_macro "input"  (Macro Input )
-let out   = mk_macro "output" (Macro Output)
-let cond  = mk_macro "cond"   (Macro Cond  )
-let exec  = mk_macro "exec"   (Macro Exec  )
-let frame = mk_macro "frame"  (Macro Frame )
+(** All macros are going to be hold [Macro (General _)] as data after
+    the prelude is processed. *)
+  
+let inp   = mk_macro ~scope:top_npath "input"  Empty 
+let out   = mk_macro ~scope:top_npath "output" Empty
+let cond  = mk_macro ~scope:top_npath "cond"   Empty
+let exec  = mk_macro ~scope:top_npath "exec"   Empty
+let frame = mk_macro ~scope:top_npath "frame"  Empty
 
+let quant_npath = 
+  let qnp = [L.mk_loc L._dummy "Q"] in
+  let table = 
+    namespace_enter !builtin_ref qnp |> 
+    (^~) namespace_exit qnp 
+  in
+  builtin_ref := table;
+  of_s_npath ["Q"]
+    
+(* FIXME: quantum: remvove `q` as prefix *)
+let q_inp   = mk_macro ~scope:quant_npath "qinput"  Empty
+let q_out   = mk_macro ~scope:quant_npath "qoutput" Empty
+let q_state = mk_macro ~scope:quant_npath "qstate"  Empty
+let q_cond  = mk_macro ~scope:quant_npath "qcond"   Empty
+let q_exec  = mk_macro ~scope:quant_npath "qexec"   Empty
+let q_frame = mk_macro ~scope:quant_npath "qframe"  Empty
+
+let is_quantum_macro m = List.mem m [q_inp; q_exec; q_frame; q_out; q_state;]
+    
 (*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
@@ -1299,7 +1324,8 @@ let fs_ite =
   let fty = Type.mk_ftype
       [tyv]
       [Type.tboolean; tyvar; tyvar]
-      tyvar in
+      tyvar 
+  in
   mk_fsymb ~fty "if" (-1)
 
 (*------------------------------------------------------------------*)
@@ -1328,6 +1354,15 @@ let fs_succ = mk_fsymb "succ" 1
 (** Adversary function *)
 
 let fs_att = mk_fsymb "att" 1
+
+let fs_qatt = 
+  let fty = 
+    Type.mk_ftype []
+      [Type.ttimestamp; Type.tmessage; Type.tquantum_message]
+      (Type.tuple [Type.tmessage; Type.tquantum_message])
+  in
+  mk_fsymb ~fty "qatt" (-1)
+
 
 (** Pairing *)
 

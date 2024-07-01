@@ -286,7 +286,8 @@ let f_succ = Symbols.fs_succ
 
 (** Adversary function *)
 
-let f_att = Symbols.fs_att
+let f_att  = Symbols.fs_att
+let f_qatt = Symbols.fs_qatt
 
 (** Pairing *)
 
@@ -344,8 +345,9 @@ let mk_name_with_tuple_args n l =
   | _  -> mk_name n [mk_tuple l]
 
 (*------------------------------------------------------------------*)
-let mk_macro ms l t = Macro (ms, l, t)
+let mk_macro ms args t = Macro (ms, args, t)
 
+(*------------------------------------------------------------------*)
 let mk_diff l =
   assert
     (let projs = List.map fst l in
@@ -495,27 +497,6 @@ module SmartConstructors = struct
 end
 
 include SmartConstructors
-
-(*------------------------------------------------------------------*)
-(** {3 Prelude terms} *)
-
-module Prelude = struct
-
-  (** Get a prelude-defined symbol *)
-  let get_prelude_fsymb table (s : string) : Symbols.fname =
-    try Symbols.Operator.convert_path ([],L.mk_loc L._dummy s) table with
-    | Symbols.Error _ -> assert false
-
-  (*------------------------------------------------------------------*)
-  let mk_fun table str ?ty_args args =
-    let symb = get_prelude_fsymb table str in
-    mk_fun table symb ?ty_args args
-
-  (*------------------------------------------------------------------*)
-  let mk_witness table ~ty_arg = mk_fun table "witness" ~ty_args:[ty_arg] []
-
-  let mk_zeroes table term = mk_fun table "zeroes" [term]
-end
 
 (*------------------------------------------------------------------*)
 (** {3 For terms} *)
@@ -1725,12 +1706,18 @@ let f_triv = function
 
 let mk s k = { s_symb = s; s_typ = k; }
 
-let in_macro    : msymb = mk Symbols.inp   Type.Message
-let out_macro   : msymb = mk Symbols.out   Type.Message
-let frame_macro : msymb = mk Symbols.frame Type.Message
+let in_macro    : msymb = mk Symbols.inp   Type.tmessage
+let out_macro   : msymb = mk Symbols.out   Type.tmessage
+let frame_macro : msymb = mk Symbols.frame Type.tmessage
+let cond_macro  : msymb = mk Symbols.cond  Type.tboolean
+let exec_macro  : msymb = mk Symbols.exec  Type.tboolean
 
-let cond_macro : msymb = mk Symbols.cond Type.Boolean
-let exec_macro : msymb = mk Symbols.exec Type.Boolean
+let q_in_macro    : msymb = mk Symbols.q_inp   Type.tmessage
+let q_out_macro   : msymb = mk Symbols.q_out   Type.tmessage
+let q_frame_macro : msymb = mk Symbols.q_frame Type.tmessage
+let q_cond_macro  : msymb = mk Symbols.q_cond  Type.tboolean
+let q_exec_macro  : msymb = mk Symbols.q_exec  Type.tboolean
+let q_state_macro : msymb = mk Symbols.q_state Type.tquantum_message
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
