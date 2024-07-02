@@ -632,6 +632,12 @@ system_modifier:
     { Decl.Rewrite p }
 
 (*------------------------------------------------------------------*)
+(* for now, a single option is enough *)
+%inline system_option:
+| LBRACKET l=lsymb RBRACKET { Some l }
+|                           { None   }
+
+(*------------------------------------------------------------------*)
 %inline op_body:
 | EQ t=term { `Concrete t }
 |           { `Abstract   }
@@ -725,17 +731,17 @@ declaration_i:
 |  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
-| SYSTEM sprojs=projs p=process
+| SYSTEM system_option=system_option sprojs=projs p=process
   { Decl.Decl_system { 
         sname      = None;
-        exec_model = Macros.Classical;
+        system_option;
         sprojs;
         sprocess   = p; } }
 
-| SYSTEM id=lsymb EQ sprojs=projs p=process
+| SYSTEM system_option=system_option sprojs=projs id=lsymb EQ p=process
    { Decl.Decl_system { 
          sname      = Some id;
-         exec_model = Macros.Classical;
+         system_option;
          sprojs;
          sprocess   = p} }
 

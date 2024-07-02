@@ -361,7 +361,14 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_system sdecl ->
     let projs = Theory.parse_projs sdecl.sprojs in
-    Process.declare_system table sdecl.exec_model sdecl.sname projs sdecl.sprocess, []
+    let exec_model = 
+      match sdecl.system_option with
+      | None 
+      | Some { pl_desc = "classical"   } -> Macros.Classical
+      | Some { pl_desc = "postquantum" } -> Macros.PostQuantum
+      | Some l -> error (L.loc l) KDecl (Failure "unknown system option")
+    in
+    Process.declare_system table exec_model sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table =
