@@ -988,7 +988,7 @@ let process_system_decl
       let shape = Action.get_shape_v (List.rev penv.action) in
       let table, x' =
         let suffix = if in_update then `Large else `Strict in
-        Macros.declare_global penv.env.table system_name Macros.Classical
+        Macros.declare_global penv.env.table system_name penv.exec_model
           (L.mk_loc L._dummy (Vars.name x)) 
           (* location not useful, declaration cannot fail *)
           ~suffix

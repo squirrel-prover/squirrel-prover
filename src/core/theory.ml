@@ -580,7 +580,9 @@ let make_app_i (state : conv_state) cntxt (p : Symbols.p_path) : app_i =
           match Symbols.get_macro_data p table with
           | Global _ -> Macro
           | State  _ -> Get
-          | General _ when List.mem p Symbols.[inp; out; cond; exec; frame] -> 
+          | General _ 
+            when List.mem p Symbols.[inp; out; cond; exec; frame] ||
+                 Symbols.is_quantum_macro p -> 
             if cntxt = NoTS then ts_expected ();
             Macro
           | General _ -> assert false (* TODO: quantum: support other macros *)
@@ -1100,7 +1102,9 @@ and conv_app
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms indices (get_at ts_opt)
 
-      | General _ when List.mem s Symbols.[inp; out; cond; exec; frame] -> 
+      | General _ when 
+          List.mem s Symbols.[inp; out; cond; exec; frame] || 
+          Symbols.is_quantum_macro s -> 
         check_arity ~mode:`Full f ~actual:(List.length terms) ~expected:0;
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)

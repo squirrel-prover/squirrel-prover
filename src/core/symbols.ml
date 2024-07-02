@@ -1246,7 +1246,7 @@ let q_cond  = mk_macro ~scope:quant_npath "qcond"   Empty
 let q_exec  = mk_macro ~scope:quant_npath "qexec"   Empty
 let q_frame = mk_macro ~scope:quant_npath "qframe"  Empty
 
-let is_quantum_macro m = List.mem m [q_inp; q_exec; q_frame; q_out; q_state;]
+let is_quantum_macro m = List.mem m [q_inp; q_out; q_state; q_cond; q_exec; q_frame; ]
     
 (*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
@@ -1358,7 +1358,7 @@ let fs_att = mk_fsymb "att" 1
 let fs_qatt = 
   let fty = 
     Type.mk_ftype []
-      [Type.ttimestamp; Type.tmessage; Type.tquantum_message]
+      [Type.tuple [Type.ttimestamp; Type.tmessage; Type.tquantum_message]]
       (Type.tuple [Type.tmessage; Type.tquantum_message])
   in
   mk_fsymb ~fty "qatt" (-1)

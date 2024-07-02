@@ -170,7 +170,7 @@ module PostQuantum = struct
                 Term.mk_zero))
       in 
       Structured {
-        name    = Symbols.frame;
+        name    = Symbols.q_frame;
         default = Term.empty;
         tinit   = Term.mk_zero;
         body    = (ts_v, body);
@@ -185,11 +185,13 @@ module PostQuantum = struct
         Term.mk_proj 2 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
-          [Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts);
-           Term.mk_macro Term.q_state_macro [] (Term.mk_pred ts);]
+          [ Term.mk_tuple
+              [ ts;
+                Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts);
+                Term.mk_macro Term.q_state_macro [] (Term.mk_pred ts); ]]
       in 
       Structured {
-        name    = Symbols.inp;
+        name    = Symbols.q_inp;
         default = qwitness;
         tinit   = qwitness;
         body    = (ts_v, body);
@@ -203,11 +205,14 @@ module PostQuantum = struct
       let body =
         Term.mk_proj 1 @@
         Term.mk_fun0
-          Symbols.fs_att { fty = Symbols.ftype_builtin Symbols.fs_att; ty_args = [] }
-          [Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts)]
+          Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
+          [ Term.mk_tuple
+              [ ts;
+                Term.mk_macro Term.q_frame_macro [] (Term.mk_pred ts);
+                Term.mk_macro Term.q_state_macro [] (Term.mk_pred ts); ]]
       in 
       Structured {
-        name    = Symbols.inp;
+        name    = Symbols.q_inp;
         default = Term.empty;
         tinit   = Term.empty;
         body    = (ts_v, body);
@@ -224,7 +229,7 @@ module PostQuantum = struct
           (Term.mk_macro Term.q_cond_macro [] ts)
       in 
       Structured {
-        name    = Symbols.exec;
+        name    = Symbols.q_exec;
         default = Term.mk_false;
         tinit   = Term.mk_true;
         body    = (ts_v, body);
