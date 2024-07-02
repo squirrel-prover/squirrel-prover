@@ -82,7 +82,7 @@ abstract f : message -> message.
       
 op g x = <f x, f x>.
 
-system [T] (S : !_i !_j new n; out(c,n)).
+system T = (S : !_i !_j new n; out(c,n)).
 
 global lemma [T] foo (i:index[const]) : equiv(if true then <n i, n i>,n i).
 Proof.

@@ -37,7 +37,7 @@ Qed.
 
 
 
-system [attT]
+system attT =
  (out(c, h(k,sk)); in(c,x); if snd(x) = h(fst(x),sk) && not(fst(x)=k) then O : out(c,diff(ok,ko)) else out(c,ok)).
 
 

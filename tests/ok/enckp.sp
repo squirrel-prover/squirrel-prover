@@ -32,7 +32,7 @@ Proof.
 Abort.
 
 (* Fail if the random seed occurs in another action. *)
-system [sharedrnd] !_i
+system sharedrnd = !_i
        (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>) | out(c,enc(m,r1(i),diff(k,kbis)))).
 
 equiv  [sharedrnd] test.
@@ -46,7 +46,7 @@ checkfail enckp 2 exn SEncSharedRandom.
 Abort.
 
 (* Fail if the random seed occur in the context. *)
-system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
+system sharedrndframe = !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
 equiv  [sharedrndframe] test2.
 Proof.
 enrich diff(n,m). induction t. expandall. by fresh 0. 
@@ -55,7 +55,7 @@ enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
 Abort.
 
 (* Fail if the ranodm seed is not a name. *)
-system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
+system nornd = !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
 
 equiv [nornd] test3.
 Proof.

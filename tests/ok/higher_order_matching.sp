@@ -69,7 +69,7 @@ abstract error : message.
 
 channel c.
 
-system [Sys] !_A T: out(c,empty).
+system Sys = !_A T: out(c,empty).
 
 (*------------------------------------------------------------------*)
 lemma [Sys] _ (t : timestamp, A : index) :

@@ -22,30 +22,24 @@ abstract ok2 : message.
 (*------------------------------------------------------------------*)
 (* system with one hash *)
 
-system [u] (!_i U: out(c, H(<n1(i), ok>,k))).
+system u = (!_i U: out(c, H(<n1(i), ok>,k))).
 
 system u2 = [u/left] with gprf time, H(_, k).
-
-print system [u2].
 
 (*------------------------------------------------------------------*)
 (* system with two hashes in two actions *)
 
-system [w] !_i ((U: out(c, H(n1(i), k) ) |
+system w = !_i ((U: out(c, H(n1(i), k) ) |
                  V: out(c, H(n2(i,i),k)) )).
 
 system w2 = [w/left] with gprf time, H (_, k).
 
-print system [w2].
-
 (*------------------------------------------------------------------*)
 (* system with one hash under binder (index) *)
 
-system [t] (!_i U: out(c, seq(j : index => H(n2(i,j),k)))).
+system t = (!_i U: out(c, seq(j : index => H(n2(i,j),k)))).
 
 system t2 = [t/left] with gprf time, H(_, k).
-
-print system [t2].
 
 lemma [t2] _ (i : index) : 
   happens(U(i)) => 
@@ -71,21 +65,17 @@ Qed.
 (*------------------------------------------------------------------*)
 (* system with one hash under binder (timestamp) *)
 
-system [s] (!_i U: out(c, seq(t : timestamp => H(nt(t,i),k)))).
+system s = (!_i U: out(c, seq(t : timestamp => H(nt(t,i),k)))).
 
 system s2 = [s/left] with gprf time, H(_, k).
-
-print system [s2].
 
 (*------------------------------------------------------------------*)
 (* system with two nested hashes and a global macro *)
 
-system [p] (!_i U: let m = H(n1p(i),k) in out(c, m)).
+system p = (!_i U: let m = H(n1p(i),k) in out(c, m)).
 
 system p2 = [p/left] with gprf time, H(_, k).
 
-
-print system [p2].
 
 lemma [p2] _ (i : index) : 
   happens(U(i)) => 
@@ -101,11 +91,9 @@ Proof. intro Hap @/m1. congruence. Qed.
 (*------------------------------------------------------------------*)
 (* system with two nested hashes and a global macro *)
 
-system [q] (!_i U: let mq = H(n1p(i),k) in out(c, H(n1(i),k))).
+system q = (!_i U: let mq = H(n1p(i),k) in out(c, H(n1(i),k))).
 
 system q2 = [q/left] with gprf time, H(_, k).
-
-print system [q2].
 
 lemma [q2] _ (i : index) : 
   happens(U(i)) => 
@@ -155,23 +143,18 @@ print system [t/left].
 (* (*------------------------------------------------------------------*) *)
 (* (* system with two hashes *) *)
 
- system [v] (!_i U: out(c, <H(n1(i), k), H(n2(i,i),k)>)). 
+ system v = (!_i U: out(c, <H(n1(i), k), H(n2(i,i),k)>)). 
 
 
 (* system v2 = [v/left] with gprf time, H(_, k). *)
 
-(* print system [v2]. *)
+(* print system v2 =. *)
 
 (* But we can do it with the classical gprf: *)
  system v2 = [v/left] with gprf (i:index), H(n2(i,i), k). 
-
-print system [v2].
-
 
 
 (* However, the following tactic application of gprf fails due to the macro. *)
 (* 
 system u3 = [t/left] with gprf (il,jl:index), H(output@U(il), k).
-
-print system [u3].
 *)

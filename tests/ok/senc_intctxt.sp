@@ -21,7 +21,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [Bis] (out(c,diff(enc(m,r,k),empty)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
+system Bis = (out(c,diff(enc(m,r,k),empty)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
 
 lemma [Bis] _: happens(A1) => output@A1 <> fail => output@A1 = m.
 Proof.

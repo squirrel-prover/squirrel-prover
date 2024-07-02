@@ -151,8 +151,8 @@ Abort.
 abstract one : message.
 
 channel c.
-system [P0] A: out(c,zero).
-system [P1] A: out(c,one).
+system P0 = A: out(c,zero).
+system P1 = A: out(c,one).
 
 global lemma [set:P1; equiv:P0] _ :
   [happens(A)] -> 

@@ -43,7 +43,7 @@ process B2 (i : index) =
  let z : T = ggi i (L_to_T(y)) in
  out (c, from_T(z)).
 
-system [Two] !_i B2(i).
+system Two = !_i B2(i).
 
 (*------------------------------------------------------------------*)
 process B3 (i : index) =
@@ -52,7 +52,7 @@ process B3 (i : index) =
  let gl : L = ggi i l in
  out (c, from_L(gl)).
 
-system [Three] !_i B3(i).
+system Three = !_i B3(i).
 
 (*------------------------------------------------------------------*)
 process State (i : index) =
@@ -61,4 +61,4 @@ process State (i : index) =
  lstate := ggi i l;
  out (c, empty).
 
-system [StateTest] !_i State(i).
+system StateTest = !_i State(i).

@@ -4,8 +4,8 @@
 
 abstract a : message
 abstract b : message
-system [s1] null.
-system [s2] null.
+system s1 = null.
+system s2 = null.
 
 axiom [s1] ax1 : a=b.
 axiom [s2] ax2 : a=b.

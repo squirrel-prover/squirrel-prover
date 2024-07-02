@@ -7,8 +7,8 @@ abstract b : message.
 
 op f : message = a.
 
-system [A] !_i O: (in(c,x); out(c, <x,f>)).
-system [B] !_i O: (in(c,x); out(c, a)).
+system A = !_i O: (in(c,x); out(c, <x,f>)).
+system B = !_i O: (in(c,x); out(c, a)).
 
 lemma [A] _ : a = b => f = b.
 Proof. by intro ->. Qed.

@@ -19,7 +19,7 @@ by prf 0.
 Qed.
 
 
-system [test]
+system test =
   in(c,x);
   let surp = diff(m,n) in
   let mac = h (<x,surp>, k) in
@@ -51,7 +51,7 @@ by fresh 1.
 Qed.
 
 
-system [failing]
+system failing =
   in(c,x);
   let key=x in
   let surp = diff(m,n) in

@@ -1,8 +1,8 @@
 (* tests that system pairs are correctly renamed and projected when changing 
    systems context. *)
 
-system [real]  null.
-system [ideal] null.
+system real =  null.
+system ideal = null.
 
 (* --------------------------------------------------------------------------*)
 name a : message.

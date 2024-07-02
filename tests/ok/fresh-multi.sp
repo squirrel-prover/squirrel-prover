@@ -10,7 +10,7 @@ process A (i:index) =
 process B (i:index) =
   in(c, x).
 
-system [S] (!_i A(i) | !_j B(j)). 
+system S = (!_i A(i) | !_j B(j)). 
 
 
 lemma [S/right, S/left] test (i,j:index) :

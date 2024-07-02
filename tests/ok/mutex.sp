@@ -9,7 +9,7 @@ lemma _ : not (happens B) || not (happens A).
 Proof. by apply mutex_default_B_A. Qed.
 
 (*------------------------------------------------------------------*)
-system [foo] (
+system foo = (
   !_a
   in(c,x); 
   if x = x then !_i (C: out(c, empty); out(c, empty)) else !_i !_j D: out(c, empty)

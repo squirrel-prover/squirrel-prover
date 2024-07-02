@@ -16,7 +16,7 @@ abstract ok : message.
 
 include Basic.
 
-system [test]
+system test =
    (A:
     out(c, <enc(n,r,pk(kenc)) , h(enc(n,r,pk(kenc)),khash)>)
     |

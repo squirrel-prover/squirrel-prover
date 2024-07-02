@@ -1,6 +1,6 @@
 include Basic.
 
-system [E] null.
+system E = null.
 
 abstract a : message
 abstract b : message

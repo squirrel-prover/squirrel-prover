@@ -8,8 +8,8 @@ process foo =
 process bar = 
   O: out(c,empty).
 
-system [P] foo.
-system [Q] bar.
+system P = foo.
+system Q = bar.
 
 lemma [P] _ : happens(O) => x@O = true.
 Proof.

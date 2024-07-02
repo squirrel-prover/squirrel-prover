@@ -13,7 +13,7 @@ Proof.
  auto.
 Qed.
 
-system [bis] in(c,x);let y = <x,x> in in(c,x);out(c,<y,x>).
+system bis = in(c,x);let y = <x,x> in in(c,x);out(c,<y,x>).
 
 lemma [bis] testAb :
   happens(A) => output@A = empty.

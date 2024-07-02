@@ -12,7 +12,7 @@ process A(res:message) =  if False then out(c,res)
 
 system !_i A(diff(ok,ko)).
 
-system [toto] !_i A(diff(ko,koo)).
+system toto = !_i A(diff(ko,koo)).
 
 equiv test.
 Proof.

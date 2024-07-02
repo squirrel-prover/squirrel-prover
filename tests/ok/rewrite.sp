@@ -12,7 +12,7 @@ channel ch
 
 system A: !_i in(ch,x);out(ch,<ok(i),x>).
 
-system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
+system bis = !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
 
 include Basic.
 
@@ -182,7 +182,7 @@ Proof.
   assumption.
 Qed.
 
-system [terce] 
+system terce = 
  !_i
    in(ch,x);
    let t = <a,x> in 

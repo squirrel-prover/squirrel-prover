@@ -16,7 +16,7 @@ process P =
   out(c, enc(diff(n,zeroes(eta)),r,pk(sk))).
 
 
-system [S] P.
+system S = P.
 
 include Basic.
 

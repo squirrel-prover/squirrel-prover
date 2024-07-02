@@ -32,7 +32,7 @@ process I(i:index) =
   else 
     out(c,<ko,h(ko,nI)>)
 
-system [main] out(c,s);( !_i R : R(i) | !_j T : T(j) | !_k !_l B : B(k,l)| !_l I : I(l)).
+system main = out(c,s);( !_i R : R(i) | !_j T : T(j) | !_k !_l B : B(k,l)| !_l I : I(l)).
 
 (*------------------------------------------------------------------*)
 global lemma [main] _ (r,i,t :index[const]) :

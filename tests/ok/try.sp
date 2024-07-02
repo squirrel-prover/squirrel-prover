@@ -18,7 +18,7 @@ Qed.
 
 abstract mess : index -> message
 
-system [test] !_i (
+system test = !_i (
 in(c,x);
 out(c, diff(try find j j2 such that j=i && j=j2 in <mess(i),mess(j2)>, 
             try find l l2 such that l=i && l2=i in <mess(i), mess(l2)>))).

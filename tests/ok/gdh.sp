@@ -66,7 +66,7 @@ process protocol =
   !_i (init(i) | resp(i) | badguy(i) | leak2(i) | !_j (leak(i,j) | DHoracle(i,j))).
 
 
-system [default] protocol.
+system default = protocol.
 
 axiom corruptleak (i,j:index) :
   happens(L(i,j)) => corrupted(i) = true.
@@ -137,7 +137,7 @@ process protocol2 =
   !_i (init2(i) | resp2(i) | leak3(i)).
 
 
-system [system2] protocol2.
+system system2 = protocol2.
 
 axiom [system2] corruptleak3 (i:index) :
   happens(B(i)) => corrupted(i) = true.
@@ -146,7 +146,7 @@ process protocol3 =
   !_i (init2(i) | resp2(i) | leak4(i)).
 
 
-system [system3] protocol3.
+system system3 = protocol3.
 
 axiom [system3] corruptleak4 (i:index) :
   happens(B(i)) => corrupted(i) = true.

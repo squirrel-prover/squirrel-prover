@@ -2,9 +2,9 @@ channel c
 
 abstract ok : message
 
-system [s1] in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
+system s1 = in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
 
-system [s2] in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
+system s2 = in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
 
 equiv [s1/left,s2/right] test.
 Proof.

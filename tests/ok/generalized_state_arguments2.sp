@@ -15,8 +15,7 @@ name k : index * index -> message.
 hash h.
 
 (* -------------------------------------------------- *)
-system [Q] !_i in(c,x); s (toI (k (i, i0))) := empty; O: out(c,s (toI (k (i, i0)))).
-print system [Q].
+system Q = !_i in(c,x); s (toI (k (i, i0))) := empty; O: out(c,s (toI (k (i, i0)))).
 
 (* -------------------------------------------------- *)
 (* check that [s] is well-formed *)

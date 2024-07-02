@@ -7,7 +7,7 @@ mutable foo (i : index) (j : index) = cst.
 include Basic.
 
 (* ========================================================= *)
-system [E] null.
+system E = null.
 
 game LR = {
   rnd k1 : message;

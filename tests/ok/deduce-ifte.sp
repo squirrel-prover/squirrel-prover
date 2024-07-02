@@ -18,7 +18,7 @@ mutable s : message = empty.
 
 system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
-system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
+system bis = !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
 
 (* This is a weakness of bideduction in Squirrel: 

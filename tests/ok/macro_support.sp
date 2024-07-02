@@ -40,16 +40,16 @@ process Dum (i : index) =
   in(c,x);
   out(c,x).
 
-system [P]  (!_i A(i)).
+system P =  (!_i A(i)).
 
-system [P0] (!_i A(i) | !_i Leak2(i)).
-system [P1] (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i)).
+system P0 = (!_i A(i) | !_i Leak2(i)).
+system P1 = (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i)).
 
-system [P2] (!_i A(i) | !_i Dum  (i) | !_i Dum  (i) | !_i Leak1(i)).
-system [P3] (!_i A(i) | !_i Leak2(i) | !_i Dum  (i) | !_i Leak1(i)).
+system P2 = (!_i A(i) | !_i Dum  (i) | !_i Dum  (i) | !_i Leak1(i)).
+system P3 = (!_i A(i) | !_i Leak2(i) | !_i Dum  (i) | !_i Leak1(i)).
 
-system [P4] (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i)).
-system [P5] (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i) | !_i Leak1B(i)).
+system P4 = (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i)).
+system P5 = (!_i A(i) | !_i Leak2(i) | !_i Leak2B(i) | !_i Leak1(i) | !_i Leak1B(i)).
 
 lemma [P] _ (t : timestamp) : happens(t) => output@t <> n1.
 Proof.

@@ -45,7 +45,7 @@ Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Failure when the key occurs inside an action condition. *)
-system [condSSC] in(c,x); if x=k then out(c,x).
+system condSSC = in(c,x); if x=k then out(c,x).
 
 lemma [condSSC] _ (tau:timestamp[param]) :
   happens(tau) =>
@@ -72,7 +72,7 @@ Abort.
 
 
 (* h and euf cannot both use the same key *)
-system [joint] (out(c,h(m,k)) | ( in(c,x); if checksign(n, x, pk(k)) then out(c,x))).
+system joint = (out(c,h(m,k)) | ( in(c,x); if checksign(n, x, pk(k)) then out(c,x))).
 
 lemma [ joint] _ (tau:timestamp): happens(A2) => cond@A2 => False.
 Proof.
@@ -92,7 +92,7 @@ Abort.
 (** Check about variables naming and renaming *)
 (**********************************************)
 
-system [boundvars] out(c,seq(i,j:index => h(n2(i,j),k1(i)))).
+system boundvars = out(c,seq(i,j:index => h(n2(i,j),k1(i)))).
 
 lemma [ boundvars] _ (tau:timestamp[param], j,j1,j2:index[param]):
   happens(tau) =>
@@ -117,7 +117,7 @@ Proof.
 Abort.
 
 
-system [dupnames] !_i out(c,<h(n,k),h(m,k)>).
+system dupnames = !_i out(c,<h(n,k),h(m,k)>).
 
 lemma [ dupnames] _ (tau:timestamp[param]): 
  happens(tau) => output@tau = h(u,k) => False.

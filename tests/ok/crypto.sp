@@ -3,7 +3,7 @@ channel c.
 include Basic.
 
 (* ========================================================= *)
-system [E] null.
+system E = null.
 
 (* ========================================================= *)
 abstract p : index -> message -> bool
@@ -146,7 +146,7 @@ Qed.
 
 
 (* ========================================================= *)
-system [X] !_i in(c,x); out(c, m i x (diff(a,b))).
+system X = !_i in(c,x); out(c, m i x (diff(a,b))).
 
 global lemma [X] _ (tau:timestamp[adv]) :
   [happens(tau)] -> equiv(output@tau).

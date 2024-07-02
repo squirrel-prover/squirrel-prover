@@ -13,17 +13,15 @@ system null.
 abstract ok : message.
 abstract ok2 : message.
 
-system [test] (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
+system test = (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
 
-system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
+system test2 = (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 
 
 (*  We should have  [test/left,test2/right] *)
 
 (* we start with a first transitivity, from test/left to testPrf *)
 system testPrf = [test/left] with gprf, h(ok,k).
-
-print system [testPrf].
 
 (* Then, second transitivity, from testprf to testRenamed *)
 system testRenamed = [testPrf] with rename equiv(diff(n_PRF,n)).
@@ -69,9 +67,9 @@ name key : index -> message
 name idn : index -> message
 name msg : index -> message
 
-system [testi] (!_i A: out(c, <ok,h(msg(i),key(i))>) | !_i B: out(c, h(msg(i),key(i)))).
+system testi = (!_i A: out(c, <ok,h(msg(i),key(i))>) | !_i B: out(c, h(msg(i),key(i)))).
 
-system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
+system testi2 = (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 
 (*  We should have  [testi/left,testi2/right] *)
 
@@ -128,7 +126,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [test_ok2] (A: out(c, <ok,<h(ok,k),h(ok2,k)>>) | B: out(c, h(ok,k))).
+system test_ok2 = (A: out(c, <ok,<h(ok,k),h(ok2,k)>>) | B: out(c, h(ok,k))).
 (* we start with a first transitivity, from test/left to testPrf *)
 system test_ok2G = [test_ok2/left] with gprf, h(ok,k).
 

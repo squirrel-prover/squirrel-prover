@@ -16,7 +16,7 @@ channel ch
 
 system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
-system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
+system bis = !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
 (*------------------------------------------------------------------*)
 lemma _ (x, y : message, i : index) : 
@@ -282,7 +282,7 @@ Proof.
  apply H. 
 Qed.
 
-system [three] !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
+system three = !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
 
 (* cond cannot be deduce in system [three], because of the new name `l` *)
 global lemma [three] _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).

@@ -50,7 +50,7 @@ mutable s2(i : index) : message = s1(i).
 process Q(i:index) =
   out(c, s2(i)).
 
-system [second] (!_i Q(i)).
+system second = (!_i Q(i)).
 
 lemma [second] _ (t : timestamp[param]) (j : index[param]):
  happens(t) => output@t = h(nonce(j),k) => false.
@@ -68,7 +68,7 @@ process R(i:index) =
   let x = s4(i) in
   out(c, x).
 
-system [third] (!_i R(i)).
+system third = (!_i R(i)).
 
 lemma [third] _ (t : timestamp[param]) (j : index[param]):
  happens(t) => output@t = h(nonce(j),k) => false.

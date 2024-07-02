@@ -9,8 +9,8 @@ op f : message = a.
 
 mutable s : message = empty.
 
-system [A] !_i O: (in(c,x); out(c, <x,f>)).
-system [B] !_i O: (in(c,x); out(c, a)).
+system A = !_i O: (in(c,x); out(c, <x,f>)).
+system B = !_i O: (in(c,x); out(c, a)).
 
 axiom [any] fst_pair (x, y: message) : fst (<x, y>) = x.
 hint rewrite fst_pair.

@@ -64,7 +64,7 @@ name r1 : message.
 name r2 : message.
 
 channel c.
-system [NSL]
+system NSL =
  PUB: out(c,<pub(ska),pub(skb)>);
  ((A:    
    out(c, enc( diff(na1,na2), r1, pub(skb))))

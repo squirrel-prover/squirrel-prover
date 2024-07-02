@@ -3,9 +3,9 @@ channel c
 abstract ok : message
 abstract ko : message
 
-system [s1] in(c,x); let S=diff(ok,ko) in A : out(c,S).
+system s1 = in(c,x); let S=diff(ok,ko) in A : out(c,S).
 
-system [s2] in(c,x); let St=diff(ko, ok) in A : out(c,St).
+system s2 = in(c,x); let St=diff(ko, ok) in A : out(c,St).
 
 global lemma [s1/left,s1/right] _ (t : timestamp[const]) : 
   [happens(t)] -> [ok = ko] -> equiv(frame@t).
@@ -28,7 +28,7 @@ Qed.
 abstract f : message -> message.
 abstract g : message -> message.
 
-system [s3] 
+system s3 = 
   in(c,x); 
   let X = diff(ok, ko) in 
   let X1 = diff(f(X), g(X)) in

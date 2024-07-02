@@ -1,8 +1,8 @@
 (*------------------------------------------------------------------*)
 mutable tt : timestamp = init.
 
-system [A] null.
-system [B] null.
+system A = null.
+system B = null.
 
 (*------------------------------------------------------------------*)
 (* the system-independence check goes through if all systems are 

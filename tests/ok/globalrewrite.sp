@@ -19,7 +19,7 @@ abstract check : message -> boolean
 axiom [any] barP (x : message) : check(x) => f(x) = x.
 
 (*------------------------------------------------------------------*)
-system [Q] !_i (in(c,x); A: out(c, a)).
+system Q = !_i (in(c,x); A: out(c, a)).
 
 system Q1 = [Q/left] with rewrite foo.
 
@@ -47,7 +47,7 @@ Proof. by intro *; apply Pa_ax. Qed.
 axiom [any] check_ax0 : check(f(a)).
 axiom [any] check_ax1 : check(a).
 
-system [E] !_i (in(c,x); A: out(c, f(f(a)))).
+system E = !_i (in(c,x); A: out(c, f(f(a)))).
 
 system E1 = [E/left] with rewrite !barP foo.
 Proof. by have ? := check_ax0. Qed.
@@ -60,7 +60,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [P] !_i (in(c,x); A: out(c, g2(x))).
+system P = !_i (in(c,x); A: out(c, g2(x))).
 
 system P1 = [P/left] with rewrite /g2.
 
@@ -75,7 +75,7 @@ Qed.
 
 
 (*------------------------------------------------------------------*)
-system [R] !_i (in(c,x); A: out(c, f(f(f(g(a,d)))))).
+system R = !_i (in(c,x); A: out(c, f(f(f(g(a,d)))))).
 
 system R1 = [R/left] with rewrite ?bar foo.
 
@@ -88,7 +88,7 @@ Qed.
 (*------------------------------------------------------------------*)
 name n : index -> message.
 
-system [G] !_i (in(c,x); A: out(c, f(f(n(i))))).
+system G = !_i (in(c,x); A: out(c, f(f(n(i))))).
 
 axiom [G] check_ax_n0 (i : index) : happens (A(i)) => check(f(n(i))).
 axiom [G] check_ax_n1 (i : index) : happens (A(i)) => check(n(i)).
@@ -104,7 +104,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [H] !_i (in(c,x); let y = <x, zero> in A: out(c, y)).
+system H = !_i (in(c,x); let y = <x, zero> in A: out(c, y)).
 
 system H1 = [H/left] with rewrite /y.
 
@@ -116,7 +116,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [W]
+system W =
   !_i (in(c,x);
        let y1 = <x, a> in
        if x = zero then
@@ -134,7 +134,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [X]
+system X =
   !_i (in(c,x);
        let w = <x, a> in
        let w1 = <w, f(d)> in
@@ -150,7 +150,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [Z]
+system Z =
   !_i (in(c,x);
        let z = <x, a> in
        let z1 = <z, f(d)> in
@@ -178,7 +178,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-system [T]
+system T =
   !_i (let p = a in
        in(c,x);
        let p1 = <x, <p, f(d)>> in

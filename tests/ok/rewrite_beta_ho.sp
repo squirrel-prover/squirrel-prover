@@ -2,7 +2,7 @@
 
 include Basic.
 
-system [real] null.
+system real = null.
 
 name skR : index -> message.
 

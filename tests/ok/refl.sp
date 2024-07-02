@@ -10,7 +10,7 @@ Proof.
   checkfail refl exn NoRefl.
 Abort.
 
-system [macros] in(c,x);out(c,x).
+system macros = in(c,x);out(c,x).
 
 equiv e : if cond@A then ok.
 Proof.

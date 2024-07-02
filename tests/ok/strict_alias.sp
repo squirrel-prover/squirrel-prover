@@ -6,4 +6,4 @@ channel c
 
 system null.
 
-system [bis] (Out : out(c,zero)).
+system bis = (Out : out(c,zero)).

@@ -7,7 +7,7 @@ channel c
 
 system !_i out(c,<a(n(i)),a(m)>).
 
-system [bis] null.
+system bis = null.
 
 (*------------------------------------------------------------------*)
 type T.
@@ -54,9 +54,9 @@ Qed.
 (*------------------------------------------------------------------*)
 abstract ok : message
 
-system [s1] in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
+system s1 = in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
 
-system [s2] in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
+system s2 = in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
 
 (* sanity checks *)
 print system [s1/left, s2/right].

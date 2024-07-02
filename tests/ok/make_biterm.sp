@@ -19,9 +19,9 @@ hash h
 
 channel c
 
-system [t1] !_i if diff(True,False)  then (S:= diff(ok,koo); out(c,diff(S,ko))).
+system t1 = !_i if diff(True,False)  then (S:= diff(ok,koo); out(c,diff(S,ko))).
 
-system [t2] !_i if diff(False,ok=ok) then (S:= diff(koo,ok); out(c,diff(ko,S))).
+system t2 = !_i if diff(False,ok=ok) then (S:= diff(koo,ok); out(c,diff(ko,S))).
 
 
 equiv [t1/left, t2/right] test.

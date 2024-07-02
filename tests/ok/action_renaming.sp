@@ -16,7 +16,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-system [alt] B: !_j in(c,x); if x = ok(j) then out(c,<x,ok(j)>).
+system alt = B: !_j in(c,x); if x = ok(j) then out(c,<x,ok(j)>).
 
 lemma [alt] two (k:index) : happens (A(k)) => output@A(k) = <input@A(k),ok(k)>.
 Proof. 

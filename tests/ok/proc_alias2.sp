@@ -10,7 +10,7 @@ system C.
 lemma _ : happens(YU,YV) => output@YU = empty && output@YV = zero. 
 Proof. auto. Qed.
 
-system [P] ((Y: B) | (Z: B)).
+system P = ((Y: B) | (Z: B)).
 
 (* check that the action is indeed named `Y` *)
 lemma [P]  _ : 

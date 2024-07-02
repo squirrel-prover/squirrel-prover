@@ -3,7 +3,7 @@ channel c.
 include Basic.
 
 (* ========================================================= *)
-system [E] null.
+system E = null.
 
 (* ========================================================= *)
 abstract p : index -> message -> bool

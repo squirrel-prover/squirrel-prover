@@ -171,7 +171,7 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-system [P1] null.
+system P1 = null.
 
 global axiom [set: P1; equiv:default] p1 ['a] (x, y : 'a) : $(P x y).
 

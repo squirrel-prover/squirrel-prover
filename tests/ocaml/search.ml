@@ -11,7 +11,7 @@ let search_unify () =
       let st = Prover.init ~with_prelude:false () in
       let st = try Prover.exec_all ~test:true st
         "channel c
-        system [T] (S : !_i !_i new n; out(c,n)).
+        system T = (S : !_i !_i new n; out(c,n)).
         lemma [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
         Proof.
         admit.
@@ -51,7 +51,7 @@ let search_about_1 () =
   let st = 
     Prover.exec_command ~test:true 
         "channel c
-        system [T] (S : !_i new n; out(c,n))." st
+        system T = (S : !_i new n; out(c,n))." st
     |> Prover.exec_command ~test:true
          "lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
   |> Prover.exec_command ~test:true "Proof."
@@ -95,7 +95,7 @@ let search_about_2 () =
   let st = Prover.exec_all ~test:true st 
     "channel c
     name n : index->message
-    system [S] (A : out(c,diff(zero,empty))).
+    system S = (A : out(c,diff(zero,empty))).
 
     lemma [S] foo (i:index) : happens(A) => output@A = diff(zero,zero).
     Proof.
@@ -229,7 +229,7 @@ let include_search () =
     Prover.exec_all ~test:true st
         "include Basic.
         channel c
-        system [T] (S : !_i new n; out(c,n)).
+        system T = (S : !_i new n; out(c,n)).
         lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
         Proof."
   in
@@ -306,7 +306,7 @@ let include_ite () =
         hint rewrite if_false0.
 
         channel c
-        system [T] (S : !_i new n; out(c,n)).
+        system T = (S : !_i new n; out(c,n)).
         lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
         Proof.
          admit.

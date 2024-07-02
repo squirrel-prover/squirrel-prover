@@ -41,7 +41,7 @@ let some_print () =
   Prover.exec_all ~test:true st
     "include Basic.\n\
      channel c\n\
-     system [T] (S : !_i !_i new n; out(c,n)).\n\
+     system T = (S : !_i !_i new n; out(c,n)).\n\
      lemma [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).\n\
      Proof.\n\
        admit.\n\

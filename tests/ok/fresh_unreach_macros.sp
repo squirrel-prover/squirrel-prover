@@ -91,7 +91,7 @@ process R (i : index) =
   s2 := s1;
   out(c, x).
 
-system [second] (!_i Q: Q (i) | !_i R: R (i)).
+system second = (!_i Q: Q (i) | !_i R: R (i)).
 
 (* starting from [frame, s3], [n] is fresh *)
 global lemma [second] _ (t : timestamp[const]) :

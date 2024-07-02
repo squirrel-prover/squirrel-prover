@@ -8,7 +8,7 @@ process A(res:message) =  in(c,x);out(c,x); B: in(c,y); if y=ok then out(c,res).
 
 system A(diff(ok,ko)).
 
-system [toto] A(diff(ko,koo)).
+system toto = A(diff(ko,koo)).
 
 
 lemma test : happens(B) => output@B = diff(ok,ko).

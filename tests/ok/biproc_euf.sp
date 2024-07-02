@@ -10,7 +10,7 @@ process A(res:message) = out(c,res).
 
 system (A(h(ok,k)) | in(c,x)).
 
-system [toto] (A(h(ko,k)) | in(c,x)).
+system toto = (A(h(ko,k)) | in(c,x)).
 
 
 lemma test : input@A1 <> h(ko,k).

@@ -10,7 +10,7 @@ include Basic.
 game Foo = {}.
 
 (* --------------------------------------------------------- *)
-system [A1]
+system A1 =
   ((
    !_l !_p
    P : in(c,w); foo (l,p) := <foo l p, w>; out(c,empty)
@@ -34,7 +34,7 @@ Qed.
 
 (* --------------------------------------------------------- *)
 
-system [B]  
+system B =  
   ((
    !_l !_p
    in(c,w); foo (l,p) := <foo l p, w>; out(c,empty)

@@ -2,8 +2,8 @@
    conditions under which the rewriting can occur must be correctly 
    projected. *)
 
-system [a] null.
-system [b] null.
+system a = null.
+system b = null.
 
 abstract c : message.
 abstract d : message.
