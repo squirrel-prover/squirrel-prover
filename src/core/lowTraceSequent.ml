@@ -173,11 +173,16 @@ let get_all_messages (s : sequent) =
 
 let get_models table (proof_context : H.hyps) =
   let proof_context = 
-    H.fold_hyps (fun _ f acc ->
+    H.fold (fun _ f acc ->
         match f with
-        | Local f
-        | Global Equiv.(Atom (Reach f)) -> f :: acc
-        | Global _ -> acc
+        | LHyp (Local f)
+        | LHyp (Global Equiv.(Atom (Reach f))) -> f :: acc
+        | LHyp (Global _) -> acc
+        | LDef (_se, _t) -> acc
+        (* FIXME: we cannot translate definitions, as doing so
+           requires checking in which system `id` appears, which is
+           not easy (this will be possible once macros are decorated
+           with the system used to interpret them) *)
       ) proof_context [] 
   in
   Constr.models_conjunct (TConfig.solver_timeout table) proof_context
