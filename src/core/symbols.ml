@@ -624,7 +624,7 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       ?(scope : npath = table.scope) ?(data=Empty)
       (name : lsymb)
     = 
-    let symb = new_symb ~approx table table.scope name in
+    let symb = new_symb ~approx table scope name in
     let p = path scope symb in
     let record = { path = !< p; status = Defined N.kind; data; } in
     add p record table, p
