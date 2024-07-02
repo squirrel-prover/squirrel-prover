@@ -136,7 +136,7 @@ be defined and given an epxlicit name. For instance, the following declare the
 system `simple`, where each tag can only be executed once for each identity.
 
 ```*)
-system [simple] ((!_j reader(j)) | (!_i tag(i))).
+system simple = ((!_j reader(j)) | (!_i tag(i))).
 
 (*```
 

@@ -249,7 +249,7 @@ process InitiatorToCompromised(i,j,k:index) =
 
 
 
-system [main] out(cI,s); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))
+system main = out(cI,s); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))
 | (!_i !_j !_k I: InitiatorToCompromised(i,j,k))
 ).
 
@@ -321,7 +321,7 @@ process Responder2(j,k:index) =
      DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
-system [main_rand] out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))
+system main_rand = out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))
 | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))
 ).
 
@@ -555,7 +555,7 @@ in
  sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
-system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
+system idealized = out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
 
 (* ======== *)
 (*  Proofs  *)

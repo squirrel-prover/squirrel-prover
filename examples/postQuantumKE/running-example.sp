@@ -97,7 +97,7 @@ process Responder =
 
 (* Finally declare our "real" system, where the public seed
    s is disclosed, after which our two agents run in parallel. *)
-system [real] out(cI,s); (Responder | Initiator).
+system real = out(cI,s); (Responder | Initiator).
 
 (**********************)
 (* Idealized Protocol *)
@@ -117,7 +117,7 @@ process InitiatorCCA =
   let kR = dec(ctR,skI) in
   sIR := h(s,kI) XOR h(s,kR).
 
-system [ideal] out(cI,s); (Responder | InitiatorCCA).
+system ideal = out(cI,s); (Responder | InitiatorCCA).
 
 (* Note that both of our systems are bi-systems with equal projections.
    This could be improved when Squirrel allows the declaration of single

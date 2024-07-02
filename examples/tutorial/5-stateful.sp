@@ -32,7 +32,7 @@ abstract a : message.
 name k : message.
 name r : message.
 
-system [example] null.
+system example = null.
 
 lemma [example] _ : 
   dec(att(enc(a,r,k)), k) <> fail => 

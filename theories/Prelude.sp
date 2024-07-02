@@ -14,4 +14,4 @@ abstract witness ['a] : 'a.
 
 abstract zeroes : message -> message.
 
-system [Empty] null.
+system Empty = null.

@@ -45,7 +45,7 @@ process Agent(i:index,k:index) =
   new nT;
   out(c, <nT, h(<nT,x>,key(i))>).
 
-system [HashLock]  (!_i !_j A: Agent(i,j)).
+system HashLock = (!_i !_j A: Agent(i,j)).
 
 (* Proof that at any time `t`,
    given the sequence of all message outputted before that time,

@@ -93,7 +93,7 @@ process protocol = (
   (!_O kdforacle(O))
 ).
 
-system [default] protocol.
+system default = protocol.
 
 (*------------------------------------------------------------------*)
 include Basic.

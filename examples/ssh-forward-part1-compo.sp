@@ -17,10 +17,10 @@ either other honnest sessions of SSH, or other forwarded session.
 As this protocol is a confirmation, we have to prove that
 
  * just after the key is derived, it satisfies the real-or-random property,
-cf. system [secret]
+cf. system secret
 
  * if the key confirmation succeeds, two honnest sessions are paired together,
-cf. system [auth].
+cf. system auth.
 
 For the first point, we actually split the first message of S into two messages,
 yielding the protocol:
@@ -116,7 +116,7 @@ process S =
   if checksign(sidS, dec(encP,gP^b1), pk(kP)) then
     Sok : out(cS,ok)
 
-system [fullSSH] ( P | S).
+system fullSSH = ( P | S).
 
 (* The secret is expected to hold at the end of P0 *)
 
@@ -137,7 +137,7 @@ process SDDH =
      out(cP,diff(g^a1^b1,g^k11))
 
 
-system [secret] (PDDH | SDDH).
+system secret = (PDDH | SDDH).
 
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -187,7 +187,7 @@ process Sauth =
      else
        Sfail :  out(cS,diff(ok,ko))
 
-system [auth]  (Pauth | Sauth).
+system auth = (Pauth | Sauth).
 
 axiom [auth] hashnotfor (x1,x2:message): h(x1,hKey) <> <forwarded,x2>
 

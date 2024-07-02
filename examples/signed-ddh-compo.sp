@@ -98,7 +98,7 @@ process S =
 	 )
 
 
-system [auth] ( P | S).
+system auth = ( P | S).
 
 
 process P2 =
@@ -133,7 +133,7 @@ process S2 =
             (try find l such that gP = g^a(l) in
                out(cP, g^b1^a(l)))
 
-system [secret] ( P2 | S2).
+system secret = ( P2 | S2).
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 lemma [auth] S1_charac :

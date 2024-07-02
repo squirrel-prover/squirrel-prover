@@ -91,7 +91,7 @@ process reader(j:index) =
     * two actions for the reader, corresponding to the two branches of the
       conditional (respectively `R` and `R1`). *)
 
-system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+system BasicHash = ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Whenever a reader accepts a message (_i.e._ the condition of the action
     `R(j)` evaluates to `true`), there exists an action `T(i,k)` that has been

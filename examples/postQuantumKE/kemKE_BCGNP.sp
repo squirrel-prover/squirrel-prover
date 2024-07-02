@@ -179,7 +179,7 @@ process InitiatorToCompromised(i,j,k:index) =
  sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
 
 
-system [main] out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))).
+system main = out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))).
 
 
 system mainCCAkR = [main/left] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(skI(il))).
@@ -269,7 +269,7 @@ process InitiatorToCompromised2(i,j,k:index) =
  let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
  sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
 
-system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
+system idealized = out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 
 
 (* ======== *)

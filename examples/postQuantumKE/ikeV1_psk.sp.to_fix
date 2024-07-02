@@ -100,7 +100,7 @@ process Responder(j:index) =
     if m2 =  h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > , h(< fst(snd(m)),Nr(j) > ,psk(i,j))) then
        out(cR, ok)
 
-system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
+system Main = ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
 
 
 
@@ -170,7 +170,7 @@ process ResponderI(j:index) =
         ) then
        out(cR, ok)
 
-system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
+system Ideal1 = ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 
 
@@ -339,7 +339,7 @@ process ResponderI2(j:index) =
          then
        out(cR, ok)
 
-system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
+system Ideal2 = ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 (* We now prove the authentication on this ideal system. *)
 
@@ -493,7 +493,7 @@ process ResponderRoR(j:index) =
                h( exp(fst(m),b(j)),  IgarbR(j,i))
 , idealkeys(i,j))).
 
-system [Ror] ((!_j R: ResponderRoR(j)) | (!_i I: InitiatorRoR(i))).
+system Ror = ((!_j R: ResponderRoR(j)) | (!_i I: InitiatorRoR(i))).
 
 
 

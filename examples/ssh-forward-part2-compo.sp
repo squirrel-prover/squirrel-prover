@@ -176,7 +176,7 @@ process SDIS =
   if checksign(<forwarded, sidS>, x, pk(kP)) then
     Sok : out(cS,ok).
 
-system [fullSSH] (P1FA | SDIS | PDIS).
+system fullSSH = (P1FA | SDIS | PDIS).
 
 (* Now the process for the secrecy *)
 
@@ -231,7 +231,7 @@ process SDISDDH =
   if gP = g^a1 then (
   out(cP,diff(g^a1^b1,g^c11))).
 
-system [secret] (P1FADDH | SDISDDH | PDISDDH).
+system secret = (P1FADDH | SDISDDH | PDISDDH).
 
 
 equiv [secret] secret.
@@ -319,7 +319,7 @@ process SDISauth =
     else (
       Sfail :  out(cS,diff(ok,ko))))
 
-system [auth] ( P1FAauth | SDISauth | PDISauth).
+system auth = ( P1FAauth | SDISauth | PDISauth).
 
 
 (* Based on a difference between the bitstring lengths, we can assume that it is

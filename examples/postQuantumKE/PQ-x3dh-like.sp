@@ -187,7 +187,7 @@ process InitiatorToCompromised(i,j,k:index) =
 
 
 
-system [main]  out(cI,skex); (
+system main = out(cI,skex); (
          (!_j !_k R: Responder(j,k)) 
        | (!_i !_j !_k I: Initiator(i,j,k))
        | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))
@@ -268,7 +268,7 @@ process InitiatorToCompromised2(i,j,k:index) =
    if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
     DFI :  sIR(i,j,k) := kj.
 
-system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
+system idealized = out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
 equiv [mainCCAkR,idealized/left] test.
@@ -479,7 +479,7 @@ process InitiatorToCompromised3(i,j,k:index) =
 
 
 
-system [idealized3]  out(cI,skex); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised3(i,j,k))).
+system idealized3 = out(cI,skex); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised3(i,j,k))).
 
 (* ============= *)
 (*    PROOFS     *)

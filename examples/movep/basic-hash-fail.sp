@@ -52,7 +52,7 @@ process reader(j:index) =
   else
     out(cR,ko).
 
-system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+system BasicHash = ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Show the set of actions obtained from above process. *)
 print system [BasicHash].

@@ -216,7 +216,7 @@ process ResponderRor(i,j:index) =
 
 
 
-system [core]  out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I: InitiatorRoR(i,j))).
+system core = out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I: InitiatorRoR(i,j))).
 
 system core2 = [core/left] with gprf (il,jl,kl,ll:index),
  prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl)).
