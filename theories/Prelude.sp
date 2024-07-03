@@ -15,3 +15,5 @@ abstract witness ['a] : 'a.
 abstract zeroes : message -> message.
 
 system Empty = null.
+
+type quantum_message.
