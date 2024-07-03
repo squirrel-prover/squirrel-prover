@@ -193,7 +193,10 @@ let _pp ~dbg : Format.formatter -> ty -> unit =
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
     | TBase (np,s) -> 
-      Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
+      if np = [] then
+        Fmt.pf ppf "%s" s
+      else 
+        Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
     | TVar id   -> _pp_tvar ~dbg ppf id
     | TUnivar u -> pp_univar ppf u
 
