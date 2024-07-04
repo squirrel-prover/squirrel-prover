@@ -527,7 +527,7 @@ let print_functions table (p : Symbols.p_path) : bool =
 
     | Abstract _ ->
       let data, _ = Symbols.OpData.get_abstract_data path table in
-      Printer.prt `Default "fun %s : %a : %a@." 
+      Printer.prt `Default "fun %s : %a = %a@." 
         (Symbols.p_path_to_string p)
         Type.pp_ftype ftype 
         Symbols.OpData.pp_abstract_def data

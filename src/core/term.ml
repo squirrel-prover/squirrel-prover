@@ -705,7 +705,7 @@ module SmartDestructors = struct
   let destr_ors   = mk_destr_many_right f_or
   let destr_ands  = mk_destr_many_right f_and
   let destr_impls = mk_destr_many_right f_impl
-
+    
   (*------------------------------------------------------------------*)
   (** for any associative [fs] of arity 2 *)
   let mk_decompose fs =

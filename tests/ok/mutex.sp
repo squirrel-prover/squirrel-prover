@@ -18,28 +18,28 @@ system foo = (
 print mutex_foo_C_D.
 
 lemma [foo] _ (a,i,j,k : index) : 
-  not (happens (C a i)) || not (happens(D a j k)).
+  not (happens (C (a, i))) || not (happens(D (a, j, k))).
 Proof. by apply mutex_foo_C_D. Qed.
 
 lemma [foo] _ (a,i,j,k : index) : 
-  not (happens (C1 a i)) || not (happens(D a j k)).
+  not (happens (C1 (a, i))) || not (happens(D (a, j, k))).
 Proof. by apply mutex_foo_C1_D. Qed.
 
 lemma [foo] _ (a,a0,i,j,k : index) : 
-  not (happens (C a i)) || not (happens(D a0 j k)).
+  not (happens (C (a, i))) || not (happens(D (a0, j, k))).
 Proof. 
   checkfail (try apply mutex_foo_C_D); auto exn GoalNotClosed. 
 Abort.
 
 lemma [foo] _ (a,i,j,k : index) : 
-  not (happens (C1 a i)) || not (happens(C a j)).
+  not (happens (C1 (a, i))) || not (happens(C (a, j))).
 Proof. 
   checkfail (try apply mutex_foo_C_C1); auto exn GoalNotClosed.
   checkfail (try apply mutex_foo_C1_C); auto exn GoalNotClosed.
 Abort.
 
 lemma [foo] _ (a,i,j,k : index) : 
-  not (happens (C a i)) || not (happens(C a j)).
+  not (happens (C (a, i))) || not (happens(C (a, j))).
 Proof. 
   checkfail (try apply mutex_foo_C_C); auto exn GoalNotClosed.
   checkfail (try apply mutex_foo_C_C1); auto exn GoalNotClosed.

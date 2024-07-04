@@ -3,6 +3,16 @@
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
+(** {2 Macro for mutable state} *)
+
+type Symbols.state_macro_def += StateInit_data of Vars.var list * Term.term
+
+(** [get_init_states] returns all the initial values of declared state symbols,
+    used to register the init action. *)
+val get_init_states :
+  Symbols.table -> (Symbols.macro * Term.terms * Term.term) list
+
+(*------------------------------------------------------------------*)
 (** {2 General macro definitions} *)
     
 (*------------------------------------------------------------------*)
@@ -170,11 +180,10 @@ val as_global_macro : Symbols.data -> global_data
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-(** Type of the output a macro. *)
-val ty_out : Symbols.table -> Symbols.macro -> Type.ty 
-
-(** Types of the arguments of a macro. *)
-val deprecated_ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
+(** Get the ftype of a macro. 
+    The second argument is the type of the variable we are recursing
+    upon (i.e. the variable after the `@` *)
+val fty : Symbols.table -> Symbols.macro -> Type.ftype * Type.ty 
 
 val is_global : Symbols.table -> Symbols.macro -> bool
 

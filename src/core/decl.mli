@@ -20,7 +20,7 @@ type c_tys = c_ty list
 
 (*------------------------------------------------------------------*)
 (** Information for a macro declaration *)
-type macro_decl = {
+type state_macro_decl = {
   name      : lsymb;
   args      : Theory.bnds;
   out_ty    : Theory.p_ty option;
@@ -152,7 +152,7 @@ type declaration_i =
 
   | Decl_action    of action_decl
   | Decl_name      of lsymb * Theory.p_ty
-  | Decl_state     of macro_decl
+  | Decl_state     of state_macro_decl
   | Decl_operator  of operator_decl
   | Decl_predicate of predicate_decl
   | Decl_bty       of bty_decl

@@ -149,7 +149,7 @@ val is_def  : Symbols.action -> Symbols.table -> bool
 val is_decl : Symbols.action -> Symbols.table -> bool 
 
 (*------------------------------------------------------------------*)
-val get_def : Symbols.action -> Symbols.table -> Vars.var list * action 
+val get_def : Symbols.action -> Symbols.table -> Vars.var list * action
 
 (*------------------------------------------------------------------*)
 val convert : Symbols.p_path -> Symbols.table -> Symbols.action

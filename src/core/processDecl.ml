@@ -54,6 +54,53 @@ let error loc k e = raise (Error (loc,k,e))
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
+(** [parse_state_decl n [(x1,s1);...;(xn;sn)] s t] declares
+    a new state symbol of type [s1->...->sn->s]
+    where [si] is [index] and [s] is [message]
+    such that value of [s(t1,...,tn)] for init timestamp
+    expands to [t\[x1:=t1,...,xn:=tn\]]. *)
+let parse_state_decl
+    (table : Symbols.table)
+    ({ name; args = p_args; out_ty; init_body; } : Decl.state_macro_decl)
+  =
+  let ts_init = Term.mk_action Symbols.init_action [] in
+
+  (* open a typing environment *)
+  let ty_env = Type.Infer.mk_env () in
+  
+  let env = Env.init ~table () in
+  let conv_env = Theory.{ env; cntxt = InProc ([], ts_init); } in
+
+  let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env p_args in
+  let conv_env = { conv_env with env } in
+
+  (* parse the macro type *)
+  let out_ty = omap (Theory.convert_ty env) out_ty in
+
+  let t, out_ty = Theory.convert ~ty_env ?ty:out_ty conv_env init_body in
+
+  (* check that the typing environment is closed *)
+  if not (Type.Infer.is_closed ty_env) then
+    Theory.conv_err (L.loc init_body) Freetyunivar;
+
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+  let t = Term.tsubst tsubst t in
+  let args = List.map (Vars.tsubst tsubst) args in
+
+  (* FIXME: generalize allowed types *)
+  List.iter2 (fun v (_, pty) ->
+      if not (Type.equal (Vars.ty v) Type.tindex) then
+        Theory.conv_err (L.loc pty) (BadPty [Type.tindex])
+    ) args p_args;
+
+  let data =
+    Symbols.Macro
+      (State (List.length p_args,out_ty, Macros.StateInit_data (args,t)))
+  in
+  let table, _ = Symbols.Macro.declare ~approx:false table name ~data in
+  table
+
 (*------------------------------------------------------------------*)
 (** Parse an abstract or concrete operator declaration. *)
 let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
@@ -92,7 +139,9 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
         `Abstract in_tys, out_ty
 
       | `Concrete body ->
-        let body, out_ty = Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body in
+        let body, out_ty =
+          Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body
+        in
         let body = Term.subst subst body in
         `Concrete body, out_ty
     in
@@ -465,8 +514,8 @@ let declare table decl : Symbols.table * Goal.t list =
     in
     Process.add_namelength_axiom table n n_fty, []
 
-  | Decl.Decl_state { name; args; out_ty; init_body; } ->
-    Theory.declare_state table name args out_ty init_body, []
+  | Decl.Decl_state decl ->
+    parse_state_decl table decl, []
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h, []

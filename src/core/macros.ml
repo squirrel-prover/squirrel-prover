@@ -1,9 +1,24 @@
 open Utils
 
+module L = Location
 module S = System
 module SE = SystemExpr
 
 let soft_failure = Tactics.soft_failure
+
+(*------------------------------------------------------------------*)
+(** {2 Macro for mutable state} *)
+
+type Symbols.state_macro_def += StateInit_data of Vars.var list * Term.term
+
+let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
+  Symbols.Macro.fold (fun s data acc ->
+      match data with
+      | Symbols.Macro (State (_arity,kind,StateInit_data (l,t))) ->
+        assert (Type.equal kind (Term.ty t));
+        (s,List.map Term.mk_var l,t) :: acc
+      | _ -> acc
+    ) [] table
 
 (*------------------------------------------------------------------*)
 (** {2 General macro definitions} *)
@@ -146,8 +161,8 @@ module Classical = struct
                      Symbols.exec , exec  ;
                      Symbols.out  , output;
                      Symbols.cond , cond  ; ];
-    }
-end
+    } 
+end (* Classical *)
 
 (*------------------------------------------------------------------*)
 module PostQuantum = struct
@@ -256,7 +271,7 @@ module PostQuantum = struct
                      Symbols.q_state, state ;
                      Symbols.q_cond , cond  ; ];
     }
-end
+end (* PostQuantum *)
 
   (*------------------------------------------------------------------*)
 let builtin_exec_models table = [Classical.model table; PostQuantum.model table]
@@ -376,25 +391,36 @@ let declare_global
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
- 
-let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
-  match Symbols.get_macro_data ms table with
-    | Symbols.Global (_, ty, _) -> ty
-    | Symbols.State (_,ty,_) -> ty
-    | Symbols.General def ->
-      match get_general_macro_data def with
-      | Structured data -> data.ty
-      | ProtocolMacro `Output -> Type.tmessage
-      | ProtocolMacro `Cond   -> Type.tboolean
 
-let deprecated_ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
-  match Symbols.get_macro_data ms table with
-    | Symbols.Global (arity, _, _) ->
-      List.init arity (fun _ -> Type.tindex)
-    | General _ -> []
-    | Symbols.State (arity,_,_) ->
-      List.init arity (fun _ -> Type.tindex)
+(** Get the ftype of a macro. 
+    The second argument is the type of the variable we are recursing
+    upon (i.e. the variable after the `@` *)
+let fty (table : Symbols.table) (ms : Symbols.macro) : Type.ftype * Type.ty =
+  let fty_args, fty_out, rec_ty =
+    match Symbols.get_macro_data ms table with
+    | Symbols.Global (_, ty, data) ->
+      let data = get_global_data data in
+      List.map Vars.ty data.indices, ty, Type.ttimestamp
+    | General def ->
+      begin
+        match get_general_macro_data def with
+        | Structured     data   -> [],       data.ty, data.rec_ty
+        | ProtocolMacro `Output -> [], Type.tmessage, Type.ttimestamp
+        | ProtocolMacro `Cond   -> [], Type.tboolean, Type.ttimestamp
+      end
 
+    | Symbols.State (_,ty,data) ->
+      begin
+        match data with
+        | StateInit_data (vs,_) -> List.map Vars.ty vs, ty, Type.ttimestamp
+        | _ -> assert false
+      end
+  in
+  (* FIXME: quantum: allow other types than [timestamp] *)
+  assert (Type.equal rec_ty Type.ttimestamp);
+  Type.mk_ftype [] fty_args fty_out, rec_ty
+
+(*------------------------------------------------------------------*)
 let is_global table (ms : Symbols.macro) : bool =
   match Symbols.get_macro_data ms table with
   | Symbols.Global (_, _, _) -> true
@@ -552,8 +578,8 @@ let get_definition_nocntxt
   | General data ->
     begin
       match get_general_macro_data data with
+      (* TODO: quantum: allow arguments in generic structured macros *)
       | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
-      (* TODO: quantum: quantum outputs *)
       | ProtocolMacro `Output -> 
         `Def (Term.subst descr_subst (snd unapplied_descr.output))
       | ProtocolMacro `Cond ->

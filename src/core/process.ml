@@ -464,9 +464,22 @@ let parse
 
     | Parse.Alias (p,a) -> Alias (doit ty_env env p, L.unloc a)
 
-    | Parse.Set (s, l, m, p) ->
-      let ty = Theory.check_state env.table s (List.length l) in
-      let s = Symbols.Macro.convert_path s env.table in
+    | Parse.Set (s_p, l, m, p) ->
+      let s = Symbols.Macro.convert_path s_p env.table in
+      let nb_args = List.length l in
+      let ty =
+        match Symbols.get_macro_data s table with
+        | Symbols.State (arity,ty,_) ->
+          (* updating a macro requires to use it in eta-long form *)
+          if arity <> nb_args then
+            Theory.conv_err (Symbols.p_path_loc s_p)
+              (Arity_error (Symbols.p_path_to_string s_p,nb_args,arity));
+          ty
+          
+        | _ ->
+          Theory.conv_err (Symbols.p_path_loc s_p)
+            (Assign_no_state (Symbols.p_path_to_string s_p))
+      in
 
       let l =
         List.map (fun x ->
@@ -1317,7 +1330,7 @@ let declare_system
       input     = Symbols.dummy_channel;
       indices   = [];
       condition = ([], Term.mk_true);
-      updates   = Theory.get_init_states table;
+      updates   = Macros.get_init_states table;
       output    = (Symbols.dummy_channel, Term.empty);
       globals   = []; }
   in

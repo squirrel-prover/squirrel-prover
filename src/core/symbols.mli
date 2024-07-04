@@ -19,7 +19,8 @@ type p_path = p_npath * string L.located
 val p_npath_loc : p_npath -> L.t
 val p_path_loc  : p_path  -> L.t
 
-val p_path_to_string : ?sep:string -> p_path -> string
+val p_npath_to_string : ?sep:string -> p_npath -> string
+val p_path_to_string  : ?sep:string -> p_path  -> string
 
 (*------------------------------------------------------------------*)
 (** An untyped namespace path. Unsafe API. *)
@@ -28,7 +29,8 @@ type s_npath = string list
 (** An untyped symbol path [(p,s)] representing [p.s]. Unsafe API. *)
 type s_path = string list * string 
 
-val s_path_to_string : ?sep:string -> s_path -> string
+val s_npath_to_string : ?sep:string -> s_npath -> string
+val s_path_to_string  : ?sep:string -> s_path  -> string
 
 (*------------------------------------------------------------------*)
 (** Type of a function symbol (Prefix or Infix)
@@ -271,8 +273,9 @@ module type SymbolKind = sig
   (** Return a single match. *)
   val convert1 : p_path -> table -> ns path * data
 
-  (** Return all matches. Result list cannot be empty. *)  
-  val convert : p_path -> table -> (ns path * data) list
+  (** Return all matches. 
+      Result list cannot be empty, except if [allow_empty] is true. *)  
+  val convert : ?allow_empty:bool -> p_path -> table -> (ns path * data) list
 
   (** Get only the path (and ignore additional matches if any). *)
   val convert_path : p_path -> table -> ns path 
@@ -325,7 +328,7 @@ val namespace_open : table -> npath -> table
 (** {2 Error Handling} *)
 
 type error_i =
-  | Unbound_identifier    of npath option * string
+  | Unbound_identifier    of string option * string
   (** [string] unknown in optional namespace [npath] *)
   | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
   | Multiple_declarations of npath * string * symbol_kind * group
@@ -446,6 +449,7 @@ type macro_data =
               
 type data += Macro of macro_data 
 
+val as_macro_data : data -> macro_data 
 val get_macro_data : macro -> table -> macro_data
 
 (*------------------------------------------------------------------*)
@@ -457,6 +461,7 @@ type name_data = {
 
 type data += Name of name_data
 
+val as_name_data : data -> name_data 
 val get_name_data : name -> table -> name_data
   
 (*------------------------------------------------------------------*)

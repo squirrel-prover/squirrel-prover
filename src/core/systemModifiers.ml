@@ -763,14 +763,16 @@ let xo_lt
     
     (* create a [msymb] with new (fresh) indices for [y] *)
     let ms_y =
-      Term.mk_symb
-        y.x_msymb
-        (Macros.ty_out table y.x_msymb)
+      let fty, _ = Macros.fty table y.x_msymb in
+      assert (fty.fty_vars = []);
+      Term.mk_symb y.x_msymb fty.fty_out
     in
     let ms_y_args =
+      let fty, _ = Macros.fty table y.x_msymb in
+      assert (fty.fty_vars = []);
       List.map (fun ty ->
           Term.mk_var (Vars.make_fresh ty "a")
-        ) (Macros.deprecated_ty_args table y.x_msymb)
+        ) fty.fty_args
     in
     let a_y = Term.mk_action y.x_a (Term.mk_vars y.x_a_is) in
 

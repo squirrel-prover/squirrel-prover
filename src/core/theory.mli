@@ -199,22 +199,9 @@ val declare_signature :
   ?pk_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
-
-(** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
-    a new state symbol of type [s1->...->sn->s]
-    where [si] is [index] and [s] is [message]
-    such that value of [s(t1,...,tn)] for init timestamp
-    expands to [t\[x1:=t1,...,xn:=tn\]]. *)
-val declare_state : 
-  Symbols.table -> lsymb -> bnds -> p_ty option -> term -> Symbols.table
        
-(** [get_init_states] returns all the initial values of declared state symbols,
-    used to register the init action. *)
-val get_init_states :
-  Symbols.table -> (Symbols.macro * Term.terms * Term.term) list
-
 (** [declare_abstract n i m] declares a new function symbol
-  * of type [index^i -> message^m -> message]. *)
+    of type [index^i -> message^m -> message]. *)
 val declare_abstract :
   Symbols.table -> 
   ty_args:Type.tvar list ->
@@ -242,7 +229,7 @@ val var          : L.t -> string -> term
 
 type conversion_error_i =
   | Arity_error          of string * int * int
-  | UndefinedOfKind      of Symbols.npath option * string * Symbols.symbol_kind
+  | UndefinedOfKind      of string option * string * Symbols.symbol_kind
   (** [string] unknown in optional namespace [npath] for kind [kind] *)
   | Type_error           of Term.term * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of string
@@ -286,8 +273,6 @@ val check :
   Type.Infer.env -> Term.projs ->
   term -> Type.ty ->
   unit
-
-val check_state : Symbols.table -> Symbols.p_path -> int -> Type.ty
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the

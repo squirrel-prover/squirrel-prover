@@ -24,11 +24,20 @@ type s_npath = string list
 (** An untyped symbol path *)
 type s_path = string list * string
 
-let s_path_to_string ?(sep = ".") ((top,sub) : s_path) =
-  Fmt.str "%a%s%a"
+(*------------------------------------------------------------------*)
+let s_npath_to_string ?(sep = ".") (top : s_npath) : string =
+  Fmt.str "%a"
     (Fmt.list ~sep:(fun fmt () -> Fmt.string fmt sep) Fmt.string) top
+
+let s_path_to_string ?(sep = ".") ((top,sub) : s_path) =
+  Fmt.str "%s%s%a"
+    (s_npath_to_string ~sep top)
     (if top = [] then "" else sep)
     Fmt.string sub
+
+(*------------------------------------------------------------------*)
+let p_npath_to_string ?sep (top : p_npath) =
+  s_npath_to_string ?sep (List.map L.unloc top)
 
 let p_path_to_string ?sep ((top,sub) : p_path) =
   s_path_to_string ?sep (List.map L.unloc top, L.unloc sub)
@@ -242,7 +251,7 @@ module Mn = Map.Make (struct
 (** {2 Error Handling} *)
 
 type error_i =
-  | Unbound_identifier    of npath option * string
+  | Unbound_identifier    of string option * string
   (** [string] unknown in optional namespace [npath] *)
   | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
   | Multiple_declarations of npath * string * symbol_kind * group
@@ -253,10 +262,10 @@ type error = L.t * error_i
 let pp_error_i fmt = function
   | Unbound_identifier (None, s) -> Fmt.pf fmt "unknown symbol %s" s 
   | Unbound_identifier (Some np, s) ->
-    if np.npath = [] then
-      Fmt.pf fmt "unknown symbol %s %a" s pp_npath np
+    if np = "" then
+      Fmt.pf fmt "unknown symbol %s" s
     else
-      Fmt.pf fmt "unknown symbol %s in %a" s pp_npath np
+      Fmt.pf fmt "unknown symbol %s in %s" s np
 
   | Incorrect_kind (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"
@@ -471,7 +480,9 @@ let lookup_p_path
   let t = { group; name = L.unloc s } in
   let records = 
     try Msymb.find t r with 
-    | Not_found -> symb_err (L.loc s) (Unbound_identifier (Some top, L.unloc s))
+    | Not_found ->
+      symb_err (L.loc s)
+        (Unbound_identifier (Some (npath_to_string top), L.unloc s))
   in
   top, records
 
@@ -513,7 +524,7 @@ module type SymbolKind = sig
 
   (*------------------------------------------------------------------*)
   val convert1     : p_path -> table ->  ns path * data
-  val convert      : p_path -> table -> (ns path * data) list
+  val convert      : ?allow_empty:bool -> p_path -> table -> (ns path * data) list
   val convert_path : p_path -> table ->  ns path 
 
   (*------------------------------------------------------------------*)
@@ -644,7 +655,8 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
     | exception Not_found -> false
     
   (*------------------------------------------------------------------*)
-  let convert 
+  let convert
+      ?(allow_empty = false)
       ( ((_,sub) as p) : p_path) (table : table) 
     : (ns path * data) list 
     =
@@ -656,8 +668,9 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
           else None
         ) records 
     in
-    if results = [] then
-      symb_err (L.loc sub) (Unbound_identifier (Some top, L.unloc sub));
+    if not allow_empty && results = [] then
+      symb_err (L.loc sub)
+        (Unbound_identifier (Some (npath_to_string top), L.unloc sub));
     results
 
   let convert1 (p : p_path) (table : table) = List.hd (convert p table)
@@ -1086,10 +1099,13 @@ type macro_data =
 
 type data += Macro of macro_data 
 
-let get_macro_data (ms : macro) (table : table) : macro_data =
-  match Macro.get_data ms table with
+let as_macro_data (data : data) : macro_data =
+  match data with
   | Macro data -> data
   | _ -> assert false           (* impossible *)
+
+let get_macro_data (ms : macro) (table : table) : macro_data =
+  as_macro_data (Macro.get_data ms table)
 
 (*------------------------------------------------------------------*)
 (** Name data *)
@@ -1100,10 +1116,13 @@ type name_data = {
 
 type data += Name of name_data
 
-let get_name_data (ms : name) (table : table) : name_data =
-  match Name.get_data ms table with
+let as_name_data (data : data) : name_data =
+  match data with
   | Name data -> data
   | _ -> assert false           (* impossible *)
+
+let get_name_data (ms : name) (table : table) : name_data =
+  as_name_data (Name.get_data ms table)
 
 (*------------------------------------------------------------------*)
 (** {2 Type information} *)

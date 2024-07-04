@@ -561,11 +561,11 @@ let pp_ftype_g pp_g fmt fty =
       pp_ty
   else
     Fmt.pf fmt "@[<hov 2>[%a] %t@]"
-      (Fmt.list ~sep:Fmt.comma pp_g) fty.fty_vars
+      (Fmt.list ~sep:(Fmt.any " ") pp_g) fty.fty_vars
       pp_ty
     
-let pp_ftype    = pp_ftype_g pp_univar
-let pp_ftype_op = pp_ftype_g pp_tvar
+let pp_ftype    = pp_ftype_g pp_tvar
+let pp_ftype_op = pp_ftype_g pp_univar
 
 (*------------------------------------------------------------------*)
 let ftype_fv (f : ftype) : Fv.t =

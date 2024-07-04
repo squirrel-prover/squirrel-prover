@@ -28,7 +28,7 @@ let pp_concrete_operator fmt op =
   let pp_tyvars fmt tyvars =
     if tyvars = [] then () 
     else
-      Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tyvars
+      Fmt.pf fmt "[%a] " (Fmt.list ~sep:(Fmt.any " ") Type.pp_tvar) tyvars
   in
   let pp_args fmt args =
     if args = [] then () 
