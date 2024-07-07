@@ -831,9 +831,12 @@ tactic_param:
 | i=loc(INT)             { TacticsArgs.Int_parsed i }
 
 tactic_params:
-|                                       { [] }
-| t=tactic_param                        { [t] }
-| t=tactic_param COMMA ts=tactic_params { t::ts }
+| l=slist(tactic_param,COMMA) { l }
+
+(*------------------------------------------------------------------*)
+tacargs_string_int:
+| s=lsymb                { TacticsArgs.String_name s }
+| i=loc(INT)             { TacticsArgs.Int_parsed i }
 
 (*------------------------------------------------------------------*)
 rw_mult:
@@ -1088,28 +1091,35 @@ crypto_arg:
 (*------------------------------------------------------------------*)
 /* Named arguments for tactics */
 /* Here we use a "lexical feedback" hack to make it possible to
-   parse keywords as lsymbs. */
+   parse keywords as lsymbs. The special production [enable_kwd_as_id]
+   must be reduced to disable the parsing of keywords as identifiers,
+   therefore it cannot be used locally around the [lsymb]s. Thus we
+   use it at the level of [named_arg_gen], where it is reduced when
+   TILDE is read.
+   As a result the genericity of [named_arg_gen] is weakened:
+   X can be instantiated by [lsymb] or something like [tacargs_string_int]
+   but nothing that includes keywords, such as terms. */
 
 enable_kwd_as_id:
 | { Feedback.enable_keywords_as_ids () }
 disable_kwd_as_id:
 | { Feedback.disable_keywords_as_ids () }
 
-named_arg:
-| enable_kwd_as_id TILDE l=label disable_kwd_as_id
+named_arg_gen(X):
+| enable_kwd_as_id TILDE l=lsymb disable_kwd_as_id
   { TacticsArgs.NArg l }
-| enable_kwd_as_id TILDE l=label COLON
-  LBRACKET ll=slist(label,COMMA) RBRACKET
+| enable_kwd_as_id TILDE l=lsymb COLON
+  LBRACKET ll=slist(X,COMMA) RBRACKET
   disable_kwd_as_id
   { TacticsArgs.NList (l,ll) }
-| enable_kwd_as_id TILDE l=label COLON a=label disable_kwd_as_id
+| enable_kwd_as_id TILDE l=lsymb COLON a=X disable_kwd_as_id
   { TacticsArgs.NList (l,[a]) }
 
-label:
-| l=lsymb { l }
+named_args_gen(X):
+| args=slist(named_arg_gen(X),empty) { args }
 
 named_args:
-| args=slist(named_arg, empty) { args }
+| named_args_gen(lsymb) { $1 }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -1146,8 +1156,8 @@ tac:
     { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Theory t] }
 
   (* SMT *)
-  | id=loc(SMT) a=named_args 
-    { mk_abstract (L.loc id) "smt" [TacticsArgs.Named_args a] }
+  | id=loc(SMT) a=named_args_gen(tacargs_string_int)
+    { mk_abstract (L.loc id) "smt" [TacticsArgs.Named_args_gen a] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term

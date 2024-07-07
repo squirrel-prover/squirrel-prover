@@ -1429,41 +1429,50 @@ let parse_prover_arg prover_alt =
     | [p] -> add_dash p, ""
     | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
 
-let parse_arg parameters = function
+let parse_arg parameters =
+  let open TacticsArgs in
+  function
 
   (* Translation style for timestamps *)
-  | TacticsArgs.NList ({Location.pl_desc="style"},
-                       [{Location.pl_desc="abstract_noeq"}]) ->
+  | NList ({Location.pl_desc="style"},
+           [String_name {Location.pl_desc="abstract_noeq"}]) ->
     { parameters with timestamp_style = Abstract }
-  | TacticsArgs.NList ({Location.pl_desc="style"},
-                       [{Location.pl_desc="nat"}]) ->
+  | NList ({Location.pl_desc="style"},
+           [String_name {Location.pl_desc="nat"}]) ->
     { parameters with timestamp_style = Nat }
-  | TacticsArgs.NList ({Location.pl_desc="style"},
-                       [{Location.pl_desc="abstract"}]) ->
+  | NList ({Location.pl_desc="style"},
+           [String_name {Location.pl_desc="abstract"}]) ->
     { parameters with timestamp_style = Abstract_eq }
 
   (* Provers *)
-  | TacticsArgs.NList ({Location.pl_desc="prover"},l)
-  | TacticsArgs.NList ({Location.pl_desc="provers"},l) ->
+  | NList ({Location.pl_desc="prover"},l)
+  | NList ({Location.pl_desc="provers"},l) ->
     let process_prover provers {Location.pl_desc=prover_alt} =
       parse_prover_arg prover_alt :: provers
+    in
+    let l =
+      List.map
+        (function
+           | String_name s -> s
+           | _ -> Tactics.(hard_failure (Failure "expected a symbol")))
+        l
     in
     { parameters with provers = List.fold_left process_prover [] l }
 
   (* Other flags *)
-  | TacticsArgs.NArg {Location.pl_desc="slow"}
-  | TacticsArgs.NList ({Location.pl_desc="slow"},
-                       [{Location.pl_desc="true"}]) ->
+  | NArg {Location.pl_desc="slow"}
+  | NList ({Location.pl_desc="slow"},
+           [String_name {Location.pl_desc="true"}]) ->
     { parameters with slow=true }
-  | TacticsArgs.NList ({Location.pl_desc="slow"},
-                       [{Location.pl_desc="false"}]) ->
+  | NList ({Location.pl_desc="slow"},
+           [String_name {Location.pl_desc="false"}]) ->
     { parameters with slow=false }
-  | TacticsArgs.NArg {Location.pl_desc="pure"}
-  | TacticsArgs.NList ({Location.pl_desc="pure"},
-                       [{Location.pl_desc="true"}]) ->
+  | NArg {Location.pl_desc="pure"}
+  | NList ({Location.pl_desc="pure"},
+           [String_name {Location.pl_desc="true"}]) ->
     { parameters with pure=true }
-  | TacticsArgs.NList ({Location.pl_desc="pure"},
-                       [{Location.pl_desc="false"}]) ->
+  | NList ({Location.pl_desc="pure"},
+           [String_name {Location.pl_desc="false"}]) ->
     { parameters with pure=false }
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
 
@@ -1474,7 +1483,7 @@ let () =
   ProverTactics.register_general "smt" ~pq_sound:true
     (fun args s sk fk ->
        let args = match args with
-         | [Named_args args] -> args
+         | [Named_args_gen args] -> args
          | _ -> assert false
        in
        let s = match s with

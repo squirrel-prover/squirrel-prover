@@ -1,8 +1,15 @@
+(** Abstract syntax for tactic arguments,
+    and mechanisms for parsing typed arguments. *)
+
 module L = Location
 
 module SE = SystemExpr
 
 type lsymb = Symbols.lsymb
+
+(** {2 Tactics args}
+
+    Abstract syntax for tactic arguments. *)
 
 (*------------------------------------------------------------------*)
 (** Tactic target. *)
@@ -14,34 +21,37 @@ type in_target = [
 ]
 
 (*------------------------------------------------------------------*)
-(** {2 Tactics named args} *)
+(** {3 Named arguments}
+    These are often used with [lsymb] parameters,
+    but sometimes with arbitrary [parser_arg] parameters,
+    which allows e.g. passing integers as named arguments. *)
 
-type named_arg =
-  | NArg  of lsymb               (** "~id" *)
-  | NList of lsymb * lsymb list  (** "~id:[id1, ..., idn]" *)
+type 'a named_arg =
+  | NArg  of lsymb            (** [~id] *)
+  | NList of lsymb * 'a list  (** [~id:[id1, ..., idn]] *)
 
-type named_args = named_arg list
+type named_args = lsymb named_arg list
 
 (*------------------------------------------------------------------*)
-(** {2 Simplification item} *)
+(** {3 Simplification item} *)
     
 type s_item_body =
-  | Tryauto      of Location.t    (** '//' *)
-  | Tryautosimpl of Location.t    (** '//' *)
-  | Simplify     of Location.t    (** '//=' *)
+  | Tryauto      of Location.t    (** [//] *)
+  | Tryautosimpl of Location.t    (** [//] *)
+  | Simplify     of Location.t    (** [//=] *)
 
 type s_item = s_item_body * named_args
 
 let s_item_loc (s,_) = match s with Tryauto l | Tryautosimpl l | Simplify l -> l
 
 (*------------------------------------------------------------------*)
-(** {2 Parsed arguments for rewrite} *)
+(** {3 Parsed arguments for rewrite} *)
 
 type rw_count = 
-    | Once                   (** ε *)
-    | Many                   (** ! *)
-    | Any                    (** ? *)
-    | Exact of int           (** i! where [i] is an integer *)
+    | Once                   (** [ε] *)
+    | Many                   (** [!] *)
+    | Any                    (** [?] *)
+    | Exact of int           (** [i!] where [i] is an integer *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 
@@ -83,13 +93,13 @@ type fa_arg = rw_count * Theory.term
 type apply_in = lsymb option
 
 (*------------------------------------------------------------------*)
-(** {2 Intro patterns} *)
+(** {3 Intro patterns} *)
 
 type naming_pat =
-  | Unnamed                  (** '_' *)
-  | AnyName                  (** '?' *)
+  | Unnamed                  (** [_] *)
+  | AnyName                  (** [?] *)
   | Named   of string
-  | Approx  of string        (* only used internally *)
+  | Approx  of string        (** only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
@@ -104,32 +114,32 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-  | Srewrite of rw_dir      (** -> or <-*)
+  | Srewrite of rw_dir      (** [->] or [<-] *)
 
 type intro_pattern =
   | SClear of lsymb list    (** [{H H' ...}] *)
-  | Star   of Location.t    (** '*' *)
-  | StarV  of Location.t    (** '>' *)
+  | Star   of Location.t    (** [*] *)
+  | StarV  of Location.t    (** [>] *)
   | SItem  of s_item
-  | SExpnd of expnd_item    (** @/macro *)
+  | SExpnd of expnd_item    (** [@/macro] *)
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
-(** {2 Fresh tactic arguments} *)
+(** {3 Fresh tactic arguments} *)
 
 type fresh_arg =
   | FreshInt of int L.located
   | FreshHyp of lsymb
 
 (*------------------------------------------------------------------*)
-(** {2 Trans tactic arguments} *)
+(** {3 Trans tactic arguments} *)
 
 type trans_arg =
   | TransSystem of SE.Parse.sys
   | TransTerms  of (int L.located * Theory.term) list
 
 (*------------------------------------------------------------------*)
-(** {2 Have tactic arguments} *)
+(** {3 Have tactic arguments} *)
 
 (** before, simpl pat for produced hypothesis, after *)
 type have_ip = s_item list * simpl_pat * s_item list
@@ -138,7 +148,7 @@ type have_arg    = have_ip option * Theory.any_term
 type have_pt_arg = Theory.pt * have_ip option * [`IntroImpl | `None]
 
 (*------------------------------------------------------------------*)
-(** {2 Diffie-Hellman tactics arguments} *)
+(** {3 Diffie-Hellman tactics arguments} *)
 
 type dh_arg =
   | CDH of { hyp : Symbols.lsymb; gen : Symbols.p_path; }
@@ -149,7 +159,7 @@ type dh_arg =
              nc  : Symbols.p_path; }
 
 (*------------------------------------------------------------------*)
-(** {2 Crypto tactic arguments} *)
+(** {3 Crypto tactic arguments} *)
 
 (** [{glob_sample = k; term; bnds; cond }] add the constraints that
     [k] must be mapped to [term] for any [bnds] such that [cond]. *)
@@ -163,9 +173,13 @@ type crypto_arg = {
 type crypto_args = crypto_arg list
 
 (*------------------------------------------------------------------*)
-(** {2 Tactics args} *)
+(** {3 General AST for tactic arguments} *)
 
-(** A parser tactic argument *)
+(** Tactics not having a specific treatment in the parser can only
+    receive a small subset of [parser_arg]s, defined through
+    [Parser.tactic_params]. *)
+
+(** A parsed tactic argument. *)
 type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
@@ -184,6 +198,9 @@ type parser_arg =
   | Have         of have_arg
   | HavePt       of have_pt_arg
   | Named_args   of named_args
+      (** Named arguments whose values are just symbols. *)
+  | Named_args_gen of parser_arg named_arg list
+      (** General named arguments whose values are [parser_arg]s. *)
   | SplitSeq     of int L.located * Theory.term * Theory.term option
   | ConstSeq     of int L.located * (Theory.term * Theory.term) list
   | MemSeq       of int L.located * int L.located
@@ -197,6 +214,12 @@ type parser_arg =
 type parser_args = parser_arg list
       
 (*------------------------------------------------------------------*)
+(** {2 Typed arguments}
+
+    Typed representation of arguments, to be provided (after parsing)
+    to the actual tactic implementations. This is only (?) used for
+    tactics registered via [ProverTactics.register_typed]. *)
+
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
