@@ -121,8 +121,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   let wrap_fail f (s: S.sequent) sk fk =
-    try sk (f s) fk with
-    | Tactics.Tactic_soft_failure e -> fk e
+    match f s with
+    | v -> sk v fk
+    | exception Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
   let make_exact_var ?loc (env : Vars.env) ty name info =
@@ -2601,8 +2602,9 @@ let gentac_of_any_tac_arg
 
 (** Same as [CommonLT.wrap_fail], but for goals. *)
 let wrap_fail f s sk fk =
-  try sk (f s) fk with
-  | Tactics.Tactic_soft_failure e -> fk e
+  match f s with
+  | v -> sk v fk
+  | exception Tactics.Tactic_soft_failure e -> fk e
 
 let split_equiv_conclusion (i : int L.located) (s : ES.t) =
   try List.splitat (L.unloc i) (ES.conclusion_as_equiv s)
