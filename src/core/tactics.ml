@@ -396,17 +396,22 @@ let try_tac t j sk fk =
   let fk' e = if !succeeded then fk e else sk [j] fk in
   t j sk' fk'
 
+(** Checks that a tactic triggers a given error.
+    The error may be triggered as a soft failure, captured through
+    the failure continuation as is expected, or a hard failure, captured
+    as a regular exception.
+    TODO it would be better to specify explicitly whether a soft or hard
+    failure is expected. *)
 let checkfail_tac (exc : string) t j (sk : 'a sk) (fk : fk) =
   try
-    let sk _l _fk = soft_failure DidNotFail in
-    t j sk fk
+    t j
+      (fun _l _fk -> fk (None,DidNotFail))
+      (function
+        | (_,e) when tac_error_to_string ~short:true e = exc -> sk [j] fk
+        | _e -> Format.eprintf "wrong kind of failure@." ; fk (None,DidNotFail))
   with
-  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when
-      tac_error_to_string ~short:true e = exc ->
-    sk [j] fk
-
-  | Tactic_soft_failure (l,e) | Tactic_hard_failure (l,e) ->
-    raise (Tactic_hard_failure (l, FailWithUnexpected e))
+  | Tactic_hard_failure (_,e)
+    when tac_error_to_string ~short:true e = exc -> sk [j] fk
 
 let check_time t j sk fk =
   let time = Sys.time () in

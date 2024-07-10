@@ -138,8 +138,11 @@ global lemma [E] _ (i,j:index[adv], x : index -> message[adv]) :
   equiv(fun i => m i (x i) (diff(a,b))).
 Proof.
   crypto Bar1.
-  checkfail crypto Bar1 exn Failure.
-Abort.
+  (* There should be a condition close to forall i j, x i <> x j. *)
+  checkfail by intro * exn GoalNotClosed.
+  assert forall i j, x i <> x j as H by admit.
+  intro a b; by apply H.
+Qed.
 
 
 (* ========================================================= *)
