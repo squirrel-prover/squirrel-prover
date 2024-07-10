@@ -15,39 +15,35 @@ Proof.
        equivalently, diff(<input@A,ok>,<input@A,ok>).
        The goal, where input macros expand to bi-terms,
        is correct: dup can be used. *)
-  fa 0.
-  by apply IH.
+    fa 0.
+    by apply IH.
 Qed.
 
 equiv [s1/left,s1/left] test2.
 Proof.
   induction t.
-  auto.
-  
-  expandall.
-
-  fa 0; fa 1; fa 2; fa 3.
-  (* The output should be <input@A,ok>. *)
-  by apply IH.
+  + auto.
+  + expandall.
+    fa <_,_>.
+    (* The output should be <input@A,ok> which disappears. *)
+    by apply IH.
 Qed.
 
 equiv [s2/right,s1/left] test3.
 Proof.
   induction t. 
-  auto.
-  
-  expandall.
-  fa 0; fa 1; fa 2; fa 2; fa 3; fa 4.
-  (* The output should be <input@A,ok>. *)
-by apply IH. 
+  + auto.
+  + expandall.
+    fa <_,_>.
+    (* The output should be <input@A,ok>. *)
+    by apply IH.
 Qed.
   
 equiv [s1/right, s1/right] test4.
 Proof.
   induction t.
-  auto.
-  
-  expandall.
-  (* The ouput should reduce to input@A. *)
-  by fa 0.
+  + auto.
+  + expandall.
+    (* The ouput should reduce to input@A. *)
+    by fa 0.
 Qed.

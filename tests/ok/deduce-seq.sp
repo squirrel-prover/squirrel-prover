@@ -35,7 +35,7 @@ global lemma _ (i:index[const]) :
  equiv(seq(j:index => n(j)), n(i)).
 Proof.
   intro H.
-  checkfail by try assumption exn GoalNotClosed.
+  checkfail assumption exn NotHypothesis.
   deduce 1.
   assumption H.
 Qed.

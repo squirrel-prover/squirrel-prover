@@ -699,19 +699,26 @@ struct
 
     | Time t -> Fmt.pf ppf "(time %a)" pp t
 
-  exception Return of M.judgment list
-
-  (** The evaluation of a tactic, may either raise a soft failure or a hard
-      failure.
-      A soft failure should be formatted inside the [Tactic_Soft_Failure] exception.
-      A hard failure inside [Tactic_hard_failure]. 
-      Those exceptions are caught inside the interactive loop. *)
+  (** Evaluate a tactic AST [ast] on a judgment [j].
+      Return the list of subgoals upon success.
+      May raise [Tactic_soft_failure] if the tactic fails softly,
+      i.e. calls its failure continuation.
+      May raise any exception actually raised by the tactic,
+      typically a [Tactic_hard_failure]. *)
   let eval_judgment ~post_quantum ast j =
     let tac = eval ~post_quantum ~modifiers:[] ast in
-    (* The failure should raise the soft failure,
-     * according to [pp_tac_error]. *)
-    let fk (loc,tac_error) = soft_failure ?loc tac_error in
-    let sk l _ = raise (Return l) in
-    try ignore (tac j sk fk) ; assert false with Return l -> l
+    (* We avoid raising [Tactic_soft_failure] directly from the
+       failure continuation, as this has lead to bugs in the past:
+       these exceptions thrown in the middle of the CPS-style computation
+       were caught as if raised by elementary tactics (e.g. by
+       re_raise_tac or wrap_fail). Instead we use internal exceptions
+       for interrupting the CPS computation. *)
+    let exception Success of M.judgment list in
+    let exception Failure of tac_error in
+    let fk tac_error = raise (Failure tac_error) in
+    let sk l _ = raise (Success l) in
+    try ignore (tac j sk fk) ; assert false with
+    | Success l -> l
+    | Failure (loc,e) -> soft_failure ?loc e
 
 end

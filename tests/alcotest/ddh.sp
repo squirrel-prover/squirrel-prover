@@ -22,6 +22,6 @@ Proof.
  cycle 1.
  expandall.
  try (expandall; refl + assumption).
- fa 0; fa 1; fa 1;fa 3.
+ fa !<_,_>, (if _ then _).
  ddh g, a, b, k.
 Qed.

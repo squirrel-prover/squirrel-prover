@@ -376,16 +376,9 @@ global lemma _ (x : message) :
   equiv(x).
 Proof.
   intro H.
-  checkfail try(rewrite H in 0); auto exn GoalNotClosed.
-Abort.
-
-
-global lemma _ (x : message) : 
-  [forall (x,y : message), f(<x,y>) = x] ->
-  equiv(x).
-Proof.
-  intro H.
-  checkfail try(rewrite H in 1); auto exn GoalNotClosed.
+  checkfail rewrite H in 0 exn NothingToRewrite.
+  checkfail rewrite -H in 0 exn BadRewriteRule.
+  rewrite -(H x empty).
 Abort.
 
 global lemma _ (x : message) : 
@@ -393,9 +386,8 @@ global lemma _ (x : message) :
   equiv(x).
 Proof.
   intro H.
-  checkfail try(rewrite H in 0,1); auto exn GoalNotClosed.
+  checkfail rewrite -(H x empty) in 0,1 exn Failure.
 Abort.
-
 
 global lemma _ (x,y,z : message) :
   equiv(x, y) ->

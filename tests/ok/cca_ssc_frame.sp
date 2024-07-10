@@ -27,7 +27,7 @@ Proof.
  induction t; intro Hap.
  + auto.
  + rewrite /frame /output /exec /cond.
-   fa 0; fa 1; fa 2.
+   fa !<_,_>, (if _ then _).
    (* cca1 does not conclude because of sk *)
    checkfail (by cca1 1) exn GoalNotClosed.
 Abort.

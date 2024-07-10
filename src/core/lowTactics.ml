@@ -17,6 +17,16 @@ module TopHyps = Hyps
   
 type lsymb = Symbols.lsymb
 
+(** Wrap a function implementing a tactic in direct style
+    (i.e. returning new subgoals or raising an exception)
+    into an ['a Tactics.tac] in CPS-style.
+    It is important that the exception catching is done only
+    around the call to [f s] to avoding **messing** with the
+    CPS-style computation. *)
+let wrap_fail f s sk fk =
+  match f s with
+  | v -> sk v fk
+  | exception Tactics.Tactic_soft_failure e -> fk e
 
 (*------------------------------------------------------------------*)
 let dbg ?(force=false) s =
@@ -120,10 +130,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ~destr_not:(S.Reduce.destr_not s Equiv.Local_t)
 
   (*------------------------------------------------------------------*)
-  let wrap_fail f (s: S.sequent) sk fk =
-    match f s with
-    | v -> sk v fk
-    | exception Tactics.Tactic_soft_failure e -> fk e
+  let wrap_fail = wrap_fail
 
   (*------------------------------------------------------------------*)
   let make_exact_var ?loc (env : Vars.env) ty name info =
@@ -2599,12 +2606,6 @@ let gentac_of_any_tac_arg
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
-
-(** Same as [CommonLT.wrap_fail], but for goals. *)
-let wrap_fail f s sk fk =
-  match f s with
-  | v -> sk v fk
-  | exception Tactics.Tactic_soft_failure e -> fk e
 
 let split_equiv_conclusion (i : int L.located) (s : ES.t) =
   try List.splitat (L.unloc i) (ES.conclusion_as_equiv s)

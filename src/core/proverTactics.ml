@@ -56,10 +56,12 @@ module AST :
   let autosimpl () = TacTable.get ~post_quantum:false ~loc:Location._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
+  (** Modify a tactic to decorate its unlocated failures (passed to the
+      failure continuation) with the given location.
+      Hard failures are not re-decorated: they are raised as exceptions
+      but catching exceptions here would **mess** with the CPS style. *)
   let re_raise_tac loc tac s sk fk : Tactics.a =
-    try tac s sk fk with
-    | Tactics.Tactic_hard_failure (None, e) -> Tactics.hard_failure ~loc e
-    | Tactics.Tactic_soft_failure (None, e) -> Tactics.soft_failure ~loc e
+    tac s sk (function (None,e) -> fk (Some loc, e) | x -> fk x)
 
   let eval_abstract ~post_quantum ~modifiers id args =
     let loc, id = Location.loc id, Location.unloc id in
