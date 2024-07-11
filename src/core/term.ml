@@ -331,7 +331,10 @@ let mk_app t l =
     | App (t, l') -> App (t, l' @ l)
     | _ -> App (t, l)
 
-let mk_proj i t = Proj (i,t)
+let mk_proj ?(simpl=false) i t = 
+  match t, simpl with
+  | Tuple l, true -> List.nth l (i - 1)
+  | _, _          -> Proj (i,t)
 
 (*------------------------------------------------------------------*)
 let mk_name n l = 
@@ -1313,8 +1316,8 @@ and _pp
       Fmt.pf ppf "@[%a%a@%a@]"
         pp_msymb m
         (Utils.pp_ne_list
-           "(@[<hov>%a@])"
-           (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
+           "@[<hov> %a@]"
+           (Fmt.list ~sep:(Fmt.any " ") (pp (macro_fixity, `NonAssoc)))) l
         (pp (macro_fixity, `NonAssoc)) ts
     in
     maybe_paren ~outer ~side ~inner:macro_fixity pp ppf ()

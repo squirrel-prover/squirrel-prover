@@ -655,7 +655,7 @@ let resolve_path
       `Macro    of Symbols.macro  |
       `Action   of Symbols.action 
     ]
-      * Type.ty
+      * Type.ftype_op
       * Term.applied_ftype
       * Type.Infer.env
     ) list
@@ -668,7 +668,7 @@ let resolve_path
   let check_arg_tys
       ?(ty_rec_symb : Type.ty option) (fty : Type.ftype) 
     :
-      Type.ty * Term.applied_ftype * Type.Infer.env
+      Type.ftype_op * Term.applied_ftype * Type.Infer.env
     =
     let ty_env = Type.Infer.copy ty_env in
     let check_ty ty1 ty2 =
@@ -678,7 +678,8 @@ let resolve_path
     in
     let fty_op = Type.open_ftype ty_env fty in
     let symb_ty_args =
-      fty_op.fty_args @ fst (Type.decompose_funs fty_op.fty_out)
+      let extra_args, _ = Type.decompose_funs fty_op.fty_out in
+      fty_op.fty_args @ extra_args
     in
     (* keep as many arguments as possible from [ty_args] and [op_ty_args] *)
     let n = min ty_args_len (List.length symb_ty_args) in
@@ -708,7 +709,7 @@ let resolve_path
       Term.{ fty = fty; ty_args; }
     in
     
-    fty_op.fty_out, applied_fty, ty_env
+    fty_op, applied_fty, ty_env
   in
 
   let op_list =
@@ -996,7 +997,8 @@ and convert_app
 
   let sub = L.unloc (snd f) in
   let top = Symbols.p_npath_to_string (fst f) in
-              
+
+  (* TODO: quantum: terrible error message *)
   if List.length symbs = 0 then
     raise (Symbols.Error (Symbols.p_path_loc f,
                           Symbols.Unbound_identifier (Some top,sub)));
@@ -1004,7 +1006,7 @@ and convert_app
   if List.length symbs > 2 then
     assert false;               (* TODO: quantum: meaningful exceptions *)
    
-  let symb, ty_out, applied_fty, ty_env = as_seq1 symbs in
+  let symb, fty_op, applied_fty, ty_env = as_seq1 symbs in
 
   (* store the typing environement of the symbol that was selected *)
   Type.Infer.set ~tgt:state.ty_env ~value:ty_env;
@@ -1015,7 +1017,7 @@ and convert_app
   let t0 =
     match symb with
     | `Operator f -> Term.mk_fun0 f applied_fty args
-    | `Name     n -> Term.mk_name (Term.mk_symb n ty_out) args
+    | `Name     n -> Term.mk_name (Term.mk_symb n fty_op.fty_out) args
 
     | `Action   a -> 
       let args = match args with | [Term.Tuple args] -> args | _ -> args in
@@ -1029,11 +1031,18 @@ and convert_app
         | _ -> conv_err loc (Timestamp_expected (Symbols.p_path_to_string f))
       in
 
-      Term.mk_macro (Term.mk_symb m ty_out) args tau
+      Term.mk_macro (Term.mk_symb m fty_op.fty_out) args tau
   in
 
-  (* check that [ty_out] can receive [args'] as arguments *)
-  check_ty_eq state ~loc ~of_t:t0 ty_out (Type.fun_l (List.map Term.ty args') ty);
+  let ty0 = 
+    (* [tys]: arguments of [symb] that have not yet been provided *)
+    let _, tys = List.takedrop (List.length args) fty_op.fty_args in
+    Type.fun_l tys fty_op.fty_out
+  in
+  (* [ty0 = tys → ty_out] *)
+
+  (* check that [ty0] can receive [args'] as arguments *)
+  check_ty_eq state ~loc ~of_t:t0 ty0 (Type.fun_l (List.map Term.ty args') ty);
   
   (* build the final term and check additional syntactic constraints *)
   let t = Term.mk_app t0 args' in

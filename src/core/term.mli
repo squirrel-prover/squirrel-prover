@@ -451,7 +451,7 @@ val mk_vars   : Vars.var list -> term list
 val mk_action : Symbols.action -> term list -> term
 val mk_tuple  : term list -> term
 val mk_app    : term -> term list -> term
-val mk_proj   : int -> term -> term
+val mk_proj   : ?simpl:bool -> int -> term -> term
 
 (** [mk_name n l] create a name. The list [l] must be of length at most 1. *)
 val mk_name : nsymb -> term list -> term
