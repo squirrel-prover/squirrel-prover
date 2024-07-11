@@ -64,6 +64,34 @@ val set_reach_conclusion : Term.term -> t -> t
 val to_trace_sequent : t -> LowTraceSequent.t
 
 (*------------------------------------------------------------------*)
+(** {2 Deducibility and non-deducibility goals} *)
+(** Goals corresponding to the predicates "u |> v" and "u *> v".
+    Defined in WeakSecrecy.sp. *)
+
+(**An objet of the type [secrecy_goal] represent a goal of
+   the form "u |> v" or "u *> v".
+   If "u" is a tuple, [left] is a list of each term is the tuple.
+   Else, the list [left] contains only one element for "u". *)
+type secrecy_goal = {
+  predicate : Symbols.predicate;
+  left_ty : Type.ty list;
+  left : Term.term list;
+  right_ty : Type.ty;
+  right : Term.term }
+
+(** Requires WeakSecrecy.sp to be loaded.
+    [get_secrecy_goal s] returning a [secrecy_goal] representing the goal
+    if it is of the form "u |> v" or "u *> v"].
+    Returns [None] is the goal is not of the correct form, or if the predicate
+    is used in a different system than the sequent's system. *)
+val get_secrecy_goal : t -> secrecy_goal option
+
+(** Requires WeakSecrecy.sp to be loaded.
+    [mk_secrecy_concl] returning a formula representing [goal]
+    in the system of [s].*)
+val mk_secrecy_concl : secrecy_goal -> t -> conc_form
+
+(*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
 
 val query_happens : precise:bool -> t -> Term.term -> bool

@@ -345,6 +345,79 @@ let to_trace_sequent s =
     in trace_s
 
 (*------------------------------------------------------------------*)
+(** {2 Deducibility and non-deducibility goals} *)
+(** Goals corresponding to the predicates "u |> v" and "u *> v".
+    Defined in WeakSecrecy.sp. *)
+
+module LS = Library.Secrecy
+
+(**An objet of the type [secrecy_goal] represent a goal of
+   the form "u |> v" or "u *> v".
+   If "u" is a tuple, [left] is a list of each term is the tuple.
+   Else, the list [left] contains only one element for "u". *)
+type secrecy_goal = {
+  predicate : Symbols.predicate;
+  left_ty : Type.ty list;
+  left : Term.term list;
+  right_ty : Type.ty;
+  right : Term.term }
+
+(** Requires WeakSecrecy.sp to be loaded.
+    [get_secrecy_goal s] returning a [secrecy_goal] representing the goal
+    if it is of the form "u |> v" or "u *> v"].
+    Returns [None] is the goal is not of the correct form, or if the predicate
+    is used in a different system than the sequent's system. *)
+let get_secrecy_goal (s : t) : secrecy_goal option =
+  let table = s.env.table in
+  if not (LS.is_loaded table) then
+    None
+  else match s.conclusion with
+    | Atom (Pred pred_app) when
+      pred_app.psymb = LS.symb_deduce table ||
+      pred_app.psymb = LS.symb_not_deduce table -> begin
+        match pred_app.multi_args with
+        | [se, [u;v]] ->
+          if se <> s.env.system.set then
+            None (*TODO : Add a warning message if the sets are different?*)
+          else begin
+            match Term.destr_tuple u, pred_app.ty_args with
+            | None, [a; b] -> Some {
+                predicate = pred_app.psymb;
+                left_ty = [a];
+                left = [u];
+                right_ty = b;
+                right = v }
+            | Some l, [Tuple a_list; b] -> Some {
+                predicate = pred_app.psymb;
+                left_ty = a_list;
+                left = l;
+                right_ty = b;
+                right = v }
+            | _ -> assert false
+          end
+        | _ -> None
+    end
+    | _ -> None
+
+(** Requires WeakSecrecy.sp to be loaded.
+    [mk_secrecy_concl] returning a formula representing [goal]
+    in the system of [s].*)
+let mk_secrecy_concl (goal : secrecy_goal) (s : t) : conc_form =
+  let left_ty, left_arg = match goal.left_ty, goal.left with
+    | [a], [t] -> a, t
+    | l_ty, l when List.length l_ty = List.length l->
+        Tuple l_ty, Term.mk_tuple l
+    | _ -> assert false
+  in
+  let se = s.env.system.set in
+  Atom (Pred {
+    psymb = goal.predicate;
+    ty_args = [left_ty; goal.right_ty];
+    se_args = [se];
+    multi_args = [se, [left_arg; goal.right]];
+    simpl_args = [] })
+
+(*------------------------------------------------------------------*)
 let get_trace_hyps s =
   TS.get_trace_hyps (to_trace_sequent (set_reach_conclusion Term.mk_false s))
 
