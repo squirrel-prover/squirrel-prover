@@ -968,6 +968,60 @@ let deduce_int (i : int L.located) s =
     [ES.set_equiv_conclusion {terms = biframe_without_e; bound = None} s]
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
+(** Deduce in a goal "u |> v" to prove that term u dudece the term v.
+    Raise a failure if impossible and else close the goal (return an empty list of goals). *)
+let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
+  let option = { Match.default_match_option with mode = `EntailRL } in
+  let hyps = ES.get_trace_hyps s in 
+  let table, system = ES.table s, ES.system s in
+  let pat = Term.{
+      pat_op_vars   = [];
+      pat_op_tyvars = [];
+      pat_op_term   = Equiv.mk_equiv_atom goal.left;
+    } in
+  let conclusion = Equiv.mk_equiv_atom [goal.right] in
+  let match_result = 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
+  in
+  match match_result with
+  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
+  | Match mv ->
+    assert (Match.Mvar.is_empty mv);
+    []
+
+(** In a goal "u |> v" or "u *> v" with "u" a tuple, check if the [i]-th element of u
+    is deducible from the rest of "u".
+    Removes this element from the current goal *)
+let deduce_predicate_int (s : ES.t) (goal : ES.secrecy_goal) (i : int) : ES.t list =
+  if i < 0 || List.length goal.left <= i then
+    (soft_failure (Failure "Invalid position"));
+    let left_without_ith = List.filteri (fun j _ -> j<>i) goal.left in
+    let left_ty_without_ith = List.filteri (fun j _ -> j<>i) goal.left_ty in
+  let option = { Match.default_match_option with mode = `EntailRL } in
+  let hyps = ES.get_trace_hyps s in 
+  let table, system = ES.table s, ES.system s in
+  let pat = Term.{
+      pat_op_vars   = [];
+      pat_op_tyvars = [];
+      pat_op_term   = Equiv.mk_equiv_atom left_without_ith;
+    } in
+  let conclusion = Equiv.mk_equiv_atom goal.left in
+  let match_result = 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
+  in
+  match match_result with
+  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
+  | Match mv ->
+    assert (Match.Mvar.is_empty mv);
+    let new_secrecy_goal = { goal with
+      left = left_without_ith;
+      left_ty = left_ty_without_ith } in
+    let conc = ES.mk_secrecy_concl new_secrecy_goal s in
+    [ES.set_conclusion conc s]
+
+let _ = deduce_predicate
+let _ = deduce_predicate_int
+
 let deduce Args.(Opt (Int, p)) s : ES.sequents =
   match p with
   | None -> deduce_all s
