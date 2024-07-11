@@ -992,11 +992,15 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
 (** In a goal "u |> v" or "u *> v" with "u" a tuple, check if the [i]-th element of u
     is deducible from the rest of "u".
     Removes this element from the current goal *)
-let deduce_predicate_int (s : ES.t) (goal : ES.secrecy_goal) (i : int) : ES.t list =
-  if i < 0 || List.length goal.left <= i then
-    (soft_failure (Failure "Invalid position"));
-    let left_without_ith = List.filteri (fun j _ -> j<>i) goal.left in
-    let left_ty_without_ith = List.filteri (fun j _ -> j<>i) goal.left_ty in
+let deduce_predicate_int
+  (i : int L.located)
+  (s : ES.t)
+  (goal : ES.secrecy_goal) :
+  ES.t list =
+  if L.unloc i < 0 || List.length goal.left <= L.unloc i then
+    (soft_failure ~loc:(L.loc i) (Failure "Invalid position"));
+    let left_without_ith = List.filteri (fun j _ -> j<> L.unloc i) goal.left in
+    let left_ty_without_ith = List.filteri (fun j _ -> j<>L.unloc i) goal.left_ty in
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
@@ -1019,13 +1023,24 @@ let deduce_predicate_int (s : ES.t) (goal : ES.secrecy_goal) (i : int) : ES.t li
     let conc = ES.mk_secrecy_concl new_secrecy_goal s in
     [ES.set_conclusion conc s]
 
-let _ = deduce_predicate
-let _ = deduce_predicate_int
-
 let deduce Args.(Opt (Int, p)) s : ES.sequents =
-  match p with
+  let table = ES.table s in
+  if ES.conclusion_is_equiv s then
+    match p with
   | None -> deduce_all s
   | Some (Args.Int i) -> deduce_int i s
+  else if Library.Secrecy.is_loaded table then
+    match p, ES.get_secrecy_goal s with
+    | None, Some goal -> 
+      if goal.predicate = Library.Secrecy.symb_deduce table then
+        deduce_predicate s goal
+      else
+        Tactics.soft_failure (Tactics.GoalBadShape "deduce expect a position with non-deduction predicate")
+    | Some (Args.Int i), Some goal -> deduce_predicate_int i s goal
+    | _, None -> Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence goal (or a deduction goal with WeakSecrecy library)")
+  else
+    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence goal (or a deduction goal with WeakSecrecy library)")
+
 
 
 let () =
