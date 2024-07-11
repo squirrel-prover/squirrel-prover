@@ -93,3 +93,25 @@ module[@warning "-32"] Real = struct
   let mk_one   table     = Term.mk_fun table (fs_one  table)  []
   let mk_two   table     = Term.mk_fun table (fs_two  table)  []
 end
+
+(** Not type safe, do not export.
+    [np] is the namespace path, [s] the symbol name. *)
+let get_predsymb (p : Symbols.s_path) : Symbols.predicate =
+  Symbols.Predicate.of_s_path p 
+
+module Secrecy = struct
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], "WeakSecrecy") table
+  let check_load table =
+    if not (is_loaded table) then
+      Tactics.hard_failure (Failure "theory WeakSecrecy is not loaded")
+        
+  let get_predsymb table s =
+    check_load table;
+    get_predsymb ([],s)
+  
+  let symb_deduce table = get_predsymb table "|>"
+  let symb_not_deduce table = get_predsymb table "*>"
+
+end  

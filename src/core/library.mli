@@ -56,4 +56,12 @@ module Real : sig
   val mk_zero  : Symbols.table                           -> Term.term
   val mk_one   : Symbols.table                           -> Term.term
   val mk_two   : Symbols.table                           -> Term.term
+end  
+
+module Secrecy : sig
+  val is_loaded : Symbols.table -> bool
+  val check_load : Symbols.table -> unit
+
+  val symb_deduce : Symbols.table -> Symbols.predicate
+  val symb_not_deduce : Symbols.table -> Symbols.predicate
 end
