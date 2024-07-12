@@ -337,8 +337,11 @@ Proof.
           destruct Hcond as [i1 t1 Hcond].
           euf Hcond => [r0 [_ _]] ; try (by use tags_neq).
           exists r; simpl.
-          assert R(r) < T(i,t) as _.
-            admit. (* WIP *)
+          assert R(r) < T(i,t) as _. {.
+            assert input@T(i,t) = nr(r) as Hf by auto.
+            fresh Hf => //.
+            intro _; by depends R(r), R2(r).
+          }.
           simpl.
           case output@R1(r) => Meq1.
           ++ destruct Meq1 as [_ _ [Meq1 ->]].
