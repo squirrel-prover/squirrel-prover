@@ -265,7 +265,7 @@ spath:
 
 /* non-ambiguous term */
 sterm_i:
-| id=path                       { Theory.Symb id }
+| id=spath_gen                       { Theory.Symb id }
 | UNDERSCORE                    { Theory.Tpat }
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
@@ -281,9 +281,6 @@ sterm_i:
 | l=lloc(FALSE)  { Theory.Symb (top_path,L.mk_loc l "false") }
 
 | l=lloc(TRUE)   { Theory.Symb (top_path,L.mk_loc l "true") }
-
-| s=paren(infix_s0)
-   { Theory.Symb (top_path,s) }
 
 | l=paren(slist1(term,COMMA))
     { match l with
@@ -1475,7 +1472,7 @@ _query:
 | PROF                       { ProverLib.Prof }
 (* print *)
 | PRINT SYSTEM l=system_expr { ProverLib.(Print (Pr_system (Some l))) }
-| PRINT l=path               { ProverLib.(Print (Pr_any l)) }
+| PRINT l=spath_gen          { ProverLib.(Print (Pr_any l)) }
 | PRINT                      { ProverLib.(Print (Pr_system None)) }
 (* search *)
 | SEARCH t=any_term IN s=system_expr 

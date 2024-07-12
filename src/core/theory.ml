@@ -129,7 +129,6 @@ type any_term = Global of global_formula | Local of term
 
 type conversion_error_i =
   | Arity_error          of string * int * int
-  | UndefinedOfKind      of string option * string * Symbols.symbol_kind
   (** [string] unknown in optional namespace [npath] for kind [kind] *)
   | Type_error           of Term.term * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of string
@@ -165,13 +164,6 @@ let conv_err loc e = raise (Conv (loc,e))
 let pp_error_i ppf = function
   | Arity_error (s,i,j) ->
     Fmt.pf ppf "symbol %s given %i arguments, but has arity %i" s i j
-
-  | UndefinedOfKind (top,sub,n) ->
-    Fmt.pf ppf "unknown %a %s%a"
-      Symbols.pp_symbol_kind n sub
-      (fun ppf -> function
-         | None -> ()
-         | Some top -> Fmt.pf ppf "%s" top) top
 
   | Type_error (s, ty_expected, ty) ->
     Fmt.pf ppf "@[<hov 0>\
@@ -245,7 +237,7 @@ let pp_error_i ppf = function
   | Failure s -> Fmt.string ppf s
       
 let pp_error pp_loc_err ppf (loc,e) =
-  Fmt.pf ppf "%a@[<hov 2>Conversion error:@, %a@]"
+  Fmt.pf ppf "%aConversion error:@ %a"
     pp_loc_err loc
     pp_error_i e
 
@@ -568,11 +560,6 @@ let convert_ext_bnds
 (*------------------------------------------------------------------*)
 (** {3 Local formula conversion conversion} *)
 
-let get_fun table path =
-  try Symbols.Operator.convert_path path table with
-  | Symbols.Error (_, Unbound_identifier (np,sub)) ->
-    conv_err (Symbols.p_path_loc path) (UndefinedOfKind (np, sub, Symbols.Operator))
-
 (*------------------------------------------------------------------*)
 (** Validate a term top-level construct (possibly below an application). *)
 let validate
@@ -647,7 +634,7 @@ let resolve_path
     ?(ty_env = Type.Infer.mk_env ())
     (table : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list)
-    ~(ty_rec : Type.ty option)
+    ~(app_cntxt : app_cntxt)
   : 
     ([
       `Operator of Symbols.fname  |
@@ -690,13 +677,12 @@ let resolve_path
     List.iter2 check_ty ty_args op_ty_args;
 
     let () =
-      match ty_rec, ty_rec_symb with
-      | Some ty, Some ty' -> check_ty ty ty'
-      (* TODO: quantum: use an app_context instead of [ty_rec] to be
-         more precise *)
-      | Some _ , None     -> ()   (* maybe parsing in a processus declaration *)
-      | None   , Some _   -> failed ()
-      | None   , None     -> ()
+      match app_cntxt, ty_rec_symb with
+      | (At t | MaybeAt t), Some ty' -> check_ty (Term.ty t) ty'
+      (* maybe parsing in a processus declaration *)
+      | MaybeAt _, None -> () 
+      | At _, None | NoTS , Some _ -> failed ()
+      | NoTS , None -> ()
     in
 
     (* build the applied function type *)
@@ -756,6 +742,38 @@ let resolve_path
   op_list @ name_list @ macro_list @ action_list
 
 (*------------------------------------------------------------------*)
+(** error message: no symbols with a given type *)
+let failure_no_symbol f ty_args ty =
+  let ty_f = Type.fun_l ty_args ty in
+  let err = 
+    Fmt.str "no symbol %s with type @[%a@]" 
+      (Symbols.p_path_to_string f)
+      Type.pp ty_f
+  in
+  conv_err (Symbols.p_path_loc f) (Failure err)
+
+(*------------------------------------------------------------------*)
+(** error message: many symbols with a given type *)
+let failure_cannot_desambiguate loc symbs =
+  let err = 
+    Fmt.str "could not desambiguate between symbols:@;<1 2>@[<v 0>%a@]"  
+      (Fmt.list ~sep:Fmt.cut 
+         (fun fmt (symb, _fty_op, fty_app, _ty_env) ->
+            Fmt.pf fmt "%t : %a"
+              (fun fmt ->
+                 match symb with 
+                 | `Operator s -> Fmt.pf fmt "op %a" Symbols.OpData.pp_fname s
+                 | `Action   s -> Fmt.pf fmt "action %a" Symbols.pp_path s
+                 | `Name     s -> Fmt.pf fmt "name %a"   Symbols.pp_path s
+                 | `Macro    s -> Fmt.pf fmt "macro %a"  Symbols.pp_path s
+              )
+              Type.pp_ftype fty_app.Term.fty
+         )
+      ) symbs
+  in
+  conv_err loc (Failure err) 
+
+(*------------------------------------------------------------------*)
 (* internal function to Theory.ml *)
 let rec convert 
     (state : conv_state)
@@ -780,7 +798,7 @@ and convert0
     let top, sub = f in
     top = [] && Vars.mem_s state.env.vars (L.unloc sub)
   in
-  
+
   match L.unloc tm with
   | Tpat ->
     if not state.allow_pat then
@@ -816,14 +834,14 @@ and convert0
     let _f, terms = decompose_app tapp in
     let app_cntxt = At (conv Type.Timestamp ts) in
     let t = convert_app state (L.loc tm) (f, terms) app_cntxt ty in
-    
+
     if is_in_proc state.cntxt then 
       Printer.prt `Warning 
         "Potential well-foundedness issue: \
          macro %a with explicit timestamp in process declaration."
         Term.pp t;
     t
-    
+
   | AppAt (t,_) ->              (* failure *)
     let t = conv ty t in
     conv_err loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
@@ -845,7 +863,7 @@ and convert0
       | InProc (_, ts) -> MaybeAt ts 
     in
     convert_app state (L.loc tm) (f, args) app_cntxt ty
-      
+
   | Symb ((top,_) as f) -> 
     assert(is_var f && top = []); 
     convert_var state (snd f) ty
@@ -901,14 +919,14 @@ and convert0
     let t1 = conv (Vars.ty v) t1 in
     let t2 = conv ~env ty t2 in
     Term.mk_let v t1 t2
-      
+
   | Diff (l,r) ->
     (* FIXME: projections should not be hard-coded to be [left, right] *)
     check_system_projs loc state [Term.left_proj; Term.right_proj];
-    
+
     let statel = proj_state [Term.left_proj ] state in
     let stater = proj_state [Term.right_proj] state in
-      
+
     Term.mk_diff [Term.left_proj , convert statel l ty;
                   Term.right_proj, convert stater r ty; ] 
 
@@ -964,7 +982,7 @@ and convert0
       conv ~env (Type.TUnivar tyv) t 
     in
     let t = Term.subst subst t in
-    
+
     Term.mk_lambda ~simpl:false evs t
 
 and convert_app
@@ -980,11 +998,7 @@ and convert_app
   in
   (* convert arguments *)
   let args = List.map2 (convert state) args ty_args in
-  let ty_rec =
-    match app_cntxt with
-    | MaybeAt t | At t -> Some (Term.ty t)
-    | NoTS -> None
-  in
+
   (* resolve [f] as a list of symbols exploiting the types of its
      arguments *)
   let symbs =
@@ -992,25 +1006,22 @@ and convert_app
       ~ty_env:state.ty_env
       state.env.table f
       ~ty_args:(List.map (Type.Infer.norm state.ty_env) ty_args)
-      ~ty_rec
+      ~app_cntxt
   in
 
-  let sub = L.unloc (snd f) in
-  let top = Symbols.p_npath_to_string (fst f) in
+  if List.length symbs = 0 then 
+    failure_no_symbol f
+      (List.map (Type.Infer.norm state.ty_env) ty_args) 
+      (Type.Infer.norm state.ty_env ty) ;
 
-  (* TODO: quantum: terrible error message *)
-  if List.length symbs = 0 then
-    raise (Symbols.Error (Symbols.p_path_loc f,
-                          Symbols.Unbound_identifier (Some top,sub)));
+  if List.length symbs >= 2 then 
+    failure_cannot_desambiguate (Symbols.p_path_loc f) symbs;
 
-  if List.length symbs > 2 then
-    assert false;               (* TODO: quantum: meaningful exceptions *)
-   
   let symb, fty_op, applied_fty, ty_env = as_seq1 symbs in
 
   (* store the typing environement of the symbol that was selected *)
   Type.Infer.set ~tgt:state.ty_env ~value:ty_env;
-  
+
   let nb_args = List.length applied_fty.fty.fty_args in
   let args, args' = List.takedrop nb_args args in
 
@@ -1024,7 +1035,9 @@ and convert_app
       Term.mk_action a args
 
     | `Macro    m ->
-      assert (args' = []);       (* TODO: quantum: error message *)
+      if args' <> [] then
+        conv_err (Symbols.p_path_loc f) (Failure "too many arguments");
+
       let tau =
         match app_cntxt with
         | At ts | MaybeAt ts -> ts
@@ -1043,11 +1056,11 @@ and convert_app
 
   (* check that [ty0] can receive [args'] as arguments *)
   check_ty_eq state ~loc ~of_t:t0 ty0 (Type.fun_l (List.map Term.ty args') ty);
-  
+
   (* build the final term and check additional syntactic constraints *)
   let t = Term.mk_app t0 args' in
   validate loc state t;
-  
+
   t
 
 (*------------------------------------------------------------------*)
@@ -1152,7 +1165,7 @@ let declare_senc_joint_with_hash
   let dec_data =
     mk_abstract_op dec_fty SDec
       ~associated_functions:[Operator.of_string (Symbols.scope table) (L.unloc enc); 
-                             get_fun table h]
+                             Symbols.Operator.convert_path h table]
   in
   let table, dec = Operator.declare ~approx:false table dec ~data:dec_data in
 

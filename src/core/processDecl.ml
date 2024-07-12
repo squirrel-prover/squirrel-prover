@@ -104,8 +104,6 @@ let parse_state_decl
 (*------------------------------------------------------------------*)
 (** Parse an abstract or concrete operator declaration. *)
 let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
-    let name = L.unloc decl.op_name in
-
     let ty_vars = List.map (fun l ->
         Type.mk_tvar (L.unloc l)
       ) decl.op_tyargs
@@ -168,20 +166,23 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
       if not (HighTerm.is_deterministic env body) then
         error (L.loc decl.op_name) KDecl NonDetOp;
 
-      let data = Operator.{ name; ty_vars; args; out_ty; body; } in
-      let ftype = Operator.concrete_ftype data in
+      let table, name =
+       Symbols.Operator.reserve ~approx:false table decl.op_name
+      in
+
+      let op_data = Operator.{ name; ty_vars; args; out_ty; body; } in
+      let ftype = Operator.concrete_ftype op_data in
 
       (* sanity checks on infix symbols *)
       let in_tys = List.length args in (* number of arguments *)
       Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
 
-      let table, _ =
-        Symbols.Operator.declare ~approx:false
-          table decl.op_name
-          ~data:(Symbols.OpData.Operator {def = Concrete (Operator.Val data); ftype; })
+      let data = 
+        Symbols.OpData.Operator {def = Concrete (Operator.Val op_data); ftype; } 
       in
+      let table = Symbols.Operator.define table ~data name in
 
-      Printer.prt `Result "%a" Operator.pp_concrete_operator data;
+      Printer.prt `Result "%a" Operator.pp_concrete_operator op_data;
 
       table
 

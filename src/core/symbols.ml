@@ -129,13 +129,13 @@ type _namespace
 
 (** A namespace path is simply a list of namespaces *)
 type npath = {
-  npath : _namespace t list; 
+  npath : _namespace t list;
   id    : int;                    (** for hash-consing *)
 }
 
-(** A path to any symbol (internal). 
+(** A path to any symbol (internal).
     [{np; s}] represents the path [np.s]. *)
-type 'a path = { 
+type 'a path = {
   np : npath;
   s  : 'a t;
   id : int;                    (** for hash-consing *)
@@ -172,7 +172,7 @@ type namespace = _namespace path
 module N = struct
   type t = npath
   let hash (t : t) : int = hcombine_list hash 0 t.npath
-  let equal (t : t) (t' : t) = 
+  let equal (t : t) (t' : t) =
     let rec doit l l' =
       match l, l' with
       | a :: l, a' :: l' -> a = a' && doit l l'
@@ -183,19 +183,19 @@ module N = struct
 end
 
 (** Create a namespace path. Hash-consed. *)
-let npath : _namespace t list -> npath = 
+let npath : _namespace t list -> npath =
   let next_id = ref 0 in
   let module M = Weak.Make(N)
   in
   let m = M.create 256 in
-  fun l -> 
+  fun l ->
     let p = { npath = l; id = !next_id; } in
     try M.find m p with
     | Not_found -> M.add m p; incr next_id; p
 
 let npath_app (n : npath) (l : _namespace t list) : npath = npath (n.npath @ l)
-    
-let of_s_npath (l : s_npath) : npath = 
+
+let of_s_npath (l : s_npath) : npath =
   List.map (fun s -> { name = s; group = namespace_group; }) l
   |> npath
 
@@ -216,12 +216,12 @@ module P = struct
 end
 
 (** Create a symbol path. Hash-consed. *)
-let path : npath -> 'a t -> 'a path = 
+let path : npath -> 'a t -> 'a path =
   let next_id = ref 0 in
   let module M = Weak.Make(P)
   in
   let m = M.create 256 in
-  fun np s -> 
+  fun np s ->
     let p = { np; s; id = !next_id; } in
     try !>(M.find m (P p)) with
     | Not_found -> M.add m (P p); incr next_id; p
@@ -229,8 +229,8 @@ let path : npath -> 'a t -> 'a path =
 let path_id (t : 'a path) = t.id
 
 let path_equal (p : 'a path) (p' : 'a path) = p.id = p'.id
-                               
-let pp_path ?(sep = ".") fmt (t : 'a path) = 
+
+let pp_path ?(sep = ".") fmt (t : 'a path) =
   Fmt.pf fmt "%a%s%a"
     (pp_npath ~sep) t.np (if t.np.npath = [] then "" else sep) pp t.s
 
@@ -242,9 +242,9 @@ let pp_npath fmt n = pp_npath ~sep:"." fmt n
 (*------------------------------------------------------------------*)
 (** Maps (namespace paths and symbol paths)  *)
 
-module Mn = Map.Make (struct 
+module Mn = Map.Make (struct
     type t = npath
-    let compare (t : t) (t' : t) = t.id - t'.id 
+    let compare (t : t) (t' : t) = t.id - t'.id
   end)
 
 (*------------------------------------------------------------------*)
@@ -260,7 +260,7 @@ type error_i =
 type error = L.t * error_i
 
 let pp_error_i fmt = function
-  | Unbound_identifier (None, s) -> Fmt.pf fmt "unknown symbol %s" s 
+  | Unbound_identifier (None, s) -> Fmt.pf fmt "unknown symbol %s" s
   | Unbound_identifier (Some np, s) ->
     if np = "" then
       Fmt.pf fmt "unknown symbol %s" s
@@ -273,7 +273,7 @@ let pp_error_i fmt = function
 
   | Multiple_declarations (np, s, n, g) ->
     Fmt.pf fmt "%a symbol %s already declared in namespace %a (%s group)"
-      pp_symbol_kind n s pp_npath np g 
+      pp_symbol_kind n s pp_npath np g
 
   | Failure s ->
     Fmt.pf fmt "%s" s
@@ -316,14 +316,14 @@ type symbol_map = record list Msymb.t
 type table = {
   scope : npath;                (** current namespace scope *)
 
-  current : symbol_map; 
-  (** Record with the symbols currently in scope. 
+  current : symbol_map;
+  (** Record with the symbols currently in scope.
       There may be name conflict between symbols. *)
 
   stack : symbol_map list;
-  (** History of the past symbols in scope (i.e. [current] field). 
+  (** History of the past symbols in scope (i.e. [current] field).
       Invariant: [List.length stack = List.length scope.npath] *)
-  
+
   store : symbol_map Mn.t;
   (** Map each namespace to the record of symbols declared in it.
       Each symbol should be declared only once. *)
@@ -341,7 +341,7 @@ let table :
     assert (List.length stack = List.length scope.npath);
     { scope; current; store; stack; tag = (incr cpt_tag; !cpt_tag) }
 
-let update ?scope ?current ?stack ?store (t : table) : table = 
+let update ?scope ?current ?stack ?store (t : table) : table =
   let scope   = odflt t.scope   scope   in
   let current = odflt t.current current in
   let stack   = odflt t.stack   stack   in
@@ -352,15 +352,15 @@ let tag (t : table) = t.tag
 
 (*------------------------------------------------------------------*)
 let scope t = t.scope
-  
+
 (*------------------------------------------------------------------*)
 let top_npath : npath = npath []
 
-let empty_table : table = 
+let empty_table : table =
   let current = Msymb.empty in
   (* the empty store contains a single (empty) symbol map for the
      top-level namespace path *)
-  let store   = Mn.singleton top_npath Msymb.empty in  
+  let store   = Mn.singleton top_npath Msymb.empty in
   table ~scope:top_npath ~current ~stack:[] ~store
 
 (*------------------------------------------------------------------*)
@@ -380,7 +380,7 @@ let[@warning "-32"] pp_symbol_map fmt map =
 (** For debugging *)
 let[@warning "-32"] pp_store fmt store =
   Fmt.pf fmt "@[<v 0>%a@]"
-    (Fmt.list ~sep:Fmt.cut 
+    (Fmt.list ~sep:Fmt.cut
        (fun fmt (np, map) ->
           Fmt.pf fmt "@[<v 2>namespace %a :@ @[%a@]@]"
             pp_npath np pp_symbol_map map
@@ -418,12 +418,12 @@ let kind_of_status : status -> symbol_kind = fun e ->
 (** Convert a qualified surface npath [top.p_n] to a npath. *)
 let convert_qualified_npath
     (top : _namespace t list) (p_n : p_npath) (table : table) : npath
-  = 
+  =
   (* We already converted [top], and needs to convert [sub] to get [top.sub]. *)
   let rec conv (top : _namespace t list) (sub : p_npath) : npath =
     match sub with
     | [] -> npath top
-    | s :: sub -> 
+    | s :: sub ->
       let s = { name = L.unloc s; group = namespace_group; } in
       let np = top @ [s] in
       if not (Mn.mem (npath np) table.store) then
@@ -439,28 +439,28 @@ let convert_npath (p_n : p_npath) (table : table) : npath =
   | [] -> top_npath
   | s :: sub ->   (* [p_n = s.sub], where [s] is a single symbol *)
     let s_symb = { group = namespace_group; name = L.unloc s; } in
-    let s_np : _namespace t list =    
+    let s_np : _namespace t list =
       let records =
         try Msymb.find s_symb table.current with
         | Not_found -> symb_err (L.loc s) (Unbound_identifier (None, L.unloc s))
       in
-      
+
       if List.length records > 1 then
         symb_err (L.loc s)
           (Failure (L.unloc s ^ " resolves to multiple namespaces"));
-      
+
       let path = !>((List.hd records).path) in
-      path.np.npath @ [path.s] 
+      path.np.npath @ [path.s]
     in
     (* [s] resolves to the npath [s_np], we have [p_n = s_np.sub] *)
-    
+
     (* convert the resolved npath [s_np.sub], which should be a qualified npath *)
     convert_qualified_npath s_np sub table
-    
+
 
 (** Internal (as we cannot type the paths returned).
-    Get all the records that can be associated to (surface syntaxe) symbol path. 
-    If [p] is a qualified path, the return list must be of size [1]. 
+    Get all the records that can be associated to (surface syntaxe) symbol path.
+    If [p] is a qualified path, the return list must be of size [1].
     Also return the namespace path of these records. *)
 let lookup_p_path
     ~(group : group) ((top,s) : p_path) (table : table) : npath * record list
@@ -476,10 +476,10 @@ let lookup_p_path
       let record = Mn.find np table.store in
       record, np
   in
-  
+
   let t = { group; name = L.unloc s } in
-  let records = 
-    try Msymb.find t r with 
+  let records =
+    try Msymb.find t r with
     | Not_found ->
       symb_err (L.loc s)
         (Unbound_identifier (Some (npath_to_string top), L.unloc s))
@@ -525,7 +525,7 @@ module type SymbolKind = sig
   (*------------------------------------------------------------------*)
   val convert1     : p_path -> table ->  ns path * data
   val convert      : ?allow_empty:bool -> p_path -> table -> (ns path * data) list
-  val convert_path : p_path -> table ->  ns path 
+  val convert_path : p_path -> table ->  ns path
 
   (*------------------------------------------------------------------*)
   val iter : (ns path -> data -> unit    )       -> table -> unit
@@ -549,7 +549,7 @@ end
 module Make (N:S) : SymbolKind with type ns = N.ns = struct
   type ns = N.ns
   let group = N.group
-  
+
   (*------------------------------------------------------------------*)
   let new_symb
       ~(approx : bool) (table : table) (top : npath) (name : lsymb) : ns t
@@ -567,14 +567,14 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
   let check_kind ~(loc : L.t option) (status : status): unit =
     if status <> Defined N.kind then kind_err ~loc ~get:status ~expect:N.kind
 
-  (*------------------------------------------------------------------*)    
+  (*------------------------------------------------------------------*)
   (** Remove an element from the table *)
   let remove (p : ns path) (table : table) : table =
-    let store = 
+    let store =
       let m = Mn.find p.np table.store in
       Mn.add p.np (Msymb.remove p.s m) table.store
     in
-    let current = 
+    let current =
       let l = Msymb.find p.s table.current in
       Msymb.add p.s (List.filter (fun r -> not (P.equal !<p r.path)) l) table.current
     in
@@ -582,7 +582,7 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
 
   (** Add a new record to the table *)
   let add (p : ns path) (record : record) (table : table) : table =
-    let store = 
+    let store =
       let m = Mn.find p.np table.store in
       assert (not (Msymb.mem p.s m));
       Mn.add p.np (Msymb.add p.s [record] m) table.store
@@ -592,14 +592,14 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
 
   (** Modify a record in the table *)
   let change (p : ns path) (record : record) (table : table) : table =
-    let store = 
+    let store =
       let m = Mn.find p.np table.store in
       assert (List.length (Msymb.find p.s m) = 1);
       Mn.add p.np (Msymb.add p.s [record] m) table.store
     in
-    let current = 
+    let current =
       let l = Msymb.find p.s table.current in
-      Msymb.add p.s 
+      Msymb.add p.s
         (List.map
            (fun record' -> if P.equal !<p record'.path then record else record')
            l)
@@ -611,13 +611,13 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
   let find (p : ns path) (table : table) : record =
     as_seq1 (Msymb.find p.s (Mn.find p.np table.store)) (* should always succeed *)
 
-  (*------------------------------------------------------------------*)    
+  (*------------------------------------------------------------------*)
   let reserve ~(approx : bool) (table : table) (name : lsymb) : table * ns path =
     let symb = new_symb ~approx table table.scope name in
     let p = path table.scope symb in
     let record = { path = !< p; status = Reserved N.kind; data = Empty; } in
     add p record table, p
-    
+
   let define (table : table) ?(data=Empty) (path : ns path) : table =
     let old_record = find path table in
     assert (old_record.status = Reserved N.kind) ;
@@ -634,12 +634,12 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       ~(approx : bool) (table : table)
       ?(scope : npath = table.scope) ?(data=Empty)
       (name : lsymb)
-    = 
+    =
     let symb = new_symb ~approx table scope name in
     let p = path scope symb in
     let record = { path = !< p; status = Defined N.kind; data; } in
     add p record table, p
-    
+
   let get_data (path : ns path) (table : table) =
     let record = find path table in
     check_kind ~loc:None record.status;
@@ -653,20 +653,20 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
     | { status = Reserved n } -> n = N.kind
     | { status = Defined  _ } -> false
     | exception Not_found -> false
-    
+
   (*------------------------------------------------------------------*)
   let convert
       ?(allow_empty = false)
-      ( ((_,sub) as p) : p_path) (table : table) 
-    : (ns path * data) list 
+      ( ((_,sub) as p) : p_path) (table : table)
+    : (ns path * data) list
     =
     let top, records = lookup_p_path ~group p table in
-    let results = 
-      List.filter_map (fun record -> 
-          if record.status = Defined N.kind 
-          then Some (!> (record.path), record.data) 
+    let results =
+      List.filter_map (fun record ->
+          if record.status = Defined N.kind
+          then Some (!> (record.path), record.data)
           else None
-        ) records 
+        ) records
     in
     if not allow_empty && results = [] then
       symb_err (L.loc sub)
@@ -685,16 +685,16 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       record.status = Defined N.kind
     with Error (_, Unbound_identifier _) | Not_found -> false
 
-  let mem_sp ((np, name) : s_path) (table : table) : bool = 
+  let mem_sp ((np, name) : s_path) (table : table) : bool =
     mem_s (of_s_npath np) name table
 
-  let mem_p (p : p_path) (table : table) : bool = 
+  let mem_p (p : p_path) (table : table) : bool =
     mem_sp (List.map L.unloc (fst p), L.unloc @@ snd p) table
 
   (*------------------------------------------------------------------*)
   let iter f (table : table) =
-    Mn.iter (fun _ m -> 
-        Msymb.iter (fun _ record -> 
+    Mn.iter (fun _ m ->
+        Msymb.iter (fun _ record ->
             let record = as_seq1 record in
             if record.status = Defined N.kind then
               f !>(record.path) record.data else ()
@@ -705,24 +705,24 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
     Mn.fold (fun _ m acc ->
         Msymb.fold (fun _ record acc ->
             let record = as_seq1 record in
-            if record.status = Defined N.kind 
-            then f !>(record.path) record.data acc 
+            if record.status = Defined N.kind
+            then f !>(record.path) record.data acc
             else acc
           ) m acc
       ) table.store acc
 
   let map (f : ns path -> data -> data) (table : table) : table =
-    let store = 
+    let store =
       Mn.map (fun m ->
           Msymb.map (fun record ->
               let record = as_seq1 record in
-              if record.status = Defined N.kind 
+              if record.status = Defined N.kind
               then [{ record with data = f !>(record.path) record.data}]
               else [record]
             ) m
         ) table.store
     in
-    let current = 
+    let current =
       Msymb.map (fun records ->
           List.map (fun record -> find !>(record.path) table) records
         ) table.current
@@ -835,7 +835,7 @@ end)
 (** Enter some namespaces (command [namespace N1. ... .NL]), creating
     it if necessary. *)
 let namespace_enter (table : table) (nl : p_npath): table =
-  let enter1 table (nsymb : lsymb) =   
+  let enter1 table (nsymb : lsymb) =
     let n = { group = namespace_group; name = L.unloc nsymb; } in
     let scope = npath_app table.scope [n] in
 
@@ -851,7 +851,7 @@ let namespace_enter (table : table) (nl : p_npath): table =
 
     let store = table.store in
     let store = if is_new then Mn.add scope Msymb.empty store else store in
-          
+
     update table ~scope ~store ~stack:(table.current :: table.stack)
   in
   List.fold_left enter1 table nl
@@ -884,7 +884,7 @@ let namespace_exit (t : table) (nl : p_npath): table =
     update t ~scope:(npath top) ~current ~stack
   in
   List.fold_left exit1 t (List.rev nl)
-    
+
 (*------------------------------------------------------------------*)
 (** Open a namespace, bringing its definitions in scope
     (command [open N1. ... .NL]) *)
@@ -907,10 +907,10 @@ let namespace_open (table : table) (np : npath): table =
       ) store table.current
   in
   { table with current; }
-  
+
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
-    
+
 module Sp (S : SymbolKind) : Set.S with type elt := S.ns path =
   Set.Make(struct
     type t = S.ns path
@@ -930,7 +930,7 @@ module Mp (S : SymbolKind) : Map.S with type key := S.ns path =
 (* Must be synchronized with the corresponding code in [Symbols.ml]! *)
 
 (* `<`,`>` and `=` are manually added after-ward. *)
-let right_infix_char_first = 
+let right_infix_char_first =
   [%sedlex.regexp? '+' | '-' | '*' | '|' | '&' | '~' | Sub (math, ('<' | '>' | '='))]
 let left_infix_char_first = [%sedlex.regexp? '^']
 
@@ -967,12 +967,12 @@ let is_infix (p : fname) : bool =
   is_infix_str s
 
 (* We only have non-associative and right-associative symbols.
-   Indeed, if we wanted symbols to have an optional associativity, we would 
-   have to record it in the symbol table. This would require the 
+   Indeed, if we wanted symbols to have an optional associativity, we would
+   have to record it in the symbol table. This would require the
    pretty-printer to take the table as argument, which is cumbersome. *)
 let infix_assoc_str (s : string) : assoc =
   assert (is_infix_str s);
-  if s = "=" || s = "<>" || s = "<=" || 
+  if s = "=" || s = "<>" || s = "<=" ||
      s = "<" || s = ">=" || s = ">" || s = "<=>" then `NonAssoc
   else if is_right_infix_str s then `Right
   else if is_left_infix_str s then `Left
@@ -999,7 +999,7 @@ let infix_assoc_predicate (p : predicate) : assoc =
 
 module OpData = struct
   (*------------------------------------------------------------------*)
-  (** Different variants on the Diffie-Hellman crypto assumption *)                          
+  (** Different variants on the Diffie-Hellman crypto assumption *)
   type dh_hyp =
     | DH_DDH
     | DH_CDH
@@ -1033,7 +1033,7 @@ module OpData = struct
     ftype : Type.ftype;
     def   : def;
   }
-        
+
   type data += Operator of op_data
 
   (*------------------------------------------------------------------*)
@@ -1049,27 +1049,33 @@ module OpData = struct
     | PublicKey  -> Fmt.pf fmt "PublicKey"
     | Abstract _ -> Fmt.pf fmt "Abstract"
 
+  let pp_fname fmt (s : fname) =
+    Fmt.pf fmt "%a%s%a" 
+      pp_npath s.np 
+      (if s.np.npath = [] then "" else ".")
+      (if is_infix s then Fmt.parens pp else pp) s.s
+
   (*------------------------------------------------------------------*)
   let as_op_data (data : data) =
     match data with Operator data -> data | _ -> assert false
 
   (*------------------------------------------------------------------*)
   let get_data s table = as_op_data (Operator.get_data s table)
- 
+
   let get_abstract_data s table =
     match (get_data s table).def with
     | Abstract (def,assoc) -> def, assoc
     | _ -> assert false
 
   (*------------------------------------------------------------------*)
-  let ftype table f = (get_data f table).ftype 
+  let ftype table f = (get_data f table).ftype
 
   (*------------------------------------------------------------------*)
   let is_abstract s table =
     match (get_data s table).def with
     | Abstract _ -> true
     | Concrete _ -> false
-  
+
   let is_abstract_with_ftype s ftype table =
     let data = get_data s table in
     match data.def with
@@ -1097,7 +1103,7 @@ type macro_data =
   | State   of int * Type.ty * state_macro_def
   | Global  of int * Type.ty * global_macro_def
 
-type data += Macro of macro_data 
+type data += Macro of macro_data
 
 let as_macro_data (data : data) : macro_data =
   match data with
@@ -1128,7 +1134,7 @@ let get_name_data (ms : name) (table : table) : name_data =
 (** {2 Type information} *)
 
 module TyInfo = struct
-  (** Type information associated to base types. 
+  (** Type information associated to base types.
       Restrict the instantiation domain of a type. *)
   type t =
     | Large
@@ -1143,26 +1149,26 @@ module TyInfo = struct
   (*------------------------------------------------------------------*)
   let parse (info : lsymb) : t =
     match L.unloc info with
-    | "name_fixed_length" -> Name_fixed_length 
-    | "large"             -> Large 
-    | "well_founded"      -> Well_founded 
+    | "name_fixed_length" -> Name_fixed_length
+    | "large"             -> Large
+    | "well_founded"      -> Well_founded
     | "fixed"             -> Fixed
     | "finite"            -> Finite
-    | "enum"              -> Enum 
+    | "enum"              -> Enum
     | _ -> symb_err (L.loc info) (Failure "unknown type information")
 
   (*------------------------------------------------------------------*)
   let get_data (s : btype) table : t list =
     match BType.get_data s table with Type l -> l | _ -> assert false
-  
+
   (*------------------------------------------------------------------*)
   let get_bty_infos table (ty : Type.ty) : t list =
     match ty with
     | Type.Index | Type.Timestamp | Type.Boolean ->
       [Fixed; Finite; Well_founded]
-      
+
     | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
-    | Type.TBase (np,b) -> 
+    | Type.TBase (np,b) ->
       (* FIXME: very hacky, but we cannot do better as qualified as
          [Symbols] depends on [Type] *)
       let np = of_s_npath np in
@@ -1179,10 +1185,10 @@ module TyInfo = struct
       let rec check : Type.ty -> bool = function
       | TVar _ | TUnivar _ -> false
       | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> allow_funs && check t1 && check t2                          
+      | Fun (t1, t2) -> allow_funs && check t1 && check t2
       | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
       | TBase _ as ty -> check_bty_info table ty def
-    in 
+    in
     check ty
 
   (** See `.mli` *)
@@ -1193,12 +1199,12 @@ module TyInfo = struct
   let is_fixed table ty : bool =
     check_info_on_closed_term true table ty Fixed
 
-  (** See `.mli` *)  
+  (** See `.mli` *)
   let is_name_fixed_length table ty : bool =
     check_info_on_closed_term false table ty Name_fixed_length
 
   (** See `.mli` *)
-  let is_enum table ty : bool = 
+  let is_enum table ty : bool =
     let rec check : Type.ty -> bool = function
       | Boolean | Index | Timestamp -> true
       | Message -> false
@@ -1206,8 +1212,8 @@ module TyInfo = struct
       | Fun (t1, t2) -> check t1 && check t2
       | TBase _ as ty -> check_bty_info table ty Enum
       | _ -> false
-    in 
-    check ty  
+    in
+    check ty
 
   let is_well_founded table ty : bool =
     check_info_on_closed_term false table ty Well_founded
@@ -1241,22 +1247,22 @@ let mk_macro ~scope m data =
 
 (** All macros are going to be hold [Macro (General _)] as data after
     the prelude is processed. *)
-  
-let inp   = mk_macro ~scope:top_npath "input"  Empty 
+
+let inp   = mk_macro ~scope:top_npath "input"  Empty
 let out   = mk_macro ~scope:top_npath "output" Empty
 let cond  = mk_macro ~scope:top_npath "cond"   Empty
 let exec  = mk_macro ~scope:top_npath "exec"   Empty
 let frame = mk_macro ~scope:top_npath "frame"  Empty
 
-let quant_npath = 
+let quant_npath =
   let qnp = [L.mk_loc L._dummy "Q"] in
-  let table = 
-    namespace_enter !builtin_ref qnp |> 
-    (^~) namespace_exit qnp 
+  let table =
+    namespace_enter !builtin_ref qnp |>
+    (^~) namespace_exit qnp
   in
   builtin_ref := table;
   of_s_npath ["Q"]
-    
+
 (* FIXME: quantum: remvove `q` as prefix *)
 let q_inp   = mk_macro ~scope:quant_npath "qinput"  Empty
 let q_out   = mk_macro ~scope:quant_npath "qoutput" Empty
@@ -1266,7 +1272,7 @@ let q_exec  = mk_macro ~scope:quant_npath "qexec"   Empty
 let q_frame = mk_macro ~scope:quant_npath "qframe"  Empty
 
 let is_quantum_macro m = List.mem m [q_inp; q_out; q_state; q_cond; q_exec; q_frame; ]
-    
+
 (*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
@@ -1279,7 +1285,7 @@ let is_quantum_macro m = List.mem m [q_inp; q_out; q_state; q_cond; q_exec; q_fr
     and would easily be declared equivalent. *)
 let dummy_channel_lsymb = L.mk_loc L._dummy "ø"
 let table,dummy_channel =
-  Channel.declare ~approx:false !builtin_ref dummy_channel_lsymb 
+  Channel.declare ~approx:false !builtin_ref dummy_channel_lsymb
 let () = builtin_ref := table
 
 (*------------------------------------------------------------------*)
@@ -1317,13 +1323,13 @@ let fs_diff  = mk_fsymb "diff" 2
 
 (** Happens *)
 
-let fs_happens = 
+let fs_happens =
   let fty = Type.mk_ftype [] [Type.Timestamp] Type.Boolean in
   mk_fsymb ~fty "happens" (-1)
 
 (** Pred *)
 
-let fs_pred = 
+let fs_pred =
   let fty = Type.mk_ftype [] [Type.Timestamp] Type.Timestamp in
   mk_fsymb ~fty "pred" (-1)
 
@@ -1343,7 +1349,7 @@ let fs_ite =
   let fty = Type.mk_ftype
       [tyv]
       [Type.tboolean; tyvar; tyvar]
-      tyvar 
+      tyvar
   in
   mk_fsymb ~fty "if" (-1)
 
@@ -1374,8 +1380,8 @@ let fs_succ = mk_fsymb "succ" 1
 
 let fs_att = mk_fsymb "att" 1
 
-let fs_qatt = 
-  let fty = 
+let fs_qatt =
+  let fty =
     Type.mk_ftype []
       [Type.tuple [Type.ttimestamp; Type.tmessage; Type.tquantum_message]]
       (Type.tuple [Type.tmessage; Type.tquantum_message])

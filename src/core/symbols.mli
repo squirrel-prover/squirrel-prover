@@ -406,7 +406,11 @@ module OpData : sig
 
   (*------------------------------------------------------------------*)
   val pp_abstract_def : Format.formatter -> abstract_def -> unit
-        
+
+  (** Pretty-printer for function names (properly parenthesized infix
+      symbols) *)
+  val pp_fname : Format.formatter -> fname -> unit
+
   (*------------------------------------------------------------------*)
   val as_op_data : data -> op_data
     

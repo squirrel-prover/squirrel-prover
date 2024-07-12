@@ -10,7 +10,7 @@ module SE = SystemExpr
 type body = Term.term
   
 type concrete_operator = {
-  name    : string;
+  name    : Symbols.fname;
   ty_vars : Type.tvar list;
   args    : Vars.var list;
   out_ty  : Type.ty;

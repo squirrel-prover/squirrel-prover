@@ -229,7 +229,6 @@ val var          : L.t -> string -> term
 
 type conversion_error_i =
   | Arity_error          of string * int * int
-  | UndefinedOfKind      of string option * string * Symbols.symbol_kind
   (** [string] unknown in optional namespace [npath] for kind [kind] *)
   | Type_error           of Term.term * Type.ty * Type.ty (* expected, got *)
   | Timestamp_expected   of string

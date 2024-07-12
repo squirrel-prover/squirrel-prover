@@ -6,7 +6,7 @@ module SE = SystemExpr
 type body = Term.term
   
 type concrete_operator = {
-  name    : string;
+  name    : Symbols.fname;
   ty_vars : Type.tvar list;
   args    : Vars.var list;
   out_ty  : Type.ty;
@@ -19,12 +19,6 @@ type Symbols.OpData.concrete_def += Val of concrete_operator
 let pp_op_body fmt body = Fmt.pf fmt "%a" Term.pp body
 
 let pp_concrete_operator fmt op =
-  let pp_op_name fmt s =
-    if Symbols.is_infix_str s then
-      (Fmt.parens Fmt.string) fmt s 
-    else
-      Fmt.string fmt s
-  in
   let pp_tyvars fmt tyvars =
     if tyvars = [] then () 
     else
@@ -37,7 +31,7 @@ let pp_concrete_operator fmt op =
   in
 
   Fmt.pf fmt "@[<hov 2>@[op %a %a%a: %a @]=@ @[%a@]@]"
-    pp_op_name op.name
+    Symbols.OpData.pp_fname op.name
     pp_tyvars op.ty_vars
     pp_args op.args
     Type.pp op.out_ty

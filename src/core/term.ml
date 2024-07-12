@@ -54,10 +54,11 @@ let pp_applied_ftype pf { fty; ty_args; } =
 let pp_funname ~dbg ppf ((fn,fty_app) : Symbols.fname * applied_ftype) = 
   if not dbg || fty_app.ty_args = [] then
     Fmt.pf ppf "%a"
-      (Printer.kws `GoalFunction) (Symbols.path_to_string fn)
+      (Printer.kws `GoalFunction) 
+      (Fmt.str "%a" Symbols.pp_path fn)
   else 
     Fmt.pf ppf "@[<hov 2>%a<%a>@]"
-      (Printer.kws `GoalFunction) (Symbols.path_to_string fn)
+      (Printer.kws `GoalFunction) (Fmt.str "%a" Symbols.pp_path fn)
       (Fmt.list ~sep:Fmt.sp Type.pp) fty_app.ty_args
 
 (*------------------------------------------------------------------*)
@@ -2163,7 +2164,7 @@ let pp_term_head fmt = function
   | HFind     -> Fmt.pf fmt "Find"
   | HTuple    -> Fmt.pf fmt "Tuple"
   | HProj     -> Fmt.pf fmt "Proj"
-  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp_path f
+  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.OpData.pp_fname f
   | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp_path m
   | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp_path n
   | HDiff     -> Fmt.pf fmt "Diff"
