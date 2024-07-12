@@ -3413,6 +3413,7 @@ module E = struct
       let system : SE.context = 
         SE.{ set = (oget st.system.pair :> SE.t); pair = None; } 
       in
+      (*FIXME: Anomaly with [any] here*)
       let st = st_change_context st system in
       let mv  = tunif_e ~mode es.terms pat_es.terms st in
       begin
