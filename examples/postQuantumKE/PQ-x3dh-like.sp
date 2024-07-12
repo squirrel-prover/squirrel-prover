@@ -959,21 +959,21 @@ Proof.
            depends I(i,j,l), FI(i,j,l) => //.
            intro OrdIFI /=.
            (have A : i0 = i by auto); rewrite A in *; clear A.
-           use sufcma with sid10(i,j,l)@FI(i,j,l), (xor(ktilde10(i,j,l)@FI(i,j,l)) (snd(snd(input@FI(i,j,l)))))  ,  skR(j); try auto .
+           use sufcma with sid10 i j l@FI(i,j,l), (xor(ktilde10 i j l@FI(i,j,l)) (snd(snd(input@FI(i,j,l)))))  ,  skR(j); try auto .
            expand output.
 
-           use xorconcel with ktilde8(j,k,i)@SR(j,k,i), ktilde8(j,k,i)@SR(j,k,i), sign(sid8(j,k,i)@SR(j,k,i),skR(j)) => //.
+           use xorconcel with ktilde8 j k i@SR(j,k,i), ktilde8 j k i@SR(j,k,i), sign(sid8 j k i@SR(j,k,i),skR(j)) => //.
            rewrite Meq in Meq0.
            rewrite -Meq0.
            expand sid10,sid8, C4,CT4.
            simpl.
-           assert ktilde8(j,k,i)@SR(j,k,i)=ktilde10(i,j,l)@FI(i,j,l).
+           assert ktilde8 j k i@SR(j,k,i)=ktilde10 i j l@FI(i,j,l).
              +++ expand ktilde8, ktilde10, FK2.
                  case  try find il jl kl such that
                       _
-                     in F2(sid10(i,j,l)@FI(i,j,l),n_PRF(il,jl,kl))
+                     in F2(sid10 i j l@FI(i,j,l),n_PRF(il,jl,kl))
                      else
-                       F2(sid10(i,j,l)@FI(i,j,l),
+                       F2(sid10 i j l@FI(i,j,l),
                        exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))).
                  intro [il jl kl [ _ ->]].
                  have U :
@@ -986,7 +986,7 @@ Proof.
                  intro [Abs _].
                  by use Abs with i,j,k.
              +++ rewrite Meq2.
-                 by use xorconcel with ktilde10(i,j,l)@FI(i,j,l), ktilde10(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))) .
+                 by use xorconcel with ktilde10 i j l@FI(i,j,l), ktilde10 i j l@FI(i,j,l),snd(snd(input@FI(i,j,l))) .
 
     + intro [k [Ord Eqsid]].
       executable pred(FI(i,j,l)) => //.
@@ -1042,16 +1042,16 @@ Proof.
   have ->: (try find il jl kl such that
                fst(snd(input@FI(i,j,k))) =
                encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
-             in F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl))
-             else F1(sid10(i,j,k)@FI(i,j,k),
+             in F1(sid10 i j k@FI(i,j,k),n_PRF(il,jl,kl))
+             else F1(sid10 i j k@FI(i,j,k),
                   exct(skex,decap(fst(snd(input@FI(i,j,k))),vkI(i)))))
              =
-              F1(sid10(i,j,k)@FI(i,j,k),n_PRF(i,j,k0)).
+              F1(sid10 i j k@FI(i,j,k),n_PRF(i,j,k0)).
     + localize H0' as H0. clear H0'. repeat destruct H0.
       expand output.
       rewrite //= in Meq0, Meq, Meq1.
       expand C4.
-      case try find il jl kl such that _ in  F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl)) else _.
+      case try find il jl kl such that _ in  F1(sid10 i j k@FI(i,j,k),n_PRF(il,jl,kl)) else _.
         ++ intro [i1 j1 k1 [I1 I2]].
            rewrite I2.
            have U :

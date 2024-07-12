@@ -347,11 +347,11 @@ lemma injective_correspondence (ii,i:index):
   happens(S(ii,i)) =>
   exec@S(ii,i) =>
   exists (j:index),
-    Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i) && 
+    Press(i,j) < S(ii,i) && cpt i j@Press(i,j) = SCpt(i)@S(ii,i) && 
     forall (ii1:index), 
       happens(S(ii1,i)) => 
       exec@S(ii1,i) =>
-      cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => 
+      cpt i j@Press(i,j) = SCpt(i)@S(ii1,i) => 
       ii1 = ii.
 (** The high-level idea of this proof is to use the INT-CTXT assumption:
 if the message received by the server is a valid ciphertext, then it must
@@ -379,7 +379,7 @@ Proof.
   we have expanded the macros `cpt` and `SCpt`. *)
   simpl. 
   split; 1: auto.
-  (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
+  (** It now remains to show that the counter value `cpt i j@Press(i,j)` is
   not involved in another successful login.
   We first show if this second successful login `S(ii',i)` had happened, then
   we must have `SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)`. *)

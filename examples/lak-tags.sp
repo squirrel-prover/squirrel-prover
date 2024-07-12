@@ -219,7 +219,7 @@ Proof.
 
   (* Case T *)
   + expand frame, exec, cond, output.
-    expand m2(i,j)@T(i,j).
+    expand m2 i j@T(i,j).
     fa !<_,_>, if _ then _, <_,_>.
     prf 2.
     * use tags_neq.

@@ -400,10 +400,10 @@ between the real system and an ideal one, using sequences to enrich the frame.
 lemma valid_decode (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
-  (aead_dec(pid,j)@t <> fail) =
+  (aead_dec pid j@t <> fail) =
   (exists(pid0 : index),
    Setup(pid0) < t &&
-   AEAD(pid0)@Setup(pid0) = aead(pid,j)@t).
+   AEAD(pid0)@Setup(pid0) = aead pid j@t).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
@@ -428,14 +428,14 @@ Qed.
 lemma valid_decode_charac (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
-  ( aead_dec(pid,j)@t <> fail &&
-    otp_dec(pid,j)@t <> fail &&
-    fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
-    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) )
+  ( aead_dec pid j@t <> fail &&
+    otp_dec pid j@t <> fail &&
+    fst(otp_dec pid j@t) = snd(snd(aead_dec pid j@t)) &&
+    mpid(pid) = fst(snd(aead_dec pid j@t)) )
   =
-  ( AEAD(pid)@Setup(pid) = aead(pid,j)@t &&
-    dec(otp(pid,j)@t,k(pid)) <> fail &&
-    fst(dec(otp(pid,j)@t,k(pid))) = sid(pid) ).
+  ( AEAD(pid)@Setup(pid) = aead pid j@t &&
+    dec(otp pid j@t,k(pid)) <> fail &&
+    fst(dec(otp pid j@t,k(pid))) = sid(pid) ).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
