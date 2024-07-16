@@ -1,14 +1,16 @@
+open Utils
+
 type rw_hint = { 
   name : string; 
   rule : LowRewrite.rw_rule;
 }
 
-val pp_rw_hint : Format.formatter -> rw_hint -> unit
+val pp_rw_hint : rw_hint formatter
 
 (*------------------------------------------------------------------*)
 type rewrite_db = rw_hint list Term.Hm.t
 
-val pp_rewrite_db : Format.formatter -> rewrite_db -> unit
+val pp_rewrite_db : rewrite_db formatter
 
 (*------------------------------------------------------------------*)
 val get_rewrite_db : Symbols.table -> rewrite_db

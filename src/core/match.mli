@@ -21,7 +21,7 @@ module Pos : sig
   (** A position in a term *)
   type pos
 
-  val pp : Format.formatter -> pos -> unit
+  val pp : pos formatter
 
   val root : pos
 

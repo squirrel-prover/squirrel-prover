@@ -1,8 +1,10 @@
 (** Completion of equalities and disequalities set *)
 
+open Utils
+    
 type state
 
-val pp_state : Format.formatter -> state -> unit
+val pp_state : state formatter
 
 (** [complete ?exn l] constructs a complete term rewriting system
     from the set of equations inside [l].
@@ -30,4 +32,4 @@ val name_index_cnstrs :
   ((Symbols.name * Term.term list) * (Symbols.name * Term.term list)) list
 
 (** Print the set of rules in the initial TRS (e.g. dec(enc(x,y,r),y) -> x). *)
-val print_init_trs : Format.formatter -> Symbols.table -> unit
+val print_init_trs : Symbols.table formatter

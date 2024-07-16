@@ -15,7 +15,7 @@ module Flat : sig
 
   val mk : unit -> t
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 end = struct 
   type t = int
 

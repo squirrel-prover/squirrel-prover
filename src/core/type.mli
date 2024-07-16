@@ -1,5 +1,7 @@
 (** This modules provides the types used to type variables and terms. *)
 
+open Utils
+
 module Sid = Ident.Sid
 
 (*------------------------------------------------------------------*)
@@ -8,8 +10,8 @@ module Sid = Ident.Sid
 type tvar
 type tvars = tvar list
 
-val pp_tvar     : Format.formatter -> tvar -> unit
-val pp_tvar_dbg : Format.formatter -> tvar -> unit
+val pp_tvar     : tvar formatter
+val pp_tvar_dbg : tvar formatter
 
 val mk_tvar : string -> tvar
 val ident_of_tvar : tvar -> Ident.t
@@ -20,7 +22,7 @@ val ident_of_tvar : tvar -> Ident.t
 type univar = private Ident.t
 type univars = univar list
 
-val pp_univar : Format.formatter -> univar -> unit
+val pp_univar : univar formatter
   
 val to_univar : Ident.t -> univar
 
@@ -84,7 +86,7 @@ val is_bitstring_encodable : ty -> bool
 module Fv : sig
   type t = { tv : Sid.t; uv : Sid.t; }
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
   val empty : t
   val union : t -> t -> t
@@ -118,7 +120,7 @@ val tquantum_message : ty
 (** A substitution from unification variables to (existential) types. *)
 type tsubst
 
-val pp_tsubst : Format.formatter -> tsubst -> unit
+val pp_tsubst : tsubst formatter
 
 val tsubst : tsubst -> ty -> ty
                                          
@@ -134,7 +136,7 @@ val tsubst_empty : tsubst
 module Infer : sig
   type env
 
-  val pp : Format.formatter -> env -> unit
+  val pp : env formatter
 
   val mk_env : unit -> env
 
@@ -191,8 +193,8 @@ type ftype = tvar ftype_g
 type ftype_op = univar ftype_g
 
 (*------------------------------------------------------------------*)
-val pp_ftype    : Format.formatter -> ftype    -> unit
-val pp_ftype_op : Format.formatter -> ftype_op -> unit
+val pp_ftype    : ftype    formatter
+val pp_ftype_op : ftype_op formatter
 
 (*------------------------------------------------------------------*)
 val ftype_fv : ftype -> Fv.t

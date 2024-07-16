@@ -1578,8 +1578,8 @@ let pp_toplevel
 let pp_with_info = pp_toplevel
 let pp           = pp_toplevel (default_pp_info ())
 
-let _pp ?table ~dbg =
-  let d = default_pp_info ?table () in
+let _pp (* ?table *) ~dbg =
+  let d = default_pp_info ?table:None () in
   pp_toplevel { d with dbg }
 
 let pp_dbg =
@@ -1588,7 +1588,7 @@ let pp_dbg =
 
 (*------------------------------------------------------------------*)
 let _pp_esubst ~dbg fmt (ESubst (t1,t2)) =
-  Fmt.pf fmt "%a->%a" (_pp ?table:None ~dbg) t1 (_pp ?table:None ~dbg) t2
+  Fmt.pf fmt "%a->%a" (_pp (* ?table:None *) ~dbg) t1 (_pp (* ?table:None *) ~dbg) t2
 
 let _pp_subst ~dbg fmt s =
   Fmt.pf fmt "@[<hv 0>%a@]"

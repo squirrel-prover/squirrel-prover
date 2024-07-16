@@ -1,3 +1,5 @@
+open Utils
+
 module Args = HighTacticsArgs
 module L = Location
 module T = ProverTactics
@@ -55,8 +57,8 @@ module MkCommonLowTac (S : Sequent.S) : sig
     val terms_of_conc : conc_form -> Term.term list
     val terms_of_hyp  : hyp_form  -> Term.term list
 
-    val pp_hyp  : Format.formatter -> hyp_form  -> unit
-    val pp_conc : Format.formatter -> conc_form -> unit
+    val pp_hyp  : hyp_form  formatter
+    val pp_conc : conc_form formatter
   end
 
   (*------------------------------------------------------------------*)

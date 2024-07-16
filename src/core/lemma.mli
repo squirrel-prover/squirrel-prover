@@ -1,9 +1,11 @@
+open Utils
+
 type lemma = { 
   stmt : Goal.statement;
   kind : [`Axiom | `Lemma];
 } 
 
-val pp : Format.formatter -> lemma -> unit
+val pp : lemma formatter
 
 val as_lemma : Symbols.data -> lemma
 
@@ -13,7 +15,7 @@ val add_lemma :
   [ `Axiom | `Lemma ] -> Goal.statement -> Symbols.table ->
   Symbols.table
 
-val print_all : Format.formatter -> Symbols.table -> unit
+val print_all : Symbols.table formatter
 
 (*------------------------------------------------------------------*)
 (** Get proved or assumed statement. *)
@@ -32,7 +34,7 @@ val mem_local  : Symbols.p_path -> Symbols.table -> bool
 val mem_global : Symbols.p_path -> Symbols.table -> bool
 
 (*------------------------------------------------------------------*)
-val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit
+val pp_kind : [`Axiom | `Lemma] formatter
 
 (*------------------------------------------------------------------*)
 (** {2 Depends, Mutex } *)

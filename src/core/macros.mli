@@ -1,5 +1,7 @@
 (** Declaring and unfolding macros *)
 
+open Utils
+
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
@@ -156,8 +158,8 @@ type system_map_arg =
   | ADescr  of Action.descr 
   | AGlobal of { is : Vars.vars; ts : Vars.var;
                  ac_descrs : Action.descr list; inputs : Vars.vars }
-(* ac_descrs is the list of actions that have a shape where the macro
-   is defined *)
+  (** ac_descrs is the list of actions that have a shape where the macro
+      is defined *)
 
 (*------------------------------------------------------------------*)
 type global_data
@@ -187,4 +189,4 @@ val fty : Symbols.table -> Symbols.macro -> Type.ftype * Type.ty
 
 val is_global : Symbols.table -> Symbols.macro -> bool
 
-val pp : Format.formatter -> global_data -> unit
+val pp : global_data formatter

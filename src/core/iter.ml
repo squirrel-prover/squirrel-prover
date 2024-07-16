@@ -732,8 +732,8 @@ module Mset : sig[@warning "-32"]
     path_cond:PathCond.t -> 
     t
 
-  val pp   : Format.formatter -> t      -> unit
-  val pp_l : Format.formatter -> t list -> unit
+  val pp   : t      formatter
+  val pp_l : t list formatter
 
   (** Compute the lub of two msets (w.r.t set inclusion).
       Must be called on sets with the same macro symbol. *)
@@ -879,7 +879,7 @@ module MsetAbs : sig[@warning "-32"]
   (** Abstract value containing one mset per macro symbol. *)
   type t = (Symbols.macro * Mset.t) list
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
   (** Join a single [mset] into an full abstract value. *)
   val join_single : Mset.t -> t -> t

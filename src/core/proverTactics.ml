@@ -1,3 +1,5 @@
+open Utils
+
 type 'a tac_infos = {
   maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
   pq_sound : bool;
@@ -17,7 +19,7 @@ module TacTable : sig
 
   val add_tac : string -> Goal.t tac_infos -> unit
 
-  val pp_goal_concl : Format.formatter -> Goal.t -> unit
+  val pp_goal_concl : Goal.t formatter
 end = struct
   let table = Hashtbl.create 97
   let tac_count_table = Hashtbl.create 97

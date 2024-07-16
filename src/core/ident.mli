@@ -26,8 +26,8 @@ val hash : ident -> int
 val to_string : ident -> string
 
 (*------------------------------------------------------------------*)
-val pp     : Format.formatter -> ident -> unit
-val pp_full: Format.formatter -> ident -> unit
+val pp     : ident formatter
+val pp_full: ident formatter
 
 (*------------------------------------------------------------------*)
 module Mid : Map.S with type key = ident

@@ -1,3 +1,5 @@
+open Utils
+
 (* DEPRECATED, should no longer be used *)
 (** Module for the euf axiom application *)
 (*------------------------------------------------------------------*)
@@ -16,7 +18,7 @@ type euf_schema = {
 }
 
 
-val pp_euf_schema : Format.formatter -> euf_schema -> unit
+val pp_euf_schema : euf_schema formatter
 
 (*------------------------------------------------------------------*)
 (** Type of a direct euf axiom case.
@@ -27,7 +29,7 @@ type euf_direct = {
   d_message : Term.term 
 }
 
-val pp_euf_direct : Format.formatter -> euf_direct -> unit
+val pp_euf_direct : euf_direct formatter
 
 (*------------------------------------------------------------------*)
 (** Type of an euf axiom rule:
@@ -42,7 +44,7 @@ type euf_rule = {
   cases_direct : euf_direct list 
 }
 
-val pp_euf_rule : Format.formatter -> euf_rule -> unit
+val pp_euf_rule : euf_rule formatter
 
 (*------------------------------------------------------------------*)
 (** Check the syntactic side conditions of the key in the protocol and

@@ -2,6 +2,8 @@
     Contains hypotheses and definitions (let binders).
     Named [Hyps] for legacy reasons. *)
 
+open Utils
+
 module SE = SystemExpr
 module Args = TacticsArgs
   
@@ -10,8 +12,8 @@ module Args = TacticsArgs
 module type Hyp = sig 
   type t 
 
-  val pp_hyp     : Format.formatter -> t -> unit
-  val pp_hyp_dbg : Format.formatter -> t -> unit
+  val pp_hyp     : t formatter
+  val pp_hyp_dbg : t formatter
   val _pp_hyp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
 
   (** Chooses a name for a formula, depending on the formula shape. *)
@@ -136,10 +138,10 @@ module type S1 = sig
   (*------------------------------------------------------------------*)
   val pp_ldecl : ?dbg:bool -> ?context:SE.context -> Format.formatter -> ldecl -> unit
 
-  val pp_hyp : Format.formatter -> hyp  -> unit
+  val pp_hyp : hyp  formatter
 
-  val pp     : Format.formatter -> hyps -> unit
-  val pp_dbg : Format.formatter -> hyps -> unit
+  val pp     : hyps formatter
+  val pp_dbg : hyps formatter
   val _pp    : dbg:bool -> Format.formatter -> hyps -> unit
 end
 

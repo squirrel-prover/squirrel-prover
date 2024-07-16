@@ -1,5 +1,7 @@
 (** Generic tactics *)
 
+open Utils
+    
 module L = Location
 
 type lsymb = string L.located
@@ -41,8 +43,8 @@ type ssc_error_c =
 
 type ssc_error = Term.term * ssc_error_c
 
-val pp_ssc_error  : Format.formatter -> ssc_error      -> unit
-val pp_ssc_errors : Format.formatter -> ssc_error list -> unit
+val pp_ssc_error  : ssc_error      formatter
+val pp_ssc_errors : ssc_error list formatter
 
 (*------------------------------------------------------------------*)
 (** The multiple types of tactics error. Specific ones are defined so that they
@@ -97,7 +99,7 @@ exception Tactic_soft_failure of tac_error
     tac_error returned by its failure. *)
 exception Tactic_hard_failure of tac_error
 
-val pp_tac_error_i : Format.formatter -> tac_error_i -> unit
+val pp_tac_error_i : tac_error_i formatter
 
 (** Purely abstract type "returned" by continuations and tactics. *)
 type a
@@ -188,7 +190,7 @@ module type AST_sig = sig
      so it may be beneficial to move this to ProverTactics *)
   val eval_judgment : post_quantum:bool -> t -> judgment -> judgment list
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
 end
 

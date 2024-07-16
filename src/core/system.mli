@@ -4,6 +4,8 @@
 
     In this module, system means multi-system. *)
 
+open Utils
+
 (** A system is indirectly represented by a system symbol. *)
 type t = Symbols.system 
 
@@ -30,7 +32,7 @@ val convert : Symbols.table -> Symbols.p_path -> t
 val pp_system : Symbols.table -> Format.formatter -> t -> unit
 
 (** Print all systems declared in symbols table. *)
-val pp_systems : Format.formatter -> Symbols.table -> unit
+val pp_systems : Symbols.table formatter
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -39,7 +41,7 @@ type error =
   | Shape_error        (** Inconsistency between shapes and indices. *)
   | Invalid_projection
 
-val pp_error : Format.formatter -> error -> unit
+val pp_error : error formatter
 
 exception Error of error
 
@@ -105,7 +107,7 @@ module Single : sig
       symbols after their complete definition. *)
   val make : Symbols.table -> Symbols.system -> Term.proj -> t
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
   val descr_of_shape : Symbols.table -> t -> Action.shape -> Action.descr
 end

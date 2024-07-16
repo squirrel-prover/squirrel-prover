@@ -49,8 +49,8 @@ sig
     negate:bool -> content -> content -> data -> Term.term
   val subst_content : Term.subst -> content -> content
   val subst_data : Term.subst -> data -> data
-  val pp_content : Format.formatter -> content -> unit
-  val pp_data : Format.formatter -> data -> unit
+  val pp_content : content formatter
+  val pp_data : data formatter
 end
 
 (*------------------------------------------------------------------*)
@@ -147,7 +147,7 @@ module type SimpleOcc = sig
   val clear_subsumed :
     Symbols.table -> SE.fset -> simple_occs -> simple_occs
 
-  val pp : Format.formatter -> simple_occ -> unit
+  val pp : simple_occ formatter
 end
 
 (*------------------------------------------------------------------*)
@@ -397,9 +397,9 @@ module type ExtOcc = sig
   val clear_subsumed :
     Symbols.table -> SE.fset -> ext_occs -> ext_occs
 
-  val pp : Format.formatter -> ext_occ -> unit
+  val pp : ext_occ formatter
 
-  val pp_occs : Format.formatter -> ext_occs -> unit
+  val pp_occs : ext_occs formatter
 end
 
 

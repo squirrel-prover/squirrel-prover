@@ -412,8 +412,8 @@ module Const = struct
       t
 
     val _pp : dbg:bool -> Format.formatter -> t -> unit
-    val[@warning "-32"] pp     : Format.formatter -> t -> unit
-    val[@warning "-32"] pp_dbg : Format.formatter -> t -> unit
+    val[@warning "-32"] pp     : t formatter
+    val[@warning "-32"] pp_dbg : t formatter
 
     val tsubst : Type.tsubst -> t -> t
     val subst  : Term.subst  -> t -> t

@@ -1,3 +1,5 @@
+open Utils
+
 module Sv = Vars.Sv
 module SE = SystemExpr
 
@@ -144,7 +146,7 @@ type hash_occ = (Term.term list * Term.term) occ
 
 type hash_occs = hash_occ list
 
-val pp_hash_occ : Format.formatter -> hash_occ -> unit
+val pp_hash_occ : hash_occ formatter
 
 (*------------------------------------------------------------------*)
 (** [deprecated_get_f_messages_ext ~cntxt f k t] collects direct occurrences of
@@ -210,7 +212,7 @@ module PathCond : sig
 
   val join : t -> t -> t
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
   val incl : t -> t -> bool
 
@@ -259,7 +261,7 @@ type iocc = {
       [path_cond τ τ0] *)
 }
 
-val pp_iocc : Format.formatter -> iocc -> unit
+val pp_iocc : iocc formatter
 
 
 (** Folding over all macro descriptions reachable from some terms.

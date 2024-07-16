@@ -1,5 +1,7 @@
 (** Equivalence formulas.  *)
 
+open Utils
+
 module SE = SystemExpr
   
 (*------------------------------------------------------------------*)
@@ -8,7 +10,7 @@ module SE = SystemExpr
 (*------------------------------------------------------------------*)
 type equiv = Term.term list
 
-val pp_equiv : Format.formatter -> equiv -> unit
+val pp_equiv : equiv formatter
 
 val  pp_equiv_numbered :             Format.formatter -> equiv -> unit
 val _pp_equiv_numbered : dbg:bool -> Format.formatter -> equiv -> unit
@@ -48,7 +50,7 @@ type atom =
   (** Fully applied predicate. Interpretation does not depend on the 
       system context, as all system arguments are explicit. *)
 
-val pp_atom : Format.formatter -> atom -> unit
+val pp_atom : atom formatter
 
 val subst_atom : Term.subst -> atom -> atom
 
@@ -70,8 +72,8 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-val pp     : Format.formatter -> form -> unit
-val pp_dbg : Format.formatter -> form -> unit
+val pp     : form formatter
+val pp_dbg : form formatter
 
 (** Full pretty printer.
     The [context] arguments allows to avoir printing some system expressions
@@ -135,7 +137,7 @@ type global_form = form
 
 type any_form = Global of form | Local of Term.term
 
-val pp_any_form : Format.formatter -> any_form -> unit
+val pp_any_form : any_form formatter
 
 val is_local : any_form -> bool
 
@@ -153,8 +155,8 @@ val kind_equal : 'a f_kind -> 'b f_kind -> bool
 module Any : sig
   type t = any_form
 
-  val pp     : Format.formatter -> t -> unit
-  val pp_dbg : Format.formatter -> t -> unit
+  val pp     : t formatter
+  val pp_dbg : t formatter
   val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
 
   val equal : t -> t -> bool

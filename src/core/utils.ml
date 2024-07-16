@@ -1,3 +1,49 @@
+
+(*------------------------------------------------------------------*)
+(** {2 Printing} *)
+
+(** Type of formatters for type ['a] *)
+type 'a formatter = Format.formatter -> 'a -> unit
+
+(** Same as ['a formatter], but with a debug option *)
+type 'a formatter_p = dbg:bool -> 'a formatter
+
+(* -------------------------------------------------------------------- *)
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_paren (c : bool) (pp : 'a formatter) : 'a formatter =
+  if c then Fmt.parens pp else pp
+
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over
+    shifting the infix symbol. *)
+let maybe_paren
+    ~(inner : 'a * fixity)
+    ~(outer : 'a * fixity)
+    ~(side  : assoc)
+    (pp : 'b formatter) : 'b formatter
+  =
+  let noparens (prio_in, fix_in) (prio_out, fix_out) side =
+    match fix_out with
+    | `NoParens -> true
+    | _ ->
+      (prio_in > prio_out) ||
+      match fix_in, side with
+      | `Postfix     , `Left     -> true
+      | `Prefix      , `Right    -> true
+      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left
+      | `Infix `Right, `Right    -> prio_in = prio_out && fix_out = `Infix `Right
+      | _            , `NonAssoc -> prio_in = prio_out && fix_out = fix_in
+      | _            , _         -> false
+  in
+  pp_maybe_paren (not (noparens inner outer side)) pp
+
+(*------------------------------------------------------------------*)
+(** {2 Hashing utilities} *)
+
 let hcombine acc n = acc * 65599 + n
 
 let hcombine_list fhash hash l =
@@ -391,7 +437,7 @@ let get_result = function
 module type Ordered = sig
   type t
   val compare : t -> t -> int
-  val print : Format.formatter -> t -> unit
+  val print : t formatter
 end
 
 (*------------------------------------------------------------------*)
@@ -696,48 +742,6 @@ let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
 let (-|) f g = fun x -> f (g x)
 
 let (^~) f = fun x y -> f y x
-
-(*------------------------------------------------------------------*)
-(** {2 Printing} *)
-
-(** Type of formatters for type ['a] *)
-type 'a formatter = Format.formatter -> 'a -> unit
-
-(** Same as ['a formatter], but with a debug option *)
-type 'a formatter_p = dbg:bool -> 'a formatter
-
-(* -------------------------------------------------------------------- *)
-type assoc  = [`Left | `Right | `NonAssoc]
-type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
-
-(* -------------------------------------------------------------------- *)
-let pp_maybe_paren (c : bool) (pp : 'a formatter) : 'a formatter =
-  if c then Fmt.parens pp else pp
-
-(** Parenthesis rules.
-    N.B.: the rule for infix left-associative symbols is only valid if,
-    in the parser, all prefix symbols are reduction-favored over
-    shifting the infix symbol. *)
-let maybe_paren
-    ~(inner : 'a * fixity)
-    ~(outer : 'a * fixity)
-    ~(side  : assoc)
-    (pp : 'b formatter) : 'b formatter
-  =
-  let noparens (prio_in, fix_in) (prio_out, fix_out) side =
-    match fix_out with
-    | `NoParens -> true
-    | _ ->
-      (prio_in > prio_out) ||
-      match fix_in, side with
-      | `Postfix     , `Left     -> true
-      | `Prefix      , `Right    -> true
-      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left
-      | `Infix `Right, `Right    -> prio_in = prio_out && fix_out = `Infix `Right
-      | _            , `NonAssoc -> prio_in = prio_out && fix_out = fix_in
-      | _            , _         -> false
-  in
-  pp_maybe_paren (not (noparens inner outer side)) pp
 
 (*------------------------------------------------------------------*)
 module Lazy = struct

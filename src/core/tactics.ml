@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 type lsymb = string L.located
@@ -621,7 +623,7 @@ module type AST_sig = sig
 
   val eval : post_quantum:bool -> modifiers:string list -> t -> judgment tac
   val eval_judgment : post_quantum:bool -> t -> judgment -> judgment list
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
 end
 

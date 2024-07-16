@@ -1,5 +1,7 @@
 (** Extending sequents with functionalities based on proved goals. *)
 
+open Utils
+    
 module Sv = Vars.Sv
 module Mvar = Match.Mvar
 module SE = SystemExpr
@@ -18,8 +20,8 @@ module PT : sig
     form   : Equiv.any_form;
   }
 
-  val pp     : Format.formatter -> t -> unit
-  val pp_dbg : Format.formatter -> t -> unit
+  val pp     : t formatter
+  val pp_dbg : t formatter
 end
 
 (*------------------------------------------------------------------*) 

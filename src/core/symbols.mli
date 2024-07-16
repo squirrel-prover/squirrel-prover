@@ -4,6 +4,8 @@
     have different kinds), and each symbol is attached to a
     definition whose Ocaml type depends on the kind. *)
 
+open Utils
+    
 module L = Location
 
 (*------------------------------------------------------------------*)
@@ -59,7 +61,7 @@ type symbol_kind =
   | Import
   | Namespace
     
-val pp_symbol_kind : Format.formatter -> symbol_kind -> unit
+val pp_symbol_kind : symbol_kind formatter
 
 (*------------------------------------------------------------------*)
 (** {3 Symbols} *)
@@ -82,7 +84,7 @@ val hash : 'a t -> int
 val to_string : 'a t -> string
 
 (** Pretty-print a symbol. *)
-val pp : Format.formatter -> 'a t -> unit
+val pp : 'a t formatter
 
 (*------------------------------------------------------------------*)
 (** Each possible symbol kind is represented by an abstract datatype.
@@ -142,8 +144,8 @@ type import    = _import    path
 type namespace = _namespace path
 
 (*------------------------------------------------------------------*)
-val pp_npath : Format.formatter -> npath   -> unit
-val pp_path  : Format.formatter -> 'a path -> unit
+val pp_npath : npath   formatter
+val pp_path  : 'a path formatter
  
 (*------------------------------------------------------------------*)
 val npath_to_string : ?sep:string -> npath   -> string
@@ -395,11 +397,11 @@ module OpData : sig
   type data += Operator of op_data
 
   (*------------------------------------------------------------------*)
-  val pp_abstract_def : Format.formatter -> abstract_def -> unit
+  val pp_abstract_def : abstract_def formatter
 
   (** Pretty-printer for function names (properly parenthesized infix
       symbols) *)
-  val pp_fname : Format.formatter -> fname -> unit
+  val pp_fname : fname formatter
 
   (*------------------------------------------------------------------*)
   val as_op_data : data -> op_data

@@ -13,9 +13,9 @@ module Var : sig
     | Pair                        (** multi-system of cardinal two *)
 
   (*------------------------------------------------------------------*)
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
-  val pp_info : Format.formatter -> info -> unit
+  val pp_info : info formatter
     
   (*------------------------------------------------------------------*)
   val equal : t -> t -> bool
@@ -74,7 +74,7 @@ type equiv_t = pair
 (*------------------------------------------------------------------*)
 val hash : 'a expr -> int
 
-val pp : Format.formatter -> 'a expr -> unit
+val pp : 'a expr formatter
 
 (** [subset s1 s2] iff [s1] is included in [s2]. *)
 val subset : Symbols.table -> 'a expr -> 'a expr -> bool
@@ -304,7 +304,7 @@ val equivalence_context : ?set:('a expr) -> <pair:unit;..> expr -> context
 (** Create context for interpreting reachability formulas. *)
 val reachability_context : 'a expr -> context
 
-val pp_context : Format.formatter -> context -> unit
+val pp_context : context formatter
 
 (** Get an expression with which all systems of a context are compatible.
     Return [None] if context is not [context_any]. *)

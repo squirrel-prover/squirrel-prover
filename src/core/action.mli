@@ -18,6 +18,9 @@
     are given relative to a (bi)system. *)
 
 (*------------------------------------------------------------------*)
+open Utils
+
+(*------------------------------------------------------------------*)
 (** {2 Execution points}
    
     Actions uniquely describe execution points in a protocol.
@@ -208,7 +211,7 @@ val combine_descrs : (Term.proj * descr) list -> descr
 
 module Shape : sig
   type t = shape
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
   val compare : t -> t -> int
 end
 
@@ -216,24 +219,24 @@ end
 (** {2 Pretty-printing} *)
 
 (** Format an action, displayed through its structure. *)
-val pp_action_structure : Format.formatter -> action -> unit
+val pp_action_structure : action formatter
 
 (** Format the action name of an action description. *)
-val pp_descr_short : Format.formatter -> descr -> unit
+val pp_descr_short : descr formatter
 
 (** Formatter for descriptions. *)
-val pp_descr : Format.formatter -> descr -> unit
+val pp_descr : descr formatter
 
-val pp_descr_dbg : Format.formatter -> descr -> unit
+val pp_descr_dbg : descr formatter
 
 (** Formatter for actions shapes. *)
-val pp_shape : Format.formatter -> shape -> unit
+val pp_shape : shape formatter
 
 (** Formatter for parsed actions. *)
-val pp_parsed_action : Format.formatter -> (string list) item list -> unit
+val pp_parsed_action : (string list) item list formatter
 
 (** Pretty-print all actions. *)
-val pp_actions : Format.formatter -> Symbols.table -> unit
+val pp_actions : Symbols.table formatter
 
 
 (*------------------------------------------------------------------*)

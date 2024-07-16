@@ -1,5 +1,7 @@
 (** Rewriting types and functions which do not depend on [Match] *)
 
+open Utils
+
 (*------------------------------------------------------------------*)
 module L   = Location
 module SE  = SystemExpr
@@ -25,7 +27,7 @@ type rw_rule = {
   rw_kind   : rw_kind;
 }
 
-val pp_rw_rule : Format.formatter -> rw_rule -> unit
+val pp_rw_rule : rw_rule formatter
 
 (*------------------------------------------------------------------*)
 val check_rule : rw_rule -> unit

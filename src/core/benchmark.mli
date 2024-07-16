@@ -1,3 +1,5 @@
+open Utils
+
 module type S = sig
   type input
   type output
@@ -7,8 +9,8 @@ module type S = sig
 
   (** Pretty-printing for inputs and outputs of considered computation. *)
 
-  val pp_input : Format.formatter -> input -> unit
-  val pp_result : Format.formatter -> (output, exn) Result.t -> unit
+  val pp_input : input formatter
+  val pp_result : (output, exn) Result.t formatter
 
   (** Prefix for benchmark data file.
       Benchmark data is only produced if BENCHMARK_DIR is set in

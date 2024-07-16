@@ -2,6 +2,8 @@
     or more accurately global sequents whose conclusion
     is a global meta-formula. *)
 
+open Utils
+    
 module SE = SystemExpr
   
 (*------------------------------------------------------------------*)
@@ -22,7 +24,7 @@ val init : ?no_sanity_check:bool -> env:Env.t-> ?hyp:Equiv.form -> Equiv.form ->
 
 (** Special pretty-printer for initial sequents.
     It does not display hypotheses, which might be misleading. *)
-val pp_init : Format.formatter -> t -> unit
+val pp_init : t formatter
 
 (** Free variables + var env **toplevel** sanity check *)
 val sanity_check : t -> unit

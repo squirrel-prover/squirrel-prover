@@ -1,3 +1,5 @@
+open Utils
+
 let query_pos = ref ""
 let set_position pos = query_pos := pos
 
@@ -5,8 +7,8 @@ module type S = sig
   type input
   type output
   val default : string * (input -> output)
-  val pp_input : Format.formatter -> input -> unit
-  val pp_result : Format.formatter -> (output,exn) Result.t -> unit
+  val pp_input : input formatter
+  val pp_result : (output,exn) Result.t formatter
   val basename : string
 end
 

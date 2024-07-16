@@ -63,7 +63,7 @@ module Tag : sig
   }
 
   (*------------------------------------------------------------------*)
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 
   (*------------------------------------------------------------------*)
   (** Built variable information according to the scope of a variable *)
@@ -94,16 +94,16 @@ type tagged_vars = tagged_var list
 (** {2 Pretty-printing} *)
 
 (** Print a variable, only showing its name. *)
-val pp : Format.formatter -> var -> unit
+val pp : var formatter
 
 (** Print a list of variables, only showing their names. *)
-val pp_list : Format.formatter -> vars -> unit
+val pp_list : vars formatter
 
 (** Print a list of variables, showing their names and sorts. *)
-val pp_typed_list : Format.formatter -> vars -> unit
+val pp_typed_list : vars formatter
 
 (** Print a list of tagged variables, showing their names and sorts. *)
-val pp_typed_tagged_list : Format.formatter -> tagged_vars -> unit
+val pp_typed_tagged_list : tagged_vars formatter
 
 (*------------------------------------------------------------------*)
 (** {2 Debug printing} *)

@@ -718,7 +718,7 @@ module XO : sig
 
   val refresh : t -> Term.subst * t
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t formatter
 end = struct
   type t = { cnt : x_hash_occ; tag : int; }
 

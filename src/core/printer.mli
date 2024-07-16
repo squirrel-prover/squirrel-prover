@@ -1,8 +1,9 @@
 (** Module instantiating the printing interface of Squirrel.
-  * It provides printing functions that behave accordingly with
-  * the running mode and the kind of printed information. *)
+    It provides printing functions that behave accordingly with
+    the running mode and the kind of printed information. *)
 
-
+open Utils
+    
 (** {2 Keywords} *)
 
 (** Keyword type. *)
@@ -48,7 +49,7 @@ val dummy_fmt : Format.formatter
 val get_std : unit -> Format.formatter
 
 (** Initialisation of a formatter. *)
-val init_ppf : Format.formatter -> printer_mode -> unit
+val init_ppf : printer_mode formatter
 
 (** Initialisation of the standard formatter. *)
 val init : printer_mode -> unit

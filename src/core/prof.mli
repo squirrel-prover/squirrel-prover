@@ -1,9 +1,11 @@
+open Utils
+
 (** Profiling *)
 
 val is_recorded : string -> bool
 val reset_all : unit -> unit
 
-val print : Format.formatter -> unit -> unit
+val print : unit formatter
 
 val mk_unary   : string -> ('a -> 'b) -> 'a -> 'b
 val mk_binary  : string -> ('a -> 'b -> 'c) -> ('a -> 'b -> 'c)

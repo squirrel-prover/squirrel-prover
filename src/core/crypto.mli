@@ -1,3 +1,5 @@
+open Utils
+
 module SE = SystemExpr
 module L = Location
 
@@ -41,11 +43,11 @@ val tsubst_oracle   : Type.tsubst -> oracle   -> oracle
 val tsubst_game     : Type.tsubst -> game     -> game 
 
 (*------------------------------------------------------------------*)
-val pp_var_decl : Format.formatter -> var_decl               -> unit
-val pp_sample   : Format.formatter -> Vars.var               -> unit
-val pp_update   : Format.formatter -> (Vars.var * Term.term) -> unit
-val pp_oracle   : Format.formatter -> oracle                 -> unit
-val pp_game     : Format.formatter -> game                   -> unit
+val pp_var_decl : var_decl               formatter
+val pp_sample   : Vars.var               formatter
+val pp_update   : (Vars.var * Term.term) formatter
+val pp_oracle   : oracle                 formatter
+val pp_game     : game                   formatter
 
 (*------------------------------------------------------------------*)
 val prove :

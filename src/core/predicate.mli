@@ -1,3 +1,5 @@
+open Utils
+
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
@@ -25,7 +27,7 @@ type predicate = private {
 type Symbols.data += Predicate of predicate
 
 (*------------------------------------------------------------------*)
-val pp : Format.formatter -> predicate -> unit
+val pp : predicate formatter
 
 (*------------------------------------------------------------------*)
 val mk :

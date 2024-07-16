@@ -202,7 +202,7 @@ val set_resolve_path :
 
 val pp      :                         term formatter
 val pp_dbg  :                         term formatter
-val _pp     : ?table:Symbols.table -> term formatter_p
+val _pp     : (* ?table:Symbols.table ->  *)term formatter_p
 
 (*------------------------------------------------------------------*)
 type pp_info

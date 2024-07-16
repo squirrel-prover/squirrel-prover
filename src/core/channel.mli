@@ -1,11 +1,13 @@
 (** Communication channels *)
 
+open Utils
+    
 (** As all channels are public and untyped.
     They must be declared before being used. *)
 
 type t = Symbols.channel
 
-val pp_channel : Format.formatter -> t -> unit
+val pp_channel : t formatter
 
 (** [of_lsymb table p] retrieves the channel previously declared
     under the name [p] in [table]. *)

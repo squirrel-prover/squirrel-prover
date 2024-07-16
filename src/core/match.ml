@@ -2148,10 +2148,10 @@ module MCset : sig[@warning "-32"]
     cond_le:(Term.term option) ->
     t
 
-  val pp       : Format.formatter -> t      -> unit
-  val pp_dbg   : Format.formatter -> t      -> unit
-  val pp_l     : Format.formatter -> t list -> unit
-  val pp_l_dbg : Format.formatter -> t list -> unit
+  val pp       : t      formatter
+  val pp_dbg   : t      formatter
+  val pp_l     : t list formatter
+  val pp_l_dbg : t list formatter
 end = struct
   type t = {
     msymb   : Term.msymb;

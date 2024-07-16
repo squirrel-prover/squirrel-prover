@@ -184,7 +184,7 @@ let toplevel_prec = 0
 let fun_fixity   = 10, `Infix `Right
 let tuple_fixity = 20, `NonAssoc
 
-let _pp ~dbg : Format.formatter -> ty -> unit = 
+let _pp ~dbg : ty formatter = 
   let rec _pp 
       ((outer,side) : ('b * fixity) * assoc)
       (ppf : Format.formatter) (t : ty) : unit 
@@ -326,7 +326,7 @@ let rec tsubst (s : tsubst) (t : ty) : ty =
 module Infer : sig
   type env
 
-  val pp : Format.formatter -> env -> unit
+  val pp : env formatter
 
   val mk_env : unit -> env
 

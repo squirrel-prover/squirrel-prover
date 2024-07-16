@@ -3,6 +3,8 @@
     Finishes the definition of data-type started in [Symbols] that
     could not be fully done (to avoid circular dependencies) *)
 
+open Utils
+
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
@@ -20,7 +22,7 @@ type concrete_operator = {
 type Symbols.OpData.concrete_def += Val of concrete_operator
 
 (*------------------------------------------------------------------*)
-val pp_concrete_operator : Format.formatter -> concrete_operator -> unit
+val pp_concrete_operator : concrete_operator formatter
 
 (*------------------------------------------------------------------*)
 val concrete_ftype : concrete_operator -> Type.ftype

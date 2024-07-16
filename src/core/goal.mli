@@ -1,3 +1,5 @@
+open Utils
+
 module SE = SystemExpr
 
 module TS = LowTraceSequent
@@ -9,8 +11,8 @@ module ES = LowEquivSequent
 type t = Local of TS.t | Global of ES.t
 
 (*------------------------------------------------------------------*)
-val pp : Format.formatter -> t -> unit
-val pp_init : Format.formatter -> t -> unit
+val pp : t formatter
+val pp_init : t formatter
 
 (*------------------------------------------------------------------*)
 val vars   : t -> Vars.env
@@ -40,7 +42,7 @@ type global_statement = (string, Equiv.form    ) abstract_statement
 type local_statement  = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
-val pp_statement : Format.formatter -> statement -> unit
+val pp_statement : statement formatter
 
 (*------------------------------------------------------------------*)
 val is_local_statement  : (_, Equiv.any_form) abstract_statement -> bool
