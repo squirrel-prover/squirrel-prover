@@ -1,5 +1,10 @@
 # Squirrel Prover
 
+The Squirrel Prover is a proof assistant dedicated to the verification
+of cryptographic protocols. It relies on a higher-order probabilistic
+logic following the computationnally complete symbolic attacker
+approach, and provides guarantees in the computational model.
+
 ## Try it
 
 Online version of `Squirrel` is available with a complete tutorial
@@ -15,186 +20,184 @@ The manual is available online
 For more information, the presentation site is on
 [github.io](https://squirrel-prover.github.io/).
 
-## Build
+## Installation
 
-You need OCaml version 4.10 or more (tested up to 4.13.1).
+Squirrel dependencies can be easily installed using Opam (version 2.0
+or more). 
 
-We recommend that you use opam (version 2.0 or more). It will notably allow
-you to install the required tools and libraries, with the following command
-inside this directory:
-```
-$ opam install . -y --deps-only
-```
+### Installing Opam
 
-You should then be able to build the software. The default target
-builds the prover and testing binaries and runs tests:
-```
-$ make
-```
+If you do not yet have Opam, it can be installed as follows:
+- On Debian/Ubuntu
+  
+  ```
+  apt-get install ocaml opam
+  ```
+  
+- One MacOSX
+  
+  ```
+  brew install ocaml opam
+  ```
+  
+- otherwise, opam installation instructions are available
+  [here](https://opam.ocaml.org/doc/Install.html).
 
-You can also just build the prover with `make squirrel`, test with `make test`.
+### Building Squirrel
 
-The documentation for developers may be built with `make doc`.
+1. Switch to a dedicated compiler for Squirrel 
+  
+   ```
+   opam switch create squirrel 5.1.1
+   ```
 
-The documentation for users may be built with `make refman-html`.
+2. Optionally, pin-it to the local repository
+   
+   ```
+   opam switch link squirrel .
+   ```
+   
+3. Initialize you environment variables:
+   
+   ```
+   eval $(opam env)
+   ```
+
+4. Install Squirrel dependencies:
+   
+   ```
+   opam install . -y --deps-only
+   ```
+   
+5. You should then be able to build the software. The default target
+   builds the prover and testing binaries and runs tests:
+   
+   ```
+   make
+   ```
+   
+   You can then run tests with `make test`.
+
+   The documentation for developers may be built with `make doc`.
+
+   The documentation for users may be built with `make refman-html`.
+
+### Adding SMT support (optional)
+
+SMT support can be added to Squirrel by installing the necessary
+dependencies. If those dependencies are not installed, Squirrel will
+still compile, but the `smt` tactic won't work. Note that you will
+need to recompile Squirrel *after* the `why3` package has been
+installed.
+
+1. Install Why3, Alt-Ergo and Z3 using opam:
+   
+   ```
+   opam install why3 alt-ergo z3
+   ```
+
+   This also installs the Why3 OCaml library used by Squirrel.
+
+2. Then tell Why3 to automatically detect supported SMT provers and update its
+   configuration accordingly:
+
+   ```
+   why3 config detect
+   ```
+
+3. Recompile Squirrel:
+   
+   ```
+   eval $(opam env)
+   make
+   ```
 
 ### Installing the Proof General mode for Emacs (optional, recommended)
 
-The required `.el` files are inside the `utils` folder. 
+The required `.el` files are inside the `utils/` folder. 
 We recommend installing Proof General from the git repository.
 
 
 - Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
-```
-mkdir -p ~/.emacs.d/lisp/ && cd ~/.emacs.d/lisp/
-git clone https://github.com/ProofGeneral/PG
-```
+  
+  ```
+  mkdir -p ~/.emacs.d/lisp/ && cd ~/.emacs.d/lisp/
+  git clone https://github.com/ProofGeneral/PG
+  ```
 
 - Create a squirrel sub-directory:
-```
-mkdir -p ~/.emacs.d/lisp/PG/squirrel
-```
+  ```
+  mkdir -p ~/.emacs.d/lisp/PG/squirrel
+  ```
 
 - Copy and paste this file, and `squirrel-syntax.el` inside it (creating
   symbolic links may be a better idea if you intend your config to follow
   the repository changes):
-```
-cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
-```
+  
+  ```
+  cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
+  ```
 
 - Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
    add to the list `proof-assistant-table-default` the following line:
-```
- (squirrel "Squirrel" "sp")
-```
-Then erase the outdated compiled version of this file:
-```
-rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
-```
+  
+  ```
+   (squirrel "Squirrel" "sp")
+  ```
+  
+  Then erase the outdated compiled version of this file:
+  ```
+  rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
+  ```
 
 - Run the following command to configure emacs:
-```
-echo -e "(require 'ansi-color)\n(load \"~/.emacs.d/lisp/PG/generic/proof-site\")" >> ~/.emacs
-```
+
+  ```
+  echo -e "(require 'ansi-color)\n(load \"~/.emacs.d/lisp/PG/generic/proof-site\")" >> ~/.emacs
+  ```
 
 - Run emacs from the squirrel repository on some example file,
-with the squirrel repository in the path:
-```
-export PATH=$PATH:/path/to/squirrel
-emacs examples/<file>.sp
-```
+  with the squirrel repository in the path:
+  
+  ```
+  export PATH=$PATH:/path/to/squirrel
+  emacs examples/<file>.sp
+  ```
 
 ### Unicode support in Emacs (Proof General) (optional)
 
 If you are missing some Unicode fonts in Emacs, you can try installing the Symbola font.
 For example, on a Debian distribution:
+
 ```
  apt-get install -y fonts-symbola 
 ```
+
 should do the trick.
 
-### Dependencies for the `smt` tactic (optional)
-
-(If those dependencies are not installed, Squirrel will still compile, but the
-`smt` tactic won't work. You will need to recompile Squirrel *after* the `why3`
-package has been installed.)
-
-First install Why3 and Alt-Ergo using opam:
-```
-$ opam install why3 alt-ergo
-```
-
-This also installs the Why3 OCaml library used by Squirrel.
-
-Then tell Why3 to automatically detect that Alt-Ergo is installed and update its
-configuration accordingly:
-```
-$ why3 config detect
-```
-
-Why3 is also able to find SMT solvers installed using the system package manager
-(e.g. `sudo dnf install z3` on Fedora) but those aren't supported by our code
-yet.
 
 ## Use
 
 ### Standalone
 
 You can check a proof development by simply passing the file to `squirrel`:
+
 ```
-$ ./squirrel examples/basic-hash.sp
+./squirrel examples/basic-hash.sp
 ```
+
 or using Emacs with the Proof General mode (if installed)
-```
-$ emacs examples/basic-hash.sp
-```
-
-### Data visualisation (with Proof General)
-
-To have a graphical representation of the state of the proof,
-set the variable `SP_VISU` to `ok` in your environnement.
-Then, launch a Squirrel file with Emacs:
 
 ```
-$ export SP_VISU=ok
-$ emacs examples/basic-hash.sp
+emacs examples/basic-hash.sp
 ```
-
-You need to validate at least one line in Emacs to launch the local server.
-Then, you can access the visualisation at: [http://localhost:8080/visualisation.html](http://localhost:8080/visualisation.html)
-
-### Export in HTML format (needs [pandoc](https://pandoc.org/)
-
-To convert a Squirrel development to HTML, you need:
-
-* A **Squirrel file** `PATH1/squirrel_name.sp`
-* An **HTML template file** `PATH2/page.html` containing a line:
-`<!--HERE-->` (without spaces or tabulations)
-
-A default HTML template can be found at `scripts/html_export/page.html`.
-
-
-```
-./squirrel PATH1/squirrel_name.sp --html PATH2/page.html
-```
-
-The previous command will create a copy of `page.html` in the same directory pointed
-by `PATH1` named `squirrel_name.html`. **Beware** that, if a file already
-exists with this name, it will be deleted by this operation.
-
-This new file will have the output of Squirrel formatted in HTML and placed
-where the `<!--HERE-->` tag is.
-
-Squirrel will put its results between span tags that will not be displayed. This result can later be processed, with javascript for example.
-
-Each instruction in the Squirrel file is translated into an item
-of the following form (with `_i` in the tags' id replaced by the number of the instuction):
-
-```
-<span class="squirrel-step" id="step_i">
-  <span class="input-line" id="in_i">
-    Input
-  </span>
-  <span class="output-line" id="out_i">
-    Output
-  </span>
-  <span class="com-line" id="com_i">
-    Comment
-  </span>
-</span>
-```
-
-The "Comment" part will be filled by comments in the Squirrel file
-starting with `(**` and ending with `*)`.
-It is possible to format these comment with pandoc's Markdown
-(detailled [here](https://pandoc.org/MANUAL.html#pandocs-markdown)).
-Others comments will be left in the "Input" part.
 
 ## Examples
+
 Examples of developments in Squirrel can be found in:
+
 - `examples/`
 
-Those include classical and post-quantum sound proofs of protocols.
 See `examples/README.md` for details.
 
 ## Tutorial
@@ -230,6 +233,71 @@ composition.
 ## Developper details
 
 We refer the reader to `CONTRIBUTING.md` for coding conventions.
+
+# Visualisation and HTML export
+
+### Data visualisation (with Proof General)
+
+To have a graphical representation of the state of the proof,
+set the variable `SP_VISU` to `ok` in your environnement.
+Then, launch a Squirrel file with Emacs:
+
+```
+export SP_VISU=ok
+emacs examples/basic-hash.sp
+```
+
+You need to validate at least one line in Emacs to launch the local server.
+Then, you can access the visualisation at: [http://localhost:8080/visualisation.html](http://localhost:8080/visualisation.html)
+
+### Export in HTML format (needs [pandoc](https://pandoc.org/))
+
+To convert a Squirrel development to HTML, you need:
+
+* A **Squirrel file** `PATH1/squirrel_name.sp`
+* An **HTML template file** `PATH2/page.html` containing a line:
+`<!--HERE-->` (without spaces or tabulations)
+
+A default HTML template can be found at `scripts/html_export/page.html`.
+
+
+```
+./squirrel PATH1/squirrel_name.sp --html PATH2/page.html
+```
+
+The previous command will create a copy of `page.html` in the same directory pointed
+by `PATH1` named `squirrel_name.html`. **Beware** that, if a file already
+exists with this name, it will be deleted by this operation.
+
+This new file will have the output of Squirrel formatted in HTML and placed
+where the `<!--HERE-->` tag is.
+
+Squirrel will put its results between span tags that will not be
+displayed. This result can later be processed, with javascript for
+example.
+
+Each instruction in the Squirrel file is translated into an item
+of the following form (with `_i` in the tags' id replaced by the number of the instuction):
+
+```
+<span class="squirrel-step" id="step_i">
+  <span class="input-line" id="in_i">
+    Input
+  </span>
+  <span class="output-line" id="out_i">
+    Output
+  </span>
+  <span class="com-line" id="com_i">
+    Comment
+  </span>
+</span>
+```
+
+The "Comment" part will be filled by comments in the Squirrel file
+starting with `(**` and ending with `*)`.
+It is possible to format these comment with pandoc's Markdown
+(detailled [here](https://pandoc.org/MANUAL.html#pandocs-markdown)).
+Others comments will be left in the "Input" part.
 
 # Documentation
 
