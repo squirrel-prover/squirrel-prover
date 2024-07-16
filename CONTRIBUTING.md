@@ -2,10 +2,9 @@
 
 ## Documentation
 
-The documentation for developers may be built with `make doc`. The standard ocamldoc syntax should be used for comments.
-Comments for functions should be put inside the `.mli` files.
-
-New modules should be added to `squirrel.odocl`.
+The documentation for developers may be built with `make doc`.
+The standard odoc syntax should be used for comments.
+Documentation for functions should be put inside the `.mli` files.
 
 ## Coding conventions
 

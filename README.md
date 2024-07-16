@@ -7,7 +7,7 @@ approach, and provides guarantees in the computational model.
 
 ## Try it
 
-Online version of `Squirrel` is available with a complete tutorial
+An online version of `Squirrel` is available with a complete tutorial
 [here](https://squirrel-prover.github.io/jsquirrel/?open=0-logic.sp).
 
 You can find more examples in the `examples` directory.
@@ -34,13 +34,13 @@ or more).
      apt-get install ocaml opam
      ```
      
-   - One MacOSX
+   - On MacOSX
      
      ```
      brew install ocaml opam
      ```
      
-   - otherwise, opam installation instructions are available
+   - Otherwise, opam installation instructions are available
      [here](https://opam.ocaml.org/doc/Install.html).
 
 2. Then, initialize opam by running:
@@ -76,7 +76,8 @@ or more).
    ```
    
 5. You should then be able to build the software. The default target
-   builds the prover and testing binaries and runs tests:
+   builds the prover, which is then available as `squirrel` in the
+   toplevel directory:
    
    ```
    make
@@ -84,9 +85,13 @@ or more).
    
    You can then run tests with `make test`.
 
-   The documentation for developers may be built with `make doc`.
-
-   The documentation for users may be built with `make refman-html`.
+   The documentation may be built with `make doc`, which consists in
+   two parts: the developers' documentation, which is built using
+   `dune build @doc` and the users' documentation built using
+   `dune build @refman-html`. The latter requires several extra
+   dependencies (see `documentation/sphinx/README.rst`) but most users
+   do not need to build it, and should find what they need in the
+   [online documentation](https://squirrel-prover.github.io/documentation/).
 
 ### Adding SMT support (optional)
 
@@ -145,7 +150,7 @@ We recommend installing Proof General from the git repository.
   ```
 
 - Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
-   add to the list `proof-assistant-table-default` the following line:
+  add to the list `proof-assistant-table-default` the following line:
   
   ```
    (squirrel "Squirrel" "sp")
@@ -208,10 +213,10 @@ See `examples/README.md` for details.
 
 ## Tutorial
 
-For a first introduction to the syntax, we recommend to open with ProofGeneral
-the `examples/basic-tutorial/tutorial.sp`, that provides a run through of the syntax
-with executables snippets. Then, browsing the `examples` folder should provide a
-wide variety of examples, starting e.g. with `basic-hash.sp`.
+For a first introduction to the syntax, we recommend opening with ProofGeneral
+the `examples/basic-tutorial/tutorial.sp`, that provides a run-through of the
+syntax with executables snippets. Then, browsing the `examples` folder should
+provide a wide variety of examples, starting e.g. with `basic-hash.sp`.
 
 ### Detailed Tutorial
 
@@ -256,7 +261,7 @@ emacs examples/basic-hash.sp
 You need to validate at least one line in Emacs to launch the local server.
 Then, you can access the visualisation at: [http://localhost:8080/visualisation.html](http://localhost:8080/visualisation.html)
 
-### Export in HTML format (needs [pandoc](https://pandoc.org/))
+### Export in HTML format (requires [pandoc](https://pandoc.org/))
 
 To convert a Squirrel development to HTML, you need:
 
@@ -322,17 +327,16 @@ The documentation can then be browsed through `squirrel.docdic/index.html`.
 
 # Coverage
 
-It can be generated through:
+Code coverage for tests can be generated as follows:
 ```
 $ make coverage
 ```
-The documentation can then be browsed through `_coverage/index.html`.
+The report can then accessed at `_coverage/index.html`.
 
 # JSquirrel
 
-If you want to run `Squirrel` in your browser we've transpiled
-Squirrel into JS using
-[JSofOcaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview)
+In order to run `Squirrel` in your browser, it can be transpiled into JS
+using [JSofOcaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview)
 linked to [CodeMirror6](https://codemirror.net/) editor.
 
 See `app/README.md` for more.
