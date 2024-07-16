@@ -42,16 +42,14 @@ type applied_ftype = {
   ty_args : Type.ty list; 
 }
 
-val pp_applied_ftype : Format.formatter -> applied_ftype -> unit
+val pp_applied_ftype : applied_ftype formatter
 
 (*------------------------------------------------------------------*)
-(** {3 Pretty printing} *)
+(** {3 Printing} *)
 
-val pp_nsymb  : Format.formatter -> nsymb      -> unit
-val pp_nsymbs : Format.formatter -> nsymb list -> unit
-
-val pp_msymb_s : Format.formatter -> Symbols.macro -> unit
-val pp_msymb   : Format.formatter -> msymb         -> unit
+val pp_nsymb   : nsymb         formatter
+val pp_msymb_s : Symbols.macro formatter
+val pp_msymb   : msymb         formatter
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
@@ -65,8 +63,8 @@ type projs = proj list
 module Mproj : Map.S with type key = proj
 module Sproj : Set.S with type elt = proj
 
-val pp_proj  : Format.formatter -> proj -> unit
-val pp_projs : Format.formatter -> projs -> unit
+val pp_proj  : proj  formatter
+val pp_projs : projs formatter
   
 (** We use strings to identify components of diff operators. *)
 val proj_from_string : string -> proj
@@ -86,7 +84,7 @@ type 'a diff_args =
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
 
-val pp_quant : Format.formatter -> quant -> unit
+val pp_quant : quant formatter
 
 (*------------------------------------------------------------------*)
 type term = private
@@ -132,7 +130,7 @@ module Lit : sig
   type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
   type ord_eq = [ `Eq | `Neq ]
 
-  val pp_ord : Format.formatter -> ord -> unit
+  val pp_ord : ord formatter
 
   type ('a,'b) _atom = 'a * 'b * 'b
 
@@ -151,8 +149,8 @@ module Lit : sig
   (** Type of compared elements. *)
   val ty  : literal -> Type.ty
 
-  val pp  : Format.formatter -> literal  -> unit
-  val pps : Format.formatter -> literals -> unit
+  val pp  : literal  formatter
+  val pps : literals formatter
 
   val neg : literal -> literal
 
@@ -173,16 +171,45 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
 
+(*------------------------------------------------------------------*)
+(** See specification in [theory.ml]. 
+
+    This function is used during pretty-printing, but cannot be
+    defined in [term.ml] due to circular dependencies issues
+    (e.g. with [macros.ml]). 
+    Thus, the function is stored here as a global variable. *)
+val set_resolve_path :
+  (
+    ?ty_env:Type.Infer.env ->
+    Symbols.table -> 
+    Symbols.p_path ->
+    ty_args:Type.ty list ->
+    ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS] ->
+    ([
+      `Operator of Symbols.fname  |
+      `Name     of Symbols.name   |
+      `Macro    of Symbols.macro  |
+      `Action   of Symbols.action
+    ]
+      * Type.ftype_op
+      * applied_ftype
+      * Type.Infer.env
+    ) list
+  ) -> unit
+    
+(*------------------------------------------------------------------*)
 (** Additional printing information *)
+
+val pp      :                         term formatter
+val pp_dbg  :                         term formatter
+val _pp     : ?table:Symbols.table -> term formatter_p
+
+(*------------------------------------------------------------------*)
 type pp_info
 
-val default_pp_info : pp_info
+val default_pp_info : ?table:Symbols.table -> unit -> pp_info
 
-val pp     :             Format.formatter -> term -> unit
-val _pp    : dbg:bool -> Format.formatter -> term -> unit
-val pp_dbg :             Format.formatter -> term -> unit
-
-val pp_with_info : pp_info -> Format.formatter -> term -> unit
+val pp_with_info : pp_info -> term formatter
 
 (*------------------------------------------------------------------*)
 val ty : ?ty_env:Type.Infer.env -> term -> Type.ty
@@ -218,8 +245,8 @@ type esubst = ESubst of term * term
 
 type subst = esubst list
 
-val pp_subst : Format.formatter -> subst -> unit
-val pp_subst_dbg : Format.formatter -> subst -> unit
+val pp_subst     : subst formatter
+val pp_subst_dbg : subst formatter
   
 
 val is_var_subst : subst -> bool
@@ -604,10 +631,9 @@ type match_info =
 
 type match_infos = match_info Mt.t
 
-val pp_match_info : Format.formatter -> match_info -> unit
-
-val pp_match_infos : Format.formatter -> match_infos -> unit
-
+val pp_match_info  : match_info  formatter
+val pp_match_infos : match_infos formatter
+  
 val match_infos_to_pp_info : match_infos -> pp_info
 
 (*------------------------------------------------------------------*)
@@ -630,7 +656,7 @@ type term_head =
   | HAction
   | HLet
 
-val pp_term_head : Format.formatter -> term_head -> unit
+val pp_term_head : term_head formatter
 
 val get_head : term -> term_head
 
@@ -656,7 +682,7 @@ type 'a pat_op = {
   pat_op_term   : 'a;
 }
 
-val pp_pat_term_op : Format.formatter -> term pat_op -> unit 
+val pp_pat_term_op : term pat_op formatter
 
 val project_tpat        : projs        -> term pat -> term pat
 val project_tpat_opt    : projs option -> term pat -> term pat

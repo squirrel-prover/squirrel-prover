@@ -2,7 +2,7 @@
 
 open Squirrelcore
 
-let () = Printexc.record_backtrace true
+(* let () = Printexc.record_backtrace true *)
 
 module L = Location
 

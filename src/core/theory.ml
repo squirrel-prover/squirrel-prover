@@ -157,9 +157,9 @@ type conversion_error_i =
       
 type conversion_error = L.t * conversion_error_i
 
-exception Conv of conversion_error
+exception Error of conversion_error
 
-let conv_err loc e = raise (Conv (loc,e))
+let conv_err loc e = raise (Error (loc,e))
 
 let pp_error_i ppf = function
   | Arity_error (s,i,j) ->
@@ -337,7 +337,7 @@ let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
 let ty_error ty_env loc (t : Term.term) ~(got : Type.ty) ~(expected : Type.ty) =
   let got      = Type.Infer.norm ty_env got in
   let expected = Type.Infer.norm ty_env expected in
-  Conv (loc, Type_error (t, expected, got))
+  Error (loc, Type_error (t, expected, got))
 
 let check_ty_eq state ~loc ~(of_t : Term.term) (t_ty : Type.ty) (ty : Type.ty) : unit =
   match Type.Infer.unify_eq state.ty_env t_ty ty with
@@ -632,9 +632,9 @@ let validate
     - optionally, [p] takes a [@] argument of type [ty_rec] *)
 let resolve_path
     ?(ty_env = Type.Infer.mk_env ())
-    (table : Symbols.table) (p : Symbols.p_path)
+    (table    : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list)
-    ~(app_cntxt : app_cntxt)
+    ~(ty_rec  : [`At of Type.ty | `MaybeAt of Type.ty | `NoTS])
   : 
     ([
       `Operator of Symbols.fname  |
@@ -677,12 +677,12 @@ let resolve_path
     List.iter2 check_ty ty_args op_ty_args;
 
     let () =
-      match app_cntxt, ty_rec_symb with
-      | (At t | MaybeAt t), Some ty' -> check_ty (Term.ty t) ty'
+      match ty_rec, ty_rec_symb with
+      | (`At ty | `MaybeAt ty), Some ty' -> check_ty ty ty'
       (* maybe parsing in a processus declaration *)
-      | MaybeAt _, None -> () 
-      | At _, None | NoTS , Some _ -> failed ()
-      | NoTS , None -> ()
+      | `MaybeAt _, None -> () 
+      | `At _, None | `NoTS , Some _ -> failed ()
+      | `NoTS , None -> ()
     in
 
     (* build the applied function type *)
@@ -740,6 +740,11 @@ let resolve_path
       ) (Symbols.Action.convert ~allow_empty:true p table)
   in
   op_list @ name_list @ macro_list @ action_list
+
+(*------------------------------------------------------------------*)
+(* make the function available in [term.ml] *)
+
+let () = Term.set_resolve_path resolve_path
 
 (*------------------------------------------------------------------*)
 (** error message: no symbols with a given type *)
@@ -999,6 +1004,12 @@ and convert_app
   (* convert arguments *)
   let args = List.map2 (convert state) args ty_args in
 
+  let ty_rec =
+    match app_cntxt with
+    | At t      -> `At      (Term.ty t)
+    | MaybeAt t -> `MaybeAt (Term.ty t)
+    | NoTS      -> `NoTS
+  in
   (* resolve [f] as a list of symbols exploiting the types of its
      arguments *)
   let symbs =
@@ -1006,7 +1017,7 @@ and convert_app
       ~ty_env:state.ty_env
       state.env.table f
       ~ty_args:(List.map (Type.Infer.norm state.ty_env) ty_args)
-      ~app_cntxt
+      ~ty_rec
   in
 
   if List.length symbs = 0 then 
@@ -1619,7 +1630,7 @@ let () =
         "message is not a boolean" Ok
         (fun () ->
            try check env ty_env [] t Type.tboolean with
-           | Conv (_, Type_error (_, Type.Boolean, _)) -> raise Ok
+           | Error (_, Type_error (_, Type.Boolean, _)) -> raise Ok
         )
     end
   ]

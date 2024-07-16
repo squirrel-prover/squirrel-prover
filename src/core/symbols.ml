@@ -459,8 +459,14 @@ let convert_npath (p_n : p_npath) (table : table) : npath =
 
 
 (** Internal (as we cannot type the paths returned).
-    Get all the records that can be associated to (surface syntaxe) symbol path.
-    If [p] is a qualified path, the return list must be of size [1].
+
+    Get all the records that can be associated to (surface syntaxe)
+    symbol path. Always suceed if the surface namespace path is valid,
+    even if the subpath is not.
+
+    If [p] is a qualified path, the return list is guaranteed to be of
+    size at-most [1].
+
     Also return the namespace path of these records. *)
 let lookup_p_path
     ~(group : group) ((top,s) : p_path) (table : table) : npath * record list
@@ -478,19 +484,8 @@ let lookup_p_path
   in
 
   let t = { group; name = L.unloc s } in
-  let records =
-    try Msymb.find t r with
-    | Not_found ->
-      symb_err (L.loc s)
-        (Unbound_identifier (Some (npath_to_string top), L.unloc s))
-  in
+  let records = Msymb.find_dflt [] t r in
   top, records
-
-(*------------------------------------------------------------------*)
-(** Exported (see `.mli`) *)
-let status_of_p_path ~(group:group) (p : p_path) (table : table) : status list =
-  let _, records = lookup_p_path ~group p table in
-  List.map (fun r -> r.status) records
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol kinds} *)

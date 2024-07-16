@@ -61,20 +61,20 @@ open C.
 
 lemma [any] _ (xt : T) (xa : A) (xb : B) (xc : C) : false. 
 Proof.
- have ? : x xt = empty by auto.
+ nosimpl have ? : x xt = empty by auto.
 
- have ? : x xa = A.x xa by auto.
+ nosimpl have ? : x xa = A.x xa by auto.
 
- have ? : x   xb = A.B.x xb by auto.
- have ? : B.x xb = A.B.x xb by auto.
+ nosimpl have ? : x   xb = A.B.x xb by auto.
+ nosimpl have ? : B.x xb = A.B.x xb by auto.
 
- have ? : x xc = C.x xc by auto.
+ nosimpl have ? : x xc = C.x xc by auto.
 
- have ? : xt + xt = witness by admit.
+ nosimpl have ? : xt + xt = witness by admit.
 
- have ? : xa + xa = A.(+) xa xa by auto. 
+ nosimpl have ? : xa + xa = A.(+) xa xa by auto. 
 
- have ? : xb + xb = B.(+) xb xb by auto.
+ nosimpl have ? : xb + xb = B.(+) xb xb by auto.
 
- have ? : xc + xc = C.(+) xc xc by auto.
+ nosimpl have ? : xc + xc = C.(+) xc xc by auto.
 Abort.

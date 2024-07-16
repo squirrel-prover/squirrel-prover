@@ -697,12 +697,21 @@ let (-|) f g = fun x -> f (g x)
 
 let (^~) f = fun x y -> f y x
 
+(*------------------------------------------------------------------*)
+(** {2 Printing} *)
+
+(** Type of formatters for type ['a] *)
+type 'a formatter = Format.formatter -> 'a -> unit
+
+(** Same as ['a formatter], but with a debug option *)
+type 'a formatter_p = dbg:bool -> 'a formatter
+
 (* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
 type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
 
 (* -------------------------------------------------------------------- *)
-let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
+let pp_maybe_paren (c : bool) (pp : 'a formatter) : 'a formatter =
   if c then Fmt.parens pp else pp
 
 (** Parenthesis rules.
@@ -713,7 +722,7 @@ let maybe_paren
     ~(inner : 'a * fixity)
     ~(outer : 'a * fixity)
     ~(side  : assoc)
-    (pp : 'b Fmt.t) : 'b Fmt.t
+    (pp : 'b formatter) : 'b formatter
   =
   let noparens (prio_in, fix_in) (prio_out, fix_out) side =
     match fix_out with

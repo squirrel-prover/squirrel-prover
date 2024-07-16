@@ -177,12 +177,6 @@ val path : npath -> 'a t -> 'a path
 (** {2 Symbol tables} *)
 
 (*------------------------------------------------------------------*)
-(** The status of a symbol. *)
-type status =
-  | Defined  of symbol_kind
-  | Reserved of symbol_kind
- 
-(*------------------------------------------------------------------*)
 (** In addition to their definition data, some more data can be attached
     to symbols. This is used for data that is defined in modules that
     depend on this module, through an extensible datatype. 
@@ -201,10 +195,6 @@ val tag : table -> int
 (*------------------------------------------------------------------*)
 (** Return the current scope *)
 val scope : table -> npath
-
-(*------------------------------------------------------------------*)
-(** Return all the status that can be associated to a [p_path] (for typing). *)
-val status_of_p_path : group:group -> p_path -> table -> status list
 
 (*------------------------------------------------------------------*)
 (** Convert a surface npath to a npath. *)

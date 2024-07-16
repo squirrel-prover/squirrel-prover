@@ -21,21 +21,21 @@ let test1 () =
          try Prover.exec_command ~test:true
                "global axiom _ ['a] (x,y,z : 'a) : $(Foo x y empty)." st
          with
-         | Theory.Conv _ -> raise Ok));
+         | Theory.Error _ -> raise Ok));
   Alcotest.check_raises "no multi-term: diff" Ok
     (fun () ->
        ignore (
          try Prover.exec_command ~test:true
                "global axiom _ ['a] (x,y,z : 'a) : $(Foo x y (diff(x,y)))." st
          with
-         | Theory.Conv _ -> raise Ok));
+         | Theory.Error _ -> raise Ok));
   Alcotest.check_raises "no multi-term: macro" Ok
     (fun () ->
        ignore (
          try Prover.exec_command ~test:true
                "global axiom _  : $(Foo empty empty (frame@init))." st
          with
-         | Theory.Conv _ -> raise Ok));
+         | Theory.Error _ -> raise Ok));
 
   ()
 

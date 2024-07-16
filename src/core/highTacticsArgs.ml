@@ -35,7 +35,7 @@ let convert_pat_arg
   let message = match List.nth_opt res (sel-1) with
     | Some et -> et
     | None -> 
-      raise Theory.(Conv (L._dummy,
+      raise Theory.(Error (L._dummy,
                           Tactic_type
                             ("Could not extract the element "
                              ^ string_of_int (sel)
@@ -61,7 +61,7 @@ let convert_args env parser_args tactic_type conc =
     | [Theory p], Sort Message ->
       begin match Theory.convert conv_cntxt p with
         | (t, ty) -> Arg (Message (t, ty))
-        | exception Theory.(Conv (_,PatNotAllowed)) ->
+        | exception Theory.(Error (_,PatNotAllowed)) ->
           let (m, ty) = convert_pat_arg 1 conv_cntxt p conc in
           Arg (Message (m, ty))
       end
@@ -75,7 +75,7 @@ let convert_args env parser_args tactic_type conc =
         try
           let et, ty = Theory.convert conv_cntxt p in
           Term (ty,et,L.loc p)
-        with Theory.(Conv (_,PatNotAllowed)) ->
+        with Theory.(Error (_,PatNotAllowed)) ->
           let (m,ty) = convert_pat_arg 1 conv_cntxt p conc in
           Term (ty, m, L.loc p)
       in
@@ -88,10 +88,10 @@ let convert_args env parser_args tactic_type conc =
       Arg (Int i)
 
     | [Theory t], Sort String ->
-      raise Theory.(Conv (L.loc t, Failure "expected a string"))
+      raise Theory.(Error (L.loc t, Failure "expected a string"))
 
     | [Theory t], Sort Int ->
-      raise Theory.(Conv (L.loc t, Failure "expected an integer"))
+      raise Theory.(Error (L.loc t, Failure "expected an integer"))
 
     | [Theory p], Sort Index ->
       let f = 
@@ -106,7 +106,7 @@ let convert_args env parser_args tactic_type conc =
         | Arg arg1 ->
           let Arg arg2 = conv_args q (Sort s2) in
           Arg (Pair (arg1, arg2))
-        | exception Theory.(Conv _) ->
+        | exception Theory.(Error _) ->
           let Arg arg2 = conv_args (th1::q) (Sort s2) in
           Arg (Pair (Opt (s1, None), arg2))
       end
@@ -133,10 +133,10 @@ let convert_args env parser_args tactic_type conc =
 
     | [], Sort None -> Arg None
 
-    | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
+    | [], _ -> raise Theory.(Error (L._dummy, Tactic_type "more arguments expected"))
 
     | _ :: _, _  ->
-      raise Theory.(Conv (L._dummy,
+      raise Theory.(Error (L._dummy,
                           Tactic_type "tactic argument error \
                                        (maybe you gave too many arguments?)"))
 

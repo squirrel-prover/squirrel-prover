@@ -244,7 +244,7 @@ let models =
            try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp"
                        : Symbols.table )
            with
-             Theory.Conv _ -> raise Ok)
+             Theory.Error _ -> raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

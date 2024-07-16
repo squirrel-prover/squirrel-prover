@@ -15,7 +15,7 @@ let is_toplevel_error ~interactive ~test (e : exn) : bool =
   | Command.Cmd_error               _
   | Process.Error                   _
   | ProcessDecl.Error               _
-  | Theory.Conv                     _
+  | Theory.Error                    _
   | Symbols.Error                   _
   | System.Error                    _
   | SystemExpr.Error                _
@@ -56,7 +56,7 @@ let pp_toplevel_error
   | ProcessDecl.Error e when not test ->
     (ProcessDecl.pp_error pp_loc_error) fmt e
 
-  | Theory.Conv e when not test ->
+  | Theory.Error e when not test ->
     (Theory.pp_error pp_loc_error) fmt e
 
   | Symbols.Error e when not test ->

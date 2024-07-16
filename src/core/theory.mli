@@ -257,7 +257,7 @@ type conversion_error_i =
 
 type conversion_error = L.t * conversion_error_i
 
-exception Conv of conversion_error
+exception Error of conversion_error
 
 val conv_err : L.t -> conversion_error_i -> 'a
     
