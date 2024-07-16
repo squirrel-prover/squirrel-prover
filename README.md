@@ -27,31 +27,37 @@ or more).
 
 ### Installing Opam
 
-If you do not yet have Opam, it can be installed as follows:
-- On Debian/Ubuntu
-  
-  ```
-  apt-get install ocaml opam
-  ```
-  
-- One MacOSX
-  
-  ```
-  brew install ocaml opam
-  ```
-  
-- otherwise, opam installation instructions are available
-  [here](https://opam.ocaml.org/doc/Install.html).
+1. If you do not yet have Opam, it can be installed as follows:
+   - On Debian/Ubuntu
+     
+     ```
+     apt-get install ocaml opam
+     ```
+     
+   - One MacOSX
+     
+     ```
+     brew install ocaml opam
+     ```
+     
+   - otherwise, opam installation instructions are available
+     [here](https://opam.ocaml.org/doc/Install.html).
 
+2. Then, initialize opam by running:
+
+   ```
+   opam init
+   ```
+   
 ### Building Squirrel
 
-1. Switch to a dedicated compiler for Squirrel 
+1. Switch to a dedicated compiler for Squirrel:
   
    ```
    opam switch create squirrel 5.1.1
    ```
 
-2. Optionally, pin-it to the local repository
+2. Optionally, pin-it to the local repository:
    
    ```
    opam switch link squirrel .
