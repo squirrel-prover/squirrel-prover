@@ -293,7 +293,7 @@ global lemma
       (nb:message)
       (rand1:message)
       (rand3:message)    
-=>
+    =>
       (f p m1 m2 m3 ka na nb rand1 rand3)#1
   in
   Let ex =
@@ -309,7 +309,7 @@ global lemma
       (nb:message)
       (rand1:message)
       (rand3:message) 
-=>
+    =>
       (f  p m1 m2 m3 ka na nb rand1 rand3)#2
   in
   Let pk =
@@ -325,7 +325,7 @@ global lemma
       (nb:message)
       (rand1:message)
       (rand3:message)  
-=>
+    =>
       (f p m1 m2 m3 ka na nb rand1 rand3)#3
   in
   [happens(t)] -> [t < B] ->
@@ -339,8 +339,7 @@ Proof.
     exists (fun (a,b,c,d,e,f,g,h,i:message) => (zero,true,zero)).
     by rewrite if_false.
   + destruct IH.
-    rewrite /*.
-    rewrite and_true_r.
+    rewrite /* and_true_r.
     exists (fun (p,m1,m2,m3,ka,na,nb,rand1,rand3:message) =>
       (<(fr f p m1 m2 m3 ka na nb rand1 rand3), 
        <of_bool ((ex f  p m1 m2 m3 ka na nb rand1 rand3)), 
@@ -348,12 +347,9 @@ Proof.
        (ex f  p m1 m2 m3 ka na nb rand1 rand3),
        (pk f  p m1 m2 m3 ka na nb rand1 rand3))).
     assert ((A <= PUB) <=> (A <= pred PUB)) as -> by auto.
-    reduce.
-    rewrite /fr /ex /pk /=.
-    reduce.
+    rewrite /= /fr /ex /pk /=. 
     rewrite /msg1 /msg2 /msg3 in H1.
-    rewrite H1.
-    by reduce.
+    by rewrite H1.
   + destruct IH.
     rewrite /frame /exec /output /cond /msg1 /msg3 /input.
     rewrite and_true_r.
@@ -367,12 +363,11 @@ Proof.
        (ex f  p m1 m2 m3 ka na nb rand1 rand3),
        att (fr f  p m1 m2 m3 ka na nb rand1 rand3))).
     rewrite (if_true (A <= A)); 1: auto.
-    rewrite /fr /ex  /=.
-    reduce. 
+    rewrite /fr /ex /=.
     rewrite /msg1 /msg2 /msg3 in H1.
     rewrite H1.
     rewrite (if_false (A <= pred A)); 1: auto.
-    by reduce.
+    auto.
   + destruct IH.
     rewrite /frame /exec /output /cond /input /msg8 /msg2 /msg9 /msg3.
     rewrite and_true_r.
@@ -397,7 +392,9 @@ Proof.
     assert A < A1 by use depends_A_A1.
     assert (A <= A1) <=> (A <= pred A1) as -> by auto.
     rewrite /fr /ex /pk /input. 
-    rewrite /msg1 /msg2 /msg3 in H1. reduce.  rewrite H1. reduce. reduce ~flags:[diffr].
+    rewrite /msg1 /msg2 /msg3 in H1.
+    rewrite /= H1. 
+    reduce ~flags:[diffr].
     by rewrite (if_true (A <= pred A1)).
   + by rewrite lt_irrefl in H0.
 Qed.
@@ -426,14 +423,14 @@ global lemma [NSL/left,NSL_a/left] deduction_left (t:timestamp[const]) :
   Let ex =
     fun (f: _ -> _ -> _ -> _ -> _ -> _ -> _ -> _ -> _-> message*bool*message) 
         (p:message)
-	(m1:message)
-	(m2:message)
-	(m3:message)
-	(kb:message)
-        (na:message)
-	(nb:message)
-        (rand1:message)
-        (rand2:message)
+    	(m1:message)
+    	(m2:message)
+    	(m3:message)
+    	(kb:message)
+      (na:message)
+    	(nb:message)
+      (rand1:message)
+      (rand2:message)
     =>
       (f p m1 m2 m3 kb na nb rand1 rand2)#2
   in
@@ -462,8 +459,7 @@ Proof.
     exists (fun (a,b,c,d,e,f,g,h,i:message) => (zero,true,zero)).
     by rewrite if_false.
   + destruct IH.
-    rewrite /*.
-    rewrite and_true_r.
+    rewrite /* and_true_r.
     exists (fun (p,m1,m2,m3,kb,na,nb,rand1,rand2:message) =>
       (<(fr f p m1 m2 m3 kb na nb rand1 rand2),
        <of_bool (ex f p m1 m2 m3 kb na nb rand1 rand2),
@@ -486,12 +482,11 @@ Proof.
        (ex f p m1 m2 m3 kb na nb rand1 rand2),
        att (fr f p m1 m2 m3 kb na nb rand1 rand2))).
     rewrite /* in *.
-    rewrite /= H1; reduce.
+    rewrite /= H1.
     by rewrite (if_true (A <= A)).
   + by rewrite lt_irrefl in H0.
   + destruct IH.
-    rewrite /*.
-    rewrite and_true_r.
+    rewrite /* and_true_r.
     exists (fun (p,m1,m2,m3,kb,na,nb,rand1,rand2:message) =>
       (<(fr f  p m1 m2 m3 kb na nb rand1 rand2)
        , <of_bool (ex f  p m1 m2 m3 kb na nb rand1 rand2),
@@ -507,7 +502,7 @@ Proof.
            >>, 
        (ex f  p m1 m2 m3 kb na nb rand1 rand2),
        (pk f  p m1 m2 m3 kb na nb rand1 rand2))).
-    rewrite /* in *. simpl.
+    rewrite /* /= in *. 
     assert (A <= B) <=> (A <= pred B) as -> by auto.
     by rewrite H1.
 Qed.
@@ -533,7 +528,7 @@ Proof.
     crypto CCA2 (key :skb).
     by rewrite len3.
     by rewrite len1.
-  + rewrite /*in *.
+  + rewrite /* in *.
     apply IH.
   + rewrite /* in *.
     apply IH.
@@ -553,8 +548,8 @@ Proof.
       by rewrite Hf.
     rewrite /msg1 /msg2 /msg3.
     crypto CCA2 (key:skb) => //.
-    * by simpl ~flags:[diffr].
-    * by simpl ~flags:[diffr].
+    * auto ~flags:[diffr].
+    * auto ~flags:[diffr].
     * by rewrite len3.
     * by rewrite len1.
 Qed.
@@ -582,12 +577,11 @@ Proof.
     apply IH.
   + assert A < A1 by use depends_A_A1.
     rewrite /*.
-    fa !<_,_>.
-    fa if _ then _.
+    fa !<_,_>, if _ then _.
     have Hf := deduction_left (pred A1).
     simpl ~zeta.
     have Hap : happens(pred A1) by auto.
-    apply Hf in Hap. auto.
+    apply Hf in Hap; 1: auto.
     clear Hf.
     destruct Hap as [f Hf].
     assert frame@pred A1 = (f (pub ska) msg1 msg2 msg3 skb na nb r1' r2')#1 as ->
