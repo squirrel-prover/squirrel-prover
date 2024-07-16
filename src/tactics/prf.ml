@@ -235,7 +235,7 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
            (se,cond)::acc_conds, `Map v
          else if is_binder t' then (* t' is a binder: 
                                       stop there for this branch *)
-           (se,cond)::acc_conds, `Map t'
+           acc_conds, `Map t'
          else (* keep going *)
            acc_conds, `Continue)
       (se :> SE.arbitrary)
