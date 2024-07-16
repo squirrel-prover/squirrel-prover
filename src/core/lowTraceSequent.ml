@@ -39,9 +39,9 @@ module S : sig
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
-  val pp     :             Format.formatter -> t -> unit
-  val _pp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp_dbg :             Format.formatter -> t -> unit
+  val pp     : t formatter
+  val pp_dbg : t formatter
+  val _pp    : t formatter_p
 
   val init_sequent :
     no_sanity_check:bool ->

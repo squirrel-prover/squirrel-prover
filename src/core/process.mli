@@ -5,6 +5,8 @@
     of conditionals, since it is not necessary for correspondences. We will
     do it separately for equivalences. *)
 
+open Utils
+
 module L = Location
   
 (*------------------------------------------------------------------*)
@@ -75,9 +77,9 @@ type proc =
   | Alias    of proc * string
 
 (*------------------------------------------------------------------*)
-val _pp    : dbg:bool -> Format.formatter -> proc -> unit
-val pp     :             Format.formatter -> proc -> unit
-val pp_dbg :             Format.formatter -> proc -> unit
+val pp     : proc formatter
+val pp_dbg : proc formatter
+val _pp    : proc formatter_p
                  
 (*------------------------------------------------------------------*)
 type proc_decl = {

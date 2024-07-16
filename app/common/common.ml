@@ -87,7 +87,7 @@ let get_formatter =
 let print_goal () = 
   match Prover.get_mode !prover_state with
   | ProverLib.ProofMode -> 
-      Printer.prthtml `Goal "%a" (Prover.pp_goal !prover_state) ()
+      Printer.prthtml `Goal "%t" (Prover.pp_goal !prover_state) 
   | _ -> 
       Printer.prthtml `Goal "Nothing to show…"
 
@@ -99,8 +99,7 @@ let str_goal () : string =
   let formatter = Format.formatter_of_buffer buff in
   let _ = match Prover.get_mode !prover_state with
   | ProverLib.ProofMode -> 
-      Printer.prthtml_out formatter `Goal "%a" (Prover.pp_goal
-                                                  !prover_state) ()
+      Printer.prthtml_out formatter `Goal "%t" (Prover.pp_goal !prover_state) 
   | _ -> 
     Printer.prthtml_out formatter `Goal "Nothing to show…" 
   in

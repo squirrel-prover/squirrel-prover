@@ -13,17 +13,17 @@ module SE = SystemExpr
 type equiv = Term.term list
 
 (*------------------------------------------------------------------*)
-let _pp_equiv ~dbg ppf (l : equiv) =
-  Fmt.pf ppf "@[%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") (Term._pp ~dbg))
+let _pp_equiv ~dbg fmt (l : equiv) =
+  Fmt.pf fmt "@[%a@]"
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (Term._pp ~dbg))
     l
 
 let pp_equiv = _pp_equiv ~dbg:false
 
 (*------------------------------------------------------------------*)
-let _pp_equiv_numbered ~dbg ppf (l : equiv) =
+let _pp_equiv_numbered ~dbg fmt (l : equiv) =
   List.iteri (fun i elem ->
-      Fmt.pf ppf "%i: @[%a@]@;" i (Term._pp ~dbg) elem
+      Fmt.pf fmt "%i: @[%a@]@;" i (Term._pp ~dbg) elem
     ) l
 
 let pp_equiv_numbered = _pp_equiv_numbered ~dbg:false
@@ -463,8 +463,8 @@ let pp ~(dbg:bool) ?context =
         let v = as_seq1 v in
         let f = subst s f in
 
-        let pp ppf () =
-          Fmt.pf ppf "@[<hov 0>Let %a =@;<1 2>@[%a@]@ in@ %a@]"
+        let pp fmt () =
+          Fmt.pf fmt "@[<hov 0>Let %a =@;<1 2>@[%a@]@ in@ %a@]"
             (Vars._pp ~dbg) v
             (Term._pp ~dbg) t
             (pp (let_in_fixity, `NonAssoc)) f

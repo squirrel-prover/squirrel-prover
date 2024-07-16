@@ -249,9 +249,9 @@ module Mvar : sig
   (** Checks that all arguments of [pat] have been inferred in [mv]. *)
   val check_args_inferred : 'a Term.pat_op -> t -> unit 
 
-  val _pp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp     :             Format.formatter -> t -> unit
-  val pp_dbg :             Format.formatter -> t -> unit
+  val pp     : t formatter
+  val pp_dbg : t formatter
+  val _pp    : t formatter_p
 end
 
 (*------------------------------------------------------------------*)

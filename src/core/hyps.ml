@@ -17,9 +17,9 @@ let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 module type Hyp = sig 
   type t 
 
-  val pp_hyp     : t formatter
-  val pp_hyp_dbg : t formatter
-  val _pp_hyp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
+  val pp_hyp     :                        t formatter
+  val pp_hyp_dbg :                        t formatter
+  val _pp_hyp    : ?context:SE.context -> t formatter_p 
 
   (** Chooses a name for a formula, depending on the formula shape. *)
   val choose_name : t -> string
@@ -148,7 +148,7 @@ module type S1 = sig
 
   val pp     : hyps formatter
   val pp_dbg : hyps formatter
-  val _pp    : dbg:bool -> Format.formatter -> hyps -> unit
+  val _pp    : hyps formatter_p
 end
 
 (*------------------------------------------------------------------*)
@@ -156,7 +156,7 @@ end
 module type S = sig
   include S1
   val empty : hyps
-  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> hyps -> unit
+  val _pp    : ?context:SE.context -> hyps formatter_p
 end
 
 (*------------------------------------------------------------------*)
@@ -219,7 +219,7 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
           pp_id SE.pp se 
           (Term._pp ~dbg) t
 
-  let _pp ~dbg ?context ppf hyps =
+  let _pp ?context ~dbg ppf hyps =
     let pp_sep ppf () = Fmt.pf ppf "" in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg ?context)) (Mid.bindings hyps)

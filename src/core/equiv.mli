@@ -12,8 +12,8 @@ type equiv = Term.term list
 
 val pp_equiv : equiv formatter
 
-val  pp_equiv_numbered :             Format.formatter -> equiv -> unit
-val _pp_equiv_numbered : dbg:bool -> Format.formatter -> equiv -> unit
+val  pp_equiv_numbered : equiv formatter
+val _pp_equiv_numbered : equiv formatter_p
 
 (*------------------------------------------------------------------*)
 val subst_equiv : Term.subst -> equiv -> equiv
@@ -78,7 +78,7 @@ val pp_dbg : form formatter
 (** Full pretty printer.
     The [context] arguments allows to avoir printing some system expressions
     which are equal [context.set] or [context.pair]. *)
-val _pp : dbg:bool -> ?context:SE.context -> Format.formatter -> form -> unit
+val _pp : ?context:SE.context -> form formatter_p
 
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
@@ -155,9 +155,9 @@ val kind_equal : 'a f_kind -> 'b f_kind -> bool
 module Any : sig
   type t = any_form
 
-  val pp     : t formatter
-  val pp_dbg : t formatter
-  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
+  val pp     :                        t formatter
+  val pp_dbg :                        t formatter
+  val _pp    : ?context:SE.context -> t formatter_p
 
   val equal : t -> t -> bool
 
@@ -195,8 +195,8 @@ module Babel : sig
 
   val get_terms : 'a f_kind -> 'a -> Term.term list
 
-  val pp     : 'a f_kind -> Format.formatter -> 'a -> unit
-  val pp_dbg : 'a f_kind -> Format.formatter -> 'a -> unit
+  val pp     : 'a f_kind -> 'a formatter
+  val pp_dbg : 'a f_kind -> 'a formatter
 
   val project : 'a f_kind -> Term.proj list -> 'a -> 'a
 end

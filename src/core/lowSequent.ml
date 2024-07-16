@@ -14,6 +14,8 @@
     TODO this used to avoid a circular dependency, which is now
     fixed, and we may be able to simplify the architecture now. *)
 
+open Utils
+    
 module TraceHyps = Hyps.TraceHyps
 
 (** {2 Module type for sequents} *)
@@ -40,9 +42,9 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 Pretty-printing} *)
 
-  val pp     :             Format.formatter -> t -> unit
-  val _pp    : dbg:bool -> Format.formatter -> t -> unit
-  val pp_dbg :             Format.formatter -> t -> unit
+  val pp     : t formatter
+  val pp_dbg : t formatter
+  val _pp    : t formatter_p
 
   (*------------------------------------------------------------------*)
   (** {2 Access to sequent components}

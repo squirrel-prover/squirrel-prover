@@ -29,7 +29,7 @@ val convert : Symbols.table -> Symbols.p_path -> t
 
 (*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
-val pp_system : Symbols.table -> Format.formatter -> t -> unit
+val pp_system : Symbols.table -> t formatter
 
 (** Print all systems declared in symbols table. *)
 val pp_systems : Symbols.table formatter

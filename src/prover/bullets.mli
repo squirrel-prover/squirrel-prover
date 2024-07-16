@@ -1,12 +1,14 @@
 (** Management of bullets and braces in proof scripts. *)
 
+open Squirrelcore.Utils
+
 (** Bullet symbols. *)
 type bullet = string
 
 (** Path through a proof tree under construction. *)
 type path
 
-val pp : Format.formatter -> path -> unit
+val pp : path formatter
 
 val initial_path : path
 

@@ -83,7 +83,7 @@ let str_mode = function
   | ProverLib.WaitQed -> "WaitQed"
   | ProverLib.AllDone -> "AllDone"
 
-let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
+let pp_goal (ps:state) ppf = match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf ppf "No subgoals remaining.@."
   | Some _, j :: _ ->
@@ -92,7 +92,7 @@ let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       Goal.pp j
   | _ -> assert false
 
-let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
+let pp_subgoals (ps:state) ppf = match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
   | Some _, subgoals ->
@@ -111,7 +111,7 @@ let try_complete_proof (ps:state) : state =
     { ps with prover_mode = WaitQed }
   end
   else begin
-    Printer.prt `Goal "%a" (pp_goal ps) ();
+    Printer.prt `Goal "%t" (pp_goal ps);
     { ps with prover_mode = ProofMode}
   end
 
@@ -170,7 +170,7 @@ let start_proof (ps:state) (check : [`NoCheck | `Check])
 let do_start_proof ?(check=`NoCheck) (st: state) : state =
   match start_proof st check with
   | None, ps ->
-    Printer.prt `Goal "%a" (pp_goal ps) ();
+    Printer.prt `Goal "%t" (pp_goal ps);
     ps
   | Some es, _ -> Command.cmd_error (StartProofError es)
 
@@ -338,7 +338,7 @@ let tactic_handle (ps:state) = function
 let do_print_goal (st:state) : unit = 
   match get_mode st with
   | ProverLib.ProofMode -> 
-    Printer.prt `Goal "%a" (pp_goal st) ();
+    Printer.prt `Goal "%t" (pp_goal st);
   | _ -> ()
 
 let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : state =

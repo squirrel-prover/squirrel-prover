@@ -379,7 +379,7 @@ let pp_descrs (table : Symbols.table) ppf (system : _) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
     Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-      Action.pp_descr descr) ;
+      (Action.pp_descr table) descr) ;
   Fmt.pf ppf "@]%!@."
 
 (*------------------------------------------------------------------*)

@@ -411,7 +411,7 @@ module Const = struct
       term:Term.terms -> cond:Term.terms -> 
       t
 
-    val _pp : dbg:bool -> Format.formatter -> t -> unit
+    val                 _pp    : t formatter_p
     val[@warning "-32"] pp     : t formatter
     val[@warning "-32"] pp_dbg : t formatter
 

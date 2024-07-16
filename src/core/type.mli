@@ -63,9 +63,9 @@ val exists   : (ty ->          bool) -> ty       -> bool
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
-val _pp    : dbg:bool -> Format.formatter -> ty -> unit
-val pp     :             Format.formatter -> ty -> unit
-val pp_dbg :             Format.formatter -> ty -> unit
+val pp     : ty formatter
+val pp_dbg : ty formatter
+val _pp    : ty formatter_p
 
 (** Encoding of a type as a string without discontinuity nor
     parenthesis. *)

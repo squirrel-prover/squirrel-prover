@@ -109,19 +109,19 @@ val pp_typed_tagged_list : tagged_vars formatter
 (** {2 Debug printing} *)
   
 (** Debug versions of [pp]: also print the identifier. *)
-val _pp    : dbg:bool -> Format.formatter -> var -> unit
-val pp_dbg :             Format.formatter -> var -> unit
+val pp_dbg : var formatter
+val _pp    : var formatter_p
 
 (** Debug versions of [pp_list]: also print the identifier. *)
-val _pp_list    : dbg:bool -> Format.formatter -> vars -> unit
-val pp_list_dbg :             Format.formatter -> vars -> unit
+val pp_list_dbg : vars formatter
+val _pp_list    : vars formatter_p
 
 (** Debug versions of [pp_typed_list_dbg]: also print the identifier. *)
-val _pp_typed_list    : dbg:bool -> Format.formatter -> vars -> unit
-val pp_typed_list_dbg :             Format.formatter -> vars -> unit
+val pp_typed_list_dbg : vars formatter
+val _pp_typed_list    : vars formatter_p
 
-val _pp_typed_tagged_list    : dbg:bool -> Format.formatter -> tagged_vars -> unit
-val pp_typed_tagged_list_dbg :             Format.formatter -> tagged_vars -> unit
+val pp_typed_tagged_list_dbg : tagged_vars formatter
+val _pp_typed_tagged_list    : tagged_vars formatter_p
   
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
@@ -187,23 +187,14 @@ val sanity_check : 'a genv -> unit
 
 (*------------------------------------------------------------------*)
 (** Print an environment, showing variables names and sorts. *)
-val pp_genv    :
-  (Format.formatter -> 'a -> unit) ->
-  Format.formatter -> 'a genv -> unit
-
-val _pp_genv    :
-  dbg:bool ->
-  (Format.formatter -> 'a -> unit) ->
-  Format.formatter -> 'a genv -> unit
-
-val pp_genv_dbg :
-  (Format.formatter -> 'a -> unit) ->
-  Format.formatter -> 'a genv -> unit
+val pp_genv     :             'a formatter -> 'a genv formatter
+val pp_genv_dbg :             'a formatter -> 'a genv formatter
+val _pp_genv    : dbg:bool -> 'a formatter -> 'a genv formatter
 
 (*------------------------------------------------------------------*)
-val  pp_env     :             Format.formatter -> env -> unit
-val _pp_env     : dbg:bool -> Format.formatter -> env -> unit
-val  pp_env_dbg :             Format.formatter -> env -> unit
+val  pp_env     : env formatter
+val  pp_env_dbg : env formatter
+val _pp_env     : env formatter_p
 
 (*------------------------------------------------------------------*)
 val empty_env : 'a genv

@@ -225,9 +225,8 @@ val pp_action_structure : action formatter
 val pp_descr_short : descr formatter
 
 (** Formatter for descriptions. *)
-val pp_descr : descr formatter
-
-val pp_descr_dbg : descr formatter
+val pp_descr     : Symbols.table -> descr formatter
+val pp_descr_dbg : Symbols.table -> descr formatter
 
 (** Formatter for actions shapes. *)
 val pp_shape : shape formatter

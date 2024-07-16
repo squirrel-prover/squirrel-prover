@@ -64,10 +64,10 @@ val current_goal_name : state -> string option
     @raise Not_found if there is no subgoal or current goal. *)
 val get_first_subgoal : state -> Goal.t
 
-val pp_subgoals : state -> Format.formatter -> unit -> unit
+val pp_subgoals : state -> Format.formatter -> unit
 
 (** Print goal *)
-val pp_goal : state -> Format.formatter -> unit -> unit
+val pp_goal : state -> Format.formatter -> unit
 
 (** Print current goal. *)
 val do_print_goal : state -> unit
