@@ -5,8 +5,10 @@ include Driver
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-(** check if an exception is handled *)
-let is_toplevel_error ?(interactive=true) ~test (e : exn) : bool =
+(** Check if an exception is handled.
+    If `OCAMLRUNPARAM` contains `b`, do not catch top-level errors
+    so that a proper OCAML backtrace is raised. *)
+let is_toplevel_error ~interactive ~test (e : exn) : bool =
   match e with
   | Parserbuf.Error                 _
   | ProverLib.Error                 _
@@ -19,7 +21,9 @@ let is_toplevel_error ?(interactive=true) ~test (e : exn) : bool =
   | SystemExpr.Error                _
   | Crypto.Parse.Error              _
   | Tactics.Tactic_soft_failure     _
-  | Tactics.Tactic_hard_failure     _ -> not test
+  | Tactics.Tactic_hard_failure     _ ->
+    let params = try Sys.getenv "OCAMLRUNPARAM" with Not_found -> "" in
+    not test && not (String.contains params 'b') 
 
   | _e when interactive -> not test
 
