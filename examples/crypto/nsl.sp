@@ -172,7 +172,7 @@ process Bob =
                    nb, pub skb),
              r2', get1_id(dec(x,skb)))).
 
-system [NSL]
+system NSL =
   (PUB : out(c, <pub(ska),pub(skb)>);
   ((A : Alice)|(B : Bob))).
 
@@ -244,7 +244,7 @@ process Bob_a =
                    nb, pub skb),
              r2', get1_id(dec(x,skb)))).
 
-system [NSL_a]
+system NSL_a =
   (PUB : out(c, <pub(ska),pub(skb)>);
   ((A : Alice_a)|(B : Bob_a))).
 
