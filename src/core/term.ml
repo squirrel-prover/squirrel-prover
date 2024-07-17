@@ -1339,13 +1339,14 @@ and _pp
   | _ as f when is_and_happens f -> pp_and_happens info fmt f
 
   (* infix *)
-  | App (Fun (s,fty_app),[bl;br]) when Symbols.is_infix s ->
+  | App (Fun (s,fty_app), ([bl;br] as args)) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
+    let ty_args = List.map ty args in
     let pp fmt () =
       Fmt.pf fmt "@[<0>%a %a@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
-        (pp_fname info.ppe) (s,fty_app)
+        (pp_fname ~ty_args info.ppe) (s,fty_app)
         (pp ((prec, `Infix assoc), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp fmt ()
