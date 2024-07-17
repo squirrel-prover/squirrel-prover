@@ -30,6 +30,12 @@ namespace C.
   op x = c.
 end C.
 
+(* same type signatures as in `C` *)
+namespace C2.
+  op (+) : C -> C -> bool.
+  op x = c.
+end C2.
+
 lemma [any] _ : x = t.
 Proof.
  rewrite /x.
@@ -49,6 +55,12 @@ Proof.
 Qed.
 
 lemma [any] _ : C.x = c.
+Proof.
+ rewrite /x.
+ apply eq_refl.  
+Qed.
+
+lemma [any] _ : C2.x = c.
 Proof.
  rewrite /x.
  apply eq_refl.  
@@ -77,4 +89,21 @@ Proof.
  nosimpl have ? : xb + xb = B.(+) xb xb by auto.
 
  nosimpl have ? : xc + xc = C.(+) xc xc by auto.
+Abort.
+
+(*------------------------------------------------------------------*)
+(* open `C2`, now there is an ambiguity between `C.x` and `C2.x` 
+  (idem `C.(+)` and `C2.(+)`) *) 
+open C2.
+
+lemma [any] _ (xc : C) : false. 
+Proof.
+ (* nosimpl have ? : x xc = C.x xc by auto. *)
+ (* Conversion Error: could not desambiguate *)
+
+ (* nosimpl have ? : xc + xc = C.(+) xc xc by auto. *)
+ (* Conversion Error: could not desambiguate *)
+
+ nosimpl have ? : C.x xc = C2.x xc by auto.
+ nosimpl have ? : C.x xc = C2.x xc by auto.
 Abort.

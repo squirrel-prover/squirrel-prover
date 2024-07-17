@@ -12,20 +12,21 @@ open! Squirrelcore.Vars
 
 let test_suites : unit Alcotest.test list =
   [
-    ("Template", Squirreltests.Template.tests);
-    ("Include", Squirreltests.Main.includes);
-    ("Tactics", Squirreltests.Main.tactics);
-    ("Equivalence", Squirreltests.Main.equivalence);
-    ("Channel", Squirreltests.Channel.channels);
-    ("Models",         Squirreltests.Parserbuf.models);
-    ("ProcessParsing", Squirreltests.Parserbuf.process_parsing);
-    ("TermParsing",    Squirreltests.Parserbuf.term_parsing);
-    ("Prover", Squirreltests.Prover.tests);
-    ("Predicate", Squirreltests.Predicate.tests);
-    ("Search", Squirreltests.Search.tests);
-    ("NewTactics", Squirreltests.Tactics.tests);
-    ("Term", Squirreltests.Term.tests);
-    ("Projection", Squirreltests.Projection.tests)
+    ("Template"       , Squirreltests.Template.tests);
+    ("Include"        , Squirreltests.Main.includes);
+    ("Tactics"        , Squirreltests.Main.tactics);
+    ("Equivalence"    , Squirreltests.Main.equivalence);
+    ("Channel"        , Squirreltests.Channel.channels);
+    ("Models"         , Squirreltests.Parserbuf.models);
+    ("ProcessParsing" , Squirreltests.Parserbuf.process_parsing);
+    ("TermParsing"    , Squirreltests.Parserbuf.term_parsing);
+    ("Prover"         , Squirreltests.Prover.tests);
+    ("Predicate"      , Squirreltests.Predicate.tests);
+    ("Search"         , Squirreltests.Search.tests);
+    ("NewTactics"     , Squirreltests.Tactics.tests);
+    ("Term"           , Squirreltests.Term.tests);
+    ("Projection"     , Squirreltests.Projection.tests);
+    ("Typing"         , Squirreltests.Typing.tests);
   ]
 
 let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
