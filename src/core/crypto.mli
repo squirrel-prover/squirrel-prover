@@ -1,4 +1,4 @@
-open Utils
+open Ppenv
 
 module SE = SystemExpr
 module L = Location
@@ -43,11 +43,11 @@ val tsubst_oracle   : Type.tsubst -> oracle   -> oracle
 val tsubst_game     : Type.tsubst -> game     -> game 
 
 (*------------------------------------------------------------------*)
-val pp_var_decl : var_decl               formatter
-val pp_sample   : Vars.var               formatter
-val pp_update   : (Vars.var * Term.term) formatter
-val pp_oracle   : oracle                 formatter
-val pp_game     : game                   formatter
+val _pp_var_decl : var_decl               formatter_p
+val _pp_sample   : Vars.var               formatter_p
+val _pp_update   : (Vars.var * Term.term) formatter_p
+val _pp_oracle   : oracle                 formatter_p
+val _pp_game     : game                   formatter_p
 
 (*------------------------------------------------------------------*)
 val prove :

@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L  = Location
 module Sv = Vars.Sv
@@ -221,51 +222,51 @@ let iter_def_table f table =
 (** Pretty-printing *)
 
 (** Print integers in action shapes. *)
-let pp_int ppf i =
-  if i <> 0 then Fmt.pf ppf "(%d)" i
+let pp_int fmt i =
+  if i <> 0 then Fmt.pf fmt "(%d)" i
 
 (** Print list of indices in actions. *)
-let pp_indices ppf (l : Vars.var list) =
-  if l <> [] then Fmt.pf ppf "(%a)" (Fmt.list ~sep:Fmt.comma Vars.pp) l
+let pp_indices fmt (l : Vars.var list) =
+  if l <> [] then Fmt.pf fmt "(%a)" (Fmt.list ~sep:Fmt.comma Vars.pp) l
 
 (** Print list of indices in actions. *)
-let pp_terms_list ppf (l : Term.term list) =
-  if l <> [] then Fmt.pf ppf "(%a)" (Fmt.list ~sep:Fmt.comma Term.pp) l
+let pp_terms_list fmt (l : Term.term list) =
+  if l <> [] then Fmt.pf fmt "(%a)" (Fmt.list ~sep:Fmt.comma Term.pp) l
 
 (** Print list of strings in actions. *)
-let pp_strings ppf l =
-  let pp_list = Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.string in
-  if l <> [] then Fmt.pf ppf "(%a)" pp_list l
+let pp_strings fmt l =
+  let pp_list = Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",") Fmt.string in
+  if l <> [] then Fmt.pf fmt "(%a)" pp_list l
 
 (** [pp_par_choice_f f] formats [int * 'a] as parallel choices,
     relying on [f] to format ['a]. *)
-let pp_par_choice_f f ppf (k,a) =
-  Fmt.pf ppf "%d%a" k f a
+let pp_par_choice_f f fmt (k,a) =
+  Fmt.pf fmt "%d%a" k f a
 
 (** [pp_sum_choice_f f d] formats [int * 'a] as sum choices,
     relying on [f] to format ['a]. It does not format
     the default choice [d]. *)
-let pp_sum_choice_f f d ppf (k,a) =
-  if (k,a) <> d then Fmt.pf ppf "/%d%a" k f a
+let pp_sum_choice_f f d fmt (k,a) =
+  if (k,a) <> d then Fmt.pf fmt "/%d%a" k f a
 
 (** [pp_action_f f d] is a formatter for ['a action],
     relying on the formatter [f] for ['a], and ignoring
     the default sum choice [d]. *)
-let pp_action_f f d ppf a =
-  if a = [] then Fmt.pf ppf "ε" 
+let pp_action_f f d fmt a =
+  if a = [] then Fmt.pf fmt "ε" 
   else
     Fmt.list ~sep:(Fmt.any "_")
-      (fun ppf { par_choice; sum_choice } ->
-         Fmt.pf ppf "%a%a"
+      (fun fmt { par_choice; sum_choice } ->
+         Fmt.pf fmt "%a%a"
            (pp_par_choice_f f) par_choice
            (pp_sum_choice_f f d) sum_choice)
-      ppf
+      fmt
       a
 
-let pp_action_structure ppf (a : action) =
-  Printer.kw `GoalAction ppf "%a" (pp_action_f pp_terms_list (0,[])) a
+let pp_action_structure fmt (a : action) =
+  Printer.kw `GoalAction fmt "%a" (pp_action_f pp_terms_list (0,[])) a
 
-let pp_shape ppf a = pp_action_f pp_int (0,0) ppf a
+let pp_shape fmt a = pp_action_f pp_int (0,0) fmt a
 
 (*------------------------------------------------------------------*)
 let rec subst_action (s : Term.subst) (a : action) : action =
@@ -296,7 +297,7 @@ let of_term (s : Symbols.action) (l : Term.term list) table : action =
   in
   subst_action subst a
 
-let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
+let pp_parsed_action fmt a = pp_action_f pp_strings (0,[]) fmt a
 
 (*------------------------------------------------------------------*)
 (** An action description features an input, a condition (which sums up
@@ -357,37 +358,37 @@ let subst_descr subst (descr : descr) =
   descr
 
 (*------------------------------------------------------------------*)
-let pp_descr_short ppf descr =
+let pp_descr_short fmt descr =
   let t = Term.mk_action descr.name (List.map Term.mk_var descr.indices) in
-  Term.pp ppf t
+  Term.pp fmt t
 
 (*------------------------------------------------------------------*)
-let pp_descr ~dbg ppf descr =
+let _pp_descr ppe fmt descr =
   let _, s = Term.refresh_vars descr.indices in
-  let descr = if dbg then descr else subst_descr s descr in
+  let descr = if ppe.dbg then descr else subst_descr s descr in
 
-  Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
+  Fmt.pf fmt "@[<v 0>action name: @[<hov>%a@]@;\
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
     pp_descr_short descr
-    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" (Vars._pp_list ~dbg))
+    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" (Vars._pp_list ppe))
     descr.indices
-    (Term._pp ~dbg) (snd descr.condition)
+    (Term._pp ppe) (snd descr.condition)
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hv>%a@]@]@;"
        (Fmt.list
           ~sep:(Fmt.any ";@ ")
-          (fun ppf (s, args, t) ->             
-             Fmt.pf ppf "@[%a@[(%a)@] :=@ %a@]" 
-               Symbols.pp_path s (Fmt.list (Term._pp ~dbg)) args 
-               (Term._pp ~dbg) t)))
+          (fun fmt (s, args, t) ->             
+             Fmt.pf fmt "@[%a@[(%a)@] :=@ %a@]" 
+               Symbols.pp_path s (Fmt.list (Term._pp ppe)) args 
+               (Term._pp ppe) t)))
     descr.updates
     (Utils.pp_ne_list "@[<hv 2>globals:@ @[<hv>%a@]@]@;"
-       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp_path))
+       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ";@ ") Symbols.pp_path))
     descr.globals
-    (Term._pp ~dbg) (snd descr.output)
+    (Term._pp ppe) (snd descr.output)
 
 (*------------------------------------------------------------------*)
 let descr_map
@@ -508,24 +509,24 @@ let combine_descrs (descrs : (Term.proj * descr) list) : descr =
 (*------------------------------------------------------------------*)
 let debug = false
 
-let pp_actions ppf table =
-  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
+let pp_actions fmt table =
+  Fmt.pf fmt "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
   iter_def_table
     (fun symbol indices action ->
-       if !comma then Fmt.pf ppf ",@;" ;
+       if !comma then Fmt.pf fmt ",@;" ;
        comma := true ;
        if debug then
-         Fmt.pf ppf "%a%a=%a"
+         Fmt.pf fmt "%a%a=%a"
            Symbols.pp_path symbol
            pp_indices indices
            pp_action_structure action
        else
-         Fmt.pf ppf "%a%a"
+         Fmt.pf fmt "%a%a"
            Symbols.pp_path symbol
            pp_indices indices)
     table;
-  Fmt.pf ppf "@]@]@."
+  Fmt.pf fmt "@]@]@."
 
 let rec dummy (shape : shape) : action =
   let mk_index_var _ = Term.mk_var @@ Vars.make_fresh Type.Index "i" in
@@ -617,6 +618,5 @@ let is_dup ~eq table t t' : bool =
   | Some () -> true
 
 (*------------------------------------------------------------------*)
-let pp_descr_dbg = pp_descr ~dbg:true
-let pp_descr     = pp_descr ~dbg:false
-
+let pp_descr     table = _pp_descr (default_ppe ~dbg:false ~table ())
+let pp_descr_dbg table = _pp_descr (default_ppe ~dbg:true  ~table ())

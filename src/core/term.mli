@@ -7,6 +7,7 @@
     processes, axioms, etc. *)
 
 open Utils
+open Ppenv
 
 module Sv = Vars.Sv
 
@@ -200,14 +201,14 @@ val set_resolve_path :
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
 
-val pp      :                         term formatter
-val pp_dbg  :                         term formatter
-val _pp     : (* ?table:Symbols.table ->  *)term formatter_p
+val pp      : term formatter
+val pp_dbg  : term formatter
+val _pp     : term formatter_p
 
 (*------------------------------------------------------------------*)
 type pp_info
 
-val default_pp_info : ?table:Symbols.table -> unit -> pp_info
+val pp_info : ?ppe:ppenv -> unit -> pp_info
 
 val pp_with_info : pp_info -> term formatter
 

@@ -51,7 +51,7 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
     HistoryTP.reset_state state.history_state nb_undo in
   begin match Prover.get_mode prover_state with
     | ProofMode ->
-      Printer.prt `Goal "%t" (Prover.pp_goal prover_state) 
+      Printer.prt `Goal "%a" Prover.pp_goal prover_state
     | GoalMode ->
       Printer.pr "%a" Action.pp_actions (Prover.get_table prover_state)
     | WaitQed -> ()

@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L    = Location
 module Args = TacticsArgs
@@ -190,8 +191,8 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
   let g = Crypto.Parse.parse loc table decl in
 
-  Printer.prt `Result "%a"
-    Crypto.pp_game g;
+  let ppe = default_ppe ~table ~dbg:false () in
+  Printer.prt `Result "%a" (Crypto._pp_game ppe) g;
 
   let table, _ =
     Symbols.Game.declare ~approx:false

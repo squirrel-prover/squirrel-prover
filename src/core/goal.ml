@@ -28,13 +28,13 @@ let table = function
 
 (*------------------------------------------------------------------*)
 (* when printing, we run some well-formedness checks on the sequents *)
-let pp ch = function
-  | Local  j -> TS.sanity_check j; TS.pp ch j
-  | Global j -> ES.sanity_check j; ES.pp ch j
+let pp fmt = function
+  | Local  j -> TS.sanity_check j; TS.pp fmt j
+  | Global j -> ES.sanity_check j; ES.pp fmt j
 
-let pp_init ch = function
-  | Local  j -> Term.pp ch (TS.conclusion j)
-  | Global j -> ES.pp_init ch j
+let pp_init fmt = function
+  | Local  j -> Term.pp fmt (TS.conclusion j)
+  | Global j -> ES.pp_init fmt j
 
 (*------------------------------------------------------------------*)
 let map ft fe = function

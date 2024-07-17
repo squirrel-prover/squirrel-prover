@@ -1,6 +1,7 @@
 (** Equivalence formulas.  *)
 
 open Utils
+open Ppenv
 
 module SE = SystemExpr
   

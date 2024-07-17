@@ -1,6 +1,7 @@
 (** Equivalence formulas.  *)
 
 open Utils
+open Ppenv
     
 module Sv = Vars.Sv
 module Mv = Vars.Mv
@@ -13,20 +14,20 @@ module SE = SystemExpr
 type equiv = Term.term list
 
 (*------------------------------------------------------------------*)
-let _pp_equiv ~dbg fmt (l : equiv) =
+let _pp_equiv ppe fmt (l : equiv) =
   Fmt.pf fmt "@[%a@]"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (Term._pp ~dbg))
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (Term._pp ppe))
     l
 
-let pp_equiv = _pp_equiv ~dbg:false
+let pp_equiv = _pp_equiv (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
-let _pp_equiv_numbered ~dbg fmt (l : equiv) =
+let _pp_equiv_numbered ppe fmt (l : equiv) =
   List.iteri (fun i elem ->
-      Fmt.pf fmt "%i: @[%a@]@;" i (Term._pp ~dbg) elem
+      Fmt.pf fmt "%i: @[%a@]@;" i (Term._pp ppe) elem
     ) l
 
-let pp_equiv_numbered = _pp_equiv_numbered ~dbg:false
+let pp_equiv_numbered = _pp_equiv_numbered (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
@@ -88,16 +89,16 @@ let pp_se_args ?context fmt se_args =
       (Fmt.list ~sep:(Fmt.any "@ ") (Fmt.brackets SE.pp))
       se_args
 
-let pp_ty_args ~dbg fmt ty_args =
-  if not dbg || ty_args = [] then () else
+let pp_ty_args ppe fmt ty_args =
+  if not ppe.dbg || ty_args = [] then () else
     Fmt.pf fmt "@[<hov 2><%a>@]"
       (Fmt.list ~sep:Fmt.comma Type.pp) ty_args
 
-let _pp_atom ~dbg ?context fmt = function
-  | Equiv e -> Fmt.pf fmt "equiv(%a)" (_pp_equiv ~dbg) e
+let _pp_atom ?context ppe fmt = function
+  | Equiv e -> Fmt.pf fmt "equiv(%a)" (_pp_equiv ppe) e
 
   | Reach f -> 
-    Fmt.pf fmt "@[[%a]@]" (Term._pp ~dbg) f
+    Fmt.pf fmt "@[[%a]@]" (Term._pp ppe) f
 
   (* infix *)
   | Pred { psymb; ty_args; se_args; multi_args; simpl_args } 
@@ -105,26 +106,26 @@ let _pp_atom ~dbg ?context fmt = function
     let bl,br = as_seq2 (List.concat_map snd multi_args @ simpl_args) in
     let pp fmt () =
       Fmt.pf fmt "@[<0>$(%a %a%a%a@ %a)@]"
-        (Term._pp ~dbg) bl
+        (Term._pp ppe) bl
         Symbols.pp_path psymb
-        (pp_ty_args ~dbg) ty_args
+        (pp_ty_args ppe) ty_args
         (pp_se_args ?context) se_args
-        (Term._pp ~dbg) br
+        (Term._pp ppe) br
     in
     pp fmt ()
 
   | Pred { psymb; ty_args; se_args; multi_args; simpl_args } ->
     let pp_args fmt =
       let all_args = List.concat_map snd multi_args @ simpl_args in
-      Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ~dbg) fmt all_args
+      Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ppe) fmt all_args
     in
     Fmt.pf fmt "@[$(%a%a%a %t)@]"
       Symbols.pp_path psymb
-      (pp_ty_args ~dbg) ty_args
+      (pp_ty_args ppe) ty_args
       (pp_se_args ?context) se_args
       pp_args 
 
-let pp_atom = _pp_atom ~dbg:false ?context:None
+let pp_atom = _pp_atom (default_ppe ~dbg:false ()) ?context:None
 
 (*------------------------------------------------------------------*)
 let subst_pred_app (subst : Term.subst) (pa : pred_app) : pred_app = {
@@ -424,12 +425,12 @@ let or_fixity     = 20 , `Infix `Right
 let and_fixity    = 25 , `Infix `Right
 
 (** Internal *)
-let pp ~(dbg:bool) ?context = 
+let pp (ppe : ppenv) ?context = 
   let rec pp 
       ((outer,side) : ('b * fixity) * assoc)
       (fmt : Format.formatter)
     = function
-      | Atom at -> _pp_atom ~dbg ?context fmt at
+      | Atom at -> _pp_atom ppe ?context fmt at
 
       | Impl (f0, f) ->
         let pp fmt () = 
@@ -465,8 +466,8 @@ let pp ~(dbg:bool) ?context =
 
         let pp fmt () =
           Fmt.pf fmt "@[<hov 0>Let %a =@;<1 2>@[%a@]@ in@ %a@]"
-            (Vars._pp ~dbg) v
-            (Term._pp ~dbg) t
+            (Vars._pp ppe) v
+            (Term._pp ppe) t
             (pp (let_in_fixity, `NonAssoc)) f
         in
         maybe_paren ~outer ~side ~inner:let_in_fixity pp fmt ()
@@ -481,7 +482,7 @@ let pp ~(dbg:bool) ?context =
         let pp fmt () = 
           Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
             pp_quant bd
-            (Vars._pp_typed_tagged_list ~dbg)
+            (Vars._pp_typed_tagged_list ppe)
             (List.map2 (fun v (_, tag) -> v,tag) vs vs0)
             (pp (quant_fixity, `Right)) f
         in
@@ -489,13 +490,13 @@ let pp ~(dbg:bool) ?context =
   in
   pp
 
-let pp_toplevel ~dbg ?context (fmt : Format.formatter) (f : form) : unit =
-  pp ~dbg ?context ((toplevel_prec, `NoParens), `NonAssoc) fmt f
+let pp_toplevel ?context ppe (fmt : Format.formatter) (f : form) : unit =
+  pp ppe ?context ((toplevel_prec, `NoParens), `NonAssoc) fmt f
     
 (** Exported *)
 let _pp    = pp_toplevel
-let pp     = pp_toplevel ~dbg:false ?context:None
-let pp_dbg = pp_toplevel ~dbg:true  ?context:None
+let pp     = pp_toplevel (default_ppe ~dbg:false ()) ?context:None
+let pp_dbg = pp_toplevel (default_ppe ~dbg:true ())  ?context:None
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
@@ -912,9 +913,9 @@ module PreAny = struct
     | Local  f -> Term.pp fmt f
     | Global f ->      pp fmt f
 
-  let _pp ~dbg ?context fmt = function
-    | Local  f -> Term._pp ~dbg          fmt f
-    | Global f ->      _pp ~dbg ?context fmt f
+  let _pp ?context ppe fmt = function
+    | Local  f -> Term._pp ppe          fmt f
+    | Global f ->      _pp ppe ?context fmt f
 
   let pp_dbg fmt = function
     | Local  f -> Term.pp_dbg fmt f

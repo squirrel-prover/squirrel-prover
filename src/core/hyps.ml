@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 (*------------------------------------------------------------------*)  
 module L = Location
@@ -142,7 +143,9 @@ module type S1 = sig
   val clear_triv : hyps -> hyps
 
   (*------------------------------------------------------------------*)
-  val pp_ldecl : ?dbg:bool -> ?context:SE.context -> Format.formatter -> ldecl -> unit
+  val pp_ldecl     : ?context:SE.context -> ldecl formatter
+  val pp_ldecl_dbg : ?context:SE.context -> ldecl formatter
+  val _pp_ldecl    : ?context:SE.context -> ldecl formatter_p
 
   val pp_hyp : hyp  formatter
 
@@ -195,37 +198,42 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
     | LHyp _ -> Fmt.pf fmt "hypothesis"
     | LDef _ -> Fmt.pf fmt "definition"
 
-  let _pp_ldecl_cnt ~dbg ?context fmt = function
-    | LHyp h     -> H._pp_hyp ?context ~dbg fmt h
+  let _pp_ldecl_cnt ppe ?context fmt = function
+    | LHyp h     -> H._pp_hyp ?context ppe fmt h
     | LDef (se,t) -> 
       if context <> None && SE.equal0 (oget context).set se then
-        Term._pp ~dbg fmt t
+        Term._pp ppe fmt t
       else
         Fmt.pf fmt "[%a] : %a"
           SE.pp se
-          (Term._pp ~dbg) t
-                 
-  let pp_ldecl ?(dbg=false) ?context ppf (id,hyp) =
-    let pp_id ppf = (if dbg then Ident.pp_full else Ident.pp) ppf id in
+          (Term._pp ppe) t
+
+  (*------------------------------------------------------------------*)
+  let _pp_ldecl ?context ppe fmt (id,hyp) =
+    let pp_id fmt = (if ppe.dbg then Ident.pp_full else Ident.pp) fmt id in
     match hyp with
     | LHyp h     ->
-      Fmt.pf ppf "%t: %a@;"
-        pp_id (H._pp_hyp ?context ~dbg) h
+      Fmt.pf fmt "%t: %a@;"
+        pp_id (H._pp_hyp ?context ppe) h
     | LDef (se,t) ->
       if context <> None && SE.equal0 (oget context).set se then
-        Fmt.pf ppf "%t := %a@;" pp_id (Term._pp ~dbg) t
+        Fmt.pf fmt "%t := %a@;" pp_id (Term._pp ppe) t
       else
-        Fmt.pf ppf "@[<hv 2>@[<hv 2>%t :=@ [%a]@]@ : %a@]@;"
+        Fmt.pf fmt "@[<hv 2>@[<hv 2>%t :=@ [%a]@]@ : %a@]@;"
           pp_id SE.pp se 
-          (Term._pp ~dbg) t
+          (Term._pp ppe) t
 
-  let _pp ?context ~dbg ppf hyps =
-    let pp_sep ppf () = Fmt.pf ppf "" in
-    Fmt.pf ppf "@[<v 0>%a@]"
-      (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg ?context)) (Mid.bindings hyps)
+  let pp_ldecl     ?context = _pp_ldecl ?context (default_ppe ~dbg:false ()) 
+  let pp_ldecl_dbg ?context = _pp_ldecl ?context (default_ppe ~dbg:true  ()) 
 
-  let pp     = _pp ~dbg:false ?context:None
-  let pp_dbg = _pp ~dbg:true  ?context:None
+  (*------------------------------------------------------------------*)
+  let _pp ?context ppe fmt hyps =
+    let pp_sep fmt () = Fmt.pf fmt "" in
+    Fmt.pf fmt "@[<v 0>%a@]"
+      (Fmt.list ~sep:pp_sep (_pp_ldecl ppe ?context)) (Mid.bindings hyps)
+
+  let pp     = _pp (default_ppe ~dbg:false ()) ?context:None
+  let pp_dbg = _pp (default_ppe ~dbg:true  ()) ?context:None
 
   (*------------------------------------------------------------------*)
   let find_opt (func : ldecl -> bool) hyps =

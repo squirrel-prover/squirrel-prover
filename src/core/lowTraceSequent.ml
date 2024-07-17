@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L    = Location
 module SE   = SystemExpr
@@ -65,8 +66,11 @@ end = struct
     proof_context : H.hyps;
     conclusion    : Term.term;
   }
-  
-  let _pp ~dbg ppf s =
+
+  (** The pretty-printing environment table [ppe.table] is always
+    replaced by the table of the sequent. *)
+  let _pp ppe fmt s =
+    let ppe = { ppe with table = s.env.table; } in
     let env_without_defined_vars = 
       H.fold (fun id ld env ->
           match ld with
@@ -74,28 +78,28 @@ end = struct
           | _ -> env
         ) s.proof_context s.env.vars
     in
-    Fmt.pf ppf "@[<v 0>" ;
-    Fmt.pf ppf "@[System: %a@]@;"
+    Fmt.pf fmt "@[<v 0>" ;
+    Fmt.pf fmt "@[System: %a@]@;"
       SystemExpr.pp_context s.env.system;
 
     if s.env.ty_vars <> [] then
-      Fmt.pf ppf "@[Type variables: %a@]@;" 
+      Fmt.pf fmt "@[Type variables: %a@]@;" 
         (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
     if s.env.vars <> Vars.empty_env then
-      Fmt.pf ppf "@[<hv 2>Variables:@ @[%a@]@]@;"
-        (Vars._pp_env ~dbg) env_without_defined_vars ;
+      Fmt.pf fmt "@[<hv 2>Variables:@ @[%a@]@]@;"
+        (Vars._pp_env ppe) env_without_defined_vars ;
 
     (* Print hypotheses *)
-    H._pp ~dbg ~context:s.env.system ppf s.proof_context ;
+    H._pp ppe ~context:s.env.system fmt s.proof_context ;
 
     (* Print separation between proof_context and conclusion *)
-    Printer.kws `Separation ppf (String.make 40 '-') ;
+    Printer.kws `Separation fmt (String.make 40 '-') ;
     (* Print conclusion formula and close box. *)
-    Fmt.pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
+    Fmt.pf fmt "@;%a@]" (Term._pp ppe) s.conclusion
 
-  let pp     = _pp ~dbg:false
-  let pp_dbg = _pp ~dbg:true
+  let pp     = _pp (default_ppe ~dbg:false ())
+  let pp_dbg = _pp (default_ppe ~dbg:true ())
 
   let fv (s : t) : Vars.Sv.t = 
     let h_vars = 
@@ -265,7 +269,10 @@ module Hyps
 
   (*------------------------------------------------------------------*)  
   let pp_hyp = Equiv.pp_any_form
-  let pp_ldecl = H.pp_ldecl
+
+  let pp_ldecl     = H.pp_ldecl
+  let pp_ldecl_dbg = H.pp_ldecl_dbg
+  let _pp_ldecl    = H._pp_ldecl
 
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.proof_context
   let fresh_ids ?approx names s = H.fresh_ids ?approx names s.proof_context
@@ -328,9 +335,12 @@ module Hyps
     in
     S.update ~proof_context:(H.filter not_triv s.proof_context) s
 
-  let pp          fmt s = H.pp                                fmt s.proof_context
-  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.proof_context
-  let pp_dbg      fmt s = H.pp_dbg                            fmt s.proof_context
+  let _pp ppe fmt s =
+    let ppe = { ppe with table = s.env.table; } in
+    H._pp ppe ~context:s.env.system fmt s.proof_context
+      
+  let pp     = _pp (default_ppe ~dbg:false ()) 
+  let pp_dbg = _pp (default_ppe ~dbg:true  ()) 
 end
 
 (*------------------------------------------------------------------*)

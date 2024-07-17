@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 module L = Location
@@ -73,66 +74,69 @@ let tsubst_game (ts : Type.tsubst) (g : game) : game =
   }
 
 (*------------------------------------------------------------------*)
-let pp_var_decl fmt (vd : var_decl) : unit = 
+let _pp_var_decl ppe fmt (vd : var_decl) : unit = 
   Fmt.pf fmt "%a %a : %a = %a;" 
     (Printer.kws `Prog) "var"
-    Vars.pp vd.var Type.pp (Vars.ty vd.var) Term.pp vd.init
+    (Vars._pp ppe) vd.var
+    (Type._pp ~dbg:ppe.dbg) (Vars.ty vd.var)
+    (Term._pp ppe) vd.init
 
-let pp_var_decls fmt (l : var_decl list) : unit = 
+let _pp_var_decls ppe fmt (l : var_decl list) : unit = 
   if l = [] then ()
   else
-    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp pp_var_decl) l
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_var_decl ppe)) l
 
 (*------------------------------------------------------------------*)
-let pp_sample fmt (v : Vars.var) : unit = 
+let _pp_sample ppe fmt (v : Vars.var) : unit = 
   Fmt.pf fmt "%a %a : %a;" 
     (Printer.kws `Prog) "rnd"
-    Vars.pp v Type.pp (Vars.ty v)
+    (Vars._pp ppe) v
+    (Type._pp ~dbg:ppe.dbg) (Vars.ty v)
 
-let pp_samples fmt (l : Vars.var list) : unit = 
+let _pp_samples ppe fmt (l : Vars.var list) : unit = 
   if l = [] then ()
   else
-    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp pp_sample) l
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_sample ppe)) l
 
 (*------------------------------------------------------------------*)
-let pp_update fmt ((v,t) : (Vars.var * Term.term)) : unit = 
-  Fmt.pf fmt "%a := %a;" Vars.pp v Term.pp t
+let _pp_update ppe fmt ((v,t) : (Vars.var * Term.term)) : unit = 
+  Fmt.pf fmt "%a := %a;" (Vars._pp ppe) v (Term._pp ppe) t
 
-let pp_updates fmt (l : (Vars.var * Term.term) list) : unit = 
+let _pp_updates ppe fmt (l : (Vars.var * Term.term) list) : unit = 
   if l = [] then ()
   else
-    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp pp_update) l
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_update ppe)) l
 
 (*------------------------------------------------------------------*)
-let pp_oracle fmt (o : oracle) : unit = 
+let _pp_oracle ppe fmt (o : oracle) : unit = 
   let pp_args fmt args =
     if args = [] then ()
     else
-      Fmt.pf fmt "(%a) " Vars.pp_typed_list args
+      Fmt.pf fmt "(%a) " (Vars._pp_typed_list ppe) args
   in
   let pp_return fmt ret =
     if Term.equal ret Term.empty then ()
     else
-      Fmt.pf fmt "@[%a %a@]" (Printer.kws `Prog) "return" Term.pp ret
+      Fmt.pf fmt "@[%a %a@]" (Printer.kws `Prog) "return" (Term._pp ppe) ret
   in 
   Fmt.pf fmt "@[<hv 0>%a %s @[%a@]: %a = {@;<1 2>@[<hv 0>%a@,%a@,%a@,%a@]@,}@]"
     (Printer.kws `Prog) "oracle"
     o.name
     pp_args o.args
-    Type.pp (Term.ty o.output)
-    pp_samples   o.loc_smpls
-    pp_var_decls o.loc_vars
-    pp_updates   o.updates
-    pp_return    o.output
+    (Type._pp ~dbg:ppe.dbg) (Term.ty o.output)
+    (_pp_samples   ppe) o.loc_smpls
+    (_pp_var_decls ppe) o.loc_vars
+    (_pp_updates   ppe) o.updates
+    pp_return           o.output
 
 (*------------------------------------------------------------------*)
-let pp_game fmt (g : game) : unit = 
+let _pp_game ppe fmt (g : game) : unit = 
   Fmt.pf fmt "@[<hv 2>%a %s = {@;@[<hv 0>%a@ %a@ %a@]@]@;}"
     (Printer.kws `Goal) "game"
     g.name
-    pp_samples   g.glob_smpls
-    pp_var_decls g.glob_vars
-    (Fmt.list ~sep:Fmt.sp pp_oracle) g.oracles
+    (_pp_samples   ppe) g.glob_smpls
+    (_pp_var_decls ppe) g.glob_vars
+    (Fmt.list ~sep:Fmt.sp (_pp_oracle ppe)) g.oracles
 
 (*------------------------------------------------------------------*)
 
@@ -189,20 +193,20 @@ module CondTerm = struct
     conds = List.map (Term.subst subst) c.conds;
   }
 
-  let _pp ~dbg fmt (c : t) =
+  let _pp ppe fmt (c : t) =
     if c.conds = [] then
-      Fmt.pf fmt "@[%a@]" (Term._pp ~dbg) c.term
+      Fmt.pf fmt "@[%a@]" (Term._pp ppe) c.term
     else
       Fmt.pf fmt "@[<hov 2>{ @[%a@] |@ @[%a@] }@]"
-        (Term._pp ~dbg) c.term
-        (Fmt.list ~sep:(Fmt.any " ∧ ") (Term._pp ~dbg)) c.conds
+        (Term._pp ppe) c.term
+        (Fmt.list ~sep:(Fmt.any " ∧ ") (Term._pp ppe)) c.conds
 
   let mk ~term ~conds = { term; conds; }
 
   let mk_simpl term = { term; conds = [] }
 
-  let[@warning "-32"] pp     = _pp ~dbg:false
-  let[@warning "-32"] pp_dbg = _pp ~dbg:true
+  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
 end
 
 
@@ -433,7 +437,7 @@ module Const = struct
       cond : Term.terms;
     }
 
-    let _pp ~dbg fmt (const : t) : unit =
+    let _pp ppe fmt (const : t) : unit =
       let fvs = Term.fvs (const.term @ const.cond) in
       let _, vars, sbst = 
         Term.add_vars_simpl_env (Vars.of_set fvs) const.vars
@@ -445,23 +449,23 @@ module Const = struct
         if vars = [] && cond = [] then ()
         else if vars = [] then
           Fmt.pf fmt "|@ @[%a@] "
-            (Term._pp ~dbg) (Term.mk_ands cond)
+            (Term._pp ppe) (Term.mk_ands cond)
         else if cond = [] then
           Fmt.pf fmt "|@ @[∀ %a@] "
-            (Vars._pp_list ~dbg) vars
+            (Vars._pp_list ppe) vars
         else
           Fmt.pf fmt "|@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] "
-            (Vars._pp_list ~dbg) vars
-            (Term._pp ~dbg) (Term.mk_ands cond)
+            (Vars._pp_list ppe) vars
+            (Term._pp ppe) (Term.mk_ands cond)
       in          
       Fmt.pf fmt "@[<hv 4>{ %a @[%a@], %s %t}@]"
         Term.pp_nsymb const.name
-        (Fmt.list (Term._pp ~dbg)) term
+        (Fmt.list (Term._pp ppe)) term
         (Tag.tostring const.tag)
         pp_vars_and_cond
 
-    let pp     = _pp ~dbg:false
-    let pp_dbg = _pp ~dbg:true
+    let pp     = _pp (default_ppe ~dbg:false ())
+    let pp_dbg = _pp (default_ppe ~dbg:true ())
 
     let normalize (const: t) =
       let vars =
@@ -730,7 +734,7 @@ module TSet = struct
       term  = Term.subst subst tset.term;
       vars; }
 
-  let _pp ~(dbg:bool) fmt (tset : t) =
+  let _pp ppe fmt (tset : t) =
     let fvs = Term.fvs (tset.term :: tset.conds) in
     let _, vars, sbst = 
       Term.add_vars_simpl_env (Vars.of_set fvs) tset.vars
@@ -740,16 +744,16 @@ module TSet = struct
 
     if vars = [] then
       Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
-      (Term._pp ~dbg) term
-      (Term._pp ~dbg)(Term.mk_ands conds)
+      (Term._pp ppe) term
+      (Term._pp ppe)(Term.mk_ands conds)
     else
       Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
-      (Term._pp ~dbg) term
-      (Vars._pp_list ~dbg) vars
-      (Term._pp ~dbg)(Term.mk_ands conds)
+      (Term._pp ppe) term
+      (Vars._pp_list ppe) vars
+      (Term._pp ppe)(Term.mk_ands conds)
 
-  let[@warning "-32"] pp     = _pp ~dbg:false
-  let[@warning "-32"] pp_dbg = _pp ~dbg:true
+  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
 
   let normalize tset = 
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -832,12 +836,12 @@ module AbstractSet = struct
     | Top
     | Sets of TSet.t list
 
-  let _pp ~(dbg:bool) fmt (t:t) = match t with
+  let _pp ppe fmt (t:t) = match t with
     | Top -> Fmt.pf fmt "T"
-    | Sets tl -> Fmt.pf fmt "@[[%a ]@]" (Fmt.list ~sep:Fmt.comma (TSet._pp ~dbg)) tl
+    | Sets tl -> Fmt.pf fmt "@[[%a ]@]" (Fmt.list ~sep:Fmt.comma (TSet._pp ppe)) tl
 
-  let[@warning "-32"] pp = _pp ~dbg:false
-  let[@warning "-32"] pp_dbg = _pp ~dbg:true
+  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true  ())
 
   let fv_t set = match set with
     | Top -> Vars.Sv.empty
@@ -911,14 +915,14 @@ module AbstractSet = struct
   (** Abstract memory represented by an association list *)
   type mem = (Vars.var * t) list
 
-  let _pp_mem ~dbg (fmt : Format.formatter) (ass : mem)  : unit =  
+  let _pp_mem ppe (fmt : Format.formatter) (ass : mem)  : unit =  
     let pp (fmt) (v,t) =
-      Fmt.pf fmt "@[%a -> %a @]" (Vars._pp ~dbg) v (_pp ~dbg) t
+      Fmt.pf fmt "@[%a -> %a @]" (Vars._pp ppe) v (_pp ppe) t
     in
     Fmt.pf fmt "@[{%a }@]" (Fmt.list pp) ass
 
-  let[@warning "-32"] pp_mem     = _pp_mem ~dbg:false
-  let[@warning "-32"] pp_mem_dbg = _pp_mem ~dbg:true
+  let[@warning "-32"] pp_mem     = _pp_mem (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_mem_dbg = _pp_mem (default_ppe ~dbg:true ())
 
   let fv_mem (mem : mem) : Sv.t =
     List.fold_left
@@ -1150,7 +1154,7 @@ let subst_state (subst : Term.subst) (st : state) : state =
     subgoals   = List.map (Term.subst subst) st.subgoals;
   }
 
-let _pp_gen_state ~dbg fmt ((togen,st,outputs) : Vars.vars * state * CondTerm.t list) =
+let _pp_gen_state ppe fmt ((togen,st,outputs) : Vars.vars * state * CondTerm.t list) =
   let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
     Term.add_vars_simpl_env (Vars.to_simpl_env st.env.vars) togen
   in
@@ -1158,33 +1162,33 @@ let _pp_gen_state ~dbg fmt ((togen,st,outputs) : Vars.vars * state * CondTerm.t 
   let outputs = List.map (CondTerm.subst sbst) outputs in
 
   let pp_env fmt =
-    if dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg st.env.vars
+    if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg st.env.vars
   in
   let pp_constraints fmt =
     if st.consts = [] then Fmt.pf fmt "" else
       Fmt.pf fmt "@[<hov 2>constraints:@ @[%a@]@]@;"
-        (Fmt.list ~sep:(Fmt.any "@ ") (Const._pp ~dbg)) st.consts
+        (Fmt.list ~sep:(Fmt.any "@ ") (Const._pp ppe)) st.consts
   in
   let pp_mem fmt =
     if st.mem = [] then Fmt.pf fmt "" else
       Fmt.pf fmt "@[<hov 2>mem:@ @[%a@]@]@;"
-        (AbstractSet._pp_mem ~dbg) st.mem
+        (AbstractSet._pp_mem ppe) st.mem
   in
   let pp_vars_togen fmt =
     if togen = [] then () else
-      Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ~dbg) togen
+      Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ppe) togen
   in
   let pp_all_inputs fmt =
     if st.rec_inputs = [] && st.inputs = [] then Fmt.pf fmt "∅" else
       Fmt.pf fmt "%a%t%a"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ~dbg)) st.rec_inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) st.rec_inputs
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ~dbg)) st.inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) st.inputs
   in
   let pp_outputs _fmt =
     if outputs = [] then Fmt.pf fmt "∅" else 
       Fmt.pf fmt "%a"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ~dbg)) outputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) outputs
   in
   let pp_bideduction_goal fmt =
     Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]@]" pp_vars_togen pp_all_inputs pp_outputs
@@ -1194,14 +1198,14 @@ let _pp_gen_state ~dbg fmt ((togen,st,outputs) : Vars.vars * state * CondTerm.t 
     pp_constraints pp_mem
     pp_bideduction_goal
 
-let[@warning "-32"] pp_gen_state     = _pp_gen_state ~dbg:false
-let[@warning "-32"] pp_gen_state_dbg = _pp_gen_state ~dbg:true
+let[@warning "-32"] pp_gen_state     = _pp_gen_state (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_gen_state_dbg = _pp_gen_state (default_ppe ~dbg:true ())
 
 (*-------------------------------------------------------------------*)
-let _pp_state ~dbg fmt (st : state) = _pp_gen_state ~dbg fmt ([],st,[])
+let _pp_state ppe fmt (st : state) = _pp_gen_state ppe fmt ([],st,[])
 
-let[@warning "-32"] pp_state     = _pp_state ~dbg:false
-let[@warning "-32"] pp_state_dbg = _pp_state ~dbg:true
+let[@warning "-32"] pp_state     = _pp_state (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_state_dbg = _pp_state (default_ppe ~dbg:true ())
 
 (*-------------------------------------------------------------------*)
 module Game = struct

@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 type var = {
   id : Ident.t;
@@ -92,17 +93,17 @@ let tsubst s v = { v with ty = Type.tsubst s v.ty }
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
-let _pp ~dbg ppf v = 
-  if dbg then
-    Fmt.pf ppf "%s<%a>/%d" (name v) Type.pp_dbg v.ty (hash v)
+let _pp ppe fmt v = 
+  if ppe.dbg then
+    Fmt.pf fmt "%s<%a>/%d" (name v) Type.pp_dbg v.ty (hash v)
   else
-    Fmt.pf ppf "%s" (name v) 
+    Fmt.pf fmt "%s" (name v) 
 
-let _pp_list ~dbg ppf l =
-  Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(Fmt.any ",") (_pp ~dbg)) l
+let _pp_list ppe fmt l =
+  Fmt.pf fmt "@[<hov>%a@]"
+    (Fmt.list ~sep:(Fmt.any ",") (_pp ppe)) l
 
-let _pp_typed_list_w_info pp_info ~dbg ppf (vars : (var * 'a) list) =
+let _pp_typed_list_w_info pp_info ppe fmt (vars : (var * 'a) list) =
   let rec aux cur_vars cur_type cur_info = function
     | (v, info)::vs when v.ty = cur_type && info = cur_info ->
       aux (v :: cur_vars) cur_type cur_info vs 
@@ -110,9 +111,9 @@ let _pp_typed_list_w_info pp_info ~dbg ppf (vars : (var * 'a) list) =
       if cur_vars <> [] then begin
         Fmt.list
           ~sep:(Fmt.any ",")
-          (_pp ~dbg) ppf (List.rev cur_vars) ;
-        Fmt.pf ppf ":%a%a" Type.pp cur_type pp_info cur_info;
-        if vs <> [] then Fmt.pf ppf ",@,"
+          (_pp ppe) fmt (List.rev cur_vars) ;
+        Fmt.pf fmt ":%a%a" Type.pp cur_type pp_info cur_info;
+        if vs <> [] then Fmt.pf fmt ",@,"
       end ;
       match vs with
       | [] -> ()
@@ -122,27 +123,27 @@ let _pp_typed_list_w_info pp_info ~dbg ppf (vars : (var * 'a) list) =
   | [] -> ()
   | (v, info) :: vars -> aux [v] v.ty info vars
 
-let _pp_typed_list ~dbg ppf (vars : 'a list) : unit =
-  _pp_typed_list_w_info (fun _ _ -> ()) ~dbg ppf (List.map (fun v -> (v, ())) vars)
+let _pp_typed_list ppe fmt (vars : 'a list) : unit =
+  _pp_typed_list_w_info (fun _ _ -> ()) ppe fmt (List.map (fun v -> (v, ())) vars)
   
 (*------------------------------------------------------------------*)
 (** Exported *)
-let pp            = _pp            ~dbg:false
-let pp_list       = _pp_list       ~dbg:false
-let pp_typed_list = _pp_typed_list ~dbg:false
+let pp            = _pp            (default_ppe ~dbg:false ())
+let pp_list       = _pp_list       (default_ppe ~dbg:false ())
+let pp_typed_list = _pp_typed_list (default_ppe ~dbg:false ())
 
 let _pp_typed_tagged_list = _pp_typed_list_w_info Tag.pp 
-let pp_typed_tagged_list  = _pp_typed_list_w_info Tag.pp ~dbg:false
+let pp_typed_tagged_list  = _pp_typed_list_w_info Tag.pp (default_ppe ~dbg:false ())
     
 (*------------------------------------------------------------------*)
 (** {2 Debug printing} *)
 
 (** Exported *)
-let pp_dbg            = _pp            ~dbg:true
-let pp_list_dbg       = _pp_list       ~dbg:true
-let pp_typed_list_dbg = _pp_typed_list ~dbg:true
+let pp_dbg            = _pp            (default_ppe ~dbg:true ())
+let pp_list_dbg       = _pp_list       (default_ppe ~dbg:true ())
+let pp_typed_list_dbg = _pp_typed_list (default_ppe ~dbg:true ())
 
-let pp_typed_tagged_list_dbg = _pp_typed_list_w_info Tag.pp ~dbg:true
+let pp_typed_tagged_list_dbg = _pp_typed_list_w_info Tag.pp (default_ppe ~dbg:true ())
     
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
@@ -218,16 +219,16 @@ let sanity_check (e : 'a genv) =
   assert (Ms.for_all (fun _ l -> List.length l = 1) e)
 
 (*------------------------------------------------------------------*)
-let _pp_genv ~dbg pp_info ppf (e : 'a genv) =
-  _pp_typed_list_w_info pp_info ~dbg ppf (to_list e)
+let _pp_genv ppe pp_info fmt (e : 'a genv) =
+  _pp_typed_list_w_info pp_info ppe fmt (to_list e)
 
-let pp_genv     pp_info = _pp_genv ~dbg:false pp_info
-let pp_genv_dbg pp_info = _pp_genv ~dbg:true  pp_info
+let pp_genv     pp_info = _pp_genv (default_ppe ~dbg:false ()) pp_info
+let pp_genv_dbg pp_info = _pp_genv (default_ppe ~dbg:true ()) pp_info
 
 (*------------------------------------------------------------------*)
-let _pp_env ~dbg = _pp_genv ~dbg Tag.pp
-let  pp_env      =  pp_genv      Tag.pp
-let  pp_env_dbg  =  pp_genv_dbg  Tag.pp
+let _pp_env ppe = _pp_genv ppe Tag.pp
+let  pp_env     =  pp_genv     Tag.pp
+let  pp_env_dbg =  pp_genv_dbg Tag.pp
 
 (*------------------------------------------------------------------*)
 let empty_env : 'a genv = Ms.empty

@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
 
@@ -59,9 +60,11 @@ let pp_path (mode : [`Short | `Qualified]) fmt (p : 'a Symbols.path) =
 (** Pretty-print a function path. 
     See [pp_path] for the description of the [mode] argument *)
 let pp_funname
-    ~dbg (mode : [`Short | `Qualified]) fmt ((fn,fty_app) : Symbols.fname * applied_ftype)
+    (ppe : ppenv) (mode : [`Short | `Qualified])
+    (fmt : Format.formatter)
+    ((fn,fty_app) : Symbols.fname * applied_ftype)
   =
-  if not dbg || fty_app.ty_args = [] then
+  if not ppe.dbg || fty_app.ty_args = [] then
     Fmt.pf fmt "@[<hov 2>%a@]" (pp_path mode) fn
   else 
     Fmt.pf fmt "@[<hov 2>%a<%a>@]"
@@ -1149,8 +1152,8 @@ let subst_projs (s : (proj * proj) list) (t : term) : term =
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
-let _pp_indices ~dbg fmt l =
-  if l <> [] then Fmt.pf fmt "(%a)" (Vars._pp_list ~dbg) l
+let _pp_indices (ppe : ppenv) fmt l =
+  if l <> [] then Fmt.pf fmt "(%a)" (Vars._pp_list ppe) l
 
 let rec is_and_happens = function
   | App (Fun (f, _), [_]) when f = f_happens -> true
@@ -1168,17 +1171,15 @@ let set_resolve_path f = resolve_path := f
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
 type pp_info = {
-  table : Symbols.table;
+  ppe    : ppenv;               (** pretty-printing environment *)
   styler : pp_info -> term -> Printer.keyword option * pp_info;
-  dbg : bool;
 }
 
-let default_pp_info ?table () = 
-  let table = odflt (Symbols.builtins_table ()) table in
+let pp_info ?ppe () = 
+  let ppe = odflt (default_ppe ()) ppe in
   {
-    table;
+    ppe;
     styler = (fun info _ -> None, info);
-    dbg = false;
   }
 
 
@@ -1256,7 +1257,7 @@ and _pp
   let pp = pp info in
 
   match t with
-  | Var m -> Fmt.pf fmt "%a" (Vars._pp ~dbg:info.dbg) m
+  | Var m -> Fmt.pf fmt "%a" (Vars._pp info.ppe) m
 
   | App (Fun (s,_),[a]) when s = f_happens -> pp_happens info fmt [a]
 
@@ -1288,14 +1289,14 @@ and _pp
     let pp fmt () =
       Fmt.pf fmt "@[<0>%a %a@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
-        (pp_funname ~dbg:info.dbg `Qualified) (s,fty_app)
+        (pp_funname info.ppe `Qualified) (s,fty_app)
         (pp ((prec, `Infix assoc), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp fmt ()
 
   (* function symbol, general case *)
   | Fun (f, fty_app) ->
-    pp_funname ~dbg:info.dbg `Qualified fmt (f,fty_app)
+    pp_funname info.ppe `Qualified fmt (f,fty_app)
 
   (* application *)
   | App (t, args) -> pp_app info (outer,side) fmt (t,args)
@@ -1324,7 +1325,7 @@ and _pp
     
     let pp fmt () =
       Fmt.pf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (Vars._pp ~dbg:info.dbg) v
+        (Vars._pp info.ppe) v
         (pp (let_in_fixity, `NonAssoc)) t1
         (pp (let_in_fixity, `NonAssoc)) t2
     in
@@ -1359,7 +1360,7 @@ and _pp
   | Diff (Explicit list) ->
     let pp_elem fmt (label,term) =
       Fmt.pf fmt "%s%a" 
-        (if info.dbg then label ^ ":" else "")
+        (if info.ppe.dbg then label ^ ":" else "")
         (pp (diff_fixity, `NonAssoc)) term
     in
     Fmt.pf fmt "@[<hov 2>diff(@,%a)@]"
@@ -1392,7 +1393,7 @@ and _pp
       Fmt.pf fmt "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        (Vars._pp_typed_list ~dbg:info.dbg) vs
+        (Vars._pp_typed_list info.ppe) vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
@@ -1410,7 +1411,7 @@ and _pp
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
                   %a@]"
-        (Vars._pp_typed_list ~dbg:info.dbg) vs
+        (Vars._pp_typed_list info.ppe) vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
         (pp_chained_find info)        e 
@@ -1431,19 +1432,19 @@ and _pp
         let pp fmt () =
           Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
             pp_quant q
-            (Vars._pp_typed_list ~dbg:info.dbg) vs
+            (Vars._pp_typed_list info.ppe) vs
             (pp (quant_fixity, `Right)) b
         in
         maybe_paren ~outer ~side ~inner:quant_fixity pp fmt ()
 
       | Seq ->
         Fmt.pf fmt "@[<hov 2>seq(%a=>@,%a)@]"
-          (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `Right)) b
+          (Vars._pp_typed_list info.ppe) vs (pp (seq_fixity, `Right)) b
 
       | Lambda ->
         let pp fmt () =
           Fmt.pf fmt "@[<hov 2>fun (@[%a@]) =>@ %a@]"
-            (Vars._pp_typed_list ~dbg:info.dbg) vs
+            (Vars._pp_typed_list info.ppe) vs
             (pp (fun_fixity, `Right)) b
         in
         maybe_paren ~outer ~side ~inner:fun_fixity pp fmt ()
@@ -1462,13 +1463,13 @@ and pp_app
     | Fun (f, fty_app) ->
       let fp : Symbols.p_path = ([], L.mk_loc L._dummy (Symbols.to_string f.s)) in
       let ty_args = List.map ty args in
-      let symbs = !resolve_path info.table fp ~ty_args ~ty_rec:`NoTS in
+      let symbs = !resolve_path info.ppe.table fp ~ty_args ~ty_rec:`NoTS in
       let mode =
         match symbs with
         | [(symb, _, _, _)] when symb = `Operator f -> `Short 
         | _ -> `Qualified
       in
-      pp_funname ~dbg:info.dbg mode fmt (f,fty_app)
+      pp_funname info.ppe mode fmt (f,fty_app)
 
     | _ -> pp info (app_fixity, `Left) fmt head
   in
@@ -1544,7 +1545,7 @@ and pp_chained_find info fmt (t : term) =
     Fmt.pf fmt "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
                 @[<hov 2>in@ %a@]@;<1 0>\
                 %a"
-      (Vars._pp_typed_list ~dbg:info.dbg) vs
+      (Vars._pp_typed_list info.ppe) vs
       (pp info (find_fixity, `NonAssoc)) c
       (pp info (find_fixity, `NonAssoc)) d
       (pp_chained_find info)             e
@@ -1576,26 +1577,26 @@ let pp_toplevel
 
 (** Exported *)
 let pp_with_info = pp_toplevel
-let pp           = pp_toplevel (default_pp_info ())
+let pp           = pp_toplevel (pp_info ())
 
-let _pp (* ?table *) ~dbg =
-  let d = default_pp_info ?table:None () in
-  pp_toplevel { d with dbg }
+let _pp ppe =
+  let d = pp_info ~ppe () in
+  pp_toplevel d
 
 let pp_dbg =
-  let d = default_pp_info () in
-  pp_toplevel { d with dbg = true }
+  let d = pp_info () in
+  pp_toplevel { d with ppe = { d.ppe with dbg = true }}
 
 (*------------------------------------------------------------------*)
-let _pp_esubst ~dbg fmt (ESubst (t1,t2)) =
-  Fmt.pf fmt "%a->%a" (_pp (* ?table:None *) ~dbg) t1 (_pp (* ?table:None *) ~dbg) t2
+let _pp_esubst ppe fmt (ESubst (t1,t2)) =
+  Fmt.pf fmt "%a->%a" (_pp ppe) t1 (_pp ppe) t2
 
-let _pp_subst ~dbg fmt s =
+let _pp_subst ppe fmt s =
   Fmt.pf fmt "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (_pp_esubst ~dbg)) s
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (_pp_esubst ppe)) s
 
-let pp_subst = _pp_subst ~dbg:false
-let pp_subst_dbg = _pp_subst ~dbg:true
+let pp_subst     = _pp_subst (default_ppe ~dbg:false ())
+let pp_subst_dbg = _pp_subst (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
 (** {2 Literals.} *)
@@ -1628,7 +1629,7 @@ module Lit = struct
     | Comp (o,tl,tr) ->
       Fmt.pf fmt "@[%a %a@ %a@]" pp tl pp_ord o pp tr
 
-    | Happens a -> pp_happens (default_pp_info ()) fmt [a]
+    | Happens a -> pp_happens (pp_info ()) fmt [a]
 
     | Atom t -> pp fmt t
 
@@ -2166,11 +2167,11 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
   let styler info (t : term) : Printer.keyword option * pp_info =
     match Mt.find_opt t minfos with
     | None               -> None       , info
-    | Some MR_ok         -> None       , default_pp_info ()
+    | Some MR_ok         -> None       , pp_info ()
     | Some MR_check_st _ -> None       , info
     | Some MR_failed     -> Some `Error, info
   in
-  { table = Symbols.builtins_table (); styler; dbg = false; }
+  { (pp_info ()) with styler; }
 
 
 (*------------------------------------------------------------------*)

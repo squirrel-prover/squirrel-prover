@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 open Term
 
 module Sv = Vars.Sv
@@ -899,18 +900,18 @@ end = struct
   let cpt = ref 0
   let make subst = incr cpt; { id = !cpt; subst }
 
-  let _pp ~dbg fmt (mv : t) : unit =
+  let _pp ppe fmt (mv : t) : unit =
     let pp_binding fmt (v, (tag,system,t)) =
       Fmt.pf fmt "@[%a[%a]{%a} → %a@]"
-        (Vars._pp ~dbg) v
+        (Vars._pp ppe) v
         Vars.Tag.pp tag SE.pp system 
-        (Term._pp ~dbg) t 
+        (Term._pp ppe) t 
     in
     Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
       (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
 
-  let pp     = _pp ~dbg:false
-  let pp_dbg = _pp ~dbg:true
+  let pp     = _pp (default_ppe ~dbg:false ())
+  let pp_dbg = _pp (default_ppe ~dbg:true ())
 
   let empty = make Mv.empty
 
@@ -2170,10 +2171,10 @@ end = struct
     let indices = Sv.elements indices in
     { msymb; args; indices; cond_le; }
 
-  let _pp ~dbg fmt (mset : t) =
+  let _pp ppe fmt (mset : t) =
     (* when [dbg] is [false], we refresh variables in [mset.indices] *)
     let mset =
-      if dbg then mset
+      if ppe.dbg then mset
       else
         let env_vars =
           Sv.diff
@@ -2208,17 +2209,17 @@ end = struct
         (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices
         pp_cond mset.cond_le
 
-  let pp_dbg = _pp ~dbg:true
+  let pp_dbg = _pp (default_ppe ~dbg:true ())
 
-  let pp = _pp ~dbg:false
+  let pp = _pp (default_ppe ~dbg:false ())
 
-  let _pp_l ~dbg fmt (mset_l : t list) =
+  let _pp_l ppe fmt (mset_l : t list) =
     Fmt.pf fmt "@[<v 0>%a@]"
-      (Fmt.list ~sep:Fmt.sp (_pp ~dbg)) mset_l
+      (Fmt.list ~sep:Fmt.sp (_pp ppe)) mset_l
 
-  let pp_l_dbg = _pp_l ~dbg:true
+  let pp_l_dbg = _pp_l (default_ppe ~dbg:true ())
 
-  let pp_l = _pp_l ~dbg:false
+  let pp_l = _pp_l (default_ppe ~dbg:false ())
 
 end
 

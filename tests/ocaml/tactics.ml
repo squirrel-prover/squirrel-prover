@@ -104,7 +104,7 @@ let case_study () =
 
   (* Attention, simpl va trivialiser ce but. *)
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,ZERO"
@@ -137,7 +137,7 @@ let case_study () =
   in
   (* Attention, simpl va trivialiser ce but. *)
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
   (* deux sous-buts, l'un avec equiv(true,zero,n) l'autre equiv(true,empty,m) *)
   let terms = get_seq_in_nth_goal st 0 in
   Alcotest.(check' term_testable) 
@@ -183,7 +183,7 @@ let case_study () =
   in
   (* Attention, simpl va trivialiser ce but. *)
   let st = Prover.exec_command ~test:true "nosimpl cs true in 1." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
   (* deux sous-buts, equiv(true,if true then zero else empty,n)
      et  equiv(true,if true then zero else empty,m) *)
   let terms = get_seq_in_nth_goal st 0 in
@@ -241,7 +241,7 @@ let case_study () =
   in
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
 
   let terms = get_seq_in_nth_goal st 0 in
   let f = Symbols.Operator.convert_path (mk_p "f") (Prover.get_table st) in
@@ -282,7 +282,7 @@ let case_study () =
   in
   let st = Prover.exec_command ~test:true "nosimpl cs true." st in
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
 
   let f = Symbols.Operator.convert_path (mk_p "f") (Prover.get_table st) in
   let terms = get_seq_in_nth_goal st 0 in
@@ -335,7 +335,7 @@ let case_study () =
       deux buts
       1) exec@tau, exec@tau, frame@tau, if exec@tau' then x else y, x
       2) idem avec y à la fin au lieu de x *)
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
   let x = find_in_sys_from_string "x" st in
   let y = find_in_sys_from_string "y" st in
 
@@ -395,7 +395,7 @@ let case_study () =
         Proof."
   in
   let st = Prover.exec_command ~test:true "nosimpl cs exec@tau." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
 
   let x = find_in_sys_from_string "x" st in
   let y = find_in_sys_from_string "y" st in
@@ -480,7 +480,7 @@ let case_study () =
         Proof."
   in
   let st = Prover.exec_command ~test:true "nosimpl cs exec@tau in 3." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
 
   let x = find_in_sys_from_string "x" st in
   let y = find_in_sys_from_string "y" st in
@@ -533,7 +533,7 @@ let case_study () =
         Proof."
   in
   let st = Prover.exec_command ~test:true "nosimpl cs exec@_ in 3." st in
-  Printer.pr "%t" (Prover.pp_subgoals st);
+  Printer.pr "%a" Prover.pp_subgoals st;
 
   let x = find_in_sys_from_string "x" st in
   let y = find_in_sys_from_string "y" st in
@@ -583,7 +583,7 @@ let namelength () =
         lemma _ : true.
         Proof.
         " in
-  Printer.pr "%a@." (Prover.pp_subgoals st) ();
+  Printer.pr "%a@." Prover.pp_subgoals st;
   let tn = find_in_sys_from_string "n" st in
   let _tm = find_in_sys_from_string "m" st in
   let tyn = Term.ty tn in 
@@ -643,7 +643,7 @@ let namelength2 () =
         lemma _ : True.
         Proof.
         " in
-  Printer.pr "%a@." (Prover.pp_subgoals st) ();
+  Printer.pr "%a@." Prover.pp_subgoals st;
   let tn = find_in_sys_from_string "n" st in
   let tyn = Term.ty tn in 
   let table = Prover.get_table st in

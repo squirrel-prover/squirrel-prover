@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L  = Location
 module Sv = Vars.Sv
@@ -167,7 +168,7 @@ let alias_subst (f : string -> string) proc =
 
 (*------------------------------------------------------------------*)
 (** Pretty-printer *)
-let _pp ~dbg ppf (process : proc) = 
+let _pp ppe ppf (process : proc) = 
   let rec doit ppf (process : proc) = 
     let open Fmt in
     match process with
@@ -176,7 +177,7 @@ let _pp ~dbg ppf (process : proc) =
     | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
         (Printer.kws `ProcessName) (Symbols.path_to_string s)
-        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ~dbg)) l
+        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") (Term._pp ppe)) l
 
     | Alias (p,a) ->
       pf ppf "%s: %a" a doit p
@@ -190,14 +191,14 @@ let _pp ~dbg ppf (process : proc) =
       let p = subst s p in
 
       pf ppf "@[<hv 2>!_%a(@ @[<hv>%a@])@]"
-        (Vars._pp ~dbg) v doit p
+        (Vars._pp ppe) v doit p
 
     | Set (s, args, t, p) ->
       pf ppf "@[<hov>%s%a %a@ %a;@]@ %a"
         (Symbols.path_to_string s)
         (Utils.pp_list Term.pp) args
         (Printer.kws `ProcessKeyword) ":="
-        (Term._pp ~dbg) t
+        (Term._pp ppe) t
         doit p
 
     | New (v, ty, p) ->
@@ -210,7 +211,7 @@ let _pp ~dbg ppf (process : proc) =
 
       pf ppf "@[<hov>%a %a : %a;@]@ %a"
         (Printer.kws `ProcessKeyword) "new"
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ppe) v)
         Type.pp ty
         doit p
 
@@ -225,14 +226,14 @@ let _pp ~dbg ppf (process : proc) =
       pf ppf "@[<hov>%a(%a,@,%a);@]@ %a"
         (Printer.kws `ProcessInOut) "in"
         (Printer.kws `ProcessChannel) (Symbols.path_to_string c)
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ppe) v)
         doit p
 
     | Out (c, t, p) ->
       pf ppf "@[<hov 2>%a(%a,@,@[%a@]);@]@ %a"
         (Printer.kws `ProcessInOut) "out"
         (Printer.kws `ProcessChannel) (Symbols.path_to_string c)
-        (Term._pp ~dbg) t
+        (Term._pp ppe) t
         doit p
 
     | Parallel _ ->
@@ -251,9 +252,9 @@ let _pp ~dbg ppf (process : proc) =
 
       pf ppf "@[<hov 2>%a %a : %a =@ @[%a@] %a@]@ %a"
         (Printer.kws `ProcessKeyword) "let"
-        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ~dbg) v)
+        (Printer.kws `ProcessVariable) (Fmt.str "%a" (Vars._pp ppe) v)
         Type.pp ty
-        (Term._pp ~dbg) t
+        (Term._pp ppe) t
         (Printer.kws `ProcessKeyword) "in"
         doit p
 
@@ -269,15 +270,15 @@ let _pp ~dbg ppf (process : proc) =
       if vs = [] then
         pf ppf "@[<hv>%a %a %a@;<1 2>@[<hv>%a@]"
           (Printer.kws `ProcessCondition) "if"
-          (Term._pp ~dbg) f
+          (Term._pp ppe) f
           (Printer.kws `ProcessCondition) "then"
           doit p1
       else
         pf ppf "@[<hv>%a %a %a %a %a@;<1 2>@[<hv>%a@]"
           (Printer.kws `ProcessCondition) "find"
-          (Utils.pp_list (Vars._pp ~dbg)) vs
+          (Utils.pp_list (Vars._pp ppe)) vs
           (Printer.kws `ProcessCondition) "such that"
-          (Term._pp ~dbg) f
+          (Term._pp ppe) f
           (Printer.kws `ProcessCondition) "in"
           doit p1 ;
       if p2 <> Null then
@@ -301,10 +302,10 @@ let _pp ~dbg ppf (process : proc) =
   Fmt.pf ppf "@[<hv>%a@]" doit process
 
 (* box [_pp]'s output *)
-let _pp ~dbg fmt p = Fmt.pf fmt "@[<hov> %a@]" (_pp ~dbg) p
+let _pp ppe fmt p = Fmt.pf fmt "@[<hov> %a@]" (_pp ppe) p
     
-let pp_dbg = _pp ~dbg:true
-let pp     = _pp ~dbg:false
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
+let pp     = _pp (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 type error_i =

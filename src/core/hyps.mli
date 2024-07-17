@@ -3,6 +3,7 @@
     Named [Hyps] for legacy reasons. *)
 
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 module Args = TacticsArgs
@@ -136,7 +137,9 @@ module type S1 = sig
   val clear_triv : hyps -> hyps
 
   (*------------------------------------------------------------------*)
-  val pp_ldecl : ?dbg:bool -> ?context:SE.context -> Format.formatter -> ldecl -> unit
+  val pp_ldecl     : ?context:SE.context -> ldecl formatter
+  val pp_ldecl_dbg : ?context:SE.context -> ldecl formatter
+  val _pp_ldecl    : ?context:SE.context -> ldecl formatter_p
 
   val pp_hyp : hyp  formatter
 

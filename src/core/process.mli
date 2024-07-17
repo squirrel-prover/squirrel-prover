@@ -6,6 +6,7 @@
     do it separately for equivalences. *)
 
 open Utils
+open Ppenv
 
 module L = Location
   

@@ -5,9 +5,6 @@
 (** Type of formatters for type ['a] *)
 type 'a formatter = Format.formatter -> 'a -> unit
 
-(** Same as ['a formatter], but with a debug option *)
-type 'a formatter_p = dbg:bool -> 'a formatter
-
 (* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
 type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]

@@ -11,7 +11,7 @@ module ES = LowEquivSequent
 type t = Local of TS.t | Global of ES.t
 
 (*------------------------------------------------------------------*)
-val pp : t formatter
+val pp      : t formatter
 val pp_init : t formatter
 
 (*------------------------------------------------------------------*)

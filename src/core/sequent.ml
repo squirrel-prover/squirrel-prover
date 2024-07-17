@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
 module SE = SystemExpr
@@ -50,28 +51,28 @@ module PT = struct
       subgs  = List.map do_proj pt.subgs;
       form   = do_proj pt.form; }
 
-  let _pp ~dbg fmt (pt : t) : unit =
+  let _pp ppe fmt (pt : t) : unit =
     let pp_subgoals_and_mv fmt =
-      if not dbg then () 
+      if not ppe.dbg then () 
       else 
         Fmt.pf fmt "@[<v 2>subgoals:@ @[%a@]@]@;\
                     @[<v 2>mv:@ @[%a@]@]@;"
-          (Fmt.list (Equiv.Any._pp ~dbg ?context:None))
+          (Fmt.list (Equiv.Any._pp ppe ?context:None))
           pt.subgs
-          (Mvar._pp ~dbg) pt.mv
+          (Mvar._pp ppe) pt.mv
     in        
     Fmt.pf fmt "@[<v 0>\
                 @[%a@]@;\
                 @[system : @[%a@]@]@;\
                 %t\
                 @[vars: @[%a@]@]@]"
-      (Equiv.Any._pp ~dbg ?context:None) pt.form  
+      (Equiv.Any._pp ppe ?context:None) pt.form  
       SE.pp_context pt.system
       pp_subgoals_and_mv
-      (Vars._pp_typed_tagged_list ~dbg) (List.rev pt.args) 
+      (Vars._pp_typed_tagged_list ppe) (List.rev pt.args) 
 
-  let pp     = _pp ~dbg:false
-  let pp_dbg = _pp ~dbg:true
+  let pp     = _pp (default_ppe ~dbg:false ())
+  let pp_dbg = _pp (default_ppe ~dbg:true ())
 end
 
 (*------------------------------------------------------------------*)

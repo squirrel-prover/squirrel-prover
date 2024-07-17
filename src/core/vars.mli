@@ -25,6 +25,7 @@
       This is the case for local variables. *)
 
 open Utils
+open Ppenv
 
 (*------------------------------------------------------------------*)
 (** {2 Variables} *)
@@ -187,9 +188,9 @@ val sanity_check : 'a genv -> unit
 
 (*------------------------------------------------------------------*)
 (** Print an environment, showing variables names and sorts. *)
-val pp_genv     :             'a formatter -> 'a genv formatter
-val pp_genv_dbg :             'a formatter -> 'a genv formatter
-val _pp_genv    : dbg:bool -> 'a formatter -> 'a genv formatter
+val pp_genv     :          'a formatter -> 'a genv formatter
+val pp_genv_dbg :          'a formatter -> 'a genv formatter
+val _pp_genv    : ppenv -> 'a formatter -> 'a genv formatter
 
 (*------------------------------------------------------------------*)
 val  pp_env     : env formatter

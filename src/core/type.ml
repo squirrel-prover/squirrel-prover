@@ -219,7 +219,7 @@ let _pp ~dbg : ty formatter =
   _pp ((toplevel_prec, `NoParens), `NonAssoc) 
 
 let pp     = _pp ~dbg:false
-let pp_dbg = _pp ~dbg:true
+let pp_dbg = _pp ~dbg:true 
 
 (** Encoding of a type as a string without discontinuity nor
     parenthesis. *)

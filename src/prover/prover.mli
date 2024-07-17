@@ -1,6 +1,7 @@
 (** {2 Prover} *)
 
 open Squirrelcore
+open Utils
 
 (** A prover state contains everything that the prover needs to perform
     its operations in an immutable fashion (with a few exceptions):
@@ -64,10 +65,10 @@ val current_goal_name : state -> string option
     @raise Not_found if there is no subgoal or current goal. *)
 val get_first_subgoal : state -> Goal.t
 
-val pp_subgoals : state -> Format.formatter -> unit
+val pp_subgoals : state formatter
 
 (** Print goal *)
-val pp_goal : state -> Format.formatter -> unit
+val pp_goal : state formatter
 
 (** Print current goal. *)
 val do_print_goal : state -> unit

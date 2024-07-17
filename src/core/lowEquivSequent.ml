@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
 module Args = TacticsArgs
@@ -77,12 +78,15 @@ let ty_fv (s : t) : Type.Fv.t =
   Type.Fv.union h_vars (Equiv.ty_fv s.conclusion)
 
 (*------------------------------------------------------------------*)
-let _pp_conclusion ~dbg ~context fmt = function
-  | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ~dbg) fmt e
-  | _  as f -> Equiv._pp ~dbg ~context fmt f
+let _pp_conclusion ppe ~context fmt = function
+  | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ppe) fmt e
+  | _  as f -> Equiv._pp ppe ~context fmt f
 
 (*------------------------------------------------------------------*)
-let _pp ~dbg ppf j =
+(** The pretty-printing environment table [ppe.table] is always
+    replaced by the table of the sequent. *)
+let _pp ppe fmt j =
+  let ppe = { ppe with table = j.env.table; } in
   let env_without_defined_vars =
     H.fold (fun id ld env ->
         match ld with
@@ -90,33 +94,34 @@ let _pp ~dbg ppf j =
         | _ -> env
       ) j.proof_context j.env.vars
   in
-  Fmt.pf ppf "@[<v 0>" ;
-  Fmt.pf ppf "@[Systems: %a@]@;"
+  Fmt.pf fmt "@[<v 0>" ;
+  Fmt.pf fmt "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
 
   if j.env.ty_vars <> [] then
-    Fmt.pf ppf "@[Type variables: %a@]@;"
+    Fmt.pf fmt "@[Type variables: %a@]@;"
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
   if j.env.vars <> Vars.empty_env then
-    Fmt.pf ppf "@[<hv 2>Variables:@ @[%a@]@]@;"
-      (Vars._pp_env ~dbg) env_without_defined_vars ;
+    Fmt.pf fmt "@[<hv 2>Variables:@ @[%a@]@]@;"
+      (Vars._pp_env ppe) env_without_defined_vars ;
 
-  H._pp ~dbg ~context:j.env.system ppf j.proof_context ;
+  H._pp ppe ~context:j.env.system fmt j.proof_context ;
 
   (* Print separation between hyps and conclusion *)
-  Printer.kws `Separation ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]"
-    (_pp_conclusion ~dbg ~context:j.env.system) j.conclusion
+  Printer.kws `Separation fmt (String.make 40 '-') ;
+  Fmt.pf fmt "@;%a@]"
+    (_pp_conclusion ppe ~context:j.env.system) j.conclusion
 
-let pp     = _pp ~dbg:false
-let pp_dbg = _pp ~dbg:true
+let pp     = _pp (default_ppe ~dbg:false ())
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
-let pp_init ppf j =
+let pp_init fmt (j : sequent) =
+  let ppe = default_ppe ~table:j.env.table () in
   if j.env.vars <> Vars.empty_env then
-    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
-  Fmt.pf ppf "%a" Equiv.pp j.conclusion
+    Fmt.pf fmt "forall %a,@ " (Vars._pp_env ppe) j.env.vars ;
+  Fmt.pf fmt "%a" (Equiv._pp ppe) j.conclusion
 
 (*------------------------------------------------------------------*)
 let sanity_check (s : t) : unit =
@@ -154,7 +159,9 @@ module Hyps
   (*------------------------------------------------------------------*)  
   let pp_hyp = Equiv.pp
 
-  let pp_ldecl = H.pp_ldecl
+  let pp_ldecl     = H.pp_ldecl
+  let pp_ldecl_dbg = H.pp_ldecl_dbg
+  let _pp_ldecl    = H._pp_ldecl
 
   (*------------------------------------------------------------------*)  
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.proof_context
@@ -212,9 +219,12 @@ module Hyps
 
   let clear_triv s = { s with proof_context = H.clear_triv s.proof_context }
 
-  let pp          fmt s = H.pp                                fmt s.proof_context
-  let _pp    ~dbg fmt s = H._pp    ~dbg ~context:s.env.system fmt s.proof_context
-  let pp_dbg      fmt s = H.pp_dbg                            fmt s.proof_context
+  let _pp ppe fmt s =
+    let ppe = { ppe with table = s.env.table; } in
+    H._pp ppe ~context:s.env.system fmt s.proof_context
+
+  let pp     = _pp (default_ppe ~dbg:false ()) 
+  let pp_dbg = _pp (default_ppe ~dbg:true  ())
 end
 
 (*------------------------------------------------------------------*)

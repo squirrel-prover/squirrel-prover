@@ -15,6 +15,7 @@
     fixed, and we may be able to simplify the architecture now. *)
 
 open Utils
+open Ppenv
     
 module TraceHyps = Hyps.TraceHyps
 
