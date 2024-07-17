@@ -416,7 +416,8 @@ let declare table decl : Symbols.table * Goal.t list =
       match sdecl.system_option with
       | None 
       | Some { pl_desc = "classical"   } -> Macros.Classical
-      | Some { pl_desc = "postquantum" } -> Macros.PostQuantum
+      (* | Some { pl_desc = "postquantum" } -> Macros.PostQuantum *)
+      (* TODO: quantum: enable quantum execution model *)
       | Some l -> error (L.loc l) KDecl (Failure "unknown system option")
     in
     Process.declare_system table exec_model sdecl.sname projs sdecl.sprocess, []
