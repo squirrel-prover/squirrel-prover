@@ -445,7 +445,11 @@ type macro_data =
               
 type data += Macro of macro_data 
 
-val as_macro_data : data -> macro_data 
+exception Macro_reserved_no_def
+
+(** Raise [Macro_reserved_no_def] if the macro is registered but not
+    yet defined. *)
+val as_macro_data  : data -> macro_data 
 val get_macro_data : macro -> table -> macro_data
 
 (*------------------------------------------------------------------*)

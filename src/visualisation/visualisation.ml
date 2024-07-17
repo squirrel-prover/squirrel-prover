@@ -178,7 +178,7 @@ let pp_term_id ppf term =
 (** Print a state update with HTML format: [state] := [term] *)
 let pp_update ppf (state,args,term) =
   Format.fprintf ppf "%a(%a) := %a"
-    Term.pp_msymb_s state
+    Symbols.pp_path state
     (Fmt.list pp_term) args
     pp_term term
 

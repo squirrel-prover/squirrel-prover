@@ -459,7 +459,7 @@ module Const = struct
             (Term._pp ppe) (Term.mk_ands cond)
       in          
       Fmt.pf fmt "@[<hv 4>{ %a @[%a@], %s %t}@]"
-        Term.pp_nsymb const.name
+        (Term._pp_name ppe) const.name.s_symb
         (Fmt.list (Term._pp ppe)) term
         (Tag.tostring const.tag)
         pp_vars_and_cond

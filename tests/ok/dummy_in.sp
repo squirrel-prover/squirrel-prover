@@ -1,7 +1,5 @@
-
-
-channel c
-abstract ok : message
+channel c.
+abstract ok : message.
 system (!_i in(c,x);A:out(c,ok);B:out(c,x) |
         C:out(c,ok);in(c,x);D:out(c,x)).
 

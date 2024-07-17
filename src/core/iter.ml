@@ -760,9 +760,9 @@ end = struct
 
   let pp fmt (mset : t) =
     Fmt.pf fmt "@[<hv 2>{ @[%a(%a)@]@@_ |@ %a%a}@]"
-      Term.pp_msymb mset.msymb
-      Vars.pp_list mset.args
-      Vars.pp_list mset.indices 
+      Symbols.pp_path mset.msymb.s_symb
+      Vars.pp_list  mset.args
+      Vars.pp_list  mset.indices 
       PathCond.pp mset.path_cond
 
   let pp_l fmt (mset_l : t list) =

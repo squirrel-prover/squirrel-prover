@@ -48,9 +48,8 @@ val pp_applied_ftype : applied_ftype formatter
 (*------------------------------------------------------------------*)
 (** {3 Printing} *)
 
-val pp_nsymb   : nsymb         formatter
-val pp_msymb_s : Symbols.macro formatter
-val pp_msymb   : msymb         formatter
+val _pp_name  : ?ty_args:Type.ty list                    -> Symbols.name  formatter_p
+val _pp_macro : ?ty_args:Type.ty list -> ?ty_rec:Type.ty -> Symbols.macro formatter_p
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
@@ -185,7 +184,7 @@ val set_resolve_path :
     Symbols.table -> 
     Symbols.p_path ->
     ty_args:Type.ty list ->
-    ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS] ->
+    ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown] ->
     ([
       `Operator of Symbols.fname  |
       `Name     of Symbols.name   |

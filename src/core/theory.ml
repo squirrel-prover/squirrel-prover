@@ -634,7 +634,7 @@ let resolve_path
     ?(ty_env = Type.Infer.mk_env ())
     (table    : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list)
-    ~(ty_rec  : [`At of Type.ty | `MaybeAt of Type.ty | `NoTS])
+    ~(ty_rec  : [`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown])
   : 
     ([
       `Operator of Symbols.fname  |
@@ -683,6 +683,7 @@ let resolve_path
       | `MaybeAt _, None -> () 
       | `At _, None | `NoTS , Some _ -> failed ()
       | `NoTS , None -> ()
+      | `Unknown, _ -> ()
     in
 
     (* build the applied function type *)

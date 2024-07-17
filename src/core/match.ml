@@ -2200,12 +2200,12 @@ end = struct
     match mset.indices with
     | [] ->
       Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ τ. %a}@]"
-        Term.pp_msymb mset.msymb
+        (Term._pp_macro ppe) mset.msymb.s_symb
         pp_cond mset.cond_le
 
     | _ ->
       Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ @[τ,%a@]. s.t. %a}@]"
-        Term.pp_msymb mset.msymb
+        (Term._pp_macro ppe) mset.msymb.s_symb
         (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices
         pp_cond mset.cond_le
 

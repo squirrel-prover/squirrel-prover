@@ -1100,10 +1100,12 @@ type macro_data =
 
 type data += Macro of macro_data
 
+exception Macro_reserved_no_def
+
 let as_macro_data (data : data) : macro_data =
   match data with
   | Macro data -> data
-  | _ -> assert false           (* impossible *)
+  | _ -> raise Macro_reserved_no_def           (* impossible for registered macros *)
 
 let get_macro_data (ms : macro) (table : table) : macro_data =
   as_macro_data (Macro.get_data ms table)
