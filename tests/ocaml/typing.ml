@@ -113,4 +113,38 @@ end C2.
   ()
 
 (*------------------------------------------------------------------*)
-let tests = [ ("typing", `Quick, Util.catch_error typing); ]
+let crypto_parsing () =
+  let exception Ok in
+  let exception Ko in
+  let st = Prover.init ~with_prelude:true () in
+
+  let ill_formed_game st =
+    Prover.exec_all ~test:true st 
+      "\
+game Foo = {
+  oracle o (m: message) = {
+    return m
+  }
+
+ oracle h = {
+   return m 
+  }
+}.
+"
+  in
+  Alcotest.check_raises "ill-formed game" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try ill_formed_game st with
+         | Squirrelcore.Theory.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
+  ()
+
+(*------------------------------------------------------------------*)
+let tests = [
+  ("typing"      , `Quick, Util.catch_error typing);
+  ("game parsing", `Quick, Util.catch_error crypto_parsing);
+]

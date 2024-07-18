@@ -117,7 +117,7 @@ let _pp_oracle ppe fmt (o : oracle) : unit =
   let pp_return fmt ret =
     if Term.equal ret Term.empty then ()
     else
-      Fmt.pf fmt "@[%a %a@]" (Printer.kws `Prog) "return" (Term._pp ppe) ret
+      Fmt.pf fmt "@[%a %a @]" (Printer.kws `Prog) "return" (Term._pp ppe) ret
   in 
   Fmt.pf fmt "@[<hv 0>%a %s @[%a@]: %a = {@;<1 2>@[<hv 0>%a@,%a@,%a@,%a@]@,}@]"
     (Printer.kws `Prog) "oracle"
@@ -2381,9 +2381,9 @@ module Parse = struct
     in
     env, List.rev updates
 
-  let parse_oracle_decl ty_env env (po : oracle_decl) =
+  let parse_oracle_decl ty_env (init_env : Env.t) (po : oracle_decl) =
     let env, args = 
-      Theory.convert_bnds ~ty_env ~mode:NoTags env po.o_args 
+      Theory.convert_bnds ~ty_env ~mode:NoTags init_env po.o_args 
     in
 
     (* return type *)
@@ -2420,16 +2420,16 @@ module Parse = struct
       name = L.unloc po.o_name; 
       args; loc_smpls ; loc_vars; updates ; output ; }
     in
-    env, oracle
+    oracle
 
   let parse_oracle_decls ty_env env (p_oracles : oracle_decl list) =
-    let env, oracles =
-      List.fold_left (fun (env, oracles) po -> 
-          let env, oracle = parse_oracle_decl ty_env env po in
-          (env, oracle :: oracles)
-        ) (env, []) p_oracles
+    let oracles =
+      List.fold_left (fun oracles po -> 
+          let oracle = parse_oracle_decl ty_env env po in
+          oracle :: oracles
+        ) [] p_oracles
     in
-    env, List.rev oracles
+    List.rev oracles
 
   (*------------------------------------------------------------------*)
   let parse loc table (decl : game_decl) : game = 
@@ -2449,7 +2449,7 @@ module Parse = struct
     let env, glob_vars  = parse_var_decls ty_env env decl.g_gvar in
 
     (* parse oracle declarations *)
-    let _, oracles = parse_oracle_decls ty_env env decl.g_oracles in
+    let oracles = parse_oracle_decls ty_env env decl.g_oracles in
 
     let game = {
       name = L.unloc decl.g_name; 
