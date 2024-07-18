@@ -6,7 +6,6 @@ module ProverLib = Squirrelcore.ProverLib
 
 let template_test () =
   let st = Prover.init ~with_prelude:true () in
-  (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_all ~check:`Check ~test:true st
         "channel c

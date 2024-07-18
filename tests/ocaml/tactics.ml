@@ -574,7 +574,7 @@ let case_study () =
 
 let namelength () =
   let mk_p c = [], L.mk_loc L._dummy c in      
-  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:false ())
+  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:true ())
         "
         system null.
         name n : message.
@@ -635,7 +635,7 @@ let namelength () =
 
 let namelength2 () =
   let mk_p c = [], L.mk_loc L._dummy c in      
-  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:false ())
+  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:true ())
         "
         system null.
         name n : message * message.

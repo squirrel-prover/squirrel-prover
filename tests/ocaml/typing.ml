@@ -22,7 +22,7 @@ let term_of_string st string : Term.term =
 let typing () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init ~with_prelude:false () in
+  let st = Prover.init ~with_prelude:true () in
   let st = Prover.exec_all ~test:true st 
       "\
 type T.
