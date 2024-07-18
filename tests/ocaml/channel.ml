@@ -19,17 +19,17 @@ let channels =
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try ignore(convert (Symbols.builtins_table ()) (mk_p "c")) with
-           | Symbols.Error (_, Unbound_identifier (_,"c")) -> raise Ok) ;
+           | Symbols.Error (_, Unbound_identifier (_,_,"c")) -> raise Ok) ;
 
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try ignore (convert (Symbols.builtins_table ()) (mk_p "d")) with
-           | Symbols.Error (_,Unbound_identifier (_,"d")) -> raise Ok ) ;
+           | Symbols.Error (_,Unbound_identifier (_,_,"d")) -> raise Ok ) ;
 
       Alcotest.check_raises "fails" Ok 
         (fun () -> 
            try ignore (convert table_c (mk_p "d")) with 
-           | Symbols.Error (_,Unbound_identifier (_,"d")) -> raise Ok) ;
+           | Symbols.Error (_,Unbound_identifier (_,_,"d")) -> raise Ok) ;
       
       ignore (convert table_c (mk_p "c")) ;
 

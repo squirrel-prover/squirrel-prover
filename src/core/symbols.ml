@@ -76,7 +76,7 @@ let pp_symbol_kind fmt = function
   | System    -> Fmt.pf fmt "system"
   | Process   -> Fmt.pf fmt "process"
   | BType     -> Fmt.pf fmt "type"
-  | Game      -> Fmt.pf fmt "type"
+  | Game      -> Fmt.pf fmt "game"
   | HintDB    -> Fmt.pf fmt "hint database"
   | Lemma     -> Fmt.pf fmt "lemma"
   | Predicate -> Fmt.pf fmt "predicate"
@@ -86,14 +86,21 @@ let pp_symbol_kind fmt = function
 (*------------------------------------------------------------------*)
 (** {3 Symbols} *)
 
+(*------------------------------------------------------------------*)
+(** A [group] allows to group together symbols kinds.
+    Also used to report errors to the user, so the name should be 
+    chosen carefully. *)
 type group = string
 
+let group_to_string (g : group) : string = g
+
+(*------------------------------------------------------------------*)
 type symb = { group: group; name: string }
 
 type 'a t = symb
 
 (*------------------------------------------------------------------*)
-let default_group   = "default"
+let symbol_group    = "symbol"
 let namespace_group = "namespace"
 
 let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
@@ -251,7 +258,7 @@ module Mn = Map.Make (struct
 (** {2 Error Handling} *)
 
 type error_i =
-  | Unbound_identifier    of string option * string
+  | Unbound_identifier    of group * string option * string
   (** [string] unknown in optional namespace [npath] *)
   | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
   | Multiple_declarations of npath * string * symbol_kind * group
@@ -260,19 +267,19 @@ type error_i =
 type error = L.t * error_i
 
 let pp_error_i fmt = function
-  | Unbound_identifier (None, s) -> Fmt.pf fmt "unknown symbol %s" s
-  | Unbound_identifier (Some np, s) ->
+  | Unbound_identifier (g, None, s) -> Fmt.pf fmt "unknown %s %s" g s
+  | Unbound_identifier (g, Some np, s) ->
     if np = "" then
-      Fmt.pf fmt "unknown symbol %s" s
+      Fmt.pf fmt "unknown %s %s" g s
     else
-      Fmt.pf fmt "unknown symbol %s in %s" s np
+      Fmt.pf fmt "unknown %s  %s in %s" g s np
 
   | Incorrect_kind (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"
       pp_symbol_kind n1 pp_symbol_kind n2
 
   | Multiple_declarations (np, s, n, g) ->
-    Fmt.pf fmt "%a symbol %s already declared in namespace %a (%s group)"
+    Fmt.pf fmt "%a %s already declared in namespace %a (as a %s)"
       pp_symbol_kind n s pp_npath np g
 
   | Failure s ->
@@ -442,7 +449,8 @@ let convert_npath (p_n : p_npath) (table : table) : npath =
     let s_np : _namespace t list =
       let records =
         try Msymb.find s_symb table.current with
-        | Not_found -> symb_err (L.loc s) (Unbound_identifier (None, L.unloc s))
+        | Not_found ->
+          symb_err (L.loc s) (Unbound_identifier (namespace_group, None, L.unloc s))
       in
 
       if List.length records > 1 then
@@ -665,7 +673,7 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
     in
     if not allow_empty && results = [] then
       symb_err (L.loc sub)
-        (Unbound_identifier (Some (npath_to_string top), L.unloc sub));
+        (Unbound_identifier (group, Some (npath_to_string top), L.unloc sub));
     results
 
   let convert1 (p : p_path) (table : table) = List.hd (convert p table)
@@ -729,25 +737,25 @@ end
 module Action = Make (struct
   type ns   = _action
   let kind  = Action
-  let group = default_group
+  let group = symbol_group
 end)
 
 module Name = Make (struct
   type ns   = _name
   let kind  = Name
-  let group = default_group
+  let group = symbol_group
 end)
 
 module Channel = Make (struct
   type ns   = _channel
   let kind  = Channel
-  let group = default_group
+  let group = symbol_group
 end)
 
 module Config = Make (struct
   type ns   = _config
   let kind  = Config
-  let group = default_group
+  let group = "setting"
 end)
 
 module Oracle = Make (struct
@@ -771,7 +779,7 @@ end)
 module System = Make (struct
   type ns   = _system
   let kind  = System
-  let group = default_group
+  let group = symbol_group
 end)
 
 module Process = Make (struct
@@ -780,17 +788,17 @@ module Process = Make (struct
   let group = "process"
 end)
 
-(** Abtract and concrete operators *)
+(** abtract and concrete operators *)
 module Operator = Make (struct
   type ns   = _fname
   let kind  = Operator
-  let group = default_group
+  let group = symbol_group
 end)
 
 module Macro = Make (struct
   type ns   = _macro
   let kind  = Macro
-  let group = default_group
+  let group = symbol_group
 end)
 
 module HintDB = Make (struct
@@ -799,10 +807,11 @@ module HintDB = Make (struct
   let group = "hint-db"
 end)
 
+(** lemmas and axioms *)
 module Lemma = Make (struct
   type ns   = _lemma
   let kind  = Lemma
-  let group = "lemma"
+  let group = "statement"
 end)
 
 module Import = Make (struct

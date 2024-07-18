@@ -72,7 +72,7 @@ val pp_symbol_kind : symbol_kind formatter
     groups. *)
 type group
 
-val default_group : group
+val group_to_string : group -> string
 
 (*------------------------------------------------------------------*)
 (** ['a t] is the type of symbols of kind ['a]. *)
@@ -320,7 +320,7 @@ val namespace_open : table -> npath -> table
 (** {2 Error Handling} *)
 
 type error_i =
-  | Unbound_identifier    of string option * string
+  | Unbound_identifier    of group * string option * string
   (** [string] unknown in optional namespace [npath] *)
   | Incorrect_kind        of symbol_kind * symbol_kind (** expected, got *)
   | Multiple_declarations of npath * string * symbol_kind * group

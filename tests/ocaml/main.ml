@@ -94,7 +94,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/axiom3.sp" with
-           | Symbols.Error (_, Symbols.Unbound_identifier (_,"test")) ->
+           | Symbols.Error (_, Symbols.Unbound_identifier (_,_,"test")) ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->

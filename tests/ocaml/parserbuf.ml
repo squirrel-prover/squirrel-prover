@@ -262,7 +262,7 @@ let models =
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                        : Symbols.table )
-           with Symbols.Error (_, Symbols.Unbound_identifier (_,"D")) -> raise Ok)
+           with Symbols.Error (_, Symbols.Unbound_identifier (_,_,"D")) -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
