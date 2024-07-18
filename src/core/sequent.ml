@@ -520,7 +520,6 @@ module Mk (Args : MkArgs) : S with
   (** Internal 
       Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). *)
   let pt_of_assumption
-      ~(table : Symbols.table)
       (ty_env : Type.Infer.env) 
       (p      : Symbols.p_path)
       (s      : t)
@@ -543,12 +542,13 @@ module Mk (Args : MkArgs) : S with
         args   = [];
         form   = f; }
 
-    else if not (Lemma.mem p table) then
-      soft_failure ~loc:(Symbols.p_path_loc  p)
-        (Failure ("no lemma named " ^ Symbols.p_path_to_string p))
-
     else
-      let lem = Lemma.find_stmt p (S.table s) in
+      let lem =
+        try Lemma.find_stmt p (S.table s) with
+        | Symbols.Error (_, Symbols.Unbound_identifier _) ->
+          soft_failure ~loc:(Symbols.p_path_loc  p)
+            (Failure ("no lemma named " ^ Symbols.p_path_to_string p))
+      in
 
       (* Open the lemma type variables. *)
       let _, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
@@ -820,8 +820,7 @@ module Mk (Args : MkArgs) : S with
       (s       : S.t) 
     : ghyp * PT.t
     =
-    let table = S.table s in
-    let lem_name, pt = pt_of_assumption ~table ty_env p s in
+    let lem_name, pt = pt_of_assumption ty_env p s in
     assert (pt.mv = Mvar.empty);
     let pt = { pt with mv = init_mv; } in
     lem_name, pt
