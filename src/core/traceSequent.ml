@@ -39,7 +39,9 @@ include Sequent.Mk(struct
                   (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
               else es
             | LDef (se,t) -> 
-              ES.Hyps.add (Args.Named (Ident.name id)) (LDef (se,t)) es
+              let id', es = ES.Hyps._add ~force:true id (LDef (se,t)) es in
+              assert (Ident.equal id' id);
+              es
           ) s es
       in
       es
