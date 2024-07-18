@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -11,7 +12,10 @@ module ES = LowEquivSequent
 type t = Local of TS.t | Global of ES.t
 
 (*------------------------------------------------------------------*)
-val pp      : t formatter
+val pp     : t formatter
+val pp_dbg : t formatter
+val _pp    : t formatter_p
+
 val pp_init : t formatter
 
 (*------------------------------------------------------------------*)

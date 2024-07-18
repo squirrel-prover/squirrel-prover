@@ -323,7 +323,8 @@ let conclusion_as_equiv s = match conclusion s with
 let to_trace_sequent s =
   let env = s.env in
 
-  let conclusion = match s.conclusion with
+  let conclusion =
+    match s.conclusion with
     | Equiv.Atom (Equiv.Reach f) -> f
     | _ ->
       Tactics.soft_failure
@@ -331,15 +332,19 @@ let to_trace_sequent s =
   in
 
   let trace_s = TS.init ~env conclusion in
-  Hyps.fold
-    (fun id ld trace_s ->
-       match ld with
-       | TopHyps.LHyp hyp ->
-         TS.Hyps.add (Args.Named (Ident.name id)) (TopHyps.LHyp (Global hyp)) trace_s
-       | TopHyps.LDef (se,t) -> 
-         let _, trace_s = TS.Hyps._add ~force:true id (LDef (se,t)) trace_s in
-         trace_s
-    ) s trace_s
+  let trace_s =
+    Hyps.fold
+      (fun id ld trace_s ->
+         match ld with
+         | TopHyps.LHyp hyp ->
+           TS.Hyps.add (Args.Named (Ident.name id)) (TopHyps.LHyp (Global hyp)) trace_s
+         | TopHyps.LDef (se,t) -> 
+           let id', trace_s = TS.Hyps._add ~force:true id (LDef (se,t)) trace_s in
+           assert (Ident.equal id' id);
+           trace_s
+      ) s trace_s
+  in
+  trace_s
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s =

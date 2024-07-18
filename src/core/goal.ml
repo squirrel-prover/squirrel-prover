@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
 
@@ -28,10 +29,13 @@ let table = function
 
 (*------------------------------------------------------------------*)
 (* when printing, we run some well-formedness checks on the sequents *)
-let pp fmt = function
-  | Local  j -> TS.sanity_check j; TS.pp fmt j
-  | Global j -> ES.sanity_check j; ES.pp fmt j
+let _pp ppe fmt = function
+  | Local  j -> TS.sanity_check j; TS._pp ppe fmt j
+  | Global j -> ES.sanity_check j; ES._pp ppe fmt j
 
+let pp     = _pp (default_ppe ~dbg:false ())
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
+    
 let pp_init fmt = function
   | Local  j -> Term.pp fmt (TS.conclusion j)
   | Global j -> ES.pp_init fmt j

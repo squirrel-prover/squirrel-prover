@@ -236,7 +236,7 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
   let pp_dbg = _pp (default_ppe ~dbg:true  ()) ?context:None
 
   (*------------------------------------------------------------------*)
-  let find_opt (func : ldecl -> bool) hyps =
+  let find_opt (func : ldecl -> bool) hyps : ldecl option =
     let exception Found of ldecl in
     try
       Mid.iter (fun id ldc ->
