@@ -491,6 +491,9 @@ processes_i:
 | p=process_i                             { p }
 | p=process PARALLEL ps=loc(processes_i)  { Process.Parse.Parallel (p,ps) }
 
+processes:
+| p=loc(processes_i) { p }
+
 process_cont:
 |                                { let loc = L.make $startpos $endpos in
                                    L.mk_loc loc Process.Parse.Null }
@@ -728,14 +731,14 @@ declaration_i:
 |  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
-| SYSTEM system_option=system_option sprojs=projs p=process
+| SYSTEM system_option=system_option sprojs=projs p=processes
   { Decl.Decl_system { 
         sname      = None;
         system_option;
         sprojs;
         sprocess   = p; } }
 
-| SYSTEM system_option=system_option sprojs=projs id=lsymb EQ p=process
+| SYSTEM system_option=system_option sprojs=projs id=lsymb EQ p=processes
    { Decl.Decl_system { 
          sname      = Some id;
          system_option;
