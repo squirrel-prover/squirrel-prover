@@ -269,11 +269,28 @@ let () =
        | _ -> assert false)
 
 (*------------------------------------------------------------------*)
+(* Rewrite equiv *)
+
+(** [has_frame_geq s biframe ts] checks that [biframe] contains
+    [frame@ts'] for some [ts'] such that [ts <= ts'] holds wrt [s].
+    Because timestamp comparisons are performed wrt [s] we need to
+    introduce [happens] hypotheses before applying [rewrite equiv];
+    the tactic will make sure that the hypothesis can be preserved
+    through the rewriting. *)
+let has_frame_geq s biframe ts =
+  List.exists
+    (function
+      | Macro (msymb',[],ts') ->
+        msymb' = Term.frame_macro &&
+        TS.query ~precise:true s [`Pos,Comp (`Leq, ts, ts')]
+      | _ -> false)
+    biframe
 
 (** Transform a term according to some equivalence given as a biframe.
-  * Macros in the term occurring (at toplevel) on the [src] projection
-  * of some biframe element are replaced by the corresponding [dst]
-  * projection. *)
+    In practice the term is the conclusion of the rewrite-equiv sequent.
+    The input [term] is matched against the [src] projection of [biframe],
+    rewritten to an equivalent term (to be interpreted wrt the system
+    associated to the [dst] projection). *)
 let rewrite_equiv_transform
     ~(src:Term.proj)
     ~(dst:Term.proj)
@@ -284,9 +301,10 @@ let rewrite_equiv_transform
   let exception Invalid in
 
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e ->
-        TS.Reduce.conv_term s (Term.project1 src e) t
-      ) biframe
+    match
+      List.find_opt
+        (fun e -> TS.Reduce.conv_term s (Term.project1 src e) t)
+        biframe
     with
     | Some e -> Some (Term.project1 dst e)
     | None -> None
@@ -322,15 +340,17 @@ let rewrite_equiv_transform
      * happen, which is necessary to have input@ts =
      * att(frame@pred(ts)) and frame@pred(ts) a sublist
      * of frame@ts'. *)
-    | Macro (msymb,_,ts) when msymb = Term.in_macro ->
-      let ok_frame = function
-        | Macro (msymb',[],ts') ->
-          msymb' = Term.frame_macro &&
-          TS.query ~precise:true s
-            [`Pos,Comp (`Leq, mk_pred ts, ts')]
-        | _ -> false
-      in
-      if List.exists ok_frame biframe then t else raise Invalid
+    | Macro (msymb,_,ts)
+      when msymb = Term.in_macro && has_frame_geq s biframe (mk_pred ts) -> t
+
+    (* Similar special case for frame and exec.
+       We do not have a special case for outputs as they are only
+       available in frames under exec conditions, so this would
+       require a little more work in the tactic. *)
+    | Macro (msymb,_,ts)
+      when msymb = Term.frame_macro && has_frame_geq s biframe ts -> t
+    | Macro (msymb,_,ts)
+      when msymb = Term.exec_macro && has_frame_geq s biframe ts -> t
 
     | _ -> raise Invalid
   in
