@@ -1,3 +1,21 @@
+- **dependency and mutex lemmas**, [commit: `a5c01ceb`]
+
+  Dependency and mutex lemmas are now generated for [any] systems.
+  Moreover, the form of dependency lemmas has been simplified:
+  when in the past we might have had
+  ```
+  axiom [mysys] depends_mysys_A1_A2 :
+    forall (tau:timestamp,i,j:index),
+    tau = A2(i,j) =>
+    happens(tau) => A1(i) < A2(j).
+  ```
+  we now have
+  ```
+  axiom [any] depends_A1_A2 :
+    forall (tau:timestamp,i,j:index),
+    happens(A2(i,j)) => A1(i) < A2(j).
+  ```
+
 - **namespaces**, [commit: `6c37fe36`]
   
   Squirrel objects can now be stored in namespace, which allow to
