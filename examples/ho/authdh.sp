@@ -202,7 +202,7 @@ lemma [default] B_agreement (A,B,i:index):
 Proof.
   intro Hhap HB Hc.
   rewrite /cond in Hc.
-  have C := depends_default_B1_B2 _ A B i _ Hhap => //. 
+  have C := depends_B1_B2 A B i => //.
   euf Hc.
     + (* case 1: B corrupted *)
       by intro []. 

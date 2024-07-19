@@ -12,7 +12,7 @@ Qed.
 lemma _ (i:index): happens(A1(i)) => A(i) < A1(i).
 Proof.
   intro Hap. 
-  by apply depends_default_A_A1 _ _ _ Hap.
+  by apply depends_A_A1.
 Qed.
 
 (* Not true if only A1(i) happens *)

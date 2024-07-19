@@ -252,16 +252,6 @@ system NSL_a =
 
 (** Proofs *)
 
-(* Dependency lemma for all systems. *)
-lemma [NSL/left,NSL/right,NSL_a/left,NSL_a/right] depends_A_A1 :
-  happens(A1) => A < A1.
-Proof.
-  intro _.
-  project; try
-  ((by use depends_NSL_A_A1 with A1) +
-   (by use depends_NSL_a_A_A1 with A1)).
-Qed.
-
 (* Our current implementation of proof-search for bi-deduction cannot
    prove that `(frame@t,exec@t)` is bi-deducible (considering e.g.
    `NSL_a/left` and `NSL/right` on the right). We expect that this

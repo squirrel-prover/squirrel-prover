@@ -3,7 +3,7 @@ open Utils
 module L = Location
                
 (*------------------------------------------------------------------*)
-(** An top-level axiom or proved lemma. *)
+(** A top-level axiom or proved lemma. *)
 
 type lemma = { 
   stmt : Goal.statement;
@@ -88,12 +88,10 @@ let print_all fmt table : unit =
 
 
 (*------------------------------------------------------------------*)
-(** {2 Depends, Mutex } *)
+(** {2 Dependency and mutual exclusion (conflict) axioms} *)
 
-(** Builds the sequential dependency lemma between [descr] and [descr'] *)
+(** Build the sequential dependency lemma between [descr] and [descr']. *)
 let mk_depends_lemma
-    table
-    (system : Symbols.system)
     (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
@@ -101,7 +99,6 @@ let mk_depends_lemma
             (Action.get_shape_v descr.action)
             (Action.get_shape_v descr'.action));
   
-  let sys_expr = SystemExpr.of_system table system in
   let a' = Term.mk_action descr'.name (Term.mk_vars descr'.indices) in
   let a =
     let indices =
@@ -109,41 +106,33 @@ let mk_depends_lemma
     in
     Term.mk_action descr.name (Term.mk_vars indices)
   in
-  let tvar = Vars.make_fresh Type.ttimestamp "t" in
-  let tau = Term.mk_var tvar in
   let form =
-    Term.mk_forall ~simpl:false (tvar :: descr'.indices)
+    Term.mk_forall ~simpl:false descr'.indices
       (Term.mk_impls
-         [Term.mk_happens tau;
-          Term.mk_eq tau a' ]
+         [Term.mk_happens a']
          (Term.mk_lt a a'))
   in
   let name =
-    Fmt.str "depends_%s_%s_%s"
-      (Symbols.path_to_string system)
+    Fmt.str "depends_%s_%s"
       (Symbols.path_to_string descr.name)
       (Symbols.path_to_string descr'.name)
   in
   Goal.{
     name;
     ty_vars = [];
-    system = SystemExpr.reachability_context sys_expr;
+    system = SystemExpr.(reachability_context any);
     formula = Equiv.Local form;
   } 
 
 (*------------------------------------------------------------------*)
-(** Builds the mutual exlusivity lemma between [descr] and [descr'] *)
+(** Build the mutual exlusivity lemma between [descr] and [descr']. *)
 let mk_mutex_lemma
-    table
-    (system : Symbols.system)
     (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
   let shape  = Action.get_shape_v  descr.action in
   let shape' = Action.get_shape_v descr'.action in
   assert (Action.mutex shape shape');
-
-  let sys_expr = SystemExpr.of_system table system in
 
   (* number of common variables between mutually exclusives actions
      of [descr] and [descr'] *)
@@ -162,20 +151,19 @@ let mk_mutex_lemma
          (Term.mk_not (Term.mk_happens a')))
   in
   let name =
-    Fmt.str "mutex_%s_%s_%s"
-      (Symbols.path_to_string system)
+    Fmt.str "mutex_%s_%s"
       (Symbols.path_to_string descr.name)
       (Symbols.path_to_string descr'.name)
   in
   Goal.{
     name;
     ty_vars = [];
-    system = SystemExpr.reachability_context sys_expr;
+    system = SystemExpr.(reachability_context any);
     formula = Equiv.Local form;
   }
 
 (*------------------------------------------------------------------*)
-(** Compute the sequential dependencies and mutual exclusion lemmas 
+(** Compute the sequential dependency and mutual exclusion lemmas
     for a given system. *)
 let mk_depends_mutex
     table (system : Symbols.system) : Goal.statement list
@@ -184,21 +172,28 @@ let mk_depends_mutex
   System.Msh.fold (fun shape (descr : Action.descr) lems ->
       System.Msh.fold (fun shape' (descr' : Action.descr) lems ->
           if Action.depends shape shape' then
-            mk_depends_lemma table system descr descr' :: lems
+            mk_depends_lemma descr descr' :: lems
           else if Action.mutex shape shape' then
-            mk_mutex_lemma table system descr descr' :: lems
+            mk_mutex_lemma descr descr' :: lems
           else lems
         ) descrs lems
     ) descrs []
 
+(** Generate the sequential dependency and mutual exclusion lemmas
+    for a given system, and add them to the table. *)
 let add_depends_mutex_lemmas table (system : Symbols.system) : Symbols.table =
   (* add axioms related to action dependancies *)
   let lems = mk_depends_mutex table system in
   Printer.pr "@[<v 0>Added action dependencies lemmas:@;@;";
   let table =
-    List.fold_left (fun table lem ->
-        add_lemma `Axiom lem table
-      ) table lems
+    List.fold_left
+      (fun table lem ->
+         (* Try to add_lemma. This can fail if actions from a previous
+            system have been re-used; in that case the dependency lemma
+            has been added for the first system so we simply skip it. *)
+         try add_lemma `Axiom lem table with
+         | Symbols.Error (_, Multiple_declarations _) -> table)
+      table lems
   in
   Printer.pr "@;@]";
   table

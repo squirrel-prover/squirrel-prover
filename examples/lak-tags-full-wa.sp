@@ -126,6 +126,6 @@ Proof.
    case H1t; case H2t; try auto.
   * case H1t; case H2t; depends T(i,j), T2(i,j); try auto.
     intro _; assert T2(i,j) < T1(i,j); [1:auto].
-    use mutex_default_T1_T2 with i,j. by case H.
+    by use mutex_T1_T2 with i,j.
 Qed.
 
