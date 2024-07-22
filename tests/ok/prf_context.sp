@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 channel c
@@ -21,6 +19,6 @@ Proof.
 
   xor 1,n_PRF.
   rewrite if_true in 1.
-  by namelength m, n_PRF.
+  by rewrite namelength_m namelength_n_PRF.
   by fresh 1.
 Qed.

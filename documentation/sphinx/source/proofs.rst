@@ -1061,15 +1061,7 @@ Common tactics
       useless to me now, except for `try find` constructs.
       Finally, `fa` reach takes no arguments.
 
-.. tacn:: namelength @term, @term
-    
-    Adds the fact that two names have the same
-    length. The two arguments must the indeed be a :decl:`name`.
 
-    .. warning::
-       This tactic is deprecated. Use the :term:`namelength axiom` instead.
-
-      
 Local tactics
 ~~~~~~~~~~~~~
 

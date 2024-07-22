@@ -2351,38 +2351,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> assert false
 
   (*------------------------------------------------------------------*)
-  (** {3 Namelength} *)
-
-  let namelength
-      Args.(Pair (Message (tn, tyn), Message (tm, tym)))
-      (s : S.t) : S.t list
-    =
-    Printer.prt
-      `Warning
-      "The namelength tactic is deprecated! It will disappear soon.\n\
-       Consider using the namelength_* axioms instead.";
-
-    match tn, tm with
-    | Name (n, _), Name _ ->
-      let table = S.table s in
-
-      if not (tyn = tym) then
-        Tactics.soft_failure (Failure "names are not of the same types");
-
-      if not Symbols.TyInfo.(check_bty_info table n.s_typ Symbols.TyInfo.Name_fixed_length) then
-        Tactics.soft_failure
-          (Failure "names are of a type that is not [name_fixed_length]");
-
-      let f =
-        Term.mk_eq (Term.mk_len tn) (Term.mk_len tm)
-      in
-      let f = Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.conc_kind in
-
-      [S.set_conclusion (S.Conc.mk_impl ~simpl:false f (S.conclusion s)) s]
-
-    | _ -> Tactics.(soft_failure (Failure "expected names"))
-
-  (*------------------------------------------------------------------*)
   (** {3 Remember} *)
 
   let remember (id : Symbols.lsymb) (term : Theory.term) (s : S.t) =
@@ -2897,19 +2865,6 @@ let () =
        (EquivLT.induction_tac ~dependent:true))
 
 (*------------------------------------------------------------------*)
-(* we are only registering the help here *)
-let () =
-  T.register "print"
-    ~pq_sound:true
-    (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register "search"
-    ~pq_sound:true
-    (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
-
-(*------------------------------------------------------------------*)
 let () =
   T.register_general "show"
     (gentac_of_any_tac_arg TraceLT.print_messages_tac EquivLT.print_messages_tac)
@@ -2920,13 +2875,6 @@ let () =
     ~pq_sound:true
     (genfun_of_any_pure_fun_arg TraceLT.depends EquivLT.depends)
     Args.(Pair (Timestamp, Timestamp))
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_typed "namelength"
-    ~pq_sound:true
-    (genfun_of_any_pure_fun_arg TraceLT.namelength EquivLT.namelength)
-    Args.(Pair (Message, Message))
 
 (*------------------------------------------------------------------*)
 let () =

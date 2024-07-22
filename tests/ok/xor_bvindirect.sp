@@ -29,7 +29,7 @@ Proof.
   (* Check that the right formula has been produced using H. *)
   rewrite if_true in 1.
 
-  by namelength n(i),m(i); use len_ok with i.
+  by rewrite (len_ok i) namelength_n namelength_m.
   fresh 1; 1:auto.
   assumption.
 Qed.
@@ -46,7 +46,7 @@ Proof.
   (* Check that the right formula has been produced using H. *)
   rewrite if_true in 1.
 
-  by namelength n(i),m(i); use len_ok with i.
+  by rewrite (len_ok i) namelength_n namelength_m.
   fresh 1; 1:auto.
   assumption.
 Qed.

@@ -51,21 +51,21 @@ Proof. checkfail auto exn GoalNotClosed. Abort.
 (* check the [named_fixed_length] type info  *)
 lemma _ (i,j : index) : len(nfl(i)) = len(nfl(j)).
 Proof.
-by namelength nfl(i), nfl(j).
+by rewrite !namelength_nfl.
 Qed.
 
 lemma _ (i,j : index) : len(nn(i)) = len(nn(j)).
-Proof. 
-checkfail (try namelength nn(i), nn(j); auto) exn GoalNotClosed.
+Proof.
+checkfail rewrite namelength_nn exn Failure.
 Abort.
 
-
 (*------------------------------------------------------------------*)
-(* check that namelength fails if call with names of different types. *)
+(* check that names of different types do not necessarily have same length *)
 type NFL2 [name_fixed_length]
 name nfl2 : index -> NFL2.
 
 lemma _ (i,j : index) : len(nfl(i)) = len(nfl2(j)).
 Proof.
-checkfail (by (try namelength nfl(i), nfl2(j))) exn GoalNotClosed.
+rewrite namelength_nfl namelength_nfl2.
+checkfail auto exn GoalNotClosed.
 Abort.

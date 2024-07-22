@@ -4,10 +4,10 @@ senc sym_enc,sym_dec.
 name sk : message.
 
 name n : message.
-
 name eta : message.
+
 lemma [any] len_n : len(n) = len(eta).
-Proof. by namelength n, eta. Qed.
+Proof. by rewrite namelength_n namelength_eta. Qed.
 
 channel c.
 

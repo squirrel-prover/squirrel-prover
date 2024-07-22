@@ -20,7 +20,7 @@ equiv testXorOneArg : diff(f(ok),f(ok)),diff(n,m) XOR k.
 Proof.
   xor 1.
   rewrite if_true in 1.
-  by namelength k,n; namelength k,m. 
+  by rewrite !namelength_k namelength_n namelength_m.
   auto.
 Qed.
 
