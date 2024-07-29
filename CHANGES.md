@@ -1,3 +1,19 @@
+- **type argument**, [commit: `4202b3e3`]
+
+  Type arguments of symbols can now be manually provided by writing
+  `s[ty1, ..., tyn]` when `s` is a symbol with `n` arguments.
+  E.g. `witness[message]` is the symbol `witness` of type `message`.
+  
+  The same syntax can be used to instantiate the type arguments of a
+  lemma in a proof-term.
+
+- **arguments for s_items**, [commit: `4202b3e3`, **breaking change**]
+
+  The syntax to provide named arguments to `s_item` such as `//`,
+  `/=`, etc, has been changed from `[// ~arg1:foo ~arg2 ...]` to 
+  `` `[// ~arg1:foo ~arg2 ...]`` (a backtick must now precede the 
+  opening bracket).
+
 - **dependency and mutex lemmas**, [commit: `a5c01ceb`]
 
   Dependency and mutex lemmas are now generated for [any] systems.

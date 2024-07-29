@@ -31,7 +31,7 @@
 %token LANGLE RANGLE
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
-%token XOR STAR UNDERSCORE QMARK TICK
+%token XOR STAR UNDERSCORE QMARK TICK BACKTICK
 %token LLET LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
@@ -942,11 +942,7 @@ s_item_body:
 
 %inline s_item:
 | s=s_item_body { s,[] }
-| LBRACKET s=s_item_body a=named_args RBRACKET { s, a }
-
-/* same as a [s_item], but without arguments */
-s_item_noargs:
-| s=s_item_body { s,[] }
+| BACKTICK LBRACKET s=s_item_body a=named_args RBRACKET { s, a }
 
 clear_ip:
 | LBRACE l=slist1(lsymb, empty) RBRACE { l }
@@ -1005,8 +1001,8 @@ pt:
 (*------------------------------------------------------------------*)
 /* non-ambiguous pt */
 spt_cnt:
-| head=path                         { Typing.PT_symb head }
-| PERCENT LOCAL LPAREN pt=pt RPAREN { Typing.PT_localize pt }
+| head=path ty_args=ty_args?         { Typing.PT_symb (head,ty_args) }
+| PERCENT LOCAL LPAREN pt=pt RPAREN  { Typing.PT_localize pt }
 | LPAREN pt=pt_cnt RPAREN
     { pt }
 

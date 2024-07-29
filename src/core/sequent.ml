@@ -437,14 +437,10 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_term ({ pl_desc = App ({ pl_desc = Symb (head, ty_args) }, _) } as t) ->
       let _head, terms = Typing.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
-
-      (* FIXME: support type argument in proof-term *)
-      if ty_args <> None then
-        hard_failure ~loc:(pt_arg_loc p_arg) (Failure "type arguments unsupported here");
       
       let pt_cnt = 
         Typing.PT_app {
-          pta_head = L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb head);
+          pta_head = L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb (head, ty_args));
           pta_args = List.map (fun x -> Typing.PTA_term x) terms ;
           pta_loc  = loc;
         } 
@@ -465,6 +461,15 @@ module Mk (Args : MkArgs) : S with
                @[%a@]@]"
         PT.pp prove 
         PT.pp target
+    in
+    soft_failure ~loc (Failure err_str)
+
+  (*------------------------------------------------------------------*)
+  let error_pt_wrong_number_ty_args loc ~(expected : Type.ty list) ~(got : Type.ty list) =
+    let err_str =
+      Fmt.str "@[<v 0>wrong number of type variables: \
+               expected %d, got %d@]"
+        (List.length expected) (List.length got)
     in
     soft_failure ~loc (Failure err_str)
 
@@ -501,7 +506,7 @@ module Mk (Args : MkArgs) : S with
         let loc = last_loc (L.loc h) args in
         let pt_cnt = 
           Typing.PT_app {
-            pta_head = L.mk_loc (L.loc h) (Typing.PT_symb ([],h));
+            pta_head = L.mk_loc (L.loc h) (Typing.PT_symb (([],h), None));
             pta_args;
             pta_loc = loc;
           } 
@@ -526,11 +531,13 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)      
   (** Internal 
-      Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). *)
+      Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). 
+      Optionally apply it to some user-provided type arguments. *)
   let pt_of_assumption
-      (ty_env : Type.Infer.env) 
-      (p      : Symbols.p_path)
-      (s      : t)
+      (ty_env   : Type.Infer.env) 
+      (p        : Symbols.p_path)
+      (ty_args  : Type.ty list option)
+      (s        : t)
     : ghyp * PT.t
     =
     let top, sub = fst p, snd p in
@@ -554,12 +561,31 @@ module Mk (Args : MkArgs) : S with
       let lem =
         try Lemma.find_stmt p (S.table s) with
         | Symbols.Error (_, Symbols.Unbound_identifier _) ->
-          soft_failure ~loc:(Symbols.p_path_loc  p)
+          soft_failure ~loc:(Symbols.p_path_loc p)
             (Failure ("no lemma named " ^ Symbols.p_path_to_string p))
       in
 
       (* Open the lemma type variables. *)
-      let _, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+      let ty_vars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+
+      (* if the user provided type variables, apply them *)
+      if ty_args <> None then
+        begin
+          let ty_args = oget ty_args in
+          let ty_vars = List.map (fun u -> Type.TUnivar u) ty_vars in
+
+          if List.length ty_args <> List.length ty_vars then
+            error_pt_wrong_number_ty_args
+              (Symbols.p_path_loc p) ~expected:ty_vars ~got:ty_args;
+
+          List.iter2
+            (fun ty1 ty2 ->
+               match Type.Infer.unify_eq ty_env ty1 ty2 with
+               | `Ok   -> ()
+               | `Fail -> assert false) (* cannot fail *)
+            ty_vars ty_args;
+        end;
+      
       let form = Equiv.Babel.tsubst Equiv.Any_t tsubst lem.formula in
 
       (* a local lemma or axiom is actually a global reachability formula *)
@@ -810,7 +836,7 @@ module Mk (Args : MkArgs) : S with
       (s : S.t) : ghyp * PT.t
     =
     match L.unloc p_pt with
-    | Typing.PT_symb symb -> do_convert_path ty_env mv symb s
+    | Typing.PT_symb (path, ty_args) -> do_convert_path ty_env mv path ty_args s
     | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
     | Typing.PT_localize p_sub_pt -> 
       let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
@@ -825,10 +851,14 @@ module Mk (Args : MkArgs) : S with
       (ty_env  : Type.Infer.env)
       (init_mv : Mvar.t)
       (p       : Symbols.p_path)
+      (ty_args : Typing.ty list option)
       (s       : S.t) 
     : ghyp * PT.t
     =
-    let lem_name, pt = pt_of_assumption ty_env p s in
+    let ty_args =
+      omap (List.map (Typing.convert_ty ~ty_env (S.env s))) ty_args 
+    in
+    let lem_name, pt = pt_of_assumption ty_env p ty_args s in
     assert (pt.mv = Mvar.empty);
     let pt = { pt with mv = init_mv; } in
     lem_name, pt

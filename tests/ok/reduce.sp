@@ -33,14 +33,14 @@ lemma [any] _ :
  in zero else empty
  =
  empty.
-Proof. by rewrite [/= ~constr] exists_false1 /=. Qed.
+Proof. by rewrite `[/= ~constr] exists_false1 /=. Qed.
 
 lemma [any] _ :
  try find i such that not (exists (j : index), not (i = j && i <> j))
  in zero else empty
  =
  empty.
-Proof. by rewrite [/= ~constr] exists_true1 /=. Qed.
+Proof. by rewrite `[/= ~constr] exists_true1 /=. Qed.
 
 (*==================================================================*)
 (* small tests for flags and rewriting *)
@@ -50,8 +50,8 @@ axiom [any] foo (x,y : message): (x,y)#1 = y.
 lemma [any] _ (a,b : message) : (a,b)#1 = b.
 Proof. 
   checkfail rewrite /= foo exn Failure.
-  checkfail rewrite [/= ~flags:[proj]] foo exn Failure.
-  rewrite [/= ~flags:[]]. 
+  checkfail rewrite `[/= ~flags:[proj]] foo exn Failure.
+  rewrite `[/= ~flags:[]]. 
   rewrite foo. 
   apply eq_refl.
 Qed.
@@ -81,8 +81,8 @@ lemma [any] _ (a,b : message) :
   (fun x y => y) a b = a.
 Proof. 
   checkfail rewrite /= bar exn Failure.
-  checkfail rewrite [/= ~flags:[beta]] bar exn Failure.
-  rewrite [/= ~flags:[]]. 
+  checkfail rewrite `[/= ~flags:[beta]] bar exn Failure.
+  rewrite `[/= ~flags:[]]. 
   rewrite bar. 
   apply eq_refl.
 Qed.

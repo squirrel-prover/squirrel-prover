@@ -122,6 +122,7 @@ let rec token buf =
   | '~' -> TILDE
   | '+' -> PLUS
   | '\'' -> TICK
+  | '`' -> BACKTICK
   | '%' -> PERCENT
   | int -> INT (Utf8.lexeme buf |> int_of_string)
 

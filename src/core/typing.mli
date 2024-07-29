@@ -375,7 +375,8 @@ val parse_projs : lsymb list option -> Term.projs
 (** {2 Proof-terms} *)
 
 type pt_cnt =
-  | PT_symb     of Symbols.p_path
+  | PT_symb     of Symbols.p_path * ty list option
+  (** (path, optional type arguments) *)
   | PT_app      of pt_app
   | PT_localize of pt
 
