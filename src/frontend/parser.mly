@@ -261,12 +261,16 @@ spath:
 | s=infix_s { fst s }
 
 (*------------------------------------------------------------------*)
+ty_args:
+| LBRACKET ids=slist1(ty,COMMA) RBRACKET { ids }
+
+(*------------------------------------------------------------------*)
 (* Terms *)
 
 /* non-ambiguous term */
 sterm_i:
-| id=spath_gen                       { Typing.Symb id }
-| UNDERSCORE                    { Typing.Tpat }
+| id=spath_gen ty_args=ty_args?   { Typing.Symb (id, ty_args) }
+| UNDERSCORE                      { Typing.Tpat }
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Typing.Diff (t,t0) }
 
@@ -278,9 +282,9 @@ sterm_i:
     { let fsymb = L.mk_loc (L.loc l) "not" in
       Typing.mk_app_i (Typing.mk_symb ([],fsymb)) [f] }
 
-| l=lloc(FALSE)  { Typing.Symb (top_path,L.mk_loc l "false") }
+| l=lloc(FALSE)  { Typing.Symb ((top_path,L.mk_loc l "false"), None) }
 
-| l=lloc(TRUE)   { Typing.Symb (top_path,L.mk_loc l "true") }
+| l=lloc(TRUE)   { Typing.Symb ((top_path,L.mk_loc l "true"), None) }
 
 | l=paren(slist1(term,COMMA))
     { match l with
@@ -329,7 +333,7 @@ term_i:
 %inline else_term:
 | %prec empty_else   { let loc = L.make $startpos $endpos in
                        let fsymb = L.mk_loc loc "zero" in
-                       L.mk_loc loc (Typing.Symb (top_path,fsymb)) }
+                       L.mk_loc loc (Typing.Symb ((top_path,fsymb), None)) }
 | ELSE t=term       { t }
 
 sterm:
@@ -567,8 +571,8 @@ c_tys:
 | WHERE list=slist1(c_ty, empty) { list }
 |                                { [] }
 
-ty_args:
-|                                            { [] }
+ty_vars:
+|                                            { []  }
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
 
 bty_info:
@@ -684,28 +688,28 @@ declaration_i:
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
-| ABSTRACT e=lsymb_gen_decl tyargs=ty_args COLON tyo=ty
+| ABSTRACT e=lsymb_gen_decl tyvars=ty_vars COLON tyo=ty
     { let symb_type, name = e in
       Decl.(Decl_operator
               { op_name      = name;
                 op_symb_type = symb_type;
-                op_tyargs    = tyargs;
+                op_tyargs    = tyvars;
                 op_args      = [];
                 op_tyout     = Some tyo;
                 op_body      = `Abstract }) }
 
-| OP e=lsymb_gen_decl tyargs=ty_args args=ext_bnds_tagged_strict tyo=colon_ty? body=op_body
+| OP e=lsymb_gen_decl tyvars=ty_vars args=ext_bnds_tagged_strict tyo=colon_ty? body=op_body
     { let symb_type, name = e in
       Decl.(Decl_operator
               { op_name      = name;
                 op_symb_type = symb_type;
-                op_tyargs    = tyargs;
+                op_tyargs    = tyvars;
                 op_args      = args;
                 op_tyout     = tyo;
                 op_body      = body; }) }
 
 | PREDICATE e=lsymb_gen_decl
-  tyargs=ty_args sebnds=se_bnds
+  tyvars=ty_vars sebnds=se_bnds
   multi_args=multi_term_bnds
   simpl_args=bnds
   body=predicate_body? 
@@ -713,7 +717,7 @@ declaration_i:
       Decl.(Decl_predicate
               { pred_name       = name;
                 pred_symb_type  = symb_type;
-                pred_tyargs     = tyargs;
+                pred_tyargs     = tyvars;
                 pred_se_args    = sebnds;
                 pred_multi_args = multi_args;
                 pred_simpl_args = simpl_args;
@@ -1395,14 +1399,14 @@ statement_name:
 | UNDERSCORE { None }
 
 local_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=bnds_tagged
+| s=system_annot name=statement_name ty_vars=ty_vars vars=bnds_tagged
   COLON f=term
    { let system = `Local, s in
      let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=bnds_tagged
+| s=system_annot name=statement_name ty_vars=ty_vars vars=bnds_tagged
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      let system = `Global, s in

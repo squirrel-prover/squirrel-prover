@@ -48,8 +48,8 @@ val pp_applied_ftype : applied_ftype formatter
 (*------------------------------------------------------------------*)
 (** {3 Printing} *)
 
-val _pp_name  : ?ty_args:Type.ty list                    -> Symbols.name  formatter_p
-val _pp_macro : ?ty_args:Type.ty list -> ?ty_rec:Type.ty -> Symbols.macro formatter_p
+val _pp_name  : ?args_ty:Type.ty list                    -> Symbols.name  formatter_p
+val _pp_macro : ?args_ty:Type.ty list -> ?ty_rec:Type.ty -> Symbols.macro formatter_p
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
@@ -182,8 +182,9 @@ val set_resolve_path :
   (
     ?ty_env:Type.Infer.env ->
     Symbols.table -> 
-    Symbols.p_path ->
-    ty_args:Type.ty list ->
+    Symbols.p_path ->               (* surface path [p] *)
+    ty_args:Type.ty list option ->  (* optional type arguments of [p] *)
+    args_ty:Type.ty list ->         (* types of [p]'s (term) arguments  *)
     ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown] ->
     ([
       `Operator of Symbols.fname  |

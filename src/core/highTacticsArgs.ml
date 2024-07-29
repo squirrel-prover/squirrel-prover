@@ -5,7 +5,7 @@ module Sv = Vars.Sv
 (*------------------------------------------------------------------*)
 let as_p_path parser_args =
   match parser_args with
-  | [Theory (L.{ pl_desc = Symb p } )] ->
+  | [Theory (L.{ pl_desc = Symb (p, None) } )] ->
     Some p
   | _ -> None
 
@@ -81,7 +81,7 @@ let convert_args env parser_args tactic_type conc =
       in
       Arg et
 
-    | [Theory (L.{ pl_desc = Symb ([],p) } )], Sort String ->
+    | [Theory (L.{ pl_desc = Symb (([],p), None) } )], Sort String ->
       Arg (String p)
 
     | [Int_parsed i], Sort Int ->

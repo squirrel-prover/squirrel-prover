@@ -76,7 +76,8 @@ type term_i =
   | Tuple of term list
   | Proj  of int L.located * term
   | Let   of lsymb * term * ty option * term
-  | Symb  of Symbols.p_path
+  | Symb  of Symbols.p_path * ty list option
+  (** (symbole, optional type arguments) *)
   | App   of term * term list
   (** Application of a term to another. 
       [AppTerm (t, [t1 ... tn])] is [t t1 ... tn]. *)

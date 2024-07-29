@@ -433,10 +433,15 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Typing.PTA_term ({ pl_desc = Symb head } as t) 
-    | Typing.PTA_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
+    | Typing.PTA_term ({ pl_desc = Symb (head, ty_args) } as t) 
+    | Typing.PTA_term ({ pl_desc = App ({ pl_desc = Symb (head, ty_args) }, _) } as t) ->
       let _head, terms = Typing.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
+
+      (* FIXME: support type argument in proof-term *)
+      if ty_args <> None then
+        hard_failure ~loc:(pt_arg_loc p_arg) (Failure "type arguments unsupported here");
+      
       let pt_cnt = 
         Typing.PT_app {
           pta_head = L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb head);
@@ -484,9 +489,12 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_sub sub -> PTA_sub (resolve_pt s sub)
     | Typing.PTA_term t  ->
       match L.unloc t with
-      | Typing.App ({ pl_desc = Typing.Symb ([],h)}, args)
+      | Typing.App ({ pl_desc = Typing.Symb (([],h), ty_args) }, args)
         when S.Hyps.mem_name (L.unloc h) s
         ->
+        if ty_args <> None then
+          hard_failure ~loc:(L.loc t) (Failure "unexpected type arguments");
+
         let pta_args =
           List.map (fun a -> resolve_pt_arg s (Typing.PTA_term a)) args
         in

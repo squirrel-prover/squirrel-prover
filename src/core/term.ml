@@ -39,7 +39,7 @@ type applied_ftype = {
 }
 
 let pp_applied_ftype pf { fty; ty_args; } =
-  Fmt.pf pf "@[<hov 2>( (%a) %a)@]"
+  Fmt.pf pf "@[<hov 2>(%a)[%a]@]"
     Type.pp_ftype fty
     (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
 
@@ -48,7 +48,7 @@ let pp_applied_ftype pf { fty; ty_args; } =
 let[@warning "-27"] resolve_path = 
   ref ( 
     fun
-      ?(ty_env) _ _ ~ty_args 
+      ?(ty_env) _ _ ~ty_args ~args_ty 
       ~(ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown]) ->
       assert false)
 
@@ -83,7 +83,7 @@ let pp_fname0
   if not ppe.dbg || fty_app.ty_args = [] then
     Fmt.pf fmt "@[<hov 2>%a@]" (pp_path mode `GoalFunction) f
   else 
-    Fmt.pf fmt "@[<hov 2>%a<%a>@]"
+    Fmt.pf fmt "@[<hov 2>%a[%a]@]"
       (pp_path mode `GoalFunction) f
       (Fmt.list ~sep:Fmt.sp Type.pp) fty_app.ty_args
 
@@ -98,12 +98,13 @@ let pp_macro0 (mode : [`Short | `Qualified]) fmt (ms : Symbols.macro) =
 (*------------------------------------------------------------------*)
 (** pretty-print a [Symbols.fname]. *)
 let pp_fname
-    ?(ty_args : Type.ty list = []) 
+    ?(args_ty : Type.ty list = []) 
     (ppe : ppenv) (fmt : Format.formatter) ((f,fty_app) : Symbols.fname * applied_ftype)
   =
   let fp = s_path_to_p_path ([],Symbols.to_string f.s) in
   let mode =
-    match !resolve_path ppe.table fp ~ty_args ~ty_rec:`NoTS with
+    (* set [ty_args] to [None], as we do not know if the user provided them manually *)
+    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoTS with
     | [(symb, _, _, _)] when symb = `Operator f -> `Short 
     | _                                         -> `Qualified
   in
@@ -112,12 +113,13 @@ let pp_fname
 
 (** pretty-print a [Symbols.name]. *)
 let _pp_name
-     ?(ty_args : Type.ty list = [])
+     ?(args_ty : Type.ty list = [])
      (ppe : ppenv) (fmt : Format.formatter) (n : Symbols.name) 
   =
   let fp = s_path_to_p_path ([],Symbols.to_string n.s) in
   let mode =
-    match !resolve_path ppe.table fp ~ty_args ~ty_rec:`NoTS with
+    (* set [ty_args] to [None], as we do not know if the user provided them manually *)
+    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoTS with
     | [(symb, _, _, _)] when symb = `Name n -> `Short 
     | _                                     -> `Qualified
   in
@@ -125,14 +127,15 @@ let _pp_name
 
 (** pretty-print a [Symbols.macro]. *)
 let _pp_macro
-     ?(ty_args : Type.ty list = [])
+     ?(args_ty : Type.ty list = [])
      ?(ty_rec : Type.ty option) 
      (ppe : ppenv) (fmt : Format.formatter) (m : Symbols.macro) 
   =
   let ty_rec = omap_dflt `Unknown (fun ty -> `At ty) ty_rec in
   let fp = s_path_to_p_path ([],Symbols.to_string m.s) in
   let mode =
-    match !resolve_path ppe.table fp ~ty_args ~ty_rec with
+    (* set [ty_args] to [None], as we do not know if the user provided them manually *)
+    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec with
     | [(symb, _, _, _)] when symb = `Macro m  -> `Short 
     | _                                       -> `Qualified
     | exception Symbols.Macro_reserved_no_def -> `Qualified
@@ -1342,11 +1345,11 @@ and _pp
   | App (Fun (s,fty_app), ([bl;br] as args)) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
-    let ty_args = List.map ty args in
+    let args_ty = List.map ty args in
     let pp fmt () =
       Fmt.pf fmt "@[<0>%a %a@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
-        (pp_fname ~ty_args info.ppe) (s,fty_app)
+        (pp_fname ~args_ty info.ppe) (s,fty_app)
         (pp ((prec, `Infix assoc), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp fmt ()
@@ -1360,14 +1363,14 @@ and _pp
 
   (* name *)
   | Name (n,l) ->
-    let ty_args = List.map ty l in
+    let args_ty = List.map ty l in
       if l = [] then
-        _pp_name ~ty_args info.ppe fmt n.s_symb
+        _pp_name ~args_ty info.ppe fmt n.s_symb
       else
         let pp fmt () =
           let a = as_seq1 l in    (* [l] of length at most 1. *)
           Fmt.pf fmt "@[<hov 2>%a %a@]"
-            (_pp_name ~ty_args info.ppe) n.s_symb
+            (_pp_name ~args_ty info.ppe) n.s_symb
             (pp (app_fixity, `Right)) a
         in
         maybe_paren ~outer ~side ~inner:app_fixity pp fmt ()
@@ -1391,10 +1394,10 @@ and _pp
 
   (* macro *)
   | Macro (m, l, ts) ->
-    let ty_args, ty_rec = (List.map ty l, ty ts) in
+    let args_ty, ty_rec = (List.map ty l, ty ts) in
     let pp fmt () =
       Fmt.pf fmt "@[%a%a@%a@]"
-        (_pp_macro ~ty_args ~ty_rec info.ppe) m.s_symb
+        (_pp_macro ~args_ty ~ty_rec info.ppe) m.s_symb
         (Utils.pp_ne_list
            "@[<hov> %a@]"
            (Fmt.list ~sep:(Fmt.any " ") (pp (macro_fixity, `NonAssoc)))) l
@@ -1523,8 +1526,8 @@ and pp_app
   let pp_head fmt =
     match head with
     | Fun (f, fty_app) ->
-      let ty_args = List.map ty args in
-      pp_fname ~ty_args info.ppe fmt (f,fty_app)
+      let args_ty = List.map ty args in
+      pp_fname ~args_ty info.ppe fmt (f,fty_app)
 
     | _ -> pp info (app_fixity, `Left) fmt head
   in

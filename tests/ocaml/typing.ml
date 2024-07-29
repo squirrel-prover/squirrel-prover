@@ -112,6 +112,7 @@ end C2.
 
   ()
 
+
 (*------------------------------------------------------------------*)
 let crypto_parsing () =
   let exception Ok in
@@ -144,7 +145,62 @@ game Foo = {
   ()
 
 (*------------------------------------------------------------------*)
+let type_arguments () =
+  let exception Ok in
+  let exception Ko in
+  let st = Prover.init ~with_prelude:true () in
+  let st = Prover.exec_all ~test:true st 
+      "\
+type T.
+op foo ['a] : 'a.
+op bar ['a 'b] : ('a * 'b).
+"
+  in
+  (* positive tests *)
+  let _ : Term.term = term_of_string st "foo[message] = empty" in
+  let _ : Term.term = term_of_string st "bar[message,bool]    = (empty,true)" in
+  let _ : Term.term = term_of_string st "bar[message,message] = (empty,empty)" in
+  let _ : Term.term = term_of_string st "bar[message,bool]    = witness" in
+
+  (* negative tests *)
+  Alcotest.check_raises "type argument 1" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "foo[bool] = empty" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+  Alcotest.check_raises "type argument 2" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "bar[message,message] = (empty,true)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+  Alcotest.check_raises "type argument 3" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "bar[message,message] = (true,empty)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+  Alcotest.check_raises "too many type arguments" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "bar[message,message,message]" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
+  ()
+
+(*------------------------------------------------------------------*)
 let tests = [
-  ("typing"      , `Quick, Util.catch_error typing);
-  ("game parsing", `Quick, Util.catch_error crypto_parsing);
+  ("typing"        , `Quick, Util.catch_error typing);
+  ("type arguments", `Quick, Util.catch_error type_arguments);
+  ("game parsing"  , `Quick, Util.catch_error crypto_parsing);
 ]

@@ -63,7 +63,7 @@ type term_i =
   | Tuple of term list
   | Proj  of int L.located * term
   | Let   of lsymb * term * ty option * term
-  | Symb  of Symbols.p_path
+  | Symb  of Symbols.p_path * ty list option
   | App   of term * term list
   | AppAt of term * term
   | Quant of quant * ext_bnds * term
@@ -72,7 +72,7 @@ and term = term_i L.located
 
 (*------------------------------------------------------------------*)
 let mk_symb (s : Symbols.p_path) : term =
-  L.mk_loc (Symbols.p_path_loc s) (Symb s)
+  L.mk_loc (Symbols.p_path_loc s) (Symb (s, None))
 
 let mk_app_i (t1 : term) (l : term list) : term_i = App (t1, l)
 
@@ -89,9 +89,9 @@ let rec decompose_app (t : term) : term * term list =
   | _ -> t, []
 
 (*------------------------------------------------------------------*)
-let var_i loc x : term_i = Symb ([],L.mk_loc loc x)
+let var_i loc x : term_i = Symb (([],L.mk_loc loc x), None)
 
-let var   loc x : term = L.mk_loc loc (var_i loc x)
+let var loc x : term = L.mk_loc loc (var_i loc x)
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
@@ -628,12 +628,14 @@ let validate
 (** Resolve an surface path [p] into an operator.
     If [p] resolves to multiple operators, try to desambiguate using 
     the information that:
-    - [p]'s arguments must be of type [ty_args]. 
+    - [p]'s type arguments must be of type [ty_args] (optional). 
+    - [p]'s arguments must be of type [args_ty]. 
     - optionally, [p] takes a [@] argument of type [ty_rec] *)
 let resolve_path
     ?(ty_env = Type.Infer.mk_env ())
     (table    : Symbols.table) (p : Symbols.p_path)
-    ~(ty_args : Type.ty list)
+    ~(ty_args : Type.ty list option)
+    ~(args_ty : Type.ty list)
     ~(ty_rec  : [`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown])
   : 
     ([
@@ -650,8 +652,11 @@ let resolve_path
   let exception Failed in
   let failed () = raise Failed in
 
-  let ty_args_len = List.length ty_args in
+  let args_ty_len = List.length args_ty in
 
+  (* check if type [fty] (and optionally a recursive argument of type
+     [ty_rec_symb]) is comptatible with the information provided
+     (i.e. [ty_args], [args_ty] and [ty_rec]) *)
   let check_arg_tys
       ?(ty_rec_symb : Type.ty option) (fty : Type.ftype) 
     :
@@ -663,18 +668,29 @@ let resolve_path
       | `Ok   -> ()
       | `Fail -> failed ()
     in
+
     let fty_op = Type.open_ftype ty_env fty in
-    let symb_ty_args =
+    let fty_vars = List.map (fun u -> Type.TUnivar u) fty_op.fty_vars in
+    
+    (* if the user manually provided type arguments, process them *)    
+    if ty_args <> None then
+      begin
+        let ty_args = oget ty_args in
+        if List.length fty_vars <> List.length ty_args then failed ();
+        List.iter2 check_ty fty_vars ty_args;
+      end;
+        
+    let symb_args_ty =
       let extra_args, _ = Type.decompose_funs fty_op.fty_out in
       fty_op.fty_args @ extra_args
     in
-    (* keep as many arguments as possible from [ty_args] and [op_ty_args] *)
-    let n = min ty_args_len (List.length symb_ty_args) in
-    let    ty_args, _ = List.takedrop n      ty_args in
-    let op_ty_args, _ = List.takedrop n symb_ty_args in
+    (* keep as many arguments as possible from [args_ty] and [op_args_ty] *)
+    let n = min args_ty_len (List.length symb_args_ty) in
+    let    args_ty, _ = List.takedrop n      args_ty in
+    let op_args_ty, _ = List.takedrop n symb_args_ty in
 
     (* check if types can be unified *)
-    List.iter2 check_ty ty_args op_ty_args;
+    List.iter2 check_ty args_ty op_args_ty;
 
     let () =
       match ty_rec, ty_rec_symb with
@@ -690,8 +706,8 @@ let resolve_path
     let applied_fty =
       let ty_args = 
         List.map (fun u -> 
-            Type.Infer.norm ty_env (Type.TUnivar u)
-          ) fty_op.fty_vars 
+            Type.Infer.norm ty_env u
+          ) fty_vars 
       in
       Term.{ fty = fty; ty_args; }
     in
@@ -749,8 +765,8 @@ let () = Term.set_resolve_path resolve_path
 
 (*------------------------------------------------------------------*)
 (** error message: no symbols with a given type *)
-let failure_no_symbol f ty_args ty =
-  let ty_f = Type.fun_l ty_args ty in
+let failure_no_symbol f args_ty ty =
+  let ty_f = Type.fun_l args_ty ty in
   let err = 
     Fmt.str "no symbol %s with type @[%a@]" 
       (Symbols.p_path_to_string f)
@@ -820,13 +836,13 @@ and convert0
   (*------------------------------------------------------------------*)
   (* particular cases for init and happens *)
 
-  | Symb ([],{ pl_desc = "init" }) ->
+  | Symb (([],{ pl_desc = "init" }), None) ->
     Term.mk_action Symbols.init_action []
 
   (* happens distributes over its arguments *)
   (* open-up tuples *)
-  | App ({ pl_desc = Symb ([],{ pl_desc = "happens" })}, [{pl_desc = Tuple ts}])
-  | App ({ pl_desc = Symb ([],{ pl_desc = "happens" })}, ts) ->
+  | App ({ pl_desc = Symb (([],{ pl_desc = "happens" }), None)}, [{pl_desc = Tuple ts}])
+  | App ({ pl_desc = Symb (([],{ pl_desc = "happens" }), None)}, ts) ->
     let atoms = List.map (fun t ->
         Term.mk_happens (conv Type.Timestamp t)
       ) ts in
@@ -835,11 +851,14 @@ and convert0
   (* end of special cases *)
   (*------------------------------------------------------------------*)
 
-  | AppAt ({ pl_desc = Symb f } as tapp, ts) 
-  | AppAt ({ pl_desc = App ({ pl_desc = Symb f },_)} as tapp, ts) when not (is_var f) ->
+  | AppAt ({ pl_desc = Symb (f, p_ty_args) } as tapp, ts) 
+  | AppAt ({ pl_desc = App ({ pl_desc = Symb (f, p_ty_args) },_)} as tapp, ts)
+    when not (is_var f) ->
+    
     let _f, terms = decompose_app tapp in
     let app_cntxt = At (conv Type.Timestamp ts) in
-    let t = convert_app state (L.loc tm) (f, terms) app_cntxt ty in
+    
+    let t = convert_app state (L.loc tm) f p_ty_args terms app_cntxt ty in
 
     if is_in_proc state.cntxt then 
       Printer.prt `Warning 
@@ -853,8 +872,8 @@ and convert0
     conv_err loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
 
   (* application, special case *)
-  | Symb f
-  | App ({ pl_desc = Symb f}, _ (* = _args *) ) when not (is_var f) ->
+  | Symb (f, p_ty_args)
+  | App ({ pl_desc = Symb (f, p_ty_args)}, _ (* = _args *) ) when not (is_var f) ->
     let _top, sub = f in
     let _f, args = decompose_app tm in (* [args = _args] *)
 
@@ -864,14 +883,17 @@ and convert0
                                  (if L.unloc sub = "init" then 0 else 1), 
                                  List.length args));
 
-    let app_cntxt = match state.cntxt with
+    let app_cntxt =
+      match state.cntxt with
       | InGoal -> NoTS
       | InProc (_, ts) -> MaybeAt ts 
     in
-    convert_app state (L.loc tm) (f, args) app_cntxt ty
+    
+    convert_app state (L.loc tm) f p_ty_args args app_cntxt ty
 
-  | Symb ((top,_) as f) -> 
-    assert(is_var f && top = []); 
+  | Symb ((top,_) as f, p_ty_args) -> 
+    assert(is_var f && top = []);
+    if p_ty_args <> None then conv_err loc (Failure "cannot given type arguments here");
     convert_var state (snd f) ty
 
   (* application, general case *)
@@ -994,16 +1016,22 @@ and convert0
 and convert_app
     (state     : conv_state)
     (loc       : L.t)
-    ((f, args) : (Symbols.p_path * term list))
+    (f         : Symbols.p_path)
+    (p_ty_args : ty list option) (* optional type arguments of symbol [f] *)
+    (args      : term list)
     (app_cntxt : app_cntxt)
     (ty        : Type.ty)
   : Term.term
   =
   let ty_args =
+    omap (List.map (convert_ty ~ty_env:state.ty_env state.env)) p_ty_args
+  in
+
+  let args_ty =                 (* types of arguments [args] *)
     List.map (fun _ -> Type.TUnivar (Type.Infer.mk_univar state.ty_env)) args
   in
   (* convert arguments *)
-  let args = List.map2 (convert state) args ty_args in
+  let args = List.map2 (convert state) args args_ty in
 
   let ty_rec =
     match app_cntxt with
@@ -1017,13 +1045,14 @@ and convert_app
     resolve_path
       ~ty_env:state.ty_env
       state.env.table f
-      ~ty_args:(List.map (Type.Infer.norm state.ty_env) ty_args)
+      ~ty_args
+      ~args_ty:(List.map (Type.Infer.norm state.ty_env) args_ty)
       ~ty_rec
   in
 
   if List.length symbs = 0 then 
     failure_no_symbol f
-      (List.map (Type.Infer.norm state.ty_env) ty_args) 
+      (List.map (Type.Infer.norm state.ty_env) args_ty) 
       (Type.Infer.norm state.ty_env ty) ;
 
   if List.length symbs >= 2 then 
