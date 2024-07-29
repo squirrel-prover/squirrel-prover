@@ -1061,12 +1061,8 @@ tac_any_term:
 as_have_ip:
 | AS ip=simpl_ip { ([],ip,[]) }
 
-s_item_noargs_list:
-| l=slist(s_item_noargs,empty) { l }
-
-/* FIXME: allow [s_item] with arguments */
 have_ip:
-| pre=s_item_noargs_list ip=simpl_ip post=s_item_noargs_list { (pre, ip, post) }
+| pre=slist(s_item,empty) ip=simpl_ip post=slist(s_item,empty) { (pre, ip, post) }
 
 %inline have_tac:
 | l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
