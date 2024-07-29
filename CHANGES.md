@@ -1,4 +1,5 @@
-- **type argument**, [commit: `4202b3e3`]
+### type argument
+  [commit: `4202b3e3`]
 
   Type arguments of symbols can now be manually provided by writing
   `s[ty1, ..., tyn]` when `s` is a symbol with `n` arguments.
@@ -14,7 +15,8 @@
   `` `[// ~arg1:foo ~arg2 ...]`` (a backtick must now precede the 
   opening bracket).
 
-- **dependency and mutex lemmas**, [commit: `a5c01ceb`]
+### dependency and mutex lemmas
+  [commit: `a5c01ceb`]
 
   Dependency and mutex lemmas are now generated for [any] systems.
   Moreover, the form of dependency lemmas has been simplified:
@@ -32,7 +34,8 @@
     happens(A2(i,j)) => A1(i) < A2(j).
   ```
 
-- **namespaces**, [commit: `6c37fe36`]
+### namespaces
+  [commit: `6c37fe36`]
   
   Squirrel objects can now be stored in namespace, which allow to
   organize developments. For example,
@@ -58,7 +61,8 @@
   `Int.+` or `Real.+` depending on its arguments.
 
 
-- **new syntax for system declaration**, [commit: `6c37fe36`, **breaking change**]
+### new syntax for system declaration
+  [commit: `6c37fe36`, **breaking change**]
 
   ```
   system [foo] P
