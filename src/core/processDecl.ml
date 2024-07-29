@@ -70,19 +70,19 @@ let parse_state_decl
   let ty_env = Type.Infer.mk_env () in
   
   let env = Env.init ~table () in
-  let conv_env = Theory.{ env; cntxt = InProc ([], ts_init); } in
+  let conv_env = Typing.{ env; cntxt = InProc ([], ts_init); } in
 
-  let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env p_args in
+  let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env p_args in
   let conv_env = { conv_env with env } in
 
   (* parse the macro type *)
-  let out_ty = omap (Theory.convert_ty env) out_ty in
+  let out_ty = omap (Typing.convert_ty env) out_ty in
 
-  let t, out_ty = Theory.convert ~ty_env ?ty:out_ty conv_env init_body in
+  let t, out_ty = Typing.convert ~ty_env ?ty:out_ty conv_env init_body in
 
   (* check that the typing environment is closed *)
   if not (Type.Infer.is_closed ty_env) then
-    Theory.conv_err (L.loc init_body) Freetyunivar;
+    Typing.conv_err (L.loc init_body) Freetyunivar;
 
   (* close the typing environment and substitute *)
   let tsubst = Type.Infer.close ty_env in
@@ -92,7 +92,7 @@ let parse_state_decl
   (* FIXME: generalize allowed types *)
   List.iter2 (fun v (_, pty) ->
       if not (Type.equal (Vars.ty v) Type.tindex) then
-        Theory.conv_err (L.loc pty) (BadPty [Type.tindex])
+        Typing.conv_err (L.loc pty) (BadPty [Type.tindex])
     ) args p_args;
 
   let data =
@@ -116,7 +116,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     (* translate arguments *)
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
-      Theory.convert_ext_bnds
+      Typing.convert_ext_bnds
         ~ty_env ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) 
         env decl.op_args
         (* assume global constant variables to properly check that the
@@ -124,7 +124,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
            (as constant => deterministic). *)
     in
 
-    let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
+    let out_ty = omap (Typing.convert_ty ~ty_env env) decl.op_tyout in
 
     (* translate body *)
     let body, out_ty =
@@ -139,7 +139,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
       | `Concrete body ->
         let body, out_ty =
-          Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body
+          Typing.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body
         in
         let body = Term.subst subst body in
         `Concrete body, out_ty
@@ -157,7 +157,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     match body with
     | `Abstract in_tys ->       (* abstract declaration *)
-      Theory.declare_abstract table
+      Typing.declare_abstract table
         ~ty_args:ty_vars ~in_tys ~out_ty
         decl.op_name decl.op_symb_type
 
@@ -176,7 +176,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
       (* sanity checks on infix symbols *)
       let in_tys = List.length args in (* number of arguments *)
-      Theory.check_fun_symb in_tys decl.op_name decl.op_symb_type;
+      Typing.check_fun_symb in_tys decl.op_name decl.op_symb_type;
 
       let data = 
         Symbols.OpData.Operator {def = Concrete (Operator.Val op_data); ftype; } 
@@ -268,14 +268,14 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
 
              SE.var (fst (Ms.find se_name se_env))
            in
-           let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env bnds in
+           let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env bnds in
            let se_info = Mv.add_list (List.map (fun v -> v, se_v) args) se_info in
            (se_info, env), (se_v, args)
         ) (Mv.empty, env) decl.pred_multi_args
     in
     (* parse binders for simple variables *)
     let env, simpl_args =
-      Theory.convert_bnds ~ty_env ~mode:NoTags env decl.pred_simpl_args
+      Typing.convert_bnds ~ty_env ~mode:NoTags env decl.pred_simpl_args
     in
 
     let body =
@@ -283,7 +283,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
       | None -> Predicate.Abstract
       | Some b ->
         let b =
-          Theory.convert_global_formula
+          Typing.convert_global_formula
             ~ty_env ~system_info:se_info
             { env; cntxt = InGoal; } b
         in
@@ -323,7 +323,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
         (fun in_tys (_, args) -> in_tys + List.length args)
         (List.length simpl_args) multi_args
     in
-    Theory.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
+    Typing.check_fun_symb in_tys decl.pred_name decl.pred_symb_type;
 
     let table, _ =
       Symbols.Predicate.declare ~approx:false
@@ -356,16 +356,16 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       if not (List.mem sp kws) then
         error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.convert_ty env cty.Decl.cty_ty in
+      let ty = Typing.convert_ty env cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
 (*------------------------------------------------------------------*)
-let define_oracle_tag_formula (h : lsymb) table (fm : Theory.term) :
+let define_oracle_tag_formula (h : lsymb) table (fm : Typing.term) :
   Symbols.table =
   let env = Env.init ~table () in
-  let conv_env = Theory.{ env; cntxt = InGoal; } in
-  let form, _ = Theory.convert conv_env ~ty:Type.Boolean fm in
+  let conv_env = Typing.{ env; cntxt = InGoal; } in
+  let form, _ = Typing.convert conv_env ~ty:Type.Boolean fm in
     match form with
      | Term.Quant (ForAll, [uvarm; uvarkey], _) ->
        begin
@@ -411,7 +411,7 @@ let declare table decl : Symbols.table * Goal.t list =
     Lemma.add_lemma ~loc `Axiom gc table, []
 
   | Decl.Decl_system sdecl ->
-    let projs = Theory.parse_projs sdecl.sprojs in
+    let projs = Typing.parse_projs sdecl.sprojs in
     let exec_model = 
       match sdecl.system_option with
       | None 
@@ -435,7 +435,7 @@ let declare table decl : Symbols.table * Goal.t list =
      in
      let group_ty = List.assoc_opt "group"     ctys
      and exp_ty   = List.assoc_opt "exponents" ctys in
-     Theory.declare_dh table h ?group_ty ?exp_ty g ex om, []
+     Typing.declare_dh table h ?group_ty ?exp_ty g ex om, []
 
   | Decl.Decl_hash (n, tagi, ctys) ->
     let table = match tagi with
@@ -447,7 +447,7 @@ let declare table decl : Symbols.table * Goal.t list =
     and h_ty = List.assoc_opt  "h" ctys
     and k_ty  = List.assoc_opt "k" ctys in
 
-    Theory.declare_hash table ?m_ty ?h_ty ?k_ty n, []
+    Typing.declare_hash table ?m_ty ?h_ty ?k_ty n, []
 
   | Decl.Decl_aenc (enc, dec, pk, ctys) ->
     let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "r"; "sk"; "pk"] in
@@ -457,7 +457,7 @@ let declare table decl : Symbols.table * Goal.t list =
     and sk_ty   = List.assoc_opt "sk"   ctys
     and pk_ty   = List.assoc_opt "pk"   ctys in
 
-    Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk, []
+    Typing.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk, []
 
   | Decl.Decl_senc (senc, sdec, ctys) ->
     let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "r"; "k"] in
@@ -466,7 +466,7 @@ let declare table decl : Symbols.table * Goal.t list =
     and rnd_ty  = List.assoc_opt "r"    ctys
     and k_ty    = List.assoc_opt "k"    ctys in
 
-    Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
+    Typing.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
   | Decl.Decl_name (s, p_ty) ->
     let env = Env.init ~table () in
@@ -474,21 +474,21 @@ let declare table decl : Symbols.table * Goal.t list =
     let p_args_tys, p_out_ty =
       match p_ty with
       | { pl_desc =
-            Theory.P_fun (
-              { pl_desc = Theory.P_tuple p_args_ty},
+            Typing.P_fun (
+              { pl_desc = Typing.P_tuple p_args_ty},
               p_out_ty
             )
         } ->
         p_args_ty, p_out_ty
 
-      | { pl_desc = Theory.P_fun (p_arg_ty, p_out_ty)} ->
+      | { pl_desc = Typing.P_fun (p_arg_ty, p_out_ty)} ->
         [p_arg_ty], p_out_ty
 
       | _ -> [], p_ty
     in
 
-    let args_tys = List.map (Theory.convert_ty env) p_args_tys in
-    let out_ty = Theory.convert_ty env p_out_ty in
+    let args_tys = List.map (Typing.convert_ty env) p_args_tys in
+    let out_ty = Typing.convert_ty env p_out_ty in
 
     if List.length (fst (Type.decompose_funs out_ty)) >= 1 then
       begin
@@ -521,7 +521,7 @@ let declare table decl : Symbols.table * Goal.t list =
     parse_state_decl table decl, []
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
-    Theory.declare_senc_joint_with_hash table senc sdec h, []
+    Typing.declare_senc_joint_with_hash table senc sdec h, []
 
   | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
     let table = match tagi with
@@ -534,7 +534,7 @@ let declare table decl : Symbols.table * Goal.t list =
     and sk_ty    = List.assoc_opt "sk"    ctys
     and pk_ty    = List.assoc_opt "pk"    ctys in
 
-    Theory.declare_signature table
+    Typing.declare_signature table
       ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk,
     []
 

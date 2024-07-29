@@ -30,7 +30,7 @@ let tactics =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Theory.(Error (_, Failure "no symbol a1 with type index")) -> raise Ok)
+           | Typing.(Error (_, Failure "no symbol a1 with type index")) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -250,6 +250,6 @@ let includes =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/bad-actions.sp" with
-             Theory.Error (_, UndefInSystem _) -> raise Ok)
+             Typing.Error (_, UndefInSystem _) -> raise Ok)
     end ;
   ]

@@ -64,7 +64,7 @@ type 'a rw_item_g = {
 
 (** Rewrite or expand item *)
 type rw_item = [
-  | `Rw        of Theory.pt
+  | `Rw        of Typing.pt
   | `Expand    of Symbols.p_path
   | `ExpandAll of Location.t
 ] rw_item_g
@@ -77,7 +77,7 @@ type expnd_item = [
 
 (** Rewrite equiv item *)
 type rw_equiv_item = [
-  | `Rw of Theory.pt
+  | `Rw of Typing.pt
 ] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item. *)
@@ -87,7 +87,7 @@ type rw_arg =
 
 (*------------------------------------------------------------------*)
 (** Function application argument *)
-type fa_arg = rw_count * Theory.term
+type fa_arg = rw_count * Typing.term
 
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
@@ -136,7 +136,7 @@ type fresh_arg =
 
 type trans_arg =
   | TransSystem of SE.Parse.sys
-  | TransTerms  of (int L.located * Theory.term) list
+  | TransTerms  of (int L.located * Typing.term) list
 
 (*------------------------------------------------------------------*)
 (** {3 Have tactic arguments} *)
@@ -144,8 +144,8 @@ type trans_arg =
 (** before, simpl pat for produced hypothesis, after *)
 type have_ip = s_item list * simpl_pat * s_item list
 
-type have_arg    = have_ip option * Theory.any_term
-type have_pt_arg = Theory.pt * have_ip option * [`IntroImpl | `None]
+type have_arg    = have_ip option * Typing.any_term
+type have_pt_arg = Typing.pt * have_ip option * [`IntroImpl | `None]
 
 (*------------------------------------------------------------------*)
 (** {3 Diffie-Hellman tactics arguments} *)
@@ -165,9 +165,9 @@ type dh_arg =
     [k] must be mapped to [term] for any [bnds] such that [cond]. *)
 type crypto_arg = { 
   glob_sample : lsymb; 
-  term        : Theory.term;
-  bnds        : Theory.bnds option;
-  cond        : Theory.term option;
+  term        : Typing.term;
+  bnds        : Typing.bnds option;
+  cond        : Typing.term option;
 }
 
 type crypto_args = crypto_arg list
@@ -183,7 +183,7 @@ type crypto_args = crypto_arg list
 type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
-  | Theory       of Theory.term
+  | Theory       of Typing.term
 
   | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
@@ -194,20 +194,20 @@ type parser_arg =
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
-  | ApplyIn      of named_args * Theory.pt * apply_in
+  | ApplyIn      of named_args * Typing.pt * apply_in
   | Have         of have_arg
   | HavePt       of have_pt_arg
   | Named_args   of named_args
       (** Named arguments whose values are just symbols. *)
   | Named_args_gen of parser_arg named_arg list
       (** General named arguments whose values are [parser_arg]s. *)
-  | SplitSeq     of int L.located * Theory.term * Theory.term option
-  | ConstSeq     of int L.located * (Theory.term * Theory.term) list
+  | SplitSeq     of int L.located * Typing.term * Typing.term option
+  | ConstSeq     of int L.located * (Typing.term * Typing.term) list
   | MemSeq       of int L.located * int L.located
-  | Remember     of Theory.term * lsymb
-  | Generalize   of Theory.term list * naming_pat list option
+  | Remember     of Typing.term * lsymb
+  | Generalize   of Typing.term list * naming_pat list option
   | Fa           of fa_arg list
-  | TermPat      of int * Theory.term
+  | TermPat      of int * Typing.term
   | DH           of dh_arg
   | Crypto       of Symbols.p_path * crypto_args
 

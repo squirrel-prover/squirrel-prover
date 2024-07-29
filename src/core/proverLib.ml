@@ -18,8 +18,8 @@ type print_query =
 (*------------------------------------------------------------------*)
 (** {2 User search query} *)
 type search_query = (* [None] means current system *)
-  | Srch_term    of Theory.any_term
-  | Srch_inSys   of Theory.any_term * SystemExpr.Parse.t 
+  | Srch_term    of Typing.any_term
+  | Srch_inSys   of Typing.any_term * SystemExpr.Parse.t 
 
 (** Includes *)
 

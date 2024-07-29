@@ -31,29 +31,29 @@ module Parse : sig
   (** A parsed process *)
   type cnt =
     | Null                                        (** Null process *)
-    | New of lsymb * Theory.ty * t              (** Name creation *)
+    | New of lsymb * Typing.ty * t              (** Name creation *)
     | In  of Symbols.p_path * lsymb * t           (** Input *)
-    | Out of Symbols.p_path * Theory.term * t     (** Output *)
+    | Out of Symbols.p_path * Typing.term * t     (** Output *)
     | Parallel of t * t                           (** Parallel composition *)
 
-    | Set of Symbols.p_path * Theory.term list * Theory.term * t
+    | Set of Symbols.p_path * Typing.term list * Typing.term * t
     (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
         FIXME: for now, we only allow argument of type index. *)
 
-    | Let of lsymb * Theory.term * Theory.ty option * t 
+    | Let of lsymb * Typing.term * Typing.ty option * t 
     (** Local definition, optional type information *)
 
     | Repl of lsymb * t
     (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         for all indices [i]. *)
 
-    | Exists of lsymb list * Theory.term * t * t
+    | Exists of lsymb list * Typing.term * t * t
     (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         if there exists [indices] such that [test[vars:=indices]]
         is true, and [q] otherwise. Note that this construct
         subsumes the common conditional construct. *)
 
-    | Apply of Symbols.p_path * Theory.term list
+    | Apply of Symbols.p_path * Typing.term list
     (** Process call: [Apply (p,ts)] calls [p(ts)]. *)
 
     | Alias of t * lsymb
@@ -93,13 +93,13 @@ type proc_decl = {
 (** Check that a process is well-typed. *)
 val parse : 
   Symbols.table ->
-  args:Theory.bnds -> Term.projs -> Parse.t -> proc_decl
+  args:Typing.bnds -> Term.projs -> Parse.t -> proc_decl
 
 (*------------------------------------------------------------------*)
 (** Declare a named process. The body of the definition is type-checked. *)
 val declare :
   Symbols.table -> 
-  id:lsymb -> args:Theory.bnds -> projs:(lsymb list option) -> Parse.t ->
+  id:lsymb -> args:Typing.bnds -> projs:(lsymb list option) -> Parse.t ->
   Symbols.table
 
 (*------------------------------------------------------------------*)

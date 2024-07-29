@@ -71,30 +71,30 @@ module Parse : sig
       [name : ty <$] *)
   type var_rnd = {
     vr_name : lsymb ;
-    vr_ty   : Theory.ty ;
+    vr_ty   : Typing.ty ;
   }
 
   (** a mutable variable declaration 
       [name : ty = init <$;] *)
   type var_decl = {
     vd_name : lsymb ;
-    vd_ty   : Theory.ty option ;
-    vd_init : Theory.term;
+    vd_ty   : Typing.ty option ;
+    vd_init : Typing.term;
   }
 
   (** an oracle body *)
   type oracle_body = {
     bdy_rnds    : var_rnd list ;               (** local random samplings *)
     bdy_lvars   : var_decl list ;              (** local variables *)
-    bdy_updates : (lsymb * Theory.term) list ; (** state updates *)
-    bdy_ret     : Theory.term option ;         (** returned value *)
+    bdy_updates : (lsymb * Typing.term) list ; (** state updates *)
+    bdy_ret     : Typing.term option ;         (** returned value *)
   }
 
   (** an oracle declaration *)
   type oracle_decl = {
     o_name  : lsymb ;
-    o_args  : Theory.bnds ;
-    o_tyout : Theory.ty option ;
+    o_args  : Typing.bnds ;
+    o_tyout : Typing.ty option ;
     o_body  : oracle_body ;
   }
 

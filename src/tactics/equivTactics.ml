@@ -195,7 +195,7 @@ let transitivity_systems new_context s =
    u ~_{L,R} w -> 
    w ~_{R,R} v -> 
    u ~_{L,R} v *)
-let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t list =
+let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t list =
   let _, r_sys = SE.snd (ES.get_system_pair s) in
   let l_proj, r_proj = ES.get_system_pair_projs s in
 
@@ -206,10 +206,10 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
     (* remove the pair when parsing, to prevent diffs *)
     let system = SE.{ set = (fset_r :> SE.arbitrary); pair = None; } in
     let env = { (ES.env s) with system; } in
-    Theory.{ env; cntxt = InGoal; } 
+    Typing.{ env; cntxt = InGoal; } 
   in
 
-  let args = List.map (fun (i,t) -> i, fst (Theory.convert cenv t)) args in
+  let args = List.map (fun (i,t) -> i, fst (Typing.convert cenv t)) args in
 
   let equiv = ES.conclusion_as_equiv s in
 
@@ -755,15 +755,15 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
       Env.set_system env
         SE.{ set = (pair:>SE.arbitrary) ; pair = None }
     in
-    Theory.{ env; cntxt = InGoal; } 
+    Typing.{ env; cntxt = InGoal; } 
   in
 
   (* parse one [fa_arg] *)
   let parse_fa_arg_pat
-      ty_env (tpat : Theory.term)
+      ty_env (tpat : Typing.term)
     : L.t * Term.term Term.pat_op
     =
-    let t, _ty = Theory.convert ~ty_env ~pat:true cntxt tpat in
+    let t, _ty = Typing.convert ~ty_env ~pat:true cntxt tpat in
     let vars =
       Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
     in
@@ -1342,7 +1342,7 @@ let () =
 (*------------------------------------------------------------------*)
 (** implement the SplitSeq rule of CSF'21, modified when moving
     to the higher-order logic. *)
-let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.sequent =
+let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.sequent =
   let before, t, after = split_equiv_conclusion li s in
   let i = L.unloc li in
 
@@ -1376,8 +1376,8 @@ let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.se
     match else_branch with
     | Some t ->
       let t, _ =
-        let cntxt = Theory.{ env = ES.env s; cntxt = InGoal; } in
-        Theory.convert ~ty:(Term.ty ti) ~pat:false cntxt t
+        let cntxt = Typing.{ env = ES.env s; cntxt = InGoal; } in
+        Typing.convert ~ty:(Term.ty ti) ~pat:false cntxt t
       in
       t
 
@@ -1452,7 +1452,7 @@ let () =
 (*------------------------------------------------------------------*)
 (** implement the ConstSeq rule of CSF'21, modified when moving to the higher-order logic. *)
 let const_seq
-    ((li, b_t_terms) : int L.located * (Theory.term * Theory.term) list)
+    ((li, b_t_terms) : int L.located * (Typing.term * Typing.term) list)
     (s : ES.t) : Goal.t list
   =
   let before, e, after = split_equiv_conclusion li s in

@@ -124,11 +124,11 @@ let parse_single_system_name table sdecl : SE.fset * System.Single.t =
 (*------------------------------------------------------------------*)
 (** Convertion of system modifiers arguments.
     - [bnds] are additional binded variables. *)
-let conv_term ?pat table system ~bnds (term : Theory.term)
+let conv_term ?pat table system ~bnds (term : Typing.term)
   : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
-  let env,is = Theory.convert_bnds ~mode:NoTags env bnds in
+  let env,is = Typing.convert_bnds ~mode:NoTags env bnds in
 
   Vars.check_type_vars is [Type.Index]
     (fun () ->
@@ -140,8 +140,8 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
        Tactics.hard_failure ~loc
          (Tactics.Failure "Only index variables can be bound."));
 
-  let conv_env = Theory.{ env; cntxt = InGoal } in
-  let t, _ = Theory.convert ?pat conv_env term in
+  let conv_env = Typing.{ env; cntxt = InGoal } in
+  let t, _ = Typing.convert ?pat conv_env term in
   is, t
 
 (*------------------------------------------------------------------*)
@@ -167,7 +167,7 @@ let mk_equiv_statement
 
 let global_rename
     (table : Symbols.table) 
-    sdecl (gf : Theory.global_formula)
+    sdecl (gf : Typing.global_formula)
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -180,8 +180,8 @@ let global_rename
   let system =
     SE.equivalence_context (SE.make_pair old_single_system old_single_system) in
   let env = Env.init ~table ~system () in
-  let conv_env = Theory.{ env; cntxt = InGoal } in
-  let f = Theory.convert_global_formula conv_env gf in
+  let conv_env = Typing.{ env; cntxt = InGoal } in
+  let f = Typing.convert_global_formula conv_env gf in
 
   (* Decompose it as universally quantified equivalence over names. *)
   let vs, f = Equiv.Smart.decompose_forall f in
@@ -307,8 +307,8 @@ let rec is_simple (t : Term.term) : bool =
 let global_prf
     (table : Symbols.table)
     (sdecl : Decl.system_modifier)
-    (bnds  : Theory.bnds)
-    (hash  : Theory.term)
+    (bnds  : Typing.bnds)
+    (hash  : Typing.term)
   : Goal.statement option * Goal.t list * Symbols.table
   =
   let old_system, old_single_system =
@@ -450,7 +450,7 @@ let global_prf
   
 let global_cca
     (table : Symbols.table) 
-    sdecl bnds (p_enc : Theory.term)
+    sdecl bnds (p_enc : Typing.term)
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -876,8 +876,8 @@ let check_uniq _table (map : XO.t list) =
 let global_prf_t
     (table   : Symbols.table)
     (sdecl   : Decl.system_modifier)
-    (bnds    : Theory.bnds)
-    (hash    : Theory.term)
+    (bnds    : Typing.bnds)
+    (hash    : Typing.term)
   : Goal.statement option * Goal.t list * Symbols.table
   =
   let old_system, old_single_system =

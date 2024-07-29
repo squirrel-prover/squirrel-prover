@@ -1,6 +1,6 @@
 (** This module defines terms and facts used during parsing,
-  * functions to type-check them, and convert them to proper
-  * terms and formulas of the logic. *)
+    functions to type-check them, and convert them to proper
+    terms and formulas of the logic. *)
 
 module L  = Location
 module SE = SystemExpr

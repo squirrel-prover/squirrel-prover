@@ -11,7 +11,7 @@ module LT = LowTactics
 module St = Term.St
 module Sv = Vars.Sv
 
-type lsymb = Theory.lsymb
+type lsymb = Typing.lsymb
 
 (*------------------------------------------------------------------*)
 let dbg = LT.dbg

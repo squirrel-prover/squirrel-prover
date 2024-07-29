@@ -15,7 +15,7 @@ open LowTactics
 let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
-type lsymb = Theory.lsymb
+type lsymb = Typing.lsymb
 
 (*------------------------------------------------------------------*)
 (** for now, `fresh` has only one named optional arguments *)

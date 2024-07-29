@@ -13,7 +13,7 @@ type lsymb = Symbols.lsymb
 (** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
 type c_ty = {
   cty_space : lsymb;
-  cty_ty    : Theory.ty;
+  cty_ty    : Typing.ty;
 }
 
 type c_tys = c_ty list
@@ -22,16 +22,16 @@ type c_tys = c_ty list
 (** Information for a macro declaration *)
 type state_macro_decl = {
   name      : lsymb;
-  args      : Theory.bnds;
-  out_ty    : Theory.ty option;
-  init_body : Theory.term;
+  args      : Typing.bnds;
+  out_ty    : Typing.ty option;
+  init_body : Typing.term;
 }
 
 (*------------------------------------------------------------------*)
 (** Information for a name declaration *)
 type name_decl = {
   n_name : lsymb ;
-  n_ty   : Theory.ty list;
+  n_ty   : Typing.ty list;
 }
 
 (*------------------------------------------------------------------*)
@@ -62,10 +62,10 @@ type system_decl = {
 
 (** Global cryptographic rules *)
 type global_rule =
-  | Rename  of Theory.global_formula
-  | PRF     of Theory.bnds * Theory.term
-  | PRFt    of Theory.bnds * Theory.term (* gPRF, with time *)
-  | CCA     of Theory.bnds * Theory.term
+  | Rename  of Typing.global_formula
+  | PRF     of Typing.bnds * Typing.term
+  | PRFt    of Typing.bnds * Typing.term (* gPRF, with time *)
+  | CCA     of Typing.bnds * Typing.term
   | Rewrite of TacticsArgs.rw_arg list
 
 (** System modifier, comprising:
@@ -83,9 +83,9 @@ type operator_decl = {
   op_name      : Symbols.lsymb;
   op_symb_type : Symbols.symb_type;
   op_tyargs    : lsymb list;
-  op_args      : Theory.ext_bnds;
-  op_tyout     : Theory.ty option;
-  op_body      : [`Concrete of Theory.term | `Abstract];
+  op_args      : Typing.ext_bnds;
+  op_tyout     : Typing.ty option;
+  op_body      : [`Concrete of Typing.term | `Abstract];
 }
 
 (*------------------------------------------------------------------*)
@@ -96,10 +96,10 @@ type predicate_decl = {
   pred_tyargs     : lsymb list;
   pred_se_args    : (lsymb * lsymb list) list;
   (** system variable, system information *)
-  pred_multi_args : (lsymb * Theory.bnds) list;
+  pred_multi_args : (lsymb * Typing.bnds) list;
   (** system variable, mutli-term variables *)
-  pred_simpl_args : Theory.bnds;
-  pred_body       : Theory.global_formula option;
+  pred_simpl_args : Typing.bnds;
+  pred_body       : Typing.global_formula option;
 }
 
 (*------------------------------------------------------------------*)
@@ -107,7 +107,7 @@ type predicate_decl = {
 type proc_decl = {
   id    : lsymb;
   projs : lsymb list option;
-  args  : Theory.bnds;
+  args  : Typing.bnds;
   proc  : Process.Parse.t;
 }
 
@@ -124,7 +124,7 @@ type namespace_info =
     Defining a function with such a tag, is equivalent to giving to the
     attacker a backdoor, allowing to compute the ouput of the function on
     all messages that satisfy the tag. *)
-type orcl_tag_info = Theory.term
+type orcl_tag_info = Typing.term
 
 (*------------------------------------------------------------------*)
 (** {2 Declarations} *)
@@ -151,7 +151,7 @@ type declaration_i =
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
   | Decl_action    of action_decl
-  | Decl_name      of lsymb * Theory.ty
+  | Decl_name      of lsymb * Typing.ty
   | Decl_state     of state_macro_decl
   | Decl_operator  of operator_decl
   | Decl_predicate of predicate_decl

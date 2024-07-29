@@ -780,7 +780,7 @@ let failure_cannot_desambiguate loc symbs =
   conv_err loc (Failure err) 
 
 (*------------------------------------------------------------------*)
-(* internal function to Theory.ml *)
+(* internal function to Typing.ml *)
 let rec convert 
     (state : conv_state)
     (tm    : term)

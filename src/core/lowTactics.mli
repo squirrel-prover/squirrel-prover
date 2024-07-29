@@ -79,7 +79,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val convert_args :
     S.t -> Args.parser_arg list -> Args.esort -> Args.earg
 
-  val convert : ?pat:bool -> S.t -> Theory.term  -> Term.term * Type.ty
+  val convert : ?pat:bool -> S.t -> Typing.term  -> Term.term * Type.ty
 
   (*------------------------------------------------------------------*)
   (** {3 Expantion} *)
@@ -122,7 +122,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
         rule  : Rewrite.rw_rule;  (** rule *)
       }
 
-    | Rw_expand    of Theory.term
+    | Rw_expand    of Typing.term
     | Rw_expandall of Location.t
 
   type rw_earg = Args.rw_count * rw_arg
@@ -135,7 +135,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     | Mterm of Term.term
     | Any
 
-  val p_rw_expand_arg : S.t -> Theory.term -> expand_kind 
+  val p_rw_expand_arg : S.t -> Typing.term -> expand_kind 
 
   val expand_term :
     ?m_rec:bool -> 

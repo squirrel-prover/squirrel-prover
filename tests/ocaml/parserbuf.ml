@@ -114,7 +114,7 @@ let process_parsing =
             op_symb_type = `Prefix;
             op_tyargs    = [];
             op_args      = [];
-            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
@@ -130,7 +130,7 @@ let process_parsing =
             op_symb_type = `Prefix;
             op_tyargs    = [];
             op_args      = [];
-            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
@@ -144,7 +144,7 @@ let process_parsing =
             op_symb_type = `Prefix;
             op_tyargs    = [];
             op_args      = [];
-            op_tyout     = L.mk_loc L._dummy Theory.P_message |> Utils.some;
+            op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract; }
         in
         
@@ -244,7 +244,7 @@ let models =
            try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp"
                        : Symbols.table )
            with
-             Theory.Error _ -> raise Ok)
+             Typing.Error _ -> raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

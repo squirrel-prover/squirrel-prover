@@ -24,8 +24,8 @@ type print_query =
 
 (** User search query *)
 type search_query =
-  | Srch_term    of Theory.any_term
-  | Srch_inSys   of Theory.any_term * SystemExpr.Parse.t 
+  | Srch_term    of Typing.any_term
+  | Srch_inSys   of Typing.any_term * SystemExpr.Parse.t 
 
 (*------------------------------------------------------------------*)
 (** Error handling *)

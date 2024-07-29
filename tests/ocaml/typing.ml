@@ -6,7 +6,7 @@ open Squirrelfront
 module ProverLib = ProverLib
 
 module Prover = Squirrelprover.Prover
-
+module Typing = Squirrelcore.Typing
 
 open Util
 
@@ -15,7 +15,7 @@ open Util
 let term_of_string st string : Term.term =
   let t_p = Util.parse_from_string Parser.top_formula string in
   let env = Env.init ~table:(Prover.get_table st) () in
-  let t,_ = Theory.convert Theory.{ env ; cntxt = InGoal } t_p in
+  let t,_ = Typing.convert Typing.{ env ; cntxt = InGoal } t_p in
   t
 
 (*------------------------------------------------------------------*)
@@ -74,7 +74,7 @@ end C2.
     (fun () ->
        let _ : Term.term =
          try term_of_string st2 "a t" with
-         | Squirrelcore.Theory.Error (_, Failure _) -> raise Ok
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
        in
        raise Ko
     );
@@ -82,7 +82,7 @@ end C2.
     (fun () ->
        let _ : Term.term =
          try term_of_string st2 "n i" with
-         | Squirrelcore.Theory.Error (_, Failure _) -> raise Ok
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
        in
        raise Ko
     );
@@ -136,7 +136,7 @@ game Foo = {
     (fun () ->
        let _ : Prover.state =
          try ill_formed_game st with
-         | Squirrelcore.Theory.Error (_, Failure _) -> raise Ok
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
        in
        raise Ko
     );

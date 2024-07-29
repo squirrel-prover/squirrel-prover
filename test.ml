@@ -7,7 +7,7 @@ open! Squirrelcore.Constr
 open! Squirrelcore.Completion
 open! Squirrelcore.Tactics
 open! Squirrelcore.Term
-open! Squirrelcore.Theory
+open! Squirrelcore.Typing
 open! Squirrelcore.Vars
 
 let test_suites : unit Alcotest.test list =

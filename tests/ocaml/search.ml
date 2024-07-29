@@ -1,7 +1,10 @@
+open Util
+
 module Prover = Squirrelprover.Prover
 module ProverLib = Squirrelcore.ProverLib
 
-open Util
+module Typing = Squirrelcore.Typing
+
 
 (*------------------------------------------------------------------*)
 let search_unify () =
@@ -103,11 +106,11 @@ let search_about_2 () =
   Alcotest.check_raises "search fail without context 1" Ok
       (fun () ->
         let _ = try Prover.exec_command ~test:true "search input@A." st with
-          | Squirrelcore.Theory.Error _ -> raise Ok in raise Ko);
+          | Typing.Error _ -> raise Ok in raise Ko);
   Alcotest.check_raises "search fail without context 2" Ok
       (fun () ->
         let _ = try Prover.exec_command ~test:true "search output@A." st with
-          | Squirrelcore.Theory.Error _ -> raise Ok in raise Ko);
+          | Typing.Error _ -> raise Ok in raise Ko);
   let _ = Prover.exec_command ~test:true "search input@A in [S]." st in
   let _ = Prover.exec_command ~test:true "search output@A in [S]." st in
   let matches = Prover.search_about st

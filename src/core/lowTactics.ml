@@ -152,12 +152,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.conclusion s))
 
   let convert ?pat (s : S.sequent) term =
-    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
-    Theory.convert ?pat cenv term
+    let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
+    Typing.convert ?pat cenv term
 
-  let convert_any (s : S.sequent) (term : Theory.any_term) =
-    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
-    Theory.convert_any cenv term
+  let convert_any (s : S.sequent) (term : Typing.any_term) =
+    let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
+    Typing.convert_any cenv term
 
   (*------------------------------------------------------------------*)
   (** {3 Targets} *)
@@ -537,7 +537,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     [expand_all targets s]
 
   (** parse a expand argument *)
-  let p_rw_expand_arg (s : S.t) (arg : Theory.term) : expand_kind =
+  let p_rw_expand_arg (s : S.t) (arg : Typing.term) : expand_kind =
     let tbl = S.table s in
     match Args.as_p_path [Args.Theory arg] with
     | Some m ->
@@ -569,14 +569,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
         hard_failure ~loc:(L.loc arg)
           (Tactics.Failure "expected a term of sort message")
 
-  let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
+  let expand_arg (targets : target list) (arg : Typing.term) (s : S.t) : S.t =
     let expnd_arg = p_rw_expand_arg s arg in
     let found, s = expand targets expnd_arg s in
     if not found then
       soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");
     s
 
-  let expands (args : Theory.term list) (s : S.t) : S.t =
+  let expands (args : Typing.term list) (s : S.t) : S.t =
     List.fold_left (fun s arg -> expand_arg (target_all s) arg s) s args
 
   let expand_tac args s =
@@ -627,7 +627,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         rule   : Rewrite.rw_rule;  
       }
 
-    | Rw_expand    of Theory.term
+    | Rw_expand    of Typing.term
     | Rw_expandall of Location.t
 
   type rw_earg = Args.rw_count * rw_arg
@@ -711,7 +711,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
     let p_rw_rule
-        dir (p_pt : Theory.pt) 
+        dir (p_pt : Typing.pt) 
       : Term.term list * Rewrite.rw_rule * Ident.t option 
       =
       let ghyp, tyvars, pt =
@@ -755,7 +755,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             hard_failure ~loc:(L.loc rw_arg.rw_dir)
               (Failure "expand cannot take a direction");
 
-          let t = Theory.mk_symb s in
+          let t = Typing.mk_symb s in
           
           Rw_expand t
 
@@ -1942,7 +1942,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Convert an untyped proof-term into a proof-term of kind [dst]. *)
   let p_pt_as_pat (type a)
       ~(dst : a Equiv.f_kind)
-      (p_pt : Theory.pt) (s : S.t) : Equiv.any_form list * a Term.pat
+      (p_pt : Typing.pt) (s : S.t) : Equiv.any_form list * a Term.pat
     =
     let loc = L.loc p_pt in
     let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
@@ -2062,7 +2062,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** [conc_exists_intro judge ths] introduces the existentially
       quantified variables in the conclusion of the judgment,
       using [ths] as existential witnesses. *)
-  let exists_intro (terms : Theory.term list) (s : S.t) =
+  let exists_intro (terms : Typing.term list) (s : S.t) =
     let env = S.env s in
     let vs, f = S.Conc.decompose_exists_tagged (S.conclusion s) in
     let vs, f =
@@ -2077,9 +2077,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let f = S.Conc.mk_exists_tagged vs1 f in
     
     let subst =
-      let conv_env = Theory.{ env; cntxt = InGoal; } in
+      let conv_env = Typing.{ env; cntxt = InGoal; } in
       List.map2 (fun pt ((v,tag) : Vars.tagged_var) ->
-          let t, _ = Theory.convert ~ty:(Vars.ty v) conv_env pt in
+          let t, _ = Typing.convert ~ty:(Vars.ty v) conv_env pt in
           let tag' = HighTerm.tag_of_term env t in
 
           (* check tags, if applicable *)
@@ -2161,7 +2161,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       that we cannot use a global hypothesis or lemma. *)
   let have_pt
       ~(mode:[`IntroImpl | `None]) (ip : Args.simpl_pat option)
-      (p_pt : Theory.pt) (s : S.t)
+      (p_pt : Typing.pt) (s : S.t)
     : Goal.t list 
     =
     let loc = L.loc p_pt in
@@ -2268,7 +2268,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       more general forms should be allowed here or elsewhere. *)
   let have_form
       (ip : Args.simpl_pat option)
-      (f : Theory.any_term)
+      (f : Typing.any_term)
       (s : S.t) : Goal.t list
     =
     let loc = match f with
@@ -2353,7 +2353,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Remember} *)
 
-  let remember (id : Symbols.lsymb) (term : Theory.term) (s : S.t) =
+  let remember (id : Symbols.lsymb) (term : Typing.term) (s : S.t) =
     let t, ty = convert s term in
     let tag = HighTerm.tag_of_term (S.env s) t in
     let env, x =

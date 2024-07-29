@@ -304,13 +304,13 @@ module type S = sig
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
-    Theory.pt -> 
+    Typing.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 
   val convert_pt :
     ?close_pats:bool ->
-    Theory.pt -> 
+    Typing.pt -> 
     t ->
     ghyp * Type.tvars * PT.t
 end
@@ -411,42 +411,42 @@ module Mk (Args : MkArgs) : S with
   
   (*------------------------------------------------------------------*)
   (** Return the location of a proof term argument. *)
-  let pt_arg_loc (p_arg : Theory.pt_app_arg) : L.t =
+  let pt_arg_loc (p_arg : Typing.pt_app_arg) : L.t =
     match p_arg with
     | PTA_term  t -> L.loc t
     | PTA_sub  pt -> L.loc pt
 
-  let pt_app_arg_as_term (p_arg : Theory.pt_app_arg) : Theory.term =
+  let pt_app_arg_as_term (p_arg : Typing.pt_app_arg) : Typing.term =
     match p_arg with
-    | Theory.PTA_term t -> t
+    | Typing.PTA_term t -> t
     | _ ->
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
 
   (** A proof term with type [f1 -> f2] argument is either:
       - another proof term whose type [f'] must match [f1] 
       - an underscore, which generates a subgaol for [f1] *)
-  type pt_impl_arg = [`Pt of Theory.pt | `Subgoal]
+  type pt_impl_arg = [`Pt of Typing.pt | `Subgoal]
 
   (** Try to interpret a proof term argument as a proof term. *)
-  let pt_app_arg_as_pt (p_arg : Theory.pt_app_arg) : [`Pt of Theory.pt | `Subgoal] =
+  let pt_app_arg_as_pt (p_arg : Typing.pt_app_arg) : [`Pt of Typing.pt | `Subgoal] =
     match p_arg with
-    | Theory.PTA_sub pt -> `Pt pt
+    | Typing.PTA_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Theory.PTA_term ({ pl_desc = Symb head } as t) 
-    | Theory.PTA_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
-      let _head, terms = Theory.decompose_app t in (* [_head = head] *)
+    | Typing.PTA_term ({ pl_desc = Symb head } as t) 
+    | Typing.PTA_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
+      let _head, terms = Typing.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
       let pt_cnt = 
-        Theory.PT_app {
-          pta_head = L.mk_loc (Symbols.p_path_loc head) (Theory.PT_symb head);
-          pta_args = List.map (fun x -> Theory.PTA_term x) terms ;
+        Typing.PT_app {
+          pta_head = L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb head);
+          pta_args = List.map (fun x -> Typing.PTA_term x) terms ;
           pta_loc  = loc;
         } 
       in 
       `Pt (L.mk_loc loc pt_cnt)
 
-    | Theory.PTA_term { pl_desc = Theory.Tpat } -> `Subgoal
+    | Typing.PTA_term { pl_desc = Typing.Tpat } -> `Subgoal
 
     | _ ->
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
@@ -479,21 +479,21 @@ module Mk (Args : MkArgs) : S with
   (** Solve parser ambiguities, e.g. in [H (G x)], the sub-element [(G x)] is
       parsed as a term (i.e. a [PTA_term]. We resolve it as a [PTA_sub] using
       the context. *)
-  let rec resolve_pt_arg (s : S.t) (pt_arg : Theory.pt_app_arg) : Theory.pt_app_arg =
+  let rec resolve_pt_arg (s : S.t) (pt_arg : Typing.pt_app_arg) : Typing.pt_app_arg =
     match pt_arg with
-    | Theory.PTA_sub sub -> PTA_sub (resolve_pt s sub)
-    | Theory.PTA_term t  ->
+    | Typing.PTA_sub sub -> PTA_sub (resolve_pt s sub)
+    | Typing.PTA_term t  ->
       match L.unloc t with
-      | Theory.App ({ pl_desc = Theory.Symb ([],h)}, args)
+      | Typing.App ({ pl_desc = Typing.Symb ([],h)}, args)
         when S.Hyps.mem_name (L.unloc h) s
         ->
         let pta_args =
-          List.map (fun a -> resolve_pt_arg s (Theory.PTA_term a)) args
+          List.map (fun a -> resolve_pt_arg s (Typing.PTA_term a)) args
         in
         let loc = last_loc (L.loc h) args in
         let pt_cnt = 
-          Theory.PT_app {
-            pta_head = L.mk_loc (L.loc h) (Theory.PT_symb ([],h));
+          Typing.PT_app {
+            pta_head = L.mk_loc (L.loc h) (Typing.PT_symb ([],h));
             pta_args;
             pta_loc = loc;
           } 
@@ -502,19 +502,19 @@ module Mk (Args : MkArgs) : S with
 
       | _ -> pt_arg
 
-  and resolve_pt (s : S.t) (pt : Theory.pt) : Theory.pt =
+  and resolve_pt (s : S.t) (pt : Typing.pt) : Typing.pt =
     let loc = L.loc pt in
     match L.unloc pt with
     | PT_symb _ -> pt
 
     | PT_localize sub_pt -> 
-      L.mk_loc loc (Theory.PT_localize (resolve_pt s sub_pt))
+      L.mk_loc loc (Typing.PT_localize (resolve_pt s sub_pt))
 
     | PT_app app ->
       let app = 
-        Theory.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } 
+        Typing.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } 
       in
-      L.mk_loc loc (Theory.PT_app app)
+      L.mk_loc loc (Typing.PT_app app)
 
   (*------------------------------------------------------------------*)      
   (** Internal 
@@ -798,13 +798,13 @@ module Mk (Args : MkArgs) : S with
   let rec do_convert_pt_gen 
       (ty_env : Type.Infer.env)
       (mv : Mvar.t)
-      (p_pt : Theory.pt)
+      (p_pt : Typing.pt)
       (s : S.t) : ghyp * PT.t
     =
     match L.unloc p_pt with
-    | Theory.PT_symb symb -> do_convert_path ty_env mv symb s
-    | Theory.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
-    | Theory.PT_localize p_sub_pt -> 
+    | Typing.PT_symb symb -> do_convert_path ty_env mv symb s
+    | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
+    | Typing.PT_localize p_sub_pt -> 
       let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
       let pt = 
         pt_try_localize
@@ -828,7 +828,7 @@ module Mk (Args : MkArgs) : S with
   and do_convert_pt_app
       (ty_env : Type.Infer.env)
       (init_mv : Mvar.t)
-      (pt_app : Theory.pt_app)
+      (pt_app : Typing.pt_app)
       (s : S.t) : ghyp * PT.t
     =
     let table, env = S.table s, S.vars s in
@@ -837,17 +837,17 @@ module Mk (Args : MkArgs) : S with
       do_convert_pt_gen ty_env init_mv pt_app.pta_head s 
     in
 
-    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
+    let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
 
     (** Apply [pt] to [p_arg] when [pt] is a forall. *)
-    let do_var (pt : PT.t) (p_arg : Theory.term) : PT.t =
+    let do_var (pt : PT.t) (p_arg : Typing.term) : PT.t =
       match destr_forall1_tagged_k Equiv.Any_t pt.form with
       | None ->
         error_pt_cannot_apply (L.loc pt_app.pta_head) pt
 
       | Some ((f_arg, _), _) ->
         let ty = Vars.ty f_arg in
-        let arg, _ = Theory.convert ~ty_env ~pat:true cenv ~ty p_arg in
+        let arg, _ = Typing.convert ~ty_env ~pat:true cenv ~ty p_arg in
 
         pt_apply_var_forall ~arg_loc:(L.loc p_arg) table env pt arg
     in
@@ -893,7 +893,7 @@ module Mk (Args : MkArgs) : S with
        instantiating [f] along the way, 
        and accumulating proof obligations. *)
     let pt =
-      List.fold_left (fun (pt : PT.t) (p_arg : Theory.pt_app_arg) ->
+      List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
           if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
             do_impl pt (pt_app_arg_as_pt p_arg) 
           else
@@ -946,7 +946,7 @@ module Mk (Args : MkArgs) : S with
   let convert_pt_gen
       ~check_compatibility
       ?(close_pats=true)
-      (p_pt : Theory.pt)
+      (p_pt : Typing.pt)
       (s    : S.t)
     : ghyp * Type.tvars * PT.t
     =
@@ -1001,7 +1001,7 @@ module Mk (Args : MkArgs) : S with
   (** Exported. *)
   let convert_pt
       ?close_pats
-      (pt :  Theory.pt)
+      (pt :  Typing.pt)
       (s : S.t)
     : ghyp * Type.tvars * PT.t
     =

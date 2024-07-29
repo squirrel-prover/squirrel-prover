@@ -108,8 +108,8 @@
 %start top_proofmode_or_undo
 %start top_global_formula
 %type <Decl.declarations> declarations
-%type <Theory.term> top_formula
-%type <Theory.global_formula> top_global_formula
+%type <Typing.term> top_formula
+%type <Typing.global_formula> top_global_formula
 %type <SystemExpr.Parse.t> system_expr
 %type <Process.Parse.t> top_process
 %type <ProverLib.input> interactive
@@ -265,27 +265,27 @@ spath:
 
 /* non-ambiguous term */
 sterm_i:
-| id=spath_gen                       { Theory.Symb id }
-| UNDERSCORE                    { Theory.Tpat }
+| id=spath_gen                       { Typing.Symb id }
+| UNDERSCORE                    { Typing.Tpat }
 
-| DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
+| DIFF LPAREN t=term COMMA t0=term RPAREN { Typing.Diff (t,t0) }
 
 | SEQ LPAREN 
   vs=bnd_group_list(lval,ty_tagged) 
-  DARROW t=term RPAREN                    { Theory.Quant (Seq,vs,t) }
+  DARROW t=term RPAREN                    { Typing.Quant (Seq,vs,t) }
 
 | l=loc(NOT) f=sterm
     { let fsymb = L.mk_loc (L.loc l) "not" in
-      Theory.mk_app_i (Theory.mk_symb ([],fsymb)) [f] }
+      Typing.mk_app_i (Typing.mk_symb ([],fsymb)) [f] }
 
-| l=lloc(FALSE)  { Theory.Symb (top_path,L.mk_loc l "false") }
+| l=lloc(FALSE)  { Typing.Symb (top_path,L.mk_loc l "false") }
 
-| l=lloc(TRUE)   { Theory.Symb (top_path,L.mk_loc l "true") }
+| l=lloc(TRUE)   { Typing.Symb (top_path,L.mk_loc l "true") }
 
 | l=paren(slist1(term,COMMA))
     { match l with
       | [t] -> L.unloc t
-      | _ -> Theory.Tuple l }
+      | _ -> Typing.Tuple l }
 
 
 %inline quantif:
@@ -296,40 +296,40 @@ sterm_i:
 term_i:
 | f=sterm_i                         { f }
 
-| t=term AT ts=term                 { Theory.AppAt (t, ts) }
-| t=sterm l=slist1(sterm,empty)     { Theory.App (t,l) }
+| t=term AT ts=term                 { Typing.AppAt (t, ts) }
+| t=sterm l=slist1(sterm,empty)     { Typing.App (t,l) }
 
 | LANGLE t=term COMMA t0=term RANGLE
    { let fsymb = sloc $startpos $endpos "pair" in
-     Theory.mk_app_i (Theory.mk_symb (top_path,fsymb)) [t;t0] }
+     Typing.mk_app_i (Typing.mk_symb (top_path,fsymb)) [t;t0] }
 
 | t=term s=infix_s0 t0=term       
-   { Theory.mk_app_i (Theory.mk_symb (top_path,s)) [t;t0] }
+   { Typing.mk_app_i (Typing.mk_symb (top_path,s)) [t;t0] }
 
 | t=term SHARP i=loc(INT)
-    { Theory.Proj (i,t) }
+    { Typing.Proj (i,t) }
 
 | IF b=term THEN t=term t0=else_term
     { let fsymb = sloc $startpos $endpos "if" in
-      Theory.mk_app_i (Theory.mk_symb (top_path,fsymb)) [b;t;t0] }
+      Typing.mk_app_i (Typing.mk_symb (top_path,fsymb)) [b;t;t0] }
 
 | FIND vs=bnds SUCHTHAT b=term IN t=term t0=else_term
-                                 { Theory.Find (vs,b,t,t0) }
+                                 { Typing.Find (vs,b,t,t0) }
 
 | FUN vs=ext_bnds_tagged DARROW f=term
-                                 { Theory.Quant (Lambda,vs,f)  }
+                                 { Typing.Quant (Lambda,vs,f)  }
 
 | q=quantif vs=ext_bnds_tagged COMMA f=term %prec QUANTIF
-                                 { Theory.Quant (q,vs,f)  }
+                                 { Typing.Quant (q,vs,f)  }
 
 | LET v=lsymb ty=colon_ty? EQ t1=term IN t2=term
-    { Theory.Let (v,t1,ty,t2) }
+    { Typing.Let (v,t1,ty,t2) }
 
 /* non-ambiguous term */
 %inline else_term:
 | %prec empty_else   { let loc = L.make $startpos $endpos in
                        let fsymb = L.mk_loc loc "zero" in
-                       L.mk_loc loc (Theory.Symb (top_path,fsymb)) }
+                       L.mk_loc loc (Typing.Symb (top_path,fsymb)) }
 | ELSE t=term       { t }
 
 sterm:
@@ -351,8 +351,8 @@ simpl_lval:
 
 /* full lvalues */
 %inline lval:
-| l=simpl_lval                          { Theory.L_var l }
-| LPAREN ids=slist1(lsymb,COMMA) RPAREN { Theory.L_tuple ids }
+| l=simpl_lval                          { Typing.L_var l }
+| LPAREN ids=slist1(lsymb,COMMA) RPAREN { Typing.L_tuple ids }
 
 (*------------------------------------------------------------------*)
 /* Auxiliary:
@@ -371,7 +371,7 @@ simpl_lval:
 | LPAREN l=bnd_group_list(simpl_lval,ty) RPAREN { l }
 /* many binders, grouped  */
 
-| x=simpl_lval    { [x, L.mk_loc (L.loc x) Theory.P_ty_pat] }
+| x=simpl_lval    { [x, L.mk_loc (L.loc x) Typing.P_ty_pat] }
 /* single binder `x`, unspecified type */
 
 /* Many binder declarations, strict version
@@ -408,7 +408,7 @@ ty_tagged:
 | LPAREN l=bnd_group_list(simpl_lval,ty_tagged) RPAREN { l }
 
 /* single binder `x`, no argument */
-| x=simpl_lval    { [x, (L.mk_loc (L.loc x) Theory.P_ty_pat, [])] }
+| x=simpl_lval    { [x, (L.mk_loc (L.loc x) Typing.P_ty_pat, [])] }
 
 /* Many binder declarations with tags. */
 bnds_tagged:
@@ -421,7 +421,7 @@ bnds_tagged:
 | LPAREN l=bnd_group_list(lval,ty_tagged) RPAREN { l }
 
 /* single binder `x`, no argument */
-| x=simpl_lval    { [Theory.L_var x, (L.mk_loc (L.loc x) Theory.P_ty_pat, [])] }
+| x=simpl_lval    { [Typing.L_var x, (L.mk_loc (L.loc x) Typing.P_ty_pat, [])] }
 
 /* Many binder declarations with tags (see bnds_strict). */
 ext_bnds_tagged_strict:
@@ -429,7 +429,7 @@ ext_bnds_tagged_strict:
 
 ext_bnds_tagged:
 | ext_bnds_tagged_strict           { $1 }
-| v=simpl_lval COLON ty=ty_tagged  { [Theory.L_var v, ty] }
+| v=simpl_lval COLON ty=ty_tagged  { [Typing.L_var v, ty] }
 
 (*------------------------------------------------------------------*)
 top_formula:
@@ -460,7 +460,7 @@ process_i:
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with
         | Some ty -> ty
-        | None -> L.mk_loc (L.loc id) Theory.P_message
+        | None -> L.mk_loc (L.loc id) Typing.P_message
       in
       Process.Parse.New (id,ty,p) }
 
@@ -524,19 +524,19 @@ se_var:
 
 ty_i:
 | ty=sty_i                          { ty }
-| t1=ty ARROW t2=ty                 { Theory.P_fun (t1, t2) }
-| t1=sty STAR tys=slist1(sty, STAR) { Theory.P_tuple (t1 :: tys) }
+| t1=ty ARROW t2=ty                 { Typing.P_fun (t1, t2) }
+| t1=sty STAR tys=slist1(sty, STAR) { Typing.P_tuple (t1 :: tys) }
 
 sty_i:
-| MESSAGE                        { Theory.P_message }
-| INDEX                          { Theory.P_index }
-| TIMESTAMP                      { Theory.P_timestamp }
-| BOOLEAN                        { Theory.P_boolean }
-| BOOL                           { Theory.P_boolean }
-| tv=ty_var                      { Theory.P_tvar tv }
-| l=path                         { Theory.P_tbase l }
+| MESSAGE                        { Typing.P_message }
+| INDEX                          { Typing.P_index }
+| TIMESTAMP                      { Typing.P_timestamp }
+| BOOLEAN                        { Typing.P_boolean }
+| BOOL                           { Typing.P_boolean }
+| tv=ty_var                      { Typing.P_tvar tv }
+| l=path                         { Typing.P_tbase l }
 | LPAREN ty=ty_i RPAREN          { ty }
-| UNDERSCORE                     { Theory.P_ty_pat }
+| UNDERSCORE                     { Typing.P_ty_pat }
 
 sty:
 | ty=loc(sty_i) { ty }
@@ -979,11 +979,11 @@ sel_tacs:
 
 (*------------------------------------------------------------------*)
 pt_arg:
-| t=sterm                        { Theory.PTA_term t }
+| t=sterm                        { Typing.PTA_term t }
 /* Note: some terms parsed as [sterm] may be resolved as [PTA_sub]
    later, using the judgement hypotheses. */
 
-| PERCENT LPAREN pt=pt RPAREN  { Theory.PTA_sub pt }
+| PERCENT LPAREN pt=pt RPAREN  { Typing.PTA_sub pt }
 
 (*------------------------------------------------------------------*)
 /* ambiguous pt */
@@ -992,8 +992,8 @@ pt_cnt:
 
 | head=spt args=slist1(pt_arg,empty)
     { let pta_loc = L.make $startpos $endpos in
-      let app = Theory.{ pta_head = head; pta_args = args; pta_loc; } in
-      Theory.PT_app app }
+      let app = Typing.{ pta_head = head; pta_args = args; pta_loc; } in
+      Typing.PT_app app }
 
 pt:
 | pt=loc(pt_cnt) { pt }
@@ -1001,8 +1001,8 @@ pt:
 (*------------------------------------------------------------------*)
 /* non-ambiguous pt */
 spt_cnt:
-| head=path                         { Theory.PT_symb head }
-| PERCENT LOCAL LPAREN pt=pt RPAREN { Theory.PT_localize pt }
+| head=path                         { Typing.PT_symb head }
+| PERCENT LOCAL LPAREN pt=pt RPAREN { Typing.PT_localize pt }
 | LPAREN pt=pt_cnt RPAREN
     { pt }
 
@@ -1016,9 +1016,9 @@ pt_use_tac:
 
 | head=spt WITH args=slist1(tac_term,COMMA)
     { let pta_loc = L.make $startpos $endpos in
-      let args = List.map (fun x -> Theory.PTA_term x) args in
-      let app = Theory.{ pta_head = head; pta_args = args; pta_loc; } in
-      L.mk_loc pta_loc (Theory.PT_app app) }
+      let args = List.map (fun x -> Typing.PTA_term x) args in
+      let app = Typing.{ pta_head = head; pta_args = args; pta_loc; } in
+      L.mk_loc pta_loc (Typing.PT_app app) }
 
 (*------------------------------------------------------------------*)
 constseq_arg:
@@ -1050,8 +1050,8 @@ fresh_arg:
 (*------------------------------------------------------------------*)
 /* local or global formula */
 %inline any_term:
-  | f=term           { Theory.Local f }
-  | g=global_formula { Theory.Global g }
+  | f=term           { Typing.Local f }
+  | g=global_formula { Typing.Global g }
 
 tac_any_term:
 | f=any_term %prec tac_prec { f }
@@ -1070,7 +1070,7 @@ have_ip:
 
 %inline have_tac:
 | l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
-    { mk_abstract l "have" [TacticsArgs.Have (ip, Theory.Local p)] }
+    { mk_abstract l "have" [TacticsArgs.Have (ip, Typing.Local p)] }
 
 | l=lloc(HAVE) ip=have_ip COLON p=tac_any_term 
     { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
@@ -1313,31 +1313,31 @@ biframe:
 
 /* ----------------------------------------------------------------------- */
 %inline quant:
-| UFORALL { Theory.PForAll }
-| UEXISTS { Theory.PExists }
+| UFORALL { Typing.PForAll }
+| UEXISTS { Typing.PExists }
 
 se_args:
 | LBRACE l=slist(system_expr,empty) RBRACE { l  }
 |                                          { [] }
 
 global_formula_i:
-| LBRACKET f=term RBRACKET         { Theory.PReach f }
-| TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
-| EQUIV LPAREN e=biframe RPAREN    { Theory.PEquiv e }
+| LBRACKET f=term RBRACKET         { Typing.PReach f }
+| TILDE LPAREN e=biframe RPAREN    { Typing.PEquiv e }
+| EQUIV LPAREN e=biframe RPAREN    { Typing.PEquiv e }
 | LPAREN f=global_formula_i RPAREN { f }
 
-| f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
+| f=global_formula ARROW f0=global_formula { Typing.PImpl (f,f0) }
 
 | q=quant vs=bnds_tagged COMMA f=global_formula %prec QUANTIF
-                                   { Theory.PQuant (q,vs,f)  }
+                                   { Typing.PQuant (q,vs,f)  }
 
 | f1=global_formula GAND f2=global_formula
-                                   { Theory.PAnd (f1, f2) }
+                                   { Typing.PAnd (f1, f2) }
 | f1=global_formula GOR f2=global_formula
-                                   { Theory.POr (f1, f2) }
+                                   { Typing.POr (f1, f2) }
 
 | LLET v=lsymb ty=colon_ty? EQ t=term IN f=global_formula
-    { Theory.PLet (v,t,ty,f) }
+    { Typing.PLet (v,t,ty,f) }
   
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
@@ -1345,10 +1345,10 @@ global_formula_i:
    with a local term */
 a_global_formula_i:
 | name=upath se_args=se_args args=slist(sterm, empty)
-    { Theory.PPred Theory.{ name; se_args; args; }  }
+    { Typing.PPred Typing.{ name; se_args; args; }  }
 
 | t=sterm n=infix_s0 se_args=se_args t0=sterm 
-    { Theory.PPred Theory.{ name = (top_path, n); se_args; args = [t; t0]; }  }
+    { Typing.PPred Typing.{ name = (top_path, n); se_args; args = [t; t0]; }  }
 
 /* ----------------------------------------------------------------------- */
 /* a_global_formula: */
@@ -1426,7 +1426,7 @@ _lemma:
 | GLOBAL lemma_head s=global_statement    { s }
 | EQUIV  s=obs_equiv_statement            { s }
 | EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) 
-    { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
+    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 

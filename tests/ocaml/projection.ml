@@ -16,7 +16,7 @@ let formula_of_string st string : Equiv.local_form =
   let th_tm = Util.parse_from_string Parser.top_formula string in
   let env = Env.init ~table:(Prover.get_table st) () in
   let tm,ty =
-    Theory.convert Theory.{ env ; cntxt = InGoal } th_tm in
+    Typing.convert Typing.{ env ; cntxt = InGoal } th_tm in
   assert (ty = Boolean);
   tm
 

@@ -2153,7 +2153,7 @@ let parse_crypto_args
     let ty_env = Type.Infer.mk_env () in
 
     let env, vars = 
-      Theory.convert_bnds ~ty_env ~mode:NoTags env (odflt [] arg.bnds) 
+      Typing.convert_bnds ~ty_env ~mode:NoTags env (odflt [] arg.bnds) 
     in
 
     let glob_v = 
@@ -2163,14 +2163,14 @@ let parse_crypto_args
           (Failure "unknown global sample")
     in
 
-    let conv_env = Theory.{ env; cntxt = InGoal } in
+    let conv_env = Typing.{ env; cntxt = InGoal } in
     let cond = 
       match arg.cond with
       | None -> []
-      | Some arg -> [fst (Theory.convert ~ty:Type.tboolean ~ty_env conv_env arg)]
+      | Some arg -> [fst (Typing.convert ~ty:Type.tboolean ~ty_env conv_env arg)]
     in
     let name, term = 
-      match fst (Theory.convert ~ty:(Vars.ty glob_v) ~ty_env conv_env arg.term) with
+      match fst (Typing.convert ~ty:(Vars.ty glob_v) ~ty_env conv_env arg.term) with
       | Term.Name (name, terms) -> name, terms
       | _ ->
         Tactics.hard_failure ~loc:(L.loc arg.term) (Failure "must be a name")
@@ -2276,30 +2276,30 @@ module Parse = struct
       [name : ty <$] *)
   type var_rnd = {
     vr_name : lsymb ;
-    vr_ty   : Theory.ty ;
+    vr_ty   : Typing.ty ;
   }
 
   (** a mutable variable declaration 
       [name : ty = init <$;] *)
   type var_decl = {
     vd_name : lsymb ;
-    vd_ty   : Theory.ty option ;
-    vd_init : Theory.term;
+    vd_ty   : Typing.ty option ;
+    vd_init : Typing.term;
   }
 
   (** an oracle body *)
   type oracle_body = {
     bdy_rnds    : var_rnd list ;               (** local random samplings *)
     bdy_lvars   : var_decl list ;              (** local variables *)
-    bdy_updates : (lsymb * Theory.term) list ; (** state updates *)
-    bdy_ret     : Theory.term option ;         (** returned value *)
+    bdy_updates : (lsymb * Typing.term) list ; (** state updates *)
+    bdy_ret     : Typing.term option ;         (** returned value *)
   }
 
   (** an oracle declaration *)
   type oracle_decl = {
     o_name  : lsymb ;
-    o_args  : Theory.bnds ;
-    o_tyout : Theory.ty option ;
+    o_args  : Typing.bnds ;
+    o_tyout : Typing.ty option ;
     o_body  : oracle_body ;
   }
 
@@ -2344,7 +2344,7 @@ module Parse = struct
 
   let parse_sample_decls env (rnds : var_rnd list) =
     List.fold_left (fun (env, smpls) pv -> 
-        let ty = Theory.convert_ty env pv.vr_ty in
+        let ty = Typing.convert_ty env pv.vr_ty in
         let env, v = make_exact_var env pv.vr_name ty in
         (env, v :: smpls)
       ) (env, []) rnds
@@ -2354,19 +2354,19 @@ module Parse = struct
       List.fold_left (fun (env, vdecls) pv -> 
           let ty = 
             match pv.vd_ty with 
-            | Some pty -> Theory.convert_ty env pty
+            | Some pty -> Typing.convert_ty env pty
             | None     -> Type.TUnivar (Type.Infer.mk_univar ty_env)
           in
           let env, var = make_exact_var env pv.vd_name ty in
           let init, _ = 
-            Theory.convert ~ty ~ty_env { env; cntxt = Theory.InGoal; } pv.vd_init 
+            Typing.convert ~ty ~ty_env { env; cntxt = Typing.InGoal; } pv.vd_init 
           in
           (env, { var; init } :: vdecls)
         ) (env, []) p_vdecls
     in
     env, List.rev vdecls
 
-  let parse_updates ty_env (env : Env.t) (p_updates : (lsymb * Theory.term) list) =
+  let parse_updates ty_env (env : Env.t) (p_updates : (lsymb * Typing.term) list) =
     let env, updates =
       List.fold_left (fun (env, updates) (pv, pt) ->         
           let v, _ =
@@ -2374,7 +2374,7 @@ module Parse = struct
             | Not_found -> failure (L.loc pv) (Failure "unknown variable");
           in
           let t, _ = 
-            Theory.convert ~ty:(Vars.ty v) ~ty_env { env; cntxt = Theory.InGoal; } pt
+            Typing.convert ~ty:(Vars.ty v) ~ty_env { env; cntxt = Typing.InGoal; } pt
           in
           (env, (v, t) :: updates)
         ) (env, []) p_updates
@@ -2383,13 +2383,13 @@ module Parse = struct
 
   let parse_oracle_decl ty_env (init_env : Env.t) (po : oracle_decl) =
     let env, args = 
-      Theory.convert_bnds ~ty_env ~mode:NoTags init_env po.o_args 
+      Typing.convert_bnds ~ty_env ~mode:NoTags init_env po.o_args 
     in
 
     (* return type *)
     let tyout = 
       match po.o_tyout with 
-      | Some pty -> Theory.convert_ty env pty
+      | Some pty -> Typing.convert_ty env pty
       | None     -> Type.TUnivar (Type.Infer.mk_univar ty_env)
     in
 
@@ -2413,7 +2413,7 @@ module Parse = struct
         Term.empty
 
       | Some pret ->
-        fst (Theory.convert ~ty:tyout ~ty_env { env; cntxt = Theory.InGoal; } pret)
+        fst (Typing.convert ~ty:tyout ~ty_env { env; cntxt = Typing.InGoal; } pret)
     in
 
     let oracle = {

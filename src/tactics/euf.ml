@@ -11,7 +11,7 @@ module TS = TraceSequent
 
 type sequent = TS.sequent
 
-type lsymb = Theory.lsymb
+type lsymb = Typing.lsymb
 
 module MP = Match.Pos
 module Sp = MP.Sp
@@ -265,7 +265,7 @@ let euf_param
         match O.expand_macro_check_all einfo tpk with
         | App (Fun (g, _), [tk]) ->
           begin
-            match Theory.check_signature table f g, 
+            match Typing.check_signature table f g, 
                   O.expand_macro_check_all einfo tk with
             | Some sg, (Name _ as k) ->
               {ep_key= Name.of_term k; ep_intmsg=m; ep_term=s;

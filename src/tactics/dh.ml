@@ -12,7 +12,7 @@ module TS = TraceSequent
 
 type sequent = TS.sequent
 
-type lsymb = Theory.lsymb
+type lsymb = Typing.lsymb
 
 module MP = Match.Pos
 module Sp = MP.Sp

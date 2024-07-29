@@ -61,14 +61,14 @@ val to_global_statement : ?loc:Location.t -> statement -> global_statement
 module Parsed : sig
 
   type contents =
-  | Local     of Theory.term
-  | Global    of Theory.global_formula
+  | Local     of Typing.term
+  | Global    of Typing.global_formula
   | Obs_equiv   (** All the information is in the system expression. *)
 
   type t = {
     name    : Symbols.lsymb option;
     ty_vars : Symbols.lsymb list;
-    vars    : Theory.bnds_tagged;
+    vars    : Typing.bnds_tagged;
     system  : SE.Parse.sys;
     formula : contents
   }

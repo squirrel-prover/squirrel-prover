@@ -388,15 +388,15 @@ module Parse = struct
   (** A parsed process *)
   type cnt =
     | Null
-    | New      of lsymb * Theory.ty * t
+    | New      of lsymb * Typing.ty * t
     | In       of Symbols.p_path * lsymb * t
-    | Out      of Symbols.p_path * Theory.term * t
+    | Out      of Symbols.p_path * Typing.term * t
     | Parallel of t * t
-    | Set      of Symbols.p_path * Theory.term list * Theory.term * t
-    | Let      of lsymb * Theory.term * Theory.ty option * t
+    | Set      of Symbols.p_path * Typing.term list * Typing.term * t
+    | Let      of lsymb * Typing.term * Typing.ty option * t
     | Repl     of lsymb * t
-    | Exists   of lsymb list * Theory.term * t * t
-    | Apply    of Symbols.p_path * Theory.term list
+    | Exists   of lsymb list * Typing.term * t * t
+    | Apply    of Symbols.p_path * Typing.term list
     | Alias    of t * lsymb
 
   and t = cnt L.located
@@ -408,7 +408,7 @@ let is_out p = is_out_i (L.unloc p)
 
 (** Type checking for processes *)
 let parse
-    table ~(args : Theory.bnds) (projs : Term.projs) (process : Parse.t) 
+    table ~(args : Typing.bnds) (projs : Term.projs) (process : Parse.t) 
   : proc_decl
   =
 
@@ -416,7 +416,7 @@ let parse
   let ty_env = Type.Infer.mk_env () in
 
   let env = Env.init ~table () in
-  let env, args = Theory.convert_bnds ~ty_env ~mode:NoTags env args in
+  let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env args in
 
   (* create a variable holding the current time-point *)
   let env, time =
@@ -425,8 +425,8 @@ let parse
     in
     { env with vars; }, time
   in
-  let cntxt = Theory.InProc (projs, Term.mk_var time) in
-  let mk_cenv env = Theory.{ env; cntxt; } in
+  let cntxt = Typing.InProc (projs, Term.mk_var time) in
+  let mk_cenv env = Typing.{ env; cntxt; } in
 
   let rec doit (ty_env : Type.Infer.env) (env : Env.t) (proc : Parse.t) : proc =
     let loc = L.loc proc in
@@ -434,7 +434,7 @@ let parse
     | Parse.Null -> Null
 
     | Parse.New (x, ty, p) -> 
-      let ty = Theory.convert_ty ~ty_env env ty in 
+      let ty = Typing.convert_ty ~ty_env env ty in 
       let vars, x = Vars.make_local `Shadow env.vars ty (L.unloc x) in
       New (x, ty, doit ty_env { env with vars } p)
 
@@ -452,7 +452,7 @@ let parse
         error ~loc (StrictAliasError "missing alias");
 
       let m, _ =
-        Theory.convert ~ty_env ~ty:Type.tmessage (mk_cenv env) m 
+        Typing.convert ~ty_env ~ty:Type.tmessage (mk_cenv env) m 
       in
 
       let p = doit ty_env env p in
@@ -473,21 +473,21 @@ let parse
         | Symbols.State (arity,ty,_) ->
           (* updating a macro requires to use it in eta-long form *)
           if arity <> nb_args then
-            Theory.conv_err (Symbols.p_path_loc s_p)
+            Typing.conv_err (Symbols.p_path_loc s_p)
               (Arity_error (Symbols.p_path_to_string s_p,nb_args,arity));
           ty
           
         | _ ->
-          Theory.conv_err (Symbols.p_path_loc s_p)
+          Typing.conv_err (Symbols.p_path_loc s_p)
             (Assign_no_state (Symbols.p_path_to_string s_p))
       in
 
       let l =
         List.map (fun x ->
-            fst @@ Theory.convert ~ty_env ~ty:Type.tindex (mk_cenv env) x
+            fst @@ Typing.convert ~ty_env ~ty:Type.tindex (mk_cenv env) x
           ) l
       in
-      let m, _ = Theory.convert ~ty_env ~ty (mk_cenv env) m in
+      let m, _ = Typing.convert ~ty_env ~ty (mk_cenv env) m in
       Set (s, l, m, doit ty_env env p)
 
     | Parse.Parallel (p, q) ->
@@ -496,10 +496,10 @@ let parse
     | Parse.Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
-        | Some pty -> Theory.convert_ty ~ty_env env pty 
+        | Some pty -> Typing.convert_ty ~ty_env env pty 
       in
 
-      let t, _ = Theory.convert ~ty_env ~ty (mk_cenv env) t in
+      let t, _ = Typing.convert ~ty_env ~ty (mk_cenv env) t in
       let vars, x = Vars.make_local `Shadow env.vars ty (L.unloc x) in
       Let (x, t, ty, doit ty_env { env with vars } p)
 
@@ -517,7 +517,7 @@ let parse
       in
       let env = { env with vars } in
       let test, _ =
-        Theory.convert ~ty_env ~ty:Type.tboolean (mk_cenv env) test
+        Typing.convert ~ty_env ~ty:Type.tboolean (mk_cenv env) test
       in
       let p = doit ty_env env p in
       Exists (vs, test, p, q)
@@ -535,7 +535,7 @@ let parse
 
       let args = 
         List.map2 (fun v t ->
-            fst @@ Theory.convert ~ty_env ~ty:(Vars.ty v) (mk_cenv env) t
+            fst @@ Typing.convert ~ty_env ~ty:(Vars.ty v) (mk_cenv env) t
           )
           p.args args
       in
@@ -577,10 +577,10 @@ let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
 (** Declare a new declared process. *)
 let declare
     (table : Symbols.table)
-    ~(id : lsymb) ~(args : Theory.bnds) ~(projs : lsymb list option)
+    ~(id : lsymb) ~(args : Typing.bnds) ~(projs : lsymb list option)
     (proc : Parse.t)
   =
-  let projs = Theory.parse_projs projs in
+  let projs = Typing.parse_projs projs in
 
   (* type-check and declare *)
   let pdecl = parse table ~args projs proc in

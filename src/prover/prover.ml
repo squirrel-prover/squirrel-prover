@@ -412,7 +412,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
   let t = match q with
     | ProverLib.Srch_inSys (t,_)
     | ProverLib.Srch_term t -> t in
-  let cntxt = Theory.{ env; cntxt = InGoal; } in
+  let cntxt = Typing.{ env; cntxt = InGoal; } in
   let ty_env = Type.Infer.mk_env () in
 
   let find (t:Term.term) =
@@ -447,10 +447,10 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
   match t with
   | Local p -> 
-    let t = fst (Theory.convert ~ty_env ~pat:true cntxt p) in
+    let t = fst (Typing.convert ~ty_env ~pat:true cntxt p) in
     find t
   | Global f ->
-    let t = Theory.convert_global_formula ~ty_env ~pat:true cntxt f in
+    let t = Typing.convert_global_formula ~ty_env ~pat:true cntxt f in
     let pat_op_vars =
       Vars.Tag.local_vars ~const:true
         (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))

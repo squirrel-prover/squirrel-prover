@@ -2,9 +2,9 @@
 
 open Squirrelcore
 open Squirrelfront
-(* Insist that we need Prover from Squirrellib, not Squirreltests.
- * TODO is this an OCaml bug?! *)
+
 module Prover = Squirrelprover.Prover
+module Typing = Squirrelcore.Typing
 
 let catch_error (f:unit -> unit) () : unit  =
   try 
@@ -27,11 +27,11 @@ let parse_from_string
 
 let term_from_string (s:string) =
   let t = parse_from_string Parser.top_formula s in
-  Theory.Local t
+  Typing.Local t
 
 let global_formula_from_string (s:string) =
   let t = parse_from_string Parser.top_global_formula s in
-  Theory.Global t
+  Typing.Global t
 
 let sexpr_from_string (s:string) =
   parse_from_string Parser.system_expr s 
@@ -53,9 +53,9 @@ let find_in_sys_from_string s st =
     end
   in
   let x = match term_from_string s with 
-    | Theory.Local x -> x
+    | Typing.Local x -> x
     | _ -> assert false
   in
-  let cntxt = Theory.{ env; cntxt = InGoal; } in
-  let x,_ = Theory.convert cntxt x in
+  let cntxt = Typing.{ env; cntxt = InGoal; } in
+  let x,_ = Typing.convert cntxt x in
   x

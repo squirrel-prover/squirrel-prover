@@ -106,14 +106,14 @@ let to_global_statement ?loc stmt =
 module Parsed = struct
 
   type contents =
-    | Local     of Theory.term
-    | Global    of Theory.global_formula
+    | Local     of Typing.term
+    | Global    of Typing.global_formula
     | Obs_equiv   (** All the information is in the system expression. *)
 
   type t = {
     name    : Symbols.lsymb option;
     ty_vars : Symbols.lsymb list;
-    vars    : Theory.bnds_tagged;
+    vars    : Typing.bnds_tagged;
     system  : SE.Parse.sys;
     formula : contents
   }
@@ -176,14 +176,14 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       | Local  _ -> Vars.Tag.make Vars.Local
       | Global _ | Obs_equiv -> Vars.Tag.gtag
     in
-    Theory.convert_bnds_tagged ~ty_env ~mode:(DefaultTag var_tag) env vars
+    Typing.convert_bnds_tagged ~ty_env ~mode:(DefaultTag var_tag) env vars
   in
 
-  let conv_env = Theory.{ env; cntxt = InGoal } in
+  let conv_env = Typing.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
     | Local f ->
-      let f,_ = Theory.convert ~ty_env conv_env ~ty:Type.Boolean f in
+      let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.Boolean f in
       let s = TS.init ~no_sanity_check:true ~env f in
 
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
@@ -217,7 +217,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       formula, Local s
 
     | Global f ->
-      let f = Theory.convert_global_formula ~ty_env conv_env f in
+      let f = Typing.convert_global_formula ~ty_env conv_env f in
       let s = ES.init ~no_sanity_check:true ~env f in
       let formula = Equiv.Global (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Global s
