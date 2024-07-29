@@ -31,7 +31,7 @@ module Parse : sig
   (** A parsed process *)
   type cnt =
     | Null                                        (** Null process *)
-    | New of lsymb * Theory.p_ty * t              (** Name creation *)
+    | New of lsymb * Theory.ty * t              (** Name creation *)
     | In  of Symbols.p_path * lsymb * t           (** Input *)
     | Out of Symbols.p_path * Theory.term * t     (** Output *)
     | Parallel of t * t                           (** Parallel composition *)
@@ -40,7 +40,7 @@ module Parse : sig
     (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
         FIXME: for now, we only allow argument of type index. *)
 
-    | Let of lsymb * Theory.term * Theory.p_ty option * t 
+    | Let of lsymb * Theory.term * Theory.ty option * t 
     (** Local definition, optional type information *)
 
     | Repl of lsymb * t

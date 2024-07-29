@@ -13,7 +13,7 @@ type lsymb = Symbols.lsymb
 (** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
 type c_ty = {
   cty_space : lsymb;
-  cty_ty    : Theory.p_ty;
+  cty_ty    : Theory.ty;
 }
 
 type c_tys = c_ty list
@@ -23,7 +23,7 @@ type c_tys = c_ty list
 type state_macro_decl = {
   name      : lsymb;
   args      : Theory.bnds;
-  out_ty    : Theory.p_ty option;
+  out_ty    : Theory.ty option;
   init_body : Theory.term;
 }
 
@@ -31,7 +31,7 @@ type state_macro_decl = {
 (** Information for a name declaration *)
 type name_decl = {
   n_name : lsymb ;
-  n_ty   : Theory.p_ty list;
+  n_ty   : Theory.ty list;
 }
 
 (*------------------------------------------------------------------*)
@@ -84,7 +84,7 @@ type operator_decl = {
   op_symb_type : Symbols.symb_type;
   op_tyargs    : lsymb list;
   op_args      : Theory.ext_bnds;
-  op_tyout     : Theory.p_ty option;
+  op_tyout     : Theory.ty option;
   op_body      : [`Concrete of Theory.term | `Abstract];
 }
 
@@ -151,7 +151,7 @@ type declaration_i =
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
   | Decl_action    of action_decl
-  | Decl_name      of lsymb * Theory.p_ty
+  | Decl_name      of lsymb * Theory.ty
   | Decl_state     of state_macro_decl
   | Decl_operator  of operator_decl
   | Decl_predicate of predicate_decl

@@ -71,14 +71,14 @@ module Parse : sig
       [name : ty <$] *)
   type var_rnd = {
     vr_name : lsymb ;
-    vr_ty   : Theory.p_ty ;
+    vr_ty   : Theory.ty ;
   }
 
   (** a mutable variable declaration 
       [name : ty = init <$;] *)
   type var_decl = {
     vd_name : lsymb ;
-    vd_ty   : Theory.p_ty option ;
+    vd_ty   : Theory.ty option ;
     vd_init : Theory.term;
   }
 
@@ -94,7 +94,7 @@ module Parse : sig
   type oracle_decl = {
     o_name  : lsymb ;
     o_args  : Theory.bnds ;
-    o_tyout : Theory.p_ty option ;
+    o_tyout : Theory.ty option ;
     o_body  : oracle_body ;
   }
 

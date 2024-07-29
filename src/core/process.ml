@@ -388,12 +388,12 @@ module Parse = struct
   (** A parsed process *)
   type cnt =
     | Null
-    | New      of lsymb * Theory.p_ty * t
+    | New      of lsymb * Theory.ty * t
     | In       of Symbols.p_path * lsymb * t
     | Out      of Symbols.p_path * Theory.term * t
     | Parallel of t * t
     | Set      of Symbols.p_path * Theory.term list * Theory.term * t
-    | Let      of lsymb * Theory.term * Theory.p_ty option * t
+    | Let      of lsymb * Theory.term * Theory.ty option * t
     | Repl     of lsymb * t
     | Exists   of lsymb list * Theory.term * t * t
     | Apply    of Symbols.p_path * Theory.term list

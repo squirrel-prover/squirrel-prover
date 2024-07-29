@@ -9,23 +9,23 @@ type lsymb = string L.located
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
 
-type p_ty_i =
+type ty_i =
   | P_message
   | P_boolean
   | P_index
   | P_timestamp
   | P_tbase  of Symbols.p_path
   | P_tvar   of lsymb
-  | P_fun    of p_ty * p_ty
-  | P_tuple  of p_ty list
+  | P_fun    of ty * ty
+  | P_tuple  of ty list
   | P_ty_pat
 
-and p_ty = p_ty_i L.located
+and ty = ty_i L.located
   
 (*------------------------------------------------------------------*)
 (** Parsed binder *)
     
-type bnd = lsymb * p_ty
+type bnd = lsymb * ty
 
 type bnds = bnd list
 
@@ -36,7 +36,7 @@ type var_tags = lsymb list
 (*------------------------------------------------------------------*)
 (** Parsed binder with tags *)
     
-type bnd_tagged = lsymb * (p_ty * var_tags)
+type bnd_tagged = lsymb * (ty * var_tags)
 
 type bnds_tagged = bnd_tagged list
 
@@ -48,7 +48,7 @@ type lval =
   | L_tuple of lsymb list 
 
 (** Extended binders (with variable tags) *)
-type ext_bnd = lval * (p_ty * var_tags)
+type ext_bnd = lval * (ty * var_tags)
 type ext_bnds = ext_bnd list
 
 (*------------------------------------------------------------------*)
@@ -62,7 +62,7 @@ type term_i =
   | Find  of bnds * term * term * term
   | Tuple of term list
   | Proj  of int L.located * term
-  | Let   of lsymb * term * p_ty option * term
+  | Let   of lsymb * term * ty option * term
   | Symb  of Symbols.p_path
   | App   of term * term list
   | AppAt of term * term
@@ -117,7 +117,7 @@ and global_formula_i =
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds_tagged * global_formula
-  | PLet    of lsymb * term * p_ty option * global_formula
+  | PLet    of lsymb * term * ty option * global_formula
            
 (*------------------------------------------------------------------*)
 (** {2 Any term: local or global} *)
@@ -244,7 +244,7 @@ let pp_error pp_loc_err ppf (loc,e) =
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
 
-let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
+let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
   let convert_ty = convert_ty ?ty_env in
 
   match L.unloc pty with
