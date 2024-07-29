@@ -191,36 +191,37 @@ type crypto_args = crypto_arg list
 
 (** A parsed tactic argument. *)
 type parser_arg =
-  | String_name  of lsymb
-  | Int_parsed   of int L.located
-  | Theory       of Typing.term
+  | String_name    of lsymb
+  | Int_parsed     of int L.located
+  | Theory         of Typing.term
 
-  | NamingPat    of naming_pat
-  | IntroPat     of intro_pattern list
-  | AndOrPat     of and_or_pat
-  | SimplPat     of simpl_pat
+  | NamingPat      of naming_pat
+  | IntroPat       of intro_pattern list
+  | AndOrPat       of and_or_pat
+  | SimplPat       of simpl_pat
 
-  | Fresh        of named_args * fresh_arg option
-  | RewriteIn    of rw_arg list * in_target
-  | RewriteEquiv of rw_equiv_item
-  | Trans        of trans_arg
-  | ApplyIn      of named_args * Typing.pt * apply_in
-  | Weak         of weak_arg
-  | Have         of have_arg
-  | HavePt       of have_pt_arg
-  | Named_args   of named_args
+  | Fresh          of named_args * fresh_arg option
+  | RewriteIn      of rw_arg list * in_target
+  | RewriteEquiv   of rw_equiv_item
+  | RewriteOracle  of Typing.term * int L.located
+  | Trans          of trans_arg
+  | ApplyIn        of named_args * Typing.pt * apply_in
+  | Weak           of weak_arg
+  | Have           of have_arg
+  | HavePt         of have_pt_arg
+  | Named_args     of named_args
       (** Named arguments whose values are just symbols. *)
   | Named_args_gen of parser_arg named_arg list
       (** General named arguments whose values are [parser_arg]s. *)
-  | SplitSeq     of int L.located * Typing.term * Typing.term option
-  | ConstSeq     of int L.located * (Typing.term * Typing.term) list
-  | MemSeq       of int L.located * int L.located
-  | Remember     of Typing.term * lsymb
-  | Generalize   of Typing.term list * naming_pat list option
-  | Fa           of fa_arg list
-  | TermPat      of int * Typing.term
-  | DH           of dh_arg
-  | Crypto       of Symbols.p_path * crypto_args
+  | SplitSeq       of int L.located * Typing.term * Typing.term option
+  | ConstSeq       of int L.located * (Typing.term * Typing.term) list
+  | MemSeq         of int L.located * int L.located
+  | Remember       of Typing.term * lsymb
+  | Generalize     of Typing.term list * naming_pat list option
+  | Fa             of fa_arg list
+  | TermPat        of int * Typing.term
+  | DH             of dh_arg
+  | Crypto         of Symbols.p_path * crypto_args
 
 type parser_args = parser_arg list
       

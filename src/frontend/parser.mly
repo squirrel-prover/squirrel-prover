@@ -1055,6 +1055,9 @@ fresh_arg:
 %inline rewrite_equiv:
 | REWRITE EQUIV { }
 
+%inline rewrite_oracle:
+| REWRITE ORACLE { }
+
 (*------------------------------------------------------------------*)
 /* local or global formula, un-ambiguous */
 /* %inline any_sform: */
@@ -1316,6 +1319,9 @@ tac:
 
   | l=lloc(rewrite_equiv) p=rw_equiv_item
     { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
+
+  | l=lloc(rewrite_oracle) t=term IN i=loc(INT)
+    { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, i)] }
 
   | l=lloc(APPLY) a=named_args t=pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
