@@ -290,7 +290,7 @@ Proof.
 
         (* find condB => condA *)
         - intro _. 
-          have A := %local(unique_outputs i j i0 j0). 
+          have A := localize(unique_outputs i j i0 j0). 
           (have [A1 A2] := A _ _; 1,2: auto); clear A.
           use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
           auto.
@@ -305,7 +305,7 @@ Proof.
 
         (* find condB => condA *)
         - intro _.
-          have A := %local(unique_outputs i j i0 j0). 
+          have A := localize(unique_outputs i j i0 j0). 
           (have [A1 A2] := A _ _; 1,2: auto); clear A.
           use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
           auto.

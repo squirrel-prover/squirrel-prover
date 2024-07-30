@@ -99,6 +99,7 @@
   "trans"
   "sym"
   "have"
+  "ghave"
   "case"
   "const"
   "adv"

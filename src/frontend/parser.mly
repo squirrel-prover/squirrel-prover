@@ -49,7 +49,7 @@
 %token GAME VAR RND RETURN
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE USE
 %token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -735,6 +735,7 @@ declaration_i:
 |  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
+/* declares the default system */
 | SYSTEM system_option=system_option sprojs=projs p=processes
   { Decl.Decl_system { 
         sname      = None;
@@ -742,6 +743,7 @@ declaration_i:
         sprojs;
         sprocess   = p; } }
 
+/* declares a named system */
 | SYSTEM system_option=system_option sprojs=projs id=lsymb EQ p=processes
    { Decl.Decl_system { 
          sname      = Some id;
@@ -749,27 +751,31 @@ declaration_i:
          sprojs;
          sprocess   = p} }
 
-| SYSTEM id=lsymb EQ from_sys=system_expr WITH modifier=system_modifier
-    { Decl.(Decl_system_modifier
-              { from_sys = from_sys;
-                modifier;
-                name = id}) }
-
  | g=game { Decl.Decl_game g }
 
  | NAMESPACE n=npath { Decl.Namespace_cmd (Enter n) }
  | END       n=npath { Decl.Namespace_cmd (Exit  n) }
  | OPEN      n=npath { Decl.Namespace_cmd (Open  n) }
 
+/* declaration that must always be followed by the terminator symbol `.` */
 declaration_no_concat_i:
 | TACTIC lsymb EQ tac                     { Decl.Tactic ($2,$4) }
 
+/* system modifiers */
+| SYSTEM id=lsymb EQ from_sys=system_expr WITH modifier=system_modifier
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier;
+                name = id}) }
+
+(*------------------------------------------------------------------*)
 declaration:
 | ldecl=loc(declaration_i)                { ldecl }
 
 declaration_no_concat:
 | ldecl=loc(declaration_no_concat_i)      { ldecl }
 
+(*------------------------------------------------------------------*)
 declaration_list:
 | decl=declaration                        { [decl] }
 | decl=declaration_no_concat              { [decl] }
@@ -1002,7 +1008,7 @@ pt:
 /* non-ambiguous pt */
 spt_cnt:
 | head=path ty_args=ty_args?         { Typing.PT_symb (head,ty_args) }
-| PERCENT LOCAL LPAREN pt=pt RPAREN  { Typing.PT_localize pt }
+| LOCALIZE LPAREN pt=pt RPAREN  { Typing.PT_localize pt }
 | LPAREN pt=pt_cnt RPAREN
     { pt }
 
@@ -1048,13 +1054,20 @@ fresh_arg:
 | REWRITE EQUIV { }
 
 (*------------------------------------------------------------------*)
-/* local or global formula */
-%inline any_term:
-  | f=term           { Typing.Local f }
-  | g=global_formula { Typing.Global g }
+/* local or global formula, un-ambiguous */
+/* %inline any_sform: */
+/*   |        f=sterm          { Typing.Local f  } /\* default to local formulas *\/ */
+/*   | LOCAL  f=sterm          { Typing.Local f  } */
+/*   | GLOBAL g=global_formula { Typing.Global g } */
 
-tac_any_term:
-| f=any_term %prec tac_prec { f }
+/* local or global formula, ambiguous */
+%inline any_form:
+  |        f=term           { Typing.Local f  } /* default to local formulas */
+  | LOCAL  f=term           { Typing.Local f  }
+  | GLOBAL g=global_formula { Typing.Global g }
+
+tac_any_form:
+| f=any_form %prec tac_prec { f }
 
 (*------------------------------------------------------------------*)
 /* have ip (with AS keyword) for legacy usage (no support for s_items) */
@@ -1065,11 +1078,17 @@ have_ip:
 | pre=slist(s_item,empty) ip=simpl_ip post=slist(s_item,empty) { (pre, ip, post) }
 
 %inline have_tac:
+/* legacy syntax */
 | l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
     { mk_abstract l "have" [TacticsArgs.Have (ip, Typing.Local p)] }
 
-| l=lloc(HAVE) ip=have_ip COLON p=tac_any_term 
+/* have ip : any_form */
+| l=lloc(HAVE) ip=have_ip COLON p=tac_any_form
     { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
+
+/* have ip : global_form */
+| l=lloc(GHAVE) ip=have_ip COLON p=global_formula
+    { mk_abstract l "have" [TacticsArgs.Have (Some ip, Typing.Global p)] }
 
 (*------------------------------------------------------------------*)
 /* diffie-hellman tactics arguments */
@@ -1316,6 +1335,7 @@ se_args:
 | LBRACE l=slist(system_expr,empty) RBRACE { l  }
 |                                          { [] }
 
+/* ----------------------------------------------------------------------- */
 global_formula_i:
 | LBRACKET f=term RBRACKET         { Typing.PReach f }
 | TILDE LPAREN e=biframe RPAREN    { Typing.PEquiv e }
@@ -1337,12 +1357,12 @@ global_formula_i:
   
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
-/* ambiguous global formula, in the sens that it can be confused 
-   with a local term */
-a_global_formula_i:
 | name=upath se_args=se_args args=slist(sterm, empty)
     { Typing.PPred Typing.{ name; se_args; args; }  }
 
+/* ambiguous global formula, in the sens that it can be confused
+   with a local term */
+a_global_formula_i:
 | t=sterm n=infix_s0 se_args=se_args t0=sterm 
     { Typing.PPred Typing.{ name = (top_path, n); se_args; args = [t; t0]; }  }
 
@@ -1474,9 +1494,9 @@ _query:
 | PRINT l=spath_gen          { ProverLib.(Print (Pr_any l)) }
 | PRINT                      { ProverLib.(Print (Pr_system None)) }
 (* search *)
-| SEARCH t=any_term IN s=system_expr 
+| SEARCH t=any_form IN s=system_expr 
                               { ProverLib.(Search (Srch_inSys (t,s))) }
-| SEARCH t=any_term           { ProverLib.(Search (Srch_term t)) }
+| SEARCH t=any_form           { ProverLib.(Search (Srch_term t)) }
 
 query:
 | x=_query TERMINAL { x }

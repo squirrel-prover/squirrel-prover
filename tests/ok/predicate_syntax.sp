@@ -18,11 +18,11 @@ predicate Foo5 ['a] {set equiv S}
  =
  [u = v && v = w] /\ equiv(y,z,u,v,w) /\ [x => v = w].
 
-global axiom _ : $(Foo0{[default]} empty empty empty).
+global axiom _ : Foo0{[default]} empty empty empty.
 
-global axiom _ : $(Foo1{[default] [default]}).
+global axiom _ : Foo1{[default] [default]}.
 
-global axiom _ : $(Foo2{[default/left, default/right] [default]}).
+global axiom _ : Foo2{[default/left, default/right] [default]}.
 
 predicate a0 ['a 'b] {set} {set: (u : 'a, v : 'b)} =
   Exists (f : ('a -> 'b)[adv]), [f u = v].

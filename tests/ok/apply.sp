@@ -392,7 +392,7 @@ global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
-  have A  := %local(bar x y); 1: apply foo2. 
+  have A  := localize(bar x y); 1: apply foo2. 
 
   checkfail apply A in H exn Failure. 
   (* Failure: cannot match a local lemma in a global hypothesis  *)
@@ -407,7 +407,7 @@ global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
-  have A := %local(bar x y _); 1: apply foo2.  
+  have A := localize(bar x y _); 1: apply foo2.  
 
   checkfail apply A in H exn Failure. 
   (* Failure: cannot match a local lemma in a global hypothesis  *)

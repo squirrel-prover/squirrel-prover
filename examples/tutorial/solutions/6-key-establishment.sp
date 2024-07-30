@@ -193,7 +193,8 @@ Proof.
 Qed.
 
 (* Show that the following equivalence is false, using `rewrite equiv`.
-   You'll have to introduce an intermediate step using `have`.
+   You'll have to introduce an intermediate global formula using `ghave` 
+   (`ghave` behaves as `have`, except that it takes a global formula).
    Warning: incorrectly using `rewrite equiv` does not cause a failure
    but can result in an unprovable goal. *)
 global lemma [default/left,default/left] rewrite_equiv_2 :
@@ -201,7 +202,7 @@ global lemma [default/left,default/left] rewrite_equiv_2 :
 Proof.
   (* BEGIN EXO *)
   intro H.
-  have H' : [n1=n2].
+  ghave H' : [n1=n2].
   rewrite equiv -H.
   auto.
   auto. 
@@ -243,7 +244,7 @@ global lemma [set:default/left; equiv:default] hash_6 :
 Proof.
   (* BEGIN EXO *)
   intro H.
-  have E : equiv(diff(h(a,k),n1),diff(h(b,k),n2)). {
+  ghave E : equiv(diff(h(a,k),n1),diff(h(b,k),n2)). {
     prf 0; 1:auto.
     prf 1.
     fresh 0; 1:auto.

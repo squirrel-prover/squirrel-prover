@@ -176,6 +176,7 @@ let rec token buf =
   | "gprf" -> !?GPRF
   | "hash" -> !?HASH
   | "have" -> !?HAVE
+  | "ghave" -> !?GHAVE
   | "help" -> !?HELP
   | "hint" -> !?HINT
   | "if" -> !?IF

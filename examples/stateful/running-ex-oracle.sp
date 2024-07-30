@@ -127,7 +127,7 @@ Proof.
 
     + (* A(i0,j) *)
       intro [i0 j Eq]; rewrite Eq in *; clear Eq.
-      have [Neq | Eq] : [i <> i0 || i = i0]; 1:auto. 
+      ghave [Neq | Eq] : [i <> i0 || i = i0]; 1:auto. 
        - (* 1st case: i<>i0 *)
           use IH with pred(A(i0,j)) => //.
           destruct H as [H1 | [j0 H2]].

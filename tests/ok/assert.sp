@@ -59,7 +59,7 @@ Qed.
 global lemma _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
 Proof.
   intro H.
-  have T: [a = b]; 
+  ghave T: [a = b]; 
     1: by apply ax.
   rewrite T.
   by apply H.
@@ -69,7 +69,7 @@ Qed.
 lemma _ (i:message) : b = c => a = c.
 Proof.
   intro H.
-  have T: [a = b];
+  ghave T: [a = b];
     1: by apply ax.
   rewrite T.
   by apply H.
@@ -79,7 +79,7 @@ Qed.
 lemma _ (i:message) : output@init = empty => b = c => a = c.
 Proof.
   intro H1 H2.
-  have T: [a = b]. 
+  ghave T: [a = b]. 
 
   (* check that [H1] as been cleared, since it is not a pure trace formula. *)
   have H1 : true by auto.
@@ -101,7 +101,7 @@ global lemma [set:default/left; equiv:default] _ :
   [a <> b] -> [h(a,k) <> h(b,k)].
 Proof.
   intro U.
-  have H : equiv(diff(h(a,k),n),diff(h(b,k),m)). 
+  ghave H : equiv(diff(h(a,k),n),diff(h(b,k),m)). 
   prf 0 => //.
   prf 1 => //.
   fresh 0 => //.

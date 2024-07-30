@@ -291,7 +291,7 @@ Proof.
   
   (* I part *)
   + intro i j; intro H0 H1 Hap Hap0.
-    have A := %local(authI i j).
+    have A := localize(authI i j).
     (have [Clt Meq0 Meq] := A _ _; 1,2: auto); clear A.
     
     case try find il jl kl ll such that _ in idealkeys(il,jl,kl,ll) else _.
@@ -310,7 +310,7 @@ Proof.
   (* R part *)
   + intro k l; intro H0 H1 Hap Hap0.
 
-    have A := %local(authR k l).
+    have A := localize(authR k l).
     (have [l0 [Clt Meq0 Meq]] := A _ _; 1,2: auto); clear A.
 
     case try find il jl kl ll such that _
