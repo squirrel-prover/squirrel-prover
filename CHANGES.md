@@ -1,3 +1,17 @@
+### syntax change for global formulas
+  [commit: `71c81505`, **breaking change**]
+  
+  A modification of the syntax of global formulas created a few syntax changes:
+  
+  - ambiguities in some commands must now be manually resolved.
+    + `have ip : any_form` becomes `have ip : local_form` or
+      `ghave ip : global_form`
+    + `search any_form` becomes `search local_form`, 
+      `search local(local_form)` or `search global(global_form)`
+
+  - localizing a proof-term `pt` is now done by writing `localize(pt)`,
+    rather than `%local(pt)`.
+
 ### type argument
   [commit: `4202b3e3`]
 
@@ -8,7 +22,8 @@
   The same syntax can be used to instantiate the type arguments of a
   lemma in a proof-term.
 
-- **arguments for s_items**, [commit: `4202b3e3`, **breaking change**]
+### arguments for s_items
+  [commit: `4202b3e3`, **breaking change**]
 
   The syntax to provide named arguments to `s_item` such as `//`,
   `/=`, etc, has been changed from `[// ~arg1:foo ~arg2 ...]` to 
