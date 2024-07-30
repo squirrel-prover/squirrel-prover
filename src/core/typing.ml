@@ -94,12 +94,13 @@ let var_i loc x : term_i = Symb (([],L.mk_loc loc x), None)
 let var loc x : term = L.mk_loc loc (var_i loc x)
 
 (*------------------------------------------------------------------*)
-(** {2 Equivalence formulas} *)
+(** {2 Global formulas} *)
 
 (** global predicate application *)
 type pred_app = {
-  name    : Symbols.p_path;      (** predicate symbol *)
-  se_args : SE.Parse.t list;    (** system arguments *)
+  name    : Symbols.p_path;     (** predicate symbol *)
+  se_args : SE.Parse.t list;    (** optional system arguments *)
+  ty_args : ty list option;     (** optional type arguments *)
   args    : term list;          (** multi-term and term arguments *)
 }
 
@@ -1275,8 +1276,18 @@ let declare_abstract
 let empty loc = mk_symb ([],L.mk_loc loc "empty")
 
 (*------------------------------------------------------------------*)
-(** {2 Convert equiv formulas} *)
+(** {2 Convert global formulas} *)
 
+(*------------------------------------------------------------------*)
+let error_wrong_number_ty_args loc ~(expected : Type.ty list) ~(got : Type.ty list) =
+  let err_str =
+    Fmt.str "@[<v 0>wrong number of type variables: \
+             expected %d, got %d@]"
+      (List.length expected) (List.length got)
+  in
+  conv_err loc (Failure err_str)
+
+(*------------------------------------------------------------------*)
 let parse_se_subst
     (pred_loc : L.t) 
     (env      : Env.t)
@@ -1342,12 +1353,32 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   let pred = Predicate.get table psymb in
 
   (* refresh all type variables in [pred.ty_vars] and substitute *)
-  let ty_args, ts = Type.Infer.open_tvars st.ty_env pred.ty_vars in
+  let ty_vars, ts = Type.Infer.open_tvars st.ty_env pred.ty_vars in
   let pred_args_multi =
     List.map (fun (se, args) -> se, List.map (Vars.tsubst ts) args) pred.args.multi
   in
   let pred_args_simple = List.map (Vars.tsubst ts) pred.args.simple in
 
+  (* if the user manually provided type arguments, process them *)
+  let ty_vars = List.map (fun x -> Type.TUnivar x) ty_vars in
+  if ppa.ty_args <> None then
+    begin
+      let ty_args =
+        List.map (convert_ty ~ty_env:st.ty_env st.env) (oget ppa.ty_args)
+      in
+
+      if List.length ty_args <> List.length ty_vars then
+        error_wrong_number_ty_args loc ~expected:ty_vars ~got:ty_args;
+ 
+      List.iter2
+        (fun ty1 ty2 ->
+           match Type.Infer.unify_eq st.ty_env ty1 ty2 with
+           | `Ok   -> ()
+           | `Fail -> assert false) (* cannot fail *)
+        ty_vars ty_args;
+    end;
+
+ 
   (* substitute system expression variables by their arguments *)
   let se_subst = 
     parse_se_subst loc st.env pred.Predicate.se_vars ppa.se_args 
@@ -1410,7 +1441,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
 
   Equiv.{
     psymb;
-    ty_args = List.map (fun x -> Type.TUnivar x) ty_args;
+    ty_args = ty_vars;
     se_args;
     multi_args; simpl_args;
   }

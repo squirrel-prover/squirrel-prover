@@ -101,8 +101,9 @@ val decompose_app : term -> term * term list
 
 (** global predicate application *)
 type pred_app = {
-  name    : Symbols.p_path;      (** predicate symbol *)
-  se_args : SE.Parse.t list;    (** system arguments *)
+  name    : Symbols.p_path;     (** predicate symbol *)
+  se_args : SE.Parse.t list;    (** optional system arguments *)
+  ty_args : ty list option;     (** optional type arguments *)
   args    : term list;          (** multi-term and term arguments *)
 }
 

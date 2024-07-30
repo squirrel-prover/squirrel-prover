@@ -1357,14 +1357,16 @@ global_formula_i:
   
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
-| name=upath se_args=se_args args=slist(sterm, empty)
-    { Typing.PPred Typing.{ name; se_args; args; }  }
+(* postfix predicate application *)
+| name=upath ty_args=ty_args? se_args=se_args args=slist(sterm, empty)
+    { Typing.PPred Typing.{ name; se_args; ty_args; args; }  }
 
 /* ambiguous global formula, in the sens that it can be confused
    with a local term */
 a_global_formula_i:
-| t=sterm n=infix_s0 se_args=se_args t0=sterm 
-    { Typing.PPred Typing.{ name = (top_path, n); se_args; args = [t; t0]; }  }
+(* infix predicate application *)
+| t=sterm n=infix_s0 ty_args=ty_args? se_args=se_args t0=sterm 
+    { Typing.PPred Typing.{ name = (top_path, n); se_args; ty_args; args = [t; t0]; }  }
 
 /* ----------------------------------------------------------------------- */
 /* a_global_formula: */

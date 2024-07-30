@@ -26,3 +26,27 @@ Proof.
     rewrite Hb.
     apply witness_empty_bool.
 Qed.
+
+(* ---------------------------------------------------------------- *)
+predicate Bar ['a] {} = [witness['a] = witness['a]].
+predicate ( *=  ) ['a   ] {} (x,y : 'a) = [x = y].
+predicate ( **= ) ['a 'b] {} (x,y : 'a) = [x = y].
+
+system P = null.
+
+type T.
+
+global axiom [P] _ ['b] : 
+  Bar['b] /\ Bar[bool] /\ 
+
+  $(empty         *=    empty) /\ 
+  $(empty         *=[_] empty) /\ 
+  $(empty         *=[message] empty) /\
+  $(witness['b]   *=['b] witness) /\ 
+  $(witness[bool] *=[_] witness) /\
+
+  $(empty         **=[_,T] empty) /\ 
+  $(empty         **=[message, bool] empty) /\
+  $(witness['b]   **=['b, bool] witness) /\ 
+  $(witness[bool] **=[_, 'b] witness)
+.
