@@ -25,6 +25,8 @@ let check_goal (i : int L.located) (s : ES.t) =
 
 let get_oracle (i : int L.located) (s : ES.t) =
   let equiv = S.conclusion_as_equiv s in
+  if Term.ty (List.nth equiv (L.unloc i)) <> Type.(Fun (Message, Message)) then
+    soft_failure (Failure "The item in the equivalence must be typed [message -> message]");
   List.nth equiv (L.unloc i)
 
 let convert_arg (term : Typing.term) (s : ES.t) =
@@ -54,7 +56,7 @@ let mk_subgoal
   =
   let equiv = S.conclusion_as_equiv s in
   let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), Message)) in (*FIXME : Proble if one element*)
-  let new_vars, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
+  let _, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
   let mk_term oracle =
     Term.(mk_app oracle [mk_app (mk_var f_var) [(mk_tuple equiv)]])
   in
@@ -62,7 +64,7 @@ let mk_subgoal
   let glob_form = Equiv.(Quant (ForAll,
                                 [f_var, Vars.Tag.make ~adv:true Global], (*TODO check if we must have [glob] tag*)
                                 Atom (Reach loc_form))) in
-  S.set_conclusion glob_form (S.set_vars new_vars s)
+  S.set_conclusion glob_form s
 
 let rewrite_oracle_args (args : Args.parser_arg list) s : ES.t list =
   match args with
