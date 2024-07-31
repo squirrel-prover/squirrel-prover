@@ -69,36 +69,36 @@ tactic allows one to combine these two steps, and to conclude.
 set timeout=100.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
-senc enc,dec
+senc enc,dec.
 
 (*------------------------------------------------------------------*)
 (* protocol constants *)
-abstract endplug  : message
-abstract accept   : message
-abstract setup_ok : message
+abstract endplug  : message.
+abstract accept   : message.
+abstract setup_ok : message.
 
 (*------------------------------------------------------------------*)
 (* counters initial value *)
-abstract cinit : message
+abstract cinit : message.
 (* counter successor *)
-abstract mySucc : message -> message
+abstract mySucc : message -> message.
 
 (*------------------------------------------------------------------*)
 (* Encoding of a public identity as a message.
    This encoding is injective (this is axiomatized later). *)
-abstract mpid: index -> message
+abstract mpid: index -> message.
 
 (* secret identity *)
-name sid: index -> message
+name sid: index -> message.
 
 (*------------------------------------------------------------------*)
 (* public key handle kh to reference the AES master key mkey *)
-abstract kh: message
-name mkey: message
+abstract kh: message.
+name mkey: message.
 
 (*------------------------------------------------------------------*)
 (* working key k(pid) of yubikey `pid`, stored inside the AEAD *)
-name k: index -> message
+name k: index -> message.
 (* Dummy key used in AEAD idealized so that the key does not occur in
    plaintext anymore in the idealized system *)
 name k_dummy: index -> message
@@ -115,7 +115,7 @@ mutable AEAD(pid:index) : message = zero.
 (*------------------------------------------------------------------*)
 channel cY
 channel cS
-channel cHSM
+channel cHSM.
 
 (* Order over counters. Assumed transitive and strict later through axioms. *)
 abstract (~<): message -> message -> boolean.

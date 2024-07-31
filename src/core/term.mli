@@ -447,6 +447,9 @@ module Smart : sig
   val is_lt  : term -> bool
 
   (*------------------------------------------------------------------*)
+  val decompose_app : term -> term * term list
+
+  (*------------------------------------------------------------------*)
   (** left-associative *)
   val destr_ands  : int -> term -> term list option
   val destr_ors   : int -> term -> term list option
@@ -550,10 +553,9 @@ val mk_lambda : ?simpl:bool -> Vars.vars -> term -> term
 (** {3 Destructors} *)
 
 val is_binder : term -> bool
-
+val is_action : term -> bool
 val is_macro  : term -> bool
-
-val is_name : term -> bool
+val is_name   : term -> bool
 
 val destr_var : term -> Vars.var option
 

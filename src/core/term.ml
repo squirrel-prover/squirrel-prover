@@ -709,6 +709,12 @@ module SmartDestructors = struct
   let destr_exists = destr_quant Exists
 
   (*------------------------------------------------------------------*)
+  let decompose_app t = 
+    match t with
+    | App (f, args) -> f, args
+    | _             -> t, []
+
+  (*------------------------------------------------------------------*)
   let rec decompose_quant q = function
     | Quant (q', vs, f) when q = q' ->
       let vs', f0 = decompose_quant q f in
@@ -1114,6 +1120,10 @@ let subst_support s =
 
 let is_binder : term -> bool = function
   | Quant _ | Find _ -> true
+  | _ -> false
+
+let is_action : term -> bool = function
+  | Action _ -> true
   | _ -> false
 
 let is_macro : term -> bool = function

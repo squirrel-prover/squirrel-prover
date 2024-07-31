@@ -228,10 +228,12 @@ let query ~precise s q =
 (** Exported versions of query and its alternatives. *)
 
 let query_happens ~precise s a =
-   query ~precise s (Some [`Pos, Happens a])
+  query ~precise s (Some [`Pos, Happens a])
+
 let constraints_valid s =
   (* The precise flag is irrelevant in that case. *)
   query ~precise:true s None
+
 let query ~precise s q =
    query ~precise s (Some q)
 

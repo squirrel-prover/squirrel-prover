@@ -100,7 +100,16 @@ let conditional_case (m : Term.term) s : sequent list =
       soft_failure (Tactics.MustHappen ts);
 
     begin
-      match Macros.get_definition_exn (TS.mk_trace_cntxt s) ms ~args ~ts with
+      let def = 
+        match Macros.get_definition (TS.mk_trace_cntxt s) ms ~args ~ts with
+        | `Undef ->
+          soft_failure (Failure "cannot expand this macro: macro is undefined");
+        | `MaybeDef ->
+          soft_failure (Failure "cannot expand this macro: undetermined action")
+        | `Def mdef -> mdef
+      in
+
+      match def with
       | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
       | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
         case_cond m [] c t e s
@@ -272,7 +281,7 @@ let () =
 (* Rewrite equiv *)
 
 (** [has_frame_geq s biframe ts] checks that [biframe] contains
-    [frame@ts'] for some [ts'] such that [ts <= ts'] holds wrt [s].
+    [frame@ts'] for some [ts'] such that [ts <= ts'] holds wrt [s].
     Because timestamp comparisons are performed wrt [s] we need to
     introduce [happens] hypotheses before applying [rewrite equiv];
     the tactic will make sure that the hypothesis can be preserved

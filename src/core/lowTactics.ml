@@ -289,13 +289,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
-      let se =
-        if SE.is_fset se then SE.to_fset se
-        else soft_failure
-            (Tactics.Failure "nothing to expand: the system is too general")
-      in
+      if not (SE.is_fset se) then failed ();
+      let se = SE.to_fset se in
 
-      Macros.get_definition_exn ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
+      begin
+        match Macros.get_definition ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a with
+        | `Undef | `MaybeDef -> failed ()
+        | `Def mdef -> mdef
+      end                         
 
     | Fun _ | App _ | Var _ ->
       let t, has_red =

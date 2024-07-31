@@ -340,6 +340,14 @@ val reduce_delta_def1 :
   Term.term ->
   Term.term * bool 
 
+(** Perform δ-reduction once for macro at head position. *)
+val reduce_delta_macro1 :
+  ?mode:Macros.expand_context ->
+  Symbols.table -> SE.t -> 
+  ?hyps:Hyps.TraceHyps.hyps ->
+  Term.term ->
+  Term.term * bool
+
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 val reduce_delta1 :

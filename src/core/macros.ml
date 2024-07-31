@@ -4,8 +4,6 @@ module L = Location
 module S = System
 module SE = SystemExpr
 
-let soft_failure = Tactics.soft_failure
-
 (*------------------------------------------------------------------*)
 (** {2 Macro for mutable state} *)
 
@@ -551,7 +549,6 @@ let get_def_glob
 
 (*------------------------------------------------------------------*)
 (** Exported *)
-
 let get_definition_nocntxt
     (system : SE.fset)
     (table  : Symbols.table)
@@ -692,23 +689,6 @@ let get_definition
     (* if that fails, and if we are in [InGlobal] mode, get the internal def. *)
     `Def (get_def_glob_internal cntxt.table cntxt.system symb ~args ~ts inputs)
   | res, _ -> res
-
-(** Exported *)
-let get_definition_exn
-    ?(mode : expand_context = InSequent)
-    (cntxt : Constr.trace_cntxt)
-    (symb  : Term.msymb)
-    ~(args : Term.term list)
-    ~(ts    : Term.term) : Term.term
-  =
-  match get_definition ~mode cntxt symb ~args ~ts with
-  | `Undef ->
-    soft_failure (Failure "cannot expand this macro: macro is undefined");
-
-  | `MaybeDef ->
-    soft_failure (Failure "cannot expand this macro: undetermined action")
-
-  | `Def mdef -> mdef
 
 
 (*------------------------------------------------------------------*)

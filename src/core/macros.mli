@@ -127,14 +127,6 @@ val get_definition :
   Term.msymb -> args:Term.term list -> ts:Term.term ->
   def_result
 
-(** Same as [get_definition] but raises a soft failure if the macro
-    cannot be expanded. *)
-val get_definition_exn :
-  ?mode:expand_context ->
-  Constr.trace_cntxt ->
-  Term.msymb -> args:Term.term list -> ts:Term.term ->
-  Term.term
-
 (** Variant of [get_definition] without dependency on [Constr] module,
     where the timestamp is directly passed as an action.
     Unlike [get_definition] it only returns [`Def body] or [`Undef]

@@ -1212,45 +1212,7 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
 
-(**  Perform δ-reduction once for macro at head position. *)
-let reduce_delta_macro1
-    ~(mode : Macros.expand_context)
-    (table : Symbols.table) (sexpr : SE.t)
-    (hyps : Hyps.TraceHyps.hyps)
-    (t : Term.term)
-  : Term.term * bool
-  =
-  let exception Failed in
-  try
-    match t with
-    | Term.Macro (ms, l, ts) ->
-      let models =
-        let lits = Hyps.TraceHyps.fold (fun _ f acc ->
-            match f with
-            | LHyp (Local f)
-            | LHyp (Global Equiv.(Atom (Reach f))) -> f :: acc
-            | LHyp (Global _) -> acc
-            | LDef _ -> acc       (* FEATURE: translate definition *)
-          ) hyps []
-        in
-        Constr.models_conjunct (TConfig.solver_timeout table) ~exn:Failed lits
-      in
-      let cntxt () =
-        let se = try SE.to_fset sexpr with SE.Error _ -> raise Failed in
-        Constr.{
-          table; system = se;
-          models = Some models; }
-      in
-      if Constr.query ~precise:true models [`Pos, Happens ts] then
-        match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts with
-        | `Def mdef -> mdef, true
-        | _ -> t, false
-      else t, false
-
-    | _ -> t, false
-  with Failed -> t, false
-
-
+(*------------------------------------------------------------------*)
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 let reduce_delta_def1
@@ -1283,6 +1245,85 @@ let reduce_delta_def1
 
   | _ -> t, false
 
+(*------------------------------------------------------------------*)
+(** Try to find a action term [t0] equal to [t]. *)
+let as_action
+    (* (table : Symbols.table) (sexpr : SE.t)  *)(hyps : Hyps.TraceHyps.hyps)
+    (t : Term.term)
+  : term option
+  =
+  TraceHyps.find_map (fun (_x, f) ->
+      match f with
+      | LHyp (Global Equiv.(Atom (Reach f)))
+      | LHyp (Local f) ->
+        begin
+          match Term.decompose_app f with
+          | Term.Fun (fs,_), [t0; t1] ->
+            if Symbols.path_equal fs Symbols.fs_eq then
+              if      Term.is_action t1 && Term.equal t t0 then Some t1 
+              else if Term.is_action t0 && Term.equal t t1 then Some t0
+              else None
+            else None
+              
+          | _ -> None
+        end
+      | _ -> None
+    ) hyps 
+
+(*------------------------------------------------------------------*)
+(** Fast function checking if [t] happens. *)
+let happens (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
+  TraceHyps.exists (fun (_x,f) ->
+      match f with
+      | LHyp (Global Equiv.(Atom (Reach f)))
+      | LHyp (Local f) ->
+        begin
+          match Term.decompose_app f with
+          | Term.Fun (fs,_), [t0] -> (* [happens(t)] *)
+            Symbols.path_equal fs Symbols.fs_happens &&
+            Term.equal t0 t
+
+          | Term.Fun (fs,_), [t0; t1] -> (* [t < t'], or [t' < t] (idem for ≤) *)
+            (Symbols.path_equal fs Symbols.fs_leq || Symbols.path_equal fs Symbols.fs_lt)
+            &&
+            (Term.equal t0 t || Term.equal t1 t)
+
+          | _ -> false
+        end
+      | LHyp (Global _) -> false
+      | LDef _ -> false
+    ) hyps
+
+(*------------------------------------------------------------------*)
+(** Perform δ-reduction once for macro at head position. *)
+let reduce_delta_macro1
+    ?(mode : Macros.expand_context = InSequent)
+    (table : Symbols.table) (sexpr : SE.t)
+    ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
+    (t : Term.term)
+  : Term.term * bool
+  =
+  let exception Failed in
+  try
+    match t with
+    | Term.Macro (ms, l, ts) ->
+      let cntxt () =
+        let se = try SE.to_fset sexpr with SE.Error _ -> raise Failed in
+        Constr.{ table; system = se; models = None; }
+      in
+      let ta_opt = as_action hyps ts in
+      let ta = odflt ts ta_opt in (* [ta = ts] *)
+
+      if happens hyps ta || (ta_opt <> None && happens hyps ts) then
+        match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts:ta with
+        | `Def mdef -> Term.subst [Term.ESubst (ta, ts)] mdef, true
+        | _ -> t, false
+      else t, false
+
+    | _ -> t, false
+  with Failed -> t, false
+
+(*------------------------------------------------------------------*)
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 let reduce_delta1
@@ -1296,7 +1337,7 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~mode table se hyps t
+    reduce_delta_macro1 ~mode table se ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->
