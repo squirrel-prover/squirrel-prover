@@ -21,7 +21,7 @@ type lsymb = Symbols.lsymb
     (i.e. returning new subgoals or raising an exception)
     into an ['a Tactics.tac] in CPS-style.
     It is important that the exception catching is done only
-    around the call to [f s] to avoding **messing** with the
+    around the call to [f s] to avoid **messing** with the
     CPS-style computation. *)
 let wrap_fail f s sk fk =
   match f s with
@@ -980,24 +980,45 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Clear} *)
 
-  let clear ?loc (hid : Ident.t) s = 
-    match Hyps.by_id hid s with
-    | LHyp _ -> Hyps.remove hid s
-    | LDef (_,t) ->
-      if Sv.exists (fun v -> v.id = hid) (S.fv s) then
-        soft_failure ?loc
-          (Failure "cannot clear definition: used in the sequent");
-      Hyps.remove hid s |>
-      S.set_vars (Vars.rm_var (Vars.mk hid (Term.ty t)) (S.vars s))
+  let clear_lsymb (name : lsymb) s : S.t =
+    let env = S.vars s in
+    let name_s = L.unloc name in
 
-  let clear_str (name : lsymb) s : S.t =
-    let hid,_ = Hyps.by_name name s in
-    clear ~loc:(L.loc name) hid s
+    if Hyps.mem_name name_s s then
+      begin                     (* clear an hypothesis *)
+        let hid,_ = Hyps.by_name name s in
+        match Hyps.by_id hid s with
+        | LHyp _ -> Hyps.remove hid s
+        | LDef (_,t) ->
+
+          if Sv.exists (fun v -> v.id = hid) (S.fv s) then
+            soft_failure ~loc:(L.loc name)
+              (Failure "cannot clear definition: used in the sequent");
+
+          Hyps.remove hid s |>
+          S.set_vars (Vars.rm_var (Vars.mk hid (Term.ty t)) env)
+      end
+      
+    else if Vars.mem_s env name_s then
+      (* variable must be uniquely characterized by their name in a
+         sequent. *)
+      let v,_ = as_seq1 (Vars.find env name_s) in
+
+      if Sv.exists (Vars.equal v) (S.fv s) then
+        soft_failure ~loc:(L.loc name)
+          (Failure "cannot clear variable: used in the sequent");
+
+      S.set_vars (Vars.rm_var v env) s
+
+    else 
+      soft_failure ~loc:(L.loc name)
+        (Failure ("unknown identifier " ^ name_s))
+
 
   let clear_tac_args (args : Args.parser_arg list) s : S.t list =
     let s =
       List.fold_left (fun s arg -> match arg with
-          | Args.String_name arg -> clear_str arg s
+          | Args.String_name arg -> clear_lsymb arg s
           | _ -> bad_args ()
         ) s args in
     [s]
@@ -2630,10 +2651,10 @@ let do_rw_item
     (EquivLT.do_rw_item rw_item rw_in)
 
 (* lifting to [Goal.t] *)
-let clear_str (str : lsymb) : Goal.t -> Goal.t =
+let clear_lsymb (ls : lsymb) : Goal.t -> Goal.t =
   Goal.map
-    (TraceLT.clear_str str)
-    (EquivLT.clear_str str)
+    (TraceLT.clear_lsymb ls)
+    (EquivLT.clear_lsymb ls)
 
 (** Applies a rewrite arg  *)
 let do_rw_arg
@@ -2711,12 +2732,12 @@ let rec do_intros_ip
   | Args.SClear l :: Args.SItem s_item :: intros ->
     let s_l = do_s_item simpl s_item s in
     let s_l =
-      List.map (fun s -> List.fold_left (fun s str -> clear_str str s) s l) s_l
+      List.map (fun s -> List.fold_left (fun s str -> clear_lsymb str s) s l) s_l
     in
     do_intros_ip_list simpl intros s_l
 
   | Args.SClear l :: intros ->
-    let s = List.fold_left (fun s str -> clear_str str s) s l in
+    let s = List.fold_left (fun s str -> clear_lsymb str s) s l in
     do_intros_ip_list simpl intros [s]
 
   | Args.SItem s_item :: intros ->

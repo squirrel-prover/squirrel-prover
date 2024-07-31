@@ -29,7 +29,7 @@ Proof.
   (* Check that H1 is still present. *)
   have _ := H1.
   (* Check that H2 is absent. *) 
-  checkfail clear H2 exn HypUnknown. 
+  checkfail clear H2 exn Failure. 
   (* Check that H3 is still present. *)
   rewrite equiv H3; 1: by apply A. 
   by apply refl.
@@ -37,7 +37,7 @@ Proof.
   (* Check that H1 is still present. *)
   have _ := H1.
   (* Check that H2 is absent. *)
-  checkfail clear H2 exn HypUnknown. 
+  checkfail clear H2 exn Failure. 
   (* Check that H3 is still present. *)
   rewrite equiv -H3; 1: by apply A.
   (* Goal should be "false" at this point. *)
