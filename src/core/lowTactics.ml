@@ -983,12 +983,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let clear ?loc (hid : Ident.t) s = 
     match Hyps.by_id hid s with
     | LHyp _ -> Hyps.remove hid s
-    | LDef _ ->
+    | LDef (_,t) ->
       if Sv.exists (fun v -> v.id = hid) (S.fv s) then
         soft_failure ?loc
           (Failure "cannot clear definition: used in the sequent");
-      Hyps.remove hid s
-
+      Hyps.remove hid s |>
+      S.set_vars (Vars.rm_var (Vars.mk hid (Term.ty t)) (S.vars s))
 
   let clear_str (name : lsymb) s : S.t =
     let hid,_ = Hyps.by_name name s in
