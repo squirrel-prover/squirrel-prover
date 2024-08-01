@@ -569,8 +569,11 @@ let setup_change_hyps_context
             | Some p -> SE.compatible table old_context.SE.set p
             | None -> true);
 
-  (* Flags indicating which parts of the context are changed. *)
-  let set_unchanged = SE.equal table new_context.SE.set old_context.SE.set in
+  (* Flags indicating which parts of the context are changed. 
+     - For the set, use SE.equal, which ignores the labels of the systems
+       and compares the sets as sets (i.e. double inclusion) 
+     - For the pair, the labels must be the same, so use equality *)
+  let set_unchanged = SE.equal_modulo table new_context.SE.set old_context.SE.set in
   let pair_unchanged = 
     oequal (SE.equal table) new_context.SE.pair old_context.SE.pair 
   in
