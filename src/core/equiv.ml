@@ -119,7 +119,7 @@ let _pp_atom ?context ppe fmt = function
       let all_args = List.concat_map snd multi_args @ simpl_args in
       Fmt.list ~sep:(Fmt.any "@ ") (Term._pp ppe) fmt all_args
     in
-    Fmt.pf fmt "@[$(%a%a%a %t)@]"
+    Fmt.pf fmt "@[%a%a%a %t@]"
       Symbols.pp_path psymb
       (pp_ty_args ppe) ty_args
       (pp_se_args ?context) se_args
