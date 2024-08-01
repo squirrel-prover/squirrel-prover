@@ -132,9 +132,9 @@ let is_any_or_any_comp (se : t) : bool =
 
 (*------------------------------------------------------------------*)
 let pp fmt (se : 'a expr) : unit = 
-  (* if se.name <> None then *)
-  (*   Fmt.pf fmt "%s" (oget se.name) *)
-  (* else *)
+  if se.name <> None then
+    Fmt.pf fmt "%s" (oget se.name)
+  else
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
     | Any -> Fmt.pf fmt "any"
@@ -143,9 +143,9 @@ let pp fmt (se : 'a expr) : unit =
       Fmt.list
         ~sep:Fmt.comma
         (fun fmt (label,single_sys) ->
-           (* if Term.proj_to_string label = "ε" then *)
-           (*   System.Single.pp fmt single_sys *)
-           (* else *)
+           if Term.proj_to_string label = "ε" then
+             System.Single.pp fmt single_sys
+           else
              Fmt.pf fmt "%a:%a"
                Term.pp_proj label
                System.Single.pp single_sys)
