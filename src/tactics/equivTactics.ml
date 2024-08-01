@@ -119,7 +119,8 @@ let sym_tac (s : ES.t) : Goal.t list =
   let old_context = (ES.env s).system in
   let old_pair = Utils.oget old_context.pair in
   let new_pair =
-    SE.make_pair (snd (SE.snd old_pair)) (snd (SE.fst old_pair)) in
+    SE.make_pair (l_proj, snd @@ SE.snd old_pair) (r_proj, snd @@ SE.fst old_pair)
+  in
   let new_context = { old_context with pair = Some new_pair } in
   let diff l r = Term.combine [l_proj,l; r_proj,r] in
   [ Goal.Global
@@ -172,8 +173,12 @@ let transitivity_systems new_context s =
      the chances that the context does not change in new sequents,
      which will allow set_conclusion_in_context to keep a maximum of
      hypotheses. *)
-  let left_systems = SE.make_pair (snd (SE.fst old_pair)) new_left in
-  let right_systems = SE.make_pair new_right (snd (SE.snd old_pair)) in
+  let left_systems =
+    SE.make_pair (l_proj, snd (SE.fst old_pair)) (r_proj, new_left)
+  in
+  let right_systems =
+    SE.make_pair (l_proj, new_right) (r_proj, snd (SE.snd old_pair))
+  in
 
   let s1 =
     ES.set_conclusion_in_context
@@ -220,8 +225,8 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
     snd (SE.fst pair), snd (SE.snd pair)
   in
 
-  let pair1 = SE.make_pair l_system r_system in (* L/R *)
-  let pair2 = SE.make_pair r_system r_system in (* R/R *)
+  let pair1 = SE.make_pair (l_proj, l_system) (r_proj, r_system) in (* L/R *)
+  let pair2 = SE.make_pair (l_proj, r_system) (r_proj, r_system) in (* R/R *)
 
   (* fset with only the right system, twice *)
   let fset_r2 =

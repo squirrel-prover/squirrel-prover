@@ -132,9 +132,9 @@ let is_any_or_any_comp (se : t) : bool =
 
 (*------------------------------------------------------------------*)
 let pp fmt (se : 'a expr) : unit = 
-  if se.name <> None then
-    Fmt.pf fmt "%s" (oget se.name)
-  else
+  (* if se.name <> None then *)
+  (*   Fmt.pf fmt "%s" (oget se.name) *)
+  (* else *)
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
     | Any -> Fmt.pf fmt "any"
@@ -143,9 +143,9 @@ let pp fmt (se : 'a expr) : unit =
       Fmt.list
         ~sep:Fmt.comma
         (fun fmt (label,single_sys) ->
-           if Term.proj_to_string label = "ε" then
-             System.Single.pp fmt single_sys
-           else
+           (* if Term.proj_to_string label = "ε" then *)
+           (*   System.Single.pp fmt single_sys *)
+           (* else *)
              Fmt.pf fmt "%a:%a"
                Term.pp_proj label
                System.Single.pp single_sys)
@@ -385,7 +385,11 @@ let pp_descrs (table : Symbols.table) ppf (system : _) =
 (*------------------------------------------------------------------*)
 (* Pairs *)
 
-let make_pair a b = mk (List [Term.left_proj,a; Term.right_proj,b])
+let make_pair
+    ((l,a) : Term.proj * System.Single.t)
+    ((r,b) : Term.proj * System.Single.t)
+  =
+  mk (List [l,a; r,b])
 
 let fst se = 
   match se.cnt with

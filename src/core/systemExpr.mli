@@ -267,7 +267,10 @@ val project_opt : Term.projs option -> 'a expr -> 'a expr
 (*------------------------------------------------------------------*)
 (** {2 Operations on pairs} *)
 
-val make_pair : System.Single.t -> System.Single.t -> pair
+val make_pair :
+  Term.proj * System.Single.t ->
+  Term.proj * System.Single.t ->
+  pair
 
 val fst : <pair:unit;..> expr -> Term.proj * System.Single.t
 

@@ -576,7 +576,6 @@ let setup_change_hyps_context
   in
 
   let pair_sym =
-    (* DBG *)
     if new_context.SE.pair = None || old_context.SE.pair = None then false
     else
       let new_pair = oget new_context.SE.pair in

@@ -100,7 +100,11 @@ let clone_system_map
       | _ -> assert false
   in
 
-  let old_new_pair = SE.make_pair system new_single_system in
+  let old_new_pair =
+    SE.make_pair
+      (Term.left_proj, system)
+      (Term.right_proj, new_single_system)
+  in
 
   let global_macro_fold
       (ns : Symbols.macro) _ (table : Symbols.table) : Symbols.table
@@ -178,7 +182,11 @@ let global_rename
      but any system would work here since the equivalence must
      relate names. *)
   let system =
-    SE.equivalence_context (SE.make_pair old_single_system old_single_system) in
+    SE.equivalence_context
+      (SE.make_pair
+         (Term.left_proj, old_single_system)
+         (Term.right_proj, old_single_system))
+  in
   let env = Env.init ~table ~system () in
   let conv_env = Typing.{ env; cntxt = InGoal } in
   let f = Typing.convert_global_formula conv_env gf in
