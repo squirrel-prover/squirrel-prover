@@ -16,9 +16,9 @@ mutable state(i:index): T = a.
 name n: index * index -> message.
 
 process tag(i:index, j:index) =
-  kT(i,j)    := n(i,j);
-  kTbis(j,i) := n(i,j);
-  state(i) := a;
+  kT i j    := n(i,j);
+  kTbis j i := n(i,j);
+  state i := a;
   out(c, n(i,j))
 
 system (!_i !_j T: tag(i,j)).

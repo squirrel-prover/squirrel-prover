@@ -18,12 +18,12 @@ mutable s5 (i, j : index) : message = <n(i), m(j)>.
 
 process P(i : index) = 
   in(c,x);
-  s0(i)    := f(s0 i);
-  s1(i)    := f(s1 i);
-  s2(i)    := f(s2 i);
-  s3(i, i) := f(s3 i i);
-  s4(i)    := f(s4 i);
-  s5(i, i) := f(s5 i i);
+  s0 i    := f(s0 i);
+  s1 i    := f(s1 i);
+  s2 i    := f(s2 i);
+  s3 i i := f(s3 i i);
+  s4 i    := f(s4 i);
+  s5 i i := f(s5 i i);
   out(c,zero).
 
 system !_i P(i).

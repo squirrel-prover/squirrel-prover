@@ -122,9 +122,11 @@ val declare_system :
 (** {2 Error handling}*)
 
 type error_i =
-  | Arity_error of string * int * int
+  | ArityError of string * int * int
+  | CurrifiedArityError of string * int * int                                      
   | StrictAliasError of string
   | DuplicatedUpdate of string
+  | SyntaxError of string
   | Freetyunivar
   | ProjsMismatch of Term.projs * Term.projs
   | ActionUndef of Symbols.action

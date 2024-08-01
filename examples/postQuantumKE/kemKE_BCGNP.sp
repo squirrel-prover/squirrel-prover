@@ -138,7 +138,7 @@ process Initiator(i,j,k:index) =
  let kI2 = exct(skex,kI(i,j,k)) in
  let kR2 = exct(skex,decap(ctR,skI(i)) ) in
  let s = <pk(skI(i)),<ctI,<pk(skR(j)),ctR>>> in
- sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+ sIR i j k :=  expd(s,kI2) XOR expd(s,kR2).
 
 (* k-th copy of responder with key skR(j) *)
 process Responder(j,k:index) =
@@ -153,7 +153,7 @@ process Responder(j,k:index) =
      let kI2 = exct(skex,decap(ctI,skR(j)) ) in
      let kR2 = exct(skex,kR(i,j,k)) in
      let s = <pk(skI(i)),<ctI,<pk(skR(j)),ctR>>> in
-     sRI(j,k,i) :=  expd(s,kI2) XOR expd(s,kR2)
+     sRI j k i :=  expd(s,kI2) XOR expd(s,kR2)
     else
      let DctR = encap(DkR(j,k), DrR(j,k), pkI) in
      out(cR,DctR);
@@ -162,7 +162,7 @@ process Responder(j,k:index) =
      let DkI2 = exct(skex,decap(ctI,skR(j))) in
      let DkR2 = exct(skex,DkR(j,k)) in
      let Ds = <pkI,<ctI,<pk(skR(j)),DctR>>> in
-     DsRI(j,k) :=  expd(Ds,DkI2) XOR expd(Ds,DkR2)
+     DsRI j k :=  expd(Ds,DkI2) XOR expd(Ds,DkR2)
 
 (* k-th copy of initiator with key skI(i) trying to communicate with compromised responder with key pk(DskR(j)) *)
 process InitiatorToCompromised(i,j,k:index) =
@@ -176,7 +176,7 @@ process InitiatorToCompromised(i,j,k:index) =
  let kI2 = exct(skex,DkI(i,j,k)) in
  let kR2 = exct(skex,decap(ctR,skI(i)) ) in
  let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
- sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+ sIR i j k :=  expd(s,kI2) XOR expd(s,kR2).
 
 
 system main = out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))).
@@ -207,7 +207,7 @@ process Initiator2(i,j,k:index) =
        exct(skex,decap(ctR,skI(i)))
  in
  let s = <pk(skI(i)),<ctI,<pk(skR(j)),ctR>>> in
- sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+ sIR i j k :=  expd(s,kI2) XOR expd(s,kR2).
 
 (* k-th copy of responder with key skR(j) *)
 process Responder2(j,k:index) =
@@ -232,7 +232,7 @@ process Responder2(j,k:index) =
 
      let kR2 = exct(skex,kR(i,j,k)) in
      let s = <pk(skI(i)),<ctI,<pk(skR(j)),ctR>>> in
-     sRI(j,k,i) :=  expd(s,kI2) XOR expd(s,kR2)
+     sRI j k i :=  expd(s,kI2) XOR expd(s,kR2)
     else
      let DctR = encap(DkR(j,k), DrR(j,k), pkI) in
      out(cR,DctR);
@@ -248,7 +248,7 @@ in
 
      let DkR2 = exct(skex,DkR(j,k)) in
      let Ds = <pkI,<ctI,<pk(skR(j)),DctR>>> in
-     DsRI(j,k) :=  expd(Ds,DkI2) XOR expd(Ds,DkR2).
+     DsRI j k :=  expd(Ds,DkI2) XOR expd(Ds,DkR2).
 
 process InitiatorToCompromised2(i,j,k:index) =
   (* we only send an encapsulation to an honest peer, with what we assume to be a valid public key*)
@@ -267,7 +267,7 @@ process InitiatorToCompromised2(i,j,k:index) =
        exct(skex,decap(ctR,skI(i)))
  in
  let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
- sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+ sIR i j k :=  expd(s,kI2) XOR expd(s,kR2).
 
 system idealized = out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 

@@ -13,14 +13,14 @@ game Foo = {}.
 system A1 =
   ((
    !_l !_p
-   P : in(c,w); foo (l,p) := <foo l p, w>; out(c,empty)
+   P : in(c,w); foo l p := <foo l p, w>; out(c,empty)
   ) |
   (
    !_i new a; 
    !_j new b; 
    in(c,y);
    let x = <b, foo i j> in 
-   foo (i,i) := <foo i i, b>; 
+   foo i i := <foo i i, b>; 
    Q : out(c,<y, <x,<b,foo i i>>>)
   )).
 
@@ -37,14 +37,14 @@ Qed.
 system B =  
   ((
    !_l !_p
-   in(c,w); foo (l,p) := <foo l p, w>; out(c,empty)
+   in(c,w); foo l p := <foo l p, w>; out(c,empty)
   ) |
   (
    !_i new a; 
    !_j new b; 
    in(c,y);
    let x = <b, seq (k : index => foo i k) > in 
-   foo (i,i) := <foo i i, b>; 
+   foo i i := <foo i i, b>; 
    out(c,<y, <x,<b,foo i i>>>)
   )).
 

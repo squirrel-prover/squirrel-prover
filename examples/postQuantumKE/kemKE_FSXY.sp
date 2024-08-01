@@ -184,7 +184,7 @@ process Initiator(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1)) (xor (G(ST,K2)) (G(ST,K3))).
+ sIR i j k := xor(G(ST,K1)) (xor (G(ST,K2)) (G(ST,K3))).
 
 
 
@@ -207,7 +207,7 @@ process Responder(j,k:index) =
      let K2 = kdf(s,kR(i,j,k)) in
      let K3 = kdf(s,kT(i,j,k)) in
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
+     sRI j k i := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -222,7 +222,7 @@ process Responder(j,k:index) =
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+     DsRI j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -245,7 +245,7 @@ process InitiatorToCompromised(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+ sIR i j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -279,7 +279,7 @@ process Initiator2(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+ sIR i j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -303,7 +303,7 @@ process Responder2(j,k:index) =
      let K3 = kdf(s,kT(i,j,k)) in
 
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
+     sRI j k i := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -318,7 +318,7 @@ process Responder2(j,k:index) =
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+     DsRI j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 system main_rand = out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))
@@ -467,7 +467,7 @@ in
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+ sIR i j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -499,7 +499,7 @@ process Responder3(j,k:index) =
      let K3 = kdf(s,kT(i,j,k)) in
 
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
+     sRI j k i := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -522,7 +522,7 @@ in
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+     DsRI j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 (* k-th copy of initiator with key dkI(i) trying to communicate with compromised responder with key pk(DdkR(j)) *)
@@ -552,7 +552,7 @@ in
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
+ sIR i j k := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 system idealized = out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).

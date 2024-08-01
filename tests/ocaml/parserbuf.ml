@@ -254,7 +254,7 @@ let models =
                        : Symbols.table )
            with
              (Process.Error (_,
-                             Arity_error ("C",1,0))) ->
+                             ArityError ("C",1,0))) ->
              raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->

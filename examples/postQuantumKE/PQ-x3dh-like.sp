@@ -142,7 +142,7 @@ process Initiator(i,j,k:index) =
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
-    FI :  sIR(i,j,k) := kj.
+    FI :  sIR i j k := kj.
 
 process Responder(j,k:index) =
 (* Responder j who is willing to talk to initator i *)
@@ -156,7 +156,7 @@ process Responder(j,k:index) =
    let K2 = exct(skex,kt(i,j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-    sRI(i,j,k) := kj;
+    sRI i j k := kj;
    SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 else
    let CT = encap(Dkt(j,k), Drkt(j,k), m) in
@@ -166,7 +166,7 @@ else
    let K2 = exct(skex,Dkt(j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-    DsRI(j,k) := kj;
+    DsRI j k := kj;
    DSR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>).
 
 (* Initiator vkI(i) who wants to talk to Responder spk(DskR(j)), whose key is actually compromised *)
@@ -183,7 +183,7 @@ process InitiatorToCompromised(i,j,k:index) =
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
-    DFI :  sIR(i,j,k) := kj.
+    DFI :  sIR i j k := kj.
 
 
 
@@ -219,7 +219,7 @@ process Initiator2(i,j,k:index) =
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
-     FI:  sIR(i,j,k) := kj.
+     FI:  sIR i j k := kj.
 
 process Responder2(j,k:index) =
 (* Responder j who is willing to talk to initator i *)
@@ -233,7 +233,7 @@ process Responder2(j,k:index) =
    let K2 = exct(skex,kt(i,j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-    sRI(i,j,k) := kj;
+    sRI i j k := kj;
    SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 else
    let CT = encap(Dkt(j,k), Drkt(j,k), m) in
@@ -243,7 +243,7 @@ else
    let K2 = exct(skex,Dkt(j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-    DsRI(j,k) := kj;
+    DsRI j k := kj;
    DSR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 .
 process InitiatorToCompromised2(i,j,k:index) =
@@ -266,7 +266,7 @@ process InitiatorToCompromised2(i,j,k:index) =
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
-    DFI :  sIR(i,j,k) := kj.
+    DFI :  sIR i j k := kj.
 
 system idealized = out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
 
@@ -417,7 +417,7 @@ process Initiator3(i,j,k:index) =
    let kj = FK1 XOR F1(sid,K2) in
    let ktilde = FK2 XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
-     FI:  sIR(i,j,k) := kj.
+     FI:  sIR i j k := kj.
 
 process Responder3(j,k:index) =
 (* Responder j who is willing to talk to initator i *)
@@ -433,7 +433,7 @@ process Responder3(j,k:index) =
    let K2 = exct(skex,kt(i,j,k)) in
    let kj = F1(sid, n_PRF(i,j,k)) XOR F1(sid,K2) in
    let ktilde = F2(sid, n_PRF(i,j,k)) XOR F2(sid,K2) in
-    sRI(i,j,k) := kj;
+    sRI i j k := kj;
    SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 else
    let CT = encap(Dkt(j,k), Drkt(j,k), m) in
@@ -443,7 +443,7 @@ else
    let K2 = exct(skex,Dkt(j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-    DsRI(j,k) := kj;
+    DsRI j k := kj;
    DSR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 .
 
@@ -475,7 +475,7 @@ process InitiatorToCompromised3(i,j,k:index) =
    let kj = FK1 XOR F1(sid,K2) in
    let ktilde = FK2 XOR F2(sid,K2) in
    if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
-     FI:  sIR(i,j,k) := kj.
+     FI:  sIR i j k := kj.
 
 
 

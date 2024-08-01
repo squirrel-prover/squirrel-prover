@@ -343,11 +343,6 @@ term:
 | t=loc(term_i) { t }
 
 (*------------------------------------------------------------------*)
-term_list:
-|                            { [] }
-| t=paren(slist(term,COMMA)) { t }
-
-(*------------------------------------------------------------------*)
 /* simple lvalues: only support variable declarations */
 simpl_lval:
 | l=loc(UNDERSCORE)  { L.mk_loc (L.loc l) "_x" }
@@ -458,7 +453,6 @@ colon_ty:
 process_i:
 | NULL                               { Process.Parse.Null }
 | LPAREN ps=processes_i RPAREN       { ps }
-| id=path terms=term_list            { Process.Parse.Apply (id,terms) }
 | id=loc(alias_name) COLON p=process { Process.Parse.Alias (p,id) }
 
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
@@ -483,7 +477,11 @@ process_i:
 | LET id=lsymb ty=colon_ty? EQ t=term IN p=process
     { Process.Parse.Let (id,t,ty,p) }
 
-| id=path args=term_list COLONEQ t=term p=process_cont
+| id=path terms=slist(sterm,empty)   { Process.Parse.Apply (id,terms) }
+(* we have to use a slist(sterm,empty) while we want to just parse a
+tuple (t1,...,tn), to avoid conflicts with the next line *)
+
+| id=path args=slist(sterm,empty) COLONEQ t=term p=process_cont
     { Process.Parse.Set (id,args,t,p) }
 
 | s=loc(BANG) p=process { Process.Parse.Repl (s,p) }

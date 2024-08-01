@@ -309,9 +309,11 @@ let pp     = _pp (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 type error_i =
-  | Arity_error of string * int * int
+  | ArityError of string * int * int
+  | CurrifiedArityError of string * int * int                   
   | StrictAliasError of string
   | DuplicatedUpdate of string
+  | SyntaxError of string      
   | Freetyunivar
   | ProjsMismatch of Term.projs * Term.projs
   | ActionUndef of Symbols.action
@@ -321,9 +323,16 @@ type error = L.t * error_i
 let pp_error_i fmt = function
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
 
-  | Arity_error (s,i,j) -> 
+  | SyntaxError s -> Fmt.pf fmt "syntax error: %s" s
+
+  | ArityError (s,i,j) -> 
     Fmt.pf fmt "process %s used with arity %i, but \
                 defined with arity %i" s i j
+
+  | CurrifiedArityError (s,i,j) -> 
+    Fmt.pf fmt "identifier %s used with arity %i, but \
+                expected a sequence of arguments (currified) of length %i" s i j
+
 
   | DuplicatedUpdate s -> 
     Fmt.pf fmt "state %s can only be updated once in an action" s
@@ -473,8 +482,8 @@ let parse
         | Symbols.State (arity,ty,_) ->
           (* updating a macro requires to use it in eta-long form *)
           if arity <> nb_args then
-            Typing.conv_err (Symbols.p_path_loc s_p)
-              (Arity_error (Symbols.p_path_to_string s_p,nb_args,arity));
+            error ~loc:(Symbols.p_path_loc s_p)
+              (CurrifiedArityError (Symbols.p_path_to_string s_p,nb_args,arity));
           ty
           
         | _ ->
@@ -522,7 +531,16 @@ let parse
       let p = doit ty_env env p in
       Exists (vs, test, p, q)
 
-    | Parse.Apply (p_id, args) ->
+    | Parse.Apply (p_id, args') ->
+      let args =
+        match args' with
+          [] -> []
+        | [p] -> (match L.unloc p with
+            | Typing.Tuple tl -> tl     (* Here, we parsed (x1,...,xn) *)
+            | _ -> [p]                  (* Here, we parsed (x) or x *)
+          )
+        | _ -> error ~loc (SyntaxError "a process identifier must take a tuple as input ")
+      in      
       let id, p = convert_process_path env.table p_id in
 
       if projs <> p.projs then
@@ -531,7 +549,7 @@ let parse
       let l1, l2 = List.length args, List.length p.args in
       if l1 <> l2 then
         error ~loc:(Symbols.p_path_loc p_id)
-          (Arity_error (L.unloc @@ snd p_id, l1 , l2));
+          (ArityError (L.unloc @@ snd p_id, l1 , l2));
 
       let args = 
         List.map2 (fun v t ->

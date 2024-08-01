@@ -295,7 +295,7 @@ Processes in Squirrel can use mutable states.
    With this declaration, the following formula is valid:
 
    .. squirreldoc::
-      forall i j k, counter (i,j,k) @ init = zero
+      forall i j k, counter i j k @ init = zero
    
 Processes
 ---------
@@ -305,7 +305,7 @@ performed by processes:
 
 .. prodn::
    process_prefix ::= new @name_id 
-   | @state_id {? ({*, @term})} := @term
+   | @state_id {? {* @term}} := @term
    | out(@channel, @term) 
    | in(@channel, @term)
 
