@@ -119,7 +119,7 @@ let can_unfold
     ~(se_args : SE.t list)
   : bool 
   =
-  let p = get table psymb in
+  let p : predicate = get table psymb in
 
   let body_concrete =
     match p.body with Abstract -> false | Concrete _ -> true
@@ -156,8 +156,8 @@ let unfold
   =
   if not (can_unfold table context psymb ~se_args) then None else
     begin
-      let p = get table psymb in
-      let p = refresh p in          (* may not be necessary *)
+      let p : predicate = get table psymb in
+      let p : predicate = refresh p       in          (* may not be necessary *)
 
       let body = match p.body with Concrete b -> b | Abstract -> assert false in
 
