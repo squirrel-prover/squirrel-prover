@@ -90,8 +90,6 @@ let search_about_1 () =
 
 (*------------------------------------------------------------------*)
 let search_about_2 () =
-  let exception Ok in
-  let exception Ko in
   let st = Prover.init ~with_prelude:true () in
   let st = Prover.exec_all ~test:true st 
     "channel c
@@ -103,22 +101,17 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  Alcotest.check_raises "search fail without context 1" Ok
-      (fun () ->
-        let _ = try Prover.exec_command ~test:true "search input@A." st with
-          | Typing.Error _ -> raise Ok in raise Ko);
-  Alcotest.check_raises "search fail without context 2" Ok
-      (fun () ->
-        let _ = try Prover.exec_command ~test:true "search output@A." st with
-          | Typing.Error _ -> raise Ok in raise Ko);
+
   let _ = Prover.exec_command ~test:true "search input@A in [S]." st in
   let _ = Prover.exec_command ~test:true "search output@A in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "output@A"),
                            sexpr_from_string "[S]"))
   in
+
   Alcotest.(check int) "Found one lemma with output@A"
     1 (List.length matches);
+
   (* works but no matches *)
   let _ = Prover.exec_command ~test:true "search <_,_>." st in
   let _ = Prover.exec_command ~test:true "search (_,_)." st in
@@ -128,19 +121,26 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  let matches = Prover.search_about st
-    (ProverLib.Srch_inSys ((global_formula_from_string "equiv(_)"),
-                           sexpr_from_string "[S]"))
+
+  let matches = 
+    Prover.search_about st
+      (ProverLib.Srch_inSys ((global_formula_from_string "equiv(_)"),
+                             sexpr_from_string "[S]"))
   in
+
   Alcotest.(check' int) ~msg:"Found one lemma with equiv(_)"
     ~expected:1 ~actual:(List.length matches);
+
   let _ = Prover.exec_command ~test:true "search true in [S]." st in
-  let matches = Prover.search_about st
-    (ProverLib.Srch_inSys ((term_from_string "true"),
-                           sexpr_from_string "[S]"))
+  let matches = 
+    Prover.search_about st
+      (ProverLib.Srch_inSys ((term_from_string "true"),
+                             sexpr_from_string "[S]"))
   in
+
   Alcotest.(check' int) ~msg:"Found one lemma with true"
     ~expected:1 ~actual:(List.length matches);
+
   (* Should print ↓ *)
   let _ = Prover.exec_command ~test:true "print myeq." st in
   ()

@@ -185,7 +185,8 @@ val descr_of_shape :
     and a substitution [s], such that [Action.subst_descr s descr] is
     the description corresponding to the action [a] in [t]. 
     Remark: we do not apply the substitution, as it may fail by trying 
-    to substitute indices by non-variable terms. *)
+    to substitute indices by non-variable terms. 
+    @raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_action :
   Symbols.table -> <fset:unit;..> expr -> Action.action ->
   Action.descr * Term.subst
