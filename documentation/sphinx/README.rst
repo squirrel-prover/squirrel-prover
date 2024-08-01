@@ -17,9 +17,11 @@ Then with pip :
    pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs readthedocs-sphinx-search\
    antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
 
-You may want syntax coloration included in your generated
-doc. There is a [fork of `pygments`](https://github.com/ThomasRuby/pygments) including a lexer for `squirrel`
-files. You can install it but it's not necessary.
+The generated doc relies on syntax coloration through a fork of [fork
+of `pygments`](https://github.com/squirrel-prover/pygments) including
+a lexer for `squirrel` files. This repository must be pull, and then
+the corresponding python module installed with `pip install -e .` inside
+the repository.
 
 Build
 -----
