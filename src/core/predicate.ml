@@ -130,7 +130,7 @@ let can_unfold
   let set_ok =
     List.for_all2 (fun (v,_) se ->
         if SE.Var.equal v SE.Var.set then
-          SE.equal table se context.set  
+          SE.equal_modulo table se context.set  
         else true
       ) p.se_vars se_args
   in
@@ -138,7 +138,7 @@ let can_unfold
     List.for_all2 (fun (v,_) se ->
         if SE.Var.equal v SE.Var.pair then
           context.pair <> None &&
-          SE.equal table se (oget context.pair :> SE.t)
+          SE.equal_modulo table se (oget context.pair :> SE.t)
         else true
       ) p.se_vars se_args
   in
