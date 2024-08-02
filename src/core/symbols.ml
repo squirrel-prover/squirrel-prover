@@ -1280,7 +1280,10 @@ let mk_action a =
 let init_action = mk_action "init"
 
 (*------------------------------------------------------------------*)
-(** {3 Macro builtins} *)
+(** {3 Macro builtins} 
+
+    All macros are going to be hold [Macro (General _)] as data after
+    the prelude is processed (in `macros.ml`). *)
 
 let mk_macro ~scope m data =
   let table, m =
@@ -1289,22 +1292,29 @@ let mk_macro ~scope m data =
   builtin_ref := table;
   m
 
-(** All macros are going to be hold [Macro (General _)] as data after
-    the prelude is processed. *)
+(*------------------------------------------------------------------*)
+(** Enter the `Classic` namespace, declares the new macros, and then
+    exit the namespace. *)
 
-let inp   = mk_macro ~scope:top_npath "input"  Empty
-let out   = mk_macro ~scope:top_npath "output" Empty
-let cond  = mk_macro ~scope:top_npath "cond"   Empty
-let exec  = mk_macro ~scope:top_npath "exec"   Empty
-let frame = mk_macro ~scope:top_npath "frame"  Empty
+let classical_s_npath = [L.mk_loc L._dummy "Classic"] 
+let classical_npath = of_s_npath ["Classic"]
 
-let quant_s_npath = [L.mk_loc L._dummy "Q"] 
-let quant_npath = of_s_npath ["Q"]
+let () = builtin_ref := namespace_enter !builtin_ref classical_s_npath
+
+let inp   = mk_macro ~scope:classical_npath "input"  Empty
+let out   = mk_macro ~scope:classical_npath "output" Empty
+let cond  = mk_macro ~scope:classical_npath "cond"   Empty
+let exec  = mk_macro ~scope:classical_npath "exec"   Empty
+let frame = mk_macro ~scope:classical_npath "frame"  Empty
+
+let () = builtin_ref := namespace_exit !builtin_ref classical_s_npath
 
 (*------------------------------------------------------------------*)
-(** Enter the `Q` namespace, declares the new macros, and then exit the
-    `Q`namespace.
-    The macros are declared here but defined in `macros.ml`. *)
+(** Enter the `Quantum` namespace, declares the new macros, and then exit the
+    namespace. *)
+
+let quant_s_npath = [L.mk_loc L._dummy "Quantum"] 
+let quant_npath = of_s_npath ["Quantum"]
 
 let () = builtin_ref := namespace_enter !builtin_ref quant_s_npath
 

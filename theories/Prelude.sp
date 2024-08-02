@@ -16,4 +16,9 @@ abstract zeroes : message -> message.
 
 system Empty = null.
 
+(*------------------------------------------------------------------*)
 type quantum_message.
+
+(*------------------------------------------------------------------*)
+(* `Classic` defines the macros for the classical execution model *)
+open Classic.
