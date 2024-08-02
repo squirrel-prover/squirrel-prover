@@ -316,6 +316,10 @@ val namespace_exit : table -> p_npath -> table
     (command [open N1. ... .NL]) *)
 val namespace_open : table -> npath -> table
 
+(** Close a namespace, removing its definitions from scope
+    (command [close N1. ... .NL]) *)
+val namespace_close : table -> npath -> table
+
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 

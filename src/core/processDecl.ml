@@ -206,6 +206,7 @@ let parse_namespace_cmd table (cmd : Decl.namespace_info) : Symbols.table =
   | Decl.Enter n -> Symbols.namespace_enter table n
   | Decl.Exit  n -> Symbols.namespace_exit  table n
   | Decl.Open  n -> Symbols.namespace_open  table (Symbols.convert_npath n table)
+  | Decl.Close n -> Symbols.namespace_close table (Symbols.convert_npath n table)
 
 (*------------------------------------------------------------------*)
 let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =

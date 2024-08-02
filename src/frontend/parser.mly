@@ -58,7 +58,7 @@
 %token TACTIC
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH PROF
-%token NAMESPACE END OPEN
+%token NAMESPACE END OPEN CLOSE
 %token SMT
 %token TERMINAL
 %token EOF
@@ -754,6 +754,7 @@ declaration_i:
  | NAMESPACE n=npath { Decl.Namespace_cmd (Enter n) }
  | END       n=npath { Decl.Namespace_cmd (Exit  n) }
  | OPEN      n=npath { Decl.Namespace_cmd (Open  n) }
+ | CLOSE     n=npath { Decl.Namespace_cmd (Close n) }
 
 /* declaration that must always be followed by the terminator symbol `.` */
 declaration_no_concat_i:

@@ -201,6 +201,7 @@ let rec token buf =
   | "null" -> !?NULL
   | "op" -> !?OP
   | "open" -> !?OPEN
+  | "close" -> !?CLOSE
   | "oracle" -> !?ORACLE
   | "out" -> !?OUT
   | "predicate" -> !?PREDICATE

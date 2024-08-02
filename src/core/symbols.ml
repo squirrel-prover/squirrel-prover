@@ -909,22 +909,46 @@ let namespace_exit (t : table) (nl : p_npath): table =
 let namespace_open (table : table) (np : npath): table =
   let store = Mn.find np table.store in
   let current =
-    Msymb.fold (fun s recs current ->
-        let current_recs = Msymb.find_dflt [] s current in
-        (* remove from [recs] all records already in scope (i.e. in
-           [current_recs]) *)
-        let recs =
+    Msymb.fold (fun s records current ->
+        let current_records = Msymb.find_dflt [] s current in
+        (* remove from [records] all records already in scope (i.e. in
+           [current_records]) *)
+        let records =
           List.filter (fun r ->
               not
                 (List.exists
                    (fun r' -> path_equal !>(r.path) !>(r'.path))
-                   current_recs)
-            ) recs
+                   current_records)
+            ) records
         in
-        Msymb.add s (recs @ current_recs) current
+        Msymb.add s (records @ current_records) current
       ) store table.current
   in
   { table with current; }
+
+(*------------------------------------------------------------------*)
+(** Close a namespace, removing its definitions from the scope
+    (command [close N1. ... .NL]) *)
+let namespace_close (table : table) (np : npath): table =
+  let store = Mn.find np table.store in
+  let current =
+    Msymb.fold (fun s records current ->
+        let current_records = Msymb.find_dflt [] s current in
+        (* remove from [current_records] all records in namespace
+           [np], i.e. in [store] *)
+        let current_records =
+          List.filter (fun r ->
+              not
+                (List.exists
+                   (fun r' -> path_equal !>(r.path) !>(r'.path))
+                   records)
+            ) current_records
+        in
+        if current_records = [] then Msymb.remove s current else Msymb.add s current_records current
+      ) store table.current
+      
+  in
+  { table with current; } 
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)

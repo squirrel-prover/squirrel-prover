@@ -107,3 +107,8 @@ Proof.
  nosimpl have ? : C.x xc = C2.x xc by auto.
  nosimpl have ? : C.x xc = C2.x xc by auto.
 Abort.
+
+(*------------------------------------------------------------------*)
+close A.
+close A.B.
+close C.

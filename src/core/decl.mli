@@ -117,6 +117,7 @@ type namespace_info =
   | Enter of Symbols.p_npath
   | Exit  of Symbols.p_npath
   | Open  of Symbols.p_npath
+  | Close of Symbols.p_npath
 
 (*------------------------------------------------------------------*)
 (** Additional oracle tagging information

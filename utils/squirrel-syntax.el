@@ -35,6 +35,7 @@
   "equiv"
   "any"
   "open"
+  "close"
   "end"
   "namespace"
 ))
