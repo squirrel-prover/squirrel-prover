@@ -1229,9 +1229,8 @@ let reduce_delta_def1
             if Ident.equal v' v.id &&
                SE.subset_modulo table se se'
             then
-              let projs, subst = SE.mk_proj_subst ~strict:false ~src:se' ~dst:se in
-              let t' = Term.subst_projs subst t' in
-              let t' = omap_dflt t' (fun projs -> Term.project projs t') projs in
+              let _, subst = SE.mk_proj_subst ~strict:false ~src:se' ~dst:se in
+              let t' = Term.subst_projs ~project:true subst t' in
               Some t'
             else None
           | _, LHyp _ -> None

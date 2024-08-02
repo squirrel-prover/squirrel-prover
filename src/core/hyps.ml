@@ -570,8 +570,8 @@ let setup_change_hyps_context
             | None -> true);
 
   (* Flags indicating which parts of the context are changed. 
-     - For the set, use SE.equal, which ignores the labels of the systems
-       and compares the sets as sets (i.e. double inclusion) 
+     - For the set, use SE.equal_modulo, which ignores the labels of
+       the systems and compares the sets as sets (i.e. double inclusion) 
      - For the pair, the labels must be the same, so use equality *)
   let set_unchanged = SE.equal_modulo table new_context.SE.set old_context.SE.set in
   let pair_unchanged = 
@@ -592,9 +592,11 @@ let setup_change_hyps_context
   let set_projections : (Term.term -> Term.term) option =
     if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
       if SE.subset_modulo table new_context.set old_context.set then
-        match SE.(to_projs (to_fset new_context.set)) with
-          | projs -> Some (fun f -> Term.project projs f)
-          | exception SE.(Error (_,Expected_fset)) -> assert false
+        let (_, s) = (* rename the projections and project *)
+          SE.mk_proj_subst
+            ~strict:false ~src:old_context.set ~dst:new_context.set
+        in
+        Some (Term.subst_projs ~project:true s)
       else
         None
   in
@@ -616,7 +618,7 @@ let setup_change_hyps_context
     Env.init ~table ~vars ~system:{ old_context with pair = None; } () in
   
   (* For global hypotheses:
-    - Reachability atoms are handled as local hypotheses.
+    - Reachability atoms at top level are handled as local hypotheses.
     - Other global hypotheses can be kept if their meaning is unchanged
       in the new annotation. This is ensured in [can_keep_global]
       by checking the following conditions on atoms:
@@ -626,6 +628,9 @@ let setup_change_hyps_context
         not changed. 
       + General predicates can always be kept, as their semantics 
         does not depend on the system annotation of the sequent *)
+  (* We could have a weaker condition on reachability atoms: the system
+     must stay the same only in contrapositive positions. *)
+     
   let rec can_keep_global (env : Env.t) = function
     | Equiv.Quant (_,vars,f) ->
       let env = { env with Env.vars = Vars.add_vars vars env.vars } in
@@ -653,13 +658,31 @@ let setup_change_hyps_context
       (HighTerm.is_constant     env a &&
        HighTerm.is_system_indep env a)
       || set_unchanged
+           (* in this case, the set of systems is the same,
+              but the labels may need to be renamed later *)
   in
+  
+  let s = (* rename the projections, no need to project *)
+    lazy (snd @@ SE.mk_proj_subst (* since the sets are equal modulo *)
+            ~strict:true ~src:old_context.set ~dst:new_context.set)
+  in
+
   let update_global f =
-    if can_keep_global env f then Some f else
+    if can_keep_global env f then
+      (* aux function renames the sets in reach atoms *)
+      let rec update_glob_aux (f:Equiv.form) : Equiv.form =
+        match f with
+        | Atom (Reach a) when set_unchanged ->
+           Equiv.mk_reach_atom
+             (Term.subst_projs ~project:true (Lazy.force s) a)
+        | _ -> Equiv.tmap update_glob_aux f
+      in
+      Some (update_glob_aux f)
+    else 
       match f with
-        | Equiv.Atom (Reach f) ->
-            Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
-        | _ -> None
+      | Equiv.Atom (Reach f) ->
+         Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
+      | _ -> None
   in
 
   update_local, update_global

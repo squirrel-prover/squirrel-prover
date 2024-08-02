@@ -282,7 +282,16 @@ val subst_vars : subst -> Vars.vars -> Vars.vars
 val tsubst : Type.tsubst -> term -> term
 
 (*------------------------------------------------------------------*)
-val subst_projs : (proj * proj) list -> term -> term 
+
+(** [subst_projs s t] renames the projections in diffs in [t]
+    according to the substitution [s].
+    if [project] is false, a projection without a mapping in [s] is
+    left unchanged.
+    if [project] is true, a projection without a mapping in [s] is removed.
+    e.g. for [s = {p1->q1}] and [t=diff(p1:a, p2:b)], the result is
+    [diff(q1:a, p2:b)] if [project=false], and [diff(q1:a)] otherwise.
+ *)
+val subst_projs : ?project:bool -> (proj * proj) list -> term -> term 
 
 (*------------------------------------------------------------------*)
 val refresh_vars        : (Vars.var     ) list -> (Vars.var     ) list * subst

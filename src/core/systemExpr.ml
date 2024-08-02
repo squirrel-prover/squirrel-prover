@@ -463,7 +463,7 @@ let mk_proj_subst
     (* [src] may not apply to all systems in [dst] *)
 
     (* FIXME: if [dst=src], empty substitution is normal, but why [None]? *)
-    if dst = src then None, [] else
+(*    if dst = src then None, [] else*)
       (* [l] contains tuples [(p,q), single] where:
          - [p] is a projection of [src] for [single]
          - [q] is a projection of [dst] for [single] *)

@@ -93,13 +93,19 @@ let mk_state
     SE.mk_proj_subst ~strict:false ~src:rule.rw_system ~dst:systems 
   in
 
+  (* this does not ensure that [systems] is a subset of [rule.rw_system],
+     only that [systems] contains at least one system that
+     is part of [rule.rw_system]. 
+     i.e. this checks that there is a possibility that the rule applies,
+     and later on when we actually do the rewriting we will have to check that 
+     the system at that point (which may be a subset of [systems]
+     if we are under a diff) is indeed in [rule.rw_system] *)
   if projs = Some [] then
     raise (Failed (RuleBadSystems "no system of the rule applies"));
 
   (* check that all projection of [rule] on [projs] are valid *)
   let () = match projs with
-    | None -> ()
-    | Some projs ->
+    | Some projs when not (SE.equal0 rule.rw_system systems) ->
       let left  = Term.subst_projs psubst left  in
       let right = Term.subst_projs psubst right in
       List.iter (fun proj ->
@@ -107,6 +113,7 @@ let mk_state
           let right = Term.project1 proj right in
           check_rule { rule with rw_rw = left, right }
         ) projs
+    | _ -> ()
   in
 
   (* open an type unification environment *)

@@ -429,11 +429,12 @@ let mk_macro ms args t = Macro (ms, args, t)
 
 (*------------------------------------------------------------------*)
 let mk_diff l =
-  assert
+
+  assert 
     (let projs = List.map fst l in
      List.sort Stdlib.compare projs = List.sort_uniq Stdlib.compare projs);
-
-  match l with
+  
+    match l with
   | []     -> assert false
   | [_, t] -> t
   | _      -> Diff (Explicit l)
@@ -1215,10 +1216,19 @@ and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
   var, s
 
 (*------------------------------------------------------------------*)
-let subst_projs (s : (proj * proj) list) (t : term) : term = 
+let subst_projs
+      ?(project=false)
+      (s : (proj * proj) list)
+      (t : term) : term = 
   let rec do_subst : term -> term = function
-    | Diff (Explicit l) ->
-      Diff (Explicit (List.map (fun (p, t) -> List.assoc_dflt p p s, t) l))
+    | Diff (Explicit l) when project ->
+       mk_diff (List.filter_map
+                  (fun (p, t) ->
+                    Option.map (fun p' -> (p',t)) (List.assoc_opt p s))
+                  l)
+
+    | Diff (Explicit l) when not project ->
+      mk_diff (List.map (fun (p, t) -> List.assoc_dflt p p s, t) l)
 
     | _ as t -> tmap do_subst t
 
