@@ -2,6 +2,7 @@
 
 (*------------------------------------------------------------------*)
 open Utils
+open Ppenv
 
 module MP = Match.Pos
 module SE = SystemExpr
@@ -49,8 +50,8 @@ sig
     negate:bool -> content -> content -> data -> Term.term
   val subst_content : Term.subst -> content -> content
   val subst_data : Term.subst -> data -> data
-  val pp_content : content formatter
-  val pp_data : data formatter
+  val pp_content : content formatter_p
+  val pp_data : data formatter_p
 end
 
 (*------------------------------------------------------------------*)
@@ -73,9 +74,9 @@ struct
 
   let subst_data _ () = ()
 
-  let pp_content = Term.pp
+  let pp_content = Term._pp
 
-  let pp_data (fmt : Format.formatter) () : unit =
+  let pp_data _ppe (fmt : Format.formatter) () : unit =
     Fmt.pf fmt ""
 end
 
@@ -94,7 +95,7 @@ struct
 
   let subst_data _ () = ()
 
-  let pp_content (fmt:Format.formatter) () = Fmt.pf fmt ""
+  let pp_content _ppe (fmt:Format.formatter) () = Fmt.pf fmt ""
 
   let pp_data = pp_content
 end
@@ -147,7 +148,7 @@ module type SimpleOcc = sig
   val clear_subsumed :
     Symbols.table -> SE.fset -> simple_occs -> simple_occs
 
-  val pp : simple_occ formatter
+  val pp : simple_occ formatter_p
 end
 
 (*------------------------------------------------------------------*)
@@ -296,26 +297,26 @@ struct
 
   (** Internal.
       Prints a description of the occurrence. *)
-  let pp_internal (ppf:Format.formatter) (o:simple_occ) : unit =
+  let pp_internal ppe (ppf:Format.formatter) (o:simple_occ) : unit =
     (* we don't print the data. maybe we would like to sometimes?*)
     match o.so_occtype with
     | EI_indirect a ->
       Fmt.pf ppf
         "@[%a@] @,(collision with @[%a@])@ in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
-        OC.pp_content o.so_cnt
-        OC.pp_content o.so_coll
-        Term.pp a
-        Term.pp o.so_subterm
+        (OC.pp_content ppe) o.so_cnt
+        (OC.pp_content ppe) o.so_coll
+        (Term._pp      ppe) a
+        (Term._pp      ppe) o.so_subterm
     | EI_direct ->
       Fmt.pf ppf
         "@[%a@] @,(collision with @[%a@])@ @[<hov 2>in term@ @[%a@]@]"
-        OC.pp_content o.so_cnt
-        OC.pp_content o.so_coll
-        Term.pp o.so_subterm
+        (OC.pp_content ppe) o.so_cnt
+        (OC.pp_content ppe) o.so_coll
+        (Term._pp      ppe) o.so_subterm
 
  (** Exported (see `.mli`) *)
-  let pp (fmt:Format.formatter) (o:simple_occ) : unit =
-    Fmt.pf fmt "@[<hv 2>%a@]" pp_internal o
+  let pp ppe (fmt:Format.formatter) (o:simple_occ) : unit =
+    Fmt.pf fmt "@[<hv 2>%a@]" (pp_internal ppe) o
 
 end
 
@@ -397,9 +398,9 @@ module type ExtOcc = sig
   val clear_subsumed :
     Symbols.table -> SE.fset -> ext_occs -> ext_occs
 
-  val pp : ext_occ formatter
+  val pp : ext_occ formatter_p
 
-  val pp_occs : ext_occs formatter
+  val pp_occs : ext_occs formatter_p
 end
 
 
@@ -462,15 +463,15 @@ struct
     List.clear_subsumed (ext_occ_incl table system) occs
 
   (** Exported (see `.mli`) *)
-  let pp (fmt:Format.formatter) (occ:ext_occ) : unit =
-    SO.pp fmt occ.eo_occ
+  let pp ppe (fmt:Format.formatter) (occ:ext_occ) : unit =
+    (SO.pp ppe) fmt occ.eo_occ
 
   (** Exported (see `.mli`) *)
-  let pp_occs (fmt:Format.formatter) (occs:ext_occs) : unit =
+  let pp_occs ppe (fmt:Format.formatter) (occs:ext_occs) : unit =
     if occs = [] then
       Fmt.pf fmt "(no occurrences)@;"
     else
-      Fmt.list ~sep:(Fmt.any "@;@;") pp fmt occs
+      Fmt.list ~sep:(Fmt.any "@;@;") (pp ppe) fmt occs
 end
 
 
@@ -748,6 +749,7 @@ struct
       (sources      : Term.terms) 
     : ext_occs
     =
+    let ppe = default_ppe ~table:contx.table () in
     let find_occs = fold_bad_occs get_bad_occs in
 
     let system = contx.system in
@@ -781,7 +783,7 @@ struct
              Printer.pr "@[<hv 2>\
                          @[<hov 0>Direct @[%t@]@ in@ @[%a@]:@]\
                          @;@[%a@]@]@;@;@;"
-               ppp Term.pp t EO.pp_occs occs;
+               ppp Term.pp t (EO.pp_occs ppe) occs;
            dir_occs @ occs)
         []
         sources
@@ -830,7 +832,7 @@ struct
     if pp_ns <> None && ind_occs <> [] then
       Printer.pr "@[<hv 2>@[Indirect @[%t@]@ in other actions:@]@;%a@]@;@;"
         ppp
-        EO.pp_occs ind_occs;
+        (EO.pp_occs ppe) ind_occs;
 
     (* remove subsumed occs *)
     let occs = dir_occs @ ind_occs in
@@ -1120,13 +1122,13 @@ struct
   let subst (s : Term.subst) (n : t) : t =
     { n with args = List.map (Term.subst s) n.args }
 
-  let pp fmt (n : t) =
+  let pp ppe fmt (n : t) =
     if n.args = [] then
       Fmt.pf fmt "%a" Symbols.pp_path n.symb.s_symb
     else
       Fmt.pf fmt "%a(%a)"
         Symbols.pp_path n.symb.s_symb
-        (Fmt.list ~sep:Fmt.comma Term.pp) n.args
+        (Fmt.list ~sep:Fmt.comma (Term._pp ppe)) n.args
 
   let of_term : Term.term -> t = function
     | Name (symb, args) -> { symb; args; }
@@ -1171,7 +1173,7 @@ struct
 
   let pp_content = Name.pp
 
-  let pp_data (fmt : Format.formatter) () : unit =
+  let pp_data _ppe (fmt : Format.formatter) () : unit =
     Fmt.pf fmt ""
 end
 

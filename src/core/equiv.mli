@@ -138,7 +138,9 @@ type global_form = form
 
 type any_form = Global of form | Local of Term.term
 
-val pp_any_form : any_form formatter
+val pp_any_form     : any_form formatter
+val pp_any_form_dbg : any_form formatter
+val _pp_any_form    : any_form formatter_p
 
 val is_local : any_form -> bool
 

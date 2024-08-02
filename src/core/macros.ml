@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
 module S = System
@@ -322,7 +323,7 @@ let data_of_global_data (d : global_data) : Symbols.data =
   Symbols.Macro (Global (List.length d.indices, d.ty, Global_data d))
 
 (*------------------------------------------------------------------*)
-let pp fmt (g : global_data) : unit =
+let _pp ppe fmt (g : global_data) : unit =
   let pp_strict fmt = function
     | `Strict -> Fmt.pf fmt "Strict"
     | `Large -> Fmt.pf fmt "Large"
@@ -338,8 +339,11 @@ let pp fmt (g : global_data) : unit =
     Vars.pp_typed_list g.indices
     Vars.pp g.ts
     (Fmt.list ~sep:Fmt.cut
-       (Fmt.parens (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)))
+       (Fmt.parens (Fmt.pair ~sep:Fmt.comma System.Single.pp (Term._pp ppe))))
     g.bodies
+
+let pp     = _pp (default_ppe ~dbg:false ())
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
 let get_global_data : Symbols.global_macro_def -> global_data = function

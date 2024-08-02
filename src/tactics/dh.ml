@@ -3,6 +3,7 @@
 open Squirrelcore
 open Term
 open Utils
+open Ppenv
 
 module Args = TacticsArgs
 module L = Location
@@ -300,6 +301,7 @@ let cgdh
     (s : sequent)
   : sequent list
   =
+  let ppe = default_ppe ~table:(TS.table s) () in
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
   let contx = TS.mk_trace_cntxt s in
@@ -309,7 +311,7 @@ let cgdh
     dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
   in
   let pp_nab =
-    fun ppf () -> Fmt.pf ppf "bad occurrences@ of %a and %a" Name.pp na Name.pp nb
+    fun ppf () -> Fmt.pf ppf "bad occurrences@ of %a and %a" (Name.pp ppe) na (Name.pp ppe) nb
   in
   let get_bad : NOS.f_fold_occs =
     get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]

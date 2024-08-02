@@ -1,4 +1,4 @@
-open Utils
+open Ppenv
 
 module SE = SystemExpr
 module MP = Match.Pos
@@ -77,10 +77,10 @@ module type OccContent = sig
   val subst_data : Term.subst -> data -> data
 
   (** Printing function for occurrence contents *)
-  val pp_content : content formatter
+  val pp_content : content formatter_p
 
   (** Printing function for occurrence data *)
-  val pp_data : data formatter
+  val pp_data : data formatter_p
 
 end
 
@@ -189,7 +189,7 @@ module type SimpleOcc = sig
     Symbols.table -> SE.fset -> simple_occs -> simple_occs
 
   (** Prints a description of the occurrence *)
-  val pp : simple_occ formatter
+  val pp : simple_occ formatter_p
 end
 
 
@@ -256,10 +256,10 @@ module type ExtOcc = sig
     Symbols.table -> SE.fset -> ext_occs -> ext_occs
 
   (** Prints a description of the occurrence. *)
-  val pp : ext_occ formatter
+  val pp : ext_occ formatter_p
 
   (** Prints a list of occurrences *)
-  val pp_occs : ext_occs formatter
+  val pp_occs : ext_occs formatter_p
 
 end
 
@@ -423,7 +423,7 @@ sig
   (** An applied named [symb(args)] *)
   type t = { symb : Term.nsymb; args : Term.terms; }
 
-  val pp : t formatter
+  val pp : t formatter_p
 
   val of_term : Term.t -> t
 
@@ -445,7 +445,7 @@ end
 (** [OccurrenceContent], [OccurrenceSearch], [OccurrenceFormulas]
     for occurrences of names *)
 
-module NameOC : OccContent 
+module NameOC : OccContent
   with type content = Name.t
    and type data = unit
 

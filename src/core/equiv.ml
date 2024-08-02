@@ -869,10 +869,13 @@ let is_equiv f = destr_equiv f <> None
 
 type any_form = Global of form | Local of Term.term
 
-let pp_any_form fmt (f : any_form) =
+let _pp_any_form ppe fmt (f : any_form) =
   match f with
-  | Global e -> pp fmt e
-  | Local f -> Term.pp fmt f
+  | Global e ->      _pp ppe fmt e
+  | Local  f -> Term._pp ppe fmt f
+
+let pp_any_form     = _pp_any_form (default_ppe ~dbg:false ()) 
+let pp_any_form_dbg = _pp_any_form (default_ppe ~dbg:true ())  
 
 let any_to_reach (f : any_form) : Term.term =
   match f with

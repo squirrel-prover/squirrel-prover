@@ -36,9 +36,9 @@ let _pp ppe fmt = function
 let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
     
-let pp_init fmt = function
-  | Local  j -> Term.pp fmt (TS.conclusion j)
-  | Global j -> ES.pp_init fmt j
+let pp_init ppe fmt = function
+  | Local  j -> Term._pp ppe fmt (TS.conclusion j)
+  | Global j -> ES.pp_init ppe fmt j
 
 (*------------------------------------------------------------------*)
 let map ft fe = function
@@ -69,7 +69,7 @@ type global_statement = (string, Equiv.form    ) abstract_statement
 type local_statement  = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
-let pp_statement fmt (g : statement) : unit =
+let _pp_statement ppe fmt (g : statement) : unit =
   let pp_tyvars fmt tyvs = 
     if tyvs = [] then () 
     else
@@ -80,7 +80,7 @@ let pp_statement fmt (g : statement) : unit =
     SE.pp_context g.system
     g.name
     pp_tyvars g.ty_vars
-    Equiv.pp_any_form g.formula
+    (Equiv._pp_any_form ppe) g.formula
 
 (*------------------------------------------------------------------*)
 

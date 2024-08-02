@@ -183,7 +183,8 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
       in
       let table = Symbols.Operator.define table ~data name in
 
-      Printer.prt `Result "%a" Operator.pp_concrete_operator op_data;
+      let ppe = default_ppe ~table () in
+      Printer.prt `Result "%a" (Operator._pp_concrete_operator ppe) op_data;
 
       table
 
@@ -332,8 +333,9 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
         ~data:(Predicate.Predicate data)
     in
 
+    let ppe = default_ppe ~table () in
     Printer.prt `Result "@[<v 2>new predicate:@;%a@;@]"
-      Predicate.pp data;
+      (Predicate._pp ppe) data;
 
     table
 

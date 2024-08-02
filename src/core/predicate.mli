@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -27,7 +28,9 @@ type predicate = private {
 type Symbols.data += Predicate of predicate
 
 (*------------------------------------------------------------------*)
-val pp : predicate formatter
+val _pp     : predicate formatter_p
+val  pp     : predicate formatter
+val  pp_dbg : predicate formatter
 
 (*------------------------------------------------------------------*)
 val mk :

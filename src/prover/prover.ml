@@ -85,16 +85,18 @@ let str_mode = function
   | ProverLib.AllDone -> "AllDone"
 
 let pp_goal fmt (ps:state) =
+  let ppe = default_ppe ~table:ps.table () in
   match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf fmt "No subgoals remaining.@."
   | Some _, j :: _ ->
     Fmt.pf fmt "Focused goal (1/%d):@;%a@;@."
       (List.length ps.subgoals)
-      Goal.pp j
+      (Goal._pp ppe) j
   | _ -> assert false
 
 let pp_subgoals fmt (ps:state) =
+  let ppe = default_ppe ~table:ps.table () in
   match ps.current_goal, ps.subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf fmt "@[<v 0>[goal> No subgoals remaining.@]@."
@@ -103,7 +105,7 @@ let pp_subgoals fmt (ps:state) =
     Fmt.pf fmt "@[<v 0>[goal> (%d/%d):@;%a@;@]@." 
       (i+1) 
       (List.length subgoals) 
-      Goal.pp sg
+      (Goal._pp ppe) sg
     ) subgoals
   | _ -> assert false
 
@@ -220,11 +222,13 @@ let first_goal (ps:state) : ProverLib.pending_proof =
 let do_add_goal (st:state) (g:Goal.Parsed.t L.located) : state =
   let new_ps = add_new_goal st g in
   (* for printing new goal ↓ *)
-  let goal,name = match first_goal new_ps with
+  let goal,name = 
+    match first_goal new_ps with
     | ProverLib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
     | _ -> assert false (* should be only ↑ *)
   in
-  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name Goal.pp_init goal;
+  let ppe = default_ppe ~table:st.table () in
+  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name (Goal.pp_init ppe) goal;
   (* return toplevel state with new prover_state *)
   new_ps
 
@@ -242,11 +246,11 @@ let add_decls (st:state) (decls : Decl.declarations)
   { ps with prover_mode = ProverLib.GoalMode }, proof_obls
 
 let do_decls (st:state) (decls : Decl.declarations) : state =
-  let new_prover_state, proof_obls = 
-    add_decls st decls in
+  let new_prover_state, proof_obls = add_decls st decls in
+  let ppe = default_ppe ~table:new_prover_state.table () in
   if proof_obls <> [] then
     Printer.pr "@[<v 2>proof obligations:@;%a@]"
-      (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
+      (Fmt.list ~sep:Fmt.cut (Goal.pp_init ppe)) proof_obls;
   new_prover_state
 
 let get_first_subgoal (ps:state) : Goal.t =
@@ -479,11 +483,12 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
 let do_search (st:state) (t:ProverLib.search_query) : unit =
   let matches = search_about st t in
+  let ppe = default_ppe ~table:st.table ~dbg:false () in
   Printer.prt `Default "Search result(s):@.@.";
   let print_all fmt matches =
   List.iter (fun (lemma,_:Lemma.lemma * Equiv.any_form list) -> 
         Fmt.pf fmt "%a@.@."
-          Lemma.pp lemma
+          (Lemma._pp ppe) lemma
     ) matches in
   Printer.prt `Default "%a" print_all matches
 
@@ -509,21 +514,23 @@ let print_system (st:state) (s_opt:SystemExpr.Parse.t option)
 
 (*------------------------------------------------------------------*)
 let print_lemmas table (p:Symbols.p_path) : bool =
+  let ppe = default_ppe ~table () in
   let print1 (_path,data) =
     let data = Lemma.as_lemma data in
-    Printer.prt `Default "%a@." Lemma.pp data;
+    Printer.prt `Default "%a@." (Lemma._pp ppe) data;
   in
   try List.iter print1 (Symbols.Lemma.convert p table); true
   with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 
 
 (*------------------------------------------------------------------*)
 let print_functions table (p : Symbols.p_path) : bool =
+  let ppe = default_ppe ~table () in
   let print1 (path,_) =
     let Symbols.OpData.{ ftype; def;} = Symbols.OpData.get_data path table in
     match def with
     | Concrete _ ->
       let data = Operator.get_concrete_data table path in
-      Printer.prt `Default "%a@." Operator.pp_concrete_operator data
+      Printer.prt `Default "%a@." (Operator._pp_concrete_operator ppe) data
 
     | Abstract _ ->
       let data, _ = Symbols.OpData.get_abstract_data path table in
@@ -548,11 +555,12 @@ let print_names table (p:Symbols.p_path) : bool =
 
 (*------------------------------------------------------------------*)
 let print_macros table (p:Symbols.p_path) : bool =
+  let ppe = default_ppe ~table () in
   let print1 (path,_data) =
     (* FIXME: do not print only global macros *)
     if Macros.is_global table path then 
       let macro = Symbols.Macro.get_data path table in
-      Printer.prt `Default "%a@." Macros.pp (Macros.as_global_macro macro)
+      Printer.prt `Default "%a@." (Macros._pp ppe) (Macros.as_global_macro macro)
   in
   try List.iter print1 (Symbols.Macro.convert p table); true
   with Symbols.Error (_, Symbols.Unbound_identifier _) -> false 

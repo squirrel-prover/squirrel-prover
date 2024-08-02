@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module MP = Match.Pos
 module SE = SystemExpr
@@ -407,32 +408,32 @@ let clear_subsumed_nameoccs
 
 (*------------------------------------------------------------------*)
 (** Internally used to print a description of the occurrence *)
-let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
+let pp_internal ppe (ppf:Format.formatter) (occ:name_occ) : unit =
   let o = occ.eo_occ in
   match o.so_occtype with
   | EI_indirect a ->
     Fmt.pf ppf
       "@[%a@] @,(collision with @[%a@])@ in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
-      Name.pp o.so_cnt
-      Name.pp o.so_coll
-      Term.pp a
-      Term.pp o.so_subterm
+      (Name.pp  ppe) o.so_cnt
+      (Name.pp  ppe) o.so_coll
+      (Term._pp ppe) a
+      (Term._pp ppe) o.so_subterm
   | EI_direct ->
     Fmt.pf ppf
       "@[%a@] @,(collision with @[%a@])@ @[<hov 2>in term@ @[%a@]@]"
-      Name.pp o.so_cnt
-      Name.pp o.so_coll
-      Term.pp o.so_subterm
+      (Name.pp  ppe) o.so_cnt
+      (Name.pp  ppe) o.so_coll
+      (Term._pp ppe) o.so_subterm
 
 (** Prints a description of the occurrence *)
-let pp_name_occ (fmt:Format.formatter) (occ:name_occ) : unit =
-  Fmt.pf fmt "@[<hv 2>%a@]" pp_internal occ
+let pp_name_occ ppe (fmt:Format.formatter) (occ:name_occ) : unit =
+  Fmt.pf fmt "@[<hv 2>%a@]" (pp_internal ppe) occ
 
-let pp_name_occs (fmt:Format.formatter) (occs:name_occ list) : unit =
+let pp_name_occs ppe (fmt:Format.formatter) (occs:name_occ list) : unit =
   if occs = [] then
     Fmt.pf fmt "(no occurrences)@;"
   else
-    Fmt.list ~sep:(Fmt.any "@;@;") pp_name_occ fmt occs
+    Fmt.list ~sep:(Fmt.any "@;@;") (pp_name_occ ppe) fmt occs
 
 (*------------------------------------------------------------------*)
 (** {2 Functions to look for illegal name occurrences in a term} *)
@@ -533,6 +534,7 @@ let find_occurrences
   =
   let system = contx.system in
   let table = contx.table in
+  let ppe = default_ppe ~table () in
 
   let ppp ppf = match pp_ns with
     | Some x -> Fmt.pf ppf "of @[%a@] " x ()
@@ -567,7 +569,7 @@ let find_occurrences
            Printer.pr "@[<hv 2>\
                        @[<hov 0>Direct bad occurrences@ @[%t@]in@ @[%a@]:@]\
                        @;@[%a@]@]@;@;@;"
-             ppp Term.pp t pp_name_occs occs;
+             ppp (Term._pp ppe) t (pp_name_occs ppe) occs;
          dir_occs @ occs, dir_acc @ acc)
       ([], [])
       sources
@@ -626,7 +628,7 @@ let find_occurrences
   if pp_ns <> None && ind_occs <> [] then
     Printer.pr "@[<hv 2>@[Bad occurrences@ @[%t@]in other actions:@]@;%a@]@;@;"
       ppp
-      pp_name_occs ind_occs;
+      (pp_name_occs ppe) ind_occs;
 
   (* remove subsumed occs *)
   let occs = dir_occs @ ind_occs in

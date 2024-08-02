@@ -1,6 +1,7 @@
 (** Declaring and unfolding macros *)
 
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -181,4 +182,7 @@ val fty : Symbols.table -> Symbols.macro -> Type.ftype * Type.ty
 
 val is_global : Symbols.table -> Symbols.macro -> bool
 
-val pp : global_data formatter
+(*------------------------------------------------------------------*)
+val _pp    : global_data formatter_p
+val pp     : global_data formatter
+val pp_dbg : global_data formatter

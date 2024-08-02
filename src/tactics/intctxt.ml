@@ -2,6 +2,7 @@
 open Squirrelcore
 open Term
 open Utils
+open Ppenv
 
 module Args = TacticsArgs
 module L = Location
@@ -109,6 +110,7 @@ let intctxt
     (s : sequent)
   : sequent list
   =
+  let ppe = default_ppe ~table:(TS.table s) () in
   (* find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
@@ -120,7 +122,7 @@ let intctxt
     intctxt_param ~hyp_loc:(L.loc h) contx hyp s
   in
   
-  let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
+  let pp_k ppf () = Fmt.pf ppf "%a" (Name.pp ppe) k in
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   Printer.pr "@[<v 0>";

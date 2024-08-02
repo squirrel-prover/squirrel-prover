@@ -12,6 +12,7 @@
 
 open Term
 open Utils
+open Ppenv
 
 module T    = ProverTactics
 module Args = HighTacticsArgs
@@ -427,11 +428,12 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   let updated_context =
     { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
 
+  let ppe = default_ppe ~table:(TS.table s) () in
   let warn_unsupported t =
     (* cannot use Emacs code `warning>` because it messes-up the boxes *)
     Printer.prt `Result
       "@[<hov 2>Cannot transform@ @[%a@]@]@;\
-       It will be dropped." Term.pp t
+       It will be dropped." (Term._pp ppe) t
   in
 
   (* Attempt to transform. If the transformation can't

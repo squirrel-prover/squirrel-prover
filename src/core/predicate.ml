@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -51,12 +52,12 @@ let refresh (p : predicate) : predicate =
   { p with body; args = { multi; simple; }; }
                   
 (*------------------------------------------------------------------*)
-let pp_pred_body fmt = function
+let pp_pred_body ppe fmt = function
   | Abstract   -> Fmt.pf fmt "Abstract"
-  | Concrete f -> Fmt.pf fmt "%a" Equiv.pp f
+  | Concrete f -> Fmt.pf fmt "%a" (Equiv._pp ppe) f
 
 (** Pretty-printer *)
-let pp fmt p =
+let _pp ppe fmt p =
   let pp_pred_name fmt s =
     if Symbols.is_infix_str s then
       (Fmt.parens Fmt.string) fmt s 
@@ -95,12 +96,15 @@ let pp fmt p =
   in
 
   Fmt.pf fmt "@[<hov 2>@[<hov 2>predicate %a %a%a%a%a @]=@ @[%a@]@]"
-    pp_pred_name   p.name
-    pp_tyvars      p.ty_vars
-    pp_sevars      p.se_vars
-    pp_multi_args  p.args.multi
-    pp_simple_args p.args.simple
-    pp_pred_body   p.body
+    pp_pred_name       p.name
+    pp_tyvars          p.ty_vars
+    pp_sevars          p.se_vars
+    pp_multi_args      p.args.multi
+    pp_simple_args     p.args.simple
+    (pp_pred_body ppe) p.body
+
+let pp     = _pp (default_ppe ~dbg:false ())
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
 let mk ~name ~ty_vars ~se_vars ~args ~body = 

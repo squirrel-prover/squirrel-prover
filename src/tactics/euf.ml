@@ -2,6 +2,7 @@
 open Squirrelcore
 open Term
 open Utils
+open Ppenv
 
 module Args = TacticsArgs
 module L = Location
@@ -81,13 +82,13 @@ struct
 
   let subst_data _ () = ()
 
-  let pp_content fmt x =
+  let pp_content ppe fmt x =
     match x with
-    | BadKey k -> Fmt.pf fmt "%a" Name.pp k
+    | BadKey k -> Fmt.pf fmt "%a" (Name.pp ppe) k
     | IntegrityMsg im ->
-      Fmt.pf fmt "%a auth. by %a" Term.pp im.msg Name.pp im.key
+      Fmt.pf fmt "%a auth. by %a" (Term._pp ppe) im.msg (Name.pp ppe) im.key
 
-  let pp_data fmt () : unit =
+  let pp_data _ppe fmt () : unit =
     Fmt.pf fmt ""
 end
 
@@ -279,6 +280,7 @@ let euf_param
 
 (*------------------------------------------------------------------*)
 let euf (h : lsymb) (s : sequent) : sequent list =
+  let ppe = default_ppe ~table:(TS.table s) () in
   (* find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
@@ -291,7 +293,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
 
   let pp_k ppf () =
     Fmt.pf ppf "bad occurrences of key %a,@ and messages authenticated by it" 
-      Name.pp k
+      (Name.pp ppe) k
   in
 
   (* apply euf: first construct the IOS.f_fold_occs to use *)

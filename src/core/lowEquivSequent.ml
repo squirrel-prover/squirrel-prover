@@ -117,8 +117,7 @@ let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
-let pp_init fmt (j : sequent) =
-  let ppe = default_ppe ~table:j.env.table () in
+let pp_init ppe fmt (j : sequent) =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf fmt "forall %a,@ " (Vars._pp_env ppe) j.env.vars ;
   Fmt.pf fmt "%a" (Equiv._pp ppe) j.conclusion

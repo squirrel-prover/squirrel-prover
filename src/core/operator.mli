@@ -4,6 +4,7 @@
     could not be fully done (to avoid circular dependencies) *)
 
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -22,7 +23,9 @@ type concrete_operator = {
 type Symbols.OpData.concrete_def += Val of concrete_operator
 
 (*------------------------------------------------------------------*)
-val pp_concrete_operator : concrete_operator formatter
+val _pp_concrete_operator     : concrete_operator formatter_p
+val  pp_concrete_operator     : concrete_operator formatter
+val  pp_concrete_operator_dbg : concrete_operator formatter
 
 (*------------------------------------------------------------------*)
 val concrete_ftype : concrete_operator -> Type.ftype

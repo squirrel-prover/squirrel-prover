@@ -2,6 +2,7 @@
 open Squirrelcore
 open Term
 open Utils
+open Ppenv
 
 module Args = TacticsArgs
 module L = Location
@@ -316,6 +317,7 @@ let phi_proj
     (proj    : proj)
   : Term.terms
   =
+  let ppe = default_ppe ~table:env.table () in
   (* project everything *)
   let system_p = SE.project [proj] contx.system in
   let env = Env.update ~system:{ env.system with set = (system_p :> SE.arbitrary); } env in
@@ -338,7 +340,7 @@ let phi_proj
   in
   let frame_p = List.map (Term.project1 proj) biframe in
 
-  let pp_kr ppf () = Fmt.pf ppf "%a and %a" Name.pp k_p Name.pp r_p in
+  let pp_kr ppf () = Fmt.pf ppf "%a and %a" (Name.pp ppe) k_p (Name.pp ppe) r_p in
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   let dummy_cipher =              (* dummy ciphertext, needed by [EncRandom] *)

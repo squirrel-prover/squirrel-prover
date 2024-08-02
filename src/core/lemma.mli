@@ -1,11 +1,14 @@
 open Utils
+open Ppenv
 
 type lemma = { 
   stmt : Goal.statement;
   kind : [`Axiom | `Lemma];
 } 
 
-val pp : lemma formatter
+val _pp    : lemma formatter_p
+val pp     : lemma formatter
+val pp_dbg : lemma formatter
 
 val as_lemma : Symbols.data -> lemma
 

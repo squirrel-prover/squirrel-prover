@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module L = Location
                
@@ -17,7 +18,7 @@ let pp_kind fmt = function
   | `Axiom -> Printer.kw `Goal fmt "axiom"
   | `Lemma -> Printer.kw `Goal fmt "lemma"
 
-let pp fmt lem =
+let _pp ppe fmt lem =
   let stmt_kind_str =
     match lem.stmt.formula with
     | Equiv.Global _ -> "global "
@@ -25,7 +26,10 @@ let pp fmt lem =
   in
   Fmt.pf fmt "@[<2>%s%a %a@]"
     stmt_kind_str
-    pp_kind lem.kind Goal.pp_statement lem.stmt
+    pp_kind lem.kind (Goal._pp_statement ppe) lem.stmt
+
+let pp_dbg = _pp (default_ppe ~dbg:true  ())
+let pp     = _pp (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 let as_lemma : Symbols.data -> lemma = function
@@ -76,7 +80,8 @@ let add_lemma
   let table, _ =
     Symbols.Lemma.declare ~approx:false table (L.mk_loc loc gconcl.Goal.name) ~data 
   in
-  Printer.pr "%a@;" pp lem;
+  let ppe = default_ppe ~table () in
+  Printer.pr "%a@;" (_pp ppe) lem;
   table
 
 (*------------------------------------------------------------------*)

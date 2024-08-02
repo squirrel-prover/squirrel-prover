@@ -2,6 +2,7 @@
 open Squirrelcore
 open Term
 open Utils
+open Ppenv
 
 module Args = TacticsArgs
 module L = Location
@@ -80,13 +81,13 @@ struct
 
   let subst_data _ () = ()
 
-  let pp_content fmt x =
+  let pp_content ppe fmt x =
     match x with
-    | BadKey k -> Fmt.pf fmt "%a" Name.pp k
+    | BadKey k -> Fmt.pf fmt "%a" (Name.pp ppe) k
     | IntegrityMsg im ->
-      Fmt.pf fmt "%a hashed by %a" Term.pp im.msg Name.pp im.key
+      Fmt.pf fmt "%a hashed by %a" (Term._pp ppe) im.msg (Name.pp ppe) im.key
 
-  let pp_data fmt () : unit =
+  let pp_data _ppe fmt () : unit =
     Fmt.pf fmt ""
 end
 
@@ -389,6 +390,7 @@ let phi_proj
     (proj    : Term.proj)
   : Term.terms
   =
+  let ppe = default_ppe ~table:env.table () in
   (* project everything *)
   let system_p = SE.project [proj] contx.system in
   let new_context = { env.system with set = (system_p :> SE.arbitrary); } in
@@ -416,7 +418,7 @@ let phi_proj
 
   let pp_k ppf () = 
     Fmt.pf ppf "bad occurrences of key %a,@ and messages hashed by it" 
-      Name.pp k_p
+      (Name.pp ppe) k_p
   in
 
   (* first construct the IOS.folds_occs *)
@@ -459,6 +461,7 @@ let phi_proj
 (*------------------------------------------------------------------*)
 (** The PRF tactic *)
 let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
+  let ppe = default_ppe ~table:(ES.table s) () in
   let contx = ES.mk_pair_trace_cntxt s in
   let env = ES.env s in
   let loc = L.loc i in
@@ -479,7 +482,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   Printer.pr
     "@[<v 0>Applying PRF to %a@;@;"
-    Term.pp (Term.mk_fun contx.table hash_f [Term.mk_tuple [m;k]]);  
+    (Term._pp ppe) (Term.mk_fun contx.table hash_f [Term.mk_tuple [m;k]]);  
   let phi_proj =
     phi_proj ~use_path_cond:false loc
       env contx_nprf (ES.get_trace_hyps s) hash_f biframe cc_nprf m k nprf 

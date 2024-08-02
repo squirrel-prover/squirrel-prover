@@ -16,7 +16,7 @@ val pp     : t formatter
 val pp_dbg : t formatter
 val _pp    : t formatter_p
 
-val pp_init : t formatter
+val pp_init : t formatter_p
 
 (*------------------------------------------------------------------*)
 val vars   : t -> Vars.env
@@ -46,7 +46,7 @@ type global_statement = (string, Equiv.form    ) abstract_statement
 type local_statement  = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
-val pp_statement : statement formatter
+val _pp_statement : statement formatter_p
 
 (*------------------------------------------------------------------*)
 val is_local_statement  : (_, Equiv.any_form) abstract_statement -> bool

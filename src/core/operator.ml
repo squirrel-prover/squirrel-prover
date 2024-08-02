@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 
@@ -16,9 +17,9 @@ type concrete_operator = {
 type Symbols.OpData.concrete_def += Val of concrete_operator
 
 (*------------------------------------------------------------------*)
-let pp_op_body fmt body = Fmt.pf fmt "%a" Term.pp body
+let pp_op_body ppe fmt body = Fmt.pf fmt "%a" (Term._pp ppe) body
 
-let pp_concrete_operator fmt op =
+let _pp_concrete_operator ppe fmt op =
   let pp_tyvars fmt tyvars =
     if tyvars = [] then () 
     else
@@ -35,7 +36,10 @@ let pp_concrete_operator fmt op =
     pp_tyvars op.ty_vars
     pp_args op.args
     Type.pp op.out_ty
-    pp_op_body op.body
+    (pp_op_body ppe) op.body
+
+let pp_concrete_operator     = _pp_concrete_operator (default_ppe ~dbg:false ())
+let pp_concrete_operator_dbg = _pp_concrete_operator (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
 let concrete_ftype (op : concrete_operator) : Type.ftype = 
