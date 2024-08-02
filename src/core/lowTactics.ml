@@ -548,28 +548,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** parse a expand argument *)
   let p_rw_expand_arg (s : S.t) (arg : Typing.term) : expand_kind =
-    let tbl = S.table s in
+    (* let tbl = S.table s in *)
     match Args.as_p_path [Args.Theory arg] with
-    | Some m ->
-      let mem_def =
-        match m with
-        | [], ms ->
-          let ms = L.unloc ms in
-          S.Hyps.exists (fun (id,ldc) ->
-              id.name = ms &&
-              (match ldc with LDef _ -> true | _ -> false)
-            ) s
-        | _ -> false
-      in
-      if mem_def                       ||
-         Symbols.Macro.mem_p     m tbl ||
-         Symbols.Operator.mem_p  m tbl ||
-         Symbols.Predicate.mem_p m tbl
-      then
-        Ppath m
-      else 
-        soft_failure ~loc:(L.loc arg) 
-          (Failure "not a macro, operator, predicate or definition")
+    | Some m -> Ppath m
       
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with

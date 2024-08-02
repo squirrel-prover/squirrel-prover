@@ -1,6 +1,3 @@
-
-(* set debugConstr=true. *)
-
 channel c
 
 abstract ok : index -> message
