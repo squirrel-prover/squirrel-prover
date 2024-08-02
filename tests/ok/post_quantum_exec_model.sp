@@ -26,26 +26,53 @@ print system [PQ].
 print a.
 print b.
 
+
 (* --------------------------------------------------------- *)
 (* checking the shape of generic macro definitions *)
 lemma [PQ] _ i :
   let t = X i in
   happens(t) =>
-  Q.frame@t = < Q.frame@pred t,
-                 <of_bool (Q.exec@t), if Q.exec@t then Q.output@t>> &&
-  Q.state@t = qatt(t, Q.frame@pred t, Q.state@pred t)#2 &&
-  Q.input@t = qatt(t, Q.frame@pred t, Q.state@pred t)#1 &&
-  Q.exec @t = (Q.exec@pred t && Q.cond@t).
+  Quantum.frame@t = < Quantum.frame@pred t,
+                 <of_bool (Quantum.exec@t), if Quantum.exec@t then Quantum.output@t>> &&
+  Quantum.state@t = qatt(t, Quantum.frame@pred t, Quantum.state@pred t)#2 &&
+  Quantum.input@t = qatt(t, Quantum.frame@pred t, Quantum.state@pred t)#1 &&
+  Quantum.exec @t = (Quantum.exec@pred t && Quantum.cond@t).
 Proof.
   intro t H. 
   split; 2:split; 2: split.
-  + rewrite /Q.frame.
+  + rewrite /Quantum.frame.
     by apply eq_refl.
-  + rewrite /Q.state.
+  + rewrite /Quantum.state.
     by apply eq_refl.
-  + rewrite /Q.input.
+  + rewrite /Quantum.input.
     by apply eq_refl.
-  + rewrite /Q.exec.
+  + rewrite /Quantum.exec.
+    by apply eq_refl.
+Qed.
+
+open Quantum.
+close Classic.
+
+(* --------------------------------------------------------- *)
+(* checking the shape of generic macro definitions *)
+lemma [PQ] _ i :
+  let t = X i in
+  happens(t) =>
+  frame@t = < frame@pred t,
+                 <of_bool (exec@t), if exec@t then output@t>> &&
+  state@t = qatt(t, frame@pred t, state@pred t)#2 &&
+  input@t = qatt(t, frame@pred t, state@pred t)#1 &&
+  exec @t = (exec@pred t && cond@t).
+Proof.
+  intro t H. 
+  split; 2:split; 2: split.
+  + rewrite /frame.
+    by apply eq_refl.
+  + rewrite /state.
+    by apply eq_refl.
+  + rewrite /input.
+    by apply eq_refl.
+  + rewrite /exec.
     by apply eq_refl.
 Qed.
 
@@ -59,15 +86,15 @@ lemma [PQ] _ i :
   let t'' = Z i in
   happens(t,t',t'') =>
 
-  output@t = <Q.input@t,<a i @t,s@t>> &&
+  output@t = <input@t,<a i @t,s@t>> &&
 
-  a i@t   = <Q.input@t,s@pred t> &&
-  b i@t'  = <Q.input@t,<Q.input@t',<a i@t',s@t'>>> &&
-  d i@t'' = <Q.input@t,
-             <Q.input@t',
-              <Q.input@t'',<<a i@t'',s@pred t''>,b i@t''>>>> &&
+  a i@t   = <input@t,s@pred t> &&
+  b i@t'  = <input@t,<input@t',<a i@t',s@t'>>> &&
+  d i@t'' = <input@t,
+             <input@t',
+              <input@t'',<<a i@t'',s@pred t''>,b i@t''>>>> &&
 
-  s  @t   = <Q.input@t,<a(i)@t,s@pred t>>.
+  s  @t   = <input@t,<a(i)@t,s@pred t>>.
 Proof.
   intro t t' t'' H.
   rewrite /t /t' /t'' in *.
