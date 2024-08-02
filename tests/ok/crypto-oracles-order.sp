@@ -29,6 +29,6 @@ equiv( ok( (ok(m,m,n,diff(a,b))) ,m,n ,diff(a,b) )).
 Proof.
 intro H.
 crypto FOO.
-auto.
+ auto.
 Qed.
 

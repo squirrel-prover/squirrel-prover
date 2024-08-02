@@ -279,11 +279,8 @@ let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state =
     let new_j = ProverTactics.AST.eval_judgment ~post_quantum tac judge in
     begin
       try
-        let bullets = Bullets.expand_goal (List.length new_j)
-            ps.bullets  in
-        {
-          ps with subgoals = new_j @ ejs'; bullets = bullets
-        }
+        let bullets = Bullets.expand_goal (List.length new_j) ps.bullets in
+        { ps with subgoals = new_j @ ejs'; bullets = bullets }
       with Bullets.Error _ -> Tactics.(hard_failure (Failure "bullet error"))
     end
 

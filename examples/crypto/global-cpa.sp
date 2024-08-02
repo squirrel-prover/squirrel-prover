@@ -31,7 +31,7 @@ process foo (i:index) =
 
 system (!_i F : foo(i)).
 
-(* Proof of indistinguishability for the two projection of the system.
+(* Proof of indistinguishability for the two projections of the system.
    The `crypto` tactics handles induction, and can thus prove indistinguishability
    for all frames. Proving such goals can be useful to support rewriting a system
    into a variant system, to reduce the proof on one protocol to a proof of

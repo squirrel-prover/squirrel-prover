@@ -126,7 +126,11 @@ end = struct
 
     if not (Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars)) then
       let () =
-        Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@." pp_dbg s
+        Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@.
+                 Fail on %a @.not in %a @.@."
+          pp_dbg s
+          (Fmt.list Vars.pp) (Vars.Sv.elements (fv s))
+          (Fmt.list Vars.pp) (Vars.Sv.elements (Vars.to_vars_set s.env.Env.vars))
       in
       assert false
     else ();

@@ -2496,15 +2496,17 @@ module E = struct
 
   (*------------------------------------------------------------------*)
   let known_set_check_impl_alpha
-      (_table : Symbols.table) 
+      (_table : Symbols.table)
+      ?(conv:Term.term -> Term.term -> bool = Term.alpha_conv ~subst:[])
+      ~(decompose_ands: Term.term -> Term.term list)
       (global_hyps : Term.term list)
       (hyp : Term.term)
       (cond : Term.term) : bool
     =
     (* slow, we are re-doing all of this at each call *)
-    let hyps = List.concat_map Term.decompose_ands (hyp :: global_hyps) in
+    let hyps = List.concat_map decompose_ands (hyp :: global_hyps) in
     List.exists (fun hyp ->
-        Term.alpha_conv cond hyp
+        conv cond hyp
       ) hyps
 
   (*------------------------------------------------------------------*)
@@ -2545,11 +2547,12 @@ module E = struct
       such that [ta  ≤ tb] implies [t1  ≤ t2] then [hyp] implies [cond] and [true] 
       is returned. Otherwise [false] is returned. *)
   let known_set_check_impl_auto
+      ~(decompose_ands: Term.term -> Term.term list)
       (table : Symbols.table)
       (hyp : Term.term) (cond : Term.term)
     : bool
     =
-    let hyps = Term.decompose_ands hyp
+    let hyps = decompose_ands hyp
     in
     match cond with
     | Term.App (Fun (fs, _), [t1;t2]) 
@@ -2578,6 +2581,7 @@ module E = struct
   (** Check that [hyp] implies [cond] for the special case when [cond] is [exec@t]. 
       Return [true] when it can proved [hyp => cond], and [false] otherwise. *)  
   let known_set_check_exec_case
+      ~(decompose_ands: Term.term -> Term.term list)
       (table : Symbols.table) (hyps : Term.terms) (cond : Term.term) : bool
     =
     let exception Fail in
@@ -2593,7 +2597,7 @@ module E = struct
           end
         | _ -> false 
       in
-      List.exists find_greater_exec (List.concat_map Term.decompose_ands hyps)
+      List.exists find_greater_exec (List.concat_map decompose_ands hyps)
     | _ -> false
 
 
@@ -2616,6 +2620,8 @@ module E = struct
       FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
       as hypothesis. *)
   let known_set_check_impl
+      ?(conv:(Term.term -> Term.term -> bool) option)
+      ?(decompose_ands: (Term.term -> Term.term list) = Term.decompose_ands )
       (table : Symbols.table)
       (global_hyps : TraceHyps.hyps)
       (hyp   : Term.term)
@@ -2624,17 +2630,19 @@ module E = struct
     let global_hyps = get_local_of_hyps global_hyps in
     let check_one cond = 
       let check0 =              (* alpha-renaming *)
-        known_set_check_impl_alpha table global_hyps hyp cond
+        known_set_check_impl_alpha
+          ?conv ~decompose_ands
+          table global_hyps hyp cond
       and check1 =              (* constraints *)
         known_set_check_impl_sat table (hyp :: global_hyps) cond
       and check2 =              (* ad hoc inequality reasoning *)
-        known_set_check_impl_auto table hyp cond
+        known_set_check_impl_auto ~decompose_ands table hyp cond
       and check3 =              (* ad hoc reasoning on [exec] *)
-        known_set_check_exec_case table (hyp :: global_hyps) cond
+        known_set_check_exec_case ~decompose_ands table (hyp :: global_hyps) cond
       in
       check0 || check1 || check2 || check3
     in
-    List.for_all check_one (Term.decompose_ands cond)
+    List.for_all check_one (decompose_ands cond)
     
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
@@ -3037,6 +3045,8 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Try to match [cterm] as an element of [known]. *)
   let _deduce_mem_one
+      ?(conv:(Term.term -> Term.term -> bool) option)
+      ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
       (known : known_set)
       (st    : unif_state) : Mvar.t option
@@ -3052,7 +3062,8 @@ module E = struct
     (* Elements of [known] are known only for bi-deducible values of [known.vars]. 
        For now, we only check that these [known.vars] is instantiated by 
        constant (* TODO: ptime *) values, which ensures that they are bi-deducible.
-       FEATURE: we could be more precise by creating a bi-deduciton proof obligation instead. *)
+       FEATURE: we could be more precise by creating a bi-deduction proof obligation
+       instead. *)
     let st = { st with support = known.vars @ st.support; } in
 
     (* adding [cterm.cond] as hypohtesis before matching *)
@@ -3066,24 +3077,26 @@ module E = struct
 
     try
       let mv = T.tunif cterm.term e_pat.pat_op_term st in
-
       let subst =
         match Mvar.to_subst ~mode:`Unif st.table st.env mv with
         | `Subst subst -> subst
         | `BadInst _pp_err ->
-          (* Fmt.epr "bad instantiation: %t@." _pp_err; *) 
           no_unif ()
       in
-
       let known_cond = Term.subst subst known_cond in
       let global_hyps = st.hyps in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
-      if not (known_set_check_impl st.table global_hyps cterm.cond known_cond) then None
+      if not (known_set_check_impl
+                ?conv ?decompose_ands
+                st.table global_hyps cterm.cond known_cond)
+      then None
       else (* clear [known.var] from the binding *)
         Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
     with NoMatch _ -> None
 
   let deduce_mem_one
+      ?(conv:(Term.term -> Term.term -> bool) option)
+      ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
       (known : known_set)
       (st    : unif_state) : Mvar.t option
@@ -3106,7 +3119,7 @@ module E = struct
        arguments of the lemma being applied).
        We move [st.bvs] to [st.env] to keep variable tags information.
     *)
-    match _deduce_mem_one cterm known st with
+    match _deduce_mem_one ?conv ?decompose_ands cterm known st with
     | Some mv -> Some mv
     | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
       if st.bvs = [] && st.support = [] then None

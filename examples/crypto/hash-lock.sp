@@ -1,5 +1,12 @@
-(* A simple analysis of the Hash-Lock protocol,
-   following the paper's running example. *)
+(*******************************************************************************
+HASH-LOCK
+
+[C] Ari Juels and Stephen A. Weis. Defining strong privacy for RFID. ACM
+Trans. Inf. Syst. Secur., 13(1):7:1–7:23, 2009.
+
+R --> T : x
+T --> R : < nT, h(<nT,x>,kT) >
+*******************************************************************************)
 
 include Basic.
 
@@ -26,7 +33,7 @@ game PRF = {
     rnd r : message;
     var old_lchal = lchal;
     lchal := add x lchal;
-    return if mem x old_lchal || mem x lhash then zero else diff(r, h(x,key))
+    return if mem x old_lchal || mem x lhash then zero else diff(h(x,key),r)
   }
 }.
 
@@ -57,7 +64,7 @@ global lemma [HashLock] _ (i,j:index[adv]) :
          diff(h(<nT(i,j),input@A(i,j)>,key(i)),
               dummy)>).
 Proof.
-  expandall.
-  fa 1. sym.
   crypto PRF (key:key(i)) => //.
 Qed.
+
+

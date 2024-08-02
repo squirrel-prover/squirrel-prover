@@ -372,6 +372,7 @@ let mk_state
   =
   { table; se; param; hyps; expand_context; vars; }
 
+
 (*------------------------------------------------------------------*)
 let add_hyp (f : Term.term) hyps : THyps.hyps =
   THyps.add TacticsArgs.AnyName (LHyp (Local f)) hyps

@@ -29,8 +29,8 @@ Qed.
 global lemma _ (i:index[adv]):
 equiv(n a).
 Proof.
-crypto EMPTY (key: m (n i)).
-Qed.
+checkfail crypto EMPTY (key: m (n i)) exn Failure.
+Abort.
 
 abstract h : message* message -> index.
 name k : index -> message.
@@ -44,6 +44,6 @@ global lemma _ (i:index[adv]):
 [false] -> equiv( h(m(i),k2)).
 Proof.
 intro H.
-crypto HASH (key: k (h(zero,k2))).
+checkfail crypto HASH (key: k (h(zero,k2))) exn Failure.
 auto.
 Qed.

@@ -25,7 +25,7 @@ process A (i : index) = A: in(c,x); out(c, <x, <g^ (a i), g^(b i)>>).
 system !_i A(i).
 
 global lemma _ (f0 : E -> message[adv], i,i0 : index[adv]): 
-  [i <> i0] -> [true].
+  [i0 <> i] -> [true].
 Proof.
   intro A. 
   ghave H : equiv( diff(f0 (a i0) <> g^ (a i ** b i), true) ). {

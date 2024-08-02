@@ -59,7 +59,8 @@ val init : printer_mode -> unit
 
 (** Type defining the markup to use before and after printing. *)
 type pp = [ `Prompt | `Start | `Result | `Error
-  | `Dbg | `Warning | `Ignore | `Goal | `Default ]
+          | `Dbg | `Warning | `Ignore | `Goal | `Default
+          | `Vbs]
 
 (** Print with the printer's standard formatter w.r.t. a given markup. *)
 val prt : pp -> ('a, Format.formatter, unit) format -> 'a

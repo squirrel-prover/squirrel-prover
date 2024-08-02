@@ -84,9 +84,10 @@ op g x = <f x, f x>.
 
 system T = (S : !_i !_j new n; out(c,n)).
 
-global lemma [T] foo (i:index[const]) : equiv(if true then <n i, n i>,n i).
+global lemma [T] foo (i:index[const]) :
+equiv(if true then <n i, n i>,n i).
 Proof.
-crypto ALEA.
+nosimpl crypto ALEA.
 Abort.
 
 
@@ -94,9 +95,11 @@ global lemma [T] _ (i:index[adv]) :
  equiv(forall (j:index),  <n j, m i> = < n j, m i>).
 Proof.
 crypto ALEA.
-Abort.
+auto.
+Qed.
 
-global lemma [T] _ (i,j,k:index[adv]) :  equiv( <n i, m i>,<m j,m i >,<n k, m j> ).
+global lemma [T] _ (i,j,k:index[adv]) : 
+ equiv( <n i, m i>,<m j,m i >,<n k, m j> ).
 Proof.
 crypto ALEA.
 Abort.

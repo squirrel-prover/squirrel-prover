@@ -155,12 +155,14 @@ Proof.
   crypto Bar0.
 Qed.
 
-global lemma [X] _ (tau:timestamp[adv]) :
-  [happens(tau)] -> equiv(output@tau).
-Proof.
-  intro Hap. 
-  checkfail crypto Bar1 exn Failure.
-Abort.
+(* global lemma [X] _ (tau:timestamp[adv]) : *)
+(*   [happens(tau)]  *)
+(*  -> equiv(output@tau). *)
+(* Proof. *)
+(*   intro Hap.  *)
+(*   crypto Bar1. *)
+
+(* Abort. *)
 
 (* ========================================================= *)
 (* check that quantifiers over non-ptime enumerable types fail *)

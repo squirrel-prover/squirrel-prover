@@ -11,7 +11,16 @@ module Mvar = Match.Mvar
                 
 module TraceHyps = Hyps.TraceHyps
 
+module Args = TacticsArgs
+  
 module PathCond = Iter.PathCond
+
+
+(* -------------------------------------------------------------*)
+
+(* let vbs ?(force=false) s = *)
+(*   let mode = if Config.verbose_crypto () || force then `Vbs else `Ignore in *)
+(*   Printer.prt mode s *)
 
 (*------------------------------------------------------------------*)
 (** a variable declaration, with an initial value *)
@@ -201,12 +210,46 @@ module CondTerm = struct
         (Term._pp ppe) c.term
         (Fmt.list ~sep:(Fmt.any " ∧ ") (Term._pp ppe)) c.conds
 
-  let mk ~term ~conds = { term; conds; }
-
   let mk_simpl term = { term; conds = [] }
+
+  (* Function polishing a conditional term: 
+     - removing duplicates in conds *)
+  let polish (c:t) (hyps : TraceHyps.hyps) (env : Env.t) =
+    let reduction_state hyps =
+      Reduction.mk_state
+        ~hyps ~se:env.system.set ~vars:env.vars
+        ~param:Reduction.rp_crypto
+        env.table
+    in
+    (* Removing duplicates *)
+    let conds = List.remove_duplicate Term.equal c.conds in
+    (* Redution in whnf *)
+    let conds = List.map (fun cond -> fst (
+        let strat = Reduction.(MayRedSub rp_full) in
+        Reduction.whnf_term ~strat (reduction_state hyps) cond))
+        conds
+    in
+    let term, _ =
+      let extended_hyps = 
+        List.fold_left (fun h f ->
+            TraceHyps.add Args.AnyName (LHyp (Local f)) h
+          ) hyps conds
+      in
+      let strat = Reduction.(MayRedSub rp_full) in
+      Reduction.whnf_term ~strat (reduction_state extended_hyps) c.term
+    in
+    { term; conds; }
+
+  let mk ~term ~conds =
+    (* All ands terms set into list *)
+    let conds = List.concat_map Term.decompose_ands conds in
+    let conds = List.remove_duplicate Term.equal conds in
+    {term;conds}                     
+    
 
   let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
   let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
+
 end
 
 
@@ -264,6 +307,7 @@ let constant_name_to_var
   term,subst
 
 
+(** Return conditions under wich two names are not equal.*)
 let get_name_eq_conditon
     (subst1 : Term.subst)
     (subst2 : Term.subst)
@@ -354,6 +398,7 @@ type oracle_pat = {
 }
 
 (* ----------------------------------------------------------------- *)
+(* FIXME: rename and document *)
 let match_known_set
     (env : Env.t) (hyps : TraceHyps.hyps)
     ~(target : Term.term) ~(known : oracle_pat)
@@ -375,7 +420,14 @@ let match_known_set
   match match_res with
   | Match mv -> Some mv
   | NoMatch _ -> None
-    
+
+
+(** The function [exact_eq_under_cond] return a substitution [\sigma]
+    of the variables [unif_vars] such that : 
+    - the target term and known term matched each other
+    - the conditional of known implies the conditional of target 
+*)
+
 let exact_eq_under_cond
     ?(unif_vars : Vars.vars = [])
     (env        : Env.t)
@@ -383,17 +435,37 @@ let exact_eq_under_cond
     ~(target    : CondTerm.t)
     ~(known     : CondTerm.t)
   =
-  let se_pair = oget env.system.pair in
+  let se_pair =  oget env.system.pair in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
   let known_set = 
     Match.mk_known_set
       ~term:known.term ~cond:(Term.mk_ands known.conds) [] (se_pair :> SE.t)
   in
+  let system =
+    SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; }
+  in
+  let conv_state =
+    Reduction.mk_cstate
+      ~system ~hyps 
+      ~param:Reduction.rp_full env.table
+  in
+  let conv = Reduction.conv conv_state in
+  (*TODO adrien*)
+  
+  let reduction_state =
+    Reduction.mk_state ~hyps
+      ~se:system.set ~vars:env.vars
+      ~param:Reduction.rp_crypto
+      env.table
+  in
+  let decompose_ands x =
+    Term.decompose_ands @@ Reduction.reduce_term reduction_state x
+  in
+  (* FIXME : system changed without modifying hyps accordingly*)
   let unif_state =
-    let system = SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; } in
     Match.mk_unif_state env.vars env.table system hyps unif_vars
   in 
-  Match.E.deduce_mem_one cterm known_set unif_state 
+  Match.E.deduce_mem_one ~conv ~decompose_ands cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 exception UnknowGlobalSmplsAssign
@@ -420,7 +492,7 @@ module Const = struct
     val[@warning "-32"] pp_dbg : t formatter
 
     val tsubst : Type.tsubst -> t -> t
-    val subst  : Term.subst  -> t -> t
+    (* val subst  : Term.subst  -> t -> t *)
 
     val refresh : t -> t
 
@@ -478,13 +550,13 @@ module Const = struct
       in
       { const with vars }
 
-    let subst (ts : Term.subst) (c : t) : t =
-      { name = c.name; 
-        tag  = c.tag; 
-        vars = List.map (Term.subst_var ts) c.vars;
-        term = List.map (Term.subst     ts) c.term; 
-        cond = List.map (Term.subst     ts) c.cond; 
-      }
+    (* let subst (ts : Term.subst) (c : t) : t = *)
+    (*   { name = c.name;  *)
+    (*     tag  = c.tag;  *)
+    (*     vars = List.map (Term.subst_var ts) c.vars; *)
+    (*     term = List.map (Term.subst     ts) c.term;  *)
+    (*     cond = List.map (Term.subst     ts) c.cond;  *)
+    (*   } *)
 
     let tsubst (ts : Type.tsubst) (c : t) : t =
       { name = c.name; 
@@ -525,10 +597,37 @@ module Const = struct
         { const with cond = cond::const.cond }
       in
       List.map doit consts
-                  
   end
   include Const
 
+
+  let notify_fresh_checks ~vbs ~dbg =
+    if not vbs && not dbg then () else
+      Printer.pr "-----Freshness checks------@."
+
+  let notify_global_checks ~vbs ~dbg =
+    if not vbs && not dbg then () else
+      Printer.pr "-----Compatible global names checks------@."
+
+  let notify_functional_checks ~vbs ~dbg =
+    if not vbs && not dbg then () else
+      Printer.pr "-----Good name ownerships checks------@."
+  
+        
+  let notify_valid_formula ~vbs ~dbg ~const1 ~const2 form : unit =
+    if not vbs && not dbg then () else                                                  
+    if not dbg then 
+      Printer.pr "Between @[%a@]@. and @[%a@] @. Corresponding formula : %a@. ---@."
+        Const.pp const1
+        Const.pp const2
+        Term.pp form
+    else 
+      Printer.pr "Between @[%a@]@. and @[%a@]  @. Corresponding formula : %a@. ---@. "
+        Const.pp_dbg const1
+        Const.pp_dbg const2
+        Term.pp_dbg form
+
+  
   exception InvalidConstraints
 
   let rec get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
@@ -610,19 +709,22 @@ module Const = struct
     List.concat_map get_loc_smpls oracle.loc_smpls @ snd(global_const), subst
 
 
-  let function_formula (const1:t) (const2:t) =
+  let function_formula ~vbs ~dbg (const1:t) (const2:t) =
     if const1.name = const2.name && not (const1.tag = const2.tag)
     then
       let const1 = refresh const1 in
       let const2 = refresh const2 in 
       let term_equal = Term.mk_neqs (const1.term) (const2.term) in
       let cond_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+      let form = 
       Term.mk_forall
         (const1.vars @ const2.vars)
         (Term.mk_impl (cond_conjunction) term_equal)
+      in
+      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
     else Term.mk_true
 
-  let fresh_formula (const1 : t) (const2 : t) =
+  let fresh_formula ~vbs ~dbg (const1 : t) (const2 : t) =
     if const1.tag = Tag.game_local
     && const2.tag = Tag.game_local
     && const1.name=const2.name
@@ -631,13 +733,15 @@ module Const = struct
       let const2 = refresh const2 in
       let term_not_equal = Term.mk_neqs const1.term const2.term in
       let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      Term.mk_forall
+      let form = Term.mk_forall
         (const1.vars @ const2.vars)
         (Term.mk_impl const_conjunction term_not_equal)
+      in
+      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
     else 
       Term.mk_true
 
-  let fresh_one_const (const :t) =
+  let fresh_one_const ~vbs ~dbg (const :t) =
     if const.tag = Tag.game_local
     then
       let const1 = refresh const in
@@ -649,29 +753,32 @@ module Const = struct
              const1.vars const2.vars)
       in
       let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      Term.mk_forall (const1.vars @ const2.vars)
-        (Term.mk_impl const_conjunction (Term.mk_impl hyps term_not_equal ))
+      let form = Term.mk_forall (const1.vars @ const2.vars)
+          (Term.mk_impl const_conjunction (Term.mk_impl hyps term_not_equal ))
+      in
+      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
     else
       Term.mk_true
 
 
   let rec function_all_formulas
+      ~vbs ~dbg
       (const : t list)
     =
     match const with
     | [] -> []
     | const1::q ->
-      List.map (function_formula const1) const @ function_all_formulas q
+      List.map (function_formula ~vbs ~dbg const1) const @ function_all_formulas ~vbs ~dbg q
 
-  let rec fresh_all_formulas (const : t list) =
+  let rec fresh_all_formulas ~vbs ~dbg (const : t list) =
     match const with
     | [] -> []
     | const1::q ->
-      fresh_one_const const1 ::
-      List.map (fresh_formula const1) q @
-      fresh_all_formulas q
+      fresh_one_const ~vbs ~dbg const1 ::
+      List.map (fresh_formula ~vbs ~dbg const1) q @
+      fresh_all_formulas ~vbs ~dbg q
 
-  let global_formula (const1 : t) (const2 : t) (otag : Tag.t) =
+  let global_formula ~vbs ~dbg (const1 : t) (const2 : t) (otag : Tag.t) =
     if const1.name = const2.name
     && const1.tag = otag
     && const2.tag = otag
@@ -680,30 +787,36 @@ module Const = struct
       let const2 = refresh const2 in
       let term_equal = Term.mk_eqs const1.term const2.term in
       let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      Term.mk_forall
+      let form = Term.mk_forall
         (const1.vars @ const2.vars)
         (Term.mk_impl const_conjunction term_equal)
+      in
+      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
     else Term.mk_true
 
 
-  let rec global_all_formulas (game : game) (const : t list) =
+  let rec global_all_formulas ~vbs ~dbg (game : game) (const : t list) =
     match const with
     | [] -> []
     | const1::q ->
       List.concat_map
-        (fun tg -> List.map (fun const -> global_formula const1 const tg ) const)
+        (fun tg -> List.map (fun const -> global_formula ~vbs ~dbg const1 const tg ) const)
         (Tag.global_tags game)
-      @ (global_all_formulas game q)
+      @ (global_all_formulas ~vbs ~dbg game q)
 
   (** [to_subgoals consts] produces a list of (local formulas)
       subgoals ensuring that [consts] are valid. *)
-  let to_subgoals (game : game) (consts : t list) : Term.terms =
-    let global = global_all_formulas game consts in
-    let functional = function_all_formulas consts in
-    let freshness = fresh_all_formulas consts in
+  let to_subgoals ~vbs ~dbg (game : game) (consts : t list) : Term.terms =
+    notify_global_checks ~vbs ~dbg;
+    let global = global_all_formulas ~vbs ~dbg game consts in
+    notify_functional_checks ~vbs ~dbg;
+    let functional = function_all_formulas ~vbs ~dbg consts in
+    notify_fresh_checks ~vbs ~dbg;
+    let freshness = fresh_all_formulas ~vbs ~dbg consts in
     List.filter
       (fun x -> not (Term.Smart.is_true x))
-      (global @ functional @ freshness)  
+      (global @ functional @ freshness)
+
 end
 
 
@@ -828,6 +941,92 @@ module TSet = struct
 end
 
 (*------------------------------------------------------------------*)
+(** An extention of TSet structure for condtional terms*)
+module CTSet = struct
+
+  (** [{cond; (term|form); vars}] represents [{ (term|form) | ∀ vars s.t. cond }]  *)
+  type t = {
+    conds : Term.terms ;          (** conditions  *)
+    term  : CondTerm.t ;           (** term of the set *)
+    vars  : Vars.vars ;           (** free variables  *)
+  }
+
+  let[@warning "-32"] fv tset =
+    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds)) in
+    let bound_vars = Vars.Sv.of_list tset.vars in
+    Vars.Sv.filter (fun x -> not (Vars.Sv.mem x bound_vars)) fvs
+
+  let[@warning "-32"] subst subst tset =
+    let vars, subst = 
+      List.fold_left (fun (vars, subst) v ->
+          let v, subst = Term.subst_binding v subst in
+          (v :: vars, subst)
+        ) ([],subst) tset.vars
+    in
+    let vars = List.rev vars in
+    { conds = List.map (Term.subst subst) tset.conds;
+      term  = CondTerm.subst subst tset.term;
+      vars; }
+
+  let[@warning "-32"] _pp ppe fmt (tset : t) =
+    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds)) in
+    let _, vars, sbst = 
+      Term.add_vars_simpl_env (Vars.of_set fvs) tset.vars
+    in
+    let term  = CondTerm.subst sbst tset.term in
+    let conds = List.map (Term.subst sbst) tset.conds in
+
+    if vars = [] then
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
+      (CondTerm._pp ppe) term
+      (Term._pp ppe)(Term.mk_ands conds)
+    else
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
+      (CondTerm._pp ppe) term
+      (Vars._pp_list ppe) vars
+      (Term._pp ppe)(Term.mk_ands conds)
+
+  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
+
+  let normalize tset = 
+    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds))  in
+    let vars = List.filter (fun v -> Sv.mem v fvs) tset.vars in
+    { tset with vars = List.sort_uniq Stdlib.compare vars }
+
+  let refresh (tset : t) : t =
+    let vars, subst = Term.refresh_vars tset.vars in
+    let term  = CondTerm.subst subst tset.term in
+    let conds = List.map (Term.subst subst) tset.conds in
+    {conds; term; vars}
+
+  let[@warning "-32"] singleton (term : CondTerm.t) (conds : Term.terms) = {term; conds; vars = []}
+
+  let[@warning "-32"] generalize (vars : Vars.vars) (tset: t) =
+    let vars = vars @ tset.vars in
+    normalize { tset with vars }
+
+  (* alias ... *)
+  let _refresh = refresh
+
+  
+  (** Check if [cond_term ∈ ctset] and returns the instanciation of 
+      [ctset] refreshed variables witnessing it, the refreshed variables, and the condition under which it holds. *)
+  let cterm_mem env hyps (cond_term : CondTerm.t) ctset : Mvar.t option * Vars.vars * Term.terms =
+    let ctset =  _refresh ctset in
+    let term1 = {cond_term with conds =[] }in
+    let term2 = {ctset.term with conds = []} in
+    let res = exact_eq_under_cond env hyps
+        ~unif_vars:ctset.vars ~target:term1 ~known:term2
+    in
+    let conds = ctset.conds@ctset.term.conds in  
+    res,ctset.vars,conds
+
+
+
+end
+
+(*------------------------------------------------------------------*)
 (** Ad-hoc functions for growing list abstract analysis *)
 
 module AbstractSet = struct 
@@ -848,9 +1047,9 @@ module AbstractSet = struct
     | Sets tl ->
       List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
 
-  let subst sbst = function
-    | Top -> Top
-    | Sets l -> Sets (List.map (TSet.subst sbst) l)
+  (* let subst sbst = function *)
+  (*   | Top -> Top *)
+  (*   | Sets l -> Sets (List.map (TSet.subst sbst) l) *)
 
   let is_included (env : Env.t) (hyps : TraceHyps.hyps) (s1 : t) (s2 : t) =
     match s1,s2 with
@@ -929,8 +1128,8 @@ module AbstractSet = struct
       (fun fv (_,set) -> Vars.Sv.union fv (fv_t set))
       Vars.Sv.empty mem 
 
-  let subst_mem sbst (mem : mem) : mem =
-    List.map (fun (v,t) -> v, subst sbst t) mem
+  (* let subst_mem sbst (mem : mem) : mem = *)
+  (*   List.map (fun (v,t) -> v, subst sbst t) mem *)
 
   let well_formed (env : Env.t) (mem : mem) =
     let fvs = fv_mem mem in
@@ -1118,7 +1317,8 @@ end
 
 (*-----------------------------------------------------------------*)
 
-type state = {
+(** Query and result states for bideduction.*)
+type query = {
   env        : Env.t;
   game       : game;
   hyps       : TraceHyps.hyps;
@@ -1127,7 +1327,7 @@ type state = {
   consts     : Const.t list;
   (** name constraints *)
   
-  mem        : AbstractSet.mem;
+  initial_mem        : AbstractSet.mem;
   (** abstract memory *)
     
   inputs     : CondTerm.t list;
@@ -1139,73 +1339,171 @@ type state = {
       [v] it can computes such that [φ v].
       Careful, it is **not** allowed to get anything if [φ v] does not hold. 
       In particuler, it does not know [φ v]. *)
-  
-  subgoals : Term.terms;
-  (** TODO: all these subgoals must be always true, not simply almost always true. 
-      Currently, we cannot create such subgoals in Squirrel. *)
+
+  extra_inputs : CTSet.t list;
+  (** Special inputs for potentiall already computed oracle calls.
+       [{ t | ∀ v, φ }] means that the adversary can get [t v] for any [v]
+  *)
 }
 
-let subst_state (subst : Term.subst) (st : state) : state =
-  { env = st.env; game = st.game; hyps = st.hyps; allow_oracle = st.allow_oracle;
-    consts     = List.map (Const.subst subst) st.consts;
-    mem        = AbstractSet.subst_mem subst st.mem;
-    inputs     = List.map (CondTerm.subst subst) st.inputs;
-    rec_inputs = List.map (TSet.subst subst) st.rec_inputs;
-    subgoals   = List.map (Term.subst subst) st.subgoals;
+(** Results state*)
+type result = {
+  subgoals     : Term.terms;
+  (** TODO: all these subgoals must be always true, not simply almost always true. 
+      Currently, we cannot create such subgoals in Squirrel. *)    
+  extra_outputs : CondTerm.t list;
+  (** Sequence of oracles input (game trace) during the bideduction goal with this state. *)
+  
+  final_mem    : AbstractSet.mem;
+  (** abstract memory *)
+  consts       : Const.t list;
+  (** name constraints added *)
+}
+
+let empty_result (mem: AbstractSet.mem) : result =
+  { subgoals      = [];
+    extra_outputs = [];
+    final_mem     = mem;
+    consts        = [];}
+
+(** Functions to chain query and result trought transitivity rules *)
+
+(** When the state build with [old_query] and [result] is a valid bidedcution goal 
+    for list of terms [output_term], then 
+    [transitivity_get_next_query] build the query a following term*)
+let transitivity_get_next_query
+    (old_query:query)
+    (output_term:CondTerm.t list)
+    (result:result) =
+  (* TODO : remove folowing line : it doesn't follow semantics*)
+  let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
+  { old_query with
+    consts = old_query.consts @ consts;
+    initial_mem = result.final_mem;
+    inputs = output_term
+             @ old_query.inputs
+             @ result.extra_outputs;
   }
 
-let _pp_gen_state ppe fmt ((togen,st,outputs) : Vars.vars * state * CondTerm.t list) =
-  let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
-    Term.add_vars_simpl_env (Vars.to_simpl_env st.env.vars) togen
-  in
-  let st = subst_state sbst st in
-  let outputs = List.map (CondTerm.subst sbst) outputs in
+let chain_results  (res1 : result) (res2 : result):result=
+  { subgoals = res1.subgoals@res2.subgoals;
+    extra_outputs = res1.extra_outputs@res2.extra_outputs;
+    final_mem = res2.final_mem;
+    consts = res1.consts@res2.consts}
 
+
+type goal =
+  { env : Env.t;
+    hyps : TraceHyps.hyps;
+    game : game ;
+    vars : Vars.vars;
+    macro : Term.term option;
+    inputs : CondTerm.t list;
+    rec_inputs :TSet.t list ;
+    extra_inputs : CTSet.t list;
+    extra_outputs : CondTerm.t list;
+    output : CondTerm.t;}
+
+(* Substitued goals variables with subst. 
+Env should be free from goals.vars and 
+thus are left unchanged*)
+let subst_goal (subst : Term.subst) (goal:goal) : goal =
+  {env = goal.env;
+   hyps = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
+   game = goal.game;
+   macro = Option.map (Term.subst subst) goal.macro;
+   vars = Term.subst_vars subst goal.vars;
+   inputs = List.map (CondTerm.subst subst) goal.inputs;
+   rec_inputs = List.map (TSet.subst subst) goal.rec_inputs;
+   extra_inputs = List.map (CTSet.subst subst) goal.extra_inputs;
+   extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
+   output = CondTerm.subst subst goal.output;
+  }
+
+(* let refresh_goal (goal:goal) = *)
+(*   let _, sbst = Term.refresh_vars goal.vars in *)
+(*   subst_goal sbst goal *)
+
+
+let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
   let pp_env fmt =
-    if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg st.env.vars
+    if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg query.env.vars
   in
-  let pp_constraints fmt =
-    if st.consts = [] then Fmt.pf fmt "" else
+  let pp_all_inputs fmt =
+    if query.rec_inputs = [] && query.inputs = [] then Fmt.pf fmt "∅" else
+      Fmt.pf fmt "%a%t%a"
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) query.rec_inputs
+        (fun fmt -> if query.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
+        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) query.inputs
+  in
+  let pp_constraints fmt = 
+    if query.consts = [] then Fmt.pf fmt "" else
       Fmt.pf fmt "@[<hov 2>constraints:@ @[%a@]@]@;"
-        (Fmt.list ~sep:(Fmt.any "@ ") (Const._pp ppe)) st.consts
+        (Fmt.list ~sep:(Fmt.any "@ ") (Const._pp ppe)) query.consts
   in
   let pp_mem fmt =
-    if st.mem = [] then Fmt.pf fmt "" else
+    if query.initial_mem = [] then Fmt.pf fmt "" else
       Fmt.pf fmt "@[<hov 2>mem:@ @[%a@]@]@;"
-        (AbstractSet._pp_mem ppe) st.mem
+        (AbstractSet._pp_mem ppe) query.initial_mem
   in
+  let pp_query fmt =
+    Fmt.pf fmt "@[<hv 0>%t%t@[%t@]@ ▷@ @[%t@]@]"
+      pp_constraints
+      pp_mem
+      pp_all_inputs
+      (fun fmt -> Fmt.pf fmt "%a@;" (Fmt.list CondTerm.pp) outputs)
+  in
+  Fmt.pf fmt "@[<v 0>%t%t@]"
+    pp_env
+    pp_query
+
+let[@warning "-32"] pp_query = _pp_query  (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_query_dbg = _pp_query (default_ppe ~dbg:true ())
+
+let _pp_gen_goal ppe fmt (goal:goal) =
+  let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
+    Term.add_vars_simpl_env (Vars.to_simpl_env goal.env.vars) goal.vars
+  in
+  let st = subst_goal sbst goal in
+  
+  let pp_env fmt =
+    if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg goal.env.vars
+  in
+  
   let pp_vars_togen fmt =
     if togen = [] then () else
       Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ppe) togen
   in
   let pp_all_inputs fmt =
-    if st.rec_inputs = [] && st.inputs = [] then Fmt.pf fmt "∅" else
-      Fmt.pf fmt "%a%t%a"
+    if st.rec_inputs = [] && st.inputs = [] && st.extra_inputs=[] then Fmt.pf fmt "∅" else
+      Fmt.pf fmt "%a%t%a%t%a"
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) st.rec_inputs
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) st.inputs
+        (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
+        (Fmt.list ~sep:(Fmt.any ",@ ") (CTSet._pp ppe)) st.extra_inputs
   in
-  let pp_outputs _fmt =
-    if outputs = [] then Fmt.pf fmt "∅" else 
-      Fmt.pf fmt "%a"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) outputs
-  in
+  let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe) goal.output in
+  (* let pp_outputs _fmt = *)
+  (*   if outputs = [] then Fmt.pf fmt "∅" else  *)
+  (*     Fmt.pf fmt "%a" *)
+  (*       (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) outputs *)
+  (* in *)
   let pp_bideduction_goal fmt =
-    Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]@]" pp_vars_togen pp_all_inputs pp_outputs
+    Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]@]" pp_vars_togen pp_all_inputs pp_output
   in
-  Fmt.pf fmt "@[<v 0>%t%t%t%t@]"
+  Fmt.pf fmt "@[<v 0>%t%t@]"
     pp_env
-    pp_constraints pp_mem
     pp_bideduction_goal
 
-let[@warning "-32"] pp_gen_state     = _pp_gen_state (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_gen_state_dbg = _pp_gen_state (default_ppe ~dbg:true ())
+let[@warning "-32"] pp_gen_goal     = _pp_gen_goal (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_gen_goal_dbg = _pp_gen_goal (default_ppe ~dbg:true ())
 
 (*-------------------------------------------------------------------*)
-let _pp_state ppe fmt (st : state) = _pp_gen_state ppe fmt ([],st,[])
+(* let _pp_state ppe fmt (st : state) = _pp_gen_state ppe fmt ([],st,[]) *)
 
-let[@warning "-32"] pp_state     = _pp_state (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_state_dbg = _pp_state (default_ppe ~dbg:true ())
+(* let[@warning "-32"] pp_state     = _pp_state (default_ppe ~dbg:false ()) *)
+(* let[@warning "-32"] pp_state_dbg = _pp_state (default_ppe ~dbg:true ()) *)
 
 (*-------------------------------------------------------------------*)
 module Game = struct
@@ -1299,12 +1597,13 @@ module Game = struct
     subgoals   : Term.terms;    (** (exact) subgoals under which match applies *)
   }
 
+  
   (* ----------------------------------------------------------------- *)
   (** Try to infer variables association to un-matched variable in oracle call*)
   exception LocSmplToInfer
   
   let infer_args_and_name
-      (state      : state)
+      (query      : query)
       (mv         : Match.Mvar.t)
       (oracle_pat : oracle_pat)
       (oracle     : oracle)
@@ -1319,7 +1618,7 @@ module Game = struct
     let mv =
       List.fold_left (fun mv var -> 
           Mvar.add (var,Vars.Tag.ltag) SE.any
-            (Library.Prelude.mk_witness state.env.table ~ty_arg:(Vars.ty var)) mv)
+            (Library.Prelude.mk_witness query.env.table ~ty_arg:(Vars.ty var)) mv)
         mv arg_not_used
     in
 
@@ -1329,15 +1628,13 @@ module Game = struct
       List.filter
         (fun x ->
            not (Mvar.mem x mv) && Sv.mem x (Term.fvs (oracle_pat.cond @ subgoals)))
-        state.game.glob_smpls
+        query.game.glob_smpls
     in
-    let rec infer_with_constraints smpls mv =
-      match smpls with
-      | [] -> mv
-      | r :: q ->
-        let n = Const.get_global r state.consts state.game in
-        let mv = Mvar.add (r, Vars.Tag.ltag) SE.any n mv in
-        infer_with_constraints q mv
+    let infer_with_constraints smpls mv =
+      List.fold_left (fun mv smpl -> 
+          let n = Const.get_global smpl query.consts query.game in
+          let mv = Mvar.add (smpl,Vars.Tag.ltag) SE.any n mv in
+          mv) mv smpls 
     in
     let mv = infer_with_constraints glob_smpls_not_used mv in
 
@@ -1352,9 +1649,29 @@ module Game = struct
 
   
   (** Return the list for each oracle pattern of the successful oracle
-      matches. *)
-  let match_oracle (state : state) (term : CondTerm.t) : oracle_match list = 
-    let env = state.env in
+      matches in query bideduction goal [query] . *)
+  let match_oracle (query : query) (term : CondTerm.t) : oracle_match list = 
+    let env = query.env in
+    (** Reducing all possible macros to avoid the following problem.
+        Imagine a by-system S0||S1 with two macros msg0 msg1 where 
+        - [msg0] only make sence in [S0] , equal to some name [n0] and
+        - [msg1] only make sence in [S1], equal to some name [n1]. 
+        Now imagine that we're bi-deducing using CPA game, 
+        and we have to bi-deduce the term [enc diff(msg0,msg1) r k].
+        Then, if we don't reduce, the bideduction will then 
+        ask to bideduce [msg0,msg1], ie [diff(n0,witness), diff(witness,n1)]. 
+        which isn't possible.
+
+        If we reduce, then it is left to bideduce [n0,n1], and that is possible.
+    *)
+    let reduction_state =
+      Reduction.mk_state ~hyps:query.hyps
+        ~se:query.env.system.set ~vars:query.env.vars
+        ~param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
+        query.env.table
+    in
+    let red_term = Reduction.reduce_term reduction_state term.term in
+    let term = {term with term = red_term} in
     
     (** The function [try_match_oracle0] try to finds terms [inputs]
         and names [n=n_1\,t1,...,n_i\,ti] such that [term] matches a
@@ -1364,7 +1681,7 @@ module Game = struct
       : oracle_match option
       =
       let match_res =
-        match_known_set env state.hyps ~target:term.term ~known:oracle_pat
+        match_known_set env query.hyps ~target:term.term ~known:oracle_pat
       in
       match match_res with
       | Some mv when subst_check mv oracle_pat->
@@ -1374,7 +1691,7 @@ module Game = struct
           let used_names =
             List.filter
               (fun x -> Mvar.mem x mv)
-              ( oracle.loc_smpls @ state.game.glob_smpls )
+              ( oracle.loc_smpls @ query.game.glob_smpls )
           in
           let mk_cinput_name n =
             match n with
@@ -1394,7 +1711,7 @@ module Game = struct
                (fun v -> try [Mvar.find v mv] with Not_found -> [] )
                oracle.args)
         in
-
+        
         (* full inputs = condition + names indices + standard inputs *)
         let full_inputs =
           CondTerm.{ term = Term.mk_true; conds = term.conds} ::
@@ -1402,11 +1719,16 @@ module Game = struct
           name_indices_inputs
         in
 
+        (* FIXME : now that there are subgoals : there could be variables used 
+                   in the subgoal 
+                   but not used by the output, hence not seen by the matching 
+                   (ex : names not used) *)
+        
         (* complete [mv] with a default [witness] value for all (standard) 
            oracle inputs that are not needed and try to infer global name with constraints*)
         begin
           try 
-            let mv = infer_args_and_name state mv oracle_pat oracle subgoals in
+            let mv = infer_args_and_name query mv oracle_pat oracle subgoals in
             Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
           with
           | UnknowGlobalSmplsAssign -> None
@@ -1439,12 +1761,13 @@ module Game = struct
         end
     in
 
+    (* TODO : checks that it was initial memry*)
     let match_one_oracle (oracle : oracle) : oracle_match list =
-      let outputs = oracle_to_term_and_cond env state.mem state.game oracle in
+      let outputs = oracle_to_term_and_cond env query.initial_mem query.game oracle in
       List.concat_map (try_match_oracle oracle ~subgoals:[]) outputs
     in
     
-    List.concat_map match_one_oracle state.game.oracles
+    List.concat_map match_one_oracle query.game.oracles
       
   (* ----------------------------------------------------------------- *)
   type call_oracle_res = {
@@ -1458,14 +1781,67 @@ module Game = struct
     mem_subgoals : Term.terms;      (** (exact) memory subgoals *)
     subgoals     : Term.terms;      (** (exact) additional subgoals *)    
   }
-  
+
+  let _pp_call_oracle_res ppe fmt (cor:call_oracle_res) =
+    let _pp_new_const fmt = 
+      if cor.new_consts = [] then ()
+      else Fmt.pf fmt "@[<hov 2> %a@]@;"
+          (Fmt.list (Const._pp ppe)) cor.new_consts
+    in
+    let _pp_index_cond fmt =
+      if cor.index_cond = [] then ()                                
+      else Fmt.pf fmt "@[<hov 2>%a@]@;" (Term._pp ppe)
+          (Term.mk_ands cor.index_cond )
+    in
+    let _pp_mem_subgoals fmt = 
+      if cor.mem_subgoals = [] then ()                                
+      else Fmt.pf fmt "@[<hov 2>%a@]" (Term._pp ppe)
+          (Term.mk_ands cor.mem_subgoals)
+    in
+    let _pp_subgoals fmt =
+      if cor.subgoals = [] then ()                                
+      else Fmt.pf fmt "@[<hov 2>%a@]" (Term._pp ppe)
+          (Term.mk_ands cor.subgoals)
+    in
+    let _pp_mem fmt =
+      Fmt.pf fmt "@[<hov 2>%a @]"
+        ((AbstractSet._pp_mem ppe)) cor.post
+    in
+    Fmt.pf fmt "@[<hv 0>New constraints: %t@ Post-condition:%t@ Under index condition: %t@ Under memory condition : %t@ Under additional subgoals: %t@ @]"
+      _pp_new_const
+      _pp_mem
+      _pp_index_cond
+      _pp_mem_subgoals
+      _pp_subgoals
+
+  let pp_call_oracle_res = _pp_call_oracle_res (default_ppe ~dbg:false ())
+  let pp_call_oracle_res_dbg = _pp_call_oracle_res (default_ppe ~dbg:true ())
   (* ----------------------------------------------------------------- *)
 
-  
+  let notify_call_oracle_res
+      ~vbs
+      ~dbg
+      (cor:call_oracle_res option)
+    =
+    if (not vbs && not dbg) ||  cor = None then () else
+      if dbg then
+      Printer.pr "@[ Oracle call succeded, yielding:@. %a@]@."
+        (pp_call_oracle_res_dbg) (oget cor)
+      else
+        Printer.pr "@[ Oracle call succeded, yielding:@. %a@]@."
+          (pp_call_oracle_res) (oget cor)
   (** If a successful match has been found, does the actual symbolic call 
-      to the oracle *)
+      to the oracle.
+      It takes as inputs : 
+      - a query [query] corresponding to the query state 
+        in which the oracle rules in called.
+      - the term [term] matched as an oracle outputs
+      - the matching substitution [mv]
+      - subgoals under which the matching is an oracle match [subgoals]
+      - data of oracle matching (pattern, name etc.) [oracle_pat, oracle] *)
   let call_oracle
-      (state      : state)
+      ~vbs ~dbg 
+      (query      : query)
       (term       : CondTerm.t)
       (mv         : Match.Mvar.t)
       ~(subgoals  : Term.terms)
@@ -1479,23 +1855,28 @@ module Game = struct
     try
       let consts,eqs =
         Const.constraints_terms_from_mv
-          ~fixed_global_names:true state.game oracle state.consts term.conds mv
+          ~fixed_global_names:true query.game oracle query.consts term.conds mv
       in
       let subst_eqs = Term.mk_subst eqs in
       let eqs = List.map (fun  (t1,t2) -> Term.mk_eq t1 t2) eqs in
       let conds = List.map (Term.subst subst_eqs) term.conds in
+      let consts =
+        if eqs = []
+        then consts
+        else Const.add_condition (Term.mk_ands eqs) consts
+      in
       let oracle_conds = Term.subst subst_eqs oracle_cond in
       let mem_subgoals =
-        abstract_boolean state.env state.hyps state.env.table  
+        abstract_boolean query.env query.hyps query.env.table  
           { term  = oracle_conds;
-            conds; } state.mem
+            conds; } query.initial_mem
       in
       let mem =
         update
-          state.env state.hyps mv subst_eqs
+          query.env query.hyps mv subst_eqs
           conds
           (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
-          state.mem
+          query.initial_mem
       in
       (* creating the implication is better than substituting *)
       let subgoals = List.map (Term.mk_impls eqs) subgoals in
@@ -1503,20 +1884,26 @@ module Game = struct
       match mem_subgoals with
       | Some mem_subgoals ->
         let mem_subgoals =
-          List.map (Term.mk_impl (Term.mk_ands term.conds)) mem_subgoals
+          List.map (Term.mk_impl (Term.mk_ands term.conds)) (mem_subgoals)
         in
         let subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) subgoals
         in
-        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs mem_subgoals) );
-        assert  (Vars.Sv.for_all (Vars.mem state.env.vars) (Term.fvs subgoals) );
-        Some {
-          new_consts = consts;
-          index_cond = eqs;
-          post = mem;
-          mem_subgoals;
-          subgoals;
-        } 
+        assert
+          (Vars.Sv.for_all (Vars.mem query.env.vars)
+             (Term.fvs mem_subgoals) );
+        assert  (Vars.Sv.for_all (Vars.mem query.env.vars)
+                   (Term.fvs subgoals) );
+        let res =
+          Some {
+            new_consts = consts;
+            index_cond = eqs;
+            post = mem;
+            mem_subgoals;
+            subgoals;
+          }
+        in
+        notify_call_oracle_res ~vbs ~dbg res; res
       | None -> None
     with Const.InvalidConstraints -> None 
         
@@ -1527,8 +1914,8 @@ end
 (*------------------------------------------------------------------------*)
 (** Generalized checksMvar.empty that a term is in the knowledge or not.*)
 let knowledge_mem
-    (env : Env.t)
-    (hyps : TraceHyps.hyps)
+    ~(env : Env.t)
+    ~(hyps : TraceHyps.hyps)
     (output : CondTerm.t)
     (inputs : CondTerm.t list) : bool
   =
@@ -1539,9 +1926,12 @@ let knowledge_mem
       let term = Term.subst subst term in
       let conds = List.map (Term.subst subst) input.conds in
       let input_term = CondTerm.{ term ; conds } in
+      let input_term = CondTerm.polish input_term hyps env in
       exact_eq_under_cond
         ~unif_vars:es env hyps ~target:output ~known:input_term <> None
-    | _ -> exact_eq_under_cond env hyps ~target:output ~known:input <> None
+    | _ ->
+       let input = CondTerm.polish input hyps env in
+       exact_eq_under_cond env hyps ~target:output ~known:input <> None
   in
   List.exists eq_implies inputs
 
@@ -1570,129 +1960,314 @@ let knowledge_mem_tsets
   in
   List.find_map is_in rec_inputs
 
-(*------------------------------------------------------------------------*)
+
+(** Checks whether a conditional term [output = (t|f)] is whithin a conditional term set [extra_inputs].
+    For any found a map beween [(t|f)] and a term [(t'|f')] in [extra_inputs], ie 
+    an substitution [\sigma] of binding variables of [(t'|f')] such that [t = t'\sigma] and
+    [f \implies f'\sigma] then, it computed the pair :
+    - the image of [\sigma] 
+    - the condition [\phi\sigma] attached to [(t'|f')] 
+    
+    Then, the list of all found pair in send.
+*)
+let knowledge_mem_condterm_sets
+    (env : Env.t)
+    (hyps : TraceHyps.hyps)
+    (output : CondTerm.t)
+    (extra_inputs : CTSet.t list)
+  =
+  let is_in (input : CTSet.t) : (Term.terms*Term.term) option =
+    let input = CTSet.refresh input in
+    match CTSet.cterm_mem  env hyps output input with
+    | (None,_,_) -> None
+    | (Some mv,vars, conds) ->
+      (* (\* There should always be a condition:  *)
+      (*    the one saying we are after  *)
+      (*    the computation that lead  *)
+      (*    to the extra_inputs*\) *)
+      (* assert(conds <> []); *)
+      let subst = Mvar.to_subst_locals ~mode:`Match mv in
+      let bound_vars,free_vars = List.partition (fun x -> Mvar.mem x mv) vars in
+      let conds =  List.map (Term.subst subst) conds in
+      let args = List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars in
+      
+      if Match.E.known_set_check_impl env.table hyps (Term.mk_ands conds) (Term.mk_false)
+      then
+        None
+      else
+       let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in 
+        Some (args,conds)
+  in
+  List.filter_map is_in extra_inputs
+
+  (*------------------------------------------------------------------------*)
+(** {2 Notify functions to print bi-deduction flow} *)
+
+
+
+let notify_bideduce_term_strict
+    ~vbs
+    ~dbg
+    (rule:string)
+  =
+  if not vbs && not dbg then () else
+  Printer.pr "@[Openning by %s rule @]@." rule
+
+let notify_bideduce_immediate
+    ~vbs
+    ~dbg
+  =
+  if not vbs && not dbg then () else
+    Printer.pr "Outputs adversarial or in inputs@."
+    
+let notify_bideduce_oracle_extra_inputs
+    ~vbs ~dbg
+    (extra_inputs : CTSet.t list)
+    (cond:Term.term)
+  =
+  if not vbs && not dbg then () else
+  if not dbg then
+    Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
+      (Fmt.list ~sep:(Fmt.any ",@.") CTSet.pp) extra_inputs
+      Term.pp cond
+  else
+    Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
+      (Fmt.list ~sep:(Fmt.any ",@.") CTSet.pp_dbg) extra_inputs
+      Term.pp_dbg cond
+
+let notify_bideduce_term_start
+    ~vbs ~dbg
+    (output:CondTerm.t)
+  =
+  if not vbs && not dbg then () else
+  if not dbg then
+    Printer.pr "___Bideducing term %a ___@." CondTerm.pp output
+  else
+    Printer.pr "___Bideducing term %a ___@." CondTerm.pp_dbg output
+
+let notify_bideduce_oracle_inputs_start
+    ~vbs ~dbg
+    (oracle_name: string)
+  =
+  if not vbs && not dbg then () else
+    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@." oracle_name
+
+
+let notify_bideduce_oracle_inputs_end
+    ~vbs ~dbg
+    (oracle_name : string)
+  =
+  if not vbs && not dbg then () else
+    Printer.pr "___Call %s : Ending oracles's inputs bideduction___@." oracle_name
+
+
+
+let notify_bideduce_second_go
+    ~vbs
+    ~dbg
+  =
+  if not vbs && not dbg then () else
+    Printer.pr "__________Starting second go____________@."
+
+
+let  notify_bideduce_oracle_already_call ~vbs ~dbg already_called =
+  if not vbs && not dbg then () else
+    Printer.pr "Allready called : %a" (Fmt.list (Fmt.pair (Fmt.list Term.pp) Term.pp)) already_called
+
+
+let  notify_query_goal_start ~vbs ~dbg query =
+  if not vbs && not dbg then () else
+    Printer.pr "@. ******* Strating goal ********** @. %a @. ********@. "
+      pp_query query
+
+  (*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
 
-let rec bideduce_term_strict (state : state) (output_term : CondTerm.t) =
+let rec bideduce_term_strict
+    ~(vbs:bool)
+    ~(dbg:bool)
+    (query : query)
+    (output_term : CondTerm.t) : result option =
   let conds = output_term.conds in
-  let reduction_state =
-    Reduction.mk_state ~hyps:state.hyps
-      ~se:state.env.system.set ~vars:state.env.vars
-      ~param:Reduction.rp_crypto
-      state.env.table
-  in
-  let term, _ =
-    let strat = Reduction.(MayRedSub rp_full) in
-    Reduction.whnf_term ~strat reduction_state output_term.term
-  in
+  let term = output_term.term in
   match term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
-    let t0 = CondTerm.{ term = t0; conds =             b :: conds } in
-    let t1 = CondTerm.{ term = t1; conds = Term.mk_not b :: conds } in
-    let b  = CondTerm.{ term = b ; conds                          } in
+    let t0 = CondTerm.mk ~term:t0 ~conds:(b::conds ) in
+    let t1 = CondTerm.mk ~term:t1 ~conds:(Term.mk_not b :: conds) in
+    let b  = CondTerm.mk ~term: b ~conds  in
     let outputs = [b;t0;t1] in
-    bideduce state outputs
+    notify_bideduce_term_strict ~vbs ~dbg "If then else" ;
+    bideduce ~vbs ~dbg  query outputs 
       
   | Term.(App (Fun(fs,_),[t0;t1])) when fs = Term.f_impl ->
-    let t1 = CondTerm.{term = t1; conds = t0::conds} in
-    let t0 = CondTerm.{term = t0; conds} in
+    let t1 = CondTerm.mk ~term:t1  ~conds:( t0::conds) in
+    let t0 = CondTerm.mk ~term:t0  ~conds in
     let outputs= [t0;t1] in
-    bideduce state outputs
+    notify_bideduce_term_strict ~vbs ~dbg "Function '=>' " ;
+    bideduce ~vbs ~dbg query outputs
 
   | Term.(App (Fun(f,_),[t0;t1])) when f = Term.f_and ->
-    let t1 = CondTerm.{term = t1;conds = t0::conds} in
-    let t0 = CondTerm.{term = t0; conds } in
+    let t1 = CondTerm.mk ~term:t1 ~conds:( t0::conds) in
+    let t0 = CondTerm.mk ~term:t0 ~conds in
     let outputs = [t0;t1] in
-    bideduce state outputs
+    notify_bideduce_term_strict ~vbs ~dbg "Function And" ;
+    bideduce ~vbs ~dbg query outputs
         
   | Term.(App (Fun _ as fs,l))
-    when HighTerm.is_ptime_deducible ~si:true state.env fs ->
+    when HighTerm.is_ptime_deducible ~si:true query.env fs ->
       assert (l <> []);
       let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
-      bideduce state l
+      notify_bideduce_term_strict ~vbs ~dbg "Function Application";
+      bideduce ~vbs ~dbg query l
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
-    let output = CondTerm.{term=f;conds}::t in
-    bideduce state output
+    let output = (CondTerm.mk ~term:f ~conds)::t in
+    notify_bideduce_term_strict ~vbs ~dbg "Lambda" ;
+    bideduce ~vbs ~dbg query output
 
   | Term.Tuple l ->
     let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
     let output = l in
-    bideduce state output
+    notify_bideduce_term_strict ~vbs ~dbg "Tuple" ;
+    bideduce ~vbs ~dbg query output
 
   | Term.Name (n,i) ->
     let const = Const.create Tag.adv n ~term:i ~cond:conds in
-    let consts = const::state.consts in
     let output = List.map (fun x -> CondTerm.{term=x;conds}) i in
-    bideduce {state with consts} output
+    notify_bideduce_term_strict ~vbs ~dbg "Adversarial name" ;
+    let result = bideduce ~vbs ~dbg query output in
+    begin
+      match result with
+      | Some result ->
+        let consts = const::result.consts in
+        some {result with consts}
+      | None -> None
+    end
 
   | Term.Quant (_,es,term) when 
-      List.for_all (fun v -> Symbols.TyInfo.is_enum state.env.table (Vars.ty v) ) es ->
+      List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es ->
     let es, subst = Term.refresh_vars es in
     let term = Term.subst subst term in
     let vars =
-      Vars.add_vars (Vars.Tag.global_vars ~adv:true es) state.env.vars in
-    let env = {state.env with vars} in
-    let post,consts,subgoals =
-      bideduce_fp es { state with env }
-        [CondTerm.{term;conds = output_term.conds}]
+      Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars in
+    let env = {query.env with vars} in
+    notify_bideduce_term_strict ~vbs ~dbg "Quantificator";
+    let result =  bideduce_fp ~vbs ~dbg es { query with env }
+        [CondTerm.mk ~term ~conds:output_term.conds]
     in
-    some {state with mem = post;consts;subgoals}
+    (* Generalising constraints, subgoals and extra/save outputs*)
+    let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
+    let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
+    (*building lambda term that contains all computed extra and save outputs*)
+    let extra_outputs =
+      List.map
+        (fun t -> CondTerm.{term=(Term.mk_lambda es t.term); conds = output_term.conds})
+        result.extra_outputs
+    in
+    some {result with consts;subgoals;extra_outputs;}
 
   | Term.Proj (_,l) ->
-    bideduce_term state {output_term with term = l}
+    notify_bideduce_term_strict ~vbs ~dbg "Projection";
+    bideduce_term ~vbs ~dbg query {output_term with term = l}
+
+  | Term.Find (v,f,t,e) ->
+    let f1 = Term.mk_lambda v f in
+    let f2 =
+      Term.mk_lambda v
+        (Term.mk_ite f t
+           (Library.Prelude.mk_witness query.env.table ~ty_arg:(Term.ty t)))
+    in
+    bideduce ~vbs ~dbg query
+      ( (List.map (fun (t:Term.term) -> {output_term with term = t}) [f1;f2;e])) 
 
   | _ -> None
 
 (*------------------------------------------------------------------*)
 and bideduce_term
+    ~(vbs:bool) ~(dbg:bool)
     ?(bideduction_suite = bideduce_oracle) 
-    (state  : state) (output : CondTerm.t)
-  : state option
+    (query: query) (output : CondTerm.t)
+  : result option
   =
-  assert (AbstractSet.well_formed state.env state.mem);
-
+  let output = CondTerm.polish output query.hyps query.env in
+  assert (AbstractSet.well_formed query.env query.initial_mem);
+  notify_bideduce_term_start ~vbs ~dbg output; 
   if
-    (* [output] trivially ptime-computable *)
-    HighTerm.is_ptime_deducible ~si:true state.env output.term ||
-    (* [output ∈ inputs] *)
-    knowledge_mem state.env state.hyps output state.inputs
+    HighTerm.is_ptime_deducible ~si:true query.env output.term ||
+    knowledge_mem ~env:query.env ~hyps:query.hyps output query.inputs
   then                          (* deduce conditions *)
-    if output.conds = [] then Some state 
-    else
-      bideduce_term
-        state
-        CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}
-  (* [cond] = false *)
+      let result = empty_result query.initial_mem in
+      notify_bideduce_immediate ~vbs ~dbg;
+      Some result 
   else if
     output.conds <> [] &&
-    Match.E.known_set_check_impl state.env.table (state.hyps)
+    Match.E.known_set_check_impl query.env.table (query.hyps)
       (Term.mk_ands output.conds) Term.mk_false
-  then 
-    Some state 
-        
-  (* [output ∈ rec_inputs] *)
-  else
-    match knowledge_mem_tsets state.env state.hyps output state.rec_inputs with
-    | Some args ->
-      if output.conds =  [] then  bideduce state (List.map CondTerm.mk_simpl args)
-      else
-        bideduce state
-          (CondTerm.{term = List.hd output.conds;conds = List.tl output.conds}::
-           (List.map CondTerm.mk_simpl args))
+  then
+    Some (empty_result query.initial_mem)
 
-    | None -> bideduction_suite state output
+  else
+    (* [output ∈ rec_inputs] *)
+    match knowledge_mem_tsets query.env query.hyps output query.rec_inputs with
+    | Some args ->
+      (* if output.conds =  [] then *)
+        bideduce ~vbs ~dbg query (List.map CondTerm.mk_simpl args)          
+    | None ->  bideduction_suite ~vbs ~dbg query output
 
 (*------------------------------------------------------------------*)
+
+(* FIXME general : we checks that f is bideducible before conditionned f on t. 
+Do we not add bug when rechecking condtion bideducible when deducing (t|f).
+Could we change the semantic to have the condtions are known to be bi-deducible ?
+*)
 (** Try to show that [output_term] is bi-deducible using an oracle call.
     Fall-back to the main-loop in case of failure. *)
-and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
-
-  (* Given an oracle match, check whether the full inputs
+and bideduce_oracle
+    ~vbs ~dbg
+    (query : query)
+    (output_term : CondTerm.t) : result option
+  =
+   (* First checking that the oracle could have been called before in the computation.
+      I.e, [output ∈ extra_inputs] *)
+  let already_called =
+    knowledge_mem_condterm_sets
+      query.env query.hyps
+      output_term query.extra_inputs
+  in
+  let output_term,query,result_start = 
+    if already_called <> [] then
+      let _ =
+        notify_bideduce_oracle_already_call ~vbs ~dbg
+          already_called
+      in
+      let args = List.concat_map fst already_called in
+      let conds = List.map snd already_called in
+      let args =  List.map CondTerm.mk_simpl args in
+      let conds_true = Term.mk_ors conds in
+      let conds_false = Term.mk_not conds_true in
+      (*let output_conds = List.map CondTerm.mk_simpl output_term.conds in*)
+      let cterm = {output_term with conds = conds_false::output_term.conds} in
+      (* By sematnic of conditional tset, the condition are also in the inputs, so ne need to
+      bideduce them*)
+      let to_deduce = args(*@conds_true@output_conds*) in
+      (* TODO : conds_false might be always false, in which case it is not usufull to run oracle*)
+      notify_bideduce_oracle_extra_inputs ~vbs ~dbg
+        query.extra_inputs conds_false;
+      match bideduce ~vbs ~dbg
+              {query with allow_oracle=false} to_deduce
+      with
+      | Some result ->
+        let query_start = transitivity_get_next_query query to_deduce result in
+        let query_start = {query_start with inputs = (CondTerm.mk_simpl conds_true)::query.inputs} in
+            cterm,query_start,result
+      | None -> output_term,query, (empty_result query.initial_mem)
+    else output_term,query,(empty_result query.initial_mem) 
+  in
+    (* Given an oracle match, check whether the full inputs
      (standard inputs + randomness indices + conditions) are
      bi-deducible *)
-  let find_valid_match (oracle_match : Game.oracle_match) : state option =
+  let find_valid_match (oracle_match : Game.oracle_match) : result option =
     let exception Failed in     (* return [None] if [Failed] is raised *)
 
     let Game.{ mv; full_inputs; oracle_pat; oracle; subgoals; } =
@@ -1700,154 +2275,145 @@ and bideduce_oracle (state : state) (output_term : CondTerm.t) : state option =
     in
     try     
       (* check that inputs are bi-deducible *)
-      let state =
-        bideduce state full_inputs |> oget_exn ~exn:Failed
+      notify_bideduce_oracle_inputs_start ~vbs ~dbg oracle_match.oracle.name;
+      let result_inputs = 
+        bideduce ~vbs ~dbg query full_inputs |> oget_exn ~exn:Failed
       in
-
+      notify_bideduce_oracle_inputs_end ~vbs ~dbg oracle_match.oracle.name;
+      (* Building the query for the oracle call *)
+      let query_call = transitivity_get_next_query query full_inputs result_inputs in 
       let Game.{ new_consts = consts; index_cond; post; mem_subgoals; subgoals; } =
-        Game.call_oracle state output_term mv ~subgoals oracle_pat oracle
+        Game.call_oracle ~vbs ~dbg query_call output_term mv ~subgoals oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
       (* add the subgoals required by the [oracle_match] to the state *)
-      let state = { state with subgoals = subgoals @ state.subgoals; } in
-
-      (* We check that some terms are bi-deducible:
-         - [mem_subgoal]: the memory condition under which the adversary knows 
-           that the oracle answer is what it wants. 
-         - [index_cond]: indices conditions guaranteeing that the mapping
-             `logical names <-> local and global game samplings`
-           is the wanted one.  *)
-      let deducing_subgoals =
-        List.map
-          (fun x -> CondTerm.{ term = x; conds = output_term.conds })
-          ( mem_subgoals @ index_cond )
+      let extra_outputs =
+        if index_cond = [] then
+          [output_term] 
+        else
+          [ {output_term with conds = index_cond@output_term.conds} ]
       in
-      let state =
-        bideduce {state with allow_oracle = false} deducing_subgoals
-        |> oget_exn ~exn:Failed
-      in
-      let state = {state with allow_oracle = true} in
-      let subgoals = mem_subgoals @ state.subgoals in
+      let result_call =
+        { subgoals = mem_subgoals @ subgoals;
+          final_mem = post;
+          consts;
+          extra_outputs;
+        } in
 
-      (* We know that [output_term] is bi-deducible when [index_cond] holds.
-         It remains to check that it is also the case when [¬ index_cond] *)
+       let result = chain_results result_inputs result_call in
       if index_cond = [] then
-        (* nothing to do since [index_cond = ⊤] *)
-        let consts = consts @ state.consts in
-        Some {state with consts; mem = post; subgoals; }
+        (* nothing to do since [index_cond = ⊤] *)     
+        Some result
       else
         begin
           let index_cond = Term.mk_ands index_cond in
-          let consts = Const.add_condition index_cond consts in
-          let consts = consts @ state.consts in
-          let const_loc, consts =
-            List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) consts
-          in
-          let state = {state with consts; mem = post ; subgoals; } in
-
-          let state =
-            bideduce_term ~bideduction_suite:bideduce_term_strict state
-              { output_term with conds = Term.mk_not index_cond :: output_term.conds }
-            |> oget_exn ~exn:Failed
-          in
-          Some { state with consts = const_loc @ state.consts; }
+          if Term.is_true index_cond then
+            Some result
+          else 
+            let query_else = transitivity_get_next_query query [] result in 
+            let result_else =
+              bideduce_term ~bideduction_suite:bideduce_term_strict ~vbs ~dbg query_else
+                { output_term with conds = Term.mk_not index_cond :: output_term.conds }
+              |> oget_exn ~exn:Failed
+            in
+            Some (chain_results result result_else)
         end
-    with Failed -> None         (* not a valid oracle match *)
+    with Failed ->
+      None         (* not a valid oracle match *)
   in
 
-  if state.allow_oracle then 
-    let all_matches = Game.match_oracle state output_term in
+  if query.allow_oracle then 
+    let all_matches = Game.match_oracle query output_term in
     match List.find_map find_valid_match all_matches with
-    | Some _ as res -> res      
-    | None -> bideduce_term_strict state output_term
+    | Some res ->
+      Some (chain_results result_start res)      
+    | None -> bideduce_term_strict ~vbs ~dbg query output_term
     (* oracle match failed, we recurse *)
   else
-    bideduce_term_strict state output_term
+    bideduce_term_strict ~vbs ~dbg query output_term
 
 (*------------------------------------------------------------------*)
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
-and bideduce (state : state) (outputs : CondTerm.t list) =
+and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) =
   match outputs with
-  | [] -> 
-    some state
+  | [] -> some (empty_result query.initial_mem)
   | term :: outputs ->
-    let const_loc, consts =
-      List.partition (fun (x:Const.t) -> Tag.is_Gloc x.tag) state.consts
-    in
-    let state_op = bideduce_term {state with consts} term in
-    match state_op with
+    let result_op = bideduce_term ~vbs ~dbg query  term in
+    match result_op with
     | None -> None
-    | Some state ->
-      let inputs = term :: state.inputs in
-      let state = bideduce { state with inputs} outputs in
-      match state with
+    | Some result ->
+      (* Next query : following terms passing on deduced term and extras as inputs
+         on the final memory of first bideduction.
+         We also add global and adversarial constraints to help oracle call 
+         in next query constraints  *)
+      let next_query = transitivity_get_next_query query [term] result in 
+      let next_result = bideduce ~vbs ~dbg next_query outputs in
+      match next_result with
       | None -> None
-      | Some state -> some {state with consts = const_loc @ state.consts}
+      | Some next_result -> Some (chain_results result next_result)
 
 
-(** Assume [togen = x] of type [τ] and [outputs=v] which is [finite] and [well_founded],
-    and [state] is the bi-deduction goal [x, φ₀, C₀, u ▷ v], 
-    computes [ψ₀,C] s.t. there exists predicates [ψ] and [φ] s.t.
-    - [C ⇒ C₀] and [x ∉ fv(C)]
+(** Assume [togen = x] of type [τ] which is [finite] and [well_founded],
+    then for [outputs=v], [query] is the bi-deduction goal [x, φ₀, _, C₀._, u ▷ v,_], 
+    computes [ψ₀,C,v'] s.t. there exists predicates [ψ] and [φ] s.t.
     - [φ₀ ⇒ φ 0]   where [0]   is the smallest value of type [τ]
     - [ψ max ⇒ ψ₀] where [max] is the largest  value of type [τ] and [x ∉ fv(ψ₀)]
     - [⊧ (∀ x, (∀ y < x, ψ y) ⇒ φ x)] 
        where [<] is well-founded order for values of type [τ]
-    - [⊧ (x, φ x, ψ x, C, u ▷ v)] 
+    - [⊧ (x, φ x, ψ x, C₀.C, u ▷ v,v')] 
       May generate additional (local formulas) sub-goals.
 
     Note: currently, the procedure applies to any type [τ], by 
     generalizing over [x]. *)
-and bideduce_fp ?loc
-    (togen : Vars.vars) (state : state) (outputs : CondTerm.t list)
+and bideduce_fp ?loc ~vbs ~dbg
+    (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   =
-  let hyps      = state.hyps     in
-  let pre0      = state.mem      in    (* [φ₀] *)
-  let consts0   = state.consts   in    (* [C₀] *)
-  let subgoals0 = state.subgoals in
+  let hyps      = query.hyps     in
+  let pre0      = query.initial_mem      in    (* [φ₀] *)
+  let consts0   = query.consts   in    (* [C₀] *)
+  (* let subgoals0 = state.subgoals in *)
 
   (* [pre = φ] *)
   let rec compute_fp pre =
     let env =
-      Env.set_vars state.env (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) state.env.vars)
+      Env.set_vars query.env (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) query.env.vars)
     in
-    let state1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
-      { env; game = state.game; hyps = state.hyps; allow_oracle = state.allow_oracle;
-        rec_inputs = state.rec_inputs;
-        inputs     = state.inputs;
+    let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
+      { env; game = query.game; hyps = query.hyps; allow_oracle = query.allow_oracle;
+        rec_inputs = query.rec_inputs;
+        inputs     = query.inputs;
+        extra_inputs = query.extra_inputs;
         consts     = consts0;
-        mem        = pre;
-        subgoals   = []; }
+        initial_mem = pre;}
     in
-    match bideduce state1 outputs with (* ⊧ (x, φ, ψ, C, u ▷ v) where [C ⇒ C₀] *)
-    | Some state ->
-      let post = state.mem in    (* [ψ] *)
-      let gen_post = AbstractSet.generalize togen state.mem in (* try to take [ψ₀ = (∀ x, ψ)] *)
+    match bideduce ~vbs ~dbg query1 outputs with (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
+    | Some result ->
+      let post = result.final_mem in    (* [ψ] *)
+      let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
       if AbstractSet.is_eq env hyps pre  gen_post && (* [φ ⇔ ψ₀] *)
          AbstractSet.is_eq env hyps post gen_post    (* [ψ ⇔ ψ₀] *)
       then          
         let () = assert (AbstractSet.is_leq env hyps pre0 pre) in (* [φ₀ ⇒ φ] *)
-        let gen_consts = Const.generalize togen state.consts in (* final constraints [∀ x, C] *)
-        let gen_subgoals = List.map (Term.mk_forall ~simpl:true togen) state.subgoals in
-        Some (gen_post, gen_consts, gen_subgoals)
+        (* let gen_consts = Const.generalize togen result.consts in (\* final constraints [∀ x, C] *\) *)
+        (* let gen_subgoals = List.map (Term.mk_forall ~simpl:true togen) result.subgoals in *)
+        Some {result with final_mem = gen_post}
       else
         let pre = AbstractSet.widening env hyps pre gen_post in
         compute_fp pre 
     | None ->
-      let err_str =
+      let err_str = 
         Fmt.str "@[<v 2>failed to apply the game:@;\
                  bideduction goal failed:@;@[%a@]@]"
-          pp_gen_state (togen, state1,outputs)
+          pp_query  (query,outputs)
       in
       Tactics.hard_failure ?loc (Failure err_str)
   in
-
-  let fp_post, fp_consts, subgs = oget (compute_fp pre0) in
-
-  ( fp_post, fp_consts, subgoals0 @ subgs )
+  oget (compute_fp pre0)
 
 
+
+(** The search algorithm: direct proof of a given bidedcution goal *)
 
 (*------------------------------------------------------------------*)
 (** {2 Handling of recursive procedures } *)
@@ -1988,7 +2554,7 @@ let known_set_strengthen (k : TSet.t) : TSet.t list =
 
 (* compute a set of known macros from a occurrence of a recursive call *)
 let known_term_of_occ ~cond (k : rec_call_occ) : TSet.t list =
-  let conds = cond :: k.occ_cond in
+  let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
   known_set_strengthen TSet.{ term = body; conds; vars = k.occ_vars; }
 
@@ -1997,10 +2563,10 @@ let known_term_of_occ ~cond (k : rec_call_occ) : TSet.t list =
 let notify_bideduction_subgoals ~direct ~recursive : unit =
   Printer.pr "@[<v 0>Direct bi-deduction sub-goal (assuming recursive calls are bi-deducible):@;<1 2>\
               @[<v 0>%a@]@;@;@]"
-    pp_gen_state ([],fst direct, snd direct );
+    pp_gen_goal direct;
   Printer.pr "@[<v 0>Bi-deduction sub-goals for recursive calls:@;\
              \  @[<v 0>%a@]@;@;@]"
-    (Fmt.list ~sep:(Fmt.any "@;@;") pp_gen_state) recursive
+    (Fmt.list ~sep:(Fmt.any "@;@;") pp_gen_goal) recursive
 
 (*------------------------------------------------------------------*)
 (** Given a list of terms [t] using recursively defined functions,
@@ -2030,26 +2596,27 @@ let notify_bideduction_subgoals ~direct ~recursive : unit =
 
     Note that in practice, these subgoals are tailored to Squirrel
     macros, and may be of a different form than the sub-goal above. *)
+
+
+               
 let derecursify
-    ?(consts = []) (env : Env.t) (targets : Term.terms)
+    (env : Env.t) (targets : Term.terms)
     (game : game) (hyps : TraceHyps.hyps)
-  : (Vars.vars * state * CondTerm.t list ) list * (state * CondTerm.t list)
+  : (goal * Term.term) list * goal
   =
   let system = (oget env.system.pair :> SE.fset) in
   let trace_context =
     Constr.make_context ~table:env.table ~system:system
   in
 
-  let mk_bideduction_goal hyps ?form (* ?at_time *) (output : Term.term) =
+  let mk_bideduction_goal hyps vars macro (output : Term.term) : goal =
     let rec_term_occs, output =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
         ~expand_mode:`FullDelta hyps trace_context (system :> SE.t) output
     in
-
-    let extra_cond = odflt Term.mk_true form in
-    let rec_terms = List.concat_map (known_term_of_occ ~cond:extra_cond) rec_term_occs in
-
+    (* let extra_cond = odflt Term.mk_true form in *)
+    let rec_terms = List.concat_map (known_term_of_occ (*~cond:extra_cond*) ~cond:[] ) rec_term_occs in
     (* remove duplicates *)
     let rec_terms =
       List.fold_left (fun rec_terms t ->
@@ -2060,30 +2627,31 @@ let derecursify
         ) [] rec_terms
     in
 
-    ( { consts; env; mem = []; game; hyps; allow_oracle = true;
-        inputs = [];
-        rec_inputs = rec_terms;
-        subgoals = []},
-      [CondTerm.{ term = output; conds = Option.to_list form }] )
+    ( { vars;
+        macro;
+        env;
+        game;
+        hyps;
+        inputs       = [];
+        rec_inputs   = rec_terms;
+        extra_inputs = [];
+        extra_outputs = [];
+        output = CondTerm.{ term = output; conds = []}} )
   in
 
   (* direct bi-deduction sub-goals assuming recursive calls are bideducible *)
-  let direct : state * CondTerm.t list =
+  let direct : goal =
     let t = Term.mk_tuple targets in
-    
-    (* let ts_occs = Occurrences.get_macro_actions trace_context [t] in *)
-    (* TODO: see EI_direct in occurrences (mk_exists ...) *)
-
-    mk_bideduction_goal hyps t
+    (* FIXME : add rec_inputs for any time before macros in t. *)
+    mk_bideduction_goal hyps [] None t
   in
 
   (* indirect bi-deduction goals for recursive calls *)
-  let recursive : (Vars.vars * state * CondTerm.t list) list =
+  let recursive : (goal*Term.term) list =
     Iter.fold_macro_support ~mode:Iter.PTimeSI (fun iocc goals ->
         let ts =
           Term.mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action)
         in
-
         let ts_occs = Occurrences.get_macro_actions trace_context iocc.iocc_sources in
         let path_cond =         (* FIXME: add a flag [~precise] *)
           if false (* use_path_cond *)
@@ -2093,62 +2661,120 @@ let derecursify
         let form = Occurrences.time_formula ts ~path_cond ts_occs in
 
         let hyps =
-          TraceHyps.add TacticsArgs.AnyName (LHyp (Local (Term.mk_happens ts))) hyps
+          TraceHyps.add Args.AnyName (LHyp (Local (Term.mk_happens ts))) hyps |>
+          TraceHyps.add Args.AnyName (LHyp (Local form))
         in
-        let goal, output = mk_bideduction_goal hyps ~form iocc.iocc_cnt in
         let togen = Sv.elements iocc.iocc_vars in
-        (togen, goal, output) :: goals
+        let goal =
+          mk_bideduction_goal hyps togen (Some ts) iocc.iocc_cnt
+        in
+        (goal,form) :: goals
       ) trace_context env hyps targets []
   in
 
   (* notify the user *)
-  notify_bideduction_subgoals ~direct ~recursive;
-
+  notify_bideduction_subgoals ~direct ~recursive:(fst (List.split recursive));
   recursive, direct
 
 (*------------------------------------------------------------------*)
+  
+
+  
+let goal_to_query (query:query) result (goal:goal) : query  =
+  assert (query.env = goal.env);
+  assert (query.game = goal.game);
+  let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
+  {env = goal.env;
+   game = goal.game;
+   hyps = goal.hyps;
+   allow_oracle = query.allow_oracle;
+   consts = query.consts @ consts ;
+   inputs = goal.inputs;
+   rec_inputs = goal.rec_inputs;
+   extra_inputs = goal.extra_inputs;
+   initial_mem = result.final_mem}
+
+(** Bideduction of rececruive subgoals.
+    
+    Takes as inputs a list of bideduction goals each of the form 
+    [env \cup vars ,hyps, _ , _ : inputs, rec_inputs |> outputs ],
+    a precondition [init_pre], and constraints [init_consts]. 
+    Returns a result state such 
+    TODO
+
+*)
+    
 let bideduce_recursive_subgoals
-    loc (env : Env.t) (hyps : TraceHyps.hyps) (_game : game)
-    (init_pre : AbstractSet.mem) (init_consts : Const.t list)
-    (bided_subgoals : (Vars.vars * state * CondTerm.t list) list)
+    loc ~vbs ~dbg query (bided_subgoals : goal list)
   =
-  let step (mem : AbstractSet.mem) =
-    List.fold_left (fun (mem, consts, subgs) (togen, state, outputs) ->
-        let mem, (* new_consts *) consts, subgs =
-          bideduce_fp ~loc
-            (* togen { state with mem; subgoals = subgs } outputs *)
-            togen { state with mem; consts; subgoals = subgs } outputs
+
+  let doit
+      (query:query)
+      (togen : Vars.vars)
+      (output : CondTerm.t)
+    =
+    notify_query_goal_start ~vbs ~dbg (query,[output]);
+    let result_fp = bideduce_fp ~vbs ~dbg ~loc togen query [output] in
+    let consts = Const.generalize togen result_fp.consts in (* final constraints [∀ x, C] *)
+    let subgoals = List.map (Term.mk_forall ~simpl:true togen) result_fp.subgoals in
+    (*building lambda term that contains all computed extra and save outputs*)
+    let extra_outputs =
+        result_fp.extra_outputs
+    in
+    let result_fp = {result_fp with
+                     consts;subgoals;extra_outputs;}
+    in
+    result_fp
+  in
+  
+  let step (start_query:query) (start_res : result) =
+    let query,_,next_goals,result = 
+    List.fold_left (fun (previous_query,previous_result,acc,result) goal ->
+        let query = goal_to_query previous_query previous_result goal in
+        let togen = goal.vars in
+        let output = goal.output in
+        let result_fp = doit query togen output
         in
-        mem, consts(* Const.union consts new_consts *), subgs
-      )
-      (mem, init_consts, [])      (* restart from initial constraints and (local) subgoals *)
-      bided_subgoals
+        let result = chain_results result result_fp in
+        
+        (* Building new goal by adding the extra_outputs to it.*)
+        let extra_outputs = result_fp.extra_outputs in
+        let goal = {goal with extra_outputs = goal.extra_outputs @ extra_outputs} in
+        query,result_fp,goal::acc,result)
+      (start_query, start_res,[],empty_result start_query.initial_mem )     
+      (bided_subgoals)
+    in
+    List.rev next_goals,query,result
   in
 
-  let rec fp mem =
-    let mem', consts, subgs = step mem in
-    if AbstractSet.is_leq env hyps mem' mem then
-      (mem', consts, subgs)
+  
+  let rec fp mem: goal list * result =
+    let res0 = empty_result mem in
+    if bided_subgoals = [] then [],res0
     else
-      fp mem'
+      let next_goals,query,result = step query res0  in
+    if AbstractSet.is_leq query.env query.hyps result.final_mem mem then
+      next_goals,result
+    else
+      fp (result.final_mem)
   in
 
-  fp init_pre  
+  fp query.initial_mem  
 
 (*------------------------------------------------------------------*)
 (** {2 Top-level bi-deduction function } *)
 
-let loc_of_crypto_arg (arg : TacticsArgs.crypto_arg) : L.t =
+let loc_of_crypto_arg (arg : Args.crypto_arg) : L.t =
   L.mergeall (
     Option.to_list (omap L.loc arg.cond )
     @ [L.loc arg.glob_sample; L.loc arg.term]
   )
 
 let parse_crypto_args
-    (env : Env.t) (game : game) (args : TacticsArgs.crypto_args) 
+    (env : Env.t) (game : game) (args : Args.crypto_args) 
   : Const.t list * Term.terms
   =
-  let parse1 (arg : TacticsArgs.crypto_arg) : Const.t=
+  let parse1 (arg : Args.crypto_arg) : Const.t=
     (* open a type unification environment *)
     let ty_env = Type.Infer.mk_env () in
 
@@ -2194,14 +2820,43 @@ let parse_crypto_args
   consts,terms
 
 
+(** Function that takes a list of bideduction goal, recursive and direct 
+    and try to bideduce them all in the list order.*)
+
+let bideduce_all_goals
+    ~vbs ~dbg
+    (locate : L.t)
+    (query_start : query)
+    (rec_bided_subgs : goal list)
+    (direct_bided_subgs : goal)
+  =
+  let next_goals,result_rec =
+    bideduce_recursive_subgoals ~vbs ~dbg
+      locate query_start rec_bided_subgs
+  in
+  let query_dir = goal_to_query query_start result_rec direct_bided_subgs in
+  notify_query_goal_start ~vbs ~dbg (query_dir,[direct_bided_subgs.output]);
+  match
+    bideduce ~vbs ~dbg query_dir [direct_bided_subgs.output]
+  with
+  | Some result_dir ->
+    let result = chain_results result_rec result_dir in
+    let result = {result with consts = (query_dir.consts@result.consts)} in
+    next_goals,Some result
+  | None -> next_goals,None
+
+
+
 (** Exported *)
 let prove
     (env   : Env.t)
     (hyps  : TraceHyps.hyps)
     (pgame : Symbols.p_path)
-    (args  : TacticsArgs.crypto_args)
-    (terms : Equiv.equiv)
+    (args  : Args.crypto_args)
+    (terms : Equiv.equiv) 
   =
+  let vbs = TConfig.verbose_crypto env.table in
+  let dbg = TConfig.debug_tactics env.table in
   let game_loc = Symbols.p_path_loc pgame in
 
   let game = find env.table pgame in
@@ -2209,59 +2864,111 @@ let prove
 
   let initial_consts, initial_name_args = parse_crypto_args env game args in
 
-  (*FIXME : initial_name_args are bideduce with an empty C*)
-  let init_state =
-    { consts = []; env; mem = initial_mem; game; hyps; allow_oracle = true;
+  (** Checking the initial constraint are determinitly bi-deducible*)
+  let query0 =
+    { consts = [];
+      env;
+      initial_mem;
+      game; hyps;
+      allow_oracle = false;
       inputs = [];
       rec_inputs = [];
-      subgoals = []}
+      extra_inputs = [];
+    }
   in
-  let init_output = List.map CondTerm.mk_simpl  initial_name_args in 
-  let init_state =
-    match bideduce init_state init_output with
-    | Some s -> s
-    | None ->
-      Tactics.hard_failure ~loc:game_loc
-        (Failure "failde to apply the game to user constraints'a argument")
+  let init_output = List.map CondTerm.mk_simpl initial_name_args in 
+  let res0 =
+    match bideduce ~vbs ~dbg query0 init_output with
+    | Some s  when s.consts = [] -> s
+    (* To ensure well-formness of constraints. 
+       FIXEME : could be improved, to allow randomness that do not break well-formness. *)
+    | Some _ -> Tactics.hard_failure ~loc:(game_loc)
+        (Failure "failed to bideduce the game to user constraints' arguments: 
+                  randomness is not allowed.")
+    | None    ->
+      Tactics.hard_failure ~loc:(game_loc)
+        (Failure "failed to apply the game to user constraints' argument")
   in
+  (** First bideduction go*)
+  let query_start = transitivity_get_next_query query0 init_output res0 in
+  let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms game hyps
   in
-  let inv, consts, rec_subgs =
-    bideduce_recursive_subgoals 
-      game_loc env hyps game
-      init_state.mem (init_state.consts@initial_consts) rec_bided_subgs
+  let rec_bided_subgs_goals =
+    List.map (fun ((goal,form):goal*Term.term):goal -> 
+        let output = {goal.output with conds = [form]} in
+        {goal with output})
+      rec_bided_subgs
   in
-  let final_mem, final_consts, direct_subgs =
-    let final_state =
-      let state_direct,output_direct = direct_bided_subgs in
-      match
-        bideduce { state_direct with mem = inv; consts; subgoals = []; } output_direct
-      with
-      | Some s -> s
-      | None ->
-        Tactics.hard_failure ~loc:game_loc (Failure "failed to apply the game")
+   let rec_bided_subgs_conds =
+    List.map (fun ((_,form):goal*Term.term):Term.term -> form)
+      rec_bided_subgs
+(* First pass on bideduction, to find extra inputs.*)
+  in
+  let next_bided_subgs, _  =
+    bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs_goals direct_bided_subgs 
+  in
+  notify_bideduce_second_go ~dbg ~vbs ;
+  (** Take the extra_outputs compute by the bideduction of [goal], and create 
+      the corresponding extra inputs for bideduction a time [timestamp(vars)]
+      under conds [conds].*)
+  let extra_input_from_goal (goal:goal) (conds:Term.terms) timestamp  =
+    let varsg = goal.vars in
+    let macro = oget goal.macro in
+    let extra_outputs = goal.extra_outputs in
+    let varsg,subst = Term.refresh_vars varsg in
+    let macro = Term.subst subst macro in
+    let extra_outputs = List.map (CondTerm.subst subst) extra_outputs in
+    let conds = List.map (Term.subst subst) conds in
+    List.map (fun (term:CondTerm.t) : CTSet.t ->
+        (* Refresh terms*)
+        {conds = (Term.mk_leq macro timestamp)::conds;
+         vars=varsg;
+         term;})
+      extra_outputs
+  in
+  (** Get all extra inputs for [goal_to] coming from [goal_from] under [cond_from] that should be 
+      the condition under which [goal_from] is to be deduced*)
+  let get_extra_inputs  (goal_to:goal) (goal_from:goal) (cond_from: Term.term) =
+    let timestamp = Term.mk_pred (oget goal_to.macro) in
+    let _ = goal_to.vars in
+    extra_input_from_goal goal_from [cond_from] timestamp 
+  in
+  let extra_inputs_full (goal:goal) (cond:Term.term) =
+    let extra_inputs = 
+      List.concat (List.map2 (get_extra_inputs goal) next_bided_subgs rec_bided_subgs_conds)
     in
-    final_state.mem, final_state.consts, final_state.subgoals
+    let output = {goal.output with conds = [cond]} in
+    {goal with extra_inputs; output}
   in
-  let oracle_subgoals = rec_subgs @ direct_subgs in
-
-  let consts_subgs    = Const.to_subgoals game final_consts in
-
-  Printer.pr
-    "@[<2>Constraints are:@ @[<v 0>%a@]@."
-    (Fmt.list ~sep:Fmt.cut Const.pp) final_consts;
-  Printer.pr
-    "@[<2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
-    (Fmt.list ~sep:Fmt.cut Term.pp) consts_subgs;
-  Printer.pr
-    "@[<2>Oracle subgoals are:@ %a@]@."
-    (Fmt.list ~sep:Fmt.cut Term.pp)
-    oracle_subgoals;
-  Printer.pr "@[<2>Final memory is:@ %a@]@." AbstractSet.pp_mem final_mem;
-
-  let cstate = Reduction.mk_cstate ~hyps ~system:env.system env.table in
-  List.remove_duplicate (Reduction.conv cstate) (consts_subgs @ oracle_subgoals)
+  (*FIXME : Adding extra_inputs to direct_bideduction goal*)
+  let rec_bided_subgs =
+    List.map2 extra_inputs_full next_bided_subgs rec_bided_subgs_conds 
+  in
+  let _, res = bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs direct_bided_subgs in             
+  match  res with
+  | Some result -> 
+    let oracle_subgoals = result.subgoals in
+    let final_consts = result.consts in
+    let consts_subgs = Const.to_subgoals ~vbs ~dbg game final_consts in
+    
+    Printer.pr
+      "@[<2>Constraints are:@ @[<v 0>%a@]@."
+      (Fmt.list ~sep:Fmt.cut Const.pp) final_consts;
+    Printer.pr
+      "@[<2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
+      (Fmt.list ~sep:Fmt.cut Term.pp) consts_subgs;
+    Printer.pr
+      "@[<2>Oracle subgoals are:@ %a@]@."
+      (Fmt.list ~sep:Fmt.cut Term.pp)
+      oracle_subgoals;
+    Printer.pr "@[<2>Final memory is:@ %a@]@." AbstractSet.pp_mem result.final_mem;
+    
+    let cstate = Reduction.mk_cstate ~hyps ~system:env.system env.table in
+    List.remove_duplicate (Reduction.conv cstate) (consts_subgs @ oracle_subgoals)
+  | None -> Tactics.hard_failure ~loc:(game_loc)
+        (Failure "failed to apply the game" )
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end types and parsing} *)

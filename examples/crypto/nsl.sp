@@ -172,6 +172,7 @@ process Bob =
                    nb, pub skb),
              r2', get1_id(dec(x,skb)))).
 
+
 system NSL =
   (PUB : out(c, <pub(ska),pub(skb)>);
   ((A : Alice)|(B : Bob))).
@@ -243,6 +244,7 @@ process Bob_a =
          enc(make2(get1_na(dec(x,skb)),
                    nb, pub skb),
              r2', get1_id(dec(x,skb)))).
+
 
 system NSL_a =
   (PUB : out(c, <pub(ska),pub(skb)>);
@@ -516,8 +518,8 @@ Proof.
   induction t.
   + rewrite /*.
     crypto CCA2 (key :skb).
-    by rewrite len3.
     by rewrite len1.
+    by rewrite len3.
   + rewrite /* in *.
     apply IH.
   + rewrite /* in *.
@@ -538,10 +540,10 @@ Proof.
       by rewrite Hf.
     rewrite /msg1 /msg2 /msg3.
     crypto CCA2 (key:skb) => //.
-    * auto ~flags:[diffr].
-    * auto ~flags:[diffr].
-    * by rewrite len3.
     * by rewrite len1.
+    * by rewrite len3.
+    * auto ~flags:[diffr].
+    * auto ~flags:[diffr].
 Qed.
 
 (* ----------------------------------------------------------------------- *)
@@ -580,8 +582,8 @@ Proof.
       by rewrite Hf (if_true (A <= pred A1)).
     rewrite /msg1 /msg2 /msg3.
     crypto CCA2 (key:ska) => //.
-    * by project.
     * by rewrite len2.
+   * by project.
   + rewrite /* in *.
     apply IH.
 Qed.

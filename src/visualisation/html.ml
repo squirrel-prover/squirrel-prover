@@ -62,34 +62,37 @@ let print_pandoc ppf (s : string) : unit =
 
 (** Print the output formatted with html tag
   * Input and comments are read in [!lex]
-  * Output must be already stored in the standard buffer (standard output for Html printer mode).*)
+  * Output must be already stored in the standard buffer
+  * (standard output for Html printer mode).*)
 let pp () =
   let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
   let concat_com = String.concat "\n\n" coms in
-  let trimed_input_line = if concat_com <> "" then trim input_line else input_line in
-  let output_line = (Format.flush_str_formatter ()) in
-  (*Open a span element to encapsulated everything*)
+  let trimed_input_line =
+    if concat_com <> "" then trim input_line else input_line in
+  let output_line = Format.flush_str_formatter () in
+  (* Open a span element to encapsulated everything. *)
   Format.fprintf !current_ppf
     "<span class=\"squirrel-step\" id=\"step%d\">\n"
     !counter;
-  (*Print input lines*)
+  (* Print input lines. *)
   Format.fprintf !current_ppf
     "<span class=\"input-line\" id=\"in%d\">%a</span>\n"
     !counter
     (Printer.html Format.pp_print_string) trimed_input_line;
-  (*Print output lines
-    Since they passed throught the str_formatter, they already have an HTML format*)
+  (* Print output lines.
+     Since they passed throught the str_formatter,
+     they already have an HTML format. *)
   Format.fprintf !current_ppf
     "<span class=\"output-line\" id=\"out%d\">%a</span>\n"
     !counter
     Format.pp_print_string output_line;
-  (*Print comments, if there are some*)
+  (* Print comments, if there are some. *)
   if concat_com <> "" then
     Format.fprintf !current_ppf
       "<span class=\"com-line\" id=\"com%d\">%a</span>\n"
       !counter
       print_pandoc concat_com;
-  (*Close the span element*)
+  (* Close the span element. *)
   Format.fprintf !current_ppf "</span>\n\n";
   incr counter
 

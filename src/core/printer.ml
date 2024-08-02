@@ -129,7 +129,7 @@ let kw_ansi_stag_funs : Format.formatter_stag_functions =
     print_close_stag = (fun _ -> ()); }
 
 
-  (** HTML **)
+(** HTML **)
 
 (* Each keyword is associated to HTML attributes *)
 let kw_html_attributes (keyword : keyword) : string =
@@ -218,7 +218,9 @@ let html_out_funs ppf =
       escaping := true
     end
   in
-  { out_string = (fun s i j -> String.iter (html_out_char (ref true)) (String.sub s i j)) ;
+  { out_string =
+      (fun s i j ->
+         String.iter (html_out_char (ref true)) (String.sub s i j)) ;
     out_flush = base_funs.out_flush ;
     out_newline = base_funs.out_newline ;
     out_spaces = base_funs.out_spaces ;
@@ -266,6 +268,7 @@ type pp = [
   | `Ignore (* do not print *)
   | `Goal
   | `Default
+  | `Vbs
 ]
 
 let pp_pref (ty : pp) =
@@ -279,6 +282,7 @@ let pp_pref (ty : pp) =
   | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
+  | `Vbs     -> pr "@[[vbs>"
 
 let pphtml_pref (ty : pp) =
   match ty with
@@ -291,7 +295,7 @@ let pphtml_pref (ty : pp) =
   | `Ignore  -> ()
   | `Goal    -> pr "@[\x1B<div class=goal \x1B>"
   | `Default -> ()
-
+  | `Vbs     -> pr "@[[vbs>" 
 
 let pp_suf fmt (ty : pp) =
   match ty with
@@ -304,6 +308,7 @@ let pp_suf fmt (ty : pp) =
   | `Ignore  -> ()
   | `Goal    -> Fmt.pf fmt "@;@]@?"
   | `Default -> ()
+  | `Vbs     -> Fmt.pf fmt "@;<]@]@?"
 
 let pphtml_suf fmt (ty : pp) =
   match ty with
@@ -316,6 +321,7 @@ let pphtml_suf fmt (ty : pp) =
   | `Ignore  -> ()
   | `Goal    -> Fmt.pf fmt "\x1B</div\x1B>@;@]@?"
   | `Default -> ()
+  | `Vbs     -> Fmt.pf fmt "@;<]@]@?"
 
 let prt ty fmt = 
   let out = match ty with

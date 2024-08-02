@@ -405,12 +405,16 @@ module T : S with type t = Term.term
 module E : sig
   include S with type t = Equiv.form
 
-  val deduce_mem_one : 
+  val deduce_mem_one :
+      ?conv:(Term.term -> Term.term -> bool) ->
+      ?decompose_ands: (Term.term -> Term.term list) ->
       cond_term ->
       known_set ->
       unif_state -> Mvar.t option
 
   val known_set_check_impl :
+    ?conv:(Term.term -> Term.term -> bool) ->
+    ?decompose_ands: (Term.term -> Term.term list) ->
     Symbols.table ->
     TraceHyps.hyps ->  Term.term -> Term.term -> bool
 
