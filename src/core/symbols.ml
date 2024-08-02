@@ -372,20 +372,20 @@ let empty_table : table =
 
 (*------------------------------------------------------------------*)
 (** For debugging *)
-let[@warning "-32"] pp_symbol_map fmt map =
+let[@warning "-32"] pp_symbol_map fmt (map : symbol_map) =
   Fmt.pf fmt "@[<v 0>%a@]"
     (Fmt.list ~sep:Fmt.cut
        (fun fmt (symb, recs) ->
           Fmt.pf fmt "@[%s: @[%a@]@]"
             symb.name
-            (Fmt.list ~sep:Fmt.cut
+            (Fmt.list ~sep:(Fmt.any ", ")
                (fun fmt r ->
                   Fmt.pf fmt "@[%a@]" pp_path !>(r.path)))
             recs)
     ) (Msymb.bindings map)
 
 (** For debugging *)
-let[@warning "-32"] pp_store fmt store =
+let[@warning "-32"] pp_store fmt (store : symbol_map Mn.t) =
   Fmt.pf fmt "@[<v 0>%a@]"
     (Fmt.list ~sep:Fmt.cut
        (fun fmt (np, map) ->
@@ -394,6 +394,18 @@ let[@warning "-32"] pp_store fmt store =
        )
     )
     (Mn.bindings store)
+
+(** For debugging *)
+let[@warning "-32"] pp_table fmt (table : table) : unit =
+  Fmt.pf fmt "@[<v 0>\
+              @[<hov 2>Current scope:@;@[%a@]@]@;\
+              @[<v 2>Symbols in scope:@;%a@]@;\
+              @[<v 2>Store:@;%a@]@;\
+              @]"
+    pp_npath table.scope
+    pp_symbol_map table.current
+    pp_store table.store
+
 
 (*------------------------------------------------------------------*)
 (** Approximated string creation *)
@@ -601,12 +613,14 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       Mn.add p.np (Msymb.add p.s [record] m) table.store
     in
     let current =
-      let l = Msymb.find p.s table.current in
-      Msymb.add p.s
-        (List.map
-           (fun record' -> if P.equal !<p record'.path then record else record')
-           l)
-        table.current
+      Msymb.find_opt p.s table.current |> 
+      omap_dflt table.current
+        (fun l ->
+           Msymb.add p.s
+             (List.map
+                (fun record' -> if P.equal !<p record'.path then record else record')
+                l)
+             table.current) 
     in
     update table ~current ~store
 
@@ -1260,23 +1274,26 @@ let cond  = mk_macro ~scope:top_npath "cond"   Empty
 let exec  = mk_macro ~scope:top_npath "exec"   Empty
 let frame = mk_macro ~scope:top_npath "frame"  Empty
 
-let quant_npath =
-  let qnp = [L.mk_loc L._dummy "Q"] in
-  let table =
-    namespace_enter !builtin_ref qnp |>
-    (^~) namespace_exit qnp
-  in
-  builtin_ref := table;
-  of_s_npath ["Q"]
+let quant_s_npath = [L.mk_loc L._dummy "Q"] 
+let quant_npath = of_s_npath ["Q"]
 
-(* FIXME: quantum: remvove `q` as prefix *)
-let q_inp   = mk_macro ~scope:quant_npath "qinput"  Empty
-let q_out   = mk_macro ~scope:quant_npath "qoutput" Empty
-let q_state = mk_macro ~scope:quant_npath "qstate"  Empty
-let q_cond  = mk_macro ~scope:quant_npath "qcond"   Empty
-let q_exec  = mk_macro ~scope:quant_npath "qexec"   Empty
-let q_frame = mk_macro ~scope:quant_npath "qframe"  Empty
+(*------------------------------------------------------------------*)
+(** Enter the `Q` namespace, declares the new macros, and then exit the
+    `Q`namespace.
+    The macros are declared here but defined in `macros.ml`. *)
 
+let () = builtin_ref := namespace_enter !builtin_ref quant_s_npath
+
+let q_inp   = mk_macro ~scope:quant_npath "input"  Empty
+let q_out   = mk_macro ~scope:quant_npath "output" Empty
+let q_state = mk_macro ~scope:quant_npath "state"  Empty
+let q_cond  = mk_macro ~scope:quant_npath "cond"   Empty
+let q_exec  = mk_macro ~scope:quant_npath "exec"   Empty
+let q_frame = mk_macro ~scope:quant_npath "frame"  Empty
+
+let () = builtin_ref := namespace_exit !builtin_ref quant_s_npath
+
+(*------------------------------------------------------------------*)
 let is_quantum_macro m = List.mem m [q_inp; q_out; q_state; q_cond; q_exec; q_frame; ]
 
 (*------------------------------------------------------------------*)
