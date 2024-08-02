@@ -293,6 +293,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let se = SE.to_fset se in
 
       begin
+        (* Put `a` in weak-head normal form before trying to expand the macro,
+           to try to make the action symbol appear. *)
+        let red_state =
+          Reduction.mk_state
+            ~hyps:(S.get_trace_hyps s) ~se:(se :> SE.t) ~vars:(S.vars s)
+            ~param:Reduction.rp_full
+            (S.table s)
+        in
+        let a, _ = Reduction.whnf_term ~strat:Std red_state a in
         match Macros.get_definition ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a with
         | `Undef | `MaybeDef -> failed ()
         | `Def mdef -> mdef
