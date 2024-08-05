@@ -355,13 +355,13 @@ Proof.
       fa 15.
       fa 15.
       fa 15.
-      fa 16.
-      prf 16, F (sk2R _, _); [1:auto].
-      xor 16, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
-      rewrite if_true in 16.
+      fa 16. fa if _ then _ else _. deduce. simpl.
+      prf 15, F (sk2R _, _); 1: auto.
+      xor 15, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
+      rewrite if_true in 15.
       by rewrite len_F namelength_n_PRF.
-      fa 16. fa 16.
-      fresh 17; 1:auto.
+      fa 15. fa 15.
+      fresh 16; 1:auto.
       by apply IH.
 
     + (* Second output of R *)
@@ -375,13 +375,12 @@ Proof.
       fa 15.
       fa 16.
       deduce 15.
-      repeat fa 15.
-      fa 17.
-      prf 16, F (sk2R _, _); [1:auto].
-      xor 16, n_PRF.
-      rewrite if_true // in 16.
+      repeat fa 15. deduce.
+      prf 15, F (sk2R _, _); [1:auto].
+      xor 15, n_PRF.
+      rewrite if_true // in 15.
       by rewrite len_F namelength_n_PRF.
-      fresh 16; 1: auto.
+      fresh 15; 1: auto.
       by apply IH.
 
     + (* Second output of R with dishonnest talker *)

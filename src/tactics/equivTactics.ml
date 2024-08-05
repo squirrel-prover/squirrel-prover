@@ -865,7 +865,6 @@ let fa_tac args = match args with
 let is_dup
     (s : ES.t) (elem  : Term.term) (elems : Term.term list) : bool 
   =
-  let table = ES.table s in
   let eq = ES.Reduce.conv_term s in
 
   (* check whether [t ≤ t'] (where [≤] is the standard timestamp order
@@ -879,10 +878,6 @@ let is_dup
           when f = Term.f_pred && f' = Term.f_pred ->
           leq t t'
         | App (Fun (f,_), [t]), t' when f = Term.f_pred -> leq t t'
-
-        | Action (n,is), Action (n',is') ->
-          (* FIXME: allow to match [is] with (a prefix of) [is'] *)
-          Action.depends (Action.of_term n is table) (Action.of_term n' is' table)
 
         | _ -> false
       end
