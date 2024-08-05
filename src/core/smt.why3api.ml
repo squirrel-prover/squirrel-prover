@@ -458,11 +458,11 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
     | Term.Quant (ForAll, vs, f) -> msg_to_fmla_q context t_forall_close vs f fmla
     | Term.Quant (Exists, vs, f) -> msg_to_fmla_q context t_exists_close vs f fmla
     | Term.Quant (Seq,_,_) | Term.Quant (Lambda,_,_) -> unsupported_term context fmla "unsupp_quant" 
-    | Macro (ms,[],ts) when ms.s_symb = Symbols.cond ->
+    | Macro (ms,[],ts) when ms.s_symb = Symbols.Classic.cond ->
       t_app_infer 
         (context.macro_cond_symb)
         [msg_to_fmla context ts]
-    | Macro (ms,[],ts) when ms.s_symb = Symbols.exec ->
+    | Macro (ms,[],ts) when ms.s_symb = Symbols.Classic.exec ->
       t_app_infer 
         (context.macro_exec_symb) 
         [msg_to_fmla context ts]
@@ -1112,8 +1112,8 @@ let add_macro_axioms context =
               begin match mdef with
               (* FIXME: quantum: translate quantum macros *)
               (* cond@ already handled above; exec@ defined in .why file *)
-              | _ when mn = Symbols.cond || mn = Symbols.exec -> None
-              | _ when mn = Symbols.out ->
+              | _ when mn = Symbols.Classic.cond || mn = Symbols.Classic.exec -> None
+              | _ when mn = Symbols.Classic.out ->
                 (* output@A(i1,...) = output *)
                 Some (macro_wterm_eq
                         []

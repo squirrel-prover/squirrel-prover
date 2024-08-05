@@ -113,7 +113,7 @@ class deprecated_iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) =
     | _ when Symbols.is_quantum_macro ms.s_symb ->
       Tactics.soft_failure (Tactics.Failure "quantum macros unsupported")
 
-    | _ when List.mem ms.s_symb Symbols.[inp; out; cond; exec; frame] -> ()
+    | _ when List.mem ms.s_symb Symbols.Classic.[inp; out; cond; exec; frame] -> ()
     (* no implemented, as this is a depracated function *)
 
     | Symbols.General _ -> assert false (* FIXME: do we need a clean error-message? *)
@@ -614,8 +614,8 @@ let fold_descr
     (init   : 'a) : 'a
   =
   let mval =
-    func Symbols.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
-    func Symbols.cond descr.indices ~args:[] ~body:(snd descr.condition) 
+    func Symbols.Classic.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
+    func Symbols.Classic.cond descr.indices ~args:[] ~body:(snd descr.condition) 
   in
 
   (* fold over state macros *)
@@ -1000,20 +1000,20 @@ let macro_support
     (* special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)
     let sm =
-      if List.mem_assoc Symbols.inp sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.frame Type.tmessage) sm
+      if List.mem_assoc Symbols.Classic.inp sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.frame Type.tmessage) sm
       else sm
     in
     let sm =
-      if List.mem_assoc Symbols.frame sm
+      if List.mem_assoc Symbols.Classic.frame sm
       then
-        MsetAbs.join_single (Mset.mk_simple Symbols.exec Type.tboolean)
-          (MsetAbs.join_single (Mset.mk_simple Symbols.out Type.tmessage) sm)
+        MsetAbs.join_single (Mset.mk_simple Symbols.Classic.exec Type.tboolean)
+          (MsetAbs.join_single (Mset.mk_simple Symbols.Classic.out Type.tmessage) sm)
       else sm
     in
     let sm =
-      if List.mem_assoc Symbols.exec sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.cond Type.tboolean) sm
+      if List.mem_assoc Symbols.Classic.exec sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.cond Type.tboolean) sm
       else sm
     in
 

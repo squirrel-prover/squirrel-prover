@@ -1320,42 +1320,46 @@ let mk_macro ~scope m data =
   m
 
 (*------------------------------------------------------------------*)
-(** Enter the `Classic` namespace, declares the new macros, and then
-    exit the namespace. *)
+module Classic = struct
+  let s_npath = [L.mk_loc L._dummy "Classic"] 
+  let npath = of_s_npath ["Classic"]
 
-let classical_s_npath = [L.mk_loc L._dummy "Classic"]
-let classical_npath = of_s_npath ["Classic"]
+  (** Enter the `Classic` namespace, declares the new macros, and then
+      exit the namespace. *)
+  let () = builtin_ref := namespace_enter !builtin_ref s_npath
+      
+  let inp   = mk_macro ~scope:npath "input"  Empty
+  let out   = mk_macro ~scope:npath "output" Empty
+  let cond  = mk_macro ~scope:npath "cond"   Empty
+  let exec  = mk_macro ~scope:npath "exec"   Empty
+  let frame = mk_macro ~scope:npath "frame"  Empty
 
-let () = builtin_ref := namespace_enter !builtin_ref classical_s_npath
-
-let inp   = mk_macro ~scope:classical_npath "input"  Empty
-let out   = mk_macro ~scope:classical_npath "output" Empty
-let cond  = mk_macro ~scope:classical_npath "cond"   Empty
-let exec  = mk_macro ~scope:classical_npath "exec"   Empty
-let frame = mk_macro ~scope:classical_npath "frame"  Empty
-
-let () = builtin_ref := namespace_exit !builtin_ref classical_s_npath
+  let () = builtin_ref := namespace_exit !builtin_ref s_npath
+end
 
 (*------------------------------------------------------------------*)
 (** Enter the `Quantum` namespace, declares the new macros, and then exit the
     namespace. *)
 
-let quant_s_npath = [L.mk_loc L._dummy "Quantum"]
-let quant_npath = of_s_npath ["Quantum"]
+module Quantum = struct
+  let s_npath = [L.mk_loc L._dummy "Quantum"] 
+  let npath = of_s_npath ["Quantum"]
 
-let () = builtin_ref := namespace_enter !builtin_ref quant_s_npath
+  let () = builtin_ref := namespace_enter !builtin_ref s_npath
 
-let q_inp   = mk_macro ~scope:quant_npath "input"  Empty
-let q_out   = mk_macro ~scope:quant_npath "output" Empty
-let q_state = mk_macro ~scope:quant_npath "state"  Empty
-let q_cond  = mk_macro ~scope:quant_npath "cond"   Empty
-let q_exec  = mk_macro ~scope:quant_npath "exec"   Empty
-let q_frame = mk_macro ~scope:quant_npath "frame"  Empty
+  let inp   = mk_macro ~scope:npath "input"  Empty
+  let out   = mk_macro ~scope:npath "output" Empty
+  let state = mk_macro ~scope:npath "state"  Empty
+  let cond  = mk_macro ~scope:npath "cond"   Empty
+  let exec  = mk_macro ~scope:npath "exec"   Empty
+  let frame = mk_macro ~scope:npath "frame"  Empty
 
-let () = builtin_ref := namespace_exit !builtin_ref quant_s_npath
+  let () = builtin_ref := namespace_exit !builtin_ref s_npath
+end
 
 (*------------------------------------------------------------------*)
-let is_quantum_macro m = List.mem m [q_inp; q_out; q_state; q_cond; q_exec; q_frame; ]
+let is_quantum_macro m = 
+  List.mem m Quantum.[inp; out; state; cond; exec; frame; ]
 
 (*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)

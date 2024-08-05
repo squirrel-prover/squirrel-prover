@@ -594,11 +594,10 @@ let get_actions_ext
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
           let ts =
-            (* we force on unfolding of the following macros,
-               for a more precise rule *)
-            if m.s_symb = Symbols.inp     || 
-               m.s_symb = Symbols.q_inp   || 
-               m.s_symb = Symbols.q_state 
+            (* we force on unfolding of the following macros, for a more precise rule *)
+            if m.s_symb = Symbols.Classic.inp   || 
+               m.s_symb = Symbols.Quantum.inp   || 
+               m.s_symb = Symbols.Quantum.state 
             then Term.mk_pred ts
             else ts
           in

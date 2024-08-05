@@ -2152,7 +2152,7 @@ let known_set_of_term (se : SE.t) (term : Term.term) : known_set =
     the condition [ts' ≤ ts] is never satisfied. *)
 let known_set_add_frame (k : known_set) : known_set list =
   match k.term with
-  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
+  | Term.Macro (ms, l, ts) when ms = Term.Classic.frame ->
     assert (l = []);
     let tv' = Vars.make_fresh Type.ttimestamp "t" in
     let ts' = Term.mk_var tv' in
@@ -2161,10 +2161,10 @@ let known_set_add_frame (k : known_set) : known_set list =
        Furthermore, this implies that we known [t]. *)
     let vars = (tv', Vars.Tag.make ~const:false ~adv:true Vars.Global) :: k.vars in
 
-    let term_frame = Term.mk_macro ms [] ts' in
-    let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
-    let term_input = Term.mk_macro Term.in_macro [] ts' in
-    let term_output = Term.mk_macro Term.out_macro [] ts' in
+    let term_frame  = Term.mk_macro ms [] ts' in
+    let term_exec   = Term.mk_macro Term.Classic.exec [] ts' in
+    let term_input  = Term.mk_macro Term.Classic.inp  [] ts' in
+    let term_output = Term.mk_macro Term.Classic.out  [] ts' in
 
     let mk_and = Term.mk_and ~simpl:true in
 
@@ -2651,9 +2651,9 @@ module E = struct
     let exception Fail in
     let timeout = TConfig.solver_timeout table in
     match cond with
-    | Term.Macro (ms', _ ,ts') when ms' = Term.exec_macro ->
+    | Term.Macro (ms', _ ,ts') when ms' = Term.Classic.exec ->
       let find_greater_exec hyp = match hyp with
-        | Term.Macro (ms, _, ts) when ms = Term.exec_macro ->
+        | Term.Macro (ms, _, ts) when ms = Term.Classic.exec ->
           begin
             let term_impl = Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
             in
@@ -3014,7 +3014,7 @@ module E = struct
        frame. If there is no such timestamp, we have no constraints. *)
     let cond_le =
       List.find_map (function
-          | Term.Macro (ms, _, ts) when ms = Term.frame_macro -> Some ts
+          | Term.Macro (ms, _, ts) when ms = Term.Classic.frame -> Some ts
           | _ -> None
         ) init_terms
     in
@@ -3025,7 +3025,7 @@ module E = struct
           let in_init = 
             match data with
             | Symbols.State _ -> true
-            | _ -> mn = Symbols.cond
+            | _ -> mn = Symbols.Classic.cond
           in
 
           (* Ignore other macros. Notably, ignore global macros, as
@@ -3037,7 +3037,7 @@ module E = struct
                 match data with
                 | Symbols.State (i, ty,_) ->
                   ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
-                | _ when mn = Symbols.cond -> Type.tboolean, []
+                | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
                 | _ -> assert false
               in
               let ms = Term.mk_symb mn ty in

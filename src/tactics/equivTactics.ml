@@ -900,7 +900,6 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
     assumptions, or elements that contain a subterm which is neither a duplicate
     nor an assumption. *)
 let fa_dup (s : ES.t) : ES.t list =
-  (* TODO: allow to choose the hypothesis through its id *)
   let hyp =
     Hyps.find_map (fun (_, hyp) ->
         match hyp with
@@ -1485,7 +1484,7 @@ let global_diff_eq (s : ES.t) =
               (Equiv.mk_reach_atom 
                  (Term.mk_impls 
                     (List.map Term.mk_happens ts_list
-                     @ List.map (fun t -> Term.mk_macro Term.exec_macro [] t) ts_list
+                     @ List.map (fun t -> Term.mk_macro Term.Classic.exec [] t) ts_list
                      @ [cond])
                     (Term.mk_atom `Eq s1 s2))
               ))
@@ -2113,7 +2112,7 @@ class ddh_context
       | _ when Symbols.is_quantum_macro ms.s_symb ->
         soft_failure (Failure "DDH is unsupported for quantum adversaries")
 
-      | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) -> ()
+      | _ when List.mem ms.s_symb Symbols.Classic.([inp; out; cond; exec; frame]) -> ()
       | Symbols.State _ -> ()
 
       | _ -> super#visit_macro ms args a
@@ -2160,7 +2159,7 @@ class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
     | _ when Symbols.is_quantum_macro ms.s_symb ->
       soft_failure (Failure "DDH is unsupported for quantum adversaries")
 
-    | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) ->
+    | _ when List.mem ms.s_symb Symbols.Classic.([inp; out; cond; exec; frame]) ->
       raise Macro_found
 
     | Symbols.State _ -> raise Macro_found

@@ -302,18 +302,22 @@ val empty : term
 val init : term
 
 (*------------------------------------------------------------------*)
-val in_macro    : msymb
-val out_macro   : msymb
-val frame_macro : msymb
-val cond_macro  : msymb
-val exec_macro  : msymb
+module Classic : sig
+  val inp   : msymb
+  val out   : msymb
+  val frame : msymb
+  val cond  : msymb
+  val exec  : msymb
+end
 
-val q_in_macro    : msymb
-val q_out_macro   : msymb
-val q_frame_macro : msymb
-val q_cond_macro  : msymb
-val q_exec_macro  : msymb
-val q_state_macro : msymb
+module Quantum : sig
+  val inp   : msymb
+  val out   : msymb
+  val frame : msymb
+  val cond  : msymb
+  val exec  : msymb
+  val state : msymb
+end
 
 (*------------------------------------------------------------------*)
 val f_happens : Symbols.fname

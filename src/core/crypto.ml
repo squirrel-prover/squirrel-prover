@@ -2461,17 +2461,17 @@ let derecursify_term
     the condition [ts' ≤ ts] is never satisfied. *)
 let known_set_add_frame (k : TSet.t) : TSet.t list =
   match k.term with
-  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
+  | Term.Macro (ms, l, ts) when ms = Term.Classic.frame ->
     assert (l = []);
     let tv' = Vars.make_fresh Type.ttimestamp "t" in
     let ts' = Term.mk_var tv' in
 
     let vars = tv' :: k.vars in
 
-    let term_frame  = Term.mk_macro ms              [] ts' in
-    let term_exec   = Term.mk_macro Term.exec_macro [] ts' in
-    let term_input  = Term.mk_macro Term.in_macro   [] ts' in
-    let term_output = Term.mk_macro Term.out_macro  [] ts' in
+    let term_frame  = Term.mk_macro ms                [] ts' in
+    let term_exec   = Term.mk_macro Term.Classic.exec [] ts' in
+    let term_input  = Term.mk_macro Term.Classic.inp  [] ts' in
+    let term_output = Term.mk_macro Term.Classic.out  [] ts' in
 
     let mk_and = Term.mk_and ~simpl:true in
 

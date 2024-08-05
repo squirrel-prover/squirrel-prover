@@ -1883,18 +1883,22 @@ let f_triv = function
 
 let mk s k = { s_symb = s; s_typ = k; }
 
-let in_macro    : msymb = mk Symbols.inp   Type.tmessage
-let out_macro   : msymb = mk Symbols.out   Type.tmessage
-let frame_macro : msymb = mk Symbols.frame Type.tmessage
-let cond_macro  : msymb = mk Symbols.cond  Type.tboolean
-let exec_macro  : msymb = mk Symbols.exec  Type.tboolean
+module Classic = struct
+  let inp   : msymb = mk Symbols.Classic.inp   Type.tmessage
+  let out   : msymb = mk Symbols.Classic.out   Type.tmessage
+  let frame : msymb = mk Symbols.Classic.frame Type.tmessage
+  let cond  : msymb = mk Symbols.Classic.cond  Type.tboolean
+  let exec  : msymb = mk Symbols.Classic.exec  Type.tboolean
+end
 
-let q_in_macro    : msymb = mk Symbols.q_inp   Type.tmessage
-let q_out_macro   : msymb = mk Symbols.q_out   Type.tmessage
-let q_frame_macro : msymb = mk Symbols.q_frame Type.tmessage
-let q_cond_macro  : msymb = mk Symbols.q_cond  Type.tboolean
-let q_exec_macro  : msymb = mk Symbols.q_exec  Type.tboolean
-let q_state_macro : msymb = mk Symbols.q_state Type.tquantum_message
+module Quantum = struct
+  let inp   : msymb = mk Symbols.Quantum.inp   Type.tmessage
+  let out   : msymb = mk Symbols.Quantum.out   Type.tmessage
+  let frame : msymb = mk Symbols.Quantum.frame Type.tmessage
+  let cond  : msymb = mk Symbols.Quantum.cond  Type.tboolean
+  let exec  : msymb = mk Symbols.Quantum.exec  Type.tboolean
+  let state : msymb = mk Symbols.Quantum.state Type.tquantum_message
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
@@ -2416,7 +2420,7 @@ let () =
     "Macro, different ts", `Quick, begin fun () ->
       let ts = mkvar "ts" Type.ttimestamp in
       let ts' = mkvar "ts'" Type.ttimestamp in
-      let m = in_macro in
+      let m = Classic.inp in
       let t = mk_diff [Projection.left,  Macro (m,[],ts);
                        Projection.right, Macro (m,[],ts')] in
       let r = head_normal_biterm [Projection.left; Projection.right] t in

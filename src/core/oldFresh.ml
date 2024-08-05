@@ -42,7 +42,7 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (_self)
 
   method visit_macro mn _args a =
     let cleara, a' =
-      if mn.s_symb = Symbols.inp then
+      if mn.s_symb = Symbols.Classic.inp then
         true,  Term.mk_pred a
 
       (* no implemented, as this is a depracated function *)
@@ -185,7 +185,7 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
     | Term.Macro (m, l, ts) ->
       let get_macro_default () =
         let ts =
-          if m.s_symb = Symbols.inp then Term.mk_pred ts
+          if m.s_symb = Symbols.Classic.inp then Term.mk_pred ts
           (* not implmented, as this is deprecated code *)
           else if Symbols.is_quantum_macro m.s_symb then assert false
           else ts

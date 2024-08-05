@@ -400,14 +400,14 @@ let descr_map
   
   let condition =
     fst descr.condition,
-    f Symbols.cond (snd descr.condition)
+    f Symbols.Classic.cond (snd descr.condition)
   in
   let updates =
     List.map (fun (ss,args,t) -> 
         ss, List.map (f ss) args, f ss t
       ) descr.updates
   in
-  let output = fst descr.output, f Symbols.out (snd descr.output) in
+  let output = fst descr.output, f Symbols.Classic.out (snd descr.output) in
 
   let descr = { descr with condition; updates; output;  } in
   check_descr descr;
@@ -588,24 +588,24 @@ let is_dup_match
   | Some res -> Some res
   | None ->
     match elem with
-    | Macro (im,[],t) when im = Term.in_macro ->
+    | Macro (im,[],t) when im = Term.Classic.inp ->
       List.find_map (function
-          | Term.Macro (fm,[],t') when fm = Term.frame_macro ->
+          | Term.Macro (fm,[],t') when fm = Term.Classic.frame ->
             is_dup_leq table st (Term.mk_pred t) t'
           | _ -> None
         ) elems
 
-    | Macro (em,[],t) when em = Term.frame_macro ->
+    | Macro (em,[],t) when em = Term.Classic.frame ->
       List.find_map (function
           | Term.Macro (fm,[],t')
-            when fm = Term.frame_macro -> is_dup_leq table st t t'
+            when fm = Term.Classic.frame -> is_dup_leq table st t t'
           | _ -> None
         ) elems
 
-    | Macro (em,[],t) when em = Term.exec_macro ->
+    | Macro (em,[],t) when em = Term.Classic.exec ->
       List.find_map (function
           | Term.Macro (fm,[],t')
-            when fm = Term.frame_macro -> is_dup_leq table st t t'
+            when fm = Term.Classic.frame -> is_dup_leq table st t t'
           | _ -> None
         ) elems
 

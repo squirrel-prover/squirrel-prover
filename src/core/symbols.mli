@@ -560,24 +560,33 @@ val init_action : action
 (** {3 Macro builtins} *)
 
 (*------------------------------------------------------------------*)
-(** Macros for the classical execution model *)
-val inp   : macro
-val out   : macro
-val cond  : macro
-val exec  : macro
-val frame : macro
+module Classic : sig
+
+  (** Namepath for the quantum execution model *)
+  val npath : npath
+
+  (** Macros for the classical execution model *)
+  val inp   : macro
+  val out   : macro
+  val cond  : macro
+  val exec  : macro
+  val frame : macro
+end
 
 (*------------------------------------------------------------------*)
-(** Namepath for the quantum execution model *)
-val quant_npath : npath
+module Quantum : sig
 
-(** Macros for the quantum execution model *)
-val q_inp   : macro
-val q_out   : macro
-val q_state : macro
-val q_cond  : macro
-val q_exec  : macro
-val q_frame : macro
+  (** Namepath for the quantum execution model *)
+  val npath : npath
+
+  (** Macros for the quantum execution model *)
+  val inp   : macro
+  val out   : macro
+  val state : macro
+  val cond  : macro
+  val exec  : macro
+  val frame : macro
+end
 
 val is_quantum_macro : macro -> bool
 
