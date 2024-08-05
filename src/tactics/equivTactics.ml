@@ -856,6 +856,69 @@ let fa_tac args = match args with
 
 
 (*------------------------------------------------------------------*)
+(** [is_dup is_eq t terms] check if:
+    - [t] appears twice in [terms];
+    - or if [t] is [input\@t] with [frame\@t'] appearing in [terms]
+      where [pred(t) <= t'];
+    - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
+      where with [t <= t']. *)
+let is_dup
+    (s : ES.t) (elem  : Term.term) (elems : Term.term list) : bool 
+  =
+  let table = ES.table s in
+  let eq = ES.Reduce.conv_term s in
+
+  (* check whether [t ≤ t'] (where [≤] is the standard timestamp order
+     without the happens component!) *)
+  let is_dup_leq t t' : bool =
+    let rec leq t t' =
+      eq t t' ||
+      begin
+        match t,t' with
+        | App (Fun (f,_), [t]), App (Fun (f',_), [t']) 
+          when f = Term.f_pred && f' = Term.f_pred ->
+          leq t t'
+        | App (Fun (f,_), [t]), t' when f = Term.f_pred -> leq t t'
+
+        | Action (n,is), Action (n',is') ->
+          (* FIXME: allow to match [is] with (a prefix of) [is'] *)
+          Action.depends (Action.of_term n is table) (Action.of_term n' is' table)
+
+        | _ -> false
+      end
+    in
+    leq t t'
+  in
+
+  let direct_match = List.exists (eq elem) elems in
+
+  direct_match ||
+  begin
+    match elem with
+    | Macro (im,[],t) when im = Term.Classic.inp ->
+      List.exists (function
+          | Term.Macro (fm,[],t') when fm = Term.Classic.frame ->
+            is_dup_leq (Term.mk_pred t) t'
+          | _ -> false
+        ) elems
+
+    | Macro (em,[],t) when em = Term.Classic.frame ->
+      List.exists (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.Classic.frame -> is_dup_leq t t'
+          | _ -> false
+        ) elems
+
+    | Macro (em,[],t) when em = Term.Classic.exec ->
+      List.exists (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.Classic.frame -> is_dup_leq t t'
+          | _ -> false
+        ) elems
+
+    | _ -> false
+  end
+
 (** This function goes over all elements inside elems.  All elements that can be
     seen as duplicates, or context of duplicates, are removed. All elements that
     can be seen as context of duplicates and assumptions are removed, but
@@ -863,11 +926,9 @@ let fa_tac args = match args with
 
     Used in automatic simplification with FA. *)
 let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
-  let table = ES.table s in
-
   let rec is_fa_dup (elems : Term.terms) (e : Term.term) =
     (* if an element is a duplicate wrt. elems, we remove it directly *)
-    if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
+    if is_dup s e elems then
       (true,[])
       (* if an element is an assumption, we succeed, but do not remove it *)
     else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then

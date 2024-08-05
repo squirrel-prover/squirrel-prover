@@ -253,25 +253,3 @@ val descr_map :
   (Vars.vars -> Symbols.macro -> Term.term -> Term.term) ->
   descr ->
   descr
-
-
-(*------------------------------------------------------------------*)
-(** {2 FA-DUP } *)
-
-(** [is_dup is_eq t terms] check if:
-    - [t] appears twice in [terms];
-    - or if [t] is [input\@t] with [frame\@t'] appearing in [terms]
-      where [pred(t) <= t'];
-    - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
-      where with [t <= t']. *)
-val is_dup :
-  eq:(Term.term -> Term.term -> bool) ->
-  Symbols.table -> Term.term -> Term.term list
-  -> bool
-
-(** Same as [is_dup], but instead of checking term equality, checks
-    that term matchs. *)
-val is_dup_match :
-  (Term.term -> Term.term -> 'a -> 'a option) -> 'a ->
-  Symbols.table -> Term.term -> Term.term list
-  -> 'a option
