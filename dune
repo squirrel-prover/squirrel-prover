@@ -9,7 +9,8 @@
   (name squirrel)
   (libraries squirrellib)
   (link_flags -linkall -g)
-  (modules squirrel))
+  (modules squirrel)
+  (modes byte exe))
 
 (test
   (name test)
