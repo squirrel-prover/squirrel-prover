@@ -1,6 +1,6 @@
 (** Rewriting types and functions which do not depend on [Match] *)
 
-open Utils
+open Ppenv
 
 (*------------------------------------------------------------------*)
 module L   = Location
@@ -28,7 +28,7 @@ type rw_rule = {
   rw_bound  : Concrete.bound;
 }
 
-val pp_rw_rule : rw_rule formatter
+val pp_rw_rule : rw_rule formatter_p
 
 (*------------------------------------------------------------------*)
 val check_rule : rw_rule -> unit

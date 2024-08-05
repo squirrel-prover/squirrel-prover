@@ -558,7 +558,7 @@ let local_stmt_valid_in_any_system (lem : Goal.local_statement) =
   | _ -> false
 
 (*------------------------------------------------------------------*)
-let add_hint_rewrite table (s : Symbols.p_path) db =
+let add_hint_rewrite table (s : Symbols.p_path) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
 
@@ -569,10 +569,10 @@ let add_hint_rewrite table (s : Symbols.p_path) db =
 
   assert (lem.system.pair = None;); (* as we only forward [system.set] below *)
 
-  Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula db
+  Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula table
 
 (*------------------------------------------------------------------*)
-let add_hint_smt table (s : Symbols.p_path) db =
+let add_hint_smt table (s : Symbols.p_path) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
 
@@ -589,4 +589,18 @@ let add_hint_smt table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints do not support system variables");
 
-  Hint.add_hint_smt lem.formula.formula db
+  Hint.add_hint_smt lem.Goal.formula.formula table
+
+
+let add_hint_deduce table (s : Symbols.p_path) = 
+  let lem = Lemma.find_stmt_global s table in
+
+  Hint.add_hint_deduce s lem.params lem.system lem.formula table
+
+
+(*------------------------------------------------------------------*)
+let add_hint (table : Symbols.table) (h : Hint.p_hint) : Symbols.table =
+  match h with
+  | Hint.Hint_rewrite id -> add_hint_rewrite table id 
+  | Hint.Hint_smt     id -> add_hint_smt     table id 
+  | Hint.Hint_deduce  id -> add_hint_deduce  table id 

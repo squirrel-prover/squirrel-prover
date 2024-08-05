@@ -2161,10 +2161,10 @@ let known_set_add_frame (k : known_set) : known_set list =
        Furthermore, this implies that we known [t]. *)
     let vars = (tv', Vars.Tag.make ~const:false ~adv:true Vars.Global) :: k.vars in
 
-    let term_frame  = Term.mk_macro ms [] ts' in
-    let term_exec   = Term.mk_macro Term.Classic.exec [] ts' in
-    let term_input  = Term.mk_macro Term.Classic.inp  [] ts' in
-    let term_output = Term.mk_macro Term.Classic.out  [] ts' in
+    let term_frame  = Term.mk_macro Term.Classic.frame [] ts' in
+    let term_exec   = Term.mk_macro Term.Classic.exec  [] ts' in
+    let term_input  = Term.mk_macro Term.Classic.inp   [] ts' in
+    let term_output = Term.mk_macro Term.Classic.out   [] ts' in
 
     let mk_and = Term.mk_and ~simpl:true in
 

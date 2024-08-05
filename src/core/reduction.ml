@@ -564,7 +564,7 @@ module Core (* : ReductionCore.S *) = struct
       let db = Hint.get_rewrite_db st.table in
       let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
-      let rule = List.find_map (fun Hint.{ rule } ->
+      let rule = List.find_map (fun Hint.{ cnt = rule } ->
           match 
             Rewrite.rewrite_head
               st.table st.params st.vars st.expand_context st.hyps st.system.set

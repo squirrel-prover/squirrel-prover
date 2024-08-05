@@ -34,7 +34,4 @@ val declare_list :
   Symbols.table * Goal.t list (* new table, proof obligation *)
 
 (*------------------------------------------------------------------*)
-val add_hint_rewrite :
-  Symbols.table -> Symbols.p_path -> Symbols.table -> Symbols.table
-val add_hint_smt     :
-  Symbols.table -> Symbols.p_path -> Symbols.table -> Symbols.table
+val add_hint : Symbols.table -> Hint.p_hint -> Symbols.table

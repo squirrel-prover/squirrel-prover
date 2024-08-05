@@ -18,21 +18,21 @@ type rw_rule = {
   rw_bound  : Concrete.bound;
 }
 
-let pp_rw_rule fmt (rw : rw_rule) =
+let pp_rw_rule ppe fmt (rw : rw_rule) =
   let pp_vars fmt vars = 
     if vars = [] then () else
       Fmt.pf fmt "%a " Vars.pp_typed_tagged_list vars
   in
   let pp_conds fmt conds =
     if conds = [] then () else
-      Fmt.pf fmt " when %a" (Fmt.list Term.pp) conds
+      Fmt.pf fmt " when %a" (Fmt.list (Term._pp ppe)) conds
   in
   
   let src, dst = rw.rw_rw in
   Fmt.pf fmt "%a%a: %a -> %a%a"
     Params.pp rw.rw_params
     pp_vars rw.rw_vars
-    Term.pp src Term.pp dst
+    (Term._pp ppe) src Term.pp dst
     pp_conds rw.rw_conds
 
 (*------------------------------------------------------------------*)

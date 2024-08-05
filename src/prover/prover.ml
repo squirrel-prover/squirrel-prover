@@ -54,14 +54,7 @@ let do_set_option (st:state) (sp:Config.p_set_param) : state =
   { st with table = TConfig.set_param sp st.table }
 
 let add_hint (ps:state) (h: Hint.p_hint) : state =
-  let table = 
-    match h with
-    | Hint.Hint_rewrite id -> 
-        ProcessDecl.add_hint_rewrite ps.table id ps.table
-    | Hint.Hint_smt     id -> 
-        ProcessDecl.add_hint_smt     ps.table id ps.table
-  in
-  { ps with table; }
+  { ps with table = ProcessDecl.add_hint ps.table h; }
 
 let abort (ps:state) : state = 
   { ps with current_goal  = None; 
