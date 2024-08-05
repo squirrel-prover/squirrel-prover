@@ -2085,11 +2085,10 @@ let known_set_add_frame (k : known_set) : known_set list =
     assert (l = []);
     let tv' = Vars.make_fresh Type.Timestamp "t" in
     let ts' = Term.mk_var tv' in
-    (* [const] is set to **false**, as knowing [frame@t] implies that we known
-       [input@t'] for any [t' <= t], even if [t'] is non-constant. 
-       Furthermore, this implies that we known [t]. 
-       Idem for the [adv] tag. *)
-    let vars = (tv', Vars.Tag.make ~const:false ~adv:false Vars.Global) :: k.vars in
+    (* We need [adv], as knowing [frame@t] implies that we known
+       [input@t'] for any [t' <= t] that can be computed.
+       Furthermore, this implies that we known [t]. *)
+    let vars = (tv', Vars.Tag.make ~const:false ~adv:true Vars.Global) :: k.vars in
 
     let term_frame = Term.mk_macro ms [] ts' in
     let term_exec  = Term.mk_macro Term.exec_macro [] ts' in

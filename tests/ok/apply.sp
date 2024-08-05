@@ -237,39 +237,37 @@ Abort.
 (* apply modulo FA dup *)
 
 (* with input *)
-global lemma _ (t : timestamp) : equiv(frame@t) -> equiv(input@t).
+global lemma _ (t : timestamp[adv]) : equiv(frame@t, t) -> equiv(input@t).
 Proof.
  intro H; apply H.
 Qed.
 
-global lemma _ (t : timestamp) : equiv(frame@t) -> equiv(input@pred(pred(t))).
+global lemma _ (t : timestamp[adv]) : equiv(frame@t) -> equiv(input@pred(pred(t))).
 Proof.
  intro H; apply H.
 Qed.
 
-global lemma _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(input@t).
+global lemma _ (t : timestamp[adv]) : equiv(frame@pred(t)) -> equiv(input@t).
 Proof.
  intro H; apply H.
 Qed.
 
-global lemma _ (t, t' : timestamp) : equiv(frame@t) -> equiv(input@t').
+global lemma _ (t, t' : timestamp[adv]) : equiv(frame@t) -> equiv(input@t').
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
-global lemma _ (t : timestamp) : equiv(input@t) -> equiv(frame@t).
+global lemma _ (t : timestamp[adv]) : equiv(input@t) -> equiv(frame@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)
 (* with exec *)
-global lemma _ (t : timestamp) : equiv(frame@t) -> equiv(exec@t).
+global lemma _ (t : timestamp[adv]) : equiv(frame@t) -> equiv(exec@t).
 Proof.
  intro H; apply H.
 Qed.
-
-set showStrengthenedHyp=true.
 
 (* cond can be deduce (hence exec), because it is trivial *)
 global lemma _ (t : timestamp[const]) : 
@@ -285,7 +283,7 @@ Qed.
 system three = !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
 
 (* cond cannot be deduce in system [three], because of the new name `l` *)
-global lemma [three] _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
+global lemma [three] _ (t : timestamp[adv]) : equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
  intro H.
  checkfail (apply H) exn ApplyMatchFailure.
@@ -293,12 +291,12 @@ Abort.
 
 (*------------------------------------------------------------------*)
 (* with frame *)
-global lemma _ (t : timestamp) : equiv(frame@t) -> equiv(frame@t).
+global lemma _ (t : timestamp[adv]) : equiv(frame@t) -> equiv(frame@t).
 Proof.
  intro H; apply H.
 Qed.
 
-global lemma _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(frame@t).
+global lemma _ (t : timestamp[adv]) : equiv(frame@pred(t)) -> equiv(frame@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
@@ -361,7 +359,7 @@ axiom        foo1 ['a] (x,y : 'a) : p x y.
 global axiom foo2 ['a] (x,y : 'a) : equiv(x,y).
 
 (* using `have` *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+global lemma _ ['a] (x,y : 'a[const]) : [q x y].
 Proof. 
   byequiv.
 
@@ -370,7 +368,7 @@ Proof.
 Qed. 
 
 (* using `apply` *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+global lemma _ ['a] (x,y : 'a[adv]) : [q x y].
 Proof. 
   byequiv.
 
@@ -379,7 +377,7 @@ Proof.
 Qed. 
 
 (* using `apply` with discharge *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : [q x y].
+global lemma _ ['a] (x,y : 'a[const]) : [q x y].
 Proof. 
   byequiv.
 
@@ -388,7 +386,7 @@ Qed.
 
 (* ========================================================= *)
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
+global lemma _ ['a] (x,y : 'a[adv]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
@@ -403,7 +401,7 @@ Proof.
 Qed.
 
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : [p x y] -> [q x y].
+global lemma _ ['a] (x,y : 'a[adv]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
@@ -418,7 +416,7 @@ Proof.
 Qed.
 
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[const,glob]) : equiv(x,y) -> [q x y].
+global lemma _ ['a] (x,y : 'a[const]) : equiv(x,y) -> [q x y].
 Proof.
   intro H.
 

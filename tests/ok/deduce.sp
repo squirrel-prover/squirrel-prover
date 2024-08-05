@@ -1,7 +1,7 @@
 abstract foo : message
 system null.
 
-global lemma one (tau:timestamp) :
+global lemma one (tau:timestamp[const]) :
   equiv(frame@pred(tau)) ->
   equiv(frame@pred(tau), input@tau).
 Proof.
@@ -9,7 +9,7 @@ Proof.
   nosimpl(apply H).
 Qed.
 
-global lemma two (tau:timestamp) :
+global lemma two (tau:timestamp[const]) :
   equiv(frame@pred(tau)) ->
   equiv(frame@pred(tau), exec@pred(tau) && output@pred(tau) = foo).
 Proof.
@@ -18,7 +18,7 @@ Proof.
 Qed.
 
 
-global lemma three (tau:timestamp) :
+global lemma three (tau:timestamp[const]) :
   equiv(frame@pred(tau)) ->
   equiv(frame@pred(tau), output@pred(tau) = foo).
 Proof.
