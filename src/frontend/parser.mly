@@ -53,7 +53,7 @@
 %token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
-%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO
+%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO DEDUCE
 %token PROOF QED RESET UNDO ABORT HINT
 %token TACTIC
 %token RENAME GPRF GCCA
@@ -1229,13 +1229,16 @@ tac:
   | l=lloc(CDH) arg=cdh_arg
     { mk_abstract l "cdh" [TacticsArgs.DH arg] }
 
+  (* Deduce *)
+  | l=lloc(DEDUCE) t=tactic_params     { mk_abstract l "deduce" t }
+
   (* Case *)
-  | id=loc(CASE) a=named_args t=tac_term
-    { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Term_parsed t] }
+  | l=lloc(CASE) a=named_args t=tac_term
+    { mk_abstract l "case" [TacticsArgs.Named_args a; Term_parsed t] }
 
   (* SMT *)
-  | id=loc(SMT) a=named_args_gen(tacargs_string_int)
-    { mk_abstract (L.loc id) "smt" [TacticsArgs.Named_args_gen a] }
+  | l=lloc(SMT) a=named_args_gen(tacargs_string_int)
+    { mk_abstract l "smt" [TacticsArgs.Named_args_gen a] }
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
@@ -1608,6 +1611,7 @@ set_option:
 _hint:
 | HINT REWRITE id=path   { Hint.Hint_rewrite id }
 | HINT SMT     id=path   { Hint.Hint_smt     id }
+| HINT DEDUCE  id=path   { Hint.Hint_deduce  id }
 
 hint:
 | x=_hint TERMINAL   { x }

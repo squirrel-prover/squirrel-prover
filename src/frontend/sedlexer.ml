@@ -223,6 +223,7 @@ let rec token buf =
   | "signature" -> !?SIGNATURE
   | "simpl" -> !?SIMPL
   | "smt" -> !?SMT
+  | "deduce" -> !?DEDUCE
   | "splitseq" -> !?SPLITSEQ
   | "such that" -> !?SUCHTHAT
   | "system" -> !?SYSTEM
