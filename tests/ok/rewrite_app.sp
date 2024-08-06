@@ -1,7 +1,7 @@
 (* test that rewriting sees [t1 t2 t3] as [(t1 t2) t3], and 
    in particular tries to rewriting the sub-term [(t1 t2)] *)
 
-include Basic.
+include Core.
 
 axiom [any] foo ['a 'b] f (g : _ -> 'b) (x : 'a) : f x = g x.
 

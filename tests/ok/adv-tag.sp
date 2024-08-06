@@ -4,7 +4,7 @@
 name n : message.
 name nb : bool.
 
-include Basic.
+include Core.
 
 system null.
 

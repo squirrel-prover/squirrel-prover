@@ -1,6 +1,4 @@
-
-
-include Basic.
+include Core.
 
 channel c
 system A: in(c,x);out(c,zero);

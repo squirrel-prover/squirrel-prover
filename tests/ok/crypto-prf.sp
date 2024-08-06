@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract h : message*message -> message.
 

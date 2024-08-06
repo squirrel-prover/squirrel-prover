@@ -74,7 +74,7 @@ Proof. intro [[Hf | Hg] _].   (* names can be dropped if useless, with _ *)
 Abort.
 
 
-include Basic.
+include Core.
 
 (* The library notably contains an equation allowing to simplify a trivial if. *)
 lemma _ (x,y:message): if true then x else y=x.

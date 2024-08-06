@@ -1,6 +1,6 @@
 channel c.
 
-include Basic.
+include Core.
 
 (* ========================================================= *)
 system E = null.

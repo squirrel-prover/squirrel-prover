@@ -55,7 +55,7 @@ process reader =
 
 system (!_i !_j T: tag(i) | !_jj R: reader).
 
-include Basic.
+include Core.
 
 (* HELPING LEMMAS *)
 

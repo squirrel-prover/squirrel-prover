@@ -1,3 +1,5 @@
+include Core.
+
 abstract foo : message
 system null.
 

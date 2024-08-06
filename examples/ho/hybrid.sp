@@ -3,7 +3,7 @@
 #General purpose Hybrid argument 
 *)
 
-include Basic.
+include Core.
 include MyInt.
 
 system null.

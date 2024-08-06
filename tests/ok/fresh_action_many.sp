@@ -6,7 +6,7 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,<n(i),n(j)>).
 
-include Basic.
+include Core.
 
 global lemma test (k:index[const]) : 
   [((exec@A(k,k) => k <> k) && 

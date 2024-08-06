@@ -13,7 +13,7 @@ system (
    (A: !_i s:=H(s,k); out(o,G(s,k')))
 ).
 
-include Basic.
+include Core.
 
 (** Last update lemmas: basic reasoning about the memory cell.
     Here we decompose the usual lastupdate lemma to separate the "pure" part

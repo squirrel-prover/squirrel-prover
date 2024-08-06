@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 mutable pre  : message = empty
 mutable s    : message = empty

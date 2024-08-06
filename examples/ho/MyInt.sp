@@ -1,6 +1,6 @@
 (* Theory of integers *)
 
-include Basic.
+include Core.
 
 (*==================================================================*)
 (* `Ordering` *)

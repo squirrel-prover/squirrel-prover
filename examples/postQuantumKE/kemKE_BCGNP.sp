@@ -66,7 +66,7 @@ party could potentially compute the key.
 *******************************************************************************)
 (* set postQuantumSound = true. *)
 
-include Basic.
+include Core.
 
 hash exct
 

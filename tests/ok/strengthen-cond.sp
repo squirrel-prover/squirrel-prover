@@ -1,3 +1,5 @@
+include Core.
+
 senc enc,dec
 
 abstract accept : message

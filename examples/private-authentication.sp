@@ -29,6 +29,8 @@ ACM, 2014
 ******************************************************************************
 *)
 
+include Core.
+
 (**
 We first declare the communication channels, the function symbols for the public
 encryption scheme as well as the several names used in the protocol's messages.
@@ -120,8 +122,6 @@ system O:
 This axiom states that the length of a pair is equal to the sum of the lengths
 of each component of the pair.
 *)
-
-include Basic.
 
 axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 

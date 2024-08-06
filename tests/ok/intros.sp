@@ -3,7 +3,7 @@ abstract ok : message
 
 system A: if True then out(c,ok).
 
-include Basic.
+include Core.
 
 lemma _: true || false.
 Proof.

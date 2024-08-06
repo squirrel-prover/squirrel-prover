@@ -35,7 +35,7 @@ process tag(i:index,j:index) =
 
 system (!_i !_j T: tag(i,j)).
 
-include Basic.
+include Core.
 
 (* HELPING LEMMAS *)
 

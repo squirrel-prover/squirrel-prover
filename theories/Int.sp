@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 namespace Int. 
   op ( + ) : int -> int -> int.

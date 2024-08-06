@@ -7,7 +7,7 @@ channel c.
 
 system out(c,<n1,diff(xor n1 ok, xor n1 ko)>).
 
-include Basic.
+include Core.
 
 equiv test.
 Proof.

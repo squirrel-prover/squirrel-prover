@@ -7,7 +7,7 @@ channel c
 
 system !_i out(c,<n(i),seq(i:index => n(i))>).
 
-include Basic.
+include Core.
 
 (* indices of the name itself must be checked *)
 global lemma _ (i:index, j:index[const]) :

@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 game ALEA = {
 rnd key : message;

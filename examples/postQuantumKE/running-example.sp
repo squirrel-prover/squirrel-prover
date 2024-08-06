@@ -32,7 +32,7 @@ Final key derivation: KIR := h(s,kI2) XOR h(s,kR2).
 
 ******************************************************************************)
 
-include Basic.
+include Core.
 
 (***********************)
 (* Global Declarations *)

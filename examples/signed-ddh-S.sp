@@ -21,6 +21,8 @@ Part 3: Mechanisms using digital signature techniques.
 
 *******************************************************************************)
 
+include Core.
+
 (**
 Declarations are identical to the ones in `signed-ddh-P.sp`.
 *)
@@ -71,8 +73,6 @@ process Schall(j:index) =
         out(cS, diff(ok,ko))))
 
 system  (!_i P(i) | !_j Schall(j)).
-
-include Basic.
 
 (**
 In the proof of strong secrecy for the system `secretS`, we will use

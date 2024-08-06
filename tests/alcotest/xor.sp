@@ -1,6 +1,4 @@
-
-
-include Basic.
+include Core.
 
 name n1 : message
 

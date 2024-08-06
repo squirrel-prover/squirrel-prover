@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* Assume a binary function h, which we will use a a keyed hash function,
    assuming PRF and EUF (which is actually implied by PRF).

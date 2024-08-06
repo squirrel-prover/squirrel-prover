@@ -1,6 +1,6 @@
 (* Checks oracle call in the right order*)
 
-include Basic.
+include Core.
 
 abstract ok : message * message * message * message -> message.
 abstract ko : message.

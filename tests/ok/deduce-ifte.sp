@@ -1,3 +1,5 @@
+include Core.
+
 abstract a : message
 abstract b : message
 abstract c : message

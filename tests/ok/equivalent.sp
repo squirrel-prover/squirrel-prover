@@ -1,4 +1,4 @@
-
+include Core.
 
 channel c
 abstract ok:message

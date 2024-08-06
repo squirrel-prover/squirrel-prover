@@ -15,7 +15,7 @@ module Prelude : sig
 end
 
 (*------------------------------------------------------------------*)
-module Basic : sig
+module Set : sig
   val check_load : Symbols.table -> unit
   val get_fsymb : Symbols.table -> string -> Symbols.fname
   val fs_mem : Symbols.table -> Symbols.fname

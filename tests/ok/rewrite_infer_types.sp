@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* test that infered types in the LHS are correctly substituted in the RHS *)
 lemma [any] _ ['a] (phi:'a -> bool) :

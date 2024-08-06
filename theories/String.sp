@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 namespace String.
   op ( + ) : string -> string -> string.

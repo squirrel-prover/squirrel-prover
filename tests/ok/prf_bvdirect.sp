@@ -1,6 +1,6 @@
 
 
-include Basic.
+include Core.
 
 (* Checking the treatment of bound variables in direct cases for prf. *)
 

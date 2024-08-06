@@ -8,7 +8,7 @@ R --> T : x
 T --> R : < nT, h(<nT,x>,kT) >
 *******************************************************************************)
 
-include Basic.
+include Core.
 
 (* Assume a binary function h, which we will use a a keyed hash function,
    assuming PRF.

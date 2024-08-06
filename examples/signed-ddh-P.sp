@@ -21,6 +21,8 @@ Part 3: Mechanisms using digital signature techniques.
 
 *****************************************************************)
 
+include Core.
+
 (**
 We first declare some public constants, the secret keys for roles P and S,
 the channels used by these two roles.
@@ -96,8 +98,6 @@ process S(j:index) =
       out(cS,ok))
 
 system (!_i Pchall(i) | !_j S(j)).
-
-include Basic.
 
 (**
 In the proof of strong secrecy for the system `secretP`, we will use

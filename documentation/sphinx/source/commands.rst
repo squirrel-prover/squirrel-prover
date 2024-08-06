@@ -37,11 +37,11 @@ Commands
    first in the same directory as the current Squirrel file,
    and then in the theories directory.
 
-     .. example:: Including theories/Basic.sp
+     .. example:: Including theories/Core.sp
 
        .. squirreldoc::
 
-          include Basic.
+          include Core.
 
    If you
    install squirrel (with ``make install``) and not running it from root directory of its

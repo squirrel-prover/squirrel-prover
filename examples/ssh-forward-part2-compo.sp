@@ -44,9 +44,9 @@ In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
-set timeout=4.
+include Core.
 
-include Basic.
+set timeout=4.
 
 abstract ok : message
 abstract ko : message

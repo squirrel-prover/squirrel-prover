@@ -12,6 +12,8 @@ B -> A : enc(<nA,nB>,rB,pkA)
 This is a "light" model without the last check of A.
 *******************************************************************************)
 
+include Core.
+
 channel cA
 channel cB
 
@@ -62,8 +64,6 @@ system
      out(cA,< < pk(kA(A)), pk(kAbis(A,i)) >, pk(kB(A)) >);
      (A(A,i) | B(A,i))
    ).
-
-include Basic.
 
 axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 

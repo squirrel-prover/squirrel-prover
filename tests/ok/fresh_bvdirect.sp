@@ -5,7 +5,7 @@ name m : index->message
 
 system null.
 
-include Basic.
+include Core.
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index[const]) : seq(i:index => n(i)), diff(n(i),m(i)).

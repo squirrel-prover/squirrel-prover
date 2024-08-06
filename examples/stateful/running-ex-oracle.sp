@@ -45,7 +45,7 @@ system (
    (A: !_i !_j s(i):=H(s(i),k); out(o,G(s(i),k')))
 ).
 
-include Basic.
+include Core.
 
 (* AXIOMS *)
 

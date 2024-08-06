@@ -2,6 +2,8 @@
   * anything if he can recover the key from chosen-message attacks.
   * Here we carry out this argument formally in Squirrel. *)
 
+include Core.
+
 set postQuantumSound=true.
 
 hash h

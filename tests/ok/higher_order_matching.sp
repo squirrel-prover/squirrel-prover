@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract G : index -> message.
 abstract F : index -> message.

@@ -1,4 +1,4 @@
-(* set debugConstr=true. *)
+include Core.
 
 aenc enc,dec,pk
 hash h
@@ -14,7 +14,7 @@ system null.
 
 abstract ok : message.
 
-include Basic.
+include Core.
 
 system test =
    (A:

@@ -41,7 +41,7 @@ process tag(i:index) =
 
 system !_i sT(i):=diff(s0(i),s0b(i)); !_j T: tag(i).
 
-include Basic.
+include Core.
 
 set showStrengthenedHyp=true.
 

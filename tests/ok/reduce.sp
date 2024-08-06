@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 hint rewrite fst_pair.
 hint rewrite snd_pair.

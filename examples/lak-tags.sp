@@ -16,6 +16,8 @@ This is a "light" model without the last check of T.
 
 set postQuantumSound=true.
 
+include Core.
+
 hash h
 
 abstract ok : message
@@ -51,8 +53,6 @@ process reader =
     out(cR,ko).
 
 system ((!_k R: reader) | (!_i !_j T: tag(i,j))).
-
-include Basic.
 
 axiom tags_neq : tag1 <> tag2.
 

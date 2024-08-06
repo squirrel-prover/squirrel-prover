@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* Keyed hash function with an incorrect PRF game.
    The game is broken: the hash oracle can be called after the

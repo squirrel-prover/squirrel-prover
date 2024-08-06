@@ -4,7 +4,7 @@ abstract cst : message.
 
 mutable foo (i : index) (j : index) = cst.
 
-include Basic.
+include Core.
 
 (* ========================================================= *)
 system E = null.

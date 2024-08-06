@@ -21,7 +21,7 @@ Proof.
   + intro [_ _]. by left.
 Qed.
 
-include Basic.
+include Core.
 
 (* Same goal, forcing ourselves to do type-based case analyses,
    resulting in a tedious proof. *)

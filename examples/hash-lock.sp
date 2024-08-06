@@ -11,6 +11,8 @@ R --> T : ok
 
 set postQuantumSound = true.
 
+include Core.
+
 hash h
 
 abstract ok : message
@@ -37,8 +39,6 @@ process reader(j:index) =
     out(cR,ko)
 
 system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
-
-include Basic.
 
 (* For the sake of simplicity, we assume injective pairing. *)
 axiom injective_pairing (x,y : message) :

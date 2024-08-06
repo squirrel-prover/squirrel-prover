@@ -10,7 +10,7 @@ name m:message
 
 system  in(c,x); let surp = diff(m,n) in let mac = h(<x,surp>,k) in  out(c,mac); out(c,h(diff(<x,n>,<x,m>),k)).
 
-include Basic.
+include Core.
 
 equiv test2.
 Proof.

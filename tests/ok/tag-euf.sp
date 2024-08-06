@@ -1,6 +1,6 @@
 set processStrictAliasMode=true.
 
-include Basic.
+include Core.
 
 abstract okSess0 : message
 abstract okSessi : message

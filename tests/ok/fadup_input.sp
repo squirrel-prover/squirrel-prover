@@ -1,3 +1,5 @@
+include Core.
+
 channel c
 name n : message
 abstract ok : message

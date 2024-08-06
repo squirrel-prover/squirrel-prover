@@ -50,7 +50,7 @@ In the following model, we remove multiple layers of integrity and encryption, k
 set timeout=10.
 set postQuantumSound = true.
 
-include Basic.
+include Core.
 
 hash h
 

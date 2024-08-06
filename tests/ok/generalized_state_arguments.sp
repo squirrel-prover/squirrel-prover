@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 name n : index -> message.
 

@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract i0 : int.
 abstract i1 : int.

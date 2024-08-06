@@ -1,6 +1,6 @@
 (* tests some instantiations of local and global lemmas in global sequents. *)
 
-include Basic.
+include Core.
 
 system null.
 

@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* Careful, our order on timestamp is **NOT** reflexive! *)
 lemma [any] _ (t : timestamp) : t <= t.

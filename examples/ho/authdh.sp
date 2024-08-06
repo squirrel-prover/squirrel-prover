@@ -96,7 +96,7 @@ process protocol = (
 system default = protocol.
 
 (*------------------------------------------------------------------*)
-include Basic.
+include Core.
 
 abstract Some : message -> message.
 abstract None : message.

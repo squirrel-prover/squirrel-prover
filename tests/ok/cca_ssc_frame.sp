@@ -18,7 +18,7 @@ process P =
 
 system S = P.
 
-include Basic.
+include Core.
 
 global lemma [S] ideal (t:timestamp[const]) :
   [happens(t)] ->

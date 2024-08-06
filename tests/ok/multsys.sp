@@ -1,6 +1,6 @@
 
 
-include Basic.
+include Core.
 
 name ok : message
 name ko : message

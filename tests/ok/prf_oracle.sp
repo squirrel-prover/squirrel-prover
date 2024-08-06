@@ -11,7 +11,7 @@ name n:message
 name m:message
 system null.
 
-include Basic.
+include Core.
 
 (* Test direct case *)
 equiv test : h(diff(m,n),k),h(diff(n,m),k) .

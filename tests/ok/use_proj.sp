@@ -1,6 +1,6 @@
 
 
-include Basic.
+include Core.
 
 channel c
 system (A: out(c,empty) | B: out(c,empty)).

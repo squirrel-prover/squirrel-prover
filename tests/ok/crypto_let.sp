@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* TODO : enlever les admits, remplacer par un axiom étant les subgoals.*)
 

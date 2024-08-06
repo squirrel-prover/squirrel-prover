@@ -4,9 +4,10 @@
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
 (* R --> T: h(<h(<nR, nT, tag1>, k), nr, tag2>, k)*)
 
-include Basic.
 set postQuantumSound = true.
 set timout=10.
+
+include Core.
 
 hash h
 

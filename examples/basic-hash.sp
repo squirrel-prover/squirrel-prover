@@ -31,7 +31,7 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
     also sound for quantum attackers. *)
 set postQuantumSound=true.
 
-include Basic.
+include Core.
 
 (** We start by declaring the function symbol `h` for the hash function,
     as well as two public constants `ok` and `ko` (used by the reader). *)

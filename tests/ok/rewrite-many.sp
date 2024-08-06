@@ -1,7 +1,7 @@
 (* test that `rewrite` cannot do too much when rewritting under a
    binder *)
 
-include Basic.
+include Core.
 
 system null.
 

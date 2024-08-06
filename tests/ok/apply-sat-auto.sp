@@ -1,3 +1,5 @@
+include Core.
+
 (* Tests of the use of satisfiability (constraints) in the 
    bi-deduction *)
 

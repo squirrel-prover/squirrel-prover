@@ -25,7 +25,7 @@
    We assume a tagging mechanism to distinguish the first and last
    messages from `A`. *)
 
-include Basic.
+include Core.
 
 (* ------------------------------------------------------------------------ *)
 

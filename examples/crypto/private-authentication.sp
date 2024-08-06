@@ -33,7 +33,7 @@ ACM, 2014
 ******************************************************************************
 *)
 
-include Basic.
+include Core.
 
 (* We assume a type `ptxt` for plain-text messages, of bounded length.
    This is achieved by taking a truncation function from messages

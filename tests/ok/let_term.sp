@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 lemma [any] _ x y : let z = <x,y> in z = <x,y>.
 Proof.

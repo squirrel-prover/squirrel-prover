@@ -21,7 +21,7 @@
 *)
 
 (* Declare a hash function h that satisfies PRF, hence EUF. *)
-include Basic.
+include Core.
 
 hash h.
 

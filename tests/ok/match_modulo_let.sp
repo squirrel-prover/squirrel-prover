@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 lemma [any] rewrite_fun x :
 let f = fun (x:message) => x in 

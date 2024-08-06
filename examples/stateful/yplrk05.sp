@@ -85,7 +85,7 @@ axiom sequentiality (t:timestamp, i,j:index):
 
 (* LIBRARIES *)
 
-include Basic.
+include Core.
 
 (* HELPING LEMMAS *)
 

@@ -2,7 +2,7 @@ channel c.
 
 system new n; out(c,n).
 
-include Basic.
+include Core.
 
 equiv test.
 Proof.

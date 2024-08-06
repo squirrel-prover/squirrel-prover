@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 name n : message. name m : message.
 abstract g : message -> message.

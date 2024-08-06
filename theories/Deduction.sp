@@ -1,0 +1,53 @@
+include Logic.
+include DeductionSyntax.
+
+(* ------------------------------------------------------------------- *)
+(* 
+# Reasoning rules on Deduction
+*)
+
+global lemma [set: Empty; equiv:Empty] 
+  _ ['a 'b 'c] (u : 'b, v : 'a -> 'c) : 
+  Let u0 = fun _ => u in
+  $(u0 |1> (fun x => v x)) ->
+  $(u  |>  (fun x => v x)).
+Proof.
+  intro u0 H.
+  rewrite /(|>).
+  rewrite /(|1>) in H.
+  destruct H as [f H].
+  exists (fun u x => f u) => /=. 
+  apply fun_ext => x /=.
+  rewrite /u0 /= in H.
+  apply H.
+Qed.
+
+namespace Deduce.
+  global axiom [set:any; equiv:Empty] frame_from_frame : 
+    $( (fun t => frame@t) 
+       |1> 
+       (fun t t' => if t' <= t then frame@t')
+    ).
+  hint deduce frame_from_frame.
+
+  global axiom [set:any; equiv:Empty] exec_from_frame : 
+    $( (fun t => frame@t) 
+       |1> 
+       (fun t t' => if t' <= t then exec@t' else witness)
+    ).
+  hint deduce exec_from_frame.
+
+  global axiom [set:any; equiv:Empty] output_from_frame : 
+    $( (fun t => frame@t) 
+       |1> 
+       (fun t t' => if t' <= t && exec@t' then output@t')
+    ).
+  hint deduce output_from_frame.
+
+  global axiom [set:any; equiv:Empty] input_from_frame : 
+    $( (fun t => frame@t) 
+       |1> 
+       (fun t t' => if pred t' <= t then input@t')
+    ).
+  hint deduce input_from_frame.
+end Deduce.

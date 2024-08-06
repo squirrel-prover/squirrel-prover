@@ -2,7 +2,7 @@
    can support applications which are beyond the reach of the current
    `cca1` tactic. *)
 
-include Basic.
+include Core.
 
 (* Defining an encryption function as an abstract function. *)
 abstract enc : message -> message -> message -> message.

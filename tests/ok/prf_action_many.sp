@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 (* Test that the prf tactic creates the correct formula when
  * several instances of the name are found in an action. 

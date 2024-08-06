@@ -2,7 +2,7 @@ channel c.
 
 system A : !_i new a; !_j new b; out(c,b).
 
-include Basic.
+include Core.
 
 global lemma test (i,j,ii,jj:index[const]) :
   [happens(A(i,j))] -> [happens(A(ii,jj))] ->

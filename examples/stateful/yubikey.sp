@@ -134,7 +134,7 @@ system
 We include here some libraries, useful to help the tool with automated
 reasoning. *)
 
-include Basic.
+include Core.
 
 lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.

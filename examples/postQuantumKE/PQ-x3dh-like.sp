@@ -52,7 +52,7 @@ secrecy of the keys.
 set timeout = 50.
 set postQuantumSound = true.
 
-include Basic.
+include Core.
 
 hash exct
 

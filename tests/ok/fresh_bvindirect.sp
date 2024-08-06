@@ -7,7 +7,7 @@ channel c
 
 system !_i out(c,<n(i),seq(i:index => n(i))>).
 
-include Basic.
+include Core.
 
 (* The main test, with a non-empty list of bound variables. *)
 global lemma nonempty (tau:timestamp[const],i:index[const]) :

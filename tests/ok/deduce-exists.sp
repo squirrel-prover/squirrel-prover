@@ -1,4 +1,6 @@
-channel c
+include Core.
+
+channel c.
 
 name s : message
 abstract ok : message

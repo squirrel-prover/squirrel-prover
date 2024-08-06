@@ -45,6 +45,8 @@ tactic's implementation. In the meantime, the file is left as-is with its
 admits.
 *)
 
+include Core.
+
 set timeout=10.
 set postQuantumSound=true.
 
@@ -94,8 +96,6 @@ process Tag(i:index, j:index) =
   out(cT, cipher).
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
-
-include Basic.
 
 axiom tags_neq : tagR <> tagT
 

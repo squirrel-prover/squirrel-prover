@@ -1,6 +1,4 @@
-(* set debugConstr=true. *)
-
-include Basic.
+include Core.
 
 hash h
 name k:message

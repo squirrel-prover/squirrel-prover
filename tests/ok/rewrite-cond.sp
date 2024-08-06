@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract p : bool.
 abstract q : bool.

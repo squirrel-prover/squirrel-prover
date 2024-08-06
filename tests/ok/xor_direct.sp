@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract ok : message
 abstract ko : message

@@ -78,7 +78,7 @@ system ((!_i !_j ReceiverA(i,j)) | (!_i !_j SenderA(i,j)) |
 
 (* LIBRARIES *)
 
-include Basic.
+include Core.
 
 (* f_apply *)
 

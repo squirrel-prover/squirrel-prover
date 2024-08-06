@@ -14,7 +14,7 @@ system A: !_i in(ch,x);out(ch,<ok(i),x>).
 
 system bis = !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
 
-include Basic.
+include Core.
 
 axiom foo (x : message) : f(x) = a.
 axiom foog (x : message) : gg(x,b) = c.

@@ -12,7 +12,7 @@ process B(i,j : index) =
 
 system !_i !_j B(i, j).
 
-include Basic.
+include Core.
 
 (*------------------------------------------------------------------*)
 (* macro expantion under binders *)

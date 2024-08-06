@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 namespace Foo.
   op ( * )  x y = <x,y>.

@@ -1,6 +1,6 @@
 (* test rewriting modulo β with higher-order matching *)
 
-include Basic.
+include Core.
 
 system real = null.
 

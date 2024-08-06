@@ -92,7 +92,7 @@ system (let pkB = enc_pk(skB) in
 
 (* Load basic library of axioms, and add some complement. *)
 
-include Basic.
+include Core.
 
 (* ------------------------------------------------------------------- *)
 

@@ -1,6 +1,6 @@
 system null.
 
-include Basic.
+include Core.
 
 name n  : index     -> timestamp.
 name n1 : timestamp -> timestamp.

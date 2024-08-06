@@ -12,7 +12,6 @@ let get_btype (s : Symbols.s_path) : Symbols.btype =
 
 (*------------------------------------------------------------------*)
 module Prelude = struct
-  (*------------------------------------------------------------------*)
   let mk_fun table str ?ty_args args =
     let symb = get_fsymb str in
     Term.mk_fun table symb ?ty_args args
@@ -32,11 +31,11 @@ module Prelude = struct
 end
 
 (*------------------------------------------------------------------*)
-module Basic = struct
+module Set = struct
 
   let check_load table =
-    if not (Symbols.Import.mem_sp ([], "Basic") table) then
-      Tactics.hard_failure (Failure "theory Basic is not loaded")
+    if not (Symbols.Import.mem_sp ([], "Set") table) then
+      Tactics.hard_failure (Failure "theory Set is not loaded")
         
   let get_fsymb table s =
     check_load table;
@@ -47,8 +46,8 @@ module Basic = struct
   let const_emptyset table = get_fsymb table "empty_set"
 end  
 
+(*------------------------------------------------------------------*)
 module Int = struct
-
   (* namespace path *)
   let int_p = ["Int"]
  

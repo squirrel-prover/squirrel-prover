@@ -1,6 +1,6 @@
 (* SMT: Z3 4.13.0 *)
 
-include Basic.
+include Core.
 
 set timout=10.
 

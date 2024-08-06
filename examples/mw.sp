@@ -17,6 +17,8 @@ This is a "light" model without the last check of T.
 
 set postQuantumSound=true.
 
+include Core.
+
 hash H
 
 abstract id : index -> message
@@ -51,8 +53,6 @@ process reader =
     out(c,error).
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
-
-include Basic.
 
 axiom len_id (i:index)   : len(id(i))    = namelength_message.
 axiom len_id' (i,t:index): len(id'(i,t)) = namelength_message.

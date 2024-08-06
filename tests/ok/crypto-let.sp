@@ -1,5 +1,5 @@
 
-include Basic.
+include Core.
 
 name a:message.
 name b:message.

@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 mutable s(i:index): message = empty.
 abstract f : message -> message.

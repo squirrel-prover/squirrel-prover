@@ -1,6 +1,6 @@
 set newInduction=true.
 
-include Basic.
+include Core.
 
 hash h
 channel c

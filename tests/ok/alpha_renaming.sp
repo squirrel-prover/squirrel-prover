@@ -1,5 +1,4 @@
-(* Check that alpha equivalent systems are compatible
-   and can be proved equivalent. *)
+include Core.
 
 channel c.
 

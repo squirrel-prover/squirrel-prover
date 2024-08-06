@@ -43,7 +43,7 @@ In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
-include Basic.
+include Core.
 
 abstract ok : message
 abstract ko : message

@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 abstract a : message.
 abstract p : message -> bool.

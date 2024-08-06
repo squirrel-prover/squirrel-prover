@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 channel c
 name n : index -> message
