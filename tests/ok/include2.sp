@@ -1,4 +1,3 @@
-
 include "./testInclude/TestInclude2.sp".
 
 abstract ToMessage : T -> message.

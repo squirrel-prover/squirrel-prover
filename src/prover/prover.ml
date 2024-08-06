@@ -608,12 +608,14 @@ exception Unfinished
 
 (* Manage all commands. *)
 let rec do_command 
-    ?(driver_stack=[])
-    ?(test=false) 
-    ?(check=`Check) 
-    (st:state) 
-    (driver:Driver.t)
-    (command:ProverLib.input) : state =
+    ?(driver_stack = [])
+    ?(test  = false) 
+    ?(check = `Check) 
+    (st      : state) 
+    (driver  : Driver.t)
+    (command : ProverLib.input) 
+  : state 
+  =
   let open ProverLib in
   let mode = get_mode st in
   Benchmark.set_position
@@ -663,47 +665,49 @@ let rec do_command
       Command.cmd_error UnexpectedCommand
 
 and do_include
-      ?(test=true) ?(driver_stack=[]) (st:state) ~dirname (i:ProverLib.include_param)
-    : state
-=
-  let load_paths = Driver.mk_load_paths dirname in
-  let driver =
-    Driver.from_include driver_stack load_paths i.th_name
-  in
-  let interactive = TConfig.interactive (get_table st) in
-  let checkInclude = 
-    if TConfig.checkInclude (get_table st) then `Check 
-    else begin
-      if List.exists 
-          (fun x -> L.unloc x = "admit") i.ProverLib.params 
-      then `NoCheck
-      else `Check
-    end in
-  let new_driver_stack = driver :: driver_stack in
-  let st = 
-    try 
-      let st = 
-        do_all_commands_in
-          ~driver_stack:new_driver_stack ~check:checkInclude ~test st driver
+    ?(test=true) ?(driver_stack=[]) (st:state) ~dirname (i:ProverLib.include_param)
+  : state
+  =
+  let name = Driver.name_of_load_path i.th_name in
+  if Symbols.Import.mem_s Symbols.top_npath name st.table then st else
+    begin
+      let load_paths = Driver.mk_load_paths dirname in
+      let driver =
+        Driver.from_include driver_stack load_paths i.th_name
       in
-      (* Adding imported file in the symbol table. *)
-      let table, _ =
-        let name = match i.th_name with Name s -> s | Path s -> s in
-        Symbols.Import.declare ~approx:false st.table name in
-      { st with table }
+      let interactive = TConfig.interactive (get_table st) in
+      let checkInclude = 
+        if TConfig.checkInclude (get_table st) then `Check 
+        else if List.exists (fun x -> L.unloc x = "admit") i.ProverLib.params
+        then `NoCheck
+        else `Check
+      in
+      let new_driver_stack = driver :: driver_stack in
+      let st = 
+        try 
+          let st = 
+            do_all_commands_in
+              ~driver_stack:new_driver_stack ~check:checkInclude ~test st driver
+          in
+          (* Adding imported file in the symbol table. *)
+          let table, _ =
+            Symbols.Import.declare ~approx:false st.table (L.mk_loc L._dummy name )
+          in
+          { st with table }
 
-    with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
-      let err_mess fmt =
-        Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
-          (L.unloc (ProverLib.lsymb_of_load_path i.th_name))
-          (Errors.pp_toplevel_error ~interactive:interactive ~test driver) e
+        with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
+          let err_mess fmt =
+            Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
+              (L.unloc (ProverLib.lsymb_of_load_path i.th_name))
+              (Errors.pp_toplevel_error ~interactive:interactive ~test driver) e
+          in
+          Driver.close driver;
+          Command.cmd_error (IncludeFailed err_mess)
       in
       Driver.close driver;
-      Command.cmd_error (IncludeFailed err_mess)
-  in
-  Driver.close driver;
-  Printer.prt `Warning "Loaded \"%s.sp\"." (Driver.name driver);
-  st
+      Printer.prt `Warning "Loaded \"%s.sp\"." (Driver.name driver);
+      st
+    end
 
 and do_all_commands_in ?(driver_stack=[])
     ~check ~test (st:state) (driver:Driver.t) : state
@@ -740,13 +744,13 @@ let init : ?with_prelude:bool -> unit -> state =
     | _ -> 
       let state = init' () in
       if with_prelude then begin
-        let inc =
-          ProverLib.{ th_name =
-                        Name (L.mk_loc L._dummy "Prelude");
-                      params = []; }
+        let prelude = ProverLib.{ 
+            th_name = Name (L.mk_loc L._dummy "Prelude");
+            params = []; 
+          }
         in
         (* process the prelude file *)
-        let state = do_include ~dirname:Driver.theory_dir state inc in
+        let state = do_include ~dirname:Driver.theory_dir state prelude in
         (* define the macros defining the builtin execution models *)
         let table = Macros.define_execution_models state.table in
         let () = Symbols.set_builtins_table_after_processing_prelude table in

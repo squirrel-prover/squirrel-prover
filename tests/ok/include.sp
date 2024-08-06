@@ -1,5 +1,3 @@
-
-
 include TestInclude.
 
 abstract ToMessage : T -> message.

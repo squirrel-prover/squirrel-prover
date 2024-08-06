@@ -152,6 +152,16 @@ let check_cycle (driver_stack : t list) (name : string) : unit =
   in
   if has_cycle then Command.cmd_error (IncludeCycle name)
 
+(** Name of an included file from its load path.
+    Obtain by stripping the extention and the directory path. *)
+let name_of_load_path (path : ProverLib.load_path) : string =
+  let filename =
+    match path with
+    | Name name -> L.unloc name
+    | Path name -> Filename.chop_extension (L.unloc name)
+  in
+  Filename.basename filename
+
 let from_include driver_stack load_paths (path:ProverLib.load_path) : t =
   let filename =
     match path with
