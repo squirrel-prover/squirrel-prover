@@ -90,3 +90,10 @@ module Secrecy : sig
   val symb_deduce : Symbols.table -> Symbols.predicate
   val symb_not_deduce : Symbols.table -> Symbols.predicate
 end
+
+(*------------------------------------------------------------------*)
+module Deduction : sig
+  val check_load_deduction_syntax : Symbols.table -> unit
+
+  val uniform_deduction : Symbols.table -> Symbols.predicate
+end  

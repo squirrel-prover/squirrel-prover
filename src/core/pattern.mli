@@ -8,6 +8,12 @@ val open_pat :
   ('a * Concrete.bound) Term.pat ->
   Subst.t * ('a * Concrete.bound) Term.pat_op
 
+val open_pat_k :
+  'a Equiv.f_kind ->
+  Infer.env ->
+  'a Term.pat ->
+  Subst.t * 'a Term.pat_op
+
 (*------------------------------------------------------------------*)
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)

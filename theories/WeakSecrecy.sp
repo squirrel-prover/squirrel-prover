@@ -1,10 +1,6 @@
-include Basic.
+include Core.
 
 (* ------------------------------------------------------------------- *)
-
-(* `Deduction` *)
-predicate ( |> ) ['a 'b] {set:system} {set: (u : 'a, m : 'b)} =
-  Exists (f : _[adv]), [f u = m].
 
 (* `Non-deduction` or weak-secrecy *)
 predicate ( *> ) ['a 'b] {set:system} {set: (u : 'a, m : 'b)} =

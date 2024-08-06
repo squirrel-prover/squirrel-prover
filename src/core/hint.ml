@@ -52,35 +52,64 @@ let add_rewrite_rule (h : Term.term_head) (r : rw_hint) db : rewrite_db =
 (** {3 Deduction hints } *)
 
 type deduce_info = unit
-type deduce_cnt  = { 
+
+(** For all [ty_vars], we have the rule:
+    [args ⊢ left ▷ λ vars ⇒ (right | cond) ]
+    where [args] are uniform arguments of the underlying simulator. *)
+type deduce_rule  = { 
   params : Params.t;
-  system : SE.context;
-  form   : Equiv.form; 
+  system : SE.t;
+  args   : Vars.vars;
+  left   : Term.term; 
+  vars   : Vars.vars;
+  right  : Term.term; 
+  cond   : Term.term;
 }
 
-type deduce_hint = (deduce_cnt, deduce_info) hint
+type deduce_hint = (deduce_rule, deduce_info) hint
 type deduce_db   = deduce_hint list
 
+(*------------------------------------------------------------------*)
 let pp_deduce_info _ppe fmt (_i : deduce_info) : unit =
   Fmt.pf fmt ""
 
-let pp_deduce_cnt ppe fmt (c : deduce_cnt) : unit =
-  Fmt.pf fmt "%t%a" 
-    (fun fmt -> 
+let pp_deduce_rule ppe fmt (c : deduce_rule) : unit = 
+  Fmt.pf fmt "%t@system:(%t), %t⊢ %a ▷ %t"
+    (fun fmt ->                 (* params *)
        if c.params = Params.empty 
        then Fmt.pf fmt "" 
-       else Fmt.pf fmt "[∀ @[%a@]]" Params.pp c.params)
-    (Equiv._pp ppe) c.form
+       else Fmt.pf fmt "∀@[%a@], " Params.pp c.params)
+    (fun fmt ->                 (* system *)
+       Fmt.pf fmt "@[%a@]" SE.pp c.system)
+    (fun fmt ->                 (* args *)
+       if c.args = []
+       then ()
+       else Fmt.pf fmt "@[∀ %a@] " Vars.pp_list c.args)
+    (Term._pp ppe) c.left
+    (fun fmt ->
+       if c.vars = [] && Term.equal c.cond Term.mk_true
+       then Fmt.pf fmt "%a" (Term._pp ppe) c.right
+       else
+         Fmt.pf fmt "@[@[%t@](@[%a@] |@ @[%a@])@]"
+           (fun fmt ->
+              if c.vars = [] then ()
+              else Fmt.pf fmt "λ %a ⇒ " Vars.pp_list c.vars)
+           (Term._pp ppe) c.right
+           (Term._pp ppe) c.cond)
 
-let pp_deduce_hint : deduce_hint formatter_p =
-  pp_hint pp_deduce_cnt pp_deduce_info
+let _pp_deduce_hint : deduce_hint formatter_p =
+  pp_hint pp_deduce_rule pp_deduce_info
+
+let pp_deduce_hint     = _pp_deduce_hint (default_ppe ~dbg:false ())
+let pp_deduce_hint_dbg = _pp_deduce_hint (default_ppe ~dbg:true ())
 
 let[@warning "-32"] pp_deduce_db : deduce_db formatter_p =
   fun ppe fmt db ->
   let pp_el fmt hint =
-    Fmt.pf fmt "@[%a@]" (pp_deduce_hint ppe) hint
+    Fmt.pf fmt "@[%a@]" (_pp_deduce_hint ppe) hint
   in
   Fmt.pf fmt "@[<v>%a@]" (Fmt.list pp_el) db
+     
 
 (*------------------------------------------------------------------*)
 (** {3 Hint database } *)
@@ -169,8 +198,6 @@ let add_hint_smt formula table : Symbols.table =
   set_hint_db table { db with db_smt = formula :: db.db_smt }
 
 (*------------------------------------------------------------------*)
-let add_hint_deduce (s : Symbols.p_path) params system form table : Symbols.table =
+let add_hint_deduce (h : deduce_hint) table : Symbols.table =
   let db = hint_db table in
-  let name = Symbols.p_path_to_string ~sep:"_" s in
-  let h = { name; cnt = { params; system; form;}; info = (); } in
   set_hint_db table { db with db_deduce = h :: db.db_deduce; }

@@ -558,6 +558,9 @@ let local_stmt_valid_in_any_system (lem : Goal.local_statement) =
   | _ -> false
 
 (*------------------------------------------------------------------*)
+(** {3 Hints } *)
+
+(*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : Symbols.p_path) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
@@ -591,11 +594,76 @@ let add_hint_smt table (s : Symbols.p_path) =
 
   Hint.add_hint_smt lem.Goal.formula.formula table
 
+(*------------------------------------------------------------------*)
+let deduction_hint_of_global_formula
+    table loc (params : Params.t) (form : Equiv.form) : Hint.deduce_rule
+  =
+  let open Equiv in
+  let failed error =
+    Typing.error loc (Failure ("ill-formed deduction hint: " ^ error))
+  in
+
+  let uded = Library.Deduction.uniform_deduction table in
+
+  let p = 
+    match form with
+    | Atom (Pred p) when p.psymb = uded -> p
+    | _ -> failed ("must be a " ^ Symbols.path_to_string uded ^ " atom")
+  in
+
+  let system = as_seq1 p.se_args in
+
+  (* [p.ty_args] starts by the type of the uniform argument to both
+     [left] and [right]. 
+     We extract it in [ty_args], possibly decomposing tuple arguments. *)
+  let ty_arg = (List.hd p.ty_args) in
+  let ty_args = Type.decompose_tuple ty_arg  in
+
+  (* Get [left] and [right]. *)
+  let left, right = 
+    let _, pred_args = as_seq1 p.multi_args in
+    as_seq2 pred_args
+  in
+
+  (* Apply them to the uniform arguments of the deduction property. *)
+  let args = List.map (fun ty -> Vars.make_fresh ty "x") ty_args in
+  let term_args = List.map Term.mk_var args in
+  let left  = Term.mk_app ~simpl:true left  term_args in
+  let right = Term.mk_app ~simpl:true right term_args in
+
+  (* Try to decompose [right] as [(right | ∀ vars : cond)], which is
+     sugar for [λ vars. (if cond then right else witness)]. *)
+  let vars, right = 
+    let vars, right = Term.decompose_fun right in
+    let vars, subst = Term.refresh_vars vars in
+    vars, Term.subst subst right     
+  in
+  let right, cond = 
+    match Term.destr_app ~fs:Symbols.fs_ite ~arity:3 right with
+    | Some [cond; t_then; Term.Fun (w, _)] 
+      when   ( w = Library.Prelude.fs_witness && 
+               not (Type.equal (Term.ty t_then) Type.tmessage) ) 
+           || w = Symbols.fs_zero -> t_then, cond
+    | _ -> right, Term.mk_true
+  in
+
+  { params; system; args; left; vars; right; cond; }
 
 let add_hint_deduce table (s : Symbols.p_path) = 
   let lem = Lemma.find_stmt_global s table in
 
-  Hint.add_hint_deduce s lem.params lem.system lem.formula table
+  let name = Symbols.p_path_to_string ~sep:"_" s in
+  let rule = 
+    deduction_hint_of_global_formula 
+      table (Symbols.p_path_loc s) lem.params lem.formula
+  in
+  let h = Hint.{ name; cnt = rule; info = (); } in
+
+  let ppe = default_ppe ~table () in
+  Printer.prt `Warning "added deduction hint:@;<1 0>@[%a@]" 
+    (Hint._pp_deduce_hint ppe) h;
+
+  Hint.add_hint_deduce h table
 
 
 (*------------------------------------------------------------------*)

@@ -6,6 +6,8 @@ reachability by showing a proof of (weak) secrecy using a strong secrecy
 property as hypothesis.
 *)
 
+include Core.
+
 (**
 We first declare:
 

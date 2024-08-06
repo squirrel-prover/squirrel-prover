@@ -91,7 +91,7 @@ type term = private
 type t = term
 
 (** Structural comparison of terms. *)
-val compare : t -> t -> int
+val compare : term -> term -> int
 
 type terms = term list
 
@@ -362,7 +362,6 @@ val f_len    : Symbols.fname
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
 
-val destr_app : fs:Symbols.fname -> arity:int -> term -> term list option
 val oas_seq2 : term list option -> (term * term) option
 
 module Smart : sig
@@ -486,7 +485,7 @@ val mk_string : String.t -> term
 val mk_vars   : Vars.var list -> term list
 val mk_action : Symbols.action -> term list -> term
 val mk_tuple  : term list -> term
-val mk_app    : term -> term list -> term
+val mk_app    : ?simpl:bool -> term -> term list -> term
 val mk_proj   : ?simpl:bool -> int -> term -> term
 
 (** [mk_name n l] create a name. The list [l] must be of length at most 1. *)
@@ -561,7 +560,11 @@ val is_binder : term -> bool
 val is_action : term -> bool
 val is_macro  : term -> bool
 val is_name   : term -> bool
+val is_var    : term -> bool
+val is_tuple  : term -> bool
+val is_proj   : term -> bool
 
+(*------------------------------------------------------------------*)
 val destr_var : term -> Vars.var option
 
 val destr_tuple : term -> term list option
@@ -573,26 +576,20 @@ val destr_tuple : term -> term list option
 val destr_tuple_flatten : term -> term list
 val destr_proj : term -> (int * term) option
 
-val is_var   : term -> bool
-val is_tuple : term -> bool
-val is_proj  : term -> bool
+val destr_app : fs:Symbols.fname -> arity:int -> term -> term list option
 
-(*------------------------------------------------------------------*)
 val destr_action : term -> (Symbols.action * term list) option
 
-(*------------------------------------------------------------------*)
 val destr_pair : term -> (term * term) option
 
 (*------------------------------------------------------------------*)
-(** Destruct a given number of [Fun]. 
-    If [ty_env] is not [None], may add new type equalities to do so. *)
-val destr_ty_funs : ?ienv:Infer.env -> Type.ty -> int -> Type.ty list * Type.ty
-
 (** Flatten all nested tuples at top level in a type:
     if [u, v, w] are not tuples, [u] becomes [[u]]
     [u * v] becomes [[u;v]], [u * (v * w))] becomes [[u;v;w]] and so on.
     Consistent with [Term.destr_tuple_flatten]. *)
 val destr_ty_tuple_flatten : Type.ty -> Type.ty list
+
+val decompose_fun : term -> Vars.var list * term 
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

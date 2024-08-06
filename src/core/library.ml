@@ -129,11 +129,7 @@ module[@warning "-32"] Real = struct
   let mk_two   table     = Term.mk_fun table (fs_two  table)  []
 end
 
-(** Not type safe, do not export.
-    [np] is the namespace path, [s] the symbol name. *)
-let get_predsymb (p : Symbols.s_path) : Symbols.predicate =
-  Symbols.Predicate.of_s_path p 
-
+(*------------------------------------------------------------------*)
 module Secrecy = struct
 
   let is_loaded table =
@@ -142,11 +138,25 @@ module Secrecy = struct
     if not (is_loaded table) then
       Tactics.hard_failure (Failure "theory WeakSecrecy is not loaded")
         
-  let get_predsymb table s =
+  let get_predicate table s =
     check_load table;
-    get_predsymb ([],s)
+    Symbols.Predicate.of_s_path ([],s)
   
-  let symb_deduce table = get_predsymb table "|>"
-  let symb_not_deduce table = get_predsymb table "*>"
+  let symb_deduce table = get_predicate table "|>"
+  let symb_not_deduce table = get_predicate table "*>"
+end
 
+(*------------------------------------------------------------------*)
+module Deduction = struct
+  let name = "DeductionSyntax"
+
+  let check_load_deduction_syntax table =
+    if not (Symbols.Import.mem_sp ([], name) table) then
+      Tactics.hard_failure (Failure "theory DeductionSyntax is not loaded")
+        
+  let get_predicate table s =
+    check_load_deduction_syntax table;
+    Symbols.Predicate.of_s_path ([],s)
+
+  let uniform_deduction table = get_predicate table "|1>"
 end  

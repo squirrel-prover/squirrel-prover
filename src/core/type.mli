@@ -136,6 +136,11 @@ val tuple  : ty list     -> ty
     - [tout] is not an arrow type *)
 val decompose_funs : ty -> ty list * ty
 
+(** If [decompose_typle ty = l] then either:
+    - [List.length l = 1] and [l = [ty]]
+    - or [ty = Tuple t]. *)
+val decompose_tuple : ty -> ty list
+
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 

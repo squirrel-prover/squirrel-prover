@@ -438,11 +438,12 @@ let mk_tuple l = match l with
   | [a] -> a
   | _ -> Tuple l
 
-let mk_app t l =
-  if l = [] then t else
+(* application, no simplification *)
+let mk_app_ns t args =
+  if args = [] then t else
     match t with
-    | App (t, l') -> App (t, l' @ l)
-    | _ -> App (t, l)
+    | App (t, args') -> App (t, args' @ args)
+    | _ -> App (t, args)
 
 let mk_proj ?(simpl=false) i t = 
   match t, simpl with
@@ -479,12 +480,12 @@ let mk_diff l =
 (** {2 Smart constructors for function applications.} *)
 
 let mk_fun0 fname (app_fty : applied_ftype) terms = 
-  mk_app (Fun (fname, app_fty)) terms
+  mk_app_ns (Fun (fname, app_fty)) terms
 
 let mk_fun table fname ?(ty_args = []) terms =
   let fty = Symbols.OpData.ftype table fname in
   assert (List.length ty_args = List.length fty.fty_vars);
-  mk_app (Fun (fname, { fty; ty_args; })) terms
+  mk_app_ns (Fun (fname, { fty; ty_args; })) terms
 
 let mk_fun_tuple table fname ?ty_args terms =
   mk_fun table fname ?ty_args [mk_tuple terms]
@@ -926,6 +927,9 @@ let destr_action = function
   | _ -> None
 
 (*------------------------------------------------------------------*)
+let decompose_fun = decompose_quant Lambda
+
+(*------------------------------------------------------------------*)
 (** Substitutions *)
 
 type esubst = ESubst of term * term 
@@ -1058,7 +1062,7 @@ let tmap (func : term -> term) (t : term) : term =
 
   | Fun (f,fty) -> Fun (f, fty)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
-  | App (t, l)  -> mk_app (func t) (List.map func l)
+  | App (t, l)  -> mk_app_ns (func t) (List.map func l)
 
   | Tuple ts -> Tuple (List.map func ts)
   | Proj (i,t) -> Proj (i, func t)
@@ -1204,7 +1208,7 @@ let rec subst (s : subst) (t : term) : term =
       | Int _ | String _ -> t
       | Fun (fs, fty) -> Fun (fs, fty)
 
-      | App (t, l) -> mk_app (subst s t) (List.map (subst s) l)
+      | App (t, l) -> mk_app_ns (subst s t) (List.map (subst s) l)
 
       | Name (symb,l) ->
         Name (symb, List.map (subst s) l)
@@ -1916,6 +1920,34 @@ let mk_quant ?(simpl=false) q l f =
 let mk_seq    ?simpl = mk_quant ?simpl Seq
 let mk_lambda ?simpl = mk_quant ?simpl Lambda
 
+
+let take_max_common_prefix
+    (l1 : 'a list) (l2 : 'b list) : ('a * 'b) list * 'a list * 'b list 
+  =
+  let rec doit acc l1 l2 =
+    match l1, l2 with
+    | [], _ | _, [] -> acc, l1, l2
+    | x1 :: l1, x2 :: l2 -> doit ((x1,x2) :: acc) l1 l2
+  in 
+  doit [] l1 l2
+
+(*------------------------------------------------------------------*)                              
+let mk_app  ?(simpl=false) t args =
+  if simpl then
+    match t with
+    | Quant (Lambda, vars, t0) ->
+      let to_subst, vars', args' = take_max_common_prefix vars args in
+      (* The substitution must be built reversed w.r.t. vars, to handle capture. *)
+      let s = 
+        List.rev_map (fun (var,arg) -> ESubst (mk_var var, arg)) to_subst
+      in
+      let t0 = subst s t0 in
+
+      mk_app_ns (mk_lambda vars' t0) args'
+
+    | _ -> mk_app_ns t args
+  else mk_app_ns t args
+
 (*------------------------------------------------------------------*)
 module Smart = struct
   include SmartConstructors
@@ -2167,7 +2199,7 @@ let make_normal_biterm_pair
 
       | App (f, l), App (f', l') when List.length l = List.length l' ->
         check_reduced ();
-        mk_app (mdiff s f f') (List.map2 (mdiff s) l l')
+        mk_app_ns (mdiff s f f') (List.map2 (mdiff s) l l')
 
       | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
         check_alpha s l l';

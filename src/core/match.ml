@@ -2103,22 +2103,42 @@ type known_sets = (term_head * known_set list) list
 
 
 (*------------------------------------------------------------------*)
-let pp_known_set fmt (known : known_set) =
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
-    Term.pp known.term
-    Vars.pp_typed_tagged_list known.vars
-    Term.pp known.cond
+let _pp_known_set ppe fmt (known : known_set) =
+  let _, vars, s = (* rename quantified vars. to avoid name clashes *)
+    let fv_b =
+      List.fold_left
+        ((^~) (fst_map Sv.remove))
+        (Sv.union (Term.fv known.term) (Term.fv known.cond))
+        known.vars
+    in
+    add_vars_simpl_env (Vars.of_set fv_b) (List.map fst known.vars)
+  in
+  let vars = List.map2 (fun v (_,tag) -> v,tag)vars known.vars in
+  let term,cond = Term.subst s known.term, Term.subst s known.cond in
 
-let pp_known_sets fmt (ks : known_sets) =
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
+    (Term._pp ppe) term
+    Vars.pp_typed_tagged_list vars
+    (Term._pp ppe) cond
+
+let[@warning "-32"] pp_known_set     = _pp_known_set (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_known_set_dbg = _pp_known_set (default_ppe ~dbg:true ())
+
+(*------------------------------------------------------------------*)
+let _pp_known_sets ppe fmt (ks : known_sets) =
   Fmt.pf fmt "@[<v>";
   List.iter (fun (head, k_l) ->
       Fmt.pf fmt "head: %a@;@[<v>%a@]"
         pp_term_head head
-        (Fmt.list ~sep:Fmt.cut pp_known_set) k_l;
+        (Fmt.list ~sep:Fmt.cut (_pp_known_set ppe)) k_l;
       Fmt.cut fmt ();
     ) ks;
   Fmt.pf fmt "@]"
 
+let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
+
+(*------------------------------------------------------------------*)
 let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
   (* get [k.term] head symbol if the system kind allows it *)
   let term = 
@@ -2146,43 +2166,80 @@ let known_set_of_term (se : SE.t) (term : Term.term) : known_set =
     cond = Term.mk_true;
     se; }
 
-(** Special treatment of `frame`, to account for the fact
-    that it contains all its prefix frame and exec, and inputs.
-    Remark: this is correct even if [ts] does not happens. Indeed, in that case,
-    the condition [ts' ≤ ts] is never satisfied. *)
-let known_set_add_frame (k : known_set) : known_set list =
-  match k.term with
-  | Term.Macro (ms, l, ts) when ms = Term.Classic.frame ->
-    assert (l = []);
-    let tv' = Vars.make_fresh Type.ttimestamp "t" in
-    let ts' = Term.mk_var tv' in
-    (* We need [adv], as knowing [frame@t] implies that we known
-       [input@t'] for any [t' <= t] that can be computed.
-       Furthermore, this implies that we known [t]. *)
-    let vars = (tv', Vars.Tag.make ~const:false ~adv:true Vars.Global) :: k.vars in
+(** Apply the user deduction rules to [k].
+    Do it only once: we do not try to reach a fixpoint.
+    (We could do a fixpoint computation, with proper entailment pruning.) *)
+let apply_user_deduction_rules 
+    (env : Env.t) (k : known_set) : known_set list 
+  =
+  let table = env.table in
+  let deduction_rules = Hint.get_deduce_db table in
 
-    let term_frame  = Term.mk_macro Term.Classic.frame [] ts' in
-    let term_exec   = Term.mk_macro Term.Classic.exec  [] ts' in
-    let term_input  = Term.mk_macro Term.Classic.inp   [] ts' in
-    let term_output = Term.mk_macro Term.Classic.out   [] ts' in
+  List.filter_map (fun (hint : Hint.deduce_hint) ->
+      let rule = hint.cnt in
+      (* Refresh [rules.args]. 
+         To avoid unecessary computations, we refresh [rules.vars] 
+         only if the matching succeeds. *)
+      let args, subst = Term.refresh_vars rule.args in
+      let left, right, cond =
+        Term.subst subst rule.left,
+        Term.subst subst rule.right,
+        Term.subst subst rule.cond
+      in
 
-    let mk_and = Term.mk_and ~simpl:true in
+      let ienv = Infer.mk_env () in
+      let pat = Term.{
+        pat_term   = left;
+        pat_params = rule.params;
+        pat_vars   = Vars.Tag.local_vars args;
+        (* variables are local in deduction rules *)
+      } in
+      let gsubst, pat = Pattern.open_pat_k Equiv.Local_t ienv pat in
+      let rule_system = SE.gsubst gsubst rule.system in
 
-    (* FIXME: quantum: add ad hoc handling of quantum execution macros *)
-    { term = term_frame; 
-      vars; se = k.se;
-      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
-    { term = term_exec;
-      vars; se = k.se;
-      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
-    { term = term_output;
-      vars; se = k.se;
-      cond =mk_and ( mk_and (Term.mk_atom `Leq ts' ts)  term_exec) k.cond; }::
-    [{ term = term_input;       (* input is know one step further *)
-       vars; se = k.se;
-       cond = mk_and (Term.mk_atom `Leq (Term.mk_pred ts') ts) k.cond; }]
+      if Infer.unify_se ienv k.se rule_system = `Fail then None else
+        begin
+          let context = SE.{ set = k.se; pair = None; } in 
+          match T.try_match table context k.term pat with
+          | NoMatch _ -> None
+          | Match  mv ->
+            (* substitute type variables in [right] and [left], which we
+               did not do right away to avoid the unecessary
+               computations in case the matching failed. *)
+            let right = Term.gsubst gsubst right in
+            let cond  = Term.gsubst gsubst cond  in
 
-  | _ -> []
+            (* substitute [tsubst] and compute the refreshing
+               substitution for [rule.vars] *)
+            let vars = List.map (Subst.subst_var gsubst) rule.vars in
+            let vars, subst_refresh_vars = Term.refresh_vars vars in
+
+            let subst_match = Mvar.to_subst_locals ~mode:`Match mv in
+
+            let subst = subst_match @ subst_refresh_vars in
+            let right, cond = Term.subst subst right, Term.subst subst cond in
+
+            (* Close the typing environment. I don't think this can be
+               factorized with the other substitutions above. *)
+            match Infer.close env ienv with
+            | Closed gsubst ->
+              let right = Term.gsubst gsubst right in
+              let cond  = Term.gsubst gsubst cond  in
+
+              (* We need [adv], to ensure that we can compute the
+                 arguments *)
+              let vars = Vars.Tag.global_vars ~const:false ~adv:true vars in
+
+              { term = right;
+                vars = vars @ k.vars;
+                se = k.se;
+                cond = Term.mk_and cond k.cond; }
+              |> some 
+
+            | _ -> None
+        end
+    ) deduction_rules
+
 
 (** Give a set of known terms [k], decompose it as a set of set of know 
     termes [k1, ..., kn] such that:
@@ -2222,15 +2279,15 @@ let rec known_set_decompose (k : known_set) : known_set list =
 
   | _ -> [k]
 
-(** Given a term, return some corresponding [known_sets].  *)
-let known_set_list_of_term (se : SE.t) (term : Term.term) : known_set list =
-  let k = known_set_of_term se term in
+(** Given a term on [env.system.set], return some corresponding [known_sets].  *)
+let known_set_list_of_term (env : Env.t) (term : Term.term) : known_set list =
+  let k = known_set_of_term env.system.set term in
   let k_dec = known_set_decompose k in
-  let k_dec_seq = List.concat_map known_set_add_frame k_dec in
+  let k_dec_seq = List.concat_map (apply_user_deduction_rules env) k_dec in
   k_dec @ k_dec_seq
 
-let known_sets_of_terms (se : SE.t) (terms : Term.term list) : known_sets =
-  let ks_l = List.concat_map (known_set_list_of_term se) terms in
+let known_sets_of_terms env (terms : Term.term list) : known_sets =
+  let ks_l = List.concat_map (known_set_list_of_term env) terms in
   List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
 
 (*------------------------------------------------------------------*)
@@ -2891,6 +2948,8 @@ module E = struct
       (env    : Vars.env)
       (init_terms : Term.terms) : msets
     =
+    let ppe = default_ppe ~table () in
+    
     (* Return a list of specialization of [cand] deducible from
        [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
@@ -3052,9 +3111,13 @@ module E = struct
     dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
 
     (* initially known terms *)
-    let init_terms = known_sets_of_terms (system :> SE.t) init_terms in
+    let init_terms = 
+      let context = SE.{ set= (system :> SE.t); pair = None; } in
+      let env = Env.init ~table ~system:context ~vars:env () in
+      known_sets_of_terms env init_terms 
+    in
 
-    dbg "init_terms:@.%a@." pp_known_sets init_terms;
+    dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
 
     deduce_fixpoint init_fixpoint init_terms
 
@@ -3358,10 +3421,11 @@ module E = struct
        TConfig.show_strengthened_hyp st.table then
       (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
 
+    let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
     let pat_terms =
       known_sets_union
         (known_sets_of_mset_l se mset_l)
-        (known_sets_of_terms se pat_terms)
+        (known_sets_of_terms env pat_terms)
     in
     let mv, minfos =
       List.fold_left (fun (mv, minfos) term ->

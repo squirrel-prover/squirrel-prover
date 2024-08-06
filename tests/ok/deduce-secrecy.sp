@@ -1,3 +1,4 @@
+include Core.
 include WeakSecrecy.
 
 system P = null.

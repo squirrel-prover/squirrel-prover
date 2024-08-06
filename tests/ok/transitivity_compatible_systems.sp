@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 
 channel c.
 abstract b : bool.

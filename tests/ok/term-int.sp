@@ -1,4 +1,4 @@
-include Basic.
+include Core.
 include Int.
 open Int.
 

@@ -1,7 +1,7 @@
 module Sv = Vars.Sv
 module C = Concrete
-(*------------------------------------------------------------------*)
 
+(*------------------------------------------------------------------*)
 let open_pat (type a)
     (f_kind : a Equiv.f_kind)
     (ty_env : Infer.env)
@@ -16,6 +16,22 @@ let open_pat (type a)
   ( tsubst,
     Term.{ 
       pat_op_term   = (conclusion, bound);
+      pat_op_params;
+      pat_op_vars   = vars; 
+    } )
+
+let open_pat_k (type a)
+    (f_kind : a Equiv.f_kind)
+    (ty_env : Infer.env)
+    (p      : a Term.pat)
+  : Subst.t * a Term.pat_op
+  =
+  let pat_op_params, tsubst = Infer.open_params ty_env p.pat_params in
+  let pat_op_term = Equiv.Babel.gsubst f_kind tsubst p.pat_term in
+  let vars = List.map (fun (v,t) -> Subst.subst_var tsubst v, t) p.pat_vars in
+  ( tsubst,
+    Term.{ 
+      pat_op_term;
       pat_op_params;
       pat_op_vars   = vars; 
     } )

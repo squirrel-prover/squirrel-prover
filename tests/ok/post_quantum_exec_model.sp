@@ -22,7 +22,7 @@ process P =
 
 system [postquantum] PQ = !_i P.
 
-print system [PQ].
+print system PQ.
 print a.
 print b.
 

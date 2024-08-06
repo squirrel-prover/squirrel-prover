@@ -300,6 +300,9 @@ let rec decompose_funs t =
   | _ -> [], t
 
 (*------------------------------------------------------------------*)
+let decompose_tuple t = match t with Tuple l -> l | _ -> [t]
+
+(*------------------------------------------------------------------*)
 let tuple = function
   | [] -> assert false
   | [t] -> t

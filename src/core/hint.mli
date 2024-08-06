@@ -1,4 +1,7 @@
+open Utils
+
 module SE = SystemExpr
+open Ppenv
 
 (*------------------------------------------------------------------*)
 (** Parametric type for hints *)
@@ -17,14 +20,26 @@ type rewrite_db = rw_hint list Term.Hm.t
 (** {3 Deduction hints } *)
 
 type deduce_info = unit
-type deduce_cnt  = { 
+
+(** For all [ty_vars], we have the rule:
+    [args ⊢ left ▷ (right | ∀ vars : cond) ]
+    where [args] are uniform arguments of the underlying simulator. *)
+type deduce_rule  = { 
   params : Params.t;
-  system : SE.context;
-  form   : Equiv.form; 
+  system : SE.t;
+  args   : Vars.vars;
+  left   : Term.term; 
+  vars   : Vars.vars;
+  right  : Term.term; 
+  cond   : Term.term;
 }
 
-type deduce_hint = (deduce_cnt, deduce_info) hint
+type deduce_hint = (deduce_rule, deduce_info) hint
 type deduce_db   = deduce_hint list
+
+val _pp_deduce_hint    : deduce_hint formatter_p
+val pp_deduce_hint     : deduce_hint formatter
+val pp_deduce_hint_dbg : deduce_hint formatter
 
 (*------------------------------------------------------------------*)
 (** {3 Adding and retrieving hints } *)
@@ -46,5 +61,4 @@ val add_hint_rewrite :
 
 val add_hint_smt : Term.term -> Symbols.table -> Symbols.table
 
-val add_hint_deduce : 
-  Symbols.p_path -> Params.t -> SE.context -> Equiv.form -> Symbols.table -> Symbols.table
+val add_hint_deduce : deduce_hint -> Symbols.table -> Symbols.table
