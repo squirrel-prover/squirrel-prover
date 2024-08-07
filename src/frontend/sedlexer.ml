@@ -87,6 +87,7 @@ let rec token buf =
   | '"' -> QUOTE
   | '<' -> LANGLE
   | '>' -> RANGLE
+  | "<:" -> LANGLECOLON
   | '[' -> LBRACKET
   | ']' -> RBRACKET
   | '{' -> LBRACE
@@ -239,6 +240,7 @@ let rec token buf =
   | "undo" -> !?UNDO
   | "use" -> !?USE
   | "var" -> !?VAR
+  | "weak" -> !?WEAK
   | "where" -> !?WHERE
   | "with" -> !?WITH
   | "XOR" -> !?XOR

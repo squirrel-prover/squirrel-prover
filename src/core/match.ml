@@ -3365,12 +3365,15 @@ module E = struct
 
     | Atom (Reach t), Atom (Reach pat) ->
       (* no need to change the system, we already have the correct context *)
+      let  mv = term_unif t.formula pat.formula st in
       begin
         match t.bound, pat.bound with
-        | None, None ->  term_unif t.formula pat.formula st
+        | None, None -> mv
         | Some e, Some ve ->
-          let  mv = term_unif t.formula pat.formula st
-          in term_unif e ve {st with mv}
+          let system =SE.{ set = (SE.of_list [] :> SE.t); pair = None; }  in
+          (*FIXME:Concrete : Use SE.empty_system*)
+          let st = st_change_context st system in
+          term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
     | Atom (Equiv es), Atom (Equiv pat_es) ->
@@ -3382,7 +3385,11 @@ module E = struct
       begin
         match es.bound, pat_es.bound with
         | None, None -> mv
-        | Some e, Some ve -> term_unif e ve {st with mv}
+        | Some e, Some ve ->
+          let system =SE.{ set = (SE.of_list [] :> SE.t); pair = None; }  in
+          (*FIXME:Concrete : Use SE.empty_system*)
+          let st = st_change_context st system in
+          term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->

@@ -76,7 +76,7 @@ let _pp_bform_conclusion ppe fmt = function
   | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
 let _pp_bform ppe fmt = function
-  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a : %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a <: %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
   | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
 let equal_bform (f : bform) (g : bform) : bool =

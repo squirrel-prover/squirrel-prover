@@ -101,6 +101,7 @@
   "sym"
   "have"
   "ghave"
+  "weak"
   "case"
   "const"
   "adv"
