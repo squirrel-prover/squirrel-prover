@@ -672,7 +672,7 @@ let setup_change_hyps_context
       (* aux function renames the sets in reach atoms *)
       let rec update_glob_aux (f:Equiv.form) : Equiv.form =
         match f with
-        | Atom (Reach a) when set_unchanged ->
+        | Atom (Reach {formula =a ; bound = None}) when set_unchanged ->
            Equiv.mk_reach_atom
              (Term.subst_projs ~project:true (Lazy.force s) a)
         | _ -> Equiv.tmap update_glob_aux f

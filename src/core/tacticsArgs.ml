@@ -147,14 +147,6 @@ type weak_ip =
 
 type weak_arg = weak_ip * apply_in
 
-(*------------------------------------------------------------------*)
-(** {2 Weak tactic arguments} *)
-
-type weak_ip =
-|  Weak_pt   of Theory.pt
-|  Weak_term of Theory.term
-
-type weak_arg = weak_ip * apply_in
 
 (*------------------------------------------------------------------*)
 (** {3 Have tactic arguments} *)

@@ -599,7 +599,7 @@ module Mk (Args : MkArgs) : S with
             ty_vars ty_args;
         end;
       
-      let form = Equiv.Babel.tsubst Equiv.Any_t tsubst lem.formula in
+      let form = Equiv.Babel_statement.tsubst Equiv.Any_s tsubst lem.formula in
       if Equiv.is_local_statement form
       then
         (* a local lemma or axiom is actually a global reachability formula *)
@@ -627,14 +627,11 @@ module Mk (Args : MkArgs) : S with
       let form = 
         match S.conc_kind, form with
         (* we already downgrade it for local sequents *)
-        | Equiv.Local_t, _ -> form
-
+        | Equiv.Local_t, Equiv.GlobalS f -> Equiv.Global f
         (* in global sequent, we use it as a global formula  *)
-        | Equiv.Global_t, Equiv.Local f -> Equiv.Global (Atom (Reach {formula = f; bound = None}))
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-        | Equiv.Global_t, Equiv.Global _ -> form
-          
-        | Equiv.Any_t, _ -> assert false (* impossible *)
+        | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f))
+        | Equiv.Global_t, Equiv.GlobalS f -> Equiv.Global f
+        | _  -> assert false (* impossible *)
       in
 
         `Lemma lem.Goal.name,

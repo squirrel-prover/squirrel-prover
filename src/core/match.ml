@@ -1259,7 +1259,7 @@ let as_action
   =
   TraceHyps.find_map (fun (_x, f) ->
       match f with
-      | LHyp (Global Equiv.(Atom (Reach f)))
+      | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None})))
       | LHyp (Local f) ->
         begin
           match Term.decompose_app f with
@@ -1280,7 +1280,7 @@ let as_action
 let happens (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
   TraceHyps.exists (fun (_x,f) ->
       match f with
-      | LHyp (Global Equiv.(Atom (Reach f)))
+      | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None})))
       | LHyp (Local f) ->
         begin
           match Term.decompose_app f with

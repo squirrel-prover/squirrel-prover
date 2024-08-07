@@ -83,9 +83,9 @@ val pp_dbg : form formatter
 (** Full pretty printer.
     The [context] arguments allows to avoir printing some system expressions
     which are equal [context.set] or [context.pair]. *)
-val _pp : ?context:SE.context -> form formatter_p
+val _pp : ?context:SE.context -> ppenv -> Format.formatter -> form -> unit
 
-val _pp_conclusion : dbg:bool -> ?context:SE.context -> Format.formatter -> form -> unit
+val _pp_conclusion : ?context:SE.context -> ppenv -> Format.formatter -> form -> unit
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
@@ -245,7 +245,7 @@ module Any_statement : sig
 
   val pp     : Format.formatter -> t -> unit
   val pp_dbg : Format.formatter -> t -> unit
-  val _pp    : dbg:bool -> ?context:SE.context -> Format.formatter -> t -> unit
+  val _pp    :  ?context:SE.context -> ppenv -> Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
 

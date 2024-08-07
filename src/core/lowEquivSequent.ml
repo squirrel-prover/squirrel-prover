@@ -107,7 +107,7 @@ let _pp ppe fmt j =
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation fmt (String.make 40 '-') ;
   Fmt.pf fmt "@;%a@]"
-    (Equiv._pp_conclusion ppe ~context:j.env.system) j.conclusion
+    (Equiv._pp_conclusion ~context:j.env.system ppe) j.conclusion
 
 let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
@@ -343,6 +343,7 @@ let to_trace_sequent s =
          assert (Ident.equal id' id);
          trace_s
     ) s trace_s
+    in trace_s
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s =

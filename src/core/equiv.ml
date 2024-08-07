@@ -220,19 +220,19 @@ type atom =
   | Pred of pred_app
     
 
-let _pp_atom_conclusion ?context ppe fmt (l : atom) =
+let _pp_atom_conclusion ppe ?context fmt (l : atom) =
   match l with
   | Equiv e -> _pp_equiv_numbered ppe fmt e
   | Reach f -> _pp_bform_conclusion ppe fmt f
   | Pred p -> _pp_pred_app ?context ppe fmt p
 
 
-let _pp_atom ?context ppe fmt = function
+let _pp_atom ppe ?context fmt = function
   | Equiv e -> _pp_equiv ppe fmt e
   | Reach f ->  Fmt.pf fmt "[%a]" (_pp_bform ppe) f
   | Pred p -> _pp_pred_app ?context ppe fmt p
 
-let pp_atom = _pp_atom ?context:None (default_ppe ~dbg:false ())
+let pp_atom = _pp_atom (default_ppe ~dbg:false ()) ?context:None
 
 (*------------------------------------------------------------------*)
 
@@ -581,7 +581,7 @@ let _pp    = fun ?context ppe -> pp_toplevel ?context ppe _pp_atom
 let pp     = pp_toplevel (default_ppe ~dbg:false ()) ?context:None _pp_atom
 let pp_dbg = pp_toplevel (default_ppe ~dbg:true ()) ?context:None _pp_atom
 
-let _pp_conclusion    = fun ?context ppe -> pp_toplevel ?context ppe _pp_atom_conclusion
+let _pp_conclusion   = fun ?context ppe -> pp_toplevel ?context ppe _pp_atom_conclusion
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
@@ -969,7 +969,6 @@ let _pp_any_form ppe fmt (f : any_form) =
   match f with
   | Global e -> _pp ppe fmt e
   | Local f -> Term._pp ppe fmt f
-  | _ -> assert false
 
 let pp_any_form     = _pp_any_form (default_ppe ~dbg:false ()) 
 let pp_any_form_dbg = _pp_any_form (default_ppe ~dbg:true ())  
@@ -1481,7 +1480,7 @@ type any_statement = GlobalS of form | LocalS of bform
 let pp_any_statement fmt (f : any_statement) =
   match f with
   | GlobalS e -> pp fmt e
-  | LocalS f -> _pp_bform ~dbg:false fmt f
+  | LocalS f -> _pp_bform (default_ppe ~dbg:false ()) fmt f
 
 let any_statement_to_reach (f : any_statement) : bform =
   match f with
@@ -1516,15 +1515,15 @@ module PreAny_statement = struct
   type t = any_statement
 
   let pp fmt = function
-    | LocalS  f -> _pp_bform ~dbg:false fmt f
+    | LocalS  f -> _pp_bform (default_ppe ~dbg:false ()) fmt f
     | GlobalS f ->        pp fmt f
 
-  let _pp ~dbg ?context fmt = function
-    | LocalS  f -> _pp_bform ~dbg          fmt f
-    | GlobalS f ->      _pp  ~dbg ?context fmt f
+  let _pp ?context ppe fmt = function
+    | LocalS  f -> _pp_bform ppe          fmt f
+    | GlobalS f ->      _pp  ppe ?context fmt f
 
   let pp_dbg fmt = function
-    | LocalS  f -> _pp_bform ~dbg:true fmt f
+    | LocalS  f -> _pp_bform (default_ppe ~dbg:true ()) fmt f
     | GlobalS f ->      pp_dbg fmt f
 
   let equal x y = match x,y with
@@ -1632,12 +1631,12 @@ module Babel_statement = struct
     | Any_s    -> PreAny_statement.get_terms
 
   let pp : type a. a s_kind -> Format.formatter -> a -> unit = function
-    | Local_s  -> _pp_bform ~dbg:false
+    | Local_s  -> _pp_bform (default_ppe ~dbg:false ())
     | Global_s -> pp
     | Any_s    -> PreAny_statement.pp
 
   let pp_dbg : type a. a s_kind -> Format.formatter -> a -> unit = function
-    | Local_s  -> _pp_bform ~dbg:true
+    | Local_s  -> _pp_bform (default_ppe ~dbg:true ())
     | Global_s -> pp_dbg
     | Any_s    -> PreAny_statement.pp_dbg
 

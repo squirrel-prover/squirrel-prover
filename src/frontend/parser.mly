@@ -1452,7 +1452,7 @@ _lemma:
 | GLOBAL lemma_head s=global_statement    { s }
 | EQUIV  s=obs_equiv_statement            { s }
 | EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) t=tilde_term?
-    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b)) in
+    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b,t)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 

@@ -6,8 +6,8 @@ module L = Location
 let get_fsymb (p : Symbols.s_path) : Symbols.fname =
   Symbols.Operator.of_s_path p 
 
-let get_btype table (s : string) : Symbols.btype =
-  try Symbols.BType.of_lsymb (L.mk_loc L._dummy s) table with
+let get_btype (s : Symbols.s_path) : Symbols.btype =
+  try Symbols.BType.of_s_path s with
   | Symbols.Error _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -46,7 +46,7 @@ end
 module Real = struct
 
   let check_load table =
-    if not (Symbols.Theory.mem "Real" table) then
+    if not (Symbols.Import.mem_sp ([],"Real") table) then
       Tactics.hard_failure (Failure "theory Real is not loaded")
 
   let get_fsymb table s =
@@ -55,9 +55,8 @@ module Real = struct
 
   let get_btype table s =
     check_load table;
-    get_btype table s
-
-  let real table = Type.TBase (Symbols.to_string (get_btype table "real"))
+    get_btype  ([],s)
+  let real table = Type.TBase ([],Symbols.to_string (get_btype table "real").s)
   let leq table = get_fsymb table "leq"
   let add table = get_fsymb table "addr"
   let minus table = get_fsymb table "minus"

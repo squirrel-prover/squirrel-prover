@@ -86,7 +86,7 @@ let _pp_statement ppe fmt (g : statement) : unit =
       SE.pp_context g.system
       g.name
       pp_tyvars g.ty_vars
-      (Equiv.pp_any_statement ppe) g.formula
+      (Equiv.Any_statement._pp ppe) g.formula
 
 (*------------------------------------------------------------------*)
 

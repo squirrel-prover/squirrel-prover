@@ -175,10 +175,6 @@ val top_npath : npath
 (** Build a path (with hash-consing) *)
 val path : npath -> 'a t -> 'a path
 
-(*------------------------------------------------------------------*)
-(** {2 Symbol tables} *)
-
-val status_of_lsymb : ?group:group -> lsymb -> table -> status
 
 (*------------------------------------------------------------------*)
 (** In addition to their definition data, some more data can be attached

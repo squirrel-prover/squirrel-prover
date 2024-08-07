@@ -573,7 +573,7 @@ let add_hint_rewrite table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
 
   if lem.Goal.formula.bound <> None then
-    Tactics.hard_failure ~loc:(L.loc s)
+    Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "rewrite hints must be asymptotic");
 
   if not (SE.subset table SE.any lem.system.set) then
@@ -586,7 +586,7 @@ let add_hint_smt table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
 
   if lem.Goal.formula.bound <> None then
-    Tactics.hard_failure ~loc:(L.loc s)
+    Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic");
 
   if not (SE.subset table SE.any lem.system.set) then
