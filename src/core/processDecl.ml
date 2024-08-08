@@ -660,7 +660,7 @@ let add_hint_deduce table (s : Symbols.p_path) =
   let h = Hint.{ name; cnt = rule; info = (); } in
 
   let ppe = default_ppe ~table () in
-  Printer.prt `Warning "added deduction hint:@;<1 0>@[%a@]" 
+  Printer.prt `Result "@[<v 2>New deduction hint %a@]" 
     (Hint._pp_deduce_hint ppe) h;
 
   Hint.add_hint_deduce h table

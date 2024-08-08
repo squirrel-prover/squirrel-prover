@@ -18,7 +18,7 @@ let pp_hint
     (pp_info : 'b formatter_p)
     ppe fmt (h : ('a,'b) hint) : unit 
   =
-  Fmt.pf fmt "@[<v 2>%s %a:@,@[%a@]@]" 
+  Fmt.pf fmt "%s %a:@,@[%a@]" 
     h.name (pp_info ppe) h.info
     (pp_cnt ppe) h.cnt
 
