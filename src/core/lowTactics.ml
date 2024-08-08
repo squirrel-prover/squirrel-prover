@@ -2352,7 +2352,9 @@ type form_type =
     let pat_concl, pat_bound = opat.pat_op_term in
     let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
-    let current_bound = oget (*  ~exn:(soft_failure (Failure "Not a concrete goal t")) *) (get_bound s)  in
+    let current_bound =
+      oget_exn ~exn:(soft_failure_arg (Failure "Not a concrete goal t")) (get_bound s)
+    in
     match
       Match.T.try_match ~option ~ty_env ~hyps table ~env system match_bound
         {opat with pat_op_term = current_bound}
