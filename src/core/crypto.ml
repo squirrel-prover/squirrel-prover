@@ -343,7 +343,12 @@ let equal_term_name_eq
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds)  in
   let name_vars = support_subst subst  in
   let known_set = 
-    Match.mk_known_set ~term:term.term ~cond:(Term.mk_ands term.conds) [] (se_pair :> SE.t)
+    Match.{ 
+      term = term.term; 
+      cond = term.conds; 
+      vars = []; 
+      se   = (se_pair :> SE.t); 
+    }
   in
   let unif_state =
     Match.mk_unif_state env.vars env.table system hyps (name_vars)
@@ -439,8 +444,12 @@ let exact_eq_under_cond
   let se_pair =  oget env.system.pair in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
   let known_set = 
-    Match.mk_known_set
-      ~term:known.term ~cond:(Term.mk_ands known.conds) [] (se_pair :> SE.t)
+    Match.{ 
+      term = known.term; 
+      cond = known.conds; 
+      vars = []; 
+      se   = (se_pair :> SE.t); 
+    }
   in
   let system = env.system in
   let conv_state =
@@ -1095,7 +1104,7 @@ module AbstractSet = struct
   let join env hyps (mem1 : mem) (mem2 : mem) : mem =
     List.fold_left (fun mem1 (v, l) -> append env hyps v l mem1) mem1 mem2
 
-  (* FIXEME: convergence is not guaranteed, only soundness *)
+  (* FIXME: convergence is not guaranteed, only soundness *)
   let widening env hyps (old_mem : mem) (new_mem : mem) = 
     join env hyps old_mem new_mem
 
@@ -2453,90 +2462,36 @@ let derecursify_term
   in
   acc, t_init
 
-(*------------------------------------------------------------------*)
-(* TODO: quantum: modify as was done for corresponding function in
-   [Match], and try to factorize *)
-(** Special treatment of `frame`, to account for the fact
-    that it contains all its prefix frame and exec, and inputs.
-    Remark: this is correct even if [ts] does not happens. Indeed, in that case,
-    the condition [ts' ≤ ts] is never satisfied. *)
-let known_set_add_frame _table (k : TSet.t) : TSet.t list =
-  match k.term with
-  | Term.Macro (ms, l, ts) when ms.s_symb = Symbols.Classic.frame ->
-    assert (l = []);
-    let tv' = Vars.make_fresh Type.ttimestamp "t" in
-    let ts' = Term.mk_var tv' in
-
-    let vars = tv' :: k.vars in
-
-    let term_frame  = Term.mk_macro Macros.Classic.frame [] ts' in
-    let term_exec   = Term.mk_macro Macros.Classic.exec  [] ts' in
-    let term_input  = Term.mk_macro Macros.Classic.inp   [] ts' in
-    let term_output = Term.mk_macro Macros.Classic.out   [] ts' in
-
-    let mk_and = Term.mk_and ~simpl:true in
-
-    (* FIXME: quantum: add ad hoc rules (or better, factorize with
-       code in [Match]) *)
-    { term = term_frame;
-      vars;
-      conds = Term.mk_atom `Leq ts' ts :: k.conds; } ::
-    { term = term_exec;
-      vars;
-      conds = Term.mk_atom `Leq ts' ts :: k.conds; } ::
-    { term = term_output;
-      vars;
-      conds = mk_and (Term.mk_atom `Leq ts' ts)  term_exec :: k.conds; }::
-    [{ term = term_input;       (* input is know one step further *)
-       vars;
-       conds = Term.mk_atom `Leq (Term.mk_pred ts') ts :: k.conds; }]
-
-  | _ -> []
-
-(* FIXME factorize with corresponding function in [Match] *)
-(** Give a set of known terms [k], decompose it as a set of set of know 
-    termes [k1, ..., kn] such that:
-    - for all i, [ki] is deducible from [k]
-    - [k] is deducible from [(k1, ..., kn)] *)
-let rec known_set_decompose (k : TSet.t) : TSet.t list =
-  match k.term with
-  (* Exploit the pair symbol injectivity.
-      If [k] is a pair, we can replace [k] by its left and right
-      composants w.l.o.g. *)
-  | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
-    let kl = { k with term = a; }
-    and kr = { k with term = b; } in
-    List.concat_map known_set_decompose (kl :: [kr])
-
-  (* Idem for tuples. *)
-  | Term.Tuple l ->
-    let kl = List.map (fun a -> { k with term = a; } ) l in
-    List.concat_map known_set_decompose kl
-
-  | Quant ((Seq | Lambda), vars, term) ->
-    let vars, s = Term.refresh_vars vars in
-    let term = Term.subst s term in
-    let k = TSet.{
-        term;
-        vars = k.vars @ vars;
-        conds = k.conds; }
-    in
-    known_set_decompose k
-
-  | _ -> [k]
-
-(* FIXME factorize with corresponding function in [Match] *)
-(** Given a term, return some corresponding [known_sets].  *)
-let known_set_strengthen table (k : TSet.t) : TSet.t list =
-  let k_dec = known_set_decompose k in
-  let k_dec_seq = List.concat_map (known_set_add_frame table) k_dec in
-  k_dec @ k_dec_seq
+(** Given a term, return some corresponding [known_sets] using
+    built-in rules + user-given deduction rules *)
+let term_set_strengthen (env : Env.t) (k : TSet.t) : TSet.t list =
+  (* convert [k] from a [TSet.t] to a [Match.term_set] *)
+  let k = Match.{
+      term = k.term; 
+      vars = Vars.Tag.global_vars ~const:false ~adv:true k.vars; 
+      cond = k.conds; 
+      se = env.system.set; } 
+  in
+  let l = Match.term_set_strengthen env k in
+  (* convert back the [Match.term_set] to [TSet.t] *)
+  List.map (fun (k : Match.term_set) ->
+      assert (
+        (* We check that we only use global tags with `const` at
+           `false`, as we will not check that the arguments of the
+           tset are `const` later one. *)
+        List.for_all
+          (fun (_, t) -> t = Vars.Tag.make ~const:false ~adv:true Global) 
+          k.vars
+      );
+      let vars = List.map fst k.vars in
+      TSet.{ term = k.term; vars; conds = k.cond; } 
+    ) l
 
 (* compute a set of known macros from a occurrence of a recursive call *)
-let known_term_of_occ table ~cond (k : rec_call_occ) : TSet.t list =
+let term_set_of_occ env ~cond (k : rec_call_occ) : TSet.t list =
   let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
-  known_set_strengthen table TSet.{ term = body; conds; vars = k.occ_vars; }
+  term_set_strengthen env TSet.{ term = body; conds; vars = k.occ_vars; }
 
 (*------------------------------------------------------------------*)
 (** Notify the user of the bi-deduction subgoals generated. *) 
@@ -2597,7 +2552,7 @@ let derecursify
            [vars] are local, unrestricted, variables. *)
     in
     (* let extra_cond = odflt Term.mk_true form in *)
-    let rec_terms = List.concat_map (known_term_of_occ env.table ~cond:[] ) rec_term_occs in
+    let rec_terms = List.concat_map (term_set_of_occ env ~cond:[] ) rec_term_occs in
     (* remove duplicates *)
     let rec_terms =
       List.fold_left (fun rec_terms t ->
@@ -2871,7 +2826,7 @@ let prove
     match bideduce ~vbs ~dbg query0 init_output with
     | Some s  when s.consts = [] -> s
     (* To ensure well-formness of constraints. 
-       FIXEME : could be improved, to allow randomness that do not break well-formness. *)
+       FIXME : could be improved, to allow randomness that do not break well-formness. *)
     | Some _ -> Tactics.hard_failure ~loc:(game_loc)
         (Failure "failed to bideduce the game to user constraints' arguments: 
                   randomness is not allowed.")

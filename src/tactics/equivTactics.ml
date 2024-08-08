@@ -454,7 +454,6 @@ let rec tautology (f : Equiv.form) (s : ES.t) : bool =
   | Equiv.(Atom (Reach _)) ->
     let s = ES.set_conclusion f s in
     let trace_s = ES.to_trace_sequent s in
-    (* TODO: improve automation by doing more than just constraint solving ? *)
     TraceTactics.constraints trace_s
 
 (** [form_simpl_impl f s] simplifies the formula [f] in [s], by trying to
@@ -976,8 +975,7 @@ let fa_dup (s : ES.t) : ES.t list =
 (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (*------------------------------------------------------------------*)
-(** Deduce. 
-    FIXME: is considered pq-sound, since apply is, but this has not been checked. *)
+(** Deduce. *)
 
 (** Deduce recursively removes all elements of a biframe
     that are deducible from the rest. *)

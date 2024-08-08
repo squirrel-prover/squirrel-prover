@@ -394,10 +394,23 @@ type cond_term
 val mk_cond_term : Term.term -> Term.term -> cond_term 
 
 (*------------------------------------------------------------------*)
-type known_set
+(** Set of terms over some variables of sort index or timestamp,
+    under a condition.
+      [{ term    = t;
+         vars    = vars;
+         cond    = ψ; 
+         se; }]
+    represents the set of terms [\{t | ∀ vars, s.t. ψ \}] taken in system [se]. *)
+type term_set = {
+  term : Term.term;
+  vars : Vars.tagged_vars; 
+  cond : Term.terms;
+  se   : SE.t;                  (* system kind *)
+}
 
-val mk_known_set : 
-  term:Term.term -> cond:Term.term -> Vars.tagged_vars -> SE.t -> known_set
+(** Given a term, return some [known_sets] that can be deduced from it.
+    Use ad hoc built-in rules + user-provided deduction rules. *)
+val term_set_strengthen : Env.t -> term_set -> term_set list
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
@@ -411,7 +424,7 @@ module E : sig
       ?conv:(Term.term -> Term.term -> bool) ->
       ?decompose_ands: (Term.term -> Term.term list) ->
       cond_term ->
-      known_set ->
+      term_set ->
       unif_state -> Mvar.t option
 
   val known_set_check_impl :

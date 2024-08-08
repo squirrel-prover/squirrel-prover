@@ -2080,49 +2080,43 @@ let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
     Term.pp cand.cond
 
 (*------------------------------------------------------------------*)
-(** Set of terms over some variables of sort index or timestamp,
-    under a condition.
-      [{ term    = t;
-         vars    = vars;
-         cond    = ψ; }]
-    represents the set of terms [\{t | ∀ vars, s.t. ψ \}].
-    Invariant: Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible *)
-type known_set = {
+(** Exported, see `.mli`.
+
+    Additional invariant only used in [Match.ml]: 
+    Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible *)
+type term_set = {
   term : Term.term;
-  vars : Vars.tagged_vars;      (* sort index or timestamp *)
-  cond : Term.term;
+  vars : Vars.tagged_vars; 
+  cond : Term.terms;
   se   : SE.t;                  (* system kind *)
 }
 
-
-let mk_known_set ~term ~cond vars se : known_set = { term; vars; cond; se }
-
-(** Association list sorting [known_sets] by the head of the term,
+(*------------------------------------------------------------------*)
+(** Association list sorting [term_sets] by the head of the term,
     in diff-head normal form. *)
-type known_sets = (term_head * known_set list) list
-
+type known_sets = (term_head * term_set list) list
 
 (*------------------------------------------------------------------*)
-let _pp_known_set ppe fmt (known : known_set) =
+let _pp_term_set ppe fmt (ts : term_set) =
   let _, vars, s = (* rename quantified vars. to avoid name clashes *)
     let fv_b =
       List.fold_left
         ((^~) (fst_map Sv.remove))
-        (Sv.union (Term.fv known.term) (Term.fv known.cond))
-        known.vars
+        (Sv.union (Term.fv ts.term) (Term.fvs ts.cond))
+        ts.vars
     in
-    add_vars_simpl_env (Vars.of_set fv_b) (List.map fst known.vars)
+    add_vars_simpl_env (Vars.of_set fv_b) (List.map fst ts.vars)
   in
-  let vars = List.map2 (fun v (_,tag) -> v,tag)vars known.vars in
-  let term,cond = Term.subst s known.term, Term.subst s known.cond in
+  let vars = List.map2 (fun v (_,tag) -> v,tag)vars ts.vars in
+  let term,cond = Term.subst s ts.term, List.map (Term.subst s) ts.cond in
 
   Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
     (Term._pp ppe) term
     Vars.pp_typed_tagged_list vars
-    (Term._pp ppe) cond
+    (Term._pp ppe) (Term.mk_ands cond)
 
-let[@warning "-32"] pp_known_set     = _pp_known_set (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_known_set_dbg = _pp_known_set (default_ppe ~dbg:true ())
+let[@warning "-32"] pp_term_set     = _pp_term_set (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_term_set_dbg = _pp_term_set (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
 let _pp_known_sets ppe fmt (ks : known_sets) =
@@ -2130,7 +2124,7 @@ let _pp_known_sets ppe fmt (ks : known_sets) =
   List.iter (fun (head, k_l) ->
       Fmt.pf fmt "head: %a@;@[<v>%a@]"
         pp_term_head head
-        (Fmt.list ~sep:Fmt.cut (_pp_known_set ppe)) k_l;
+        (Fmt.list ~sep:Fmt.cut (_pp_term_set ppe)) k_l;
       Fmt.cut fmt ();
     ) ks;
   Fmt.pf fmt "@]"
@@ -2139,7 +2133,7 @@ let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false (
 let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
-let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
+let known_sets_add (k : term_set) (ks : known_sets) : known_sets =
   (* get [k.term] head symbol if the system kind allows it *)
   let term = 
     match SE.to_projs_any k.se with
@@ -2160,20 +2154,17 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
     ) s s2
 
 (*------------------------------------------------------------------*)
-let known_set_of_term (se : SE.t) (term : Term.term) : known_set =
+let term_set_of_term (se : SE.t) (term : Term.term) : term_set =
   { term = term;
     vars = [];
-    cond = Term.mk_true;
+    cond = [];
     se; }
 
 (** Apply the user deduction rules to [k].
     Do it only once: we do not try to reach a fixpoint.
     (We could do a fixpoint computation, with proper entailment pruning.) *)
-let apply_user_deduction_rules 
-    (env : Env.t) (k : known_set) : known_set list 
-  =
-  let table = env.table in
-  let deduction_rules = Hint.get_deduce_db table in
+let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
+  let deduction_rules = Hint.get_deduce_db env.table in
 
   List.filter_map (fun (hint : Hint.deduce_hint) ->
       let rule = hint.cnt in
@@ -2200,7 +2191,7 @@ let apply_user_deduction_rules
       if Infer.unify_se ienv k.se rule_system = `Fail then None else
         begin
           let context = SE.{ set = k.se; pair = None; } in 
-          match T.try_match table context k.term pat with
+          match T.try_match env.table context k.term pat with
           | NoMatch _ -> None
           | Match  mv ->
             (* substitute type variables in [right] and [left], which we
@@ -2233,7 +2224,7 @@ let apply_user_deduction_rules
               { term = right;
                 vars = vars @ k.vars;
                 se = k.se;
-                cond = Term.mk_and cond k.cond; }
+                cond = cond :: k.cond; }
               |> some 
 
             | _ -> None
@@ -2245,7 +2236,7 @@ let apply_user_deduction_rules
     termes [k1, ..., kn] such that:
     - for all i, [ki] is deducible from [k]
     - [k] is deducible from [(k1, ..., kn)] *)
-let rec known_set_decompose (k : known_set) : known_set list =
+let rec term_set_decompose (k : term_set) : term_set list =
   (* get [k.term] head symbol if the system kind allows it *)
   let term = 
     match SE.to_projs_any k.se with
@@ -2259,12 +2250,12 @@ let rec known_set_decompose (k : known_set) : known_set list =
   | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
     let kl = { k with term = a; }
     and kr = { k with term = b; } in
-    List.concat_map known_set_decompose (kl :: [kr])
+    List.concat_map term_set_decompose (kl :: [kr])
 
   (* Idem for tuples. *)
   | Term.Tuple l ->
     let kl = List.map (fun a -> { k with term = a; } ) l in
-    List.concat_map known_set_decompose kl
+    List.concat_map term_set_decompose kl
 
   | Quant ((Seq | Lambda), vars, term) ->
     let vars, s = Term.refresh_vars vars in
@@ -2275,19 +2266,23 @@ let rec known_set_decompose (k : known_set) : known_set list =
         vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
         cond = k.cond }
     in
-    known_set_decompose k
+    term_set_decompose k
 
   | _ -> [k]
 
-(** Given a term on [env.system.set], return some corresponding [known_sets].  *)
-let known_set_list_of_term (env : Env.t) (term : Term.term) : known_set list =
-  let k = known_set_of_term env.system.set term in
-  let k_dec = known_set_decompose k in
-  let k_dec_seq = List.concat_map (apply_user_deduction_rules env) k_dec in
-  k_dec @ k_dec_seq
+(** Exported, see `.mli` *)
+let term_set_strengthen (env : Env.t) (k : term_set) : term_set list =
+  let k_decomposed = term_set_decompose k in
+  let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
+  k_decomposed @ k_decomposed'
 
-let known_sets_of_terms env (terms : Term.term list) : known_sets =
-  let ks_l = List.concat_map (known_set_list_of_term env) terms in
+(** Given a term, return some corresponding [known_sets].  *)
+let term_set_list_of_term (env : Env.t) (term : Term.term) : term_set list =
+  let k = term_set_of_term env.system.set term in
+  term_set_strengthen env k
+
+let known_sets_of_terms (env : Env.t) (terms : Term.term list) : known_sets =
+  let ks_l = List.concat_map (term_set_list_of_term env) terms in
   List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
 
 (*------------------------------------------------------------------*)
@@ -2404,21 +2399,21 @@ let pp_msets fmt (msets : msets) =
 (*------------------------------------------------------------------*)
 (** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add
     an additional constraint [t ≤ ts']. *)
-let known_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : known_set =
+let term_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : term_set =
   let t = Vars.make_fresh Type.ttimestamp "t" in
   let term = Term.mk_macro mset.msymb mset.args (Term.mk_var t) in
   let cond =
     let cond_le = match mset.cond_le with
-      | None -> Term.mk_true
+      | None -> []
       | Some cond_le ->
-        Term.mk_atom `Leq (Term.mk_var t) cond_le
+        [Term.mk_atom `Leq (Term.mk_var t) cond_le]
     in
     let extra_cond_le = match extra_cond_le with
-      | None -> Term.mk_true
+      | None -> []
       | Some ts' ->
-        (Term.mk_atom `Lt (Term.mk_var t) ts')
+        [Term.mk_atom `Lt (Term.mk_var t) ts']
     in
-    Term.mk_and ~simpl:true cond_le extra_cond_le
+    cond_le @ extra_cond_le
   in
   { term; se; cond;
     vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices); }
@@ -2427,7 +2422,7 @@ let known_sets_of_mset_l
     ?extra_cond_le (se : SE.t) (msets : MCset.t list) : known_sets 
   =
   List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
-      let new_ks = known_set_of_mset ?extra_cond_le se mset in
+      let new_ks = term_set_of_mset ?extra_cond_le se mset in
       known_sets_add new_ks known_sets
     ) [] msets
 
@@ -2445,20 +2440,19 @@ let pat_of_cand_set
   }
 
 (* return: condition, pattern *)
-let pat_of_known_set (known : known_set) : Term.term * Term.term pat_op =
-  known.cond,
-  {
-    pat_op_term   = known.term;
+let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
+  Term.mk_ands known.cond,
+  { pat_op_term   = known.term;
     pat_op_vars   = known.vars;
     pat_op_params = Params.Open.empty;
   }
 
 (*------------------------------------------------------------------*)
-let refresh_known_set (known : known_set) : known_set =
+let refresh_term_set (known : term_set) : term_set =
   let vars, subst = Term.refresh_vars_w_info known.vars in
   { vars; se = known.se;
     term = Term.subst subst known.term;
-    cond = Term.subst subst known.cond; }
+    cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
 let msets_add (mset : MCset.t) (msets : msets) : msets =
@@ -2772,13 +2766,13 @@ module E = struct
       (table  : Symbols.table)
       (system : SE.fset)
       (cand   : cand_set)
-      (known  : known_set) : cand_set option
+      (known  : term_set) : cand_set option
     =
-    let known = refresh_known_set known in
+    let known = refresh_term_set known in
 
     let mv, c_cond, c_pat = pat_of_cand_set cand in
     let known_cond, e_pat = 
-      pat_of_known_set
+      pat_of_term_set
         { known with vars = Vars.Tag.local_vars (List.map fst known.vars) } 
     in
 
@@ -3176,12 +3170,12 @@ module E = struct
       ?(conv:(Term.term -> Term.term -> bool) option)
       ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
-      (known : known_set)
+      (known : term_set)
       (st    : unif_state) : Mvar.t option
     =
-    let known = refresh_known_set known in
+    let known = refresh_term_set known in
 
-    let known_cond, e_pat = pat_of_known_set known in
+    let known_cond, e_pat = pat_of_term_set known in
     assert (
       Sv.disjoint
         (Sv.of_list (List.map fst known.vars))
@@ -3226,7 +3220,7 @@ module E = struct
       ?(conv:(Term.term -> Term.term -> bool) option)
       ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
-      (known : known_set)
+      (known : term_set)
       (st    : unif_state) : Mvar.t option
     =
     (* FIXME:
