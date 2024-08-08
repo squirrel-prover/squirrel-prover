@@ -398,6 +398,8 @@ let descr_map
   =
   let f = f descr.indices in
   
+  (* TODO: quantum: this should not be Classic.cond, as we may be
+     unrolling the classic or quantum condition *)
   let condition =
     fst descr.condition,
     f Symbols.Classic.cond (snd descr.condition)
@@ -407,6 +409,8 @@ let descr_map
         ss, List.map (f ss) args, f ss t
       ) descr.updates
   in
+  (* TODO: quantum: this should not be Classic.out, as we may be
+     unrolling the classic or quantum output *)
   let output = fst descr.output, f Symbols.Classic.out (snd descr.output) in
 
   let descr = { descr with condition; updates; output;  } in

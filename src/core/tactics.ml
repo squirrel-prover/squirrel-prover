@@ -8,9 +8,7 @@ type lsymb = string L.located
 type ssc_error_c =
   | E_message
   | E_elem
-  | E_indirect of
-      Symbols.action *
-      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
+  | E_indirect of Symbols.action * Symbols.macro
 
 type ssc_error = Term.term * ssc_error_c
 
@@ -18,12 +16,7 @@ let pp_ssc_error fmt (t, e) =
   let pp_ssc_error_c fmt = function
   | E_message -> Fmt.pf fmt "message"
   | E_elem    -> Fmt.pf fmt "frame element"
-  | E_indirect (a, case) ->
-    match case with
-    | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp_path a
-    | `Output    -> Fmt.pf fmt "%a output" Symbols.pp_path a
-    | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp_path a Symbols.pp_path st
-    | `Global m  -> Fmt.pf fmt "%a, global: %a" Symbols.pp_path a Symbols.pp_path m
+  | E_indirect (a, m) -> Fmt.pf fmt "%a (in %a)" Symbols.pp_path a Symbols.pp_path m
   in
   Fmt.pf fmt "%a %a" pp_ssc_error_c e Term.pp t
 

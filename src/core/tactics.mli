@@ -37,9 +37,7 @@ type lsymb = string L.located
 type ssc_error_c =
   | E_message
   | E_elem
-  | E_indirect of
-      Symbols.action *
-      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
+  | E_indirect of Symbols.action * Symbols.macro
 
 type ssc_error = Term.term * ssc_error_c
 

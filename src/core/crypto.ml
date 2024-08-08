@@ -2454,7 +2454,8 @@ let derecursify_term
   acc, t_init
 
 (*------------------------------------------------------------------*)
-(* FIXME factorize with corresponding function in [Match] *)
+(* TODO: quantum: modify as was done for corresponding function in
+   [Match], and try to factorize *)
 (** Special treatment of `frame`, to account for the fact
     that it contains all its prefix frame and exec, and inputs.
     Remark: this is correct even if [ts] does not happens. Indeed, in that case,

@@ -939,6 +939,8 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule. *)
+(* This was purposely not adapted to support alternative execution
+   models (such as `Quantum`), as this tactic is deprecated. *)
 let exec (Args.Message (a,_)) s =
   let _,var = Vars.make `Approx (TS.vars s) Type.ttimestamp "t" TS.var_info in
   let formula =

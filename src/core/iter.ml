@@ -613,6 +613,7 @@ let fold_descr
     (descr  : Action.descr)
     (init   : 'a) : 'a
   =
+  (* TODO: quantum: update *)
   let mval =
     func Symbols.Classic.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
     func Symbols.Classic.cond descr.indices ~args:[] ~body:(snd descr.condition) 
@@ -996,6 +997,7 @@ let macro_support
     SE.fold_descrs (fun d l -> d.name :: l) cntxt.table cntxt.system []
   in
 
+  (* TODO: quantum: update *)
   let do1 (sm : MsetAbs.t) : MsetAbs.t =
     (* special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)

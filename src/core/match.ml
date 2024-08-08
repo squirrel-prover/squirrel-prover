@@ -2708,6 +2708,7 @@ module E = struct
     let exception Fail in
     let timeout = TConfig.solver_timeout table in
     match cond with
+    (* TODO: quantum: have a way of doing this for other execution model *)
     | Term.Macro (ms', _ ,ts') when ms'.s_symb = Symbols.Classic.exec ->
       let find_greater_exec hyp = match hyp with
         | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.exec ->
@@ -3073,6 +3074,7 @@ module E = struct
        frame. If there is no such timestamp, we have no constraints. *)
     let cond_le =
       List.find_map (function
+          (* TODO: quantum: update or remove the `apply ~inductive` function altogether *)
           | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.frame -> Some ts
           | _ -> None
         ) init_terms

@@ -56,16 +56,8 @@ class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n =
 end
 
 (*------------------------------------------------------------------*)
-let err_msg_of_msymb table a (ms : Symbols.macro) : Tactics.ssc_error_c =
-  let k = 
-    match Symbols.get_macro_data ms table with
-    | _ when ms = Symbols.Classic.out  -> `Output
-    | _ when ms = Symbols.Classic.cond -> `Cond
-    | Symbols.Global _ -> `Global ms
-    | Symbols.State _  -> `Update ms
-    | _ -> assert false
-  in
-  Tactics.E_indirect (a,k)
+let err_msg_of_msymb a (ms : Symbols.macro) : Tactics.ssc_error_c =
+  Tactics.E_indirect (a,ms)
 
 (*------------------------------------------------------------------*) 
 (** Check the key syntactic side-condition in the given list of messages
@@ -95,7 +87,7 @@ let key_ssc
         let name = descr.name in
         Iter.fold_descr ~globals (fun ms _a_is ~args ~body acc ->
             let _ = args in
-            let err_msg = err_msg_of_msymb cntxt.table name ms in
+            let err_msg = err_msg_of_msymb name ms in
             match check err_msg body with
             | None -> acc
             | Some x -> x :: acc
