@@ -1,8 +1,10 @@
-(* `Deduction` *)
+(* `Deduction`
+   `'a` and `'b` must be order 0 or 1 types. *)
 predicate ( |> ) ['a 'b] {set : system} {set: (u : 'a, m : 'b)} =
-  Exists (f : _[adv]), [f u = m].
+  Exists (f : 'a -> 'b[adv]), [f u = m].
 
 (* `Deduction`, version with an argument to `u` and `m` 
-   handled uniformly by `f`  *)
+   handled uniformly by `f`.
+   `'b` and `'c` must be order 0 or 1 types. *)
 predicate ( |1> ) ['a 'b 'c] {set : system} {set: (u : 'a -> 'b, m : 'a -> 'c)} =
-  Exists (f : _[adv]), [forall (x : 'a), f (u x) = m x].
+  Exists (f : 'b -> 'c[adv]), [forall (x : 'a), f (u x) = m x].
