@@ -1798,7 +1798,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     (* open an type unification environment *)
     let ienv = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.conc_kind ienv pat in
+    let tsubst, opat = Pattern.open_bnd_pat S.conc_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let opat =  {opat with pat_op_term = pat_concl} in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
@@ -1955,7 +1955,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = S.env s in
     (* open an type unification environment *)
     let ienv = Infer.mk_env () in
-    let tsubst, pat = Pattern.open_pat S.hyp_kind ienv pat in
+    let tsubst, pat = Pattern.open_bnd_pat S.hyp_kind ienv pat in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let formula, bound = pat.pat_op_term in
     let pat, _ =
@@ -2426,7 +2426,7 @@ type form_type =
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)
     let ienv = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.hyp_kind ienv pat in
+    let tsubst, opat = Pattern.open_bnd_pat S.hyp_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
@@ -2474,7 +2474,7 @@ type form_type =
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)
     let ienv = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.hyp_kind ienv pat in
+    let tsubst, opat = Pattern.open_bnd_pat S.hyp_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in

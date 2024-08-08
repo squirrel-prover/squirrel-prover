@@ -2194,7 +2194,7 @@ let apply_user_deduction_rules
         pat_vars   = Vars.Tag.local_vars args;
         (* variables are local in deduction rules *)
       } in
-      let gsubst, pat = Pattern.open_pat_k Equiv.Local_t ienv pat in
+      let gsubst, pat = Pattern.open_pat Equiv.Local_t ienv pat in
       let rule_system = SE.gsubst gsubst rule.system in
 
       if Infer.unify_se ienv k.se rule_system = `Fail then None else
