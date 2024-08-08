@@ -146,7 +146,7 @@ let make_obs_equiv ?(enrich=[]) table system =
   let vars,ts =
     Vars.make `Approx Vars.empty_env Type.ttimestamp "t" ts_tag
   in
-  let term = Term.mk_macro Term.Classic.frame [] (Term.mk_var ts) in
+  let term = Term.mk_macro Macros.Classic.frame [] (Term.mk_var ts) in
 
   let goal = Equiv.(Atom (Equiv {terms = (term :: enrich); bound = None})) in
 

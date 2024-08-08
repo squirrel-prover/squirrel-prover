@@ -50,7 +50,7 @@ val as_general_macro : Symbols.data -> general_macro_data
 (** {2 Execution models} *)
 
 (** An execution model *)
-type exec_model = Classical | PostQuantum
+type exec_model = Classic | PostQuantum
 
 (** The definition of an execution model *)    
 type exec_model_def = {
@@ -194,6 +194,28 @@ val smallest_prefix :
   'a Action.t -> 'b Action.t -> 'b Action.t 
 
 (*------------------------------------------------------------------*)
+(** {3 Execution model macros } *)
+
+module Classic : sig
+  val inp   : Term.msymb
+  val out   : Term.msymb
+  val frame : Term.msymb
+  val cond  : Term.msymb
+  val exec  : Term.msymb
+end
+
+module Quantum : sig
+  val inp   : Term.msymb
+  val out   : Term.msymb
+  val frame : Term.msymb
+  val cond  : Term.msymb
+  val exec  : Term.msymb
+  val state : Term.msymb
+end
+
+(*------------------------------------------------------------------*)
+(** {3 Pretty-printers } *)
+
 val _pp    : global_data formatter_p
 val pp     : global_data formatter
 val pp_dbg : global_data formatter

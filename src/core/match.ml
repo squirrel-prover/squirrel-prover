@@ -2708,9 +2708,9 @@ module E = struct
     let exception Fail in
     let timeout = TConfig.solver_timeout table in
     match cond with
-    | Term.Macro (ms', _ ,ts') when ms' = Term.Classic.exec ->
+    | Term.Macro (ms', _ ,ts') when ms'.s_symb = Symbols.Classic.exec ->
       let find_greater_exec hyp = match hyp with
-        | Term.Macro (ms, _, ts) when ms = Term.Classic.exec ->
+        | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.exec ->
           begin
             let term_impl = Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
             in
@@ -3073,7 +3073,7 @@ module E = struct
        frame. If there is no such timestamp, we have no constraints. *)
     let cond_le =
       List.find_map (function
-          | Term.Macro (ms, _, ts) when ms = Term.Classic.frame -> Some ts
+          | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.frame -> Some ts
           | _ -> None
         ) init_terms
     in

@@ -33,7 +33,7 @@ axiom [any] get_leq_no_happens' t t' :
   get_leq (frame@t) t' = zero.
 
 (* restate and prove the [Deduce.frame_leq] axiom. *)
-global lemma [set:any; equiv:Empty] frame_leq_bis : 
+global lemma frame_leq_bis {P:system} @set:P : 
   $((fun t => frame@t) |1> 
     (fun t t' => if t' <= t then frame@t')).
 Proof.

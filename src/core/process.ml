@@ -1318,8 +1318,8 @@ let process_system_decl
 
   let input_macro = 
     match exec_model with
-    | Macros.Classical   -> Term.Classic.inp
-    | Macros.PostQuantum -> Term.Quantum.inp
+    | Macros.Classic     -> Macros.Classic.inp 
+    | Macros.PostQuantum -> Macros.Quantum.inp 
   in
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =

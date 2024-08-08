@@ -890,24 +890,24 @@ let is_dup
   direct_match ||
   begin
     match elem with
-    | Macro (im,[],t) when im = Term.Classic.inp ->
+    | Macro (im,[],t) when im.s_symb = Symbols.Classic.inp ->
       List.exists (function
-          | Term.Macro (fm,[],t') when fm = Term.Classic.frame ->
+          | Term.Macro (fm,[],t') when fm.s_symb = Symbols.Classic.frame ->
             is_dup_leq (Term.mk_pred t) t'
           | _ -> false
         ) elems
 
-    | Macro (em,[],t) when em = Term.Classic.frame ->
+    | Macro (em,[],t) when em.s_symb = Symbols.Classic.frame ->
       List.exists (function
           | Term.Macro (fm,[],t')
-            when fm = Term.Classic.frame -> is_dup_leq t t'
+            when fm.s_symb = Symbols.Classic.frame -> is_dup_leq t t'
           | _ -> false
         ) elems
 
-    | Macro (em,[],t) when em = Term.Classic.exec ->
+    | Macro (em,[],t) when em.s_symb = Symbols.Classic.exec ->
       List.exists (function
           | Term.Macro (fm,[],t')
-            when fm = Term.Classic.frame -> is_dup_leq t t'
+            when fm.s_symb = Symbols.Classic.frame -> is_dup_leq t t'
           | _ -> false
         ) elems
 
@@ -1540,7 +1540,7 @@ let global_diff_eq (s : ES.t) =
               (Equiv.mk_reach_atom 
                  (Term.mk_impls 
                     (List.map Term.mk_happens ts_list
-                     @ List.map (fun t -> Term.mk_macro Term.Classic.exec [] t) ts_list
+                     @ List.map (fun t -> Term.mk_macro Macros.Classic.exec [] t) ts_list
                      @ [cond])
                     (Term.mk_atom `Eq s1 s2))
               ))

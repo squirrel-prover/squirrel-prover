@@ -399,7 +399,7 @@ let declare table decl : Symbols.table * Goal.t list =
     let exec_model = 
       match sdecl.system_option with
       | None 
-      | Some { pl_desc = "classical"   } -> Macros.Classical
+      | Some { pl_desc = "classic"     } -> Macros.Classic
       | Some { pl_desc = "postquantum" } -> Macros.PostQuantum
       | Some l -> error (L.loc l) KDecl (Failure "unknown system option")
     in

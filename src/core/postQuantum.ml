@@ -70,7 +70,7 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
     (* We don't care about input macros. *)
     (* TODO: why? equiv(diff(input@t1, input@t2)) is clearly not syncrhonized *)
-    | Macro (ms,[],_a) when ms = Term.Classic.inp -> (max_ts,ignore_ts)
+    | Macro (ms,[],_a) when ms.s_symb = Symbols.Classic.inp -> (max_ts,ignore_ts)
 
     (* For other macros, we add the ts to the possible max_ts, but we don't
        unfold the macro, as it would only contain smaller timestamps. *)
@@ -123,7 +123,7 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
   method fold_message aux t = match t with
     (* TODO: quantum: new symbol is [fs_qatt] *)
     | App (Fun (sf, _), [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
-      ms = Term.Classic.frame && aux
+      ms.s_symb = Symbols.Classic.frame && aux
     (* we accept att(frame@t) *)
     (* TODO: quantum: new symbol is [fs_qatt] *)
     | App (Fun (sf, _), _) when sf = Symbols.fs_att -> false
@@ -174,13 +174,13 @@ let is_attacker_call_synchronized cntxt models biframe =
     in
     let has_frame_or_input tau =
       let frame_at t =
-        Term.mk_macro Term.Classic.frame [] t
+        Term.mk_macro Macros.Classic.frame [] t
       in
       let frame_at_pred t =
-        Term.mk_macro Term.Classic.frame [] (Term.mk_pred t)
+        Term.mk_macro Macros.Classic.frame [] (Term.mk_pred t)
       in
       let input_at t =
-        Term.mk_macro Term.Classic.inp [] t
+        Term.mk_macro Macros.Classic.inp [] t
       in
       let ok_list =
         [frame_at tau; frame_at_pred tau; input_at tau]

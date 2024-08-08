@@ -32,10 +32,10 @@ print b.
 lemma [PQ] _ i :
   let t = X i in
   happens(t) =>
-  Quantum.frame@t = < Quantum.frame@pred t,
-                 <of_bool (Quantum.exec@t), if Quantum.exec@t then Quantum.output@t>> &&
-  Quantum.state@t = qatt(t, Quantum.frame@pred t, Quantum.state@pred t)#2 &&
-  Quantum.input@t = qatt(t, Quantum.frame@pred t, Quantum.state@pred t)#1 &&
+  Quantum.frame@t = (t, Quantum.state@t, Quantum.exec@t, 
+                     if Quantum.exec@t then Quantum.output@t) &&
+  Quantum.state@t = qatt(Quantum.frame@pred t)#2 &&
+  Quantum.input@t = qatt(Quantum.frame@pred t)#1 &&
   Quantum.exec @t = (Quantum.exec@pred t && Quantum.cond@t).
 Proof.
   intro t H. 
@@ -58,10 +58,9 @@ close Classic.
 lemma [PQ] _ i :
   let t = X i in
   happens(t) =>
-  frame@t = < frame@pred t,
-                 <of_bool (exec@t), if exec@t then output@t>> &&
-  state@t = qatt(t, frame@pred t, state@pred t)#2 &&
-  input@t = qatt(t, frame@pred t, state@pred t)#1 &&
+  frame@t = (t, state@t, exec@t, if exec@t then output@t) &&
+  state@t = qatt(frame@pred t)#2 &&
+  input@t = qatt(frame@pred t)#1 &&
   exec @t = (exec@pred t && cond@t).
 Proof.
   intro t H. 
@@ -112,4 +111,4 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-system [classical] PC = !_i P.
+system [classic] PC = !_i P.

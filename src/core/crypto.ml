@@ -2459,19 +2459,19 @@ let derecursify_term
     that it contains all its prefix frame and exec, and inputs.
     Remark: this is correct even if [ts] does not happens. Indeed, in that case,
     the condition [ts' ≤ ts] is never satisfied. *)
-let known_set_add_frame (k : TSet.t) : TSet.t list =
+let known_set_add_frame _table (k : TSet.t) : TSet.t list =
   match k.term with
-  | Term.Macro (ms, l, ts) when ms = Term.Classic.frame ->
+  | Term.Macro (ms, l, ts) when ms.s_symb = Symbols.Classic.frame ->
     assert (l = []);
     let tv' = Vars.make_fresh Type.ttimestamp "t" in
     let ts' = Term.mk_var tv' in
 
     let vars = tv' :: k.vars in
 
-    let term_frame  = Term.mk_macro ms                [] ts' in
-    let term_exec   = Term.mk_macro Term.Classic.exec [] ts' in
-    let term_input  = Term.mk_macro Term.Classic.inp  [] ts' in
-    let term_output = Term.mk_macro Term.Classic.out  [] ts' in
+    let term_frame  = Term.mk_macro Macros.Classic.frame [] ts' in
+    let term_exec   = Term.mk_macro Macros.Classic.exec  [] ts' in
+    let term_input  = Term.mk_macro Macros.Classic.inp   [] ts' in
+    let term_output = Term.mk_macro Macros.Classic.out   [] ts' in
 
     let mk_and = Term.mk_and ~simpl:true in
 
@@ -2526,16 +2526,16 @@ let rec known_set_decompose (k : TSet.t) : TSet.t list =
 
 (* FIXME factorize with corresponding function in [Match] *)
 (** Given a term, return some corresponding [known_sets].  *)
-let known_set_strengthen (k : TSet.t) : TSet.t list =
+let known_set_strengthen table (k : TSet.t) : TSet.t list =
   let k_dec = known_set_decompose k in
-  let k_dec_seq = List.concat_map known_set_add_frame k_dec in
+  let k_dec_seq = List.concat_map (known_set_add_frame table) k_dec in
   k_dec @ k_dec_seq
 
 (* compute a set of known macros from a occurrence of a recursive call *)
-let known_term_of_occ ~cond (k : rec_call_occ) : TSet.t list =
+let known_term_of_occ table ~cond (k : rec_call_occ) : TSet.t list =
   let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
-  known_set_strengthen TSet.{ term = body; conds; vars = k.occ_vars; }
+  known_set_strengthen table TSet.{ term = body; conds; vars = k.occ_vars; }
 
 (*------------------------------------------------------------------*)
 (** Notify the user of the bi-deduction subgoals generated. *) 
@@ -2596,7 +2596,7 @@ let derecursify
            [vars] are local, unrestricted, variables. *)
     in
     (* let extra_cond = odflt Term.mk_true form in *)
-    let rec_terms = List.concat_map (known_term_of_occ (*~cond:extra_cond*) ~cond:[] ) rec_term_occs in
+    let rec_terms = List.concat_map (known_term_of_occ env.table ~cond:[] ) rec_term_occs in
     (* remove duplicates *)
     let rec_terms =
       List.fold_left (fun rec_terms t ->

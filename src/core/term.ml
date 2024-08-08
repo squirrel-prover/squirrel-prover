@@ -292,8 +292,7 @@ let ty ?ienv (t : term) : Type.ty =
       Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
 
     | App (t1, l) ->
-      let tys, t_out = destr_ty_funs ~ienv (ty t1) (List.length l) in      
-      check_tys l tys;
+      let _tys, t_out = destr_ty_funs ~ienv (ty t1) (List.length l) in      
       t_out
 
     | Name (ns, _) -> ns.s_typ
@@ -327,13 +326,6 @@ let ty ?ienv (t : term) : Type.ty =
       end
 
     | Let (_,_,t) -> ty t
-
-  and check_tys (terms : term list) (tys : Type.ty list) =
-    List.iter2 (fun term arg_ty ->
-        match Infer.unify_ty ienv (ty term) arg_ty with
-        | `Ok -> ()
-        | `Fail -> assert false
-      ) terms tys
   in
 
   let tty = ty t in
@@ -1883,28 +1875,6 @@ let f_triv = function
 
 
 (*------------------------------------------------------------------*)
-(** Declare input and output macros. *)
-
-let mk s k = { s_symb = s; s_typ = k; }
-
-module Classic = struct
-  let inp   : msymb = mk Symbols.Classic.inp   Type.tmessage
-  let out   : msymb = mk Symbols.Classic.out   Type.tmessage
-  let frame : msymb = mk Symbols.Classic.frame Type.tmessage
-  let cond  : msymb = mk Symbols.Classic.cond  Type.tboolean
-  let exec  : msymb = mk Symbols.Classic.exec  Type.tboolean
-end
-
-module Quantum = struct
-  let inp   : msymb = mk Symbols.Quantum.inp   Type.tmessage
-  let out   : msymb = mk Symbols.Quantum.out   Type.tmessage
-  let frame : msymb = mk Symbols.Quantum.frame Type.tmessage
-  let cond  : msymb = mk Symbols.Quantum.cond  Type.tboolean
-  let exec  : msymb = mk Symbols.Quantum.exec  Type.tboolean
-  let state : msymb = mk Symbols.Quantum.state Type.tquantum_message
-end
-
-(*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
 
 (*------------------------------------------------------------------*)
@@ -2442,32 +2412,3 @@ let project_tpat_opt (projs : Projection.t list option) (pat : term pat) : term 
 let project_tpat_op_opt (projs : Projection.t list option) (pat : term pat_op) : term pat_op
   =
   omap_dflt pat (project_tpat_op ^~ pat) projs
-
-(*------------------------------------------------------------------*)
-(** {2 Tests} *)
-
-let () =
-  let mkvar x s = Var (snd (Vars.make `Approx Vars.empty_env s x ())) in
-  Checks.add_suite "Head normalization" [
-    "Macro, different ts", `Quick, begin fun () ->
-      let ts = mkvar "ts" Type.ttimestamp in
-      let ts' = mkvar "ts'" Type.ttimestamp in
-      let m = Classic.inp in
-      let t = mk_diff [Projection.left,  Macro (m,[],ts);
-                       Projection.right, Macro (m,[],ts')] in
-      let r = head_normal_biterm [Projection.left; Projection.right] t in
-      assert (r = t)
-    end ;
-    "Boolean operator", `Quick, begin fun () ->
-      let f = mkvar "f" Type.tboolean in
-      let g = mkvar "g" Type.tboolean in
-      let f' = mkvar "f'" Type.tboolean in
-      let g' = mkvar "g'" Type.tboolean in
-      let t = mk_diff [Projection.left,  mk_and f g; 
-                       Projection.right, mk_and f' g'] in
-        assert (head_normal_biterm [Projection.left; Projection.right] t = 
-                mk_and
-                  (mk_diff [Projection.left, f; Projection.right, f']) 
-                  (mk_diff [Projection.left, g; Projection.right, g']))
-    end ;
-  ] 

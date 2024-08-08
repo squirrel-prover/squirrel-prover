@@ -1471,7 +1471,7 @@ let fs_att = mk_fsymb "att" 1
 let fs_qatt =
   let fty =
     Type.mk_ftype []
-      [Type.tuple [Type.ttimestamp; Type.tmessage; Type.tquantum_message]]
+      [Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tboolean; Type.tmessage; ]]
       (Type.tuple [Type.tmessage; Type.tquantum_message])
   in
   mk_fsymb ~fty "qatt" (-1)

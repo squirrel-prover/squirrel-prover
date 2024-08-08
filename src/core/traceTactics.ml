@@ -946,11 +946,11 @@ let exec (Args.Message (a,_)) s =
       [var]
       (Term.mk_impl
          (Term.mk_timestamp_leq (mk_var var) a)
-         (mk_macro Term.Classic.exec [] (mk_var var)))
+         (mk_macro Macros.Classic.exec [] (mk_var var)))
   in
   [TraceLT.happens_premise s a ;
 
-   TS.set_conclusion (Term.mk_macro Classic.exec [] a) s;
+   TS.set_conclusion (Term.mk_macro Macros.Classic.exec [] a) s;
 
     TS.set_conclusion
       (Term.mk_impl ~simpl:false formula (TS.conclusion s)) s]

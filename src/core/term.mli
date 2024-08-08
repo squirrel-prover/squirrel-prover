@@ -302,24 +302,6 @@ val empty : term
 val init : term
 
 (*------------------------------------------------------------------*)
-module Classic : sig
-  val inp   : msymb
-  val out   : msymb
-  val frame : msymb
-  val cond  : msymb
-  val exec  : msymb
-end
-
-module Quantum : sig
-  val inp   : msymb
-  val out   : msymb
-  val frame : msymb
-  val cond  : msymb
-  val exec  : msymb
-  val state : msymb
-end
-
-(*------------------------------------------------------------------*)
 val f_happens : Symbols.fname
 
 val f_pred : Symbols.fname

@@ -80,24 +80,37 @@ type exec_model_def = {
 (** {3 Builtin execution models} *)
 
 (** An execution model *)
-type exec_model = Classical | PostQuantum
+type exec_model = Classic | PostQuantum
 
 (*------------------------------------------------------------------*)
-module Classical = struct
+module Classic = struct
+
+  let out_ty   = Type.tmessage
+  let cond_ty  = Type.tboolean
+  let inp_ty   = Type.tmessage
+  let frame_ty = Type.tmessage
+  let exec_ty  = Type.tboolean
+
+  let inp   : Term.msymb = Term.mk_symb Symbols.Classic.inp   inp_ty
+  let out   : Term.msymb = Term.mk_symb Symbols.Classic.out   out_ty
+  let frame : Term.msymb = Term.mk_symb Symbols.Classic.frame frame_ty
+  let cond  : Term.msymb = Term.mk_symb Symbols.Classic.cond  cond_ty
+  let exec  : Term.msymb = Term.mk_symb Symbols.Classic.exec  exec_ty
+
   let model _table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts   = Term.mk_var ts_v in
 
     (*------------------------------------------------------------------*)
-    let frame =
+    let frame_data =
       let body =
         Term.mk_pair
-          (Term.mk_macro Term.Classic.frame [] (Term.mk_pred ts))
+          (Term.mk_macro frame [] (Term.mk_pred ts))
           (Term.mk_pair
-             (Term.mk_of_bool (Term.mk_macro Term.Classic.exec [] ts))
+             (Term.mk_of_bool (Term.mk_macro exec [] ts))
              (Term.mk_ite
-                (Term.mk_macro Term.Classic.exec [] ts)
-                (Term.mk_macro Term.Classic.out [] ts)
+                (Term.mk_macro exec [] ts)
+                (Term.mk_macro out [] ts)
                 Term.mk_zero))
       in 
       Structured {
@@ -106,16 +119,16 @@ module Classical = struct
         tinit   = Term.mk_zero;
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tmessage;
+        ty      = frame_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let input =
+    let input_data =
       let body =
         Term.mk_fun0
           Symbols.fs_att { fty = Symbols.ftype_builtin Symbols.fs_att; ty_args = [] }
-          [Term.mk_macro Term.Classic.frame [] (Term.mk_pred ts)]
+          [Term.mk_macro frame [] (Term.mk_pred ts)]
       in 
       Structured {
         name    = Symbols.Classic.inp;
@@ -123,16 +136,16 @@ module Classical = struct
         tinit   = Term.empty;
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tmessage;
+        ty      = inp_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let exec =
+    let exec_data =
       let body =
         Term.mk_and
-          (Term.mk_macro Term.Classic.exec [] (Term.mk_pred ts))
-          (Term.mk_macro Term.Classic.cond [] ts)
+          (Term.mk_macro exec [] (Term.mk_pred ts))
+          (Term.mk_macro cond [] ts)
       in 
       Structured {
         name    = Symbols.Classic.exec;
@@ -140,13 +153,13 @@ module Classical = struct
         tinit   = Term.mk_true;
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tboolean;
+        ty      = exec_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let output = ProtocolMacro `Output in
-    let cond   = ProtocolMacro `Cond   in
+    let output_data = ProtocolMacro `Output in
+    let cond_data   = ProtocolMacro `Cond   in
 
     (*------------------------------------------------------------------*)
     {
@@ -155,16 +168,31 @@ module Classical = struct
       input_name  = Symbols.Classic.inp;
       output_name = Symbols.Classic.out;
       cond_name   = Symbols.Classic.cond;
-      macros      = [Symbols.Classic.frame, frame ;
-                     Symbols.Classic.inp  , input ;
-                     Symbols.Classic.exec , exec  ;
-                     Symbols.Classic.out  , output;
-                     Symbols.Classic.cond , cond  ; ];
+      macros      = [Symbols.Classic.frame, frame_data ;
+                     Symbols.Classic.inp  , input_data ;
+                     Symbols.Classic.exec , exec_data  ;
+                     Symbols.Classic.out  , output_data;
+                     Symbols.Classic.cond , cond_data  ; ];
     } 
-end (* Classical *)
+end (* Classic *)
 
 (*------------------------------------------------------------------*)
-module PostQuantum = struct
+module Quantum = struct
+
+  let out_ty   = Type.tmessage
+  let cond_ty  = Type.tboolean
+  let inp_ty   = Type.tmessage
+  let state_ty = Type.tquantum_message
+  let frame_ty = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tboolean; Type.tmessage]
+  let exec_ty  = Type.tboolean
+
+  let inp   : Term.msymb = Term.mk_symb Symbols.Quantum.inp   inp_ty
+  let out   : Term.msymb = Term.mk_symb Symbols.Quantum.out   out_ty
+  let frame : Term.msymb = Term.mk_symb Symbols.Quantum.frame frame_ty
+  let cond  : Term.msymb = Term.mk_symb Symbols.Quantum.cond  cond_ty
+  let exec  : Term.msymb = Term.mk_symb Symbols.Quantum.exec  exec_ty 
+  let state : Term.msymb = Term.mk_symb Symbols.Quantum.state state_ty
+
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts   = Term.mk_var ts_v in
@@ -172,58 +200,52 @@ module PostQuantum = struct
     let qwitness = Library.Prelude.mk_witness table ~ty_arg:(Type.tquantum_message) in
 
     (*------------------------------------------------------------------*)
-    let frame =
+    let frame_data =
       let body =
-        Term.mk_pair
-          (Term.mk_macro Term.Quantum.frame [] (Term.mk_pred ts))
-          (Term.mk_pair
-             (Term.mk_of_bool (Term.mk_macro Term.Quantum.exec [] ts))
-             (Term.mk_ite
-                (Term.mk_macro Term.Quantum.exec [] ts)
-                (Term.mk_macro Term.Quantum.out [] ts)
-                Term.mk_zero))
+        Term.mk_tuple
+          [ts;
+           Term.mk_macro state [] ts;
+           Term.mk_macro exec  [] ts;
+           (Term.mk_ite
+              (Term.mk_macro exec [] ts)
+              (Term.mk_macro out  [] ts)
+              Term.mk_zero)]
       in 
       Structured {
         name    = Symbols.Quantum.frame;
-        default = Term.empty;
-        tinit   = Term.mk_zero;
+        default = Term.mk_tuple [Term.init; qwitness; Term.mk_false; Term.empty  ];
+        tinit   = Term.mk_tuple [Term.init; qwitness; Term.mk_true ; Term.mk_zero];
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tmessage;
+        ty      = frame_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let state =
+    let state_data =
       let body =
         Term.mk_proj 2 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
-          [ Term.mk_tuple
-              [ ts;
-                Term.mk_macro Term.Quantum.frame [] (Term.mk_pred ts);
-                Term.mk_macro Term.Quantum.state [] (Term.mk_pred ts); ]]
+          [ Term.mk_macro frame [] (Term.mk_pred ts) ]
       in 
       Structured {
-        name    = Symbols.Quantum.inp;
+        name    = Symbols.Quantum.state;
         default = qwitness;
         tinit   = qwitness;
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tquantum_message;
+        ty      = state_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let input =
+    let input_data =
       let body =
         Term.mk_proj 1 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
-          [ Term.mk_tuple
-              [ ts;
-                Term.mk_macro Term.Quantum.frame [] (Term.mk_pred ts);
-                Term.mk_macro Term.Quantum.state [] (Term.mk_pred ts); ]]
+          [ Term.mk_macro frame [] (Term.mk_pred ts) ]
       in 
       Structured {
         name    = Symbols.Quantum.inp;
@@ -231,16 +253,16 @@ module PostQuantum = struct
         tinit   = Term.empty;
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
-        ty      = Type.tmessage;
+        ty      = inp_ty;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let exec =
+    let exec_data =
       let body =
         Term.mk_and
-          (Term.mk_macro Term.Quantum.exec [] (Term.mk_pred ts))
-          (Term.mk_macro Term.Quantum.cond [] ts)
+          (Term.mk_macro exec [] (Term.mk_pred ts))
+          (Term.mk_macro cond [] ts)
       in 
       Structured {
         name    = Symbols.Quantum.exec;
@@ -253,8 +275,8 @@ module PostQuantum = struct
     in
 
     (*------------------------------------------------------------------*)
-    let output = ProtocolMacro `Output in
-    let cond   = ProtocolMacro `Cond   in 
+    let output_data = ProtocolMacro `Output in
+    let cond_data   = ProtocolMacro `Cond   in 
 
   (*------------------------------------------------------------------*)
     {
@@ -263,17 +285,17 @@ module PostQuantum = struct
       input_name  = Symbols.Quantum.inp;
       output_name = Symbols.Quantum.out;
       cond_name   = Symbols.Quantum.cond;
-      macros      = [Symbols.Quantum.frame, frame ;
-                     Symbols.Quantum.inp  , input ;
-                     Symbols.Quantum.exec , exec  ;
-                     Symbols.Quantum.out  , output;
-                     Symbols.Quantum.state, state ;
-                     Symbols.Quantum.cond , cond  ; ];
+      macros      = [Symbols.Quantum.frame, frame_data ;
+                     Symbols.Quantum.inp  , input_data ;
+                     Symbols.Quantum.exec , exec_data  ;
+                     Symbols.Quantum.out  , output_data;
+                     Symbols.Quantum.state, state_data ;
+                     Symbols.Quantum.cond , cond_data  ; ];
     }
 end (* PostQuantum *)
 
   (*------------------------------------------------------------------*)
-let builtin_exec_models table = [Classical.model table; PostQuantum.model table]
+let builtin_exec_models table = [Classic.model table; Quantum.model table]
 
 let define_execution_models table : Symbols.table = 
   List.fold_left (fun table em ->
@@ -572,8 +594,8 @@ let get_def_glob
 
   let input_macro = 
     match data.exec_model with
-    | Classical   -> Term.Classic.inp
-    | PostQuantum -> Term.Quantum.inp
+    | Classic     -> Classic.inp
+    | PostQuantum -> Quantum.inp
   in
 
   let subst,_ =
