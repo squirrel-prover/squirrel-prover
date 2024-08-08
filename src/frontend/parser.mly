@@ -658,9 +658,6 @@ system_modifier:
 | GPRF args=bnds_strict COMMA hash=term
     { Decl.PRF (args, hash) }
 
-| GPRF TIME args=bnds_strict COMMA hash=term
-    { Decl.PRFt (args, hash) }
-
 | REWRITE p=rw_args
     { Decl.Rewrite p }
 

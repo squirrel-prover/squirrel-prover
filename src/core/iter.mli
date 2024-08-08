@@ -149,26 +149,6 @@ type hash_occs = hash_occ list
 val pp_hash_occ : hash_occ formatter
 
 (*------------------------------------------------------------------*)
-(** [deprecated_get_f_messages_ext ~cntxt f k t] collects direct occurrences of
-    [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
-    a name [k].
-    Over-approximation: we try to expand macros, even if they are at a 
-    timestamp that may not happen.
-
-    Deprecated. *)
-val deprecated_get_f_messages_ext :
-  ?drop_head:bool ->
-  ?fun_wrap_key:(Symbols.fname -> bool) option ->
-  ?fv:Vars.vars ->
-  mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
-  SE.arbitrary ->
-  Symbols.table ->
-  Symbols.fname -> 
-  Symbols.name -> 
-  Term.term -> 
-  hash_occs
-
-(*------------------------------------------------------------------*)
 (** {2 Folding over action descriptions} *)
 
 (** Fold over macros defined at a given description.

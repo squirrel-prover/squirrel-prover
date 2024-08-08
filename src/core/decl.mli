@@ -64,7 +64,6 @@ type system_decl = {
 type global_rule =
   | Rename  of Typing.global_formula
   | PRF     of Typing.bnds * Typing.term
-  | PRFt    of Typing.bnds * Typing.term (* gPRF, with time *)
   | CCA     of Typing.bnds * Typing.term
   | Rewrite of TacticsArgs.rw_arg list
 

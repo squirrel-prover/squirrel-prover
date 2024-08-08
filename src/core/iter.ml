@@ -280,14 +280,6 @@ let tfold_occ (type a)
     Term.tfold (func ~fv ~cond) t acc
 
 (*------------------------------------------------------------------*)
-(** Try to unfold a macro.
-    To be used in conjunction with [Match.Pos.map_fold]. *)
-let try_unfold cntxt (m : Term.msymb) ~(args : Term.terms) ~(ts : Term.term) acc =
-  match Macros.get_definition cntxt m ~args ~ts with
-  | `Def t             -> acc, `Map t
-  | `Undef | `MaybeDef -> acc, `Continue
-
-(*------------------------------------------------------------------*)
 (** {2 get_ftype} *)
 
 type mess_occ = Term.term occ
@@ -421,84 +413,6 @@ let pp_hash_occ fmt (x : hash_occ) =
       Fmt.pf fmt "@[&H(%a, &K(%a))@]"
         Term.pp m
         (Fmt.list ~sep:Fmt.sp Term.pp) kis) fmt x
-
-(*------------------------------------------------------------------*)
-(** See `.mli` *)
-let deprecated_get_f_messages_ext
-    ?(drop_head    = true)
-    ?(fun_wrap_key = None)
-    ?(fv    : Vars.vars = [])
-    ~(mode:[`Delta of Constr.trace_cntxt | `NoDelta])
-    (sexpr  : SE.arbitrary)
-    (table  : Symbols.table)
-    (f      : Symbols.fname)
-    (k      : Symbols.name)
-    (t      : Term.term)
-  : hash_occs
-  =
-  let init_fv = fv in
-  
-  let func : hash_occs Pos.f_map_fold = fun
-    (t : Term.term)
-    (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
-    (occs : hash_occs) ->
-    match t with
-      | Term.App (Fun (f',_), [Tuple [m;k']]) as m_full when f' = f ->
-        let occs' =
-          match k' with
-          | Term.Name (s', args') when s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = args', ret_m;
-               occ_vars = init_fv @ (List.rev fv);
-               occ_cond = cond;
-               occ_pos  = Pos.Sp.singleton pos; }]
-          | _ -> []
-        in
-        occs' @ occs, `Continue
-
-      | Term.App (Fun (f',_), [Tuple [m;_r;k']]) as m_full when f' = f ->
-        let occs' =
-          match k', fun_wrap_key with
-          | Term.Name (s', args'), None when s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = args', ret_m;
-               occ_vars = init_fv @ (List.rev fv);
-               occ_cond = cond;
-               occ_pos  = Pos.Sp.singleton pos; }]
-
-          | Term.App (Term.Fun (f', _), [Term.Name (s', args')]), Some is_pk
-            when is_pk f' && s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = args', ret_m;
-               occ_vars = init_fv @ (List.rev fv);
-               occ_cond = cond;
-               occ_pos  = Pos.Sp.singleton pos; }]
-          | _ -> []
-        in
-        occs' @ occs, `Continue
-
-      | Term.Var m when not (Symbols.TyInfo.is_finite table (Vars.ty m)) -> assert false
-      (* TODO: DET: check for ptime_deducible 
-         Note that this should not be a problem when this function is used in global 
-         tactics in [SystemModifiers]. *)
-
-      | Term.Macro (m, l, ts) ->
-        begin
-          match mode with 
-          | `Delta cntxt ->
-            let cntxt = { cntxt with system = SE.to_fset se } in
-            try_unfold cntxt m ~args:l ~ts occs
-          | `NoDelta -> occs, `Continue
-        end
-        
-      | _ -> occs, `Continue
-  in
-
-  let occs, _, _ =
-    Pos.map_fold ~mode:(`TopDown true) func sexpr [] t
-  in
-  occs
-
    
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
