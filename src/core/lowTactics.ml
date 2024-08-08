@@ -2077,6 +2077,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure
         (Failure "induction supports only well-founded types");
 
+    begin
+    match S.conc_kind with
+    | Equiv.Global_t ->
+    if (not tag.const)  then
+      soft_failure
+        (Failure "induction supports only constants variables");
+    | Equiv.Local_t -> ()
+    | _ -> assert false
+    end;
+
     let v' = Vars.refresh v in
     
     let ih =

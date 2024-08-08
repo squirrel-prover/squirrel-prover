@@ -1,5 +1,5 @@
 (* check global induction over timestamps, as it automatically does a 
-   case analysis: deterministic is necessary *)
+   case analysis: const is necessary *)
 
 channel c
 
@@ -21,9 +21,15 @@ Proof.
 Qed.
 
 (* dependent global induction does not automatically do a case analysis, 
-   hence `det` is not necessary *)
+   but `const` is still necessary *)
 global lemma _ (t:timestamp) :
   [t = init] \/ [t = A] \/ Exists (i:index), [t = A1(i)].
 Proof. 
+  checkfail dependent induction t exn Failure.
+Abort.
+
+global lemma _ (t:timestamp[const]) :
+  [t = init] \/ [t = A] \/ Exists (i:index), [t = A1(i)].
+Proof.
   dependent induction t.
 Abort.
