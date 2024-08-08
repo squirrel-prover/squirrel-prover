@@ -552,7 +552,6 @@ module Pos = struct
       let se = system.set in
       let acc, found, t =
         map_fold func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t.formula
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in
       let ti' = Equiv.Atom (Reach {formula = t; bound = None}) in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
@@ -560,7 +559,7 @@ module Pos = struct
 
     | Equiv.Atom (Equiv e) -> 
       let se = (oget system.pair :> SE.t) in
-      let acc, found, l = 
+      let acc, found, l =
         map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e.terms
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in

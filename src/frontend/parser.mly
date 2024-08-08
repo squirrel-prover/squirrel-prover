@@ -28,7 +28,7 @@
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
 %token QUOTE
-%token LANGLE RANGLE LANGLECOLON
+%token LANGLE RANGLE (*LANGLECOLON*)
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
@@ -443,8 +443,9 @@ top_process:
 colon_ty:
 | COLON t=ty { t }
 
-tilde_term:
+(*concrete_term:
 | LANGLECOLON t=term { t }
+*)
 
 (* identifier with '$' allowed at the beginning or end *) 
 %inline alias_name:
@@ -1288,7 +1289,7 @@ tac:
   | l=lloc(WEAK) COLONEQ pt=pt i=apply_in
     { mk_abstract l "weak" [TacticsArgs.Weak (Weak_pt pt,i)] }
 
-  | l=lloc(WEAK) t=term i=apply_in
+  | l=lloc(WEAK) t=tac_term i=apply_in
     { mk_abstract l "weak" [TacticsArgs.Weak (Weak_term t,i)] }
 
 (*------------------------------------------------------------------*)
@@ -1346,8 +1347,8 @@ se_args:
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
-| LBRACKET f=term t=tilde_term? RBRACKET         { Typing.PReach (f,t) }
-| EQUIV LPAREN e=biframe t=tilde_term? RPAREN    { Typing.PEquiv (e,t) }
+| LBRACKET f=term (*t=concrete_term?*) RBRACKET         { Typing.PReach (f,None (*t*)) }
+| EQUIV LPAREN e=biframe (*t=concrete_term?*) RPAREN    { Typing.PEquiv (e,None(*t*)) }
 | LPAREN f=global_formula_i RPAREN { f }
 
 | f=global_formula ARROW f0=global_formula { Typing.PImpl (f,f0) }
@@ -1422,9 +1423,9 @@ statement_name:
 
 local_statement:
 | s=system_annot name=statement_name ty_vars=ty_vars vars=bnds_tagged
-  COLON f=term e=tilde_term?
+  COLON f=term (*e=concrete_term?*)
    { let system = `Local, s in
-     let formula = Goal.Parsed.Local (f,e) in
+     let formula = Goal.Parsed.Local (f,None (*e*)) in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
@@ -1451,8 +1452,8 @@ _lemma:
 |  LOCAL lemma_head s=local_statement     { s }
 | GLOBAL lemma_head s=global_statement    { s }
 | EQUIV  s=obs_equiv_statement            { s }
-| EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) t=tilde_term?
-    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b,t)) in
+| EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) (*t=concrete_term?*)
+    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b,None (*t*))) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
