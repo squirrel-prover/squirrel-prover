@@ -41,8 +41,9 @@ let pp_init ppe fmt = function
     begin
       match TS.bound j with
         | None -> Term._pp ppe fmt (TS.conclusion j)
-        | Some e ->  Fmt.pf fmt "@[%a@; bound : %a@]"
-                       Term.pp (TS.conclusion j) Term.pp e
+        | Some e ->  
+          Fmt.pf fmt "@[%a@; bound : %a@]"
+            (Term._pp ppe) (TS.conclusion j) (Term._pp ppe) e
     end
   | Global j -> ES.pp_init ppe fmt j
 

@@ -86,9 +86,12 @@ let add_lemma
 
 (*------------------------------------------------------------------*)
 let print_all fmt table : unit =
+  let ppe = default_ppe ~table () in
   Symbols.Lemma.iter (fun _ data ->
       let g = as_lemma data in
-      Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any_statement.pp g.stmt.formula
+      Fmt.pf fmt "%s: %a@;" 
+        g.stmt.name
+        (Equiv.Any_statement._pp ppe) g.stmt.formula
     ) table
 
 

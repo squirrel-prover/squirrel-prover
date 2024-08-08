@@ -53,8 +53,7 @@ let fv_equiv e : Sv.t =
     (List.fold_left (fun sv elem ->
       Sv.union sv (Term.fv elem)
     ) Sv.empty e.terms)
-    (Option.value (Option.map Term.fv e.bound)
-    ~default:Sv.empty)
+    (Option.value ~default:Sv.empty (Option.map Term.fv e.bound))
 
 (** Free type variables of an [equiv]. *)
 let ty_fv_equiv e : Type.Fv.t =
@@ -62,8 +61,7 @@ let ty_fv_equiv e : Type.Fv.t =
     (List.fold_left (fun sv elem ->
       Type.Fv.union sv (Term.ty_fv elem)
      ) Type.Fv.empty e.terms)
-    (Option.value (Option.map Term.ty_fv e.bound)
-      ~default:Type.Fv.empty)
+    (Option.value ~default:Type.Fv.empty (Option.map Term.ty_fv e.bound))
 
 (*------------------------------------------------------------------*)
 (** {2 Formula with potential upper bound} *)
@@ -72,12 +70,16 @@ type bform = {formula : Term.term; bound : Term.term option}
 
 (*------------------------------------------------------------------*)
 let _pp_bform_conclusion ppe fmt = function
-  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a@]@;bound : @[%a@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
-  | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
+  | {formula; bound = Some ve} -> 
+    Fmt.pf fmt "@[%a@]@;bound : @[%a@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = None} -> 
+    Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
 let _pp_bform ppe fmt = function
-  | {formula; bound = Some ve} -> Fmt.pf fmt "@[%a <: %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
-  | {formula; bound = None} -> Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
+  | {formula; bound = Some ve} -> 
+    Fmt.pf fmt "@[%a <: %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
+  | {formula; bound = None} -> 
+    Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
 let equal_bform (f : bform) (g : bform) : bool =
   match f.bound, g.bound with
@@ -86,20 +88,26 @@ let equal_bform (f : bform) (g : bform) : bool =
   | _ -> false
 
 let subst_bform (subst : Term.subst) (f : bform) : bform =
-  {formula = Term.subst subst f.formula; bound = Option.map (Term.subst subst) f.bound}
+  { formula = Term.subst subst f.formula; 
+    bound   = Option.map (Term.subst subst) f.bound}
 
 let tsubst_bform (subst : Type.tsubst) (f : bform) : bform =
-  {formula = Term.tsubst subst f.formula; bound = Option.map (Term.tsubst subst) f.bound}
+  { formula = Term.tsubst subst f.formula;
+    bound   = Option.map (Term.tsubst subst) f.bound}
 
 let subst_projs_bform (subst : (Term.proj * Term.proj) list) (f : bform) : bform =
-  {formula = Term.subst_projs subst f.formula; bound = Option.map (Term.subst_projs subst) f.bound}
+  { formula = Term.subst_projs subst f.formula; 
+    bound   = Option.map (Term.subst_projs subst) f.bound}
 
 let proj_bform (subst : Term.proj list) (f : bform) : bform =
-  {formula = Term.project subst f.formula; bound = Option.map (Term.project subst) f.bound}
+  { formula = Term.project subst f.formula; 
+    bound   = Option.map (Term.project subst) f.bound}
 
 (** Free variables of a [formula]. *)
 let fv_bform f : Sv.t =
-  Sv.union (Term.fv f.formula) (Option.value (Option.map Term.fv f.bound) ~default:Sv.empty)
+  Sv.union 
+    (Term.fv f.formula)
+    (Option.value (Option.map Term.fv f.bound) ~default:Sv.empty)
 
 (** Free type variables of a [formula]. *)
 let ty_fv_bform f : Type.Fv.t =
@@ -422,13 +430,13 @@ let subst_projs_atom
   match at with
   | Equiv e ->
     if target = `Equiv
-     then Equiv (subst_projs_equiv s e)
-     else at
-
+    then Equiv (subst_projs_equiv s e)
+    else at
+      
   | Reach f ->
     if target = `Reach
-     then Reach (subst_projs_bform s f)
-     else at
+    then Reach (subst_projs_bform s f)
+    else at
 
   (* FIXME: allow to substitute projections in predicates *)
   (* | Pred { psymb; ty_args; se_args; multi_args; simpl_args } -> *)
@@ -579,7 +587,7 @@ let pp_toplevel ?context ppe pp_atom (fmt : Format.formatter) (f : form) : unit 
 (** Exported *)
 let _pp    = fun ?context ppe -> pp_toplevel ?context ppe _pp_atom
 let pp     = pp_toplevel (default_ppe ~dbg:false ()) ?context:None _pp_atom
-let pp_dbg = pp_toplevel (default_ppe ~dbg:true ()) ?context:None _pp_atom
+let pp_dbg = pp_toplevel (default_ppe ~dbg:true  ()) ?context:None _pp_atom
 
 let _pp_conclusion   = fun ?context ppe -> pp_toplevel ?context ppe _pp_atom_conclusion
 
@@ -680,11 +688,11 @@ module Smart : SmartFO.S with type form = _form = struct
     mk_quant_tagged ?simpl Exists (List.map (fun v -> v, Vars.Tag.gtag) vs)
 
   (*------------------------------------------------------------------*)
-  let mk_eq  ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_eq  ?simpl f1 f2); bound = None})
-  let mk_neq ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_neq ?simpl f1 f2); bound = None})
+  let mk_eq  ?simpl f1 f2 = Atom (Reach {formula = (Term.Smart.mk_eq  ?simpl f1 f2); bound = None})
+  let mk_neq ?simpl f1 f2 = Atom (Reach {formula = (Term.Smart.mk_neq ?simpl f1 f2); bound = None})
   let mk_leq        f1 f2 = Atom (Reach {formula = (Term.Smart.mk_leq f1 f2); bound = None})
   let mk_geq        f1 f2 = Atom (Reach {formula = (Term.Smart.mk_geq f1 f2); bound = None})
-  let mk_lt  ?simpl f1 f2  = Atom (Reach {formula = (Term.Smart.mk_lt  ?simpl f1 f2); bound = None})
+  let mk_lt  ?simpl f1 f2 = Atom (Reach {formula = (Term.Smart.mk_lt  ?simpl f1 f2); bound = None})
   let mk_gt  ?simpl f1 f2 = Atom (Reach {formula = (Term.Smart.mk_gt  ?simpl f1 f2); bound = None})
 
   (*------------------------------------------------------------------*)
@@ -1050,11 +1058,11 @@ module PreAny = struct
     | Global f -> ty_fv f
 
   let get_terms = function
-    | Local f -> [f]
+    | Local f  -> [f]
     | Global f -> get_terms f
 
   let project p = function
-    | Local f -> Local (Term.project p f)
+    | Local f  -> Local  (Term.project p f)
     | Global f -> Global (     project p f)
 end
 
@@ -1104,7 +1112,7 @@ module Babel = struct
     =
     fun kind target s f ->
     match kind with
-    | Local_t  ->                Term.subst_projs s f
+    | Local_t  ->   Term.subst_projs        s f
     | Global_t ->        subst_projs target s f
     | Any_t    -> PreAny.subst_projs target s f
 
@@ -1154,30 +1162,30 @@ module Any = struct
   module Smart : SmartFO.S with type form = any_form = struct
     type form = any_form
 
-    let mk_true  = Local (Term.mk_true)
-    let mk_false = Local (Term.mk_false)
+    let mk_true  = Local Term.mk_true
+    let mk_false = Local Term.mk_false
 
     let mk_not ?simpl f =
       match f with
-        | Local f -> Local (Term.Smart.mk_not ?simpl f)
-        | Global f -> Global (Smart.mk_not ?simpl f)
+        | Local f  -> Local  (Term.Smart.mk_not ?simpl f)
+        | Global f -> Global (     Smart.mk_not ?simpl f)
 
     let mk_and ?simpl f g =
       match f,g with
-        | Local f, Local g -> Local (Term.Smart.mk_and ?simpl f g)
-        | Global f, Global g -> Global (Smart.mk_and ?simpl f g)
+        | Local  f, Local  g -> Local  (Term.Smart.mk_and ?simpl f g)
+        | Global f, Global g -> Global (     Smart.mk_and ?simpl f g)
         | _ -> assert false
 
     let mk_or ?simpl f g =
       match f,g with
-        | Local f, Local g -> Local (Term.Smart.mk_or ?simpl f g)
-        | Global f, Global g -> Global (Smart.mk_or ?simpl f g)
+        | Local  f, Local  g -> Local  (Term.Smart.mk_or ?simpl f g)
+        | Global f, Global g -> Global (     Smart.mk_or ?simpl f g)
         | _ -> assert false
 
     let mk_impl ?simpl f g : any_form =
       match f,g with
-        | Local f, Local g -> Local (Term.Smart.mk_impl ?simpl f g)
-        | Global f, Global g -> Global (Smart.mk_impl ?simpl f g)
+        | Local  f, Local  g -> Local  (Term.Smart.mk_impl ?simpl f g)
+        | Global f, Global g -> Global (     Smart.mk_impl ?simpl f g)
         | _ -> assert false
 
     let mk_ands ?simpl = function
@@ -1218,96 +1226,89 @@ module Any = struct
 
     (*------------------------------------------------------------------*)
     let mk_let ?simpl v t1 = function
-      | Local t2 -> Local (Term.Smart.mk_let ?simpl v t1 t2)
+      | Local  t2 -> Local  (Term.Smart.mk_let ?simpl v t1 t2)
       | Global t2 -> Global (     Smart.mk_let ?simpl v t1 t2)
 
     (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function
-      | Local f -> Local (Term.Smart.mk_forall ?simpl vs f)
+      | Local  f -> Local  (Term.Smart.mk_forall ?simpl vs f)
       | Global f -> Global (     Smart.mk_forall ?simpl vs f)
 
     let mk_exists ?simpl vs = function
-      | Local f -> Local (Term.Smart.mk_exists ?simpl vs f)
+      | Local  f -> Local  (Term.Smart.mk_exists ?simpl vs f)
       | Global f -> Global (     Smart.mk_exists ?simpl vs f)
 
     (*------------------------------------------------------------------*)
     let mk_forall_tagged ?simpl vs = function
-      | Local f -> Local (Term.Smart.mk_forall_tagged ?simpl vs f)
+      | Local  f -> Local  (Term.Smart.mk_forall_tagged ?simpl vs f)
       | Global f -> Global (     Smart.mk_forall_tagged ?simpl vs f)
 
     let mk_exists_tagged ?simpl vs = function
-      | Local f -> Local (Term.Smart.mk_exists_tagged ?simpl vs f)
+      | Local  f -> Local  (Term.Smart.mk_exists_tagged ?simpl vs f)
       | Global f -> Global (     Smart.mk_exists_tagged ?simpl vs f)
 
     (*------------------------------------------------------------------*)
     let destr_forall1 = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall1 f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall1 f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1 f)
 
     let destr_exists1 ?env = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists1      f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists1      f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1 ?env f)
 
     let destr_forall = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall f)
 
     let destr_exists ?env = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists      f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists      f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists ?env f)
 
     (*------------------------------------------------------------------*)
     let destr_forall1_tagged = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall1_tagged f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall1_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1_tagged f)
 
     let destr_exists1_tagged ?env = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists1_tagged      f)
-      | Global f ->
-        omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1_tagged ?env f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists1_tagged      f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1_tagged ?env f)
 
     let destr_forall_tagged = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_forall_tagged f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall_tagged f)
 
     let destr_exists_tagged ?env = function
-      | Local f -> omap (fun (vs,f) -> vs, Local f) (Term.Smart.destr_exists_tagged      f)
-      | Global f ->
-        omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists_tagged ?env f)
+      | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists_tagged      f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists_tagged ?env f)
 
     (*------------------------------------------------------------------*)
     let destr_false = function
-      | Local f -> Term.Smart.destr_false f
+      | Local  f -> Term.Smart.destr_false f
       | Global f ->      Smart.destr_false f
 
     let destr_true = function
-      | Local f -> Term.Smart.destr_true f
+      | Local  f -> Term.Smart.destr_true f
       | Global f ->      Smart.destr_true f
 
     let destr_not = function
-      | Local f -> omap (fun f -> Local f) (Term.Smart.destr_not f)
+      | Local  f -> omap (fun f -> Local  f) (Term.Smart.destr_not f)
       | Global f -> omap (fun f -> Global f) (     Smart.destr_not f)
 
     let destr_and = function
-      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_and f)
-      | Global f ->
-          omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and f)
+      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_and f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and f)
 
     let destr_or ?env = function
-      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_or      f)
-      | Global f ->
-          omap (fun (x,y) -> Global x, Global y) (     Smart.destr_or ?env f)
+      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_or      f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_or ?env f)
 
     let destr_impl ?env = function
-      | Local f ->
-          omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_impl f)
-      | Global f ->
-          omap (fun (x,y) -> Global x, Global y) (Smart.destr_impl ?env f)
+      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_impl      f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_impl ?env f)
 
     let destr_iff =  function
-      | Local f -> omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_iff f)
-      | Global f ->
-          omap (fun (x,y) -> Global x, Global y) (Smart.destr_iff f)
+      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_iff f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_iff f)
 
 
     (*------------------------------------------------------------------*)
@@ -1450,15 +1451,15 @@ module Any = struct
 
     (*------------------------------------------------------------------*)
     let decompose_ands = function
-      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_ands f)
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ands f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ands f)
 
     let decompose_ors = function
-      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_ors f)
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ors f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ors f)
 
     let decompose_impls = function
-      | Local f -> List.map (fun x -> Local x) (Term.Smart.decompose_impls f)
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_impls f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_impls f)
 
     let decompose_impls_last = function
@@ -1477,10 +1478,10 @@ end
 
 type any_statement = GlobalS of form | LocalS of bform
 
-let pp_any_statement fmt (f : any_statement) =
+let pp_any_statement ppe fmt (f : any_statement) =
   match f with
-  | GlobalS e -> pp fmt e
-  | LocalS f -> _pp_bform (default_ppe ~dbg:false ()) fmt f
+  | GlobalS e -> _pp       ppe fmt e
+  | LocalS  f -> _pp_bform ppe fmt f
 
 let any_statement_to_reach (f : any_statement) : bform =
   match f with
@@ -1514,30 +1515,25 @@ module PreAny_statement = struct
 
   type t = any_statement
 
-  let pp fmt = function
-    | LocalS  f -> _pp_bform (default_ppe ~dbg:false ()) fmt f
-    | GlobalS f ->        pp fmt f
-
   let _pp ?context ppe fmt = function
     | LocalS  f -> _pp_bform ppe          fmt f
-    | GlobalS f ->      _pp  ppe ?context fmt f
+    | GlobalS f -> _pp       ppe ?context fmt f
 
-  let pp_dbg fmt = function
-    | LocalS  f -> _pp_bform (default_ppe ~dbg:true ()) fmt f
-    | GlobalS f ->      pp_dbg fmt f
+  let pp     = _pp (default_ppe ~dbg:false ()) 
+  let pp_dbg = _pp (default_ppe ~dbg:true  ()) 
 
   let equal x y = match x,y with
-    | LocalS f, LocalS g  -> equal_bform f g
-    | GlobalS f, GlobalS g ->  equal f g
+    | LocalS  f, LocalS  g -> equal_bform f g
+    | GlobalS f, GlobalS g -> equal       f g
     | _ -> false
 
   let subst s = function
-    | LocalS  f -> LocalS (subst_bform s f)
-    | GlobalS f -> GlobalS (     subst s f)
+    | LocalS  f -> LocalS  (subst_bform s f)
+    | GlobalS f -> GlobalS (      subst s f)
 
   let tsubst s = function
     | LocalS  f -> LocalS  (tsubst_bform s f)
-    | GlobalS f -> GlobalS (     tsubst s f)
+    | GlobalS f -> GlobalS (      tsubst s f)
 
   let subst_projs target s = function
     | LocalS f ->
@@ -1569,36 +1565,36 @@ module Babel_statement = struct
   let convert (type a b) ?loc ~(src:a s_kind) ~(dst:b s_kind) (s : a) : b
     =
     match src,dst with
-      (* Identity cases *)
-      | Local_s,  Local_s  -> s
-      | Global_s, Global_s -> s
-      | Any_s,    Any_s    -> s
+    (* Identity cases *)
+    | Local_s,  Local_s  -> s
+    | Global_s, Global_s -> s
+    | Any_s,    Any_s    -> s
 
-      (* Injections into [any_form] *)
-      | Local_s,  Any_s -> LocalS s
-      | Global_s, Any_s -> GlobalS s
+    (* Injections into [any_form] *)
+    | Local_s,  Any_s -> LocalS s
+    | Global_s, Any_s -> GlobalS s
 
-      (* Inverses of the injections. *)
-      | Any_s, Local_s ->
-        begin match s with
-          | GlobalS (Atom (Reach s)) -> s
-          | LocalS s -> s
-          | _ -> Tactics.soft_failure ?loc CannotConvert
-        end
+    (* Inverses of the injections. *)
+    | Any_s, Local_s ->
+      begin match s with
+        | GlobalS (Atom (Reach s)) -> s
+        | LocalS s -> s
+        | _ -> Tactics.soft_failure ?loc CannotConvert
+      end
 
-      | Any_s, Global_s ->
-        begin match s with
-          | GlobalS f -> f
-          | LocalS f -> Atom (Reach f)
-        end
+    | Any_s, Global_s ->
+      begin match s with
+        | GlobalS f -> f
+        | LocalS f -> Atom (Reach f)
+      end
 
-      (* Conversions between local and global formulas. *)
-      | Local_s,  Global_s -> Atom (Reach s)
-      | Global_s, Local_s  ->
-        begin match s with
-          | Atom (Reach s) -> s
-          | _ -> Tactics.soft_failure ?loc CannotConvert
-        end
+    (* Conversions between local and global formulas. *)
+    | Local_s,  Global_s -> Atom (Reach s)
+    | Global_s, Local_s  ->
+      begin match s with
+        | Atom (Reach s) -> s
+        | _ -> Tactics.soft_failure ?loc CannotConvert
+      end
 
   let subst : type a. a s_kind -> Term.subst -> a -> a = function
     | Local_s  -> subst_bform
@@ -1610,9 +1606,9 @@ module Babel_statement = struct
     =
     fun kind target s f ->
     match kind with
-    | Local_s  ->                subst_projs_bform s f
-    | Global_s ->        subst_projs target s f
-    | Any_s    -> PreAny_statement.subst_projs target s f
+    | Local_s  ->                  subst_projs_bform        s f
+    | Global_s ->                  subst_projs       target s f
+    | Any_s    -> PreAny_statement.subst_projs       target s f
 
   let tsubst : type a. a s_kind -> Type.tsubst -> a -> a = function
     | Local_s  -> tsubst_bform
@@ -1624,21 +1620,21 @@ module Babel_statement = struct
     | Global_s -> fv
     | Any_s    -> PreAny_statement.fv
 
-
   let get_terms : type a. a s_kind -> a -> Term.term list = function
     | Local_s  -> fun f -> f.formula::(Option.to_list f.bound)
     | Global_s -> get_terms
     | Any_s    -> PreAny_statement.get_terms
 
-  let pp : type a. a s_kind -> Format.formatter -> a -> unit = function
-    | Local_s  -> _pp_bform (default_ppe ~dbg:false ())
-    | Global_s -> pp
-    | Any_s    -> PreAny_statement.pp
+  let _pp : type a. a s_kind -> a formatter_p = function
+    | Local_s  ->                  _pp_bform
+    | Global_s ->                  _pp ?context:None
+    | Any_s    -> PreAny_statement._pp ?context:None
 
-  let pp_dbg : type a. a s_kind -> Format.formatter -> a -> unit = function
-    | Local_s  -> _pp_bform (default_ppe ~dbg:true ())
-    | Global_s -> pp_dbg
-    | Any_s    -> PreAny_statement.pp_dbg
+  let pp     : type a. a s_kind -> a formatter = 
+    fun k -> _pp k (default_ppe ~dbg:false ())
+
+  let pp_dbg : type a. a s_kind -> a formatter = 
+    fun k -> _pp k (default_ppe ~dbg:true ())
 
   let project : type a. a s_kind -> Term.proj list -> a -> a = function
     | Local_s  -> proj_bform

@@ -1,8 +1,9 @@
-type bound = Glob | LocAsym | LocHyp | LocConc of Term.term
-  (** [Glob] represent a global hypothesis/lemma
-      [LocAsym] is an local asymptotic proof-term
-      [LocalHyp] is when [form] come from a local hypothesis (in concrete judgement)
-      [LocConc] represent a local concrete lemma*)
+type bound = 
+  | Glob                 (** a global hypothesis/lemma *)
+  | LocAsym              (** a local asymptotic proof-term *)
+  | LocHyp               (** when [form] comes from a local hypothesis (in a concrete judgement) *)
+  | LocConc of Term.term (** a local concrete lemma *)
+
 
 let bound_projs projs = function
   | LocConc t -> LocConc (Term.project projs t)

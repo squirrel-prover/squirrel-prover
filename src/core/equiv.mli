@@ -83,9 +83,10 @@ val pp_dbg : form formatter
 (** Full pretty printer.
     The [context] arguments allows to avoir printing some system expressions
     which are equal [context.set] or [context.pair]. *)
-val _pp : ?context:SE.context -> ppenv -> Format.formatter -> form -> unit
+val _pp : ?context:SE.context -> form formatter_p
 
-val _pp_conclusion : ?context:SE.context -> ppenv -> Format.formatter -> form -> unit
+val _pp_conclusion : ?context:SE.context -> form formatter_p
+
 (*------------------------------------------------------------------*)
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
@@ -225,7 +226,7 @@ val is_reach : form -> bool
 
 type any_statement = GlobalS of form | LocalS of bform
 
-val pp_any_statement : Format.formatter -> any_statement -> unit
+val pp_any_statement : any_statement formatter_p
 
 val is_local_statement : any_statement -> bool
 
@@ -234,18 +235,18 @@ val any_statement_to_equiv : any_statement -> form
 
 (*------------------------------------------------------------------*)
 type _ s_kind =
-  | Local_s  : bform  s_kind
-  | Global_s : form s_kind
-  | Any_s    : any_statement    s_kind
+  | Local_s  : bform         s_kind
+  | Global_s : form          s_kind
+  | Any_s    : any_statement s_kind
 
 val s_kind_equal : 'a s_kind -> 'b s_kind -> bool
 
 module Any_statement : sig
   type t = any_statement
 
-  val pp     : Format.formatter -> t -> unit
-  val pp_dbg : Format.formatter -> t -> unit
-  val _pp    :  ?context:SE.context -> ppenv -> Format.formatter -> t -> unit
+  val pp     :                         t formatter
+  val pp_dbg :                         t formatter
+  val _pp    :  ?context:SE.context -> t formatter_p
 
   val equal : t -> t -> bool
 
@@ -261,10 +262,11 @@ module Any_statement : sig
   val convert_from : 'a s_kind -> 'a -> t
 
   (** Convert [any_form] to any formula kind.
-    * Issue a soft failure (with the provided location, if any)
-    * when the input formula is not of the right kind. *)
+      Issue a soft failure (with the provided location, if any)
+      when the input formula is not of the right kind. *)
   val convert_to : ?loc:Location.t -> 'a s_kind -> t -> 'a
 end
+
 (** Conversions between formula kinds and generic functionalities
     over all formula kinds. *)
 module Babel_statement : sig
@@ -280,8 +282,9 @@ module Babel_statement : sig
 
   val get_terms : 'a s_kind -> 'a -> Term.term list
 
-  val pp     : 'a s_kind -> Format.formatter -> 'a -> unit
-  val pp_dbg : 'a s_kind -> Format.formatter -> 'a -> unit
+  val _pp    : 'a s_kind -> 'a formatter_p
+  val pp     : 'a s_kind -> 'a formatter
+  val pp_dbg : 'a s_kind -> 'a formatter
 
   val project : 'a s_kind -> Term.proj list -> 'a -> 'a
 end
