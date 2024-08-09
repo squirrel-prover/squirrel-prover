@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 type 'a tac_infos = {
   maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
@@ -40,9 +41,13 @@ end = struct
       | Not_found -> Tactics.hard_failure ~loc
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
-  let pp_goal_concl ppf j = match j with
-    | Goal.Local  j -> Term.pp  ppf (LowTraceSequent.conclusion j)
-    | Goal.Global j -> Equiv.pp ppf (LowEquivSequent.conclusion j)
+  let pp_goal_concl fmt j = match j with
+    | Goal.Local  j ->
+      let ppe = default_ppe ~table:(LowTraceSequent.table j) () in
+      Term._pp ppe fmt (LowTraceSequent.conclusion j)
+    | Goal.Global j ->
+      let ppe = default_ppe ~table:(LowEquivSequent.table j) () in
+      Equiv._pp ppe fmt (LowEquivSequent.conclusion j)
 end
 
 (** AST evaluators for general judgments, i.e. [Goal.t]. *)

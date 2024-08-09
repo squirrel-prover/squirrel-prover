@@ -196,7 +196,7 @@ let _pp ppe ppf (process : proc) =
     | Set (s, args, t, p) ->
       pf ppf "@[<hov>%s%a %a@ %a;@]@ %a"
         (Symbols.path_to_string s)
-        (Utils.pp_list Term.pp) args
+        (Utils.pp_list (Term._pp ppe)) args
         (Printer.kws `ProcessKeyword) ":="
         (Term._pp ppe) t
         doit p
@@ -1331,10 +1331,11 @@ let declare_system
     pdecl.time, pdecl.proc
   in
 
+  let ppe = default_ppe ~table () in
   Printer.pr
     "@[<v 2>Typed-check process:@;@;@[%a@]@]@.@."
-    pp p ;
-
+    (_pp ppe) p ;
+  
   (* FIXME: do not use hard coded projections *)
   let projections = [Term.left_proj; Term.right_proj] in
   let system_name = match system_name with
@@ -1367,6 +1368,7 @@ let declare_system
   
   let table = Lemma.add_depends_mutex_lemmas table system_name in
 
-  Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp proc ;
+  let ppe = default_ppe ~table () in
+  Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." (_pp ppe) proc ;
   Printer.pr "%a" System.pp_systems table;
   table

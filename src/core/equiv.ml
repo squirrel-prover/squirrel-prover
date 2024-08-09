@@ -1018,7 +1018,7 @@ module PreAny = struct
 
   let pp fmt = function
     | Local  f -> Term.pp fmt f
-    | Global f ->        pp fmt f
+    | Global f ->      pp fmt f
 
   let _pp ?context ppe fmt = function
     | Local  f -> Term._pp ppe          fmt f
