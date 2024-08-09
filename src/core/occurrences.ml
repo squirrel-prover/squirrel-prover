@@ -854,9 +854,7 @@ struct
           let t = iocc.iocc_cnt in
           let sfv = iocc.iocc_vars in
           let src = iocc.iocc_sources in
-          let a =
-            Term.mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action)
-          in
+          let a = iocc.iocc_rec_arg in
           (* a's free variables should always be in fv \cup env *)
           assert (Vars.Sv.subset
                     (Term.fv a)

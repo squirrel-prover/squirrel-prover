@@ -212,33 +212,38 @@ end
 type allowed_constants = Const | PTimeSI | PTimeNoSI
 
 (*------------------------------------------------------------------*)
-(** An indirect occurrence of a macro term, used as return type of
+(** An indirect occurrence, used as return type of
     [fold_macro_support]. The record:
 
-      [ { iocc_aname = n;
-          iocc_vars = is;
-          iocc_cnt = t;
-          iocc_action = a;
-          iocc_sources = srcs; 
+      [ { iocc_fun       = f;
+          iocc_rec_args  = τ;
+          iocc_vars      = vars;
+          iocc_cnt       = t;
+          iocc_se        = se;
+          iocc_sources   = [(f0,τ0); ...; (fN,τN)]; 
           iocc_path_info = path_cond; } ]
 
-    states that, for all indices [is], [t] is the body of a macro of action [a],
-    and that this macro may appear in the translation of any of the terms in [srcs]
-    in some trace model.
+    states that, for all indices [vars], [t] is the body (taken in
+    system [se]) of a macro that can only be evaluated if
+
+      ∃ [f0,τ0] ∈ [iocc_sources] such that [path_cond (f,τ) (f0,τ0)] 
+
+    (e.g. we could have [path_cond (f,τ) (f0,τ0) = τ < τ0]).
+
     Notes:
-    - [env ∩ is = ∅]
-    - the free index variables of [t] and [a] are included in [env ∪ is]. *)
+    - [vars] are bound by the indirect occurrence. *)
 type iocc = {
-  iocc_aname   : Symbols.action;
-  iocc_action  : Action.action;
+  iocc_fun     : Symbols.macro;
+  iocc_rec_arg : Term.term;
   iocc_vars    : Sv.t;
   iocc_cnt     : Term.term;
-  iocc_sources : Term.term list;
 
+  (* iocc_se      : SE.t; *) (* FIXME: support this *)
+
+  iocc_sources : Term.term list;
+  (* FIXME: replace by a list of (Symbols.macro * Term.term), instead
+     of computing this list in a second time *)
   iocc_path_cond : PathCond.t;
-  (** Path condition on the timestamps [τ] at which the occurrence can occur:
-      for any source timestamp [τ0] (in [iocc_sources]),
-      [path_cond τ τ0] *)
 }
 
 val pp_iocc : iocc formatter
@@ -251,23 +256,9 @@ val pp_iocc : iocc formatter
 
     [List.fold_left func init occs]
 
-    where [occs] is a list of indirect occurrences of type [iocc]
-    that, roughly, "covers" all subterms of any expansion of [terms],
-    in the following sense:
-    
-    TODO: the description below is not completely acurrate, as only
-    indirect occurrences are covered! Also, it is expressed using the
-    old formalism, and need to be updated.
-
-    [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
-
-     - [∃ s₀ ∈ st([occ.iocc_cnt])]
-
-     - [∃ σ : (F_{s₀} ↦ T_I)]
-       a valuation of [s₀]'s free variables, w.r.t. [env], in the trace
-       model index interpretation T_I (i.e [F_{s₀} = fv(s₀) \ [env]]).
-
-     such that [s ≡ (s₀)^{Tσ}]. *)
+    where [occs] is a list of indirect occurrences covering all
+    possible cases of recursively defined function bodies that may be
+    evaluated during the evaluation of [terms]. *)
 val fold_macro_support :
   ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (iocc -> 'a -> 'a) ->

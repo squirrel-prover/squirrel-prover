@@ -2585,9 +2585,7 @@ let derecursify
   (* indirect bi-deduction goals for recursive calls *)
   let recursive : (goal*Term.term) list =
     Iter.fold_macro_support ~mode:Iter.PTimeSI (fun iocc goals ->
-        let ts =
-          Term.mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action)
-        in
+        let ts = iocc.iocc_rec_arg in
         let ts_occs = Occurrences.get_macro_actions trace_context iocc.iocc_sources in
         let path_cond =         (* FIXME: add a flag [~precise] *)
           if false (* use_path_cond *)

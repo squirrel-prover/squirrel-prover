@@ -833,9 +833,14 @@ let deprecated_mk_fresh_indirect_cases
 
   let macro_cases =
     Iter.fold_macro_support (fun iocc macro_cases ->
-        let action_name = iocc.iocc_aname  in
-        let a           = iocc.iocc_action in
-        let t           = iocc.iocc_cnt    in
+        let action_name, a =
+          match iocc.iocc_rec_arg with
+          | Term.Action (a, is) -> a, Action.of_term a is cntxt.table
+          | _ -> assert false
+          (* Recursion unsupported on something else than an action. 
+             FIXME: port this code to use the [Occurrences] module. *)
+        in
+        let t = iocc.iocc_cnt in
 
         let fv =
           Sv.diff

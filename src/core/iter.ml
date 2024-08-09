@@ -984,19 +984,23 @@ let macro_support
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
 type iocc = {
-  iocc_aname   : Symbols.action;
-  iocc_action  : Action.action;
+  iocc_fun     : Symbols.macro;
+  iocc_rec_arg : Term.term;
   iocc_vars    : Sv.t;
   iocc_cnt     : Term.term;
-  iocc_sources : Term.term list;
 
+  (* iocc_se      : SE.t; *)
+
+  iocc_sources : Term.term list;
+  (* FIXME: replace by a list of (Symbols.macro * Term.term), instead
+     of computing this list in a second time *)
   iocc_path_cond : PathCond.t;
 }
 
 let pp_iocc fmt (o : iocc) : unit =
-  Fmt.pf fmt "@[<v 2>[@[%a(%a)@]:@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
-    Symbols.pp_path o.iocc_aname
-    (Fmt.list ~sep:Fmt.comma Term.pp) (Action.get_args o.iocc_action)
+  Fmt.pf fmt "@[<v 2>[@[%a@%a@]:@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
+    Symbols.pp_path o.iocc_fun
+    Term.pp o.iocc_rec_arg
     Term.pp o.iocc_cnt
     (Fmt.list ~sep:Fmt.comma Term.pp) o.iocc_sources
     (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements o.iocc_vars)
@@ -1060,13 +1064,16 @@ let _fold_macro_support
             let iocc_action = 
               Action.subst_action subst (Action.to_action descr.action) 
             in
+            let iocc_rec_arg =
+              Term.mk_action descr.name (Action.get_args iocc_action)
+            in
             let iocc_fv = 
               Sv.union (Action.fv_action iocc_action) (Term.fv iocc_cnt) 
             in
             let iocc = {
-              iocc_aname = descr.name;
+              iocc_fun   = msymb;
+              iocc_rec_arg ;
               iocc_vars  = Sv.diff iocc_fv venv;
-              iocc_action;
               iocc_cnt;
               iocc_sources = srcs;
               iocc_path_cond = mset.path_cond;
