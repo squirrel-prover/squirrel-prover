@@ -851,7 +851,11 @@ struct
              instead of contx to find_occs *)
           (* todo: we could print which source the indirect occs came from,
              not sure that's useful though *)
-          let t = iocc.iocc_cnt in
+          (* FIXME: quantum: we build the tuple [(iocc_cond, iocc_cnt)],
+             while we used to only consider [iocc_cnt] (the condition
+             [iocc_cond] is new). This makes the printing slightly less
+             useful. How can this be fixed? (check this with Joseph). *)
+          let t = Term.mk_tuple [iocc.iocc_cond; iocc.iocc_cnt] in
           let sfv = iocc.iocc_vars in
           let src = iocc.iocc_sources in
           let a = iocc.iocc_rec_arg in

@@ -840,7 +840,7 @@ let deprecated_mk_fresh_indirect_cases
           (* Recursion unsupported on something else than an action. 
              FIXME: port this code to use the [Occurrences] module. *)
         in
-        let t = iocc.iocc_cnt in
+        let t = Term.mk_tuple [iocc.iocc_cond; iocc.iocc_cnt] in
 
         let fv =
           Sv.diff

@@ -216,26 +216,42 @@ type allowed_constants = Const | PTimeSI | PTimeNoSI
     [fold_macro_support]. The record:
 
       [ { iocc_fun       = f;
-          iocc_rec_args  = τ;
           iocc_vars      = vars;
+          iocc_rec_args  = τ;
+
           iocc_cnt       = t;
+          iocc_cond      = ϕ;
+
           iocc_se        = se;
           iocc_sources   = [(f0,τ0); ...; (fN,τN)]; 
           iocc_path_info = path_cond; } ]
 
-    states that, for all indices [vars], [t] is the body (taken in
-    system [se]) of a macro that can only be evaluated if
+    states that, for all indices [vars], [ϕ, t] is a recursive
+    definition case (taken in system [se]) of a macro that can only be
+    evaluated if
 
       ∃ [f0,τ0] ∈ [iocc_sources] such that [path_cond (f,τ) (f0,τ0)] 
 
     (e.g. we could have [path_cond (f,τ) (f0,τ0) = τ < τ0]).
 
     Notes:
-    - [vars] are bound by the indirect occurrence. *)
+    - [vars] are bound by the indirect occurrence. 
+    - in the following recursive definition
+      
+      [let rec fac n = 
+         match n with
+         | _ when n > 0 -> n * fac (n - 1) 
+         | _ when n = 0 -> 1]
+
+      there would likely be two recursive definition cases,
+      [(n > 0, n * fac (n - 1) )] and [(n = 0, 1)].
+*)
 type iocc = {
   iocc_fun     : Symbols.macro;
-  iocc_rec_arg : Term.term;
   iocc_vars    : Sv.t;
+  iocc_rec_arg : Term.term;
+
+  iocc_cond    : Term.term;
   iocc_cnt     : Term.term;
 
   (* iocc_se      : SE.t; *) (* FIXME: support this *)

@@ -985,8 +985,10 @@ let macro_support
 (** See `.mli` *)
 type iocc = {
   iocc_fun     : Symbols.macro;
-  iocc_rec_arg : Term.term;
   iocc_vars    : Sv.t;
+  iocc_rec_arg : Term.term;
+
+  iocc_cond    : Term.term;
   iocc_cnt     : Term.term;
 
   (* iocc_se      : SE.t; *)
@@ -1071,10 +1073,13 @@ let _fold_macro_support
               Sv.union (Action.fv_action iocc_action) (Term.fv iocc_cnt) 
             in
             let iocc = {
-              iocc_fun   = msymb;
-              iocc_rec_arg ;
-              iocc_vars  = Sv.diff iocc_fv venv;
+              iocc_fun = msymb;
+              iocc_vars = Sv.diff iocc_fv venv;
+              iocc_rec_arg;
+
+              iocc_cond = Term.mk_happens iocc_rec_arg;
               iocc_cnt;
+
               iocc_sources = srcs;
               iocc_path_cond = mset.path_cond;
             } in

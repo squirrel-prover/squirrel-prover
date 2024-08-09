@@ -2411,7 +2411,7 @@ let derecursify_term
     (hyps : TraceHyps.hyps)
     (params : Params.t) (venv : Vars.env)
     (constr : Constr.trace_cntxt) (system : SE.context) (t_init : Term.term)
-  : rec_call_occ list * Term.term
+  : rec_call_occ list
   =
   let table = constr.table in
   
@@ -2460,7 +2460,7 @@ let derecursify_term
   let acc, _, _ = 
     Match.Pos.map_fold ~mode:(`TopDown true) t_fold system.set [] t_init
   in
-  acc, t_init
+  acc
 
 (** Given a term, return some corresponding [known_sets] using
     built-in rules + user-given deduction rules *)
@@ -2543,11 +2543,14 @@ let derecursify
     Constr.make_context ~table:env.table ~system:(SE.to_fset system.set)
   in
 
-  let mk_bideduction_goal hyps vars macro (output : Term.term) : goal =
-    let rec_term_occs, output =
+  let mk_bideduction_goal
+      hyps vars macro ~(term : Term.term) ~(conds : Term.term list) : goal 
+    =
+    let rec_term_occs =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta hyps params env.vars trace_context system output
+        ~expand_mode:`FullDelta hyps params env.vars trace_context system
+        (Term.mk_tuple (term :: conds))
         (* extending [env.vars] with [vars] would not be useful as
            [vars] are local, unrestricted, variables. *)
     in
@@ -2572,14 +2575,14 @@ let derecursify
         rec_inputs   = rec_terms;
         extra_inputs = [];
         extra_outputs = [];
-        output = CondTerm.{ term = output; conds = []}} )
+        output = CondTerm.{ term; conds}} )
   in
 
   (* direct bi-deduction sub-goals assuming recursive calls are bideducible *)
   let direct : goal =
     let t = Term.mk_tuple targets in
     (* FIXME : add rec_inputs for any time before macros in t. *)
-    mk_bideduction_goal hyps [] None t
+    mk_bideduction_goal hyps [] None ~term:t ~conds:[]
   in
 
   (* indirect bi-deduction goals for recursive calls *)
@@ -2600,7 +2603,7 @@ let derecursify
         in
         let togen = Sv.elements iocc.iocc_vars in
         let goal =
-          mk_bideduction_goal hyps togen (Some ts) iocc.iocc_cnt
+          mk_bideduction_goal hyps togen (Some ts) ~term:iocc.iocc_cnt ~conds:[iocc.iocc_cond]
         in
         (goal,form) :: goals
       ) trace_context env hyps targets []
