@@ -974,6 +974,16 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
+  if SE.is_single_system system then
+    (soft_failure (Failure "Require a single system"));
+  let systems_list = SE.to_list (SE.to_fset(system.set)) in
+  if systems_list = [] then
+      assert false;
+  let proj, single_system = List.hd systems_list in
+  let system_eq : SE.context = { 
+      set = SE.to_arbitrary (SE.singleton single_system);
+      pair = Some (SE.make_pair (proj, single_system) (proj, single_system))
+    } in
   let pat = Term.{
       pat_op_vars   = [];
       pat_op_tyvars = [];
@@ -981,7 +991,7 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
     } in
   let conclusion = Equiv.mk_equiv_atom [goal.right] in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system_eq conclusion pat 
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
