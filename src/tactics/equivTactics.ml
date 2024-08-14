@@ -968,22 +968,29 @@ let deduce_int (i : int L.located) s =
     [ES.set_equiv_conclusion {terms = biframe_without_e; bound = None} s]
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
+(** If [system] is a single system, build the system with pair of this system 
+    Else, raises a soft failure. *)
+let pair_of_single_sys (system : SE.context) : SE.context =
+  let system_of_set = { system with pair = None } in
+  let singles = SE.single_systems_of_context system_of_set in
+  if singles = None || System.Single.Set.cardinal (oget singles) <> 1 then
+    (soft_failure (Failure "Require a single system"));
+  let systems_list = SE.to_list (SE.to_fset(system.set)) in
+  if systems_list = [] then
+      assert false;
+  let proj, single_system = List.hd systems_list in
+  let res :SE.context = { set = SE.to_arbitrary (SE.singleton single_system);
+    pair = Some (SE.make_pair (proj, single_system) (proj, single_system)) } in
+  Printer.pr "-> %a@." SE.pp_context res;
+  res
+
 (** Deduce in a goal "u |> v" to prove that term u dudece the term v.
     Raise a failure if impossible and else close the goal (return an empty list of goals). *)
 let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
-  if SE.is_single_system system then
-    (soft_failure (Failure "Require a single system"));
-  let systems_list = SE.to_list (SE.to_fset(system.set)) in
-  if systems_list = [] then
-      assert false;
-  let proj, single_system = List.hd systems_list in
-  let system_eq : SE.context = { 
-      set = SE.to_arbitrary (SE.singleton single_system);
-      pair = Some (SE.make_pair (proj, single_system) (proj, single_system))
-    } in
+  let system_eq = pair_of_single_sys system in
   let pat = Term.{
       pat_op_vars   = [];
       pat_op_tyvars = [];
@@ -1009,11 +1016,12 @@ let deduce_predicate_int
   ES.t list =
   if L.unloc i < 0 || List.length goal.left <= L.unloc i then
     (soft_failure ~loc:(L.loc i) (Failure "Invalid position"));
-    let left_without_ith = List.filteri (fun j _ -> j<> L.unloc i) goal.left in
-    let left_ty_without_ith = List.filteri (fun j _ -> j<>L.unloc i) goal.left_ty in
+  let left_without_ith = List.filteri (fun j _ -> j<> L.unloc i) goal.left in
+  let left_ty_without_ith = List.filteri (fun j _ -> j<>L.unloc i) goal.left_ty in
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
+  let system_eq = pair_of_single_sys system in
   let pat = Term.{
       pat_op_vars   = [];
       pat_op_tyvars = [];
@@ -1021,7 +1029,7 @@ let deduce_predicate_int
     } in
   let conclusion = Equiv.mk_equiv_atom goal.left in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system_eq conclusion pat 
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
