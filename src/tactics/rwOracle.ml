@@ -25,7 +25,9 @@ let check_goal (i : int L.located) (s : ES.t) =
 
 let get_oracle (i : int L.located) (s : ES.t) =
   let equiv = S.conclusion_as_equiv s in
-  if Term.ty (List.nth equiv (L.unloc i)) <> Type.(Fun (Message, Message)) then
+  let ty = Term.ty (List.nth equiv (L.unloc i)) in
+  let ty_is_valid = Type.equal ty (Type.(Fun (Message, Message))) in
+  if not ty_is_valid then
     soft_failure (Failure "The item in the equivalence must be typed [message -> message]");
   List.nth equiv (L.unloc i)
 
@@ -55,7 +57,7 @@ let mk_subgoal
     (s : ES.t) : ES.t
   =
   let equiv = S.conclusion_as_equiv s in
-  let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), Message)) in (*FIXME : Proble if one element*)
+  let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), Message)) in (*FIXME : Problem if one element*)
   let _, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
   let mk_term oracle =
     Term.(mk_app oracle [mk_app (mk_var f_var) [(mk_tuple equiv)]])
