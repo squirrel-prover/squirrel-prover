@@ -203,7 +203,7 @@ type parser_arg =
   | Fresh          of named_args * fresh_arg option
   | RewriteIn      of rw_arg list * in_target
   | RewriteEquiv   of rw_equiv_item
-  | RewriteOracle  of Typing.term * int L.located
+  | RewriteOracle  of Typing.term * int L.located option
   | Trans          of trans_arg
   | ApplyIn        of named_args * Typing.pt * apply_in
   | Weak           of weak_arg
