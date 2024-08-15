@@ -25,11 +25,15 @@ let check_goal (pos : int L.located option) (s : ES.t) =
       soft_failure ~loc:(L.loc i) (GoalBadShape "Wrong number of equivalence item")
   | None -> ()
 
-let convert_arg (term : Typing.term) (s : ES.t) : Term.term * Type.ty =
+let convert_arg (term : Typing.term) (s : ES.t) : Term.term * Type.ty * Type.ty =
   let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in (**TODO : check if [InGoal] is correct*)
   let t, ty = Typing.convert cenv term in
   match ty with
-  | Type.(Fun (Message, Message)) -> t, ty
+  | Type.(Fun (ty1, ty2)) ->
+    if Type.is_bitstring_encodable ty1 && Type.is_bitstring_encodable ty2 then
+      t, ty1, ty2
+    else
+      soft_failure (Failure "First argument must be a function with encodable types")
   | _ ->
     soft_failure (Failure "First argument must be a function")
 
@@ -43,7 +47,7 @@ let get_oracle
     let oracle = List.nth terms (L.unloc i) in
     let oracle_ty = Term.ty oracle in
     if not (Type.equal oracle_ty ty) then
-      soft_failure (Failure "The item in the equivalence must be typed [message -> message]");
+      soft_failure (Failure "The given item in the goal must have the same type than the argument");
     oracle, L.unloc i
   | None ->
     let terms_with_pos = List.mapi (fun i t -> t, i) terms in
@@ -69,10 +73,11 @@ let mk_maingoal
 let mk_subgoal
     (oracle_old : Term.term)
     (oracle_new : Term.term)
+    (input_ty : Type.ty)
     (s : ES.t) : ES.t
   =
   let equiv = S.conclusion_as_equiv s in
-  let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), Message)) in (*FIXME : Problem if one element*)
+  let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), input_ty)) in (*FIXME : Problem if one element*)
   let _, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
   let mk_term oracle =
     Term.(mk_app oracle [mk_app (mk_var f_var) [(mk_tuple equiv)]])
@@ -87,10 +92,10 @@ let rewrite_oracle_args (args : Args.parser_arg list) s : ES.t list =
   match args with
   | [Args.RewriteOracle (term, pos_opt)] -> 
     check_goal pos_opt s;
-    let oracle_new, ty = convert_arg term s in
-    let oracle_old, i = get_oracle pos_opt ty s in
+    let oracle_new, ty1, ty2 = convert_arg term s in
+    let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) s in
     let maingoal = mk_maingoal oracle_new i s in
-    let subgoal = mk_subgoal oracle_old oracle_new s in
+    let subgoal = mk_subgoal oracle_old oracle_new ty1 s in
     [subgoal; maingoal]
   | _ -> hard_failure (Failure "improper arguments")
 
