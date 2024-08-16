@@ -16,17 +16,37 @@ let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
 (*------------------------------------------------------------------*)
-let check_goal (pos : int L.located option) (s : ES.t) =
-  if not (S.conclusion_is_equiv s) then
-    hard_failure (GoalBadShape "Goal must be an equivalence");
-  let equiv = S.conclusion_as_equiv s in
-  match pos with
-  | Some i -> if (L.unloc i < 0 || List.length equiv <= L.unloc i) then
-      soft_failure ~loc:(L.loc i) (GoalBadShape "Wrong number of equivalence item")
-  | None -> ()
+type mode = Equiv of Term.terms | Deduction of S.secrecy_goal
 
-let convert_arg (term : Typing.term) (s : ES.t) : Term.term * Type.ty * Type.ty =
-  let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in (**TODO : check if [InGoal] is correct*)
+
+(*------------------------------------------------------------------*)
+let get_mode (s : ES.t) : mode =
+  if S.conclusion_is_equiv s then
+    Equiv (S.conclusion_as_equiv s)
+  else if Library.Secrecy.is_loaded (ES.table s) then
+    match S.get_secrecy_goal s with
+    | Some goal -> 
+      if Type.is_bitstring_encodable goal.right_ty then
+        Deduction goal
+      else
+        soft_failure (Tactics.GoalBadShape
+          "The right part of the (non-)deduction goal must be encodable")
+    | None ->
+      soft_failure (Tactics.GoalBadShape
+        "expected an equivalence goal or a (non-)deduction goal with WeakSecrecy library")
+  else
+    soft_failure (Tactics.GoalBadShape
+      "expected an equivalence goal or a (non-)deduction goal with WeakSecrecy library")
+
+let get_terms (mode : mode) : Term.terms =
+  match mode with
+  | Equiv terms -> terms
+  | Deduction goal -> goal.left
+
+let convert_arg
+    (term : Typing.term)
+    (cenv : Typing.conv_env)
+    : Term.term * Type.ty * Type.ty =
   let t, ty = Typing.convert cenv term in
   match ty with
   | Type.(Fun (ty1, ty2)) ->
@@ -40,10 +60,13 @@ let convert_arg (term : Typing.term) (s : ES.t) : Term.term * Type.ty * Type.ty 
 let get_oracle
     (pos : int L.located option)
     (ty : Type.ty)
-    (s : ES.t) : Term.term * int =
-  let terms = S.conclusion_as_equiv s in
+    (mode : mode) :
+    Term.term * int =
+  let terms = get_terms mode in
   match pos with
-  | Some i -> 
+  | Some i ->
+    if (L.unloc i) < 0 || (L.unloc i) >= List.length terms then
+      soft_failure ~loc:(L.loc i) (GoalBadShape "Wrong number of equivalence item");
     let oracle = List.nth terms (L.unloc i) in
     let oracle_ty = Term.ty oracle in
     if not (Type.equal oracle_ty ty) then
@@ -57,18 +80,27 @@ let get_oracle
     | [oracle, i] -> oracle, i 
     | _ -> soft_failure (Failure "The goal contains several functions with the same type as the argument.\nPrecise the position of the oracle you want to rewrite.")
 
-
 let mk_maingoal
     (oracle_new : Term.term)
+    (mode : mode)
     (i : int)
     (s : ES.t) : ES.t
   =
-  let equiv = S.conclusion_as_equiv s in
-  let equiv_new = List.mapi
-    (fun j t -> if j = i then oracle_new else t)
-    equiv
-  in
-  S.set_equiv_conclusion equiv_new s
+  match mode with
+  | Equiv terms ->
+    let terms_new = List.mapi
+      (fun j t -> if j = i then oracle_new else t)
+      terms
+    in
+    S.set_equiv_conclusion terms_new s
+  | Deduction goal ->
+    let terms_new = List.mapi
+      (fun j t -> if j = i then oracle_new else t)
+      goal.left
+    in
+    let goal_new = { goal with left = terms_new } in
+    let conc = S.mk_secrecy_concl goal_new s in
+    S.set_conclusion conc s
 
 let mk_subgoal
     (oracle_old : Term.term)
@@ -88,13 +120,15 @@ let mk_subgoal
                                 Atom (Reach loc_form))) in
   S.set_conclusion glob_form s
 
-let rewrite_oracle_args (args : Args.parser_arg list) s : ES.t list =
+let rewrite_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
   match args with
   | [Args.RewriteOracle (term, pos_opt)] -> 
-    check_goal pos_opt s;
-    let oracle_new, ty1, ty2 = convert_arg term s in
-    let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) s in
-    let maingoal = mk_maingoal oracle_new i s in
+    let mode = get_mode s in
+    let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
+    (**TODO : check if [InGoal] is correct*)
+    let oracle_new, ty1, ty2 = convert_arg term cenv in
+    let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) mode in
+    let maingoal = mk_maingoal oracle_new mode i s in
     let subgoal = mk_subgoal oracle_old oracle_new ty1 s in
     [subgoal; maingoal]
   | _ -> hard_failure (Failure "improper arguments")
