@@ -105,14 +105,28 @@ let mk_maingoal
 let mk_subgoal
     (oracle_old : Term.term)
     (oracle_new : Term.term)
+    (mode : mode)
     (input_ty : Type.ty)
     (s : ES.t) : ES.t
   =
-  let equiv = S.conclusion_as_equiv s in
-  let f_ty = Type.(Fun (Tuple (List.map Term.ty equiv), input_ty)) in (*FIXME : Problem if one element*)
+  let terms = get_terms mode in
+  let ty =
+    if List.length terms = 1 then
+      Term.ty (List.hd terms)
+    else
+      Tuple (List.map Term.ty terms)
+  in
+  let f_ty = Type.(Fun (ty, input_ty)) in
   let _, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
+
   let mk_term oracle =
-    Term.(mk_app oracle [mk_app (mk_var f_var) [(mk_tuple equiv)]])
+    let term = 
+      if List.length terms = 1 then
+        List.hd terms
+      else
+        Term.mk_tuple terms
+    in
+    Term.(mk_app oracle [mk_app (mk_var f_var) [term]])
   in
   let loc_form = Term.mk_eq (mk_term oracle_old) (mk_term oracle_new) in
   let glob_form = Equiv.(Quant (ForAll,
@@ -129,7 +143,7 @@ let rewrite_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
     let oracle_new, ty1, ty2 = convert_arg term cenv in
     let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) mode in
     let maingoal = mk_maingoal oracle_new mode i s in
-    let subgoal = mk_subgoal oracle_old oracle_new ty1 s in
+    let subgoal = mk_subgoal oracle_old oracle_new mode ty1 s in
     [subgoal; maingoal]
   | _ -> hard_failure (Failure "improper arguments")
 
