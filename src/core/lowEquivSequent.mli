@@ -72,11 +72,11 @@ val to_trace_sequent : t -> LowTraceSequent.t
    the form "u |> v" or "u *> v".
    If "u" is a tuple, [left] is a list of each term is the tuple.
    Else, the list [left] contains only one element for "u". *)
-type secrecy_goal = {
+type secrecy_goal = { (* FIXME : Add field for set *)
   predicate : Symbols.predicate;
-  left_ty : Type.ty list;
+  left_ty : Type.ty list; (* FIXME : Redundent with Type.ty *)
   left : Term.term list;
-  right_ty : Type.ty;
+  right_ty : Type.ty; (* FIXME : Redundent with Type.ty *)
   right : Term.term }
 
 (** Requires WeakSecrecy.sp to be loaded.
