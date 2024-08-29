@@ -20,8 +20,6 @@ let hard_failure = Tactics.hard_failure
     Allows factorasation of the code between equivalence goals and deduction goals. *)
 type mode = Equiv of Term.terms | Deduction of S.secrecy_goal
 
-
-(*------------------------------------------------------------------*)
 (** Get the mode from a sequent.
     Raise a soft failure if the sequent is not an equivalence or deduction goal. *)
 let get_mode (s : ES.t) : mode =
@@ -48,6 +46,9 @@ let get_terms (mode : mode) : Term.terms =
   | Equiv terms -> terms
   | Deduction goal -> goal.left
 
+(*------------------------------------------------------------------*)
+(** Arguments *)
+
 (** Type the term given as argument to the tactic.
     Raise a soft failure if the function does not have the type [ty1 -> ty2]
     with both types encodable.
@@ -59,13 +60,22 @@ let convert_arg
   let t, ty = Typing.convert cenv term in
   match ty with
   | Type.(Fun (ty1, ty2)) ->
-    (** TODO : add support for oracles with multiple arguments *)
+    (* TODO : add support for oracles with multiple arguments *)
     if Type.is_bitstring_encodable ty1 && Type.is_bitstring_encodable ty2 then
       t, ty1, ty2
     else
       soft_failure (Failure "First argument must be a function with encodable types")
   | _ ->
     soft_failure (Failure "First argument must be a function")
+
+(** Parse the [named_arg] to know if it is ~reversed (returns true) or empty (returns false).
+    Raises a soft filure otherwise *)
+let parse_named_args : Args.named_args -> bool = function
+  | [] -> false
+  | [NArg lsymb] when L.unloc lsymb = "reverse" -> true
+  | _ -> soft_failure (Failure "Wrong named argument.@.rewrite oracle only accepts ~reverse.")
+
+(*------------------------------------------------------------------*)
 
 (** Return the terms of the goal that have to be rewritten.
     Check that the type of this oracle is [ty]
@@ -119,6 +129,27 @@ let mk_maingoal
     let conc = S.mk_secrecy_concl goal_new s in
     S.set_conclusion conc s
 
+(** Return the argument of symbols f in the subgoal.
+    It get the terms in [mode], in a tuple if there are more than one.
+    If [reverse] is true, it replace the [i]-th term with [new_oracle] *)
+let get_f_arg
+    (mode : mode)
+    (reverse : bool)
+    (i : int)
+    (oracle_new : Term.term) : Term.term
+  =
+  let terms_init = get_terms mode in
+  let terms =
+    if reverse then
+      List.mapi (fun j t -> if i=j then oracle_new else t) terms_init
+    else
+      terms_init
+  in
+  match terms with
+  | [] -> assert false
+  | [t] -> t
+  | _ -> Term.mk_tuple terms
+
 (** Return a sequent for the side condition to prove to use [rewrite oracle].
     Intuitively, the user has to prove that [oracle_old] and [oracle_new]
     retuns the same result for any input computable with the terms contained
@@ -127,26 +158,17 @@ let mk_subgoal
     (oracle_old : Term.term)
     (oracle_new : Term.term)
     (mode : mode)
+    (reverse : bool)
+    (i : int)
     (input_ty : Type.ty)
     (s : ES.t) : ES.t
   =
-  let terms = get_terms mode in
-  let ty =
-    if List.length terms = 1 then
-      Term.ty (List.hd terms)
-    else
-      Tuple (List.map Term.ty terms)
-  in
+  let f_arg = get_f_arg mode reverse i oracle_new in
+  let ty = Term.ty f_arg in
   let f_ty = Type.(Fun (ty, input_ty)) in
   let _, f_var = Vars.make_global `Approx (ES.vars s) f_ty "f" in
   let mk_term oracle =
-    let term = 
-      if List.length terms = 1 then
-        List.hd terms
-      else
-        Term.mk_tuple terms
-    in
-    Term.(mk_app oracle [mk_app (mk_var f_var) [term]])
+    Term.(mk_app oracle [mk_app (mk_var f_var) [f_arg]])
   in
   let loc_form = Term.mk_eq (mk_term oracle_old) (mk_term oracle_new) in
   let glob_form = Equiv.(Quant (ForAll,
@@ -157,14 +179,15 @@ let mk_subgoal
 (** Parse the argument of the tactic and return the two new sequent to prove.*)
 let rewrite_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
   match args with
-  | [Args.RewriteOracle (term, pos_opt)] -> 
+  | [Args.RewriteOracle (term, named_args, pos_opt)] -> 
+    let reverse = parse_named_args named_args in
     let mode = get_mode s in
     let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
-    (**TODO : check if [InGoal] is correct*)
+    (*TODO : check if [InGoal] is correct*)
     let oracle_new, ty1, ty2 = convert_arg term cenv in
     let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) mode in
     let maingoal = mk_maingoal oracle_new mode i s in
-    let subgoal = mk_subgoal oracle_old oracle_new mode ty1 s in
+    let subgoal = mk_subgoal oracle_old oracle_new mode reverse i ty1 s in
     [subgoal; maingoal]
   | _ -> hard_failure (Failure "improper arguments")
 

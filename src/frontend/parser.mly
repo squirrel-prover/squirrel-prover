@@ -922,6 +922,11 @@ apply_in:
 | IN id=lsymb { Some id }
 
 (*------------------------------------------------------------------*)
+rewrite_oracle_in:
+|               { None }
+| IN i=loc(INT) { Some i }
+
+(*------------------------------------------------------------------*)
 naming_pat:
 | UNDERSCORE  { TacticsArgs.Unnamed }
 | QMARK       { TacticsArgs.AnyName }
@@ -1320,11 +1325,8 @@ tac:
   | l=lloc(rewrite_equiv) p=rw_equiv_item
     { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
 
-  | l=lloc(rewrite_oracle) t=term
-    { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, None)] }
-
-  | l=lloc(rewrite_oracle) t=term IN i=loc(INT)
-    { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, Some i)] }
+  | l=lloc(rewrite_oracle) a=named_args t=term pos=rewrite_oracle_in
+    { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, a, pos)] }
 
   | l=lloc(APPLY) a=named_args t=pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
