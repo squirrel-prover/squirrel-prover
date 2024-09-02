@@ -241,7 +241,7 @@ system `simple`, where each tag can only be executed once for each identity.
 
 .. squirreltop::  in
 
-   system [simple] ((!_j reader) | (!_i tag(i))).
+   system simple = ((!_j reader) | (!_i tag(i))).
 
 
 Reachability properties
@@ -396,7 +396,7 @@ that tags cannot be tracked.
      else
        out(cR,ko)
 
-   system [BasicHash] ((!_j R: readerD(j)) | (!_i !_k T: tagD(i,k))).
+   system BasicHash = ((!_j R: readerD(j)) | (!_i !_k T: tagD(i,k))).
 
 Importantly, reachability formulas can be expressed and proved
 directly on bi-systems. We can for instance write a variant of the
