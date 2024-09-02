@@ -367,7 +367,7 @@ using a process featuring multi-terms.
 .. prodn::
    system_id ::= @ident
 
-.. decl:: system {? [@system_id]} @process
+.. decl:: system {? @system_id =} @process
 
    Declare a :gdef:`bi-system` whose actions are obtained by
    translating :n:`@process`, which may use bi-terms.
