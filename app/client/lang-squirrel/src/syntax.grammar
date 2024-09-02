@@ -310,7 +310,7 @@ tac {
   | xor INT COMMA Lsymb
   | xor INT COMMA Lsymb COMMA Lsymb
   | prf INT
-  | prf INT
+  | prf INT COMMA Term
   /* | CONST */
   | NAMELENGTH Term COMMA Term
   | right
