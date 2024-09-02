@@ -33,13 +33,6 @@ let rec json_to_obj (cobj : < .. > Js.t) (json : Yojson.Safe.t) : < .. > Js.t =
   | `Tuple t  -> Array.(Js.array @@ map ofresh (of_list t))
   | `Variant(_,_) -> pure_js_expr "undefined"
 
-type jsquirrel_answer =
-  | Info      of string
-  | Goal      of string * string
-  | Ok        of int * string * string
-  | Ko        of int
-  [@@deriving to_yojson]
-
 type jsquirrel_cmd =
   | Undo    of int (* undo n sentences → set current state as
   current-n in the stack *)
@@ -51,9 +44,17 @@ type jsquirrel_cmd =
   (* run and ouput a specific command without changing state used for
    print or search for example *)
   | Run     of string 
-  | Reset (* will reset prover state *)
+  | Reset of string (* will reset prover state, given the string corresponding to Prelude.sp *)
   | Info (* will show current state output *)
   [@@deriving yojson]
+
+type jsquirrel_answer =
+  | Info      of string
+  | Goal      of string * string
+  | Ok        of int * string * string
+  | Ko        of int
+  [@@deriving to_yojson]
+
 
 (* make given message an unsafe json obj *)
 let answer_to_jsobj msg =
@@ -130,4 +131,4 @@ let execute_cmd (cmd:jsquirrel_cmd) : unit =
     (* Run one given command *)
     | Run s -> show_info (Common.exec_command s)
     (* Reset prover *)
-    | Reset -> Common.init (); show_goal ()
+    | Reset s -> Common.init s; show_goal ()

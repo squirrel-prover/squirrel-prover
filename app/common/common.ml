@@ -20,40 +20,51 @@ type stack = state list
 (* This is the initial prover state 
  * Loading Prelude.sp will fail since in full JS it can't access file
  * system *)
-let prover_state : Prover.state ref = 
-  ref (Prover.init ~with_prelude:false ())
+let prover_state : Prover.state option ref = ref None
 
 let firstOutput = "Prover initial state : Ready to go !"
 
 (* initial history is an stack with first prover state *) 
-let prover_stack : (state list) ref = 
-  ref [{ps = !prover_state;
-        output = firstOutput}]
-
+let prover_stack : (state list) option ref = ref None
 (* function that re-init state and history *)
-let init () =
-  prover_state := Prover.init ~with_prelude:false ();
-  prover_state := Prover.do_set_option 
-      !prover_state (TConfig.s_interactive,Config.Param_bool true);
-  prover_stack := [{ps= !prover_state; output=firstOutput}]
+let init s =
+  let init_state = Prover.init ~with_string_prelude:(Some s) () in
+  prover_state := Some (Prover.do_set_option 
+      init_state (TConfig.s_interactive,Config.Param_bool true));
+  prover_stack := Some [{ps= init_state; output=firstOutput}]
+
+
+exception NonInit
+  
+let get_stack_or_fail () =
+  match !prover_stack with
+  |None -> raise NonInit
+  | Some s-> s
+
+let get_state_or_fail () =
+  match !prover_state with
+  |None -> raise NonInit
+  | Some s-> s
+
 
 (* push state in history *)
 let push (s:state) : stack =
-  let h' = s::(!prover_stack) in
-  prover_stack := h';
-  prover_state := s.ps;
+  let h' = s::(get_stack_or_fail ()) in
+  prover_stack := Some h';
+  prover_state := Some s.ps;
   h'
 
 exception Empty
 exception TryToPopInit
 (* pop state of history *)
-let pop : stack * state =
+(* let pop : stack * state =
   match !prover_stack with
-  | [] -> raise Empty
-  | s::h -> prover_stack := h;
-            prover_state := s.ps;
-            (h,s)
-
+  | Some [] -> raise Empty
+  | Some (s::h) -> prover_stack := Some h;
+            prover_state := Some s.ps;
+    (h,s)
+  | None -> raise NonInit
+*)
 let rec popn' (i:int) (h:stack) (poped:state list) 
   : stack * state list =
   if i = 0 then (h,poped) else
@@ -64,19 +75,19 @@ let rec popn' (i:int) (h:stack) (poped:state list)
 
 (* pop n states of history *)
 let popn (i:int) : stack * state list = 
-  let h',poped = popn' i !prover_stack [] in
-  prover_stack := h';
-  prover_state := (List.hd h').ps; (*should always have init state*)
+  let h',poped = popn' i (get_stack_or_fail ()) [] in
+  prover_stack := Some h';
+  prover_state := Some (List.hd h').ps; (*should always have init state*)
   (h',poped)
 
 (* get output of current state *)
 let show () : string =
-  let st = List.hd !prover_stack in
+  let st = List.hd (get_stack_or_fail ()) in
   st.output
 
 (* get output of nth state *)
 let shown (i:int) : string =
-  let st = List.nth !prover_stack i in
+  let st = List.nth (get_stack_or_fail ()) i in
   st.output
 
 (* get actual formatter *)
@@ -85,10 +96,11 @@ let get_formatter =
 
 (* print goal in actual buffer *)
 let print_goal () = 
-  match Prover.get_mode !prover_state with
+  match Prover.get_mode (get_state_or_fail ()) with
   | ProverLib.ProofMode -> 
-      Printer.prthtml `Goal "%a" Prover.pp_goal !prover_state
-  | _ -> 
+    Printer.prthtml `Goal "%a" Prover.pp_goal (get_state_or_fail ())
+      
+  | _ | exception NonInit -> 
       Printer.prthtml `Goal "Nothing to show…"
 
 (* FIXME ↓ this removes html style compare to print_goal, why ? *)
@@ -97,10 +109,10 @@ let print_goal () =
 let str_goal () : string =
   let buff = Buffer.create 16 in
   let formatter = Format.formatter_of_buffer buff in
-  let _ = match Prover.get_mode !prover_state with
+  let _ = match Prover.get_mode (get_state_or_fail ()) with
   | ProverLib.ProofMode -> 
-      Printer.prthtml_out formatter `Goal "%a" Prover.pp_goal !prover_state
-  | _ -> 
+      Printer.prthtml_out formatter `Goal "%a" Prover.pp_goal (get_state_or_fail ())
+  | _ | exception NonInit  -> 
     Printer.prthtml_out formatter `Goal "Nothing to show…" 
   in
   Format.pp_print_flush formatter ();
@@ -116,10 +128,10 @@ let get_goal_print () : string =
  * ok + the corresponding output *)
 let exec_sentence ?(check=`Check) s : bool * string = 
   try
-    prover_state := Prover.exec_all ~check !prover_state s;
+    prover_state := Some (Prover.exec_all ~check (get_state_or_fail ()) s);
     let info = Format.flush_str_formatter () in
-    prover_stack := 
-      push {ps= !prover_state; output= get_goal_print ()};
+    prover_stack := Some (
+      push {ps= (get_state_or_fail ()); output= get_goal_print ()});
     (true,info)
   with e -> 
     Printer.prthtml `Error "Exec failed: %a"
@@ -132,7 +144,7 @@ let exec_sentence ?(check=`Check) s : bool * string =
 (* execute given command and return the corresponding output *)
 let exec_command ?(check=`Check) s : string = 
   try
-    let _ = Prover.exec_command ~check s !prover_state in
+    let _ = Prover.exec_command ~check s (get_state_or_fail ()) in
     let info = Format.flush_str_formatter () in
     info
   with e -> 
@@ -144,7 +156,7 @@ let exec_command ?(check=`Check) s : string =
 (* return visualisation as string *)
 let visualisation () : string =
  try begin 
-   match Prover.get_first_subgoal !prover_state with
+   match Prover.get_first_subgoal (get_state_or_fail ()) with
    | Local j ->
          Format.asprintf "%a"
            Squirrelhtml.Visualisation.pp j

@@ -22,7 +22,7 @@ let term_of_string st string : Term.term =
 let typing () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init ~with_prelude:true () in
+  let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
       "\
 type T.
@@ -117,7 +117,7 @@ end C2.
 let crypto_parsing () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init ~with_prelude:true () in
+  let st = Prover.init () in
 
   let ill_formed_game st =
     Prover.exec_all ~test:true st 
@@ -148,7 +148,7 @@ game Foo = {
 let type_arguments () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init ~with_prelude:true () in
+  let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
       "\
 type T.

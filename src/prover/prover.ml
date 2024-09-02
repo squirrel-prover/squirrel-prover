@@ -736,30 +736,30 @@ let exec_all ?(check=`Check) ?(test=false) (st:state) (s:string) =
   let driver = Driver.from_string s in
   do_all_commands_in ~check ~test st driver
 
-let init : ?with_prelude:bool -> unit -> state =
+let init : ?with_string_prelude:string option -> unit -> state =
   (* Memoise state with prelude. *)
   let state0 : state option ref = ref None in
-  fun ?(with_prelude=true) () : state ->
+  fun ?(with_string_prelude=None) () : state ->
     match !state0 with
-    | Some st when with_prelude = true -> st
+    | Some st when with_string_prelude = None -> st
     | _ -> 
       let state = init' () in
-      if with_prelude then begin
-        let prelude = ProverLib.{ 
+      let prelude = ProverLib.{ 
             th_name = Name (L.mk_loc L._dummy "Prelude");
             params = []; 
           }
-        in
-        (* process the prelude file *)
-        let state = do_include ~dirname:Driver.theory_dir state prelude in
-        (* define the macros defining the builtin execution models *)
-        let table = Macros.define_execution_models state.table in
-        let () = Symbols.set_builtins_table_after_processing_prelude table in
-        let state = { state with table } in
-        state0 := Some state;
-        state
-      end
-      else state
+      in
+        (* process the prelude file *)      
+      let state =  match with_string_prelude with
+        |  None -> do_include ~dirname:Driver.theory_dir state prelude
+        | Some s -> exec_all state s
+      in      
+      (* define the macros defining the builtin execution models *)
+      let table = Macros.define_execution_models state.table in
+      let () = Symbols.set_builtins_table_after_processing_prelude table in
+      let state = { state with table; prover_mode=ProverLib.GoalMode } in
+      state0 := Some state;
+      state
 
 (* Run entire Squirrel file with given path as string. *)
 let run ?(test=false) (file_path:string) : unit =

@@ -11,8 +11,10 @@ open Utils
     - etc. *)
 type state
 
+
+
 (** Return initial prover state. *)
-val init : ?with_prelude:bool -> unit -> state
+val init : ?with_string_prelude:string option -> unit -> state
 
 (** {2 Executing commands} *)
 

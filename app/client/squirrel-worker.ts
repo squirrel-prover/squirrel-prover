@@ -203,9 +203,9 @@ export class SquirrelWorker {
     this.curSentences = [];
     this.queueSentences = [];
     this.executedSentences = [];
-    this.sendCommand(["Reset"]);
     // FIXME Should be done somewhere else
-    this.exec([await this.fileManager.getFileString("Prelude.sp")]);
+    let sentence = await this.fileManager.getFileString("Prelude.sp");
+    this.sendCommand(["Reset", sentence]);    
   }
 
   // TODO check type for sent command ↓
@@ -917,7 +917,7 @@ export class SquirrelWorker {
     try {
       await this.when_created;
       this.init();
-      this.info();
+//      this.info();
       if(filename !== undefined){
         await this.loadFile(filename,view);
       }

@@ -406,8 +406,9 @@ APPDIR=app/
 jsquirrel: 
 	rm -f app/www/static/client.bc.js
 	dune build app/www/static/client.bc.js
+	rm -rf app/www/static/theories
 	mkdir -p app/www/static/theories
-	cp ./theories/*.sp app/www/static/theories/.
+	cp ./theories/*.sp app/www/static/theories
 	cp ./examples/tutorial/*.sp app/www/static/theories/.
 
 bundle:

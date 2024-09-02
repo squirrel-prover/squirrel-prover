@@ -5,7 +5,7 @@ module Prover = Squirrelprover.Prover
 module ProverLib = Squirrelcore.ProverLib
 
 let template_test () =
-  let st = Prover.init ~with_prelude:true () in
+  let st = Prover.init () in
   let st = 
     Prover.exec_all ~check:`Check ~test:true st
         "channel c

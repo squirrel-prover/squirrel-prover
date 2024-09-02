@@ -34,7 +34,7 @@ let mk_message st s =
 (** Check that case study fails when there is no conditional
     with the target condition. *)
 let case_study_fail () =
-  let st = Prover.init ~with_prelude:false () in
+  let st = Prover.init () in
   let st =
     Prover.exec_all ~test:true st
       "name n : message.\n\
@@ -66,7 +66,7 @@ let case_study_fail () =
 (** Check that case study fails when there is no conditional
     with the target condition in the target item. *)
 let case_study_fail' () =
-  let st = Prover.init ~with_prelude:false () in
+  let st = Prover.init () in
   let st =
     Prover.exec_all ~test:true st
       "name n : message.\n\
@@ -91,7 +91,7 @@ let case_study_fail' () =
 (** Check that case study works as expected on several examples. *)
 let case_study () =
 
-  let st = Prover.init ~with_prelude:false () in
+  let st = Prover.init () in
   let st = 
     Prover.exec_all ~test:true st
         "mutable state : message = empty.
@@ -609,7 +609,7 @@ let case_study () =
 
 let namelength () =
   let mk_p c = [], L.mk_loc L._dummy c in      
-  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:true ())
+  let st = Prover.exec_all ~test:true (Prover.init ())
         "
         system null.
         name n : message.
@@ -670,7 +670,7 @@ let namelength () =
 
 let namelength2 () =
   let mk_p c = [], L.mk_loc L._dummy c in      
-  let st = Prover.exec_all ~test:true (Prover.init ~with_prelude:true ())
+  let st = Prover.exec_all ~test:true (Prover.init ())
         "
         system null.
         name n : message * message.

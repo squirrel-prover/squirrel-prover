@@ -4,7 +4,7 @@ open Squirrelcore
     Enrich a prover state with ability to undo. *)
 module type TOPLEVELPROVER = sig
   type state
-  val init : ?with_prelude:bool -> unit -> state
+  val init : ?with_string_prelude:string option -> unit -> state
 end
 
 (* This module manage history with global configs. *)
