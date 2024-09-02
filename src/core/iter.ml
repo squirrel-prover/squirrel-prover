@@ -535,7 +535,7 @@ let get_macro_occs
     (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
        Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
     let t =
-      let se = env.system.set in
+      let se = (constr.system :> SE.t) in
       let param = Reduction.rp_crypto in
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in

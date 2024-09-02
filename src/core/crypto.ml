@@ -217,7 +217,7 @@ module CondTerm = struct
   let polish (c:t) (hyps : TraceHyps.hyps) (env : Env.t) =
     let reduction_state hyps =
       Reduction.mk_state
-        ~hyps ~se:env.system.set ~vars:env.vars
+        ~hyps ~se:(oget env.system.pair :> SE.t) ~vars:env.vars
         ~param:Reduction.rp_crypto
         env.table
     in
@@ -1666,7 +1666,7 @@ module Game = struct
     *)
     let reduction_state =
       Reduction.mk_state ~hyps:query.hyps
-        ~se:query.env.system.set ~vars:query.env.vars
+        ~se:(oget query.env.system.pair :> SE.t) ~vars:query.env.vars
         ~param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
         query.env.table
     in
@@ -2596,9 +2596,6 @@ let notify_bideduction_subgoals ~direct ~recursive : unit =
 
     Note that in practice, these subgoals are tailored to Squirrel
     macros, and may be of a different form than the sub-goal above. *)
-
-
-               
 let derecursify
     (env : Env.t) (targets : Term.terms)
     (game : game) (hyps : TraceHyps.hyps)
