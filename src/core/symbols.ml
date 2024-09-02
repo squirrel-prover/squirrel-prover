@@ -215,6 +215,8 @@ let pp_npath ?(sep = ".") fmt (t : npath) =
 
 let npath_to_string ?sep = Fmt.str "%a" (pp_npath ?sep)
 
+let top_npath : npath = npath []
+
 (*------------------------------------------------------------------*)
 module P = struct
   type t = _path
@@ -279,8 +281,13 @@ let pp_error_i fmt = function
       pp_symbol_kind n1 pp_symbol_kind n2
 
   | Multiple_declarations (np, s, n, g) ->
-    Fmt.pf fmt "%a %s already declared in namespace %a (as a %s)"
-      pp_symbol_kind n s pp_npath np g
+    Fmt.pf fmt "%a %s already declared %t(as a %s)"
+      pp_symbol_kind n s 
+      (fun fmt ->
+         if npath_equal np top_npath then ()
+         else Fmt.pf fmt "in namespace %a" pp_npath np
+      )
+      g
 
   | Failure s ->
     Fmt.pf fmt "%s" s
@@ -361,8 +368,6 @@ let tag (t : table) = t.tag
 let scope t = t.scope
 
 (*------------------------------------------------------------------*)
-let top_npath : npath = npath []
-
 let empty_table : table =
   let current = Msymb.empty in
   (* the empty store contains a single (empty) symbol map for the
