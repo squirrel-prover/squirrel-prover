@@ -236,6 +236,7 @@ module Mvar : sig
   (** [table] and [env] are necessary to check that restrictions on 
       variables instantiation have been respected. *)
   val to_subst :
+    ?ty_env:Type.Infer.env ->
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
     t ->

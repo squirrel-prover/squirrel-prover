@@ -48,7 +48,10 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
   is_det env.vars t
 
 (*------------------------------------------------------------------*)
-let is_constant (env : Env.t) (t : Term.term) : bool =
+let is_constant
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    (env : Env.t) (t : Term.term) : bool
+  =
   let rec is_const (venv : Vars.env): Term.term -> bool = function
     | Var v ->
       begin
@@ -67,7 +70,7 @@ let is_constant (env : Env.t) (t : Term.term) : bool =
     | Find (vs, _, _, _) | Quant (_,vs,_) as t ->
       let fixed_type_binders =
         List.for_all (fun v -> 
-            Symbols.TyInfo.is_fixed env.table (Vars.ty v)
+            Symbols.TyInfo.is_fixed env.table (Type.Infer.norm ty_env (Vars.ty v))
           ) vs 
       in
       if not fixed_type_binders then false else
@@ -122,9 +125,14 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
   SE.is_single_system env.system || is_si env t
 
 (*------------------------------------------------------------------*)
-let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
+let is_ptime_deducible
+    ~(si:bool)
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    (env : Env.t) (t : Term.term) : bool
+  =
   let rec is_adv (venv : Vars.env): Term.term -> bool = function
     | Var v ->
+      let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
       (* check that the variable is constant, fixed and finite
          FEATURE: we could check instead that the type contains elements at-most
          polynomial sized. *)
@@ -132,15 +140,15 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
         try
           let info = Vars.get_info v venv in
           info.const &&
-          Symbols.TyInfo.is_fixed  env.table (Vars.ty v) &&
-          Symbols.TyInfo.is_finite env.table (Vars.ty v) 
+          Symbols.TyInfo.is_fixed  env.table ty_v &&
+          Symbols.TyInfo.is_finite env.table ty_v 
         with Not_found -> false (* sound though possibly inprecise *)
       in
       (* const + encodable as bit-strings => adv *)
       let is_const_base_type =
         try
           let info = Vars.get_info v venv in
-          info.const && Type.is_bitstring_encodable (Vars.ty v)
+          info.const && Type.is_bitstring_encodable ty_v
         with Not_found -> false 
       in
       let is_adv =
@@ -161,9 +169,10 @@ let is_ptime_deducible ~(si:bool) (env : Env.t) (t : Term.term) : bool =
       (* fixed + finite => enumerable in polynomial time
          (though we could be more precise with another type information) *)
       let poly_card_type_binders =
-        List.for_all (fun v -> 
-            Symbols.TyInfo.is_fixed  env.table (Vars.ty v) &&
-            Symbols.TyInfo.is_finite env.table (Vars.ty v) 
+        List.for_all (fun v ->
+            let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
+            Symbols.TyInfo.is_fixed  env.table ty_v &&
+            Symbols.TyInfo.is_finite env.table ty_v 
           ) vs 
       in
       if not poly_card_type_binders then false else

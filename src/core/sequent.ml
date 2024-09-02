@@ -689,7 +689,9 @@ module Mk (Args : MkArgs) : S with
       Pop the first universally quantified variable in [f] and
       instantiate it with [pt_arg]*)
   let pt_apply_var_forall
-      ~(arg_loc:L.t) (table : Symbols.table) (env : Vars.env)
+      ~(arg_loc:L.t)
+      (ty_env : Type.Infer.env)
+      (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) (pt_arg : Term.term)
     : PT.t
     =
@@ -719,7 +721,7 @@ module Mk (Args : MkArgs) : S with
       if f_arg_tag.adv && not (HTerm.is_ptime_deducible ~si:false env pt_arg) then
         error_pt_apply_not_adv table arg_loc ~pt ~arg:pt_arg;
 
-      if f_arg_tag.const && not (HTerm.is_constant env pt_arg) then
+      if f_arg_tag.const && not (HTerm.is_constant ~ty_env env pt_arg) then
         error_pt_apply_not_constant table arg_loc ~pt ~arg:pt_arg;
     in
 
@@ -758,9 +760,9 @@ module Mk (Args : MkArgs) : S with
   (*     (Failure "cannot apply a asymptotic implication with an concrete hypothesis") *)
 
    (*------------------------------------------------------------------*)
-  let subst_of_pt ~loc table (vars : Vars.env) (pt : PT.t) : Term.subst = 
+  let subst_of_pt ~loc ty_env table (vars : Vars.env) (pt : PT.t) : Term.subst = 
     let pt_venv = venv_of_pt vars pt in
-    match Mvar.to_subst ~mode:`Unif table pt_venv pt.mv with
+    match Mvar.to_subst ~ty_env ~mode:`Unif table pt_venv pt.mv with
     | `Subst sbst -> sbst
     | `BadInst pp_err ->
       soft_failure ~loc
@@ -808,7 +810,7 @@ module Mk (Args : MkArgs) : S with
     in
     (* Specializing [pt.form] by an extention of [pt.mv]. *)
     (* FIXME: correct location? *)
-    let sbst = subst_of_pt ~loc:loc_arg table (S.vars s) arg in
+    let sbst = subst_of_pt ~loc:loc_arg ty_env table (S.vars s) arg in
     let f1 = Equiv.Any.subst sbst f1 in
     let pat_f1 = Term.{
         pat_op_vars   = pt.args;
@@ -945,11 +947,12 @@ module Mk (Args : MkArgs) : S with
         let ty = Vars.ty f_arg in
         let arg, _ = Typing.convert ~ty_env ~pat:true cenv ~ty p_arg in
 
-        pt_apply_var_forall ~arg_loc:(L.loc p_arg) table env pt arg
+        pt_apply_var_forall ~arg_loc:(L.loc p_arg) ty_env table env pt arg
     in
 
     (** Apply [pt] to [p_arg] when [pt] is an implication. *)
     let do_impl
+        (ty_env : Type.Infer.env)
         (pt : PT.t) (pt_impl_arg : pt_impl_arg)
       : PT.t
       =
@@ -962,7 +965,7 @@ module Mk (Args : MkArgs) : S with
         | None ->
           (* destruct failed, applying the pending substitution and try to 
              destruct again *)
-          let subst = subst_of_pt ~loc:pt_app.pta_loc table (S.vars s) pt in
+          let subst = subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt in
           match destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form) with
           | Some (f1, f2) -> f1, f2
           | None ->
@@ -994,7 +997,7 @@ module Mk (Args : MkArgs) : S with
     let pt =
       List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
           if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
-            do_impl pt (pt_app_arg_as_pt p_arg) 
+            do_impl ty_env pt (pt_app_arg_as_pt p_arg) 
           else
             do_var pt (pt_app_arg_as_term p_arg) 
         ) init_pt pt_app.pta_args
@@ -1004,16 +1007,19 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)
   (** Closes inferred variables from [pt.args] by [pt.mv]. *)
-  let close loc (table : Symbols.table) (env : Vars.env) (pt : PT.t) : PT.t =
+  let close
+      (loc : L.t)
+      (ty_env : Type.Infer.env) (table : Symbols.table) (env : Vars.env)
+      (pt : PT.t) : PT.t
+    =
     (* clear infered variables from [pat_vars] *)
     let args =
       List.filter (fun (v, _) -> not (Mvar.mem v pt.mv)) pt.args
     in
     (* instantiate infered variables *)
-    let subst = subst_of_pt ~loc table env pt in 
+    let subst = subst_of_pt ~loc ty_env table env pt in 
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
-
     (* the only remaining variables are pattern holes '_' *)
     assert (List.for_all (fst_map Vars.is_pat) args);
 
@@ -1071,7 +1077,7 @@ module Mk (Args : MkArgs) : S with
     in
 
     (* close the proof-term by inferring as many pattern variables as possible *)
-    let pt = close loc (S.table s) (S.vars s) pt in
+    let pt = close loc ty_env (S.table s) (S.vars s) pt in
     assert (pt.mv = Mvar.empty);
 
     (* pattern variable remaining, and not allowed *)

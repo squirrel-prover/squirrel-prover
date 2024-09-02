@@ -147,7 +147,7 @@ module Infer : sig
 
   val open_tvars : env -> tvars -> univars * tsubst
 
-  val norm   : env -> ty  -> ty
+  val norm : env -> ty -> ty
       
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
 

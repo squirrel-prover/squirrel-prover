@@ -877,6 +877,7 @@ module Mvar : sig[@warning "-32"]
   (** [table] and [env] are necessary to check that restrictions on 
       variables instantiation have been respected. *)
   val to_subst :
+    ?ty_env:Type.Infer.env ->
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
     t ->
@@ -950,6 +951,7 @@ end = struct
   let fold f (m : t) (init : 'b) : 'b = Mv.fold f m.subst init
 
   let to_subst
+      ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
       ~(mode:[`Match|`Unif])
       (table : Symbols.table) (env : Vars.env)
       (mv : t)
@@ -964,9 +966,9 @@ end = struct
             let sys_cntxt = SE.{ set = system; pair = None; } in
             let env = Env.init ~table ~vars:env ~system:sys_cntxt () in
 
-            (tag.Vars.Tag.system_indep && not (HighTerm.is_system_indep              env t)) ||
-            (tag.Vars.Tag.const        && not (HighTerm.is_constant                  env t)) ||
-            (tag.Vars.Tag.adv          && not (HighTerm.is_ptime_deducible ~si:false env t))
+            (tag.Vars.Tag.system_indep && not (HighTerm.is_system_indep                      env t)) ||
+            (tag.Vars.Tag.const        && not (HighTerm.is_constant                  ~ty_env env t)) ||
+            (tag.Vars.Tag.adv          && not (HighTerm.is_ptime_deducible ~si:false ~ty_env env t))
           ) (Mv.bindings mv.subst)
       in
       if bad_instantiations = [] then

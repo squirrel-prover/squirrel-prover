@@ -18,12 +18,16 @@ val is_deterministic : Env.t -> Term.term -> bool
 
 (** Check if a term represents a constant (i.e. 
     non-probabilistic and η-independent) value. *)
-val is_constant : Env.t -> Term.term -> bool
+val is_constant :
+  ?ty_env:Type.Infer.env ->
+  Env.t -> Term.term -> bool
 
 (** Check if a term is deducible in ptime by an adversary with no direct 
     access to the protocol randomness. *)
 val is_ptime_deducible : 
-  si:bool -> Env.t -> Term.term -> bool
+  si:bool ->
+  ?ty_env:Type.Infer.env ->
+  Env.t -> Term.term -> bool
 
 (** Compute the tag satisfied by a term *)
 val tag_of_term : Env.t -> Term.term -> Vars.Tag.t
