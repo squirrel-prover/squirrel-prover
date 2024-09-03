@@ -854,59 +854,6 @@ end)
 (*------------------------------------------------------------------*)
 (** {2 Namespace} *)
 
-(*------------------------------------------------------------------*)
-(** Enter some namespaces (command [namespace N1. ... .NL]), creating
-    it if necessary. *)
-let namespace_enter (table : table) (nl : p_npath): table =
-  let enter1 table (nsymb : lsymb) =
-    let n = { group = namespace_group; name = L.unloc nsymb; } in
-    let scope = npath_app table.scope [n] in
-
-    let is_new = not (Mn.mem scope table.store) in
-    let table =
-      if is_new then
-        let table, _np =
-          Namespace.declare ~approx:false table ~data:Empty nsymb
-        in
-        table
-      else table
-    in
-
-    let store = table.store in
-    let store = if is_new then Mn.add scope Msymb.empty store else store in
-
-    update table ~scope ~store ~stack:(table.current :: table.stack)
-  in
-  List.fold_left enter1 table nl
-
-(*------------------------------------------------------------------*)
-(** Exit some namespaces (command [exit N1. ... .NL]) *)
-let namespace_exit (t : table) (nl : p_npath): table =
-  let exit1 table (n : lsymb) =
-    let top, n' =
-      let scope = table.scope.npath in
-      try List.takedrop (List.length scope - 1) scope with
-      | Not_found ->
-        symb_err (L.loc n)
-          (Failure ("already at top-level: cannot exit namespace " ^ (L.unloc n)));
-    in
-    let n' = as_seq1 n' in
-
-    if L.unloc n <> n'.name then begin
-      let err_str =
-        Fmt.str "in sub-namespace %s: cannot exit %s" n'.name (L.unloc n)
-      in
-      symb_err (p_npath_loc nl) (Failure err_str)
-    end;
-
-    let current, stack =
-      match table.stack with
-      | current :: stack -> current, stack
-      | []               -> assert false
-    in
-    update t ~scope:(npath top) ~current ~stack
-  in
-  List.fold_left exit1 t (List.rev nl)
 
 (*------------------------------------------------------------------*)
 (** Open a namespace, bringing its definitions in scope
@@ -954,6 +901,64 @@ let namespace_close (table : table) (np : npath): table =
       
   in
   { table with current; } 
+
+(*------------------------------------------------------------------*)
+(** Enter some namespaces (command [namespace N1. ... .NL]), creating
+    it if necessary. *)
+let namespace_enter (table : table) (nl : p_npath): table =
+  let enter1 table (nsymb : lsymb) =
+    let n = { group = namespace_group; name = L.unloc nsymb; } in
+    let scope = npath_app table.scope [n] in
+
+    let is_new = not (Mn.mem scope table.store) in
+    let table =
+      if is_new then
+        let table, _np =
+          Namespace.declare ~approx:false table ~data:Empty nsymb
+        in
+        table
+      else table
+    in
+
+    let store = table.store in
+    let store = if is_new then Mn.add scope Msymb.empty store else store in
+
+    update table ~scope ~store ~stack:(table.current :: table.stack)
+  in
+  (* create missing namespaces, adding them to the store if necessary *)
+  let table = List.fold_left enter1 table nl in
+
+  (* enter the namespace *)
+  namespace_open table (convert_npath nl table)
+
+(*------------------------------------------------------------------*)
+(** Exit some namespaces (command [exit N1. ... .NL]) *)
+let namespace_exit (t : table) (nl : p_npath): table =
+  let exit1 table (n : lsymb) =
+    let top, n' =
+      let scope = table.scope.npath in
+      try List.takedrop (List.length scope - 1) scope with
+      | Not_found ->
+        symb_err (L.loc n)
+          (Failure ("already at top-level: cannot exit namespace " ^ (L.unloc n)));
+    in
+    let n' = as_seq1 n' in
+
+    if L.unloc n <> n'.name then begin
+      let err_str =
+        Fmt.str "in sub-namespace %s: cannot exit %s" n'.name (L.unloc n)
+      in
+      symb_err (p_npath_loc nl) (Failure err_str)
+    end;
+
+    let current, stack =
+      match table.stack with
+      | current :: stack -> current, stack
+      | []               -> assert false
+    in
+    update t ~scope:(npath top) ~current ~stack
+  in
+  List.fold_left exit1 t (List.rev nl)
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
