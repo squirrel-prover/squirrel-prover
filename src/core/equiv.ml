@@ -995,6 +995,10 @@ let is_local = function
   | Local  _ -> true
   | Global _ -> false
 
+let is_global = function
+  | Local  _ -> false
+  | Global _ -> true
+
 (*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form

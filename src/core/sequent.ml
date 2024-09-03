@@ -80,6 +80,26 @@ module PT = struct
 end
 
 (*------------------------------------------------------------------*)
+(** Check that a proof-term is well-formed *)
+let well_formed (pt : PT.t) : unit =
+  begin (* check the bound *)
+    match pt.form, pt.bound with
+    | Global _, Concrete.Glob      -> ()
+    | Global _, Concrete.LocHyp    -> assert false
+    | Global _,                  _ -> assert false  
+    |        _, Concrete.Glob      -> assert false  
+    | Local  _, Concrete.LocAsym   -> ()
+    | Local  _, Concrete.LocHyp    -> ()
+    | Local  _, Concrete.LocConc _ -> ()
+  end;
+
+  begin (* check the subgoals *)
+    match pt.form with
+    | Global _ -> assert (List.for_all Equiv.is_global pt.subgs)
+    | Local  _ -> ()
+  end
+
+(*------------------------------------------------------------------*)
 (** Try to localize [pt] *)
 let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   let rec doit (pt : PT.t) : PT.t =
@@ -897,17 +917,21 @@ module Mk (Args : MkArgs) : S with
       (p_pt : Typing.pt)
       (s : S.t) : ghyp * PT.t
     =
-    match L.unloc p_pt with
-    | Typing.PT_symb (path, ty_args) -> do_convert_path ty_env mv path ty_args s
-    | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
-    | Typing.PT_localize p_sub_pt -> 
-      let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
-      let pt = 
-        pt_try_localize
-          ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt)
-          sub_pt 
-      in
-      ghyp, pt
+    let ghyp, pt =
+      match L.unloc p_pt with
+      | Typing.PT_symb (path, ty_args) -> do_convert_path ty_env mv path ty_args s
+      | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
+      | Typing.PT_localize p_sub_pt -> 
+        let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
+        let pt = 
+          pt_try_localize
+            ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt)
+            sub_pt 
+        in
+        ghyp, pt
+    in
+    well_formed pt;             (* sanity check *)
+    ghyp, pt
 
   and do_convert_path
       (ty_env  : Type.Infer.env)
