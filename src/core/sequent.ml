@@ -24,17 +24,16 @@ module PT = struct
     (** in reversed order w.r.t. introduction *)
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
-    bound : Concrete.bound;
+    bound  : Concrete.bound;
     form   : Equiv.any_form;
   }
-
 
 
   (** Project the [set] of all systems in a proof-term. *)
   let projs_set_in_local (projs : Term.projs) (pt : t) : t =
     (* It does not make sense to project global hypotheses.
        E.g. projecting over [P1] in
-         [phi]_{P1,P2} -> [psi]_{P1}
+         [phi]_{P1,P2} -> [psi]_{P1,P2}
        would yield
          [phi]_{P1} -> [psi]_{P1} 
        which is stronger than the initial formula.*)
@@ -51,7 +50,7 @@ module PT = struct
       mv     = Match.Mvar.map do_t_proj pt.mv; 
       system = SE.project_set projs pt.system ;
       subgs  = List.map do_proj pt.subgs;
-      bound = Concrete.bound_projs projs pt.bound;
+      bound  = Concrete.bound_projs projs pt.bound;
       form   = do_proj pt.form; }
 
   let _pp ppe fmt (pt : t) : unit =
@@ -65,17 +64,19 @@ module PT = struct
           (Mvar._pp ppe) pt.mv
     in        
     Fmt.pf fmt "@[<v 0>\
-                @[%a@]@;\
-                @[system : @[%a@]@]@;\
+                %a judgement@;\
+                formula: @[%a@]@;\
+                @[system: @[%a@]@]@;\
                 %t\
                 @[vars: @[%a@]@]@]"
+      (Concrete._pp ppe) pt.bound (* prints the judgement kind, not only the bound *)
       (Equiv.Any._pp ppe ?context:None) pt.form  
       SE.pp_context pt.system
       pp_subgoals_and_mv
       (Vars._pp_typed_tagged_list ppe) (List.rev pt.args) 
 
   let pp     = _pp (default_ppe ~dbg:false ())
-  let pp_dbg = _pp (default_ppe ~dbg:true ())
+  let pp_dbg = _pp (default_ppe ~dbg:true  ())
 end
 
 (*------------------------------------------------------------------*)
@@ -87,7 +88,8 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
     | Global (Atom (Reach f)) ->
       assert(pt.bound = Glob || pt.bound = LocAsym);
       let bound =
-        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound) in
+        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound) 
+      in
       { pt with form = Local f.formula; bound = bound }
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
@@ -103,8 +105,8 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
     (* [pf_t] is an implication [f1 -> f2]: add [f1] as hypothesis *)
     | Global (Equiv.Impl (f1, f2)) ->
       doit { pt with
-             subgs = (Global f1) :: pt.subgs;
-             form = Global f2; }
+             subgs = Global f1 :: pt.subgs;
+             form  = Global f2; }
 
     | Global _f -> failed ()
 
@@ -122,11 +124,13 @@ let pt_try_cast (type a)
   | Equiv.Local_t , Local  _ -> pt
   | Equiv.Global_t, Global _ -> pt
 
-  | Equiv.Local_t , Global _ -> pt_try_localize  ~failed pt
+  | Equiv.Local_t , Global _ -> well_formed pt; pt_try_localize ~failed pt
+
   | Equiv.Global_t, Local  _ -> failed ()
-  (* Casting [pt.form] as a [Reach form] may be unsound if [pt] has
-     (discharged) local subgoals
-     (FIXME: we could check it and cast if there are no local subgoals). *)
+  (* Casting [pt.form] as a [Reach form] is generally unsound if [pt] has
+     (discharged) local subgoals.
+     Note that we could do such a cast if we first checked that there are
+     no local subgoals. *)
 
   | Equiv.Any_t, _ -> pt
 
@@ -560,7 +564,8 @@ module Mk (Args : MkArgs) : S with
           Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, LocHyp
         | Equiv.Global_t as src ->
           Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, Glob
-      in let f, bound = g in
+      in
+      let f, bound = g in
 
       `Hyp id,
       { system = S.system s;
@@ -605,13 +610,16 @@ module Mk (Args : MkArgs) : S with
         (* a local lemma or axiom is actually a global reachability formula *)
         let form, bound =
           match S.conc_kind, form with
-          (* we already downgrade it for local sequents *)
-          | Equiv.Local_t, Equiv.LocalS {formula; bound = Some ve} ->
+          (* we already downgraded it for local sequents *)
+          | Equiv.Local_t, Equiv.LocalS {formula; bound = Some ve } ->
             Equiv.Local formula, Concrete.LocConc ve
-          | Equiv.Local_t, Equiv.LocalS {formula; bound = None} ->
+
+          | Equiv.Local_t, Equiv.LocalS {formula; bound = None    } ->
             Equiv.Local formula, Concrete.LocAsym
+
           (* in global sequent, we use it as a global formula  *)
           | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f)), Glob
+
           | _ -> assert false (* impossible *)
         in
 
@@ -754,11 +762,6 @@ module Mk (Args : MkArgs) : S with
     soft_failure
       (Failure "cannot apply a concrete implication with an asymptotic hypothesis")
 
-  (*------------------------------------------------------------------*)
-  (* let error_pt_apply_concrete_asymptotic () = *)
-  (*   soft_failure *)
-  (*     (Failure "cannot apply a asymptotic implication with an concrete hypothesis") *)
-
    (*------------------------------------------------------------------*)
   let subst_of_pt ~loc ty_env table (vars : Vars.env) (pt : PT.t) : Term.subst = 
     let pt_venv = venv_of_pt vars pt in
@@ -860,14 +863,13 @@ module Mk (Args : MkArgs) : S with
     let bound =
       match pt.bound, arg.bound with
       | LocConc b, LocConc sb ->
-        Concrete.LocConc (Library.Real.mk_add (S.table s) sb (Library.Real.mk_minus (S.table s) b))
-      | f, g when f = g  -> f
-      | LocAsym, LocHyp -> LocAsym
-      | LocHyp, LocAsym -> LocAsym
-      | LocHyp, LocConc _ -> arg.bound
-      | LocConc _, LocHyp -> pt.bound
-      | _ ->
-        error_pt_apply_asymptotic_concrete ()
+        Concrete.LocConc (Library.Real.mk_add table sb (Library.Real.mk_minus table b))
+      | f, g when Concrete.equal f g  -> f
+      | LocAsym  , LocHyp    -> LocAsym
+      | LocHyp   , LocAsym   -> LocAsym
+      | LocHyp   , LocConc _ -> arg.bound
+      | LocConc _, LocHyp    -> pt.bound
+      | _ -> error_pt_apply_asymptotic_concrete ()
     in
     { subgs; mv; args; form = f2; bound; system = pt.system; }
 
@@ -889,7 +891,7 @@ module Mk (Args : MkArgs) : S with
       
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let rec do_convert_pt_gen 
+  let rec do_convert_pt_gen
       (ty_env : Type.Infer.env)
       (mv : Mvar.t)
       (p_pt : Typing.pt)
@@ -924,10 +926,11 @@ module Mk (Args : MkArgs) : S with
     lem_name, pt
 
   and do_convert_pt_app
-      (ty_env : Type.Infer.env)
+      (ty_env  : Type.Infer.env)
       (init_mv : Mvar.t)
-      (pt_app : Typing.pt_app)
-      (s : S.t) : ghyp * PT.t
+      (pt_app  : Typing.pt_app)
+      (s       : S.t) 
+    : ghyp * PT.t
     =
     let table, env = S.table s, S.vars s in
 
@@ -978,8 +981,9 @@ module Mk (Args : MkArgs) : S with
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;
           args   = pt.args;
-          bound = if Equiv.is_local f2 && (S.bound s) <> None
-            then  LocConc (Library.Real.mk_zero (S.table s))
+          bound = 
+            if Equiv.is_local f2 && S.bound s <> None
+            then LocConc (Library.Real.mk_zero (S.table s))
             else LocAsym;
           form   = f2; }
 

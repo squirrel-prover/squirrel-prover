@@ -1709,7 +1709,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* local sequent, global sub-goal *)
     | Equiv.Local_t, Equiv.Global subg ->
-      (**TODO: Check that this message is necessary *)
       Printer.prt `Warning
         "Discharged a global subgoal in a local sequent,@ \
          moved to a global sequent@ \
@@ -1774,18 +1773,26 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | Local_t  ->
           begin
             match Match.T.try_match ~option ~ty_env ~hyps table ~env system conclusion pat with
-            | NoMatch _ as f -> f
-            | Match mv as f->
+            | NoMatch _ as res -> res
+            | Match mv as res ->
               match bound, pat_bound with
-              | None, Concrete.LocAsym | None, Concrete.LocHyp -> f
+              | None, Concrete.LocAsym | None, Concrete.LocHyp -> res
+
               | Some e, LocConc ve ->
-                Match.T.try_match ~option ~mv ~ty_env ~hyps table
+                Match.T.try_match
+                  ~option ~mv ~ty_env ~hyps table
                   ~env system e {opat with pat_op_term = ve}
-              | Some _, LocHyp -> f
+
+              | Some _, LocHyp -> res
+
               | None, LocConc _ ->
-                soft_failure ~loc (Failure "Cannot apply a concrete hypothesis on an asymptotic goal")
+                soft_failure ~loc
+                  (Failure "Cannot apply a concrete hypothesis on an asymptotic goal")
+
               | Some _, LocAsym ->
-                soft_failure ~loc (Failure "Cannot apply an asymptotic hypothesis on a concrete goal")
+                soft_failure ~loc
+                  (Failure "Cannot apply an asymptotic hypothesis on a concrete goal")
+
               | _ -> assert false
           end
         | Global_t ->

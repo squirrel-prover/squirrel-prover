@@ -17,7 +17,7 @@ module PT : sig
 
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
-    bound : Concrete.bound;
+    bound  : Concrete.bound;
     form   : Equiv.any_form;
   }
 
