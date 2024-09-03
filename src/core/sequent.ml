@@ -28,30 +28,68 @@ module PT = struct
     form   : Equiv.any_form;
   }
 
+  (** Project the [set] of all systems in a proof-term while
+      preserving validity of the proof-term, if possible.
 
-  (** Project the [set] of all systems in a proof-term. *)
-  let projs_set_in_local (projs : Term.projs) (pt : t) : t =
-    (* It does not make sense to project global hypotheses.
-       E.g. projecting over [P1] in
-         [phi]_{P1,P2} -> [psi]_{P1,P2}
-       would yield
-         [phi]_{P1} -> [psi]_{P1} 
-       which is stronger than the initial formula.*)
-    let do_proj : Equiv.any_form -> Equiv.any_form = function
-      | Equiv.Local t -> Local (Term.project projs t)
-      | Equiv.Global _ as a -> a
-      (* TODO: system: there is an issue here:
-         global hypotheses cannot be left unchanged, but cannot always
-         be projected (see comment above)... *)
+      We cannot project everywhere as this would not preserve validity:
+      notably, it is generally unsound to project global hypotheses
+      appearing in contrapositive positions.
+
+      E.g. projecting over [P1] in
+        [phi]_{P1,P2} -> [psi]_{P1,P2}
+      would yield
+        [phi]_{P1} -> [psi]_{P1} 
+      which is stronger than the initial formula.
+  *)
+  let projs_set table env (projs : Term.projs) (pt : t) : t =
+    (** Check that reachability atoms, which are the only atom in
+        which we are projecting, only appear in positive position.
+
+        Remark: we accept reachability atoms in contrapositive
+        positions if these atoms are system independent. *)
+    let rec check_positivity (p : bool) (f : Equiv.form) =
+      match f with
+      | Quant (_, _,f) | Let (_,_,f) -> check_positivity p f
+      | And  (f1, f2)
+      | Or   (f1, f2) -> check_positivity p f1 && check_positivity p f2
+      | Impl (f1, f2) -> 
+        check_positivity (not p) f1 &&
+        check_positivity      p  f2
+      | Atom (Reach f) -> 
+        p ||
+        begin
+          let vars = Vars.add_vars pt.args env in
+          let env = Env.init ~table ~system:pt.system ~vars () in
+          HTerm.is_system_indep env f.formula
+        end
+      | Atom _ -> true
     in
-    let do_t_proj = Term.project projs in
 
+    let new_system = SE.project_set projs pt.system in
+    
+    (** [b] indicates if we are in positive or contrapositive position *)
+    let do_proj (p : bool) : Equiv.any_form -> Equiv.any_form = function
+      | Equiv.Local  t -> Local (Term.project projs t)
+      | Equiv.Global e -> 
+        (* If the system expressions after projections contains the
+           same set of single systems, we can project. *)
+        let can_project = 
+          SE.equal_modulo table pt.system.set new_system.set || 
+          check_positivity p e
+        in
+        if not can_project then 
+          soft_failure (Failure "cannot not project system set in proof-term");
+        (* FIXME: this is a terrible error message, but this check
+           should disappear in the near future, so it will do until then. *)
+
+        Global (Equiv.project projs e)
+    in
     { args   = pt.args;
-      mv     = Match.Mvar.map do_t_proj pt.mv; 
-      system = SE.project_set projs pt.system ;
-      subgs  = List.map do_proj pt.subgs;
+      mv     = Match.Mvar.map (Term.project projs) pt.mv; 
+      system = new_system ;
+      subgs  = List.map (do_proj false) pt.subgs;
       bound  = Concrete.bound_projs projs pt.bound;
-      form   = do_proj pt.form; }
+      form   = do_proj true pt.form; }
 
   let _pp ppe fmt (pt : t) : unit =
     let pp_subgoals_and_mv fmt =
@@ -182,7 +220,10 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
 (*------------------------------------------------------------------*)
 (** Projects [pt] onto [system], projecting diffs in terms if necessary.
     Projection must be possible. *)
-let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
+let pt_project_system_set
+    (table : Symbols.table) (vars : Vars.env) 
+    (pt : PT.t) (system : SE.context) : PT.t 
+  =
   (* project local hyps. and conclusion [arg] over [system]. *)
   if SE.is_fset system.set then
     if SE.is_fset pt.system.set then
@@ -206,7 +247,7 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
       (* [system] and [pt.system] are fsets. 
          Project [pt] over [system.set]. *)
       let projs = List.map fst (SE.to_list @@ SE.to_fset system.set) in
-      PT.projs_set_in_local projs pt
+      PT.projs_set table vars projs pt
 
     (* [system.set] is a fset, [pt.system.set] is [SE.any]
        or [SE.any_compatible_with].
@@ -283,6 +324,7 @@ let pt_unify_warning_systems ~(pt : PT.t) ~(arg : PT.t) : unit =
 let pt_unify_systems
     ~(failed : unit -> 'a)
     (table : Symbols.table)
+    (vars  : Vars.env)
     ~(pt : PT.t) ~(arg : PT.t)
   : PT.t * PT.t
   =
@@ -304,11 +346,11 @@ let pt_unify_systems
         (* Unify reachability systems in [system.set]. *)
         let pt_set, arg_set = pt.system.set, arg.system.set in
         if SE.subset_modulo table pt_set arg_set then
-          pt, pt_project_system_set arg pt.system 
+          pt, pt_project_system_set table vars arg pt.system 
         else
         if SE.subset_modulo table arg_set pt_set then begin
           pt_unify_warning_systems ~pt ~arg;
-          pt_project_system_set pt arg.system, arg
+          pt_project_system_set table vars pt arg.system, arg
         end
         else failed ()
     end
@@ -848,7 +890,7 @@ module Mk (Args : MkArgs) : S with
     (* Verify that the systems of the argument [arg] applies to the systems
        of [pt], projecting it if necessary. *)
     let pt, arg =
-      pt_unify_systems ~failed:(pt_apply_error arg) table ~pt ~arg
+      pt_unify_systems ~failed:(pt_apply_error arg) table (S.vars s) ~pt ~arg
     in
 
     let match_res =
@@ -1080,6 +1122,7 @@ module Mk (Args : MkArgs) : S with
       (s    : S.t)
     : ghyp * Type.tvars * PT.t
     =
+    let table = S.table s in
     (* resolve (to some extent) parser ambiguities in [s] *)
     let p_pt = resolve_pt s p_pt in
     let loc = L.loc p_pt in
@@ -1095,8 +1138,8 @@ module Mk (Args : MkArgs) : S with
       if not check_compatibility then
         pt
       else 
-        match pt_compatible_with (S.table s) pt (S.system s) with
-        | `Subset         -> pt_project_system_set pt (S.system s)
+        match pt_compatible_with table pt (S.system s) with
+        | `Subset         -> pt_project_system_set table (S.vars s) pt (S.system s)
         | `ContextIndepPT -> { pt with system = S.system s; }
         | `Failed         -> error_pt_bad_system loc pt 
     in
