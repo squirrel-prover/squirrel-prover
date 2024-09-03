@@ -981,10 +981,7 @@ module Mk (Args : MkArgs) : S with
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;
           args   = pt.args;
-          bound = 
-            if Equiv.is_local f2 && S.bound s <> None
-            then LocConc (Library.Real.mk_zero (S.table s))
-            else LocAsym;
+          bound  = pt.bound;
           form   = f2; }
 
       | `Pt p_arg ->
