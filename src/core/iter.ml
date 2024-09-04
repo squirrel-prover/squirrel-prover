@@ -1053,27 +1053,7 @@ let macro_support
   let abs_incl = MsetAbs.incl cntxt.table cntxt.system in
 
   (* reachable macros from [init] *)
-  let s_reach = Utils.fpt abs_incl do1 init in
-
-  (* we now try to minimize [s_reach], by removing as many global macros as
-     possible *)
-
-  let s_reach_no_globs =
-    List.filter (fun (ms,_) -> not (Macros.is_global cntxt.table ms)) s_reach
-  in
-  (* [s_reach'] are macros reachable from non-global macros in [s_reach] *)
-  let s_reach' = Utils.fpt abs_incl do1 s_reach_no_globs in
-
-  assert (abs_incl s_reach' s_reach);
-
-  (* global macros reachable from s_reach' *)
-  let s_reach'_glob =
-    List.filter (fun (ms, _) -> Macros.is_global cntxt.table ms) s_reach'
-  in
-
-  (* we remove from [s_reach] all global macros reachable from non-global
-     macros in [s_reach] *)
-  MsetAbs.diff cntxt.table cntxt.system s_reach s_reach'_glob
+  Utils.fpt abs_incl do1 init 
 
 
 (*------------------------------------------------------------------*)
