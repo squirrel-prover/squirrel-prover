@@ -18,32 +18,44 @@ let hard_failure = Tactics.hard_failure
 (*------------------------------------------------------------------*)
 (** The mode contains the information to modify the goal.
     Allows factorasation of the code between equivalence goals and deduction goals. *)
-type mode = Equiv of Term.terms | Deduction of S.secrecy_goal
+type mode = EquivAsymp of Term.terms | Deduction of S.secrecy_goal
 
 (** Get the mode from a sequent.
     Raise a soft failure if the sequent is not an equivalence or deduction goal. *)
 let get_mode (s : ES.t) : mode =
-  if S.conclusion_is_equiv s then
-    Equiv (S.conclusion_as_equiv s)
-  else if Library.Secrecy.is_loaded (ES.table s) then
+  let bad_goal () =
+    soft_failure
+      (Tactics.GoalBadShape
+         "expected an equivalence goal or a (non-)deduction goal");
+  in
+  
+  if S.conclusion_is_equiv s then begin
+    let concl = S.conclusion_as_equiv s in
+    if concl.bound <> None then
+      soft_failure
+        (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+
+    EquivAsymp concl.terms
+  end
+  else begin
+    if not (Library.Secrecy.is_loaded (ES.table s)) then bad_goal ();
+
     match S.get_secrecy_goal s with
     | Some goal -> 
-      if Type.is_bitstring_encodable goal.right_ty then
-        Deduction goal
-      else
-        soft_failure (Tactics.GoalBadShape
-          "The right part of the (non-)deduction goal must be encodable")
-    | None ->
-      soft_failure (Tactics.GoalBadShape
-        "expected an equivalence goal or a (non-)deduction goal with WeakSecrecy library")
-  else
-    soft_failure (Tactics.GoalBadShape
-      "expected an equivalence goal or a (non-)deduction goal with WeakSecrecy library")
+      if not (Type.is_bitstring_encodable goal.right_ty) then
+        soft_failure
+          (Tactics.GoalBadShape
+             "The right part of the (non-)deduction goal must be bistring encodable");
+      
+      Deduction goal
+        
+    | None -> bad_goal ()
+  end
 
 (** Get the list of terms contained in the goal. *)
 let get_terms (mode : mode) : Term.terms =
   match mode with
-  | Equiv terms -> terms
+  | EquivAsymp terms -> terms
   | Deduction goal -> goal.left
 
 (*------------------------------------------------------------------*)
@@ -114,16 +126,19 @@ let mk_maingoal
     (s : ES.t) : ES.t
   =
   match mode with
-  | Equiv terms ->
-    let terms_new = List.mapi
-      (fun j t -> if j = i then oracle_new else t)
-      terms
+  | EquivAsymp terms ->
+    let terms_new = 
+      List.mapi
+        (fun j t -> if j = i then oracle_new else t)
+        terms
     in
-    S.set_equiv_conclusion terms_new s
+    S.set_equiv_conclusion { terms = terms_new; bound = None; } s
+
   | Deduction goal ->
-    let terms_new = List.mapi
-      (fun j t -> if j = i then oracle_new else t)
-      goal.left
+    let terms_new =
+      List.mapi
+        (fun j t -> if j = i then oracle_new else t)
+        goal.left
     in
     let goal_new = { goal with left = terms_new } in
     let conc = S.mk_secrecy_concl goal_new s in
@@ -171,9 +186,11 @@ let mk_subgoal
     Term.(mk_app oracle [mk_app (mk_var f_var) [f_arg]])
   in
   let loc_form = Term.mk_eq (mk_term oracle_old) (mk_term oracle_new) in
-  let glob_form = Equiv.(Quant (ForAll,
-                                [f_var, Vars.Tag.make ~adv:true Global], (*TODO check if we must have [glob] tag*)
-                                Atom (Reach loc_form))) in
+  let glob_form = 
+    Equiv.mk_quant_tagged Equiv.ForAll
+      [f_var, Vars.Tag.make ~adv:true Global]
+      (Equiv.Atom (Reach { formula = loc_form; bound = None; }))
+  in
   S.set_conclusion glob_form s
 
 (** Parse the argument of the tactic and return the two new sequent to prove.*)
@@ -183,7 +200,6 @@ let rewrite_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
     let reverse = parse_named_args named_args in
     let mode = get_mode s in
     let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
-    (*TODO : check if [InGoal] is correct*)
     let oracle_new, ty1, ty2 = convert_arg term cenv in
     let oracle_old, i = get_oracle pos_opt (Type.Fun (ty1,ty2)) mode in
     let maingoal = mk_maingoal oracle_new mode i s in
