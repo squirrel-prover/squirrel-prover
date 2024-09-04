@@ -166,6 +166,9 @@ val arity : Symbols.action -> Symbols.table -> int
     Describe the behavior of an action: it consists of an input, followed by a
     condition, then state updates and an output. *)
 
+(** An execution model *)
+type exec_model = Classic | PostQuantum
+
 (** Type of action descriptions. *)
 type descr = {
   name      : Symbols.action ;
@@ -184,6 +187,8 @@ type descr = {
   output    : Channel.t * Term.term;
   globals   : Symbols.macro list;
     (** List of global macros declared at [action]. *)
+
+  exec_model : exec_model;
 }
 
 (** Check that an action description is well-formed. *)
@@ -198,7 +203,10 @@ val project_descr : Projection.t -> descr -> descr
 (** Strong notion of compatibility, more restrictive (and syntactical) than
     what system compatibility alone would require, which helps to combine
     descriptions. Does not rename indices, i.e. not stable by alpha
-    renaming. *)
+    renaming. 
+
+    Notably (but not only) requires that the systems have the same
+    execution models. *)
 val strongly_compatible_descr : descr -> descr -> bool
 
 (** Takes a labelled list of single-system descriptions

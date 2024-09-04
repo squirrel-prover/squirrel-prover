@@ -300,6 +300,10 @@ let of_term (s : Symbols.action) (l : Term.term list) table : action =
 let pp_parsed_action fmt a = pp_action_f pp_strings (0,[]) fmt a
 
 (*------------------------------------------------------------------*)
+(** An execution model *)
+type exec_model = Classic | PostQuantum
+
+(*------------------------------------------------------------------*)
 (** An action description features an input, a condition (which sums up
     several [Exist] constructs which might have succeeded or not) and
     subsequent updates and outputs.
@@ -311,14 +315,15 @@ let pp_parsed_action fmt a = pp_action_f pp_strings (0,[]) fmt a
     conditions). *)
 
 type descr = {
-  name      : Symbols.action ;
-  action    : action_v ;
-  input     : Channel.t ;
-  indices   : Vars.var list ;
-  condition : Vars.var list * Term.term ;
-  updates   : (Symbols.macro * Term.terms * Term.term) list ;
-  output    : Channel.t * Term.term;
-  globals   : Symbols.macro list;
+  name       : Symbols.action ;
+  action     : action_v ;
+  input      : Channel.t ;
+  indices    : Vars.var list ;
+  condition  : Vars.var list * Term.term ;
+  updates    : (Symbols.macro * Term.terms * Term.term) list ;
+  output     : Channel.t * Term.term;
+  globals    : Symbols.macro list;
+  exec_model : exec_model;
 }
 
 (** Validation function for action description: checks for free variables. *)
@@ -368,12 +373,14 @@ let _pp_descr ppe fmt descr =
   let descr = if ppe.dbg then descr else subst_descr s descr in
 
   Fmt.pf fmt "@[<v 0>action name: @[<hov>%a@]@;\
+              %s@;\
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
     pp_descr_short descr
+    (match descr.exec_model with Classic -> "classic" | PostQuantum -> "postquantum")
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" (Vars._pp_list ppe))
     descr.indices
     (Term._pp ppe) (snd descr.condition)
@@ -448,21 +455,19 @@ let strongly_compatible_descr d1 d2 : bool =
     let d2 = subst_descr subst d2 in
     assert (d1.indices = d2.indices);
 
-    d1.name    = d2.name &&
-    d1.action  = d2.action &&
-    d1.input   = d2.input &&
-    fst d1.condition = fst d2.condition &&
+    d1.name          = d2.name                  &&
+    d1.action        = d2.action                &&
+    d1.input         = d2.input                 &&
+    d1.exec_model    = d2.exec_model            &&
+    fst d1.condition = fst d2.condition         &&
+    fst d1.output    = fst d2.output            &&
     ( List.map (fun (x,_,_) -> x) d1.updates = 
-      List.map  (fun (x,_,_) -> x) d2.updates ) &&
-    fst d1.output = fst d2.output
+      List.map  (fun (x,_,_) -> x) d2.updates )
 
 let combine_descrs (descrs : (Projection.t * descr) list) : descr =
 
-  let (p1,d1),rest =
-    match descrs with
-      | hd :: tl -> hd,tl
-      | [] -> assert false
-  in
+  let (p1,d1),rest = List.hd descrs, List.tl descrs in
+
   (* Rename indices of descriptions in [rest] to agree with [d1]. *)
   let rest =
     List.map
@@ -477,6 +482,9 @@ let combine_descrs (descrs : (Projection.t * descr) list) : descr =
   in
   let descrs = (p1,d1)::rest in
 
+  let exec_model = d1.exec_model in
+  assert(List.for_all (fun (_,d) -> d.exec_model = exec_model) rest);
+
   assert (List.for_all (fun (_,d2) -> strongly_compatible_descr d1 d2) rest);
 
   let map f = List.map (fun (lbl,descr) -> (lbl, f descr)) descrs in
@@ -485,6 +493,7 @@ let combine_descrs (descrs : (Projection.t * descr) list) : descr =
     action  = d1.action;
     input   = d1.input;
     indices = d1.indices;
+    exec_model;
     condition =
       fst d1.condition,
       Term.combine (map (fun descr -> snd descr.condition));

@@ -110,5 +110,12 @@ Proof.
     by apply eq_refl.
 Qed.
 
+
+(* --------------------------------------------------------- *)
+(* checking that classical macros cannot be expanded *)
+lemma [PQ] _ j : Classic.output@X j = empty. 
+Proof. checkfail rewrite /output exn Failure. Abort.
+
+
 (* --------------------------------------------------------- *)
 system [classic] PC = !_i P.

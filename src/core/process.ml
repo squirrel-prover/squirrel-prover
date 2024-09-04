@@ -673,7 +673,7 @@ type p_env = {
   (** list of global macros declared at [action] *)
 
   (*------------------------------------------------------------------*)
-  exec_model  : Macros.exec_model;
+  exec_model  : Action.exec_model;
   input_macro : Term.msymb;
 }
 
@@ -813,7 +813,7 @@ let subst_macros_ts table l ts t =
 
 (*------------------------------------------------------------------*)
 let process_system_decl
-    _proc_loc (system_name : System.t) (exec_model : Macros.exec_model)
+    _proc_loc (system_name : System.t) (exec_model : Action.exec_model)
     (init_table : Symbols.table)
     (init_projs : Projection.t list) (ts, init_proc : Vars.var * proc)
   : proc * Symbols.table
@@ -933,7 +933,8 @@ let process_system_decl
         input   = in_ch;
         indices = indices;
         globals = penv.globals; 
-        condition; updates; output; } 
+        condition; updates; output; 
+        exec_model; } 
     in
 
     Action.check_descr action_descr;
@@ -1318,8 +1319,8 @@ let process_system_decl
 
   let input_macro = 
     match exec_model with
-    | Macros.Classic     -> Macros.Classic.inp 
-    | Macros.PostQuantum -> Macros.Quantum.inp 
+    | Action.Classic     -> Macros.Classic.inp 
+    | Action.PostQuantum -> Macros.Quantum.inp 
   in
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =
@@ -1381,7 +1382,7 @@ let check_actions_all_def table (p : proc) =
 
 (* FIXME: fix user-defined projections miss-used *)
 let declare_system
-    (table : Symbols.table) (exec_model : Macros.exec_model) 
+    (table : Symbols.table) (exec_model : Action.exec_model) 
     (system_name : lsymb option)
     (projs : Projection.t list) (proc : Parse.t) 
   : Symbols.table
@@ -1397,7 +1398,7 @@ let declare_system
   Printer.pr
     "@[<v 2>Typed-check process:@;@;@[%a@]@]@.@."
     (_pp ppe) p ;
-  
+
   (* FIXME: do not use hard coded projections *)
   let projections = [Projection.left; Projection.right] in
   let system_name = match system_name with
@@ -1408,14 +1409,15 @@ let declare_system
 
   (* we register the init action before parsing the system *)
   let init_descr = Action.{ 
-      name      = Symbols.init_action;
-      action    = [];
-      input     = Symbols.dummy_channel;
-      indices   = [];
-      condition = ([], Term.mk_true);
-      updates   = Macros.get_init_states table;
-      output    = (Symbols.dummy_channel, Term.empty);
-      globals   = []; }
+      name       = Symbols.init_action;
+      action     = [];
+      input      = Symbols.dummy_channel;
+      indices    = [];
+      condition  = ([], Term.mk_true);
+      updates    = Macros.get_init_states table;
+      output     = (Symbols.dummy_channel, Term.empty);
+      globals    = []; 
+      exec_model; }
   in
   let table, _, _ =
     System.register_action table system_name init_descr

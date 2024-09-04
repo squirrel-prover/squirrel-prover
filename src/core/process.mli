@@ -116,7 +116,7 @@ val add_namelength_axiom :
     as a set of actions. In that process, name creations are compiled away.
     Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> Macros.exec_model -> lsymb option -> Projection.t list -> Parse.t -> Symbols.table
+  Symbols.table -> Action.exec_model -> lsymb option -> Projection.t list -> Parse.t -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)

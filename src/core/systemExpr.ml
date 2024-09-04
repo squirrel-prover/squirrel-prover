@@ -95,12 +95,11 @@ let action_to_term table system a =
 (** {2 Action descriptions} *)
 
 (** Compute action description of some system expression for a given shape. *)
-let descr_of_shape
+let descr_of_shape 
     (type a) (table : Symbols.table) (expr : a expr) (shape : Action.shape)
-    : Action.descr
+  : Action.descr
   =
   let expr = to_list (to_fset expr) in
-  (* TODO refreshing in descr_of_shape useless before combine_descrs *)
   Action.combine_descrs
     (List.map
        (fun (lbl,sys) -> lbl, System.Single.descr_of_shape table sys shape)

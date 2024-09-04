@@ -699,8 +699,8 @@ let add_macros context =
                 (* for now, only support recurrence over timestamps *)
                 assert (Type.equal d.rec_ty Type.ttimestamp);
                 convert_type context d.ty
-              | ProtocolMacro `Output -> convert_type context Type.tmessage
-              | ProtocolMacro `Cond   -> convert_type context Type.tboolean
+              | ProtocolMacro (`Output,_) -> convert_type context Type.tmessage
+              | ProtocolMacro (`Cond  ,_) -> convert_type context Type.tboolean
             end
               
           |State(_,t,_) | Global(_,t,_) -> convert_type context t 

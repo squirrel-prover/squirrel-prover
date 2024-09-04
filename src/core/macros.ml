@@ -40,7 +40,7 @@ type structed_macro_data = {
 (* FIXME: quantum: move all macro definitions in this type *)
 type general_macro_data = 
   | Structured of structed_macro_data
-  | ProtocolMacro of [`Output | `Cond] 
+  | ProtocolMacro of [`Output | `Cond] * Action.exec_model
   (** ad hoc macro definitions using action descriptions *)
 
 type Symbols.general_macro_def += Macro_data of general_macro_data
@@ -78,9 +78,6 @@ type exec_model_def = {
 
 (*------------------------------------------------------------------*)
 (** {3 Builtin execution models} *)
-
-(** An execution model *)
-type exec_model = Classic | PostQuantum
 
 (*------------------------------------------------------------------*)
 module Classic = struct
@@ -158,8 +155,8 @@ module Classic = struct
     in
 
     (*------------------------------------------------------------------*)
-    let output_data = ProtocolMacro `Output in
-    let cond_data   = ProtocolMacro `Cond   in
+    let output_data = ProtocolMacro (`Output, Classic) in
+    let cond_data   = ProtocolMacro (`Cond  , Classic) in
 
     (*------------------------------------------------------------------*)
     {
@@ -275,8 +272,8 @@ module Quantum = struct
     in
 
     (*------------------------------------------------------------------*)
-    let output_data = ProtocolMacro `Output in
-    let cond_data   = ProtocolMacro `Cond   in 
+    let output_data = ProtocolMacro (`Output, PostQuantum) in
+    let cond_data   = ProtocolMacro (`Cond  , PostQuantum) in 
 
   (*------------------------------------------------------------------*)
     {
@@ -331,7 +328,7 @@ type global_data = {
   bodies : (System.Single.t * Term.term) list;
   (** Definitions of macro body for single systems where it is defined. *)
 
-  exec_model : exec_model; 
+  exec_model : Action.exec_model; 
   (** The execution model this macro was declared in*)
   
   ty : Type.ty;
@@ -428,9 +425,9 @@ let fty (table : Symbols.table) (ms : Symbols.macro) : Type.ftype * Type.ty =
     | General def ->
       begin
         match get_general_macro_data def with
-        | Structured     data   -> [],       data.ty, data.rec_ty
-        | ProtocolMacro `Output -> [], Type.tmessage, Type.ttimestamp
-        | ProtocolMacro `Cond   -> [], Type.tboolean, Type.ttimestamp
+        | Structured     data       -> [],       data.ty, data.rec_ty
+        | ProtocolMacro (`Output,_) -> [], Type.tmessage, Type.ttimestamp
+        | ProtocolMacro (`Cond  ,_) -> [], Type.tboolean, Type.ttimestamp
       end
 
     | Symbols.State (_,ty,data) ->
@@ -627,6 +624,9 @@ let get_definition_nocntxt
     (asymb  : Symbols.action)
     (aidx   : Term.term list) : [ `Def of Term.term | `Undef ]
   =
+  let exception Failed in
+  let failed () = raise Failed in
+
   let init_or_generic ~init ~body =
     let var, t = body in
     let subst = Term.ESubst (Term.mk_var var, Term.mk_action asymb aidx) in
@@ -634,6 +634,8 @@ let get_definition_nocntxt
           then init
           else Term.subst [subst] t)
   in
+
+  let doit () =
   let action = Action.of_term asymb aidx table in
 
   (* we do not apply the substitution right away, as it may fail by
@@ -645,11 +647,15 @@ let get_definition_nocntxt
   | General data ->
     begin
       match get_general_macro_data data with
-      (* TODO: quantum: allow arguments in generic structured macros *)
       | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
-      | ProtocolMacro `Output -> 
+      | ProtocolMacro (`Output, exec_model) -> 
+        if exec_model <> unapplied_descr.exec_model then failed ();
+
         `Def (Term.subst descr_subst (snd unapplied_descr.output))
-      | ProtocolMacro `Cond ->
+
+      | ProtocolMacro (`Cond, exec_model) ->
+        if exec_model <> unapplied_descr.exec_model then failed ();
+
         `Def (Term.subst descr_subst (snd unapplied_descr.condition))
     end
 
@@ -707,6 +713,8 @@ let get_definition_nocntxt
     then `Def (get_def_glob ~allow_dummy:false system table
                  symb ~args action gdata)
     else `Undef
+
+  in try doit () with Failed -> `Undef
 
 (*------------------------------------------------------------------*)
 type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]

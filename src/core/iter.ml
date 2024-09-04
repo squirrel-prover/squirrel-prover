@@ -527,10 +527,14 @@ let fold_descr
     (descr  : Action.descr)
     (init   : 'a) : 'a
   =
-  (* TODO: quantum: update *)
   let mval =
-    func Symbols.Classic.out  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
-    func Symbols.Classic.cond descr.indices ~args:[] ~body:(snd descr.condition) 
+    let out_symb, cond_symb = 
+      match descr.exec_model with
+      | Action.Classic     -> Symbols.Classic.out, Symbols.Classic.cond
+      | Action.PostQuantum -> Symbols.Quantum.out, Symbols.Quantum.cond
+    in
+    func out_symb  descr.indices ~args:[] ~body:(snd descr.output   ) init |>
+    func cond_symb descr.indices ~args:[] ~body:(snd descr.condition) 
   in
 
   (* fold over state macros *)

@@ -36,7 +36,7 @@ type structed_macro_data = {
 (** A general macro definition. *)
 type general_macro_data = 
   | Structured of structed_macro_data
-  | ProtocolMacro of [`Output | `Cond] 
+  | ProtocolMacro of [`Output | `Cond] * Action.exec_model
   (** ad hoc macro definitions using action descriptions *)
 
 (*------------------------------------------------------------------*)
@@ -48,9 +48,6 @@ val as_general_macro : Symbols.data -> general_macro_data
 
 (*------------------------------------------------------------------*)
 (** {2 Execution models} *)
-
-(** An execution model *)
-type exec_model = Classic | PostQuantum
 
 (** The definition of an execution model *)    
 type exec_model_def = {
@@ -88,7 +85,7 @@ val builtin_exec_models : Symbols.table -> exec_model_def list
 val declare_global :
   Symbols.table ->
   System.t ->
-  exec_model ->
+  Action.exec_model ->
   Symbols.lsymb ->
   suffix:[`Large | `Strict] ->
   action:Action.shape ->
@@ -197,6 +194,12 @@ val smallest_prefix :
 (** {3 Execution model macros } *)
 
 module Classic : sig
+  val out_ty   : Type.ty
+  val cond_ty  : Type.ty
+  val inp_ty   : Type.ty
+  val frame_ty : Type.ty
+  val exec_ty  : Type.ty
+
   val inp   : Term.msymb
   val out   : Term.msymb
   val frame : Term.msymb
@@ -205,6 +208,13 @@ module Classic : sig
 end
 
 module Quantum : sig
+  val out_ty   : Type.ty
+  val cond_ty  : Type.ty
+  val inp_ty   : Type.ty
+  val state_ty : Type.ty
+  val frame_ty : Type.ty
+  val exec_ty  : Type.ty
+
   val inp   : Term.msymb
   val out   : Term.msymb
   val frame : Term.msymb
