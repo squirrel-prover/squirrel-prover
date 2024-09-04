@@ -915,28 +915,57 @@ let macro_support
     SE.fold_descrs (fun d l -> d.name :: l) cntxt.table cntxt.system []
   in
 
-  (* TODO: quantum: update *)
   let do1 (sm : MsetAbs.t) : MsetAbs.t =
-    (* special cases for Input, Frame and Exec, since they do not appear in the
+    (*------------------------------------------------------------------*)
+    (* Classic execution model:
+       special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)
     let sm =
       if List.mem_assoc Symbols.Classic.inp sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.frame Type.tmessage) sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.frame Macros.Classic.frame_ty) sm
       else sm
     in
     let sm =
       if List.mem_assoc Symbols.Classic.frame sm
       then
-        MsetAbs.join_single (Mset.mk_simple Symbols.Classic.exec Type.tboolean)
-          (MsetAbs.join_single (Mset.mk_simple Symbols.Classic.out Type.tmessage) sm)
+        MsetAbs.join_single (Mset.mk_simple Symbols.Classic.out  Macros.Classic.out_ty ) sm |>
+        MsetAbs.join_single (Mset.mk_simple Symbols.Classic.exec Macros.Classic.exec_ty)
       else sm
     in
     let sm =
       if List.mem_assoc Symbols.Classic.exec sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.cond Type.tboolean) sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Classic.cond Macros.Classic.cond_ty) sm
       else sm
     in
 
+    (*------------------------------------------------------------------*)
+    (* Quantum execution model: idem *)
+    let sm =
+      if List.mem_assoc Symbols.Quantum.inp sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.frame Macros.Quantum.frame_ty) sm
+      else sm
+    in
+    let sm =
+      if List.mem_assoc Symbols.Quantum.state sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.frame Macros.Quantum.frame_ty) sm
+      else sm
+    in
+    let sm =
+      if List.mem_assoc Symbols.Quantum.frame sm
+      then
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.out   Macros.Quantum.out_ty  ) sm |>
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.exec  Macros.Quantum.exec_ty )    |>
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.state Macros.Quantum.state_ty)
+
+      else sm
+    in
+    let sm =
+      if List.mem_assoc Symbols.Quantum.exec sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.cond Macros.Quantum.cond_ty) sm
+      else sm
+    in
+
+    (*------------------------------------------------------------------*)
     SE.fold_descrs (fun (descr : Action.descr) (sm : MsetAbs.t) ->
         fold_descr ~globals:true
           (fun
@@ -944,7 +973,7 @@ let macro_support
             (a_is : Vars.vars) ~(args : Term.terms) 
             ~(body : Term.term) (sm : MsetAbs.t) ->
             (* Represent the update [msymb(args) := body]. *)
-            
+
             if List.mem_assoc msymb sm then
               (* we compute the substitution which we will use to instantiate
                  in [body] the arguments [args] on the arguments of the macro 
@@ -983,7 +1012,6 @@ let macro_support
 
   (* reachable macros from [init] *)
   Utils.fpt abs_incl do1 init 
-
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
