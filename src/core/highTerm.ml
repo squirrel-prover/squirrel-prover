@@ -21,7 +21,7 @@ module Smart : SmartFO.S with type form = Term.term = struct
 end
 
 (*------------------------------------------------------------------*)
-let is_deterministic (env : Env.t) (t : Term.term) : bool =
+let rec is_deterministic (env : Env.t) (t : Term.term) : bool =
   let rec is_det (venv : Vars.env): Term.term -> bool = function
     | Var v ->
       begin
@@ -42,13 +42,17 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
       Term.tforall (is_det env) t
         
     (* recurse *)
-    | Let _ | App _ |Fun _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | App _ |Fun _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_det venv) t
+
+    | Let (v,t1,t2) ->
+      let tags = tag_of_term env t1 in
+      let venv = Vars.add_vars [v, tags] venv in
+      is_det venv t2
   in
   is_det env.vars t
 
-(*------------------------------------------------------------------*)
-let is_constant
+and is_constant
     ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
@@ -78,13 +82,17 @@ let is_constant
         Term.tforall (is_const venv) t
         
     (* recurse *)
-    | Let _ | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_const venv) t
+
+    | Let (v,t1,t2) ->
+      let tags = tag_of_term env t1 in
+      let venv = Vars.add_vars [v, tags] env.vars in
+      is_const venv t2
   in
   is_const env.vars t
 
-(*------------------------------------------------------------------*)
-let is_system_indep (env : Env.t) (t : Term.term) : bool =
+and is_system_indep (env : Env.t) (t : Term.term) : bool =
   (* check if a term is system-independent because it uses no system-dependent 
      constructions. *)
   let rec is_si (env : Env.t) : Term.term -> bool = function
@@ -117,15 +125,23 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
     (* recurse *)
     (* notice that [Action _] is allowed, since we check the independence of the system 
        among all compatible systems. *)
-    | Let _ | Name _ | App _ | Action _ | Tuple _ | Proj _ as t ->
+    | Name _ | App _ | Action _ | Tuple _ | Proj _ as t ->
       Term.tforall (is_si env) t
+
+    | Let (v,t1,t2) ->
+      let tags = tag_of_term env t1 in
+      let env = 
+        Env.update
+          ~vars:(Vars.add_vars [v, tags] env.vars)
+          env
+      in
+      is_si env t2
   in
   (* a term is system-independent if it applies to a single system (for 
      both set and pair), or if it uses only system-independent constructs *)
   SE.is_single_system env.system || is_si env t
 
-(*------------------------------------------------------------------*)
-let is_ptime_deducible
+and is_ptime_deducible
     ~(si:bool)
     ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
@@ -180,14 +196,18 @@ let is_ptime_deducible
         Term.tforall (is_adv venv) t
         
     (* recurse *)
-    | Let _ | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
+    | App _ | Action _ | Tuple _ | Proj _ | Diff _ as t ->
       Term.tforall (is_adv venv) t
+
+    | Let (v,t1,t2) ->
+      let tags = tag_of_term env t1 in
+      let venv = Vars.add_vars [v, tags] env.vars in
+      is_adv venv t2
   in
   is_adv env.vars t &&
   (not si || is_system_indep env t) 
 
-(*------------------------------------------------------------------*)
-let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
+and tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
   let const        = is_constant                  env t in
   let adv          = is_ptime_deducible ~si:false env t in
   let system_indep = is_system_indep              env t in
