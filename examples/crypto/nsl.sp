@@ -14,7 +14,7 @@
    A -> B: {nB,nA}_pkB
 
    In this file we prove that a simple scenario of this protocol
-   is indistinguishabile from a variant where encrypted messages
+   is indistinguishable from a variant where encrypted messages
    are replaced by their length (in unary), relying on the
    IND-CCA2 crypto assumption. We explain how this is useful to
    prove the strong secrecy of the exchanged nonces `nA` and `nB`.
@@ -187,11 +187,11 @@ system NSL =
      na only occurs in the last test and encryption of Alice;
    - nb only occurs in the last encryption of Bob.
 
-   We could then prove, when `pk = pub skb`, the test
-   `get2_na(dec(input@A1,ska)) = na` is always false by freshness of na
-   at this point. This allows to prove that the final output of na
+   We could then prove, when `pk = pub skb`, that
+   `get2_na(dec(input@A1,ska)) = na` is always false by freshness of `na`
+   at this point. This allows to prove that the final output of `na`
    is indistinguishable from a fresh name (it is actually a fresh name itself):
-   thus na is strongly secret in NSL/right. By observational equivalence,
+   thus `na` is strongly secret in NSL/right. By observational equivalence,
    it is also strongly secret in the real protocol NSL/left.
 
    Further, we only output `<na,nb>` at the end of Alice if `pk = pub skb`

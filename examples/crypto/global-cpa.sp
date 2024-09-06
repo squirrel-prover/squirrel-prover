@@ -14,8 +14,8 @@ abstract enc : message -> message -> message -> message.
 game CPA = {
   rnd key : message;
   oracle enc x = {
-  rnd r : message;
-  return enc (diff(x,zeroes x)) r key
+    rnd r : message;
+    return enc (diff(x,zeroes x)) r key
   }
 }.
 
@@ -24,12 +24,12 @@ game CPA = {
    - on the right: the encryption of a zeroed-out version of that message. *)
 name k :  message.
 channel c.
-process foo (i:index) = 
+process P (i:index) =
   new foo;
   new n;
-  out(c,diff((enc foo n (k)), (enc (zeroes foo) n (k)))).
+  out(c,diff((enc foo n k), (enc (zeroes foo) n k))).
 
-system (!_i F : foo(i)).
+system (!_i F : P(i)).
 
 (* Proof of indistinguishability for the two projections of the system.
    The `crypto` tactics handles induction, and can thus prove indistinguishability
