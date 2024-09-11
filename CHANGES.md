@@ -1,3 +1,25 @@
+### better automated reasoning on action dependencies
+  [commit: `3280faaa`]
+
+  Improved the automated reasoning w.r.t. action dependencies.
+  Impacts `constraints` (and thus `auto`), as well as some automated
+  reasoning used to determine whether an action happens before
+  unrolling a macros.
+
+### syntax change for memory cells
+  [commit: `5b2415c0b765`, **breaking change**]
+
+  States update accepted non currified inputs, which lead to
+  inconsistent notations in process declaration such as:
+  ```
+  rK(i,j) := <rK i j, rK i j>;
+  ```
+  The expected syntax is now 
+  ```
+  rK i j := <rK i j, rK i j>;
+  ```
+
+
 ### syntax change for global formulas
   [commit: `71c81505`, **breaking change**]
   
