@@ -171,7 +171,12 @@ val update_global_data :
   Symbols.table
 
 val as_global_macro : Symbols.data -> global_data
-    
+
+(** The global macro [m] is defined at any action which has
+    the action shape as a strict or large prefix *)
+val global_defined_from :
+  Symbols.table -> Symbols.macro -> [`Strict | `Large] * Action.shape
+
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
@@ -181,6 +186,12 @@ val as_global_macro : Symbols.data -> global_data
 val fty : Symbols.table -> Symbols.macro -> Type.ftype * Type.ty 
 
 val is_global : Symbols.table -> Symbols.macro -> bool
+
+(** find the smallest prefix of [action] that is a suffix of
+    [suffix] *)
+val smallest_prefix :
+  [`Large | `Strict] ->
+  'a Action.t -> 'b Action.t -> 'b Action.t 
 
 (*------------------------------------------------------------------*)
 val _pp    : global_data formatter_p

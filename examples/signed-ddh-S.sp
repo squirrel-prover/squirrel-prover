@@ -89,7 +89,7 @@ Proof.
   depends Schall(j), Schall1(j) => //.
   intro Ord Hexec'.
   use Hexec' with Schall(j) as Hyp => //.
-  expand exec, cond, pkp(j)@Schall1(j).
+  expand exec, cond, pkp. 
   assert fst(input@Schall(j)) = pk(skP) as Meq' => //.
   rewrite Meq' in Hexec. destruct Hexec as [Hexec Hcheck].
   euf Hcheck.

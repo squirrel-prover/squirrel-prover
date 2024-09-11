@@ -133,11 +133,11 @@ process Alice_2 =
   let msg2 = enc diff((make2(na, nb, pub skb)),len2) r2 (pub ska) in
   let msg3 = enc (len3)  r3 (pub skb) in
   in(c,pk);
-  out(c, if pk = pub skb then msg1 
-         else enc (make1(na,pub ska)) r1' pk);
+  A: out(c, if pk = pub skb then msg1 
+            else enc (make1(na,pub ska)) r1' pk);
   in(c,y);
-  out(c, if y = msg2 then (if pk = pub skb then msg3)  else
-          enc (make3(get2_nb (dec y ska),na)) r3' (pub ska)).
+  A1: out(c, if y = msg2 then (if pk = pub skb then msg3) 
+             else enc (make3(get2_nb (dec y ska),na)) r3' (pub ska)).
 
 
 process Bob_2 =
@@ -145,7 +145,7 @@ process Bob_2 =
   let msg2 = enc diff((make2(na, nb, pub skb)),len2) r2 (pub ska) in
   let msg3 = enc (len3)  r3 (pub skb) in
   in(c,x);
-  out(c, (* Cannot decrypt msg1: express result directly. *)
+  B: out(c, (* Cannot decrypt msg1: express result directly. *)
          if x = msg1 then msg2 else 
          if x = msg3 then empty else
          enc (make2(get1_na(dec x skb),nb,pub skb)) r2' (get1_id (dec x skb))).
@@ -154,15 +154,14 @@ system NSL_part2 =
   (PUB : out(c, <pub(ska),pub(skb)>);
   ((A : Alice_2)|(B : Bob_2))).
 
-
 global lemma [NSL_part2] privacy_2 (t:timestamp[const]) : 
 [happens(t)] -> equiv(frame@t).
 Proof.
 intro *.
-crypto CCA2 (key:ska) => //.
-+ admit. (*smt ~prover:Z3*).
-+ intro *. apply len2. 
-+ intro *. apply len2.
+crypto CCA2 (key:ska) => //. 
++ smt ~prover:Z3.
++ intro *; apply len2.
++ intro *; apply len2. 
 Qed.
 
 

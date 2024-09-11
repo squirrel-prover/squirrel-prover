@@ -187,7 +187,7 @@ Proof.
   - intro [j [H1 [H2 H3 H4 H5]]]. 
     rewrite /cond /sA. 
     have ->: gy A B i@A2(A, B, i) = ofG (gen ^ y(A, B, j)) by auto.
-    have ->: ofG (gen ^ xA A B i@A2(A, B, i)) = ofG (gen ^ x(A, B, i)) by auto. 
+    have ->: ofG (gen ^ xA A B i@A1(A, B, i)) = ofG (gen ^ x(A, B, i)) by auto. 
     auto. 
 Qed.
 

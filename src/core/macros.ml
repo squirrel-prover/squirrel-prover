@@ -495,18 +495,50 @@ let get_def_glob_internal
   Term.subst subst body
 
 (*------------------------------------------------------------------*)
-(** Give the definition of the global macro [symb(args)@ts]
-    where [action] is the action corresponding to [ts].
-    All prefixes of [action] must be valid actions of the system, except if:
-    - [allow_dummy] is true
-    - and for the full action, which may be dummy (we use [ts] instead). *)
+(** Exported, see `.mli`. *)
+let global_defined_from
+    table (m : Symbols.macro) : [`Strict | `Large] * Action.shape
+  =
+  let data = as_global_macro (Symbols.Macro.get_data m table) in
+  data.action
+  
+(*------------------------------------------------------------------*)
+(** find an action shape defined in [system] that is a suffix of
+    [prefix_shape] *)
+let find_shape_suffix_of
+    table (system : SE.fset)
+    (strict : [`Large | `Strict]) 
+    (prefix_shape : 'a Action.t)
+  : Action.shape
+  =
+  let found = ref None in
+  SE.fold_descrs (fun (descr : Action.descr) () ->
+      let shape = Action.get_shape_v descr.action in
+      if is_prefix strict prefix_shape shape then found := Some shape;
+    ) table system ();
+  oget !found                 (* must always succeed *)
+
+(** Exported.
+    find the smallest prefix of [action] that is a suffix of
+    [suffix] *)
+let smallest_prefix 
+    (strict : [`Large | `Strict]) 
+    (suffix : 'a Action.t) (action : 'b Action.t) : 'b Action.t 
+  =
+  match strict with
+  | `Large  -> List.take (List.length suffix    ) action
+  | `Strict -> List.take (List.length suffix + 1) action
+
+(*------------------------------------------------------------------*)
+(** Give the definition of the global macro [symb(args)@action].
+    All prefixes of [action] must be valid actions of the system, except 
+    if [allow_dummy] is true. *)
 let get_def_glob
    ~(allow_dummy : bool)
     (system : SE.fset)
     (table  : Symbols.table)
     (_symb  : Term.msymb)
     ~(args  : Term.term list)
-    ~(ts    : Term.term)
     (action : Action.action)
     (data   : global_data)
   : Term.term
@@ -518,6 +550,18 @@ let get_def_glob
       data.indices
       args
   in
+
+  let ts =                      (* a bit complex because of dummy actions *)
+    let strict, prefix_shape = data.action in
+    let ts_action =
+      if allow_dummy then
+        let shape = find_shape_suffix_of table system strict prefix_shape in
+        Action.dummy shape
+      else smallest_prefix strict prefix_shape action
+    in
+    SE.action_to_term table system ts_action
+  in
+    
   let ts_subst = Term.ESubst (Term.mk_var data.ts, ts) in
   (* Compute the relevant part of the action, i.e. the
      prefix of length [length inputs], reversed. *)
@@ -642,8 +686,9 @@ let get_definition_nocntxt
       let {action = (strict, glob_a)} as gdata = get_global_data gdata in
       if is_prefix strict glob_a (Action.get_shape action)
       then
-        get_def_glob ~allow_dummy:false system table
-          symb ~args ~ts:(Term.mk_action asymb aidx) action gdata
+        get_def_glob 
+          ~allow_dummy:false system table
+          symb ~args  action gdata
       else failed ()
   in
   try `Def (doit ()) with Failed -> `Undef
@@ -725,11 +770,8 @@ let get_dummy_definition
       prefix @ [dummy_end]
   in
 
-  let tvar = Vars.make_fresh Type.Timestamp "dummy" in
-  let ts = Term.mk_var tvar in
-
   get_def_glob ~allow_dummy:true
-    system table symb ~args ~ts dummy_action gdata
+    system table symb ~args dummy_action gdata
 
 (*------------------------------------------------------------------*)
 type system_map_arg =

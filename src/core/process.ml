@@ -4,7 +4,8 @@ open Ppenv
 module L  = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
-
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 let dum : L.t = L._dummy
 
@@ -813,8 +814,49 @@ let process_system_decl
   in
 
   (*------------------------------------------------------------------*)
-  (* Register an action, when we arrive at the end of a block
-     (input / condition / update / output). *)
+  (** To be used when defining the action [action] with name [name].
+      This functions simplifies the actions at which global macros
+      occurs by taking the smallest action before [action] such that
+      the macro is defined.
+      
+      E.g., in the system `let x = t in A:out(...); !_i B:out(x)`, this
+      will set `output@B i` to be `x@A` rather than `x@B i`.
+  *)
+  let simplify_globals
+      (table : Symbols.table)
+      (name : Symbols.action) (action : Action.action_v)
+      (t : Term.term) : Term.term 
+    =
+    let rec doit t =
+      match t with
+      | Term.Macro (m,args,Term.Action (a,args0))
+        when a = name && List.for_all Term.is_var args0 && Macros.is_global table m.s_symb ->
+        let strict, prefix = Macros.global_defined_from table m.s_symb in
+        let t_action =
+          let subst =
+            List.map2
+              (fun i j -> Term.ESubst (Term.mk_var i, j))
+              (Action.get_args_v action)
+              args0
+          in
+          Action.subst_action subst (Action.to_action action)
+        in
+        let new_action =
+          let suffix = Macros.smallest_prefix strict prefix t_action in
+          if List.length suffix = List.length t_action then Term.mk_action a args0
+          else
+            SE.action_to_term table
+              (SE.of_system table system_name) suffix
+        in
+        Term.mk_macro m (List.map doit args) (doit new_action)
+      | _ as t -> Term.tmap doit t
+    in
+    doit t
+  in
+
+  (*------------------------------------------------------------------*)
+  (** Register an action, when we arrive at the end of a block
+      (input / condition / update / output). *)
   let register_action ?loc (name : alias_name) output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = TConfig.strict_alias_mode (penv.env.table) in
@@ -826,11 +868,7 @@ let process_system_decl
     in
 
     let action = List.rev penv.action in
-    let in_ch, in_var =
-      match penv.inputs with
-      | (c,v) :: _ -> c, v
-      | _ -> assert false
-    in
+    let in_ch, in_var = List.hd penv.inputs in
     let indices = List.rev penv.indices in
     let action_term = Term.mk_action name (Term.mk_vars indices) in
     let in_tm = Term.mk_macro penv.input_macro [] action_term in
@@ -847,22 +885,30 @@ let process_system_decl
       Term.subst s1 (Term.subst penv.subst t)
     in
 
+    let subst_and_simplify_globals t = 
+      subst t |> simplify_globals table name action 
+    in
+    
     (* compute the condition, the updates, and the output of this action,
        using elements we have stored in [env] of type [p_env] while parsing
        the process *)
     let condition =
       let vars = List.rev penv.evars in
-      let t = subst (Term.mk_ands penv.facts) in
+      let t = subst_and_simplify_globals (Term.mk_ands penv.facts) in
       (vars,t)
     in
 
     let updates =
-      List.map (fun (ms,args,t) -> ms, List.map subst args, subst t) penv.updates
+      List.map (fun (ms,args,t) ->
+          (ms, 
+           List.map subst_and_simplify_globals args, 
+           subst_and_simplify_globals t)
+        ) penv.updates
     in
 
     let output : Symbols.channel * Term.term =
       match output with
-      | Some (c,t) -> c, subst t
+      | Some (c,t) -> c, subst_and_simplify_globals t
       | None -> Symbols.dummy_channel, Term.empty
     in
 
