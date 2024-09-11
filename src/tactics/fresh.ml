@@ -126,7 +126,7 @@ let phi_fresh_same_system
     match n with
     | Name _ -> Name.of_term n
     | _ -> soft_failure ?loc
-             (Tactics.Failure ("Term " ^ err ^ " is not a name."))
+             (Tactics.Failure "Can only be applied to names.")
   in
 
   (* ensure that the type of the name is large *)
@@ -235,12 +235,13 @@ let fresh_trace_param
     (einfo    : O.expand_info) 
     (hyp      : Term.term)
     (s        : TS.sequent)
-  : Term.term * Term.term  =
+  : Term.term * Term.term  
+  =
   let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
     | None -> 
       soft_failure ~loc:hyp_loc
-        (Tactics.Failure "Can only be applied on an equality hypothesis.")
+        (Tactics.Failure "can only be applied on an equality hypothesis")
   in
   let em1 = O.expand_macro_check_all einfo m1 in
   let em2 = O.expand_macro_check_all einfo m2 in
@@ -264,9 +265,8 @@ let fresh_trace
 
   if (TS.bound s) <> None then
     soft_failure 
-      (Tactics.GoalBadShape "Fresh does not handle concrete bounds.");
-
-
+      (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
+  
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
@@ -312,7 +312,6 @@ let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
 (*------------------------------------------------------------------*)
 (** {2 Fresh equiv tactic} *)
 
-
 (** Constructs the sequent where goal [i], when of the form [diff(n_l, n_r)],
     is removed, and an additional proof obligation [phi] is created,
     where [phi] expresses the freshness of [n_l] on the left, and [n_r] on 
@@ -330,7 +329,7 @@ let fresh_equiv
 
   if (ES.conclusion_as_equiv s).bound <> None then 
     soft_failure 
-      (Tactics.GoalBadShape "Fresh does not handle concrete bounds.");
+      (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
 
   let before, t, after = split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
@@ -373,13 +372,118 @@ let fresh_equiv
    ES.set_equiv_conclusion {terms=new_biframe; bound=None} s]
 
 
+(*------------------------------------------------------------------*)
+(** {2 Fresh secrecy tactic} *)
 
+
+(** From a sequent whose goal is of the form [u *> n],
+    closes the goal, and replaces it with a proof obligation [phi],
+    where [phi] expresses the freshness of [n].
+    Must be used only on secrecy goals. *)
+let freshR_secrecy
+      (opt_args : Args.named_args) (s : ES.sequent) 
+    : ES.sequents 
+  =
+  let use_path_cond = p_fresh_arg opt_args in
+
+  (* get the components of the secrecy predicate, incl. the system *)
+  let sgoal = Utils.oget (ES.get_secrecy_goal s) in
+  let env = ES.env s in
+  let sec_context =
+    Constr.make_context ~table:env.table ~system:sgoal.system in
+
+  
+  
+  (* compute the freshness conditions *)
+  Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
+  let phis =
+    phi_fresh ~negate:true ~use_path_cond ~checklarge:true
+      (ES.get_trace_hyps s)
+      sec_context
+      env
+      sgoal.right
+      sgoal.left
+  in
+  Printer.pr "@]@]@;";
+
+  let phi = Term.mk_ands ~simpl:true phis in
+
+  (* the sequent for the new proof obligation. *)
+  if Term.equal phi Term.mk_true then []
+  else 
+    let freshness_sequent =
+      ES.set_conclusion_in_context
+        {env.system with set=((sec_context.system) :> SE.arbitrary)}
+        (Equiv.mk_reach_atom phi)
+        s
+    in
+    [freshness_sequent]
+
+
+
+(** From a sequent whose goal is of the form [u,n,v *> w],
+    replaces the goal with [u,v *> w] + a proof obligation [phi],
+    where [phi] expresses the freshness of [n].
+    Must be used only on secrecy goals. *)
+let freshL_secrecy
+      (opt_args : Args.named_args) (i:int L.located) (s : ES.sequent) 
+    : ES.sequents 
+  =
+  let use_path_cond = p_fresh_arg opt_args in
+  let loc = L.loc i in
+
+  (* get the components of the secrecy predicate, incl. the system *)
+  let sgoal = Utils.oget (ES.get_secrecy_goal s) in
+  let env = ES.env s in
+  let sec_context = Constr.make_context ~table:env.table ~system:sgoal.system in
+
+  (* get n *)
+  let ii = L.unloc i in
+  let uu, n, vv =
+    try List.splitat ii sgoal.left with
+    | List.Out_of_range ->
+       soft_failure ~loc
+         (Tactics.Failure ("invalid position "^(string_of_int ii)^" on the left of the predicate"));
+  in
+  (* compute the freshness conditions *)
+  Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
+  let phis =
+    phi_fresh ~negate:true ~use_path_cond ~checklarge:true ~loc
+      (ES.get_trace_hyps s)
+      sec_context
+      env
+      n
+      (uu @ vv @ [sgoal.right])
+  in
+  Printer.pr "@]@]@;";
+
+  let phi = Term.mk_ands ~simpl:true phis in
+
+  (* the remaining secrecy goal *)
+  let lty,_,lty' = List.splitat ii sgoal.left_ty in 
+  let new_sec_sequent =
+    ES.set_conclusion
+      (ES.mk_secrecy_concl 
+         {sgoal with left = (uu @ vv); left_ty = (lty @ lty')}) s
+  in
+
+  (* the sequent for the new proof obligation. *)
+  if Term.equal phi Term.mk_true then 
+    [new_sec_sequent]
+  else 
+    let freshness_sequent =
+      ES.set_conclusion_in_context
+        {env.system with set=((sec_context.system) :> SE.arbitrary)}
+        (Equiv.mk_reach_atom phi)
+        s
+    in
+    [freshness_sequent; new_sec_sequent]
 
 (*------------------------------------------------------------------*)
 (** {2 Fresh global tactic} *)
 
 (** Dispatches the application of fresh on a global sequent to
-    fresh_equiv *)
+    fresh_equiv, freshL_secrecy, or freshR_secrecy *)
 let fresh_global_tac (args : TacticsArgs.parser_args)
   : LowTactics.etac =
   EquivLT.wrap_fail
@@ -390,15 +494,26 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
          (* equivalence goal -> fresh_equiv *)
          if ES.conclusion_is_equiv s then
            fresh_equiv opt_args i s
+           (* non-deduction goal -> freshL *)
+         else if
+           ES.conclusion_is_secrecy s &&
+           ES.conclusion_secrecy_kind s = ES.NotDeduce
+         then 
+           freshL_secrecy opt_args i s
+           (* neither -> bad arguments *)
          else
            bad_args ()
 
-       (* "fresh" *)
-       (* This case is unused for now, but should be soon. *)
-       | [Args.Fresh (_, None)] ->
-         bad_args ()
-
-       | _ -> bad_args ())
+      (* "fresh" *)
+      | [Args.Fresh (opt_args, None)] ->
+        if ES.conclusion_is_secrecy s &&
+           ES.conclusion_secrecy_kind s = ES.NotDeduce
+        then
+          freshR_secrecy opt_args s
+        else
+          bad_args ()
+     
+      | _ -> bad_args ())
 
 
 (*------------------------------------------------------------------*)

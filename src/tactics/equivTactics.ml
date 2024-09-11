@@ -1038,7 +1038,7 @@ let deduce_predicate_int
     let new_secrecy_goal = { goal with
       left = left_without_ith;
       left_ty = left_ty_without_ith } in
-    let conc = ES.mk_secrecy_concl new_secrecy_goal s in
+    let conc = ES.mk_secrecy_concl new_secrecy_goal in
     [ES.set_conclusion conc s]
 
 let deduce Args.(Opt (Int, p)) s : ES.sequents =

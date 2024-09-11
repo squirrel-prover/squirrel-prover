@@ -141,7 +141,7 @@ let mk_maingoal
         goal.left
     in
     let goal_new = { goal with left = terms_new } in
-    let conc = S.mk_secrecy_concl goal_new s in
+    let conc = S.mk_secrecy_concl goal_new in
     S.set_conclusion conc s
 
 (** Return the argument of symbols f in the subgoal.

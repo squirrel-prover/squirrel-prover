@@ -68,16 +68,30 @@ val to_trace_sequent : t -> LowTraceSequent.t
 (** Goals corresponding to the predicates "u |> v" and "u *> v".
     Defined in WeakSecrecy.sp. *)
 
+(** There are two kinds of secrecy judgements:
+    deduction  ( |> )
+    and non-deduction ( *> ) *)
+type secrecy_kind = Deduce | NotDeduce
+
+(** Checks whether the sequent's conclusion is a secrecy judgement
+    (necessarily, this implies that WeakSecrecy is loaded) *)
+val conclusion_is_secrecy : t -> bool
+
+(** Which kind of secrecy judgement.
+    Can only be used on secrecy sequents. *)
+val conclusion_secrecy_kind : t -> secrecy_kind
+
 (**An objet of the type [secrecy_goal] represent a goal of
    the form "u |> v" or "u *> v".
    If "u" is a tuple, [left] is a list of each term is the tuple.
    Else, the list [left] contains only one element for "u". *)
 type secrecy_goal = { (* FIXME : Add field for set *)
-  predicate : Symbols.predicate;
-  left_ty : Type.ty list; (* FIXME : Redundent with Type.ty *)
-  left : Term.term list;
-  right_ty : Type.ty; (* FIXME : Redundent with Type.ty *)
-  right : Term.term }
+    predicate : Symbols.predicate;
+    system : SE.fset;
+    left_ty : Type.ty list; (* FIXME : Redundent with Type.ty *)
+    left : Term.term list;
+    right_ty : Type.ty; (* FIXME : Redundent with Type.ty *)
+    right : Term.term }
 
 (** Requires WeakSecrecy.sp to be loaded.
     [get_secrecy_goal s] returning a [secrecy_goal] representing the goal
@@ -87,9 +101,8 @@ type secrecy_goal = { (* FIXME : Add field for set *)
 val get_secrecy_goal : t -> secrecy_goal option
 
 (** Requires WeakSecrecy.sp to be loaded.
-    [mk_secrecy_concl] returning a formula representing [goal]
-    in the system of [s].*)
-val mk_secrecy_concl : secrecy_goal -> t -> conc_form
+    [mk_secrecy_concl] returning a formula representing [goal]. *)
+val mk_secrecy_concl : secrecy_goal -> conc_form
 
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)

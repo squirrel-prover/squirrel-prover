@@ -351,17 +351,41 @@ let to_trace_sequent s =
 
 module LS = Library.Secrecy
 
+type secrecy_kind = Deduce | NotDeduce
+
 (**An objet of the type [secrecy_goal] represent a goal of
    the form "u |> v" or "u *> v".
    If "u" is a tuple, [left] is a list of each term is the tuple.
    Else, the list [left] contains only one element for "u". *)
 type secrecy_goal = {
-  predicate : Symbols.predicate;
-  left_ty : Type.ty list;
-  left : Term.term list;
-  right_ty : Type.ty;
-  right : Term.term }
+    predicate : Symbols.predicate;
+    system : SE.fset; (* TODO why not arbitrary? *)
+    left_ty : Type.ty list;
+    left : Term.term list;
+    right_ty : Type.ty;
+    right : Term.term }
 
+
+let conclusion_is_secrecy (s : t) : bool =
+  let table = table s in
+  LS.is_loaded table &&
+    match s.conclusion with
+    | Atom (Pred pred_app) when
+           pred_app.psymb = LS.symb_deduce table ||
+             pred_app.psymb = LS.symb_not_deduce table -> true
+    | _ -> false
+
+
+let conclusion_secrecy_kind (s : t) : secrecy_kind =
+  let table = table s in
+  match s.conclusion with
+  | Atom (Pred pred_app) when
+         pred_app.psymb = LS.symb_deduce table  -> Deduce
+  | Atom (Pred pred_app) when
+         pred_app.psymb = LS.symb_not_deduce table -> NotDeduce
+  | _ -> assert false
+  
+    
 (** Requires WeakSecrecy.sp to be loaded.
     [get_secrecy_goal s] returning a [secrecy_goal] representing the goal
     if it is of the form "u |> v" or "u *> v"].
@@ -369,52 +393,55 @@ type secrecy_goal = {
     is used in a different system than the sequent's system. *)
 let get_secrecy_goal (s : t) : secrecy_goal option =
   let table = s.env.table in
-  if not (LS.is_loaded table) then
+  if not (LS.is_loaded table) || not (conclusion_is_secrecy s) then
     None
   else match s.conclusion with
-    | Atom (Pred pred_app) when
-      pred_app.psymb = LS.symb_deduce table ||
-      pred_app.psymb = LS.symb_not_deduce table -> begin
-        match pred_app.multi_args with
-        | [se, [u;v]] ->
-          if se <> s.env.system.set then
-            None (*TODO : Add a warning message if the sets are different?*)
-          else begin
-            match Term.destr_tuple u, pred_app.ty_args with
-            | None, [a; b] -> Some {
-                predicate = pred_app.psymb;
-                left_ty = [a];
-                left = [u];
-                right_ty = b;
-                right = v }
-            | Some l, [Tuple a_list; b] -> Some {
-                predicate = pred_app.psymb;
-                left_ty = a_list;
-                left = l;
-                right_ty = b;
-                right = v }
-            | _ -> assert false
-          end
-        | _ -> None
-    end
-    | _ -> None
+       | Atom (Pred pred_app) ->
+          begin 
+            match pred_app.multi_args with
+            | [_, [u;v]] ->
+               assert (List.length pred_app.se_args = 1);
+               let se = SE.to_fset (List.hd pred_app.se_args) in
+               begin
+                 match Term.destr_tuple u, pred_app.ty_args with
+                 | None, [a; b] ->
+                    Some {
+                        predicate = pred_app.psymb;
+                        system = se;
+                        left_ty = [a];
+                        left = [u];
+                        right_ty = b;
+                        right = v }
+                 | Some l, [Tuple a_list; b] ->
+                    Some {
+                        predicate = pred_app.psymb;
+                        system = se;
+                        left_ty = a_list;
+                        left = l;
+                        right_ty = b;
+                        right = v }
+                 | _ -> assert false
+               end 
+            | _ -> None
+          end 
+       | _ -> assert false
 
 (** Requires WeakSecrecy.sp to be loaded.
-    [mk_secrecy_concl] returning a formula representing [goal]
-    in the system of [s].*)
-let mk_secrecy_concl (goal : secrecy_goal) (s : t) : conc_form =
+    [mk_secrecy_concl] returning a formula representing [goal].*)
+let mk_secrecy_concl (goal : secrecy_goal) : conc_form =
   let left_ty, left_arg = match goal.left_ty, goal.left with
+    | [], [] -> Type.tmessage, Term.mk_zero
     | [a], [t] -> a, t
     | l_ty, l when List.length l_ty = List.length l->
-        Tuple l_ty, Term.mk_tuple l
+       Tuple l_ty, Term.mk_tuple l
     | _ -> assert false
   in
-  let se = s.env.system.set in
+  let se = goal.system in
   Atom (Pred {
     psymb = goal.predicate;
     ty_args = [left_ty; goal.right_ty];
-    se_args = [se];
-    multi_args = [se, [left_arg; goal.right]];
+    se_args = [(se :> SE.arbitrary)];
+    multi_args = [(se :> SE.arbitrary), [left_arg; goal.right]];
     simpl_args = [] })
 
 (*------------------------------------------------------------------*)
