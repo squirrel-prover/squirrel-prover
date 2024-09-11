@@ -289,7 +289,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* we do not use [Match.reduce_delta1] for macros, to have sensible error
        messages. *)
     | Macro (ms,l,a) ->
-      if not (force_happens) && not (S.query_happens ~precise:true s a) then
+      let hyps = S.get_trace_hyps s in
+      let table = S.table s in
+      
+      if not (force_happens) &&
+         not (S.query_happens ~precise:true s a || Match.happens table hyps a) then
         soft_failure (Tactics.MustHappen a);
 
       if not (SE.is_fset se) then failed ();
@@ -300,9 +304,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
            to try to make the action symbol appear. *)
         let red_state =
           Reduction.mk_state
-            ~hyps:(S.get_trace_hyps s) ~se:(se :> SE.t) ~vars:(S.vars s)
+            ~hyps ~se:(se :> SE.t) ~vars:(S.vars s)
             ~param:Reduction.rp_full
-            (S.table s)
+            table
         in
         let a, _ = Reduction.whnf_term ~strat:Std red_state a in
         match Macros.get_definition ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a with

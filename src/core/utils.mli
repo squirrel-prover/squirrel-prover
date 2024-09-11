@@ -255,7 +255,8 @@ val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
 (** {2 Hash} *)
 
 val hcombine : int -> int -> int
-val hcombine_list : ('a -> int) -> int -> 'a list -> int                         
+val hcombine_list  : ('a -> int) -> int -> 'a list  -> int
+val hcombine_array : ('a -> int) -> int -> 'a array -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Printing} *)

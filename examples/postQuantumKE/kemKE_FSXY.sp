@@ -80,7 +80,7 @@ party could potentially compute the key.
 
 
 *******************************************************************************)
-set postQuantumSound = true.
+(* set postQuantumSound = true. *)
 
 include Basic.
 
@@ -652,15 +652,17 @@ global lemma [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
  [happens(R2(i,j,k))] ->
  equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), kIR(i,j,k))) .
 Proof.
-  intro Hap .
-  use reflex with R2(i,j,k) => //.
+  intro Hap. 
+  use reflex with R2(i,j,k); 2: auto. 
   expandall.
   prf 1, kdf(s,kR(k,i,j)).
   prf 1, G(_,n_PRF).
-  xor 1, xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
-  by rewrite len_G namelength_n_PRF1.
-  xor 1,  n_XOR; rewrite if_true // in 1.
-  by rewrite len_G namelength_n_XOR.
+  xor 1, xor n_PRF1 _, n_PRF1; rewrite if_true // in 1. {
+    by rewrite len_G namelength_n_PRF1.
+  }.
+  xor 1,  n_XOR; rewrite if_true // in 1. {
+    by rewrite len_G namelength_n_XOR.
+  }.
   by fresh 1.
 Qed.
 

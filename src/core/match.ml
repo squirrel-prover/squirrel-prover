@@ -1277,8 +1277,25 @@ let as_action
     ) hyps 
 
 (*------------------------------------------------------------------*)
+let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
+  let rec leq t t' =
+    match t,t' with
+    | _ when Term.equal t t' -> true
+    | App (Fun (f,_), [t]), App (Fun (f',_), [t']) 
+      when f = f_pred && f' = f_pred ->
+      leq t t'
+    | App (Fun (f,_), [t]), t' when f = f_pred -> leq t t'
+    | Action (n,is), Action (n',is') ->
+      Action.depends
+        (Action.of_term n is table)
+        (Action.of_term n' is' table)
+    | _ -> false
+  in
+  leq t t'
+
+(*------------------------------------------------------------------*)
 (** Fast function checking if [t] happens. *)
-let happens (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
+let happens table (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
   TraceHyps.exists (fun (_x,f) ->
       match f with
       | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None})))
@@ -1287,13 +1304,13 @@ let happens (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
           match Term.decompose_app f with
           | Term.Fun (fs,_), [t0] -> (* [happens(t)] *)
             Symbols.path_equal fs Symbols.fs_happens &&
-            Term.equal t0 t
+            leq_tauto table t t0
 
           | Term.Fun (fs,_), [t0; t1] -> (* [t < t'], or [t' < t] (idem for ≤) *)
             (Symbols.path_equal fs Symbols.fs_leq || Symbols.path_equal fs Symbols.fs_lt)
             &&
-            (Term.equal t0 t || Term.equal t1 t)
-
+            (leq_tauto table t t0 || leq_tauto table t t1)
+            
           | _ -> false
         end
       | LHyp (Global _) -> false
@@ -1320,7 +1337,7 @@ let reduce_delta_macro1
       let ta_opt = as_action hyps ts in
       let ta = odflt ts ta_opt in (* [ta = ts] *)
 
-      if happens hyps ta || (ta_opt <> None && happens hyps ts) then
+      if happens table hyps ta || (ta_opt <> None && happens table hyps ts) then
         match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts:ta with
         | `Def mdef -> Term.subst [Term.ESubst (ta, ts)] mdef, true
         | _ -> t, false
@@ -2526,26 +2543,10 @@ module E = struct
     let timeout = TConfig.solver_timeout table in
     let hyp = Term.mk_ands hyps in 
     let t_impl = Term.mk_impl hyp cond in
-    try Constr.(is_tautology ~exn:Fail timeout t_impl) with Fail -> false
+    try Constr.(is_tautology ~exn:Fail ~table ~timeout t_impl) with Fail -> false
    
 
-  (*------------------------------------------------------------------*)
-  let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
-    let rec leq t t' =
-      match t,t' with
-      | _ when t = t' -> true
-      | App (Fun (f,_), [t]), App (Fun (f',_), [t']) 
-        when f = f_pred && f' = f_pred ->
-        leq t t'
-      | App (Fun (f,_), [t]), t' when f = f_pred -> leq t t'
-      | Action (n,is), Action (n',is') ->
-        Action.depends
-          (Action.of_term n is table)
-          (Action.of_term n' is' table)
-      | _ -> false
-    in
-    leq t t'
-  
+  (*------------------------------------------------------------------*) 
   (** Check that [hyp] implies [cond] for the special case when [cond] is 
       an inequalitie between function of time stamps or actions.
       [cond] is reduced to [t1 ≤ t2] by removing the [pred] function and if 
@@ -2599,7 +2600,7 @@ module E = struct
           begin
             let term_impl = Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
             in
-            try Constr.is_tautology ~exn:Fail timeout term_impl with Fail -> false
+            try Constr.is_tautology ~exn:Fail ~table ~timeout term_impl with Fail -> false
           end
         | _ -> false 
       in

@@ -64,7 +64,7 @@ party could potentially compute the key.
 
 
 *******************************************************************************)
-set postQuantumSound = true.
+(* set postQuantumSound = true. *)
 
 include Basic.
 

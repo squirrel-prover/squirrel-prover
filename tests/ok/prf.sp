@@ -44,10 +44,11 @@ expandall.
 fa 0.
 fa 1; fa 1.
 prf 1 => //.
-
-by intro H0; depends A, A1.
-
-by fresh 1.
++ split; 1:auto. 
+  by intro H0; depends A, A1.
++ split; 1:auto. 
+  by intro H0; depends A, A1.
++ by fresh 1.
 Qed.
 
 
