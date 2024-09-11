@@ -73,7 +73,7 @@ let mutex (a : shape) (b : shape) =
 
 (*------------------------------------------------------------------*)  
 (** Distance in control-flow graph. Return [None] when there is no
-  * dependency, and [Some 0] when the actions are equal. *)
+    dependency, and [Some 0] when the actions are equal. *)
 let distance a b =
   let rec aux a b = match a, b with
     | [], _ -> Some (List.length b)

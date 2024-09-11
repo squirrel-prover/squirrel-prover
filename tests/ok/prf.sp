@@ -23,8 +23,8 @@ system test =
   in(c,x);
   let surp = diff(m,n) in
   let mac = h (<x,surp>, k) in
-  out(c,mac);
-  out(c,h (diff(<x,n>,<x,m>), k)).
+  A:  out(c,mac);
+  A1: out(c,h (diff(<x,n>,<x,m>), k)).
 
 equiv [test] test2.
 Proof.
@@ -35,7 +35,7 @@ auto.
 
 expandall.
 fa 0.
-fa 1. fa 1.
+fa 1; fa 1.
 prf 1 => //. 
 (* easy case, it is the firt produced hash. *)
 by fresh 1.
