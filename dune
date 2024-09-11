@@ -14,8 +14,11 @@
 
 (test
   (name test)
-  (libraries squirrelcore squirreltests)
-  (modules test)
+  (libraries squirrelcore squirreltests
+    (select smt.ml from
+      (why3  -> smt.why3api.ml)
+      (!why3 -> smt.stub.ml)))
+  (modules test smt)
   (action (run %{test} --compact))
   ;; some tests rely on *.sp files in tests/ and theories/
   (deps (source_tree tests) (source_tree theories)) 

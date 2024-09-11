@@ -11,9 +11,9 @@ type timestamp_style =
     which is guaranteed correct but not complete.
     Other arguments allow to tweak this translation. *)
 val is_valid :
-  timestamp_style:timestamp_style ->
-  pure:bool ->
-  slow:bool ->
+timestamp_style:timestamp_style ->
+  separate_tuple:bool -> 
+  slow:int ->
   provers:(string*string) list->
   Symbols.table ->
   SystemExpr.fset option ->

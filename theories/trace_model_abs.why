@@ -53,8 +53,6 @@ theory Trace_model_abs
   function pair message message : message 
   function fst message : message 
   function snd message : message 
-  axiom axiom_pair : forall x : message, y:message. 
-    fst (pair x y) = x /\ snd (pair x y)= y
   function att message : message 
   function of_bool bool : message
  
@@ -71,6 +69,8 @@ theory Trace_model_abs
 
   axiom macro_exec_def : forall t : timestamp.
     macro_exec t <-> (t =  init  \/ (macro_cond t /\ macro_exec (pred t)))
+
+  axiom executable : forall ts t : timestamp. (macro_exec ts) -> (t <~ ts -> (macro_exec t))
 
   axiom input_init : forall t : timestamp. 
     ((not (happens t) )\/ t = init) -> input t = empty   

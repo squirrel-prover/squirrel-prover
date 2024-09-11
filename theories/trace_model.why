@@ -53,13 +53,15 @@ theory Trace_model
   axiom macro_exec_def : forall t : timestamp.
     macro_exec t <-> (t =  init  \/ (macro_cond t /\ macro_exec (pred t)))
 
+  axiom executable : forall ts t : timestamp. (macro_exec ts) -> (t <~ ts -> (macro_exec t))
+
   axiom input_init : forall t : timestamp. 
     ((not (happens t) )\/ t = init) -> input t = empty   
   axiom expand_input :  forall t : timestamp. 
     (happens t /\ not t = init) -> input t = att (frame (pred t))
 
   axiom frame_init : forall t : timestamp. 
-    ((not (happens t) )\/ t = init) -> input t = empty   
+    ((not (happens t) )\/ t = init) -> frame t = empty   
   axiom expand_frame : forall t : timestamp.
     (happens t /\ not t = init) -> frame t = (pair 
       (of_bool (macro_exec t))

@@ -104,10 +104,12 @@ installed.
 1. Install Why3, Alt-Ergo and Z3 using opam:
    
    ```
-   opam install why3 alt-ergo z3
+   opam install why3 alt-ergo
+   opam install z3.4.12.6
    ```
 
    This also installs the Why3 OCaml library used by Squirrel.
+   The version of Z3 used must be prior to 4.13.
 
 2. Then tell Why3 to automatically detect supported SMT provers and update its
    configuration accordingly:
