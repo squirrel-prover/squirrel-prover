@@ -22,6 +22,7 @@ depends: [
   "menhir" {>= "20180523"}
   "menhirLib"
   "conf-which" {build}
+  "dune" {>="3.16.0"}
 ]
 
 depopts: [

@@ -1400,12 +1400,25 @@ type parameters = {
   separate_tuple : bool;
   provers : (string*string) list
 }
-
+let default_prover = 
+  let l = (List.map 
+    (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern)) 
+    (Why3.Whyconf.Mprover.keys why3_provers)
+  ) in 
+  match l with 
+  | [] -> Tactics.(hard_failure (Failure "No SMT solvers detected"))
+  | _ -> 
+    if (List.mem ("CVC5","") l) then 
+      ["CVC5",""]
+    else if (List.mem ("Z3","") l) then 
+      ["Z3",""]
+    else [List.hd l]
+  
 let default_parameters = {
   timestamp_style = Nat;
   slow = 1;
   separate_tuple = true ;
-  provers = ["CVC5",""]
+  provers = default_prover
 }
 
 let parse_prover_arg prover_alt =
