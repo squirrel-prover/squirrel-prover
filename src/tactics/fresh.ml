@@ -119,6 +119,8 @@ let phi_fresh_same_system
   : Term.terms =
   (* sanity check: contx and env should agree *)
   assert (SE.equal0 env.system.set ((contx.system) :> SE.arbitrary));
+  
+  let err = Format.asprintf "%a" Term.pp n in
 
   let err = Format.asprintf "%a" Term.pp n in
 
@@ -126,7 +128,7 @@ let phi_fresh_same_system
     match n with
     | Name _ -> Name.of_term n
     | _ -> soft_failure ?loc
-             (Tactics.Failure "Can only be applied to names.")
+             (Tactics.Failure ("Term " ^ err ^ " is not a name."))
   in
 
   (* ensure that the type of the name is large *)
