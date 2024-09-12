@@ -383,7 +383,7 @@ Proof.
         (pk f p m1 m2 m3 ka na nb rand1 rand3))).
     assert A < A1 by use depends_A_A1.
     assert (A <= A1) <=> (A <= pred A1) as -> by auto.
-    rewrite /fr /ex /pk /input. 
+    rewrite /fr /ex /pk. 
     rewrite /msg1 /msg2 /msg3 in H1.
     rewrite /= H1. 
     reduce ~flags:[diffr].

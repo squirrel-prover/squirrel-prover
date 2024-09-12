@@ -1,7 +1,15 @@
-module SE = SystemExpr
+open Graph
+open Utils
 
+(*------------------------------------------------------------------*)
+module L = Location
+
+module SE = SystemExpr
 module Mt = Term.Mt
 module Mv = Vars.Mv
+
+module Sa = Symbols.Sp(Symbols.Action)
+module Ma = Symbols.Mp(Symbols.Action)
               
 (*------------------------------------------------------------------*)
 (** - Huet's unification algorithm using union-find.
@@ -14,11 +22,6 @@ module Mv = Vars.Mv
     - Also, note that during the unification and graph-based inequality
     constraints solving, the union-find structure contains an
     *under-approximation* of equality equivalence classes. *)
-
-open Graph
-open Utils
-
-module L = Location
 
 (*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
@@ -397,6 +400,7 @@ type constr_instance = {
   leqs    : (ut * ut) list;
   clauses : Form.disjunction list;   (* clauses that have not yet been split *)
   uf      : Uuf.t;
+  table   : Symbols.table;
   memo    : memo;
 }
 
@@ -492,13 +496,14 @@ let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) =
 
 (*------------------------------------------------------------------*)
 (** Make the initial constraint solving instance. *)
-let mk_instance memo (l : Form.form list) : constr_instance =
+let mk_instance table memo (l : Form.form list) : constr_instance =
   let inst =
     { uf      = Uuf.create [];       (* dummy, real uf build after *)
       eqs     = [];
       leqs    = [];
       neqs    = [];
       clauses = [];
+      table;
       memo; }
   in
   let l = Form.Lit (`Neq, uinit, uundef) :: l in
@@ -1207,7 +1212,6 @@ let find_new_eqs inst graph =
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
-(** Check  *)
 let undef_is_new inst ut =
   let uf, ut = mgu inst.uf ut in
   not (is_def uf inst.neqs ut)
@@ -1221,7 +1225,7 @@ let remove_dups inst uts =
 
 
 (** Looks for new undefined elements. *)
-let find_new_undef inst g =
+let find_new_undef (inst : constr_instance) g =
   let uf = inst.uf in
   let elems = elems uf in
 
@@ -1237,9 +1241,53 @@ let find_new_undef inst g =
       ) elems
   in
 
+  let all_actions : Sa.t =
+    List.fold_left (fun action_set ut ->
+        match ut.cnt with
+        | UName (a,_) -> Sa.add a action_set
+        | _ -> action_set
+      ) Sa.empty elems
+  in
+
+  (* maps an action symbol [A] to all action symbols [B] s.t. [B]
+     depends sequentially on [A] *)
+  let all_depends : Symbols.action list Ma.t =
+    Sa.fold (fun action_symbols map ->
+        let _, action = Action.get_def action_symbols inst.table in
+        Sa.fold (fun action_symbols' map ->
+            let _, action' = Action.get_def action_symbols' inst.table in
+            if Action.depends action action' then
+              Ma.add_to_list action_symbols' action_symbols map
+            else map
+          ) all_actions map
+      ) all_actions Ma.empty
+  in
+                          
+  (* Looks for new instances of the rule:
+     ∀τ, (happens(B) ∧ depends A B) ⇒ happens(A) *)
+  let undefs1 =
+    List.fold_left (fun acc ut ->
+        match ut.cnt with
+        | UName (a,args) ->
+          if is_def uf inst.neqs ut then
+            begin
+              let depends_a = Ma.find_dflt [] a all_depends in
+              List.fold_left (fun acc b ->
+                  let args0 = List.take (Action.arity b inst.table) args in
+                  let ut_b = uname b args0 in
+                  if undef_is_new inst ut_b then ut_b :: acc else acc
+                ) acc depends_a
+            end
+          else acc
+             
+        | _ -> acc
+
+      ) [] elems
+  in
+
   (* Looks for new instances of the rule:
      ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
-  let undefs1 =
+  let undefs2 =
     UtG.fold_edges (fun ut1 ut2 undefs ->
         (if undef_is_new inst ut1 then [ut1] else []) @
         (if undef_is_new inst ut2 then [ut2] else []) @
@@ -1247,7 +1295,7 @@ let find_new_undef inst g =
       ) g []
   in
 
-  remove_dups inst (undefs0 @ undefs1)
+  remove_dups inst (undefs0 @ undefs1 @ undefs2)
 
 (*------------------------------------------------------------------*)
 (** [split instance] return a disjunction of satisfiable and normalized instances
@@ -1325,29 +1373,32 @@ let split_models instance =
 type models = memo * model list
 
 (*------------------------------------------------------------------*)
-let models_conjunct (terms : Term.terms) : models =
+let models_conjunct table (terms : Term.terms) : models =
   let memo = mk_memo () in
   let l = Form.mk_list memo terms in
-  let instance = mk_instance memo l in
+  let instance = mk_instance table memo l in
   (memo, split_models instance)
 
 (*------------------------------------------------------------------*)
-(** Arrays of terms for memoisation *)
-module TermArray : sig
-  type t = Term.term
-  val mk : t list -> t array
-  module Memo : Ephemeron.S with type key = t array
+(** Memoisation of arrays of terms and the table *)
+module Args : sig
+  type t = Term.term array * int
+  val mk : Term.term list -> Symbols.table -> t
+  module Memo : Ephemeron.S with type key = t
 end = struct
-  type t = Term.term
+  type t = Term.term array * int
 
-  let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
+  let mk l table =
+    (Array.of_list (List.sort_uniq Stdlib.compare l), Symbols.tag table)
 
-  let equal t t' = Term.equal t t'
+  let equal (a,t) (a',t') =
+    t = t' &&
+    Array.length a = Array.length a' &&
+    Array.for_all2 Term.equal a a'
 
-  (* FIXME: term hashconsing *)
-  let hash = Term.hash
+  let hash ((a,t) : t) : int = hcombine_array Term.hash t a
 
-  module Memo = Ephemeron.Kn.Make(struct
+  module Memo = Ephemeron.K1.Make(struct
       type _t = t
       type t = _t
       let equal = equal
@@ -1358,23 +1409,25 @@ end
 (*------------------------------------------------------------------*)
 (** Memoisation *)
 let models_conjunct =
-  let memo = TermArray.Memo.create 256 in
-  fun (terms : Term.terms) ->
-    let terms_array = TermArray.mk terms in
-    try TermArray.Memo.find memo terms_array with
+  let memo = Args.Memo.create 256 in
+  fun table (terms : Term.terms) ->
+    let terms_array = Args.mk terms table in
+    try Args.Memo.find memo terms_array with
     | Not_found ->
-      let res = models_conjunct terms in
-      TermArray.Memo.add memo terms_array res;
+      let res = models_conjunct table terms in
+      Args.Memo.add memo terms_array res;
       res
 
 (** Exported.
     [models_conjunct] with timeout and profiling. *)
 let models_conjunct =
   let prof = Prof.mk "Constr.models_conjunct" in
-  fun (time_out : int)
-      ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
-      (terms : Term.terms) ->
-    prof (fun () -> Utils.timeout exn time_out models_conjunct terms)
+  fun
+    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+    ~(timeout : int)
+    ~table
+    (terms : Term.terms) ->
+    prof (fun () -> Utils.timeout exn timeout (models_conjunct table) terms)
 
 (*------------------------------------------------------------------*)
 (** Exported. *)
@@ -1384,12 +1437,14 @@ let m_is_sat (models : models) = (snd models) <> []
 (** Exported. *)
 let is_tautology =
   let prof = Prof.mk "Constr.is_tautology" in
-  fun ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
-      (timeout:int)
-      (t:Term.term)
-  ->
-    prof (fun () ->
-      not (m_is_sat (models_conjunct timeout ~exn:exn [Term.mk_not t])))
+  fun
+    ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
+    ~(timeout:int)
+    ~table
+    (t:Term.term)
+    ->
+      prof (fun () ->
+          not (m_is_sat (models_conjunct ~exn:exn ~timeout ~table [Term.mk_not t])))
 
 (*------------------------------------------------------------------*)
 (** [ext_support model ut] adds [ut] to the model union-find, if necessary, and

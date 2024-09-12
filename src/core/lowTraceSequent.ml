@@ -214,7 +214,10 @@ let get_models table (proof_context : H.hyps) =
            with the system used to interpret them) *)
       ) proof_context [] 
   in
-  Constr.models_conjunct (TConfig.solver_timeout table) proof_context
+  Constr.models_conjunct
+    ~timeout:(TConfig.solver_timeout table)
+    ~table
+    proof_context
 
 let get_models (s : sequent) = get_models s.env.table s.proof_context
 

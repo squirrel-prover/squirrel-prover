@@ -48,6 +48,11 @@ let hcombine_list fhash hash l =
       hcombine hash (fhash x)
     ) hash l
 
+let hcombine_array fhash hash l =
+  Array.fold_left (fun hash x ->
+      hcombine hash (fhash x)
+    ) hash l
+
 (* -------------------------------------------------------------------- *)
 module Hashtbl = struct
   include Hashtbl

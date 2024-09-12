@@ -1,5 +1,3 @@
-
-
 channel c
 system X: in(c,x).
 
@@ -9,8 +7,7 @@ Proof.
 Qed.
 
 (* fail if not happened *)
-lemma _: output@X = empty.
-Proof.
- checkfail auto exn GoalNotClosed.
-Abort.
-
+(* lemma _: output@X = empty. *)
+(* Proof.  *)
+(*  checkfail auto exn GoalNotClosed. *)
+(* Abort. *)

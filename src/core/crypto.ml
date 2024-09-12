@@ -614,18 +614,13 @@ module Const = struct
       Printer.pr "-----Good name ownerships checks------@."
   
         
-  let notify_valid_formula ~vbs ~dbg ~const1 ~const2 form : unit =
-    if not vbs && not dbg then () else                                                  
-    if not dbg then 
-      Printer.pr "Between @[%a@]@. and @[%a@] @. Corresponding formula : %a@. ---@."
-        Const.pp const1
-        Const.pp const2
-        Term.pp form
-    else 
+  let notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form : unit =
+    if not vbs && not dbg then () else
+      let ppe = default_ppe ~table ~dbg () in
       Printer.pr "Between @[%a@]@. and @[%a@]  @. Corresponding formula : %a@. ---@. "
-        Const.pp_dbg const1
-        Const.pp_dbg const2
-        Term.pp_dbg form
+        (Const._pp ppe) const1
+        (Const._pp ppe) const2
+        (Term._pp  ppe) form
 
   
   exception InvalidConstraints
@@ -709,110 +704,119 @@ module Const = struct
     List.concat_map get_loc_smpls oracle.loc_smpls @ snd(global_const), subst
 
 
-  let function_formula ~vbs ~dbg (const1:t) (const2:t) =
+  let function_formula table ~vbs ~dbg (const1:t) (const2:t) =
     if const1.name = const2.name && not (const1.tag = const2.tag)
     then
-      let const1 = refresh const1 in
-      let const2 = refresh const2 in 
-      let term_equal = Term.mk_neqs (const1.term) (const2.term) in
-      let cond_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      let form = 
-      Term.mk_forall
-        (const1.vars @ const2.vars)
-        (Term.mk_impl (cond_conjunction) term_equal)
-      in
-      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
+      begin
+        let const1 = refresh const1 in
+        let const2 = refresh const2 in 
+        let term_equal = Term.mk_neqs (const1.term) (const2.term) in
+        let cond_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+        let form = 
+          Term.mk_forall
+            (const1.vars @ const2.vars)
+            (Term.mk_impl (cond_conjunction) term_equal)
+        in
+        notify_valid_formula table ~vbs ~dbg  ~const1 ~const2 form;
+        form
+      end
     else Term.mk_true
 
-  let fresh_formula ~vbs ~dbg (const1 : t) (const2 : t) =
+  let fresh_formula table ~vbs ~dbg (const1 : t) (const2 : t) =
     if const1.tag = Tag.game_local
     && const2.tag = Tag.game_local
     && const1.name=const2.name
     then
-      let const1 = refresh const1 in
-      let const2 = refresh const2 in
-      let term_not_equal = Term.mk_neqs const1.term const2.term in
-      let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      let form = Term.mk_forall
-        (const1.vars @ const2.vars)
-        (Term.mk_impl const_conjunction term_not_equal)
-      in
-      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
+      begin
+        let const1 = refresh const1 in
+        let const2 = refresh const2 in
+        let term_not_equal = Term.mk_neqs const1.term const2.term in
+        let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+        let form = Term.mk_forall
+            (const1.vars @ const2.vars)
+            (Term.mk_impl const_conjunction term_not_equal)
+        in
+        notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form; form
+      end
     else 
       Term.mk_true
 
-  let fresh_one_const ~vbs ~dbg (const :t) =
+  let fresh_one_const table ~vbs ~dbg (const :t) =
     if const.tag = Tag.game_local
     then
-      let const1 = refresh const in
-      let const2 = refresh const in
-      let term_not_equal = Term.mk_neqs const1.term const2.term in
-      let hyps = Term.mk_ors ~simpl:true
-          (List.map2
-             (fun x y -> Term.mk_neq (Term.mk_var x) (Term.mk_var y ))
-             const1.vars const2.vars)
-      in
-      let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      let form = Term.mk_forall (const1.vars @ const2.vars)
-          (Term.mk_impl const_conjunction (Term.mk_impl hyps term_not_equal ))
-      in
-      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
+      begin
+        let const1 = refresh const in
+        let const2 = refresh const in
+        let term_not_equal = Term.mk_neqs const1.term const2.term in
+        let hyps = Term.mk_ors ~simpl:true
+            (List.map2
+               (fun x y -> Term.mk_neq (Term.mk_var x) (Term.mk_var y ))
+               const1.vars const2.vars)
+        in
+        let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+        let form = Term.mk_forall (const1.vars @ const2.vars)
+            (Term.mk_impl const_conjunction (Term.mk_impl hyps term_not_equal ))
+        in
+        notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form;
+        form
+      end
     else
       Term.mk_true
 
 
-  let rec function_all_formulas
-      ~vbs ~dbg
-      (const : t list)
-    =
+  let rec function_all_formulas table ~vbs ~dbg (const : t list) =
     match const with
     | [] -> []
     | const1::q ->
-      List.map (function_formula ~vbs ~dbg const1) const @ function_all_formulas ~vbs ~dbg q
+      List.map (function_formula table ~vbs ~dbg const1) const @
+      function_all_formulas table ~vbs ~dbg q
 
-  let rec fresh_all_formulas ~vbs ~dbg (const : t list) =
+  let rec fresh_all_formulas table ~vbs ~dbg (const : t list) =
     match const with
     | [] -> []
     | const1::q ->
-      fresh_one_const ~vbs ~dbg const1 ::
-      List.map (fresh_formula ~vbs ~dbg const1) q @
-      fresh_all_formulas ~vbs ~dbg q
+      fresh_one_const table ~vbs ~dbg const1 ::
+      List.map (fresh_formula table ~vbs ~dbg const1) q @
+      fresh_all_formulas table ~vbs ~dbg q
 
-  let global_formula ~vbs ~dbg (const1 : t) (const2 : t) (otag : Tag.t) =
+  let global_formula table ~vbs ~dbg (const1 : t) (const2 : t) (otag : Tag.t) =
     if const1.name = const2.name
     && const1.tag = otag
     && const2.tag = otag
     then
-      let const1 = refresh const1 in
-      let const2 = refresh const2 in
-      let term_equal = Term.mk_eqs const1.term const2.term in
-      let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-      let form = Term.mk_forall
-        (const1.vars @ const2.vars)
-        (Term.mk_impl const_conjunction term_equal)
-      in
-      notify_valid_formula ~vbs ~dbg  ~const1 ~const2 form; form
+      begin
+        let const1 = refresh const1 in
+        let const2 = refresh const2 in
+        let term_equal = Term.mk_eqs const1.term const2.term in
+        let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+        let form = Term.mk_forall
+            (const1.vars @ const2.vars)
+            (Term.mk_impl const_conjunction term_equal)
+        in
+        notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form;
+        form
+      end
     else Term.mk_true
 
 
-  let rec global_all_formulas ~vbs ~dbg (game : game) (const : t list) =
+  let rec global_all_formulas table ~vbs ~dbg (game : game) (const : t list) =
     match const with
     | [] -> []
     | const1::q ->
       List.concat_map
-        (fun tg -> List.map (fun const -> global_formula ~vbs ~dbg const1 const tg ) const)
+        (fun tg -> List.map (fun const -> global_formula table ~vbs ~dbg const1 const tg ) const)
         (Tag.global_tags game)
-      @ (global_all_formulas ~vbs ~dbg game q)
+      @ (global_all_formulas table ~vbs ~dbg game q)
 
   (** [to_subgoals consts] produces a list of (local formulas)
       subgoals ensuring that [consts] are valid. *)
-  let to_subgoals ~vbs ~dbg (game : game) (consts : t list) : Term.terms =
+  let to_subgoals table ~vbs ~dbg (game : game) (consts : t list) : Term.terms =
     notify_global_checks ~vbs ~dbg;
-    let global = global_all_formulas ~vbs ~dbg game consts in
+    let global = global_all_formulas table ~vbs ~dbg game consts in
     notify_functional_checks ~vbs ~dbg;
-    let functional = function_all_formulas ~vbs ~dbg consts in
+    let functional = function_all_formulas table ~vbs ~dbg consts in
     notify_fresh_checks ~vbs ~dbg;
-    let freshness = fresh_all_formulas ~vbs ~dbg consts in
+    let freshness = fresh_all_formulas table ~vbs ~dbg consts in
     List.filter
       (fun x -> not (Term.Smart.is_true x))
       (global @ functional @ freshness)
@@ -1451,13 +1455,13 @@ let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
       pp_constraints
       pp_mem
       pp_all_inputs
-      (fun fmt -> Fmt.pf fmt "%a@;" (Fmt.list CondTerm.pp) outputs)
+      (fun fmt -> Fmt.pf fmt "%a@;" (Fmt.list (CondTerm._pp ppe)) outputs)
   in
   Fmt.pf fmt "@[<v 0>%t%t@]"
     pp_env
     pp_query
 
-let[@warning "-32"] pp_query = _pp_query  (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_query     = _pp_query (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_query_dbg = _pp_query (default_ppe ~dbg:true ())
 
 let _pp_gen_goal ppe fmt (goal:goal) =
@@ -2021,29 +2025,25 @@ let notify_bideduce_immediate
     Printer.pr "Outputs adversarial or in inputs@."
     
 let notify_bideduce_oracle_extra_inputs
+    table
     ~vbs ~dbg
     (extra_inputs : CTSet.t list)
     (cond:Term.term)
   =
   if not vbs && not dbg then () else
-  if not dbg then
+    let ppe = default_ppe ~table ~dbg () in
     Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
-      (Fmt.list ~sep:(Fmt.any ",@.") CTSet.pp) extra_inputs
-      Term.pp cond
-  else
-    Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
-      (Fmt.list ~sep:(Fmt.any ",@.") CTSet.pp_dbg) extra_inputs
-      Term.pp_dbg cond
+      (Fmt.list ~sep:(Fmt.any ",@.") (CTSet._pp ppe)) extra_inputs
+      (Term._pp ppe) cond
 
 let notify_bideduce_term_start
+    table
     ~vbs ~dbg
     (output:CondTerm.t)
   =
   if not vbs && not dbg then () else
-  if not dbg then
-    Printer.pr "___Bideducing term %a ___@." CondTerm.pp output
-  else
-    Printer.pr "___Bideducing term %a ___@." CondTerm.pp_dbg output
+    let ppe = default_ppe ~table ~dbg () in
+    Printer.pr "___Bideducing term %a ___@." (CondTerm._pp ppe) output
 
 let notify_bideduce_oracle_inputs_start
     ~vbs ~dbg
@@ -2070,15 +2070,18 @@ let notify_bideduce_second_go
     Printer.pr "__________Starting second go____________@."
 
 
-let  notify_bideduce_oracle_already_call ~vbs ~dbg already_called =
+let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
+  let ppe = default_ppe ~table () in
   if not vbs && not dbg then () else
-    Printer.pr "Allready called : %a" (Fmt.list (Fmt.pair (Fmt.list Term.pp) Term.pp)) already_called
+    Printer.pr "Allready called : %a"
+      (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
 
 
-let  notify_query_goal_start ~vbs ~dbg query =
+let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
+  let ppe = default_ppe ~table:qs.env.table () in
   if not vbs && not dbg then () else
     Printer.pr "@. ******* Strating goal ********** @. %a @. ********@. "
-      pp_query query
+      (_pp_query ppe) query
 
   (*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
@@ -2192,7 +2195,7 @@ and bideduce_term
   =
   let output = CondTerm.polish output query.hyps query.env in
   assert (AbstractSet.well_formed query.env query.initial_mem);
-  notify_bideduce_term_start ~vbs ~dbg output; 
+  notify_bideduce_term_start query.env.table ~vbs ~dbg output; 
   if
     HighTerm.is_ptime_deducible ~si:true query.env output.term ||
     knowledge_mem ~env:query.env ~hyps:query.hyps output query.inputs
@@ -2238,8 +2241,7 @@ and bideduce_oracle
   let output_term,query,result_start = 
     if already_called <> [] then
       let _ =
-        notify_bideduce_oracle_already_call ~vbs ~dbg
-          already_called
+        notify_bideduce_oracle_already_call query.env.table ~vbs ~dbg already_called
       in
       let args = List.concat_map fst already_called in
       let conds = List.map snd already_called in
@@ -2252,8 +2254,8 @@ and bideduce_oracle
       bideduce them*)
       let to_deduce = args(*@conds_true@output_conds*) in
       (* TODO : conds_false might be always false, in which case it is not usufull to run oracle*)
-      notify_bideduce_oracle_extra_inputs ~vbs ~dbg
-        query.extra_inputs conds_false;
+      notify_bideduce_oracle_extra_inputs
+        query.env.table ~vbs ~dbg query.extra_inputs conds_false;
       match bideduce ~vbs ~dbg
               {query with allow_oracle=false} to_deduce
       with
@@ -2852,6 +2854,8 @@ let prove
     (args  : Args.crypto_args)
     (terms : Equiv.equiv) 
   =
+  let table = env.table in
+  let ppe = default_ppe ~table () in
   let vbs = TConfig.verbose_crypto env.table in
   let dbg = TConfig.debug_tactics env.table in
   let game_loc = Symbols.p_path_loc pgame in
@@ -2928,7 +2932,7 @@ let prove
   in
   (** Get all extra inputs for [goal_to] coming from [goal_from] under [cond_from] that should be 
       the condition under which [goal_from] is to be deduced*)
-  let get_extra_inputs  (goal_to:goal) (goal_from:goal) (cond_from: Term.term) =
+  let get_extra_inputs (goal_to:goal) (goal_from:goal) (cond_from: Term.term) =
     let timestamp = Term.mk_pred (oget goal_to.macro) in
     let _ = goal_to.vars in
     extra_input_from_goal goal_from [cond_from] timestamp 
@@ -2949,24 +2953,24 @@ let prove
   | Some result -> 
     let oracle_subgoals = result.subgoals in
     let final_consts = result.consts in
-    let consts_subgs = Const.to_subgoals ~vbs ~dbg game final_consts in
+    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game final_consts in
     
     Printer.pr
-      "@[<2>Constraints are:@ @[<v 0>%a@]@."
-      (Fmt.list ~sep:Fmt.cut Const.pp) final_consts;
+      "@[<v 2>Constraints are:@ @[<v 0>%a@]@."
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) final_consts;
     Printer.pr
-      "@[<2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
-      (Fmt.list ~sep:Fmt.cut Term.pp) consts_subgs;
+      "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe)) consts_subgs;
     Printer.pr
-      "@[<2>Oracle subgoals are:@ %a@]@."
-      (Fmt.list ~sep:Fmt.cut Term.pp)
+      "@[<v 2>Oracle subgoals are:@ %a@]@."
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
       oracle_subgoals;
-    Printer.pr "@[<2>Final memory is:@ %a@]@." AbstractSet.pp_mem result.final_mem;
+    Printer.pr "@[<2>Final memory is:@ %a@]@." (AbstractSet._pp_mem ppe) result.final_mem;
     
     let cstate = Reduction.mk_cstate ~hyps ~system:env.system env.table in
     List.remove_duplicate (Reduction.conv cstate) (consts_subgs @ oracle_subgoals)
-  | None -> Tactics.hard_failure ~loc:(game_loc)
-        (Failure "failed to apply the game" )
+  | None ->
+    Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end types and parsing} *)

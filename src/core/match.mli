@@ -332,6 +332,8 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
+val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
+  
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
 

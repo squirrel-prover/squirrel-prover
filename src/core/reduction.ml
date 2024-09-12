@@ -477,9 +477,9 @@ and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
   else
     try
       let timeout = TConfig.solver_timeout st.table in
-      if Constr.(is_tautology ~exn:NoExp timeout t )
+      if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table t )
       then Term.mk_true,true
-      else if Constr.(is_tautology ~exn:NoExp timeout (Term.mk_not t))
+      else if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table (Term.mk_not t))
       then Term.mk_false,true
       else t,false   
     with NoExp -> (t,false)
