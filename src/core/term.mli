@@ -559,6 +559,12 @@ val is_name   : term -> bool
 val destr_var : term -> Vars.var option
 
 val destr_tuple : term -> term list option
+
+(** Flatten all nested tuples at top level in a term:
+    if [u, v, w] are not tuples, [u] becomes [[u]]
+    [(u, v)] becomes [[u;v]], [(u,(v,w))] becomes [[u;v:w]] and so on.
+    Consistent with [Type.destr_ty_tuple_flatten]. *)
+val destr_tuple_flatten : term -> term list
 val destr_proj : term -> (int * term) option
 
 val is_var   : term -> bool
@@ -575,6 +581,12 @@ val destr_pair : term -> (term * term) option
 (** Destruct a given number of [Fun]. 
     If [ty_env] is not [None], may add new type equalities to do so. *)
 val destr_ty_funs : ?ty_env:Infer.env -> Type.ty -> int -> Type.ty list * Type.ty
+
+(** Flatten all nested tuples at top level in a type:
+    if [u, v, w] are not tuples, [u] becomes [[u]]
+    [u * v] becomes [[u;v]], [u * (v * w))] becomes [[u;v;w]] and so on.
+    Consistent with [Term.destr_tuple_flatten]. *)
+val destr_ty_tuple_flatten : Type.ty -> Type.ty list
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

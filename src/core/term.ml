@@ -264,6 +264,12 @@ let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
   | _ -> assert false   (* FIXME: can this happen? *)
 
 (*------------------------------------------------------------------*)
+let rec destr_ty_tuple_flatten (t : Type.ty) : Type.ty list =
+  match t with 
+  | Tuple l -> List.concat_map destr_ty_tuple_flatten l
+  | _ -> [t]
+
+(*------------------------------------------------------------------*)
 let ty ?ty_env (t : term) : Type.ty =
   let must_close, ty_env = match ty_env with
     | None        -> true, Infer.mk_env ()
@@ -668,6 +674,11 @@ let destr_app ~fs ~arity = function
 let destr_tuple = function
   | Tuple ts -> Some ts
   | _ -> None
+
+let rec destr_tuple_flatten (t:term) : term list =
+  match destr_tuple t with 
+    | Some ts -> List.concat_map destr_tuple_flatten ts
+    | None -> [t]
 
 let destr_proj = function
   | Proj (i,t) -> Some (i,t)

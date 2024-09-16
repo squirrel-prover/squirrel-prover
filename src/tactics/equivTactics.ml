@@ -1,5 +1,5 @@
 (** All equivalence tactics.
-   Tactics are organized in three classes:
+    Tactics are organized in three classes:
     - Logical -> relies on the logical properties of the sequent.
     - Strucutral -> relies on properties of protocols, or of equality over
       messages,...
@@ -17,7 +17,7 @@ module L    = Location
 module SE   = SystemExpr
 
 module TopHyps = Hyps
-  
+
 module ES   = EquivSequent
 module Hyps = ES.Hyps
 
@@ -25,7 +25,7 @@ module O  = Occurrences
 module Name = O.Name
 
 module LT = LowTactics
-  
+
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
@@ -74,7 +74,7 @@ let check_no_macro_or_var (env : Env.t) ~refl_system (t : Term.term) =
   with Failed -> false
 
 (** Closes the goal if it is an equivalence
-  * where the two frames are identical. *)
+ * where the two frames are identical. *)
 let refl (e : Equiv.equiv) (s : ES.t) =
   let system_pair = Utils.oget ((ES.env s).system.pair) in
   let env_pair = Env.update ~system:{ set = (system_pair :> SE.t); pair = None; } (ES.env s) in
@@ -89,7 +89,7 @@ let refl (e : Equiv.equiv) (s : ES.t) =
     match ES.get_frame l_proj s, ES.get_frame r_proj s with
     | Some el, Some er ->
       if List.for_all2 (ES.Reduce.conv_term ~se:(system_pair :> SE.t) s) el.terms er.terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       then `True
       else `NoRefl
 
@@ -97,12 +97,12 @@ let refl (e : Equiv.equiv) (s : ES.t) =
 
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
-  * where the two frames are identical. *)
+ * where the two frames are identical. *)
 let refl_tac (s : ES.t) =
   match refl (ES.conclusion_as_equiv s) s with
-    | `True           -> []
-    | `NoRefl         -> soft_failure (Tactics.NoRefl)
-    | `NoReflMacroVar -> soft_failure (Tactics.NoReflMacroVar)
+  | `True           -> []
+  | `NoRefl         -> soft_failure (Tactics.NoRefl)
+  | `NoReflMacroVar -> soft_failure (Tactics.NoReflMacroVar)
 
 let () =
   T.register "refl"
@@ -114,7 +114,7 @@ let sym_tac (s : ES.t) : Goal.t list =
   check_conclusion_is_equiv s;
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  
+
   let equiv_left = ES.get_frame l_proj s |> Utils.oget in
   let equiv_right = ES.get_frame r_proj s |> Utils.oget in
   let old_context = (ES.env s).system in
@@ -128,7 +128,7 @@ let sym_tac (s : ES.t) : Goal.t list =
       (ES.set_conclusion_in_context
          new_context
          (Atom (Equiv {terms = (List.map2 diff equiv_right.terms equiv_left.terms); bound = None}))
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+         (*TODO:Concrete : Probably something to do to create a bounded goal*)
          s) ]
 
 let () =
@@ -141,13 +141,13 @@ let () =
 (** Prove a sequent s whose conclusion is an equivalence
     from s1,s2,s3 where:
 
-     - s1 shows that the left projections of the equivalence
-       are equivalent for the old and new left systems;
+    - s1 shows that the left projections of the equivalence
+      are equivalent for the old and new left systems;
 
-     - s3 shows that the right projections of the equivalence
-       are equivalent for the old and new right systems;
+    - s3 shows that the right projections of the equivalence
+      are equivalent for the old and new right systems;
 
-     - s2 proves the same equivalence as s1 but for the new systems.
+    - s2 proves the same equivalence as s1 but for the new systems.
 
     For convenience a new context is passed and not just a new pair.
     This allows to change the set annotations for s2 by the way. *)
@@ -163,7 +163,7 @@ let transitivity_systems ~loc (new_context : SE.context) (s : ES.t) =
                 with the current context");
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  
+
   (* Extract data from initial sequent. *)
   let equiv_left = ES.get_frame l_proj s |> Utils.oget in
   let equiv_right = ES.get_frame r_proj s |> Utils.oget in
@@ -216,7 +216,7 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
   let cenv =
     (* fset with only the right system, once *)
     let fset_r = SE.make_fset (ES.table s) ~labels:[Some r_proj] [r_sys] in
-    
+
     (* remove the pair when parsing, to prevent diffs *)
     let system = SE.{ set = (fset_r :> SE.arbitrary); pair = None; } in
     let env = { (ES.env s) with system; } in
@@ -241,10 +241,10 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
   let fset_r2 =
     SE.make_fset (ES.table s) ~labels:[Some l_proj;Some r_proj] [r_sys; r_sys]
   in
-  
+
   let context1 = { context with pair = Some pair1; } in
   let context2 = SE.{ set = (fset_r2 :> SE.arbitrary); pair = Some pair2; } in
-  
+
   let equiv1, equiv2 = 
     List.mapi (fun i t ->
         let t1 = Term.project1 l_proj t in
@@ -255,15 +255,15 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
           Term.simple_bi_term
             [l_proj; r_proj]
             (Term.mk_diff [(l_proj, t2); (r_proj,    t2)])
-            
+
         | Some (_,new_t) ->
           Term.mk_diff [(l_proj,    t1); (r_proj, new_t) ],
           Term.mk_diff [(l_proj, new_t); (r_proj,    t2) ]
       ) equiv.terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
     |> List.split
   in
-  
+
   let goal1 = ES.set_conclusion_in_context context1 (Atom (Equiv {terms = equiv1; bound = None})) s in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
   let goal2 = ES.set_conclusion_in_context context2 (Atom (Equiv {terms = equiv2; bound = None})) s in
@@ -271,7 +271,7 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
 
 
   [Goal.Global goal1; Goal.Global goal2 ]
-          
+
 
 let trans_tac args s =
   match args with
@@ -322,8 +322,8 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
         match ty with
         | Type.Timestamp when type_based ->
           let env = ES.env s in
-          if not (HighTerm.is_constant                                   env f &&
-                  HighTerm.is_single_term_in_context ~context:env.system env f   ) then
+          if not (HighTerm.is_constant     env f &&
+                  HighTerm.is_system_indep env f   ) then
             hard_failure ~loc
               (Failure "global case must be on a constant and \
                         system-independent term");
@@ -339,7 +339,7 @@ let case_tac (args : Args.parser_args) : LT.etac =
 
 (*------------------------------------------------------------------*)
 (** Apply the entailment (i.e. bi-frame inclusion) and left-false rule.
-   
+
     Entailment is checked by verifying that there exists an hypothesis H 
     such that each element of the biframe in conclusion appears in H.
 
@@ -349,7 +349,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
 
   let is_false = function
     | Equiv.Reach {formula = f; bound = None} -> ES.Reduce.conv_term s f Term.mk_false
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
     | _ -> false
   in
 
@@ -358,10 +358,10 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
        an existing equivalence hypothesis *)
     if ES.conclusion_is_equiv s then
       let conclusion = (ES.conclusion_as_equiv s).terms in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       (function
         | Equiv.Equiv {terms = equiv; bound = None}  ->
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          (*TODO:Concrete : Probably something to do to create a bounded goal*)
           List.for_all (fun elem ->
               List.exists (ES.Reduce.conv_term s elem)
                 equiv
@@ -369,7 +369,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
         | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false
         |_ -> false)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
     else (fun at -> ES.Reduce.conv_global s (Equiv.Atom at) conclusion)
   in
@@ -437,7 +437,7 @@ let rec tautology (f : Equiv.form) (s : ES.t) : bool =
   | Equiv.Let _ | Equiv.Quant _ -> false
 
   | Equiv.(Atom (Pred _)) -> false
-    
+
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
 
   | Equiv.(Atom (Reach _)) ->
@@ -615,7 +615,7 @@ let old_or_new_induction args : etac =
 (*------------------------------------------------------------------*)
 let enrich _ty f _loc (s : ES.t) =
   ES.set_equiv_conclusion {terms = f :: (ES.conclusion_as_equiv s).terms; bound = None} s
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let enrich_a arg s =
   match 
@@ -663,7 +663,7 @@ let fa_select_felems ~ty_env (pat : Term.term Term.pat_op) (s : ES.t) : int opti
       | NoMatch _ -> None
       | Match _   -> Some i
     ) (ES.conclusion_as_equiv s).terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (*------------------------------------------------------------------*)
 exception No_FA of [`HeadDiff | `HeadNoFun]
@@ -719,7 +719,7 @@ let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
       (Failure (Fmt.str 
                   "FA does not apply to sequences over types which are not \
                    finite and of fixed-sized: %a" Vars.pp_list bad_vars))
-      
+
 (** Applies Function Application on a given frame element *)
 let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
   let before, e, after = split_equiv_conclusion i s in
@@ -762,7 +762,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
   | _ ->
     let biframe = List.rev_append before (fa_expand s e @ after) in
     ES.set_equiv_conclusion {terms = biframe; bound = None} s
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (** [do_fa_felem] with user-level errors *)
 let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
@@ -880,7 +880,7 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
       let fa_succ, fa_rem =  is_fa_dup (res @ els) e in
       if fa_succ then doit (fa_rem @ res) {terms = els; bound = None}
       else doit (e :: res) {terms = els; bound = None}
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   doit [] elems
 
@@ -894,7 +894,7 @@ let fa_dup (s : ES.t) : ES.t list =
     Hyps.find_map (fun (_, hyp) ->
         match hyp with
         | TopHyps.LHyp (Equiv.Atom (Equiv {terms = e; bound = None})) -> Some e
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        (*TODO:Concrete : Probably something to do to create a bounded goal*)
         | _ -> None) s
   in
 
@@ -903,49 +903,51 @@ let fa_dup (s : ES.t) : ES.t list =
   let biframe =
     ES.conclusion_as_equiv s
     |> fun e -> {terms = List.rev e.terms; bound = None}
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    |> filter_fa_dup s hyp
+                (*TODO:Concrete : Probably something to do to create a bounded goal*)
+                |> filter_fa_dup s hyp
   in
   [ES.set_equiv_conclusion {terms = biframe; bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (*------------------------------------------------------------------*)
 (** Deduce. 
-    FIXME : is considered pq-sound, since apply is, but this has not been checked.*)
+    FIXME: is considered pq-sound, since apply is, but this has not been checked. *)
 
-(** Deduce recursively removed all elements of a biframe that are deducible from the other ones.*)
+(** Deduce recursively removes all elements of a biframe
+    that are deducible from the rest. *)
 let deduce_all (s:ES.t) =  
-    let table,system = ES.table s, ES.system s in
-    let hyps = ES.get_trace_hyps s in
-    let option = { Match.default_match_option with mode = `EntailRL } in
-    let rec _deduce_all res goals =
-      match goals with
-      | [] -> res
-      | e::after ->
-        let biframe = List.rev_append res goals in
-        let biframe_without_e = List.rev_append res after in
-        let goal = Equiv.mk_equiv_atom biframe in
-        let pat = Term.{
+  let table,system = ES.table s, ES.system s in
+  let hyps = ES.get_trace_hyps s in
+  let option = { Match.default_match_option with mode = `EntailRL } in
+  let rec _deduce_all res goals =
+    match goals with
+    | [] -> res
+    | e::after ->
+      let biframe = List.rev_append res goals in
+      let biframe_without_e = List.rev_append res after in
+      let goal = Equiv.mk_equiv_atom biframe in
+      let pat = Term.{
           pat_op_vars   = [];
           pat_op_tyvars = [];
           pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
         } in
-        let match_result = 
-          Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
-        in
-        match match_result with
-        | NoMatch _ -> _deduce_all (e::res) after 
-        | Match mv -> 
-          assert (Match.Mvar.is_empty mv);
-          _deduce_all res after
-    in
-    let new_conclusion = List.rev (_deduce_all [] (ES.conclusion_as_equiv s).terms) in
+      let match_result = 
+        Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
+      in
+      match match_result with
+      | NoMatch _ -> _deduce_all (e::res) after 
+      | Match mv -> 
+        assert (Match.Mvar.is_empty mv);
+        _deduce_all res after
+  in
+  let new_conclusion = List.rev (_deduce_all [] (ES.conclusion_as_equiv s).terms) in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    [ES.set_equiv_conclusion {terms = new_conclusion; bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  [ES.set_equiv_conclusion {terms = new_conclusion; bound = None} s]
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
-(** Check whether the i^th element of the biframe is bideductible from the other ones, and 
-    remove it if its the case. *)
+
+(** Checks whether the [i]-th element of the biframe is bideducible
+    from the other ones, and if so removes it. *)
 let deduce_int (i : int L.located) s =
   let before, _, after = split_equiv_conclusion i s in
   let biframe_without_e = List.rev_append before after in
@@ -966,98 +968,119 @@ let deduce_int (i : int L.located) s =
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
     [ES.set_equiv_conclusion {terms = biframe_without_e; bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO: Concrete: Probably something to do to create a bounded goal *)
 
-(** If [system] is a single system, build the system with pair of this system 
-    Else, raises a soft failure. *)
+(** If [system] is a single system, builds the system with the
+    pair of that system. 
+    Otherwise, raises a soft failure. *)
 let pair_of_single_sys (system : SE.context) : SE.context =
   let system_of_set = { system with pair = None } in
+
   let singles = SE.single_systems_of_context system_of_set in
   if singles = None || System.Single.Set.cardinal (oget singles) <> 1 then
     (soft_failure (Failure "Require a single system"));
-  let systems_list = SE.to_list (SE.to_fset(system.set)) in
-  if systems_list = [] then
-      assert false;
-  let proj, single_system = List.hd systems_list in
-  let res :SE.context = { set = SE.to_arbitrary (SE.singleton single_system);
-    pair = Some (SE.make_pair (proj, single_system) (proj, single_system)) } in
-  Printer.pr "-> %a@." SE.pp_context res;
+
+  let systems_list = SE.to_list (SE.to_fset system.set) in
+  assert (List.length systems_list = 1);
+  let _, single_system = List.hd systems_list in
+  let res:SE.context = 
+    { set = SE.to_arbitrary (SE.singleton single_system);
+      pair = Some (SE.make_pair
+                     (Projection.left, single_system) 
+                     (Projection.right, single_system)) } 
+  in
   res
 
-(** Deduce in a goal "u |> v" to prove that term u dudece the term v.
-    Raise a failure if impossible and else close the goal (return an empty list of goals). *)
+
+(** Tactic [deduce] in a goal [u |> v] to prove that term [u]
+    can be deduced from term [v].
+    Closes the goal if that is the case, fails otherwise. *)
 let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
   let system_eq = pair_of_single_sys system in
-  let pat = Term.{
+  let pat = 
+    Term.{
       pat_op_vars   = [];
       pat_op_tyvars = [];
-      pat_op_term   = Equiv.mk_equiv_atom goal.left;
-    } in
-  let conclusion = Equiv.mk_equiv_atom [goal.right] in
+      pat_op_term   = Equiv.mk_equiv_atom (ES.secrecy_left goal);} 
+  in
+  let conclusion = Equiv.mk_equiv_atom [ES.secrecy_right goal] in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system_eq conclusion pat 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) 
+      table system_eq conclusion pat 
   in
   match match_result with
-  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
+  | NoMatch minfos -> 
+    soft_failure (ApplyMatchFailure minfos) (*TODO check information printed *)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
     []
 
-(** In a goal "u |> v" or "u *> v" with "u" a tuple, check if the [i]-th element of u
-    is deducible from the rest of "u".
-    Removes this element from the current goal *)
+(** Tactic [deduce i] in a goal [u |> v] or [u *> v], with [u] a tuple,
+    checks if the [i]-th element of [u]
+    is deducible from the rest of [u].
+    If so, removes it. *)
 let deduce_predicate_int
-  (i : int L.located)
-  (s : ES.t)
-  (goal : ES.secrecy_goal) :
+    (i : int L.located)
+    (s : ES.t)
+    (goal : ES.secrecy_goal) :
   ES.t list =
-  if L.unloc i < 0 || List.length goal.left <= L.unloc i then
+  if L.unloc i < 0 || List.length (ES.secrecy_left goal) <= L.unloc i then
     (soft_failure ~loc:(L.loc i) (Failure "Invalid position"));
-  let left_without_ith = List.filteri (fun j _ -> j<> L.unloc i) goal.left in
-  let left_ty_without_ith = List.filteri (fun j _ -> j<>L.unloc i) goal.left_ty in
+
+  let filter_ith l = List.filteri (fun j _ -> j <> L.unloc i) l in
+  let left_without_ith = filter_ith (ES.secrecy_left goal) in
+  let left_ty_without_ith = filter_ith (fst (ES.secrecy_ty goal)) in
+
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = ES.get_trace_hyps s in 
   let table, system = ES.table s, ES.system s in
   let system_eq = pair_of_single_sys system in
-  let pat = Term.{
+
+  let pat =
+    Term.{
       pat_op_vars   = [];
       pat_op_tyvars = [];
-      pat_op_term   = Equiv.mk_equiv_atom left_without_ith;
-    } in
-  let conclusion = Equiv.mk_equiv_atom goal.left in
+      pat_op_term   = Equiv.mk_equiv_atom left_without_ith; }
+  in
+  let conclusion = Equiv.mk_equiv_atom (ES.secrecy_left goal) in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system_eq conclusion pat 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) 
+      table system_eq conclusion pat 
   in
   match match_result with
-  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
+  | NoMatch minfos -> 
+    soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    let new_secrecy_goal = { goal with
-      left = left_without_ith;
-      left_ty = left_ty_without_ith } in
-    let conc = ES.mk_secrecy_concl new_secrecy_goal in
-    [ES.set_conclusion conc s]
+    let new_secrecy_goal = 
+      ES.secrecy_update_left left_ty_without_ith left_without_ith goal
+    in
+    [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
+
 
 let deduce Args.(Opt (Int, p)) s : ES.sequents =
-  let table = ES.table s in
   if ES.conclusion_is_equiv s then
     match p with
-  | None -> deduce_all s
-  | Some (Args.Int i) -> deduce_int i s
-  else if Library.Secrecy.is_loaded table then
-    match p, ES.get_secrecy_goal s with
-    | None, Some goal -> 
-      if goal.predicate = Library.Secrecy.symb_deduce table then
-        deduce_predicate s goal
-      else
-        Tactics.soft_failure (Tactics.GoalBadShape "deduce expect a position with non-deduction predicate")
-    | Some (Args.Int i), Some goal -> deduce_predicate_int i s goal
-    | _, None -> Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence goal (or a deduction goal with WeakSecrecy library)")
+    | None -> deduce_all s
+    | Some (Args.Int i) -> deduce_int i s
+  else if ES.conclusion_is_secrecy s then
+    let goal = ES.conclusion_as_secrecy s in
+    match p, ES.secrecy_kind goal with
+    | None, ES.Deduce -> 
+      deduce_predicate s goal
+    | None, _ ->
+      Tactics.soft_failure 
+        (Tactics.GoalBadShape 
+           "deduce expects a position, \
+            when used with a non-deduction predicate")
+    | Some (Args.Int i), _ -> deduce_predicate_int i s goal
   else
-    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence goal (or a deduction goal with WeakSecrecy library)")
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape 
+         "Expected an equivalence or secrecy goal.")
 
 
 
@@ -1092,7 +1115,7 @@ let case_study arg s : ES.sequents =
     | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
       i, b
     | _ -> Tactics.(soft_failure 
-                     (Failure "Argument of cs should match a boolean"))
+                      (Failure "Argument of cs should match a boolean"))
   in
   match li with
   | None ->
@@ -1100,15 +1123,15 @@ let case_study arg s : ES.sequents =
     let founds,e1 =
       List.split
         (List.map (cs_proj fst b false) (ES.conclusion_as_equiv s).terms) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
     let e2 =
       List.map (fun t -> snd (cs_proj snd b false t)) (ES.conclusion_as_equiv s).terms in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
     if not (List.exists (fun x -> x) founds) then
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
     [ES.set_equiv_conclusion {terms = (e1@[b]); bound = None} s;
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+     (*TODO:Concrete : Probably something to do to create a bounded goal*)
      ES.set_equiv_conclusion {terms = (e2@[b]); bound = None} s]
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
@@ -1121,9 +1144,9 @@ let case_study arg s : ES.sequents =
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
     [ES.set_equiv_conclusion {terms = (before@b::[e1]@after); bound = None} s;
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+     (*TODO:Concrete : Probably something to do to create a bounded goal*)
      ES.set_equiv_conclusion {terms = (before@b::[e2]@after); bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let () =
   T.register_typed "cs"
@@ -1140,7 +1163,7 @@ let deprecated_fresh_mk_direct
   let cond = List.map (Term.subst subst) occ.occ_cond in
 
   let cond = Term.mk_ands (List.rev cond) in
-  
+
   let j = List.map (Term.subst subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
     (Term.mk_impl cond (Term.mk_neqs ~simpl_tuples:true n_args j))
@@ -1245,7 +1268,7 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let env   = ES.vars s in
   let hyps  = ES.get_trace_hyps s in
   let lproj, rproj = ES.get_system_pair_projs s in
-  
+
   let n_left, n_left_args, n_right, n_right_args =
     match Term.project1 lproj t,
           Term.project1 rproj t with
@@ -1339,7 +1362,7 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
         s sk fk
   in
   auto_rec s sk fk
-    
+
 let equiv_auto ~red_param ~close ~strong s sk (fk : Tactics.fk) =
   auto ~red_param ~close ~strong s sk fk
 
@@ -1359,7 +1382,7 @@ let global_diff_eq (s : ES.t) =
   let system = Utils.oget (ES.system s).pair in
   let cntxt = mk_pair_trace_cntxt s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  
+
   (* Collect in ocs the list of diff terms that occur (directly or not)
      in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
@@ -1376,88 +1399,88 @@ let global_diff_eq (s : ES.t) =
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   SE.iter_descrs cntxt.table system
-  (fun action_descr ->
-     let miter = iter [action_descr.Action.name] action_descr.Action.indices in
-     miter (snd action_descr.Action.output) ;
-     miter (snd action_descr.Action.condition) ;
-     List.iter (fun (_,args,m) ->
-         List.iter miter args;
-         miter m
-       ) action_descr.Action.updates) ;
+    (fun action_descr ->
+       let miter = iter [action_descr.Action.name] action_descr.Action.indices in
+       miter (snd action_descr.Action.output) ;
+       miter (snd action_descr.Action.condition) ;
+       List.iter (fun (_,args,m) ->
+           List.iter miter args;
+           miter m
+         ) action_descr.Action.updates) ;
 
   (* Function converting each occurrence to the corresponding subgoal. *)
   let subgoal_of_occ (vs,is,t) =
     let is = List.map Term.mk_var is in
-    
+
     let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
     match t.Iter.occ_cnt with
     | Term.Diff (Explicit [p1,s1; p2,s2]) as subterm
       when p1 = l_proj && p2 = r_proj ->
-        let fvars =
-          t.Iter.occ_vars @ Sv.elements (Term.fv subterm)
-        in
-        let pred_ts_list =
-          let iter = new OldFresh.deprecated_get_actions ~cntxt in
-          iter#visit_message subterm;
-          iter#visit_message cond;
-          iter#get_actions
-        in
-        (* Remark that the get_actions add pred to all timestamps, to simplify. *)
-        let ts_list = 
-          (List.map (fun v -> Term.mk_action v is) vs)
-          @ List.map (function
-              | Term.App (Term.Fun (fs, _), [tau]) when fs = Term.f_pred -> tau
-              | t -> t
-            ) pred_ts_list 
-        in
+      let fvars =
+        t.Iter.occ_vars @ Sv.elements (Term.fv subterm)
+      in
+      let pred_ts_list =
+        let iter = new OldFresh.deprecated_get_actions ~cntxt in
+        iter#visit_message subterm;
+        iter#visit_message cond;
+        iter#get_actions
+      in
+      (* Remark that the get_actions add pred to all timestamps, to simplify. *)
+      let ts_list = 
+        (List.map (fun v -> Term.mk_action v is) vs)
+        @ List.map (function
+            | Term.App (Term.Fun (fs, _), [tau]) when fs = Term.f_pred -> tau
+            | t -> t
+          ) pred_ts_list 
+      in
 
-        (* free vars of [ts_list], minus [fvars] *)
-        let fv_ts_list =
-          let s =
-            List.fold_left (fun sv ts -> 
-                Sv.union sv (Term.fv ts)
-              ) Sv.empty ts_list
-          in
-          Sv.diff s (Sv.of_list fvars)
+      (* free vars of [ts_list], minus [fvars] *)
+      let fv_ts_list =
+        let s =
+          List.fold_left (fun sv ts -> 
+              Sv.union sv (Term.fv ts)
+            ) Sv.empty ts_list
         in
+        Sv.diff s (Sv.of_list fvars)
+      in
 
-        (* add correctly the new free variables in [s] *)
-        let env, _, subst = 
-          Term.add_vars_env (ES.vars s) (Vars.Tag.global_vars (Sv.elements fv_ts_list))
-        in
-        let ts_list = List.map (Term.subst subst) ts_list in
-        let s = ES.set_vars env s in
+      (* add correctly the new free variables in [s] *)
+      let env, _, subst = 
+        Term.add_vars_env (ES.vars s) (Vars.Tag.global_vars (Sv.elements fv_ts_list))
+      in
+      let ts_list = List.map (Term.subst subst) ts_list in
+      let s = ES.set_vars env s in
 
-        (* XXX the expansions that come next are inefficient (and may become
-           in incorrect if we allow richer diff operators): s1 and s2 only make
-           sense in projected systems, so we should not expand macros wrt s in
-           them; anyway it is useless to do so if we project immediately
-           afterwards. *)
-        let s1 = 
-          let sexpr1 = SE.project [p1] (ES.system s).set in
-          Term.project1 p1
-            (EquivLT.expand_all_macros ~force_happens:true s1 sexpr1 s) 
-        in
-        let s2 = 
-          let sexpr2 = SE.project [p2] (ES.system s).set in
-          Term.project1 p2
-            (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
-        in
-        Goal.Global
-          (ES.set_conclusion
-             (* TODO: we assume that the variables are global and constant. 
-                It is not clear that this is correct: check this when the tactic 
-                is reworked. *)
-             (Equiv.Smart.mk_forall_tagged (Vars.Tag.global_vars ~const:true fvars)
-                (Equiv.mk_reach_atom 
-                   (Term.mk_impls 
-                      (List.map Term.mk_happens ts_list
-                       @ List.map (fun t -> Term.mk_macro Term.exec_macro [] t) ts_list
-                       @ [cond])
-                      (Term.mk_atom `Eq s1 s2))
-                ))
-             s
-          )
+      (* XXX the expansions that come next are inefficient (and may become
+         in incorrect if we allow richer diff operators): s1 and s2 only make
+         sense in projected systems, so we should not expand macros wrt s in
+         them; anyway it is useless to do so if we project immediately
+         afterwards. *)
+      let s1 = 
+        let sexpr1 = SE.project [p1] (ES.system s).set in
+        Term.project1 p1
+          (EquivLT.expand_all_macros ~force_happens:true s1 sexpr1 s) 
+      in
+      let s2 = 
+        let sexpr2 = SE.project [p2] (ES.system s).set in
+        Term.project1 p2
+          (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
+      in
+      Goal.Global
+        (ES.set_conclusion
+           (* TODO: we assume that the variables are global and constant. 
+              It is not clear that this is correct: check this when the tactic 
+              is reworked. *)
+           (Equiv.Smart.mk_forall_tagged (Vars.Tag.global_vars ~const:true fvars)
+              (Equiv.mk_reach_atom 
+                 (Term.mk_impls 
+                    (List.map Term.mk_happens ts_list
+                     @ List.map (fun t -> Term.mk_macro Term.exec_macro [] t) ts_list
+                     @ [cond])
+                    (Term.mk_atom `Eq s1 s2))
+              ))
+           s
+        )
     | _ -> assert false
   in
   List.map subgoal_of_occ !ocs
@@ -1525,7 +1548,7 @@ let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.se
   let frame = List.rev_append before ([mk_seq_or_lambda is ti_t;
                                        mk_seq_or_lambda is ti_f] @ after) in
   ES.set_equiv_conclusion {terms = frame; bound = None} s
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let split_seq_args args s : ES.sequent list =
   match args with
@@ -1567,7 +1590,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
 
   let frame = List.rev_append before after in
   [subgoal; Goal.Global (ES.set_equiv_conclusion {terms = frame; bound = None} s)]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let mem_seq_args args s : Goal.t list =
   match args with
@@ -1649,7 +1672,7 @@ let const_seq
   [ Goal.Local subg1;
     Goal.Local subg2;
     Goal.Global (ES.set_equiv_conclusion {terms = frame; bound = None} s) ]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let const_seq_args args s : Goal.t list =
   match args with
@@ -1708,7 +1731,7 @@ let enckp arg (s : ES.t) =
                Env.update ~system:SE.{ set = (system :> SE.t); pair = None } env
              in
              let frame = List.map (Term.project1 proj) biframe in
-             
+
              Oldcca.deprecated_symenc_key_ssc
                ~cntxt fnenc fndec
                ~elems:(List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
@@ -1716,7 +1739,7 @@ let enckp arg (s : ES.t) =
                sk.Name.symb.s_symb;
              Oldcca.deprecated_symenc_rnd_ssc
                ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args {terms = frame; bound = None}),
-            (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          (*TODO:Concrete : Probably something to do to create a bounded goal*)
           (fun x -> x),
           k
         | _ -> assert false
@@ -1731,8 +1754,8 @@ let enckp arg (s : ES.t) =
                OldEuf.key_ssc ~globals:false
                  ~cntxt
                  ~elems:{terms = (List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-                            ; bound = None}
+                        (*TODO:Concrete : Probably something to do to create a bounded goal*)
+                        ; bound = None}
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.Name.symb.s_symb
              in
              if errors <> [] then
@@ -1787,10 +1810,10 @@ let enckp arg (s : ES.t) =
               (new_skr, rproj, rsys)]) ;
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] {terms = [e]; bound = None}
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          (*TODO:Concrete : Probably something to do to create a bounded goal*)
         in
         deprecated_fresh_cond s (Term.mk_name r.symb r.args) (context.terms@biframe)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       with Oldcca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
@@ -1803,14 +1826,14 @@ let enckp arg (s : ES.t) =
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] {terms = [e]; bound = None}
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
     in
     let biframe = (List.rev_append before (new_elem.terms @ after)) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
     [Goal.Local fresh_goal;
      Goal.Global (ES.set_equiv_conclusion {terms = biframe; bound = None} s)]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   in
 
@@ -1852,13 +1875,13 @@ let enckp arg (s : ES.t) =
       | occ :: occs ->
         if not (occ.Iter.occ_vars = []) then find occs
         else
-        begin match occ.Iter.occ_cnt with
-          | Term.App (Term.Fun (fnenc, _), [Tuple [m; Term.Name _ as r; k]]) as enc
-            when diff_key k ->
-            apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
+          begin match occ.Iter.occ_cnt with
+            | Term.App (Term.Fun (fnenc, _), [Tuple [m; Term.Name _ as r; k]]) as enc
+              when diff_key k ->
+              apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
 
-          | _ -> find occs
-        end
+            | _ -> find occs
+          end
 
       | [] ->
         soft_failure
@@ -1888,7 +1911,7 @@ let mk_xor_phi_base (s : ES.t) biframe
   let env   = ES.vars s in
   let hyps  = ES.get_trace_hyps s in
   let lproj, rproj = ES.get_system_pair_projs s in
-  
+
   let biframe =
     Term.mk_diff [lproj,l_left;rproj,l_right] :: biframe
   in
@@ -1935,7 +1958,7 @@ let xor arg (s : ES.t) =
   in
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  
+
   let is_xored_diff t =
     match Term.project1 l_proj  t,
           Term.project1 r_proj t with
@@ -1949,7 +1972,7 @@ let xor arg (s : ES.t) =
     | Name _, Name _ -> true
     | _ -> false
   in
-  
+
   (* We allow the optional arguments to be in any order, we just match them
      however we can. *)
   let opt_m, opt_n =  match m1, m2 with
@@ -1989,8 +2012,8 @@ let xor arg (s : ES.t) =
 
     | occs, Some xor ->
       begin match
-        List.find (fun xor_occ -> xor_occ.Iter.occ_cnt = xor) occs
-      with
+          List.find (fun xor_occ -> xor_occ.Iter.occ_cnt = xor) occs
+        with
         | occ -> occ
         | exception Not_found ->
           soft_failure
@@ -2020,12 +2043,12 @@ let xor arg (s : ES.t) =
         | Name (nl,al), Name (nr,ar) ->
           begin match Term.project1 l_proj t,
                       Term.project1 r_proj t with
-            | (App (Fun (fl,_),ll), App (Fun (fr,_),lr))
-              when (fl = Term.f_xor && fr = Term.f_xor) ->
-              ((nl,al),remove_name_occ (nl,al) ll,
-               (nr,ar),remove_name_occ (nr,ar) lr,
-               t)
-            | _ -> soft_failure (Failure "ill-formed arguments")
+          | (App (Fun (fl,_),ll), App (Fun (fr,_),lr))
+            when (fl = Term.f_xor && fr = Term.f_xor) ->
+            ((nl,al),remove_name_occ (nl,al) ll,
+             (nr,ar),remove_name_occ (nr,ar) lr,
+             t)
+          | _ -> soft_failure (Failure "ill-formed arguments")
           end
         | _ -> soft_failure (Failure "ill-formed arguments")
       end
@@ -2051,19 +2074,19 @@ let xor arg (s : ES.t) =
 
   let new_elem =
     Equiv.subst_equiv [Term.ESubst (t,if_term)] {terms = [e]; bound = None}
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   let biframe = List.rev_append before (new_elem.terms @ after) in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
   [ES.set_equiv_conclusion {terms = biframe; bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 
 let () =
   T.register_typed "xor"
-   ~pq_sound:true
-   (LT.genfun_of_pure_efun_arg xor)
-   Args.(Pair (Int, Pair (Opt Message, Opt Message)))
+    ~pq_sound:true
+    (LT.genfun_of_pure_efun_arg xor)
+    Args.(Pair (Int, Pair (Opt Message, Opt Message)))
 
 
 (*------------------------------------------------------------------*)
@@ -2073,54 +2096,54 @@ class ddh_context
     ~(cntxt:Constr.trace_cntxt) ~gen ~exp ~l_proj ~r_proj exact a b c
   = object (_self)
 
- inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
+    inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
-  method visit_macro ms args a =
-    match Symbols.get_macro_data ms.s_symb cntxt.table with
-    | _ when Symbols.is_quantum_macro ms.s_symb ->
-      soft_failure (Failure "DDH is unsupported for quantum adversaries")
+    method visit_macro ms args a =
+      match Symbols.get_macro_data ms.s_symb cntxt.table with
+      | _ when Symbols.is_quantum_macro ms.s_symb ->
+        soft_failure (Failure "DDH is unsupported for quantum adversaries")
 
-    | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) -> ()
-    | Symbols.State _ -> ()
+      | _ when List.mem ms.s_symb Symbols.([inp; out; cond; exec; frame]) -> ()
+      | Symbols.State _ -> ()
 
-    | _ -> super#visit_macro ms args a
+      | _ -> super#visit_macro ms args a
 
-  (* we check if the only diff are over g^ab and g^c, and that a, b and c
-     appears only as g^a, g^b and g^c. *)
-  (* if we ever decide to rewrite this tactic or generalize it,
-     we may want to use functions from dh.ml written for cdh/gdh,
-     that do this in a more general way *)
-  method visit_message t =
-    match Term.project1 l_proj t, 
-          Term.project1 r_proj t with
-    (* left:  a b can occur as g^a^b 
-       right: c can occur as g^c *)
-    | Term.(App (Fun (f1,_), [(App (Fun (f2,_), [g1; Name (n1,_)])); Name (n2,_)])),
-      Term.(App (Fun (_f, _), [g3; Name (n3,_)])) 
-      when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
-           ((n1.s_symb = a && n2.s_symb = b) ||
-            (n1.s_symb = b && n2.s_symb = a)) -> ()
+    (* we check if the only diff are over g^ab and g^c, and that a, b and c
+       appears only as g^a, g^b and g^c. *)
+    (* if we ever decide to rewrite this tactic or generalize it,
+       we may want to use functions from dh.ml written for cdh/gdh,
+       that do this in a more general way *)
+    method visit_message t =
+      match Term.project1 l_proj t, 
+            Term.project1 r_proj t with
+      (* left:  a b can occur as g^a^b 
+         right: c can occur as g^c *)
+      | Term.(App (Fun (f1,_), [(App (Fun (f2,_), [g1; Name (n1,_)])); Name (n2,_)])),
+        Term.(App (Fun (_f, _), [g3; Name (n3,_)])) 
+        when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
+             ((n1.s_symb = a && n2.s_symb = b) ||
+              (n1.s_symb = b && n2.s_symb = a)) -> ()
 
-    | _ ->
-      match t with
-      (* any name n can occur as g^n *)
-      | Term.App (Term.Fun (f, _), [g1; Name _]) when f = exp && g1 = gen -> ()
+      | _ ->
+        match t with
+        (* any name n can occur as g^n *)
+        | Term.App (Term.Fun (f, _), [g1; Name _]) when f = exp && g1 = gen -> ()
 
-      (* if a name a, b, c appear anywhere else, fail *)
-      | Term.Name (n,_) when List.mem n.s_symb [a; b; c] -> raise Not_context
+        (* if a name a, b, c appear anywhere else, fail *)
+        | Term.Name (n,_) when List.mem n.s_symb [a; b; c] -> raise Not_context
 
-      (* if a diff is not over a valid ddh diff, we fail  *)
-      | Term.Diff _ -> raise Not_context
+        (* if a diff is not over a valid ddh diff, we fail  *)
+        | Term.Diff _ -> raise Not_context
 
-      | _ -> super#visit_message t
+        | _ -> super#visit_message t
 
-end
+  end
 
 (*------------------------------------------------------------------*)
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
- inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
+  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms args a =
     match Symbols.get_macro_data ms.s_symb cntxt.table with
@@ -2131,7 +2154,7 @@ class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
       raise Macro_found
 
     | Symbols.State _ -> raise Macro_found
-                                  
+
     | _ -> self#visit_macro ms args a
 end
 
@@ -2156,17 +2179,17 @@ let is_ddh_context
   try
     (* we check that a b and c only occur in the correct form inside the system,
        if the elements contain some macro based on the system.*)
-   if exists_macro then
-    SE.iter_descrs cntxt.table cntxt.system (
-      fun d ->
-        iter#visit_message (snd d.condition) ;
-        iter#visit_message (snd d.output) ;
-        List.iter (fun (_,args,t) ->
-            List.iter iter#visit_message args;
-            iter#visit_message t
-          ) d.updates;
-    );
-   (* we then check inside the frame *)
+    if exists_macro then
+      SE.iter_descrs cntxt.table cntxt.system (
+        fun d ->
+          iter#visit_message (snd d.condition) ;
+          iter#visit_message (snd d.output) ;
+          List.iter (fun (_,args,t) ->
+              List.iter iter#visit_message args;
+              iter#visit_message t
+            ) d.updates;
+      );
+    (* we then check inside the frame *)
     List.iter iter#visit_message elem_list;
     true
   with Not_context | OldFresh.Deprecated_Name_found -> false
@@ -2204,8 +2227,8 @@ let ddh
   let cntxt = mk_pair_trace_cntxt s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   if is_ddh_context ~gen ~exp ~cntxt ~l_proj ~r_proj
-       na nb nc (ES.conclusion_as_equiv s).terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      na nb nc (ES.conclusion_as_equiv s).terms
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
   then sk [] fk
   else soft_failure Tactics.NotDDHContext
 
@@ -2218,15 +2241,15 @@ let ddh
 let () =
   T.register_general "ddh"
     (function
-       | [Args.DH (DDH { gen; na; nb; nc; })] -> LT.gentac_of_etac (ddh gen na nb nc)
-       | _ -> bad_args ())
+      | [Args.DH (DDH { gen; na; nb; nc; })] -> LT.gentac_of_etac (ddh gen na nb nc)
+      | _ -> bad_args ())
 
 (*------------------------------------------------------------------*)
 let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
   let frame = ES.conclusion_as_equiv s in
   let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
-  
+
 let crypto_tac args (s : ES.t) =
   match args with
   | [Args.Crypto (game, args)] -> wrap_fail (crypto game args) s

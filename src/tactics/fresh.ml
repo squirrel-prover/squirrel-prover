@@ -122,8 +122,6 @@ let phi_fresh_same_system
   
   let err = Format.asprintf "%a" Term.pp n in
 
-  let err = Format.asprintf "%a" Term.pp n in
-
   let n : Name.t = 
     match n with
     | Name _ -> Name.of_term n
@@ -389,10 +387,10 @@ let freshR_secrecy
   let use_path_cond = p_fresh_arg opt_args in
 
   (* get the components of the secrecy predicate, incl. the system *)
-  let sgoal = Utils.oget (ES.get_secrecy_goal s) in
+  let sgoal = ES.conclusion_as_secrecy s in
   let env = ES.env s in
   let sec_context =
-    Constr.make_context ~table:env.table ~system:sgoal.system in
+    Constr.make_context ~table:env.table ~system:(ES.secrecy_system sgoal) in
 
   
   
@@ -403,8 +401,8 @@ let freshR_secrecy
       (ES.get_trace_hyps s)
       sec_context
       env
-      sgoal.right
-      sgoal.left
+      (ES.secrecy_right sgoal)
+      (ES.secrecy_left sgoal)
   in
   Printer.pr "@]@]@;";
 
@@ -435,17 +433,20 @@ let freshL_secrecy
   let loc = L.loc i in
 
   (* get the components of the secrecy predicate, incl. the system *)
-  let sgoal = Utils.oget (ES.get_secrecy_goal s) in
+  let sgoal = ES.conclusion_as_secrecy s in
   let env = ES.env s in
-  let sec_context = Constr.make_context ~table:env.table ~system:sgoal.system in
+  let sec_context = 
+    Constr.make_context ~table:env.table ~system:(ES.secrecy_system sgoal)
+  in
 
   (* get n *)
   let ii = L.unloc i in
   let uu, n, vv =
-    try List.splitat ii sgoal.left with
+    try List.splitat ii (ES.secrecy_left sgoal) with
     | List.Out_of_range ->
        soft_failure ~loc
-         (Tactics.Failure ("invalid position "^(string_of_int ii)^" on the left of the predicate"));
+         (Tactics.Failure 
+            ("invalid position "^(string_of_int ii)^" on the left of the predicate"));
   in
   (* compute the freshness conditions *)
   Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
@@ -455,18 +456,19 @@ let freshL_secrecy
       sec_context
       env
       n
-      (uu @ vv @ [sgoal.right])
+      (uu @ vv @ [ES.secrecy_right sgoal])
   in
   Printer.pr "@]@]@;";
 
   let phi = Term.mk_ands ~simpl:true phis in
 
   (* the remaining secrecy goal *)
-  let lty,_,lty' = List.splitat ii sgoal.left_ty in 
+  let ty_left, _ = ES.secrecy_ty sgoal in
+  let ty_left,_,ty_left' = List.splitat ii ty_left in
+  let ty_left = ty_left @ ty_left' in
+  let new_goal = ES.secrecy_update_left ty_left (uu @ vv) sgoal in
   let new_sec_sequent =
-    ES.set_conclusion
-      (ES.mk_secrecy_concl 
-         {sgoal with left = (uu @ vv); left_ty = (lty @ lty')}) s
+    ES.set_conclusion (ES.mk_form_from_secrecy_goal new_goal) s
   in
 
   (* the sequent for the new proof obligation. *)
@@ -499,7 +501,7 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
            (* non-deduction goal -> freshL *)
          else if
            ES.conclusion_is_secrecy s &&
-           ES.conclusion_secrecy_kind s = ES.NotDeduce
+           ES.(secrecy_kind (conclusion_as_secrecy s)) = ES.NotDeduce
          then 
            freshL_secrecy opt_args i s
            (* neither -> bad arguments *)
@@ -509,12 +511,12 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
       (* "fresh" *)
       | [Args.Fresh (opt_args, None)] ->
         if ES.conclusion_is_secrecy s &&
-           ES.conclusion_secrecy_kind s = ES.NotDeduce
+           ES.(secrecy_kind (conclusion_as_secrecy s)) = ES.NotDeduce
         then
           freshR_secrecy opt_args s
         else
           bad_args ()
-     
+
       | _ -> bad_args ())
 
 

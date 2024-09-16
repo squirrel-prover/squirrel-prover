@@ -3,13 +3,13 @@
     is a global meta-formula. *)
 
 open Ppenv
-    
+
 module SE = SystemExpr
-  
+
 (*------------------------------------------------------------------*)
 include LowSequent.S with
-  type  hyp_form = Equiv.global_form and
-  type conc_form = Equiv.global_form
+          type  hyp_form = Equiv.global_form and
+          type conc_form = Equiv.global_form
 
 (*------------------------------------------------------------------*)
 (** {2 Creation of global sequents} *)
@@ -31,7 +31,7 @@ val sanity_check : t -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
-  
+
 val get_system_pair : t -> SE.pair
 val get_system_pair_projs : t -> Projection.t * Projection.t
 
@@ -65,44 +65,65 @@ val to_trace_sequent : t -> LowTraceSequent.t
 
 (*------------------------------------------------------------------*)
 (** {2 Deducibility and non-deducibility goals} *)
-(** Goals corresponding to the predicates "u |> v" and "u *> v".
-    Defined in WeakSecrecy.sp. *)
+(** Goals corresponding to the predicates [u |> v] and [u *> v].
+    Defined in [WeakSecrecy.sp]. *)
 
 (** There are two kinds of secrecy judgements:
-    deduction  ( |> )
-    and non-deduction ( *> ) *)
+    deduction  [( |> )] and non-deduction [( *> )] *)
 type secrecy_kind = Deduce | NotDeduce
+
+(** The type of a secrecy goal. It's actually the 
+    global formula, but it's intentionally left abstract. *)
+type secrecy_goal
+
+(** Checks whether a global formula is a secrecy judgement. 
+    This in particular implies that [WeakSecrecy] is loaded. *)
+val is_secrecy : Symbols.table -> Equiv.form -> bool
+
+(** Constructs a secrecy goal. The lists of types and of terms
+ are the left side of the goal and must have the same length. 
+ The [WeakSecrecy] module must be loaded. *)
+val mk_secrecy_goal : 
+  Symbols.table -> secrecy_kind -> SE.fset -> 
+  Type.ty list -> Type.ty -> Term.terms -> Term.term -> secrecy_goal
+
+(** Constructs a secrecy goal from a global formula. 
+ *Assumes [is_secrecy] holds*. *)
+val mk_secrecy_goal_from_form : Symbols.table -> Equiv.form -> secrecy_goal 
+
+(** Constructs the global formula for a secrecy goal. *)
+val mk_form_from_secrecy_goal : secrecy_goal -> Equiv.form
+
+(** Extracts the kind of secrecy goal. *)
+val secrecy_kind : secrecy_goal -> secrecy_kind
+
+(** Returns the system of the secrecy goal *)
+val secrecy_system : secrecy_goal -> SE.fset
+
+(** Returns the left-hand side of the secrecy goal. 
+    In case it is a tuple, or nested tuples, flattens it as
+    a list of terms. *)
+val secrecy_left : secrecy_goal -> Term.terms
+
+(** Returns the right-hand side of the secrecy goal. *)
+val secrecy_right : secrecy_goal -> Term.term
+
+(** Returns the types of the left- and right-hand sides of the goal. 
+    On the left, in case it is a tuple or nested tuples, flattens it. *)
+
+val secrecy_ty : secrecy_goal -> Type.ty list * Type.ty
 
 (** Checks whether the sequent's conclusion is a secrecy judgement
     (necessarily, this implies that WeakSecrecy is loaded) *)
 val conclusion_is_secrecy : t -> bool
 
-(** Which kind of secrecy judgement.
-    Can only be used on secrecy sequents. *)
-val conclusion_secrecy_kind : t -> secrecy_kind
+(** Extracts the secrecy goal from a sequent. 
+    Fails if the sequent is not a secrecy sequent. *)
+val conclusion_as_secrecy : t -> secrecy_goal
 
-(**An objet of the type [secrecy_goal] represent a goal of
-   the form "u |> v" or "u *> v".
-   If "u" is a tuple, [left] is a list of each term is the tuple.
-   Else, the list [left] contains only one element for "u". *)
-type secrecy_goal = { (* FIXME : Add field for set *)
-    predicate : Symbols.predicate;
-    system : SE.fset;
-    left_ty : Type.ty list; (* FIXME : Redundent with Type.ty *)
-    left : Term.term list;
-    right_ty : Type.ty; (* FIXME : Redundent with Type.ty *)
-    right : Term.term }
-
-(** Requires WeakSecrecy.sp to be loaded.
-    [get_secrecy_goal s] returning a [secrecy_goal] representing the goal
-    if it is of the form "u |> v" or "u *> v"].
-    Returns [None] is the goal is not of the correct form, or if the predicate
-    is used in a different system than the sequent's system. *)
-val get_secrecy_goal : t -> secrecy_goal option
-
-(** Requires WeakSecrecy.sp to be loaded.
-    [mk_secrecy_concl] returning a formula representing [goal]. *)
-val mk_secrecy_concl : secrecy_goal -> conc_form
+(** Returns a new secrecy goal where the left-hand side has been updated*)
+val secrecy_update_left :
+  Type.ty list -> Term.terms -> secrecy_goal -> secrecy_goal
 
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
