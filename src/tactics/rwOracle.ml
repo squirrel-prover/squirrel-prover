@@ -184,6 +184,12 @@ let mk_subgoal
     (input_ty : Type.ty)
     (s : ES.t) : ES.t
   =
+  let system =
+    match mode with
+    | EquivAsymp _ -> (Utils.oget (ES.env s).system.pair :> SystemExpr.fset)
+    | Deduction g -> ES.secrecy_system g
+  in
+  let system = (system :> SystemExpr.arbitrary) in
   let f_arg = subgoal_f_arg mode reverse i ~new_oracle in
   let ty = Term.ty f_arg in
   let f_ty = Type.func ty input_ty in
@@ -197,7 +203,9 @@ let mk_subgoal
       [f_var, Vars.Tag.make ~adv:true Global]
       (Equiv.Atom (Reach { formula = loc_form; bound = None; }))
   in
-  ES.set_conclusion glob_form s
+  ES.set_conclusion_in_context
+    {(ES.env s).system with set=system}
+    glob_form s
 
 
 (** Parses the arguments of the tactic, and 
