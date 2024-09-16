@@ -1740,12 +1740,37 @@ module T (* : S with type t = Term.term *) = struct
 
       tunif_l l l' st 
 
+    (* unifying `s(terms)@ts` and `s'(terms')@ts'` *)
     | Macro (s, terms, ts),
-      Macro (s', terms', ts') when s.s_symb = s'.s_symb ->
+      Macro (s', terms', ts') when s.s_symb = s'.s_symb -> 
       assert (Type.equal s.s_typ s'.s_typ && List.length terms = List.length terms');
 
-      let mv = tunif_l terms terms' st in
-      tunif ts ts' { st with mv }
+      (* default strategy, unify `ts :: terms` and `ts' :: terms'` *)
+      let default () =
+        let mv = tunif_l terms terms' st in
+        tunif ts ts' { st with mv }
+      in
+
+      (* for global macros, if both `t` and `pat` can be reduced,
+         unify the reduced terms instead of using the default strategy
+         (to be able to unify `s@A` and `s@B` were `A` depends on
+         `B`.) *)
+      if not (Macros.is_global st.table s.s_symb) then default ()
+      else begin
+        let t,t_red =
+          reduce_delta_macro1
+            ~mode:st.expand_context
+            st.table st.system.set ~hyps:st.hyps t
+        in
+        if not t_red then default ()
+        else 
+          let pat,pat_red =
+            reduce_delta_macro1
+              ~mode:st.expand_context
+              st.table st.system.set ~hyps:st.hyps pat
+          in
+          if not pat_red then default () else tunif t pat st
+      end
 
     | Action (s,is), Action (s',is') when s = s' -> 
       tunif_l is is' st
