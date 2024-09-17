@@ -1,11 +1,9 @@
-(* FIXME : SMT not supported by the CI, so smt commands where replaced by admits *)
+(* SMT: Z3 4.13.0 *)
 
 include Basic.
 
 set timeout = 10.
 
-
-(*tactic mysmt = smt ~prover:Z3.*)
 
 (* A type seed, for any ponctual randomness (in signature and encryption *)
 type seed[large].
@@ -86,14 +84,20 @@ global lemma [S0] _ (t:timestamp[const]):
 [happens(t)] -> equiv(frame@t).
 Proof.
 intro *.
-crypto CCA2 => //; admit (*mysmt*).
-Qed.    
-
+crypto CCA2 => //.
++ smt.
++ smt.
+Qed.
 
 global lemma [S1] _ (t:timestamp[const]): 
 [happens(t)] -> equiv(frame@t).
 Proof.
 intro *.
-crypto CCA2 => //; admit (*mysmt*).
+crypto CCA2 => //.
++ smt.
++ smt.
++ smt.
++ smt.
++ smt.
 Qed.    
 

@@ -1,4 +1,4 @@
-(* FIXME : SMT not supported by the CI, so smt commands where replaced by admits *)
+(* SMT: Z3 4.13.0 *)
 
 include Basic.
 
@@ -118,11 +118,11 @@ global lemma [NSL_part1] privacy_1 (t:timestamp[const]) :
 Proof.
 intro *.
 crypto CCA2 (key:skb) => //.
-+ admit (*smt ~prover:Z3*).
-+ admit (*smt ~prover:Z3*). 
++ smt.
++ smt.
 + intro *. apply len1. 
 + intro *. apply len3.
-+ intro*. apply len3.
++ intro *. apply len3.
 + intro *. apply len1.
 Qed.
 
@@ -159,7 +159,7 @@ global lemma [NSL_part2] privacy_2 (t:timestamp[const]) :
 Proof.
 intro *.
 crypto CCA2 (key:ska) => //. 
-+ smt ~prover:Z3.
++ smt.
 + intro *; apply len2.
 + intro *; apply len2. 
 Qed.
