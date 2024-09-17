@@ -1297,7 +1297,10 @@ tac:
     { mk_abstract l "trans" [TacticsArgs.Trans arg] }
 
   | l=lloc(FRESH) a=named_args arg=fresh_arg
-    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,arg)] }
+    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,Some arg)] }
+
+  | l=lloc(FRESH) a=named_args
+    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,None)] }
 
   | l=lloc(AUTO) a=named_args 
     { mk_abstract l "auto" [TacticsArgs.Named_args a] }
