@@ -981,7 +981,6 @@ let pair_of_single_sys (system : SE.context) : SE.context =
     (soft_failure (Failure "Require a single system"));
 
   let systems_list = SE.to_list (SE.to_fset system.set) in
-  assert (List.length systems_list = 1);
   let _, single_system = List.hd systems_list in
   let res:SE.context = 
     { set = SE.to_arbitrary (SE.singleton single_system);
