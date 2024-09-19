@@ -15,10 +15,11 @@ return h diff(<x,r>,b)
 
 channel c.
 name n : message.
-name m : index -> message.
+
+mutable ma:message = zero.
 
 process A = 
-let ma = h a in
+ma := h a;
 let m = h diff(<ma,n>,b) in 
 out(c,m).
 
@@ -36,28 +37,6 @@ Proof.
 intro Hap.
 crypto FOO. 
 * auto.
-* smt ~prover:Z3.
-* auto.
-Qed.
-
-
-process C (i:index) = 
-let ma = h a in 
-let m = h diff(<ma, m i>,b) in 
-out(c,m)
-
-process D (i:index) = 
-out(c, h diff(<h a, m i>,b)).
-
-system FOO2 = (!_i (C i)) | (!_j (D j)) .
-
-
-global lemma [FOO2] _ (t:timestamp[const]):
-[happens(t)] -> equiv(frame@t).
-Proof.
-intro Hap.
-crypto FOO. 
-* auto.
-* smt ~prover:Z3.
+* smt.
 * auto.
 Qed.

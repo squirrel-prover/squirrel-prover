@@ -25,5 +25,5 @@ global lemma _ (t:timestamp[const]):
 Proof.
 intro *.
 crypto foo.
-admit. (*smt ~prover:Z3.*)
+smt.
 Qed.
