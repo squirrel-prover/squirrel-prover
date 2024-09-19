@@ -23,33 +23,35 @@ end
 (*------------------------------------------------------------------*)
 type tags = {
   const : bool;
-  adv : bool;
-  si : bool;
+  adv   : bool;
+  si    : bool;
   ptime : bool;
-  det : bool; }
+  det   : bool;
+}
 
 let mk_tags
   ?(const = false)
-  ?(adv = false)
-  ?(si = false)
+  ?(adv   = false)
+  ?(si    = false)
   ?(ptime = false)
-  ?(det = false)
-  () =
+  ?(det   = false)
+  ()
+  =
   { const ; adv ; si ; ptime ; det }
 
 let to_vars_tags (tags : tags) : Vars.Tag.t =
-  { const = tags.const ;
-    adv = tags.adv ;
+  { const        = tags.const ;
+    adv          = tags.adv ;
     system_indep = tags.si }
 
 type goal = AllTags | Adv | NotAdv
 
 let merge_tags (merge : bool -> bool -> bool) (tags1 : tags) (tags2 : tags): tags =
   { const = merge tags1.const tags2.const ; 
-    adv = merge tags1.adv tags2.adv ; 
-    si = merge tags1.si tags2.si ; 
+    adv   = merge tags1.adv   tags2.adv   ; 
+    si    = merge tags1.si    tags2.si    ; 
     ptime = merge tags1.ptime tags2.ptime ; 
-    det = merge tags1.det tags2.det }
+    det   = merge tags1.det   tags2.det }
 
 let and_tags_list : tags list -> tags =
   List.fold_left
@@ -65,42 +67,47 @@ let rec tag_of_term_full
   (*TODO check link between ptime and si*)
   let get_subterms_tags goal env ~ty_env t : tags list =
     Term.tfold
-      (fun term list -> (tag_of_term_full goal env ~ty_env term) :: list)
-      t
-      []
+      (fun term list -> tag_of_term_full goal env ~ty_env term :: list)
+      t []
   in
   match t with 
   | Var v ->
-    begin 
-      let info = Vars.get_info v env.vars in
-      let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
-      let is_ty_fixed = Symbols.TyInfo.is_fixed env.table ty_v in
-      let is_ty_finite = Symbols.TyInfo.is_finite env.table ty_v in
-      let is_ty_encodable = Type.is_bitstring_encodable ty_v in
-      let adv =
-        (info.const && is_ty_finite && is_ty_fixed) ||
-        (info.const && is_ty_encodable) ||
-        info.adv
-      in
-      { const = info.const ;
-        adv = adv ;
-        si = info.system_indep ;
-        ptime = adv ;
-        det = info.const }
-    end
+    let info = Vars.get_info v env.vars in
+    let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
+    let is_ty_fixed = Symbols.TyInfo.is_fixed env.table ty_v in
+    let is_ty_finite = Symbols.TyInfo.is_finite env.table ty_v in
+    let is_ty_encodable = Type.is_bitstring_encodable ty_v in
+    let adv =
+      (info.const && is_ty_finite && is_ty_fixed) ||
+      (info.const && is_ty_encodable) ||
+      info.adv
+    in
+    {
+      const = info.const        ;
+      adv   = adv               ;
+      si    = info.system_indep ;
+      ptime = adv               ;
+      det   = info.const        ;
+    }
+
   | Name _ -> 
     let st_tags = get_subterms_tags goal env ~ty_env t in
     let merged = and_tags_list st_tags in
     mk_tags ~si:merged.si ()
+      
   | Macro _ -> mk_tags ()
+
   | Fun (f,_) -> (*TODO : Check carefully. I am not sure Term.tfold have no effect on Fun*)
     let is_att = f = Symbols.fs_att || f = Symbols.fs_qatt in
     let is_si = Operator.is_system_indep env.table f in
-    { const = not is_att ;
-      adv = true ;
-      si = is_si ;
-      ptime = true ;
-      det = not is_att }
+    {
+      const = not is_att ;
+      adv   = true       ;
+      si    = is_si      ;
+      ptime = true       ;
+      det   = not is_att ;
+    }
+    
   | Find (vs, _, _, _) | Quant (_,vs,_) ->
     let fixed_type_binders =
       List.for_all (fun v -> 
@@ -140,16 +147,17 @@ let rec tag_of_term_full
       | Adv -> false, false, false
     in
     { const; adv; si; ptime; det }
+    
   | App _| Action _ | Tuple _ | Proj _ -> 
     let st_tags = get_subterms_tags goal env ~ty_env t in
     let merged = and_tags_list st_tags in
     merged
+      
   | Diff _ -> 
     let st_tags = get_subterms_tags goal env ~ty_env t in
     let merged = and_tags_list st_tags in
     { merged with si = false }
-    (* FEATURE: this could be made more precise in case we
-       are considering a single system (or if the diff is spurious) *)
+    
   | Let (v,t1,t2) ->
     let tags = to_vars_tags (tag_of_term_full goal env ~ty_env t1) in
     let venv = Vars.add_vars [v, tags] env.vars in
@@ -178,6 +186,8 @@ let is_ptime_deducible
 
 let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
   let tags = tag_of_term_full AllTags env t in
-  { system_indep = tags.si ;
-    const = tags.const ;
-    adv = tags.adv }
+  {
+    system_indep = tags.si    ;
+    const        = tags.const ;
+    adv          = tags.adv   ;
+  }
