@@ -310,13 +310,14 @@ let pt_compatible_with
   end
 
 (*------------------------------------------------------------------*)
-let pt_unify_warning_systems ~(pt : PT.t) ~(arg : PT.t) : unit =
+let pt_unify_warning_systems table ~(pt : PT.t) ~(arg : PT.t) : unit =
+  let ppe = default_ppe ~table () in
   Printer.prt `Warning
     "Proof-term argument@;  @[%a@]@;\
      has less general systems than the proof-term it is applied into@;  @[%a@]@;\
      The latter proof-term's system set has been projected."
-    PT.pp arg
-    PT.pp pt
+    (PT._pp ppe) arg
+    (PT._pp ppe) pt
 
 (** Unify the systems of [pt] and [arg], prioritizing [pt]'s systems,
     projecting if necessary.
@@ -349,7 +350,7 @@ let pt_unify_systems
           pt, pt_project_system_set table vars arg pt.system 
         else
         if SE.subset_modulo table arg_set pt_set then begin
-          pt_unify_warning_systems ~pt ~arg;
+          pt_unify_warning_systems table ~pt ~arg;
           pt_project_system_set table vars pt arg.system, arg
         end
         else failed ()
@@ -529,14 +530,15 @@ module Mk (Args : MkArgs) : S with
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
 
   (*------------------------------------------------------------------*)
-  let error_pt_nomatch loc ~(prove : PT.t) ~(target : PT.t) =
+  let error_pt_nomatch loc table ~(prove : PT.t) ~(target : PT.t) =
+    let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<v 0>the proof term proves:@;  \
                @[%a@]@;\
                but it must prove:@;  \
                @[%a@]@]"
-        PT.pp prove 
-        PT.pp target
+        (PT._pp ppe) prove 
+        (PT._pp ppe) target
     in
     soft_failure ~loc (Failure err_str)
 
@@ -801,21 +803,23 @@ module Mk (Args : MkArgs) : S with
     { subgs = pt.subgs; args; mv; form = f; bound = pt.bound; system = pt.system }
 
   (*------------------------------------------------------------------*)
-  let pt_downgrade_warning ~(pt : PT.t) ~(arg : PT.t) : unit =
+  let pt_downgrade_warning table ~(pt : PT.t) ~(arg : PT.t) : unit =
+    let ppe = default_ppe ~table () in
     Printer.prt `Warning
       "Proof-term argument@;  @[%a@]@;\
        is local, while the proof-term it is applied into is global@;  @[%a@]@;\
        The latter proof-term has been downgraded to a local proof-term."
-      PT.pp arg
-      PT.pp pt
+      (PT._pp ppe) arg
+      (PT._pp ppe) pt
 
   (*------------------------------------------------------------------*)
-  let error_pt_apply_bad_kind loc ~(pt : PT.t) ~(arg : PT.t) =
+  let error_pt_apply_bad_kind loc table ~(pt : PT.t) ~(arg : PT.t) =
+    let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<v 0>bad kind: the proof term proves:@;  @[%a@]@;\
                it cannot be applied to:@;  @[%a@].@]"
-        PT.pp arg
-        PT.pp pt
+        (PT._pp ppe) arg
+        (PT._pp ppe) pt
     in
     soft_failure ~loc (Failure err_str)
 
@@ -848,7 +852,7 @@ module Mk (Args : MkArgs) : S with
     =
     let table = S.table s in
 
-    let apply_kind_error () = error_pt_apply_bad_kind loc_arg ~pt ~arg in
+    let apply_kind_error () = error_pt_apply_bad_kind loc_arg table ~pt ~arg in
 
     (* Try to case [arg] to the appropriate kind (local or global), 
        depending on [f1] kind. 
@@ -865,7 +869,7 @@ module Mk (Args : MkArgs) : S with
       | Equiv.Global _, Equiv.Local  _ ->
         (* downgrade [pt] *)
         let down_pt = pt_try_localize ~failed:apply_kind_error pt in
-        pt_downgrade_warning ~pt ~arg;
+        pt_downgrade_warning table ~pt ~arg;
         down_pt, arg
     in
 
@@ -884,7 +888,7 @@ module Mk (Args : MkArgs) : S with
       } in
 
     let pt_apply_error arg () =
-      error_pt_nomatch loc_arg ~prove:arg ~target:{ pt with form = f1 }
+      error_pt_nomatch loc_arg table ~prove:arg ~target:{ pt with form = f1 }
     in
 
     (* Verify that the systems of the argument [arg] applies to the systems
@@ -936,18 +940,20 @@ module Mk (Args : MkArgs) : S with
     { subgs; mv; args; form = f2; bound; system = pt.system; }
 
   (*------------------------------------------------------------------*)
-  let error_pt_cannot_apply loc (pt : PT.t) =
+  let error_pt_cannot_apply loc table (pt : PT.t) =
+    let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<hov 2>too many argument, cannot apply:@;  @[%a@]@]"
-        PT.pp pt
+        (PT._pp ppe) pt
     in
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
-  let error_pt_cannot_localize loc (pt : PT.t) () =
+  let error_pt_cannot_localize loc table (pt : PT.t) () =
+    let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<v 0>cannot localize the proof term:@;  @[%a@]@;@]"
-        PT.pp pt
+        (PT._pp ppe) pt
     in
     soft_failure ~loc (Failure err_str)
       
@@ -959,6 +965,7 @@ module Mk (Args : MkArgs) : S with
       (p_pt : Typing.pt)
       (s : S.t) : ghyp * PT.t
     =
+    let table = S.table s in
     let ghyp, pt =
       match L.unloc p_pt with
       | Typing.PT_symb (path, ty_args) -> do_convert_path ty_env mv path ty_args s
@@ -967,7 +974,7 @@ module Mk (Args : MkArgs) : S with
         let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
         let pt = 
           pt_try_localize
-            ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) sub_pt)
+            ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) table sub_pt)
             sub_pt 
         in
         ghyp, pt
@@ -1010,7 +1017,7 @@ module Mk (Args : MkArgs) : S with
     let do_var (pt : PT.t) (p_arg : Typing.term) : PT.t =
       match destr_forall1_tagged_k Equiv.Any_t pt.form with
       | None ->
-        error_pt_cannot_apply (L.loc pt_app.pta_head) pt
+        error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
 
       | Some ((f_arg, _), _) ->
         let ty = Vars.ty f_arg in
@@ -1038,7 +1045,7 @@ module Mk (Args : MkArgs) : S with
           match destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form) with
           | Some (f1, f2) -> f1, f2
           | None ->
-            error_pt_cannot_apply (L.loc pt_app.pta_head) pt
+            error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
       in
 
       match pt_impl_arg with
@@ -1105,11 +1112,12 @@ module Mk (Args : MkArgs) : S with
     { pt with mv = Mvar.empty; subgs; args; form; }
 
   (*------------------------------------------------------------------*)
-  let error_pt_bad_system loc (pt : PT.t) =
+  let error_pt_bad_system loc table (pt : PT.t) =
+    let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<v 0>the proof term proves:@;  @[%a@]@;\
                it does not apply to the current system.@]"
-        PT.pp pt
+        (PT._pp ppe) pt
     in
     soft_failure ~loc (NoAssumpSystem err_str)
 
@@ -1141,7 +1149,7 @@ module Mk (Args : MkArgs) : S with
         match pt_compatible_with table pt (S.system s) with
         | `Subset         -> pt_project_system_set table (S.vars s) pt (S.system s)
         | `ContextIndepPT -> { pt with system = S.system s; }
-        | `Failed         -> error_pt_bad_system loc pt 
+        | `Failed         -> error_pt_bad_system loc table pt 
     in
 
     (* close the proof-term by inferring as many pattern variables as possible *)
