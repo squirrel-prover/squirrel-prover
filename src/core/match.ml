@@ -1729,9 +1729,10 @@ module T (* : S with type t = Term.term *) = struct
         | _ -> tunif_eta_expand st t (f', l')
       end
 
-    | Fun (fn , { fty = fty ; ty_args = args ;}), 
-      Fun (fn', { fty = fty'; ty_args = args';}) when fn = fn' ->
-      assert (fty = fty');
+    | Fun (fn , { fty = _fty ; ty_args = args ;}), 
+      Fun (fn', { fty = _fty'; ty_args = args';}) when fn = fn' ->
+      (* we should have [_fty = _fty'] modulo alpha
+         (we do not check it, as this would take some time) *)
       unif_tys st args args';
       st.mv
 
