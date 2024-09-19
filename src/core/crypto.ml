@@ -254,8 +254,6 @@ end
 
 
 (*------------------------------------------------------------------*)
-
-
 (** Replace every name whose argument are constant by a var and return
     the substitution*)
 let constant_name_to_var
@@ -464,7 +462,7 @@ let exact_eq_under_cond
   (* FIXME : system changed without modifying hyps accordingly*)
   let unif_state =
     Match.mk_unif_state env.vars env.table system hyps unif_vars
-  in 
+  in
   Match.E.deduce_mem_one ~conv ~decompose_ands cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
@@ -941,94 +939,29 @@ module TSet = struct
       [tset2] variable witnessing it. *)
   let cterm_mem env hyps (cond_term : CondTerm.t) tset : Mvar.t option =
     let tset0 = { term = cond_term.term; conds = cond_term.conds; vars = [] } in
-    check_incl env hyps tset0 tset    
-end
+    check_incl env hyps tset0 tset
 
-(*------------------------------------------------------------------*)
-(** An extention of TSet structure for condtional terms*)
-module CTSet = struct
 
-  (** [{cond; (term|form); vars}] represents [{ (term|form) | ∀ vars s.t. cond }]  *)
-  type t = {
-    conds : Term.terms ;          (** conditions  *)
-    term  : CondTerm.t ;           (** term of the set *)
-    vars  : Vars.vars ;           (** free variables  *)
-  }
+  (** Check if [cond_term ∈ tset] and returns the instanciation of
+      [tset] refreshed variables witnessing it, the refreshed variables, and the condition under which it holds. *)
 
-  let[@warning "-32"] fv tset =
-    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds)) in
-    let bound_vars = Vars.Sv.of_list tset.vars in
-    Vars.Sv.filter (fun x -> not (Vars.Sv.mem x bound_vars)) fvs
-
-  let[@warning "-32"] subst subst tset =
-    let vars, subst = 
-      List.fold_left (fun (vars, subst) v ->
-          let v, subst = Term.subst_binding v subst in
-          (v :: vars, subst)
-        ) ([],subst) tset.vars
-    in
-    let vars = List.rev vars in
-    { conds = List.map (Term.subst subst) tset.conds;
-      term  = CondTerm.subst subst tset.term;
-      vars; }
-
-  let[@warning "-32"] _pp ppe fmt (tset : t) =
-    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds)) in
-    let _, vars, sbst = 
-      Term.add_vars_simpl_env (Vars.of_set fvs) tset.vars
-    in
-    let term  = CondTerm.subst sbst tset.term in
-    let conds = List.map (Term.subst sbst) tset.conds in
-
-    if vars = [] then
-      Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
-      (CondTerm._pp ppe) term
-      (Term._pp ppe)(Term.mk_ands conds)
-    else
-      Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
-      (CondTerm._pp ppe) term
-      (Vars._pp_list ppe) vars
-      (Term._pp ppe)(Term.mk_ands conds)
-
-  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
-  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
-
-  let normalize tset = 
-    let fvs = Sv.union (CondTerm.fv tset.term) (Term.fvs (tset.conds))  in
-    let vars = List.filter (fun v -> Sv.mem v fvs) tset.vars in
-    { tset with vars = List.sort_uniq Stdlib.compare vars }
-
-  let refresh (tset : t) : t =
-    let vars, subst = Term.refresh_vars tset.vars in
-    let term  = CondTerm.subst subst tset.term in
-    let conds = List.map (Term.subst subst) tset.conds in
-    {conds; term; vars}
-
-  let[@warning "-32"] singleton (term : CondTerm.t) (conds : Term.terms) = {term; conds; vars = []}
-
-  let[@warning "-32"] generalize (vars : Vars.vars) (tset: t) =
-    let vars = vars @ tset.vars in
-    normalize { tset with vars }
-
-  (* alias ... *)
-  let _refresh = refresh
-
-  
-  (** Check if [cond_term ∈ ctset] and returns the instanciation of 
-      [ctset] refreshed variables witnessing it, the refreshed variables, and the condition under which it holds. *)
-  let cterm_mem env hyps (cond_term : CondTerm.t) ctset : Mvar.t option * Vars.vars * Term.terms =
-    let ctset =  _refresh ctset in
-    let term1 = {cond_term with conds =[] }in
-    let term2 = {ctset.term with conds = []} in
+  let cterm_mem_cond env hyps (cond_term : CondTerm.t) tset : Mvar.t option * Vars.vars * Term.terms =
+    let tset =  _refresh tset in
+    let term1 = {cond_term with conds = []} in
+    let term2 = CondTerm.{term = tset.term; conds = []} in
+    (* Adding hyps issued from conds of term and tset*)
+    let hyps = List.fold_left (fun hyps cond ->
+      TraceHyps.add
+        TacticsArgs.AnyName (LHyp (Equiv.Local cond)) hyps) hyps (cond_term.conds@tset.conds)
+    in 
     let res = exact_eq_under_cond env hyps
-        ~unif_vars:ctset.vars ~target:term1 ~known:term2
+        ~unif_vars:tset.vars ~target:term1 ~known:term2
     in
-    let conds = ctset.conds@ctset.term.conds in  
-    res,ctset.vars,conds
-
-
+    let conds = tset.conds in
+    res,tset.vars,conds
 
 end
+
 
 (*------------------------------------------------------------------*)
 (** Ad-hoc functions for growing list abstract analysis *)
@@ -1339,14 +1272,13 @@ type query = {
   
   rec_inputs : TSet.t list;
   (** Special inputs for recursive calls.
-      [{ t | ∀ v, φ }] means that the adversary can get [t v] for any
-      [v] it can computes such that [φ v].
-      Careful, it is **not** allowed to get anything if [φ v] does not hold. 
-      In particuler, it does not know [φ v]. *)
+      [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary can get [φ v, if φ v then t v] 
+      for any [v] it can compute.*)
 
-  extra_inputs : CTSet.t list;
+  extra_inputs : TSet.t list;
   (** Special inputs for potentiall already computed oracle calls.
-       [{ t | ∀ v, φ }] means that the adversary can get [t v] for any [v]
+       [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary can get [φ v, if φ v then t v] 
+      for any [v] it can compute
   *)
 }
 
@@ -1404,7 +1336,7 @@ type goal =
     macro : Term.term option;
     inputs : CondTerm.t list;
     rec_inputs :TSet.t list ;
-    extra_inputs : CTSet.t list;
+    extra_inputs : TSet.t list;
     extra_outputs : CondTerm.t list;
     output : CondTerm.t;}
 
@@ -1419,7 +1351,7 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
    vars = Term.subst_vars subst goal.vars;
    inputs = List.map (CondTerm.subst subst) goal.inputs;
    rec_inputs = List.map (TSet.subst subst) goal.rec_inputs;
-   extra_inputs = List.map (CTSet.subst subst) goal.extra_inputs;
+   extra_inputs = List.map (TSet.subst subst) goal.extra_inputs;
    extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
    output = CondTerm.subst subst goal.output;
   }
@@ -1434,11 +1366,13 @@ let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
     if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg query.env.vars
   in
   let pp_all_inputs fmt =
-    if query.rec_inputs = [] && query.inputs = [] then Fmt.pf fmt "∅" else
-      Fmt.pf fmt "%a%t%a"
+    if query.rec_inputs = [] && query.inputs = [] && query.extra_inputs = [] then Fmt.pf fmt "∅" else
+      Fmt.pf fmt "%a%t%a%t%a"
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) query.rec_inputs
         (fun fmt -> if query.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) query.inputs
+        (fun fmt -> if query.inputs <> [] then Fmt.pf fmt ",@ " else ())
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) query.extra_inputs
   in
   let pp_constraints fmt = 
     if query.consts = [] then Fmt.pf fmt "" else
@@ -1461,8 +1395,8 @@ let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
     pp_env
     pp_query
 
-let[@warning "-32"] pp_query     = _pp_query (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_query_dbg = _pp_query (default_ppe ~dbg:true ())
+let[@warning "-32"] pp_query  ppe  = _pp_query ppe
+let[@warning "-32"] pp_query_dbg  ppe= _pp_query ppe
 
 let _pp_gen_goal ppe fmt (goal:goal) =
   let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
@@ -1485,7 +1419,7 @@ let _pp_gen_goal ppe fmt (goal:goal) =
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) st.inputs
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CTSet._pp ppe)) st.extra_inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) st.extra_inputs
   in
   let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe) goal.output in
   (* let pp_outputs _fmt = *)
@@ -1500,8 +1434,8 @@ let _pp_gen_goal ppe fmt (goal:goal) =
     pp_env
     pp_bideduction_goal
 
-let[@warning "-32"] pp_gen_goal     = _pp_gen_goal (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_gen_goal_dbg = _pp_gen_goal (default_ppe ~dbg:true ())
+let[@warning "-32"] pp_gen_goal  ppe   = _pp_gen_goal ppe
+let[@warning "-32"] pp_gen_goal_dbg ppe = _pp_gen_goal ppe
 
 (*-------------------------------------------------------------------*)
 (* let _pp_state ppe fmt (st : state) = _pp_gen_state ppe fmt ([],st,[]) *)
@@ -1921,7 +1855,7 @@ let knowledge_mem
     ~(env : Env.t)
     ~(hyps : TraceHyps.hyps)
     (output : CondTerm.t)
-    (inputs : CondTerm.t list) : bool
+    (inputs : CondTerm.t list) : bool * Term.terms option
   =
   let eq_implies (input : CondTerm.t)  =
     match input.term with
@@ -1931,13 +1865,31 @@ let knowledge_mem
       let conds = List.map (Term.subst subst) input.conds in
       let input_term = CondTerm.{ term ; conds } in
       let input_term = CondTerm.polish input_term hyps env in
-      exact_eq_under_cond
-        ~unif_vars:es env hyps ~target:output ~known:input_term <> None
+      let res = exact_eq_under_cond
+          ~unif_vars:es env hyps ~target:output ~known:input_term
+      in
+      begin
+        match res with
+        | Some mv ->
+          let subst = Mvar.to_subst_locals ~mode:`Match  mv in
+          (true, Some (List.map (Term.subst subst) (List.map (Term.mk_var) es)))
+        | None -> (false,None)
+      end
     | _ ->
-       let input = CondTerm.polish input hyps env in
-       exact_eq_under_cond env hyps ~target:output ~known:input <> None
+      let input = CondTerm.polish input hyps env in
+      let res = exact_eq_under_cond env hyps ~target:output ~known:input in
+      begin
+        match res with 
+        | Some _ -> (true, None)
+        | None -> (false, None)
+      end
   in
-  List.exists eq_implies inputs
+  let res = List.map eq_implies inputs in
+  if List.exists fst res then
+    List.find (fun x -> fst x) res
+  else
+    (false,None)
+    
 
 (*------------------------------------------------------------------------*)
 (** Check if [output] is included in [inputs]. In case of success,
@@ -1978,13 +1930,14 @@ let knowledge_mem_condterm_sets
     (env : Env.t)
     (hyps : TraceHyps.hyps)
     (output : CondTerm.t)
-    (extra_inputs : CTSet.t list)
+    (extra_inputs : TSet.t list)
   =
-  let is_in (input : CTSet.t) : (Term.terms*Term.term) option =
-    let input = CTSet.refresh input in
-    match CTSet.cterm_mem  env hyps output input with
-    | (None,_,_) -> None
-    | (Some mv,vars, conds) ->
+  let is_in (input : TSet.t) : (Term.terms*Term.term) option =
+    let input = TSet.refresh input in
+    match TSet.cterm_mem_cond env hyps output input with
+    | (None,_,_) ->  
+      None
+    | (Some mv,vars, conds) -> 
       (* (\* There should always be a condition:  *)
       (*    the one saying we are after  *)
       (*    the computation that lead  *)
@@ -1994,13 +1947,12 @@ let knowledge_mem_condterm_sets
       let bound_vars,free_vars = List.partition (fun x -> Mvar.mem x mv) vars in
       let conds =  List.map (Term.subst subst) conds in
       let args = List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars in
-      
-      if Match.E.known_set_check_impl env.table hyps (Term.mk_ands conds) (Term.mk_false)
+      let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in
+      if Match.E.known_set_check_impl env.table hyps conds (Term.mk_false)
       then
         None
       else
-       let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in 
-        Some (args,conds)
+      Some (args,conds)
   in
   List.filter_map is_in extra_inputs
 
@@ -2027,13 +1979,13 @@ let notify_bideduce_immediate
 let notify_bideduce_oracle_extra_inputs
     table
     ~vbs ~dbg
-    (extra_inputs : CTSet.t list)
+    (extra_inputs : TSet.t list)
     (cond:Term.term)
   =
   if not vbs && not dbg then () else
     let ppe = default_ppe ~table ~dbg () in
     Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
-      (Fmt.list ~sep:(Fmt.any ",@.") (CTSet._pp ppe)) extra_inputs
+      (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
       (Term._pp ppe) cond
 
 let notify_bideduce_term_start
@@ -2050,7 +2002,7 @@ let notify_bideduce_oracle_inputs_start
     (oracle_name: string)
   =
   if not vbs && not dbg then () else
-    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@." oracle_name
+    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@.@[" oracle_name
 
 
 let notify_bideduce_oracle_inputs_end
@@ -2058,7 +2010,7 @@ let notify_bideduce_oracle_inputs_end
     (oracle_name : string)
   =
   if not vbs && not dbg then () else
-    Printer.pr "___Call %s : Ending oracles's inputs bideduction___@." oracle_name
+    Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@." oracle_name
 
 
 
@@ -2067,7 +2019,14 @@ let notify_bideduce_second_go
     ~dbg
   =
   if not vbs && not dbg then () else
-    Printer.pr "__________Starting second go____________@."
+    Printer.pr "****************************************@.__________Starting second go____________@.****************************************@."
+
+let notify_bideduce_first_go
+    ~vbs
+    ~dbg
+  =
+  if not vbs && not dbg then () else
+    Printer.pr "***************************************@.__________Starting first go____________@.***************************************@."
 
 
 let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
@@ -2080,7 +2039,7 @@ let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
 let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
   let ppe = default_ppe ~table:qs.env.table () in
   if not vbs && not dbg then () else
-    Printer.pr "@. ******* Strating goal ********** @. %a @. ********@. "
+    Printer.pr "@. ******* Starting goal ********** @. %a @. ********@. "
       (_pp_query ppe) query
 
   (*------------------------------------------------------------------------*)
@@ -2195,10 +2154,11 @@ and bideduce_term
   =
   let output = CondTerm.polish output query.hyps query.env in
   assert (AbstractSet.well_formed query.env query.initial_mem);
-  notify_bideduce_term_start query.env.table ~vbs ~dbg output; 
+  notify_bideduce_term_start query.env.table ~vbs ~dbg output;
+  let kmem = knowledge_mem ~env:query.env ~hyps:query.hyps output query.inputs in
   if
     HighTerm.is_ptime_deducible ~si:true query.env output.term ||
-    knowledge_mem ~env:query.env ~hyps:query.hyps output query.inputs
+    (fst kmem && (snd kmem = None))
   then                          (* deduce conditions *)
       let result = empty_result query.initial_mem in
       notify_bideduce_immediate ~vbs ~dbg;
@@ -2210,7 +2170,10 @@ and bideduce_term
   then
     Some (empty_result query.initial_mem)
 
-  else
+  else if (fst kmem) then
+    bideduce ~vbs ~dbg query
+      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget (snd kmem)))
+  else 
     (* [output ∈ rec_inputs] *)
     match knowledge_mem_tsets query.env query.hyps output query.rec_inputs with
     | Some args ->
@@ -2407,7 +2370,7 @@ and bideduce_fp ?loc ~vbs ~dbg
       let err_str = 
         Fmt.str "@[<v 2>failed to apply the game:@;\
                  bideduction goal failed:@;@[%a@]@]"
-          pp_query  (query,outputs)
+          (pp_query (default_ppe ~table:query.env.table ())) (query,outputs)
       in
       Tactics.hard_failure ?loc (Failure err_str)
   in
@@ -2562,13 +2525,14 @@ let known_term_of_occ ~cond (k : rec_call_occ) : TSet.t list =
 
 (*------------------------------------------------------------------*)
 (** Notify the user of the bi-deduction subgoals generated. *) 
-let notify_bideduction_subgoals ~direct ~recursive : unit =
+let notify_bideduction_subgoals table ~direct ~recursive : unit =
+  let ppe = default_ppe ~table () in
   Printer.pr "@[<v 0>Direct bi-deduction sub-goal (assuming recursive calls are bi-deducible):@;<1 2>\
               @[<v 0>%a@]@;@;@]"
-    pp_gen_goal direct;
+    (pp_gen_goal ppe) direct;
   Printer.pr "@[<v 0>Bi-deduction sub-goals for recursive calls:@;\
              \  @[<v 0>%a@]@;@;@]"
-    (Fmt.list ~sep:(Fmt.any "@;@;") pp_gen_goal) recursive
+    (Fmt.list ~sep:(Fmt.any "@;@;") (pp_gen_goal ppe)) recursive
 
 (*------------------------------------------------------------------*)
 (** Given a list of terms [t] using recursively defined functions,
@@ -2672,7 +2636,7 @@ let derecursify
   in
 
   (* notify the user *)
-  notify_bideduction_subgoals ~direct ~recursive:(fst (List.split recursive));
+  notify_bideduction_subgoals (env.table) ~direct ~recursive:(fst (List.split recursive));
   recursive, direct
 
 (*------------------------------------------------------------------*)
@@ -2891,6 +2855,7 @@ let prove
         (Failure "failed to apply the game to user constraints' argument")
   in
   (** First bideduction go*)
+  notify_bideduce_first_go ~dbg ~vbs ;
   let query_start = transitivity_get_next_query query0 init_output res0 in
   let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
@@ -2923,11 +2888,11 @@ let prove
     let macro = Term.subst subst macro in
     let extra_outputs = List.map (CondTerm.subst subst) extra_outputs in
     let conds = List.map (Term.subst subst) conds in
-    List.map (fun (term:CondTerm.t) : CTSet.t ->
+    List.map (fun (term:CondTerm.t) : TSet.t ->
         (* Refresh terms*)
-        {conds = (Term.mk_leq macro timestamp)::conds;
+        {conds = (Term.mk_leq macro timestamp)::conds@term.conds;
          vars=varsg;
-         term;})
+         term=term.term;})
       extra_outputs
   in
   (** Get all extra inputs for [goal_to] coming from [goal_from] under [cond_from] that should be 

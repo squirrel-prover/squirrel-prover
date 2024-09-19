@@ -1,5 +1,7 @@
 include Basic.
 
+set verboseCrypto = true.
+
 abstract h : message -> message.
 
 game FOO  = { 
