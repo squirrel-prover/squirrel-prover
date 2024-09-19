@@ -181,8 +181,8 @@ let is_ptime_deducible
     ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
-  ignore (si);
-  (tag_of_term_full AllTags env ~ty_env t).ptime
+  let tags = tag_of_term_full AllTags env ~ty_env t in
+  tags.ptime && (not si || tags.si) 
 
 let tag_of_term (env : Env.t) (t : Term.term) : Vars.Tag.t =
   let tags = tag_of_term_full AllTags env t in
