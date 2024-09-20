@@ -59,7 +59,7 @@ module Tag : sig
     (** var represents an adversarially computable value *)
 
     system_indep : bool;
-    (** var must be instantiated by a term representiang a
+    (** var must be instantiated by a term representing a
         system-independent value *)
   }
 

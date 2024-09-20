@@ -20,87 +20,37 @@ module PT = struct
       For now, we do not keep the proof-term itself. *)
   type t = {
     system : SE.context;
+      (** system wrt which everything is understood *)
     args   : (Vars.var * Vars.Tag.t) list;
-    (** in reversed order w.r.t. introduction *)
+      (** hole/pattern variables from applied terms
+          (i.e. terms used to instantiate universal quantifications)
+          in reversed order w.r.t. introduction *)
     mv     : Mvar.t;
+      (** instantiations for metavariables resulting from
+          instantiations of universal quantifications *)
+      (* FIXME maintaining metavariables like this, using an
+         explicit substitution rather than substituting eagerly,
+         probably yields worse performance rather than a better
+         one, because we substitute in several places during the
+         construction of the proof term to avoid imprecision issues *)
     subgs  : Equiv.any_form list;
+      (** subgoals *)
     bound  : Concrete.bound;
+      (** concrete security bound *)
     form   : Equiv.any_form;
+      (** conclusion of the proof term *)
   }
-
-  (** Project the [set] of all systems in a proof-term while
-      preserving validity of the proof-term, if possible.
-
-      We cannot project everywhere as this would not preserve validity:
-      notably, it is generally unsound to project global hypotheses
-      appearing in contrapositive positions.
-
-      E.g. projecting over [P1] in
-        [phi]_{P1,P2} -> [psi]_{P1,P2}
-      would yield
-        [phi]_{P1} -> [psi]_{P1} 
-      which is stronger than the initial formula.
-  *)
-  let projs_set table env (projs : Term.projs) (pt : t) : t =
-    (** Check that reachability atoms, which are the only atom in
-        which we are projecting, only appear in positive position.
-
-        Remark: we accept reachability atoms in contrapositive
-        positions if these atoms are system independent. *)
-    let rec check_positivity (p : bool) (f : Equiv.form) =
-      match f with
-      | Quant (_, _,f) | Let (_,_,f) -> check_positivity p f
-      | And  (f1, f2)
-      | Or   (f1, f2) -> check_positivity p f1 && check_positivity p f2
-      | Impl (f1, f2) -> 
-        check_positivity (not p) f1 &&
-        check_positivity      p  f2
-      | Atom (Reach f) -> 
-        p ||
-        begin
-          let vars = Vars.add_vars pt.args env in
-          let env = Env.init ~table ~system:pt.system ~vars () in
-          HTerm.is_system_indep env f.formula
-        end
-      | Atom _ -> true
-    in
-
-    let new_system = SE.project_set projs pt.system in
-    
-    (** [b] indicates if we are in positive or contrapositive position *)
-    let do_proj (p : bool) : Equiv.any_form -> Equiv.any_form = function
-      | Equiv.Local  t -> Local (Term.project projs t)
-      | Equiv.Global e -> 
-        (* If the system expressions after projections contains the
-           same set of single systems, we can project. *)
-        let can_project = 
-          SE.equal_modulo table pt.system.set new_system.set || 
-          check_positivity p e
-        in
-        if not can_project then 
-          soft_failure (Failure "cannot not project system set in proof-term");
-        (* FIXME: this is a terrible error message, but this check
-           should disappear in the near future, so it will do until then. *)
-
-        Global (Equiv.project projs e)
-    in
-    { args   = pt.args;
-      mv     = Match.Mvar.map (Term.project projs) pt.mv; 
-      system = new_system ;
-      subgs  = List.map (do_proj false) pt.subgs;
-      bound  = Concrete.bound_projs projs pt.bound;
-      form   = do_proj true pt.form; }
 
   let _pp ppe fmt (pt : t) : unit =
     let pp_subgoals_and_mv fmt =
-      if not ppe.dbg then () 
-      else 
+      if not ppe.dbg then ()
+      else
         Fmt.pf fmt "@[<v 2>subgoals:@ @[%a@]@]@;\
                     @[<v 2>mv:@ @[%a@]@]@;"
           (Fmt.list (Equiv.Any._pp ppe ?context:None))
           pt.subgs
           (Mvar._pp ppe) pt.mv
-    in        
+    in
     Fmt.pf fmt "@[<v 0>\
                 %a judgement@;\
                 formula: @[%a@]@;\
@@ -108,13 +58,115 @@ module PT = struct
                 %t\
                 @[vars: @[%a@]@]@]"
       (Concrete._pp ppe) pt.bound (* prints bound + judgement kind *)
-      (Equiv.Any._pp ppe ?context:None) pt.form  
+      (Equiv.Any._pp ppe ?context:None) pt.form
       SE.pp_context pt.system
       pp_subgoals_and_mv
-      (Vars._pp_typed_tagged_list ppe) (List.rev pt.args) 
+      (Vars._pp_typed_tagged_list ppe) (List.rev pt.args)
 
   let pp     = _pp (default_ppe ~dbg:false ())
   let pp_dbg = _pp (default_ppe ~dbg:true  ())
+
+  (** Project the "set" part of a proof-terms's system annotations,
+      and adjust reachability atoms accordingly,
+      if this can be done while preserving the proof-term's validity.
+
+      For instance, if a proof term establishes the local formula [f]
+      under system annotation [{set:l1:P1,l2:P2;equiv:<E>}], projecting
+      to [l1] results in a proof term establishing [f'] under the
+      system annotation [{set:l1:P1;equiv:<E>}], where diff operators
+      inside [f'] have been projected to [l1].
+
+      We cannot always project so as to preserve validity:
+      notably, it is generally unsound to project global hypotheses
+      appearing in negative/contravariant positions.
+      E.g. projecting over [P1] in
+        [[phi]_{P1,P2} -> [psi]_{P1,P2}]
+      would yield
+        [[phi]_{P1} -> [psi]_{P1}]
+      which is not implied by (and does not imply) the initial formula. *)
+  let projs_set table env (projs : Term.projs) (pt : t) : t =
+
+    let system_independent env (f:Term.term) =
+      let vars = Vars.add_vars pt.args env in
+      let env = Env.init ~table ~system:pt.system ~vars () in
+      (* Apply pending substitution to avoid imprecision. *)
+      (* TODO un test pour ça FIXME genre lemma tau avec tau':=tau const *)
+      let f =
+        match Mvar.to_subst ~mode:`Unif table vars pt.mv with
+        | `Subst subst -> Term.subst subst f
+        | `BadInst _ -> f
+          (* FIXME is it worth continuing, or should we fail now? *)
+      in
+      HTerm.is_system_indep env f
+    in
+
+    (** Check that reachability atoms appear
+               only in positive positions when [b]
+        (resp. only in negative positions when [not b])
+        or are system independent. *)
+    let rec check_positivity env (p : bool) (f : Equiv.form) =
+      match f with
+      | Quant (_,vars,f) -> check_positivity (Vars.add_vars vars env) p f
+      | Let (_,_,f) -> check_positivity env p f
+          (* FIXME: can we really ignore second component of [Let(_,_,f)]? *)
+          (* FEATURE: enrich env with variable bound by Let,
+             using tags inferred from second component. *)
+      | And  (f1, f2)
+      | Or   (f1, f2) -> check_positivity env p f1 && check_positivity env p f2
+      | Impl (f1, f2) -> 
+        check_positivity env (not p) f1 &&
+        check_positivity env      p  f2
+      | Atom (Reach f) ->
+        p || system_independent env f.formula
+      | Atom _ -> true
+    in
+
+    let new_system = SE.project_set projs pt.system in
+    
+    let project_failure () =
+      soft_failure (Failure "cannot project 'set' system annotation in proof-term")
+    in
+
+    (** [do_proj p form] returns a new formula [form'] such that
+        [form] implies [form'] if [b], and conversely if [not b],
+        where [form] is taken under the original system annotation
+        and [form'] under the newly projected one.
+
+        If will fail if system-dependent local formulas occur in
+        negative occurrences; other occurrences will be projected
+        to obtain [form'].
+
+        FIXME explain (and check) what happens with equal_modulo:
+        it seems that [l1:S,l2:S] equal_modulo [l1:S],
+        but changing from one system to the other cannot be done
+        without some conditions on occurrences. *)
+    let do_proj (p : bool) : Equiv.any_form -> Equiv.any_form = function
+      | Equiv.Local t ->
+        let can_project =
+          SE.equal_modulo table pt.system.set new_system.set ||
+          p ||
+          system_independent env t
+        in
+        if not can_project then project_failure ();
+        Local (Term.project projs t)
+      | Equiv.Global e -> 
+        (* If the system expressions after projection contains the
+           same set of single systems, we can project. *)
+        let can_project = 
+          SE.equal_modulo table pt.system.set new_system.set || 
+          check_positivity env p e
+        in
+        if not can_project then project_failure ();
+        Global (Equiv.project projs e)
+    in
+
+    { args   = pt.args;
+      mv     = Match.Mvar.map (Term.project projs) pt.mv; 
+      system = new_system ;
+      subgs  = List.map (do_proj false) pt.subgs;
+      bound  = Concrete.bound_projs projs pt.bound;
+      form   = do_proj true pt.form; }
+
 end
 
 (*------------------------------------------------------------------*)
@@ -194,7 +246,9 @@ let pt_try_cast (type a)
 
 (*------------------------------------------------------------------*)
 
- (** Rename projections in [pt] to use [pt_pair]'s projections, if necessary. *)
+(** Return a new proof term equivalent to [pt] but using projections
+    used in [system_pair] (which must be a projection renaming of [pt.system]).
+    Diff operators in equivalence atoms are modified accordingly. *)
 let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
   match pt.system.pair, system_pair with
   | None, _ | _, None -> pt
@@ -218,12 +272,15 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
 
 
 (*------------------------------------------------------------------*)
-(** Projects [pt] onto [system], projecting diffs in terms if necessary.
-    Projection must be possible. *)
+(** Projects [pt] onto [system], if possible,
+    projecting diffs in terms if necessary. *)
 let pt_project_system_set
     (table : Symbols.table) (vars : Vars.env) 
     (pt : PT.t) (system : SE.context) : PT.t 
+    (* FIXME equiv component of [system] seems unused:
+      passing set directly would be clearer *)
   =
+  if pt.system = system then pt else
   (* project local hyps. and conclusion [arg] over [system]. *)
   if SE.is_fset system.set then
     if SE.is_fset pt.system.set then
@@ -234,14 +291,15 @@ let pt_project_system_set
         SE.mk_proj_subst ~strict:true ~src:pt.system.set ~dst:system.set 
       in
       let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Reach proj_subst in
-      let pt = 
+      let new_system =
+        { pt.system with set = SE.subst_projs proj_subst pt.system.set }
+      in
+      let pt =
         { pt with subgs = List.map psubst pt.subgs;
                   bound = Concrete.bound_subst_projs proj_subst pt.bound;
+                  (* FIXME shouldn't we subst_projs for mvars? *)
                   form  = psubst pt.form;
-                  system = { pt.system with set = system.set };
-                  (* we already set [pt.system] to [system.set], even though 
-                     we did not project the diffs yet. *) 
-        } 
+                  system = new_system }
       in
 
       (* [system] and [pt.system] are fsets. 
@@ -249,16 +307,21 @@ let pt_project_system_set
       let projs = List.map fst (SE.to_list @@ SE.to_fset system.set) in
       PT.projs_set table vars projs pt
 
-    (* [system.set] is a fset, [pt.system.set] is [SE.any]
-       or [SE.any_compatible_with].
-       In that case, no projection needed in terms: simply uses 
-       [system.set]. *)
     else
+      (* [system.set] is a fset, [pt.system.set] is [SE.any]
+         or [SE.any_compatible_with].
+         In that case, no projection needed in terms: simply uses
+         [system.set].
+         FIXME don't we need to check polarities? e.g.
+         if subgoal asks [input@tau=true] for all systems compatible
+         with something, it's not OK to change it to weaker
+         subgoal [input@tau=true]_{S}! *)
       let () = assert (SE.is_any_or_any_comp pt.system.set) in
       { pt with system }
   else
     (* [system.set] is [SE.any] or [SE.any_compatible_with].
-       [pt.system.set] must be in the same case. *)
+       [pt.system.set] must be in the same case.
+       FIXME this is not what we check below *)
     let () = assert (SE.is_any_or_any_comp    system.set &&
                      SE.is_any_or_any_comp pt.system.set   ) in
     { pt with system }
@@ -349,10 +412,13 @@ let pt_unify_systems
 
         (* Unify reachability systems in [system.set]. *)
         let pt_set, arg_set = pt.system.set, arg.system.set in
-        if SE.subset_modulo table pt_set arg_set then
+        (* FIXME subset_modulo used to be used below, but this yields
+           projections from [l1:S] to [l1:S,l2:S], which is rejected:
+           is there some generalization that we can/should do? *)
+        if SE.subset table pt_set arg_set then
           pt, pt_project_system_set table vars arg pt.system 
         else
-        if SE.subset_modulo table arg_set pt_set then begin
+        if SE.subset table arg_set pt_set then begin
           pt_unify_warning_systems table ~pt ~arg;
           pt_project_system_set table vars pt arg.system, arg
         end
@@ -775,9 +841,9 @@ module Mk (Args : MkArgs) : S with
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
-  (** Apply [pt] to [p_arg].
-      Pop the first universally quantified variable in [f] and
-      instantiate it with [pt_arg]*)
+  (** Apply proof-term ([PT.t]) to some term ([Term.term]):
+      pop the first universally quantified variable in the proof-term's
+      conclusion and instantiate it with given term. *)
   let pt_apply_var_forall
       ~(arg_loc:L.t)
       (ty_env : Type.Infer.env)
@@ -799,10 +865,13 @@ module Mk (Args : MkArgs) : S with
        if [f_arg_kind] is [`Global]. *)
     let args =
       List.rev_append
-        (List.map (fun x -> x, f_arg_tag) (Sv.elements new_p_vs)) pt.args
+        (List.map (fun x -> x, f_arg_tag) (Sv.elements new_p_vs))
+        pt.args
     in
 
     (* check tags, if applicable *)
+    (* FIXME factor this behind a central function call,
+       otherwise we might forget to update this code after adding a new tag *)
     let () =
       let venv = Vars.add_vars args env in
       let env = Env.init ~table ~system:pt.system ~vars:venv () in
@@ -1080,7 +1149,7 @@ module Mk (Args : MkArgs) : S with
 
       match pt_impl_arg with
       | `Subgoal ->             (* discharge the subgoal *)
-        { system = pt.system;
+        { PT.system = pt.system;
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;
           args   = pt.args;
@@ -1121,14 +1190,15 @@ module Mk (Args : MkArgs) : S with
       List.filter (fun (v, _) -> not (Mvar.mem v pt.mv)) pt.args
     in
     (* instantiate infered variables *)
+    (* FIXME why don't we substitute in [pt.bound]? *)
     let subst = subst_of_pt ~loc ty_env table env pt in 
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
     (* the only remaining variables are pattern holes '_' *)
     assert (List.for_all (fst_map Vars.is_pat) args);
 
-    (* renamed remaining pattern variables,
-       to avoir having variable named '_' in the rest of the prover. *)
+    (* rename remaining pattern variables,
+       to avoid having variables named '_' in the rest of the prover. *)
     let subst, args =
       List.map_fold (fun subst (v, var_info) ->
           let new_v = Vars.make_fresh (Vars.ty v) "x" in
