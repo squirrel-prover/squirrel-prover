@@ -45,10 +45,11 @@ struct
   type data = unit
 
   let collision_formula ~(negate : bool)
-      (x : content) (xcoll : content) ()
+      ~(content : content) ~(collision : content) ~(data:unit)
     : Term.term
     =
-    match x, xcoll with
+    let _ = data in
+    match content, collision with
     | BadKey k, BadKey kcoll ->
       (* sanity check: only apply when same symbol *)
       assert (k.symb = kcoll.symb);
@@ -132,8 +133,8 @@ let get_bad_occs
     (m:term)
     (k:Name.t)
     (hash_f:Symbols.fname) (* hash function *)
-    (retry_on_subterms : unit -> IOS.simple_occs)
-    (rec_call_on_subterms : O.pos_info -> Term.term -> IOS.simple_occs)
+    ~(retry : unit -> IOS.simple_occs)
+    ~(rec_call : O.pos_info -> Term.term -> IOS.simple_occs)
     (info:O.pos_info)
     (t:term) 
   : IOS.simple_occs =
@@ -162,36 +163,36 @@ let get_bad_occs
   (* occurrence of the hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
-    let occs1 = List.concat_map (rec_call_on_subterms info) kargs' in
+    let occs1 = List.concat_map (rec_call info) kargs' in
     let occ =
       mk_simple_occ
-        (BadKey (Name.of_term k'))
-        (BadKey k)
-        ()
-        info.pi_vars
-        info.pi_cond
-        info.pi_occtype
-        info.pi_subterm 
+        ~content:(BadKey (Name.of_term k'))
+        ~collision:(BadKey k)
+        ~data:()
+        ~vars:info.pi_vars
+        ~cond:info.pi_cond
+        ~typ:info.pi_occtype
+        ~sub:info.pi_subterm 
     in
     occ :: occs1
 
   (* hash occurrence: no key occ but record the message hashed *)
   | App (Fun (f, _), [Tuple [m'; Name (ksb',kargs') as k']])
     when f = hash_f && ksb'.s_symb = k.symb.s_symb ->
-    let occs = List.concat_map (rec_call_on_subterms info) (m' :: kargs') in
+    let occs = List.concat_map (rec_call info) (m' :: kargs') in
     (* we add to the end here, it seems to produce goals
        in a more intuitive order *)
     occs @
     [ mk_simple_occ
-        (IntegrityMsg {msg=m'; key=Name.of_term k'})
-        (IntegrityMsg {msg=m; key=k})
-        ()
-        info.pi_vars
-        info.pi_cond
-        info.pi_occtype
-        info.pi_subterm ]
+        ~content:(IntegrityMsg {msg=m'; key=Name.of_term k'})
+        ~collision:(IntegrityMsg {msg=m; key=k})
+        ~data:()
+        ~vars:info.pi_vars
+        ~cond:info.pi_cond
+        ~typ:info.pi_occtype
+        ~sub:info.pi_subterm ]
 
-  | _ -> retry_on_subterms ()
+  | _ -> retry ()
 
 
 

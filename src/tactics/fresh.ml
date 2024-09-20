@@ -49,8 +49,8 @@ module NOF = O.NameOccFormulas
 let get_bad_occs
       (env : Env.t)
       (n : Name.t) 
-      (retry_on_subterms : unit -> NOS.simple_occs)
-      (rec_call_on_subterms : O.pos_info -> Term.term -> NOS.simple_occs) 
+      ~(retry : unit -> NOS.simple_occs)
+      ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs) 
       (info : O.pos_info)
       (t : Term.term) 
     : NOS.simple_occs
@@ -85,12 +85,15 @@ let get_bad_occs
         up to date.
         still fine, since we don't actually use it. *)
      (* in fact here we could just rec_call_on_subterms. *)
-     let occs = List.concat_map (rec_call_on_subterms info) nn_args in
+     let occs = List.concat_map (rec_call info) nn_args in
      (NOS.EO.SO.mk_simple_occ
-        (Name.of_term t) n ()
-        (info.pi_vars) (info.pi_cond) (info.pi_occtype) (info.pi_subterm)) :: occs
+        ~content:(Name.of_term t) ~collision:n ~data:()
+        ~vars:info.pi_vars
+        ~cond:info.pi_cond
+        ~typ:info.pi_occtype
+        ~sub:info.pi_subterm) :: occs
 
-  | _ -> retry_on_subterms ()
+  | _ -> retry ()
 
 
 

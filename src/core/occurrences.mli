@@ -68,7 +68,8 @@ module type OccContent = sig
       we turn occurrences to terms using it, and then
       o2 subsumes o1 if o1's term is an instantiation of o2's. *)
   val collision_formula :
-    negate:bool -> content -> content -> data -> Term.term
+    negate:bool -> content:content -> collision:content ->
+    data:data -> Term.term
 
   (** Applies a substitution to an occurrence content *)
   val subst_content : Term.subst -> content -> content
@@ -141,8 +142,8 @@ module type SimpleOcc = sig
      so_vars    : Vars.vars;   (** variables bound above the occurrence *)
      so_cond    : Term.terms;  (** condition above the occurrence *)
      so_occtype : occ_type;    (** occurrence type *)
-     so_subterm : Term.term;   (** a subterm where the occurrence was found
-                                   (for printing) *)
+     so_subterm : Term.term;   (** a subterm where the occurrence
+                                          was found (for printing) *)
     }
 
 
@@ -154,8 +155,8 @@ module type SimpleOcc = sig
       Hence it is assumed fv contains all variables occurring in the content
       and data that are bound above the occurrence. *)
   val mk_simple_occ :
-    content -> content -> data ->
-    Vars.vars -> Term.terms -> occ_type -> Term.term ->
+    content:content -> collision:content -> data:data ->
+    vars:Vars.vars -> cond:Term.terms -> typ:occ_type -> sub:Term.term ->
     simple_occ
 
   (*------------------------------------------------------------------*)
@@ -302,7 +303,7 @@ val expand_macro_check_once : expand_info -> Term.term -> Term.term option
 val expand_macro_check_all : expand_info -> Term.term -> Term.term
 
 (** Returns all timestamps occuring in macros in a list of terms.
-    Should only be used when sources are directly occurring,
+    Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)
 val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
 
@@ -339,8 +340,8 @@ module type OccurrenceSearch = sig
       Functions of this type don't need to unfold macros,
       which are handled separately. *)
   type f_fold_occs =
-    (unit -> simple_occs) ->
-    (pos_info -> Term.term -> simple_occs) ->
+    retry:(unit -> simple_occs) ->
+    rec_call:(pos_info -> Term.term -> simple_occs) ->
     pos_info ->
     Term.term ->
     simple_occs
@@ -350,7 +351,8 @@ module type OccurrenceSearch = sig
       Takes care of macro expansion and going through all terms,
       using [fold_macro_support] and [map_fold]. *)
   val find_all_occurrences :
-    mode:Iter.allowed_constants -> (* allowed sub-terms without further checks *)
+    mode:Iter.allowed_constants -> (* allowed sub-terms 
+                                      without further checks *)
     ?pp_ns:unit Fmt.t option -> (* printing searched for occurrences *)
     f_fold_occs ->
     TraceHyps.hyps ->
@@ -364,6 +366,11 @@ end
 module MakeSearch :
   functor (OC:OccContent) -> (OccurrenceSearch with module EO.SO.OC = OC)
 
+
+(*------------------------------------------------------------------*)
+(** {2 Formula construction and simplification} *)
+
+
 (** [time_formula τ ts_occs] constructs the formula:
 
       [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
@@ -372,10 +379,7 @@ module MakeSearch :
     (for example, [path_cond x y] can be [x ≤ y]). *)
 val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
 
-(*------------------------------------------------------------------*)
-(** {2 Formula construction and simplification} *)
-
-(** Module to containing functions to produce formulas (proof goals)
+(** Module containing functions to produce formulas (proof goals)
     expressing that extended occurrences of the given type are
     indeed collisions (or alternately, that they are not) *)
 module type OccurrenceFormulas = sig

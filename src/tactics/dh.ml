@@ -108,8 +108,8 @@ let get_bad_occs
     (env : Env.t)            (* initial environment  *)
     (gdh_oracles : bool) (g : term) (exp : Symbols.fname) (mult : Symbols.fname option)
     (nab : Name.t list) 
-    (retry_on_subterms : unit -> NOS.simple_occs)
-    (rec_call_on_subterms : O.pos_info -> Term.term -> NOS.simple_occs)
+    ~(retry : unit -> NOS.simple_occs)
+    ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs)
     (info : O.pos_info)
     (t : Term.term)
   : NOS.simple_occs
@@ -121,7 +121,7 @@ let get_bad_occs
     : NOS.simple_occs 
     =
     if m <> g then (* all occs in m, pows are bad *)
-      List.concat_map (rec_call_on_subterms info) (m :: pows)
+      List.concat_map (rec_call info) (m :: pows)
 
     else (* 1 bad pi is allowed.
             bad occs = all bad pi except 1 + bad occs in other pis *)
@@ -140,7 +140,7 @@ let get_bad_occs
          and the arguments of all the bad_pows (incl. the one we dropped) *)
       let occs1 =
         List.concat_map
-        (rec_call_on_subterms info)
+        (rec_call info)
         ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
       in
       bad_pows_occs @ occs1
@@ -165,7 +165,7 @@ let get_bad_occs
       O.find_name_occ (Name.of_term n) nab info
     in
     (* rec call on the arguments *)
-    let occs2 = List.concat_map (rec_call_on_subterms info) nargs in
+    let occs2 = List.concat_map (rec_call info) nargs in
     occs1 @ occs2
 
   | App (Fun (f, _), _) when f = exp ->
@@ -198,16 +198,16 @@ let get_bad_occs
     let occs2 =
       match bad_pows with
       | [] -> []
-      | n :: _ -> List.concat_map (rec_call_on_subterms info) n.args
+      | n :: _ -> List.concat_map (rec_call info) n.args
     in
     let occs3 =
       match bad_qows with
       | [] -> []
-      | n :: _ -> List.concat_map (rec_call_on_subterms info) n.args
+      | n :: _ -> List.concat_map (rec_call info) n.args
     in
     occs1 @ occs2 @ occs3
     
-  | _ -> retry_on_subterms ()
+  | _ -> retry ()
 
 
 

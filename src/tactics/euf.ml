@@ -46,10 +46,11 @@ struct
   type data = unit
 
   let collision_formula ~(negate : bool)
-      (x : content) (xcoll : content) ()
+      ~(content : content) ~(collision : content) ~(data : unit)
     : Term.term
     =
-    match x, xcoll with
+    let _ = data in
+    match content, collision with
     | BadKey k, BadKey kcoll ->
       (* sanity check: only apply when same symbol *)
       assert (k.symb = kcoll.symb);
@@ -113,8 +114,8 @@ let get_bad_occs
     (k : name)
     (int_f : Symbols.fname) (* function with integrity (hash, signature) *)
     ?(pk_f : Symbols.fname option=None) (* public key function. Must be None iff hash *)
-    (retry_on_subterms : unit -> IOS.simple_occs)
-    (rec_call_on_subterms : O.pos_info -> Term.term -> IOS.simple_occs)
+    ~(retry : unit -> IOS.simple_occs)
+    ~(rec_call : O.pos_info -> Term.term -> IOS.simple_occs)
     (info : O.pos_info)
     (t : term) 
   : IOS.simple_occs
@@ -143,16 +144,16 @@ let get_bad_occs
   (* occurrence of the signing/hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
-    let occs1 = List.concat_map (rec_call_on_subterms info) kargs' in
+    let occs1 = List.concat_map (rec_call info) kargs' in
     let oc =
       mk_simple_occ
-        (BadKey (Name.of_term k'))
-        (BadKey k)
-        ()
-        info.pi_vars
-        info.pi_cond
-        info.pi_occtype
-        info.pi_subterm
+        ~content:(BadKey (Name.of_term k'))
+        ~collision:(BadKey k)
+        ~data:()
+        ~vars:info.pi_vars
+        ~cond:info.pi_cond
+        ~typ:info.pi_occtype
+        ~sub:info.pi_subterm
     in
     oc :: occs1
 
@@ -161,10 +162,10 @@ let get_bad_occs
     begin
       match O.expand_macro_check_all (O.get_expand_info info) tk' with
       | Name (_, tkargs') ->
-        List.concat_map (rec_call_on_subterms info) tkargs'
+        List.concat_map (rec_call info) tkargs'
       (* pk(k'): no occ,
          even if k'=k, just look in k' args *)
-      | _ -> retry_on_subterms () (* otherwise look in tk' *)
+      | _ -> retry () (* otherwise look in tk' *)
     end
 
   (* hash verification oracle: test u = h(m', k).
@@ -173,7 +174,7 @@ let get_bad_occs
   | App (Fun (f, _), [u; App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]])])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
     List.concat_map
-      (rec_call_on_subterms {info with pi_subterm=t}) (* we change the
+      (rec_call {info with pi_subterm=t}) (* we change the
                                                          subterm *)
       (u :: m' :: kargs')
 
@@ -181,7 +182,7 @@ let get_bad_occs
   | App (Fun (f, _), [App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]]); u])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
     List.concat_map
-      (rec_call_on_subterms {info with pi_subterm=t})
+      (rec_call {info with pi_subterm=t})
       (u :: m' :: kargs') (* we change st here as well*)
 
   (* hash/sign/etc w/ a name that could be the right key *) 
@@ -191,15 +192,18 @@ let get_bad_occs
      a: that would be sound but generate too many occs *)
   | App (Fun (f, _), [Tuple [m'; Name (ksb', kargs') as k']])
     when f = int_f && k.symb.s_symb = ksb'.s_symb ->
-    let occs = List.concat_map (rec_call_on_subterms info) (m' :: kargs') in
+    let occs = List.concat_map (rec_call info) (m' :: kargs') in
     occs @
     [ mk_simple_occ
-        (IntegrityMsg {msg=m'; key=Name.of_term k'})
-        (IntegrityMsg {msg=m ; key=k})
-        ()
-        info.pi_vars info.pi_cond info.pi_occtype info.pi_subterm ]
+        ~content:(IntegrityMsg {msg=m'; key=Name.of_term k'})
+        ~collision:(IntegrityMsg {msg=m ; key=k})
+        ~data:()
+        ~vars:info.pi_vars
+        ~cond:info.pi_cond
+        ~typ:info.pi_occtype
+        ~sub:info.pi_subterm ]
 
-  | _ -> retry_on_subterms ()
+  | _ -> retry ()
 
 
 
