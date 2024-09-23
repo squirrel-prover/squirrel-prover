@@ -5,7 +5,7 @@
     definition whose Ocaml type depends on the kind. *)
 
 open Utils
-    
+
 module L = Location
 
 (*------------------------------------------------------------------*)
@@ -29,7 +29,7 @@ val p_path_to_string  : ?sep:string -> p_path  -> string
 type s_npath = string list
 
 (** An untyped symbol path [(p,s)] representing [p.s]. Unsafe API. *)
-type s_path = string list * string 
+type s_path = string list * string
 
 val s_npath_to_string : ?sep:string -> s_npath -> string
 val s_path_to_string  : ?sep:string -> s_path  -> string
@@ -60,7 +60,7 @@ type symbol_kind =
   | Predicate
   | Import
   | Namespace
-    
+
 val pp_symbol_kind : symbol_kind formatter
 
 (*------------------------------------------------------------------*)
@@ -68,7 +68,7 @@ val pp_symbol_kind : symbol_kind formatter
 
 (*------------------------------------------------------------------*)
 (** Symbol kind groups:
-    symbols with the same name can exist in different symbol kind 
+    symbols with the same name can exist in different symbol kind
     groups. *)
 type group
 
@@ -113,13 +113,13 @@ type _namespace
 
 (** A namespace path is simply a list of namespaces *)
 type npath = private {
-  npath : _namespace t list; 
+  npath : _namespace t list;
   id    : int;                    (** for hash-consing *)
 }
 
 (** A path to a symbol of kind ['a].
     [{np; s}] represents the path [np.s]. *)
-type 'a path = private { 
+type 'a path = private {
   np : npath;
   s  : 'a t;
   id : int;                    (** for hash-consing *)
@@ -146,7 +146,7 @@ type namespace = _namespace path
 (*------------------------------------------------------------------*)
 val pp_npath : npath   formatter
 val pp_path  : 'a path formatter
- 
+
 (*------------------------------------------------------------------*)
 val npath_to_string : ?sep:string -> npath   -> string
 val path_to_string  : ?sep:string -> 'a path -> string
@@ -165,7 +165,7 @@ val npath : _namespace t list -> npath
 
 (** Extends a namespace *)
 val npath_app : npath -> _namespace t list -> npath
-    
+
 (** Build a namespace path from a [s_npath]. Unsafe API. *)
 val of_s_npath : s_npath -> npath
 
@@ -179,7 +179,7 @@ val path : npath -> 'a t -> 'a path
 (*------------------------------------------------------------------*)
 (** In addition to their definition data, some more data can be attached
     to symbols. This is used for data that is defined in modules that
-    depend on this module, through an extensible datatype. 
+    depend on this module, through an extensible datatype.
     Due to circular dependencies, this is not type-safe. *)
 type data = ..
 type data += Empty
@@ -191,7 +191,7 @@ type table
 
 (** For debugging *)
 val pp_table : table formatter
-  
+
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
@@ -211,12 +211,12 @@ module type SymbolKind = sig
 
   (** Abstract type representing this kind. *)
   type ns
-    
+
   val remove : ns path -> table -> table
-    
+
   (** Reserve a fresh symbol name in the current namespace. *)
   val reserve : approx:bool -> table -> lsymb -> table * ns path
-    
+
   (** Define a symbol name that has been previously reserved
       using [fresh]. *)
   val define : table -> ?data:data -> ns path -> table
@@ -224,9 +224,9 @@ module type SymbolKind = sig
   (** Redefine a symbol name that has been previously defined. *)
   val redefine : table -> ?data:data -> ns path -> table
 
-  (** Declare a new symbol in the namespace [scope] (default to the 
+  (** Declare a new symbol in the namespace [scope] (default to the
       current namespace [scope table]).
-      @raise Multiple_declarations if the name is not available 
+      @raise Multiple_declarations if the name is not available
       and [not approx] holds. *)
   val declare :
     approx:bool -> table -> ?scope:npath -> ?data:data -> lsymb -> table * ns path
@@ -235,7 +235,7 @@ module type SymbolKind = sig
 
   (** Get data associated to some symbol.
       Always succeed for paths constructed through the type-safe API.
-      @raise Not_found if the path (built from the unsafe API) does 
+      @raise Not_found if the path (built from the unsafe API) does
       not map to anything. *)
   val get_data : ns path -> table -> data
 
@@ -249,7 +249,7 @@ module type SymbolKind = sig
   (** [mem_p p table] checks if [p] exists for this kind in [table]. *)
   val mem_p : p_path -> table -> bool
 
-  (*------------------------------------------------------------------*)   
+  (*------------------------------------------------------------------*)
   (** Build a symbol path from a [s_path]. Unsafe API. *)
   val of_s_path : s_path -> ns path
 
@@ -262,16 +262,16 @@ module type SymbolKind = sig
   (*------------------------------------------------------------------*)
   (** Convert a surface language path (qualified or short) to a path and
       retrieve the associated data. *)
-     
+
   (** Return a single match. *)
   val convert1 : p_path -> table -> ns path * data
 
-  (** Return all matches. 
-      Result list cannot be empty, except if [allow_empty] is true. *)  
+  (** Return all matches.
+      Result list cannot be empty, except if [allow_empty] is true. *)
   val convert : ?allow_empty:bool -> p_path -> table -> (ns path * data) list
 
   (** Get only the path (and ignore additional matches if any). *)
-  val convert_path : p_path -> table -> ns path 
+  val convert_path : p_path -> table -> ns path
 
   (*------------------------------------------------------------------*)
   (** {3 Iterators} *)
@@ -352,16 +352,16 @@ module Mp (S : SymbolKind) : Map.S with type key := S.ns path
     whose type depends on the kind. *)
 
 (*------------------------------------------------------------------*)
-(** {3 Data definitions for operators (abstract and concrete)} 
+(** {3 Data definitions for operators (abstract and concrete)}
 
     Contain the data definitions for concrete and abstract operators,
-    except for some fields of concrete operators that are postponed 
+    except for some fields of concrete operators that are postponed
     after the definition of terms. *)
-    
+
 module OpData : sig
 
   (*------------------------------------------------------------------*)
-  (** Different variants on the Diffie-Hellman crypto assumption *)                          
+  (** Different variants on the Diffie-Hellman crypto assumption *)
   type dh_hyp =
     | DH_DDH
     | DH_CDH
@@ -398,7 +398,7 @@ module OpData : sig
     ftype : Type.ftype;
     def   : def;
   }
-        
+
   type data += Operator of op_data
 
   (*------------------------------------------------------------------*)
@@ -410,16 +410,16 @@ module OpData : sig
 
   (*------------------------------------------------------------------*)
   val as_op_data : data -> op_data
-    
+
   val get_data : fname -> table -> op_data
 
   val get_abstract_data : fname -> table -> abstract_def * associated_fun
-    
+
   val ftype : table -> fname -> Type.ftype
 
   (*------------------------------------------------------------------*)
   val is_abstract : fname -> table -> bool
- 
+
   (** Indicates if an abstract function symbol has been defined with
       the specified definition. *)
   val is_abstract_with_ftype : fname -> abstract_def -> table -> bool
@@ -434,7 +434,7 @@ end
     - see [macros.ml] for [general_macro_def].
     - see [theory.ml] for [state_macro_def].
 
-    (the types are postponed because their definition uses terms, 
+    (the types are postponed because their definition uses terms,
     which are defined after the [Symbols] module).  *)
 type general_macro_def = ..
 type global_macro_def = ..
@@ -447,14 +447,14 @@ type macro_data =
   (** Stateful cells. *)
   | Global of int * Type.ty * global_macro_def
   (** Global macros are used to encapsulate let-definitions. *)
-              
-type data += Macro of macro_data 
+
+type data += Macro of macro_data
 
 exception Macro_reserved_no_def
 
 (** Raise [Macro_reserved_no_def] if the macro is registered but not
     yet defined. *)
-val as_macro_data  : data -> macro_data 
+val as_macro_data  : data -> macro_data
 val get_macro_data : macro -> table -> macro_data
 
 (*------------------------------------------------------------------*)
@@ -466,14 +466,14 @@ type name_data = {
 
 type data += Name of name_data
 
-val as_name_data : data -> name_data 
+val as_name_data : data -> name_data
 val get_name_data : name -> table -> name_data
-  
+
 (*------------------------------------------------------------------*)
 (** {3 Type information: Ocaml type declaration}  *)
 
 module TyInfo : sig
-  (** Type information associated to base types. 
+  (** Type information associated to base types.
       Restrict the instantiation domain of a type. *)
   type t =
     | Large               (** collision probabiliy between names is negligible *)
@@ -484,47 +484,47 @@ module TyInfo : sig
     | Enum                (** enumerable in poly time  *)
 
   type data += Type of t list
-        
+
   (*------------------------------------------------------------------*)
   val parse : lsymb -> t
 
   (*------------------------------------------------------------------*)
   val get_data : btype -> table -> t list
-    
+
   (*------------------------------------------------------------------*)
-  val get_bty_infos  : table -> Type.ty -> t list 
+  val get_bty_infos  : table -> Type.ty -> t list
   val check_bty_info : table -> Type.ty -> t -> bool
 
   (*------------------------------------------------------------------*)
   (** Is the type a finite type, e.g. [Index] and [Timestamp] *)
-  val is_finite : table -> Type.ty -> bool 
+  val is_finite : table -> Type.ty -> bool
 
-  (** Is the type a fixed set (independent from the security 
+  (** Is the type a fixed set (independent from the security
       parameter η.
       (e.g. [Index], [Timestamp] and [Message]) *)
   val is_fixed : table -> Type.ty -> bool
 
-  (** Is the type enumerable in polynomial time *) 
+  (** Is the type enumerable in polynomial time. *)
   val is_enum : table -> Type.ty -> bool
 
   (** Are the names all of the same length. *)
   val is_name_fixed_length : table -> Type.ty -> bool
 
-  (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp] 
+  (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp]
       or [Message]. *)
-  val is_well_founded : table -> Type.ty -> bool 
+  val is_well_founded : table -> Type.ty -> bool
 end
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-val is_infix     : fname -> bool 
-val is_infix_str : string  -> bool 
+val is_infix     : fname -> bool
+val is_infix_str : string  -> bool
 
 val infix_assoc : fname -> assoc
 
 (*------------------------------------------------------------------*)
-val is_infix_predicate : predicate -> bool 
+val is_infix_predicate : predicate -> bool
 val infix_assoc_predicate : predicate -> assoc
 
 (*------------------------------------------------------------------*)

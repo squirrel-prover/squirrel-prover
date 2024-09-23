@@ -88,7 +88,7 @@ let pp_symbol_kind fmt = function
 
 (*------------------------------------------------------------------*)
 (** A [group] allows to group together symbols kinds.
-    Also used to report errors to the user, so the name should be 
+    Also used to report errors to the user, so the name should be
     chosen carefully. *)
 type group = string
 
@@ -282,7 +282,7 @@ let pp_error_i fmt = function
 
   | Multiple_declarations (np, s, n, g) ->
     Fmt.pf fmt "%a %s already declared %t(as a %s)"
-      pp_symbol_kind n s 
+      pp_symbol_kind n s
       (fun fmt ->
          if npath_equal np top_npath then ()
          else Fmt.pf fmt "in namespace %a" pp_npath np
@@ -618,14 +618,14 @@ module Make (N:S) : SymbolKind with type ns = N.ns = struct
       Mn.add p.np (Msymb.add p.s [record] m) table.store
     in
     let current =
-      Msymb.find_opt p.s table.current |> 
+      Msymb.find_opt p.s table.current |>
       omap_dflt table.current
         (fun l ->
            Msymb.add p.s
              (List.map
                 (fun record' -> if P.equal !<p record'.path then record else record')
                 l)
-             table.current) 
+             table.current)
     in
     update table ~current ~store
 
@@ -898,9 +898,9 @@ let namespace_close (table : table) (np : npath): table =
         in
         if current_records = [] then Msymb.remove s current else Msymb.add s current_records current
       ) store table.current
-      
+
   in
-  { table with current; } 
+  { table with current; }
 
 (*------------------------------------------------------------------*)
 (** Enter some namespaces (command [namespace N1. ... .NL]), creating
@@ -1102,8 +1102,8 @@ module OpData = struct
     | Abstract _ -> Fmt.pf fmt "Abstract"
 
   let pp_fname fmt (s : fname) =
-    Fmt.pf fmt "%a%s%a" 
-      pp_npath s.np 
+    Fmt.pf fmt "%a%s%a"
+      pp_npath s.np
       (if s.np.npath = [] then "" else ".")
       (if is_infix s then Fmt.parens pp else pp) s.s
 
@@ -1290,7 +1290,7 @@ let mk_action a =
 let init_action = mk_action "init"
 
 (*------------------------------------------------------------------*)
-(** {3 Macro builtins} 
+(** {3 Macro builtins}
 
     All macros are going to be hold [Macro (General _)] as data after
     the prelude is processed (in `macros.ml`). *)
@@ -1306,7 +1306,7 @@ let mk_macro ~scope m data =
 (** Enter the `Classic` namespace, declares the new macros, and then
     exit the namespace. *)
 
-let classical_s_npath = [L.mk_loc L._dummy "Classic"] 
+let classical_s_npath = [L.mk_loc L._dummy "Classic"]
 let classical_npath = of_s_npath ["Classic"]
 
 let () = builtin_ref := namespace_enter !builtin_ref classical_s_npath
@@ -1323,7 +1323,7 @@ let () = builtin_ref := namespace_exit !builtin_ref classical_s_npath
 (** Enter the `Quantum` namespace, declares the new macros, and then exit the
     namespace. *)
 
-let quant_s_npath = [L.mk_loc L._dummy "Quantum"] 
+let quant_s_npath = [L.mk_loc L._dummy "Quantum"]
 let quant_npath = of_s_npath ["Quantum"]
 
 let () = builtin_ref := namespace_enter !builtin_ref quant_s_npath
