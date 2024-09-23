@@ -25,7 +25,6 @@ type tags = {
   const : bool;
   adv   : bool;
   si    : bool;
-  ptime : bool;
   det   : bool;
 }
 
@@ -33,11 +32,10 @@ let mk_tags
   ?(const = false)
   ?(adv   = false)
   ?(si    = false)
-  ?(ptime = false)
   ?(det   = false)
   ()
   =
-  { const ; adv ; si ; ptime ; det }
+  { const ; adv ; si ; det }
 
 let to_vars_tags (tags : tags) : Vars.Tag.t =
   { const        = tags.const ;
@@ -51,7 +49,6 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
     const = tags1.const && tags2.const ;
     adv   = tags1.adv   && tags2.adv   ;
     si    = tags1.si    && tags2.si    ;
-    ptime = tags1.ptime && tags2.ptime ;
     det   = tags1.det   && tags2.det   ;
   }
 
@@ -61,7 +58,7 @@ let rec tags_of_subterms
   =
   Term.tfold
     (fun term tag -> merge_tags tag (tags_of_term goal env ~ty_env term))
-    t { const = true; adv = true; si = true; ptime = true; det = true }
+    t { const = true; adv = true; si = true; det = true }
 
 and tags_of_term
     (goal    : goal)
@@ -86,7 +83,6 @@ and tags_of_term
       const = info.const        ;
       adv   = adv               ;
       si    = info.system_indep ;
-      ptime = adv               ;
       det   = info.const        ;
     }
 
@@ -103,7 +99,6 @@ and tags_of_term
       const = not is_att ;
       adv   = true       ;
       si    = is_si      ;
-      ptime = true       ;
       det   = not is_att ;
     }
 
@@ -118,7 +113,7 @@ and tags_of_term
           Symbols.TyInfo.is_finite env.table ty
         ) vs_tys
     in
-    let adv, ptime =
+    let adv =
       match goal with
       | AllTags | Adv ->
         if poly_card_type_binders then
@@ -126,10 +121,10 @@ and tags_of_term
           let venv = Vars.add_vars vars env.vars in
           let env = Env.update ~vars:venv env in
           let merged = tags_of_subterms Adv env ~ty_env t in
-          merged.adv, merged.ptime
+          merged.adv
         else
-          false, false
-      | NotAdv -> false, false
+          false
+      | NotAdv -> false
     in
     let const, si, det =
       match goal with
@@ -141,7 +136,7 @@ and tags_of_term
         merged.const && fixed_type_binders, merged.si, merged.det
       | Adv -> false, false, false
     in
-    { const; adv; si; ptime; det }
+    { const; adv; si; det }
 
   | App _| Action _ | Tuple _ | Proj _ ->
     tags_of_subterms goal env ~ty_env t
@@ -183,7 +178,7 @@ let is_ptime_deducible
     (env : Env.t) (t : Term.term) : bool
   =
   let tags = tags_of_term AllTags env ~ty_env t in
-  tags.ptime && (not si || tags.si)
+  tags.adv && (not si || tags.si)
 
 (*------------------------------------------------------------------*)
 (** Exported, shadows the previous definition. *)
