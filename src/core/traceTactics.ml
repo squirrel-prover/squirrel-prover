@@ -10,7 +10,6 @@
     Some high-level tactics, common to local and global sequents, are
     also in other modules, e.g. `LowTactics`. *)
 
-open Term
 open Utils
 open Ppenv
 
@@ -237,13 +236,13 @@ let assumption ?hyp (s : TS.t) =
        (List.exists (fun f ->
            TS.Reduce.conv_term s conclusion f ||
            TS.Reduce.conv_term s f Term.mk_false
-         ) (decompose_ands f)) && hyp = None)
+         ) (Term.decompose_ands f)) && hyp = None)
     | TopHyps.LHyp (Equiv.Local f) ->
       (TS.Reduce.conv_term s conclusion f  ||
      ( List.exists (fun f ->
           TS.Reduce.conv_term s conclusion f ||
           TS.Reduce.conv_term s f Term.mk_false
-        ) (decompose_ands f) && hyp = None) )
+        ) (Term.decompose_ands f) && hyp = None) )
      &&
       (sbound = None || sbound = Some (Library.Real.mk_zero (TS.table s)))
     | TopHyps.LHyp (Equiv.Global(Equiv.And (f1,f2) )) ->
@@ -307,7 +306,7 @@ let () =
        | _ -> assert false)
 
 (*------------------------------------------------------------------*)
-(* Rewrite equiv *)
+(** {3 Rewrite equiv} *)
 
 (** Transform a term according to some equivalence given as a biframe.
     In practice the term is the conclusion of the rewrite-equiv sequent.
@@ -370,7 +369,7 @@ let rewrite_equiv_transform
     | Some e -> Some (Term.project1 dst_proj e)
     | None -> None
   in
-  let rec aux (t : term) : term =
+  let rec aux (t : Term.term) : Term.term =
     (* System-independence needed to leave [t] unchanged when changing
        the system from [src] to [dst].
        (Note that [pair = (src,dst)] or [(dst,src)].) *)
@@ -721,7 +720,7 @@ let eq_names (s : TS.t) =
           if n1 <> n2 then
             add_hyp s Term.mk_false
           else
-            List.fold_left2 (fun s t1 t2 ->
+            List.fold_left2 (fun s (t1 : Term.t) (t2 : Term.t) ->
                 match t1, t2 with
                 | Tuple l1, Tuple l2 ->
                   List.fold_left add_hyp s (List.map2 Term.mk_eq l1 l2)
@@ -952,8 +951,8 @@ let exec (Args.Message (a,_)) s =
     Term.mk_forall ~simpl:false
       [var]
       (Term.mk_impl
-         (Term.mk_timestamp_leq (mk_var var) a)
-         (mk_macro Macros.Classic.exec [] (mk_var var)))
+         (Term.mk_timestamp_leq (Term.mk_var var) a)
+         (Term.mk_macro Macros.Classic.exec [] (Term.mk_var var)))
   in
   [TraceLT.happens_premise s a ;
 
@@ -1089,7 +1088,7 @@ let fa s =
 
     let subst_aux = List.map2 (fun x y ->
         Term.(ESubst (mk_var x,mk_var y))) vs vars' in
-    let subst' = List.map (function ESubst (x, y) ->
+    let subst' = List.map (function Term.ESubst (x, y) ->
         Term.(ESubst (subst subst_aux x,y))) subst in
 
     let s = TS.set_vars env s in
@@ -1112,8 +1111,7 @@ let fa s =
 
         set_conclusion (Term.mk_impl c' c) s;
 
-        set_conclusion (Term.mk_impls [c;c']
-                    (mk_atom `Eq t t')) s;
+        set_conclusion (Term.mk_impls [c;c'] (Term.mk_atom `Eq t t')) s;
 
         set_conclusion (Term.mk_atom `Eq e e') s]
     in
