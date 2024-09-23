@@ -67,13 +67,11 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
     | Var v ->
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
       let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
-      let is_ty_fixed = Symbols.TyInfo.is_fixed env.table ty_v in
-      let is_ty_finite = Symbols.TyInfo.is_finite env.table ty_v in
+      let is_ty_enum = Symbols.TyInfo.is_enum env.table ty_v in
       let is_ty_encodable = Type.is_bitstring_encodable ty_v in
       let adv =
-        (* fixed + finite => enumerable in polynomial time
-           (though we could be more precise with another type information) *)
-        (info.const && is_ty_finite && is_ty_fixed) ||
+        (* FIXME: could be improved into `info.det && is_ty_enum` *)
+        (info.const && is_ty_enum) || 
         (info.const && is_ty_encodable) ||
         info.adv
       in

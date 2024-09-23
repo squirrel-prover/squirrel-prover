@@ -482,6 +482,7 @@ module TyInfo : sig
     | Fixed               (** independent from η *)
     | Well_founded        (** well-founded for all η *)
     | Enum                (** enumerable in poly time  *)
+    | Serializable        (** bit-string encodable *)
 
   type data += Type of t list
 
@@ -504,6 +505,16 @@ module TyInfo : sig
       (e.g. [Index], [Timestamp] and [Message]) *)
   val is_fixed : table -> Type.ty -> bool
 
+  (** The serializability order of the term. E.g. 
+      - [message] is serializable as a bit-string (obviously), 
+         and is thus order 0. 
+      - [message -> message]              is order 1. 
+      - [message -> message -> message]   is order 1.
+      - [(message -> message) -> message] is order 2. 
+      Returns [None] if no order could be inferred (e.g. because there
+      are type variables). *)
+  val serializability_order : table -> Type.ty -> int option
+    
   (** Is the type enumerable in polynomial time. *)
   val is_enum : table -> Type.ty -> bool
 

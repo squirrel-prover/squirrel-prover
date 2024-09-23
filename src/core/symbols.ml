@@ -1197,7 +1197,8 @@ module TyInfo = struct
     | Fixed
     | Well_founded
     | Enum
-
+    | Serializable
+  
   type data += Type of t list
 
   (*------------------------------------------------------------------*)
@@ -1209,6 +1210,7 @@ module TyInfo = struct
     | "fixed"             -> Fixed
     | "finite"            -> Finite
     | "enum"              -> Enum
+    | "serializable"      -> Serializable
     | _ -> symb_err (L.loc info) (Failure "unknown type information")
 
   (*------------------------------------------------------------------*)
@@ -1219,9 +1221,9 @@ module TyInfo = struct
   let get_bty_infos table (ty : Type.ty) : t list =
     match ty with
     | Type.Index | Type.Timestamp | Type.Boolean ->
-      [Fixed; Finite; Well_founded]
+      [Fixed; Finite; Well_founded; Serializable; Enum; ]
 
-    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length]
+    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length; Serializable; ]
     | Type.TBase (np,b) ->
       (* FIXME: very hacky, but we cannot do better as qualified as
          [Symbols] depends on [Type] *)
@@ -1234,7 +1236,6 @@ module TyInfo = struct
     List.mem info infos
 
   (*------------------------------------------------------------------*)
-
   let check_info_on_closed_term allow_funs table ty def : bool =
       let rec check : Type.ty -> bool = function
       | TVar _ | TUnivar _ -> false
@@ -1258,16 +1259,32 @@ module TyInfo = struct
     check_info_on_closed_term false table ty Name_fixed_length
 
   (** See `.mli` *)
+  let serializability_order table ty : int option =
+    let exception Unknown in
+    let rec order : Type.ty -> int = function
+      | Boolean | Index | Timestamp | Message -> 0
+      | Tuple l -> List.fold_left (fun m t -> max (order t) m) 0 l 
+      | Fun (t1, t2) -> max (order t1 + 1) (order t2)
+      | TBase _ as ty ->
+        if check_bty_info table ty Serializable then 0 else raise Unknown
+      | TVar _ | TUnivar _ -> raise Unknown
+    in    
+    try Some (order ty) with Unknown -> None
+    
+  (** See `.mli` *)
   let is_enum table ty : bool =
     let rec check : Type.ty -> bool = function
       | Boolean | Index | Timestamp -> true
       | Message -> false
-      | Tuple l -> List.for_all check  l
+      | Tuple l -> List.for_all check l
       | Fun (t1, t2) -> check t1 && check t2
       | TBase _ as ty -> check_bty_info table ty Enum
       | _ -> false
     in
-    check ty
+    check ty ||
+    (serializability_order table ty = Some 0 &&
+     is_finite table ty &&
+     is_fixed table ty)
 
   let is_well_founded table ty : bool =
     check_info_on_closed_term false table ty Well_founded
