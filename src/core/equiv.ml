@@ -937,15 +937,15 @@ module Smart : SmartFO.S with type form = _form = struct
     in
     doit [] f
 
-  let decompose_impls f =
-    let rec decompose f = match destr_impl f with
+  let decompose_impls ~env f =
+    let rec decompose f = match destr_impl ~env f with
       | None -> [f]
       | Some (f,g) -> f :: decompose g
     in
     decompose f
 
-  let decompose_impls_last f =
-    let forms = decompose_impls f in
+  let decompose_impls_last ~env f =
+    let forms = decompose_impls ~env f in
     let rec last = function
       | [] -> assert false
       | [f] -> [], f
@@ -1462,17 +1462,17 @@ module Any = struct
       | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ors f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ors f)
 
-    let decompose_impls = function
-      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_impls f)
-      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_impls f)
+    let decompose_impls ~env = function
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_impls      f)
+      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_impls ~env f)
 
-    let decompose_impls_last = function
+    let decompose_impls_last ~env = function
       | Local f ->
-          let l,f = Term.Smart.decompose_impls_last f in
-            List.map (fun x -> Local x) l, Local f
+        let l,f = Term.Smart.decompose_impls_last f in
+        List.map (fun x -> Local x) l, Local f
       | Global f ->
-          let l,f = Smart.decompose_impls_last f in
-            List.map (fun x -> Global x) l, Global f
+        let l,f = Smart.decompose_impls_last ~env f in
+        List.map (fun x -> Global x) l, Global f
   end
 
 end

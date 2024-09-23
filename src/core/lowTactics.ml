@@ -1898,6 +1898,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (hyp : Ident.t)
       (s : S.t) : Goal.t list
     =
+    let env = S.env s in
     (* open an type unification environment *)
     let ty_env = Type.Infer.mk_env () in
     let tsubst, pat = Pattern.open_pat S.hyp_kind ty_env pat in
@@ -1906,10 +1907,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let pat, _ =
       {pat with pat_op_term = formula}, {pat with pat_op_term = bound}
     in
-    let fprems, fconcl = S.Hyp.decompose_impls_last pat.pat_op_term in
+    let fprems, fconcl = S.Hyp.decompose_impls_last ~env pat.pat_op_term in
 
     let h = Hyps.by_id_k hyp Hyp s in
-    let hprems, hconcl = S.Hyp.decompose_impls_last h in
+    let hprems, hconcl = S.Hyp.decompose_impls_last ~env h in
 
     let try1 (fprem : S.hyp_form) : (Match.Mvar.t * Type.tsubst) option =
       let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in

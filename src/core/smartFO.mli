@@ -99,9 +99,9 @@ module type S = sig
   val decompose_exists_tagged : form -> Vars.tagged_var list * form
 
   (*------------------------------------------------------------------*)
-  val decompose_ands  : form -> form list
-  val decompose_ors   : form -> form list
-  val decompose_impls : form -> form list
+  val decompose_ands  :              form -> form list
+  val decompose_ors   :              form -> form list
+  val decompose_impls : env:Env.t -> form -> form list
 
-  val decompose_impls_last : form -> form list * form
+  val decompose_impls_last : env:Env.t -> form -> form list * form
 end

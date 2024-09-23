@@ -230,17 +230,16 @@ Proof.
   intro [i H].
 Abort.
 
+global axiom [set:any; equiv:default] foo (x : timestamp[glob]) : [false].
+
 (* the body is constant, but not SI (because several systems are considered in 
    the set and equiv part) *)
 global lemma [set:default/left, default/right; equiv:default] 
   _ (t0 : timestamp[const]): 
   [exists (t:timestamp), t = t0] -> [false].
 Proof.
-   (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
-
-   (* idem *)
-  checkfail intro H; destruct H as [i H] exn Failure. 
+  intro [t H]. (* we can introduce `t`, but it is not `glob`, which we check below *)
+  checkfail have ? := foo t exn Failure. 
 Abort.
 
 (* bis, changing how the system is given *)
@@ -248,11 +247,8 @@ global lemma [set:default/left, default/right; equiv:default/left,default/right]
   _ (t0 : timestamp[const]): 
   [exists (t:timestamp), t = t0] -> [false].
 Proof.
-   (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
-
-   (* idem *)
-  checkfail intro H; destruct H as [i H] exn Failure. 
+  intro [t H]. (* we can introduce `t`, but it is not `glob`, which we check below *)
+  checkfail have ? := foo t exn Failure. 
 Abort.
 
 (* the body is constant, but not SI (because several systems are considered 
@@ -261,8 +257,8 @@ global lemma [set:default/left, default/right; equiv:default/left,default/left]
   _ (t0 : timestamp[const]): 
   [exists (t:timestamp), t = t0] -> [false].
 Proof.
-   (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
+  intro [t H]. (* we can introduce `t`, but it is not `glob`, which we check below *)
+  checkfail have ? := foo t exn Failure. 
 Abort.
 
 (* the body is constant, but not SI (because several systems are considered in 
@@ -271,8 +267,10 @@ global lemma [set:default/left; equiv:default/left,default/right]
   _ (t0 : timestamp[const]): 
   [exists (t:timestamp), t = t0] -> [false].
 Proof.
-   (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
+  intro [t H]. (* we can introduce `t` *)
+  (* `t` could be `glob` here, as we are in a single system.
+     Curently, Squirrel does not see it *)
+  checkfail have ? := foo t exn Failure. 
 Abort.
 
 (* bis, changing how the system is given *)
@@ -280,7 +278,9 @@ global lemma [set:default/left; equiv:default]
   _ (t0 : timestamp[const]): 
   [exists (t:timestamp), t = t0] -> [false].
 Proof.
-   (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
+  intro [t H]. (* we can introduce `t` *)
+  (* `t` could be `glob` here, as we are in a single system.
+     Curently, Squirrel does not see it *)
+  checkfail have ? := foo t exn Failure. 
 Abort.
 
