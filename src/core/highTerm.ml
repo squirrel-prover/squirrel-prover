@@ -8,16 +8,18 @@ module Smart : SmartFO.S with type form = Term.term = struct
 
   include Term.Smart
 
-  let[@warning "-27"] destr_exists_tagged  ?env x = destr_exists_tagged  x
-  let[@warning "-27"] destr_exists         ?env x = destr_exists         x
-  let[@warning "-27"] destr_exists1_tagged ?env x = destr_exists1_tagged x
-  let[@warning "-27"] destr_exists1        ?env x = destr_exists1        x
-  let[@warning "-27"] destr_or             ?env x = destr_or             x
-  let[@warning "-27"] destr_impl           ?env x = destr_impl           x
-  let[@warning "-27"] destr_ors            ?env x = destr_ors            x
-  let[@warning "-27"] is_or                ?env x = is_or                x
-  let[@warning "-27"] is_impl              ?env x = is_impl              x
-  let[@warning "-27"] is_exists            ?env x = is_exists            x
+  let[@warning "-27"] destr_exists_tagged  ~env x = destr_exists_tagged  x
+  let[@warning "-27"] destr_exists         ~env x = destr_exists         x
+  let[@warning "-27"] destr_exists1_tagged ~env x = destr_exists1_tagged x
+  let[@warning "-27"] destr_exists1        ~env x = destr_exists1        x
+  let[@warning "-27"] destr_or             ~env x = destr_or             x
+  let[@warning "-27"] destr_impl           ~env x = destr_impl           x
+  let[@warning "-27"] destr_impls          ~env x = destr_impls          x
+  let[@warning "-27"] destr_ors            ~env x = destr_ors            x
+  let[@warning "-27"] is_or                ~env x = is_or                x
+  let[@warning "-27"] is_impl              ~env x = is_impl              x
+  let[@warning "-27"] is_exists            ~env x = is_exists            x
+  let[@warning "-27"] decompose_ors        ~env x = decompose_ors        x
   let[@warning "-27"] decompose_impls      ~env x = decompose_impls      x
   let[@warning "-27"] decompose_impls_last ~env x = decompose_impls_last x
 end

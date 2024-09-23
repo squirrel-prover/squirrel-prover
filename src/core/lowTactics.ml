@@ -1771,12 +1771,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       then
         soft_failure ApplyBadInst;
 
-      let env = S.vars s in
+      let vars = S.vars s in
+      let env = S.env  s in
       let match_res =
         match S.conc_kind with
         | Local_t  ->
           begin
-            match Match.T.try_match ~option ~ty_env ~hyps table ~env system conclusion pat with
+            match
+              Match.T.try_match ~option ~ty_env ~hyps table ~env:vars system conclusion pat
+            with
             | NoMatch _ as res -> res
             | Match mv as res ->
               match bound, pat_bound with
@@ -1785,7 +1788,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
               | Some e, LocConc ve ->
                 Match.T.try_match
                   ~option ~mv ~ty_env ~hyps table
-                  ~env system e {opat with pat_op_term = ve}
+                  ~env:vars system e {opat with pat_op_term = ve}
 
               | Some _, LocHyp -> res
 
@@ -1801,7 +1804,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           end
         | Global_t ->
           assert(bound = None || pat_bound = Glob);
-          Match.E.try_match ~option ~ty_env ~hyps table ~env system conclusion pat
+          Match.E.try_match ~option ~ty_env ~hyps table ~env:vars system conclusion pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -1809,8 +1812,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match match_res with
       (* match failed but [pat] is a product: retry with the rhs *)
       | NoMatch minfos ->
-        if S.Conc.is_impl pat.pat_op_term then
-          let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
+        if S.Conc.is_impl ~env pat.pat_op_term then
+          let t1, t2 = oget (S.Conc.destr_impl ~env pat.pat_op_term) in
           match S.conc_kind with
           | Equiv.Global_t ->
             begin

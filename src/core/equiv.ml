@@ -712,12 +712,13 @@ module Smart : SmartFO.S with type form = _form = struct
        - [f0] is system-independant *)
     (*TODO : kind, check this for multiterms*)
     (*TODO:Concrete : Check if valid of concrete*)
-    | Atom (Reach {formula = f; bound}) when q = Exists && is_constant ?env f ->
-        begin match Term.Smart.destr_exists_tagged f with
-          | Some (es,f) when is_system_indep ?env f ->
-            Some (es, Atom (Reach {formula = f;bound}))
-          | _ -> None
-        end
+    | Atom (Reach {formula = f; bound}) when q = Exists ->
+      let env = oget env in     (* must never fail *)
+      begin match Term.Smart.destr_exists_tagged f with
+        | Some (es,f0) when is_system_indep ~env f0 && is_constant ~env f ->
+          Some (es, Atom (Reach {formula = f0;bound}))
+        | _ -> None
+      end
 
     (*TODO : kind, check this for multiterms*)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
@@ -729,13 +730,13 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   let destr_forall_tagged      = destr_quant_tagged      ForAll
-  let destr_exists_tagged ?env = destr_quant_tagged ?env Exists
+  let destr_exists_tagged ~env = destr_quant_tagged ~env Exists
 
   let destr_forall f =
     omap (fun (vs, f) -> List.map fst vs, f) (destr_quant_tagged ForAll f)
 
-  let destr_exists ?env f =
-    omap (fun (vs, f) -> List.map fst vs, f) (destr_quant_tagged ?env Exists f)
+  let destr_exists ~env f =
+    omap (fun (vs, f) -> List.map fst vs, f) (destr_quant_tagged ~env Exists f)
   
   (*------------------------------------------------------------------*)
   let destr_quant1_tagged ?env q = function
@@ -746,12 +747,13 @@ module Smart : SmartFO.S with type form = _form = struct
        - [f] is constant
        - [f0] is system-independant *)
     (*TODO:Concrete : Check if valid of concrete*)
-    | Atom (Reach {formula = f; bound}) when q = Exists && is_constant ?env f ->
-        begin match Term.Smart.destr_exists1_tagged f with
-          | Some (es,f) when is_system_indep ?env f ->
-            Some (es, Atom (Reach {formula = f; bound}))
-          | _ -> None
-        end
+    | Atom (Reach {formula = f; bound}) when q = Exists ->
+      let env = oget env in     (* must never fail *)
+      begin match Term.Smart.destr_exists1_tagged f with
+        | Some (es,f0) when is_constant ~env f && is_system_indep ~env f0 ->
+          Some (es, Atom (Reach {formula = f0; bound}))
+        | _ -> None
+      end
 
     (* For a local meta-formula f,
        (Forall x. [f]) is equivalent to [forall x. f]. *)
@@ -764,13 +766,13 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   let destr_forall1_tagged      = destr_quant1_tagged      ForAll
-  let destr_exists1_tagged ?env = destr_quant1_tagged ?env Exists
+  let destr_exists1_tagged ~env = destr_quant1_tagged ~env Exists
 
   let destr_forall1 f =
     omap (fun (vs, f) -> fst vs, f) (destr_quant1_tagged ForAll f)
       
-  let destr_exists1 ?env f =
-    omap (fun (vs, f) -> fst vs, f) (destr_quant1_tagged ?env Exists f)
+  let destr_exists1 ~env f =
+    omap (fun (vs, f) -> fst vs, f) (destr_quant1_tagged ~env Exists f)
 
   (*------------------------------------------------------------------*)
   let destr_let = function
@@ -796,13 +798,13 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   (*TODO:Concrete : Check if valid of concrete*)
-  let destr_or ?env = function
+  let destr_or ~env = function
     | Or (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound}) ->
        begin match Term.Smart.destr_or f with
          | Some (f1,f2) when
-             (is_constant ?env f1 && is_system_indep ?env f1) ||
-             (is_constant ?env f2 && is_system_indep ?env f2)
+             (is_constant ~env f1 && is_system_indep ~env f1) ||
+             (is_constant ~env f2 && is_system_indep ~env f2)
            ->
              Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
          | _ -> None
@@ -810,12 +812,12 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   (*TODO:Concrete : Check if valid of concrete*)
-  let destr_impl ?env = function
+  let destr_impl ~env = function
     | Impl (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound = None}) ->
        begin match Term.Smart.destr_impl f with
          | Some (f1,f2) when
-             is_constant ?env f1 && is_system_indep ?env f1 ->
+             is_constant ~env f1 && is_system_indep ~env f1 ->
              Some (Atom (Reach {formula = f1; bound = None}), Atom (Reach {formula = f2; bound = None}))
          | _ -> None
        end
@@ -857,9 +859,9 @@ module Smart : SmartFO.S with type form = _form = struct
 
   let destr_ands i f = mk_destr_right destr_and i f
 
-  let destr_ors ?env i f = mk_destr_right (destr_or ?env) i f
+  let destr_ors ~env i f = mk_destr_right (destr_or ~env) i f
 
-  let destr_impls i f = mk_destr_right destr_impl i f
+  let destr_impls ~env i f = mk_destr_right (destr_impl ~env) i f
 
   (*TODO:Concrete : Check if it is necessary to add the bounded case*)
   let destr_eq = function
@@ -884,13 +886,13 @@ module Smart : SmartFO.S with type form = _form = struct
   let is_true  _f = todo ()
   let is_not   _f = false       (* FIXME *)
   let is_and       f = destr_and       f <> None
-  let is_or   ?env f = destr_or   ?env f <> None
-  let is_impl ?env f = destr_impl ?env f <> None
+  let is_or   ~env f = destr_or   ~env f <> None
+  let is_impl ~env f = destr_impl ~env f <> None
   let is_iff       f = destr_iff       f <> None
   let is_let       f = destr_let       f <> None
   
   let is_forall      f = destr_forall      f <> None
-  let is_exists ?env f = destr_exists ?env f <> None
+  let is_exists ~env f = destr_exists ~env f <> None
 
   let is_eq  f = destr_eq  f <> None
   let is_neq f = destr_neq f <> None
@@ -930,15 +932,17 @@ module Smart : SmartFO.S with type form = _form = struct
     in
     doit [] f
 
-  let decompose_ors (f : form) : form list  =
-    let rec doit acc = function
-      | Or (f1,f2) -> doit (doit acc f2) f1
-      | _ as f -> f :: acc
+  let decompose_ors ~env (f : form) : form list  =
+    let rec decompose f =
+      match destr_or ~env f with
+      | None -> [f]
+      | Some (f,g) -> f :: decompose g
     in
-    doit [] f
+    decompose f
 
   let decompose_impls ~env f =
-    let rec decompose f = match destr_impl ~env f with
+    let rec decompose f =
+      match destr_impl ~env f with
       | None -> [f]
       | Some (f,g) -> f :: decompose g
     in
@@ -1256,34 +1260,34 @@ module Any = struct
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall1 f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1 f)
 
-    let destr_exists1 ?env = function
+    let destr_exists1 ~env = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists1      f)
-      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1 ?env f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1 ~env f)
 
     let destr_forall = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall f)
 
-    let destr_exists ?env = function
+    let destr_exists ~env = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists      f)
-      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists ?env f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists ~env f)
 
     (*------------------------------------------------------------------*)
     let destr_forall1_tagged = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall1_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall1_tagged f)
 
-    let destr_exists1_tagged ?env = function
+    let destr_exists1_tagged ~env = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists1_tagged      f)
-      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1_tagged ?env f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists1_tagged ~env f)
 
     let destr_forall_tagged = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_forall_tagged f)
       | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_forall_tagged f)
 
-    let destr_exists_tagged ?env = function
+    let destr_exists_tagged ~env = function
       | Local  f -> omap (fun (vs,f) -> vs, Local  f) (Term.Smart.destr_exists_tagged      f)
-      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists_tagged ?env f)
+      | Global f -> omap (fun (vs,f) -> vs, Global f) (     Smart.destr_exists_tagged ~env f)
 
     (*------------------------------------------------------------------*)
     let destr_false = function
@@ -1302,15 +1306,15 @@ module Any = struct
       | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_and f)
       | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and f)
 
-    let destr_or ?env = function
+    let destr_or ~env = function
       | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_or      f)
-      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_or ?env f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_or ~env f)
 
-    let destr_impl ?env = function
+    let destr_impl ~env = function
       | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_impl      f)
-      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_impl ?env f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_impl ~env f)
 
-    let destr_iff =  function
+    let destr_iff = function
       | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_iff f)
       | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_iff f)
 
@@ -1332,13 +1336,13 @@ module Any = struct
       | Local  f -> Term.Smart.is_and f
       | Global f ->      Smart.is_and f
 
-    let is_or ?env = function
+    let is_or ~env = function
       | Local  f -> Term.Smart.is_or      f
-      | Global f ->      Smart.is_or ?env f
+      | Global f ->      Smart.is_or ~env f
 
-    let is_impl ?env = function
+    let is_impl ~env = function
       | Local  f -> Term.Smart.is_impl      f
-      | Global f ->      Smart.is_impl ?env f
+      | Global f ->      Smart.is_impl ~env f
 
     let is_iff = function
       | Local  f -> Term.Smart.is_iff f
@@ -1348,9 +1352,9 @@ module Any = struct
       | Local  f -> Term.Smart.is_forall f
       | Global f ->      Smart.is_forall f
 
-    let is_exists ?env = function
+    let is_exists ~env = function
       | Local  f -> Term.Smart.is_exists      f
-      | Global f ->      Smart.is_exists ?env f
+      | Global f ->      Smart.is_exists ~env f
 
     let is_let = function
       | Local  f -> Term.Smart.is_let f
@@ -1387,21 +1391,21 @@ module Any = struct
           omap (fun l -> List.map (fun x -> Global x) l)
             (Smart.destr_ands i f)
 
-    let destr_ors ?env i = function
+    let destr_ors ~env i = function
       | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_ors i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
-            (Smart.destr_ors ?env i f)
+            (Smart.destr_ors ~env i f)
 
-    let destr_impls i = function
+    let destr_impls ~env i = function
       | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_impls i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
-            (Smart.destr_impls i f)
+            (Smart.destr_impls ~env i f)
 
     let destr_eq = function
       | Local  f -> Term.Smart.destr_eq f
@@ -1458,9 +1462,9 @@ module Any = struct
       | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ands f)
       | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ands f)
 
-    let decompose_ors = function
-      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ors f)
-      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ors f)
+    let decompose_ors ~env = function
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ors      f)
+      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ors ~env f)
 
     let decompose_impls ~env = function
       | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_impls      f)
