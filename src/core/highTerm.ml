@@ -42,8 +42,6 @@ let to_vars_tags (tags : tags) : Vars.Tag.t =
     adv          = tags.adv ;
     system_indep = tags.si }
 
-type goal = AllTags | Adv | NotAdv
-
 let merge_tags (tags1 : tags) (tags2 : tags): tags =
   {
     const = tags1.const && tags2.const ;
@@ -54,14 +52,13 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
 
 (*------------------------------------------------------------------*)
 let rec tags_of_subterms
-    (goal : goal) (env : Env.t) ~ty_env (t : Term.term) : tags
+    (env : Env.t) ~ty_env (t : Term.term) : tags
   =
   Term.tfold
-    (fun term tag -> merge_tags tag (tags_of_term goal env ~ty_env term))
+    (fun term tag -> merge_tags tag (tags_of_term env ~ty_env term))
     t { const = true; adv = true; si = true; det = true }
 
 and tags_of_term
-    (goal    : goal)
     (env     : Env.t)
     ~(ty_env : Type.Infer.env)
     (t       : Term.term)
@@ -75,6 +72,8 @@ and tags_of_term
     let is_ty_finite = Symbols.TyInfo.is_finite env.table ty_v in
     let is_ty_encodable = Type.is_bitstring_encodable ty_v in
     let adv =
+      (* fixed + finite => enumerable in polynomial time
+         (though we could be more precise with another type information) *)
       (info.const && is_ty_finite && is_ty_fixed) ||
       (info.const && is_ty_encodable) ||
       info.adv
@@ -87,7 +86,7 @@ and tags_of_term
     }
 
   | Name _ ->
-    let merged = tags_of_subterms goal env ~ty_env t in
+    let merged = tags_of_subterms env ~ty_env t in
     mk_tags ~si:merged.si ()
 
   | Macro _ -> mk_tags ()
@@ -113,43 +112,32 @@ and tags_of_term
           Symbols.TyInfo.is_finite env.table ty
         ) vs_tys
     in
+    let merged =
+      let vars = Vars.Tag.global_vars ~const:true ~adv:true vs in
+      let venv = Vars.add_vars vars env.vars in
+      let env = Env.update ~vars:venv env in
+      tags_of_subterms env ~ty_env t 
+    in
     let adv =
-      match goal with
-      | AllTags | Adv ->
-        if poly_card_type_binders then
-          let vars = Vars.Tag.global_vars ~const:true ~adv:true vs in
-          let venv = Vars.add_vars vars env.vars in
-          let env = Env.update ~vars:venv env in
-          let merged = tags_of_subterms Adv env ~ty_env t in
-          merged.adv
-        else
-          false
-      | NotAdv -> false
+      if poly_card_type_binders then merged.adv else false
     in
     let const, si, det =
-      match goal with
-      | AllTags | NotAdv ->
-        let vars = Vars.Tag.global_vars ~const:true vs in
-        let venv = Vars.add_vars vars env.vars in
-        let env = Env.update ~vars:venv env in
-        let merged = tags_of_subterms NotAdv env ~ty_env t in
-        merged.const && fixed_type_binders, merged.si, merged.det
-      | Adv -> false, false, false
+      merged.const && fixed_type_binders, merged.si, merged.det
     in
     { const; adv; si; det }
 
   | App _| Action _ | Tuple _ | Proj _ ->
-    tags_of_subterms goal env ~ty_env t
+    tags_of_subterms env ~ty_env t
 
   | Diff _ ->
-    let merged = tags_of_subterms goal env ~ty_env t in
+    let merged = tags_of_subterms env ~ty_env t in
     { merged with si = false }
 
   | Let (v,t1,t2) ->
-    let tags = to_vars_tags (tags_of_term goal env ~ty_env t1) in
+    let tags = to_vars_tags (tags_of_term env ~ty_env t1) in
     let venv = Vars.add_vars [v, tags] env.vars in
     let env = Env.update ~vars:venv env in
-    tags_of_term AllTags env ~ty_env t2
+    tags_of_term env ~ty_env t2
 
 (*------------------------------------------------------------------*)
 let is_system_indep
@@ -157,27 +145,27 @@ let is_system_indep
     (env : Env.t) (t : Term.term)
   : bool
   =
-  (tags_of_term AllTags ~ty_env env t).si
+  (tags_of_term ~ty_env env t).si
 
 let is_deterministic
     ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term)
   : bool
   =
-  (tags_of_term AllTags ~ty_env env t).det
+  (tags_of_term ~ty_env env t).det
 
 let is_constant
     ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
-  (tags_of_term AllTags env ~ty_env t).const
+  (tags_of_term env ~ty_env t).const
 
 let is_ptime_deducible
     ~(si : bool)
     ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
-  let tags = tags_of_term AllTags env ~ty_env t in
+  let tags = tags_of_term env ~ty_env t in
   tags.adv && (not si || tags.si)
 
 (*------------------------------------------------------------------*)
@@ -187,7 +175,7 @@ let tags_of_term
     (env : Env.t) (t : Term.term)
   : Vars.Tag.t
   =
-  let tags = tags_of_term ~ty_env AllTags env t in
+  let tags = tags_of_term ~ty_env env t in
   {
     system_indep = tags.si    ;
     const        = tags.const ;
