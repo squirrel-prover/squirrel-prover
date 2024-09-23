@@ -401,7 +401,7 @@ let[@warning "-32"] pp_store fmt (store : symbol_map Mn.t) =
     (Mn.bindings store)
 
 (** For debugging *)
-let[@warning "-32"] pp_table fmt (table : table) : unit =
+let pp_table fmt (table : table) : unit =
   Fmt.pf fmt "@[<v 0>\
               @[<hov 2>Current scope:@;@[%a@]@]@;\
               @[<v 2>Symbols in scope:@;%a@]@;\

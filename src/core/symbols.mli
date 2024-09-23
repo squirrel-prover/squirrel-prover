@@ -189,6 +189,9 @@ type data += Empty
     [status] + [data]). *)
 type table
 
+(** For debugging *)
+val pp_table : table formatter
+  
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
