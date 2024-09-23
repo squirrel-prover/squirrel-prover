@@ -641,7 +641,7 @@ let setup_change_hyps_context
          its semantics is preserved. *)
       pair_unchanged &&         
       let env =
-        { env with Env.vars = Vars.add_var v (HighTerm.tag_of_term env t) env.vars }
+        { env with Env.vars = Vars.add_var v (HighTerm.tags_of_term env t) env.vars }
       in
       can_keep_global env f
       

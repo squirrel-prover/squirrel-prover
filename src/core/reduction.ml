@@ -809,7 +809,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         else
           begin
             (* reduce [f] *)
-            let vtag = v, HighTerm.tag_of_term env t in
+            let vtag = v, HighTerm.tags_of_term env t in
             let _, subst = Term.refresh_vars_w_info [vtag] in
             let f = Equiv.subst subst f in
             let f =

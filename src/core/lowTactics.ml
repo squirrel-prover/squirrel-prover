@@ -1466,7 +1466,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let subst = Term.ESubst (Term.mk_var v, Term.mk_var v') in
           let t2 = S.subst_conc [subst] t2 in
           let s = S.set_conclusion t2 s in
-          `Def (v', Vars.name v, HighTerm.tag_of_term (S.env s) t1), s
+          `Def (v', Vars.name v, HighTerm.tags_of_term (S.env s) t1), s
         end
 
       else 
@@ -1610,7 +1610,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     (* compute tag of [v] *)
-    let tag = HighTerm.tag_of_term (S.env s) term in
+    let tag = HighTerm.tags_of_term (S.env s) term in
     (v,tag), s
 
   (** [terms] and [n_ips] must be of the same length *)
@@ -2168,7 +2168,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let conv_env = Typing.{ env; cntxt = InGoal; } in
       List.map2 (fun pt ((v,tag) : Vars.tagged_var) ->
           let t, _ = Typing.convert ~ty:(Vars.ty v) conv_env pt in
-          let tag' = HighTerm.tag_of_term env t in
+          let tag' = HighTerm.tags_of_term env t in
 
           (* check tags, if applicable *)
           let () =
@@ -2738,7 +2738,7 @@ type form_type =
 
   let remember (id : Symbols.lsymb) (term : Typing.term) (s : S.t) =
     let t, ty = convert s term in
-    let tag = HighTerm.tag_of_term (S.env s) t in
+    let tag = HighTerm.tags_of_term (S.env s) t in
     let env, x =
       make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) tag
     in
