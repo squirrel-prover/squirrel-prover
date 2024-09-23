@@ -231,7 +231,7 @@ let include_search () =
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_all ~test:true st
-        "include Basic.
+        "include Logic.
         channel c
         system T = (S : !_i new n; out(c,n)).
         lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   

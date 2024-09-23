@@ -36,7 +36,7 @@ let reset_test () =
 let some_print () =
   let st = Prover.init () in
   (Prover.exec_all ~test:true st
-     "include Basic.\n\
+     "include Logic.\n\
       channel c\n\
       system T = (S : !_i !_i new n; out(c,n)).\n\
       lemma [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).\n\
@@ -59,7 +59,7 @@ let run_test () =
 let some_include () =
   let st = Prover.init () in
   Prover.exec_all ~test:true st
-    "include \"./Basic.sp\"."
+    "include \"./Logic.sp\"."
   |> ignore
 
 (*------------------------------------------------------------------*)

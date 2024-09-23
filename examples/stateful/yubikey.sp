@@ -208,7 +208,7 @@ Proof.
       (** The case `i <> i0` corresponds to the right disjunct. When expanding
       the macro `SCpt(i)@t`, we notice that it is an `if _ then _ else _` term
       with a condition that is always false. This can be simplified using the
-      `rewrite` tactic with lemma `if_false` (which is included in the `Basic`
+      `rewrite` tactic with lemma `if_false` (which is included in the `Logic`
       library. *)
     + right.
       by rewrite if_false.
