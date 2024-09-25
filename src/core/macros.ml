@@ -71,13 +71,16 @@ type exec_model_def = {
 
   rec_ty : Type.ty;
   (** type along which the execution takes place (actions, integers, ...) *)
-  
+
   macros : (Symbols.macro * general_macro_data) list
   (** definitions of the execution model macros *)
 }
 
 (*------------------------------------------------------------------*)
-(** {3 Builtin execution models} *)
+(** {3 Builtin execution models} 
+    
+    When manually adding an execution model, 
+    the code in `Iter.ml` must be adapted accordingly. *)
 
 (*------------------------------------------------------------------*)
 module Classic = struct
@@ -176,19 +179,21 @@ end (* Classic *)
 (*------------------------------------------------------------------*)
 module Quantum = struct
 
-  let out_ty   = Type.tmessage
-  let cond_ty  = Type.tboolean
-  let inp_ty   = Type.tmessage
-  let state_ty = Type.tquantum_message
-  let frame_ty = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tboolean; Type.tmessage]
-  let exec_ty  = Type.tboolean
+  let out_ty        = Type.tmessage
+  let cond_ty       = Type.tboolean
+  let inp_ty        = Type.tmessage
+  let transcript_ty = Type.tmessage
+  let state_ty      = Type.tquantum_message
+  let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage]
+  let exec_ty       = Type.tboolean
 
-  let inp   : Term.msymb = Term.mk_symb Symbols.Quantum.inp   inp_ty
-  let out   : Term.msymb = Term.mk_symb Symbols.Quantum.out   out_ty
-  let frame : Term.msymb = Term.mk_symb Symbols.Quantum.frame frame_ty
-  let cond  : Term.msymb = Term.mk_symb Symbols.Quantum.cond  cond_ty
-  let exec  : Term.msymb = Term.mk_symb Symbols.Quantum.exec  exec_ty 
-  let state : Term.msymb = Term.mk_symb Symbols.Quantum.state state_ty
+  let out        : Term.msymb = Term.mk_symb Symbols.Quantum.out        out_ty
+  let cond       : Term.msymb = Term.mk_symb Symbols.Quantum.cond       cond_ty
+  let inp        : Term.msymb = Term.mk_symb Symbols.Quantum.inp        inp_ty
+  let transcript : Term.msymb = Term.mk_symb Symbols.Quantum.transcript transcript_ty
+  let state      : Term.msymb = Term.mk_symb Symbols.Quantum.state      state_ty
+  let frame      : Term.msymb = Term.mk_symb Symbols.Quantum.frame      frame_ty
+  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       exec_ty 
 
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
@@ -201,20 +206,39 @@ module Quantum = struct
       let body =
         Term.mk_tuple
           [ts;
-           Term.mk_macro state [] ts;
-           Term.mk_macro exec  [] ts;
-           (Term.mk_ite
-              (Term.mk_macro exec [] ts)
-              (Term.mk_macro out  [] ts)
-              Term.mk_zero)]
+           Term.mk_macro state      [] ts;
+           Term.mk_macro transcript [] ts; ]
       in 
       Structured {
         name    = Symbols.Quantum.frame;
-        default = Term.mk_tuple [Term.init; qwitness; Term.mk_false; Term.empty  ];
-        tinit   = Term.mk_tuple [Term.init; qwitness; Term.mk_true ; Term.mk_zero];
+        default = Term.mk_tuple [Term.init; qwitness; Term.empty  ];
+        tinit   = Term.mk_tuple [Term.init; qwitness; Term.empty];
         body    = (ts_v, body);
         rec_ty  = Type.ttimestamp;
         ty      = frame_ty;
+      }
+    in
+
+    (*------------------------------------------------------------------*)
+    let transcript_data =
+      let body =
+        Term.mk_pair 
+          (Term.mk_macro transcript [] (Term.mk_pred ts))
+          (Term.mk_pair
+             (Term.mk_macro inp [] ts)
+             (Term.mk_pair
+                (Term.mk_of_bool (Term.mk_macro exec [] ts))
+                (Term.mk_ite (Term.mk_macro exec [] ts) (Term.mk_macro out [] ts) Term.mk_zero)
+             )
+          )
+      in 
+      Structured {
+        name    = Symbols.Quantum.transcript;
+        default = Term.empty;
+        tinit   = Term.empty;
+        body    = (ts_v, body);
+        rec_ty  = Type.ttimestamp;
+        ty      = transcript_ty;
       }
     in
 
@@ -282,12 +306,13 @@ module Quantum = struct
       input_name  = Symbols.Quantum.inp;
       output_name = Symbols.Quantum.out;
       cond_name   = Symbols.Quantum.cond;
-      macros      = [Symbols.Quantum.frame, frame_data ;
-                     Symbols.Quantum.inp  , input_data ;
-                     Symbols.Quantum.exec , exec_data  ;
-                     Symbols.Quantum.out  , output_data;
-                     Symbols.Quantum.state, state_data ;
-                     Symbols.Quantum.cond , cond_data  ; ];
+      macros      = [Symbols.Quantum.frame     , frame_data      ;
+                     Symbols.Quantum.transcript, transcript_data ;
+                     Symbols.Quantum.inp       , input_data      ;
+                     Symbols.Quantum.exec      , exec_data       ;
+                     Symbols.Quantum.out       , output_data     ;
+                     Symbols.Quantum.state     , state_data      ;
+                     Symbols.Quantum.cond      , cond_data       ; ];
     }
 end (* PostQuantum *)
 

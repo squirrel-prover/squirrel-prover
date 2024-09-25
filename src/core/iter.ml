@@ -953,10 +953,16 @@ let macro_support
     let sm =
       if List.mem_assoc Symbols.Quantum.frame sm
       then
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.transcript Macros.Quantum.transcript_ty ) sm |>
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.state      Macros.Quantum.state_ty      )
+      else sm
+    in
+    let sm =
+      if List.mem_assoc Symbols.Quantum.transcript sm
+      then
         MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.out   Macros.Quantum.out_ty  ) sm |>
         MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.exec  Macros.Quantum.exec_ty )    |>
-        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.state Macros.Quantum.state_ty)
-
+        MsetAbs.join_single (Mset.mk_simple Symbols.Quantum.inp   Macros.Quantum.inp_ty  )
       else sm
     in
     let sm =

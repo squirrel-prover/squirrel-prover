@@ -580,12 +580,13 @@ module Quantum : sig
   val npath : npath
 
   (** Macros for the quantum execution model *)
-  val inp   : macro
-  val out   : macro
-  val state : macro
-  val cond  : macro
-  val exec  : macro
-  val frame : macro
+  val inp        : macro
+  val out        : macro
+  val state      : macro
+  val transcript : macro
+  val cond       : macro
+  val exec       : macro
+  val frame      : macro
 end
 
 val is_quantum_macro : macro -> bool

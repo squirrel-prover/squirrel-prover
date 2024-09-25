@@ -23,6 +23,7 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 namespace Classic.
+  (* `frame@t ▷ {frame@t' | ∀ t' ≤ t}` *)
   global axiom frame_from_frame {P : system} @set:P : 
     $( (fun t => frame@t) 
        |1> 
@@ -30,6 +31,7 @@ namespace Classic.
     ).
   hint deduce frame_from_frame.
 
+  (* `frame@t ▷ {exec@t' | ∀ t' ≤ t}` *)
   global axiom exec_from_frame {P : system} @set:P : 
     $( (fun t => frame@t) 
        |1> 
@@ -37,6 +39,7 @@ namespace Classic.
     ).
   hint deduce exec_from_frame.
 
+  (* `frame@t ▷ {output@t' | ∀ t' ≤ t, exec@t'}` *)
   global axiom output_from_frame {P : system} @set:P :
     $( (fun t => frame@t) 
        |1> 
@@ -44,6 +47,7 @@ namespace Classic.
     ).
   hint deduce output_from_frame.
 
+  (* `frame@t ▷ {input@t' | ∀ t' < t}` *)
   global axiom input_from_frame {P : system} @set:P : 
     $( (fun t => frame@t) 
        |1> 
@@ -53,9 +57,11 @@ namespace Classic.
 end Classic.
 
 (* ------------------------------------------------------------------- *)
+
 namespace Quantum.
   close Classic.
 
+  (* `frame@t ▷ {exec@t' | ∀ t' ≤ t}` *)
   global axiom exec_from_frame {P : system} @set:P :
     $( (fun t => frame@t)
        |1>
@@ -63,6 +69,7 @@ namespace Quantum.
     ). 
   hint deduce exec_from_frame.
 
+  (* `frame@t ▷ {output@t' | ∀ t' ≤ t, exec@t'}` *)
   global axiom output_from_frame {P : system} @set:P :
     $( (fun t => frame@t)
        |1>
@@ -70,10 +77,52 @@ namespace Quantum.
     ).
   hint deduce output_from_frame.
 
+  (* `frame@t ▷ {input@t' | ∀ t' < t}` *)
   global axiom input_from_frame {P : system} @set:P :
     $( (fun t => frame@t)
        |1>
        (fun t t' => if pred t' <= t then input@t')
     ).
   hint deduce input_from_frame.
+
+  (* `frame@t ▷ {transcript@t' | ∀ t' < t}` *)
+  global axiom transcript_from_frame {P : system} @set:P :
+    $( (fun t => frame@t)
+       |1>
+       (fun t t' => if t' <= t then transcript@t')
+    ).
+  hint deduce transcript_from_frame.
+
+  (* ------------------------------------------------------------------- *)
+  (* `transcript@t ▷ {transcript@t' | ∀ t' < t}` *)
+  global axiom transcript_from_transcript {P : system} @set:P :
+    $( (fun t => frame@t)
+       |1>
+       (fun t t' => if t' <= t then transcript@t')
+    ).
+  hint deduce transcript_from_frame.
+
+  (* `transcript@t ▷ {exec@t' | ∀ t' ≤ t}` *)
+  global axiom exec_from_transcript {P : system} @set:P :
+    $( (fun t => transcript@t)
+       |1>
+       (fun t t' => if t' <= t then exec@t' else witness)
+    ).
+  hint deduce exec_from_transcript.
+
+  (* `transcript@t ▷ {output@t' | ∀ t' ≤ t, exec@t'}` *)
+  global axiom output_from_transcript {P : system} @set:P :
+    $( (fun t => transcript@t)
+       |1>
+       (fun t t' => if t' <= t && exec@t' then output@t')
+    ).
+  hint deduce output_from_transcript.
+
+  (* `transcript@t ▷ {input@t' | ∀ t' < t}` *)
+  global axiom input_from_transcript {P : system} @set:P :
+    $( (fun t => transcript@t)
+       |1>
+       (fun t t' => if pred t' <= t then input@t')
+    ).
+  hint deduce input_from_transcript.
 end Quantum.

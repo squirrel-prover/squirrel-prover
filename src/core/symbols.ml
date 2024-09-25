@@ -1347,12 +1347,13 @@ module Quantum = struct
 
   let () = builtin_ref := namespace_enter !builtin_ref s_npath
 
-  let inp   = mk_macro ~scope:npath "input"  Empty
-  let out   = mk_macro ~scope:npath "output" Empty
-  let state = mk_macro ~scope:npath "state"  Empty
-  let cond  = mk_macro ~scope:npath "cond"   Empty
-  let exec  = mk_macro ~scope:npath "exec"   Empty
-  let frame = mk_macro ~scope:npath "frame"  Empty
+  let inp        = mk_macro ~scope:npath "input"      Empty
+  let out        = mk_macro ~scope:npath "output"     Empty
+  let state      = mk_macro ~scope:npath "state"      Empty
+  let transcript = mk_macro ~scope:npath "transcript" Empty
+  let cond       = mk_macro ~scope:npath "cond"       Empty
+  let exec       = mk_macro ~scope:npath "exec"       Empty
+  let frame      = mk_macro ~scope:npath "frame"      Empty
 
   let () = builtin_ref := namespace_exit !builtin_ref s_npath
 end
@@ -1471,7 +1472,7 @@ let fs_att = mk_fsymb "att" 1
 let fs_qatt =
   let fty =
     Type.mk_ftype []
-      [Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tboolean; Type.tmessage; ]]
+      [Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage; ]]
       (Type.tuple [Type.tmessage; Type.tquantum_message])
   in
   mk_fsymb ~fty "qatt" (-1)

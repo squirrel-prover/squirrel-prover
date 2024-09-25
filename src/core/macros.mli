@@ -208,19 +208,21 @@ module Classic : sig
 end
 
 module Quantum : sig
-  val out_ty   : Type.ty
-  val cond_ty  : Type.ty
-  val inp_ty   : Type.ty
-  val state_ty : Type.ty
-  val frame_ty : Type.ty
-  val exec_ty  : Type.ty
+  val out_ty        : Type.ty
+  val cond_ty       : Type.ty
+  val inp_ty        : Type.ty
+  val transcript_ty : Type.ty
+  val state_ty      : Type.ty
+  val frame_ty      : Type.ty
+  val exec_ty       : Type.ty
 
-  val inp   : Term.msymb
-  val out   : Term.msymb
-  val frame : Term.msymb
-  val cond  : Term.msymb
-  val exec  : Term.msymb
-  val state : Term.msymb
+  val inp        : Term.msymb
+  val transcript : Term.msymb
+  val out        : Term.msymb
+  val frame      : Term.msymb
+  val cond       : Term.msymb
+  val exec       : Term.msymb
+  val state      : Term.msymb
 end
 
 (*------------------------------------------------------------------*)

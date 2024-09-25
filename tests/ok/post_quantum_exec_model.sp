@@ -32,15 +32,20 @@ print b.
 lemma [PQ] _ i :
   let t = X i in
   happens(t) =>
-  Quantum.frame@t = (t, Quantum.state@t, Quantum.exec@t, 
-                     if Quantum.exec@t then Quantum.output@t) &&
-  Quantum.state@t = qatt(Quantum.frame@pred t)#2 &&
-  Quantum.input@t = qatt(Quantum.frame@pred t)#1 &&
-  Quantum.exec @t = (Quantum.exec@pred t && Quantum.cond@t).
+  Quantum.frame@t       = (t, Quantum.state@t, Quantum.transcript@t) &&
+  Quantum.transcript @t = <Quantum.transcript@pred t, 
+                           <Quantum.input@t, 
+                            <of_bool (Quantum.exec@t),
+                             if Quantum.exec@t then Quantum.output@t>>> &&
+  Quantum.state@t       = qatt(Quantum.frame@pred t)#2 &&
+  Quantum.input@t       = qatt(Quantum.frame@pred t)#1 &&
+  Quantum.exec @t       = (Quantum.exec@pred t && Quantum.cond@t).
 Proof.
   intro t H. 
-  split; 2:split; 2: split.
+  split; 2:split; 2:split; 2:split.
   + rewrite /Quantum.frame.
+    by apply eq_refl.
+  + rewrite /Quantum.transcript.
     by apply eq_refl.
   + rewrite /Quantum.state.
     by apply eq_refl.
@@ -58,20 +63,26 @@ close Classic.
 lemma [PQ] _ i :
   let t = X i in
   happens(t) =>
-  frame@t = (t, state@t, exec@t, if exec@t then output@t) &&
+  frame@t       = (t, state@t, transcript@t) &&
+  transcript @t = <transcript@pred t, 
+                   <input@t, 
+                    <of_bool (exec@t),
+                     if exec@t then output@t>>> &&
   state@t = qatt(frame@pred t)#2 &&
   input@t = qatt(frame@pred t)#1 &&
   exec @t = (exec@pred t && cond@t).
 Proof.
   intro t H. 
-  split; 2:split; 2: split.
-  + rewrite /frame.
+  split; 2:split; 2:split; 2:split.
+  + rewrite /Quantum.frame.
     by apply eq_refl.
-  + rewrite /state.
+  + rewrite /Quantum.transcript.
     by apply eq_refl.
-  + rewrite /input.
+  + rewrite /Quantum.state.
     by apply eq_refl.
-  + rewrite /exec.
+  + rewrite /Quantum.input.
+    by apply eq_refl.
+  + rewrite /Quantum.exec.
     by apply eq_refl.
 Qed.
 
