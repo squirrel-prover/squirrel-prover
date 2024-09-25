@@ -281,7 +281,7 @@ let ts_equ context t1 t2 = match context.timestamp_style with
   | Abstract_eq -> Why3.Term.t_equ t1 t2 
   |_-> Why3.Term.t_app_infer (Option.get context.eqv_symb) [t1;t2]
 
-let rec convert_type context = function
+let rec convert_type context ?(decl_fun=false) = function
   | Type.Message -> context.msg_ty
   | Type.Timestamp -> context.ts_ty
   | Type.Boolean -> Why3.Ty.ty_bool 
@@ -290,9 +290,10 @@ let rec convert_type context = function
   | TBase (ns,t) -> 
     let s = Symbols.s_path_to_string (ns,t) in
     Why3.Ty.(ty_var (tv_of_string s))
-  | TVar _ -> assert false 
-  | Fun (t1,t2) -> Why3.Ty.ty_func (convert_type context t1)
-                   (convert_type context t2)
+  | TVar _ -> raise InternalError
+  | Fun (t1,t2) -> 
+    if decl_fun then raise InternalError else 
+      Why3.Ty.ty_func (convert_type context t1) (convert_type context t2)
   | TUnivar ty ->
     Format.printf
       "smt: unsupported argument type %a@."
@@ -340,7 +341,7 @@ let rec prop_list_to_bool context terms =
     )
    
 
-and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
+and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla -> 
   let open Term in
   let open Why3.Term in
   (bool_to_prop fmla) (match fmla with 
@@ -500,7 +501,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
       | Not_found -> raise InternalError
     end
 
-  | Tuple l -> t_tuple (List.map (msg_to_fmla context) l)
+  | Tuple l -> t_tuple (prop_list_to_bool context l)
 
   | Let (_,_,_) -> 
     unsupported_term context fmla "let"
@@ -579,37 +580,51 @@ let add_var context =
     context.tsvars;
   List.iter 
     (fun var -> 
-      add_tbl_var 
-        context.vars_tbl 
-        (convert_type context (Vars.ty var))
-        context.uc
-        var
+      try 
+        add_tbl_var 
+          context.vars_tbl 
+          (convert_type context ~decl_fun:true (Vars.ty var))
+          context.uc
+          var
+    with InternalError -> ()
     ) 
     context.msgvars
 
 let add_functions context =
-  Symbols.Operator.iter (fun fname _ ->
-    let data = Symbols.OpData.get_data fname context.table in
-    let ftype = data.ftype in
-    let str = path_to_string fname in
-    (* special treatment of xor for two reasons:
-     *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
-     *   - allows us to declare the equations for xor in the .why file *)
-    let predeclared_symbols =
-      [
-        Symbols.fs_xor; Symbols.fs_pair;
-        Symbols.fs_fst; Symbols.fs_snd;
-        Symbols.fs_att; Symbols.fs_of_bool;
-        Symbols.fs_empty; Symbols.fs_pred;
-        Symbols.fs_happens; Symbols.fs_or;
-        Symbols.fs_and; Symbols.fs_true;
-        Symbols.fs_false; Symbols.fs_iff;
-        Symbols.fs_impl; Symbols.fs_not;
-        Symbols.fs_diff
-      ]
-    in
-    if not (List.mem fname predeclared_symbols) then
-      if ftype.Type.fty_vars <> [] then
+  Symbols.Operator.iter 
+    (fun fname _ ->
+      let data = Symbols.OpData.get_data fname context.table in
+      let ftype = data.ftype in
+      let str = path_to_string fname in
+      (* special treatment of xor for two reasons:
+      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
+      *   - allows us to declare the equations for xor in the .why file *)
+      let predeclared_symbols =
+        [
+          Symbols.fs_xor; Symbols.fs_pair;
+          Symbols.fs_fst; Symbols.fs_snd;
+          Symbols.fs_att; Symbols.fs_of_bool;
+          Symbols.fs_empty; Symbols.fs_pred;
+          Symbols.fs_happens; Symbols.fs_or;
+          Symbols.fs_and; Symbols.fs_true;
+          Symbols.fs_false; Symbols.fs_iff;
+          Symbols.fs_impl; Symbols.fs_not;
+          Symbols.fs_diff
+        ]
+      in
+      if not (List.mem fname predeclared_symbols) then begin
+        try 
+          let symb =
+            Why3.Term.create_fsymbol
+              (id_fresh context str)
+              (List.map (convert_type context ~decl_fun:true) ftype.fty_args)
+              (convert_type context ~decl_fun:true ftype.fty_out)
+          in
+          Hashtbl.add context.functions_tbl str (symb)
+        with InternalError -> if smt_debug then Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
+      end)
+
+      (* if ftype.Type.fty_vars <> [] then
         begin if smt_debug then
           Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
         end
@@ -621,7 +636,7 @@ let add_functions context =
             (convert_type context ftype.fty_out)
         in
         Hashtbl.add context.functions_tbl str (symb)
-      end)
+      end) *)
     context.table;
   context.uc :=
     Hashtbl.fold
@@ -1082,7 +1097,8 @@ let add_macro_axioms context =
                           t_forall_close !quantified_vars [] ax_cond) ::
                         !macro_axioms;
         
-        Symbols.Macro.iter (fun mn _ -> 
+        Symbols.Macro.iter (fun mn _ ->
+          try
             let mdef = Symbols.get_macro_data mn context.table in
             let m_str  = path_to_string mn in
             let m_symb = Hashtbl.find context.macros_tbl m_str in
@@ -1118,7 +1134,7 @@ let add_macro_axioms context =
                       descr.name (Term.mk_vars descr.indices)
                   with
                   | `Undef   -> None
-                  | `Def msg ->
+                  | `Def msg ->  
                     Some (t_forall_close quantified_indices [] (macro_wterm_eq
                             (List.map (index_var_to_wterm context) m_idx) 
                             (
@@ -1185,7 +1201,7 @@ let add_macro_axioms context =
                       expansion_ok
                       )
                     else
-                      (assert (List.inclusion (ns_args) (Term.mk_vars descr.indices));
+                      ((*assert (List.inclusion (ns_args) (Term.mk_vars descr.indices));*)
                       t_if
                         (if context.separate_tuple then 
                           equal_lists 
@@ -1218,6 +1234,7 @@ let add_macro_axioms context =
                                   )
                               )
                               :: !macro_axioms
+          with _ -> if smt_debug then Format.printf "Macro %s unexpandable" (path_to_string mn);
           ) context.table; 
         (* cleanup scope  *)
         List.iter
