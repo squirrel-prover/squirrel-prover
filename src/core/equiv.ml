@@ -71,9 +71,9 @@ type bform = {formula : Term.term; bound : Term.term option}
 (*------------------------------------------------------------------*)
 let _pp_bform_conclusion ppe fmt = function
   | {formula; bound = Some ve} -> 
-    Fmt.pf fmt "@[%a@]@;bound : @[%a@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
+    Fmt.pf fmt "[@[%a@]@;bound : @[%a@]]@;" (Term._pp ppe) formula (Term._pp ppe) ve
   | {formula; bound = None} -> 
-    Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
+    Fmt.pf fmt "[@[%a@]]" (Term._pp ppe) formula
 
 let _pp_bform ppe fmt = function
   | {formula; bound = Some ve} -> 
@@ -232,7 +232,7 @@ let _pp_atom_conclusion ppe ?context fmt (l : atom) =
   match l with
   | Equiv e -> _pp_equiv_numbered ppe fmt e
   | Reach f -> _pp_bform_conclusion ppe fmt f
-  | Pred p -> _pp_pred_app ?context ppe fmt p
+  | Pred  p -> _pp_pred_app ?context ppe fmt p
 
 
 let _pp_atom ppe ?context fmt = function
