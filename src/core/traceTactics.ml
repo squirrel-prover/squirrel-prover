@@ -397,7 +397,7 @@ let rewrite_equiv_transform
 
 (** Rewrite equiv rule on sequent [s] with direction [dir],
     using assumption [ass] wrt system [ass_context]. *)
-let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
+let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
   let env   = TS.env   s in
   let table = TS.table s in
 
@@ -408,7 +408,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
-      | _ -> Tactics.soft_failure (Failure "invalid assumption")
+      | _ -> soft_failure ~loc (Failure "invalid assumption")
     in aux ass
   in
 
@@ -457,7 +457,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     List.map
       (fun (p,s) ->
          if s = src_sys then p, dst_sys 
-         else Tactics.soft_failure Rewrite_equiv_system_mismatch) |>
+         else soft_failure ~loc Rewrite_equiv_system_mismatch) |>
     SE.of_list
   in
   let updated_context =
@@ -498,7 +498,8 @@ let rewrite_equiv_args args (s : TS.t) : TS.t list =
   match args with
   | [TacticsArgs.RewriteEquiv rw] ->
     let ass_context, subgs, ass, dir = TraceLT.p_rw_equiv rw s in
-    subgs @ rewrite_equiv (ass_context, ass, dir) s
+    let loc = match rw.rw_type with `Rw pt -> L.loc pt in
+    subgs @ rewrite_equiv ~loc (ass_context, ass, dir) s
   | _ -> bad_args ()
 
 let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)
