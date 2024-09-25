@@ -527,66 +527,65 @@ let old_induction Args.(Message (ts,_)) s =
                 system-independent timestamp term (maybe try dependent induction ?)");
 
   let env = ES.env s in
-  match ts with
-  | Var t as ts ->
-    (* Generalizes over [ts]. *)
-    let intro_back, s = generalize ts s in
-
-    (* Remove ts from the sequent, as it will become unused. *)
-    let s = ES.set_vars (Vars.rm_var t env.vars) s in
-    let table  = ES.table s in
-    let system =
-      match SE.get_compatible_expr (ES.env s).system with
-        | Some expr -> expr
-        | None -> soft_failure (Failure "underspecified system")
-    in
-    let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
-    let conclusion = ES.conclusion s in
-
-    let ind_hyp = Equiv.subst subst conclusion in
-    (* Introduce back generalized hypotheses. *)
-    let induc_s = intro_back s in
-    (* Introduce induction hypothesis. *)
-    let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") (LHyp ind_hyp) induc_s in
-
-    let init_conclusion = Equiv.subst [Term.ESubst(ts,Term.init)] conclusion in
-    let init_s = ES.set_conclusion init_conclusion s in
-    let init_s = intro_back init_s in
-
-    let const = HighTerm.is_constant env ts in
-    
-    (* Creates the conclusion corresponding to the case
-       where [t] is instantiated by [action]. *)
-    let case_of_action (action,_symbol,indices) =
-      let env = ref @@ ES.vars induc_s in
-      let subst =
-        List.map
-          (fun i ->
-             let i' = Vars.make_approx_r env i (Vars.Tag.make ~const Vars.Global) in
-             Term.ESubst (Term.mk_var i, Term.mk_var i'))
-          indices
-      in
-      let name =
-        SE.action_to_term table system
-          (Action.subst_action subst action)
-      in
-      let ts_subst = [Term.ESubst(ts,name)] in
-      ES.subst ts_subst induc_s |> ES.set_vars !env
-    in
-    let case_of_action (action,symbol,indices) =
-      if symbol = Symbols.init_action then None else
-        Some (case_of_action ((Action.to_action action),symbol,indices))
-    in
-
-    let conclusions =
-      List.filter_map case_of_action (SE.actions table system) 
-    in
-
-    List.map simpl_impl (init_s :: conclusions)
-
-  | _  ->
+  if not (Term.is_var ts) then
     soft_failure
-      (Tactics.Failure "expected a variable of finite type")
+      (Tactics.Failure "expected a variable of type timestamp");
+
+  let t = oget (Term.destr_var ts) in
+  (* Generalizes over [ts]. *)
+  let intro_back, s = generalize ts s in
+
+  (* Remove ts from the sequent, as it will become unused. *)
+  let s = ES.set_vars (Vars.rm_var t env.vars) s in
+  let table  = ES.table s in
+  let system =
+    match SE.get_compatible_expr (ES.env s).system with
+    | Some expr -> expr
+    | None -> soft_failure (Failure "underspecified system")
+  in
+  let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
+  let conclusion = ES.conclusion s in
+
+  let ind_hyp = Equiv.subst subst conclusion in
+  (* Introduce back generalized hypotheses. *)
+  let induc_s = intro_back s in
+  (* Introduce induction hypothesis. *)
+  let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") (LHyp ind_hyp) induc_s in
+
+  let init_conclusion = Equiv.subst [Term.ESubst(ts,Term.init)] conclusion in
+  let init_s = ES.set_conclusion init_conclusion s in
+  let init_s = intro_back init_s in
+
+  let const = HighTerm.is_constant env ts in
+
+  (* Creates the conclusion corresponding to the case
+     where [t] is instantiated by [action]. *)
+  let case_of_action (action,_symbol,indices) =
+    let env = ref @@ ES.vars induc_s in
+    let subst =
+      List.map
+        (fun i ->
+           let i' = Vars.make_approx_r env i (Vars.Tag.make ~const Vars.Global) in
+           Term.ESubst (Term.mk_var i, Term.mk_var i'))
+        indices
+    in
+    let name =
+      SE.action_to_term table system
+        (Action.subst_action subst action)
+    in
+    let ts_subst = [Term.ESubst(ts,name)] in
+    ES.subst ts_subst induc_s |> ES.set_vars !env
+  in
+  let case_of_action (action,symbol,indices) =
+    if symbol = Symbols.init_action then None else
+      Some (case_of_action ((Action.to_action action),symbol,indices))
+  in
+
+  let conclusions =
+    List.filter_map case_of_action (SE.actions table system) 
+  in
+
+  List.map simpl_impl (init_s :: conclusions)
 
 (*------------------------------------------------------------------*)
 (** Induction *)
