@@ -371,7 +371,10 @@ let rewrite_equiv_transform
   in
   let rec aux (t : term) : term =
     (* system-independence needed to leave [t] unchanged *)
-    if HighTerm.is_ptime_deducible ~si:true (TS.env s) t then t
+    if HighTerm.is_ptime_deducible ~si:false (TS.env s) t &&
+       HighTerm.is_single_term_in_context    (TS.env s) t then t
+    (* TODO: si: we only care about the fact that [t] is unchanged in
+       the set part of the environment *)
     else if try_bideduce t then t 
     else
       match assoc t with
@@ -429,10 +432,11 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
             hence their semantics remain unchanged. *)
 
          | LHyp (Local f) ->
-           HighTerm.is_constant     env f &&
-           HighTerm.is_system_indep env f
+           HighTerm.is_constant               env f &&
+           HighTerm.is_single_term_in_context env f
          | LHyp (Global _) -> true)
   in
+  (* TODO: si: use [change_hyps_context] instead? *)
   let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
 
   (* Identify which projection of the assumption's conclusion

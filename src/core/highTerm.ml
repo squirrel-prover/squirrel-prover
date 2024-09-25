@@ -25,21 +25,34 @@ module Smart : SmartFO.S with type form = Term.term = struct
 end
 
 (*------------------------------------------------------------------*)
+(** Tags that can be associated to a term [t] *)
 type tags = {
-  const : bool;
-  adv   : bool;
-  si    : bool;
-  det   : bool;
+  const   : bool;
+  (** [t] is constant *)
+
+  adv     : bool;
+  (** [t] is computable in ptime by an adversary with no direct
+      access to the protocol randomness  *)
+
+  si      : bool; 
+  (** [t] system-independent, i.e. its semantics does not change when the system does *)
+
+  no_diff : bool;
+  (** [t] does no contain any diff *)
+
+  det     : bool;
+  (** [t] deterministic *)
 }
 
 let mk_tags
-  ?(const = false)
-  ?(adv   = false)
-  ?(si    = false)
-  ?(det   = false)
+  ?(const   = false)
+  ?(adv     = false)
+  ?(si      = false)
+  ?(det     = false)
+  ?(no_diff = false)
   ()
   =
-  { const ; adv ; si ; det }
+  { const ; adv ; si ; det; no_diff; }
 
 let to_vars_tags (tags : tags) : Vars.Tag.t =
   { const        = tags.const ;
@@ -48,10 +61,11 @@ let to_vars_tags (tags : tags) : Vars.Tag.t =
 
 let merge_tags (tags1 : tags) (tags2 : tags): tags =
   {
-    const = tags1.const && tags2.const ;
-    adv   = tags1.adv   && tags2.adv   ;
-    si    = tags1.si    && tags2.si    ;
-    det   = tags1.det   && tags2.det   ;
+    const   = tags1.const   && tags2.const   ;
+    adv     = tags1.adv     && tags2.adv     ;
+    si      = tags1.si      && tags2.si      ;
+    det     = tags1.det     && tags2.det     ;
+    no_diff = tags1.no_diff && tags2.no_diff ;
   }
     
 (*------------------------------------------------------------------*)
@@ -60,7 +74,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
   let rec doit_subterms (env : Env.t) (t : Term.term) : tags =
     Term.tfold
       (fun term tag -> merge_tags tag (doit env term))
-      t { const = true; adv = true; si = true; det = true }
+      t { const = true; adv = true; si = true; det = true; no_diff = true; }
 
   and doit (env : Env.t) (t : Term.term) : tags =
     match t with
@@ -76,26 +90,30 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
         info.adv
       in
       {
-        const = info.const        ;
-        adv   = adv               ;
-        si    = info.system_indep ;
-        det   = info.const        ;
+        const   = info.const        ;
+        adv     = adv               ;
+        si      = info.system_indep ;
+        no_diff = true              ;
+        det     = info.const        ;
       }
 
     | Name _ ->
       let merged = doit_subterms env t in
-      mk_tags ~si:merged.si ()
+      { merged with det = false; const = false; adv = false; }
 
-    | Macro _ -> mk_tags ()
+    | Macro _ -> mk_tags ~no_diff:true ()
+    (* TODO: multi-terms: once macros are decorated by system
+       expressions, this needs to change *)
 
     | Fun (f,_) -> 
       let is_att = f = Symbols.fs_att || f = Symbols.fs_qatt in
       let is_si = Operator.is_system_indep env.table f in
       {
-        const = not is_att ;
-        adv   = true       ;
-        si    = is_si      ;
-        det   = not is_att ;
+        const   = not is_att ;
+        adv     = true       ;
+        si      = is_si      ;
+        no_diff = true       ;
+        det     = not is_att ;
       }
 
     | Find (vs, _, _, _) | Quant (_,vs,_) ->
@@ -119,17 +137,17 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
       let adv =
         if poly_card_type_binders || is_lambda then merged.adv else false
       in
-      let const, si, det =
-        merged.const && fixed_type_binders, merged.si, merged.det
+      let const =
+        merged.const && fixed_type_binders
       in
-      { const; adv; si; det }
+      { merged with const; adv; }
 
     | App _| Action _ | Tuple _ | Proj _ ->
       doit_subterms env t
 
     | Diff _ ->
       let merged = doit_subterms env t in
-      { merged with si = false }
+      { merged with si = false; no_diff = false; }
 
     | Let (v,t1,t2) ->
       let tags = to_vars_tags (doit env t1) in
@@ -139,11 +157,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
   in
   let tags = doit env t in
   { tags with
-    si =
-      (* a term is system-independent if it applies to a single system
-         (for both set and pair), or if it uses only system-independent
-         constructs *)
-      SE.is_single_system env.system || tags.si; }
+    si = tags.si; }
   
 (*------------------------------------------------------------------*)
 let is_system_indep
@@ -173,6 +187,22 @@ let is_ptime_deducible
   =
   let tags = tags_of_term env ~ty_env t in
   tags.adv && (not si || tags.si) 
+
+(*------------------------------------------------------------------*)
+let is_single_term_in_context
+    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    (env : Env.t) (t : Term.term)
+  : bool
+  =
+  let tags = tags_of_term ~ty_env env t in
+  (SE.is_single_system env.system && tags.no_diff) || tags.si
+  (* a term [t] taken over [env.system.set] or [env.system.pair] is a
+     single in any single system of [env.system] if:
+
+     - if it applies to a single system (for both set and pair) and
+       does not use any [diff]
+     - or if it is system-independent *)
+     
 
 (*------------------------------------------------------------------*)
 (** Exported, shadows the previous definition. *)

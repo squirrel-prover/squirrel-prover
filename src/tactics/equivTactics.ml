@@ -316,8 +316,8 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
         match ty with
         | Type.Timestamp when type_based ->
           let env = ES.env s in
-          if not (HighTerm.is_constant     env f &&
-                  HighTerm.is_system_indep env f   ) then
+          if not (HighTerm.is_constant               env f &&
+                  HighTerm.is_single_term_in_context env f   ) then
             hard_failure ~loc
               (Failure "global case must be on a constant and \
                         system-independent term");
@@ -520,8 +520,8 @@ let old_induction Args.(Message (ts,_)) s =
   assert (Type.equal (Term.ty ts) Type.ttimestamp);
 
   let env = ES.env s in
-  if not (HighTerm.is_constant     env ts &&
-          HighTerm.is_system_indep env ts   ) then
+  if not (HighTerm.is_constant               env ts &&
+          HighTerm.is_single_term_in_context env ts   ) then
     hard_failure 
       (Failure "simple global induction must be on a constant and \
                 system-independent timestamp term (maybe try dependent induction ?)");

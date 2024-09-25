@@ -7,9 +7,11 @@ system B = null.
 (*------------------------------------------------------------------*)
 (* the system-independence check goes through if all systems are 
    the same single system. *)
-global axiom [set:B/left; equiv:B/left, B/left] gfooB (t:timestamp): equiv(frame@t).
+global axiom [set:B/left; equiv:B/left, B/left ] gfooB  (t:timestamp): equiv(frame@t).
+global axiom [set:B/left; equiv:B/left, B/right] gfooB2 (t:timestamp): equiv(frame@t).
 global lemma  [set:B/left; equiv:B/left, B/left] _ : equiv(frame@(tt@init)).
 Proof. 
+  checkfail have ? := gfooB2 (tt@init) exn Failure.
   have ? := gfooB (tt@init). 
 Abort.
 

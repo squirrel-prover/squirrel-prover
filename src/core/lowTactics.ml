@@ -1381,17 +1381,24 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
             let new_formula = S.subst_conc subst f in
 
-            (* for finite types which do not depend on the security
-               parameter η, we have
-               [∀ x, phi] ≡ ∀ x. const(x) → [phi]
-               (where the RHS quantification is a global quantification) *)
             let tag =
               match S.conc_kind with
               | Equiv.Local_t  -> 
-                if Symbols.TyInfo.is_finite table (Vars.ty x) && 
-                   Symbols.TyInfo.is_fixed  table (Vars.ty x) then
-                  { tag with const = true } 
-                else tag
+                let const =
+                  (* for finite types which do not depend on the security
+                     parameter η, we have
+                     [∀ x, phi] ≡ ∀ x. const(x) → [phi]
+                     (where the RHS quantification is a global quantification) *)
+                  Symbols.TyInfo.is_finite table (Vars.ty x) && 
+                  Symbols.TyInfo.is_fixed  table (Vars.ty x) 
+                in
+                let system_indep = 
+                  let set = (S.system s).set in
+                  if SE.is_fset set then
+                    List.length (SE.to_list (SE.to_fset set)) = 1
+                  else false
+                in
+                { tag with const; system_indep; } 
               | Equiv.Global_t -> tag
               | Equiv.Any_t    -> assert false
             in
@@ -1399,9 +1406,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             ( `Var (x',tag),
               S.set_conclusion new_formula s )
 
-          | [], f ->
-            (* FIXME: this case should never happen. *)
-            doit f
+          | [], f -> doit f (* this case should never happen. *)
         end
 
       else

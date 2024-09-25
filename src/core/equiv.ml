@@ -598,12 +598,10 @@ let is_constant ?(env : Env.t option) (t : Term.term) : bool =
   let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
   HighTerm.is_constant env t
 
-let is_system_indep
-    ?(env : Env.t = Env.init ~table:(Symbols.builtins_table ()) ())
-    (t    : Term.term)
-  : bool
-  =
-  HighTerm.is_system_indep env t
+let is_single_term_in_context ?(env : Env.t option) (t : Term.term) : bool =
+  let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
+  HighTerm.is_single_term_in_context env t
+
 let rec get_terms = function
   | Atom (Reach f) -> f.formula::(Option.to_list f.bound)
   | Atom (Equiv e) -> Option.to_list e.bound  @ e.terms
@@ -709,18 +707,19 @@ module Smart : SmartFO.S with type form = _form = struct
 
     (* case [f = ∃es. f0], check that:
        - [f] is constant
-       - [f0] is system-independant *)
-    (*TODO : kind, check this for multiterms*)
-    (*TODO:Concrete : Check if valid of concrete*)
+       - [f0] is a single term *)
+    (* TODO: si: is this necessary? *)
+    (* TODO: multi-terms *)
+    (* TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists_tagged f with
-        | Some (es,f0) when is_system_indep ~env f0 && is_constant ~env f ->
+        | Some (es,f0) when is_single_term_in_context ~env f0 && is_constant ~env f ->
           Some (es, Atom (Reach {formula = f0;bound}))
         | _ -> None
       end
 
-    (*TODO : kind, check this for multiterms*)
+    (* TODO: multi-terms *)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
         begin match Term.Smart.destr_forall_tagged f with
           | Some (es,f) -> Some (es, Atom (Reach {formula = f; bound}))
@@ -746,15 +745,18 @@ module Smart : SmartFO.S with type form = _form = struct
     (* case [f = ∃es. f0], check that:
        - [f] is constant
        - [f0] is system-independant *)
-    (*TODO:Concrete : Check if valid of concrete*)
+    (* TODO: si: is this necessary? *)
+    (* TODO: multi-terms *)
+    (* TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists1_tagged f with
-        | Some (es,f0) when is_constant ~env f && is_system_indep ~env f0 ->
+        | Some (es,f0) when is_constant ~env f && is_single_term_in_context ~env f0 ->
           Some (es, Atom (Reach {formula = f0; bound}))
         | _ -> None
       end
 
+    (* TODO: multi-terms *)
     (* For a local meta-formula f,
        (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
@@ -803,8 +805,12 @@ module Smart : SmartFO.S with type form = _form = struct
     | Atom (Reach {formula = f; bound}) ->
        begin match Term.Smart.destr_or f with
          | Some (f1,f2) when
-             (is_constant ~env f1 && is_system_indep ~env f1) ||
-             (is_constant ~env f2 && is_system_indep ~env f2)
+             (* TODO: si: I believe we only care about the fact that
+                [f1]'s (resp. [f2]) semantics is the same in all
+                single systems of [env.system.set], so we can get rid
+                of the pair *)
+             (is_constant ~env f1 && is_single_term_in_context ~env f1) ||
+             (is_constant ~env f2 && is_single_term_in_context ~env f2)
            ->
              Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
          | _ -> None
@@ -817,7 +823,8 @@ module Smart : SmartFO.S with type form = _form = struct
     | Atom (Reach {formula = f; bound = None}) ->
        begin match Term.Smart.destr_impl f with
          | Some (f1,f2) when
-             is_constant ~env f1 && is_system_indep ~env f1 ->
+             (* TODO: si: idem as above *)
+             is_constant ~env f1 && is_single_term_in_context ~env f1 ->
              Some (Atom (Reach {formula = f1; bound = None}), Atom (Reach {formula = f2; bound = None}))
          | _ -> None
        end

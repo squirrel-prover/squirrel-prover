@@ -14,6 +14,13 @@ val is_system_indep :
   ?ty_env:Type.Infer.env ->
   Env.t -> Term.term -> bool 
 
+(** Check if a term [t] can be seen as a single term whose semantics
+    is independent of the system (among all single systems of the
+    system context [env.system]). *)
+val is_single_term_in_context :
+  ?ty_env:Type.Infer.env ->
+  Env.t -> Term.term -> bool 
+
 (** Check if a term represents a deterministic (i.e. 
     non-probabilistic) value. *)
 val is_deterministic :

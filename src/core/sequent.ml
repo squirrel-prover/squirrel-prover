@@ -876,7 +876,7 @@ module Mk (Args : MkArgs) : S with
       let venv = Vars.add_vars args env in
       let env = Env.init ~table ~system:pt.system ~vars:venv () in
       
-      if f_arg_tag.system_indep && not (HTerm.is_system_indep env pt_arg) then
+      if f_arg_tag.system_indep && not (HTerm.is_single_term_in_context env pt_arg) then
         error_pt_apply_not_system_indep table arg_loc ~pt ~arg:pt_arg;
 
       if

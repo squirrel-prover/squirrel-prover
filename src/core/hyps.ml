@@ -570,7 +570,7 @@ let setup_change_hyps_context
             | None -> true);
 
   (* Flags indicating which parts of the context are changed. 
-     - For the set, use SE.equal_modulo, which ignores the labels of
+     - For the set, use [SE.equal_modulo], which ignores the labels of
        the systems and compares the sets as sets (i.e. double inclusion) 
      - For the pair, the labels must be the same, so use equality *)
   let set_unchanged = SE.equal_modulo table new_context.SE.set old_context.SE.set in

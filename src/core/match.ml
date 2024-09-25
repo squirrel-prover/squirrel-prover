@@ -966,7 +966,7 @@ end = struct
             let sys_cntxt = SE.{ set = system; pair = None; } in
             let env = Env.init ~table ~vars:env ~system:sys_cntxt () in
 
-            (tag.Vars.Tag.system_indep && not (HighTerm.is_system_indep                      env t)) ||
+            (tag.Vars.Tag.system_indep && not (HighTerm.is_single_term_in_context            env t)) ||
             (tag.Vars.Tag.const        && not (HighTerm.is_constant                  ~ty_env env t)) ||
             (tag.Vars.Tag.adv          && not (HighTerm.is_ptime_deducible ~si:false ~ty_env env t))
           ) (Mv.bindings mv.subst)
