@@ -349,11 +349,9 @@ let rewrite_equiv_transform
     | None -> None
   in
   let rec aux (t : term) : term =
-    match Term.ty t with
-    | _ when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
-    (* System-independence needed to leave [t] unchanged. *)
-
-    | _ ->
+    (* system-independence needed to leave [t] unchanged *)
+    if HighTerm.is_ptime_deducible ~si:true (TS.env s) t then t
+    else
       match assoc t with
       | None -> aux_rec t
       | Some t' -> t'
