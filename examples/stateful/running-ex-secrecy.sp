@@ -37,10 +37,10 @@ Note that this global meta-logic formula is defined w.r.t. the same system
 This is a technical restriction coming from the fact that, in the current
 implementation of Squirrel, global and local hypotheses cannot coexist.
 *)
-global lemma [default/left,default/left] secrecy (i:index,tau,tau':timestamp):
-  [happens(pred(tau))]
-    -> equiv(frame@tau, diff(s(i)@tau',m))
-    -> [input@tau <> s(i)@tau'].
+global lemma [default/left,default/left] secrecy (i:index,tau,tau':timestamp[const]):
+  [happens(pred tau)] ->
+  equiv(frame@tau, diff(s(i)@tau',m)) ->
+  [input@tau <> s(i)@tau'].
 (**
 The high-level idea of this proof is to use the strong secrecy hypothesis
 to prove the weak secrecy, relying on the `rewrite equiv` tactic which allows

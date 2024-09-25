@@ -309,35 +309,56 @@ let () =
 (*------------------------------------------------------------------*)
 (* Rewrite equiv *)
 
-(** [has_frame_geq s biframe ts] checks that [biframe] contains
-    [frame@ts'] for some [ts'] such that [ts <= ts'] holds wrt [s].
-    Because timestamp comparisons are performed wrt [s] we need to
-    introduce [happens] hypotheses before applying [rewrite equiv];
-    the tactic will make sure that the hypothesis can be preserved
-    through the rewriting. *)
-let has_frame_geq s biframe ts =
-  List.exists
-    (function
-      | Macro (msymb',[],ts') ->
-        msymb' = Term.frame_macro &&
-        TS.query ~precise:true s [`Pos,Comp (`Leq, ts, ts')]
-      | _ -> false)
-    biframe
-
 (** Transform a term according to some equivalence given as a biframe.
     In practice the term is the conclusion of the rewrite-equiv sequent.
     The input [term] is matched against the [src] projection of [biframe],
     rewritten to an equivalent term (to be interpreted wrt the system
     associated to the [dst] projection). *)
 let rewrite_equiv_transform
+    ~(pair : SE.pair)
     ~src:((src_proj,_src_sys) : Term.proj * System.Single.t)
     ~dst:((dst_proj,_dst_sys) : Term.proj * System.Single.t)
-    ~(s      : TS.t)
-    (biframe : Term.terms) (* over [TS.system s], which is [(src,dst)] or [(dst,src)] *)
+    (s       : TS.t)
+    (biframe : Term.terms) (* over [pair], which is [(src,dst)] or [(dst,src)] *)
     (term    : Term.term)  (* over [src] *)
   : Term.term option
   =
   let exception Invalid in
+
+  let table  = TS.table s in
+  let vars   = TS.vars  s in
+  let option = { Match.default_match_option with mode = `EntailLR } in
+  let pair_context = SE.{set = (pair :> SE.t) ; pair = Some pair; } in
+  let hyps =
+    Hyps.change_trace_hyps_context
+      ~old_context:(TS.system s)
+      ~new_context:pair_context
+      ~vars ~table
+      (TS.get_trace_hyps s)
+  in
+
+  (** Take a term [t] over [src] and:
+      1) lift it as a term over [system] 
+         (which is [(src,dst)] or [(dst,src)]);
+      2) check if [biframe ▷ t] (over [system]). *)
+  let try_bideduce (t : Term.term) : bool =
+    let to_deduce =
+      Term.{
+        pat_op_vars   = [];
+        pat_op_tyvars = [];
+        pat_op_term   = Equiv.mk_equiv_atom [t];}
+      (* We could also take [diff(t,t)] to build the bi-term *)
+    in
+    let known = Equiv.mk_equiv_atom biframe in
+    let match_result =
+      Match.E.try_match
+        ~option ~hyps ~env:vars
+        table pair_context known to_deduce
+    in
+    match match_result with
+    | NoMatch _  -> false
+    | Match   mv -> assert (Match.Mvar.is_empty mv); true
+  in
 
   let assoc (t : Term.term) : Term.term option =
     match
@@ -351,6 +372,7 @@ let rewrite_equiv_transform
   let rec aux (t : term) : term =
     (* system-independence needed to leave [t] unchanged *)
     if HighTerm.is_ptime_deducible ~si:true (TS.env s) t then t
+    else if try_bideduce t then t 
     else
       match assoc t with
       | None -> aux_rec t
@@ -364,26 +386,6 @@ let rewrite_equiv_transform
 
     | Diff (Explicit l) ->
       Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)
-
-    (* We can support input@ts (and keep it unchanged) if
-       for some ts' such that ts'>=pred(ts),
-       frame@ts' is a biframe element, i.e. the two
-       projections are frame@ts'.
-       Note that this requires that ts' and pred(ts)
-       happen, which is necessary to have input@ts =
-       att(frame@pred(ts)) and frame@pred(ts) a sublist
-       of frame@ts'. *)
-    | Macro (msymb,_,ts)
-      when msymb = Term.in_macro && has_frame_geq s biframe (mk_pred ts) -> t
-
-    (* Similar special case for frame and exec.
-       We do not have a special case for outputs as they are only
-       available in frames under exec conditions, so this would
-       require a little more work in the tactic. *)
-    | Macro (msymb,_,ts)
-      when msymb = Term.frame_macro && has_frame_geq s biframe ts -> t
-    | Macro (msymb,_,ts)
-      when msymb = Term.exec_macro && has_frame_geq s biframe ts -> t
 
     | _ -> raise Invalid
   in
@@ -405,6 +407,10 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
       | _ -> soft_failure ~loc (Failure "invalid assumption")
     in aux ass
   in
+
+  if biframe.bound <> None then
+    soft_failure ~loc (Failure "concrete logic unsupported");
+  (* TODO: Concrete *)
 
   (* Subgoals are relative to [ass_context.set].
      They are proved in theory as global formulas, immediately changed in
@@ -433,6 +439,7 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
      corresponds to the current goal and new goal (projections [src,dst])
      and the expected systems before and after the transformation. *)
   let
+    pair,
     ((_src_proj, src_sys) as src), 
     ((_dst_proj, dst_sys) as dst) 
     =
@@ -440,8 +447,8 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
     let src = SE.fst pair in
     let dst = SE.snd pair in
     match dir with
-      | `LeftToRight -> src, dst
-      | `RightToLeft -> dst, src
+      | `LeftToRight -> pair, src, dst
+      | `RightToLeft -> pair, dst, src
   in
 
   (* Compute new set annotation, checking by the way
@@ -455,7 +462,8 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
     SE.of_list
   in
   let updated_context =
-    { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
+    { (TS.system s) with set = (updated_set :> SE.arbitrary) }
+  in
 
   let ppe = default_ppe ~table () in
   let warn_unsupported t =
@@ -469,7 +477,7 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
      be applied we can simply drop the hypothesis rather
      than failing completely. *)
   let rewrite (h : Term.term) : Term.term option =
-    match rewrite_equiv_transform ~src ~dst ~s biframe.terms h with
+    match rewrite_equiv_transform ~pair ~src ~dst s biframe.terms h with
     | None -> warn_unsupported h; None
     | x -> x
   in
@@ -480,7 +488,7 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
       ~update_local:rewrite
       updated_context
       (match
-         rewrite_equiv_transform ~src ~dst ~s biframe.terms conclusion
+         rewrite_equiv_transform ~pair ~src ~dst s biframe.terms conclusion
        with
        | Some t -> t
        | None -> warn_unsupported conclusion; Term.mk_false)

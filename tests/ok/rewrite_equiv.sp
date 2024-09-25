@@ -4,10 +4,17 @@ channel c.
 system (A: out(c,of_bool(true)) | B: out(c,of_bool(false))).
 
 name m : message.
+
 global axiom ax_ground : equiv(frame@pred(A),diff(s@B,m)).
-global axiom [default/right,default/left] ax_ground_rev : equiv(frame@pred(A),diff(m,s@B)).
-global axiom [default/right,default/left] ax_ground_ver : equiv(frame@pred(A),diff(s@B,m)).
-global axiom [default/left,default/left] ax_ground_left : equiv(frame@pred(A),diff(s@B,m)).
+
+global axiom [default/right,default/left] ax_ground_rev : 
+  equiv(frame@pred(A),diff(m,s@B)).
+
+global axiom [default/right,default/left] ax_ground_ver : 
+  equiv(frame@pred(A),diff(s@B,m)).
+
+global axiom [default/left,default/left] ax_ground_left t: 
+  equiv(frame@t,diff(s@B,m)).
 
 (** Dummy axioms to check that we are in a given system. *)
 axiom [default/left] check_left : True.
@@ -18,10 +25,10 @@ Proof.
   intro H; by fresh H.
 Qed.
 
-lemma [default] _ : happens(A) => input@A = s@B => False.
+lemma [default] _ : happens(A) => input@A = s@B => false.
 Proof.
   checkfail rewrite equiv ax_ground exn Rewrite_equiv_system_mismatch.
-  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
+  checkfail rewrite equiv ax_ground_left (pred A) exn Rewrite_equiv_system_mismatch.
   checkfail rewrite equiv ax_ground_rev exn Rewrite_equiv_system_mismatch.
 Abort.
 
@@ -33,14 +40,21 @@ Proof.
   intro H; assumption.
 Qed.
 
-lemma [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => input@A = s@B => false.
 Proof.
   intro H.
-  rewrite equiv ax_ground_left.
+  rewrite equiv ax_ground_left (pred A).
   by use m_fresh with A.
 Qed.
 
-lemma [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => exec@A && input@A = s@B => false.
+Proof.
+  intro H.
+  rewrite equiv ax_ground_left A.
+  by use m_fresh with A.
+Qed.
+
+lemma [default/left] _ : happens(A) => input@A = s@B => false.
 Proof.
   intro H.
   rewrite equiv ax_ground.
@@ -48,7 +62,7 @@ Proof.
   by use m_fresh with A.
 Qed.
 
-lemma [default/left] _ : happens(A) => input@A = s@B => False.
+lemma [default/left] _ : happens(A) => input@A = s@B => false.
 Proof.
   intro H.
   rewrite equiv -ax_ground_rev.
@@ -56,19 +70,19 @@ Proof.
   by use m_fresh with A.
 Qed.
 
-lemma [default/right] _ : happens(A) => input@A = s@B => False.
+lemma [default/right] _ : happens(A) => input@A = s@B => false.
 Proof.
   intro H.
-  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
+  checkfail rewrite equiv ax_ground_left (pred A) exn Rewrite_equiv_system_mismatch.
   rewrite equiv ax_ground_ver.
   use check_left.
   by use m_fresh with A.
 Qed.
 
-lemma [default] _ : happens(A) => input@A = s@B => False.
+lemma [default] _ : happens(A) => input@A = s@B => false.
 Proof.
   intro H.
-  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
+  checkfail rewrite equiv ax_ground_left (pred A) exn Rewrite_equiv_system_mismatch.
   project; [1: rewrite equiv ax_ground | 2: rewrite equiv ax_ground_ver];
   by use m_fresh with A.
 Qed.
