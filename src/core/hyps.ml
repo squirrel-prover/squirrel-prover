@@ -588,23 +588,30 @@ let setup_change_hyps_context
       new_left = old_right && new_right = old_left
   in
   
-  (* Can we project formulas from the old to the new context? *)
-  let set_projections : (Term.term -> Term.term) option =
-    if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
-      if SE.subset_modulo table new_context.set old_context.set then
-        let (_, s) = (* rename the projections and project *)
-          SE.mk_proj_subst
-            ~strict:false ~src:old_context.set ~dst:new_context.set
-        in
-        Some (Term.subst_projs ~project:true s)
-      else
-        None
+  (* Is the term system independent, or can we project formulas from
+     the old to the new context? *)
+  let si_or_set_projections : Term.term -> Term.term option =
+    let env = Env.init ~table ~system:old_context ~vars () in
+    if SE.is_any_or_any_comp old_context.set then (fun f -> Some f) else
+      let subst_proj =
+        if SE.subset_modulo table new_context.set old_context.set then
+          let (_, s) = (* rename the projections and project *)
+            SE.mk_proj_subst
+              ~strict:false ~src:old_context.set ~dst:new_context.set
+          in
+          fun t -> Some (Term.subst_projs ~project:true s t)
+        else
+          fun _ -> None
+      in
+      fun f -> 
+        if HighTerm.is_system_indep env f then Some f else
+          subst_proj f
   in
 
   (* A local hypothesis can be kept with a projection from the old to
      the new system, when it exists. *)
-  let update_local f =
-    Utils.omap (fun project -> project f) set_projections
+  let update_local (f : Term.t) : Term.t option =
+    si_or_set_projections f
   in
 
   let rec no_diff = function
