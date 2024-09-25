@@ -3372,11 +3372,15 @@ module E = struct
     | `Eq        -> 
       unif_equiv_eq terms pat_terms st
     | `Contravar ->
-       unif_equiv_eq terms pat_terms st
-    (* FIXME: in contravariant position, we cannot check for inclusion
-       because, in the seq case, this requires to infer the seq
-       variables for the *term* being matched. Consequently, this is no longer
-       a matching problem, but is a unification problem. *)
+      if st.support = [] then
+        match_equiv_incl pat_terms terms st
+      else 
+        unif_equiv_eq terms pat_terms st
+    (* FIXME: in contravariant position with a non-empty support, we
+       cannot check for inclusion because, in the seq case, this
+       requires to infer the seq variables for the *term* being
+       matched. Consequently, this is no longer a matching problem,
+       but is a unification problem. *)
 
     | `Covar     -> 
       match_equiv_incl terms pat_terms st
