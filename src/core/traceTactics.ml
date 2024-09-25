@@ -350,8 +350,7 @@ let rewrite_equiv_transform
   in
   let rec aux (t : term) : term =
     match Term.ty t with
-    | Type.Timestamp | Type.Index 
-      when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
+    | _ when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* System-independence needed to leave [t] unchanged. *)
 
     | _ ->
@@ -361,9 +360,6 @@ let rewrite_equiv_transform
 
   and aux_rec (t : Term.term) : Term.term =
     match t with
-    | t when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
-    (* System-independence needed to leave [t] unchanged. *)
-
     | Term.Tuple l -> Term.mk_tuple (List.map aux l)
 
     | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
