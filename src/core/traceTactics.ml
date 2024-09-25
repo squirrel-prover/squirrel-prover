@@ -330,27 +330,28 @@ let has_frame_geq s biframe ts =
     rewritten to an equivalent term (to be interpreted wrt the system
     associated to the [dst] projection). *)
 let rewrite_equiv_transform
-    ~(src:Term.proj)
-    ~(dst:Term.proj)
-    ~(s:TS.t)
-    (biframe : Term.term list)
-    (term : Term.term) : Term.term option
+    ~src:((src_proj,_src_sys) : Term.proj * System.Single.t)
+    ~dst:((dst_proj,_dst_sys) : Term.proj * System.Single.t)
+    ~(s      : TS.t)
+    (biframe : Term.terms) (* over [TS.system s], which is [(src,dst)] or [(dst,src)] *)
+    (term    : Term.term)  (* over [src] *)
+  : Term.term option
   =
   let exception Invalid in
 
   let assoc (t : Term.term) : Term.term option =
     match
       List.find_opt
-        (fun e -> TS.Reduce.conv_term s (Term.project1 src e) t)
+        (fun e -> TS.Reduce.conv_term s (Term.project1 src_proj e) t)
         biframe
     with
-    | Some e -> Some (Term.project1 dst e)
+    | Some e -> Some (Term.project1 dst_proj e)
     | None -> None
   in
   let rec aux (t : term) : term =
     match Term.ty t with
-    | Type.Timestamp | Type.Index when
-        HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
+    | Type.Timestamp | Type.Index 
+      when HighTerm.is_ptime_deducible ~si:true (TS.env s) t -> t
     (* System-independence needed to leave [t] unchanged. *)
 
     | _ ->
@@ -371,13 +372,13 @@ let rewrite_equiv_transform
       Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)
 
     (* We can support input@ts (and keep it unchanged) if
-     * for some ts' such that ts'>=pred(ts),
-     * frame@ts' is a biframe element, i.e. the two
-     * projections are frame@ts'.
-     * Note that this requires that ts' and pred(ts)
-     * happen, which is necessary to have input@ts =
-     * att(frame@pred(ts)) and frame@pred(ts) a sublist
-     * of frame@ts'. *)
+       for some ts' such that ts'>=pred(ts),
+       frame@ts' is a biframe element, i.e. the two
+       projections are frame@ts'.
+       Note that this requires that ts' and pred(ts)
+       happen, which is necessary to have input@ts =
+       att(frame@pred(ts)) and frame@pred(ts) a sublist
+       of frame@ts'. *)
     | Macro (msymb,_,ts)
       when msymb = Term.in_macro && has_frame_geq s biframe (mk_pred ts) -> t
 
@@ -394,9 +395,11 @@ let rewrite_equiv_transform
   in
   try Some (aux term) with Invalid -> None
 
-(* Rewrite equiv rule on sequent [s] with direction [dir],
-   using assumption [ass] wrt system [ass_context]. *)
+(** Rewrite equiv rule on sequent [s] with direction [dir],
+    using assumption [ass] wrt system [ass_context]. *)
 let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
+  let env   = TS.env   s in
+  let table = TS.table s in
 
   (* Decompose [ass] as [subgoal_1 => .. => subgoal_N => equiv(biframe)].
      We currently require subgoals to be reachability formulas,
@@ -426,8 +429,8 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
             hence their semantics remain unchanged. *)
 
          | LHyp (Local f) ->
-           HighTerm.is_constant     (TS.env s) f &&
-           HighTerm.is_system_indep (TS.env s) f
+           HighTerm.is_constant     env f &&
+           HighTerm.is_system_indep env f
          | LHyp (Global _) -> true)
   in
   let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
@@ -435,28 +438,32 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
      and the expected systems before and after the transformation. *)
-  let src,dst,orig_sys,new_sys =
+  let
+    ((_src_proj, src_sys) as src), 
+    ((_dst_proj, dst_sys) as dst) 
+    =
     let pair = Utils.oget ass_context.SE.pair in
-    let left,lsys = SE.fst pair in
-    let right,rsys = SE.snd pair in
+    let src = SE.fst pair in
+    let dst = SE.snd pair in
     match dir with
-      | `LeftToRight -> left,right,lsys,rsys
-      | `RightToLeft -> right,left,rsys,lsys
+      | `LeftToRight -> src, dst
+      | `RightToLeft -> dst, src
   in
 
   (* Compute new set annotation, checking by the way
      that rewrite equiv applies to sequent [s]. *)
   let updated_set =
     SE.to_list (SE.to_fset (TS.system s).set) |>
-    List.map (fun (p,s) ->
-                if s = orig_sys then p, new_sys else
-                  Tactics.(soft_failure Rewrite_equiv_system_mismatch)) |>
+    List.map
+      (fun (p,s) ->
+         if s = src_sys then p, dst_sys 
+         else Tactics.soft_failure Rewrite_equiv_system_mismatch) |>
     SE.of_list
   in
   let updated_context =
     { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
 
-  let ppe = default_ppe ~table:(TS.table s) () in
+  let ppe = default_ppe ~table () in
   let warn_unsupported t =
     (* cannot use Emacs code `warning>` because it messes-up the boxes *)
     Printer.prt `Result
@@ -465,23 +472,24 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   in
 
   (* Attempt to transform. If the transformation can't
-   * be applied we can simply drop the hypothesis rather
-   * than failing completely. *)
+     be applied we can simply drop the hypothesis rather
+     than failing completely. *)
   let rewrite (h : Term.term) : Term.term option =
     match rewrite_equiv_transform ~src ~dst ~s biframe.terms h with
     | None -> warn_unsupported h; None
     | x -> x
   in
 
+  let conclusion = TS.conclusion s in
   let goal =
     TS.set_conclusion_in_context
       ~update_local:rewrite
       updated_context
       (match
-         rewrite_equiv_transform ~src ~dst ~s biframe.terms (TS.conclusion s)
+         rewrite_equiv_transform ~src ~dst ~s biframe.terms conclusion
        with
        | Some t -> t
-       | None -> warn_unsupported (TS.conclusion s); Term.mk_false)
+       | None -> warn_unsupported conclusion; Term.mk_false)
       s
   in
   subgoals @ [goal]
