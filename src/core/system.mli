@@ -110,4 +110,7 @@ module Single : sig
   val pp : t formatter
 
   val descr_of_shape : Symbols.table -> t -> Action.shape -> Action.descr
+
+  module Map : Map.S with type key = t
+  module Set : Set.S with type elt = t
 end

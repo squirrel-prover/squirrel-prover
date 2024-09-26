@@ -598,9 +598,11 @@ let is_constant ?(env : Env.t option) (t : Term.term) : bool =
   let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
   HighTerm.is_constant env t
 
-let is_single_term_in_context ?(env : Env.t option) (t : Term.term) : bool =
+let is_single_term_in_se
+    ?(env : Env.t option) ~(se:SE.t)(t : Term.term) : bool
+  =
   let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
-  HighTerm.is_single_term_in_context env t
+  HighTerm.is_single_term_in_se ~se env t
 
 let rec get_terms = function
   | Atom (Reach f) -> f.formula::(Option.to_list f.bound)
@@ -707,14 +709,27 @@ module Smart : SmartFO.S with type form = _form = struct
 
     (* case [f = ∃es. f0], check that:
        - [f] is constant
-       - [f0] is a single term *)
-    (* TODO: si: is this necessary? *)
+       - [f0] is a single term w.r.t. [env.system.set] *)
     (* TODO: multi-terms *)
-    (* TODO:Concrete : Check if valid of concrete*)
+    (* TODO:Concrete : Check if valid of concrete *)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists_tagged f with
-        | Some (es,f0) when is_single_term_in_context ~env f0 && is_constant ~env f ->
+        | Some (es,f0)
+          when is_constant                             ~env f  &&
+               is_single_term_in_se ~se:env.system.set ~env f0  ->
+          (* By system independence of [f0] system indep. wrt. {P1,P2}:
+             
+               [f0]_{P1} ≡ [f0]_{P2}
+
+             Thus:
+                 [∃es. f0]_{P1,P2}
+               ≡ [∃es. f0]_{P1} ∧ [∃es. f0]_{P2}
+               ≡ ∃es.[f0]_{P1} ∧ ∃es.[f0]_{P2}    (* property of the logic *)
+               ≡ ∃es.[f0]_{P1} ∧ ∃es.[f0]_{P1}    (* [f0] system indep. wrt. {P1,P2} *)
+               ≡ ∃es.[f0]_{P1}
+               ≡ ∃es.[f0]_{P1,P2}                 (* again by system indep. *)
+          *)
           Some (es, Atom (Reach {formula = f0;bound}))
         | _ -> None
       end
@@ -745,13 +760,15 @@ module Smart : SmartFO.S with type form = _form = struct
     (* case [f = ∃es. f0], check that:
        - [f] is constant
        - [f0] is system-independant *)
-    (* TODO: si: is this necessary? *)
     (* TODO: multi-terms *)
     (* TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists1_tagged f with
-        | Some (es,f0) when is_constant ~env f && is_single_term_in_context ~env f0 ->
+        | Some (es,f0)
+          when is_constant                             ~env f  &&
+               is_single_term_in_se ~se:env.system.set ~env f0  ->
+          (* see justification in [destr_quant_tagged] above *)
           Some (es, Atom (Reach {formula = f0; bound}))
         | _ -> None
       end
@@ -805,14 +822,27 @@ module Smart : SmartFO.S with type form = _form = struct
     | Atom (Reach {formula = f; bound}) ->
        begin match Term.Smart.destr_or f with
          | Some (f1,f2) when
-             (* TODO: si: I believe we only care about the fact that
-                [f1]'s (resp. [f2]) semantics is the same in all
-                single systems of [env.system.set], so we can get rid
-                of the pair *)
-             (is_constant ~env f1 && is_single_term_in_context ~env f1) ||
-             (is_constant ~env f2 && is_single_term_in_context ~env f2)
-           ->
-             Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
+             (is_constant ~env f1 && is_single_term_in_se ~se:env.system.set ~env f1) ||
+             (is_constant ~env f2 && is_single_term_in_se ~se:env.system.set ~env f2)   ->
+           Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
+           (* Proof for the [f1] case, when [env.system.set] is the bi-system {P1,P2}.
+              By system independence of [f1] system indep. wrt. {P1,P2}:              
+
+                [f1]_{P1} ≡ [f1]_{P2}
+
+              Thus:
+                  [f1 ∨ f2]_{P1,P2}
+                ≡ [f1 ∨ f2]_{P1} ∧ [f1 ∨ f2]_{P2}
+                ≡ ([f1]_{P1} ∨ [f2]_{P1}) ∧ ([f1]_{P2} ∨ [f2]_{P2})
+                                                   (* property of the logic *)
+                ≡ ([f1]_{P1} ∨ [f2]_{P1}) ∧ ([f1]_{P1} ∨ [f2]_{P2})
+                                         (* [f0] system indep. wrt. {P1,P2} *)
+                ≡ [f1]_{P1} ∨ ([f2]_{P1} ∧ [f2]_{P2})
+                                                 (* propositional reasoning *)
+                ≡ [f1]_{P1}    ∨ ([f2]_{P1,P2})
+                ≡ [f1]_{P1,P2} ∨ ([f2]_{P1,P2})   (* again by system indep. *)
+           *)
+
          | _ -> None
        end
     | _ -> None
@@ -823,8 +853,8 @@ module Smart : SmartFO.S with type form = _form = struct
     | Atom (Reach {formula = f; bound = None}) ->
        begin match Term.Smart.destr_impl f with
          | Some (f1,f2) when
-             (* TODO: si: idem as above *)
-             is_constant ~env f1 && is_single_term_in_context ~env f1 ->
+             (* Idem as proof above for [destr_or]. *)
+             is_constant ~env f1 && is_single_term_in_se ~se:env.system.set ~env f1 ->
              Some (Atom (Reach {formula = f1; bound = None}), Atom (Reach {formula = f2; bound = None}))
          | _ -> None
        end

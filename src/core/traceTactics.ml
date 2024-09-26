@@ -325,6 +325,7 @@ let rewrite_equiv_transform
   =
   let exception Invalid in
 
+  let env    = TS.env   s in
   let table  = TS.table s in
   let vars   = TS.vars  s in
   let option = { Match.default_match_option with mode = `EntailLR } in
@@ -370,11 +371,11 @@ let rewrite_equiv_transform
     | None -> None
   in
   let rec aux (t : term) : term =
-    (* system-independence needed to leave [t] unchanged *)
-    if HighTerm.is_ptime_deducible ~si:false (TS.env s) t &&
-       HighTerm.is_single_term_in_context    (TS.env s) t then t
-    (* TODO: si: we only care about the fact that [t] is unchanged in
-       the set part of the environment *)
+    (* System-independence needed to leave [t] unchanged when changing
+       the system from [src] to [dst].
+       (Note that [pair = (src,dst)] or [(dst,src)].) *)
+    if HighTerm.is_ptime_deducible ~si:false            env t &&
+       HighTerm.is_single_term_in_se ~se:(pair :> SE.t) env t then t
     else if try_bideduce t then t 
     else
       match assoc t with
@@ -414,31 +415,7 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
   if biframe.bound <> None then
     soft_failure ~loc (Failure "concrete logic unsupported");
   (* TODO: Concrete *)
-
-  (* Subgoals are relative to [ass_context.set].
-     They are proved in theory as global formulas, immediately changed in
-     the tactic to local formulas. These local formulas cannot be proved
-     while keeping all local hypotheses: however, we can keep the pure trace
-     formulas from the local hypotheses.
-     We already know that [ass_context.set] is compatible with the systems
-     used in the equivalence, hence we keep [s]'s context. *)
-  let s' =
-    s |>
-    TS.Hyps.filter
-      (fun (_,ldc) ->
-         match ldc with
-         | LDef _ -> true
-         (* Definition have their own local context,
-            hence their semantics remain unchanged. *)
-
-         | LHyp (Local f) ->
-           HighTerm.is_constant               env f &&
-           HighTerm.is_single_term_in_context env f
-         | LHyp (Global _) -> true)
-  in
-  (* TODO: si: use [change_hyps_context] instead? *)
-  let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
-
+  
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
      and the expected systems before and after the transformation. *)
@@ -468,6 +445,34 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
   let updated_context =
     { (TS.system s) with set = (updated_set :> SE.arbitrary) }
   in
+
+  (* Subgoals are relative to [ass_context.set].
+     They are proved in theory as global formulas, immediately changed in
+     the tactic to local formulas. These local formulas cannot be proved
+     while keeping all local hypotheses: however, we can keep the pure trace
+     formulas from the local hypotheses.
+     We already know that [ass_context.set] is compatible with the systems
+     used in the equivalence, hence we keep [s]'s context. *)
+  let s' =
+    s |>
+    TS.Hyps.filter
+      (fun (_,ldc) ->
+         match ldc with
+         | LDef _ -> true
+         (* Definition have their own local context,
+            hence their semantics remain unchanged. *)
+
+         | LHyp (Local f) ->
+           HighTerm.is_constant                             env f &&
+           HighTerm.is_single_term_in_se ~se:(pair :> SE.t) env f
+         (* System-independence needed to leave [t] unchanged when changing
+            the system from [src] to [dst].
+            (Note that [pair = (src,dst)] or [(dst,src)].) *)
+
+         | LHyp (Global _) -> true)
+  in
+  (* TODO: use [change_hyps_context] instead? *)
+  let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
 
   let ppe = default_ppe ~table () in
   let warn_unsupported t =

@@ -103,7 +103,7 @@ type 'a t = symb
 let symbol_group    = "symbol"
 let namespace_group = "namespace"
 
-let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
+let hash (s : symb) = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
 
 let to_string (s : symb) : string = s.name
 

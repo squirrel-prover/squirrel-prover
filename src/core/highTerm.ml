@@ -1,3 +1,5 @@
+open Utils
+
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
@@ -31,17 +33,19 @@ type tags = {
   (** [t] is constant *)
 
   adv     : bool;
-  (** [t] is computable in ptime by an adversary with no direct
-      access to the protocol randomness  *)
+  (** [t] is computable in ptime by an adversary with no direct access
+      to the protocol randomness *)
 
   si      : bool; 
-  (** [t] system-independent, i.e. its semantics does not change when the system does *)
+  (** [t] system-independent, i.e. its semantics does not change when
+      the system does *)
 
   no_diff : bool;
-  (** [t] does no contain any diff *)
+  (** [t] does no contain any diff (thus [t] could be seen as a single
+      system) *)
 
   det     : bool;
-  (** [t] deterministic *)
+  (** [t] is deterministic *)
 }
 
 let mk_tags
@@ -189,25 +193,48 @@ let is_ptime_deducible
   tags.adv && (not si || tags.si) 
 
 (*------------------------------------------------------------------*)
-let is_single_term_in_context
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+let is_single_term_in_single_systems
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ~(single_systems : System.Single.Set.t option) (* [None] means no information *)
     (env : Env.t) (t : Term.term)
   : bool
   =
   let tags = tags_of_term ~ty_env env t in
-  (SE.is_single_system env.system && tags.no_diff) || tags.si
-  (* a term [t] taken over [env.system.set] or [env.system.pair] is a
-     single in any single system of [env.system] if:
+  ( single_systems <> None                               &&
+    System.Single.Set.cardinal (oget single_systems) = 1 &&
+    tags.no_diff)
+  || tags.si
+  (* a term [t] can be seen as a single term in any single system of
+     [single_systems] if:
 
-     - if it applies to a single system (for both set and pair) and
-       does not use any [diff]
-     - or if it is system-independent *)
-     
+     - [single_systems] is a singleton and [t] does not use any [diff] 
+     - or [t] is system-independent *)
+
+(** Exported, see `.mli` *)
+let is_single_term_in_context
+    ?(ty_env : Type.Infer.env option)
+    ~(context : SE.context)
+    (env : Env.t) (t : Term.term)
+  : bool
+  =
+  let single_systems = SE.single_systems_of_context context in
+  is_single_term_in_single_systems ?ty_env env t ~single_systems
+
+(** Exported, see `.mli` *)
+let is_single_term_in_se
+    ?(ty_env:Type.Infer.env option)
+    ~(se : SE.t)
+    (env : Env.t) (t : Term.term)
+  : bool
+  =
+  let single_systems = SE.single_systems_of_se se in
+  is_single_term_in_single_systems ?ty_env env t ~single_systems
+
 
 (*------------------------------------------------------------------*)
 (** Exported, shadows the previous definition. *)
 let tags_of_term
-    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
     (env : Env.t) (t : Term.term)
   : Vars.Tag.t
   =

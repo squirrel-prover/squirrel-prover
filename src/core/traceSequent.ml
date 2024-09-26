@@ -35,14 +35,27 @@ include Sequent.Mk(struct
             | LHyp (Local f) ->
               begin
                 match bound s with
-                | None ->
-                  if HighTerm.is_constant               env f &&
-                     HighTerm.is_single_term_in_context env f
-                     (* TODO: si: we only care about [(env s).system.set] *)
+                | None ->       (* asymptotic logic *)
+                  if HighTerm.is_constant                             env f &&
+                     HighTerm.is_single_term_in_se ~se:env.system.set env f
+                     (* We can keep an hypothesis ϕ if it is constant
+                        and independent of the systems in
+                        [env.system.set = l1:P1, ..., ln:Pn]. Indeed, in that case:
+
+                          [ϕ]_{li:Pi} ≡ [ϕ]_{lj:Pj}     for all i,j
+
+                        Thus, writing Γ the local hypotheses (other than ϕ) and ψ the conclusion:
+                          [ϕ ⇒ Γ ⇒ ψ]_{l1:P1, ..., ln:Pn}
+                          ≡ ⋀ᵢ [ϕ ⇒ Γ ⇒ ψ]_{li:Pi}                 (* by definition *)
+                          ≡ ⋀ᵢ [ϕ]_{li:Pi} ⇒ [Γ ⇒ ψ]_{li:Pi}       (* property of [_ ⇒ _] *)
+                          ≡ [ϕ]_{l1:P1} ⇒ ⋀ᵢ [Γ ⇒ ψ]_{li:Pi}       (* prop. reasoning  *)
+                          ≡ [ϕ]_{l1:P1, ..., ln:Pn} ⇒ ⋀ᵢ [Γ ⇒ ψ]_{l1:P1, ..., ln:Pn}
+                     *)
                   then
                     ES.Hyps.add
                       (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
                   else es
+                    
                 | Some _ -> es
                   (* TODO:Concrete allow to keep the local hypothesis
                      with bound 0 when the bound of the conclusion is

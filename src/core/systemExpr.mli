@@ -340,11 +340,16 @@ val subst_projs : (Term.proj * Term.proj) list -> 'a expr -> 'a expr
 (** Print the system to the user. *)
 val print_system : Symbols.table -> _ expr -> unit
 
-val is_single_system : context -> bool
-
 (** create the bi-system for the empty system declared in the
     [Prelude] *)
 val empty_system : Symbols.table -> pair 
+
+(** Compute all the single systems occuring in a system context.
+    Return [None] if this is cannot be done. *)
+val single_systems_of_context : context -> System.Single.Set.t option
+
+(** Idem as [single_systems_of_context], but for a system expression. *)
+val single_systems_of_se : t -> System.Single.Set.t option
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing, printing, and conversions} *)

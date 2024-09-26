@@ -14,13 +14,6 @@ val is_system_indep :
   ?ty_env:Type.Infer.env ->
   Env.t -> Term.term -> bool 
 
-(** Check if a term [t] can be seen as a single term whose semantics
-    is independent of the system (among all single systems of the
-    system context [env.system]). *)
-val is_single_term_in_context :
-  ?ty_env:Type.Infer.env ->
-  Env.t -> Term.term -> bool 
-
 (** Check if a term represents a deterministic (i.e. 
     non-probabilistic) value. *)
 val is_deterministic :
@@ -44,3 +37,24 @@ val is_ptime_deducible :
 val tags_of_term :
   ?ty_env:Type.Infer.env ->
   Env.t -> Term.term -> Vars.Tag.t
+
+(*------------------------------------------------------------------*)
+(** Check if a term [t] can be seen as a single term whose semantics
+    is independent of the system (among all single systems of
+    [context]). *)
+val is_single_term_in_context :
+  ?ty_env:Type.Infer.env ->
+  context:SE.context ->
+  Env.t -> Term.term -> bool 
+
+(** Idem as [is_single_term_in_context], but for a system expression. *)
+val is_single_term_in_se :
+  ?ty_env:Type.Infer.env ->
+  se:SE.t ->
+  Env.t -> Term.term -> bool 
+
+(** Idem as [is_single_term_in_context], but for a set of single systems. *)
+val is_single_term_in_single_systems :
+  ?ty_env:Type.Infer.env ->
+  single_systems:System.Single.Set.t option -> (* [None] means no information *)
+  Env.t -> Term.term -> bool 

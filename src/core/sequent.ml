@@ -876,9 +876,11 @@ module Mk (Args : MkArgs) : S with
       let venv = Vars.add_vars args env in
       let env = Env.init ~table ~system:pt.system ~vars:venv () in
       
-      if f_arg_tag.system_indep && not (HTerm.is_single_term_in_context env pt_arg) then
+      if f_arg_tag.system_indep &&
+         not (HTerm.is_single_term_in_context ~context:env.system env pt_arg) then
         error_pt_apply_not_system_indep table arg_loc ~pt ~arg:pt_arg;
-
+      (* TODO: multi-terms: this check probably needs to modified *)
+      
       if
         f_arg_tag.adv && not (HTerm.is_ptime_deducible ~si:false env pt_arg)
       then

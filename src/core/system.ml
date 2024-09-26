@@ -184,4 +184,18 @@ module Single = struct
     let descr = Action.project_descr projection multi_descr in
     Action.check_descr descr;
     descr
+
+  let compare (s1 : t) (s2 : t) =
+    Stdlib.compare
+      (s1.system.id,s1.projection)
+      (s2.system.id,s2.projection)
+
+  module O = struct
+    type _t =  t
+    type  t = _t
+    let compare = compare
+  end
+
+  module Map = Map.Make(O)
+  module Set = Set.Make(O)
 end

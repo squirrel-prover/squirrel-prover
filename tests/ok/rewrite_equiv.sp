@@ -33,7 +33,7 @@ Proof.
 Abort.
 
 (* Check that timestamp atoms are not dropped by rewrite equiv. *)
-lemma [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
+lemma [default/left] _ (tau,tau':timestamp[glob]) : tau <= tau' => tau <= tau'.
 Proof. 
   const tau.
   rewrite equiv ax_ground.

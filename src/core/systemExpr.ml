@@ -510,21 +510,28 @@ let print_system (table : Symbols.table) (system : _ expr) : unit =
       pp system
 
 (*------------------------------------------------------------------*)
-let is_single_system (se : context) : bool =
-  if not (is_fset se.set) then false
-  else
+(** Exported, see `.mli`. *)
+let single_systems_of_context (sc : context) : System.Single.Set.t option =
+  if not (is_fset sc.set) then None else
+    let set = to_fset sc.set in
     let pair_fsets =
-      match se.pair with
+      match sc.pair with
       | None -> []
       | Some pair ->
         [Stdlib.snd (fst pair); Stdlib.snd (snd pair)]
     in
-    let set_fsets = List.map Stdlib.snd (to_list (to_fset se.set)) in
-    let fsets = pair_fsets @ set_fsets in
-    match fsets with
-    | [] -> false
-    | single :: _ -> List.for_all (fun single' -> single = single') fsets
+    let set_fsets = List.map Stdlib.snd (to_list set) in
+    some @@
+    System.Single.Set.of_list (pair_fsets @ set_fsets)
 
+(** Exported, see `.mli`. *)
+let single_systems_of_se (se : t) : System.Single.Set.t option =
+  if not (is_fset se) then None else
+    let set = to_fset se in
+    let set_fsets = List.map Stdlib.snd (to_list set) in
+    some @@
+    System.Single.Set.of_list set_fsets
+  
 (*------------------------------------------------------------------*)
 (** {2 Parsing} *)
 
