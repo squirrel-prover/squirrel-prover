@@ -1139,7 +1139,13 @@ module Babel = struct
     | Local_t  -> fun f -> [f]
     | Global_t -> get_terms
     | Any_t    -> PreAny.get_terms
-(*TODO:Concrete : Do the pretty printer for local formula*)
+
+  let _pp : type a. a f_kind -> a formatter_p = function
+    | Local_t  -> Term._pp
+    | Global_t -> _pp        ?context:None
+    | Any_t    -> PreAny._pp ?context:None
+
+  (*TODO:Concrete : Do the pretty printer for local formula*)
   let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
     | Local_t  -> Term.pp
     | Global_t -> pp

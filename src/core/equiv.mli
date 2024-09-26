@@ -205,6 +205,7 @@ module Babel : sig
 
   val get_terms : 'a f_kind -> 'a -> Term.term list
 
+  val _pp    : 'a f_kind -> 'a formatter_p
   val pp     : 'a f_kind -> 'a formatter
   val pp_dbg : 'a f_kind -> 'a formatter
 

@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module Args = HighTacticsArgs
 module L = Location
@@ -114,8 +115,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let terms_of_conc = Equiv.Babel.get_terms S.conc_kind
     let terms_of_hyp  = Equiv.Babel.get_terms S.hyp_kind
 
-    let pp_hyp  = Equiv.Babel.pp S.hyp_kind
-    let pp_conc = Equiv.Babel.pp S.conc_kind
+    let _pp_hyp  = Equiv.Babel._pp S.hyp_kind
+    let _pp_conc = Equiv.Babel._pp S.conc_kind
 
     let[@warning "-32"] pp_hyp_dbg  = Equiv.Babel.pp_dbg S.hyp_kind
     let[@warning "-32"] pp_conc_dbg = Equiv.Babel.pp_dbg S.conc_kind
@@ -591,16 +592,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Print} *)
 
   let print_messages args s =
-    let messages = List.map (fun arg ->
-        match convert_args s [Args.Theory arg] Args.(Sort Message) with
-        | Args.Arg (Args.Message (f, _)) -> f
-        | _ ->
-          hard_failure ~loc:(L.loc arg)
-            (Tactics.Failure "expected a term of sort message")
-      ) args in
-    let pp_messages ppf messages = List.iteri
-        (fun i m -> Fmt.pf ppf "@.%i:%a@." i Term.pp m)
-        messages in
+    let ppe = default_ppe ~table:(S.table s) () in
+    let messages =
+      List.map (fun arg ->
+          match convert_args s [Args.Theory arg] Args.(Sort Message) with
+          | Args.Arg (Args.Message (f, _)) -> f
+          | _ ->
+            hard_failure ~loc:(L.loc arg)
+              (Tactics.Failure "expected a term of sort message")
+        ) args
+    in
+
+    let pp_messages fmt messages =
+      List.iteri
+        (fun i m -> Fmt.pf fmt "@.%i:%a@." i (Term._pp ppe) m)
+        messages
+    in
     Printer.prt `Result "%a" pp_messages messages;
     s
 
@@ -1137,6 +1144,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Apply a And pattern (this is a destruct) of length [l].
       Note that variables in handlers have not been added to the env yet. *)
   let do_and_pat (hid : Ident.t) (len : int) (s : S.t) : ip_handler list * S.t =
+    let ppe = default_ppe ~table:(S.table s) () in
     let destr_fail pp_err =
       soft_failure
         (Tactics.Failure (Fmt.str "@[<hv 2>cannot destruct:@ @[%t@]@]" pp_err))
@@ -1144,7 +1152,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let get_destr ~orig = function
       | Some x -> x
-      | None -> destr_fail (fun fmt -> Equiv.Any.pp fmt orig)
+      | None -> destr_fail (fun fmt -> Equiv.Any._pp ppe fmt orig)
     in
 
     let env = S.env s in
@@ -1264,7 +1272,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           if has_red then 
             doit form init_destr_list (* start again *)
           else 
-            destr_fail (fun fmt -> S.pp_hyp fmt form)
+            destr_fail (fun fmt -> S._pp_hyp ppe fmt form)
       in
       doit form init_destr_list
 
@@ -2709,13 +2717,14 @@ type form_type =
   (** {3 Depends} *)
 
   let depends Args.(Pair (Message (a1,_), Message (a2,_))) s =
+    let ppe = default_ppe ~table:(S.table s) () in
     let models = S.get_models s in
     let get_action ts =
       match Constr.find_eq_action models ts with
       | Some ts -> ts
       | None ->
         soft_failure
-          (Failure (Fmt.str "cannot find a action equal to %a" Term.pp ts))
+          (Failure (Fmt.str "cannot find a action equal to %a" (Term._pp ppe) ts))
     in
 
     match get_action a1, get_action a2 with
@@ -2732,8 +2741,8 @@ type form_type =
 
       else
         soft_failure
-          (Tactics.NotDepends (Fmt.str "%a" Term.pp a1,
-                               Fmt.str "%a" Term.pp a2))
+          (Tactics.NotDepends (Fmt.str "%a" (Term._pp ppe) a1,
+                               Fmt.str "%a" (Term._pp ppe) a2))
 
     | _ -> assert false
 
