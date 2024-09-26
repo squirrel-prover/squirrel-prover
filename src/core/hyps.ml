@@ -604,8 +604,9 @@ let setup_change_hyps_context
           fun _ -> None
       in
       fun f -> 
-        if HighTerm.is_system_indep env f then Some f else
-          subst_proj f
+        if HighTerm.is_single_term_in_se
+            ~se:[new_context.set; old_context.set] env f
+        then Some f else subst_proj f
   in
 
   (* A local hypothesis can be kept with a projection from the old to
