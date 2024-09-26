@@ -223,11 +223,18 @@ let is_single_term_in_context
 (** Exported, see `.mli` *)
 let is_single_term_in_se
     ?(ty_env:Type.Infer.env option)
-    ~(se : SE.t)
+    ~(se : SE.t list)
     (env : Env.t) (t : Term.term)
   : bool
   =
-  let single_systems = SE.single_systems_of_se se in
+  let single_systems =
+    List.fold_left (fun set e ->
+        let set' = SE.single_systems_of_se e in
+        match set,set' with
+        | Some set, Some set' -> System.Single.Set.union set set' |> some
+        | _ -> None
+      ) (Some System.Single.Set.empty) se
+  in
   is_single_term_in_single_systems ?ty_env env t ~single_systems
 
 

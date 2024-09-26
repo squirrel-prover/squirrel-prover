@@ -374,8 +374,8 @@ let rewrite_equiv_transform
     (* System-independence needed to leave [t] unchanged when changing
        the system from [src] to [dst].
        (Note that [pair = (src,dst)] or [(dst,src)].) *)
-    if HighTerm.is_ptime_deducible ~si:false            env t &&
-       HighTerm.is_single_term_in_se ~se:(pair :> SE.t) env t then t
+    if HighTerm.is_ptime_deducible ~si:false              env t &&
+       HighTerm.is_single_term_in_se ~se:[(pair :> SE.t)] env t then t
     else if try_bideduce t then t 
     else
       match assoc t with
@@ -463,8 +463,8 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
             hence their semantics remain unchanged. *)
 
          | LHyp (Local f) ->
-           HighTerm.is_constant                             env f &&
-           HighTerm.is_single_term_in_se ~se:(pair :> SE.t) env f
+           HighTerm.is_constant                               env f &&
+           HighTerm.is_single_term_in_se ~se:[(pair :> SE.t)] env f
          (* System-independence needed to leave [t] unchanged when changing
             the system from [src] to [dst].
             (Note that [pair = (src,dst)] or [(dst,src)].) *)

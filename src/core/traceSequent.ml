@@ -36,8 +36,8 @@ include Sequent.Mk(struct
               begin
                 match bound s with
                 | None ->       (* asymptotic logic *)
-                  if HighTerm.is_constant                             env f &&
-                     HighTerm.is_single_term_in_se ~se:env.system.set env f
+                  if HighTerm.is_constant                               env f &&
+                     HighTerm.is_single_term_in_se ~se:[env.system.set] env f
                      (* We can keep an hypothesis ϕ if it is constant
                         and independent of the systems in
                         [env.system.set = l1:P1, ..., ln:Pn]. Indeed, in that case:

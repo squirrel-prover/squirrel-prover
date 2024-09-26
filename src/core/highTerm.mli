@@ -47,10 +47,10 @@ val is_single_term_in_context :
   context:SE.context ->
   Env.t -> Term.term -> bool 
 
-(** Idem as [is_single_term_in_context], but for a system expression. *)
+(** Idem as [is_single_term_in_context], but for system expressions. *)
 val is_single_term_in_se :
   ?ty_env:Type.Infer.env ->
-  se:SE.t ->
+  se:SE.t list ->
   Env.t -> Term.term -> bool 
 
 (** Idem as [is_single_term_in_context], but for a set of single systems. *)

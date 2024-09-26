@@ -602,7 +602,7 @@ let is_single_term_in_se
     ?(env : Env.t option) ~(se:SE.t)(t : Term.term) : bool
   =
   let env = odflt (Env.init ~table:(Symbols.builtins_table ()) ()) env in
-  HighTerm.is_single_term_in_se ~se env t
+  HighTerm.is_single_term_in_se ~se:[se] env t
 
 let rec get_terms = function
   | Atom (Reach f) -> f.formula::(Option.to_list f.bound)
