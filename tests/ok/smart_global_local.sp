@@ -201,17 +201,16 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-(* Existential quantification cannot be made global if body is probabilistic. *)
+(* Existential quantification can be made global, even if the body is
+   probabilistic (because the introduced variable is also probabilistic). *)
 global lemma _ : [exists (i:index), q(n,i) = true] -> [false].
 Proof. 
-  (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
+  intro [i H].
 Abort.
 
 global lemma _ (t0 : timestamp): [exists (t:timestamp), t = t0] -> [false].
 Proof.
-  (* Tactic failed: cannot destruct *)
-  checkfail intro [i H] exn Failure.
+  intro [i H].
 Abort.
 
 (*------------------------------------------------------------------*)

@@ -708,7 +708,6 @@ module Smart : SmartFO.S with type form = _form = struct
     | Quant (q', es, f) when q = q' -> Some (es, f)
 
     (* case [f = ∃es. f0], check that:
-       - [f] is constant
        - [f0] is a single term w.r.t. [env.system.set] *)
     (* TODO: multi-terms *)
     (* TODO:Concrete : Check if valid of concrete *)
@@ -716,8 +715,7 @@ module Smart : SmartFO.S with type form = _form = struct
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists_tagged f with
         | Some (es,f0)
-          when is_constant                             ~env f  &&
-               is_single_term_in_se ~se:env.system.set ~env f0  ->
+          when is_single_term_in_se ~se:env.system.set ~env f0  ->
           (* By system independence of [f0] system indep. wrt. {P1,P2}:
              
                [f0]_{P1} ≡ [f0]_{P2}
@@ -758,7 +756,6 @@ module Smart : SmartFO.S with type form = _form = struct
       Some ((v, tag), mk_quant_tagged q es f)
 
     (* case [f = ∃es. f0], check that:
-       - [f] is constant
        - [f0] is system-independant *)
     (* TODO: multi-terms *)
     (* TODO:Concrete : Check if valid of concrete*)
@@ -766,8 +763,7 @@ module Smart : SmartFO.S with type form = _form = struct
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists1_tagged f with
         | Some (es,f0)
-          when is_constant                             ~env f  &&
-               is_single_term_in_se ~se:env.system.set ~env f0  ->
+          when is_single_term_in_se ~se:env.system.set ~env f0  ->
           (* see justification in [destr_quant_tagged] above *)
           Some (es, Atom (Reach {formula = f0; bound}))
         | _ -> None
