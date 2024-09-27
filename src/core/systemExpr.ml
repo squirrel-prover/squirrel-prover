@@ -631,6 +631,7 @@ module Parse = struct
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])
 
+  (** Parse the system context for a local statement. *)
   let parse_local_context table (c : sys_cnt L.located) : context = 
     match L.unloc c with
     | NoSystem ->
@@ -643,6 +644,7 @@ module Parse = struct
       let pair = parse_pair table p in
       { set ; pair = Some pair; }
 
+  (** Parse the system context for a global statement. *)
   let parse_global_context table (c : sys_cnt L.located) : context = 
     let check_compatible set pair =
       if not (compatible table set pair) then 
