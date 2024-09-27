@@ -178,6 +178,7 @@
   "congruence"
   "constraints"
   "auto"
+  "smt"
   "refl"
   "hint"
 ))
