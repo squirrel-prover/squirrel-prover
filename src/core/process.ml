@@ -423,7 +423,7 @@ let parse
   =
 
   (* open a typing environment *)
-  let ty_env = Type.Infer.mk_env () in
+  let ty_env = Infer.mk_env () in
 
   let env = Env.init ~table () in
   let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env args in
@@ -438,7 +438,7 @@ let parse
   let cntxt = Typing.InProc (projs, Term.mk_var time) in
   let mk_cenv env = Typing.{ env; cntxt; } in
 
-  let rec doit (ty_env : Type.Infer.env) (env : Env.t) (proc : Parse.t) : proc =
+  let rec doit (ty_env : Infer.env) (env : Env.t) (proc : Parse.t) : proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Parse.Null -> Null
@@ -505,7 +505,7 @@ let parse
 
     | Parse.Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
-        | None -> TUnivar (Type.Infer.mk_univar ty_env)
+        | None -> TUnivar (Infer.mk_univar ty_env)
         | Some pty -> Typing.convert_ty ~ty_env env pty 
       in
 
@@ -565,11 +565,11 @@ let parse
   let proc = doit ty_env env process in
 
   (* check that the typing environment is closed *)
-  if not (Type.Infer.is_closed ty_env) then
+  if not (Infer.is_closed ty_env) then
     error ~loc:(L.loc process) Freetyunivar;
 
   (* close the typing environment and substitute *)
-  let tysubst = Type.Infer.close ty_env in
+  let tysubst = Infer.close ty_env in
   let args = List.map (Vars.tsubst tysubst) args in
   let proc = tsubst tysubst proc in
 

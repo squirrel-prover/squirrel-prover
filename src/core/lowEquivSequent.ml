@@ -132,8 +132,7 @@ let sanity_check (s : t) : unit =
       
   let tyfv = ty_fv s in
   (* all type variables are bound *)
-  assert (Sid.subset tyfv.tv
-            (Sid.of_list (List.map Type.ident_of_tvar s.env.ty_vars)));
+  assert (Sid.subset tyfv.tv (Sid.of_list s.env.ty_vars));
   (* no univars remaining *)
   assert (Sid.subset tyfv.uv Sid.empty)
 

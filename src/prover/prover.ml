@@ -420,7 +420,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | ProverLib.Srch_inSys (t,_)
     | ProverLib.Srch_term t -> t in
   let cntxt = Typing.{ env; cntxt = InGoal; } in
-  let ty_env = Type.Infer.mk_env () in
+  let ty_env = Infer.mk_env () in
 
   let find (t:Term.term) =
     let pat_op_vars =

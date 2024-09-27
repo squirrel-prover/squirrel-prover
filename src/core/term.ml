@@ -253,9 +253,36 @@ let equal (t : term) (t' : term) : bool = t = t'
 (** {2 Typing} *)
 
 (*------------------------------------------------------------------*)
+let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
+  match t, i with
+  | _, 0 -> [], t
+
+  | Fun (t1, t2), _ -> 
+    let lty, tout = destr_ty_funs t2 (i - 1) in
+    t1 :: lty, tout
+
+  | TUnivar _, _ when ty_env <> None -> 
+    let ty_env = oget ty_env in
+
+    let ty_args =
+      List.init i
+        (fun _ -> Type.TUnivar (Infer.mk_univar ty_env))
+    in
+    let ty_out = Type.TUnivar (Infer.mk_univar ty_env) in
+    let () =
+      match Infer.unify_eq ty_env t (Type.fun_l ty_args ty_out) with
+      | `Fail -> assert false   (* FIXME: can this happen? *)
+      | `Ok   -> ()
+    in
+
+    ty_args, ty_out
+
+  | _ -> assert false   (* FIXME: can this happen? *)
+
+(*------------------------------------------------------------------*)
 let ty ?ty_env (t : term) : Type.ty =
   let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
+    | None        -> true, Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
 
@@ -269,7 +296,7 @@ let ty ?ty_env (t : term) : Type.ty =
       Type.tsubst tsubst (Type.fun_l fty.fty_args fty.fty_out)
 
     | App (t1, l) ->
-      let tys, t_out = Type.destr_funs ~ty_env (ty t1) (List.length l) in      
+      let tys, t_out = destr_ty_funs ~ty_env (ty t1) (List.length l) in      
       check_tys l tys;
       t_out
 
@@ -281,7 +308,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
     | Proj (i,t) -> 
       begin
-        match Type.Infer.norm ty_env (ty t) with
+        match Infer.norm ty_env (ty t) with
         | Type.Tuple tys -> List.nth tys (i - 1)
         | _ -> assert false
       end
@@ -307,7 +334,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
-        match Type.Infer.unify_eq ty_env (ty term) arg_ty with
+        match Infer.unify_eq ty_env (ty term) arg_ty with
         | `Ok -> ()
         | `Fail -> assert false
       ) terms tys
@@ -316,7 +343,7 @@ let ty ?ty_env (t : term) : Type.ty =
   let tty = ty t in
 
   if must_close
-  then Type.tsubst (Type.Infer.close ty_env) tty (* [ty_env] should be closed *)
+  then Type.tsubst (Infer.close ty_env) tty (* [ty_env] should be closed *)
   else tty
                                           
 (*------------------------------------------------------------------*)
@@ -454,31 +481,43 @@ let mk_fun_tuple table fname ?ty_args terms =
   mk_fun table fname ?ty_args [mk_tuple terms]
 
 (*------------------------------------------------------------------*)
+(** Freshen function types *)
+
+let open_ftype (ty_env : Infer.env) (fty : Type.ftype) : Type.ftype_op =
+  let vars_f, ts = Infer.open_tvars ty_env fty.fty_vars in
+
+  (* compute the new function type *)
+  Type.mk_ftype
+    vars_f
+    (List.map (Type.tsubst ts) fty.fty_args)
+    (Type.tsubst ts fty.fty_out)
+
+(*------------------------------------------------------------------*)
 (** See `.mli` *)
 let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
-  let ty_env = Type.Infer.mk_env () in
+  let ty_env = Infer.mk_env () in
 
   let fty = Symbols.OpData.ftype table fname in
-  let opened_fty = Type.open_ftype ty_env fty in 
+  let opened_fty = open_ftype ty_env fty in 
 
   (* decompose [fty]'s type  *)
   let terms_tys, _ =
     let arrow_ty = Type.fun_l opened_fty.fty_args opened_fty.fty_out in
-    Type.destr_funs ~ty_env arrow_ty (List.length terms)
+    destr_ty_funs ~ty_env arrow_ty (List.length terms)
   in
   (* unify types [ty_args] with [terms] *)
   List.iter2 (fun term arg_ty ->
-      match Type.Infer.unify_eq ty_env (ty term) arg_ty with
+      match Infer.unify_eq ty_env (ty term) arg_ty with
       | `Ok -> ()
       | `Fail -> assert false
     ) terms terms_tys;
 
   (* [ty_env] should be closed thanks to types in [terms]. *)
-  assert (Type.Infer.is_closed ty_env);
+  assert (Infer.is_closed ty_env);
 
   let ty_args = 
     List.map (fun uv -> 
-        Type.Infer.norm ty_env (Type.TUnivar uv) 
+        Infer.norm ty_env (Type.TUnivar uv) 
       ) opened_fty.fty_vars
   in
   mk_fun0 fname { fty; ty_args; } terms
@@ -2044,7 +2083,6 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
   in
 
   try doit subst t1 t2; true with AlphaFailed -> false
-
 
 (*------------------------------------------------------------------*)
 (** Evaluate topmost diff operators for a given proj of a biterm.

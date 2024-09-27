@@ -24,7 +24,7 @@ type ty_i =
              
 and ty = ty_i L.located
     
-val convert_ty : ?ty_env:Type.Infer.env -> Env.t -> ty -> Type.ty 
+val convert_ty : ?ty_env:Infer.env -> Env.t -> ty -> Type.ty 
 
 (*------------------------------------------------------------------*)
 (** Parsed binder *)
@@ -270,7 +270,7 @@ val check :
   Env.t ->
   ?local:bool -> ?pat:bool ->
   ?system_info:SE.t Mv.t ->
-  Type.Infer.env -> Term.projs ->
+  Infer.env -> Term.projs ->
   term -> Type.ty ->
   unit
 
@@ -311,7 +311,7 @@ type conv_env = {
     [se]'s single systems. *)
 val convert : 
   ?ty:Type.ty ->
-  ?ty_env:Type.Infer.env -> 
+  ?ty_env:Infer.env -> 
   ?pat:bool ->
   ?system_info:SE.t Mv.t ->
   conv_env -> 
@@ -328,14 +328,14 @@ type bnds_tag_mode =
 
 (** Convert binders. *)  
 val convert_bnds : 
-  ?ty_env:Type.Infer.env -> 
+  ?ty_env:Infer.env -> 
   mode:bnds_tag_mode ->
   Env.t ->
   bnds ->
   Env.t * Vars.vars
 
 val convert_bnds_tagged :
-  ?ty_env:Type.Infer.env -> 
+  ?ty_env:Infer.env -> 
   mode:bnds_tag_mode ->
   Env.t ->
   bnds_tagged ->
@@ -344,7 +344,7 @@ val convert_bnds_tagged :
 (** Convert extended binders.
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
 val convert_ext_bnds :
-  ?ty_env:Type.Infer.env -> 
+  ?ty_env:Infer.env -> 
   mode:bnds_tag_mode ->
   Env.t -> ext_bnds ->
   Env.t * Term.subst * Vars.vars
@@ -359,7 +359,7 @@ val convert_ext_bnds :
     [system_info] is allows to control variable usage in 
     mutli-terms (see [convert]). *)
 val convert_global_formula : 
-  ?ty_env:Type.Infer.env -> 
+  ?ty_env:Infer.env -> 
   ?pat:bool ->
   ?system_info:SE.t Mv.t ->
   conv_env -> global_formula -> Equiv.form

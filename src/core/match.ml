@@ -877,7 +877,7 @@ module Mvar : sig[@warning "-32"]
   (** [table] and [env] are necessary to check that restrictions on 
       variables instantiation have been respected. *)
   val to_subst :
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
     t ->
@@ -951,7 +951,7 @@ end = struct
   let fold f (m : t) (init : 'b) : 'b = Mv.fold f m.subst init
 
   let to_subst
-      ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+      ?(ty_env : Infer.env = Infer.mk_env ())
       ~(mode:[`Match|`Unif])
       (table : Symbols.table) (env : Vars.env)
       (mv : t)
@@ -1164,7 +1164,7 @@ type unif_state = {
   expand_context : Macros.expand_context; 
   (** expantion mode for macros. See [Macros.expand_context]. *)
 
-  ty_env  : Type.Infer.env;
+  ty_env  : Infer.env;
   table   : Symbols.table;
   system  : SE.context; (** system context applying at the current position *)
 
@@ -1188,7 +1188,7 @@ let mk_unif_state
     support        = Vars.Tag.local_vars support;
     env;
     expand_context = Macros.InSequent;
-    ty_env         = Type.Infer.mk_env () ;
+    ty_env         = Infer.mk_env () ;
     table;
     system;
     hyps;
@@ -1546,7 +1546,7 @@ module type S = sig
     ?option:match_option ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps ->
     ?expand_context:Macros.expand_context ->
     Symbols.table ->
@@ -1557,7 +1557,7 @@ module type S = sig
 
   val find : 
     ?option:match_option ->
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     Symbols.table ->
     SE.context ->
     (Term.term pat_op) -> 
@@ -1579,7 +1579,7 @@ let unif_gen (type a)
     ?(option=default_match_option)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ?(hyps   : Hyps.TraceHyps.hyps = Hyps.TraceHyps.empty)
     ?(expand_context : Macros.expand_context = InSequent)
     (table   : Symbols.table)
@@ -1591,11 +1591,11 @@ let unif_gen (type a)
   let init_ty_env, ty_env =     (* copy [ty_env], to reset it if necessary *)
     match ty_env with
     | None -> 
-      let e = Type.Infer.mk_env () in 
+      let e = Infer.mk_env () in 
       e, e (* [init_ty_env] does not matter in that case *)
 
     | Some ty_env ->
-      ty_env, Type.Infer.copy ty_env
+      ty_env, Infer.copy ty_env
   in
 
   let supp1, supp2 = t1.pat_op_vars, t2.pat_op_vars in
@@ -1656,7 +1656,7 @@ let unif_gen (type a)
   try
     let mv = fmatch ~mode t1.pat_op_term t2.pat_op_term st_init in
     (* save the type env, as we found a match *)
-    Type.Infer.set ~tgt:init_ty_env ~value:ty_env; 
+    Infer.set ~tgt:init_ty_env ~value:ty_env; 
     Match mv
   with
   | NoMatch minfos -> NoMatch minfos
@@ -1686,7 +1686,7 @@ module T (* : S with type t = Term.term *) = struct
 
   (*------------------------------------------------------------------*)
   let unif_ty (st : unif_state) (ty1 : Type.ty) (ty2 : Type.ty) : unit =
-    if Type.Infer.unify_eq st.ty_env ty1 ty2 = `Fail then
+    if Infer.unify_eq st.ty_env ty1 ty2 = `Fail then
       no_unif () 
     else ()
 
@@ -1884,7 +1884,7 @@ module T (* : S with type t = Term.term *) = struct
 
         if tag <> tag' then no_unif ();
         
-        if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
+        if Infer.unify_eq st.ty_env ty ty' = `Fail then
           no_unif ();
       ) vs vs';
 
@@ -1936,7 +1936,7 @@ module T (* : S with type t = Term.term *) = struct
         (* first time we see [v]: store the substitution and add the
            type information. *)
         | exception Not_found ->
-          if Type.Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
+          if Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
             no_unif ();
 
           (* When [st.allow_capture] is false (which is the default), check that we

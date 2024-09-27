@@ -180,7 +180,7 @@ end
     Thus, the function is stored here as a global variable. *)
 val set_resolve_path :
   (
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     Symbols.table -> 
     Symbols.p_path ->               (* surface path [p] *)
     ty_args:Type.ty list option ->  (* optional type arguments of [p] *)
@@ -194,7 +194,7 @@ val set_resolve_path :
     ]
       * Type.ftype_op
       * applied_ftype
-      * Type.Infer.env
+      * Infer.env
     ) list
   ) -> unit
     
@@ -213,7 +213,7 @@ val pp_info : ?ppe:ppenv -> unit -> pp_info
 val pp_with_info : pp_info -> term formatter
 
 (*------------------------------------------------------------------*)
-val ty : ?ty_env:Type.Infer.env -> term -> Type.ty
+val ty : ?ty_env:Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
@@ -585,6 +585,11 @@ val destr_action : term -> (Symbols.action * term list) option
 val destr_pair : term -> (term * term) option
 
 (*------------------------------------------------------------------*)
+(** Destruct a given number of [Fun]. 
+    If [ty_env] is not [None], may add new type equalities to do so. *)
+val destr_ty_funs : ?ty_env:Infer.env -> Type.ty -> int -> Type.ty list * Type.ty
+
+(*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
 val not_simpl : term -> term
@@ -719,5 +724,7 @@ val alpha_conv : ?subst:subst -> term -> term -> bool
     Raise if alpha-conversion fails. *)
 val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 
 
-
-
+(*------------------------------------------------------------------*)
+(** [open_ftype fty] opens an [ftype] by refreshes its quantified 
+    type variables. *)
+val open_ftype : Infer.env -> Type.ftype -> Type.ftype_op

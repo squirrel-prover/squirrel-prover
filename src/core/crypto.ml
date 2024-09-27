@@ -2739,7 +2739,7 @@ let parse_crypto_args
   =
   let parse1 (arg : Args.crypto_arg) : Const.t=
     (* open a type unification environment *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
 
     let env, vars = 
       Typing.convert_bnds ~ty_env ~mode:NoTags env (odflt [] arg.bnds) 
@@ -2770,11 +2770,11 @@ let parse_crypto_args
     in
 
     (* close the type unification environment *)
-    if not (Type.Infer.is_closed ty_env) then
+    if not (Infer.is_closed ty_env) then
       Tactics.hard_failure ~loc:(loc_of_crypto_arg arg)
         (Failure "some type variables could not be inferred");
 
-    let tsubst = Type.Infer.close ty_env in
+    let tsubst = Infer.close ty_env in
     Const.tsubst tsubst const
   in
   let get_terms = fun (x:Const.t) -> x.term@x.cond in 
@@ -3029,7 +3029,7 @@ module Parse = struct
           let ty = 
             match pv.vd_ty with 
             | Some pty -> Typing.convert_ty env pty
-            | None     -> Type.TUnivar (Type.Infer.mk_univar ty_env)
+            | None     -> Type.TUnivar (Infer.mk_univar ty_env)
           in
           let env, var = make_exact_var env pv.vd_name ty in
           let init, _ = 
@@ -3064,7 +3064,7 @@ module Parse = struct
     let tyout = 
       match po.o_tyout with 
       | Some pty -> Typing.convert_ty env pty
-      | None     -> Type.TUnivar (Type.Infer.mk_univar ty_env)
+      | None     -> Type.TUnivar (Infer.mk_univar ty_env)
     in
 
     let body = po.o_body in
@@ -3082,7 +3082,7 @@ module Parse = struct
     let output = 
       match body.bdy_ret with
       | None -> 
-        if Type.Infer.unify_eq ty_env Type.tmessage tyout <> `Ok then
+        if Infer.unify_eq ty_env Type.tmessage tyout <> `Ok then
           failure (L.loc po.o_name) (Failure "return type should be message");
         Term.empty
 
@@ -3114,7 +3114,7 @@ module Parse = struct
     in
 
     (* open a type unification environment *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
 
     (* parse global samplings declarations *)
     let env, glob_smpls = parse_sample_decls env decl.g_rnds in
@@ -3134,10 +3134,10 @@ module Parse = struct
     in
 
     (* close the type unification environment *)
-    if not (Type.Infer.is_closed ty_env) then
+    if not (Infer.is_closed ty_env) then
       failure loc (Failure "some type variables could not be inferred");
 
-    let tsubst = Type.Infer.close ty_env in
+    let tsubst = Infer.close ty_env in
     tsubst_game tsubst game
 
 end

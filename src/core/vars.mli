@@ -133,7 +133,7 @@ val name : var -> string
 
 val ty : var -> Type.ty
 
-val norm_ty : Type.Infer.env -> var -> var
+val norm_ty : Infer.env -> var -> var
 
 val tsubst  : Type.tsubst -> var -> var
 

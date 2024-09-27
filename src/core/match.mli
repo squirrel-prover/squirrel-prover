@@ -236,7 +236,7 @@ module Mvar : sig
   (** [table] and [env] are necessary to check that restrictions on 
       variables instantiation have been respected. *)
   val to_subst :
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     mode:[`Match|`Unif] ->
     Symbols.table -> Vars.env ->
     t ->
@@ -307,7 +307,7 @@ module type S = sig
     ?option:match_option ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps ->
     ?expand_context:Macros.expand_context ->
     Symbols.table ->
@@ -320,7 +320,7 @@ module type S = sig
       pattern. *)
   val find : 
     ?option:match_option ->
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     Symbols.table ->
     SE.context ->
     Term.term Term.pat_op -> 
@@ -425,7 +425,7 @@ module E : sig
   (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
     ?option:match_option ->
-    ?ty_env:Type.Infer.env ->
+    ?ty_env:Infer.env ->
     Symbols.table ->
     SE.context ->
     t Term.pat_op -> 

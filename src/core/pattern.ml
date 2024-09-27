@@ -4,11 +4,11 @@ module C = Concrete
 
 let open_pat (type a )
     (f_kind : a Equiv.f_kind)
-    (ty_env : Type.Infer.env)
+    (ty_env : Infer.env)
     (p      : (a*C.bound) Term.pat)
   : Type.tsubst *  (a*C.bound) Term.pat_op
   =
-  let univars, tsubst = Type.Infer.open_tvars ty_env p.pat_tyvars in
+  let univars, tsubst = Infer.open_tvars ty_env p.pat_tyvars in
   let conclusion,bound = p.pat_term in
   let conclusion = Equiv.Babel.tsubst f_kind tsubst conclusion in
   let bound = C.bound_tsubst tsubst bound in

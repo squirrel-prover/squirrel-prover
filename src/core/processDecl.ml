@@ -67,7 +67,7 @@ let parse_state_decl
   let ts_init = Term.mk_action Symbols.init_action [] in
 
   (* open a typing environment *)
-  let ty_env = Type.Infer.mk_env () in
+  let ty_env = Infer.mk_env () in
   
   let env = Env.init ~table () in
   let conv_env = Typing.{ env; cntxt = InProc ([], ts_init); } in
@@ -81,11 +81,11 @@ let parse_state_decl
   let t, out_ty = Typing.convert ~ty_env ?ty:out_ty conv_env init_body in
 
   (* check that the typing environment is closed *)
-  if not (Type.Infer.is_closed ty_env) then
+  if not (Infer.is_closed ty_env) then
     Typing.conv_err (L.loc init_body) Freetyunivar;
 
   (* close the typing environment and substitute *)
-  let tsubst = Type.Infer.close ty_env in
+  let tsubst = Infer.close ty_env in
   let t = Term.tsubst tsubst t in
   let args = List.map (Vars.tsubst tsubst) args in
 
@@ -111,7 +111,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     in
 
     (* open a typing environment *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
 
     (* translate arguments *)
     let env = Env.init ~table ~ty_vars () in
@@ -146,11 +146,11 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     in
 
     (* check that the typing environment is closed *)
-    if not (Type.Infer.is_closed ty_env) then
+    if not (Infer.is_closed ty_env) then
       error (L.loc decl.op_name) KDecl (Failure "some types could not be inferred");
 
     (* close the typing environment and substitute *)
-    let tsubst = Type.Infer.close ty_env in
+    let tsubst = Infer.close ty_env in
     let args = List.map (Vars.tsubst tsubst) args in
     let out_ty = Type.tsubst tsubst out_ty in
     (* substitue in [body] below, in the concrete case *)
@@ -219,7 +219,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     in
 
     (* open a typing environment *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
 
     let env =
       let system = SE.{
@@ -293,7 +293,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     in
 
     (* check that the typing environment is closed *)
-    if not (Type.Infer.is_closed ty_env) then
+    if not (Infer.is_closed ty_env) then
       begin
         let loc =
           match decl.pred_body with Some b -> L.loc b | None -> L.loc decl.pred_name
@@ -302,7 +302,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
       end;
 
     (* close the typing environment and substitute *)
-    let tsubst = Type.Infer.close ty_env in
+    let tsubst = Infer.close ty_env in
     let multi_args =
       List.map (fun (info, args) ->
           info, List.map (Vars.tsubst tsubst) args

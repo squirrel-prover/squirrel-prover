@@ -253,7 +253,6 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
     let tv =
       try
         List.find (fun tv' ->
-            let tv' = Type.ident_of_tvar tv' in
             Ident.name tv' = L.unloc tv_l
           ) env.ty_vars
       with Not_found ->
@@ -278,7 +277,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
     match ty_env with
     | None -> conv_err (L.loc pty) (Failure "type holes not allowed") 
     | Some ty_env ->
-      Type.TUnivar (Type.Infer.mk_univar ty_env)
+      Type.TUnivar (Infer.mk_univar ty_env)
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion contexts and states} *)
@@ -318,7 +317,7 @@ type conv_state = {
   type_checking : bool;
   (** if [true], we are only type-checking the term *)
 
-  ty_env        : Type.Infer.env;
+  ty_env        : Infer.env;
 }
 
 let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
@@ -331,12 +330,12 @@ let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
 (** {3 Types} *)
 
 let ty_error ty_env loc (t : Term.term) ~(got : Type.ty) ~(expected : Type.ty) =
-  let got      = Type.Infer.norm ty_env got in
-  let expected = Type.Infer.norm ty_env expected in
+  let got      = Infer.norm ty_env got in
+  let expected = Infer.norm ty_env expected in
   Error (loc, Type_error (t, expected, got))
 
 let check_ty_eq state ~loc ~(of_t : Term.term) (t_ty : Type.ty) (ty : Type.ty) : unit =
-  match Type.Infer.unify_eq state.ty_env t_ty ty with
+  match Infer.unify_eq state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
     raise (ty_error state.ty_env loc of_t ~got:t_ty ~expected:ty)
@@ -458,7 +457,7 @@ let convert_tags ~(mode : bnds_tag_mode) (parsed_tags : var_tags) : Vars.Tag.t =
     
 (** Convert a tagged variable binding *)
 let convert_bnd_tagged
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) ((vsymb, (p_ty, p_tags)) : bnd_tagged)
   : Env.t * Vars.tagged_var
   =
@@ -469,7 +468,7 @@ let convert_bnd_tagged
 
 (** Convert a list of tagged variable bindings *)
 let convert_bnds_tagged
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
   =
   let env, vars = List.map_fold (convert_bnd_tagged ?ty_env ~mode) env bnds in
@@ -477,7 +476,7 @@ let convert_bnds_tagged
 
 (** Convert a list of variable bindings *)
 let convert_bnds
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) (bnds : bnds) : Env.t * Vars.vars
   =
   (* add an empty list of tags and use [convert_bnds_tagged] *)
@@ -489,7 +488,7 @@ let convert_bnds
 (*------------------------------------------------------------------*)
 (** See [convert_ext_bnds] in `.mli` *)
 let convert_ext_bnd
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) (ebnd : ext_bnd)
   : (Env.t * Term.subst) * Vars.var
   =
@@ -540,7 +539,7 @@ let convert_ext_bnd
 
 (** See `.mli` *)
 let convert_ext_bnds
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) (ebnds : ext_bnds)
   : Env.t * Term.subst * Vars.vars
   =
@@ -618,7 +617,7 @@ let validate
     - [p]'s arguments must be of type [args_ty]. 
     - optionally, [p] takes a [@] argument of type [ty_rec] *)
 let resolve_path
-    ?(ty_env = Type.Infer.mk_env ())
+    ?(ty_env = Infer.mk_env ())
     (table    : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list option)
     ~(args_ty : Type.ty list)
@@ -632,7 +631,7 @@ let resolve_path
     ]
       * Type.ftype_op
       * Term.applied_ftype
-      * Type.Infer.env
+      * Infer.env
     ) list
   = 
   let exception Failed in
@@ -646,16 +645,16 @@ let resolve_path
   let check_arg_tys
       ?(ty_rec_symb : Type.ty option) (fty : Type.ftype) 
     :
-      Type.ftype_op * Term.applied_ftype * Type.Infer.env
+      Type.ftype_op * Term.applied_ftype * Infer.env
     =
-    let ty_env = Type.Infer.copy ty_env in
+    let ty_env = Infer.copy ty_env in
     let check_ty ty1 ty2 =
-      match Type.Infer.unify_eq ty_env ty1 ty2 with
+      match Infer.unify_eq ty_env ty1 ty2 with
       | `Ok   -> ()
       | `Fail -> failed ()
     in
 
-    let fty_op = Type.open_ftype ty_env fty in
+    let fty_op = Term.open_ftype ty_env fty in
     let fty_vars = List.map (fun u -> Type.TUnivar u) fty_op.fty_vars in
     
     (* if the user manually provided type arguments, process them *)    
@@ -692,7 +691,7 @@ let resolve_path
     let applied_fty =
       let ty_args = 
         List.map (fun u -> 
-            Type.Infer.norm ty_env u
+            Infer.norm ty_env u
           ) fty_vars 
       in
       Term.{ fty = fty; ty_args; }
@@ -886,7 +885,7 @@ and convert0
   | App (t1, l) -> 
     let l_tys, l =
       List.map (fun t2 ->
-          let ty2 = Type.TUnivar (Type.Infer.mk_univar state.ty_env) in
+          let ty2 = Type.TUnivar (Infer.mk_univar state.ty_env) in
           let t2 = conv ty2 t2 in
           ty2, t2
         ) l
@@ -901,17 +900,17 @@ and convert0
   | Tuple l -> 
     let terms =
       List.map (fun t ->
-          let ty = Type.TUnivar (Type.Infer.mk_univar state.ty_env) in
+          let ty = Type.TUnivar (Infer.mk_univar state.ty_env) in
           conv ty t
         ) l
     in
     Term.mk_tuple terms
 
   | Proj (i, t) -> 
-    let ty_t = Type.TUnivar (Type.Infer.mk_univar state.ty_env) in
+    let ty_t = Type.TUnivar (Infer.mk_univar state.ty_env) in
     let t_proj = Term.mk_proj (L.unloc i) (conv ty_t t) in
 
-    let () = match Type.Infer.norm state.ty_env ty_t with
+    let () = match Infer.norm state.ty_env ty_t with
       | Type.Tuple l -> 
         if List.length l < L.unloc i then
           conv_err (L.loc i) (BadTermProj (List.length l, L.unloc i))
@@ -967,7 +966,7 @@ and convert0
     in
 
     let t = 
-      let tyv = Type.Infer.mk_univar state.ty_env in
+      let tyv = Infer.mk_univar state.ty_env in
       conv ~env (Type.TUnivar tyv) t 
     in
     let t = Term.subst subst t in
@@ -992,7 +991,7 @@ and convert0
     in
 
     let t = 
-      let tyv = Type.Infer.mk_univar state.ty_env in
+      let tyv = Infer.mk_univar state.ty_env in
       conv ~env (Type.TUnivar tyv) t 
     in
     let t = Term.subst subst t in
@@ -1014,7 +1013,7 @@ and convert_app
   in
 
   let args_ty =                 (* types of arguments [args] *)
-    List.map (fun _ -> Type.TUnivar (Type.Infer.mk_univar state.ty_env)) args
+    List.map (fun _ -> Type.TUnivar (Infer.mk_univar state.ty_env)) args
   in
   (* convert arguments *)
   let args = List.map2 (convert state) args args_ty in
@@ -1032,14 +1031,14 @@ and convert_app
       ~ty_env:state.ty_env
       state.env.table f
       ~ty_args
-      ~args_ty:(List.map (Type.Infer.norm state.ty_env) args_ty)
+      ~args_ty:(List.map (Infer.norm state.ty_env) args_ty)
       ~ty_rec
   in
 
   if List.length symbs = 0 then 
     failure_no_symbol f
-      (List.map (Type.Infer.norm state.ty_env) args_ty) 
-      (Type.Infer.norm state.ty_env ty) ;
+      (List.map (Infer.norm state.ty_env) args_ty) 
+      (Infer.norm state.ty_env ty) ;
 
   if List.length symbs >= 2 then 
     failure_cannot_desambiguate (Symbols.p_path_loc f) symbs;
@@ -1047,7 +1046,7 @@ and convert_app
   let symb, fty_op, applied_fty, ty_env = as_seq1 symbs in
 
   (* store the typing environement of the symbol that was selected *)
-  Type.Infer.set ~tgt:state.ty_env ~value:ty_env;
+  Infer.set ~tgt:state.ty_env ~value:ty_env;
 
   let nb_args = List.length applied_fty.fty.fty_args in
   let args, args' = List.takedrop nb_args args in
@@ -1338,7 +1337,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   let pred = Predicate.get table psymb in
 
   (* refresh all type variables in [pred.ty_vars] and substitute *)
-  let ty_vars, ts = Type.Infer.open_tvars st.ty_env pred.ty_vars in
+  let ty_vars, ts = Infer.open_tvars st.ty_env pred.ty_vars in
   let pred_args_multi =
     List.map (fun (se, args) -> se, List.map (Vars.tsubst ts) args) pred.args.multi
   in
@@ -1357,7 +1356,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
  
       List.iter2
         (fun ty1 ty2 ->
-           match Type.Infer.unify_eq st.ty_env ty1 ty2 with
+           match Infer.unify_eq st.ty_env ty1 ty2 with
            | `Ok   -> ()
            | `Fail -> assert false) (* cannot fail *)
         ty_vars ty_args;
@@ -1447,7 +1446,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
         let st = { st with env } in
         let e =
           List.map (fun t ->
-              let ty = Type.TUnivar (Type.Infer.mk_univar st.ty_env) in
+              let ty = Type.TUnivar (Infer.mk_univar st.ty_env) in
               convert st t ty
             ) p_e
         in
@@ -1509,7 +1508,7 @@ let check
     (env : Env.t)
     ?(local=false) ?(pat=false)
     ?(system_info = Mv.empty)
-    (ty_env : Type.Infer.env)
+    (ty_env : Infer.env)
     (projs : Term.projs)
     (t : term) (s : Type.ty) 
   : unit 
@@ -1526,7 +1525,7 @@ let check
 (** Exported *)
 let convert 
     ?(ty     : Type.ty option)
-    ?(ty_env : Type.Infer.env option) 
+    ?(ty_env : Infer.env option) 
     ?(pat    : bool = false)
     ?(system_info = Mv.empty)
     (cenv    : conv_env) 
@@ -1534,11 +1533,11 @@ let convert
   : Term.term * Type.ty
   =
   let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
+    | None        -> true, Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
   let ty = match ty with
-    | None    -> Type.TUnivar (Type.Infer.mk_univar ty_env) 
+    | None    -> Type.TUnivar (Infer.mk_univar ty_env) 
     | Some ty -> ty 
   in
   let state = mk_state ~system_info cenv.env cenv.cntxt pat ty_env in
@@ -1546,21 +1545,21 @@ let convert
 
   if must_close then
     begin
-      if not (Type.Infer.is_closed state.ty_env) then
+      if not (Infer.is_closed state.ty_env) then
         conv_err (L.loc tm) Freetyunivar;
 
-      let tysubst = Type.Infer.close ty_env in
+      let tysubst = Infer.close ty_env in
       Term.tsubst tysubst t, Type.tsubst tysubst ty
     end
   else
-    t, Type.Infer.norm ty_env ty
+    t, Infer.norm ty_env ty
 
 (*------------------------------------------------------------------*)
 (** {3 Global formulas conversion} *)
 
 (** Exported *)
 let convert_global_formula 
-    ?(ty_env : Type.Infer.env option) 
+    ?(ty_env : Infer.env option) 
     ?(pat    : bool = false)
     ?(system_info = Mv.empty)
     (cenv : conv_env)
@@ -1568,7 +1567,7 @@ let convert_global_formula
   : Equiv.form
   =
   let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
+    | None        -> true, Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
   let state = mk_state ~system_info cenv.env cenv.cntxt pat ty_env in
@@ -1576,10 +1575,10 @@ let convert_global_formula
 
   if must_close then
     begin
-      if not (Type.Infer.is_closed state.ty_env) then
+      if not (Infer.is_closed state.ty_env) then
         conv_err (L.loc p) Freetyunivar;
 
-      let tysubst = Type.Infer.close ty_env in
+      let tysubst = Infer.close ty_env in
       Equiv.tsubst tysubst t
     end
   else
@@ -1679,7 +1678,7 @@ let () =
           [mk @@ Tuple [mk_app (mk_symb ([],mk "h")) [mk @@ Tuple [x;y]]; x; y]]
       in
       let t = mk t_i in
-      let ty_env = Type.Infer.mk_env () in
+      let ty_env = Infer.mk_env () in
       check env ty_env [] t Type.tmessage ;
       let exception Ok in
       Alcotest.check_raises

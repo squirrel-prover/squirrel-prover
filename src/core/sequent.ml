@@ -693,7 +693,7 @@ module Mk (Args : MkArgs) : S with
       Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). 
       Optionally apply it to some user-provided type arguments. *)
   let pt_of_assumption
-      (ty_env   : Type.Infer.env) 
+      (ty_env   : Infer.env) 
       (p        : Symbols.p_path)
       (ty_args  : Type.ty list option)
       (s        : t)
@@ -729,7 +729,7 @@ module Mk (Args : MkArgs) : S with
       in
 
       (* Open the lemma type variables. *)
-      let ty_vars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+      let ty_vars, tsubst = Infer.open_tvars ty_env lem.ty_vars in
 
       (* if the user provided type variables, apply them *)
       if ty_args <> None then
@@ -743,7 +743,7 @@ module Mk (Args : MkArgs) : S with
 
           List.iter2
             (fun ty1 ty2 ->
-               match Type.Infer.unify_eq ty_env ty1 ty2 with
+               match Infer.unify_eq ty_env ty1 ty2 with
                | `Ok   -> ()
                | `Fail -> assert false) (* cannot fail *)
             ty_vars ty_args;
@@ -846,7 +846,7 @@ module Mk (Args : MkArgs) : S with
       conclusion and instantiate it with given term. *)
   let pt_apply_var_forall
       ~(arg_loc:L.t)
-      (ty_env : Type.Infer.env)
+      (ty_env : Infer.env)
       (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) (pt_arg : Term.term)
     : PT.t
@@ -941,7 +941,7 @@ module Mk (Args : MkArgs) : S with
       [pt]'s substitution. *)
   let pt_apply_var_impl
       (* ~(loc : L.t)  *) ~(loc_arg : L.t)
-      (ty_env : Type.Infer.env) (s : S.t)
+      (ty_env : Infer.env) (s : S.t)
       (pt : PT.t) (arg : PT.t)
     : PT.t
     =
@@ -1057,7 +1057,7 @@ module Mk (Args : MkArgs) : S with
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec do_convert_pt_gen
-      (ty_env : Type.Infer.env)
+      (ty_env : Infer.env)
       (mv : Mvar.t)
       (p_pt : Typing.pt)
       (s : S.t) : ghyp * PT.t
@@ -1081,7 +1081,7 @@ module Mk (Args : MkArgs) : S with
     ghyp, pt
 
   and do_convert_path
-      (ty_env  : Type.Infer.env)
+      (ty_env  : Infer.env)
       (init_mv : Mvar.t)
       (p       : Symbols.p_path)
       (ty_args : Typing.ty list option)
@@ -1097,7 +1097,7 @@ module Mk (Args : MkArgs) : S with
     lem_name, pt
 
   and do_convert_pt_app
-      (ty_env  : Type.Infer.env)
+      (ty_env  : Infer.env)
       (init_mv : Mvar.t)
       (pt_app  : Typing.pt_app)
       (s       : S.t) 
@@ -1126,7 +1126,7 @@ module Mk (Args : MkArgs) : S with
 
     (** Apply [pt] to [p_arg] when [pt] is an implication. *)
     let do_impl
-        (ty_env : Type.Infer.env)
+        (ty_env : Infer.env)
         (pt : PT.t) (pt_impl_arg : pt_impl_arg)
       : PT.t
       =
@@ -1184,7 +1184,7 @@ module Mk (Args : MkArgs) : S with
   (** Closes inferred variables from [pt.args] by [pt.mv]. *)
   let close
       (loc : L.t)
-      (ty_env : Type.Infer.env) (table : Symbols.table) (env : Vars.env)
+      (ty_env : Infer.env) (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) : PT.t
     =
     (* clear infered variables from [pat_vars] *)
@@ -1238,7 +1238,7 @@ module Mk (Args : MkArgs) : S with
     let loc = L.loc p_pt in
 
     (* create a fresh unienv and matching env *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
     let mv = Mvar.empty in
 
     (* convert the proof term *)
@@ -1263,7 +1263,7 @@ module Mk (Args : MkArgs) : S with
       Tactics.soft_failure Tactics.CannotInferPats;
 
     (* close the unienv and generalize remaining univars *)
-    let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
+    let pat_tyvars, tysubst = Infer.gen_and_close ty_env in
     let form = Equiv.Babel.tsubst Equiv.Any_t tysubst pt.form in
     let subgs = List.map (Equiv.Babel.tsubst Equiv.Any_t tysubst) pt.subgs in
     let args =

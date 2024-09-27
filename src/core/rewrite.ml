@@ -47,7 +47,7 @@ type rw_state = {
   init_subs  : Term.term list;
   init_right : Term.term;
   
-  ty_env : Type.Infer.env;
+  ty_env : Infer.env;
 
   found_instance : [ `False | `Found of found ];
 }
@@ -117,8 +117,8 @@ let mk_state
   in
 
   (* open an type unification environment *)
-  let ty_env = Type.Infer.mk_env () in
-  let univars, tsubst = Type.Infer.open_tvars ty_env rule.rw_tyvars in
+  let ty_env = Infer.mk_env () in
+  let univars, tsubst = Infer.open_tvars ty_env rule.rw_tyvars in
 
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f) |>
@@ -210,7 +210,7 @@ let rw_inst
 
         (* Check that all type variables have been infered.
            Remark: type unification environments are stateful *)
-        | Match _ when not (Type.Infer.is_closed ty_env) -> s, `Continue
+        | Match _ when not (Infer.is_closed ty_env) -> s, `Continue
 
         (* head matches *)
         | Match mv -> 
@@ -232,7 +232,7 @@ let rw_inst
               soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
           in
           
-          let tsubst = Type.Infer.close s.ty_env in
+          let tsubst = Infer.close s.ty_env in
 
           (* Substitute [mv] and [tsubst] *)
           let do_subst t = Term.tsubst tsubst (Term.subst subst t) in

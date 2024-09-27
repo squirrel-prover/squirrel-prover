@@ -175,7 +175,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let env = Env.init ~system ~ty_vars ~table () in
 
   (* open a typing environment *)
-  let ty_env = Type.Infer.mk_env () in
+  let ty_env = Infer.mk_env () in
 
   let env, vs =
     let var_tag =
@@ -241,11 +241,11 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   in
 
   (* check that the typing environment is closed *)
-  if not (Type.Infer.is_closed ty_env) then 
+  if not (Infer.is_closed ty_env) then 
     Tactics.hard_failure (Failure "some types could not be inferred");
 
   (* close the typing environment and substitute *)
-  let tsubst = Type.Infer.close ty_env in
+  let tsubst = Infer.close ty_env in
 
   let formula = Equiv.Any_statement.tsubst tsubst formula in
   let goal = map (TS.tsubst tsubst) (ES.tsubst tsubst) goal in

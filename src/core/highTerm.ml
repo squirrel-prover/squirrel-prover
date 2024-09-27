@@ -84,7 +84,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
     match t with
     | Var v ->
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
-      let ty_v = Type.Infer.norm ty_env (Vars.ty v) in
+      let ty_v = Infer.norm ty_env (Vars.ty v) in
       let is_ty_enum = Symbols.TyInfo.is_enum env.table ty_v in
       let is_ty_encodable = Type.is_bitstring_encodable ty_v in
       let adv =
@@ -121,7 +121,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
       }
 
     | Find (vs, _, _, _) | Quant (_,vs,_) ->
-      let vs_tys = List.map (fun v -> Type.Infer.norm ty_env (Vars.ty v)) vs in
+      let vs_tys = List.map (fun v -> Infer.norm ty_env (Vars.ty v)) vs in
       let fixed_type_binders =
         List.for_all (Symbols.TyInfo.is_fixed env.table) vs_tys
       in
@@ -165,21 +165,21 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
   
 (*------------------------------------------------------------------*)
 let is_system_indep
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term)
   : bool
   =
   (tags_of_term ~ty_env env t).si
 
 let is_deterministic
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term)
   : bool
   =
   (tags_of_term ~ty_env env t).det
 
 let is_constant
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
   (tags_of_term env ~ty_env t).const
@@ -201,7 +201,7 @@ let si_or_single_system
      - or [t] is system-independent *)
 
 let is_single_term_in_single_systems
-    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env : Infer.env = Infer.mk_env ())
     ~(single_systems : System.Single.Set.t option) (* [None] means no information *)
     (env : Env.t) (t : Term.term)
   : bool
@@ -211,7 +211,7 @@ let is_single_term_in_single_systems
 
 (** Exported, see `.mli` *)
 let is_single_term_in_context
-    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env : Infer.env = Infer.mk_env ())
     ~(context : SE.context)
     (env : Env.t) (t : Term.term)
   : bool
@@ -222,7 +222,7 @@ let is_single_term_in_context
 
 (** Exported, see `.mli` *)
 let is_single_term_in_se
-    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env : Infer.env = Infer.mk_env ())
     ~(se : SE.t list)
     (env : Env.t) (t : Term.term)
   : bool
@@ -242,7 +242,7 @@ let is_single_term_in_se
 (*------------------------------------------------------------------*)
 let is_ptime_deducible
     ~(si : bool)
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
   let tags = tags_of_term env ~ty_env t in
@@ -254,7 +254,7 @@ let is_ptime_deducible
 (*------------------------------------------------------------------*)
 (** Exported, shadows the previous definition. *)
 let tags_of_term
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    ?(ty_env:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term)
   : Vars.Tag.t
   =

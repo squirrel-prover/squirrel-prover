@@ -809,7 +809,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     (* Create a new type unification environement.
        Remark: we will never close it, as it is only used to selection a
        matching element in the bi-frame. *)
-    let ty_env = Type.Infer.mk_env () in
+    let ty_env = Infer.mk_env () in
 
     (* parse the function  *)
     let loc, pat = parse_fa_arg_pat ty_env arg_pat in
