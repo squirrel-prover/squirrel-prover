@@ -152,15 +152,22 @@ let () =
 
     For convenience a new context is passed and not just a new pair.
     This allows to change the set annotations for s2 by the way. *)
-let transitivity_systems new_context s =
+let transitivity_systems ~loc (new_context : SE.context) (s : ES.t) =
   check_conclusion_is_equiv s;
+
+  let old_context = ES.system s in
+  let table       = ES.table  s in
+
+  if not (SE.compatible table new_context.set old_context.set) then
+    soft_failure ~loc
+      (Failure "the new system context must be compatible \
+                with the current context");
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
   (* Extract data from initial sequent. *)
   let equiv_left = ES.get_frame l_proj s |> Utils.oget in
   let equiv_right = ES.get_frame r_proj s |> Utils.oget in
-  let old_context = (ES.env s).system in
   let old_pair = Utils.oget old_context.pair in
 
   let new_pair = Utils.oget new_context.SE.pair in
@@ -269,10 +276,10 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
 
 let trans_tac args s =
   match args with
-  | [Args.Trans (Args.TransSystem annot)] ->
+  | [Args.Trans (Args.TransSystem ((_,new_sys) as annot))] ->
     let context = SE.Parse.parse_sys (ES.table s) annot in
     fun sk fk ->
-      begin match transitivity_systems context s with
+      begin match transitivity_systems ~loc:(L.loc new_sys) context s with
         | l -> sk l fk
         | exception Tactics.Tactic_soft_failure e -> fk e
       end
