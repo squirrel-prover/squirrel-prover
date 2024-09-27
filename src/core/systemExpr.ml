@@ -557,7 +557,7 @@ module Parse = struct
     | Some p ->
       System.Single.make table sys (Term.proj_from_string (L.unloc p))
 
-  let parse table p : arbitrary = 
+  let parse table (p : t) : arbitrary = 
     match L.unloc p with
     | [] ->
       (* Default system annotation. We might make it mean "any" eventually
@@ -609,19 +609,29 @@ module Parse = struct
       { set ; pair }
 
   let parse_global_context table (c : sys_cnt L.located) : context = 
+    let check_compatible set pair =
+      if not (compatible table set pair) then 
+        error ~loc:(L.loc c) Incompatible_systems;
+    in
+
     match L.unloc c with
     | NoSystem ->
       let set = parse table empty in
       let pair = to_pair ~loc:(L.loc c) set in
+      check_compatible set pair;
       { set ; pair = Some pair }
+
     | System s ->
       let set = parse table s in
       let pair = to_pair ~loc:(L.loc c) set in
+      check_compatible set pair;
       { set ; pair = Some pair }
+
     | Set_pair (s,p) ->
       let set = parse table s in
-      let pair = Some (to_pair ~loc:(L.loc c) (parse table p)) in
-      { set ; pair }
+      let pair = to_pair ~loc:(L.loc c) (parse table p) in
+      check_compatible set pair;
+      { set ; pair = Some pair; }
 
   let parse_sys table ((k,p_system) : sys) : context =
     match k with

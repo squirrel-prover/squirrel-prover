@@ -154,9 +154,9 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-global axiom [set: any; equiv:default] pany ['a] (x, y : 'a) : P x y.
+global axiom [set: any/default; equiv:default] pany ['a] (x, y : 'a) : P x y.
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   checkfail have ? := pany empty (frame@init) exn Failure.
   checkfail have ? := pany (frame@init) empty exn Failure.
@@ -165,7 +165,7 @@ Proof.
   assumption A.
 Qed.
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   apply pany.
 Qed.
@@ -196,10 +196,10 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-global axiom [set: any; equiv:default] pp ['a] (x, y : 'a) : 
+global axiom [set: any/default; equiv:default] pp ['a] (x, y : 'a) : 
   P{[P1] [default]} x y -> P x y.
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   have ? := pp x y.
 
@@ -209,7 +209,7 @@ Proof.
   assumption A.
 Qed.
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   have ? := pp x y _. {
     checkfail apply p exn ApplyMatchFailure.
@@ -218,26 +218,26 @@ Proof.
   assumption H.
 Qed.
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   apply pp _ _ _. 
   (* apply pp x y _. *)
   apply p1.
 Qed. 
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   apply pp _ _.
   apply p1.
 Qed. 
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   apply pp _.
   apply p1.
 Qed. 
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P x y.
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
   apply pp.
   apply p1.
@@ -245,13 +245,13 @@ Qed.
 
 (* --------------------------------------------------------- *)
 (* stronger version of `pp` *)
-global axiom [set: any; equiv:default] pps ['a] (x, y, z : 'a) : 
+global axiom [set: any/default; equiv:default] pps ['a] (x, y, z : 'a) : 
   P{[P1] [default]} x (diff(y,z)) -> P x (diff(y,z)).
 
 (* stronger version of `p1` *)
 global axiom [set: P1; equiv:default] p1s ['a] (x, y, z : 'a) : P x (diff(y,z)).
 
-global lemma [set: any; equiv:default] _ ['a] (x,y : 'a) : P empty (frame@init).
+global lemma [set: any/default; equiv:default] _ ['a] (x,y : 'a) : P empty (frame@init).
 Proof. 
   checkfail apply pp exn Failure. (* bad variable instantiation *)
   (* TODO: system-annotations on macros *)
@@ -260,7 +260,7 @@ Proof.
 Qed.
 
 global lemma [set: P1; equiv:default] _ ['a] (x,y : 'a) : 
-  P{[any][default]} x (diff(x,y)).
+  P{[any/default][default]} x (diff(x,y)).
 Proof. 
   apply pps.
   checkfail apply p1 exn Failure. (* bad variable instantiation *)
@@ -268,7 +268,7 @@ Proof.
 Qed.
 
 global lemma [set: P1; equiv:default] _ ['a] (x,y : 'a) : 
-  P{[any][default]} x (diff(x,y)).
+  P{[any/default][default]} x (diff(x,y)).
 Proof. 
   apply pps _ _ _.
   checkfail apply p1 exn Failure. (* bad variable instantiation *)

@@ -311,7 +311,7 @@ val reachability_context : 'a expr -> context
 val pp_context : context formatter
 
 (** Get an expression with which all systems of a context are compatible.
-    Return [None] if context is not [context_any]. *)
+    Return [None] if context is [context_any]. *)
 val get_compatible_expr : context -> compatible option
 
 val project_set     : Term.projs        -> context -> context
