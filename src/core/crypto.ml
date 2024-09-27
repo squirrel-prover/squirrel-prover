@@ -1555,7 +1555,7 @@ module Game = struct
     in
     let mv =
       List.fold_left (fun mv var -> 
-          Mvar.add (var,Vars.Tag.ltag) SE.any
+          Mvar.add (var,Vars.Tag.ltag) SE.full_any
             (Library.Prelude.mk_witness query.env.table ~ty_arg:(Vars.ty var)) mv)
         mv arg_not_used
     in
@@ -1571,7 +1571,7 @@ module Game = struct
     let infer_with_constraints smpls mv =
       List.fold_left (fun mv smpl -> 
           let n = Const.get_global smpl query.consts query.game in
-          let mv = Mvar.add (smpl,Vars.Tag.ltag) SE.any n mv in
+          let mv = Mvar.add (smpl,Vars.Tag.ltag) SE.full_any n mv in
           mv) mv smpls 
     in
     let mv = infer_with_constraints glob_smpls_not_used mv in

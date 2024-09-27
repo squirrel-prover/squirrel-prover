@@ -242,7 +242,7 @@ let global_rename
 
   let rw_rule = Rewrite.{
       rw_tyvars = [];
-      rw_system = SE.any;
+      rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars rw_vars;
       rw_conds  = [];
       rw_rw     = n1', n2';
@@ -401,7 +401,7 @@ let global_prf
 
   let rw_rule = Rewrite.{
       rw_tyvars = [];
-      rw_system = SE.any;
+      rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: rw_vars);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
@@ -578,7 +578,7 @@ let global_cca
     in
     Rewrite.{
       rw_tyvars = [];
-      rw_system = SE.any;
+      rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars enc_rw_vars;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
@@ -593,7 +593,7 @@ let global_cca
     in
     Rewrite.{
       rw_tyvars = [];
-      rw_system = SE.any;
+      rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: dec_rw_vars);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
@@ -1226,7 +1226,7 @@ let global_prf_t
       
       let rule = Rewrite.{
           rw_tyvars = [];
-          rw_system = SE.any;
+          rw_system = SE.full_any;
           rw_vars   = Vars.Tag.local_vars (x :: is);
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target tau0 xocc); 

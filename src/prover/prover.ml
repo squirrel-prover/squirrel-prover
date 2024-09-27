@@ -1,6 +1,7 @@
 open Squirrelcore
 open Ppenv
 
+module SE = SystemExpr
 module L  = Location
 module Sv = Vars.Sv
 
@@ -182,7 +183,7 @@ let do_start_proof ?(check=`NoCheck) (st: state) : state =
 (*---------------------    Goals handling  -----------------*)
 let get_current_goal (ps:state) : ProverLib.pending_proof option = ps.current_goal
 
-let get_system (ps:state) : SystemExpr.context option =
+let get_system (ps:state) : SE.context option =
   match get_current_goal (ps) with
   | None -> None
   | Some (ProofObl g)
@@ -397,11 +398,15 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | _ -> 
       begin match q with 
       | ProverLib.Srch_inSys (_,sysexpr) ->
-          let set = SystemExpr.Parse.parse 
-                            (get_table st) sysexpr in
-          let system: SystemExpr.context option = 
+          let set = SE.Parse.parse (get_table st) sysexpr in
+
+          if not (SE.is_pair set) then 
+            Tactics.hard_failure ~loc:(L.loc sysexpr)
+              (Tactics.Failure "expected a system pair");
+
+          let system: SE.context option = 
             Some ({ set  = set;
-                    pair = Some (SystemExpr.to_pair set)
+                    pair = Some (SE.to_pair set)
                   }) in
           Env.init ~table:st.table ?system () 
       | _ -> Env.init ~table:st.table ()
@@ -409,7 +414,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
     end
   in
   Printer.prt `Default "@[<2>Search in context system@ [@[%a@]].@]@."
-    SystemExpr.pp env.system.set;
+    SE.pp env.system.set;
 
   let t = match q with
     | ProverLib.Srch_inSys (t,_)
@@ -493,7 +498,7 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
     ) matches in
   Printer.prt `Default "%a" print_all matches
 
-let print_system (st:state) (s_opt:SystemExpr.Parse.t option) 
+let print_system (st:state) (s_opt:SE.Parse.t option) 
   : unit =
   let system = 
     begin match s_opt with
@@ -502,10 +507,10 @@ let print_system (st:state) (s_opt:SystemExpr.Parse.t option)
           | Some s -> s.set
           | None -> Tactics.hard_failure (Failure "no default system");
         end
-      | Some s -> SystemExpr.Parse.parse (get_table st) s
+      | Some s -> SE.Parse.parse (get_table st) s
     end
   in
-  SystemExpr.print_system (get_table st) system;
+  SE.print_system (get_table st) system;
 
   if TConfig.print_trs_equations (get_table st)
   then

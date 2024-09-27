@@ -316,14 +316,14 @@ let pt_project_system_set
          if subgoal asks [input@tau=true] for all systems compatible
          with something, it's not OK to change it to weaker
          subgoal [input@tau=true]_{S}! *)
-      let () = assert (SE.is_any_or_any_comp pt.system.set) in
+      let () = assert (SE.is_any pt.system.set) in
       { pt with system }
   else
     (* [system.set] is [SE.any] or [SE.any_compatible_with].
        [pt.system.set] must be in the same case.
        FIXME this is not what we check below *)
-    let () = assert (SE.is_any_or_any_comp    system.set &&
-                     SE.is_any_or_any_comp pt.system.set   ) in
+    let () = assert (SE.is_any    system.set &&
+                     SE.is_any pt.system.set   ) in
     { pt with system }
 
 (*------------------------------------------------------------------*)

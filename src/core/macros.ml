@@ -707,25 +707,25 @@ let get_definition_in_sequent
     ~(ts   : Term.term)
   : def_result
   =
-  match SE.to_fset cntxt.system with
-  | exception SE.(Error (_,Expected_fset)) -> `MaybeDef
-  | system ->
-    (* Try to find an action equal to [ts] in [cntxt]. *)
-    let ts_action =
-      if can_expand symb.s_symb ts cntxt.table
-      then ts
-      else
-        omap_dflt ts (fun models ->
-            odflt ts (Constr.find_eq_action models ts)
-          ) cntxt.models
-    in
-    match ts_action with
-    | Term.Action (asymb, idx) -> begin
-        match get_definition_nocntxt system cntxt.table symb ~args asymb idx with
-        | `Undef    -> `Undef
-        | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
-      end
-    | _ -> `MaybeDef
+  if not (SE.is_fset cntxt.system) then `MaybeDef else
+    match SE.to_fset cntxt.system with
+    | system ->
+      (* Try to find an action equal to [ts] in [cntxt]. *)
+      let ts_action =
+        if can_expand symb.s_symb ts cntxt.table
+        then ts
+        else
+          omap_dflt ts (fun models ->
+              odflt ts (Constr.find_eq_action models ts)
+            ) cntxt.models
+      in
+      match ts_action with
+      | Term.Action (asymb, idx) -> begin
+          match get_definition_nocntxt system cntxt.table symb ~args asymb idx with
+          | `Undef    -> `Undef
+          | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
+        end
+      | _ -> `MaybeDef
 
   (*------------------------------------------------------------------*)
 (** Exported *)

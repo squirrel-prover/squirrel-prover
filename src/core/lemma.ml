@@ -1,7 +1,8 @@
 open Utils
 open Ppenv
 
-module L = Location
+module L  = Location
+module SE = SystemExpr
                
 (*------------------------------------------------------------------*)
 (** A top-level axiom or proved lemma. *)
@@ -128,7 +129,7 @@ let mk_depends_lemma
   Goal.{
     name;
     ty_vars = [];
-    system = SystemExpr.(reachability_context any);
+    system = SE.(reachability_context full_any);
     formula = Equiv.LocalS {formula = form; bound = None};
   } 
 (*TODO:Concrete : Check what this fonction does*)
@@ -167,7 +168,7 @@ let mk_mutex_lemma
   Goal.{
     name;
     ty_vars = [];
-    system = SystemExpr.(reachability_context any);
+    system = SE.reachability_context SE.full_any;
     formula = Equiv.LocalS {formula; bound = None};
   }
 (*TODO:Concrete : Check what this fonction does*)

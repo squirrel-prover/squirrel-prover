@@ -91,21 +91,22 @@ val subset_modulo : Symbols.table -> 'a expr -> 'a expr -> bool
 val equal_modulo  : Symbols.table -> 'a expr -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
-(** System expression denoting all possible systems.
-    It is typically used for axioms or lemmas about primitives. *)
-val any : arbitrary
+(** System expression denoting all possible systems:
+    - [pair]: if true, restricts to pair of labeled single systems.
+    - if [compatible_with = Some s], restricts labeled single systems
+      compatible with [s]. *) 
+val any : compatible_with:System.t option -> pair:bool -> arbitrary
 
-(** System expression denoting all possible systems
-    compatible with a given system. *)
-val any_compatible_with : System.t -> compatible
+(** [full_any] is [any ~compatible_with:None ~pair:false]. *)
+val full_any : arbitrary
 
 (** Create a system expression from a system expression variable. *)
 val var : Var.t -> arbitrary
   
 (*------------------------------------------------------------------*)
-val is_fset : t -> bool
-
-val is_any_or_any_comp : t -> bool
+val is_fset : 'a expr -> bool
+val is_any  : 'a expr -> bool
+val is_pair : 'a expr -> bool
 
 (** Check that all systems in two expressions are compatible. *)
 val compatible : Symbols.table -> 'a expr -> 'b expr -> bool
@@ -142,17 +143,20 @@ val subst : subst -> 'a expr -> 'a expr
 (** Cast expr to arbitrary. Always succeeds. *)
 val to_arbitrary : 'a expr -> arbitrary
 
-(** Cast expression to [compatible] if possible,
-    fail with [Error Expected_compatible] otherwise. *)
-val to_compatible : ?loc:L.t -> 'a expr -> compatible
+(** Convert an expression [s] to a [compatible]. 
+    [s] must be convertible. *)
+val to_compatible : 'a expr -> compatible
 
-(** Cast expression to [fset] if possible,
-    fail with [Error Expected_fset] otherwise. *)
-val to_fset : ?loc:L.t -> 'a expr -> fset
+(** Convert an expression [s] to a [fset]. 
+    [s] must be convertible.
 
-(** Convert expression to [pair] if possible,
-    fail with [Error Expected_pair] otherwise. *)
-val to_pair : ?loc:L.t -> 'a expr -> pair
+    DEPRECATED: @raise Expected_fset if the expression is not
+    convertible *)
+val to_fset : 'a expr -> fset
+
+(** Convert an expression [s] to a [pair]. 
+    [s] must be convertible. *)
+val to_pair : 'a expr -> pair
 
 (*------------------------------------------------------------------*)
 (** {2 Actions symbols} *)
@@ -312,7 +316,7 @@ val pp_context : context formatter
 
 (** Get an expression with which all systems of a context are compatible.
     Return [None] if context is [context_any]. *)
-val get_compatible_expr : context -> compatible option
+val get_compatible_expr : Symbols.table -> context -> compatible option
 
 val project_set     : Term.projs        -> context -> context
 val project_set_opt : Term.projs option -> context -> context

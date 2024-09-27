@@ -862,12 +862,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Case analysis on a timestamp *)
   let timestamp_case (ts : Term.term) (s : S.t) : S.t list =
+    let table = S.table s in
     let system =
-      match SE.get_compatible_expr (S.system s) with
+      match SE.get_compatible_expr table (S.system s) with
         | Some e -> e
         | None -> soft_failure (Failure "underspecified systems")
     in
-    let table = S.table s in
 
     let mk_case (action,_symbol,indices) : Vars.tagged_vars * Term.term =
       let action = Action.to_action action in

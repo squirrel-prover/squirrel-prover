@@ -63,11 +63,16 @@ end
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 
+type any_info = {
+  pair : bool;
+  (** if true, restricts to pair of labeled single systems. *)
+  compatible_with : System.t option
+  (** if [Some s], restricts labeled single systems compatible with [s]. *)
+}
+
 type cnt =
   | Var of Var.t
-  (** Represents a (named) set of compatible single systems. *)
-  | Any
-  | Any_compatible_with of System.t
+  | Any of any_info
   | List of (Term.proj * System.Single.t) list
   (** Each single system is identified by a label. Can be empty.
       All single systems are compatible. *)
@@ -90,7 +95,7 @@ let hash (x : 'a expr) : int = Hashtbl.hash x.cnt
 
 let mk ?name cnt = { cnt; name; }
 
-let force (se : 'a expr) : 'b expr = { cnt = se.cnt; name = se.name; }
+external force : 'a expr -> 'b expr = "%identity"
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -100,13 +105,13 @@ type subst = (Var.t * t) list
 let subst (type a) (s : subst) (se : a expr) : a expr = 
   match se.cnt with
   | Var v -> if List.mem_assoc v s then force (List.assoc v s) else se
-  | (Any | Any_compatible_with _ | List _) -> se
+  | Any _ | List _ -> se
 
 (*------------------------------------------------------------------*)
 let subst_projs (s : (Term.proj * Term.proj) list) (t : 'a expr) : 'a expr =
   match t.cnt with
   | Var _ -> t                  (* FIXME: unclear what should be done here *)
-  | Any | Any_compatible_with _ -> t
+  | Any _ -> t
   | List l ->
     mk (List (List.map (fun (p,single) -> List.assoc_dflt p p s, single) l))
 
@@ -117,18 +122,28 @@ let subst_projs (s : (Term.proj * Term.proj) list) (t : 'a expr) : 'a expr =
 let var v = mk (Var v)
   
 (*------------------------------------------------------------------*)
-let any = mk Any
+let any ~compatible_with ~pair = mk (Any {compatible_with; pair; })
 
-let any_compatible_with s = mk (Any_compatible_with s)
+let full_any = any ~compatible_with:None ~pair:false
 
 (*------------------------------------------------------------------*)
-let is_fset (se : t) : bool = 
+let is_fset (type a) (se : a expr) : bool = 
   match se.cnt with List _ -> true | _ -> false
 
-let is_any_or_any_comp (se : t) : bool = 
+let is_any (type a) (se : a expr) : bool = 
   match se.cnt with
-  | Any | Any_compatible_with _ -> true
+  | Any _ -> true
   | _ -> false 
+
+let is_pair (type a) (se : a expr) : bool = 
+  match se.cnt with
+  | Any { pair = true; } -> true
+  | List [_;_]           -> true
+
+  | Var _                -> true
+  (* FIXME: I broke the interface there I think *)
+
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 let pp fmt (se : 'a expr) : unit = 
@@ -137,8 +152,18 @@ let pp fmt (se : 'a expr) : unit =
   else
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
-    | Any -> Fmt.pf fmt "any"
-    | Any_compatible_with s -> Fmt.pf fmt "any/%a" Symbols.pp_path s
+
+    | Any {compatible_with; pair; } -> 
+      let pp_head fmt = 
+        if pair then Fmt.pf fmt "any_pair" else Fmt.pf fmt "any"
+      in
+      let pp_tail fmt =
+        match compatible_with with
+        | None -> ()
+        | Some s -> Fmt.pf fmt "/%a" Symbols.pp_path s
+      in
+      Fmt.pf fmt "%t%t" pp_head pp_tail
+
     | List l ->
       Fmt.list
         ~sep:Fmt.comma
@@ -155,39 +180,44 @@ let pp fmt (se : 'a expr) : unit =
 (*------------------------------------------------------------------*)
 let to_arbitrary (type a) (x : a expr) : arbitrary = force x
 
-let to_compatible (type a) ?loc (se : a expr) : compatible = 
+let to_compatible (type a) (se : a expr) : compatible = 
   match se.cnt with
-  | Var _ | Any -> error ?loc Expected_compatible
-  | _ -> force se
+  | Var _ | Any { compatible_with = None; } -> assert false
+  | Any { compatible_with = Some _; } | _ -> force se
 
-let to_fset (type a) ?loc (se : a expr) : fset =
-  match se.cnt with
-  | List _ -> force se
-  | _ -> error ?loc Expected_fset
+let to_fset (type a) (se : a expr) : fset =
+  if not (is_fset se) then error Expected_fset; (* FIXME: replace by an assert *)
+  force se
 
-let to_pair (type a) ?loc (se : a expr) : pair =
-  match se.cnt with
-  | List [_;_] -> mk ?name:se.name se.cnt
-  | Var _      -> mk ?name:se.name se.cnt
-  (* FIXME: I broke the interface there I think *)
-
-  | _ -> error ?loc Expected_pair
+let to_pair (type a) (se : a expr) : pair =
+  assert (is_pair se);
+  force se
 
 (*------------------------------------------------------------------*)
 let subset table e1 e2 : bool =
   match e1.cnt, e2.cnt with
   | Var v1, Var v2 -> Var.equal v1 v2
     
-  | Any_compatible_with s1, Any_compatible_with s2 ->
-    System.compatible table s1 s2
+  | Any { compatible_with = s1; pair = p1; }, 
+    Any { compatible_with = s2; pair = p2; } ->
+    (
+      match s1, s2 with
+      | None,   Some _ -> false
+      | None,   None
+      | Some _, None   -> true
+      | Some s1, Some s2 -> System.compatible table s1 s2 
+    ) 
+    && 
+    (not p2 || p1)              (* p2 ⇒ p1 *)
       
-  | List l, Any_compatible_with s ->
-    l = [] || System.compatible table (snd (List.hd l)).system s
+  | List l, Any { compatible_with = Some s; pair = p; } ->
+    ( l = [] || System.compatible table (snd (List.hd l)).system s ) &&
+    (not p || List.length l = 2)
       
   | List l1, List l2 ->
     List.for_all (fun s1 -> List.exists (fun s2 -> s1 = s2) l2) l1
       
-  | _, Any -> true
+  | _, Any {compatible_with = None; } -> true
   | _ -> false
 
 let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
@@ -196,20 +226,11 @@ let equal0 s1 s2 = s1.cnt = s2.cnt
 
 (*------------------------------------------------------------------*)
 let subset_modulo table e1 e2 : bool =
-  match e1.cnt, e2.cnt with
-  | Var v1, Var v2 -> Var.equal v1 v2
-    
-  | Any_compatible_with s1, Any_compatible_with s2 ->
-    System.compatible table s1 s2
-      
-  | List l, Any_compatible_with s ->
-    l = [] || System.compatible table (snd (List.hd l)).system s
-      
+  match e1.cnt, e2.cnt with     
   | List l1, List l2 ->
     List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
-      
-  | _, Any -> true
-  | _ -> false
+
+  | _ -> subset table e1 e2
 
 let equal_modulo table s1 s2 = subset_modulo table s1 s2 && subset_modulo table s2 s1
 
@@ -217,8 +238,8 @@ let equal_modulo table s1 s2 = subset_modulo table s1 s2 && subset_modulo table 
 (** Get system that is compatible with all systems of an expresion. *)
 let get_compatible_sys (se : 'a expr) : Symbols.system option = 
   match se.cnt with
-  | Var _ | Any -> None
-  | Any_compatible_with s -> Some s
+  | Var _ | Any { compatible_with = None; } -> None
+  | Any { compatible_with = s; } -> s
   | List ((_,s)::_) -> Some s.System.Single.system
   | List [] -> assert false     (* FIXME *)
 
@@ -226,6 +247,7 @@ let get_compatible_sys (se : 'a expr) : Symbols.system option =
 let compatible table (e1 : 'a expr) (e2 : 'b expr) =
   match get_compatible_sys e1, get_compatible_sys e2 with
     | Some s1, Some s2 -> System.compatible table s1 s2
+    | None, None -> true
     | _ -> false
 
 (*------------------------------------------------------------------*)
@@ -244,12 +266,12 @@ let to_projs (t : _) = List.map fst (to_list t)
 let to_list_any (t : _ expr) : (Term.proj * System.Single.t) list option =
   match t.cnt with
   | List l -> Some l
-  | Var _ | Any | Any_compatible_with _ -> None
+  | Var _ | Any _ -> None
 
 let to_projs_any (t : _ expr) : Term.projs option =
   match t.cnt with
   | List l -> Some (List.map fst l)
-  | Var _ | Any | Any_compatible_with _ -> None
+  | Var _ | Any _ -> None
 
 (*------------------------------------------------------------------*)
 let project_opt (projs : Term.projs option) (t : 'a expr) =
@@ -260,7 +282,7 @@ let project_opt (projs : Term.projs option) (t : 'a expr) =
 
     mk (List (List.filter (fun (x,_) -> List.mem x projs) l))
 
-  | (Any | Any_compatible_with _ | Var _), Some _projs -> assert false
+  | (Any _ | Var _), Some _projs -> assert false
 
   | _, None -> t
     
@@ -409,16 +431,19 @@ type context = {
   pair : pair option
 }
 
-let context_any = { set = any ; pair = None }
+let context_any =
+  { set  = any ~compatible_with:None ~pair:false ; 
+    pair = None;
+  }
 
 let equivalence_context ?set pair =
   let set = match set with
     | Some s -> s
     | None ->
-       begin match pair.cnt with
-         | List ((_,ss)::_) -> any_compatible_with ss.system
-         | _ -> assert false
-       end
+      begin match pair.cnt with
+        | List ((_,ss)::_) -> any ~compatible_with:(Some ss.system) ~pair:false
+        | _ -> assert false
+      end
   in
   let set, pair = force set, force pair in
   { pair = Some pair ; set }
@@ -435,8 +460,11 @@ let pp_context fmt = function
 
 let pp_context fmt c = Fmt.pf fmt "@[%a@]" pp_context c
 
-let get_compatible_expr = function
-  | { set = { cnt = Any } } -> None
+let get_compatible_expr table = function
+  | { set = { cnt = Any { compatible_with = None; } } } -> None
+  | { set = { cnt = Any { compatible_with = Some s; } } } -> 
+    let single = System.Single.make table s (Term.proj_from_string "ε") in
+    Some (singleton single)
   | { set = expr } -> Some (force expr)
 
 let project_set (projs : Term.projs) (c : context) : context =
@@ -454,16 +482,13 @@ let mk_proj_subst
   : Term.projs option * (Term.proj * Term.proj) list
   =
   match dst.cnt, src.cnt with
-  | (Any | Any_compatible_with _), _
-  | _, (Any | Any_compatible_with _) -> None, []
+  | (Any _), _ | _, (Any _) -> None, []
 
   | Var _, _ | _, Var _ -> assert false (* only concrete systems are supported *)
 
   | List dst, List src ->
     (* [src] may not apply to all systems in [dst] *)
 
-    (* FIXME: if [dst=src], empty substitution is normal, but why [None]? *)
-(*    if dst = src then None, [] else*)
       (* [l] contains tuples [(p,q), single] where:
          - [p] is a projection of [src] for [single]
          - [q] is a projection of [dst] for [single] *)
@@ -565,11 +590,16 @@ module Parse = struct
       of_system table
         (System.convert table ([], L.mk_loc L._dummy "default"))
 
-    | [{ system = [], { pl_desc = "any" }; projection = None; alias = None}] ->
-      any
-
-    | [{ system = [], { pl_desc = "any" }; projection = Some system}] ->
-      any_compatible_with (System.convert table ([], system))
+    | [{ system = [], { pl_desc = ("any" | "any_pair") as pair}; 
+         projection; 
+         alias = None}] ->
+      let pair = 
+        match pair with | "any" -> false | "any_pair" -> true | _ -> assert false
+      in
+      let compatible_with = 
+        omap (fun system -> System.convert table ([], system)) projection
+      in
+      any ~compatible_with ~pair
 
     | [{ system; projection = None; alias = None}] ->
       of_system table (System.convert table system)
@@ -584,6 +614,11 @@ module Parse = struct
         List.map (fun i -> parse_single table { i with alias = None }) l
       in
       make_fset ~loc:(L.loc p) table ~labels l
+
+  let parse_pair table (c : t) : pair =
+    let pair = parse table c in
+    if not (is_pair pair) then error ~loc:(L.loc c) Expected_pair;
+    to_pair pair
 
   (*------------------------------------------------------------------*)
   type sys_cnt =
@@ -605,8 +640,8 @@ module Parse = struct
       { set ; pair = None }
     | Set_pair (s,p) ->
       let set = parse table s in
-      let pair = Some (to_pair ~loc:(L.loc c) (parse table p)) in
-      { set ; pair }
+      let pair = parse_pair table p in
+      { set ; pair = Some pair; }
 
   let parse_global_context table (c : sys_cnt L.located) : context = 
     let check_compatible set pair =
@@ -617,19 +652,19 @@ module Parse = struct
     match L.unloc c with
     | NoSystem ->
       let set = parse table empty in
-      let pair = to_pair ~loc:(L.loc c) set in
+      let pair = parse_pair table empty in
       check_compatible set pair;
       { set ; pair = Some pair }
 
     | System s ->
       let set = parse table s in
-      let pair = to_pair ~loc:(L.loc c) set in
+      let pair = parse_pair table s in
       check_compatible set pair;
       { set ; pair = Some pair }
 
     | Set_pair (s,p) ->
       let set = parse table s in
-      let pair = to_pair ~loc:(L.loc c) (parse table p) in
+      let pair = parse_pair table p in
       check_compatible set pair;
       { set ; pair = Some pair; }
 

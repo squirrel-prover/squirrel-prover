@@ -1,5 +1,3 @@
-
-
 abstract m:message
 abstract n:message
 

@@ -592,7 +592,7 @@ let setup_change_hyps_context
      the old to the new context? *)
   let si_or_set_projections : Term.term -> Term.term option =
     let env = Env.init ~table ~system:old_context ~vars () in
-    if SE.is_any_or_any_comp old_context.set then (fun f -> Some f) else
+    if SE.is_any old_context.set then (fun f -> Some f) else
       let subst_proj =
         if SE.subset_modulo table new_context.set old_context.set then
           let (_, s) = (* rename the projections and project *)

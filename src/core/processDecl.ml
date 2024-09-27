@@ -576,7 +576,7 @@ let add_hint_rewrite table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "rewrite hints must be asymptotic");
 
-  if not (SE.subset table SE.any lem.system.set) then
+  if not (SE.subset table SE.full_any lem.system.set) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "rewrite hints must apply to any system");
 
@@ -589,7 +589,7 @@ let add_hint_smt table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic");
 
-  if not (SE.subset table SE.any lem.system.set) then
+  if not (SE.subset table SE.full_any lem.system.set) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints must apply to any system");
 
