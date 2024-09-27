@@ -26,8 +26,12 @@ val is_constant :
   ?ty_env:Type.Infer.env ->
   Env.t -> Term.term -> bool
 
-(** Check if a term is deducible in ptime by an adversary with no direct 
-    access to the protocol randomness. *)
+(** Check if a term [t] is deducible in ptime by an adversary with no
+    direct access to the protocol randomness.  
+
+    If [si], also checks that [t] can be seen as a single term whose
+    semantics is independent of the system (among all single systems
+    of [env.system]). *)
 val is_ptime_deducible : 
   si:bool ->
   ?ty_env:Type.Infer.env ->

@@ -184,22 +184,12 @@ let is_constant
   =
   (tags_of_term env ~ty_env t).const
 
-let is_ptime_deducible
-    ~(si : bool)
-    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
-    (env : Env.t) (t : Term.term) : bool
-  =
-  let tags = tags_of_term env ~ty_env t in
-  tags.adv && (not si || tags.si) 
-
 (*------------------------------------------------------------------*)
-let is_single_term_in_single_systems
-    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+let si_or_single_system
     ~(single_systems : System.Single.Set.t option) (* [None] means no information *)
-    (env : Env.t) (t : Term.term)
+    (tags : tags)                                  (* the tags associated to a term [t] *)
   : bool
   =
-  let tags = tags_of_term ~ty_env env t in
   ( single_systems <> None                               &&
     System.Single.Set.cardinal (oget single_systems) = 1 &&
     tags.no_diff)
@@ -210,23 +200,34 @@ let is_single_term_in_single_systems
      - [single_systems] is a singleton and [t] does not use any [diff] 
      - or [t] is system-independent *)
 
+let is_single_term_in_single_systems
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
+    ~(single_systems : System.Single.Set.t option) (* [None] means no information *)
+    (env : Env.t) (t : Term.term)
+  : bool
+  =
+  let tags = tags_of_term ~ty_env env t in
+  si_or_single_system tags ~single_systems
+
 (** Exported, see `.mli` *)
 let is_single_term_in_context
-    ?(ty_env : Type.Infer.env option)
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
     ~(context : SE.context)
     (env : Env.t) (t : Term.term)
   : bool
   =
+  let tags = tags_of_term ~ty_env env t in
   let single_systems = SE.single_systems_of_context context in
-  is_single_term_in_single_systems ?ty_env env t ~single_systems
+  si_or_single_system tags ~single_systems
 
 (** Exported, see `.mli` *)
 let is_single_term_in_se
-    ?(ty_env:Type.Infer.env option)
+    ?(ty_env : Type.Infer.env = Type.Infer.mk_env ())
     ~(se : SE.t list)
     (env : Env.t) (t : Term.term)
   : bool
   =
+  let tags = tags_of_term ~ty_env env t in
   let single_systems =
     List.fold_left (fun set e ->
         let set' = SE.single_systems_of_se e in
@@ -235,8 +236,20 @@ let is_single_term_in_se
         | _ -> None
       ) (Some System.Single.Set.empty) se
   in
-  is_single_term_in_single_systems ?ty_env env t ~single_systems
+  si_or_single_system tags ~single_systems
 
+
+(*------------------------------------------------------------------*)
+let is_ptime_deducible
+    ~(si : bool)
+    ?(ty_env:Type.Infer.env = Type.Infer.mk_env ())
+    (env : Env.t) (t : Term.term) : bool
+  =
+  let tags = tags_of_term env ~ty_env t in
+  tags.adv &&
+  (not si ||
+   let single_systems = SE.single_systems_of_context env.system in
+   si_or_single_system tags ~single_systems)
 
 (*------------------------------------------------------------------*)
 (** Exported, shadows the previous definition. *)
