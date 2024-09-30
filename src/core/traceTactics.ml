@@ -280,7 +280,7 @@ let localize h h' s =
     | _,Global (Equiv.Atom (Reach {formula = f; bound = b})) ->
           let b =
             match b, TS.bound s with
-            | Some b, Some sb -> Some(Library.Real.mk_add (TS.table s) sb (Library.Real.mk_minus (TS.table s) b))
+            | Some b, Some sb -> Some(Library.Real.mk_add (TS.table s) sb (Library.Real.mk_opp (TS.table s) b))
             | None, None -> None
             | Some _, None ->
               Tactics.(soft_failure(Failure "cannot localize a concrete hypothesis in a asymptotic goal"))

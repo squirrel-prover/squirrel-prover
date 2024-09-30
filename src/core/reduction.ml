@@ -707,7 +707,7 @@ module type S = sig
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   val destr_and : 
-    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+    t -> mode:SmartFO.mode -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   (*------------------------------------------------------------------*)
   (** {2 conversion from a sequent } *)
@@ -977,7 +977,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (*------------------------------------------------------------------*)
   let destr_and (type a)
-      (s : S.t) (k : a Equiv.f_kind)
+      (s : S.t) ~(mode : SmartFO.mode) (k : a Equiv.f_kind)
       (x : a) : (a * a) option
     =
     let destr_and x =
@@ -991,7 +991,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
         | None -> None
     in
-    mk_destr_k destr_and Equiv.Smart.destr_and s k x
+    mk_destr_k destr_and (Equiv.Smart.destr_and ~mode ~env:(S.env s)) s k x
 
   (*------------------------------------------------------------------*)
   (** Make a cstate from a sequent *)

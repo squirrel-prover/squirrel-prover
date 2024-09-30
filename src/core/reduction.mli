@@ -126,7 +126,7 @@ module type S = sig
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   val destr_and :
-    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+    t -> mode:SmartFO.mode -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   (*------------------------------------------------------------------*)
   (** {2 Conversion from a sequent } *)

@@ -1453,7 +1453,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
         let b =
           match p_t with
             | None -> None
-            | Some b -> Some (convert st b (Library.Real.real st.env.table))
+            | Some b -> Some (convert st b (Library.Real.treal st.env.table))
         in
         Equiv.Atom (Equiv.Equiv {terms = e; bound = b})
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
@@ -1466,7 +1466,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
     let e =
         match e with
           | None -> None
-          | Some e -> Some (convert st e (Library.Real.real st.env.table)) in
+          | Some e -> Some (convert st e (Library.Real.treal st.env.table)) in
     Equiv.Atom (Equiv.Reach {formula = f; bound = e})
 
   | PPred ppa ->

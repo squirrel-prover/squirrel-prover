@@ -3,10 +3,10 @@
 open Utils
 open Ppenv
     
-module Sv = Vars.Sv
-module Mv = Vars.Mv
-
-module SE = SystemExpr
+module Sv   = Vars.Sv
+module Mv   = Vars.Mv
+module Real = Library.Real
+module SE   = SystemExpr
   
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
@@ -704,18 +704,21 @@ module Smart : SmartFO.S with type form = _form = struct
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
-  let destr_quant_tagged ?env q = function
+  let destr_quant_tagged
+      ?env (q : quant)
+    : form -> (Vars.tagged_vars * form) option
+    = function
     | Quant (q', es, f) when q = q' -> Some (es, f)
 
     (* case [f = ∃es. f0], check that:
        - [f0] is a single term w.r.t. [env.system.set] *)
-    (* TODO: multi-terms *)
-    (* TODO:Concrete : Check if valid of concrete *)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists_tagged f with
         | Some (es,f0)
-          when is_single_term_in_se ~se:env.system.set ~env f0  ->
+          when is_single_term_in_se ~se:env.system.set ~env f0 &&
+               ( bound = None ||
+                 is_single_term_in_se ~se:env.system.set ~env (oget bound)) ->
           (* By system independence of [f0] system indep. wrt. {P1,P2}:
              
                [f0]_{P1} ≡ [f0]_{P2}
@@ -732,7 +735,8 @@ module Smart : SmartFO.S with type form = _form = struct
         | _ -> None
       end
 
-    (* TODO: multi-terms *)
+    (* For a local meta-formula f,
+       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
         begin match Term.Smart.destr_forall_tagged f with
           | Some (es,f) -> Some (es, Atom (Reach {formula = f; bound}))
@@ -757,21 +761,18 @@ module Smart : SmartFO.S with type form = _form = struct
 
     (* case [f = ∃es. f0], check that:
        - [f0] is system-independant *)
-    (* TODO: multi-terms *)
-    (* TODO:Concrete : Check if valid of concrete*)
     | Atom (Reach {formula = f; bound}) when q = Exists ->
       let env = oget env in     (* must never fail *)
       begin match Term.Smart.destr_exists1_tagged f with
         | Some (es,f0)
-          when is_single_term_in_se ~se:env.system.set ~env f0  ->
+          when is_single_term_in_se ~se:env.system.set ~env f0 &&
+               ( bound = None ||
+                 is_single_term_in_se ~se:env.system.set ~env (oget bound)) ->
           (* see justification in [destr_quant_tagged] above *)
           Some (es, Atom (Reach {formula = f0; bound}))
         | _ -> None
       end
 
-    (* TODO: multi-terms *)
-    (* For a local meta-formula f,
-       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach {formula = f; bound}) when q = ForAll ->
       begin match Term.Smart.destr_forall1_tagged f with
           | Some (es,f) -> Some (es, Atom (Reach {formula = f; bound}))
@@ -799,29 +800,60 @@ module Smart : SmartFO.S with type form = _form = struct
   let destr_true  _f = todo ()
   let destr_not   _f = todo ()
 
-  (*TODO:Concrete : Check if valid of concrete*)
-  let destr_and = function
+  (** See [SmartFO.mode] for a description of the role of [mode]. *)
+  let destr_and ~(mode : [`LR | `RL]) ~(env : Env.t) = function
     | And (f1, f2) -> Some (f1, f2)
-    | Atom (Reach {formula = f; bound = None}) ->
-        begin match Term.Smart.destr_and f with
-          | Some (f1,f2) ->
-             Some
-               (Atom (Reach {formula = f1; bound = None}),
-                Atom (Reach {formula = f2; bound = None}))
-          | None -> None
+    | Atom (Reach {formula = f; bound; }) ->
+        begin
+          match Term.Smart.destr_and f, bound with
+          | Some (f1,f2), None -> 
+            (* asymptotic logic *)
+            Some
+              (Atom (Reach {formula = f1; bound = None; }),
+               Atom (Reach {formula = f2; bound = None; }))
+
+          | Some (f1,f2), Some _ when mode = `LR ->
+            (* [ϕ <: ε] ⇒ [ψ₁ <: ε] ∧ [ψ₂ <: ε] *)
+            Some
+              (Atom (Reach {formula = f1; bound; }),
+               Atom (Reach {formula = f2; bound; }))
+
+          | Some (f1,f2), Some bound when mode = `RL ->
+            (* [ψ₁ <: ε/2] ∧ [ψ₂ <: ε/2] ⇒ [ϕ <: ε]*)
+            let new_bound =
+              Real.mk_div env.table bound (Real.mk_two env.table) |>
+              some
+            in
+            Some
+              (Atom (Reach {formula = f1; bound = new_bound; }),
+               Atom (Reach {formula = f2; bound = new_bound; }))
+
+          | None, None -> None
+            
+          | _ -> assert false
         end
     | _ -> None
 
-  (*TODO:Concrete : Check if valid of concrete*)
   let destr_or ~env = function
     | Or (f1, f2) -> Some (f1, f2)
     | Atom (Reach {formula = f; bound}) ->
        begin match Term.Smart.destr_or f with
          | Some (f1,f2) when
-             (is_constant ~env f1 && is_single_term_in_se ~se:env.system.set ~env f1) ||
-             (is_constant ~env f2 && is_single_term_in_se ~se:env.system.set ~env f2)   ->
+             ( (is_constant                             ~env f1 &&
+                is_single_term_in_se ~se:env.system.set ~env f1)
+               ||
+               (is_constant                             ~env f2 &&
+                is_single_term_in_se ~se:env.system.set ~env f2)   )
+             &&
+             ( bound = None ||
+               is_single_term_in_se ~se:env.system.set ~env (oget bound))
+           ->
            Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
            (* Proof for the [f1] case, when [env.system.set] is the bi-system {P1,P2}.
+
+              We prove this in the asymptotic case, but the same proof
+              applies for the concrete logic.
+
               By system independence of [f1] system indep. wrt. {P1,P2}:              
 
                 [f1]_{P1} ≡ [f1]_{P2}
@@ -843,25 +875,36 @@ module Smart : SmartFO.S with type form = _form = struct
        end
     | _ -> None
 
-  (*TODO:Concrete : Check if valid of concrete*)
   let destr_impl ~env = function
     | Impl (f1, f2) -> Some (f1, f2)
-    | Atom (Reach {formula = f; bound = None}) ->
+    | Atom (Reach {formula = f; bound; }) ->
        begin match Term.Smart.destr_impl f with
          | Some (f1,f2) when
              (* Idem as proof above for [destr_or]. *)
-             is_constant ~env f1 && is_single_term_in_se ~se:env.system.set ~env f1 ->
-             Some (Atom (Reach {formula = f1; bound = None}), Atom (Reach {formula = f2; bound = None}))
+             ( is_constant                             ~env f1 &&
+               is_single_term_in_se ~se:env.system.set ~env f1   )
+             &&
+             ( bound = None ||
+               is_single_term_in_se ~se:env.system.set ~env (oget bound))
+           ->
+           let f1_bound =
+             match bound with
+             | None   -> None
+             | Some _ -> some (Real.mk_zero env.table)
+           in
+           Some (Atom (Reach {formula = f1; bound = f1_bound; }),
+                 Atom (Reach {formula = f2; bound = bound;    }))
          | _ -> None
        end
     | _ -> None
 
-  (*TODO:Concrete : Check if valid of concrete*)
   let destr_iff = function
-    | Atom (Reach {formula = f; bound}) ->
+    | Atom (Reach {formula = f; bound = None;}) ->
+      (* here, we only descruct below [_] in the asymptotic case *)
        begin match Term.Smart.destr_iff f with
          | Some (f1,f2) ->
-             Some (Atom (Reach {formula = f1; bound}), Atom (Reach {formula = f2; bound}))
+           Some (Atom (Reach {formula = f1; bound = None;}),
+                 Atom (Reach {formula = f2; bound = None;}))
          | _ -> None
        end
     | _ -> None
@@ -890,13 +933,10 @@ module Smart : SmartFO.S with type form = _form = struct
     in
     destr
 
-  let destr_ands i f = mk_destr_right destr_and i f
+  let destr_ands  ~mode ~env i f = mk_destr_right (destr_and ~mode ~env) i f
+  let destr_ors         ~env i f = mk_destr_right (destr_or        ~env) i f
+  let destr_impls       ~env i f = mk_destr_right (destr_impl      ~env) i f
 
-  let destr_ors ~env i f = mk_destr_right (destr_or ~env) i f
-
-  let destr_impls ~env i f = mk_destr_right (destr_impl ~env) i f
-
-  (*TODO:Concrete : Check if it is necessary to add the bounded case*)
   let destr_eq = function
     | Atom (Reach {formula = f; bound = None}) -> Term.destr_eq f
     | _ -> None
@@ -914,15 +954,16 @@ module Smart : SmartFO.S with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  (*TODO:Concrete : Not valid for concrete*)
   let is_false _f = todo ()
   let is_true  _f = todo ()
   let is_not   _f = false       (* FIXME *)
-  let is_and       f = destr_and       f <> None
-  let is_or   ~env f = destr_or   ~env f <> None
-  let is_impl ~env f = destr_impl ~env f <> None
-  let is_iff       f = destr_iff       f <> None
-  let is_let       f = destr_let       f <> None
+
+  let is_and  ~mode ~env f = destr_and  ~mode ~env f <> None
+  let is_or         ~env f = destr_or         ~env f <> None
+  let is_impl       ~env f = destr_impl       ~env f <> None
+
+  let is_iff f = destr_iff f <> None
+  let is_let f = destr_let f <> None
   
   let is_forall      f = destr_forall      f <> None
   let is_exists ~env f = destr_exists ~env f <> None
@@ -958,12 +999,13 @@ module Smart : SmartFO.S with type form = _form = struct
     List.map fst vs, f
  
   (*------------------------------------------------------------------*)
-  let decompose_ands (f : form) : form list  =
-    let rec doit acc = function
-      | And (f1,f2) -> doit (doit acc f2) f1
-      | _ as f -> f :: acc
+  let decompose_ands ~mode ~env (f : form) : form list  =
+    let rec decompose f =
+      match destr_and ~mode ~env f with
+      | None -> [f]
+      | Some (f,g) -> f :: decompose g
     in
-    doit [] f
+    decompose f
 
   let decompose_ors ~env (f : form) : form list  =
     let rec decompose f =
@@ -1178,7 +1220,6 @@ module Babel = struct
     | Global_t -> _pp        ?context:None
     | Any_t    -> PreAny._pp ?context:None
 
-  (*TODO:Concrete : Do the pretty printer for local formula*)
   let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
     | Local_t  -> Term.pp
     | Global_t -> pp
@@ -1341,9 +1382,9 @@ module Any = struct
       | Local  f -> omap (fun f -> Local  f) (Term.Smart.destr_not f)
       | Global f -> omap (fun f -> Global f) (     Smart.destr_not f)
 
-    let destr_and = function
-      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_and f)
-      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and f)
+    let destr_and ~mode ~env = function
+      | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_and            f)
+      | Global f -> omap (fun (x,y) -> Global x, Global y) (     Smart.destr_and ~mode ~env f)
 
     let destr_or ~env = function
       | Local  f -> omap (fun (x,y) -> Local  x, Local  y) (Term.Smart.destr_or      f)
@@ -1371,9 +1412,9 @@ module Any = struct
       | Local  f -> Term.Smart.is_not f
       | Global f ->      Smart.is_not f
 
-    let is_and = function
-      | Local  f -> Term.Smart.is_and f
-      | Global f ->      Smart.is_and f
+    let is_and ~mode ~env = function
+      | Local  f -> Term.Smart.is_and            f
+      | Global f ->      Smart.is_and ~mode ~env f
 
     let is_or ~env = function
       | Local  f -> Term.Smart.is_or      f
@@ -1422,13 +1463,13 @@ module Any = struct
       | Global f ->
         omap (fun (v,t1,t2) -> v,t1, Global t2) (     Smart.destr_let f)
 
-    let destr_ands i = function
+    let destr_ands ~mode ~env i = function
       | Local f ->
           omap (fun l -> List.map (fun x -> Local x) l)
             (Term.Smart.destr_ands i f)
       | Global f ->
           omap (fun l -> List.map (fun x -> Global x) l)
-            (Smart.destr_ands i f)
+            (Smart.destr_ands ~mode ~env i f)
 
     let destr_ors ~env i = function
       | Local f ->
@@ -1497,9 +1538,9 @@ module Any = struct
         vs, Global f
 
     (*------------------------------------------------------------------*)
-    let decompose_ands = function
-      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ands f)
-      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ands f)
+    let decompose_ands ~mode ~env = function
+      | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ands            f)
+      | Global f -> List.map (fun x -> Global x) (     Smart.decompose_ands ~mode ~env f)
 
     let decompose_ors ~env = function
       | Local  f -> List.map (fun x -> Local  x) (Term.Smart.decompose_ors      f)

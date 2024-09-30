@@ -18,12 +18,18 @@ module Smart : SmartFO.S with type form = Term.term = struct
   let[@warning "-27"] destr_impl           ~env x = destr_impl           x
   let[@warning "-27"] destr_impls          ~env x = destr_impls          x
   let[@warning "-27"] destr_ors            ~env x = destr_ors            x
+  let[@warning "-27"] destr_and      ~mode ~env x = destr_and            x
+  let[@warning "-27"] destr_ands     ~mode ~env x = destr_ands           x
+      
   let[@warning "-27"] is_or                ~env x = is_or                x
   let[@warning "-27"] is_impl              ~env x = is_impl              x
   let[@warning "-27"] is_exists            ~env x = is_exists            x
+  let[@warning "-27"] is_and         ~mode ~env x = is_and               x
+      
   let[@warning "-27"] decompose_ors        ~env x = decompose_ors        x
   let[@warning "-27"] decompose_impls      ~env x = decompose_impls      x
   let[@warning "-27"] decompose_impls_last ~env x = decompose_impls_last x
+  let[@warning "-27"] decompose_ands ~mode ~env x = decompose_ands       x
 end
 
 (*------------------------------------------------------------------*)

@@ -132,7 +132,7 @@ let mk_depends_lemma
     system = SE.(reachability_context full_any);
     formula = Equiv.LocalS {formula = form; bound = None};
   } 
-(*TODO:Concrete : Check what this fonction does*)
+  (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
 (** Build the mutual exlusivity lemma between [descr] and [descr']. *)
@@ -171,7 +171,7 @@ let mk_mutex_lemma
     system = SE.reachability_context SE.full_any;
     formula = Equiv.LocalS {formula; bound = None};
   }
-(*TODO:Concrete : Check what this fonction does*)
+  (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
 (** Compute the sequential dependency and mutual exclusion lemmas

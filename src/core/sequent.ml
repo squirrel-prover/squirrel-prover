@@ -1026,7 +1026,7 @@ module Mk (Args : MkArgs) : S with
       match pt.bound, arg.bound with
       | LocConc b, LocConc sb ->
         Concrete.LocConc
-          (Library.Real.mk_add table sb (Library.Real.mk_minus table b))
+          (Library.Real.mk_add table sb (Library.Real.mk_opp table b))
       | f, g when Concrete.equal f g  -> f
       | LocAsym  , LocHyp    -> LocAsym
       | LocHyp   , LocAsym   -> LocAsym

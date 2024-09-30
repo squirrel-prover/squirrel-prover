@@ -83,7 +83,6 @@ let add_hint_rewrite (s : Symbols.p_path) tyvars form table : Symbols.table =
   let db = hint_db table in
   let pat = Pattern.pat_of_form form in
   let pat = Term.{ pat with pat_tyvars = tyvars; pat_term = (pat.pat_term,Concrete.LocHyp) } in
-  (* TODO:Concrete : placeholder for now but almost sure there is something to do here *)
   let rule = 
     LowRewrite.pat_to_rw_rule
       ~loc:(Symbols.p_path_loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
@@ -97,7 +96,6 @@ let add_hint_rewrite (s : Symbols.p_path) tyvars form table : Symbols.table =
   in
   set_hint_db table
     { db with db_rewrite = add_rewrite_rule head h db.db_rewrite; }
-(* TODO:Concrete : Add the possibility to have concrete rewrite hint *)
 
 let add_hint_smt formula table : Symbols.table =
   let db = hint_db table in

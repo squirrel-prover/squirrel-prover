@@ -1,12 +1,21 @@
-(* TODO:Concrete : Add non bit-string encodable flag*)
-type real.
+include Basic.
 
-abstract addr : real -> real -> real
-abstract minus : real -> real
-abstract leq : real -> real -> bool
-abstract z_r : real
+namespace Real.
+  type real.
+  
+  op ( + ) : real -> real -> real.
+  op opp : real -> real.
+  op ( - ) (x : real) (y : real) = x + (opp y).
 
+  abstract ( * ) : real -> real -> real.
+  op inv : real -> real.
+  op div (x : real) (y : real) = x * (inv y).
 
-op assoc ['a]  (f : 'a -> 'a ->  'a) = forall x y z, f (f x y) z = f x (f y z).
-
-axiom [any] add_assoc : assoc addr.
+  abstract leq : real -> real -> bool
+  abstract z_r : real 
+  abstract o_r : real 
+  abstract t_r : real 
+   
+  axiom [any] add_assoc : assoc ( + ).
+  axiom [any] mul_assoc : assoc ( * ).
+end Real.

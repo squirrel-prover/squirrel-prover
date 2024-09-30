@@ -25,6 +25,10 @@ module Prelude = struct
   let zeroes_p = ([],"zeroes")
   let fs_zeroes = Symbols.Operator.of_s_path zeroes_p
   let mk_zeroes table term = mk_fun table zeroes_p [term]
+
+  let leq_p = ([],"<=")
+  let fs_leq = Symbols.Operator.of_s_path leq_p
+  let mk_leq table x y = mk_fun table leq_p [x;y]
 end
 
 (*------------------------------------------------------------------*)
@@ -43,27 +47,49 @@ module Basic = struct
   let const_emptyset table = get_fsymb table "empty_set"
 end  
 
-module Real = struct
+module[@warning "-32"] Real = struct
 
+  (* namespace path *)
+  let real_p = ["Real"]
+ 
   let check_load table =
     if not (Symbols.Import.mem_sp ([],"Real") table) then
       Tactics.hard_failure (Failure "theory Real is not loaded")
 
   let get_fsymb table s =
     check_load table;
-    get_fsymb ([],s)
+    get_fsymb (real_p,s)
 
   let get_btype table s =
     check_load table;
-    get_btype  ([],s)
-  let real table = Type.TBase ([],Symbols.to_string (get_btype table "real").s)
-  let leq table = get_fsymb table "leq"
-  let add table = get_fsymb table "addr"
-  let minus table = get_fsymb table "minus"
-  let zero table = get_fsymb table "z_r"
+    get_btype  (real_p,s)
 
-  let mk_minus table x = Term.mk_fun table (minus table) [x]
-  let mk_add table x y = Term.mk_fun table (add table) [x;y]
-  let mk_leq table x y = Term.mk_fun table (leq table) [x;y]
-  let mk_zero table    = Term.mk_fun table (zero table) []
+  (*------------------------------------------------------------------*)
+  let treal table = Type.TBase (real_p,Symbols.to_string (get_btype table "real").s)
+
+  (*------------------------------------------------------------------*)
+  let fs_add   table = get_fsymb table "+"
+  let fs_minus table = get_fsymb table "-"
+  let fs_opp   table = get_fsymb table "opp"
+
+  let fs_mul   table = get_fsymb table "*"
+  let fs_div   table = get_fsymb table "div"
+  let fs_inv   table = get_fsymb table "inv"
+
+  let fs_zero  table = get_fsymb table "z_r"
+  let fs_one   table = get_fsymb table "o_r"
+  let fs_two   table = get_fsymb table "t_r"
+
+  (*------------------------------------------------------------------*)
+  let mk_add   table x y = Term.mk_fun table (fs_add table)   [x;y]
+  let mk_minus table x y = Term.mk_fun table (fs_minus table) [x;y]
+  let mk_opp   table x   = Term.mk_fun table (fs_opp table)   [x]
+
+  let mk_mul   table x y = Term.mk_fun table (fs_mul table)   [x;y]
+  let mk_div   table x y = Term.mk_fun table (fs_div table)   [x;y]
+  let mk_inv   table x   = Term.mk_fun table (fs_inv table)   [x]
+
+  let mk_zero  table     = Term.mk_fun table (fs_zero table)  []
+  let mk_one   table     = Term.mk_fun table (fs_one  table)  []
+  let mk_two   table     = Term.mk_fun table (fs_two  table)  []
 end

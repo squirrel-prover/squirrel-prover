@@ -1,3 +1,6 @@
+op assoc ['a] (f : 'a -> 'a ->  'a) = 
+   forall x y z, f (f x y) z = f x (f y z).
+
 (*------------------------------------------------------------------*)
 (* equality *)
 
@@ -644,6 +647,3 @@ abstract mem : message -> mset -> bool.
 abstract add : message -> mset -> mset.
 
 axiom [any] empty_set_is_empty (x:message) : not (mem x empty_set).
-
-
- 

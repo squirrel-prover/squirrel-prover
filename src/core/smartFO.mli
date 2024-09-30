@@ -1,6 +1,14 @@
 (** Module type for smart constructors and destructors on first-order formulas,
     where the type is abstracted. Instantiated by both [Term] and [Equiv]. *)
 
+(** Describe whether we are looking for a formula implied or implying
+    the input formula.
+
+    E.g. if [destr_and mode ϕ] returns [Some (ψ₁,ψ₂)] then: 
+    - ϕ ⇒ ψ₁ ∧ ψ₂ if [mode = `LR] 
+    - ψ₁ ∧ ψ₂ ⇒ ϕ if [mode = `RL] *)
+type mode = [`LR | `RL]
+            
 module type S = sig
   type form
 
@@ -44,14 +52,14 @@ module type S = sig
   val destr_false : form ->         unit  option
   val destr_true  : form ->         unit  option
   val destr_not   : form ->         form  option
-  val destr_and   : form -> (form * form) option
-  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   (* The optional argument [env] is used to obtain variables tags. *)
-  val destr_or   : env:Env.t -> form -> (form * form) option
-  val destr_impl : env:Env.t -> form -> (form * form) option
-
+  val destr_and  : mode:mode -> env:Env.t -> form -> (form * form) option
+  val destr_or   :              env:Env.t -> form -> (form * form) option
+  val destr_impl :              env:Env.t -> form -> (form * form) option
+  val destr_iff  :                           form -> (form * form) option
+      
   (*------------------------------------------------------------------*)
   val destr_forall_tagged  :              form -> (Vars.tagged_vars * form) option
   val destr_forall1_tagged :              form -> (Vars.tagged_var  * form) option
@@ -67,16 +75,16 @@ module type S = sig
   val destr_let : form -> (Vars.var * Term.term * form) option
 
   (*------------------------------------------------------------------*)
-  val is_false  :              form -> bool
-  val is_true   :              form -> bool
-  val is_not    :              form -> bool
-  val is_and    :              form -> bool
-  val is_or     : env:Env.t -> form -> bool
-  val is_impl   : env:Env.t -> form -> bool
-  val is_iff    :              form -> bool
-  val is_forall :              form -> bool
-  val is_exists : env:Env.t -> form -> bool
-  val is_let    :              form -> bool
+  val is_false  :                           form -> bool
+  val is_true   :                           form -> bool
+  val is_not    :                           form -> bool
+  val is_and    : mode:mode -> env:Env.t -> form -> bool
+  val is_or     :              env:Env.t -> form -> bool
+  val is_impl   :              env:Env.t -> form -> bool
+  val is_iff    :                           form -> bool
+  val is_forall :                           form -> bool
+  val is_exists :              env:Env.t -> form -> bool
+  val is_let    :                           form -> bool
 
   (*------------------------------------------------------------------*)
   val is_neq : form -> bool
@@ -86,10 +94,10 @@ module type S = sig
    
   (*------------------------------------------------------------------*)
   (** left-associative *)
-  val destr_ands  :              int -> form -> form list option
-  val destr_ors   : env:Env.t -> int -> form -> form list option
-  val destr_impls : env:Env.t -> int -> form -> form list option
-
+  val destr_ands  : mode:mode -> env:Env.t -> int -> form -> form list option
+  val destr_ors   :              env:Env.t -> int -> form -> form list option
+  val destr_impls :              env:Env.t -> int -> form -> form list option
+ 
   (*------------------------------------------------------------------*)
   val decompose_forall : form -> Vars.var list * form 
   val decompose_exists : form -> Vars.var list * form
@@ -99,9 +107,9 @@ module type S = sig
   val decompose_exists_tagged : form -> Vars.tagged_var list * form
 
   (*------------------------------------------------------------------*)
-  val decompose_ands  :              form -> form list
-  val decompose_ors   : env:Env.t -> form -> form list
-  val decompose_impls : env:Env.t -> form -> form list
+  val decompose_ands  : mode:mode -> env:Env.t -> form -> form list
+  val decompose_ors   :              env:Env.t -> form -> form list
+  val decompose_impls :              env:Env.t -> form -> form list
 
   val decompose_impls_last : env:Env.t -> form -> form list * form
 end

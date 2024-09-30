@@ -2820,6 +2820,10 @@ let prove
   =
   let table = env.table in
   let ppe = default_ppe ~table () in
+
+  if terms.bound <> None then
+    Tactics.soft_failure (Failure "concrete logic unsupported");
+
   let vbs = TConfig.verbose_crypto env.table in
   let dbg = TConfig.debug_tactics env.table in
   let game_loc = Symbols.p_path_loc pgame in
@@ -2860,7 +2864,6 @@ let prove
   let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms.terms game hyps
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   let rec_bided_subgs_goals =
     List.map (fun ((goal,form):goal*Term.term):goal -> 
@@ -2871,7 +2874,7 @@ let prove
    let rec_bided_subgs_conds =
     List.map (fun ((_,form):goal*Term.term):Term.term -> form)
       rec_bided_subgs
-(* First pass on bideduction, to find extra inputs.*)
+      (* First pass on bideduction, to find extra inputs.*)
   in
   let next_bided_subgs, _  =
     bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs_goals direct_bided_subgs 

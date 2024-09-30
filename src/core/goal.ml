@@ -195,7 +195,10 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
            match e with
             | None -> None
             | Some e ->
-              let e, _ = Typing.convert ~ty_env conv_env ~ty:(Library.Real.real conv_env.env.table) e in Some e
+              let e, _ = 
+                Typing.convert ~ty_env conv_env ~ty:(Library.Real.treal conv_env.env.table) e 
+              in 
+              Some e
       in
       let s = TS.init ~no_sanity_check:true ~env ?bound:e f in
 

@@ -15,7 +15,9 @@ module St = Term.St
 module Sv = Vars.Sv
 
 module TopHyps = Hyps
-  
+
+module Real = Library.Real
+
 type lsymb = Symbols.lsymb
 
 (** Wrap a function implementing a tactic in direct style
@@ -1193,10 +1195,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
 
       let try_destr_and form =
-        if S.Hyp.is_and form then
+        (* [`LR] as we are looking for hypotheses implied by [form] *)
+        if S.Hyp.is_and ~mode:`LR ~env form then
           begin
             let ands =
-              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands len form)
+              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands ~mode:`LR ~env len form)
             in
             let ands = List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) ands in
             let ids, s = Hyps.add_i_list ands s in
@@ -1833,7 +1836,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
               match t1 with
               | Equiv.Atom(Reach {formula; bound = Some _}) ->
                 let t1 =
-                  Equiv.Atom(Reach {formula; bound = Some (Library.Real.mk_zero (S.table s))})
+                  Equiv.Atom(Reach {formula; bound = Some (Real.mk_zero (S.table s))})
                 in
                 try_apply (t1 :: subs) { pat with pat_op_term = t2 }
               | _ -> try_apply (t1 :: subs) { pat with pat_op_term = t2 }
@@ -1887,8 +1890,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
             | Some _ as b, LocHyp  -> (S.set_bound b s)
             | Some e, LocConc ve ->
               (S.set_bound
-                 (Some (Library.Real.mk_add (S.table s) e
-                          (Library.Real.mk_minus  (S.table s) ve))) s)
+                 (Some (Real.mk_add (S.table s) e
+                          (Real.mk_opp (S.table s) ve))) s)
             | _ -> assert false
         in
         let new_subgs =
@@ -2222,8 +2225,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Weak Tactic} *)
   let weak_term (t : Term.term) (s : S.t)  =
-    let z_r = Some (Library.Real.mk_zero (S.table s)) in
-    let  leq_t e = Library.Real.mk_leq (S.table s) e t in
+    let z_r = Some (Real.mk_zero (S.table s)) in
+    let  leq_t e = Library.Prelude.mk_leq (S.table s) e t in
     match S.conc_kind with
     | Global_t ->
      let mk_reach f e =  S.set_conclusion (Equiv.mk_reach_atom ?e f) s in
@@ -2245,8 +2248,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> assert false
 
   let weak_term_in (t : Term.term) (s : S.t) (hyp : Ident.t) =
-    let z_r = Some (Library.Real.mk_zero (S.table s)) in
-    let  leq_t e = Library.Real.mk_leq (S.table s) t e in
+    let z_r = Some (Real.mk_zero (S.table s)) in
+    let  leq_t e = Library.Prelude.mk_leq (S.table s) t e in
     let h = Hyps.by_id_k hyp Hyp s in
     let h : Equiv.form = match S.hyp_kind with
       | Global_t -> h
@@ -2280,8 +2283,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | _ -> soft_failure (Failure "Not a concrete equivalence or reachability goal")
     end
 
-let destr_leq_real (st : Symbols.table ) (t : Term.term)  =
-  Term.oas_seq2 (Term.destr_app ~fs:(Library.Real.leq st) ~arity:2 t)
+let destr_leq_real (t : Term.term) =
+  Term.oas_seq2 (Term.destr_app ~fs:Library.Prelude.fs_leq ~arity:2 t)
 
 type form_type =
     | Atom_conc of Term.term
@@ -2341,11 +2344,11 @@ type form_type =
       | LocAsym -> soft_failure (Failure "Not a concrete hypothesis")
       | LocHyp -> soft_failure (Failure "Not a concrete hypothesis")
     in
-    if S.Reduce.conv_term s ve (Library.Real.mk_zero (S.table s))
+    if S.Reduce.conv_term s ve (Real.mk_zero (S.table s))
     then
       oget_exn
         ~exn:( soft_failure_arg (Failure "Not a hypothesis on inequality between reals"))
-        (destr_leq_real (S.table s) form)
+        (destr_leq_real form)
     else
       soft_failure (Failure "Not a exact local lemma")
 
@@ -2500,12 +2503,12 @@ type form_type =
 
 
     | Weak_term t, T_conc ->
-      let ty = Some (Library.Real.real (S.table s)) in
+      let ty = Some (Real.treal (S.table s)) in
       let t,_ = convert ?ty s t in
       let l = weak_term t s in List.map S.to_general_sequent l
 
     | Weak_term t, T_hyp id ->
-      let ty = Some (Library.Real.real (S.table s)) in
+      let ty = Some (Real.treal (S.table s)) in
       let t,_ = convert ?ty s t in
       weak_term_in t s id
 
@@ -2777,38 +2780,81 @@ type form_type =
   let remember_tac args = wrap_fail (remember_tac_args args)
 
   (*------------------------------------------------------------------*)
-  (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
-  let and_right (bound : Term.term option) (s : S.t) : S.t list =
-    let sbound = try S.bound s with | _ -> None in
-    (**TODO:Concrete : change that to avoid try with *)
-    match S.Reduce.destr_and s S.conc_kind (S.conclusion s),bound, sbound with
-    | Some (lformula, rformula),None,None ->
-      [ S.set_conclusion lformula s ;
-        S.set_conclusion rformula s ]
-    | Some(lformula,rformula), None, Some ve when Term.equal ve (Library.Real.mk_zero (S.table s)) ->
-      [ S.set_conclusion lformula s ;
-        S.set_conclusion rformula s ]
-    | Some (lformula, rformula), Some e, Some ve ->
-      begin
-       let s1 = S.set_conclusion lformula s in
-        let s2 = S.set_conclusion rformula s in
-       [S.set_bound (Some e) s1;
-        S.set_bound
-          (Some (Library.Real.mk_add (S.table s) ve
-                     (Library.Real.mk_minus (S.table s) e))) s2]
-       end
-    | Some(lformula,rformula), None, Some App(Fun(e,_),x::[y])
-       when e = (Library.Real.add (S.table s)) ->
-        let s1 = S.set_conclusion lformula s in
-        let s2 = S.set_conclusion rformula s in
-         [S.set_bound (Some x) s1;
-          S.set_bound (Some y ) s2]
-    | Some(_), None, Some _ -> soft_failure (Failure "not possible to split the upper-bound")
-    | Some(_),Some _, None -> soft_failure (Failure "not a concrete local judgement")
+  (** Split a conjunction conclusion, creating one subgoal per conjunct. 
+      Implements the [split] tactic. *)
+  let and_right (user_bound : Term.term option) (s : S.t) : S.t list =
+    let table = S.table s in
+    let sequent_bound =
+      match S.conc_kind with
+      | Equiv.Global_t -> None
+      | Equiv.Local_t  -> S.bound s
+      | Equiv.Any_t    -> assert false
+    in
+    let conclusion = S.conclusion s in
+    let s1, f1, s2, f2 =
+      match S.Reduce.destr_and ~mode:`RL s S.conc_kind conclusion with
+      | Some (lf, rf) -> 
+        ( S.set_conclusion lf s, lf,
+          S.set_conclusion rf s, rf )
+        
+      | None -> soft_failure (Failure "conclusion is not a conjunction")
+    in
+    match user_bound, sequent_bound with
+    | None, None -> (* asymptotic or global sequent *)
+      [ s1; s2; ]
 
+    | None, Some ve
+      when Term.equal ve (Real.mk_zero table) -> (* concrete, exact *)
+      [ s1; s2; ]
 
+    | None, Some App(Fun(e,_), [x; y])
+      when e = Real.fs_add table ->
+      [S.set_bound (Some x) s1;
+       S.set_bound (Some y) s2]
 
-    | None,_,_ -> soft_failure (Failure "not a conjunction")
+    | Some e, Some ve ->
+      [S.set_bound (Some e) s1;
+       S.set_bound (Some (Real.mk_minus table ve e)) s2]
+
+    | None, Some ve ->
+      (* [ψ₁ <: ε/2] ∧ [ψ₂ <: ε/2] ⇒ [ϕ <: ε]*)
+      let new_bound =
+        Real.mk_div table ve (Real.mk_two table) |>
+        some
+      in
+      [S.set_bound new_bound s1;
+       S.set_bound new_bound s2]
+
+    | Some e, None ->
+      match S.conc_kind with
+      | Equiv.Global_t -> (* annoying, but it is hard to do something cleaner *)
+        if Equiv.is_reach conclusion then
+          (* We have:
+               conclusion = [f1 ∧ f2 <: ve],
+             destruct as:
+               conclusion = [f1 <: e    ]
+               conclusion = [f2 <: ve - e]
+             where [e] is the bound provided by the user. *)
+          let ve = oget (oget (Equiv.destr_reach conclusion)).bound in
+          let s1 =
+            let f1 =
+              (oget (Equiv.destr_reach f1)).formula |>
+              Equiv.mk_reach_atom ~e 
+            in
+            S.set_conclusion f1 s
+          in
+          let s2 =
+            let f2 =
+              (oget (Equiv.destr_reach f2)).formula |>
+              Equiv.mk_reach_atom ~e:(Real.mk_minus table ve e) 
+            in
+            S.set_conclusion f2 s
+          in
+          [s1; s2]
+        else
+          soft_failure (Failure "cannot use provided bound")
+
+      | _ -> assert false   (* cannot happen, we are in a global sequent *)
 
 let and_right_args args s =
   match args with
