@@ -98,7 +98,8 @@ let partition_powers
     (depending on [gdh_oracles]).
     Finds all possible occurrences of [nab] in [t] (ground), except
     1) in [g ^ p1…pn]: one [pi] is allowed to be [a] or [b]
-    2) in [u^p1…pn = v^q1…qm]: if GDH, one [pi] and one [qi] are allowed to be [a] or [b]
+    2) in [u^p1…pn = v^q1…qm]: if GDH, one [pi] and one [qi] are
+    allowed to be [a] or [b]
     If [t] is of the form [something^something], looks directly for occurrences
     in [t],
     and uses the provided continuation for the rec calls on its subterms.
@@ -106,7 +107,8 @@ let partition_powers
     again on subterms. *)
 let get_bad_occs
     (env : Env.t)            (* initial environment  *)
-    (gdh_oracles : bool) (g : term) (exp : Symbols.fname) (mult : Symbols.fname option)
+    (gdh_oracles : bool) (g : term) (exp : Symbols.fname) 
+    (mult : Symbols.fname option)
     (nab : Name.t list) 
     ~(retry : unit -> NOS.simple_occs)
     ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs)
@@ -140,8 +142,8 @@ let get_bad_occs
          and the arguments of all the bad_pows (incl. the one we dropped) *)
       let occs1 =
         List.concat_map
-        (rec_call info)
-        ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
+          (rec_call info)
+          ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
       in
       bad_pows_occs @ occs1
   in 
@@ -149,7 +151,10 @@ let get_bad_occs
 
   let env =
     Env.update
-      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
+      ~vars:(Vars.add_vars 
+               (Vars.Tag.global_vars ~const:true info.pi_vars) 
+               env.vars) 
+      env
   in
   match t with
   | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
@@ -158,7 +163,7 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure
          (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
-      
+
   | Name (_, nargs) as n when Name.exists_name (Name.of_term n) nab ->
     (* one of the nab: generate occs for all potential collisions *)
     let occs1 =
@@ -206,7 +211,7 @@ let get_bad_occs
       | n :: _ -> List.concat_map (rec_call info) n.args
     in
     occs1 @ occs2 @ occs3
-    
+
   | _ -> retry ()
 
 
@@ -311,7 +316,9 @@ let cgdh
     dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
   in
   let pp_nab =
-    fun ppf () -> Fmt.pf ppf "bad occurrences@ of %a and %a" (Name.pp ppe) na (Name.pp ppe) nb
+    fun ppf () -> 
+      Fmt.pf ppf "bad occurrences@ of %a and %a" 
+        (Name.pp ppe) na (Name.pp ppe) nb
   in
   let get_bad : NOS.f_fold_occs =
     get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]

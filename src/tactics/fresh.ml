@@ -24,8 +24,8 @@ let p_fresh_arg (nargs : Args.named_args) : bool =
   | [Args.NArg L.{ pl_desc = "precise_ts" }] -> true
 
   | Args.NList (l,_) :: _ 
-    | Args.NArg  l     :: _ ->
-     hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+  | Args.NArg  l     :: _ ->
+    hard_failure ~loc:(L.loc l) (Failure "unknown argument")
 
   | [] -> false
 
@@ -43,17 +43,17 @@ module NOF = O.NameOF
     A [NOS.f_fold_occs] function.
     Looks for occurrences of [n] in [t]:
     - if [t] is an name with the same symbol as [n]: returns the occurrence,
-    and look recursively in the arguments
+      and look recursively in the arguments
     - otherwise: asks to be called recursively on subterms.
-    Do not uses an accumulator, so returns an empty unit list. *)
+      Do not uses an accumulator, so returns an empty unit list. *)
 let get_bad_occs
-      (env : Env.t)
-      (n : Name.t) 
-      ~(retry : unit -> NOS.simple_occs)
-      ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs) 
-      (info : O.pos_info)
-      (t : Term.term) 
-    : NOS.simple_occs
+    (env : Env.t)
+    (n : Name.t) 
+    ~(retry : unit -> NOS.simple_occs)
+    ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs) 
+    (info : O.pos_info)
+    (t : Term.term) 
+  : NOS.simple_occs
   =
   (* handles a few cases, using [rec_call] for rec calls,
      and calls [retry] for the rest *)
@@ -75,24 +75,24 @@ let get_bad_occs
 
   (* the fresh tactic does not apply to terms with non-constant variables *)
   | Var v ->
-     soft_failure
-       (Failure (Fmt.str "terms contain a non-constant variable: %a" Vars.pp v))
+    soft_failure
+      (Failure (Fmt.str "terms contain a non-constant variable: %a" Vars.pp v))
 
   (* a name with the symbol we want: build an occurrence,
      and also look in its args *)
   | Name (nn, nn_args) when nn.s_symb = n.symb.s_symb ->
-     (* keep the same info: all good except the Match.pos is not kept
-        up to date.
-        still fine, since we don't actually use it. *)
-     (* in fact here we could just rec_call_on_subterms. *)
-     let occs = List.concat_map (rec_call info) nn_args in
-     (NOS.EO.SO.mk_simple_occ
-        ~content:(Name.of_term t) ~collision:n ~data:()
-        ~vars:info.pi_vars
-        ~cond:info.pi_cond
-        ~typ:info.pi_occtype
-        ~sub:info.pi_subterm
-        ~show:Show) :: occs
+    (* keep the same info: all good except the Match.pos is not kept
+       up to date.
+       still fine, since we don't actually use it. *)
+    (* in fact here we could just rec_call_on_subterms. *)
+    let occs = List.concat_map (rec_call info) nn_args in
+    (NOS.EO.SO.mk_simple_occ
+       ~content:(Name.of_term t) ~collision:n ~data:()
+       ~vars:info.pi_vars
+       ~cond:info.pi_cond
+       ~typ:info.pi_occtype
+       ~sub:info.pi_subterm
+       ~show:Show) :: occs
 
   | _ -> retry ()
 
@@ -107,19 +107,19 @@ let get_bad_occs
     [hyps] are understood in environment [env], and
     [n], [tt] in [env.system.set], which must be the system in [contx]. *)
 let phi_fresh_same_system
-      ~(negate : bool)
-      ~(use_path_cond : bool)
-      ~(checklarge : bool)
-      ?(loc : L.t option)
-      (hyps : Hyps.TraceHyps.hyps) 
-      (contx : Constr.trace_cntxt)
-      (env : Env.t)
-      (n : Term.term)
-      (tt : Term.terms)
-    : Term.terms =
+    ~(negate : bool)
+    ~(use_path_cond : bool)
+    ~(checklarge : bool)
+    ?(loc : L.t option)
+    (hyps : Hyps.TraceHyps.hyps) 
+    (contx : Constr.trace_cntxt)
+    (env : Env.t)
+    (n : Term.term)
+    (tt : Term.terms)
+  : Term.terms =
   (* sanity check: contx and env should agree *)
   assert (SE.equal0 env.system.set ((contx.system) :> SE.arbitrary));
-  
+
   let err = Format.asprintf "%a" Term.pp n in
 
   let n : Name.t = 
@@ -132,15 +132,15 @@ let phi_fresh_same_system
   (* ensure that the type of the name is large *)
   let ty = n.Name.symb.s_typ in
   if checklarge 
-     && not Symbols.TyInfo.(check_bty_info env.table ty Large) then
+  && not Symbols.TyInfo.(check_bty_info env.table ty Large) then
     Tactics.soft_failure ?loc
       (Tactics.Failure ("the type of term "^err^" is not [large]"));
-  
+
   let ppe = default_ppe ~table:env.table () in
   let pp_n ppf () = Fmt.pf ppf "occurrences of %a" (Name.pp ppe) n in
 
   let get_bad : NOS.f_fold_occs = get_bad_occs env n in
-  
+
   let occs =
     NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_n)
       get_bad
@@ -157,20 +157,20 @@ let phi_fresh_same_system
     Used e.g. when the terms come from a projection, or a system other than
     the sequent's [set]. *)
 let phi_fresh
-      ~(negate : bool)
-      ~(use_path_cond : bool)
-      ~(checklarge : bool)
-      ?(loc : L.t option)
-      (hyps : Hyps.TraceHyps.hyps) 
-      (contx : Constr.trace_cntxt)
-      (env : Env.t)
-      (n : Term.term)
-      (tt : Term.terms)
-    : Term.terms =
+    ~(negate : bool)
+    ~(use_path_cond : bool)
+    ~(checklarge : bool)
+    ?(loc : L.t option)
+    (hyps : Hyps.TraceHyps.hyps) 
+    (contx : Constr.trace_cntxt)
+    (env : Env.t)
+    (n : Term.term)
+    (tt : Term.terms)
+  : Term.terms =
   (* the new environment, where the generated formulas are to be understood *)
   let envp_context = {env.system with set=((contx.system) :> SE.arbitrary)} in
   let envp = Env.update ~system:envp_context env in
-  
+
   (* keep what trace hypotheses we can going from env.system to
      {set:contx.system, pair:env.system.pair} *)
   let hypsp =
@@ -180,7 +180,7 @@ let phi_fresh
       ~vars:env.vars ~table:env.table
       hyps
   in
-  
+
   phi_fresh_same_system
     ~negate ~use_path_cond ~checklarge ?loc
     hypsp contx envp n tt
@@ -192,15 +192,15 @@ let phi_fresh
     [hyps] are understood in environment [env], and
     [n], [tt] in [env.system.pair], which must be the system in [contx]. *)
 let phi_fresh_proj
-      ~(use_path_cond : bool)
-      ?(loc  : L.t option)
-      (hyps  : Hyps.TraceHyps.hyps) 
-      (contx : Constr.trace_cntxt)
-      (env   : Env.t)
-      (n     : Term.term)
-      (tt    : Term.terms)
-      (proj  : Term.proj)
-    : Term.terms 
+    ~(use_path_cond : bool)
+    ?(loc  : L.t option)
+    (hyps  : Hyps.TraceHyps.hyps) 
+    (contx : Constr.trace_cntxt)
+    (env   : Env.t)
+    (n     : Term.term)
+    (tt    : Term.terms)
+    (proj  : Term.proj)
+  : Term.terms 
   =
   let system = ((Utils.oget env.system.pair) :> SE.fset) in
 
@@ -215,10 +215,10 @@ let phi_fresh_proj
 
   (* project tt on proj *)
   let ttp = List.map (Term.project1 proj) tt in
-  
+
   (* project n on proj *)
   let np = O.expand_macro_check_all infop (Term.project1 proj n) in
-  
+
   phi_fresh
     ?loc ~checklarge:false ~negate:true ~use_path_cond
     hyps contxp env np ttp
@@ -231,33 +231,33 @@ let phi_fresh_proj
     returns n, t such that hyp is n = t or t = n
     (looks under macros if possible *)
 let fresh_trace_param
-      ~(hyp_loc : L.t) 
-      (einfo    : O.expand_info) 
-      (hyp      : Term.term)
-      (s        : TS.sequent)
-    : Term.term * Term.term  =
+    ~(hyp_loc : L.t) 
+    (einfo    : O.expand_info) 
+    (hyp      : Term.term)
+    (s        : TS.sequent)
+  : Term.term * Term.term  =
   let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
     | None -> 
-       soft_failure ~loc:hyp_loc
-         (Tactics.Failure "Can only be applied on an equality hypothesis.")
+      soft_failure ~loc:hyp_loc
+        (Tactics.Failure "Can only be applied on an equality hypothesis.")
   in
   let em1 = O.expand_macro_check_all einfo m1 in
   let em2 = O.expand_macro_check_all einfo m2 in
   match em1, em2 with
-    | (Name _ as ns), _ -> (ns, em2)
-    | _, (Name _ as ns) -> (ns, em1)
-    | _ ->
-       soft_failure ~loc:hyp_loc
-         (Tactics.Failure "can only be applied on an hypothesis of \
-                           the form t=n or n=t")
+  | (Name _ as ns), _ -> (ns, em2)
+  | _, (Name _ as ns) -> (ns, em1)
+  | _ ->
+    soft_failure ~loc:hyp_loc
+      (Tactics.Failure "can only be applied on an hypothesis of \
+                        the form t=n or n=t")
 
 
 (** Applies fresh to the trace sequent s and hypothesis m:
     returns the list of subgoals with the added hyp that there is a collision *)
 let fresh_trace
-      (opt_args : Args.named_args) (m : lsymb) (s : TS.sequent) 
-    : TS.sequent list 
+    (opt_args : Args.named_args) (m : lsymb) (s : TS.sequent) 
+  : TS.sequent list 
   =
   let use_path_cond = p_fresh_arg opt_args in
   let loc = L.loc m in
@@ -266,7 +266,7 @@ let fresh_trace
     soft_failure 
       (Tactics.GoalBadShape "Fresh does not handle concrete bounds.");
 
-  
+
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
@@ -275,7 +275,7 @@ let fresh_trace
     let (n, t) =
       fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, contx) hyp s
     in
-    
+
     Printer.pr "Freshness of %a:@; @[<v 0>" Term.pp n;
     let phis =
       phi_fresh_same_system (* phi_fresh would work as well *) 
@@ -291,18 +291,18 @@ let fresh_trace
     let g = TS.conclusion s in
     List.map
       (fun phi ->
-        TS.set_conclusion (Term.mk_impl ~simpl:false phi g) s)
+         TS.set_conclusion (Term.mk_impl ~simpl:false phi g) s)
       phis
   with
   | SE.(Error (_,Expected_fset)) ->
-     soft_failure Underspecified_system
+    soft_failure Underspecified_system
 
 
 (** fresh trace tactic *)
 let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
   match args with
   | [Args.Fresh (opt_args, Some (Args.FreshHyp hyp))] -> 
-     TraceLT.wrap_fail (fresh_trace opt_args hyp)
+    TraceLT.wrap_fail (fresh_trace opt_args hyp)
 
   | _ -> bad_args ()
 
@@ -318,8 +318,8 @@ let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
     where [phi] expresses the freshness of [n_l] on the left, and [n_r] on 
     the right *)
 let fresh_equiv
-      (opt_args : Args.named_args) (i : int L.located) (s : ES.sequent) 
-    : ES.sequents 
+    (opt_args : Args.named_args) (i : int L.located) (s : ES.sequent) 
+  : ES.sequents 
   =
   let use_path_cond = p_fresh_arg opt_args in
   let loc = L.loc i in
@@ -327,14 +327,14 @@ let fresh_equiv
   let env = ES.env s in
   let pair_context = ES.mk_pair_trace_cntxt s in
   let proj_l, proj_r = ES.get_system_pair_projs s in
-  
+
   if (ES.conclusion_as_equiv s).bound <> None then 
     soft_failure 
       (Tactics.GoalBadShape "Fresh does not handle concrete bounds.");
 
   let before, t, after = split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
-  
+
   (* compute the freshness conditions *)
   let phi_fresh_p =
     phi_fresh_proj ~use_path_cond ~loc
@@ -381,24 +381,24 @@ let fresh_equiv
 (** Dispatches the application of fresh on a global sequent to
     fresh_equiv *)
 let fresh_global_tac (args : TacticsArgs.parser_args)
-    : LowTactics.etac =
+  : LowTactics.etac =
   EquivLT.wrap_fail
     (fun s ->
-      match args with
-      (* "fresh i" *)
-      | [Args.Fresh (opt_args, Some (Args.FreshInt i))] ->
+       match args with
+       (* "fresh i" *)
+       | [Args.Fresh (opt_args, Some (Args.FreshInt i))] ->
          (* equivalence goal -> fresh_equiv *)
          if ES.conclusion_is_equiv s then
            fresh_equiv opt_args i s
          else
            bad_args ()
 
-      (* "fresh" *)
-      (* This case is unused for now, but should be soon. *)
-      | [Args.Fresh (_, None)] ->
+       (* "fresh" *)
+       (* This case is unused for now, but should be soon. *)
+       | [Args.Fresh (_, None)] ->
          bad_args ()
-     
-      | _ -> bad_args ())
+
+       | _ -> bad_args ())
 
 
 (*------------------------------------------------------------------*)
