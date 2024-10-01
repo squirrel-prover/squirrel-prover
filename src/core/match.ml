@@ -178,11 +178,9 @@ module Pos = struct
         
       | Equiv.Atom (Reach t) ->
         sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t.formula
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Equiv e) -> 
         sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e.terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Pred pa) ->
         let p = 0 :: 0 :: p in
@@ -246,7 +244,7 @@ module Pos = struct
     'a
 
   (*------------------------------------------------------------------*)
-  (* TODO: explicit system in terms: conds below may not be in the correct 
+  (* TODO: meta-terms: conds below may not be in the correct 
      system: they should be stated in [se] *)
 
   (** Internal *)
@@ -554,17 +552,17 @@ module Pos = struct
         map_fold func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t.formula
       in
       let ti' = Equiv.Atom (Reach {formula = t; bound = None}) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
       let se = (oget system.pair :> SE.t) in
       let acc, found, l =
         map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e.terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        (*TODO:Concrete : Probably something to do to create a bounded goal*)
       in
       let ti' = Equiv.Atom (Equiv {terms = l; bound = None}) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Pred pa) ->
@@ -2647,7 +2645,7 @@ module E = struct
           match hyp with
           | Equiv.Local f
           | Equiv.(Global Atom( (Reach {formula = f; bound = None}))) ->
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+            (*TODO:Concrete : Probably something to do to create a bounded goal*)
             f:: acc
           | _ -> acc 
         ) hyps []
@@ -2697,7 +2695,6 @@ module E = struct
     let known_cond, e_pat = 
       pat_of_known_set
         { known with vars = Vars.Tag.local_vars (List.map fst known.vars) } 
-        (* TODO: det: do not erase tags info *)
     in
 
     let sys_cntxt = SE.{ set = (system :> SE.t); pair = None; } in
@@ -2719,7 +2716,6 @@ module E = struct
                because we must not forget the instantiation by [mv] of any
                variable. *)
             vars = cand.vars @ List.map fst known.vars;
-            (* TODO: det: do not erase tag info *)
             cond = cand.cond; }
         in
         Some cand
@@ -3101,7 +3097,7 @@ module E = struct
     );
     (* Elements of [known] are known only for bi-deducible values of [known.vars]. 
        For now, we only check that these [known.vars] is instantiated by 
-       constant (* TODO: ptime *) values, which ensures that they are bi-deducible.
+       ptime values, which ensures that they are bi-deducible.
        FEATURE: we could be more precise by creating a bi-deduction proof obligation
        instead. *)
     let st = { st with support = known.vars @ st.support; } in
@@ -3408,15 +3404,14 @@ module E = struct
         match t.bound, pat.bound with
         | None, None -> mv
         | Some e, Some ve ->
-          let system =SE.{ set = (SE.of_list [] :> SE.t); pair = None; }  in
-          (*FIXME:Concrete : Use SE.empty_system*)
+          let system = SE.{ set = (SE.of_list [] :> SE.t); pair = None; } in
           let st = st_change_context st system in
           term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       let system : SE.context = 
-        SE.{ set = ((oget st.system.pair) :> SE.t); pair = None; } 
+        SE.{ set = (oget st.system.pair :> SE.t); pair = None; } 
       in
       let st = st_change_context st system in
       let mv  = tunif_e ~mode es.terms pat_es.terms st in
@@ -3424,8 +3419,7 @@ module E = struct
         match es.bound, pat_es.bound with
         | None, None -> mv
         | Some e, Some ve ->
-          let system =SE.{ set = (SE.of_list [] :> SE.t); pair = None; }  in
-          (*FIXME:Concrete : Use SE.empty_system*)
+          let system = SE.{ set = (SE.of_list [] :> SE.t); pair = None; } in
           let st = st_change_context st system in
           term_unif e ve {st with mv}
         | _ -> no_unif ()
