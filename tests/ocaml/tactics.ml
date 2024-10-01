@@ -268,7 +268,7 @@ let case_study () =
     ~actual:(List.hd terms.terms)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_fun (Prover.get_table st) f  
-       [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
+       [Term.mk_diff [Projection.left,n;Projection.right,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     TRUE,
@@ -313,7 +313,7 @@ let case_study () =
     ~actual:(List.hd terms.terms)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_fun (Prover.get_table st) f  
-       [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
+       [Term.mk_diff [Projection.left,n;Projection.right,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
     TRUE,

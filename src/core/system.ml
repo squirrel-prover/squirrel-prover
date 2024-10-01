@@ -1,34 +1,15 @@
 open Utils
 
-type t = Symbols.system 
+include SystemSyntax
 
 (*------------------------------------------------------------------*)
-let convert table s = Symbols.System.convert_path s table
-
-(*------------------------------------------------------------------*)
-type error =
-  | Shape_error
-  | Invalid_projection
-
-let pp_error fmt = function
-  | Shape_error ->
-    Format.fprintf fmt "cannot register a shape twice with distinct indices"
-  | Invalid_projection ->
-    Format.fprintf fmt "invalid projection"
-
-exception Error of error
-
-let error e = raise (Error e)
-
-(*------------------------------------------------------------------*)
-
 module Msh = Map.Make (Action.Shape)
 
 (** For each system we store the list of projections (which defines
     the system's arity) and a map from action shapes to action descriptions,
     which also contain action symbols. *)
 type data = {
-  projections : Term.proj list;
+  projections : Projection.t list;
   actions     : Action.descr Msh.t
 }
 
@@ -159,43 +140,17 @@ let register_action table system_symb (descr : Action.descr) =
 
 module Single = struct
 
-  type t = {
-    system     : Symbols.system ;
-    projection : Term.proj
-  }
+  include SystemSyntax.Single
 
   let make table system projection =
     if valid_projection table system projection then
-      {system;projection}
+      make_unsafe system projection
     else
       error Invalid_projection
-
-  let pp fmt {system;projection} =
-    if Term.proj_to_string projection = "ε" then
-      (* Convention typically used for single system. *)
-      Format.fprintf fmt "%a" Symbols.pp_path system
-    else
-      Format.fprintf fmt "%a/%a"
-        Symbols.pp_path system
-        Term.pp_proj projection
 
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in
     let descr = Action.project_descr projection multi_descr in
     Action.check_descr descr;
     descr
-
-  let compare (s1 : t) (s2 : t) =
-    Stdlib.compare
-      (s1.system.id,s1.projection)
-      (s2.system.id,s2.projection)
-
-  module O = struct
-    type _t =  t
-    type  t = _t
-    let compare = compare
-  end
-
-  module Map = Map.Make(O)
-  module Set = Set.Make(O)
 end

@@ -109,7 +109,7 @@ val get_terms : form -> Term.term list
 
 (*------------------------------------------------------------------*)
 (** Project the reachability formulas in a global formula. *)
-val project : Term.proj list -> form -> form 
+val project : Projection.t list -> form -> form 
 
 (*------------------------------------------------------------------*)
 (** Checks if a formula is independent of the system context,
@@ -125,7 +125,7 @@ val se_subst    : SE.subst    -> form -> form
 
 (** Substitute projections in [Equiv] or [Reach] atoms. *)
 val subst_projs :
-  [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> form -> form
+  [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> form -> form
 
 (** Free variables *)
 val fv : form -> Vars.Sv.t
@@ -177,7 +177,7 @@ module Any : sig
   val fv    : t -> Vars.Sv.t
   val ty_fv : t -> Type.Fv.t
 
-  val project : Term.proj list -> t -> t
+  val project : Projection.t list -> t -> t
     
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a f_kind -> 'a -> any_form
@@ -199,7 +199,7 @@ module Babel : sig
   val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
 
   val subst_projs : 
-    'a f_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> 'a -> 'a
+    'a f_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> 'a -> 'a
 
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
 
@@ -209,7 +209,7 @@ module Babel : sig
   val pp     : 'a f_kind -> 'a formatter
   val pp_dbg : 'a f_kind -> 'a formatter
 
-  val project : 'a f_kind -> Term.proj list -> 'a -> 'a
+  val project : 'a f_kind -> Projection.t list -> 'a -> 'a
 end
 
 (*------------------------------------------------------------------*)
@@ -258,7 +258,7 @@ module Any_statement : sig
   val fv    : t -> Vars.Sv.t
   val ty_fv : t -> Type.Fv.t
 
-  val project : Term.proj list -> t -> t
+  val project : Projection.t list -> t -> t
 
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a s_kind -> 'a -> t
@@ -278,7 +278,7 @@ module Babel_statement : sig
   val tsubst : 'a s_kind -> Type.tsubst -> 'a -> 'a
 
   val subst_projs :
-    'a s_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> 'a -> 'a
+    'a s_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> 'a -> 'a
 
   val fv     : 'a s_kind -> 'a -> Vars.Sv.t
 
@@ -288,5 +288,5 @@ module Babel_statement : sig
   val pp     : 'a s_kind -> 'a formatter
   val pp_dbg : 'a s_kind -> 'a formatter
 
-  val project : 'a s_kind -> Term.proj list -> 'a -> 'a
+  val project : 'a s_kind -> Projection.t list -> 'a -> 'a
 end

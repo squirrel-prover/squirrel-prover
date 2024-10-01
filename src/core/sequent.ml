@@ -84,7 +84,7 @@ module PT = struct
       would yield
         [[phi]_{P1} -> [psi]_{P1}]
       which is not implied by (and does not imply) the initial formula. *)
-  let projs_set table env (projs : Term.projs) (pt : t) : t =
+  let projs_set table env (projs : Projection.t list) (pt : t) : t =
 
     let system_independent env (f:Term.term) =
       let vars = Vars.add_vars pt.args env in
@@ -398,7 +398,7 @@ let pt_unify_systems
   else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
     { pt with system = arg.system; }, arg
   else
-    begin
+    begin     
       (* Check equivalence systems in [system.pair].
          Fails if not compatible. *)
       let arg_pair, pt_pair = arg.system.pair, pt.system.pair in

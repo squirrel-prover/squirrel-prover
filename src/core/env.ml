@@ -35,5 +35,5 @@ let set_ty_vars e ty_vars : t = { e with ty_vars }
 let set_vars    e vars    : t = { e with vars }
 
 (*------------------------------------------------------------------*)
-let projs_set (projs : Term.projs) (e : t) : t =
+let projs_set (projs : Projection.t list) (e : t) : t =
   { e with system = SE.project_set projs e.system }

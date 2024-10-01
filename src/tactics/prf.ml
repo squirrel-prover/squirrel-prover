@@ -258,7 +258,7 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
     So we select a side with proj, and compute a term saying 
     'the condition above at least one of the occurrences on that side holds'.*)
 let project_conditions
-    (proj:Term.proj) (conds:(SE.fset * Term.terms) list) : Term.term =
+    (proj:Projection.t) (conds:(SE.fset * Term.terms) list) : Term.term =
   let conds_p =
     List.filter_map
       (fun (se, cond) ->
@@ -390,7 +390,7 @@ let phi_proj
     (m       : Term.term)
     (k       : Term.term)
     (nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
-    (proj    : Term.proj)
+    (proj    : Projection.t)
   : Term.terms
   =
   let ppe = default_ppe ~table:env.table () in

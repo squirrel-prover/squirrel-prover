@@ -43,7 +43,7 @@ let tsubst_equiv (subst : Type.tsubst) (e : equiv) : equiv =
   {terms = List.map (Term.tsubst subst) e.terms;
    bound = Option.map (Term.tsubst subst) e.bound}
 
-let subst_projs_equiv (subst : (Term.proj * Term.proj) list) (e : equiv) : equiv =
+let subst_projs_equiv (subst : (Projection.t * Projection.t) list) (e : equiv) : equiv =
   {terms = List.map (Term.subst_projs subst) e.terms;
    bound = Option.map (Term.subst_projs subst) e.bound}
 
@@ -95,11 +95,11 @@ let tsubst_bform (subst : Type.tsubst) (f : bform) : bform =
   { formula = Term.tsubst subst f.formula;
     bound   = Option.map (Term.tsubst subst) f.bound}
 
-let subst_projs_bform (subst : (Term.proj * Term.proj) list) (f : bform) : bform =
+let subst_projs_bform (subst : (Projection.t * Projection.t) list) (f : bform) : bform =
   { formula = Term.subst_projs subst f.formula; 
     bound   = Option.map (Term.subst_projs subst) f.bound}
 
-let proj_bform (subst : Term.proj list) (f : bform) : bform =
+let proj_bform (subst : Projection.t list) (f : bform) : bform =
   { formula = Term.project subst f.formula; 
     bound   = Option.map (Term.project subst) f.bound}
 
@@ -425,7 +425,7 @@ let rec subst s (f : form) =
 
 let subst_projs_atom 
     (target : [`Equiv | `Reach]) 
-    (s : (Term.proj * Term.proj) list) (at : atom) : atom 
+    (s : (Projection.t * Projection.t) list) (at : atom) : atom 
   =
   match at with
   | Equiv e ->
@@ -455,7 +455,7 @@ let subst_projs_atom
 
 let subst_projs
     (target : [`Equiv | `Reach]) 
-    (s : (Term.proj * Term.proj) list) (t : form) : form 
+    (s : (Projection.t * Projection.t) list) (t : form) : form 
   =
   let rec doit = function
     | Atom at -> Atom (subst_projs_atom target s at)
@@ -620,7 +620,7 @@ let rec is_system_context_indep (f : form) : bool =
   | _ -> tforall is_system_context_indep f
 
 (*------------------------------------------------------------------*)
-let rec project (projs : Term.proj list) (f : form) : form =
+let rec project (projs : Projection.t list) (f : form) : form =
   match f with
   | Atom (Reach f) -> Atom (Reach (proj_bform projs f))
 
@@ -1191,7 +1191,7 @@ module Babel = struct
     | Any_t    -> PreAny.subst
 
   let subst_projs : 
-    type a. a f_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> a -> a 
+    type a. a f_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> a -> a 
     =
     fun kind target s f ->
     match kind with
@@ -1230,7 +1230,7 @@ module Babel = struct
     | Global_t -> pp_dbg
     | Any_t    -> PreAny.pp_dbg
 
-  let project : type a. a f_kind -> Term.proj list -> a -> a = function
+  let project : type a. a f_kind -> Projection.t list -> a -> a = function
     | Local_t  -> Term.project
     | Global_t -> project
     | Any_t    -> PreAny.project
@@ -1690,7 +1690,7 @@ module Babel_statement = struct
     | Any_s    -> PreAny_statement.subst
 
   let subst_projs :
-    type a. a s_kind -> [`Equiv | `Reach] -> (Term.proj * Term.proj) list -> a -> a
+    type a. a s_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> a -> a
     =
     fun kind target s f ->
     match kind with
@@ -1724,7 +1724,7 @@ module Babel_statement = struct
   let pp_dbg : type a. a s_kind -> a formatter = 
     fun k -> _pp k (default_ppe ~dbg:true ())
 
-  let project : type a. a s_kind -> Term.proj list -> a -> a = function
+  let project : type a. a s_kind -> Projection.t list -> a -> a = function
     | Local_s  -> proj_bform
     | Global_s -> project
     | Any_s    -> PreAny_statement.project

@@ -252,7 +252,7 @@ type conversion_error_i =
   | PatNotAllowed
   | ExplicitTSInProc
   | MissingSystem
-  | BadProjInSubterm     of Term.projs * Term.projs
+  | BadProjInSubterm     of Projection.t list * Projection.t list
 
   | Failure              of string
 
@@ -270,7 +270,7 @@ val check :
   Env.t ->
   ?local:bool -> ?pat:bool ->
   ?system_info:SE.t Mv.t ->
-  Infer.env -> Term.projs ->
+  Infer.env -> Projection.t list ->
   term -> Type.ty ->
   unit
 
@@ -290,7 +290,7 @@ val check_signature :
     - [InProc (projs, ts)]: converting a term in a process at an implicit
       timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.projs * Term.term
+  | InProc of Projection.t list * Term.term
   | InGoal
 
 (*------------------------------------------------------------------*)
@@ -369,7 +369,7 @@ val convert_any : conv_env -> any_term -> Equiv.any_form
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
-val parse_projs : lsymb list option -> Term.projs 
+val parse_projs : lsymb list option -> Projection.t list 
 
 (*------------------------------------------------------------------*)
 (** {2 Proof-terms} *)

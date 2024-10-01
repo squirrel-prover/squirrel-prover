@@ -199,7 +199,7 @@ let phi_fresh_proj
     (env   : Env.t)
     (n     : Term.term)
     (tt    : Term.terms)
-    (proj  : Term.proj)
+    (proj  : Projection.t)
   : Term.terms 
   =
   let system = ((Utils.oget env.system.pair) :> SE.fset) in

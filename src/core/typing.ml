@@ -151,7 +151,7 @@ type conversion_error_i =
   | PatNotAllowed
   | ExplicitTSInProc
   | MissingSystem
-  | BadProjInSubterm     of Term.projs * Term.projs
+  | BadProjInSubterm     of Projection.t list * Projection.t list
 
   | Failure              of string
       
@@ -227,8 +227,8 @@ let pp_error_i ppf = function
   | BadProjInSubterm (ps1, ps2) ->
     Fmt.pf ppf "@[<v 2>invalid projection:@;missing projections: @[%a@]@;\
                 unknown projections: @[%a@]@]"
-      Term.pp_projs ps1
-      Term.pp_projs ps2
+      Projection.pp_list ps1
+      Projection.pp_list ps2
 
   | Failure s -> Fmt.string ppf s
       
@@ -288,7 +288,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
     - [InProc (projs, ts)]: converting a term in a process at an implicit
       timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.projs * Term.term
+  | InProc of Projection.t list * Term.term
   | InGoal
 
 let is_in_proc = function InProc _ -> true | InGoal -> false
@@ -348,7 +348,7 @@ let check_term_ty state ~loc (t : Term.term) (ty : Type.ty) : unit =
 
 (** check that projection alive at a given subterm w.r.t. projections
     used in a diff operator application. *)
-let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
+let check_system_projs loc (state : conv_state) (projs : Projection.t list) : unit =
   let current_projs =
     match state.cntxt with
     | InProc (ps, _) -> ps
@@ -366,7 +366,7 @@ let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
   if diff1 <> [] || diff2 <> [] then
     conv_err loc (BadProjInSubterm (diff1, diff2))
 
-let proj_state (projs : Term.projs) (state : conv_state) : conv_state =
+let proj_state (projs : Projection.t list) (state : conv_state) : conv_state =
   match state.cntxt with 
   | InProc (_, ts) -> { state with cntxt = InProc (projs, ts) }
   | InGoal -> { state with env = Env.projs_set projs state.env }
@@ -935,13 +935,13 @@ and convert0
 
   | Diff (l,r) ->
     (* FIXME: projections should not be hard-coded to be [left, right] *)
-    check_system_projs loc state [Term.left_proj; Term.right_proj];
+    check_system_projs loc state [Projection.left; Projection.right];
 
-    let statel = proj_state [Term.left_proj ] state in
-    let stater = proj_state [Term.right_proj] state in
+    let statel = proj_state [Projection.left ] state in
+    let stater = proj_state [Projection.right] state in
 
-    Term.mk_diff [Term.left_proj , convert statel l ty;
-                  Term.right_proj, convert stater r ty; ] 
+    Term.mk_diff [Projection.left , convert statel l ty;
+                  Projection.right, convert stater r ty; ] 
 
   | Find (vs,c,t,e) ->
     let env, is = 
@@ -1509,7 +1509,7 @@ let check
     ?(local=false) ?(pat=false)
     ?(system_info = Mv.empty)
     (ty_env : Infer.env)
-    (projs : Term.projs)
+    (projs : Projection.t list)
     (t : term) (s : Type.ty) 
   : unit 
   =
@@ -1597,10 +1597,10 @@ let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
 (** {2 Misc} *)
     
 (*------------------------------------------------------------------*)
-let parse_projs (p_projs : lsymb list option) : Term.projs =
+let parse_projs (p_projs : lsymb list option) : Projection.t list =
   omap_dflt
-    [Term.left_proj; Term.right_proj]
-    (List.map (Term.proj_from_string -| L.unloc))
+    [Projection.left; Projection.right]
+    (List.map (Projection.from_string -| L.unloc))
     p_projs
 
 (*------------------------------------------------------------------*)

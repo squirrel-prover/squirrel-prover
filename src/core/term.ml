@@ -147,25 +147,9 @@ let _pp_macro
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
 
-type proj = string
-type projs = proj list
-
-let proj_from_string x : proj = x
-
-let proj_to_string x : string = x
-
-let pp_proj  fmt (x : proj)  = Fmt.string fmt x
-let pp_projs fmt (l : projs) = Fmt.list ~sep:Fmt.comma pp_proj fmt l
-
-let left_proj  = "left"
-let right_proj = "right"
-
-module Sproj = Ss 
-module Mproj = Ms
-
 (*------------------------------------------------------------------*)
 type 'a diff_args =
-  | Explicit of (proj * 'a) list
+  | Explicit of (Projection.t * 'a) list
 
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
@@ -1260,7 +1244,7 @@ and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
 (*------------------------------------------------------------------*)
 let subst_projs
       ?(project=false)
-      (s : (proj * proj) list)
+      (s : (Projection.t * Projection.t) list)
       (t : term) : term = 
   let rec do_subst : term -> term = function
     | Diff (Explicit l) when project ->
@@ -1484,7 +1468,7 @@ and _pp
   | Diff (Explicit list) ->
     let pp_elem fmt (label,term) =
       Fmt.pf fmt "%s%a" 
-        (if info.ppe.dbg then label ^ ":" else "")
+        (if info.ppe.dbg then (Projection.to_string label) ^ ":" else "")
         (pp (diff_fixity, `NonAssoc)) term
     in
     Fmt.pf fmt "@[<hov 2>diff(@,%a)@]"
@@ -1979,7 +1963,7 @@ let rec not_simpl = function
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
 
-let project1 (proj : proj) (term : term) : term =
+let project1 (proj : Projection.t) (term : term) : term =
   let rec project1 (t : term) : term = 
     match t with
     (* do not recurse, as subterms cannot contain any diff *)
@@ -1991,7 +1975,7 @@ let project1 (proj : proj) (term : term) : term =
   project1 term
 
 (*------------------------------------------------------------------*)
-let project (projs : proj list) (term : term) : term =
+let project (projs : Projection.t list) (term : term) : term =
   let rec project (t : term) : term = 
     match t with
     | Diff (Explicit l) ->
@@ -2006,7 +1990,7 @@ let project (projs : proj list) (term : term) : term =
 
   project term
 
-let project_opt (projs : projs option) (term : term) : term =
+let project_opt (projs : Projection.t list option) (term : term) : term =
   omap_dflt term (project ^~ term) projs 
 
 (*------------------------------------------------------------------*)
@@ -2088,7 +2072,7 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
 (** Evaluate topmost diff operators for a given proj of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
     and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
-let head_pi_term (s : proj) (t : term) : term =
+let head_pi_term (s : Projection.t) (t : term) : term =
   match t with
   | Diff (Explicit l) -> List.assoc s l
   | _ -> t
@@ -2097,7 +2081,7 @@ let head_pi_term (s : proj) (t : term) : term =
 (** Normalize a term of system kind [lproj,rproj]. *)
 let make_normal_biterm_pair
     ~(dorec : bool) ~(alpha_find : bool)
-    ~(lproj : proj) ~(rproj : proj)
+    ~(lproj : Projection.t) ~(rproj : Projection.t)
     (t : term) : term * bool
   =
   let reduced = ref false in
@@ -2200,7 +2184,7 @@ let make_normal_biterm_pair
 (*------------------------------------------------------------------*)
 let make_normal_biterm
     (dorec : bool) ?(alpha_find = true)
-    (projs : projs)
+    (projs : Projection.t list)
     (t : term) : term * bool
   =
   match projs with
@@ -2223,8 +2207,9 @@ let simple_bi_term_no_alpha_find projs t : term =
 (*------------------------------------------------------------------*)
 let combine = function
   | [_,t] -> t
-  | ["left",_;"right",_] as l -> 
-    simple_bi_term [left_proj; right_proj] (Diff (Explicit l))
+  | [left,_;right,_] as l
+    when left = Projection.left && right = Projection.right -> 
+    simple_bi_term [Projection.left; Projection.right] (Diff (Explicit l))
 
   | _ -> assert false
 
@@ -2378,17 +2363,17 @@ let pp_pat_term_op fmt (pat : term pat_op):unit =
     pp pat.pat_op_term
     (Fmt.list ~sep:Fmt.comma Vars.pp) (List.map fst pat.pat_op_vars)
 
-let project_tpat (projs : projs) (pat : term pat) : term pat =
+let project_tpat (projs : Projection.t list) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }
 
-let project_tpat_op (projs : projs) (pat : term pat_op) : term pat_op =
+let project_tpat_op (projs : Projection.t list) (pat : term pat_op) : term pat_op =
   { pat with pat_op_term = project projs pat.pat_op_term; }
 
-let project_tpat_opt (projs : projs option) (pat : term pat) : term pat 
+let project_tpat_opt (projs : Projection.t list option) (pat : term pat) : term pat 
   =
   omap_dflt pat (project_tpat ^~ pat) projs
 
-let project_tpat_op_opt (projs : projs option) (pat : term pat_op) : term pat_op
+let project_tpat_op_opt (projs : Projection.t list option) (pat : term pat_op) : term pat_op
   =
   omap_dflt pat (project_tpat_op ^~ pat) projs
 
@@ -2402,9 +2387,9 @@ let () =
       let ts = mkvar "ts" Type.Timestamp in
       let ts' = mkvar "ts'" Type.Timestamp in
       let m = in_macro in
-      let t = mk_diff [left_proj,  Macro (m,[],ts);
-                       right_proj, Macro (m,[],ts')] in
-      let r = head_normal_biterm [left_proj; right_proj] t in
+      let t = mk_diff [Projection.left,  Macro (m,[],ts);
+                       Projection.right, Macro (m,[],ts')] in
+      let r = head_normal_biterm [Projection.left; Projection.right] t in
       assert (r = t)
     end ;
     "Boolean operator", `Quick, begin fun () ->
@@ -2412,11 +2397,11 @@ let () =
       let g = mkvar "g" Type.Boolean in
       let f' = mkvar "f'" Type.Boolean in
       let g' = mkvar "g'" Type.Boolean in
-      let t = mk_diff [left_proj,  mk_and f g; 
-                       right_proj, mk_and f' g'] in
-        assert (head_normal_biterm [left_proj; right_proj] t = 
+      let t = mk_diff [Projection.left,  mk_and f g; 
+                       Projection.right, mk_and f' g'] in
+        assert (head_normal_biterm [Projection.left; Projection.right] t = 
                 mk_and
-                  (mk_diff [left_proj, f; right_proj, f']) 
-                  (mk_diff [left_proj, g; right_proj, g']))
+                  (mk_diff [Projection.left, f; Projection.right, f']) 
+                  (mk_diff [Projection.left, g; Projection.right, g']))
     end ;
   ] 

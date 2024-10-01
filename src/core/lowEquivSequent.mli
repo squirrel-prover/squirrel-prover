@@ -33,7 +33,7 @@ val sanity_check : t -> unit
 (** {2 Misc} *)
   
 val get_system_pair : t -> SE.pair
-val get_system_pair_projs : t -> Term.proj * Term.proj
+val get_system_pair_projs : t -> Projection.t * Projection.t
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities for equivalence sequents}
@@ -46,7 +46,7 @@ val set_equiv_conclusion : Equiv.equiv -> t -> t
     as a list of terms where diff operators have been fully
     eliminated.
     @return [None] if the conclusion is not an equivalence atom. *)
-val get_frame : Term.proj -> t -> Equiv.equiv option
+val get_frame : Projection.t -> t -> Equiv.equiv option
 
 val conclusion_is_equiv : t -> bool
 

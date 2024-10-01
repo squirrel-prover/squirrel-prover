@@ -316,7 +316,7 @@ type error_i =
   | DuplicatedUpdate of string
   | SyntaxError of string      
   | Freetyunivar
-  | ProjsMismatch of Term.projs * Term.projs
+  | ProjsMismatch of Projection.t list * Projection.t list
   | ActionUndef of Symbols.action
 
 type error = L.t * error_i
@@ -343,8 +343,8 @@ let pp_error_i fmt = function
 
   | ProjsMismatch (ps1, ps2) ->
     Fmt.pf fmt "projections mismatch: @[%a@] ≠ @[%a@]"
-      Term.pp_projs ps1
-      Term.pp_projs ps2
+      Projection.pp_list ps1
+      Projection.pp_list ps2
 
   | ActionUndef a ->
     Fmt.pf fmt "action %a used in the system but not defined"
@@ -362,7 +362,7 @@ let error ?loc e = raise (Error (odflt L._dummy loc,e))
 (*------------------------------------------------------------------*)
 type proc_decl = {
   args  : Vars.vars;
-  projs : Term.projs;
+  projs : Projection.t list;
   time  : Vars.var;             (* type timestamp *)
   proc  : proc;
 }
@@ -418,7 +418,7 @@ let is_out p = is_out_i (L.unloc p)
 
 (** Type checking for processes *)
 let parse
-    table ~(args : Typing.bnds) (projs : Term.projs) (process : Parse.t) 
+    table ~(args : Typing.bnds) (projs : Projection.t list) (process : Parse.t) 
   : proc_decl
   =
 
@@ -583,9 +583,9 @@ let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
   in
   let pp_projs fmt =
     if pdecl.projs = [] ||
-       pdecl.projs = [Term.left_proj; Term.right_proj] then ()
+       pdecl.projs = [Projection.left; Projection.right] then ()
     else
-      Fmt.pf fmt "@[<:%a>@]@ " Term.pp_projs pdecl.projs
+      Fmt.pf fmt "@[<:%a>@]@ " Projection.pp_list pdecl.projs
   in
   Printer.pr "@[<v 2>@[%a%t %s %t@]=@ @[%a@]@]@." 
     (Printer.kws `ProcessName) "process"
@@ -631,7 +631,7 @@ let is_user_name = function
 (*------------------------------------------------------------------*)
 (** Type for data we store while translating a process as a set of actions. *)
 type p_env = {
-  projs : Term.projs;
+  projs : Projection.t list;
   (** valid projections for the process being parsed *)
 
   alias : alias_name ;
@@ -799,7 +799,7 @@ let subst_macros_ts table l ts t =
 let process_system_decl
     _proc_loc (system_name : System.t) (exec_model : Macros.exec_model)
     (init_table : Symbols.table)
-    (init_projs : Term.projs) (ts, init_proc : Vars.var * proc)
+    (init_projs : Projection.t list) (ts, init_proc : Vars.var * proc)
   : proc * Symbols.table
   =
 
@@ -1367,7 +1367,7 @@ let check_actions_all_def table (p : proc) =
 let declare_system
     (table : Symbols.table) (exec_model : Macros.exec_model) 
     (system_name : lsymb option)
-    (projs : Term.projs) (proc : Parse.t) 
+    (projs : Projection.t list) (proc : Parse.t) 
   : Symbols.table
   =
   (* type-check the processus *)
@@ -1383,7 +1383,7 @@ let declare_system
     (_pp ppe) p ;
   
   (* FIXME: do not use hard coded projections *)
-  let projections = [Term.left_proj; Term.right_proj] in
+  let projections = [Projection.left; Projection.right] in
   let system_name = match system_name with
     | Some lsymb -> lsymb
     | None -> L.mk_loc Location._dummy "default"

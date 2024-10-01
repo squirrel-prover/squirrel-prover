@@ -316,8 +316,8 @@ let () =
     associated to the [dst] projection). *)
 let rewrite_equiv_transform
     ~(pair : SE.pair)
-    ~src:((src_proj,_src_sys) : Term.proj * System.Single.t)
-    ~dst:((dst_proj,_dst_sys) : Term.proj * System.Single.t)
+    ~src:((src_proj,_src_sys) : Projection.t * System.Single.t)
+    ~dst:((dst_proj,_dst_sys) : Projection.t * System.Single.t)
     (s       : TS.t)
     (biframe : Term.terms) (* over [pair], which is [(src,dst)] or [(dst,src)] *)
     (term    : Term.term)  (* over [src] *)

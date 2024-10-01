@@ -163,7 +163,7 @@ let rw_inst
     (* adds [conds] in [hyps] *)
     let hyps = hyps_add_conds hyps conds in
     let ty_env = s.ty_env in
-    let projs : Term.projs option = 
+    let projs : Projection.t list option = 
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
 

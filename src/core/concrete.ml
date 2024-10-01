@@ -31,7 +31,7 @@ let bound_projs projs = function
   | LocConc t -> LocConc (Term.project projs t)
   | _ as f -> f
 
-let bound_subst_projs (projs : (Term.proj * Term.proj) list) = function
+let bound_subst_projs (projs : (Projection.t * Projection.t) list) = function
   | LocConc t -> LocConc (Term.subst_projs projs t)
   | _ as f -> f
 

@@ -34,4 +34,4 @@ val set_ty_vars : t -> Type.tvar list -> t
 val set_vars    : t -> Vars.env       -> t
 
 (*------------------------------------------------------------------*)
-val projs_set : Term.projs -> t -> t
+val projs_set : Projection.t list -> t -> t

@@ -430,7 +430,7 @@ let get_felem ?loc i s =
 (*------------------------------------------------------------------*)
 let get_system_pair t = oget (system t).pair
 
-let get_system_pair_projs t : Term.proj * Term.proj =
+let get_system_pair_projs t : Projection.t * Projection.t =
   let p = get_system_pair t in
   fst (SE.fst p), fst (SE.snd p)
 

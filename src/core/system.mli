@@ -1,20 +1,18 @@
-(** The user specifies one or more multi-systems, identified using names.
-    An n-system (multi-system of arity n) is a set of n-actions,
-    featuring n-ary diff operators, usually obtained from an n-process.
+(** Syntax for systems. 
+    More functions are defined in the [System] module. *)
 
-    In this module, system means multi-system. *)
-
+(*------------------------------------------------------------------*)
 open Utils
 
-(** A system is indirectly represented by a system symbol. *)
-type t = Symbols.system 
+(*------------------------------------------------------------------*)
+include module type of SystemSyntax
 
 (*------------------------------------------------------------------*)
 (** Indicates the list of projections of a system. *)
-val projections : Symbols.table -> t -> Term.proj list
+val projections : Symbols.table -> t -> Projection.t list
 
 (** Indicates whether a system supports a given projection. *)
-val valid_projection : Symbols.table -> t -> Term.proj -> bool
+val valid_projection : Symbols.table -> t -> Projection.t -> bool
 
 (*------------------------------------------------------------------*)
 (** Check that two systems are strongly compatible.
@@ -24,26 +22,12 @@ val valid_projection : Symbols.table -> t -> Term.proj -> bool
 val compatible : Symbols.table -> t -> t -> bool
 
 (*------------------------------------------------------------------*)
-(** Convert a symbol to a system. *)
-val convert : Symbols.table -> Symbols.p_path -> t
-
-(*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
 val pp_system : Symbols.table -> t formatter
 
 (** Print all systems declared in symbols table. *)
 val pp_systems : Symbols.table formatter
 
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type error =
-  | Shape_error        (** Inconsistency between shapes and indices. *)
-  | Invalid_projection
-
-val pp_error : error formatter
-
-exception Error of error
 
 (*------------------------------------------------------------------*)
 (** {2 Access functions} *)
@@ -75,7 +59,7 @@ val symbs :
     without any associated actions.
     Fails if name is already in use. *)
 val declare_empty :
-  Symbols.table -> Symbols.lsymb -> Term.proj list-> Symbols.table * t
+  Symbols.table -> Symbols.lsymb -> Projection.t list-> Symbols.table * t
 
 (** Register an action symbol in a system,
     associating it with an action description.
@@ -93,24 +77,10 @@ val register_action :
 
 module Single : sig
 
-  type t = private {
-    system     : Symbols.system ;
-    projection : Term.proj
-  }
+  include module type of SystemSyntax.Single
 
-  (** A single system is obtained by taking a valid projection
-      of a multi-system, identified by a system symbol.
-
-      Note that the projection is only validated against the current table,
-      and is then not attached to this particular table.
-      This shouldn't be too bad because we never override system
-      symbols after their complete definition. *)
-  val make : Symbols.table -> Symbols.system -> Term.proj -> t
-
-  val pp : t formatter
+  (** Safe single system constructor *)
+  val make : Symbols.table -> Symbols.system -> Projection.t -> t
 
   val descr_of_shape : Symbols.table -> t -> Action.shape -> Action.descr
-
-  module Map : Map.S with type key = t
-  module Set : Set.S with type elt = t
 end

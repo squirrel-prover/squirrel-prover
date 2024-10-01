@@ -85,7 +85,7 @@ val _pp    : proc formatter_p
 (*------------------------------------------------------------------*)
 type proc_decl = {
   args  : Vars.vars;
-  projs : Term.projs;
+  projs : Projection.t list;
   time  : Vars.var;             (* type timestamp *)
   proc  : proc;
 }
@@ -93,7 +93,7 @@ type proc_decl = {
 (** Check that a process is well-typed. *)
 val parse : 
   Symbols.table ->
-  args:Typing.bnds -> Term.projs -> Parse.t -> proc_decl
+  args:Typing.bnds -> Projection.t list -> Parse.t -> proc_decl
 
 (*------------------------------------------------------------------*)
 (** Declare a named process. The body of the definition is type-checked. *)
@@ -116,7 +116,7 @@ val add_namelength_axiom :
     as a set of actions. In that process, name creations are compiled away.
     Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> Macros.exec_model -> lsymb option -> Term.projs -> Parse.t -> Symbols.table
+  Symbols.table -> Macros.exec_model -> lsymb option -> Projection.t list -> Parse.t -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
@@ -128,7 +128,7 @@ type error_i =
   | DuplicatedUpdate of string
   | SyntaxError of string
   | Freetyunivar
-  | ProjsMismatch of Term.projs * Term.projs
+  | ProjsMismatch of Projection.t list * Projection.t list
   | ActionUndef of Symbols.action
   
 type error = Location.t * error_i

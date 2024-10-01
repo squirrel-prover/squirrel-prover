@@ -73,7 +73,7 @@ let term_parsing =
 
 let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-  let projs = [ Term.left_proj; Term.right_proj; ] in
+  let projs = [ Projection.left; Projection.right; ] in
   if typecheck then 
     ignore (Process.parse table ~args:[] projs p) ;
   p

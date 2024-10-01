@@ -688,7 +688,7 @@ let phi_cca_proj
     (env : Env.t)
     (icp : indcca_param)
     (frame : terms)
-    (proj : proj)
+    (proj : Projection.t)
   : Term.terms
   =
 

@@ -85,9 +85,6 @@ let ty_fvs l =
   List.fold_left (fun uvs v -> Type.Fv.union uvs (ty_fv v)) Type.Fv.empty l
 
 (*------------------------------------------------------------------*)
-let norm_ty (env : Infer.env) (v : var) : var =
-  { v with ty = Infer.norm env v.ty }
-
 let tsubst s v = { v with ty = Type.tsubst s v.ty }
 
 (*------------------------------------------------------------------*)

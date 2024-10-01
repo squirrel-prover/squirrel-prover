@@ -1196,7 +1196,7 @@ let mk_unif_state
 
 (*------------------------------------------------------------------*)
 (** [st.system.set] must be a system pair. *)
-let get_system_set_pair_projs (st : unif_state) : Term.proj * Term.proj =
+let get_system_set_pair_projs (st : unif_state) : Projection.t * Projection.t =
   let se = st.system.set |> SE.to_pair in
   fst (SE.fst se), fst (SE.snd se)
 

@@ -102,8 +102,8 @@ let clone_system_map
 
   let old_new_pair =
     SE.make_pair
-      (Term.left_proj, system)
-      (Term.right_proj, new_single_system)
+      (Projection.left, system)
+      (Projection.right, new_single_system)
   in
 
   let global_macro_fold
@@ -184,8 +184,8 @@ let global_rename
   let system =
     SE.equivalence_context
       (SE.make_pair
-         (Term.left_proj, old_single_system)
-         (Term.right_proj, old_single_system))
+         (Projection.left, old_single_system)
+         (Projection.right, old_single_system))
   in
   let env = Env.init ~table ~system () in
   let conv_env = Typing.{ env; cntxt = InGoal } in
@@ -275,7 +275,7 @@ let global_rename
           (Vars.Tag.global_vars ~const:true evars)
           (* FIXME: unclear what tags should be used here *)
           (Atom (Equiv {terms = [Term.mk_var fresh_x_var;
-                        Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]]; bound = None})),
+                        Term.mk_diff [Projection.left,n1;Projection.right,n2]]; bound = None})),
         equiv)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
     in
@@ -431,8 +431,8 @@ let global_prf
       Equiv.Atom (
         Equiv {terms = [Term.mk_var fresh_x_var;
                Term.mk_diff
-                 [Term.left_proj, Name.to_term h_key;
-                  Term.right_proj,
+                 [Projection.left, Name.to_term h_key;
+                  Projection.right,
                   Term.mk_name_with_tuple_args
                     (Term.mk_symb n Message) (Term.mk_vars is)]]; bound = None})
         (*TODO:Concrete: Probably something to bound to create a bounded goal*)
@@ -635,11 +635,11 @@ let global_cca
    *       Equiv [ Term.mk_var fresh_x_var;
    *               
    *               Term.mk_diff
-   *                 [Term.left_proj, Name.to_term enc_key;
+   *                 [Projection.left, Name.to_term enc_key;
    *                  Term.right_proj, Name.to_term @@ Term.mk_symb n Message is];
    *               
    *              Term.mk_diff
-   *                [Term.left_proj, Name.to_term enc_rnd;
+   *                [Projection.left, Name.to_term enc_rnd;
    *                 Term.right_proj, Name.to_term @@ Term.mk_symb r Message is] ])
    *   in
    *   let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      

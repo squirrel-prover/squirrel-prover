@@ -21,7 +21,7 @@ val sanity_check : trace_sequent -> unit
 (** Project diff-operators occurring in a sequent;
     only makes sense when a sequent for a bi-system has just
     been narrowed to a projected system. *)
-val pi : Term.proj -> sequent -> sequent
+val pi : Projection.t -> sequent -> sequent
  
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning}

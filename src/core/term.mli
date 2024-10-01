@@ -56,30 +56,13 @@ val _pp_macro : ?args_ty:Type.ty list -> ?ty_rec:Type.ty -> Symbols.macro format
 
   In this module {!term} describe both terms and formulas of the meta-logic. *)
 
-(** components of diff operators. *)
-type proj
-type projs = proj list
-
-module Mproj : Map.S with type key = proj
-module Sproj : Set.S with type elt = proj
-
-val pp_proj  : proj  formatter
-val pp_projs : projs formatter
-  
-(** We use strings to identify components of diff operators. *)
-val proj_from_string : string -> proj
-val proj_to_string   : proj -> string
-
-val left_proj  : proj
-val right_proj : proj
-
 (*------------------------------------------------------------------*)
 (** We allow users to write [diff(t1,t2)] as well as [diff(lbl1:t1,lbl2:t2)]
     and even [diff(l1:t1,l2:t2,_:t)] and keep trace of this structure in
     terms in order to display them back similarly.
     TODO for simplicity we allow only a simple style for now *)
 type 'a diff_args =
-  | Explicit of (proj * 'a) list
+  | Explicit of (Projection.t * 'a) list
 
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
@@ -291,7 +274,8 @@ val tsubst : Type.tsubst -> term -> term
     e.g. for [s = {p1->q1}] and [t=diff(p1:a, p2:b)], the result is
     [diff(q1:a, p2:b)] if [project=false], and [diff(q1:a)] otherwise.
  *)
-val subst_projs : ?project:bool -> (proj * proj) list -> term -> term 
+val subst_projs :
+  ?project:bool -> (Projection.t * Projection.t) list -> term -> term 
 
 (*------------------------------------------------------------------*)
 val refresh_vars        : (Vars.var     ) list -> (Vars.var     ) list * subst
@@ -503,7 +487,7 @@ val mk_name : nsymb -> term list -> term
 val mk_name_with_tuple_args : nsymb -> term list -> term
 
 val mk_macro : msymb -> term list -> term -> term
-val mk_diff  : (proj * term) list -> term
+val mk_diff  : (Projection.t * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
@@ -603,9 +587,9 @@ module Mt : Map.S with type key = term
 (*------------------------------------------------------------------*)
 (** {2 Multi-terms} *)
 
-val project1    : proj         -> term -> term
-val project     : projs        -> term -> term
-val project_opt : projs option -> term -> term 
+val project1    : Projection.t             -> term -> term
+val project     : Projection.t list        -> term -> term
+val project_opt : Projection.t list option -> term -> term 
   
 (** Push topmost diff-operators just enough to expose the common
     topmost constructor of the two projections of a biterm, if possible.
@@ -619,18 +603,18 @@ val project_opt : projs option -> term -> term
     constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
     will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
     [Macro(m,l,Diff(ts,ts'))]. *)
-val head_normal_biterm  : projs -> term -> term
-val head_normal_biterm0 : projs -> term -> term * bool (* bool = reduction occurred *)
+val head_normal_biterm  : Projection.t list -> term -> term
+val head_normal_biterm0 : Projection.t list -> term -> term * bool (* bool = reduction occurred *)
   
-val simple_bi_term  : projs -> term -> term
-val simple_bi_term0 : projs -> term -> term * bool (* bool = reduction occurred *)
+val simple_bi_term  : Projection.t list -> term -> term
+val simple_bi_term0 : Projection.t list -> term -> term * bool (* bool = reduction occurred *)
 
 (** Same as [simple_bi_term], but does not try to normalize try-finds. 
     Ad-hoc fix to keep diffeq tactic working properly. 
     FIXME: remove it. *)
-val simple_bi_term_no_alpha_find : projs -> term -> term
+val simple_bi_term_no_alpha_find : Projection.t list -> term -> term
 
-val combine : (proj * term) list -> term
+val combine : (Projection.t * term) list -> term
 
 (** All projections of the term are names. *)
 val diff_names : term -> bool
@@ -704,9 +688,9 @@ type 'a pat_op = {
 
 val pp_pat_term_op : term pat_op formatter
 
-val project_tpat        : projs        -> term pat -> term pat
-val project_tpat_opt    : projs option -> term pat -> term pat
-val project_tpat_op_opt : projs option -> term pat_op -> term pat_op
+val project_tpat        : Projection.t list        -> term pat -> term pat
+val project_tpat_opt    : Projection.t list option -> term pat -> term pat
+val project_tpat_op_opt : Projection.t list option -> term pat_op -> term pat_op
     
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
