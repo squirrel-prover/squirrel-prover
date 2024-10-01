@@ -2,7 +2,7 @@ let rec tatsts acc : Term.Lit.xatom list -> Term.term list = function
   | [] -> acc
 
   | (Comp (_, ts, ts') as at) :: l 
-    when Term.Lit.ty_xatom at = Type.Timestamp ->
+    when Type.equal (Term.Lit.ty_xatom at) Type.ttimestamp ->
     tatsts (ts :: ts' :: acc) l
 
   | Comp (_, _, _) :: l -> tatsts acc l
@@ -18,7 +18,7 @@ let rec tatsind acc : Term.Lit.xatom list -> Vars.vars = function
   | [] -> acc
 
   | (Comp (_, Term.Var i, Term.Var j) as at) :: l 
-    when Term.Lit.ty_xatom at = Type.Index ->
+    when Type.equal (Term.Lit.ty_xatom at) Type.tindex ->
     tatsind (i :: j :: acc) l
       
   | Comp (_, _, _) :: l -> tatsind acc l

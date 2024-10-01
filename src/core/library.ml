@@ -65,7 +65,7 @@ module[@warning "-32"] Real = struct
     get_btype  (real_p,s)
 
   (*------------------------------------------------------------------*)
-  let treal table = Type.TBase (real_p,Symbols.to_string (get_btype table "real").s)
+  let treal table = Type.base real_p (Symbols.to_string (get_btype table "real").s)
 
   (*------------------------------------------------------------------*)
   let fs_add   table = get_fsymb table "+"

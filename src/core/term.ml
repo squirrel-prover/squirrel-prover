@@ -250,9 +250,9 @@ let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
 
     let ty_args =
       List.init i
-        (fun _ -> Type.TUnivar (Infer.mk_univar ty_env))
+        (fun _ -> Type.univar (Infer.mk_ty_univar ty_env))
     in
-    let ty_out = Type.TUnivar (Infer.mk_univar ty_env) in
+    let ty_out = Type.univar (Infer.mk_ty_univar ty_env) in
     let () =
       match Infer.unify_eq ty_env t (Type.fun_l ty_args ty_out) with
       | `Fail -> assert false   (* FIXME: can this happen? *)
@@ -288,17 +288,17 @@ let ty ?ty_env (t : term) : Type.ty =
     | Macro (s,_,_)  -> s.s_typ
 
     | Tuple ts -> 
-      Type.Tuple (List.map ty ts)
+      Type.tuple (List.map ty ts)
 
     | Proj (i,t) -> 
       begin
-        match Infer.norm ty_env (ty t) with
+        match Infer.norm_ty ty_env (ty t) with
         | Type.Tuple tys -> List.nth tys (i - 1)
         | _ -> assert false
       end
 
     | Var v                -> Vars.ty v
-    | Action _             -> Type.Timestamp
+    | Action _             -> Type.ttimestamp
     | Diff (Explicit l)    -> ty (snd (List.hd l))
 
     | Find (_, _, c, _)    -> ty c
@@ -306,8 +306,8 @@ let ty ?ty_env (t : term) : Type.ty =
     | Quant (q, vs, t) ->
       begin
         match q with
-        | ForAll | Exists -> Type.Boolean
-        | Seq             -> Type.Message
+        | ForAll | Exists -> Type.tboolean
+        | Seq             -> Type.tmessage
         | Lambda          -> 
           let tys = List.map Vars.ty vs in
           let ty_out = ty t in
@@ -501,7 +501,7 @@ let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
 
   let ty_args = 
     List.map (fun uv -> 
-        Infer.norm ty_env (Type.TUnivar uv) 
+        Infer.norm_ty ty_env (Type.univar uv) 
       ) opened_fty.fty_vars
   in
   mk_fun0 fname { fty; ty_args; } terms
@@ -1748,12 +1748,12 @@ module Lit = struct
 
   (*------------------------------------------------------------------*)
   let ty_xatom = function
-    | Happens _ -> Type.Timestamp
+    | Happens _ -> Type.ttimestamp
     | Comp (_, t1, t2) ->
       let ty1 = ty t1 in
       assert (ty1 = ty t2);
       ty1
-    | Atom _ -> Type.Boolean
+    | Atom _ -> Type.tboolean
 
   let ty ((_, at) : literal) : Type.ty = ty_xatom at
 
@@ -2384,8 +2384,8 @@ let () =
   let mkvar x s = Var (snd (Vars.make `Approx Vars.empty_env s x ())) in
   Checks.add_suite "Head normalization" [
     "Macro, different ts", `Quick, begin fun () ->
-      let ts = mkvar "ts" Type.Timestamp in
-      let ts' = mkvar "ts'" Type.Timestamp in
+      let ts = mkvar "ts" Type.ttimestamp in
+      let ts' = mkvar "ts'" Type.ttimestamp in
       let m = in_macro in
       let t = mk_diff [Projection.left,  Macro (m,[],ts);
                        Projection.right, Macro (m,[],ts')] in
@@ -2393,10 +2393,10 @@ let () =
       assert (r = t)
     end ;
     "Boolean operator", `Quick, begin fun () ->
-      let f = mkvar "f" Type.Boolean in
-      let g = mkvar "g" Type.Boolean in
-      let f' = mkvar "f'" Type.Boolean in
-      let g' = mkvar "g'" Type.Boolean in
+      let f = mkvar "f" Type.tboolean in
+      let g = mkvar "g" Type.tboolean in
+      let f' = mkvar "f'" Type.tboolean in
+      let g' = mkvar "g'" Type.tboolean in
       let t = mk_diff [Projection.left,  mk_and f g; 
                        Projection.right, mk_and f' g'] in
         assert (head_normal_biterm [Projection.left; Projection.right] t = 

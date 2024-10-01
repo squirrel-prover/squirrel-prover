@@ -325,8 +325,8 @@ let mk_quant0_tagged q (evs : Vars.tagged_vars) f =
 
 let%test_unit _ =
   let f = Atom (Equiv {terms = []; bound = None}) in
-  let v1 = [Vars.make_fresh Type.Message "x",Vars.Tag.ltag] in
-  let v2 = [Vars.make_fresh Type.Message "y",Vars.Tag.ltag] in
+  let v1 = [Vars.make_fresh Type.tmessage "x",Vars.Tag.ltag] in
+  let v2 = [Vars.make_fresh Type.tmessage "y",Vars.Tag.ltag] in
   assert (mk_quant0_tagged ForAll [] f = f) ;
   assert (mk_quant0_tagged ForAll v1 f = Quant (ForAll,v1,f)) ;
   assert (f |> mk_quant0_tagged ForAll v2

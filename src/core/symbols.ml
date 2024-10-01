@@ -1408,13 +1408,13 @@ let fs_diff  = mk_fsymb "diff" 2
 (** Happens *)
 
 let fs_happens =
-  let fty = Type.mk_ftype [] [Type.Timestamp] Type.Boolean in
+  let fty = Type.mk_ftype [] [Type.ttimestamp] Type.tboolean in
   mk_fsymb ~fty "happens" (-1)
 
 (** Pred *)
 
 let fs_pred =
-  let fty = Type.mk_ftype [] [Type.Timestamp] Type.Timestamp in
+  let fty = Type.mk_ftype [] [Type.ttimestamp] Type.ttimestamp in
   mk_fsymb ~fty "pred" (-1)
 
 (** Boolean connectives *)
@@ -1429,7 +1429,7 @@ let fs_not   = mk_fsymb ~bool:true "not" 1
 
 let fs_ite =
   let tyv = Type.mk_tvar "t" in
-  let tyvar = Type.TVar tyv in
+  let tyvar = Type.tvar tyv in
   let fty = Type.mk_ftype
       [tyv]
       [Type.tboolean; tyvar; tyvar]
@@ -1482,7 +1482,7 @@ let fs_snd  = mk_fsymb "snd" 1
 
 (** Boolean to Message *)
 let fs_of_bool  =
-  let fty = Type.mk_ftype [] [Type.Boolean] Type.Message in
+  let fty = Type.mk_ftype [] [Type.tboolean] Type.tmessage in
   mk_fsymb ~fty "of_bool" (-1)
 
 (** Empty *)
@@ -1493,9 +1493,9 @@ let fs_empty = mk_fsymb "empty" 0
 
 let fs_len =
   let tyv = Type.mk_tvar "t" in
-  let tyvar = Type.TVar tyv in
+  let tyvar = Type.tvar tyv in
 
-  let fty = Type.mk_ftype [tyv] [tyvar] Type.Message
+  let fty = Type.mk_ftype [tyv] [tyvar] Type.tmessage
   in
   mk_fsymb ~fty "len" 1
 

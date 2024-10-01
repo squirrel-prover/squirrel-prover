@@ -19,19 +19,20 @@ let copy env = ref (!env)
 
 let set ~tgt ~value = tgt := !value
 
-let mk_univar (env : env) : Type.univar =
+(*------------------------------------------------------------------*)
+let mk_ty_univar (env : env) : Type.univar =
   let uv = Ident.create "_u" in
-  let ety = Type.TUnivar uv in
+  let ety = Type.univar uv in
   env := Mid.add uv ety !env;
   uv
 
 let open_tvars ty_env (tvars : Type.tvars) =
-  let vars_f = List.map (fun _ -> mk_univar ty_env) tvars in
+  let vars_f = List.map (fun _ -> mk_ty_univar ty_env) tvars in
 
   (* create substitution refreshing all type variables *)
   let ts_tvar =
     List.fold_left2 (fun ts_tvar (id : Type.tvar) id_f ->        
-        Mid.add (id :> Ident.t) (Type.TUnivar id_f) ts_tvar
+        Mid.add (id :> Ident.t) (Type.univar id_f) ts_tvar
       ) Mid.empty tvars vars_f
   in  
   let ts = Type.mk_tsubst ~univars:Mid.empty ~tvars:ts_tvar in
@@ -51,11 +52,13 @@ let rec norm (env : env) (t : Type.ty) : Type.ty =
     let u' = Mid.find_dflt t u !env in
     if t = u' then u' else norm env u'
 
-  | Fun (t1, t2) -> Fun (norm env t1, norm env t2)
+  | Fun (t1, t2) -> Type.func (norm env t1) (norm env t2)
 
-  | Tuple l -> Tuple (List.map (norm env) l)
+  | Tuple l -> Type.tuple (List.map (norm env) l)
 
   | Message | Boolean | Index | Timestamp | TBase _ | TVar _ -> t
+
+let norm_ty = norm
 
 let norm_env (env : env) : unit = 
   env := Mid.map (norm env) !env
@@ -89,7 +92,7 @@ let gen_and_close (env : env) : Type.tvars * Type.tsubst =
     | TUnivar uid ->
       let tv = Ident.fresh uid in
       ( tv :: gen_tvars, 
-        Mid.add uid (Type.TVar tv) ts_univar )
+        Mid.add uid (Type.tvar tv) ts_univar )
 
     | Tuple l -> List.fold_left gen0 (gen_tvars, ts_univar) l
 

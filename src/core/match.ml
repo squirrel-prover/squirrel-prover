@@ -2137,7 +2137,7 @@ let known_set_add_frame (k : known_set) : known_set list =
   match k.term with
   | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
     assert (l = []);
-    let tv' = Vars.make_fresh Type.Timestamp "t" in
+    let tv' = Vars.make_fresh Type.ttimestamp "t" in
     let ts' = Term.mk_var tv' in
     (* We need [adv], as knowing [frame@t] implies that we known
        [input@t'] for any [t' <= t] that can be computed.
@@ -2331,7 +2331,7 @@ let pp_msets fmt (msets : msets) =
 (** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add
     an additional constraint [t ≤ ts']. *)
 let known_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : known_set =
-  let t = Vars.make_fresh Type.Timestamp "t" in
+  let t = Vars.make_fresh Type.ttimestamp "t" in
   let term = Term.mk_macro mset.msymb mset.args (Term.mk_var t) in
   let cond =
     let cond_le = match mset.cond_le with
@@ -2395,7 +2395,7 @@ let mset_incl
     (table : Symbols.table) (system : SE.arbitrary) 
     (s1 : MCset.t) (s2 : MCset.t) : bool
   =
-  let tv = Vars.make_fresh Type.Timestamp "t" in
+  let tv = Vars.make_fresh Type.ttimestamp "t" in
   let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
@@ -2479,7 +2479,7 @@ let mset_inter
   =
   let s1, s2 = mset_refresh env s1, mset_refresh env s2 in
 
-  let tv = Vars.make_fresh Type.Timestamp "t" in
+  let tv = Vars.make_fresh Type.ttimestamp "t" in
   let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
@@ -2594,7 +2594,7 @@ module E = struct
     match cond with
     | Term.App (Fun (fs, _), [t1;t2]) 
       when (fs = Term.f_lt || fs = Term.f_leq)
-        && Term.ty t1 = Type.Timestamp ->
+        && Term.ty t1 = Type.ttimestamp ->
       let t2' =
         if fs = Term.f_lt then Term.mk_pred t2 else t2
       in
@@ -2603,7 +2603,7 @@ module E = struct
         List.exists (fun hyp ->
             match hyp with
             | Term.App (Fun (fs, _), [ta;tb]) 
-              when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
+              when fs = Term.f_leq && Term.ty t1 = Type.ttimestamp -> (* ≤ *)
               (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
               leq_tauto table t1 ta && leq_tauto table tb t2'
             | Term.Fun (fs,_) when fs = Term.f_true -> false
@@ -2876,7 +2876,7 @@ module E = struct
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
       let is = 
-        List.init i (fun _ -> Vars.make_fresh Type.Index "i")
+        List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
       in
       let ts = Term.mk_action a (List.map Term.mk_var is) in
 
@@ -3009,8 +3009,8 @@ module E = struct
               let ty, indices =
                 match data with
                 | Symbols.State (i, ty,_) ->
-                  ty, List.init i (fun _ -> Vars.make_fresh Type.Index "i")
-                | _ when mn = Symbols.cond -> Type.Boolean, []
+                  ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
+                | _ when mn = Symbols.cond -> Type.tboolean, []
                 | _ -> assert false
               in
               let ms = Term.mk_symb mn ty in

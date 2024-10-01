@@ -134,7 +134,7 @@ let conv_term ?pat table system ~bnds (term : Typing.term)
   let env = Env.init ~table ~system:system () in
   let env,is = Typing.convert_bnds ~mode:NoTags env bnds in
 
-  Vars.check_type_vars is [Type.Index]
+  Vars.check_type_vars is [Type.tindex]
     (fun () ->
        let loc =
          let hloc = L.loc @@ snd @@ List.hd   bnds in
@@ -193,7 +193,7 @@ let global_rename
 
   (* Decompose it as universally quantified equivalence over names. *)
   let vs, f = Equiv.Smart.decompose_forall f in
-  Vars.check_type_vars vs [Type.Index]
+  Vars.check_type_vars vs [Type.tindex]
     (fun () -> Tactics.hard_failure ~loc:(L.loc gf)
         (Tactics.Failure "Only index variables can be bound."));
   let _ns1, ns2, n1, n2 =
@@ -265,7 +265,7 @@ let global_rename
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.tmessage "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
 
   let make_conclusion equiv =
@@ -370,14 +370,14 @@ let global_prf
     | _ -> assert false
   in
   (* We create the pattern for the hash *)
-  let fresh_x_var = Vars.make_fresh Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.tmessage "x" in
   let hash_pattern =
     Term.mk_fun_tuple table h_fn [Term.mk_var fresh_x_var; left_key ]
   in
 
   (* Instantiation of the fresh name *)
   let ty_args = List.map Vars.ty is in
-  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
   let ndef = Symbols.Name { n_fty } in
   let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
@@ -386,7 +386,7 @@ let global_prf
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind =
-    let ns = Term.mk_symb n Message in
+    let ns = Term.mk_symb n Type.tmessage in
     Term.mk_find is Term.(
         mk_and
           (mk_atom `Eq (Term.mk_var fresh_x_var) h_cnt)
@@ -424,7 +424,7 @@ let global_prf
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.tmessage "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
   let make_conclusion equiv =
     let atom =
@@ -434,7 +434,7 @@ let global_prf
                  [Projection.left, Name.to_term h_key;
                   Projection.right,
                   Term.mk_name_with_tuple_args
-                    (Term.mk_symb n Message) (Term.mk_vars is)]]; bound = None})
+                    (Term.mk_symb n Type.tmessage) (Term.mk_vars is)]]; bound = None})
         (*TODO:Concrete: Probably something to bound to create a bounded goal*)
     in
     let concl = 
@@ -530,7 +530,7 @@ let global_cca
   let is1, left_subst = Term.refresh_vars is in
 
   (* The dec must match all decryption with the corresponding secret key *)
-  let fresh_x_var = Vars.make_fresh Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.tmessage "x" in
   let dec_pattern =
     Term.mk_fun_tuple table dec_fn [ Term.mk_var fresh_x_var;
                                      Name.to_term enc_key ]
@@ -539,7 +539,7 @@ let global_cca
 
   (* Instantiation of the fresh replacement *)
   let ty_args = List.map Term.ty enc_rnd.args in
-  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
   let ndef = Symbols.Name { n_fty } in
   let s = L.mk_loc L._dummy "n_CCA" in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
@@ -547,7 +547,7 @@ let global_cca
   
   let mess_replacement =
     if Term.is_name plaintext then
-      let ns = Term.mk_symb n Message in
+      let ns = Term.mk_symb n Type.tmessage in
       Term.mk_name_with_tuple_args ns enc_rnd.args
     else
       Library.Prelude.mk_zeroes table (Term.mk_len plaintext) in
@@ -618,10 +618,10 @@ let global_cca
    * in *)
 
   (* we now create the lhs of the obtained conclusion *)
-  (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
+  (* let fresh_x_var = Vars.make_fresh Type.tmessage "mess" in *)
   let s = (L.mk_loc L._dummy "r_CCA") in
   let ty_args = List.map Vars.ty is in
-  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
   let table, r =
     let rdef = Symbols.Name { n_fty } in
     Symbols.Name.declare ~approx:true table s ~data:rdef
@@ -1424,7 +1424,7 @@ let global_rewrite
             match arg with
             | Macros.AGlobal {is = _; ts; ac_descrs = _; inputs = _} ->
               let _, new_ts =
-                Vars.make `Approx (TS.vars gg) Type.Timestamp "t" (Vars.Tag.make Vars.Local)
+                Vars.make `Approx (TS.vars gg) Type.ttimestamp "t" (Vars.Tag.make Vars.Local)
               in 
               TS.rename ts new_ts gg
             | _ -> gg

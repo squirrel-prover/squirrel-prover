@@ -1398,7 +1398,7 @@ let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.se
   in
 
   (* check that types are compatible *)
-  let seq_hty = Type.fun_l (List.map Vars.ty is) Type.Boolean in
+  let seq_hty = Type.fun_l (List.map Vars.ty is) Type.tboolean in
 
   let htcond, hty = EquivLT.convert s htcond in
 
@@ -1515,7 +1515,7 @@ let const_seq
         let p_bool_loc = L.loc p_bool in
 
         (* check that types are compatible *)
-        let seq_hty = Type.fun_l (List.map Vars.ty e_is) Type.Boolean in
+        let seq_hty = Type.fun_l (List.map Vars.ty e_is) Type.tboolean in
         check_ty_eq ~loc:p_bool_loc b_ty seq_hty;
 
         check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
@@ -1947,7 +1947,7 @@ let xor arg (s : ES.t) =
     mk_xor_phi_base s biframe
       ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term)
   in
-  let n_fty = Type.mk_ftype [] [] Message in
+  let n_fty = Type.mk_ftype [] [] Type.tmessage in
   let sym = L.mk_loc L._dummy "n_XOR" in
   let table,n =
     let data = Symbols.Name { n_fty } in
@@ -1955,7 +1955,7 @@ let xor arg (s : ES.t) =
   in
   let table = Process.add_namelength_axiom table n n_fty in
 
-  let ns = Term.mk_symb n Message in
+  let ns = Term.mk_symb n Type.tmessage in
   let s = ES.set_table table s in
 
   let then_branch = Term.mk_name ns [] in

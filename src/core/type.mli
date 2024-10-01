@@ -27,7 +27,7 @@ val pp_univar : univar formatter
 
 (*------------------------------------------------------------------*)
 (** Types of terms *)
-type ty =
+type ty = private
   | Message
   | Boolean
   | Index  
@@ -104,15 +104,7 @@ end
 (*------------------------------------------------------------------*)
 val fv  : ty      -> Fv.t
 val fvs : ty list -> Fv.t
-
-(*------------------------------------------------------------------*)
-val tboolean   : ty
-val tmessage   : ty
-val ttimestamp : ty
-val tindex     : ty
-
-val tquantum_message : ty
-  
+ 
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
 
@@ -131,12 +123,24 @@ val tsubst_empty : tsubst
 
 (*------------------------------------------------------------------*)
 (** {2 Constructors and destructors} *)
-val base : string list -> string -> ty   
 
-val fun_l : ty list -> ty -> ty
+(*------------------------------------------------------------------*)
+val tboolean   : ty
+val tmessage   : ty
+val ttimestamp : ty
+val tindex     : ty
 
-val tuple : ty list -> ty
-  
+val tquantum_message : ty
+
+(*------------------------------------------------------------------*)
+val univar : univar                -> ty
+val tvar   : tvar                  -> ty
+val base   : string list -> string -> ty   
+val func   : ty          -> ty     -> ty
+val fun_l  : ty list     -> ty     -> ty
+val tuple  : ty list     -> ty
+
+(*------------------------------------------------------------------*)  
 (** If [decompose_funs t = (targs, tout)] then:
     - [t = t1 -> ... -> tn -> tout] where [targs = \[t1; ...; tn\]]
     - [tout] is not an arrow type *)

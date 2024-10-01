@@ -42,7 +42,7 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   method extract_ts_atoms phi =
     List.partition (fun t ->
         match Term.Lit.form_to_xatom t with
-        | Some at when Term.Lit.ty_xatom at = Type.Timestamp -> true
+        | Some at when Term.Lit.ty_xatom at = Type.ttimestamp -> true
         | _ -> false
       ) (Term.decompose_ands phi)
 

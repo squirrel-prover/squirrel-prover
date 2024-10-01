@@ -735,7 +735,7 @@ module Mk (Args : MkArgs) : S with
       if ty_args <> None then
         begin
           let ty_args = oget ty_args in
-          let ty_vars = List.map (fun u -> Type.TUnivar u) ty_vars in
+          let ty_vars = List.map (fun u -> Type.univar u) ty_vars in
 
           if List.length ty_args <> List.length ty_vars then
             error_pt_wrong_number_ty_args

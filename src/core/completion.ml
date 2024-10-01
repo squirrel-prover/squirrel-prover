@@ -1636,7 +1636,7 @@ let () =
     ("Basic", `Quick,
      fun () ->
        let open Symbols.OpData in
-       let ftype = Type.mk_ftype [] [] Type.Message in
+       let ftype = Type.mk_ftype [] [] Type.tmessage in
        let data = Operator {
            ftype; def = Abstract (Abstract `Prefix, []);
          }
@@ -1653,7 +1653,7 @@ let () =
                               mk_cst (), mk_cst (), mk_cst () in
 
        let v = ccst (Cst.Var ((snd (
-           Vars.make `Approx Vars.empty_env (Type.Message) "v" ()))))
+           Vars.make `Approx Vars.empty_env (Type.tmessage) "v" ()))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);
                                            (b,d); (e,e'); 

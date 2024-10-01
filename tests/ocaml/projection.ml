@@ -17,7 +17,7 @@ let formula_of_string st string : Equiv.local_form =
   let env = Env.init ~table:(Prover.get_table st) () in
   let tm,ty =
     Typing.convert Typing.{ env ; cntxt = InGoal } th_tm in
-  assert (ty = Boolean);
+  assert (ty = Type.tboolean);
   tm
 
 let tests =

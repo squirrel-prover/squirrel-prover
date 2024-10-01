@@ -940,7 +940,7 @@ let () =
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Message (a,_)) s =
-  let _,var = Vars.make `Approx (TS.vars s) Type.Timestamp "t" TS.var_info in
+  let _,var = Vars.make `Approx (TS.vars s) Type.ttimestamp "t" TS.var_info in
   let formula =
     Term.mk_forall ~simpl:false
       [var]

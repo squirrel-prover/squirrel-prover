@@ -26,7 +26,7 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (_sel
   method visit_message t = match t with
     | Term.Name (ns,_) -> if ns.s_symb = name then raise Deprecated_Name_found
     | Term.Var m
-      when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index ->
+      when Vars.ty m <> Type.ttimestamp && Vars.ty m <> Type.tindex ->
       (* FEATURE: this function is only used in [SystemModifiers], where
          variables are probabbly fine, regardless of their types. *)
       raise Deprecated_Var_found

@@ -830,7 +830,7 @@ end = struct
                  - otherwise, we must use a fresh universally quantified var. *)
               if v_a = v_b
               then false, v_a
-              else true, Vars.make_fresh Type.Index "i"
+              else true, Vars.make_fresh Type.tindex "i"
 
             (* [v_a] or [v_b] is not a constant.
                In that case, use a universally quantified variable. *)
@@ -856,7 +856,7 @@ end = struct
     mk ~env:Sv.empty ~msymb:join_ms ~args:join_is ~path_cond ~indices:(!indices_r)
 
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
-    let tv = Vars.make_fresh Type.Timestamp "t" in
+    let tv = Vars.make_fresh Type.ttimestamp "t" in
     let term1 = Term.mk_macro s1.msymb (Term.mk_vars s1.args) (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb (Term.mk_vars s2.args) (Term.mk_var tv) in
 
@@ -992,19 +992,19 @@ let macro_support
        action descriptions. *)
     let sm =
       if List.mem_assoc Symbols.inp sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.frame Type.Message) sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.frame Type.tmessage) sm
       else sm
     in
     let sm =
       if List.mem_assoc Symbols.frame sm
       then
-        MsetAbs.join_single (Mset.mk_simple Symbols.exec Type.Boolean)
-          (MsetAbs.join_single (Mset.mk_simple Symbols.out Type.Message) sm)
+        MsetAbs.join_single (Mset.mk_simple Symbols.exec Type.tboolean)
+          (MsetAbs.join_single (Mset.mk_simple Symbols.out Type.tmessage) sm)
       else sm
     in
     let sm =
       if List.mem_assoc Symbols.exec sm
-      then MsetAbs.join_single (Mset.mk_simple Symbols.cond Type.Boolean) sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.cond Type.tboolean) sm
       else sm
     in
 

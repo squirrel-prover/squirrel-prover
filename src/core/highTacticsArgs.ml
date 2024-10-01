@@ -51,8 +51,8 @@ let convert_args env parser_args tactic_type conc =
   let rec conv_args parser_args tactic_type =
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      let f, _ = Typing.convert conv_cntxt ~ty:Type.Timestamp p in
-      Arg (Message (f, Type.Timestamp))
+      let f, _ = Typing.convert conv_cntxt ~ty:Type.ttimestamp p in
+      Arg (Message (f, Type.ttimestamp))
 
     | [TermPat (sel, p)], Sort Message ->
       let (m, ty) = convert_pat_arg sel conv_cntxt p conc in
@@ -67,8 +67,8 @@ let convert_args env parser_args tactic_type conc =
       end
 
     | [Theory p], Sort Boolean ->
-      let f, _ = Typing.convert conv_cntxt ~ty:Type.Boolean p in
-      Arg (Message (f, Type.Boolean))
+      let f, _ = Typing.convert conv_cntxt ~ty:Type.tboolean p in
+      Arg (Message (f, Type.tboolean))
 
     | [Theory p], Sort Term ->
       let et = 
@@ -95,7 +95,7 @@ let convert_args env parser_args tactic_type conc =
 
     | [Theory p], Sort Index ->
       let f = 
-        match Typing.convert conv_cntxt ~ty:Type.Index p with
+        match Typing.convert conv_cntxt ~ty:Type.tindex p with
         | Term.Var v, _ -> v
         | _ -> Typing.conv_err (L.loc p) (Failure "must be a variable of type index")
       in

@@ -52,7 +52,7 @@ class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n =
       ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
 
   method visit_message t =
-    if Term.ty t = Type.Boolean then () else super#visit_message t
+    if Term.ty t = Type.tboolean then () else super#visit_message t
 end
 
 (*------------------------------------------------------------------*)

@@ -529,7 +529,7 @@ let pp_actions fmt table =
   Fmt.pf fmt "@]@]@."
 
 let rec dummy (shape : shape) : action =
-  let mk_index_var _ = Term.mk_var @@ Vars.make_fresh Type.Index "i" in
+  let mk_index_var _ = Term.mk_var @@ Vars.make_fresh Type.tindex "i" in
   match shape with
   | [] -> []
   | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->

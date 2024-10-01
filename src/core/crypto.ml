@@ -2449,7 +2449,7 @@ let known_set_add_frame (k : TSet.t) : TSet.t list =
   match k.term with
   | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
     assert (l = []);
-    let tv' = Vars.make_fresh Type.Timestamp "t" in
+    let tv' = Vars.make_fresh Type.ttimestamp "t" in
     let ts' = Term.mk_var tv' in
 
     let vars = tv' :: k.vars in
@@ -3032,7 +3032,7 @@ module Parse = struct
           let ty = 
             match pv.vd_ty with 
             | Some pty -> Typing.convert_ty env pty
-            | None     -> Type.TUnivar (Infer.mk_univar ty_env)
+            | None     -> Type.univar (Infer.mk_ty_univar ty_env)
           in
           let env, var = make_exact_var env pv.vd_name ty in
           let init, _ = 
@@ -3067,7 +3067,7 @@ module Parse = struct
     let tyout = 
       match po.o_tyout with 
       | Some pty -> Typing.convert_ty env pty
-      | None     -> Type.TUnivar (Infer.mk_univar ty_env)
+      | None     -> Type.univar (Infer.mk_ty_univar ty_env)
     in
 
     let body = po.o_body in

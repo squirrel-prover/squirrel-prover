@@ -133,7 +133,7 @@ end
 let make_obs_equiv ?(enrich=[]) table system =
   let ts_tag = Vars.Tag.make ~const:true Vars.Global in
   let vars,ts =
-    Vars.make `Approx Vars.empty_env Type.Timestamp "t" ts_tag
+    Vars.make `Approx Vars.empty_env Type.ttimestamp "t" ts_tag
   in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
@@ -190,7 +190,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let formula, goal =
     match formula with
     | Local (f,e) ->
-      let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.Boolean f in
+      let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.tboolean f in
       let e =
            match e with
             | None -> None

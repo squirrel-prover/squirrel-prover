@@ -202,7 +202,7 @@ type context = {
 
 let filter_ty t = List.filter (fun x -> Vars.ty x = t)
 let filter_msg = List.filter (fun x -> let t = Vars.ty x in
-                                t <> Type.Index && t <> Type.Timestamp)
+                                t <> Type.tindex && t <> Type.ttimestamp)
 
 let id_fresh context name = 
   context.fresh:=!(context.fresh)+1;
@@ -260,8 +260,8 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
     ts_ty    = Why3.Ty.ty_app ts_symb [];
     index_ty = Why3.Ty.ty_app index_symb [];
     (* int_ty = Why3.Ty.ty_app int_symb []; *)
-    indices = filter_ty Type.Index evars;
-    tsvars = filter_ty Type.Timestamp evars;
+    indices = filter_ty Type.tindex evars;
+    tsvars = filter_ty Type.ttimestamp evars;
     msgvars = filter_msg evars;
     actions_tbl = Hashtbl.create 12;
     vars_tbl = Hashtbl.create 193;
@@ -294,10 +294,10 @@ let rec convert_type context ?(decl_fun=false) = function
   | Fun (t1,t2) -> 
     if decl_fun then raise InternalError else 
       Why3.Ty.ty_func (convert_type context t1) (convert_type context t2)
-  | TUnivar ty ->
+  | TUnivar _ as ty->
     Format.printf
       "smt: unsupported argument type %a@."
-      Type.pp (TUnivar ty);
+      Type.pp ty;
     raise InternalError
 
 (** {2 Translation} *)
@@ -329,14 +329,14 @@ let unsupported_term context fmla str =
   (Why3.Term.t_app_infer symb var_list)      
 
 let bool_to_prop t = 
-  if Term.ty t = Type.Boolean then Why3.Term.to_prop else (fun x -> x)
+  if Term.ty t = Type.tboolean then Why3.Term.to_prop else (fun x -> x)
 
 let prop_to_bool p = Why3.Term.(t_if p t_bool_true t_bool_false) 
 let rec prop_list_to_bool context terms = 
   List.map
     (fun (t,b) ->  if b then (prop_to_bool t) else t)
     (List.map 
-      (fun t -> ((msg_to_fmla context) t, Term.ty t=Type.Boolean))
+      (fun t -> ((msg_to_fmla context) t, Term.ty t=Type.tboolean))
       terms
     )
    
@@ -345,7 +345,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   let open Term in
   let open Why3.Term in
   (bool_to_prop fmla) (match fmla with 
-    | Term.Var v when Term.ty fmla = Type.Boolean -> 
+    | Term.Var v when Term.ty fmla = Type.tboolean -> 
       begin try to_prop (Hashtbl.find context.vars_tbl (Vars.hash v)) with
       | Not_found -> raise InternalError
       end
@@ -374,30 +374,30 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         (context.xor_symb)
           [msg_to_fmla context t1; 
           msg_to_fmla context t2]
-      | [t1;t2] when symb = f_eq -> if Term.ty t1 = Type.Boolean then 
+      | [t1;t2] when symb = f_eq -> if Term.ty t1 = Type.tboolean then 
           t_iff (msg_to_fmla context t1) (msg_to_fmla context t2) 
           else 
-            (if Term.ty t1 = Type.Timestamp then 
+            (if Term.ty t1 = Type.ttimestamp then 
             ts_equ context (msg_to_fmla context t1) (msg_to_fmla context t2)
             else
             t_equ (msg_to_fmla context t1) (msg_to_fmla context t2) )
-      | [t1;t2] when symb = f_neq -> if Term.ty t1 = Type.Boolean then 
+      | [t1;t2] when symb = f_neq -> if Term.ty t1 = Type.tboolean then 
         t_not (t_iff (msg_to_fmla context t1) (msg_to_fmla context t2)) 
         else 
-          (if Term.ty t1 = Type.Timestamp then 
+          (if Term.ty t1 = Type.ttimestamp then 
           t_not 
             (ts_equ context (msg_to_fmla context t1) (msg_to_fmla context t2))
           else
           t_not (t_equ (msg_to_fmla context t1) (msg_to_fmla context t2) ))
-      | [t1;t2] when symb = f_leq && (Term.ty t1 = Type.Timestamp) ->
+      | [t1;t2] when symb = f_leq && (Term.ty t1 = Type.ttimestamp) ->
         t_app_infer 
           context.leq_symb 
           [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_geq && (Term.ty t1 = Type.Timestamp) ->
+      | [t1;t2] when symb = f_geq && (Term.ty t1 = Type.ttimestamp) ->
         t_app_infer 
           context.leq_symb 
           [msg_to_fmla context t2;msg_to_fmla context t1]
-      | [t1;t2] when symb = f_lt && (Term.ty t1 = Type.Timestamp) ->
+      | [t1;t2] when symb = f_lt && (Term.ty t1 = Type.ttimestamp) ->
             t_and 
               (t_app_infer 
                 context.leq_symb
@@ -406,7 +406,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
               (t_not @@ ts_equ context 
                 (msg_to_fmla context t1) (msg_to_fmla context t2)
               )
-      | [t1;t2] when symb = f_gt && (Term.ty t1 = Type.Timestamp) ->
+      | [t1;t2] when symb = f_gt && (Term.ty t1 = Type.ttimestamp) ->
             t_and 
               (t_app_infer 
                 context.leq_symb
@@ -508,8 +508,8 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   
   )
 and msg_to_fmla_q context quantifier vs f =
-  let i_vs = filter_ty  Type.Index     vs
-  and t_vs = filter_ty  Type.Timestamp vs
+  let i_vs = filter_ty  Type.tindex     vs
+  and t_vs = filter_ty  Type.ttimestamp vs
   and m_vs = filter_msg                vs in
   (* NOTE: here we use the fact that OCaml hashtables can have multiple
    *       bindings, and the newer ones shadow the older ones
@@ -1118,7 +1118,7 @@ let add_macro_axioms context =
                   (* for now, handle only the case where the indices of the macro
                       coincide with those of the action TODO *)
                   let m_idx = List.init arity (fun _ -> 
-                    Vars.make_fresh Type.Index "i") in
+                    Vars.make_fresh Type.tindex "i") in
                   let quantified_indices = List.map 
                     (fun v -> 
                       let vsymb = create_vsymbol (id_fresh context (Vars.name v))
@@ -1138,7 +1138,7 @@ let add_macro_axioms context =
                     Some (t_forall_close quantified_indices [] (macro_wterm_eq
                             (List.map (index_var_to_wterm context) m_idx) 
                             (
-                              (if gty=Type.Boolean 
+                              (if gty=Type.tboolean 
                                 then prop_to_bool else (fun x -> x)
                               )
                               (msg_to_fmla context msg)
@@ -1188,7 +1188,7 @@ let add_macro_axioms context =
                       ns_args
                     );
                     let expansion_ok = 
-                      (if sty=Type.Boolean then prop_to_bool else (fun x -> x)) 
+                      (if sty=Type.tboolean then prop_to_bool else (fun x -> x)) 
                       (msg_to_fmla context msg) 
                     in
                     if descr.Action.name = Symbols.init_action then

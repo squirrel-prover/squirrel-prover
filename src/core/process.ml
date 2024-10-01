@@ -450,7 +450,7 @@ let parse
 
     | Parse.In (c,x,p) -> 
       let c = Channel.convert env.table c in
-      let vars, x = Vars.make_local `Shadow env.vars (Type.Message) (L.unloc x) in
+      let vars, x = Vars.make_local `Shadow env.vars (Type.tmessage) (L.unloc x) in
       In (c, x, doit ty_env { env with vars } p)
 
     | Parse.Out (c,m,p)
@@ -505,7 +505,7 @@ let parse
 
     | Parse.Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
-        | None -> TUnivar (Infer.mk_univar ty_env)
+        | None -> Type.univar (Infer.mk_ty_univar ty_env)
         | Some pty -> Typing.convert_ty ~ty_env env pty 
       in
 
@@ -711,7 +711,7 @@ let mk_namelength_statement
       let fname = Symbols.Operator.convert_path ([],lsy) table in
       (table, fname)
     else
-      let ftype = Type.mk_ftype [] [] Message in
+      let ftype = Type.mk_ftype [] [] Type.tmessage in
       let data =
         Symbols.OpData.Operator {
           ftype; def = Abstract (Abstract `Prefix, [])
@@ -809,7 +809,7 @@ let process_system_decl
   let env_ts,dummy_in =
     let env = Vars.empty_env in
     let env = Vars.add_var ts Vars.Tag.ltag env in
-    let env,dummy_in = Vars.make_local `Shadow env Type.Message "$dummy" in
+    let env,dummy_in = Vars.make_local `Shadow env Type.tmessage "$dummy" in
     env,dummy_in
   in
 

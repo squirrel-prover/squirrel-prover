@@ -322,7 +322,7 @@ module Form = struct
          ¬ (x ⋄ y) ⇔ (undef(x) ∨ undef(y) ∨ (x □ y))
          where □ is the standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
       | `Neg, Comp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v)
-        when Term.ty u = Type.Timestamp ->
+        when Term.ty u = Type.ttimestamp ->
         let nord = not_ord ord in
         let form =
           disj (
@@ -332,7 +332,7 @@ module Form = struct
 
         [form]
 
-      (* Type.Index *)
+      (* Type.tindex *)
       | `Neg, Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
 
       (* If we have an arbitrary atom, try to open-it up as a disjunction or 
@@ -1496,7 +1496,7 @@ let query ~precise (models : models) (ats : Term.Lit.literals) =
   try
     assert (List.for_all (fun lit ->
         let ty = Term.Lit.ty lit in
-        ty = Type.Index || ty = Type.Timestamp
+        ty = Type.tindex || ty = Type.ttimestamp
       ) ats);
 
     (* if the conjunction of trace literals is  *)

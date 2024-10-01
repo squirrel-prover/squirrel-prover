@@ -145,6 +145,8 @@ let tquantum_message   = TBase ([], "quantum_message")
   
 let base np s = TBase (np,s)
 
+let func ty ty' = Fun (ty, ty')
+
 let rec fun_l tys tyout : ty =
   match tys with
   | [] -> tyout
@@ -290,10 +292,10 @@ type tsubst = {
 }
 
 let pp_tsubst fmt ts =
-  let pp_bd fmt (id,ty) = 
+  let pp_bd fmt (id,ty) =
     Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id pp ty
   in
-  Fmt.pf fmt "@[<v 0>@[<hov 2>univars:@ %a@]@;@[<hov 2>tvars:@ %a@]@]" 
+  Fmt.pf fmt "@[<v 0>@[<hov 2>univars:@ %a@]@;@[<hov 2>tvars:@ %a@]@]"
     (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_univar)
     (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_tvar)
 
@@ -309,7 +311,7 @@ let mk_tsubst ~(tvars:ty Mid.t) ~(univars:ty Mid.t) : tsubst =
 let tsubst_add_tvar   s tv ty = { s with ts_tvar   = Mid.add tv ty s.ts_tvar; }
 let tsubst_add_univar s tu ty = { s with ts_univar = Mid.add tu ty s.ts_univar; }
   
-let rec tsubst (s : tsubst) (t : ty) : ty = 
+let rec tsubst (s : tsubst) (t : ty) : ty =
   match t with
   | Message | Boolean | Index | Timestamp | TBase _ -> t
 
@@ -319,7 +321,6 @@ let rec tsubst (s : tsubst) (t : ty) : ty =
 
   | Tuple tys -> Tuple (List.map (tsubst s) tys)
   | Fun (t1, t2) -> Fun (tsubst s t1, tsubst s t2)
-
 
 (*------------------------------------------------------------------*)
 (** {2 Type destructors and constructors} *)
@@ -337,7 +338,10 @@ let tuple = function
   | [] -> assert false
   | [t] -> t
   | l -> Tuple l
-           
+
+(*------------------------------------------------------------------*)
+let univar v = TUnivar v
+let tvar   v = TVar v
   
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
@@ -383,14 +387,7 @@ let ftype_fv (f : ftype) : Fv.t =
     (Fv.union
        (fvs f.fty_args)
        (fv f.fty_out)) 
-
-(*------------------------------------------------------------------*)
-let tsubst_ftype (ts : tsubst) (fty : ftype) : ftype = { 
-  fty_vars = fty.fty_vars;              (* bound type variable *)
-  fty_args = List.map (tsubst ts) fty.fty_args;
-  fty_out  = tsubst ts fty.fty_out;
-  }
-    
+   
 (*------------------------------------------------------------------*)
 let mk_ftype vars args out : 'a ftype_g = {
   fty_vars = vars;
@@ -405,3 +402,11 @@ let mk_ftype_tuple vars args out : ftype =
   (* arity ≥ 2 *)
   | _ -> mk_ftype vars [tuple args] out
   
+
+(*------------------------------------------------------------------*)
+let tsubst_ftype (ts : tsubst) (fty : ftype) : ftype = {
+  fty_vars = fty.fty_vars;              (* bound type variable *)
+  fty_args = List.map (tsubst ts) fty.fty_args;
+  fty_out  = tsubst ts fty.fty_out;
+  }
+

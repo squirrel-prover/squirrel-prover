@@ -29,7 +29,7 @@ let mk_p c = [], L.mk_loc L._dummy c
 
 let mk_message st s =
   let n = Symbols.Name.convert_path (mk_p s) (Prover.get_table st) in
-  Term.mk_name (Term.mk_symb n Message) []
+  Term.mk_name (Term.mk_symb n Type.tmessage) []
 
 (** Check that case study fails when there is no conditional
     with the target condition. *)

@@ -90,7 +90,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
     match t with
     | Var v ->
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
-      let ty_v = Infer.norm ty_env (Vars.ty v) in
+      let ty_v = Infer.norm_ty ty_env (Vars.ty v) in
       let is_ty_enum = Symbols.TyInfo.is_enum env.table ty_v in
       let is_ty_encodable = Type.is_bitstring_encodable ty_v in
       let adv =
@@ -127,7 +127,7 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
       }
 
     | Find (vs, _, _, _) | Quant (_,vs,_) ->
-      let vs_tys = List.map (fun v -> Infer.norm ty_env (Vars.ty v)) vs in
+      let vs_tys = List.map (fun v -> Infer.norm_ty ty_env (Vars.ty v)) vs in
       let fixed_type_binders =
         List.for_all (Symbols.TyInfo.is_fixed env.table) vs_tys
       in

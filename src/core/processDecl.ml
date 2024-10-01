@@ -368,7 +368,7 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Typing.term) :
   Symbols.table =
   let env = Env.init ~table () in
   let conv_env = Typing.{ env; cntxt = InGoal; } in
-  let form, _ = Typing.convert conv_env ~ty:Type.Boolean fm in
+  let form, _ = Typing.convert conv_env ~ty:Type.tboolean fm in
     match form with
      | Term.Quant (ForAll, [uvarm; uvarkey], _) ->
        begin

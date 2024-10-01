@@ -422,9 +422,9 @@ let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->
       let  env = empty_env in
-      let  env,i  = make `Approx env Type.Index "i"  () in
-      let  env,i0 = make `Approx env Type.Index "i"  () in
-      let _env,i1 = make `Approx env Type.Index "i1" () in
+      let  env,i  = make `Approx env Type.tindex "i"  () in
+      let  env,i0 = make `Approx env Type.tindex "i"  () in
+      let _env,i1 = make `Approx env Type.tindex "i1" () in
       
       Alcotest.(check string)
         "proper name for i"

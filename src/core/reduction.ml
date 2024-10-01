@@ -470,7 +470,7 @@ and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
 (* Try to show using [Constr] that [t] is [false] or [true] *)
 and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
   if not st.param.constr ||
-     Term.ty t <> Type.Boolean ||
+     Term.ty t <> Type.tboolean ||
      Term.equal t Term.mk_false ||
      Term.equal t Term.mk_true
   then t, false
