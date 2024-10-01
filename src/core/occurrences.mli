@@ -288,7 +288,8 @@ type pos_info =
     pi_trctxt  : Constr.trace_cntxt; (** system+table at the position *)
     pi_vars    : Vars.vars;          (** variables bound above the position *)
     pi_cond    : Term.terms;         (** conditions above the position *)
-    pi_subterm : Term.term;          (** subterm of the position (for printing) *)
+    pi_subterm : Term.term;          (** subterm of the position
+                                         (for printing) *)
   }
 
 (** Information used to check if a macro can be expanded in a term:
@@ -317,7 +318,7 @@ val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Occurrence search} *)
-  
+
 (** Module containing functions to search for occurrences of the given type
     in a term, iterating through the term and indirect occurrences,
     unfolding macros. *)
@@ -332,7 +333,7 @@ module type OccurrenceSearch = sig
 
   (** Type of a function that takes a term, and generates
       a list of simple occurrences in it.
-      
+
       Uses:
       - A continuation of type [unit -> simple_occs]:
         to "give up", ie do nothing and
@@ -344,7 +345,7 @@ module type OccurrenceSearch = sig
          and call this continuation on the remaining ones,
          or handle subterms at depth 1 by hand,
          and call the continuation on subterms at depth 2).
-      
+
       Functions of this type don't need to unfold macros,
       which are handled separately. *)
   type f_fold_occs =
@@ -353,7 +354,7 @@ module type OccurrenceSearch = sig
     pos_info ->
     Term.term ->
     simple_occs
-    
+
   (** Given a [f_fold_occs],
       computes the list of all occurrences in the given source terms.
       Takes care of macro expansion and going through all terms,
@@ -415,7 +416,8 @@ module type OccurrenceFormulas = sig
         or [iocc_vars] (for indirect occurrences)).
       - The free vars of [ts] should be all be bound in the sequent's env.
 
-      If [negate] is set to [true], returns instead the negation of that formula. *)
+      If [negate] is set to [true], returns instead
+      the negation of that formula. *)
   val occurrence_formula :
     ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
@@ -464,10 +466,10 @@ module NameOC : OccurrenceContent
 
 module NameOS : OccurrenceSearch 
   with module EO.SO.OC = NameOC
-                                               
+
 module NameOF : OccurrenceFormulas 
   with type ext_occ = NameOS.ext_occ
-                                               
+
 (*------------------------------------------------------------------*)
 (** Utility:
     finds all names in the list with the same symbol as the given name,

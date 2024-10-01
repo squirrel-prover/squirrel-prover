@@ -107,7 +107,7 @@ end
 (** Exported (see `.mli`) *)
 module EncryptionOS = O.MakeSearch (EncryptionOC)
 module EncryptionOF = O.MakeFormulas (EncryptionOS.EO)
-    
+
 (* shortcuts *)
 module EOC = EncryptionOC
 module EOS = EncryptionOS

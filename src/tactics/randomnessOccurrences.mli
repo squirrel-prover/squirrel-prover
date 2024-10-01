@@ -53,7 +53,7 @@ module EncryptionOC : O.OccurrenceContent
    and type data = enc_data
 
 module EncryptionOS : O.OccurrenceSearch
-    with module EO.SO.OC = EncryptionOC
+  with module EO.SO.OC = EncryptionOC
 
 module EncryptionOF : O.OccurrenceFormulas
   with type ext_occ = EncryptionOS.ext_occ
