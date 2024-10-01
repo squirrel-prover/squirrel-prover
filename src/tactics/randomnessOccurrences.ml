@@ -48,10 +48,7 @@ struct
       else
         Term.mk_neqs ~simpl:false ~simpl_tuples:true ncoll.args n.args
 
-    | Ciphertext c, NoCipher, DataCiphertext d ->
-      (* in that case, we will not use the generated formula -- we only want
-         to gather all ciphertexts. We still generate a term containing
-         c and the key, which is used to remove duplicates. *)
+    | Ciphertext c, _, DataCiphertext d ->
       (* sanity check: the key and keycoll in d have the same symbol *)
       assert (d.key.symb = d.keycoll.symb);
       (* sanity check: the msg, random, and key in d match those in c *)
@@ -63,15 +60,34 @@ struct
                Term.equal k (Name.to_term d.key) -> ()
         | _ -> assert false
       in
+      begin
+        match collision with
+        | NoCipher ->
+          (* in that case, we will not use the generated formula -- we only want
+             to gather all ciphertexts. We still generate a term containing
+             c and the key, which is used to remove duplicates. *)
+          let t = mk_tuple [c; Name.to_term d.keycoll] in
+          mk_eq ~simpl:false t t
 
-      let t = mk_tuple [c; Name.to_term d.keycoll] in
-      mk_eq ~simpl:false t t
-
+        | Ciphertext ccoll ->
+          (* in that case, we do want a formula. We require
+             [c = ccoll /\ k = kcoll] (note that [ccoll] is not necessarily
+             syntactically an encryption).*)
+          if not negate then
+            mk_and
+              (mk_eq ~simpl:true ccoll c)
+              (mk_eqs ~simpl:true ~simpl_tuples:true d.keycoll.args d.key.args)
+          else
+            mk_or
+              (mk_not (mk_eq ~simpl:true ccoll c))
+              (mk_neqs ~simpl:true ~simpl_tuples:true d.keycoll.args d.key.args)
+        | _ -> assert false
+      end
     | _ ->
       (* sanity check: we should never record a collision between two things
          with a different constructor *)
       assert false
-
+        
   let subst_content sigma x =
     match x with
     | BadName n -> BadName (Name.subst sigma n)
