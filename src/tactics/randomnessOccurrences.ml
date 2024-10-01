@@ -27,7 +27,7 @@ type enc_data =
   | NoData
 
 (** Exported (see `.mli`) *)
-module EncryptionOC : O.OccContent
+module EncryptionOC : O.OccurrenceContent
   with type content = enc_content
    and type data = enc_data =
 struct
@@ -124,7 +124,7 @@ type rand_data =
 
 
 (** Exported (see `.mli`) *)
-module RandomnessOC : O.OccContent
+module RandomnessOC : O.OccurrenceContent
   with type content = rand_content
    and type data = rand_data =
 struct

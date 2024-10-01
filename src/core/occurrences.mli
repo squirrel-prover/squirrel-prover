@@ -11,7 +11,7 @@ module PathCond  = Iter.PathCond
     The [Occurrences] module provides ways to easily search for occurrences
     of anything in a term.
 
-    - Users need to provide a module of type [OccContent],
+    - Users need to provide a module of type [OccurrenceContent],
       containing the type of the things they want to search for, and a few
       operations on this type.
 
@@ -49,7 +49,7 @@ val clear_trivial_equalities : Term.term -> Term.term
 
 (** Module containing the type of the contents of occurrences
     we will look for, and some operations on this type. *)
-module type OccContent = sig
+module type OccurrenceContent = sig
   (** Type of the thing for which we want occurrences *)
   type content
 
@@ -86,14 +86,14 @@ module type OccContent = sig
 end
 
 (*------------------------------------------------------------------*)
-(** Predefined instance of [OccContent] for timestamps,
+(** Predefined instance of [OccurrenceContent] for timestamps,
     plus a dummy occurrence with no content *)
 
-module TSContent : OccContent 
+module TSContent : OccurrenceContent 
   with type content = Term.term
    and type data = unit
 
-module EmptyContent : OccContent 
+module EmptyContent : OccurrenceContent 
   with type content = unit
    and type data = unit
 
@@ -114,7 +114,8 @@ type occ_show = Show | Hide | ShowContentOnly
 
 (*------------------------------------------------------------------*)
 (** Signature of a module for simple occurrences.
-    Contains an OccContent submodule, defining what types occurrences contain.
+    Contains an OccurrenceContent submodule,
+    defining what types occurrences contain.
     They contain a content, and a value of the same type with which it
     could collide (that value is the one we search occurrences of).
     They also store additional information such as the variables
@@ -122,7 +123,7 @@ type occ_show = Show | Hide | ShowContentOnly
 module type SimpleOcc = sig
 
   (** The content occurrences store *)
-  module OC : OccContent
+  module OC : OccurrenceContent
 
   type content = OC.content
 
@@ -199,8 +200,10 @@ module type SimpleOcc = sig
 end
 
 
-(** Functor to produce a SimpleOcc module from an OccContent *)
-module MakeSO : functor (OC:OccContent) -> (SimpleOcc with module OC = OC)
+(** Functor to produce a SimpleOcc module from an OccurrenceContent *)
+module MakeSO :
+  functor (OC:OccurrenceContent) ->
+    (SimpleOcc with module OC = OC)
 
 (*------------------------------------------------------------------*)
 (** module for timestamp occurrences *)
@@ -367,9 +370,10 @@ module type OccurrenceSearch = sig
     ext_occs
 end
 
-(** Functor to construct an OccurrenceSearch for a given OccContent. *)
+(** Functor to construct an OccurrenceSearch for a given OccurrenceContent. *)
 module MakeSearch :
-  functor (OC:OccContent) -> (OccurrenceSearch with module EO.SO.OC = OC)
+  functor (OC:OccurrenceContent) ->
+    (OccurrenceSearch with module EO.SO.OC = OC)
 
 
 (*------------------------------------------------------------------*)
@@ -454,15 +458,15 @@ end
 (** [OccurrenceContent], [OccurrenceSearch], [OccurrenceFormulas]
     for occurrences of names *)
 
-module NameOC : OccContent
+module NameOC : OccurrenceContent
   with type content = Name.t
    and type data = unit
 
-module NameOccSearch : OccurrenceSearch 
+module NameOS : OccurrenceSearch 
   with module EO.SO.OC = NameOC
                                                
-module NameOccFormulas : OccurrenceFormulas 
-  with type ext_occ = NameOccSearch.ext_occ
+module NameOF : OccurrenceFormulas 
+  with type ext_occ = NameOS.ext_occ
                                                
 (*------------------------------------------------------------------*)
 (** Utility:
@@ -470,5 +474,5 @@ module NameOccFormulas : OccurrenceFormulas
     returns the corresponding simple occs *)
 val find_name_occ :
   Name.t -> Name.t list -> pos_info ->
-  NameOccSearch.simple_occs
+  NameOS.simple_occs
 

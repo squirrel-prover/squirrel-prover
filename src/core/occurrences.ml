@@ -42,7 +42,7 @@ let clear_trivial_equalities (phi : Term.term) : Term.term =
 (** Occurrence content *)
 
 (** Exported (see `.mli`) *)
-module type OccContent =
+module type OccurrenceContent =
   sig
     type content
     type data
@@ -57,8 +57,8 @@ module type OccContent =
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module TSContent : OccContent with type content = Term.term
-                               and type data = unit =
+module TSContent : OccurrenceContent with type content = Term.term
+                                      and type data = unit =
   struct
     type content = Term.term
     type data = unit
@@ -86,8 +86,8 @@ module TSContent : OccContent with type content = Term.term
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module EmptyContent : OccContent with type content = unit
-                                  and type data = unit =
+module EmptyContent : OccurrenceContent with type content = unit
+                                         and type data = unit =
   struct
     type content = unit
     type data = unit
@@ -131,7 +131,7 @@ type occ_show = Show | Hide | ShowContentOnly
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module type SimpleOcc = sig
-  module OC : OccContent
+  module OC : OccurrenceContent
   type content = OC.content
   type data = OC.data
   type simple_occ =
@@ -167,7 +167,7 @@ end
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
+module MakeSO (OC:OccurrenceContent) : (SimpleOcc with module OC = OC) =
   struct
     module OC = OC
     
@@ -676,7 +676,7 @@ end
 
 
 (** Exported (see `.mli`) *)
-module MakeSearch (OC:OccContent) :
+module MakeSearch (OC:OccurrenceContent) :
 (OccurrenceSearch with module EO.SO.OC = OC) =
   struct
 
@@ -1228,8 +1228,8 @@ module Name =
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module NameOC : OccContent with type content = Name.t
-                            and type data = unit =
+module NameOC : OccurrenceContent with type content = Name.t
+                                   and type data = unit =
   struct
     type content = Name.t
     type data = unit
@@ -1255,17 +1255,17 @@ module NameOC : OccContent with type content = Name.t
       Fmt.pf fmt ""
   end
 
-module NameOccSearch = MakeSearch (NameOC)
+module NameOS = MakeSearch (NameOC)
 
-module NameOccFormulas = MakeFormulas (NameOccSearch.EO)
+module NameOF = MakeFormulas (NameOS.EO)
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 let find_name_occ (n:Name.t) (ns:Name.t list) (info:pos_info)
-    : NameOccSearch.simple_occs =
+    : NameOS.simple_occs =
   List.map
     (fun (nn:Name.t) ->
-      NameOccSearch.EO.SO.mk_simple_occ
+      NameOS.EO.SO.mk_simple_occ
         ~content:n ~collision:nn ~data:()
         ~vars:info.pi_vars
         ~cond:info.pi_cond

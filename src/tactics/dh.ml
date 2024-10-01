@@ -25,8 +25,8 @@ open LowTactics
 module O = Occurrences
 module Name = O.Name
 module NOC = O.NameOC
-module NOS = O.NameOccSearch
-module NOF = O.NameOccFormulas
+module NOS = O.NameOS
+module NOF = O.NameOF
 
 (*------------------------------------------------------------------*)
 let wrap_fail = TraceLT.wrap_fail

@@ -39,8 +39,8 @@ type integrity_content =
   | IntegrityMsg of {msg:Term.term; key:name}
 
 
-module IntegrityOC : O.OccContent with type content = integrity_content
-                                   and type data = unit =
+module IntegrityOC : O.OccurrenceContent with type content = integrity_content
+                                          and type data = unit =
 struct
   type content = integrity_content
   type data = unit

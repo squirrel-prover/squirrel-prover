@@ -35,8 +35,8 @@ let p_fresh_arg (nargs : Args.named_args) : bool =
 module O = Occurrences
 module Name = O.Name 
 module NOC = O.NameOC
-module NOS = O.NameOccSearch
-module NOF = O.NameOccFormulas
+module NOS = O.NameOS
+module NOF = O.NameOF
 
 
 (** Look for occurrences using [Occurrences].

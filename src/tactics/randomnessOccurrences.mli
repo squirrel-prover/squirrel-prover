@@ -48,7 +48,7 @@ type enc_data =
 
 
 (** Occurrences instantiation for the encryption search *)
-module EncryptionOC : O.OccContent
+module EncryptionOC : O.OccurrenceContent
   with type content = enc_content
    and type data = enc_data
 
@@ -86,7 +86,7 @@ type rand_data =
 
 
 (** Occurrences instantiation for the randomness search *)
-module RandomnessOC : O.OccContent
+module RandomnessOC : O.OccurrenceContent
   with type content = rand_content
    and type data = rand_data
 
