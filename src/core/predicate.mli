@@ -43,7 +43,7 @@ val get : Symbols.table -> Symbols.predicate -> predicate
 
 (*------------------------------------------------------------------*)
 val subst_body  : Term.subst  -> predicate_body -> predicate_body
-val tsubst_body : Type.tsubst -> predicate_body -> predicate_body 
+val tsubst_body : Subst.t -> predicate_body -> predicate_body 
   
 (*------------------------------------------------------------------*)
 (** Check if the predicate can be unfolded, i.e.:

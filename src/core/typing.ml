@@ -1339,9 +1339,9 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   (* refresh all type variables in [pred.ty_vars] and substitute *)
   let ty_vars, ts = Infer.open_tvars st.ty_env pred.ty_vars in
   let pred_args_multi =
-    List.map (fun (se, args) -> se, List.map (Vars.tsubst ts) args) pred.args.multi
+    List.map (fun (se, args) -> se, List.map (Subst.subst_var ts) args) pred.args.multi
   in
-  let pred_args_simple = List.map (Vars.tsubst ts) pred.args.simple in
+  let pred_args_simple = List.map (Subst.subst_var ts) pred.args.simple in
 
   (* if the user manually provided type arguments, process them *)
   let ty_vars = List.map (fun x -> Type.univar x) ty_vars in
@@ -1549,7 +1549,7 @@ let convert
         conv_err (L.loc tm) Freetyunivar;
 
       let tysubst = Infer.close ty_env in
-      Term.tsubst tysubst t, Type.tsubst tysubst ty
+      Term.tsubst tysubst t, Subst.subst_ty tysubst ty
     end
   else
     t, Infer.norm_ty ty_env ty

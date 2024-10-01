@@ -128,7 +128,7 @@ let mk_state
   let init_pat : Term.term Term.pat_op = { 
     pat_op_tyvars = univars; 
     pat_op_vars   = 
-      List.map (fun (v,tag) -> (Vars.tsubst tsubst v, tag)) rule.rw_vars; 
+      List.map (fun (v,tag) -> (Subst.subst_var tsubst v, tag)) rule.rw_vars; 
     pat_op_term   = mk_form left;
   } in
   

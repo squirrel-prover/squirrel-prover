@@ -62,22 +62,22 @@ let find table (name : Symbols.p_path) : game =
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let tsubst_var_decl (ts : Type.tsubst) (gv : var_decl) : var_decl =
-  { var = Vars.tsubst ts gv.var; init = Term.tsubst ts gv.init; }
+let tsubst_var_decl (ts : Subst.t) (gv : var_decl) : var_decl =
+  { var = Subst.subst_var ts gv.var; init = Term.tsubst ts gv.init; }
 
-let tsubst_oracle (ts : Type.tsubst) (o : oracle) : oracle =
+let tsubst_oracle (ts : Subst.t) (o : oracle) : oracle =
   { name      = o.name;
-    args      = List.map (Vars.tsubst     ts) o.args;
-    loc_smpls = List.map (Vars.tsubst     ts) o.loc_smpls;
+    args      = List.map (Subst.subst_var     ts) o.args;
+    loc_smpls = List.map (Subst.subst_var     ts) o.loc_smpls;
     loc_vars  = List.map (tsubst_var_decl ts) o.loc_vars;
     updates   = 
-      List.map (fun (v,t) -> Vars.tsubst ts v, Term.tsubst ts t) o.updates;
+      List.map (fun (v,t) -> Subst.subst_var ts v, Term.tsubst ts t) o.updates;
     output    = Term.tsubst ts o.output;
   }
 
-let tsubst_game (ts : Type.tsubst) (g : game) : game =
+let tsubst_game (ts : Subst.t) (g : game) : game =
   { name       = g.name;
-    glob_smpls = List.map (Vars.tsubst     ts) g.glob_smpls;
+    glob_smpls = List.map (Subst.subst_var     ts) g.glob_smpls;
     glob_vars  = List.map (tsubst_var_decl ts) g.glob_vars;
     oracles    = List.map (tsubst_oracle   ts) g.oracles;
   }
@@ -489,7 +489,7 @@ module Const = struct
     val[@warning "-32"] pp     : t formatter
     val[@warning "-32"] pp_dbg : t formatter
 
-    val tsubst : Type.tsubst -> t -> t
+    val tsubst : Subst.t -> t -> t
     (* val subst  : Term.subst  -> t -> t *)
 
     val refresh : t -> t
@@ -556,10 +556,10 @@ module Const = struct
     (*     cond = List.map (Term.subst     ts) c.cond;  *)
     (*   } *)
 
-    let tsubst (ts : Type.tsubst) (c : t) : t =
+    let tsubst (ts : Subst.t) (c : t) : t =
       { name = c.name; 
         tag  = c.tag; 
-        vars = List.map (Vars.tsubst ts) c.vars;
+        vars = List.map (Subst.subst_var ts) c.vars;
         term = List.map (Term.tsubst ts) c.term; 
         cond = List.map (Term.tsubst ts) c.cond; 
       }

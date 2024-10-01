@@ -38,9 +38,9 @@ val data_as_game : Symbols.data -> game
 val find : Symbols.table -> Symbols.p_path -> game
 
 (*------------------------------------------------------------------*)
-val tsubst_var_decl : Type.tsubst -> var_decl -> var_decl 
-val tsubst_oracle   : Type.tsubst -> oracle   -> oracle 
-val tsubst_game     : Type.tsubst -> game     -> game 
+val tsubst_var_decl : Subst.t -> var_decl -> var_decl 
+val tsubst_oracle   : Subst.t -> oracle   -> oracle 
+val tsubst_game     : Subst.t -> game     -> game 
 
 (*------------------------------------------------------------------*)
 val _pp_var_decl : var_decl               formatter_p

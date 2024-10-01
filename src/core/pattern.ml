@@ -6,13 +6,13 @@ let open_pat (type a )
     (f_kind : a Equiv.f_kind)
     (ty_env : Infer.env)
     (p      : (a*C.bound) Term.pat)
-  : Type.tsubst *  (a*C.bound) Term.pat_op
+  : Subst.t *  (a*C.bound) Term.pat_op
   =
   let univars, tsubst = Infer.open_tvars ty_env p.pat_tyvars in
   let conclusion,bound = p.pat_term in
   let conclusion = Equiv.Babel.tsubst f_kind tsubst conclusion in
   let bound = C.bound_tsubst tsubst bound in
-  let vars = List.map (fun (v,t) -> Vars.tsubst tsubst v, t) p.pat_vars in
+  let vars = List.map (fun (v,t) -> Subst.subst_var tsubst v, t) p.pat_vars in
   ( tsubst,
     Term.{ 
       pat_op_term   = (conclusion, bound);

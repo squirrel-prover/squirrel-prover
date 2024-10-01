@@ -22,7 +22,7 @@ let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
     ~def:(fun (se,t) -> se, Term.subst subst t) 
     hyps
 
-let tsubst_hyps (tsubst : Type.tsubst) (hyps : H.hyps) : H.hyps =
+let tsubst_hyps (tsubst : Subst.t) (hyps : H.hyps) : H.hyps =
   H.map
     ~hyp:(Equiv.tsubst tsubst) 
     ~def:(fun (se,t) -> se, Term.tsubst tsubst t) 
@@ -289,9 +289,9 @@ let subst subst s =
            proof_context = subst_hyps subst s.proof_context; }
 
 (*------------------------------------------------------------------*)
-let tsubst (tsubst : Type.tsubst) s =
-  if tsubst == Type.tsubst_empty then s else
-    let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
+let tsubst (tsubst : Subst.t) s =
+  if tsubst == Subst.empty_subst then s else
+    let vars = Vars.map (fun v t -> Subst.subst_var tsubst v, t) s.env.vars in
     { env  = Env.update ~vars s.env;
       conclusion = Equiv.tsubst tsubst s.conclusion;
       proof_context = tsubst_hyps tsubst s.proof_context; }

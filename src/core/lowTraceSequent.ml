@@ -454,9 +454,9 @@ let subst subst s =
       s 
 
 (*------------------------------------------------------------------*)
-let tsubst (tsubst : Type.tsubst) s =
-  if tsubst == Type.tsubst_empty then s else
-    let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
+let tsubst (tsubst : Subst.t) s =
+  if tsubst == Subst.empty_subst then s else
+    let vars = Vars.map (fun v t -> Subst.subst_var tsubst v, t) s.env.vars in
     let proof_context = 
       H.map
         ~hyp:(Equiv.Any.tsubst tsubst)

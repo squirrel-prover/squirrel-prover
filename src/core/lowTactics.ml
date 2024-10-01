@@ -1931,7 +1931,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let h = Hyps.by_id_k hyp Hyp s in
     let hprems, hconcl = S.Hyp.decompose_impls_last ~env h in
 
-    let try1 (fprem : S.hyp_form) : (Match.Mvar.t * Type.tsubst) option =
+    let try1 (fprem : S.hyp_form) : (Match.Mvar.t * Subst.t) option =
       let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
       if not (Sv.subset pat_vars (S.fv_hyp fprem)) then None
       else

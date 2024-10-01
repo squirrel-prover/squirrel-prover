@@ -39,7 +39,7 @@ let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
   {terms = List.map (Term.subst subst) e.terms;
    bound = Option.map (Term.subst subst) e.bound}
 
-let tsubst_equiv (subst : Type.tsubst) (e : equiv) : equiv =
+let tsubst_equiv (subst : Subst.t) (e : equiv) : equiv =
   {terms = List.map (Term.tsubst subst) e.terms;
    bound = Option.map (Term.tsubst subst) e.bound}
 
@@ -91,7 +91,7 @@ let subst_bform (subst : Term.subst) (f : bform) : bform =
   { formula = Term.subst subst f.formula; 
     bound   = Option.map (Term.subst subst) f.bound}
 
-let tsubst_bform (subst : Type.tsubst) (f : bform) : bform =
+let tsubst_bform (subst : Subst.t) (f : bform) : bform =
   { formula = Term.tsubst subst f.formula;
     bound   = Option.map (Term.tsubst subst) f.bound}
 
@@ -209,9 +209,9 @@ let ty_fv_pred_app (pa : pred_app) =
   in
   Type.Fv.union fv (Term.ty_fvs pa.simpl_args)
 
-let tsubst_pred_app (ts : Type.tsubst) (pa : pred_app) : pred_app = {
+let tsubst_pred_app (ts : Subst.t) (pa : pred_app) : pred_app = {
   psymb      = pa.psymb;
-  ty_args    = List.map (Type.tsubst ts) pa.ty_args;
+  ty_args    = List.map (Subst.subst_ty ts) pa.ty_args;
   se_args    = pa.se_args;
   multi_args =
     List.map (fun (se,args) -> se, List.map (Term.tsubst ts) args) pa.multi_args;
@@ -268,7 +268,7 @@ let ty_fv_atom = function
 
 
 (** Type substitution of an [atom]*)
-let tsubst_atom (ts : Type.tsubst) (at : atom) =
+let tsubst_atom (ts : Subst.t) (at : atom) =
   match at with
   | Equiv e -> Equiv (tsubst_equiv ts e)
   | Reach f -> Reach (tsubst_bform ts f)
@@ -468,12 +468,12 @@ let subst_projs
 (** Type substitutions *)
 
 
-let tsubst (ts : Type.tsubst) (t : form) =
+let tsubst (ts : Subst.t) (t : form) =
   let rec tsubst = function
     | Quant (q, vs, f) ->
-      Quant (q, List.map (fst_bind (Vars.tsubst ts)) vs, tsubst f)
+      Quant (q, List.map (fst_bind (Subst.subst_var ts)) vs, tsubst f)
     | Let (v, t, f) ->
-      Let (Vars.tsubst ts v, Term.tsubst ts t, tsubst f)
+      Let (Subst.subst_var ts v, Term.tsubst ts t, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
     | _ as term -> tmap tsubst term
   in
@@ -1199,7 +1199,7 @@ module Babel = struct
     | Global_t ->        subst_projs target s f
     | Any_t    -> PreAny.subst_projs target s f
 
-  let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
+  let tsubst : type a. a f_kind -> Subst.t -> a -> a = function
     | Local_t  -> Term.tsubst
     | Global_t -> tsubst
     | Any_t    -> PreAny.tsubst
@@ -1698,7 +1698,7 @@ module Babel_statement = struct
     | Global_s ->                  subst_projs       target s f
     | Any_s    -> PreAny_statement.subst_projs       target s f
 
-  let tsubst : type a. a s_kind -> Type.tsubst -> a -> a = function
+  let tsubst : type a. a s_kind -> Subst.t -> a -> a = function
     | Local_s  -> tsubst_bform
     | Global_s -> tsubst
     | Any_s    -> PreAny_statement.tsubst

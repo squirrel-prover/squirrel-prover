@@ -1,33 +1,66 @@
 open Utils
 
 (*------------------------------------------------------------------*)
+module SE = SystemExprSyntax
+
 module Mid = Ident.Mid
+module Msv = SE.Var.M
 
-(* an unification environment *)
-type env = Type.ty Mid.t ref
+(*------------------------------------------------------------------*)
+(** A unification environment.
 
+    Unification variables must be created through the [mk_ty_univar]
+    and [mk_se_univar] functions below. *)
+type env0 = {
+  ty : Type.ty        Mid.t;      (** for type unification variables *)
+  se : < > SE.exposed Msv.t;      (** for system variables *)
+}
+
+type env = env0 ref
+
+(*------------------------------------------------------------------*)
 let pp fmt (e : env) =
-  Fmt.pf fmt "[@[<v 0>%a@]]"
+  Fmt.pf fmt "[@[<v 0>\
+              @[<v 2>Types:@;%a@]@;\
+              @[<v 2>System variables:@;%a@]]"
+
+    (* types *)
     (Fmt.list ~sep:Fmt.cut
        (fun fmt (id, ty) ->
           Fmt.pf fmt "@[<hv 2>@[%a@] →@ @[%a@]@]" Ident.pp_full id Type.pp ty
-       )) (Mid.bindings !e)
+       )) (Mid.bindings !e.ty)
 
-let mk_env () = ref Mid.empty 
+    (* system expressions *)
+    (Fmt.list ~sep:Fmt.cut
+       (fun fmt (id, ty) ->
+          Fmt.pf fmt "@[<hv 2>@[%a@] →@ @[%a@]@]" SE.Var.pp id SE.pp (SE.force ty)
+       )) (Msv.bindings !e.se)
 
-let copy env = ref (!env) 
+(*------------------------------------------------------------------*)
+let mk_env () = ref { ty = Mid.empty; se = Msv.empty; }
 
-let set ~tgt ~value = tgt := !value
+let copy (env : env) : env = ref (!env) 
+
+let set ~(tgt : env) ~(value : env) : unit =
+  tgt := !value
 
 (*------------------------------------------------------------------*)
 let mk_ty_univar (env : env) : Type.univar =
   let uv = Ident.create "_u" in
   let ety = Type.univar uv in
-  env := Mid.add uv ety !env;
+  env := { !env with ty = Mid.add uv ety !env.ty; };
   uv
 
-let open_tvars ty_env (tvars : Type.tvars) =
-  let vars_f = List.map (fun _ -> mk_ty_univar ty_env) tvars in
+(*------------------------------------------------------------------*)
+let mk_se_univar (env : env) : SE.Var.t =
+  let uv = SE.Var.of_ident (Ident.create "_s") in 
+  let e = SE.{ cnt = SE.Var uv; name = None; } in
+  env := { !env with se = Msv.add uv e !env.se; };
+  uv
+
+(*------------------------------------------------------------------*)
+let open_tvars (env : env) (tvars : Type.tvars) =
+  let vars_f = List.map (fun _ -> mk_ty_univar env) tvars in
 
   (* create substitution refreshing all type variables *)
   let ts_tvar =
@@ -35,10 +68,11 @@ let open_tvars ty_env (tvars : Type.tvars) =
         Mid.add (id :> Ident.t) (Type.univar id_f) ts_tvar
       ) Mid.empty tvars vars_f
   in  
-  let ts = Type.mk_tsubst ~univars:Mid.empty ~tvars:ts_tvar in
+  let ts = Subst.mk_subst ~univars:Mid.empty ~tvars:ts_tvar in
   vars_f, ts
 
-(* Univar are maximal for this ordering *)
+(*------------------------------------------------------------------*)
+(** [univar] are maximal for this ordering *)
 let compare (t : Type.ty) (t' : Type.ty) : int =
   match t, t' with
   | TUnivar u, TUnivar u' -> Ident.compare u u'
@@ -46,43 +80,70 @@ let compare (t : Type.ty) (t' : Type.ty) : int =
   | _, TUnivar _ -> -1
   | _, _ -> Stdlib.compare t t'
 
-let rec norm (env : env) (t : Type.ty) : Type.ty =
-  match t with
-  | TUnivar u ->
-    let u' = Mid.find_dflt t u !env in
-    if t = u' then u' else norm env u'
+let norm_ty (env : env) (t : Type.ty) : Type.ty =
+  let rec doit : Type.ty -> Type.ty = function
+    | TUnivar u as t ->
+      let u' = Mid.find_dflt t u !env.ty in
+      if Type.equal t u' then u' else doit u'
 
-  | Fun (t1, t2) -> Type.func (norm env t1) (norm env t2)
+    | Fun (t1, t2) -> Type.func (doit t1) (doit t2)
 
-  | Tuple l -> Type.tuple (List.map (norm env) l)
+    | Tuple l -> Type.tuple (List.map doit l)
 
-  | Message | Boolean | Index | Timestamp | TBase _ | TVar _ -> t
+    | Message | Boolean | Index | Timestamp | TBase _ | TVar _ as t -> t
+  in
+  doit t
 
-let norm_ty = norm
+let norm_se0 (env : env) (se : < > SE.exposed) : < > SE.exposed =
+  let rec doit (se : < > SE.exposed) : < > SE.exposed = 
+    match se.cnt with
+    | Var v -> 
+      let v' = Msv.find_dflt se v !env.se in
+      if se = v' then v' else doit v'
 
+    | Any _ | List _ -> se
+  in
+  doit se
+
+let norm_se (type a) (env : env) (se : a SE.expr) : a SE.expr =
+  SE.force (norm_se0 env (se :> < > SE.exposed))
+
+(*------------------------------------------------------------------*)
 let norm_env (env : env) : unit = 
-  env := Mid.map (norm env) !env
+  env := { 
+    ty = Mid.map (norm_ty  env) !env.ty; 
+    se = Msv.map (norm_se0 env) !env.se; 
+  }
 
-(** An type inference environment [ty_env] is closed if every unification 
-    variable normal form is a type that do not use univars in [ty_env]
-    (but may use other univars). *)
+(*------------------------------------------------------------------*)
+(** An type inference environment [env] is closed if every unification
+    variable have a normal form that do not use univars in [env] (but
+    may use other univars). *)
 let is_closed (env : env) : bool =
-  let rec check : Type.ty -> bool = function
-    | TUnivar uv -> not (Mid.mem uv !env)
-    | Message | Boolean | Index | Timestamp | TBase _ | TVar _ -> true
-    | Fun (t1, t2) -> check t1 && check t2
-    | Tuple l -> List.for_all check l
+  let rec check_ty : Type.ty -> bool = function
+    | TUnivar uv -> not (Mid.mem uv !env.ty)
+    | _ as ty -> Type.forall check_ty ty
+  in
+
+  let check_se (se : < > SE.exposed) : bool = 
+    match se.cnt with
+    | Var uv -> not (Msv.mem uv !env.se)
+    | Any _ | List _ -> true 
   in
 
   norm_env env;
-  Mid.for_all (fun _ -> check) !env
 
-let close (env : env) : Type.tsubst =
+  Mid.for_all (fun _ -> check_ty) !env.ty &&
+  Msv.for_all (fun _ -> check_se) !env.se
+
+(*------------------------------------------------------------------*)
+let close (env : env) : Subst.t =
   assert (is_closed env);
-  Type.mk_tsubst ~tvars:Mid.empty ~univars:!env
+  Subst.mk_subst ~tvars:Mid.empty ~univars:!env.ty
 
+(*------------------------------------------------------------------*)
 (** Generalize unification variables and close the unienv. *)
-let gen_and_close (env : env) : Type.tvars * Type.tsubst =
+let gen_and_close (env : env) : Type.tvars * Subst.t =
   (* find all univar that are unconstrained and generalize them.
      Compute: 
      - generalized tvars, 
@@ -102,20 +163,20 @@ let gen_and_close (env : env) : Type.tvars * Type.tsubst =
     | Message | Boolean | Timestamp | Index ->
       gen_tvars, ts_univar
   in
-  let gen acc ty = gen0 acc (norm env ty) in
+  let gen acc ty = gen0 acc (norm_ty env ty) in
 
   let gen_tvars, univars = 
-    Mid.fold (fun _ ty acc -> gen acc ty) !env ([], Mid.empty)
+    Mid.fold (fun _ ty acc -> gen acc ty) !env.ty ([], Mid.empty)
   in
-  let ts = Type.mk_tsubst ~univars ~tvars:Mid.empty in
-  env := Mid.map (Type.tsubst ts) !env;
+  let ts = Subst.mk_subst ~univars ~tvars:Mid.empty in
+  env := { !env with ty = Mid.map (Subst.subst_ty ts) !env.ty; };
 
   (* close the resulting environment *)
   gen_tvars, close env
 
 let unify_eq (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
-  let t  = norm env t
-  and t' = norm env t' in
+  let t  = norm_ty env t
+  and t' = norm_ty env t' in
 
   let rec do_unif t t' : bool =
     let t, t' = if compare t t' < 0 then t', t else t, t' in
@@ -123,7 +184,7 @@ let unify_eq (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
     if Type.equal t t'
     then true
     else match t, t' with
-      | TUnivar u, _ -> env := Mid.add u t' !env; true
+      | TUnivar u, _ -> env := { !env with ty = Mid.add u t' !env.ty; }; true
       | Tuple tl, Tuple tl' ->
         List.length tl = List.length tl' &&
         do_unifs tl tl'

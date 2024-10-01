@@ -133,8 +133,6 @@ val name : var -> string
 
 val ty : var -> Type.ty
 
-val tsubst  : Type.tsubst -> var -> var
-
 (** Free type variables of a term *)
 val ty_fv  : var  -> Type.Fv.t
 val ty_fvs : vars -> Type.Fv.t

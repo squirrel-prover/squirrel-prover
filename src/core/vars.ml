@@ -85,9 +85,6 @@ let ty_fvs l =
   List.fold_left (fun uvs v -> Type.Fv.union uvs (ty_fv v)) Type.Fv.empty l
 
 (*------------------------------------------------------------------*)
-let tsubst s v = { v with ty = Type.tsubst s v.ty }
-
-(*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
 let _pp ppe fmt v = 

@@ -275,9 +275,9 @@ let ty ?ty_env (t : term) : Type.ty =
     | Fun (_, { fty; ty_args; }) ->
       (* substitute pending type variables by the type arguments *)
       let tsubst = 
-        List.fold_left2 Type.tsubst_add_tvar Type.tsubst_empty fty.fty_vars ty_args 
+        List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
       in
-      Type.tsubst tsubst (Type.fun_l fty.fty_args fty.fty_out)
+      Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
 
     | App (t1, l) ->
       let tys, t_out = destr_ty_funs ~ty_env (ty t1) (List.length l) in      
@@ -327,7 +327,7 @@ let ty ?ty_env (t : term) : Type.ty =
   let tty = ty t in
 
   if must_close
-  then Type.tsubst (Infer.close ty_env) tty (* [ty_env] should be closed *)
+  then Subst.subst_ty (Infer.close ty_env) tty (* [ty_env] should be closed *)
   else tty
                                           
 (*------------------------------------------------------------------*)
@@ -473,8 +473,8 @@ let open_ftype (ty_env : Infer.env) (fty : Type.ftype) : Type.ftype_op =
   (* compute the new function type *)
   Type.mk_ftype
     vars_f
-    (List.map (Type.tsubst ts) fty.fty_args)
-    (Type.tsubst ts fty.fty_out)
+    (List.map (Subst.subst_ty ts) fty.fty_args)
+    (Subst.subst_ty ts fty.fty_out)
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
@@ -1907,33 +1907,31 @@ end
 include Smart
 
 
-(*------------------------------------------------------------------*)
-(** {2 Type substitution} *)
+let tsubst_applied_ftype (ts : Subst.t) { fty; ty_args;} =
+  { fty     = Subst.subst_ftype ts fty; 
+    ty_args = List.map (Subst.subst_ty ts) ty_args; }
 
-let tsubst_applied_ftype (ts : Type.tsubst) { fty; ty_args;} =
-  { fty     = Type.tsubst_ftype ts fty; 
-    ty_args = List.map (Type.tsubst ts) ty_args; }
-
-let tsubst (ts : Type.tsubst) (t : term) : term =
+let tsubst (ts : Subst.t) (t : term) : term =
   let rec tsubst : term -> term = function
-    | Var v -> Var (Vars.tsubst ts v)
+    | Var v -> Var (Subst.subst_var ts v)
 
     | Fun (fn, fty_app) -> 
       Fun (fn, tsubst_applied_ftype ts fty_app)
 
-    | Name (n,args) -> Name ({ n with s_typ = Type.tsubst ts n.s_typ}, 
-                             List.map tsubst args)
+    | Name (n,args) -> 
+      Name ({ n with s_typ = Subst.subst_ty ts n.s_typ}, 
+            List.map tsubst args)
 
-    | Macro (m,args,arg) -> Macro ({ m with s_typ = Type.tsubst ts m.s_typ}, 
+    | Macro (m,args,arg) -> Macro ({ m with s_typ = Subst.subst_ty ts m.s_typ}, 
                                    List.map tsubst args,
                                    tsubst arg)
 
-    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
+    | Quant (q, vs, f) -> Quant (q, List.map (Subst.subst_var ts) vs, tsubst f)
 
     | Find (vs, a,b,c) ->
-      Find (List.map (Vars.tsubst ts) vs, tsubst a, tsubst b, tsubst c)
+      Find (List.map (Subst.subst_var ts) vs, tsubst a, tsubst b, tsubst c)
 
-    | Let (v, t1, t2) -> Let (Vars.tsubst ts v, tsubst t1, tsubst t2)
+    | Let (v, t1, t2) -> Let (Subst.subst_var ts v, tsubst t1, tsubst t2)
                            
     | App (_, _) | Action (_, _)  | Tuple _ | Proj (_, _) | Diff _ as term ->
       tmap (fun t -> tsubst t) term

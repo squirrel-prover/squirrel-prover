@@ -261,8 +261,8 @@ val subst_var : subst -> Vars.var -> Vars.var
 val subst_vars : subst -> Vars.vars -> Vars.vars
 
 (*------------------------------------------------------------------*)
-(** substitute type variables *)
-val tsubst : Type.tsubst -> term -> term
+(** substitute using a [Subst.t] *)
+val tsubst : Subst.t -> term -> term
 
 (*------------------------------------------------------------------*)
 

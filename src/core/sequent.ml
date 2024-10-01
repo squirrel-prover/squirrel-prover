@@ -1267,7 +1267,7 @@ module Mk (Args : MkArgs) : S with
     let form = Equiv.Babel.tsubst Equiv.Any_t tysubst pt.form in
     let subgs = List.map (Equiv.Babel.tsubst Equiv.Any_t tysubst) pt.subgs in
     let args =
-      List.map (fun (v, info) -> Vars.tsubst tysubst v, info) pt.args in
+      List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args in
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)

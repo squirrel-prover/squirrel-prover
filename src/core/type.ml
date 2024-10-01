@@ -283,46 +283,6 @@ let fvs l =
   List.fold_left (fun uvs v -> Fv.union uvs (fv v)) Fv.empty l
 
 (*------------------------------------------------------------------*)
-(** {2 Type substitution } *)
-              
-(** A type substitution*)
-type tsubst = {
-  ts_univar : ty Ident.Mid.t;
-  ts_tvar   : ty Ident.Mid.t;
-}
-
-let pp_tsubst fmt ts =
-  let pp_bd fmt (id,ty) =
-    Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id pp ty
-  in
-  Fmt.pf fmt "@[<v 0>@[<hov 2>univars:@ %a@]@;@[<hov 2>tvars:@ %a@]@]"
-    (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_univar)
-    (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_tvar)
-
-
-let tsubst_empty =
-  { ts_univar = Mid.empty;
-    ts_tvar   = Mid.empty; }
-
-let mk_tsubst ~(tvars:ty Mid.t) ~(univars:ty Mid.t) : tsubst =
-  { ts_univar = univars;
-    ts_tvar   = tvars; }
-  
-let tsubst_add_tvar   s tv ty = { s with ts_tvar   = Mid.add tv ty s.ts_tvar; }
-let tsubst_add_univar s tu ty = { s with ts_univar = Mid.add tu ty s.ts_univar; }
-  
-let rec tsubst (s : tsubst) (t : ty) : ty =
-  match t with
-  | Message | Boolean | Index | Timestamp | TBase _ -> t
-
-  | TVar id -> Mid.find_dflt t id s.ts_tvar
-
-  | TUnivar ui -> Mid.find_dflt t ui s.ts_univar
-
-  | Tuple tys -> Tuple (List.map (tsubst s) tys)
-  | Fun (t1, t2) -> Fun (tsubst s t1, tsubst s t2)
-
-(*------------------------------------------------------------------*)
 (** {2 Type destructors and constructors} *)
 
 (*------------------------------------------------------------------*)
@@ -402,11 +362,4 @@ let mk_ftype_tuple vars args out : ftype =
   (* arity ≥ 2 *)
   | _ -> mk_ftype vars [tuple args] out
   
-
-(*------------------------------------------------------------------*)
-let tsubst_ftype (ts : tsubst) (fty : ftype) : ftype = {
-  fty_vars = fty.fty_vars;              (* bound type variable *)
-  fty_args = List.map (tsubst ts) fty.fty_args;
-  fty_out  = tsubst ts fty.fty_out;
-  }
 

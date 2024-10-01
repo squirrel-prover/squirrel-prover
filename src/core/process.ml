@@ -134,23 +134,23 @@ let subst (ts : Term.subst) proc =
 
 (*------------------------------------------------------------------*)
 (** Type variable substitution *)
-let tsubst (ts : Type.tsubst) proc =
+let tsubst (ts : Subst.t) proc =
   let rec doit p =
     match p with
-    | New (v, ty, p) -> New (Vars.tsubst ts v, Type.tsubst ts ty, doit p)
-    | In  (c, v , p) -> In  (c, Vars.tsubst ts v, doit p)
+    | New (v, ty, p) -> New (Subst.subst_var ts v, Subst.subst_ty ts ty, doit p)
+    | In  (c, v , p) -> In  (c, Subst.subst_var ts v, doit p)
     | Out (c, t , p) -> Out (c, Term.tsubst ts t, doit p)
 
     | Set (m, args, t, p) ->
       Set (m, List.map (Term.tsubst ts) args, Term.tsubst ts t, doit p)
 
     | Let (v, t, ty, p) ->
-      Let (Vars.tsubst ts v, Term.tsubst ts t,Type.tsubst ts ty, doit p)
+      Let (Subst.subst_var ts v, Term.tsubst ts t,Subst.subst_ty ts ty, doit p)
 
-    | Repl (vs, p) -> Repl (Vars.tsubst ts vs, doit p)
+    | Repl (vs, p) -> Repl (Subst.subst_var ts vs, doit p)
 
     | Exists (vs, t, p1, p2) ->
-      Exists (List.map (Vars.tsubst ts) vs, Term.tsubst ts t, doit p1, doit p2)
+      Exists (List.map (Subst.subst_var ts) vs, Term.tsubst ts t, doit p1, doit p2)
 
     | Apply (id,args) -> Apply (id, List.map (Term.tsubst ts) args) 
     | Alias _ | Null | Parallel _ -> tmap doit p
@@ -570,7 +570,7 @@ let parse
 
   (* close the typing environment and substitute *)
   let tysubst = Infer.close ty_env in
-  let args = List.map (Vars.tsubst tysubst) args in
+  let args = List.map (Subst.subst_var tysubst) args in
   let proc = tsubst tysubst proc in
 
   { args; projs; time; proc; }

@@ -76,9 +76,9 @@ let unfold
 
   (* apply type argument type variables *)
   let ts =
-    List.fold_left2 Type.tsubst_add_tvar Type.tsubst_empty op.ty_vars tyargs
+    List.fold_left2 Subst.add_tvar Subst.empty_subst op.ty_vars tyargs
   in
-  let op_args = List.map (Vars.tsubst ts) op.args in
+  let op_args = List.map (Subst.subst_var ts) op.args in
   let op_body = Term.tsubst ts op.body in
 
   let i = min (List.length op_args) (List.length args) in

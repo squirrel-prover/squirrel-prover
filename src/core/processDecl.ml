@@ -87,7 +87,7 @@ let parse_state_decl
   (* close the typing environment and substitute *)
   let tsubst = Infer.close ty_env in
   let t = Term.tsubst tsubst t in
-  let args = List.map (Vars.tsubst tsubst) args in
+  let args = List.map (Subst.subst_var tsubst) args in
 
   (* FIXME: generalize allowed types *)
   List.iter2 (fun v (_, pty) ->
@@ -151,8 +151,8 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     (* close the typing environment and substitute *)
     let tsubst = Infer.close ty_env in
-    let args = List.map (Vars.tsubst tsubst) args in
-    let out_ty = Type.tsubst tsubst out_ty in
+    let args = List.map (Subst.subst_var tsubst) args in
+    let out_ty = Subst.subst_ty tsubst out_ty in
     (* substitue in [body] below, in the concrete case *)
 
     match body with
@@ -305,10 +305,10 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let tsubst = Infer.close ty_env in
     let multi_args =
       List.map (fun (info, args) ->
-          info, List.map (Vars.tsubst tsubst) args
+          info, List.map (Subst.subst_var tsubst) args
         ) multi_args
     in
-    let simpl_args = List.map (Vars.tsubst tsubst) simpl_args in
+    let simpl_args = List.map (Subst.subst_var tsubst) simpl_args in
     let body = Predicate.tsubst_body tsubst body in
 
     let se_vars =

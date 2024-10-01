@@ -106,22 +106,6 @@ val fv  : ty      -> Fv.t
 val fvs : ty list -> Fv.t
  
 (*------------------------------------------------------------------*)
-(** {2 Type substitution } *)
-
-(** A substitution from unification variables to (existential) types. *)
-type tsubst
-
-val pp_tsubst : tsubst formatter
-
-val tsubst : tsubst -> ty -> ty
-                                         
-val tsubst_add_tvar   : tsubst -> tvar   -> ty -> tsubst
-val tsubst_add_univar : tsubst -> univar -> ty -> tsubst
-
-val mk_tsubst : tvars:ty Mid.t -> univars:ty Mid.t -> tsubst
-val tsubst_empty : tsubst
-
-(*------------------------------------------------------------------*)
 (** {2 Constructors and destructors} *)
 
 (*------------------------------------------------------------------*)
@@ -151,7 +135,7 @@ val decompose_funs : ty -> ty list * ty
 
 (** Type of a function symbol: 
     ∀'a₁ ... 'aₙ, τ₁ → ... → τₙ → τ *)
-type 'a ftype_g = private {
+type 'a ftype_g = {
   fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
   fty_args : ty list; (** τ₁, ... ,τₙ *)
   fty_out  : ty;      (** τ *)
@@ -170,8 +154,6 @@ val pp_ftype_op : ftype_op formatter
 (*------------------------------------------------------------------*)
 val ftype_fv : ftype -> Fv.t
  
-val tsubst_ftype : tsubst -> ftype -> ftype 
-
 (*------------------------------------------------------------------*)
 val mk_ftype : 'a list -> ty list -> ty -> 'a ftype_g
 

@@ -33,7 +33,7 @@ let subst_body (subst : Term.subst) (b : predicate_body) : predicate_body =
   | Abstract -> Abstract
   | Concrete c -> Concrete (Equiv.subst subst c)
 
-let tsubst_body (subst : Type.tsubst) (b : predicate_body) : predicate_body =
+let tsubst_body (subst : Subst.t) (b : predicate_body) : predicate_body =
   match b with
   | Abstract -> Abstract
   | Concrete c -> Concrete (Equiv.tsubst subst c)
@@ -177,8 +177,8 @@ let unfold
       (* substitute type arguments *)
       let ts = 
         List.fold_left2 (fun ts v ty ->
-            Type.tsubst_add_tvar ts v ty 
-          ) Type.tsubst_empty p.ty_vars ty_args 
+            Subst.add_tvar ts v ty 
+          ) Subst.empty_subst p.ty_vars ty_args 
       in
       let body = Equiv.tsubst ts body in
 
