@@ -154,6 +154,7 @@ let get_bad_occs
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
         ~sub:info.pi_subterm
+        ~show:Show
     in
     oc :: occs1
 
@@ -201,7 +202,8 @@ let get_bad_occs
         ~vars:info.pi_vars
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
-        ~sub:info.pi_subterm ]
+        ~sub:info.pi_subterm
+        ~show:Show] (* TODO maybe we don't actually want to print it? *)
 
   | _ -> retry ()
 
@@ -307,7 +309,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
 
   (* get all occurrences *)
   let occs =
-    IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
+    IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_k)
       get_bad
       (TS.get_trace_hyps s) contx env (t :: m :: k.Name.args)
   in

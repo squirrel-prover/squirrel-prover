@@ -124,6 +124,10 @@ let subst_occtype (sigma : Term.subst) (ot : occ_type) : occ_type =
   | EI_direct -> EI_direct
   | EI_indirect a -> EI_indirect (Term.subst sigma a)
 
+(** Exported (see `.mli`) *)
+type occ_show = Show | Hide | ShowContentOnly
+                 
+
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 module type SimpleOcc = sig
@@ -138,14 +142,15 @@ module type SimpleOcc = sig
      so_cond    : Term.terms;
      so_occtype : occ_type;
      so_subterm : Term.term;
+     so_show    : occ_show;
     }
 
   type simple_occs = simple_occ list
 
   val mk_simple_occ :
     content:content -> collision:content -> data:data ->
-    vars:Vars.vars -> cond:Term.terms -> typ:occ_type -> sub:Term.term ->
-    simple_occ
+    vars:Vars.vars -> cond:Term.terms -> typ:occ_type ->
+    sub:Term.term -> show:occ_show -> simple_occ
 
   val aux_occ_incl :
     Symbols.table -> SE.fset -> ?mv:Match.Mvar.t ->
@@ -179,6 +184,7 @@ module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
        so_cond    : Term.terms;
        so_occtype : occ_type;
        so_subterm : Term.term;
+       so_show    : occ_show;
       }
 
     type simple_occs = simple_occ list
@@ -187,18 +193,22 @@ module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
     let mk_simple_occ
           ~(content : content) ~(collision : content) ~(data : data)
           ~(vars : Vars.vars) ~(cond : Term.terms) ~(typ : occ_type)
-          ~(sub : Term.term) 
+          ~(sub : Term.term) ~(show:occ_show)
         : simple_occ 
       =
       let vars, sigma = Term.refresh_vars vars in
       {so_cnt  = OC.subst_content sigma content;
-       so_coll = collision; (* variables bound above the occurrence 
-                               are not supposed to occur in coll *)
+       so_coll = OC.subst_content sigma collision; (* variables bound above the occurrence 
+                               can actually occur in coll. That happens
+                               eg for ind-cca, where we construct collisions 
+                               between two encryption randomnesses
+                               that may be under binders. *)
        so_ad   = OC.subst_data sigma data; 
        so_vars = vars;
        so_cond = List.map (Term.subst sigma) cond;
        so_occtype = subst_occtype sigma typ;
        so_subterm = sub; (* don't rename in sub, to keep it more readable *)
+       so_show = show;
       }
 
 
@@ -233,58 +243,61 @@ module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
       (* we don't care about the variables bound above being the same,
          as we rename *)
 
-      (* build a dummy term, which we use to match in one go many elements of
-         the two occurrences *)
-      (* TODO: there's no real reason to use boolean formulas,
-         rather than just terms *)
-      let mk_dummy (o : simple_occ) : Term.term =
-        let phi_f =
-          OC.collision_formula ~negate:false ~content:o.so_cnt
-            ~collision:o.so_coll ~data:o.so_ad in
-        (* usually when we use it there are no fv in coll,
-           but it should still work *)
-        let phi_ac = match o.so_occtype with
-          | EI_direct -> Term.mk_eq ~simpl:false Term.mk_false Term.mk_false
-          | EI_indirect a -> Term.mk_eq ~simpl:false a a
-        in
-        Term.mk_ands ~simpl:false [phi_f; phi_ac]
-      in
-      let pat2 = Term.{
-            pat_op_tyvars = [];
-            pat_op_vars   = Vars.Tag.local_vars o2.so_vars;
-            (* local information, since we allow to match diff operators *)
+      (* we check that the print flags are the same *)
+      if o1.so_show <> o2.so_show then None
+      else
+        begin
+          (* build a dummy term, which we use to match in one go many elements
+             of the two occurrences *)
+          (* TODO: there's no real reason to use boolean formulas,
+             rather than just terms *)
+          let mk_dummy (o : simple_occ) : Term.term =
+            let phi_f =
+              OC.collision_formula ~negate:false ~content:o.so_cnt
+                ~collision:o.so_coll ~data:o.so_ad in
+            let phi_ac = match o.so_occtype with
+              | EI_direct -> Term.mk_eq ~simpl:false Term.mk_false Term.mk_false
+              | EI_indirect a -> Term.mk_eq ~simpl:false a a
+            in
+            Term.mk_ands ~simpl:false [phi_f; phi_ac]
+          in
+          let pat2 = Term.{
+              pat_op_tyvars = [];
+              pat_op_vars   = Vars.Tag.local_vars o2.so_vars;
+              (* local information, since we allow to match diff operators *)
 
-            pat_op_term   = mk_dummy o2;
-                 }
-      in
+              pat_op_term   = mk_dummy o2;
+            }
+          in
 
-      let mv = pat_subsumes ~mv table system (mk_dummy o1) pat2 in
-      match mv with
-      | None -> None
-      | Some mv -> (* only the condition is left to check.
-                      we want cond1 => cond2 *)
-         (* start from the matching substitution [mv], and try to match all
-            conditions of [o1.so_conds] with a condition of
-            [o2.so_conds], updating [mv] along the way if successful. *)
-         let mv = ref mv in
+          let mv = pat_subsumes ~mv table system (mk_dummy o1) pat2 in
+          match mv with
+          | None -> None
+          | Some mv -> (* only the condition is left to check.
+                          we want cond1 => cond2 *)
+            (* start from the matching substitution [mv], and try to match all
+               conditions of [o1.so_conds] with a condition of
+               [o2.so_conds], updating [mv] along the way if successful. *)
+            let mv = ref mv in
 
-         let mk_cond2 cond2 = { pat2 with pat_op_term = cond2; } in
-         let b = (* construct the inst. of cond2 on the fly,
-                    so maybe we get the wrong one and
-                    conclude it's not included.
-                    still fine, that's an overapproximation *)
-           List.for_all (fun cond2 ->
-               List.exists (fun cond1 ->
-                   match
-                     pat_subsumes ~mv:(!mv) table system cond1 (mk_cond2 cond2)
-                   with
-                   | None -> false
-                   | Some mv' -> mv := mv'; true
-                 ) o1.so_cond
-             ) o2.so_cond
-         in
-         if b then Some !mv else None
-
+            let mk_cond2 cond2 = { pat2 with pat_op_term = cond2; } in
+            let b = (* construct the inst. of cond2 on the fly,
+                       so maybe we get the wrong one and
+                       conclude it's not included.
+                       still fine, that's an overapproximation *)
+              List.for_all (fun cond2 ->
+                  List.exists (fun cond1 ->
+                      match
+                        pat_subsumes ~mv:(!mv) table system
+                          cond1 (mk_cond2 cond2)
+                      with
+                      | None -> false
+                      | Some mv' -> mv := mv'; true
+                    ) o1.so_cond
+                ) o2.so_cond
+            in
+            if b then Some !mv else None
+        end
 
     (** Exported (see `.mli`) *)
     let occ_incl
@@ -296,14 +309,14 @@ module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
       match aux_occ_incl table system o1 o2 with
       | Some _ -> true
       | None -> false
-
+        
     
     (** Exported (see `.mli`) *)
     let clear_subsumed
-          (table : Symbols.table)
-          (system : SE.fset)
-          (occs : simple_occs) :
-          simple_occs =
+        (table : Symbols.table)
+        (system : SE.fset)
+        (occs : simple_occs) :
+      simple_occs =
       List.clear_subsumed (occ_incl table system) occs
 
 
@@ -311,19 +324,31 @@ module MakeSO (OC:OccContent) : (SimpleOcc with module OC = OC) =
         Prints a description of the occurrence. *)
     let pp_internal ppe (ppf:Format.formatter) (o:simple_occ) : unit =
       (* we don't print the data. maybe we would like to sometimes?*)
-      match o.so_occtype with
-      | EI_indirect a ->
+      match o.so_show, o.so_occtype with
+      | Hide, _ -> ()
+      | Show, EI_indirect a ->
          Fmt.pf ppf
            "@[%a@] @,(collision with @[%a@])@ in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
            (OC.pp_content ppe) o.so_cnt
            (OC.pp_content ppe) o.so_coll
            (Term._pp      ppe) a
            (Term._pp      ppe) o.so_subterm
-      | EI_direct ->
+      | ShowContentOnly, EI_indirect a ->
+         Fmt.pf ppf
+           "@[%a@] @,in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
+           (OC.pp_content ppe) o.so_cnt
+           (Term._pp      ppe) a
+           (Term._pp      ppe) o.so_subterm
+      | Show, EI_direct ->
          Fmt.pf ppf
            "@[%a@] @,(collision with @[%a@])@ @[<hov 2>in term@ @[%a@]@]"
            (OC.pp_content ppe) o.so_cnt
            (OC.pp_content ppe) o.so_coll
+           (Term._pp      ppe) o.so_subterm
+      | ShowContentOnly, EI_direct ->
+         Fmt.pf ppf
+           "@[%a@] @,@[<hov 2>in term@ @[%a@]@]"
+           (OC.pp_content ppe) o.so_cnt
            (Term._pp      ppe) o.so_subterm
 
     (** Exported (see `.mli`) *)
@@ -481,6 +506,7 @@ module MakeEO (SO:SimpleOcc) : (ExtOcc with module SO = SO) =
 
     (** Exported (see `.mli`) *)
     let pp_occs ppe (fmt:Format.formatter) (occs:ext_occs) : unit =
+      let occs = List.filter (fun o -> o.eo_occ.so_show <> Hide) occs in
       if occs = [] then
         Fmt.pf fmt "(no occurrences)@;"
       else
@@ -567,7 +593,8 @@ let get_actions_ext
          | Some t' -> get ~fv ~cond ~p ~se t'
          | None ->
             let ts =
-              (* we force on unfolding of the following macros, for a more precise rule *)
+              (* we force on unfolding of the following macros,
+                 for a more precise rule *)
               if m.s_symb = Symbols.inp     || 
                    m.s_symb = Symbols.q_inp   || 
                      m.s_symb = Symbols.q_state 
@@ -585,6 +612,7 @@ let get_actions_ext
                 ~cond:cond
                 ~typ:ot
                 ~sub:Term.mk_false (* unused *)
+                ~show:Hide
             in
             [occ] @ 
               List.concat_map (fun t ->
@@ -637,7 +665,7 @@ module type OccurrenceSearch = sig
 
   val find_all_occurrences :
     mode:Iter.allowed_constants ->
-    ?pp_ns:unit Fmt.t option ->
+    ?pp_descr:unit Fmt.t option ->
     f_fold_occs ->
     TraceHyps.hyps ->
     Constr.trace_cntxt ->
@@ -760,7 +788,7 @@ module MakeSearch (OC:OccContent) :
     let find_all_occurrences
           ~(mode        : Iter.allowed_constants)   (* allowed sub-terms
                                                        without further checks *)
-          ?(pp_ns       : unit Fmt.t option = None)
+          ?(pp_descr    : unit Fmt.t option = None)
           (get_bad_occs : f_fold_occs)
           (hyps         : TraceHyps.hyps)
           (contx        : Constr.trace_cntxt)
@@ -774,14 +802,18 @@ module MakeSearch (OC:OccContent) :
       let system = contx.system in
       let table = contx.table in
 
-      let ppp ppf = match pp_ns with
+      (* printer for the thing we're looking for *)
+      let ppp ppf = match pp_descr with
         | Some x -> Fmt.pf ppf "@[%a@] " x ()
         | None   -> Fmt.pf ppf ""
       in
 
-      (* TODO: we currently print info only on the name occurrences.
-         we could print some for the 'a, 'b ext_occs, would that be useful? *)
-      if pp_ns <> None then Printer.pr "@[<v 0>";
+      (* auxiliary function to keep only non-hidden occs (for printing) *)
+      let filter_show occs =
+        List.filter (fun o -> o.EO.eo_occ.so_show <> Hide) occs
+      in
+      
+      if pp_descr <> None then Printer.pr "@[<v 0>";
       (* direct occurrences *)
       let dir_occs =
         List.fold_left
@@ -799,11 +831,12 @@ module MakeSearch (OC:OccContent) :
             in
 
             (* printing *)
-            if pp_ns <> None && occs <> [] then
+            let showoccs = filter_show occs in
+            if pp_descr <> None && showoccs <> [] then
               Printer.pr "@[<hv 2>\
                           @[<hov 0>Direct @[%t@]@ in@ @[%a@]:@]\
                           @;@[%a@]@]@;@;@;"
-                ppp Term.pp t (EO.pp_occs ppe) occs;
+                ppp Term.pp t (EO.pp_occs ppe) showoccs;
             dir_occs @ occs)
           []
           sources
@@ -849,21 +882,22 @@ module MakeSearch (OC:OccContent) :
       in
 
       (* printing *)
-      if pp_ns <> None && ind_occs <> [] then
+      let showoccs = filter_show ind_occs in
+      if pp_descr <> None && showoccs <> [] then
         Printer.pr "@[<hv 2>@[Indirect @[%t@]@ in other actions:@]@;%a@]@;@;"
           ppp
-          (EO.pp_occs ppe) ind_occs;
+          (EO.pp_occs ppe) showoccs;
 
       (* remove subsumed occs *)
       let occs = dir_occs @ ind_occs in
-      let loccs = List.length occs in
+      let loccs = List.length (filter_show occs) in
 
       (* todo: this would need to change if the system depends on the occ *)
       let occs = EO.clear_subsumed table system occs in
-      let loccs' = List.length occs in
+      let loccs' = List.length (filter_show occs) in
       let lsub = loccs - loccs' in
 
-      if pp_ns <> None && loccs <> 0 then
+      if pp_descr <> None && loccs <> 0 then
         (Printer.pr
            "Total: @[<v 0>%d occurrence%s@;"
            loccs (if loccs = 1 then "" else "s");
@@ -873,7 +907,7 @@ module MakeSearch (OC:OccContent) :
          Printer.pr
            "%d occurrence%s remaining@;@]"
            loccs' (if loccs' = 1 then "" else "s"));
-      if pp_ns <> None then
+      if pp_descr <> None then
         Printer.pr "@;@]";
       occs
   end
@@ -1236,5 +1270,6 @@ let find_name_occ (n:Name.t) (ns:Name.t list) (info:pos_info)
         ~vars:info.pi_vars
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
-        ~sub:info.pi_subterm)
+        ~sub:info.pi_subterm
+        ~show:Show)
     (Name.find_name n ns)

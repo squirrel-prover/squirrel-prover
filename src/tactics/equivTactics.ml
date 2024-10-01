@@ -21,7 +21,6 @@ module TopHyps = Hyps
 module ES   = EquivSequent
 module Hyps = ES.Hyps
 
-module NO = NameOccs
 module O  = Occurrences
 module Name = O.Name
 

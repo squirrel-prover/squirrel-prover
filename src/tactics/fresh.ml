@@ -55,8 +55,8 @@ let get_bad_occs
       (t : Term.term) 
     : NOS.simple_occs
   =
-  (* handles a few cases, using [rec_call_on_subterm] for rec calls,
-     and calls [retry_on_subterm] for the rest *)
+  (* handles a few cases, using [rec_call] for rec calls,
+     and calls [retry] for the rest *)
   (* add variables from fv (ie bound above where we're looking)
      to env with const tag. *)
   let env =
@@ -91,7 +91,8 @@ let get_bad_occs
         ~vars:info.pi_vars
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
-        ~sub:info.pi_subterm) :: occs
+        ~sub:info.pi_subterm
+        ~show:Show) :: occs
 
   | _ -> retry ()
 
@@ -141,7 +142,7 @@ let phi_fresh_same_system
   let get_bad : NOS.f_fold_occs = get_bad_occs env n in
   
   let occs =
-    NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_ns:(Some pp_n)
+    NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_n)
       get_bad
       hyps contx env (tt @ n.args)
   in
@@ -215,7 +216,7 @@ let phi_fresh_proj
   (* project tt on proj *)
   let ttp = List.map (Term.project1 proj) tt in
   
-  (* project np on proj *)
+  (* project n on proj *)
   let np = O.expand_macro_check_all infop (Term.project1 proj n) in
   
   phi_fresh
@@ -370,8 +371,6 @@ let fresh_equiv
   in
   [freshness_sequent;
    ES.set_equiv_conclusion {terms=new_biframe; bound=None} s]
-(* why do I have to write the record by hand?
-   there should be a constructor *)
 
 
 

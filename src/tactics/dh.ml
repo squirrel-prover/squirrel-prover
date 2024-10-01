@@ -318,7 +318,7 @@ let cgdh
   in
 
   let occs =
-    NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_ns:(Some pp_nab)
+    NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_nab)
       get_bad
       (TS.get_trace_hyps s) contx env [t]
   in

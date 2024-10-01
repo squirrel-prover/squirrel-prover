@@ -172,7 +172,8 @@ let get_bad_occs
         ~vars:info.pi_vars
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
-        ~sub:info.pi_subterm 
+        ~sub:info.pi_subterm
+        ~show:Show
     in
     occ :: occs1
 
@@ -190,7 +191,8 @@ let get_bad_occs
         ~vars:info.pi_vars
         ~cond:info.pi_cond
         ~typ:info.pi_occtype
-        ~sub:info.pi_subterm ]
+        ~sub:info.pi_subterm
+        ~show:Show ] (* TODO do we actually want to print it? *)
 
   | _ -> retry ()
 
@@ -428,7 +430,7 @@ let phi_proj
 
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
-  let occs = IOS.find_all_occurrences ~mode:PTimeSI ~pp_ns:(Some pp_k)
+  let occs = IOS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_k)
       get_bad
       hyps contx_p env (cc_nprf_p :: m_p :: k_p.args @ frame_p)
   in

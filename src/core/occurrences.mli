@@ -109,6 +109,9 @@ type occ_type =
 (** Applies a substitution to an {!occ_type}. *)
 val subst_occtype : Term.subst -> occ_type -> occ_type
 
+(** Tag indicating whether an occurrence should be printed or not *)
+type occ_show = Show | Hide | ShowContentOnly
+
 (*------------------------------------------------------------------*)
 (** Signature of a module for simple occurrences.
     Contains an OccContent submodule, defining what types occurrences contain.
@@ -144,6 +147,7 @@ module type SimpleOcc = sig
      so_occtype : occ_type;    (** occurrence type *)
      so_subterm : Term.term;   (** a subterm where the occurrence
                                           was found (for printing) *)
+     so_show    : occ_show;    (** should we print that occurrence? *)
     }
 
 
@@ -156,7 +160,8 @@ module type SimpleOcc = sig
       and data that are bound above the occurrence. *)
   val mk_simple_occ :
     content:content -> collision:content -> data:data ->
-    vars:Vars.vars -> cond:Term.terms -> typ:occ_type -> sub:Term.term ->
+    vars:Vars.vars -> cond:Term.terms -> typ:occ_type ->
+    sub:Term.term -> show:occ_show ->
     simple_occ
 
   (*------------------------------------------------------------------*)
@@ -353,7 +358,7 @@ module type OccurrenceSearch = sig
   val find_all_occurrences :
     mode:Iter.allowed_constants -> (* allowed sub-terms 
                                       without further checks *)
-    ?pp_ns:unit Fmt.t option -> (* printing searched for occurrences *)
+    ?pp_descr:unit Fmt.t option -> (* prints what we're looking for *)
     f_fold_occs ->
     TraceHyps.hyps ->
     Constr.trace_cntxt ->
