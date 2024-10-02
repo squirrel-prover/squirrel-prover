@@ -585,7 +585,7 @@ let phi_cca_one_system
   (* First: in the frame + m + kargs + rargs.
      here, decryption is allowed (we are before the challenge ciphertext) *)
   let occs_krc = 
-    EOS.find_all_occurrences ~mode:Iter.PTimeSI ~pp_descr:(Some pp_kr)
+    EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:Allowed)
       hyps contx env
       (icp.ip_plain :: k.args @ r.args @ frame)
@@ -595,7 +595,7 @@ let phi_cca_one_system
      There, decryption with k is allowed ONLY on subterms that do not contain
      the name which stands for the challenge *)
   let occs_krc' =
-    EOS.find_all_occurrences ~mode:Iter.PTimeSI ~pp_descr:(Some pp_kr)
+    EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:(NotAbove icp.ip_cname))
       hyps contx env
       [icp.ip_context]
@@ -631,7 +631,7 @@ let phi_cca_one_system
 
   let occs_r =
     if icp.ip_pk = None then (* only in the symmetric case *)
-      ROS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_rand)
+      ROS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_rand)
         get_bad_randoms
         hyps contx env
         (icp.ip_context :: icp.ip_plain :: (Name.to_term k) :: r.args @ frame)
