@@ -18,11 +18,11 @@ type predicate_args = {
 }
 
 type predicate = {
-  name    : string;
-  ty_vars : Type.tvar list;
-  se_vars : (SE.Var.t * SE.Var.info list) list;
-  args    : predicate_args;
-  body    : predicate_body;
+  name      : string;
+  ty_params : Type.tvar list;
+  se_params : (SE.Var.t * SE.Var.info list) list;
+  args      : predicate_args;
+  body      : predicate_body;
 }
 
 type Symbols.data += Predicate of predicate
@@ -97,8 +97,8 @@ let _pp ppe fmt p =
 
   Fmt.pf fmt "@[<hov 2>@[<hov 2>predicate %a %a%a%a%a @]=@ @[%a@]@]"
     pp_pred_name       p.name
-    pp_tyvars          p.ty_vars
-    pp_sevars          p.se_vars
+    pp_tyvars          p.ty_params
+    pp_sevars          p.se_params
     pp_multi_args      p.args.multi
     pp_simple_args     p.args.simple
     (pp_pred_body ppe) p.body
@@ -107,8 +107,8 @@ let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
-let mk ~name ~ty_vars ~se_vars ~args ~body = 
-  { name; ty_vars; se_vars; args; body = body }
+let mk ~name ~ty_params ~se_params ~args ~body = 
+  { name; ty_params; se_params; args; body = body }
 
 let get (table : Symbols.table) (psymb : Symbols.predicate) : predicate =
   match Symbols.Predicate.get_data psymb table with
@@ -136,7 +136,7 @@ let can_unfold
         if SE.Var.equal v SE.Var.set then
           SE.equal_modulo table se context.set  
         else true
-      ) p.se_vars se_args
+      ) p.se_params se_args
   in
   let equiv_ok =
     List.for_all2 (fun (v,_) se ->
@@ -144,7 +144,7 @@ let can_unfold
           context.pair <> None &&
           SE.equal_modulo table se (oget context.pair :> SE.t)
         else true
-      ) p.se_vars se_args
+      ) p.se_params se_args
   in
   body_concrete && set_ok && equiv_ok
 
@@ -178,19 +178,19 @@ let unfold
       let ts = 
         List.fold_left2 (fun ts v ty ->
             Subst.add_tvar ts v ty 
-          ) Subst.empty_subst p.ty_vars ty_args 
+          ) Subst.empty_subst p.ty_params ty_args 
       in
       let body = Equiv.gsubst ts body in
 
       (* substitute system expression arguments *)
-      let se_s = 
-        List.fold_left2 (fun se_s (se_v,_) se_arg ->
+      let s = 
+        List.fold_left2 (fun s (se_v,_) se_arg ->
             (* no need to check [info] here, should have been
                already done *)
-            (se_v, se_arg) :: se_s
-          ) [] p.se_vars se_args 
+            Subst.add_se_var s se_v se_arg
+          ) Subst.empty_subst p.se_params se_args 
       in
-      let body = Equiv.se_subst se_s body in
+      let body = Equiv.gsubst s body in
 
       Some body
     end

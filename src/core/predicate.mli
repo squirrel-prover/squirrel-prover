@@ -18,11 +18,11 @@ type predicate_args = {
 }
 
 type predicate = private {
-  name    : string;
-  ty_vars : Type.tvar list;
-  se_vars : (SE.Var.t * SE.Var.info list) list;
-  args    : predicate_args;
-  body    : predicate_body;
+  name      : string;
+  ty_params : Type.tvar list;
+  se_params : (SE.Var.t * SE.Var.info list) list;
+  args      : predicate_args;
+  body      : predicate_body;
 }
 
 type Symbols.data += Predicate of predicate
@@ -35,8 +35,10 @@ val  pp_dbg : predicate formatter
 (*------------------------------------------------------------------*)
 val mk :
   name:string ->
-  ty_vars:Type.tvar list -> se_vars:(SE.Var.t * SE.Var.info list) list ->
-  args:predicate_args -> body:predicate_body ->
+  ty_params:Type.tvar list ->
+  se_params:(SE.Var.t * SE.Var.info list) list ->
+  args:predicate_args ->
+  body:predicate_body ->
   predicate
 
 val get : Symbols.table -> Symbols.predicate -> predicate

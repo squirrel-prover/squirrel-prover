@@ -482,30 +482,6 @@ let gsubst (ts : Subst.t) (t : form) =
   doit t
 
 (*------------------------------------------------------------------*)
-(** System variable substitutions *)
-
-let se_subst_pred_app (s : SE.subst) (pa : pred_app) : pred_app = {
-  psymb      = pa.psymb;
-  ty_args    = pa.ty_args;
-  se_args    = List.map (SE.subst s) pa.se_args;
-  multi_args =
-    List.map (fun (se,args) -> SE.subst s se, args) pa.multi_args;
-  simpl_args = pa.simpl_args;
-}
-
-let se_subst_atom (s : SE.subst) (at : atom) =
-  match at with
-  | Equiv _ | Reach _ -> at
-  | Pred pa -> Pred (se_subst_pred_app s pa)
-
-let se_subst (s : SE.subst) (t : form) =
-  let rec se_subst = function
-    | Atom at -> Atom (se_subst_atom s at)
-    | _ as term -> tmap se_subst term
-  in
-  se_subst t
-
-(*------------------------------------------------------------------*)
 (** {2 Pretty printing} *)
 
 let toplevel_prec = 0

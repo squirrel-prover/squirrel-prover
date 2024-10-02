@@ -120,13 +120,6 @@ external force0 : 'a expr    -> 'b expr = "%identity"
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
-type subst = (Var.t * t) list
-
-let subst (type a) (s : subst) (se : a expr) : a expr =
-  match se.cnt with
-  | Var v -> if List.mem_assoc v s then force (List.assoc v s) else se
-  | Any _ | List _ -> se
-
 (*------------------------------------------------------------------*)
 let subst_projs (s : (Projection.t * Projection.t) list) (t : 'a expr) : 'a expr =
   match t.cnt with
@@ -393,3 +386,25 @@ let single_systems_of_se (se : t) : Single.Set.t option =
     let set_fsets = List.map Stdlib.snd (to_list set) in
     some @@
     Single.Set.of_list set_fsets
+
+(*------------------------------------------------------------------*)
+(** Exported, see `.mli`. *)
+let check_se_subst (v : Var.t) (se : t) (se_infos : Var.info list) =
+  let error e =
+    `BadInst
+      (fun fmt ->
+         Fmt.pf fmt "@[<v 0>system variable substitution:@;\
+                    \  @[%a → %a@]@;\
+                     does not satisfy the system restrictions: %t@]"
+           Var.pp v pp se e)
+  in
+  let check1 (se_info : Var.info) =
+    match se_info with
+    | Var.Pair ->
+      if not (is_fset se && List.length (to_list se) = 2) then
+        Some (error (fun fmt -> Fmt.pf fmt "pair"))
+      else None
+  in
+  match List.find_map check1 se_infos with
+  | None     -> `Ok
+  | Some err -> err

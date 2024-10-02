@@ -121,8 +121,6 @@ val is_system_context_indep : form -> bool
 
 val subst       : Term.subst  -> form -> form
 val gsubst     : form Subst.substitution
-val se_subst    : SE.subst    -> form -> form
-(* TODO: subst: remove *)
 
 (** Substitute projections in [Equiv] or [Reach] atoms. *)
 val subst_projs :

@@ -213,7 +213,7 @@ let parse_namespace_cmd table (cmd : Decl.namespace_info) : Symbols.table =
 let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let name = L.unloc decl.pred_name in
 
-    let ty_vars = List.map (fun l ->
+    let ty_params = List.map (fun l ->
         Type.mk_tvar (L.unloc l)
       ) decl.pred_tyargs
     in
@@ -226,7 +226,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
           set  = var SE.Var.set;
           pair = Some (SE.to_pair (var SE.Var.pair)); }
       in
-      Env.init ~system ~table ~ty_vars ()
+      Env.init ~system ~table ~ty_vars:ty_params ()
     in
 
     (* parse the system variables declared and build the
@@ -311,13 +311,13 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let simpl_args = List.map (Subst.subst_var tsubst) simpl_args in
     let body = Predicate.gsubst_body tsubst body in
 
-    let se_vars =
+    let se_params =
       List.map (fun (_, (se_v,infos)) ->
           (se_v, infos)
         ) (Ms.bindings se_env)
     in
     let args = Predicate.{ multi = multi_args; simple = simpl_args; } in
-    let data = Predicate.mk ~name ~se_vars ~ty_vars ~args ~body in
+    let data = Predicate.mk ~name ~se_params ~ty_params ~args ~body in
 
     (* sanity checks on infix symbols *)
     let in_tys =

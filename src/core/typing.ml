@@ -1287,26 +1287,13 @@ let error_wrong_number_ty_args loc ~(expected : Type.ty list) ~(got : Type.ty li
   conv_err loc (Failure err_str)
 
 (*------------------------------------------------------------------*)
-let parse_se_subst
+let parse_pred_app_se_args
     (pred_loc : L.t) 
     (env      : Env.t)
-    (se_vars  : (SE.Var.t * SE.Var.info list) list)
+    (se_params  : (SE.Var.t * SE.Var.info list) list)
     (se_args  : SE.Parse.t list) 
-  : SE.subst 
+  : Subst.t 
   =
-  (** check that a system expression satisfies some properties *)
-  let check_se_info ~loc (se : SE.t) (se_infos : SE.Var.info list) : unit =
-    let check1 se_info =
-      match se_info with
-      | SE.Var.Pair ->
-        if not (SE.is_fset se &&
-                List.length (SE.to_list (SE.to_fset se)) = 2) then
-          conv_err loc (Failure "does not satisfies system restrictions: \
-                                 is not a pair");
-    in
-    List.iter check1 se_infos
-  in
-
   (* parse system arguments given as input *)
   let se_args =
     List.map (fun p_se -> L.loc p_se, SE.Parse.parse env.table p_se) se_args
@@ -1315,15 +1302,15 @@ let parse_se_subst
   (* implicit system arguments:
      complete input using [set] and [equiv] if necessary *)
   let se_args =
-    let len_se_vars = List.length se_vars in
-    let len_se_args = List.length se_args in
+    let len_se_params = List.length se_params in
+    let len_se_args   = List.length se_args   in
 
-    if len_se_vars = len_se_args then 
+    if len_se_params = len_se_args then 
       se_args
-    else if len_se_vars = len_se_args + 1 then 
+    else if len_se_params = len_se_args + 1 then 
       (L._dummy, env.system.set) :: 
       se_args
-    else if len_se_vars = len_se_args + 2 && env.system.pair <> None then 
+    else if len_se_params = len_se_args + 2 && env.system.pair <> None then 
       (L._dummy,                 env.system.set) :: 
       (L._dummy, (oget env.system.pair :> SE.t)) :: 
       se_args
@@ -1333,15 +1320,21 @@ let parse_se_subst
            (Fmt.str "not enough system arguments: \
                      expected %d (up-to -2 with implicits), \
                      got %d"
-              (List.length se_vars)
+              (List.length se_params)
               (List.length se_args)));
   in
 
-  List.map2 (fun (se_v, se_infos) (loc, se) ->
-      (* check that system argument restrictions are satisfied *)
-      check_se_info ~loc se se_infos;
-      (se_v, se)
-    ) se_vars se_args
+  (* check that system argument restrictions are satisfied *)
+  let check ~loc (se_v : SE.Var.t) (se : SE.t) (se_infos : SE.Var.info list) : unit =
+    match SE.check_se_subst se_v se se_infos with
+    | `Ok -> ()
+    | `BadInst err -> conv_err loc (Failure (Fmt.str "%t" err));
+  in
+  
+  List.fold_left2 (fun subst (se_v, se_infos) (loc, se) ->
+      check ~loc se_v se se_infos;
+      Subst.add_se_var subst se_v se
+    ) Subst.empty_subst se_params se_args
 
 
 (** Internal *)
@@ -1352,7 +1345,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   let pred = Predicate.get table psymb in
 
   (* refresh all type variables in [pred.ty_vars] and substitute *)
-  let ty_vars, ts = Infer.open_tvars st.ty_env pred.ty_vars in
+  let ty_vars, ts = Infer.open_tvars st.ty_env pred.ty_params in
   let pred_args_multi =
     List.map (fun (se, args) -> se, List.map (Subst.subst_var ts) args) pred.args.multi
   in
@@ -1377,14 +1370,15 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
         ty_vars ty_args;
     end;
 
- 
   (* substitute system expression variables by their arguments *)
   let se_subst = 
-    parse_se_subst loc st.env pred.Predicate.se_vars ppa.se_args 
+    parse_pred_app_se_args loc st.env pred.se_params ppa.se_args 
   in
-  let se_args = List.map snd se_subst in
+  let se_args =
+    List.map (fun (v,_info) -> Subst.subst_se_var se_subst v) pred.se_params
+  in
   let pred_args_multi =
-    List.map (fun (se, args) -> SE.subst se_subst se, args) pred_args_multi
+    List.map (fun (se, args) -> SE.gsubst se_subst se, args) pred_args_multi
   in
   
   (* parse arguments, complicated because we need to group them

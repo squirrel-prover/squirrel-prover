@@ -110,7 +110,7 @@ val hash : 'a expr -> int
 
 val pp : 'a expr formatter
 
-val equal0 :                  'a expr -> 'a expr -> bool
+val equal0 : 'a expr -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
 (** System expression denoting all possible systems:
@@ -150,13 +150,6 @@ val pp_error :
   Format.formatter -> error -> unit
 
 val error : ?loc:L.t -> error_i -> 'a
-
-(*------------------------------------------------------------------*)
-(** {2 Substitutions} *)
-
-type subst = (Var.t * t) list
-
-val subst : subst -> 'a expr -> 'a expr
 
 (*------------------------------------------------------------------*)
 (** {2 Conversions} *)
@@ -285,3 +278,9 @@ val single_systems_of_context : context -> Single.Set.t option
 
 (** Idem as [single_systems_of_context], but for a system expression. *)
 val single_systems_of_se : t -> Single.Set.t option
+
+(** check that a system expression substitution satisfies the
+    necessary constraints *)
+val check_se_subst :
+  Var.t -> t -> Var.info list ->
+  [`Ok | `BadInst of Format.formatter -> unit]
