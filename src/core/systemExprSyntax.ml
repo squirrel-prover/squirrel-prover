@@ -201,7 +201,7 @@ let to_arbitrary (type a) (x : a expr) : arbitrary = force x
 
 let to_compatible (type a) (se : a expr) : compatible =
   match se.cnt with
-  | Var _ | Any { compatible_with = None; } -> assert false
+  | Var _ | Any { compatible_with = None; } -> error Expected_compatible
   | Any { compatible_with = Some _; } | _ -> force se
 
 let to_fset (type a) (se : a expr) : fset =

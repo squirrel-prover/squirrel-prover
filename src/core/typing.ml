@@ -150,6 +150,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
+  | UndefInSystem        of string * SE.t
   | MissingSystem
   | BadProjInSubterm     of Projection.t list * Projection.t list
 
@@ -220,6 +221,10 @@ let pp_error_i ppf = function
   | ExplicitTSInProc ->
     Fmt.pf ppf "macros cannot be written at explicit \
                 timestamps in procedure"
+
+  | UndefInSystem (s, t) ->
+    Fmt.pf ppf "action %s not defined in system @[%a@]"
+      s SE.pp t
 
   | MissingSystem ->
     Fmt.pf ppf "missing system annotation"
@@ -586,9 +591,19 @@ let validate
        - type-checking mode
        - or if we are in a process declaration. *)
     if not (state.type_checking || in_proc) then
-      begin
+      begin 
         if Action.is_decl a table then
           conv_err loc (Failure "action is declared but un-defined");
+
+        let _, action = Action.get_def a table in
+        try
+          let system = SE.to_compatible state.env.system.set in
+          ignore (SE.action_to_term table system action : Term.term)
+        with
+        | Not_found
+        | SE.Error (_,Expected_compatible) ->
+          let loc = if in_proc then L._dummy else loc in
+          conv_err loc (UndefInSystem (action_name, state.env.system.set))
       end
 
   | Term.Macro (m,args,_t) ->

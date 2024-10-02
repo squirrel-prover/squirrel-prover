@@ -251,6 +251,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
+  | UndefInSystem        of string * SE.t
   | MissingSystem
   | BadProjInSubterm     of Projection.t list * Projection.t list
 

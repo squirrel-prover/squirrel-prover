@@ -605,94 +605,87 @@ let get_definition_nocntxt
     (asymb  : Symbols.action)
     (aidx   : Term.term list) : [ `Def of Term.term | `Undef ]
   =
-  let exception Failed in
-  let failed () = raise Failed in
-
   let init_or_generic ~init ~body =
     let var, t = body in
     let subst = Term.ESubst (Term.mk_var var, Term.mk_action asymb aidx) in
-    if asymb = Symbols.init_action then init else Term.subst [subst] t
+    `Def (if asymb = Symbols.init_action
+          then init
+          else Term.subst [subst] t)
   in
+  let action = Action.of_term asymb aidx table in
 
-  let doit () =
-    let action = Action.of_term asymb aidx table in
-    
-    (* we do not apply the substitution right away, as it may fail by
-       trying to substitute indices by non-variable terms. *)
-    let unapplied_descr, descr_subst =
-      try SE.descr_of_action table system action with
-      | Not_found -> failed ()
-      (* fails if the action is not defined in the current system 
-         (because it comes from another uncompatible system) *)
-    in
-    match Symbols.get_macro_data symb.s_symb table with
-    | General data ->
-      begin
-        match get_general_macro_data data with
-        (* TODO: quantum: allow arguments in generic structured macros *)
-        | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
-        | ProtocolMacro `Output -> 
-          Term.subst descr_subst (snd unapplied_descr.output)
-        | ProtocolMacro `Cond ->
-          Term.subst descr_subst (snd unapplied_descr.condition)
-      end
+  (* we do not apply the substitution right away, as it may fail by
+     trying to substitute indices by non-variable terms. *)
+  let unapplied_descr, descr_subst =
+    SE.descr_of_action table system action
+  in
+  match Symbols.get_macro_data symb.s_symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      (* TODO: quantum: allow arguments in generic structured macros *)
+      | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
+      | ProtocolMacro `Output -> 
+        `Def (Term.subst descr_subst (snd unapplied_descr.output))
+      | ProtocolMacro `Cond ->
+        `Def (Term.subst descr_subst (snd unapplied_descr.condition))
+    end
 
-    | State _ ->
-      begin try
-          (* Look for an update of the state macro [name] in the updates
-             of [action]; we rely on the fact that [action] can only contain
-             a single update for each state macro symbol *)
-          let (ns_args, msg) : Term.terms * Term.term =
-            let _, ns_args, msg =
-              List.find (fun (ns,ns_args,_) ->
-                  ns = symb.s_symb &&
-                  List.length ns_args = List.length args
-                ) unapplied_descr.updates
-            in
-            List.map (Term.subst descr_subst) ns_args, Term.subst descr_subst msg
+  | State _ ->
+    `Def begin
+      try
+        (* Look for an update of the state macro [name] in the updates
+           of [action]; we rely on the fact that [action] can only contain
+           a single update for each state macro symbol *)
+        let (ns_args, msg) : Term.terms * Term.term =
+          let _, ns_args, msg =
+            List.find (fun (ns,ns_args,_) ->
+                ns = symb.s_symb &&
+                List.length ns_args = List.length args
+              ) unapplied_descr.updates
           in
+          List.map (Term.subst descr_subst) ns_args, Term.subst descr_subst msg
+        in
 
-          (* Init case: we substitute the indices by their definition. *)
-          if asymb = Symbols.init_action then
-            let s = List.map2 (fun i1 i2 ->
-                match i1 with
-                | Term.Var _ -> Term.ESubst (i1, i2)
-                | _ -> assert false
-                (* impossible for well-formed action description for init *)
-              ) ns_args args
-            in
-            Term.subst s msg
+        (* Init case: we substitute the indices by their definition. *)
+        if asymb = Symbols.init_action then
+          let s = List.map2 (fun i1 i2 ->
+              match i1 with
+              | Term.Var _ -> Term.ESubst (i1, i2)
+              | _ -> assert false
+              (* impossible for well-formed action description for init *)
+            ) ns_args args
+          in
+          Term.subst s msg
 
-          (* If indices [args] of the macro we want to expand
-             are equal to indices [ns_args] corresponding to this macro
-             in the action description, then the macro is expanded as defined
-             by the update term. *)
-          else if List.for_all2 Term.equal args ns_args then
-            msg
+        (* If indices [args] of the macro we want to expand
+           are equal to indices [ns_args] corresponding to this macro
+           in the action description, then the macro is expanded as defined
+           by the update term. *)
+        else if List.for_all2 Term.equal args ns_args then
+          msg
 
-          (* Otherwise, we need to take into account the possibility that
-             [arg] and [ns_args] might be equal, and generate a conditional.  *)
-          else
+        (* Otherwise, we need to take into account the possibility that
+           [arg] and [ns_args] might be equal, and generate a conditional.  *)
+        else
+          let def =
             Term.mk_ite
               (Term.mk_eqs ~simpl:true args ns_args)
               msg
-              (Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx)))
-              
-        with Not_found ->
-          Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))
-      end
+              (Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))) 
+          in
+          def
+      with Not_found ->
+        Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))
+    end
 
-    | Global (_,_,gdata) ->
-      let {action = (strict, glob_a)} as gdata = get_global_data gdata in
-      if is_prefix strict glob_a (Action.get_shape action)
-      then
-        get_def_glob 
-          ~allow_dummy:false system table
-          symb ~args  action gdata
-      else failed ()
-  in
-  try `Def (doit ()) with Failed -> `Undef
-    
+  | Global (_,_,gdata) ->
+    let {action = (strict, glob_a)} as gdata = get_global_data gdata in
+    if is_prefix strict glob_a (Action.get_shape action)
+    then `Def (get_def_glob ~allow_dummy:false system table
+                 symb ~args action gdata)
+    else `Undef
+
 (*------------------------------------------------------------------*)
 type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 

@@ -246,4 +246,10 @@ let includes =
            | Symbols.(Error (_, Multiple_declarations _)) ->
              raise Ok)
     end ;
+    "Undefined Action", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/bad-actions.sp" with
+             Typing.Error (_, UndefInSystem _) -> raise Ok)
+    end ;
   ]
