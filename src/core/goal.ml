@@ -248,10 +248,10 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
     Tactics.hard_failure (Failure "some types could not be inferred");
 
   (* close the typing environment and substitute *)
-  let tsubst = Infer.close ty_env in
+  let subst = Infer.close ty_env in
 
-  let formula = Equiv.Any_statement.tsubst tsubst formula in
-  let goal = map (TS.tsubst tsubst) (ES.tsubst tsubst) goal in
+  let formula = Equiv.Any_statement.gsubst subst formula in
+  let goal = map (TS.gsubst subst) (ES.gsubst subst) goal in
 
   { name; system; ty_vars; formula },
   goal

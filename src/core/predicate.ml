@@ -33,10 +33,10 @@ let subst_body (subst : Term.subst) (b : predicate_body) : predicate_body =
   | Abstract -> Abstract
   | Concrete c -> Concrete (Equiv.subst subst c)
 
-let tsubst_body (subst : Subst.t) (b : predicate_body) : predicate_body =
+let gsubst_body (subst : Subst.t) (b : predicate_body) : predicate_body =
   match b with
   | Abstract -> Abstract
-  | Concrete c -> Concrete (Equiv.tsubst subst c)
+  | Concrete c -> Concrete (Equiv.gsubst subst c)
 
 (*------------------------------------------------------------------*)
 (** Refresh all variables in the predicate [p]. *)
@@ -180,7 +180,7 @@ let unfold
             Subst.add_tvar ts v ty 
           ) Subst.empty_subst p.ty_vars ty_args 
       in
-      let body = Equiv.tsubst ts body in
+      let body = Equiv.gsubst ts body in
 
       (* substitute system expression arguments *)
       let se_s = 

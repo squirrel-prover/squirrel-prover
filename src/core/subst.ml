@@ -1,9 +1,14 @@
+(*------------------------------------------------------------------*)
+module SE = SystemExprSyntax
+
+module Msv = SE.Var.M
 module Mid = Ident.Mid
 
-(*------------------------------------------------------------------*)             
+(*------------------------------------------------------------------*)
 type t = {
-  univars : Type.ty Ident.Mid.t;
-  tvars   : Type.ty Ident.Mid.t;
+  univars : Type.ty Mid.t; (** type unification variables *)
+  tvars   : Type.ty Mid.t; (** type variables *)
+  se_vars : SE.t    Msv.t; (** system expression variables *)  
 }
 
 type 'a substitution = t -> 'a -> 'a
@@ -22,15 +27,22 @@ let pp_subst fmt ts =
 
 let empty_subst =
   { univars = Mid.empty;
-    tvars   = Mid.empty; }
+    tvars   = Mid.empty;
+    se_vars = Msv.empty; }
 
-let mk_subst ~(tvars:Type.ty Mid.t) ~(univars:Type.ty Mid.t) : t =
-  { univars;
-    tvars; }
+let mk_subst
+    ?(tvars   : Type.ty Mid.t = Mid.empty)
+    ?(univars : Type.ty Mid.t = Mid.empty)
+    (* ?(se_vars : SE.t    Msv.t = Msv.empty) *)
+    ()
+  : t
+  =
+  { univars; tvars; se_vars = Msv.empty; }
 
 (*------------------------------------------------------------------*)
-let add_tvar   s tv ty = { s with tvars   = Mid.add tv ty s.tvars; }
+let add_tvar   s tv ty = { s with tvars   = Mid.add tv ty s.tvars;   }
 let add_univar s tu ty = { s with univars = Mid.add tu ty s.univars; }
+(* let add_se_var s x  se = { s with se_vars = Msv.add x  se s.se_vars; } *)
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution functions} *)
@@ -55,7 +67,7 @@ let subst_var (s : t) (v : Vars.var) : Vars.var =
   Vars.mk v.id (subst_ty s v.ty)
 
 (*------------------------------------------------------------------*)
-let subst_ftype (ts : t) (fty : Type.ftype) : Type.ftype = 
+let subst_ftype (ts : t) (fty : Type.ftype) : Type.ftype =
   Type.{
     fty_vars = fty.fty_vars;              (* bound type variable *)
     fty_args = List.map (subst_ty ts) fty.fty_args;

@@ -134,25 +134,25 @@ let subst (ts : Term.subst) proc =
 
 (*------------------------------------------------------------------*)
 (** Type variable substitution *)
-let tsubst (ts : Subst.t) proc =
+let gsubst (ts : Subst.t) proc =
   let rec doit p =
     match p with
     | New (v, ty, p) -> New (Subst.subst_var ts v, Subst.subst_ty ts ty, doit p)
     | In  (c, v , p) -> In  (c, Subst.subst_var ts v, doit p)
-    | Out (c, t , p) -> Out (c, Term.tsubst ts t, doit p)
+    | Out (c, t , p) -> Out (c, Term.gsubst ts t, doit p)
 
     | Set (m, args, t, p) ->
-      Set (m, List.map (Term.tsubst ts) args, Term.tsubst ts t, doit p)
+      Set (m, List.map (Term.gsubst ts) args, Term.gsubst ts t, doit p)
 
     | Let (v, t, ty, p) ->
-      Let (Subst.subst_var ts v, Term.tsubst ts t,Subst.subst_ty ts ty, doit p)
+      Let (Subst.subst_var ts v, Term.gsubst ts t,Subst.subst_ty ts ty, doit p)
 
     | Repl (vs, p) -> Repl (Subst.subst_var ts vs, doit p)
 
     | Exists (vs, t, p1, p2) ->
-      Exists (List.map (Subst.subst_var ts) vs, Term.tsubst ts t, doit p1, doit p2)
+      Exists (List.map (Subst.subst_var ts) vs, Term.gsubst ts t, doit p1, doit p2)
 
-    | Apply (id,args) -> Apply (id, List.map (Term.tsubst ts) args) 
+    | Apply (id,args) -> Apply (id, List.map (Term.gsubst ts) args) 
     | Alias _ | Null | Parallel _ -> tmap doit p
   in
   doit proc
@@ -569,9 +569,9 @@ let parse
     error ~loc:(L.loc process) Freetyunivar;
 
   (* close the typing environment and substitute *)
-  let tysubst = Infer.close ty_env in
-  let args = List.map (Subst.subst_var tysubst) args in
-  let proc = tsubst tysubst proc in
+  let subst = Infer.close ty_env in
+  let args = List.map (Subst.subst_var subst) args in
+  let proc = gsubst subst proc in
 
   { args; projs; time; proc; }
 

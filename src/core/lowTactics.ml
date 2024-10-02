@@ -111,8 +111,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let subst_conc = Equiv.Babel.subst S.conc_kind
     let subst_hyp  = Equiv.Babel.subst S.hyp_kind
 
-    let tsubst_conc = Equiv.Babel.tsubst S.conc_kind
-    let tsubst_hyp  = Equiv.Babel.tsubst S.hyp_kind
+    let gsubst_conc = Equiv.Babel.gsubst S.conc_kind
+    let gsubst_hyp  = Equiv.Babel.gsubst S.hyp_kind
 
     let terms_of_conc = Equiv.Babel.get_terms S.conc_kind
     let terms_of_hyp  = Equiv.Babel.get_terms S.hyp_kind
@@ -1771,7 +1771,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let tsubst, opat = Pattern.open_pat S.conc_kind ty_env pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let opat =  {opat with pat_op_term = pat_concl} in
-    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
+    let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
    
     (* Try to apply [pat] to [conclusion] by matching [pat] with [conclusion].
        In case of failure, try to destruct [pat] into a product [lhs -> rhs],
@@ -1869,7 +1869,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | Match mv -> 
         Match.Mvar.check_args_inferred pat mv;
         
-        let tsubst = Infer.close ty_env in
+        let gsubst = Infer.close ty_env in
         let subst =
           let pat_env = Vars.add_vars pat.pat_op_vars (S.vars s) in
           match Match.Mvar.to_subst ~mode:`Match table pat_env mv with
@@ -1877,9 +1877,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
           | `BadInst pp_err ->
             soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
         in
-        let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
+        let subgs_pat = List.map (Equiv.Any.gsubst gsubst -| Equiv.Any.subst subst) subgs_pat in
         let goals =
-          List.map (S.tsubst_conc tsubst -| S.subst_conc subst) (List.rev subs) 
+          List.map (S.gsubst_conc gsubst -| S.subst_conc subst) (List.rev subs) 
         in
 
         (* discharge subgoals (i.e. creates judgements from subgoals) *)
@@ -1921,7 +1921,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* open an type unification environment *)
     let ty_env = Infer.mk_env () in
     let tsubst, pat = Pattern.open_pat S.hyp_kind ty_env pat in
-    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
+    let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let formula, bound = pat.pat_op_term in
     let pat, _ =
       {pat with pat_op_term = formula}, {pat with pat_op_term = bound}
@@ -1997,9 +1997,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       
       (* instantiate the inferred variables everywhere *)
-      let fprems_other = List.map (S.tsubst_hyp tsubst -| S.subst_hyp subst) fsubgoals in
-      let fconcl = S.tsubst_hyp tsubst (S.subst_hyp subst fconcl) in
-      let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
+      let fprems_other = List.map (S.gsubst_hyp tsubst -| S.subst_hyp subst) fsubgoals in
+      let fconcl = S.gsubst_hyp tsubst (S.subst_hyp subst fconcl) in
+      let subgs_pat = List.map (Equiv.Any.gsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
 
       let goal1 =
         let s = Hyps.remove hyp s in
@@ -2391,7 +2391,7 @@ type form_type =
     let ty_env = Infer.mk_env () in
     let tsubst, opat = Pattern.open_pat S.hyp_kind ty_env pat in
     let pat_concl, pat_bound = opat.pat_op_term in
-    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
+    let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
     let current_bound =
       oget_exn ~exn:(soft_failure_arg (Failure "Not a concrete goal t")) (get_bound s)
@@ -2414,9 +2414,9 @@ type form_type =
         | `BadInst pp_err ->
           soft_failure (Failure (Fmt.str "@[<hv 2>weakening failed:@ @[%t@]@]" pp_err))
       in
-      let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
+      let subgs_pat = List.map (Equiv.Any.gsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
       let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
-      let new_bound = (Term.tsubst tsubst -| Term.subst subst) new_bound in
+      let new_bound = (Term.gsubst tsubst -| Term.subst subst) new_bound in
       (set_bound new_bound s |> S.to_general_sequent) :: subgs_pat
 
   let weak_pt_in ~loc
@@ -2433,7 +2433,7 @@ type form_type =
     let ty_env = Infer.mk_env () in
     let tsubst, opat = Pattern.open_pat S.hyp_kind ty_env pat in
     let pat_concl, pat_bound = opat.pat_op_term in
-    let subgs_pat = List.map (Equiv.Any.tsubst tsubst) subgs_pat in
+    let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
     let h = Hyps.by_id_k hyp Hyp s in
     let h : Equiv.form = match S.hyp_kind with
@@ -2466,9 +2466,9 @@ type form_type =
         | `BadInst pp_err ->
           soft_failure (Failure (Fmt.str "@[<hv 2>weaking failed:@ @[%t@]@]" pp_err))
       in
-      let subgs_pat = List.map (Equiv.Any.tsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
+      let subgs_pat = List.map (Equiv.Any.gsubst tsubst -| Equiv.Any.subst subst) subgs_pat in
       let subgs_pat = List.map ((^~) (pt_discharge_subgoal ~loc) s) subgs_pat in
-      let new_bound = (Term.tsubst tsubst -| Term.subst subst) new_bound in
+      let new_bound = (Term.gsubst tsubst -| Term.subst subst) new_bound in
       let new_h = global_set_bound new_bound h in
       let new_h : Hyps.ldecl_cnt = match S.hyp_kind with
         | Any_t -> LHyp (Global new_h)

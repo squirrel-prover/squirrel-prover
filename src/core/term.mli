@@ -261,8 +261,11 @@ val subst_var : subst -> Vars.var -> Vars.var
 val subst_vars : subst -> Vars.vars -> Vars.vars
 
 (*------------------------------------------------------------------*)
-(** substitute using a [Subst.t] *)
-val tsubst : Subst.t -> term -> term
+(** general substitution *)
+
+val gsubst : term Subst.substitution
+
+val gsubst_applied_ftype : applied_ftype Subst.substitution
 
 (*------------------------------------------------------------------*)
 

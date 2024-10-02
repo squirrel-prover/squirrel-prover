@@ -12,8 +12,13 @@ module Msv = SE.Var.M
     Unification variables must be created through the [mk_ty_univar]
     and [mk_se_univar] functions below. *)
 type env0 = {
-  ty : Type.ty        Mid.t;      (** for type unification variables *)
-  se : < > SE.exposed Msv.t;      (** for system variables *)
+  ty : Type.ty        Mid.t;
+  (** for type unification variables *)
+
+  se : < > SE.exposed Msv.t;
+  (** for system variables
+      (we use the exposed type to be able to easily inspect the
+      expressions) *)
 }
 
 type env = env0 ref
@@ -68,7 +73,7 @@ let open_tvars (env : env) (tvars : Type.tvars) =
         Mid.add (id :> Ident.t) (Type.univar id_f) ts_tvar
       ) Mid.empty tvars vars_f
   in  
-  let ts = Subst.mk_subst ~univars:Mid.empty ~tvars:ts_tvar in
+  let ts = Subst.mk_subst ~univars:Mid.empty ~tvars:ts_tvar () in
   vars_f, ts
 
 (*------------------------------------------------------------------*)
@@ -139,7 +144,7 @@ let is_closed (env : env) : bool =
 (*------------------------------------------------------------------*)
 let close (env : env) : Subst.t =
   assert (is_closed env);
-  Subst.mk_subst ~tvars:Mid.empty ~univars:!env.ty
+  Subst.mk_subst ~tvars:Mid.empty ~univars:!env.ty ()
 
 (*------------------------------------------------------------------*)
 (** Generalize unification variables and close the unienv. *)
@@ -168,7 +173,7 @@ let gen_and_close (env : env) : Type.tvars * Subst.t =
   let gen_tvars, univars = 
     Mid.fold (fun _ ty acc -> gen acc ty) !env.ty ([], Mid.empty)
   in
-  let ts = Subst.mk_subst ~univars ~tvars:Mid.empty in
+  let ts = Subst.mk_subst ~univars () in
   env := { !env with ty = Mid.map (Subst.subst_ty ts) !env.ty; };
 
   (* close the resulting environment *)

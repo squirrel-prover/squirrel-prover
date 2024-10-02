@@ -454,20 +454,20 @@ let subst subst s =
       s 
 
 (*------------------------------------------------------------------*)
-let tsubst (tsubst : Subst.t) s =
-  if tsubst == Subst.empty_subst then s else
-    let vars = Vars.map (fun v t -> Subst.subst_var tsubst v, t) s.env.vars in
+let gsubst (subst : Subst.t) s =
+  if subst == Subst.empty_subst then s else
+    let vars = Vars.map (fun v t -> Subst.subst_var subst v, t) s.env.vars in
     let proof_context = 
       H.map
-        ~hyp:(Equiv.Any.tsubst tsubst)
-        ~def:(fun (se,t) -> se, Term.tsubst tsubst t) 
+        ~hyp:(Equiv.Any.gsubst subst)
+        ~def:(fun (se,t) -> se, Term.gsubst subst t) 
         s.proof_context
     in
     S.update
       ~env:(Env.update ~vars s.env)
       ~proof_context
-      ?bound:(omap (Term.tsubst tsubst) s.bound)
-      ~conclusion:(Term.tsubst tsubst s.conclusion)
+      ?bound:(omap (Term.gsubst subst) s.bound)
+      ~conclusion:(Term.gsubst subst s.conclusion)
       s 
 
 (*------------------------------------------------------------------*)      

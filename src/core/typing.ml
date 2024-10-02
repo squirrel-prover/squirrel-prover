@@ -1564,7 +1564,7 @@ let convert
         conv_err (L.loc tm) Freetyunivar;
 
       let tysubst = Infer.close ty_env in
-      Term.tsubst tysubst t, Subst.subst_ty tysubst ty
+      Term.gsubst tysubst t, Subst.subst_ty tysubst ty
     end
   else
     t, Infer.norm_ty ty_env ty
@@ -1594,7 +1594,7 @@ let convert_global_formula
         conv_err (L.loc p) Freetyunivar;
 
       let tysubst = Infer.close ty_env in
-      Equiv.tsubst tysubst t
+      Equiv.gsubst tysubst t
     end
   else
     t

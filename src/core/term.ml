@@ -1907,37 +1907,37 @@ end
 include Smart
 
 
-let tsubst_applied_ftype (ts : Subst.t) { fty; ty_args;} =
+let gsubst_applied_ftype (ts : Subst.t) { fty; ty_args;} =
   { fty     = Subst.subst_ftype ts fty; 
     ty_args = List.map (Subst.subst_ty ts) ty_args; }
 
-let tsubst (ts : Subst.t) (t : term) : term =
-  let rec tsubst : term -> term = function
+let gsubst (ts : Subst.t) (t : term) : term =
+  let rec doit : term -> term = function
     | Var v -> Var (Subst.subst_var ts v)
 
     | Fun (fn, fty_app) -> 
-      Fun (fn, tsubst_applied_ftype ts fty_app)
+      Fun (fn, gsubst_applied_ftype ts fty_app)
 
     | Name (n,args) -> 
       Name ({ n with s_typ = Subst.subst_ty ts n.s_typ}, 
-            List.map tsubst args)
+            List.map doit args)
 
     | Macro (m,args,arg) -> Macro ({ m with s_typ = Subst.subst_ty ts m.s_typ}, 
-                                   List.map tsubst args,
-                                   tsubst arg)
+                                   List.map doit args,
+                                   doit arg)
 
-    | Quant (q, vs, f) -> Quant (q, List.map (Subst.subst_var ts) vs, tsubst f)
+    | Quant (q, vs, f) -> Quant (q, List.map (Subst.subst_var ts) vs, doit f)
 
     | Find (vs, a,b,c) ->
-      Find (List.map (Subst.subst_var ts) vs, tsubst a, tsubst b, tsubst c)
+      Find (List.map (Subst.subst_var ts) vs, doit a, doit b, doit c)
 
-    | Let (v, t1, t2) -> Let (Subst.subst_var ts v, tsubst t1, tsubst t2)
+    | Let (v, t1, t2) -> Let (Subst.subst_var ts v, doit t1, doit t2)
                            
     | App (_, _) | Action (_, _)  | Tuple _ | Proj (_, _) | Diff _ as term ->
-      tmap (fun t -> tsubst t) term
+      tmap (fun t -> doit t) term
   in
 
-  tsubst t
+  doit t
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

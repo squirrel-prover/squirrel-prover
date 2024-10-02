@@ -131,7 +131,7 @@ module type S = sig
   val subst : Term.subst -> t -> t
 
   (** Same but for a type substitution. *)
-  val tsubst : Subst.t -> t -> t
+  val gsubst : t Subst.substitution
 
   (** [rename u v s] returns the sequent [s] where
       free variable u is replaced with v *)

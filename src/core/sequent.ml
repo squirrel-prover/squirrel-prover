@@ -749,7 +749,7 @@ module Mk (Args : MkArgs) : S with
             ty_vars ty_args;
         end;
       
-      let form = Equiv.Babel_statement.tsubst Equiv.Any_s tsubst lem.formula in
+      let form = Equiv.Babel_statement.gsubst Equiv.Any_s tsubst lem.formula in
       if Equiv.is_local_statement form
       then
         (* a local lemma or axiom is actually a global reachability formula *)
@@ -1264,8 +1264,8 @@ module Mk (Args : MkArgs) : S with
 
     (* close the unienv and generalize remaining univars *)
     let pat_tyvars, tysubst = Infer.gen_and_close ty_env in
-    let form = Equiv.Babel.tsubst Equiv.Any_t tysubst pt.form in
-    let subgs = List.map (Equiv.Babel.tsubst Equiv.Any_t tysubst) pt.subgs in
+    let form = Equiv.Babel.gsubst Equiv.Any_t tysubst pt.form in
+    let subgs = List.map (Equiv.Babel.gsubst Equiv.Any_t tysubst) pt.subgs in
     let args =
       List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args in
 

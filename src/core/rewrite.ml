@@ -122,7 +122,7 @@ let mk_state
 
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f) |>
-    Term.tsubst tsubst
+    Term.gsubst tsubst
   in
 
   let init_pat : Term.term Term.pat_op = { 
@@ -235,7 +235,7 @@ let rw_inst
           let tsubst = Infer.close s.ty_env in
 
           (* Substitute [mv] and [tsubst] *)
-          let do_subst t = Term.tsubst tsubst (Term.subst subst t) in
+          let do_subst t = Term.gsubst tsubst (Term.subst subst t) in
           
           let left = do_subst pat_proj.pat_op_term in
           let right = 

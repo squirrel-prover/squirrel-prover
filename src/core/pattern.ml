@@ -10,8 +10,8 @@ let open_pat (type a )
   =
   let univars, tsubst = Infer.open_tvars ty_env p.pat_tyvars in
   let conclusion,bound = p.pat_term in
-  let conclusion = Equiv.Babel.tsubst f_kind tsubst conclusion in
-  let bound = C.bound_tsubst tsubst bound in
+  let conclusion = Equiv.Babel.gsubst f_kind tsubst conclusion in
+  let bound = C.bound_gsubst tsubst bound in
   let vars = List.map (fun (v,t) -> Subst.subst_var tsubst v, t) p.pat_vars in
   ( tsubst,
     Term.{ 

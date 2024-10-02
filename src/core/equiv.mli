@@ -120,8 +120,9 @@ val is_system_context_indep : form -> bool
 (** {2 Substitutions} *)
 
 val subst       : Term.subst  -> form -> form
-val tsubst      : Subst.t -> form -> form
+val gsubst     : form Subst.substitution
 val se_subst    : SE.subst    -> form -> form
+(* TODO: subst: remove *)
 
 (** Substitute projections in [Equiv] or [Reach] atoms. *)
 val subst_projs :
@@ -171,8 +172,8 @@ module Any : sig
 
   val equal : t -> t -> bool
 
-  val subst  : Term.subst  -> t -> t
-  val tsubst : Subst.t -> t -> t
+  val subst  : Term.subst -> t -> t
+  val gsubst : t Subst.substitution
 
   val fv    : t -> Vars.Sv.t
   val ty_fv : t -> Type.Fv.t
@@ -196,7 +197,7 @@ module Babel : sig
   val convert : ?loc:Location.t -> src:'a f_kind -> dst:'b f_kind -> 'a -> 'b
 
   val subst  : 'a f_kind -> Term.subst  -> 'a -> 'a
-  val tsubst : 'a f_kind -> Subst.t -> 'a -> 'a
+  val gsubst : 'a f_kind -> 'a Subst.substitution
 
   val subst_projs : 
     'a f_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> 'a -> 'a
@@ -253,7 +254,7 @@ module Any_statement : sig
   val equal : t -> t -> bool
 
   val subst  : Term.subst  -> t -> t
-  val tsubst : Subst.t -> t -> t
+  val gsubst : t Subst.substitution
 
   val fv    : t -> Vars.Sv.t
   val ty_fv : t -> Type.Fv.t
@@ -275,7 +276,7 @@ module Babel_statement : sig
   val convert : ?loc:Location.t -> src:'a s_kind -> dst:'b s_kind -> 'a -> 'b
 
   val subst  : 'a s_kind -> Term.subst  -> 'a -> 'a
-  val tsubst : 'a s_kind -> Subst.t -> 'a -> 'a
+  val gsubst : 'a s_kind -> 'a Subst.substitution
 
   val subst_projs :
     'a s_kind -> [`Equiv | `Reach] -> (Projection.t * Projection.t) list -> 'a -> 'a

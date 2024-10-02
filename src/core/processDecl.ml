@@ -86,7 +86,7 @@ let parse_state_decl
 
   (* close the typing environment and substitute *)
   let tsubst = Infer.close ty_env in
-  let t = Term.tsubst tsubst t in
+  let t = Term.gsubst tsubst t in
   let args = List.map (Subst.subst_var tsubst) args in
 
   (* FIXME: generalize allowed types *)
@@ -162,7 +162,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
         decl.op_name decl.op_symb_type
 
     | `Concrete body ->         (* concrete declaration *)
-      let body = Term.tsubst tsubst body in
+      let body = Term.gsubst tsubst body in
 
       if not (HighTerm.is_deterministic env body) then
         error (L.loc decl.op_name) KDecl NonDetOp;
@@ -309,7 +309,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
         ) multi_args
     in
     let simpl_args = List.map (Subst.subst_var tsubst) simpl_args in
-    let body = Predicate.tsubst_body tsubst body in
+    let body = Predicate.gsubst_body tsubst body in
 
     let se_vars =
       List.map (fun (_, (se_v,infos)) ->

@@ -62,24 +62,24 @@ let find table (name : Symbols.p_path) : game =
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let tsubst_var_decl (ts : Subst.t) (gv : var_decl) : var_decl =
-  { var = Subst.subst_var ts gv.var; init = Term.tsubst ts gv.init; }
+let gsubst_var_decl (s : Subst.t) (gv : var_decl) : var_decl =
+  { var = Subst.subst_var s gv.var; init = Term.gsubst s gv.init; }
 
-let tsubst_oracle (ts : Subst.t) (o : oracle) : oracle =
+let gsubst_oracle (s : Subst.t) (o : oracle) : oracle =
   { name      = o.name;
-    args      = List.map (Subst.subst_var     ts) o.args;
-    loc_smpls = List.map (Subst.subst_var     ts) o.loc_smpls;
-    loc_vars  = List.map (tsubst_var_decl ts) o.loc_vars;
+    args      = List.map (Subst.subst_var s) o.args;
+    loc_smpls = List.map (Subst.subst_var s) o.loc_smpls;
+    loc_vars  = List.map (gsubst_var_decl s) o.loc_vars;
     updates   = 
-      List.map (fun (v,t) -> Subst.subst_var ts v, Term.tsubst ts t) o.updates;
-    output    = Term.tsubst ts o.output;
+      List.map (fun (v,t) -> Subst.subst_var s v, Term.gsubst s t) o.updates;
+    output    = Term.gsubst s o.output;
   }
 
-let tsubst_game (ts : Subst.t) (g : game) : game =
+let gsubst_game (s : Subst.t) (g : game) : game =
   { name       = g.name;
-    glob_smpls = List.map (Subst.subst_var     ts) g.glob_smpls;
-    glob_vars  = List.map (tsubst_var_decl ts) g.glob_vars;
-    oracles    = List.map (tsubst_oracle   ts) g.oracles;
+    glob_smpls = List.map (Subst.subst_var s) g.glob_smpls;
+    glob_vars  = List.map (gsubst_var_decl s) g.glob_vars;
+    oracles    = List.map (gsubst_oracle   s) g.oracles;
   }
 
 (*------------------------------------------------------------------*)
@@ -489,7 +489,7 @@ module Const = struct
     val[@warning "-32"] pp     : t formatter
     val[@warning "-32"] pp_dbg : t formatter
 
-    val tsubst : Subst.t -> t -> t
+    val gsubst : t Subst.substitution
     (* val subst  : Term.subst  -> t -> t *)
 
     val refresh : t -> t
@@ -556,12 +556,12 @@ module Const = struct
     (*     cond = List.map (Term.subst     ts) c.cond;  *)
     (*   } *)
 
-    let tsubst (ts : Subst.t) (c : t) : t =
+    let gsubst (s : Subst.t) (c : t) : t =
       { name = c.name; 
         tag  = c.tag; 
-        vars = List.map (Subst.subst_var ts) c.vars;
-        term = List.map (Term.tsubst ts) c.term; 
-        cond = List.map (Term.tsubst ts) c.cond; 
+        vars = List.map (Subst.subst_var s) c.vars;
+        term = List.map (Term.gsubst     s) c.term; 
+        cond = List.map (Term.gsubst     s) c.cond; 
       }
 
     let create
@@ -2775,7 +2775,7 @@ let parse_crypto_args
         (Failure "some type variables could not be inferred");
 
     let tsubst = Infer.close ty_env in
-    Const.tsubst tsubst const
+    Const.gsubst tsubst const
   in
   let get_terms = fun (x:Const.t) -> x.term@x.cond in 
   let consts =  List.map parse1 args in
@@ -3141,6 +3141,6 @@ module Parse = struct
       failure loc (Failure "some type variables could not be inferred");
 
     let tsubst = Infer.close ty_env in
-    tsubst_game tsubst game
+    gsubst_game tsubst game
 
 end

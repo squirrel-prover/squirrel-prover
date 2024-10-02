@@ -36,16 +36,16 @@ let pp_equiv_numbered = _pp_equiv_numbered (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
-  {terms = List.map (Term.subst subst) e.terms;
-   bound = Option.map (Term.subst subst) e.bound}
+  {terms = List.map   (Term.subst subst) e.terms;
+   bound = Option.map (Term.subst subst) e.bound; }
 
-let tsubst_equiv (subst : Subst.t) (e : equiv) : equiv =
-  {terms = List.map (Term.tsubst subst) e.terms;
-   bound = Option.map (Term.tsubst subst) e.bound}
+let gsubst_equiv (subst : Subst.t) (e : equiv) : equiv =
+  {terms = List.map   (Term.gsubst subst) e.terms;
+   bound = Option.map (Term.gsubst subst) e.bound; }
 
 let subst_projs_equiv (subst : (Projection.t * Projection.t) list) (e : equiv) : equiv =
-  {terms = List.map (Term.subst_projs subst) e.terms;
-   bound = Option.map (Term.subst_projs subst) e.bound}
+  {terms = List.map   (Term.subst_projs subst) e.terms;
+   bound = Option.map (Term.subst_projs subst) e.bound; }
 
 (** Free variables of an [equiv]. *)
 let fv_equiv e : Sv.t =
@@ -91,9 +91,9 @@ let subst_bform (subst : Term.subst) (f : bform) : bform =
   { formula = Term.subst subst f.formula; 
     bound   = Option.map (Term.subst subst) f.bound}
 
-let tsubst_bform (subst : Subst.t) (f : bform) : bform =
-  { formula = Term.tsubst subst f.formula;
-    bound   = Option.map (Term.tsubst subst) f.bound}
+let gsubst_bform (subst : Subst.t) (f : bform) : bform =
+  { formula = Term.gsubst subst f.formula;
+    bound   = Option.map (Term.gsubst subst) f.bound}
 
 let subst_projs_bform (subst : (Projection.t * Projection.t) list) (f : bform) : bform =
   { formula = Term.subst_projs subst f.formula; 
@@ -209,13 +209,13 @@ let ty_fv_pred_app (pa : pred_app) =
   in
   Type.Fv.union fv (Term.ty_fvs pa.simpl_args)
 
-let tsubst_pred_app (ts : Subst.t) (pa : pred_app) : pred_app = {
+let gsubst_pred_app (ts : Subst.t) (pa : pred_app) : pred_app = {
   psymb      = pa.psymb;
   ty_args    = List.map (Subst.subst_ty ts) pa.ty_args;
   se_args    = pa.se_args;
   multi_args =
-    List.map (fun (se,args) -> se, List.map (Term.tsubst ts) args) pa.multi_args;
-  simpl_args = List.map (Term.tsubst ts) pa.simpl_args;
+    List.map (fun (se,args) -> se, List.map (Term.gsubst ts) args) pa.multi_args;
+  simpl_args = List.map (Term.gsubst ts) pa.simpl_args;
 }
 
  (*------------------------------------------------------------------*)
@@ -267,12 +267,13 @@ let ty_fv_atom = function
   | Pred  pa -> ty_fv_pred_app pa
 
 
-(** Type substitution of an [atom]*)
-let tsubst_atom (ts : Subst.t) (at : atom) =
+(** General substitution of an [atom]*)
+let gsubst_atom (ts : Subst.t) (at : atom) =
   match at with
-  | Equiv e -> Equiv (tsubst_equiv ts e)
-  | Reach f -> Reach (tsubst_bform ts f)
-  | Pred  pa -> Pred  (tsubst_pred_app ts pa)
+  | Equiv e  -> Equiv (gsubst_equiv ts e)
+  | Reach f  -> Reach (gsubst_bform ts f)
+  | Pred  pa -> Pred  (gsubst_pred_app ts pa)
+
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 (** We only support a small fragment for now *)
@@ -465,20 +466,18 @@ let subst_projs
   doit t
 
 (*------------------------------------------------------------------*)
-(** Type substitutions *)
+(** General substitutions in a [form] *)
 
-
-let tsubst (ts : Subst.t) (t : form) =
-  let rec tsubst = function
+let gsubst (ts : Subst.t) (t : form) =
+  let rec doit = function
     | Quant (q, vs, f) ->
-      Quant (q, List.map (fst_bind (Subst.subst_var ts)) vs, tsubst f)
+      Quant (q, List.map (fst_bind (Subst.subst_var ts)) vs, doit f)
     | Let (v, t, f) ->
-      Let (Subst.subst_var ts v, Term.tsubst ts t, tsubst f)
-    | Atom at -> Atom (tsubst_atom ts at)
-    | _ as term -> tmap tsubst term
+      Let (Subst.subst_var ts v, Term.gsubst ts t, doit f)
+    | Atom at -> Atom (gsubst_atom ts at)
+    | Impl _ | And _ | Or _ as term -> tmap doit term
   in
-
-  tsubst t
+  doit t
 
 (*------------------------------------------------------------------*)
 (** System variable substitutions *)
@@ -1120,9 +1119,9 @@ module PreAny = struct
     | Local  f -> Local  (Term.subst s f)
     | Global f -> Global (     subst s f)
 
-  let tsubst s = function
-    | Local  f -> Local  (Term.tsubst s f)
-    | Global f -> Global (     tsubst s f)
+  let gsubst s = function
+    | Local  f -> Local  (Term.gsubst s f)
+    | Global f -> Global (     gsubst s f)
 
   let subst_projs target s = function
     | Local f -> 
@@ -1199,10 +1198,10 @@ module Babel = struct
     | Global_t ->        subst_projs target s f
     | Any_t    -> PreAny.subst_projs target s f
 
-  let tsubst : type a. a f_kind -> Subst.t -> a -> a = function
-    | Local_t  -> Term.tsubst
-    | Global_t -> tsubst
-    | Any_t    -> PreAny.tsubst
+  let gsubst : type a. a f_kind -> Subst.t -> a -> a = function
+    | Local_t  -> Term.gsubst
+    | Global_t -> gsubst
+    | Any_t    -> PreAny.gsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
     | Local_t  -> Term.fv
@@ -1619,9 +1618,9 @@ module PreAny_statement = struct
     | LocalS  f -> LocalS  (subst_bform s f)
     | GlobalS f -> GlobalS (      subst s f)
 
-  let tsubst s = function
-    | LocalS  f -> LocalS  (tsubst_bform s f)
-    | GlobalS f -> GlobalS (      tsubst s f)
+  let gsubst s = function
+    | LocalS  f -> LocalS  (gsubst_bform s f)
+    | GlobalS f -> GlobalS (      gsubst s f)
 
   let subst_projs target s = function
     | LocalS f ->
@@ -1698,10 +1697,10 @@ module Babel_statement = struct
     | Global_s ->                  subst_projs       target s f
     | Any_s    -> PreAny_statement.subst_projs       target s f
 
-  let tsubst : type a. a s_kind -> Subst.t -> a -> a = function
-    | Local_s  -> tsubst_bform
-    | Global_s -> tsubst
-    | Any_s    -> PreAny_statement.tsubst
+  let gsubst : type a. a s_kind -> Subst.t -> a -> a = function
+    | Local_s  -> gsubst_bform
+    | Global_s -> gsubst
+    | Any_s    -> PreAny_statement.gsubst
 
   let fv : type a. a s_kind -> a -> Vars.Sv.t = function
     | Local_s  -> fv_bform
