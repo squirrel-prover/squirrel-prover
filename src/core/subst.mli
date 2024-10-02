@@ -30,17 +30,19 @@ val empty_subst : t
 val mk_subst :
   ?tvars   : Type.ty Mid.t ->
   ?univars : Type.ty Mid.t ->
-  (* ?se_vars : SE.t    Msv.t -> *)
+  ?se_vars : SE.t    Msv.t ->
   unit -> t
 
 (*------------------------------------------------------------------*)
 val add_tvar   : t -> Type.tvar   -> Type.ty -> t
 val add_univar : t -> Type.univar -> Type.ty -> t
-(* val add_se_var : t -> SE.Var.t    -> SE.t    -> t *)
+val add_se_var : t -> SE.Var.t    -> SE.t    -> t
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution functions} *)
 
-val subst_ty    : Type.ty    substitution
-val subst_var   : Vars.var   substitution
-val subst_ftype : Type.ftype substitution
+val subst_se_var : t -> SE.Var.t -> SE.t
+
+val subst_ty     : Type.ty    substitution
+val subst_var    : Vars.var   substitution
+val subst_ftype  : Type.ftype substitution

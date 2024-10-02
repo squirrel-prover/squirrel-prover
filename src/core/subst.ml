@@ -33,16 +33,16 @@ let empty_subst =
 let mk_subst
     ?(tvars   : Type.ty Mid.t = Mid.empty)
     ?(univars : Type.ty Mid.t = Mid.empty)
-    (* ?(se_vars : SE.t    Msv.t = Msv.empty) *)
+    ?(se_vars : SE.t    Msv.t = Msv.empty)
     ()
   : t
   =
-  { univars; tvars; se_vars = Msv.empty; }
+  { univars; tvars; se_vars; }
 
 (*------------------------------------------------------------------*)
 let add_tvar   s tv ty = { s with tvars   = Mid.add tv ty s.tvars;   }
 let add_univar s tu ty = { s with univars = Mid.add tu ty s.univars; }
-(* let add_se_var s x  se = { s with se_vars = Msv.add x  se s.se_vars; } *)
+let add_se_var s x  se = { s with se_vars = Msv.add x  se s.se_vars; }
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution functions} *)
@@ -65,6 +65,10 @@ let subst_ty (s : t) (t : Type.ty) : Type.ty =
 (*------------------------------------------------------------------*)
 let subst_var (s : t) (v : Vars.var) : Vars.var =
   Vars.mk v.id (subst_ty s v.ty)
+
+(*------------------------------------------------------------------*)
+let subst_se_var (s : t) (v : SE.Var.t) : SE.t =
+  Msv.find_dflt (SE.var v) v s.se_vars
 
 (*------------------------------------------------------------------*)
 let subst_ftype (ts : t) (fty : Type.ftype) : Type.ftype =

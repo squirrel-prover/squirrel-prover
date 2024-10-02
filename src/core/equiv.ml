@@ -209,13 +209,15 @@ let ty_fv_pred_app (pa : pred_app) =
   in
   Type.Fv.union fv (Term.ty_fvs pa.simpl_args)
 
-let gsubst_pred_app (ts : Subst.t) (pa : pred_app) : pred_app = {
+let gsubst_pred_app (s : Subst.t) (pa : pred_app) : pred_app = {
   psymb      = pa.psymb;
-  ty_args    = List.map (Subst.subst_ty ts) pa.ty_args;
-  se_args    = pa.se_args;
+  ty_args    = List.map (Subst.subst_ty s) pa.ty_args;
+  se_args    = List.map (SE.gsubst s) pa.se_args;
   multi_args =
-    List.map (fun (se,args) -> se, List.map (Term.gsubst ts) args) pa.multi_args;
-  simpl_args = List.map (Term.gsubst ts) pa.simpl_args;
+    List.map
+      (fun (se,args) -> SE.gsubst s se, List.map (Term.gsubst s) args)
+      pa.multi_args;
+  simpl_args = List.map (Term.gsubst s) pa.simpl_args;
 }
 
  (*------------------------------------------------------------------*)

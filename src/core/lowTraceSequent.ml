@@ -460,7 +460,7 @@ let gsubst (subst : Subst.t) s =
     let proof_context = 
       H.map
         ~hyp:(Equiv.Any.gsubst subst)
-        ~def:(fun (se,t) -> se, Term.gsubst subst t) 
+        ~def:(fun (se,t) -> SE.gsubst subst se, Term.gsubst subst t) 
         s.proof_context
     in
     S.update

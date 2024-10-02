@@ -194,6 +194,11 @@ let get_compatible_expr table (context : context) : compatible option =
     Some (singleton single :> compatible)
   | _ -> Some (force expr :> compatible)
 
+let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
+  match (g :> a exposed).cnt with
+  | Var v -> force0 (Subst.subst_se_var s v)
+  | Any _ | List _ -> g
+
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printers} *)
     

@@ -25,7 +25,7 @@ let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
 let gsubst_hyps (subst : Subst.t) (hyps : H.hyps) : H.hyps =
   H.map
     ~hyp:(Equiv.gsubst subst) 
-    ~def:(fun (se,t) -> se, Term.gsubst subst t) 
+    ~def:(fun (se,t) -> SE.gsubst subst se, Term.gsubst subst t) 
     hyps
 
 (*------------------------------------------------------------------*)

@@ -110,6 +110,8 @@ val map_descrs  :
     Return [None] if context is [context_any]. *)
 val get_compatible_expr : Symbols.table -> context -> compatible option
 
+val gsubst : 'a expr Subst.substitution
+
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printers} *)
 

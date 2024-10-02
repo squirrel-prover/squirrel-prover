@@ -102,7 +102,8 @@ type t = arbitrary
 
 (*------------------------------------------------------------------*)
 (** not type-safe *)
-val force : 'a exposed -> 'b expr
+val force  : 'a exposed -> 'b expr
+val force0 : 'a expr    -> 'b expr
 
 (*------------------------------------------------------------------*)
 val hash : 'a expr -> int

@@ -114,7 +114,8 @@ let hash (x : 'a expr) : int = Hashtbl.hash x.cnt
 let mk ?name cnt = { cnt; name; }
 
 (** exported *)
-external force : 'a exposed -> 'b expr = "%identity"
+external force  : 'a exposed -> 'b expr = "%identity"
+external force0 : 'a expr    -> 'b expr = "%identity"
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
