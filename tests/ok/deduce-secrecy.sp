@@ -43,7 +43,7 @@ Proof.
   checkfail deduce exn ApplyMatchFailure.
 Abort.
 
-global lemma[set:any; equiv:none] toto7 (tau : timestamp[const]):
+global lemma[set:any; equiv:any_pair] toto7 (tau : timestamp[const]):
   [happens tau] -> [exec@tau] ->
   $(zero |> zero).
 Proof.
