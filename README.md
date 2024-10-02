@@ -109,7 +109,6 @@ installed.
    ```
 
    This also installs the Why3 OCaml library used by Squirrel.
-   The version of Z3 used must be prior to 4.13.
 
 2. Then tell Why3 to automatically detect supported SMT provers and update its
    configuration accordingly:
