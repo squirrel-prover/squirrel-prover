@@ -20,7 +20,7 @@ system none = null.
 # Reasoning rules on Non-deduction and Deduction
 *)
 
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   refl_ded ['a] (u : 'a) : 
  $(u |> u).
 Proof.
@@ -28,7 +28,7 @@ rewrite /(|>).
 exists (fun x => x) => //.
 Qed.
 
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   right_fa ['a 'b 'c] (u : 'a, v : 'b, g : 'b -> 'c) : 
     $( u *> v ) ->
     (Exists (ginv : _ [adv]), [ginv u (g v) = v]) ->
@@ -45,7 +45,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------- *)
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
  left_fa ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c) : 
    $( u *> v ) ->
    $( (f u) *> v ).
@@ -55,7 +55,7 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 (* Rules in Figure 1 *)
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   ND ['a 'b] (u : 'a) (v : 'b) : 
     $(u *> v) ->
     $(u |> v) ->
@@ -64,7 +64,7 @@ Proof.
   admit.
 Qed.
 
-global lemma [set: any; equiv: none]
+global lemma [set: any; equiv:any_pair]
   Ineq ['a 'b] (u : 'a) (v, w : 'b) :
     $(u |> v) ->
     $( u *> w) ->
@@ -74,7 +74,7 @@ Proof.
   by have ? := (H2 f).
 Qed.
 
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   NDWeakL ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u |> v) ->
     $(u *> w) ->
@@ -83,7 +83,7 @@ Proof.
   admit.
 Qed.
 
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   NDWeakR ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u *> w) ->
     $(v |> w) ->
@@ -166,7 +166,7 @@ Qed.
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Oracle *)
 
-global lemma [set: any; equiv:none]
+global lemma [set: any; equiv:any_pair]
   RwOracle1 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
   (* Warning : 'd must be a simple type *)
     (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t1) = t2 (f u t1)]) ->
@@ -175,7 +175,7 @@ Proof.
   admit.
 Qed.
 
-global lemma [set: any; equiv:none] 
+global lemma [set: any; equiv:any_pair] 
   RwOracle2 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
     (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t2) = t2 (f u t2)]) ->
     (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
@@ -204,7 +204,7 @@ axiom [any] frame_init :
   frame@init = zero.
 
 
-global lemma  [set: any; equiv:none]  frame_ded_past (tau,tau':timestamp [const]) :
+global lemma  [set: any; equiv:any_pair] frame_ded_past (tau,tau':timestamp [const]) :
  [tau'<= tau] -> $( (frame@tau) |> (frame@tau')).
 Proof.
 
