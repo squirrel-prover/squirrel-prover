@@ -187,10 +187,6 @@ Proof.
   auto.
 Qed.
 
-(* ------------------------------------------------------------------- *)
-(* TODO charchacterisation of equiv ? *)
-
-(*Forall (d : 'a -> bool[adv]) (u, v: 'a), [d u = d v] -> equiv(diff(u,v))*)
 
 (*
 # Frames
