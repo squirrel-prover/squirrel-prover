@@ -125,23 +125,8 @@ include Basic.
 
 axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 
-(** Helper lemma for pushing conditionals under the `len(_)` function. *)
-lemma if_len (b : boolean, y,z:message):
-  len(if b then y else z) =
-  (if b then len(y) else len(z)).
-Proof.
-  by case b.
-Qed.
 
 (* Helper lemma *)
-lemma if_same_branch (x,y,z : message, b : boolean):
-  (b => y = x) =>
-  (not b => z = x) =>
-  (if b then y else z) = x.
-Proof.
-  by intro *; case b.
-Qed.
-
 lemma if_same_len (x,y : message, b : boolean):
   (b => (len x = len y)) =>
   (len (if b then x else y) = len y).
@@ -149,7 +134,8 @@ Proof.
   by intro *; case b.
 Qed.
 
-
+(* Helper lemma (f_apply twice does not work, 
+as f a and f aa are not the same) *)
 lemma f_apply2 ['a 'b 'c] (f:'a -> 'b -> 'c) (a,aa:'a) (b,bb:'b) :
  a = aa =>
  b = bb => 
@@ -158,15 +144,7 @@ Proof.
  intro ->. by intro ->.
 Qed. 
 
-lemma f_apply' ['a 'b] (f,g:'a -> 'b) (x,y:'a) :
- f = g =>
- x = y => 
- f x = g y.
-Proof.
- intro ->. by intro ->.
-Qed. 
 
-set verboseCrypto = true.
 (**
 The anonymity property is expressed as an equivalence between the left side
 (the one using `kA` and the right side (the one using `kAbis`) of the system.
@@ -239,7 +217,7 @@ Proof.
   *)
   cca1 4; [1:auto].
 
-  (** We use the lemma `if_len` to push the conditional under len(_),
+  (** We use the lemma `if_same_len` to push the conditional under len(_),
   and simplify the resulting expression. *)
   rewrite if_same_len in 4.
   (* We use our axiom on the length of a pair. *)

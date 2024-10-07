@@ -24,6 +24,19 @@ aenc enc,dec,pk
 
 abstract (++) : message -> message -> message
 
+game Enckp = {
+ rnd k0:message;
+ rnd k1:message;
+
+ oracle pk0 = {return pk(k0)}
+ oracle pk1 = {return pk(k1)}
+ oracle challenge x = {
+   rnd r:message;
+   return enc(x,r,pk(diff(k0,k1)))
+ }
+}
+
+
 process A(A:index, i:index) =
   new rA;
   new nA;
@@ -55,21 +68,23 @@ include Basic.
 axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 
 (* Helper lemma *)
-lemma if_len (b : boolean, y,z:message):
-  len(if b then y else z) =
-  (if b then len(y) else len(z)).
+lemma if_same_len (x,y : message, b : boolean):
+  (b => (len x = len y)) =>
+  (len (if b then x else y) = len y).
 Proof.
- by case b.
+  by intro *; case b.
 Qed.
 
-(* Helper lemma *)
-lemma if_same_branch (x,y,z : message, b : boolean):
-  (b => y = x) =>
-  (not b => z = x) =>
-  (if b then y else z) = x.
+(* Helper lemma (f_apply twice does not work, 
+as f a and f aa are not the same) *)
+lemma f_apply2 ['a 'b 'c] (f:'a -> 'b -> 'c) (a,aa:'a) (b,bb:'b) :
+ a = aa =>
+ b = bb => 
+ f a b = f aa bb.
 Proof.
- by intro *; case b.
-Qed.
+ intro ->. by intro ->.
+Qed. 
+
 
 global lemma unlinkability (t : timestamp[const]) :
   [happens(t)] -> equiv(frame@t).
@@ -98,12 +113,16 @@ Proof.
   * (* Case B *)
     rewrite /frame /output /exec /cond /dmess /=.
     fa 3; fa 4; fa 4.
-    enckp 4; 1: auto.
+ 
+
+(*    enckp 4; 1: auto.*)
     cca1 4. 
     + auto.
-    + rewrite if_len !length_pair.
-      rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
-      fa enc _, zeroes _, _ ++ _, len _.
-      fresh 5; 1:auto.
-      by fresh 4.
+    + rewrite if_same_len; [1:by rewrite !length_pair].
+      rewrite !length_pair namelength_nB in 4.
+      trans [default/left, default/left].
+      - auto.      
+      - by crypto Enckp (k0:kA A) (k1:kAbis (A, i)).
+      - fa enc _, zeroes _, _ ++ _. 
+        by fresh 4. 
 Qed.
