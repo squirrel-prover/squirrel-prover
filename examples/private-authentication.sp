@@ -60,6 +60,21 @@ the addition of lengths of messages.
 
 abstract (++) : message -> message -> message.
 
+
+game Enckp = {
+ rnd k0:message;
+ rnd k1:message;
+
+ oracle pk0 = {return pk(k0)}
+ oracle pk1 = {return pk(k1)}
+ oracle challenge x = {
+   rnd r:message;
+   return enc(x,r,pk(diff(k0,k1)))
+ }
+}
+
+
+
 (**
 The initiator A is indexed by `i` to represent an unbounded number of sessions
 and is defined by a single output.
@@ -127,6 +142,31 @@ Proof.
   by intro *; case b.
 Qed.
 
+lemma if_same_len (x,y : message, b : boolean):
+  (b => (len x = len y)) =>
+  (len (if b then x else y) = len y).
+Proof.
+  by intro *; case b.
+Qed.
+
+
+lemma f_apply2 ['a 'b 'c] (f:'a -> 'b -> 'c) (a,aa:'a) (b,bb:'b) :
+ a = aa =>
+ b = bb => 
+ f a b = f aa bb.
+Proof.
+ intro ->. by intro ->.
+Qed. 
+
+lemma f_apply' ['a 'b] (f,g:'a -> 'b) (x,y:'a) :
+ f = g =>
+ x = y => 
+ f x = g y.
+Proof.
+ intro ->. by intro ->.
+Qed. 
+
+set verboseCrypto = true.
 (**
 The anonymity property is expressed as an equivalence between the left side
 (the one using `kA` and the right side (the one using `kAbis`) of the system.
@@ -141,6 +181,7 @@ to distinguish the left side from the right side, relying on the fact that
 encryption satisfies key privacy and IND-CCA1 assumptions.
 *)
 Proof.
+
   (**
   We start by adding to the frame the two public keys `pk(kA)`, `pk(kAbis)`
   and `pk(kB)` since any execution starts by the action `O` outputting them.
@@ -186,36 +227,38 @@ Proof.
   We have to show that the output message does not give any information
   to the attacker to distinguish the left side from the right side.
   *)
+
+  
   expand frame, output, exec, cond, dmess.
   fa 3; fa 4; fa 4.
 
-  (**
-  We first use the key privacy assumption: knowing only a cipertext, it
-  should not be possible to know which specific key was used.
-  The corresponding `enckp` tactic allows here to replace `kAbis` by `kA`
-  on the right side.
-  *)
-  enckp 4; 1: auto.
 
-  (**
-  We now use the ciphertext indistinguishability (IND-CCA1) assumption,
-  which requires to show that the lengths of the plaintexts on both sides
-  are equal.
+  (** We first use the ciphertext indistinguishability (IND-CCA1)
+  assumption, which requires to show that the lengths of the plaintexts
+  on both sides are equal.
   *)
-  cca1 4; [1:auto]. 
-  fa 4; fa 4.
-  fresh 5; 1:auto.
-  (** We use the lemma `if_len` to push the conditional under len(_). *)
-  rewrite if_len.
+  cca1 4; [1:auto].
 
+  (** We use the lemma `if_len` to push the conditional under len(_),
+  and simplify the resulting expression. *)
+  rewrite if_same_len in 4.
   (* We use our axiom on the length of a pair. *)
-  rewrite !length_pair.
+  by rewrite !length_pair.
 
-  (** We use the `if_same_branch` helper lemma to simplify the
-  conditional using the fact that both branches are identical. *)
-  rewrite (if_same_branch (len(n(j)) ++ len(n(j)))) //.
+  rewrite length_pair namelength_n in 4. 
 
-  (** We conclude using the fact that `n(j)` is fresh. *)
-  fa 4; fa 4.
-  by fresh 4.
+  (**
+  Thanks to the IND-CCA assumption, the ciphertext now only encrypts
+  publicly known values that do not depend on the side.
+  We now use the key privacy assumption: knowing only a ciphertext, it
+  should not be possible to know which specific key was used.
+  We apply a transitivity step first: enckp is applied on the left system,
+  so that the only remaining diff is in 4.
+  *)
+
+  trans [default/left,default/left].
+  - auto.
+  - by crypto Enckp (k0 : kA) (k1 : kAbis).
+  - fa enc _. by fresh 4. 
 Qed.
+
