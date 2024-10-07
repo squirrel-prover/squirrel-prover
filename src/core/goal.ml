@@ -243,12 +243,14 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       make_obs_equiv table system
   in
 
-  (* check that the typing environment is closed *)
-  if not (Infer.is_closed ty_env) then 
-    Tactics.hard_failure (Failure "some types could not be inferred");
-
   (* close the typing environment and substitute *)
-  let subst = Infer.close ty_env in
+  let subst =
+    match Infer.close env ty_env with        
+    | Infer.Closed subst -> subst
+
+    | _ as e ->
+      Tactics.hard_failure (Failure (Fmt.str "%a" Infer.pp_error_result e))
+  in
 
   let formula = Equiv.Any_statement.gsubst subst formula in
   let goal = map (TS.gsubst subst) (ES.gsubst subst) goal in

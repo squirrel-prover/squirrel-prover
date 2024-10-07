@@ -208,74 +208,85 @@ let rw_inst
         with
         | NoMatch _ -> s, `Continue
 
-        (* Check that all type variables have been infered.
-           Remark: type unification environments are stateful *)
-        | Match _ when not (Infer.is_closed ty_env) -> s, `Continue
-
         (* head matches *)
         | Match mv -> 
           Match.Mvar.check_args_inferred s.init_pat mv;
 
-          (* we found the rewrite instance *)
-          let subst =
-            let pat_vars =
-              Vars.add_vars pat_proj.pat_op_vars env
-              (* vars in the pattern are restricted according to what the pattern 
-                 specifies *)
+          let pat_vars =
+            Vars.add_vars pat_proj.pat_op_vars env
+            (* vars in the pattern are restricted according to what the pattern 
+               specifies *)
 
-              |> Vars.add_vars (Vars.Tag.local_vars vars)
-              (* vars above the current position are unrestricted, i.e. local vars *)
+            |> Vars.add_vars (Vars.Tag.local_vars vars)
+            (* vars above the current position are unrestricted, i.e. local vars *)
+          in
+          let env = Env.{
+              vars = pat_vars; table;
+              ty_vars = [];
+              se_vars = SE.Var.empty_env; (* TODO: system variables: pass along [se_vars] and [ty_vars] 
+                                             + do not construct a full environment each time? 
+                                             (less sure about the latter point) *)
+              system = context; }
+          in
+
+          (* Check that all type variables have been infered.
+             Remark: type unification environments are stateful *)
+          match Infer.close env s.ty_env with
+          | Infer.FreeTyVars
+          | Infer.FreeSystemVars
+          | Infer.BadInstantiation _ -> s, `Continue
+ 
+          | Infer.Closed tsubst ->
+            (* we found the rewrite instance *)
+            let subst =
+              match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
+              | `Subst subst -> subst
+              | `BadInst pp_err ->
+                soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
             in
-            match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
-            | `Subst subst -> subst
-            | `BadInst pp_err ->
-              soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
-          in
-          
-          let tsubst = Infer.close s.ty_env in
 
-          (* Substitute [mv] and [tsubst] *)
-          let do_subst t = Term.gsubst tsubst (Term.subst subst t) in
-          
-          let left = do_subst pat_proj.pat_op_term in
-          let right = 
-            let right_proj = Term.project_opt projs s.init_right in
-            do_subst right_proj
-          in
-          let found_conds = List.map do_subst conds in
-          let found_subs =
-            List.map (fun rsub ->
-                let rsub = Term.project_opt projs rsub in
-                do_subst rsub
-              ) s.init_subs
-          in
+            (* Substitute [mv] and [tsubst] *)
+            let do_subst t = Term.gsubst tsubst (Term.subst subst t) in
 
-          let found_pat = Term.{ 
-              pat_op_term   = left;
-              pat_op_tyvars = [];
-              pat_op_vars   = []; 
-            } in
+            let left = do_subst pat_proj.pat_op_term in
+            let right = 
+              let right_proj = Term.project_opt projs s.init_right in
+              do_subst right_proj
+            in
+            let found_conds = List.map do_subst conds in
+            let found_subs =
+              List.map (fun rsub ->
+                  let rsub = Term.project_opt projs rsub in
+                  do_subst rsub
+                ) s.init_subs
+            in
 
-          let found_instance = `Found {
-              pat    = found_pat;
-              right;
-              system = se;
-              vars; 
-              conds  = found_conds;
-              subgs  = found_subs;
-            } in
+            let found_pat = Term.{ 
+                pat_op_term   = left;
+                pat_op_tyvars = [];
+                pat_op_vars   = []; 
+              } in
 
-          { s with found_instance }, `Map right
+            let found_instance = `Found {
+                pat    = found_pat;
+                right;
+                system = se;
+                vars; 
+                conds  = found_conds;
+                subgs  = found_subs;
+              } in
+
+            { s with found_instance }, `Map right
   in
   doit
-
+ 
 (*------------------------------------------------------------------*)
 (** {2 Rewrite at head position} *)
 
 (** Exported *)
 let rewrite_head
     (table : Symbols.table)
-    (env : Vars.env)
+    (env   : Vars.env)
     (expand_context : Macros.expand_context)
     (hyps  : Hyps.TraceHyps.hyps)
     (sexpr : SE.t)

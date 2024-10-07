@@ -164,7 +164,7 @@ type conversion_error = L.t * conversion_error_i
 
 exception Error of conversion_error
 
-let conv_err loc e = raise (Error (loc,e))
+let error loc e = raise (Error (loc,e))
 
 let pp_error_i ppf = function
   | Arity_error (s,i,j) ->
@@ -265,7 +265,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
             Ident.name tv' = L.unloc tv_l
           ) env.ty_vars
       with Not_found ->
-        conv_err (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
+        error (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
     in
     Type.tvar tv
 
@@ -284,7 +284,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : ty) : Type.ty =
 
   | P_ty_pat -> 
     match ty_env with
-    | None -> conv_err (L.loc pty) (Failure "type holes not allowed") 
+    | None -> error (L.loc pty) (Failure "type holes not allowed") 
     | Some ty_env ->
       Type.univar (Infer.mk_ty_univar ty_env)
 
@@ -316,17 +316,17 @@ type conv_env = {
     - a type unification environment
     - a variable substitution  *)
 type conv_state = {
-  env           : Env.t;
-  system_info   : SE.t Mv.t;
+  env         : Env.t;
+  system_info : SE.t Mv.t;
   (** see description in `.mli` for type [conv_env] *)
   
-  cntxt         : conv_cntxt;
+  cntxt : conv_cntxt;
 
   allow_pat     : bool;
   type_checking : bool;
   (** if [true], we are only type-checking the term *)
 
-  ty_env        : Infer.env;
+  ty_env : Infer.env;
 }
 
 let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ty_env =
@@ -344,7 +344,7 @@ let ty_error ty_env loc (t : Term.term) ~(got : Type.ty) ~(expected : Type.ty) =
   Error (loc, Type_error (t, expected, got))
 
 let check_ty_eq state ~loc ~(of_t : Term.term) (t_ty : Type.ty) (ty : Type.ty) : unit =
-  match Infer.unify_eq state.ty_env t_ty ty with
+  match Infer.unify_ty state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
     raise (ty_error state.ty_env loc of_t ~got:t_ty ~expected:ty)
@@ -363,7 +363,7 @@ let check_system_projs loc (state : conv_state) (projs : Projection.t list) : un
     | InProc (ps, _) -> ps
     | InGoal ->
       if not (SE.is_fset state.env.system.set) then
-        conv_err loc MissingSystem;
+        error loc MissingSystem;
 
       let fset = SE.to_fset state.env.system.set in
       SE.to_projs fset
@@ -373,7 +373,7 @@ let check_system_projs loc (state : conv_state) (projs : Projection.t list) : un
   and diff2 = List.diff projs current_projs in
 
   if diff1 <> [] || diff2 <> [] then
-    conv_err loc (BadProjInSubterm (diff1, diff2))
+    error loc (BadProjInSubterm (diff1, diff2))
 
 let proj_state (projs : Projection.t list) (state : conv_state) : conv_state =
   match state.cntxt with 
@@ -395,7 +395,7 @@ let check_system (state : conv_state) (loc : L.t) (v : Vars.var) : unit =
           SE.pp se
           SE.pp state_se
       in
-      conv_err loc (Failure err_msg) 
+      error loc (Failure err_msg) 
         
   | exception Not_found -> ()   (* no information => no restrictions *)
 
@@ -426,7 +426,7 @@ let convert_var (state : conv_state) (symb : lsymb) (ty : Type.ty) : Term.term =
 
     Term.mk_var v
   with
-  | Not_found -> conv_err (L.loc symb) (Failure ("unknown symbol " ^ L.unloc symb))
+  | Not_found -> error (L.loc symb) (Failure ("unknown symbol " ^ L.unloc symb))
 
 
 (*------------------------------------------------------------------*)
@@ -451,13 +451,13 @@ let convert_tags ~(mode : bnds_tag_mode) (parsed_tags : var_tags) : Vars.Tag.t =
         doit { tag with adv = true; } tags
       else if L.unloc t = "glob" then
         doit { tag with system_indep = true; } tags
-      else conv_err (L.loc t) (Failure ("unknown tag: " ^ (L.unloc t)))
+      else error (L.loc t) (Failure ("unknown tag: " ^ (L.unloc t)))
   in
   match mode with
   | NoTags ->
     if parsed_tags <> [] then begin
       let loc = L.mergeall (List.map L.loc parsed_tags) in
-      conv_err loc (Failure ("tags unsupported here"));
+      error loc (Failure ("tags unsupported here"));
     end;
     
     Vars.Tag.ltag
@@ -480,8 +480,7 @@ let convert_bnds_tagged
     ?(ty_env : Infer.env option)
     ~(mode : bnds_tag_mode) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
   =
-  let env, vars = List.map_fold (convert_bnd_tagged ?ty_env ~mode) env bnds in
-  env, vars
+  List.map_fold (convert_bnd_tagged ?ty_env ~mode) env bnds 
 
 (** Convert a list of variable bindings *)
 let convert_bnds
@@ -513,10 +512,10 @@ let convert_ext_bnd
     let tys, tuple_ty =
       match convert_ty ?ty_env env p_tuple_ty with
       | Tuple tys as ty -> tys, ty
-      | _ -> conv_err (L.loc p_tuple_ty) ExpectedTupleTy
+      | _ -> error (L.loc p_tuple_ty) ExpectedTupleTy
     in
     if List.length tys <> List.length p_vars then
-      conv_err (L.loc p_tuple_ty)
+      error (L.loc p_tuple_ty)
         (BadTupleLength (List.length tys, List.length p_vars));
 
     let info = convert_tags ~mode p_tags in
@@ -560,7 +559,41 @@ let convert_ext_bnds
   in
   env, subst, vars
 
+(*------------------------------------------------------------------*)
+(** Convert a systeme expression variable binding *)
+let convert_se_var_bnd
+    (env : Env.t) ((lv, infos) : lsymb * lsymb list)
+  : Env.t * SE.tagged_var
+  =
+  let name = L.unloc lv in
 
+  let infos =
+    List.map (fun info ->
+        match L.unloc info with
+        | "pair" -> SE.Var.Pair
+        | _ -> error (L.loc info) (Failure "unknown system information");
+      ) infos
+  in
+  (* ["equiv"] is always a [Pair] *)
+  let infos = if name = "equiv" then SE.Var.Pair :: infos else infos in
+
+  let se_vars =         (* remove any binding [v'] shadowed by [v] *)
+    SE.Var.M.filter (fun v' _ -> SE.Var.name v' <> name) env.se_vars
+  in
+
+  let var =
+    match name with
+    | "set"   -> SE.Var.set
+    | "equiv" -> SE.Var.pair
+    | _ -> SE.Var.of_ident (Ident.create name)
+  in
+  { env with se_vars = SE.Var.M.add var infos se_vars; }, (var, infos)
+
+let convert_se_var_bnds
+    (env : Env.t) (bnds : (lsymb * lsymb list) list) : Env.t * SE.tagged_vars
+  =
+  List.map_fold convert_se_var_bnd env bnds
+    
 (*------------------------------------------------------------------*)
 (** {3 Local formula conversion conversion} *)
 
@@ -588,7 +621,7 @@ let validate
 
     (* we require that actions are used in eta-long form *)
     if arity <> n then
-      conv_err loc (Arity_error (action_name,n,arity));
+      error loc (Arity_error (action_name,n,arity));
 
     let in_proc = match state.cntxt with InProc _ -> true | InGoal -> false in
     (* do not check that the system is compatible in:
@@ -597,7 +630,7 @@ let validate
     if not (state.type_checking || in_proc) then
       begin 
         if Action.is_decl a table then
-          conv_err loc (Failure "action is declared but un-defined");
+          error loc (Failure "action is declared but un-defined");
 
         let _, action = Action.get_def a table in
         try
@@ -610,7 +643,7 @@ let validate
         | Not_found
         | SE.Error (_,Expected_compatible) ->
           let loc = if in_proc then L._dummy else loc in
-          conv_err loc (UndefInSystem (action_name, state.env.system.set))
+          error loc (UndefInSystem (action_name, state.env.system.set))
       end
 
   | Term.Macro (m,args,_t) ->
@@ -619,7 +652,7 @@ let validate
     let arity = List.length fty.fty_args in
     (* we require that macros are used in eta-long form *)
     if arity <> n then
-      conv_err loc (Arity_error (Symbols.path_to_string m.s_symb,n,arity))
+      error loc (Arity_error (Symbols.path_to_string m.s_symb,n,arity))
 
   | Term.Name (n,args) ->
     let fty = (Symbols.get_name_data n.s_symb table).n_fty in
@@ -627,7 +660,7 @@ let validate
     let arity = List.length fty.fty_args in
     (* we require that names are used in eta-long form *)
     if arity <> n_args then
-      conv_err loc (Arity_error (Symbols.path_to_string n.s_symb,n_args,arity));
+      error loc (Arity_error (Symbols.path_to_string n.s_symb,n_args,arity));
 
   | _ -> ()
 
@@ -671,7 +704,7 @@ let resolve_path
     =
     let ty_env = Infer.copy ty_env in
     let check_ty ty1 ty2 =
-      match Infer.unify_eq ty_env ty1 ty2 with
+      match Infer.unify_ty ty_env ty1 ty2 with
       | `Ok   -> ()
       | `Fail -> failed ()
     in
@@ -779,7 +812,7 @@ let failure_no_symbol f args_ty ty =
       (Symbols.p_path_to_string f)
       Type.pp ty_f
   in
-  conv_err (Symbols.p_path_loc f) (Failure err)
+  error (Symbols.p_path_loc f) (Failure err)
 
 (*------------------------------------------------------------------*)
 (** error message: many symbols with a given type *)
@@ -800,7 +833,7 @@ let failure_cannot_desambiguate loc symbs =
          )
       ) symbs
   in
-  conv_err loc (Failure err) 
+  error loc (Failure err) 
 
 (*------------------------------------------------------------------*)
 (* internal function to Typing.ml *)
@@ -837,7 +870,7 @@ and convert0
   (*------------------------------------------------------------------*)
   | Tpat ->
     if not state.allow_pat then
-      conv_err (L.loc tm) PatNotAllowed;
+      error (L.loc tm) PatNotAllowed;
 
     let _, p =
       Vars.make
@@ -882,7 +915,7 @@ and convert0
 
   | AppAt (t,_) ->              (* failure *)
     let t = conv ty t in
-    conv_err loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
+    error loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
 
   (* application, special case *)
   | Symb (f, p_ty_args)
@@ -892,7 +925,7 @@ and convert0
 
     (* check that we are not in one of the special cases above *)
     if L.unloc sub = "init" || L.unloc sub = "happens" then 
-      conv_err loc (Arity_error (Symbols.p_path_to_string f, 
+      error loc (Arity_error (Symbols.p_path_to_string f, 
                                  (if L.unloc sub = "init" then 0 else 1), 
                                  List.length args));
 
@@ -906,7 +939,7 @@ and convert0
 
   | Symb ((top,_) as f, p_ty_args) -> 
     assert(is_var f && top = []);
-    if p_ty_args <> None then conv_err loc (Failure "cannot given type arguments here");
+    if p_ty_args <> None then error loc (Failure "cannot given type arguments here");
     convert_var state (snd f) ty
 
   (* application, general case *)
@@ -941,10 +974,10 @@ and convert0
     let () = match Infer.norm_ty state.ty_env ty_t with
       | Type.Tuple l -> 
         if List.length l < L.unloc i then
-          conv_err (L.loc i) (BadTermProj (List.length l, L.unloc i))
+          error (L.loc i) (BadTermProj (List.length l, L.unloc i))
         else ()
 
-      | _ -> conv_err (L.loc i) NotTermProj
+      | _ -> error (L.loc i) NotTermProj
     in
     t_proj
 
@@ -1004,11 +1037,11 @@ and convert0
         match ebnd with
         | L_var p_v, (_, p_tags) ->
           if p_tags <> [] then
-            conv_err (L.loc p_v) (Failure "tag unsupported here");
+            error (L.loc p_v) (Failure "tag unsupported here");
 
         | L_tuple l,_ ->
           let loc = L.mergeall (List.map L.loc l) in
-          conv_err loc (Failure "tuples unsupported in seq")
+          error loc (Failure "tuples unsupported in seq")
       ) evs vs;
 
     Term.mk_seq ~simpl:false evs t
@@ -1090,12 +1123,12 @@ and convert_app
 
     | `Macro    m ->
       if args' <> [] then
-        conv_err (Symbols.p_path_loc f) (Failure "too many arguments");
+        error (Symbols.p_path_loc f) (Failure "too many arguments");
 
       let tau =
         match app_cntxt with
         | At ts | MaybeAt ts -> ts
-        | _ -> conv_err loc (Timestamp_expected (Symbols.p_path_to_string f))
+        | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
       in
 
       Term.mk_macro (Term.mk_symb m fty_op.fty_out) args tau
@@ -1268,7 +1301,7 @@ let check_fun_symb
   | `Prefix -> ()
   | `Infix _side ->
     if not (in_tys = 2) then
-      conv_err (L.loc s) BadInfixDecl
+      error (L.loc s) BadInfixDecl
 
 let declare_abstract 
     table ~ty_args ~in_tys ~out_ty 
@@ -1297,14 +1330,14 @@ let error_wrong_number_ty_args loc ~(expected : Type.ty list) ~(got : Type.ty li
              expected %d, got %d@]"
       (List.length expected) (List.length got)
   in
-  conv_err loc (Failure err_str)
+  error loc (Failure err_str)
 
 (*------------------------------------------------------------------*)
 let parse_pred_app_se_args
-    (pred_loc : L.t) 
-    (env      : Env.t)
-    (se_params  : (SE.Var.t * SE.Var.info list) list)
-    (se_args  : SE.Parse.t list) 
+    (pred_loc  : L.t) 
+    (env       : Env.t)
+    (se_params : (SE.Var.t * SE.Var.info list) list)
+    (se_args   : SE.Parse.t list) 
   : Subst.t 
   =
   (* parse system arguments given as input *)
@@ -1328,7 +1361,7 @@ let parse_pred_app_se_args
       (L._dummy, (oget env.system.pair :> SE.t)) :: 
       se_args
     else
-      conv_err pred_loc 
+      error pred_loc 
         (Failure 
            (Fmt.str "not enough system arguments: \
                      expected %d (up-to -2 with implicits), \
@@ -1339,9 +1372,9 @@ let parse_pred_app_se_args
 
   (* check that system argument restrictions are satisfied *)
   let check ~loc (se_v : SE.Var.t) (se : SE.t) (se_infos : SE.Var.info list) : unit =
-    match SE.check_se_subst se_v se se_infos with
+    match Infer.check_se_subst env se_v se se_infos with
     | `Ok -> ()
-    | `BadInst err -> conv_err loc (Failure (Fmt.str "%t" err));
+    | `BadInst err -> error loc (Failure (Fmt.str "%t" err));
   in
   
   List.fold_left2 (fun subst (se_v, se_infos) (loc, se) ->
@@ -1377,7 +1410,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
  
       List.iter2
         (fun ty1 ty2 ->
-           match Infer.unify_eq st.ty_env ty1 ty2 with
+           match Infer.unify_ty st.ty_env ty1 ty2 with
            | `Ok   -> ()
            | `Fail -> assert false) (* cannot fail *)
         ty_vars ty_args;
@@ -1401,7 +1434,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
     | [] -> [], p_args
     | (se, vars) :: multi_args' ->
       if (List.length p_args < List.length vars) then
-        conv_err loc (Failure "not enough arguments");
+        error loc (Failure "not enough arguments");
 
       let system = SE.{ set = (se :> SE.t) ; pair = None } in
       let env = Env.update ~system st.env in
@@ -1427,9 +1460,9 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   in
 
   if List.length rem_p_args > List.length pred_args_simple then
-    conv_err loc (Failure "too many arguments");
+    error loc (Failure "too many arguments");
   if List.length rem_p_args < List.length pred_args_simple then
-    conv_err loc (Failure "not enough arguments");
+    error loc (Failure "not enough arguments");
 
   let simpl_args =
     List.fold_right2 (fun var p_arg acc ->
@@ -1439,7 +1472,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
         let arg = convert st p_arg (Vars.ty var) in
 
         if not (Term.is_single_term env.vars arg) then
-          conv_err (L.loc p_arg) (Failure "should not be a multi-term");
+          error (L.loc p_arg) (Failure "should not be a multi-term");
 
         arg :: acc
       ) pred_args_simple rem_p_args []
@@ -1480,7 +1513,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
         Equiv.Atom (Equiv.Equiv {terms = e; bound = b})
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
       | _ ->
-        conv_err (L.loc p) MissingSystem
+        error (L.loc p) MissingSystem
     end
 
   | PReach (f,e) ->
@@ -1567,11 +1600,15 @@ let convert
 
   if must_close then
     begin
-      if not (Infer.is_closed state.ty_env) then
-        conv_err (L.loc tm) Freetyunivar;
+      let tysubst =
+        match Infer.close cenv.env ty_env with        
+        | Infer.Closed subst -> subst
 
-      let tysubst = Infer.close ty_env in
-      Term.gsubst tysubst t, Subst.subst_ty tysubst ty
+        | _ as e ->
+          error (L.loc tm) (Failure (Fmt.str "%a" Infer.pp_error_result e))
+      in
+      
+      ( Term.gsubst tysubst t, Subst.subst_ty tysubst ty )
     end
   else
     t, Infer.norm_ty ty_env ty
@@ -1597,10 +1634,13 @@ let convert_global_formula
 
   if must_close then
     begin
-      if not (Infer.is_closed state.ty_env) then
-        conv_err (L.loc p) Freetyunivar;
+      let tysubst =
+        match Infer.close cenv.env ty_env with        
+        | Infer.Closed subst -> subst
 
-      let tysubst = Infer.close ty_env in
+        | _ as e ->
+          error (L.loc p) (Failure (Fmt.str "%a" Infer.pp_error_result e))
+      in      
       Equiv.gsubst tysubst t
     end
   else

@@ -1808,7 +1808,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         soft_failure ApplyBadInst;
 
       let vars = S.vars s in
-      let env = S.env  s in
+      let env  = S.env  s in
       let match_res =
         match S.conc_kind with
         | Local_t  ->
@@ -1880,16 +1880,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
           else
             (* [pat] reduced, try again *)
             try_apply subs { pat with pat_op_term = t }
-
-      (* failed succeeded but incomplete type inference. *)
-      | Match _ when not (Infer.is_closed ty_env) -> 
-        soft_failure (Failure "all type variables could not be inferred")
           
       (* match succeeded *)
       | Match mv -> 
         Match.Mvar.check_args_inferred pat mv;
-        
-        let gsubst = Infer.close ty_env in
+
+        (* close the inference environment for types, system
+           variables, ... *)
+        let gsubst =
+          match Infer.close env ty_env with
+          | Infer.Closed subst -> subst
+
+          | _ as e ->
+            soft_failure (Failure (Fmt.str "%a" Infer.pp_error_result e))
+        in
+        (* compute the inference substitution from [mv] *)
         let subst =
           let pat_env = Vars.add_vars pat.pat_op_vars (S.vars s) in
           match Match.Mvar.to_subst ~mode:`Match table pat_env mv with
@@ -1987,8 +1992,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
         (* Check that [hconcl] entails [pat]. *)
         match match_res with
         | NoMatch _ -> None
-        | Match _ when not (Infer.is_closed ty_env) -> None
-        | Match mv -> Some (mv, Infer.close ty_env)
+        | Match mv ->
+          match Infer.close env ty_env with
+          | Closed subst -> Some (mv, subst)
+          | _ -> None
     in
 
     (* try to match a premise of [form] with [hconcl] *)
@@ -2421,12 +2428,17 @@ type form_type =
         {opat with pat_op_term = current_bound}
     with
     | NoMatch _ -> soft_failure (Failure "Cannot match the bounds")
-    | Match _ when not (Infer.is_closed ty_env) ->
-      soft_failure (Failure "all type variables could not be inferred")
+
     (* match succeeded *)
     | Match mv ->
       Match.Mvar.check_args_inferred opat mv;
-      let tsubst = Infer.close ty_env in
+      let tsubst =
+        match Infer.close (S.env s) ty_env with
+        | Infer.Closed subst -> subst
+
+        | _ as e ->
+          soft_failure (Failure (Fmt.str "%a" Infer.pp_error_result e))
+      in
       let subst =
         let pat_env = Vars.add_vars opat.pat_op_vars (S.vars s) in
         match Match.Mvar.to_subst ~mode:`Match table pat_env mv with
@@ -2443,7 +2455,8 @@ type form_type =
       (subgs_pat : Equiv.any_form list)
       (pat : (S.hyp_form * Concrete.bound) Term.pat)
       (hyp : Ident.t)
-      (s : S.t) : Goal.t list =
+      (s : S.t) : Goal.t list
+    =
     let option =
       { Match.default_match_option with mode = `Eq}
     in
@@ -2470,15 +2483,27 @@ type form_type =
       | Atom_conc ve -> ve
       | Form -> soft_failure (Failure "Not a atomic global formula")
     in
-    match Match.T.try_match ~option ~ty_env ~hyps table ~env system match_bound
-            {opat with pat_op_term = current_bound} with
+
+    let result =
+      Match.T.try_match
+        ~option ~ty_env ~hyps table ~env
+        system match_bound
+        { opat with pat_op_term = current_bound; }
+    in
+    match result with
     | NoMatch _ -> soft_failure (Failure "Cannot match the bounds")
-    | Match _ when not (Infer.is_closed ty_env) ->
-      soft_failure (Failure "all type variables could not be inferred")
+        
     (* match succeeded *)
     | Match mv ->
       Match.Mvar.check_args_inferred {opat with pat_op_term = new_bound} mv;
-      let tsubst = Infer.close ty_env in
+      let tsubst =
+        match Infer.close (S.env s) ty_env with
+        | Infer.Closed subst -> subst
+
+        | _ as e ->
+          soft_failure (Failure (Fmt.str "%a" Infer.pp_error_result e))
+      in
+
       let subst =
         let pat_env = Vars.add_vars opat.pat_op_vars (S.vars s_r) in
         match Match.Mvar.to_subst ~mode:`Match table pat_env mv with

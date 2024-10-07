@@ -1693,7 +1693,7 @@ module T (* : S with type t = Term.term *) = struct
 
   (*------------------------------------------------------------------*)
   let unif_ty (st : unif_state) (ty1 : Type.ty) (ty2 : Type.ty) : unit =
-    if Infer.unify_eq st.ty_env ty1 ty2 = `Fail then
+    if Infer.unify_ty st.ty_env ty1 ty2 = `Fail then
       no_unif () 
     else ()
 
@@ -1702,7 +1702,7 @@ module T (* : S with type t = Term.term *) = struct
 
   (*------------------------------------------------------------------*)
   let unif_system (st : unif_state) (se : SE.t) (se' : SE.t) : unit =
-    if not (SE.equal st.table se se') then
+    if Infer.unify_se st.ty_env se se' = `Fail then
       no_unif ()
     else ()
 
@@ -1899,7 +1899,7 @@ module T (* : S with type t = Term.term *) = struct
 
         if tag <> tag' then no_unif ();
         
-        if Infer.unify_eq st.ty_env ty ty' = `Fail then
+        if Infer.unify_ty st.ty_env ty ty' = `Fail then
           no_unif ();
       ) vs vs';
 
@@ -1951,7 +1951,7 @@ module T (* : S with type t = Term.term *) = struct
         (* first time we see [v]: store the substitution and add the
            type information. *)
         | exception Not_found ->
-          if Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
+          if Infer.unify_ty st.ty_env (ty t) (Vars.ty v) = `Fail then
             no_unif ();
 
           (* When [st.allow_capture] is false (which is the default), check that we

@@ -14,7 +14,7 @@ type t = {
 type 'a substitution = t -> 'a -> 'a
 
 (*------------------------------------------------------------------*)
-let pp_subst fmt ts =
+let pp fmt ts =
   let pp_bd fmt (id,ty) =
     Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id Type.pp ty
   in

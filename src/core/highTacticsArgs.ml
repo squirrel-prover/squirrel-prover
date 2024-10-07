@@ -100,7 +100,7 @@ let convert_args env parser_args tactic_type conc =
       let f = 
         match Typing.convert conv_cntxt ~ty:Type.tindex p with
         | Term.Var v, _ -> v
-        | _ -> Typing.conv_err (L.loc p) (Failure "must be a variable of type index")
+        | _ -> Typing.error (L.loc p) (Failure "must be a variable of type index")
       in
       Arg (Index (f))
 

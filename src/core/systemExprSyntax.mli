@@ -26,6 +26,8 @@ module Var : sig
   (*------------------------------------------------------------------*)
   val equal : t -> t -> bool
 
+  val name : t -> string
+    
   val of_ident : Ident.t -> t
   val to_ident : t -> Ident.t
 
@@ -36,16 +38,25 @@ module Var : sig
   val pair : t
 
   (*------------------------------------------------------------------*)
-  type env = (t * info list) Ms.t
-
-  val init_env : env
-
-  (*------------------------------------------------------------------*)
-  (** {3 Sets and Maps } *)
+  (** {3 Sets and maps} *)
 
   module S : Set.S with type elt = t
   module M : Map.S with type key = t
+
+  (*------------------------------------------------------------------*)
+  (** {3 Environment} *)
+ 
+  type env = info list M.t
+
+  val empty_env : env
 end
+
+(*------------------------------------------------------------------*)
+(** A system expression variable with a list of [Var.info]s
+    constraining its possible instantiation. *)
+type tagged_var = Var.t * Var.info list
+
+type tagged_vars = tagged_var list
 
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
@@ -280,9 +291,3 @@ val single_systems_of_context : context -> Single.Set.t option
 
 (** Idem as [single_systems_of_context], but for a system expression. *)
 val single_systems_of_se : t -> Single.Set.t option
-
-(** check that a system expression substitution satisfies the
-    necessary constraints *)
-val check_se_subst :
-  Var.t -> t -> Var.info list ->
-  [`Ok | `BadInst of Format.formatter -> unit]

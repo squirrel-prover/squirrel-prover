@@ -80,19 +80,21 @@ let parse_state_decl
 
   let t, out_ty = Typing.convert ~ty_env ?ty:out_ty conv_env init_body in
 
-  (* check that the typing environment is closed *)
-  if not (Infer.is_closed ty_env) then
-    Typing.conv_err (L.loc init_body) Freetyunivar;
-
   (* close the typing environment and substitute *)
-  let tsubst = Infer.close ty_env in
+  let tsubst =
+    match Infer.close env ty_env with        
+    | Infer.Closed subst -> subst
+
+    | _ as e ->
+      Typing.error (L.loc init_body) (Failure (Fmt.str "%a" Infer.pp_error_result e))
+  in
   let t = Term.gsubst tsubst t in
   let args = List.map (Subst.subst_var tsubst) args in
 
   (* FIXME: generalize allowed types *)
   List.iter2 (fun v (_, pty) ->
       if not (Type.equal (Vars.ty v) Type.tindex) then
-        Typing.conv_err (L.loc pty) (BadPty [Type.tindex])
+        Typing.error (L.loc pty) (BadPty [Type.tindex])
     ) args p_args;
 
   let data =
@@ -146,11 +148,13 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     in
 
     (* check that the typing environment is closed *)
-    if not (Infer.is_closed ty_env) then
-      error (L.loc decl.op_name) KDecl (Failure "some types could not be inferred");
+    let tsubst =
+      match Infer.close env ty_env with        
+      | Infer.Closed subst -> subst
 
-    (* close the typing environment and substitute *)
-    let tsubst = Infer.close ty_env in
+      | _ as e ->
+        error (L.loc decl.op_name) KDecl (Failure (Fmt.str "%a" Infer.pp_error_result e))
+    in
     let args = List.map (Subst.subst_var tsubst) args in
     let out_ty = Subst.subst_ty tsubst out_ty in
     (* substitue in [body] below, in the concrete case *)
@@ -232,31 +236,8 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
 
     (* parse the system variables declared and build the
        system variables environment *)
-    let se_env : SE.Var.env =
-      List.fold_left (fun se_env (lv, infos) ->
-          let name = L.unloc lv in
-
-          let infos =
-            List.map (fun info ->
-                match L.unloc info with
-                | "pair" -> SE.Var.Pair
-                | _ -> error (L.loc info) KDecl (Failure "unknown system information");
-              ) infos
-          in
-          (* ["equiv"] is always a [Pair] *)
-          let infos = if name = "equiv" then SE.Var.Pair :: infos else infos in
-
-          if Ms.mem name se_env then
-            error (L.loc lv) KDecl (Failure "duplicated system name");
-
-          let var =
-            match name with
-            | "set"   -> SE.Var.set
-            | "equiv" -> SE.Var.pair
-            | _ -> SE.Var.of_ident (Ident.create name)
-          in
-          Ms.add name (var, infos) se_env
-        ) SE.Var.init_env decl.pred_se_args
+    let env, se_params =
+      Typing.convert_se_var_bnds env decl.pred_se_args
     in
 
     (* parse binders for multi-term variables *)
@@ -266,10 +247,24 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
            let se_v : SE.t =
              let se_name = L.unloc se_v in
 
-             if not (Ms.mem se_name se_env) then
-               error (L.loc se_v) KDecl (Failure "unknown system variable");
+             let v =
+               let found = ref None in
+               SE.Var.M.iter (fun v' _ ->
+                   if SE.Var.name v' = se_name then begin
+                     (* It must be guaranteed that [env.se_vars] does
+                        not contains multiple identically named
+                        variables. *)
+                     assert (!found = None); 
+                     found := Some v'
+                   end
+                 ) env.Env.se_vars;
 
-             SE.var (fst (Ms.find se_name se_env))
+               match !found with
+               | None -> error (L.loc se_v) KDecl (Failure "unknown system variable")
+               | Some v -> v
+             in
+             
+             SE.var v
            in
            let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env bnds in
            let se_info = Mv.add_list (List.map (fun v -> v, se_v) args) se_info in
@@ -293,17 +288,18 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
         Predicate.Concrete b
     in
 
-    (* check that the typing environment is closed *)
-    if not (Infer.is_closed ty_env) then
-      begin
+    (* close the typing environment and substitute *)
+    let tsubst =
+      match Infer.close env ty_env with        
+      | Infer.Closed subst -> subst
+
+      | _ as e ->
         let loc =
           match decl.pred_body with Some b -> L.loc b | None -> L.loc decl.pred_name
         in
-        error loc KDecl (Failure "some types could not be inferred")
-      end;
-
-    (* close the typing environment and substitute *)
-    let tsubst = Infer.close ty_env in
+        error loc KDecl (Failure (Fmt.str "%a" Infer.pp_error_result e))
+    in
+    
     let multi_args =
       List.map (fun (info, args) ->
           info, List.map (Subst.subst_var tsubst) args
@@ -312,11 +308,6 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     let simpl_args = List.map (Subst.subst_var tsubst) simpl_args in
     let body = Predicate.gsubst_body tsubst body in
 
-    let se_params =
-      List.map (fun (_, (se_v,infos)) ->
-          (se_v, infos)
-        ) (Ms.bindings se_env)
-    in
     let args = Predicate.{ multi = multi_args; simple = simpl_args; } in
     let data = Predicate.mk ~name ~se_params ~ty_params ~args ~body in
 

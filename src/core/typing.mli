@@ -265,7 +265,7 @@ type conversion_error = L.t * conversion_error_i
 
 exception Error of conversion_error
 
-val conv_err : L.t -> conversion_error_i -> 'a
+val error : L.t -> conversion_error_i -> 'a
     
 val pp_error :
   (Format.formatter -> L.t -> unit) ->
@@ -354,6 +354,11 @@ val convert_ext_bnds :
   Env.t -> ext_bnds ->
   Env.t * Term.subst * Vars.vars
 
+(*------------------------------------------------------------------*)
+(** Convert a systeme expression variable binding *)
+val convert_se_var_bnds :
+  Env.t -> (lsymb * lsymb list) list -> Env.t * SE.tagged_vars
+              
 (*------------------------------------------------------------------*)
 (** {3 Global formulas conversion} *)
 

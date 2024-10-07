@@ -122,15 +122,15 @@ val declare_system :
 (** {2 Error handling}*)
 
 type error_i =
-  | ArityError of string * int * int
+  | ArityError          of string * int * int
   | CurrifiedArityError of string * int * int                                      
-  | StrictAliasError of string
-  | DuplicatedUpdate of string
-  | SyntaxError of string
-  | Freetyunivar
-  | ProjsMismatch of Projection.t list * Projection.t list
-  | ActionUndef of Symbols.action
-  
+  | StrictAliasError    of string
+  | DuplicatedUpdate    of string
+  | SyntaxError         of string
+  | ProjsMismatch       of Projection.t list * Projection.t list
+  | ActionUndef         of Symbols.action
+  | Failure             of string
+
 type error = Location.t * error_i
 
 val pp_error :

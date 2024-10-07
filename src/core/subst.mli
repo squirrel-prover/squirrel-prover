@@ -17,7 +17,7 @@ type t = private {
   se_vars : SE.t    Msv.t; (** system expression variables *)  
 }
 
-val pp_subst : t formatter
+val pp : t formatter
 
 (** a substitution function over values of type ['a] *)
 type 'a substitution = t -> 'a -> 'a

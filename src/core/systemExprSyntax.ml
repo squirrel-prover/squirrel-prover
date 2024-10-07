@@ -52,6 +52,9 @@ module Var = struct
   let equal = Ident.equal
 
   (*------------------------------------------------------------------*)
+  let name (t : t) = Ident.name t
+
+  (*------------------------------------------------------------------*)
   let of_ident s = s
   let to_ident s = s
 
@@ -60,11 +63,8 @@ module Var = struct
   let pair = Ident.create "equiv"
 
   (*------------------------------------------------------------------*)
-  type env = (t * info list) Ms.t
-
-  let init_env : env = Ms.empty
-
-  (*------------------------------------------------------------------*)
+  (** {3 Sets and maps} *)
+      
   module O = struct
     type _t = t
     type t  = _t
@@ -73,7 +73,21 @@ module Var = struct
 
   module M = Map.Make (O)
   module S = Set.Make (O)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Environment} *)
+
+  type env = info list M.t
+
+  let empty_env : env = M.empty
 end
+
+(*------------------------------------------------------------------*)
+(** A system expression variable with a list of [Var.info]s
+    constraining its possible instantiation. *)
+type tagged_var = Var.t * Var.info list
+
+type tagged_vars = tagged_var list
 
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
@@ -390,25 +404,3 @@ let single_systems_of_se (se : t) : Single.Set.t option =
     let set_fsets = List.map Stdlib.snd (to_list set) in
     some @@
     Single.Set.of_list set_fsets
-
-(*------------------------------------------------------------------*)
-(** Exported, see `.mli`. *)
-let check_se_subst (v : Var.t) (se : t) (se_infos : Var.info list) =
-  let error e =
-    `BadInst
-      (fun fmt ->
-         Fmt.pf fmt "@[<v 0>system variable substitution:@;\
-                    \  @[%a → %a@]@;\
-                     does not satisfy the system restrictions: %t@]"
-           Var.pp v pp se e)
-  in
-  let check1 (se_info : Var.info) =
-    match se_info with
-    | Var.Pair ->
-      if not (is_fset se && List.length (to_list se) = 2) then
-        Some (error (fun fmt -> Fmt.pf fmt "pair"))
-      else None
-  in
-  match List.find_map check1 se_infos with
-  | None     -> `Ok
-  | Some err -> err

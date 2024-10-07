@@ -258,7 +258,7 @@ let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
     in
     let ty_out = Type.univar (Infer.mk_ty_univar ty_env) in
     let () =
-      match Infer.unify_eq ty_env t (Type.fun_l ty_args ty_out) with
+      match Infer.unify_ty ty_env t (Type.fun_l ty_args ty_out) with
       | `Fail -> assert false   (* FIXME: can this happen? *)
       | `Ok   -> ()
     in
@@ -330,7 +330,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
-        match Infer.unify_eq ty_env (ty term) arg_ty with
+        match Infer.unify_ty ty_env (ty term) arg_ty with
         | `Ok -> ()
         | `Fail -> assert false
       ) terms tys
@@ -338,8 +338,18 @@ let ty ?ty_env (t : term) : Type.ty =
 
   let tty = ty t in
 
-  if must_close
-  then Subst.subst_ty (Infer.close ty_env) tty (* [ty_env] should be closed *)
+  if must_close then
+    let tsubst =
+      (* TODO: system variables: clean-up *)
+      match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ty_env with
+      | Infer.Closed subst -> subst
+
+      | _ -> assert false
+      (* [ty_env] should be closed as we only use it for type variable
+         inference *)
+    in
+
+    Subst.subst_ty tsubst tty 
   else tty
                                           
 (*------------------------------------------------------------------*)
@@ -506,13 +516,17 @@ let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
   in
   (* unify types [ty_args] with [terms] *)
   List.iter2 (fun term arg_ty ->
-      match Infer.unify_eq ty_env (ty term) arg_ty with
+      match Infer.unify_ty ty_env (ty term) arg_ty with
       | `Ok -> ()
       | `Fail -> assert false
     ) terms terms_tys;
 
   (* [ty_env] should be closed thanks to types in [terms]. *)
-  assert (Infer.is_closed ty_env);
+  assert (
+    (* TODO: system variables: clean-up *)
+    match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ty_env with
+    | Closed _ -> true
+    | _        -> false);
 
   let ty_args = 
     List.map (fun uv -> 

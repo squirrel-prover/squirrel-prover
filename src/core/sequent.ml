@@ -716,7 +716,7 @@ module Mk (Args : MkArgs) : S with
 
           List.iter2
             (fun ty1 ty2 ->
-               match Infer.unify_eq ty_env ty1 ty2 with
+               match Infer.unify_ty ty_env ty1 ty2 with
                | `Ok   -> ()
                | `Fail -> assert false) (* cannot fail *)
             ty_vars ty_args;
@@ -1257,7 +1257,10 @@ module Mk (Args : MkArgs) : S with
       (s    : S.t)
     : ghyp * Type.tvars * PT.t
     =
-    let table = S.table s in
+    let table  = S.table  s in
+    let env    = S.env    s in
+    let system = S.system s in
+    
     (* resolve (to some extent) parser ambiguities in [s] *)
     let p_pt = resolve_pt s p_pt in
     let loc = L.loc p_pt in
@@ -1275,13 +1278,13 @@ module Mk (Args : MkArgs) : S with
       else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
         (* TODO this case seems hardly useful because [is_system_context_indep]
            currently forbids both reach and equiv atoms *)
-        { pt with system = S.system s }
+        { pt with system; }
       else
 
         (* First adjust proof-term wrt pair annotation.
            Annotation will be changed later. *)
         let pt =
-          match pt.system.pair, (S.system s).pair with
+          match pt.system.pair, system.pair with
 
           (* Cases where annotation is irrelevant. *)
           | None, _ -> pt
@@ -1293,8 +1296,8 @@ module Mk (Args : MkArgs) : S with
           (* Swapped systems. *)
           | Some src, Some dst
             when
-              let (_,src1),(_,src2) = SystemExprSyntax.fst src, SystemExprSyntax.snd src in
-              let (_,dst1),(_,dst2) = SystemExprSyntax.fst dst, SystemExprSyntax.snd dst in
+              let (_,src1),(_,src2) = SE.fst src, SE.snd src in
+              let (_,dst1),(_,dst2) = SE.fst dst, SE.snd dst in
               (src1,src2) = (dst2,dst1) ->
             pt_rename_system_pair pt (Some dst)
 
@@ -1302,7 +1305,7 @@ module Mk (Args : MkArgs) : S with
         in
 
         (* Then adjust proof-term for set annotations. *)
-        if SE.is_any pt.system.set then { pt with system = S.system s } else
+        if SE.is_any pt.system.set then { pt with system; } else
         let pt_set = SE.(to_list (to_fset pt.system.set)) in
         let s_set = SE.(to_list (to_fset (S.system s).set)) in
         (* We want to be able to move from a set annotation to one of its
@@ -1328,9 +1331,9 @@ module Mk (Args : MkArgs) : S with
              of terms as diff operators cannot appear. *)
           let pt =
             pt_project_system_set table (S.vars s) pt
-              { (S.system s) with set = (SE.make_fset table ~labels:[Some lbl] [ss] :> < > SE.expr) }
+              { system with set = (SE.make_fset table ~labels:[Some lbl] [ss] :> < > SE.expr) }
           in
-          { pt with system = S.system s }
+          { pt with system; }
         | _ ->
           (* Every single system in s_set must be covered (perhaps ambiguously)
              by a single system from pt_set, and every single system from
@@ -1347,7 +1350,7 @@ module Mk (Args : MkArgs) : S with
                  List.length l <= 1)
                pt_set
           then
-            pt_project_system_set table (S.vars s) pt (S.system s)
+            pt_project_system_set table (S.vars s) pt system
           else
             error_pt_bad_system loc table pt
     in
@@ -1358,14 +1361,31 @@ module Mk (Args : MkArgs) : S with
 
     (* pattern variable remaining, and not allowed *)
     if close_pats && not (pt.args = []) then
-      Tactics.soft_failure Tactics.CannotInferPats;
+      Tactics.soft_failure ~loc Tactics.CannotInferPats;
 
     (* close the unienv and generalize remaining univars *)
-    let pat_tyvars, tysubst = Infer.gen_and_close ty_env in
+    let pat_tyvars, _pat_sevars, tysubst =
+      match Infer.gen_and_close env ty_env with
+      | Closed r -> r
+
+      | FreeTyVars | FreeSystemVars ->
+        assert false
+      (* cannot happen (thanks to generalization in [gen_and_close]) *)
+ 
+      | BadInstantiation e ->
+        Tactics.soft_failure ~loc (Failure (Fmt.str "%t" e))
+    in
+    assert (_pat_sevars = []);  (* TODO: system variables: allow to generalize *)
+    (* REM *)
+    Fmt.epr "before: %a@." (Equiv.Babel.pp_dbg Equiv.Any_t) pt.form;
+
     let form = Equiv.Babel.gsubst Equiv.Any_t tysubst pt.form in
     let subgs = List.map (Equiv.Babel.gsubst Equiv.Any_t tysubst) pt.subgs in
     let args =
-      List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args in
+      List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args
+    in
+    (* REM *)
+    Fmt.epr "after: %a@." (Equiv.Babel.pp_dbg Equiv.Any_t) form;
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)

@@ -310,14 +310,14 @@ let pp     = _pp (default_ppe ~dbg:false ())
 
 (*------------------------------------------------------------------*)
 type error_i =
-  | ArityError of string * int * int
+  | ArityError          of string * int * int
   | CurrifiedArityError of string * int * int                   
-  | StrictAliasError of string
-  | DuplicatedUpdate of string
-  | SyntaxError of string      
-  | Freetyunivar
-  | ProjsMismatch of Projection.t list * Projection.t list
-  | ActionUndef of Symbols.action
+  | StrictAliasError    of string
+  | DuplicatedUpdate    of string
+  | SyntaxError         of string      
+  | ProjsMismatch       of Projection.t list * Projection.t list
+  | ActionUndef         of Symbols.action
+  | Failure             of string
 
 type error = L.t * error_i
 
@@ -338,9 +338,6 @@ let pp_error_i fmt = function
   | DuplicatedUpdate s -> 
     Fmt.pf fmt "state %s can only be updated once in an action" s
 
-  | Freetyunivar -> 
-    Fmt.pf fmt "some type variable(s) could not be instantiated"
-
   | ProjsMismatch (ps1, ps2) ->
     Fmt.pf fmt "projections mismatch: @[%a@] ≠ @[%a@]"
       Projection.pp_list ps1
@@ -349,7 +346,9 @@ let pp_error_i fmt = function
   | ActionUndef a ->
     Fmt.pf fmt "action %a used in the system but not defined"
       Symbols.pp_path a
-    
+
+  | Failure s -> Fmt.pf fmt "%s" s
+
 let pp_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aProcess error: @[%a@]."
     pp_loc_err loc
@@ -488,7 +487,7 @@ let parse
           ty
           
         | _ ->
-          Typing.conv_err (Symbols.p_path_loc s_p)
+          Typing.error (Symbols.p_path_loc s_p)
             (Assign_no_state (Symbols.p_path_to_string s_p))
       in
 
@@ -564,12 +563,15 @@ let parse
 
   let proc = doit ty_env env process in
 
-  (* check that the typing environment is closed *)
-  if not (Infer.is_closed ty_env) then
-    error ~loc:(L.loc process) Freetyunivar;
-
   (* close the typing environment and substitute *)
-  let subst = Infer.close ty_env in
+  let subst =
+    match Infer.close env ty_env with        
+    | Infer.Closed subst -> subst
+
+    | _ as e ->
+      error ~loc:(L.loc process) (Failure (Fmt.str "%a" Infer.pp_error_result e))
+  in
+
   let args = List.map (Subst.subst_var subst) args in
   let proc = gsubst subst proc in
 

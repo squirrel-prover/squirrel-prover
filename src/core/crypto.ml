@@ -2777,13 +2777,16 @@ let parse_crypto_args
       Const.create ~vars (Tag.game_glob glob_v game) name ~term ~cond
     in
 
-    (* close the type unification environment *)
-    if not (Infer.is_closed ty_env) then
-      Tactics.hard_failure ~loc:(loc_of_crypto_arg arg)
-        (Failure "some type variables could not be inferred");
+    (* close the inference environment *)
+    let subst =
+      match Infer.close env ty_env with        
+      | Infer.Closed subst -> subst
 
-    let tsubst = Infer.close ty_env in
-    Const.gsubst tsubst const
+      | _ as e ->
+        Tactics.hard_failure ~loc:(loc_of_crypto_arg arg)
+          (Failure (Fmt.str "%a" Infer.pp_error_result e))
+    in
+    Const.gsubst subst const
   in
   let get_terms = fun (x:Const.t) -> x.term@x.cond in 
   let consts =  List.map parse1 args in
@@ -3095,7 +3098,7 @@ module Parse = struct
     let output = 
       match body.bdy_ret with
       | None -> 
-        if Infer.unify_eq ty_env Type.tmessage tyout <> `Ok then
+        if Infer.unify_ty ty_env Type.tmessage tyout <> `Ok then
           failure (L.loc po.o_name) (Failure "return type should be message");
         Term.empty
 
@@ -3146,11 +3149,14 @@ module Parse = struct
     } 
     in
 
-    (* close the type unification environment *)
-    if not (Infer.is_closed ty_env) then
-      failure loc (Failure "some type variables could not be inferred");
+    (* close the inference environment *)
+    let subst =
+      match Infer.close env ty_env with        
+      | Infer.Closed subst -> subst
 
-    let tsubst = Infer.close ty_env in
-    gsubst_game tsubst game
+      | _ as e ->
+        failure loc (Failure (Fmt.str "%a" Infer.pp_error_result e))
+    in
 
+    gsubst_game subst game
 end
