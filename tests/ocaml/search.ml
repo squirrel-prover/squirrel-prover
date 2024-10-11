@@ -228,20 +228,26 @@ let search_about_type_holes_2 () =
 (*------------------------------------------------------------------*)
 let include_search () =
   let st = Prover.init () in
-  (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
     Prover.exec_all ~test:true st
-        "include Logic.
-        channel c
-        system T = (S : !_i new n; out(c,n)).
-        lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
-        Proof."
+        "axiom [any] executability :
+         forall (t:timestamp),
+             happens(t) => exec@t => forall (t0:timestamp), t0 <= t => exec@t0.
+         
+         axiom [any] exec_cond :
+           forall (tau:timestamp), happens(tau) => exec@tau => cond@tau.
+         
+         channel c
+         system T = (S : !_i new n; out(c,n)).
+         lemma [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
+         Proof."
   in
-  let matches = Prover.search_about st
+  let matches = 
+    Prover.search_about st
       (ProverLib.Srch_term (term_from_string "happens(_)"))
   in
-  Alcotest.(check' int) ~msg:"Found 2 lemmas with happens(_)"
-    ~expected:2 ~actual:(List.length matches);
+  Alcotest.(check' int) ~msg:"Found 3 lemmas with happens(_)"
+    ~expected:3 ~actual:(List.length matches);
 
   Alcotest.(check' int) ~msg:"Found one pattern happens(_) in lemma"
     ~expected:1 ~actual:(List.length (snd (List.hd matches)));
@@ -263,8 +269,11 @@ let include_search () =
   Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
-  let matches = Prover.search_about st
-    (ProverLib.Srch_term (term_from_string "<_,_>"))
+  let st = Prover.init () in
+  let st = Prover.exec_all ~test:true st "include Logic." in
+  let matches = 
+    Prover.search_about st
+      (ProverLib.Srch_term (term_from_string "<_,_>"))
   in
   Alcotest.(check' int) ~msg:"Found 2 lemmas with <_,_>"
     ~actual:(List.length matches) ~expected:2;
