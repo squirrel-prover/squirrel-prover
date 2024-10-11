@@ -58,6 +58,9 @@ type tagged_var = Var.t * Var.info list
 
 type tagged_vars = tagged_var list
 
+val pp_tagged_var  : tagged_var  formatter
+val pp_tagged_vars : tagged_vars formatter
+
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 

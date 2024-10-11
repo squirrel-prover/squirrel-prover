@@ -1,17 +1,25 @@
+open Utils
+open Ppenv
+
 module SE = SystemExprSyntax
 
 (*------------------------------------------------------------------*)
 type t = {
   table   : Symbols.table;      (** symbol table *)
   system  : SE.context;         (** default systems *)
+  se_vars : SE.Var.env;         (** free system variables *)
   ty_vars : Type.tvar list;     (** free type variables *)
   vars    : Vars.env;           (** free term variables *)
-  se_vars : SE.Var.env;         (** free system variables *)
 }
 
 (** Historically the system was a system expression, but it has changed
     to a context. For simplicity the field is still named system for now. *)
 
+(*------------------------------------------------------------------*)
+val _pp    : t formatter_p
+val pp     : t formatter
+val pp_dbg : t formatter
+    
 (*------------------------------------------------------------------*)
 val init :
   table:Symbols.table ->

@@ -12,8 +12,9 @@ module Sid = Ident.Sid
 type tvar = Ident.t
 type tvars = tvar list
 
-val pp_tvar     : tvar formatter
-val pp_tvar_dbg : tvar formatter
+val _pp_tvar    : dbg:bool -> tvar formatter
+val pp_tvar     :             tvar formatter
+val pp_tvar_dbg :             tvar formatter
 
 val mk_tvar : string -> tvar
   

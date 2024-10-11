@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 (*------------------------------------------------------------------*)
 module SE = SystemExprSyntax
@@ -7,10 +8,26 @@ module SE = SystemExprSyntax
 type t = {
   table   : Symbols.table;      (** symbol table *)
   system  : SE.context;         (** default systems *)
+  se_vars : SE.Var.env;         (** free system variables *)
   ty_vars : Type.tvar list;     (** free type variables *)
   vars    : Vars.env;           (** free term variables *)
-  se_vars : SE.Var.env;         (** free system variables *)
 }
+
+(*------------------------------------------------------------------*)
+let _pp ppe fmt env =
+  Fmt.pf fmt "@[<v 0>\
+              @[<hov 2>system:@ @[%a@]@]@;\
+              @[<hov 2>ty_vars:@ @[%a@]@]@;\
+              @[<hov 2>se_vars:@ @[%a@]@]@;\
+              @[<hov 2>vars:@ @[%a@]@]@;\
+              @]"
+    SE.pp_context env.system
+    (Fmt.list ~sep:(Fmt.any ",@ ") (Type._pp_tvar ~dbg:ppe.dbg)) env.ty_vars
+    SE.pp_tagged_vars (SE.Var.M.bindings env.se_vars)
+    (Vars._pp_typed_tagged_list ppe) (Vars.to_list env.vars)
+    
+let pp     = _pp (default_ppe ~dbg:false ()) 
+let pp_dbg = _pp (default_ppe ~dbg:true  ()) 
 
 (*------------------------------------------------------------------*)
 let init 

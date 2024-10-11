@@ -89,6 +89,17 @@ type tagged_var = Var.t * Var.info list
 
 type tagged_vars = tagged_var list
 
+let pp_tagged_var fmt (v,infos) =
+  if infos = [] then
+    Fmt.pf fmt "%a" Var.pp v
+  else
+    Fmt.pf fmt "%a[@[%a@]]"
+      Var.pp v
+      (Fmt.list ~sep:(Fmt.any ",@ ") Var.pp_info) infos
+
+let pp_tagged_vars =
+  Fmt.list ~sep:(Fmt.any ",@ ") pp_tagged_var
+
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 
