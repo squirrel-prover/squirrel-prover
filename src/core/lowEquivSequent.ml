@@ -91,6 +91,11 @@ let _pp ppe fmt j =
       ) j.proof_context j.env.vars
   in
   Fmt.pf fmt "@[<v 0>" ;
+
+  if not (SE.Var.M.is_empty j.env.se_vars) then
+    Fmt.pf fmt "@[System variables: %a@]@;" 
+      SE.pp_tagged_vars (SE.Var.M.bindings j.env.se_vars) ;
+
   Fmt.pf fmt "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
 

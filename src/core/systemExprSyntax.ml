@@ -115,6 +115,9 @@ let pp_tagged_var fmt (v,infos) =
 let pp_tagged_vars =
   Fmt.list ~sep:(Fmt.any ",@ ") pp_tagged_var
 
+type p_bnd  = (string L.located * string L.located list) 
+type p_bnds = p_bnd list
+
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 

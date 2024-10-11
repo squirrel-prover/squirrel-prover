@@ -65,15 +65,16 @@ let bind ft fe = function
 (*------------------------------------------------------------------*)
 type ('a,'b) abstract_statement = {
   name    : 'a;
-  ty_vars : Type.tvars;
+  se_vars : SE.tagged_vars;
   system  : SE.context;
+  ty_vars : Type.tvars;
   formula : 'b;
 }
 
 (*------------------------------------------------------------------*)
 type statement        = (string, Equiv.any_statement) abstract_statement
-type global_statement = (string, Equiv.form    ) abstract_statement
-type local_statement  = (string, Equiv.bform     ) abstract_statement
+type global_statement = (string, Equiv.form         ) abstract_statement
+type local_statement  = (string, Equiv.bform        ) abstract_statement
 
 (*------------------------------------------------------------------*)
 let _pp_statement ppe fmt (g : statement) : unit =
@@ -168,11 +169,27 @@ let make_obs_equiv ?(enrich=[]) table system =
 let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let Parsed.{ name; system; ty_vars; vars; formula; } = parsed_goal in
 
-  let system = SE.Parse.parse_sys table system in
-  let name = L.unloc (oget name) in
+  let env = Env.init ~table () in
+
+  (*------------------------------------------------------------------*)
+  (* parse the system variables and the system *)
+  let k, (bnds, p_system) = system in
+  let env, se_vars = Typing.convert_se_var_bnds env bnds in
+  let system = 
+    match k with
+    | `Local  -> SE.Parse.parse_local_context  ~se_env:env.se_vars table p_system
+    | `Global -> SE.Parse.parse_global_context ~se_env:env.se_vars table p_system
+  in
+  let env = Env.update ~system env in
+
+  (*------------------------------------------------------------------*)
+  (* parse the type variables *)
 
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
-  let env = Env.init ~system ~ty_vars ~table () in
+  let env = Env.update ~ty_vars env in
+
+  (*------------------------------------------------------------------*)
+  (* parse the standard variables and the body *)
 
   (* open a typing environment *)
   let ty_env = Infer.mk_env () in
@@ -192,13 +209,14 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
     | Local (f,e) ->
       let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.tboolean f in
       let e =
-           match e with
-            | None -> None
-            | Some e ->
-              let e, _ = 
-                Typing.convert ~ty_env conv_env ~ty:(Library.Real.treal conv_env.env.table) e 
-              in 
-              Some e
+        match e with
+        | None -> None
+        | Some e ->
+          let e, _ = 
+            let ty = Library.Real.treal conv_env.env.table in
+            Typing.convert ~ty_env conv_env ~ty e 
+          in 
+          Some e
       in
       let s = TS.init ~no_sanity_check:true ~env ?bound:e f in
 
@@ -255,5 +273,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   let formula = Equiv.Any_statement.gsubst subst formula in
   let goal = map (TS.gsubst subst) (ES.gsubst subst) goal in
 
-  { name; system; ty_vars; formula },
+  let name = L.unloc (oget name) in
+
+  { name; se_vars; system; ty_vars; formula },
   goal

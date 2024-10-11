@@ -85,6 +85,11 @@ end = struct
         ) s.proof_context s.env.vars
     in
     Fmt.pf fmt "@[<v 0>" ;
+
+    if not (SE.Var.M.is_empty s.env.se_vars) then
+      Fmt.pf fmt "@[System variables: %a@]@;" 
+        SE.pp_tagged_vars (SE.Var.M.bindings s.env.se_vars) ;
+
     Fmt.pf fmt "@[System: %a@]@;"
       SystemExpr.pp_context s.env.system;
 

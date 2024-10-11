@@ -562,8 +562,7 @@ se_bnd:
 | v=se_var LBRACKET l=slist(se_info,empty) RBRACKET { v, l  }
 
 %inline se_bnds:
-/* |                                        { [] } */
-| LBRACE ids=slist(se_bnd,empty) RBRACE { ids }
+| ids=slist(se_bnd,empty) { ids }
 
 (*------------------------------------------------------------------*)
 /* crypto assumption typed space */
@@ -714,7 +713,8 @@ declaration_i:
                 op_body      = body; }) }
 
 | PREDICATE e=lsymb_gen_decl
-  tyvars=ty_vars sebnds=se_bnds
+  tyvars=ty_vars 
+  LBRACE sebnds=se_bnds RBRACE
   multi_args=multi_term_bnds
   simpl_args=bnds
   body=predicate_body? 
@@ -1045,7 +1045,7 @@ trans_arg_item:
 | i=loc(int) COLON t=term %prec tac_prec { i,t }
 
 trans_arg:
-| annot=system_annot { TacticsArgs.TransSystem (`Global, annot) }
+| annot=system_context_with_default { TacticsArgs.TransSystem annot }
 | l=slist1(trans_arg_item, COMMA) { TacticsArgs.TransTerms l }
 
 (*------------------------------------------------------------------*)
@@ -1415,16 +1415,28 @@ system_item_list:
 system_expr:
 | LBRACKET s=loc(system_item_list) RBRACKET   { s }
 
-system_annot_cnt:
-|                                             { SE.Parse.NoSystem }
-| LBRACKET l=loc(system_item_list) RBRACKET   { SE.Parse.System l }
-| LBRACKET
-    SET COLON s=loc(system_item_list) SEMICOLON
+/* ----------------------------------------------------------------------- */
+system_context_i:
+| l=loc(system_item_list)    { SE.Parse.System l }
+| SET COLON s=loc(system_item_list) SEMICOLON
   EQUIV COLON p=loc(system_item_list)
-  RBRACKET                                    { SE.Parse.Set_pair (s,p) }
+                             { SE.Parse.Set_pair (s,p) }
+
+system_context:
+| x=loc(system_context_i) { x }
+
+system_context_with_default:
+|      { let loc = L.make $startpos $endpos in
+          L.mk_loc loc SE.Parse.NoSystem }
+| LBRACKET s=system_context RBRACKET
+       { s }
+
+system_context_with_vars:
+| LBRACE SYSTEM bnds=se_bnds COMMA c=system_context RBRACE { (bnds, c) }
 
 system_annot:
-| a=loc(system_annot_cnt) { a }
+| c=system_context_with_default   { ([], c) }
+| bnds_c=system_context_with_vars { bnds_c }
 
 /* -----------------------------------------------------------------------
  * Statements and goals

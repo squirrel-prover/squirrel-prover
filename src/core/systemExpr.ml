@@ -306,18 +306,20 @@ module Parse = struct
     to_pair pair
 
   (*------------------------------------------------------------------*)
-  type sys_cnt =
+  type p_context_i =
     | NoSystem
     | System   of t
     | Set_pair of t * t
 
-  type sys = [`Local | `Global] * sys_cnt L.located
+  type p_context = p_context_i L.located 
+
+  type sys = [`Local | `Global] * (p_bnds * p_context)
 
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])
 
   (** Parse the system context for a local statement. *)
-  let parse_local_context ?se_env table (c : sys_cnt L.located) : context = 
+  let parse_local_context ?se_env table (c : p_context) : context = 
     match L.unloc c with
     | NoSystem ->
       { set = parse ?se_env table empty ; pair = None }
@@ -332,7 +334,7 @@ module Parse = struct
       { set ; pair = Some pair; }
 
   (** Parse the system context for a global statement. *)
-  let parse_global_context ?se_env table (c : sys_cnt L.located) : context = 
+  let parse_global_context ?se_env table (c : p_context) : context = 
     let check_compatible set pair =
       if not (compatible table set pair) then 
         error ~loc:(L.loc c) Incompatible_systems;
@@ -348,9 +350,4 @@ module Parse = struct
     let pair = parse_pair ?se_env table pair in
     check_compatible set pair;
     { set ; pair = Some pair; }
-    
-  let parse_sys ?(se_env:Var.env option) table ((k,p_system) : sys) : context =
-    match k with
-    | `Local  -> parse_local_context  ?se_env table p_system
-    | `Global -> parse_global_context ?se_env table p_system
 end

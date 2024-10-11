@@ -135,7 +135,7 @@ type fresh_arg =
 (** {3 Trans tactic arguments} *)
 
 type trans_arg =
-  | TransSystem of SE.Parse.sys
+  | TransSystem of SE.Parse.p_context
   | TransTerms  of (int L.located * Typing.term) list
 
 (*------------------------------------------------------------------*)

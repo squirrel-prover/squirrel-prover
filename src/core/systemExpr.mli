@@ -145,12 +145,17 @@ module Parse : sig
   (** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
   val parse : ?se_env:Var.env -> Symbols.table -> t -> arbitrary
 
-  type sys_cnt =
+  (*------------------------------------------------------------------*)
+  type p_context_i =
     | NoSystem
     | System   of t
     | Set_pair of t * t
 
-  type sys = [`Local | `Global] * sys_cnt L.located
+  type p_context = p_context_i L.located 
 
-  val parse_sys : ?se_env:Var.env -> Symbols.table -> sys -> context
+  val parse_local_context  : ?se_env:Var.env -> Symbols.table -> p_context -> context
+  val parse_global_context : ?se_env:Var.env -> Symbols.table -> p_context -> context
+
+  (*------------------------------------------------------------------*)
+  type sys = [`Local | `Global] * (p_bnds * p_context)
 end

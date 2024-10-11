@@ -161,6 +161,7 @@ let mk_equiv_statement
   in
   let formula = make_conclusion formula in
   Goal.{ name    = new_axiom_name; 
+         se_vars = [];
          system  = context; 
          ty_vars = []; 
          formula }

@@ -128,10 +128,12 @@ let mk_depends_lemma
   in
   Goal.{
     name;
+    se_vars = [];
+    system  = SE.(reachability_context full_any);
     ty_vars = [];
-    system = SE.(reachability_context full_any);
     formula = Equiv.LocalS {formula = form; bound = None};
   } 
+  (* TODO: sv: use se vars + restrict to compatible *)
   (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
@@ -167,10 +169,12 @@ let mk_mutex_lemma
   in
   Goal.{
     name;
+    se_vars = [];
+    system  = SE.reachability_context SE.full_any;
     ty_vars = [];
-    system = SE.reachability_context SE.full_any;
     formula = Equiv.LocalS {formula; bound = None};
   }
+(* TODO: sv: use se vars + restrict to compatible *)
   (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)

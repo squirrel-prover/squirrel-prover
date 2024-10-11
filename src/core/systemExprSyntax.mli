@@ -63,6 +63,10 @@ type tagged_vars = tagged_var list
 val pp_tagged_var  : tagged_var  formatter
 val pp_tagged_vars : tagged_vars formatter
 
+(** system variable binder in the surface AST *)
+type p_bnd  = (string L.located * string L.located list) 
+type p_bnds = p_bnd list
+
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 

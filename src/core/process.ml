@@ -731,9 +731,11 @@ let mk_namelength_statement
   (* build statement with name given in arg (often namelength_s with s the
      symbol of the name) *)
   table, { name; 
+           se_vars = [];
            system  = SystemExpr.context_any; 
            ty_vars = ftype.fty_vars; 
            formula = Equiv.GlobalS f }
+  (* TODO: sv: use se vars *)
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)

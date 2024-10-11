@@ -357,7 +357,7 @@ val convert_ext_bnds :
 (*------------------------------------------------------------------*)
 (** Convert a systeme expression variable binding *)
 val convert_se_var_bnds :
-  Env.t -> (lsymb * lsymb list) list -> Env.t * SE.tagged_vars
+  Env.t -> SE.p_bnds -> Env.t * SE.tagged_vars
               
 (*------------------------------------------------------------------*)
 (** {3 Global formulas conversion} *)
