@@ -277,7 +277,9 @@ let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t 
 let trans_tac args s =
   match args with
   | [Args.Trans (Args.TransSystem ((_,new_sys) as annot))] ->
-    let context = SE.Parse.parse_sys (ES.table s) annot in
+    let table = ES.table s in
+    let se_env = (ES.env s).se_vars in
+    let context = SE.Parse.parse_sys ~se_env table annot in
     fun sk fk ->
       begin match transitivity_systems ~loc:(L.loc new_sys) context s with
         | l -> sk l fk

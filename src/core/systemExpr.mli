@@ -143,7 +143,7 @@ module Parse : sig
   type t = item list L.located
 
   (** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
-  val parse : Symbols.table -> t -> arbitrary
+  val parse : ?se_env:Var.env -> Symbols.table -> t -> arbitrary
 
   type sys_cnt =
     | NoSystem
@@ -152,5 +152,5 @@ module Parse : sig
 
   type sys = [`Local | `Global] * sys_cnt L.located
 
-  val parse_sys : Symbols.table -> sys -> context
+  val parse_sys : ?se_env:Var.env -> Symbols.table -> sys -> context
 end

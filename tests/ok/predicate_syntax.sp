@@ -32,3 +32,8 @@ predicate a1 ['a 'b] {set equiv} {set: (u : 'a, v : 'b)} {equiv: (x : 'b)} =
 
 predicate a2 ['a 'b] {set equiv} {set: (u : 'a, m : 'b)} {equiv: x : message} =
   Exists (f : ('a -> 'b)[adv]), [f u = m] /\ equiv(x).
+
+(* --------------------------------------------------------- *)
+predicate Bar {S1} {S1 : x : message}.
+
+predicate Bar1 {S1 S2} {S1 : x} {S2: y} = Bar{[S1]} x /\ Bar{[S2]} y.

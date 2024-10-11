@@ -247,19 +247,8 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
            let se_v : SE.t =
              let se_name = L.unloc se_v in
 
-             let v =
-               let found = ref None in
-               SE.Var.M.iter (fun v' _ ->
-                   if SE.Var.name v' = se_name then begin
-                     (* It must be guaranteed that [env.se_vars] does
-                        not contains multiple identically named
-                        variables. *)
-                     assert (!found = None); 
-                     found := Some v'
-                   end
-                 ) env.Env.se_vars;
-
-               match !found with
+             let v = 
+               match SE.Var.lookup_string se_name env.Env.se_vars with
                | None -> error (L.loc se_v) KDecl (Failure "unknown system variable")
                | Some v -> v
              in

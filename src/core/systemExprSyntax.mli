@@ -49,6 +49,8 @@ module Var : sig
   type env = info list M.t
 
   val empty_env : env
+
+  val lookup_string : string -> env -> t option 
 end
 
 (*------------------------------------------------------------------*)

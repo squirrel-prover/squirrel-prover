@@ -80,6 +80,21 @@ module Var = struct
   type env = info list M.t
 
   let empty_env : env = M.empty
+
+  let lookup_string (se_name : string) (env : env) : t option =
+    (* FIXME: inefficient as we lookup through the whole table *)
+    let found = ref None in
+    M.iter (fun v' _ ->
+        if name v' = se_name then begin
+          (* It must be guaranteed that [env.se_vars] does
+             not contains multiple identically named
+             variables. *)
+          assert (!found = None); 
+          found := Some v'
+        end
+      ) env;
+    !found
+
 end
 
 (*------------------------------------------------------------------*)

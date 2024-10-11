@@ -387,17 +387,17 @@ let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
 let search_about (st:state) (q:ProverLib.search_query) : 
   (Lemma.lemma * Equiv.any_form list) list =
   let env = 
-    begin match st.prover_mode with
+    match st.prover_mode with
     | ProofMode -> 
-      let goal = get_first_subgoal st
-      in
+      let goal = get_first_subgoal st in
       begin match goal with
         | Goal.Local  j -> LowTraceSequent.env j
         | Goal.Global j -> LowEquivSequent.env j
       end
+      
     | _ -> 
       begin match q with 
-      | ProverLib.Srch_inSys (_,sysexpr) ->
+        | ProverLib.Srch_inSys (_,sysexpr) ->
           let set = SE.Parse.parse (get_table st) sysexpr in
 
           if not (SE.is_pair set) then 
@@ -409,9 +409,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
                     pair = Some (SE.to_pair set)
                   }) in
           Env.init ~table:st.table ?system () 
-      | _ -> Env.init ~table:st.table ()
+        | _ -> Env.init ~table:st.table ()
       end
-    end
   in
   Printer.prt `Default "@[<2>Search in context system@ [@[%a@]].@]@."
     SE.pp env.system.set;
