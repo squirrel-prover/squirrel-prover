@@ -45,9 +45,3 @@ Proof.
   - admit.
 Qed.
 
-(* (* Weird anomaly on `simpl` *) *)
-(* global lemma [set : S/left; equiv : S/left,S/left] _ : *)
-(*   equiv(empty,fun x => diff(x,zeroes(x)), fun b => not b). *)
-(* Proof. *)
-(*   rewrite oracle (fun (y : message) => y) in 1. *)
-(*   intro f. simpl. *)
