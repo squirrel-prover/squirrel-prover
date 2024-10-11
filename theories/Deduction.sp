@@ -96,11 +96,11 @@ namespace Quantum.
   (* ------------------------------------------------------------------- *)
   (* `transcript@t ▷ {transcript@t' | ∀ t' < t}` *)
   global axiom transcript_from_transcript {P : system} @set:P :
-    $( (fun t => frame@t)
+    $( (fun t => transcript@t)
        |1>
        (fun t t' => if t' <= t then transcript@t')
     ).
-  hint deduce transcript_from_frame.
+  hint deduce transcript_from_transcript.
 
   (* `transcript@t ▷ {exec@t' | ∀ t' ≤ t}` *)
   global axiom exec_from_transcript {P : system} @set:P :
