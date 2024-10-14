@@ -389,7 +389,8 @@ let indcca_param
     let xk = Vars.make_fresh kty "K" in
 
     (* the rewrite rule *)
-    {rw_tyvars = [];
+    {
+     rw_params = Params.empty;
      rw_system = SE.to_arbitrary sys; (* rewrite in the pair *)
      rw_vars   = Vars.Tag.local_vars [xm; xr; xk]; (* local information,
                                                       since we allow to

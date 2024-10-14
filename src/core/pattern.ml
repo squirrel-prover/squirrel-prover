@@ -2,13 +2,13 @@ module Sv = Vars.Sv
 module C = Concrete
 (*------------------------------------------------------------------*)
 
-let open_pat (type a )
+let open_pat (type a)
     (f_kind : a Equiv.f_kind)
     (ty_env : Infer.env)
-    (p      : (a*C.bound) Term.pat)
-  : Subst.t *  (a*C.bound) Term.pat_op
+    (p      : (a * C.bound) Term.pat)
+  : Subst.t * (a * C.bound) Term.pat_op
   =
-  let univars, tsubst = Infer.open_tvars ty_env p.pat_tyvars in
+  let pat_op_params, tsubst = Infer.open_params ty_env p.pat_params in
   let conclusion,bound = p.pat_term in
   let conclusion = Equiv.Babel.gsubst f_kind tsubst conclusion in
   let bound = C.bound_gsubst tsubst bound in
@@ -16,7 +16,7 @@ let open_pat (type a )
   ( tsubst,
     Term.{ 
       pat_op_term   = (conclusion, bound);
-      pat_op_tyvars = univars;
+      pat_op_params;
       pat_op_vars   = vars; 
     } )
 
@@ -27,9 +27,9 @@ let pat_of_form (t : Term.term) =
   let t = Term.subst s t in
 
   Term.{
-    pat_tyvars = [];
-    pat_vars = vs;
-    pat_term = t;
+    pat_params = Params.empty;
+    pat_vars   = vs;
+    pat_term   = t;
   }
     
 (*------------------------------------------------------------------*)
@@ -38,9 +38,9 @@ let op_pat_of_term (t : Term.term) =
     Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
   in
   Term.{
-    pat_op_tyvars = [];
+    pat_op_params = Params.Open.empty;
     pat_op_vars   = Vars.Tag.local_vars vars;
-    (* local information, since we allow to match diff operators *)
+    (* unrestricted variables *)
     
     pat_op_term   = t;
   }

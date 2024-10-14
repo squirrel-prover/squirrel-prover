@@ -116,7 +116,7 @@ let deprecated_pat_subsumes
     (t1 : Term.term) (pat2 : Term.term Term.pat_op) 
   : Match.Mvar.t option
   =
-  assert (pat2.pat_op_tyvars = []);
+  assert (pat2.pat_op_params = Params.Open.empty);
   match Match.T.try_match ~mv table context t1 pat2
   with
   | NoMatch _ -> None
@@ -134,7 +134,7 @@ let[@warning "-27"] deprecated_term_occ_subsumes
 
   let pat2 = Term.{
       pat_op_term   = occ2.occ_cnt;
-      pat_op_tyvars = [];
+      pat_op_params = Params.Open.empty;
       pat_op_vars   = Vars.Tag.local_vars occ2.occ_vars; 
     } in
   match deprecated_pat_subsumes table context occ1.occ_cnt pat2 with

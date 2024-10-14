@@ -346,7 +346,7 @@ let rewrite_equiv_transform
     let to_deduce =
       Term.{
         pat_op_vars   = [];
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
         pat_op_term   = Equiv.mk_equiv_atom [t];}
       (* We could also take [diff(t,t)] to build the bi-term *)
     in
@@ -769,7 +769,7 @@ let deprecated_fresh_occ_incl
        [cond])
   in
   let pat2 = Term.{
-      pat_op_tyvars = [];
+      pat_op_params = Params.Open.empty;
       pat_op_vars   = Vars.Tag.local_vars o2.occ_vars;
       pat_op_term   = mk_dum a2 is2 cond2;
     }

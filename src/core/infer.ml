@@ -56,7 +56,7 @@ let set ~(tgt : env) ~(value : env) : unit =
 
 (*------------------------------------------------------------------*)
 let mk_ty_univar (env : env) : Type.univar =
-  let uv = Ident.create "_u" in
+  let uv = Ident.create "?u" in
   let ety = Type.univar uv in
   env := { !env with ty = Mid.add uv ety !env.ty; };
   uv
@@ -66,33 +66,46 @@ let mk_se_univar
     ?(constraints:SE.Var.info list = []) (env : env)
   : SE.Var.t
   =
-  let uv = SE.Var.of_ident (Ident.create "_s") in
+  let uv = SE.Var.of_ident (Ident.create "?P") in
   let e = SE.{ cnt = SE.Var uv; name = None; } in
   env := { !env with se = Msv.add uv (e,constraints) !env.se; };
   uv
 
 (*------------------------------------------------------------------*)
-let open_tvars (env : env) (tvars : Type.tvars) =
+let open_tvars ?(subst = Subst.empty_subst) (env : env) (tvars : Type.tvars) =
   let vars_f = List.map (fun _ -> mk_ty_univar env) tvars in
 
   (* create substitution refreshing all type variables *)
-  let ts_tvar =
-    List.fold_left2 (fun ts_tvar (id : Type.tvar) id_f ->
-        Mid.add (id :> Ident.t) (Type.univar id_f) ts_tvar
-      ) Mid.empty tvars vars_f
+  let subst =
+    List.fold_left2 (fun subst (id : Type.tvar) id_f ->
+        Subst.add_tvar subst (id :> Ident.t) (Type.univar id_f) 
+      ) subst tvars vars_f
   in
-  let ts = Subst.mk_subst ~univars:Mid.empty ~tvars:ts_tvar () in
-  vars_f, ts
+  vars_f, subst
 
 (*------------------------------------------------------------------*)
-(** [univar] are maximal for this ordering *)
-let compare (t : Type.ty) (t' : Type.ty) : int =
-  match t, t' with
-  | TUnivar u, TUnivar u' -> Ident.compare u u'
-  | TUnivar _, _ -> 1
-  | _, TUnivar _ -> -1
-  | _, _ -> Stdlib.compare t t'
+let open_svars ?(subst = Subst.empty_subst) (env : env) (svars : SE.tagged_vars) =
+  let vars_f = 
+    List.map (fun (_,constraints) -> mk_se_univar ~constraints env) svars 
+  in
 
+  (* create substitution refreshing all type variables *)
+  let subst =
+    List.fold_left2 (fun subst ( (id,_) : _) id_f ->
+        Subst.add_se_var subst id (SE.var id_f) 
+      ) subst svars vars_f
+  in
+  vars_f, subst
+
+(*------------------------------------------------------------------*)
+let open_params (env : env) (p : Params.t) =
+  let subst = Subst.empty_subst in
+  let ty_vars, subst = open_tvars ~subst env p.ty_vars in
+  let se_vars, subst = open_svars ~subst env p.se_vars in
+
+  Params.Open.{ ty_vars; se_vars; }, subst
+
+(*------------------------------------------------------------------*)
 let norm_ty (env : env) (t : Type.ty) : Type.ty =
   let rec doit : Type.ty -> Type.ty = function
     | TUnivar u as t ->
@@ -233,9 +246,7 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
 (** Generalize unification variables and close the inference
     environment. *)
 let gen_and_close
-    (env : Env.t) (ienv : env)
-  :
-    (Type.tvars * SE.tagged_vars * Subst.t) result
+    (env : Env.t) (ienv : env) : (Params.t * Subst.t) result
   =
 
   (* normalize the inference environment *)
@@ -321,7 +332,10 @@ let gen_and_close
   
   (* close the resulting environment *)
   match failed with
-  | [] -> Closed (gen_tvars, gen_se_vars, to_subst ienv)
+  | [] -> 
+    let params = Params.{ ty_vars = gen_tvars; se_vars = gen_se_vars; } in
+    Closed (params, to_subst ienv)
+
   | _  ->
     BadInstantiation
       (fun fmt ->
@@ -330,12 +344,23 @@ let gen_and_close
            failed)
 
 (*------------------------------------------------------------------*)
+(** [univar] are maximal for this ordering *)
+(* FIXME: why don't we restrict ourselves to [univar] in the domain of
+   the inference environment? (as for in [compare_se] below) *)
+let compare_ty (t : Type.ty) (t' : Type.ty) : int =
+  match t, t' with
+  | TUnivar u, TUnivar u' -> Ident.compare u u'
+  | TUnivar _, _ -> 1
+  | _, TUnivar _ -> -1
+  | _, _ -> Stdlib.compare t t'
+
+(*------------------------------------------------------------------*)
 let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
   let t  = norm_ty env t
   and t' = norm_ty env t' in
 
   let rec do_unif t t' : bool =
-    let t, t' = if compare t t' < 0 then t', t else t, t' in
+    let t, t' = if compare_ty t t' < 0 then t', t else t, t' in
 
     if Type.equal t t'
     then true
@@ -355,5 +380,28 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
   if do_unif t t' then `Ok else `Fail
 
 (*------------------------------------------------------------------*)
-let unify_se (_env : env) (t : SE.t) (t' : SE.t) : [`Fail | `Ok] =
-  if SE.equal0 t t' then `Ok else `Fail
+(** system unification variables (i.e. variable in the domain of
+    [!env.se] are maximal for this ordering *)
+let compare_se (env : env) (t : < > SE.exposed) (t' : < > SE.exposed) : int =
+  match t.cnt, t'.cnt with
+  | Var u, Var u' when Msv.mem u !env.se && Msv.mem u' !env.se -> 
+    Ident.compare (SE.Var.to_ident u) (SE.Var.to_ident u')
+  | Var u, _ when Msv.mem u !env.se -> 1
+  | _, Var u when Msv.mem u !env.se -> -1
+  | _, _ -> Stdlib.compare t t'
+
+(*------------------------------------------------------------------*)
+let unify_se (env : env) (t : SE.t) (t' : SE.t) : [`Fail | `Ok] =
+  let t  = (norm_se env t  :> < > SE.exposed)
+  and t' = (norm_se env t' :> < > SE.exposed) in
+
+  let t, t' = if compare_se env t t' < 0 then t', t else t, t' in
+
+  if SE.equal0 (SE.force t) (SE.force t') then `Ok else
+    match t.cnt, t'.cnt with
+    | Var u, _ when Msv.mem u !env.se -> 
+      (* [u] is a system unification variable. *)
+      let _, infos = Msv.find u !env.se in
+      env := { !env with se = Msv.add u (t',infos) !env.se; }; `Ok
+
+    | _ -> `Fail

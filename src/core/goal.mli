@@ -35,9 +35,8 @@ val bind     : (TS.t -> 'a)        -> (ES.t -> 'a)        -> t -> 'a
     axioms, or hypotheses extracted from a sequent. *)
 type ('a,'b) abstract_statement = {
   name    : 'a;
-  se_vars : SE.tagged_vars;
+  params  : Params.t;
   system  : SE.context;
-  ty_vars : Type.tvars;
   formula : 'b;
 }
 

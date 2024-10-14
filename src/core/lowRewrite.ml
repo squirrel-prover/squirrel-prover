@@ -9,20 +9,16 @@ type rw_kind = LocalEq | GlobalEq
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
 type rw_rule = {
-  rw_tyvars : Type.tvars;            
+  rw_params : Params.t;
   rw_system : SE.t;                  
   rw_vars   : Vars.tagged_vars;      
   rw_conds  : Term.term list; 
   rw_rw     : Term.term * Term.term; 
   rw_kind   : rw_kind;
-  rw_bound : Concrete.bound;
+  rw_bound  : Concrete.bound;
 }
 
 let pp_rw_rule fmt (rw : rw_rule) =
-  let pp_tys fmt tys = 
-    if tys = [] then () else
-      Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
-  in
   let pp_vars fmt vars = 
     if vars = [] then () else
       Fmt.pf fmt "%a " Vars.pp_typed_tagged_list vars
@@ -34,7 +30,7 @@ let pp_rw_rule fmt (rw : rw_rule) =
   
   let src, dst = rw.rw_rw in
   Fmt.pf fmt "%a%a: %a -> %a%a"
-    pp_tys rw.rw_tyvars
+    Params.pp rw.rw_params
     pp_vars rw.rw_vars
     Term.pp src Term.pp dst
     pp_conds rw.rw_conds
@@ -56,7 +52,7 @@ let pat_to_rw_rule ?loc
     (system    : SE.arbitrary) 
     (rw_kind   : rw_kind)
     (dir       : [< `LeftToRight | `RightToLeft ])
-    (p         : (Term.term*Concrete.bound) Term.pat)
+    (p         : (Term.term * Concrete.bound) Term.pat)
   : rw_rule 
   =
   let _ = loc in                (* unused *)
@@ -79,7 +75,7 @@ let pat_to_rw_rule ?loc
   in
 
   let rule = {
-    rw_tyvars = p.pat_tyvars;
+    rw_params = p.pat_params;
     rw_system = system;
     rw_vars   = p.pat_vars;
     rw_conds  = subs;

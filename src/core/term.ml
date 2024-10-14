@@ -2380,7 +2380,7 @@ module Hm = Map.Make(struct
     term [t] and a subset of [t]'s free variables that must be
     infered. *)
 type 'a pat = {
-  pat_tyvars : Type.tvars;
+  pat_params : Params.t;
   pat_vars   : (Vars.var * Vars.Tag.t) list;
   pat_term   : 'a;
 }
@@ -2388,15 +2388,10 @@ type 'a pat = {
 (** An opened pattern, i.e. a pattern where type variables are
     type unification variables. *)
 type 'a pat_op = {
-  pat_op_tyvars : Type.univars;
+  pat_op_params : Params.Open.t;
   pat_op_vars   : (Vars.var * Vars.Tag.t) list;
   pat_op_term   : 'a;
 }
-
-let pp_pat_term_op fmt (pat : term pat_op):unit =
-  Fmt.pf fmt "( %a | %a)"
-    pp pat.pat_op_term
-    (Fmt.list ~sep:Fmt.comma Vars.pp) (List.map fst pat.pat_op_vars)
 
 let project_tpat (projs : Projection.t list) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }

@@ -70,7 +70,7 @@ module type S = sig
     ?close_pats:bool ->
     Typing.pt -> 
     t ->
-    ghyp * Type.tvars * PT.t
+    ghyp * Params.t * PT.t
 
   (** Same as [convert_pt_gen], when the system is the current system of
       the sequent. *)
@@ -78,7 +78,7 @@ module type S = sig
     ?close_pats:bool ->
     Typing.pt -> 
     t ->
-    ghyp * Type.tvars * PT.t
+    ghyp * Params.t * PT.t
 end
 
 (*------------------------------------------------------------------*)

@@ -78,6 +78,16 @@ let check_ty_eq ?loc ty1 ty2 =
   ()
 
 (*------------------------------------------------------------------*)
+let check_empty_params (params : Params.t) =
+  if params.ty_vars <> [] then
+    soft_failure (Failure "free type variables remaining") ;
+
+  if params.se_vars <> [] then
+    soft_failure (Failure "free system variables remaining") ;
+
+  assert (params = Params.empty)
+
+(*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
   | `Var of Vars.tagged_var (* Careful, the variable is not added to the env *)
@@ -711,7 +721,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Convert a proof-term to a pattern + subgoals of the given kind. *)
   let pt_to_pat (type a)
       ~failed (loc : L.t) 
-      (kind : a Equiv.f_kind) (tyvars : Type.tvars)
+      (kind : a Equiv.f_kind) (params : Params.t)
       (pt : Sequent.PT.t) : Equiv.any_form list * (a * Concrete.bound) Term.pat
     =
     assert (pt.mv = Match.Mvar.empty);
@@ -723,9 +733,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind pt.form
     in
     let pat = Term.{
-        pat_tyvars = tyvars;
+        pat_params = params;
         pat_vars   = pt.args;
-        pat_term = (pat_term, pt.bound); }
+        pat_term   = (pat_term, pt.bound); }
     in
     let subgs = pt.subgs in
     subgs, pat
@@ -831,8 +841,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.t list * 
     Equiv.global_form *
     [ `LeftToRight | `RightToLeft ]
-
-
+  
   let bad_rw_equiv_pt loc () =
     soft_failure ~loc
       (Failure "cannot rewrite an equivalence: this proof-term does not prove a \
@@ -844,15 +853,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Rw p_pt ->
       let dir = L.unloc rw_arg.rw_dir in
 
-      let _, tyvars, pt = S.convert_pt_gen ~check_compatibility:false p_pt s in
+      let _, params, pt = S.convert_pt_gen ~check_compatibility:false p_pt s in
       assert (pt.mv = Match.Mvar.empty);
 
       let pt = 
         Sequent.pt_try_cast ~failed:(bad_rw_equiv_pt (L.loc p_pt)) Global_t pt
       in
 
-      if tyvars <> [] then
-        soft_failure (Failure "free type variables remaining") ;
+      (* check that no type or system variables remain *)
+      check_empty_params params;
 
       if pt.args <> [] then
         soft_failure (Failure "universally quantified variables remaining") ;
@@ -2069,11 +2078,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (p_pt : Typing.pt) (s : S.t) : Equiv.any_form list * (a * Concrete.bound) Term.pat
     =
     let loc = L.loc p_pt in
-    let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
+    let _, params, pt = S.convert_pt ~close_pats:false p_pt s in
     assert (pt.mv = Match.Mvar.empty);
     assert (pt.bound = Glob || pt.bound = LocAsym || Equiv.is_local pt.form);
     let subgs, pat =
-      pt_to_pat loc ~failed:(bad_apply_pt loc) dst tyvars pt
+      pt_to_pat loc ~failed:(bad_apply_pt loc) dst params pt
     in
     subgs, pat
 
@@ -2613,16 +2622,17 @@ type form_type =
     =
     let loc = L.loc p_pt in
 
-    let _, tyvars, pt = S.convert_pt p_pt s in
+    let _, params, pt = S.convert_pt p_pt s in
     assert (pt.mv = Match.Mvar.empty);
     (* [subgs_pt]: subgoals resulting from the convertion of the proof term [pt] *)
     let subgs_pt, pat =
-      pt_to_pat loc ~failed:(bad_apply_pt loc) Equiv.Any_t tyvars pt
+      pt_to_pat loc ~failed:(bad_apply_pt loc) Equiv.Any_t params pt
     in
     let formula, bound = pat.pat_term in
     let pat, _ = {pat with pat_term = formula }, {pat with pat_term = bound} in
-    if pat.pat_tyvars <> [] then
-      soft_failure (Failure "free type variables remaining") ;
+
+    (* check that no type or system variables remain *)
+    check_empty_params params;
 
     (* rename cleanly the variables and add universal quantifiers *)
     let _, vars, subst =

@@ -222,7 +222,7 @@ struct
       (t1 : Term.term) (pat2 : Term.term Term.pat_op)
     : Match.Mvar.t option
     =
-    assert (pat2.pat_op_tyvars = []);
+    assert (pat2.pat_op_params = Params.Open.empty);
     let context = SE.reachability_context system in
     match Match.T.try_match ~mv table context t1 pat2
     with
@@ -262,7 +262,7 @@ struct
           Term.mk_ands ~simpl:false [phi_f; phi_ac]
         in
         let pat2 = Term.{
-            pat_op_tyvars = [];
+            pat_op_params = Params.Open.empty;
             pat_op_vars   = Vars.Tag.local_vars o2.so_vars;
             (* local information, since we allow to match diff operators *)
 

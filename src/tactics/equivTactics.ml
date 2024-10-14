@@ -798,7 +798,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
       Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
     in
     let pat = Term.{
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
         pat_op_vars   = Vars.Tag.local_vars vars;
         (* local inforation, since we allow to match diff operators *)
 
@@ -931,7 +931,7 @@ let deduce_all (s:ES.t) =
       let goal = Equiv.mk_equiv_atom biframe in
       let pat = Term.{
           pat_op_vars   = [];
-          pat_op_tyvars = [];
+          pat_op_params = Params.Open.empty;
           pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
         } in
       let match_result = 
@@ -959,7 +959,7 @@ let deduce_int (i : int L.located) s =
   let table, system = ES.table s, ES.system s in
   let pat = Term.{
       pat_op_vars   = [];
-      pat_op_tyvars = [];
+      pat_op_params = Params.Open.empty;
       pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
     } in
   let conclusion = ES.conclusion s in
@@ -1005,7 +1005,7 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
   let pat = 
     Term.{
       pat_op_vars   = [];
-      pat_op_tyvars = [];
+      pat_op_params = Params.Open.empty;
       pat_op_term   = Equiv.mk_equiv_atom (ES.secrecy_left goal);} 
   in
   let conclusion = Equiv.mk_equiv_atom [ES.secrecy_right goal] in
@@ -1044,7 +1044,7 @@ let deduce_predicate_int
   let pat =
     Term.{
       pat_op_vars   = [];
-      pat_op_tyvars = [];
+      pat_op_params = Params.Open.empty;
       pat_op_term   = Equiv.mk_equiv_atom left_without_ith; }
   in
   let conclusion = Equiv.mk_equiv_atom (ES.secrecy_left goal) in

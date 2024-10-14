@@ -692,20 +692,18 @@ module Hm : Map.S with type key = term_head
     term [t] and a subset of [t]'s free variables that must be
     infered. *)
 type 'a pat = {
-  pat_tyvars : Type.tvars;
+  pat_params : Params.t;
   pat_vars   : (Vars.var * Vars.Tag.t) list;
   pat_term   : 'a;
 }
 
-(** An opened pattern, i.e. a pattern where type variables are
-    type unification variables. *)
+(** An opened pattern, i.e. a pattern where parameter variables have
+    been added to a inference environment (see [Infer]). *)
 type 'a pat_op = {
-  pat_op_tyvars : Type.univars;
+  pat_op_params : Params.Open.t;
   pat_op_vars   : (Vars.var * Vars.Tag.t) list;
   pat_op_term   : 'a;
 }
-
-val pp_pat_term_op : term pat_op formatter
 
 val project_tpat        : Projection.t list        -> term pat -> term pat
 val project_tpat_opt    : Projection.t list option -> term pat -> term pat
@@ -713,8 +711,6 @@ val project_tpat_op_opt : Projection.t list option -> term pat_op -> term pat_op
     
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
-
-exception AlphaFailed
 
 (** [alpha_conv ~subst t1 t2] check that [t1] and [t2] are 
     alpha-convertible.

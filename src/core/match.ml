@@ -1677,13 +1677,13 @@ module T (* : S with type t = Term.term *) = struct
   let pp_pat pp_t fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
       pp_t p.pat_term
-      (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
+      Params.pp p.pat_params
       Vars.pp_typed_tagged_list p.pat_vars
 
   let pp_pat_op pp_t fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
       pp_t p.pat_op_term
-      (Fmt.list ~sep:Fmt.sp Type.pp_univar) p.pat_op_tyvars
+      Params.Open.pp p.pat_op_params
       Vars.pp_typed_tagged_list p.pat_op_vars
 
   (*------------------------------------------------------------------*)
@@ -1989,7 +1989,7 @@ module T (* : S with type t = Term.term *) = struct
       (* repeat arguments, wrapping [t1] in a pattern *)
       ?option ?mv ?env ?ty_env ?hyps ?expand_context
       table system
-      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_tyvars = []}
+      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
 
   (*------------------------------------------------------------------*)
@@ -2381,16 +2381,20 @@ let pat_of_cand_set
   =
   cand.subst,
   cand.cond,
-  { pat_op_term   = cand.term;
+  {
+    pat_op_term   = cand.term;
     pat_op_vars   = Vars.Tag.local_vars cand.vars;
-    pat_op_tyvars = []; }
+    pat_op_params = Params.Open.empty;
+  }
 
 (* return: condition, pattern *)
 let pat_of_known_set (known : known_set) : Term.term * Term.term pat_op =
   known.cond,
-  { pat_op_term   = known.term;
+  {
+    pat_op_term   = known.term;
     pat_op_vars   = known.vars;
-    pat_op_tyvars = []; }
+    pat_op_params = Params.Open.empty;
+  }
 
 (*------------------------------------------------------------------*)
 let refresh_known_set (known : known_set) : known_set =
@@ -2418,12 +2422,14 @@ let mset_incl
 
   assert (s1.cond_le = s2.cond_le);
 
-  let pat2 = {
-    pat_op_term = term2;
-    pat_op_tyvars = [];
-    pat_op_vars = Vars.Tag.local_vars s2.indices;
-    (* local inforation, since we allow to match diff operators *)
-  } in
+  let pat2 = 
+    {
+      pat_op_term   = term2;
+      pat_op_vars   = Vars.Tag.local_vars s2.indices;
+      (* local inforation, since we allow to match diff operators *)
+      pat_op_params = Params.Open.empty;
+    } 
+  in
 
   let context = SE.{ set = system; pair = None; } in
   (* FIXME: cleanup with unification of list of terms *)
@@ -2500,17 +2506,21 @@ let mset_inter
   let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
-  let pat1 = {
-    pat_op_term   = term1;
-    pat_op_tyvars = [];
-    pat_op_vars   = Vars.Tag.local_vars s1.indices;}
-  (* local inforation, since we allow to match diff operators *)
+  let pat1 = 
+    {
+      pat_op_term   = term1;
+      pat_op_params = Params.Open.empty;
+      pat_op_vars   = Vars.Tag.local_vars s1.indices;
+      (* local inforation, since we allow to match diff operators *)
+    }
   in
-  let pat2 = {
-    pat_op_term   = term2;
-    pat_op_tyvars = [];
-    pat_op_vars   = Vars.Tag.local_vars s2.indices;}
-  (* local inforation, since we allow to match diff operators *)
+  let pat2 = 
+    {
+      pat_op_term   = term2;
+      pat_op_params = Params.Open.empty;
+      pat_op_vars   = Vars.Tag.local_vars s2.indices;
+      (* local inforation, since we allow to match diff operators *)
+    }
   in
   (* FIXME: cleanup with unification of list of terms *)
   let sys_cntxt = SE.{ set = system; pair = None; } in
@@ -3502,7 +3512,7 @@ module E = struct
 
       (* repeat arguments, wrapping [t1] in a pattern *)
       ?option ?mv ?env ?ty_env ?hyps ?expand_context table system
-      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_tyvars = []}
+      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
   
   (*------------------------------------------------------------------*)

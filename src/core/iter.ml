@@ -868,7 +868,7 @@ end = struct
 
     let pat2 = Term.{ 
         pat_op_term   = term2;
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
         pat_op_vars   = Vars.Tag.local_vars s2.indices;}
     in
     let system = SE.reachability_context sexpr in

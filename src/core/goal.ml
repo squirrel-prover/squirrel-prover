@@ -65,9 +65,8 @@ let bind ft fe = function
 (*------------------------------------------------------------------*)
 type ('a,'b) abstract_statement = {
   name    : 'a;
-  se_vars : SE.tagged_vars;
+  params  : Params.t;
   system  : SE.context;
-  ty_vars : Type.tvars;
   formula : 'b;
 }
 
@@ -84,11 +83,19 @@ let _pp_statement ppe fmt (g : statement) : unit =
       Fmt.pf fmt " [%a]"
         (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
-    Fmt.pf fmt "@[[%a] %s%a :@]@ %a"
-      SE.pp_context g.system
-      g.name
-      pp_tyvars g.ty_vars
-      (Equiv.Any_statement._pp ppe) g.formula
+  let pp_system fmt = 
+    if g.params.se_vars = [] then 
+      Fmt.pf fmt "[%a]" SE.pp_context g.system
+    else
+      Fmt.pf fmt "{system %a, %a}"
+        SE.pp_tagged_vars g.params.se_vars
+        SE.pp_context g.system
+  in
+  Fmt.pf fmt "@[%t %s%a :@]@ %a"
+    pp_system
+    g.name
+    pp_tyvars g.params.ty_vars
+    (Equiv.Any_statement._pp ppe) g.formula
 
 (*------------------------------------------------------------------*)
 
@@ -275,5 +282,5 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
 
   let name = L.unloc (oget name) in
 
-  { name; se_vars; system; ty_vars; formula },
+  { name; params = { se_vars; ty_vars; }; system; formula },
   goal

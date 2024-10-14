@@ -5,7 +5,7 @@
 val open_pat :
   'a Equiv.f_kind ->
   Infer.env ->
-  ('a* Concrete.bound) Term.pat ->
+  ('a * Concrete.bound) Term.pat ->
   Subst.t * ('a * Concrete.bound) Term.pat_op
 
 (*------------------------------------------------------------------*)

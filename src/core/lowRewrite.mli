@@ -19,13 +19,13 @@ type rw_kind = LocalEq | GlobalEq
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_rule = {
-  rw_tyvars : Type.tvars;            (** type variables *)
+  rw_params : Params.t;              (** parameters of the rule (polymorphisme) *)
   rw_system : SE.t;                  (** systems the rule applies to *)
   rw_vars   : Vars.tagged_vars;      (** term variables *)
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
   rw_kind   : rw_kind;
-  rw_bound : Concrete.bound;
+  rw_bound  : Concrete.bound;
 }
 
 val pp_rw_rule : rw_rule formatter

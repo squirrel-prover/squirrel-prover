@@ -118,7 +118,7 @@ let mk_state
 
   (* open an type unification environment *)
   let ty_env = Infer.mk_env () in
-  let univars, tsubst = Infer.open_tvars ty_env rule.rw_tyvars in
+  let params, tsubst = Infer.open_params ty_env rule.rw_params in
 
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f) |>
@@ -126,7 +126,7 @@ let mk_state
   in
 
   let init_pat : Term.term Term.pat_op = { 
-    pat_op_tyvars = univars; 
+    pat_op_params = params; 
     pat_op_vars   = 
       List.map (fun (v,tag) -> (Subst.subst_var tsubst v, tag)) rule.rw_vars; 
     pat_op_term   = mk_form left;
@@ -263,7 +263,7 @@ let rw_inst
 
             let found_pat = Term.{ 
                 pat_op_term   = left;
-                pat_op_tyvars = [];
+                pat_op_params = Params.Open.empty;
                 pat_op_vars   = []; 
               } in
 

@@ -161,9 +161,8 @@ let mk_equiv_statement
   in
   let formula = make_conclusion formula in
   Goal.{ name    = new_axiom_name; 
-         se_vars = [];
+         params  = Params.empty;
          system  = context; 
-         ty_vars = []; 
          formula }
 
 
@@ -242,7 +241,7 @@ let global_rename
   in
 
   let rw_rule = Rewrite.{
-      rw_tyvars = [];
+      rw_params = Params.empty;
       rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars rw_vars;
       rw_conds  = [];
@@ -403,7 +402,7 @@ let global_prf
   in
 
   let rw_rule = Rewrite.{
-      rw_tyvars = [];
+      rw_params = Params.empty;
       rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: rw_vars);
       rw_conds  = [];
@@ -580,7 +579,7 @@ let global_cca
       List.filter (fun v -> Sv.mem v fv) is
     in
     Rewrite.{
-      rw_tyvars = [];
+      rw_params = Params.empty;
       rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars enc_rw_vars;
       rw_conds  = [];
@@ -595,7 +594,7 @@ let global_cca
       List.filter (fun v -> Sv.mem v fv) is1
     in
     Rewrite.{
-      rw_tyvars = [];
+      rw_params = Params.empty;
       rw_system = SE.full_any;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: dec_rw_vars);
       rw_conds  = [];
@@ -1228,7 +1227,7 @@ let global_prf_t
       in
       
       let rule = Rewrite.{
-          rw_tyvars = [];
+          rw_params = Params.empty;
           rw_system = SE.full_any;
           rw_vars   = Vars.Tag.local_vars (x :: is);
           rw_conds  = [];

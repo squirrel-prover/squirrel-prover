@@ -427,7 +427,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
         (Sv.elements (Vars.Sv.filter Vars.is_pat (Term.fv t)))
     in
     let pat = Term.{
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
         pat_op_vars;
         pat_op_term = t; } 
     in
@@ -462,7 +462,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
         (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))
     in
     let pat = Term.{
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
         pat_op_vars;
         pat_op_term = t; } in
 

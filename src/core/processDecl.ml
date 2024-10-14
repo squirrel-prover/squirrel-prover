@@ -552,23 +552,29 @@ let declare_list table decls =
 (*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
+  let bound = lem.formula.bound in
 
   (* TODO: concrete: only support exact hint rather *)
-  if lem.Goal.formula.bound <> None then
+  if bound <> None then
     Tactics.hard_failure ~loc:(L.loc (snd s))
-      (Failure "rewrite hints must be asymptotic");
+      (Failure "rewrite hints must be asymptotic or exact");
 
   if not (SE.subset table SE.full_any lem.system.set) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "rewrite hints must apply to any system");
 
-  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula.formula db
+  if lem.params.se_vars <> [] then
+    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
+      (Failure "rewrite hints do not support system variables");
+
+  Hint.add_hint_rewrite s lem.params.ty_vars lem.Goal.formula.formula db
 
 let add_hint_smt table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
 
-  if bound <> None || bound = Some (Library.Real.mk_zero table) then
+  (* TODO: concrete: only support exact hint rather *)
+  if bound <> None || bound <> Some (Library.Real.mk_zero table) then
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic or exact");
 
@@ -576,4 +582,8 @@ let add_hint_smt table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints must apply to any system");
 
-  Hint.add_hint_smt lem.Goal.formula.formula db
+  if lem.params.se_vars <> [] then
+    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
+      (Failure "smt hints do not support system variables");
+
+  Hint.add_hint_smt lem.formula.formula db

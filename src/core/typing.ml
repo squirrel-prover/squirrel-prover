@@ -1393,6 +1393,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
   let psymb = Symbols.Predicate.convert_path ppa.name table in
   let pred = Predicate.get table psymb in
 
+  (* FIXME: sevars: use a [Params.t] in [pred_app] *)
   (* refresh all type variables in [pred.ty_vars] and substitute *)
   let ty_vars, ts = Infer.open_tvars st.ty_env pred.ty_params in
   let pred_args_multi =

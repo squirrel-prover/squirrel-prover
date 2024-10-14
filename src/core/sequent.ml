@@ -422,13 +422,13 @@ module type S = sig
     ?close_pats:bool ->
     Typing.pt ->
     t ->
-    ghyp * Type.tvars * PT.t
+    ghyp * Params.t * PT.t
 
   val convert_pt :
     ?close_pats:bool ->
     Typing.pt ->
     t ->
-    ghyp * Type.tvars * PT.t
+    ghyp * Params.t * PT.t
 end
 
 (*------------------------------------------------------------------*)
@@ -701,14 +701,15 @@ module Mk (Args : MkArgs) : S with
             (Failure ("no lemma named " ^ Symbols.p_path_to_string p))
       in
 
-      (* Open the lemma type variables. *)
-      let ty_vars, tsubst = Infer.open_tvars ty_env lem.ty_vars in
+      (*------------------------------------------------------------------*)      
+      (* open the lemma type variables *)
+      let params, subst = Infer.open_params ty_env lem.params in
 
       (* if the user provided type variables, apply them *)
       if ty_args <> None then
         begin
           let ty_args = oget ty_args in
-          let ty_vars = List.map (fun u -> Type.univar u) ty_vars in
+          let ty_vars = List.map (fun u -> Type.univar u) params.ty_vars in
 
           if List.length ty_args <> List.length ty_vars then
             error_pt_wrong_number_ty_args
@@ -722,7 +723,10 @@ module Mk (Args : MkArgs) : S with
             ty_vars ty_args;
         end;
 
-      let form = Equiv.Babel_statement.gsubst Equiv.Any_s tsubst lem.formula in
+      (*------------------------------------------------------------------*)      
+      let form = Equiv.Babel_statement.gsubst Equiv.Any_s subst lem.formula in
+
+      (*------------------------------------------------------------------*)      
       if Equiv.is_local_statement form
       then
         (* a local lemma or axiom is actually a global reachability formula *)
@@ -952,7 +956,7 @@ module Mk (Args : MkArgs) : S with
     let pat_f1 = Term.{
         pat_op_vars   = pt.args;
         pat_op_term   = f1;
-        pat_op_tyvars = [];
+        pat_op_params = Params.Open.empty;
       } in
 
     let pt_apply_error arg () =
@@ -1255,7 +1259,7 @@ module Mk (Args : MkArgs) : S with
       ?(close_pats=true)
       (p_pt : Typing.pt)
       (s    : S.t)
-    : ghyp * Type.tvars * PT.t
+    : ghyp * Params.t * PT.t
     =
     let table  = S.table  s in
     let env    = S.env    s in
@@ -1364,7 +1368,7 @@ module Mk (Args : MkArgs) : S with
       Tactics.soft_failure ~loc Tactics.CannotInferPats;
 
     (* close the unienv and generalize remaining univars *)
-    let pat_tyvars, _pat_sevars, tysubst =
+    let pat_params, tysubst =
       match Infer.gen_and_close env ty_env with
       | Closed r -> r
 
@@ -1375,7 +1379,6 @@ module Mk (Args : MkArgs) : S with
       | BadInstantiation e ->
         Tactics.soft_failure ~loc (Failure (Fmt.str "%t" e))
     in
-    assert (_pat_sevars = []);  (* TODO: system variables: allow to generalize *)
     (* REM *)
     Fmt.epr "before: %a@." (Equiv.Babel.pp_dbg Equiv.Any_t) pt.form;
 
@@ -1397,7 +1400,7 @@ module Mk (Args : MkArgs) : S with
 
     let pt = { pt with form; subgs; args; } in
 
-    name, pat_tyvars, pt
+    name, pat_params, pt
 
   (*------------------------------------------------------------------*)
   (** Exported. *)
@@ -1405,10 +1408,10 @@ module Mk (Args : MkArgs) : S with
       ?close_pats
       (pt :  Typing.pt)
       (s : S.t)
-    : ghyp * Type.tvars * PT.t
+    : ghyp * Params.t * PT.t
     =
-    let name, tyvars, pt =
+    let name, params, pt =
       convert_pt_gen ~check_compatibility:true ?close_pats pt s
     in
-    name, tyvars, pt
+    name, params, pt
 end

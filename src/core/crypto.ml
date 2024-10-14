@@ -404,9 +404,11 @@ let match_known_set
   =
   let vars = known.loc_names @ known.glob_names @ known.args in
   let pat =
-    Term.{pat_op_term = known.term;
-          pat_op_vars = (Vars.Tag.local_vars vars);
-          pat_op_tyvars =[] }
+    Term.{
+      pat_op_term   = known.term;
+      pat_op_vars   = (Vars.Tag.local_vars vars);
+      pat_op_params = Params.Open.empty;
+    }
   in
   let system =
     SE.{ set = (oget env.system.pair :> SE.t) ;

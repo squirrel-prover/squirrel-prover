@@ -50,8 +50,12 @@ val mk_ty_univar : env -> Type.univar
 val mk_se_univar : ?constraints:SE.Var.info list -> env -> SE.Var.t
 
 (*------------------------------------------------------------------*)
-val open_tvars : env -> Type.tvars -> Type.univars * Subst.t
+val open_tvars  : ?subst:Subst.t -> env -> Type.tvars     -> Type.univars  * Subst.t
+val open_svars  : ?subst:Subst.t -> env -> SE.tagged_vars -> SE.Var.t list * Subst.t
 
+val open_params : env -> Params.t -> Params.Open.t * Subst.t
+
+(*------------------------------------------------------------------*)
 val norm_ty : env -> Type.ty -> Type.ty
 val norm_se : env -> SE.t    -> SE.t
 
@@ -83,4 +87,4 @@ val close : Env.t -> env -> Subst.t result
 (** Similar to [close], except that it generalizes remaining type and
     system expression variables.
     Thus, [gen_and_close] cannot return [FreeTyVars] nor [FreeSystemVars]. *)
-val gen_and_close : Env.t -> env -> (Type.tvars * SE.tagged_vars * Subst.t) result
+val gen_and_close : Env.t -> env -> (Params.t * Subst.t) result
