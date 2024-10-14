@@ -316,7 +316,7 @@ module Parse = struct
 
   type p_context = p_context_i L.located 
 
-  type sys = [`Local | `Global] * (p_bnds * p_context)
+  type sys = [`Local | `Global] * p_context
 
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])

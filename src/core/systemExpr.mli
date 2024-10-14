@@ -157,5 +157,5 @@ module Parse : sig
   val parse_global_context : se_env:Var.env -> Symbols.table -> p_context -> context
 
   (*------------------------------------------------------------------*)
-  type sys = [`Local | `Global] * (p_bnds * p_context)
+  type sys = [`Local | `Global] * p_context
 end

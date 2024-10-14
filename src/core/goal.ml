@@ -127,6 +127,7 @@ module Parsed = struct
 
   type t = {
     name    : Symbols.lsymb option;
+    se_vars : SE.p_bnds;
     ty_vars : Symbols.lsymb list;
     vars    : Typing.bnds_tagged;
     system  : SE.Parse.sys;
@@ -174,14 +175,14 @@ let make_obs_equiv ?(enrich=[]) table system =
 
 (*------------------------------------------------------------------*)
 let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
-  let Parsed.{ name; system; ty_vars; vars; formula; } = parsed_goal in
+  let Parsed.{ name; system; ty_vars; se_vars; vars; formula; } = parsed_goal in
 
   let env = Env.init ~table () in
 
   (*------------------------------------------------------------------*)
   (* parse the system variables and the system *)
-  let k, (bnds, p_system) = system in
-  let env, se_vars = Typing.convert_se_var_bnds env bnds in
+  let k, p_system = system in
+  let env, se_vars = Typing.convert_se_var_bnds env se_vars in
   let system = 
     match k with
     | `Local  -> SE.Parse.parse_local_context  ~se_env:env.se_vars table p_system

@@ -67,6 +67,7 @@ module Parsed : sig
 
   type t = {
     name    : Symbols.lsymb option;
+    se_vars : SE.p_bnds;
     ty_vars : Symbols.lsymb list;
     vars    : Typing.bnds_tagged;
     system  : SE.Parse.sys;

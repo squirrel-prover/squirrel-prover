@@ -564,6 +564,10 @@ se_bnd:
 %inline se_bnds:
 | ids=slist(se_bnd,empty) { ids }
 
+%inline braced_se_bnds:
+| empty                      { []   }
+| LBRACE bnds=se_bnds RBRACE { bnds }
+
 (*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
@@ -1045,7 +1049,8 @@ trans_arg_item:
 | i=loc(int) COLON t=term %prec tac_prec { i,t }
 
 trans_arg:
-| annot=system_context_with_default { TacticsArgs.TransSystem annot }
+| l=lloc(empty)                          { TacticsArgs.TransSystem (L.mk_loc l SE.Parse.NoSystem) }
+| LBRACKET annot=system_context RBRACKET { TacticsArgs.TransSystem annot }
 | l=slist1(trans_arg_item, COMMA) { TacticsArgs.TransTerms l }
 
 (*------------------------------------------------------------------*)
@@ -1425,18 +1430,13 @@ system_context_i:
 system_context:
 | x=loc(system_context_i) { x }
 
-system_context_with_default:
-|      { let loc = L.make $startpos $endpos in
-          L.mk_loc loc SE.Parse.NoSystem }
-| LBRACKET s=system_context RBRACKET
-       { s }
+/* ----------------------------------------------------------------------- */
+%inline old_system_annot:
+| l=lloc(empty)                      { L.mk_loc l SE.Parse.NoSystem }
+| LBRACKET s=system_context RBRACKET { s }
 
-system_context_with_vars:
-| LBRACE SYSTEM bnds=se_bnds COMMA c=system_context RBRACE { (bnds, c) }
-
-system_annot:
-| c=system_context_with_default   { ([], c) }
-| bnds_c=system_context_with_vars { bnds_c }
+%inline system_annot:
+| IN LBRACKET s=system_context RBRACKET { s }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -1447,24 +1447,43 @@ statement_name:
 | UNDERSCORE { None }
 
 local_statement:
-| s=system_annot name=statement_name ty_vars=ty_vars vars=bnds_tagged
+| s=old_system_annot
+  name=statement_name
+  se_vars=braced_se_bnds
+  s2=system_annot?
+  ty_vars=ty_vars 
+  vars=bnds_tagged
   COLON f=term (*e=concrete_term?*)
-   { let system = `Local, s in
-     let formula = Goal.Parsed.Local (f,None (*e*)) in
-     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+
+  {
+    let system = `Local, (Utils.odflt s s2) in
+    let formula = Goal.Parsed.Local (f,None (*e*)) in
+    Goal.Parsed.{ name; se_vars; ty_vars; vars; system; formula } 
+  }
 
 global_statement:
-| s=system_annot name=statement_name ty_vars=ty_vars vars=bnds_tagged
-  COLON f=global_formula
-   { let formula = Goal.Parsed.Global f in
-     let system = `Global, s in
-     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+| s=old_system_annot 
+  name=statement_name 
+  se_vars=braced_se_bnds
+  s2=system_annot?
+  ty_vars=ty_vars 
+  vars=bnds_tagged
+  COLON
+  f=global_formula
+
+  { 
+    let system = `Global, (Utils.odflt s s2) in
+    let formula = Goal.Parsed.Global f in
+    Goal.Parsed.{ name; se_vars; ty_vars; vars; system; formula } 
+  }
 
 obs_equiv_statement:
-| s=system_annot n=statement_name
-   { let system = `Global, s in
-     Goal.Parsed.{ name = n; system; ty_vars = []; vars = [];
-                   formula = Goal.Parsed.Obs_equiv } }
+| s=old_system_annot n=statement_name
+  {
+    let system = `Global, s in
+     Goal.Parsed.{ name = n; system; ty_vars = []; se_vars = []; vars = [];
+                   formula = Goal.Parsed.Obs_equiv } 
+  }
 
 (*------------------------------------------------------------------*)
 lemma_head:
@@ -1477,10 +1496,10 @@ _lemma:
 |  LOCAL lemma_head s=local_statement     { s }
 | GLOBAL lemma_head s=global_statement    { s }
 | EQUIV  s=obs_equiv_statement            { s }
-| EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) (*t=concrete_term?*)
+| EQUIV s=old_system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) (*t=concrete_term?*)
     { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b,None (*t*))) in
       let system = `Global, s in
-      Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
+      Goal.Parsed.{ name; system; ty_vars = []; se_vars = []; vars; formula = Global f } }
 
 lemma:
 | x=loc(_lemma) TERMINAL   { x }
