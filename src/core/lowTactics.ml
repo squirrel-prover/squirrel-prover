@@ -1796,8 +1796,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | _ -> assert false
     in
     (* open an type unification environment *)
-    let ty_env = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.conc_kind ty_env pat in
+    let ienv = Infer.mk_env () in
+    let tsubst, opat = Pattern.open_pat S.conc_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let opat =  {opat with pat_op_term = pat_concl} in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
@@ -1823,7 +1823,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | Local_t  ->
           begin
             match
-              Match.T.try_match ~option ~ty_env ~hyps table ~env:vars system conclusion pat
+              Match.T.try_match ~option ~ienv ~hyps table ~env:vars system conclusion pat
             with
             | NoMatch _ as res -> res
             | Match mv as res ->
@@ -1832,7 +1832,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
               | Some e, LocConc ve ->
                 Match.T.try_match
-                  ~option ~mv ~ty_env ~hyps table
+                  ~option ~mv ~ienv ~hyps table
                   ~env:vars system e {opat with pat_op_term = ve}
 
               | Some _, LocHyp -> res
@@ -1849,7 +1849,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           end
         | Global_t ->
           assert(bound = None || pat_bound = Glob);
-          Match.E.try_match ~option ~ty_env ~hyps table ~env:vars system conclusion pat
+          Match.E.try_match ~option ~ienv ~hyps table ~env:vars system conclusion pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -1897,7 +1897,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         (* close the inference environment for types, system
            variables, ... *)
         let gsubst =
-          match Infer.close env ty_env with
+          match Infer.close env ienv with
           | Infer.Closed subst -> subst
 
           | _ as e ->
@@ -1953,8 +1953,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let env = S.env s in
     (* open an type unification environment *)
-    let ty_env = Infer.mk_env () in
-    let tsubst, pat = Pattern.open_pat S.hyp_kind ty_env pat in
+    let ienv = Infer.mk_env () in
+    let tsubst, pat = Pattern.open_pat S.hyp_kind ienv pat in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let formula, bound = pat.pat_op_term in
     let pat, _ =
@@ -1979,15 +1979,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
           match S.hyp_kind, hconcl, fprem with
           | Global_t, _, _ ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+            Match.E.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
               
           | Any_t, Local hconcl, Local fprem ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+            Match.T.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
               
           | Any_t, Global hconcl, Global fprem ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+            Match.E.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
 
           | Any_t, Global _, Local _ ->
             soft_failure ~loc (Failure "cannot match a local lemma in a global hypothesis")
@@ -2002,7 +2002,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match match_res with
         | NoMatch _ -> None
         | Match mv ->
-          match Infer.close env ty_env with
+          match Infer.close env ienv with
           | Closed subst -> Some (mv, subst)
           | _ -> None
     in
@@ -2424,8 +2424,8 @@ type form_type =
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)
-    let ty_env = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.hyp_kind ty_env pat in
+    let ienv = Infer.mk_env () in
+    let tsubst, opat = Pattern.open_pat S.hyp_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
@@ -2433,7 +2433,7 @@ type form_type =
       oget_exn ~exn:(soft_failure_arg (Failure "Not a concrete goal t")) (get_bound s)
     in
     match
-      Match.T.try_match ~option ~ty_env ~hyps table ~env system match_bound
+      Match.T.try_match ~option ~ienv ~hyps table ~env system match_bound
         {opat with pat_op_term = current_bound}
     with
     | NoMatch _ -> soft_failure (Failure "Cannot match the bounds")
@@ -2442,7 +2442,7 @@ type form_type =
     | Match mv ->
       Match.Mvar.check_args_inferred opat mv;
       let tsubst =
-        match Infer.close (S.env s) ty_env with
+        match Infer.close (S.env s) ienv with
         | Infer.Closed subst -> subst
 
         | _ as e ->
@@ -2472,8 +2472,8 @@ type form_type =
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)
-    let ty_env = Infer.mk_env () in
-    let tsubst, opat = Pattern.open_pat S.hyp_kind ty_env pat in
+    let ienv = Infer.mk_env () in
+    let tsubst, opat = Pattern.open_pat S.hyp_kind ienv pat in
     let pat_concl, pat_bound = opat.pat_op_term in
     let subgs_pat = List.map (Equiv.Any.gsubst tsubst) subgs_pat in
     let match_bound,new_bound = destruct_leq_exact s pat_concl pat_bound in
@@ -2495,7 +2495,7 @@ type form_type =
 
     let result =
       Match.T.try_match
-        ~option ~ty_env ~hyps table ~env
+        ~option ~ienv ~hyps table ~env
         system match_bound
         { opat with pat_op_term = current_bound; }
     in
@@ -2506,7 +2506,7 @@ type form_type =
     | Match mv ->
       Match.Mvar.check_args_inferred {opat with pat_op_term = new_bound} mv;
       let tsubst =
-        match Infer.close (S.env s) ty_env with
+        match Infer.close (S.env s) ienv with
         | Infer.Closed subst -> subst
 
         | _ as e ->

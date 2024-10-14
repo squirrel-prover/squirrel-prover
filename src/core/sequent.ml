@@ -666,7 +666,7 @@ module Mk (Args : MkArgs) : S with
       Get a proof-term conclusion by name (from a lemma, axiom or hypothesis).
       Optionally apply it to some user-provided type arguments. *)
   let pt_of_assumption
-      (ty_env   : Infer.env)
+      (ienv     : Infer.env) 
       (p        : Symbols.p_path)
       (ty_args  : Type.ty list option)
       (s        : t)
@@ -703,7 +703,7 @@ module Mk (Args : MkArgs) : S with
 
       (*------------------------------------------------------------------*)      
       (* open the lemma type variables *)
-      let params, subst = Infer.open_params ty_env lem.params in
+      let params, subst = Infer.open_params ienv lem.params in
 
       (* if the user provided type variables, apply them *)
       if ty_args <> None then
@@ -717,7 +717,7 @@ module Mk (Args : MkArgs) : S with
 
           List.iter2
             (fun ty1 ty2 ->
-               match Infer.unify_ty ty_env ty1 ty2 with
+               match Infer.unify_ty ienv ty1 ty2 with
                | `Ok   -> ()
                | `Fail -> assert false) (* cannot fail *)
             ty_vars ty_args;
@@ -823,7 +823,7 @@ module Mk (Args : MkArgs) : S with
       conclusion and instantiate it with given term. *)
   let pt_apply_var_forall
       ~(arg_loc:L.t)
-      (ty_env : Infer.env)
+      (ienv : Infer.env)
       (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) (pt_arg : Term.term)
     : PT.t
@@ -863,7 +863,7 @@ module Mk (Args : MkArgs) : S with
       then
         error_pt_apply_not_adv table arg_loc ~pt ~arg:pt_arg;
 
-      if f_arg_tag.const && not (HTerm.is_constant ~ty_env env pt_arg) then
+      if f_arg_tag.const && not (HTerm.is_constant ~ienv env pt_arg) then
         error_pt_apply_not_constant table arg_loc ~pt ~arg:pt_arg;
     in
 
@@ -901,9 +901,9 @@ module Mk (Args : MkArgs) : S with
                 with an asymptotic hypothesis")
 
    (*------------------------------------------------------------------*)
-  let subst_of_pt ~loc ty_env table (vars : Vars.env) (pt : PT.t) : Term.subst =
+  let subst_of_pt ~loc ienv table (vars : Vars.env) (pt : PT.t) : Term.subst =
     let pt_venv = venv_of_pt vars pt in
-    match Mvar.to_subst ~ty_env ~mode:`Unif table pt_venv pt.mv with
+    match Mvar.to_subst ~ienv ~mode:`Unif table pt_venv pt.mv with
     | `Subst sbst -> sbst
     | `BadInst pp_err ->
       soft_failure ~loc
@@ -918,7 +918,7 @@ module Mk (Args : MkArgs) : S with
       [pt]'s substitution. *)
   let pt_apply_var_impl
       (* ~(loc : L.t)  *) ~(loc_arg : L.t)
-      (ty_env : Infer.env) (s : S.t)
+      (ienv : Infer.env) (s : S.t)
       (pt : PT.t) (arg : PT.t)
     : PT.t
     =
@@ -951,7 +951,7 @@ module Mk (Args : MkArgs) : S with
     in
     (* Specializing [pt.form] by an extention of [pt.mv]. *)
     (* FIXME: correct location? *)
-    let sbst = subst_of_pt ~loc:loc_arg ty_env table (S.vars s) arg in
+    let sbst = subst_of_pt ~loc:loc_arg ienv table (S.vars s) arg in
     let f1 = Equiv.Any.subst sbst f1 in
     let pat_f1 = Term.{
         pat_op_vars   = pt.args;
@@ -978,14 +978,14 @@ module Mk (Args : MkArgs) : S with
       | Local f1, Local f_arg ->
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.T.try_match
-          ~ty_env ~mv:arg.mv ~env
+          ~ienv ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
       | Global f1, Global f_arg  ->
         assert(pt.bound = Glob && arg.bound = Glob);
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
-          ~ty_env ~mv:arg.mv ~env
+          ~ienv ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
@@ -1034,7 +1034,7 @@ module Mk (Args : MkArgs) : S with
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec do_convert_pt_gen
-      (ty_env : Infer.env)
+      (ienv : Infer.env)
       (mv : Mvar.t)
       (p_pt : Typing.pt)
       (s : S.t) : ghyp * PT.t
@@ -1043,11 +1043,11 @@ module Mk (Args : MkArgs) : S with
     let ghyp, pt =
       match L.unloc p_pt with
       | Typing.PT_symb (path, ty_args) ->
-        do_convert_path ty_env mv path ty_args s
-      | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
-      | Typing.PT_localize p_sub_pt ->
-        let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
-        let pt =
+        do_convert_path ienv mv path ty_args s
+      | Typing.PT_app pt_app -> do_convert_pt_app ienv mv pt_app s
+      | Typing.PT_localize p_sub_pt -> 
+        let ghyp, sub_pt = do_convert_pt_gen ienv mv p_sub_pt s in
+        let pt = 
           pt_try_localize
             ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) table sub_pt)
             sub_pt
@@ -1058,7 +1058,7 @@ module Mk (Args : MkArgs) : S with
     ghyp, pt
 
   and do_convert_path
-      (ty_env  : Infer.env)
+      (ienv  : Infer.env)
       (init_mv : Mvar.t)
       (p       : Symbols.p_path)
       (ty_args : Typing.ty list option)
@@ -1066,15 +1066,15 @@ module Mk (Args : MkArgs) : S with
     : ghyp * PT.t
     =
     let ty_args =
-      omap (List.map (Typing.convert_ty ~ty_env (S.env s))) ty_args
+      omap (List.map (Typing.convert_ty ~ienv (S.env s))) ty_args 
     in
-    let lem_name, pt = pt_of_assumption ty_env p ty_args s in
+    let lem_name, pt = pt_of_assumption ienv p ty_args s in
     assert (pt.mv = Mvar.empty);
     let pt = { pt with mv = init_mv; } in
     lem_name, pt
 
   and do_convert_pt_app
-      (ty_env  : Infer.env)
+      (ienv    : Infer.env)
       (init_mv : Mvar.t)
       (pt_app  : Typing.pt_app)
       (s       : S.t)
@@ -1084,12 +1084,11 @@ module Mk (Args : MkArgs) : S with
 
     let table, env = S.table s, S.vars s in
 
-    let lem_name, init_pt =
-      do_convert_pt_gen ty_env init_mv pt_app.pta_head s
+    let lem_name, init_pt = 
+      do_convert_pt_gen ienv init_mv pt_app.pta_head s 
     in
 
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
-
 
     (** If [pt.form] does not start with the wanted construct, try
         to reduce it once. *)
@@ -1122,7 +1121,7 @@ module Mk (Args : MkArgs) : S with
         (* destruct failed, applying the pending substitution and try to
            destruct again *)
         let subst =
-          subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt 
+          subst_of_pt ~loc:pt_app.pta_loc ienv table (S.vars s) pt 
         in
         let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
         match
@@ -1142,7 +1141,7 @@ module Mk (Args : MkArgs) : S with
         (* destruct failed, applying the pending substitution and try to
            destruct again *)
         let subst =
-          subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt 
+          subst_of_pt ~loc:pt_app.pta_loc ienv table (S.vars s) pt 
         in
         let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
         match
@@ -1157,15 +1156,15 @@ module Mk (Args : MkArgs) : S with
         (pt : PT.t) ((f_arg, _) : Vars.tagged_var) (p_arg : Typing.term) : PT.t 
       =
       let ty = Vars.ty f_arg in
-      let arg, _ = Typing.convert ~ty_env ~pat:true cenv ~ty p_arg in
+      let arg, _ = Typing.convert ~ienv ~pat:true cenv ~ty p_arg in
       
-      pt_apply_var_forall ~arg_loc:(L.loc p_arg) ty_env table env pt arg
+      pt_apply_var_forall ~arg_loc:(L.loc p_arg) ienv table env pt arg
     in
 
     (** Apply [pt] to [p_arg] when [pt] is an implication.
         We must have [pt.form = f1 → f2]. *)
     let do_impl
-        (ty_env : Infer.env)
+        (ienv : Infer.env)
         (pt : PT.t)
         (f1 : Equiv.any_form) (f2 : Equiv.any_form) 
         (pt_impl_arg : pt_impl_arg)
@@ -1181,10 +1180,10 @@ module Mk (Args : MkArgs) : S with
           form   = f2; }
 
       | `Pt p_arg ->
-        let _, pt_arg = do_convert_pt_gen ty_env pt.mv p_arg s in
+        let _, pt_arg = do_convert_pt_gen ienv pt.mv p_arg s in
         pt_apply_var_impl
           ~loc_arg:(L.loc p_arg)
-          ty_env s
+          ienv s
           pt pt_arg
     in
 
@@ -1195,7 +1194,7 @@ module Mk (Args : MkArgs) : S with
       List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
           try (* try as a [f1 → f2] *)
             let f1, f2, pt = decompose_impl pt in
-            do_impl ty_env pt f1 f2 (pt_app_arg_as_pt p_arg)
+            do_impl ienv pt f1 f2 (pt_app_arg_as_pt p_arg)
           with CannotApply _ ->
 
           try (* try as a [∀ x. f1] *)
@@ -1213,7 +1212,7 @@ module Mk (Args : MkArgs) : S with
   (** Closes inferred variables from [pt.args] by [pt.mv]. *)
   let close
       (loc : L.t)
-      (ty_env : Infer.env) (table : Symbols.table) (env : Vars.env)
+      (ienv : Infer.env) (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) : PT.t
     =
     (* clear infered variables from [pat_vars] *)
@@ -1222,7 +1221,7 @@ module Mk (Args : MkArgs) : S with
     in
     (* instantiate infered variables *)
     (* FIXME why don't we substitute in [pt.bound]? *)
-    let subst = subst_of_pt ~loc ty_env table env pt in
+    let subst = subst_of_pt ~loc ienv table env pt in 
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
     (* the only remaining variables are pattern holes '_' *)
@@ -1270,11 +1269,11 @@ module Mk (Args : MkArgs) : S with
     let loc = L.loc p_pt in
 
     (* create a fresh unienv and matching env *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
     let mv = Mvar.empty in
 
     (* convert the proof term *)
-    let name, pt = do_convert_pt_gen ty_env mv p_pt s in
+    let name, pt = do_convert_pt_gen ienv mv p_pt s in
 
     let pt =
       if not check_compatibility then
@@ -1360,7 +1359,7 @@ module Mk (Args : MkArgs) : S with
     in
 
     (* close proof-term by inferring as many pattern variables as possible *)
-    let pt = close loc ty_env table (S.vars s) pt in
+    let pt = close loc ienv table (S.vars s) pt in
     assert (pt.mv = Mvar.empty);
 
     (* pattern variable remaining, and not allowed *)
@@ -1369,7 +1368,7 @@ module Mk (Args : MkArgs) : S with
 
     (* close the unienv and generalize remaining univars *)
     let pat_params, tysubst =
-      match Infer.gen_and_close env ty_env with
+      match Infer.gen_and_close env ienv with
       | Closed r -> r
 
       | FreeTyVars | FreeSystemVars ->

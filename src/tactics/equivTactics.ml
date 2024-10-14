@@ -653,7 +653,7 @@ let () =
 (** Function application *)
 
 (** Select a frame element matching a pattern. *)
-let fa_select_felems ~ty_env (pat : Term.term Term.pat_op) (s : ES.t) : int option =
+let fa_select_felems ~ienv (pat : Term.term Term.pat_op) (s : ES.t) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
@@ -661,7 +661,7 @@ let fa_select_felems ~ty_env (pat : Term.term Term.pat_op) (s : ES.t) : int opti
   in
   List.find_mapi (fun i e ->
       match 
-        Match.T.try_match ~ty_env ~option ~env:(ES.vars s) (ES.table s) system e pat 
+        Match.T.try_match ~ienv ~option ~env:(ES.vars s) (ES.table s) system e pat 
       with
       | NoMatch _ -> None
       | Match _   -> Some i
@@ -790,10 +790,10 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
 
   (* parse one [fa_arg] *)
   let parse_fa_arg_pat
-      ty_env (tpat : Typing.term)
+      ienv (tpat : Typing.term)
     : L.t * Term.term Term.pat_op
     =
-    let t, _ty = Typing.convert ~ty_env ~pat:true cntxt tpat in
+    let t, _ty = Typing.convert ~ienv ~pat:true cntxt tpat in
     let vars =
       Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
     in
@@ -811,13 +811,13 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     (* Create a new type unification environement.
        Remark: we will never close it, as it is only used to selection a
        matching element in the bi-frame. *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
 
     (* parse the function  *)
-    let loc, pat = parse_fa_arg_pat ty_env arg_pat in
+    let loc, pat = parse_fa_arg_pat ienv arg_pat in
 
     if mult = Args.Exact 0 then s else
-      match fa_select_felems ~ty_env pat s with
+      match fa_select_felems ~ienv pat s with
       | None -> 
         if mult = Args.Any 
         then s

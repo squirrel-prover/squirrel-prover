@@ -422,10 +422,10 @@ let parse
   =
 
   (* open a typing environment *)
-  let ty_env = Infer.mk_env () in
+  let ienv = Infer.mk_env () in
 
   let env = Env.init ~table () in
-  let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env args in
+  let env, args = Typing.convert_bnds ~ienv ~mode:NoTags env args in
 
   (* create a variable holding the current time-point *)
   let env, time =
@@ -437,20 +437,20 @@ let parse
   let cntxt = Typing.InProc (projs, Term.mk_var time) in
   let mk_cenv env = Typing.{ env; cntxt; } in
 
-  let rec doit (ty_env : Infer.env) (env : Env.t) (proc : Parse.t) : proc =
+  let rec doit (ienv : Infer.env) (env : Env.t) (proc : Parse.t) : proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Parse.Null -> Null
 
     | Parse.New (x, ty, p) -> 
-      let ty = Typing.convert_ty ~ty_env env ty in 
+      let ty = Typing.convert_ty ~ienv env ty in 
       let vars, x = Vars.make_local `Shadow env.vars ty (L.unloc x) in
-      New (x, ty, doit ty_env { env with vars } p)
+      New (x, ty, doit ienv { env with vars } p)
 
     | Parse.In (c,x,p) -> 
       let c = Channel.convert env.table c in
       let vars, x = Vars.make_local `Shadow env.vars (Type.tmessage) (L.unloc x) in
-      In (c, x, doit ty_env { env with vars } p)
+      In (c, x, doit ienv { env with vars } p)
 
     | Parse.Out (c,m,p)
     | Parse.Alias (L.{ pl_desc = Out (c,m,p) },_) ->
@@ -461,10 +461,10 @@ let parse
         error ~loc (StrictAliasError "missing alias");
 
       let m, _ =
-        Typing.convert ~ty_env ~ty:Type.tmessage (mk_cenv env) m 
+        Typing.convert ~ienv ~ty:Type.tmessage (mk_cenv env) m 
       in
 
-      let p = doit ty_env env p in
+      let p = doit ienv env p in
       begin
         match L.unloc proc with
         | Alias (_, a) -> Alias (Out (c, m, p), L.unloc a)
@@ -472,7 +472,7 @@ let parse
         | _ -> assert false
       end
 
-    | Parse.Alias (p,a) -> Alias (doit ty_env env p, L.unloc a)
+    | Parse.Alias (p,a) -> Alias (doit ienv env p, L.unloc a)
 
     | Parse.Set (s_p, l, m, p) ->
       let s = Symbols.Macro.convert_path s_p env.table in
@@ -493,31 +493,31 @@ let parse
 
       let l =
         List.map (fun x ->
-            fst @@ Typing.convert ~ty_env ~ty:Type.tindex (mk_cenv env) x
+            fst @@ Typing.convert ~ienv ~ty:Type.tindex (mk_cenv env) x
           ) l
       in
-      let m, _ = Typing.convert ~ty_env ~ty (mk_cenv env) m in
-      Set (s, l, m, doit ty_env env p)
+      let m, _ = Typing.convert ~ienv ~ty (mk_cenv env) m in
+      Set (s, l, m, doit ienv env p)
 
     | Parse.Parallel (p, q) ->
-      Parallel (doit ty_env env p, doit ty_env env q)
+      Parallel (doit ienv env p, doit ienv env q)
 
     | Parse.Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
-        | None -> Type.univar (Infer.mk_ty_univar ty_env)
-        | Some pty -> Typing.convert_ty ~ty_env env pty 
+        | None -> Type.univar (Infer.mk_ty_univar ienv)
+        | Some pty -> Typing.convert_ty ~ienv env pty 
       in
 
-      let t, _ = Typing.convert ~ty_env ~ty (mk_cenv env) t in
+      let t, _ = Typing.convert ~ienv ~ty (mk_cenv env) t in
       let vars, x = Vars.make_local `Shadow env.vars ty (L.unloc x) in
-      Let (x, t, ty, doit ty_env { env with vars } p)
+      Let (x, t, ty, doit ienv { env with vars } p)
 
     | Parse.Repl (x, p) -> 
       let vars, x = Vars.make_local `Shadow env.vars Type.tindex (L.unloc x) in
-      Repl (x, doit ty_env { env with vars } p)
+      Repl (x, doit ienv { env with vars } p)
 
     | Parse.Exists (vs, test, p, q) ->
-      let q = doit ty_env env q in
+      let q = doit ienv env q in
       let vars, vs =
         List.fold_left_map (fun vars x ->
             let vars, x = Vars.make_local `Shadow vars Type.tindex (L.unloc x) in
@@ -526,9 +526,9 @@ let parse
       in
       let env = { env with vars } in
       let test, _ =
-        Typing.convert ~ty_env ~ty:Type.tboolean (mk_cenv env) test
+        Typing.convert ~ienv ~ty:Type.tboolean (mk_cenv env) test
       in
-      let p = doit ty_env env p in
+      let p = doit ienv env p in
       Exists (vs, test, p, q)
 
     | Parse.Apply (p_id, args') ->
@@ -553,7 +553,7 @@ let parse
 
       let args = 
         List.map2 (fun v t ->
-            fst @@ Typing.convert ~ty_env ~ty:(Vars.ty v) (mk_cenv env) t
+            fst @@ Typing.convert ~ienv ~ty:(Vars.ty v) (mk_cenv env) t
           )
           p.args args
       in
@@ -561,11 +561,11 @@ let parse
       Apply (id, args)
   in
 
-  let proc = doit ty_env env process in
+  let proc = doit ienv env process in
 
   (* close the typing environment and substitute *)
   let subst =
-    match Infer.close env ty_env with        
+    match Infer.close env ienv with        
     | Infer.Closed subst -> subst
 
     | _ as e ->

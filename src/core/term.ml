@@ -48,7 +48,7 @@ let pp_applied_ftype pf { fty; ty_args; } =
 let[@warning "-27"] resolve_path = 
   ref ( 
     fun
-      ?(ty_env) _ _ ~ty_args ~args_ty 
+      ?(ienv) _ _ ~ty_args ~args_ty 
       ~(ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown]) ->
       assert false)
 
@@ -241,7 +241,7 @@ let equal (t : term) (t' : term) : bool = t = t'
 (** {2 Typing} *)
 
 (*------------------------------------------------------------------*)
-let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
+let rec destr_ty_funs ?ienv (t : Type.ty) (i : int) : Type.ty list * Type.ty =
   match t, i with
   | _, 0 -> [], t
 
@@ -249,16 +249,16 @@ let rec destr_ty_funs ?ty_env (t : Type.ty) (i : int) : Type.ty list * Type.ty =
     let lty, tout = destr_ty_funs t2 (i - 1) in
     t1 :: lty, tout
 
-  | TUnivar _, _ when ty_env <> None -> 
-    let ty_env = oget ty_env in
+  | TUnivar _, _ when ienv <> None -> 
+    let ienv = oget ienv in
 
     let ty_args =
       List.init i
-        (fun _ -> Type.univar (Infer.mk_ty_univar ty_env))
+        (fun _ -> Type.univar (Infer.mk_ty_univar ienv))
     in
-    let ty_out = Type.univar (Infer.mk_ty_univar ty_env) in
+    let ty_out = Type.univar (Infer.mk_ty_univar ienv) in
     let () =
-      match Infer.unify_ty ty_env t (Type.fun_l ty_args ty_out) with
+      match Infer.unify_ty ienv t (Type.fun_l ty_args ty_out) with
       | `Fail -> assert false   (* FIXME: can this happen? *)
       | `Ok   -> ()
     in
@@ -274,10 +274,10 @@ let rec destr_ty_tuple_flatten (t : Type.ty) : Type.ty list =
   | _ -> [t]
 
 (*------------------------------------------------------------------*)
-let ty ?ty_env (t : term) : Type.ty =
-  let must_close, ty_env = match ty_env with
-    | None        -> true, Infer.mk_env ()
-    | Some ty_env -> false, ty_env
+let ty ?ienv (t : term) : Type.ty =
+  let must_close, ienv = match ienv with
+    | None      -> true, Infer.mk_env ()
+    | Some ienv -> false, ienv
   in
 
   let rec ty (t : term) : Type.ty =
@@ -292,7 +292,7 @@ let ty ?ty_env (t : term) : Type.ty =
       Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
 
     | App (t1, l) ->
-      let tys, t_out = destr_ty_funs ~ty_env (ty t1) (List.length l) in      
+      let tys, t_out = destr_ty_funs ~ienv (ty t1) (List.length l) in      
       check_tys l tys;
       t_out
 
@@ -304,7 +304,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
     | Proj (i,t) -> 
       begin
-        match Infer.norm_ty ty_env (ty t) with
+        match Infer.norm_ty ienv (ty t) with
         | Type.Tuple tys -> List.nth tys (i - 1)
         | _ -> assert false
       end
@@ -330,7 +330,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
-        match Infer.unify_ty ty_env (ty term) arg_ty with
+        match Infer.unify_ty ienv (ty term) arg_ty with
         | `Ok -> ()
         | `Fail -> assert false
       ) terms tys
@@ -341,11 +341,11 @@ let ty ?ty_env (t : term) : Type.ty =
   if must_close then
     let tsubst =
       (* TODO: system variables: clean-up *)
-      match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ty_env with
+      match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ienv with
       | Infer.Closed subst -> subst
 
       | _ -> assert false
-      (* [ty_env] should be closed as we only use it for type variable
+      (* [ienv] should be closed as we only use it for type variable
          inference *)
     in
 
@@ -492,8 +492,8 @@ let mk_fun_tuple table fname ?ty_args terms =
 (*------------------------------------------------------------------*)
 (** Freshen function types *)
 
-let open_ftype (ty_env : Infer.env) (fty : Type.ftype) : Type.ftype_op =
-  let vars_f, ts = Infer.open_tvars ty_env fty.fty_vars in
+let open_ftype (ienv : Infer.env) (fty : Type.ftype) : Type.ftype_op =
+  let vars_f, ts = Infer.open_tvars ienv fty.fty_vars in
 
   (* compute the new function type *)
   Type.mk_ftype
@@ -504,33 +504,33 @@ let open_ftype (ty_env : Infer.env) (fty : Type.ftype) : Type.ftype_op =
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
 let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
-  let ty_env = Infer.mk_env () in
+  let ienv = Infer.mk_env () in
 
   let fty = Symbols.OpData.ftype table fname in
-  let opened_fty = open_ftype ty_env fty in 
+  let opened_fty = open_ftype ienv fty in 
 
   (* decompose [fty]'s type  *)
   let terms_tys, _ =
     let arrow_ty = Type.fun_l opened_fty.fty_args opened_fty.fty_out in
-    destr_ty_funs ~ty_env arrow_ty (List.length terms)
+    destr_ty_funs ~ienv arrow_ty (List.length terms)
   in
   (* unify types [ty_args] with [terms] *)
   List.iter2 (fun term arg_ty ->
-      match Infer.unify_ty ty_env (ty term) arg_ty with
+      match Infer.unify_ty ienv (ty term) arg_ty with
       | `Ok -> ()
       | `Fail -> assert false
     ) terms terms_tys;
 
-  (* [ty_env] should be closed thanks to types in [terms]. *)
+  (* [ienv] should be closed thanks to types in [terms]. *)
   assert (
     (* TODO: system variables: clean-up *)
-    match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ty_env with
+    match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ienv with
     | Closed _ -> true
     | _        -> false);
 
   let ty_args = 
     List.map (fun uv -> 
-        Infer.norm_ty ty_env (Type.univar uv) 
+        Infer.norm_ty ienv (Type.univar uv) 
       ) opened_fty.fty_vars
   in
   mk_fun0 fname { fty; ty_args; } terms

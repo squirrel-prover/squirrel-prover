@@ -2749,10 +2749,10 @@ let parse_crypto_args
   =
   let parse1 (arg : Args.crypto_arg) : Const.t=
     (* open a type unification environment *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
 
     let env, vars = 
-      Typing.convert_bnds ~ty_env ~mode:NoTags env (odflt [] arg.bnds) 
+      Typing.convert_bnds ~ienv ~mode:NoTags env (odflt [] arg.bnds) 
     in
 
     let glob_v = 
@@ -2766,10 +2766,10 @@ let parse_crypto_args
     let cond = 
       match arg.cond with
       | None -> []
-      | Some arg -> [fst (Typing.convert ~ty:Type.tboolean ~ty_env conv_env arg)]
+      | Some arg -> [fst (Typing.convert ~ty:Type.tboolean ~ienv conv_env arg)]
     in
     let name, term = 
-      match fst (Typing.convert ~ty:(Vars.ty glob_v) ~ty_env conv_env arg.term) with
+      match fst (Typing.convert ~ty:(Vars.ty glob_v) ~ienv conv_env arg.term) with
       | Term.Name (name, terms) -> name, terms
       | _ ->
         Tactics.hard_failure ~loc:(L.loc arg.term) (Failure "must be a name")
@@ -2781,7 +2781,7 @@ let parse_crypto_args
 
     (* close the inference environment *)
     let subst =
-      match Infer.close env ty_env with        
+      match Infer.close env ienv with        
       | Infer.Closed subst -> subst
 
       | _ as e ->
@@ -3041,24 +3041,24 @@ module Parse = struct
         (env, v :: smpls)
       ) (env, []) rnds
 
-  let parse_var_decls ty_env env (p_vdecls : var_decl list) =
+  let parse_var_decls ienv env (p_vdecls : var_decl list) =
     let env, vdecls =
       List.fold_left (fun (env, vdecls) pv -> 
           let ty = 
             match pv.vd_ty with 
             | Some pty -> Typing.convert_ty env pty
-            | None     -> Type.univar (Infer.mk_ty_univar ty_env)
+            | None     -> Type.univar (Infer.mk_ty_univar ienv)
           in
           let env, var = make_exact_var env pv.vd_name ty in
           let init, _ = 
-            Typing.convert ~ty ~ty_env { env; cntxt = Typing.InGoal; } pv.vd_init 
+            Typing.convert ~ty ~ienv { env; cntxt = Typing.InGoal; } pv.vd_init 
           in
           (env, { var; init } :: vdecls)
         ) (env, []) p_vdecls
     in
     env, List.rev vdecls
 
-  let parse_updates ty_env (env : Env.t) (p_updates : (lsymb * Typing.term) list) =
+  let parse_updates ienv (env : Env.t) (p_updates : (lsymb * Typing.term) list) =
     let env, updates =
       List.fold_left (fun (env, updates) (pv, pt) ->         
           let v, _ =
@@ -3066,23 +3066,23 @@ module Parse = struct
             | Not_found -> failure (L.loc pv) (Failure "unknown variable");
           in
           let t, _ = 
-            Typing.convert ~ty:(Vars.ty v) ~ty_env { env; cntxt = Typing.InGoal; } pt
+            Typing.convert ~ty:(Vars.ty v) ~ienv { env; cntxt = Typing.InGoal; } pt
           in
           (env, (v, t) :: updates)
         ) (env, []) p_updates
     in
     env, List.rev updates
 
-  let parse_oracle_decl ty_env (init_env : Env.t) (po : oracle_decl) =
+  let parse_oracle_decl ienv (init_env : Env.t) (po : oracle_decl) =
     let env, args = 
-      Typing.convert_bnds ~ty_env ~mode:NoTags init_env po.o_args 
+      Typing.convert_bnds ~ienv ~mode:NoTags init_env po.o_args 
     in
 
     (* return type *)
     let tyout = 
       match po.o_tyout with 
       | Some pty -> Typing.convert_ty env pty
-      | None     -> Type.univar (Infer.mk_ty_univar ty_env)
+      | None     -> Type.univar (Infer.mk_ty_univar ienv)
     in
 
     let body = po.o_body in
@@ -3091,21 +3091,21 @@ module Parse = struct
     let env, loc_smpls = parse_sample_decls env body.bdy_rnds in
 
     (* local variables *)
-    let env, loc_vars = parse_var_decls ty_env env body.bdy_lvars in
+    let env, loc_vars = parse_var_decls ienv env body.bdy_lvars in
 
     (* state updates *)
-    let env, updates = parse_updates ty_env env body.bdy_updates in
+    let env, updates = parse_updates ienv env body.bdy_updates in
 
     (* parse return term *)
     let output = 
       match body.bdy_ret with
       | None -> 
-        if Infer.unify_ty ty_env Type.tmessage tyout <> `Ok then
+        if Infer.unify_ty ienv Type.tmessage tyout <> `Ok then
           failure (L.loc po.o_name) (Failure "return type should be message");
         Term.empty
 
       | Some pret ->
-        fst (Typing.convert ~ty:tyout ~ty_env { env; cntxt = Typing.InGoal; } pret)
+        fst (Typing.convert ~ty:tyout ~ienv { env; cntxt = Typing.InGoal; } pret)
     in
 
     let oracle = {
@@ -3114,10 +3114,10 @@ module Parse = struct
     in
     oracle
 
-  let parse_oracle_decls ty_env env (p_oracles : oracle_decl list) =
+  let parse_oracle_decls ienv env (p_oracles : oracle_decl list) =
     let oracles =
       List.fold_left (fun oracles po -> 
-          let oracle = parse_oracle_decl ty_env env po in
+          let oracle = parse_oracle_decl ienv env po in
           oracle :: oracles
         ) [] p_oracles
     in
@@ -3132,16 +3132,16 @@ module Parse = struct
     in
 
     (* open a type unification environment *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
 
     (* parse global samplings declarations *)
     let env, glob_smpls = parse_sample_decls env decl.g_rnds in
 
     (* parse global variable declarations *)
-    let env, glob_vars  = parse_var_decls ty_env env decl.g_gvar in
+    let env, glob_vars  = parse_var_decls ienv env decl.g_gvar in
 
     (* parse oracle declarations *)
-    let oracles = parse_oracle_decls ty_env env decl.g_oracles in
+    let oracles = parse_oracle_decls ienv env decl.g_oracles in
 
     let game = {
       name = L.unloc decl.g_name; 
@@ -3153,7 +3153,7 @@ module Parse = struct
 
     (* close the inference environment *)
     let subst =
-      match Infer.close env ty_env with        
+      match Infer.close env ienv with        
       | Infer.Closed subst -> subst
 
       | _ as e ->

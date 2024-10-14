@@ -163,7 +163,7 @@ end
     Thus, the function is stored here as a global variable. *)
 val set_resolve_path :
   (
-    ?ty_env:Infer.env ->
+    ?ienv:Infer.env ->
     Symbols.table -> 
     Symbols.p_path ->               (* surface path [p] *)
     ty_args:Type.ty list option ->  (* optional type arguments of [p] *)
@@ -196,7 +196,7 @@ val pp_info : ?ppe:ppenv -> unit -> pp_info
 val pp_with_info : pp_info -> term formatter
 
 (*------------------------------------------------------------------*)
-val ty : ?ty_env:Infer.env -> term -> Type.ty
+val ty : ?ienv:Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
@@ -582,7 +582,7 @@ val destr_pair : term -> (term * term) option
 (*------------------------------------------------------------------*)
 (** Destruct a given number of [Fun]. 
     If [ty_env] is not [None], may add new type equalities to do so. *)
-val destr_ty_funs : ?ty_env:Infer.env -> Type.ty -> int -> Type.ty list * Type.ty
+val destr_ty_funs : ?ienv:Infer.env -> Type.ty -> int -> Type.ty list * Type.ty
 
 (** Flatten all nested tuples at top level in a type:
     if [u, v, w] are not tuples, [u] becomes [[u]]

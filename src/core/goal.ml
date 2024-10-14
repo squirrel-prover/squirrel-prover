@@ -199,7 +199,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   (* parse the standard variables and the body *)
 
   (* open a typing environment *)
-  let ty_env = Infer.mk_env () in
+  let ienv = Infer.mk_env () in
 
   let env, vs =
     let var_tag =
@@ -207,21 +207,21 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       | Local  _ -> Vars.Tag.make Vars.Local
       | Global _ | Obs_equiv -> Vars.Tag.gtag
     in
-    Typing.convert_bnds_tagged ~ty_env ~mode:(DefaultTag var_tag) env vars
+    Typing.convert_bnds_tagged ~ienv ~mode:(DefaultTag var_tag) env vars
   in
 
   let conv_env = Typing.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
     | Local (f,e) ->
-      let f,_ = Typing.convert ~ty_env conv_env ~ty:Type.tboolean f in
+      let f,_ = Typing.convert ~ienv conv_env ~ty:Type.tboolean f in
       let e =
         match e with
         | None -> None
         | Some e ->
           let e, _ = 
             let ty = Library.Real.treal conv_env.env.table in
-            Typing.convert ~ty_env conv_env ~ty e 
+            Typing.convert ~ienv conv_env ~ty e 
           in 
           Some e
       in
@@ -258,7 +258,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       formula, Local s
 
     | Global f ->
-      let f = Typing.convert_global_formula ~ty_env conv_env f in
+      let f = Typing.convert_global_formula ~ienv conv_env f in
       let s = ES.init ~no_sanity_check:true ~env f in
       let formula = Equiv.GlobalS (Equiv.Smart.mk_forall_tagged vs f) in
       formula, Global s
@@ -270,7 +270,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
 
   (* close the typing environment and substitute *)
   let subst =
-    match Infer.close env ty_env with        
+    match Infer.close env ienv with        
     | Infer.Closed subst -> subst
 
     | _ as e ->

@@ -67,22 +67,22 @@ let parse_state_decl
   let ts_init = Term.mk_action Symbols.init_action [] in
 
   (* open a typing environment *)
-  let ty_env = Infer.mk_env () in
+  let ienv = Infer.mk_env () in
   
   let env = Env.init ~table () in
   let conv_env = Typing.{ env; cntxt = InProc ([], ts_init); } in
 
-  let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env p_args in
+  let env, args = Typing.convert_bnds ~ienv ~mode:NoTags env p_args in
   let conv_env = { conv_env with env } in
 
   (* parse the macro type *)
   let out_ty = omap (Typing.convert_ty env) out_ty in
 
-  let t, out_ty = Typing.convert ~ty_env ?ty:out_ty conv_env init_body in
+  let t, out_ty = Typing.convert ~ienv ?ty:out_ty conv_env init_body in
 
   (* close the typing environment and substitute *)
   let tsubst =
-    match Infer.close env ty_env with        
+    match Infer.close env ienv with        
     | Infer.Closed subst -> subst
 
     | _ as e ->
@@ -113,20 +113,20 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
     in
 
     (* open a typing environment *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
 
     (* translate arguments *)
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
       Typing.convert_ext_bnds
-        ~ty_env ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) 
+        ~ienv ~mode:(DefaultTag (Vars.Tag.make ~const:true Vars.Global)) 
         env decl.op_args
         (* assume global constant variables to properly check that the
            body represents a deterministic computations later
            (as constant => deterministic). *)
     in
 
-    let out_ty = omap (Typing.convert_ty ~ty_env env) decl.op_tyout in
+    let out_ty = omap (Typing.convert_ty ~ienv env) decl.op_tyout in
 
     (* translate body *)
     let body, out_ty =
@@ -141,7 +141,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
       | `Concrete body ->
         let body, out_ty =
-          Typing.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal; } body
+          Typing.convert ~ienv ?ty:out_ty { env; cntxt = InGoal; } body
         in
         let body = Term.subst subst body in
         `Concrete body, out_ty
@@ -149,7 +149,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     (* check that the typing environment is closed *)
     let tsubst =
-      match Infer.close env ty_env with        
+      match Infer.close env ienv with        
       | Infer.Closed subst -> subst
 
       | _ as e ->
@@ -224,7 +224,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
     in
 
     (* open a typing environment *)
-    let ty_env = Infer.mk_env () in
+    let ienv = Infer.mk_env () in
 
     let env =
       let system = SE.{
@@ -255,14 +255,14 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
              
              SE.var v
            in
-           let env, args = Typing.convert_bnds ~ty_env ~mode:NoTags env bnds in
+           let env, args = Typing.convert_bnds ~ienv ~mode:NoTags env bnds in
            let se_info = Mv.add_list (List.map (fun v -> v, se_v) args) se_info in
            (se_info, env), (se_v, args)
         ) (Mv.empty, env) decl.pred_multi_args
     in
     (* parse binders for simple variables *)
     let env, simpl_args =
-      Typing.convert_bnds ~ty_env ~mode:NoTags env decl.pred_simpl_args
+      Typing.convert_bnds ~ienv ~mode:NoTags env decl.pred_simpl_args
     in
 
     let body =
@@ -271,7 +271,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
       | Some b ->
         let b =
           Typing.convert_global_formula
-            ~ty_env ~system_info:se_info
+            ~ienv ~system_info:se_info
             { env; cntxt = InGoal; } b
         in
         Predicate.Concrete b
@@ -279,7 +279,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
 
     (* close the typing environment and substitute *)
     let tsubst =
-      match Infer.close env ty_env with        
+      match Infer.close env ienv with        
       | Infer.Closed subst -> subst
 
       | _ as e ->

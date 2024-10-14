@@ -47,7 +47,7 @@ type rw_state = {
   init_subs  : Term.term list;
   init_right : Term.term;
   
-  ty_env : Infer.env;
+  ienv : Infer.env;
 
   found_instance : [ `False | `Found of found ];
 }
@@ -117,8 +117,8 @@ let mk_state
   in
 
   (* open an type unification environment *)
-  let ty_env = Infer.mk_env () in
-  let params, tsubst = Infer.open_params ty_env rule.rw_params in
+  let ienv = Infer.mk_env () in
+  let params, tsubst = Infer.open_params ienv rule.rw_params in
 
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f) |>
@@ -136,7 +136,7 @@ let mk_state
     init_pat;
     init_right = mk_form right;
     init_subs  = List.map mk_form rule.rw_conds;
-    ty_env;
+    ienv;
     found_instance = `False; } 
 
 (*------------------------------------------------------------------*)
@@ -162,7 +162,7 @@ let rw_inst
     =
     (* adds [conds] in [hyps] *)
     let hyps = hyps_add_conds hyps conds in
-    let ty_env = s.ty_env in
+    let ienv = s.ienv in
     let projs : Projection.t list option = 
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
@@ -182,7 +182,7 @@ let rw_inst
           begin
             match 
               Match.T.try_match
-                ~expand_context ~ty_env ~hyps ~env table context occ inst.pat 
+                ~expand_context ~ienv ~hyps ~env table context occ inst.pat 
             with
             | NoMatch _ -> s, `Continue
             | Match _mv -> 
@@ -204,7 +204,7 @@ let rw_inst
         let context = SE.reachability_context se in
         match 
           Match.T.try_match
-            ~expand_context ~ty_env ~hyps ~env table context occ pat_proj 
+            ~expand_context ~ienv ~hyps ~env table context occ pat_proj 
         with
         | NoMatch _ -> s, `Continue
 
@@ -231,7 +231,7 @@ let rw_inst
 
           (* Check that all type variables have been infered.
              Remark: type unification environments are stateful *)
-          match Infer.close env s.ty_env with
+          match Infer.close env s.ienv with
           | Infer.FreeTyVars
           | Infer.FreeSystemVars
           | Infer.BadInstantiation _ -> s, `Continue
@@ -343,7 +343,7 @@ let do_rewrite
        This may require renaming projections in [rule], and removing some
        projections from [rule]. 
 
-       Rebuild at each application of [_rewrite], to have a new [ty_env]. *)
+       Rebuild at each application of [_rewrite], to have a new [ienv]. *)
     let s = 
       let target_systems : SE.t =
         match target with
