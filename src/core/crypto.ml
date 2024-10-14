@@ -218,7 +218,8 @@ module CondTerm = struct
     let reduction_state hyps =
       Reduction.mk_state
         ~hyps ~system:env.system ~vars:env.vars
-        ~param:Reduction.rp_crypto
+        ~params:(Env.to_params env)
+        ~red_param:Reduction.rp_crypto
         env.table
     in
     (* Removing duplicates *)
@@ -444,16 +445,15 @@ let exact_eq_under_cond
   let system = env.system in
   let conv_state =
     Reduction.mk_state
-      ~system ~hyps 
-      ~param:Reduction.rp_full env.table
+      ~system ~hyps ~params:(Env.to_params env)
+      ~red_param:Reduction.rp_full env.table
   in
-  let conv = Reduction.conv conv_state in
-  (*TODO adrien*)
-  
+  let conv = Reduction.conv conv_state in 
   let reduction_state =
     Reduction.mk_state ~hyps
-      ~system:system ~vars:env.vars
-      ~param:Reduction.rp_crypto
+      ~system ~vars:env.vars
+      ~params:(Env.to_params env)
+      ~red_param:Reduction.rp_crypto
       env.table
   in
   let decompose_ands x =
@@ -1605,7 +1605,8 @@ module Game = struct
     let reduction_state =
       Reduction.mk_state ~hyps:query.hyps
         ~system:query.env.system ~vars:query.env.vars
-        ~param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
+        ~params:(Env.to_params env)
+        ~red_param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
         query.env.table
     in
     let red_term = Reduction.reduce_term reduction_state term.term in
@@ -2397,7 +2398,7 @@ type rec_call_occ = rec_call Iter.occ
 let derecursify_term
     ~(expand_mode : [`FullDelta | `Delta ])
     (hyps : TraceHyps.hyps)
-    (venv : Vars.env)
+    (params : Params.t) (venv : Vars.env)
     (constr : Constr.trace_cntxt) (system : SE.context) (t_init : Term.term)
   : rec_call_occ list * Term.term
   =
@@ -2414,10 +2415,13 @@ let derecursify_term
             hyps
         in
 
-        let param = Reduction.rp_crypto in
+        let red_param = Reduction.rp_crypto in
         (* FIXME: add tag information in [fv] *)
         let vars = Vars.of_list (Vars.Tag.local_vars vars) in
-        let st = Reduction.mk_state ~hyps ~system:new_context ~vars ~param table in
+        let st =
+          Reduction.mk_state
+            ~hyps ~system:new_context ~vars ~params ~red_param table
+        in
         let strat = Reduction.(MayRedSub rp_full) in
         Reduction.whnf_term ~strat st t
       in
@@ -2576,6 +2580,7 @@ let derecursify
   : (goal * Term.term) list * goal
   =
   let system = env.system in
+  let params = Env.to_params env in
   let trace_context =
     Constr.make_context ~table:env.table ~system:(SE.to_fset system.set)
   in
@@ -2584,7 +2589,7 @@ let derecursify
     let rec_term_occs, output =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta hyps env.vars trace_context system output
+        ~expand_mode:`FullDelta hyps params env.vars trace_context system output
         (* extending [env.vars] with [vars] would not be useful as
            [vars] are local, unrestricted, variables. *)
     in
@@ -2949,8 +2954,12 @@ let prove
       oracle_subgoals;
     Printer.pr "@[<2>Final memory is:@ %a@]@." (AbstractSet._pp_mem ppe) result.final_mem;
     
-    let param = Reduction.rp_default in
-    let state = Reduction.mk_state ~hyps ~system:env.system ~param env.table in
+    let red_param = Reduction.rp_default in
+    let params = Env.to_params env in
+    let state = 
+      Reduction.mk_state
+        ~hyps ~system:env.system ~params ~red_param env.table
+    in
     List.remove_duplicate (Reduction.conv state) (consts_subgs @ oracle_subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )

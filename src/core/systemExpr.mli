@@ -143,7 +143,7 @@ module Parse : sig
 
   type t = item list L.located
 
-  val parse : se_env:Var.env -> Symbols.table -> t -> arbitrary
+  val parse : se_env:env -> Symbols.table -> t -> arbitrary
 
   (*------------------------------------------------------------------*)
   type p_context_i =
@@ -153,8 +153,8 @@ module Parse : sig
 
   type p_context = p_context_i L.located 
 
-  val parse_local_context  : se_env:Var.env -> Symbols.table -> p_context -> context
-  val parse_global_context : se_env:Var.env -> Symbols.table -> p_context -> context
+  val parse_local_context  : se_env:env -> Symbols.table -> p_context -> context
+  val parse_global_context : se_env:env -> Symbols.table -> p_context -> context
 
   (*------------------------------------------------------------------*)
   type sys = [`Local | `Global] * p_context

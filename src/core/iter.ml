@@ -542,10 +542,13 @@ let get_macro_occs
        Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
     let t =
       let system = SE.{ set = (constr.system :> SE.t); pair = None; } in
-      let param = Reduction.rp_crypto in
+      let params = Env.to_params env in
+      let red_param = Reduction.rp_crypto in
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in
-      let st = Reduction.mk_state ~hyps ~system ~vars ~param constr.table in
+      let st =
+        Reduction.mk_state ~hyps ~system ~vars ~params ~red_param constr.table
+      in
       let strat = Reduction.(MayRedSub rp_full) in
       fst (Reduction.whnf_term ~strat st t)
     in

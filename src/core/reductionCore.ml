@@ -52,16 +52,17 @@ module type S = sig
   val mk_state :
     ?expand_context:Macros.expand_context ->
     ?hyps:THyps.hyps ->
-    system:SE.context -> 
-    ?vars:Vars.env -> 
-    param:red_param -> 
+    ?params:Params.t ->
+    system:SE.context ->
+    ?vars:Vars.env ->
+    red_param:red_param -> 
     Symbols.table -> 
     state
 
   (*------------------------------------------------------------------*)
   (** {2 Conversion functions} *)
 
-  (** Conversion functions using a [cstate] *)
+  (** Conversion functions using a [state] *)
   val conv   : state -> Term.term  -> Term.term  -> bool 
   val conv_g : state -> Equiv.form -> Equiv.form -> bool 
 

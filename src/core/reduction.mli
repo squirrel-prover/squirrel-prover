@@ -11,7 +11,6 @@ module THyps = Hyps.TraceHyps
 
 include ReductionCore.S
 
-
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)
 

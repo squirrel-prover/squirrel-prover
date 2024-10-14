@@ -68,6 +68,7 @@ module type S = sig
 
   val system : t -> SystemExpr.context
 
+  val params : t -> Params.t
 
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t

@@ -245,7 +245,7 @@ module Parse = struct
   type t = item list L.located
 
   let parse_system
-      ?(se_env = Var.empty_env)
+      ?(se_env = [])
       (table : Symbols.table)
       (system : Symbols.p_path)
     :
@@ -253,7 +253,7 @@ module Parse = struct
     =
     let top, sub = system in
     if top = [] then
-      match Var.lookup_string (L.unloc sub) se_env with
+      match lookup_string (L.unloc sub) se_env with
       | Some v -> var v
       | None ->
         of_system table (System.convert table system)
@@ -273,7 +273,7 @@ module Parse = struct
     | Some p ->
       System.Single.make table sys (Projection.from_string (L.unloc p))
 
-  let parse ~(se_env : Var.env) table (p : t) : arbitrary = 
+  let parse ~(se_env : env) table (p : t) : arbitrary = 
     match L.unloc p with
     | [] ->
       (* Default system annotation. *)

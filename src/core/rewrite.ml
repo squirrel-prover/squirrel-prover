@@ -223,9 +223,9 @@ let rw_inst
           let env = Env.{
               vars = pat_vars; table;
               ty_vars = [];
-              se_vars = SE.Var.empty_env; (* TODO: system variables: pass along [se_vars] and [ty_vars] 
-                                             + do not construct a full environment each time? 
-                                             (less sure about the latter point) *)
+              se_vars = []; (* TODO: system variables: pass along [se_vars] and [ty_vars] 
+                             + do not construct a full environment each time? 
+                              (less sure about the latter point) *)
               system = context; }
           in
 

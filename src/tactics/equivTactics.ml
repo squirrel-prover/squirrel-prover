@@ -1251,11 +1251,11 @@ let deprecated_mk_phi_proj
         ) [] macro_cases
     in
     let state = 
-      let param = Reduction.rp_default in
+      let red_param = Reduction.rp_default in
       let context = 
         SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
       in
-      Reduction.mk_state cntxt.table ~system:context ~param
+      Reduction.mk_state cntxt.table ~system:context ~red_param
     in
     List.remove_duplicate (Reduction.conv state) (phi_frame @ phi_actions)
 

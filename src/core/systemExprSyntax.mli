@@ -42,15 +42,6 @@ module Var : sig
 
   module S : Set.S with type elt = t
   module M : Map.S with type key = t
-
-  (*------------------------------------------------------------------*)
-  (** {3 Environment} *)
- 
-  type env = info list M.t
-
-  val empty_env : env
-
-  val lookup_string : string -> env -> t option 
 end
 
 (*------------------------------------------------------------------*)
@@ -59,6 +50,9 @@ end
 type tagged_var = Var.t * Var.info list
 
 type tagged_vars = tagged_var list
+type env = tagged_vars
+
+val lookup_string : string -> env -> Var.t option 
 
 val pp_tagged_var  : tagged_var  formatter
 val pp_tagged_vars : tagged_vars formatter
@@ -146,10 +140,10 @@ val full_any : arbitrary
 val var : Var.t -> arbitrary
 
 (*------------------------------------------------------------------*)
-val is_var  :                    'a expr -> bool
-val is_fset :                    'a expr -> bool
-val is_any  :                    'a expr -> bool
-val is_pair : ?se_env:Var.env -> 'a expr -> bool
+val is_var  :                'a expr -> bool
+val is_fset :                'a expr -> bool
+val is_any  :                'a expr -> bool
+val is_pair : ?se_env:env -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -191,7 +185,7 @@ val to_fset : 'a expr -> fset
 
 (** Convert an expression [s] to a [pair].
     [s] must be convertible. *)
-val to_pair : ?se_env:Var.env -> 'a expr -> pair
+val to_pair : ?se_env:env -> 'a expr -> pair
 
 (*------------------------------------------------------------------*)
 (** {2 Operations on finite sets} *)

@@ -730,10 +730,10 @@ struct
          Must be synchronized with corresponding code in
          [Iter.fold_macro_support]. *)
       let t =
-        let param = Reduction.rp_crypto in
+        let red_param = Reduction.rp_crypto in
         (* FIXME: add tag information in [pos_info] *)
         let vars = Vars.of_list (Vars.Tag.local_vars pi.pi_vars) in
-        let st = Reduction.mk_state ~hyps ~system ~vars ~param table in
+        let st = Reduction.mk_state ~hyps ~system ~vars ~red_param table in
         let strat = Reduction.(MayRedSub rp_full) in
         fst (Reduction.whnf_term ~strat st t)
       in

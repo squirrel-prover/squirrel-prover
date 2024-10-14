@@ -337,8 +337,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
            to try to make the action symbol appear. *)
         let red_state =
           Reduction.mk_state
-            ~hyps:new_hyps ~system:new_context ~vars
-            ~param:Reduction.rp_full
+            ~hyps:new_hyps ~system:new_context
+            ~vars ~params:(S.params s)
+            ~red_param:Reduction.rp_full
             table
         in
         let a, _ = Reduction.whnf_term ~strat:Std red_state a in

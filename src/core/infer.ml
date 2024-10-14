@@ -174,7 +174,7 @@ let check_se_subst
         match (se :> SE.exposed).cnt with
         | List l -> List.length l = 2
         | Var  v -> 
-          let infos = SE.Var.M.find_dflt [] v env.se_vars in
+          let infos = List.assoc_dflt [] v env.se_vars in
           List.mem SE.Var.Pair infos
         | Any  _ -> false
       end

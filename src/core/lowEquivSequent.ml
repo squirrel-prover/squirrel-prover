@@ -92,9 +92,9 @@ let _pp ppe fmt j =
   in
   Fmt.pf fmt "@[<v 0>" ;
 
-  if not (SE.Var.M.is_empty j.env.se_vars) then
+  if not (j.env.se_vars = []) then
     Fmt.pf fmt "@[System variables: %a@]@;" 
-      SE.pp_tagged_vars (SE.Var.M.bindings j.env.se_vars) ;
+      SE.pp_tagged_vars j.env.se_vars ;
 
   Fmt.pf fmt "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
@@ -267,6 +267,8 @@ let set_conclusion_in_context ?update_local ?bound system conc s =
 
     (* Finally set the new conclusion. *)
     { s with conclusion = conc }
+
+let params s = Params.{ ty_vars = s.env.ty_vars; se_vars = s.env.se_vars; }
 
 let table j = j.env.table
 let set_table table j = update ~table j

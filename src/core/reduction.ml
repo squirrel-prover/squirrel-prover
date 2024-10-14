@@ -123,11 +123,12 @@ module Core (* : ReductionCore.S *) = struct
   (*------------------------------------------------------------------*)
   (** reduction state *)
   type state = { 
-    table  : Symbols.table;
-    vars   : Vars.env;         (* used to get variable tags *)
-    system : SE.context;
-    param  : red_param;
-    hyps   : THyps.hyps;
+    table     : Symbols.table;
+    params    : Params.t;
+    vars      : Vars.env;         (* used to get variable tags *)
+    system    : SE.context;
+    red_param : red_param;
+    hyps      : THyps.hyps;
 
     expand_context : Macros.expand_context;
     (** expantion mode for macros. See [Macros.expand_context]. *)
@@ -137,14 +138,15 @@ module Core (* : ReductionCore.S *) = struct
   (** Make a reduction state directly *)
   let mk_state
       ?(expand_context = Macros.InSequent)
-      ?(hyps = THyps.empty)
-      ~(system : SE.context)
-      ?(vars   : Vars.env = Vars.empty_env)
-      ~(param  : red_param)
-      (table   : Symbols.table)
+      ?(hyps      = THyps.empty)
+      ?(params    = Params.empty )
+      ~(system    : SE.context)
+      ?(vars      = Vars.empty_env)
+      ~(red_param : red_param)
+      (table      : Symbols.table)
     : state 
     =
-    { table; system; param; hyps; expand_context; vars; }
+    { table; system; params; red_param; hyps; expand_context; vars; }
 
 
   (*------------------------------------------------------------------*)
@@ -185,7 +187,7 @@ module Core (* : ReductionCore.S *) = struct
     {
       table  = c.table;
       system = c.system;
-      param  = c.param;
+      param  = c.red_param;
       hyps   = c.hyps;
 
       expand_context = c.expand_context;
@@ -479,10 +481,10 @@ module Core (* : ReductionCore.S *) = struct
     let t, has_red = red_head1 t in
     match strat, has_red with
     | Std, _ | MayRedSub _, true -> t, has_red
-    | MayRedSub param, false ->
+    | MayRedSub red_param, false ->
       (* put strict subterms in whnf and try to reduce at head position again *)
       let t', has_red_sub =
-        reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with param; } t
+        reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with red_param; } t
       in
       if has_red_sub then
         let t', has_red = red_head1 t' in
@@ -490,26 +492,26 @@ module Core (* : ReductionCore.S *) = struct
       else t, false
 
   and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.beta then t, false
+    if not st.red_param.beta then t, false
     else Match.reduce_beta1 t
 
   and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.zeta then t, false
+    if not st.red_param.zeta then t, false
     else Match.reduce_let1 t
 
   and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.proj then t, false
+    if not st.red_param.proj then t, false
     else Match.reduce_proj1 t
 
   and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.diff || not (SE.is_fset st.system.set) then t, false
+    if not st.red_param.diff || not (SE.is_fset st.system.set) then t, false
     else
       let se = SE.to_fset st.system.set in
       Term.head_normal_biterm0 (SE.to_projs se) t
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
   and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.constr ||
+    if not st.red_param.constr ||
        Term.ty t <> Type.tboolean ||
        Term.equal t Term.mk_false ||
        Term.equal t Term.mk_true
@@ -527,7 +529,7 @@ module Core (* : ReductionCore.S *) = struct
   (* Expand once at head position *)
   and reduce_delta1 (st : state) (t : Term.term) : Term.term * bool = 
     Match.reduce_delta1
-      ~delta:st.param.delta
+      ~delta:st.red_param.delta
       ~mode:st.expand_context st.table st.system st.hyps t
 
   and reduce_builtin (st : state) (t : Term.t) : Term.t * bool =
@@ -557,7 +559,7 @@ module Core (* : ReductionCore.S *) = struct
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    if not st.param.rewrite then t, false 
+    if not st.red_param.rewrite then t, false 
     else 
       let db = Hint.get_rewrite_db st.table in
       let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
@@ -574,7 +576,7 @@ module Core (* : ReductionCore.S *) = struct
               List.for_all (fun (se, sub) -> 
                   let new_context = { st.system with set = se; } in
                   let st_sub =
-                    { (change_context st new_context) with param = rp_default; } 
+                    { (change_context st new_context) with red_param = rp_default; } 
                   in
                   (* FEATURE: conversion *)
                   fst (reduce_term st_sub sub) =
@@ -719,7 +721,7 @@ module Core (* : ReductionCore.S *) = struct
 
   (*------------------------------------------------------------------*)
   let reduce_glob_let1 (st : state) (t : Equiv.form) : Equiv.form * bool =
-    if not st.param.zeta then t, false
+    if not st.red_param.zeta then t, false
     else Match.reduce_glob_let1 t
 
   (*------------------------------------------------------------------*)
@@ -825,10 +827,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       [system] is the system of the term being reduced. *)
   let to_state
       ?(expand_context : Macros.expand_context = InSequent) 
-      ?(system : SE.context option)
-      ?(vars   : Vars.env option) (* overloads [s] variables *)
-      (param   : red_param) 
-      (s       : S.t) 
+      ?(system   : SE.context option)
+      ?(vars     : Vars.env option) (* overloads [s] variables *)
+      (red_param : red_param)
+      (s         : S.t)
     : state
     = 
     let table = S.table s in
@@ -845,9 +847,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     in
 
     { table;
+      params = S.params s;
       system = new_context;
       vars;
-      param;
+      red_param;
       hyps;
       expand_context; } 
 

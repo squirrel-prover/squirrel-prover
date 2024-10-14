@@ -248,7 +248,7 @@ let parse_predicate_decl table (decl : Decl.predicate_decl) : Symbols.table =
              let se_name = L.unloc se_v in
 
              let v = 
-               match SE.Var.lookup_string se_name env.Env.se_vars with
+               match SE.lookup_string se_name env.Env.se_vars with
                | None -> error (L.loc se_v) KDecl (Failure "unknown system variable")
                | Some v -> v
              in

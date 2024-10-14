@@ -581,7 +581,7 @@ let convert_se_var_bnd
   let infos = if name = "equiv" then SE.Var.Pair :: infos else infos in
 
   let se_vars =         (* remove any binding [v'] shadowed by [v] *)
-    SE.Var.M.filter (fun v' _ -> SE.Var.name v' <> name) env.se_vars
+    List.filter (fun (v', _) -> SE.Var.name v' <> name) env.se_vars
   in
 
   let var =
@@ -590,7 +590,7 @@ let convert_se_var_bnd
     | "equiv" -> SE.Var.pair
     | _ -> SE.Var.of_ident (Ident.create name)
   in
-  { env with se_vars = SE.Var.M.add var infos se_vars; }, (var, infos)
+  { env with se_vars = (var, infos) :: se_vars; }, (var, infos)
 
 let convert_se_var_bnds
     (env : Env.t) (bnds : (lsymb * lsymb list) list) : Env.t * SE.tagged_vars

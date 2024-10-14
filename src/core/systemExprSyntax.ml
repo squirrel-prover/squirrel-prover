@@ -73,28 +73,6 @@ module Var = struct
 
   module M = Map.Make (O)
   module S = Set.Make (O)
-
-  (*------------------------------------------------------------------*)
-  (** {3 Environment} *)
-
-  type env = info list M.t
-
-  let empty_env : env = M.empty
-
-  let lookup_string (se_name : string) (env : env) : t option =
-    (* FIXME: inefficient as we lookup through the whole table *)
-    let found = ref None in
-    M.iter (fun v' _ ->
-        if name v' = se_name then begin
-          (* It must be guaranteed that [env.se_vars] does
-             not contains multiple identically named
-             variables. *)
-          assert (!found = None); 
-          found := Some v'
-        end
-      ) env;
-    !found
-
 end
 
 (*------------------------------------------------------------------*)
@@ -103,6 +81,7 @@ end
 type tagged_var = Var.t * Var.info list
 
 type tagged_vars = tagged_var list
+type env = tagged_vars
 
 let pp_tagged_var fmt (v,infos) =
   if infos = [] then
@@ -115,6 +94,22 @@ let pp_tagged_var fmt (v,infos) =
 let pp_tagged_vars =
   Fmt.list ~sep:(Fmt.any ",@ ") pp_tagged_var
 
+
+let lookup_string (se_name : string) (env : tagged_vars) : Var.t option =
+  (* FIXME: inefficient as we lookup through the whole table *)
+  let found = ref None in
+  List.iter (fun (v',_) ->
+      if Var.name v' = se_name then begin
+        (* It must be guaranteed that [env.se_vars] does
+           not contains multiple identically named
+           variables. *)
+        assert (!found = None); 
+        found := Some v'
+      end
+    ) env;
+  !found
+
+(*------------------------------------------------------------------*)
 type p_bnd  = (string L.located * string L.located list) 
 type p_bnds = p_bnd list
 
@@ -203,7 +198,7 @@ let is_pair (type a) ?se_env (se : a expr) : bool =
     if se_env = None then true  (* FIXME: this likely breaks some stuff *)
     else 
       let se_env = oget se_env in
-      List.mem Var.Pair (Var.M.find_dflt [] v se_env)
+      List.mem Var.Pair (List.assoc_dflt [] v se_env)
 
   | _ -> false
 

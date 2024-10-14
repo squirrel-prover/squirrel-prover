@@ -86,9 +86,9 @@ end = struct
     in
     Fmt.pf fmt "@[<v 0>" ;
 
-    if not (SE.Var.M.is_empty s.env.se_vars) then
+    if not (s.env.se_vars = []) then
       Fmt.pf fmt "@[System variables: %a@]@;" 
-        SE.pp_tagged_vars (SE.Var.M.bindings s.env.se_vars) ;
+        SE.pp_tagged_vars s.env.se_vars;
 
     Fmt.pf fmt "@[System: %a@]@;"
       SystemExpr.pp_context s.env.system;
@@ -381,6 +381,8 @@ let vars    s = s.env.vars
 let ty_vars s = s.env.ty_vars
 let system  s = s.env.system
 let table   s = s.env.table
+
+let params s = Params.{ ty_vars = s.env.ty_vars; se_vars = s.env.se_vars; }
 
 let set_env (env : Env.t) s = S.update ~env s
 
