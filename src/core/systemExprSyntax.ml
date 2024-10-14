@@ -136,13 +136,13 @@ type cnt =
       All single systems are compatible. *)
 
 (** exposed type for system expressions *)
-type 'a exposed = {
+type exposed = {
   cnt  : cnt;
   name : string option;         (** optional short name, for printing *)
 }
 
 (** private type for system expressions *)
-type 'a expr = 'a exposed
+type 'a expr = exposed
 
 type arbitrary  = < > expr
 type compatible = < symbols : unit > expr
@@ -157,8 +157,8 @@ let hash (x : 'a expr) : int = Hashtbl.hash x.cnt
 let mk ?name cnt = { cnt; name; }
 
 (** exported *)
-external force  : 'a exposed -> 'b expr = "%identity"
-external force0 : 'a expr    -> 'b expr = "%identity"
+external force  : exposed -> 'b expr = "%identity"
+external force0 : 'a expr -> 'b expr = "%identity"
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)

@@ -89,7 +89,7 @@ type cnt =
       All single systems are compatible. *)
 
 (** exposed type for system expressions *)
-type 'a exposed = {
+type exposed = {
   cnt  : cnt;
   name : string option;         (** optional short name, for printing *)
 }
@@ -110,7 +110,7 @@ type 'a exposed = {
 
     An equivalence must be annotated with a [pair expr], representing
     an ordered and labelled pair. *)
-type +'a expr = private 'a exposed
+type +'a expr = private exposed
 
 (** Hierarchy of subtypes used as phantom types. *)
 type arbitrary  = < > expr
@@ -122,8 +122,8 @@ type t = arbitrary
 
 (*------------------------------------------------------------------*)
 (** not type-safe *)
-val force  : 'a exposed -> 'b expr
-val force0 : 'a expr    -> 'b expr
+val force  : exposed -> 'b expr
+val force0 : 'a expr -> 'b expr
 
 (*------------------------------------------------------------------*)
 val hash : 'a expr -> int

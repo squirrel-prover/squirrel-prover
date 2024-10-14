@@ -579,8 +579,8 @@ let setup_change_hyps_context
   let pair_sym =
     if new_context.SE.pair = None || old_context.SE.pair = None then false
     else 
-      match (oget new_context.SE.pair :> < > SE.exposed).cnt, 
-            (oget old_context.SE.pair :> < > SE.exposed).cnt with
+      match (oget new_context.SE.pair :> SE.exposed).cnt, 
+            (oget old_context.SE.pair :> SE.exposed).cnt with
       | List [new_left; new_right], List [old_left; old_right] ->
         snd new_left  = snd old_right && 
         snd new_right = snd old_left

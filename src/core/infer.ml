@@ -15,7 +15,7 @@ type env0 = {
   ty : Type.ty        Mid.t;
   (** for type unification variables *)
 
-  se : (< > SE.exposed * SE.Var.info list) Msv.t;
+  se : (SE.exposed * SE.Var.info list) Msv.t;
   (** for system variables
       (we use the exposed type to be able to easily inspect the
       expressions) *)
@@ -120,8 +120,8 @@ let norm_ty (env : env) (t : Type.ty) : Type.ty =
   in
   doit t
 
-let norm_se0 (env : env) (se : < > SE.exposed) : < > SE.exposed =
-  let rec doit (se : < > SE.exposed) : < > SE.exposed =
+let norm_se0 (env : env) (se : SE.exposed) : SE.exposed =
+  let rec doit (se : SE.exposed) : SE.exposed =
     match se.cnt with
     | Var v ->
       let v', _ = Msv.find_dflt (se,[]) v !env.se in
@@ -132,7 +132,7 @@ let norm_se0 (env : env) (se : < > SE.exposed) : < > SE.exposed =
   doit se
 
 let norm_se (type a) (env : env) (se : a SE.expr) : a SE.expr =
-  SE.force (norm_se0 env (se :> < > SE.exposed))
+  SE.force (norm_se0 env (se :> SE.exposed))
 
 let norm_se_context (env : env) (c : SE.context) : SE.context =
   { set = norm_se env c.set; pair = omap (norm_se env) c.pair; }
@@ -171,7 +171,7 @@ let check_se_subst
     match se_info with
     | SE.Var.Pair ->
       begin
-        match (se :> < > SE.exposed).cnt with
+        match (se :> SE.exposed).cnt with
         | List l -> List.length l = 2
         | Var  v -> 
           let infos = SE.Var.M.find_dflt [] v env.se_vars in
@@ -215,7 +215,7 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
   in
 
   (* check that system expression variables have all been inferred *)
-  let check_se (se : < > SE.exposed) : bool =
+  let check_se (se : SE.exposed) : bool =
     match se.cnt with
     | Var uv -> not (Msv.mem uv !ienv.se)
     | Any _ | List _ -> true
@@ -303,7 +303,7 @@ let gen_and_close
 
      The latter is in reversed order. *)
   let check_and_gen_se_vars
-      (v : SE.Var.t) ((se,infos) : < > SE.exposed * SE.Var.info list)
+      (v : SE.Var.t) ((se,infos) : SE.exposed * SE.Var.info list)
       (gen_se_vars, failed : SE.tagged_vars * (Format.formatter -> unit) list)
     :
       SE.tagged_vars * (Format.formatter -> unit) list
@@ -387,7 +387,7 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
 (*------------------------------------------------------------------*)
 (** system unification variables (i.e. variable in the domain of
     [!env.se] are maximal for this ordering *)
-let compare_se (env : env) (t : < > SE.exposed) (t' : < > SE.exposed) : int =
+let compare_se (env : env) (t : SE.exposed) (t' : SE.exposed) : int =
   match t.cnt, t'.cnt with
   | Var u, Var u' when Msv.mem u !env.se && Msv.mem u' !env.se -> 
     Ident.compare (SE.Var.to_ident u) (SE.Var.to_ident u')
@@ -397,8 +397,8 @@ let compare_se (env : env) (t : < > SE.exposed) (t' : < > SE.exposed) : int =
 
 (*------------------------------------------------------------------*)
 let unify_se (env : env) (t : SE.t) (t' : SE.t) : [`Fail | `Ok] =
-  let t  = (norm_se env t  :> < > SE.exposed)
-  and t' = (norm_se env t' :> < > SE.exposed) in
+  let t  = (norm_se env t  :> SE.exposed)
+  and t' = (norm_se env t' :> SE.exposed) in
 
   let t, t' = if compare_se env t t' < 0 then t', t else t, t' in
 

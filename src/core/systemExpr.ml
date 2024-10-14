@@ -7,7 +7,7 @@ include SystemExprSyntax
 
 (*------------------------------------------------------------------*)
 let subset (type a) table (e1 : a expr) (e2 : a expr) : bool =
-  match (e1 :> a exposed).cnt, (e2 :> a exposed).cnt with
+  match (e1 :> exposed).cnt, (e2 :> exposed).cnt with
   | Var v1, Var v2 -> Var.equal v1 v2
     
   | Any { compatible_with = s1; pair = p1; }, 
@@ -37,7 +37,7 @@ let equal (type a) table (e1 : a expr) (e2 : a expr) : bool =
 
 (*------------------------------------------------------------------*)
 let subset_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
-  match (e1 :> a exposed).cnt, (e2 :> a exposed).cnt with
+  match (e1 :> exposed).cnt, (e2 :> exposed).cnt with
   | List l1, List l2 ->
     List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
 
@@ -49,7 +49,7 @@ let equal_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
 (*------------------------------------------------------------------*)
 (** Get system that is compatible with all systems of an expresion. *)
 let get_compatible_sys (type a) (se : a expr) : Symbols.system option = 
-  match (se :> a exposed).cnt with
+  match (se :> exposed).cnt with
   | Var _ | Any { compatible_with = None; } -> None
   | Any { compatible_with = s; } -> s
   | List ((_,s)::_) -> Some s.Single.system
@@ -113,7 +113,7 @@ let make_fset ?loc table ~labels (l : Single.t list) : fset =
 (** {2 Action symbols and terms} *)
 
 let symbs (type a) (table : Symbols.table) (se : a expr) = 
-  match (se :> a exposed).cnt with
+  match (se :> exposed).cnt with
   | List ((_,{ system })::_) -> System.symbs table system
   | _ -> assert false
 
@@ -186,7 +186,7 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
 (** {2 Miscelaneous} *)
 
 let get_compatible_of_context table (context : context) : compatible option =
-  let expr = (context.set :> < symbols : unit ; fset : unit > exposed) in
+  let expr = (context.set :> exposed) in
   match expr.cnt with
   | Any { compatible_with = None; } -> None
   | Any { compatible_with = Some s; } -> 
@@ -196,7 +196,7 @@ let get_compatible_of_context table (context : context) : compatible option =
 
 (*------------------------------------------------------------------*)
 let get_compatible_fset table (se : compatible) : fset =
-  match (se :> < > exposed).cnt with
+  match (se :> exposed).cnt with
   | Var _ | Any { compatible_with = None; } -> assert false
 
   | Any { compatible_with = Some s; } -> of_system table s
@@ -205,7 +205,7 @@ let get_compatible_fset table (se : compatible) : fset =
 
 (*------------------------------------------------------------------*)
 let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
-  match (g :> a exposed).cnt with
+  match (g :> exposed).cnt with
   | Var v -> force0 (Subst.subst_se_var s v)
   | Any _ | List _ -> g
 
