@@ -699,7 +699,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         else
           match
             Rewrite.rewrite_exn
-              ~loc (S.table s) (S.vars s) system InSequent
+              ~loc (S.table s) (S.params s) (S.vars s) system InSequent
               (S.get_trace_hyps s)
               mult rw_erule f
           with

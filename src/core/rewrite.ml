@@ -152,7 +152,8 @@ let hyps_add_conds hyps (conds : Term.terms) =
     the generated sub-goals. *)
 let rw_inst
     (expand_context : Macros.expand_context)
-    (table : Symbols.table) (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
+    (table : Symbols.table) (params : Params.t)
+    (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
   : rw_state Pos.f_map_fold 
   = 
   let doit
@@ -222,10 +223,9 @@ let rw_inst
           in
           let env = Env.{
               vars = pat_vars; table;
-              ty_vars = [];
-              se_vars = []; (* TODO: system variables: pass along [se_vars] and [ty_vars] 
-                             + do not construct a full environment each time? 
-                              (less sure about the latter point) *)
+              ty_vars = params.ty_vars;
+              se_vars = params.se_vars;
+              (* TODO: do not construct a full environment each time? *)
               system = context; }
           in
 
@@ -285,17 +285,18 @@ let rw_inst
 
 (** Exported *)
 let rewrite_head
-    (table : Symbols.table)
-    (env   : Vars.env)
+    (table  : Symbols.table)
+    (params : Params.t)
+    (env    : Vars.env)
     (expand_context : Macros.expand_context)
-    (hyps  : Hyps.TraceHyps.hyps)
-    (sexpr : SE.t)
-    (rule  : rw_rule)
-    (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
+    (hyps   : Hyps.TraceHyps.hyps)
+    (sexpr  : SE.t)
+    (rule   : rw_rule)
+    (t      : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
   assert (rule.rw_kind = GlobalEq);
   let s = mk_state rule sexpr in
-  match rw_inst expand_context table env hyps t sexpr [] [] Pos.root s with
+  match rw_inst expand_context table params env hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t ->
     Some (t, subgoals_of_found inst)
@@ -314,6 +315,7 @@ type rw_res_opt =
 (** Internal *)
 let do_rewrite
     (table  : Symbols.table)
+    (params : Params.t)
     (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
@@ -357,13 +359,13 @@ let do_rewrite
       match f with
       | Global f when rule.rw_kind = GlobalEq ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst expand_context table env hyps) system s f 
+          Pos.map_fold_e (rw_inst expand_context table params env hyps) system s f 
         in
         s, Equiv.Global f
 
       | Local f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst expand_context table env hyps) system.set s f 
+          Pos.map_fold (rw_inst expand_context table params env hyps) system.set s f 
         in
         s, Equiv.Local f
 
@@ -401,6 +403,7 @@ let do_rewrite
 (** Exported *)
 let rewrite
     (table  : Symbols.table)
+    (params : Params.t)
     (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
@@ -411,7 +414,7 @@ let rewrite
   =
   try
     let r =
-      do_rewrite table env system expand_context hyps mult rule target
+      do_rewrite table params env system expand_context hyps mult rule target
     in
     RW_Result r
   with
@@ -421,6 +424,7 @@ let rewrite
 let rewrite_exn   
     ~(loc   : L.t)
     (table  : Symbols.table)
+    (params : Params.t)
     (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
@@ -430,7 +434,7 @@ let rewrite_exn
     (target : Equiv.any_form) : rw_res
   =
   try
-    do_rewrite table env system expand_context hyps mult rule target
+    do_rewrite table params env system expand_context hyps mult rule target
   with
   | Failed e -> recast_error ~loc e
 
@@ -441,6 +445,7 @@ let high_rewrite
     ~(mode   : [`TopDown of bool | `BottomUp])
     ~(strict : bool)
     (table   : Symbols.table)
+    (params  : Params.t)
     (env     : Vars.env)
     (system  : SE.t)
     (mk_rule : Vars.vars -> Pos.pos -> rw_rule option) 
@@ -459,7 +464,7 @@ let high_rewrite
         assert (rule.rw_conds = []);
         
         let state = mk_state rule se in
-        match rw_inst InSequent table env hyps occ se vars conds p state with
+        match rw_inst InSequent table params env hyps occ se vars conds p state with
         | _, `Continue -> assert (not strict); `Continue
         | _, `Map t -> `Map t
   in

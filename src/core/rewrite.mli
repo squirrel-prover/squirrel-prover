@@ -14,6 +14,7 @@ type error =
     Return: rewritten term, proof obligations *)
 val rewrite_head :
   Symbols.table ->
+  Params.t ->
   Vars.env ->
   Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
@@ -32,6 +33,7 @@ type rw_res_opt =
 (*------------------------------------------------------------------*)
 val rewrite :
   Symbols.table ->
+  Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)
   SE.context ->
   Macros.expand_context ->
@@ -47,6 +49,7 @@ val rewrite :
 val rewrite_exn :
   loc:L.t ->
   Symbols.table ->
+  Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)
   SE.context ->
   Macros.expand_context ->
@@ -70,6 +73,7 @@ val high_rewrite :
   mode : [`TopDown of bool | `BottomUp] ->
   strict : bool ->
   Symbols.table ->
+  Params.t ->
   Vars.env ->
   SE.t ->
   (Vars.vars -> Pos.pos -> rw_rule option) ->

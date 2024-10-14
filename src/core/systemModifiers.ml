@@ -33,7 +33,7 @@ let high_rewrite_norec
   let env = Vars.empty_env in
   (* only local variables, hence [env] should is useless here. *)
   
-  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table env system mk_rule t
+  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table Params.empty env system mk_rule t
     
 
 (*------------------------------------------------------------------*)
@@ -1252,7 +1252,7 @@ let global_prf_t
        We set [strict] to true, to make sure that we indeed rewrite at
        all necessary positions. *)
     Rewrite.high_rewrite ~mode:`BottomUp ~strict:true
-      table env (old_system :> SE.t) (mk_rw_rule arg ms) t
+      table Params.empty env (old_system :> SE.t) (mk_rw_rule arg ms) t
   in
 
   let table, _new_system_e =
@@ -1274,7 +1274,7 @@ let do_rewrite
   let mult, rw_erule = rw in
   match
     Rewrite.rewrite_exn 
-      ~loc (TS.table s) (TS.vars s) (TS.system s) expand_context
+      ~loc (TS.table s) (TS.params s) (TS.vars s) (TS.system s) expand_context
       (TS.get_trace_hyps s)
       mult rw_erule (Local t)
   with

@@ -533,7 +533,7 @@ module Core (* : ReductionCore.S *) = struct
       ~mode:st.expand_context st.table st.system st.hyps t
 
   and reduce_builtin (st : state) (t : Term.t) : Term.t * bool =
-    if not st.param.builtin then t, false
+    if not st.red_param.builtin then t, false
     else
       let open Library in
       let table = st.table in
@@ -567,7 +567,7 @@ module Core (* : ReductionCore.S *) = struct
       let rule = List.find_map (fun Hint.{ rule } ->
           match 
             Rewrite.rewrite_head
-              st.table st.vars st.expand_context st.hyps st.system.set
+              st.table st.params st.vars st.expand_context st.hyps st.system.set
               rule t 
           with
           | None -> None

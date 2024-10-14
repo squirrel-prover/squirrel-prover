@@ -433,7 +433,7 @@ let indcca_param
              let rule, table, xc = mk_rewrule f cty mty rty kty in
              let res =
                Rewrite.rewrite
-                 table
+                 table (ES.params s)
                  Vars.empty_env (* only local variables,
                                    hence [env] is useless here *)
                  secontx InSequent hyps TacticsArgs.Once
