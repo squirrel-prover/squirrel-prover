@@ -209,6 +209,9 @@ let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
   | Var v -> force0 (Subst.subst_se_var s v)
   | Any _ | List _ -> g
 
+let gsubst_context (s : Subst.t) (g : context) : context =
+  { set = gsubst s g.set; pair = omap (gsubst s) g.pair ;}
+
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printers} *)
     
@@ -270,7 +273,7 @@ module Parse = struct
     | Some p ->
       System.Single.make table sys (Projection.from_string (L.unloc p))
 
-  let parse ?(se_env:Var.env option) table (p : t) : arbitrary = 
+  let parse ~(se_env : Var.env) table (p : t) : arbitrary = 
     match L.unloc p with
     | [] ->
       (* Default system annotation. *)
@@ -287,7 +290,7 @@ module Parse = struct
       any ~compatible_with ~pair
 
     | [{ system; projection = None; alias = None}] ->
-      parse_system ?se_env table system
+      parse_system ~se_env table system
 
     | l ->
       let labels =
@@ -300,9 +303,9 @@ module Parse = struct
       in
       (make_fset ~loc:(L.loc p) table ~labels l :> arbitrary)
 
-  let parse_pair ?se_env table (c : t) : pair =
-    let pair = parse ?se_env table c in
-    if not (is_pair pair) then error ~loc:(L.loc c) Expected_pair;
+  let parse_pair ~se_env table (c : t) : pair =
+    let pair = parse ~se_env table c in
+    if not (is_pair ~se_env pair) then error ~loc:(L.loc c) Expected_pair;
     to_pair pair
 
   (*------------------------------------------------------------------*)
@@ -319,22 +322,22 @@ module Parse = struct
   let empty = L.(mk_loc _dummy [])
 
   (** Parse the system context for a local statement. *)
-  let parse_local_context ?se_env table (c : p_context) : context = 
+  let parse_local_context ~se_env table (c : p_context) : context = 
     match L.unloc c with
     | NoSystem ->
-      { set = parse ?se_env table empty ; pair = None }
+      { set = parse ~se_env table empty ; pair = None }
 
     | System s ->
-      let set = parse ?se_env table s in
+      let set = parse ~se_env table s in
       { set ; pair = None }
       
     | Set_pair (s,p) ->
-      let set  = parse      ?se_env table s in
-      let pair = parse_pair ?se_env table p in
+      let set  = parse      ~se_env table s in
+      let pair = parse_pair ~se_env table p in
       { set ; pair = Some pair; }
 
   (** Parse the system context for a global statement. *)
-  let parse_global_context ?se_env table (c : p_context) : context = 
+  let parse_global_context ~se_env table (c : p_context) : context = 
     let check_compatible set pair =
       if not (compatible table set pair) then 
         error ~loc:(L.loc c) Incompatible_systems;
@@ -346,8 +349,8 @@ module Parse = struct
       | System s       -> s, s
       | Set_pair (s,p) -> s, p
     in
-    let set  = parse      ?se_env table set in
-    let pair = parse_pair ?se_env table pair in
+    let set  = parse      ~se_env table set in
+    let pair = parse_pair ~se_env table pair in
     check_compatible set pair;
     { set ; pair = Some pair; }
 end

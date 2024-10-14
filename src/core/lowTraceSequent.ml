@@ -158,9 +158,6 @@ end = struct
     (* all type variables are bound *)
     assert (Sid.subset tyfv.tv (Sid.of_list s.env.ty_vars));
     (* no univars remaining *)
-    (* REM *)
-    if not (Sid.subset tyfv.uv Sid.empty) then
-      Fmt.epr "%a@.@.%a@.@." pp_dbg s (Fmt.list Ident.pp_full) (Sid.elements tyfv.uv);
     assert (Sid.subset tyfv.uv Sid.empty)
 
 

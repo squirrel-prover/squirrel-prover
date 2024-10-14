@@ -11,7 +11,7 @@ let open_pat (type a)
   let pat_op_params, tsubst = Infer.open_params ty_env p.pat_params in
   let conclusion,bound = p.pat_term in
   let conclusion = Equiv.Babel.gsubst f_kind tsubst conclusion in
-  let bound = C.bound_gsubst tsubst bound in
+  let bound = C.gsubst tsubst bound in
   let vars = List.map (fun (v,t) -> Subst.subst_var tsubst v, t) p.pat_vars in
   ( tsubst,
     Term.{ 

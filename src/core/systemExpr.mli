@@ -113,7 +113,8 @@ val get_compatible_of_context : Symbols.table -> context -> compatible option
 (** Return an [fset] compatible with the system given as input. *)
 val get_compatible_fset : Symbols.table -> compatible -> fset
 
-val gsubst : 'a expr Subst.substitution
+val gsubst         : 'a expr Subst.substitution
+val gsubst_context : context Subst.substitution
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printers} *)
@@ -142,8 +143,7 @@ module Parse : sig
 
   type t = item list L.located
 
-  (** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
-  val parse : ?se_env:Var.env -> Symbols.table -> t -> arbitrary
+  val parse : se_env:Var.env -> Symbols.table -> t -> arbitrary
 
   (*------------------------------------------------------------------*)
   type p_context_i =
@@ -153,8 +153,8 @@ module Parse : sig
 
   type p_context = p_context_i L.located 
 
-  val parse_local_context  : ?se_env:Var.env -> Symbols.table -> p_context -> context
-  val parse_global_context : ?se_env:Var.env -> Symbols.table -> p_context -> context
+  val parse_local_context  : se_env:Var.env -> Symbols.table -> p_context -> context
+  val parse_global_context : se_env:Var.env -> Symbols.table -> p_context -> context
 
   (*------------------------------------------------------------------*)
   type sys = [`Local | `Global] * (p_bnds * p_context)

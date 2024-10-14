@@ -183,6 +183,9 @@ let any ~compatible_with ~pair = mk (Any {compatible_with; pair; })
 let full_any = any ~compatible_with:None ~pair:false
 
 (*------------------------------------------------------------------*)
+let is_var (type a) (se : a expr) : bool =
+  match se.cnt with Var _ -> true | _ -> false
+
 let is_fset (type a) (se : a expr) : bool =
   match se.cnt with List _ -> true | _ -> false
 
@@ -191,13 +194,16 @@ let is_any (type a) (se : a expr) : bool =
   | Any _ -> true
   | _ -> false
 
-let is_pair (type a) (se : a expr) : bool =
+let is_pair (type a) ?se_env (se : a expr) : bool =
   match se.cnt with
   | Any { pair = true; } -> true
   | List [_;_]           -> true
 
-  | Var _                -> true
-  (* FIXME: I broke the interface there I think *)
+  | Var v -> 
+    if se_env = None then true  (* FIXME: this likely breaks some stuff *)
+    else 
+      let se_env = oget se_env in
+      List.mem Var.Pair (Var.M.find_dflt [] v se_env)
 
   | _ -> false
 
@@ -245,8 +251,8 @@ let to_fset (type a) (se : a expr) : fset =
   if not (is_fset se) then error Expected_fset; (* FIXME: replace by an assert *)
   force se
 
-let to_pair (type a) (se : a expr) : pair =
-  assert (is_pair se);
+let to_pair (type a) ?se_env (se : a expr) : pair =
+  assert (is_pair ?se_env se);
   force se
 
 (*------------------------------------------------------------------*)

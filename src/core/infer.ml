@@ -134,6 +134,11 @@ let norm_se0 (env : env) (se : < > SE.exposed) : < > SE.exposed =
 let norm_se (type a) (env : env) (se : a SE.expr) : a SE.expr =
   SE.force (norm_se0 env (se :> < > SE.exposed))
 
+let norm_se_context (env : env) (c : SE.context) : SE.context =
+  { set = norm_se env c.set; pair = omap (norm_se env) c.pair; }
+
+let norm_var (env : env) (v : Vars.var) = Vars.mk v.id (norm_ty env v.ty)
+
 (*------------------------------------------------------------------*)
 let norm_env (env : env) : unit =
   env := {
@@ -196,8 +201,8 @@ let pp_error_result fmt = function
 
     Does **not** check that the environment is closed, nor that the
     substitution is valid (e.g. this function does not verify that the
-    system expressions satisfy the required constraints).c *)
-let to_subst (ienv : env) : Subst.t =
+    system expressions satisfy the required constraints). *)
+let unsafe_to_subst (ienv : env) : Subst.t =
   let se_vars = Msv.map (SE.force -| fst) !ienv.se in
   Subst.mk_subst ~univars:!ienv.ty ~se_vars ()
   
@@ -240,7 +245,7 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
              (fun fmt (_,err) -> err fmt)
           ) (Msv.bindings bad_se_instantiation)
       )
-  else Closed (to_subst ienv)
+  else Closed (unsafe_to_subst ienv)  (* safe call to [unsafe_to_subst] *)
       
 (*------------------------------------------------------------------*)
 (** Generalize unification variables and close the inference
@@ -334,7 +339,7 @@ let gen_and_close
   match failed with
   | [] -> 
     let params = Params.{ ty_vars = gen_tvars; se_vars = gen_se_vars; } in
-    Closed (params, to_subst ienv)
+    Closed (params, unsafe_to_subst ienv) (* safe call to [unsafe_to_subst] *)
 
   | _  ->
     BadInstantiation
@@ -404,4 +409,19 @@ let unify_se (env : env) (t : SE.t) (t' : SE.t) : [`Fail | `Ok] =
       let _, infos = Msv.find u !env.se in
       env := { !env with se = Msv.add u (t',infos) !env.se; }; `Ok
 
+    | _ -> `Fail
+
+
+(*------------------------------------------------------------------*)
+let unify_se_context
+    (env : env) (c : SE.context) (c' : SE.context) 
+  :
+    [`Fail | `Ok] 
+  =
+  match unify_se env c.set c'.set with
+  | `Fail -> `Fail
+  | `Ok ->
+    match c.pair, c'.pair with
+    | Some p, Some p' -> unify_se env (p :> SE.t) (p' :> SE.t)
+    | None, None -> `Ok
     | _ -> `Fail

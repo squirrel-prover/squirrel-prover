@@ -41,6 +41,25 @@ module PT = struct
       (** conclusion of the proof term *)
   }
 
+  (** Normalize the proof-term to show inferred values to the user.
+
+      We use a mix of [Subst.subst] and [Infer.norm_*], depending on
+      what is available.
+
+      This is unsafe because we never checked that the mapping in
+      [ienv] is valid. *)
+  let unsafe_norm ienv (pt : t) : t =
+    let s = Infer.unsafe_to_subst ienv in 
+    {
+      system = Infer.norm_se_context ienv pt.system;
+      args   = List.map (fun (v,tags) -> (Infer.norm_var ienv v, tags)) pt.args;
+      mv     = Match.Mvar.map (Term.gsubst s) pt.mv;
+      subgs  = List.map (Equiv.Any.gsubst s) pt.subgs;
+      bound  = Concrete.gsubst s pt.bound;
+      form   = Equiv.Any.gsubst s pt.form;
+    }
+
+
   let _pp ppe fmt (pt : t) : unit =
     let pp_subgoals_and_mv fmt =
       if not ppe.dbg then ()
@@ -359,6 +378,7 @@ let pt_unify_warning_systems table ~(pt : PT.t) ~(arg : PT.t) : unit =
 let pt_unify_systems
     ~(failed : unit -> 'a)
     (table : Symbols.table)
+    (ienv  : Infer.env)
     (vars  : Vars.env)
     ~(pt : PT.t) ~(arg : PT.t)
   : PT.t * PT.t
@@ -377,6 +397,8 @@ let pt_unify_systems
       then
         failed ()
       else
+        (* TODO: sevars: use [Infer] here also *)
+
         (* Unify projections of [system.pair] for [arg] and [pt]. *)
         let arg = pt_rename_system_pair arg pt_pair in
 
@@ -392,7 +414,12 @@ let pt_unify_systems
           pt_unify_warning_systems table ~pt ~arg;
           pt_project_system_set table vars pt arg.system, arg
         end
-        else failed ()
+        else
+          (* after ad hoc subtyping rules for system expressions,
+             fall-back on the generic polymorphism mechanism *)
+          match Infer.unify_se ienv pt_set arg_set with 
+          | `Ok   -> pt, arg
+          | `Fail -> failed ()
     end
 
 (*------------------------------------------------------------------*)
@@ -725,6 +752,7 @@ module Mk (Args : MkArgs) : S with
 
       (*------------------------------------------------------------------*)      
       let form = Equiv.Babel_statement.gsubst Equiv.Any_s subst lem.formula in
+      let system = SE.gsubst_context subst lem.system in
 
       (*------------------------------------------------------------------*)      
       if Equiv.is_local_statement form
@@ -747,7 +775,7 @@ module Mk (Args : MkArgs) : S with
         in
 
         `Lemma lem.Goal.name,
-        { system = lem.system;
+        { system;
           mv     = Mvar.empty;
           subgs  = [];
           args   = [];
@@ -766,7 +794,7 @@ module Mk (Args : MkArgs) : S with
       in
 
         `Lemma lem.Goal.name,
-        { system = lem.system;
+        { system;
           mv     = Mvar.empty;
           subgs  = [];
           args   = [];
@@ -966,7 +994,7 @@ module Mk (Args : MkArgs) : S with
     (* Verify that the systems of the argument [arg] applies to the systems
        of [pt], projecting it if necessary. *)
     let pt, arg =
-      pt_unify_systems ~failed:(pt_apply_error arg) table (S.vars s) ~pt ~arg
+      pt_unify_systems ~failed:(pt_apply_error arg) table ienv (S.vars s) ~pt ~arg
     in
 
     let match_res =
@@ -1242,7 +1270,9 @@ module Mk (Args : MkArgs) : S with
     { pt with mv = Mvar.empty; subgs; args; form; }
 
   (*------------------------------------------------------------------*)
-  let error_pt_bad_system loc table (pt : PT.t) =
+  let error_pt_bad_system loc table ienv (pt : PT.t) =
+    (* to show inferred values in [ienv] to the user. *)
+    let pt = PT.unsafe_norm ienv pt in
     let ppe = default_ppe ~table () in
     let err_str =
       Fmt.str "@[<v 0>the proof term proves:@;  @[%a@]@;\
@@ -1278,11 +1308,42 @@ module Mk (Args : MkArgs) : S with
     let pt =
       if not check_compatibility then
         pt
-      else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
-        (* TODO this case seems hardly useful because [is_system_context_indep]
-           currently forbids both reach and equiv atoms *)
-        { pt with system; }
-      else
+      else 
+        (* first, normalizes the systems *)
+        let pt_system = Infer.norm_se_context ienv pt.system in
+        let    system = Infer.norm_se_context ienv system    in
+        let pt = { pt with system = pt_system; } in
+
+        (* if [pt] has no [pair] but [system] does, we set
+           [pt.system.pair] to [system.pair]
+           (which is sound as [pt] must have no equiv statements). )*)
+        let pt =
+          if pt.system.pair = None && system.pair <> None then
+            { pt with system = { pt.system with pair = system.pair}}
+          else pt
+        in
+
+        let use_infer =
+          SE.is_var pt.system.set ||
+          (pt.system.pair <> None && SE.is_var (oget pt.system.pair)) ||
+
+          SE.is_var system.set ||
+          (system.pair <> None && SE.is_var (oget system.pair))
+        in
+    
+        (* use the generic polymorphism mechanism if one of the system is a
+           variable (after normalization). *)
+        if use_infer then
+          match Infer.unify_se_context ienv pt.system system with
+          | `Ok   -> pt
+          | `Fail -> error_pt_bad_system loc table ienv pt
+        else
+
+        if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
+          (* TODO this case seems hardly useful because [is_system_context_indep]
+             currently forbids both reach and equiv atoms *)
+          { pt with system; }
+        else
 
         (* First adjust proof-term wrt pair annotation.
            Annotation will be changed later. *)
@@ -1304,7 +1365,7 @@ module Mk (Args : MkArgs) : S with
               (src1,src2) = (dst2,dst1) ->
             pt_rename_system_pair pt (Some dst)
 
-          | _ -> error_pt_bad_system loc table pt
+          | _ -> error_pt_bad_system loc table ienv pt
         in
 
         (* Then adjust proof-term for set annotations. *)
@@ -1355,7 +1416,7 @@ module Mk (Args : MkArgs) : S with
           then
             pt_project_system_set table (S.vars s) pt system
           else
-            error_pt_bad_system loc table pt
+            error_pt_bad_system loc table ienv pt
     in
 
     (* close proof-term by inferring as many pattern variables as possible *)
@@ -1378,16 +1439,11 @@ module Mk (Args : MkArgs) : S with
       | BadInstantiation e ->
         Tactics.soft_failure ~loc (Failure (Fmt.str "%t" e))
     in
-    (* REM *)
-    Fmt.epr "before: %a@." (Equiv.Babel.pp_dbg Equiv.Any_t) pt.form;
-
     let form = Equiv.Babel.gsubst Equiv.Any_t tysubst pt.form in
     let subgs = List.map (Equiv.Babel.gsubst Equiv.Any_t tysubst) pt.subgs in
     let args =
       List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args
     in
-    (* REM *)
-    Fmt.epr "after: %a@." (Equiv.Babel.pp_dbg Equiv.Any_t) form;
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)

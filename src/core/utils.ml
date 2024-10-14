@@ -417,6 +417,10 @@ let omap f a = match a with
   | None -> None
   | Some x -> Some (f x)
 
+let omap2 f a b = match a,b with
+  | None, _ | _, None -> None
+  | Some x, Some y -> Some (f x y)
+
 let omap_dflt dflt f a = match a with
   | None -> dflt
   | Some x -> f x

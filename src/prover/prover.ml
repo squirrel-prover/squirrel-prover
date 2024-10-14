@@ -398,7 +398,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | _ -> 
       begin match q with 
         | ProverLib.Srch_inSys (_,sysexpr) ->
-          let set = SE.Parse.parse (get_table st) sysexpr in
+          let set = SE.Parse.parse ~se_env:SE.Var.empty_env (get_table st) sysexpr in
 
           if not (SE.is_pair set) then 
             Tactics.hard_failure ~loc:(L.loc sysexpr)
@@ -506,7 +506,7 @@ let print_system (st:state) (s_opt:SE.Parse.t option)
           | Some s -> s.set
           | None -> Tactics.hard_failure (Failure "no default system");
         end
-      | Some s -> SE.Parse.parse (get_table st) s
+      | Some s -> SE.Parse.parse ~se_env:SE.Var.empty_env (get_table st) s
     end
   in
   SE.print_system (get_table st) system;

@@ -56,11 +56,14 @@ val open_svars  : ?subst:Subst.t -> env -> SE.tagged_vars -> SE.Var.t list * Sub
 val open_params : env -> Params.t -> Params.Open.t * Subst.t
 
 (*------------------------------------------------------------------*)
-val norm_ty : env -> Type.ty -> Type.ty
-val norm_se : env -> SE.t    -> SE.t
+val norm_ty         : env -> Type.ty    -> Type.ty
+val norm_se         : env -> SE.t       -> SE.t
+val norm_se_context : env -> SE.context -> SE.context
+val norm_var        : env -> Vars.var   -> Vars.var
 
-val unify_ty  : env -> Type.ty -> Type.ty -> [`Fail | `Ok]
-val unify_se  : env -> SE.t    -> SE.t    -> [`Fail | `Ok]
+val unify_ty         : env -> Type.ty -> Type.ty -> [`Fail | `Ok]
+val unify_se         : env -> SE.t    -> SE.t    -> [`Fail | `Ok]
+val unify_se_context : env -> SE.context -> SE.context -> [`Fail | `Ok]
 
 (*------------------------------------------------------------------*)
 type 'a result =
@@ -88,3 +91,13 @@ val close : Env.t -> env -> Subst.t result
     system expression variables.
     Thus, [gen_and_close] cannot return [FreeTyVars] nor [FreeSystemVars]. *)
 val gen_and_close : Env.t -> env -> (Params.t * Subst.t) result
+
+(*------------------------------------------------------------------*)
+(** Return the substitution associated to an inference environment.
+
+    Does **not** check that the environment is closed, nor that the
+    substitution is valid (e.g. this function does not verify that the
+    system expressions satisfy the required constraints).
+
+    Useful for printing. *)
+val unsafe_to_subst : env -> Subst.t 

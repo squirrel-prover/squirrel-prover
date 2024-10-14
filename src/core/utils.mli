@@ -197,6 +197,7 @@ val oget_exn  : exn:exn -> 'a option -> 'a
 val odflt     : 'a -> 'a option -> 'a
 val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option
+val omap2     : ('a -> 'b -> 'c) -> 'a option -> 'b option -> 'c option
 val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
 val oproj1    : ('a * 'b) option -> 'a option
 val oproj2    : ('a * 'b) option -> 'b option

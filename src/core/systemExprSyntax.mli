@@ -146,9 +146,10 @@ val full_any : arbitrary
 val var : Var.t -> arbitrary
 
 (*------------------------------------------------------------------*)
-val is_fset : 'a expr -> bool
-val is_any  : 'a expr -> bool
-val is_pair : 'a expr -> bool
+val is_var  :                    'a expr -> bool
+val is_fset :                    'a expr -> bool
+val is_any  :                    'a expr -> bool
+val is_pair : ?se_env:Var.env -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -190,7 +191,7 @@ val to_fset : 'a expr -> fset
 
 (** Convert an expression [s] to a [pair].
     [s] must be convertible. *)
-val to_pair : 'a expr -> pair
+val to_pair : ?se_env:Var.env -> 'a expr -> pair
 
 (*------------------------------------------------------------------*)
 (** {2 Operations on finite sets} *)
