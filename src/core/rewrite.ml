@@ -21,6 +21,7 @@ let soft_failure = Tactics.soft_failure
 
     Type unification environments has already been closed. *) 
 type found = { 
+  ienv   : Infer.env;
   pat    : Term.term Term.pat_op; 
   right  : Term.term;
   system : SE.t; 
@@ -40,24 +41,25 @@ let subgoals_of_found (f : found) : (SE.t * Term.term) list =
     ) f.subgs
 
 (*------------------------------------------------------------------*)
-(** Rewrite internal state, propagated downward. *)
-type rw_state = { 
-  rl_system  : SE.t;
-  init_pat   : Term.term Term.pat_op;
-  init_subs  : Term.term list;
-  init_right : Term.term;
+(** An opened rewrite rule at a given subterm for its corresponding
+    system. *)
+type open_rw_rule = { 
+  system  : SE.t;
+  subs  : Term.term list;
+  pat   : Term.term Term.pat_op;
+  right : Term.term;
   
   ienv : Infer.env;
-
-  found_instance : [ `False | `Found of found ];
 }
+
+(** Rewrite internal state, propagated downward. *)
+type rw_state = [ `False | `Found of found ]
 
 (*------------------------------------------------------------------*)
 (** Rewrite error *)
 type error = 
   | NothingToRewrite
   | MaxNestedRewriting
-  | RuleBadSystems of string
 
 (*------------------------------------------------------------------*)
 (** Recast a rewrite error as a [Tactic] error *)
@@ -67,77 +69,81 @@ let recast_error ~loc = function
   | MaxNestedRewriting ->
     hard_failure ~loc (Failure "max nested rewriting reached (1000)")
 
-  | RuleBadSystems s ->
-    soft_failure ~loc (Tactics.Failure ("rule bad systems: " ^ s))
-
 (*------------------------------------------------------------------*)
 (** Not exported *)
 exception Failed of error
 
 (*------------------------------------------------------------------*)
-(** Build the rewrite state corresponding to a rewrite rule.
+exception OpenRuleFailed
 
-    - [systems] are the systems applying to the term we are rewriting in
+let open_failed () = raise OpenRuleFailed
+  
+(** Open a rewrite rule at a sub-term taken in the system [system].
 
     Tries to rename the projections of [rule] in a way which is 
-    compatible with [systems]. 
-    Raise [Failed `RuleBadSystems] if it failed  *)
-let mk_state
-    (rule : rw_rule)
-    (systems : SE.t) 
-  : rw_state
-  = 
+    compatible with [system]. 
+    Raise [OpenRuleFailed] if it failed  *)
+let open_rw_rule table (rule : rw_rule) (system : SE.t) : open_rw_rule = 
   let left, right = rule.rw_rw in
 
-  let projs, psubst = 
-    SE.mk_proj_subst ~strict:false ~src:rule.rw_system ~dst:systems 
-  in
-
-  (* this does not ensure that [systems] is a subset of [rule.rw_system],
-     only that [systems] contains at least one system that
-     is part of [rule.rw_system]. 
-     i.e. this checks that there is a possibility that the rule applies,
-     and later on when we actually do the rewriting we will have to check that 
-     the system at that point (which may be a subset of [systems]
-     if we are under a diff) is indeed in [rule.rw_system] *)
-  if projs = Some [] then
-    raise (Failed (RuleBadSystems "no system of the rule applies"));
-
-  (* check that all projection of [rule] on [projs] are valid *)
-  let () = match projs with
-    | Some projs when not (SE.equal0 rule.rw_system systems) ->
-      let left  = Term.subst_projs psubst left  in
-      let right = Term.subst_projs psubst right in
-      List.iter (fun proj ->
-          let left  = Term.project1 proj left  in
-          let right = Term.project1 proj right in
-          check_rule { rule with rw_rw = left, right }
-        ) projs
-    | _ -> ()
-  in
-
-  (* open an type unification environment *)
+  (* open an inference environment *)
   let ienv = Infer.mk_env () in
-  let params, tsubst = Infer.open_params ienv rule.rw_params in
+  let params, gsubst = Infer.open_params ienv rule.rw_params in
 
-  let mk_form f =
-    Term.project_opt projs (Term.subst_projs psubst f) |>
-    Term.gsubst tsubst
+  let rule_system = SE.gsubst gsubst rule.rw_system in
+
+  (* check whether the systems are compatible *)
+  let is_compatible =
+    if SE.is_var rule_system || SE.is_var system then
+      match Infer.unify_se ienv rule_system system with
+      | `Ok   -> `Equal
+      | `Fail -> open_failed ()
+    else if SE.subset_modulo table system rule_system then
+      `Subset
+    else
+      open_failed ()
   in
 
-  let init_pat : Term.term Term.pat_op = { 
-    pat_op_params = params; 
-    pat_op_vars   = 
-      List.map (fun (v,tag) -> (Subst.subst_var tsubst v, tag)) rule.rw_vars; 
-    pat_op_term   = mk_form left;
-  } in
+  let rule_system = Infer.norm_se ienv rule_system in
+  let systems     = Infer.norm_se ienv system      in
   
-  { rl_system = rule.rw_system;
-    init_pat;
-    init_right = mk_form right;
-    init_subs  = List.map mk_form rule.rw_conds;
+  let mk_form_proj =
+    match is_compatible with
+    | `Equal -> fun x -> x
+    | `Subset -> 
+      let projs, psubst = 
+        SE.mk_proj_subst ~strict:false ~src:rule_system ~dst:system
+      in
+      let doit f = Term.project_opt projs (Term.subst_projs psubst f) in
+      (* FIXME: svars: remove the [~proj] field of [Term.subst_projs]
+         and replace by the code above? *)
+
+      (* check that all projection of [rule] on [projs] are valid *)
+      if not (SE.equal0 rule.rw_system systems) then
+        check_rule { rule with rw_rw = doit left, doit right };
+      
+      doit
+  in
+
+  (* combine [mk_form_proj] with [gsubst] *)
+  let mk_form f = mk_form_proj f |> Term.gsubst gsubst in
+
+  let pat : Term.term Term.pat_op = 
+    { 
+      pat_op_params = params; 
+      pat_op_vars   = 
+        List.map (fun (v,tag) -> (Subst.subst_var gsubst v, tag)) rule.rw_vars; 
+      pat_op_term   = mk_form left;
+    } 
+  in
+  
+  {
+    system = rule_system;
+    pat;
+    right = mk_form right;
+    subs  = List.map mk_form rule.rw_conds;
     ienv;
-    found_instance = `False; } 
+  }
 
 (*------------------------------------------------------------------*)
 let hyps_add_conds hyps (conds : Term.terms) =
@@ -154,6 +160,7 @@ let rw_inst
     (expand_context : Macros.expand_context)
     (table : Symbols.table) (params : Params.t)
     (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
+    (rule : rw_rule)
   : rw_state Pos.f_map_fold 
   = 
   let doit
@@ -163,123 +170,123 @@ let rw_inst
     =
     (* adds [conds] in [hyps] *)
     let hyps = hyps_add_conds hyps conds in
-    let ienv = s.ienv in
-    let projs : Projection.t list option = 
-      if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
-    in
 
-    if not (SE.subset_modulo table se s.rl_system) then 
-      s, `Continue
-    else 
-      match s.found_instance with
-      | `Found inst -> 
-        (* we already found the rewrite instance earlier *)
+    match s with
+    | `Found inst -> 
+      (* we already found the rewrite instance earlier *)
 
-        (* check if the same system apply to the subterm *)
-        if not (SE.equal table se inst.system) then 
-          s, `Continue 
-        else
-          let context = SE.reachability_context se in
-          begin
-            match 
-              Match.T.try_match
-                ~expand_context ~ienv ~hyps ~env table context occ inst.pat 
-            with
-            | NoMatch _ -> s, `Continue
-            | Match _mv -> 
-              (* When we found another occurrence of the same rewrite
-                 instance, we clear the conditions that are not shared by 
-                 both occurrences (i.e. we keep only common conditions) *)
-              let conds = List.filter (fun cond -> List.mem cond conds) inst.conds in
-              let s = { s with found_instance = `Found { inst with conds } } in
-
-              (* project the already found instance with the projections
-                 applying to the current subterm *)
-              s, `Map (Term.project_opt projs inst.right)
-          end
-
-      | `False ->
-        (* project the pattern *)
-        let pat_proj = Term.project_tpat_op_opt projs s.init_pat in
-
+      (* check if the same system apply to the subterm *)
+      if not (SE.equal table se inst.system) then 
+        s, `Continue 
+      else
+        let ienv = inst.ienv in (* TODO: sevars: why keep using [ienv]? *)
         let context = SE.reachability_context se in
-        match 
+        begin
+          match 
+            Match.T.try_match
+              ~expand_context ~ienv ~hyps ~env table context occ inst.pat 
+          with
+          | NoMatch _ -> s, `Continue
+          | Match _mv -> 
+            (* When we found another occurrence of the same rewrite
+               instance, we clear the conditions that are not shared by 
+               both occurrences (i.e. we keep only common conditions) *)
+            let conds = List.filter (fun cond -> List.mem cond conds) inst.conds in
+            let s = `Found { inst with conds } in
+
+            s, `Map inst.right
+        end
+
+    | `False ->
+      let context = SE.reachability_context se in
+
+      match
+        (* open the rule in the match block, to catch exception below *)
+        let op_rule = open_rw_rule table rule se in
+        let res_match =
           Match.T.try_match
-            ~expand_context ~ienv ~hyps ~env table context occ pat_proj 
-        with
-        | NoMatch _ -> s, `Continue
+            ~expand_context ~ienv:op_rule.ienv
+            ~hyps ~env table context occ op_rule.pat
+        in
+        (op_rule, res_match)
+      with
+      | exception OpenRuleFailed -> s, `Continue (* [open_rw_rule] failed *)
 
-        (* head matches *)
-        | Match mv -> 
-          Match.Mvar.check_args_inferred s.init_pat mv;
+      | _, NoMatch _ -> s, `Continue
 
-          let pat_vars =
-            Vars.add_vars pat_proj.pat_op_vars env
-            (* vars in the pattern are restricted according to what the pattern 
-               specifies *)
+      (* head matches *)
+      | op_rule, Match mv -> 
+        Match.Mvar.check_args_inferred op_rule.pat mv;
 
-            |> Vars.add_vars (Vars.Tag.local_vars vars)
-            (* vars above the current position are unrestricted, i.e. local vars *)
+        let ienv = op_rule.ienv in
+        
+        let pat_vars =
+          Vars.add_vars op_rule.pat.pat_op_vars env
+          (* vars in the pattern are restricted according to what the
+             pattern specifies *)
+
+          |> Vars.add_vars (Vars.Tag.local_vars vars)
+          (* vars above the current position are unrestricted,
+             i.e. local vars *)
+        in
+        let env = Env.{
+            vars = pat_vars; 
+            table;
+            ty_vars = params.ty_vars;
+            se_vars = params.se_vars;
+            (* TODO: sevars: do not construct a full environment each time? *)
+            system = context; }
+        in
+
+        (* Check that all type variables have been infered.
+           Remark: type unification environments are stateful *)
+        match Infer.close env ienv with
+        | Infer.FreeTyVars
+        | Infer.FreeSystemVars
+        | Infer.BadInstantiation _ ->
+          s, `Continue
+
+        | Infer.Closed tsubst ->
+          (* we found the rewrite instance *)
+          let subst =
+            match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
+            | `Subst subst -> subst
+            | `BadInst pp_err ->
+              soft_failure
+                (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
           in
-          let env = Env.{
-              vars = pat_vars; table;
-              ty_vars = params.ty_vars;
-              se_vars = params.se_vars;
-              (* TODO: do not construct a full environment each time? *)
-              system = context; }
+
+          (* Substitute [mv] and [tsubst] *)
+          let do_subst t = Term.gsubst tsubst (Term.subst subst t) in
+
+          let left  = do_subst op_rule.pat.pat_op_term in
+          let right = do_subst op_rule.right in
+          let found_conds = List.map do_subst conds in
+          let found_subs  = List.map do_subst op_rule.subs in
+
+          let found_pat = Term.{ 
+              pat_op_term   = left;
+              pat_op_params = Params.Open.empty;
+              pat_op_vars   = []; 
+            } 
           in
 
-          (* Check that all type variables have been infered.
-             Remark: type unification environments are stateful *)
-          match Infer.close env s.ienv with
-          | Infer.FreeTyVars
-          | Infer.FreeSystemVars
-          | Infer.BadInstantiation _ -> s, `Continue
- 
-          | Infer.Closed tsubst ->
-            (* we found the rewrite instance *)
-            let subst =
-              match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
-              | `Subst subst -> subst
-              | `BadInst pp_err ->
-                soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
-            in
-
-            (* Substitute [mv] and [tsubst] *)
-            let do_subst t = Term.gsubst tsubst (Term.subst subst t) in
-
-            let left = do_subst pat_proj.pat_op_term in
-            let right = 
-              let right_proj = Term.project_opt projs s.init_right in
-              do_subst right_proj
-            in
-            let found_conds = List.map do_subst conds in
-            let found_subs =
-              List.map (fun rsub ->
-                  let rsub = Term.project_opt projs rsub in
-                  do_subst rsub
-                ) s.init_subs
-            in
-
-            let found_pat = Term.{ 
-                pat_op_term   = left;
-                pat_op_params = Params.Open.empty;
-                pat_op_vars   = []; 
-              } in
-
-            let found_instance = `Found {
-                pat    = found_pat;
-                right;
-                system = se;
-                vars; 
-                conds  = found_conds;
-                subgs  = found_subs;
-              } in
-
-            { s with found_instance }, `Map right
+          let found_instance =
+            `Found {
+              ienv;
+              pat    = found_pat;
+              right;
+              system = se;
+              vars; 
+              conds  = found_conds;
+              subgs  = found_subs;
+            }
+          in
+          
+          found_instance, `Map right
   in
   doit
- 
+
 (*------------------------------------------------------------------*)
 (** {2 Rewrite at head position} *)
 
@@ -288,17 +295,16 @@ let rewrite_head
     (table  : Symbols.table)
     (params : Params.t)
     (env    : Vars.env)
-    (expand_context : Macros.expand_context)
+    (ec     : Macros.expand_context)
     (hyps   : Hyps.TraceHyps.hyps)
     (sexpr  : SE.t)
     (rule   : rw_rule)
     (t      : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
   assert (rule.rw_kind = GlobalEq);
-  let s = mk_state rule sexpr in
-  match rw_inst expand_context table params env hyps t sexpr [] [] Pos.root s with
+  match rw_inst ec table params env hyps rule t sexpr [] [] Pos.root `False with
   | _, `Continue -> None
-  | { found_instance = `Found inst }, `Map t ->
+  | `Found inst, `Map t ->
     Some (t, subgoals_of_found inst)
   | _ -> assert false
 
@@ -335,44 +341,33 @@ let do_rewrite
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec do_rewrite1 (mult : Args.rw_count) (f : Equiv.any_form) 
-    : Equiv.any_form * (SE.t * Term.term) list
+  let rec do_rewrite1
+      (mult : Args.rw_count) (f : Equiv.any_form) 
+    : 
+      Equiv.any_form * (SE.t * Term.term) list
     =
     check_max_rewriting ();
 
-    (* Build the rewrite state corresponding to the rewrite rule [rule] and the 
-       systems applying to [target].
-       This may require renaming projections in [rule], and removing some
-       projections from [rule]. 
-
-       Rebuild at each application of [_rewrite], to have a new [ienv]. *)
-    let s = 
-      let target_systems : SE.t =
-        match target with
-        | Global _ -> (oget system.pair :> SE.t)
-        | Local _ -> system.set
-      in
-      mk_state rule target_systems
-    in
 
     let s, f = 
+      let s = `False in      (* we haven't found a instance yet *)
       match f with
       | Global f when rule.rw_kind = GlobalEq ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst expand_context table params env hyps) system s f 
+          Pos.map_fold_e (rw_inst expand_context table params env hyps rule) system s f 
         in
         s, Equiv.Global f
 
       | Local f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst expand_context table params env hyps) system.set s f 
+          Pos.map_fold (rw_inst expand_context table params env hyps rule) system.set s f 
         in
         s, Equiv.Local f
 
       | _ -> s, f
     in
 
-    match mult, s.found_instance with
+    match mult, s with
     | (Args.Any | Args.Exact 0), `False -> f, []
 
     | (Args.Once | Args.Many | Args.Exact _), `False -> 
@@ -463,8 +458,8 @@ let high_rewrite
         assert (rule.rw_kind = GlobalEq);
         assert (rule.rw_conds = []);
         
-        let state = mk_state rule se in
-        match rw_inst InSequent table params env hyps occ se vars conds p state with
+        let s = `False in       (* we have not found an instance yet *)
+        match rw_inst InSequent table params env hyps rule occ se vars conds p s with
         | _, `Continue -> assert (not strict); `Continue
         | _, `Map t -> `Map t
   in

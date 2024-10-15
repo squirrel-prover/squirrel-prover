@@ -86,7 +86,7 @@ Proof.
   (* `q` as equivalences, but the current system context does not have
       a `equiv` field. Thus, it is not possible to add `q` as an hypothesis. *)
   checkfail have ? := q empty exn NoAssumpSystem.
-  checkfail have ? := q empty _; 1: auto exn NoAssumpSystem.  Abort.
+  checkfail have ? := q empty _; 1: auto exn NoAssumpSystem. Abort.
 
 (*------------------------------------------------------------------*)
 (* we can add `q` by manually setting the `equiv` field of the sequent to 

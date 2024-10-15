@@ -590,7 +590,7 @@ let convert_se_var_bnd
     | "equiv" -> SE.Var.pair
     | _ -> SE.Var.of_ident (Ident.create name)
   in
-  { env with se_vars = (var, infos) :: se_vars; }, (var, infos)
+  { env with se_vars = se_vars @ [(var, infos)]; }, (var, infos)
 
 let convert_se_var_bnds
     (env : Env.t) (bnds : (lsymb * lsymb list) list) : Env.t * SE.tagged_vars

@@ -77,23 +77,25 @@ type local_statement  = (string, Equiv.bform        ) abstract_statement
 
 (*------------------------------------------------------------------*)
 let _pp_statement ppe fmt (g : statement) : unit =
+  let pp_sevars fmt = 
+    if g.params.se_vars = [] then ()
+    else
+      Fmt.pf fmt "{%a} "
+        SE.pp_tagged_vars g.params.se_vars
+  in
+  let pp_system fmt = 
+    Fmt.pf fmt "@[in [%a]@] " SE.pp_context g.system
+  in
   let pp_tyvars fmt tyvs = 
     if tyvs = [] then () 
     else
-      Fmt.pf fmt " [%a]"
+      Fmt.pf fmt "[%a] "
         (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
-  let pp_system fmt = 
-    if g.params.se_vars = [] then 
-      Fmt.pf fmt "[%a]" SE.pp_context g.system
-    else
-      Fmt.pf fmt "{system %a, %a}"
-        SE.pp_tagged_vars g.params.se_vars
-        SE.pp_context g.system
-  in
-  Fmt.pf fmt "@[%t %s%a :@]@ %a"
-    pp_system
+  Fmt.pf fmt "@[%s %t%t%a:@]@ %a"
     g.name
+    pp_sevars
+    pp_system
     pp_tyvars g.params.ty_vars
     (Equiv.Any_statement._pp ppe) g.formula
 

@@ -383,43 +383,46 @@ let pt_unify_systems
     ~(pt : PT.t) ~(arg : PT.t)
   : PT.t * PT.t
   =
-  if List.for_all is_system_context_indep (arg.form :: arg.subgs) then
-    pt, { arg with system = pt.system; }
-  else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
-    { pt with system = arg.system; }, arg
+  let ienv0 = Infer.copy ienv in
+  
+  (* start with the generic polymorphism mechanism then fall-back on
+     the ad hoc subtyping rules for system expressions *)
+  if Infer.unify_se_context ienv pt.system arg.system = `Ok then (pt, arg)
   else
     begin
-      (* Check equivalence systems in [system.pair].
-         Fails if not compatible. *)
-      let arg_pair, pt_pair = arg.system.pair, pt.system.pair in
-      if pt_pair <> None &&
-         not (oequal (SE.equal_modulo table) pt_pair arg_pair)
-      then
-        failed ()
+      let () = Infer.set ~tgt:ienv ~value:ienv0 in
+
+      if List.for_all is_system_context_indep (arg.form :: arg.subgs) then 
+        pt, { arg with system = pt.system; }
+      else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
+        { pt with system = arg.system; }, arg
       else
-        (* TODO: sevars: use [Infer] here also *)
+        begin     
+          (* Check equivalence systems in [system.pair].
+             Fails if not compatible. *)
+          let arg_pair, pt_pair = arg.system.pair, pt.system.pair in
+          if pt_pair <> None &&
+             not (oequal (SE.equal_modulo table) pt_pair arg_pair)
+          then
+            failed ()
+          else
+            (* Unify projections of [system.pair] for [arg] and [pt]. *)
+            let arg = pt_rename_system_pair arg pt_pair in
 
-        (* Unify projections of [system.pair] for [arg] and [pt]. *)
-        let arg = pt_rename_system_pair arg pt_pair in
-
-        (* Unify reachability systems in [system.set]. *)
-        let pt_set, arg_set = pt.system.set, arg.system.set in
-        (* FIXME subset_modulo used to be used below, but this yields
-           projections from [l1:S] to [l1:S,l2:S], which is rejected:
-           is there some generalization that we can/should do? *)
-        if SE.subset table pt_set arg_set then
-          pt, pt_project_system_set table vars arg pt.system
-        else
-        if SE.subset table arg_set pt_set then begin
-          pt_unify_warning_systems table ~pt ~arg;
-          pt_project_system_set table vars pt arg.system, arg
+            (* Unify reachability systems in [system.set]. *)
+            let pt_set, arg_set = pt.system.set, arg.system.set in
+            (* FIXME subset_modulo used to be used below, but this yields
+               projections from [l1:S] to [l1:S,l2:S], which is rejected:
+               is there some generalization that we can/should do? *)
+            if SE.subset table pt_set arg_set then
+              pt, pt_project_system_set table vars arg pt.system 
+            else
+            if SE.subset table arg_set pt_set then begin
+              pt_unify_warning_systems table ~pt ~arg;
+              pt_project_system_set table vars pt arg.system, arg
+            end
+            else failed ()
         end
-        else
-          (* after ad hoc subtyping rules for system expressions,
-             fall-back on the generic polymorphism mechanism *)
-          match Infer.unify_se ienv pt_set arg_set with 
-          | `Ok   -> pt, arg
-          | `Fail -> failed ()
     end
 
 (*------------------------------------------------------------------*)

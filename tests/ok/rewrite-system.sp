@@ -66,7 +66,7 @@ lemma _ (x, y, z : message) :
   diff(a, f(x)) = d =>
   diff(f(x), f(x)) = d.
 Proof.
-  intro H.
+  intro H. 
   rewrite foo_left.
   assumption.
 Qed.

@@ -43,7 +43,9 @@ module Var = struct
   type info = Pair
 
   (*------------------------------------------------------------------*)
-  let pp = Ident.pp
+  let pp     = Ident.pp
+  let pp_dbg = Ident.pp_full
+  let _pp ~dbg = if dbg then pp_dbg else pp
 
   let pp_info fmt = function
     | Pair -> Fmt.pf fmt "pair"
@@ -83,18 +85,26 @@ type tagged_var = Var.t * Var.info list
 type tagged_vars = tagged_var list
 type env = tagged_vars
 
-let pp_tagged_var fmt (v,infos) =
+(*------------------------------------------------------------------*)
+let _pp_tagged_var ~dbg fmt (v,infos) =
   if infos = [] then
-    Fmt.pf fmt "%a" Var.pp v
+    Fmt.pf fmt "%a" (Var._pp ~dbg) v
   else
     Fmt.pf fmt "%a[@[%a@]]"
       Var.pp v
       (Fmt.list ~sep:(Fmt.any ",@ ") Var.pp_info) infos
 
-let pp_tagged_vars =
-  Fmt.list ~sep:(Fmt.any ",@ ") pp_tagged_var
+let pp_tagged_var     = _pp_tagged_var ~dbg:false
+let pp_tagged_var_dbg = _pp_tagged_var ~dbg:true
 
+(*------------------------------------------------------------------*)
+let _pp_tagged_vars ~dbg =
+  Fmt.list ~sep:(Fmt.any ",@ ") (_pp_tagged_var ~dbg)
 
+let pp_tagged_vars     = _pp_tagged_vars ~dbg:false
+let pp_tagged_vars_dbg = _pp_tagged_vars ~dbg:true
+
+(*------------------------------------------------------------------*)
 let lookup_string (se_name : string) (env : tagged_vars) : Var.t option =
   (* FIXME: inefficient as we lookup through the whole table *)
   let found = ref None in
@@ -372,7 +382,9 @@ let mk_proj_subst
   match dst.cnt, src.cnt with
   | (Any _), _ | _, (Any _) -> None, []
 
-  | Var _, _ | _, Var _ -> assert false (* only concrete systems are supported *)
+  | Var v, Var v' when Var.equal v v' -> None, []
+
+  | Var _, _ | _, Var _ -> assert false (* TODO: sevars: what should be done there? *)
 
   | List dst, List src ->
     (* [src] may not apply to all systems in [dst] *)

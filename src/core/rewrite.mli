@@ -7,7 +7,6 @@ include module type of LowRewrite
 type error = 
   | NothingToRewrite
   | MaxNestedRewriting
-  | RuleBadSystems of string
 
 (*------------------------------------------------------------------*)
 (** Try to do a rewrite at head position in a term.

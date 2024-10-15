@@ -106,7 +106,8 @@ end = struct
 
     (* Print separation between proof_context and conclusion *)
     Printer.kws `Separation fmt (String.make 40 '-') ;
-   (* Print conclusion formula and close box. *)
+
+    (* Print conclusion formula and close box. *)
     match s.bound with
     | None -> Fmt.pf fmt "@;%a@]" (Term._pp ppe) s.conclusion
     | Some ve ->

@@ -351,7 +351,7 @@ let gen_and_close
 (*------------------------------------------------------------------*)
 (** [univar] are maximal for this ordering *)
 (* FIXME: why don't we restrict ourselves to [univar] in the domain of
-   the inference environment? (as for in [compare_se] below) *)
+   the inference environment? (as in [compare_se] below) *)
 let compare_ty (t : Type.ty) (t' : Type.ty) : int =
   match t, t' with
   | TUnivar u, TUnivar u' -> Ident.compare u u'
@@ -410,7 +410,6 @@ let unify_se (env : env) (t : SE.t) (t' : SE.t) : [`Fail | `Ok] =
       env := { !env with se = Msv.add u (t',infos) !env.se; }; `Ok
 
     | _ -> `Fail
-
 
 (*------------------------------------------------------------------*)
 let unify_se_context

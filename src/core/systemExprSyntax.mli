@@ -19,7 +19,9 @@ module Var : sig
     | Pair                        (** multi-system of cardinal two *)
 
   (*------------------------------------------------------------------*)
-  val pp : t formatter
+  val _pp    : dbg:bool -> t formatter
+  val pp     :             t formatter
+  val pp_dbg :             t formatter
 
   val pp_info : info formatter
 
@@ -54,9 +56,17 @@ type env = tagged_vars
 
 val lookup_string : string -> env -> Var.t option 
 
-val pp_tagged_var  : tagged_var  formatter
-val pp_tagged_vars : tagged_vars formatter
+(*------------------------------------------------------------------*)
+val _pp_tagged_var    : dbg:bool -> tagged_var  formatter
+val pp_tagged_var     :             tagged_var  formatter
+val pp_tagged_var_dbg :             tagged_var  formatter
 
+(*------------------------------------------------------------------*)
+val _pp_tagged_vars    : dbg:bool -> tagged_vars formatter
+val pp_tagged_vars     :             tagged_vars formatter
+val pp_tagged_vars_dbg :             tagged_vars formatter
+
+(*------------------------------------------------------------------*)
 (** system variable binder in the surface AST *)
 type p_bnd  = (string L.located * string L.located list) 
 type p_bnds = p_bnd list

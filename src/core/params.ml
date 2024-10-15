@@ -19,7 +19,7 @@ let pp fmt (p : t) =
       Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) p.ty_vars
   in
   
-  Fmt.pf fmt "%t%t" pp_se_vars pp_tys
+  Fmt.pf fmt "@[%t%t@]" pp_se_vars pp_tys
 
 (*------------------------------------------------------------------*)
 module Open = struct
@@ -42,5 +42,5 @@ module Open = struct
         Fmt.pf fmt "[%a] " (Fmt.list Type.pp_univar) p.ty_vars
     in
 
-    Fmt.pf fmt "%t%t" pp_se_vars pp_tys
+    Fmt.pf fmt "@[%t%t@]" pp_se_vars pp_tys
 end
