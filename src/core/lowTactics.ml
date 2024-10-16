@@ -886,7 +886,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let timestamp_case (ts : Term.term) (s : S.t) : S.t list =
     let table = S.table s in
     let system =
-      match SE.get_compatible_expr table (S.system s) with
+      match SE.get_compatible_of_context table (S.system s) with
         | Some e -> e
         | None -> soft_failure (Failure "underspecified systems")
     in

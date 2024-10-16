@@ -185,7 +185,7 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
 (*------------------------------------------------------------------*)
 (** {2 Miscelaneous} *)
 
-let get_compatible_expr table (context : context) : compatible option =
+let get_compatible_of_context table (context : context) : compatible option =
   let expr = (context.set :> < symbols : unit ; fset : unit > exposed) in
   match expr.cnt with
   | Any { compatible_with = None; } -> None
@@ -194,6 +194,16 @@ let get_compatible_expr table (context : context) : compatible option =
     Some (singleton single :> compatible)
   | _ -> Some (force expr :> compatible)
 
+(*------------------------------------------------------------------*)
+let get_compatible_fset table (se : compatible) : fset =
+  match (se :> < > exposed).cnt with
+  | Var _ | Any { compatible_with = None; } -> assert false
+
+  | Any { compatible_with = Some s; } -> of_system table s
+
+  | List _ -> force0 se
+
+(*------------------------------------------------------------------*)
 let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
   match (g :> a exposed).cnt with
   | Var v -> force0 (Subst.subst_se_var s v)

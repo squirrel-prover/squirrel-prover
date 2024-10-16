@@ -108,7 +108,10 @@ val map_descrs  :
 
 (** Get an expression with which all systems of a context are compatible.
     Return [None] if context is [context_any]. *)
-val get_compatible_expr : Symbols.table -> context -> compatible option
+val get_compatible_of_context : Symbols.table -> context -> compatible option
+
+(** Return an [fset] compatible with the system given as input. *)
+val get_compatible_fset : Symbols.table -> compatible -> fset
 
 val gsubst : 'a expr Subst.substitution
 

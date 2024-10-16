@@ -597,8 +597,11 @@ let validate
 
         let _, action = Action.get_def a table in
         try
-          let system = SE.to_compatible state.env.system.set in
-          ignore (SE.action_to_term table system action : Term.term)
+          let compatible_system = 
+            SE.to_compatible state.env.system.set |>
+            SE.get_compatible_fset table 
+          in
+          ignore (SE.action_to_term table compatible_system action : Term.term)
         with
         | Not_found
         | SE.Error (_,Expected_compatible) ->

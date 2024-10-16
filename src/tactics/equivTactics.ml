@@ -546,7 +546,7 @@ let old_induction Args.(Message (ts,_)) s =
   let s = ES.set_vars (Vars.rm_var t env.vars) s in
   let table  = ES.table s in
   let system =
-    match SE.get_compatible_expr table (ES.env s).system with
+    match SE.get_compatible_of_context table (ES.env s).system with
     | Some expr -> expr
     | None -> soft_failure (Failure "underspecified system")
   in
