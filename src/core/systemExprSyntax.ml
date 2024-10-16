@@ -43,8 +43,18 @@ module Var = struct
   type info = Pair
 
   (*------------------------------------------------------------------*)
-  let pp     = Ident.pp
+  let pp fmt (v : t) =
+    (* System unification variables starts with a `?`, and are printed
+       with a long name (as they all have the same short name `P`).
+       Remark that the user should not be able to use such names
+       directly. *)
+    if String.starts_with ~prefix:"?" v.name then
+      Ident.pp_full fmt v 
+    else 
+      Ident.pp fmt v
+
   let pp_dbg = Ident.pp_full
+
   let _pp ~dbg = if dbg then pp_dbg else pp
 
   let pp_info fmt = function
