@@ -316,7 +316,7 @@ let gen_and_close
       let gen_se_vars =
         List.assoc_up_dflt
           v infos
-          (fun infos' -> List.sort Stdlib.compare (infos' @ infos) )
+          (fun infos' -> List.sort_uniq Stdlib.compare (infos' @ infos) )
           gen_se_vars
       in
       (gen_se_vars, failed)
