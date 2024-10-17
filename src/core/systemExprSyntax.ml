@@ -283,6 +283,10 @@ let context_any =
     pair = None;
   }
 
+let equal_context0 c c' =
+  equal0 c.set c'.set &&
+  oequal equal0 c.pair c'.pair
+
 let equivalence_context ?set pair =
   let set = match set with
     | Some s -> s

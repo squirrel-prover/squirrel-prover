@@ -340,14 +340,14 @@ val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 val reduce_delta_def1 :
-  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
+  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool 
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
   ?mode:Macros.expand_context ->
-  Symbols.table -> SE.t -> 
+  Symbols.table -> SE.context -> 
   ?hyps:Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool
@@ -357,7 +357,7 @@ val reduce_delta_macro1 :
 val reduce_delta1 :
   ?delta:delta ->
   mode:Macros.expand_context ->
-  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
+  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool 
 

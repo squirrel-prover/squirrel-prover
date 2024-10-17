@@ -217,7 +217,7 @@ module CondTerm = struct
   let polish (c:t) (hyps : TraceHyps.hyps) (env : Env.t) =
     let reduction_state hyps =
       Reduction.mk_state
-        ~hyps ~se:(oget env.system.pair :> SE.t) ~vars:env.vars
+        ~hyps ~system:env.system ~vars:env.vars
         ~param:Reduction.rp_crypto
         env.table
     in
@@ -439,9 +439,7 @@ let exact_eq_under_cond
     Match.mk_known_set
       ~term:known.term ~cond:(Term.mk_ands known.conds) [] (se_pair :> SE.t)
   in
-  let system =
-    SE.{ set = (oget env.system.pair :> SE.t) ; pair = None; }
-  in
+  let system = env.system in
   let conv_state =
     Reduction.mk_cstate
       ~system ~hyps 
@@ -452,7 +450,7 @@ let exact_eq_under_cond
   
   let reduction_state =
     Reduction.mk_state ~hyps
-      ~se:system.set ~vars:env.vars
+      ~system:system ~vars:env.vars
       ~param:Reduction.rp_crypto
       env.table
   in
@@ -1604,7 +1602,7 @@ module Game = struct
     *)
     let reduction_state =
       Reduction.mk_state ~hyps:query.hyps
-        ~se:(oget query.env.system.pair :> SE.t) ~vars:query.env.vars
+        ~system:query.env.system ~vars:query.env.vars
         ~param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
         query.env.table
     in
@@ -2397,19 +2395,27 @@ type rec_call_occ = rec_call Iter.occ
 let derecursify_term
     ~(expand_mode : [`FullDelta | `Delta ])
     (hyps : TraceHyps.hyps)
-    (* (vars : Vars.vars) *)
-    (constr : Constr.trace_cntxt) (system : SE.arbitrary) (t_init : Term.term)
+    (venv : Vars.env)
+    (constr : Constr.trace_cntxt) (system : SE.context) (t_init : Term.term)
   : rec_call_occ list * Term.term
   =
   let table = constr.table in
   
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
+      let new_context = { system with set = se; } in
       let t, has_red =
+        let hyps = 
+          Hyps.change_trace_hyps_context
+            ~old_context:system ~new_context
+            ~table ~vars:venv
+            hyps
+        in
+
         let param = Reduction.rp_crypto in
         (* FIXME: add tag information in [fv] *)
         let vars = Vars.of_list (Vars.Tag.local_vars vars) in
-        let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
+        let st = Reduction.mk_state ~hyps ~system:new_context ~vars ~param table in
         let strat = Reduction.(MayRedSub rp_full) in
         Reduction.whnf_term ~strat st t
       in
@@ -2435,7 +2441,7 @@ let derecursify_term
       | _ -> acc, if has_red then `Map t else `Continue 
   in
   let acc, _, _ = 
-    Match.Pos.map_fold ~mode:(`TopDown true) t_fold system [] t_init
+    Match.Pos.map_fold ~mode:(`TopDown true) t_fold system.set [] t_init
   in
   acc, t_init
 
@@ -2567,16 +2573,18 @@ let derecursify
     (game : game) (hyps : TraceHyps.hyps)
   : (goal * Term.term) list * goal
   =
-  let system = (oget env.system.pair :> SE.fset) in
+  let system = env.system in
   let trace_context =
-    Constr.make_context ~table:env.table ~system:system
+    Constr.make_context ~table:env.table ~system:(SE.to_fset system.set)
   in
 
   let mk_bideduction_goal hyps vars macro (output : Term.term) : goal =
     let rec_term_occs, output =
       (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta hyps trace_context (system :> SE.t) output
+        ~expand_mode:`FullDelta hyps env.vars trace_context system output
+        (* extending [env.vars] with [vars] would not be useful as
+           [vars] are local, unrestricted, variables. *)
     in
     (* let extra_cond = odflt Term.mk_true form in *)
     let rec_terms = List.concat_map (known_term_of_occ (*~cond:extra_cond*) ~cond:[] ) rec_term_occs in
@@ -2813,10 +2821,10 @@ let bideduce_all_goals
 (** Exported *)
 let prove
     (env   : Env.t)
-    (hyps  : TraceHyps.hyps)
+    (hyps  : TraceHyps.hyps)    (* in system [env.system] *)
     (pgame : Symbols.p_path)
     (args  : Args.crypto_args)
-    (terms : Equiv.equiv) 
+    (terms : Equiv.equiv)       (* in system [env.system.set] (and not [pair]!) *)
   =
   let table = env.table in
   let ppe = default_ppe ~table () in

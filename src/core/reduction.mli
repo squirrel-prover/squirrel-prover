@@ -50,7 +50,7 @@ type state
 val mk_state :
   ?expand_context:Macros.expand_context ->
   ?hyps:THyps.hyps ->
-  se:SE.arbitrary -> 
+  system:SE.context -> 
   vars:Vars.env -> 
   param:red_param -> 
   Symbols.table -> 
@@ -92,7 +92,7 @@ module type S = sig
       [se] is the system of the term being reduced. *)
   val to_state :
     ?expand_context:Macros.expand_context  ->
-    ?se:SE.t ->
+    ?system:SE.context ->
     ?vars:Vars.env ->
     red_param -> t -> state
 
@@ -133,7 +133,7 @@ module type S = sig
 
   val conv_term :
     ?expand_context:Macros.expand_context ->
-    ?se:SE.t ->
+    ?system:SE.context ->
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool

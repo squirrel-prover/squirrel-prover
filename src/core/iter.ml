@@ -535,11 +535,11 @@ let get_macro_occs
     (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
        Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
     let t =
-      let se = (constr.system :> SE.t) in
+      let system = SE.{ set = (constr.system :> SE.t); pair = None; } in
       let param = Reduction.rp_crypto in
       (* FIXME: add tag information in [fv] *)
       let vars = Vars.of_list (Vars.Tag.local_vars fv) in
-      let st = Reduction.mk_state ~hyps ~se ~vars ~param constr.table in
+      let st = Reduction.mk_state ~hyps ~system ~vars ~param constr.table in
       let strat = Reduction.(MayRedSub rp_full) in
       fst (Reduction.whnf_term ~strat st t)
     in

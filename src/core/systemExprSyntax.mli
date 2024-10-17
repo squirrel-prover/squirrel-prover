@@ -237,6 +237,8 @@ type context = {
 
 val context_any : context
 
+val equal_context0 : context -> context -> bool
+
 (** Create context for global formulas where equivalence atoms are
     interpreted wrt the given pair, and reachability atoms are
     interpreted wrt the given set expression (default: any system

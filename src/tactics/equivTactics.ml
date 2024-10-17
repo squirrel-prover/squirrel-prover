@@ -88,7 +88,8 @@ let refl (e : Equiv.equiv) (s : ES.t) =
   else
     match ES.get_frame l_proj s, ES.get_frame r_proj s with
     | Some el, Some er ->
-      if List.for_all2 (ES.Reduce.conv_term ~se:(system_pair :> SE.t) s) el.terms er.terms
+      let system = { (ES.system s) with set = (system_pair :> SE.t); } in
+      if List.for_all2 (ES.Reduce.conv_term ~system s) el.terms er.terms
       (*TODO:Concrete : Probably something to do to create a bounded goal*)
       then `True
       else `NoRefl
@@ -2246,7 +2247,20 @@ let () =
 (*------------------------------------------------------------------*)
 let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
   let frame = ES.conclusion_as_equiv s in
-  let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
+  let old_context = ES.system s in
+  let new_context = { old_context with set = (oget old_context.pair :> SE.t); } in
+  let env = Env.{ (ES.env s) with system = new_context; } in
+  let hyps =
+    TopHyps.change_trace_hyps_context
+      ~old_context ~new_context
+      ~table:env.table ~vars:env.vars
+      (ES.get_trace_hyps s)
+  in
+  let subgs = Crypto.prove env hyps game args frame in
+  let s = (* change the system context and hypotheses in [s] *)
+    let dummy = Equiv.mk_reach_atom Term.mk_false in
+    ES.set_conclusion_in_context new_context dummy s 
+  in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
 
 let crypto_tac args (s : ES.t) =

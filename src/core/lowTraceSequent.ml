@@ -402,7 +402,7 @@ let set_conclusion_in_context ?update_local ?bound system conc s =
   let proof_context =
     change_trace_hyps_context
       ?update_local
-    ~table:s.env.table
+      ~table:s.env.table
       ~old_context:s.env.system
       ~new_context:system
       ~vars:s.env.vars
