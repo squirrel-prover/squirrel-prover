@@ -97,10 +97,65 @@ let parse_simpl_args
     ) param args
 
 (*------------------------------------------------------------------*)
+(** {2 Reduction state} *)
+
+(*------------------------------------------------------------------*)
+(** reduction strategy for head normalization *)
+type red_strat =
+  | Std
+  (** only reduce at head position *)
+  | MayRedSub of red_param
+  (** may put strict subterms in whnf if it allows to reduce at head
+      position *)
+
+(*------------------------------------------------------------------*)
+(** reduction state *)
+type state = { 
+  table  : Symbols.table;
+  vars   : Vars.env;         (* used to get variable tags *)
+  system : SE.context;
+  param  : red_param;
+  hyps   : THyps.hyps;
+
+  expand_context : Macros.expand_context;
+  (** expantion mode for macros. See [Macros.expand_context]. *)
+}
+
+(*------------------------------------------------------------------*)
+(** Make a reduction state directly *)
+let mk_state
+    ?(expand_context = Macros.InSequent)
+    ?(hyps = THyps.empty)
+    ~(system : SE.context)
+    ?(vars   : Vars.env = Vars.empty_env)
+    ~(param  : red_param)
+    (table   : Symbols.table)
+  : state 
+  =
+  { table; system; param; hyps; expand_context; vars; }
+
+
+(*------------------------------------------------------------------*)
+(** Change the system context of a [state], updating its hypotheses
+    accordingly. *)
+let change_context (st : state) (new_context : SE.context) : state =
+  let hyps = 
+    Hyps.change_trace_hyps_context
+      ~old_context:st.system ~new_context
+      ~table:st.table ~vars:st.vars st.hyps
+  in
+  { st with system = new_context; hyps; } 
+
+(*------------------------------------------------------------------*)
+let add_hyp (f : Term.term) hyps : THyps.hyps =
+  THyps.add TacticsArgs.AnyName (LHyp (Local f)) hyps
+
+(*------------------------------------------------------------------*)
 (** {2 Conversion} *)
 
-(** Conversion state *)
 (* FEATURE: conversion modulo *)
+
+(** conversion state *)
 type cstate = { 
   table   : Symbols.table;
   system  : SE.context;
@@ -114,18 +169,17 @@ type cstate = {
   (** expantion mode for macros. See [Macros.expand_context]. *)
 }
 
+let cstate_of_state (c : state) : cstate =
+  {
+    table  = c.table;
+    system = c.system;
+    param  = c.param;
+    hyps   = c.hyps;
 
-(** Make a cstate directly *)
-let mk_cstate 
-    ?(system = SystemExpr.context_any)
-    ?(expand_context = Macros.InSequent)
-    ?(hyps = THyps.empty)
-    ?(param = rp_default)
-    table 
-  : cstate 
-  =
-  { table; system; param; hyps; expand_context;
-    subst = []; }
+    expand_context = c.expand_context;
+
+    subst = [];
+  }
 
 (*------------------------------------------------------------------*)
 (** Internal *)
@@ -287,7 +341,7 @@ let rec conv_g (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
     List.iter2 (fun (se1,l1) (se2,l2) ->
         assert (SE.equal st.table se1 se2);
         let system = SE.{set = (se1 :> SE.t); pair = None; } in
-        conv_l { st with system } l1 l2
+        conv_l { st with system; } l1 l2
       ) p1.multi_args p2.multi_args;
 
     let system = SE.{set = (SE.of_list [] :> SE.t); pair = None; } in
@@ -325,68 +379,18 @@ and conv_g_l
 
 (*------------------------------------------------------------------*)
 (** Exported *)
-let conv (s : cstate) (t1 : Term.term) (t2 : Term.term) : bool =
+let conv (s : state) (t1 : Term.term) (t2 : Term.term) : bool =
+  let s = cstate_of_state s in
   try conv s t1 t2; true with NotConv -> false
 
 (** Exported *)
-let conv_g (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+let conv_g (s : state) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+  let s = cstate_of_state s in
   try conv_g s t1 t2; true with NotConv -> false
 
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions} *)
-
-
-(*------------------------------------------------------------------*)
-(** reduction strategy for head normalization *)
-type red_strat =
-  | Std
-  (** only reduce at head position *)
-  | MayRedSub of red_param
-  (** may put strict subterms in whnf if it allows to reduce at head
-      position *)
-
-(*------------------------------------------------------------------*)
-(** reduction state *)
-type state = { 
-  table  : Symbols.table;
-  vars   : Vars.env;         (* used to get variable tags *)
-  system : SE.context;
-  param  : red_param;
-  hyps   : THyps.hyps;
-
-  expand_context : Macros.expand_context;
-  (** expantion mode for macros. See [Macros.expand_context]. *)
-}
-
-(*------------------------------------------------------------------*)
-(** Make a reduction state directly *)
-let mk_state
-    ?(expand_context = Macros.InSequent)
-    ?(hyps = THyps.empty)
-    ~(system : SE.context)
-    ~(vars   : Vars.env)
-    ~(param  : red_param)
-    (table   : Symbols.table)
-  : state 
-  =
-  { table; system; param; hyps; expand_context; vars; }
-
-
-(*------------------------------------------------------------------*)
-(** Change the system context of a [state], updating its hypotheses
-    accordingly. *)
-let change_context (st : state) (new_context : SE.context) : state =
-  let hyps = 
-    Hyps.change_trace_hyps_context
-      ~old_context:st.system ~new_context
-      ~table:st.table ~vars:st.vars st.hyps
-  in
-  { st with system = new_context; hyps; } 
-
-(*------------------------------------------------------------------*)
-let add_hyp (f : Term.term) hyps : THyps.hyps =
-  THyps.add TacticsArgs.AnyName (LHyp (Local f)) hyps
 
 (*------------------------------------------------------------------*)  
 (** Internal exception *)
@@ -755,8 +759,8 @@ end
 module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (*------------------------------------------------------------------*)
-  (** Build a conversion state from a sequent. 
-      [se] is the system of the term being reduced. *)
+  (** Build a reduction state from a sequent. 
+      [system] is the system of the term being reduced. *)
   let to_state
       ?(expand_context : Macros.expand_context = InSequent) 
       ?(system : SE.context option)
@@ -765,13 +769,24 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (s       : S.t) 
     : state
     = 
-    let system = odflt (S.system s) system in
-    let vars = odflt (S.vars s) vars in
-    { table = S.table s;
-      system;
+    let table = S.table s in
+    let vars  = odflt (S.vars s) vars in
+
+    let old_context = S.system s in
+    let new_context = odflt old_context system in
+    let hyps = S.get_trace_hyps s in
+    let hyps = 
+      Hyps.change_trace_hyps_context
+        ~old_context ~new_context
+        ~table ~vars:(S.vars s)
+        hyps
+    in
+
+    { table;
+      system = new_context;
       vars;
       param;
-      hyps = S.get_trace_hyps s; 
+      hyps;
       expand_context; } 
 
   (*------------------------------------------------------------------*)
@@ -1012,49 +1027,26 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     mk_destr_k destr_and (Equiv.Smart.destr_and ~mode ~env:(S.env s)) s k x
 
   (*------------------------------------------------------------------*)
-  (** Make a cstate from a sequent *)
-  let cstate_of_sequent
-      (expand_context : Macros.expand_context)
-      (system : SE.context) 
-      (param : red_param) (s : S.t) : cstate 
-    =
-    let table        = S.table          s in
-    let old_context  = S.system         s in
-    let s_trace_hyps = S.get_trace_hyps s in
-    let hyps = 
-      Hyps.change_trace_hyps_context
-        ~old_context ~new_context:system
-        ~table ~vars:(S.vars s)
-        s_trace_hyps
-    in
-    {
-      subst = []; 
-      table; system; param; hyps; expand_context;
-    } 
-
-  (*------------------------------------------------------------------*)
   (** Exported. *)
   let conv_term
-      ?(expand_context : Macros.expand_context = InSequent)
+      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
       (s : S.t)
       (t1 : Term.term) (t2 : Term.term) : bool
     =
-    let system = odflt (S.system s) system in
-    let state = cstate_of_sequent expand_context system param s in
+    let state = to_state ?expand_context ?system param s in
     conv state t1 t2
 
   (** Exported. *)
   let conv_global
-      ?(expand_context : Macros.expand_context = InSequent)
+      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
       (s : S.t)
       (e1 : Equiv.form) (e2 : Equiv.form) : bool
     =
-    let system = odflt (S.system s) system in
-    let state = cstate_of_sequent expand_context system param s in
+    let state = to_state ?expand_context ?system param s in
     conv_g state e1 e2
 
   (** We need type introspection there *)

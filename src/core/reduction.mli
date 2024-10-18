@@ -22,25 +22,7 @@ val rp_crypto  : red_param      (** used in cryptographic tactics *)
 val parse_simpl_args : red_param -> Args.named_args -> red_param 
 
 (*------------------------------------------------------------------*)
-
-(** Conversion state *)
-type cstate
-
-(** Built a convertion state *)
-val mk_cstate :
-  ?system:SE.context -> 
-  ?expand_context:Macros.expand_context -> 
-  ?hyps:THyps.hyps ->
-  ?param:red_param -> 
-  Symbols.table -> 
-  cstate
-
-(** Conversion functions using a [cstate] *)
-val conv   : cstate -> Term.term  -> Term.term  -> bool 
-val conv_g : cstate -> Equiv.form -> Equiv.form -> bool 
-
-(*------------------------------------------------------------------*)
-(** {2 Reduction functions} *)
+(** {2 State} *)
 
 (** Reduction state *)
 type state
@@ -51,10 +33,20 @@ val mk_state :
   ?expand_context:Macros.expand_context ->
   ?hyps:THyps.hyps ->
   system:SE.context -> 
-  vars:Vars.env -> 
+  ?vars:Vars.env -> 
   param:red_param -> 
   Symbols.table -> 
   state
+
+(*------------------------------------------------------------------*)
+(** {2 Conversion functions} *)
+
+(** Conversion functions using a [cstate] *)
+val conv   : state -> Term.term  -> Term.term  -> bool 
+val conv_g : state -> Equiv.form -> Equiv.form -> bool 
+
+(*------------------------------------------------------------------*)
+(** {2 Reduction functions} *)
 
 (*------------------------------------------------------------------*)
 (** reduction strategy for head normalization *)

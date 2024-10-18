@@ -1248,13 +1248,14 @@ let deprecated_mk_phi_proj
           cases @ forms
         ) [] macro_cases
     in
-    let cstate = 
+    let state = 
+      let param = Reduction.rp_default in
       let context = 
         SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
       in
-      Reduction.mk_cstate cntxt.table ~system:context 
+      Reduction.mk_state cntxt.table ~system:context ~param
     in
-    List.remove_duplicate (Reduction.conv cstate) (phi_frame @ phi_actions)
+    List.remove_duplicate (Reduction.conv state) (phi_frame @ phi_actions)
 
   with
   | OldFresh.Deprecated_Name_found ->

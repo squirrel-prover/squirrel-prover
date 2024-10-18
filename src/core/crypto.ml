@@ -441,7 +441,7 @@ let exact_eq_under_cond
   in
   let system = env.system in
   let conv_state =
-    Reduction.mk_cstate
+    Reduction.mk_state
       ~system ~hyps 
       ~param:Reduction.rp_full env.table
   in
@@ -2943,8 +2943,9 @@ let prove
       oracle_subgoals;
     Printer.pr "@[<2>Final memory is:@ %a@]@." (AbstractSet._pp_mem ppe) result.final_mem;
     
-    let cstate = Reduction.mk_cstate ~hyps ~system:env.system env.table in
-    List.remove_duplicate (Reduction.conv cstate) (consts_subgs @ oracle_subgoals)
+    let param = Reduction.rp_default in
+    let state = Reduction.mk_state ~hyps ~system:env.system ~param env.table in
+    List.remove_duplicate (Reduction.conv state) (consts_subgs @ oracle_subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
 
