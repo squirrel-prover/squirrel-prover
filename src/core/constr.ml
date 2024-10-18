@@ -369,18 +369,16 @@ module Form = struct
           doit (`Neg, Comp (`Eq,  f, Term.mk_true))
 
     and doit_form (f : Term.term) : form =
+      let l = Term.Lit.form_to_literals f in
+      List.concat (List.map doit l) |>
       conj
-        (match Term.Lit.form_to_literals f with
-         | `Equiv l | `Entails l -> List.concat (List.map doit l)
-        ) 
     in
     doit lit
 
   let mk_list memo (l : Term.terms) : conjunction =
     let l =
       List.concat_map (fun t ->
-        match Term.Lit.form_to_literals t with
-          | `Equiv l | `Entails l -> l
+          Term.Lit.form_to_literals t 
         ) l
     in
     List.concat_map (fun t ->       
@@ -1484,25 +1482,20 @@ let rec query_form model (form : Form.form) = match form with
   | Form.Disj forms -> List.exists  (query_form model) forms
   | Form.Conj forms -> List.for_all (query_form model) forms
 
-let query_one (memo : memo) (model : model) (at : Term.Lit.literal) : bool =
+let query_one (memo : memo) (model : model) (t : Term.term) : bool =
   try
-    let cnf = Form.mk memo at in
+    let cnf = Form.mk_list memo [t] in
     List.for_all (query_form model) cnf
   with Unsupported -> false
 
-let query ~precise (models : models) (ats : Term.Lit.literals) =
+let query ~precise (models : models) (terms : Term.terms) =
   let memo, models = models in
   
   try
-    assert (List.for_all (fun lit ->
-        let ty = Term.Lit.ty lit in
-        ty = Type.tindex || ty = Type.ttimestamp
-      ) ats);
-
     (* if the conjunction of trace literals is  *)
     if
       List.for_all (fun model ->
-          List.for_all (query_one memo model) ats
+          List.for_all (query_one memo model) terms
         ) models
     then true
     else if not precise then false
@@ -1511,8 +1504,8 @@ let query ~precise (models : models) (ats : Term.Lit.literals) =
       (* compute [form = (⋁ ¬ atᵢ)] *)
       let form =
         List.map (fun at ->
-            Form.conj (Form.mk memo (Term.Lit.neg at))
-          ) ats
+            Form.conj (Form.mk_list memo [Term.mk_not at])
+          ) terms
         |> Form.disj
       in
       (* compute [M' = M, (⋁ ¬ atᵢ)] *)
@@ -1522,14 +1515,6 @@ let query ~precise (models : models) (ats : Term.Lit.literals) =
       (* check if [M' ⊧ ⊥], for every model [M'] *)
       List.for_all (fun inst -> split_models inst = []) insts
   with Unsupported -> false
-
-(* Add debugging information. *)
-let query ~precise (models : models) ats =
-  dbg "%squery: %a"
-    (if precise then "precise " else "") Term.Lit.pps ats;
-  let b = query ~precise models ats in
-  dbg "query result: %a : %a" Term.Lit.pps ats Fmt.bool b;
-  b
     
 (*------------------------------------------------------------------*)
 (** [max_elems_model model elems] returns the maximal elements of [elems]
@@ -1568,13 +1553,13 @@ let maximal_elems ~precise (models : models) (elems : Term.term list) =
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
   Utils.classes (fun ts ts' ->
-      query ~precise (memo, models_list) [`Pos, Comp (`Eq,ts,ts')]
+      query ~precise (memo, models_list) [Term.mk_eq ts ts']
     ) maxs
   |> List.map List.hd
 
 let get_ts_equalities ~precise (models : models) ts =
   Utils.classes (fun ts ts' ->
-      query ~precise models [`Pos, Comp (`Eq,ts,ts')]
+      query ~precise models [Term.mk_eq ts ts']
     ) ts
 
 let find_eq_action (models : models) (t : Term.term) =
@@ -1600,7 +1585,7 @@ let find_eq_action (models : models) (t : Term.term) =
     | None -> None
     | Some term ->
       (* check that [t] = [term] in all models. *)
-      if query ~precise:true models [`Pos, Comp (`Eq,t,term)]
+      if query ~precise:true models [Term.mk_eq t term]
       then Some term
       else None
 

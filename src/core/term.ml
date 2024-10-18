@@ -1776,51 +1776,42 @@ module Lit = struct
     (pn, at)
 
   (*------------------------------------------------------------------*)
-  let form_to_xatom (form : term) : xatom option =
+  let form_to_xatom (form : term) : xatom =
     match form with
-    | App (Fun (f, _), [a]) when f = f_happens -> Some (Happens a)
+    | App (Fun (f, _), [a]) when f = f_happens -> Happens a
 
-    | App (Fun (fseq,  _), [a;b]) when fseq  = f_eq  -> Some (Comp (`Eq,  a, b))
-    | App (Fun (fsneq, _), [a;b]) when fsneq = f_neq -> Some (Comp (`Neq, a, b))
-    | App (Fun (fsleq, _), [a;b]) when fsleq = f_leq -> Some (Comp (`Leq, a, b))
-    | App (Fun (fslt,  _), [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
-    | App (Fun (fsgeq, _), [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
-    | App (Fun (fsgt,  _), [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
-    | _ -> Some (Atom form)
+    | App (Fun (fseq,  _), [a;b]) when fseq  = f_eq  -> Comp (`Eq,  a, b)
+    | App (Fun (fsneq, _), [a;b]) when fsneq = f_neq -> Comp (`Neq, a, b)
+    | App (Fun (fsleq, _), [a;b]) when fsleq = f_leq -> Comp (`Leq, a, b)
+    | App (Fun (fslt,  _), [a;b]) when fslt  = f_lt  -> Comp (`Lt,  a, b)
+    | App (Fun (fsgeq, _), [a;b]) when fsgeq = f_geq -> Comp (`Geq, a, b)
+    | App (Fun (fsgt,  _), [a;b]) when fsgt  = f_gt  -> Comp (`Gt,  a, b)
+    | _ -> Atom form
 
-  let rec form_to_literal (form : term) : literal option =
+  let rec form_to_literal (form : term) : literal =
     match form with
-    | App (Fun (fnot, _), [f]) when fnot = f_not -> omap neg (form_to_literal f)
-    | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
+    | App (Fun (fnot, _), [f]) when fnot = f_not -> neg (form_to_literal f)
+    | _ -> (`Pos, form_to_xatom form)
 
   (*------------------------------------------------------------------*)
-  let form_to_literals
-      (form : term) 
-    : [`Entails of literal list | `Equiv of literal list]
-    =
-    let partial = ref false in
+  let form_to_literals (form : term) : literal list =
     let lits : literal list =
       List.fold_left (fun acc f -> 
           match form_to_literal f with
-          | Some at -> at :: acc
-          | None    -> partial := true; acc
+          | at -> at :: acc
         ) [] (decompose_ands form)
     in
-    if !partial then `Entails lits else `Equiv lits
+    lits
 
   (*------------------------------------------------------------------*)
   let disjunction_to_literals f : literal list option =
-    let exception Not_a_disjunction in
-
     let rec aux_l = function
       | tf when tf = mk_false -> []
       | App (Fun (fsor,_), [a; b]) when fsor = f_or -> aux_l a @ aux_l b
-      | f -> match form_to_literal f with
-        | Some f -> [f] 
-        | None   -> raise Not_a_disjunction
+      | f -> [form_to_literal f]
     in
 
-    try Some (aux_l f) with Not_a_disjunction -> None
+    Some (aux_l f)
 
   let mk_atom (o : ord) (t1 : term) (t2 : term) : term = 
     match o with

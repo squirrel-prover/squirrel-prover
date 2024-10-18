@@ -471,10 +471,10 @@ module TraceHyps = Mk(struct
       | Global _ -> "G"
       | Local f ->
         match Term.Lit.form_to_xatom f with
-        | Some (Term.Lit.Comp (`Eq, _, ftrue)) when ftrue = Term.mk_true -> "H"
-        | Some (Term.Lit.Atom _) | None -> "H"
-        | Some (Term.Lit.Happens _) -> "Hap"
-        | Some at ->
+        | Term.Lit.Comp (`Eq, _, ftrue) when ftrue = Term.mk_true -> "H"
+        | Term.Lit.Atom _ -> "H"
+        | Term.Lit.Happens _ -> "Hap"
+        | at ->
           let sort = match Term.Lit.ty_xatom at with
             | Type.Timestamp -> "C"
             | Type.Index     -> "I"
@@ -500,9 +500,7 @@ let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
       match f with
       | Local f
       | Global Equiv.(Atom (Reach {formula = f; bound = None})) ->
-        begin match Term.Lit.form_to_literals f with
-          | `Entails lits | `Equiv lits -> lits @ acc
-        end
+        Term.Lit.form_to_literals f @ acc
       | Global _ -> acc
     ) hyps [] 
 

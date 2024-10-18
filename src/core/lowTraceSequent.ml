@@ -184,9 +184,7 @@ let get_all_messages (s : sequent) =
   let atoms = List.map snd (Hyps.get_atoms_of_hyps s.proof_context) in
   (*TODO:Concrete : Probably something to here but not sure for now*)
   let atoms =
-    match Term.Lit.form_to_xatom s.conclusion with
-      | Some at -> at :: atoms
-      | _ -> atoms
+    Term.Lit.form_to_xatom s.conclusion :: atoms
   in
   List.fold_left (fun acc at ->
       match at with
@@ -230,7 +228,7 @@ let query ~precise s = function
   | Some q -> Constr.query ~precise (get_models s) q
 
 module ConstrBenchmark = Benchmark.Make(struct
-  type input = bool * sequent * Term.Lit.literals option
+  type input = bool * sequent * Term.terms option
   type output = bool
   let default =
     "Constr",
@@ -238,7 +236,7 @@ module ConstrBenchmark = Benchmark.Make(struct
   let basename = "squirrel_bench_constr_"
   let pp_input ch (_,_,q) = match q with
     | None -> Format.fprintf ch "false"
-    | Some q -> Term.Lit.pps ch q
+    | Some q -> (Fmt.list ~sep:(Fmt.any ",@ ") Term.pp) ch q
   let pp_result ch = function
     | Ok b -> Format.fprintf ch "%b" b
     | Error _ -> Format.fprintf ch "fail"
@@ -255,7 +253,7 @@ let query ~precise s q =
 (** Exported versions of query and its alternatives. *)
 
 let query_happens ~precise s a =
-  query ~precise s (Some [`Pos, Happens a])
+  query ~precise s (Some [Term.mk_happens a])
 
 let constraints_valid s =
   (* The precise flag is irrelevant in that case. *)

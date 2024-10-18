@@ -36,7 +36,7 @@ val pi : Projection.t -> sequent -> sequent
 val get_trs : sequent -> Completion.state 
 
 (** See [Constr.query] *)
-val query : precise:bool -> t -> Term.Lit.literals -> bool
+val query : precise:bool -> t -> Term.terms -> bool
 
 (** [register_query_alternative name f] adds an alternative method
     for solving queries (in a form that subsumes [query] and
@@ -48,7 +48,7 @@ val query : precise:bool -> t -> Term.Lit.literals -> bool
     For each call to [constraints_valid s q], [f ~precise:true s None]
     will be similarly executed. *)
 val register_query_alternative :
-  string -> (precise:bool -> t -> Term.Lit.literals option -> bool) -> unit
+  string -> (precise:bool -> t -> Term.terms option -> bool) -> unit
 
 val query_happens : precise:bool -> t -> Term.term -> bool
 

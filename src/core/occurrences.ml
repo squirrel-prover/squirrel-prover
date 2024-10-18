@@ -546,7 +546,7 @@ let expand_macro_check_once
       | EI_direct ->
         begin
           match c.models with
-          | Some m -> Constr.query ~precise:true m [`Pos, Happens ts]
+          | Some m -> Constr.query ~precise:true m [Term.mk_happens ts]
           | None -> false
         end
       | EI_indirect _ -> true
