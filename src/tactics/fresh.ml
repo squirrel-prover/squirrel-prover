@@ -350,9 +350,8 @@ let fresh_equiv
 
   (* Removing duplicates. We already did that for occurrences, but
      only within [phi_l] and [phi_r], not across both *)
-  let cstate = Reduction.mk_cstate (ES.table s) in
   let phis =
-    List.remove_duplicate (Reduction.conv cstate) (phi_l @ phi_r)
+    List.remove_duplicate (ES.Reduce.conv_term s) (phi_l @ phi_r)
   in
 
   let phi = Term.mk_ands ~simpl:true phis in

@@ -1290,10 +1290,9 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
     deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
   in
 
-  let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
     (* concatenate and remove duplicates *)
-    (List.remove_duplicate (Reduction.conv cstate) (phi_left @ phi_right))
+    (List.remove_duplicate (ES.Reduce.conv_term s) (phi_left @ phi_right))
 
 
 

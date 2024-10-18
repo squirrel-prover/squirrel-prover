@@ -53,7 +53,7 @@ let get_compatible_sys (type a) (se : a expr) : Symbols.system option =
   | Var _ | Any { compatible_with = None; } -> None
   | Any { compatible_with = s; } -> s
   | List ((_,s)::_) -> Some s.Single.system
-  | List [] -> assert false     (* FIXME *)
+  | List [] -> None
 
 (** Check that all systems in [e1] are compatible with all systems in [e2]. *)
 let compatible table (e1 : 'a expr) (e2 : 'b expr) =
