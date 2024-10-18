@@ -99,68 +99,45 @@ global lemma [set: none/left; equiv:none/left,none/left]
   RwEquiv ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
     $(u2 *> v2)->
     equiv(diff(u1,u2), diff(v1,v2)) ->
-    $(u1 *> v1) 
-.
+    $(u1 *> v1).
 Proof.
-
   intro Nded.
   intro equ.
-  
   rewrite /( *> ) in *.
-
   intro f.
-
   ghave equ' : equiv(diff(f(u1) <> v1,f(u2) <> v2)). {
-
-  fa 0. fa 0.
-  deduce 0.  
-  auto.  
-
+    fa 0; fa 0.
+    deduce 0.  
+    auto.
   }.
-
   rewrite equiv equ'.
-
   by have C := Nded f.
-  
-
 Qed.
-
-
 
 global lemma [set: none/left; equiv:none/left,none/left] 
   RwEquivWeak ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
     $(u2 *> v2)->
     equiv(diff(u1,u2), (fun x => x=diff(v1,v2))) ->
-    $(u1 *> v1) 
-.
+    $(u1 *> v1).
 Proof.
-
   intro Nded.
   intro equ.
-  
   rewrite /( *> ) in *.
+  intro f.
 
-  intro f. intro Neq.
-
-
-  ghave equ' : equiv(diff(f(u1) = v1,f(u2) = v2)). {
-
-  have lambdared : forall (u:'a,v:'b), (f u =v) = (fun x => x=v) (f u) by auto.
-  
-  rewrite lambdared.
-
-  fa 0. fa 1.
-  deduce 1.
-  auto.  
-
+  ghave equ' : equiv(diff(f u1 <> v1,f u2 <> v2)). {
+   
+    have -> : forall (u:'a,v:'b), (f u <> v) = (fun x => not (x = v)) (f u) by auto.
+    fa 0; fa 1. fa 0.
+    deduce 1.
+    auto.  
   }.
 
   rewrite equiv equ'.
 
-  by have C := Nded f.
-  
+  have C := Nded f. 
+  auto.
 Qed.
-
 
 
 (* ------------------------------------------------------------------- *)
@@ -187,48 +164,40 @@ Proof.
   auto.
 Qed.
 
-
 (*
 # Frames
 *)
 
 axiom [any] frame_not_init (tau:timestamp) :
-  init < tau => frame@tau = <frame@pred(tau), <of_bool (exec@tau), if exec@tau then output@tau>>.
-
+  init < tau => 
+  frame@tau = <frame@pred(tau), <of_bool (exec@tau), if exec@tau then output@tau>>.
 
 axiom [any] frame_init :
   frame@init = zero.
 
-
 global lemma  [set: any; equiv:any_pair] frame_ded_past (tau,tau':timestamp [const]) :
  [tau'<= tau] -> $( (frame@tau) |> (frame@tau')).
 Proof.
-
-dependent induction tau.
-intro tau IH Ord.
-
-
-ghave [H1 | H2] : [tau=init || tau<>init] by auto.
-
-
-
-+ ghave H2 : [tau'=init] by auto.
-  rewrite H1 H2.
-
-  rewrite frame_init.
-  use (refl_ded zero) => //.
-
-+ ghave [H3 | H4] : [tau=tau' || tau<>tau'] by auto.
-
-   
-  ++ rewrite H3.
-     rewrite /(|>).
-     exists (fun x => x) => //.
-
-  ++ rewrite frame_not_init //.
-     use IH with (pred tau) => //.
-
-     rewrite / (|>) in *.
-     destruct H.
-     exists (fun x => f (fst x)) => //.
+  dependent induction tau.
+  intro tau IH Ord.
+  
+  ghave [H1 | H2] : [tau=init || tau<>init] by auto.
+  
+  + ghave H2 : [tau'=init] by auto.
+    rewrite H1 H2.
+  
+    rewrite frame_init.
+    by have ? := refl_ded zero.
+  
+  + ghave [H3 | H4] : [tau=tau' || tau<>tau'] by auto.
+    - rewrite H3.
+      rewrite /(|>).
+      by exists (fun x => x).
+  
+    - rewrite frame_not_init //.
+      have ? // := IH (pred tau) _ _.
+  
+      rewrite / (|>) in *.
+      destruct H.
+      exists (fun x => f (fst x)) => //.
 Qed.

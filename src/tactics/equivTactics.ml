@@ -743,7 +743,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
     in
     let c, t = Term.subst subst c, Term.subst subst t in
 
-    let c_seq = Term.mk_seq vars c in
+    let c_seq = Term.mk_lambda vars c in
     let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
     ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
@@ -754,7 +754,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
     let biframe =
       List.rev_append
         before
-        ((List.map (fun t' -> Term.mk_seq ~simpl:true vars t') terms) @ after)
+        ((List.map (fun t' -> Term.mk_lambda ~simpl:true vars t') terms) @ after)
     in
     ES.set_equiv_conclusion {terms = biframe; bound = None} s
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
