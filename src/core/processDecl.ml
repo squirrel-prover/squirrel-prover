@@ -157,6 +157,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) : Symbols.table =
 
     match body with
     | `Abstract in_tys ->       (* abstract declaration *)
+      let in_tys = List.map Vars.ty args @ in_tys in
       Typing.declare_abstract table
         ~ty_args:ty_vars ~in_tys ~out_ty
         decl.op_name decl.op_symb_type
