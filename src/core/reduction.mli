@@ -4,73 +4,13 @@ module Args = TacticsArgs
 module THyps = Hyps.TraceHyps
 
 (*------------------------------------------------------------------*)
-type red_param = { 
-  rewrite : bool;         (** user-defined rewriting rules *)
-  delta   : Match.delta;  (** replace defined variables by their body *)
-  beta    : bool;         (** β-reduction *)
-  proj    : bool;         (** reduce projections *)
-  zeta    : bool;         (** let reduction *)
-  diff    : bool;         (** diff terms reduction *)
-  constr  : bool;         (** reduce tautologies over timestamps *)
-}
+(** {2 Core reduction functions} 
 
-val rp_empty   : red_param
-val rp_default : red_param
-val rp_full    : red_param
-val rp_crypto  : red_param      (** used in cryptographic tactics *)
+    Allow to avoid the cyclic dependency between [Reduction] and
+    [Match] (see [ReductionCore] for details). *)
 
-val parse_simpl_args : red_param -> Args.named_args -> red_param 
+include ReductionCore.S
 
-(*------------------------------------------------------------------*)
-(** {2 State} *)
-
-(** Reduction state *)
-type state
-
-(*------------------------------------------------------------------*)
-(** Make a reduction state directly *)
-val mk_state :
-  ?expand_context:Macros.expand_context ->
-  ?hyps:THyps.hyps ->
-  system:SE.context -> 
-  ?vars:Vars.env -> 
-  param:red_param -> 
-  Symbols.table -> 
-  state
-
-(*------------------------------------------------------------------*)
-(** {2 Conversion functions} *)
-
-(** Conversion functions using a [cstate] *)
-val conv   : state -> Term.term  -> Term.term  -> bool 
-val conv_g : state -> Equiv.form -> Equiv.form -> bool 
-
-(*------------------------------------------------------------------*)
-(** {2 Reduction functions} *)
-
-(*------------------------------------------------------------------*)
-(** reduction strategy for head normalization *)
-type red_strat =
-  | Std
-  (** only reduce at head position *)
-  | MayRedSub of red_param
-  (** may put strict subterms in whnf w.r.t. [red_param] if it allows to
-      reduce at head position *)
-
-(*------------------------------------------------------------------*)
-(** Fully reduces a term *)
-val reduce_term : state -> Term.term -> Term.term 
-
-(** Try to reduce once at head position (bool=reduction occured),
-    according to [strat] (default to [Std]). *)
-val reduce_head1_term :
-  ?strat:red_strat ->
-  state -> Term.term -> Term.term * bool
-
-(** Weak head normal form according to [strat] (default to [Std]) *) 
-val whnf_term :
-  ?strat:red_strat ->
-  state -> Term.term -> Term.term * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)

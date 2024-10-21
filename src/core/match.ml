@@ -14,11 +14,11 @@ let dbg ?(force=true) s =
   else Printer.prt `Ignore s
 
 (*------------------------------------------------------------------*)
-type delta = { def : bool; macro : bool; op : bool; }
+type delta = ReductionCore.delta
 
-let delta_full    = { def = true ; macro = true ; op = true ; }
-let delta_empty   = { def = false; macro = false; op = false; }
-let delta_default = delta_empty
+let delta_full    : delta = { def = true ; macro = true ; op = true ; }
+let delta_empty   : delta = { def = false; macro = false; op = false; }
+let delta_default : delta = delta_empty
   
 (*------------------------------------------------------------------*)
 (** {2 Positions} *)
@@ -1332,6 +1332,9 @@ let reduce_delta_macro1
     (t : Term.term)
   : Term.term * bool
   =
+  (* let module Reduction : ReductionCore.S =  *)
+  (*   (val ReductionCore.Register.get ())  *)
+  (* in *)
   let exception Failed in
   try
     match t with
