@@ -67,6 +67,13 @@ type ext_bnds = ext_bnd list
     permissives [App] and [AppAt] constructors which represents
     function applications, macros, variables, names etc. *)
 
+(** a symbol optionally applied to some parameters (type, system arguments). *)
+type applied_symb = {
+  path    : Symbols.p_path;
+  ty_args : ty list option;         (** type arguments *)
+  se_args : SE.Parse.t list option; (** system arguments *)
+}
+
 type quant = Term.quant
 
 type term_i =
@@ -80,8 +87,7 @@ type term_i =
   | Tuple of term list
   | Proj  of int L.located * term
   | Let   of lsymb * term * ty option * term
-  | Symb  of Symbols.p_path * ty list option
-  (** (symbole, optional type arguments) *)
+  | Symb  of applied_symb       (** an applied symbol *)
   | App   of term * term list
   (** Application of a term to another. 
       [AppTerm (t, [t1 ... tn])] is [t t1 ... tn]. *)
@@ -93,10 +99,13 @@ type term_i =
 and term = term_i L.located
 
 (*------------------------------------------------------------------*)
-val mk_symb : Symbols.p_path -> term 
+val mk_applied_symb : Symbols.p_path -> applied_symb 
 
-val mk_app   : term -> term list -> term 
+val mk_symb_i : Symbols.p_path -> term_i
+val mk_symb   : Symbols.p_path -> term 
+
 val mk_app_i : term -> term list -> term_i
+val mk_app   : term -> term list -> term 
 
 val decompose_app : term -> term * term list
 
@@ -105,10 +114,10 @@ val decompose_app : term -> term * term list
 
 (** global predicate application *)
 type pred_app = {
-  name    : Symbols.p_path;     (** predicate symbol *)
-  se_args : SE.Parse.t list;    (** optional system arguments *)
-  ty_args : ty list option;     (** optional type arguments *)
-  args    : term list;          (** multi-term and term arguments *)
+  name    : Symbols.p_path;         (** predicate symbol *)
+  se_args : SE.Parse.t list option; (** optional system arguments *)
+  ty_args : ty list option;         (** optional type arguments *)
+  args    : term list;              (** multi-term and term arguments *)
 }
 
 type equiv = term list 
@@ -385,8 +394,7 @@ val parse_projs : lsymb list option -> Projection.t list
 (** {2 Proof-terms} *)
 
 type pt_cnt =
-  | PT_symb     of Symbols.p_path * ty list option
-  (** (path, optional type arguments) *)
+  | PT_symb     of applied_symb
   | PT_app      of pt_app
   | PT_localize of pt
 

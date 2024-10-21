@@ -5,7 +5,7 @@ module Sv = Vars.Sv
 (*------------------------------------------------------------------*)
 let as_p_path (parser_args : parser_arg list) =
   match parser_args with
-  | [Term_parsed (L.{ pl_desc = Symb (p, None) } )] ->
+  | [Term_parsed (L.{ pl_desc = Symb { path = p; ty_args = None; se_args = None; }} )] ->
     Some p
   | _ -> None
 
@@ -81,7 +81,9 @@ let convert_args env parser_args tactic_type conc =
       in
       Arg et
 
-    | [Term_parsed (L.{ pl_desc = Symb (([],p), None) } )], Sort String ->
+    | [Term_parsed (L.{ pl_desc = Symb ({ path = ([],p) } as symb)} )], Sort String
+      when symb.ty_args = None && symb.se_args = None 
+      ->
       Arg (String p)
 
     | [Term_parsed L.{ pl_desc = Int i }], Sort Int ->

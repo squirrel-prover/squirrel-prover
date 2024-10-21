@@ -273,7 +273,7 @@ ty_args:
 sterm_i:
 | i=loc(int)                      { Typing.Int i }
 | s=quoted_string                 { Typing.String s }
-| id=spath_gen ty_args=ty_args?   { Typing.Symb (id, ty_args) }
+| path=spath_gen ty_args=ty_args? se_args=se_args?   { Typing.Symb {path; ty_args; se_args; } }
 | UNDERSCORE                      { Typing.Tpat }
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Typing.Diff (t,t0) }
@@ -286,9 +286,9 @@ sterm_i:
     { let fsymb = L.mk_loc (L.loc l) "not" in
       Typing.mk_app_i (Typing.mk_symb ([],fsymb)) [f] }
 
-| l=lloc(FALSE)  { Typing.Symb ((top_path,L.mk_loc l "false"), None) }
+| l=lloc(FALSE)  { Typing.mk_symb_i (top_path, L.mk_loc l "false") }
 
-| l=lloc(TRUE)   { Typing.Symb ((top_path,L.mk_loc l "true"), None) }
+| l=lloc(TRUE)   { Typing.mk_symb_i (top_path, L.mk_loc l "true") }
 
 | l=paren(slist1(term,COMMA))
     { match l with
@@ -337,7 +337,7 @@ term_i:
 %inline else_term:
 | %prec empty_else   { let loc = L.make $startpos $endpos in
                        let fsymb = L.mk_loc loc "zero" in
-                       L.mk_loc loc (Typing.Symb ((top_path,fsymb), None)) }
+                       Typing.mk_symb (top_path,fsymb) }
 | ELSE t=term       { t }
 
 sterm:
@@ -1019,9 +1019,15 @@ pt:
 | pt=loc(pt_cnt) { pt }
 
 (*------------------------------------------------------------------*)
+/* a symbol optionally applied to some parameters */
+applied_symb:
+| head=path ty_args=ty_args? se_args=se_args?    { Typing.{ path = head; ty_args; se_args; } }
+
+(*------------------------------------------------------------------*)
 /* non-ambiguous pt */
+
 spt_cnt:
-| head=path ty_args=ty_args?         { Typing.PT_symb (head,ty_args) }
+| h=applied_symb                { Typing.PT_symb h }
 | LOCALIZE LPAREN pt=pt RPAREN  { Typing.PT_localize pt }
 | LPAREN pt=pt_cnt RPAREN
     { pt }
@@ -1361,7 +1367,6 @@ biframe:
 
 se_args:
 | LBRACE l=slist(system_expr,empty) RBRACE { l  }
-|                                          { [] }
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
@@ -1385,14 +1390,14 @@ global_formula_i:
 | DOLLAR LPAREN g=a_global_formula_i RPAREN { g }
 
 (* postfix predicate application *)
-| name=upath ty_args=ty_args? se_args=se_args args=slist(sterm, empty)
+| name=upath ty_args=ty_args? se_args=se_args? args=slist(sterm, empty)
     { Typing.PPred Typing.{ name; se_args; ty_args; args; }  }
 
 /* ambiguous global formula, in the sens that it can be confused
    with a local term */
 a_global_formula_i:
 (* infix predicate application *)
-| t=sterm n=infix_s0 ty_args=ty_args? se_args=se_args t0=sterm 
+| t=sterm n=infix_s0 ty_args=ty_args? se_args=se_args? t0=sterm 
     { Typing.PPred Typing.{ name = (top_path, n); se_args; ty_args; args = [t; t0]; }  }
 
 /* ----------------------------------------------------------------------- */

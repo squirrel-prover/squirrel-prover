@@ -54,6 +54,12 @@ type ext_bnds = ext_bnd list
 (*------------------------------------------------------------------*)
 (** {2 Terms} *)
 
+type applied_symb = {
+  path    : Symbols.p_path;
+  ty_args : ty list option;
+  se_args : SE.Parse.t list option;
+}
+
 type quant = Term.quant
 
 type term_i =
@@ -67,7 +73,7 @@ type term_i =
   | Tuple of term list
   | Proj  of int L.located * term
   | Let   of lsymb * term * ty option * term
-  | Symb  of Symbols.p_path * ty list option
+  | Symb  of applied_symb
   | App   of term * term list
   | AppAt of term * term
   | Quant of quant * ext_bnds * term
@@ -75,8 +81,14 @@ type term_i =
 and term = term_i L.located
 
 (*------------------------------------------------------------------*)
+let mk_applied_symb (s : Symbols.p_path) : applied_symb =
+  { path = s; ty_args = None; se_args = None; }
+
+let mk_symb_i (s : Symbols.p_path) : term_i =
+  Symb (mk_applied_symb s)
+
 let mk_symb (s : Symbols.p_path) : term =
-  L.mk_loc (Symbols.p_path_loc s) (Symb (s, None))
+  L.mk_loc (Symbols.p_path_loc s) (mk_symb_i s)
 
 let mk_app_i (t1 : term) (l : term list) : term_i = App (t1, l)
 
@@ -93,7 +105,8 @@ let rec decompose_app (t : term) : term * term list =
   | _ -> t, []
 
 (*------------------------------------------------------------------*)
-let var_i loc x : term_i = Symb (([],L.mk_loc loc x), None)
+let var_i loc x : term_i = 
+  Symb { path = ([],L.mk_loc loc x); ty_args = None; se_args = None; }
 
 let var loc x : term = L.mk_loc loc (var_i loc x)
 
@@ -102,10 +115,10 @@ let var loc x : term = L.mk_loc loc (var_i loc x)
 
 (** global predicate application *)
 type pred_app = {
-  name    : Symbols.p_path;     (** predicate symbol *)
-  se_args : SE.Parse.t list;    (** optional system arguments *)
-  ty_args : ty list option;     (** optional type arguments *)
-  args    : term list;          (** multi-term and term arguments *)
+  name    : Symbols.p_path;         (** predicate symbol *)
+  se_args : SE.Parse.t list option; (** optional system arguments *)
+  ty_args : ty list option;         (** optional type arguments *)
+  args    : term list;              (** multi-term and term arguments *)
 }
 
 type equiv = term list
@@ -839,6 +852,14 @@ let failure_cannot_desambiguate loc symbs =
   error loc (Failure err) 
 
 (*------------------------------------------------------------------*)
+let is_symb (t : term) (s : string) : bool =
+  match L.unloc t with
+  | Symb { path; ty_args = None; se_args = None;} -> 
+    let top, sub = path in 
+    top = [] && L.unloc sub = s
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 (* internal function to Typing.ml *)
 let rec convert 
     (state : conv_state)
@@ -885,13 +906,12 @@ and convert0
   (*------------------------------------------------------------------*)
   (* particular cases for init and happens *)
 
-  | Symb (([],{ pl_desc = "init" }), None) ->
+  | Symb _ when is_symb tm "init" ->
     Term.mk_action Symbols.init_action []
 
   (* happens distributes over its arguments *)
   (* open-up tuples *)
-  | App ({ pl_desc = Symb (([],{ pl_desc = "happens" }), None)}, [{pl_desc = Tuple ts}])
-  | App ({ pl_desc = Symb (([],{ pl_desc = "happens" }), None)}, ts) ->
+  | App (f, [L.{pl_desc = Tuple ts}]) | App (f, ts) when is_symb f "happens" ->
     let atoms = List.map (fun t ->
         Term.mk_happens (conv Type.ttimestamp t)
       ) ts in
@@ -900,14 +920,14 @@ and convert0
   (* end of special cases *)
   (*------------------------------------------------------------------*)
 
-  | AppAt ({ pl_desc = Symb (f, p_ty_args) } as tapp, ts) 
-  | AppAt ({ pl_desc = App ({ pl_desc = Symb (f, p_ty_args) },_)} as tapp, ts)
-    when not (is_var f) ->
+  | AppAt ({ pl_desc = Symb applied_symb } as tapp, ts) 
+  | AppAt ({ pl_desc = App ({ pl_desc = Symb applied_symb },_)} as tapp, ts)
+    when not (is_var applied_symb.path) ->
     
     let _f, terms = decompose_app tapp in
     let app_cntxt = At (conv Type.ttimestamp ts) in
     
-    let t = convert_app state (L.loc tm) f p_ty_args terms app_cntxt ty in
+    let t = convert_app state (L.loc tm) applied_symb terms app_cntxt ty in
 
     if is_in_proc state.cntxt then 
       Printer.prt `Warning 
@@ -921,8 +941,9 @@ and convert0
     error loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
 
   (* application, special case *)
-  | Symb (f, p_ty_args)
-  | App ({ pl_desc = Symb (f, p_ty_args)}, _ (* = _args *) ) when not (is_var f) ->
+  | Symb applied_symb
+  | App ({ pl_desc = Symb applied_symb}, _ (* = _args *) ) when not (is_var applied_symb.path) ->
+    let f = applied_symb.path in
     let _top, sub = f in
     let _f, args = decompose_app tm in (* [args = _args] *)
 
@@ -938,11 +959,15 @@ and convert0
       | InProc (_, ts) -> MaybeAt ts 
     in
     
-    convert_app state (L.loc tm) f p_ty_args args app_cntxt ty
+    convert_app state (L.loc tm) applied_symb args app_cntxt ty
 
-  | Symb ((top,_) as f, p_ty_args) -> 
+  | Symb applied_symb -> 
+    let (top, _) as f = applied_symb.path in
     assert(is_var f && top = []);
-    if p_ty_args <> None then error loc (Failure "cannot given type arguments here");
+
+    if applied_symb.ty_args <> None then error loc (Failure "cannot apply type arguments here");
+    if applied_symb.se_args <> None then error loc (Failure "cannot apply system arguments here");
+
     convert_var state (snd f) ty
 
   (* application, general case *)
@@ -1065,15 +1090,18 @@ and convert0
 and convert_app
     (state     : conv_state)
     (loc       : L.t)
-    (f         : Symbols.p_path)
-    (p_ty_args : ty list option) (* optional type arguments of symbol [f] *)
+    (symb_app  : applied_symb)
     (args      : term list)
     (app_cntxt : app_cntxt)
     (ty        : Type.ty)
   : Term.term
   =
+  let { path = f; ty_args; se_args; } = symb_app in
+
+  if se_args <> None then error loc (Failure "cannot apply system arguments here");
+
   let ty_args =
-    omap (List.map (convert_ty ~ienv:state.ienv state.env)) p_ty_args
+    omap (List.map (convert_ty ~ienv:state.ienv state.env)) ty_args
   in
 
   let args_ty =                 (* types of arguments [args] *)
@@ -1425,7 +1453,7 @@ let convert_pred_app (st : conv_state) (ppa : pred_app) : Equiv.pred_app =
 
   (* substitute system expression variables by their arguments *)
   let se_subst = 
-    parse_pred_app_se_args loc st.env pred.se_params ppa.se_args 
+    parse_pred_app_se_args loc st.env pred.se_params (odflt [] ppa.se_args)
   in
   let se_args =
     List.map (fun (v,_info) -> Subst.subst_se_var se_subst v) pred.se_params
@@ -1676,7 +1704,7 @@ let parse_projs (p_projs : lsymb list option) : Projection.t list =
 (** {2 Proof-terms} *)
 
 type pt_cnt =
-  | PT_symb     of Symbols.p_path * ty list option
+  | PT_symb     of applied_symb
   | PT_app      of pt_app
   | PT_localize of pt
 

@@ -588,16 +588,20 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Typing.PTA_term ({ pl_desc = Symb (head, ty_args) } as t)
+    | Typing.PTA_term ({ pl_desc = Symb applied_symb } as t) 
     | Typing.PTA_term
-        ({ pl_desc = App ({ pl_desc = Symb (head, ty_args) }, _) } as t) ->
+        ({ pl_desc = App ({ pl_desc = Symb applied_symb }, _) } as t) ->
       let _head, terms = Typing.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
-
-      let pt_cnt =
+      
+      let pt_cnt = 
+        let pta_head =
+          L.mk_loc
+            (Symbols.p_path_loc applied_symb.path) 
+            (Typing.PT_symb applied_symb)
+        in
         Typing.PT_app {
-          pta_head =
-            L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb (head, ty_args));
+          pta_head;
           pta_args = List.map (fun x -> Typing.PTA_term x) terms ;
           pta_loc  = loc;
         }
@@ -634,6 +638,17 @@ module Mk (Args : MkArgs) : S with
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
+  let error_pt_wrong_number_se_args
+    loc ~(expected : SE.t list) ~(got : SE.t list)
+  =
+    let err_str =
+      Fmt.str "@[<v 0>wrong number of system variables: \
+               expected %d, got %d@]"
+        (List.length expected) (List.length got)
+    in
+    soft_failure ~loc (Failure err_str)
+
+  (*------------------------------------------------------------------*)
   (** Auxiliary function building a location for nice errors. *)
   let last_loc (head_loc : L.t) (args : 'a L.located list) : L.t =
     let exception Fail in
@@ -647,8 +662,8 @@ module Mk (Args : MkArgs) : S with
 
 
   (** Solve parser ambiguities, e.g. in [H (G x)], the sub-element [(G x)] is
-      parsed as a term (i.e. a [PTA_term]. We resolve it as a [PTA_sub] using
-      the context. *)
+      parsed as a term (i.e. a [PTA_term]).
+      We resolve it as a [PTA_sub] using the context. *)
   let rec resolve_pt_arg
     (s : S.t) (pt_arg : Typing.pt_app_arg) : Typing.pt_app_arg
   =
@@ -656,11 +671,10 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_sub sub -> PTA_sub (resolve_pt s sub)
     | Typing.PTA_term t  ->
       match L.unloc t with
-      | Typing.App ({ pl_desc = Typing.Symb (([],h), ty_args) }, args)
-        when S.Hyps.mem_name (L.unloc h) s
+      | Typing.App ({ pl_desc = Typing.Symb app_symb }, args)
+        when S.Hyps.mem_name (L.unloc (snd app_symb.path)) s
         ->
-        if ty_args <> None then
-          hard_failure ~loc:(L.loc t) (Failure "unexpected type arguments");
+        let (_top,h) = app_symb.path in
 
         let pta_args =
           List.map (fun a -> resolve_pt_arg s (Typing.PTA_term a)) args
@@ -668,7 +682,7 @@ module Mk (Args : MkArgs) : S with
         let loc = last_loc (L.loc h) args in
         let pt_cnt =
           Typing.PT_app {
-            pta_head = L.mk_loc (L.loc h) (Typing.PT_symb (([],h), None));
+            pta_head = L.mk_loc (L.loc h) (Typing.PT_symb app_symb);
             pta_args;
             pta_loc = loc;
           }
@@ -699,6 +713,7 @@ module Mk (Args : MkArgs) : S with
       (ienv     : Infer.env) 
       (p        : Symbols.p_path)
       (ty_args  : Type.ty list option)
+      (se_args  : SE.t list option)
       (s        : t)
     : ghyp * PT.t
     =
@@ -735,6 +750,7 @@ module Mk (Args : MkArgs) : S with
       (* open the lemma type variables *)
       let params, subst = Infer.open_params ienv lem.params in
 
+      (*------------------------------------------------------------------*)      
       (* if the user provided type variables, apply them *)
       if ty_args <> None then
         begin
@@ -751,6 +767,25 @@ module Mk (Args : MkArgs) : S with
                | `Ok   -> ()
                | `Fail -> assert false) (* cannot fail *)
             ty_vars ty_args;
+        end;
+
+      (*------------------------------------------------------------------*)      
+      (* if the user provided type variables, apply them *)
+      if se_args <> None then
+        begin
+          let se_args = oget se_args in
+          let se_vars = List.map (fun u -> SE.var u) params.se_vars in
+
+          if List.length se_args <> List.length se_vars then
+            error_pt_wrong_number_se_args
+              (Symbols.p_path_loc p) ~expected:se_vars ~got:se_args;
+
+          List.iter2
+            (fun se1 se2 ->
+               match Infer.unify_se ienv se1 se2 with
+               | `Ok   -> ()
+               | `Fail -> assert false) (* cannot fail *)
+            se_vars se_args;
         end;
 
       (*------------------------------------------------------------------*)      
@@ -1073,8 +1108,8 @@ module Mk (Args : MkArgs) : S with
     let table = S.table s in
     let ghyp, pt =
       match L.unloc p_pt with
-      | Typing.PT_symb (path, ty_args) ->
-        do_convert_path ienv mv path ty_args s
+      | Typing.PT_symb applied_symb ->
+        do_convert_path ienv mv applied_symb s
       | Typing.PT_app pt_app -> do_convert_pt_app ienv mv pt_app s
       | Typing.PT_localize p_sub_pt -> 
         let ghyp, sub_pt = do_convert_pt_gen ienv mv p_sub_pt s in
@@ -1091,15 +1126,23 @@ module Mk (Args : MkArgs) : S with
   and do_convert_path
       (ienv  : Infer.env)
       (init_mv : Mvar.t)
-      (p       : Symbols.p_path)
-      (ty_args : Typing.ty list option)
-      (s       : S.t)
+      (app_symb : Typing.applied_symb)
+      (s       : S.t) 
     : ghyp * PT.t
     =
+    let Typing.{ path = p; ty_args; se_args; } = app_symb in
+
+    let table  = S.table s            in
+    let se_env = (S.params s).se_vars in
+    let env    = S.env s              in
+    
     let ty_args =
-      omap (List.map (Typing.convert_ty ~ienv (S.env s))) ty_args 
+      omap (List.map (Typing.convert_ty ~ienv env)) ty_args 
     in
-    let lem_name, pt = pt_of_assumption ienv p ty_args s in
+    let se_args =
+      omap (List.map (SE.Parse.parse ~se_env table)) se_args 
+    in
+    let lem_name, pt = pt_of_assumption ienv p ty_args se_args s in
     assert (pt.mv = Mvar.empty);
     let pt = { pt with mv = init_mv; } in
     lem_name, pt
