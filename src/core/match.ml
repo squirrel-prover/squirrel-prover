@@ -2692,22 +2692,29 @@ module E = struct
     | Term.Fun (fs,_) when fs = Term.f_true -> true
     | _ -> false
   
-
-  (** Check that [hyp] implies [cond] for the special case when [cond] is [exec@t]. 
-      Return [true] when it can proved [hyp => cond], and [false] otherwise. *)  
+  (*------------------------------------------------------------------*)
+  let is_exec ms : bool =
+    ms.s_symb = Symbols.Classic.exec ||
+    ms.s_symb = Symbols.Quantum.exec
+    
+  (** Check that [hyps] implies [cond] for the special case when
+      [cond] is [exec@t]. *)  
   let known_set_check_exec_case
       ~(decompose_ands: Term.term -> Term.term list)
-      (table : Symbols.table) (hyps : Term.terms) (cond : Term.term) : bool
+      (table : Symbols.table)
+      (hyps : Term.terms) (cond : Term.term)
+    : bool
     =
     let exception Fail in
     let timeout = TConfig.solver_timeout table in
     match cond with
-    (* TODO: quantum: have a way of doing this for other execution model *)
-    | Term.Macro (ms', _ ,ts') when ms'.s_symb = Symbols.Classic.exec ->
-      let find_greater_exec hyp = match hyp with
-        | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.exec ->
+    | Term.Macro (ms', _ ,ts') when is_exec ms' ->
+      let find_greater_exec hyp =
+        match hyp with
+        | Term.Macro (ms, _, ts) when is_exec ms && ms = ms' ->
           begin
-            let term_impl = Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
+            let term_impl =
+              Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
             in
             try Constr.is_tautology ~exn:Fail ~table ~timeout term_impl with Fail -> false
           end
@@ -2717,7 +2724,8 @@ module E = struct
     | _ -> false
 
 
-    (*------------------------------------------------------------------*)
+  
+  (*------------------------------------------------------------------*)
   let get_local_of_hyps (hyps : TraceHyps.hyps) =
     let hyps =
       TraceHyps.fold_hyps (fun _ hyp acc ->
