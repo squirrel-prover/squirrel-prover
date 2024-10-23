@@ -449,8 +449,8 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
       end
     | Term.App (_,_) -> unsupported_term context fmla "unsupported_app"
     | Term.Proj (_,_) -> unsupported_term context fmla "unsupported_proj" 
-    | Term.Quant (ForAll, vs, f) -> msg_to_fmla_q context t_forall_close vs f
-    | Term.Quant (Exists, vs, f) -> msg_to_fmla_q context t_exists_close vs f
+    | Term.Quant (ForAll, vs, f) -> msg_to_fmla_q context t_forall_close vs f fmla
+    | Term.Quant (Exists, vs, f) -> msg_to_fmla_q context t_exists_close vs f fmla
     | Term.Quant (Seq,_,_) | Term.Quant (Lambda,_,_) -> unsupported_term context fmla "unsupp_quant" 
     | Macro (ms,[],ts) when ms.s_symb = Symbols.cond ->
       t_app_infer 
@@ -507,10 +507,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
     unsupported_term context fmla "let"
   
   )
-and msg_to_fmla_q context quantifier vs f =
-  let i_vs = filter_ty  Type.tindex     vs
-  and t_vs = filter_ty  Type.ttimestamp vs
-  and m_vs = filter_msg                vs in
+and msg_to_fmla_q context quantifier vs f fmla=
   (* NOTE: here we use the fact that OCaml hashtables can have multiple
    *       bindings, and the newer ones shadow the older ones
    * thus we can use Hashtbl.(add|remove) to handle bound variable scope *)
@@ -522,22 +519,23 @@ and msg_to_fmla_q context quantifier vs f =
     Hashtbl.add tbl (Vars.hash v) (t_var vsymb);
     vsymb
   and rem_var tbl v = Hashtbl.remove tbl (Vars.hash v) in
-  let quantified_vars =
-    List.map (create_var (Why3.Ty.ty_app context.index_symb []) context.vars_tbl) i_vs @
-    List.map (create_var (Why3.Ty.ty_app context.ts_symb []) context.vars_tbl) t_vs @
-    (List.map 
+  let quantified_vars = try 
+    Some (List.map 
       (fun v -> 
         (create_var (convert_type context (Vars.ty v)) context.vars_tbl v))
-      m_vs
+      vs
     ) 
-  in
-  (* at this stage the variables are added to the scope, we can recurse *)
-  let subfmla = msg_to_fmla context f in
-  (* and then cleanup *)
-  List.iter (rem_var context.vars_tbl) i_vs;
-  List.iter (rem_var context.vars_tbl) t_vs;
-  List.iter (rem_var context.vars_tbl) m_vs;
-  quantifier quantified_vars [] subfmla
+    with InternalError -> None
+  in match quantified_vars with 
+    | None -> List.iter (rem_var context.vars_tbl) vs;
+      unsupported_term context fmla "unsupported_quant"
+    | Some qv -> 
+      (* at this stage the variables are added to the scope, we can recurse *)
+      let subfmla = msg_to_fmla context f in
+      (* and then cleanup *)
+      List.iter (rem_var context.vars_tbl) vs;
+      quantifier qv [] subfmla
+    
 
 
 (*Fill symbol tables*)
