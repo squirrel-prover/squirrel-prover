@@ -287,14 +287,34 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s     : S.sequent)
     : Term.term
     =
-    let failed () = soft_failure (Tactics.Failure "nothing to expand") in    
+    let failed () = soft_failure (Tactics.Failure "nothing to expand") in
+
+    let () =                    (* abort early if possible *)
+      match t with
+      | Macro _ | Fun _ | App _ | Var _ -> ()
+      | _ -> failed ()
+    in
+
+    let hyps  = S.get_trace_hyps s in
+    let table = S.table          s in
+    let vars  = S.vars           s in
+
+    let old_context = S.system s in
+    let new_context = { old_context with set = (se :> SE.t); } in
+    let new_hyps =  (* [hyps] in [new_context] *)
+      TopHyps.change_trace_hyps_context
+        ~old_context ~new_context
+        ~table ~vars
+        hyps
+    in
+    (* FIXME: do not recompute [new_hyps] at each sub-term, but
+       propagate and update it during the downward exploration
+       (through [Match.Pos.*]) of the term in [expand_term]. *)
+
     match t with
     (* we do not use [Match.reduce_delta1] for macros, to have sensible error
        messages. *)
-    | Macro (ms,l,a) ->
-      let hyps = S.get_trace_hyps s in
-      let table = S.table s in
-      
+    | Macro (ms,l,a) ->     
       if not (force_happens) &&
          not (S.query_happens ~precise:true s a || Match.happens table hyps a) then
         soft_failure (Tactics.MustHappen a);
@@ -307,7 +327,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
            to try to make the action symbol appear. *)
         let red_state =
           Reduction.mk_state
-            ~hyps ~se:(se :> SE.t) ~vars:(S.vars s)
+            ~hyps:new_hyps ~system:new_context ~vars
             ~param:Reduction.rp_full
             table
         in
@@ -320,7 +340,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Fun _ | App _ | Var _ ->
       let t, has_red =
         Match.reduce_delta1
-          ~delta:Match.delta_full ~mode (S.table s) se (S.get_trace_hyps s) t
+          ~delta:Match.delta_full ~mode table new_context new_hyps t
       in      
       if has_red then t else failed ()
       

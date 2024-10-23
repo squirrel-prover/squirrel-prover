@@ -41,9 +41,8 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method extract_ts_atoms phi =
     List.partition (fun t ->
-        match Term.Lit.form_to_xatom t with
-        | Some at when Term.Lit.ty_xatom at = Type.ttimestamp -> true
-        | _ -> false
+        let at = Term.Lit.form_to_xatom t in
+        Term.Lit.ty_xatom at = Type.ttimestamp
       ) (Term.decompose_ands phi)
 
   (* Given a set of atoms, returns a list of ts that are smaller than other
@@ -52,10 +51,10 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
     List.fold_left
       (fun smaller_acc at ->
          match Term.Lit.form_to_xatom at with
-         | Some (Comp (`Leq,tau_1,_tau_2)) ->
+         | Comp (`Leq,tau_1,_tau_2) ->
            (* TODO: [tau_2] unused, is it normal? This works only if tau_2 is in max_att *)
            Sts.add tau_1 smaller_acc
-         | Some (Comp (`Lt,tau_1,_tau_2)) ->
+         | Comp (`Lt,tau_1,_tau_2) ->
            (* TODO: [tau_2] unused, is it normal? *)
            Sts.add tau_1 smaller_acc
         | _ -> smaller_acc)

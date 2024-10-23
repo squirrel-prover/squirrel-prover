@@ -92,7 +92,7 @@ let build_dependence models (l : Term.terms) : dependence =
   let dep = List.fold_left 
     (fun dep1 t1 -> List.fold_left 
       (fun dep2 t2 ->
-        let query = [(`Pos,Term.Lit.Comp(`Leq, t1, t2))] in
+        let query = [Term.mk_leq t1 t2] in
         if t1 <> t2 && Constr.query ~precise:true models query then
           add_edge t1 t2 dep2
         else

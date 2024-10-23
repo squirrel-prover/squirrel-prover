@@ -8,11 +8,9 @@ module SE = SystemExpr
 module TraceHyps = Hyps.TraceHyps
 
 (*------------------------------------------------------------------*)
-type delta = { def : bool; macro : bool; op : bool; }
-
-val delta_default : delta
-val delta_full    : delta
-val delta_empty   : delta
+val delta_default : ReductionCore.delta
+val delta_full    : ReductionCore.delta
+val delta_empty   : ReductionCore.delta
 
 (*------------------------------------------------------------------*)
 (** {2 Positions} *)
@@ -340,14 +338,14 @@ val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 val reduce_delta_def1 :
-  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
+  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool 
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
   ?mode:Macros.expand_context ->
-  Symbols.table -> SE.t -> 
+  Symbols.table -> SE.context -> 
   ?hyps:Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool
@@ -355,9 +353,9 @@ val reduce_delta_macro1 :
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 val reduce_delta1 :
-  ?delta:delta ->
+  ?delta:ReductionCore.delta ->
   mode:Macros.expand_context ->
-  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps ->
+  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * bool 
 

@@ -25,7 +25,7 @@ val is_tautology : ?exn:exn -> timeout:int -> table:Symbols.table -> Term.term -
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very imprecise on disequalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : precise:bool -> models -> Term.Lit.literals -> bool
+val query : precise:bool -> models -> Term.terms -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].

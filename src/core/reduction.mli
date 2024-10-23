@@ -4,81 +4,13 @@ module Args = TacticsArgs
 module THyps = Hyps.TraceHyps
 
 (*------------------------------------------------------------------*)
-type red_param = { 
-  rewrite : bool;         (** user-defined rewriting rules *)
-  delta   : Match.delta;  (** replace defined variables by their body *)
-  beta    : bool;         (** β-reduction *)
-  proj    : bool;         (** reduce projections *)
-  zeta    : bool;         (** let reduction *)
-  diff    : bool;         (** diff terms reduction *)
-  constr  : bool;         (** reduce tautologies over timestamps *)
-}
+(** {2 Core reduction functions} 
 
-val rp_empty   : red_param
-val rp_default : red_param
-val rp_full    : red_param
-val rp_crypto  : red_param      (** used in cryptographic tactics *)
+    Allow to avoid the cyclic dependency between [Reduction] and
+    [Match] (see [ReductionCore] for details). *)
 
-val parse_simpl_args : red_param -> Args.named_args -> red_param 
+include ReductionCore.S
 
-(*------------------------------------------------------------------*)
-
-(** Conversion state *)
-type cstate
-
-(** Built a convertion state *)
-val mk_cstate :
-  ?system:SE.context -> 
-  ?expand_context:Macros.expand_context -> 
-  ?hyps:THyps.hyps ->
-  ?param:red_param -> 
-  Symbols.table -> 
-  cstate
-
-(** Conversion functions using a [cstate] *)
-val conv   : cstate -> Term.term  -> Term.term  -> bool 
-val conv_g : cstate -> Equiv.form -> Equiv.form -> bool 
-
-(*------------------------------------------------------------------*)
-(** {2 Reduction functions} *)
-
-(** Reduction state *)
-type state
-
-(*------------------------------------------------------------------*)
-(** Make a reduction state directly *)
-val mk_state :
-  ?expand_context:Macros.expand_context ->
-  ?hyps:THyps.hyps ->
-  se:SE.arbitrary -> 
-  vars:Vars.env -> 
-  param:red_param -> 
-  Symbols.table -> 
-  state
-
-(*------------------------------------------------------------------*)
-(** reduction strategy for head normalization *)
-type red_strat =
-  | Std
-  (** only reduce at head position *)
-  | MayRedSub of red_param
-  (** may put strict subterms in whnf w.r.t. [red_param] if it allows to
-      reduce at head position *)
-
-(*------------------------------------------------------------------*)
-(** Fully reduces a term *)
-val reduce_term : state -> Term.term -> Term.term 
-
-(** Try to reduce once at head position (bool=reduction occured),
-    according to [strat] (default to [Std]). *)
-val reduce_head1_term :
-  ?strat:red_strat ->
-  state -> Term.term -> Term.term * bool
-
-(** Weak head normal form according to [strat] (default to [Std]) *) 
-val whnf_term :
-  ?strat:red_strat ->
-  state -> Term.term -> Term.term * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)
@@ -92,7 +24,7 @@ module type S = sig
       [se] is the system of the term being reduced. *)
   val to_state :
     ?expand_context:Macros.expand_context  ->
-    ?se:SE.t ->
+    ?system:SE.context ->
     ?vars:Vars.env ->
     red_param -> t -> state
 
@@ -133,7 +65,7 @@ module type S = sig
 
   val conv_term :
     ?expand_context:Macros.expand_context ->
-    ?se:SE.t ->
+    ?system:SE.context ->
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool

@@ -243,13 +243,14 @@ let mk_var : unit -> cterm =
 (*------------------------------------------------------------------*)
 (** Stateful memoization for conversion of [Term.term] to [cterm] *)
 type ct_memo = { 
-  cstate       : Reduction.cstate;  (** State to check for convertability 
-                                        (w.r.t. [Reduction.conv]) *)
+  cstate       : Reduction.state ;  (** State to check for convertability  *)
   mutable memo : cterm Mt.t;        (** Memoized results *)
 }
 
 let mk_ct_memo table : ct_memo = 
-  let cstate = Reduction.mk_cstate table in
+  let system = SystemExpr.context_any in
+  let param = Reduction.rp_default in
+  let cstate = Reduction.mk_state ~system table ~param in
   { cstate; memo = Mt.empty; }
 
 (** Box a term. 

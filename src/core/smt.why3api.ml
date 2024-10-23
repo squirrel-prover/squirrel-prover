@@ -1569,8 +1569,7 @@ let () =
                 match q with
                 | None -> s
                 | Some q ->
-                  let conclusion =
-                    Term.mk_ands (List.map Term.Lit.lit_to_form q) in
+                  let conclusion = Term.mk_ands q in
                   TraceSequent.set_conclusion conclusion s
               in
               sequent_is_valid

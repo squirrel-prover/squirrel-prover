@@ -471,10 +471,10 @@ module TraceHyps = Mk(struct
       | Global _ -> "G"
       | Local f ->
         match Term.Lit.form_to_xatom f with
-        | Some (Term.Lit.Comp (`Eq, _, ftrue)) when ftrue = Term.mk_true -> "H"
-        | Some (Term.Lit.Atom _) | None -> "H"
-        | Some (Term.Lit.Happens _) -> "Hap"
-        | Some at ->
+        | Term.Lit.Comp (`Eq, _, ftrue) when ftrue = Term.mk_true -> "H"
+        | Term.Lit.Atom _ -> "H"
+        | Term.Lit.Happens _ -> "Hap"
+        | at ->
           let sort = match Term.Lit.ty_xatom at with
             | Type.Timestamp -> "C"
             | Type.Index     -> "I"
@@ -500,9 +500,7 @@ let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
       match f with
       | Local f
       | Global Equiv.(Atom (Reach {formula = f; bound = None})) ->
-        begin match Term.Lit.form_to_literals f with
-          | `Entails lits | `Equiv lits -> lits @ acc
-        end
+        Term.Lit.form_to_literals f @ acc
       | Global _ -> acc
     ) hyps [] 
 
@@ -580,12 +578,14 @@ let setup_change_hyps_context
 
   let pair_sym =
     if new_context.SE.pair = None || old_context.SE.pair = None then false
-    else
-      let new_pair = oget new_context.SE.pair in
-      let new_left, new_right = snd (SE.fst new_pair), snd (SE.snd new_pair) in
-      let old_pair = oget old_context.SE.pair in
-      let old_left, old_right = snd (SE.fst old_pair), snd (SE.snd old_pair) in
-      new_left = old_right && new_right = old_left
+    else 
+      match (oget new_context.SE.pair :> < > SE.exposed).cnt, 
+            (oget old_context.SE.pair :> < > SE.exposed).cnt with
+      | List [new_left; new_right], List [old_left; old_right] ->
+        snd new_left  = snd old_right && 
+        snd new_right = snd old_left
+      | List _, List _ -> assert false
+      | _ -> false
   in
   
   (* Is the term system independent, or can we project formulas from
@@ -708,22 +708,24 @@ let change_trace_hyps_context
     (hyps : TraceHyps.hyps)
   : TraceHyps.hyps
   =
-  let default_update_local,update_global =
-    setup_change_hyps_context 
-      ~old_context ~new_context ~vars ~table
-  in
-  let update_local = odflt default_update_local update_local in
+  if SE.equal_context0 old_context new_context then hyps else
 
-  TraceHyps.filter_map
-    ~hyp:(fun _ f ->
-        match f with
-        | Local  f -> omap (fun x -> Equiv.Local  x) (update_local  f)
-        | Global f -> omap (fun x -> Equiv.Global x) (update_global f)
-      )
-    ~def:(fun _ (se,t) -> Some (se,t))
-    (* changing the context does not impact definitions, as these come
-       with their own context *)
-    hyps
+    let default_update_local,update_global =
+      setup_change_hyps_context 
+        ~old_context ~new_context ~vars ~table
+    in
+    let update_local = odflt default_update_local update_local in
+
+    TraceHyps.filter_map
+      ~hyp:(fun _ f ->
+          match f with
+          | Local  f -> omap (fun x -> Equiv.Local  x) (update_local  f)
+          | Global f -> omap (fun x -> Equiv.Global x) (update_global f)
+        )
+      ~def:(fun _ (se,t) -> Some (se,t))
+      (* changing the context does not impact definitions, as these come
+         with their own context *)
+      hyps
 
 (*------------------------------------------------------------------*) 
 (** See `.mli` *)
@@ -735,14 +737,16 @@ let change_equiv_hyps_context
     (hyps : EquivHyps.hyps)
   : EquivHyps.hyps
   =
-  let _update_local,update_global =
-    setup_change_hyps_context
-      ~old_context ~new_context ~vars ~table
-  in
-  EquivHyps.filter_map
-    ~hyp:(fun _ f -> update_global f)
-    ~def:(fun _ (se,t) -> Some (se,t))
-    (* changing the context does not impact definitions, as these come
-       with their own context *)
-    hyps 
+  if SE.equal_context0 old_context new_context then hyps else
+
+    let _update_local,update_global =
+      setup_change_hyps_context
+        ~old_context ~new_context ~vars ~table
+    in
+    EquivHyps.filter_map
+      ~hyp:(fun _ f -> update_global f)
+      ~def:(fun _ (se,t) -> Some (se,t))
+      (* changing the context does not impact definitions, as these come
+         with their own context *)
+      hyps 
 

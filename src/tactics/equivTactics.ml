@@ -88,7 +88,8 @@ let refl (e : Equiv.equiv) (s : ES.t) =
   else
     match ES.get_frame l_proj s, ES.get_frame r_proj s with
     | Some el, Some er ->
-      if List.for_all2 (ES.Reduce.conv_term ~se:(system_pair :> SE.t) s) el.terms er.terms
+      let system = { (ES.system s) with set = (system_pair :> SE.t); } in
+      if List.for_all2 (ES.Reduce.conv_term ~system s) el.terms er.terms
       (*TODO:Concrete : Probably something to do to create a bounded goal*)
       then `True
       else `NoRefl
@@ -743,7 +744,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
     in
     let c, t = Term.subst subst c, Term.subst subst t in
 
-    let c_seq = Term.mk_seq vars c in
+    let c_seq = Term.mk_lambda vars c in
     let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
     ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
@@ -754,7 +755,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
     let biframe =
       List.rev_append
         before
-        ((List.map (fun t' -> Term.mk_seq ~simpl:true vars t') terms) @ after)
+        ((List.map (fun t' -> Term.mk_lambda ~simpl:true vars t') terms) @ after)
     in
     ES.set_equiv_conclusion {terms = biframe; bound = None} s
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
@@ -1247,13 +1248,14 @@ let deprecated_mk_phi_proj
           cases @ forms
         ) [] macro_cases
     in
-    let cstate = 
+    let state = 
+      let param = Reduction.rp_default in
       let context = 
         SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
       in
-      Reduction.mk_cstate cntxt.table ~system:context 
+      Reduction.mk_state cntxt.table ~system:context ~param
     in
-    List.remove_duplicate (Reduction.conv cstate) (phi_frame @ phi_actions)
+    List.remove_duplicate (Reduction.conv state) (phi_frame @ phi_actions)
 
   with
   | OldFresh.Deprecated_Name_found ->
@@ -1289,10 +1291,9 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
     deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
   in
 
-  let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
     (* concatenate and remove duplicates *)
-    (List.remove_duplicate (Reduction.conv cstate) (phi_left @ phi_right))
+    (List.remove_duplicate (ES.Reduce.conv_term s) (phi_left @ phi_right))
 
 
 
@@ -2246,7 +2247,20 @@ let () =
 (*------------------------------------------------------------------*)
 let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
   let frame = ES.conclusion_as_equiv s in
-  let subgs = Crypto.prove (ES.env s) (ES.get_trace_hyps s) game args frame in
+  let old_context = ES.system s in
+  let new_context = { old_context with set = (oget old_context.pair :> SE.t); } in
+  let env = Env.{ (ES.env s) with system = new_context; } in
+  let hyps =
+    TopHyps.change_trace_hyps_context
+      ~old_context ~new_context
+      ~table:env.table ~vars:env.vars
+      (ES.get_trace_hyps s)
+  in
+  let subgs = Crypto.prove env hyps game args frame in
+  let s = (* change the system context and hypotheses in [s] *)
+    let dummy = Equiv.mk_reach_atom Term.mk_false in
+    ES.set_conclusion_in_context new_context dummy s 
+  in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
 
 let crypto_tac args (s : ES.t) =

@@ -14,11 +14,11 @@ let dbg ?(force=true) s =
   else Printer.prt `Ignore s
 
 (*------------------------------------------------------------------*)
-type delta = { def : bool; macro : bool; op : bool; }
+type delta = ReductionCore.delta
 
-let delta_full    = { def = true ; macro = true ; op = true ; }
-let delta_empty   = { def = false; macro = false; op = false; }
-let delta_default = delta_empty
+let delta_full    : delta = { def = true ; macro = true ; op = true ; }
+let delta_empty   : delta = { def = false; macro = false; op = false; }
+let delta_default : delta = delta_empty
   
 (*------------------------------------------------------------------*)
 (** {2 Positions} *)
@@ -1166,7 +1166,7 @@ type unif_state = {
   table   : Symbols.table;
   system  : SE.context; (** system context applying at the current position *)
 
-  hyps : Hyps.TraceHyps.hyps;
+  hyps : Hyps.TraceHyps.hyps; (** hypotheses, taken in [system] *)
 
   use_fadup     : bool;
   allow_capture : bool;
@@ -1227,7 +1227,7 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 let reduce_delta_def1
-    (table : Symbols.table) (se : SE.t) 
+    (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * bool 
@@ -1238,9 +1238,11 @@ let reduce_delta_def1
       Hyps.TraceHyps.find_map (function
           | v', LDef (se',t') ->
             if Ident.equal v' v.id &&
-               SE.subset_modulo table se se'
+               SE.subset_modulo table system.set se'
             then
-              let _, subst = SE.mk_proj_subst ~strict:false ~src:se' ~dst:se in
+              let _, subst = 
+                SE.mk_proj_subst ~strict:false ~src:se' ~dst:system.set 
+              in
               let t' = Term.subst_projs ~project:true subst t' in
               Some t'
             else None
@@ -1325,17 +1327,20 @@ let happens table (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
 (** Perform δ-reduction once for macro at head position. *)
 let reduce_delta_macro1
     ?(mode : Macros.expand_context = InSequent)
-    (table : Symbols.table) (sexpr : SE.t)
+    (table : Symbols.table) (system : SE.context) 
     ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
     (t : Term.term)
   : Term.term * bool
   =
+  (* let module Reduction : ReductionCore.S =  *)
+  (*   (val ReductionCore.Register.get ())  *)
+  (* in *)
   let exception Failed in
   try
     match t with
     | Term.Macro (ms, l, ts) ->
       let cntxt () =
-        let se = try SE.to_fset sexpr with SE.Error _ -> raise Failed in
+        let se = try SE.to_fset system.set with SE.Error _ -> raise Failed in
         Constr.{ table; system = se; models = None; }
       in
       let ta_opt = as_action hyps ts in
@@ -1356,7 +1361,7 @@ let reduce_delta_macro1
 let reduce_delta1
     ?(delta = delta_full)
     ~(mode : Macros.expand_context)
-    (table : Symbols.table) (se : SE.t) 
+    (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * bool 
@@ -1364,18 +1369,18 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~mode table se ~hyps t
+    reduce_delta_macro1 ~mode table system ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->
-    reduce_delta_def1 table se hyps t
+    reduce_delta_def1 table system hyps t
 
   (* concrete operators *)
   | Fun (fs, { ty_args })
   | App (Fun (fs, { ty_args }), _)
     when delta.op && Operator.is_concrete_operator table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
-    let t = Operator.unfold table se fs ty_args args in
+    let t = Operator.unfold table system.set fs ty_args args in
     t, true
     
   | _ -> t, false
@@ -1461,12 +1466,12 @@ let reduce_glob_let1 (t : Equiv.form) : Equiv.form * bool =
 let reduce_head1
     ?delta
     ~(mode : Macros.expand_context)
-    (table : Symbols.table) (se : SE.t) 
+    (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * bool 
   = 
-  let t, has_red = reduce_delta1 ?delta ~mode table se hyps t in
+  let t, has_red = reduce_delta1 ?delta ~mode table system hyps t in
   if has_red then t, true
   else
     match t with
@@ -1484,8 +1489,8 @@ let reduce_head1
 
     | _ ->
       let t', red = 
-        if SE.is_fset se then
-          let se = SE.to_fset se in
+        if SE.is_fset system.set then
+          let se = SE.to_fset system.set in
           Term.head_normal_biterm0 (SE.to_projs se) t 
         else 
           t, false
@@ -1765,14 +1770,14 @@ module T (* : S with type t = Term.term *) = struct
         let t,t_red =
           reduce_delta_macro1
             ~mode:st.expand_context
-            st.table st.system.set ~hyps:st.hyps t
+            st.table st.system ~hyps:st.hyps t
         in
         if not t_red then default ()
         else 
           let pat,pat_red =
             reduce_delta_macro1
               ~mode:st.expand_context
-              st.table st.system.set ~hyps:st.hyps pat
+              st.table st.system ~hyps:st.hyps pat
           in
           if not pat_red then default () else tunif t pat st
       end
@@ -1849,14 +1854,14 @@ module T (* : S with type t = Term.term *) = struct
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
     let t, has_red = 
       reduce_head1 ~delta:delta_full
-        ~mode:st.expand_context st.table st.system.set st.hyps t 
+        ~mode:st.expand_context st.table st.system st.hyps t 
     in
     if has_red then 
       tunif t pat st
     else
       let pat, has_red = 
         reduce_head1 ~delta:delta_full
-          ~mode:st.expand_context st.table st.system.set st.hyps pat
+          ~mode:st.expand_context st.table st.system st.hyps pat
       in
       if has_red then
         tunif t pat st

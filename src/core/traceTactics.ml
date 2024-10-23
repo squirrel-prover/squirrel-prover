@@ -889,7 +889,7 @@ let substitute_mess (m1, m2) s =
 
 let substitute_ts (ts1, ts2) s =
   let subst =
-      if TS.query ~precise:true s [(`Pos, Comp (`Eq,ts1,ts2))] then
+      if TS.query ~precise:true s [Term.mk_eq ts1 ts2] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -907,7 +907,7 @@ let substitute_idx (i1 , i2 : Term.term * Term.term) s =
   in
 
   let subst =
-    if TS.query ~precise:true s [(`Pos, Comp (`Eq,i1,i2))] then
+    if TS.query ~precise:true s [Term.mk_eq i1 i2] then
       [Term.ESubst (i1,i2)]
     else
       soft_failure Tactics.NotEqualArguments
@@ -1129,23 +1129,22 @@ let new_simpl ~red_param ~congr ~constr s =
   let s = TS.set_conclusion Term.mk_false s in
   let goals = List.filter_map (fun goal ->
       if TS.Hyps.is_hyp (Local goal) s || Term.f_triv goal then None
-      else match Term.Lit.form_to_xatom goal with
-        | None -> Some goal
-        | Some at ->
-          match at, Term.Lit.ty_xatom at with
-          | _, Type.Index | _, Type.Timestamp ->
-            let lit = `Pos, (at :> Term.Lit.xatom) in
-            if constr && TS.query ~precise:true s [lit]
-            then None
-            else Some goal
+      else
+        (* FIXME: simplify *)
+        let at = Term.Lit.form_to_xatom goal in
+        match at, Term.Lit.ty_xatom at with
+        | _, Type.Index | _, Type.Timestamp ->
+          if constr && TS.query ~precise:true s [goal]
+          then None
+          else Some goal
 
-          | Comp (`Eq, t1, t2), _ ->
-            if congr &&
-               Completion.check_equalities (TS.get_trs s) [(t1,t2)]
-            then None
-            else Some goal
-
-          | _ -> Some goal
+        | Comp (`Eq, t1, t2), _ ->
+          if congr &&
+             Completion.check_equalities (TS.get_trs s) [(t1,t2)]
+          then None
+          else Some goal
+              
+        | _ -> Some goal
     ) goals in
   [TS.set_conclusion (Term.mk_ands goals) s]
 

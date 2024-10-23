@@ -546,7 +546,7 @@ let expand_macro_check_once
       | EI_direct ->
         begin
           match c.models with
-          | Some m -> Constr.query ~precise:true m [`Pos, Happens ts]
+          | Some m -> Constr.query ~precise:true m [Term.mk_happens ts]
           | None -> false
         end
       | EI_indirect _ -> true
@@ -723,6 +723,7 @@ struct
     (* instantiation of [get_bad_occs] on its continuation *)
     let rec get (pi : pos_info) (t : Term.term) : simple_occs =
       let se = SE.to_arbitrary pi.pi_trctxt.system in
+      let system = SE.{ set = se; pair = None; } in
 
       (* Put [t] in weak head normal form w.r.t. rules in
          [Reduction.rp_crypto].
@@ -732,7 +733,7 @@ struct
         let param = Reduction.rp_crypto in
         (* FIXME: add tag information in [pos_info] *)
         let vars = Vars.of_list (Vars.Tag.local_vars pi.pi_vars) in
-        let st = Reduction.mk_state ~hyps ~se ~vars ~param table in
+        let st = Reduction.mk_state ~hyps ~system ~vars ~param table in
         let strat = Reduction.(MayRedSub rp_full) in
         fst (Reduction.whnf_term ~strat st t)
       in

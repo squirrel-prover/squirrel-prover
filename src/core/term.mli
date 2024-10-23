@@ -139,15 +139,13 @@ module Lit : sig
 
   val disjunction_to_literals : term -> literal list option
 
-  val form_to_xatom   : term ->   xatom option
-  val form_to_literal : term -> literal option
+  val form_to_xatom   : term ->   xatom
+  val form_to_literal : term -> literal
 
-  (** Given a formula, return a list of literals which is either
-      entailed by the formula, or equivalent to the formula. *)
-  val form_to_literals :
-    term -> [`Entails of literal list | `Equiv of literal list]
+  (** Given a formula, return a list of literals whose conjunction is
+      equivalent to the formula. *)
+  val form_to_literals : term -> literal list
 
-  val xatom_to_form : xatom   -> term
   val lit_to_form   : literal -> term
 end
 
