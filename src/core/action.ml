@@ -404,21 +404,23 @@ let descr_map
   : descr
   =
   let f = f descr.indices in
-  
-  (* TODO: quantum: this should not be Classic.cond, as we may be
-     unrolling the classic or quantum condition *)
+
+  let descr_cond, descr_out =
+    match descr.exec_model with
+    | Classic     -> Symbols.Classic.cond, Symbols.Classic.out
+    | PostQuantum -> Symbols.Quantum.cond, Symbols.Quantum.out
+  in
+
   let condition =
     fst descr.condition,
-    f Symbols.Classic.cond (snd descr.condition)
+    f descr_cond (snd descr.condition)
   in
   let updates =
     List.map (fun (ss,args,t) -> 
         ss, List.map (f ss) args, f ss t
       ) descr.updates
   in
-  (* TODO: quantum: this should not be Classic.out, as we may be
-     unrolling the classic or quantum output *)
-  let output = fst descr.output, f Symbols.Classic.out (snd descr.output) in
+  let output = fst descr.output, f descr_out (snd descr.output) in
 
   let descr = { descr with condition; updates; output;  } in
   check_descr descr;
