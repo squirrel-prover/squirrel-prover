@@ -770,7 +770,7 @@ module Mk (Args : MkArgs) : S with
         end;
 
       (*------------------------------------------------------------------*)      
-      (* if the user provided type variables, apply them *)
+      (* if the user provided system variables, apply them *)
       if se_args <> None then
         begin
           let se_args = oget se_args in

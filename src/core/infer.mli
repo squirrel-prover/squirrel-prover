@@ -11,7 +11,7 @@
       which comes with optional instantiation constraints.
 
     Equality constraints on unification variables can be added using
-    [unify_ty] and [unify_se].
+    [unify_*].
 
     Expressions (types or systems) can be normalized using the
     [norm_*] functions. 
@@ -61,9 +61,10 @@ val norm_se         : env -> SE.t       -> SE.t
 val norm_se_context : env -> SE.context -> SE.context
 val norm_var        : env -> Vars.var   -> Vars.var
 
-val unify_ty         : env -> Type.ty -> Type.ty -> [`Fail | `Ok]
-val unify_se         : env -> SE.t    -> SE.t    -> [`Fail | `Ok]
-val unify_se_context : env -> SE.context -> SE.context -> [`Fail | `Ok]
+(*------------------------------------------------------------------*)
+val unify_ty         : env -> Type.ty    -> Type.ty    -> [`Fail | `Ok]
+val unify_se         : env -> SE.t       -> SE.t       -> [`Fail | `Ok]
+val unify_se_context : env -> SE.context -> SE.context -> [`Fail | `Ok] 
 
 (*------------------------------------------------------------------*)
 type 'a result =

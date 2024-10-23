@@ -1,5 +1,6 @@
 (** This module define substitution that can substitute
-    - type variables [Type.univar] and [Type.tvar] *)
+    - type variables [Type.univar] and [Type.tvar];
+    - system variables [SE.Var.t]. *)
 
 (*------------------------------------------------------------------*)
 open Utils
