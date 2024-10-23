@@ -1515,7 +1515,16 @@ let query ~precise (models : models) (terms : Term.terms) =
       (* check if [M' ⊧ ⊥], for every model [M'] *)
       List.for_all (fun inst -> split_models inst = []) insts
   with Unsupported -> false
-    
+
+(* Add debugging information. *)
+let query ~precise (models : models) (terms : Term.terms) =
+  dbg "%squery: %a"
+    (if precise then "precise " else "") (Fmt.list Term.pp) terms;
+  let b = query ~precise models terms in
+  dbg "query result: %a : %a" (Fmt.list Term.pp) terms Fmt.bool b;
+  b
+
+
 (*------------------------------------------------------------------*)
 (** [max_elems_model model elems] returns the maximal elements of [elems]
     in [model], *with* redundancy modulo [model]'s equality relation. *)
