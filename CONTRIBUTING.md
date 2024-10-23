@@ -24,7 +24,8 @@ let x = ... in
 let y = ... in
 do something
 ```
-* if a let construct spans across multiple line, it should be indented and the `in` should be on a new line at the end:
+* if a let construct spans across multiple line, it should be indented
+  and the `in` should be on a new line at the end:
 
 Good:
 ```
@@ -47,8 +48,8 @@ type t =
   | Tutu
 
 match .. with
-  | Toto -> ...
-  | Tutu -> ...
+| Toto -> ...
+| Tutu -> ...
 ```
 Bad:
 ```
@@ -56,7 +57,7 @@ type t =
     Toto
   | Tutu
 match .. with
-    Toto -> ...
-  | Tutu -> ...
+  Toto -> ...
+| Tutu -> ...
 ```
 * in `mly` files, the `x=TOTO` notation should not have spaces
