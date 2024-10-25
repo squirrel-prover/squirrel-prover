@@ -46,11 +46,12 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 global lemma [set: any; equiv:any_pair] 
- left_fa ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c) : 
+ left_fa ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
    $( u *> v ) ->
    $( (f u) *> v ).
 Proof.
-  admit.
+  intro @/( *> ) H g.
+  apply H (fun x => g (f x)).
 Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -61,7 +62,8 @@ global lemma [set: any; equiv:any_pair]
     $(u |> v) ->
     [false].
 Proof.
-  admit.
+  intro @/( *> ) @/( |> ) H [f G].
+  by have ? := H f. 
 Qed.
 
 global lemma [set: any; equiv:any_pair]
@@ -80,7 +82,10 @@ global lemma [set: any; equiv:any_pair]
     $(u *> w) ->
     $(v *> w).
 Proof.
-  admit.
+  intro @/( |> ) @/( *> ) [f H1] H2 g.
+  have A /= := H2 (fun x => g(f x)).
+  rewrite H1 in A.
+  assumption A.
 Qed.
 
 global lemma [set: any; equiv:any_pair] 
@@ -89,7 +94,9 @@ global lemma [set: any; equiv:any_pair]
     $(v |> w) ->
     $(u *> v).
 Proof.
-  admit.
+  intro @/( |> ) @/( *> ) H1 [f H2] g.
+  have A /= := H1 (fun x => f(g x)).
+  auto.
 Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -143,14 +150,11 @@ Qed.
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Oracle *)
 
-global lemma [set: any; equiv:any_pair]
+global axiom [set: any; equiv:any_pair]
   RwOracle1 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
   (* Warning : 'd must be a simple type *)
     (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t1) = t2 (f u t1)]) ->
     (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
-Proof.
-  admit.
-Qed.
 
 global lemma [set: any; equiv:any_pair] 
   RwOracle2 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
