@@ -143,7 +143,15 @@ module Parse : sig
 
   type t = item list L.located
 
-  val parse : se_env:env -> Symbols.table -> t -> arbitrary
+  (** Parse a system expression.
+      If [implicit], then implicit system variables starting with a ['P] 
+      are added to [env] during parsing, with infos [implicit_infos]. 
+      If not [allow_vars], then the returned environment is exactly
+      the environment given as input. *)
+  val parse :
+    implicit:bool ->
+    ?implicit_infos:Var.info list ->
+    se_env:env -> Symbols.table -> t -> env * arbitrary
 
   (*------------------------------------------------------------------*)
   type p_context_i =
@@ -153,8 +161,17 @@ module Parse : sig
 
   type p_context = p_context_i L.located 
 
-  val parse_local_context  : se_env:env -> Symbols.table -> p_context -> context
-  val parse_global_context : se_env:env -> Symbols.table -> p_context -> context
+  
+  (** Parse a system context for a local lemma.
+      See [parse] for a description of [implicit]. *)
+  val parse_local_context :
+    implicit:bool ->
+    se_env:env -> Symbols.table -> p_context -> env * context
+
+  (** Same as [parse_local_context], but for a global lemma. *)
+  val parse_global_context :
+    implicit:bool ->
+    se_env:env -> Symbols.table -> p_context -> env * context
 
   (*------------------------------------------------------------------*)
   type sys = [`Local | `Global] * p_context

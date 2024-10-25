@@ -1374,8 +1374,10 @@ let parse_pred_app_se_args
   (* parse system arguments given as input *)
   let se_args =
     List.map (fun p_se ->
-        ( L.loc p_se,
-          SE.Parse.parse ~se_env:env.se_vars env.table p_se )
+        let _se_env, arg =
+          SE.Parse.parse ~implicit:false ~se_env:env.se_vars env.table p_se
+        in
+        (L.loc p_se, arg )
       ) se_args
   in
 

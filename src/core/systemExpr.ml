@@ -58,9 +58,9 @@ let get_compatible_sys (type a) (se : a expr) : Symbols.system option =
 (** Check that all systems in [e1] are compatible with all systems in [e2]. *)
 let compatible table (e1 : 'a expr) (e2 : 'b expr) =
   match get_compatible_sys e1, get_compatible_sys e2 with
-    | Some s1, Some s2 -> System.compatible table s1 s2
-    | None, None -> true
-    | _ -> false
+  | Some s1, Some s2 -> System.compatible table s1 s2
+  | None, None -> true
+  | _ -> false
 
 
 (*------------------------------------------------------------------*)
@@ -245,20 +245,31 @@ module Parse = struct
   type t = item list L.located
 
   let parse_system
-      ?(se_env = [])
-      (table : Symbols.table)
-      (system : Symbols.p_path)
-    :
-      'a expr
+      ~(implicit : bool)
+      ?(implicit_infos : Var.info list = [])
+      (table : Symbols.table) (se_env : env) (system : Symbols.p_path)
+    : env * 'a expr
     =
     let top, sub = system in
+    let sub = L.unloc sub in
+    
     if top = [] then
-      match lookup_string (L.unloc sub) se_env with
-      | Some v -> var v
+      match lookup_string sub se_env with
+      (* retrieve an existing variable *)
+      | Some v -> (se_env, var v)
+
+      (* declare a new variable *)
+      | None when implicit && String.starts_with ~prefix:"'" sub ->
+        let v = Var.of_ident (Ident.create sub) in
+        ( se_env @ [v, implicit_infos], var v)
+
+      (* parse a concrete systeme expression *)
       | None ->
-        of_system table (System.convert table system)
+        (se_env, of_system table (System.convert table system))
+
     else
-      of_system table (System.convert table system)
+      (* parse a concrete systeme expression *)
+      (se_env, of_system table (System.convert table system))
       
   let parse_single table item =
     assert (item.alias = None);
@@ -273,12 +284,15 @@ module Parse = struct
     | Some p ->
       System.Single.make table sys (Projection.from_string (L.unloc p))
 
-  let parse ~(se_env : env) table (p : t) : arbitrary = 
+  let parse ~implicit ?implicit_infos ~(se_env : env) table (p : t) : env * arbitrary = 
     match L.unloc p with
     | [] ->
       (* Default system annotation. *)
-      of_system table
-        (System.convert table ([], L.mk_loc L._dummy "default"))
+      let s =
+        of_system table
+          (System.convert table ([], L.mk_loc L._dummy "default"))
+      in
+      (se_env, s)
 
     | [{ system = [], { pl_desc = ("any" | "any_pair") as pair}; 
          projection; 
@@ -287,10 +301,10 @@ module Parse = struct
       let compatible_with = 
         omap (fun system -> System.convert table ([], system)) projection
       in
-      any ~compatible_with ~pair
+      (se_env, any ~compatible_with ~pair)
 
     | [{ system; projection = None; alias = None}] ->
-      parse_system ~se_env table system
+      parse_system ~implicit ?implicit_infos table se_env system
 
     | l ->
       let labels =
@@ -301,12 +315,15 @@ module Parse = struct
       let l =
         List.map (fun i -> parse_single table { i with alias = None }) l
       in
-      (make_fset ~loc:(L.loc p) table ~labels l :> arbitrary)
+      let s = (make_fset ~loc:(L.loc p) table ~labels l :> arbitrary) in
+      (se_env, s)
 
-  let parse_pair ~se_env table (c : t) : pair =
-    let pair = parse ~se_env table c in
+  let parse_pair ~implicit ~se_env table (c : t) : env * pair =
+    let se_env, pair = 
+      parse ~implicit ~implicit_infos:[Var.Pair] ~se_env table c 
+    in
     if not (is_pair ~se_env pair) then error ~loc:(L.loc c) Expected_pair;
-    to_pair pair
+    (se_env, to_pair pair)
 
   (*------------------------------------------------------------------*)
   type p_context_i =
@@ -321,36 +338,50 @@ module Parse = struct
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])
 
+  let check_compatible loc table set pair =
+    if not (compatible table set pair) then 
+      error ~loc Incompatible_systems
+
   (** Parse the system context for a local statement. *)
-  let parse_local_context ~se_env table (c : p_context) : context = 
-    match L.unloc c with
-    | NoSystem ->
-      { set = parse ~se_env table empty ; pair = None }
-
-    | System s ->
-      let set = parse ~se_env table s in
-      { set ; pair = None }
-      
-    | Set_pair (s,p) ->
-      let set  = parse      ~se_env table s in
-      let pair = parse_pair ~se_env table p in
-      { set ; pair = Some pair; }
-
-  (** Parse the system context for a global statement. *)
-  let parse_global_context ~se_env table (c : p_context) : context = 
-    let check_compatible set pair =
-      if not (compatible table set pair) then 
-        error ~loc:(L.loc c) Incompatible_systems;
+  let parse_local_context
+      ~implicit ~se_env table (c : p_context)
+    : env * context
+    =
+    let set, pair =
+      match L.unloc c with
+      | NoSystem       -> empty, None
+      | System s       -> s    , None
+      | Set_pair (s,p) -> s    , Some p
+    in
+    let se_env, set  = parse ~implicit ~se_env table set in
+    let se_env, pair =
+      omap_dflt
+        (se_env, None)
+        ( snd_bind some -|
+          parse_pair ~implicit ~se_env table )
+        pair
     in
 
+    if pair <> None then
+      check_compatible (L.loc c) table set (oget pair);
+    
+    se_env, { set ; pair; }
+
+  (** Parse the system context for a global statement. *)
+  let parse_global_context
+      ~implicit ~se_env table (c : p_context)
+    : env * context
+    =
     let set, pair =
       match L.unloc c with
       | NoSystem       -> empty, empty
-      | System s       -> s, s
-      | Set_pair (s,p) -> s, p
+      | System s       -> s    , s
+      | Set_pair (s,p) -> s    , p
     in
-    let set  = parse      ~se_env table set in
-    let pair = parse_pair ~se_env table pair in
-    check_compatible set pair;
-    { set ; pair = Some pair; }
+    let se_env, set  = parse      ~implicit ~se_env table set  in
+    let se_env, pair = parse_pair ~implicit ~se_env table pair in
+    
+    check_compatible (L.loc c) table set pair;
+    
+    se_env, { set ; pair = Some pair; }
 end

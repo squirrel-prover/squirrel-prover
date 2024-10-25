@@ -185,12 +185,16 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
   (* parse the system variables and the system *)
   let k, p_system = system in
   let env, se_vars = Typing.convert_se_var_bnds env se_vars in
-  let system = 
+
+  (* [se_vars] can be extend with new system variables. *)
+  let se_vars, system = 
     match k with
-    | `Local  -> SE.Parse.parse_local_context  ~se_env:env.se_vars table p_system
-    | `Global -> SE.Parse.parse_global_context ~se_env:env.se_vars table p_system
+    | `Local  ->
+      SE.Parse.parse_local_context  ~implicit:true ~se_env:se_vars table p_system
+    | `Global ->
+      SE.Parse.parse_global_context ~implicit:true ~se_env:se_vars table p_system
   in
-  let env = Env.update ~system env in
+  let env = Env.update ~se_vars ~system env in
 
   (*------------------------------------------------------------------*)
   (* parse the type variables *)

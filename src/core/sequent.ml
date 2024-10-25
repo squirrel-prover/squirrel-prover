@@ -1140,7 +1140,7 @@ module Mk (Args : MkArgs) : S with
       omap (List.map (Typing.convert_ty ~ienv env)) ty_args 
     in
     let se_args =
-      omap (List.map (SE.Parse.parse ~se_env table)) se_args 
+      omap (List.map (snd -| SE.Parse.parse ~implicit:false ~se_env table)) se_args 
     in
     let lem_name, pt = pt_of_assumption ienv p ty_args se_args s in
     assert (pt.mv = Mvar.empty);

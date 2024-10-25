@@ -518,15 +518,25 @@ opt_indices:
 | id=lsymb                          { [id] }
 | id=lsymb COMMA ids=opt_indices    { id::ids }
 
+(*------------------------------------------------------------------*)
 /* type variable */
 ty_var:
 | TICK id=lsymb     { id }
+
+(*------------------------------------------------------------------*)
+%inline _tick_uid:
+| TICK s=UID { "'" ^ s }
+
+/* e.g. ['P] or ['Q] */
+%inline tick_uid:
+| s=loc(_tick_uid) { s }
 
 /* system expression variable */
 se_var:
 | ll=lloc(SET)   { L.mk_loc ll "set" }
 | ll=lloc(EQUIV) { L.mk_loc ll "equiv" }
 | id=lsymb       { id }
+| id=tick_uid    { id }
 
 (*------------------------------------------------------------------*)
 /* general types */
@@ -1415,8 +1425,9 @@ top_global_formula:
  * ----------------------------------------------------------------------- */
 
 system_item:
-| i=path               { SE.Parse.{ alias = None; system = i; projection = None   } }
-| i=path SLASH p=lsymb { SE.Parse.{ alias = None; system = i; projection = Some p } }
+| i=tick_uid              { SE.Parse.{ alias = None; system = ([],i); projection = None      } }
+| p=path                  { SE.Parse.{ alias = None; system = p;      projection = None      } }
+| p=path SLASH proj=lsymb { SE.Parse.{ alias = None; system = p;      projection = Some proj } }
 
 system_item_list:
 | i=system_item                          {  [i] }

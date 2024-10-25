@@ -163,6 +163,12 @@ let transitivity_systems ~loc (new_context : SE.context) (s : ES.t) =
       (Failure "the new system context must be compatible \
                 with the current context");
 
+  (* FIXME: get rid of this limitation *)
+  if new_context.pair <> None && SE.is_var (oget new_context.pair) then
+    soft_failure ~loc
+      (Failure "the pair component of the new system context must \
+                not be a variable");
+
   let l_proj, r_proj = ES.get_system_pair_projs s in
 
   (* Extract data from initial sequent. *)
@@ -279,7 +285,9 @@ let trans_tac args s =
   | [Args.Trans (Args.TransSystem (new_sys as annot))] ->
     let table = ES.table s in
     let se_env = (ES.env s).se_vars in
-    let context = SE.Parse.parse_global_context ~se_env table annot in
+    let _, context =
+      SE.Parse.parse_global_context ~implicit:false ~se_env table annot
+    in
     fun sk fk ->
       begin match transitivity_systems ~loc:(L.loc new_sys) context s with
         | l -> sk l fk
