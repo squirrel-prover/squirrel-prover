@@ -550,6 +550,15 @@ let declare_list table decls =
   table, List.flatten subgs
 
 (*------------------------------------------------------------------*)
+(** Check that [lem] applies to an unconstrained system variable [v]. *)
+let local_stmt_valid_in_any_system (lem : Goal.local_statement) =
+  match (lem.system.set :> SE.exposed).cnt with
+  | Var v -> 
+    let infos = List.assoc v lem.params.se_vars in
+    infos = []
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
@@ -573,7 +582,7 @@ let add_hint_smt table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic or exact");
 
-  if not (SE.subset table SE.full_any lem.system.set) then
+  if not (local_stmt_valid_in_any_system lem) then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints must apply to any system");
 

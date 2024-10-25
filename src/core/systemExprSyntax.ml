@@ -40,7 +40,9 @@ let pp_error pp_loc_err_opt fmt (loc,e) =
 module Var = struct
   type t = Ident.t
 
-  type info = Pair
+  type info = 
+    | Pair
+    | Compatible_with of Symbols.system
 
   (*------------------------------------------------------------------*)
   let pp fmt (v : t) =
@@ -59,6 +61,7 @@ module Var = struct
 
   let pp_info fmt = function
     | Pair -> Fmt.pf fmt "pair"
+    | Compatible_with p -> Fmt.pf fmt "like %a" Symbols.pp_path p
 
   (*------------------------------------------------------------------*)
   let equal = Ident.equal
@@ -128,6 +131,17 @@ let lookup_string (se_name : string) (env : tagged_vars) : Var.t option =
       end
     ) env;
   !found
+
+(*------------------------------------------------------------------*)
+let fresh_var ~(prefix:string) (env : tagged_vars) : Var.t =
+  let name = ref prefix in
+  let suffix = ref 0 in
+  (* inefficient but this should not be an issue *)
+  while lookup_string !name env <> None do
+    incr suffix;
+    name := prefix ^ string_of_int !suffix;
+  done;
+  Var.of_ident (Ident.create !name)
 
 (*------------------------------------------------------------------*)
 type p_bnd  = (string L.located * string L.located list) 
@@ -257,10 +271,7 @@ let pp fmt (se : 'a expr) : unit =
 (*------------------------------------------------------------------*)
 let to_arbitrary (type a) (x : a expr) : arbitrary = force x
 
-let to_compatible (type a) (se : a expr) : compatible =
-  match se.cnt with
-  | Var _ | Any { compatible_with = None; } -> error Expected_compatible
-  | Any { compatible_with = Some _; } | _ -> force se
+let to_compatible (type a) (se : a expr) : compatible = force se
 
 let to_fset (type a) (se : a expr) : fset =
   if not (is_fset se) then error Expected_fset; (* FIXME: replace by an assert *)
@@ -456,3 +467,27 @@ let single_systems_of_se (se : t) : Single.Set.t option =
     let set_fsets = List.map Stdlib.snd (to_list set) in
     some @@
     Single.Set.of_list set_fsets
+
+(*------------------------------------------------------------------*)
+(** Get system that is compatible with all systems of an expresion. *)
+let get_compatible_system
+    (type a) (env : env) (se : a expr) : Symbols.system option 
+  =
+  match (se :> exposed).cnt with
+  | Var v -> 
+    let infos = List.assoc_dflt [] v env in
+    List.find_map (function
+        | Var.Compatible_with p -> Some p
+        | _ -> None
+      ) infos
+  | Any { compatible_with = None; } -> None
+  | Any { compatible_with = s; } -> s
+  | List ((_,s)::_) -> Some s.Single.system
+  | List [] -> None
+
+(** Check that all systems in [e1] are compatible with all systems in [e2]. *)
+let compatible table (env : env) (e1 : 'a expr) (e2 : 'b expr) =
+  match get_compatible_system env e1, get_compatible_system env e2 with
+  | Some s1, Some s2 -> SystemSyntax.compatible table s1 s2
+  | None, None -> true
+  | _ -> false

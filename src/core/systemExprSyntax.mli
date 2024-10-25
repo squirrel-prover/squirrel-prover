@@ -16,7 +16,8 @@ module Var : sig
 
   (*------------------------------------------------------------------*)
   type info =
-    | Pair                        (** multi-system of cardinal two *)
+    | Pair                              (** multi-system of cardinal two *)
+    | Compatible_with of Symbols.system (** multi-system compatible with some system *)
 
   (*------------------------------------------------------------------*)
   val _pp    : dbg:bool -> t formatter
@@ -55,6 +56,7 @@ type tagged_vars = tagged_var list
 type env = tagged_vars
 
 val lookup_string : string -> env -> Var.t option 
+val fresh_var : prefix:string -> env -> Var.t
 
 (*------------------------------------------------------------------*)
 val _pp_tagged_var    : dbg:bool -> tagged_var  formatter
@@ -182,8 +184,7 @@ val error : ?loc:L.t -> error_i -> 'a
 (** Cast expr to arbitrary. Always succeeds. *)
 val to_arbitrary : 'a expr -> arbitrary
 
-(** Convert an expression [s] to a [compatible].
-    [s] must be convertible. *)
+(** Convert an expression [s] to a [compatible]. Always succeed. *)
 val to_compatible : 'a expr -> compatible
 
 (** Convert an expression [s] to a [fset].
@@ -305,3 +306,10 @@ val single_systems_of_context : context -> Single.Set.t option
 
 (** Idem as [single_systems_of_context], but for a system expression. *)
 val single_systems_of_se : t -> Single.Set.t option
+
+(*------------------------------------------------------------------*)
+(** Get system that is compatible with all systems of an expresion. *)
+val get_compatible_system : env -> 'a expr -> Symbols.system option 
+
+(** Check that all systems in two expressions are compatible. *)
+val compatible : Symbols.table -> env -> 'a expr -> 'b expr -> bool

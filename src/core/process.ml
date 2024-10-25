@@ -728,13 +728,24 @@ let mk_namelength_statement
   let f = Equiv.Atom (Reach {formula = (Term.mk_forall vars eq); bound = None}) in
   (*TODO:Concrete : Put bound at zero here (exact) by default and then use it  as is, probably a bit of  inference to do*)
 
+  let v = SE.Var.of_ident (Ident.create "'P") in (* fresh system variable *)
+  let params = 
+    Params.{
+      ty_vars = ftype.fty_vars;
+      se_vars = [v,[]]; 
+    }
+  in
+
   (* build statement with name given in arg (often namelength_s with s the
      symbol of the name) *)
-  table, { name; 
-           params  = { Params.empty with ty_vars = ftype.fty_vars; };
-           system  = SystemExpr.context_any; 
-           formula = Equiv.GlobalS f }
-  (* TODO: sv: use se vars *)
+  let stmt = 
+    Goal.{
+      name; params;
+      system  = { set = SE.var v; pair = None; };
+      formula = Equiv.GlobalS f;
+    }
+  in
+  ( table, stmt )
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)

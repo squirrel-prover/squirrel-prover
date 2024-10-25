@@ -15,13 +15,6 @@ val projections : Symbols.table -> t -> Projection.t list
 val valid_projection : Symbols.table -> t -> Projection.t -> bool
 
 (*------------------------------------------------------------------*)
-(** Check that two systems are strongly compatible.
-    This implies the theoretical notion of compatibility,
-    and relies on [Action.strongly_compatible_descr] to ensure
-    that descriptions can be merged later on. *)
-val compatible : Symbols.table -> t -> t -> bool
-
-(*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
 val pp_system : Symbols.table -> t formatter
 

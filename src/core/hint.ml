@@ -33,7 +33,10 @@ let add_rewrite_rule (h : Term.term_head) (r : rw_hint) db : rewrite_db =
 
 (*------------------------------------------------------------------*)
 
-type hint_db = { db_rewrite : rewrite_db; db_smt : Term.term list }
+type hint_db = { 
+  db_rewrite : rewrite_db; 
+  db_smt     : Term.term list;
+}
 
 type Symbols.data += HintDb of hint_db
 

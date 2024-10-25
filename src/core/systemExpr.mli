@@ -17,10 +17,6 @@ val subset_modulo : Symbols.table -> 'a expr -> 'a expr -> bool
 val equal_modulo  : Symbols.table -> 'a expr -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
-(** Check that all systems in two expressions are compatible. *)
-val compatible : Symbols.table -> 'a expr -> 'b expr -> bool
-
-(*------------------------------------------------------------------*)
 (** {2 Operations on finite sets} *)
 
 (** Finite set of all projections of a system. *)
@@ -108,10 +104,8 @@ val map_descrs  :
 
 (** Get an expression with which all systems of a context are compatible.
     Return [None] if context is [context_any]. *)
-val get_compatible_of_context : Symbols.table -> context -> compatible option
-
-(** Return an [fset] compatible with the system given as input. *)
-val get_compatible_fset : Symbols.table -> compatible -> fset
+val get_compatible_of_context : 
+  Symbols.table -> env -> context -> compatible option
 
 val gsubst         : 'a expr Subst.substitution
 val gsubst_context : context Subst.substitution

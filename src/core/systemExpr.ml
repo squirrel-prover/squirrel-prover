@@ -47,23 +47,6 @@ let equal_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
   subset_modulo table e1 e2 && subset_modulo table e2 e1
 
 (*------------------------------------------------------------------*)
-(** Get system that is compatible with all systems of an expresion. *)
-let get_compatible_sys (type a) (se : a expr) : Symbols.system option = 
-  match (se :> exposed).cnt with
-  | Var _ | Any { compatible_with = None; } -> None
-  | Any { compatible_with = s; } -> s
-  | List ((_,s)::_) -> Some s.Single.system
-  | List [] -> None
-
-(** Check that all systems in [e1] are compatible with all systems in [e2]. *)
-let compatible table (e1 : 'a expr) (e2 : 'b expr) =
-  match get_compatible_sys e1, get_compatible_sys e2 with
-  | Some s1, Some s2 -> System.compatible table s1 s2
-  | None, None -> true
-  | _ -> false
-
-
-(*------------------------------------------------------------------*)
 (** {2 Operations on finite sets} *)
 
 let of_system table (s : Symbols.system) : 'a expr =
@@ -185,23 +168,10 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
 (*------------------------------------------------------------------*)
 (** {2 Miscelaneous} *)
 
-let get_compatible_of_context table (context : context) : compatible option =
-  let expr = (context.set :> exposed) in
-  match expr.cnt with
-  | Any { compatible_with = None; } -> None
-  | Any { compatible_with = Some s; } -> 
-    let single = System.Single.make table s (Projection.from_string "ε") in
-    Some (singleton single :> compatible)
-  | _ -> Some (force expr :> compatible)
-
-(*------------------------------------------------------------------*)
-let get_compatible_fset table (se : compatible) : fset =
-  match (se :> exposed).cnt with
-  | Var _ | Any { compatible_with = None; } -> assert false
-
-  | Any { compatible_with = Some s; } -> of_system table s
-
-  | List _ -> force0 se
+let get_compatible_of_context table (env : env) (context : context) : compatible option =
+  match get_compatible_system env context.set with
+  | Some e -> Some (force0 (of_system table e))
+  | None -> None
 
 (*------------------------------------------------------------------*)
 let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
@@ -338,21 +308,40 @@ module Parse = struct
   (*------------------------------------------------------------------*)
   let empty = L.(mk_loc _dummy [])
 
-  let check_compatible loc table set pair =
-    if not (compatible table set pair) then 
+  let check_compatible loc table se_env set pair =
+    if not (compatible table se_env set pair) then 
       error ~loc Incompatible_systems
 
-  (** Parse the system context for a local statement. *)
-  let parse_local_context
-      ~implicit ~se_env table (c : p_context)
+  (** Parse the `any` syntactic sugar as a system context. *)
+  let parse_any
+      ~mode ~se_env table
+      (compatible_with : Symbols.lsymb option)
     : env * context
     =
-    let set, pair =
-      match L.unloc c with
-      | NoSystem       -> empty, None
-      | System s       -> s    , None
-      | Set_pair (s,p) -> s    , Some p
+    let compatible_with =
+      omap_dflt [] 
+        (fun s -> 
+           let s = System.convert table ([],s) in
+           [Var.Compatible_with s])
+        compatible_with
     in
+    let p = fresh_var ~prefix:"'P" se_env in
+    let q = fresh_var ~prefix:"'Q" se_env in
+
+    let p_infos = compatible_with in
+    let q_infos = Var.Pair :: compatible_with in
+
+    match mode with
+    | `Local ->
+      let se_env = se_env @ [(p, p_infos)] in
+      (se_env, { set = var p; pair = None; })
+
+    | `Global ->
+      let se_env = se_env @ [(p, p_infos); (q, q_infos) ] in
+      (se_env, { set = var p; pair = Some (to_pair (var q)); })
+
+  (** Parse a [set; pair] system context. *)
+  let parse_set_pair ~loc ~implicit ~se_env table ~set ~pair =
     let se_env, set  = parse ~implicit ~se_env table set in
     let se_env, pair =
       omap_dflt
@@ -363,25 +352,43 @@ module Parse = struct
     in
 
     if pair <> None then
-      check_compatible (L.loc c) table set (oget pair);
-    
+      check_compatible loc table se_env set (oget pair);
+
     se_env, { set ; pair; }
+
+  (** Parse the system context for a local statement. *)
+  let parse_local_context
+      ~implicit ~se_env table (c : p_context)
+    : env * context
+    =
+    let loc = L.loc c in
+    let parse_set_pair = parse_set_pair ~loc ~implicit ~se_env table in
+    match L.unloc c with
+    | System                   (* [c = any] *)
+        {pl_desc = [{ system = ([], { pl_desc = "any"}); 
+                      projection = p; 
+                      alias = None}] } ->
+      parse_any ~mode:`Local ~se_env table p
+
+    | NoSystem       -> parse_set_pair ~set:empty ~pair:None
+    | System s       -> parse_set_pair ~set:s     ~pair:None
+    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:(Some p)
 
   (** Parse the system context for a global statement. *)
   let parse_global_context
       ~implicit ~se_env table (c : p_context)
     : env * context
     =
-    let set, pair =
-      match L.unloc c with
-      | NoSystem       -> empty, empty
-      | System s       -> s    , s
-      | Set_pair (s,p) -> s    , p
-    in
-    let se_env, set  = parse      ~implicit ~se_env table set  in
-    let se_env, pair = parse_pair ~implicit ~se_env table pair in
-    
-    check_compatible (L.loc c) table set pair;
-    
-    se_env, { set ; pair = Some pair; }
+    let loc = L.loc c in
+    let parse_set_pair = parse_set_pair ~loc ~implicit ~se_env table in
+    match L.unloc c with
+    | System                    (* [c = any] *)
+        {pl_desc = [{ system = ([], { pl_desc = "any"}); 
+                      projection = p; 
+                      alias = None}] } ->
+      parse_any ~mode:`Global ~se_env table p
+
+    | NoSystem       -> parse_set_pair ~set:empty ~pair:(Some empty)
+    | System s       -> parse_set_pair ~set:s     ~pair:(Some s)
+    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:(Some p)
 end

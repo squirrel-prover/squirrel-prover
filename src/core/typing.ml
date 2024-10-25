@@ -648,18 +648,21 @@ let validate
         if Action.is_decl a table then
           error loc (Failure "action is declared but un-defined");
 
-        let _, action = Action.get_def a table in
-        try
-          let compatible_system = 
-            SE.to_compatible state.env.system.set |>
-            SE.get_compatible_fset table 
-          in
-          ignore (SE.action_to_term table compatible_system action : Term.term)
-        with
-        | Not_found
-        | SE.Error (_,Expected_compatible) ->
+        let not_compatible () =
           let loc = if in_proc then L._dummy else loc in
           error loc (UndefInSystem (action_name, state.env.system.set))
+        in
+
+        let _, action = Action.get_def a table in
+        match SE.get_compatible_system state.env.se_vars state.env.system.set with
+        | Some compatible_system ->
+          let compatible_system = SE.of_system table compatible_system in
+          begin 
+            try
+              ignore (SE.action_to_term table compatible_system action : Term.term) 
+            with Not_found -> not_compatible ()
+          end
+        | None -> not_compatible ()
       end
 
   | Term.Macro (m,args,_t) ->

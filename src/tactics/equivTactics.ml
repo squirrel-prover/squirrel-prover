@@ -158,7 +158,7 @@ let transitivity_systems ~loc (new_context : SE.context) (s : ES.t) =
   let old_context = ES.system s in
   let table       = ES.table  s in
 
-  if not (SE.compatible table new_context.set old_context.set) then
+  if not (SE.compatible table (ES.env s).se_vars new_context.set old_context.set) then
     soft_failure ~loc
       (Failure "the new system context must be compatible \
                 with the current context");
@@ -556,7 +556,7 @@ let old_induction Args.(Message (ts,_)) s =
   let s = ES.set_vars (Vars.rm_var t env.vars) s in
   let table  = ES.table s in
   let system =
-    match SE.get_compatible_of_context table (ES.env s).system with
+    match SE.get_compatible_of_context table (ES.env s).se_vars (ES.env s).system with
     | Some expr -> expr
     | None -> soft_failure (Failure "underspecified system")
   in

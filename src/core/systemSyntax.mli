@@ -16,6 +16,17 @@ type t = Symbols.system
 val convert : Symbols.table -> Symbols.p_path -> t
 
 (*------------------------------------------------------------------*)
+(** Check that two systems are strongly compatible.
+    This implies the theoretical notion of compatibility,
+    and relies on [Action.strongly_compatible_descr] to ensure
+    that descriptions can be merged later on. *)
+val compatible : Symbols.table -> t -> t -> bool
+
+(** Record the function [compatible], as it must be defined later in
+    [system.ml] due to circular dependencies. *)
+val record_compatible : (Symbols.table -> t -> t -> bool) -> unit
+
+(*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
 type error =

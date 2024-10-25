@@ -101,7 +101,7 @@ let print_all fmt table : unit =
 
 (** Build the sequential dependency lemma between [descr] and [descr']. *)
 let mk_depends_lemma
-    (descr : Action.descr) (descr' : Action.descr)
+    (s : Symbols.system) (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
   assert (Action.depends
@@ -126,19 +126,19 @@ let mk_depends_lemma
       (Symbols.path_to_string descr.name)
       (Symbols.path_to_string descr'.name)
   in
+  let v = SE.Var.of_ident (Ident.create "'P") in
   Goal.{
     name;
-    params  = Params.empty;
-    system  = SE.(reachability_context full_any);
+    params  = { Params.empty with se_vars = [v,[SE.Var.Compatible_with s]]; };
+    system  = { set = SE.var v; pair = None; };
     formula = Equiv.LocalS {formula = form; bound = None};
   } 
-  (* TODO: sv: use se vars + restrict to compatible *)
   (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
 (** Build the mutual exlusivity lemma between [descr] and [descr']. *)
 let mk_mutex_lemma
-    (descr : Action.descr) (descr' : Action.descr)
+    (s : Symbols.system) (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
   let shape  = Action.get_shape_v  descr.action in
@@ -166,13 +166,13 @@ let mk_mutex_lemma
       (Symbols.path_to_string descr.name)
       (Symbols.path_to_string descr'.name)
   in
+  let v = SE.Var.of_ident (Ident.create "'P") in
   Goal.{
     name;
-    params  = Params.empty;
-    system  = SE.reachability_context SE.full_any;
+    params  = { Params.empty with se_vars = [v,[SE.Var.Compatible_with s]]; };
+    system  = { set = SE.var v; pair = None; };
     formula = Equiv.LocalS {formula; bound = None};
   }
-  (* TODO: sv: use se vars + restrict to compatible *)
   (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
@@ -185,9 +185,9 @@ let mk_depends_mutex
   System.Msh.fold (fun shape (descr : Action.descr) lems ->
       System.Msh.fold (fun shape' (descr' : Action.descr) lems ->
           if Action.depends shape shape' then
-            mk_depends_lemma descr descr' :: lems
+            mk_depends_lemma system descr descr' :: lems
           else if Action.mutex shape shape' then
-            mk_mutex_lemma descr descr' :: lems
+            mk_mutex_lemma system descr descr' :: lems
           else lems
         ) descrs lems
     ) descrs []

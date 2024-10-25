@@ -34,6 +34,7 @@ let descrs table s = Msh.map Action.refresh_descr (get_data table s).actions
 
 let symbs table s = Msh.map (fun d -> d.Action.name) (get_data table s).actions
 
+(*------------------------------------------------------------------*)
 let compatible table s1 s2 =
   Msh.equal (=) (symbs table s1) (symbs table s2) &&
   let d1 = descrs table s1 in
@@ -52,6 +53,11 @@ let compatible table s1 s2 =
        Action.strongly_compatible_descr d1 d2)
     d1
 
+(* Record [compatible] to make it available in [SystemSyntax].  
+   (This is to avoid circular dependencies issue.) *)
+let () = SystemSyntax.record_compatible compatible
+
+(*------------------------------------------------------------------*)
 let pp_system table fmt s =
   let {actions} = get_data table s in
   let descrs = Msh.bindings actions in

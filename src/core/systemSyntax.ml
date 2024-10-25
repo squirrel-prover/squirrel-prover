@@ -21,6 +21,14 @@ exception Error of error
 let error e = raise (Error e)
 
 (*------------------------------------------------------------------*)
+let store_compatible = ref None
+let compatible table t1 t2 : bool = (oget !store_compatible) table t1 t2
+let record_compatible 
+    (f : Symbols.table -> t -> t -> bool) : unit 
+  =
+  store_compatible := Some f
+
+(*------------------------------------------------------------------*)
 (** Single systems *)
 
 module Single = struct

@@ -178,6 +178,13 @@ let check_se_subst
           List.mem SE.Var.Pair infos
         | Any  _ -> false
       end
+
+    | SE.Var.Compatible_with p -> 
+      begin
+        match SE.get_compatible_system env.se_vars se with
+        | None -> false
+        | Some p0 -> SystemSyntax.compatible env.table p0 p
+      end
   in
   match List.filter (not -| satisfies) se_infos with
   | [] -> `Ok
