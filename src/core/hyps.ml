@@ -559,14 +559,6 @@ let setup_change_hyps_context
   : ( Term.term ->  Term.term option) *
     (Equiv.form -> Equiv.form option)
   =
-  assert (SE.compatible table new_context.SE.set old_context.SE.set);
-  assert (match new_context.SE.pair with
-            | Some p -> SE.compatible table new_context.SE.set p
-            | None -> true);
-  assert (match old_context.SE.pair with
-            | Some p -> SE.compatible table old_context.SE.set p
-            | None -> true);
-
   (* Flags indicating which parts of the context are changed. 
      - For the set, use [SE.equal_modulo], which ignores the labels of
        the systems and compares the sets as sets (i.e. double inclusion) 

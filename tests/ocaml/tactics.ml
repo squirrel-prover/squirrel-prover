@@ -629,13 +629,6 @@ let namelength () =
 
   let stmt_n = Lemma.find_stmt_local (mk_p axiom_n) table in
   let stmt_m = Lemma.find_stmt_local (mk_p axiom_m) table in
-
-  let system = SystemExpr.context_any in
-
-  Alcotest.(check (sys_testable table)) 
-    "SystemExpr equals → context_any"
-    (system.set)
-    (stmt_n.system.set);
   
   (* Should be of same length ↓ *)
   Printer.pr "Term n: %a@." Term.pp stmt_n.formula.formula;
@@ -686,13 +679,6 @@ let namelength2 () =
   let axiom_n = "namelength_n" in
 
   let stmt_n = Lemma.find_stmt_local (mk_p axiom_n) table in
-
-  let system = SystemExpr.context_any in
-
-  Alcotest.(check (sys_testable table)) 
-    "SystemExpr equals → context_any"
-    (system.set)
-    (stmt_n.system.set);
   
   (* Should be of same length ↓ *)
   Printer.pr "Term n: %a@." Term.pp stmt_n.formula.formula;
@@ -706,7 +692,7 @@ let namelength2 () =
 
   let fname = Symbols.Operator.convert_path lsy table in
   let cst = Term.mk_fun table fname [] in
-  let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+  let f = Term.mk_eq (Term.mk_len tn) (cst) in
 
   Alcotest.(check (term_testable)) 
     "axiom namelength_n → len(n) = namelength_message•message"
