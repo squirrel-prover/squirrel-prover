@@ -229,7 +229,7 @@ Proof.
   intro [i H].
 Abort.
 
-global axiom [set:any/default; equiv:default] foo (x : timestamp[glob]) : [false].
+global axiom [any/default] foo (x : timestamp[glob]) : [false].
 
 (* the body is constant, but not SI (because several systems are considered in 
    the set and equiv part) *)

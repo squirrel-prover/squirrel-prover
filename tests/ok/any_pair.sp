@@ -1,4 +1,4 @@
-global axiom [set: any; equiv:any_pair] toto : [false].
+global axiom [any] toto : [false].
 
 system P = null.
 

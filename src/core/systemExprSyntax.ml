@@ -144,22 +144,18 @@ let fresh_var ~(prefix:string) (env : tagged_vars) : Var.t =
   Var.of_ident (Ident.create !name)
 
 (*------------------------------------------------------------------*)
-type p_bnd  = (string L.located * string L.located list) 
+type p_info = Symbols.lsymb list
+type p_infos = p_info list
+
+type p_bnd  = (Symbols.lsymb * p_infos) 
 type p_bnds = p_bnd list
 
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 
-type any_info = {
-  pair : bool;
-  (** if true, restricts to pair of labeled single systems. *)
-  compatible_with : Symbols.system option
-  (** if [Some s], restricts labeled single systems compatible with [s]. *)
-}
-
 type cnt =
   | Var of Var.t
-  | Any of any_info
+  | Any
   | List of (Projection.t * Single.t) list
   (** Each single system is identified by a label. Can be empty.
       All single systems are compatible. *)
@@ -196,7 +192,7 @@ external force0 : 'a expr -> 'b expr = "%identity"
 let subst_projs (s : (Projection.t * Projection.t) list) (t : 'a expr) : 'a expr =
   match t.cnt with
   | Var _ -> t                  (* FIXME: unclear what should be done here *)
-  | Any _ -> t
+  | Any   -> t
   | List l ->
     mk (List (List.map (fun (p,single) -> List.assoc_dflt p p s, single) l))
 
@@ -207,9 +203,7 @@ let subst_projs (s : (Projection.t * Projection.t) list) (t : 'a expr) : 'a expr
 let var v = mk (Var v)
 
 (*------------------------------------------------------------------*)
-let any ~compatible_with ~pair = mk (Any {compatible_with; pair; })
-
-let full_any = any ~compatible_with:None ~pair:false
+let any = mk Any
 
 (*------------------------------------------------------------------*)
 let is_var (type a) (se : a expr) : bool =
@@ -220,12 +214,11 @@ let is_fset (type a) (se : a expr) : bool =
 
 let is_any (type a) (se : a expr) : bool =
   match se.cnt with
-  | Any _ -> true
+  | Any -> true
   | _ -> false
 
 let is_pair (type a) ?se_env (se : a expr) : bool =
   match se.cnt with
-  | Any { pair = true; } -> true
   | List [_;_]           -> true
 
   | Var v -> 
@@ -244,16 +237,7 @@ let pp fmt (se : 'a expr) : unit =
     match se.cnt with
     | Var v -> Fmt.pf fmt "%a" Var.pp v
 
-    | Any {compatible_with; pair; } ->
-      let pp_head fmt =
-        if pair then Fmt.pf fmt "any_pair" else Fmt.pf fmt "any"
-      in
-      let pp_tail fmt =
-        match compatible_with with
-        | None -> ()
-        | Some s -> Fmt.pf fmt "/%a" Symbols.pp_path s
-      in
-      Fmt.pf fmt "%t%t" pp_head pp_tail
+    | Any -> Fmt.pf fmt "any"
 
     | List l ->
       Fmt.list
@@ -301,12 +285,12 @@ let to_projs (t : _) = List.map fst (to_list t)
 let to_list_any (t : _ expr) : (Projection.t * Single.t) list option =
   match t.cnt with
   | List l -> Some l
-  | Var _ | Any _ -> None
+  | Var _ | Any -> None
 
 let to_projs_any (t : _ expr) : Projection.t list option =
   match t.cnt with
   | List l -> Some (List.map fst l)
-  | Var _ | Any _ -> None
+  | Var _ | Any -> None
 
 (*------------------------------------------------------------------*)
 let project_opt (projs : Projection.t list option) (t : 'a expr) =
@@ -317,7 +301,7 @@ let project_opt (projs : Projection.t list option) (t : 'a expr) =
 
     mk (List (List.filter (fun (x,_) -> List.mem x projs) l))
 
-  | (Any _ | Var _), Some _projs -> assert false
+  | (Any | Var _), Some _projs -> assert false
 
   | _, None -> t
 
@@ -354,25 +338,13 @@ type context = {
 }
 
 let context_any =
-  { set  = any ~compatible_with:None ~pair:false ;
+  { set  = any ;
     pair = None;
   }
 
 let equal_context0 c c' =
   equal0 c.set c'.set &&
   oequal equal0 c.pair c'.pair
-
-let equivalence_context ?set pair =
-  let set = match set with
-    | Some s -> s
-    | None ->
-      begin match pair.cnt with
-        | List ((_,ss)::_) -> any ~compatible_with:(Some ss.system) ~pair:false
-        | _ -> assert false
-      end
-  in
-  let set, pair = force set, force pair in
-  { pair = Some pair ; set }
 
 let reachability_context set = { set = force set ; pair = None }
 
@@ -401,7 +373,7 @@ let mk_proj_subst
   : Projection.t list option * (Projection.t * Projection.t) list
   =
   match dst.cnt, src.cnt with
-  | (Any _), _ | _, (Any _) -> None, []
+  | (Any , _ | _, Any) -> None, []
 
   | Var v, Var v' when Var.equal v v' -> None, []
 
@@ -480,8 +452,7 @@ let get_compatible_system
         | Var.Compatible_with p -> Some p
         | _ -> None
       ) infos
-  | Any { compatible_with = None; } -> None
-  | Any { compatible_with = s; } -> s
+  | Any -> None
   | List ((_,s)::_) -> Some s.Single.system
   | List [] -> None
 

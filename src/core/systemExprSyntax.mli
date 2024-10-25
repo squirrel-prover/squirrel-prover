@@ -69,27 +69,20 @@ val pp_tagged_vars     :             tagged_vars formatter
 val pp_tagged_vars_dbg :             tagged_vars formatter
 
 (*------------------------------------------------------------------*)
+(** system informations in the surface AST *)
+type p_info = Symbols.lsymb list
+type p_infos = p_info list
+
 (** system variable binder in the surface AST *)
-type p_bnd  = (string L.located * string L.located list) 
+type p_bnd  = (Symbols.lsymb * p_infos) 
 type p_bnds = p_bnd list
 
 (*------------------------------------------------------------------*)
 (** {2 System expressions} *)
 
-(** A system expression is used to indicate to which systems a formula
-    applies. Some formulas apply to any system, others apply to any number of
-    systems, and equivalence formulas only make sense relative to
-    a pair of systems. *)
-type any_info = {
-  pair : bool;
-  (** if true, restricts to pair of labeled single systems. *)
-  compatible_with : SystemSyntax.t option
-  (** if [Some s], restricts labeled single systems compatible with [s]. *)
-}
-
 type cnt =
   | Var of Var.t
-  | Any of any_info
+  | Any                         (** Deprecated, use system variables instead *)
   | List of (Projection.t * Single.t) list
   (** Each single system is identified by a label. Can be empty.
       All single systems are compatible. *)
@@ -139,15 +132,6 @@ val pp : 'a expr formatter
 val equal0 : 'a expr -> 'a expr -> bool
 
 (*------------------------------------------------------------------*)
-(** System expression denoting all possible systems:
-    - [pair]: if true, restricts to pair of labeled single systems.
-    - if [compatible_with = Some s], restricts labeled single systems
-      compatible with [s]. *)
-val any : compatible_with:SystemSyntax.t option -> pair:bool -> arbitrary
-
-(** [full_any] is [any ~compatible_with:None ~pair:false]. *)
-val full_any : arbitrary
-
 (** Create a system expression from a system expression variable. *)
 val var : Var.t -> arbitrary
 
@@ -261,15 +245,10 @@ type context = {
   pair : pair option
 }
 
+(** Depracated, use system variables instead. *)
 val context_any : context
 
 val equal_context0 : context -> context -> bool
-
-(** Create context for global formulas where equivalence atoms are
-    interpreted wrt the given pair, and reachability atoms are
-    interpreted wrt the given set expression (default: any system
-    compatible with the pair). *)
-val equivalence_context : ?set:('a expr) -> <pair:unit;..> expr -> context
 
 (** Create context for interpreting reachability formulas. *)
 val reachability_context : 'a expr -> context

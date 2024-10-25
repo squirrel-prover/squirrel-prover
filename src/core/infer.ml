@@ -127,7 +127,7 @@ let norm_se0 (env : env) (se : SE.exposed) : SE.exposed =
       let v', _ = Msv.find_dflt (se,[]) v !env.se in
       if se = v' then v' else doit v'
 
-    | Any _ | List _ -> se
+    | Any | List _ -> se
   in
   doit se
 
@@ -176,7 +176,7 @@ let check_se_subst
         | Var  v -> 
           let infos = List.assoc_dflt [] v env.se_vars in
           List.mem SE.Var.Pair infos
-        | Any  _ -> false
+        | Any    -> false
       end
 
     | SE.Var.Compatible_with p -> 
@@ -225,7 +225,7 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
   let check_se (se : SE.exposed) : bool =
     match se.cnt with
     | Var uv -> not (Msv.mem uv !ienv.se)
-    | Any _ | List _ -> true
+    | Any | List _ -> true
   in
 
   (* check the instantiation of system variables *)

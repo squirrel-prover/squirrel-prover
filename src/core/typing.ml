@@ -578,16 +578,21 @@ let convert_ext_bnds
 (*------------------------------------------------------------------*)
 (** Convert a systeme expression variable binding *)
 let convert_se_var_bnd
-    (env : Env.t) ((lv, infos) : lsymb * lsymb list)
+    (env : Env.t) ((lv, infos) : SE.p_bnd)
   : Env.t * SE.tagged_var
   =
   let name = L.unloc lv in
 
   let infos =
     List.map (fun info ->
-        match L.unloc info with
-        | "pair" -> SE.Var.Pair
-        | _ -> error (L.loc info) (Failure "unknown system information");
+        match info with
+        | [ L.{pl_desc = "pair" }] -> SE.Var.Pair
+        | [ L.{pl_desc = "like" }; p] -> 
+          let p, _ = Symbols.System.convert1 ([],p) env.table in
+          SE.Var.Compatible_with p
+        | _ -> 
+          let loc = L.mergeall (List.map L.loc info) in
+          error loc (Failure "unknown system information");
       ) infos
   in
   (* ["equiv"] is always a [Pair] *)
@@ -606,7 +611,7 @@ let convert_se_var_bnd
   { env with se_vars = se_vars @ [(var, infos)]; }, (var, infos)
 
 let convert_se_var_bnds
-    (env : Env.t) (bnds : (lsymb * lsymb list) list) : Env.t * SE.tagged_vars
+    (env : Env.t) (bnds : SE.p_bnds) : Env.t * SE.tagged_vars
   =
   List.map_fold convert_se_var_bnd env bnds
     

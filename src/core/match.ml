@@ -3436,6 +3436,7 @@ module E = struct
           term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
+
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       let system : SE.context = 
         SE.{ set = (oget st.system.pair :> SE.t); pair = None; } 
@@ -3452,6 +3453,7 @@ module E = struct
           term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
+
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)
       unif_tys st p.ty_args ppat.ty_args;
@@ -3461,8 +3463,8 @@ module E = struct
 
       (* unify multi-term arguments *)
       let mv = 
-        List.fold_left2 (fun mv (set, args) (set', args') ->
-            assert (SE.equal st.table set set');
+        List.fold_left2 (fun mv (set, args) (_set', args') ->
+            (* [set] and [_set'] already unified *)
             let st = { st with mv; system = SE.{set; pair = None; } } in
             term_unif_l args args' st            
           ) st.mv p.multi_args ppat.multi_args

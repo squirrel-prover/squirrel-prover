@@ -6,30 +6,16 @@ include SystemExprSyntax
 (** {2 General operations} *)
 
 (*------------------------------------------------------------------*)
-let subset (type a) table (e1 : a expr) (e2 : a expr) : bool =
+let subset (type a) _table (e1 : a expr) (e2 : a expr) : bool =
   match (e1 :> exposed).cnt, (e2 :> exposed).cnt with
   | Var v1, Var v2 -> Var.equal v1 v2
     
-  | Any { compatible_with = s1; pair = p1; }, 
-    Any { compatible_with = s2; pair = p2; } ->
-    (
-      match s1, s2 with
-      | None,   Some _ -> false
-      | None,   None
-      | Some _, None   -> true
-      | Some s1, Some s2 -> System.compatible table s1 s2 
-    ) 
-    && 
-    (not p2 || p1)              (* p2 ⇒ p1 *)
-      
-  | List l, Any { compatible_with = Some s; pair = p; } ->
-    ( l = [] || System.compatible table (Stdlib.snd (List.hd l)).system s ) &&
-    (not p || List.length l = 2)
+  | Any, Any -> true
       
   | List l1, List l2 ->
     List.for_all (fun s1 -> List.exists (fun s2 -> s1 = s2) l2) l1
       
-  | _, Any {compatible_with = None; } -> true
+  | _, Any -> true
   | _ -> false
 
 let equal (type a) table (e1 : a expr) (e2 : a expr) : bool =
@@ -177,7 +163,7 @@ let get_compatible_of_context table (env : env) (context : context) : compatible
 let gsubst (type a) (s : Subst.t) (g : a expr) : a expr =
   match (g :> exposed).cnt with
   | Var v -> force0 (Subst.subst_se_var s v)
-  | Any _ | List _ -> g
+  | Any | List _ -> g
 
 let gsubst_context (s : Subst.t) (g : context) : context =
   { set = gsubst s g.set; pair = omap (gsubst s) g.pair ;}
@@ -263,15 +249,6 @@ module Parse = struct
           (System.convert table ([], L.mk_loc L._dummy "default"))
       in
       (se_env, s)
-
-    | [{ system = [], { pl_desc = ("any" | "any_pair") as pair}; 
-         projection; 
-         alias = None}] ->
-      let pair = pair = "any_pair" in
-      let compatible_with = 
-        omap (fun system -> System.convert table ([], system)) projection
-      in
-      (se_env, any ~compatible_with ~pair)
 
     | [{ system; projection = None; alias = None}] ->
       parse_system ~implicit ?implicit_infos table se_env system

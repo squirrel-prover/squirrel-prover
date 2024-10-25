@@ -76,7 +76,7 @@ type predicate_decl = {
   pred_name       : Symbols.lsymb;
   pred_symb_type  : Symbols.symb_type;
   pred_tyargs     : lsymb list;
-  pred_se_args    : (lsymb * lsymb list) list;
+  pred_se_args    : SE.p_bnds;
   pred_multi_args : (lsymb * Typing.bnds) list;
   pred_simpl_args : Typing.bnds;
   pred_body       : Typing.global_formula option;

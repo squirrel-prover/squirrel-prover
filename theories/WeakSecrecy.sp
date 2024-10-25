@@ -20,16 +20,16 @@ system none = null.
 # Reasoning rules on Non-deduction and Deduction
 *)
 
-global lemma [set: any; equiv:any_pair] 
-  refl_ded ['a] (u : 'a) : 
+global lemma refl_ded in [any] ['a] (u : 'a) : 
  $(u |> u).
 Proof.
 rewrite /(|>).
 exists (fun x => x) => //.
 Qed.
 
-global lemma [set: any; equiv:any_pair] 
-  right_fa ['a 'b 'c] (u : 'a, v : 'b, g : 'b -> 'c) : 
+global lemma right_fa in [any]
+ ['a 'b 'c] (u : 'a, v : 'b, g : 'b -> 'c) 
+: 
     $( u *> v ) ->
     (Exists (ginv : _ [adv]), [ginv u (g v) = v]) ->
     $( u *> (g v) ).
@@ -45,8 +45,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------- *)
-global lemma [set: any; equiv:any_pair] 
- left_fa ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
+global lemma left_fa in [any] ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
    $( u *> v ) ->
    $( (f u) *> v ).
 Proof.
@@ -56,8 +55,7 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 (* Rules in Figure 1 *)
-global lemma [set: any; equiv:any_pair] 
-  ND ['a 'b] (u : 'a) (v : 'b) : 
+global lemma ND in [any] ['a 'b] (u : 'a) (v : 'b) : 
     $(u *> v) ->
     $(u |> v) ->
     [false].
@@ -66,8 +64,7 @@ Proof.
   by have ? := H f. 
 Qed.
 
-global lemma [set: any; equiv:any_pair]
-  Ineq ['a 'b] (u : 'a) (v, w : 'b) :
+global lemma Ineq in [any] ['a 'b] (u : 'a) (v, w : 'b) :
     $(u |> v) ->
     $( u *> w) ->
     [v <> w].
@@ -76,7 +73,7 @@ Proof.
   by have ? := (H2 f).
 Qed.
 
-global lemma [set: any; equiv:any_pair] 
+global lemma [any]
   NDWeakL ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u |> v) ->
     $(u *> w) ->
@@ -88,7 +85,7 @@ Proof.
   assumption A.
 Qed.
 
-global lemma [set: any; equiv:any_pair] 
+global lemma [any] 
   NDWeakR ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u *> w) ->
     $(v |> w) ->
@@ -150,13 +147,13 @@ Qed.
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Oracle *)
 
-global axiom [set: any; equiv:any_pair]
+global axiom [any]
   RwOracle1 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
   (* Warning : 'd must be a simple type *)
     (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t1) = t2 (f u t1)]) ->
     (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
 
-global lemma [set: any; equiv:any_pair] 
+global lemma [any] 
   RwOracle2 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
     (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t2) = t2 (f u t2)]) ->
     (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
@@ -179,7 +176,7 @@ axiom [any] frame_not_init (tau:timestamp) :
 axiom [any] frame_init :
   frame@init = zero.
 
-global lemma  [set: any; equiv:any_pair] frame_ded_past (tau,tau':timestamp [const]) :
+global lemma  [any] frame_ded_past (tau,tau':timestamp [const]) :
  [tau'<= tau] -> $( (frame@tau) |> (frame@tau')).
 Proof.
   dependent induction tau.

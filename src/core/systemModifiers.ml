@@ -154,7 +154,7 @@ let mk_equiv_statement
     new_axiom_name enrich make_conclusion new_system
   : Goal.statement
   =
-  let context = SE.equivalence_context ~set:new_system new_system in
+  let context = SE.{ set = new_system; pair = Some (SE.to_pair new_system) ; } in
   let formula =
     fst (Goal.make_obs_equiv ~enrich table context)
     |> Equiv.any_statement_to_equiv
@@ -182,10 +182,12 @@ let global_rename
      but any system would work here since the equivalence must
      relate names. *)
   let system =
-    SE.equivalence_context
+    let pair =
       (SE.make_pair
          (Projection.left, old_single_system)
          (Projection.right, old_single_system))
+    in
+    SE.{ set = (pair :> SE.t); pair = Some pair ; } 
   in
   let env = Env.init ~table ~system () in
   let conv_env = Typing.{ env; cntxt = InGoal } in
@@ -240,9 +242,10 @@ let global_rename
     List.filter (fun v -> Sv.mem v fv) vs
   in
 
+  let v = SE.Var.of_ident (Ident.create "'P") in
   let rw_rule = Rewrite.{
-      rw_params = Params.empty;
-      rw_system = SE.full_any;
+      rw_params = { Params.empty with se_vars = [v,[]]; };
+      rw_system = SE.var v;
       rw_vars   = Vars.Tag.local_vars rw_vars;
       rw_conds  = [];
       rw_rw     = n1', n2';
@@ -284,7 +287,7 @@ let global_rename
   let lemma =
     mk_equiv_statement
       table
-      axiom_name enrich make_conclusion old_new_pair
+      axiom_name enrich make_conclusion (old_new_pair :> SE.t)
   in
   (Some lemma, [], table)
 
@@ -401,9 +404,10 @@ let global_prf
     List.filter (fun v -> Sv.mem v fv) is1
   in
 
+  let v = SE.Var.of_ident (Ident.create "'P") in
   let rw_rule = Rewrite.{
-      rw_params = Params.empty;
-      rw_system = SE.full_any;
+      rw_params = { Params.empty with se_vars = [v,[]]; };
+      rw_system = SE.var v;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: rw_vars);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
@@ -453,7 +457,7 @@ let global_prf
   let lemma =
     mk_equiv_statement
       table
-      axiom_name enrich make_conclusion old_new_pair
+      axiom_name enrich make_conclusion (old_new_pair :> SE.t)
   in
 
   Some lemma, [], table
@@ -578,9 +582,10 @@ let global_cca
       let fv = Term.fv enc in
       List.filter (fun v -> Sv.mem v fv) is
     in
+    let v = SE.Var.of_ident (Ident.create "'P") in
     Rewrite.{
-      rw_params = Params.empty;
-      rw_system = SE.full_any;
+      rw_params = { Params.empty with se_vars = [v,[]]; };
+      rw_system = SE.var v;
       rw_vars   = Vars.Tag.local_vars enc_rw_vars;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
@@ -593,9 +598,10 @@ let global_cca
       let fv = Term.fv dec_pattern in
       List.filter (fun v -> Sv.mem v fv) is1
     in
+    let v = SE.Var.of_ident (Ident.create "'P") in
     Rewrite.{
-      rw_params = Params.empty;
-      rw_system = SE.full_any;
+      rw_params = { Params.empty with se_vars = [v,[]]; };
+      rw_system = SE.var v;
       rw_vars   = Vars.Tag.local_vars (fresh_x_var :: dec_rw_vars);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
@@ -1225,10 +1231,11 @@ let global_prf_t
         | Macros.ADescr d  -> Term.mk_action d.name (Term.mk_vars d.indices)
         | Macros.AGlobal a -> Term.mk_var a.ts 
       in
-      
+
+      let v = SE.Var.of_ident (Ident.create "'P") in
       let rule = Rewrite.{
-          rw_params = Params.empty;
-          rw_system = SE.full_any;
+          rw_params = { Params.empty with se_vars = [v,[]]; };
+          rw_system = SE.var v;
           rw_vars   = Vars.Tag.local_vars (x :: is);
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target tau0 xocc); 

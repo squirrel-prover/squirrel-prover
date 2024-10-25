@@ -565,11 +565,11 @@ ty:
 
 (*------------------------------------------------------------------*)
 se_info:
-| i=lsymb { i }
+| i=slist1(lsymb,empty) { i }
 
 se_bnd:
 | v=se_var                                          { v, [] }
-| v=se_var LBRACKET l=slist(se_info,empty) RBRACKET { v, l  }
+| v=se_var LBRACKET l=slist(se_info,COMMA) RBRACKET { v, l  }
 
 %inline se_bnds:
 | ids=slist(se_bnd,empty) { ids }

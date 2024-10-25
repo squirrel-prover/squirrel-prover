@@ -1,6 +1,5 @@
 include WeakSecrecy.
 
-
 name n:message.
 
 abstract m:message.
