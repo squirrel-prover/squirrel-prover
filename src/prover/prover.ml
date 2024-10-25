@@ -749,14 +749,16 @@ let init : ?with_string_prelude:string option -> unit -> state =
     | Some st when with_string_prelude = None -> st
     | _ -> 
       let state = init' () in
-      let prelude = ProverLib.{ 
-            th_name = Name (L.mk_loc L._dummy "Prelude");
-            params = []; 
-          }
-      in
-        (* process the prelude file *)      
-      let state =  match with_string_prelude with
-        |  None -> do_include ~dirname:Driver.theory_dir state prelude
+      (* process the prelude file *)
+      let state =
+        match with_string_prelude with
+        |  None ->
+          let prelude = ProverLib.{
+              th_name = Name (L.mk_loc L._dummy "Prelude");
+              params = [];
+            }
+          in
+          do_include ~dirname:Driver.theory_dir state prelude
         | Some s -> exec_all state s
       in      
       (* define the macros defining the builtin execution models *)
