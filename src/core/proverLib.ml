@@ -87,4 +87,4 @@ let unnamed_goal =
   let cpt = ref 0 in
   fun () ->
     incr cpt;
-    Location.mk_loc Location._dummy ("unnamedgoal" ^ string_of_int !cpt)
+    Location.mk_loc Location._dummy ("unnamed" ^ string_of_int !cpt)

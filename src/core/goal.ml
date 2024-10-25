@@ -80,19 +80,19 @@ let _pp_statement ppe fmt (g : statement) : unit =
   let pp_sevars fmt = 
     if g.params.se_vars = [] then ()
     else
-      Fmt.pf fmt "{%a} "
+      Fmt.pf fmt "@[{%a}@]@ "
         SE.pp_tagged_vars g.params.se_vars
   in
   let pp_system fmt = 
-    Fmt.pf fmt "@[in [%a]@] " SE.pp_context g.system
+    Fmt.pf fmt "@[in [%a]@]@ " SE.pp_context g.system
   in
   let pp_tyvars fmt tyvs = 
     if tyvs = [] then () 
     else
-      Fmt.pf fmt "[%a] "
+      Fmt.pf fmt "@[[%a]@] "
         (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
-  Fmt.pf fmt "@[%s %t%t%a:@]@ %a"
+  Fmt.pf fmt "%s@ %t%t%a:@ %a"
     g.name
     pp_sevars
     pp_system

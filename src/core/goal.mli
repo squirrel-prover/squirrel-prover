@@ -46,6 +46,7 @@ type global_statement = (string, Equiv.form    ) abstract_statement
 type local_statement  = (string, Equiv.bform     ) abstract_statement
 
 (*------------------------------------------------------------------*)
+(** unboxed pretty-printer *)
 val _pp_statement : statement formatter_p
 
 (*------------------------------------------------------------------*)
