@@ -545,7 +545,7 @@ let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
 
 (** Internal.
     
-    Common setup for to change hypotheses context.
+    Common setup to change hypotheses context.
     For each kind of hypothesis we need an update function that
     returns [None] if the hypothesis must be dropped, and [Some f]
     if it must be changed to [f].

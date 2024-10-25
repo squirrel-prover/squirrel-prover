@@ -350,10 +350,10 @@ let mk_proj_subst
           ) dst
       in
 
-      (* If two projections of [src] applies to the
+      (* If two projections of [src] apply to the
          same element in [dst], there is an ambiguity
          about which rewriting to apply.
-         In that case, we raise an error. *)
+         In that case, we issue a warning. *)
       if List.exists (fun ((p_src, p), single) ->
           List.exists (fun ((p_src', p'), single') ->
               p_src <> p_src' && p = p' && single = single'

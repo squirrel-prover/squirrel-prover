@@ -43,7 +43,7 @@ let subset_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
 
   | _ -> subset table e1 e2
 
-let equal_modulo  (type a) table (e1 : a expr) (e2 : a expr) : bool =
+let equal_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
   subset_modulo table e1 e2 && subset_modulo table e2 e1
 
 (*------------------------------------------------------------------*)

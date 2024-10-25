@@ -108,12 +108,11 @@ module PT = struct
       match f with
       | Quant (_,vars,f) -> check_positivity (Vars.add_vars vars env) p f
       | Let (_,_,f) -> check_positivity env p f
-          (* FIXME: can we really ignore second component of [Let(_,_,f)]? *)
           (* FEATURE: enrich env with variable bound by Let,
              using tags inferred from second component. *)
       | And  (f1, f2)
       | Or   (f1, f2) -> check_positivity env p f1 && check_positivity env p f2
-      | Impl (f1, f2) -> 
+      | Impl (f1, f2) ->
         check_positivity env (not p) f1 &&
         check_positivity env      p  f2
       | Atom (Reach f) ->
@@ -122,7 +121,7 @@ module PT = struct
     in
 
     let new_system = SE.project_set projs pt.system in
-    
+
     let project_failure () =
       soft_failure (Failure "cannot project 'set' system annotation in proof-term")
     in
@@ -149,11 +148,11 @@ module PT = struct
         in
         if not can_project then project_failure ();
         Local (Term.project projs t)
-      | Equiv.Global e -> 
+      | Equiv.Global e ->
         (* If the system expressions after projection contains the
            same set of single systems, we can project. *)
-        let can_project = 
-          SE.equal_modulo table pt.system.set new_system.set || 
+        let can_project =
+          SE.equal_modulo table pt.system.set new_system.set ||
           check_positivity env p e
         in
         if not can_project then project_failure ();
@@ -161,7 +160,7 @@ module PT = struct
     in
 
     { args   = pt.args;
-      mv     = Match.Mvar.map (Term.project projs) pt.mv; 
+      mv     = Match.Mvar.map (Term.project projs) pt.mv;
       system = new_system ;
       subgs  = List.map (do_proj false) pt.subgs;
       bound  = Concrete.bound_projs projs pt.bound;
@@ -176,8 +175,8 @@ let well_formed (pt : PT.t) : unit =
     match pt.form, pt.bound with
     | Global _, Concrete.Glob      -> ()
     | Global _, Concrete.LocHyp    -> assert false
-    | Global _,                  _ -> assert false  
-    |        _, Concrete.Glob      -> assert false  
+    | Global _,                  _ -> assert false
+    |        _, Concrete.Glob      -> assert false
     | Local  _, Concrete.LocAsym   -> ()
     | Local  _, Concrete.LocHyp    -> ()
     | Local  _, Concrete.LocConc _ -> ()
@@ -198,7 +197,7 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
     | Global (Atom (Reach f)) ->
       assert(pt.bound = Glob || pt.bound = LocAsym);
       let bound =
-        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound) 
+        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound)
       in
       { pt with form = Local f.formula; bound = bound }
 
@@ -224,7 +223,7 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
   doit pt
 
 (*------------------------------------------------------------------*)
-(** Try to cast [pt] as a [dst] proof-term conclusion. 
+(** Try to cast [pt] as a [dst] proof-term conclusion.
     Call [failed ()] in case of failure. *)
 let pt_try_cast (type a)
     ~(failed : unit -> 'b)
@@ -253,30 +252,30 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
   match pt.system.pair, system_pair with
   | None, _ | _, None -> pt
   | Some pt_pair, Some system_pair ->
-    (* Use [system_pair] projections in [pt], by renaming [pt]'s projections to 
+    (* Use [system_pair] projections in [pt], by renaming [pt]'s projections to
        projections in [system_pair] for the same single systems. *)
     let _, proj_subst =
       SE.mk_proj_subst ~strict:true
         ~src:(pt_pair :> SE.t) ~dst:(system_pair :> SE.t)
     in
     let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Equiv proj_subst in
-    let system = 
+    let system =
       let pt_pair = SE.subst_projs proj_subst pt_pair in
       { pt.system with pair = Some pt_pair };
     in
-    { pt with 
+    { pt with
       subgs = List.map psubst pt.subgs;
       form  = psubst pt.form;
       bound = Concrete.bound_subst_projs proj_subst pt.bound;
-      system; } 
+      system; }
 
 
 (*------------------------------------------------------------------*)
 (** Projects [pt] onto [system], if possible,
     projecting diffs in terms if necessary. *)
 let pt_project_system_set
-    (table : Symbols.table) (vars : Vars.env) 
-    (pt : PT.t) (system : SE.context) : PT.t 
+    (table : Symbols.table) (vars : Vars.env)
+    (pt : PT.t) (system : SE.context) : PT.t
     (* FIXME equiv component of [system] seems unused:
       passing set directly would be clearer *)
   =
@@ -285,10 +284,10 @@ let pt_project_system_set
   if SE.is_fset system.set then
     if SE.is_fset pt.system.set then
 
-      (* Use [system] projections in [pt], by renaming [pt]'s projections to 
+      (* Use [system] projections in [pt], by renaming [pt]'s projections to
          projections in [system] for the same single systems. *)
       let _, proj_subst =
-        SE.mk_proj_subst ~strict:true ~src:pt.system.set ~dst:system.set 
+        SE.mk_proj_subst ~strict:true ~src:pt.system.set ~dst:system.set
       in
       let psubst = Equiv.Babel.subst_projs Equiv.Any_t `Reach proj_subst in
       let new_system =
@@ -302,7 +301,7 @@ let pt_project_system_set
                   system = new_system }
       in
 
-      (* [system] and [pt.system] are fsets. 
+      (* [system] and [pt.system] are fsets.
          Project [pt] over [system.set]. *)
       let projs = List.map fst (SE.to_list @@ SE.to_fset system.set) in
       PT.projs_set table vars projs pt
@@ -341,22 +340,22 @@ let is_system_context_indep : Equiv.any_form -> bool = function
   | Equiv.Local  _ -> false
   | Equiv.Global f -> Equiv.is_system_context_indep f
 
-(** Check if [pt] is general enough for [system]. 
-    Note that we do not use this function in [pt_unify_systems], 
+(** Check if [pt] is general enough for [system].
+    Note that we do not use this function in [pt_unify_systems],
     because it must do more complicated checks.
-    Result: 
-    - [`ContextIndep] if there are no system-context dependent formulas in 
+    Result:
+    - [`ContextIndep] if there are no system-context dependent formulas in
       the proof-term
-    - [`Subset] if there may be system-context dependent formulas, but the 
-      system context of the proof-term contains the target system context 
+    - [`Subset] if there may be system-context dependent formulas, but the
+      system context of the proof-term contains the target system context
     - [`Failed] if everything else failed. *)
 let pt_compatible_with
-    table (pt : PT.t) (system : SE.context) 
-  : [`Subset | `ContextIndepPT | `Failed] 
+    table (pt : PT.t) (system : SE.context)
+  : [`Subset | `ContextIndepPT | `Failed]
   =
-  if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
+  if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
     `ContextIndepPT
-  else 
+  else
     begin
     (* Check equivalence systems in [system.pair]. *)
     let comp_pair =
@@ -393,12 +392,12 @@ let pt_unify_systems
     ~(pt : PT.t) ~(arg : PT.t)
   : PT.t * PT.t
   =
-  if List.for_all is_system_context_indep (arg.form :: arg.subgs) then 
+  if List.for_all is_system_context_indep (arg.form :: arg.subgs) then
     pt, { arg with system = pt.system; }
-  else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then 
+  else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
     { pt with system = arg.system; }, arg
   else
-    begin     
+    begin
       (* Check equivalence systems in [system.pair].
          Fails if not compatible. *)
       let arg_pair, pt_pair = arg.system.pair, pt.system.pair in
@@ -416,7 +415,7 @@ let pt_unify_systems
            projections from [l1:S] to [l1:S,l2:S], which is rejected:
            is there some generalization that we can/should do? *)
         if SE.subset table pt_set arg_set then
-          pt, pt_project_system_set table vars arg pt.system 
+          pt, pt_project_system_set table vars arg pt.system
         else
         if SE.subset table arg_set pt_set then begin
           pt_unify_warning_systems table ~pt ~arg;
@@ -445,18 +444,18 @@ module type S = sig
   val to_general_sequent : t -> Goal.t
 
   val to_global_sequent : t -> LowEquivSequent.t
-                                 
+
   (*------------------------------------------------------------------*)
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
-    Typing.pt -> 
+    Typing.pt ->
     t ->
     ghyp * Type.tvars * PT.t
 
   val convert_pt :
     ?close_pats:bool ->
-    Typing.pt -> 
+    Typing.pt ->
     t ->
     ghyp * Type.tvars * PT.t
 end
@@ -511,7 +510,7 @@ module Mk (Args : MkArgs) : S with
         omap
           (fun (v,f) -> Equiv.Local v, Equiv.Local f)
           (HTerm.Smart.destr_impl ~env f)
-          
+
       | Global f ->
         omap
           (fun (v,f) -> Equiv.Global v, Equiv.Global f)
@@ -526,19 +525,19 @@ module Mk (Args : MkArgs) : S with
     match f_kind with
     | Equiv.Local_t  -> HTerm.Smart.destr_forall1_tagged f
     | Equiv.Global_t -> Equiv.Smart.destr_forall1_tagged f
-        
+
     | Equiv.Any_t ->
       match f with
       | Local f ->
         omap
           (fun (v,f) -> v, Equiv.Local f)
           (HTerm.Smart.destr_forall1_tagged f)
-          
+
       | Global f ->
         omap
           (fun (v,f) -> v, Equiv.Global f)
           (Equiv.Smart.destr_forall1_tagged f)
-          
+
   let decompose_forall_tagged_k
       (type a)
       (f_kind : a Equiv.f_kind)
@@ -546,9 +545,9 @@ module Mk (Args : MkArgs) : S with
     : Vars.tagged_vars * a
     =
     match f_kind with
-    | Equiv.Local_t  -> HTerm.Smart.decompose_forall_tagged f 
-    | Equiv.Global_t -> Equiv.Smart.decompose_forall_tagged f 
-      
+    | Equiv.Local_t  -> HTerm.Smart.decompose_forall_tagged f
+    | Equiv.Global_t -> Equiv.Smart.decompose_forall_tagged f
+
     | Equiv.Any_t ->
       match f with
       | Local f ->
@@ -558,7 +557,7 @@ module Mk (Args : MkArgs) : S with
       | Global f ->
         let vs,f = Equiv.Smart.decompose_forall_tagged f in
         vs, Global f
-  
+
   (*------------------------------------------------------------------*)
   (** Return the location of a proof term argument. *)
   let pt_arg_loc (p_arg : Typing.pt_app_arg) : L.t =
@@ -573,7 +572,7 @@ module Mk (Args : MkArgs) : S with
       hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
 
   (** A proof term with type [f1 -> f2] argument is either:
-      - another proof term whose type [f'] must match [f1] 
+      - another proof term whose type [f'] must match [f1]
       - an underscore, which generates a subgaol for [f1] *)
   type pt_impl_arg = [`Pt of Typing.pt | `Subgoal]
 
@@ -585,20 +584,20 @@ module Mk (Args : MkArgs) : S with
     | Typing.PTA_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Typing.PTA_term ({ pl_desc = Symb (head, ty_args) } as t) 
+    | Typing.PTA_term ({ pl_desc = Symb (head, ty_args) } as t)
     | Typing.PTA_term
         ({ pl_desc = App ({ pl_desc = Symb (head, ty_args) }, _) } as t) ->
       let _head, terms = Typing.decompose_app t in (* [_head = head] *)
       let loc = L.loc t in
-      
-      let pt_cnt = 
+
+      let pt_cnt =
         Typing.PT_app {
           pta_head =
             L.mk_loc (Symbols.p_path_loc head) (Typing.PT_symb (head, ty_args));
           pta_args = List.map (fun x -> Typing.PTA_term x) terms ;
           pta_loc  = loc;
-        } 
-      in 
+        }
+      in
       `Pt (L.mk_loc loc pt_cnt)
 
     | Typing.PTA_term { pl_desc = Typing.Tpat } -> `Subgoal
@@ -614,7 +613,7 @@ module Mk (Args : MkArgs) : S with
                @[%a@]@;\
                but it must prove:@;  \
                @[%a@]@]"
-        (PT._pp ppe) prove 
+        (PT._pp ppe) prove
         (PT._pp ppe) target
     in
     soft_failure ~loc (Failure err_str)
@@ -663,12 +662,12 @@ module Mk (Args : MkArgs) : S with
           List.map (fun a -> resolve_pt_arg s (Typing.PTA_term a)) args
         in
         let loc = last_loc (L.loc h) args in
-        let pt_cnt = 
+        let pt_cnt =
           Typing.PT_app {
             pta_head = L.mk_loc (L.loc h) (Typing.PT_symb (([],h), None));
             pta_args;
             pta_loc = loc;
-          } 
+          }
         in
         PTA_sub (L.mk_loc loc pt_cnt)
 
@@ -679,21 +678,21 @@ module Mk (Args : MkArgs) : S with
     match L.unloc pt with
     | PT_symb _ -> pt
 
-    | PT_localize sub_pt -> 
+    | PT_localize sub_pt ->
       L.mk_loc loc (Typing.PT_localize (resolve_pt s sub_pt))
 
     | PT_app app ->
-      let app = 
-        Typing.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args } 
+      let app =
+        Typing.{ app with pta_args = List.map (resolve_pt_arg s) app.pta_args }
       in
       L.mk_loc loc (Typing.PT_app app)
 
-  (*------------------------------------------------------------------*)      
-  (** Internal 
-      Get a proof-term conclusion by name (from a lemma, axiom or hypothesis). 
+  (*------------------------------------------------------------------*)
+  (** Internal
+      Get a proof-term conclusion by name (from a lemma, axiom or hypothesis).
       Optionally apply it to some user-provided type arguments. *)
   let pt_of_assumption
-      (ty_env   : Infer.env) 
+      (ty_env   : Infer.env)
       (p        : Symbols.p_path)
       (ty_args  : Type.ty list option)
       (s        : t)
@@ -748,7 +747,7 @@ module Mk (Args : MkArgs) : S with
                | `Fail -> assert false) (* cannot fail *)
             ty_vars ty_args;
         end;
-      
+
       let form = Equiv.Babel_statement.gsubst Equiv.Any_s tsubst lem.formula in
       if Equiv.is_local_statement form
       then
@@ -778,7 +777,7 @@ module Mk (Args : MkArgs) : S with
           form; }
       else
       (* a local lemma or axiom is actually a global reachability formula *)
-      let form = 
+      let form =
         match S.conc_kind, form with
         (* we already downgrade it for local sequents *)
         | Equiv.Local_t, Equiv.GlobalS f -> Equiv.Global f
@@ -875,12 +874,12 @@ module Mk (Args : MkArgs) : S with
     let () =
       let venv = Vars.add_vars args env in
       let env = Env.init ~table ~system:pt.system ~vars:venv () in
-      
+
       if f_arg_tag.system_indep &&
          not (HTerm.is_single_term_in_context ~context:env.system env pt_arg) then
         error_pt_apply_not_system_indep table arg_loc ~pt ~arg:pt_arg;
       (* TODO: multi-terms: this check probably needs to modified *)
-      
+
       if
         f_arg_tag.adv && not (HTerm.is_ptime_deducible ~si:false env pt_arg)
       then
@@ -933,11 +932,11 @@ module Mk (Args : MkArgs) : S with
         (Failure (Fmt.str "@[<hv 2>proof-term failed:@ @[%t@]@]" pp_err))
 
   (*------------------------------------------------------------------*)
-  (** Apply [pt] to [arg] when [pt] is an implication. 
+  (** Apply [pt] to [arg] when [pt] is an implication.
       Pop the first implication [f1] of [pt.form], instantiate (by matching) it
       using [arg], and return the updated [pt].
 
-      Remark: [arg]'s substitution must be an extention of 
+      Remark: [arg]'s substitution must be an extention of
       [pt]'s substitution. *)
   let pt_apply_var_impl
       (* ~(loc : L.t)  *) ~(loc_arg : L.t)
@@ -949,12 +948,12 @@ module Mk (Args : MkArgs) : S with
 
     let apply_kind_error () = error_pt_apply_bad_kind loc_arg table ~pt ~arg in
 
-    (* Try to case [arg] to the appropriate kind (local or global), 
-       depending on [f1] kind. 
+    (* Try to case [arg] to the appropriate kind (local or global),
+       depending on [f1] kind.
        If the cast fails, we raise a user-level error. *)
     let pt, arg =
       match pt.form, arg.form with
-      | Equiv.Local  _, Equiv.Local  _ 
+      | Equiv.Local  _, Equiv.Local  _
       | Equiv.Global _, Equiv.Global _ -> pt, arg
       | Equiv.Local  _, Equiv.Global _ ->
         (* downgrade [arg] *)
@@ -1014,7 +1013,7 @@ module Mk (Args : MkArgs) : S with
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
     in
     let mv = match match_res with
-      | Match.NoMatch _  -> pt_apply_error arg () 
+      | Match.NoMatch _  -> pt_apply_error arg ()
       | Match.Match   mv -> mv
     in
 
@@ -1053,7 +1052,7 @@ module Mk (Args : MkArgs) : S with
         (PT._pp ppe) pt
     in
     soft_failure ~loc (Failure err_str)
-      
+
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec do_convert_pt_gen
@@ -1068,12 +1067,12 @@ module Mk (Args : MkArgs) : S with
       | Typing.PT_symb (path, ty_args) ->
         do_convert_path ty_env mv path ty_args s
       | Typing.PT_app pt_app -> do_convert_pt_app ty_env mv pt_app s
-      | Typing.PT_localize p_sub_pt -> 
+      | Typing.PT_localize p_sub_pt ->
         let ghyp, sub_pt = do_convert_pt_gen ty_env mv p_sub_pt s in
-        let pt = 
+        let pt =
           pt_try_localize
             ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) table sub_pt)
-            sub_pt 
+            sub_pt
         in
         ghyp, pt
     in
@@ -1085,11 +1084,11 @@ module Mk (Args : MkArgs) : S with
       (init_mv : Mvar.t)
       (p       : Symbols.p_path)
       (ty_args : Typing.ty list option)
-      (s       : S.t) 
+      (s       : S.t)
     : ghyp * PT.t
     =
     let ty_args =
-      omap (List.map (Typing.convert_ty ~ty_env (S.env s))) ty_args 
+      omap (List.map (Typing.convert_ty ~ty_env (S.env s))) ty_args
     in
     let lem_name, pt = pt_of_assumption ty_env p ty_args s in
     assert (pt.mv = Mvar.empty);
@@ -1100,13 +1099,13 @@ module Mk (Args : MkArgs) : S with
       (ty_env  : Infer.env)
       (init_mv : Mvar.t)
       (pt_app  : Typing.pt_app)
-      (s       : S.t) 
+      (s       : S.t)
     : ghyp * PT.t
     =
     let table, env = S.table s, S.vars s in
 
-    let lem_name, init_pt = 
-      do_convert_pt_gen ty_env init_mv pt_app.pta_head s 
+    let lem_name, init_pt =
+      do_convert_pt_gen ty_env init_mv pt_app.pta_head s
     in
 
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
@@ -1137,7 +1136,7 @@ module Mk (Args : MkArgs) : S with
         match destr_impl_k Equiv.Any_t pt_env pt.form with
         | Some (f1, f2) -> f1, f2
         | None ->
-          (* destruct failed, applying the pending substitution and try to 
+          (* destruct failed, applying the pending substitution and try to
              destruct again *)
           let subst =
             subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt in
@@ -1167,14 +1166,14 @@ module Mk (Args : MkArgs) : S with
     in
 
     (* fold through the provided arguments and [f],
-       instantiating [f] along the way, 
+       instantiating [f] along the way,
        and accumulating proof obligations. *)
     let pt =
       List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
           if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
-            do_impl ty_env pt (pt_app_arg_as_pt p_arg) 
+            do_impl ty_env pt (pt_app_arg_as_pt p_arg)
           else
-            do_var pt (pt_app_arg_as_term p_arg) 
+            do_var pt (pt_app_arg_as_term p_arg)
         ) init_pt pt_app.pta_args
     in
 
@@ -1193,7 +1192,7 @@ module Mk (Args : MkArgs) : S with
     in
     (* instantiate infered variables *)
     (* FIXME why don't we substitute in [pt.bound]? *)
-    let subst = subst_of_pt ~loc ty_env table env pt in 
+    let subst = subst_of_pt ~loc ty_env table env pt in
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
     (* the only remaining variables are pattern holes '_' *)
@@ -1247,11 +1246,11 @@ module Mk (Args : MkArgs) : S with
     let pt =
       if not check_compatibility then
         pt
-      else 
+      else
         match pt_compatible_with table pt (S.system s) with
         | `Subset -> pt_project_system_set table (S.vars s) pt (S.system s)
         | `ContextIndepPT -> { pt with system = S.system s; }
-        | `Failed         -> error_pt_bad_system loc table pt 
+        | `Failed         -> error_pt_bad_system loc table pt
     in
 
     (* close proof-term by inferring as many pattern variables as possible *)
@@ -1273,7 +1272,7 @@ module Mk (Args : MkArgs) : S with
     (* FIXME: don't generalize in convert_pt_gen *)
     let f_args, form = decompose_forall_tagged_k Equiv.Any_t form in
     let f_args, subst = Term.refresh_vars_w_info f_args in
-   
+
     let form = Equiv.Any.subst subst form in
     let args = List.append f_args args in
 
