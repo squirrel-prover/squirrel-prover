@@ -79,15 +79,14 @@ type p_hint =
   | Hint_rewrite of Symbols.p_path
   | Hint_smt     of Symbols.p_path
 
-let add_hint_rewrite (s : Symbols.p_path) ty_vars form table : Symbols.table =
+let add_hint_rewrite (s : Symbols.p_path) pat_params system form table : Symbols.table =
   let db = hint_db table in
   let pat = Pattern.pat_of_form form in
-  let pat_params = { Params.empty with ty_vars; } in
   let pat = Term.{ pat with pat_params; pat_term = (pat.pat_term,Concrete.LocHyp) } in
   let rule = 
     LowRewrite.pat_to_rw_rule
       ~loc:(Symbols.p_path_loc s) ~destr_eq:Term.destr_eq ~destr_not:Term.destr_not 
-      SE.full_any GlobalEq `LeftToRight pat 
+      system GlobalEq `LeftToRight pat 
   in
   let name = Symbols.p_path_to_string ~sep:"_" s in
   let h = { name; rule; } in

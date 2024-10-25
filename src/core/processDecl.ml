@@ -559,16 +559,11 @@ let add_hint_rewrite table (s : Symbols.p_path) db =
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "rewrite hints must be asymptotic or exact");
 
-  if not (SE.subset table SE.full_any lem.system.set) then
-    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
-      (Failure "rewrite hints must apply to any system");
+  assert (lem.system.pair = None;); (* as we only forward [system.set] below *)
 
-  if lem.params.se_vars <> [] then
-    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
-      (Failure "rewrite hints do not support system variables");
+  Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula db
 
-  Hint.add_hint_rewrite s lem.params.ty_vars lem.Goal.formula.formula db
-
+(*------------------------------------------------------------------*)
 let add_hint_smt table (s : Symbols.p_path) db =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in

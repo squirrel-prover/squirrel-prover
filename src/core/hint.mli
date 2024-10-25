@@ -1,5 +1,8 @@
 open Utils
 
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
 type rw_hint = { 
   name : string; 
   rule : LowRewrite.rw_rule;
@@ -22,6 +25,6 @@ type p_hint =
   | Hint_smt     of Symbols.p_path
 
 val add_hint_rewrite : 
-  Symbols.p_path -> Type.tvars -> Term.term -> Symbols.table -> Symbols.table
+  Symbols.p_path -> Params.t -> SE.t -> Term.term -> Symbols.table -> Symbols.table
 
 val add_hint_smt : Term.term -> Symbols.table -> Symbols.table
