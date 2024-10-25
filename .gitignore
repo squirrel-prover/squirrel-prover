@@ -33,6 +33,7 @@ node_modules/
 *.exrc
 *.\#*.sp
 .venv/
+app/www/static/theories/
 documentation/sphinx/build/
 # *.py[cod]
 *__pycache__/
