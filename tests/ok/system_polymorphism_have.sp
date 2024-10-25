@@ -27,10 +27,7 @@ Abort.
 (* local lemma, with an `equiv` field *)
 lemma _ {P Q[pair]} in [set:P; equiv:Q] : false.
 Proof.
-  checkfail have ? := loc_lem exn NoAssumpSystem. 
-  (* Squirrel does not see that the lemma should apply because
-     the lemma has no `equiv` component and can thus safely be interpreted in `Q`. *)
-
+  have ? := loc_lem.
   checkfail have ? := glob_lem1 exn NoAssumpSystem. 
   (*`P` is not necessarily a pair, so applying this lemma would be
   unsound. *)
@@ -70,11 +67,7 @@ Abort.
 
 lemma _ in [set:P1; equiv:P1] : false.
 Proof.
-  checkfail have ? := loc_lem exn NoAssumpSystem. 
-  (* Squirrel does not see that the lemma should apply because
-     the lemma has no `equiv` component and can thus safely be 
-     interpreted in `Q`. *)
-
+  have ? := loc_lem.
   have ? := glob_lem1.
   have ? := glob_lem2.  
 Abort.
