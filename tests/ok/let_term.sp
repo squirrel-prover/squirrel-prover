@@ -173,7 +173,7 @@ Proof.
   (* apply eq_ref. *)
 Abort.
 
-global lemma [set:P1; equiv:P1] _ :
+global lemma [P1] _ :
   [happens(A)] -> 
   Let z = output@A in
   equiv(diff(z,zero)) ->
@@ -187,7 +187,7 @@ Proof.
   rewrite /output.
 Abort.
 
-global lemma [set:P0; equiv:P0] _ :
+global lemma [P0] _ :
   [happens(A)] -> 
   Let z = output@A in
   equiv(diff(z,zero)) ->
@@ -196,12 +196,12 @@ global lemma [set:P0; equiv:P0] _ :
 Proof.
   intro H z H0 H1.
   rewrite /z in H1.
-  rewrite /z.
+  rewrite /z. print eq_refl.
   apply eq_refl.
 Qed.
 
 (* trivial check *)
-global lemma [set:P1; equiv:P1] _ :
+global lemma [P1] _ :
   [happens(A)] -> 
   Let z = output@A in
   [z = one] /\ equiv(z).
@@ -213,7 +213,7 @@ Proof.
 Qed.
 
 (* trivial check *)
-global lemma [set:P0; equiv:P0] _ :
+global lemma [P0] _ :
   [happens(A)] -> 
   Let z = output@A in
   equiv(z).
@@ -231,7 +231,7 @@ Proof.
     admit.
 Qed.
 
-global lemma [set:P1; equiv:P1] _ :
+global lemma [P1] _ :
   [diff(one, zero) = zero] ->
   [happens(A)] -> 
   Let z = diff(output@A,zero) in
