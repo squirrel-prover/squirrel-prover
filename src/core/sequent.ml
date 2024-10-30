@@ -271,13 +271,15 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
 
 
 (*------------------------------------------------------------------*)
-(** Projects [pt] onto [system], if possible,
-    projecting diffs in terms if necessary. *)
+(** Return a proof-term equivalent to [pt] but under the set annotation
+    of [system], projecting diffs in reachability atoms if necessary.
+    It is assumed that the change of annotation is possible, i.e. that
+    enough checks have been performed before-hand.
+    It is assumed (but not checked) that pair annotations require
+    no changes to [pt]. *)
 let pt_project_system_set
     (table : Symbols.table) (vars : Vars.env)
     (pt : PT.t) (system : SE.context) : PT.t
-    (* FIXME equiv component of [system] seems unused:
-      passing set directly would be clearer *)
   =
   if pt.system = system then pt else
   (* project local hyps. and conclusion [arg] over [system]. *)
@@ -339,37 +341,6 @@ let no_equiv_any : Equiv.any_form -> bool = function
 let is_system_context_indep : Equiv.any_form -> bool = function
   | Equiv.Local  _ -> false
   | Equiv.Global f -> Equiv.is_system_context_indep f
-
-(** Check if [pt] is general enough for [system].
-    Note that we do not use this function in [pt_unify_systems],
-    because it must do more complicated checks.
-    Result:
-    - [`ContextIndep] if there are no system-context dependent formulas in
-      the proof-term
-    - [`Subset] if there may be system-context dependent formulas, but the
-      system context of the proof-term contains the target system context
-    - [`Failed] if everything else failed. *)
-let pt_compatible_with
-    table (pt : PT.t) (system : SE.context)
-  : [`Subset | `ContextIndepPT | `Failed]
-  =
-  if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
-    `ContextIndepPT
-  else
-    begin
-    (* Check equivalence systems in [system.pair]. *)
-    let comp_pair =
-      (* if [pt] has no equivalences, it is compatible. *)
-      ( List.for_all no_equiv_any (pt.form :: pt.subgs) ) ||
-
-      (* or if both system pair are identical *)
-      oequal (SE.equal_modulo table) system.pair pt.system.pair
-    in
-    let comp_set =
-      SE.subset_modulo table system.set pt.system.set
-    in
-    if comp_pair && comp_set then `Subset else `Failed
-  end
 
 (*------------------------------------------------------------------*)
 let pt_unify_warning_systems table ~(pt : PT.t) ~(arg : PT.t) : unit =
@@ -1246,11 +1217,84 @@ module Mk (Args : MkArgs) : S with
     let pt =
       if not check_compatibility then
         pt
+      else if List.for_all is_system_context_indep (pt.form :: pt.subgs) then
+        (* TODO this case seems hardly useful because [is_system_context_indep]
+           currently forbids both reach and equiv atoms *)
+        { pt with system = S.system s }
       else
-        match pt_compatible_with table pt (S.system s) with
-        | `Subset -> pt_project_system_set table (S.vars s) pt (S.system s)
-        | `ContextIndepPT -> { pt with system = S.system s; }
-        | `Failed         -> error_pt_bad_system loc table pt
+
+        (* First adjust proof-term wrt pair annotation.
+           Annotation will be changed later. *)
+        let pt =
+          match pt.system.pair, (S.system s).pair with
+
+          (* Cases where annotation is irrelevant. *)
+          | None, _ -> pt
+          | Some _, _ when List.for_all no_equiv_any (pt.form :: pt.subgs) -> pt
+
+          (* Same pair annotations, i.e. same systems with same labels. *)
+          | Some src, Some dst when SE.equal table src dst -> pt
+
+          (* Swapped systems. *)
+          | Some src, Some dst
+            when
+              let (_,src1),(_,src2) = SystemExprSyntax.fst src, SystemExprSyntax.snd src in
+              let (_,dst1),(_,dst2) = SystemExprSyntax.fst dst, SystemExprSyntax.snd dst in
+              (src1,src2) = (dst2,dst1) ->
+            pt_rename_system_pair pt (Some dst)
+
+          | _ -> error_pt_bad_system loc table pt
+        in
+
+        (* Then adjust proof-term for set annotations. *)
+        if SE.is_any pt.system.set then { pt with system = S.system s } else
+        let pt_set = SE.(to_list (to_fset pt.system.set)) in
+        let s_set = SE.(to_list (to_fset (S.system s).set)) in
+        (* We want to be able to move from a set annotation to one of its
+           subsets (e.g. from [left:S1,right:S2] to [left:S1]) but we also
+           want to be able to rename projections (e.g. going from
+           [left:S1,right:S2] to [epsilon:S1]).
+           It is however not safe to use pt_project_system_set when the target
+           set annotation is a subset_modulo of the original annotation:
+           we have to guarantee that mk_proj_subst does not encounter
+           conflicting projections. Hence we check below a criterion that
+           sits somewhere between subset and subset_modulo.
+           In addition to this, we handle separately a special case,
+           which allows to move e.g. from [left:S1,right:S2] to
+           [lbl1:S1,lbl2:S1], as this is easily achieved and is used in
+           one of our examples (although it was probably initially only
+           supported by accident). *)
+        match s_set with
+        | (lbl,ss)::tl when
+          List.exists (fun (_,ss') -> ss = ss') pt_set &&
+          List.for_all (fun (_,ss') -> ss = ss') tl ->
+          (* Project to ss alone, then move to repeated set annotation,
+             which is logically equivalent and requires no modification
+             of terms as diff operators cannot appear. *)
+          let pt =
+            pt_project_system_set table (S.vars s) pt
+              { (S.system s) with set = (SE.make_fset table ~labels:[Some lbl] [ss] :> < > SE.expr) }
+          in
+          { pt with system = S.system s }
+        | _ ->
+          (* Every single system in s_set must be covered (perhaps ambiguously)
+             by a single system from pt_set, and every single system from
+             pt_set should correspond to at most one single system in s_set so
+             that projection renaming is a function. *)
+          if List.for_all
+               (fun (_,sys) ->
+                  let l = List.filter (fun (_,sys') -> sys = sys') pt_set in
+                  List.length l >= 1)
+               s_set &&
+             List.for_all
+               (fun (_,sys) ->
+                 let l = List.filter (fun (_,sys') -> sys = sys') s_set in
+                 List.length l <= 1)
+               pt_set
+          then
+            pt_project_system_set table (S.vars s) pt (S.system s)
+          else
+            error_pt_bad_system loc table pt
     in
 
     (* close proof-term by inferring as many pattern variables as possible *)
