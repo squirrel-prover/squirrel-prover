@@ -997,6 +997,12 @@ let fa s =
     | None -> unsupported ()
   in
   match u,v with
+  | Term.Tuple l, Term.Tuple l' ->
+    List.map2
+      (fun t t' ->
+         s |> TS.set_conclusion (Term.mk_eq t t'))
+      l l'
+
   | Term.App (Term.Fun (f,_),[c;t;e]), Term.App (Term.Fun (f',_),[c';t';e'])
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
