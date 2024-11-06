@@ -2725,7 +2725,6 @@ module E = struct
     | _ -> false
 
 
-  
   (*------------------------------------------------------------------*)
   let get_local_of_hyps (hyps : TraceHyps.hyps) =
     let hyps =
@@ -2770,6 +2769,7 @@ module E = struct
     in
     List.for_all check_one (decompose_ands cond)
     
+  (*------------------------------------------------------------------*)
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
       (table  : Symbols.table)
@@ -2839,7 +2839,7 @@ module E = struct
       [known].
       This includes both direct specialization, and specialization relying on
       the Function Application rule. *)
-  let rec deduce
+  let rec specialize_deduce
       (table  : Symbols.table)
       (env    : Vars.env)
       (system : SE.fset)
@@ -2847,13 +2847,13 @@ module E = struct
       (known_sets : known_sets) : cand_sets
     =
     let direct_deds = specialize_all table system cand known_sets in
-    let fa_deds = deduce_fa table env system cand known_sets in
+    let fa_deds = specialize_deduce_fa table env system cand known_sets in
 
     direct_deds @ fa_deds
 
   (** Return a list of specialization of the tuples in [cand] deducible from
       [terms] and [pseqs]. *)
-  and deduce_list
+  and specialize_deduce_list
       (table  : Symbols.table)
       (env    : Vars.env)
       (system : SE.fset)
@@ -2864,7 +2864,7 @@ module E = struct
     | [] -> [cand]
     | t :: tail ->
       (* find deducible specialization of the first term of the tuple. *)
-      let t_deds = deduce table env system { cand with term = t } known_sets in
+      let t_deds = specialize_deduce table env system { cand with term = t } known_sets in
 
       (* for each such specialization, complete it into a specialization of
          the full tuple. *)
@@ -2872,7 +2872,7 @@ module E = struct
           (* find a deducible specialization of the tail of the tuple,
              starting from the  specialization of [t]. *)
           let cand_tail : cand_tuple_set = { t_ded with term = tail } in
-          let tail_deds = deduce_list table env system cand_tail known_sets in
+          let tail_deds = specialize_deduce_list table env system cand_tail known_sets in
 
           (* build the deducible specialization of the full tuple. *)
           List.map (fun (tail_ded : cand_tuple_set) ->
@@ -2880,10 +2880,10 @@ module E = struct
             ) tail_deds
         ) t_deds
 
-  (** Return a list of specialization of [cand] deducible from [terms] and
-      [pseqs] using Function Application.
+  (** Return a list of specialization of [cand] deducible from [terms] 
+      using Function Application.
       Does not include direct specialization. *)
-  and deduce_fa
+  and specialize_deduce_fa
       (table  : Symbols.table)
       (env    : Vars.env)
       (system : SE.fset)
@@ -2897,7 +2897,7 @@ module E = struct
       : cand_sets 
       =
       let terms_cand = { cand with term = terms } in
-      let terms_deds = deduce_list table env system terms_cand known_sets in
+      let terms_deds = specialize_deduce_list table env system terms_cand known_sets in
       List.map (fun (terms_ded : cand_tuple_set) ->
           { terms_ded with
             term = mk_cand_of_terms terms_ded.term }
@@ -2922,7 +2922,7 @@ module E = struct
         match Macros.get_definition cntxt ms ~args:l ~ts with
         | `Undef | `MaybeDef -> []
         | `Def body ->
-          deduce table env system { cand with term = body } known_sets
+          specialize_deduce table env system { cand with term = body } known_sets
       end
 
     | Term.Proj (i,t) -> 
@@ -2956,7 +2956,7 @@ module E = struct
     
     (* Return a list of specialization of [cand] deducible from
        [init_terms, known_sets] for action [a] at time [a]. *)
-    let filter_deduce_action
+    let filter_specialize_deduce_action
         (a : Symbols.action)
         (cand : MCset.t)
         (init_terms : known_sets)              (* initial terms *)
@@ -2996,7 +2996,7 @@ module E = struct
           in
           known_sets_union init_terms known_sets
         in
-        let ded_sets = deduce table env system cand_set all_known_sets in
+        let ded_sets = specialize_deduce table env system cand_set all_known_sets in
 
         let mset_l =
           List.fold_left (fun mset_l ded_set ->
@@ -3026,7 +3026,7 @@ module E = struct
         mset_list_simplify table (system:>SE.t) mset_l
     in
 
-    let filter_deduce_action_list
+    let filter_specialize_deduce_action_list
         (a : Symbols.action)
         (cands : msets)
         (init_terms : known_sets)              (* initial terms *)
@@ -3036,7 +3036,7 @@ module E = struct
       List.map (fun (mname, cand_l) ->
           let mset_l =
             List.concat_map (fun cand ->
-                filter_deduce_action a cand init_terms known_sets
+                filter_specialize_deduce_action a cand init_terms known_sets
               ) cand_l
           in
           (mname, mset_list_inter table (system:>SE.t) env cand_l mset_l)
@@ -3045,7 +3045,7 @@ module E = struct
 
     (* fold over all actions of the protocol, to find a specialization of
        [cands] stable by each action. *)
-    let filter_deduce_all_actions
+    let filter_specialize_deduce_all_actions
         (cands : msets)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)
@@ -3053,24 +3053,24 @@ module E = struct
       =
       let names = SE.symbs table system in
       System.Msh.fold (fun _ name cands ->
-          filter_deduce_action_list name cands init_terms known_sets
+          filter_specialize_deduce_action_list name cands init_terms known_sets
         ) names cands
     in
 
-    let rec deduce_fixpoint
+    let rec specialize_deduce_fixpoint
         (cands : msets)
         (init_terms : known_sets) (* initial terms *)
       : msets
       =
       let init_known : MCset.t list = msets_to_list cands in
-      let cands' = filter_deduce_all_actions cands init_terms init_known in
+      let cands' = filter_specialize_deduce_all_actions cands init_terms init_known in
 
       dbg "deduce_fixpoint:@.%a@." pp_msets cands';
 
       (* check if [cands] is included in [cands'] *)
       if msets_incl table (system:>SE.t) cands cands'
       then cands'
-      else deduce_fixpoint cands' init_terms
+      else specialize_deduce_fixpoint cands' init_terms
     in
 
     (* we use as maximal timestamp the first timestamp appearing in a
@@ -3124,7 +3124,7 @@ module E = struct
 
     dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
 
-    deduce_fixpoint init_fixpoint init_terms
+    specialize_deduce_fixpoint init_fixpoint init_terms
 
   (* memoisation *)
   let strengthen =
@@ -3140,13 +3140,12 @@ module E = struct
 
       let equal (tbl, s, e, terms) (tbl', s', e', terms') =
         Symbols.tag tbl = Symbols.tag tbl' &&
-        s = s' &&
+        SE.equal0 s s' &&
         e = e' &&               (* FIXME: better eq check? *)
         List.length terms = List.length terms' &&
-        List.for_all2 (=) terms terms' (* FIXME: term hashconsing *)
+        List.for_all2 (Term.equal) terms terms'
 
     end in
-    (* FIXME: memory leaks *)
     let module Memo = Hashtbl.Make(M) in
     let memo = Memo.create 256 in
     fun tbl s e terms ->
@@ -3174,8 +3173,8 @@ module E = struct
   (* throw away match infos, which have no meaning when unifying *)
 
   (*------------------------------------------------------------------*)
-  (** Try to match [cterm] as an element of [known]. *)
-  let _deduce_mem_one
+  (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
+  let deduce_mem0
       ?(conv:(Term.term -> Term.term -> bool) option)
       ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
@@ -3225,7 +3224,7 @@ module E = struct
         Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
     with NoMatch _ -> None
 
-  let deduce_mem_one
+  let deduce_mem
       ?(conv:(Term.term -> Term.term -> bool) option)
       ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
@@ -3238,29 +3237,29 @@ module E = struct
          [st.support] ∪ [known.vars]
        - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
 
-       The issue is that the matching algorithm will ensure that the latter
+       The issue is that the unification algorithm will ensure that the latter
        condition holds for ([st.support] ∪ [known.vars]), and not just
        for [st.support]. This makes us reject valid instance that appear in
        practice.
 
-       We need to modify the matching algorithm to account for that.
+       We need to modify the unification algorithm to account for that.
 
-       Instead, for now, we try either a normal matching, or a matching where we
+       Instead, for now, we try either a normal unification, or a unification where we
        cleared both [st.bvs] and [st.support] (i.e. we do not try to infer the
        arguments of the lemma being applied).
        We move [st.bvs] to [st.env] to keep variable tags information.
     *)
-    match _deduce_mem_one ?conv ?decompose_ands cterm known st with
+    match deduce_mem0 ?conv ?decompose_ands cterm known st with
     | Some mv -> Some mv
     | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
       if st.bvs = [] && st.support = [] then None
       else
         let env = Vars.add_vars st.bvs st.env in
         let st = { st with bvs = []; support = []; env; } in
-        _deduce_mem_one cterm known st
+        deduce_mem0 ?conv ?decompose_ands cterm known st
 
   (** Try to match [term] as an element of a sequence in [elems]. *)
-  let deduce_mem
+  let deduce_mem_list
       (cterm : cond_term)
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
@@ -3268,15 +3267,15 @@ module E = struct
     let l_proj, r_proj = get_system_set_pair_projs st in
     let term = head_normal_biterm [l_proj; r_proj] cterm.term in
     let elems_head = List.assoc_dflt [] (Term.get_head term) elems in
-    List.find_map (fun elem -> deduce_mem_one cterm elem st) elems_head
+    List.find_map (fun elem -> deduce_mem cterm elem st) elems_head
  
   (*------------------------------------------------------------------*)
-  (** [fa_decompose term st] return a list of matching conditions that must be
-      met for [term] to be deducible starting from [st].
+  (** [fa_decompose cterm st] return a list of deduction conditions that must be
+      met for [cterm] to be deducible starting from [st].
       Return [None] if Function Application fails on [term] *)
   let fa_decompose
-      (cterm : cond_term)
-      (st    : unif_state) : (unif_state * cond_term) list option
+      (cterm : cond_term) (st : unif_state)
+    : (unif_state * cond_term) list option
     =
     let env = env_of_unif_state st in  
     let l_proj, r_proj = get_system_set_pair_projs st in
@@ -3361,55 +3360,49 @@ module E = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  (** Check that [cterm] can be deduced from [pat_terms].
-      This check is modulo:
-      - Restr: all elements may not be used;
-      - Sequence expantion: sequences may be expanded;
-      - Function Application: [cterm] may be decomposed into smaller terms. *)
-  let rec match_term_incl
-      (cterm     : cond_term)
-      (pat_terms : known_sets)
+  (** Check if [inputs ▷ output]. *)
+  let rec deduce
+      ~(output   : cond_term)
+      ~(inputs   : known_sets)
       (st        : unif_state)
       (minfos    : match_infos) : Mvar.t * match_infos
     =
-    match deduce_mem cterm pat_terms st with
-    | Some mv -> mv, minfos_ok cterm.term minfos
+    match deduce_mem_list output inputs st with
+    | Some mv -> mv, minfos_ok output.term minfos
     | None ->
       (* if that fails, decompose [term] through the Function Application
          rule, and recurse. *)
-      fa_match_term_incl cterm pat_terms st minfos
+      deduce_fa ~output ~inputs st minfos
 
-  (** Check that [cterm] can be deduced from [pat_terms]. *)
-  and fa_match_term_incl
-      (cterm     : cond_term)
-      (pat_terms : known_sets)
-      (st        : unif_state)
-      (minfos    : match_infos) : Mvar.t * match_infos
+  (** Check if [inputs ▷ output] using the function application rules. *)
+  and deduce_fa
+      ~(output : cond_term)
+      ~(inputs : known_sets)
+      (st      : unif_state)
+      (minfos  : match_infos) : Mvar.t * match_infos
     =
-    match fa_decompose cterm st with
-    | None -> st.mv, minfos_failed cterm.term minfos
+    match fa_decompose output st with
+    | None -> st.mv, minfos_failed output.term minfos
 
     | Some fa_conds ->
       let minfos =
         let st = List.map (fun x -> (snd x).term) fa_conds in
-        minfos_check_st cterm.term st minfos
+        minfos_check_st output.term st minfos
       in
 
       List.fold_left (fun (mv, minfos) (st, t) ->
           let mv, minfos =
-            match_term_incl t pat_terms { st with mv } minfos
+            deduce ~output:t ~inputs { st with mv } minfos
           in
           mv, minfos
         ) (st.mv, minfos) fa_conds
 
   (*------------------------------------------------------------------*)
-  (** Greedily check entailment through an inclusion check of [terms] in
-      [pat_terms]. 
-      [terms] and [pat_terms] are over [st.system.set]. *)
-  let match_equiv_incl
-      (terms     : Term.term list)
-      (pat_terms : Term.term list)
-      (st        : unif_state) : Mvar.t
+  (** Check if [inputs ▷ outputs].
+      [outputs] and [inputs] are over [st.system.set]. *)
+  let deduce_terms
+      ~(outputs : Term.terms) ~(inputs  : Term.terms) (st : unif_state)
+    : Mvar.t
     =
     let se = st.system.set in
 
@@ -3418,7 +3411,7 @@ module E = struct
     let mset_l =
       if st.support = [] && st.use_fadup && SE.is_fset se then
         let system = SE.to_fset se in
-        let msets = strengthen st.table system st.env pat_terms in
+        let msets = strengthen st.table system st.env inputs in
         msets_to_list msets
       else []
     in
@@ -3426,26 +3419,26 @@ module E = struct
        TConfig.show_strengthened_hyp st.table then
       (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
 
-    let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
-    let pat_terms =
+  let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
+  let inputs =
       known_sets_union
         (known_sets_of_mset_l se mset_l)
-        (known_sets_of_terms env pat_terms)
+        (known_sets_of_terms env inputs)
     in
     let mv, minfos =
-      List.fold_left (fun (mv, minfos) term ->
-          let cterm = { term; cond = Term.mk_true; } in
-          match_term_incl cterm pat_terms { st with mv } minfos
-        ) (st.mv, Mt.empty) terms
+      List.fold_left (fun (mv, minfos) output ->
+          let output = { term = output; cond = Term.mk_true; } in
+          deduce ~output ~inputs { st with mv } minfos
+        ) (st.mv, Mt.empty) outputs
     in
 
     if Mt.for_all (fun _ r -> r <> MR_failed) minfos
     then mv
-    else no_unif ~infos:(terms, minfos_norm minfos) ()
+    else no_unif ~infos:(outputs, minfos_norm minfos) ()
 
 
   (*------------------------------------------------------------------*)
-  let unif_equiv_eq
+  let tunif_equiv_eq
       (terms     : Term.term list)
       (pat_terms : Term.term list)
       (st        : unif_state) : Mvar.t
@@ -3457,31 +3450,25 @@ module E = struct
       ) terms pat_terms st.mv
 
   (*------------------------------------------------------------------*)
-  (** Check entailment between two equivalences (only in matching mode).
-      - [Covar]    : [pat_es] entails [es]
-      - [Contravar]: [es] entails [pat_es] *)
-  let tunif_e
-      ~(mode     : [`Eq | `Covar | `Contravar])
-      (terms     : Term.terms)
-      (pat_terms : Term.terms)
-      (st        : unif_state) : Mvar.t
+  (** Check entailment between two equivalences.
+      - [Covar]    : [equiv(terms0) ↔ equiv(terms)]
+      - [Covar]    : [equiv(terms0) → equiv(terms)]
+      - [Contravar]: [equiv(terms0) ← equiv(terms)] *)
+  let tunif_equiv
+      ~(mode  : [`Eq | `Covar | `Contravar])
+      (terms  : Term.terms)
+      (terms0 : Term.terms)
+      (st     : unif_state) : Mvar.t
     =
     match mode with
-    | `Eq        -> 
-      unif_equiv_eq terms pat_terms st
+    | `Eq        ->
+      tunif_equiv_eq terms terms0 st
     | `Contravar ->
-      if st.support = [] then
-        match_equiv_incl pat_terms terms st
-      else 
-        unif_equiv_eq terms pat_terms st
-    (* FIXME: in contravariant position with a non-empty support, we
-       cannot check for inclusion because, in the seq case, this
-       requires to infer the seq variables for the *term* being
-       matched. Consequently, this is no longer a matching problem,
-       but is a unification problem. *)
-
-    | `Covar     -> 
-      match_equiv_incl terms pat_terms st
+      (* [terms ▷ terms0 → equiv(terms) → equiv(terms0)] *)
+      deduce_terms ~outputs:terms0 ~inputs:terms  st
+    | `Covar     ->
+      (* [terms0 ▷ terms → equiv(terms0) → equiv(terms)] *)
+      deduce_terms ~outputs:terms  ~inputs:terms0 st
 
   (*------------------------------------------------------------------*)
   (** Unifies two [Equiv.form] *)
@@ -3512,7 +3499,7 @@ module E = struct
       in
       (*FIXME: Anomaly with [any] here*)
       let st = st_change_context st system in
-      let mv  = tunif_e ~mode es.terms pat_es.terms st in
+      let mv = tunif_equiv ~mode es.terms pat_es.terms st in
       begin
         match es.bound, pat_es.bound with
         | None, None -> mv

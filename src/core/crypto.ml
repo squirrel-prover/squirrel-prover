@@ -353,7 +353,7 @@ let equal_term_name_eq
   let unif_state =
     Match.mk_unif_state env.vars env.table system hyps (name_vars)
   in 
-  let mv = Match.E.deduce_mem_one cterm known_set unif_state in
+  let mv = Match.E.deduce_mem cterm known_set unif_state in
   match mv with
   | Some mv ->
     (* If the matching found a substitution, get all equalities in name the 
@@ -472,7 +472,7 @@ let exact_eq_under_cond
   let unif_state =
     Match.mk_unif_state env.vars env.table system hyps unif_vars
   in
-  Match.E.deduce_mem_one ~conv ~decompose_ands cterm known_set unif_state
+  Match.E.deduce_mem ~conv ~decompose_ands cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 exception UnknowGlobalSmplsAssign

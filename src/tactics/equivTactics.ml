@@ -1050,13 +1050,10 @@ let pair_of_single_sys (system : SE.context) : SE.context =
 
   let systems_list = SE.to_list (SE.to_fset system.set) in
   let _, single_system = List.hd systems_list in
-  let res:SE.context = 
-    { set = SE.to_arbitrary (SE.singleton single_system);
-      pair = Some (SE.make_pair
-                     (Projection.left, single_system) 
-                     (Projection.right, single_system)) } 
-  in
-  res
+  { set = (SE.singleton single_system :> SE.t);
+    pair = Some (SE.make_pair
+                   (Projection.left , single_system) 
+                   (Projection.right, single_system)) } 
 
 
 (** Tactic [deduce] in a goal [u |> v] to prove that term [u]
@@ -1080,7 +1077,7 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
   in
   match match_result with
   | NoMatch minfos -> 
-    soft_failure (ApplyMatchFailure minfos) (*TODO check information printed *)
+    soft_failure (ApplyMatchFailure minfos) 
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
     []
