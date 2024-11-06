@@ -3310,32 +3310,27 @@ module E = struct
       Some (List.map (fun term -> st, { cterm with term } ) (t :: terms))
 
     | Term.Quant (q, es, term) ->
-      (* [ForAll] and [Exists] require quant. over finite fix types *)
+      (* [Seq], [ForAll] and [Exists] require to quantify over
+         enumerable types *)
       let check_quantif =
         match q with
-          List.for_all (fun v -> 
-              Symbols.TyInfo.is_finite st.table (Vars.ty v) && 
-              Symbols.TyInfo.is_fixed  st.table (Vars.ty v)) es 
         | Lambda -> true
         | Seq | ForAll | Exists ->
+          List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) es
       in
-      if not check_quantif then 
-        None 
+      if not check_quantif then None
       else
         let es, subst = Term.refresh_vars es in
         let term = Term.subst subst term in
-
+        
         (* binder variables are declared global, constant and adv,
            as these are inputs (hence known values) to the adversary  *)
         let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
         Some [(st, { cterm with term; })]
 
     | Find (is, c, d, e)
-      when List.for_all
-          (fun v -> 
-             Symbols.TyInfo.is_finite st.table (Vars.ty v) && 
-             Symbols.TyInfo.is_fixed  st.table (Vars.ty v)
-          ) is 
+      when
+        List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) is
       ->
       let is, subst = Term.refresh_vars is in
       let c, d = Term.subst subst c, Term.subst subst d in
