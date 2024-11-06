@@ -3313,11 +3313,11 @@ module E = struct
       (* [ForAll] and [Exists] require quant. over finite fix types *)
       let check_quantif =
         match q with
-        | Seq | Lambda -> true
-        | ForAll | Exists -> 
           List.for_all (fun v -> 
               Symbols.TyInfo.is_finite st.table (Vars.ty v) && 
               Symbols.TyInfo.is_fixed  st.table (Vars.ty v)) es 
+        | Lambda -> true
+        | Seq | ForAll | Exists ->
       in
       if not check_quantif then 
         None 
