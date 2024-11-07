@@ -5,6 +5,7 @@ open Ppenv
 
 module TS = TraceSequent
 module ES = EquivSequent
+module SE = SystemExpr
 
 module MP = Match.Pos
 module Sp = Match.Pos.Sp
@@ -369,8 +370,13 @@ let freshR_secrecy
   (* get the components of the secrecy predicate, incl. the system *)
   let sgoal = ES.conclusion_as_secrecy s in
   let env = ES.env s in
-  let sec_context =
-    Constr.make_context ~table:env.table ~system:(ES.secrecy_system sgoal) in
+
+  let system = ES.secrecy_system sgoal in
+  if not (SE.is_fset system) then
+    soft_failure (Failure "the conclusion must be over a concrete system");
+  let system = SE.to_fset system in
+  
+  let sec_context = Constr.make_context ~table:env.table ~system in
 
   
   
@@ -415,8 +421,14 @@ let freshL_secrecy
   (* get the components of the secrecy predicate, incl. the system *)
   let sgoal = ES.conclusion_as_secrecy s in
   let env = ES.env s in
+  
+  let system = ES.secrecy_system sgoal in
+  if not (SE.is_fset system) then
+    soft_failure (Failure "the conclusion must be over a concrete system");
+  let system = SE.to_fset system in
+  
   let sec_context = 
-    Constr.make_context ~table:env.table ~system:(ES.secrecy_system sgoal)
+    Constr.make_context ~table:env.table ~system
   in
 
   (* get n *)
@@ -443,10 +455,7 @@ let freshL_secrecy
   let phi = Term.mk_ands ~simpl:true phis in
 
   (* the remaining secrecy goal *)
-  let ty_left, _ = ES.secrecy_ty sgoal in
-  let ty_left,_,ty_left' = List.splitat ii ty_left in
-  let ty_left = ty_left @ ty_left' in
-  let new_goal = ES.secrecy_update_left ty_left (uu @ vv) sgoal in
+  let new_goal = ES.secrecy_update_left (uu @ vv) sgoal in
   let new_sec_sequent =
     ES.set_conclusion (ES.mk_form_from_secrecy_goal new_goal) s
   in

@@ -49,5 +49,5 @@ global lemma [any] toto7 (tau : timestamp[const]):
   $(zero |> zero).
 Proof.
   intro Hap E.
-  checkfail deduce exn Failure.
-Abort.
+  deduce.
+Qed.

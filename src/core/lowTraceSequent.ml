@@ -186,6 +186,16 @@ type sequent = S.t
 type sequents = sequent list
 
 (*------------------------------------------------------------------*)
+let get_trace_hyps ?in_system (s : sequent) =
+  match in_system with
+  | None -> s.proof_context
+  | Some system ->
+    Hyps.change_trace_hyps_context
+      ~old_context:s.env.system ~new_context:system
+      ~table:s.env.table ~vars:s.env.vars
+      s.proof_context
+
+(*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
   let atoms = List.map snd (Hyps.get_atoms_of_hyps s.proof_context) in
   (*TODO:Concrete : Probably something to here but not sure for now*)
@@ -524,9 +534,6 @@ let mk_trace_cntxt ?se s =
     system;
     models = Some (get_models s);
   }
-
-(*------------------------------------------------------------------*)
-let get_trace_hyps s = s.proof_context
 
 (*------------------------------------------------------------------*)
 let mem_felem _ _ = false

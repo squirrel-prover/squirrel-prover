@@ -1177,11 +1177,11 @@ type unif_state = {
 }
 
 let mk_unif_state
-    (env : Vars.env)
-    (table : Symbols.table)
-    (system : SE.context)
-    (hyps:Hyps.TraceHyps.hyps)
-    (support : Vars.vars): unif_state
+    ~(env     : Vars.env)
+    (table    : Symbols.table)
+    (system   : SE.context)
+    (hyps     : Hyps.TraceHyps.hyps)
+    ~(support : Vars.vars) : unif_state
   =
   { mode           = `Unif;
     mv             = Mvar.empty;
@@ -1199,11 +1199,12 @@ let mk_unif_state
   }
 
 (*------------------------------------------------------------------*)
-(** [st.system.set] must be a system pair. *)
-let get_system_set_pair_projs (st : unif_state) : Projection.t * Projection.t =
-  let se = st.system.set |> SE.to_pair in
-  fst (SE.fst se), fst (SE.snd se)
-
+let try_head_normal_biterm (st : unif_state) (term : Term.t) : Term.t =
+  if SE.is_fset st.system.set then
+    let projs = SE.to_projs (SE.to_fset st.system.set) in
+    head_normal_biterm projs term
+  else term
+  
 (*------------------------------------------------------------------*)
 let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
   let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
@@ -3264,8 +3265,7 @@ module E = struct
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
     =
-    let l_proj, r_proj = get_system_set_pair_projs st in
-    let term = head_normal_biterm [l_proj; r_proj] cterm.term in
+    let term = try_head_normal_biterm st cterm.term in
     let elems_head = List.assoc_dflt [] (Term.get_head term) elems in
     List.find_map (fun elem -> deduce_mem cterm elem st) elems_head
  
@@ -3278,9 +3278,9 @@ module E = struct
     : (unif_state * cond_term) list option
     =
     let env = env_of_unif_state st in  
-    let l_proj, r_proj = get_system_set_pair_projs st in
+    let term = try_head_normal_biterm st cterm.term in
 
-    match Term.head_normal_biterm [l_proj; r_proj] cterm.term with
+    match term with
     | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)
@@ -3397,7 +3397,7 @@ module E = struct
       [outputs] and [inputs] are over [st.system.set]. *)
   let deduce_terms
       ~(outputs : Term.terms) ~(inputs  : Term.terms) (st : unif_state)
-    : Mvar.t
+    : match_res
     =
     let se = st.system.set in
 
@@ -3428,9 +3428,8 @@ module E = struct
     in
 
     if Mt.for_all (fun _ r -> r <> MR_failed) minfos
-    then mv
-    else no_unif ~infos:(outputs, minfos_norm minfos) ()
-
+    then Match mv
+    else NoMatch (Some (outputs, minfos_norm minfos))
 
   (*------------------------------------------------------------------*)
   let tunif_equiv_eq
@@ -3443,6 +3442,14 @@ module E = struct
     List.fold_right2 (fun t1 t2 mv ->
         term_unif t1 t2 { st with mv }
       ) terms pat_terms st.mv
+
+  (*------------------------------------------------------------------*)
+  (** Get a [Mvar.t] from a [match_res].
+      @raise [NoMatch _] if this is not possible. *)
+  let mvar_of_match_res (res : match_res) : Mvar.t =
+    match res with
+    | Match r -> r
+    | NoMatch infos -> no_unif ?infos ()
 
   (*------------------------------------------------------------------*)
   (** Check entailment between two equivalences.
@@ -3458,12 +3465,16 @@ module E = struct
     match mode with
     | `Eq        ->
       tunif_equiv_eq terms terms0 st
+
     | `Contravar ->
       (* [terms ▷ terms0 → equiv(terms) → equiv(terms0)] *)
-      deduce_terms ~outputs:terms0 ~inputs:terms  st
+      deduce_terms ~outputs:terms0 ~inputs:terms  st |>
+      mvar_of_match_res
+
     | `Covar     ->
       (* [terms0 ▷ terms → equiv(terms0) → equiv(terms)] *)
-      deduce_terms ~outputs:terms  ~inputs:terms0 st
+      deduce_terms ~outputs:terms  ~inputs:terms0 st |>
+      mvar_of_match_res
 
   (*------------------------------------------------------------------*)
   (** Unifies two [Equiv.form] *)

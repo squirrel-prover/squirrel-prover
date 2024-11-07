@@ -18,6 +18,7 @@ open Utils
 open Ppenv
     
 module TraceHyps = Hyps.TraceHyps
+module SE = SystemExpr
 
 (** {2 Module type for sequents} *)
 module type S = sig
@@ -66,7 +67,7 @@ module type S = sig
   val bound : t -> Term.term option
   val set_bound : Term.term option -> t -> t
 
-  val system : t -> SystemExpr.context
+  val system : t -> SE.context
 
   val params : t -> Params.t
 
@@ -93,7 +94,7 @@ module type S = sig
   val set_conclusion_in_context :
     ?update_local:(Term.term -> Term.term option) ->
     ?bound :Term.term ->
-    SystemExpr.context -> conc_form -> t -> t
+    SE.context -> conc_form -> t -> t
 
   (*------------------------------------------------------------------*)
   (** {2 Manipulation of bi-frame elements}
@@ -112,9 +113,14 @@ module type S = sig
   (** Returns trace context, corresponding to [s.env.system.set] for
       both kinds of sequents.
       Option projections to restrict the systems considered. *)
-  val mk_trace_cntxt : ?se:SystemExpr.fset -> t -> Constr.trace_cntxt
+  val mk_trace_cntxt : ?se:SE.fset -> t -> Constr.trace_cntxt
 
-  val get_trace_hyps : t -> TraceHyps.hyps
+  (** Return a set of hypotheses that are a consequence of the
+      hypotheses of the sequent, and are taken in the system context
+      [in_system].
+
+      [in_system] defaults to a[s]'s system. *)
+  val get_trace_hyps : ?in_system:SE.context -> t -> TraceHyps.hyps
 
   (** [get_models s] returns a set of minimal models corresponding to the
       trace atoms in the sequent [s].

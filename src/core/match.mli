@@ -384,8 +384,9 @@ val reduce_glob_let1    : Equiv.form -> Equiv.form * bool
 type unif_state
 
 val mk_unif_state :
-  Vars.env -> Symbols.table -> 
-  SE.context -> Hyps.TraceHyps.hyps -> Vars.vars -> 
+  env:Vars.env -> Symbols.table -> 
+  SE.context -> Hyps.TraceHyps.hyps ->
+  support:Vars.vars -> 
   unif_state
 
 (*------------------------------------------------------------------*)
@@ -427,6 +428,10 @@ module E : sig
     cond_term ->
     term_set ->
     unif_state -> Mvar.t option
+
+  (** Check if [inputs ▷ outputs].
+      [outputs] and [inputs] are over [st.system.set]. *)
+  val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
 
   val known_set_check_impl :
     ?conv:(Term.term -> Term.term -> bool) ->

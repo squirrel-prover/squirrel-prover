@@ -984,23 +984,22 @@ let fa_dup (s : ES.t) : ES.t list =
 (** Deduce recursively removes all elements of a biframe
     that are deducible from the rest. *)
 let deduce_all (s:ES.t) =  
-  let table,system = ES.table s, ES.system s in
-  let hyps = ES.get_trace_hyps s in
-  let option = { Match.default_match_option with mode = `EntailRL } in
-  let rec _deduce_all res goals =
+  let table = ES.table s in
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  
+  let rec _deduce_all res goals : Term.terms =
     match goals with
     | [] -> res
-    | e::after ->
+    | e :: after ->
       let biframe = List.rev_append res goals in
       let biframe_without_e = List.rev_append res after in
-      let goal = Equiv.mk_equiv_atom biframe in
-      let pat = Term.{
-          pat_op_vars   = [];
-          pat_op_params = Params.Open.empty;
-          pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
-        } in
       let match_result = 
-        Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
+        Match.E.deduce_terms ~outputs:biframe ~inputs:biframe_without_e st
       in
       match match_result with
       | NoMatch _ -> _deduce_all (e::res) after 
@@ -1016,64 +1015,47 @@ let deduce_all (s:ES.t) =
 
 (** Checks whether the [i]-th element of the biframe is bideducible
     from the other ones, and if so removes it. *)
-let deduce_int (i : int L.located) s =
+let deduce_int (i : int L.located) (s : ES.t) : ES.t list =
+  let table = ES.table s in
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+
   let before, _, after = split_equiv_conclusion i s in
-  let biframe_without_e = List.rev_append before after in
-  let option = { Match.default_match_option with mode = `EntailRL } in
-  let hyps = ES.get_trace_hyps s in 
-  let table, system = ES.table s, ES.system s in
-  let pat = Term.{
-      pat_op_vars   = [];
-      pat_op_params = Params.Open.empty;
-      pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
-    } in
-  let conclusion = ES.conclusion s in
+  let conclusion_without_e = List.rev_append before after in
+  let conclusion = (ES.conclusion_as_equiv s).terms in
+
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system conclusion pat 
+    Match.E.deduce_terms ~outputs:conclusion ~inputs:conclusion_without_e st
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    [ES.set_equiv_conclusion {terms = biframe_without_e; bound = None} s]
+    [ES.set_equiv_conclusion {terms = conclusion_without_e; bound = None} s]
 (*TODO: Concrete: Probably something to do to create a bounded goal *)
-
-(** If [system] is a single system, builds the system with the
-    pair of that system. 
-    Otherwise, raises a soft failure. *)
-let pair_of_single_sys (system : SE.context) : SE.context =
-  let system_of_set = { system with pair = None } in
-
-  let singles = SE.single_systems_of_context system_of_set in
-  if singles = None || System.Single.Set.cardinal (oget singles) <> 1 then
-    (soft_failure (Failure "Require a single system"));
-
-  let systems_list = SE.to_list (SE.to_fset system.set) in
-  let _, single_system = List.hd systems_list in
-  { set = (SE.singleton single_system :> SE.t);
-    pair = Some (SE.make_pair
-                   (Projection.left , single_system) 
-                   (Projection.right, single_system)) } 
 
 
 (** Tactic [deduce] in a goal [u |> v] to prove that term [u]
     can be deduced from term [v].
     Closes the goal if that is the case, fails otherwise. *)
 let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
-  let option = { Match.default_match_option with mode = `EntailRL } in
-  let hyps = ES.get_trace_hyps s in 
-  let table, system = ES.table s, ES.system s in
-  let system_eq = pair_of_single_sys system in
-  let pat = 
-    Term.{
-      pat_op_vars   = [];
-      pat_op_params = Params.Open.empty;
-      pat_op_term   = Equiv.mk_equiv_atom (ES.secrecy_left goal);} 
+  let table = ES.table s in
+  let system =
+    let system_secrecy = ES.secrecy_system goal in
+    SE.{ (ES.system s) with set = system_secrecy; }
   in
-  let conclusion = Equiv.mk_equiv_atom [ES.secrecy_right goal] in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) 
-      table system_eq conclusion pat 
+    Match.E.deduce_terms
+      ~outputs:[ES.secrecy_right goal]
+      ~inputs:(ES.secrecy_left goal)
+      st
   in
   match match_result with
   | NoMatch minfos -> 
@@ -1087,40 +1069,33 @@ let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
     is deducible from the rest of [u].
     If so, removes it. *)
 let deduce_predicate_int
-    (i : int L.located)
-    (s : ES.t)
-    (goal : ES.secrecy_goal) :
-  ES.t list =
-  if L.unloc i < 0 || List.length (ES.secrecy_left goal) <= L.unloc i then
-    (soft_failure ~loc:(L.loc i) (Failure "Invalid position"));
+    (i : int L.located) (s : ES.t) (goal : ES.secrecy_goal)
+  : ES.t list
+  =
+  let L.{ pl_desc = i; pl_loc = loc; } = i in
+  if i < 0 || List.length (ES.secrecy_left goal) <= i then
+    (soft_failure ~loc (Failure "Invalid position"));
 
-  let filter_ith l = List.filteri (fun j _ -> j <> L.unloc i) l in
-  let left_without_ith = filter_ith (ES.secrecy_left goal) in
-  let left_ty_without_ith = filter_ith (fst (ES.secrecy_ty goal)) in
+  let left_without_ith = List.filteri (fun j _ -> j <> i) (ES.secrecy_left goal) in
 
-  let option = { Match.default_match_option with mode = `EntailRL } in
-  let hyps = ES.get_trace_hyps s in 
-  let table, system = ES.table s, ES.system s in
-  let system_eq = pair_of_single_sys system in
-
-  let pat =
-    Term.{
-      pat_op_vars   = [];
-      pat_op_params = Params.Open.empty;
-      pat_op_term   = Equiv.mk_equiv_atom left_without_ith; }
+  let table = ES.table s in
+  let system =
+    let system_secrecy = ES.secrecy_system goal in
+    SE.{ (ES.system s) with set = system_secrecy; }
   in
-  let conclusion = Equiv.mk_equiv_atom (ES.secrecy_left goal) in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
   let match_result = 
-    Match.E.try_match ~option ~hyps ~env:(ES.vars s) 
-      table system_eq conclusion pat 
+    Match.E.deduce_terms ~outputs:(ES.secrecy_left goal) ~inputs:left_without_ith st
   in
+  
   match match_result with
   | NoMatch minfos -> 
-    soft_failure (ApplyMatchFailure minfos) (*TODO check information printed*)
+    soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
     let new_secrecy_goal = 
-      ES.secrecy_update_left left_ty_without_ith left_without_ith goal
+      ES.secrecy_update_left left_without_ith goal
     in
     [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
 

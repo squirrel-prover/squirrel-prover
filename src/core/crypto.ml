@@ -351,7 +351,7 @@ let equal_term_name_eq
     }
   in
   let unif_state =
-    Match.mk_unif_state env.vars env.table system hyps (name_vars)
+    Match.mk_unif_state ~env:env.vars env.table system hyps ~support:name_vars
   in 
   let mv = Match.E.deduce_mem cterm known_set unif_state in
   match mv with
@@ -470,7 +470,7 @@ let exact_eq_under_cond
   in
   (* FIXME : system changed without modifying hyps accordingly*)
   let unif_state =
-    Match.mk_unif_state env.vars env.table system hyps unif_vars
+    Match.mk_unif_state ~env:env.vars env.table system hyps ~support:unif_vars
   in
   Match.E.deduce_mem ~conv ~decompose_ands cterm known_set unif_state
 

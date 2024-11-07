@@ -417,13 +417,11 @@ let mk_form_from_secrecy_goal (_, pa:secrecy_goal) : Equiv.form =
 let secrecy_kind (sk, _:secrecy_goal) : secrecy_kind =
   sk
 
-let secrecy_system (_, pa:secrecy_goal) : SE.fset =
-  (* sanity check: only one system for secrecy predicates *)
-  assert (List.length pa.se_args = 1);
+let secrecy_system (_, pa:secrecy_goal) : SE.t =
   let se = List.hd pa.se_args in
   (* sanity check: the same system must be in the multi_args *)
   match pa.multi_args with 
-    | [se', _] when SE.equal0 se se' -> (SE.to_fset se)
+    | [se', _] when SE.equal0 se se' -> se
     | _ -> assert false
   
 let secrecy_left (_, pa:secrecy_goal) : Term.terms =
@@ -435,11 +433,6 @@ let secrecy_right (_, pa:secrecy_goal) : Term.term =
   match pa.multi_args with
   | [_, [_;v]] -> v
   | _ -> assert false 
-
-let secrecy_ty (_, pa:secrecy_goal) : Type.ty list * Type.ty =
-  match pa.ty_args with 
-  | [ty_left; ty_right] -> Term.destr_ty_tuple_flatten ty_left, ty_right
-  | _ -> assert false
   
 let conclusion_is_secrecy (s : t) : bool =
   is_secrecy (table s) (s.conclusion)
@@ -450,25 +443,30 @@ let conclusion_as_secrecy (s : t) : secrecy_goal =
   else 
     mk_secrecy_goal_from_form (table s) s.conclusion
   
-let secrecy_update_left 
-      (ty_left:Type.ty list) (left:Term.terms) (sk, pa:secrecy_goal) 
-    : secrecy_goal =
-  assert (List.length left = List.length ty_left);
-  let _, ty_right = secrecy_ty (sk, pa) in
+let secrecy_update_left
+    (left : Term.terms) (sk, pa : secrecy_goal) : secrecy_goal
+  =
+  let ty_left = List.map Term.ty left in
+  let ty_right = Term.ty (secrecy_right (sk, pa)) in
   let left, ty_left =
     if List.length left = 0 then 
       [Term.mk_zero], [Type.tmessage]
     else
       left, ty_left
   in
-  sk, {pa with ty_args=[Type.tuple ty_left; ty_right];
-               multi_args=[(secrecy_system (sk, pa) :> SE.arbitrary),
-                           [Term.mk_tuple left; secrecy_right (sk, pa)]]} 
+  ( sk,
+    {pa with
+     ty_args    = [Type.tuple ty_left; ty_right];
+     multi_args = [secrecy_system (sk, pa),
+                   [Term.mk_tuple left; secrecy_right (sk, pa)]]
+    } )
 
 
 (*------------------------------------------------------------------*)
-let get_trace_hyps s =
-  TS.get_trace_hyps (to_trace_sequent (set_reach_conclusion Term.mk_false s))
+let get_trace_hyps ?in_system s =
+  TS.get_trace_hyps
+    ?in_system
+    (to_trace_sequent (set_reach_conclusion Term.mk_false s))
 
 (*------------------------------------------------------------------*)
 let get_models (s : t) =

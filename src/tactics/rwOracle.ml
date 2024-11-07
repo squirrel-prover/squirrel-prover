@@ -2,6 +2,7 @@
 open Squirrelcore
 
 module ES = EquivSequent
+module SE = SystemExpr
 
 module T = ProverTactics
 module LT = LowTactics
@@ -35,7 +36,7 @@ let get_mode (s : ES.t) : mode =
   else if ES.conclusion_is_secrecy s then
     begin
       let concl = ES.conclusion_as_secrecy s in
-      let _, ty_right = ES.secrecy_ty concl in
+      let ty_right = Term.ty (ES.secrecy_right concl) in
       if not (Type.is_bitstring_encodable ty_right) then
         soft_failure
           (Tactics.GoalBadShape
@@ -144,8 +145,7 @@ let mk_maingoal
      ES.set_equiv_conclusion {equiv with terms = new_terms} s
 
   | Deduction goal ->
-     let old_ty_left, _ = ES.secrecy_ty goal in
-     let new_goal = ES.secrecy_update_left old_ty_left new_terms goal in
+     let new_goal = ES.secrecy_update_left new_terms goal in
      ES.set_conclusion (ES.mk_form_from_secrecy_goal new_goal) s
 
 
@@ -187,7 +187,11 @@ let mk_subgoal
   let system =
     match mode with
     | EquivAsymp _ -> (Utils.oget (ES.env s).system.pair :> SystemExpr.fset)
-    | Deduction g -> ES.secrecy_system g
+    | Deduction g ->
+      let system = ES.secrecy_system g in
+      if not (SE.is_fset system) then
+        soft_failure (Failure "the conclusion must be over a concrete system");
+      SE.to_fset system 
   in
   let system = (system :> SystemExpr.arbitrary) in
   let f_arg = subgoal_f_arg mode reverse i ~new_oracle in

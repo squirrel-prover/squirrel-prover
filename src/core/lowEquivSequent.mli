@@ -64,8 +64,9 @@ val set_reach_conclusion : Term.term -> t -> t
 val to_trace_sequent : t -> LowTraceSequent.t
 
 (*------------------------------------------------------------------*)
-(** {2 Deducibility and non-deducibility goals} *)
-(** Goals corresponding to the predicates [u |> v] and [u *> v].
+(** {2 Deducibility and non-deducibility goals} 
+
+    Goals corresponding to the predicates [u |> v] and [u *> v].
     Defined in [WeakSecrecy.sp]. *)
 
 (** There are two kinds of secrecy judgements:
@@ -98,7 +99,7 @@ val mk_form_from_secrecy_goal : secrecy_goal -> Equiv.form
 val secrecy_kind : secrecy_goal -> secrecy_kind
 
 (** Returns the system of the secrecy goal *)
-val secrecy_system : secrecy_goal -> SE.fset
+val secrecy_system : secrecy_goal -> SE.t
 
 (** Returns the left-hand side of the secrecy goal. 
     In case it is a tuple, or nested tuples, flattens it as
@@ -107,11 +108,6 @@ val secrecy_left : secrecy_goal -> Term.terms
 
 (** Returns the right-hand side of the secrecy goal. *)
 val secrecy_right : secrecy_goal -> Term.term
-
-(** Returns the types of the left- and right-hand sides of the goal. 
-    On the left, in case it is a tuple or nested tuples, flattens it. *)
-
-val secrecy_ty : secrecy_goal -> Type.ty list * Type.ty
 
 (** Checks whether the sequent's conclusion is a secrecy judgement
     (necessarily, this implies that WeakSecrecy is loaded) *)
@@ -122,8 +118,7 @@ val conclusion_is_secrecy : t -> bool
 val conclusion_as_secrecy : t -> secrecy_goal
 
 (** Returns a new secrecy goal where the left-hand side has been updated*)
-val secrecy_update_left :
-  Type.ty list -> Term.terms -> secrecy_goal -> secrecy_goal
+val secrecy_update_left : Term.terms -> secrecy_goal -> secrecy_goal
 
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
