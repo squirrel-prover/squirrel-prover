@@ -10,7 +10,7 @@ Proof. apply foo. Qed.
 
 global lemma _ (x : message) : equiv(diff(x,one)).
 Proof. 
-  checkfail apply foo   exn ApplyMatchFailure. 
+  checkfail apply foo   exn Failure. (* proof-term failure: bad instanciation *)
   checkfail apply foo x exn Failure. (* proof-term failure: bad instanciation *)
 Abort.
 

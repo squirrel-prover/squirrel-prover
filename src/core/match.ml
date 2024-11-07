@@ -5,6 +5,8 @@ open Term
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module Secrecy = Library.Secrecy
+
 module TraceHyps = Hyps.TraceHyps
                      
 module SE = SystemExpr
@@ -1606,7 +1608,7 @@ let unif_gen (type a)
     (f_kind  : a Equiv.f_kind)
     (ut_mode : [`Unif | `Match])
     (fmatch  : 
-       mode:[`Contravar | `Covar | `Eq] -> a -> a -> unif_state -> Mvar.t) 
+       mode:[`EntailLR | `EntailRL | `Eq] -> a -> a -> unif_state -> Mvar.t) 
     ?(option=default_match_option)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
@@ -1675,14 +1677,7 @@ let unif_gen (type a)
   } in
 
   (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
-  let mode =
-    if ut_mode = `Unif then `Eq
-    else
-      match option.mode with
-      | `Eq -> `Eq
-      | `EntailRL -> `Covar
-      | `EntailLR -> `Contravar
-  in
+  let mode = if ut_mode = `Unif then `Eq else option.mode in
 
   try
     let mv = fmatch ~mode t1.pat_op_term t2.pat_op_term st_init in
@@ -3175,9 +3170,9 @@ module E = struct
 
   (*------------------------------------------------------------------*)
   let flip = function
-    | `Eq        -> `Eq
-    | `Covar     -> `Contravar
-    | `Contravar -> `Covar
+    | `Eq       -> `Eq
+    | `EntailLR -> `EntailRL
+    | `EntailRL -> `EntailLR
 
   (*------------------------------------------------------------------*)
   let term_unif term pat st : Mvar.t =
@@ -3462,25 +3457,20 @@ module E = struct
     =
     if List.length terms <> List.length pat_terms then no_unif ();
 
+    (* unify types *)
+    unif_tys st (List.map Term.ty terms) (List.map Term.ty pat_terms);
+
     List.fold_right2 (fun t1 t2 mv ->
         term_unif t1 t2 { st with mv }
       ) terms pat_terms st.mv
 
   (*------------------------------------------------------------------*)
-  (** Get a [Mvar.t] from a [match_res].
-      @raise [NoMatch _] if this is not possible. *)
-  let mvar_of_match_res (res : match_res) : Mvar.t =
-    match res with
-    | Match r -> r
-    | NoMatch infos -> no_unif ?infos ()
-
-  (*------------------------------------------------------------------*)
-  (** Check entailment between two equivalences.
-      - [Covar]    : [equiv(terms0) ↔ equiv(terms)]
-      - [Covar]    : [equiv(terms0) → equiv(terms)]
-      - [Contravar]: [equiv(terms0) ← equiv(terms)] *)
-  let tunif_equiv
-      ~(mode  : [`Eq | `Covar | `Contravar])
+  (** Check entailment between two equivalences by deduction or plain unification.
+      - [Eq   ]   : [equiv(terms ) ↔ equiv(terms0)]
+      - [EntailLR]: [equiv(terms ) → equiv(terms0)]
+      - [EntailRL]: [equiv(terms ) ← equiv(terms0)] *)
+  let tunif_deduce
+      ~(mode  : [`Eq | `EntailLR | `EntailRL])
       (terms  : Term.terms)
       (terms0 : Term.terms)
       (st     : unif_state) : Mvar.t
@@ -3489,15 +3479,21 @@ module E = struct
     | `Eq        ->
       tunif_equiv_eq terms terms0 st
 
-    | `Contravar ->
+    | `EntailLR ->
       (* [terms ▷ terms0 → equiv(terms) → equiv(terms0)] *)
       deduce_terms ~outputs:terms0 ~inputs:terms  st |>
-      mvar_of_match_res
+      (* in case deduction fails, fall-back to standard unification *)
+      (function
+        | Match   r -> r
+        | NoMatch _ -> tunif_equiv_eq terms terms0 st)
 
-    | `Covar     ->
+    | `EntailRL     ->
       (* [terms0 ▷ terms → equiv(terms0) → equiv(terms)] *)
       deduce_terms ~outputs:terms  ~inputs:terms0 st |>
-      mvar_of_match_res
+      (* in case deduction fails, fall-back to standard unification *)
+      (function
+        | Match   r -> r
+        | NoMatch _ -> tunif_equiv_eq terms terms0 st)
 
   (*------------------------------------------------------------------*)
   (** Unifies two [Equiv.form] *)
@@ -3526,9 +3522,8 @@ module E = struct
       let system : SE.context = 
         SE.{ set = (oget st.system.pair :> SE.t); pair = None; } 
       in
-      (*FIXME: Anomaly with [any] here*)
       let st = st_change_context st system in
-      let mv = tunif_equiv ~mode es.terms pat_es.terms st in
+      let mv = tunif_deduce ~mode es.terms pat_es.terms st in
       begin
         match es.bound, pat_es.bound with
         | None, None -> mv
@@ -3538,6 +3533,52 @@ module E = struct
           term_unif e ve {st with mv}
         | _ -> no_unif ()
       end
+
+    (* Deduction atoms [· ▷ ·], special case when
+       - [mode] is [→] or [←] 
+       - the support is empty (we do not know how to mix deduction and
+         variable inference) *)
+    | Atom (Pred p), Atom (Pred ppat) when
+        p.psymb = ppat.psymb && 
+        ( Secrecy.is_loaded st.table &&
+          p.psymb = Secrecy.symb_deduce st.table ) &&
+        mode <> `Eq && st.support = [] ->
+
+      (* unify system arguments *)
+      unif_systems st p.se_args ppat.se_args;
+      let system : SE.context =
+        let se = as_seq1 p.se_args in
+        SE.{ set = se; pair = st.system.pair; } 
+      in
+
+      let st = st_change_context st system in
+
+      (* [p] is [l ▷ r] *)
+      let l, r =
+        match p.multi_args with
+        | [_, [x;y]] -> x, y
+        | _ -> assert false
+      in
+      (* [ppat] is [l0 ▷ r0] *)
+      let l0, r0 =
+        match ppat.multi_args with
+        | [_, [x;y]] -> x, y
+        | _ -> assert false
+      in
+      
+      let l, r, l0, r0 =        (* swap terms if [mode = ←] *)
+        match mode with
+        | `EntailLR -> l, r, l0, r0
+        | `EntailRL -> l0, r0, l, r
+        | _ -> assert false
+      in
+      
+      (* We check if:
+           [(l ▷ r) → (l0 ▷ r0)] 
+         using the transitivity rule:
+           [l0 ▷ l] and [l0,r ▷ r0] *)
+      let mv = tunif_deduce ~mode:`EntailLR [l0] [l] st in
+      tunif_deduce ~mode:`EntailLR [l0; r] [r0] { st with mv }
 
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)
