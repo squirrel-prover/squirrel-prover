@@ -191,13 +191,12 @@ Proof.
  intro H; apply H.
 Qed.
 
-(* TODO: inferance is failing there. See [Match.deduce_mem_one] *)
-(* global goal _ (y : message) : *)
-(*   (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) -> *)
-(*   equiv(seq (j:index -> <n1(j), f(y)>)). *)
-(* Proof. *)
-(*  intro H; apply H. *)
-(* Qed. *)
+global lemma _ (y : message) :
+  (Forall (x : message), equiv(seq (i:index => <n1(i), x>))) ->
+  equiv(seq (j:index => <n1(j), f(y)>)).
+Proof.
+ intro H; apply H.
+Qed.
  
 name nj : index -> message.
 
