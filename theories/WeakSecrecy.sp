@@ -107,7 +107,7 @@ Proof.
   intro f.
   ghave equ' : equiv(diff(f(u1) <> v1,f(u2) <> v2)). {
     fa 0; fa 0.
-    deduce 0.  
+    deduce 0.
     auto.
   }.
   rewrite equiv equ'.

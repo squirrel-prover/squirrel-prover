@@ -3357,10 +3357,10 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Check if [inputs ▷ output]. *)
   let rec deduce
-      ~(output   : cond_term)
-      ~(inputs   : known_sets)
-      (st        : unif_state)
-      (minfos    : match_infos) : Mvar.t * match_infos
+      ~(output : cond_term)
+      ~(inputs : known_sets)
+      (st      : unif_state)
+      (minfos  : match_infos) : Mvar.t * match_infos
     =
     match deduce_mem_list output inputs st with
     | Some mv -> mv, minfos_ok output.term minfos
