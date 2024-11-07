@@ -78,3 +78,10 @@ global lemma[set:P/left; equiv:none] _:
 Proof.
   deduce.
 Qed.
+
+(* in an arbitrary system *)
+global lemma [any] _:
+  $(a |> b).
+Proof.
+  deduce.
+Qed.
