@@ -58,10 +58,7 @@ lemma [any] _ x y (z : index):
   let z = <z,<x,y>> in
   z = <<x,y>,<x,y>>.
 Proof.  
-  intro ??. 
-  checkfail simpl; true exn Failure.
-  (* `simpl` does not open definitions by default *)
-
+  intro ??.
   simpl ~def; true.
 Qed.
 
@@ -121,9 +118,6 @@ global lemma _ x y (z : index):
   [z = <<x,y>,<x,y>>].
 Proof.  
   intro ??. 
-  checkfail simpl; true exn Failure.
-  (* `simpl` does not open definitions by default *)
-
   simpl ~def; true.
 Qed.
 

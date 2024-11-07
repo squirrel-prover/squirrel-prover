@@ -1819,7 +1819,7 @@ module T (* : S with type t = Term.term *) = struct
         zeta = true; 
         proj = true; 
         beta = true;
-        delta = { ReductionCore.delta_full with def = false; }; } 
+        delta = ReductionCore.delta_full; } 
     in
     let t, has_red = reduce_head1 red_param st t in
     if has_red then 

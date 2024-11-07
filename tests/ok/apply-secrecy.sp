@@ -29,3 +29,24 @@ Proof.
   intro H. 
   apply H.
 Qed.
+
+(*------------------------------------------------------------------*)
+global lemma _ {P[pair]} in [P] (x,y : message):
+  Let a = y in
+  Let b = x in
+  $(y |> b) -> $(a |> x).
+Proof.
+  intro a b H.
+  rewrite /b in H. 
+  rewrite /a. 
+  apply H.  
+Qed.
+
+global lemma _ {P[pair]} in [P] (x : message):
+  Let a = x in
+  Let b = x in
+  $(a |> b) -> $(a |> x).
+Proof.
+  intro a b H.
+  apply H.  
+Qed.
