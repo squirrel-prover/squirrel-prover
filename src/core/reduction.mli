@@ -1,15 +1,12 @@
-module SE = SystemExpr
-module Args = TacticsArgs
-
-module THyps = Hyps.TraceHyps
-
 (*------------------------------------------------------------------*)
 (** {2 Core reduction functions} 
 
     Allow to avoid the cyclic dependency between [Reduction] and
     [Match] (see [ReductionCore] for details). *)
 
-include ReductionCore.S
+include module type of ReductionCore
+
+include ReductionCore.Sig
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction functions from a sequent} *)

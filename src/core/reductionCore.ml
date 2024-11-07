@@ -21,23 +21,67 @@ module THyps = Hyps.TraceHyps
 type delta = { def : bool; macro : bool; op : bool; }
 
 (*------------------------------------------------------------------*)
-module type S = sig
+let delta_full    : delta = { def = true ; macro = true ; op = true ; }
+let delta_empty   : delta = { def = false; macro = false; op = false; }
+let delta_default : delta = delta_empty
 
-  type red_param = { 
-    rewrite : bool;  (** user-defined rewriting rules *)
-    delta   : delta; (** replace defined variables by their body *)
-    beta    : bool;  (** β-reduction *)
-    proj    : bool;  (** reduce projections *)
-    zeta    : bool;  (** let reduction *)
-    diff    : bool;  (** diff terms reduction *)
-    constr  : bool;  (** reduce tautologies over timestamps *)
-    builtin : bool;  (** reduce builtins (e.g. [Int.(+)]) *)
+(*------------------------------------------------------------------*)
+type red_param = { 
+  rewrite : bool;  (** user-defined rewriting rules *)
+  delta   : delta; (** replace defined variables by their body *)
+  beta    : bool;  (** β-reduction *)
+  proj    : bool;  (** reduce projections *)
+  zeta    : bool;  (** let reduction *)
+  diff    : bool;  (** diff terms reduction *)
+  constr  : bool;  (** reduce tautologies over timestamps *)
+  builtin : bool;  (** reduce builtins (e.g. [Int.(+)]) *)
+}
+
+(*------------------------------------------------------------------*)
+  let rp_empty = { 
+    rewrite = false;
+    beta    = false; 
+    delta   = delta_empty; 
+    proj    = false;
+    zeta    = false;
+    diff    = false;
+    constr  = false; 
+    builtin = false;
   }
 
-  val rp_empty   : red_param
-  val rp_default : red_param
-  val rp_full    : red_param
-  val rp_crypto  : red_param      (** used in cryptographic tactics *)
+  let rp_default = { 
+    rewrite = true;
+    beta    = true; 
+    delta   = delta_default;
+    zeta    = true;
+    proj    = true;
+    diff    = false;
+    constr  = false;
+    builtin = true; 
+  }
+
+  let rp_full = { 
+    rewrite = true;
+    beta    = true; 
+    delta   = delta_full;
+    zeta    = true;
+    proj    = true;
+    diff    = true;
+    constr  = false;   (* [constr] is not enabled in [rp_full] *)
+    builtin = true;
+  }
+
+  let rp_crypto = {
+    rp_empty with 
+    delta = { op = false; macro = true; def = true; };
+    diff = true;
+    beta = true; 
+    proj = true; 
+    zeta = true;    
+  }
+
+(*------------------------------------------------------------------*)
+module type Sig = sig
 
   val parse_simpl_args : red_param -> Args.named_args -> red_param 
 
@@ -100,12 +144,12 @@ end
 (*------------------------------------------------------------------*)
 (** Register the implementation of [S] done in [reduction.ml]. *)
 module Register = struct
-  let v : (module S) option ref = ref None
+  let v : (module Sig) option ref = ref None
       
-  let store (m : (module S)) =
+  let store (m : (module Sig)) =
     assert (!v = None);
     v := Some m
 
-  let get () : (module S) = Utils.oget !v
+  let get () : (module Sig) = Utils.oget !v
 end
   

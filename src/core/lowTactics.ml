@@ -351,7 +351,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Fun _ | App _ | Var _ ->
       let t, has_red =
         Match.reduce_delta1
-          ~delta:Match.delta_full ~mode table new_context new_hyps t
+          ~delta:ReductionCore.delta_full ~mode table new_context new_hyps t
       in      
       if has_red then t else failed ()
       

@@ -14,13 +14,6 @@ module SE = SystemExpr
 let dbg ?(force=true) s =
   if force then Printer.prt `Dbg s
   else Printer.prt `Ignore s
-
-(*------------------------------------------------------------------*)
-type delta = ReductionCore.delta
-
-let delta_full    : delta = { def = true ; macro = true ; op = true ; }
-let delta_empty   : delta = { def = false; macro = false; op = false; }
-let delta_default : delta = delta_empty
   
 (*------------------------------------------------------------------*)
 (** {2 Positions} *)
@@ -1243,20 +1236,39 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (** {2 Reduction utilities} *)
 
 (*------------------------------------------------------------------*)
-(** Put [t] in weak-head normal form in [st]. *)
-let whnf (st : unif_state) (t : Term.term) : Term.term * bool =
-  let module Reduction : ReductionCore.S =
+(** Put [t] in weak-head normal form w.r.t. [st]. *)
+let whnf 
+    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+  : Term.term * bool 
+  =
+  let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
   let hyps = st.hyps in
-  let red_param = Reduction.rp_crypto in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
-    Reduction.mk_state
+    R.mk_state
       ~hyps ~system:st.system ~vars ~red_param st.table
   in
-  let strat = Reduction.(MayRedSub rp_full) in
-  Reduction.whnf_term ~strat red_st t
+  let strat = R.(MayRedSub ReductionCore.rp_full) in
+  R.whnf_term ~strat red_st t
+
+(*------------------------------------------------------------------*)
+(** Reduce [t] once in head position w.r.t. [st]. *)
+let reduce_head1
+    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+  : Term.term * bool 
+  =
+  let module R : ReductionCore.Sig =
+    (val ReductionCore.Register.get ())
+  in
+  let hyps = st.hyps in
+  let vars = Vars.add_vars st.bvs st.env in
+  let red_st =
+    R.mk_state
+      ~hyps ~system:st.system ~vars ~red_param st.table
+  in
+  R.reduce_head1_term red_st t
 
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
@@ -1398,7 +1410,7 @@ let reduce_delta_macro1
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 let reduce_delta1
-    ?(delta = delta_full)
+    ?(delta = ReductionCore.delta_full)
     ~(mode : Macros.expand_context)
     (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
@@ -1425,62 +1437,6 @@ let reduce_delta1
   | _ -> t, false
 
 (*------------------------------------------------------------------*)
-(* projection reduction *)
-
-let can_reduce_proj (t : Term.term) : bool =
-  match t with
-  | Term.Proj (_, Term.Tuple _) -> true
-  | _ -> false
-
-let reduce_proj1 (t : Term.term) : Term.term * bool =
-  match t with
-  | Term.Proj (i, t) ->
-    begin
-      match t with
-      | Term.Tuple ts -> List.nth ts (i - 1), true
-      | _ -> t, false
-    end
-
-  | _ -> t, false
-
-(*------------------------------------------------------------------*)
-(* let reduction *)
-
-let can_reduce_let (t : Term.term) : bool =
-  match t with
-  | Term.Let _ -> true
-  | _ -> false
-
-let reduce_let1 (t : Term.term) : Term.term * bool =
-  match t with
-  | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
-  | _ -> t, false
-
-(*------------------------------------------------------------------*)
-(* β-reduction *)
-
-let can_reduce_beta (t : Term.term) : bool =
-  match t with
-  | Term.App (Quant (Lambda, _ :: _, _), _ :: _) -> true
-  | _ -> false
-
-let reduce_beta1 (t : Term.term) : Term.term * bool =
-  match t with
-  | Term.App (t, arg :: args) -> 
-    begin
-      match t with
-      | Term.Quant (Term.Lambda, v :: evs, t0) ->
-        let evs, subst = Term.refresh_vars evs in
-        let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
-
-        Term.mk_app (Term.mk_lambda evs t0) args, true
-
-      | _ -> Term.mk_app t (arg :: args), false
-    end 
-
-  | _ -> t, false
-
-(*------------------------------------------------------------------*)
 (** {3 Global formulas reduction utilities} *)
 
 (*------------------------------------------------------------------*)
@@ -1498,43 +1454,6 @@ let reduce_glob_let1 (t : Equiv.form) : Equiv.form * bool =
 
 (*------------------------------------------------------------------*)
 (** {3 Higher-level reduction utility} *)
-
-(** Reduce once at head position.
-    Only use the following reduction rules:
-    [δ, β, proj, zeta] *)
-let reduce_head1
-    ?delta
-    ~(mode : Macros.expand_context)
-    (table : Symbols.table) (system : SE.context) 
-    (hyps : Hyps.TraceHyps.hyps)
-    (t : Term.term) 
-  : Term.term * bool 
-  = 
-  let t, has_red = reduce_delta1 ?delta ~mode table system hyps t in
-  if has_red then t, true
-  else
-    match t with
-    | _ when can_reduce_beta t ->
-      let t, _ = reduce_beta1 t in
-      t, true
-
-    | _ when can_reduce_let t ->
-      let t, _ = reduce_let1 t in
-      t, true
-
-    | _ when can_reduce_proj t ->
-      let t, _ = reduce_proj1 t in
-      t, true
-
-    | _ ->
-      let t', red = 
-        if SE.is_fset system.set then
-          let se = SE.to_fset system.set in
-          Term.head_normal_biterm0 (SE.to_projs se) t 
-        else 
-          t, false
-      in
-      if red then t', true else t, false
 
 (*------------------------------------------------------------------*)
 (** Reduce once at head position in a global formula.
@@ -1747,8 +1666,10 @@ module T (* : S with type t = Term.term *) = struct
      Remark: [st] handles the unification environment statefully. *)
   let rec tunif (t : term) (pat : term) (st : unif_state) : Mvar.t =
     match t, pat with
-    (*      *) | _, Var v when st.mode = `Match -> vunif t v st
-    | Var v, t | t, Var v when st.mode = `Unif  -> vunif t v st
+    | Var v, Var v' when Vars.equal v v' -> st.mv
+
+    | _, Var v when List.mem_assoc v st.support                    -> vunif t v st
+    | Var v, t when List.mem_assoc v st.support && st.mode = `Unif -> vunif t v st
 
     | Int i, Int i' -> 
       if not (Z.equal i i') then no_unif ();
@@ -1892,17 +1813,19 @@ module T (* : S with type t = Term.term *) = struct
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
-    let t, has_red = 
-      reduce_head1 ~delta:delta_full
-        ~mode:st.expand_context st.table st.system st.hyps t 
+    let red_param = 
+      { ReductionCore.rp_empty with
+        diff = true; 
+        zeta = true; 
+        proj = true; 
+        beta = true;
+        delta = { ReductionCore.delta_full with def = false; }; } 
     in
+    let t, has_red = reduce_head1 red_param st t in
     if has_red then 
       tunif t pat st
     else
-      let pat, has_red = 
-        reduce_head1 ~delta:delta_full
-          ~mode:st.expand_context st.table st.system st.hyps pat
-      in
+      let pat, has_red = reduce_head1 red_param st pat in
       if has_red then
         tunif t pat st
       else no_unif ()
@@ -1954,51 +1877,49 @@ module T (* : S with type t = Term.term *) = struct
 
   (* unify a variable and a term. *)
   and vunif (t : term) (v : Vars.var) (st : unif_state) : Mvar.t =
+    assert (List.mem_assoc v st.support);
     let v, t = match t with
       | Var v' ->
-        if not (List.mem_assoc v st.support) then
-          v', mk_var v
-        else if not (List.mem_assoc v' st.support) then
-          v, t
-        else if Vars.compare v v' < 0 then
-          v, t
+        if List.mem_assoc v' st.support then
+          if Vars.compare v v' < 0 then
+            v, t
+          else
+            v', mk_var v
         else
-          v', mk_var v
+          v, t
 
       | _ -> v, t
     in
     if Term.equal t (mk_var v) then
       st.mv
 
-    else match List.assoc_opt v st.support with
-      | None -> no_unif ()
+    else
+      let tag = List.assoc v st.support in
+      (* [v] in the support with tag [tag], and [v] smaller than [v'] if [t = Var v'] *)
+      match Mvar.find v st.mv with
+      (* first time we see [v]: store the substitution and add the
+         type information. *)
+      | exception Not_found ->
+        if Infer.unify_ty st.ienv (ty t) (Vars.ty v) = `Fail then
+          no_unif ();
 
-      | Some tag ->
-        (* [v] in the support with tag [tag], and [v] smaller than [v'] if [t = Var v'] *)
-        match Mvar.find v st.mv with
-        (* first time we see [v]: store the substitution and add the
-           type information. *)
-        | exception Not_found ->
-          if Infer.unify_ty st.ienv (ty t) (Vars.ty v) = `Fail then
-            no_unif ();
+        (* When [st.allow_capture] is false (which is the default), check that we
+           are not trying to unify [v] with a term bound variables. *)
+        if not (Sv.disjoint (fv t) (Sv.of_list (List.map fst st.bvs))) &&
+           not st.allow_capture then
+          no_unif ();
 
-          (* When [st.allow_capture] is false (which is the default), check that we
-             are not trying to unify [v] with a term bound variables. *)
-          if not (Sv.disjoint (fv t) (Sv.of_list (List.map fst st.bvs))) &&
-             not st.allow_capture then
-            no_unif ();
+        (Mvar.add (v, tag) st.system.set t st.mv)
 
-          (Mvar.add (v, tag) st.system.set t st.mv)
-
-        (* If we already saw the variable, check that there is no cycle, and
-           call back [unif]. *)
-        | t' -> 
-          if Sv.mem v st.subst_vs then no_unif ()
-          else
-            let st =
-              { st with subst_vs = Sv.add v st.subst_vs }
-            in
-            tunif t t' st
+      (* If we already saw the variable, check that there is no cycle, and
+         call back [unif]. *)
+      | t' -> 
+        if Sv.mem v st.subst_vs then no_unif ()
+        else
+          let st =
+            { st with subst_vs = Sv.add v st.subst_vs }
+          in
+          tunif t t' st
 
   (*------------------------------------------------------------------*)
   (** Exported.
@@ -3399,7 +3320,7 @@ module E = struct
     | None ->
       (* We could not decompose [output] through into deduction sub-goals.
          Try to reduce [output] and restart [deduce]. *)
-      let term, has_red = whnf st output.term in
+      let term, has_red = whnf ReductionCore.rp_crypto st output.term in
       if has_red then
         deduce ~output:{ output with term; } ~inputs st minfos
       else

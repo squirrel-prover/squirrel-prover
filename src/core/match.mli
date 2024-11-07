@@ -8,11 +8,6 @@ module SE = SystemExpr
 module TraceHyps = Hyps.TraceHyps
 
 (*------------------------------------------------------------------*)
-val delta_default : ReductionCore.delta
-val delta_full    : ReductionCore.delta
-val delta_empty   : ReductionCore.delta
-
-(*------------------------------------------------------------------*)
 (** {2 Positions} *)
 
 module Pos : sig
@@ -362,23 +357,11 @@ val reduce_delta1 :
   Term.term ->
   Term.term * bool 
 
-(** projection reduction *)
-val can_reduce_proj : Term.term -> bool 
-val reduce_proj1    : Term.term -> Term.term * bool 
-
-(** let reduction *)
-val reduce_let1 : Term.term -> Term.term * bool
-  
-(** β-reduction *)
-val can_reduce_beta : Term.term -> bool 
-val reduce_beta1    : Term.term -> Term.term * bool 
-
 (*------------------------------------------------------------------*)
 (** {3 Global formulas reduction utilities} *)
 
-(** let reduction *)
-val can_reduce_glob_let : Equiv.form -> bool
-val reduce_glob_let1    : Equiv.form -> Equiv.form * bool
+(** global let reduction *)
+val reduce_glob_let1 : Equiv.form -> Equiv.form * bool
 
 (*------------------------------------------------------------------*)
 (** {2 Internals} *)

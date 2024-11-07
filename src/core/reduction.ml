@@ -1,9 +1,8 @@
 open Utils
 
 module L = Location
-module SE = SystemExpr
-module Args = TacticsArgs
-module THyps = Hyps.TraceHyps
+
+include ReductionCore
 
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
@@ -13,63 +12,6 @@ let rev_subst subst =
 (** {2 Core reduction functions} *)
 
 module Core (* : ReductionCore.S *) = struct
-
-  type delta = ReductionCore.delta
-
-  (*------------------------------------------------------------------*)
-  type red_param = { 
-    rewrite : bool;    (** user-defined rewriting rules *)
-    delta   : delta;   (** replace defined variables by their body *)
-    beta    : bool;    (** β-reduction *)
-    proj    : bool;    (** reduce projections *)
-    zeta    : bool;    (** let reduction *)
-    diff    : bool;    (** diff terms reduction *)
-    constr  : bool;    (** reduce tautologies over timestamps *)
-    builtin : bool;    (** reduce builtins (e.g. [Int.(+)]) *)
-  }
-
-  (*------------------------------------------------------------------*)
-  let rp_empty = { 
-    rewrite = false;
-    beta    = false; 
-    delta   = Match.delta_empty; 
-    proj    = false;
-    zeta    = false;
-    diff    = false;
-    constr  = false; 
-    builtin = false;
-  }
-
-  let rp_default = { 
-    rewrite = true;
-    beta    = true; 
-    delta   = Match.delta_default;
-    zeta    = true;
-    proj    = true;
-    diff    = false;
-    constr  = false;
-    builtin = true; 
-  }
-
-  let rp_full = { 
-    rewrite = true;
-    beta    = true; 
-    delta   = Match.delta_full;
-    zeta    = true;
-    proj    = true;
-    diff    = true;
-    constr  = false;   (* [constr] is not enabled in [rp_full] *)
-    builtin = true;
-  }
-
-  let rp_crypto = {
-    rp_empty with 
-    delta = { op = false; macro = true; def = true; };
-    diff = true;
-    beta = true; 
-    proj = true; 
-    zeta = true;    
-  }
 
   (*------------------------------------------------------------------*)
   let parse_simpl_args
@@ -83,7 +25,7 @@ module Core (* : ReductionCore.S *) = struct
       | L.{ pl_desc = "proj"   } -> { param with proj    = true; }
       | L.{ pl_desc = "constr" } -> { param with constr  = true; }
       | L.{ pl_desc = "diffr"  } -> { param with diff    = true; }
-      | L.{ pl_desc = "delta"  } -> { param with delta   = Match.delta_full; }
+      | L.{ pl_desc = "delta"  } -> { param with delta   = delta_full; }
       | L.{ pl_desc = "def"    } ->
         { param with delta   = { param.delta with def = true;} }
       | L.{ pl_desc = "op"     } ->
@@ -491,17 +433,48 @@ module Core (* : ReductionCore.S *) = struct
         if has_red then t', true else t, false
       else t, false
 
+
+  (*------------------------------------------------------------------*)
+  (* β-reduction *)
   and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.red_param.beta then t, false
-    else Match.reduce_beta1 t
+    else 
+      match t with
+      | Term.App (t, arg :: args) -> 
+        begin
+          match t with
+          | Term.Quant (Term.Lambda, v :: evs, t0) ->
+            let evs, subst = Term.refresh_vars evs in
+            let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
 
+            Term.mk_app (Term.mk_lambda evs t0) args, true
+
+          | _ -> Term.mk_app t (arg :: args), false
+        end 
+
+      | _ -> t, false
+
+  (** (local) let reduction *)
   and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.red_param.zeta then t, false
-    else Match.reduce_let1 t
+    else
+      match t with
+      | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
+      | _ -> t, false
 
+  (** projection reduction *)
   and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.red_param.proj then t, false
-    else Match.reduce_proj1 t
+    else
+      match t with
+      | Term.Proj (i, t) ->
+        begin
+          match t with
+          | Term.Tuple ts -> List.nth ts (i - 1), true
+          | _ -> t, false
+        end
+
+      | _ -> t, false
 
   and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
     if not st.red_param.diff || not (SE.is_fset st.system.set) then t, false

@@ -219,14 +219,14 @@ module CondTerm = struct
       Reduction.mk_state
         ~hyps ~system:env.system ~vars:env.vars
         ~params:(Env.to_params env)
-        ~red_param:Reduction.rp_crypto
+        ~red_param:ReductionCore.rp_crypto
         env.table
     in
     (* Removing duplicates *)
     let conds = List.remove_duplicate Term.equal c.conds in
     (* Redution in whnf *)
     let conds = List.map (fun cond -> fst (
-        let strat = Reduction.(MayRedSub rp_full) in
+        let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
         Reduction.whnf_term ~strat (reduction_state hyps) cond))
         conds
     in
@@ -236,7 +236,7 @@ module CondTerm = struct
             TraceHyps.add Args.AnyName (LHyp (Local f)) h
           ) hyps conds
       in
-      let strat = Reduction.(MayRedSub rp_full) in
+      let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
       Reduction.whnf_term ~strat (reduction_state extended_hyps) c.term
     in
     { term; conds; }
@@ -455,14 +455,14 @@ let exact_eq_under_cond
   let conv_state =
     Reduction.mk_state
       ~system ~hyps ~params:(Env.to_params env)
-      ~red_param:Reduction.rp_full env.table
+      ~red_param:ReductionCore.rp_full env.table
   in
   let conv = Reduction.conv conv_state in 
   let reduction_state =
     Reduction.mk_state ~hyps
       ~system ~vars:env.vars
       ~params:(Env.to_params env)
-      ~red_param:Reduction.rp_crypto
+      ~red_param:ReductionCore.rp_crypto
       env.table
   in
   let decompose_ands x =
@@ -1617,7 +1617,7 @@ module Game = struct
       Reduction.mk_state ~hyps:query.hyps
         ~system:query.env.system ~vars:query.env.vars
         ~params:(Env.to_params env)
-        ~red_param:Reduction.{rp_empty with  delta = Match.{delta_empty with macro = true}} 
+        ~red_param:ReductionCore.{rp_empty with  delta = {delta_empty with macro = true}} 
         query.env.table
     in
     let red_term = Reduction.reduce_term reduction_state term.term in
@@ -2426,14 +2426,14 @@ let derecursify_term
             hyps
         in
 
-        let red_param = Reduction.rp_crypto in
+        let red_param = ReductionCore.rp_crypto in
         (* FIXME: add tag information in [fv] *)
         let vars = Vars.of_list (Vars.Tag.local_vars vars) in
         let st =
           Reduction.mk_state
             ~hyps ~system:new_context ~vars ~params ~red_param table
         in
-        let strat = Reduction.(MayRedSub rp_full) in
+        let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
         Reduction.whnf_term ~strat st t
       in
 
