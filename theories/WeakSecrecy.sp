@@ -16,14 +16,16 @@ system none = null.
 # Reasoning rules on Non-deduction and Deduction
 *)
 
-global lemma refl_ded @system:any ['a] (u : 'a) : 
+namespace Deduction.
+
+global lemma d_refl @system:any ['a] (u : 'a) : 
  $(u |> u).
 Proof.
 rewrite /(|>).
 exists (fun x => x) => //.
 Qed.
 
-global lemma right_fa @system:any
+global lemma s_right_fa @system:any
  ['a 'b 'c] (u : 'a, v : 'b, g : 'b -> 'c) 
 : 
     $( u *> v ) ->
@@ -40,8 +42,7 @@ Proof.
   auto.
 Qed.
 
-(* ------------------------------------------------------------------- *)
-global lemma left_fa @system:any ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
+global lemma s_left_fa @system:any ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
    $( u *> v ) ->
    $( (f u) *> v ).
 Proof.
@@ -50,8 +51,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------- *)
-(* Rules in Figure 1 *)
-global lemma ND @system:any ['a 'b] (u : 'a) (v : 'b) : 
+global lemma d_nd @system:any ['a 'b] (u : 'a) (v : 'b) : 
     $(u *> v) ->
     $(u |> v) ->
     [false].
@@ -60,7 +60,7 @@ Proof.
   by have ? := H f. 
 Qed.
 
-global lemma Ineq @system:any ['a 'b] (u : 'a) (v, w : 'b) :
+global lemma neq @system:any ['a 'b] (u : 'a) (v, w : 'b) :
     $(u |> v) ->
     $( u *> w) ->
     [v <> w].
@@ -70,7 +70,7 @@ Proof.
 Qed.
 
 global lemma [any]
-  NDWeakL ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
+  s_weak_l ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u |> v) ->
     $(u *> w) ->
     $(v *> w).
@@ -82,7 +82,7 @@ Proof.
 Qed.
 
 global lemma [any] 
-  NDWeakR ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
+  s_weak_r ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
     $(u *> w) ->
     $(v |> w) ->
     $(u *> v).
@@ -90,6 +90,18 @@ Proof.
   intro @/( |> ) @/( *> ) H1 [f H2] g.
   have A /= := H1 (fun x => f(g x)).
   auto.
+Qed.
+
+global lemma [any] d_trans ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) :
+  $(u     |> v) ->
+  $((u,v) |> w) ->
+  $(u     |> w).
+Proof.
+  intro @/( |> ) [f H] [f1 H1].
+  exists (fun u => f1 (u, f u)). 
+  reduce.
+  rewrite H H1.
+  apply eq_refl.
 Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -161,6 +173,9 @@ Proof.
   auto.
 Qed.
 
+end Deduction.
+
+(* ------------------------------------------------------------------- *)
 (*
 # Frames
 *)
@@ -184,7 +199,7 @@ Proof.
     rewrite H1 H2.
   
     rewrite frame_init.
-    by have ? := refl_ded zero.
+    by have ? := Deduction.d_refl zero.
   
   + ghave [H3 | H4] : [tau=tau' || tau<>tau'] by auto.
     - rewrite H3.
