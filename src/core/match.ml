@@ -871,6 +871,9 @@ module Mvar : sig[@warning "-32"]
 
   val filter : (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> bool) -> t -> t
 
+  val forall : (Vars.var -> Term.term -> bool) -> t -> bool
+  val exists : (Vars.var -> Term.term -> bool) -> t -> bool
+
   val map : (Term.term -> Term.term) -> t -> t
 
   val mapi : (Vars.var -> SE.t -> Term.term -> Term.term) -> t -> t
@@ -945,6 +948,12 @@ end = struct
   (* FIXME: check that forgetting variables does not modify the variable 
      assigment for the other variables. *)
   let filter f (m : t) : t = make (Mv.filter f m.subst)
+
+  let forall (f : Vars.var -> Term.term -> bool) (m : t) : bool =
+    Mv.for_all (fun v (_tag,_system,t) -> f v t) m.subst
+
+  let exists (f : Vars.var -> Term.term -> bool) (m : t) : bool =
+    Mv.exists (fun v (_tag,_system,t) -> f v t) m.subst
 
   let map (f : Term.term -> Term.term) (m : t) : t =
     make (Mv.map (fun (tag,system,t) -> tag, system, f t) m.subst)

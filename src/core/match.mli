@@ -224,6 +224,9 @@ module Mvar : sig
 
   val filter : (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> bool) -> t -> t
 
+  val forall : (Vars.var -> Term.term -> bool) -> t -> bool
+  val exists : (Vars.var -> Term.term -> bool) -> t -> bool
+
   val map : (Term.term -> Term.term) -> t -> t
 
   val mapi : (Vars.var -> SE.t -> Term.term -> Term.term) -> t -> t
