@@ -203,8 +203,8 @@ name nj : index -> message.
 
 (* we cannot match `x` with `nj(j)` since `j` is bound in the conclusion. *)
 global lemma _ :
- (Forall (x : message), equiv(seq (i:index => <n1(i), x>))) ->
- equiv(seq (j:index => <n1(j), nj(j)>)).
+ (Forall (x : message), equiv(fun (i:index) => <n1(i), x>)) ->
+ equiv(fun (j:index) => <n1(j), nj(j)>).
 Proof.
  intro H.
  checkfail (apply H) exn ApplyMatchFailure.
