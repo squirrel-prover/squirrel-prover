@@ -147,6 +147,15 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
+(* test `equiv` in system `any` *)
+
+global lemma [any] _ ['a] (u : 'a) (f :  _ -> message[adv]) :
+  equiv (u) -> equiv(f u).
+Proof.
+  intro H. apply H.
+Qed.
+
+(*------------------------------------------------------------------*)
 (* matching under binders *)
 
 (* The term `ok(j)` can be computed by the adversary for any index `j`, since

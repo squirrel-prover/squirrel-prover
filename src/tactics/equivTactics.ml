@@ -686,9 +686,14 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
         HighTerm.is_ptime_deducible ~si:true env t
       ) l
   in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
   let l =
-    match Term.head_normal_biterm [l_proj; r_proj] t with
+    let system_pair =
+      let system = ES.system s in
+      { system with set = (oget system.pair :> SE.t); }
+    in
+    let red_param = { Reduction.rp_empty with diff = true; } in
+    let st = ES.Reduce.to_state ~system:system_pair red_param s in
+    match fst @@ Reduction.whnf_term st t with
     | Tuple l ->
       if is_deducible_vars l then [] else l
 
