@@ -1112,7 +1112,7 @@ let minfos_check_st
     -     at least one of its subterms is tagged [MR_ok]
     - and at least one of its subterms is tagged [MR_fail]. *)
 let minfos_norm (minit : match_infos) : match_infos =
-  let rec norm t mfinal : match_info * match_infos =
+  let rec norm (t : Term.t) (mfinal : match_infos) : match_info * match_infos =
     if Mt.mem t mfinal
     then Mt.find t mfinal, mfinal
     else match Mt.find t minit with
@@ -1124,18 +1124,31 @@ let minfos_norm (minit : match_infos) : match_infos =
               i :: infos, mfinal
             ) ([], mfinal) st
         in
+        if List.for_all (fun x -> x = MR_ok) infos then
+          MR_ok, Mt.add t MR_ok mfinal
+
         (* special case for binders, because alpha-renamed subterms
            cannot be checked later *)
         (* FEATURE: fix it to have an improved printing *)
-        if List.for_all (fun x -> x = MR_ok) infos
-        then MR_ok, Mt.add t MR_ok mfinal
-        else if Term.is_binder t
-        then MR_failed, Mt.add t MR_failed mfinal
-        else MR_check_st st, Mt.add t (MR_check_st st) mfinal
+        else if Term.is_binder t then
+          MR_failed, Mt.add t MR_failed mfinal
+
+        else
+          MR_check_st st, Mt.add t (MR_check_st st) mfinal
+
+      (* [t] may not appear in [minit] because reduction (whnf) occur
+         during deduction but [minfos_norm] does not reduce.
+
+         If [t] does not appear in [minit] and was not marked as
+         solved (i.e. [MR_ok]) or failed (i.e. [MR_failed]), then mark
+         it as failed. 
+         As in the binder case, this is imprecise (we could find a
+         more precise sub-term on which we failed) but sound. *)
+      | exception Not_found -> MR_failed, Mt.add t MR_failed mfinal
   in
 
-  Mt.fold (fun et _ mfinal ->
-      let _, mfinal = norm et mfinal in
+  Mt.fold (fun (t : Term.t) _ mfinal ->
+      let _, mfinal = norm t mfinal in
       mfinal) minit Mt.empty
 
 (*------------------------------------------------------------------*)
@@ -1197,13 +1210,6 @@ let mk_unif_state
     use_fadup      = false;
     allow_capture  = false
   }
-
-(*------------------------------------------------------------------*)
-let try_head_normal_biterm (st : unif_state) (term : Term.t) : Term.t =
-  if SE.is_fset st.system.set then
-    let projs = SE.to_projs (SE.to_fset st.system.set) in
-    head_normal_biterm projs term
-  else term
   
 (*------------------------------------------------------------------*)
 let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
@@ -1224,6 +1230,22 @@ let env_of_unif_state (st : unif_state) : Env.t =
 
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
+
+(*------------------------------------------------------------------*)
+(** Put [t] in weak-head normal form in [st]. *)
+let whnf (st : unif_state) (t : Term.term) : Term.term * bool =
+  let module Reduction : ReductionCore.S =
+    (val ReductionCore.Register.get ())
+  in
+  let hyps = st.hyps in
+  let red_param = Reduction.rp_crypto in
+  let vars = Vars.add_vars st.bvs st.env in
+  let red_st =
+    Reduction.mk_state
+      ~hyps ~system:st.system ~vars ~red_param st.table
+  in
+  let strat = Reduction.(MayRedSub rp_full) in
+  Reduction.whnf_term ~strat red_st t
 
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
@@ -2112,9 +2134,10 @@ let _pp_term_set ppe fmt (ts : term_set) =
   let vars = List.map2 (fun v (_,tag) -> v,tag)vars ts.vars in
   let term,cond = Term.subst s ts.term, List.map (Term.subst s) ts.cond in
 
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a%s@[%a@]}@]"
     (Term._pp ppe) term
     Vars.pp_typed_tagged_list vars
+    (if ts.vars = [] then "" else ". ")
     (Term._pp ppe) (Term.mk_ands cond)
 
 let[@warning "-32"] pp_term_set     = _pp_term_set (default_ppe ~dbg:false ())
@@ -2136,13 +2159,7 @@ let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ()
 
 (*------------------------------------------------------------------*)
 let known_sets_add (k : term_set) (ks : known_sets) : known_sets =
-  (* get [k.term] head symbol if the system kind allows it *)
-  let term = 
-    match SE.to_projs_any k.se with
-    | None       -> k.term
-    | Some projs -> Term.head_normal_biterm projs k.term
-  in
-  List.assoc_up_dflt (get_head term) [] (fun ks_l -> k :: ks_l) ks
+  List.assoc_up_dflt (get_head k.term) [] (fun ks_l -> k :: ks_l) ks
 
 let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
   let s = List.fold_left (fun s (head, k_l) ->
@@ -3265,8 +3282,7 @@ module E = struct
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
     =
-    let term = try_head_normal_biterm st cterm.term in
-    let elems_head = List.assoc_dflt [] (Term.get_head term) elems in
+    let elems_head = List.assoc_dflt [] (Term.get_head cterm.term) elems in
     List.find_map (fun elem -> deduce_mem cterm elem st) elems_head
  
   (*------------------------------------------------------------------*)
@@ -3277,10 +3293,8 @@ module E = struct
       (cterm : cond_term) (st : unif_state)
     : (unif_state * cond_term) list option
     =
-    let env = env_of_unif_state st in  
-    let term = try_head_normal_biterm st cterm.term in
-
-    match term with
+    let env = env_of_unif_state st in
+    match cterm.term with
     | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   
     (* function: if-then-else *)
@@ -3363,7 +3377,8 @@ module E = struct
       (minfos  : match_infos) : Mvar.t * match_infos
     =
     match deduce_mem_list output inputs st with
-    | Some mv -> mv, minfos_ok output.term minfos
+    | Some mv ->
+      (mv, minfos_ok output.term minfos)
     | None ->
       (* if that fails, decompose [term] through the Function Application
          rule, and recurse. *)
@@ -3377,7 +3392,14 @@ module E = struct
       (minfos  : match_infos) : Mvar.t * match_infos
     =
     match fa_decompose output st with
-    | None -> st.mv, minfos_failed output.term minfos
+    | None ->
+      (* We could not decompose [output] through into deduction sub-goals.
+         Try to reduce [output] and restart [deduce]. *)
+      let term, has_red = whnf st output.term in
+      if has_red then
+        deduce ~output:{ output with term; } ~inputs st minfos
+      else
+        (st.mv, minfos_failed output.term minfos)
 
     | Some fa_conds ->
       let minfos =
@@ -3420,6 +3442,7 @@ module E = struct
         (known_sets_of_mset_l se mset_l)
         (known_sets_of_terms env inputs)
     in
+
     let mv, minfos =
       List.fold_left (fun (mv, minfos) output ->
           let output = { term = output; cond = Term.mk_true; } in

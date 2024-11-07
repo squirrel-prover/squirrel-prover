@@ -51,3 +51,30 @@ Proof.
   intro Hap E.
   deduce.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* deduce modulo reduction *)
+
+(* macros are reduced *)
+global lemma[set:P/left; equiv:none] _:
+  [happens(init)] -> $(empty |> (frame@init,exec@init)).
+Proof.
+  intro H.
+  deduce.
+Qed.
+
+global lemma[set:P/left; equiv:none] _:
+  $(empty |> (frame@init,exec@init)).
+Proof.
+  checkfail deduce exn ApplyMatchFailure.
+Abort.
+
+op a : message.
+op b = a.
+
+(* operators are reduced *)
+global lemma[set:P/left; equiv:none] _:
+  $(a |> b).
+Proof.
+  deduce.
+Qed.

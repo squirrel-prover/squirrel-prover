@@ -1,9 +1,9 @@
 include Core.
 
 (* Test that the prf tactic creates the correct formula when
- * several instances of the name are found in an action. 
- * Each time, the prf condition does not hold. We add it in hypothesis and check
- * that it has been correctly produced. *)
+   several instances of the name are found in an action. 
+   Each time, the prf condition does not hold. We add it in hypothesis and check
+   that it has been correctly produced. *)
 channel c
 hash h
 name k : message
@@ -41,6 +41,6 @@ Proof.
   prf 1.
   + by rewrite H1 H2.
   + by rewrite H1 H2.
-  + fresh 1; 1:auto.
+  + fresh 1; 1:auto. 
     by apply E.
 Qed.
