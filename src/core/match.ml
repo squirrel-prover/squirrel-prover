@@ -3374,6 +3374,12 @@ module E = struct
       ) terms pat_terms st.mv
 
   (*------------------------------------------------------------------*)
+  (** Obtain the result, or raise a user-level error
+      with deduction failure informations. *)
+  let success_or_user_error = function
+    | Match   r -> r
+    | NoMatch infos -> no_unif ?infos ()
+
   (** Check entailment between two equivalences by deduction or plain unification.
       - [Eq   ]   : [equiv(terms ) ↔ equiv(terms0)]
       - [EntailLR]: [equiv(terms ) → equiv(terms0)]
@@ -3391,18 +3397,12 @@ module E = struct
     | `EntailLR ->
       (* [terms ▷ terms0 → equiv(terms) → equiv(terms0)] *)
       deduce_terms ~outputs:terms0 ~inputs:terms  st |>
-      (* in case deduction fails, fall-back to standard unification *)
-      (function
-        | Match   r -> r
-        | NoMatch _ -> tunif_equiv_eq terms terms0 st)
+      success_or_user_error
 
     | `EntailRL     ->
       (* [terms0 ▷ terms → equiv(terms0) → equiv(terms)] *)
       deduce_terms ~outputs:terms  ~inputs:terms0 st |>
-      (* in case deduction fails, fall-back to standard unification *)
-      (function
-        | Match   r -> r
-        | NoMatch _ -> tunif_equiv_eq terms terms0 st)
+      success_or_user_error
 
   (*------------------------------------------------------------------*)
   (** Unifies two [Equiv.form] *)
