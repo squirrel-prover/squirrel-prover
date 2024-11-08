@@ -2041,9 +2041,7 @@ type term_set = {
 }
 
 (*------------------------------------------------------------------*)
-(** Association list sorting [term_sets] by the head of the term,
-    in diff-head normal form. *)
-type known_sets = (term_head * term_set list) list
+type known_sets = term_set list
 
 (*------------------------------------------------------------------*)
 let _pp_term_set ppe fmt (ts : term_set) =
@@ -2058,7 +2056,6 @@ let _pp_term_set ppe fmt (ts : term_set) =
   in
   let vars = List.map2 (fun v (_,tag) -> v,tag)vars ts.vars in
   let term,cond = Term.subst s ts.term, List.map (Term.subst s) ts.cond in
-
   Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a%s@[%a@]}@]"
     (Term._pp ppe) term
     Vars.pp_typed_tagged_list vars
@@ -2070,32 +2067,16 @@ let[@warning "-32"] pp_term_set_dbg = _pp_term_set (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
 let _pp_known_sets ppe fmt (ks : known_sets) =
-  Fmt.pf fmt "@[<v>";
-  List.iter (fun (head, k_l) ->
-      Fmt.pf fmt "head: %a@;@[<v>%a@]"
-        pp_term_head head
-        (Fmt.list ~sep:Fmt.cut (_pp_term_set ppe)) k_l;
-      Fmt.cut fmt ();
-    ) ks;
-  Fmt.pf fmt "@]"
+  Fmt.pf fmt "@[<v>%a@]"
+  (Fmt.list ~sep:Fmt.cut (_pp_term_set ppe)) ks
 
 let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
-let known_sets_add (k : term_set) (ks : known_sets) : known_sets =
-  List.assoc_up_dflt (get_head k.term) [] (fun ks_l -> k :: ks_l) ks
+let known_sets_add (k : term_set) (ks : known_sets) : known_sets = k :: ks
 
-let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
-  let s = List.fold_left (fun s (head, k_l) ->
-      let k_l' = List.assoc_dflt [] head s2 in
-      (head, k_l' @ k_l) :: s
-    ) [] s1
-  in
-  List.fold_left (fun s (head', k_l') ->
-      if List.mem_assoc head' s1 then s
-      else (head', k_l') :: s
-    ) s s2
+let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets = s1 @ s2
 
 (*------------------------------------------------------------------*)
 let term_set_of_term (se : SE.t) (term : Term.term) : term_set =
@@ -2764,11 +2745,10 @@ module E = struct
     =
     let cand_head = Term.get_head cand.term in
     let cands =
-      List.fold_left (fun acc (head, known_list) ->
+      List.fold_left (fun acc (known : term_set) ->
+          let head = Term.get_head known.term in
           if cand_head = HVar || head = HVar || cand_head = head then
-            List.fold_left (fun acc known ->
-                specialize table system cand known :: acc
-              ) acc known_list
+            specialize table system cand known :: acc
           else acc
         ) [] known_sets
     in
@@ -3207,8 +3187,7 @@ module E = struct
       (elems : known_sets)
       (st    : unif_state) : Mvar.t option
     =
-    let elems_head = List.assoc_dflt [] (Term.get_head cterm.term) elems in
-    List.find_map (fun elem -> deduce_mem cterm elem st) elems_head
+    List.find_map (fun elem -> deduce_mem cterm elem st) elems
  
   (*------------------------------------------------------------------*)
   (** [fa_decompose cterm st] return a list of deduction conditions that must be
