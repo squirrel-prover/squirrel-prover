@@ -86,6 +86,9 @@ module type S = sig
     ?strat:red_strat ->
     state -> Term.term -> Term.term * bool
 
+  (** Reduce once at head position in a global formula. *)
+  val reduce_head1_global : state -> Equiv.form -> Equiv.form * bool 
+
   (** Weak head normal form according to [strat] (default to [Std]) *) 
   val whnf_term :
     ?strat:red_strat ->

@@ -452,6 +452,9 @@ module Mk (Args : MkArgs) : S with
   let to_global_sequent  = Args.to_global_sequent
 
   (*------------------------------------------------------------------*)
+  module Reduce = Reduction.Mk(S)
+
+  (*------------------------------------------------------------------*)
   let is_assumption (p : Symbols.p_path) (s : S.t) =
     (match p with ([],name) -> Hyps.mem_name (L.unloc name) s | _ -> false) ||
     Lemma.mem p (S.table s)
@@ -880,7 +883,7 @@ module Mk (Args : MkArgs) : S with
   let error_pt_apply_bad_kind loc table ~(pt : PT.t) ~(arg : PT.t) =
     let ppe = default_ppe ~table () in
     let err_str =
-      Fmt.str "@[<v 0>bad kind: the proof term proves:@;  @[%a@]@;\
+      Fmt.str "@[<v 0>Not an implication: the proof term proves:@;  @[%a@]@;\
                it cannot be applied to:@;  @[%a@].@]"
         (PT._pp ppe) arg
         (PT._pp ppe) pt
@@ -1073,6 +1076,8 @@ module Mk (Args : MkArgs) : S with
       (s       : S.t)
     : ghyp * PT.t
     =
+    let exception CannotApply of PT.t in
+
     let table, env = S.table s, S.vars s in
 
     let lem_name, init_pt =
@@ -1081,44 +1086,87 @@ module Mk (Args : MkArgs) : S with
 
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
 
-    (** Apply [pt] to [p_arg] when [pt] is a forall. *)
-    let do_var (pt : PT.t) (p_arg : Typing.term) : PT.t =
-      match destr_forall1_tagged_k Equiv.Any_t pt.form with
-      | None ->
-        error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
 
-      | Some ((f_arg, _), _) ->
-        let ty = Vars.ty f_arg in
-        let arg, _ = Typing.convert ~ty_env ~pat:true cenv ~ty p_arg in
+    (** If [pt.form] does not start with the wanted construct, try
+        to reduce it once. *)
+    let try_reduce_head1 (pt : PT.t) : PT.t =
+      let form, has_red = 
+        match pt.form with
+        | Equiv.Local f -> 
+          let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Local_t f in
+          Equiv.Local f, has_red
+        | Equiv.Global f ->
+          let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t f in
+          Equiv.Global f, has_red
+      in
+      let pt = { pt with form } in
 
-        pt_apply_var_forall ~arg_loc:(L.loc p_arg) ty_env table env pt arg
+      if has_red then pt
+      else raise (CannotApply pt)
     in
 
-    (** Apply [pt] to [p_arg] when [pt] is an implication. *)
-    let do_impl
-        (ty_env : Infer.env)
-        (pt : PT.t) (pt_impl_arg : pt_impl_arg)
-      : PT.t
+    (** decompose [pt.form] as an implication [f1 → f2], possibly
+        reducing [pt] *)
+    let rec decompose_impl
+        (pt : PT.t) : Equiv.any_form * Equiv.any_form * PT.t 
       =
       let pt_env = env_of_pt (S.table s) (S.system s) (S.vars s) pt in
-
       (* try to destruct [pt.form] as an implication *)
-      let f1, f2 =
-        match destr_impl_k Equiv.Any_t pt_env pt.form with
-        | Some (f1, f2) -> f1, f2
-        | None ->
-          (* destruct failed, applying the pending substitution and try to
-             destruct again *)
-          let subst =
-            subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt in
-          match
-            destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form)
-          with
-          | Some (f1, f2) -> f1, f2
-          | None ->
-            error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
-      in
+      match destr_impl_k Equiv.Any_t pt_env pt.form with
+      | Some (f1, f2) -> (f1, f2, pt)
+      | None ->
+        (* destruct failed, applying the pending substitution and try to
+           destruct again *)
+        let subst =
+          subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt 
+        in
+        let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
+        match
+          destr_impl_k Equiv.Any_t pt_env pt.form
+        with
+        | Some (f1, f2) -> (f1, f2, pt)
+        | None -> decompose_impl (try_reduce_head1 pt)
+    in
 
+    (** decompose [pt.form] as a forall, possibly reducing [pt] *)
+    let rec decompose_forall
+        (pt : PT.t) : (Vars.tagged_var * Equiv.any_form) * PT.t 
+      =
+      match destr_forall1_tagged_k Equiv.Any_t pt.form with
+      | Some x -> x, pt
+      | None ->
+        (* destruct failed, applying the pending substitution and try to
+           destruct again *)
+        let subst =
+          subst_of_pt ~loc:pt_app.pta_loc ty_env table (S.vars s) pt 
+        in
+        let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
+        match
+          destr_forall1_tagged_k Equiv.Any_t pt.form
+        with
+        | Some x -> x, pt
+        | None -> decompose_forall (try_reduce_head1 pt)
+    in
+
+    (** Apply [pt] to [p_arg] when [pt] is a forall. *)
+    let do_var
+        (pt : PT.t) ((f_arg, _) : Vars.tagged_var) (p_arg : Typing.term) : PT.t 
+      =
+      let ty = Vars.ty f_arg in
+      let arg, _ = Typing.convert ~ty_env ~pat:true cenv ~ty p_arg in
+      
+      pt_apply_var_forall ~arg_loc:(L.loc p_arg) ty_env table env pt arg
+    in
+
+    (** Apply [pt] to [p_arg] when [pt] is an implication.
+        We must have [pt.form = f1 → f2]. *)
+    let do_impl
+        (ty_env : Infer.env)
+        (pt : PT.t)
+        (f1 : Equiv.any_form) (f2 : Equiv.any_form) 
+        (pt_impl_arg : pt_impl_arg)
+      : PT.t
+      =
       match pt_impl_arg with
       | `Subgoal ->             (* discharge the subgoal *)
         { PT.system = pt.system;
@@ -1141,10 +1189,17 @@ module Mk (Args : MkArgs) : S with
        and accumulating proof obligations. *)
     let pt =
       List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
-          if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
-            do_impl ty_env pt (pt_app_arg_as_pt p_arg)
-          else
-            do_var pt (pt_app_arg_as_term p_arg)
+          try (* try as a [f1 → f2] *)
+            let f1, f2, pt = decompose_impl pt in
+            do_impl ty_env pt f1 f2 (pt_app_arg_as_pt p_arg)
+          with CannotApply _ ->
+
+          try (* try as a [∀ x. f1] *)
+            let (v, _f1), pt = decompose_forall pt in
+            do_var pt v (pt_app_arg_as_term p_arg)
+
+          with CannotApply pt -> (* failed, reports to the user *)
+            error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
         ) init_pt pt_app.pta_args
     in
 
@@ -1336,7 +1391,4 @@ module Mk (Args : MkArgs) : S with
       convert_pt_gen ~check_compatibility:true ?close_pats pt s
     in
     name, tyvars, pt
-
-  (*------------------------------------------------------------------*)
-  module Reduce = Reduction.Mk(S)
 end
