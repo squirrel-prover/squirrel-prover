@@ -1004,8 +1004,8 @@ let fa_dup (s : ES.t) : ES.t list =
 (*------------------------------------------------------------------*)
 (** Deduce. *)
 
-(** If [filter_deduce ~all ~knows to_filter = results] then [knows,
-    results ▷ to_filter]. *)
+(** If [filter_deduce ~all ~knows to_filter = results] then
+    [knows, results ▷ to_filter]. *)
 let filter_deduce
     (system : SE.context) (s : ES.t) 
     ?(knows: Term.terms = [])
@@ -1041,7 +1041,9 @@ let filter_deduce
 (*------------------------------------------------------------------*)
 (** Deduce recursively removes all elements of a biframe
     that are deducible from the rest. *)
-let deduce_all (s : ES.t) : ES.t list =  
+let deduce_all
+    ?(with_hyp: ES.secrecy_goal option) (s : ES.t) : ES.t list 
+  =
   let system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
@@ -1051,9 +1053,28 @@ let deduce_all (s : ES.t) : ES.t list =
 
   if equiv.bound <> None then (* TODO: concrete *)
     soft_failure (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
-  
-  let terms = filter_deduce system s equiv.terms in
-  [ES.set_equiv_conclusion {terms; bound = None} s]
+
+  let terms = equiv.terms in
+
+  (*------------------------------------------------------------------*) 
+  if with_hyp <> None && ES.secrecy_system (oget with_hyp) <> system.set then
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
+
+  (* we know that [h_left ▷ h_right] holds *)
+  let h_left  = omap_dflt [] ES.secrecy_left with_hyp in
+  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| ES.secrecy_right) with_hyp in
+
+  (*------------------------------------------------------------------*)   
+  (* [terms0, h_left, h_right ▷ terms] *)
+  let terms0 = filter_deduce system s ~knows:(h_right @ h_left) terms in
+
+  (* Since [h_left ▷ h_right], we know that [terms0, h_left ▷ terms] *)
+
+  (* [terms0, h_left0 ▷ h_left] and thus [terms0, h_left0 ▷ terms] *)
+  let h_left0 = filter_deduce system s ~knows:terms0 h_left in
+
+  [ES.set_equiv_conclusion {terms = terms0 @ h_left0; bound = None} s]
 
 (*------------------------------------------------------------------*) 
 (** Tactic [deduce] in a goal [u |> v] to prove that term [u]
@@ -1064,7 +1085,9 @@ let deduce_all (s : ES.t) : ES.t list =
 
     If [~all], then raise a user-level error if all elements cannot be
     deduced. *)
-let deduce_predicate_all ~(all : bool) (s : ES.t) : ES.t list =
+let deduce_predicate_all 
+    ~(all : bool) ?(with_hyp: ES.secrecy_goal option) (s : ES.t) : ES.t list 
+  =
   let goal = ES.conclusion_as_secrecy s in
 
   if ES.secrecy_kind goal <> Deduce then
@@ -1076,6 +1099,16 @@ let deduce_predicate_all ~(all : bool) (s : ES.t) : ES.t list =
     SE.{ (ES.system s) with set = system_secrecy; }
   in
 
+  (*------------------------------------------------------------------*) 
+  if with_hyp <> None && ES.secrecy_system (oget with_hyp) <> system.set then
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
+
+  (* we know that [h_left ▷ h_right] holds *)
+  let h_left  = omap_dflt [] ES.secrecy_left with_hyp in
+  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| ES.secrecy_right) with_hyp in
+
+  (*------------------------------------------------------------------*) 
   let table = ES.table s in
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
@@ -1085,21 +1118,35 @@ let deduce_predicate_all ~(all : bool) (s : ES.t) : ES.t list =
 
   if all then (* two different mode of operations, depending on [all] *)
     begin
+      let () = (* check that [left ▷ h_left] *)
+        match Match.E.deduce_terms ~outputs:h_left ~inputs:left st with
+        | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
+        | Match mv -> assert (Match.Mvar.is_empty mv)
+      in
+
+      (* Since [h_left ▷ h_right], it only remains to check that
+         [left, h_left, h_right ▷ right] *)
       let match_result = 
-        Match.E.deduce_terms ~outputs:right ~inputs:left st
+        Match.E.deduce_terms ~outputs:right ~inputs:(left @ h_left @ h_right) st
       in
       match match_result with
       | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
-      | Match mv ->
-        assert (Match.Mvar.is_empty mv);
-        []
+      | Match mv -> assert (Match.Mvar.is_empty mv); []
     end
   else
     begin
-      let right = filter_deduce system s ~knows:left right in
+      (* [left, h_left0 ▷ h_left] *)
+      let h_left0 = filter_deduce system s ~knows:left h_left in
 
-      if right = [] then [] else
-        let new_secrecy_goal = ES.secrecy_update_right right goal in
+      (* Since [h_left ▷ h_right],
+         we know that [left, h_left0 ▷ left, h_left, h_right] *)
+      let knows = left @ h_left @ h_right in
+
+      (* [left, h_left0, right0 ▷ right] *)
+      let right0 = filter_deduce system s ~knows right in
+
+      if right0 = [] then [] else
+        let new_secrecy_goal = ES.secrecy_update_right (h_left0 @ right0) goal in
         [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
     end
 
@@ -1179,17 +1226,38 @@ let p_deduce_named_arg (nargs : Args.named_args) : bool =
 
 let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
   match args with
-  | [Args.Deduce (nargs, targets_opt, _with_hyps_opt)] ->
+  | [Args.Deduce (nargs, targets_opt, with_hyps_opt)] ->
     let all = p_deduce_named_arg nargs in
+
+    let table = ES.table s in
+    let with_hyp =
+      match with_hyps_opt with
+      | None -> None
+      | Some str ->
+        let _, hyp = Hyps.by_name str s in
+        match hyp with
+        | LHyp f when ES.is_secrecy table f -> 
+          let f = ES.mk_secrecy_goal_from_form table f in
+          if ES.secrecy_kind f <> Deduce then
+          Tactics.soft_failure ~loc:(L.loc str)
+            (Tactics.Failure "expected a deduction hypothesis.");
+
+          Some f
+
+        | _ -> 
+          Tactics.soft_failure ~loc:(L.loc str)
+            (Tactics.Failure "expected a deduction hypothesis.")
+    in
+
     if ES.conclusion_is_equiv s then
       match targets_opt with
-      | None   -> deduce_all   s |> to_goals
-      | Some l -> deduce_int l s |> to_goals
+      | None   -> deduce_all ?with_hyp s |> to_goals
+      | Some l -> deduce_int l s         |> to_goals
 
     else if ES.conclusion_is_secrecy s then
       match targets_opt with
-      | None   -> deduce_predicate_all ~all   s |> to_goals 
-      | Some l -> deduce_predicate_int      l s |> to_goals
+      | None   -> deduce_predicate_all ~all ?with_hyp s |> to_goals 
+      | Some l -> deduce_predicate_int l s              |> to_goals
 
     else
       Tactics.soft_failure 

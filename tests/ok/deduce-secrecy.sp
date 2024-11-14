@@ -85,3 +85,23 @@ global lemma [any] _:
 Proof.
   deduce.
 Qed.
+
+(*------------------------------------------------------------------*)
+global lemma [any] _ (x,y,z : message) (f : _ -> message[adv]):
+  $(x |> (z,y)) -> $(x |> (z,f y)).
+Proof.
+  intro H. 
+  checkfail (deduce ~all) exn ApplyMatchFailure.
+  deduce with H.
+Qed.
+
+global lemma _ 
+  {P[pair]} in [set:P; equiv:P] 
+  (x,x0,y,z : message) (f : _ -> message[adv])
+:
+  equiv(x,x0) -> $((x,x0) |> (z,y)) -> equiv(x,z,f y).
+Proof.
+  intro A H.
+  deduce with H.
+  assumption A.
+Qed.
