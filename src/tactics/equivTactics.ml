@@ -1145,9 +1145,10 @@ let deduce_predicate_all
       (* [left, h_left0, right0 ▷ right] *)
       let right0 = filter_deduce system s ~knows right in
 
-      if right0 = [] then [] else
-        let new_secrecy_goal = ES.secrecy_update_right (h_left0 @ right0) goal in
-        [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
+      let right' = right0 @ h_left0 in
+      if right' = [] then [] else
+        let g = ES.secrecy_update_right right' goal in 
+        [ES.set_conclusion (ES.mk_form_from_secrecy_goal g) s]
     end
 
 (*------------------------------------------------------------------*)

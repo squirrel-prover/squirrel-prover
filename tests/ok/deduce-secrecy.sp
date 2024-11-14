@@ -86,13 +86,33 @@ Proof.
   deduce.
 Qed.
 
-(*------------------------------------------------------------------*)
-global lemma [any] _ (x,y,z : message) (f : _ -> message[adv]):
-  $(x |> (z,y)) -> $(x |> (z,f y)).
+(* operators are reduced *)
+global lemma[set:P/left; equiv:none] _:
+  Let x = b in
+  $(a |> x).
 Proof.
-  intro H. 
+  intro x.
+  deduce.
+Qed.
+
+(*------------------------------------------------------------------*)
+
+global lemma [any] _ (x,x0,y,z : message) (f : _ -> message[adv]):
+  $(x |> x0) -> $(x |> (z,y)) -> $(x |> (x0,z,f y)).
+Proof.
+  intro A H.
   checkfail (deduce ~all) exn ApplyMatchFailure.
   deduce with H.
+  assumption A.
+Qed.
+
+global lemma [any] _ (x,x0,y,z,w : message) (f : _ -> message[adv]):
+  $(x |> (w, x0)) -> $((x,x0) |> (z,y)) -> $(x |> (z,f y,w)).
+Proof.
+  intro A H.
+  checkfail (deduce ~all) exn ApplyMatchFailure.
+  deduce with H.
+  assumption A.
 Qed.
 
 global lemma _ 
