@@ -120,6 +120,9 @@ val conclusion_as_secrecy : t -> secrecy_goal
 (** Returns a new secrecy goal where the left-hand side has been updated*)
 val secrecy_update_left : Term.terms -> secrecy_goal -> secrecy_goal
 
+(** Returns a new secrecy goal where the right-hand side has been updated*)
+val secrecy_update_right : Term.terms -> secrecy_goal -> secrecy_goal
+
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
 

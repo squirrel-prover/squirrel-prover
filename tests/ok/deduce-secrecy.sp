@@ -40,8 +40,8 @@ Qed.
 
 global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
   $((frame@tau) |> (output@tau)).
-Proof.
-  checkfail deduce exn ApplyMatchFailure.
+Proof. 
+  checkfail (deduce ~all) exn ApplyMatchFailure.
 Abort.
 
 global lemma [any] _ (tau : timestamp[const]):
@@ -66,7 +66,7 @@ Qed.
 global lemma[set:P/left; equiv:none] _:
   $(empty |> (frame@init,exec@init)).
 Proof.
-  checkfail deduce exn ApplyMatchFailure.
+  checkfail (deduce ~all) exn ApplyMatchFailure.
 Abort.
 
 op a : message.

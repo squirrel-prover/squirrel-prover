@@ -155,6 +155,7 @@ let rec token buf =
   | "dependent" -> !?DEPENDENT
   | "depends" -> !?DEPENDS
   | "destruct" -> !?DESTRUCT
+  | "deduce" -> !?DEDUCE
   | "diff" -> !?DIFF
   | "else" -> !?ELSE
   | "equiv" -> !?EQUIV

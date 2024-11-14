@@ -424,6 +424,11 @@ let secrecy_system (_, pa:secrecy_goal) : SE.t =
     | [se', _] when SE.equal0 se se' -> se
     | _ -> assert false
   
+let secrecy_left0 (_, pa:secrecy_goal) : Term.term =
+  match pa.multi_args with
+  | [_, [u;_]] -> u
+  | _ -> assert false 
+
 let secrecy_left (_, pa:secrecy_goal) : Term.terms =
   match pa.multi_args with
   | [_, [u;_]] -> Term.destr_tuple_flatten u
@@ -446,8 +451,9 @@ let conclusion_as_secrecy (s : t) : secrecy_goal =
 let secrecy_update_left
     (left : Term.terms) (sk, pa : secrecy_goal) : secrecy_goal
   =
+  let right = secrecy_right (sk, pa) in
   let ty_left = List.map Term.ty left in
-  let ty_right = Term.ty (secrecy_right (sk, pa)) in
+  let ty_right = Term.ty right in
   let left, ty_left =
     if List.length left = 0 then 
       [Term.mk_zero], [Type.tmessage]
@@ -458,7 +464,26 @@ let secrecy_update_left
     {pa with
      ty_args    = [Type.tuple ty_left; ty_right];
      multi_args = [secrecy_system (sk, pa),
-                   [Term.mk_tuple left; secrecy_right (sk, pa)]]
+                   [Term.mk_tuple left; right]]
+    } )
+
+let secrecy_update_right
+    (right : Term.terms) (sk, pa : secrecy_goal) : secrecy_goal
+  =
+  let left = secrecy_left0 (sk,pa) in
+  let ty_left = Term.ty left in
+  let ty_right = List.map Term.ty right in
+  let right, ty_right =
+    if List.length right = 0 then 
+      [Term.mk_zero], [Type.tmessage]
+    else
+      right, ty_right
+  in
+  ( sk,
+    {pa with
+     ty_args    = [ty_left; Type.tuple ty_right];
+     multi_args = [secrecy_system (sk, pa),
+                   [left; Term.mk_tuple right]]
     } )
 
 

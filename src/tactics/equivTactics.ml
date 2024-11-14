@@ -31,13 +31,31 @@ module Sv = Vars.Sv
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-let split_equiv_conclusion = LT.split_equiv_conclusion
 
 (*------------------------------------------------------------------*)
 let wrap_fail = EquivLT.wrap_fail
 
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
+
+(*------------------------------------------------------------------*)
+let split_equiv_conclusion = LT.split_equiv_conclusion
+
+(*------------------------------------------------------------------*)
+(** Given a list [l] of integer positions and a list of terms [terms],
+    returns [u] and [v] such that [u] are the terms at positions [l]
+    in [terms], and [v] are the remaining terms. 
+    Order is preserved. *)
+let get_elems (l : int L.located list) (terms : Term.terms) : Term.terms * Term.terms = 
+  let len = List.length terms in
+
+  List.iter (fun i -> 
+      if L.unloc i >= len then
+        soft_failure ~loc:(L.loc i) (Tactics.Failure "out of range position")
+    ) l;
+
+  let l = List.map L.unloc l in
+  List.partitioni (fun i _ -> List.mem i l) terms
 
 (*------------------------------------------------------------------*)
 let mk_pair_trace_cntxt = ES.mk_pair_trace_cntxt
@@ -986,102 +1004,144 @@ let fa_dup (s : ES.t) : ES.t list =
 (*------------------------------------------------------------------*)
 (** Deduce. *)
 
-(** Deduce recursively removes all elements of a biframe
-    that are deducible from the rest. *)
-let deduce_all (s:ES.t) =  
+(** If [filter_deduce ~all ~knows to_filter = results] then [knows,
+    results ▷ to_filter]. *)
+let filter_deduce
+    (system : SE.context) (s : ES.t) 
+    ?(knows: Term.terms = [])
+    (to_filter_init : Term.terms) 
+  : Term.terms
+  =
   let table = ES.table s in
-  let system =
-    let system_s = ES.system s in
-    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
-  in
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
-  
-  let rec _deduce_all res goals : Term.terms =
-    match goals with
-    | [] -> res
-    | e :: after ->
-      let biframe = List.rev_append res goals in
-      let biframe_without_e = List.rev_append res after in
+
+  (** Invariant: [knows, results, to_filter ▷ to_filter_init] *)
+  let rec doit result to_filter : Term.terms =
+    match to_filter with
+    | [] -> List.rev result
+    | e :: to_filter0 ->
+      let inputs = result @ to_filter0 @ knows in (* without [e] *)
       let match_result = 
-        Match.E.deduce_terms ~outputs:biframe ~inputs:biframe_without_e st
+        Match.E.deduce_terms ~outputs:[e] ~inputs st
       in
       match match_result with
-      | NoMatch _ -> _deduce_all (e::res) after 
+      | NoMatch _ -> doit (e :: result) to_filter0
       | Match mv -> 
+        (* [result @ to_filter0 @ knows ▷ e], thus removing [e]
+           preserves the invariant. *)
         assert (Match.Mvar.is_empty mv);
-        _deduce_all res after
+        doit result to_filter0
   in
-  let new_conclusion = List.rev (_deduce_all [] (ES.conclusion_as_equiv s).terms) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-  [ES.set_equiv_conclusion {terms = new_conclusion; bound = None} s]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
+  (* Initially, [results=[] ∧ to_filter = to_filter_init], thus the
+     invariant is respected. *)
+  doit [] to_filter_init
 
+(*------------------------------------------------------------------*)
+(** Deduce recursively removes all elements of a biframe
+    that are deducible from the rest. *)
+let deduce_all (s : ES.t) : ES.t list =  
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+  
+  let equiv = ES.conclusion_as_equiv s in
+
+  if equiv.bound <> None then (* TODO: concrete *)
+    soft_failure (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+  
+  let terms = filter_deduce system s equiv.terms in
+  [ES.set_equiv_conclusion {terms; bound = None} s]
+
+(*------------------------------------------------------------------*) 
+(** Tactic [deduce] in a goal [u |> v] to prove that term [u]
+    can be deduced from term [v].
+
+    Closes the goal if that is the case, fails filter the elements
+    that could be deduced. 
+
+    If [~all], then raise a user-level error if all elements cannot be
+    deduced. *)
+let deduce_predicate_all ~(all : bool) (s : ES.t) : ES.t list =
+  let goal = ES.conclusion_as_secrecy s in
+
+  if ES.secrecy_kind goal <> Deduce then
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape "secrecy predicate unsupported");
+
+  let system =
+    let system_secrecy = ES.secrecy_system goal in
+    SE.{ (ES.system s) with set = system_secrecy; }
+  in
+
+  let table = ES.table s in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+
+  let right = Term.destr_tuple_flatten @@ ES.secrecy_right goal in
+  let left  = ES.secrecy_left goal in
+
+  if all then (* two different mode of operations, depending on [all] *)
+    begin
+      let match_result = 
+        Match.E.deduce_terms ~outputs:right ~inputs:left st
+      in
+      match match_result with
+      | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
+      | Match mv ->
+        assert (Match.Mvar.is_empty mv);
+        []
+    end
+  else
+    begin
+      let right = filter_deduce system s ~knows:left right in
+
+      if right = [] then [] else
+        let new_secrecy_goal = ES.secrecy_update_right right goal in
+        [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
+    end
+
+(*------------------------------------------------------------------*)
 (** Checks whether the [i]-th element of the biframe is bideducible
     from the other ones, and if so removes it. *)
-let deduce_int (i : int L.located) (s : ES.t) : ES.t list =
+let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
+  let conc = ES.conclusion_as_equiv s in
+  assert (conc.bound = None);   (* TODO: concrete *)
+
+  let to_deduce, rest = get_elems l conc.terms in
+
   let table = ES.table s in
   let system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
   let hyps = ES.get_trace_hyps ~in_system:system s in
-
-  let before, _, after = split_equiv_conclusion i s in
-  let conclusion_without_e = List.rev_append before after in
-  let conclusion = (ES.conclusion_as_equiv s).terms in
-
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+
   let match_result = 
-    Match.E.deduce_terms ~outputs:conclusion ~inputs:conclusion_without_e st
+    Match.E.deduce_terms ~outputs:to_deduce ~inputs:rest st
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    [ES.set_equiv_conclusion {terms = conclusion_without_e; bound = None} s]
-(*TODO: Concrete: Probably something to do to create a bounded goal *)
+    [ES.set_equiv_conclusion {terms = rest; bound = None} s]
 
-
-(** Tactic [deduce] in a goal [u |> v] to prove that term [u]
-    can be deduced from term [v].
-    Closes the goal if that is the case, fails otherwise. *)
-let deduce_predicate (s : ES.t) (goal : ES.secrecy_goal) : ES.t list =
-  let table = ES.table s in
-  let system =
-    let system_secrecy = ES.secrecy_system goal in
-    SE.{ (ES.system s) with set = system_secrecy; }
-  in
-  let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
-  
-  let match_result = 
-    Match.E.deduce_terms
-      ~outputs:[ES.secrecy_right goal]
-      ~inputs:(ES.secrecy_left goal)
-      st
-  in
-  match match_result with
-  | NoMatch minfos -> 
-    soft_failure (ApplyMatchFailure minfos) 
-  | Match mv ->
-    assert (Match.Mvar.is_empty mv);
-    []
-
+(*------------------------------------------------------------------*)
 (** Tactic [deduce i] in a goal [u |> v] or [u *> v], with [u] a tuple,
     checks if the [i]-th element of [u]
     is deducible from the rest of [u].
     If so, removes it. *)
-let deduce_predicate_int
-    (i : int L.located) (s : ES.t) (goal : ES.secrecy_goal)
-  : ES.t list
-  =
-  let L.{ pl_desc = i; pl_loc = loc; } = i in
-  if i < 0 || List.length (ES.secrecy_left goal) <= i then
-    (soft_failure ~loc (Failure "Invalid position"));
+let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
+  let goal = ES.conclusion_as_secrecy s in
 
-  let left_without_ith = List.filteri (fun j _ -> j <> i) (ES.secrecy_left goal) in
+  if ES.secrecy_kind goal <> Deduce then
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape "secrecy predicate unsupported");
+
+  let to_deduce, rest = get_elems l (ES.secrecy_left goal) in
 
   let table = ES.table s in
   let system =
@@ -1090,48 +1150,60 @@ let deduce_predicate_int
   in
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+
   let match_result = 
-    Match.E.deduce_terms ~outputs:(ES.secrecy_left goal) ~inputs:left_without_ith st
-  in
-  
+    Match.E.deduce_terms ~outputs:to_deduce ~inputs:rest st
+  in  
   match match_result with
   | NoMatch minfos -> 
     soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    let new_secrecy_goal = 
-      ES.secrecy_update_left left_without_ith goal
-    in
+    let new_secrecy_goal = ES.secrecy_update_left rest goal in
     [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
 
+(*------------------------------------------------------------------*)
+let to_goals l = List.map (fun x -> Goal.Global x) l
 
-let deduce Args.(Opt (Int, p)) s : ES.sequents =
-  if ES.conclusion_is_equiv s then
-    match p with
-    | None -> deduce_all s
-    | Some (Args.Int i) -> deduce_int i s
-  else if ES.conclusion_is_secrecy s then
-    let goal = ES.conclusion_as_secrecy s in
-    match p, ES.secrecy_kind goal with
-    | None, ES.Deduce -> 
-      deduce_predicate s goal
-    | None, _ ->
+(*------------------------------------------------------------------*)
+(** for now, `deduce` has only one named optional arguments *)
+let p_deduce_named_arg (nargs : Args.named_args) : bool =
+  match nargs with
+  | [Args.NArg L.{ pl_desc = "all" }] -> true
+
+  | Args.NList (l,_) :: _ 
+  | Args.NArg  l     :: _ ->
+    hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+
+  | [] -> false
+
+let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
+  match args with
+  | [Args.Deduce (nargs, targets_opt, _with_hyps_opt)] ->
+    let all = p_deduce_named_arg nargs in
+    if ES.conclusion_is_equiv s then
+      match targets_opt with
+      | None   -> deduce_all   s |> to_goals
+      | Some l -> deduce_int l s |> to_goals
+
+    else if ES.conclusion_is_secrecy s then
+      match targets_opt with
+      | None   -> deduce_predicate_all ~all   s |> to_goals 
+      | Some l -> deduce_predicate_int      l s |> to_goals
+
+    else
       Tactics.soft_failure 
         (Tactics.GoalBadShape 
-           "deduce expects a position, \
-            when used with a non-deduction predicate")
-    | Some (Args.Int i), _ -> deduce_predicate_int i s goal
-  else
-    Tactics.soft_failure 
-      (Tactics.GoalBadShape 
-         "Expected an equivalence or secrecy goal.")
+           "expected an equivalence or secrecy goal.")
 
+  | _ -> assert false
 
+let deduce args = wrap_fail (deduce args)
 
 let () =
-  T.register_typed "deduce"
+  T.register_general "deduce"
     ~pq_sound:true
-    (LT.genfun_of_pure_efun_arg deduce) Args.(Opt Int)
+    (LT.genfun_of_efun_arg deduce)
 
 
 (*------------------------------------------------------------------*)

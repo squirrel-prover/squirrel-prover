@@ -24,7 +24,7 @@
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
 
-%token AT TRANS FRESH
+%token AT TRANS FRESH DEDUCE
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
@@ -948,6 +948,10 @@ apply_in:
 | IN id=lsymb { Some id }
 
 (*------------------------------------------------------------------*)
+deduce_with:
+| WITH ids=slist1(lsymb,COMMA) { ids }
+
+(*------------------------------------------------------------------*)
 rewrite_oracle_in:
 |               { None }
 | IN i=loc(INT) { Some i }
@@ -1332,7 +1336,12 @@ tac:
   | l=lloc(WEAK) t=tac_term i=apply_in
     { mk_abstract l "weak" [TacticsArgs.Weak (Weak_term t,i)] }
 
-(*------------------------------------------------------------------*)
+
+  (*------------------------------------------------------------------*)
+  | l=lloc(DEDUCE) a=named_args i=slist1(loc(int),COMMA)? w=deduce_with?
+    { mk_abstract l "deduce" [TacticsArgs.Deduce (a,i,w)] }
+
+  (*------------------------------------------------------------------*)
   | l=lloc(TRANS) arg=trans_arg
     { mk_abstract l "trans" [TacticsArgs.Trans arg] }
 

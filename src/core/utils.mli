@@ -72,6 +72,10 @@ module List : sig
 
   val assoc_dflt : 'b -> 'a -> ('a * 'b) list -> 'b
 
+  val partitioni : (int -> 'a -> bool) -> 'a list -> 'a list * 'a list
+  (** Same as [partition f l], where [f] additionally receives
+      position of the element being partitionned. *)
+
   val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
 
   val find2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a * 'b

@@ -130,6 +130,13 @@ module List = struct
     | (a,b)::l -> if Stdlib.compare a x = 0 then b else assoc_dflt dflt x l
 
   (*------------------------------------------------------------------*)
+  let partitioni p l =
+    let rec part i yes no = function
+      | [] -> (rev yes, rev no)
+      | x :: l -> if p i x then part (i + 1) (x :: yes) no l else part (i + 1) yes (x :: no) l in
+    part 0 [] [] l
+
+  (*------------------------------------------------------------------*)
   let rec iteri2 i f l1 l2 =
     match (l1, l2) with
       ([], []) -> ()
