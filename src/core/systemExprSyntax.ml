@@ -124,7 +124,7 @@ let lookup_string (se_name : string) (env : tagged_vars) : Var.t option =
   List.iter (fun (v',_) ->
       if Var.name v' = se_name then begin
         (* It must be guaranteed that [env.se_vars] does
-           not contains multiple identically named
+           not contain multiple identically named
            variables. *)
         assert (!found = None); 
         found := Some v'

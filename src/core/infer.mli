@@ -17,7 +17,7 @@
     [norm_*] functions. 
 
     Eventually, we can check whether all unification variables have
-    been properly inferred and close to inference environment using
+    been properly inferred and close the inference environment using
     [close], which returns (if it succeeds) a substitution of Ocaml
     type [Subst.t] from inferred unification variables to their
     inferred values. *)
@@ -35,33 +35,41 @@ val pp : env formatter
 val mk_env : unit -> env
 
 (*------------------------------------------------------------------*)
-(** Stateful copie and set. *)
+(** Stateful copy and set. *)
 val copy : env -> env
 val set : tgt:env -> value:env -> unit
 
 (*------------------------------------------------------------------*)
-(** Create a type unification to be inferred. *)
+(** Creates a type unification to be inferred. *)
 val mk_ty_univar : env -> Type.univar
 
-(** Create a system expression variable to be inferred.
+(** Creates a system expression variable to be inferred.
 
     Optionally, the variable may be restricted to be instantiated by
     a system expression satisfying [constraints].  *)
 val mk_se_univar : ?constraints:SE.Var.info list -> env -> SE.Var.t
 
 (*------------------------------------------------------------------*)
-val open_tvars  : ?subst:Subst.t -> env -> Type.tvars     -> Type.univars  * Subst.t
-val open_svars  : ?subst:Subst.t -> env -> SE.tagged_vars -> SE.Var.t list * Subst.t
-
+(** These functions take a list of variables (type, system, or both),
+    create as many fresh unification variables (which modifies env),
+    and returns them together with the corresponding substitution. *)
+val open_tvars : 
+  ?subst:Subst.t -> env -> Type.tvars -> Type.univars  * Subst.t
+val open_svars : 
+  ?subst:Subst.t -> env -> SE.tagged_vars -> SE.Var.t list * Subst.t
 val open_params : env -> Params.t -> Params.Open.t * Subst.t
 
 (*------------------------------------------------------------------*)
+(** These functions normalise a type/system expression/context/variable
+    by recursively replacing unification variables whose value has been 
+    inferred. *)
 val norm_ty         : env -> Type.ty    -> Type.ty
 val norm_se         : env -> SE.t       -> SE.t
 val norm_se_context : env -> SE.context -> SE.context
 val norm_var        : env -> Vars.var   -> Vars.var
 
 (*------------------------------------------------------------------*)
+(** Attempt to unify two types/system expr/contexts in the unification env. *)
 val unify_ty         : env -> Type.ty    -> Type.ty    -> [`Fail | `Ok]
 val unify_se         : env -> SE.t       -> SE.t       -> [`Fail | `Ok]
 val unify_se_context : env -> SE.context -> SE.context -> [`Fail | `Ok] 
@@ -73,19 +81,19 @@ type 'a result =
   | BadInstantiation of (Format.formatter -> unit)
   | Closed of 'a
 
-(** Print the error message in a result. 
+(** Prints the error message in a result. 
     Requires that the result is **not** successful.  *)
 val pp_error_result : 'a result formatter
 
-(** [check_se_subst env v se c] check that the substitution [v → se]
+(** [check_se_subst env v se c] checks that the substitution [v → se]
     satisfies the constraints [c] in environment [env]. *)
 val check_se_subst :
   Env.t -> SE.Var.t -> SE.t -> SE.Var.info list ->
   [`Ok | `BadInst of Format.formatter -> unit]
 
-(** Try to close an inference environment, and return the closing
+(** Tries to close an inference environment, and returns the closing
     substitution in case of success.
-    In case of failure, return why the environment could not be closed. *)
+    In case of failure, returns why the environment could not be closed. *)
 val close : Env.t -> env -> Subst.t result
 
 (** Similar to [close], except that it generalizes remaining type and

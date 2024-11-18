@@ -17,7 +17,8 @@ module Var : sig
   (*------------------------------------------------------------------*)
   type info =
     | Pair                              (** multi-system of cardinal two *)
-    | Compatible_with of Symbols.system (** multi-system compatible with some system *)
+    | Compatible_with of Symbols.system (** multi-system
+                                            compatible with some system *)
 
   (*------------------------------------------------------------------*)
   val _pp    : dbg:bool -> t formatter

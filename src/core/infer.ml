@@ -299,7 +299,7 @@ let gen_and_close
   };
 
   (*------------------------------------------------------------------*)
-  (* For system expression variables, for look for variables appearing
+  (* For system expression variables, we look for variables appearing
      in normalized expressions and compute the accumulated set of
      constraints they must satisfy.
 
@@ -308,7 +308,7 @@ let gen_and_close
 
      Return: (variables to generalize, failed variable instantiations)
 
-     The latter is in reversed order. *)
+     The latter is in reverse order. *)
   let check_and_gen_se_vars
       (v : SE.Var.t) ((se,infos) : SE.exposed * SE.Var.info list)
       (gen_se_vars, failed : SE.tagged_vars * (Format.formatter -> unit) list)
