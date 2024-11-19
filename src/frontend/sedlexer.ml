@@ -38,8 +38,8 @@ let lid =
 let uid =
   [%sedlex.regexp? (lu), Star (ll | lu | emoji | digit | '_' | '\'')]
 
-let filepath =
-  [%sedlex.regexp? '.', '/', Plus (alphanum | '_' | '.' | '-' | '/'), ".sp"]
+let quoted_string =
+  [%sedlex.regexp? '"', Plus (alphanum | '_' | '.' | '-' | '/'), '"']
 
 let int = [%sedlex.regexp? Plus digit]
 let drop_n_first_chars ~n s = String.sub s n (String.length s - 2)
@@ -84,7 +84,6 @@ let rec token buf =
   | "/\\" -> GAND
   | "\\/" -> GOR
   | "||" -> OR
-  | '"' -> QUOTE
   | '<' -> LANGLE
   | '>' -> RANGLE
   (*| "<:" -> LANGLECOLON*)
@@ -249,7 +248,11 @@ let rec token buf =
   | '.', (whitespace | '\n' | eof) -> TERMINAL
   | '.' -> DOT
 
-  | filepath -> FILEPATH (Utf8.lexeme buf)
+  | quoted_string -> 
+    let s = Utf8.lexeme buf in
+    QUOTED_STRING (String.sub s 1 (String.length s - 2))
+    (* remove the enclosing quotes '"' *)
+
   | uid -> UID (Utf8.lexeme buf)
   | lid -> LID (Utf8.lexeme buf)
   | eof -> EOF

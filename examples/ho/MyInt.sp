@@ -1,8 +1,6 @@
 (* Theory of integers *)
 
-(* This theory must be loaded after `Basic`. *)
-
-type int [well_founded, fixed].
+include Basic.
 
 (*==================================================================*)
 (* `Ordering` *)

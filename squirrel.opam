@@ -23,6 +23,7 @@ depends: [
   "menhirLib"
   "conf-which" {build}
   "dune" {>="3.16.0"}
+  "zarith"
 ]
 
 depopts: [

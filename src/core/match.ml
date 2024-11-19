@@ -79,6 +79,8 @@ module Pos = struct
 
       (* FIXME: add missing cases for &&, ||, => *)
 
+      | Term.Int    _
+      | Term.String _
       | Term.Fun (_, _) -> sp
 
       | Term.App (t1, args) ->
@@ -370,8 +372,10 @@ module Pos = struct
         let ti' = Term.mk_action a l in
         acc, found, if found then ti' else ti
 
-      (* variable *)
-      | Term.Var _ -> acc, false, ti
+      (* variable, int, string *)
+      | Term.Int    _
+      | Term.String _
+      | Term.Var    _ -> acc, false, ti
 
       (* tuple *)
       | Term.Tuple l ->
@@ -1717,6 +1721,14 @@ module T (* : S with type t = Term.term *) = struct
     match t, pat with
     (*      *) | _, Var v when st.mode = `Match -> vunif t v st
     | Var v, t | t, Var v when st.mode = `Unif  -> vunif t v st
+
+    | Int i, Int i' -> 
+      if not (Z.equal i i') then no_unif ();
+      st.mv
+
+    | String s, String s' -> 
+      if not (String.equal s s') then no_unif ();
+      st.mv
 
     | Tuple l, Tuple l' ->
       if List.length l <> List.length l' then no_unif ();

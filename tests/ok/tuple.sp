@@ -1,5 +1,3 @@
-type int.
-
 abstract foo : int * int -> int.
 
 abstract foo0 : int * int.

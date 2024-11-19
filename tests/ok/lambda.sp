@@ -1,5 +1,3 @@
-type int.
-
 lemma [any] _ (x : message) : (fun (y : int) => x) = (fun (z : int) => x).
 Proof.
   auto.

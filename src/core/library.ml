@@ -47,6 +47,42 @@ module Basic = struct
   let const_emptyset table = get_fsymb table "empty_set"
 end  
 
+module Int = struct
+
+  (* namespace path *)
+  let int_p = ["Int"]
+ 
+  let check_load table =
+    if not (Symbols.Import.mem_sp ([],"Int") table) then
+      Tactics.hard_failure (Failure "theory Int is not loaded")
+
+  let get_fsymb table s =
+    check_load table;
+    get_fsymb (int_p,s)
+
+  let get_btype table s =
+    check_load table;
+    get_btype  (int_p,s)
+
+  (*------------------------------------------------------------------*)
+  let tint table = Type.base int_p (Symbols.to_string (get_btype table "int").s)
+
+  (*------------------------------------------------------------------*)
+  let add   table = get_fsymb table "+"
+  let minus table = get_fsymb table "-"
+  let opp   table = get_fsymb table "opp"
+
+  let mul   table = get_fsymb table "*"
+
+  (*------------------------------------------------------------------*)
+  let mk_add   table x y = Term.mk_fun table (add table)   [x;y]
+  let mk_minus table x y = Term.mk_fun table (minus table) [x;y]
+  let mk_opp   table x   = Term.mk_fun table (opp table)   [x]
+
+  let mk_mul   table x y = Term.mk_fun table (mul table)   [x;y]
+end
+
+(*------------------------------------------------------------------*)
 module[@warning "-32"] Real = struct
 
   (* namespace path *)

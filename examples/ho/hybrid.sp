@@ -4,7 +4,7 @@
 *)
 
 include Basic.
-include Int.
+include MyInt.
 
 system null.
 

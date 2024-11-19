@@ -141,8 +141,14 @@ let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
 
-let tquantum_message   = TBase ([], "quantum_message")
-  
+(*------------------------------------------------------------------*)
+(** Prelude types *)
+let tquantum_message = TBase ([], "quantum_message")
+let tint             = TBase ([], "int")
+let tstring          = TBase ([], "string")
+   
+
+(*------------------------------------------------------------------*)
 let base np s = TBase (np,s)
 
 let func ty ty' = Fun (ty, ty')

@@ -71,6 +71,8 @@ val pp_quant : quant formatter
 
 (*------------------------------------------------------------------*)
 type term = private
+  | Int    of Z.t
+  | String of String.t
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
   (** An applied function type, instantiating type variable when [f] 
@@ -475,6 +477,8 @@ include module type of Smart
 
 val mk_pred   : term -> term
 val mk_var    : Vars.var -> term
+val mk_int    : Z.t -> term
+val mk_string : String.t -> term
 val mk_vars   : Vars.var list -> term list
 val mk_action : Symbols.action -> term list -> term
 val mk_tuple  : term list -> term
@@ -657,6 +661,8 @@ val match_infos_to_pp_info : match_infos -> pp_info
 (** {2 Term heads} *)
 
 type term_head =
+  | HInt
+  | HString
   | HApp
   | HExists
   | HForAll

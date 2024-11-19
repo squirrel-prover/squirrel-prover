@@ -58,6 +58,10 @@ type quant = Term.quant
 
 type term_i =
   | Tpat
+
+  | Int    of int L.located
+  | String of string L.located
+
   | Diff  of term * term (* TODO generalize *)
   | Find  of bnds * term * term * term
   | Tuple of term list
@@ -825,6 +829,12 @@ and convert0
   in
 
   match L.unloc tm with
+  (*------------------------------------------------------------------*)
+  | Int i -> Term.mk_int (Z.of_int (L.unloc i))
+
+  | String s -> Term.mk_string (L.unloc s)
+  
+  (*------------------------------------------------------------------*)
   | Tpat ->
     if not state.allow_pat then
       conv_err (L.loc tm) PatNotAllowed;

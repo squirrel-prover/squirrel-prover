@@ -9,7 +9,7 @@
   (inline_tests)
   (preprocess (pps ppx_inline_test sedlex.ppx))
   (modules_without_implementation smartFO)
-  (libraries fmt fmt.tty alcotest ocamlgraph str menhirLib sedlex
+  (libraries fmt fmt.tty alcotest ocamlgraph str menhirLib sedlex zarith
     (select smt.ml from
       (why3  -> smt.why3api.ml)
       (!why3 -> smt.stub.ml))))

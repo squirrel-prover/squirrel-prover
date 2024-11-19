@@ -16,6 +16,8 @@ let pp_dbg = false
 class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message (t : Term.term) = 
     match t with
+    | Term.Int    _
+    | Term.String _
     | Fun _ -> ()
 
     | Tuple l -> List.iter self#visit_message l
@@ -56,7 +58,7 @@ end
 (*------------------------------------------------------------------*)
 class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
   method fold_message (x : 'a) (t : Term.term) : 'a = 
-    match t with
+    match t with                      
     | Tuple l -> List.fold_left self#fold_message x l
 
     | App (t, l) -> List.fold_left self#fold_message x (t :: l)
@@ -91,6 +93,8 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst s l in
       self#fold_message x l
 
+    | Term.Int    _
+    | Term.String _
     | Term.Fun _
     | Term.Action _ -> x
 
@@ -263,6 +267,8 @@ let tfold_occ (type a)
         | `Undef | `MaybeDef -> default ()
     end
 
+  | Term.Int    _
+  | Term.String _
   | Term.App    _
   | Term.Tuple  _
   | Term.Proj   _

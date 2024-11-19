@@ -306,6 +306,8 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
       cfun (ct_diff) l
       
     (* default case *)
+    | Term.Int    _
+    | Term.String _
     | Let _
     | Quant _ | Find _ as t -> box_term ct_memo t
   in

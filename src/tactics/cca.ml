@@ -814,7 +814,7 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
 (*------------------------------------------------------------------*)
 let indcca1_tac args =
   match args with
-  | [Args.Int_parsed i] -> wrap_fail (indcca1 i)
+  | [Args.Term_parsed {pl_desc = Int i}] -> wrap_fail (indcca1 i)
   | _ -> LT.bad_args ()
 
 

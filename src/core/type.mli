@@ -114,7 +114,12 @@ val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
 
-val tquantum_message : ty
+(*------------------------------------------------------------------*)
+(** Prelude types *)
+
+val tquantum_message : ty   
+val tint             : ty
+val tstring          : ty
 
 (*------------------------------------------------------------------*)
 val univar : univar                -> ty

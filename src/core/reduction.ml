@@ -25,6 +25,7 @@ module Core (* : ReductionCore.S *) = struct
     zeta    : bool;    (** let reduction *)
     diff    : bool;    (** diff terms reduction *)
     constr  : bool;    (** reduce tautologies over timestamps *)
+    builtin : bool;    (** reduce builtins (e.g. [Int.(+)]) *)
   }
 
   (*------------------------------------------------------------------*)
@@ -36,6 +37,7 @@ module Core (* : ReductionCore.S *) = struct
     zeta    = false;
     diff    = false;
     constr  = false; 
+    builtin = false;
   }
 
   let rp_default = { 
@@ -45,7 +47,8 @@ module Core (* : ReductionCore.S *) = struct
     zeta    = true;
     proj    = true;
     diff    = false;
-    constr  = false; 
+    constr  = false;
+    builtin = true; 
   }
 
   let rp_full = { 
@@ -56,6 +59,7 @@ module Core (* : ReductionCore.S *) = struct
     proj    = true;
     diff    = true;
     constr  = false;   (* [constr] is not enabled in [rp_full] *)
+    builtin = true;
   }
 
   let rp_crypto = {
@@ -64,7 +68,7 @@ module Core (* : ReductionCore.S *) = struct
     diff = true;
     beta = true; 
     proj = true; 
-    zeta = true;
+    zeta = true;    
   }
 
   (*------------------------------------------------------------------*)
@@ -86,6 +90,7 @@ module Core (* : ReductionCore.S *) = struct
         { param with delta   = { param.delta with op = true;} }
       | L.{ pl_desc = "macro"  } ->
         { param with delta   = { param.delta with macro = true;} }
+      | L.{ pl_desc = "builtin"} -> { param with builtin = true; }
 
       | l -> Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
     in
@@ -247,6 +252,12 @@ module Core (* : ReductionCore.S *) = struct
   (*------------------------------------------------------------------*)
   let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
     match t1, t2 with
+    | Term.Int i1, Term.Int i2 ->
+      if not (Z.equal i1 i2) then not_conv ()
+
+    | Term.String s1, Term.String s2 ->
+      if not (String.equal s1 s2) then not_conv ()
+
     | Term.Fun (fs1, app_fty1), Term.Fun (fs2, app_fty2)
       when fs1 = fs2 ->
       conv_applied_ftype app_fty1 app_fty2
@@ -301,6 +312,8 @@ module Core (* : ReductionCore.S *) = struct
       conv st' s1 s2
 
     (* FEATURE: reduce head when conversion fails *)
+    | Term.Int    _, _
+    | Term.String _, _
     | Term.Fun    _, _
     | Term.Name   _, _
     | Term.Action _, _
@@ -313,6 +326,8 @@ module Core (* : ReductionCore.S *) = struct
     | Term.Tuple  _, _
     | Term.Proj   _, _
 
+    | _, Term.Int    _
+    | _, Term.String _
     | _, Term.Fun    _
     | _, Term.Name   _
     | _, Term.Action _
@@ -449,13 +464,16 @@ module Core (* : ReductionCore.S *) = struct
           if has_red then t, true
           else try_red red_funcs
       in
-      try_red [reduce_delta1     st;     (* δ *)
-               rewrite_head_once st;     (* user rewriting rules *)
-               reduce_beta1      st;     (* β *)
-               reduce_proj1      st;     (* proj *)
-               reduce_diff1      st;     (* diff *)
-               reduce_let1       st;     (* zeta *)
-               reduce_constr1    st; ]   (* constr *)
+      try_red [
+        reduce_delta1     st;     (* δ *)
+        rewrite_head_once st;     (* user rewriting rules *)
+        reduce_beta1      st;     (* β *)
+        reduce_proj1      st;     (* proj *)
+        reduce_diff1      st;     (* diff *)
+        reduce_let1       st;     (* zeta *)
+        reduce_constr1    st;     (* constr *)
+        reduce_builtin    st;     (* builtin *)
+      ]
     in
 
     let t, has_red = red_head1 t in
@@ -511,6 +529,31 @@ module Core (* : ReductionCore.S *) = struct
     Match.reduce_delta1
       ~delta:st.param.delta
       ~mode:st.expand_context st.table st.system st.hyps t
+
+  and reduce_builtin (st : state) (t : Term.t) : Term.t * bool =
+    if not st.param.builtin then t, false
+    else
+      let open Library in
+      let table = st.table in
+
+      match Term.decompose_app t with
+      (* Int.( + ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.add table ->
+        Term.mk_int Z.(i1 + i2), true
+
+      (* Int.( - ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.minus table ->
+        Term.mk_int Z.(i1 - i2), true
+
+      (* Int.( * ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.mul table ->
+        Term.mk_int Z.(i1 * i2), true
+
+      (* Int.opp *)
+      | Fun (fs,_), [Int i]          when fs = Int.opp table ->
+        Term.mk_int Z.(- i), true
+
+      | _ -> t, false
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
@@ -648,6 +691,8 @@ module Core (* : ReductionCore.S *) = struct
       in
       Term.mk_diff l, has_red
 
+    | Term.Int    _
+    | Term.String _
     | Term.Let    _
     | Term.Proj   _
     | Term.App    _ 

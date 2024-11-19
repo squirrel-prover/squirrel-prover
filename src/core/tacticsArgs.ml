@@ -193,7 +193,7 @@ type crypto_args = crypto_arg list
 type parser_arg =
   | String_name    of lsymb
   | Int_parsed     of int L.located
-  | Theory         of Typing.term
+  | Term_parsed    of Typing.term
 
   | NamingPat      of naming_pat
   | IntroPat       of intro_pattern list

@@ -23,6 +23,31 @@ module Basic : sig
   val const_emptyset : Symbols.table -> Symbols.fname
 end
 
+(*------------------------------------------------------------------*)
+module Int : sig
+  val check_load : Symbols.table -> unit
+  val get_fsymb : Symbols.table -> string -> Symbols.fname
+  val get_btype : Symbols.table -> string -> Symbols.btype
+
+  (*------------------------------------------------------------------*)
+  val tint : Symbols.table -> Type.ty
+
+  (*------------------------------------------------------------------*)
+  val add   : Symbols.table -> Symbols.fname
+  val minus : Symbols.table -> Symbols.fname
+  val opp   : Symbols.table -> Symbols.fname
+ 
+  val mul   : Symbols.table -> Symbols.fname
+
+  (*------------------------------------------------------------------*)
+  val mk_add   : Symbols.table -> Term.term -> Term.term -> Term.term
+  val mk_minus : Symbols.table -> Term.term -> Term.term -> Term.term
+  val mk_opp   : Symbols.table -> Term.term              -> Term.term
+
+  val mk_mul   : Symbols.table -> Term.term -> Term.term -> Term.term
+end  
+
+(*------------------------------------------------------------------*)
 module Real : sig
   val check_load : Symbols.table -> unit
   val get_fsymb : Symbols.table -> string -> Symbols.fname

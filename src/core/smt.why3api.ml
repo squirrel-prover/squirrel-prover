@@ -344,7 +344,13 @@ let rec prop_list_to_bool context terms =
 and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla -> 
   let open Term in
   let open Why3.Term in
-  (bool_to_prop fmla) (match fmla with 
+  (bool_to_prop fmla) (match fmla with
+    | Term.Int i ->
+      let i = Why3.BigInt.of_string (Z.to_string i) in
+      Why3.Term.t_int_const i
+
+    | Term.String s -> Why3.Term.t_string_const s
+
     | Term.Var v when Term.ty fmla = Type.tboolean -> 
       begin try to_prop (Hashtbl.find context.vars_tbl (Vars.hash v)) with
       | Not_found -> raise InternalError

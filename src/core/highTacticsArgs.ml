@@ -3,9 +3,9 @@ include TacticsArgs
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
-let as_p_path parser_args =
+let as_p_path (parser_args : parser_arg list) =
   match parser_args with
-  | [Theory (L.{ pl_desc = Symb (p, None) } )] ->
+  | [Term_parsed (L.{ pl_desc = Symb (p, None) } )] ->
     Some p
   | _ -> None
 
@@ -50,7 +50,7 @@ let convert_args env parser_args tactic_type conc =
 
   let rec conv_args parser_args tactic_type =
     match parser_args, tactic_type with
-    | [Theory p], Sort Timestamp ->
+    | [Term_parsed p], Sort Timestamp ->
       let f, _ = Typing.convert conv_cntxt ~ty:Type.ttimestamp p in
       Arg (Message (f, Type.ttimestamp))
 
@@ -58,7 +58,7 @@ let convert_args env parser_args tactic_type conc =
       let (m, ty) = convert_pat_arg sel conv_cntxt p conc in
       Arg (Message (m, ty))
 
-    | [Theory p], Sort Message ->
+    | [Term_parsed p], Sort Message ->
       begin match Typing.convert conv_cntxt p with
         | (t, ty) -> Arg (Message (t, ty))
         | exception Typing.(Error (_,PatNotAllowed)) ->
@@ -66,11 +66,11 @@ let convert_args env parser_args tactic_type conc =
           Arg (Message (m, ty))
       end
 
-    | [Theory p], Sort Boolean ->
+    | [Term_parsed p], Sort Boolean ->
       let f, _ = Typing.convert conv_cntxt ~ty:Type.tboolean p in
       Arg (Message (f, Type.tboolean))
 
-    | [Theory p], Sort Term ->
+    | [Term_parsed p], Sort Term ->
       let et = 
         try
           let et, ty = Typing.convert conv_cntxt p in
@@ -81,19 +81,22 @@ let convert_args env parser_args tactic_type conc =
       in
       Arg et
 
-    | [Theory (L.{ pl_desc = Symb (([],p), None) } )], Sort String ->
+    | [Term_parsed (L.{ pl_desc = Symb (([],p), None) } )], Sort String ->
       Arg (String p)
+
+    | [Term_parsed L.{ pl_desc = Int i }], Sort Int ->
+      Arg (Int i)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
 
-    | [Theory t], Sort String ->
+    | [Term_parsed t], Sort String ->
       raise Typing.(Error (L.loc t, Failure "expected a string"))
 
-    | [Theory t], Sort Int ->
+    | [Term_parsed t], Sort Int ->
       raise Typing.(Error (L.loc t, Failure "expected an integer"))
 
-    | [Theory p], Sort Index ->
+    | [Term_parsed p], Sort Index ->
       let f = 
         match Typing.convert conv_cntxt ~ty:Type.tindex p with
         | Term.Var v, _ -> v

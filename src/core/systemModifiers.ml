@@ -304,6 +304,8 @@ let rec is_simple (t : Term.term) : bool =
   | Tuple l                       
   | Name (_,l) -> are_simple l 
 
+  | Term.Int    _
+  | Term.String _
   | Let _
   | Macro (_, _, _) 
   | Action (_,_) 

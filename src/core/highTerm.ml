@@ -88,6 +88,15 @@ let tags_of_term (env : Env.t) ~ty_env (t : Term.term) : tags =
 
   and doit (env : Env.t) (t : Term.term) : tags =
     match t with
+    | Int _ | String _ ->
+      {
+        const   = true ;
+        adv     = true ;
+        si      = true ;
+        no_diff = true ;
+        det     = true ;
+      }
+
     | Var v ->
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
       let ty_v = Infer.norm_ty ty_env (Vars.ty v) in

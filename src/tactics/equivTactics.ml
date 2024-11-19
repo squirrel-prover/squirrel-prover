@@ -840,7 +840,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
   [List.fold_left do1 s args]
 
 let fa_tac args = match args with
-  | [Args.Int_parsed i] -> wrap_fail (fa_felem i)
+  | [Args.Fa [Once, { pl_desc = Int i}]] -> wrap_fail (fa_felem i)
   | [Args.Fa args] -> wrap_fail (do_fa_tac args)
   | _ -> bad_args ()
 

@@ -70,7 +70,11 @@ type ext_bnds = ext_bnd list
 type quant = Term.quant
 
 type term_i =
-  | Tpat  
+  | Tpat
+
+  | Int    of int L.located
+  | String of string L.located
+
   | Diff  of term * term
   | Find  of bnds * term * term * term
   | Tuple of term list

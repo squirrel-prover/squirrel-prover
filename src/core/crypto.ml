@@ -2906,8 +2906,9 @@ let prove
          term=term.term;})
       extra_outputs
   in
-  (** Get all extra inputs for [goal_to] coming from [goal_from] under [cond_from] that should be 
-      the condition under which [goal_from] is to be deduced*)
+  (** Get all extra inputs for [goal_to] coming from [goal_from] under
+      [cond_from] that should be the condition under which [goal_from]
+      is to be deduced*)
   let get_extra_inputs (goal_to:goal) (goal_from:goal) (cond_from: Term.term) =
     let timestamp = Term.mk_pred (oget goal_to.macro) in
     let _ = goal_to.vars in
@@ -2925,7 +2926,7 @@ let prove
     List.map2 extra_inputs_full next_bided_subgs rec_bided_subgs_conds 
   in
   let _, res = bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs direct_bided_subgs in             
-  match  res with
+  match res with
   | Some result -> 
     let oracle_subgoals = result.subgoals in
     let final_consts = result.consts in

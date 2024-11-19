@@ -18,7 +18,8 @@
 %token <int> INT
 %token <string> LID              /* identifier started by a lower-case character */
 %token <string> UID              /* identifier started by an upper-case character */
-%token <string> FILEPATH         /* file path */
+%token <string> QUOTED_STRING    /* a quoted string (the enclosing quotes '"'
+                                    have already been stripped) */
 %token <string> LEFTINFIXSYMB    /* left infix function symbols */
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
@@ -27,7 +28,6 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
-%token QUOTE
 %token LANGLE RANGLE (*LANGLECOLON*)
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
@@ -176,8 +176,10 @@ dh_flags:
 | l=slist1(dh_flag, COMMA) { l }
 
 (*------------------------------------------------------------------*)
-filepath:
-| id=loc(FILEPATH) { id }
+/* parse a quoted string, where the enclosing quotes '"' have been
+   stripped */
+quoted_string:
+| s=loc(QUOTED_STRING) { s }
 
 (*------------------------------------------------------------------*)
 (* Identifiers and paths *)
@@ -269,6 +271,8 @@ ty_args:
 
 /* non-ambiguous term */
 sterm_i:
+| i=loc(int)                      { Typing.Int i }
+| s=quoted_string                 { Typing.String s }
 | id=spath_gen ty_args=ty_args?   { Typing.Symb (id, ty_args) }
 | UNDERSCORE                      { Typing.Tpat }
 
@@ -849,8 +853,7 @@ game:
 
 (*------------------------------------------------------------------*)
 tactic_param:
-| f=term %prec tac_prec  { TacticsArgs.Theory f }
-| i=loc(INT)             { TacticsArgs.Int_parsed i }
+| f=term %prec tac_prec  { TacticsArgs.Term_parsed f }
 
 tactic_params:
 | l=slist(tactic_param,COMMA) { l }
@@ -861,7 +864,7 @@ tacargs_string_int:
 | i=loc(INT)             { TacticsArgs.Int_parsed i }
 
 (*------------------------------------------------------------------*)
-rw_mult:
+%inline rw_mult:
 | i=int BANGU { TacticsArgs.Exact i }
 | BANGU       { TacticsArgs.Many }
 | QMARK       { TacticsArgs.Any }
@@ -1188,7 +1191,7 @@ tac:
 
   (* Case *)
   | id=loc(CASE) a=named_args t=tac_term
-    { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Theory t] }
+    { mk_abstract (L.loc id) "case" [TacticsArgs.Named_args a; Term_parsed t] }
 
   (* SMT *)
   | id=loc(SMT) a=named_args_gen(tacargs_string_int)
@@ -1196,20 +1199,16 @@ tac:
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
-    { mk_abstract l "cs" [TacticsArgs.Theory t] }
+    { mk_abstract l "cs" [TacticsArgs.Term_parsed t] }
 
   (* Case_Study, equiv tactic, patterns with element number *)
   | l=lloc(CS) t=term IN i=loc(int)
-    { mk_abstract l "cs" [TacticsArgs.Theory t; 
+    { mk_abstract l "cs" [TacticsArgs.Term_parsed t; 
                           TacticsArgs.Int_parsed i] }
 
   (* FA, equiv tactic, patterns *)
   | l=lloc(FA) args=slist1(fa_arg, COMMA)
     { mk_abstract l "fa" [TacticsArgs.Fa args] }
-
-  (* FA, equiv tactic, frame element number *)
-  | l=lloc(FA) i=loc(int)
-    { mk_abstract l "fa" [TacticsArgs.Int_parsed i] }
 
   (* FA, trace tactic *)
   | l=lloc(FA) 
@@ -1502,7 +1501,7 @@ include_params:
 
 (*------------------------------------------------------------------*)
 _p_include:
-| INCLUDE l=include_params QUOTE th=filepath QUOTE 
+| INCLUDE l=include_params th=quoted_string 
     { ProverLib.{ th_name = ProverLib.Path th; params = l; } }
 | INCLUDE l=include_params th=lsymb 
     { ProverLib.{ th_name = ProverLib.Name th; params = l; } }

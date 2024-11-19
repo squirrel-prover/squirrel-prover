@@ -1,7 +1,5 @@
 include Basic.
 
-type int.
-
 abstract i0 : int.
 abstract i1 : int.
 

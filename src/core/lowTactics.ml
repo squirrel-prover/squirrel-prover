@@ -579,11 +579,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** parse a expand argument *)
   let p_rw_expand_arg (s : S.t) (arg : Typing.term) : expand_kind =
     (* let tbl = S.table s in *)
-    match Args.as_p_path [Args.Theory arg] with
+    match Args.as_p_path [Args.Term_parsed arg] with
     | Some m -> Ppath m
       
     | _ ->
-      match convert_args s [Args.Theory arg] Args.(Sort Message) with
+      match convert_args s [Args.Term_parsed arg] Args.(Sort Message) with
       | Args.Arg (Args.Message (f, _)) -> Mterm f
 
       | _ ->
@@ -602,7 +602,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let expand_tac args s =
     let args = List.map (function
-        | Args.Theory t -> t
+        | Args.Term_parsed t -> t
         | _ -> bad_args ()
       ) args
     in
@@ -617,7 +617,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let ppe = default_ppe ~table:(S.table s) () in
     let messages =
       List.map (fun arg ->
-          match convert_args s [Args.Theory arg] Args.(Sort Message) with
+          match convert_args s [Args.Term_parsed arg] Args.(Sort Message) with
           | Args.Arg (Args.Message (f, _)) -> f
           | _ ->
             hard_failure ~loc:(L.loc arg)
@@ -635,7 +635,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let print_messages_tac args s =
     let args = List.map (function
-        | Args.Theory t -> t
+        | Args.Term_parsed t -> t
         | _ -> bad_args ()
       ) args
     in
@@ -2173,7 +2173,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let induction_args ~dependent args s =
     match args with
     | [] -> induction s
-    | [Args.Theory _] ->
+    | [Args.Term_parsed _] ->
       begin
         match convert_args s args (Args.Sort Args.Message) with
         | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
@@ -2234,7 +2234,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let exists_intro_args args s =
     let args =
       List.map (function
-          | Args.Theory tm -> tm
+          | Args.Term_parsed tm -> tm
           | _ -> bad_args ()
         ) args
     in
@@ -2878,7 +2878,7 @@ type form_type =
 
 let and_right_args args s =
   match args with
-  | [TacticsArgs.Theory e] -> let e,_ = convert s e in and_right (Some e) s
+  | [TacticsArgs.Term_parsed e] -> let e,_ = convert s e in and_right (Some e) s
   | [] -> and_right None s
   | _ -> soft_failure (Failure "Not a correct term given to split")
 
@@ -3277,7 +3277,7 @@ let () =
     ~pq_sound:true
     (function
       | [] -> fun _ sk fk -> sk [] fk
-      | [Args.Int_parsed i] ->
+      | [Args.Term_parsed { pl_desc = Int i}] ->
         begin
           fun s sk fk ->
             match s with

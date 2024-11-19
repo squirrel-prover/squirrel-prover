@@ -31,6 +31,7 @@ module type S = sig
     zeta    : bool;  (** let reduction *)
     diff    : bool;  (** diff terms reduction *)
     constr  : bool;  (** reduce tautologies over timestamps *)
+    builtin : bool;  (** reduce builtins (e.g. [Int.(+)]) *)
   }
 
   val rp_empty   : red_param

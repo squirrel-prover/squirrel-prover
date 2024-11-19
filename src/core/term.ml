@@ -163,6 +163,8 @@ let pp_quant fmt = function
 
 (*------------------------------------------------------------------*)
 type term =
+  | Int    of Z.t
+  | String of String.t
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
   | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
@@ -190,6 +192,8 @@ let hash_quant : quant -> int = function
   | Lambda -> 3
 
 let rec hash : term -> int = function
+  | Int i -> Z.hash i
+  | String s -> String.hash s
   | App (f,terms) ->
     let h = hash f in
     hcombine (-1) (hash_l terms h)
@@ -278,6 +282,8 @@ let ty ?ty_env (t : term) : Type.ty =
 
   let rec ty (t : term) : Type.ty =
     match t with
+    | Int _ -> Type.tint
+    | String _ -> Type.tstring
     | Fun (_, { fty; ty_args; }) ->
       (* substitute pending type variables by the type arguments *)
       let tsubst = 
@@ -408,6 +414,9 @@ let init = Action(Symbols.init_action,[])
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors} *)
 
+let mk_int (i : Z.t) : term = Int i
+let mk_string (s : String.t) : term = String s
+    
 let mk_var (v : Vars.var) : term = Var v
 
 let mk_vars (l : Vars.vars) : terms = List.map mk_var l
@@ -950,6 +959,7 @@ let subst_add_bindings0 subst l =
 (*------------------------------------------------------------------*)
 let rec fv (t : term) : Sv.t = 
   match t with
+  | Int _ | String _ -> Sv.empty
   | Var tv -> Sv.singleton tv
   | Fun (_, _) -> Sv.empty
   | App (t, l) -> fvs (t :: l)
@@ -1027,7 +1037,7 @@ let add_vars_simpl_env
 (** Does not recurse. *)
 let tmap (func : term -> term) (t : term) : term =
   match t with
-  | Var _    -> t
+  | Int _ | String _ | Var _    -> t
 
   | Action (a,is) -> Action (a, List.map func is)
   | Name (n,is)   -> Name (n, List.map func is)
@@ -1085,6 +1095,7 @@ let isymb_ty_fv (s : 'a isymb) : Type.Fv.t =
 let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t = 
   let rec doit acc t =
     match t with
+    | Int _ | String _ -> Type.Fv.empty
     | Var tv -> Type.Fv.union (Vars.ty_fv tv) acc
     | Fun (_, { fty; ty_args; }) -> 
       let acc = Type.Fv.union (Type.ftype_fv fty) acc in
@@ -1176,6 +1187,7 @@ let rec subst (s : subst) (t : term) : term =
   else
     let new_term =
       match t with
+      | Int _ | String _ -> t
       | Fun (fs, fty) -> Fun (fs, fty)
 
       | App (t, l) -> mk_app (subst s t) (List.map (subst s) l)
@@ -1373,6 +1385,8 @@ and _pp
   let pp = pp info in
 
   match t with
+  | Int i -> Fmt.pf fmt "%a" Z.pp_print i
+  | String s -> Fmt.pf fmt "\"%s\"" s
   | Var m -> Fmt.pf fmt "%a" (Vars._pp info.ppe) m
 
   | App (Fun (s,_),[a]) when s = f_happens -> pp_happens info fmt [a]
@@ -1915,6 +1929,7 @@ let gsubst_applied_ftype (ts : Subst.t) { fty; ty_args;} =
 
 let gsubst (ts : Subst.t) (t : term) : term =
   let rec doit : term -> term = function
+    | Int _ | String _ as t -> t
     | Var v -> Var (Subst.subst_var ts v)
 
     | Fun (fn, fty_app) -> 
@@ -2282,6 +2297,8 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
 (** {2 Term heads} *)
 
 type term_head =
+  | HInt
+  | HString
   | HApp
   | HExists
   | HForAll
@@ -2299,6 +2316,8 @@ type term_head =
   | HLet
 
 let pp_term_head fmt = function
+  | HInt      -> Fmt.pf fmt "Int"
+  | HString   -> Fmt.pf fmt "String"
   | HApp      -> Fmt.pf fmt "App"
   | HExists   -> Fmt.pf fmt "Exists"
   | HForAll   -> Fmt.pf fmt "Forall"
@@ -2316,6 +2335,8 @@ let pp_term_head fmt = function
   | HLet      -> Fmt.pf fmt "Let"
                    
 let get_head : term -> term_head = function
+  | Int _                -> HInt
+  | String _             -> HString
   | App _                -> HApp
   | Quant (Exists, _, _) -> HExists
   | Quant (ForAll, _, _) -> HForAll

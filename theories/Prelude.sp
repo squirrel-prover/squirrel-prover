@@ -19,6 +19,10 @@ system Empty = null.
 (*------------------------------------------------------------------*)
 type quantum_message.
 
+type string[fixed].
+  
+type int[well_founded, fixed].
+
 (*------------------------------------------------------------------*)
 (* `Classic` defines the macros for the classical execution model *)
 open Classic.

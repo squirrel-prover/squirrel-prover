@@ -787,6 +787,8 @@ let subst_macros_ts table l ts t =
         | _ -> Term.mk_macro is terms ts'
       end
 
+    | Term.Int    _
+    | Term.String _
     | Let _
     | Name _ | Action _ | Var _ 
     | App _ | Diff _ | Fun _ | Find _ | Quant _ 
