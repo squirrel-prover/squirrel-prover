@@ -276,7 +276,7 @@ module Parse = struct
   type p_context_i =
     | NoSystem
     | System   of t
-    | Set_pair of t * t
+    | Set_pair of t * t option
 
   type p_context = p_context_i L.located 
 
@@ -342,14 +342,15 @@ module Parse = struct
     let parse_set_pair = parse_set_pair ~loc ~implicit ~se_env table in
     match L.unloc c with
     | System                   (* [c = any] *)
-        {pl_desc = [{ system = ([], { pl_desc = "any"}); 
-                      projection = p; 
-                      alias = None}] } ->
+        {
+          pl_desc = [{ system = ([], { pl_desc = "any"}); 
+                       projection = p; 
+                       alias = None}] } ->
       parse_any ~mode:`Local ~se_env table p
 
     | NoSystem       -> parse_set_pair ~set:empty ~pair:None
     | System s       -> parse_set_pair ~set:s     ~pair:None
-    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:(Some p)
+    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:p
 
   (** Parse the system context for a global statement. *)
   let parse_global_context
@@ -367,5 +368,5 @@ module Parse = struct
 
     | NoSystem       -> parse_set_pair ~set:empty ~pair:(Some empty)
     | System s       -> parse_set_pair ~set:s     ~pair:(Some s)
-    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:(Some p)
+    | Set_pair (s,p) -> parse_set_pair ~set:s     ~pair:p
 end

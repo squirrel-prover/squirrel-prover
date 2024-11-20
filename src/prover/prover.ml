@@ -397,7 +397,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
       
     | _ -> 
       begin match q with 
-        | ProverLib.Srch_inSys (_,sysexpr) ->
+        | ProverLib.Srch_inSys (_, sysexpr) ->
           let _, set =
             SE.Parse.parse ~implicit:false ~se_env:[] (get_table st) sysexpr
           in

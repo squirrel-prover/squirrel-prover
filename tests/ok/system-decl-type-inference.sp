@@ -8,6 +8,6 @@ system A = (A (empty, empty)).
 system B = (B (empty, empty)).
 system C = (C (empty, empty)).
 
-print system [A].
-print system [B].
-print system [C].
+print system A.
+print system B.
+print system C.

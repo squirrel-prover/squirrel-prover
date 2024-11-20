@@ -34,8 +34,8 @@ equiv foo (tau:timestamp,i:index) : output@tau, exec@tau.
 Proof.
   (* print in equivalences *)
   print.
-  print system [default].
-  print system [bis].
+  print system default.
+  print system bis.
   admit.
 Qed.
 
@@ -46,8 +46,8 @@ lemma bar : forall (tau, tau' : timestamp),
 Proof.
   (* print in trace sequent *)
   print.
-  print system [default].
-  print system [bis].
+  print system default.
+  print system bis.
   admit.
 Qed.
 
@@ -59,9 +59,9 @@ system s1 = in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
 system s2 = in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
 
 (* sanity checks *)
-print system [s1/left, s2/right].
-print system [s2/left, s1/right].
-print system [s1/left].
-print system [s2/left].
-print system [s1/right].
-print system [s2/right].
+print system s1/left, s2/right.
+print system s2/left, s1/right.
+print system s1/left.
+print system s2/left.
+print system s1/right.
+print system s2/right.

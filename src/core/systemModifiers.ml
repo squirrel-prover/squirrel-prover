@@ -122,8 +122,8 @@ let parse_single_system_name table sdecl : SE.fset * System.Single.t =
   match SE.(to_list (to_fset res)) with
   | [_,s] -> SE.to_fset res, s
   | _ ->
-    soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
-      (Failure "a single system must be provided")
+    let loc = match sdecl.Decl.from_sys with se -> L.loc se in
+    soft_failure ~loc (Failure "a single system must be provided")
 
 (*------------------------------------------------------------------*)
 (** Convertion of system modifiers arguments.

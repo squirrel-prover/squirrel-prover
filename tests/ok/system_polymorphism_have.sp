@@ -1,17 +1,17 @@
-predicate A {P}       {P : (x : message)}. 
-predicate B {P[pair]} {P : (x : message)}. 
+predicate A {P:system}       {P : (x : message)}. 
+predicate B {P:system[pair]} {P : (x : message)}. 
 
-(*  *) axiom loc_lem {P} in [P] : false.
+(*  *) axiom loc_lem {P:system} @system:P : false.
 
-global axiom glob_lem1 {P[pair]} in [P] :
-   A{[P]} empty /\ [false] /\ equiv(frame@init).
+global axiom glob_lem1 {P:system[pair]} @system:P :
+   A{P} empty /\ [false] /\ equiv(frame@init).
 
-global axiom glob_lem2 {P Q[pair]} in [set:P; equiv:Q] : 
-  B{[Q]} empty /\ [false] /\ equiv(frame@init).
+global axiom glob_lem2 {P:system,Q:system[pair]} @set:P @equiv:Q : 
+  B{Q} empty /\ [false] /\ equiv(frame@init).
 
 (*------------------------------------------------------------------*)
 (* local lemma, no `equiv` field *)
-lemma _ {P} in [P] : false.
+lemma _ {P:system} @system:P : false.
 Proof.
   have ? := loc_lem. 
   checkfail have ? := glob_lem1 exn NoAssumpSystem. 
@@ -25,7 +25,7 @@ Abort.
 
 (*------------------------------------------------------------------*)
 (* local lemma, with an `equiv` field *)
-lemma _ {P Q[pair]} in [set:P; equiv:Q] : false.
+lemma _ {P:system,Q:system[pair]} @set:P @equiv:Q : false.
 Proof.
   have ? := loc_lem.
   checkfail have ? := glob_lem1 exn NoAssumpSystem. 
@@ -39,7 +39,7 @@ Abort.
 system P1 = null.
 
 (* in `P1/left` *)
-lemma _ in [P1/left] : false.
+lemma _ @system:P1/left : false.
 Proof.
   have ? := loc_lem. 
   checkfail have ? := glob_lem1 exn NoAssumpSystem. 
@@ -52,7 +52,7 @@ Proof.
 Abort.
 
 (* in `P1` *)
-lemma _ in [P1] : false.
+lemma _ @system:P1 : false.
 Proof.
   have ? := loc_lem. 
   checkfail have ? := glob_lem1 exn NoAssumpSystem. 
@@ -65,7 +65,7 @@ Abort.
 (*------------------------------------------------------------------*)
 (* local lemma, with an `equiv` field *)
 
-lemma _ in [set:P1; equiv:P1] : false.
+lemma _ @set:P1 @equiv:P1 : false.
 Proof.
   have ? := loc_lem.
   have ? := glob_lem1.

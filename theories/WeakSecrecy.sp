@@ -3,11 +3,11 @@ include Basic.
 (* ------------------------------------------------------------------- *)
 
 (* `Deduction` *)
-predicate ( |> ) ['a 'b] {set} {set: (u : 'a, m : 'b)} =
+predicate ( |> ) ['a 'b] {set:system} {set: (u : 'a, m : 'b)} =
   Exists (f : _[adv]), [f u = m].
 
 (* `Non-deduction` or weak-secrecy *)
-predicate ( *> ) ['a 'b] {set} {set: (u : 'a, m : 'b)} =
+predicate ( *> ) ['a 'b] {set:system} {set: (u : 'a, m : 'b)} =
   Forall (f : _[adv]), [f u <> m].
 
 (* ------------------------------------------------------------------- *)
@@ -20,14 +20,14 @@ system none = null.
 # Reasoning rules on Non-deduction and Deduction
 *)
 
-global lemma refl_ded in [any] ['a] (u : 'a) : 
+global lemma refl_ded @system:any ['a] (u : 'a) : 
  $(u |> u).
 Proof.
 rewrite /(|>).
 exists (fun x => x) => //.
 Qed.
 
-global lemma right_fa in [any]
+global lemma right_fa @system:any
  ['a 'b 'c] (u : 'a, v : 'b, g : 'b -> 'c) 
 : 
     $( u *> v ) ->
@@ -45,7 +45,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------- *)
-global lemma left_fa in [any] ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
+global lemma left_fa @system:any ['a 'b 'c 'd] (u : 'a) (v : 'b, f : 'a -> 'c[adv]) : 
    $( u *> v ) ->
    $( (f u) *> v ).
 Proof.
@@ -55,7 +55,7 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 (* Rules in Figure 1 *)
-global lemma ND in [any] ['a 'b] (u : 'a) (v : 'b) : 
+global lemma ND @system:any ['a 'b] (u : 'a) (v : 'b) : 
     $(u *> v) ->
     $(u |> v) ->
     [false].
@@ -64,7 +64,7 @@ Proof.
   by have ? := H f. 
 Qed.
 
-global lemma Ineq in [any] ['a 'b] (u : 'a) (v, w : 'b) :
+global lemma Ineq @system:any ['a 'b] (u : 'a) (v, w : 'b) :
     $(u |> v) ->
     $( u *> w) ->
     [v <> w].

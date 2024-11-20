@@ -135,7 +135,7 @@ module Parse : sig
     alias      : Symbols.lsymb option
   }
 
-  type t = item list L.located
+  type t = item list Location.located
 
   (** Parse a system expression.
       If [implicit], then implicit system variables starting with a ['P] 
@@ -151,7 +151,7 @@ module Parse : sig
   type p_context_i =
     | NoSystem
     | System   of t
-    | Set_pair of t * t
+    | Set_pair of t * t option
 
   type p_context = p_context_i L.located 
 

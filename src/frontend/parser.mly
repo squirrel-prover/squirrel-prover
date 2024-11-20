@@ -100,7 +100,7 @@
 
 %start declarations
 %start top_formula
-%start system_expr
+/* %start system_expr */ (* Menhir bug *)
 %start top_process
 %start interactive
 %start top_proofmode
@@ -369,7 +369,7 @@ simpl_lval:
 | args=slist1(bnd_group(LVAL,TY),COMMA) { List.flatten args }
 
 (*------------------------------------------------------------------*)
-/* Auxiliary: a single binder declarations */
+/* Auxiliary: a single binder declarations for variables */
 %inline bnd:
 | LPAREN l=bnd_group_list(simpl_lval,ty) RPAREN { l }
 /* many binders, grouped  */
@@ -433,6 +433,32 @@ ext_bnds_tagged_strict:
 ext_bnds_tagged:
 | ext_bnds_tagged_strict           { $1 }
 | v=simpl_lval COLON ty=ty_tagged  { [Typing.L_var v, ty] }
+
+(*------------------------------------------------------------------*)
+/* System variables binders */
+
+/* System variable information (i.e. a tag).
+  Currently, a **single** system tag is a **list** of symbols
+  (e.g. `pair`, of `like P`). */
+%inline se_info:
+| i=slist1(lsymb,empty) { i }
+
+/* a list of system infos */
+%inline se_infos:
+| LBRACKET l=slist(se_info,COMMA) RBRACKET { l }
+
+/* the "type" of a system variable binder */
+se_ty:
+| SYSTEM i=se_infos?  { Utils.odflt [] i }
+
+/* A group of system variables binders, enclosed in curcly bracket `{ ... }` */
+%inline se_bnds_group:
+| LBRACE l=bnd_group_list(se_var,se_ty) RBRACE { l }
+/* many binders, grouped  */
+
+/* Several groups of system variable binders. */
+%inline se_bnds:
+| l=slist(se_bnds_group, empty) { List.flatten l }
 
 (*------------------------------------------------------------------*)
 top_formula:
@@ -564,21 +590,6 @@ ty:
 | ty=loc(ty_i) { ty }
 
 (*------------------------------------------------------------------*)
-se_info:
-| i=slist1(lsymb,empty) { i }
-
-se_bnd:
-| v=se_var                                          { v, [] }
-| v=se_var LBRACKET l=slist(se_info,COMMA) RBRACKET { v, l  }
-
-%inline se_bnds:
-| ids=slist(se_bnd,empty) { ids }
-
-%inline braced_se_bnds:
-| empty                      { []   }
-| LBRACE bnds=se_bnds RBRACE { bnds }
-
-(*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
 | l=lsymb COLON ty=ty { Decl.{ cty_space = l;
@@ -663,6 +674,12 @@ system_modifier:
 %inline op_body:
 | EQ t=term { `Concrete t }
 |           { `Abstract   }
+
+(*------------------------------------------------------------------*)
+/* workaround to avoid parser conflicts in predicates declarations */
+se_bnds_group_or_empty_group:
+| l=se_bnds_group { l  }
+| LBRACE RBRACE   { [] }
        
 (*------------------------------------------------------------------*)
 declaration_i:
@@ -728,7 +745,9 @@ declaration_i:
 
 | PREDICATE e=lsymb_gen_decl
   tyvars=ty_vars 
-  LBRACE sebnds=se_bnds RBRACE
+  sebnds=se_bnds_group_or_empty_group
+  /* workaround to avoid parser conflits: we must have exactly one
+     group of system variable binders */
   multi_args=multi_term_bnds
   simpl_args=bnds
   body=predicate_body? 
@@ -782,7 +801,7 @@ declaration_no_concat_i:
 | TACTIC lsymb EQ tac                     { Decl.Tactic ($2,$4) }
 
 /* system modifiers */
-| SYSTEM id=lsymb EQ from_sys=system_expr WITH modifier=system_modifier
+| SYSTEM id=lsymb EQ LBRACKET from_sys=system_expr RBRACKET WITH modifier=system_modifier
     { Decl.(Decl_system_modifier
               { from_sys = from_sys;
                 modifier;
@@ -1376,7 +1395,7 @@ biframe:
 | UEXISTS { Typing.PExists }
 
 se_args:
-| LBRACE l=slist(system_expr,empty) RBRACE { l  }
+| LBRACE l=slist(s_system_expr,COMMA) RBRACE { l  }
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
@@ -1429,19 +1448,54 @@ system_item:
 | p=path                  { SE.Parse.{ alias = None; system = p;      projection = None      } }
 | p=path SLASH proj=lsymb { SE.Parse.{ alias = None; system = p;      projection = Some proj } }
 
-system_item_list:
-| i=system_item                          {  [i] }
-| i=system_item COMMA l=system_item_list { i::l }
+/* ----------------------------------------------------------------------- */
+/* a unambiguous system expression (i.e. that does not need to be 
+   enclosed in parentheses) */
+s_system_expr:
+| l=loc(system_item)            /* either a single system item */
+    { L.mk_loc (L.loc l) [L.unloc l] }
+| LPAREN s=system_expr RPAREN /* or a parenthesized ambiguous system expr */
+    { s } 
 
 system_expr:
-| LBRACKET s=loc(system_item_list) RBRACKET   { s }
+| s=s_system_expr { s }
+/* we unroll one step of the loop, to help menhir see that there 
+   are no conflits  */
+| h=loc(system_item) COMMA t=loc(slist(system_item,COMMA)) 
+    { 
+      let loc = L.merge (L.loc h) (L.loc t) in
+      L.mk_loc loc (L.unloc h :: L.unloc t)
+    }
 
 /* ----------------------------------------------------------------------- */
+/* an unambiguous system context (i.e. that does not need to be 
+   enclosed in parentheses) */
+s_system_context_i:
+| l=loc(system_item)            /* either a single system item */
+    { SE.Parse.System (L.mk_loc (L.loc l) [L.unloc l]) }
+| LPAREN s=system_context_i RPAREN /* or a parenthesized ambiguous context */
+    { s } 
+
+s_system_context:
+| x=loc(s_system_context_i) { x }
+
+/* a possibly ambiguous system context, that may need to be enclosed in
+   parentheses in ambiguous parsing contexts */
 system_context_i:
-| l=loc(system_item_list)    { SE.Parse.System l }
-| SET COLON s=loc(system_item_list) SEMICOLON
-  EQUIV COLON p=loc(system_item_list)
-                             { SE.Parse.Set_pair (s,p) }
+| s=s_system_context_i                
+    { s }
+
+/* we unroll one step of the loop, to help menhir see that there 
+   are no conflits  */
+| h=loc(system_item) COMMA t=loc(slist(system_item,COMMA)) 
+    { 
+      let loc = L.merge (L.loc h) (L.loc t) in
+      SE.Parse.System (L.mk_loc loc (L.unloc h :: L.unloc t))
+    }
+
+| SET COLON s=system_expr SEMICOLON
+  EQUIV COLON p=system_expr
+    { SE.Parse.Set_pair (s,Some p) }
 
 system_context:
 | x=loc(system_context_i) { x }
@@ -1451,8 +1505,25 @@ system_context:
 | l=lloc(empty)                      { L.mk_loc l SE.Parse.NoSystem }
 | LBRACKET s=system_context RBRACKET { s }
 
-%inline system_annot:
-| IN LBRACKET s=system_context RBRACKET { s }
+at_X_annot(X):
+| AT X COLON s=s_system_expr { s }
+
+system_annot:
+| AT SYSTEM COLON s=s_system_context { s }
+| s=at_X_annot(SET) e=at_X_annot(EQUIV)?
+    { 
+      let loc = 
+        match e with
+        | None -> L.loc s
+        | Some e -> L.merge (L.loc s) (L.loc e) 
+      in
+      L.mk_loc loc (SE.Parse.Set_pair (s,e))
+    }
+| e=at_X_annot(EQUIV) s=at_X_annot(SET)
+    { 
+      let loc = L.merge (L.loc s) (L.loc e) in      
+      L.mk_loc loc (SE.Parse.Set_pair (s,Some e))
+    }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -1465,7 +1536,7 @@ statement_name:
 local_statement:
 | s=old_system_annot
   name=statement_name
-  se_vars=braced_se_bnds
+  se_vars=se_bnds
   s2=system_annot?
   ty_vars=ty_vars 
   vars=bnds_tagged
@@ -1480,7 +1551,7 @@ local_statement:
 global_statement:
 | s=old_system_annot 
   name=statement_name 
-  se_vars=braced_se_bnds
+  se_vars=se_bnds
   s2=system_annot?
   ty_vars=ty_vars 
   vars=bnds_tagged
@@ -1562,11 +1633,13 @@ _query:
 | PROF                       { ProverLib.Prof }
 (* print *)
 | PRINT SYSTEM l=system_expr { ProverLib.(Print (Pr_system (Some l))) }
+
 | PRINT l=spath_gen          { ProverLib.(Print (Pr_any l)) }
 | PRINT                      { ProverLib.(Print (Pr_system None)) }
 (* search *)
-| SEARCH t=any_form IN s=system_expr 
+| SEARCH t=any_form IN s=system_expr
                               { ProverLib.(Search (Srch_inSys (t,s))) }
+
 | SEARCH t=any_form           { ProverLib.(Search (Srch_term t)) }
 
 query:

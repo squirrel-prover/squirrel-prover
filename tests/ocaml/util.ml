@@ -33,8 +33,11 @@ let global_formula_from_string (s:string) =
   let t = parse_from_string Parser.top_global_formula s in
   Typing.Global t
 
-let sexpr_from_string (s:string) =
-  parse_from_string Parser.system_expr s 
+(* FIXME: Menhir bug (see parser.mly
+   preventing us from exporting the system expression parser as a
+   top-level construct. *)
+(* let sexpr_from_string (s:string) = *)
+(*   parse_from_string Parser.system_expr s  *)
 
 let find_in_sys_from_string s st =
   let env = 

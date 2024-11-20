@@ -18,7 +18,7 @@ Proof.
 Qed.
 
 global lemma[set:P/left; equiv:none] test2:
-  $(zero *>{[P]} m) ->  $(n *>{[P]} m).
+  $(zero *>{P} m) ->  $(n *>{P} m).
 Proof.
   intro H.
   fresh 0.  
@@ -26,14 +26,14 @@ Proof.
 Qed.
 
 global lemma[set:P/left; equiv:none] test3:
-  $(n *>{[P]} n).
+  $(n *>{P} n).
 Proof.
   fresh 0.
   checkfail auto exn GoalNotClosed.
 Abort.
 
 global lemma[set:P; equiv:none] test4:
-  $(n *>{[P/left]} n).
+  $(n *>{P/left} n).
 Proof.
   fresh 0.
   checkfail auto exn GoalNotClosed.

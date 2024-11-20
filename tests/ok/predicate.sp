@@ -98,7 +98,7 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-predicate P ['a] {S1 S2} {S1: x : 'a} {S2: y : 'a}.
+predicate P ['a] {S1,S2:system} {S1: x : 'a} {S2: y : 'a}.
 
 global axiom [default] p_default ['a] (x, y : 'a) : P x y.
 
@@ -154,7 +154,7 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-global axiom pany in [any/default] ['a] (x, y : 'a) : P x y.
+global axiom pany @system:any/default ['a] (x, y : 'a) : P x y.
 
 global lemma [any/default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
@@ -175,7 +175,7 @@ system P1 = null.
 global axiom [set: P1; equiv:default] p1 ['a] (x, y : 'a) : P x y.
 (* same lemma as `p1`, but using different default systems (which are
    irrelevant here) *)
-global axiom [any] p1_any ['a] (x, y : 'a) : P{[P1] [default]} x y.
+global axiom [any] p1_any ['a] (x, y : 'a) : P{P1, default} x y.
 
 global lemma [set: P1; equiv:default] _ ['a] (x,y : 'a) : P x y /\ P x y.
 Proof. 
@@ -199,7 +199,7 @@ Qed.
 
 (* --------------------------------------------------------- *)
 global axiom [any/default] pp ['a] (x, y : 'a) : 
-  P{[P1] [default]} x y -> P x y.
+  P{P1,default} x y -> P x y.
 
 global lemma [any/default] _ ['a] (x,y : 'a) : P x y.
 Proof. 
@@ -247,11 +247,11 @@ Qed.
 (* --------------------------------------------------------- *)
 (* stronger version of `pp` *)
 global axiom pps 
-  {P[like default]}
-  in [any/default]
+  {P:system[like default]}
+  @system:any/default
   ['a] (x, y, z : 'a) 
 : 
-  P{[P1] [default]} x (diff(y,z)) -> P{[P] [default]} x (diff(y,z)).
+  P{P1, default} x (diff(y,z)) -> P{P, default} x (diff(y,z)).
 
 (* stronger version of `p1` *)
 global axiom [set: P1; equiv:default] p1s ['a] (x, y, z : 'a) : P x (diff(y,z)).
@@ -263,11 +263,11 @@ Proof.
 Qed.
 
 global lemma _
-  { P0 [like default] }
-  in [set: P1; equiv:default]
+  { P0:system[like default] }
+  @set: P1 @equiv:default
   ['a] (x,y : 'a)
 :
-  P{[P0][default]} x (diff(x,y)).
+  P{P0,default} x (diff(x,y)).
 Proof. 
   apply pps.
   checkfail apply p1 exn Failure. (* bad variable instantiation *)
@@ -275,11 +275,11 @@ Proof.
 Qed.
 
 global lemma _
-  { P0 [like default] }
-  in [set: P1; equiv:default]
+  { P0:system[like default] }
+  @set:P1 @equiv:default
   ['a] (x,y : 'a)
 :
-  P{[P0][default]} x (diff(x,y)).
+  P{P0,default} x (diff(x,y)).
 Proof.
   apply pps _ _ _.
   checkfail apply p1 exn Failure. (* bad variable instantiation *)
@@ -287,16 +287,16 @@ Proof.
 Qed.
 
 (* --------------------------------------------------------- *)
-predicate Q {set} {set: (x : message)} = [x = empty].
+predicate Q {set:system} {set: (x : message)} = [x = empty].
 
-global lemma [set: P1; equiv:default] _ : Q{[P1]} empty.
+global lemma [set: P1; equiv:default] _ : Q{P1} empty.
 Proof.
   rewrite /Q.
   auto.
 Qed.
 
 (* cannot expand `Q`, as `default <> P1`. *)
-global lemma [set: P1; equiv:default] _ : Q{[default]} empty.
+global lemma [set: P1; equiv:default] _ : Q{default} empty.
 Proof.
   checkfail rewrite /Q exn Failure.
 Abort.  

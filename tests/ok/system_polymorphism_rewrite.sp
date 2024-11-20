@@ -2,17 +2,17 @@
 op a : message.
 op b : message.
 
-axiom foo  {P      } in [P] : a = b.
-axiom foo2 {P[pair]} in [P] : a = b.
+axiom foo  {P:system      } @system:P : a = b.
+axiom foo2 {P:system[pair]} @system:P : a = b.
 
-global axiom bar  {P[pair]        } in [P]              : [a = b].
-global axiom bar1 {P       Q[pair]} in [set:P; equiv:Q] : [a = b].
-global axiom bar2 {P[pair] Q[pair]} in [set:P; equiv:Q] : [a = b].
+global axiom bar  {P:system[pair]                } @system:P                : [a = b].
+global axiom bar1 {P:system      , Q:system[pair]} @system:(set:P; equiv:Q) : [a = b].
+global axiom bar2 {P:system[pair], Q:system[pair]} @system:(set:P; equiv:Q) : [a = b].
 
 (*------------------------------------------------------------------*)
 (* tests in `P` *)
 
-lemma _ {P} in [P] : a = b.
+lemma _ {P:system} @system:P : a = b.
 Proof. 
   checkfail rewrite foo2 exn NothingToRewrite. 
   checkfail rewrite bar  exn NothingToRewrite.
@@ -31,31 +31,31 @@ Qed.
 (*------------------------------------------------------------------*)
 (* tests in `P[pair]` *)
 
-lemma _ {P[pair]} in [P] : a = b.
+lemma _ {P:system[pair]} @system:P : a = b.
 Proof. 
   rewrite foo. 
   congruence.
 Qed.
 
-lemma _ {P[pair]} in [P] : a = b.
+lemma _ {P:system[pair]} @system:P : a = b.
 Proof. 
   rewrite foo2. 
   congruence.
 Qed.
 
-lemma _ {P[pair]} in [P] : a = b.
+lemma _ {P:system[pair]} @system:P : a = b.
 Proof.
   rewrite bar.
   congruence.
 Qed.
 
-lemma _ {P[pair]} in [P] : a = b.
+lemma _ {P:system[pair]} @system:P : a = b.
 Proof. 
   checkfail rewrite bar1 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)
 Abort.
 
-lemma _ {P[pair]} in [P] : a = b.
+lemma _ {P:system[pair]} @system:P : a = b.
 Proof.
   checkfail rewrite bar2 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)
@@ -64,19 +64,26 @@ Abort.
 (*------------------------------------------------------------------*)
 (* global lemmas in `P` *)
 
-global lemma _ {P Q[pair]} in [set:P; equiv:Q] : [a = b].
+global lemma _ {P:system, Q:system[pair]} @system:(set:P; equiv:Q) : [a = b].
 Proof. 
   rewrite foo.
   congruence.
 Qed.
 
-global lemma _ {P Q[pair]} in [set:P; equiv:Q] : [a = b].
+(* same, using the alternative syntax to provide default system expressions *)
+global lemma _ {P:system, Q:system[pair]} @set:P @equiv:Q : [a = b].
+Proof. 
+  rewrite foo.
+  congruence.
+Qed.
+
+global lemma _ {P:system,Q:system[pair]} @set:P @equiv:Q : [a = b].
 Proof. 
   checkfail rewrite foo2 exn NothingToRewrite.
   checkfail rewrite bar  exn NothingToRewrite.
 Abort.
 
-global lemma _ {P Q[pair]} in [set:P; equiv:Q] : [a = b].
+global lemma _ {P:system,Q:system[pair]} @set:P @equiv:Q : [a = b].
 Proof. 
   checkfail rewrite bar1 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)
@@ -89,30 +96,30 @@ Qed.
 (*------------------------------------------------------------------*)
 (* global lemmas in `P[pair]` *)
 
-global lemma _ {P[pair]} in [P] : [a = b].
+global lemma _ {P:system[pair]} @system:P : [a = b].
 Proof. 
   rewrite foo.
   congruence.
 Qed.
 
-global lemma _ {P[pair]} in [P] : [a = b].
+global lemma _ {P:system[pair]} @system:P : [a = b].
 Proof. 
   rewrite foo2.
   congruence.
 Qed.
 
-global lemma _ {P[pair]} in [P] : [a = b].
+global lemma _ {P:system[pair]} @system:P : [a = b].
 Proof. 
   rewrite bar.
   congruence.
 Qed.
 
-global lemma _ {P[pair]} in [P] : [a = b].
+global lemma _ {P:system[pair]} @system:P : [a = b].
 Proof. 
   checkfail rewrite bar1 exn NothingToRewrite. 
 Abort.
 
-global lemma _ {P[pair]} in [P] : [a = b].
+global lemma _ {P:system[pair]} @system:P : [a = b].
 Proof. 
   checkfail rewrite bar2 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)
@@ -127,7 +134,7 @@ system X = A:out(c,empty); B:out(c,empty).
 (*------------------------------------------------------------------*)
 (* tests in a concrete single system *)
 
-lemma _ in [X/left] : a = b.
+lemma _ @system:X/left : a = b.
 Proof. 
   checkfail rewrite foo2 exn NothingToRewrite. 
   checkfail rewrite bar  exn NothingToRewrite.
@@ -145,31 +152,31 @@ Qed.
 (*------------------------------------------------------------------*)
 (* tests in a concrete  bi-system *)
 
-lemma _ in [X] : a = b.
+lemma _ @system:X : a = b.
 Proof. 
   rewrite foo.
   congruence.
 Qed.
 
-lemma _ in [X] : a = b.
+lemma _ @system:X : a = b.
 Proof. 
   rewrite foo2.
   congruence.
 Qed.
 
-lemma _ in [X] : a = b.
+lemma _ @system:X : a = b.
 Proof. 
   rewrite bar.
   congruence.
 Qed.
 
-lemma _ in [X] : a = b.
+lemma _ @system:X : a = b.
 Proof. 
   checkfail rewrite bar1 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)
 Abort.
 
-lemma _ in [X] : a = b.
+lemma _ @system:X : a = b.
 Proof.
   checkfail rewrite bar2 exn NothingToRewrite. 
   (* all system variables cannot be inferred *)

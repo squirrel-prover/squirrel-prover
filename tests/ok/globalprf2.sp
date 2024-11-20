@@ -134,7 +134,7 @@ Proof.
   auto.
 Qed.
 
-print system [t/left].
+print system t/left.
 
 
 
