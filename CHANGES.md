@@ -1,3 +1,15 @@
+### basic builtin support for integer and string constants
+  [commit: `7542e89e`]
+
+  Added builtin support for integer and string constants. E.g.
+  ```
+  op x : int = 42.
+  op s : string = "42".
+  lemma [any] _ : x + 42 = 84 && s = "42".
+  ```
+  There is also basic support for integer computations in the reduction engine
+  (e.g. `21+21` reduces to `42`).
+  
 ### better automated reasoning on action dependencies
   [commit: `3280faaa`]
 
