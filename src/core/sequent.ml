@@ -1508,16 +1508,19 @@ module Mk (Args : MkArgs) : S with
     let args =
       List.map (fun (v, info) -> Subst.subst_var tysubst v, info) pt.args
     in
+    let pt = { pt with form; subgs; args; } in
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)
-    let f_args, form = decompose_forall_tagged_k Equiv.Any_t form in
-    let f_args, subst = Term.refresh_vars_w_info f_args in
-
-    let form = Equiv.Any.subst subst form in
-    let args = List.append f_args args in
-
-    let pt = { pt with form; subgs; args; } in
+    let pt =
+      let f_args, form = decompose_forall_tagged_k Equiv.Any_t form in
+      let f_args, subst = Term.refresh_vars_w_info f_args in
+      
+      let form = Equiv.Any.subst subst form in
+      let args = List.append f_args args in
+      
+      { pt with form; args; } 
+    in
 
     name, pat_params, pt
 

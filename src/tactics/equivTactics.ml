@@ -1231,39 +1231,62 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
     let all = p_deduce_named_arg nargs in
 
     let table = ES.table s in
-    let with_hyp =
+    let subgs, with_hyp =
       match with_hyps_opt with
-      | None -> None
-      | Some str ->
-        let _, hyp = Hyps.by_name str s in
-        match hyp with
-        | LHyp f when ES.is_secrecy table f -> 
-          let f = ES.mk_secrecy_goal_from_form table f in
-          if ES.secrecy_kind f <> Deduce then
-          Tactics.soft_failure ~loc:(L.loc str)
+      | None -> [], None
+      | Some p_pt ->
+        let _, params,pt = ES.convert_pt p_pt s in
+        assert (Match.Mvar.is_empty pt.mv);
+
+        (* check that no type or system variables remain *)
+        LT.check_empty_params params;
+
+        if pt.bound <> Glob then
+           Tactics.soft_failure ~loc:(L.loc p_pt) 
             (Tactics.Failure "expected a deduction hypothesis.");
 
-          Some f
+        if pt.args <> [] then
+           Tactics.soft_failure ~loc:(L.loc p_pt) 
+            (Tactics.Failure "some arguments could not be inferred.");
 
-        | _ -> 
-          Tactics.soft_failure ~loc:(L.loc str)
+        match pt.form with
+        | Equiv.Global f when ES.is_secrecy table f ->
+          let f = ES.mk_secrecy_goal_from_form table f in
+          if ES.secrecy_kind f <> Deduce then
+          Tactics.soft_failure ~loc:(L.loc p_pt)
+            (Tactics.Failure "expected a deduction hypothesis.");
+
+          (pt.subgs, Some f)
+
+        | _ ->
+          Tactics.soft_failure ~loc:(L.loc p_pt)
             (Tactics.Failure "expected a deduction hypothesis.")
     in
 
-    if ES.conclusion_is_equiv s then
-      match targets_opt with
-      | None   -> deduce_all ?with_hyp s |> to_goals
-      | Some l -> deduce_int l s         |> to_goals
+    let new_goals =
+      if ES.conclusion_is_equiv s then
+        match targets_opt with
+        | None   -> deduce_all ?with_hyp s 
+        | Some l -> deduce_int l s
 
-    else if ES.conclusion_is_secrecy s then
-      match targets_opt with
-      | None   -> deduce_predicate_all ~all ?with_hyp s |> to_goals 
-      | Some l -> deduce_predicate_int l s              |> to_goals
+      else if ES.conclusion_is_secrecy s then
+        match targets_opt with
+        | None   -> deduce_predicate_all ~all ?with_hyp s
+        | Some l -> deduce_predicate_int l s
 
-    else
-      Tactics.soft_failure 
-        (Tactics.GoalBadShape 
-           "expected an equivalence or secrecy goal.")
+      else
+        Tactics.soft_failure 
+          (Tactics.GoalBadShape 
+             "expected an equivalence or secrecy goal.")
+     in
+     let subgs = 
+       List.map (function 
+           | Equiv.Global f -> ES.set_conclusion f s
+           | Equiv.Local _ -> assert false (* cannot happen as the conclusion is global *)
+         ) subgs 
+     in
+     subgs @ new_goals |> 
+     to_goals
 
   | _ -> assert false
 

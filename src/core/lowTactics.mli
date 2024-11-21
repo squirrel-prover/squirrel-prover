@@ -29,6 +29,9 @@ val bad_args : unit -> 'a
 
 val check_ty_eq  : ?loc:L.t -> Type.ty  -> Type.ty  -> unit
 
+(** raise a user-level error if any type or system variables remain *)
+val check_empty_params : Params.t -> unit
+
 (*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
 

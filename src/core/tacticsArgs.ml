@@ -221,8 +221,8 @@ type parser_arg =
   | TermPat        of int * Typing.term
   | DH             of dh_arg
   | Crypto         of Symbols.p_path * crypto_args
-  | Deduce         of named_args * int L.located list option * lsymb option
-  (** optional target, option hypotheses provided by `with H1,...,Hn` *)
+  | Deduce         of named_args * int L.located list option * Typing.pt option
+  (** optional target, option hypotheses provided by `with H1` *)
 
 type parser_args = parser_arg list
       
