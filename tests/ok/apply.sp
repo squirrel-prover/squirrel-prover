@@ -157,7 +157,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* test that `apply` is modulo definition unrolling *)
-global lemma _ {P[pair]} in [P] (x : message):
+global lemma _ {P:system[pair]} @system:P (x : message):
   Let a = x in
   Let b = x in
   [a = b] -> [a = x].

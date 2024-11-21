@@ -14,7 +14,7 @@ Proof.
   simpl ~def; true.
 Qed.
 
-global lemma _ {P[pair]} in [P] x y (z : index): 
+global lemma _ {P:system[pair]} @system:P x y (z : index): 
   Let z = <x,y> in
   Let z = <z,<x,y>> in
   [z = <<x,y>,<x,y>>].

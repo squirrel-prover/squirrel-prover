@@ -4,7 +4,7 @@ include WeakSecrecy.
 
 (*------------------------------------------------------------------*)
 (* `apply` can infers arguments by unification *)
-global lemma _ in [any] ['a 'b 'c] (u0 : 'a) (v0 : 'b) (w0 : 'c) :
+global lemma _ @system:any ['a 'b 'c] (u0 : 'a) (v0 : 'b) (w0 : 'c) :
   $(u0 |> v0) -> $((u0, v0) |> w0) -> $(u0 |> w0).
 Proof.
   intro H G. 
@@ -12,7 +12,7 @@ Proof.
   assumption G.
 Qed.
 
-global lemma _ in [any] ['a 'b 'c] 
+global lemma _ @system:any ['a 'b 'c] 
   (u0,u : 'a) (v,v0 : 'b) (w : 'c) (f :  _ -> message[adv]) 
 :
   $(u0 |> v0) -> $( (u,u0) |> (f v0) ).
@@ -21,7 +21,7 @@ Proof.
   apply H.
 Qed.
 
-global lemma _ in [any] ['a 'b 'c] 
+global lemma _ @system:any ['a 'b 'c] 
   (u0,u : 'a) (v,v0 : 'b) (w : 'c) (f : _ -> _ -> _ -> message[adv]) 
 :
   $(u0 |> v0) -> $( (u,u0) |> (u, v0, f u u0 v0)).
@@ -31,7 +31,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global lemma _ {P[pair]} in [P] (x,y : message):
+global lemma _ {P:system[pair]} @system:P (x,y : message):
   Let a = y in
   Let b = x in
   $(y |> b) -> $(a |> x).
@@ -42,7 +42,7 @@ Proof.
   apply H.  
 Qed.
 
-global lemma _ {P[pair]} in [P] (x : message):
+global lemma _ {P:system[pair]} @system:P (x : message):
   Let a = x in
   Let b = x in
   $(a |> b) -> $(a |> x).
@@ -69,7 +69,7 @@ system P =
   let b = comm (comm diff(y0, y1) diff(k0, k1)) z in
   A:out(c,m).
 
-global lemma _ in [P] (x : message):
+global lemma _ @system:P (x : message):
   [happens(A)] ->
   Let a = output@A in
   $(a |> a)          /\
@@ -91,7 +91,7 @@ Proof.
   + deduce.
 Qed.
 
-global lemma _ in [P] (x : message) (f : _[adv]):
+global lemma _ @system:P (x : message) (f : _[adv]):
   [happens(A)] ->
   Let b = output@A in
   Let a = <f b,empty> in
