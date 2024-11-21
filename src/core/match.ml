@@ -3190,42 +3190,49 @@ module E = struct
     List.find_map (fun elem -> deduce_mem cterm elem st) elems
  
   (*------------------------------------------------------------------*)
-  (** [fa_decompose cterm st] return a list of deduction conditions that must be
-      met for [cterm] to be deducible starting from [st].
-      Return [None] if Function Application fails on [term] *)
+  (** [fa_decompose output st] return a list of deduction conditions
+      that must be met for [output] to be deducible (from some
+      arbitrary terms [inputs]).
+
+      Return [None] if Function Application fails on [output].
+
+      See [deduce] for the precise semantics of [· ▷ output]. *)
   let fa_decompose
-      (cterm : cond_term) (st : unif_state)
+      (output : cond_term) (st : unif_state)
     : (unif_state * cond_term) list option
     =
     let env = env_of_unif_state st in
-    match cterm.term with
+    match output.term with
     | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
+    (* we do not need to check that [· ▷ output.cond], since we know
+       that we already have [output.cond] on the left of [▷]. *)
   
     (* function: if-then-else *)
     | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
-      let cond1 = Term.mk_and b cterm.cond
-      and cond2 = Term.mk_and (Term.mk_not b) cterm.cond in
+      let cond1 = Term.mk_and b output.cond
+      and cond2 = Term.mk_and (Term.mk_not b) output.cond in
 
-      Some (List.map (fun t -> st, t) [{ term = b ; cond = cterm.cond; };
+      Some (List.map (fun t -> st, t) [{ term = b ; cond = output.cond; };
                                        { term = t1; cond = cond1; };
                                        { term = t2; cond = cond2; }])
+
     (* function: and *)
     | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_and -> 
-      let cond = Term.mk_and t1 cterm.cond in
-      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=cterm.cond};
+      let cond = Term.mk_and t1 output.cond in
+      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
                                       { term = t2 ; cond }])
 
     (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
 
     (* tuples *)
     | Term.Tuple terms ->
-      Some (List.map (fun term -> st, { cterm with term } ) terms)
+      Some (List.map (fun term -> st, { output with term } ) terms)
 
     | Term.Proj (_, t) ->
-      Some [st, { cterm with term = t }]
+      Some [st, { output with term = t }]
 
     | Term.App (t, terms) ->
-      Some (List.map (fun term -> st, { cterm with term } ) (t :: terms))
+      Some (List.map (fun term -> st, { output with term } ) (t :: terms))
 
     | Term.Quant (q, es, term) ->
       (* [Seq], [ForAll] and [Exists] require to quantify over
@@ -3244,7 +3251,7 @@ module E = struct
         (* binder variables are declared global, constant and adv,
            as these are inputs (hence known values) to the adversary  *)
         let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
-        Some [(st, { cterm with term; })]
+        Some [(st, { output with term; })]
 
     | Find (is, c, d, e)
       when
@@ -3256,14 +3263,14 @@ module E = struct
       (* idem, binder variables are declared global, constant and adv *)
       let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
 
-      let d_cond = Term.mk_and cterm.cond c in
+      let d_cond = Term.mk_and output.cond c in
       let e_cond =
         Term.mk_and
-          cterm.cond
+          output.cond
           (Term.mk_forall is (Term.mk_not c))
       in
 
-      let c = { term = c; cond = cterm.cond; }
+      let c = { term = c; cond = output.cond; }
       and d = { term = d; cond = d_cond; }
       and e = { term = e; cond = e_cond; } in
 
@@ -3273,7 +3280,16 @@ module E = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  (** Check if [inputs ▷ output]. *)
+  (** Check if [inputs ▷ output]. 
+      More precisely, if [output = {v | ψ} ] then verify if:
+
+        [inputs, ψ ▷ if ψ then v]       
+
+      (Remark that [ψ] appears on the left of [▷].)
+
+      Here, an element [{u | vars: ϕ}] of [inputs] represents
+        [λ vars ⇒ if ϕ then u].
+   *)
   let rec deduce
       ~(output : cond_term)
       ~(inputs : known_sets)
@@ -3288,7 +3304,8 @@ module E = struct
          rule, and recurse. *)
       deduce_fa ~output ~inputs st minfos
 
-  (** Check if [inputs ▷ output] using the function application rules. *)
+  (** Check if [inputs ▷ output] using the function application rules. 
+      See [deduce] for the precise semantics of [inputs ▷ output]. *)
   and deduce_fa
       ~(output : cond_term)
       ~(inputs : known_sets)
