@@ -99,13 +99,14 @@ type tagged_vars = tagged_var list
 type env = tagged_vars
 
 (*------------------------------------------------------------------*)
-let _pp_tagged_var ~dbg fmt (v,infos) =
-  if infos = [] then
-    Fmt.pf fmt "%a" (Var._pp ~dbg) v
-  else
-    Fmt.pf fmt "%a[@[%a@]]"
-      Var.pp v
+let pp_infos fmt infos =
+  if infos = [] then () else
+    Fmt.pf fmt "[@[%a@]]"
       (Fmt.list ~sep:(Fmt.any ",@ ") Var.pp_info) infos
+
+(*------------------------------------------------------------------*)
+let _pp_tagged_var ~dbg fmt (v,infos) =
+  Fmt.pf fmt "%a%a" (Var._pp ~dbg) v pp_infos infos
 
 let pp_tagged_var     = _pp_tagged_var ~dbg:false
 let pp_tagged_var_dbg = _pp_tagged_var ~dbg:true
@@ -116,6 +117,30 @@ let _pp_tagged_vars ~dbg =
 
 let pp_tagged_vars     = _pp_tagged_vars ~dbg:false
 let pp_tagged_vars_dbg = _pp_tagged_vars ~dbg:true
+
+(*------------------------------------------------------------------*)
+let _pp_binders ~dbg fmt (vars : tagged_vars) =
+  let rec aux cur_vars cur_info = function
+    | (v, info)::vs when info = cur_info ->
+      aux (v :: cur_vars) cur_info vs 
+    | vs ->
+      if cur_vars <> [] then begin
+        Fmt.list
+          ~sep:(Fmt.any ",")
+          (Var._pp ~dbg) fmt (List.rev cur_vars) ;
+        Fmt.pf fmt ":system%a" pp_infos cur_info;
+        if vs <> [] then Fmt.pf fmt ",@,"
+      end ;
+      match vs with
+      | [] -> ()
+      | (v, info) :: vs -> aux [v] info vs
+  in
+  match vars with
+  | [] -> ()
+  | (v, info) :: vars -> aux [v] info vars
+
+let pp_binders     = _pp_binders ~dbg:false
+let pp_binders_dbg = _pp_binders ~dbg:true
 
 (*------------------------------------------------------------------*)
 let lookup_string (se_name : string) (env : tagged_vars) : Var.t option =
@@ -240,17 +265,21 @@ let pp fmt (se : 'a expr) : unit =
     | Any -> Fmt.pf fmt "any"
 
     | List l ->
-      Fmt.list
-        ~sep:Fmt.comma
-        (fun fmt (label,single_sys) ->
-           if Projection.to_string label = "ε" then
-             Single.pp fmt single_sys
-           else
-             Fmt.pf fmt "%a:%a"
-               Projection.pp label
-               Single.pp single_sys)
-        fmt
-        l
+      let pp_l =
+        Fmt.list
+          ~sep:Fmt.comma
+          (fun fmt (label,single_sys) ->
+             if Projection.to_string label = "ε" then
+               Single.pp fmt single_sys
+             else
+               Fmt.pf fmt "%a:%a"
+                 Projection.pp label
+                 Single.pp single_sys)
+      in
+      if List.length l > 1 then
+        Fmt.pf fmt "(%a)" pp_l l 
+      else
+        Fmt.pf fmt "%a" pp_l l 
 
 (*------------------------------------------------------------------*)
 let to_arbitrary (type a) (x : a expr) : arbitrary = force x
@@ -349,12 +378,13 @@ let equal_context0 c c' =
 let reachability_context set = { set = force set ; pair = None }
 
 let pp_context fmt = function
-  | { set; pair = None   } -> pp fmt set
+  | { set; pair = None   } -> 
+    Fmt.pf fmt "(set:%a;@ @[<2>equiv:None@])" pp set 
   | { set; pair = Some p } ->
-      if set.cnt = p.cnt then
-        Fmt.pf fmt "%a@ (same for equivalences)" pp set
-      else
-        Fmt.pf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
+    if set.cnt = p.cnt then
+      Fmt.pf fmt "%a" pp set
+    else
+      Fmt.pf fmt "(set:%a;@ @[<2>equiv:%a@])" pp set pp p
 
 let pp_context fmt c = Fmt.pf fmt "@[%a@]" pp_context c
 

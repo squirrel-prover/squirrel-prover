@@ -70,6 +70,11 @@ val pp_tagged_vars     :             tagged_vars formatter
 val pp_tagged_vars_dbg :             tagged_vars formatter
 
 (*------------------------------------------------------------------*)
+val _pp_binders    : dbg:bool -> tagged_vars formatter
+val pp_binders     :             tagged_vars formatter
+val pp_binders_dbg :             tagged_vars formatter
+
+(*------------------------------------------------------------------*)
 (** system informations in the surface AST *)
 type p_info = Symbols.lsymb list
 type p_infos = p_info list

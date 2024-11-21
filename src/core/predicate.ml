@@ -68,20 +68,11 @@ let _pp ppe fmt p =
     if tyvars = [] then () 
     else
       Fmt.pf fmt "[@[%a@]] " (Fmt.list ~sep:(Fmt.any "@ ") Type.pp_tvar) tyvars
+  in 
+  let pp_se_binders fmt =
+    if p.se_params = [] then () else
+      Fmt.pf fmt "{%a} " SE.pp_binders p.se_params
   in
-
-  let pp_sevar fmt (v, infos) =
-    if infos = [] then
-      Fmt.pf fmt "%a" SE.Var.pp v
-    else
-      Fmt.pf fmt "%a[@[%a@]]" SE.Var.pp v (Fmt.list SE.Var.pp_info) infos
-  in
-  let pp_sevars fmt sevars =
-    if sevars = [] then () 
-    else
-      Fmt.pf fmt "{@[%a@]} " (Fmt.list ~sep:(Fmt.any "@ ") pp_sevar) sevars
-  in
-  
   let pp_multi_args fmt args =
     if args = [] then () 
     else
@@ -95,10 +86,10 @@ let _pp ppe fmt p =
       Fmt.pf fmt "(%a)" Vars.pp_typed_list args
   in
 
-  Fmt.pf fmt "@[<hov 2>@[<hov 2>predicate %a %a%a%a%a @]=@ @[%a@]@]"
+  Fmt.pf fmt "@[<hov 2>@[<hov 2>predicate %a %t%a%a%a @]=@ @[%a@]@]"
     pp_pred_name       p.name
+    pp_se_binders
     pp_tyvars          p.ty_params
-    pp_sevars          p.se_params
     pp_multi_args      p.args.multi
     pp_simple_args     p.args.simple
     (pp_pred_body ppe) p.body

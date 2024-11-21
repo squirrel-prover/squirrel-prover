@@ -12,7 +12,7 @@ let empty : t = { ty_vars = []; se_vars = []; }
 let pp fmt (p : t) =
   let pp_se_vars fmt = 
     if p.se_vars = [] then () else
-      Fmt.pf fmt "{%a} " SE.pp_tagged_vars p.se_vars
+      Fmt.pf fmt "{%a} " SE.pp_binders p.se_vars
   in
   let pp_tys fmt = 
     if p.ty_vars = [] then () else

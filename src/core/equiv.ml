@@ -151,12 +151,12 @@ let _pp_pred_app ?context ppe fmt p =
     in
     if se_args = [] then () else
       Fmt.pf fmt "{%a}"
-        (Fmt.list ~sep:(Fmt.any "@ ") (Fmt.brackets SE.pp))
+        (Fmt.list ~sep:(Fmt.any ",@,") SE.pp)
         se_args
   in
   let pp_ty_args ppe fmt ty_args =
     if not ppe.dbg || ty_args = [] then () else
-      Fmt.pf fmt "@[<hov 2><%a>@]"
+      Fmt.pf fmt "@[<hov 2>[%a]@]"
         (Fmt.list ~sep:Fmt.comma Type.pp) ty_args
   in
   match p with
