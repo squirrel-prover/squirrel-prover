@@ -2073,10 +2073,14 @@ let _pp_known_sets ppe fmt (ks : known_sets) =
 let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
 
-(*------------------------------------------------------------------*)
-let known_sets_add (k : term_set) (ks : known_sets) : known_sets = k :: ks
-
 let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets = s1 @ s2
+
+(*------------------------------------------------------------------*)
+let refresh_term_set (known : term_set) : term_set =
+  let vars, subst = Term.refresh_vars_w_info known.vars in
+  { vars; se = known.se;
+    term = Term.subst subst known.term;
+    cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
 let term_set_of_term (se : SE.t) (term : Term.term) : term_set =
@@ -2157,58 +2161,92 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
     ) deduction_rules
 
 
-(** Give a set of known terms [k], decompose it as a set of set of know 
-    termes [k1, ..., kn] such that:
-    - for all i, [ki] is deducible from [k]
-    - [k] is deducible from [(k1, ..., kn)] *)
-let rec term_set_decompose (k : term_set) : term_set list =
-  (* get [k.term] head symbol if the system kind allows it *)
-  let term = 
-    match SE.to_projs_any k.se with
-    | None       -> k.term
-    | Some projs -> Term.head_normal_biterm projs k.term
+(** Give a set of inputs [inputs] and a known term [k], 
+    decompose [k] as a set of set [k1, ..., kn] such that:
+    - [(k1,...,kn)] is deducible from [inputs,k]
+    - [k] is deducible from [inputs,(k1, ..., kn)] *)
+let term_set_decompose
+    ~(inputs:term_set list) (known : term_set) : term_set list 
+  =
+  (* FEATURE: use the real deduction function `deduce` below rather
+     than a very basic syntactic check as we do now. *)
+  let deduce ~(inputs:term_set list) (t : term_set) =   
+    let t = refresh_term_set t in
+    List.exists (fun input ->
+        List.for_all (fun x -> List.exists (Term.equal x) input.cond) t.cond &&
+        Term.equal input.term t.term 
+      ) inputs
   in
-  match term with
-  (* Exploit the pair symbol injectivity.
-      If [k] is a pair, we can replace [k] by its left and right
-      composants w.l.o.g. *)
-  | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
-    let kl = { k with term = a; }
-    and kr = { k with term = b; } in
-    List.concat_map term_set_decompose (kl :: [kr])
 
-  (* Idem for tuples. *)
-  | Term.Tuple l ->
-    let kl = List.map (fun a -> { k with term = a; } ) l in
-    List.concat_map term_set_decompose kl
-
-  | Quant ((Seq | Lambda), vars, term) ->
-    let vars, s = Term.refresh_vars vars in
-    let term = Term.subst s term in
-    let k = 
-      { term; 
-        se = k.se;
-        vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
-        cond = k.cond }
+  let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
+  (* get [k.term] head symbol if the system kind allows it *)
+    let term = 
+      match SE.to_projs_any k.se with
+      | None       -> k.term
+      | Some projs -> Term.head_normal_biterm projs k.term
     in
-    term_set_decompose k
+    match term with
+    (* Exploit the pair symbol injectivity.
+        If [k] is a pair, we can replace [k] by its left and right
+        composants w.l.o.g. *)
+    | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
+      let kl = { k with term = a; }
+      and kr = { k with term = b; } in
+      doit_list ~inputs ([kl;kr])
 
-  | _ -> [k]
+    (* Idem for tuples. *)
+    | Term.Tuple l ->
+      let kl = List.map (fun a -> { k with term = a; } ) l in
+      doit_list ~inputs kl
 
+    (* Replace:
+         [(if b then u else v | ϕ)] 
+       by:
+         [(u | b ∧ ϕ), (v | ¬b ∧ ϕ)]
+       when [inputs ▷ (b | ϕ)] *)
+    | Term.App (Fun (fs, _), [b;u;v]) when fs = Term.f_ite ->
+      let kb = { k with term = b; } in
+      if not (deduce ~inputs kb) then [k] else
+        let ku = { k with term = u; cond =             b :: k.cond } 
+        and kv = { k with term = v; cond = Term.mk_not b :: k.cond } in
+        doit_list ~inputs [ku; kv]
+
+    | Quant ((Seq | Lambda), vars, term) ->
+      let vars, s = Term.refresh_vars vars in
+      let term = Term.subst s term in
+      let k = 
+        { term; 
+          se = k.se;
+          vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
+          cond = k.cond }
+      in
+      doit ~inputs k
+
+    | _ -> [k]
+
+  and doit_list ~inputs k_l =
+    List.fold_left (fun inputs k -> doit ~inputs k @ inputs) inputs k_l
+  in
+  doit ~inputs known
+
+(*------------------------------------------------------------------*)
 (** Exported, see `.mli` *)
-let term_set_strengthen (env : Env.t) (k : term_set) : term_set list =
-  let k_decomposed = term_set_decompose k in
+let term_set_strengthen ~(inputs:term_set list) (env : Env.t) (k : term_set) : term_set list =
+  let k_decomposed = term_set_decompose ~inputs k in
   let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
   k_decomposed @ k_decomposed'
 
-(** Given a term, return some corresponding [known_sets].  *)
-let term_set_list_of_term (env : Env.t) (term : Term.term) : term_set list =
+(** Given a term [term], return some corresponding [known_sets] such that:
+    [inputs, term ▷ knowns] *)
+let term_set_list_of_term ~(inputs:term_set list) (env : Env.t) (term : Term.term) : term_set list =
   let k = term_set_of_term env.system.set term in
-  term_set_strengthen env k
+  term_set_strengthen ~inputs env k
 
-let known_sets_of_terms (env : Env.t) (terms : Term.term list) : known_sets =
-  let ks_l = List.concat_map (term_set_list_of_term env) terms in
-  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
+let known_sets_of_terms (env : Env.t) (terms : Term.terms) : known_sets =
+  List.fold_left (fun inputs term ->
+      term_set_list_of_term ~inputs env term @ 
+      inputs
+    ) [] terms 
 
 (*------------------------------------------------------------------*)
 module MCset : sig[@warning "-32"]
@@ -2348,7 +2386,7 @@ let known_sets_of_mset_l
   =
   List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
       let new_ks = term_set_of_mset ?extra_cond_le se mset in
-      known_sets_add new_ks known_sets
+      new_ks :: known_sets
     ) [] msets
 
 (*------------------------------------------------------------------*)
@@ -2371,13 +2409,6 @@ let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
     pat_op_vars   = known.vars;
     pat_op_params = Params.Open.empty;
   }
-
-(*------------------------------------------------------------------*)
-let refresh_term_set (known : term_set) : term_set =
-  let vars, subst = Term.refresh_vars_w_info known.vars in
-  { vars; se = known.se;
-    term = Term.subst subst known.term;
-    cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
 let msets_add (mset : MCset.t) (msets : msets) : msets =
@@ -3288,7 +3319,10 @@ module E = struct
       (Remark that [ψ] appears on the left of [▷].)
 
       Here, an element [{u | vars: ϕ}] of [inputs] represents
-        [λ vars ⇒ if ϕ then u].
+
+        [λ vars ⇒ (ϕ, if ϕ then u)].
+
+      (Remark that [ϕ] is part of the function's output.)
    *)
   let rec deduce
       ~(output : cond_term)

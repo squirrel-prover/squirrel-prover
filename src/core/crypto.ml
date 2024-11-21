@@ -2472,7 +2472,7 @@ let term_set_strengthen (env : Env.t) (k : TSet.t) : TSet.t list =
       cond = k.conds; 
       se = env.system.set; } 
   in
-  let l = Match.term_set_strengthen env k in
+  let l = Match.term_set_strengthen ~inputs:[] env k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
   List.map (fun (k : Match.term_set) ->
       assert (

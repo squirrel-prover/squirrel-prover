@@ -24,7 +24,7 @@
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
 
-%token AT TRANS FRESH DEDUCE
+%token AT TRANS FRESH
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
@@ -1222,9 +1222,6 @@ tac:
 
   | l=lloc(CDH) arg=cdh_arg
     { mk_abstract l "cdh" [TacticsArgs.DH arg] }
-
-  (* Deduce *)
-  | l=lloc(DEDUCE) t=tactic_params     { mk_abstract l "deduce" t }
 
   (* Case *)
   | l=lloc(CASE) a=named_args t=tac_term

@@ -397,7 +397,7 @@ type term_set = {
 
 (** Given a term, return some [known_sets] that can be deduced from it.
     Use ad hoc built-in rules + user-provided deduction rules. *)
-val term_set_strengthen : Env.t -> term_set -> term_set list
+val term_set_strengthen : inputs:term_set list -> Env.t -> term_set -> term_set list
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
