@@ -517,14 +517,14 @@ discharged by the user through a :ref:`proof<section-proofs>`.
 
 A local statement as described above expresses that
 the local formula :n:`forall @binders, @formula` holds
-in the context :n:`[@system_expr]` (which
-defaults to :n:`[default]`).
+in the context :n:`@system_expr` (which
+defaults to :n:`default`).
 The statement is named :n:`@statement_id` for future reference.
 
 Similarly,
 a global statement expresses that
 :n:`Forall @binders, @global_formula` holds in the context
-:n:`[@system_context]` (which defaults to :n:`[default]`).
+:n:`@system_context` (which defaults to :n:`default`).
 
 Local and global statements can be
 :ref:`polymorphic<section-polymorphism>` through the optional

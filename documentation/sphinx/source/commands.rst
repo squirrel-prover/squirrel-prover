@@ -71,7 +71,7 @@ Commands
 
 .. cmd:: print {? @ident}
 
-  Show the definition of a given :n:`@ident` if it is a lemma, function, name, macro or system.
+  Show the definition of a given :n:`@ident` if it is a lemma, function, name, or macro.
   :g:`print` without :n:`@idendifier` shows the current system.
 
   .. example:: printing a lemma
@@ -87,7 +87,11 @@ Commands
 
         print foo.
 
-.. cmd:: search @term {? in [{| @system_id | @system_exp }] }
+.. cmd:: print system @system_expr
+
+  Print the system :n:`@system_expr`.
+
+.. cmd:: search @term {? in {| @system_id | @system_exp } }
 
    Search lemmas containing a given :n:`@term` (that can contain
    holes ``_`` as specified in :n:`@sterm`). 
