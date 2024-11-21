@@ -74,7 +74,7 @@ parameter used in security proofs.
 Type variables and polymorphism
 -------------------------------
 
-Squirrel supports :gdef:`type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<op>`, :term:`lemmas<lemma>`, ...).
+Squirrel supports :gdef:`type polymorphism<polymorphism>` à la `Hindley–Milner <https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system>`_ in most places (:decl:`operators<op>`, :decl:`lemmas<lemma>`, ...).
 Type variables are identifiers preceded by a
 single apostrophe, e.g. :g:`'x`.
 

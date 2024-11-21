@@ -462,10 +462,10 @@ component of the :term:`bi-system` named :n:`@system_id`.
 
 
 .. prodn::
-   system_expr ::= any | @system_id | {*, @single_system_expr}
+   ssystem_expr ::= @system_id | (@system_expr)
+   system_expr ::= @ssytem_expr | {*, @single_system_expr}
 
-A system expression may be generic (:g:`any`, corresponding to any system,
-already declared or not) or specify a fixed list of systems, each
+A system expression specify a fixed list of systems, each
 of them coming with a label identifying it.
 When :n:`@system_id` is a :gdef:`multi-system`,
 the system expression :n:`@system_id` corresponds to the list of
@@ -484,8 +484,8 @@ System contexts
 +++++++++++++++
   
 .. prodn::
-   system_context ::= set: @system_expr; equiv:  @system_expr
-   | @system_id
+   ssystem_context ::= @system_id | (@system_context)
+   system_context ::= @ssytem_context | set: @system_expr; equiv:  @system_expr
 
 A *concrete system context* :g:`set:S; equiv:P` comprises:
 
@@ -498,7 +498,59 @@ A *concrete system context* :g:`set:S; equiv:P` comprises:
 A :n:`@system_id` :g:`S` can also be used as a system context:
 it stands for :g:`set:S; equiv:S/left,S/right`.
 
+
+System binders
+--------------
+
+A :token:`system_variable` is an identifier, optionally precedeed by a tick :n:`'`,
+or the special keywords :n:`set` or :n:`equiv`.
+
+.. prodn::
+  system_variable ::= @ident | '@ident | set | equiv
+
+:gdef:`System variable tags <system_tag>` restrict a system variable's
+possible instantiations.
+
+.. prodn::
+  system_tag ::= pair
+  
+Currently, only a single tag :n:`pair` is supported. A tagged system
+variable :g:`{P : system[tag]}` restricts :g:`P`'s instantiations
+according to :g:`tag`:
+
+- Tag :gdef:`pair` requires that :g:`P` is a system pair.
+ 
+Squirrel uses the following syntax for system binders:
+
+.. prodn::  
+  system_binder_group ::= {{+, {+, @system_variable } : system {? [{+ @system_tag}]} }}
+  system_binders ::= {* @system_binder_group }
    
+
+System annotations
+------------------
+
+A system annotation :token:`system_annot` can be used to specify
+defaults system context values.
+
+.. prodn::
+  expr_annot ::= @ssystem_expr | any
+  context_annot ::= @ssystem_context | any
+  system_annot ::= {? @@set:@expr_annot} {? @@equiv:@expr_annot} 
+  | {? @@equiv:@expr_annot} {? @@set:@expr_annot}
+  | @@system:@context_context
+
+A :n:`@system_annot` is interpretated as a :n:`@system_context` in
+the expected way, where a missing :n:`@@set` or :n:`@@equiv`
+annotations yields a system context where the corresponding field is
+empty (when this is allowed).
+
+The special :g:`any` annotation is interpreted as a parametric system
+expression or context. E.g. :n:`@@set:any` is syntactic sugar for
+:n:`@@set:'P` where :n:`'P` is a universally quantified system variable.
+Similarly, :n:`@@system:any` is syntactic sugar for
+:n:`@@set:'P @@equiv:'Q`.
+
 Axioms and Lemmas
 =================
 
@@ -511,25 +563,27 @@ declaration is that the former creates a proof-obligation that must be
 discharged by the user through a :ref:`proof<section-proofs>`.
 
 .. prodn::
-   statement_id ::= @ident 
-   local_statement ::= {? [@system_expr] } {| @statement_id | _} {? [@tvar_params]} @binders : @formula
-   global_statement ::= {? [@system_context] } {| @statement_id | _} {? [@tvar_params]} @binders : @global_formula
+   statement_id ::= @ident | _
+   local_statement ::= @statement_id @system_binders {? @system_annot} {? [@tvar_params]} @binders : @formula
+   global_statement ::= @statement_id @system_binders {? @system_annot} {? [@tvar_params]} @binders : @global_formula
 
 A local statement as described above expresses that
 the local formula :n:`forall @binders, @formula` holds
-in the context :n:`@system_expr` (which
-defaults to :n:`default`).
-The statement is named :n:`@statement_id` for future reference.
+in the context provided by :n:`@system_annot` (which defaults to :n:`@@set:default`).
+The statement is named :n:`@statement_id` for future reference (except
+for :n:`_`, which declares an anonymous lemma).
 
 Similarly,
 a global statement expresses that
 :n:`Forall @binders, @global_formula` holds in the context
-:n:`@system_context` (which defaults to :n:`default`).
+:n:`@system_annot` (which defaults to :n:`@@set:default @@equiv:default`).
 
 Local and global statements can be
 :ref:`polymorphic<section-polymorphism>` through the optional
 :n:`@tvar_params` type variable parameters (they hold for all
 instances of the given type variables).
+Further, they are parametrized by the system parameters in
+:n:`@system_binders`.
 
 Unnamed (local and global) statements can be declared using an
 underscore :g:`_` instead of a statement identifier
@@ -544,6 +598,21 @@ underscore :g:`_` instead of a statement identifier
    :name: global
 
    Declares a new global :g:`lemma` or :g:`axiom`.
+
+The system context of a lemma can also be provided using the following legacy syntax:
+
+.. decl:: {| lemma | axiom } [@system_expr] @statement_id {? [@tvar_params]} @binders : @formula 
+   :name: legacylemma
+   
+   Legacy syntax for local lemma declarations.
+
+.. decl:: global {| lemma | axiom } [@system_context] @statement_id {? [@tvar_params]} @binders : @global_formula 
+   :name: legacygloballemma
+   
+   Legacy syntax for global lemma declarations.
+
+.. note::
+   Currently, most Squirrel files (and this documentation) use the legacy syntax.
 
 .. example:: Local axioms and lemmas
        
