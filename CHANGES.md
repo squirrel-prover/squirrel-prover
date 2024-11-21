@@ -1,3 +1,49 @@
+### system variables
+  [commit: `3a05f18b`]
+
+Lemmas and axioms can now be parameterized by systems, bringing a form
+of system parametricity: system arguments are inferred during lemma's
+applications, as for type variables.
+
+System variable binders are written using `{S1,...,Sn:system}`, or
+equivalently `{S1:system} ... {Sn:system}`. Further, constraints can
+be attached to a system variable. E.g. `{S : system[pair]}` requires
+that `S` is a system pair.
+
+Here are a few examples of the new syntax:
+```
+global lemma foo {P : system} {Q : system[pair]} @set:P @pair:Q {a, b : type} x y : ...
+global lemma foo {P : system[pair]} @system:P {a, b : type} x y : ...
+```
+the latter being equivalent to
+```
+global lemma foo {P : system[pair]} @set:P @equiv:P {a, b : type} x y : ...
+```
+
+Additional changes:
+- Replace brackets by parentheses to enclose system expressions.
+  Further, remove the need to enclose system expressions in between
+  parentheses when there are no parsing ambiguities.
+  E.g. we can now do `print system P` (rather than `print P`).
+
+- `any` is now syntactic sugar:
+  + `lemma foo @system:any` is `lemma foo {P : system} @system:(set:P; equiv:None)`
+  + `global lemma foo @system:any` is 
+    `global lemma foo {P : system} {Q : system[pair]}  @system:(set:P; equiv:Q)`
+
+- Allow to implicitly introduce system variable when giving a
+  lemma's system context. E.g. the following two lemmas are equivalent:
+  ```
+  global lemma foo {P : system} {Q : system[pair]} @set:P @pair:Q : ...
+  global lemma foo @set:'P @equiv:'Q
+  ```
+  Remark that because `'Q` occurs in an `@equiv` annotation, it is
+  implicitly tagged with `pair`.
+
+- Systems arguments can be manually provided using `A{S1,...,Sn}`,
+  where `A` is a lemma parameterized by `n` systems and `S1,...,Sn` are
+  system expressions.
+
 ### basic builtin support for integer and string constants
   [commit: `7542e89e`]
 
