@@ -65,7 +65,7 @@ module Int = struct
     get_btype  (int_p,s)
 
   (*------------------------------------------------------------------*)
-  let tint table = Type.base int_p (Symbols.to_string (get_btype table "int").s)
+  let tint table = Type.base [] (Symbols.to_string (get_btype table "int").s)
 
   (*------------------------------------------------------------------*)
   let add   table = get_fsymb table "+"
