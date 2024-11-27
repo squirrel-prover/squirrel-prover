@@ -612,13 +612,19 @@ module PathCond = struct
     match p2 with
     | Top -> p1
     (* heuristic: use the last (i.e. right-most) action name which is not [Top] *)
+    (* p1 · ⊤ ⇒ p1 *)
 
     | Before l
-      when List.for_all (fun a -> List.exists (fun d -> d.Action.name = a) l) all_actions -> 
+      when List.for_all
+          (fun a -> List.exists (fun d -> d.Action.name = a) l) 
+          all_actions
+      ->
       p1
+    (* p1 · ⊤ ⇒ p1 *)
     (* same as previous cas *)
 
    | Before _ -> p2
+   (* p1 · p2 ⇒ p2 *)
 
   let apply (p : t) (tau0 : Term.term) (tau2 : Term.term) : Term.term =
     match p with
