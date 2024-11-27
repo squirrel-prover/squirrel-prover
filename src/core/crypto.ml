@@ -452,12 +452,6 @@ let exact_eq_under_cond
     }
   in
   let system = env.system in
-  let conv_state =
-    Reduction.mk_state
-      ~system ~hyps ~params:(Env.to_params env)
-      ~red_param:ReductionCore.rp_full env.table
-  in
-  let conv = Reduction.conv conv_state in 
   let reduction_state =
     Reduction.mk_state ~hyps
       ~system ~vars:env.vars
@@ -472,7 +466,7 @@ let exact_eq_under_cond
   let unif_state =
     Match.mk_unif_state ~env:env.vars env.table system hyps ~support:unif_vars
   in
-  Match.E.deduce_mem ~conv ~decompose_ands cterm known_set unif_state
+  Match.E.deduce_mem ~decompose_ands cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 exception UnknowGlobalSmplsAssign
@@ -1960,7 +1954,11 @@ let knowledge_mem_condterm_sets
       let conds =  List.map (Term.subst subst) conds in
       let args = List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars in
       let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in
-      if Match.E.known_set_check_impl env.table hyps conds (Term.mk_false)
+
+      let st =
+        Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
+      in
+      if Match.E.known_set_check_impl env.table ~st conds (Term.mk_false)
       then
         None
       else
@@ -2164,30 +2162,36 @@ and bideduce_term
     (query: query) (output : CondTerm.t)
   : result option
   =
-  let output = CondTerm.polish output query.hyps query.env in
-  assert (AbstractSet.well_formed query.env query.initial_mem);
-  notify_bideduce_term_start query.env.table ~vbs ~dbg output;
-  let kmem = knowledge_mem ~env:query.env ~hyps:query.hyps output query.inputs in
+  let env = query.env in
+  let output = CondTerm.polish output query.hyps env in
+  assert (AbstractSet.well_formed env query.initial_mem);
+  notify_bideduce_term_start env.table ~vbs ~dbg output;
+  let mem, mem_res = knowledge_mem ~env ~hyps:query.hyps output query.inputs in
+  let st : Match.unif_state Lazy.t =
+    lazy(
+      Match.mk_unif_state ~env:env.vars env.table env.system query.hyps ~support:[]
+    )
+  in
   if
-    HighTerm.is_ptime_deducible ~si:true query.env output.term ||
-    (fst kmem && (snd kmem = None))
+    HighTerm.is_ptime_deducible ~si:true env output.term ||
+    (mem && (mem_res = None))
   then                          (* deduce conditions *)
       let result = empty_result query.initial_mem in
       notify_bideduce_immediate ~vbs ~dbg;
       Some result 
   else if
     output.conds <> [] &&
-    Match.E.known_set_check_impl query.env.table (query.hyps)
+    Match.E.known_set_check_impl env.table ~st:(Lazy.force st)
       (Term.mk_ands output.conds) Term.mk_false
   then
     Some (empty_result query.initial_mem)
 
-  else if (fst kmem) then
+  else if mem then
     bideduce ~vbs ~dbg query
-      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget (snd kmem)))
+      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget mem_res))
   else 
     (* [output ∈ rec_inputs] *)
-    match knowledge_mem_tsets query.env query.hyps output query.rec_inputs with
+    match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
       (* if output.conds =  [] then *)
         bideduce ~vbs ~dbg query (List.map CondTerm.mk_simpl args)          

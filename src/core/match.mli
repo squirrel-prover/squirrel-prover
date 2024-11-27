@@ -409,7 +409,6 @@ module E : sig
 
   (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
   val deduce_mem :
-    ?conv:(Term.term -> Term.term -> bool) ->
     ?decompose_ands: (Term.term -> Term.term list) ->
     cond_term ->
     term_set ->
@@ -420,10 +419,10 @@ module E : sig
   val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
 
   val known_set_check_impl :
-    ?conv:(Term.term -> Term.term -> bool) ->
     ?decompose_ands: (Term.term -> Term.term list) ->
+    ?st:unif_state ->
     Symbols.table ->
-    TraceHyps.hyps ->  Term.term -> Term.term -> bool
+    Term.term -> Term.term -> bool
 
   (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
