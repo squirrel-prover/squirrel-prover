@@ -452,21 +452,11 @@ let exact_eq_under_cond
     }
   in
   let system = env.system in
-  let reduction_state =
-    Reduction.mk_state ~hyps
-      ~system ~vars:env.vars
-      ~params:(Env.to_params env)
-      ~red_param:ReductionCore.rp_crypto
-      env.table
-  in
-  let decompose_ands x =
-    Term.decompose_ands @@ Reduction.reduce_term reduction_state x
-  in
   (* FIXME : system changed without modifying hyps accordingly*)
   let unif_state =
     Match.mk_unif_state ~env:env.vars env.table system hyps ~support:unif_vars
   in
-  Match.E.deduce_mem ~decompose_ands cterm known_set unif_state
+  Match.E.deduce_mem cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 exception UnknowGlobalSmplsAssign

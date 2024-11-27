@@ -1244,11 +1244,10 @@ let whnf
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let hyps = st.hyps in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
     R.mk_state
-      ~hyps ~system:st.system ~vars ~red_param st.table
+      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
   let strat = R.(MayRedSub ReductionCore.rp_full) in
   R.whnf_term ~strat red_st t
@@ -1262,11 +1261,10 @@ let reduce_head1
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let hyps = st.hyps in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
     R.mk_state
-      ~hyps ~system:st.system ~vars ~red_param st.table
+      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
   R.reduce_head1_term red_st t
 
@@ -1280,11 +1278,10 @@ let conv_term
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let hyps = st.hyps in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
     R.mk_state
-      ~hyps ~system:st.system ~vars ~red_param st.table
+      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
   R.conv red_st t1 t2
 
@@ -2583,6 +2580,10 @@ type cond_term = { term : Term.term; cond : Term.term }
 
 let mk_cond_term (term:Term.term) (cond:Term.term) :cond_term = {term;cond}
 
+let pp_cond_term fmt (c : cond_term) =
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]}@]"
+    Term.pp c.term Term.pp c.cond
+
 (*------------------------------------------------------------------*)
 (** {3 Equiv matching and unification} *)
 
@@ -2598,8 +2599,8 @@ module E = struct
       ?(st : unif_state option)
       ~(decompose_ands: Term.term -> Term.term list)
       (global_hyps : Term.term list)
-      (hyp : Term.term)
-      (cond : Term.term) : bool
+      ~(hyp : Term.term)
+      ~(cond : Term.term) : bool
     =
     (* FIXME: retrieve rp_param from the reduction state *)
     let red_param = ReductionCore.rp_crypto in
@@ -2638,7 +2639,7 @@ module E = struct
   let known_set_check_impl_auto
       ~(decompose_ands: Term.term -> Term.term list)
       (table : Symbols.table)
-      (hyp : Term.term) (cond : Term.term)
+      ~(hyp : Term.term) ~(cond : Term.term)
     : bool
     =
     let hyps = decompose_ands hyp
@@ -2719,20 +2720,34 @@ module E = struct
       FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
       as hypothesis. *)
   let known_set_check_impl
-      ?(decompose_ands: (Term.term -> Term.term list) = Term.decompose_ands )
       ?(st : unif_state option)
       (table : Symbols.table)
       (hyp   : Term.term)
       (cond  : Term.term) : bool
     =
+    (* decompose a formula as an equivalent conjunction of formulas,
+       modulo reduction if [st<>None]. *)
+    let decompose_ands =
+      match st with
+      | None -> Term.decompose_ands
+      | Some st ->
+        let rec decompose_ands t =
+          let t, _ = whnf ReductionCore.rp_crypto st t in
+          let terms = Term.decompose_ands t in
+          if List.length terms = 1 then terms
+          else List.concat_map decompose_ands terms
+        in
+        decompose_ands
+    in
+    
     let global_hyps = omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st in
     let check_one cond = 
       let check0 =              (* convertibility *)
-        known_set_check_impl_conv ~decompose_ands ?st global_hyps hyp cond
+        known_set_check_impl_conv ~decompose_ands ?st global_hyps ~hyp ~cond
       and check1 =              (* constraints *)
         known_set_check_impl_sat table (hyp :: global_hyps) cond
       and check2 =              (* ad hoc inequality reasoning *)
-        known_set_check_impl_auto ~decompose_ands table hyp cond
+        known_set_check_impl_auto ~decompose_ands table ~hyp ~cond
       and check3 =              (* ad hoc reasoning on [exec] *)
         known_set_check_exec_case ~decompose_ands table (hyp :: global_hyps) cond
       in
@@ -3145,7 +3160,6 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
   let deduce_mem0
-      ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
       (known : term_set)
       (st    : unif_state) : Mvar.t option
@@ -3185,9 +3199,7 @@ module E = struct
       let known_cond = Term.subst subst known_cond in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
       if not (
-          known_set_check_impl
-            ?decompose_ands
-            st.table ~st cterm.cond known_cond
+          known_set_check_impl st.table ~st cterm.cond known_cond
         )
       then None
       else (* clear [known.var] from the binding *)
@@ -3195,7 +3207,6 @@ module E = struct
     with NoMatch _ -> None
 
   let deduce_mem
-      ?(decompose_ands: (Term.term -> Term.term list) option )
       (cterm : cond_term)
       (known : term_set)
       (st    : unif_state) : Mvar.t option
@@ -3218,14 +3229,14 @@ module E = struct
        arguments of the lemma being applied).
        We move [st.bvs] to [st.env] to keep variable tags information.
     *)
-    match deduce_mem0 ?decompose_ands cterm known st with
+    match deduce_mem0 cterm known st with
     | Some mv -> Some mv
     | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
       if st.bvs = [] && st.support = [] then None
       else
         let env = Vars.add_vars st.bvs st.env in
         let st = { st with bvs = []; support = []; env; } in
-        deduce_mem0 ?decompose_ands cterm known st
+        deduce_mem0 cterm known st
 
   (** Try to match [term] as an element of a sequence in [elems]. *)
   let deduce_mem_list

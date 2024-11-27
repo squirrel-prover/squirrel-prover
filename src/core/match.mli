@@ -380,6 +380,8 @@ type cond_term
 
 val mk_cond_term : Term.term -> Term.term -> cond_term 
 
+val pp_cond_term : Format.formatter -> cond_term -> unit
+
 (*------------------------------------------------------------------*)
 (** Set of terms over some variables of sort index or timestamp,
     under a condition.
@@ -409,7 +411,6 @@ module E : sig
 
   (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
   val deduce_mem :
-    ?decompose_ands: (Term.term -> Term.term list) ->
     cond_term ->
     term_set ->
     unif_state -> Mvar.t option
@@ -419,7 +420,6 @@ module E : sig
   val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
 
   val known_set_check_impl :
-    ?decompose_ands: (Term.term -> Term.term list) ->
     ?st:unif_state ->
     Symbols.table ->
     Term.term -> Term.term -> bool
