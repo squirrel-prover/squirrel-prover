@@ -1831,14 +1831,8 @@ module T (* : S with type t = Term.term *) = struct
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
-    let red_param = 
-      { ReductionCore.rp_empty with
-        diff = true; 
-        zeta = true; 
-        proj = true; 
-        beta = true;
-        delta = ReductionCore.delta_full; } 
-    in
+    (* FIXME: retrieve rp_param from the reduction state *)
+    let red_param = ReductionCore.rp_crypto in
     let t, has_red = reduce_head1 red_param st t in
     if has_red then 
       tunif t pat st
@@ -2607,14 +2601,8 @@ module E = struct
       (hyp : Term.term)
       (cond : Term.term) : bool
     =
-    let red_param = 
-      { ReductionCore.rp_empty with
-        diff = true; 
-        zeta = true; 
-        proj = true; 
-        beta = true;
-        delta = ReductionCore.delta_full; } 
-    in
+    (* FIXME: retrieve rp_param from the reduction state *)
+    let red_param = ReductionCore.rp_crypto in
     let conv =
       match st with
       | None -> Term.alpha_conv ~subst:[]

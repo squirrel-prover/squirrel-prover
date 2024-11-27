@@ -73,7 +73,7 @@ type red_param = {
 
   let rp_crypto = {
     rp_empty with 
-    delta = { op = false; macro = true; def = true; };
+    delta = delta_full;
     diff = true;
     beta = true; 
     proj = true; 
