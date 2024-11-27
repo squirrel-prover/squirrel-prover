@@ -109,33 +109,14 @@ module Core (* : ReductionCore.S *) = struct
   (*------------------------------------------------------------------*)
   (** {2 Conversion} *)
 
-  (* FEATURE: conversion modulo *)
-
   (** conversion state *)
-  type cstate = { 
-    table   : Symbols.table;
-    system  : SE.context;
-    param   : red_param;
-    hyps    : THyps.hyps;
-
-    subst   : Term.subst;
+  type cstate = {
+    rst   : state;              (** a reduction state *)
+    subst : Term.subst;
     (** pending variable to variable substitution (left -> right) *)
-
-    expand_context : Macros.expand_context;
-    (** expantion mode for macros. See [Macros.expand_context]. *)
   }
 
-  let cstate_of_state (c : state) : cstate =
-    {
-      table  = c.table;
-      system = c.system;
-      param  = c.red_param;
-      hyps   = c.hyps;
-
-      expand_context = c.expand_context;
-
-      subst = [];
-    }
+  let cstate_of_state (c : state) : cstate = { rst = c; subst = []; }
 
   (*------------------------------------------------------------------*)
   (** Internal *)
@@ -166,7 +147,7 @@ module Core (* : ReductionCore.S *) = struct
     conv_tys ft1.fty.fty_args ft2.fty.fty_args;
 
     List.iter2 (fun tv1 tv2 ->
-        if not (tv1 = tv2) then not_conv () (* FIXME: necessary? *)
+        if not (Ident.equal tv1 tv2) then not_conv ()
       ) ft1.fty.fty_vars ft2.fty.fty_vars;
 
     conv_tys ft1.ty_args ft2.ty_args
@@ -207,7 +188,7 @@ module Core (* : ReductionCore.S *) = struct
       conv_applied_ftype app_fty1 app_fty2
 
     | Term.Name (ns1,l1), Term.Name (ns2,l2) when ns1.s_symb = ns2.s_symb ->
-      assert (ns1.Term.s_typ = ns2.Term.s_typ);
+      assert (Type.equal ns1.Term.s_typ ns2.Term.s_typ);
       conv_l st l1 l2
 
     | Term.Action (a1, is1), Term.Action (a2, is2) when a1 = a2 ->
@@ -221,7 +202,7 @@ module Core (* : ReductionCore.S *) = struct
 
     | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
       when ms1.s_symb = ms2.s_symb ->
-      assert (ms1.Term.s_typ = ms2.Term.s_typ);
+      assert (Type.equal ms1.Term.s_typ ms2.Term.s_typ);
       conv_l st (ts1 :: terms1) (ts2 :: terms2)
 
     | Term.Quant  (q, is1, t1), Term.Quant (q', is2, t2) when q = q' ->
@@ -235,27 +216,39 @@ module Core (* : ReductionCore.S *) = struct
       conv_l st' [c1; t1] [c2; t2];
       conv st e1 e2
 
-    | Term.Var v1, Term.Var v2 -> conv_var st v1 v2
+    | Term.Var v1, Term.Var v2 ->
+      begin
+        try conv_var st v1 v2
+        with NotConv -> conv_try_reduce st t1 t2
+      end
 
     | Term.App (u1, v1), Term.App (u2, v2) ->
-      conv st u1 u2;
       if List.length v1 <> List.length v2 then not_conv ();
-      conv_l st v1 v2
+      conv_l st (u1 :: v1) (u2 :: v2)
 
     | Term.Tuple l1, Term.Tuple l2 ->
       if List.length l1 <> List.length l2 then not_conv ();
       conv_l st l1 l2
 
-    | Term.Proj (i1, t1), Term.Proj (i2, t2) ->
-      if i1 <> i2 then not_conv ();
-      conv st t1 t2
+    | Term.Proj (i1, u1), Term.Proj (i2, u2) ->
+      if i1 <> i2 then conv_try_reduce st t1 t2 else
+        conv st u1 u2
 
     | Term.Let (v1,t1,s1), Term.Let (v2,t2,s2) ->
       let st' = conv_bnd st v1 v2 in
       conv st  t1 t2;
       conv st' s1 s2
-
-    (* FEATURE: reduce head when conversion fails *)
+      (* FEATURE: we could more agressively rely on reduction during
+         conversion in several cases (e.g. `Let` and `App`), but this
+         impact performances *)
+      (* begin *)
+      (*   try *)
+      (*     let st' = conv_bnd st v1 v2 in *)
+      (*     conv st  t1 t2; *)
+      (*     conv st' s1 s2 *)
+      (*   with NotConv -> conv_try_reduce st t1 t2 *)
+      (* end *)
+      
     | Term.Int    _, _
     | Term.String _, _
     | Term.Fun    _, _
@@ -282,91 +275,33 @@ module Core (* : ReductionCore.S *) = struct
     | _, Term.Var    _
     | _, Term.App    _
     | _, Term.Tuple  _
-    | _, Term.Proj   _ ->
-      not_conv ()
+    | _, Term.Proj   _ -> conv_try_reduce st t1 t2
 
   and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
     List.iter2 (conv st) ts1 ts2
 
-  let rec conv_g (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
-    match e1, e2 with
-    | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
-      if List.length vs1 <> List.length vs2 then not_conv ();
-      let st = conv_tagged_bnds st vs1 vs2 in
-      conv_g st e1 e2
+  (** Reduce [t1] or [t2] and resume the convertion check.
 
-    | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
-    | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
-    | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
-      conv_g_l st [el1; er1] [el2; er2]
-
-    | Equiv.Atom (Pred p1), Equiv.Atom (Pred p2) when p1.psymb = p2.psymb ->
-      conv_tys p1.ty_args p2.ty_args;
-      conv_systems st.table p1.se_args p2.se_args;
-
-      List.iter2 (fun (se1,l1) (se2,l2) ->
-          assert (SE.equal st.table se1 se2);
-          let system = SE.{set = (se1 :> SE.t); pair = None; } in
-          conv_l { st with system; } l1 l2
-        ) p1.multi_args p2.multi_args;
-
-      let system = SE.{set = (SE.of_list [] :> SE.t); pair = None; } in
-      conv_l { st with system } p1.simpl_args p2.simpl_args
-
-    | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
-      let system = SE.{set = st.system.set; pair = None; } in
-      conv { st with system } f1.formula f2.formula
-
-    | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
-      let system =
-        SE.{set = (oget st.system.pair :> SE.arbitrary); pair = None; }
-      in
-      conv_l { st with system } ts1.terms ts2.terms
-
-    | Equiv.Let (v1,t1,f1), Equiv.Let (v2,t2,f2) ->
-      let st' = conv_bnd st v1 v2 in
-      conv   st  t1 t2;
-      conv_g st' f1 f2
-
-    (* FEATURE: reduce head when conversion fails *)
-    | Equiv.Atom (Pred _ | Reach _ | Equiv _), _
-    | Equiv.Quant _, _
-    | Equiv.Impl  _, _
-    | Equiv.Or    _, _
-    | Equiv.And   _, _
-    | Equiv.Let   _, _ ->
-      not_conv ()
-
-  and conv_g_l
-      (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
-    =
-    List.iter2 (conv_g st) es1 es2
-
-
-  (*------------------------------------------------------------------*)
-  (** Exported *)
-  let conv (s : state) (t1 : Term.term) (t2 : Term.term) : bool =
-    let s = cstate_of_state s in
-    try conv s t1 t2; true with NotConv -> false
-
-  (** Exported *)
-  let conv_g (s : state) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
-    let s = cstate_of_state s in
-    try conv_g s t1 t2; true with NotConv -> false
-
+      Let [st.subst = θ], remark that we try to reduce [t1] and not
+      [t1 θ] (idem for [t2]).
+      This is not an issue, since if [t1 ⇝ t1'] then [t1 θ ⇝ t1' θ]
+      when [θ] is a variable renaming. *)
+  and conv_try_reduce (st : cstate) (t1 : Term.t) (t2 : Term.t) : unit =
+    let t1, has_red = reduce_head1_term st.rst t1 in
+    if has_red then conv st t1 t2
+    else
+      let t2, has_red = reduce_head1_term st.rst t2 in
+      if has_red then conv st t1 t2
+      else not_conv ()
 
   (*------------------------------------------------------------------*)
   (** {2 Reduction functions} *)
-
-  (*------------------------------------------------------------------*)  
-  (** Internal exception *)
-  exception NoExp 
 
   (** Internal.
       Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
       Return: reduced term, reduction occurred *)
   (* FEATURE: memoisation? *)
-  let rec reduce_term (st : state) (t : Term.term) : Term.term * bool = 
+  and reduce_term (st : state) (t : Term.term) : Term.term * bool = 
     let t, has_red = reduce_head1_term st t in
 
     if has_red then fst (reduce_term st t), true
@@ -391,6 +326,32 @@ module Core (* : ReductionCore.S *) = struct
     let t, has_red = reduce_head1_term ~strat st t in
     if has_red then doit t, true else t, false
 
+  (** Auxiliary function reducing once at head position. 
+      The reduction strategy is implemented in [reduce_head1_term]. *)
+  and red_head1 : state -> Term.t -> Term.t * bool =
+    let red_rules =
+      [
+        reduce_delta1    ;     (* δ *)
+        rewrite_head_once;     (* user rewriting rules *)
+        reduce_beta1     ;     (* β *)
+        reduce_proj1     ;     (* proj *)
+        reduce_diff1     ;     (* diff *)
+        reduce_let1      ;     (* zeta *)
+        reduce_constr1   ;     (* constr *)
+        reduce_builtin   ;     (* builtin *)
+      ]
+    in
+    let rec try_red red_funcs (st : state) (t : Term.t) : Term.t * bool =
+      match red_funcs with
+      | [] -> t, false
+      | red_f :: red_funcs ->
+        let t0, has_red = red_f st t in
+        if has_red then t0, true
+        else try_red red_funcs st t
+    in
+
+    fun (st : state) (t : Term.term) -> try_red red_rules st t
+      
   (** Reduce once at head position.
       May use all reduction rules:
        [δ, user rewriting rules, β, proj, diff, zeta, constr] *)
@@ -398,29 +359,7 @@ module Core (* : ReductionCore.S *) = struct
       ?(strat : red_strat = Std)
       (st : state) (t : Term.term) : Term.term * bool
     =
-    (* reduce once at head position *)
-    let red_head1 (t : Term.term) =
-      let rec try_red red_funcs =
-        match red_funcs with
-        | [] -> t, false
-        | red_f :: red_funcs ->
-          let t, has_red = red_f t in
-          if has_red then t, true
-          else try_red red_funcs
-      in
-      try_red [
-        reduce_delta1     st;     (* δ *)
-        rewrite_head_once st;     (* user rewriting rules *)
-        reduce_beta1      st;     (* β *)
-        reduce_proj1      st;     (* proj *)
-        reduce_diff1      st;     (* diff *)
-        reduce_let1       st;     (* zeta *)
-        reduce_constr1    st;     (* constr *)
-        reduce_builtin    st;     (* builtin *)
-      ]
-    in
-
-    let t, has_red = red_head1 t in
+    let t, has_red = red_head1 st t in
     match strat, has_red with
     | Std, _ | MayRedSub _, true -> t, has_red
     | MayRedSub red_param, false ->
@@ -429,7 +368,7 @@ module Core (* : ReductionCore.S *) = struct
         reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with red_param; } t
       in
       if has_red_sub then
-        let t', has_red = red_head1 t' in
+        let t', has_red = red_head1 st t' in
         if has_red then t', true else t, false
       else t, false
 
@@ -440,17 +379,10 @@ module Core (* : ReductionCore.S *) = struct
     if not st.red_param.beta then t, false
     else 
       match t with
-      | Term.App (t, arg :: args) -> 
-        begin
-          match t with
-          | Term.Quant (Term.Lambda, v :: evs, t0) ->
-            let evs, subst = Term.refresh_vars evs in
-            let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
-
-            Term.mk_app (Term.mk_lambda evs t0) args, true
-
-          | _ -> Term.mk_app t (arg :: args), false
-        end 
+      | Term.App (Term.Quant (Term.Lambda, v :: evs, t0), arg :: args) -> 
+        let evs, subst = Term.refresh_vars evs in
+        let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
+        Term.mk_app (Term.mk_lambda evs t0) args, true
 
       | _ -> t, false
 
@@ -467,13 +399,7 @@ module Core (* : ReductionCore.S *) = struct
     if not st.red_param.proj then t, false
     else
       match t with
-      | Term.Proj (i, t) ->
-        begin
-          match t with
-          | Term.Tuple ts -> List.nth ts (i - 1), true
-          | _ -> t, false
-        end
-
+      | Term.Proj (i, Term.Tuple ts) -> List.nth ts (i - 1), true
       | _ -> t, false
 
   and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
@@ -490,6 +416,7 @@ module Core (* : ReductionCore.S *) = struct
        Term.equal t Term.mk_true
     then t, false
     else
+      let exception NoExp in
       try
         let timeout = TConfig.solver_timeout st.table in
         if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table t )
@@ -686,10 +613,6 @@ module Core (* : ReductionCore.S *) = struct
       t, has_red
 
   (*------------------------------------------------------------------*)
-  (** Exported. *)
-  let reduce_term (st : state) (t : Term.term) : Term.term = fst (reduce_term st t)
-
-  (*------------------------------------------------------------------*)
   (** {2 Global formula reduction} *)
 
   (*------------------------------------------------------------------*)
@@ -711,6 +634,81 @@ module Core (* : ReductionCore.S *) = struct
         else try_red red_funcs
     in
     try_red [reduce_glob_let1 st; ]     (* zeta *)
+
+  (*------------------------------------------------------------------*)
+  (** {2 Global formula convertion} *)
+  
+  let rec conv_g (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
+    match e1, e2 with
+    | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
+      if List.length vs1 <> List.length vs2 then not_conv ();
+      let st = conv_tagged_bnds st vs1 vs2 in
+      conv_g st e1 e2
+
+    | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
+    | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
+    | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
+      conv_g_l st [el1; er1] [el2; er2]
+
+    | Equiv.Atom (Pred p1), Equiv.Atom (Pred p2) when p1.psymb = p2.psymb ->
+      conv_tys p1.ty_args p2.ty_args;
+      conv_systems st.rst.table p1.se_args p2.se_args;
+
+      List.iter2 (fun (se1,l1) (se2,l2) ->
+          assert (SE.equal st.rst.table se1 se2);
+          let system = SE.{set = (se1 :> SE.t); pair = None; } in
+          conv_l { st with rst = { st.rst with system} } l1 l2
+        ) p1.multi_args p2.multi_args;
+
+      let system = SE.{set = (SE.of_list [] :> SE.t); pair = None; } in
+      conv_l { st with rst = { st.rst with system} } p1.simpl_args p2.simpl_args
+
+    | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
+      let system = SE.{set = st.rst.system.set; pair = None; } in
+      conv { st with rst = { st.rst with system} } f1.formula f2.formula
+
+    | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
+      let system =
+        SE.{set = (oget st.rst.system.pair :> SE.arbitrary); pair = None; }
+      in
+      conv_l { st with rst = { st.rst with system} } ts1.terms ts2.terms
+
+    | Equiv.Let (v1,t1,f1), Equiv.Let (v2,t2,f2) ->
+      let st' = conv_bnd st v1 v2 in
+      conv   st  t1 t2;
+      conv_g st' f1 f2
+
+    (* FEATURE: reduce head when conversion fails *)
+    | Equiv.Atom (Pred _ | Reach _ | Equiv _), _
+    | Equiv.Quant _, _
+    | Equiv.Impl  _, _
+    | Equiv.Or    _, _
+    | Equiv.And   _, _
+    | Equiv.Let   _, _ ->
+      not_conv ()
+
+  and conv_g_l
+      (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
+    =
+    List.iter2 (conv_g st) es1 es2
+
+  (*------------------------------------------------------------------*)
+  (** {2 Exported reduction and convertion fonctions} *)
+
+  (*------------------------------------------------------------------*)
+  (** Exported. *)
+  let reduce_term (st : state) (t : Term.term) : Term.term = fst (reduce_term st t)
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let conv (s : state) (t1 : Term.term) (t2 : Term.term) : bool =
+    let s = cstate_of_state s in
+    try conv s t1 t2; true with NotConv -> false
+
+  (** Exported *)
+  let conv_g (s : state) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+    let s = cstate_of_state s in
+    try conv_g s t1 t2; true with NotConv -> false
 
   (*------------------------------------------------------------------*)
 end (* Core *)
