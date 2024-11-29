@@ -6,6 +6,7 @@ open Ppenv
 module TS = TraceSequent
 module ES = EquivSequent
 module SE = SystemExpr
+module CP = ComputePredicates
 
 module MP = Match.Pos
 module Sp = Match.Pos.Sp
@@ -368,10 +369,10 @@ let freshR_secrecy
   let use_path_cond = p_fresh_arg opt_args in
 
   (* get the components of the secrecy predicate, incl. the system *)
-  let sgoal = ES.conclusion_as_secrecy s in
+  let sgoal = ES.conclusion_as_computability s in
   let env = ES.env s in
 
-  let system = ES.secrecy_system sgoal in
+  let system = CP.system sgoal in
   if not (SE.is_fset system) then
     soft_failure (Failure "the conclusion must be over a concrete system");
   let system = SE.to_fset system in
@@ -387,8 +388,8 @@ let freshR_secrecy
       (ES.get_trace_hyps s)
       sec_context
       env
-      (ES.secrecy_right sgoal)
-      (ES.secrecy_left sgoal)
+      (CP.right sgoal)
+      (CP.left sgoal)
   in
   Printer.pr "@]@]@;";
 
@@ -419,10 +420,10 @@ let freshL_secrecy
   let loc = L.loc i in
 
   (* get the components of the secrecy predicate, incl. the system *)
-  let sgoal = ES.conclusion_as_secrecy s in
+  let sgoal = ES.conclusion_as_computability s in
   let env = ES.env s in
   
-  let system = ES.secrecy_system sgoal in
+  let system = CP.system sgoal in
   if not (SE.is_fset system) then
     soft_failure (Failure "the conclusion must be over a concrete system");
   let system = SE.to_fset system in
@@ -434,7 +435,7 @@ let freshL_secrecy
   (* get n *)
   let ii = L.unloc i in
   let uu, n, vv =
-    try List.splitat ii (ES.secrecy_left sgoal) with
+    try List.splitat ii (CP.left sgoal) with
     | List.Out_of_range ->
        soft_failure ~loc
          (Tactics.Failure 
@@ -448,16 +449,16 @@ let freshL_secrecy
       sec_context
       env
       n
-      (uu @ vv @ [ES.secrecy_right sgoal])
+      (uu @ vv @ [CP.right sgoal])
   in
   Printer.pr "@]@]@;";
 
   let phi = Term.mk_ands ~simpl:true phis in
 
   (* the remaining secrecy goal *)
-  let new_goal = ES.secrecy_update_left (uu @ vv) sgoal in
+  let new_goal = CP.update_left (uu @ vv) sgoal in
   let new_sec_sequent =
-    ES.set_conclusion (ES.mk_form_from_secrecy_goal new_goal) s
+    ES.set_conclusion (CP.to_global new_goal) s
   in
 
   (* the sequent for the new proof obligation. *)
@@ -489,8 +490,8 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
            fresh_equiv opt_args i s
            (* non-deduction goal -> freshL *)
          else if
-           ES.conclusion_is_secrecy s &&
-           ES.(secrecy_kind (conclusion_as_secrecy s)) = ES.NotDeduce
+           ES.conclusion_is_computability s &&
+           CP.kind (ES.conclusion_as_computability s) = CP.NotDeduce
          then 
            freshL_secrecy opt_args i s
            (* neither -> bad arguments *)
@@ -499,8 +500,8 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
 
       (* "fresh" *)
       | [Args.Fresh (opt_args, None)] ->
-        if ES.conclusion_is_secrecy s &&
-           ES.(secrecy_kind (conclusion_as_secrecy s)) = ES.NotDeduce
+        if ES.conclusion_is_computability s &&
+           CP.kind (ES.conclusion_as_computability s) = CP.NotDeduce
         then
           freshR_secrecy opt_args s
         else

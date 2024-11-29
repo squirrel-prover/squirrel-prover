@@ -349,143 +349,18 @@ let to_trace_sequent s =
          assert (Ident.equal id' id);
          trace_s
     ) s trace_s
-    in trace_s
+    in 
+    trace_s
 
 (*------------------------------------------------------------------*)
-(** {2 Deducibility and non-deducibility goals} *)
-(** Goals corresponding to the predicates "u |> v" and "u *> v".
-    Defined in WeakSecrecy.sp. *)
+let conclusion_is_computability (s : t) : bool =
+  ComputePredicates.is_computability s.env.table s.conclusion
 
-module LS = Library.Secrecy
+let conclusion_as_computability (s : t) : ComputePredicates.form =
+  if not (ComputePredicates.is_computability s.env.table s.conclusion) then
+    Tactics.soft_failure (Tactics.GoalBadShape "expected a computability goal");
 
-type secrecy_kind = Deduce | NotDeduce 
-
-type secrecy_goal = secrecy_kind * Equiv.pred_app
-
-let is_secrecy (table:Symbols.table) (e:Equiv.form) : bool =
-  LS.is_loaded table &&
-    match e with
-    | Atom (Pred pred_app) when
-           pred_app.psymb = LS.symb_deduce table ||
-             pred_app.psymb = LS.symb_not_deduce table -> true
-    | _ -> false
-
-let mk_secrecy_goal 
-      (table:Symbols.table) 
-      (sk:secrecy_kind) 
-      (se:SE.fset) 
-      (ty_left:Type.ty list)
-      (ty_right:Type.ty)
-      (left:Term.terms) 
-      (right:Term.term) : secrecy_goal =
-  assert (List.length ty_left = List.length left);
-  assert (LS.is_loaded table);
-  let se = (se :> SE.arbitrary) in
-  let ty_left, left =
-    match ty_left, left with 
-      | [], [] -> Type.tmessage, Term.mk_zero
-      | _ ->  (Type.tuple ty_left, Term.mk_tuple left)
-  in
-  let pa = 
-    Equiv.{ psymb = (match sk with
-              | Deduce -> LS.symb_deduce table
-              | NotDeduce -> LS.symb_not_deduce table);
-      ty_args = [ty_left; ty_right];
-      se_args = [se];
-      multi_args = [se, [left; right]];
-      simpl_args = []}
-  in
-  sk, pa
-
-let mk_secrecy_goal_from_form 
-      (table:Symbols.table) (e:Equiv.form) : secrecy_goal =
-  assert (is_secrecy table e);
-  match e with 
-  | Atom (Pred pa) -> 
-     let sk = 
-       if pa.psymb = LS.symb_deduce table then Deduce
-       else if pa.psymb = LS.symb_not_deduce table then NotDeduce
-       else assert false
-     in
-     (sk, pa)
-  | _ -> assert false
-
-let mk_form_from_secrecy_goal (_, pa:secrecy_goal) : Equiv.form =
-  Atom (Pred pa)
-
-
-let secrecy_kind (sk, _:secrecy_goal) : secrecy_kind =
-  sk
-
-let secrecy_system (_, pa:secrecy_goal) : SE.t =
-  let se = List.hd pa.se_args in
-  (* sanity check: the same system must be in the multi_args *)
-  match pa.multi_args with 
-    | [se', _] when SE.equal0 se se' -> se
-    | _ -> assert false
-  
-let secrecy_left0 (_, pa:secrecy_goal) : Term.term =
-  match pa.multi_args with
-  | [_, [u;_]] -> u
-  | _ -> assert false 
-
-let secrecy_left (_, pa:secrecy_goal) : Term.terms =
-  match pa.multi_args with
-  | [_, [u;_]] -> Term.destr_tuple_flatten u
-  | _ -> assert false 
-
-let secrecy_right (_, pa:secrecy_goal) : Term.term =
-  match pa.multi_args with
-  | [_, [_;v]] -> v
-  | _ -> assert false 
-  
-let conclusion_is_secrecy (s : t) : bool =
-  is_secrecy (table s) (s.conclusion)
-
-let conclusion_as_secrecy (s : t) : secrecy_goal =
-  if not (is_secrecy (table s) s.conclusion) then 
-    Tactics.soft_failure (Tactics.GoalBadShape "expected a secrecy goal")
-  else 
-    mk_secrecy_goal_from_form (table s) s.conclusion
-  
-let secrecy_update_left
-    (left : Term.terms) (sk, pa : secrecy_goal) : secrecy_goal
-  =
-  let right = secrecy_right (sk, pa) in
-  let ty_left = List.map Term.ty left in
-  let ty_right = Term.ty right in
-  let left, ty_left =
-    if List.length left = 0 then 
-      [Term.mk_zero], [Type.tmessage]
-    else
-      left, ty_left
-  in
-  ( sk,
-    {pa with
-     ty_args    = [Type.tuple ty_left; ty_right];
-     multi_args = [secrecy_system (sk, pa),
-                   [Term.mk_tuple left; right]]
-    } )
-
-let secrecy_update_right
-    (right : Term.terms) (sk, pa : secrecy_goal) : secrecy_goal
-  =
-  let left = secrecy_left0 (sk,pa) in
-  let ty_left = Term.ty left in
-  let ty_right = List.map Term.ty right in
-  let right, ty_right =
-    if List.length right = 0 then 
-      [Term.mk_zero], [Type.tmessage]
-    else
-      right, ty_right
-  in
-  ( sk,
-    {pa with
-     ty_args    = [ty_left; Type.tuple ty_right];
-     multi_args = [secrecy_system (sk, pa),
-                   [left; Term.mk_tuple right]]
-    } )
-
+  ComputePredicates.from_global s.env.table s.conclusion
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps ?in_system s =

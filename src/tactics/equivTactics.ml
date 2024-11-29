@@ -15,6 +15,7 @@ module T    = ProverTactics
 module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
+module CP = ComputePredicates
 
 module TopHyps = Hyps
 
@@ -1042,7 +1043,7 @@ let filter_deduce
 (** Deduce recursively removes all elements of a biframe
     that are deducible from the rest. *)
 let deduce_all
-    ?(with_hyp: ES.secrecy_goal option) (s : ES.t) : ES.t list 
+    ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
   let system =
     let system_s = ES.system s in
@@ -1057,13 +1058,13 @@ let deduce_all
   let terms = equiv.terms in
 
   (*------------------------------------------------------------------*) 
-  if with_hyp <> None && ES.secrecy_system (oget with_hyp) <> system.set then
+  if with_hyp <> None && CP.system (oget with_hyp) <> system.set then
     Tactics.soft_failure 
       (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
 
   (* we know that [h_left ▷ h_right] holds *)
-  let h_left  = omap_dflt [] ES.secrecy_left with_hyp in
-  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| ES.secrecy_right) with_hyp in
+  let h_left  = omap_dflt [] CP.left with_hyp in
+  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| CP.right) with_hyp in
 
   (*------------------------------------------------------------------*)   
   (* [terms0, h_left, h_right ▷ terms] *)
@@ -1086,35 +1087,35 @@ let deduce_all
     If [~all], then raise a user-level error if all elements cannot be
     deduced. *)
 let deduce_predicate_all 
-    ~(all : bool) ?(with_hyp: ES.secrecy_goal option) (s : ES.t) : ES.t list 
+    ~(all : bool) ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
-  let goal = ES.conclusion_as_secrecy s in
+  let goal = ES.conclusion_as_computability s in
 
-  if ES.secrecy_kind goal <> Deduce then
+  if CP.kind goal <> Deduce then
     Tactics.soft_failure 
       (Tactics.GoalBadShape "secrecy predicate unsupported");
 
   let system =
-    let system_secrecy = ES.secrecy_system goal in
+    let system_secrecy = CP.system goal in
     SE.{ (ES.system s) with set = system_secrecy; }
   in
 
   (*------------------------------------------------------------------*) 
-  if with_hyp <> None && ES.secrecy_system (oget with_hyp) <> system.set then
+  if with_hyp <> None && CP.system (oget with_hyp) <> system.set then
     Tactics.soft_failure 
       (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
 
   (* we know that [h_left ▷ h_right] holds *)
-  let h_left  = omap_dflt [] ES.secrecy_left with_hyp in
-  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| ES.secrecy_right) with_hyp in
+  let h_left  = omap_dflt [] CP.left with_hyp in
+  let h_right = omap_dflt [] (Term.destr_tuple_flatten -| CP.right) with_hyp in
 
   (*------------------------------------------------------------------*) 
   let table = ES.table s in
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
-  let right = Term.destr_tuple_flatten @@ ES.secrecy_right goal in
-  let left  = ES.secrecy_left goal in
+  let right = Term.destr_tuple_flatten @@ CP.right goal in
+  let left  = CP.left goal in
 
   if all then (* two different mode of operations, depending on [all] *)
     begin
@@ -1147,8 +1148,8 @@ let deduce_predicate_all
 
       let right' = right0 @ h_left0 in
       if right' = [] then [] else
-        let g = ES.secrecy_update_right right' goal in 
-        [ES.set_conclusion (ES.mk_form_from_secrecy_goal g) s]
+        let g = CP.update_right right' goal in 
+        [ES.set_conclusion (CP.to_global g) s]
     end
 
 (*------------------------------------------------------------------*)
@@ -1183,17 +1184,17 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     is deducible from the rest of [u].
     If so, removes it. *)
 let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
-  let goal = ES.conclusion_as_secrecy s in
+  let goal = ES.conclusion_as_computability s in
 
-  if ES.secrecy_kind goal <> Deduce then
+  if CP.kind goal <> Deduce then
     Tactics.soft_failure 
       (Tactics.GoalBadShape "secrecy predicate unsupported");
 
-  let to_deduce, rest = get_elems l (ES.secrecy_left goal) in
+  let to_deduce, rest = get_elems l (CP.left goal) in
 
   let table = ES.table s in
   let system =
-    let system_secrecy = ES.secrecy_system goal in
+    let system_secrecy = CP.system goal in
     SE.{ (ES.system s) with set = system_secrecy; }
   in
   let hyps = ES.get_trace_hyps ~in_system:system s in
@@ -1207,8 +1208,8 @@ let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
     soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    let new_secrecy_goal = ES.secrecy_update_left rest goal in
-    [ES.set_conclusion (ES.mk_form_from_secrecy_goal new_secrecy_goal) s]
+    let new_secrecy_goal = CP.update_left rest goal in
+    [ES.set_conclusion (CP.to_global new_secrecy_goal) s]
 
 (*------------------------------------------------------------------*)
 let to_goals l = List.map (fun x -> Goal.Global x) l
@@ -1250,9 +1251,9 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
             (Tactics.Failure "some arguments could not be inferred.");
 
         match pt.form with
-        | Equiv.Global f when ES.is_secrecy table f ->
-          let f = ES.mk_secrecy_goal_from_form table f in
-          if ES.secrecy_kind f <> Deduce then
+        | Equiv.Global f when CP.is_computability table f ->
+          let f = CP.from_global table f in
+          if CP.kind f <> Deduce then
           Tactics.soft_failure ~loc:(L.loc p_pt)
             (Tactics.Failure "expected a deduction hypothesis.");
 
@@ -1269,7 +1270,7 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
         | None   -> deduce_all ?with_hyp s 
         | Some l -> deduce_int l s
 
-      else if ES.conclusion_is_secrecy s then
+      else if ES.conclusion_is_computability s then
         match targets_opt with
         | None   -> deduce_predicate_all ~all ?with_hyp s
         | Some l -> deduce_predicate_int l s

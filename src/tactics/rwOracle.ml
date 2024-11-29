@@ -3,6 +3,7 @@ open Squirrelcore
 
 module ES = EquivSequent
 module SE = SystemExpr
+module CP = ComputePredicates
 
 module T = ProverTactics
 module LT = LowTactics
@@ -18,7 +19,7 @@ let hard_failure = Tactics.hard_failure
 (*------------------------------------------------------------------*)
 (** The mode describes whether the goal is an equiv or a secrecy goal.
     Allows factorisation of the code. *)
-type mode = EquivAsymp of Equiv.equiv | Deduction of ES.secrecy_goal
+type mode = EquivAsymp of Equiv.equiv | Deduction of CP.form
 
 (** Gets the mode from a sequent.
     Raises a soft failure if the sequent is not
@@ -33,10 +34,10 @@ let get_mode (s : ES.t) : mode =
       
       EquivAsymp concl
     end
-  else if ES.conclusion_is_secrecy s then
+  else if ES.conclusion_is_computability s then
     begin
-      let concl = ES.conclusion_as_secrecy s in
-      let ty_right = Term.ty (ES.secrecy_right concl) in
+      let concl = ES.conclusion_as_computability s in
+      let ty_right = Term.ty (CP.right concl) in
       if not (Type.is_bitstring_encodable ty_right) then
         soft_failure
           (Tactics.GoalBadShape
@@ -53,7 +54,7 @@ let get_mode (s : ES.t) : mode =
 let get_terms (mode : mode) : Term.terms =
   match mode with
   | EquivAsymp equiv -> equiv.terms
-  | Deduction goal -> ES.secrecy_left goal
+  | Deduction goal -> CP.left goal
 
 
 (*------------------------------------------------------------------*)
@@ -145,8 +146,8 @@ let mk_maingoal
      ES.set_equiv_conclusion {equiv with terms = new_terms} s
 
   | Deduction goal ->
-     let new_goal = ES.secrecy_update_left new_terms goal in
-     ES.set_conclusion (ES.mk_form_from_secrecy_goal new_goal) s
+     let new_goal = CP.update_left new_terms goal in
+     ES.set_conclusion (CP.to_global new_goal) s
 
 
 (** Returns the term to be used as argument of the adversarial function [f]
@@ -188,7 +189,7 @@ let mk_subgoal
     match mode with
     | EquivAsymp _ -> (Utils.oget (ES.env s).system.pair :> SystemExpr.fset)
     | Deduction g ->
-      let system = ES.secrecy_system g in
+      let system = CP.system g in
       if not (SE.is_fset system) then
         soft_failure (Failure "the conclusion must be over a concrete system");
       SE.to_fset system 
