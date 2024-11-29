@@ -1,3 +1,12 @@
+### library re-organisation
+  [commit: `52d4a8a7`, **breaking change**]
+
+Standard libraries have been reorganized. 
+
+Most projects should start by including the `Core` library file
+(instead of `Basic`, which has been removed).
+
+
 ### system variables
   [commit: `3a05f18b`]
 
