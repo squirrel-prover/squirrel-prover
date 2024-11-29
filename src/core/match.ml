@@ -1242,7 +1242,8 @@ let reduce_delta_def1
       Hyps.TraceHyps.find_map (function
           | v', LDef (se',t') ->
             if Ident.equal v' v.id &&
-               SE.subset_modulo table system.set se'
+               SE.subset table system.set se' 
+               (* we must use [subset] and not [subset_modulo] here! *)
             then
               let _, subst = 
                 SE.mk_proj_subst ~strict:false ~src:se' ~dst:system.set 
