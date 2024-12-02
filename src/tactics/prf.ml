@@ -129,7 +129,6 @@ let is_hash (table:Symbols.table) (f:Symbols.fname) =
     2) occurrences of hashed messages, with a key that has
        the same symbol as k. *)
 let get_bad_occs
-    (env : Env.t)
     (m:term)
     (k:Name.t)
     (hash_f:Symbols.fname) (* hash function *)
@@ -140,26 +139,7 @@ let get_bad_occs
   : IOS.simple_occs =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
-
-  (* variables quantified above the current point are considered constant,
-     so we add them to the env usd for "is_ptime_deducible" *)
-  let env =
-    Env.update 
-      ~vars:(Vars.add_vars 
-               (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars) env
-  in
   match t with
-  (* deterministic term -> no occurrences needed *)
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
-  (* SI not needed here *)
-
-  (* non ptime deterministic variable -> forbidden *)
-  (* (this is where we used to check variables were only timestamps or indices) *)
-  | Var v ->
-    soft_failure
-      (Tactics.Failure 
-         (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
-
   (* occurrence of the hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
@@ -425,7 +405,7 @@ let phi_proj
   in
 
   (* first construct the IOS.folds_occs *)
-  let get_bad = get_bad_occs env m_p k_p hash_f in
+  let get_bad = get_bad_occs m_p k_p hash_f in
 
 
   (* get the bad key occs, and the messages hashed,

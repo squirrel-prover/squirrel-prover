@@ -106,7 +106,6 @@ let partition_powers
     Otherwise, gives up, and asks [occurrence_goals] to be called
     again on subterms. *)
 let get_bad_occs
-    (env : Env.t)            (* initial environment  *)
     (gdh_oracles : bool) (g : term) (exp : Symbols.fname) 
     (mult : Symbols.fname option)
     (nab : Name.t list) 
@@ -148,22 +147,7 @@ let get_bad_occs
       bad_pows_occs @ occs1
   in 
 
-
-  let env =
-    Env.update
-      ~vars:(Vars.add_vars 
-               (Vars.Tag.global_vars ~const:true info.pi_vars) 
-               env.vars) 
-      env
-  in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
-
-  | Var v ->
-    soft_failure
-      (Tactics.Failure
-         (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
-
   | Name (_, nargs) as n when Name.exists_name (Name.of_term n) nab ->
     (* one of the nab: generate occs for all potential collisions *)
     let occs1 =
@@ -321,7 +305,7 @@ let cgdh
         (Name.pp ppe) na (Name.pp ppe) nb
   in
   let get_bad : NOS.f_fold_occs =
-    get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]
+    get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]
   in
 
   let occs =

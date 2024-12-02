@@ -54,7 +54,6 @@ module ROF = RO.RandomnessOF
     the same symbol as [k]. Store as collision in these occurrences the
     [ciphertext], which is the term we were trying to decrypt. *)
 let get_bad_occs
-    (env : Env.t)
     ~(k : name)
     ~(ciphertext : term)
     ~(enc_f : Symbols.fname) (* encryption function *)
@@ -68,26 +67,7 @@ let get_bad_occs
   =
   (* handles a few cases, using rec_call for rec calls on subterms,
      and calls retry for the rest *)
-
-  (* variables quantified above the current point are considered constant,
-     so we add them to the env used for "is_ptime_deducible" *)
-  let env =
-    Env.update
-      ~vars:(Vars.add_vars
-               (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars)
-      env
-  in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
-
-  (* non ptime deterministic variable -> forbidden *)
-  (* (this is where we used to check variables
-     were only timestamps or indices) *)
-  | Var v ->
-    soft_failure
-      (Tactics.Failure
-         (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
-
   (* a name with the same symbol as the key *)
   | Name (ns, nargs) as n when ns.s_symb = k.symb.s_symb ->
     let n = Name.of_term n in
@@ -273,7 +253,7 @@ let intctxt
 
   (* Find bad occurrences of [k], and all ciphertexts with [k] *)
   let get_bad_kc : EOS.f_fold_occs =
-    get_bad_occs env ~k:icp.ip_k ~ciphertext:icp.ip_c
+    get_bad_occs ~k:icp.ip_k ~ciphertext:icp.ip_c
       ~enc_f:icp.ip_enc ~dec_f:icp.ip_dec ~hash_f:icp.ip_hash
   in
 

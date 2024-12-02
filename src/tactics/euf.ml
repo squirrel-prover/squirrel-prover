@@ -109,7 +109,6 @@ let mk_simple_occ = IOS.EO.SO.mk_simple_occ
     2) occurrences of protected (signed/hashed) messages, with a key that has
        the same symbol as [k]. *)
 let get_bad_occs
-    (env : Env.t)
     (m : Term.term)
     (k : name)
     (int_f : Symbols.fname) (* function with integrity (hash, signature) *)
@@ -122,25 +121,7 @@ let get_bad_occs
   =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
-
-  (* variables quantified above the current point are considered constant,
-     so we add them to the env used for "is_ptime_deducible" *)
-  let env =
-    Env.update
-      ~vars:(Vars.add_vars
-               (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars)
-      env
-  in
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
-  (* SI not needed here *)
-
-  (* non ptime deterministic variable -> forbidden *)
-  (* (this is where we used to check variables were only timestamps or indices) *)
-  | Var v ->
-    soft_failure
-      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
-
   (* occurrence of the signing/hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
@@ -303,9 +284,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
   in
 
   (* apply euf: first construct the IOS.f_fold_occs to use *)
-  let get_bad : IOS.f_fold_occs = 
-    get_bad_occs env m k int_f ~pk_f 
-  in
+  let get_bad : IOS.f_fold_occs = get_bad_occs m k int_f ~pk_f in
 
   (* get all occurrences *)
   let occs =

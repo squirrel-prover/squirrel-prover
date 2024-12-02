@@ -47,7 +47,6 @@ module NOF = O.NameOF
     - otherwise: asks to be called recursively on subterms.
       Do not uses an accumulator, so returns an empty unit list. *)
 let get_bad_occs
-    (env : Env.t)
     (n : Name.t) 
     ~(retry : unit -> NOS.simple_occs)
     ~(rec_call : O.pos_info -> Term.term -> NOS.simple_occs) 
@@ -57,27 +56,7 @@ let get_bad_occs
   =
   (* handles a few cases, using [rec_call] for rec calls,
      and calls [retry] for the rest *)
-  (* add variables from fv (ie bound above where we're looking)
-     to env with const tag. *)
-  let env =
-    let vars = 
-      Vars.add_vars (Vars.Tag.global_vars ~const:true info.pi_vars) env.vars 
-    in
-    Env.update ~vars env
-  in
-
   match t with
-  (* for freshness, we can ignore **adversarial** subterms
-     FIXME: we do not need the fact that [t] is ptime-computable, only that 
-     it does not use the honest randomness. We could use a more precise check 
-     here. *)
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
-
-  (* the fresh tactic does not apply to terms with non-constant variables *)
-  | Var v ->
-    soft_failure
-      (Failure (Fmt.str "terms contain a non-constant variable: %a" Vars.pp v))
-
   (* a name with the symbol we want: build an occurrence,
      and also look in its args *)
   | Name (nn, nn_args) when nn.s_symb = n.symb.s_symb ->
@@ -139,10 +118,10 @@ let phi_fresh_same_system
   let ppe = default_ppe ~table:env.table () in
   let pp_n ppf () = Fmt.pf ppf "occurrences of %a" (Name.pp ppe) n in
 
-  let get_bad : NOS.f_fold_occs = get_bad_occs env n in
+  let get_bad : NOS.f_fold_occs = get_bad_occs n in
 
   let occs =
-    NOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_n)
+    NOS.find_all_occurrences ~mode:Iter.Const ~pp_descr:(Some pp_n)
       get_bad
       hyps contx env (tt @ n.args)
   in
