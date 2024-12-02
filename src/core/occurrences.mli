@@ -314,7 +314,13 @@ val expand_macro_check_all : expand_info -> Term.term -> Term.term
 (** Returns all timestamps occuring in macros in a list of terms.
     Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)
-val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
+val get_macro_actions :
+  mode:Iter.allowed_constants ->
+  env:Env.t ->
+  hyps:TraceHyps.hyps ->
+  Constr.trace_cntxt ->
+  Term.terms ->
+  ts_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Occurrence search} *)

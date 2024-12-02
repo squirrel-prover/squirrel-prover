@@ -2589,7 +2589,13 @@ let derecursify
   let recursive : (goal*Term.term) list =
     Iter.fold_macro_support ~mode:Iter.PTimeSI (fun iocc goals ->
         let ts = iocc.iocc_rec_arg in
-        let ts_occs = Occurrences.get_macro_actions trace_context iocc.iocc_sources in
+        (* TODO: can we add [iocc_vars] to [env]? And what about
+           [iocc_cond] to hyps? Or the added hypotheses below? *)
+        let ts_occs =
+          Occurrences.get_macro_actions
+            ~mode:PTimeSI ~env ~hyps
+            trace_context iocc.iocc_sources
+        in
         let path_cond =         (* FIXME: add a flag [~precise] *)
           if false (* use_path_cond *)
           then iocc.iocc_path_cond

@@ -7,6 +7,8 @@ open Ppenv
 module MP = Match.Pos
 module SE = SystemExpr
 
+module Sv = Vars.Sv
+
 module TraceHyps = Hyps.TraceHyps
 module PathCond  = Iter.PathCond
 
@@ -570,12 +572,18 @@ let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
   | None -> t
 
 
-(** Exported (see `.mli`) *)
 let get_actions_ext
+    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(env   : Env.t)
+    ~(hyps  : TraceHyps.hyps)
     (t : Term.term)
-    ?(fv:Vars.vars=[])
     (info:expand_info)
-  : ts_occs =
+  : ts_occs
+  =
+  let env fv =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
+
   let ot, contx = info in
   (* sanity check: this function is meant to be called on the initial
      direct terms (the sources from which other occs come),
@@ -583,10 +591,44 @@ let get_actions_ext
   assert (ot = EI_direct); 
   let system = contx.system in
   let se = (SE.reachability_context system).set in
+
   let rec get (t : Term.term)
       ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary)
     : ts_occs =
+    let env = env fv in
+    assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
+
+    (* Put [t] in weak head normal form w.r.t. rules in
+       [Reduction.rp_crypto].  
+
+       Must be synchronized with corresponding code in [fold_bad_occs]
+       and [Occurrences.fold_bad_occs]. *)
+    let t =
+      let system = SE.{ set = se; pair = None; } in
+      let params = Env.to_params env in
+      let red_param = Reduction.rp_crypto in
+      (* FIXME: add tag information in [fv] *)
+      let vars = Vars.of_list (Vars.Tag.local_vars fv) in
+      let st =
+        Reduction.mk_state ~hyps ~system ~vars ~params ~red_param contx.table
+      in
+      let strat = Reduction.(MayRedSub rp_full) in
+      fst (Reduction.whnf_term ~strat st t)
+    in
+
     match t with
+    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
+    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env t -> []
+    | _ when mode = Const     && HighTerm.is_constant                  env t -> []
+
+    | Term.Var v -> 
+      let err_str =
+        Fmt.str "terms contain a %s variable: @[%a@]"
+          (match mode with Const -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
+          Vars.pp v
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
     | Macro (m, l, ts) ->
       begin
         let info = fst info, { (snd info) with system = SE.to_fset se } in
@@ -626,19 +668,22 @@ let get_actions_ext
            occs @ (get t' ~fv ~cond ~p ~se))
         ~se ~fv ~p ~cond [] t
   in
-  get t ~fv ~cond:[] ~p:MP.root ~se
+  get t ~fv:[] ~cond:[] ~p:MP.root ~se
 
 
 (** Returns all timestamps occuring in macros in a list of terms.
     Should only be used when sources are directly occurring,
     not themselves produced by unfolding macros. *)
 let get_macro_actions
+    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(env   : Env.t)
+    ~(hyps  : TraceHyps.hyps)
     (contx : Constr.trace_cntxt)
     (sources : Term.terms) : ts_occs
   =
   let ei = (EI_direct, contx) in
   let actions =
-    List.concat_map (fun t -> get_actions_ext t ei) sources
+    List.concat_map (fun t -> get_actions_ext ~mode ~env ~hyps t ei) sources
   in
   let table = contx.table in
   let system = contx.system in
@@ -726,8 +771,9 @@ struct
 
       (* Put [t] in weak head normal form w.r.t. rules in
          [Reduction.rp_crypto].
+
          Must be synchronized with corresponding code in
-         [Iter.fold_macro_support]. *)
+         [get_actions_ext] and [Iter.fold_macro_support]. *)
       let t =
         let red_param = Reduction.rp_crypto in
         (* FIXME: add tag information in [pos_info] *)
@@ -787,8 +833,7 @@ struct
       Relies on [fold_macro_support] to look through
       all macros in the term. *)
   let find_all_occurrences
-      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms
-                                                   without further checks *)
+      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
       ?(pp_descr    : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
       (hyps         : TraceHyps.hyps)
@@ -820,7 +865,7 @@ struct
       List.fold_left
         (fun dir_occs t -> (* find direct occurrences in t *)
            (* timestamps occurring in t *)
-           let ts = get_macro_actions contx [t] in
+           let ts = get_macro_actions ~mode ~env ~hyps contx [t] in
            (* name occurrences in t *)
            let occs = find_occs ~fv:[] hyps (EI_direct, contx) t in
            (* add the info to the occurrences *)
@@ -864,7 +909,7 @@ struct
                     (Term.fv a)
                     (Vars.Sv.union sfv (Vars.to_vars_set env.vars)));
           (* timestamps occurring in sources (not in the indirect occs!) *)
-          let ts = get_macro_actions contx src in
+          let ts = get_macro_actions ~mode ~env ~hyps contx src in
           (* indirect occurrences in iocc *)
           let occs =
             find_occs ~fv:(Vars.Sv.elements sfv) hyps (EI_indirect a, contx) t

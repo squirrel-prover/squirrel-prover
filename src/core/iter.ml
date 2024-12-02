@@ -453,7 +453,10 @@ let get_macro_occs
     assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
 
     (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
-       Must be synchronized with corresponding code in [Occurrences.fold_bad_occs]. *)
+
+       Must be synchronized with corresponding code in
+       [Occurrences.get_actions_ext] and
+       [Occurrences.fold_bad_occs]. *)
     let t =
       let system = SE.{ set = (constr.system :> SE.t); pair = None; } in
       let params = Env.to_params env in
