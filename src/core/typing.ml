@@ -1069,17 +1069,22 @@ and convert0
     let t = Term.subst subst t in
 
     (* seq are only over finite types *)
-    List.iter2 (fun _ ebnd ->
+    List.iter2 (fun v ebnd ->
         match ebnd with
         | L_var p_v, (_, p_tags) ->
-          if p_tags <> [] then
-            error (L.loc p_v) (Failure "tag unsupported here");
+          let loc = L.loc p_v in
 
+          if p_tags <> [] then
+            error loc (Failure "tag unsupported here");
+
+          if not (Symbols.TyInfo.is_enum state.env.table (Vars.ty v)) then
+            error loc (Failure "sequence must be over enumerable types")
+              
         | L_tuple l,_ ->
           let loc = L.mergeall (List.map L.loc l) in
-          error loc (Failure "tuples unsupported in seq")
+          error loc (Failure "tuples unsupported in seq");
       ) evs vs;
-
+    
     Term.mk_seq ~simpl:false evs t
 
   | Quant (Lambda,vs,t) ->

@@ -19,7 +19,7 @@ let term_of_string st string : Term.term =
   t
 
 (*------------------------------------------------------------------*)
-let typing () =
+let namespaces () =
   let exception Ok in
   let exception Ko in
   let st = Prover.init () in
@@ -199,8 +199,53 @@ op bar ['a 'b] : ('a * 'b).
   ()
 
 (*------------------------------------------------------------------*)
+let generic_typing () =
+  let exception Ok in
+  let exception Ko in
+  let st = Prover.init () in
+  let st = Prover.exec_all ~test:true st 
+      "\
+type E[enum].
+type T.
+"
+  in
+  (* positive tests *)
+  let _ : Term.term = term_of_string st "seq(i : E => i)" in
+  let _ : Term.term = term_of_string st "seq(i : index => i)" in
+  let _ : Term.term = term_of_string st "seq(i : timestamp => i)" in
+
+  (* negative tests *)
+  Alcotest.check_raises "seq enum 1" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "seq(i : T => i)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+  Alcotest.check_raises "seq enum 2" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "seq(i : int => i)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+  Alcotest.check_raises "seq enum 3" Ok
+    (fun () ->
+       let _ : Term.term =
+         try term_of_string st "seq(i : message => i)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
+    ()
+    
+(*------------------------------------------------------------------*)
 let tests = [
-  ("typing"        , `Quick, Util.catch_error typing);
+  ("generic typing", `Quick, Util.catch_error generic_typing);
+  ("namespaces"    , `Quick, Util.catch_error namespaces);
   ("type arguments", `Quick, Util.catch_error type_arguments);
   ("game parsing"  , `Quick, Util.catch_error crypto_parsing);
 ]

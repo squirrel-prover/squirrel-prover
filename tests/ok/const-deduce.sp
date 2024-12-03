@@ -1,6 +1,6 @@
 system null.
 
-type T[finite]
+type T[enum, finite]
 
 name n : T -> message.
 
@@ -21,7 +21,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-type F[finite, fixed].
+type F[enum, finite, fixed].
 
 name m : F -> message.
 
