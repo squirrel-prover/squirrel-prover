@@ -1068,7 +1068,7 @@ and convert0
     in
     let t = Term.subst subst t in
 
-    (* seq are only over finite types *)
+    (* seq are only over enumerable types *)
     List.iter2 (fun v ebnd ->
         match ebnd with
         | L_var p_v, (_, p_tags) ->
