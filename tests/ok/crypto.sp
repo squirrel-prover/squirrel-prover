@@ -148,21 +148,40 @@ Qed.
 (* ========================================================= *)
 system X = !_i in(c,x); out(c, m i x (diff(a,b))).
 
-global lemma [X] _ (tau:timestamp[adv]) :
+global lemma _ @system:X (tau:timestamp[adv]) :
   [happens(tau)] -> equiv(output@tau).
 Proof.
   intro Hap. 
   crypto Bar0.
 Qed.
 
-(* global lemma [X] _ (tau:timestamp[adv]) : *)
-(*   [happens(tau)]  *)
-(*  -> equiv(output@tau). *)
-(* Proof. *)
-(*   intro Hap.  *)
-(*   crypto Bar1. *)
+op to_msg : int -> message.
 
-(* Abort. *)
+system Y = !_i in(c,x); out(c, m i x (to_msg diff(42,24))).
+
+(* same lemma as before, but on the system `Y`, in which it must fail *)
+global lemma _ @system:Y (tau:timestamp[adv]) :
+  [happens(tau)] -> equiv(output@tau).
+Proof.
+  intro Hap. 
+  checkfail crypto Bar0 exn Failure.
+Abort.
+
+(* idem, but with `Y` only as `set` (thus, this should succeed). *)
+global lemma _ @set:Y @equiv:X (tau:timestamp[adv]) :
+  [happens(tau)] -> equiv(output@tau).
+Proof.
+  intro Hap. 
+  crypto Bar0.
+Qed.
+
+(* again, this must fail if we swap `set` and `equiv` *)
+global lemma _ @set:X @equiv:Y (tau:timestamp[adv]) :
+  [happens(tau)] -> equiv(output@tau).
+Proof.
+  intro Hap. 
+  checkfail crypto Bar0 exn Failure.
+Abort.
 
 (* ========================================================= *)
 (* check that quantifiers over non-ptime enumerable types fail *)

@@ -333,8 +333,7 @@ let equal_term_name_eq
     ~(target : CondTerm.t)
     ~(known : CondTerm.t) : Term.term list option
   =
-  let se_pair = oget env.system.pair in
-  let system = SE.{ set = (se_pair :> SE.t) ; pair = None; } in
+  let system = env.system in
 
   let term,subst = constant_name_to_var env known in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds)  in
@@ -344,7 +343,7 @@ let equal_term_name_eq
       term = term.term; 
       cond = term.conds; 
       vars = []; 
-      se   = (se_pair :> SE.t); 
+      se   = (system.set :> SE.t); 
     }
   in
   let unif_state =
@@ -414,10 +413,7 @@ let match_known_set
       pat_op_params = Params.Open.empty;
     }
   in
-  let system =
-    SE.{ set = (oget env.system.pair :> SE.t) ;
-         pair = None; }
-  in
+  let system = env.system in
   let match_res =
     Match.T.try_match ~env:env.vars ~hyps:hyps env.table system target pat
   in
@@ -438,14 +434,13 @@ let exact_eq_under_cond
     ~(target    : CondTerm.t)
     ~(known     : CondTerm.t) : Mvar.t option
   =
-  let se_pair =  oget env.system.pair in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
   let known_set = 
     Match.{ 
       term = known.term; 
       cond = known.conds; 
       vars = []; 
-      se   = (se_pair :> SE.t); 
+      se   = env.system.set; 
     }
   in
   let system = env.system in
@@ -1549,7 +1544,7 @@ module Game = struct
     in
     let mv =
       List.fold_left (fun mv var -> 
-          Mvar.add (var,Vars.Tag.ltag) (oget query.env.system.pair :> SE.t)
+          Mvar.add (var,Vars.Tag.ltag) query.env.system.set
             (Library.Prelude.mk_witness query.env.table ~ty_arg:(Vars.ty var)) mv)
         mv arg_not_used
     in
@@ -1566,7 +1561,7 @@ module Game = struct
       List.fold_left (fun mv smpl -> 
           let n = Const.get_global smpl query.consts query.game in
           let mv = 
-            Mvar.add (smpl,Vars.Tag.ltag) (oget query.env.system.pair :> SE.t) n mv 
+            Mvar.add (smpl,Vars.Tag.ltag) query.env.system.set n mv 
           in
           mv) mv smpls 
     in
