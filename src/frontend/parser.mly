@@ -225,13 +225,6 @@ quoted_string:
 | p=gen_path(lsymb) { p }
 
 (*------------------------------------------------------------------*)
-(* a safe path is either a short path or a parenthesized qualified path (to avoid
-   conflit with terminator `.`) *)
-spath:
-| x=lsymb { [], x }
-| LPAREN p=path RPAREN { p }
-
-(*------------------------------------------------------------------*)
 (* auxiliary definition *)
 %inline _infix_s:
 | PLUS             { "+"   , `Left }
@@ -1214,7 +1207,7 @@ tac:
    * because they are reserved. *)
 
   (* Crypto tactic *)
-  | l=lloc(CRYPTO) game=spath args=slist(crypto_arg,empty)
+  | l=lloc(CRYPTO) game=path args=slist(crypto_arg,empty)
     { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
 
   | l=lloc(DDH) arg=ddh_arg
