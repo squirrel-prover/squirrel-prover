@@ -578,10 +578,11 @@ let parse
   { args; projs; time; proc; }
 
 (*------------------------------------------------------------------*)
-let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
+let pp_process_declaration table ~(id : lsymb) (pdecl : proc_decl) : unit =
+  let ppe = default_ppe ~table () in
   let pp_args fmt =
     if pdecl.args = [] then () else
-      Fmt.pf fmt "(%a) " Vars.pp_typed_list pdecl.args
+      Fmt.pf fmt "(%a) " (Vars._pp_typed_list ppe) pdecl.args
   in
   let pp_projs fmt =
     if pdecl.projs = [] ||
@@ -592,7 +593,7 @@ let pp_process_declaration ~(id : lsymb) (pdecl : proc_decl) : unit =
   Printer.pr "@[<v 2>@[%a%t %s %t@]=@ @[%a@]@]@." 
     (Printer.kws `ProcessName) "process"
     pp_projs (L.unloc id) pp_args 
-    pp pdecl.proc
+    (_pp ppe) pdecl.proc
 
 (*------------------------------------------------------------------*)
 (** Declare a new declared process. *)
@@ -609,7 +610,7 @@ let declare
   let table = declare_typed table id pdecl in
 
   (* notify the user of the processus declaration *)
-  pp_process_declaration ~id pdecl;
+  pp_process_declaration table ~id pdecl;
 
   table
 
