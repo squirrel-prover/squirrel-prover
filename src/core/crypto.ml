@@ -921,19 +921,36 @@ module TSet = struct
       (env : Env.t) hyps ~(output : CondTerm.t) ~(input: t)
     : Mvar.t option * Vars.vars * Term.terms
     =
-    let tset =  _refresh tset in
-    let term1 = {cond_term with conds = []} in
-    let term2 = CondTerm.{term = tset.term; conds = []} in
-    (* Adding hyps issued from conds of term and tset*)
-    let hyps = List.fold_left (fun hyps cond ->
-      TraceHyps.add
-        TacticsArgs.AnyName (LHyp (Equiv.Local cond)) hyps) hyps (cond_term.conds@tset.conds)
-    in 
-    let res = exact_eq_under_cond env hyps
-        ~unif_vars:tset.vars ~target:term1 ~known:term2
+    let input = _refresh input in
+    let input_pat = 
+      Term.{ 
+        pat_op_params = Params.Open.empty;
+        pat_op_term = input.term;
+        pat_op_vars = Vars.Tag.local_vars input.vars;
+      }
     in
-    let conds = tset.conds in
-    res,tset.vars,conds
+
+    (* Adding hypotheses from the [conds] of term and tset *)
+    let hyps = 
+      List.fold_left
+        (fun hyps cond ->
+           TraceHyps.add
+             TacticsArgs.AnyName
+             (LHyp (Equiv.Local cond)) hyps)
+        hyps
+        (output.conds @ input.conds)
+    in 
+    let res = 
+      match 
+        Match.T.try_match
+          ~env:env.vars ~hyps env.table env.system
+          output.term input_pat
+      with Match mv -> Some mv | _ -> None
+    in
+    res, input.vars, input.conds
+    (* FIXME: we could assume that [output.conds] holds, i.e. it is
+       sufficient to prove that [output.conds => inputs.conds], which
+       may be easier. *)
 end
 
 
