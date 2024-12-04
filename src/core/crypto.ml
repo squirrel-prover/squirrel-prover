@@ -399,29 +399,6 @@ type oracle_pat = {
 }
 
 (* ----------------------------------------------------------------- *)
-(* FIXME: rename and document *)
-let match_known_set
-    (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(target : Term.term) ~(known : oracle_pat)
-  : Mvar.t option
-  =
-  let vars = known.loc_names @ known.glob_names @ known.args in
-  let pat =
-    Term.{
-      pat_op_term   = known.term;
-      pat_op_vars   = (Vars.Tag.local_vars vars);
-      pat_op_params = Params.Open.empty;
-    }
-  in
-  let system = env.system in
-  let match_res =
-    Match.T.try_match ~env:env.vars ~hyps:hyps env.table system target pat
-  in
-  match match_res with
-  | Match mv -> Some mv
-  | NoMatch _ -> None
-
-
 (** The function [exact_eq_under_cond] return a substitution [sigma]
     of the variables [unif_vars] such that : 
     - the target term and known term matched each other
@@ -1611,10 +1588,20 @@ module Game = struct
       : oracle_match option
       =
       let match_res =
-        match_known_set env query.hyps ~target:term.term ~known:oracle_pat
+        let vars = oracle_pat.loc_names @ oracle_pat.glob_names @ oracle_pat.args in
+        let pat =
+          Term.{
+            pat_op_term   = oracle_pat.term;
+            pat_op_vars   = (Vars.Tag.local_vars vars);
+            pat_op_params = Params.Open.empty;
+          }
+        in
+        Match.T.try_match
+          ~env:env.vars ~hyps:query.hyps env.table env.system
+          term.term pat
       in
       match match_res with
-      | Some mv when subst_check mv oracle_pat->
+      | Match mv when subst_check mv oracle_pat->
         (* indices of logical names mapped to local and global randomness 
            (which must be provided, hence computed, by the adversary) *)
         let name_indices_inputs =
@@ -1665,7 +1652,7 @@ module Game = struct
           | LocSmplToInfer -> None
         end
           
-      | _ ->  None
+      | _ -> None
     in
 
     let rec try_match_oracle
