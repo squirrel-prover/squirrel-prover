@@ -336,8 +336,8 @@ let equal_term_name_eq
   let system = env.system in
 
   let term,subst = constant_name_to_var env known in
-  let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds)  in
-  let name_vars = subst_support subst  in
+  let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
+  let name_vars = subst_support subst in
   let known_set = 
     Match.{ 
       term = term.term; 
@@ -400,9 +400,9 @@ type oracle_pat = {
 
 (* ----------------------------------------------------------------- *)
 (** The function [exact_eq_under_cond] return a substitution [sigma]
-    of the variables [unif_vars] such that : 
-    - the target term and known term matched each other
-    - the conditional of known implies the conditional of target 
+    of the variables [unif_vars] such that: 
+    - [target.term σ = known.term σ]
+    - [known.cond σ ⇒ target.cond σ]
 *)
 let exact_eq_under_cond
     ?(unif_vars : Vars.vars = [])
@@ -420,10 +420,9 @@ let exact_eq_under_cond
       se   = env.system.set; 
     }
   in
-  let system = env.system in
-  (* FIXME: system changed without modifying hyps accordingly*)
   let unif_state =
-    Match.mk_unif_state ~env:env.vars env.table system hyps ~support:unif_vars
+    Match.mk_unif_state
+      ~env:env.vars env.table env.system hyps ~support:unif_vars
   in
   Match.E.deduce_mem cterm known_set unif_state
 
@@ -879,9 +878,8 @@ module TSet = struct
     let tset2 = if refresh then _refresh tset2 else tset2 in
     let term1 = CondTerm.{ term = tset1.term; conds = tset1.conds} in
     let term2 = CondTerm.{ term = tset2.term; conds = tset2.conds} in
-    let res = exact_eq_under_cond env hyps
-        ~unif_vars:tset2.vars ~target:term1 ~known:term2 in
-    res
+    exact_eq_under_cond env hyps
+      ~unif_vars:tset2.vars ~target:term1 ~known:term2 
 
   let singleton_incl ?(refresh = false) env hyps tset1 tset2 =
     let tset2 = if refresh then _refresh tset2 else tset2 in
@@ -907,18 +905,20 @@ module TSet = struct
     singleton_incl ~refresh:false env hyps tset1 tset2
 
   
-  (** Check if [cond_term ∈ tset] and returns the instanciation of 
+  (** Check if [cond_term ∈ tset] and returns the instantiation of 
       [tset2] variable witnessing it. *)
   let cterm_mem env hyps (cond_term : CondTerm.t) tset : Mvar.t option =
     let tset0 = { term = cond_term.term; conds = cond_term.conds; vars = [] } in
     check_incl env hyps tset0 tset
 
 
-  (** Check if [cond_term ∈ tset] and returns the instanciation of
-      [tset] refreshed variables witnessing it, the refreshed
-      variables, and the condition under which it holds. *)
+  (** Check if [output ∈ input] and returns the instantiation of
+      [input]'s variables witnessing it, [input]'s variables, and
+      the condition under which it holds. 
+
+      Note that [input]'s variables have been refreshed. *)
   let cterm_mem_cond
-      env hyps (cond_term : CondTerm.t) tset
+      (env : Env.t) hyps ~(output : CondTerm.t) ~(input: t)
     : Mvar.t option * Vars.vars * Term.terms
     =
     let tset =  _refresh tset in
@@ -1247,7 +1247,8 @@ type query = {
   *)
 }
 
-(** Results state*)
+(*------------------------------------------------------------------*)
+(** Results state *)
 type result = {
   subgoals     : Term.terms;
   (** TODO: all these subgoals must be always true, not simply almost always true. 
@@ -1267,32 +1268,37 @@ let empty_result (mem: AbstractSet.mem) : result =
     final_mem     = mem;
     consts        = [];}
 
+(*------------------------------------------------------------------*)
 (** Functions to chain query and result trought transitivity rules *)
 
 (** When the state build with [old_query] and [result] is a valid bidedcution goal 
     for list of terms [output_term], then 
-    [transitivity_get_next_query] build the query a following term*)
+    [transitivity_get_next_query] build the query a following term. *)
 let transitivity_get_next_query
-    (old_query:query)
-    (output_term:CondTerm.t list)
-    (result:result) =
+    (old_query   : query)
+    (output_term : CondTerm.t list)
+    (result      : result) 
+  : query
+  =
   (* TODO : remove folowing line : it doesn't follow semantics*)
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
-  { old_query with
-    consts = old_query.consts @ consts;
+  {
+    old_query with
+    consts      = old_query.consts @ consts;
     initial_mem = result.final_mem;
-    inputs = output_term
-             @ old_query.inputs
-             @ result.extra_outputs;
+    inputs      = 
+      output_term
+      @ old_query.inputs
+      @ result.extra_outputs;
   }
 
 let chain_results  (res1 : result) (res2 : result):result=
-  { subgoals = res1.subgoals@res2.subgoals;
-    extra_outputs = res1.extra_outputs@res2.extra_outputs;
-    final_mem = res2.final_mem;
-    consts = res1.consts@res2.consts}
+  { subgoals      = res1.subgoals @ res2.subgoals;
+    extra_outputs = res1.extra_outputs @ res2.extra_outputs;
+    final_mem     = res2.final_mem;
+    consts        = res1.consts @ res2.consts}
 
-
+(*------------------------------------------------------------------*)
 type goal =
   { env           : Env.t;
     hyps          : TraceHyps.hyps;
@@ -1846,7 +1852,8 @@ let knowledge_mem
       let conds = List.map (Term.subst subst) input.conds in
       let input_term = CondTerm.{ term ; conds } in
       let input_term = CondTerm.polish input_term hyps env in
-      let res = exact_eq_under_cond
+      let res = 
+        exact_eq_under_cond
           ~unif_vars:es env hyps ~target:output ~known:input_term
       in
       begin
@@ -1859,11 +1866,9 @@ let knowledge_mem
     | _ ->
       let input = CondTerm.polish input hyps env in
       let res = exact_eq_under_cond env hyps ~target:output ~known:input in
-      begin
-        match res with 
-        | Some _ -> (true, None)
-        | None -> (false, None)
-      end
+      match res with 
+      | Some _ -> (true , None)
+      | None   -> (false, None)
   in
   let res = List.map eq_implies inputs in
   if List.exists fst res then
@@ -1898,46 +1903,39 @@ let knowledge_mem_tsets
   List.find_map is_in rec_inputs
 
 
-(** Checks whether a conditional term [output = (t|f)] is whithin a conditional term set [extra_inputs].
-    For any found a map beween [(t|f)] and a term [(t'|f')] in [extra_inputs], ie 
-    an substitution [σ] of binding variables of [(t'|f')] such that [t = t σ] and
-    [f ⇒ f σ] then, it computed the pair :
-    - the image of [σ] 
-    - the condition [ϕ σ] attached to [(t'|f')] 
-    
-    Then, the list of all found pair in send.
+(** Checks whether [output = (t|f)] can be obtained from [extra_inputs].
+
+    For any [(t'| vars : f') ∈ extra_inputs], look for a
+    substitution [σ] of domain [vars] such that [t = t'σ]
+    and [f ⇒ f'σ]. Then, computes the pair of:
+    - the image of [σ];
+    - the condition [ϕσ] attached to [(t'| vars : f')].
+
+    Return the list of all such pairs.
 *)
 let knowledge_mem_condterm_sets
     (env : Env.t)
     (hyps : TraceHyps.hyps)
     (output : CondTerm.t)
-    (extra_inputs : TSet.t list)
+    (extra_inputs : TSet.t list) 
+  : (Term.terms * Term.term) list
   =
-  let is_in (input : TSet.t) : (Term.terms*Term.term) option =
-    let input = TSet.refresh input in
-    match TSet.cterm_mem_cond env hyps output input with
-    | (None,_,_) ->  
-      None
-    | (Some mv,vars, conds) -> 
-      (* (\* There should always be a condition:  *)
-      (*    the one saying we are after  *)
-      (*    the computation that lead  *)
-      (*    to the extra_inputs*\) *)
-      (* assert(conds <> []); *)
+  let is_in (input : TSet.t) : (Term.terms * Term.term) option =
+    match TSet.cterm_mem_cond env hyps ~output ~input with
+    | (None,_,_) -> None
+
+    | (Some mv, vars, conds) -> 
       let subst = Mvar.to_subst_locals ~mode:`Match mv in
       let bound_vars,free_vars = List.partition (fun x -> Mvar.mem x mv) vars in
       let conds =  List.map (Term.subst subst) conds in
       let args = List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars in
       let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in
-
       let st =
         Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
       in
       if Match.E.known_set_check_impl env.table ~st conds (Term.mk_false)
-      then
-        None
-      else
-      Some (args,conds)
+      then None
+      else Some (args,conds)
   in
   List.filter_map is_in extra_inputs
 
@@ -1980,17 +1978,17 @@ let notify_bideduce_oracle_inputs_end ~vbs ~dbg (oracle_name : string) =
     Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@."
       oracle_name
 
-let notify_bideduce_second_go ~vbs ~dbg =
+let notify_bideduce_second_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "****************************************@.\
-                __________Starting second go____________@.\
-                ****************************************@."
+    Printer.pr "******************************************@.\
+                __________Starting second pass____________@.\
+                ******************************************@."
 
-let notify_bideduce_first_go ~vbs ~dbg =
+let notify_bideduce_first_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "***************************************@.\
-                __________Starting first go____________@.\
-                ***************************************@."
+    Printer.pr "*****************************************@.\
+                __________Starting first pass____________@.\
+                *****************************************@."
 
 let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
   let ppe = default_ppe ~table () in
@@ -2233,7 +2231,7 @@ and bideduce_oracle
           extra_outputs;
         } in
 
-       let result = chain_results result_inputs result_call in
+      let result = chain_results result_inputs result_call in
       if index_cond = [] then
         (* nothing to do since [index_cond = ⊤] *)     
         Some result
@@ -2251,8 +2249,7 @@ and bideduce_oracle
             in
             Some (chain_results result result_else)
         end
-    with Failed ->
-      None         (* not a valid oracle match *)
+    with Failed -> None         (* not a valid oracle match *)
   in
 
   if query.allow_oracle then 
@@ -2803,32 +2800,41 @@ let prove
       Tactics.hard_failure ~loc:(game_loc)
         (Failure "failed to apply the game to user constraints' argument")
   in
-  (** First bideduction go*)
-  notify_bideduce_first_go ~dbg ~vbs ;
+
+  (*------------------------------------------------------------------*)
+  (** first bideduction pass *)
+  notify_bideduce_first_pass ~dbg ~vbs ;
   let query_start = transitivity_get_next_query query0 init_output res0 in
   let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms.terms game hyps
   in
   let rec_bided_subgs_goals =
-    List.map (fun ((goal,form):goal*Term.term):goal -> 
-        let output = {goal.output with conds = [form]} in
-        {goal with output})
+    List.map
+      (fun ((goal,form):goal*Term.term):goal -> 
+         let output = {goal.output with conds = [form]} in
+         {goal with output})
       rec_bided_subgs
   in
-   let rec_bided_subgs_conds =
-    List.map (fun ((_,form):goal*Term.term):Term.term -> form)
+  let rec_bided_subgs_conds =
+    List.map
+      (fun ((_,form):goal*Term.term) -> form)
       rec_bided_subgs
       (* First pass on bideduction, to find extra inputs.*)
   in
   let next_bided_subgs, _  =
     bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs_goals direct_bided_subgs 
   in
-  notify_bideduce_second_go ~dbg ~vbs ;
-  (** Take the extra_outputs compute by the bideduction of [goal], and create 
-      the corresponding extra inputs for bideduction a time [timestamp(vars)]
-      under conds [conds].*)
-  let extra_input_from_goal (goal:goal) (conds:Term.terms) timestamp  =
+
+  (*------------------------------------------------------------------*)
+  notify_bideduce_second_pass ~dbg ~vbs;
+
+  (** Take the [extra_outputs] computed by the bideduction of [goal],
+      and create the corresponding [extra_inputs] for bideduction at
+      time [timestamp(vars)] under conditions [conds].*)
+  let extra_input_from_goal
+      (goal : goal) (conds : Term.terms) (timestamp : Term.term) : TSet.t list 
+    =
     let varsg = goal.vars in
     let macro = oget goal.macro in
     let extra_outputs = goal.extra_outputs in
@@ -2836,31 +2842,39 @@ let prove
     let macro = Term.subst subst macro in
     let extra_outputs = List.map (CondTerm.subst subst) extra_outputs in
     let conds = List.map (Term.subst subst) conds in
-    List.map (fun (term:CondTerm.t) : TSet.t ->
+    List.map (fun (term : CondTerm.t) : TSet.t ->
         (* Refresh terms*)
-        {conds = (Term.mk_leq macro timestamp)::conds@term.conds;
-         vars=varsg;
-         term=term.term;})
-      extra_outputs
+        {
+          conds = Term.mk_leq macro timestamp :: conds @ term.conds;
+          vars = varsg;
+          term = term.term;
+        }
+      ) extra_outputs
   in
+
   (** Get all extra inputs for [goal_to] coming from [goal_from] under
       [cond_from] that should be the condition under which [goal_from]
       is to be deduced*)
-  let get_extra_inputs (goal_to:goal) (goal_from:goal) (cond_from: Term.term) =
+  let get_extra_inputs
+      (goal_to:goal) (goal_from:goal) (cond_from: Term.term)
+    : TSet.t list 
+    =
     let timestamp = Term.mk_pred (oget goal_to.macro) in
     let _ = goal_to.vars in
     extra_input_from_goal goal_from [cond_from] timestamp 
   in
-  let extra_inputs_full (goal:goal) (cond:Term.term) =
+
+  let extra_inputs_full (goal:goal) (cond:Term.term) : goal =
     let extra_inputs = 
       List.concat (List.map2 (get_extra_inputs goal) next_bided_subgs rec_bided_subgs_conds)
     in
     let output = {goal.output with conds = [cond]} in
     {goal with extra_inputs; output}
   in
-  (*FIXME : Adding extra_inputs to direct_bideduction goal*)
+
+  (*FIXME: Adding extra_inputs to direct_bideduction goal *)
   let rec_bided_subgs =
-    List.map2 extra_inputs_full next_bided_subgs rec_bided_subgs_conds 
+    List.map2 extra_inputs_full next_bided_subgs rec_bided_subgs_conds
   in
   let _, res = bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs direct_bided_subgs in             
   match res with
