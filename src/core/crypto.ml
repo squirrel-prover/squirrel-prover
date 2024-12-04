@@ -222,11 +222,14 @@ module CondTerm = struct
         ~red_param:ReductionCore.rp_crypto
         env.table
     in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+
     (* Removing duplicates *)
     let conds = List.remove_duplicate Term.equal c.conds in
+
     (* Redution in whnf *)
-    let conds = List.map (fun cond -> fst (
-        let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    let conds =
+      List.map (fun cond -> fst (
         Reduction.whnf_term ~strat (reduction_state hyps) cond))
         conds
     in
@@ -236,7 +239,6 @@ module CondTerm = struct
             TraceHyps.add Args.AnyName (LHyp (Local f)) h
           ) hyps conds
       in
-      let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
       Reduction.whnf_term ~strat (reduction_state extended_hyps) c.term
     in
     { term; conds; }
@@ -258,11 +260,10 @@ end
 (** Replace every name whose argument are constant by a var and return
     the substitution*)
 let constant_name_to_var
-    (_env:Env.t)
-    (term : CondTerm.t)
+    (_env:Env.t) (term : CondTerm.t) : CondTerm.t * Term.subst
   =
   let rec replace_names
-      (terms:Term.terms)
+      (terms : Term.terms)
       (set : (Term.term*Vars.var) list )
     =
     match terms with
@@ -291,14 +292,9 @@ let constant_name_to_var
       (term::terms),set
   in
   let terms,set = replace_names (term.term::term.conds) [] in
-  let rec build_subst set (subst:Term.subst) = match set with
-    | [] -> subst
-    | (term,var)::q ->
-      let subst = build_subst q subst in
-      let subst = Term.ESubst((Term.mk_var var), term)::subst in
-      subst
+  let subst =
+    List.map (fun (term,var) -> Term.ESubst((Term.mk_var var), term)) set
   in
-  let subst = build_subst set [] in
   let term = match terms with
     | t::conds -> CondTerm.mk ~term:t ~conds
     | _ -> assert false
@@ -307,10 +303,10 @@ let constant_name_to_var
 
 
 (** Return conditions under wich two names are not equal.*)
-let get_name_eq_conditon
+let get_name_eq_condition
     (subst1 : Term.subst)
     (subst2 : Term.subst)
-    (v : Vars.var)
+    (v : Vars.var) : Term.term 
   =
   let term1 = Term.subst subst1 (Term.mk_var v) in
   let term2 = Term.subst subst2 (Term.mk_var v) in
@@ -322,11 +318,12 @@ let get_name_eq_conditon
   | Term.Name(_,_),Term.Name(_,_) -> Term.mk_true                                      
   | _ -> Term.mk_false
 
-let rec support_subst subst = match subst with
-  | [] -> []
-  | Term.ESubst(Term.Var(v),_)::q -> v::(support_subst q)
-  | _ -> assert false      
-
+let subst_support subst =
+  List.map
+    (function
+      | Term.ESubst(Term.Var v,_) -> v
+      | _ -> assert false)
+    subst
 
 
 (** Function to access on matching in Match with running options...*)
@@ -334,14 +331,14 @@ let equal_term_name_eq
     (env : Env.t)
     (hyps : TraceHyps.hyps)
     ~(target : CondTerm.t)
-    ~(known : CondTerm.t)
+    ~(known : CondTerm.t) : Term.term list option
   =
   let se_pair = oget env.system.pair in
   let system = SE.{ set = (se_pair :> SE.t) ; pair = None; } in
 
   let term,subst = constant_name_to_var env known in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds)  in
-  let name_vars = support_subst subst  in
+  let name_vars = subst_support subst  in
   let known_set = 
     Match.{ 
       term = term.term; 
@@ -361,19 +358,20 @@ let equal_term_name_eq
     let subst_res = Mvar.to_subst ~mode:`Unif env.table env.vars mv in
     begin
       match subst_res with
-      | `Subst(subst_res) ->
-        let eqs = List.map (get_name_eq_conditon subst subst_res) name_vars in
-        if List.mem (Term.mk_false) eqs then  None
+      | `Subst subst_res ->
+        let eqs = List.map (get_name_eq_condition subst subst_res) name_vars in
+        if List.mem (Term.mk_false) eqs then None
         else Some eqs
       | _ -> None
     end
   | None -> None
 
 
-let never_equal_subgoals (env : Env.t) (hyps : TraceHyps.hyps)
+let never_equal_subgoals
+    (env : Env.t) (hyps : TraceHyps.hyps)
     ~(target : CondTerm.t)
     ~(known : CondTerm.t)
-    (vars : Vars.vars)
+    (vars : Vars.vars) : Term.term option
   =
   let eqs = equal_term_name_eq env hyps ~target ~known in
   match eqs with
@@ -428,18 +426,17 @@ let match_known_set
   | NoMatch _ -> None
 
 
-(** The function [exact_eq_under_cond] return a substitution [\sigma]
+(** The function [exact_eq_under_cond] return a substitution [sigma]
     of the variables [unif_vars] such that : 
     - the target term and known term matched each other
     - the conditional of known implies the conditional of target 
 *)
-
 let exact_eq_under_cond
     ?(unif_vars : Vars.vars = [])
     (env        : Env.t)
     (hyps       : TraceHyps.hyps)
     ~(target    : CondTerm.t)
-    ~(known     : CondTerm.t)
+    ~(known     : CondTerm.t) : Mvar.t option
   =
   let se_pair =  oget env.system.pair in
   let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
@@ -452,7 +449,7 @@ let exact_eq_under_cond
     }
   in
   let system = env.system in
-  (* FIXME : system changed without modifying hyps accordingly*)
+  (* FIXME: system changed without modifying hyps accordingly*)
   let unif_state =
     Match.mk_unif_state ~env:env.vars env.table system hyps ~support:unif_vars
   in
@@ -460,6 +457,7 @@ let exact_eq_under_cond
 
 (*------------------------------------------------------------------*)
 exception UnknowGlobalSmplsAssign
+
 (** Name contraints module.*)
 module Const = struct 
   (** Inner declaration of [Const], to have a private type [t].
@@ -562,18 +560,18 @@ module Const = struct
         (tag : Tag.t)
         (n : Term.nsymb)
         ~(term : Term.terms)
-        ~(cond : Term.terms)
+        ~(cond : Term.terms) : t
       =
       let res = { vars=vars; tag=tag; name=n; term; cond } in
       normalize res
 
-    let refresh (const : t) =
+    let refresh (const : t) : t =
       let vars, subst = Term.refresh_vars const.vars in
       let term = List.map (Term.subst subst) const.term in
       let cond = List.map (Term.subst subst) const.cond in
       normalize {const with vars;term;cond}
 
-    let generalize (es : Vars.vars) (consts : t list) =
+    let generalize (es : Vars.vars) (consts : t list) : t list =
       let generalize_one (const : t) =
         normalize { const with vars = es @ const.vars }
       in
@@ -582,7 +580,7 @@ module Const = struct
     (** Given a name [name(terms)] and a multiset of constrainsts, 
         search whether is is compatible with this set, up to some variables 
         equalities, to associate [name(terms)] to the tag [otag].  *)
-    let add_condition (cond : Term.term) (consts : t list) =
+    let add_condition (cond : Term.term) (consts : t list) : t list =
       let doit (const : t) =
         let const = refresh const in
         { const with cond = cond::const.cond }
@@ -602,7 +600,7 @@ module Const = struct
 
   let notify_functional_checks ~vbs ~dbg =
     if not vbs && not dbg then () else
-      Printer.pr "-----Good name ownerships checks------@."
+      Printer.pr "-----Name ownerships checks------@."
   
         
   let notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form : unit =
@@ -616,12 +614,17 @@ module Const = struct
   
   exception InvalidConstraints
 
-  let rec get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
-    match consts with
-    | [] -> raise UnknowGlobalSmplsAssign
-    | c::_ when c.tag = Tag.game_glob x game && c.vars = [] && c.cond = [] ->
-      Term.mk_name c.name c.term
-    | _::q -> get_global x q game
+  let get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
+    match
+      List.find_map (fun c ->
+          if c.tag = Tag.game_glob x game &&
+             c.vars = [] && c.cond = []
+          then Some (Term.mk_name c.name c.term)
+          else None
+        ) consts
+    with
+    | Some t -> t
+    | None -> raise UnknowGlobalSmplsAssign
 
   (** [retrieve_global_name] try to retrieve a constraint associated to 
       a global name [name] tagged by [otag] which holds for any branching and 
@@ -631,16 +634,17 @@ module Const = struct
       (otag : Tag.t)
       (const : t list)
       (name : Term.nsymb)
-      (terms : Term.terms) 
+      (terms : Term.terms) : (Term.term * Term.term) list option 
     =
-    let rec subst_with_open_tuple t1 t2 = match t1,t2 with
-      | x::q,y::p when Term.equal x y -> subst_with_open_tuple q p
-      | Term.Tuple (x)::t1,Term.Tuple(y)::t2 -> subst_with_open_tuple (x@t1) (y@t2)
-      | x::t1,y::t2 -> (x,y)::(subst_with_open_tuple t1 t2)
+    let rec subst_with_open_tuple t1 t2 =
+      match t1,t2 with
+      | x::q, y::p when Term.equal x y -> subst_with_open_tuple q p
+      | Term.Tuple x :: t1, Term.Tuple y :: t2 -> subst_with_open_tuple (x@t1) (y@t2)
+      | x::t1,y::t2 -> (x,y) :: subst_with_open_tuple t1 t2
       | [],[] -> []
       | _ -> assert false
     in
-    let gconst = (List.filter (fun  x -> x.tag = otag) const) in
+    let gconst = List.filter (fun  x -> x.tag = otag) const in
     match gconst with
     | [] ->  None
     | [const] when not (const.vars = []) ->  raise InvalidConstraints
@@ -739,13 +743,15 @@ module Const = struct
         let const1 = refresh const in
         let const2 = refresh const in
         let term_not_equal = Term.mk_neqs const1.term const2.term in
-        let hyps = Term.mk_ors ~simpl:true
+        let hyps =
+          Term.mk_ors ~simpl:true
             (List.map2
                (fun x y -> Term.mk_neq (Term.mk_var x) (Term.mk_var y ))
                const1.vars const2.vars)
         in
         let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-        let form = Term.mk_forall (const1.vars @ const2.vars)
+        let form =
+          Term.mk_forall (const1.vars @ const2.vars)
             (Term.mk_impl const_conjunction (Term.mk_impl hyps term_not_equal ))
         in
         notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form;
@@ -780,7 +786,8 @@ module Const = struct
         let const2 = refresh const2 in
         let term_equal = Term.mk_eqs const1.term const2.term in
         let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-        let form = Term.mk_forall
+        let form =
+          Term.mk_forall
             (const1.vars @ const2.vars)
             (Term.mk_impl const_conjunction term_equal)
         in
@@ -936,9 +943,12 @@ module TSet = struct
 
 
   (** Check if [cond_term ∈ tset] and returns the instanciation of
-      [tset] refreshed variables witnessing it, the refreshed variables, and the condition under which it holds. *)
-
-  let cterm_mem_cond env hyps (cond_term : CondTerm.t) tset : Mvar.t option * Vars.vars * Term.terms =
+      [tset] refreshed variables witnessing it, the refreshed
+      variables, and the condition under which it holds. *)
+  let cterm_mem_cond
+      env hyps (cond_term : CondTerm.t) tset
+    : Mvar.t option * Vars.vars * Term.terms
+    =
     let tset =  _refresh tset in
     let term1 = {cond_term with conds = []} in
     let term2 = CondTerm.{term = tset.term; conds = []} in
@@ -952,7 +962,6 @@ module TSet = struct
     in
     let conds = tset.conds in
     res,tset.vars,conds
-
 end
 
 
@@ -1140,15 +1149,6 @@ module AbstractSet = struct
     let updates = List.map (fun x -> (x.var,x.init)) var_decls in 
     update env hyps Mvar.empty [] [] updates  []
 
-  let option_bool_op bool1 bool2 op =
-    match bool1,bool2 with
-    | None,None -> None
-    | None,Some _ -> None
-    | Some _ , None -> None
-    | Some b1, Some b2 -> Some (op b1 b2)
-
-
-
   let rec boolean_abstraction_supported
       (env : Env.t)
       (assertion : mem)
@@ -1209,14 +1209,14 @@ module AbstractSet = struct
       | Term.App (Term.Fun(f_and, _),[t1;t2]) when f_and = Term.f_and ->
         let bool1,not_bool1,eq1 = abstract_boolean_and_not t1 in
         let bool2,not_bool2,eq2 = abstract_boolean_and_not t2 in
-        option_bool_op bool1 bool2 (&&), option_bool_op not_bool1 not_bool2 (||),eq1@eq2
+        omap2 (&&) bool1 bool2 , omap2 (||) not_bool1 not_bool2, eq1 @ eq2
       | Term.App (Term.Fun(f_or, _),[t1;t2]) when f_or = Term.f_or ->
         let bool1,not_bool1,eq1 = abstract_boolean_and_not t1 in
         let bool2,not_bool2,eq2 = abstract_boolean_and_not t2 in
-        option_bool_op bool1 bool2 (||), option_bool_op not_bool1 not_bool2 (&&),eq1@eq2
+        omap2 (||) bool1 bool2, omap2 (&&) not_bool1 not_bool2, eq1 @ eq2
                                                                                  
-      | t when t = Term.mk_true ->  Some true, Some false,[]
-      | t when t = Term.mk_false ->  Some false, Some true,[]
+      | t when t = Term.mk_true  ->  Some true , Some false, []
+      | t when t = Term.mk_false ->  Some false, Some true , []
       | _ -> None,None,[]
     in
     let b,_,eqs = abstract_boolean_and_not bool_term.term in
@@ -1236,12 +1236,12 @@ module AbstractSet = struct
     in
     List.for_all check_var mem1
 
-  (** Check that [mem1] is equal to [mem2], i.e. for each variable [v], [mem1(v) = mem2(v)] *)
+  (** Check that [mem1] is equal to [mem2], i.e. for each variable
+      [v], [mem1(v) = mem2(v)] *)
   let is_eq
       (env : Env.t) (hyps : TraceHyps.hyps) (mem1 : mem) (mem2 : mem)
     =
     is_leq env hyps mem1 mem2 && is_leq env hyps mem2 mem1
-
 end
 
 
@@ -1322,31 +1322,32 @@ let chain_results  (res1 : result) (res2 : result):result=
 
 
 type goal =
-  { env : Env.t;
-    hyps : TraceHyps.hyps;
-    game : game ;
-    vars : Vars.vars;
-    macro : Term.term option;
-    inputs : CondTerm.t list;
-    rec_inputs :TSet.t list ;
-    extra_inputs : TSet.t list;
+  { env           : Env.t;
+    hyps          : TraceHyps.hyps;
+    game          : game ;
+    vars          : Vars.vars;
+    macro         : Term.term option;
+    inputs        : CondTerm.t list;
+    rec_inputs    : TSet.t list;
+    extra_inputs  : TSet.t list;
     extra_outputs : CondTerm.t list;
-    output : CondTerm.t;}
+    output        : CondTerm.t;
+  }
 
-(* Substitued goals variables with subst. 
-Env should be free from goals.vars and 
-thus are left unchanged*)
+(* Substitute goals variables with [subst]. 
+   Env should be free from [goals.vars] and 
+   is thus are left unchanged. *)
 let subst_goal (subst : Term.subst) (goal:goal) : goal =
-  {env = goal.env;
-   hyps = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
-   game = goal.game;
-   macro = Option.map (Term.subst subst) goal.macro;
-   vars = Term.subst_vars subst goal.vars;
-   inputs = List.map (CondTerm.subst subst) goal.inputs;
-   rec_inputs = List.map (TSet.subst subst) goal.rec_inputs;
-   extra_inputs = List.map (TSet.subst subst) goal.extra_inputs;
+  {env           = goal.env;
+   hyps          = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
+   game          = goal.game;
+   macro         = Option.map (Term.subst subst) goal.macro;
+   vars          = Term.subst_vars subst goal.vars;
+   inputs        = List.map (CondTerm.subst subst) goal.inputs;
+   rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
+   extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
    extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
-   output = CondTerm.subst subst goal.output;
+   output        = CondTerm.subst subst goal.output;
   }
 
 (* let refresh_goal (goal:goal) = *)
@@ -1449,7 +1450,7 @@ module Game = struct
       Term.ESubst (Term.mk_var vd.var , Term.subst subst vd.init )::subst
     in
     let subst = List.fold_left mk_subst [] oracle.loc_vars in
-    let  mk_subst (subst : Term.subst ) ((var,term) : Vars.var * Term.term) =
+    let mk_subst (subst : Term.subst ) ((var,term) : Vars.var * Term.term) =
       let term = Term.subst subst term in
       let subst = Term.filter_subst var subst in
       Term.ESubst (Term.mk_var var , Term.subst subst term )::subst
@@ -1741,29 +1742,31 @@ module Game = struct
       Fmt.pf fmt "@[<hov 2>%a @]"
         ((AbstractSet._pp_mem ppe)) cor.post
     in
-    Fmt.pf fmt "@[<hv 0>New constraints: %t@ Post-condition:%t@ Under index condition: %t@ Under memory condition : %t@ Under additional subgoals: %t@ @]"
+    Fmt.pf fmt "@[<hv 0>New constraints: %t@ \
+                Post-condition:%t@ \
+                Under index condition: %t@ \
+                Under memory condition: %t@ \
+                Under additional subgoals: %t@ @]"
       _pp_new_const
       _pp_mem
       _pp_index_cond
       _pp_mem_subgoals
       _pp_subgoals
 
-  let pp_call_oracle_res = _pp_call_oracle_res (default_ppe ~dbg:false ())
-  let pp_call_oracle_res_dbg = _pp_call_oracle_res (default_ppe ~dbg:true ())
-  (* ----------------------------------------------------------------- *)
+  let pp_call_oracle_res     = _pp_call_oracle_res (default_ppe ~dbg:false ())
+  let pp_call_oracle_res_dbg = _pp_call_oracle_res (default_ppe ~dbg:true  ())
 
-  let notify_call_oracle_res
-      ~vbs
-      ~dbg
-      (cor:call_oracle_res option)
-    =
-    if (not vbs && not dbg) ||  cor = None then () else
-      if dbg then
-      Printer.pr "@[ Oracle call succeded, yielding:@. %a@]@."
+  (* ----------------------------------------------------------------- *)
+  let notify_call_oracle_res ~vbs ~dbg (cor:call_oracle_res option) =
+    if (not vbs && not dbg) || cor = None then () else
+    if dbg then
+      Printer.pr "@[ Oracle call succeeded, yielding:@. %a@]@."
         (pp_call_oracle_res_dbg) (oget cor)
-      else
-        Printer.pr "@[ Oracle call succeded, yielding:@. %a@]@."
-          (pp_call_oracle_res) (oget cor)
+    else
+      Printer.pr "@[ Oracle call succeeded, yielding:@. %a@]@."
+        (pp_call_oracle_res) (oget cor)
+
+  (* ----------------------------------------------------------------- *)
   (** If a successful match has been found, does the actual symbolic call 
       to the oracle.
       It takes as inputs : 
@@ -1915,10 +1918,10 @@ let knowledge_mem_tsets
 
 (** Checks whether a conditional term [output = (t|f)] is whithin a conditional term set [extra_inputs].
     For any found a map beween [(t|f)] and a term [(t'|f')] in [extra_inputs], ie 
-    an substitution [\sigma] of binding variables of [(t'|f')] such that [t = t'\sigma] and
-    [f \implies f'\sigma] then, it computed the pair :
-    - the image of [\sigma] 
-    - the condition [\phi\sigma] attached to [(t'|f')] 
+    an substitution [σ] of binding variables of [(t'|f')] such that [t = t σ] and
+    [f ⇒ f σ] then, it computed the pair :
+    - the image of [σ] 
+    - the condition [ϕ σ] attached to [(t'|f')] 
     
     Then, the list of all found pair in send.
 *)
@@ -1960,19 +1963,11 @@ let knowledge_mem_condterm_sets
 (** {2 Notify functions to print bi-deduction flow} *)
 
 
-
-let notify_bideduce_term_strict
-    ~vbs
-    ~dbg
-    (rule:string)
-  =
+let notify_bideduce_term_strict ~vbs ~dbg (rule:string) =
   if not vbs && not dbg then () else
-  Printer.pr "@[Openning by %s rule @]@." rule
+  Printer.pr "@[Opening by %s rule @]@." rule
 
-let notify_bideduce_immediate
-    ~vbs
-    ~dbg
-  =
+let notify_bideduce_immediate ~vbs ~dbg =
   if not vbs && not dbg then () else
     Printer.pr "Outputs adversarial or in inputs@."
     
@@ -1988,53 +1983,38 @@ let notify_bideduce_oracle_extra_inputs
       (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
       (Term._pp ppe) cond
 
-let notify_bideduce_term_start
-    table
-    ~vbs ~dbg
-    (output:CondTerm.t)
-  =
+let notify_bideduce_term_start table ~vbs ~dbg (output:CondTerm.t) =
   if not vbs && not dbg then () else
     let ppe = default_ppe ~table ~dbg () in
     Printer.pr "___Bideducing term %a ___@." (CondTerm._pp ppe) output
 
-let notify_bideduce_oracle_inputs_start
-    ~vbs ~dbg
-    (oracle_name: string)
-  =
+let notify_bideduce_oracle_inputs_start ~vbs ~dbg (oracle_name: string) =
   if not vbs && not dbg then () else
-    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@.@[" oracle_name
+    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@.@["
+      oracle_name
 
-
-let notify_bideduce_oracle_inputs_end
-    ~vbs ~dbg
-    (oracle_name : string)
-  =
+let notify_bideduce_oracle_inputs_end ~vbs ~dbg (oracle_name : string) =
   if not vbs && not dbg then () else
-    Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@." oracle_name
+    Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@."
+      oracle_name
 
-
-
-let notify_bideduce_second_go
-    ~vbs
-    ~dbg
-  =
+let notify_bideduce_second_go ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "****************************************@.__________Starting second go____________@.****************************************@."
+    Printer.pr "****************************************@.\
+                __________Starting second go____________@.\
+                ****************************************@."
 
-let notify_bideduce_first_go
-    ~vbs
-    ~dbg
-  =
+let notify_bideduce_first_go ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "***************************************@.__________Starting first go____________@.***************************************@."
-
+    Printer.pr "***************************************@.\
+                __________Starting first go____________@.\
+                ***************************************@."
 
 let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
   let ppe = default_ppe ~table () in
   if not vbs && not dbg then () else
-    Printer.pr "Allready called : %a"
+    Printer.pr "Already called : %a"
       (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
-
 
 let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
   let ppe = default_ppe ~table:qs.env.table () in
@@ -2046,10 +2026,10 @@ let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
 (** {2 Main bi-deduction functions} *)
 
 let rec bideduce_term_strict
-    ~(vbs:bool)
-    ~(dbg:bool)
+    ~(vbs:bool) ~(dbg:bool)
     (query : query)
-    (output_term : CondTerm.t) : result option =
+    (output_term : CondTerm.t) : result option
+  =
   let conds = output_term.conds in
   let term = output_term.term in
   match term with
@@ -2305,7 +2285,7 @@ and bideduce_oracle
 
 (*------------------------------------------------------------------*)
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
-and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) =
+and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) : result option =
   match outputs with
   | [] -> some (empty_result query.initial_mem)
   | term :: outputs ->
@@ -2336,8 +2316,10 @@ and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) =
 
     Note: currently, the procedure applies to any type [τ], by 
     generalizing over [x]. *)
-and bideduce_fp ?loc ~vbs ~dbg
+and bideduce_fp
+    ?loc ~vbs ~dbg
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
+  : result
   =
   let hyps      = query.hyps     in
   let pre0      = query.initial_mem      in    (* [φ₀] *)
@@ -2347,15 +2329,20 @@ and bideduce_fp ?loc ~vbs ~dbg
   (* [pre = φ] *)
   let rec compute_fp pre =
     let env =
-      Env.set_vars query.env (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) query.env.vars)
+      Env.set_vars
+        query.env
+        (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) query.env.vars)
     in
     let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
-      { env; game = query.game; hyps = query.hyps; allow_oracle = query.allow_oracle;
+      { env;
+        game = query.game;
+        hyps = query.hyps;
+        allow_oracle = query.allow_oracle;
         rec_inputs = query.rec_inputs;
         inputs     = query.inputs;
         extra_inputs = query.extra_inputs;
         consts     = consts0;
-        initial_mem = pre;}
+        initial_mem = pre; }
     in
     match bideduce ~vbs ~dbg query1 outputs with (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
     | Some result ->
@@ -2385,16 +2372,15 @@ and bideduce_fp ?loc ~vbs ~dbg
 
 
 (** The search algorithm: direct proof of a given bidedcution goal *)
-
 (*------------------------------------------------------------------*)
 (** {2 Handling of recursive procedures } *)
 
 (** A call to a recursive function *)
 type rec_call = {
-  macro   : Term.msymb;         (* [f] *)
-  args    : Term.terms;         (* [args] *)
-  rec_arg : Term.term;          (* [rec_args] *)
-  ty      : Type.ty;            (* type of [f args rec_args] *)
+  macro   : Term.msymb;         (** [f] *)
+  args    : Term.terms;         (** [args] *)
+  rec_arg : Term.term;          (** [rec_args] *)
+  ty      : Type.ty;            (** type of [f args rec_args] *)
 }
 
 (** Occurrence of a call to a recursive function *)
@@ -2610,14 +2596,11 @@ let derecursify
   in
 
   (* notify the user *)
-  notify_bideduction_subgoals (env.table) ~direct ~recursive:(fst (List.split recursive));
+  notify_bideduction_subgoals env.table ~direct ~recursive:(fst (List.split recursive));
   recursive, direct
 
-(*------------------------------------------------------------------*)
-  
-
-  
-let goal_to_query (query:query) result (goal:goal) : query  =
+(*------------------------------------------------------------------*)  
+let goal_to_query (query:query) result (goal:goal) : query =
   assert (query.env = goal.env);
   assert (query.game = goal.game);
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
@@ -2640,7 +2623,6 @@ let goal_to_query (query:query) result (goal:goal) : query  =
     TODO
 
 *)
-    
 let bideduce_recursive_subgoals
     loc ~vbs ~dbg query (bided_subgoals : goal list)
   =
@@ -2790,7 +2772,7 @@ let bideduce_all_goals
   | None -> next_goals,None
 
 
-
+(*------------------------------------------------------------------*)
 (** Exported *)
 let prove
     (env   : Env.t)
@@ -2926,6 +2908,7 @@ let prove
     List.remove_duplicate (Reduction.conv state) (consts_subgs @ oracle_subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
+
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end types and parsing} *)
