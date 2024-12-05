@@ -1032,7 +1032,7 @@ and convert0
 
     let () = match Infer.norm_ty state.ienv ty_t with
       | Type.Tuple l -> 
-        if List.length l < L.unloc i then
+        if L.unloc i = 0 || List.length l < L.unloc i then
           error (L.loc i) (BadTermProj (List.length l, L.unloc i))
         else ()
 
