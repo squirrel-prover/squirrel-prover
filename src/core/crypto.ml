@@ -1350,7 +1350,6 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
     game          = goal.game;
     macro         = Option.map (Term.subst subst) goal.macro;
     vars          = Term.subst_vars subst goal.vars;
-    inputs        = List.map (CondTerm.subst subst) goal.inputs;
     rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
     extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
     extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
@@ -1416,11 +1415,10 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
       Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ppe) togen
   in
   let pp_all_inputs fmt =
-    if st.rec_inputs = [] && st.inputs = [] && st.extra_inputs=[] then Fmt.pf fmt "∅" else
-      Fmt.pf fmt "%a%t%a%t%a"
+    if st.rec_inputs = [] && st.extra_inputs=[] then Fmt.pf fmt "∅" else
+      Fmt.pf fmt "%a%t%t%a"
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) st.rec_inputs
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) st.inputs
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) st.extra_inputs
   in
@@ -2535,7 +2533,6 @@ let derecursify
       macro;
       env; game; vbs; dbg;
       hyps;
-      inputs        = [];
       rec_inputs    = rec_terms;
       extra_inputs  = [];
       extra_outputs = [];
@@ -2602,7 +2599,7 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
     hyps         = goal.hyps;
     allow_oracle = query.allow_oracle;
     consts       = query.consts @ consts ;
-    inputs       = goal.inputs;
+    inputs       = [];
     rec_inputs   = goal.rec_inputs;
     extra_inputs = goal.extra_inputs;
     initial_mem  = result.final_mem;
