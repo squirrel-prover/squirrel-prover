@@ -2812,7 +2812,7 @@ let prove
   let rec_bided_subgs_goals =
     List.map
       (fun ((goal,form):goal*Term.term):goal -> 
-         let output = {goal.output with conds = [form]} in
+         let output = {goal.output with conds = form :: goal.output.conds } in
          {goal with output})
       rec_bided_subgs
   in
