@@ -1332,9 +1332,9 @@ type goal =
     output        : CondTerm.t;
   }
 
-(* Substitute goals variables with [subst]. 
-   Env should be free from [goals.vars] and 
-   is thus are left unchanged. *)
+(** Substitute goals variables with [subst]. 
+    [env] should be disjoint from [goals.vars] and 
+    is thus are left unchanged. *)
 let subst_goal (subst : Term.subst) (goal:goal) : goal =
   {env           = goal.env;
    hyps          = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
@@ -2455,7 +2455,8 @@ let term_set_of_occ env ~cond (k : rec_call_occ) : TSet.t list =
 (** Notify the user of the bi-deduction subgoals generated. *) 
 let notify_bideduction_subgoals table ~direct ~recursive : unit =
   let ppe = default_ppe ~table () in
-  Printer.pr "@[<v 0>Direct bi-deduction sub-goal (assuming recursive calls are bi-deducible):@;<1 2>\
+  Printer.pr "@[<v 0>Direct bi-deduction sub-goal \
+              (assuming recursive calls are bi-deducible):@;<1 2>\
               @[<v 0>%a@]@;@;@]"
     (pp_gen_goal ppe) direct;
   Printer.pr "@[<v 0>Bi-deduction sub-goals for recursive calls:@;\
@@ -2546,6 +2547,9 @@ let derecursify
   (* indirect bi-deduction goals for recursive calls *)
   let recursive : (goal*Term.term) list =
     Iter.fold_macro_support ~mode:Iter.PTimeSI (fun iocc goals ->
+        (* we are handling the recursive function [iocc_fun], at
+           time-point [iocc_rec_arg] *)
+
         let ts = iocc.iocc_rec_arg in
         (* TODO: can we add [iocc_vars] to [env]? And what about
            [iocc_cond] to hyps? Or the added hypotheses below? *)
@@ -2567,7 +2571,8 @@ let derecursify
         in
         let togen = Sv.elements iocc.iocc_vars in
         let goal =
-          mk_bideduction_goal hyps togen (Some ts) ~term:iocc.iocc_cnt ~conds:[iocc.iocc_cond]
+          mk_bideduction_goal hyps togen (Some ts)
+            ~term:iocc.iocc_cnt ~conds:[iocc.iocc_cond]
         in
         (goal,form) :: goals
       ) trace_context env hyps targets []
