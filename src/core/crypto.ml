@@ -303,7 +303,7 @@ let constant_name_to_var
 
 
 (** Return conditions under wich two names are not equal.*)
-let get_name_eq_condition
+let get_name_neq_condition
     (subst1 : Term.subst)
     (subst2 : Term.subst)
     (v : Vars.var) : Term.term 
@@ -311,12 +311,15 @@ let get_name_eq_condition
   let term1 = Term.subst subst1 (Term.mk_var v) in
   let term2 = Term.subst subst2 (Term.mk_var v) in
   match term1,term2 with
-  | Term.Name(n1,t1),Term.Name(n2,t2) when (n1=n2 && List.for_all2 Term.equal t1 t2)->
-    Term.mk_false
-  | Term.Name(n1,t1),Term.Name(n2,t2) when n1=n2 ->
-    Term.mk_ands (List.map2 Term.mk_neq t1 t2)
-  | Term.Name(_,_),Term.Name(_,_) -> Term.mk_true                                      
-  | _ -> Term.mk_false
+  | Term.Name(n1,t1),Term.Name(n2,t2) when n1 = n2->
+    if List.for_all2 Term.equal t1 t2 then
+      Term.mk_false
+    else
+      Term.mk_ors (List.map2 Term.mk_neq t1 t2)
+
+  | Term.Name(n1,_),Term.Name(n2,_) when n1 <> n2 -> Term.mk_true
+
+  | _ -> assert false
 
 let subst_support subst =
   List.map
@@ -358,7 +361,7 @@ let equal_term_name_eq
     begin
       match subst_res with
       | `Subst subst_res ->
-        let eqs = List.map (get_name_eq_condition subst subst_res) name_vars in
+        let eqs = List.map (get_name_neq_condition subst subst_res) name_vars in
         if List.mem (Term.mk_false) eqs then None
         else Some eqs
       | _ -> None
@@ -2744,7 +2747,6 @@ let parse_crypto_args
 
 (** Function that takes a list of bideduction goal, recursive and direct 
     and try to bideduce them all in the list order.*)
-
 let bideduce_all_goals
     ~vbs ~dbg
     (locate : L.t)
@@ -2820,7 +2822,9 @@ let prove
 
   (*------------------------------------------------------------------*)
   (** first bideduction pass *)
-  notify_bideduce_first_pass ~dbg ~vbs ;
+
+  notify_bideduce_first_pass ~dbg ~vbs;
+
   let query_start = transitivity_get_next_query query0 init_output res0 in
   let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
   let rec_bided_subgs, direct_bided_subgs =
@@ -2844,6 +2848,8 @@ let prove
   in
 
   (*------------------------------------------------------------------*)
+  (** second bideduction pass *)
+
   notify_bideduce_second_pass ~dbg ~vbs;
 
   (** Take the [extra_outputs] computed by the bideduction of [goal],
