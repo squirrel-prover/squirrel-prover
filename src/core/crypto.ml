@@ -1584,27 +1584,6 @@ module Game = struct
       matches in query bideduction goal [query] . *)
   let match_oracle (query : query) (term : CondTerm.t) : oracle_match list = 
     let env = query.env in
-    (** Reducing all possible macros to avoid the following problem.
-        Imagine a by-system S0||S1 with two macros msg0 msg1 where 
-        - [msg0] only make sence in [S0] , equal to some name [n0] and
-        - [msg1] only make sence in [S1], equal to some name [n1]. 
-        Now imagine that we're bi-deducing using CPA game, 
-        and we have to bi-deduce the term [enc diff(msg0,msg1) r k].
-        Then, if we don't reduce, the bideduction will then 
-        ask to bideduce [msg0,msg1], ie [diff(n0,witness), diff(witness,n1)]. 
-        which isn't possible.
-
-        If we reduce, then it is left to bideduce [n0,n1], and that is possible.
-    *)
-    let reduction_state =
-      Reduction.mk_state ~hyps:query.hyps
-        ~system:query.env.system ~vars:query.env.vars
-        ~params:(Env.to_params env)
-        ~red_param:ReductionCore.{rp_empty with  delta = {delta_empty with macro = true}} 
-        query.env.table
-    in
-    let red_term = Reduction.reduce_term reduction_state term.term in
-    let term = {term with term = red_term} in
     
     (** The function [try_match_oracle0] try to finds terms [inputs]
         and names [n=n_1\,t1,...,n_i\,ti] such that [term] matches a
