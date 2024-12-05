@@ -7,20 +7,19 @@ abstract h : message -> message.
 game FOO  = { 
   oracle Hash = {
     rnd key : message;
-    return (h key) }}. 
+    return (h key) 
+  }
+}. 
 
 name k:message.
 
 channel c.
 
-process A = 
-out(c, h k). 
+process A = out(c, h k). 
 
+process B = out(c, h k).
 
-process B = 
-out(c, h k).
-
-system ((A : A)|(B : B)).
+system ((A : A) | (B : B)).
 
 global lemma _ (t:timestamp[const]):
   [happens(t)] -> equiv(frame@t).
@@ -35,13 +34,12 @@ Qed.
 
 
 abstract b :bool.
-process Abis = 
-out(c, if b then h k else empty).
+process Abis = out(c, if b then h k else empty).
 
-system foo_bis= ((A : Abis)|(B : B)).
+system foo_bis= ((A : Abis) | (B : B)).
 
 global lemma [foo_bis] _ (t:timestamp[const]):
-[happens(t)] -> [b] -> equiv(frame@t).
+  [happens(t)] -> [b] -> equiv(frame@t).
 Proof.
 intro *.
 crypto FOO => //.

@@ -1265,6 +1265,9 @@ type query = {
        [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary can get [φ v, if φ v then t v] 
       for any [v] it can compute
   *)
+
+  vbs : bool;       (** verbose printing *)
+  dbg : bool;       (** debug printing *)
 }
 
 (*------------------------------------------------------------------*)
@@ -1319,33 +1322,41 @@ let chain_results  (res1 : result) (res2 : result):result=
     consts        = res1.consts @ res2.consts}
 
 (*------------------------------------------------------------------*)
-type goal =
-  { env           : Env.t;
-    hyps          : TraceHyps.hyps;
-    game          : game ;
-    vars          : Vars.vars;
-    macro         : Term.term option;
-    inputs        : CondTerm.t list;
-    rec_inputs    : TSet.t list;
-    extra_inputs  : TSet.t list;
-    extra_outputs : CondTerm.t list;
-    output        : CondTerm.t;
-  }
+type goal = {
+  env           : Env.t;
+  hyps          : TraceHyps.hyps;
+  game          : game ;
+
+  vars          : Vars.vars;
+  macro         : Term.term option;
+
+  inputs        : CondTerm.t list;
+  rec_inputs    : TSet.t list;
+  extra_inputs  : TSet.t list;
+  extra_outputs : CondTerm.t list;
+  output        : CondTerm.t;
+
+  vbs           : bool;       (* verbose printing *)
+  dbg           : bool;       (* debug printing *)
+}
 
 (** Substitute goals variables with [subst]. 
     [env] should be disjoint from [goals.vars] and 
     is thus are left unchanged. *)
 let subst_goal (subst : Term.subst) (goal:goal) : goal =
-  {env           = goal.env;
-   hyps          = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
-   game          = goal.game;
-   macro         = Option.map (Term.subst subst) goal.macro;
-   vars          = Term.subst_vars subst goal.vars;
-   inputs        = List.map (CondTerm.subst subst) goal.inputs;
-   rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
-   extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
-   extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
-   output        = CondTerm.subst subst goal.output;
+  { 
+    env           = goal.env;
+    hyps          = TraceHyps.map ~hyp:(Equiv.Any.subst subst) goal.hyps;
+    game          = goal.game;
+    macro         = Option.map (Term.subst subst) goal.macro;
+    vars          = Term.subst_vars subst goal.vars;
+    inputs        = List.map (CondTerm.subst subst) goal.inputs;
+    rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
+    extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
+    extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
+    output        = CondTerm.subst subst goal.output;
+    vbs           = goal.vbs;
+    dbg           = goal.dbg;
   }
 
 (* let refresh_goal (goal:goal) = *)
@@ -1353,14 +1364,14 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
 (*   subst_goal sbst goal *)
 
 
-let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
+let _pp_query (ppe : ppenv) fmt (query,outputs:query*CondTerm.t list) =
   let pp_env fmt =
     if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg query.env.vars
   in
   let pp_all_inputs fmt =
     if query.rec_inputs = [] && query.inputs = [] && query.extra_inputs = [] then Fmt.pf fmt "∅" else
       Fmt.pf fmt "%a%t%a%t%a"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) query.rec_inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) query.rec_inputs
         (fun fmt -> if query.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) query.inputs
         (fun fmt -> if query.inputs <> [] then Fmt.pf fmt ",@ " else ())
@@ -1387,10 +1398,10 @@ let _pp_query ppe fmt (query,outputs:query*CondTerm.t list) =
     pp_env
     pp_query
 
-let[@warning "-32"] pp_query  ppe  = _pp_query ppe
-let[@warning "-32"] pp_query_dbg  ppe= _pp_query ppe
+let[@warning "-32"] pp_query     = _pp_query (default_ppe ~dbg:false ()) 
+let[@warning "-32"] pp_query_dbg = _pp_query (default_ppe ~dbg:true  ()) 
 
-let _pp_gen_goal ppe fmt (goal:goal) =
+let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
   let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
     Term.add_vars_simpl_env (Vars.to_simpl_env goal.env.vars) goal.vars
   in
@@ -1414,20 +1425,21 @@ let _pp_gen_goal ppe fmt (goal:goal) =
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) st.extra_inputs
   in
   let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe) goal.output in
-  (* let pp_outputs _fmt = *)
-  (*   if outputs = [] then Fmt.pf fmt "∅" else  *)
-  (*     Fmt.pf fmt "%a" *)
-  (*       (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) outputs *)
-  (* in *)
+  let pp_extra_outputs fmt =
+    if not ppe.dbg || goal.extra_outputs = [] then Fmt.pf fmt "" else
+      Fmt.pf fmt ",@ @[%a@]"
+        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) goal.extra_outputs
+  in
   let pp_bideduction_goal fmt =
-    Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]@]" pp_vars_togen pp_all_inputs pp_output
+    Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]%t@]" 
+      pp_vars_togen pp_all_inputs pp_output pp_extra_outputs
   in
   Fmt.pf fmt "@[<v 0>%t%t@]"
     pp_env
     pp_bideduction_goal
 
-let[@warning "-32"] pp_gen_goal  ppe   = _pp_gen_goal ppe
-let[@warning "-32"] pp_gen_goal_dbg ppe = _pp_gen_goal ppe
+let[@warning "-32"] pp_gen_goal     = _pp_gen_goal (default_ppe ~dbg:false ()) 
+let[@warning "-32"] pp_gen_goal_dbg = _pp_gen_goal (default_ppe ~dbg:true ()) 
 
 (*-------------------------------------------------------------------*)
 (* let _pp_state ppe fmt (st : state) = _pp_gen_state ppe fmt ([],st,[]) *)
@@ -1744,9 +1756,9 @@ module Game = struct
   let pp_call_oracle_res_dbg = _pp_call_oracle_res (default_ppe ~dbg:true  ())
 
   (* ----------------------------------------------------------------- *)
-  let notify_call_oracle_res ~vbs ~dbg (cor:call_oracle_res option) =
-    if (not vbs && not dbg) || cor = None then () else
-    if dbg then
+  let notify_call_oracle_res (query : query) (cor:call_oracle_res option) =
+    if (not query.vbs && not query.dbg) || cor = None then () else
+    if query.dbg then
       Printer.pr "@[ Oracle call succeeded, yielding:@. %a@]@."
         (pp_call_oracle_res_dbg) (oget cor)
     else
@@ -1764,7 +1776,6 @@ module Game = struct
       - subgoals under which the matching is an oracle match [subgoals]
       - data of oracle matching (pattern, name etc.) [oracle_pat, oracle] *)
   let call_oracle
-      ~vbs ~dbg 
       (query      : query)
       (term       : CondTerm.t)
       (mv         : Match.Mvar.t)
@@ -1827,7 +1838,7 @@ module Game = struct
             subgoals;
           }
         in
-        notify_call_oracle_res ~vbs ~dbg res; res
+        notify_call_oracle_res query res; res
       | None -> None
     with Const.InvalidConstraints -> None 
         
@@ -1942,38 +1953,37 @@ let knowledge_mem_condterm_sets
 (** {2 Notify functions to print bi-deduction flow} *)
 
 
-let notify_bideduce_term_strict ~vbs ~dbg (rule:string) =
-  if not vbs && not dbg then () else
+let notify_bideduce_term_strict (query : query) (rule:string) =
+  if not query.vbs && not query.dbg then () else
   Printer.pr "@[Opening by %s rule @]@." rule
 
-let notify_bideduce_immediate ~vbs ~dbg =
-  if not vbs && not dbg then () else
+let notify_bideduce_immediate (query : query) =
+  if not query.vbs && not query.dbg then () else
     Printer.pr "Outputs adversarial or in inputs@."
     
 let notify_bideduce_oracle_extra_inputs
-    table
-    ~vbs ~dbg
+    (query : query)
     (extra_inputs : TSet.t list)
     (cond:Term.term)
   =
-  if not vbs && not dbg then () else
-    let ppe = default_ppe ~table ~dbg () in
+  if not query.vbs && not query.dbg then () else
+    let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
     Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
       (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
       (Term._pp ppe) cond
 
-let notify_bideduce_term_start table ~vbs ~dbg (output:CondTerm.t) =
-  if not vbs && not dbg then () else
-    let ppe = default_ppe ~table ~dbg () in
+let notify_bideduce_term_start (query : query) (output:CondTerm.t) =
+  if not query.vbs && not query.dbg then () else
+    let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
     Printer.pr "___Bideducing term %a ___@." (CondTerm._pp ppe) output
 
-let notify_bideduce_oracle_inputs_start ~vbs ~dbg (oracle_name: string) =
-  if not vbs && not dbg then () else
+let notify_bideduce_oracle_inputs_start (query : query) (oracle_name: string) =
+  if not query.vbs && not query.dbg then () else
     Printer.pr "___Call %s : Starting oracle's inputs bideduction___@.@["
       oracle_name
 
-let notify_bideduce_oracle_inputs_end ~vbs ~dbg (oracle_name : string) =
-  if not vbs && not dbg then () else
+let notify_bideduce_oracle_inputs_end (query : query) (oracle_name : string) =
+  if not query.vbs && not query.dbg then () else
     Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@."
       oracle_name
 
@@ -1989,15 +1999,15 @@ let notify_bideduce_first_pass ~vbs ~dbg =
                 __________Starting first pass____________@.\
                 *****************************************@."
 
-let notify_bideduce_oracle_already_call table ~vbs ~dbg already_called =
-  let ppe = default_ppe ~table () in
-  if not vbs && not dbg then () else
+let notify_bideduce_oracle_already_call (query : query) already_called =
+  let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
+  if not query.vbs && not query.dbg then () else
     Printer.pr "Already called : %a"
       (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
 
-let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
-  let ppe = default_ppe ~table:qs.env.table () in
-  if not vbs && not dbg then () else
+let notify_query_goal_start ((qs,_) as query : query * _) =
+  let ppe = default_ppe ~table:qs.env.table ~dbg:qs.dbg () in
+  if not qs.vbs && not qs.dbg then () else
     Printer.pr "@. ******* Starting goal ********** @. %a @. ********@. "
       (_pp_query ppe) query
 
@@ -2005,7 +2015,6 @@ let notify_query_goal_start ~vbs ~dbg ((qs,_) as query : query * _) =
 (** {2 Main bi-deduction functions} *)
 
 let rec bideduce_term_strict
-    ~(vbs:bool) ~(dbg:bool)
     (query : query)
     (output_term : CondTerm.t) : result option
   =
@@ -2017,47 +2026,47 @@ let rec bideduce_term_strict
     let t1 = CondTerm.mk ~term:t1 ~conds:(Term.mk_not b :: conds) in
     let b  = CondTerm.mk ~term: b ~conds  in
     let outputs = [b;t0;t1] in
-    notify_bideduce_term_strict ~vbs ~dbg "If then else" ;
-    bideduce ~vbs ~dbg  query outputs 
+    notify_bideduce_term_strict query "If then else" ;
+    bideduce query outputs 
       
   | Term.(App (Fun(fs,_),[t0;t1])) when fs = Term.f_impl ->
     let t1 = CondTerm.mk ~term:t1  ~conds:( t0::conds) in
     let t0 = CondTerm.mk ~term:t0  ~conds in
     let outputs= [t0;t1] in
-    notify_bideduce_term_strict ~vbs ~dbg "Function '=>' " ;
-    bideduce ~vbs ~dbg query outputs
+    notify_bideduce_term_strict query "Function '=>' " ;
+    bideduce query outputs
 
   | Term.(App (Fun(f,_),[t0;t1])) when f = Term.f_and ->
     let t1 = CondTerm.mk ~term:t1 ~conds:( t0::conds) in
     let t0 = CondTerm.mk ~term:t0 ~conds in
     let outputs = [t0;t1] in
-    notify_bideduce_term_strict ~vbs ~dbg "Function And" ;
-    bideduce ~vbs ~dbg query outputs
+    notify_bideduce_term_strict query "Function And" ;
+    bideduce query outputs
         
   | Term.(App (Fun _ as fs,l))
     when HighTerm.is_ptime_deducible ~si:true query.env fs ->
       assert (l <> []);
       let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
-      notify_bideduce_term_strict ~vbs ~dbg "Function Application";
-      bideduce ~vbs ~dbg query l
+      notify_bideduce_term_strict query "Function Application";
+      bideduce query l
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
     let output = (CondTerm.mk ~term:f ~conds)::t in
-    notify_bideduce_term_strict ~vbs ~dbg "Lambda" ;
-    bideduce ~vbs ~dbg query output
+    notify_bideduce_term_strict query "Lambda" ;
+    bideduce query output
 
   | Term.Tuple l ->
     let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
     let output = l in
-    notify_bideduce_term_strict ~vbs ~dbg "Tuple" ;
-    bideduce ~vbs ~dbg query output
+    notify_bideduce_term_strict query "Tuple" ;
+    bideduce query output
 
   | Term.Name (n,i) ->
     let const = Const.create Tag.adv n ~term:i ~cond:conds in
     let output = List.map (fun x -> CondTerm.{term=x;conds}) i in
-    notify_bideduce_term_strict ~vbs ~dbg "Adversarial name" ;
-    let result = bideduce ~vbs ~dbg query output in
+    notify_bideduce_term_strict query "Adversarial name" ;
+    let result = bideduce query output in
     begin
       match result with
       | Some result ->
@@ -2073,8 +2082,8 @@ let rec bideduce_term_strict
     let vars =
       Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars in
     let env = {query.env with vars} in
-    notify_bideduce_term_strict ~vbs ~dbg "Quantificator";
-    let result =  bideduce_fp ~vbs ~dbg es { query with env }
+    notify_bideduce_term_strict query "Quantificator";
+    let result =  bideduce_fp es { query with env }
         [CondTerm.mk ~term ~conds:output_term.conds]
     in
     (* Generalising constraints, subgoals and extra/save outputs*)
@@ -2089,8 +2098,8 @@ let rec bideduce_term_strict
     some {result with consts;subgoals;extra_outputs;}
 
   | Term.Proj (_,l) ->
-    notify_bideduce_term_strict ~vbs ~dbg "Projection";
-    bideduce_term ~vbs ~dbg query {output_term with term = l}
+    notify_bideduce_term_strict query "Projection";
+    bideduce_term query {output_term with term = l}
 
   | Term.Find (v,f,t,e) ->
     let f1 = Term.mk_lambda v f in
@@ -2099,14 +2108,13 @@ let rec bideduce_term_strict
         (Term.mk_ite f t
            (Library.Prelude.mk_witness query.env.table ~ty_arg:(Term.ty t)))
     in
-    bideduce ~vbs ~dbg query
+    bideduce query
       ( (List.map (fun (t:Term.term) -> {output_term with term = t}) [f1;f2;e])) 
 
   | _ -> None
 
 (*------------------------------------------------------------------*)
 and bideduce_term
-    ~(vbs:bool) ~(dbg:bool)
     ?(bideduction_suite = bideduce_oracle) 
     (query: query) (output : CondTerm.t)
   : result option
@@ -2114,7 +2122,7 @@ and bideduce_term
   let env = query.env in
   let output = CondTerm.polish output query.hyps env in
   assert (AbstractSet.well_formed env query.initial_mem);
-  notify_bideduce_term_start env.table ~vbs ~dbg output;
+  notify_bideduce_term_start query output;
   let mem, mem_res = knowledge_mem ~env ~hyps:query.hyps output query.inputs in
   let st : Match.unif_state Lazy.t =
     lazy(
@@ -2126,7 +2134,7 @@ and bideduce_term
     (mem && (mem_res = None))
   then                          (* deduce conditions *)
       let result = empty_result query.initial_mem in
-      notify_bideduce_immediate ~vbs ~dbg;
+      notify_bideduce_immediate query;
       Some result 
   else if
     output.conds <> [] &&
@@ -2136,15 +2144,15 @@ and bideduce_term
     Some (empty_result query.initial_mem)
 
   else if mem then
-    bideduce ~vbs ~dbg query
+    bideduce query
       (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget mem_res))
   else 
     (* [output ∈ rec_inputs] *)
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
       (* if output.conds =  [] then *)
-        bideduce ~vbs ~dbg query (List.map CondTerm.mk_simpl args)          
-    | None ->  bideduction_suite ~vbs ~dbg query output
+        bideduce query (List.map CondTerm.mk_simpl args)
+    | None ->  bideduction_suite query output
 
 (*------------------------------------------------------------------*)
 
@@ -2155,9 +2163,7 @@ Could we change the semantic to have the condtions are known to be bi-deducible 
 (** Try to show that [output_term] is bi-deducible using an oracle call.
     Fall-back to the main-loop in case of failure. *)
 and bideduce_oracle
-    ~vbs ~dbg
-    (query : query)
-    (output_term : CondTerm.t) : result option
+    (query : query) (output_term : CondTerm.t) : result option
   =
    (* First checking that the oracle could have been called before in the computation.
       I.e, [output ∈ extra_inputs] *)
@@ -2169,7 +2175,7 @@ and bideduce_oracle
   let output_term,query,result_start = 
     if already_called <> [] then
       let _ =
-        notify_bideduce_oracle_already_call query.env.table ~vbs ~dbg already_called
+        notify_bideduce_oracle_already_call query already_called
       in
       let args = List.concat_map fst already_called in
       let conds = List.map snd already_called in
@@ -2182,10 +2188,8 @@ and bideduce_oracle
       bideduce them*)
       let to_deduce = args(*@conds_true@output_conds*) in
       (* TODO : conds_false might be always false, in which case it is not usufull to run oracle*)
-      notify_bideduce_oracle_extra_inputs
-        query.env.table ~vbs ~dbg query.extra_inputs conds_false;
-      match bideduce ~vbs ~dbg
-              {query with allow_oracle=false} to_deduce
+      notify_bideduce_oracle_extra_inputs query query.extra_inputs conds_false;
+      match bideduce {query with allow_oracle=false} to_deduce
       with
       | Some result ->
         let query_start = transitivity_get_next_query query to_deduce result in
@@ -2205,15 +2209,15 @@ and bideduce_oracle
     in
     try     
       (* check that inputs are bi-deducible *)
-      notify_bideduce_oracle_inputs_start ~vbs ~dbg oracle_match.oracle.name;
+      notify_bideduce_oracle_inputs_start query oracle_match.oracle.name;
       let result_inputs = 
-        bideduce ~vbs ~dbg query full_inputs |> oget_exn ~exn:Failed
+        bideduce query full_inputs |> oget_exn ~exn:Failed
       in
-      notify_bideduce_oracle_inputs_end ~vbs ~dbg oracle_match.oracle.name;
+      notify_bideduce_oracle_inputs_end query oracle_match.oracle.name;
       (* Building the query for the oracle call *)
       let query_call = transitivity_get_next_query query full_inputs result_inputs in 
       let Game.{ new_consts = consts; index_cond; post; mem_subgoals; subgoals; } =
-        Game.call_oracle ~vbs ~dbg query_call output_term mv ~subgoals oracle_pat oracle
+        Game.call_oracle query_call output_term mv ~subgoals oracle_pat oracle
         |> oget_exn ~exn:Failed
       in
       (* add the subgoals required by the [oracle_match] to the state *)
@@ -2242,7 +2246,7 @@ and bideduce_oracle
           else 
             let query_else = transitivity_get_next_query query [] result in 
             let result_else =
-              bideduce_term ~bideduction_suite:bideduce_term_strict ~vbs ~dbg query_else
+              bideduce_term ~bideduction_suite:bideduce_term_strict query_else
                 { output_term with conds = Term.mk_not index_cond :: output_term.conds }
               |> oget_exn ~exn:Failed
             in
@@ -2256,19 +2260,18 @@ and bideduce_oracle
     match List.find_map find_valid_match all_matches with
     | Some res ->
       Some (chain_results result_start res)      
-    | None -> bideduce_term_strict ~vbs ~dbg query output_term
+    | None -> bideduce_term_strict query output_term
     (* oracle match failed, we recurse *)
   else
-    bideduce_term_strict ~vbs ~dbg query output_term
+    bideduce_term_strict query output_term
 
 (*------------------------------------------------------------------*)
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
-and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) : result option =
+and bideduce (query : query) (outputs : CondTerm.t list) : result option =
   match outputs with
   | [] -> some (empty_result query.initial_mem)
   | term :: outputs ->
-    let result_op = bideduce_term ~vbs ~dbg query  term in
-    match result_op with
+    match bideduce_term query term with
     | None -> None
     | Some result ->
       (* Next query : following terms passing on deduced term and extras as inputs
@@ -2276,7 +2279,7 @@ and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) : result opti
          We also add global and adversarial constraints to help oracle call 
          in next query constraints  *)
       let next_query = transitivity_get_next_query query [term] result in 
-      let next_result = bideduce ~vbs ~dbg next_query outputs in
+      let next_result = bideduce next_query outputs in
       match next_result with
       | None -> None
       | Some next_result -> Some (chain_results result next_result)
@@ -2295,7 +2298,7 @@ and bideduce ~vbs ~dbg (query : query) (outputs : CondTerm.t list) : result opti
     Note: currently, the procedure applies to any type [τ], by 
     generalizing over [x]. *)
 and bideduce_fp
-    ?loc ~vbs ~dbg
+    ?loc
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   : result
   =
@@ -2313,6 +2316,7 @@ and bideduce_fp
     in
     let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
       { env;
+        vbs = query.vbs; dbg = query.dbg;
         game = query.game;
         hyps = query.hyps;
         allow_oracle = query.allow_oracle;
@@ -2322,7 +2326,7 @@ and bideduce_fp
         consts     = consts0;
         initial_mem = pre; }
     in
-    match bideduce ~vbs ~dbg query1 outputs with (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
+    match bideduce query1 outputs with (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
     | Some result ->
       let post = result.final_mem in    (* [ψ] *)
       let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
@@ -2341,7 +2345,7 @@ and bideduce_fp
       let err_str = 
         Fmt.str "@[<v 2>failed to apply the game:@;\
                  bideduction goal failed:@;@[%a@]@]"
-          (pp_query (default_ppe ~table:query.env.table ())) (query,outputs)
+          (_pp_query (default_ppe ~table:query.env.table ())) (query,outputs)
       in
       Tactics.hard_failure ?loc (Failure err_str)
   in
@@ -2458,10 +2462,10 @@ let notify_bideduction_subgoals table ~direct ~recursive : unit =
   Printer.pr "@[<v 0>Direct bi-deduction sub-goal \
               (assuming recursive calls are bi-deducible):@;<1 2>\
               @[<v 0>%a@]@;@;@]"
-    (pp_gen_goal ppe) direct;
+    (_pp_gen_goal ppe) direct;
   Printer.pr "@[<v 0>Bi-deduction sub-goals for recursive calls:@;\
              \  @[<v 0>%a@]@;@;@]"
-    (Fmt.list ~sep:(Fmt.any "@;@;") (pp_gen_goal ppe)) recursive
+    (Fmt.list ~sep:(Fmt.any "@;@;") (_pp_gen_goal ppe)) recursive
 
 (*------------------------------------------------------------------*)
 (** Given a list of terms [t] using recursively defined functions,
@@ -2501,6 +2505,8 @@ let derecursify
   let trace_context =
     Constr.make_context ~table:env.table ~system:(SE.to_fset system.set)
   in
+  let vbs = TConfig.verbose_crypto env.table in
+  let dbg = TConfig.debug_tactics  env.table in
 
   let mk_bideduction_goal
       hyps vars macro ~(term : Term.term) ~(conds : Term.term list) : goal 
@@ -2524,18 +2530,18 @@ let derecursify
             t :: rec_terms
         ) [] rec_terms
     in
-
-    ( { vars;
-        macro;
-        env;
-        game;
-        hyps;
-        inputs       = [];
-        rec_inputs   = rec_terms;
-        extra_inputs = [];
-        extra_outputs = [];
-        output = CondTerm.{ term; conds}} )
-  in
+    {
+      vars;
+      macro;
+      env; game; vbs; dbg;
+      hyps;
+      inputs        = [];
+      rec_inputs    = rec_terms;
+      extra_inputs  = [];
+      extra_outputs = [];
+      output = CondTerm.{ term; conds; }
+    }
+in
 
   (* direct bi-deduction sub-goals assuming recursive calls are bideducible *)
   let direct : goal =
@@ -2583,19 +2589,24 @@ let derecursify
   recursive, direct
 
 (*------------------------------------------------------------------*)  
-let goal_to_query (query:query) result (goal:goal) : query =
+(* previous query, previous result, next goal *)
+let goal_to_query (query:query) (result : result) (goal:goal) : query =
   assert (query.env = goal.env);
   assert (query.game = goal.game);
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
-  {env = goal.env;
-   game = goal.game;
-   hyps = goal.hyps;
-   allow_oracle = query.allow_oracle;
-   consts = query.consts @ consts ;
-   inputs = goal.inputs;
-   rec_inputs = goal.rec_inputs;
-   extra_inputs = goal.extra_inputs;
-   initial_mem = result.final_mem}
+  {
+    env          = goal.env;
+    vbs          = goal.vbs; 
+    dbg          = goal.dbg;
+    game         = goal.game;
+    hyps         = goal.hyps;
+    allow_oracle = query.allow_oracle;
+    consts       = query.consts @ consts ;
+    inputs       = goal.inputs;
+    rec_inputs   = goal.rec_inputs;
+    extra_inputs = goal.extra_inputs;
+    initial_mem  = result.final_mem;
+  }
 
 (** Bideduction of rececruive subgoals.
     
@@ -2607,16 +2618,16 @@ let goal_to_query (query:query) result (goal:goal) : query =
 
 *)
 let bideduce_recursive_subgoals
-    loc ~vbs ~dbg query (bided_subgoals : goal list)
+    loc (query : query) (bided_subgoals : goal list)
   =
 
   let doit
-      (query:query)
-      (togen : Vars.vars)
+      (query  : query)
+      (togen  : Vars.vars)
       (output : CondTerm.t)
     =
-    notify_query_goal_start ~vbs ~dbg (query,[output]);
-    let result_fp = bideduce_fp ~vbs ~dbg ~loc togen query [output] in
+    notify_query_goal_start (query,[output]);
+    let result_fp = bideduce_fp ~loc togen query [output] in
     let consts = Const.generalize togen result_fp.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true togen) result_fp.subgoals in
     (*building lambda term that contains all computed extra and save outputs*)
@@ -2629,7 +2640,7 @@ let bideduce_recursive_subgoals
     result_fp
   in
   
-  let step (start_query:query) (start_res : result) =
+  let step (start_query : query) (start_res : result) =
     let query,_,next_goals,result = 
     List.fold_left (fun (previous_query,previous_result,acc,result) goal ->
         let query = goal_to_query previous_query previous_result goal in
@@ -2732,20 +2743,19 @@ let parse_crypto_args
 (** Function that takes a list of bideduction goal, recursive and direct 
     and try to bideduce them all in the list order.*)
 let bideduce_all_goals
-    ~vbs ~dbg
     (locate : L.t)
     (query_start : query)
     (rec_bided_subgs : goal list)
     (direct_bided_subgs : goal)
   =
   let next_goals,result_rec =
-    bideduce_recursive_subgoals ~vbs ~dbg
+    bideduce_recursive_subgoals 
       locate query_start rec_bided_subgs
   in
   let query_dir = goal_to_query query_start result_rec direct_bided_subgs in
-  notify_query_goal_start ~vbs ~dbg (query_dir,[direct_bided_subgs.output]);
+  notify_query_goal_start (query_dir,[direct_bided_subgs.output]);
   match
-    bideduce ~vbs ~dbg query_dir [direct_bided_subgs.output]
+    bideduce query_dir [direct_bided_subgs.output]
   with
   | Some result_dir ->
     let result = chain_results result_rec result_dir in
@@ -2769,9 +2779,9 @@ let prove
   if terms.bound <> None then
     Tactics.soft_failure (Failure "concrete logic unsupported");
 
-  let vbs = TConfig.verbose_crypto env.table in
-  let dbg = TConfig.debug_tactics env.table in
   let game_loc = Symbols.p_path_loc pgame in
+  let vbs = TConfig.verbose_crypto env.table in
+  let dbg = TConfig.debug_tactics  env.table in
 
   let game = find env.table pgame in
   let initial_mem = Game.get_initial_pre env hyps game in
@@ -2781,7 +2791,7 @@ let prove
   (** Checking the initial constraint are determinitly bi-deducible*)
   let query0 =
     { consts = [];
-      env;
+      env; vbs; dbg;
       initial_mem;
       game; hyps;
       allow_oracle = false;
@@ -2792,7 +2802,7 @@ let prove
   in
   let init_output = List.map CondTerm.mk_simpl initial_name_args in 
   let res0 =
-    match bideduce ~vbs ~dbg query0 init_output with
+    match bideduce query0 init_output with
     | Some s  when s.consts = [] -> s
     (* To ensure well-formness of constraints. 
        FIXME : could be improved, to allow randomness that do not break well-formness. *)
@@ -2810,7 +2820,11 @@ let prove
   notify_bideduce_first_pass ~dbg ~vbs;
 
   let query_start = transitivity_get_next_query query0 init_output res0 in
-  let query_start = { query_start with allow_oracle = true; consts = query_start.consts@initial_consts} in
+  let query_start =
+    { query_start with 
+      allow_oracle = true; 
+      consts = query_start.consts @ initial_consts; } 
+  in
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms.terms game hyps
   in
@@ -2828,7 +2842,7 @@ let prove
       (* First pass on bideduction, to find extra inputs.*)
   in
   let next_bided_subgs, _  =
-    bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs_goals direct_bided_subgs 
+    bideduce_all_goals game_loc query_start rec_bided_subgs_goals direct_bided_subgs 
   in
 
   (*------------------------------------------------------------------*)
@@ -2842,16 +2856,12 @@ let prove
   let extra_input_from_goal
       (goal : goal) (conds : Term.terms) (timestamp : Term.term) : TSet.t list 
     =
-    let varsg = goal.vars in
-    let macro = oget goal.macro in
-    let extra_outputs = goal.extra_outputs in
-    let varsg,subst = Term.refresh_vars varsg in
-    let macro = Term.subst subst macro in
-    let extra_outputs = List.map (CondTerm.subst subst) extra_outputs in
+    let varsg,subst = Term.refresh_vars goal.vars in
+    let macro = Term.subst subst (oget goal.macro) in
+    let extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs in
     let conds = List.map (Term.subst subst) conds in
-    List.map (fun (term : CondTerm.t) : TSet.t ->
-        (* Refresh terms*)
-        {
+    List.map (fun (term : CondTerm.t) ->
+        TSet.{
           conds = Term.mk_leq macro timestamp :: conds @ term.conds;
           vars = varsg;
           term = term.term;
@@ -2861,19 +2871,23 @@ let prove
 
   (** Get all extra inputs for [goal_to] coming from [goal_from] under
       [cond_from] that should be the condition under which [goal_from]
-      is to be deduced*)
+      is to be deduced *)
   let get_extra_inputs
-      (goal_to:goal) (goal_from:goal) (cond_from: Term.term)
+      ~(goal_to:goal) (goal_from:goal) (cond_from: Term.term)
     : TSet.t list 
     =
     let timestamp = Term.mk_pred (oget goal_to.macro) in
-    let _ = goal_to.vars in
     extra_input_from_goal goal_from [cond_from] timestamp 
   in
 
   let extra_inputs_full (goal:goal) (cond:Term.term) : goal =
     let extra_inputs = 
-      List.concat (List.map2 (get_extra_inputs goal) next_bided_subgs rec_bided_subgs_conds)
+      List.map2 
+        (get_extra_inputs ~goal_to:goal) 
+        next_bided_subgs 
+        rec_bided_subgs_conds
+
+      |> List.concat 
     in
     let output = {goal.output with conds = [cond]} in
     {goal with extra_inputs; output}
@@ -2883,7 +2897,11 @@ let prove
   let rec_bided_subgs =
     List.map2 extra_inputs_full next_bided_subgs rec_bided_subgs_conds
   in
-  let _, res = bideduce_all_goals ~vbs ~dbg (game_loc) query_start rec_bided_subgs direct_bided_subgs in             
+  let _, res = 
+    bideduce_all_goals
+      game_loc
+      query_start rec_bided_subgs direct_bided_subgs 
+  in
   match res with
   | Some result -> 
     let oracle_subgoals = result.subgoals in
