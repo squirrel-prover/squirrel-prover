@@ -2183,7 +2183,7 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
     - [(k1,...,kn)] is deducible from [inputs,k]
     - [k] is deducible from [inputs,(k1, ..., kn)] *)
 let term_set_decompose
-    (_env : Env.t) (_hyps : TraceHyps.hyps)
+    (env : Env.t) (hyps : TraceHyps.hyps)
     ~(inputs:term_set list) (known : term_set) : term_set list 
   =
   (* FEATURE: use the real deduction function `deduce` below rather
@@ -2197,11 +2197,12 @@ let term_set_decompose
   in
 
   let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
-  (* get [k.term] head symbol if the system kind allows it *)
-    let term = 
-      match SE.to_projs_any k.se with
-      | None       -> k.term
-      | Some projs -> Term.head_normal_biterm projs k.term
+    let red_param = ReductionCore.rp_crypto in
+    let term, _ = 
+      whnf0 
+        ~red_param ~hyps ~vars:env.vars
+        ~table:env.table ~system:env.system
+        k.term
     in
     match term with
     (* Exploit the pair symbol injectivity.
