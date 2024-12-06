@@ -1362,6 +1362,10 @@ let chain_results  (res1 : result) (res2 : result):result=
         [{ v1ₑ | ∀ (x1, t1) : ϕ1},]
         ...
         [{ vNₑ | ∀ (xN, tN) : ϕN}]
+
+
+    **Examples**: see the comment describing the [get_extra_inputs]
+    function below.
 *)
 type goal = {
   env  : Env.t;                 (** E *)
@@ -2509,6 +2513,35 @@ let term_set_of_occ env ~cond (k : rec_call_occ) : TSet.t list =
   term_set_strengthen env TSet.{ term = body; conds; vars = k.occ_vars; }
 
 (*------------------------------------------------------------------*)
+(** Ad hoc simplification for happens conditions in recursive
+    goals. *)
+let simplify_rec_goal table (goal : goal) : goal =
+    (* never [None] for recursive subgoals *)
+    let rec_pred = oget goal.rec_predicate in 
+
+    (* note that we always have [rec_pred ∈ goal.output.conds].  *)
+    let conds = 
+      let exception Failed in
+      List.filter (function
+          (* [happens(t)] *)
+          | Term.App (Term.Fun (fs,_), [_]) as phi 
+            when Symbols.path_equal fs Symbols.fs_happens -> 
+            begin
+              try
+                not @@
+                Constr.is_tautology
+                  ~exn:Failed ~timeout:1 ~table
+                  (Term.mk_impl rec_pred phi)
+              with
+              | Failed -> true
+            end
+          | _ -> true
+        ) goal.output.conds
+    in
+    let output = { goal.output with conds = rec_pred :: conds; } in
+    { goal with output; }
+
+(*------------------------------------------------------------------*)
 (** Notify the user of the bi-deduction subgoals generated. *) 
 let notify_bideduction_subgoals table ~direct ~recursive : unit =
   let ppe = default_ppe ~table () in
@@ -2651,6 +2684,8 @@ let derecursify
       ) trace_context env hyps targets []
   in
 
+  let recursive = List.map (simplify_rec_goal env.table) recursive in
+
   (* notify the user *)
   notify_bideduction_subgoals env.table ~direct ~recursive;
   recursive, direct
@@ -2685,13 +2720,11 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
 
 *)
 let bideduce_recursive_subgoals
-    loc (query : query) (bided_subgoals : goal list)
+    loc (query : query) (bided_subgoals : goal list) : goal list * result
   =
-
   let doit
-      (query  : query)
-      ~(togen  : Vars.vars)
-      (output : CondTerm.t)
+      (query  : query) ~(togen  : Vars.vars) (output : CondTerm.t) 
+    : result 
     =
     notify_query_goal_start (query,[output]);
     let result_fp = bideduce_fp ~loc togen query [output] in
@@ -2718,7 +2751,7 @@ let bideduce_recursive_subgoals
          let goal = {goal with extra_outputs = goal.extra_outputs @ extra_outputs} in
          query,result_fp,goal::acc,result)
       (start_query, start_res,[],empty_result start_query.initial_mem )     
-      (bided_subgoals)
+      bided_subgoals
     in
     List.rev next_goals,query,result
   in
@@ -2809,7 +2842,7 @@ let bideduce_all_goals
     (locate : L.t)
     (query_start : query)
     (rec_bided_subgs : goal list)
-    (direct_bided_subgs : goal)
+    (direct_bided_subgs : goal) : goal list * result option
   =
   let next_goals,result_rec =
     bideduce_recursive_subgoals 
@@ -2869,12 +2902,13 @@ let prove
     | Some s  when s.consts = [] -> s
     (* To ensure well-formness of constraints. 
        FIXME : could be improved, to allow randomness that do not break well-formness. *)
-    | Some _ -> Tactics.hard_failure ~loc:(game_loc)
-                  (Failure "failed to bideduce the game to user constraints' arguments: 
+    | Some _ -> 
+      Tactics.hard_failure ~loc:game_loc
+        (Failure "failed to bideduce user constraints: \
                   randomness is not allowed.")
     | None    ->
-      Tactics.hard_failure ~loc:(game_loc)
-        (Failure "failed to apply the game to user constraints' argument")
+      Tactics.hard_failure ~loc:game_loc
+        (Failure "failed to bideduce user constraints")
   in
 
   (*------------------------------------------------------------------*)
@@ -2902,71 +2936,76 @@ let prove
 
   notify_bideduce_second_pass ~dbg ~vbs;
 
-  (** Take the [extra_outputs] computed by the bideduction of [goal],
-      and create the corresponding [extra_inputs] for bideduction at
-      time [timestamp].*)
-  let extra_input_from_goal
-      (goal : goal) (timestamp : Term.term) : TSet.t list 
+  (** Compute the extra inputs that can be added to the goal [target]
+      from the recursive goal [source]. What must be done differs
+      depending on whether we are considering a direct or recursive
+      [target] goal (see description of the [goal] type).
+
+
+      Example ([target] is [`Recursive]), assume that:
+      - [source] is the bideduction goal 
+          [i; A i ≤ τ₀ ⊢ frame@pred(A i) ▷ frame@A i],
+        which can be bideduce with the additional oracle [h(A i,k)]
+      - [target] is the bideduction goal 
+          [j; B j ≤ τ₁ ⊢ frame@pred(B j) ▷ frame@B j]
+
+      then we modify [target] into
+        [j; B j ≤ τ₁ ⊢ 
+           frame@pred(B j), {h(A i,k) | i: A i < B j ∧ A i ≤ τ₀} 
+           ▷ frame@B j] 
+
+
+      Example ([target] is [`Direct]), assume that:
+      - [source] is the bideduction goal 
+          [i; A i ≤ τ₀ ⊢ frame@pred(A i) ▷ frame@A i],
+        which can be bideduce with the additional oracle [h(A i,k)]
+      - [target] is the bideduction goal 
+          [⊢ {frame@τ | τ ≤ τ₀} ▷ C[frame@τ₀]] (* where [C] is some context *)
+
+      then we modify [target] into
+        [⊢ {frame@τ | τ ≤ τ₀}, {h(A i,k) | i: A i ≤ τ₀} ▷ C[frame@τ₀]]
+  *)
+  let get_extra_inputs
+      ~(kind:[`Recursive | `Direct]) ~(target:goal) ~(source:goal) : TSet.t list 
     =
-    let varsg,subst = Term.refresh_vars goal.vars in
-    let macro = Term.subst subst (oget goal.rec_arg) in
-    let extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs in
-    let conds = Term.subst subst (oget goal.rec_predicate) in
+    let source_vars, s = Term.refresh_vars source.vars in
+    let source_rec_arg = Term.subst s (oget source.rec_arg) in
+    let rec_target_cond = (* additional condition for the recursive case only *)
+      match kind with
+      | `Recursive ->
+        let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
+        [Term.mk_leq source_rec_arg target_rec_arg]  (* A i < B j *)
+        
+      | `Direct -> []
+    in      
     List.map (fun (term : CondTerm.t) ->
+        let term = CondTerm.subst s term in
         TSet.{
-          conds = Term.mk_leq macro timestamp :: conds :: term.conds;
-          vars = varsg;
+          conds = 
+            rec_target_cond @  (* [A i < B j], if [target] is recursive *)
+            (Term.subst s (oget source.rec_predicate)) :: (* A i ≤ τ₀ *)
+            term.conds;
+          vars = source_vars;
           term = term.term;
         }
-      ) extra_outputs
+      ) source.extra_outputs
   in
 
-  (** Get all extra inputs for [goal_to] coming from [goal_from] under
-      [cond_from] that should be the condition under which [goal_from]
-      is to be deduced *)
-  let get_extra_inputs ~(goal_to:goal) (goal_from:goal) : TSet.t list =
-    let timestamp = Term.mk_pred (oget goal_to.rec_arg) in
-    extra_input_from_goal goal_from timestamp 
-  in
-
-  let extra_inputs_full (goal:goal) : goal =
-    (* never [None] for recursive subgoals *)
+  let add_extra_inputs ~(kind:[`Recursive | `Direct]) (target:goal) : goal =
     let extra_inputs = 
-      List.map
-        (get_extra_inputs ~goal_to:goal) 
-        next_bided_subgs 
-      |> List.concat 
+      List.concat_map
+        (fun source -> get_extra_inputs ~kind ~target ~source) 
+        next_bided_subgs
     in
-
-    (* never [None] for recursive subgoals *)
-    let rec_pred = oget goal.rec_predicate in 
-
-    (* Ad hoc simplification for happens conditions (note that we
-       always have [rec_pred ∈ goal.output.conds]). *)
-    let conds = 
-      let exception Failed in
-      List.filter (function
-          (* [happens(t)] *)
-          | Term.App (Term.Fun (fs,_), [_]) as phi 
-            when Symbols.path_equal fs Symbols.fs_happens -> 
-            begin
-              try
-                not @@
-                Constr.is_tautology
-                  ~exn:Failed ~timeout:1 ~table
-                  (Term.mk_impl rec_pred phi)
-              with
-              | Failed -> true
-            end
-          | _ -> true
-        ) goal.output.conds
-    in
-    let output = {goal.output with conds = rec_pred :: conds} in
-    {goal with extra_inputs; output; }
+    { target with extra_inputs; }
   in
 
-  (*FIXME: Adding extra_inputs to direct_bideduction goal *)
-  let rec_bided_subgs = List.map extra_inputs_full next_bided_subgs in
+  let rec_bided_subgs = 
+    List.map (add_extra_inputs ~kind:`Recursive) next_bided_subgs 
+  in
+  let direct_bided_subgs = 
+    add_extra_inputs ~kind:`Direct direct_bided_subgs 
+  in
   let _, res = 
     bideduce_all_goals
       game_loc

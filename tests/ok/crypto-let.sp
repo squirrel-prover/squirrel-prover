@@ -6,25 +6,9 @@ name b:message.
 
 channel c.
 
-process A = 
-  let msg= diff(a,b) in
-  out(c, msg).
-
-process Abis = 
-  let msg = diff(a,b) in
-  out(c,msg).
-
-system S1= A.
-system S2= Abis.
-
-process B = 
-  out(c, diff(a,b)).
-
-process Bbis = 
-  out(c,diff(a,b)).
-
-system SB1= B.
-system SB2= Bbis.
+(*------------------------------------------------------------------*)
+system B1 = out(c, diff(a,b)).
+system B2 = out(c, diff(a,b)). (* same process *)
 
 game FOO = {
    oracle foo = {
@@ -33,7 +17,7 @@ game FOO = {
     return diff(a,b)}
 }.
 
-global lemma [SB1/left,SB2/right] _ (t:timestamp[const]) : 
+global lemma [B1/left,B2/right] _ (t:timestamp[const]) : 
 [happens(t)] -> 
 equiv(frame@t).
 Proof.
@@ -41,13 +25,21 @@ intro *.
 crypto FOO => //.
 Qed.
 
-global lemma [SB1/left,SB2/right] _ (t:timestamp[const]) :
+global lemma [B1/left,B2/right] _ (t:timestamp[const]) :
 [happens(t)] ->
 equiv(diff(a,b),frame@t).
 Proof.
 intro *.
 crypto FOO => //.
-Abort.
+Qed.
+
+(*------------------------------------------------------------------*)
+process A = 
+  let msg= diff(a,b) in
+  out(c, msg).
+
+system S1= A.
+system S2= A.
 
 (* TODO: for now, crypto does not handle well cross-system application *)
 (* global lemma [S1/left,S2/right] _ (t:timestamp[const]) :  *)
