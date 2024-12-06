@@ -54,7 +54,7 @@ let get_mode (s : ES.t) : mode =
 let get_terms (mode : mode) : Term.terms =
   match mode with
   | EquivAsymp equiv -> equiv.terms
-  | Deduction goal -> CP.left goal
+  | Deduction goal -> CP.lefts goal
 
 
 (*------------------------------------------------------------------*)
@@ -146,7 +146,7 @@ let mk_maingoal
      ES.set_equiv_conclusion {equiv with terms = new_terms} s
 
   | Deduction goal ->
-     let new_goal = CP.update_left new_terms goal in
+     let new_goal = CP.update_lefts new_terms goal in
      ES.set_conclusion (CP.to_global new_goal) s
 
 

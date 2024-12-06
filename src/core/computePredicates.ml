@@ -4,7 +4,18 @@ module LS = Library.Secrecy
 (*------------------------------------------------------------------*)
 type kind = Deduce | NotDeduce 
 
-type form = kind * Equiv.pred_app
+let predicate_to_kind table (p : Symbols.predicate) : kind =
+  if p = LS.symb_deduce     table then Deduce    else
+  if p = LS.symb_not_deduce table then NotDeduce
+  else assert false
+
+let kind_to_predicate table (k : kind) : Symbols.predicate =
+  match k with
+  | Deduce -> LS.symb_deduce     table
+  | NotDeduce -> LS.symb_not_deduce table
+
+(*------------------------------------------------------------------*)
+type form = Equiv.pred_app
 
 let is_computability (table:Symbols.table) (e:Equiv.form) : bool =
   LS.is_loaded table &&
@@ -31,63 +42,56 @@ let make
     | [], [] -> Type.tmessage, Term.mk_zero
     | _ ->  (Type.tuple left_tys, Term.mk_tuple left)
   in
-  let pa = 
-    Equiv.{ psymb = (match sk with
-        | Deduce -> LS.symb_deduce table
-        | NotDeduce -> LS.symb_not_deduce table);
-        ty_args = [left_tys; right_ty];
-        se_args = [se];
-        multi_args = [se, [left; right]];
-        simpl_args = []}
-  in
-  sk, pa
+  let psymb = kind_to_predicate table sk in
+  Equiv.{ 
+    psymb;
+    ty_args    = [left_tys; right_ty];
+    se_args    = [se];
+    multi_args = [se, [left; right]];
+    simpl_args = [];
+  }
 
-let from_global
-    (table:Symbols.table) (e:Equiv.form) : form 
-  =
+(*------------------------------------------------------------------*)
+let from_global table (e:Equiv.form) : form =
+  assert (is_computability table e);
   match e with 
-  | Atom (Pred pa) -> 
-    let sk = 
-      if pa.psymb = LS.symb_deduce table then Deduce
-      else if pa.psymb = LS.symb_not_deduce table then NotDeduce
-      else assert false
-    in
-    (sk, pa)
+  | Atom (Pred pa) -> pa
   | _ -> assert false
 
-let to_global (_, pa:form) : Equiv.form =
+let to_global (pa:form) : Equiv.form =
   Equiv.Atom (Pred pa)
 
 (*------------------------------------------------------------------*)
-let kind (sk, _:form) : kind =
-  sk
+let kind table (pa:form) : kind = predicate_to_kind table pa.psymb
 
-let system (_, pa:form) : SE.t =
+let system (pa:form) : SE.t =
   let se = List.hd pa.se_args in
   (* sanity check: the same system must be in the multi_args *)
   match pa.multi_args with 
   | [se', _] when SE.equal0 se se' -> se
   | _ -> assert false
 
-let left0 (_, pa:form) : Term.term =
+(*------------------------------------------------------------------*)
+let left (pa:form) : Term.term =
   match pa.multi_args with
   | [_, [u;_]] -> u
   | _ -> assert false 
 
-let left (_, pa:form) : Term.terms =
-  match pa.multi_args with
-  | [_, [u;_]] -> Term.destr_tuple_flatten u
-  | _ -> assert false 
+let lefts (f : form) : Term.terms = 
+  Term.destr_tuple_flatten (left f)
 
-let right (_, pa:form) : Term.term =
+(*------------------------------------------------------------------*)
+let right (pa:form) : Term.term =
   match pa.multi_args with
   | [_, [_;v]] -> v
   | _ -> assert false 
 
-let update_left
-    (left : Term.terms) (sk, pa : form) : form
-  =
-  let right = right (sk, pa) in
+let rights (f : form) : Term.terms = 
+  Term.destr_tuple_flatten (right f)
+
+(*------------------------------------------------------------------*)
+let update_lefts (left : Term.terms) (pa : form) : form =
+  let right = right pa in
   let ty_left = List.map Term.ty left in
   let ty_right = Term.ty right in
   let left, ty_left =
@@ -96,17 +100,14 @@ let update_left
     else
       left, ty_left
   in
-  ( sk,
-    {pa with
-     ty_args    = [Type.tuple ty_left; ty_right];
-     multi_args = [system (sk, pa),
-                   [Term.mk_tuple left; right]]
-    } )
+  { pa with
+    ty_args    = [Type.tuple ty_left; ty_right];
+    multi_args = [system pa,
+                  [Term.mk_tuple left; right]]
+  }
 
-let update_right
-    (right : Term.terms) (sk, pa : form) : form
-  =
-  let left = left0 (sk,pa) in
+let update_rights (right : Term.terms) (pa : form) : form =
+  let left = left pa in
   let ty_left = Term.ty left in
   let ty_right = List.map Term.ty right in
   let right, ty_right =
@@ -115,9 +116,8 @@ let update_right
     else
       right, ty_right
   in
-  ( sk,
-    {pa with
-     ty_args    = [ty_left; Type.tuple ty_right];
-     multi_args = [system (sk, pa),
-                   [left; Term.mk_tuple right]]
-    } )
+  { pa with
+    ty_args    = [ty_left; Type.tuple ty_right];
+    multi_args = [system pa,
+                  [left; Term.mk_tuple right]]
+  }

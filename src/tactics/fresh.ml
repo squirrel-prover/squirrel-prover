@@ -389,7 +389,7 @@ let freshR_secrecy
       sec_context
       env
       (CP.right sgoal)
-      (CP.left sgoal)
+      (CP.lefts sgoal)
   in
   Printer.pr "@]@]@;";
 
@@ -435,7 +435,7 @@ let freshL_secrecy
   (* get n *)
   let ii = L.unloc i in
   let uu, n, vv =
-    try List.splitat ii (CP.left sgoal) with
+    try List.splitat ii (CP.lefts sgoal) with
     | List.Out_of_range ->
        soft_failure ~loc
          (Tactics.Failure 
@@ -456,7 +456,7 @@ let freshL_secrecy
   let phi = Term.mk_ands ~simpl:true phis in
 
   (* the remaining secrecy goal *)
-  let new_goal = CP.update_left (uu @ vv) sgoal in
+  let new_goal = CP.update_lefts (uu @ vv) sgoal in
   let new_sec_sequent =
     ES.set_conclusion (CP.to_global new_goal) s
   in
@@ -478,10 +478,13 @@ let freshL_secrecy
 
 (** Dispatches the application of fresh on a global sequent to
     fresh_equiv, freshL_secrecy, or freshR_secrecy *)
-let fresh_global_tac (args : TacticsArgs.parser_args)
-  : LowTactics.etac =
+let fresh_global_tac
+    (args : TacticsArgs.parser_args)
+  : LowTactics.etac 
+  =
   EquivLT.wrap_fail
     (fun s ->
+       let table = ES.table s in
        match args with
        (* "fresh i" *)
        | [Args.Fresh (opt_args, Some (Args.FreshInt i))] ->
@@ -491,7 +494,7 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
            (* non-deduction goal -> freshL *)
          else if
            ES.conclusion_is_computability s &&
-           CP.kind (ES.conclusion_as_computability s) = CP.NotDeduce
+           CP.kind table (ES.conclusion_as_computability s) = CP.NotDeduce
          then 
            freshL_secrecy opt_args i s
            (* neither -> bad arguments *)
@@ -501,7 +504,7 @@ let fresh_global_tac (args : TacticsArgs.parser_args)
       (* "fresh" *)
       | [Args.Fresh (opt_args, None)] ->
         if ES.conclusion_is_computability s &&
-           CP.kind (ES.conclusion_as_computability s) = CP.NotDeduce
+           CP.kind table (ES.conclusion_as_computability s) = CP.NotDeduce
         then
           freshR_secrecy opt_args s
         else

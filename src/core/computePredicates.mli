@@ -40,21 +40,30 @@ val to_global : form -> Equiv.form
 
 (*------------------------------------------------------------------*)
 (** Extracts the kind of secrecy goal. *)
-val kind : form -> kind
+val kind : Symbols.table -> form -> kind
 
-(** Returns the system of the secrecy goal *)
+(** Returns the system of the secrecy goal. *)
 val system : form -> SE.t
 
 (** Returns the left-hand side of the secrecy goal. 
     In case it is a tuple, or nested tuples, flattens it as
     a list of terms. *)
-val left : form -> Term.terms
+val left  : form -> Term.term
 
-(** Returns the right-hand side of the secrecy goal. *)
+(** Same as [left], but flattens tuple (even nested). *)
+val lefts : form -> Term.terms
+
+(** Similar to [left], but on the right. *)
 val right : form -> Term.term
 
-(** Returns a new secrecy goal where the left-hand side has been updated*)
-val update_left : Term.terms -> form -> form
+(** Similar to [lefts], but on the right. *)
+val rights : form -> Term.terms
 
-(** Returns a new secrecy goal where the right-hand side has been updated*)
-val update_right : Term.terms -> form -> form
+(*------------------------------------------------------------------*)
+(** Returns a new computability goal where the left-hand side has been
+    updated. *)
+val update_lefts : Term.terms -> form -> form
+
+(** Returns a new computability goal where the right-hand side has
+    been updated. *)
+val update_rights : Term.terms -> form -> form
