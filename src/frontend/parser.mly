@@ -54,7 +54,7 @@
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE
 %token REDUCE SIMPL AUTO
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
+%token REWRITE PUNCTURE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO DEDUCE CONST
 %token PROOF QED RESET UNDO ABORT HINT
@@ -1261,6 +1261,9 @@ fresh_arg:
 %inline rewrite_oracle:
 | REWRITE ORACLE { }
 
+%inline puncture_oracle:
+| PUNCTURE ORACLE { }
+
 (*------------------------------------------------------------------*)
 /* local or global formula, un-ambiguous */
 /* %inline any_sform: */
@@ -1564,6 +1567,9 @@ tac:
 
   | l=lloc(rewrite_oracle) a=named_args t=sterm pos=rewrite_oracle_in
     { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, a, pos)] }
+
+  | l=lloc(puncture_oracle) pos=loc(INT) t=sterm
+    { mk_abstract l "puncture oracle" [TacticsArgs.PunctureOracle (pos, t)] }
 
   | l=lloc(APPLY) a=named_args t=pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }

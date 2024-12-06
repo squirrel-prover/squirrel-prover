@@ -152,6 +152,7 @@
   "split"
   "subst"
   "rewrite"
+  "puncture"  
   "true"
   "cca1"
   "ddh"

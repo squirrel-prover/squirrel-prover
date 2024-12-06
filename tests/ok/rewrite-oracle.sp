@@ -45,3 +45,29 @@ Proof.
   - admit.
 Qed.
 
+include WeakSecrecy.
+
+type key [finite,large].
+
+name h : key -> key.
+
+name s : key.
+
+abstract null_key : key.
+
+global lemma [set : S/left; equiv : S/left,S/left] _ :
+
+ $( (h s, (fun x => h x)) *> s ).
+Proof.
+
+puncture oracle 1 null_key.
+
+fresh 0; 1 : auto.
+
+puncture oracle 0 (h s).
+simpl.
+
+rewrite if_same_under_cond; 1: auto.
+
+by fresh.
+Qed.

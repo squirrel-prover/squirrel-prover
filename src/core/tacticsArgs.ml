@@ -225,7 +225,8 @@ type parser_arg =
   | Fresh          of named_args * fresh_arg option
   | RewriteIn      of rw_arg list * in_target
   | RewriteEquiv   of rw_equiv_item
-  | RewriteOracle  of Typing.term * named_args * int L.located option
+  | RewriteOracle  of Typing.term * named_args * int L.located option 
+  | PunctureOracle of int L.located * Typing.term
   | Trans          of trans_arg
   | ApplyIn        of named_args * Typing.pt * apply_in
   | Case           of case_arg

@@ -229,6 +229,7 @@ let rec token buf =
   | "return" -> !?RETURN
   | "revert" -> !?REVERT
   | "rewrite" -> !?REWRITE
+  | "puncture" -> !?PUNCTURE
   | "rnd" -> !?RND
   | "search" -> !?SEARCH
   | "senc" -> !?SENC

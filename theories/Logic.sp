@@ -298,9 +298,15 @@ Proof.
 Qed.
 hint rewrite if_same.
 
-exact lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
- b = b' => 
- if b then (if b' then x else y) else z = 
+exact lemma [any] if_same_under_cond ['a] (b:bool,x,y:'a) :
+ (b => x = y) => if b then x else y = y.
+Proof.
+intro Eq. by case b. 
+Qed.
+
+lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' =>
+ if b then (if b' then x else y) else z =
  if b then x else z.
 Proof.
   by intro ->; case b'.

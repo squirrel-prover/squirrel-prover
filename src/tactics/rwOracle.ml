@@ -233,6 +233,8 @@ let rewrite_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
      [subgoal; maingoal]
   | _ -> hard_failure (Failure "improper arguments.")
 
+
+
 (** Declare the tactic. *)
 let rewrite_oracle_tac args s sk fk =
   try sk (rewrite_oracle_args args s) fk with
@@ -242,3 +244,51 @@ let rewrite_oracle_tac args s sk fk =
 let () =
   T.register_general "rewrite oracle"
     (LT.gentac_of_etac_arg rewrite_oracle_tac)
+
+
+(* Over a goal (u, O *> v), creates given a w and O the goal (u, fun x
+   => if x = v then w else O x) *> v *)
+let puncture_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
+  match args with
+  | [Args.PunctureOracle (pos, punc_term)] -> 
+    (match get_mode s with
+     | Deduction concl ->
+       let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
+       let punc_term, ty = Typing.convert cenv punc_term in
+       let terms = get_terms (Deduction concl) in
+       let oracle, ty  =
+         if (L.unloc pos) < 0 || (L.unloc pos) >= List.length terms then
+           soft_failure ~loc:(L.loc pos) 
+             (GoalBadShape "Wrong number of deduction items.");
+         let oracle = List.nth terms (L.unloc pos) in
+         match Term.ty oracle with
+         | Fun (ty1, _) -> 
+           (if not (Type.equal ty1 ty) then
+              soft_failure (Failure "The given item in the goal \
+                                     must have the same type as the argument.")
+            else 
+              oracle, ty1)
+         | _ -> soft_failure (Failure "Expected a function");
+       in
+       let x = Vars.make_fresh ty "x" in
+       let secret = CP.right concl in
+       let new_oracle = Term.mk_quant Term.Lambda  [x]
+           (Term.mk_ite
+              (Term.mk_eq (Term.mk_var x) secret)
+              punc_term
+              (Term.mk_app oracle [Term.mk_var x])) in
+       let goal = mk_maingoal ~new_oracle (Deduction concl) (L.unloc pos) s in
+       [goal]      
+     | _ -> hard_failure (Failure "improper arguments."))
+  | _ -> hard_failure (Failure "improper arguments.")
+
+(** Declare the tactic. *)
+let puncture_oracle_tac args s sk fk =
+  try sk (puncture_oracle_args args s) fk with
+  | Tactics.Tactic_soft_failure e -> fk e
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "puncture oracle"
+    ~pq_sound:false
+    (LT.gentac_of_etac_arg puncture_oracle_tac)
