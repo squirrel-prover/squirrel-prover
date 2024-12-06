@@ -402,7 +402,7 @@ type oracle_pat = {
 }
 
 (* ----------------------------------------------------------------- *)
-(** The function [exact_eq_under_cond] return a substitution [sigma]
+(** The function [exact_eq_under_cond] returns a substitution [sigma]
     of the variables [unif_vars] such that: 
     - [target.term σ = known.term σ]
     - [known.cond σ ⇒ target.cond σ]
@@ -430,6 +430,7 @@ let exact_eq_under_cond
   Match.E.deduce_mem cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
+(** unknow global samples assignments *)
 exception UnknowGlobalSmplsAssign
 
 (** Name contraints module.*)
