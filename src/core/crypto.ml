@@ -2484,7 +2484,10 @@ let derecursify_term
 
 (** Given a term, return some corresponding [known_sets] using
     built-in rules + user-given deduction rules *)
-let term_set_strengthen (env : Env.t) (k : TSet.t) : TSet.t list =
+let term_set_strengthen
+    (env : Env.t) (hyps : TraceHyps.hyps) (k : TSet.t) 
+  : TSet.t list 
+  =
   (* convert [k] from a [TSet.t] to a [Match.term_set] *)
   let k = Match.{
       term = k.term; 
@@ -2492,7 +2495,7 @@ let term_set_strengthen (env : Env.t) (k : TSet.t) : TSet.t list =
       cond = k.conds; 
       se = env.system.set; } 
   in
-  let l = Match.term_set_strengthen ~inputs:[] env k in (* FIXME: provide useful inputs *)
+  let l = Match.term_set_strengthen ~inputs:[] env hyps k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
   List.map (fun (k : Match.term_set) ->
       assert (
@@ -2508,10 +2511,13 @@ let term_set_strengthen (env : Env.t) (k : TSet.t) : TSet.t list =
     ) l
 
 (* compute a set of known macros from a occurrence of a recursive call *)
-let term_set_of_occ env ~cond (k : rec_call_occ) : TSet.t list =
+let term_set_of_occ 
+    (env : Env.t) (hyps : TraceHyps.hyps) ~cond (k : rec_call_occ) 
+  : TSet.t list 
+  =
   let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
-  term_set_strengthen env TSet.{ term = body; conds; vars = k.occ_vars; }
+  term_set_strengthen env hyps TSet.{ term = body; conds; vars = k.occ_vars; }
 
 (*------------------------------------------------------------------*)
 (** Ad hoc simplification for happens conditions in recursive
@@ -2617,7 +2623,7 @@ let derecursify
            [vars] are local, unrestricted, variables. *)
     in
     (* let extra_cond = odflt Term.mk_true form in *)
-    let rec_terms = List.concat_map (term_set_of_occ env ~cond:[] ) rec_term_occs in
+    let rec_terms = List.concat_map (term_set_of_occ env hyps ~cond:[] ) rec_term_occs in
     (* remove duplicates *)
     let rec_terms =
       List.fold_left (fun rec_terms t ->

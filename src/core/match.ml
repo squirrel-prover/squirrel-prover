@@ -1236,21 +1236,29 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (** {2 Reduction utilities} *)
 
 (*------------------------------------------------------------------*)
-(** Put [t] in weak-head normal form w.r.t. [st]. *)
-let whnf 
-    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+let whnf0
+    ~(red_param : ReductionCore.red_param) 
+    ~(hyps : TraceHyps.hyps) ~(system : SE.context)
+    ~(vars : Vars.env) ~(table : Symbols.table)
+    (t : Term.term) 
   : Term.term * bool 
   =
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let vars = Vars.add_vars st.bvs st.env in
-  let red_st =
-    R.mk_state
-      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
-  in
+  let red_st = R.mk_state ~hyps ~system ~vars ~red_param table in
   let strat = R.(MayRedSub ReductionCore.rp_full) in
   R.whnf_term ~strat red_st t
+
+(** Put [t] in weak-head normal form w.r.t. [st]. *)
+let whnf
+    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+  : Term.term * bool 
+  =
+  let vars = Vars.add_vars st.bvs st.env in
+  whnf0
+    ~hyps:st.hyps ~system:st.system
+    ~vars ~red_param ~table:st.table t
 
 (*------------------------------------------------------------------*)
 (** Reduce [t] once in head position w.r.t. [st]. *)
@@ -2175,6 +2183,7 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
     - [(k1,...,kn)] is deducible from [inputs,k]
     - [k] is deducible from [inputs,(k1, ..., kn)] *)
 let term_set_decompose
+    (_env : Env.t) (_hyps : TraceHyps.hyps)
     ~(inputs:term_set list) (known : term_set) : term_set list 
   =
   (* FEATURE: use the real deduction function `deduce` below rather
@@ -2240,20 +2249,30 @@ let term_set_decompose
 
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli` *)
-let term_set_strengthen ~(inputs:term_set list) (env : Env.t) (k : term_set) : term_set list =
-  let k_decomposed = term_set_decompose ~inputs k in
+let term_set_strengthen
+    (env : Env.t) (hyps : TraceHyps.hyps)
+    ~(inputs:term_set list) (k : term_set) : term_set list 
+  =
+  let k_decomposed = term_set_decompose ~inputs env hyps k in
   let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
   k_decomposed @ k_decomposed'
 
 (** Given a term [term], return some corresponding [known_sets] such that:
     [inputs, term ▷ knowns] *)
-let term_set_list_of_term ~(inputs:term_set list) (env : Env.t) (term : Term.term) : term_set list =
+let term_set_list_of_term
+    (env : Env.t) (hyps : TraceHyps.hyps)
+    ~(inputs:term_set list) (term : Term.term) : term_set list 
+  =
   let k = term_set_of_term env.system.set term in
-  term_set_strengthen ~inputs env k
+  term_set_strengthen ~inputs env hyps k
 
-let known_sets_of_terms (env : Env.t) (terms : Term.terms) : known_sets =
+let known_sets_of_terms 
+    (env : Env.t) (hyps : TraceHyps.hyps)
+    (terms : Term.terms) 
+  : known_sets 
+  =
   List.fold_left (fun inputs term ->
-      term_set_list_of_term ~inputs env term @ 
+      term_set_list_of_term ~inputs env hyps term @ 
       inputs
     ) [] terms 
 
@@ -2935,6 +2954,7 @@ module E = struct
       (table  : Symbols.table)
       (system : SE.fset)
       (env    : Vars.env)
+      (hyps   : TraceHyps.hyps)
       (init_terms : Term.terms) : msets
     =
     let ppe = default_ppe ~table () in
@@ -3104,41 +3124,12 @@ module E = struct
     let init_terms = 
       let context = SE.{ set= (system :> SE.t); pair = None; } in
       let env = Env.init ~table ~system:context ~vars:env () in
-      known_sets_of_terms env init_terms 
+      known_sets_of_terms env hyps init_terms 
     in
 
     dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
 
     specialize_deduce_fixpoint init_fixpoint init_terms
-
-  (* memoisation *)
-  let strengthen =
-    let module M = struct
-      type t = Symbols.table * SE.fset * Vars.env * Term.terms
-
-      let hash (tbl, s, e, terms) =
-        hcombine_list Term.hash
-          (hcombine (Symbols.tag tbl)
-             (hcombine (SE.hash s)
-                (Hashtbl.hash e))) (* FIXME: better hash? *)
-          terms
-
-      let equal (tbl, s, e, terms) (tbl', s', e', terms') =
-        Symbols.tag tbl = Symbols.tag tbl' &&
-        SE.equal0 s s' &&
-        e = e' &&               (* FIXME: better eq check? *)
-        List.length terms = List.length terms' &&
-        List.for_all2 (Term.equal) terms terms'
-
-    end in
-    let module Memo = Hashtbl.Make(M) in
-    let memo = Memo.create 256 in
-    fun tbl s e terms ->
-      try Memo.find memo (tbl, s, e, terms) with
-      | Not_found ->
-        let r = strengthen tbl s e terms in
-        Memo.add memo (tbl, s, e, terms) r;
-        r
 
   (*------------------------------------------------------------------*)
   let flip = function
@@ -3409,7 +3400,7 @@ module E = struct
     let mset_l =
       if st.support = [] && st.use_fadup && SE.is_fset se then
         let system = SE.to_fset se in
-        let msets = strengthen st.table system st.env inputs in
+        let msets = strengthen st.table system st.env st.hyps inputs in
         msets_to_list msets
       else []
     in
@@ -3421,7 +3412,7 @@ module E = struct
   let inputs =
       known_sets_union
         (known_sets_of_mset_l se mset_l)
-        (known_sets_of_terms env inputs)
+        (known_sets_of_terms env st.hyps inputs)
     in
 
     let mv, minfos =
