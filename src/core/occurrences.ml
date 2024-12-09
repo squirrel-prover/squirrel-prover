@@ -573,7 +573,8 @@ let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
 
 
 let get_actions_ext
-    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(mode  : Iter.allowed_constants ) (* allowed sub-terms without 
+                                          further checks *)
     ~(env   : Env.t)
     ~(hyps  : TraceHyps.hyps)
     (t : Term.term)
@@ -581,7 +582,9 @@ let get_actions_ext
   : ts_occs
   =
   let env fv =
-    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+    Env.update 
+      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) 
+      env
   in
 
   let ot, contx = info in
@@ -617,14 +620,19 @@ let get_actions_ext
     in
 
     match t with
-    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
-    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env t -> []
-    | _ when mode = Const     && HighTerm.is_constant                  env t -> []
+    | _ when mode = PTimeSI  
+          && HighTerm.is_ptime_deducible ~si:true  env t -> []
+    | _ when mode = PTimeNoSI 
+          && HighTerm.is_ptime_deducible ~si:false env t -> []
+    | _ when mode = Const     
+          && HighTerm.is_constant                  env t -> []
 
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s variable: @[%a@]"
-          (match mode with Const -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
+          (match mode with
+             Const -> "non-constant" 
+           | PTimeSI | PTimeNoSI -> "non-ptime")
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
@@ -636,7 +644,8 @@ let get_actions_ext
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
           let ts =
-            (* we force on unfolding of the following macros, for a more precise rule *)
+            (* we force the unfolding of the following macros, 
+               for a more precise rule *)
             if m.s_symb = Symbols.Classic.inp   || 
                m.s_symb = Symbols.Quantum.inp   || 
                m.s_symb = Symbols.Quantum.state 
@@ -675,7 +684,8 @@ let get_actions_ext
     Should only be used when sources are directly occurring,
     not themselves produced by unfolding macros. *)
 let get_macro_actions
-    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms 
+                                            without further checks *)
     ~(env   : Env.t)
     ~(hyps  : TraceHyps.hyps)
     (contx : Constr.trace_cntxt)
@@ -833,7 +843,8 @@ struct
       Relies on [fold_macro_support] to look through
       all macros in the term. *)
   let find_all_occurrences
-      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
+      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms
+                                                   without further checks *)
       ?(pp_descr    : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
       (hyps         : TraceHyps.hyps)

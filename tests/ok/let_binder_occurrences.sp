@@ -27,3 +27,12 @@ Proof.
   crypto G. 
   apply foo.
 Qed. 
+
+lemma [P] _ (t:timestamp[const]) : 
+  let u = frame@t in
+  att(u) <> k.
+Proof.
+  intro u H. 
+  fresh H.  
+  apply foo.
+Qed. 
