@@ -2100,7 +2100,14 @@ let rec bideduce_term_strict
     let outputs = [t0;t1] in
     notify_bideduce_term_strict query "Function And" ;
     bideduce query outputs
-        
+
+  | Term.(App (Fun(f,_),[t0;t1])) when f = Term.f_or ->
+    let t1 = CondTerm.mk ~term:t1 ~conds:( Term.mk_not t0::conds) in
+    let t0 = CondTerm.mk ~term:t0 ~conds in
+    let outputs = [t0;t1] in
+    notify_bideduce_term_strict query "Function Or" ;
+    bideduce query outputs
+
   | Term.(App (Fun _ as fs,l))
     when HighTerm.is_ptime_deducible ~si:true query.env fs ->
       assert (l <> []);
