@@ -120,6 +120,8 @@ let phi_fresh_same_system
 
   let get_bad : NOS.f_fold_occs = get_bad_occs n in
 
+  (* NoHonestRand: variables are allowed as long as they do not depend
+     on honest randomness *)
   let occs =
     NOS.find_all_occurrences ~mode:Iter.NoHonestRand ~pp_descr:(Some pp_n)
       get_bad

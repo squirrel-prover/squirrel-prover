@@ -115,7 +115,7 @@ let tactics =
         (fun () ->
            try run ~test "tests/alcotest/fresh_reach_var.sp" with
            | Tactics.Tactic_soft_failure
-               (_, Tactics.Failure "terms contain a non-constant variable: x") ->
+               (_, Tactics.Failure "terms contain a variable that may depend on honest randomness: x") ->
              raise Ok)
     end ;
     "Check equalities false if unsupported terms", `Quick, begin fun () ->

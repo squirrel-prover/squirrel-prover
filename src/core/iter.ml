@@ -478,8 +478,10 @@ let get_macro_occs
 
     | Term.Var v -> 
       let err_str =
-        Fmt.str "terms contain a %s variable: @[%a@]" 
-          (match mode with NoHonestRand -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
+        Fmt.str "terms contain a %s: @[%a@]" 
+          (match mode with
+             NoHonestRand -> "variable that may depend on honest randomness"
+           | PTimeSI | PTimeNoSI -> "non-ptime variable")
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
