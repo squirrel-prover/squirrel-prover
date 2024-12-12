@@ -573,8 +573,7 @@ let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
 
 
 let get_actions_ext
-    ~(mode  : Iter.allowed_constants ) (* allowed sub-terms without 
-                                          further checks *)
+    ~(mode  : Iter.allowed ) (* allowed sub-terms without further checks *)
     ~(env   : Env.t)
     ~(hyps  : TraceHyps.hyps)
     (t : Term.term)
@@ -624,14 +623,15 @@ let get_actions_ext
           && HighTerm.is_ptime_deducible ~si:true  env t -> []
     | _ when mode = PTimeNoSI 
           && HighTerm.is_ptime_deducible ~si:false env t -> []
-    | _ when mode = Const     
-          && HighTerm.is_constant                  env t -> []
+    | _ when mode = NoHonestRand &&
+             (HighTerm.is_constant env t ||
+              HighTerm.is_ptime_deducible ~si:false env t) -> []
 
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s variable: @[%a@]"
           (match mode with
-             Const -> "non-constant" 
+           | NoHonestRand -> "non-constant" 
            | PTimeSI | PTimeNoSI -> "non-ptime")
           Vars.pp v
       in
@@ -684,8 +684,7 @@ let get_actions_ext
     Should only be used when sources are directly occurring,
     not themselves produced by unfolding macros. *)
 let get_macro_actions
-    ~(mode  : Iter.allowed_constants )   (* allowed sub-terms 
-                                            without further checks *)
+    ~(mode  : Iter.allowed)   (* allowed sub-terms without further checks *)
     ~(env   : Env.t)
     ~(hyps  : TraceHyps.hyps)
     (contx : Constr.trace_cntxt)
@@ -719,7 +718,7 @@ module type OccurrenceSearch = sig
     simple_occs
 
   val find_all_occurrences :
-    mode:Iter.allowed_constants ->
+    mode:Iter.allowed ->
     ?pp_descr:unit Fmt.t option ->
     f_fold_occs ->
     TraceHyps.hyps ->
@@ -843,8 +842,7 @@ struct
       Relies on [fold_macro_support] to look through
       all macros in the term. *)
   let find_all_occurrences
-      ~(mode        : Iter.allowed_constants)   (* allowed sub-terms
-                                                   without further checks *)
+      ~(mode        : Iter.allowed)   (* allowed sub-terms without further checks *)
       ?(pp_descr    : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
       (hyps         : TraceHyps.hyps)

@@ -315,7 +315,7 @@ val expand_macro_check_all : expand_info -> Term.term -> Term.term
     Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)
 val get_macro_actions :
-  mode:Iter.allowed_constants ->
+  mode:Iter.allowed ->
   env:Env.t ->
   hyps:TraceHyps.hyps ->
   Constr.trace_cntxt ->
@@ -366,8 +366,7 @@ module type OccurrenceSearch = sig
       Takes care of macro expansion and going through all terms,
       using [fold_macro_support] and [map_fold]. *)
   val find_all_occurrences :
-    mode:Iter.allowed_constants -> (* allowed sub-terms 
-                                      without further checks *)
+    mode:Iter.allowed -> (* allowed sub-terms without further checks *)
     ?pp_descr:unit Fmt.t option -> (* prints what we're looking for *)
     f_fold_occs ->
     TraceHyps.hyps ->

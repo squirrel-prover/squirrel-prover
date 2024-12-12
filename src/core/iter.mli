@@ -173,7 +173,7 @@ val fold_descr :
 module PathCond : sig
   (** A path condition [φ] constraining the set of timestamp [τ] that can occur 
       before some source timestamp [τ1].
-      
+
       This precise abstraction works as follows: 
         [φ τ τ1] iff. [∃ τ0 s.t. τ ≤ τ0 ≤ τ1] and *)
   type t =
@@ -207,9 +207,14 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Folding over the macro supports of a list of terms} *)
 
-(** Allowed constants in terms for cryptographic tactics:
-    - SI is for system-independent. *)
-type allowed_constants = Const | PTimeSI | PTimeNoSI
+(** Allowed computations in terms for cryptographic and probabilistic
+    tactics:
+    - SI stands for system-independent.
+
+    - `NoHonestRand` means any computation that does not depends on
+       the protocol randomness (we do not check for system-independence
+       here). *)
+type allowed = NoHonestRand | PTimeSI | PTimeNoSI
 
 (*------------------------------------------------------------------*)
 (** An indirect occurrence, used as return type of
@@ -276,7 +281,7 @@ val pp_iocc : iocc formatter
     possible cases of recursively defined function bodies that may be
     evaluated during the evaluation of [terms]. *)
 val fold_macro_support :
-  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
+  ?mode:allowed ->   (* allowed sub-terms without further checks *)
   (iocc -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
   Env.t ->
@@ -288,7 +293,7 @@ val fold_macro_support :
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 val fold_macro_support1 :
-  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
+  ?mode:allowed ->   (* allowed sub-terms without further checks *)
   (Action.descr -> Term.term -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
   Env.t ->

@@ -121,7 +121,7 @@ let phi_fresh_same_system
   let get_bad : NOS.f_fold_occs = get_bad_occs n in
 
   let occs =
-    NOS.find_all_occurrences ~mode:Iter.Const ~pp_descr:(Some pp_n)
+    NOS.find_all_occurrences ~mode:Iter.NoHonestRand ~pp_descr:(Some pp_n)
       get_bad
       hyps contx env (tt @ n.args)
   in

@@ -417,9 +417,8 @@ let pp_hash_occ fmt (x : hash_occ) =
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
 
-(** Allowed constants in terms for cryptographic tactics:
-    - SI is for system-independent. *)
-type allowed_constants = Const | PTimeSI | PTimeNoSI
+(** see `.mli` *)
+type allowed = NoHonestRand | PTimeSI | PTimeNoSI
 
 (*------------------------------------------------------------------*)
 (** occurrences of a macro [n(i,...,j)] *)
@@ -435,7 +434,7 @@ type macro_occs = macro_occ list
     - [mode = `Delta]: only Global macros are expanded (and ignored)
     @raise a user-level error if a non-ptime term variable occurs in the term. *)
 let get_macro_occs
-    ~(mode  : allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(mode  : allowed)             (* allowed sub-terms without further checks *)
     ~(expand_mode : [`FullDelta | `Delta ])
     ~(env   : Env.t)
     ~(hyps  : TraceHyps.hyps)      (* initial hypotheses *)
@@ -473,12 +472,14 @@ let get_macro_occs
     match t with
     | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
     | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env t -> []
-    | _ when mode = Const     && HighTerm.is_constant                  env t -> []
+    | _ when mode = NoHonestRand &&
+             (HighTerm.is_constant env t ||
+              HighTerm.is_ptime_deducible ~si:false env t) -> []
 
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s variable: @[%a@]" 
-          (match mode with Const -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
+          (match mode with NoHonestRand -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
@@ -888,7 +889,7 @@ let mset_of_macro_occ (env : Sv.t) ~(path_cond : PathCond.t) (occ : macro_occ) :
 (** Return an over-approximation of the macros reachable from a term
     in any trace model. *)
 let macro_support
-    ~(mode : allowed_constants)   (* allowed sub-terms without further checks *)
+    ~(mode : allowed)             (* allowed sub-terms without further checks *)
     ~(env  : Env.t)
     ~(hyps : TraceHyps.hyps)      (* initial hypotheses *)
     (cntxt : Constr.trace_cntxt)
@@ -1053,7 +1054,7 @@ let pp_iocc fmt (o : iocc) : unit =
     See the function [fold_macro_support] below for a more detailed 
     description. *)
 let _fold_macro_support
-    ?(mode : allowed_constants = PTimeSI)   (* allowed sub-terms without further checks *)
+    ?(mode : allowed = PTimeSI)   (* allowed sub-terms without further checks *)
     (func  : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
@@ -1134,7 +1135,7 @@ let _fold_macro_support
 
 (** See `.mli` for a complete description *)
 let fold_macro_support
-    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
+    ?(mode : allowed option)   (* allowed sub-terms without further checks *)
     (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
@@ -1148,7 +1149,7 @@ let fold_macro_support
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 let fold_macro_support1
-    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
+    ?(mode : allowed option)   (* allowed sub-terms without further checks *)
     (func  : (Action.descr -> Term.term -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Env.t)
