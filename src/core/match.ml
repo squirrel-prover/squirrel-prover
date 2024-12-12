@@ -2434,7 +2434,8 @@ let fa_decompose
 
   (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
 
-  (* tuples *)
+  (* action and tuples *)
+  | Term.Action (_, terms)
   | Term.Tuple terms ->
     Some (List.map (fun term -> st, { output with term } ) terms)
 
