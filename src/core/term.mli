@@ -701,10 +701,12 @@ val project_tpat_op_opt : Projection.t list option -> term pat_op -> term pat_op
       variables. *)
 val alpha_conv : ?subst:subst -> term -> term -> bool 
 
+exception AlphaFailed
+
 (** Process binder variables during alpha-renaming, updating the
     alpha-renaming substitution (see [alpha_conv]).
     Raise if alpha-conversion fails. *)
-val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 
+val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst
 
 (*------------------------------------------------------------------*)
 (** [open_ftype fty] opens an [ftype] by refreshes its quantified 

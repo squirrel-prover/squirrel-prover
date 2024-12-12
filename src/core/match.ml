@@ -2112,6 +2112,52 @@ let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
   }
 
 (*------------------------------------------------------------------*)
+let refresh_term_set (known : term_set) : term_set =
+  let vars, subst = Term.refresh_vars_w_info known.vars in
+  { vars; se = known.se;
+    term = Term.subst subst known.term;
+    cond = List.map (Term.subst subst) known.cond; }
+
+(*------------------------------------------------------------------*)
+(** Check if [k] appears in [l] modulo alpha *)
+let term_set_mem_alpha
+    (k : term_set) (l : term_set list) : bool
+  =
+  let k = refresh_term_set k in
+  List.exists (fun k' ->
+      if List.length k'.cond <> List.length k.cond ||
+         List.length k'.vars <> List.length k.vars ||
+         not (SE.equal0 k'.se k.se)
+      then false
+      else if
+        List.exists2 (fun (_,t) (_,t') -> t <> t') k.vars k'.vars
+      then false
+      else
+        try
+          let k' = refresh_term_set k' in
+          let vars  = List.map fst k.vars  in
+          let vars' = List.map fst k'.vars in
+          let subst = Term.alpha_bnds [] vars vars' in
+          Term.alpha_conv ~subst k.term k'.term &&
+          List.for_all2 (fun c c' -> Term.alpha_conv ~subst c c') k.cond k'.cond
+        with Term.AlphaFailed -> false
+    ) l
+
+(** add [k] to [l] if [k] is not already present in [l] (modulo
+    alpha) *)
+let term_set_add
+    (k : term_set) (l : term_set list) : term_set list
+  =
+  if term_set_mem_alpha k l then l else k :: l
+
+(** computes the union of [l1] and [l2], avoiding some redundant term
+    sets (two set that are equal modulo alpha are not added).  *)
+let term_set_union
+    (l1 : term_set list) (l2 : term_set list) : term_set list
+  =
+  List.fold_left (fun l2 k -> term_set_add k l2) l2 l1
+
+(*------------------------------------------------------------------*)
 type known_sets = term_set list
 
 (*------------------------------------------------------------------*)
@@ -2121,15 +2167,6 @@ let _pp_known_sets ppe fmt (ks : known_sets) =
 
 let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
-
-let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets = s1 @ s2
-
-(*------------------------------------------------------------------*)
-let refresh_term_set (known : term_set) : term_set =
-  let vars, subst = Term.refresh_vars_w_info known.vars in
-  { vars; se = known.se;
-    term = Term.subst subst known.term;
-    cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
 (** {3 Deduction: automated entailment reasoning} *)
@@ -2320,7 +2357,7 @@ let deduce_mem0
      instead. *)
   let st = { st with support = known.vars @ st.support; } in
 
-  (* adding [cterm.cond] as hypohtesis before matching *)
+  (* adding [cterm.cond] as hypotheses before matching *)
   let st =
     let hyps =
       TraceHyps.add
@@ -2708,7 +2745,7 @@ let term_set_strengthen
   =
   let k_decomposed = term_set_decompose ~inputs env hyps k in
   let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
-  k_decomposed @ k_decomposed'
+  term_set_union k_decomposed k_decomposed'
 
 (** Given a term [term], return some corresponding [known_sets] such that:
     [inputs, term ▷ knowns] *)
@@ -2725,8 +2762,9 @@ let known_sets_of_terms
   : known_sets 
   =
   List.fold_left (fun inputs term ->
-      term_set_list_of_term ~inputs env hyps term @ 
-      inputs
+      term_set_union
+        (term_set_list_of_term ~inputs env hyps term)
+        inputs
     ) [] terms 
 
 (*------------------------------------------------------------------*)
@@ -3252,7 +3290,7 @@ let strengthen
         let known_sets = 
           known_sets_of_mset_l ~extra_cond_le:ts (system :> SE.t) known_sets 
         in
-        known_sets_union init_terms known_sets
+        term_set_union init_terms known_sets
       in
       let ded_sets = specialize_deduce table env system cand_set all_known_sets in
 
@@ -3410,7 +3448,7 @@ let deduce_terms
 
   let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
   let inputs =
-    known_sets_union
+    term_set_union
       (known_sets_of_mset_l se mset_l)
       (known_sets_of_terms env st.hyps inputs)
   in
