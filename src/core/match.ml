@@ -1493,6 +1493,11 @@ let reduce_glob_head1 (f : Equiv.form) : Equiv.form * bool =
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
 
+let init_minfos : match_infos = Mt.empty
+
+let deduce_succeed (minfos : match_infos) : bool =
+  Mt.for_all (fun _ r -> r <> MR_failed) minfos
+
 type match_res =
   | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
@@ -2677,12 +2682,29 @@ let term_set_decompose
   =
   (* FEATURE: use the real deduction function `deduce` below rather
      than a very basic syntactic check as we do now. *)
-  let deduce ~(inputs:term_set list) (t : term_set) =   
-    let t = refresh_term_set t in
-    List.exists (fun input ->
-        List.for_all (fun x -> List.exists (Term.equal x) input.cond) t.cond &&
-        Term.equal input.term t.term 
-      ) inputs
+  let deduce ~(inputs:term_set list) (t : term_set) : bool =
+    let output : cond_term = {
+      term = t.term;
+      cond = Term.mk_ands t.cond;
+    }
+    in
+
+    (* currently, this is an invariant: if this changed, we could
+       simply build a different unif state, without forgetting of
+       changing the set of hypotheses according to the system
+       change. *)
+    assert (t.se = env.system.set);
+
+    (* binder variables are declared global, constant and adv,
+       as these are inputs (hence known values) to the adversary  *)
+    let venv = Vars.add_vars t.vars env.vars in
+    let st =
+      mk_unif_state
+        ~env:venv env.table env.system hyps
+        ~support:[]
+    in
+    let _, minfos = deduce ~inputs ~output st init_minfos in
+    deduce_succeed minfos
   in
 
   let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
@@ -3457,10 +3479,10 @@ let deduce_terms
     List.fold_left (fun (mv, minfos) output ->
         let output = { term = output; cond = Term.mk_true; } in
         deduce ~output ~inputs { st with mv } minfos
-      ) (st.mv, Mt.empty) outputs
+      ) (st.mv, init_minfos) outputs
   in
 
-  if Mt.for_all (fun _ r -> r <> MR_failed) minfos
+  if deduce_succeed minfos
   then Match mv
   else NoMatch (Some (outputs, minfos_norm minfos))
 

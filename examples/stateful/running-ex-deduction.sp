@@ -159,8 +159,5 @@ Proof.
 
   (* More rewriting inside sequences. *)
   rewrite /sT.
-  (* At this point our automatic bi-deduction checker cannot verify that
-     items 2 and 3 are bi-deducible. Its implementation could be improved
-     to complete this tedious proof. *)
-  try apply ~inductive IH. admit.
+  try apply ~inductive IH. 
 Qed.
