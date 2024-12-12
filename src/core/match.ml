@@ -2006,6 +2006,16 @@ end
 (** {3 Data-structures representing various sets of terms} *)
 
 (*------------------------------------------------------------------*)
+(** [{term; cond;}] is the term [term] whenever [cond] holds. *)
+type cond_term = { term : Term.term; cond : Term.term }
+
+let mk_cond_term (term:Term.term) (cond:Term.term) :cond_term = {term;cond}
+
+let pp_cond_term fmt (c : cond_term) =
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]}@]"
+    Term.pp c.term Term.pp c.cond
+
+(*------------------------------------------------------------------*)
 (** Set of terms over some index or timestamp variables with pending substitution.
     If the type variable ['a] is [Term.term list], then
       [{ term  = [t1; ...; tn];
@@ -2046,6 +2056,19 @@ let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
     Term.pp cand.cond
 
 (*------------------------------------------------------------------*)
+(* return: substitution, condition, pattern *)
+let pat_of_cand_set
+    (cand : cand_set) : Mvar.t * Term.term * Term.term pat_op
+  =
+  cand.subst,
+  cand.cond,
+  {
+    pat_op_term   = cand.term;
+    pat_op_vars   = Vars.Tag.local_vars cand.vars;
+    pat_op_params = Params.Open.empty;
+  }
+
+(*------------------------------------------------------------------*)
 (** Exported, see `.mli`.
 
     Additional invariant only used in [Match.ml]: 
@@ -2056,9 +2079,6 @@ type term_set = {
   cond : Term.terms;
   se   : SE.t;                  (* system kind *)
 }
-
-(*------------------------------------------------------------------*)
-type known_sets = term_set list
 
 (*------------------------------------------------------------------*)
 let _pp_term_set ppe fmt (ts : term_set) =
@@ -2083,6 +2103,18 @@ let[@warning "-32"] pp_term_set     = _pp_term_set (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_term_set_dbg = _pp_term_set (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
+(* return: condition, pattern *)
+let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
+  Term.mk_ands known.cond,
+  { pat_op_term   = known.term;
+    pat_op_vars   = known.vars;
+    pat_op_params = Params.Open.empty;
+  }
+
+(*------------------------------------------------------------------*)
+type known_sets = term_set list
+
+(*------------------------------------------------------------------*)
 let _pp_known_sets ppe fmt (ks : known_sets) =
   Fmt.pf fmt "@[<v>%a@]"
   (Fmt.list ~sep:Fmt.cut (_pp_term_set ppe)) ks
@@ -2100,6 +2132,425 @@ let refresh_term_set (known : term_set) : term_set =
     cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
+(** {3 Deduction: automated entailment reasoning} *)
+
+(*------------------------------------------------------------------*)
+let known_set_check_impl_conv
+    ?(st : unif_state option)
+    ~(decompose_ands: Term.term -> Term.term list)
+    (global_hyps : Term.term list)
+    ~(hyp : Term.term)
+    ~(cond : Term.term) : bool
+  =
+  (* FIXME: retrieve rp_param from the reduction state *)
+  let red_param = ReductionCore.rp_crypto in
+  let conv =
+    match st with
+    | None -> Term.alpha_conv ~subst:[]
+    | Some st -> conv_term red_param st
+  in
+  (* slow, we are re-doing all of this at each call *)
+  let hyps = List.concat_map decompose_ands (hyp :: global_hyps) in
+  List.exists (fun hyp ->
+      conv cond hyp
+    ) hyps
+
+(*------------------------------------------------------------------*)
+(** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
+    w.r.t. to the theory of trace constraints
+    Rely on the module [Constr]. *)
+let known_set_check_impl_sat
+    (table : Symbols.table) (hyps : Term.term list) (cond : Term.term)
+  =
+  let exception Fail in
+  let timeout = TConfig.solver_timeout table in
+  let hyp = Term.mk_ands hyps in 
+  let t_impl = Term.mk_impl hyp cond in
+  try Constr.(is_tautology ~exn:Fail ~table ~timeout t_impl) with Fail -> false
+
+
+(*------------------------------------------------------------------*) 
+(** Check that [hyp] implies [cond] for the special case when [cond] is 
+    an inequalitie between function of time stamps or actions.
+    [cond] is reduced to [t1 ≤ t2] by removing the [pred] function and if 
+    there exists an inequalitie [ta  ≤ tb] in [hyp]
+    such that [ta  ≤ tb] implies [t1  ≤ t2] then [hyp] implies [cond] and [true] 
+    is returned. Otherwise [false] is returned. *)
+let known_set_check_impl_auto
+    ~(decompose_ands: Term.term -> Term.term list)
+    (table : Symbols.table)
+    ~(hyp : Term.term) ~(cond : Term.term)
+  : bool
+  =
+  let hyps = decompose_ands hyp
+  in
+  match cond with
+  | Term.App (Fun (fs, _), [t1;t2]) 
+    when (fs = Term.f_lt || fs = Term.f_leq)
+      && Term.ty t1 = Type.ttimestamp ->
+    let t2' =
+      if fs = Term.f_lt then Term.mk_pred t2 else t2
+    in
+    let check_direct = leq_tauto table t1 t2' in
+    let check_indirect =
+      List.exists (fun hyp ->
+          match hyp with
+          | Term.App (Fun (fs, _), [ta;tb]) 
+            when fs = Term.f_leq && Term.ty t1 = Type.ttimestamp -> (* ≤ *)
+            (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
+            leq_tauto table t1 ta && leq_tauto table tb t2'
+          | Term.Fun (fs,_) when fs = Term.f_true -> false
+          | _ -> false
+        ) hyps
+    in
+    check_direct || check_indirect
+  | Term.Fun (fs,_) when fs = Term.f_true -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
+let is_exec ms : bool =
+  ms.s_symb = Symbols.Classic.exec ||
+  ms.s_symb = Symbols.Quantum.exec
+
+(** Check that [hyps] implies [cond] for the special case when
+    [cond] is [exec@t]. *)  
+let known_set_check_exec_case
+    ~(decompose_ands: Term.term -> Term.term list)
+    (table : Symbols.table)
+    (hyps : Term.terms) (cond : Term.term)
+  : bool
+  =
+  let exception Fail in
+  let timeout = TConfig.solver_timeout table in
+  match cond with
+  | Term.Macro (ms', _ ,ts') when is_exec ms' ->
+    let find_greater_exec hyp =
+      match hyp with
+      | Term.Macro (ms, _, ts) when is_exec ms && ms = ms' ->
+        begin
+          let term_impl =
+            Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
+          in
+          try Constr.is_tautology ~exn:Fail ~table ~timeout term_impl with Fail -> false
+        end
+      | _ -> false 
+    in
+    List.exists find_greater_exec (List.concat_map decompose_ands hyps)
+  | _ -> false
+
+
+(*------------------------------------------------------------------*)
+let get_local_of_hyps (hyps : TraceHyps.hyps) =
+  let hyps =
+    TraceHyps.fold_hyps (fun _ hyp acc ->
+        match hyp with
+        | Equiv.Local f
+        | Equiv.(Global Atom( (Reach {formula = f; bound = None}))) ->
+          (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          f:: acc
+        | _ -> acc 
+      ) hyps []
+  in hyps
+
+(** Check that [hyp] implies [cond], trying the folowing methods:
+    - convertibility
+    - satifiability
+    - ad hoc reasonning for inequalities of time stamps
+    - ad hoc reasonning for exec macro
+      FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
+      as hypothesis. *)
+let known_set_check_impl
+    ?(st : unif_state option)
+    (table : Symbols.table)
+    (hyp   : Term.term)
+    (cond  : Term.term) : bool
+  =
+  (* decompose a formula as an equivalent conjunction of formulas,
+     modulo reduction if [st<>None]. *)
+  let decompose_ands =
+    match st with
+    | None -> Term.decompose_ands
+    | Some st ->
+      let rec decompose_ands t =
+        let t, _ = whnf ReductionCore.rp_crypto st t in
+        let terms = Term.decompose_ands t in
+        if List.length terms = 1 then terms
+        else List.concat_map decompose_ands terms
+      in
+      decompose_ands
+  in
+
+  let global_hyps = omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st in
+  let check_one cond = 
+    let check0 =              (* convertibility *)
+      known_set_check_impl_conv ~decompose_ands ?st global_hyps ~hyp ~cond
+    and check1 =              (* constraints *)
+      known_set_check_impl_sat table (hyp :: global_hyps) cond
+    and check2 =              (* ad hoc inequality reasoning *)
+      known_set_check_impl_auto ~decompose_ands table ~hyp ~cond
+    and check3 =              (* ad hoc reasoning on [exec] *)
+      known_set_check_exec_case ~decompose_ands table (hyp :: global_hyps) cond
+    in
+    check0 || check1 || check2 || check3
+  in
+  List.for_all check_one (decompose_ands cond)
+
+
+(*------------------------------------------------------------------*)
+(** {3 Deduction: right reasoning} *)
+
+(** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
+let deduce_mem0
+    (cterm : cond_term)
+    (known : term_set)
+    (st    : unif_state) : Mvar.t option
+  =
+  let known = refresh_term_set known in
+
+  let known_cond, e_pat = pat_of_term_set known in
+  assert (
+    Sv.disjoint
+      (Sv.of_list (List.map fst known.vars))
+      (Sv.of_list (List.map fst st.support))
+  );
+  (* Elements of [known] are known only for bi-deducible values of [known.vars]. 
+     For now, we only check that these [known.vars] is instantiated by 
+     ptime values, which ensures that they are bi-deducible.
+     FEATURE: we could be more precise by creating a bi-deduction proof obligation
+     instead. *)
+  let st = { st with support = known.vars @ st.support; } in
+
+  (* adding [cterm.cond] as hypohtesis before matching *)
+  let st =
+    let hyps =
+      TraceHyps.add
+        TacticsArgs.AnyName (LHyp (Equiv.Local cterm.cond)) st.hyps
+    in
+    { st with hyps }
+  in
+
+  try
+    let mv = T.tunif cterm.term e_pat.pat_op_term st in
+    let subst =
+      match Mvar.to_subst ~mode:`Unif st.table st.env mv with
+      | `Subst subst -> subst
+      | `BadInst _pp_err ->
+        no_unif ()
+    in
+    let known_cond = Term.subst subst known_cond in
+    (* check that [cterm.cond] imples [known_cond θ] holds *)
+    if not (
+        known_set_check_impl st.table ~st cterm.cond known_cond
+      )
+    then None
+    else (* clear [known.var] from the binding *)
+      Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
+  with NoMatch _ -> None
+
+let deduce_mem
+    (cterm : cond_term)
+    (known : term_set)
+    (st    : unif_state) : Mvar.t option
+  =
+  (* FIXME:
+     if [st.support] is not empty, then we need to find [mv] such that:
+     - [mv] represents a substitution θ whose support is included in
+       [st.support] ∪ [known.vars]
+     - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
+
+     The issue is that the unification algorithm will ensure that the latter
+     condition holds for ([st.support] ∪ [known.vars]), and not just
+     for [st.support]. This makes us reject valid instance that appear in
+     practice.
+
+     We need to modify the unification algorithm to account for that.
+
+     Instead, for now, we try either a normal unification, or a unification where we
+     cleared both [st.bvs] and [st.support] (i.e. we do not try to infer the
+     arguments of the lemma being applied).
+     We move [st.bvs] to [st.env] to keep variable tags information.
+  *)
+  match deduce_mem0 cterm known st with
+  | Some mv -> Some mv
+  | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
+    if st.bvs = [] && st.support = [] then None
+    else
+      let env = Vars.add_vars st.bvs st.env in
+      let st = { st with bvs = []; support = []; env; } in
+      deduce_mem0 cterm known st
+
+(** Try to match [term] as an element of a sequence in [elems]. *)
+let deduce_mem_list
+    (cterm : cond_term)
+    (elems : known_sets)
+    (st    : unif_state) : Mvar.t option
+  =
+  List.find_map (fun elem -> deduce_mem cterm elem st) elems
+
+(*------------------------------------------------------------------*)
+(** [fa_decompose output st] return a list of deduction conditions
+    that must be met for [output] to be deducible (from some
+    arbitrary terms [inputs]).
+
+    Return [None] if Function Application fails on [output].
+
+    See [deduce] for the precise semantics of [· ▷ output]. *)
+let fa_decompose
+    (output : cond_term) (st : unif_state)
+  : (unif_state * cond_term) list option
+  =
+  let env = env_of_unif_state st in
+  match output.term with
+  | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
+  (* we do not need to check that [· ▷ output.cond], since we know
+     that we already have [output.cond] on the left of [▷]. *)
+
+  (* function: if-then-else *)
+  | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
+    let cond1 = Term.mk_and b output.cond
+    and cond2 = Term.mk_and (Term.mk_not b) output.cond in
+
+    Some (List.map (fun t -> st, t) [{ term = b ; cond = output.cond; };
+                                     { term = t1; cond = cond1; };
+                                     { term = t2; cond = cond2; }])
+
+  (* function: and *)
+  | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_and -> 
+    let cond = Term.mk_and t1 output.cond in
+    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+                                    { term = t2 ; cond }])
+
+  (* function: or *)
+  | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_or -> 
+    let cond = Term.mk_and (Term.mk_not t1) output.cond in
+    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+                                    { term = t2 ; cond }])
+
+  (* function: impl *)
+  | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_impl -> 
+    let cond = Term.mk_and t1 output.cond in
+    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+                                    { term = t2 ; cond }])
+
+  (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
+
+  (* tuples *)
+  | Term.Tuple terms ->
+    Some (List.map (fun term -> st, { output with term } ) terms)
+
+  | Term.Proj (_, t) ->
+    Some [st, { output with term = t }]
+
+  | Term.App (t, terms) ->
+    Some (List.map (fun term -> st, { output with term } ) (t :: terms))
+
+  | Term.Quant (q, es, term) ->
+    (* [Seq], [ForAll] and [Exists] require to quantify over
+       enumerable types *)
+    let check_quantif =
+      match q with
+      | Lambda -> true
+      | Seq | ForAll | Exists ->
+        List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) es
+    in
+    if not check_quantif then None
+    else
+      let es, subst = Term.refresh_vars es in
+      let term = Term.subst subst term in
+
+      (* binder variables are declared global, constant and adv,
+         as these are inputs (hence known values) to the adversary  *)
+      let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
+      Some [(st, { output with term; })]
+
+  | Find (is, c, d, e)
+    when
+      List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) is
+    ->
+    let is, subst = Term.refresh_vars is in
+    let c, d = Term.subst subst c, Term.subst subst d in
+
+    (* idem, binder variables are declared global, constant and adv *)
+    let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
+
+    let d_cond = Term.mk_and output.cond c in
+    let e_cond =
+      Term.mk_and
+        output.cond
+        (Term.mk_forall is (Term.mk_not c))
+    in
+
+    let c = { term = c; cond = output.cond; }
+    and d = { term = d; cond = d_cond; }
+    and e = { term = e; cond = e_cond; } in
+
+
+    Some [(st1, c); (st1, d); (st, e)]
+
+  | _ -> None
+
+(*------------------------------------------------------------------*)
+(** Check if [inputs ▷ output]. 
+    More precisely, if [output = (v | ψ) ] then verify if:
+
+    [inputs, ψ ▷ if ψ then v]       
+    
+    (Remark that [ψ] appears on the left of [▷].)
+    
+    Here, an element [(u | vars: ϕ)] of [inputs] represents
+    
+    [λ vars ⇒ (ϕ, if ϕ then u)].
+ 
+    (Remark that [ϕ] is part of the function's output.)
+*)
+let rec deduce
+    ~(output : cond_term)
+    ~(inputs : known_sets)
+    (st      : unif_state)
+    (minfos  : match_infos) : Mvar.t * match_infos
+  =
+  match deduce_mem_list output inputs st with
+  | Some mv ->
+    (mv, minfos_ok output.term minfos)
+  | None ->
+    (* if that fails, decompose [term] through the Function Application
+       rule, and recurse. *)
+    deduce_fa ~output ~inputs st minfos
+
+(** Check if [inputs ▷ output] using the function application rules. 
+    See [deduce] for the precise semantics of [inputs ▷ output]. *)
+and deduce_fa
+    ~(output : cond_term)
+    ~(inputs : known_sets)
+    (st      : unif_state)
+    (minfos  : match_infos) : Mvar.t * match_infos
+  =
+  match fa_decompose output st with
+  | None ->
+    (* We could not decompose [output] through into deduction sub-goals.
+       Try to reduce [output] and restart [deduce]. *)
+    let term, has_red = whnf ReductionCore.rp_crypto st output.term in
+    if has_red then
+      deduce ~output:{ output with term; } ~inputs st minfos
+    else
+      (st.mv, minfos_failed output.term minfos)
+
+  | Some fa_conds ->
+    let minfos =
+      let st = List.map (fun (x : _ * cond_term) -> (snd x).term) fa_conds in
+      minfos_check_st output.term st minfos
+    in
+
+    List.fold_left (fun (mv, minfos) (st, t) ->
+        let mv, minfos =
+          deduce ~output:t ~inputs { st with mv } minfos
+        in
+        mv, minfos
+      ) (st.mv, minfos) fa_conds
+
+(*------------------------------------------------------------------*)
+(** {3 Deduction: left reasoning} *)
+
 let term_set_of_term (se : SE.t) (term : Term.term) : term_set =
   { term = term;
     vars = [];
@@ -2419,27 +2870,6 @@ let known_sets_of_mset_l
     ) [] msets
 
 (*------------------------------------------------------------------*)
-(* return: substitution, condition, pattern *)
-let pat_of_cand_set
-    (cand : cand_set) : Mvar.t * Term.term * Term.term pat_op
-  =
-  cand.subst,
-  cand.cond,
-  {
-    pat_op_term   = cand.term;
-    pat_op_vars   = Vars.Tag.local_vars cand.vars;
-    pat_op_params = Params.Open.empty;
-  }
-
-(* return: condition, pattern *)
-let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
-  Term.mk_ands known.cond,
-  { pat_op_term   = known.term;
-    pat_op_vars   = known.vars;
-    pat_op_params = Params.Open.empty;
-  }
-
-(*------------------------------------------------------------------*)
 let msets_add (mset : MCset.t) (msets : msets) : msets =
   let name = mset.msymb.s_symb in
   if List.mem_assoc name msets then
@@ -2595,14 +3025,405 @@ let mset_list_inter
   mset_list_simplify table system mset_l  
 
 (*------------------------------------------------------------------*)
-(** [{term; cond;}] is the term [term] whenever [cond] holds. *)
-type cond_term = { term : Term.term; cond : Term.term }
+(** {3 Deduction: automated inductive reasoning} *)
 
-let mk_cond_term (term:Term.term) (cond:Term.term) :cond_term = {term;cond}
+(** Return a specialization of [cand] that is a subset of [known]. *)
+let specialize
+    (table  : Symbols.table)
+    (system : SE.fset)
+    (cand   : cand_set)
+    (known  : term_set) : cand_set option
+  =
+  let known = refresh_term_set known in
 
-let pp_cond_term fmt (c : cond_term) =
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]}@]"
-    Term.pp c.term Term.pp c.cond
+  let mv, c_cond, c_pat = pat_of_cand_set cand in
+  let known_cond, e_pat = 
+    pat_of_term_set
+      { known with vars = Vars.Tag.local_vars (List.map fst known.vars) } 
+  in
+
+  let sys_cntxt = SE.{ set = (system :> SE.t); pair = None; } in
+  match T.unify_opt ~mv table sys_cntxt c_pat e_pat with
+  | None -> None
+  | Some mv -> (* [mv] represents substitution [θ] *)
+    let subst = Mvar.to_subst_locals ~mode:`Unif mv in
+
+    (* check that [c_cond θ] implies [known_cond θ] holds *)
+    let known_cond = Term.subst subst known_cond
+    and c_cond     = Term.subst subst c_cond in
+
+    if not (known_set_check_impl table c_cond known_cond) then None
+    else
+      let cand =
+        { term = cand.term;
+          subst = mv;
+          (* Note: variables must *not* be cleared yet,
+             because we must not forget the instantiation by [mv] of any
+             variable. *)
+          vars = cand.vars @ List.map fst known.vars;
+          cond = cand.cond; }
+      in
+      Some cand
+
+
+(* profiling *)
+let specialize = Prof.mk_ternary "specialize" specialize
+
+(*------------------------------------------------------------------*)
+let specialize_all
+    (table  : Symbols.table)
+    (system : SE.fset)
+    (cand   : cand_set)
+    (known_sets : known_sets) : cand_sets
+  =
+  let cand_head = Term.get_head cand.term in
+  let cands =
+    List.fold_left (fun acc (known : term_set) ->
+        let head = Term.get_head known.term in
+        if cand_head = HVar || head = HVar || cand_head = head then
+          specialize table system cand known :: acc
+        else acc
+      ) [] known_sets
+  in
+  List.concat_map (function
+      | None -> []
+      | Some x -> [x]
+    ) cands
+
+(*------------------------------------------------------------------*)
+(** Return a list of specialization of [cand] deducible from [terms] and
+    [known].
+    This includes both direct specialization, and specialization relying on
+    the Function Application rule. *)
+let rec specialize_deduce
+    (table  : Symbols.table)
+    (env    : Vars.env)
+    (system : SE.fset)
+    (cand   : cand_set)
+    (known_sets : known_sets) : cand_sets
+  =
+  let direct_deds = specialize_all table system cand known_sets in
+  let fa_deds = specialize_deduce_fa table env system cand known_sets in
+
+  direct_deds @ fa_deds
+
+(** Return a list of specialization of the tuples in [cand] deducible from
+    [terms] and [pseqs]. *)
+and specialize_deduce_list
+    (table  : Symbols.table)
+    (env    : Vars.env)
+    (system : SE.fset)
+    (cand : cand_tuple_set)
+    (known_sets : known_sets) : cand_tuple_sets
+  =
+  match cand.term with
+  | [] -> [cand]
+  | t :: tail ->
+    (* find deducible specialization of the first term of the tuple. *)
+    let t_deds = specialize_deduce table env system { cand with term = t } known_sets in
+
+    (* for each such specialization, complete it into a specialization of
+       the full tuple. *)
+    List.concat_map (fun t_ded ->
+        (* find a deducible specialization of the tail of the tuple,
+           starting from the  specialization of [t]. *)
+        let cand_tail : cand_tuple_set = { t_ded with term = tail } in
+        let tail_deds = specialize_deduce_list table env system cand_tail known_sets in
+
+        (* build the deducible specialization of the full tuple. *)
+        List.map (fun (tail_ded : cand_tuple_set) ->
+            { tail_ded with term = t_ded.term :: tail_ded.term }
+          ) tail_deds
+      ) t_deds
+
+(** Return a list of specialization of [cand] deducible from [terms] 
+    using Function Application.
+    Does not include direct specialization. *)
+and specialize_deduce_fa
+    (table  : Symbols.table)
+    (env    : Vars.env)
+    (system : SE.fset)
+    (cand   : cand_set)
+    (known_sets : known_sets) : cand_sets
+  =
+  (* [mk_cand_of_terms] build back the know terms from the known 
+     sub-terms. *)
+  let comp_deds
+      (mk_cand_of_terms : terms -> term) (terms : Term.terms) 
+    : cand_sets 
+    =
+    let terms_cand = { cand with term = terms } in
+    let terms_deds = specialize_deduce_list table env system terms_cand known_sets in
+    List.map (fun (terms_ded : cand_tuple_set) ->
+        { terms_ded with
+          term = mk_cand_of_terms terms_ded.term }
+      ) terms_deds
+  in
+
+  let cand_env =
+    let vars = Vars.add_vars (Vars.Tag.global_vars ~adv:true cand.vars) env in
+    Env.init ~table ~system:{ set = (system :> SE.arbitrary); pair = None; } ~vars ()
+  in
+
+  (* decompose the term using Function Application,
+     find a deducible specialization of its tuple of arguments,
+     and build the deducible specialization of the initial term. *)
+  match cand.term with
+  (* special case for pure timestamps *)
+  | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
+
+  | Term.Macro (ms, l, ts) ->
+    begin
+      let cntxt = Constr.make_context ~system ~table in
+      match Macros.get_definition cntxt ms ~args:l ~ts with
+      | `Undef | `MaybeDef -> []
+      | `Def body ->
+        specialize_deduce table env system { cand with term = body } known_sets
+    end
+
+  | Term.Proj (i,t) -> 
+    comp_deds (fun t -> Term.mk_proj i (as_seq1 t)) [t]
+
+  | Term.Tuple f_terms -> 
+    comp_deds (fun f_terms -> Term.mk_tuple f_terms) f_terms
+
+  | Term.App (Fun (fs, fty), f_terms) ->
+    comp_deds (fun f_terms -> Term.mk_fun0 fs fty f_terms) f_terms
+
+  | Term.App (t, l) -> 
+    comp_deds (fun t_l ->
+        let t, l = List.takedrop 1 t_l in
+        let t = as_seq1 t in
+        Term.mk_app t l
+      ) (t :: l)
+
+  | _ -> []
+
+(*------------------------------------------------------------------*)
+(** [strenghten tbl system terms] strenghten [terms] by finding an inductive
+    invariant on deducible messages which contains [terms]. *)
+let strengthen
+    (table  : Symbols.table)
+    (system : SE.fset)
+    (env    : Vars.env)
+    (hyps   : TraceHyps.hyps)
+    (init_terms : Term.terms) : msets
+  =
+  let ppe = default_ppe ~table () in
+
+  (* Return a list of specialization of [cand] deducible from
+     [init_terms, known_sets] for action [a] at time [a]. *)
+  let filter_specialize_deduce_action
+      (a : Symbols.action)
+      (cand : MCset.t)
+      (init_terms : known_sets)              (* initial terms *)
+      (known_sets : MCset.t list)            (* induction *)
+    : MCset.t list
+    =
+    (* we create the timestamp at which we are *)
+    let i = Action.arity a table in
+    let is = 
+      List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
+    in
+    let ts = Term.mk_action a (List.map Term.mk_var is) in
+
+    (* we unroll the definition of [cand] at time [ts] *)
+    let cntxt = Constr.make_context ~system ~table in
+    match Macros.get_definition cntxt cand.msymb ~args:cand.args ~ts with
+    | `Undef | `MaybeDef -> []
+
+    | `Def body ->
+      let cond = match cand.cond_le with
+        | Some cond_le ->
+          Term.mk_atom `Leq ts cond_le
+        | None -> Term.mk_true
+      in
+
+      let cand_set = {
+        term  = body;
+        vars  = cand.indices @ is;
+        subst = Mvar.empty;
+        cond; }
+      in
+      (* we instantiate the known terms at time [ts] *)
+      let all_known_sets =
+        (* we assume we know all terms in [known_sets] at time [ts] *)
+        let known_sets = 
+          known_sets_of_mset_l ~extra_cond_le:ts (system :> SE.t) known_sets 
+        in
+        known_sets_union init_terms known_sets
+      in
+      let ded_sets = specialize_deduce table env system cand_set all_known_sets in
+
+      let mset_l =
+        List.fold_left (fun mset_l ded_set ->
+            let subst = Mvar.to_subst_locals ~mode:`Unif ded_set.subst in
+            let msymb = cand.msymb in
+            let args  = List.map (Term.subst subst) cand.args in
+            let indices = List.map (Term.subst_var subst) cand.indices in
+            let mset = 
+              MCset.mk ~env ~msymb ~args ~indices ~cond_le:cand.cond_le 
+            in
+
+            (* sanity check *)
+            let () =
+              assert (match ded_set.cond with
+                  | Term.App (Fun (fs, _), [_; c]) when fs = Term.f_leq ->
+                    Some c = cand.cond_le
+
+                  | Term.Fun (_fs,_)
+                  | Term.App (Term.Fun (_fs,_),_) -> None = cand.cond_le
+
+                  | _ -> false)
+            in
+
+            mset :: mset_l
+          ) [] ded_sets
+      in
+      mset_list_simplify table (system:>SE.t) mset_l
+  in
+
+  let filter_specialize_deduce_action_list
+      (a : Symbols.action)
+      (cands : msets)
+      (init_terms : known_sets)              (* initial terms *)
+      (known_sets : MCset.t list)            (* induction *)
+    : msets
+    =
+    List.map (fun (mname, cand_l) ->
+        let mset_l =
+          List.concat_map (fun cand ->
+              filter_specialize_deduce_action a cand init_terms known_sets
+            ) cand_l
+        in
+        (mname, mset_list_inter table (system:>SE.t) env cand_l mset_l)
+      ) cands
+  in
+
+  (* fold over all actions of the protocol, to find a specialization of
+     [cands] stable by each action. *)
+  let filter_specialize_deduce_all_actions
+      (cands : msets)
+      (init_terms : known_sets)              (* initial terms *)
+      (known_sets : MCset.t list)            (* induction *)
+    : msets
+    =
+    let names = SE.symbs table system in
+    System.Msh.fold (fun _ name cands ->
+        filter_specialize_deduce_action_list name cands init_terms known_sets
+      ) names cands
+  in
+
+  let rec specialize_deduce_fixpoint
+      (cands : msets)
+      (init_terms : known_sets) (* initial terms *)
+    : msets
+    =
+    let init_known : MCset.t list = msets_to_list cands in
+    let cands' = filter_specialize_deduce_all_actions cands init_terms init_known in
+
+    dbg "deduce_fixpoint:@.%a@." pp_msets cands';
+
+    (* check if [cands] is included in [cands'] *)
+    if msets_incl table (system:>SE.t) cands cands'
+    then cands'
+    else specialize_deduce_fixpoint cands' init_terms
+  in
+
+  (* we use as maximal timestamp the first timestamp appearing in a
+     frame. If there is no such timestamp, we have no constraints. *)
+  let cond_le =
+    List.find_map (function
+        (* TODO: quantum: update or remove the `apply ~inductive` function altogether *)
+        | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.frame -> Some ts
+        | _ -> None
+      ) init_terms
+  in
+
+  let init_fixpoint : msets =
+    Symbols.Macro.fold (fun mn data msets ->
+        let data = match data with Symbols.Macro data -> data | _ -> assert false in
+        let in_init = 
+          match data with
+          | Symbols.State _ -> true
+          | _ -> mn = Symbols.Classic.cond
+        in
+
+        (* Ignore other macros. Notably, ignore global macros, as
+           they are (usually) not defined at all timestamps, so we
+           won't find a deduction invariant with them. *)
+        if not in_init then msets else
+          begin
+            let ty, indices =
+              match data with
+              | Symbols.State (i, ty,_) ->
+                ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
+              | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
+              | _ -> assert false
+            in
+            let ms = Term.mk_symb mn ty in
+            let mset = 
+              MCset.mk ~env
+                ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 
+            in
+            msets_add mset msets
+          end
+      ) [] table
+  in
+  dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
+
+  (* initially known terms *)
+  let init_terms = 
+    let context = SE.{ set= (system :> SE.t); pair = None; } in
+    let env = Env.init ~table ~system:context ~vars:env () in
+    known_sets_of_terms env hyps init_terms 
+  in
+
+  dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
+
+  specialize_deduce_fixpoint init_fixpoint init_terms
+
+(*------------------------------------------------------------------*)
+(** {3 Deduction: high-level functionality} *)
+
+(** Check if [inputs ▷ outputs].
+    [outputs] and [inputs] are over [st.system.set]. *)
+let deduce_terms
+    ~(outputs : Term.terms) ~(inputs  : Term.terms) (st : unif_state)
+  : match_res
+  =
+  let se = st.system.set in
+
+  (* If [st.support] is not empty, we cannot strengthen the invariant.
+     See explanation in [mset_mem_one]. *)
+  let mset_l =
+    if st.support = [] && st.use_fadup && SE.is_fset se then
+      let system = SE.to_fset se in
+      let msets = strengthen st.table system st.env st.hyps inputs in
+      msets_to_list msets
+    else []
+  in
+  if st.support = [] && st.use_fadup &&
+     TConfig.show_strengthened_hyp st.table then
+    (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
+
+  let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
+  let inputs =
+    known_sets_union
+      (known_sets_of_mset_l se mset_l)
+      (known_sets_of_terms env st.hyps inputs)
+  in
+
+  let mv, minfos =
+    List.fold_left (fun (mv, minfos) output ->
+        let output = { term = output; cond = Term.mk_true; } in
+        deduce ~output ~inputs { st with mv } minfos
+      ) (st.mv, Mt.empty) outputs
+  in
+
+  if Mt.for_all (fun _ r -> r <> MR_failed) minfos
+  then Match mv
+  else NoMatch (Some (outputs, minfos_norm minfos))
 
 (*------------------------------------------------------------------*)
 (** {3 Equiv matching and unification} *)
@@ -2613,525 +3434,7 @@ module E = struct
   include T
 
   type t = Equiv.form
-
-  (*------------------------------------------------------------------*)
-  let known_set_check_impl_conv
-      ?(st : unif_state option)
-      ~(decompose_ands: Term.term -> Term.term list)
-      (global_hyps : Term.term list)
-      ~(hyp : Term.term)
-      ~(cond : Term.term) : bool
-    =
-    (* FIXME: retrieve rp_param from the reduction state *)
-    let red_param = ReductionCore.rp_crypto in
-    let conv =
-      match st with
-      | None -> Term.alpha_conv ~subst:[]
-      | Some st -> conv_term red_param st
-    in
-    (* slow, we are re-doing all of this at each call *)
-    let hyps = List.concat_map decompose_ands (hyp :: global_hyps) in
-    List.exists (fun hyp ->
-        conv cond hyp
-      ) hyps
-
-  (*------------------------------------------------------------------*)
-  (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
-      w.r.t. to the theory of trace constraints
-      Rely on the module [Constr]. *)
-  let known_set_check_impl_sat
-      (table : Symbols.table) (hyps : Term.term list) (cond : Term.term)
-    =
-    let exception Fail in
-    let timeout = TConfig.solver_timeout table in
-    let hyp = Term.mk_ands hyps in 
-    let t_impl = Term.mk_impl hyp cond in
-    try Constr.(is_tautology ~exn:Fail ~table ~timeout t_impl) with Fail -> false
-   
-
-  (*------------------------------------------------------------------*) 
-  (** Check that [hyp] implies [cond] for the special case when [cond] is 
-      an inequalitie between function of time stamps or actions.
-      [cond] is reduced to [t1 ≤ t2] by removing the [pred] function and if 
-      there exists an inequalitie [ta  ≤ tb] in [hyp]
-      such that [ta  ≤ tb] implies [t1  ≤ t2] then [hyp] implies [cond] and [true] 
-      is returned. Otherwise [false] is returned. *)
-  let known_set_check_impl_auto
-      ~(decompose_ands: Term.term -> Term.term list)
-      (table : Symbols.table)
-      ~(hyp : Term.term) ~(cond : Term.term)
-    : bool
-    =
-    let hyps = decompose_ands hyp
-    in
-    match cond with
-    | Term.App (Fun (fs, _), [t1;t2]) 
-      when (fs = Term.f_lt || fs = Term.f_leq)
-        && Term.ty t1 = Type.ttimestamp ->
-      let t2' =
-        if fs = Term.f_lt then Term.mk_pred t2 else t2
-      in
-      let check_direct = leq_tauto table t1 t2' in
-      let check_indirect =
-        List.exists (fun hyp ->
-            match hyp with
-            | Term.App (Fun (fs, _), [ta;tb]) 
-              when fs = Term.f_leq && Term.ty t1 = Type.ttimestamp -> (* ≤ *)
-              (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
-              leq_tauto table t1 ta && leq_tauto table tb t2'
-            | Term.Fun (fs,_) when fs = Term.f_true -> false
-            | _ -> false
-          ) hyps
-      in
-      check_direct || check_indirect
-    | Term.Fun (fs,_) when fs = Term.f_true -> true
-    | _ -> false
   
-  (*------------------------------------------------------------------*)
-  let is_exec ms : bool =
-    ms.s_symb = Symbols.Classic.exec ||
-    ms.s_symb = Symbols.Quantum.exec
-    
-  (** Check that [hyps] implies [cond] for the special case when
-      [cond] is [exec@t]. *)  
-  let known_set_check_exec_case
-      ~(decompose_ands: Term.term -> Term.term list)
-      (table : Symbols.table)
-      (hyps : Term.terms) (cond : Term.term)
-    : bool
-    =
-    let exception Fail in
-    let timeout = TConfig.solver_timeout table in
-    match cond with
-    | Term.Macro (ms', _ ,ts') when is_exec ms' ->
-      let find_greater_exec hyp =
-        match hyp with
-        | Term.Macro (ms, _, ts) when is_exec ms && ms = ms' ->
-          begin
-            let term_impl =
-              Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
-            in
-            try Constr.is_tautology ~exn:Fail ~table ~timeout term_impl with Fail -> false
-          end
-        | _ -> false 
-      in
-      List.exists find_greater_exec (List.concat_map decompose_ands hyps)
-    | _ -> false
-
-
-  (*------------------------------------------------------------------*)
-  let get_local_of_hyps (hyps : TraceHyps.hyps) =
-    let hyps =
-      TraceHyps.fold_hyps (fun _ hyp acc ->
-          match hyp with
-          | Equiv.Local f
-          | Equiv.(Global Atom( (Reach {formula = f; bound = None}))) ->
-            (*TODO:Concrete : Probably something to do to create a bounded goal*)
-            f:: acc
-          | _ -> acc 
-        ) hyps []
-    in hyps
-
-  (** Check that [hyp] implies [cond], trying the folowing methods:
-      - convertibility
-      - satifiability
-      - ad hoc reasonning for inequalities of time stamps
-      - ad hoc reasonning for exec macro
-      FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
-      as hypothesis. *)
-  let known_set_check_impl
-      ?(st : unif_state option)
-      (table : Symbols.table)
-      (hyp   : Term.term)
-      (cond  : Term.term) : bool
-    =
-    (* decompose a formula as an equivalent conjunction of formulas,
-       modulo reduction if [st<>None]. *)
-    let decompose_ands =
-      match st with
-      | None -> Term.decompose_ands
-      | Some st ->
-        let rec decompose_ands t =
-          let t, _ = whnf ReductionCore.rp_crypto st t in
-          let terms = Term.decompose_ands t in
-          if List.length terms = 1 then terms
-          else List.concat_map decompose_ands terms
-        in
-        decompose_ands
-    in
-    
-    let global_hyps = omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st in
-    let check_one cond = 
-      let check0 =              (* convertibility *)
-        known_set_check_impl_conv ~decompose_ands ?st global_hyps ~hyp ~cond
-      and check1 =              (* constraints *)
-        known_set_check_impl_sat table (hyp :: global_hyps) cond
-      and check2 =              (* ad hoc inequality reasoning *)
-        known_set_check_impl_auto ~decompose_ands table ~hyp ~cond
-      and check3 =              (* ad hoc reasoning on [exec] *)
-        known_set_check_exec_case ~decompose_ands table (hyp :: global_hyps) cond
-      in
-      check0 || check1 || check2 || check3
-    in
-    List.for_all check_one (decompose_ands cond)
-    
-  (*------------------------------------------------------------------*)
-  (** Return a specialization of [cand] that is a subset of [known]. *)
-  let specialize
-      (table  : Symbols.table)
-      (system : SE.fset)
-      (cand   : cand_set)
-      (known  : term_set) : cand_set option
-    =
-    let known = refresh_term_set known in
-
-    let mv, c_cond, c_pat = pat_of_cand_set cand in
-    let known_cond, e_pat = 
-      pat_of_term_set
-        { known with vars = Vars.Tag.local_vars (List.map fst known.vars) } 
-    in
-
-    let sys_cntxt = SE.{ set = (system :> SE.t); pair = None; } in
-    match T.unify_opt ~mv table sys_cntxt c_pat e_pat with
-    | None -> None
-    | Some mv -> (* [mv] represents substitution [θ] *)
-      let subst = Mvar.to_subst_locals ~mode:`Unif mv in
-
-      (* check that [c_cond θ] implies [known_cond θ] holds *)
-      let known_cond = Term.subst subst known_cond
-      and c_cond     = Term.subst subst c_cond in
-
-      if not (known_set_check_impl table c_cond known_cond) then None
-      else
-        let cand =
-          { term = cand.term;
-            subst = mv;
-            (* Note: variables must *not* be cleared yet,
-               because we must not forget the instantiation by [mv] of any
-               variable. *)
-            vars = cand.vars @ List.map fst known.vars;
-            cond = cand.cond; }
-        in
-        Some cand
-
-
-  (* profiling *)
-  let specialize = Prof.mk_ternary "specialize" specialize
-
-  (*------------------------------------------------------------------*)
-  let specialize_all
-      (table  : Symbols.table)
-      (system : SE.fset)
-      (cand   : cand_set)
-      (known_sets : known_sets) : cand_sets
-    =
-    let cand_head = Term.get_head cand.term in
-    let cands =
-      List.fold_left (fun acc (known : term_set) ->
-          let head = Term.get_head known.term in
-          if cand_head = HVar || head = HVar || cand_head = head then
-            specialize table system cand known :: acc
-          else acc
-        ) [] known_sets
-    in
-    List.concat_map (function
-        | None -> []
-        | Some x -> [x]
-      ) cands
-
-  (*------------------------------------------------------------------*)
-  (** Return a list of specialization of [cand] deducible from [terms] and
-      [known].
-      This includes both direct specialization, and specialization relying on
-      the Function Application rule. *)
-  let rec specialize_deduce
-      (table  : Symbols.table)
-      (env    : Vars.env)
-      (system : SE.fset)
-      (cand   : cand_set)
-      (known_sets : known_sets) : cand_sets
-    =
-    let direct_deds = specialize_all table system cand known_sets in
-    let fa_deds = specialize_deduce_fa table env system cand known_sets in
-
-    direct_deds @ fa_deds
-
-  (** Return a list of specialization of the tuples in [cand] deducible from
-      [terms] and [pseqs]. *)
-  and specialize_deduce_list
-      (table  : Symbols.table)
-      (env    : Vars.env)
-      (system : SE.fset)
-      (cand : cand_tuple_set)
-      (known_sets : known_sets) : cand_tuple_sets
-    =
-    match cand.term with
-    | [] -> [cand]
-    | t :: tail ->
-      (* find deducible specialization of the first term of the tuple. *)
-      let t_deds = specialize_deduce table env system { cand with term = t } known_sets in
-
-      (* for each such specialization, complete it into a specialization of
-         the full tuple. *)
-      List.concat_map (fun t_ded ->
-          (* find a deducible specialization of the tail of the tuple,
-             starting from the  specialization of [t]. *)
-          let cand_tail : cand_tuple_set = { t_ded with term = tail } in
-          let tail_deds = specialize_deduce_list table env system cand_tail known_sets in
-
-          (* build the deducible specialization of the full tuple. *)
-          List.map (fun (tail_ded : cand_tuple_set) ->
-              { tail_ded with term = t_ded.term :: tail_ded.term }
-            ) tail_deds
-        ) t_deds
-
-  (** Return a list of specialization of [cand] deducible from [terms] 
-      using Function Application.
-      Does not include direct specialization. *)
-  and specialize_deduce_fa
-      (table  : Symbols.table)
-      (env    : Vars.env)
-      (system : SE.fset)
-      (cand   : cand_set)
-      (known_sets : known_sets) : cand_sets
-    =
-    (* [mk_cand_of_terms] build back the know terms from the known 
-       sub-terms. *)
-    let comp_deds
-        (mk_cand_of_terms : terms -> term) (terms : Term.terms) 
-      : cand_sets 
-      =
-      let terms_cand = { cand with term = terms } in
-      let terms_deds = specialize_deduce_list table env system terms_cand known_sets in
-      List.map (fun (terms_ded : cand_tuple_set) ->
-          { terms_ded with
-            term = mk_cand_of_terms terms_ded.term }
-        ) terms_deds
-    in
-
-    let cand_env =
-      let vars = Vars.add_vars (Vars.Tag.global_vars ~adv:true cand.vars) env in
-      Env.init ~table ~system:{ set = (system :> SE.arbitrary); pair = None; } ~vars ()
-    in
-
-    (* decompose the term using Function Application,
-       find a deducible specialization of its tuple of arguments,
-       and build the deducible specialization of the initial term. *)
-    match cand.term with
-    (* special case for pure timestamps *)
-    | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
-
-    | Term.Macro (ms, l, ts) ->
-      begin
-        let cntxt = Constr.make_context ~system ~table in
-        match Macros.get_definition cntxt ms ~args:l ~ts with
-        | `Undef | `MaybeDef -> []
-        | `Def body ->
-          specialize_deduce table env system { cand with term = body } known_sets
-      end
-
-    | Term.Proj (i,t) -> 
-      comp_deds (fun t -> Term.mk_proj i (as_seq1 t)) [t]
-
-    | Term.Tuple f_terms -> 
-      comp_deds (fun f_terms -> Term.mk_tuple f_terms) f_terms
-
-    | Term.App (Fun (fs, fty), f_terms) ->
-      comp_deds (fun f_terms -> Term.mk_fun0 fs fty f_terms) f_terms
-
-    | Term.App (t, l) -> 
-      comp_deds (fun t_l ->
-          let t, l = List.takedrop 1 t_l in
-          let t = as_seq1 t in
-          Term.mk_app t l
-        ) (t :: l)
-
-    | _ -> []
-
-  (*------------------------------------------------------------------*)
-  (** [strenghten tbl system terms] strenghten [terms] by finding an inductive
-      invariant on deducible messages which contains [terms]. *)
-  let strengthen
-      (table  : Symbols.table)
-      (system : SE.fset)
-      (env    : Vars.env)
-      (hyps   : TraceHyps.hyps)
-      (init_terms : Term.terms) : msets
-    =
-    let ppe = default_ppe ~table () in
-    
-    (* Return a list of specialization of [cand] deducible from
-       [init_terms, known_sets] for action [a] at time [a]. *)
-    let filter_specialize_deduce_action
-        (a : Symbols.action)
-        (cand : MCset.t)
-        (init_terms : known_sets)              (* initial terms *)
-        (known_sets : MCset.t list)            (* induction *)
-      : MCset.t list
-      =
-      (* we create the timestamp at which we are *)
-      let i = Action.arity a table in
-      let is = 
-        List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
-      in
-      let ts = Term.mk_action a (List.map Term.mk_var is) in
-
-      (* we unroll the definition of [cand] at time [ts] *)
-      let cntxt = Constr.make_context ~system ~table in
-      match Macros.get_definition cntxt cand.msymb ~args:cand.args ~ts with
-      | `Undef | `MaybeDef -> []
-
-      | `Def body ->
-        let cond = match cand.cond_le with
-          | Some cond_le ->
-            Term.mk_atom `Leq ts cond_le
-          | None -> Term.mk_true
-        in
-
-        let cand_set = {
-          term  = body;
-          vars  = cand.indices @ is;
-          subst = Mvar.empty;
-          cond; }
-        in
-        (* we instantiate the known terms at time [ts] *)
-        let all_known_sets =
-          (* we assume we know all terms in [known_sets] at time [ts] *)
-          let known_sets = 
-            known_sets_of_mset_l ~extra_cond_le:ts (system :> SE.t) known_sets 
-          in
-          known_sets_union init_terms known_sets
-        in
-        let ded_sets = specialize_deduce table env system cand_set all_known_sets in
-
-        let mset_l =
-          List.fold_left (fun mset_l ded_set ->
-              let subst = Mvar.to_subst_locals ~mode:`Unif ded_set.subst in
-              let msymb = cand.msymb in
-              let args  = List.map (Term.subst subst) cand.args in
-              let indices = List.map (Term.subst_var subst) cand.indices in
-              let mset = 
-                MCset.mk ~env ~msymb ~args ~indices ~cond_le:cand.cond_le 
-              in
-
-              (* sanity check *)
-              let () =
-                assert (match ded_set.cond with
-                    | Term.App (Fun (fs, _), [_; c]) when fs = Term.f_leq ->
-                      Some c = cand.cond_le
-
-                    | Term.Fun (_fs,_)
-                    | Term.App (Term.Fun (_fs,_),_) -> None = cand.cond_le
-
-                    | _ -> false)
-              in
-
-              mset :: mset_l
-            ) [] ded_sets
-        in
-        mset_list_simplify table (system:>SE.t) mset_l
-    in
-
-    let filter_specialize_deduce_action_list
-        (a : Symbols.action)
-        (cands : msets)
-        (init_terms : known_sets)              (* initial terms *)
-        (known_sets : MCset.t list)            (* induction *)
-      : msets
-      =
-      List.map (fun (mname, cand_l) ->
-          let mset_l =
-            List.concat_map (fun cand ->
-                filter_specialize_deduce_action a cand init_terms known_sets
-              ) cand_l
-          in
-          (mname, mset_list_inter table (system:>SE.t) env cand_l mset_l)
-        ) cands
-    in
-
-    (* fold over all actions of the protocol, to find a specialization of
-       [cands] stable by each action. *)
-    let filter_specialize_deduce_all_actions
-        (cands : msets)
-        (init_terms : known_sets)              (* initial terms *)
-        (known_sets : MCset.t list)            (* induction *)
-      : msets
-      =
-      let names = SE.symbs table system in
-      System.Msh.fold (fun _ name cands ->
-          filter_specialize_deduce_action_list name cands init_terms known_sets
-        ) names cands
-    in
-
-    let rec specialize_deduce_fixpoint
-        (cands : msets)
-        (init_terms : known_sets) (* initial terms *)
-      : msets
-      =
-      let init_known : MCset.t list = msets_to_list cands in
-      let cands' = filter_specialize_deduce_all_actions cands init_terms init_known in
-
-      dbg "deduce_fixpoint:@.%a@." pp_msets cands';
-
-      (* check if [cands] is included in [cands'] *)
-      if msets_incl table (system:>SE.t) cands cands'
-      then cands'
-      else specialize_deduce_fixpoint cands' init_terms
-    in
-
-    (* we use as maximal timestamp the first timestamp appearing in a
-       frame. If there is no such timestamp, we have no constraints. *)
-    let cond_le =
-      List.find_map (function
-          (* TODO: quantum: update or remove the `apply ~inductive` function altogether *)
-          | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.frame -> Some ts
-          | _ -> None
-        ) init_terms
-    in
-
-    let init_fixpoint : msets =
-      Symbols.Macro.fold (fun mn data msets ->
-          let data = match data with Symbols.Macro data -> data | _ -> assert false in
-          let in_init = 
-            match data with
-            | Symbols.State _ -> true
-            | _ -> mn = Symbols.Classic.cond
-          in
-
-          (* Ignore other macros. Notably, ignore global macros, as
-             they are (usually) not defined at all timestamps, so we
-             won't find a deduction invariant with them. *)
-          if not in_init then msets else
-            begin
-              let ty, indices =
-                match data with
-                | Symbols.State (i, ty,_) ->
-                  ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
-                | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
-                | _ -> assert false
-              in
-              let ms = Term.mk_symb mn ty in
-              let mset = 
-                MCset.mk ~env
-                  ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 
-              in
-              msets_add mset msets
-            end
-        ) [] table
-    in
-    dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
-
-    (* initially known terms *)
-    let init_terms = 
-      let context = SE.{ set= (system :> SE.t); pair = None; } in
-      let env = Env.init ~table ~system:context ~vars:env () in
-      known_sets_of_terms env hyps init_terms 
-    in
-
-    dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
-
-    specialize_deduce_fixpoint init_fixpoint init_terms
-
   (*------------------------------------------------------------------*)
   let flip = function
     | `Eq       -> `Eq
@@ -3148,296 +3451,6 @@ module E = struct
     try T.tunif_l terms pats st with
     | NoMatch _ -> no_unif ()  
   (* throw away match infos, which have no meaning when unifying *)
-
-  (*------------------------------------------------------------------*)
-  (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
-  let deduce_mem0
-      (cterm : cond_term)
-      (known : term_set)
-      (st    : unif_state) : Mvar.t option
-    =
-    let known = refresh_term_set known in
-
-    let known_cond, e_pat = pat_of_term_set known in
-    assert (
-      Sv.disjoint
-        (Sv.of_list (List.map fst known.vars))
-        (Sv.of_list (List.map fst st.support))
-    );
-    (* Elements of [known] are known only for bi-deducible values of [known.vars]. 
-       For now, we only check that these [known.vars] is instantiated by 
-       ptime values, which ensures that they are bi-deducible.
-       FEATURE: we could be more precise by creating a bi-deduction proof obligation
-       instead. *)
-    let st = { st with support = known.vars @ st.support; } in
-
-    (* adding [cterm.cond] as hypohtesis before matching *)
-    let st =
-      let hyps =
-        TraceHyps.add
-          TacticsArgs.AnyName (LHyp (Equiv.Local cterm.cond)) st.hyps
-      in
-      { st with hyps }
-    in
-
-    try
-      let mv = T.tunif cterm.term e_pat.pat_op_term st in
-      let subst =
-        match Mvar.to_subst ~mode:`Unif st.table st.env mv with
-        | `Subst subst -> subst
-        | `BadInst _pp_err ->
-          no_unif ()
-      in
-      let known_cond = Term.subst subst known_cond in
-      (* check that [cterm.cond] imples [known_cond θ] holds *)
-      if not (
-          known_set_check_impl st.table ~st cterm.cond known_cond
-        )
-      then None
-      else (* clear [known.var] from the binding *)
-        Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
-    with NoMatch _ -> None
-
-  let deduce_mem
-      (cterm : cond_term)
-      (known : term_set)
-      (st    : unif_state) : Mvar.t option
-    =
-    (* FIXME:
-       if [st.support] is not empty, then we need to find [mv] such that:
-       - [mv] represents a substitution θ whose support is included in
-         [st.support] ∪ [known.vars]
-       - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
-
-       The issue is that the unification algorithm will ensure that the latter
-       condition holds for ([st.support] ∪ [known.vars]), and not just
-       for [st.support]. This makes us reject valid instance that appear in
-       practice.
-
-       We need to modify the unification algorithm to account for that.
-
-       Instead, for now, we try either a normal unification, or a unification where we
-       cleared both [st.bvs] and [st.support] (i.e. we do not try to infer the
-       arguments of the lemma being applied).
-       We move [st.bvs] to [st.env] to keep variable tags information.
-    *)
-    match deduce_mem0 cterm known st with
-    | Some mv -> Some mv
-    | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
-      if st.bvs = [] && st.support = [] then None
-      else
-        let env = Vars.add_vars st.bvs st.env in
-        let st = { st with bvs = []; support = []; env; } in
-        deduce_mem0 cterm known st
-
-  (** Try to match [term] as an element of a sequence in [elems]. *)
-  let deduce_mem_list
-      (cterm : cond_term)
-      (elems : known_sets)
-      (st    : unif_state) : Mvar.t option
-    =
-    List.find_map (fun elem -> deduce_mem cterm elem st) elems
- 
-  (*------------------------------------------------------------------*)
-  (** [fa_decompose output st] return a list of deduction conditions
-      that must be met for [output] to be deducible (from some
-      arbitrary terms [inputs]).
-
-      Return [None] if Function Application fails on [output].
-
-      See [deduce] for the precise semantics of [· ▷ output]. *)
-  let fa_decompose
-      (output : cond_term) (st : unif_state)
-    : (unif_state * cond_term) list option
-    =
-    let env = env_of_unif_state st in
-    match output.term with
-    | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
-    (* we do not need to check that [· ▷ output.cond], since we know
-       that we already have [output.cond] on the left of [▷]. *)
-  
-    (* function: if-then-else *)
-    | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
-      let cond1 = Term.mk_and b output.cond
-      and cond2 = Term.mk_and (Term.mk_not b) output.cond in
-
-      Some (List.map (fun t -> st, t) [{ term = b ; cond = output.cond; };
-                                       { term = t1; cond = cond1; };
-                                       { term = t2; cond = cond2; }])
-
-    (* function: and *)
-    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_and -> 
-      let cond = Term.mk_and t1 output.cond in
-      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
-                                      { term = t2 ; cond }])
-
-    (* function: or *)
-    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_or -> 
-      let cond = Term.mk_and (Term.mk_not t1) output.cond in
-      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
-                                      { term = t2 ; cond }])
-
-      (* function: impl *)
-    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_impl -> 
-      let cond = Term.mk_and t1 output.cond in
-      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
-                                      { term = t2 ; cond }])
-
-    (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
-
-    (* tuples *)
-    | Term.Tuple terms ->
-      Some (List.map (fun term -> st, { output with term } ) terms)
-
-    | Term.Proj (_, t) ->
-      Some [st, { output with term = t }]
-
-    | Term.App (t, terms) ->
-      Some (List.map (fun term -> st, { output with term } ) (t :: terms))
-
-    | Term.Quant (q, es, term) ->
-      (* [Seq], [ForAll] and [Exists] require to quantify over
-         enumerable types *)
-      let check_quantif =
-        match q with
-        | Lambda -> true
-        | Seq | ForAll | Exists ->
-          List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) es
-      in
-      if not check_quantif then None
-      else
-        let es, subst = Term.refresh_vars es in
-        let term = Term.subst subst term in
-        
-        (* binder variables are declared global, constant and adv,
-           as these are inputs (hence known values) to the adversary  *)
-        let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
-        Some [(st, { output with term; })]
-
-    | Find (is, c, d, e)
-      when
-        List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) is
-      ->
-      let is, subst = Term.refresh_vars is in
-      let c, d = Term.subst subst c, Term.subst subst d in
-
-      (* idem, binder variables are declared global, constant and adv *)
-      let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
-
-      let d_cond = Term.mk_and output.cond c in
-      let e_cond =
-        Term.mk_and
-          output.cond
-          (Term.mk_forall is (Term.mk_not c))
-      in
-
-      let c = { term = c; cond = output.cond; }
-      and d = { term = d; cond = d_cond; }
-      and e = { term = e; cond = e_cond; } in
-
-
-      Some [(st1, c); (st1, d); (st, e)]
-
-    | _ -> None
-
-  (*------------------------------------------------------------------*)
-  (** Check if [inputs ▷ output]. 
-      More precisely, if [output = {v | ψ} ] then verify if:
-
-        [inputs, ψ ▷ if ψ then v]       
-
-      (Remark that [ψ] appears on the left of [▷].)
-
-      Here, an element [{u | vars: ϕ}] of [inputs] represents
-
-        [λ vars ⇒ (ϕ, if ϕ then u)].
-
-      (Remark that [ϕ] is part of the function's output.)
-   *)
-  let rec deduce
-      ~(output : cond_term)
-      ~(inputs : known_sets)
-      (st      : unif_state)
-      (minfos  : match_infos) : Mvar.t * match_infos
-    =
-    match deduce_mem_list output inputs st with
-    | Some mv ->
-      (mv, minfos_ok output.term minfos)
-    | None ->
-      (* if that fails, decompose [term] through the Function Application
-         rule, and recurse. *)
-      deduce_fa ~output ~inputs st minfos
-
-  (** Check if [inputs ▷ output] using the function application rules. 
-      See [deduce] for the precise semantics of [inputs ▷ output]. *)
-  and deduce_fa
-      ~(output : cond_term)
-      ~(inputs : known_sets)
-      (st      : unif_state)
-      (minfos  : match_infos) : Mvar.t * match_infos
-    =
-    match fa_decompose output st with
-    | None ->
-      (* We could not decompose [output] through into deduction sub-goals.
-         Try to reduce [output] and restart [deduce]. *)
-      let term, has_red = whnf ReductionCore.rp_crypto st output.term in
-      if has_red then
-        deduce ~output:{ output with term; } ~inputs st minfos
-      else
-        (st.mv, minfos_failed output.term minfos)
-
-    | Some fa_conds ->
-      let minfos =
-        let st = List.map (fun x -> (snd x).term) fa_conds in
-        minfos_check_st output.term st minfos
-      in
-
-      List.fold_left (fun (mv, minfos) (st, t) ->
-          let mv, minfos =
-            deduce ~output:t ~inputs { st with mv } minfos
-          in
-          mv, minfos
-        ) (st.mv, minfos) fa_conds
-
-  (*------------------------------------------------------------------*)
-  (** Check if [inputs ▷ outputs].
-      [outputs] and [inputs] are over [st.system.set]. *)
-  let deduce_terms
-      ~(outputs : Term.terms) ~(inputs  : Term.terms) (st : unif_state)
-    : match_res
-    =
-    let se = st.system.set in
-
-    (* If [st.support] is not empty, we cannot strengthen the invariant.
-       See explanation in [mset_mem_one]. *)
-    let mset_l =
-      if st.support = [] && st.use_fadup && SE.is_fset se then
-        let system = SE.to_fset se in
-        let msets = strengthen st.table system st.env st.hyps inputs in
-        msets_to_list msets
-      else []
-    in
-    if st.support = [] && st.use_fadup &&
-       TConfig.show_strengthened_hyp st.table then
-      (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
-
-  let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
-  let inputs =
-    known_sets_union
-      (known_sets_of_mset_l se mset_l)
-      (known_sets_of_terms env st.hyps inputs)
-  in
-  
-  let mv, minfos =
-    List.fold_left (fun (mv, minfos) output ->
-        let output = { term = output; cond = Term.mk_true; } in
-        deduce ~output ~inputs { st with mv } minfos
-      ) (st.mv, Mt.empty) outputs
-  in
-
-  if Mt.for_all (fun _ r -> r <> MR_failed) minfos
-  then Match mv
-  else NoMatch (Some (outputs, minfos_norm minfos))
 
   (*------------------------------------------------------------------*)
   let tunif_equiv_eq

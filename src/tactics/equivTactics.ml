@@ -1024,7 +1024,7 @@ let filter_deduce
     | e :: to_filter0 ->
       let inputs = result @ to_filter0 @ knows in (* without [e] *)
       let match_result = 
-        Match.E.deduce_terms ~outputs:[e] ~inputs st
+        Match.deduce_terms ~outputs:[e] ~inputs st
       in
       match match_result with
       | NoMatch _ -> doit (e :: result) to_filter0
@@ -1120,7 +1120,7 @@ let deduce_predicate_all
   if all then (* two different mode of operations, depending on [all] *)
     begin
       let () = (* check that [left ▷ h_left] *)
-        match Match.E.deduce_terms ~outputs:h_left ~inputs:left st with
+        match Match.deduce_terms ~outputs:h_left ~inputs:left st with
         | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
         | Match mv -> assert (Match.Mvar.is_empty mv)
       in
@@ -1128,7 +1128,7 @@ let deduce_predicate_all
       (* Since [h_left ▷ h_right], it only remains to check that
          [left, h_left, h_right ▷ right] *)
       let match_result = 
-        Match.E.deduce_terms ~outputs:right ~inputs:(left @ h_left @ h_right) st
+        Match.deduce_terms ~outputs:right ~inputs:(left @ h_left @ h_right) st
       in
       match match_result with
       | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
@@ -1170,7 +1170,7 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
   let match_result = 
-    Match.E.deduce_terms ~outputs:to_deduce ~inputs:rest st
+    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
@@ -1201,7 +1201,7 @@ let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
   let match_result = 
-    Match.E.deduce_terms ~outputs:to_deduce ~inputs:rest st
+    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
   in  
   match match_result with
   | NoMatch minfos -> 

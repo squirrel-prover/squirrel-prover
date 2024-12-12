@@ -403,6 +403,21 @@ val term_set_strengthen :
   Env.t -> TraceHyps.hyps ->
   inputs:term_set list -> term_set -> term_set list
 
+(** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
+val deduce_mem :
+  cond_term ->
+  term_set ->
+  unif_state -> Mvar.t option
+
+(** Check if [inputs ▷ outputs].
+    [outputs] and [inputs] are over [st.system.set]. *)
+val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
+
+val known_set_check_impl :
+  ?st:unif_state ->
+  Symbols.table ->
+  Term.term -> Term.term -> bool
+
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 module T : S with type t = Term.term
@@ -410,21 +425,6 @@ module T : S with type t = Term.term
 (*------------------------------------------------------------------*)
 module E : sig
   include S with type t = Equiv.form
-
-  (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
-  val deduce_mem :
-    cond_term ->
-    term_set ->
-    unif_state -> Mvar.t option
-
-  (** Check if [inputs ▷ outputs].
-      [outputs] and [inputs] are over [st.system.set]. *)
-  val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
-
-  val known_set_check_impl :
-    ?st:unif_state ->
-    Symbols.table ->
-    Term.term -> Term.term -> bool
 
   (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 

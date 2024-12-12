@@ -352,7 +352,7 @@ let equal_term_name_eq
   let unif_state =
     Match.mk_unif_state ~env:env.vars env.table system hyps ~support:name_vars
   in 
-  let mv = Match.E.deduce_mem cterm known_set unif_state in
+  let mv = Match.deduce_mem cterm known_set unif_state in
   match mv with
   | Some mv ->
     (* If the matching found a substitution, get all equalities in name the 
@@ -427,7 +427,7 @@ let exact_eq_under_cond
     Match.mk_unif_state
       ~env:env.vars env.table env.system hyps ~support:unif_vars
   in
-  Match.E.deduce_mem cterm known_set unif_state
+  Match.deduce_mem cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 (** unknow global samples assignments *)
@@ -2001,7 +2001,7 @@ let knowledge_mem_condterm_sets
       let st =
         Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
       in
-      if Match.E.known_set_check_impl env.table ~st conds (Term.mk_false)
+      if Match.known_set_check_impl env.table ~st conds (Term.mk_false)
       then None
       else Some (args,conds)
   in
@@ -2203,7 +2203,7 @@ and bideduce_term
       Some result 
   else if
     output.conds <> [] &&
-    Match.E.known_set_check_impl env.table ~st:(Lazy.force st)
+    Match.known_set_check_impl env.table ~st:(Lazy.force st)
       (Term.mk_ands output.conds) Term.mk_false
   then
     Some (empty_result query.initial_mem)
