@@ -3271,6 +3271,18 @@ module E = struct
       Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
                                       { term = t2 ; cond }])
 
+    (* function: or *)
+    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_or -> 
+      let cond = Term.mk_and (Term.mk_not t1) output.cond in
+      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+                                      { term = t2 ; cond }])
+
+      (* function: impl *)
+    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_impl -> 
+      let cond = Term.mk_and t1 output.cond in
+      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+                                      { term = t2 ; cond }])
+
     (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
 
     (* tuples *)
