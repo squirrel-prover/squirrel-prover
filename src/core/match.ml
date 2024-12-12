@@ -3411,21 +3411,21 @@ module E = struct
 
   let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
   let inputs =
-      known_sets_union
-        (known_sets_of_mset_l se mset_l)
-        (known_sets_of_terms env st.hyps inputs)
-    in
+    known_sets_union
+      (known_sets_of_mset_l se mset_l)
+      (known_sets_of_terms env st.hyps inputs)
+  in
+  
+  let mv, minfos =
+    List.fold_left (fun (mv, minfos) output ->
+        let output = { term = output; cond = Term.mk_true; } in
+        deduce ~output ~inputs { st with mv } minfos
+      ) (st.mv, Mt.empty) outputs
+  in
 
-    let mv, minfos =
-      List.fold_left (fun (mv, minfos) output ->
-          let output = { term = output; cond = Term.mk_true; } in
-          deduce ~output ~inputs { st with mv } minfos
-        ) (st.mv, Mt.empty) outputs
-    in
-
-    if Mt.for_all (fun _ r -> r <> MR_failed) minfos
-    then Match mv
-    else NoMatch (Some (outputs, minfos_norm minfos))
+  if Mt.for_all (fun _ r -> r <> MR_failed) minfos
+  then Match mv
+  else NoMatch (Some (outputs, minfos_norm minfos))
 
   (*------------------------------------------------------------------*)
   let tunif_equiv_eq
