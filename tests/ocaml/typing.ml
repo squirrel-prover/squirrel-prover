@@ -117,9 +117,10 @@ end C2.
 let crypto_parsing () =
   let exception Ok in
   let exception Ko in
-  let st = Prover.init () in
 
-  let ill_formed_game st =
+  (*------------------------------------------------------------------*)
+  let ill_formed_game () =
+    let st = Prover.init () in
     Prover.exec_all ~test:true st 
       "\
 game Foo = {
@@ -136,12 +137,85 @@ game Foo = {
   Alcotest.check_raises "ill-formed game" Ok
     (fun () ->
        let _ : Prover.state =
-         try ill_formed_game st with
+         try ill_formed_game () with
          | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
        in
        raise Ko
     );
 
+  (*------------------------------------------------------------------*)
+  (* check that games cannot use names or macros *)
+  begin
+    let init =
+      Prover.exec_all ~test:true (Prover.init ()) "name k : message." 
+    in
+    let g0 = "\
+game G = {
+  var x = empty;
+  oracle g = { 
+    x := input@init;
+    return empty;
+  }
+}."
+    in
+    let g1 = "\
+game G = {
+  var x = empty;
+  oracle g = { 
+    x := k;
+    return empty;
+  }
+}."
+    in
+    let g2 = "\
+game G = {
+  oracle g = { 
+    var x : message = input@init;
+    return empty;
+  }
+}."
+    in
+    let g3 = "\
+game G = {
+  oracle g = { 
+    var x : message = k;
+    return empty;
+  }
+}."
+    in
+    let g4 = "\
+game G = {
+  oracle g = { return input@init; }
+}."
+    in
+    let g5 = "\
+game G = {
+  oracle g = { return k; }
+}."
+    in
+    let g6 = "\
+game G = {
+  var x : message = input@init;
+}."
+    in
+    let g7 = "\
+game G = {
+  var x : message = k;
+}."
+    in
+    let check_typing_error (g : string) =
+      Alcotest.check_raises "ill-formed game" Ok
+        (fun () ->
+           let _ : Prover.state =
+             try Prover.exec_all ~test:true init g with
+             | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+           in
+           raise Ko
+        );
+    in
+    List.iter check_typing_error [g0;g1;g2;g3;g4;g5;g6;g7]
+  end;
+  
   ()
 
 (*------------------------------------------------------------------*)

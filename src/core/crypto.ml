@@ -2736,7 +2736,11 @@ let parse_crypto_args
     let cond = 
       match arg.cond with
       | None -> []
-      | Some arg -> [fst (Typing.convert ~ty:Type.tboolean ~ienv conv_env arg)]
+      | Some arg ->
+        [
+          fst @@
+          Typing.convert ~ty:Type.tboolean ~ienv conv_env arg
+        ]
     in
     let name, term = 
       match fst (Typing.convert ~ty:(Vars.ty glob_v) ~ienv conv_env arg.term) with
@@ -2999,6 +3003,13 @@ module Parse = struct
   (*------------------------------------------------------------------*)
   (** {3 Parsing} *)
 
+  (** games cannot use names or macros *)
+  let games_typing_option =
+    { Typing.Option.default with
+      names  = false;
+      macros = false;
+    }
+
   let make_exact_var (env : Env.t) (lsymb : lsymb) (ty : Type.ty) =
     let name = L.unloc lsymb in
     match Vars.make_exact env.vars ty name Vars.Tag.ltag with
@@ -3025,7 +3036,9 @@ module Parse = struct
           in
           let env, var = make_exact_var env pv.vd_name ty in
           let init, _ = 
-            Typing.convert ~ty ~ienv { env; cntxt = Typing.InGoal; } pv.vd_init 
+            Typing.convert
+              ~option:games_typing_option
+              ~ty ~ienv { env; cntxt = Typing.InGoal; } pv.vd_init 
           in
           (env, { var; init } :: vdecls)
         ) (env, []) p_vdecls
@@ -3040,7 +3053,9 @@ module Parse = struct
             | Not_found -> failure (L.loc pv) (Failure "unknown variable");
           in
           let t, _ = 
-            Typing.convert ~ty:(Vars.ty v) ~ienv { env; cntxt = Typing.InGoal; } pt
+            Typing.convert
+              ~option:games_typing_option
+              ~ty:(Vars.ty v) ~ienv { env; cntxt = Typing.InGoal; } pt
           in
           (env, (v, t) :: updates)
         ) (env, []) p_updates
@@ -3079,7 +3094,10 @@ module Parse = struct
         Term.empty
 
       | Some pret ->
-        fst (Typing.convert ~ty:tyout ~ienv { env; cntxt = Typing.InGoal; } pret)
+        fst @@
+        Typing.convert
+          ~option:games_typing_option
+          ~ty:tyout ~ienv { env; cntxt = Typing.InGoal; } pret
     in
 
     let oracle = {

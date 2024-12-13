@@ -17,8 +17,8 @@ rnd key : sk_enc;
 var log = empty_set;
 oracle encrypt (m0,m1 : message) = {
 rnd seed: seed;
-var c0 = enc m0 (pk_enc sk) seed;
-var c1 = enc m1 (pk_enc sk) seed;
+var c0 = enc m0 (pk_enc key) seed;
+var c1 = enc m1 (pk_enc key) seed;
 log := add (format diff(c0,c1)) log;
 return diff(c0,c1)}
 
