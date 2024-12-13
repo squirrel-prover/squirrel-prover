@@ -1005,8 +1005,8 @@ let fa_dup (s : ES.t) : ES.t list =
 (*------------------------------------------------------------------*)
 (** Deduce. *)
 
-(** If [filter_deduce ~all ~knows to_filter = results] then
-    [knows, results ▷ to_filter]. *)
+(** [filter_deduce ~knows to_filter] returns a subset [results] of [to_filter]
+    such that [knows, results ▷ to_filter]. *)
 let filter_deduce
     (system : SE.context) (s : ES.t) 
     ?(knows: Term.terms = [])
@@ -1040,8 +1040,11 @@ let filter_deduce
   doit [] to_filter_init
 
 (*------------------------------------------------------------------*)
-(** Deduce recursively removes all elements of a biframe
-    that are deducible from the rest. *)
+(** Deduce for biframes:
+    recursively removes all elements of a biframe
+    that are deducible from the rest.
+    If a ~with_hyp is specified, uses it to attempt to simplify the biframe.
+    The hyp must be a deduction formula. *)
 let deduce_all
     ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
@@ -1053,7 +1056,8 @@ let deduce_all
   let equiv = ES.conclusion_as_equiv s in
 
   if equiv.bound <> None then (* TODO: concrete *)
-    soft_failure (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+    soft_failure
+      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
 
   let terms = equiv.terms in
 
@@ -1077,16 +1081,54 @@ let deduce_all
 
   [ES.set_equiv_conclusion {terms = terms0 @ h_left0; bound = None} s]
 
+
+(*------------------------------------------------------------------*)
+(** Checks whether the [i]-th element of the biframe is bideducible
+    from the other ones, and if so removes it. *)
+let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
+  let conc = ES.conclusion_as_equiv s in
+  assert (conc.bound = None);   (* TODO: concrete *)
+
+  let to_deduce, rest = get_elems l conc.terms in
+
+  let table = ES.table s in
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+  let hyps = ES.get_trace_hyps ~in_system:system s in
+  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+
+  let match_result = 
+    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
+  in
+  match match_result with
+  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+  | Match mv ->
+    assert (Match.Mvar.is_empty mv);
+    [ES.set_equiv_conclusion {terms = rest; bound = None} s]
+
+
+
 (*------------------------------------------------------------------*) 
-(** Tactic [deduce] in a goal [u |> v] to prove that term [u]
-    can be deduced from term [v].
+(** Deduce for deduction goals *)
 
-    Closes the goal if that is the case, fails filter the elements
-    that could be deduced. 
 
-    If [~all], then raise a user-level error if all elements cannot be
-    deduced. *)
-let deduce_predicate_all 
+(** Right version:
+    Using tactic [deduce] in a goal [u |> v] to prove that term [v]
+    can be deduced from term [u].
+
+    Closes the goal if that is the case, otherwise filters from [v]
+    the elements that could be deduced.
+
+    If [~all], then raises a user-level error if all elements cannot be
+    deduced.
+
+    When a ~with_hyp deduction hypothesis is specified, uses it to
+    help deduce elements of [v]. This may however add some of the
+    left-hand side elements of the ~with_hyp to the right-hand side of the goal.
+*)
+let deduce_predicate_deduce_right_all 
     ~(all : bool) ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
   let table = ES.table s in
@@ -1094,7 +1136,7 @@ let deduce_predicate_all
 
   if CP.kind table goal <> Deduce then
     Tactics.soft_failure 
-      (Tactics.GoalBadShape "secrecy predicate unsupported");
+      (Tactics.GoalBadShape "non-deduction predicate unsupported");
 
   let system =
     let system_secrecy = CP.system goal in
@@ -1152,44 +1194,19 @@ let deduce_predicate_all
         [ES.set_conclusion (CP.to_global g) s]
     end
 
-(*------------------------------------------------------------------*)
-(** Checks whether the [i]-th element of the biframe is bideducible
-    from the other ones, and if so removes it. *)
-let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
-  let conc = ES.conclusion_as_equiv s in
-  assert (conc.bound = None);   (* TODO: concrete *)
-
-  let to_deduce, rest = get_elems l conc.terms in
-
-  let table = ES.table s in
-  let system =
-    let system_s = ES.system s in
-    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
-  in
-  let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
-
-  let match_result = 
-    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
-  in
-  match match_result with
-  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
-  | Match mv ->
-    assert (Match.Mvar.is_empty mv);
-    [ES.set_equiv_conclusion {terms = rest; bound = None} s]
 
 (*------------------------------------------------------------------*)
 (** Tactic [deduce i] in a goal [u |> v] or [u *> v], with [u] a tuple,
     checks if the [i]-th element of [u]
     is deducible from the rest of [u].
     If so, removes it. *)
-let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
+let deduce_predicate_deduce_left_int (l : int L.located list) (s : ES.t) : ES.t list =
   let table = ES.table s in
   let goal = ES.conclusion_as_computability s in
 
   if CP.kind table goal <> Deduce then
     Tactics.soft_failure 
-      (Tactics.GoalBadShape "secrecy predicate unsupported");
+      (Tactics.GoalBadShape "non-deduction predicate unsupported");
 
   let to_deduce, rest = get_elems l (CP.lefts goal) in
 
@@ -1211,11 +1228,16 @@ let deduce_predicate_int (l : int L.located list) (s : ES.t) : ES.t list =
     let new_secrecy_goal = CP.update_lefts rest goal in
     [ES.set_conclusion (CP.to_global new_secrecy_goal) s]
 
-(*------------------------------------------------------------------*)
-let to_goals l = List.map (fun x -> Goal.Global x) l
 
 (*------------------------------------------------------------------*)
-(** for now, `deduce` has only one named optional arguments *)
+(** The [deduce] tactic dispatches the goal to the relevant
+    function among those above, depending on the shape of the goal and
+    the tactic's options. *)
+
+let to_goals l = List.map (fun x -> Goal.Global x) l
+
+
+(** For now, [deduce] has only one named optional argument *)
 let p_deduce_named_arg (nargs : Args.named_args) : bool =
   match nargs with
   | [Args.NArg L.{ pl_desc = "all" }] -> true
@@ -1225,6 +1247,7 @@ let p_deduce_named_arg (nargs : Args.named_args) : bool =
     hard_failure ~loc:(L.loc l) (Failure "unknown argument")
 
   | [] -> false
+
 
 let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
   match args with
@@ -1272,8 +1295,8 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
 
       else if ES.conclusion_is_computability s then
         match targets_opt with
-        | None   -> deduce_predicate_all ~all ?with_hyp s
-        | Some l -> deduce_predicate_int l s
+        | None   -> deduce_predicate_deduce_right_all ~all ?with_hyp s
+        | Some l -> deduce_predicate_deduce_left_int l s
 
       else
         Tactics.soft_failure 
@@ -1283,7 +1306,8 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
      let subgs = 
        List.map (function 
            | Equiv.Global f -> ES.set_conclusion f s
-           | Equiv.Local _ -> assert false (* cannot happen as the conclusion is global *)
+           | Equiv.Local _ -> assert false (* cannot happen
+                                              as the conclusion is global *)
          ) subgs 
      in
      subgs @ new_goals |> 
@@ -1297,6 +1321,8 @@ let () =
   T.register_general "deduce"
     ~pq_sound:true
     (LT.genfun_of_efun_arg deduce)
+
+
 
 
 (*------------------------------------------------------------------*)
