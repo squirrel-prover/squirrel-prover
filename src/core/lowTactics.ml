@@ -165,9 +165,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert_args (s : S.sequent) args sort =
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.conclusion s))
 
-  let convert ?ty ?pat (s : S.sequent) term =
+  let convert ?ty ?option (s : S.sequent) term =
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
-    Typing.convert ?ty ?pat cenv term
+    Typing.convert ?ty ?option cenv term
 
   let convert_any (s : S.sequent) (term : Typing.any_term) =
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
@@ -1716,7 +1716,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Generalize (terms, n_ips_opt)] ->
       let terms =
         List.map (fun p_arg ->
-            let arg, _ty = convert ~pat:true s p_arg in 
+            let arg, _ty =
+              convert
+                ~option:{Typing.Option.default with pat = true; }
+                s p_arg
+            in 
             arg, Some (L.loc p_arg)
           ) terms
       in

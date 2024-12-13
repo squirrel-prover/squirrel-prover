@@ -800,7 +800,11 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
       ienv (tpat : Typing.term)
     : L.t * Term.term Term.pat_op
     =
-    let t, _ty = Typing.convert ~ienv ~pat:true cntxt tpat in
+    let t, _ty =
+      Typing.convert
+        ~option:{Typing.Option.default with pat = true; }
+        ~ienv cntxt tpat
+    in
     let vars =
       Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
     in
@@ -1592,7 +1596,7 @@ let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.se
     | Some t ->
       let t, _ =
         let cntxt = Typing.{ env = ES.env s; cntxt = InGoal; } in
-        Typing.convert ~ty:(Term.ty ti) ~pat:false cntxt t
+        Typing.convert ~ty:(Term.ty ti) cntxt t
       in
       t
 

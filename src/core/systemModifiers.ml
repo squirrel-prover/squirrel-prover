@@ -128,7 +128,7 @@ let parse_single_system_name table sdecl : SE.fset * System.Single.t =
 (*------------------------------------------------------------------*)
 (** Convertion of system modifiers arguments.
     - [bnds] are additional binded variables. *)
-let conv_term ?pat table system ~bnds (term : Typing.term)
+let conv_term table system ~bnds (term : Typing.term)
   : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
@@ -145,7 +145,7 @@ let conv_term ?pat table system ~bnds (term : Typing.term)
          (Tactics.Failure "Only index variables can be bound."));
 
   let conv_env = Typing.{ env; cntxt = InGoal } in
-  let t, _ = Typing.convert ?pat conv_env term in
+  let t, _ = Typing.convert conv_env term in
   is, t
 
 (*------------------------------------------------------------------*)

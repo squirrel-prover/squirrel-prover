@@ -323,6 +323,23 @@ type conv_env = {
 }
 
 (*------------------------------------------------------------------*)
+(** Typing option, which allow to enable or disable some term
+    constructs. *)
+module Option = struct
+  type t = {
+    pat    : bool;              (** pattern variables can occur *)
+    names  : bool;              (** names can occur *)
+    macros : bool;              (** macros can occur *)
+  }
+
+  let default = {
+    pat      = false;
+    names    = true;
+    macros   = true;
+  }
+end
+
+(*------------------------------------------------------------------*)
 (** Internal conversion states, containing:
     - all the fields of a [conv_env]
     - free type variables
@@ -335,15 +352,15 @@ type conv_state = {
   
   cntxt : conv_cntxt;
 
-  allow_pat     : bool;
+  option : Option.t;
   type_checking : bool;
   (** if [true], we are only type-checking the term *)
 
   ienv : Infer.env;
 }
 
-let mk_state ?(type_checking=false) ~system_info env cntxt allow_pat ienv =
-  { cntxt; env; allow_pat; ienv; type_checking; system_info; }
+let mk_state ?(type_checking=false) ~system_info env cntxt option ienv =
+  { cntxt; env; option; ienv; type_checking; system_info; }
 
 (*------------------------------------------------------------------*)
 (** {2 Various checks} *)
@@ -671,6 +688,9 @@ let validate
       end
 
   | Term.Macro (m,args,_t) ->
+    if not state.option.macros then
+      error loc (Failure "cannot use a macro here");
+    
     let n = List.length args in
     let fty, _rec_ty = Macros.fty table m.s_symb in
     let arity = List.length fty.fty_args in
@@ -679,6 +699,9 @@ let validate
       error loc (Arity_error (Symbols.path_to_string m.s_symb,n,arity))
 
   | Term.Name (n,args) ->
+    if not state.option.names then
+      error loc (Failure "cannot use a name here");
+
     let fty = (Symbols.get_name_data n.s_symb table).n_fty in
     let n_args = List.length args in
     let arity = List.length fty.fty_args in
@@ -901,7 +924,7 @@ and convert0
   
   (*------------------------------------------------------------------*)
   | Tpat ->
-    if not state.allow_pat then
+    if not state.option.pat then
       error (L.loc tm) PatNotAllowed;
 
     let _, p =
@@ -1611,7 +1634,7 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
 (** Exported *)
 let check
     (env : Env.t)
-    ?(local=false) ?(pat=false)
+    ?(local=false) ?(option=Option.default)
     ?(system_info = Mv.empty)
     (ienv : Infer.env)
     (projs : Projection.t list)
@@ -1624,14 +1647,14 @@ let check
   in
   let cntxt = if local then InProc (projs, (dummy_var Type.ttimestamp)) else InGoal in
   
-  let state = mk_state ~type_checking:true ~system_info env cntxt pat ienv in
+  let state = mk_state ~type_checking:true ~system_info env cntxt option ienv in
   ignore (convert state t s : Term.term)
 
 (** Exported *)
 let convert 
     ?(ty     : Type.ty option)
-    ?(ienv : Infer.env option) 
-    ?(pat    : bool = false)
+    ?(ienv   : Infer.env option) 
+    ?(option : Option.t = Option.default)
     ?(system_info = Mv.empty)
     (cenv    : conv_env) 
     (tm      : term) 
@@ -1645,7 +1668,7 @@ let convert
     | None    -> Type.univar (Infer.mk_ty_univar ienv) 
     | Some ty -> ty 
   in
-  let state = mk_state ~system_info cenv.env cenv.cntxt pat ienv in
+  let state = mk_state ~system_info cenv.env cenv.cntxt option ienv in
   let t = convert state tm ty in
 
   if must_close then
@@ -1669,17 +1692,18 @@ let convert
 (** Exported *)
 let convert_global_formula 
     ?(ienv : Infer.env option) 
-    ?(pat    : bool = false)
+    ?(option : Option.t = Option.default)
     ?(system_info = Mv.empty)
     (cenv : conv_env)
     (p : global_formula)
   : Equiv.form
   =
-  let must_close, ienv = match ienv with
-    | None        -> true, Infer.mk_env ()
+  let must_close, ienv =
+    match ienv with
+    | None      -> true, Infer.mk_env ()
     | Some ienv -> false, ienv
   in
-  let state = mk_state ~system_info cenv.env cenv.cntxt pat ienv in
+  let state = mk_state ~system_info cenv.env cenv.cntxt option ienv in
   let t = convert_g state p in
 
   if must_close then

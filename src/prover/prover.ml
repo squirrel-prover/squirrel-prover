@@ -448,10 +448,18 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
   match t with
   | Local p -> 
-    let t = fst (Typing.convert ~ienv ~pat:true cntxt p) in
+    let t, _ =
+      Typing.convert
+        ~option:{Typing.Option.default with pat = true; }
+        ~ienv cntxt p
+    in
     find t
   | Global f ->
-    let t = Typing.convert_global_formula ~ienv ~pat:true cntxt f in
+    let t =
+      Typing.convert_global_formula
+        ~option:{Typing.Option.default with pat = true; }
+        ~ienv cntxt f
+    in
     let pat_op_vars =
       Vars.Tag.local_vars ~const:true
         (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))

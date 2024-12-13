@@ -13,7 +13,11 @@ let as_p_path (parser_args : parser_arg list) =
 let convert_pat_arg
     (sel : int) conv_cntxt (p : Typing.term) (conc : Equiv.any_form)
   =
-  let t, ty = Typing.convert ~pat:true conv_cntxt p in
+  let t, ty =
+    Typing.convert
+      ~option:{Typing.Option.default with pat = true; }
+      conv_cntxt p
+  in
 
   let pat = Pattern.op_pat_of_term t in
   

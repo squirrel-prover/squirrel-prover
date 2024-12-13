@@ -1230,7 +1230,11 @@ module Mk (Args : MkArgs) : S with
         (pt : PT.t) ((f_arg, _) : Vars.tagged_var) (p_arg : Typing.term) : PT.t 
       =
       let ty = Vars.ty f_arg in
-      let arg, _ = Typing.convert ~ienv ~pat:true cenv ~ty p_arg in
+      let arg, _ =
+        Typing.convert
+          ~option:{Typing.Option.default with pat = true; }
+          ~ienv cenv ~ty p_arg
+      in
       
       pt_apply_var_forall ~arg_loc:(L.loc p_arg) ienv table env pt arg
     in

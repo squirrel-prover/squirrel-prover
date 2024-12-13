@@ -236,8 +236,23 @@ val check_fun_symb :
 val empty : L.t -> term
 
 (** [var_i x] make a variable represented as [App (x,\[\])] *)
-val var_i        : L.t -> string -> term_i
-val var          : L.t -> string -> term
+val var_i : L.t -> string -> term_i
+val var   : L.t -> string -> term
+
+(*------------------------------------------------------------------*)
+(** {2 Type-checking options} *)
+
+(** Typing option, which allow to enable or disable some term
+    constructs. *)
+module Option : sig
+  type t = {
+    pat    : bool;              (** pattern variables can occur *)
+    names  : bool;              (** names can occur *)
+    macros : bool;              (** macros can occur *)
+  }
+
+  val default : t
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Type-checking} *)
@@ -282,7 +297,7 @@ val pp_error :
 
 val check : 
   Env.t ->
-  ?local:bool -> ?pat:bool ->
+  ?local:bool -> ?option:Option.t ->
   ?system_info:SE.t Mv.t ->
   Infer.env -> Projection.t list ->
   term -> Type.ty ->
@@ -326,7 +341,7 @@ type conv_env = {
 val convert : 
   ?ty:Type.ty ->
   ?ienv:Infer.env -> 
-  ?pat:bool ->
+  ?option:Option.t ->
   ?system_info:SE.t Mv.t ->
   conv_env -> 
   term ->
@@ -335,7 +350,7 @@ val convert :
 (*------------------------------------------------------------------*)
 (** {3 Binders conversion} *)
 
-(** Are variable tags supported during binder conversion *)
+(** are variable tags supported during binder conversion *)
 type bnds_tag_mode =
   | NoTags
   | DefaultTag of Vars.Tag.t
@@ -379,7 +394,7 @@ val convert_se_var_bnds :
     mutli-terms (see [convert]). *)
 val convert_global_formula : 
   ?ienv:Infer.env -> 
-  ?pat:bool ->
+  ?option:Option.t ->
   ?system_info:SE.t Mv.t ->
   conv_env -> global_formula -> Equiv.form
 
