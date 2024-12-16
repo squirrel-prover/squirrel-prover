@@ -12,7 +12,7 @@ prerequis:
     - opam switch -y remove $OPAM_SWITCH || echo "Opam environment clean up"
     - opam switch -y create $OPAM_SWITCH $OCAML_VERSION
     - opam install . -y --deps-only
-    - opam install -y why3
+    - opam install -y why3.1.7.2
     - eval $(opam env)
     - why3 config detect
 
