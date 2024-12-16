@@ -27,7 +27,7 @@ depends: [
 ]
 
 depopts: [
-  "why3"
+  "why3" {= "1.7.2"}
   "alt-ergo"
   "js_of_ocaml"
   "js_of_ocaml-tyxml"
