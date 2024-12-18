@@ -1039,38 +1039,48 @@ let filter_deduce
      invariant is respected. *)
   doit [] to_filter_init
 
+
+(** Checks that the given with_hyp is in the correct system *)
+let check_deduction_hyp_system
+    ?(with_hyp:CP.form option) (set:SE.arbitrary) : unit =
+  if with_hyp <> None &&
+     CP.system (oget with_hyp) <> set 
+  then 
+    Tactics.soft_failure 
+      (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system")
+
+(** Retrieve the left- and right-hand sides of the optional hyp *)
+let get_deduction_hyp ~(with_hyp:CP.form option) : Term.terms * Term.terms =
+  let h_left  = omap_dflt [] CP.lefts  with_hyp in
+  let h_right = omap_dflt [] CP.rights with_hyp in
+  h_left, h_right
+    
+
 (*------------------------------------------------------------------*)
 (** Deduce for biframes:
     recursively removes all elements of a biframe
     that are deducible from the rest.
-    If a ~with_hyp is specified, uses it to attempt to simplify the biframe.
+    If a [~with_hyp] is specified, uses it to attempt to simplify the biframe.
     The hyp must be a deduction formula. *)
 let deduce_all
     ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
+  let equiv = ES.conclusion_as_equiv s in
+  if equiv.bound <> None then (* TODO: concrete *)
+    soft_failure
+      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+
   let system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
   
-  let equiv = ES.conclusion_as_equiv s in
-
-  if equiv.bound <> None then (* TODO: concrete *)
-    soft_failure
-      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
-
   let terms = equiv.terms in
 
-  (*------------------------------------------------------------------*) 
-  if with_hyp <> None && CP.system (oget with_hyp) <> system.set then
-    Tactics.soft_failure 
-      (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
-
   (* we know that [h_left ▷ h_right] holds *)
-  let h_left  = omap_dflt [] CP.lefts  with_hyp in
-  let h_right = omap_dflt [] CP.rights with_hyp in
+  check_deduction_hyp_system ?with_hyp system.set;
+  let h_left, h_right = get_deduction_hyp ~with_hyp in
 
-  (*------------------------------------------------------------------*)   
   (* [terms0, h_left, h_right ▷ terms] *)
   let terms0 = filter_deduce system s ~knows:(h_right @ h_left) terms in
 
@@ -1082,20 +1092,24 @@ let deduce_all
   [ES.set_equiv_conclusion {terms = terms0 @ h_left0; bound = None} s]
 
 
+
 (*------------------------------------------------------------------*)
-(** Checks whether the [i]-th element of the biframe is bideducible
+(** Checks whether the [i]-th element of the biframe is deducible
     from the other ones, and if so removes it. *)
 let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
-  let conc = ES.conclusion_as_equiv s in
-  assert (conc.bound = None);   (* TODO: concrete *)
+  let equiv = ES.conclusion_as_equiv s in
+  if equiv.bound <> None then (* TODO: concrete *)
+    soft_failure
+      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
 
-  let to_deduce, rest = get_elems l conc.terms in
-
-  let table = ES.table s in
   let system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
+
+  let to_deduce, rest = get_elems l equiv.terms in
+
+  let table = ES.table s in
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
@@ -1109,124 +1123,238 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     [ES.set_equiv_conclusion {terms = rest; bound = None} s]
 
 
+(*------------------------------------------------------------------*)
+(** Deduction for computation predicates. *)
 
-(*------------------------------------------------------------------*) 
-(** Deduce for deduction goals *)
+
+(** flag indicating whether deduce should be applied on the left or right
+    side of the computation predicate *)
+type deduce_side = Left | Right
+
+(** Picks which side of a computation predicate [deduce] should work on
+    by default. *)
+let pick_side ?(side:deduce_side option) (g:CP.kind) : deduce_side =
+  odflt
+    (match g with
+     | Deduce -> Right
+     | NotDeduce -> Left)
+    side
 
 
-(** Right version:
-    Using tactic [deduce] in a goal [u |> v] to prove that term [v]
-    can be deduced from term [u].
+(** [deduce] tactic for computation predicates.
+    Can be applied on deduction or non-deduction goals, on the left- or
+    right-hand side.
 
-    Closes the goal if that is the case, otherwise filters from [v]
-    the elements that could be deduced.
+    - In a goal [u |> v]:
+      * On the right (default side), attempts to prove that [v]
+    can be deduced from [u], and if so closes the goal.
+    If not, either filters from [v] the elements that could be deduced,
+    or raises a user-level error depending on the [~all] option. 
+    If a [~with_hyp] deduction hypothesis is specified, uses it to
+    help deduce elements of [v].
 
-    If [~all], then raises a user-level error if all elements cannot be
-    deduced.
+      * On the left, filters from [u] redundent elements, that can be deduced 
+    from the rest. Cannot take a [~all] or [~with_hyp] option. 
 
-    When a ~with_hyp deduction hypothesis is specified, uses it to
-    help deduce elements of [v]. This may however add some of the
-    left-hand side elements of the ~with_hyp to the right-hand side of the goal.
+    - In a goal [u *> v]: 
+      * On the left (default side), filters from [u] elements that 
+    can be deduced from the rest of [u] and are thus useless. 
+    If a [~with_hyp] deduction hypothesis is specified, uses it to
+    help deduce elements of [u]. Cannot take [~all]. 
+    
+      * On the right, filters from [v] redundent elements, that can be deduced 
+    from the rest. Cannot take a [~all] or [~with_hyp] option.
 *)
-let deduce_predicate_deduce_right_all 
-    ~(all : bool) ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
+let deduce_predicate
+    ~(all : bool)
+    ?(side:deduce_side option)
+    ?(with_hyp: CP.form option)
+    (s : ES.t) 
+  : ES.t list 
   =
   let table = ES.table s in
   let goal = ES.conclusion_as_computability s in
-
-  if CP.kind table goal <> Deduce then
-    Tactics.soft_failure 
-      (Tactics.GoalBadShape "non-deduction predicate unsupported");
+  let goal_kind = CP.kind table goal in
 
   let system =
     let system_secrecy = CP.system goal in
     SE.{ (ES.system s) with set = system_secrecy; }
   in
 
-  (*------------------------------------------------------------------*) 
-  if with_hyp <> None && CP.system (oget with_hyp) <> system.set then
-    Tactics.soft_failure 
-      (Tactics.GoalBadShape "deduction hypothesis applies to the wrong system");
-
-  (* we know that [h_left ▷ h_right] holds *)
-  let h_left  = omap_dflt [] CP.lefts  with_hyp in
-  let h_right = omap_dflt [] CP.rights with_hyp in
-
-  (*------------------------------------------------------------------*) 
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
-  let right = CP.rights goal in
   let left  = CP.lefts  goal in
+  let right = CP.rights goal in
+  
+  let side = pick_side ?side goal_kind in
 
-  if all then (* two different mode of operations, depending on [all] *)
-    begin
-      let () = (* check that [left ▷ h_left] *)
-        match Match.deduce_terms ~outputs:h_left ~inputs:left st with
+  (* [~all] flag is only allowed for deduction on the right *)
+  if all && (goal_kind <> Deduce || side <> Right) then 
+    Tactics.hard_failure (Failure "~all option not allowed here");
+
+  (* [~with_hyp] assumption is only allowed for deduction on the right or
+     non-deduction on the left *)
+  if with_hyp <> None && 
+     ((goal_kind = Deduce && side = Left) ||
+      (goal_kind = NotDeduce && side = Right)) then 
+    Tactics.hard_failure (Failure "with … option not allowed here");
+  
+  (* we know that [h_left ▷ h_right] holds *)
+  check_deduction_hyp_system ?with_hyp system.set;
+  let h_left, h_right = get_deduction_hyp ~with_hyp in
+
+
+  (* the core of the tactic *)
+  match goal_kind, side with 
+  | Deduce, Left ->
+    (* [left0 ▷ left] and also [left ▷ left0], so 
+       we may as well show [left0 ▷ right] *)
+    let left0 = filter_deduce system s left in
+    let g = CP.update_lefts left0 goal in
+    [ES.set_conclusion (CP.to_global g) s]
+
+  | Deduce, Right ->
+    if all then (* two different mode of operations, depending on [all] *)
+      begin
+        let () = (* check that [left ▷ h_left] *)
+          match Match.deduce_terms ~outputs:h_left ~inputs:left st with
+          | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
+          | Match mv -> assert (Match.Mvar.is_empty mv)
+        in
+
+        (* Since [h_left ▷ h_right], it only remains to check that
+               [left, h_left, h_right ▷ right] *)
+        let match_result = 
+          Match.deduce_terms ~outputs:right ~inputs:(left @ h_left @ h_right) st
+        in
+        match match_result with
         | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
-        | Match mv -> assert (Match.Mvar.is_empty mv)
-      in
+        | Match mv -> assert (Match.Mvar.is_empty mv); []
+      end
+    else
+      begin
+        (* [left, h_left0 ▷ h_left] *)
+        let h_left0 = filter_deduce system s ~knows:left h_left in
+        
+        (* Since [h_left ▷ h_right],
+               we know that [left, h_left0 ▷ left, h_left, h_right] *)
+        let knows = left @ h_left @ h_right in
+        
+        (* [left, h_left0, right0 ▷ right] *)
+        let right0 = filter_deduce system s ~knows right in
+        
+        let right' = right0 @ h_left0 in
+        if right' = [] then [] else
+          let g = CP.update_rights right' goal in 
+          [ES.set_conclusion (CP.to_global g) s]
+      end
 
-      (* Since [h_left ▷ h_right], it only remains to check that
-         [left, h_left, h_right ▷ right] *)
-      let match_result = 
-        Match.deduce_terms ~outputs:right ~inputs:(left @ h_left @ h_right) st
-      in
-      match match_result with
-      | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
-      | Match mv -> assert (Match.Mvar.is_empty mv); []
-    end
-  else
-    begin
-      (* [left, h_left0 ▷ h_left] *)
-      let h_left0 = filter_deduce system s ~knows:left h_left in
+  | NotDeduce, Left ->
+    (* [left0, h_left, h_right ▷ left] *)
+    let left0 = filter_deduce system s ~knows:(h_left @ h_right) left in
+    
+    (* [h_left0, left0 ▷ h_left] *)
+    let h_left0 = filter_deduce system s ~knows:left0 h_left in
+    
+    (* Since [h_left ▷ h_right], we know that
+           [left0, h_left0 ▷ left0, h_left  ▷ left0, h_left, h_right  ▷ left] *)
+    (* Thus, to prove [left *> right] it suffices to show
+           [left0, hleft_0 *> right]. The converse implication is not true in
+           general, unless h_left is empty. *)
+    
+    let left' = left0 @ h_left0 in
+    let g = CP.update_lefts left' goal in
+    [ES.set_conclusion (CP.to_global g) s]
 
-      (* Since [h_left ▷ h_right],
-         we know that [left, h_left0 ▷ left, h_left, h_right] *)
-      let knows = left @ h_left @ h_right in
-
-      (* [left, h_left0, right0 ▷ right] *)
-      let right0 = filter_deduce system s ~knows right in
-
-      let right' = right0 @ h_left0 in
-      if right' = [] then [] else
-        let g = CP.update_rights right' goal in 
-        [ES.set_conclusion (CP.to_global g) s]
-    end
+  | NotDeduce, Right ->
+    (* [right0 ▷ right] and also [right ▷ right0], so 
+               we may as well show [left *> right0] *)
+    let right0 = filter_deduce system s right in
+    let g = CP.update_rights right0 goal in
+    [ES.set_conclusion (CP.to_global g) s]
 
 
-(*------------------------------------------------------------------*)
-(** Tactic [deduce i] in a goal [u |> v] or [u *> v], with [u] a tuple,
-    checks if the [i]-th element of [u]
-    is deducible from the rest of [u].
-    If so, removes it. *)
-let deduce_predicate_deduce_left_int (l : int L.located list) (s : ES.t) : ES.t list =
+
+(** Tactic [deduce ~side i] in a goal [u |> v] or [u *> v],
+    checks if the [i]-th element of [u] (or [v] depending on [~side])
+    is deducible from the rest of [u] (or [v]).
+    If so, removes it.
+    The side is optional: by default, [~left] for [*>] and [~right]
+    for [|>].
+    Only really meaningful in those cases. [~right] for [*>] and [~left]
+    for [|>] are just weakenings, using deduce only ensures we don't
+    lose anything.
+    Attempts to use a [~with_hyp], if one is provided.
+    TODO: maybe this could be factorised with the previous function somehow.
+*)
+let deduce_predicate_int
+    (l : int L.located list)
+    ?(side : deduce_side option)
+    ?(with_hyp : CP.form option)
+    (s : ES.t)
+  : ES.t list =
+  
   let table = ES.table s in
   let goal = ES.conclusion_as_computability s in
-
-  if CP.kind table goal <> Deduce then
-    Tactics.soft_failure 
-      (Tactics.GoalBadShape "non-deduction predicate unsupported");
-
-  let to_deduce, rest = get_elems l (CP.lefts goal) in
+  let goal_kind = CP.kind table goal in
 
   let system =
     let system_secrecy = CP.system goal in
     SE.{ (ES.system s) with set = system_secrecy; }
   in
+
   let hyps = ES.get_trace_hyps ~in_system:system s in
   let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
 
-  let match_result = 
-    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
-  in  
-  match match_result with
-  | NoMatch minfos -> 
-    soft_failure (ApplyMatchFailure minfos)
-  | Match mv ->
-    assert (Match.Mvar.is_empty mv);
-    let new_secrecy_goal = CP.update_lefts rest goal in
-    [ES.set_conclusion (CP.to_global new_secrecy_goal) s]
+  let side = pick_side ?side goal_kind in
+  let left = CP.lefts goal in
+  let right = CP.rights goal in
+
+  (* [knows] is only used on the right of deduction goals: then we may 
+     use the left side of the predicate to deduce as well *)
+  let (to_deduce, rest), knows = 
+    match goal_kind, side with
+    | Deduce, Right -> (get_elems l right, left) 
+    | _, Left -> (get_elems l left, [])
+    | _, Right -> (get_elems l right, [])
+  in
+
+  (* we know that [h_left ▷ h_right] holds *)
+  check_deduction_hyp_system ?with_hyp system.set;
+  let h_left, h_right = get_deduction_hyp ~with_hyp in
+
+  let () = (* check that [rest, knows ▷ h_left] *)
+    match Match.deduce_terms ~outputs:h_left ~inputs:(rest @ knows) st with
+    | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
+    | Match mv -> assert (Match.Mvar.is_empty mv)
+  in
+
+  (* Since [h_left ▷ h_right], it only remains to check that
+               [rest, knows, h_left, h_right ▷ to_deduce] *)
+  let () =
+    match 
+      Match.deduce_terms ~outputs:to_deduce 
+        ~inputs:(rest @ knows @ h_left @ h_right) st
+    with
+    | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos) 
+    | Match mv -> assert (Match.Mvar.is_empty mv)
+  in
+  
+  if rest = [] && goal_kind = Deduce && side = Right then
+    []
+  else
+    let g = 
+      match side with 
+      | Left -> CP.update_lefts rest goal
+      | Right -> CP.update_rights rest goal 
+    in
+    [ES.set_conclusion (CP.to_global g) s]
+
+
+
+
+
 
 
 (*------------------------------------------------------------------*)
@@ -1237,22 +1365,39 @@ let deduce_predicate_deduce_left_int (l : int L.located list) (s : ES.t) : ES.t 
 let to_goals l = List.map (fun x -> Goal.Global x) l
 
 
-(** For now, [deduce] has only one named optional argument *)
-let p_deduce_named_arg (nargs : Args.named_args) : bool =
-  match nargs with
-  | [Args.NArg L.{ pl_desc = "all" }] -> true
+(** For now, [deduce] has two optional named arguments:
+    ~all: specifies whether [deduce] fails or still tries to do its best 
+          when it cannot close the goal 
+    ~left or ~right: for computatbility goals, specifies on which
+          side the tactic is applied. If not given, a reasonable default choice
+          is made. *)
+let p_deduce_named_args (nargs : Args.named_args) : bool*(deduce_side option) =
+  List.fold_left 
+    (fun (b, os) narg ->
+       match narg with
+       | Args.NArg L.{ pl_desc =  "all" } -> true, os
+       | Args.NArg L.{ pl_loc = loc; pl_desc = "left" } -> 
+         if os = None then 
+           b, (Some Left)
+         else
+           hard_failure ~loc (Failure "incompatible arguments")
+       | Args.NArg L.{ pl_loc = loc; pl_desc = "right" } -> 
+         if os = None then 
+           b, (Some Right)
+         else
+           hard_failure ~loc (Failure "incompatible arguments")
+       | Args.NList (l,_) 
+       | Args.NArg  l     ->
+         hard_failure ~loc:(L.loc l) (Failure "unknown argument"))
+    (false, None)
+    nargs
 
-  | Args.NList (l,_) :: _ 
-  | Args.NArg  l     :: _ ->
-    hard_failure ~loc:(L.loc l) (Failure "unknown argument")
-
-  | [] -> false
 
 
 let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
   match args with
   | [Args.Deduce (nargs, targets_opt, with_hyps_opt)] ->
-    let all = p_deduce_named_arg nargs in
+    let all, side = p_deduce_named_args nargs in
 
     let table = ES.table s in
     let subgs, with_hyp =
@@ -1295,8 +1440,9 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
 
       else if ES.conclusion_is_computability s then
         match targets_opt with
-        | None   -> deduce_predicate_deduce_right_all ~all ?with_hyp s
-        | Some l -> deduce_predicate_deduce_left_int l s
+        | None  ->
+          deduce_predicate ~all ?side ?with_hyp s
+        | Some l -> deduce_predicate_int ?side ?with_hyp l s
 
       else
         Tactics.soft_failure 

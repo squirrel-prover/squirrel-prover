@@ -7,21 +7,26 @@ system P = null.
 global lemma[set:P/left; equiv:none] _:
   $((empty, empty) |> (zero)).
 Proof.
-  deduce 0.
-  deduce.
+  deduce ~right.
 Qed.
 
 global lemma[set:P/left; equiv:P/left,P/left] _:
   $((empty, empty) |> (zero)).
 Proof.
-  deduce 0.
+  deduce ~left.
   deduce. 
 Qed.
 
 global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
   $((frame@tau, frame@tau) |> (exec@tau)).
 Proof.
-  deduce 0.
+  deduce ~right 0.
+Qed.
+
+global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+  $((frame@tau, frame@tau) |> (exec@tau)).
+Proof.
+  deduce ~left 0.
   deduce.
 Qed.
 
@@ -156,4 +161,20 @@ Proof.
   checkfail deduce with H _ exn CannotInferPats. (* cannot infer `_` automatically *)
   deduce with H empty.
   assumption A.
+Qed.
+
+
+
+op f : message -> message
+op g : message -> message. 
+op w:message.
+
+global lemma _ @set:P :
+ (Forall (x:message), $(u |> (f x))) ->
+ (Forall (x:message), $(u |> (g x))) ->
+ $(u |> (f v, g w) ).
+Proof.
+  intro H H'.
+  deduce ~right 0.
+  deduce.
 Qed.
