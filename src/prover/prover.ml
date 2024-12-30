@@ -137,27 +137,30 @@ let do_qed (st : state) : state =
   Printer.prt `Result "Exiting proof mode.@.";
   prover_state
 
-let start_proof (ps:state) (check : [`NoCheck | `Check])
-  : (string option * state) = 
+let start_proof
+    (ps:state) (check : [`NoCheck | `Check])
+  : (string option * state)
+  =
   match ps.current_goal, ps.goals with
   | None, pending_proof :: remaining_goals ->
     assert (ps.subgoals = []);
 
-    let goals = remaining_goals in
-
-    let goal = match pending_proof with
+    let goal =
+      match pending_proof with
       | ProofObl goal
       | UnprovedLemma (_,goal) -> goal
     in
-    let current_goal = Some pending_proof in
 
-    let subgoals, bullets, mode = begin 
+    let subgoals, bullets, mode =
       match check with
       | `Check -> [goal], Bullets.initial_path, ProverLib.ProofMode
       | `NoCheck -> [], Bullets.empty_path, ProverLib.WaitQed
-    end in
-      (None, { ps with goals; subgoals; bullets; current_goal;
-                            prover_mode = mode })
+    in
+    (None,
+     { ps with goals = remaining_goals;
+               current_goal = Some pending_proof;
+               subgoals; bullets; 
+               prover_mode = mode })
   | Some _,_ ->
     (Some "Cannot start a new proof (current proof is not done).",
      ps)
@@ -166,7 +169,7 @@ let start_proof (ps:state) (check : [`NoCheck | `Check])
     (Some "Cannot start a new proof (no goal remaining to prove).",
      ps)
 
-let do_start_proof ?(check=`NoCheck) (st: state) : state =
+let do_start_proof ~check (st: state) : state =
   match start_proof st check with
   | None, ps ->
     Printer.prt `Goal "%a" pp_goal ps;
@@ -339,7 +342,11 @@ let do_print_goal (st:state) : unit =
     Printer.prt `Goal "%a" pp_goal st;
   | _ -> ()
 
-let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : state =
+let do_tactic'
+    ~(check : [`Check | `NoCheck]) (state : state) (l:ProverLib.bulleted_tactics)
+  : state
+  =
+  if check = `Check then Fmt.epr "check@." else Fmt.epr "nocheck@.";
   begin match check with
     | `NoCheck -> assert (state.prover_mode = WaitQed)
     | `Check   -> 
@@ -350,17 +357,14 @@ let do_tactic' ?(check=`Check) (state : state) (l:ProverLib.bulleted_tactics) : 
   match check with
   | `NoCheck -> state
   | `Check   ->
-    let state = 
-      begin 
-        try List.fold_left tactic_handle state l
-        with
-          | e -> 
-            raise e
-      end in
+    let state = List.fold_left tactic_handle state l in
     try_complete_proof state
 
-let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
-    (l:ProverLib.bulleted_tactics) : state =
+let do_tactic
+    ~(check : [`Check | `NoCheck]) (st : state) (lex:Sedlexing.lexbuf)
+    (l : ProverLib.bulleted_tactics)
+  : state
+  =
   if not (TConfig.interactive (get_table st)) then begin
     let (_, curr_p) = Sedlexing.lexing_positions lex in
     let lnum = curr_p.pos_lnum in
@@ -377,8 +381,10 @@ let do_tactic ?(check=`Check) (st : state) (lex:Sedlexing.lexbuf)
 
 (*----------------------- Search --------------------------*)
 
-let search_about (st:state) (q:ProverLib.search_query) : 
-  (Lemma.lemma * Equiv.any_form list) list =
+let search_about
+    (st:state) (q:ProverLib.search_query)
+  : (Lemma.lemma * Equiv.any_form list) list
+  =
   let env = 
     match st.prover_mode with
     | ProofMode -> 
@@ -615,10 +621,10 @@ let do_eof (st:state) : state =
 exception Unfinished
 
 (* Manage all commands. *)
-let rec do_command 
+let rec do_command
     ?(driver_stack = [])
     ?(test  = false) 
-    ?(check = `Check) 
+    ?(check : [`Check | `NoCheck] = `Check)
     (st      : state) 
     (driver  : Driver.t)
     (command : ProverLib.input) 
@@ -673,7 +679,8 @@ let rec do_command
       Command.cmd_error UnexpectedCommand
 
 and do_include
-    ?(test=true) ?(driver_stack=[]) (st:state) ~dirname (i:ProverLib.include_param)
+    ?(test=true) ?(driver_stack=[]) (st:state) ~dirname
+    (i:ProverLib.include_param)
   : state
   =
   let name = Driver.name_of_load_path i.th_name in
@@ -717,8 +724,10 @@ and do_include
       st
     end
 
-and do_all_commands_in ?(driver_stack=[])
-    ~check ~test (st:state) (driver:Driver.t) : state
+and do_all_commands_in
+    ?(driver_stack=[])
+    ~(check : [`Check | `NoCheck]) ~test (st:state) (driver:Driver.t)
+  : state
   =
   let interactive = TConfig.interactive (get_table st) in
   match Driver.next_input ~test ~interactive driver (get_mode st) with
@@ -731,11 +740,15 @@ and do_all_commands_in ?(driver_stack=[])
        (do_command ~driver_stack ~test ~check st driver cmd) driver
 
 and exec_command 
-    ?(check=`Check) ?(test=false) (s:string) (st:state) : state  = 
+    ?(check : [`Check | `NoCheck] = `Check)
+    ?(test=false) (s:string) (st:state)
+  : state
+  =
   let interactive = TConfig.interactive (get_table st) in
   let input =
     Driver.next_input
-      ~test ~interactive (Driver.from_string s) (get_mode st) in
+      ~test ~interactive (Driver.from_string s) (get_mode st)
+  in
   do_command ~test ~check st (Driver.from_string s) input
 
 (** Execute all commands from a string. *)
