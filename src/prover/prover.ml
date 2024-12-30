@@ -346,7 +346,6 @@ let do_tactic'
     ~(check : [`Check | `NoCheck]) (state : state) (l:ProverLib.bulleted_tactics)
   : state
   =
-  if check = `Check then Fmt.epr "check@." else Fmt.epr "nocheck@.";
   begin match check with
     | `NoCheck -> assert (state.prover_mode = WaitQed)
     | `Check   -> 
