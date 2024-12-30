@@ -1374,25 +1374,31 @@ let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
   leq t t'
 
 (*------------------------------------------------------------------*)
-(** Fast function checking if [t] happens. *)
+(** Fast function checking if [t] happens using [form]. *)
+let rec happens_term table ~(t : Term.t) ~(form : Term.t) : bool = 
+  match Term.decompose_app form with
+  (* [happens(t)] *)
+  | Term.Fun (fs,_), [t0] when Symbols.path_equal fs Symbols.fs_happens ->
+    leq_tauto table t t0
+
+  (* [t < t'], or [t' < t] (idem for ≤) *)
+  | Term.Fun (fs,_), [t0; t1] 
+    when Symbols.path_equal fs Symbols.fs_leq || 
+         Symbols.path_equal fs Symbols.fs_lt ->
+    leq_tauto table t t0 || leq_tauto table t t1
+
+  (* [f0 ∧ f1] *)
+  | Term.Fun (fs,_), [f0; f1] when Symbols.path_equal fs Symbols.fs_and ->
+    happens_term table ~t ~form:f0 ||
+    happens_term table ~t ~form:f1 
+
+  | _ -> false
+
 let happens table (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
   TraceHyps.exists (fun (_x,f) ->
       match f with
-      | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None})))
-      | LHyp (Local f) ->
-        begin
-          match Term.decompose_app f with
-          | Term.Fun (fs,_), [t0] -> (* [happens(t)] *)
-            Symbols.path_equal fs Symbols.fs_happens &&
-            leq_tauto table t t0
-
-          | Term.Fun (fs,_), [t0; t1] -> (* [t < t'], or [t' < t] (idem for ≤) *)
-            (Symbols.path_equal fs Symbols.fs_leq || Symbols.path_equal fs Symbols.fs_lt)
-            &&
-            (leq_tauto table t t0 || leq_tauto table t t1)
-            
-          | _ -> false
-        end
+      | LHyp (Global Equiv.(Atom (Reach {formula = form; bound = None})))
+      | LHyp (Local form) -> happens_term table ~t ~form
       | LHyp (Global _) -> false
       | LDef _ -> false
     ) hyps
