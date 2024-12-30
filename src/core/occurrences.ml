@@ -571,7 +571,28 @@ let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
   | Some t' -> expand_macro_check_all info t'
   | None -> t
 
+(*------------------------------------------------------------------*)
+(** Check that if [t]'s top-level construct is a quantifier, then it
+    is over enumarable types. *)
+let check_top_quantifier_enumerable table (t : Term.t) : unit =
+  match t with
+  (* no checks for [Lambda] *)
+  | Find (es, _, _, _)
+  | Quant ((Seq | ForAll | Exists), es, _) -> 
+    let not_enum =
+      List.map Vars.ty es |>
+      List.filter (not -| Symbols.TyInfo.is_enum table)
+    in
+    if not_enum <> [] then
+      Tactics.soft_failure
+        (Failure
+           (Fmt.str "@[<hov 2>quantifier%s over non-enumerable type:@ @[%a@]@]"
+              (if List.length not_enum > 1 then "s" else "")
+              (Fmt.list ~sep:Fmt.comma Type.pp) not_enum) );
 
+  | _ -> ()
+
+(*------------------------------------------------------------------*)
 let get_actions_ext
     ~(mode  : Iter.allowed ) (* allowed sub-terms without further checks *)
     ~(env   : Env.t)
@@ -672,6 +693,8 @@ let get_actions_ext
       end
 
     | _ ->
+      check_top_quantifier_enumerable env.table t;
+
       MP.fold_shallow
         (fun t' se fv cond p occs ->
            occs @ (get t' ~fv ~cond ~p ~se))
