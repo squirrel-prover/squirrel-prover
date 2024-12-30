@@ -692,8 +692,7 @@ and do_include
       in
       let interactive = TConfig.interactive (get_table st) in
       let checkInclude = 
-        if TConfig.checkInclude (get_table st) then `Check 
-        else if List.exists (fun x -> L.unloc x = "admit") i.ProverLib.params
+        if List.exists (fun x -> L.unloc x = "admit") i.ProverLib.params
         then `NoCheck
         else `Check
       in

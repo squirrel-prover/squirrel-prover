@@ -58,14 +58,24 @@ let run_test () =
 (*------------------------------------------------------------------*)
 let some_include () =
   let st = Prover.init () in
-  Prover.exec_all ~test:true st
-    "include \"./Logic.sp\"."
+  (Prover.exec_all ~test:true st
+     "include \"./Logic.sp\"." : Prover.state)
   |> ignore
+
+(*------------------------------------------------------------------*)
+let include_admit () =
+  let st = Prover.init () in
+  let st : Prover.state =
+    Prover.exec_all ~test:true st
+      "include[admit] \"tests/alcotest/badProof.sp\"."
+  in
+  ignore st
 
 (*------------------------------------------------------------------*)
 let tests = [
    ("Print",            `Quick, Util.catch_error some_print);
    ("Include",          `Quick, Util.catch_error some_include);
+   ("Include[admit]",   `Quick, Util.catch_error include_admit);
    ("tests/ok/test.sp", `Quick, Util.catch_error run_test);
    ("Cycle by name", `Quick, Util.catch_error begin fun () ->
        Alcotest.check_raises "run test"

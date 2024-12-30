@@ -26,9 +26,6 @@ val interactive : Symbols.table -> bool
     to be used with [set_param]. *)
 val s_interactive : string
 
-(** Setting for checking proofs in included files. *)
-val checkInclude : Symbols.table -> bool
-
 (** Debug information for the constraint checker. *)
 val debug_constr : Symbols.table -> bool
 

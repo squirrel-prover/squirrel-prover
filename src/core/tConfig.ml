@@ -18,9 +18,6 @@ let s_timeout = "timeout"
 let vint_timeout = 10
 let v_timeout = Config.Param_int vint_timeout
 
-let s_CheckInclude = "checkInclude"
-let v_CheckInclude = Config.Param_bool true
-
 let s_interactive = "interactive"
 let v_interactive = Config.Param_bool false
 
@@ -62,7 +59,6 @@ let decl (s:string) (v:p_param_val) (table:Symbols.table) : Symbols.table =
 let reset_params (table:Symbols.table) : Symbols.table =
   table
   |> decl s_timeout               v_timeout 
-  |> decl s_CheckInclude          v_CheckInclude
   |> decl s_interactive           v_interactive
   |> decl s_print_equ             v_print_equ
   |> decl s_debug_constr          v_debug_constr
@@ -91,7 +87,6 @@ let get_bool s table : bool =
 let solver_timeout = get_int s_timeout
 let print_trs_equations = get_bool s_print_equ
 let interactive = get_bool s_interactive
-let checkInclude = get_bool s_CheckInclude
 let debug_constr = get_bool s_debug_constr
 let debug_completion = get_bool s_debug_completion
 let debug_tactics = get_bool s_debug_tactics
