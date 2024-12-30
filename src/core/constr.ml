@@ -213,8 +213,8 @@ module Form = struct
   (** Subset of formulas we use. *)
   type form =
     | Lit  of lit
-    | Disj of form list        (* of length > 1 *)
-    | Conj of form list        (* of length > 1 *)
+    | Disj of form list
+    | Conj of form list
 
   (** Conjunction of formulas *)
   type conjunction = form list
@@ -250,12 +250,10 @@ module Form = struct
   (** Smart constructors *)
 
   let disj = function
-    | [] -> assert false
     | [f] -> f
     | l -> Disj l
 
   let conj = function
-    | [] -> assert false
     | [f] -> f
     | l -> Conj l
 
