@@ -2680,8 +2680,8 @@ let term_set_decompose
     (env : Env.t) (hyps : TraceHyps.hyps)
     ~(inputs:term_set list) (known : term_set) : term_set list 
   =
-  (* FEATURE: use the real deduction function `deduce` below rather
-     than a very basic syntactic check as we do now. *)
+
+  (* wrapper around deduction *)
   let deduce ~(inputs:term_set list) (t : term_set) : bool =
     let output : cond_term = {
       term = t.term;
@@ -2707,8 +2707,21 @@ let term_set_decompose
     deduce_succeed minfos
   in
 
+  (* recursive computation decomposing the set of term [k] into
+     smaller, more elementary, sets of terms *)
   let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
-    let red_param = ReductionCore.rp_crypto in
+    (* heuristic: we do not unroll macros on the left, as this may
+       prevent applying useful user deduction rules. E.g.
+
+       - [frame@A] yields [{frame@t | t: t ≤ A}] thanks to a standard
+         user deduction rule;
+
+       - but it unrolls into [<frame@pred A, ...>], which only yields
+         the weaker set of terms [{frame@t | t: t ≤ pred A}] thanks to 
+         the same user rule. *)
+    let red_param = 
+      ReductionCore.{ rp_crypto with delta = { delta_full with macro = false; }} 
+    in
     let term, _ = 
       whnf0 
         ~red_param ~hyps ~vars:env.vars
