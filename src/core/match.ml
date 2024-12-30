@@ -2184,10 +2184,8 @@ let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ()
 
 (*------------------------------------------------------------------*)
 let known_set_check_impl_conv
-    ?(st : unif_state option)
-    ~(decompose_ands: Term.term -> Term.term list)
-    (global_hyps : Term.term list)
-    ~(hyp : Term.term)
+    ~(st : unif_state option)
+    ~(hyps : Term.term list)
     ~(cond : Term.term) : bool
   =
   (* FIXME: retrieve rp_param from the reduction state *)
@@ -2197,18 +2195,14 @@ let known_set_check_impl_conv
     | None -> Term.alpha_conv ~subst:[]
     | Some st -> conv_term red_param st
   in
-  (* slow, we are re-doing all of this at each call *)
-  let hyps = List.concat_map decompose_ands (hyp :: global_hyps) in
-  List.exists (fun hyp ->
-      conv cond hyp
-    ) hyps
+  List.exists (conv cond) hyps
 
 (*------------------------------------------------------------------*)
 (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
     w.r.t. to the theory of trace constraints
     Rely on the module [Constr]. *)
 let known_set_check_impl_sat
-    (table : Symbols.table) (hyps : Term.term list) (cond : Term.term)
+    (table : Symbols.table) ~(hyps : Term.term list) (cond : Term.term)
   =
   let exception Fail in
   let timeout = TConfig.solver_timeout table in
@@ -2219,19 +2213,16 @@ let known_set_check_impl_sat
 
 (*------------------------------------------------------------------*) 
 (** Check that [hyp] implies [cond] for the special case when [cond] is 
-    an inequalitie between function of time stamps or actions.
+    a timestamp inequality.
     [cond] is reduced to [t1 ≤ t2] by removing the [pred] function and if 
     there exists an inequalitie [ta  ≤ tb] in [hyp]
     such that [ta  ≤ tb] implies [t1  ≤ t2] then [hyp] implies [cond] and [true] 
     is returned. Otherwise [false] is returned. *)
 let known_set_check_impl_auto
-    ~(decompose_ands: Term.term -> Term.term list)
     (table : Symbols.table)
-    ~(hyp : Term.term) ~(cond : Term.term)
+    ~(hyps : Term.term list) ~(cond : Term.term)
   : bool
   =
-  let hyps = decompose_ands hyp
-  in
   match cond with
   | Term.App (Fun (fs, _), [t1;t2]) 
     when (fs = Term.f_lt || fs = Term.f_leq)
@@ -2263,9 +2254,8 @@ let is_exec ms : bool =
 (** Check that [hyps] implies [cond] for the special case when
     [cond] is [exec@t]. *)  
 let known_set_check_exec_case
-    ~(decompose_ands: Term.term -> Term.term list)
     (table : Symbols.table)
-    (hyps : Term.terms) (cond : Term.term)
+    ~(hyps : Term.terms) (cond : Term.term)
   : bool
   =
   let exception Fail in
@@ -2283,7 +2273,7 @@ let known_set_check_exec_case
         end
       | _ -> false 
     in
-    List.exists find_greater_exec (List.concat_map decompose_ands hyps)
+    List.exists find_greater_exec hyps
   | _ -> false
 
 
@@ -2313,35 +2303,57 @@ let known_set_check_impl
     (hyp   : Term.term)
     (cond  : Term.term) : bool
   =
-  (* decompose a formula as an equivalent conjunction of formulas,
-     modulo reduction if [st<>None]. *)
+  (* Decompose the top-level conjunctions, modulo reduction if
+     [st ≠ None]. 
+     Does not reduce recursively (i.e. reduction is only used at head
+     position to try to make a conjunction appear). *)
   let decompose_ands =
     match st with
     | None -> Term.decompose_ands
     | Some st ->
-      let rec decompose_ands t =
-        let t, _ = whnf ReductionCore.rp_crypto st t in
-        let terms = Term.decompose_ands t in
-        if List.length terms = 1 then terms
-        else List.concat_map decompose_ands terms
-      in
-      decompose_ands
+      fun t ->
+        whnf ReductionCore.rp_crypto st t |>
+        fst |>
+        Term.decompose_ands
   in
 
-  let global_hyps = omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st in
-  let check_one cond = 
-    let check0 =              (* convertibility *)
-      known_set_check_impl_conv ~decompose_ands ?st global_hyps ~hyp ~cond
-    and check1 =              (* constraints *)
-      known_set_check_impl_sat table (hyp :: global_hyps) cond
-    and check2 =              (* ad hoc inequality reasoning *)
-      known_set_check_impl_auto ~decompose_ands table ~hyp ~cond
-    and check3 =              (* ad hoc reasoning on [exec] *)
-      known_set_check_exec_case ~decompose_ands table (hyp :: global_hyps) cond
-    in
-    check0 || check1 || check2 || check3
+  (* Decompose a formula as an equivalent conjunction of formulas,
+     modulo reduction if [st ≠ None]. 
+     Aggressively reduce subterms to do so. *)
+  let rec flatten_ands t =
+    let terms = decompose_ands t in
+    if List.length terms = 1 then terms
+    else List.concat_map flatten_ands terms
   in
-  List.for_all check_one (decompose_ands cond)
+
+  (* flattened [hyp] + proof-context hypotheses *)
+  let hyps =
+    ( hyp :: omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st ) |>
+    List.concat_map flatten_ands 
+  in
+
+  (* prove that [cond] follows from [hyps] *)
+  let rec doit (cond : Term.t) : bool = 
+    (* convertibility *)
+    known_set_check_impl_conv ~st ~hyps ~cond ||
+
+    (* constraints *)
+    known_set_check_impl_sat table ~hyps cond ||
+
+    (* ad hoc inequality reasoning *) 
+    known_set_check_impl_auto table ~hyps ~cond ||
+    
+    (* ad hoc reasoning on [exec] *)
+    known_set_check_exec_case table ~hyps cond ||
+
+    (* If all the above failed, try to reduce [cond] as a list of
+       smaller conjunctions and recurse in case of success. *)
+    let conds = decompose_ands cond in
+    if List.length conds = 1 then false else List.for_all doit conds
+  in
+  (* Initially, we split [cond] as a conjunction of smaller formulas
+     without relying on reduction. *)
+  List.for_all doit (Term.decompose_ands cond)
 
 
 (*------------------------------------------------------------------*)
