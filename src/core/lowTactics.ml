@@ -1598,12 +1598,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
       
   (** Generalize a pattern [pat] (which may feature term holes [_])
       into a fresh variable [v].
+      Return the pair [(v,t)] where [t] is the instantiation of [pat]
+      that was generalized.
+
       Generalization occurs only in the conclusion, except if [depends].
       In the later case, proof-context elements depending on [v] 
       are reverted in the conclusion. *)
-  let do_generalize
+  let generalize1
       ?loc ~dependent ?(ienv:Infer.env option)
-      (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
+      (pat : Term.term) (s : S.t)
+    : (Vars.tagged_var * Term.t) * S.t
     =
     let v = Vars.make_fresh (Term.ty pat) "_x" in
     let env = S.env s in
@@ -1679,21 +1683,23 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* compute tag of [v] *)
     let tag = HighTerm.tags_of_term (S.env s) term in
-    (v,tag), s
+    ((v,tag),term), s
 
+  (*------------------------------------------------------------------*)
   (** [terms] and [n_ips] must be of the same length *)
   let generalize
       ~dependent
-      (terms : (Term.term * L.t option * Infer.env option) list) n_ips (s : S.t)
-    : S.t
+      (terms : (Term.term * L.t option * Infer.env option) list)
+      (n_ips : Args.naming_pat list) (s : S.t)
+    : (Vars.tagged_var * Term.t) list * S.t
     =
-    let s, vars =
-      List.fold_left (fun (s, vars) (term,loc,ienv) ->
-          let var, s = do_generalize ?loc ~dependent ?ienv term s in
-          s, var :: vars
+    let s, gens =
+      List.fold_left (fun (s, gens) (term,loc,ienv) ->
+          let gen, s = generalize1 ?loc ~dependent ?ienv term s in
+          s, gen :: gens
         ) (s,[]) terms
     in
-    let vars = List.rev vars in
+    let gens = List.rev gens in
 
     (* clear unused variables among [terms] free variables *)
     let t_fv =
@@ -1705,38 +1711,55 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let s = try_clean_env t_fv s in
 
     (* we rename generalized variables *)
-    let _, new_vars, subst =
-      List.fold_left2 (fun (env, new_vars, subst) (v,tag) n_ip ->
+    let _, gens, subst =
+      List.fold_left2 (fun (env, gens, subst) ((v,tag),term) n_ip ->
           let env, v' =
             var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) tag env
           in
           ( env,
-            (v',tag) :: new_vars,
+            ((v',tag), term) :: gens,
             Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst )
-        ) (S.vars s, [], []) vars n_ips
+        ) (S.vars s, [], []) gens n_ips
     in
     let s = S.subst subst s in
+    let gens = List.rev gens in
 
     (* in a local sequent, we throw away the tags *)
-    let new_vars = 
+    let gens = 
       match S.conc_kind with
-      | Equiv.Local_t -> List.map (fun (v,_tag) -> v, Vars.Tag.ltag) new_vars
-      | Equiv.Global_t -> new_vars
+      | Equiv.Local_t -> List.map (fun ((v,_tag),term) -> (v, Vars.Tag.ltag), term) gens
+      | Equiv.Global_t -> gens
       | Equiv.Any_t -> assert false
     in
 
+    (gens, s)
+
+  (*------------------------------------------------------------------*)
+  (** [terms] and [n_ips] must be of the same length *)
+  let do_generalize_tac
+      ~dependent
+      (terms : (Term.term * L.t option * Infer.env option) list)
+      (n_ips : Args.naming_pat list) (s : S.t)
+    : S.t
+    =
+    let gens, s = generalize ~dependent terms n_ips s in
+
+    (* throw away the generalized terms, which are no useful here *)
+    let new_vars = List.map fst gens in
+    
     (* quantify universally *)
-    let new_vars = List.rev new_vars in
     let conclusion =
       S.Conc.mk_forall_tagged ~simpl:false new_vars (S.conclusion s)
     in
     S.set_conclusion conclusion s
 
+  (*------------------------------------------------------------------*)
   let naming_pat_of_term t =
     match t with
     | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
     | _ -> Args.AnyName
 
+  (*------------------------------------------------------------------*)
   let generalize_tac_args ~dependent args s : S.t list =
     match args with
     | [Args.Generalize (terms, n_ips_opt)] ->
@@ -1761,7 +1784,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           n_ips
       in
 
-      [generalize ~dependent terms n_ips s]
+      [do_generalize_tac ~dependent terms n_ips s]
 
     | _ -> assert false
 
@@ -2214,7 +2237,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
 
   let induction_gen ~dependent (t : Term.term) s : S.t list =
-    let s = generalize ~dependent [t, None, None] [naming_pat_of_term t] s in
+    let s = do_generalize_tac ~dependent [t, None, None] [naming_pat_of_term t] s in
     induction s
 
   let induction_args ~dependent args s =
