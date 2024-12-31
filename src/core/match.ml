@@ -2010,7 +2010,7 @@ module T (* : S with type t = Term.term *) = struct
         | _       -> acc, `Continue
     in
     let acc, _, _ = Pos.map_fold f_fold system.set [] t in
-    acc
+    List.rev acc
 end
 
 (*------------------------------------------------------------------*)
@@ -3760,7 +3760,7 @@ module E = struct
         | _       ->      acc, `Continue
     in
     let acc, _, _ = Pos.map_fold_e f_fold system [] t in
-    acc
+    List.rev acc
 
   (** Exported.
       Same as [find], but over [Equiv.form] sub-terms. *)
@@ -3783,5 +3783,5 @@ module E = struct
         | _       ->      acc, `Continue
     in
     let acc, _, _ = Pos.map_fold_g f_fold system [] t in
-    acc
+    List.rev acc
 end

@@ -165,9 +165,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert_args (s : S.sequent) args sort =
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.conclusion s))
 
-  let convert ?ty ?option (s : S.sequent) term =
+  let convert ?ty ?option ?ienv (s : S.sequent) term =
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
-    Typing.convert ?ty ?option cenv term
+    Typing.convert ?ty ?option ?ienv cenv term
 
   let convert_any (s : S.sequent) (term : Typing.any_term) =
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
@@ -1599,7 +1599,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       
   (* [pat] can feature term holes [_] *)
   let _generalize
-      ?loc ~dependent (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
+      ?loc ~dependent ?(ienv:Infer.env option)
+      (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
     =
     let v = Vars.make_fresh (Term.ty pat) "_x" in
 
@@ -1610,24 +1611,37 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else begin
         let pat = Pattern.op_pat_of_term pat in
 
-        let option = Match.default_match_option in
+        let option = { Match.default_match_option with allow_capture = true; } in
         let table,system,conclusion = S.table s, S.system s, S.conclusion s in
 
         let res : Term.terms = 
           match S.conc_kind with
-          | Local_t  -> Match.T.find ~option table system pat conclusion
-          | Global_t -> Match.E.find ~option table system pat conclusion
+          | Local_t  -> Match.T.find ~option ?ienv table system pat conclusion
+          | Global_t -> Match.E.find ~option ?ienv table system pat conclusion
           | Any_t -> assert false   (* impossible *)
         in
-        let term_list =
-          (* Clear terms whose free variables are not a subset of the context free
-             variables (because the term appeared under a binder). *)
+        if res = [] then soft_failure ?loc (Failure "no occurrence found");
+
+        (* close [ienv] *)
+        let res =
+          match ienv with
+          | None -> res
+          | Some ienv ->
+            match Infer.close (S.env s) ienv with
+            | Infer.Closed s -> List.map (Term.gsubst s) res
+            | _ -> assert false
+            (* matching [pat] ensures that no free type variable may remain *)
+        in
+
+        (* Clear terms whose free variables are not a subset of the context free
+           variables (because the term appeared under a binder). *)
+        let res =
           List.filter (fun t ->
               Sv.subset (Term.fv t) (Vars.to_vars_set (S.vars s))
             ) res
         in
-        if term_list = [] then soft_failure ?loc (Failure "no occurrence found");
-        List.hd term_list
+        if res = [] then soft_failure ?loc (Failure "no occurrence found");
+        List.hd res
       end
     in
 
@@ -1661,20 +1675,23 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** [terms] and [n_ips] must be of the same length *)
   let generalize
-      ~dependent (terms : (Term.term * L.t option) list) n_ips (s : S.t) : S.t
+      ~dependent
+      (terms : (Term.term * L.t option * Infer.env option) list) n_ips (s : S.t)
+    : S.t
     =
     let s, vars =
-      List.fold_right (fun (term,loc) (s, vars) ->
-          let var, s = _generalize ?loc ~dependent term s in
+      List.fold_left (fun (s, vars) (term,loc,ienv) ->
+          let var, s = _generalize ?loc ~dependent ?ienv term s in
           s, var :: vars
-        ) terms (s,[])
+        ) (s,[]) terms
     in
+    let vars = List.rev vars in
 
     (* clear unused variables among [terms] free variables *)
     let t_fv =
       List.fold_left (fun vars t ->
           Sv.union vars (Term.fv t)
-        ) Sv.empty (List.map fst terms) |>
+        ) Sv.empty (List.map (fun (x,_,_) -> x) terms) |>
       Sv.filter (not -| Vars.is_pat)
     in
     let s = try_clean_env t_fv s in
@@ -1685,9 +1702,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let env, v' =
             var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) tag env
           in
-          env,
-          (v',tag) :: new_vars,
-          Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst
+          ( env,
+            (v',tag) :: new_vars,
+            Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst )
         ) (S.vars s, [], []) vars n_ips
     in
     let s = S.subst subst s in
@@ -1703,7 +1720,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* quantify universally *)
     let new_vars = List.rev new_vars in
     let conclusion =
-      S.Conc.mk_forall_tagged ~simpl:false new_vars (S.conclusion s) in
+      S.Conc.mk_forall_tagged ~simpl:false new_vars (S.conclusion s)
+    in
     S.set_conclusion conclusion s
 
   let naming_pat_of_term t =
@@ -1716,17 +1734,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Generalize (terms, n_ips_opt)] ->
       let terms =
         List.map (fun p_arg ->
+            let ienv = Infer.mk_env () in
             let arg, _ty =
-              convert
+              convert 
                 ~option:{Typing.Option.default with pat = true; }
-                s p_arg
+                ~ienv s p_arg
             in 
-            arg, Some (L.loc p_arg)
+            ( arg, Some (L.loc p_arg), Some ienv )
           ) terms
       in
       let n_ips =
         match n_ips_opt with
-        | None -> List.map (naming_pat_of_term -| fst) terms
+        | None -> List.map (naming_pat_of_term -| (fun (x,_,_) -> x)) terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \
@@ -2188,7 +2207,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
 
   let induction_gen ~dependent (t : Term.term) s : S.t list =
-    let s = generalize ~dependent [t, None] [naming_pat_of_term t] s in
+    let s = generalize ~dependent [t, None, None] [naming_pat_of_term t] s in
     induction s
 
   let induction_args ~dependent args s =

@@ -17,18 +17,18 @@ abstract even : message -> boolean.
 
 lemma _ :
  (forall (x,y : message), x = a || y = b) =>
- (forall (y,x : message), x = a || y = b).
+ (forall (x,y : message), y = a || x = b).
 Proof.
-  intro Ass y x.
-  generalize x y.
+  intro Ass x y.
+  generalize y x. 
   assumption Ass.
 Qed.
 
 lemma _ :
  (forall (u,v : message), u = a || v = b) =>
- (forall (y,x : message), x = a || y = b).
+ (forall (x,y : message), x = a || y = b).
 Proof.
-  intro Ass y x.
+  intro Ass x y.
   generalize x y as u v.
   assumption Ass.
 Qed.
@@ -104,3 +104,13 @@ Proof.
   generalize (frame@t) => x.
   checkfail apply foo_glob exn Failure. (* bad variabe instantiation *)
 Abort.
+
+(*------------------------------------------------------------------*)
+lemma [any] _ ['a 'b] (phi,phi': 'a -> _) (t : 'b) : 
+  (forall (u,v:bool), u && v) =>
+  (exists i, phi i) && exists i, phi' i.
+Proof.
+  intro Ass.
+  generalize (exists _, _) (exists _, _) as u v.
+  assumption Ass.
+Qed.
