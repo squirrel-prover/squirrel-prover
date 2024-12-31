@@ -312,7 +312,7 @@ module type S = sig
     t Term.pat_op ->
     match_res
 
-  (** [find pat t] returns the list of occurences in t that match the
+  (** [find pat t] returns the list of occurences in [t] that match the
       pattern. *)
   val find : 
     ?option:match_option ->

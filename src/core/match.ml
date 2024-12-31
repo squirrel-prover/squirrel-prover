@@ -1991,14 +1991,14 @@ module T (* : S with type t = Term.term *) = struct
     | Match mv -> Some mv
 
   (*------------------------------------------------------------------*)
-  (** Exported *)
+  (** Exported, find [Term.terms] in a [Term.term] *)
   let find
       ?option
       ?ienv
       (table  : Symbols.table) 
       (system : SE.context) 
-      (pat    : term pat_op) 
-      (t      : t) 
+      (pat    : Term.t pat_op) 
+      (t      : Term.t) 
     : Term.term list
     =
     let f_fold : Term.terms Pos.f_map_fold = 
@@ -3739,14 +3739,14 @@ module E = struct
       t2
   
   (*------------------------------------------------------------------*)
-  (** Exported *)
+  (** Exported, find [Term.terms] in a [Equiv.form] *)
   let find
       ?option
       ?ienv
       (table  : Symbols.table) 
       (system : SE.context) 
-      (pat    : term pat_op) 
-      (t      : t) 
+      (pat    : Term.t pat_op) 
+      (t      : Equiv.form) 
     : Term.terms
     =
     let f_fold : Term.terms Pos.f_map_fold = 
