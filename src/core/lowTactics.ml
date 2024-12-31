@@ -1022,13 +1022,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let name_s = L.unloc name in
 
     if Hyps.mem_name name_s s then
-      begin                     (* clear an hypothesis *)
+      begin (* clear an hypothesis or a definition *)
         let hid,_ = Hyps.by_name name s in
         match Hyps.by_id hid s with
         | LHyp _ -> Hyps.remove hid s
         | LDef (_,t) ->
 
-          if Sv.exists (fun v -> v.id = hid) (S.fv s) then
+          let fv =
+            let s = Hyps.remove hid s in
+            S.fv s
+          in
+          if Sv.exists (fun v -> v.id = hid) fv then
             soft_failure ~loc:(L.loc name)
               (Failure "cannot clear definition: used in the sequent");
 
@@ -1082,7 +1086,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let v0 = Vars.mk hid (Term.ty t) in
       
-      let fv = S.fv (S.set_conclusion (S.Conc.mk_false) s) in
+      let fv =
+        let s = Hyps.remove hid s |> S.set_conclusion (S.Conc.mk_false) in 
+        S.fv s
+      in
       if Sv.mem v0 fv then 
         soft_failure ?loc
           (Failure "cannot revert definition: variable bound in proof-context") ;

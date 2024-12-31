@@ -116,12 +116,17 @@ end = struct
   let pp     = _pp (default_ppe ~dbg:false ())
   let pp_dbg = _pp (default_ppe ~dbg:true ())
 
+  (** variables that are free in the sequent, i.e. that must be bound
+      by [s.vars]. *)
   let fv (s : t) : Vars.Sv.t = 
     let h_vars = 
-      H.fold (fun _ ld vars -> 
+      H.fold (fun id ld vars -> 
           match ld with
           | LHyp f     -> Vars.Sv.union (Equiv.Any.fv f) vars
-          | LDef (_,t) -> Vars.Sv.union (Term.fv      t) vars
+          | LDef (_,t) ->
+            Vars.Sv.union (Term.fv      t) vars |>
+            Vars.Sv.add (Vars.mk id (Term.ty t))
+            (* a defined variable must be bound by [s.vars] *)
         ) s.proof_context Vars.Sv.empty
     in
     Vars.Sv.union
