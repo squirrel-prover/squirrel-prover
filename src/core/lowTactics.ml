@@ -143,6 +143,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ~destr_eq:(S.Reduce.destr_eq   s Equiv.Local_t)
       ~destr_not:(S.Reduce.destr_not s Equiv.Local_t)
 
+  (*------------------------------------------------------------------*)  
+  (** The default system expression in a sequent:
+      - [set] for local sequent;
+      - [equiv] for global sequent. *)
+  let default_system (s : S.t) : SE.t =
+    match S.conc_kind with
+    | Equiv.Local_t  -> (S.system s).set
+    | Equiv.Global_t -> (oget (S.system s).pair :> SE.t)
+    (* TODO: if [pair] is [None], we should return a default system value. *)
+    | _ -> assert false     (* impossible *)
+
   (*------------------------------------------------------------------*)
   let wrap_fail = wrap_fail
 
@@ -165,8 +176,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert_args (s : S.sequent) args sort =
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.conclusion s))
 
-  let convert ?ty ?option ?ienv (s : S.sequent) term =
-    let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
+  let convert ?ty ?option ?system ?ienv (s : S.sequent) term =
+    let env = S.env s in
+    let env =
+      match system with None -> env | Some system -> { env with system; }
+    in
+        
+    let cenv = Typing.{ env; cntxt = InGoal; } in
     Typing.convert ?ty ?option ?ienv cenv term
 
   let convert_any (s : S.sequent) (term : Typing.any_term) =
@@ -1507,13 +1523,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else if S.Conc.is_let form then
         begin
           let v, t1, t2 = oget (S.Conc.destr_let form) in
-          let se =
-            match S.conc_kind with
-            | Equiv.Local_t  -> (S.system s).set
-            | Equiv.Global_t -> (oget ((S.system s).pair) :> SE.t)
-            (* default to [pair] for global judgements *)
-            | Equiv.Any_t -> assert false
-          in
+          let se = default_system s in
           let id, s = Hyps.add_i Args.Unnamed (LDef (se,t1)) s in
           let v' = Vars.mk id (Vars.ty v) in
           let subst = Term.ESubst (Term.mk_var v, Term.mk_var v') in
@@ -1603,8 +1613,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
       
-  (** Generalize a pattern [pat] (which may feature term holes [_])
-      into a fresh variable [v].
+  (** Generalize a pattern [pat] (which may feature term holes [_]) 
+      in system [in_system] into a fresh variable [v].
       Return the pair [(v,t)] where [t] is the instantiation of [pat]
       that was generalized.
 
@@ -1613,19 +1623,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
       are reverted in the conclusion. *)
   let generalize1
       ?loc ~dependent ?(ienv:Infer.env option)
+      ~(in_system : SE.t)
       (pat : Term.term) (s : S.t)
     : (Vars.tagged_var * Term.t) * S.t
     =
     let v = Vars.make_fresh (Term.ty pat) "_x" in
     let env = S.env s in
-
-    (* the system we are generalizing in *)
-    let in_system =
-      match S.conc_kind with
-      | Equiv.Local_t  -> (S.system s).set
-      | Equiv.Global_t -> (oget (S.system s).pair :> SE.t)
-      | _ -> assert false     (* impossible *)
-    in
 
     (* find an occurrence of [pat] in the conclusion *)
     let term =
@@ -1695,27 +1698,36 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** [terms] and [n_ips] must be of the same length *)
   let generalize
-      ~dependent
+      ~dependent ~(in_system : SE.t)
+      ~(mode: [`Gen | `Def])
+      (* are we abstracting as ∀ vars or defining are the generalized terms *)
       (terms : (Term.term * L.t option * Infer.env option) list)
       (n_ips : Args.naming_pat list) (s : S.t)
     : (Vars.tagged_var * Term.t) list * S.t
     =
     let s, gens =
       List.fold_left (fun (s, gens) (term,loc,ienv) ->
-          let gen, s = generalize1 ?loc ~dependent ?ienv term s in
+          let gen, s = generalize1 ?loc ~dependent ~in_system ?ienv term s in
           s, gen :: gens
         ) (s,[]) terms
     in
     let gens = List.rev gens in
 
-    (* clear unused variables among [terms] free variables *)
-    let t_fv =
-      List.fold_left (fun vars t ->
-          Sv.union vars (Term.fv t)
-        ) Sv.empty (List.map (fun (x,_,_) -> x) terms) |>
-      Sv.filter (not -| Vars.is_pat)
+    (* when we abstract, clear unused variables among [terms] free
+       variables *)
+    let s =
+      match mode with
+      | `Gen ->
+        let t_fv =
+          List.fold_left
+            (fun vars t -> Sv.union vars (Term.fv t))
+            Sv.empty (List.map (fun (x,_,_) -> x) terms)
+          |>
+          Sv.filter (not -| Vars.is_pat)
+        in
+        try_clean_env t_fv s
+      | `Def -> s
     in
-    let s = try_clean_env t_fv s in
 
     (* we rename generalized variables *)
     let _, gens, subst =
@@ -1729,7 +1741,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         ) (S.vars s, [], []) gens n_ips
     in
     let s = S.subst subst s in
-    let gens = List.rev gens in
+    let gens =
+      List.rev_map (fun (v_tagged,t) -> v_tagged, Term.subst subst t) gens
+    in
 
     (* in a local sequent, we throw away the tags *)
     let gens = 
@@ -1749,7 +1763,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (n_ips : Args.naming_pat list) (s : S.t)
     : S.t
     =
-    let gens, s = generalize ~dependent terms n_ips s in
+    (* the system we are generalizing in *)
+    let in_system = default_system s in
+
+    let gens, s = generalize ~mode:`Gen ~dependent ~in_system terms n_ips s in
 
     (* throw away the generalized terms, which are no useful here *)
     let new_vars = List.map fst gens in
@@ -1797,6 +1814,53 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let generalize_tac ~dependent args =
     wrap_fail (generalize_tac_args ~dependent args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Set} *)
+
+  (*------------------------------------------------------------------*)
+  let do_set_tac
+      ~dependent ~in_system
+      (term : (Term.term * L.t option * Infer.env option))
+      (n_ip : Args.naming_pat) (s : S.t)
+    : S.t
+    =
+    let gens, s = generalize ~mode:`Def ~dependent ~in_system [term] [n_ip] s in
+    let ((v,tag), t) = as_seq1 gens in
+
+    (* add the new definition to the proof-context *)
+    let s = S.set_vars (Vars.add_var v tag (S.vars s)) s in
+    let _, s = Hyps._add ~force:true v.Vars.id (LDef (in_system, t)) s in
+    s
+      
+  (*------------------------------------------------------------------*)
+  let set_tac_args ~dependent args s : S.t list =
+    match args with
+    | [Args.Set (n_ip, system, p_pat)] ->
+      let in_system =
+        match system with
+        | None -> default_system s
+        | Some system ->
+          let table = S.table s in
+          let se_env = (S.env s).se_vars in
+          SE.Parse.parse ~implicit:false ~se_env table system |>
+          snd
+      in
+
+      let ienv = Infer.mk_env () in
+      let pat, _ =
+        convert
+          ~option:{Typing.Option.default with pat = true; }
+          ~system:(SE.reachability_context in_system)
+          ~ienv s p_pat
+      in
+      let loc = Some (L.loc p_pat) in
+      [do_set_tac ~dependent ~in_system (pat, loc, Some ienv) n_ip s]
+
+    | _ -> assert false
+
+  let set_tac ~dependent args =
+    wrap_fail (set_tac_args ~dependent args)
 
   (*------------------------------------------------------------------*)
   (** {3 Apply}
@@ -3417,6 +3481,14 @@ let () =
        (TraceLT.generalize_tac ~dependent:true)
        (EquivLT.generalize_tac ~dependent:true))
 
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "set"
+    (gentac_of_any_tac_arg
+       (TraceLT.set_tac ~dependent:false)
+       (EquivLT.set_tac ~dependent:false))
+(* FIXME: provide a version of [set] with [dependent:true] *)
+    
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "reduce"

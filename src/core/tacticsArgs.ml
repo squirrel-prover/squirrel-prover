@@ -217,6 +217,8 @@ type parser_arg =
   | MemSeq         of int L.located * int L.located
   | Remember       of Typing.term * lsymb
   | Generalize     of Typing.term list * naming_pat list option
+  | Set            of naming_pat * SystemExpr.Parse.t option * Typing.term
+  (** [set @system x := t]  *)
   | Fa             of fa_arg list
   | TermPat        of int * Typing.term
   | DH             of dh_arg

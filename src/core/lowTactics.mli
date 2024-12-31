@@ -83,7 +83,8 @@ module MkCommonLowTac (S : Sequent.S) : sig
     S.t -> Args.parser_arg list -> Args.esort -> Args.earg
 
   val convert :
-    ?ty:Type.ty -> ?option:Typing.Option.t -> ?ienv:Infer.env ->
+    ?ty:Type.ty -> ?option:Typing.Option.t ->
+    ?system:SE.context -> ?ienv:Infer.env -> 
     S.t -> Typing.term ->
     Term.term * Type.ty
 
