@@ -45,7 +45,8 @@ let check_rule (rule : rw_rule) : unit =
     Tactics.hard_failure Tactics.BadRewriteRule;
   ()
 
-(** Make a rewrite rule from a formula *)
+(*------------------------------------------------------------------*)
+(** Make a rewrite rule from a pattern *)
 let pat_to_rw_rule ?loc 
     ~(destr_eq  : Term.term -> (Term.term * Term.term) option)
     ~(destr_not : Term.term -> (            Term.term) option)
@@ -83,6 +84,30 @@ let pat_to_rw_rule ?loc
     rw_kind;
     rw_bound;
   } in
+  
+  (* We check that the rule is valid *)
+  check_rule rule;
+
+  rule
+
+(*------------------------------------------------------------------*)
+let simple_rw_rule
+    ?(params = Params.empty) ?(vars = []) ?(conds = [])
+    (system  : SE.arbitrary) 
+    ~(left : Term.t) ~(right : Term.t)
+  : rw_rule 
+  =
+  let rule = {
+    rw_params = params;
+    rw_system = system;
+    rw_vars   = vars;
+    rw_conds  = conds;
+    rw_rw     = (left,right);
+    rw_kind   = GlobalEq;
+    rw_bound = Glob;
+    (* FIXME: we want to say that the rule is exact. *)
+  } 
+  in
   
   (* We check that the rule is valid *)
   check_rule rule;

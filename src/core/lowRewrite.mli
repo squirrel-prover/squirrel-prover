@@ -42,3 +42,12 @@ val pat_to_rw_rule :
   [< `LeftToRight | `RightToLeft ] ->
   (Term.term*Concrete.bound) Term.pat ->
   rw_rule
+
+(** Create a simple **exact** rewriting rule [left ↦ right] that can
+    be used in any context. *)
+val simple_rw_rule :
+  ?params:Params.t ->
+  ?vars:Vars.tagged_vars ->
+  ?conds:Term.term list ->
+  SE.arbitrary -> 
+  left:Term.term -> right:Term.term -> rw_rule

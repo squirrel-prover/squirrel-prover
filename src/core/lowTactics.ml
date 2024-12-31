@@ -1595,7 +1595,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
     let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
-
       
   (** Generalize a pattern [pat] (which may feature term holes [_])
       into a fresh variable [v].
@@ -1607,28 +1606,61 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
     =
     let v = Vars.make_fresh (Term.ty pat) "_x" in
+    let env = S.env s in
+
+    (* the system we are generalizing in *)
+    let in_system =
+      match S.conc_kind with
+      | Equiv.Local_t  -> (S.system s).set
+      | Equiv.Global_t -> (oget (S.system s).pair :> SE.t)
+      | _ -> assert false     (* impossible *)
+    in
 
     (* find an occurrence of [pat] in the conclusion *)
     let term =
       if not (Sv.exists Vars.is_pat (Term.fv pat)) then
         pat
       else begin
-        let env,target = S.env s, S.conclusion s in
+        let target = S.conclusion s in
         let target = Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t target in
-        let occurrences = Args.occurrences_of_pat ?ienv env pat ~target in
+        let occurrences = Args.occurrences_of_pat ?ienv ~in_system env pat ~target in
         if occurrences = [] then soft_failure ?loc (Failure "no occurrence found");
         List.hd occurrences
       end
     in
 
-    let subst = [Term.ESubst (term, Term.mk_var v)] in
+    let rw_rule =
+      Rewrite.simple_rw_rule in_system ~left:term ~right:(Term.mk_var v)
+    in
+    (* rewrite [term] into [v] *)
+    let doit (target : Equiv.any_form) : Equiv.any_form =
+      match
+        Rewrite.rewrite
+          (S.table s) (S.params s) (S.vars s) (S.system s) InSequent
+          (S.get_trace_hyps s)
+          Once rw_rule target
+      with
+      | Rewrite.RW_Failed _ -> target
+      | Rewrite.RW_Result (t,subgs) -> assert (subgs = []); t
+    in
+    let doit_conc = S.unwrap_conc -| doit -| S.wrap_conc in
+    let doit_hyp  = S.unwrap_hyp  -| doit -| S.wrap_hyp  in
+    let doit_def (se, t) =
+      let t =
+        if SE.equal env.table se in_system then
+          match doit (Local t) with Local t -> t | _ -> assert false
+        else t
+      in
+      (se, t)
+    in
 
     (* substitute [pat] by [v] in the conclusion, or the 
        whole sequent if [dependent = true]. *)
     let s =
+      let s = S.set_conclusion (doit_conc @@ S.conclusion s) s in
       if not dependent
-      then S.set_conclusion (S.subst_conc subst (S.conclusion s)) s
-      else S.subst subst s
+      then s
+      else S.Hyps.map ~hyp:doit_hyp ~def:doit_def s
     in
     
     (* if [dependent = true], introduce back hypotheses where [pat] was 
@@ -1735,7 +1767,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let generalize_tac ~dependent args =
     wrap_fail (generalize_tac_args ~dependent args)
-
 
   (*------------------------------------------------------------------*)
   (** {3 Apply}

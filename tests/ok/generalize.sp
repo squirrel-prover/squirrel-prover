@@ -102,15 +102,68 @@ Qed.
 global lemma _ t : [P (frame@t)].
 Proof. 
   generalize (frame@t) => x.
-  checkfail apply foo_glob exn Failure. (* bad variabe instantiation *)
+  checkfail apply foo_glob exn Failure. (* bad variable instantiation *)
 Abort.
 
+
 (*------------------------------------------------------------------*)
-lemma [any] _ ['a 'b] (phi,phi': 'a -> _): 
+lemma [any] _ ['a 'b] (phi,phi': 'a -> _) : 
   (forall (u,v:bool), u && v) =>
   (exists i, phi i) && exists i, phi' i.
 Proof.
   intro Ass.
   generalize (exists _, _) (exists _, _) as u v.
+  assumption Ass.
+Qed.
+
+lemma [any] _ ['a 'b] (phi,phi': 'a -> _) : 
+  (forall (u:bool), u && exists i, phi' i) =>
+  (exists i, phi i) && exists i, phi' i.
+Proof.
+  intro Ass.
+  generalize (exists _, _) as u.
+  assumption Ass.
+Qed.
+
+(* same, but with the same formula [phi i] both times *)
+lemma [any] _ ['a 'b] (phi: 'a -> _) : 
+  (forall (u:bool), u && u) =>
+  (exists i, phi i) && exists i, phi i.
+Proof.
+  intro Ass.
+  generalize (exists _, _) as u.
+  assumption Ass.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* We are in the system `any`, thus `set <> equiv`. Consequently,
+    we can only generalize in `equiv(_)`. *)
+global lemma [any] _ ['a 'b] (phi,phi': 'a -> _) (t : 'b) : 
+  ( Forall (E,E0:bool),
+      [(exists (i:'a), phi i) && exists (i:'a), phi' i] /\  
+      equiv(E && E0) ) 
+  ->
+  (* *) [(exists i, phi i) && exists i, phi' i] /\
+  equiv ((exists i, phi i) && exists i, phi' i).
+Proof.
+  intro Ass.
+  generalize (exists _, _) (exists _, _) as E E0.
+  assumption Ass.
+Qed.
+
+(*------------------------------------------------------------------*)
+system Q = null.
+
+(* Same as previous lemma, but in the system `P`.
+   Here, we know that `set = equiv = P`, thus we can generalize 
+   in both `[_]` and `equiv(_)`. *)
+global lemma [Q] _ ['a 'b] (phi,phi': 'a -> _) (t : 'b) : 
+  ( Forall (E,E0:bool), [E && E0] /\ equiv(E && E0)  ) 
+  ->
+  (* *) [(exists i, phi i) && exists i, phi' i] /\
+  equiv ((exists i, phi i) && exists i, phi' i).
+Proof.
+  intro Ass.
+  generalize (exists _, _) (exists _, _) as E E0.
   assumption Ass.
 Qed.

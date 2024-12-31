@@ -317,6 +317,7 @@ module type S = sig
   val find : 
     ?option:match_option ->
     ?ienv:Infer.env ->
+    ?in_system:SE.t ->
     Symbols.table ->
     SE.context ->
     Term.term Term.pat_op -> 
@@ -426,7 +427,7 @@ module T : S with type t = Term.term
 module E : sig
   include S with type t = Equiv.form
 
-  (** Same as [find], but over [Equiv.form] sub-terms. *)
+  (** Similar as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
     ?option:match_option ->
     ?ienv:Infer.env ->

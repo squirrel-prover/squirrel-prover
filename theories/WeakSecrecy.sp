@@ -187,7 +187,11 @@ axiom [any] frame_not_init (tau:timestamp) :
 axiom [any] frame_init :
   frame@init = zero.
 
-global lemma  [any] frame_ded_past (tau,tau':timestamp [const]) :
+global lemma frame_ded_past
+ {P : system[pair]}
+ @system:P
+ (tau,tau':timestamp [const]) 
+:
  [tau'<= tau] -> $( (frame@tau) |> (frame@tau')).
 Proof.
   dependent induction tau.

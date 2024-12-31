@@ -1553,6 +1553,7 @@ module type S = sig
   val find : 
     ?option:match_option ->
     ?ienv:Infer.env ->
+    ?in_system:SE.t ->
     Symbols.table ->
     SE.context ->
     (Term.term pat_op) -> 
@@ -1995,19 +1996,29 @@ module T (* : S with type t = Term.term *) = struct
   let find
       ?option
       ?ienv
+      ?(in_system : SE.t option)
       (table  : Symbols.table) 
       (system : SE.context) 
       (pat    : Term.t pat_op) 
       (t      : Term.t) 
     : Term.term list
     =
+    let is_in_system : SE.t -> bool =
+      match in_system with
+      | None           -> fun _ -> true
+      | Some in_system -> SE.equal table in_system 
+    in
+      
     let f_fold : Term.terms Pos.f_map_fold = 
       fun e se _vars _conds _p acc ->
-        let subterm_system = SE.reachability_context se in
-        match try_match ~expand_context:InSequent 
-                ?ienv ?option table subterm_system e pat with
-        | Match _ -> e :: acc, `Continue
-        | _       -> acc, `Continue
+        if not (is_in_system se) then acc, `Continue else
+          let subterm_system = SE.reachability_context se in
+          match
+            try_match ~expand_context:InSequent 
+              ?ienv ?option table subterm_system e pat
+          with
+          | Match _ -> e :: acc, `Continue
+          | _       -> acc, `Continue
     in
     let acc, _, _ = Pos.map_fold f_fold system.set [] t in
     List.rev acc
@@ -3743,27 +3754,35 @@ module E = struct
   let find
       ?option
       ?ienv
+      ?(in_system : SE.t option)
       (table  : Symbols.table) 
       (system : SE.context) 
       (pat    : Term.t pat_op) 
       (t      : Equiv.form) 
     : Term.terms
     =
+    let is_in_system : SE.t -> bool =
+      match in_system with
+      | None           -> fun _ -> true
+      | Some in_system -> SE.equal table in_system 
+    in
+
     let f_fold : Term.terms Pos.f_map_fold = 
       fun e se _vars _conds _p acc ->
-        let subterm_system = SE.reachability_context se in
-        match 
-          T.try_match ~expand_context:InSequent
-            ?ienv ?option table subterm_system e pat 
-        with
-        | Match _ -> e :: acc, `Continue
-        | _       ->      acc, `Continue
+        if not (is_in_system se) then acc, `Continue else
+          let subterm_system = SE.reachability_context se in
+          match 
+            T.try_match ~expand_context:InSequent
+              ?ienv ?option table subterm_system e pat 
+          with
+          | Match _ -> e :: acc, `Continue
+          | _       ->      acc, `Continue
     in
     let acc, _, _ = Pos.map_fold_e f_fold system [] t in
     List.rev acc
 
   (** Exported.
-      Same as [find], but over [Equiv.form] sub-terms. *)
+      Similar to [find], but over [Equiv.form] sub-terms. *)
   let find_glob
       ?option
       ?ienv

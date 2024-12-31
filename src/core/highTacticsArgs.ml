@@ -14,7 +14,8 @@ let as_p_path (parser_args : parser_arg list) : Symbols.p_path option =
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli` *)
 let occurrences_of_pat
-    ?(ienv : Infer.env option) (env : Env.t)
+    ?(ienv : Infer.env option) ?(in_system : SE.t option)
+    (env : Env.t)
     (pat : Term.t) ~(target : Equiv.any_form)
   : Term.t list
   =
@@ -25,8 +26,8 @@ let occurrences_of_pat
   let option = { Match.default_match_option with allow_capture = true; } in
   let res : Term.terms = 
     match target with
-    | Local  form -> Match.T.find ~option ~ienv env.table env.system pat form
-    | Global form -> Match.E.find ~option ~ienv env.table env.system pat form
+    | Local  form -> Match.T.find ~option ?in_system ~ienv env.table env.system pat form
+    | Global form -> Match.E.find ~option ?in_system ~ienv env.table env.system pat form
   in
 
   (* close [ienv] if at least one match was found *)
