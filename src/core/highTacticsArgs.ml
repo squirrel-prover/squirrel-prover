@@ -1,50 +1,72 @@
+open Utils
+    
 include TacticsArgs
 
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
-let as_p_path (parser_args : parser_arg list) =
+let as_p_path (parser_args : parser_arg list) : Symbols.p_path option =
   match parser_args with
   | [Term_parsed (L.{ pl_desc = Symb { path = p; ty_args = None; se_args = None; }} )] ->
     Some p
   | _ -> None
 
 (*------------------------------------------------------------------*)
+(** Exported, see `.mli` *)
+let occurrences_of_pat
+    ?(ienv : Infer.env option) (env : Env.t)
+    (pat : Term.t) ~(target : Equiv.any_form)
+  : Term.t list
+  =
+  let ienv = match ienv with None -> Infer.mk_env () | Some ienv -> ienv in
+
+  let pat = Pattern.op_pat_of_term pat in
+  
+  let option = { Match.default_match_option with allow_capture = true; } in
+  let res : Term.terms = 
+    match target with
+    | Local  form -> Match.T.find ~option ~ienv env.table env.system pat form
+    | Global form -> Match.E.find ~option ~ienv env.table env.system pat form
+  in
+
+  (* close [ienv] if at least one match was found *)
+  let res =
+    if res = [] then [] else
+      match Infer.close env ienv with
+      | Infer.Closed s -> List.map (Term.gsubst s) res
+      | _ -> assert false
+      (* Since [res ≠ []], we know that we successfully matched [pat].
+         Thus, no free type variable may remain. *)
+  in
+
+  (* Clear terms whose free free variables are not a subset of the context free
+     variables (because the term appeared under a binder). *)
+  List.filter (fun t ->
+      Sv.subset (Term.fv t) (Vars.to_vars_set env.vars)
+    ) res
+
+
+(*------------------------------------------------------------------*)
 let convert_pat_arg
     (sel : int) conv_cntxt (p : Typing.term) (conc : Equiv.any_form)
   =
+  let ienv = Infer.mk_env () in
   let t, ty =
     Typing.convert
       ~option:{Typing.Option.default with pat = true; }
-      conv_cntxt p
+      conv_cntxt ~ienv p
   in
-
-  let pat = Pattern.op_pat_of_term t in
-  
-  let option = { Match.default_match_option with allow_capture = true; } in
-  let table = conv_cntxt.env.table
-  and system = conv_cntxt.env.system in
-  let res : Term.terms = 
-    match conc with
-    | Local  form -> Match.T.find ~option table system pat form
-    | Global form -> Match.E.find ~option table system pat form
-  in
-  let res =
-    (* Clear terms whose free free variables are not a subset of the context free
-       variables (because the term appeared under a binder). *)
-    List.filter (fun t ->
-        Sv.subset (Term.fv t) (Vars.to_vars_set conv_cntxt.env.vars)
-      ) res
-  in
-  let message = match List.nth_opt res (sel-1) with
+  let res = occurrences_of_pat ~ienv conv_cntxt.env t ~target:conc in
+  let message =
+    match List.nth_opt res (sel-1) with
     | Some et -> et
     | None -> 
-      raise Typing.(Error (L._dummy,
-                          Tactic_type
-                            ("Could not extract the element "
-                             ^ string_of_int (sel)
-                             ^ " out of " ^ string_of_int (List.length res)
-                             ^ " matches found")))
+      raise Typing.(Error (L.loc p,
+                           Tactic_type
+                             ("Could not extract the element "
+                              ^ string_of_int (sel)
+                              ^ " out of " ^ string_of_int (List.length res)
+                              ^ " matches found")))
   in
   (message, ty)
 

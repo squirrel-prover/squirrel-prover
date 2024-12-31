@@ -106,7 +106,7 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-lemma [any] _ ['a 'b] (phi,phi': 'a -> _) (t : 'b) : 
+lemma [any] _ ['a 'b] (phi,phi': 'a -> _): 
   (forall (u,v:bool), u && v) =>
   (exists i, phi i) && exists i, phi' i.
 Proof.

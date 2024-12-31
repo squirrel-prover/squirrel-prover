@@ -1597,8 +1597,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_vars env s
 
       
-  (* [pat] can feature term holes [_] *)
-  let _generalize
+  (** Generalize a pattern [pat] (which may feature term holes [_])
+      into a fresh variable [v].
+      Generalization occurs only in the conclusion, except if [depends].
+      In the later case, proof-context elements depending on [v] 
+      are reverted in the conclusion. *)
+  let do_generalize
       ?loc ~dependent ?(ienv:Infer.env option)
       (pat : Term.term) (s : S.t) : Vars.tagged_var * S.t
     =
@@ -1609,39 +1613,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Sv.exists Vars.is_pat (Term.fv pat)) then
         pat
       else begin
-        let pat = Pattern.op_pat_of_term pat in
-
-        let option = { Match.default_match_option with allow_capture = true; } in
-        let table,system,conclusion = S.table s, S.system s, S.conclusion s in
-
-        let res : Term.terms = 
-          match S.conc_kind with
-          | Local_t  -> Match.T.find ~option ?ienv table system pat conclusion
-          | Global_t -> Match.E.find ~option ?ienv table system pat conclusion
-          | Any_t -> assert false   (* impossible *)
-        in
-        if res = [] then soft_failure ?loc (Failure "no occurrence found");
-
-        (* close [ienv] *)
-        let res =
-          match ienv with
-          | None -> res
-          | Some ienv ->
-            match Infer.close (S.env s) ienv with
-            | Infer.Closed s -> List.map (Term.gsubst s) res
-            | _ -> assert false
-            (* matching [pat] ensures that no free type variable may remain *)
-        in
-
-        (* Clear terms whose free variables are not a subset of the context free
-           variables (because the term appeared under a binder). *)
-        let res =
-          List.filter (fun t ->
-              Sv.subset (Term.fv t) (Vars.to_vars_set (S.vars s))
-            ) res
-        in
-        if res = [] then soft_failure ?loc (Failure "no occurrence found");
-        List.hd res
+        let env,target = S.env s, S.conclusion s in
+        let target = Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t target in
+        let occurrences = Args.occurrences_of_pat ?ienv env pat ~target in
+        if occurrences = [] then soft_failure ?loc (Failure "no occurrence found");
+        List.hd occurrences
       end
     in
 
@@ -1681,7 +1657,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let s, vars =
       List.fold_left (fun (s, vars) (term,loc,ienv) ->
-          let var, s = _generalize ?loc ~dependent ?ienv term s in
+          let var, s = do_generalize ?loc ~dependent ?ienv term s in
           s, var :: vars
         ) (s,[]) terms
     in
