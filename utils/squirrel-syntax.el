@@ -154,6 +154,7 @@
   "equivalent"
   "expandall"
   "fa"
+  "cs"
   "show"
   "deduce"
   "fresh"
