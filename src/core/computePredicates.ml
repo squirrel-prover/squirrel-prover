@@ -2,6 +2,14 @@ module SE = SystemExpr
 module LS = Library.Secrecy
 
 (*------------------------------------------------------------------*)
+
+type side = Left | Right
+
+let other (s:side) =
+  match s with 
+  | Left -> Right
+  | Right -> Left
+    
 type kind = Deduce | NotDeduce 
 
 let predicate_to_kind table (p : Symbols.predicate) : kind =
@@ -72,52 +80,47 @@ let system (pa:form) : SE.t =
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let left (pa:form) : Term.term =
-  match pa.multi_args with
-  | [_, [u;_]] -> u
-  | _ -> assert false 
 
-let lefts (f : form) : Term.terms = 
-  Term.destr_tuple_flatten (left f)
+let term ~(side:side) (f:form) : Term.term =
+  match side, f.multi_args with
+  | Left, [_, [u;_]] -> u
+  | Right, [_, [_; v]] -> v
+  | _ -> assert false
+
+let terms ~(side:side) (f:form) : Term.terms =
+  Term.destr_tuple_flatten (term ~side f)
+
+let left = term ~side:Left
+let lefts = terms ~side:Left
+let right = term ~side:Right
+let rights = terms ~side:Right
+    
 
 (*------------------------------------------------------------------*)
-let right (pa:form) : Term.term =
-  match pa.multi_args with
-  | [_, [_;v]] -> v
-  | _ -> assert false 
-
-let rights (f : form) : Term.terms = 
-  Term.destr_tuple_flatten (right f)
-
-(*------------------------------------------------------------------*)
-let update_lefts (left : Term.terms) (pa : form) : form =
-  let right = right pa in
-  let ty_left = List.map Term.ty left in
-  let ty_right = Term.ty right in
-  let left, ty_left =
-    if List.length left = 0 then 
+let update_terms ~(side:side) (terms:Term.terms) (f:form) : form =
+  let other_term = term ~side:(other side) f in
+  let ty_terms = List.map Term.ty terms in
+  let ty_other = Term.ty other_term in
+  let terms, ty_terms =
+    if terms = [] then
       [Term.mk_zero], [Type.tmessage]
     else
-      left, ty_left
+      terms, ty_terms
   in
-  { pa with
-    ty_args    = [Type.tuple ty_left; ty_right];
-    multi_args = [system pa,
-                  [Term.mk_tuple left; right]]
+  let term = Term.mk_tuple terms in
+  let ty_term = Type.tuple ty_terms in
+  let l, r, tyl, tyr =
+    match side with
+    | Left -> term, other_term, ty_term, ty_other
+    | Right -> other_term, term, ty_other, ty_term
+  in
+  { f with
+    ty_args = [tyl; tyr];
+    multi_args = [system f, [l; r]]
   }
 
-let update_rights (right : Term.terms) (pa : form) : form =
-  let left = left pa in
-  let ty_left = Term.ty left in
-  let ty_right = List.map Term.ty right in
-  let right, ty_right =
-    if List.length right = 0 then 
-      [Term.mk_zero], [Type.tmessage]
-    else
-      right, ty_right
-  in
-  { pa with
-    ty_args    = [ty_left; Type.tuple ty_right];
-    multi_args = [system pa,
-                  [left; Term.mk_tuple right]]
-  }
+
+let update_lefts = update_terms ~side:Left
+
+let update_rights = update_terms ~side:Right
+

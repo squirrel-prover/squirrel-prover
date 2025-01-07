@@ -15,6 +15,13 @@ module SE = SystemExpr
     - non-deduction [( *> )] *)
 type kind = Deduce | NotDeduce
 
+(** A computability formula has two sides: the left-hand side
+    and right-hand side. *)
+type side = Left | Right
+
+(** Returns the opposite [side] *)
+val other : side -> side
+            
 (** The type of a computability formula. *)
 type form
 
@@ -29,25 +36,33 @@ val make :
   Symbols.table -> kind -> SE.fset -> 
   left_tys:Type.ty list -> right_ty:Type.ty -> 
   left:Term.terms -> right:Term.term -> form
+(* TODO: why do we put a list on the left and a single term on the right?
+   internally the list is turned into a tuple anyway, why not put lists on
+   both sides then? *)
+
 
 (*------------------------------------------------------------------*)
-(** Constructs a secrecy goal from a global formula. 
+(** Constructs a computability goal from a global formula. 
     Assumes [is_computability] holds. *)
 val from_global : Symbols.table -> Equiv.form -> form 
 
-(** Constructs the global formula for a secrecy goal. *)
+(** Constructs the global formula for a computability goal. *)
 val to_global : form -> Equiv.form
 
 (*------------------------------------------------------------------*)
-(** Extracts the kind of secrecy goal. *)
+(** Extracts the kind of a computability goal. *)
 val kind : Symbols.table -> form -> kind
 
-(** Returns the system of the secrecy goal. *)
+(** Returns the system of the computability goal. *)
 val system : form -> SE.t
 
-(** Returns the left-hand side of the secrecy goal. 
-    In case it is a tuple, or nested tuples, flattens it as
-    a list of terms. *)
+(** Returns the left- or right-hand [~side] of the computability goal. *)
+val term : side:side -> form -> Term.term
+  
+(** Same as [term], but flattens tuples (even nested) into lists. *)
+val terms : side:side -> form -> Term.terms
+  
+(** Returns the left-hand side of the computability goal. *)
 val left  : form -> Term.term
 
 (** Same as [left], but flattens tuple (even nested). *)
@@ -59,7 +74,13 @@ val right : form -> Term.term
 (** Similar to [lefts], but on the right. *)
 val rights : form -> Term.terms
 
+
 (*------------------------------------------------------------------*)
+
+(** Returns a new computability goal where the left- or right-hand [~side]
+    has been updated. *)
+val update_terms : side:side -> Term.terms -> form -> form
+
 (** Returns a new computability goal where the left-hand side has been
     updated. *)
 val update_lefts : Term.terms -> form -> form

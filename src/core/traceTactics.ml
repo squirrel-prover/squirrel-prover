@@ -1504,8 +1504,13 @@ let do_fa_tac args s =
   fa bounds s
 
 let fa_tac args = match args with
-  | [TacticsArgs.Fa (Local None)] -> wrap_fail (fa [])
-  | [TacticsArgs.Fa (Local Some args)] -> wrap_fail (do_fa_tac args)
+  | [TacticsArgs.Fa ([], Local None)] -> wrap_fail (fa [])
+  | [TacticsArgs.Fa ([], Local (Some args))] -> wrap_fail (do_fa_tac args)
+
+  | [TacticsArgs.Fa (_ :: _, Local _)] -> 
+    Tactics.hard_failure
+      (Failure "local FA takes no optional arguments")
+
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)

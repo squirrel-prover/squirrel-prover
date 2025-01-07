@@ -247,7 +247,7 @@ type parser_arg =
   | Induction      of named_args * Typing.term option * SystemExpr.Parse.t option
   | Set            of naming_pat * SystemExpr.Parse.t option * Typing.term
   (** [set @system x := t]  *)
-  | Fa             of fa_arg
+  | Fa             of named_args * fa_arg
   | DH             of dh_arg
   | Crypto         of named_args * Symbols.p_path * crypto_args
   | Deduce         of named_args * int L.located list option * Typing.pt option

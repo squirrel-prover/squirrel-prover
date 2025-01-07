@@ -249,6 +249,10 @@ let () =
 (* Over a goal (u, O *> v), creates given a w and O the goal (u, fun x
    => if x = v then w else O x) *> v *)
 let puncture_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
+  if TConfig.post_quantum_equivs (ES.table s) then
+    hard_failure
+      (Failure "puncture oracle not supported for quantum adversaries");
+
   match args with
   | [Args.PunctureOracle (pos, punc_term)] -> 
     (match get_mode s with
@@ -290,5 +294,4 @@ let puncture_oracle_tac args s sk fk =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "puncture oracle"
-    ~pq_sound:false
     (LT.gentac_of_etac_arg puncture_oracle_tac)

@@ -761,43 +761,94 @@ let () =
 (*------------------------------------------------------------------*)
 (** Function application *)
 
-(** Select a frame element matching a pattern. *)
-let fa_select_felems ~ienv (pat : Term.term Term.pat_op) (s : ES.t) : int option =
-  (* [concrete = false] as this is not part of the TCB *)
-  let param = { Match.default_param with allow_capture = true } in
-  let system = match (ES.system s).pair with
-    | None -> soft_failure (Failure "underspecified system")
-    | Some p -> SE.reachability_context p
-  in
+(** Retrieves the terms on which [fa] will be applied, and the system in
+    which they are considered.
+    - in the case of an equiv goal: the frame, and the sequent's pair
+    - in the case of a computablity goal: the left or right hand [~side],
+                                          and the predicate's system *)
+let fa_system_and_terms
+    ?(side:CP.side=Left)
+    (s:ES.t)
+  : SE.arbitrary * Term.terms
+  =
+  if ES.conclusion_is_equiv s then
+    let system =
+      match (ES.system s).pair with
+      | None -> soft_failure (Failure "underspecified system")
+      | Some p -> SE.to_arbitrary p
+    in
+    system, (ES.conclusion_as_equiv s).terms 
+    (* FEAT: concrete: implement the concrete equiv logic *)
+
+  else if ES.conclusion_is_computability s then
+    let g = ES.conclusion_as_computability s in
+    CP.system g, CP.terms ~side g
+
+  else
+    hard_failure
+      (GoalBadShape "expected an equivalence or computability goal")
+
+
+
+(** Selects an element matching a given pattern in a list of terms *)
+let fa_select_elem_terms
+    ~ienv 
+    ~(system:SE.t)
+    ~(env:Vars.env)
+    ~(table:Symbols.table)
+    (pat:Term.term Term.pat_op)
+    (terms:Term.terms)
+  : int option =
+  let param = { Match.default_param with allow_capture = true; } in
+  let system = SE.reachability_context system in
   List.find_mapi (fun i e ->
       match 
-        Match.T.try_match
-          ~ienv ~param ~concrete:true
-          ~env:(ES.vars s) (ES.table s) system 
-          e pat 
+        (* FIXME: switching to [concrete:false] could allow more matches.
+           There is no soundness issue here, as this is not part of the TCB. *)
+        Match.T.try_match ~ienv ~param ~env ~concrete:true table system e pat 
       with
       | NoMatch _ -> None
-      | Match _   -> Some i
-    ) (ES.conclusion_as_equiv s).terms
+      | Match _   -> Some i)
+    terms
+
+
+(** Selects an element (from a frame or computability predicate,
+    depending on the goal of the given sequent) matching a pattern. *)
+let fa_select_elem
+    ~ienv
+    ?(side:CP.side option)
+    (pat : Term.term Term.pat_op)
+    (s : ES.t)
+  : int option =
+  let system, terms = fa_system_and_terms ?side s in
+  fa_select_elem_terms ~ienv ~system
+    ~env:(ES.vars s) ~table:(ES.table s) pat terms
+    
+(*------------------------------------------------------------------*)
+exception No_FA of [
+    | `HeadDiff | `HeadNoFun 
+    | `NotBackwards 
+    | `QuantumFun of Format.formatter -> unit
+  ]
 
 (*------------------------------------------------------------------*)
-exception No_FA of [`HeadDiff | `HeadNoFun | `QuantumFun of Format.formatter -> unit]
-
-
 (** Function application on a term [t]. 
 
     When [allow_subgoals], support post-quantum function applications
     which can create freshness subgoals w.r.t. to terms in
     [context_terms].
 
-    Return: (terms remaining to be computed, subgoals)
+    Return: (terms with which [t] should be replaced, subgoals)
+
+   Raises (incomplete description)
+     [No_FA `HeadDiff] when [t]'s head symbol is a [diff]
+     [No_FA `HeadNoFun] when [t]'s head symbol is not a function. 
 *)
 let fa_expand
     ~(allow_subgoals : bool) ~(context_terms : Term.terms)
     (s : ES.t) (t : Term.t)
   : Term.terms * Term.terms
   =
-
   let env = ES.env s in
 
   let quantum_witness = 
@@ -810,14 +861,15 @@ let fa_expand
         HighTerm.is_ptime_deducible ~si:true env t
       ) l
   in
-  
+
   let new_els, subgoals =
-    let system_pair =
-      let system = ES.system s in
-      { system with set = (oget system.pair :> SE.t); }
-    in
+    let system, _ = fa_system_and_terms s in
+    (* we don't give side as we don't use the resulting terms *)
+    let system = SE.reachability_context system in
     let red_param = { Reduction.rp_empty with diff = true; } in
-    let st = ES.Reduce.to_state ~system:system_pair red_param s in
+    
+    let st = ES.Reduce.to_state ~system red_param s in
+
     match fst @@ Reduction.whnf_term st t with
     | Tuple l ->
       if is_deducible_vars l then ([], []) else (l, [])
@@ -894,6 +946,8 @@ let fa_expand
     ) new_els, subgoals
 
 (*------------------------------------------------------------------*)
+
+(** Ensures that the variables in [vs] are of a [fixed, finite] type *)
 let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
   let bad_vars = 
     List.filter (fun v -> 
@@ -907,33 +961,82 @@ let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
                   "FA does not apply to sequences over types which are not \
                    finite and of fixed-sized: %a" Vars.pp_list bad_vars))
 
-(** Applies Function Application on a given frame element *)
-let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
-  let before, e, after, _bound = split_equiv_conclusion i s in
+(*------------------------------------------------------------------*)
+(** Returns a sequent [s'] which is [s] where the goal
+    has been updated using [terms]:
+    - equiv goal: the goal becomes [equiv(terms)]
+    - [u |> v] or [u *> v]: [u] or [v] is replaced with [terms] 
+      (depending on [side]). *)
+let fa_set_goal
+    ?(side:CP.side=Left) ?(env:Vars.env option)
+    (s:ES.t) (terms:Term.terms) 
+  : ES.t
+  =
+  let s =
+    if ES.conclusion_is_equiv s then
+      ES.set_equiv_conclusion {terms; bound = None} s
+      (* FEAT: concrete logic for equivalences *)
+    else if ES.conclusion_is_computability s then
+      let g = ES.conclusion_as_computability s in
+      let gg = CP.update_terms ~side terms g in  
+      ES.set_conclusion (CP.to_global gg) s
+    else
+      hard_failure
+        (GoalBadShape "expected an equivalence or computability goal")
+  in
+  if env = None then s else ES.set_vars (oget env) s     
 
+(*------------------------------------------------------------------*)
+(** Applies Function Application on a given element (identified by [i]).
+    Returns a sequent with the updated goal.
+    When [t] is replaced with [l], it is always the case that [l |> t].
+    If applied on the left of [ |> ] or the right of [ *> ], 
+    additionally checks that [t |> l], which is required for soundness.
+    Raises [No_FA `NotBackwards] if that test fails.
+ *)
+let fa_elem_ex 
+    ?(side:CP.side option) 
+    (i : int L.located) (s : ES.t) 
+  : ES.t * ES.t list 
+  =
+  let system, terms = fa_system_and_terms ?side s in
+  let system = SE.{ (ES.system s) with set = system; } in
+  let table = ES.table s in
+  
   let make_freshness_sequents (freshness_subgoals : Term.terms) =
+    if TConfig.post_quantum_equivs table &&
+       not (ES.conclusion_is_equiv s) then
+      soft_failure (Failure "Quantum.FA is only implemented for equiv(·)");
+
     if freshness_subgoals = [] then [] else
-      let env = ES.env s in  
-      let system = (Utils.oget env.system.pair :> SE.fset) in
       let phi = Term.mk_ands ~simpl:true freshness_subgoals in
-      [ES.set_conclusion_in_context
-         {env.system with set = (system :> SE.arbitrary); }
-         (Equiv.mk_reach_atom phi)
-         s]
+      [ES.set_conclusion_in_context system (Equiv.mk_reach_atom phi) s]
   in
 
-  let new_terms, freshness_subgoals =
-    (* Special case for try find, otherwise we use fa_expand *)
+  let before, e, after = 
+    try List.splitat (L.unloc i) terms 
+    with List.Out_of_range ->
+      soft_failure ~loc:(L.loc i) (Tactics.Failure "out of range position")
+  in
+
+  (* - the optional updated env (only for try-find)
+     - the terms that [e] will be replaced with 
+     - for quantum FA, the freshness subgoals *)
+  let oenv, (replaced, freshness_subgoals) =
+    (* Special case for try find, otherwise we use [fa_expand] *)
     match e with
     | Find (vars,c,t,e) ->
-      (* check that variables are of correct types (i.e. finite and of fixed size) *)
-      fa_check_vars_fixed_and_finite ~loc:(L.loc i) (ES.table s) vars;
+      (* check that variables are of correct types
+         (ie [finite] and of [fixed] size) *)
+      fa_check_vars_fixed_and_finite ~loc:(L.loc i) table vars;
 
       let env = ref (ES.vars s) in
       let vars, subst =
         let new_vars =
           List.map
-            (fun v -> Vars.make_approx_r env v (Vars.Tag.make ~const:true Vars.Global))
+            (fun v ->
+               Vars.make_approx_r env v
+                 (Vars.Tag.make ~const:true Vars.Global))
             vars
         in
         let subst = 
@@ -944,48 +1047,68 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
         (new_vars, subst)
       in
       let c, t = Term.subst subst c, Term.subst subst t in
-
       let c_seq = Term.mk_lambda vars c in
-      let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
-      ( ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s),
-        [] )
-    (* FEAT: concrete logic for equivalences *)
+      Some !env, ([c_seq ; t ; e], [])
 
     | Quant ((Seq | Lambda),vars,t) ->
-      (* this rules applies to [Seq] and [Lambda] over arbitrary types *)
-      let terms, freshness_subgoals =
-        fa_expand ~allow_subgoals:true ~context_terms:(before @ after) s t
+      (* this rule applies to [Seq] and [Lambda] over arbitrary types *)
+      let new_e, freshness_subgoals = 
+        fa_expand ~allow_subgoals:true ~context_terms:(before @ after) s t 
       in
-      let biframe =
-        List.rev_append
-          before
-          ((List.map (fun t' -> Term.mk_lambda ~simpl:true vars t') terms) @ after)
+      let new_e = 
+        List.map (fun t' -> Term.mk_lambda ~simpl:true vars t') new_e 
       in
-
-      (
-        ES.set_equiv_conclusion {terms = biframe; bound = None} s,
-        freshness_subgoals
-      )
-    (* FEAT: concrete logic for equivalences *)
+      (None, (new_e, freshness_subgoals))
 
     | _ ->
-      let terms, freshness_subgoals =
+      let res =
         fa_expand ~allow_subgoals:true ~context_terms:(before @ after) s e
       in
-      let biframe =
-        List.rev_append before (terms @ after)
-      in
-      ES.set_equiv_conclusion {terms = biframe; bound = None} s,
-      freshness_subgoals
+      (None, res)
   in
-  
-  (new_terms, make_freshness_sequents freshness_subgoals)
-  (* FEAT: concrete logic for equivalences *)
 
-(** [do_fa_felem] with user-level errors *)
-let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
-  try
-    let main_goal, subgoals = do_fa_felem i s in
+  let new_terms = List.rev_append before (replaced @ after) in
+  
+  (* the backwards test: check that [replaced] can also be deduced from [e] *)
+  (* This cannot be done in fa_expand, because that function is not called in
+      the special case of the sequence *)
+  if ES.conclusion_is_computability s &&
+     (let g = ES.conclusion_as_computability s in 
+      let k = CP.kind (ES.table s) g in
+      (k = CP.Deduce && side = Some CP.Left) || 
+      (k = CP.NotDeduce && side = Some CP.Right))
+  then
+    begin
+      let env = odflt (ES.vars s) oenv in
+      let pc = 
+        ES.proof_context ~in_system:system s |> 
+        ProofContext.set_vars env 
+      in
+      let st =
+        Match.mk_unif_state
+          ~param:Match.crypto_param
+          pc ~support:[]
+      in
+      (* check that [e ▷ replaced] *)
+      match Match.deduce_terms ~outputs:replaced ~inputs:[e] st with
+      | NoMatch _ -> raise (No_FA `NotBackwards)
+      | Match mv -> assert (Match.Mvar.is_empty mv)
+    end;
+  
+  let freshness_subgoals = make_freshness_sequents freshness_subgoals in
+
+  let main_subgoal = fa_set_goal ?side ?env:oenv s new_terms in
+
+  (main_subgoal, freshness_subgoals)
+
+(*------------------------------------------------------------------*)
+(** [fa_elem_ex] with user-level errors *)
+let fa_elem
+    ?(side:CP.side option) (i : int L.located) (s : ES.t) 
+  : ES.t list 
+  =
+  try 
+    let main_goal, subgoals = fa_elem_ex ?side i s in
     subgoals @ [main_goal]
   with
   | No_FA `HeadDiff ->
@@ -995,17 +1118,28 @@ let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
   | No_FA (`QuantumFun err) ->
     soft_failure ~loc:(L.loc i)
       (Tactics.Failure (Fmt.str "Quantum.FA not applicable:@ %t" err))
+  | No_FA `NotBackwards ->
+    soft_failure ~loc:(L.loc i) 
+      (Tactics.Failure "Cannot apply fa here (backwards test failed)")
 
 (*------------------------------------------------------------------*)
-let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES.t list =
+(** Internal implementation of the tactic: applies the tactic on [s]
+    on the element and side specifies by the options, returns the list of
+    subgoals *)
+let fa_tac_internal
+    (args : (TacticsArgs.rw_count * Typing.term) list) 
+    ?(side:CP.side option) 
+    (s : ES.t) 
+  : ES.t list 
+  =
+  let system, _ = fa_system_and_terms ?side s in
 
   (* parsing context for [fa_arg] *)
   let cntxt = 
     let env =
       let env = ES.env s in
-      let pair = Utils.oget env.system.pair in
       Env.set_system env
-        SE.{ set = (pair:>SE.arbitrary) ; pair = None }
+        SE.{ set = system ; pair = None }
     in
     Typing.{ env; cntxt = InGoal; } 
   in
@@ -1033,8 +1167,11 @@ let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES
     (L.loc tpat, pat)
   in
 
-  let rec do1
-      (s, subgoals : ES.t * (ES.t list) ) (mult, arg_pat : TacticsArgs.rw_count * Typing.term)
+  (* Applies fa once -- depending on the multiplicity (!, etc.), several rounds
+     may be needed.) *)
+  let rec fa_once
+      (s, subgoals : ES.t * (ES.t list) ) 
+      (mult, arg_pat : TacticsArgs.rw_count * Typing.term)
     : ES.t * (ES.t list)
     =
     (* Create a new type unification environement.
@@ -1046,7 +1183,7 @@ let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES
     let loc, pat = parse_fa_arg_pat ienv arg_pat in
 
     if mult = Args.Exact 0 then (s, subgoals) else
-      match fa_select_felems ~ienv pat s with
+      match fa_select_elem ~ienv ?side pat s with
       | None -> 
         if mult = Args.Any 
         then (s, subgoals)
@@ -1057,7 +1194,7 @@ let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES
         let i = L.mk_loc L._dummy i in
 
         let s, new_subgoals =
-          try do_fa_felem i s with
+          try fa_elem_ex ?side i s with
           | No_FA _ ->
             soft_failure ~loc (Failure "bad FA pattern")
         in
@@ -1065,20 +1202,70 @@ let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES
         | Args.Once | Args.Exact 1 -> (s, new_subgoals @ subgoals)
 
         | Args.Any | Args.Many ->
-          do1 (s, new_subgoals @ subgoals) (Args.Any, arg_pat)
+          fa_once (s, new_subgoals @ subgoals) (Args.Any, arg_pat)
 
         | Args.Exact i ->
-          do1 (s, new_subgoals @ subgoals) (Args.Exact (i - 1), arg_pat)
+          fa_once (s, new_subgoals @ subgoals) (Args.Exact (i - 1), arg_pat)
   in
   let main_goal, subgoals =
-    List.fold_left do1 (s,[]) args
+    List.fold_left fa_once (s,[]) args
   in
   subgoals @ [main_goal]
 
-let fa_tac args = match args with
-  | [Args.Fa Global([Once, { pl_desc = Int i}])] -> wrap_fail (fa_felem i)
-  | [Args.Fa Global(args)] -> wrap_fail (do_fa_tac args)
-  | _ -> bad_args ()
+(*------------------------------------------------------------------*)
+(** Picks which side of a computation predicate [fa] should work on
+    by default. *)
+let fa_pick_side ?(side:CP.side option) (g:CP.kind) : CP.side =
+  odflt
+    (match g with
+     | Deduce -> CP.Right
+     | NotDeduce -> CP.Left)
+    side
+
+(*------------------------------------------------------------------*)
+(** The actual tactic:
+    wrapper around [fa_tac_internal] that parses some args and picks a side *)
+let fa_tac (a:Args.parser_args) (s:ES.t) =
+  let nargs, args =
+    match a with 
+    | [Args.Fa (nargs, Global args)] -> nargs, args
+    | _ -> bad_args ()
+  in
+
+  (* choose the side on which to apply fa, 
+     in the case of a computability goal *)
+  let side =
+    if ES.conclusion_is_computability s then 
+      let side = 
+        List.fold_left 
+          (fun side narg ->
+             match narg with
+             | Args.NArg L.{ pl_loc = loc; pl_desc = "left" } -> 
+               if side = None then 
+                 Some CP.Left
+               else
+                 hard_failure ~loc (Failure "incompatible arguments")
+             | Args.NArg L.{ pl_loc = loc; pl_desc = "right" } -> 
+               if side = None then 
+                 Some CP.Right
+               else
+                 hard_failure ~loc (Failure "incompatible arguments")
+             | Args.NList (l,_) 
+             | Args.NArg  l     ->
+               hard_failure ~loc:(L.loc l) (Failure "unknown argument"))
+          None
+          nargs
+      in
+      let table = ES.table s in
+      let g = ES.conclusion_as_computability s in
+      Some (fa_pick_side ?side (CP.kind table g))
+    else 
+      None
+  in
+
+  match args with
+  | [Once, { pl_desc = Int i}] -> wrap_fail (fa_elem ?side i) s
+  | _ -> wrap_fail (fa_tac_internal ?side args) s
 
 
 (*------------------------------------------------------------------*)
@@ -1381,17 +1568,13 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
 (** Deduction for computation predicates. *)
 
 
-(** flag indicating whether deduce should be applied on the left or right
-    side of the computation predicate *)
-type deduce_side = Left | Right
-
 (** Picks which side of a computation predicate [deduce] should work on
     by default. *)
-let pick_side ?(side:deduce_side option) (g:CP.kind) : deduce_side =
+let deduce_pick_side ?(side:CP.side option) (g:CP.kind) : CP.side =
   odflt
     (match g with
-     | Deduce -> Right
-     | NotDeduce -> Left)
+     | Deduce -> CP.Right
+     | NotDeduce -> CP.Left)
     side
 
 
@@ -1421,7 +1604,7 @@ let pick_side ?(side:deduce_side option) (g:CP.kind) : deduce_side =
 *)
 let deduce_predicate
     ~(all : bool)
-    ?(side:deduce_side option)
+    ?(side:CP.side option)
     ?(with_hyp: CP.form option)
     (s : ES.t) 
   : ES.t list 
@@ -1448,17 +1631,17 @@ let deduce_predicate
   let left  = CP.lefts  goal in
   let right = CP.rights goal in
   
-  let side = pick_side ?side goal_kind in
+  let side = deduce_pick_side ?side goal_kind in
 
   (* [~all] flag is only allowed for deduction on the right *)
-  if all && (goal_kind <> Deduce || side <> Right) then 
+  if all && (goal_kind <> Deduce || side <> CP.Right) then 
     Tactics.hard_failure (Failure "~all option not allowed here");
 
   (* [~with_hyp] assumption is only allowed for deduction on the right or
      non-deduction on the left *)
   if with_hyp <> None && 
-     ((goal_kind = Deduce && side = Left) ||
-      (goal_kind = NotDeduce && side = Right)) then 
+     ((goal_kind = Deduce && side = CP.Left) ||
+      (goal_kind = NotDeduce && side = CP.Right)) then 
     Tactics.hard_failure (Failure "with … option not allowed here");
   
   (* we know that [h_left ▷ h_right] holds *)
@@ -1551,7 +1734,7 @@ let deduce_predicate
 *)
 let deduce_predicate_int
     (l : int L.located list)
-    ?(side : deduce_side option)
+    ?(side : CP.side option)
     ?(with_hyp : CP.form option)
     (s : ES.t)
   : ES.t list =
@@ -1574,7 +1757,7 @@ let deduce_predicate_int
       (ES.proof_context ~in_system:system s) ~support:[]
   in
 
-  let side = pick_side ?side goal_kind in
+  let side = deduce_pick_side ?side goal_kind in
   let left = CP.lefts goal in
   let right = CP.rights goal in
 
@@ -1633,19 +1816,19 @@ let to_goals l = List.map (fun x -> Goal.Global x) l
     - [~left] or [~right]: for computatbility goals, specifies on which
       side the tactic is applied. If not given, a reasonable default choice
       is made. *)
-let p_deduce_named_args (nargs : Args.named_args) : bool*(deduce_side option) =
+let p_deduce_named_args (nargs : Args.named_args) : bool*(CP.side option) =
   List.fold_left 
     (fun (b, os) narg ->
        match narg with
        | Args.NArg L.{ pl_desc =  "all" } -> true, os
        | Args.NArg L.{ pl_loc = loc; pl_desc = "left" } -> 
          if os = None then 
-           b, (Some Left)
+           b, (Some CP.Left)
          else
            hard_failure ~loc (Failure "incompatible arguments")
        | Args.NArg L.{ pl_loc = loc; pl_desc = "right" } -> 
          if os = None then 
-           b, (Some Right)
+           b, (Some CP.Right)
          else
            hard_failure ~loc (Failure "incompatible arguments")
        | Args.NList (l,_) 

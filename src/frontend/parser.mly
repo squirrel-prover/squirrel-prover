@@ -1429,13 +1429,13 @@ tac:
     { mk_abstract l "cs" [TacticsArgs.Term_parsed t; 
                           TacticsArgs.Int_parsed i] }
 
-  (* FA, equiv tactic, patterns *)
-  | l=lloc(FA) args=slist1(fa_arg, COMMA)
-    { mk_abstract l "fa" [TacticsArgs.Fa (Global args)] }
+  (* FA, equiv tactic, named arguments and patterns *)
+  | l=lloc(FA) nargs=named_args args=slist1(fa_arg, COMMA)
+    { mk_abstract l "fa" [TacticsArgs.Fa (nargs, Global args)] }
 
   (* FA, trace tactic *)
   | l=lloc(FA) tl=tac_bounds?
-    { mk_abstract l "fa" [TacticsArgs.Fa (Local tl)] }
+    { mk_abstract l "fa" [TacticsArgs.Fa ([], Local tl)] }
 
   (* Const, trace tactic *)
   | l=lloc(CONST) t= tac_term tl=concrete_term?

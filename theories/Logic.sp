@@ -304,7 +304,7 @@ Proof.
 intro Eq. by case b. 
 Qed.
 
-lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
+exact lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
  b = b' =>
  if b then (if b' then x else y) else z =
  if b then x else z.
