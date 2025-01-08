@@ -246,7 +246,11 @@ val subst_add_bindings  : subst -> Vars.vars -> terms     -> subst
 val subst_add_bindings0 : subst -> (Vars.var * term) list -> subst
 
 (*------------------------------------------------------------------*)
-(** term substitution *)
+(** Multi-term substitution:
+    - modulo α, thus handles capture of bound variables (as usual in
+      λ-calculii.
+    - multi-term: project diff-terms when going below a diff-operator.
+*)
 val subst : subst -> term -> term
 
 val subst_binding : Vars.var -> subst -> Vars.var * subst

@@ -1247,7 +1247,22 @@ let rec subst (s : subst) (t : term) : term =
       | Proj (i, t) -> Proj (i, subst s t)
 
       | Diff (Explicit l) ->
-        Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
+        let l =
+          List.map
+            (fun (label,term) ->
+               (* we purposedly do not project in [v], as the cases
+                  where the left-hand is not a simple variable (which
+                  do not require projection) are to be handled in a
+                  strictly syntactic fashion. *)
+               let s =
+                 List.map
+                   (fun (ESubst (v,t)) -> ESubst (v,project1 label t))
+                   s
+               in
+               (label, subst s term))
+            l
+        in
+        Diff (Explicit l)
 
       | Quant (_, [], f) -> subst s f
 
