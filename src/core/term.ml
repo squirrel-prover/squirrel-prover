@@ -998,9 +998,6 @@ and fvs (terms : term list) : Sv.t =
   List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
 
 let get_vars t = fv t |> Sv.elements
-
-let has_var (v:Vars.var) (t:term) : bool =
-  List.mem v (get_vars t)
     
 (*------------------------------------------------------------------*)
 (** The substitution must be built reversed w.r.t. vars, to handle capture. *)
@@ -1147,6 +1144,40 @@ let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t =
 (** Exported *)
 let ty_fvs l = List.fold_left (fun acc t -> ty_fv ~acc t) Type.Fv.empty l 
 let ty_fv t = ty_fv ?acc:None t
+
+(*------------------------------------------------------------------*)
+(** {2 Projection} *)
+
+let project1 (proj : Projection.t) (term : term) : term =
+  let rec project1 (t : term) : term = 
+    match t with
+    (* do not recurse, as subterms cannot contain any diff *)
+    | Diff (Explicit l) -> List.assoc proj l
+
+    | _ -> tmap project1 t
+  in
+
+  project1 term
+
+(*------------------------------------------------------------------*)
+let project (projs : Projection.t list) (term : term) : term =
+  let rec project (t : term) : term = 
+    match t with
+    | Diff (Explicit l) ->
+      (* we only project over a subset of [l]'s projs *)
+      assert (List.for_all (fun x -> List.mem_assoc x l) projs);
+
+      (* do not recurse, as subterms cannot contain any diff *)
+      mk_diff (List.filter (fun (x,_) -> List.mem x projs) l)
+        
+    | _ -> tmap project t
+  in
+
+  project term
+
+let project_opt (projs : Projection.t list option) (term : term) : term =
+  omap_dflt term (project ^~ term) projs 
+
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -1996,39 +2027,7 @@ let rec not_simpl = function
     | m -> mk_not m
 
 (*------------------------------------------------------------------*)
-(** {2 Projection} *)
-
-let project1 (proj : Projection.t) (term : term) : term =
-  let rec project1 (t : term) : term = 
-    match t with
-    (* do not recurse, as subterms cannot contain any diff *)
-    | Diff (Explicit l) -> List.assoc proj l
-
-    | _ -> tmap project1 t
-  in
-
-  project1 term
-
-(*------------------------------------------------------------------*)
-let project (projs : Projection.t list) (term : term) : term =
-  let rec project (t : term) : term = 
-    match t with
-    | Diff (Explicit l) ->
-      (* we only project over a subset of [l]'s projs *)
-      assert (List.for_all (fun x -> List.mem_assoc x l) projs);
-
-      (* do not recurse, as subterms cannot contain any diff *)
-      mk_diff (List.filter (fun (x,_) -> List.mem x projs) l)
-        
-    | _ -> tmap project t
-  in
-
-  project term
-
-let project_opt (projs : Projection.t list option) (term : term) : term =
-  omap_dflt term (project ^~ term) projs 
-
-(*------------------------------------------------------------------*)
+(** {3 Alpha-conversion} *)
 exception AlphaFailed
 
 let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =

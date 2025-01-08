@@ -202,9 +202,6 @@ val ty : ?ienv:Infer.env -> term -> Type.ty
 (** [get_vars t] returns the free variables of [t].
     The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : term -> Vars.var list
-
-(** [has_var v t] returns true iff [v] occurs as a free var in [t] *)
-val has_var : Vars.var -> term -> bool
   
 (*------------------------------------------------------------------*)
 (** Free variables of a term. *)
