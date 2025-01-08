@@ -580,7 +580,7 @@ let add_hint_smt table (s : Symbols.p_path) =
   let bound = lem.formula.bound in
 
   (* TODO: concrete: only support exact hint rather *)
-  if bound <> None || bound <> Some (Library.Real.mk_zero table) then
+  if bound <> None && bound <> Some (Library.Real.mk_zero table) then
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic or exact");
 
@@ -588,7 +588,7 @@ let add_hint_smt table (s : Symbols.p_path) =
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints must apply to any system");
 
-  if lem.params.se_vars <> [] then
+  if lem.params.se_vars = [] then
     Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
       (Failure "smt hints do not support system variables");
 

@@ -191,7 +191,7 @@ type context = {
   functions_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   macros_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   names_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
-  unsupp_tbl : (Term.term*int, Why3.Term.lsymbol) Hashtbl.t;
+  unsupp_tbl : (Term.term*(Why3.Term.term list), Why3.Term.lsymbol) Hashtbl.t;
 
   uc : Why3.Theory.theory_uc ref;
 
@@ -313,13 +313,13 @@ let unsupported_term context fmla str =
     List.sort
       Stdlib.compare  
       (Hashtbl.fold (fun _ x acc -> x::acc) context.vars_tbl []) in
-  let symb = try Hashtbl.find context.unsupp_tbl (fmla, List.length var_list) 
+  let symb = try Hashtbl.find context.unsupp_tbl (fmla, var_list) 
   with Not_found -> begin let s =       
     Why3.Term.create_fsymbol
       (id_fresh context str)
       (List.map t_type var_list)
       (convert_type context (Term.ty fmla))
-    in Hashtbl.add context.unsupp_tbl (fmla, List.length var_list) s;
+    in Hashtbl.add context.unsupp_tbl (fmla, var_list) s;
     context.uc := Why3.Theory.add_decl_with_tuples 
       !(context.uc) 
       (Why3.Decl.create_param_decl s);

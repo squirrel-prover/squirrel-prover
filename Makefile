@@ -62,7 +62,15 @@ PROVER_EXAMPLES =\
   $(wildcard examples/postQuantumKE/*.sp)       \
   $(wildcard examples/ho/authdh.sp)             \
   $(wildcard examples/ho/hybrid.sp)             \
-  $(wildcard examples/crypto/*.sp)
+  $(wildcard examples/crypto/*.sp)				
+
+# Check if why3 is installed before adding the smt case studies
+
+WHY3_FOUND := $(shell command -v why3 > /dev/null && echo "true" || echo "false")
+
+ifeq ($(WHY3_FOUND), true)
+	PROVER_EXAMPLES += $(wildcard examples/smt-csf-2025/*.sp)
+endif
 
 BENCH_JSON = $(wildcard $(BENCHDIR)/prev/*.json)
 
