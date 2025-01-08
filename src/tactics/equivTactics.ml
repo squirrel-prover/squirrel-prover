@@ -1352,11 +1352,6 @@ let deduce_predicate_int
     [ES.set_conclusion (CP.to_global g) s]
 
 
-
-
-
-
-
 (*------------------------------------------------------------------*)
 (** The [deduce] tactic dispatches the goal to the relevant
     function among those above, depending on the shape of the goal and
@@ -1366,11 +1361,11 @@ let to_goals l = List.map (fun x -> Goal.Global x) l
 
 
 (** For now, [deduce] has two optional named arguments:
-    ~all: specifies whether [deduce] fails or still tries to do its best 
-          when it cannot close the goal 
-    ~left or ~right: for computatbility goals, specifies on which
-          side the tactic is applied. If not given, a reasonable default choice
-          is made. *)
+    - [~all]: specifies whether [deduce] fails or still tries to do its best 
+      when it cannot close the goal 
+    - [~left] or [~right]: for computatbility goals, specifies on which
+      side the tactic is applied. If not given, a reasonable default choice
+      is made. *)
 let p_deduce_named_args (nargs : Args.named_args) : bool*(deduce_side option) =
   List.fold_left 
     (fun (b, os) narg ->
@@ -1392,83 +1387,103 @@ let p_deduce_named_args (nargs : Args.named_args) : bool*(deduce_side option) =
     (false, None)
     nargs
 
-
-
+(*------------------------------------------------------------------*)
 let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
-  match args with
-  | [Args.Deduce (nargs, targets_opt, with_hyps_opt)] ->
-    let all, side = p_deduce_named_args nargs in
+  let nargs, targets_opt, with_hyps_opt =
+    match args with
+    | [Args.Deduce (nargs, targets_opt, with_hyps_opt)] ->
+      nargs, targets_opt, with_hyps_opt
+    | _ -> assert false         (* guaranteed by the parser *)
+  in
+  let all, side = p_deduce_named_args nargs in
 
-    let table = ES.table s in
-    let subgs, with_hyp =
-      match with_hyps_opt with
-      | None -> [], None
-      | Some p_pt ->
-        let _, params,pt = ES.convert_pt p_pt s in
-        assert (Match.Mvar.is_empty pt.mv);
+  let table = ES.table s in
+  let subgs, with_hyp =
+    match with_hyps_opt with
+    | None -> [], None
+    | Some p_pt ->
+      let _, params,pt = ES.convert_pt p_pt s in
+      assert (Match.Mvar.is_empty pt.mv);
 
-        (* check that no type or system variables remain *)
-        LT.check_empty_params params;
+      (* check that no type or system variables remain *)
+      LT.check_empty_params params;
 
-        if pt.bound <> Glob then
-           Tactics.soft_failure ~loc:(L.loc p_pt) 
-            (Tactics.Failure "expected a deduction hypothesis.");
+      let loc = L.loc p_pt in
 
-        if pt.args <> [] then
-           Tactics.soft_failure ~loc:(L.loc p_pt) 
-            (Tactics.Failure "some arguments could not be inferred.");
+      if pt.bound <> Glob then
+        Tactics.soft_failure ~loc
+          (Tactics.Failure "expected a deduction hypothesis.");
 
-        match pt.form with
-        | Equiv.Global f when CP.is_computability table f ->
-          let f = CP.from_global table f in
-          if CP.kind table f <> Deduce then
-          Tactics.soft_failure ~loc:(L.loc p_pt)
-            (Tactics.Failure "expected a deduction hypothesis.");
+      if pt.args <> [] then
+        Tactics.soft_failure ~loc 
+          (Tactics.Failure "some arguments could not be inferred.");
 
-          (pt.subgs, Some f)
+      let bad_formula () =
+        Tactics.soft_failure ~loc
+          (Tactics.Failure "expected a deduction hypothesis.")
+      in
+      let env = ES.env s in
 
-        | _ ->
-          Tactics.soft_failure ~loc:(L.loc p_pt)
-            (Tactics.Failure "expected a deduction hypothesis.")
-    in
+      (* reduce [form] until a deducibility formula is obtained *)
+      let rec as_deduction_hyp ~subgs (form : Equiv.form) =
+        if CP.is_computability table form then
+          begin
+            let form = CP.from_global table form in
+            if CP.kind table form <> Deduce then bad_formula ();
+            (subgs, Some form)
+          end
+        else if Equiv.Smart.is_impl ~env form then
+          let form1, form = oget (Equiv.Smart.destr_impl ~env form) in
+          as_deduction_hyp ~subgs:(Equiv.Global form1 :: subgs) form
+        else
+          begin
+            let form, has_red =
+              ES.Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t form
+            in
+            if not has_red then bad_formula ();
+            as_deduction_hyp ~subgs form
+          end
+      in
 
-    let new_goals =
-      if ES.conclusion_is_equiv s then
-        match targets_opt with
-        | None   -> deduce_all ?with_hyp s 
-        | Some l -> deduce_int l s
+      if not (Equiv.is_global pt.form) then bad_formula ();
+      let form = Equiv.any_to_global pt.form in
+      as_deduction_hyp ~subgs:pt.subgs form 
+  in
 
-      else if ES.conclusion_is_computability s then
-        match targets_opt with
-        | None  ->
-          deduce_predicate ~all ?side ?with_hyp s
-        | Some l -> deduce_predicate_int ?side ?with_hyp l s
+  let new_goals =
+    if ES.conclusion_is_equiv s then
+      match targets_opt with
+      | None   -> deduce_all ?with_hyp s 
+      | Some l -> deduce_int l s
 
-      else
-        Tactics.soft_failure 
-          (Tactics.GoalBadShape 
-             "expected an equivalence or secrecy goal.")
-     in
-     let subgs = 
-       List.map (function 
-           | Equiv.Global f -> ES.set_conclusion f s
-           | Equiv.Local _ -> assert false (* cannot happen
-                                              as the conclusion is global *)
-         ) subgs 
-     in
-     subgs @ new_goals |> 
-     to_goals
+    else if ES.conclusion_is_computability s then
+      match targets_opt with
+      | None  ->
+        deduce_predicate ~all ?side ?with_hyp s
+      | Some l -> deduce_predicate_int ?side ?with_hyp l s
 
-  | _ -> assert false
+    else
+      Tactics.soft_failure 
+        (Tactics.GoalBadShape 
+           "expected an equivalence or secrecy goal.")
+  in
+  let subgs = 
+    List.map (function 
+        | Equiv.Global f -> ES.set_conclusion f s
+        | Equiv.Local _ -> assert false (* cannot happen
+                                           as the conclusion is global *)
+      ) subgs 
+  in
+  subgs @ new_goals |> 
+  to_goals
 
+(*------------------------------------------------------------------*)
 let deduce args = wrap_fail (deduce args)
 
 let () =
   T.register_general "deduce"
     ~pq_sound:true
     (LT.genfun_of_efun_arg deduce)
-
-
 
 
 (*------------------------------------------------------------------*)

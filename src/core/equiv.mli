@@ -150,8 +150,8 @@ val _pp_any_form    : any_form formatter_p
 val is_local  : any_form -> bool
 val is_global : any_form -> bool
 
-val any_to_reach : any_form -> Term.term 
-val any_to_equiv : any_form -> form 
+val any_to_local  : any_form -> Term.term 
+val any_to_global : any_form -> form 
 
 (*------------------------------------------------------------------*)
 type _ f_kind =

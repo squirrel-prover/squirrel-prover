@@ -453,7 +453,7 @@ let indcca_param
 
     (* get the context around the ciphertext *)
     let cc =
-      match Equiv.any_to_equiv ccc with
+      match Equiv.any_to_global ccc with
       | Equiv.(Atom (Equiv {terms = [cc]; bound = None})) -> cc
       (* TODO: Concrete: Probably something to do to create a bounded goal *)
       | _ -> assert false (* cannot happen given the term we constructed *)

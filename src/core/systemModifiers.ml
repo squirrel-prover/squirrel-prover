@@ -680,11 +680,11 @@ let do_rw_item
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
     let _, t = TLT.expand_term ~mode:expand_context arg s (Local t) (TS.system s) in
-    Equiv.any_to_reach t, []
+    Equiv.any_to_local t, []
   
   | Rw_expandall _ ->
     let _, t = TLT.expand_term ~mode:expand_context Any s (Local t) (TS.system s) in
-    Equiv.any_to_reach t, []    
+    Equiv.any_to_local t, []    
 
 let do_s_item
     (expand_context : Macros.expand_context)

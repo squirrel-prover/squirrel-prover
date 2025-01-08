@@ -1037,12 +1037,12 @@ let _pp_any_form ppe fmt (f : any_form) =
 let pp_any_form     = _pp_any_form (default_ppe ~dbg:false ()) 
 let pp_any_form_dbg = _pp_any_form (default_ppe ~dbg:true ())  
 
-let any_to_reach (f : any_form) : Term.term =
+let any_to_local (f : any_form) : Term.term =
   match f with
   | Global _ -> assert false
   | Local f -> f
 
-let any_to_equiv (f : any_form) : form =
+let any_to_global (f : any_form) : form =
   match f with
   | Global f -> f
   | Local _ -> assert false

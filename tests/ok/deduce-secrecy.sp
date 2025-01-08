@@ -121,7 +121,7 @@ Proof.
 Qed.
 
 global lemma _ 
-  {P:system[pair]} @set:P @equiv:P
+  {P:system[pair]} @system:P
   (x,x0,y,z : message) (f : _ -> message[adv])
 :
   equiv(x,x0) -> $((x,x0) |> (z,y)) -> equiv(x,z,f y).
@@ -138,20 +138,32 @@ op u : message.
 op v : message.
 
 global lemma _ 
-  {P:system[pair]} @set:P @equiv:P
+  {P:system[pair]} @system:P
   (x,x0,y,z : message) (f : _ -> message[adv])
 :
   equiv(x,x0) -> [u=v] -> ([u=v] -> $((x,x0) |> (z,y))) -> equiv(x,z,f y).
 Proof.
   intro A B H.
-  checkfail deduce with H exn Failure. (* must discharge [u=v] *)
   deduce with H _.
   + assumption B.
   + assumption A.
 Qed.
 
+(* same, but using `deduce with H` instead of `deduce with H _` *)
 global lemma _ 
-  {P:system[pair]} @set:P @equiv:P
+  {P:system[pair]} @system:P
+  (x,x0,y,z : message) (f : _ -> message[adv])
+:
+  equiv(x,x0) -> [u=v] -> ([u=v] -> $((x,x0) |> (z,y))) -> equiv(x,z,f y).
+Proof.
+  intro A B H.
+  deduce with H.
+  + assumption B.
+  + assumption A.
+Qed.
+
+global lemma _ 
+  {P:system[pair]} @system:P
   (x,x0,y,z : message) (f : _ -> message[adv])
 :
   equiv(x,x0) -> (Forall (_ : message), $((x,x0) |> (z,y))) -> equiv(x,z,f y).
@@ -163,8 +175,38 @@ Proof.
   assumption A.
 Qed.
 
+(*------------------------------------------------------------------*)
+global lemma _ 
+  {P:system[pair]} @system:P
+  (x,x0,y,z : message) (f : _ -> message[adv])
+:
+  equiv(x,x0) -> 
+  [u=v] -> 
+  (Let a = x in $((a,x0) |> (z,y))) -> 
+  equiv(x,z,f y).
+Proof.
+  intro A B H. 
+  deduce with H.
+  + assumption A.
+Qed.
+
+global lemma _ 
+  {P:system[pair]} @system:P
+  (x,x0,y,z : message) (f : _ -> message[adv])
+:
+  equiv(x,x0) -> 
+  [u=v] -> 
+  (Let a = x in Let b = u in [b=v] -> $((a,x0) |> (z,y))) -> 
+  equiv(x,z,f y).
+Proof.
+  intro A B H. 
+  deduce with H.
+  + assumption B.
+  + assumption A.
+Qed.
 
 
+(*------------------------------------------------------------------*)
 op f : message -> message
 op g : message -> message. 
 op w:message.
