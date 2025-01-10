@@ -414,10 +414,19 @@ val deduce_mem :
     [outputs] and [inputs] are over [st.system.set]. *)
 val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
 
+
+(** Starting from a (possibly empty) substutition [θ], check that
+    there exists a finer substitution [λ] such that [hyp λ] implies
+    [cond λ].
+
+    In particular in case there are no variable to be inferred, this
+    amounts to checking whether we can establish that [hyp ⇒ cond]. *)
 val known_set_check_impl :
   ?st:unif_state ->
+  ?mv:Mvar.t ->
   Symbols.table ->
-  Term.term -> Term.term -> bool
+  Term.term -> Term.term ->
+  [`Failed | `Ok of Mvar.t option]
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)

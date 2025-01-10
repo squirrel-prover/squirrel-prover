@@ -2212,6 +2212,17 @@ let known_set_check_impl_conv
   List.exists (conv cond) hyps
 
 (*------------------------------------------------------------------*)
+let known_set_check_unify
+    ~(st : unif_state)
+    ~(hyps : Term.term list)
+    ~(cond : Term.term) : Mvar.t option
+  =
+  List.find_map (fun hyp ->
+      try T.tunif hyp cond st |> some with
+      | NoMatch _ -> None
+    ) hyps
+    
+(*------------------------------------------------------------------*)
 (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
     w.r.t. to the theory of trace constraints
     Rely on the module [Constr]. *)
@@ -2304,19 +2315,31 @@ let get_local_of_hyps (hyps : TraceHyps.hyps) =
       ) hyps []
   in hyps
 
-(** Check that [hyp] implies [cond], trying the folowing methods:
-    - convertibility
+(** Starting from a (possibly empty) substutition [θ], check that
+    there exists a finer substitution [λ] such that [hyp λ] implies
+    [cond λ], using one of the following methods:
+
+    - unification or convertibility
     - satifiability
     - ad hoc reasonning for inequalities of time stamps
     - ad hoc reasonning for exec macro
-      FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
-      as hypothesis. *)
+
+    In particular in case there are no variable to be inferred, this
+    amounts to checking whether we can establish that [hyp ⇒ cond]. *)
 let known_set_check_impl
     ?(st : unif_state option)
+    ?(mv : Mvar.t option)
     (table : Symbols.table)
     (hyp   : Term.term)
-    (cond  : Term.term) : bool
+    (cond  : Term.term) : [`Failed | `Ok of Mvar.t option]
   =
+  (* FIXME: It could be possible to add the proven atoms of the
+     conjuction [cond] as hypothesis. *)
+
+  (* [mv] is only useful if a [mv] was provided to
+     [known_set_check_impl], meaning when [has_mv]. *)
+  let mv, has_mv = odflt Mvar.empty mv, mv <> None in
+  
   (* Decompose the top-level conjunctions, modulo reduction if
      [st ≠ None]. 
      Does not reduce recursively (i.e. reduction is only used at head
@@ -2346,28 +2369,51 @@ let known_set_check_impl
     List.concat_map flatten_ands 
   in
 
-  (* prove that [cond] follows from [hyps] *)
-  let rec doit (cond : Term.t) : bool = 
-    (* convertibility *)
-    known_set_check_impl_conv ~st ~hyps ~cond ||
+  let known_set_check_unify ~mv ~cond =
+    match st with
+    | Some st when has_mv ->
+      let st = { st with mv } in
+      known_set_check_unify ~st ~hyps ~cond
+    | _ -> None
+  in
 
-    (* constraints *)
-    known_set_check_impl_sat table ~hyps cond ||
+  let exception Failed in
+  let failed () = raise Failed in
+  
+  (* prove that [cond] follows from [hyps], possibly specializating
+     the substitution *)
+  let rec doit mv (cond : Term.t) : Mvar.t =
+    if 
+      (* convertibility *)
+      known_set_check_impl_conv ~st ~hyps ~cond ||
+      
+      (* constraints *)
+      known_set_check_impl_sat table ~hyps cond ||
 
-    (* ad hoc inequality reasoning *) 
-    known_set_check_impl_auto table ~hyps ~cond ||
-    
-    (* ad hoc reasoning on [exec] *)
-    known_set_check_exec_case table ~hyps cond ||
+      (* ad hoc inequality reasoning *) 
+      known_set_check_impl_auto table ~hyps ~cond ||
 
-    (* If all the above failed, try to reduce [cond] as a list of
-       smaller conjunctions and recurse in case of success. *)
-    let conds = decompose_ands cond in
-    if List.length conds = 1 then false else List.for_all doit conds
+      (* ad hoc reasoning on [exec] *)
+      known_set_check_exec_case table ~hyps cond
+    then mv
+    else
+      match known_set_check_unify ~mv ~cond with
+      | Some mv -> mv
+      | None ->
+        (* If all the above failed, try to reduce [cond] as a list of
+           smaller conjunctions and recurse in case of success. *)
+        let conds = decompose_ands cond in
+        if List.length conds = 1 then failed ();
+        List.fold_left doit mv conds
   in
   (* Initially, we split [cond] as a conjunction of smaller formulas
      without relying on reduction. *)
-  List.for_all doit (Term.decompose_ands cond)
+  try
+    let mv = List.fold_left doit mv (Term.decompose_ands cond) in
+
+    (* if no initial [mv] was given, do not return one *)
+    `Ok (if has_mv then Some mv else None )
+  with Failed -> `Failed
 
 
 (*------------------------------------------------------------------*)
@@ -2413,11 +2459,11 @@ let deduce_mem0
     in
     let known_cond = Term.subst subst known_cond in
     (* check that [cterm.cond] imples [known_cond θ] holds *)
-    if not (
-        known_set_check_impl st.table ~st cterm.cond known_cond
-      )
-    then None
-    else (* clear [known.var] from the binding *)
+    match known_set_check_impl st.table ~st ~mv cterm.cond known_cond with
+    | `Failed -> None
+    | `Ok None -> assert false  (* impossible, we gave [mv] above *)
+    | `Ok (Some mv) ->
+      (* clear [known.var] from the binding *)
       Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
   with NoMatch _ -> None
 
@@ -3158,8 +3204,7 @@ let specialize
     let known_cond = Term.subst subst known_cond
     and c_cond     = Term.subst subst c_cond in
 
-    if not (known_set_check_impl table c_cond known_cond) then None
-    else
+    if known_set_check_impl table c_cond known_cond = `Failed then None else
       let cand =
         { term = cand.term;
           subst = mv;

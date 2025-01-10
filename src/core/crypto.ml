@@ -2005,9 +2005,16 @@ let knowledge_mem_condterm_sets
       let st =
         Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
       in
-      if Match.known_set_check_impl env.table ~st conds (Term.mk_false)
-      then None
-      else Some (args,conds)
+      (* FIXME: updating [st] above (notably [support]) and forwarding
+         [mv] to [Match] would allow to conclude more often *)
+      
+      (* Discard any extra input that we know will never be useful (by
+         trying to show that the condition for this input never
+         holds). *)
+      match Match.known_set_check_impl env.table ~st ?mv:None conds Term.mk_false with
+      | `Failed  -> Some (args,conds) (* [`Failed]: [input] may be useful, keep it  *)
+      | `Ok None -> None              (* [`Ok]: [input] never useful, discard it  *)
+      | `Ok (Some _) -> assert false  (* impossible since we used [?mv:None] *)
   in
   List.filter_map is_in extra_inputs
 
@@ -2207,8 +2214,14 @@ and bideduce_term
       Some result 
   else if
     output.conds <> [] &&
-    Match.known_set_check_impl env.table ~st:(Lazy.force st)
-      (Term.mk_ands output.conds) Term.mk_false
+    match
+      Match.known_set_check_impl
+        env.table ~st:(Lazy.force st) ?mv:None
+        (Term.mk_ands output.conds) Term.mk_false
+    with
+    | `Failed -> false
+    | `Ok None -> true
+    | `Ok (Some _) -> assert false (* impossible since we used [?mv:None] *)
   then
     Some (empty_result query.initial_mem)
 
