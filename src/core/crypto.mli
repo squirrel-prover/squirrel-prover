@@ -15,7 +15,7 @@ type oracle = {
   name      : string ;
   args      : Vars.vars ;
   loc_smpls : Vars.vars ;       (** local random samplings *)
-  loc_vars  : var_decl list;    (** local (non-mutable) variables *)
+  loc_vars  : var_decl list;    (** local (mutable) variables *)
   updates   : (Vars.var * Term.term) list ;
   output    : Term.term ;
 }
@@ -43,9 +43,6 @@ val gsubst_oracle   : oracle   Subst.substitution
 val gsubst_game     : game     Subst.substitution
 
 (*------------------------------------------------------------------*)
-val _pp_var_decl : var_decl               formatter_p
-val _pp_sample   : Vars.var               formatter_p
-val _pp_update   : (Vars.var * Term.term) formatter_p
 val _pp_oracle   : oracle                 formatter_p
 val _pp_game     : game                   formatter_p
 

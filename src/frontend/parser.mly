@@ -826,13 +826,15 @@ game_var_rnd:
 game_var_rnds:
 | l=slist(game_var_rnd, empty ) { l }
 
-/* variable declarations (in global (mutable) or oracle (non-mutable))  */
-game_var_decl:
-| VAR v=lsymb ty=colon_ty? EQ t=term SEMICOLON
+/* variable declarations (in global (mutable) or oracle (non-mutable))
+  `KW` is either `VAR` or `LET`  */
+game_var_decl(KW):
+| KW v=lsymb ty=colon_ty? EQ t=term SEMICOLON
     { Crypto.Parse.{ vd_name = v; vd_ty = ty; vd_init = t; } } 
 
-game_var_decls:
-| l=slist(game_var_decl, empty) { l }
+/* `KW` is either `VAR` or `LET` */
+game_var_decls(KW):
+| l=slist(game_var_decl(KW), empty) { l }
 
 /* an update in an oracle */
 game_update:
@@ -845,7 +847,7 @@ oracle_ret:
 | RETURN ret=term SEMICOLON? { ret }
 
 oracle_body:
-| rnds=game_var_rnds vars=game_var_decls updates=game_updates ret=oracle_ret?
+| rnds=game_var_rnds vars=game_var_decls(VAR) updates=game_updates ret=oracle_ret?
 { Crypto.Parse.{ 
     bdy_rnds    = rnds; 
     bdy_lvars   = vars; 
@@ -865,7 +867,7 @@ oracle_decls:
 game:
 | GAME n=lsymb EQ LBRACE
     rnds=game_var_rnds
-    vars=game_var_decls 
+    vars=game_var_decls(VAR)
     orcls=oracle_decls 
   RBRACE
     { Crypto.Parse.{ 

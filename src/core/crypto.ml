@@ -36,7 +36,7 @@ type oracle = {
   name      : string ;
   args      : Vars.vars ;
   loc_smpls : Vars.vars ;       (** local random samplings *)
-  loc_vars  : var_decl list;    (** local (non-mutable) variables *)
+  loc_vars  : var_decl list;    (** local (mutable) variables *)
   updates   : (Vars.var * Term.term) list ;
   output    : Term.term ;
 }
@@ -83,17 +83,23 @@ let gsubst_game (s : Subst.t) (g : game) : game =
   }
 
 (*------------------------------------------------------------------*)
-let _pp_var_decl ppe fmt (vd : var_decl) : unit = 
+let _pp_var_decl
+    (kind : [`Var | `Let]) ppe
+    fmt (vd : var_decl) : unit
+  =
   Fmt.pf fmt "%a %a : %a = %a;" 
-    (Printer.kws `Prog) "var"
+    (Printer.kws `Prog) (match kind with `Var -> "var" | `Let -> "let")
     (Vars._pp ppe) vd.var
     (Type._pp ~dbg:ppe.dbg) (Vars.ty vd.var)
     (Term._pp ppe) vd.init
 
-let _pp_var_decls ppe fmt (l : var_decl list) : unit = 
+let _pp_var_decls
+    (kind : [`Var | `Let]) ppe
+    fmt (l : var_decl list) : unit
+  =
   if l = [] then ()
   else
-    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_var_decl ppe)) l
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_var_decl kind ppe)) l
 
 (*------------------------------------------------------------------*)
 let _pp_sample ppe fmt (v : Vars.var) : unit = 
@@ -133,18 +139,18 @@ let _pp_oracle ppe fmt (o : oracle) : unit =
     o.name
     pp_args o.args
     (Type._pp ~dbg:ppe.dbg) (Term.ty o.output)
-    (_pp_samples   ppe) o.loc_smpls
-    (_pp_var_decls ppe) o.loc_vars
-    (_pp_updates   ppe) o.updates
-    pp_return           o.output
+    (_pp_samples        ppe) o.loc_smpls
+    (_pp_var_decls `Let ppe) o.loc_vars
+    (_pp_updates        ppe) o.updates
+    pp_return o.output
 
 (*------------------------------------------------------------------*)
 let _pp_game ppe fmt (g : game) : unit = 
   Fmt.pf fmt "@[<hv 2>%a %s = {@;@[<hv 0>%a@ %a@ %a@]@]@;}"
     (Printer.kws `Goal) "game"
     g.name
-    (_pp_samples   ppe) g.glob_smpls
-    (_pp_var_decls ppe) g.glob_vars
+    (_pp_samples        ppe) g.glob_smpls
+    (_pp_var_decls `Var ppe) g.glob_vars
     (Fmt.list ~sep:Fmt.sp (_pp_oracle ppe)) g.oracles
 
 (*------------------------------------------------------------------*)
@@ -1511,19 +1517,24 @@ module Game = struct
   include AbstractSet
 
   (*-------------------------------------------------------------------*)
-  (** Build a substitution for locable non-mutable variable 
-      and replace this variable by their values in output term of oracle.*)
-  let subst_loc (oracle : oracle) (term : Term.term) =
-    let mk_subst (subst : Term.subst ) (vd : var_decl) =
-      Term.ESubst (Term.mk_var vd.var , Term.subst subst vd.init )::subst
+  (** Build a substitution for locable variables and replace them by
+      their values in [term]. *)
+  let subst_loc (oracle : oracle) (term : Term.t) : Term.t =
+    (* first, process declarations of the form [var x = t] *)
+    let mk_subst (subst : Term.subst) (vd : var_decl) =
+      Term.ESubst (Term.mk_var vd.var, Term.subst subst vd.init) :: subst
     in
     let subst = List.fold_left mk_subst [] oracle.loc_vars in
-    let mk_subst (subst : Term.subst ) ((var,term) : Vars.var * Term.term) =
+
+    (* then, process updates of the form [x := t] *)    
+    let mk_subst (subst : Term.subst) ((var,term) : Vars.var * Term.t) : Term.subst =
       let term = Term.subst subst term in
       let subst = Term.filter_subst var subst in
-      Term.ESubst (Term.mk_var var , Term.subst subst term )::subst
+      Term.ESubst (Term.mk_var var, Term.subst subst term) :: subst
     in
     let subst = List.fold_left mk_subst subst oracle.updates in
+
+    (* finally, substitute in [term] *)
     Term.subst subst term
 
   (*-------------------------------------------------------------------*)
