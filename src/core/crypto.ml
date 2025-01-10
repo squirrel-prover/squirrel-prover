@@ -1960,11 +1960,15 @@ let knowledge_mem_tsets
     match TSet.cterm_mem env hyps output input with
     | None -> None
     | Some mv ->
+      (* We found an instantiation of [input.vars] that allows to
+         obtain [output] from [input].
+         This instantiation may be partial: we heuristically complete
+         it using [witness]. *)
       let subst = Mvar.to_subst_locals ~mode:`Match mv in
-      List.filter_map (fun x ->
+      List.map (fun x ->
           if Mvar.mem x mv
-          then Some (Term.subst subst (Term.mk_var x))
-          else None
+          then Term.subst subst (Term.mk_var x)
+          else Library.Prelude.mk_witness env.table ~ty_arg:(Vars.ty x)
         ) input.vars
       |> some
   in
@@ -2434,7 +2438,6 @@ type rec_call = {
 type rec_call_occ = rec_call Iter.occ
 
 let derecursify_term
-    ~(expand_mode : [`FullDelta | `Delta ])
     (hyps : TraceHyps.hyps)
     (params : Params.t) (venv : Vars.env)
     (constr : Constr.trace_cntxt) (system : SE.context) (t_init : Term.term)
@@ -2444,6 +2447,10 @@ let derecursify_term
   
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
+      (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
+         
+         Must be synchronized with corresponding code in [Occurrences]
+         and [Iter]. *)
       let new_context = { system with set = se; } in
       let t, has_red =
         let hyps = 
@@ -2476,11 +2483,11 @@ let derecursify_term
 
           rec_occ :: acc, if has_red then `Map t else `Continue 
         in
-        if expand_mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
+        begin
           match Macros.get_definition { constr with system = SE.to_fset se } ms ~args:l ~ts with
           | `Def t -> acc, `Map t
           | `Undef | `MaybeDef -> mk_rec_call ()
-        else mk_rec_call ()
+        end
             
       | _ -> acc, if has_red then `Map t else `Continue 
   in
@@ -2622,9 +2629,9 @@ let derecursify
       ~(term : Term.term) ~(conds : Term.term list) : goal 
     =
     let rec_term_occs =
-      (* we use [`FullDelta], to mimick the behavior of [fold_macro_support] *)
+      (* we must mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        ~expand_mode:`FullDelta hyps params env.vars trace_context system
+        hyps params env.vars trace_context system
         (Term.mk_tuple (term :: conds))
         (* extending [env.vars] with [vars] would not be useful as
            [vars] are local, unrestricted, variables. *)

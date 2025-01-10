@@ -2033,9 +2033,12 @@ type cond_term = { term : Term.term; cond : Term.term }
 
 let mk_cond_term (term:Term.term) (cond:Term.term) :cond_term = {term;cond}
 
-let pp_cond_term fmt (c : cond_term) =
+let _pp_cond_term ppe fmt (c : cond_term) =
   Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]}@]"
-    Term.pp c.term Term.pp c.cond
+    (Term._pp ppe) c.term (Term._pp ppe) c.cond
+
+let[@warning "-32"] pp_cond_term     = _pp_cond_term (default_ppe ~dbg:false ())
+let[@warning "-32"] pp_cond_term_dbg = _pp_cond_term (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
 (** Set of terms over some index or timestamp variables with pending substitution.

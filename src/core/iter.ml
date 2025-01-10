@@ -454,8 +454,8 @@ let get_macro_occs
     (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
 
        Must be synchronized with corresponding code in
-       [Occurrences.get_actions_ext] and
-       [Occurrences.fold_bad_occs]. *)
+       [Occurrences.get_actions_ext], [Occurrences.fold_bad_occs] and
+       [Crypto]. *)
     let t =
       let system = SE.{ set = (constr.system :> SE.t); pair = None; } in
       let params = Env.to_params env in

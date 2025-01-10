@@ -805,7 +805,7 @@ struct
          [Reduction.rp_crypto].
 
          Must be synchronized with corresponding code in
-         [get_actions_ext] and [Iter.fold_macro_support]. *)
+         [get_actions_ext], [Iter.fold_macro_support] and [Crypto]. *)
       let t =
         let red_param = Reduction.rp_crypto in
         (* FIXME: add tag information in [pos_info] *)
