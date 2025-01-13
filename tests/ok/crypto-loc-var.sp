@@ -4,7 +4,7 @@ system P = null.
 
 game A = {
   oracle o = {
-    let x = diff(0,1);
+    var x = diff(0,1);
     x := diff(1,0);
     return x;
   }
@@ -23,7 +23,7 @@ Abort.
 (* --------------------------------------------------------- *)
 game B = {
   oracle o = {
-    let x = diff(0,1);
+    var x = diff(0,1);
     x := diff(1,0);
     x := diff(0,1);
     return x;
@@ -44,7 +44,7 @@ Qed.
 
 game C = {
   oracle o = {
-    let x = (0,diff(0,1));
+    var x = (0,diff(0,1));
     x := (diff(1,0),x#2);
     return x;
   }
@@ -59,8 +59,8 @@ Qed.
 
 game D = {
   oracle o = {
-    let x = 0;
-    let y = 1;
+    var x = 0;
+    var y = 1;
     x := diff(x,y);
     return x;
   }

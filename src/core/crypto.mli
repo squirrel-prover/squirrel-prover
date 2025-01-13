@@ -10,21 +10,32 @@ type var_decl = {
   init : Term.term ;
 }
 
-(** An stateful oracle in a cryptographic game *)
+type var_decls = var_decl list
+
+(** a stateful oracle in a cryptographic game *)
 type oracle = {
   name      : string ;
   args      : Vars.vars ;
   loc_smpls : Vars.vars ;       (** local random samplings *)
-  loc_vars  : var_decl list;    (** local (mutable) variables *)
+  loc_vars  : var_decls;        (** local (mutable) variables *)
   updates   : (Vars.var * Term.term) list ;
   output    : Term.term ;
 }
 
-(** A cryptographic game *)
+(** a global variable declaration *)
+type gdecl =
+  | Mutable of Term.t           (** mutable variable ands its initial value *)
+  | Let     of Term.t           (** non-mutable variable and its value *)
+  | LetInit                     (** adversarially-controled non-mutable variable *)
+
+(** a global variable declaration *)
+type gvar_decl = Vars.var * gdecl
+
+(** a cryptographic game *)
 type game = {
   name       : string ;
-  glob_smpls : Vars.var list ; (** global random samplings *)
-  glob_vars  : var_decl list     ; (** global (mutable) variables *)
+  glob_smpls : Vars.var list ;  (** global random samplings *)
+  glob_vars  : gvar_decl list ; (** global variables (mutable or let) *)
   oracles    : oracle list   ;
 }
 
@@ -38,13 +49,12 @@ val data_as_game : Symbols.data -> game
 val find : Symbols.table -> Symbols.p_path -> game
 
 (*------------------------------------------------------------------*)
-val gsubst_var_decl : var_decl Subst.substitution
-val gsubst_oracle   : oracle   Subst.substitution
-val gsubst_game     : game     Subst.substitution
+val gsubst_oracle : oracle   Subst.substitution
+val gsubst_game   : game     Subst.substitution
 
 (*------------------------------------------------------------------*)
-val _pp_oracle   : oracle                 formatter_p
-val _pp_game     : game                   formatter_p
+val _pp_oracle   : oracle formatter_p
+val _pp_game     : game   formatter_p
 
 (*------------------------------------------------------------------*)
 val prove :
@@ -65,24 +75,27 @@ module Parse : sig
   (** {3 Types} *)
 
   (** a randomly sampled variable 
-      [name : ty <$] *)
+      [rnd name : ty] *)
   type var_rnd = {
     vr_name : lsymb ;
     vr_ty   : Typing.ty ;
   }
 
-  (** a mutable variable declaration 
-      [name : ty = init <$;] *)
-  type var_decl = {
-    vd_name : lsymb ;
-    vd_ty   : Typing.ty option ;
-    vd_init : Typing.term;
+  (** a global variable declaration 
+      - [var name : ty = init;]
+      - [let name : ty = init;] 
+      - [let name : ty = #init;] (here, the string "#init" must appear
+        verbatim) *)
+  type gvar_decl = {
+    gvd_name    : lsymb ;
+    gvd_ty      : Typing.ty option ;
+    gvd_content : [`Mutable of Typing.term | `Let of Typing.term | `LetInit ];
   }
 
   (** an oracle body *)
   type oracle_body = {
     bdy_rnds    : var_rnd list ;               (** local random samplings *)
-    bdy_lvars   : var_decl list ;              (** local variables *)
+    bdy_lvars   : gvar_decl list ;             (** local variables (only mutable allowed) *)
     bdy_updates : (lsymb * Typing.term) list ; (** state updates *)
     bdy_ret     : Typing.term option ;         (** returned value *)
   }
@@ -99,7 +112,7 @@ module Parse : sig
   type game_decl = {
     g_name    : lsymb ; 
     g_rnds    : var_rnd list ;     (** global (initial) samplings *)
-    g_gvar    : var_decl list ;    (** global (mutable) variables *)
+    g_gvar    : gvar_decl list ;   (** global (mutable or let) variables *)
     g_oracles : oracle_decl list ; (** the oracles *)
   }
 

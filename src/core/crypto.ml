@@ -5,6 +5,7 @@ module SE = SystemExpr
 module L = Location
 
 module Sv = Vars.Sv
+module Mv = Vars.Mv
 module Sp = Match.Pos.Sp
 
 module Mvar = Match.Mvar
@@ -31,21 +32,29 @@ type var_decl = {
 
 type var_decls = var_decl list
 
-(** An stateful oracle in a cryptographic game *)
+(** a stateful oracle in a cryptographic game *)
 type oracle = {
   name      : string ;
   args      : Vars.vars ;
   loc_smpls : Vars.vars ;       (** local random samplings *)
-  loc_vars  : var_decl list;    (** local (mutable) variables *)
+  loc_vars  : var_decls;        (** local (mutable) variables *)
   updates   : (Vars.var * Term.term) list ;
   output    : Term.term ;
 }
 
-(** A cryptographic game *)
+(** a global-level variable declaration *)
+type gdecl =
+  | Mutable of Term.t           (** mutable variable ands its initial value *)
+  | Let     of Term.t           (** non-mutable variable and its value *)
+  | LetInit                     (** adversarially-controled non-mutable variable *)
+
+type gvar_decl = Vars.var * gdecl
+                 
+(** a cryptographic game *)
 type game = {
   name       : string ;
-  glob_smpls : Vars.var list ; (** global random samplings *)
-  glob_vars  : var_decls ;     (** global (mutable) variables *)
+  glob_smpls : Vars.var list ;  (** global random samplings *)
+  glob_vars  : gvar_decl list ; (** global variables (mutable or let) *)
   oracles    : oracle list   ;
 }
 
@@ -75,6 +84,15 @@ let gsubst_oracle (s : Subst.t) (o : oracle) : oracle =
     output    = Term.gsubst s o.output;
   }
 
+let gsubst_gdecl (s : Subst.t) (d : gdecl) : gdecl =
+  match d with
+  | LetInit -> LetInit
+  | Let     t -> Let     (Term.gsubst s t)
+  | Mutable t -> Mutable (Term.gsubst s t)
+
+let gsubst_var_decl (s : Subst.t) ((v,d) : gvar_decl) : gvar_decl =
+  ( Subst.subst_var s v, gsubst_gdecl s d)
+
 let gsubst_game (s : Subst.t) (g : game) : game =
   { name       = g.name;
     glob_smpls = List.map (Subst.subst_var s) g.glob_smpls;
@@ -83,23 +101,34 @@ let gsubst_game (s : Subst.t) (g : game) : game =
   }
 
 (*------------------------------------------------------------------*)
-let _pp_var_decl
-    (kind : [`Var | `Let]) ppe
-    fmt (vd : var_decl) : unit
+(** Pretty-print a global variable declaration *)
+let _pp_gvar_decl
+    ppe fmt ((v,d) : gvar_decl) : unit
   =
-  Fmt.pf fmt "%a %a : %a = %a;" 
-    (Printer.kws `Prog) (match kind with `Var -> "var" | `Let -> "let")
-    (Vars._pp ppe) vd.var
-    (Type._pp ~dbg:ppe.dbg) (Vars.ty vd.var)
-    (Term._pp ppe) vd.init
+  let kind = match d with Mutable _ -> "var" | Let _ | LetInit -> "let" in
+  Fmt.pf fmt "%a %a : %a = %t;" 
+    (Printer.kws `Prog) kind
+    (Vars._pp ppe) v
+    (Type._pp ~dbg:ppe.dbg) (Vars.ty v)
+    (fun fmt ->
+       match d with
+       | Mutable t | Let t -> Term._pp ppe fmt t
+       | LetInit -> Fmt.pf fmt "#init")
 
-let _pp_var_decls
-    (kind : [`Var | `Let]) ppe
-    fmt (l : var_decl list) : unit
-  =
+let _pp_gvar_decls ppe fmt (l : gvar_decl list) : unit =
   if l = [] then ()
   else
-    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_var_decl kind ppe)) l
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_gvar_decl ppe)) l
+
+(*------------------------------------------------------------------*)
+(** Pretty-print a simple variable declaration *)
+let _pp_var_decl ppe fmt (vd : var_decl) : unit =
+  _pp_gvar_decl ppe fmt (vd.var, Mutable vd.init)
+
+let _pp_var_decls ppe fmt (l : var_decl list) : unit =
+  if l = [] then ()
+  else
+    Fmt.pf fmt "@[<hv 0>%a @]" (Fmt.list ~sep:Fmt.sp (_pp_var_decl ppe)) l
 
 (*------------------------------------------------------------------*)
 let _pp_sample ppe fmt (v : Vars.var) : unit = 
@@ -139,9 +168,9 @@ let _pp_oracle ppe fmt (o : oracle) : unit =
     o.name
     pp_args o.args
     (Type._pp ~dbg:ppe.dbg) (Term.ty o.output)
-    (_pp_samples        ppe) o.loc_smpls
-    (_pp_var_decls `Let ppe) o.loc_vars
-    (_pp_updates        ppe) o.updates
+    (_pp_samples   ppe) o.loc_smpls
+    (_pp_var_decls ppe) o.loc_vars
+    (_pp_updates   ppe) o.updates
     pp_return o.output
 
 (*------------------------------------------------------------------*)
@@ -149,8 +178,8 @@ let _pp_game ppe fmt (g : game) : unit =
   Fmt.pf fmt "@[<hv 2>%a %s = {@;@[<hv 0>%a@ %a@ %a@]@]@;}"
     (Printer.kws `Goal) "game"
     g.name
-    (_pp_samples        ppe) g.glob_smpls
-    (_pp_var_decls `Var ppe) g.glob_vars
+    (_pp_samples    ppe) g.glob_smpls
+    (_pp_gvar_decls ppe) g.glob_vars
     (Fmt.list ~sep:Fmt.sp (_pp_oracle ppe)) g.oracles
 
 (*------------------------------------------------------------------*)
@@ -985,10 +1014,6 @@ module AbstractSet = struct
     | Sets tl ->
       List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
 
-  (* let subst sbst = function *)
-  (*   | Top -> Top *)
-  (*   | Sets l -> Sets (List.map (TSet.subst sbst) l) *)
-
   let is_included (env : Env.t) (hyps : TraceHyps.hyps) (s1 : t) (s2 : t) =
     match s1,s2 with
     | Top,Top -> true
@@ -1066,9 +1091,6 @@ module AbstractSet = struct
       (fun fv (_,set) -> Vars.Sv.union fv (fv_t set))
       Vars.Sv.empty mem 
 
-  (* let subst_mem sbst (mem : mem) : mem = *)
-  (*   List.map (fun (v,t) -> v, subst sbst t) mem *)
-
   let well_formed (env : Env.t) (mem : mem) =
     let fvs = fv_mem mem in
     Vars.Sv.for_all (Vars.mem env.vars) fvs 
@@ -1124,7 +1146,6 @@ module AbstractSet = struct
     | _::q -> remove var q
 
   let update
-      ?(transition_vars: Vars.vars = []) 
       env hyps
       (mv : Mvar.t)
       (cond_subst : Term.subst)
@@ -1142,11 +1163,12 @@ module AbstractSet = struct
         compute_decls q (append env hyps var abstract_term mem) 
     in
     let new_mem = compute_decls decls mem in 
-    (List.fold_left (fun x -> fun y -> remove y x) new_mem transition_vars)
+    (List.fold_left (fun x -> fun y -> remove y x) new_mem [])
 
-  let init env hyps (var_decls : var_decls) : mem =
-    let updates = List.map (fun x -> (x.var,x.init)) var_decls in 
-    update env hyps Mvar.empty [] [] updates  []
+  (* compute the inital abstract memory from a list of mutable
+     variables and their initial values *)
+  let init env hyps (mutable_var_decls : (Vars.var * Term.t) list) : mem =
+    update env hyps Mvar.empty [] [] mutable_var_decls []
 
   let rec boolean_abstraction_supported
       (env : Env.t)
@@ -1258,7 +1280,11 @@ type query = {
   
   initial_mem : AbstractSet.mem;
   (** abstract memory *)
-    
+
+  let_init : Term.t Mv.t;
+  (** mapping from [let _ = #init;] variables to their values (as
+      provided by the user) *)
+  
   inputs : CondTerm.t list;
   (** inputs provided to the adversary *)
   
@@ -1516,26 +1542,82 @@ module Game = struct
 
   include AbstractSet
 
-  (*-------------------------------------------------------------------*)
-  (** Build a substitution for locable variables and replace them by
-      their values in [term]. *)
-  let subst_loc (oracle : oracle) (term : Term.t) : Term.t =
-    (* first, process declarations of the form [var x = t] *)
-    let mk_subst (subst : Term.subst) (vd : var_decl) =
-      Term.ESubst (Term.mk_var vd.var, Term.subst subst vd.init) :: subst
-    in
-    let subst = List.fold_left mk_subst [] oracle.loc_vars in
+  (*------------------------------------------------------------------*)
+  (** Compute the substitution [let_subst] mapping global let variables
+      of [game] to their value.
 
-    (* then, process updates of the form [x := t] *)    
+      [let_init] must be the value of the [let _ = #init] terms,
+      as provided by the user. *)
+  let global_lets_to_subst
+      (let_init : Term.t Mv.t) (game : game) : Term.subst
+    =
+    (* [full_subst]: substitution for mutable and let variables 
+       [let_subst] : substitution for let variables only
+
+       We need [full_subst] to compute [let_subst], as the latter may be
+       defined using the initial values of mutable variables. E.g. in
+       the game:
+
+       game G = { 
+         var x = 42;
+         let y = (24,x);
+         oracle f = { x := 0; return y }
+       }.
+
+       The oracle [f] always return [(24,42)].
+       Indeed, we have here that
+       [let_subst = x ↦ (24,42)] 
+       [full_subst = y ↦ 42, x ↦ (24,42)].
+    *)
+    let _full_subst, let_subst =
+      List.fold_left (fun (full_subst, let_subst) (v,d) ->
+          match d with
+          | Mutable t ->
+            let t = Term.subst full_subst t in
+            ( Term.subst_add_binding full_subst v t,
+              let_subst )
+
+          | Let t ->
+            let t = Term.subst full_subst t in
+            ( Term.subst_add_binding full_subst v t,
+              Term.subst_add_binding let_subst  v t )
+
+          | LetInit ->
+            let t = Mv.find v let_init in
+            ( Term.subst_add_binding full_subst v t,
+              Term.subst_add_binding let_subst  v t )
+
+        ) ([],[]) game.glob_vars
+    in
+    let_subst
+
+  (*-------------------------------------------------------------------*)
+  (** Build a substitution allowing to do the symbolic evaluation of
+      a term in an oracle. This includes:
+      - global declarations;
+      - local declarations in [oracle] (new variables [var x = t],
+        updates [x := t]). *)
+  let local_subst
+      (let_init : Term.t Mv.t) (game : game) (oracle : oracle) : Term.subst
+    =
+    (* first, take the substitution for the initial global
+       declarations *)
+    let subst = global_lets_to_subst let_init game in
+    
+    (* then, process declarations of the form [var x = t] *)
+    let mk_subst (subst : Term.subst) (vd : var_decl) =
+      let term = Term.subst subst vd.init in
+      Term.ESubst (Term.mk_var vd.var, term) :: subst
+    in
+    let subst = List.fold_left mk_subst subst oracle.loc_vars in
+
+    (* finally, process updates of the form [x := t] *)    
     let mk_subst (subst : Term.subst) ((var,term) : Vars.var * Term.t) : Term.subst =
       let term = Term.subst subst term in
-      let subst = Term.filter_subst var subst in
-      Term.ESubst (Term.mk_var var, Term.subst subst term) :: subst
+      let subst = Term.filter_subst var subst in (* FIXME: is this necessary? *)
+      Term.ESubst (Term.mk_var var, term) :: subst
     in
-    let subst = List.fold_left mk_subst subst oracle.updates in
-
-    (* finally, substitute in [term] *)
-    Term.subst subst term
+    List.fold_left mk_subst subst oracle.updates 
 
   (*-------------------------------------------------------------------*)
   let rec term_and_cond
@@ -1560,11 +1642,14 @@ module Game = struct
      be chooose if the pattern matching doesn't take conds into account *)
   let oracle_to_term_and_cond
       (env : Env.t)
-      (mem : mem)
+      ~(mem : mem)
+      ~(let_init : Term.t Mv.t)
       (game : game)
       (oracle : oracle) : oracle_pat list 
     =
-    let output = subst_loc oracle oracle.output  in
+    let output =
+      Term.subst (local_subst let_init game oracle) oracle.output
+    in
     let outputs = term_and_cond env mem output in
     let build_fresh_set (term,cond) : oracle_pat =
       let term_vars = Term.get_vars term in
@@ -1766,7 +1851,11 @@ module Game = struct
 
     (* TODO : checks that it was initial memry*)
     let match_one_oracle (oracle : oracle) : oracle_match list =
-      let outputs = oracle_to_term_and_cond env query.initial_mem query.game oracle in
+      let outputs =
+        oracle_to_term_and_cond env
+          ~mem:query.initial_mem ~let_init:query.let_init
+          query.game oracle
+      in
       List.concat_map (try_match_oracle oracle ~subgoals:[]) outputs
     in
     
@@ -1876,10 +1965,13 @@ module Game = struct
             conds; } query.initial_mem
       in
       let mem =
+        let oracle_subst =
+          local_subst query.let_init query.game oracle
+        in
         update
           query.env query.hyps mv subst_eqs
           conds
-          (List.map (fun (x,y) -> (x,subst_loc oracle y)) oracle.updates )
+          (List.map (fun (x,y) -> (x, Term.subst oracle_subst y)) oracle.updates )
           query.initial_mem
       in
       (* creating the implication is better than substituting *)
@@ -1912,7 +2004,14 @@ module Game = struct
     with Const.InvalidConstraints -> None 
         
   let get_initial_pre env hyps (game : game) : mem =
-    init env hyps game.glob_vars
+    let glob_mutable =
+      List.filter_map (fun (v,d) ->
+          match d with
+          | Let _ | LetInit -> None
+          | Mutable t -> Some (v, t)
+        ) game.glob_vars
+    in
+    init env hyps glob_mutable
 end 
 
 (*------------------------------------------------------------------------*)
@@ -2434,6 +2533,7 @@ and bideduce_fp
         vbs = query.vbs; dbg = query.dbg;
         game = query.game;
         hyps = query.hyps;
+        let_init = query.let_init;
         allow_oracle = query.allow_oracle;
         rec_inputs = query.rec_inputs;
         inputs     = query.inputs;
@@ -2770,6 +2870,7 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
     dbg          = goal.dbg;
     game         = goal.game;
     hyps         = goal.hyps;
+    let_init     = query.let_init;
     allow_oracle = query.allow_oracle;
     consts       = query.consts @ consts ;
     inputs       = [];
@@ -2847,23 +2948,21 @@ let loc_of_crypto_arg (arg : Args.crypto_arg) : L.t =
     @ [L.loc arg.glob_sample; L.loc arg.term]
   )
 
+(** Parse the arguments provided by the user, which consist of:
+    - initial constraints;
+    - the value of variables that must be initialized by the adversary. *)
 let parse_crypto_args
     (env : Env.t) (game : game) (args : Args.crypto_args) 
-  : Const.t list * Term.terms
+  : Const.t list * Term.t Mv.t
   =
-  let parse1 (arg : Args.crypto_arg) : Const.t=
+  (* we know that [arg.glob_name] corresponds to the global sample
+     [glob_v], parse [arg] as a constraint *)
+  let parse1_const (glob_v : Vars.var) (arg : Args.crypto_arg) : Const.t =
     (* open a type unification environment *)
     let ienv = Infer.mk_env () in
 
     let env, vars = 
       Typing.convert_bnds ~ienv ~mode:NoTags env (odflt [] arg.bnds) 
-    in
-
-    let glob_v = 
-      try List.find (fun v -> Vars.name v = L.unloc arg.glob_sample) game.glob_smpls
-      with Not_found ->
-        Tactics.hard_failure ~loc:(L.loc arg.glob_sample)
-          (Failure "unknown global sample")
     in
 
     let conv_env = Typing.{ env; cntxt = InGoal } in
@@ -2898,11 +2997,67 @@ let parse_crypto_args
     in
     Const.gsubst subst const
   in
-  let get_terms = fun (x:Const.t) -> x.term@x.cond in 
-  let consts =  List.map parse1 args in
-  let terms =  List.concat_map get_terms consts in
-  consts,terms
 
+  (* we know that [arg.glob_name] corresponds to the global variable
+     [glob_v] that must be initialized by the adversary, parse [arg]
+     as a term without [bnds] and [cond]. *)
+  let parse1_let_init
+      (glob_v : Vars.var) (arg : Args.crypto_arg) (let_init : Term.t Mv.t)
+    : Term.t Mv.t
+    =
+    let conv_env = Typing.{ env; cntxt = InGoal } in
+    let term =
+      fst (Typing.convert ~ty:(Vars.ty glob_v) conv_env arg.term)
+    in
+
+    (* check that [glob] was not initizalized twice *)
+    if Mv.mem glob_v let_init then
+      Tactics.hard_failure ~loc:(L.loc arg.glob_sample)
+        (Failure ("variable " ^ Vars.name glob_v ^ " initialized twice")) ;
+
+    Mv.add glob_v term let_init
+  in
+
+  (* parse all user-provided constraints *)
+  let consts, let_init =
+    List.fold_left (fun (consts, let_init) (arg : Args.crypto_arg) ->
+        let glob = L.unloc arg.glob_sample in
+
+        (* try to parse [arg] as a constraints *)
+        match List.find (fun v -> Vars.name v = glob) game.glob_smpls with
+        | glob_v ->
+          let new_const = parse1_const glob_v arg in
+          (new_const :: consts, let_init)
+
+        (* try to parse [arg] as a initialization hint *)
+        | exception Not_found ->
+          match
+            List.find
+              (function (v, LetInit) -> Vars.name v = glob | _ -> false)
+              game.glob_vars
+          with
+          | glob_v, _ ->
+            let let_init = parse1_let_init glob_v arg let_init in
+            ( consts, let_init )
+
+          (* both tentative failed, raise a user-level error *)
+          | exception Not_found -> 
+            Tactics.hard_failure ~loc:(L.loc arg.glob_sample)
+              (Failure "unknown global sample or initialization variable")
+      ) ([], Mv.empty) args
+  in
+
+  (* check that the user provided values for all variables that must
+     be initialized *)
+  List.iter (function
+      | (v, LetInit) ->
+        if not (Mv.mem v let_init) then
+          Tactics.hard_failure
+            (Failure ("variable " ^ Vars.name v ^ " must be initialized"))
+      | _ -> ()
+    ) game.glob_vars;
+  
+  (consts, let_init)
 
 (** Function that takes a list of bideduction goal, recursive and direct 
     and try to bideduce them all in the list order.*)
@@ -2926,8 +3081,7 @@ let bideduce_all_goals
     let result = {result with consts = (query_dir.consts@result.consts)} in
     next_goals,Some result
   | None -> next_goals,None
-
-
+    
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
@@ -2950,11 +3104,21 @@ let prove
   let game = find env.table pgame in
   let initial_mem = Game.get_initial_pre env hyps game in
 
-  let initial_consts, initial_name_args = parse_crypto_args env game args in
+  let init_consts, let_init = parse_crypto_args env game args in
+  let init_consts_terms =
+    List.concat_map (fun (x:Const.t) -> x.term @ x.cond) init_consts |>
+    List.map CondTerm.mk_simpl
+  in
 
-  (** Checking the initial constraint are determinitly bi-deducible*)
+  (*------------------------------------------------------------------*)
+  (** Checking the terms appearing in the initial constraints are
+      deducible without oracles nor randomness. *)
+  
   let query0 =
     { consts = [];
+      let_init = Mv.empty;
+      (* the game's oracle cannot yet be called, so this field is
+         irrelevant for now *)
       env; vbs; dbg;
       initial_mem;
       game; hyps;
@@ -2964,12 +3128,11 @@ let prove
       extra_inputs = [];
     }
   in
-  let init_output = List.map CondTerm.mk_simpl initial_name_args in 
   let res0 =
-    match bideduce query0 init_output with
+    match bideduce query0 init_consts_terms with
     | Some s  when s.consts = [] -> s
     (* To ensure well-formness of constraints. 
-       FIXME : could be improved, to allow randomness that do not break well-formness. *)
+       FIXME: could be improved, to allow randomness that do not break well-formness. *)
     | Some _ -> 
       Tactics.hard_failure ~loc:game_loc
         (Failure "failed to bideduce user constraints: \
@@ -2980,16 +3143,43 @@ let prove
   in
 
   (*------------------------------------------------------------------*)
+  (** Checking the terms used to initialize the game are bideducible
+      without oracles (since the game is not yet initialized), but
+      allowing randomness (as opposed to terms appearing in
+      constraints, there is not well-foundness issue there). *)
+
+  let query0 =
+    transitivity_get_next_query query0 init_consts_terms res0
+  in
+  assert (query0.consts = []);
+  let res0 =
+    let let_init_terms =
+      Mv.fold (fun _ t terms -> CondTerm.mk_simpl t :: terms) let_init []
+    in
+    match bideduce query0 let_init_terms with
+    | Some r -> r
+    | None ->
+      Tactics.hard_failure ~loc:game_loc
+        (Failure "failed to bideduce initial values")
+  in
+
+  (*------------------------------------------------------------------*)
   (** first bideduction pass *)
 
   notify_bideduce_first_pass ~dbg ~vbs;
 
-  let query_start = transitivity_get_next_query query0 init_output res0 in
   let query_start =
-    { query_start with 
-      allow_oracle = true; 
-      consts = query_start.consts @ initial_consts; } 
+    let query =
+      transitivity_get_next_query query0 init_consts_terms res0
+    in
+    (* the game is now initialized using values in [let_init], and
+       initial constraints [init_consts]. *)
+    { query with 
+      allow_oracle = true;
+      let_init;
+      consts = query.consts @ init_consts; } 
   in
+
   let rec_bided_subgs, direct_bided_subgs =
     derecursify env terms.terms game hyps
   in
@@ -3118,24 +3308,27 @@ module Parse = struct
   (** {3 Types} *)
 
   (** a randomly sampled variable 
-      [name : ty <$] *)
+      [rnd name : ty] *)
   type var_rnd = {
     vr_name : lsymb ;
     vr_ty   : Typing.ty ;
   }
 
-  (** a mutable variable declaration 
-      [name : ty = init <$;] *)
-  type var_decl = {
-    vd_name : lsymb ;
-    vd_ty   : Typing.ty option ;
-    vd_init : Typing.term;
+  (** a global variable declaration 
+      - [var name : ty = init;]
+      - [let name : ty = init;] 
+      - [let name : ty = #init;] (here, the string "#init" must appear
+        verbatim) *)
+  type gvar_decl = {
+    gvd_name    : lsymb ;
+    gvd_ty      : Typing.ty option ;
+    gvd_content : [`Mutable of Typing.term | `Let of Typing.term | `LetInit ];
   }
 
   (** an oracle body *)
   type oracle_body = {
     bdy_rnds    : var_rnd list ;               (** local random samplings *)
-    bdy_lvars   : var_decl list ;              (** local variables *)
+    bdy_lvars   : gvar_decl list ;             (** local variables (only mutable allowed) *)
     bdy_updates : (lsymb * Typing.term) list ; (** state updates *)
     bdy_ret     : Typing.term option ;         (** returned value *)
   }
@@ -3152,7 +3345,7 @@ module Parse = struct
   type game_decl = {
     g_name    : lsymb ; 
     g_rnds    : var_rnd list ;     (** global (initial) samplings *)
-    g_gvar    : var_decl list ;    (** global (mutable) variables *)
+    g_gvar    : gvar_decl list ;   (** global (mutable or let) variables *)
     g_oracles : oracle_decl list ; (** the oracles *)
   }
 
@@ -3201,25 +3394,52 @@ module Parse = struct
         (env, v :: smpls)
       ) (env, []) rnds
 
-  let parse_var_decls ienv env (p_vdecls : var_decl list) =
+  (* parse a global variable declaration (mutable, let) *)
+  let parse_gvar_decls ienv env (p_vdecls : gvar_decl list) =
     let env, vdecls =
       List.fold_left (fun (env, vdecls) pv -> 
           let ty = 
-            match pv.vd_ty with 
+            match pv.gvd_ty with 
             | Some pty -> Typing.convert_ty env pty
             | None     -> Type.univar (Infer.mk_ty_univar ienv)
           in
-          let env, var = make_exact_var env pv.vd_name ty in
-          let init, _ = 
-            Typing.convert
-              ~option:games_typing_option
-              ~ty ~ienv { env; cntxt = Typing.InGoal; } pv.vd_init 
+          let env, var = make_exact_var env pv.gvd_name ty in
+
+          let parse_init init =
+            let init, _ =
+              Typing.convert
+                ~option:games_typing_option
+                ~ty ~ienv { env; cntxt = Typing.InGoal; } init
+            in
+            init
           in
-          (env, { var; init } :: vdecls)
+          
+          let d =
+            match pv.gvd_content with
+            | `Let     t -> Let     (parse_init t)
+            | `Mutable t -> Mutable (parse_init t)
+            | `LetInit   -> LetInit
+          in
+          (env, ( var, d ) :: vdecls)
         ) (env, []) p_vdecls
     in
     env, List.rev vdecls
 
+  (* parse a simple variable declaration (mutable), which are the only
+     declarations currently supported in oracles *)
+  let parse_oracle_var_decls ienv env (p_vdecls : gvar_decl list) =
+    let env, decls = parse_gvar_decls ienv env p_vdecls in
+    let decls =
+      List.map2 (fun p_vdecl (v,d) ->
+          match d with
+          | Let _ | LetInit ->
+            failure (L.loc p_vdecl.gvd_name)
+              (Failure "only mutable variable `var x : ty? = t` supported");
+          | Mutable init -> { var = v; init }
+        ) p_vdecls decls
+    in
+    env, decls
+      
   let parse_updates ienv (env : Env.t) (p_updates : (lsymb * Typing.term) list) =
     let env, updates =
       List.fold_left (fun (env, updates) (pv, pt) ->         
@@ -3255,7 +3475,7 @@ module Parse = struct
     let env, loc_smpls = parse_sample_decls env body.bdy_rnds in
 
     (* local variables *)
-    let env, loc_vars = parse_var_decls ienv env body.bdy_lvars in
+    let env, loc_vars = parse_oracle_var_decls ienv env body.bdy_lvars in
 
     (* state updates *)
     let env, updates = parse_updates ienv env body.bdy_updates in
@@ -3305,7 +3525,7 @@ module Parse = struct
     let env, glob_smpls = parse_sample_decls env decl.g_rnds in
 
     (* parse global variable declarations *)
-    let env, glob_vars  = parse_var_decls ienv env decl.g_gvar in
+    let env, glob_vars  = parse_gvar_decls ienv env decl.g_gvar in
 
     (* parse oracle declarations *)
     let oracles = parse_oracle_decls ienv env decl.g_oracles in

@@ -45,7 +45,7 @@
 %token UEXISTS UFORALL
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
-%token SHARP DOLLAR
+%token SHARP DOLLAR SHARPINIT
 %token GAME VAR RND RETURN
 %token TIME WHERE WITH ORACLE EXN
 %token PERCENT
@@ -826,15 +826,26 @@ game_var_rnd:
 game_var_rnds:
 | l=slist(game_var_rnd, empty ) { l }
 
-/* variable declarations (in global (mutable) or oracle (non-mutable))
-  `KW` is either `VAR` or `LET`  */
-game_var_decl(KW):
-| KW v=lsymb ty=colon_ty? EQ t=term SEMICOLON
-    { Crypto.Parse.{ vd_name = v; vd_ty = ty; vd_init = t; } } 
+/* variable declaration in an oracle (mutable only) */
+game_oracle_var_decl:
+| VAR v=lsymb ty=colon_ty? EQ t=term SEMICOLON
+    { Crypto.Parse.{ gvd_name = v; gvd_ty = ty; gvd_content = `Mutable t; } } 
 
-/* `KW` is either `VAR` or `LET` */
-game_var_decls(KW):
-| l=slist(game_var_decl(KW), empty) { l }
+game_oracle_var_decls:
+| l=slist(game_oracle_var_decl, empty) { l }
+
+/* global variable declaration (mutable or let) */
+game_var_decl:
+| decl = game_oracle_var_decl    { decl }
+
+| LET v=lsymb ty=colon_ty? EQ t=term SEMICOLON
+    { Crypto.Parse.{ gvd_name = v; gvd_ty = ty; gvd_content = `Let t; } } 
+| LET v=lsymb ty=colon_ty? EQ SHARPINIT SEMICOLON
+    { Crypto.Parse.{ gvd_name = v; gvd_ty = ty; gvd_content = `LetInit; } } 
+
+
+game_var_decls:
+| l=slist(game_var_decl, empty) { l }
 
 /* an update in an oracle */
 game_update:
@@ -847,7 +858,7 @@ oracle_ret:
 | RETURN ret=term SEMICOLON? { ret }
 
 oracle_body:
-| rnds=game_var_rnds vars=game_var_decls(VAR) updates=game_updates ret=oracle_ret?
+| rnds=game_var_rnds vars=game_oracle_var_decls updates=game_updates ret=oracle_ret?
 { Crypto.Parse.{ 
     bdy_rnds    = rnds; 
     bdy_lvars   = vars; 
@@ -867,7 +878,7 @@ oracle_decls:
 game:
 | GAME n=lsymb EQ LBRACE
     rnds=game_var_rnds
-    vars=game_var_decls(VAR)
+    vars=game_var_decls
     orcls=oracle_decls 
   RBRACE
     { Crypto.Parse.{ 

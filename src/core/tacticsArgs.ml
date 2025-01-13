@@ -171,8 +171,15 @@ type dh_arg =
 (*------------------------------------------------------------------*)
 (** {3 Crypto tactic arguments} *)
 
-(** [{glob_sample = k; term; bnds; cond }] add the constraints that
-    [k] must be mapped to [term] for any [bnds] such that [cond]. *)
+(** [{glob_sample = k; term; bnds; cond }] can have two different meaning:
+
+    - if [k] is a global randomness of the game, it adds the
+      constraints that [k] must be mapped to [term] for any [bnds] such
+      that [cond]. 
+
+    - if [k] is a variable that must be initialized by the adversary
+      (i.e. [let k = #init]), then we must have [bnds = []] and [cond =
+      None], and it set [k] to [term]. *)
 type crypto_arg = { 
   glob_sample : lsymb; 
   term        : Typing.term;

@@ -94,6 +94,7 @@ let rec token buf =
   | '?' -> QMARK
   | ',' -> COMMA
   | "!" -> BANGU
+  | "#init" -> SHARPINIT
   | '#' -> SHARP
   | '$' -> DOLLAR
   | ':' -> COLON
