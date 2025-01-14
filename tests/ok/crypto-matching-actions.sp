@@ -71,7 +71,7 @@ Proof.
 intro *.
 crypto FOO (key:sk_mix).
 + auto.
-+ intro i. intro H0. rewrite not_exists_1 in H0. 
++ intro i. intro H0. 
 destruct H0.
 destruct H1.
 destruct H1.
@@ -87,12 +87,9 @@ auto.
   destruct H0.
   destruct H1.
   destruct H1.
-  rewrite not_or in H0.
-  rewrite not_or in H1.
   destruct H0.
   destruct H1.
   assert MVC(i) < MVC(i0) || MVC(i0) < MVC(i) as Hl by auto.
-  rewrite not_exists_1 in H2, H3.
   have H4:= H2 i0.
   have H5:= H3 i.
   case Hl.

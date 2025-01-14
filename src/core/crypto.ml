@@ -1978,30 +1978,46 @@ let knowledge_mem_tsets
 (** Checks whether [output = (t|f)] can be obtained from [extra_inputs].
 
     For any [(t'| vars : f') ∈ extra_inputs], look for a
-    substitution [σ] of domain [vars] such that [t = t'σ]
-    and [f ⇒ f'σ]. Then, computes the pair of:
-    - the image of [σ];
-    - the condition [ϕσ] attached to [(t'| vars : f')].
+    substitution [σ] of domain [vars0 ⊆ vars] such that [t = t'σ].
+    
+    Then, computes the pair of:
+    - the image [vars0 σ], which will have to be bi-deduced;
+    - [cond] which is the condition [∃ (vars \ vars0). f'σ]
+    - the negation of [cond] (with some simplifications).
 
-    Return the list of all such pairs.
+    Further, it must be the case that [extra_inputs ▷ cond].
+
+    Return the list of all such tuples.
 *)
 let knowledge_mem_condterm_sets
     (env : Env.t)
     (hyps : TraceHyps.hyps)
     (output : CondTerm.t)
     (extra_inputs : TSet.t list) 
-  : (Term.terms * Term.term) list
+  : (Term.terms * Term.term * Term.term) list
   =
-  let is_in (input : TSet.t) : (Term.terms * Term.term) option =
+  let is_in (input : TSet.t) : (Term.terms * Term.term * Term.term) option =
     match TSet.cterm_mem_cond env hyps ~output ~input with
     | (None,_,_) -> None
 
     | (Some mv, vars, conds) -> 
       let subst = Mvar.to_subst_locals ~mode:`Match mv in
-      let bound_vars,free_vars = List.partition (fun x -> Mvar.mem x mv) vars in
-      let conds =  List.map (Term.subst subst) conds in
-      let args = List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars in
-      let conds = Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds) in
+      let bound_vars,free_vars =
+        List.partition (fun x -> Mvar.mem x mv) vars
+      in
+      let conds = List.map (Term.subst subst) conds in
+      let args =
+        List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars
+      in
+      (* TODO: check that [free_vars] are fixed+enum, to make sure
+         that [cond] is deducible from extra inputs. *)
+      let phi =
+        Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds)
+      in
+      let not_phi =
+        Term.mk_forall ~simpl:true free_vars
+          (Term.mk_ors (List.map Term.mk_not conds))
+      in
       let st =
         Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
       in
@@ -2011,10 +2027,12 @@ let knowledge_mem_condterm_sets
       (* Discard any extra input that we know will never be useful (by
          trying to show that the condition for this input never
          holds). *)
-      match Match.known_set_check_impl env.table ~st ?mv:None conds Term.mk_false with
-      | `Failed  -> Some (args,conds) (* [`Failed]: [input] may be useful, keep it  *)
-      | `Ok None -> None              (* [`Ok]: [input] never useful, discard it  *)
-      | `Ok (Some _) -> assert false  (* impossible since we used [?mv:None] *)
+      match
+        Match.known_set_check_impl env.table ~st ?mv:None phi Term.mk_false
+      with
+      | `Failed  -> Some (args,phi,not_phi) (* [input] may be useful, keep it  *)
+      | `Ok None -> None                    (* [input] never useful, discard it  *)
+      | `Ok (Some _) -> assert false        (* impossible since we used [?mv:None] *)
   in
   List.filter_map is_in extra_inputs
 
@@ -2069,6 +2087,7 @@ let notify_bideduce_first_pass ~vbs ~dbg =
                 *****************************************@."
 
 let notify_bideduce_oracle_already_call (query : query) already_called =
+  let already_called = List.map (fun (x,y,_) -> x,y) already_called in
   let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
   if not query.vbs && not query.dbg then () else
     Printer.pr "Already called : %a"
@@ -2248,7 +2267,9 @@ and bideduce_oracle
     (query : query) (output_term : CondTerm.t) : result option
   =
    (* First checking that the oracle could have been called before in the computation.
-      I.e, [output ∈ extra_inputs] *)
+      I.e, [output ∈ extra_inputs] under [condition] and the fact that
+      [args] can be deduced.
+      Return a list of: [(args, condition, ¬ condition)] *)
   let already_called =
     knowledge_mem_condterm_sets
       query.env query.hyps
@@ -2259,23 +2280,25 @@ and bideduce_oracle
       let _ =
         notify_bideduce_oracle_already_call query already_called
       in
-      let args = List.concat_map fst already_called in
-      let conds = List.map snd already_called in
-      let args =  List.map CondTerm.mk_simpl args in
-      let conds_true = Term.mk_ors conds in
-      let conds_false = Term.mk_not conds_true in
+      let args      = List.concat_map (fun (x,_,_) -> x) already_called in
+      let conds     = List.map        (fun (_,x,_) -> x) already_called in
+      let not_conds = List.map        (fun (_,_,x) -> x) already_called in
+      let args      = List.map CondTerm.mk_simpl args in
+      let conds     = Term.mk_ors conds in
+      let not_conds = Term.mk_ands not_conds in
       (*let output_conds = List.map CondTerm.mk_simpl output_term.conds in*)
-      let cterm = {output_term with conds = conds_false::output_term.conds} in
+      let cterm = {output_term with conds = not_conds::output_term.conds} in
       (* By sematnic of conditional tset, the condition are also in the inputs, so ne need to
       bideduce them*)
       let to_deduce = args(*@conds_true@output_conds*) in
-      (* TODO : conds_false might be always false, in which case it is not usufull to run oracle*)
-      notify_bideduce_oracle_extra_inputs query query.extra_inputs conds_false;
+      (* FEATURE: conds_false might be always false, in which case it
+         is not necessary to call the oracle. *)
+      notify_bideduce_oracle_extra_inputs query query.extra_inputs not_conds;
       match bideduce {query with allow_oracle=false} to_deduce
       with
       | Some result ->
         let query_start = transitivity_get_next_query query to_deduce result in
-        let query_start = {query_start with inputs = (CondTerm.mk_simpl conds_true)::query.inputs} in
+        let query_start = {query_start with inputs = (CondTerm.mk_simpl conds)::query.inputs} in
             cterm,query_start,result
       | None -> output_term,query, (empty_result query.initial_mem)
     else output_term,query,(empty_result query.initial_mem) 
