@@ -2407,10 +2407,9 @@ and bideduce_fp
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   : result
   =
-  let hyps      = query.hyps     in
-  let pre0      = query.initial_mem      in    (* [φ₀] *)
-  let consts0   = query.consts   in    (* [C₀] *)
-  (* let subgoals0 = state.subgoals in *)
+  let hyps      = query.hyps        in
+  let pre0      = query.initial_mem in    (* [φ₀] *)
+  let consts0   = query.consts      in    (* [C₀] *)
 
   (* [pre = φ] *)
   let rec compute_fp pre =
@@ -2438,14 +2437,15 @@ and bideduce_fp
 
       if AbstractSet.is_eq env hyps pre  gen_post && (* [φ ⇔ ψ₀] *)
          AbstractSet.is_eq env hyps post gen_post    (* [ψ ⇔ ψ₀] *)
-      then          
-        let () = assert (AbstractSet.is_leq env hyps pre0 pre) in (* [φ₀ ⇒ φ] *)
-        (* let gen_consts = Const.generalize togen result.consts in (\* final constraints [∀ x, C] *\) *)
-        (* let gen_subgoals = List.map (Term.mk_forall ~simpl:true togen) result.subgoals in *)
-        Some {result with final_mem = gen_post}
+      then
+        begin
+          assert (AbstractSet.is_leq env hyps pre0 pre); (* [φ₀ ⇒ φ] *)
+          Some {result with final_mem = gen_post}
+        end
       else
         let pre = AbstractSet.widening env hyps pre gen_post in
         compute_fp pre 
+
     | None ->
       let err_str = 
         Fmt.str "@[<v 2>failed to apply the game:@;\
