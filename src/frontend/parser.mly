@@ -28,7 +28,7 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
-%token LANGLE RANGLE (*LANGLECOLON*)
+%token LANGLE RANGLE LANGLECOLON LQUOTED RQUOTED
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
@@ -326,6 +326,8 @@ term_i:
 | LET v=lsymb ty=colon_ty? EQ t1=term IN t2=term
     { Typing.Let (v,t1,ty,t2) }
 
+| LQUOTED t=term RQUOTED {Typing.Quote t}
+
 /* non-ambiguous term */
 %inline else_term:
 | %prec empty_else   { let loc = L.make $startpos $endpos in
@@ -466,9 +468,9 @@ top_process:
 colon_ty:
 | COLON t=ty { t }
 
-(*concrete_term:
+concrete_term:
 | LANGLECOLON t=term { t }
-*)
+
 
 (* identifier with '$' allowed at the beginning or end *) 
 %inline alias_name:
@@ -1401,7 +1403,7 @@ se_args:
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
-| LBRACKET f=term (*t=concrete_term?*) RBRACKET         { Typing.PReach (f,None (*t*)) }
+| LBRACKET f=term t=concrete_term? RBRACKET         { Typing.PReach (f,t) }
 | EQUIV LPAREN e=biframe (*t=concrete_term?*) RPAREN    { Typing.PEquiv (e,None(*t*)) }
 | LPAREN f=global_formula_i RPAREN { f }
 

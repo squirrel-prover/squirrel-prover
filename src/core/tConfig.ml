@@ -51,6 +51,9 @@ let v_new_ind = Config.Param_bool false
 let s_post_quantum = "postQuantumSound"
 let v_post_quantum = Config.Param_bool false
 
+let s_prettyprint_reify = "prettyPrintReify"
+let v_prettyprint_reify = Config.Param_bool true
+
 let mk c = Location.mk_loc Location._dummy c
 
 let decl (s:string) (v:p_param_val) (table:Symbols.table) : Symbols.table =
@@ -70,6 +73,7 @@ let reset_params (table:Symbols.table) : Symbols.table =
   |> decl s_new_ind               v_new_ind
   |> decl s_post_quantum          v_post_quantum
   |> decl s_verbose_crypto        v_verbose_crypto
+  |> decl s_prettyprint_reify     v_prettyprint_reify
 
 
 let get_int s table : int = 
@@ -96,6 +100,7 @@ let auto_fadup = get_bool s_auto_fadup
 let new_ind = get_bool s_new_ind
 let post_quantum = get_bool s_post_quantum
 let verbose_crypto = get_bool s_verbose_crypto
+let prettyprint_reify = get_bool s_prettyprint_reify
 
 let set_param (s,p:string*p_param_val) table = 
   declare table (mk s) p

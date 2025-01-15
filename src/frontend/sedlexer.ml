@@ -86,7 +86,7 @@ let rec token buf =
   | "||" -> OR
   | '<' -> LANGLE
   | '>' -> RANGLE
-  (*| "<:" -> LANGLECOLON*)
+  | "<:" -> LANGLECOLON
   | '[' -> LBRACKET
   | ']' -> RBRACKET
   | '{' -> LBRACE
@@ -105,6 +105,8 @@ let rec token buf =
   | "/=" -> SLASHEQUAL
   | "//=" -> SLASHSLASHEQUAL
   | '/' -> SLASH
+  | "|\""-> LQUOTED
+  | "\"|"-> RQUOTED
   | "@/" -> ATSLASH
   | "=" -> EQ
   | "<>" -> NEQ
@@ -250,7 +252,7 @@ let rec token buf =
   | '.', (whitespace | '\n' | eof) -> TERMINAL
   | '.' -> DOT
 
-  | quoted_string -> 
+  | quoted_string ->
     let s = Utf8.lexeme buf in
     QUOTED_STRING (String.sub s 1 (String.length s - 2))
     (* remove the enclosing quotes '"' *)

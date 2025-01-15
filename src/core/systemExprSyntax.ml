@@ -209,7 +209,7 @@ let mk ?name cnt = { cnt; name; }
 (** exported *)
 external force  : exposed -> 'b expr = "%identity"
 external force0 : 'a expr -> 'b expr = "%identity"
-
+let get_cnt : t -> cnt = function u -> u.cnt
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 

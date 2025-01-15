@@ -198,6 +198,7 @@ val some : 'a -> 'a option
 
 val oget      : 'a option -> 'a
 val oget_exn  : exn:exn -> 'a option -> 'a
+val oget_dflt  : 'a -> 'a option -> 'a
 val odflt     : 'a -> 'a option -> 'a
 val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option

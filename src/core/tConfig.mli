@@ -52,3 +52,6 @@ val post_quantum : Symbols.table -> bool
 
 (** Verbose mode for crypto tactic *)
 val verbose_crypto : Symbols.table -> bool
+
+(** Pretty-print the refication of terms *)
+val prettyprint_reify : Symbols.table -> bool

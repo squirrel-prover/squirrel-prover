@@ -19,6 +19,105 @@ let term_of_string st string : Term.term =
   t
 
 (*------------------------------------------------------------------*)
+let reify () =
+  let st = Prover.init () in
+  let st = Prover.exec_all ~test:true st
+      "\
+include Reify.
+
+type T.
+op f : T -> bool.
+
+system null.
+channel c.
+process A = out(c,witness).
+system toto = A.
+
+op phi : bool -> bool.
+op psi ['a] : 'a -> bool.
+op p : bool.
+op m : message.
+op t_ : T.
+op s : string.
+op i : int.
+name n : bool.
+"
+  in
+  let st_namespace = Prover.exec_all ~test:true st
+      "
+      namespace Test.
+      namespace Testing.
+      type t.
+      op tt : t.
+     "
+  in
+  let st_post1 = Prover.exec_all ~test:true st_namespace
+      "
+       end Testing.
+       end Test.
+       senc enc,dec.
+      "
+  in
+  let st_post2 = Prover.exec_all ~test:true st_namespace
+      "
+       end Testing.
+       end Test.
+
+       open Test.
+      "
+  in
+
+  let quoting (t : string) (st : Prover.state) : Term.term =
+    term_of_string st ("|\"" ^ t ^ "\"|")
+  in
+  let print_out (t : string) = "{\"" ^ t ^ "\"}" in
+
+  let ppe (st : Prover.state) =
+    Ppenv.default_ppe ~dbg:false ~table:(Prover.get_table st) ()
+  in
+  (*
+This function test that the reification of t (in the prover state st) is pretty-printted as :
+- {"s"} when o = Some s
+- {"t"} when o = None
+*)
+  let testing ((t,o,st) : string*string option*Prover.state) =
+    let o = Utils.oget_dflt t o in
+    Alcotest.(check' string) ~msg:("reification error on term" ^ t)
+      ~actual:(Fmt.str "%a" (Term._pp (ppe st)) (quoting t st))
+      ~expected:(print_out o);
+  in
+  List.iter testing [
+    ("s",None,st);
+    ("3",None,st);
+    ("i",None,st);
+    ("m",None,st);
+    ("n",None,st);
+    ("phi",None,st);
+    ("psi[bool]",Some "psi",st);
+    ("psi[int*int]",Some "psi",st);
+    ("psi[T]",Some "psi",st);
+    ("psi s",None,st);
+    ("|\"phi true\"|",Some "{\"phi true\"}",st);
+    ("forall x, phi x",Some "forall (x:bool), phi x",st);
+    ("forall (x:bool), psi x",None,st);
+    ("fun x => (phi x, x)",Some "fun (x:bool) => (phi x, x)",st);
+      ("let x = psi true in psi x",None,st);
+    ("try find x such that phi x in psi x else true",
+     Some "try find x:bool such that phi x in psi x else true",st);
+    ("try find (x:bool) such that phi x in psi x else true",
+     Some "try find x:bool such that phi x in psi x else true",st);
+    ("tt",None,st_namespace);
+    ("psi tt",None,st_namespace);
+    ("Test.Testing.tt",None,st_post1);
+    ("psi Test.Testing.tt",None,st_post1);
+    ("Testing.tt",Some "Test.Testing.tt",st_post2);
+    ("psi Testing.tt",Some "psi Test.Testing.tt",st_post2);
+    ("enc",None,st_post1)
+  ]
+
+
+(*------------------------------------------------------------------*)
+(*------------------------------------------------------------------*)
 let namespaces () =
   let exception Ok in
   let exception Ko in
@@ -322,4 +421,5 @@ let tests = [
   ("namespaces"    , `Quick, Util.catch_error namespaces);
   ("type arguments", `Quick, Util.catch_error type_arguments);
   ("game parsing"  , `Quick, Util.catch_error crypto_parsing);
+  ("reify"  , `Quick, Util.catch_error reify);
 ]

@@ -20,6 +20,7 @@ let is_toplevel_error ~interactive ~test (e : exn) : bool =
   | System.Error                    _
   | SystemExpr.Error                _
   | Crypto.Parse.Error              _
+  | Reify.Error                   _
   | Tactics.Tactic_soft_failure     _
   | Tactics.Tactic_hard_failure     _ ->
     let params = try Sys.getenv "OCAMLRUNPARAM" with Not_found -> "" in
@@ -70,6 +71,9 @@ let pp_toplevel_error
 
   | Crypto.Parse.Error e when not test ->
     Crypto.Parse.pp_error pp_loc_error fmt e
+
+  | Reify.Error e when not test ->
+    Reify.pp_error fmt e
 
   | Tactics.Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"

@@ -435,24 +435,24 @@ module Core (* : ReductionCore.S *) = struct
   and reduce_builtin (st : state) (t : Term.t) : Term.t * bool =
     if not st.red_param.builtin then t, false
     else
-      let open Library in
+      let open Library.Int in
       let table = st.table in
 
       match Term.decompose_app t with
       (* Int.( + ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = Int.add table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = add table ->
         Term.mk_int Z.(i1 + i2), true
 
       (* Int.( - ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = Int.minus table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = minus table ->
         Term.mk_int Z.(i1 - i2), true
 
       (* Int.( * ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = Int.mul table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = mul table ->
         Term.mk_int Z.(i1 * i2), true
 
       (* Int.opp *)
-      | Fun (fs,_), [Int i]          when fs = Int.opp table ->
+      | Fun (fs,_), [Int i]          when fs = opp table ->
         Term.mk_int Z.(- i), true
 
       | _ -> t, false

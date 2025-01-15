@@ -77,6 +77,7 @@ type term_i =
   | App   of term * term list
   | AppAt of term * term
   | Quant of quant * ext_bnds * term
+  | Quote of term
 
 and term = term_i L.located
 
@@ -675,16 +676,10 @@ let validate
           error loc (UndefInSystem (action_name, state.env.system.set))
         in
 
-        let _, action = Action.get_def a table in
-        match SE.get_compatible_system state.env.se_vars state.env.system.set with
-        | Some compatible_system ->
-          let compatible_system = SE.of_system table compatible_system in
-          begin 
-            try
-              ignore (SE.action_to_term table compatible_system action : Term.term) 
-            with Not_found -> not_compatible ()
-          end
-        | None -> not_compatible ()
+        let is_compatible =
+          Reify.is_compatible table state.env.se_vars state.env.system.set a
+        in
+        if not is_compatible then not_compatible ();
       end
 
   | Term.Macro (m,args,_t) ->
@@ -831,12 +826,7 @@ let resolve_path
   in
   let action_list =
     List.filter_map (fun (path,_data) ->
-        let arity = Action.arity path table in
-        let fty =
-          Type.mk_ftype_tuple []
-            (List.init arity (fun _ -> Type.tindex))
-            Type.ttimestamp
-        in
+        let fty = Action.fty table path in
         try
           let ty_out, fty, ienv = check_arg_tys fty in
           Some (`Action path, ty_out, fty, ienv)
@@ -921,7 +911,7 @@ and convert0
   | Int i -> Term.mk_int (Z.of_int (L.unloc i))
 
   | String s -> Term.mk_string (L.unloc s)
-  
+
   (*------------------------------------------------------------------*)
   | Tpat ->
     if not state.option.pat then
@@ -1122,6 +1112,12 @@ and convert0
     let t = Term.subst subst t in
 
     Term.mk_lambda ~simpl:false evs t
+
+  | Quote t ->
+    let tyv = Type.univar (Infer.mk_ty_univar state.ienv) in
+    let e, t = Reify.quote Reify.Set state.env state.ienv (conv tyv t) in
+    Term.mk_tuple [t;e]
+   (*Quote return a tuple since it return the reified term as well as the EvalEnv needed to unquote it*)
 
 and convert_app
     (state     : conv_state)
@@ -1680,8 +1676,12 @@ let convert
         | _ as e ->
           error (L.loc tm) (Failure (Fmt.str "%a" Infer.pp_error_result e))
       in
-      
-      ( Term.gsubst tysubst t, Subst.subst_ty tysubst ty )
+      let t = Term.gsubst tysubst t in
+
+      (* sanity check: type-check again [t] *)
+      Reify.retype_check cenv.env t;
+        
+      (t , Subst.subst_ty tysubst ty )
     end
   else
     t, Infer.norm_ty ienv ty

@@ -30,5 +30,11 @@ val pp     : ident formatter
 val pp_full: ident formatter
 
 (*------------------------------------------------------------------*)
+(** Unsafe API to build idents. *)
+module Unsafe : sig
+  val make : string -> int -> ident
+end
+
+(*------------------------------------------------------------------*)
 module Mid : Map.S with type key = ident
 module Sid : Set.S with type elt = ident

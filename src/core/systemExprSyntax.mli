@@ -129,6 +129,7 @@ type t = arbitrary
 (** not type-safe *)
 val force  : exposed -> 'b expr
 val force0 : 'a expr -> 'b expr
+val get_cnt : t -> cnt
 
 (*------------------------------------------------------------------*)
 val hash : 'a expr -> int

@@ -42,6 +42,11 @@ let pp ppf id = Fmt.pf ppf "%s" (name id)
 let pp_full ppf id = Fmt.pf ppf "%s/%d" (name id) (tag id)
 
 (*------------------------------------------------------------------*)
+module Unsafe = struct
+  let make name tag = { name; tag; }
+end
+
+(*------------------------------------------------------------------*)
 module I = struct
   type _t = t
   type t = _t

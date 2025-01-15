@@ -160,6 +160,8 @@ val convert : Symbols.p_path -> Symbols.table -> Symbols.action
 (*------------------------------------------------------------------*)
 val arity : Symbols.action -> Symbols.table -> int
 
+val fty : Symbols.table -> Symbols.action -> Type.ftype
+
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}
   

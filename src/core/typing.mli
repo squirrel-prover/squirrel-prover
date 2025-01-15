@@ -95,6 +95,7 @@ type term_i =
   (** An application of a symbol to special timestamp arguments.
       [AppAt(t1, t2)] is [t1 \@ t2] *)
   | Quant of quant * ext_bnds * term
+  | Quote of term
 
 and term = term_i L.located
 

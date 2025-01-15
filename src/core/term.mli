@@ -45,6 +45,9 @@ type applied_ftype = {
 
 val pp_applied_ftype : applied_ftype formatter
 
+(** apply a [ftype] to some type arguments *)
+val apply_ftype : Type.ftype -> Type.ty list -> Type.ty
+                                                                
 (*------------------------------------------------------------------*)
 (** {3 Printing} *)
 
@@ -180,7 +183,27 @@ val set_resolve_path :
       * Infer.env
     ) list
   ) -> unit
-    
+
+(*------------------------------------------------------------------*)
+(** See specification in [reify.ml].
+
+    This function is used during pretty-printing, but cannot be
+    defined in [term.ml] due to circular dependencies issues
+    (e.g. with [reify.ml]).
+    Thus, the function is stored here as a global variable. *)
+val set_unquote :
+  ( Symbols.table -> term -> term option) -> unit
+
+ (*------------------------------------------------------------------*)
+(** See specification in [library.ml].
+
+    This function is used during pretty-printing, but cannot be
+    defined in [term.ml] due to circular dependencies issues
+    (e.g. with [library.ml]).
+    Thus, the function is stored here as a global variable. *)
+val set_reify_type :
+  ( Symbols.table -> Type.ty) -> unit
+
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
 

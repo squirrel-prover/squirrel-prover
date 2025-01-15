@@ -127,11 +127,13 @@ val _pp_typed_tagged_list    : tagged_vars formatter_p
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
 
-val hash : var -> int
+val id   : var -> Ident.t
 
 val name : var -> string
 
-val ty : var -> Type.ty
+val hash : var -> int
+
+val ty   : var -> Type.ty
 
 (** Free type variables of a term *)
 val ty_fv  : var  -> Type.Fv.t

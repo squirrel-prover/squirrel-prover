@@ -74,6 +74,7 @@ type tagged_vars = (var * Tag.t) list
 let is_pat v = v.id.name = "_"
 
 (*------------------------------------------------------------------*)
+let id v   = v.id
 let name v = v.id.name
 let hash v = v.id.tag
 let ty   v = v.ty

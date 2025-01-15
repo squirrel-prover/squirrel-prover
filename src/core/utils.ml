@@ -410,6 +410,10 @@ let oget_exn ~exn = function
   | Some u -> u
   | None -> raise exn
 
+let oget_dflt dflt = function
+  | Some u -> u
+  | None -> dflt
+
 let oget u = oget_exn ~exn:Not_found u
 
 let odflt dflt = function

@@ -162,6 +162,12 @@ let arity (s : Symbols.action) table =
   | Def (l, _) -> List.length l
   | Decl a     -> a
 
+let fty table (s : Symbols.action) =
+  let arity = arity s table in
+  Type.mk_ftype_tuple []
+    (List.init arity (fun _ -> Type.tindex))
+    Type.ttimestamp 
+
 (*------------------------------------------------------------------*)
 let is_def (s : Symbols.action) table : bool =
   if Symbols.Action.is_reserved s table then false

@@ -43,6 +43,14 @@ let pp_applied_ftype pf { fty; ty_args; } =
     Type.pp_ftype fty
     (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
 
+(** apply a [ftype] to some type arguments *)
+let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
+  (* substitute pending type variables by the type arguments *)
+  let tsubst = 
+    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
+  in
+  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
+
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
 let[@warning "-27"] resolve_path = 
@@ -265,7 +273,7 @@ let rec destr_ty_funs ?ienv (t : Type.ty) (i : int) : Type.ty list * Type.ty =
 
     ty_args, ty_out
 
-  | _ -> assert false   (* FIXME: can this happen? *)
+  | _ -> assert false
 
 (*------------------------------------------------------------------*)
 let rec destr_ty_tuple_flatten (t : Type.ty) : Type.ty list =
@@ -284,12 +292,7 @@ let ty ?ienv (t : term) : Type.ty =
     match t with
     | Int _ -> Type.tint
     | String _ -> Type.tstring
-    | Fun (_, { fty; ty_args; }) ->
-      (* substitute pending type variables by the type arguments *)
-      let tsubst = 
-        List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
-      in
-      Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
+    | Fun (_, { fty; ty_args; }) -> apply_ftype fty ty_args
 
     | App (t1, l) ->
       let _tys, t_out = destr_ty_funs ~ienv (ty t1) (List.length l) in      
@@ -1353,6 +1356,19 @@ let rec is_and_happens = function
     | _ -> false
 
 (*------------------------------------------------------------------*)
+(** See `.mli` *)
+let[@warning "-27"] unquote =
+  ref ( fun _ _ -> assert false)
+
+(** Unsafe unquoting mechanism (see [Reify.Unsafe]) *)
+let set_unquote f = unquote := f
+
+let[@warning "-27"] reify_type =
+  ref ( fun _-> assert false)
+
+let set_reify_type f = reify_type := f
+
+(*------------------------------------------------------------------*)
 (** Additional printing information *)
 type pp_info = {
   ppe    : ppenv;               (** pretty-printing environment *)
@@ -1398,6 +1414,7 @@ let macro_fixity   = 1000 , `NoParens
 let diff_fixity    = 1000 , `NoParens
 let happens_fixity = 1000 , `NoParens
 let tuple_fixity   = 1000 , `NoParens
+let quote_fixity   = 1000 , `NoParens
 
 let proj_fixity  = 1000 , `Postfix
 let app_fixity   = 10000, `Infix `Left
@@ -1439,7 +1456,7 @@ and _pp
   : unit
   =
   let pp = pp info in
-
+  let unquote_lazy = lazy (!unquote (info.ppe.table) t) in
   match t with
   | Int i -> Fmt.pf fmt "%a" Z.pp_print i
   | String s -> Fmt.pf fmt "\"%s\"" s
@@ -1555,6 +1572,22 @@ and _pp
     Fmt.pf fmt "@[<hov 2>diff(@,%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp_elem)
       list
+
+  (*quote of a term*)
+  | Tuple [term;_] when
+      Symbols.Import.mem_sp ([],"Reify") info.ppe.table
+      && TConfig.prettyprint_reify info.ppe.table
+      && ty term = !reify_type info.ppe.table
+      && Lazy.force unquote_lazy <> None ->
+    let t = Utils.oget (Lazy.force unquote_lazy) in
+    Fmt.pf fmt "@[<hov 2>{\"%a\"}@]" (pp (quote_fixity, `NonAssoc)) t
+      (*
+         Here we print the quotation of a term t as {"t"} while the syntax to declare one is |"t"|.
+This is to explicit break the invariant that something that is pretty-printed can be intrepreted.
+Indeed, we cannot keep this invariant and the pretty-printing of the quoted terms due to the ident.
+As an exemple, ( fun (x : bool) => |"x"|) = (fun (x : bool) => |"x"|)
+don't hold since x doesn't have the same ident in both places
+          *)
 
   (* tuple *)
   | Tuple ts ->
