@@ -86,7 +86,7 @@ let rec token buf =
   | "||" -> OR
   | '<' -> LANGLE
   | '>' -> RANGLE
-  | "<:" -> LANGLECOLON
+  (*| "<:" -> LANGLECOLON*)
   | '[' -> LBRACKET
   | ']' -> RBRACKET
   | '{' -> LBRACE

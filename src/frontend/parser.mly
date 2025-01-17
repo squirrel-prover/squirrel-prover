@@ -28,7 +28,7 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
-%token LANGLE RANGLE LANGLECOLON LQUOTED RQUOTED
+%token LANGLE RANGLE (*LANGLECOLON*) LQUOTED RQUOTED
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
@@ -468,8 +468,8 @@ top_process:
 colon_ty:
 | COLON t=ty { t }
 
-concrete_term:
-| LANGLECOLON t=term { t }
+(*concrete_term:
+| LANGLECOLON t=term { t }*)
 
 
 (* identifier with '$' allowed at the beginning or end *) 
@@ -1416,7 +1416,7 @@ se_args:
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
-| LBRACKET f=term t=concrete_term? RBRACKET         { Typing.PReach (f,t) }
+| LBRACKET f=term (*t=concrete_term?*) RBRACKET         { Typing.PReach (f,None(*t*)) }
 | EQUIV LPAREN e=biframe (*t=concrete_term?*) RPAREN    { Typing.PEquiv (e,None(*t*)) }
 | LPAREN f=global_formula_i RPAREN { f }
 
