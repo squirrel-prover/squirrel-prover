@@ -2,6 +2,8 @@
 (*The equality between timestamps is represented with "="*)
 theory Trace_model_abs
 
+  use int.Int
+
   (*Type declarations*) 
 
   type index

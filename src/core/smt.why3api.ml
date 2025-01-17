@@ -155,12 +155,17 @@ type context = {
   index_symb : Why3.Ty.tysymbol;
   msg_symb : Why3.Ty.tysymbol;
   ts_symb : Why3.Ty.tysymbol;
-  (* int_symb : Why3.Ty.tysymbol; *)
+  int_symb : Why3.Ty.tysymbol; 
   eqv_symb : Why3.Term.lsymbol option;
-  (* int_leq_symb : Why3.Term.lsymbol;
+  int_leq_symb : Why3.Term.lsymbol;
   int_geq_symb : Why3.Term.lsymbol;
   int_lt_symb : Why3.Term.lsymbol;
-  int_gt_symb : Why3.Term.lsymbol;  *)
+  int_gt_symb : Why3.Term.lsymbol;  
+  int_add_symb : Why3.Term.lsymbol;
+  int_sub_symb : Why3.Term.lsymbol;
+  int_mul_symb : Why3.Term.lsymbol;
+  int_opp_symb : Why3.Term.lsymbol;
+
   leq_symb : Why3.Term.lsymbol;
   happens_symb : Why3.Term.lsymbol;
   init_symb : Why3.Term.lsymbol;
@@ -180,7 +185,7 @@ type context = {
   msg_ty : Why3.Ty.ty;
   ts_ty : Why3.Ty.ty;
   index_ty : Why3.Ty.ty;
-  (* int_ty : Why3.Ty.ty; *)
+  int_ty : Why3.Ty.ty; 
 
   indices : Vars.var list;
   tsvars : Vars.var list;
@@ -214,13 +219,19 @@ let mk_const_symb context x ty =
 exception InternalError
 
 let context_init ~timestamp_style ~separate_tuple tm_theory evars table system = 
-  (* let int_theory = Why3.Env.read_theory env ["int"] "Int"in *)
-  let tm_export = tm_theory.Why3.Theory.th_export in
-  (* and int_export = int_theory.Why3.Theory.th_export  *)
+  let int_theory = try 
+    Why3.Env.read_theory env ["int"] (String.capitalize_ascii "int")
+  with
+    | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
+    | Why3.Env.AmbiguousPath   _ | Why3.Env.TheoryNotFound  _ ->
+      Format.printf "SMT: error while loading SMT theory file\n"; raise InternalError
+  in
+  let tm_export = tm_theory.Why3.Theory.th_export 
+  and int_export = int_theory.Why3.Theory.th_export in
   let index_symb = Why3.Theory.ns_find_ts tm_export ["index"]
   and msg_symb = Why3.Theory.ns_find_ts tm_export ["message"]
   and ts_symb = Why3.Theory.ns_find_ts tm_export ["timestamp"]
-  (* and int_symb = Why3.Theory.ns_find_ts int_export ["int"]; *)
+  and int_symb = Why3.Theory.ns_find_ts tm_export ["int"]; 
   and uc = ref (Why3.Theory.use_export 
     (Why3.Theory.create_theory (Why3.Ident.id_fresh "MyTheory")) 
     tm_theory
@@ -234,11 +245,18 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
     ts_symb      = ts_symb;
     eqv_symb     =  if (timestamp_style=Abstract_eq) then None 
                     else Some (Why3.Theory.ns_find_ls tm_export ["infix ~~"]); 
-    (* int_symb = int_symb; *)
-    (* int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
+
+    int_symb = int_symb; 
+    (* ajouter les autres opératuers (+ - etc)*)
+    int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
     int_geq_symb = Why3.Theory.ns_find_ls int_export ["infix >="];
     int_lt_symb = Why3.Theory.ns_find_ls int_export ["infix <"];
-    int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"]; *)
+    int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"]; 
+    int_add_symb = Why3.Theory.ns_find_ls int_export ["infix +"];
+    int_sub_symb = Why3.Theory.ns_find_ls int_export ["infix -"];
+    int_mul_symb = Why3.Theory.ns_find_ls int_export ["infix *"];
+    int_opp_symb = Why3.Theory.ns_find_ls int_export ["prefix -"];
+
     leq_symb     = Why3.Theory.ns_find_ls tm_export ["infix <~"];
     happens_symb = Why3.Theory.ns_find_ls tm_export ["happens"];
     init_symb    = Why3.Theory.ns_find_ls tm_export ["init"];
@@ -259,7 +277,7 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
     msg_ty   = Why3.Ty.ty_app (msg_symb) [];
     ts_ty    = Why3.Ty.ty_app ts_symb [];
     index_ty = Why3.Ty.ty_app index_symb [];
-    (* int_ty = Why3.Ty.ty_app int_symb []; *)
+    int_ty = Why3.Ty.ty_app int_symb []; 
     indices = filter_ty Type.tindex evars;
     tsvars = filter_ty Type.ttimestamp evars;
     msgvars = filter_msg evars;
@@ -287,6 +305,9 @@ let rec convert_type context ?(decl_fun=false) = function
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
   | Type.Index -> Why3.Ty.ty_app context.index_symb []
+  | TBase (ns,t) 
+      when Symbols.s_path_to_string (ns,t) = "int" -> 
+      context.int_ty
   | TBase (ns,t) -> 
     let s = Symbols.s_path_to_string (ns,t) in
     Why3.Ty.(ty_var (tv_of_string s))
@@ -420,24 +441,42 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
               )
               (t_not @@ ts_equ context 
                 (msg_to_fmla context t2) (msg_to_fmla context t1)
-              )
-      (* | [t1;t2] when symb = f_leq ->
+              ) 
+      (*Je dois peut-être ajouter un test sur les types ici.*)
+      | [t1;t2] when symb = f_leq && (convert_type context (Term.ty t1) = context.int_ty)->
         t_app_infer 
-          context.int_leq_symb 
+          (context.int_leq_symb)
           [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_geq ->
+      | [t1;t2] when symb = f_geq && (convert_type context (Term.ty t1) = context.int_ty)->
         t_app_infer 
-          context.int_geq_symb 
+          (context.int_geq_symb) 
           [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_lt -> 
+      | [t1;t2] when symb = f_lt && (convert_type context (Term.ty t1) = context.int_ty)-> 
         t_app_infer 
-          context.int_lt_symb
+          (context.int_lt_symb)
           [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_gt ->
+      | [t1;t2] when symb = f_gt && (convert_type context (Term.ty t1) = context.int_ty)->
         t_app_infer 
-          context.int_gt_symb
-          [msg_to_fmla context t1;msg_to_fmla context t2] *)
+          (context.int_gt_symb)
+          [msg_to_fmla context t1;msg_to_fmla context t2] 
 
+      | [t1;t2] when (path_to_string symb) = "Int_+" ->
+        t_app_infer 
+          (context.int_add_symb)
+          [msg_to_fmla context t1;msg_to_fmla context t2] 
+      | [t1;t2] when (path_to_string symb) = "Int_-" ->
+        t_app_infer 
+          (context.int_sub_symb)
+          [msg_to_fmla context t1;msg_to_fmla context t2] 
+      | [t1;t2] when (path_to_string symb) = "Int_*" ->
+        t_app_infer 
+          (context.int_mul_symb)
+          [msg_to_fmla context t1;msg_to_fmla context t2] 
+      | [t1] when (path_to_string symb) = "Int_opp" ->
+        t_app_infer 
+          (context.int_opp_symb)
+          [msg_to_fmla context t1] 
+      
       | [t1] when symb = f_happens -> 
           t_app_infer context.happens_symb [msg_to_fmla context t1]
       | [cond;f1;f2] when symb=f_ite -> 
@@ -615,8 +654,13 @@ let add_functions context =
           Symbols.fs_impl; Symbols.fs_not;
           Symbols.fs_diff
         ]
+      and predeclared_names = 
+          [
+            "Int_+"; "Int_-"; 
+            "Int_*"; "Int_opp"
+          ]
       in
-      if not (List.mem fname predeclared_symbols) then begin
+      if not (List.mem fname predeclared_symbols) && not (List.mem str predeclared_names) then begin
         try 
           let symb =
             Why3.Term.create_fsymbol
@@ -1374,7 +1418,7 @@ let is_valid
     ~timestamp_style ~separate_tuple
     table system
     evars hypotheses conclusion
-    theory
+    theory 
   in
   begin match Sys.getenv_opt "SMT_VERBOSE" with
     | None -> ()

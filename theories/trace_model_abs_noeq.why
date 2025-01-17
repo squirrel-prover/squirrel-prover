@@ -1,6 +1,8 @@
 (*Theory imported when timestamps are represented by an abstract type*)
 theory Trace_model_abs_noeq
 
+  use int.Int
+
   (*Type declarations*) 
 
   type index
