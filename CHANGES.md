@@ -1,3 +1,12 @@
+### reification of terms
+  [commit: `04a01497`]
+
+Added support for the reification of terms:
+- the syntax |"t"| allows to reify a term t.
+- Reified terms print as {"t"} to avoid any confusion (otherwise, different terms could be printed the same way).
+- Add flag "prettyPrintReify" to controlling the pretty-printing of reified terms (toggled by default).
+
+
 ### library re-organisation
   [commit: `52d4a8a7`, **breaking change**]
 
