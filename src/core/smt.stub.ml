@@ -4,7 +4,7 @@ type timestamp_style =
   | Nat
 
 let[@warning "-27"] is_valid
-  ~timestamp_style ~separate_tuple ~slow ~provers tbl system vars hyps concl
+  ~timestamp_style ~separate_tuple ~timeout ~steps ~provers tbl system vars hyps concl
 =
   Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
   false

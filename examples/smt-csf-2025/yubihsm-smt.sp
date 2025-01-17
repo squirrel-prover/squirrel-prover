@@ -258,7 +258,7 @@ lemma counterIncrease (t:timestamp, pid : index) :
     SCtr(pid)@pred(t) ~< SCtr(pid)@t ||
     SCtr(pid)@t = SCtr(pid)@pred(t).
 Proof.
- smt.
+ smt  ~steps:27385.
 Qed.
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t
@@ -271,7 +271,7 @@ lemma counterIncreaseBis:
       SCtr(pid)@t = SCtr(pid)@t').
 Proof.
   induction.
-  use counterIncrease; smt ~prover:CVC5_stringscounterexamples.
+  use counterIncrease; smt ~prover:CVC5_stringscounterexamples  ~steps:48576.
 Qed.
 
 (*------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ lemma noreplayInv (j, j', pid:index):
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
-  use counterIncreaseBis; smt ~provers:CVC5_stringscounterexamples. 
+  use counterIncreaseBis; smt ~provers:CVC5_stringscounterexamples ~steps:71121. 
 Qed.
 
 lemma noreplay (j, j', pid:index):
@@ -295,7 +295,7 @@ lemma noreplay (j, j', pid:index):
   SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=>
   j = j'.
 Proof.
-  use noreplayInv; smt. 
+  use noreplayInv; smt  ~steps:25121. 
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -305,7 +305,7 @@ lemma monotonicity (j, j', pid:index):
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
   Server(pid,j) < Server(pid,j').
 Proof.
- use noreplayInv; smt. 
+ use noreplayInv; smt  ~steps:80710. 
 Qed.
 
 
@@ -370,7 +370,7 @@ lemma valid_decode_charac (t : timestamp) (pid,j : index):
     fst(dec(otp pid j@t,k(pid))) = sid(pid) ).
 Proof.
 use valid_decode.
-project; smt.
+project; smt  ~steps:43921.
 Qed.
 
 
@@ -383,7 +383,7 @@ lemma if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
    if b && (x = y && b0) && b1 then
     snd(dec(z,diff(fst(dec(x,u)),v))).
 Proof. 
-project; smt.
+project; smt  ~steps:23373. 
 Qed.
 
 set showStrengthenedHyp=true.
@@ -423,11 +423,11 @@ Proof.
       (fun (pid0 : index) => pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
       (fun (pid0 : index) => pid <> pid0 ||
                           (pid = pid0 && not (Setup(pid0) <= t))) zero.
-      - simpl;smt.
-      - simpl;smt.
+      - simpl;smt  ~steps:22759.
+      - simpl;smt  ~steps:24083.
       - rewrite if_then_then in 3.
         assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t))
-        as H. smt.
+        as H. smt  ~steps:23987.
         rewrite /= H -le_pred_lt in 3.
         rewrite /AEAD in 1.
         fa 1.
@@ -526,7 +526,7 @@ Proof.
   use max_ts as [_ U].
   split; 1: auto.
   split.
-    + smt. 
+    + smt  ~steps:23677. 
     + by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
@@ -560,7 +560,7 @@ Proof.
   use equiv_real_ideal_enrich_tmax0 as [Hap C U].
   split; 1: auto.
   split; 1: auto.
-  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt.
+  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt  ~steps:24873.
   rewrite !Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) => happens(t')).
@@ -571,19 +571,19 @@ Proof.
   constseq 6 :
     (fun (i : index, t' : timestamp) => happens(t')) zero
     (fun (i : index, t' : timestamp) => not (happens(t'))) empty. 
-    + simpl; smt.
-    + simpl. smt.   
+    + simpl; smt  ~steps:22777.
+    + simpl. smt  ~steps:24213.   
 
     + constseq 4 :
       (fun (i : index, t' : timestamp) => happens(t')) zero
       (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
-        - simpl; smt.
-        - simpl; smt.
+        - simpl; smt  ~steps:22777.
+        - simpl; smt  ~steps:24213.
        - constseq 2 :
         (fun (t' : timestamp) => happens(t')) false
         (fun (t' : timestamp) => not (happens(t'))) exec_dflt.
-          * simpl;smt.
-          * simpl;smt.
+          * simpl;smt  ~steps:22777.
+          * simpl;smt  ~steps:24902.
           * by apply U.
 Qed.
 
@@ -630,5 +630,5 @@ Proof.
 
   intro j' Hap' Hexec'.
   use counterIncreaseBis as HH. 
-  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:CVC5_stringscounterexamples ~slow:10.
+  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:CVC5_stringscounterexamples ~steps:394268.
 Qed.

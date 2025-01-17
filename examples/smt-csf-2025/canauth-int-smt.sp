@@ -21,53 +21,55 @@ SECURITY PROPERTIES
 - authentication on one side 
 *******************************************************************************)
 
+include Int.
+open Int. 
+include Core.
+
 hash hmac
 
 name sk : index -> message
 name msgA : index * index -> message
 name msgB : index * index -> message
 
+abstract int_to_msg : int -> message
+abstract msg_to_int : message -> int
+
 abstract SIGN : message
-abstract myZero : message
 abstract ok : message
 
-mutable cellA(i:index) : message = myZero
-mutable cellB(i:index) : message = myZero
+mutable cellA(i:index) : int = 0
+mutable cellB(i:index) : int = 0
 
 channel cR
 channel cS
 
-(* mySucc function for counter *)
-abstract mySucc : message -> message
-
-(* order relation for counter *)
-abstract (~<) : message -> message -> bool
+(*op ( + ) : int -> int -> int.*)
 
 (* PROCESSES *)
 
 process ReceiverA(i,j:index) =
   in(cR,x);
-  if  cellA(i) ~< fst(fst(x))
+  if  cellA(i) < msg_to_int(fst(fst(x)))
    && snd(x) = hmac(fst(x),sk(i))
   then
-    cellA(i) := fst(fst(x));
+    cellA(i) := msg_to_int(fst(fst(x)));
     out(cS,ok)
 
 process ReceiverB(i,j:index) =
   in(cR,x);
-  if cellB(i) ~< fst(fst(x))
+  if cellB(i) < msg_to_int(fst(fst(x)))
   && snd(x) = hmac(fst(x),sk(i))
   then
-    cellB(i) := fst(fst(x));
+    cellB(i) := msg_to_int(fst(fst(x)));
     out(cS,ok)
 
 process SenderA(i,j:index) =
-  cellA(i) := mySucc(cellA(i));
-  out(cR, <<cellA(i),msgA(i,j)>, hmac(<cellA(i),msgA(i,j)>,sk(i))>)
+  cellA(i) := (cellA(i) + 1);
+  out(cR, <<int_to_msg(cellA(i)),msgA(i,j)>, hmac(<int_to_msg(cellA(i)),msgA(i,j)>,sk(i))>)
 
 process SenderB(i,j:index) =
-  cellB(i) := mySucc(cellB(i));
-  out(cR,<<cellB(i),msgB(i,j)>, hmac(<cellB(i),msgB(i,j)>,sk(i))>)
+  cellB(i) := cellB(i)+1;
+  out(cR,<<int_to_msg(cellB(i)),msgB(i,j)>, hmac(<int_to_msg(cellB(i)),msgB(i,j)>,sk(i))>)
 
 system ((!_i !_j RA: ReceiverA(i,j)) | (!_i !_j SA: SenderA(i,j)) |
         (!_i !_j RB: ReceiverB(i,j)) | (!_i !_j SB: SenderB(i,j))).
@@ -76,11 +78,14 @@ system ((!_i !_j RA: ReceiverA(i,j)) | (!_i !_j SA: SenderA(i,j)) |
 
 (* LIBRARIES *)
 
-include Real.
 
 (* AXIOMS *)
 
-axiom [any] orderSucc (n,n':message): n = n' => n ~< mySucc(n').
+axiom [any] int_msg (n:int) : msg_to_int(int_to_msg(n)) = n.
+
+hint smt int_msg. 
+
+(*axiom [any] orderSucc (n,n':message): n = n' => n ~< mySucc(n').
 
 axiom [any] orderTrans (n1,n2,n3:message): (n1 ~< n2 && n2 ~< n3) => n1 ~< n3.
 
@@ -93,17 +98,16 @@ hint smt orderSucc.
 hint smt orderTrans.
 hint smt orderStrict.
 hint smt orderEqSucc.
-
+*)
 (* The counter increases (not strictly) between t' and t when t' < t. *)
 
 lemma ctrIncA (t, t':timestamp, i:index):
   happens(t) =>
   exec@t =>
   t' < t =>
-  ( cellA(i)@t' ~< cellA(i)@t ||
-    cellA(i)@t' = cellA(i)@t).
+  cellA(i)@t' <= cellA(i)@t.
 Proof.
-induction t. smt ~steps:21281.
+induction t. smt ~steps:21073.
 Qed.
 
 (* Authentication w.r.t. A *)
@@ -116,7 +120,7 @@ lemma authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [H1 H2 H3].
   use ctrIncA.
-  euf H3; smt ~steps:22076.
+  euf H3; smt ~steps:23359.
 Qed.
 
 lemma noReplay (i,i',j,j':index) : 
@@ -125,5 +129,5 @@ lemma noReplay (i,i',j,j':index) :
    => (i<>i' || j<>j')  
    => fst(input@RA(i,j)) <> fst(input@RA(i',j')).
 Proof. 
- use authA. use ctrIncA. smt ~steps:280307.
+ use authA. use ctrIncA. smt ~steps:85500.
 Qed.

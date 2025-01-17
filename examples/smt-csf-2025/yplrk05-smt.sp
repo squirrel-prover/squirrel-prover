@@ -97,7 +97,7 @@ lemma noUpdateTag (t:timestamp, i,j:index):
 Proof.
   induction t.
   use sequentiality.
-  smt.
+  smt ~steps:35744.
 Qed.
 
 (* SECURITY PROPERTIES *)
@@ -112,7 +112,7 @@ Proof.
   generalize jj ii.
   induction t => t IH0 ii jj Hap [Ht0 Hexec].
   destruct Hexec as [_ Meq].
-  euf Meq; smt ~slow:2.
+  euf Meq; smt  ~steps:138893.
 Qed.
 
 lemma auth_T1_induction (t:timestamp, i,j:index):
@@ -124,5 +124,5 @@ Proof.
   generalize i j.
   induction t => t IH0 i j Hap [Ht Hexec].
   destruct Hexec as [H1 Meq].
-  euf Meq; smt.
+  euf Meq; smt ~steps:60310.
 Qed.

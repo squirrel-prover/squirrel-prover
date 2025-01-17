@@ -71,7 +71,7 @@ lemma lastupdateTag (i:index,tau:timestamp):
         forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau.
-  smt ~slow:5.
+  smt ~steps:280719.
 Qed.
 
 lemma lastupdateReader (ii:index,tau:timestamp):
@@ -84,7 +84,7 @@ lemma lastupdateReader (ii:index,tau:timestamp):
           happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
 induction tau.
-smt ~style:abstract.
+smt ~style:abstract ~steps:74261.
 Qed.
 
 (* The following lemma states that values of different memory cells do not
@@ -108,7 +108,7 @@ Proof.
   + rewrite Meq B /sT in A0.
     expand sR(i')@R(j',i').
     collision A0 => H.
-    smt. 
+    smt ~steps:21881. 
 Qed.
 
 (* SECURITY PROPERTIES *)

@@ -41,12 +41,8 @@ let load_theory ~timestamp_style env =
     | Why3.Env.AmbiguousPath   _ | Why3.Env.TheoryNotFound  _ ->
       Format.printf "SMT: error while loading SMT theory file\n"; None
 
-let create_call ?limit_opt prover table config_prover task :
+let create_call limit_time steps prover config_prover task :
   Why3.Call_provers.prover_call option =
-  let limit = match limit_opt with
-    | None   -> TConfig.solver_timeout (table) 
-    | Some x -> x
-  in
   Format.eprintf
     "Creating prover task for %s (version:%s altern:%S)...@."
     prover.Why3.Whyconf.prover_name
@@ -69,8 +65,9 @@ let create_call ?limit_opt prover table config_prover task :
       close_out oc 
     end;
 
-    let limit =
-      { Why3.Call_provers.empty_limit with limit_time = float_of_int limit }
+    let limit = match steps with 
+      | None -> { Why3.Call_provers.empty_limit with limit_time = float_of_int limit_time}
+      | Some s -> { Why3.Call_provers.empty_limit with limit_steps = s}
     in
     Some
       (Why3.Driver.prove_task
@@ -85,7 +82,7 @@ let create_call ?limit_opt prover table config_prover task :
       prover.Why3.Whyconf.prover_name Why3.Exn_printer.exn_printer e;
       None
 
-let run_all_async ~slow ~provers table task =
+let run_all_async ~timeout ~steps ~provers task =
   Why3.Prove_client.set_max_running_provers 4;
   let timer = start_timer () in
   let calls :
@@ -95,7 +92,7 @@ let run_all_async ~slow ~provers table task =
     Why3.Whyconf.Mprover.mapi_filter
       (fun p config_prover ->
         if List.mem Why3.Whyconf.(p.prover_name,p.prover_altern) provers then
-          let call = create_call ~limit_opt:slow p table config_prover task in
+          let call = create_call timeout steps p config_prover task in
           match call with
           | Some call -> Some (p,call)
           | None -> None
@@ -1407,7 +1404,7 @@ let unique_id =
   fun () -> incr id ; !id
 
 let is_valid
-    ~timestamp_style ~separate_tuple ~slow ~provers
+    ~timestamp_style ~separate_tuple ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   =
   let theory = match load_theory ~timestamp_style env with
@@ -1431,11 +1428,11 @@ let is_valid
   end;
   if smt_debug then
     Format.printf "%a@." Why3.Pretty.print_task task;
-  run_all_async ~slow ~provers table task
+  run_all_async ~timeout ~steps ~provers task
 
 (* Tactic registration *)
 
-let sequent_is_valid ~timestamp_style ~slow ~separate_tuple ~provers (s:TraceSequent.t) =
+let sequent_is_valid ~timestamp_style ~timeout ~steps ~separate_tuple ~provers (s:TraceSequent.t) =
   let env = TraceSequent.env s in
   let table = env.table in
   let system = match SystemExpr.to_fset env.system.set with 
@@ -1454,14 +1451,15 @@ let sequent_is_valid ~timestamp_style ~slow ~separate_tuple ~provers (s:TraceSeq
       (LowTraceSequent.Hyps.to_list s)
   in
   let conclusion = LowTraceSequent.conclusion s in
-  try is_valid ~timestamp_style ~slow ~separate_tuple ~provers
+  try is_valid ~timestamp_style ~timeout ~steps ~separate_tuple ~provers
     table system evars hypotheses conclusion
   with 
     |e -> raise e
 
 type parameters = {
   timestamp_style : timestamp_style;
-  slow : int;
+  timeout : int;
+  steps : int option;
   separate_tuple : bool;
   provers : (string*string) list
 }
@@ -1481,7 +1479,8 @@ let default_prover =
   
 let default_parameters = {
   timestamp_style = Nat;
-  slow = 1;
+  timeout = 1;
+  steps = None;
   separate_tuple = true ;
   provers = default_prover
 }
@@ -1533,9 +1532,13 @@ let parse_arg parameters =
     { parameters with provers = List.fold_left process_prover [] l }
 
   (* Other flags *)
-  | NList ({Location.pl_desc="slow"},
+  | NList ({Location.pl_desc="timeout"},
                        [Int_parsed {Location.pl_desc=s}]) ->
-    { parameters with slow=s}
+    { parameters with timeout=s}
+  | NList ({Location.pl_desc="steps"},
+                       [Int_parsed {Location.pl_desc=s}]) ->
+    { parameters with steps=Some s}
+
   | NArg {Location.pl_desc="separate_tuple"}
   | NList ({Location.pl_desc="separate_tuple"},
                        [String_name {Location.pl_desc="true"}]) ->
@@ -1560,10 +1563,10 @@ let () =
          | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
          | Goal.Local s -> s
        in
-       let {timestamp_style;slow;separate_tuple;provers} = parse_args args in
+       let {timestamp_style;timeout;steps;separate_tuple;provers} = parse_args args in
        if
          sequent_is_valid
-          ~timestamp_style ~slow ~separate_tuple
+          ~timestamp_style ~timeout ~steps ~separate_tuple
           ~provers
           s
        then
@@ -1624,7 +1627,8 @@ let () =
               in
               sequent_is_valid
                 ~timestamp_style
-                ~slow:10
+                ~timeout:10
+                ~steps:None
                 ~separate_tuple
                 ~provers:[prover,alt]
                 s))
@@ -1637,7 +1641,8 @@ let () =
            (fun s ->
               sequent_is_valid
                 ~timestamp_style
-                ~slow:10
+                ~timeout:10
+                ~steps:None
                 ~separate_tuple
                 ~provers:[prover,alt]
                 s,
@@ -1659,7 +1664,8 @@ let () =
            (fun (_,s) ->
               sequent_is_valid
                 ~timestamp_style
-                ~slow:10
+                ~timeout:10
+                ~steps:None
                 ~separate_tuple
                 ~provers:[prover,alt]
                 s))

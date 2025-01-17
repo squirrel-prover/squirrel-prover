@@ -185,7 +185,7 @@ lemma counterIncreaseBis:
 lemma to prove the induction step. *)
 Proof.
   induction.
-  smt. 
+  smt  ~steps:70136. 
 Qed.
 
 (** #### SECURITY PROPERTIES
@@ -224,7 +224,7 @@ lemma noreplayInv (ii, ii1, i:index):
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. *)
 Proof.
- use counterIncreaseBis; smt.
+ use counterIncreaseBis; smt  ~steps:41178.
 Qed.
 
 
@@ -233,7 +233,7 @@ lemma noreplay (ii, ii1, i:index):
     exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) =>
       ii = ii1.
 Proof.
-  use noreplayInv; smt.
+  use noreplayInv; smt  ~steps:11858.
 Qed.
 
 
@@ -278,7 +278,7 @@ Proof.
   (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
   not involved in another successful login, and this is done automatically 
   relying on counterIncreaseBis and the smt tactic *)
-  use counterIncreaseBis. smt ~slow:2. 
+  use counterIncreaseBis. smt ~steps:168382. 
 Qed.
 
 
@@ -296,6 +296,6 @@ lemma monotonicity (ii, ii1, i:index):
       && SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk =>
         S(ii,i) < S(ii1,i).
 Proof.
- use noreplayInv; smt.
+ use noreplayInv; smt  ~steps:22867.
 Qed.
 

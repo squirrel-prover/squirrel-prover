@@ -13,7 +13,8 @@ type timestamp_style =
 val is_valid :
 timestamp_style:timestamp_style ->
   separate_tuple:bool -> 
-  slow:int ->
+  timeout:int ->
+  steps:int option -> 
   provers:(string*string) list->
   Symbols.table ->
   SystemExpr.fset option ->
