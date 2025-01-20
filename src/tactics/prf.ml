@@ -432,9 +432,14 @@ let phi_proj
 (*------------------------------------------------------------------*)
 (** The PRF tactic *)
 let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
+  let loc = L.loc i in
+
+  if not (ES.conclusion_is_equiv s) then 
+    soft_failure ~loc 
+      (Tactics.Failure "Expected equivalence goal");
+
   let ppe = default_ppe ~table:(ES.table s) () in
   let env = ES.env s in
-  let loc = L.loc i in
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
   let system = ((Utils.oget env.system.pair) :> SE.fset) in
