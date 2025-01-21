@@ -892,7 +892,11 @@ let fa_tac args = match args with
 let is_dup
     (s : ES.t) (elem  : Term.term) (elems : Term.term list) : bool 
   =
-  let eq = ES.Reduce.conv_term s in
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+  let eq = ES.Reduce.conv_term ~system s in
 
   (* check whether [t ≤ t'] (where [≤] is the standard timestamp order
      without the happens component!) *)
@@ -948,12 +952,17 @@ let is_dup
 
     Used in automatic simplification with FA. *)
 let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
+  let system =
+    let system_s = ES.system s in
+    SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
+  in
+
   let rec is_fa_dup (elems : Term.terms) (e : Term.term) =
     (* if an element is a duplicate wrt. elems, we remove it directly *)
     if is_dup s e elems then
       (true,[])
       (* if an element is an assumption, we succeed, but do not remove it *)
-    else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then
+    else if List.mem_cmp ~eq:(ES.Reduce.conv_term ~system s) e assump then
       (true,[e])
       (* otherwise, we go recursively inside the sub-terms produced by function
          application *)
