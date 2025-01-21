@@ -1237,7 +1237,8 @@ let env_of_unif_state (st : unif_state) : Env.t =
 
 (*------------------------------------------------------------------*)
 let whnf0
-    ~(red_param : ReductionCore.red_param) 
+    ~(red_param : ReductionCore.red_param)
+    ~(strat : ReductionCore.red_strat)
     ~(hyps : TraceHyps.hyps) ~(system : SE.context)
     ~(vars : Vars.env) ~(table : Symbols.table)
     (t : Term.term) 
@@ -1247,23 +1248,26 @@ let whnf0
     (val ReductionCore.Register.get ())
   in
   let red_st = R.mk_state ~hyps ~system ~vars ~red_param table in
-  let strat = R.(MayRedSub ReductionCore.rp_full) in
   R.whnf_term ~strat red_st t
 
 (** Put [t] in weak-head normal form w.r.t. [st]. *)
 let whnf
-    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+    ~(red_param : ReductionCore.red_param)
+    ~(strat : ReductionCore.red_strat)
+    (st : unif_state) (t : Term.term) 
   : Term.term * bool 
   =
   let vars = Vars.add_vars st.bvs st.env in
   whnf0
     ~hyps:st.hyps ~system:st.system
-    ~vars ~red_param ~table:st.table t
+    ~vars ~red_param ~strat ~table:st.table t
 
 (*------------------------------------------------------------------*)
 (** Reduce [t] once in head position w.r.t. [st]. *)
 let reduce_head1
-    (red_param : ReductionCore.red_param) (st : unif_state) (t : Term.term) 
+    ~(red_param : ReductionCore.red_param)
+    ~(strat : ReductionCore.red_strat)
+    (st : unif_state) (t : Term.term) 
   : Term.term * bool 
   =
   let module R : ReductionCore.Sig =
@@ -1274,7 +1278,7 @@ let reduce_head1
     R.mk_state
       ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
-  R.reduce_head1_term red_st t
+  R.reduce_head1_term ~strat red_st t
 
 (*------------------------------------------------------------------*)
 (** Reduce [t] once in head position w.r.t. [st]. *)
@@ -1850,11 +1854,15 @@ module T (* : S with type t = Term.term *) = struct
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
     (* FIXME: retrieve rp_param from the reduction state *)
     let red_param = ReductionCore.rp_crypto in
-    let t, has_red = reduce_head1 red_param st t in
+    (* use a faster reduction strategy for subterms that ignores
+       macros, as reducing them is very slow  *)
+    (* let strat = ReductionCore.(MayRedSub { rp_crypto with diff = false; delta = delta_fast }) in *)
+    let strat = ReductionCore.Std in
+    let t, has_red = reduce_head1 ~red_param ~strat st t in
     if has_red then 
       tunif t pat st
     else
-      let pat, has_red = reduce_head1 red_param st pat in
+      let pat, has_red = reduce_head1 ~red_param ~strat st pat in
       if has_red then
         tunif t pat st
       else no_unif ()
@@ -2345,11 +2353,13 @@ let known_set_check_impl
      Does not reduce recursively (i.e. reduction is only used at head
      position to try to make a conjunction appear). *)
   let decompose_ands =
+    let red_param = ReductionCore.rp_crypto in
+    let strat = ReductionCore.(MayRedSub rp_crypto) in
     match st with
     | None -> Term.decompose_ands
     | Some st ->
       fun t ->
-        whnf ReductionCore.rp_crypto st t |>
+        whnf ~red_param ~strat st t |>
         fst |>
         Term.decompose_ands
   in
@@ -2646,11 +2656,13 @@ and deduce_fa
     (st      : unif_state)
     (minfos  : match_infos) : Mvar.t * match_infos
   =
+  let red_param = ReductionCore.rp_crypto in
+  let strat = ReductionCore.(MayRedSub rp_crypto) in
   match fa_decompose output st with
   | None ->
     (* We could not decompose [output] through into deduction sub-goals.
        Try to reduce [output] and restart [deduce]. *)
-    let term, has_red = whnf ReductionCore.rp_crypto st output.term in
+    let term, has_red = whnf ~red_param ~strat st output.term in
     if has_red then
       deduce ~output:{ output with term; } ~inputs st minfos
     else
@@ -2800,9 +2812,10 @@ let term_set_decompose
     let red_param = 
       ReductionCore.{ rp_crypto with delta = { delta_full with macro = false; }} 
     in
+    let strat = ReductionCore.(MayRedSub rp_crypto) in
     let term, _ = 
       whnf0 
-        ~red_param ~hyps ~vars:env.vars
+        ~red_param ~strat ~hyps ~vars:env.vars
         ~table:env.table ~system:env.system
         k.term
     in

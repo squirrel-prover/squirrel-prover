@@ -21,9 +21,9 @@ module THyps = Hyps.TraceHyps
 type delta = { def : bool; macro : bool; op : bool; }
 
 (*------------------------------------------------------------------*)
-let delta_full    : delta = { def = true ; macro = true ; op = true ; }
-let delta_empty   : delta = { def = false; macro = false; op = false; }
-let delta_default : delta = delta_empty
+let delta_full  : delta = { def = true ; macro = true ; op = true ; }
+let delta_fast  : delta = { def = true ; macro = false; op = true ; } (* FIXME: we could support some macros *)
+let delta_empty : delta = { def = false; macro = false; op = false; }
 
 (*------------------------------------------------------------------*)
 type red_param = { 
@@ -52,7 +52,7 @@ type red_param = {
   let rp_default = { 
     rewrite = true;
     beta    = true; 
-    delta   = delta_default;
+    delta   = delta_empty;
     zeta    = true;
     proj    = true;
     diff    = false;
@@ -79,6 +79,15 @@ type red_param = {
     proj = true; 
     zeta = true;    
   }
+
+(*------------------------------------------------------------------*)
+(** reduction strategy for head normalization *)
+type red_strat =
+  | Std
+  (** only reduce at head position *)
+  | MayRedSub of red_param
+  (** may put strict subterms in whnf w.r.t. [red_param] if it allows to
+      reduce at head position *)
 
 (*------------------------------------------------------------------*)
 module type Sig = sig
@@ -112,15 +121,6 @@ module type Sig = sig
 
   (*------------------------------------------------------------------*)
   (** {2 Reduction functions} *)
-
-  (*------------------------------------------------------------------*)
-  (** reduction strategy for head normalization *)
-  type red_strat =
-    | Std
-    (** only reduce at head position *)
-    | MayRedSub of red_param
-    (** may put strict subterms in whnf w.r.t. [red_param] if it allows to
-        reduce at head position *)
 
   (*------------------------------------------------------------------*)
   (** Fully reduces a term *)

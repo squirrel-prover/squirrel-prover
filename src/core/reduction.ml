@@ -54,15 +54,6 @@ module Core (* : ReductionCore.S *) = struct
   (** {2 Reduction state} *)
 
   (*------------------------------------------------------------------*)
-  (** reduction strategy for head normalization *)
-  type red_strat =
-    | Std
-    (** only reduce at head position *)
-    | MayRedSub of red_param
-    (** may put strict subterms in whnf if it allows to reduce at head
-        position *)
-
-  (*------------------------------------------------------------------*)
   (** reduction state *)
   type state = { 
     table     : Symbols.table;
