@@ -1242,7 +1242,7 @@ let whnf0
     ~(hyps : TraceHyps.hyps) ~(system : SE.context)
     ~(vars : Vars.env) ~(table : Symbols.table)
     (t : Term.term) 
-  : Term.term * bool 
+  : Term.term * bool
   =
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
@@ -1255,7 +1255,7 @@ let whnf
     ~(red_param : ReductionCore.red_param)
     ~(strat : ReductionCore.red_strat)
     (st : unif_state) (t : Term.term) 
-  : Term.term * bool 
+  : Term.term * bool
   =
   let vars = Vars.add_vars st.bvs st.env in
   whnf0
@@ -1268,7 +1268,7 @@ let reduce_head1
     ~(red_param : ReductionCore.red_param)
     ~(strat : ReductionCore.red_strat)
     (st : unif_state) (t : Term.term) 
-  : Term.term * bool 
+  : Term.term * ReductionCore.head_has_red
   =
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
@@ -1307,7 +1307,7 @@ let reduce_delta_def1
     (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
-  : Term.term * bool 
+  : Term.term * ReductionCore.head_has_red
   =
   match t with
   | Var v ->
@@ -1329,11 +1329,11 @@ let reduce_delta_def1
     in
     begin
       match t' with
-      | Some t' -> t', true
-      | None    -> t , false
+      | Some t' -> t', True
+      | None    -> t , False    (* no subterm to reduce *)
     end
 
-  | _ -> t, false
+  | _ -> t, False
 
 (*------------------------------------------------------------------*)
 (** Try to find a action term [t0] equal to [t]. *)
@@ -1414,17 +1414,17 @@ let reduce_delta_macro1
     (table : Symbols.table) (system : SE.context) 
     ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
     (t : Term.term)
-  : Term.term * bool
+  : Term.term * ReductionCore.head_has_red
   =
   (* let module Reduction : ReductionCore.S =  *)
   (*   (val ReductionCore.Register.get ())  *)
   (* in *)
-  let exception Failed in
+  let exception FailedBadSystem in
   try
     match t with
     | Term.Macro (ms, l, ts) ->
       let cntxt () =
-        let se = try SE.to_fset system.set with SE.Error _ -> raise Failed in
+        let se = try SE.to_fset system.set with SE.Error _ -> raise FailedBadSystem in
         Constr.{ table; system = se; models = None; }
       in
       let ta_opt = as_action hyps ts in
@@ -1432,12 +1432,12 @@ let reduce_delta_macro1
 
       if happens table hyps ta || (ta_opt <> None && happens table hyps ts) then
         match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts:ta with
-        | `Def mdef -> Term.subst [Term.ESubst (ta, ts)] mdef, true
-        | _ -> t, false
-      else t, false
+        | `Def mdef -> Term.subst [Term.ESubst (ta, ts)] mdef, True
+        | _ -> t, NeedSub
+      else t, NeedSub
 
-    | _ -> t, false
-  with Failed -> t, false
+    | _ -> t, NeedSub
+  with FailedBadSystem -> t, False
 
 (*------------------------------------------------------------------*)
 (** Perform δ-reduction once at head position
@@ -1448,7 +1448,7 @@ let reduce_delta1
     (table : Symbols.table) (system : SE.context) 
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
-  : Term.term * bool 
+  : Term.term * ReductionCore.head_has_red
   = 
   match t with
   (* macro *)
@@ -1465,9 +1465,9 @@ let reduce_delta1
     when delta.op && Operator.is_concrete_operator table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
     let t = Operator.unfold table system.set fs ty_args args in
-    t, true
+    t, True
     
-  | _ -> t, false
+  | _ -> t, False
 
 (*------------------------------------------------------------------*)
 (** {3 Global formulas reduction utilities} *)
@@ -1480,25 +1480,22 @@ let can_reduce_glob_let (t : Equiv.form) : bool =
   | Equiv.Let _ -> true
   | _ -> false
 
-let reduce_glob_let1 (t : Equiv.form) : Equiv.form * bool =
+let reduce_glob_let1 (t : Equiv.form) : Equiv.form * ReductionCore.head_has_red =
   match t with
-  | Equiv.Let (v,t1,t2) -> Equiv.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
-  | _ -> t, false
+  | Equiv.Let (v,t1,t2) -> Equiv.subst [Term.ESubst (Term.mk_var v, t1)] t2, True
+  | _ -> t, False
 
 (*------------------------------------------------------------------*)
 (** {3 Higher-level reduction utility} *)
 
 (*------------------------------------------------------------------*)
-(** Reduce once at head position in a global formula.
-    Only use the following reduction rules:
-    [zeta] *)
-let reduce_glob_head1 (f : Equiv.form) : Equiv.form * bool = 
+let reduce_glob_head1 (f : Equiv.form) : Equiv.form * ReductionCore.head_has_red = 
   match f with
   | _ when can_reduce_glob_let f ->
     let f, _ = reduce_glob_let1 f in
-    f, true
+    f, True
 
-  | _ -> f, false
+  | _ -> f, False
 
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
@@ -1772,14 +1769,14 @@ module T (* : S with type t = Term.term *) = struct
             ~mode:st.expand_context
             st.table st.system ~hyps:st.hyps t
         in
-        if not t_red then default ()
+        if t_red <> True then default ()
         else 
           let pat,pat_red =
             reduce_delta_macro1
               ~mode:st.expand_context
               st.table st.system ~hyps:st.hyps pat
           in
-          if not pat_red then default () else tunif t pat st
+          if pat_red <> True then default () else tunif t pat st
       end
 
     | Action (s,is), Action (s',is') when s = s' -> 
@@ -1855,15 +1852,16 @@ module T (* : S with type t = Term.term *) = struct
     (* FIXME: retrieve rp_param from the reduction state *)
     let red_param = ReductionCore.rp_crypto in
     (* use a faster reduction strategy for subterms that ignores
-       macros, as reducing them is very slow  *)
-    (* let strat = ReductionCore.(MayRedSub { rp_crypto with diff = false; delta = delta_fast }) in *)
-    let strat = ReductionCore.Std in
+       macros, as reducing them is slow  *)
+    let strat = ReductionCore.(MayRedSub { rp_crypto with delta = delta_fast }) in 
+    (* let strat = ReductionCore.(MayRedSub rp_empty) in *)
+    (* let strat = ReductionCore.Std in *)
     let t, has_red = reduce_head1 ~red_param ~strat st t in
-    if has_red then 
+    if has_red = True then 
       tunif t pat st
     else
       let pat, has_red = reduce_head1 ~red_param ~strat st pat in
-      if has_red then
+      if has_red = True then
         tunif t pat st
       else no_unif ()
       
@@ -3784,11 +3782,11 @@ module E = struct
       ~mode (t : Equiv.form) (pat : Equiv.form) (st : unif_state) : Mvar.t 
     =
     let t, has_red = reduce_glob_head1 t in
-    if has_red then 
+    if has_red = True then 
       unif_global ~mode t pat st
     else
       let pat, has_red = reduce_glob_head1 pat in
-      if has_red then
+      if has_red = True then
         unif_global ~mode t pat st
       else no_unif ()
 

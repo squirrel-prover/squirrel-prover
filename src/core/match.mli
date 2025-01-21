@@ -339,7 +339,7 @@ val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
 val reduce_delta_def1 :
   Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
-  Term.term * bool 
+  Term.term * ReductionCore.head_has_red 
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
@@ -347,7 +347,7 @@ val reduce_delta_macro1 :
   Symbols.table -> SE.context -> 
   ?hyps:Hyps.TraceHyps.hyps ->
   Term.term ->
-  Term.term * bool
+  Term.term * ReductionCore.head_has_red 
 
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
@@ -356,13 +356,13 @@ val reduce_delta1 :
   mode:Macros.expand_context ->
   Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
   Term.term ->
-  Term.term * bool 
+  Term.term * ReductionCore.head_has_red 
 
 (*------------------------------------------------------------------*)
 (** {3 Global formulas reduction utilities} *)
 
 (** global let reduction *)
-val reduce_glob_let1 : Equiv.form -> Equiv.form * bool
+val reduce_glob_let1 : Equiv.form -> Equiv.form * ReductionCore.head_has_red
 
 (*------------------------------------------------------------------*)
 (** {2 Internals} *)

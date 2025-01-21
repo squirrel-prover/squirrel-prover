@@ -1178,7 +1178,7 @@ module Mk (Args : MkArgs) : S with
       in
       let pt = { pt with form } in
 
-      if has_red then pt
+      if has_red = True then pt
       else raise (CannotApply pt)
     in
 

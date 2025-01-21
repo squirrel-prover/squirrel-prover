@@ -279,10 +279,10 @@ module Core (* : ReductionCore.S *) = struct
       when [θ] is a variable renaming. *)
   and conv_try_reduce (st : cstate) (t1 : Term.t) (t2 : Term.t) : unit =
     let t1, has_red = reduce_head1_term st.rst t1 in
-    if has_red then conv st t1 t2
+    if has_red = True then conv st t1 t2
     else
       let t2, has_red = reduce_head1_term st.rst t2 in
-      if has_red then conv st t1 t2
+      if has_red = True then conv st t1 t2
       else not_conv ()
 
   (*------------------------------------------------------------------*)
@@ -295,11 +295,11 @@ module Core (* : ReductionCore.S *) = struct
   and reduce_term (st : state) (t : Term.term) : Term.term * bool = 
     let t, has_red = reduce_head1_term st t in
 
-    if has_red then fst (reduce_term st t), true
+    if has_red = True then fst (reduce_term st t), true
     else
       let t, has_red = reduce_subterms ~f_red:reduce_term st t in
       if has_red then fst (reduce_term st t), true
-      else t, false
+      else t, has_red
 
   (*------------------------------------------------------------------*)
   (** Exported.
@@ -311,120 +311,137 @@ module Core (* : ReductionCore.S *) = struct
     (* reduce in head position as much as possible *)
     let rec doit t =
       let t, has_red = reduce_head1_term ~strat st t in
-      if has_red then doit t else t
+      if has_red = True then doit t else t
     in
 
     let t, has_red = reduce_head1_term ~strat st t in
-    if has_red then doit t, true else t, false
+    if has_red = True then doit t, true else t, false
 
   (** Auxiliary function reducing once at head position. 
       The reduction strategy is implemented in [reduce_head1_term]. *)
-  and red_head1 : state -> Term.t -> Term.t * bool =
+  and red_head1 : state -> Term.t -> Term.t * head_has_red =
     let red_rules =
       [
         reduce_delta1    ;     (* δ *)
-        rewrite_head_once;     (* user rewriting rules *)
+        rewrite_head1    ;     (* user rewriting rules *)
         reduce_beta1     ;     (* β *)
         reduce_proj1     ;     (* proj *)
         reduce_diff1     ;     (* diff *)
         reduce_let1      ;     (* zeta *)
         reduce_constr1   ;     (* constr *)
-        reduce_builtin   ;     (* builtin *)
+        reduce_builtin1  ;     (* builtin *)
       ]
     in
-    let rec try_red red_funcs (st : state) (t : Term.t) : Term.t * bool =
+    (* [has_red] is needed to know if one of the tried reduction rule
+       needs to reduce a subterm *)
+    let rec try_red
+        red_funcs ~(has_red : head_has_red)
+        (st : state) (t : Term.t) : Term.t * head_has_red
+      =
       match red_funcs with
-      | [] -> t, false
+      | [] -> t, has_red
       | red_f :: red_funcs ->
-        let t0, has_red = red_f st t in
-        if has_red then t0, true
-        else try_red red_funcs st t
+        let t0, has_red0 = red_f st t in
+        if has_red0 = True then t0, True
+        else
+          let has_red = has_red ||| has_red0 in
+          try_red red_funcs ~has_red st t
     in
 
-    fun (st : state) (t : Term.term) -> try_red red_rules st t
+    fun (st : state) (t : Term.term) -> try_red red_rules ~has_red:False st t
       
   (** Reduce once at head position.
       May use all reduction rules:
        [δ, user rewriting rules, β, proj, diff, zeta, constr] *)
   and reduce_head1_term
       ?(strat : red_strat = Std)
-      (st : state) (t : Term.term) : Term.term * bool
+      (st : state) (t : Term.term) : Term.term * head_has_red
     =
     let t, has_red = red_head1 st t in
     match strat, has_red with
-    | Std, _ | MayRedSub _, true -> t, has_red
-    | MayRedSub red_param, false ->
+    | Std, _ -> t, has_red
+
+    | MayRedSub _, True  -> t, True
+    | MayRedSub _, False -> t, False
+
+    | MayRedSub red_param, NeedSub ->
       (* put strict subterms in whnf and try to reduce at head position again *)
       let t', has_red_sub =
         reduce_subterms ~f_red:(whnf_term ~strat:Std) { st with red_param; } t
       in
       if has_red_sub then
         let t', has_red = red_head1 st t' in
-        if has_red then t', true else t, false
-      else t, false
+        if has_red = True then t', True else t, False
+      else t, False
 
 
   (*------------------------------------------------------------------*)
   (* β-reduction *)
-  and reduce_beta1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.red_param.beta then t, false
+  and reduce_beta1 (st : state) (t : Term.term) : Term.term * head_has_red =
+    if not st.red_param.beta then t, False
     else 
       match t with
       | Term.App (Term.Quant (Term.Lambda, v :: evs, t0), arg :: args) -> 
         let evs, subst = Term.refresh_vars evs in
         let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
-        Term.mk_app (Term.mk_lambda evs t0) args, true
+        Term.mk_app (Term.mk_lambda evs t0) args, True
 
-      | _ -> t, false
+      | Term.App (_, _) -> t, NeedSub
+      | _ -> t, False
 
   (** (local) let reduction *)
-  and reduce_let1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.red_param.zeta then t, false
+  and reduce_let1 (st : state) (t : Term.term) : Term.term * head_has_red =
+    if not st.red_param.zeta then t, False
     else
       match t with
-      | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, true
-      | _ -> t, false
+      | Term.Let (v,t1,t2) -> Term.subst [Term.ESubst (Term.mk_var v, t1)] t2, True
+      | _ -> t, False
 
   (** projection reduction *)
-  and reduce_proj1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.red_param.proj then t, false
+  and reduce_proj1 (st : state) (t : Term.term) : Term.term * head_has_red =
+    if not st.red_param.proj then t, False
     else
       match t with
-      | Term.Proj (i, Term.Tuple ts) -> List.nth ts (i - 1), true
-      | _ -> t, false
+      | Term.Proj (i, Term.Tuple ts) -> List.nth ts (i - 1), True
+      | Term.Proj (_, _) -> t, NeedSub
+      | _ -> t, False
 
-  and reduce_diff1 (st : state) (t : Term.term) : Term.term * bool =
-    if not st.red_param.diff || not (SE.is_fset st.system.set) then t, false
+  and reduce_diff1 (st : state) (t : Term.term) : Term.term * head_has_red =
+    if not st.red_param.diff || not (SE.is_fset st.system.set) then t, False
     else
       let se = SE.to_fset st.system.set in
-      Term.head_normal_biterm0 (SE.to_projs se) t
+      let t, has_red = Term.head_normal_biterm0 (SE.to_projs se) t in
+      if has_red then t, True else
+        match t with
+        | Term.Diff _ -> t, NeedSub
+        | _           -> t, False
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
-  and reduce_constr1 (st : state) (t : Term.term) : Term.term * bool =
+  and reduce_constr1 (st : state) (t : Term.term) : Term.term * head_has_red =
     if not st.red_param.constr ||
        Term.ty t <> Type.tboolean ||
        Term.equal t Term.mk_false ||
        Term.equal t Term.mk_true
-    then t, false
+    then t, False
     else
       let exception NoExp in
       try
         let timeout = TConfig.solver_timeout st.table in
         if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table t )
-        then Term.mk_true,true
+        then Term.mk_true,True
         else if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table (Term.mk_not t))
-        then Term.mk_false,true
-        else t,false   
-      with NoExp -> (t,false)
+        then Term.mk_false,True
+        else t,False
+      with NoExp -> (t,False)
 
   (* Expand once at head position *)
-  and reduce_delta1 (st : state) (t : Term.term) : Term.term * bool = 
+  and reduce_delta1 (st : state) (t : Term.term) : Term.term * head_has_red = 
     Match.reduce_delta1
       ~delta:st.red_param.delta
       ~mode:st.expand_context st.table st.system st.hyps t
 
-  and reduce_builtin (st : state) (t : Term.t) : Term.t * bool =
-    if not st.red_param.builtin then t, false
+  and reduce_builtin1 (st : state) (t : Term.t) : Term.t * head_has_red =
+    if not st.red_param.builtin then t, False
     else
       let open Library.Int in
       let table = st.table in
@@ -432,25 +449,25 @@ module Core (* : ReductionCore.S *) = struct
       match Term.decompose_app t with
       (* Int.( + ) *)
       | Fun (fs,_), [Int i1; Int i2] when fs = add table ->
-        Term.mk_int Z.(i1 + i2), true
+        Term.mk_int Z.(i1 + i2), True
 
       (* Int.( - ) *)
       | Fun (fs,_), [Int i1; Int i2] when fs = minus table ->
-        Term.mk_int Z.(i1 - i2), true
+        Term.mk_int Z.(i1 - i2), True
 
       (* Int.( * ) *)
       | Fun (fs,_), [Int i1; Int i2] when fs = mul table ->
-        Term.mk_int Z.(i1 * i2), true
+        Term.mk_int Z.(i1 * i2), True
 
       (* Int.opp *)
       | Fun (fs,_), [Int i]          when fs = opp table ->
-        Term.mk_int Z.(- i), true
+        Term.mk_int Z.(- i), True
 
-      | _ -> t, false
+      | _ -> t, NeedSub  (* FIXME: be more precise? *)
 
   (* Rewrite once at head position *)
-  and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    if not st.red_param.rewrite then t, false 
+  and rewrite_head1 (st : state) (t : Term.term) : Term.term * head_has_red = 
+    if not st.red_param.rewrite then t, False 
     else 
       let db = Hint.get_rewrite_db st.table in
       let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
@@ -479,8 +496,8 @@ module Core (* : ReductionCore.S *) = struct
       in
 
       match rule with
-      | None -> t, false
-      | Some red_t -> red_t, true
+      | None -> t, NeedSub
+      | Some red_t -> red_t, True
 
   (** Reduce all strict subterms according to [f_red] *)
   and reduce_subterms
@@ -607,24 +624,28 @@ module Core (* : ReductionCore.S *) = struct
   (** {2 Global formula reduction} *)
 
   (*------------------------------------------------------------------*)
-  let reduce_glob_let1 (st : state) (t : Equiv.form) : Equiv.form * bool =
-    if not st.red_param.zeta then t, false
+  let reduce_glob_let1 (st : state) (t : Equiv.form) : Equiv.form * head_has_red =
+    if not st.red_param.zeta then t, False
     else Match.reduce_glob_let1 t
 
   (*------------------------------------------------------------------*)
   (** Reduce once at head position in a global formula.
       May use all reduction rules:
        [zeta ] *)
-  let reduce_head1_global (st : state) (t : Equiv.form) : Equiv.form * bool = 
-    let rec try_red red_funcs =
+  let reduce_head1_global
+      (st : state) (t : Equiv.form) : Equiv.form * head_has_red
+    = 
+    let rec try_red red_funcs ~(has_red : head_has_red) =
       match red_funcs with
-      | [] -> t, false
+      | [] -> t, has_red
       | red_f :: red_funcs ->
-        let t, has_red = red_f t in
-        if has_red then t, true
-        else try_red red_funcs
+        let t0, has_red0 = red_f t in
+        if has_red0 = True then t0, True
+        else
+          let has_red = has_red ||| has_red0 in
+          try_red red_funcs ~has_red
     in
-    try_red [reduce_glob_let1 st; ]     (* zeta *)
+    try_red ~has_red:False [reduce_glob_let1 st; ]     (* zeta *)
 
   (*------------------------------------------------------------------*)
   (** {2 Global formula convertion} *)
@@ -740,7 +761,7 @@ module type S = sig
   val reduce_head1 :
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
-    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
+    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
 
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
@@ -823,7 +844,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       (param : red_param) (s : S.t)
-      (k : a Equiv.f_kind) (x : a) : a * bool
+      (k : a Equiv.f_kind) (x : a) : a * head_has_red
     =
     let st = to_state ?expand_context ?system param s in
     match k with
@@ -959,7 +980,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Some _ as res -> res
       | None ->
         let x, has_red = reduce_head1_term (to_state rp_full s) x in
-        if not has_red then 
+        if has_red <> True then 
           None                  (* did not reduce, failed *)
         else
           destr_term x          (* reduced, recurse to try again *)
@@ -986,7 +1007,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Some _ as res -> res
       | None ->
         let x, has_red = reduce_head1_term (to_state rp_full s) x in
-        if not has_red then 
+        if has_red <> True then 
           None               (* did not reduce, failed *)
         else
           destr_t x          (* reduced, recurse to try again *)
@@ -996,7 +1017,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Some _ as res -> res
       | None ->
         let x, has_red = reduce_head1_global (to_state rp_full s) x in
-        if not has_red then 
+        if has_red <> True then 
           None               (* did not reduce, failed *)
         else
           destr_e x          (* reduced, recurse to try again *)

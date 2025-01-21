@@ -369,7 +369,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         Match.reduce_delta1
           ~delta:ReductionCore.delta_full ~mode table new_context new_hyps t
       in      
-      if has_red then t else failed ()
+      if has_red = True then t else failed ()
       
     | _ -> failed ()
 
@@ -980,7 +980,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let form, has_red = 
             S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
           in
-          if has_red then 
+          if has_red = True then 
             doit_cases form
           else destr_err ()
         | Some cases -> cases
@@ -1325,7 +1325,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let form, has_red = 
             S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
           in
-          if has_red then 
+          if has_red = True then 
             doit form init_destr_list (* start again *)
           else 
             destr_fail (fun fmt -> S._pp_hyp ppe fmt form)
@@ -1469,7 +1469,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let form, has_red = 
           S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
         in
-        if has_red then 
+        if has_red = True then 
           doit form
         else 
           soft_failure Tactics.NothingToIntroduce
@@ -1536,7 +1536,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let form, has_red = 
           S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
         in
-        if has_red then 
+        if has_red = True then 
           doit form
         else 
           soft_failure Tactics.NothingToIntroduce
@@ -2008,7 +2008,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let t, has_red =
             S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind pat.pat_op_term
           in
-          if not has_red then
+          if has_red <> True then
             (* match failed and [pat] cannot be reduced: user-level error *)
             soft_failure (ApplyMatchFailure minfos)
           else

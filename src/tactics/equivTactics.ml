@@ -1449,7 +1449,7 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
             let form, has_red =
               ES.Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t form
             in
-            if not has_red then bad_formula ();
+            if has_red <> True then bad_formula ();
             as_deduction_hyp ~subgs form
           end
       in

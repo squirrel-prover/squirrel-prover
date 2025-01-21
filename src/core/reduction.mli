@@ -39,7 +39,7 @@ module type S = sig
   val reduce_head1 :
     ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
-    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * bool
+    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
 
   (*------------------------------------------------------------------*)
   (** {2 Expantion and destruction modulo } *)

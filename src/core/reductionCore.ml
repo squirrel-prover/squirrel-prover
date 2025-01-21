@@ -90,6 +90,20 @@ type red_strat =
       reduce at head position *)
 
 (*------------------------------------------------------------------*)
+type head_has_red =
+  | True         (** head-reduction succeeded *)
+  | False        (** no reduction rule could be applied at head position *)
+  | NeedSub
+  (** no reduction rule applied at head position, but a rule could
+      possibly apply if a subterm was reduced *)
+
+let ( ||| ) t1 t2 =
+  match t1, t2 with
+  | True, _ | _, True -> True
+  | False, False -> False
+  | NeedSub, _ | _, NeedSub -> NeedSub
+  
+(*------------------------------------------------------------------*)
 module type Sig = sig
 
   val parse_simpl_args : red_param -> Args.named_args -> red_param 
@@ -130,10 +144,10 @@ module type Sig = sig
       according to [strat] (default to [Std]). *)
   val reduce_head1_term :
     ?strat:red_strat ->
-    state -> Term.term -> Term.term * bool
+    state -> Term.term -> Term.term * head_has_red
 
   (** Reduce once at head position in a global formula. *)
-  val reduce_head1_global : state -> Equiv.form -> Equiv.form * bool 
+  val reduce_head1_global : state -> Equiv.form -> Equiv.form * head_has_red
 
   (** Weak head normal form according to [strat] (default to [Std]) *) 
   val whnf_term :
