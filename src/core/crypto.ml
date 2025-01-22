@@ -1313,7 +1313,7 @@ type result = {
   subgoals     : Term.terms;
   (** TODO: all these subgoals must be always true, not simply almost always true. 
       Currently, we cannot create such subgoals in Squirrel. *)    
-  extra_outputs : CondTerm.t list;
+  extra_outputs : TSet.t list;
   (** Sequence of oracles input (game trace) during the bideduction goal with this state. *)
   
   final_mem    : AbstractSet.mem;
@@ -1342,6 +1342,13 @@ let transitivity_get_next_query
   =
   (* TODO : remove folowing line : it doesn't follow semantics*)
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
+  let output = result.extra_outputs in
+  let new_inputs = List.map
+                     (fun (t:TSet.t):CondTerm.t ->
+                                     {term = Term.mk_lambda t.vars t.term;
+                                      conds = List.map (fun c -> Term.mk_forall ~simpl:true t.vars c) t.conds})
+                     output
+  in
   {
     old_query with
     consts      = old_query.consts @ consts;
@@ -1349,7 +1356,7 @@ let transitivity_get_next_query
     inputs      = 
       output_term
       @ old_query.inputs
-      @ result.extra_outputs;
+      @ new_inputs;
   }
 
 let chain_results  (res1 : result) (res2 : result):result=
@@ -1423,7 +1430,7 @@ type goal = {
 
   (** outputs [v = (vₒ, vₑ)] *)
   output        : CondTerm.t;
-  extra_outputs : CondTerm.t list;
+  extra_outputs : TSet.t list;
 
   (** [None  ]: direct subgoals
       [Some ϕ]: recursive subgoal assuming [ϕ] *)
@@ -1447,7 +1454,7 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
     vars          = Term.subst_vars subst goal.vars;
     rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
     extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
-    extra_outputs = List.map (CondTerm.subst subst) goal.extra_outputs;
+    extra_outputs = List.map (TSet.subst subst) goal.extra_outputs;
     output        = CondTerm.subst subst goal.output;
     rec_predicate = omap (Term.subst subst) goal.rec_predicate;
     vbs           = goal.vbs;
@@ -1522,7 +1529,7 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
   let pp_extra_outputs fmt =
     if not ppe.dbg || goal.extra_outputs = [] then Fmt.pf fmt "" else
       Fmt.pf fmt ",@ @[%a@]"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) goal.extra_outputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) goal.extra_outputs
   in
   let pp_bideduction_goal fmt =
     Fmt.pf fmt "@[<hv 0>%t@[%t@]@ ▷@ @[%t@]%t@]" 
@@ -2302,10 +2309,11 @@ let rec bideduce_term_strict
     let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
     (*building lambda term that contains all computed extra and save outputs*)
-    let extra_outputs =
-      List.map
-        (fun t -> CondTerm.{term=(Term.mk_lambda es t.term); conds = output_term.conds})
-        result.extra_outputs
+    let extra_outputs = List.map  (fun (t:TSet.t):TSet.t -> 
+      { term= t.term;
+        conds =t.conds;
+        vars = es@t.vars;
+      }) result.extra_outputs
     in
     some {result with consts;subgoals;extra_outputs;}
 
@@ -2447,9 +2455,9 @@ and bideduce_oracle
       (* add the subgoals required by the [oracle_match] to the state *)
       let extra_outputs =
         if index_cond = [] then
-          [output_term] 
+          [TSet.{term = output_term.term; conds = output_term.conds; vars = []}] 
         else
-          [ {output_term with conds = index_cond@output_term.conds} ]
+          [TSet.{term = output_term.term ; conds = index_cond@output_term.conds;vars = []} ]
       in
       let result_call =
         { subgoals = mem_subgoals @ subgoals;
@@ -3245,8 +3253,8 @@ let prove
         
       | `Direct -> []
     in      
-    List.map (fun (term : CondTerm.t) ->
-        let term = CondTerm.subst s term in
+    List.map (fun (term : TSet.t) ->
+        let term = TSet.subst s term in
         TSet.{
           conds = 
             rec_target_cond @  (* [A i < B j], if [target] is recursive *)
