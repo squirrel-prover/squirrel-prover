@@ -1308,18 +1308,18 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "revert" ids }
 
-  | l=lloc(GENERALIZE) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
-    { mk_abstract l "generalize" [TacticsArgs.Generalize (terms, n_ips_o)] }
+  | l=lloc(GENERALIZE) terms=slist1(sterm, empty) system=at_X_annot(SYSTEM)? n_ips_o=as_n_ips? 
+    { mk_abstract l "generalize" [TacticsArgs.Generalize (terms, n_ips_o, system)] }
 
-  | l=lloc(generalize_dependent) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
+  | l=lloc(generalize_dependent) terms=slist1(sterm, empty) system=at_X_annot(SYSTEM)? n_ips_o=as_n_ips?
     { mk_abstract l "generalize dependent"
-                  [TacticsArgs.Generalize (terms, n_ips_o)] }
+                  [TacticsArgs.Generalize (terms, n_ips_o, system)] }
 
-  | l=lloc(INDUCTION) t=tactic_params
-    { mk_abstract l "induction" t}
+  | l=lloc(INDUCTION) t=tac_term? system=at_X_annot(SYSTEM)? 
+    { mk_abstract l "induction" [TacticsArgs.Induction (t, system)] }
 
-  | l=lloc(dependent_induction) t=tactic_params
-    { mk_abstract l "dependent induction" t }
+  | l=lloc(dependent_induction) t=tac_term? system=at_X_annot(SYSTEM)?
+    { mk_abstract l "dependent induction" [TacticsArgs.Induction (t, system)] }
 
   | l=lloc(SET) n_ip=naming_pat system=at_X_annot(SYSTEM)? COLONEQ term=term %prec tac_prec
     { mk_abstract l "set" [TacticsArgs.Set (n_ip, system, term)] }

@@ -147,11 +147,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** The default system expression in a sequent:
       - [set] for local sequent;
       - [equiv] for global sequent. *)
-  let default_system (s : S.t) : SE.t =
+  let default_system ?loc (s : S.t) : SE.t =
     match S.conc_kind with
     | Equiv.Local_t  -> (S.system s).set
-    | Equiv.Global_t -> (oget (S.system s).pair :> SE.t)
-    (* TODO: if [pair] is [None], we should return a default system value. *)
+    | Equiv.Global_t ->
+      begin
+        match (S.system s).pair with
+        | Some x -> (x :> SE.t)
+        | None -> hard_failure ?loc
+                    (Tactics.Failure
+                       "A sequent with equiv ≠ None is required here")
+                    (* TODO: if [pair] is [None],
+                       we should return a default system value. *)
+      end 
+          
     | _ -> assert false     (* impossible *)
 
   (*------------------------------------------------------------------*)
@@ -1614,9 +1623,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
       
-  (** Generalize a pattern [pat] (which may feature term holes [_]) 
+  (** Generalizes a pattern [pat] (which may feature term holes [_]) 
       in system [in_system] into a fresh variable [v].
-      Return the pair [(v,t)] where [t] is the instantiation of [pat]
+      Returns the pair [(v,t)] where [t] is the instantiation of [pat]
       that was generalized.
 
       Generalization occurs only in the conclusion, except if [depends].
@@ -1649,13 +1658,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       (* Otherwise, try to infer term and type variables by matching
          in the conclusion. *)
-      else begin
-        let target = S.conclusion s in
-        let target = Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t target in
-        let occurrences = Args.occurrences_of_pat ?ienv ~in_system env pat ~target in
-        if occurrences = [] then soft_failure ?loc (Failure "no occurrence found");
-        List.hd occurrences
-      end
+      else
+        begin
+          let target = S.conclusion s in
+          let target =
+            Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t target
+          in
+          let occurrences =
+            Args.occurrences_of_pat ?ienv ~in_system env pat ~target
+          in
+          if occurrences = [] then
+            soft_failure ?loc (Failure "no occurrence found");
+          List.hd occurrences
+        end
+
     in
 
     let rw_rule =
@@ -1703,7 +1719,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
             let fv = 
               match ldc with LHyp f -> S.fv_hyp f | LDef (_,t) -> Term.fv t
             in
-            if Sv.mem v fv then revert ?loc id s else s (* note that [revert] may fail *)
+            if Sv.mem v fv then revert ?loc id s else s 
+            (* note that [revert] may fail *)
           ) s s
     in
 
@@ -1712,7 +1729,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     ((v,tag),term), s
 
   (*------------------------------------------------------------------*)
-  (** [terms] and [n_ips] must be of the same length *)
+  (** Generalizes terms [terms] understood in system [in_system]
+      into variables according to the naming patterns [n_ips].
+      Returns the new variables, and the resulting sequent.
+     [terms] and [n_ips] must be of the same length. *)
   let generalize
       ~dependent ~(in_system : SE.t)
       ~(mode: [`Gen | `Def])
@@ -1773,16 +1793,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (gens, s)
 
   (*------------------------------------------------------------------*)
-  (** [terms] and [n_ips] must be of the same length *)
-  let do_generalize_tac
+  (** Internal function implementing the [generalize] tactic.
+      [terms] and [n_ips] must be of the same length. *)
+  let generalize_tac_internal
       ~dependent
       (terms : (Term.term * L.t option * Infer.env option) list)
       (n_ips : Args.naming_pat list) (s : S.t)
+      ~(in_system:SE.arbitrary) (* the system we are interpreting [terms] in *)
     : S.t
     =
-    (* the system we are generalizing in *)
-    let in_system = default_system s in
-
     let gens, s = generalize ~mode:`Gen ~dependent ~in_system terms n_ips s in
 
     (* throw away the generalized terms, which are no useful here *)
@@ -1795,15 +1814,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_conclusion conclusion s
 
   (*------------------------------------------------------------------*)
+
+  (** Returns a naming pattern to use for a variable storing term [t]:
+      if [t] is already a variable, we keep its name *)
   let naming_pat_of_term t =
     match t with
     | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
     | _ -> Args.AnyName
 
   (*------------------------------------------------------------------*)
+  (** Parses the arguments given to the [generalize] tactic, and passes
+    them to the internal function *)
   let generalize_tac_args ~dependent args s : S.t list =
     match args with
-    | [Args.Generalize (terms, n_ips_opt)] ->
+    | [Args.Generalize (terms, n_ips_opt, system)] ->
       let terms =
         List.map (fun p_arg ->
             let ienv = Infer.mk_env () in
@@ -1824,11 +1848,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
                                    and naming patterns");
           n_ips
       in
-
-      [do_generalize_tac ~dependent terms n_ips s]
+      let in_system =
+        match system with
+        | None -> default_system s
+        | Some system ->
+          let table = S.table s in
+          let se_env = (S.env s).se_vars in
+          SE.Parse.parse ~implicit:false ~se_env table system |>
+          snd
+      in
+      [generalize_tac_internal ~dependent terms n_ips ~in_system s]
 
     | _ -> assert false
 
+
+  (** The [generalize] tactic *)
   let generalize_tac ~dependent args =
     wrap_fail (generalize_tac_args ~dependent args)
 
@@ -2266,6 +2300,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Induction} *)
 
   (** Induction, for both global and local sequents.
+      On a sequent where the conclusion is of the form forall x. phi,
+      performs an induction on x.
       Global induction is sound only over finite types. *)
   let induction (s : S.t) : S.t list =
     let conclusion = S.conclusion s in
@@ -2324,21 +2360,45 @@ module MkCommonLowTac (S : Sequent.S) = struct
     [S.set_conclusion new_conclusion s]
 
 
-  let induction_gen ~dependent (t : Term.term) s : S.t list =
-    let s = do_generalize_tac ~dependent [t, None, None] [naming_pat_of_term t] s in
+(**  When a term is given on which to perform the induction, 
+     we first generalize this term (in the given system) *)
+  let induction_gen 
+      ~dependent ~(in_system:SE.arbitrary) (t : Term.term) s : S.t list =
+    let s =
+      generalize_tac_internal
+        ~dependent [t, None, None] [naming_pat_of_term t] ~in_system s
+    in
     induction s
 
+  (** Parses the arguments to tactic [induction], passes them to the correct
+      function *)
   let induction_args ~dependent args s =
     match args with
-    | [] -> induction s
-    | [Args.Term_parsed _] ->
+    | [Args.Induction (None, None)] -> induction s
+    | [Args.Induction (None, _)] ->
+      hard_failure (Failure "System can only be specified when generalizing")
+    | [Args.Induction (Some t, system)] ->
+      let in_system =
+        match system with 
+        | None -> default_system s
+        | Some system ->
+          let table = S.table s in
+          let se_env = (S.env s).se_vars in
+          SE.Parse.parse ~implicit:false ~se_env table system |>
+          snd
+      in
       begin
-        match convert_args s args (Args.Sort Args.Message) with
-        | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
+        match 
+          convert_args s [Args.Term_parsed t] (Args.Sort Args.Message)
+        with
+        | Args.Arg (Args.Message (t, _)) -> 
+          induction_gen ~dependent ~in_system t s
         | _ -> hard_failure (Failure "ill-formed arguments")
       end
     | _ -> bad_args ()
 
+
+  (** The [induction] tactic *)
   let induction_tac ~dependent args =
     wrap_fail (induction_args ~dependent args)
 

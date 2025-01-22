@@ -628,17 +628,26 @@ let old_induction Args.(Message (ts,_)) s =
 let old_or_new_induction args : etac =
   (fun s sk fk ->
      if TConfig.new_ind (LowEquivSequent.table s) then
+       (* flag newInduction is set: always use the new induction *)
        (EquivLT.induction_tac ~dependent:false) args s sk fk
      else
-       match EquivLT.convert_args s args (Args.Sort Args.Message) with
-       | Args.Arg (Args.Message (ts,ty)) ->
-         if Type.equal ty Type.ttimestamp then
-           let ss = old_induction (Args.Message (ts,ty)) s in
-           sk ss fk
-         else
-           (* use the new induction principle over types different from timestamp. *)
-           EquivLT.induction_tac ~dependent:false args s sk fk
-       | _ -> hard_failure (Failure "ill-formed arguments")
+       (* use the old induction only if 1) a timestamp parameter is given
+          and 2) no system is provided *)
+       match args with
+       | [Args.Induction (Some t, None) ] ->
+         begin
+           match EquivLT.convert_args s [Args.Term_parsed t] (Args.Sort Args.Message) with
+           | Args.Arg (Args.Message (ts,ty)) ->
+             if Type.equal ty Type.ttimestamp then
+               let ss = old_induction (Args.Message (ts,ty)) s in
+               sk ss fk
+             else
+               (* use the new induction principle over types different from timestamp. *)
+               EquivLT.induction_tac ~dependent:false args s sk fk
+           | _ -> hard_failure (Failure "ill-formed arguments")
+         end 
+       | _ -> EquivLT.induction_tac ~dependent:false args s sk fk
+
   )
 
 (*------------------------------------------------------------------*)

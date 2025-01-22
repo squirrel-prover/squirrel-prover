@@ -38,7 +38,25 @@ lemma _ :
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
   intro Ass y x.
-  generalize (f x) (f y) as x y.
+  generalize (f x) (f y) as u v.
+  assumption Ass.
+Qed.
+
+lemma _ :
+ (forall (x,y : message), x = a || y = b) =>
+ (forall (y,x : message), f(x) = a || f(y) = b).
+Proof.
+  intro Ass y x.
+  generalize (f x) (f y) @system:default/left as u v.
+  checkfail (assumption Ass) exn NotHypothesis.
+Abort.
+
+lemma _ :
+ (forall (x,y : message), x = a || y = b) =>
+ (forall (y,x : message), f(x) = a || f(y) = b).
+Proof.
+  intro Ass y x.
+  generalize (f x) (f y) as u v.
   assumption Ass.
 Qed.
 
@@ -82,7 +100,7 @@ Proof.
   apply foo_const.
 Qed.
 
-(* check that local sequent loose tags when generalizing a local quantifier  *)
+(* check that local sequent loses tags when generalizing a local quantifier  *)
 global lemma _ (z : message[const]) : [P z].
 Proof.
   byequiv. 
@@ -148,6 +166,23 @@ global lemma [any] _ ['a 'b] (phi,phi': 'a -> _) (t : 'b) :
 Proof.
   intro Ass.
   generalize (exists _, _) (exists _, _) as E E0.
+  assumption Ass.
+Qed.
+
+(* Unless we explicitly specify we want to generalize in the set: 
+   then we can generalize in `[_]` but not `equiv(_)` *)
+global lemma _ {'P:system, 'Q:system[pair]} 
+       @set:'P @equiv:'Q ['a 'b] 
+       (phi,phi': 'a -> _) (t : 'b) : 
+  ( Forall (E,E0:bool),
+      [E && E0] /\  
+      equiv((exists (i:'a), phi i) && exists (i:'a), phi' i) ) 
+  ->
+  (* *) [(exists i, phi i) && exists i, phi' i] /\
+  equiv ((exists i, phi i) && exists i, phi' i).
+Proof.
+  intro Ass.
+  generalize (exists _, _) (exists _, _) @system:'P as E E0.
   assumption Ass.
 Qed.
 

@@ -223,7 +223,9 @@ type parser_arg =
   | ConstSeq       of int L.located * (Typing.term * Typing.term) list
   | MemSeq         of int L.located * int L.located
   | Remember       of Typing.term * lsymb
-  | Generalize     of Typing.term list * naming_pat list option
+  | Generalize     of Typing.term list * naming_pat list option *
+                      SystemExpr.Parse.t option
+  | Induction      of Typing.term option * SystemExpr.Parse.t option
   | Set            of naming_pat * SystemExpr.Parse.t option * Typing.term
   (** [set @system x := t]  *)
   | Fa             of fa_arg list
