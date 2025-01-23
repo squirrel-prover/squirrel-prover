@@ -1315,10 +1315,10 @@ tac:
     { mk_abstract l "generalize dependent"
                   [TacticsArgs.Generalize (terms, n_ips_o, system)] }
 
-  | l=lloc(INDUCTION) t=tac_term? system=at_X_annot(SYSTEM)? 
+  | l=lloc(INDUCTION) t=sterm? system=at_X_annot(SYSTEM)?
     { mk_abstract l "induction" [TacticsArgs.Induction (t, system)] }
 
-  | l=lloc(dependent_induction) t=tac_term? system=at_X_annot(SYSTEM)?
+  | l=lloc(dependent_induction) t=sterm? system=at_X_annot(SYSTEM)?
     { mk_abstract l "dependent induction" [TacticsArgs.Induction (t, system)] }
 
   | l=lloc(SET) n_ip=naming_pat system=at_X_annot(SYSTEM)? COLONEQ term=term %prec tac_prec
