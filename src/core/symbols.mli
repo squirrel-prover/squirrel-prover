@@ -540,6 +540,7 @@ module Classic : sig
   val cond  : macro
   val exec  : macro
   val frame : macro
+
 end
 
 (*------------------------------------------------------------------*)
@@ -556,6 +557,9 @@ module Quantum : sig
   val cond       : macro
   val exec       : macro
   val frame      : macro
+
+  (** Source of randomness for quantum measurements *)
+  val qrnd  : name  
 end
 
 val is_quantum_macro : macro -> bool

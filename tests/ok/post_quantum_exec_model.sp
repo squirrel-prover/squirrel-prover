@@ -47,8 +47,8 @@ lemma [PQ] _ i :
                            <Quantum.input@t, 
                             <of_bool (Quantum.exec@t),
                              if Quantum.exec@t then Quantum.output@t>>> &&
-  Quantum.state@t       = qatt(Quantum.frame@pred t)#2 &&
-  Quantum.input@t       = qatt(Quantum.frame@pred t)#1 &&
+  Quantum.state@t       = qatt(Quantum.qrnd (pred t), Quantum.frame@pred t)#2 &&
+  Quantum.input@t       = qatt(Quantum.qrnd (pred t), Quantum.frame@pred t)#1 &&
   Quantum.exec @t       = (Quantum.exec@pred t && Quantum.cond@t).
 Proof.
   intro t H. 
@@ -78,8 +78,8 @@ lemma [PQ] _ i :
                    <input@t, 
                     <of_bool (exec@t),
                      if exec@t then output@t>>> &&
-  state@t = qatt(frame@pred t)#2 &&
-  input@t = qatt(frame@pred t)#1 &&
+  state@t = qatt(Quantum.qrnd (pred t), frame@pred t)#2 &&
+  input@t = qatt(Quantum.qrnd (pred t), frame@pred t)#1 &&
   exec @t = (exec@pred t && cond@t).
 Proof.
   intro t H. 

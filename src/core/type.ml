@@ -158,11 +158,11 @@ let of_s_path ?(args:ty list = []) (np,s) = TConstr ((np,s),args)
 let tunit = Tuple []
 
 (*------------------------------------------------------------------*)
-(** Prelude types *)
-let tquantum_message = of_s_path ([], "quantum_message") ~args:[]
-let tint             = of_s_path ([], "int"            ) ~args:[]
-let tstring          = of_s_path ([], "string"         ) ~args:[]
-   
+(** Prelude types, to also declare in Prelude.sp *)
+let tquantum_message = of_s_path ([], "quantum_message"     ) ~args:[]
+let tmeasure_rnd     = of_s_path ([], "quantum_measures_rnd") ~args:[]
+let tint             = of_s_path ([], "int"                 ) ~args:[]
+let tstring          = of_s_path ([], "string"              ) ~args:[]
 
 (*------------------------------------------------------------------*)
 let func ty ty' = Fun (ty, ty')

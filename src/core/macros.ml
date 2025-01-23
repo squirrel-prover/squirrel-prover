@@ -428,6 +428,7 @@ module Quantum = struct
   let state_ty      = Type.tquantum_message
   let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage]
   let exec_ty       = Type.tboolean
+  let qrnd_ty       = Type.tmeasure_rnd
 
   let info = Term.macro_info_builtin
   
@@ -437,7 +438,9 @@ module Quantum = struct
   let transcript : Term.msymb = Term.mk_symb Symbols.Quantum.transcript ~info transcript_ty
   let state      : Term.msymb = Term.mk_symb Symbols.Quantum.state      ~info state_ty
   let frame      : Term.msymb = Term.mk_symb Symbols.Quantum.frame      ~info frame_ty
-  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       ~info exec_ty 
+  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       ~info exec_ty
+  let qrnd       : Term.nsymb = Term.mk_symb Symbols.Quantum.qrnd       ~info:() qrnd_ty       
+
 
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
@@ -499,6 +502,8 @@ module Quantum = struct
         }
 
     in
+    let qrnd_name = Term.mk_name_with_tuple_args qrnd [Term.mk_pred ts] in      
+
     (*------------------------------------------------------------------*)
     let state_data =
       let body_main =
@@ -506,7 +511,7 @@ module Quantum = struct
         Term.mk_proj 2 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
-          [ Term.mk_macro frame [] (Term.mk_pred ts) ]
+          [Term.mk_tuple [qrnd_name; Term.mk_macro frame [] (Term.mk_pred ts)]]
       and body_init = mk_timestamp_body_init qwitness
       and body_default = mk_timestamp_body_default ts qwitness in      
       Structured {
@@ -530,7 +535,7 @@ module Quantum = struct
         Term.mk_proj 1 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
-          [ Term.mk_macro frame [] (Term.mk_pred ts) ]
+          [Term.mk_tuple [qrnd_name; Term.mk_macro frame [] (Term.mk_pred ts)]]
       and body_init = mk_timestamp_body_init Term.empty
       and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {

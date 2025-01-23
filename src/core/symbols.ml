@@ -1285,6 +1285,16 @@ module Quantum = struct
   let cond       = mk_macro ~scope:npath "cond"       Empty
   let exec       = mk_macro ~scope:npath "exec"       Empty
   let frame      = mk_macro ~scope:npath "frame"      Empty
+      
+  let qrnd       =
+    let n_fty = Type.mk_ftype_tuple [] [Type.ttimestamp] Type.tmeasure_rnd in
+    let ndef = Name { n_fty; n_sty = Wrong; } in
+    let nl = L.mk_loc L._dummy "qrnd" in
+    let table, n =
+    Name.declare ~scope:npath ~approx:true !builtin_ref nl ~data:ndef
+    in
+    builtin_ref := table;
+    n    
 
   let () = builtin_ref := namespace_exit !builtin_ref s_npath
 end
@@ -1403,7 +1413,7 @@ let fs_att = mk_fsymb "att" 1
 let fs_qatt =
   let fty =
     Type.mk_ftype []
-      [Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage; ]]
+      [Type.tuple [Type.tmeasure_rnd; Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage; ]]]
       (Type.tuple [Type.tmessage; Type.tquantum_message])
   in
   mk_fsymb ~fty "qatt" (-1)
