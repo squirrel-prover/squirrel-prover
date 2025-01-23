@@ -2022,39 +2022,7 @@ module Game = struct
     in
     init env hyps glob_mutable
 end 
-
-(*------------------------------------------------------------------------*)
-(** Generalized checksMvar.empty that a term is in the knowledge or not.*)
-let knowledge_mem
-    ~(env : Env.t)
-    ~(hyps : TraceHyps.hyps)
-    (output : CondTerm.t)
-    (inputs : TSet.t list) : bool * Term.terms option
-  =
-  let eq_implies (input : TSet.t)  =
-    let input = TSet.refresh input in
-    let known =
-      CondTerm.{term = input.term;
-                conds = input.conds;}
-    in
-    let res = 
-      exact_eq_under_cond
-        ~unif_vars:input.vars  env hyps ~target:output ~known
-    in
-    begin
-      match res with
-      | Some mv ->
-         let subst = Mvar.to_subst_locals ~mode:`Match  mv in
-         (true, Some (List.map (Term.subst subst) (List.map (Term.mk_var) input.vars )))
-      | None -> (false,None)
-    end
-  in
-  let res = List.map eq_implies inputs in
-  if List.exists fst res then
-    List.find (fun x -> fst x) res
-  else
-    (false,None)
-    
+ 
 
 (*------------------------------------------------------------------------*)
 (** Check if [output] is included in [inputs]. In case of success,
@@ -2332,7 +2300,7 @@ and bideduce_term
   let output = CondTerm.polish output query.hyps env in
   assert (AbstractSet.well_formed env query.initial_mem);
   notify_bideduce_term_start query output;
-  let mem, mem_res = knowledge_mem ~env ~hyps:query.hyps output query.inputs in
+  let to_deduce = knowledge_mem_tsets env query.hyps output query.inputs in
   let st : Match.unif_state Lazy.t =
     lazy(
       Match.mk_unif_state
@@ -2342,7 +2310,7 @@ and bideduce_term
   in
   if
     HighTerm.is_ptime_deducible ~si:true env output.term ||
-    (mem && (mem_res = None))
+    (to_deduce = some [])
   then                          (* deduce conditions *)
       let result = empty_result query.initial_mem in
       notify_bideduce_immediate query;
@@ -2360,9 +2328,9 @@ and bideduce_term
   then
     Some (empty_result query.initial_mem)
 
-  else if mem then
+  else if (Option.is_some to_deduce) then
     bideduce query
-      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget mem_res))
+      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget to_deduce))
   else 
     (* [output ∈ rec_inputs] *)
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
