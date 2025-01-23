@@ -47,7 +47,7 @@ lemma _ :
  (forall (y,x : message), f(x) = a || f(y) = b).
 Proof.
   intro Ass y x.
-  generalize (f x) (f y) @system:default/left as u v.
+  generalize @system:default/left (f x) (f y) as u v.
   checkfail (assumption Ass) exn NotHypothesis.
 Abort.
 
@@ -182,7 +182,7 @@ global lemma _ {'P:system, 'Q:system[pair]}
   equiv ((exists i, phi i) && exists i, phi' i).
 Proof.
   intro Ass.
-  generalize (exists _, _) (exists _, _) @system:'P as E E0.
+  generalize @system:'P (exists _, _) (exists _, _) as E E0.
   assumption Ass.
 Qed.
 
