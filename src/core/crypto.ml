@@ -1289,7 +1289,7 @@ type query = {
   (** mapping from [let _ = #init;] variables to their values (as
       provided by the user) *)
   
-  inputs : CondTerm.t list;
+  inputs : TSet.t list;
   (** inputs provided to the adversary *)
   
   rec_inputs : TSet.t list;
@@ -1342,21 +1342,18 @@ let transitivity_get_next_query
   =
   (* TODO : remove folowing line : it doesn't follow semantics*)
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
-  let output = result.extra_outputs in
-  let new_inputs = List.map
-                     (fun (t:TSet.t):CondTerm.t ->
-                                     {term = Term.mk_lambda t.vars t.term;
-                                      conds = List.map (fun c -> Term.mk_forall ~simpl:true t.vars c) t.conds})
-                     output
+  let output = List.map
+                 (fun (t:CondTerm.t) -> TSet.{term=t.term;conds = t.conds; vars = []})
+                 output_term
   in
   {
     old_query with
     consts      = old_query.consts @ consts;
     initial_mem = result.final_mem;
     inputs      = 
-      output_term
+      output
       @ old_query.inputs
-      @ new_inputs;
+      @ result.extra_outputs;
   }
 
 let chain_results  (res1 : result) (res2 : result):result=
@@ -1475,7 +1472,7 @@ let _pp_query (ppe : ppenv) fmt (query,outputs:query*CondTerm.t list) =
       Fmt.pf fmt "%a%t%a%t%a"
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) query.rec_inputs
         (fun fmt -> if query.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (Fmt.list ~sep:(Fmt.any ",@ ") (CondTerm._pp ppe)) query.inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) query.inputs
         (fun fmt -> if query.inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) query.extra_inputs
   in
@@ -2032,33 +2029,25 @@ let knowledge_mem
     ~(env : Env.t)
     ~(hyps : TraceHyps.hyps)
     (output : CondTerm.t)
-    (inputs : CondTerm.t list) : bool * Term.terms option
+    (inputs : TSet.t list) : bool * Term.terms option
   =
-  let eq_implies (input : CondTerm.t)  =
-    match input.term with
-    | Term.Quant( (Seq | Lambda), es, term) ->
-      let es, subst = Term.refresh_vars es in
-      let term = Term.subst subst term in
-      let conds = List.map (Term.subst subst) input.conds in
-      let input_term = CondTerm.{ term ; conds } in
-      let input_term = CondTerm.polish input_term hyps env in
-      let res = 
-        exact_eq_under_cond
-          ~unif_vars:es env hyps ~target:output ~known:input_term
-      in
-      begin
-        match res with
-        | Some mv ->
-          let subst = Mvar.to_subst_locals ~mode:`Match  mv in
-          (true, Some (List.map (Term.subst subst) (List.map (Term.mk_var) es)))
-        | None -> (false,None)
-      end
-    | _ ->
-      let input = CondTerm.polish input hyps env in
-      let res = exact_eq_under_cond env hyps ~target:output ~known:input in
-      match res with 
-      | Some _ -> (true , None)
-      | None   -> (false, None)
+  let eq_implies (input : TSet.t)  =
+    let input = TSet.refresh input in
+    let known =
+      CondTerm.{term = input.term;
+                conds = input.conds;}
+    in
+    let res = 
+      exact_eq_under_cond
+        ~unif_vars:input.vars  env hyps ~target:output ~known
+    in
+    begin
+      match res with
+      | Some mv ->
+         let subst = Mvar.to_subst_locals ~mode:`Match  mv in
+         (true, Some (List.map (Term.subst subst) (List.map (Term.mk_var) input.vars )))
+      | None -> (false,None)
+    end
   in
   let res = List.map eq_implies inputs in
   if List.exists fst res then
@@ -2424,8 +2413,9 @@ and bideduce_oracle
       match bideduce {query with allow_oracle=false} to_deduce
       with
       | Some result ->
-        let query_start = transitivity_get_next_query query to_deduce result in
-        let query_start = {query_start with inputs = (CondTerm.mk_simpl conds)::query.inputs} in
+         let query_start = transitivity_get_next_query query to_deduce result in
+         let input_cond = TSet.{term = conds; conds = []; vars = [] } in
+        let query_start = {query_start with inputs = input_cond::query.inputs} in
             cterm,query_start,result
       | None -> output_term,query, (empty_result query.initial_mem)
     else output_term,query,(empty_result query.initial_mem) 
