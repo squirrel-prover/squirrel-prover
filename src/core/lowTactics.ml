@@ -1632,12 +1632,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* find an occurrence of [pat] in the conclusion *)
     let term =
-      (* If there are no term of type variable, we are
-         done. Otherwise, try to infer them by matching in the
-         goal. *)
-      if Sv.for_all (not -| Vars.is_pat) (Term.fv pat) &&
-         Ident.Sid.is_empty (Term.ty_fv pat).uv  then
-        pat
+      let no_term_holes = Sv.for_all (not -| Vars.is_pat) (Term.fv pat) in
+      let ty_subst_opt =
+        obind
+          (fun ienv ->
+             match Infer.close env ienv with
+             | Infer.Closed s -> Some s
+             | _ -> None)
+          ienv
+      in
+      (* If there are no term holes and type holes can be inferred, we
+         are done. *)
+      if no_term_holes && ty_subst_opt <> None then
+        Term.gsubst (oget ty_subst_opt) pat
+
+      (* Otherwise, try to infer term and type variables by matching
+         in the conclusion. *)
       else begin
         let target = S.conclusion s in
         let target = Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t target in
