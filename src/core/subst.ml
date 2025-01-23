@@ -16,7 +16,7 @@ type 'a substitution = t -> 'a -> 'a
 (*------------------------------------------------------------------*)
 let pp fmt ts =
   let pp_bd fmt (id,ty) =
-    Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id Type.pp ty
+    Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id (Type._pp ~dbg:true) ty
   in
   Fmt.pf fmt "@[<v 0>@[<hov 2>univars:@ %a@]@;@[<hov 2>tvars:@ %a@]@]"
     (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.univars)

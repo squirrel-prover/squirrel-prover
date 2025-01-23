@@ -1632,7 +1632,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* find an occurrence of [pat] in the conclusion *)
     let term =
-      if not (Sv.exists Vars.is_pat (Term.fv pat)) then
+      (* If there are no term of type variable, we are
+         done. Otherwise, try to infer them by matching in the
+         goal. *)
+      if Sv.for_all (not -| Vars.is_pat) (Term.fv pat) &&
+         Ident.Sid.is_empty (Term.ty_fv pat).uv  then
         pat
       else begin
         let target = S.conclusion s in
@@ -1700,7 +1704,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let generalize
       ~dependent ~(in_system : SE.t)
       ~(mode: [`Gen | `Def])
-      (* are we abstracting as ∀ vars or defining are the generalized terms *)
+      (* are the generalized terms being abstracted as ∀ vars or
+         defined *)
       (terms : (Term.term * L.t option * Infer.env option) list)
       (n_ips : Args.naming_pat list) (s : S.t)
     : (Vars.tagged_var * Term.t) list * S.t
