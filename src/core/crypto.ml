@@ -3512,8 +3512,9 @@ module Parse = struct
 
   (*------------------------------------------------------------------*)
   let parse loc table (decl : game_decl) : game = 
-    let env = 
-      let empty = SE.empty_system table in
+    let env =
+      (* empty system pair, as we want bi-terms *)
+      let empty = SE.pair_empty table in
       let system = SE.{ set = (empty :> SE.t) ; pair = None } in
       Env.init ~table ~system () 
     in

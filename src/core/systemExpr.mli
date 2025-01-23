@@ -22,10 +22,18 @@ val equal_modulo  : Symbols.table -> 'a expr -> 'a expr -> bool
 (** Finite set of all projections of a system. *)
 val of_system : Symbols.table -> System.t -> fset
 
-(** create the bi-system for the empty system declared in the
-    [Prelude] *)
-val empty_system : Symbols.table -> pair 
+(*------------------------------------------------------------------*)
+(** path to the empty bi-system declared in the [Prelude] *)
+val path_empty : Symbols.system 
 
+(** the bi-system for the empty system (in the [Prelude]) *)
+val pair_empty : Symbols.table -> pair
+
+(** A k-system where all fiels are [Empty/left] (the choice of `left`
+    vs `right` is arbitrary). *)
+val fset_empty : k:int -> Symbols.table -> fset
+
+(*------------------------------------------------------------------*)
 (** Create a set expression from a list of compatible single systems.
     The list of projections must be of the same length
     as the list of systems: these projections will be used to label the

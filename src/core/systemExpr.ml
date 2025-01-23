@@ -42,9 +42,22 @@ let of_system table (s : Symbols.system) : 'a expr =
   force { name; cnt = List l; }
 
 (*------------------------------------------------------------------*)
-(* create the bi-system for the empty system declared in the [Prelude] *)
-let empty_system table : pair =
-  of_system table (Symbols.System.of_string Symbols.top_npath "Empty")
+(** path to the empty bi-system declared in the [Prelude] *)
+let path_empty : Symbols.system =
+  Symbols.System.of_string Symbols.top_npath "Empty"
+
+(** the bi-system for the empty system (in the [Prelude]) *)
+let pair_empty table : pair = of_system table path_empty
+
+(** A k-system where all fiels are [Empty/left] (the choice of `left`
+    vs `right` is arbitrary). *)
+let fset_empty ~(k:int) table : fset =
+  let proj = Projection.left in
+  let l =
+    List.init k (fun _i -> proj, System.Single.make table path_empty proj)
+  in
+  let name = Some (Symbols.path_to_string path_empty) in
+  force { name; cnt = List l; }
 
 (*------------------------------------------------------------------*)
 let default_labels : int -> Projection.t list = function

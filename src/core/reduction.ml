@@ -936,7 +936,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       | Equiv.Atom (Pred pa) ->
         let simpl_args =
-          let system = { system with set = (SE.of_list [] :> SE.t); } in
+          (* terms in [simpl_args] are single terms (thus [k=1])
+             defined in no systems (thus the empty system) *)
+          let system = { system with set = (SE.fset_empty ~k:1 env.table :> SE.t); } in
           let state = to_state ?expand_context ~system ~vars param s in
           List.map (reduce_term state) pa.simpl_args
         in

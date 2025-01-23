@@ -19,7 +19,7 @@ include Sequent.Mk(struct
       let system =
         let system = S.system s in
         if system.pair = None then
-          let empty = SE.empty_system (table s) in
+          let empty = SE.pair_empty (table s) in
           { system with pair = Some empty; }
         else system
       in
