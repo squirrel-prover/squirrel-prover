@@ -1415,15 +1415,14 @@ let models_conjunct =
       res
 
 (** Exported.
-    [models_conjunct] with timeout and profiling. *)
-let models_conjunct =
-  let prof = Prof.mk "Constr.models_conjunct" in
-  fun
+    [models_conjunct] with a timeout. *)
+let models_conjunct 
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
     ~(timeout : int)
     ~table
-    (terms : Term.terms) ->
-    prof (fun () -> Utils.timeout exn timeout (models_conjunct table) terms)
+    (terms : Term.terms)
+  =
+  Utils.timeout exn timeout (models_conjunct table) terms
 
 (*------------------------------------------------------------------*)
 (** Exported. *)
@@ -1431,16 +1430,13 @@ let m_is_sat (models : models) = (snd models) <> []
 
 
 (** Exported. *)
-let is_tautology =
-  let prof = Prof.mk "Constr.is_tautology" in
-  fun
+let is_tautology
     ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
     ~(timeout:int)
     ~table
     (t:Term.term)
-    ->
-      prof (fun () ->
-          not (m_is_sat (models_conjunct ~exn:exn ~timeout ~table [Term.mk_not t])))
+  =
+  not (m_is_sat (models_conjunct ~exn:exn ~timeout ~table [Term.mk_not t]))
 
 (*------------------------------------------------------------------*)
 (** [ext_support model ut] adds [ut] to the model union-find, if necessary, and
@@ -1595,31 +1591,6 @@ let find_eq_action (models : models) (t : Term.term) =
       if query ~precise:true models [Term.mk_eq t term]
       then Some term
       else None
-
-(** Exported versions with profiling
-
-    Note that we only measure external calls to query,
-    not counting the internal calls performed e.g.through
-    maximal_elems. *)
-
-let query =
-  let prof_precise = Prof.mk "Constr.query [precise]" in
-  let prof_imprecise = Prof.mk "Constr.query [imprecise]" in
-  fun ~precise models ats ->
-    let prof = if precise then prof_precise else prof_imprecise in
-    prof (fun () -> query ~precise models ats)
-
-let maximal_elems =
-  let prof = Prof.mk "Constr.maximal_elems" in
-  fun ~precise (models : models) (elems : Term.term list) ->
-    prof (fun () -> maximal_elems ~precise models elems)
-
-let get_ts_equalities =
-  let prof = Prof.mk "Constr.get_ts_equalities" in
-  fun ~precise (models : models) ts ->
-    prof (fun () -> get_ts_equalities ~precise models ts)
-
-let find_eq_action = Prof.mk_binary "Constr.find_eq_action" find_eq_action
 
 (*------------------------------------------------------------------*)
 (** Context of a trace model *)

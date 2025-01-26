@@ -3227,10 +3227,6 @@ let specialize
       in
       Some cand
 
-
-(* profiling *)
-let specialize = Prof.mk_ternary "specialize" specialize
-
 (*------------------------------------------------------------------*)
 let specialize_all
     (table  : Symbols.table)

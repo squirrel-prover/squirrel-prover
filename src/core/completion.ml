@@ -804,9 +804,7 @@ end = struct
       let uf =
         List.fold_left (fun uf (a,b) -> Cuf.union uf a b) state.uf new_eqs
       in
-      { state with uf = uf }          
-
-  let deduce_eqs = Prof.mk_unary "Xor.deduce_eqs" deduce_eqs
+      { state with uf = uf }
 end
 
 
@@ -916,8 +914,6 @@ end = struct
     fold_grules (fun (a,b) state ->
         { state with uf = Cuf.union state.uf (get_cst a) b }
       ) r_trivial { state with grnd_rules = r_other } 
-
-  let deduce_triv_eqs = Prof.mk_unary "Ground.deduce_triv_eqs" deduce_triv_eqs
     
   (* Deduce constants equalities from the ground rules. *)
   let deduce_eqs (state : state) : state =
@@ -959,8 +955,6 @@ end = struct
               { state with uf = Cuf.union state.uf c c' }
             ) s state 
       ) grules state
-
-  let deduce_eqs = Prof.mk_unary "Ground.deduce_eqs" deduce_eqs
 end
 
 (* Simple unification implementation *)
@@ -1042,9 +1036,6 @@ module Unify = struct
   let unify uf u v =
     let u,v = p_terms_uf_normalize uf (u,v) in
     unify_normed u v
-
-  (** profiling *)
-  let unify = Prof.mk_ternary "Completion.unify" unify
 end
 
 
@@ -1179,8 +1170,6 @@ end = struct
   let deduce_eqs state =
     let erules = norm_e_rules state.uf state.e_rules in
     deduce_aux state erules Mct.empty 
-      
-  let deduce_eqs = Prof.mk_unary "Erule.deduce_eqs" deduce_eqs
 end
 
 
@@ -1353,8 +1342,6 @@ let rec complete_state state =
   if cond_equal s_state state 
   then state
   else complete_state state
-
-let complete_state = Prof.mk_unary "complete_state" complete_state
 
 let dec_pk table f1 f2 =
   match Symbols.OpData.get_abstract_data f1 table,

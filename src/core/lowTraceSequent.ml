@@ -295,15 +295,6 @@ let get_ts_equalities ~precise s =
              |>  Atom.trace_atoms_ts in
   Constr.get_ts_equalities ~precise models ts
 
-(** Variant of [get_models] with separate profiling to track
-    uses other than those above.
-    Note that [get_models] relies on [Constr.models_conjunct]
-    which is independently profiled.
-    We do not profile [maximal_elems] and [get_ts_equalities]
-    although they do use [get_models],
-    but the underlying functions in [Constr] are profiled. *)
-let get_models = Prof.mk_unary "TS.get_models" get_models
-
 (*------------------------------------------------------------------*)  
 module Hyps
   : Hyps.S1 with type hyp  = Equiv.any_form 
