@@ -24,7 +24,7 @@ module Ma = Symbols.Mp(Symbols.Action)
     *under-approximation* of equality equivalence classes. *)
 
 (*------------------------------------------------------------------*)
-let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
+(* let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s *)
 
 (*------------------------------------------------------------------*)
 (** Stateful memoization for conversion of [Term.term] to [Vars.var],
@@ -382,8 +382,8 @@ module Form = struct
     List.concat_map (fun t ->       
         try mk memo t with
         | Unsupported ->
-          dbg "@[<v 2>Dropping unsupported literal:@, @[%a@]@]"
-            Term.Lit.pp t;
+          (* dbg "@[<v 2>Dropping unsupported literal:@, @[%a@]@]" *)
+          (*   Term.Lit.pp t; *)
           []
       ) l
 end
@@ -401,7 +401,7 @@ type constr_instance = {
 }
 
 (*------------------------------------------------------------------*)
-let pp_constr_instance ~full fmt inst =
+let[@warning "-32"] pp_constr_instance ~full fmt inst =
   let pp_el s fmt (ut1, ut2) =
     Fmt.pf fmt "%a %s %a" pp_ut ut1 s pp_ut ut2 in
 
@@ -655,20 +655,20 @@ let is_undef uf ut = snd (mgu uf ut) = uundef
     This does not look for instances of the axiom:
     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ))
 *)
-let is_def ?explain:(explain=false) uf neqs ut =
+let is_def ?explain:(_explain=false) uf neqs ut =
   let uf, ut = mgu uf ut in
 
   (* Check whether [ut] is init. *)
   if ut_equal ut uinit then begin
-    if explain then
-      dbg "is_def(%a): is equal to %a" pp_ut ut pp_ut uinit;
+    (* if explain then *)
+    (*   dbg "is_def(%a): is equal to %a" pp_ut ut pp_ut uinit; *)
     true
   end else
 
   (* Check whether init is k-predecessor of [ut]. *)
   if is_kpred uf uinit ut then begin
-    if explain then
-      dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit;
+    (* if explain then *)
+    (*   dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit; *)
     true
   end else
 
@@ -683,9 +683,9 @@ let is_def ?explain:(explain=false) uf neqs ut =
       let b = (ut_equal v uundef) && (ut_equal ut u || is_kpred uf u ut) in
       (* ∃ k ≥ 0, u = P^k(ut) ∧ u ≠ undef  *)
 
-      if explain && b then
-        dbg "is_def(%a): is equal to %a, and %a ≠ %a"
-          pp_ut ut pp_ut u pp_ut u pp_ut uundef;
+      (* if explain && b then *)
+      (*   dbg "is_def(%a): is equal to %a, and %a ≠ %a" *)
+      (*     pp_ut ut pp_ut u pp_ut u pp_ut uundef; *)
       b
     ) neqs
 
@@ -906,15 +906,15 @@ let build_graph (uf : Uuf.t) neqs leqs =
   (uf, add_preds_and_init g)
 
 (*------------------------------------------------------------------*)
-let pp_scc fmt scc =
-  Fmt.pf fmt "@[<hv 2>%a@]"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " =@ ") pp_ut) scc
+(* let pp_scc fmt scc = *)
+(*   Fmt.pf fmt "@[<hv 2>%a@]" *)
+(*     (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " =@ ") pp_ut) scc *)
 
-let log_cycles sccs =
-  let sccs = List.filter (fun scc -> List.length scc > 1) sccs in
-  if List.length sccs > 0 then
-    dbg "@[<v 2>Adding SCCs equalities:@, %a@]"
-      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ") pp_scc) sccs
+(* let log_cycles sccs = *)
+(*   let sccs = List.filter (fun scc -> List.length scc > 1) sccs in *)
+(*   if List.length sccs > 0 then *)
+(*     dbg "@[<v 2>Adding SCCs equalities:@, %a@]" *)
+(*       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ") pp_scc) sccs *)
 
 (*------------------------------------------------------------------*)
 (** For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
@@ -922,7 +922,7 @@ let log_cycles sccs =
 let cycle_eqs g =
   let sccs = Scc.scc_list g in
 
-  log_cycles sccs;
+  (* log_cycles sccs; *)
 
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
@@ -1017,13 +1017,13 @@ let add_disj (uf : Uuf.t) (g : UtG.t) (u : ut) (base : ut) =
                 kpred base (maxj + i))
                         |> mgus uf in
 
-            dbg "@[<v 2>Disjunction:@;\
-                 to_split:%a@;\
-                 minj:%d@;\
-                 maxj:%d@;\
-                 base:%a@]"
-              pp_ut u
-              minj maxj pp_ut base;
+            (* dbg "@[<v 2>Disjunction:@;\ *)
+            (*      to_split:%a@;\ *)
+            (*      minj:%d@;\ *)
+            (*      maxj:%d@;\ *)
+            (*      base:%a@]" *)
+            (*   pp_ut u *)
+            (*   minj maxj pp_ut base; *)
             Some (uf, List.map (fun x -> (nu,x)) l)
         ) (max_pred uf g nu base)
     ) (min_pred uf g nu base)
@@ -1047,8 +1047,8 @@ let neq_sat inst g : bool =
   List.for_all (fun (u,v) ->
       let violation = ut_equal (mgu uf u |> snd) (mgu uf v |> snd) in
 
-      if violation then
-        dbg "dis-equality %a ≠ %a violated" pp_ut u pp_ut v;
+      (* if violation then *)
+      (*   dbg "dis-equality %a ≠ %a violated" pp_ut u pp_ut v; *)
 
       not violation
     ) inst.neqs
@@ -1068,20 +1068,20 @@ let neq_sat inst g : bool =
 
       let violation1 = is_kpred uf v u in
 
-      if violation1 then
-        dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
-             @[<hov>is_kpred %a %a@]"
-          pp_ut u pp_ut v
-          pp_ut v pp_ut u;
+      (* if violation1 then *)
+      (*   dbg "contradiction: @[<hov>%a ≤ %a@] and@ \ *)
+      (*        @[<hov>is_kpred %a %a@]" *)
+      (*     pp_ut u pp_ut v *)
+      (*     pp_ut v pp_ut u; *)
 
       let violation2 = is_undef uf u || is_undef uf v in
 
-      if violation2 then begin
-        let x = if is_undef uf u then u else v in
-        dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
-             @[<hov>is_undef %a@]"
-          pp_ut u pp_ut v pp_ut x
-      end;
+      (* if violation2 then begin *)
+      (*   let x = if is_undef uf u then u else v in *)
+      (*   dbg "contradiction: @[<hov>%a ≤ %a@] and@ \ *)
+      (*        @[<hov>is_undef %a@]" *)
+      (*     pp_ut u pp_ut v pp_ut x *)
+      (* end; *)
 
       not (violation1 || violation2)
     ) g
@@ -1095,40 +1095,40 @@ let get_basics uf elems =
   |> List.sort_uniq ut_compare
 
 (*------------------------------------------------------------------*)
-let log_segment_eq (eq : ut * ut) : unit =
-  dbg "@[<v 2>Adding segment equality:@, %a@]"
-    (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
-       pp_ut pp_ut) eq
+(* let log_segment_eq (eq : ut * ut) : unit = *)
+(*   dbg "@[<v 2>Adding segment equality:@, %a@]" *)
+(*     (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ") *)
+(*        pp_ut pp_ut) eq *)
 
-let log_split f =
-  dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f
+(* let log_split f = *)
+(*   dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f *)
 
-let log_new_eqs eqs =
-  let pp_eq fmt (ut1, ut2) =
-    Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in
+(* let log_new_eqs eqs = *)
+(*   let pp_eq fmt (ut1, ut2) = *)
+(*     Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in *)
 
-  let pp_eqs fmt eqs =
-    Fmt.pf fmt "@[<hv 2>%a@]"
-      (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
+(*   let pp_eqs fmt eqs = *)
+(*     Fmt.pf fmt "@[<hv 2>%a@]" *)
+(*       (Fmt.list ~sep:Fmt.comma pp_eq) eqs in *)
 
-  dbg "@[<v 2>Adding new equalities:@, %a@]"
-    pp_eqs eqs
+(*   dbg "@[<v 2>Adding new equalities:@, %a@]" *)
+(*     pp_eqs eqs *)
 
-let log_new_neqs neqs =
-  let pp_neq fmt (ut1, ut2) =
-    Fmt.pf fmt "%a ≠ %a" pp_ut ut1 pp_ut ut2 in
+(* let log_new_neqs neqs = *)
+(*   let pp_neq fmt (ut1, ut2) = *)
+(*     Fmt.pf fmt "%a ≠ %a" pp_ut ut1 pp_ut ut2 in *)
 
-  let pp_neqs fmt eqs =
-    Fmt.pf fmt "@[<hv 2>%a@]"
-      (Fmt.list ~sep:Fmt.comma pp_neq) eqs in
+(*   let pp_neqs fmt eqs = *)
+(*     Fmt.pf fmt "@[<hv 2>%a@]" *)
+(*       (Fmt.list ~sep:Fmt.comma pp_neq) eqs in *)
 
-  dbg "@[<v 2>Adding new dis-equalities:@, %a@]"
-    pp_neqs neqs
+(*   dbg "@[<v 2>Adding new dis-equalities:@, %a@]" *)
+(*     pp_neqs neqs *)
 
-let log_done () = dbg "@[<v 2>Model done@]"
+(* let log_done () = dbg "@[<v 2>Model done@]" *)
 
-let log_instr inst =
-  dbg "@[<v 2>Solving:@ %a@]" (pp_constr_instance ~full:false) inst
+(* let log_instr inst = *)
+(*   dbg "@[<v 2>Solving:@ %a@]" (pp_constr_instance ~full:false) inst *)
 
 (*------------------------------------------------------------------*)
 (** Type of a model, which is a satisfiable and normalized instance, and the
@@ -1298,7 +1298,7 @@ let find_new_undef (inst : constr_instance) g =
     equivalent to [instance]. *)
 let rec split (instance : constr_instance) : model list =
   try
-    log_instr instance;
+    (* log_instr instance; *)
 
     let instance = unify instance instance.eqs in
     let instance,g = leq_unify instance in
@@ -1307,13 +1307,13 @@ let rec split (instance : constr_instance) : model list =
 
     begin match find_new_eqs instance g with
       | Some new_eqs ->
-        log_new_eqs new_eqs;
+        (* log_new_eqs new_eqs; *)
         split { instance with eqs = new_eqs @ instance.eqs; }
 
       | None -> match find_new_undef instance g with
         | _ :: _ as undefs ->
           let new_neqs = List.map (fun ut -> ut, uundef) undefs in
-          log_new_neqs new_neqs;
+          (* log_new_neqs new_neqs; *)
           split { instance with neqs = new_neqs @ instance.neqs; }
 
 
@@ -1327,7 +1327,7 @@ let rec split (instance : constr_instance) : model list =
             match find_segment_disj instance g with
             | Some (uf, new_eqs) -> (* found a new segment disjunction *)
               List.map (fun eq ->
-                  log_segment_eq eq;
+                  (* log_segment_eq eq; *)
                   split { instance with eqs = eq :: instance.eqs; uf}
                 ) new_eqs
               |> List.flatten
@@ -1338,11 +1338,11 @@ let rec split (instance : constr_instance) : model list =
                  already been split *)
               match instance.clauses with
               | [] ->             (* no clause left, we are done *)
-                log_done ();
+                (* log_done (); *)
                 [ { inst = instance; tr_graph = g; } ]
 
               | disj :: clauses -> (* we found a clause to split *)
-                log_split disj;
+                (* log_split disj; *)
 
                 let inst = { instance with clauses = clauses; } in
                 let insts = List.map (fun f -> add_form inst f ) disj in
@@ -1351,16 +1351,16 @@ let rec split (instance : constr_instance) : model list =
     end
   with
   | No_unif ->
-    dbg "@[<v 2>No_unif@]";
+    (* dbg "@[<v 2>No_unif@]"; *)
     []
 
 let split_models instance =
   let models = split instance in
 
-  dbg "@[<v 1>final models (%d models):@;%a@]"
-    (List.length models)
-    (Fmt.list (pp_constr_instance ~full:false))
-    (List.map (fun x -> x.inst) models);
+  (* dbg "@[<v 1>final models (%d models):@;%a@]" *)
+  (*   (List.length models) *)
+  (*   (Fmt.list (pp_constr_instance ~full:false)) *)
+  (*   (List.map (fun x -> x.inst) models); *)
 
   models
 
@@ -1512,10 +1512,13 @@ let query ~precise (models : models) (terms : Term.terms) =
 
 (* Add debugging information. *)
 let query ~precise (models : models) (terms : Term.terms) =
-  dbg "%squery: %a"
-    (if precise then "precise " else "") (Fmt.list Term.pp) terms;
+  (* dbg "%squery: %a" *)
+  (*   (if precise then "precise " else "") (Fmt.list Term.pp) terms; *)
+
   let b = query ~precise models terms in
-  dbg "query result: %a : %a" (Fmt.list Term.pp) terms Fmt.bool b;
+  
+  (* dbg "query result: %a : %a" (Fmt.list Term.pp) terms Fmt.bool b; *)
+  
   b
 
 

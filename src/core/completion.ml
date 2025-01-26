@@ -5,8 +5,8 @@ module L = Location
 module Mt = Term.Mt
 
 (*------------------------------------------------------------------*)
-let dbg s = 
-  Printer.prt (if Config.debug_completion () then `Dbg else `Ignore) s
+(* let dbg s =  *)
+(*   Printer.prt (if Config.debug_completion () then `Dbg else `Ignore) s *)
 
 (*------------------------------------------------------------------*)
 module Flat : sig
@@ -1280,9 +1280,11 @@ let normalize state u =
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
-let normalize ?(print=false) state u =
+let normalize ?print:(_print=false) state u =
   let u_normed = normalize state u in
-  if print then dbg "%a normalized to %a" pp_cterm u pp_cterm u_normed;
+
+  (* if print then dbg "%a normalized to %a" pp_cterm u pp_cterm u_normed; *)
+  
   u_normed
 
   
@@ -1320,11 +1322,11 @@ let finalize_completion state =
                 grnd_rules = grnds;
                 e_rules = erules;
                 completed = true } in
-  dbg "@[<v 0>Finalized state:@; %a@]" pp_state state;
+  (* dbg "@[<v 0>Finalized state:@; %a@]" pp_state state; *)
   state
   
 let rec complete_state state =
-  dbg "%a" pp_state state; 
+  (* dbg "%a" pp_state state;  *)
   
   let cond_equal state1 state2 = 
     Cuf.union_count state1.uf = Cuf.union_count state2.uf &&
@@ -1460,8 +1462,8 @@ let complete table (l : Term.esubst list) : state =
       (fun l (Term.ESubst (u,v)) ->
          let cu, cv = cterm_of_term ct_memo u, cterm_of_term ct_memo v in
 
-         dbg "Completion: %a = %a added as %a = %a"
-           Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
+         (* dbg "Completion: %a = %a added as %a = %a" *)
+         (*   Term.pp u Term.pp v pp_cterm cu pp_cterm cv;  *)
 
          (cu, cv):: l )
       []
@@ -1548,11 +1550,11 @@ let check_equality state (u,v) =
   let cu, cv = cterm_of_term ct_memo u, cterm_of_term ct_memo v in
   let bool = check_equality_cterm state (cu, cv) in
 
-  dbg "@[<hv>check_equality (%a):@ \
-       @[<hv>@[%a@] =@ @[%a@]@]@ \
-       as@ \
-       @[<hv>@[%a@] =@ @[%a@]@]@]"
-    Fmt.bool bool Term.pp u Term.pp v pp_cterm cu pp_cterm cv;
+  (* dbg "@[<hv>check_equality (%a):@ \ *)
+  (*      @[<hv>@[%a@] =@ @[%a@]@]@ \ *)
+  (*      as@ \ *)
+  (*      @[<hv>@[%a@] =@ @[%a@]@]@]" *)
+  (*   Fmt.bool bool Term.pp u Term.pp v pp_cterm cu pp_cterm cv; *)
 
   bool
 
