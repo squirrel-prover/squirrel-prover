@@ -1165,6 +1165,27 @@ let no_unif ?infos () = raise (NoMatch infos)
 
 
 (*------------------------------------------------------------------*)
+(** {2 Unification parameters} *)
+
+(** unification parameters *)
+type param = {
+  mode          : [`Eq | `EntailLR | `EntailRL];
+  use_fadup     : bool;
+  allow_capture : bool;
+  (** allow pattern variables to capture bound variables (i.e. to be
+      instantiated by terms using bound variables). 
+      When doing rewriting, lemma application, etc, must be false. *)
+}
+
+(*------------------------------------------------------------------*)
+let default_param = { 
+  mode           = `Eq;
+  use_fadup      = false; 
+  allow_capture  = false; 
+}
+
+
+(*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
 
 (** (Descending) state used during matching or unification. *)
@@ -1189,6 +1210,9 @@ type unif_state = {
 
   hyps : Hyps.TraceHyps.hyps; (** hypotheses, taken in [system] *)
 
+  (*------------------------------------------------------------------*)
+  (** repeat most of the unification options *)
+
   use_fadup     : bool;
   allow_capture : bool;
 }
@@ -1211,6 +1235,7 @@ let mk_unif_state
     table;
     system;
     hyps;
+
     use_fadup      = false;
     allow_capture  = false
   }
@@ -1509,22 +1534,6 @@ type match_res =
   | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
 
-(** unification algorithm options *)
-type match_option = {
-  mode          : [`Eq | `EntailLR | `EntailRL];
-  use_fadup     : bool;
-  allow_capture : bool;
-  (** allow pattern variables to capture bound variables (i.e. to be
-      instantiated by terms using bound variables). 
-      When doing rewriting, lemma application, etc, must be false. *)
-}
-
-let default_match_option = { 
-  mode           = `Eq; 
-  use_fadup      = false; 
-  allow_capture  = false; 
-}
-
 (** Module signature of matching.
     The type of term we match into is abstract. *)
 module type S = sig
@@ -1539,7 +1548,7 @@ module type S = sig
     Format.formatter -> 'a pat_op -> unit
 
   val try_match :
-    ?option:match_option ->
+    ?param:param ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->
     ?ienv:Infer.env ->
@@ -1552,7 +1561,7 @@ module type S = sig
     match_res
 
   val find : 
-    ?option:match_option ->
+    ?param:param ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -1573,7 +1582,7 @@ let unif_gen (type a)
     (ut_mode : [`Unif | `Match])
     (fmatch  : 
        mode:[`EntailLR | `EntailRL | `Eq] -> a -> a -> unif_state -> Mvar.t) 
-    ?(option=default_match_option)
+    ?(param = default_param)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
     ?(ienv : Infer.env option)
@@ -1636,12 +1645,12 @@ let unif_gen (type a)
 
     table; system; env; support; ienv; hyps;
 
-    use_fadup     = option.use_fadup;
-    allow_capture = option.allow_capture; 
+    use_fadup     = param.use_fadup;
+    allow_capture = param.allow_capture; 
   } in
 
   (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
-  let mode = if ut_mode = `Unif then `Eq else option.mode in
+  let mode = if ut_mode = `Unif then `Eq else param.mode in
 
   try
     let mv = fmatch ~mode t1.pat_op_term t2.pat_op_term st_init in
@@ -1960,7 +1969,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported.
       Remark: term matching ignores [mode]. *)
   let try_match
-      ?option ?mv ?env ?ienv ?hyps ?expand_context
+      ?param ?mv ?env ?ienv ?hyps ?expand_context
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
@@ -1971,7 +1980,7 @@ module T (* : S with type t = Term.term *) = struct
       (fun[@warning "-27"] ~mode -> tunif)
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ?option ?mv ?env ?ienv ?hyps ?expand_context
+      ?param ?mv ?env ?ienv ?hyps ?expand_context
       table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
@@ -2000,7 +2009,7 @@ module T (* : S with type t = Term.term *) = struct
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Term.term] *)
   let find
-      ?option
+      ?param
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -2021,7 +2030,7 @@ module T (* : S with type t = Term.term *) = struct
           let subterm_system = SE.reachability_context se in
           match
             try_match ~expand_context:InSequent 
-              ?ienv ?option table subterm_system e pat
+              ?ienv ?param table subterm_system e pat
           with
           | Match _ -> e :: acc, `Continue
           | _       -> acc, `Continue
@@ -3789,7 +3798,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let try_match
-      ?option ?mv ?env ?ienv ?hyps ?expand_context
+      ?param ?mv ?env ?ienv ?hyps ?expand_context
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Equiv.form)
@@ -3800,14 +3809,14 @@ module E = struct
        unif_global
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ?option ?mv ?env ?ienv ?hyps ?expand_context table system
+      ?param ?mv ?env ?ienv ?hyps ?expand_context table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
   
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Equiv.form] *)
   let find
-      ?option
+      ?param
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -3828,7 +3837,7 @@ module E = struct
           let subterm_system = SE.reachability_context se in
           match 
             T.try_match ~expand_context:InSequent
-              ?ienv ?option table subterm_system e pat 
+              ?ienv ?param table subterm_system e pat 
           with
           | Match _ -> e :: acc, `Continue
           | _       ->      acc, `Continue
@@ -3839,7 +3848,7 @@ module E = struct
   (** Exported.
       Similar to [find], but over [Equiv.form] sub-terms. *)
   let find_glob
-      ?option
+      ?param
       ?ienv
       (table  : Symbols.table) 
       (system : SE.context) 
@@ -3851,7 +3860,7 @@ module E = struct
       fun e se _vars _p acc ->
         match 
           try_match ~expand_context:InSequent
-            ?ienv ?option table se e pat
+            ?ienv ?param table se e pat
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

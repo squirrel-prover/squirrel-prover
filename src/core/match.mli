@@ -253,15 +253,10 @@ module Mvar : sig
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Module signature of matching} *)
+(** {2 Unification parameter} *)
 
-type match_res =
-  | NoMatch of (Term.terms * Term.match_infos) option
-  | Match   of Mvar.t
-(*TODO:Concrete: see if add subgoal to do weaking is necesary*)
-
-(** matching algorithm options *)
-type match_option = {
+(** unification parameter *)
+type param = {
   mode          : [`Eq | `EntailLR | `EntailRL];
   use_fadup     : bool;
   allow_capture : bool;
@@ -270,7 +265,15 @@ type match_option = {
       When doing rewriting, lemma application, etc, must be false. *)
 }
 
-val default_match_option : match_option
+val default_param : param
+
+(*------------------------------------------------------------------*)
+(** {2 Module signature of matching} *)
+
+type match_res =
+  | NoMatch of (Term.terms * Term.match_infos) option
+  | Match   of Mvar.t
+(*TODO:Concrete: see if add subgoal to do weaking is necesary*)
 
 (** Module signature of matching.
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
@@ -300,7 +303,7 @@ module type S = sig
       In case of failure, the typing environment [ienv] is left 
       unchanged (it is reset). *)
   val try_match :
-    ?option:match_option ->
+    ?param:param ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
     ?ienv:Infer.env ->
@@ -315,7 +318,7 @@ module type S = sig
   (** [find pat t] returns the list of occurences in [t] that match the
       pattern. *)
   val find : 
-    ?option:match_option ->
+    ?param:param ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -438,7 +441,7 @@ module E : sig
 
   (** Similar as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
-    ?option:match_option ->
+    ?param:param ->
     ?ienv:Infer.env ->
     Symbols.table ->
     SE.context ->

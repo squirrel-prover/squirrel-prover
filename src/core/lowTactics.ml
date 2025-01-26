@@ -1924,8 +1924,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t)
     : Goal.t list
     =
-    let option =
-      { Match.default_match_option with mode = `EntailRL; use_fadup }
+    let param =
+      { Match.default_param with mode = `EntailRL; use_fadup }
     in
     let table, system, conclusion = S.table s, S.system s, S.conclusion s in
     let hyps = S.get_trace_hyps s in
@@ -1963,7 +1963,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | Local_t  ->
           begin
             match
-              Match.T.try_match ~option ~ienv ~hyps table ~env:vars system conclusion pat
+              Match.T.try_match ~param ~ienv ~hyps table ~env:vars system conclusion pat
             with
             | NoMatch _ as res -> res
             | Match mv as res ->
@@ -1972,7 +1972,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
               | Some e, LocConc ve ->
                 Match.T.try_match
-                  ~option ~mv ~ienv ~hyps table
+                  ~param ~mv ~ienv ~hyps table
                   ~env:vars system e {opat with pat_op_term = ve}
 
               | Some _, LocHyp -> res
@@ -1989,7 +1989,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           end
         | Global_t ->
           assert(bound = None || pat_bound = Glob);
-          Match.E.try_match ~option ~ienv ~hyps table ~env:vars system conclusion pat
+          Match.E.try_match ~param ~ienv ~hyps table ~env:vars system conclusion pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -2109,8 +2109,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
       if not (Sv.subset pat_vars (S.fv_hyp fprem)) then None
       else
-        let option =
-          Match.{ default_match_option with mode = `EntailLR; use_fadup}
+        let param =
+          Match.{ default_param with mode = `EntailLR; use_fadup}
         in
 
         let table  = S.table  s in
@@ -2119,15 +2119,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
           match S.hyp_kind, hconcl, fprem with
           | Global_t, _, _ ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.E.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
+            Match.E.try_match ~param ~ienv table ~env:(S.vars s) system hconcl pat
               
           | Any_t, Local hconcl, Local fprem ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.T.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
+            Match.T.try_match ~param ~ienv table ~env:(S.vars s) system hconcl pat
               
           | Any_t, Global hconcl, Global fprem ->
             let pat = { pat with pat_op_term = fprem } in
-            Match.E.try_match ~option ~ienv table ~env:(S.vars s) system hconcl pat
+            Match.E.try_match ~param ~ienv table ~env:(S.vars s) system hconcl pat
 
           | Any_t, Global _, Local _ ->
             soft_failure ~loc (Failure "cannot match a local lemma in a global hypothesis")
@@ -2558,8 +2558,8 @@ type form_type =
       (subgs_pat : Equiv.any_form list)
       (pat : (S.hyp_form * Concrete.bound) Term.pat)
       (s : S.t) : Goal.t list =
-    let option =
-      { Match.default_match_option with mode = `Eq}
+    let param =
+      { Match.default_param with mode = `Eq}
     in
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
@@ -2573,7 +2573,7 @@ type form_type =
       oget_exn ~exn:(soft_failure_arg (Failure "Not a concrete goal t")) (get_bound s)
     in
     match
-      Match.T.try_match ~option ~ienv ~hyps table ~env system match_bound
+      Match.T.try_match ~param ~ienv ~hyps table ~env system match_bound
         {opat with pat_op_term = current_bound}
     with
     | NoMatch _ -> soft_failure (Failure "Cannot match the bounds")
@@ -2606,8 +2606,8 @@ type form_type =
       (hyp : Ident.t)
       (s : S.t) : Goal.t list
     =
-    let option =
-      { Match.default_match_option with mode = `Eq}
+    let param =
+      { Match.default_param with mode = `Eq}
     in
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
@@ -2635,7 +2635,7 @@ type form_type =
 
     let result =
       Match.T.try_match
-        ~option ~ienv ~hyps table ~env
+        ~param ~ienv ~hyps table ~env
         system match_bound
         { opat with pat_op_term = current_bound; }
     in

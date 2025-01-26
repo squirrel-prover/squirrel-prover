@@ -23,11 +23,11 @@ let occurrences_of_pat
 
   let pat = Pattern.op_pat_of_term pat in
   
-  let option = { Match.default_match_option with allow_capture = true; } in
+  let param = { Match.default_param with allow_capture = true; } in
   let res : Term.terms = 
     match target with
-    | Local  form -> Match.T.find ~option ?in_system ~ienv env.table env.system pat form
-    | Global form -> Match.E.find ~option ?in_system ~ienv env.table env.system pat form
+    | Local  form -> Match.T.find ~param ?in_system ~ienv env.table env.system pat form
+    | Global form -> Match.E.find ~param ?in_system ~ienv env.table env.system pat form
   in
 
   (* close [ienv] if at least one match was found *)

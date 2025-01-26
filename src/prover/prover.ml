@@ -433,14 +433,14 @@ let search_about
     in
 
     (* allow capture of bound variables when matching *)
-    let option = { Match.default_match_option with allow_capture = true; } in
+    let param = { Match.default_param with allow_capture = true; } in
     
     Symbols.Lemma.fold begin fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | GlobalS f -> Match.E.find ~option env.table sys pat f
-        | LocalS  f -> Match.T.find ~option env.table sys pat f.formula
+        | GlobalS f -> Match.E.find ~param env.table sys pat f
+        | LocalS  f -> Match.T.find ~param env.table sys pat f.formula
         end in
         begin match res with
           | [] -> acc
@@ -475,13 +475,13 @@ let search_about
         pat_op_term = t; } in
 
     (* allow capture of bound variables when matching *)
-    let option = { Match.default_match_option with allow_capture = true; } in
+    let param = { Match.default_param with allow_capture = true; } in
 
     Symbols.Lemma.fold (fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | GlobalS f -> Match.E.find_glob ~option env.table sys pat f
+        | GlobalS f -> Match.E.find_glob ~param env.table sys pat f
         | LocalS  _ -> [] (* can't find Equiv.form in
                                       Term.term ? *)
         end in

@@ -680,14 +680,14 @@ let () =
 
 (** Select a frame element matching a pattern. *)
 let fa_select_felems ~ienv (pat : Term.term Term.pat_op) (s : ES.t) : int option =
-  let option = { Match.default_match_option with allow_capture = true; } in
+  let param = { Match.default_param with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
     | Some p -> SE.reachability_context p
   in
   List.find_mapi (fun i e ->
       match 
-        Match.T.try_match ~ienv ~option ~env:(ES.vars s) (ES.table s) system e pat 
+        Match.T.try_match ~ienv ~param ~env:(ES.vars s) (ES.table s) system e pat 
       with
       | NoMatch _ -> None
       | Match _   -> Some i

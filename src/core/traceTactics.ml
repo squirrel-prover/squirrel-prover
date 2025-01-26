@@ -327,7 +327,7 @@ let rewrite_equiv_transform
   let env    = TS.env   s in
   let table  = TS.table s in
   let vars   = TS.vars  s in
-  let option = { Match.default_match_option with mode = `EntailLR } in
+  let param = { Match.default_param with mode = `EntailLR } in
   let pair_context = SE.{set = (pair :> SE.t) ; pair = Some pair; } in
   let hyps =
     Hyps.change_trace_hyps_context
@@ -352,7 +352,7 @@ let rewrite_equiv_transform
     let known = Equiv.mk_equiv_atom biframe in
     let match_result =
       Match.E.try_match
-        ~option ~hyps ~env:vars
+        ~param ~hyps ~env:vars
         table pair_context known to_deduce
     in
     match match_result with
