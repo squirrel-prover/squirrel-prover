@@ -385,7 +385,9 @@ let equal_term_name_eq
     }
   in
   let unif_state =
-    Match.mk_unif_state ~env:env.vars env.table system hyps ~support:name_vars
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:env.vars env.table system hyps ~support:name_vars
   in 
   let mv = Match.deduce_mem cterm known_set unif_state in
   match mv with
@@ -460,6 +462,7 @@ let exact_eq_under_cond
   in
   let unif_state =
     Match.mk_unif_state
+      ~param:Match.crypto_param
       ~env:env.vars env.table env.system hyps ~support:unif_vars
   in
   Match.deduce_mem cterm known_set unif_state
@@ -982,6 +985,7 @@ module TSet = struct
     let res = 
       match 
         Match.T.try_match
+          ~param:Match.crypto_param
           ~env:env.vars ~hyps env.table env.system
           output.term input_pat
       with Match mv -> Some mv | _ -> None
@@ -1768,6 +1772,7 @@ module Game = struct
           }
         in
         Match.T.try_match
+          ~param:Match.crypto_param
           ~env:env.vars ~hyps:query.hyps env.table env.system
           term.term pat
       in
@@ -2129,7 +2134,9 @@ let knowledge_mem_condterm_sets
           (Term.mk_ors (List.map Term.mk_not conds))
       in
       let st =
-        Match.mk_unif_state ~env:env.vars env.table env.system hyps ~support:[]
+        Match.mk_unif_state
+          ~param:Match.crypto_param
+          ~env:env.vars env.table env.system hyps ~support:[]
       in
       (* FIXME: updating [st] above (notably [support]) and forwarding
          [mv] to [Match] would allow to conclude more often *)
@@ -2331,7 +2338,9 @@ and bideduce_term
   let mem, mem_res = knowledge_mem ~env ~hyps:query.hyps output query.inputs in
   let st : Match.unif_state Lazy.t =
     lazy(
-      Match.mk_unif_state ~env:env.vars env.table env.system query.hyps ~support:[]
+      Match.mk_unif_state
+        ~param:Match.crypto_param
+        ~env:env.vars env.table env.system query.hyps ~support:[]
     )
   in
   if

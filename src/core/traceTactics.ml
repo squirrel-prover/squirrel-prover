@@ -327,7 +327,7 @@ let rewrite_equiv_transform
   let env    = TS.env   s in
   let table  = TS.table s in
   let vars   = TS.vars  s in
-  let param = { Match.default_param with mode = `EntailLR } in
+  let param = { Match.crypto_param with mode = `EntailLR } in
   let pair_context = SE.{set = (pair :> SE.t) ; pair = Some pair; } in
   let hyps =
     Hyps.change_trace_hyps_context
@@ -775,7 +775,11 @@ let deprecated_fresh_occ_incl
   in
 
   let context = SE.reachability_context system in
-  match Match.T.try_match table context (mk_dum a1 is1 cond1) pat2 with
+  match
+    Match.T.try_match
+      ~param:Match.default_param
+      table context (mk_dum a1 is1 cond1) pat2
+  with
   | Match.NoMatch _ -> false
   | Match.Match   _ -> true
 

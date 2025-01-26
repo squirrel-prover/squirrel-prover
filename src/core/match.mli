@@ -255,9 +255,15 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Unification parameter} *)
 
-(** unification parameter *)
+(** unification parameters *)
 type param = {
-  mode          : [`Eq | `EntailLR | `EntailRL];
+  mode : [`Eq | `EntailLR | `EntailRL];
+
+  red_param : ReductionCore.red_param;
+  (** the reduction parameters to use during unification *)
+  red_strat : ReductionCore.red_strat;
+  (** the reduction strategy to use during unification *)
+  
   use_fadup     : bool;
   allow_capture : bool;
   (** allow pattern variables to capture bound variables (i.e. to be
@@ -265,7 +271,20 @@ type param = {
       When doing rewriting, lemma application, etc, must be false. *)
 }
 
+(** default parameters, which do not use reduction *)
 val default_param : param
+
+(** default parameters for cryptographic reasoning, which uses
+    - reduction rules: [rp_crypto] 
+    - reduction strategy: [MayRedSub { rp_crypto with delta = delta_fast; }] *)
+val crypto_param : param
+
+(** default parameters for generic logical reasoning (`apply`,
+    `rewrite`, ...), which uses 
+    - reduction rules: [rp_crypto] (* FIXME: move to [rp_logic] *)
+    - reduction strategy: [MayRedSub { rp_crypto with delta = delta_fast; }] 
+      (same as in [crypto_param]). *)
+val logic_param : param
 
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
@@ -303,7 +322,7 @@ module type S = sig
       In case of failure, the typing environment [ienv] is left 
       unchanged (it is reset). *)
   val try_match :
-    ?param:param ->
+    param:param ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
     ?ienv:Infer.env ->
@@ -318,7 +337,7 @@ module type S = sig
   (** [find pat t] returns the list of occurences in [t] that match the
       pattern. *)
   val find : 
-    ?param:param ->
+    param:param ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -374,6 +393,7 @@ val reduce_glob_let1 : Equiv.form -> Equiv.form * ReductionCore.head_has_red
 type unif_state
 
 val mk_unif_state :
+  param:param ->
   env:Vars.env -> Symbols.table -> 
   SE.context -> Hyps.TraceHyps.hyps ->
   support:Vars.vars -> 
@@ -441,7 +461,7 @@ module E : sig
 
   (** Similar as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
-    ?param:param ->
+    param:param ->
     ?ienv:Infer.env ->
     Symbols.table ->
     SE.context ->

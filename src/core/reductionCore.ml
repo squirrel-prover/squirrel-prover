@@ -38,47 +38,63 @@ type red_param = {
 }
 
 (*------------------------------------------------------------------*)
-  let rp_empty = { 
-    rewrite = false;
-    beta    = false; 
-    delta   = delta_empty; 
-    proj    = false;
-    zeta    = false;
-    diff    = false;
-    constr  = false; 
-    builtin = false;
-  }
+let rp_empty = { 
+  rewrite = false;
+  beta    = false; 
+  delta   = delta_empty; 
+  proj    = false;
+  zeta    = false;
+  diff    = false;
+  constr  = false; 
+  builtin = false;
+}
 
-  let rp_default = { 
-    rewrite = true;
-    beta    = true; 
-    delta   = delta_empty;
-    zeta    = true;
-    proj    = true;
-    diff    = false;
-    constr  = false;
-    builtin = true; 
-  }
+let rp_default = { 
+  rewrite = true;
+  beta    = true; 
+  delta   = delta_empty;
+  zeta    = true;
+  proj    = true;
+  diff    = false;
+  constr  = false;
+  builtin = true; 
+}
 
-  let rp_full = { 
-    rewrite = true;
-    beta    = true; 
-    delta   = delta_full;
-    zeta    = true;
-    proj    = true;
-    diff    = true;
-    constr  = false;   (* [constr] is not enabled in [rp_full] *)
-    builtin = true;
-  }
+let rp_full = { 
+  rewrite = true;
+  beta    = true; 
+  delta   = delta_full;
+  zeta    = true;
+  proj    = true;
+  diff    = true;
+  constr  = false;   (* [constr] is not enabled in [rp_full] *)
+  builtin = true;
+}
 
-  let rp_crypto = {
-    rp_empty with 
-    delta = delta_full;
-    diff = true;
-    beta = true; 
-    proj = true; 
-    zeta = true;    
-  }
+(** default parameters for cryptographic reasoning *)
+let rp_crypto = {
+  rewrite = false;
+  delta   = delta_full;
+  diff    = true;
+  beta    = true; 
+  proj    = true; 
+  zeta    = true;
+  builtin = false;
+  constr  = false;
+}
+
+(** default parameters for generic logical reasoning (`apply`,
+    `rewrite`, ... *)
+let rp_logic = {
+  rewrite = true;
+  delta   = delta_full;
+  diff    = true; 
+  beta    = true; 
+  proj    = true; 
+  zeta    = true;
+  builtin = true;
+  constr  = false;
+}
 
 (*------------------------------------------------------------------*)
 (** reduction strategy for head normalization *)

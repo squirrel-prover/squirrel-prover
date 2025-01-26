@@ -1925,7 +1925,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     : Goal.t list
     =
     let param =
-      { Match.default_param with mode = `EntailRL; use_fadup }
+      { Match.logic_param with mode = `EntailRL; use_fadup }
     in
     let table, system, conclusion = S.table s, S.system s, S.conclusion s in
     let hyps = S.get_trace_hyps s in
@@ -2110,7 +2110,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Sv.subset pat_vars (S.fv_hyp fprem)) then None
       else
         let param =
-          Match.{ default_param with mode = `EntailLR; use_fadup}
+          Match.{ logic_param with mode = `EntailLR; use_fadup}
         in
 
         let table  = S.table  s in
@@ -2557,10 +2557,9 @@ type form_type =
   let weak_pt ~loc
       (subgs_pat : Equiv.any_form list)
       (pat : (S.hyp_form * Concrete.bound) Term.pat)
-      (s : S.t) : Goal.t list =
-    let param =
-      { Match.default_param with mode = `Eq}
-    in
+      (s : S.t) : Goal.t list
+    =
+    let param = { Match.logic_param with mode = `Eq} in
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)
@@ -2606,9 +2605,7 @@ type form_type =
       (hyp : Ident.t)
       (s : S.t) : Goal.t list
     =
-    let param =
-      { Match.default_param with mode = `Eq}
-    in
+    let param = { Match.logic_param with mode = `Eq} in
     let table, system, env = S.table s, S.system s, S.vars s in
     let hyps = S.get_trace_hyps s in
     (* open an type unification environment *)

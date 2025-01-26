@@ -24,8 +24,8 @@ global axiom [S1/left,S2/right] foo : equiv(diff(a,b)).
 global lemma [S1/left,S2/right] _ :
 [happens(A)] -> equiv(diff(msg@A,msg1@A),diff(a,b)).
 Proof.
-intro *.
-deduce 0.
+intro *. 
+deduce 0. 
 apply foo.
 Qed.
 

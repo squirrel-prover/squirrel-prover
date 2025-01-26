@@ -179,12 +179,15 @@ let rw_inst
       if not (SE.equal table se inst.system) then 
         s, `Continue 
       else
-        let ienv = inst.ienv in (* TODO: sevars: why keep using [ienv]? *)
+        let ienv = inst.ienv in (* FIXME: why keep using [ienv]? *)
         let context = SE.reachability_context se in
         begin
           match 
             Match.T.try_match
-              ~expand_context ~ienv ~hyps ~env table context occ inst.pat 
+              (* TODO: param: take param as input *)
+              ~param:Match.crypto_param
+              ~expand_context
+              ~ienv ~hyps ~env table context occ inst.pat 
           with
           | NoMatch _ -> s, `Continue
           | Match _mv -> 
@@ -205,6 +208,8 @@ let rw_inst
         let op_rule = open_rw_rule table rule se in
         let res_match =
           Match.T.try_match
+            (* TODO: param: take param as input *)
+            ~param:Match.crypto_param
             ~expand_context ~ienv:op_rule.ienv
             ~hyps ~env table context occ op_rule.pat
         in

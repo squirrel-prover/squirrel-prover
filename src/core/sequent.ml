@@ -1044,6 +1044,7 @@ module Mk (Args : MkArgs) : S with
       | Local f1, Local f_arg ->
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.T.try_match
+          ~param:Match.logic_param
           ~ienv ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
@@ -1051,6 +1052,7 @@ module Mk (Args : MkArgs) : S with
         assert(pt.bound = Glob && arg.bound = Glob);
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
+          ~param:Match.logic_param
           ~ienv ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 

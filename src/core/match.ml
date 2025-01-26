@@ -1169,7 +1169,13 @@ let no_unif ?infos () = raise (NoMatch infos)
 
 (** unification parameters *)
 type param = {
-  mode          : [`Eq | `EntailLR | `EntailRL];
+  mode : [`Eq | `EntailLR | `EntailRL];
+
+  red_param : ReductionCore.red_param;
+  (** the reduction parameters to use during unification *)
+  red_strat : ReductionCore.red_strat;
+  (** the reduction strategy to use during unification *)
+  
   use_fadup     : bool;
   allow_capture : bool;
   (** allow pattern variables to capture bound variables (i.e. to be
@@ -1180,10 +1186,30 @@ type param = {
 (*------------------------------------------------------------------*)
 let default_param = { 
   mode           = `Eq;
+  red_param      = ReductionCore.rp_empty;
+  red_strat      = ReductionCore.Std;
   use_fadup      = false; 
   allow_capture  = false; 
 }
 
+let crypto_param = { 
+  mode           = `Eq;
+  red_param      = ReductionCore.rp_crypto;
+  red_strat      = 
+    ReductionCore.(MayRedSub { rp_crypto with delta = ReductionCore.delta_fast; });
+  use_fadup      = false; 
+  allow_capture  = false; 
+}
+
+let logic_param = {
+  mode           = `Eq;
+  red_param      = ReductionCore.rp_crypto; (* FIXME: use [rp_logic] *)
+  red_strat      = 
+    ReductionCore.(MayRedSub { rp_crypto with delta = ReductionCore.delta_fast; });
+  (* same reduction strategy as in [crypto_param] *)
+  use_fadup      = false;
+  allow_capture  = false;
+}
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
@@ -1213,17 +1239,22 @@ type unif_state = {
   (*------------------------------------------------------------------*)
   (** repeat most of the unification options *)
 
+  red_param : ReductionCore.red_param;
+  red_strat : ReductionCore.red_strat;
+  
   use_fadup     : bool;
   allow_capture : bool;
 }
 
 let mk_unif_state
+    ~(param   : param)
     ~(env     : Vars.env)
     (table    : Symbols.table)
     (system   : SE.context)
     (hyps     : Hyps.TraceHyps.hyps)
     ~(support : Vars.vars) : unif_state
   =
+  assert (param.mode = `Eq);
   { mode           = `Unif;
     mv             = Mvar.empty;
     bvs            = [];
@@ -1236,8 +1267,11 @@ let mk_unif_state
     system;
     hyps;
 
-    use_fadup      = false;
-    allow_capture  = false
+    red_param = param.red_param;
+    red_strat = param.red_strat;
+    
+    use_fadup      = param.use_fadup;
+    allow_capture  = param.allow_capture;
   }
   
 (*------------------------------------------------------------------*)
@@ -1548,7 +1582,7 @@ module type S = sig
     Format.formatter -> 'a pat_op -> unit
 
   val try_match :
-    ?param:param ->
+    param:param ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->
     ?ienv:Infer.env ->
@@ -1561,7 +1595,7 @@ module type S = sig
     match_res
 
   val find : 
-    ?param:param ->
+    param:param ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -1582,7 +1616,7 @@ let unif_gen (type a)
     (ut_mode : [`Unif | `Match])
     (fmatch  : 
        mode:[`EntailLR | `EntailRL | `Eq] -> a -> a -> unif_state -> Mvar.t) 
-    ?(param = default_param)
+    ~(param  : param)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
     ?(ienv : Infer.env option)
@@ -1645,6 +1679,9 @@ let unif_gen (type a)
 
     table; system; env; support; ienv; hyps;
 
+    red_param = param.red_param;
+    red_strat = param.red_strat;
+    
     use_fadup     = param.use_fadup;
     allow_capture = param.allow_capture; 
   } in
@@ -1858,13 +1895,8 @@ module T (* : S with type t = Term.term *) = struct
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
-    (* FIXME: retrieve rp_param from the reduction state *)
-    let red_param = ReductionCore.rp_crypto in
-    (* use a faster reduction strategy for subterms that ignores
-       macros, as reducing them is slow  *)
-    let strat = ReductionCore.(MayRedSub { rp_crypto with delta = delta_fast }) in 
-    (* let strat = ReductionCore.(MayRedSub rp_empty) in *)
-    (* let strat = ReductionCore.Std in *)
+    let red_param = st.red_param in
+    let strat = st.red_strat in
     let t, has_red = reduce_head1 ~red_param ~strat st t in
     if has_red = True then 
       tunif t pat st
@@ -1969,7 +2001,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported.
       Remark: term matching ignores [mode]. *)
   let try_match
-      ?param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps ?expand_context
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
@@ -1980,7 +2012,7 @@ module T (* : S with type t = Term.term *) = struct
       (fun[@warning "-27"] ~mode -> tunif)
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ?param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps ?expand_context
       table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
@@ -2002,14 +2034,14 @@ module T (* : S with type t = Term.term *) = struct
       (t2    : term pat_op) 
     : Mvar.t option
     =
-    match unify ?mv table system t1 t2 with
+    match unify ?mv ~param:default_param table system t1 t2 with
     | NoMatch _ -> None
     | Match mv -> Some mv
 
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Term.term] *)
   let find
-      ?param
+      ~param
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -2030,7 +2062,7 @@ module T (* : S with type t = Term.term *) = struct
           let subterm_system = SE.reachability_context se in
           match
             try_match ~expand_context:InSequent 
-              ?ienv ?param table subterm_system e pat
+              ?ienv ~param table subterm_system e pat
           with
           | Match _ -> e :: acc, `Continue
           | _       -> acc, `Continue
@@ -2217,12 +2249,10 @@ let known_set_check_impl_conv
     ~(hyps : Term.term list)
     ~(cond : Term.term) : bool
   =
-  (* FIXME: retrieve rp_param from the reduction state *)
-  let red_param = ReductionCore.rp_crypto in
   let conv =
     match st with
     | None -> Term.alpha_conv ~subst:[]
-    | Some st -> conv_term red_param st
+    | Some st -> conv_term st.red_param st
   in
   List.exists (conv cond) hyps
 
@@ -2360,6 +2390,8 @@ let known_set_check_impl
      Does not reduce recursively (i.e. reduction is only used at head
      position to try to make a conjunction appear). *)
   let decompose_ands =
+    (* deduction parametrizes reduction its own way for now
+       (i.e. we do not use [st.red_param] and [st.red_strat]) *)
     let red_param = ReductionCore.rp_crypto in
     let strat = ReductionCore.(MayRedSub rp_crypto) in
     match st with
@@ -2663,6 +2695,8 @@ and deduce_fa
     (st      : unif_state)
     (minfos  : match_infos) : Mvar.t * match_infos
   =
+  (* deduction parametrizes reduction its own way for now
+     (i.e. we do not use [st.red_param] and [st.red_strat]) *)
   let red_param = ReductionCore.rp_crypto in
   let strat = ReductionCore.(MayRedSub rp_crypto) in
   match fa_decompose output st with
@@ -2728,7 +2762,7 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
       if Infer.unify_se ienv k.se rule_system = `Fail then None else
         begin
           let context = SE.{ set = k.se; pair = None; } in 
-          match T.try_match env.table context k.term pat with
+          match T.try_match ~param:default_param env.table context k.term pat with
           | NoMatch _ -> None
           | Match  mv ->
             (* substitute type variables in [right] and [left], which we
@@ -2797,6 +2831,7 @@ let term_set_decompose
     let venv = Vars.add_vars t.vars env.vars in
     let st =
       mk_unif_state
+        ~param:crypto_param (* FIXME: should always take a default value? *)
         ~env:venv env.table env.system hyps
         ~support:[]
     in
@@ -2807,7 +2842,10 @@ let term_set_decompose
   (* recursive computation decomposing the set of term [k] into
      smaller, more elementary, sets of terms *)
   let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
-    (* heuristic: we do not unroll macros on the left, as this may
+    (* deduction parametrizes reduction its own way for now
+       (i.e. we do not use [st.red_param] and [st.red_strat]) 
+        
+       heuristic: we do not unroll macros on the left, as this may
        prevent applying useful user deduction rules. E.g.
 
        - [frame@A] yields [{frame@t | t: t ≤ A}] thanks to a standard
@@ -2817,7 +2855,10 @@ let term_set_decompose
          the weaker set of terms [{frame@t | t: t ≤ pred A}] thanks to 
          the same user rule. *)
     let red_param = 
-      ReductionCore.{ rp_crypto with delta = { delta_full with macro = false; }} 
+      ReductionCore.{
+        rp_crypto with
+        delta = { rp_crypto.delta with macro = false; }
+      } 
     in
     let strat = ReductionCore.(MayRedSub rp_crypto) in
     let term, _ = 
@@ -3070,10 +3111,12 @@ let mset_incl
   in
 
   let context = SE.{ set = system; pair = None; } in
-  (* FIXME: cleanup with unification of list of terms *)
   (* FIXME: use better expand_context mode when possible *)
   match 
-    T.try_match ~expand_context:InSequent table context term1 pat2
+    T.try_match
+      ~param:default_param ~expand_context:InSequent
+      table context
+      term1 pat2
   with
   | NoMatch _ -> false
   | Match _ -> true
@@ -3160,7 +3203,6 @@ let mset_inter
       (* local inforation, since we allow to match diff operators *)
     }
   in
-  (* FIXME: cleanup with unification of list of terms *)
   let sys_cntxt = SE.{ set = system; pair = None; } in
   match T.unify_opt table sys_cntxt pat1 pat2 with
   | None -> None
@@ -3798,7 +3840,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let try_match
-      ?param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps ?expand_context
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Equiv.form)
@@ -3809,14 +3851,14 @@ module E = struct
        unif_global
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ?param ?mv ?env ?ienv ?hyps ?expand_context table system
+      ~param ?mv ?env ?ienv ?hyps ?expand_context table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
   
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Equiv.form] *)
   let find
-      ?param
+      ~param
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -3837,7 +3879,7 @@ module E = struct
           let subterm_system = SE.reachability_context se in
           match 
             T.try_match ~expand_context:InSequent
-              ?ienv ?param table subterm_system e pat 
+              ?ienv ~param table subterm_system e pat 
           with
           | Match _ -> e :: acc, `Continue
           | _       ->      acc, `Continue
@@ -3848,7 +3890,7 @@ module E = struct
   (** Exported.
       Similar to [find], but over [Equiv.form] sub-terms. *)
   let find_glob
-      ?param
+      ~param
       ?ienv
       (table  : Symbols.table) 
       (system : SE.context) 
@@ -3860,7 +3902,7 @@ module E = struct
       fun e se _vars _p acc ->
         match 
           try_match ~expand_context:InSequent
-            ?ienv ?param table se e pat
+            ?ienv ~param table se e pat
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

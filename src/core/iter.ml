@@ -806,7 +806,11 @@ end = struct
         pat_op_vars   = Vars.Tag.local_vars s2.indices;}
     in
     let system = SE.reachability_context sexpr in
-    match Match.T.try_match table system term1 pat2 with
+    match
+      Match.T.try_match
+        ~param:Match.default_param
+        table system term1 pat2
+    with
     | Match _ -> true
     | NoMatch _ -> false
 

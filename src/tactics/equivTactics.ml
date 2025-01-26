@@ -1024,7 +1024,11 @@ let filter_deduce
   =
   let table = ES.table s in
   let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  let st =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:(ES.vars s) table system hyps ~support:[]
+  in
 
   (** Invariant: [knows, results, to_filter ▷ to_filter_init] *)
   let rec doit result to_filter : Term.terms =
@@ -1120,7 +1124,11 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
 
   let table = ES.table s in
   let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  let st =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:(ES.vars s) table system hyps ~support:[]
+  in
 
   let match_result = 
     Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
@@ -1191,7 +1199,11 @@ let deduce_predicate
   in
 
   let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  let st =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:(ES.vars s) table system hyps ~support:[]
+  in
 
   let left  = CP.lefts  goal in
   let right = CP.rights goal in
@@ -1314,7 +1326,11 @@ let deduce_predicate_int
   in
 
   let hyps = ES.get_trace_hyps ~in_system:system s in
-  let st = Match.mk_unif_state ~env:(ES.vars s) table system hyps ~support:[] in
+  let st =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:(ES.vars s) table system hyps ~support:[]
+  in
 
   let side = pick_side ?side goal_kind in
   let left = CP.lefts goal in

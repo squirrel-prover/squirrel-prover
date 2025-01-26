@@ -117,7 +117,7 @@ let deprecated_pat_subsumes
   : Match.Mvar.t option
   =
   assert (pat2.pat_op_params = Params.Open.empty);
-  match Match.T.try_match ~mv table context t1 pat2
+  match Match.T.try_match ~mv ~param:Match.default_param table context t1 pat2
   with
   | NoMatch _ -> None
   | Match mv -> Some mv 
