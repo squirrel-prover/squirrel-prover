@@ -475,6 +475,8 @@ module Core (* : ReductionCore.S *) = struct
       let rule = List.find_map (fun Hint.{ cnt = rule } ->
           match 
             Rewrite.rewrite_head
+              ~param:Match.default_param 
+              (* no reduction here, to keep performances reasonable *)
               st.table st.params st.vars st.expand_context st.hyps st.system.set
               rule t 
           with

@@ -412,6 +412,7 @@ let indcca_param
              let rule, table, xc = mk_rewrule f cty mty rty kty in
              let res =
                Rewrite.rewrite
+                 ~param:Match.crypto_param
                  table (ES.params s)
                  Vars.empty_env (* only local variables,
                                    hence [env] is useless here *)

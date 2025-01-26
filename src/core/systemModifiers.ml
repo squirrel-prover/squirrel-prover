@@ -645,6 +645,7 @@ let do_rewrite
   let mult, rw_erule = rw in
   match
     Rewrite.rewrite_exn 
+      ~param:Match.default_param
       ~loc (TS.table s) (TS.params s) (TS.vars s) (TS.system s) expand_context
       (TS.get_trace_hyps s)
       mult rw_erule (Local t)

@@ -16,7 +16,7 @@ hint rewrite fst_pair.
 lemma [A] _ (t : timestamp, i : index) : 
   t = O(i) => happens(t) => input@t = b => fst(output@t) = b.
 Proof. 
-  intro -> Hap U /=.
+  intro -> Hap U @/output /=.
   clear Hap U.
   (* clear to check `/=` indeed simplified `fst(output@t)` into `input@t`,
      which is in turn simplified into `true` by `U` *)
@@ -27,7 +27,7 @@ Qed.
 lemma [A] _ (t : timestamp, i : index) : 
   t = O(i) => happens(t) => input@t = b => fst(output@t) = b.
 Proof. 
-  intro H Hap U /=.
+  intro H Hap U @/output /=.
   clear H Hap U.
   assumption.
 Qed.

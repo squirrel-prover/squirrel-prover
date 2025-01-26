@@ -583,7 +583,8 @@ Proof.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
     simpl ~diffr.
-    rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //.
+    rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //. 
+    rewrite !dec_enc !fst_pair.
     by apply Hind (pred(t)).
 
   + (* Decode1(pid,j) *)

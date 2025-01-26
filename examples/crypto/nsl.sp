@@ -359,7 +359,9 @@ Proof.
     rewrite /msg1 /msg2 /msg3 in H1.
     rewrite H1.
     rewrite (if_false (A <= pred A)); 1: auto.
-    auto.
+    simpl. 
+    clear ex fr pk msg1 msg2 msg3. 
+    auto ~diffr.
   + destruct IH.
     rewrite /frame /exec /output /cond /input /msg8 /msg2 /msg9 /msg3.
     rewrite and_true_r.
@@ -475,7 +477,10 @@ Proof.
        att (fr f p m1 m2 m3 kb na nb rand1 rand2))).
     rewrite /* in *.
     rewrite /= H1.
-    by rewrite (if_true (A <= A)).
+    rewrite (if_true (A <= A)) //.
+    clear ex fr pk msg1 msg2 msg3. 
+    simpl. 
+    auto ~diffr.
   + by rewrite lt_irrefl in H0.
   + destruct IH.
     rewrite /* and_true_r.
@@ -496,7 +501,8 @@ Proof.
        (pk f  p m1 m2 m3 kb na nb rand1 rand2))).
     rewrite /* /= in *. 
     assert (A <= B) <=> (A <= pred B) as -> by auto.
-    by rewrite H1.
+    rewrite H1.
+    auto ~diffr.
 Qed.
 
 (* ----------------------------------------------------------------------- *)

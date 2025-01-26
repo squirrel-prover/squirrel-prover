@@ -217,7 +217,7 @@ Proof.
   exists i, k => /=.
 
   intro j0 => Hap_j0 @/cond [i0 JCond] JCond0 JCond1.   
-  rewrite -JCond0 -JCond1 /= in JCond. 
+  rewrite -JCond0 -JCond1 fst_pair snd_pair /= in JCond. 
   clear JCond0 JCond1. 
 
   have Eq: i = i0. {

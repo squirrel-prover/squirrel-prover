@@ -12,6 +12,7 @@ type error =
 (** Try to do a rewrite at head position in a term.
     Return: rewritten term, proof obligations *)
 val rewrite_head :
+  param:Match.param ->
   Symbols.table ->
   Params.t ->
   Vars.env ->
@@ -31,6 +32,7 @@ type rw_res_opt =
 
 (*------------------------------------------------------------------*)
 val rewrite :
+  param:Match.param ->
   Symbols.table ->
   Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)
@@ -47,6 +49,7 @@ val rewrite :
     the rewriting fails  *)
 val rewrite_exn :
   loc:L.t ->
+  param:Match.param ->
   Symbols.table ->
   Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)

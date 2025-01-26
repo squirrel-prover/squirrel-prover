@@ -715,6 +715,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         else
           match
             Rewrite.rewrite_exn
+              ~param:Match.logic_param
               ~loc (S.table s) (S.params s) (S.vars s) system InSequent
               (S.get_trace_hyps s)
               mult rw_erule f
@@ -1664,6 +1665,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let doit (target : Equiv.any_form) : Equiv.any_form =
       match
         Rewrite.rewrite
+          ~param:Match.logic_param
           (S.table s) (S.params s) (S.vars s) (S.system s) InSequent
           (S.get_trace_hyps s)
           Once rw_rule target
