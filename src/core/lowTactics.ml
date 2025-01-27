@@ -154,13 +154,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       begin
         match (S.system s).pair with
         | Some x -> (x :> SE.t)
-        | None -> hard_failure ?loc
-                    (Tactics.Failure
-                       "A sequent with equiv ≠ None is required here")
-                    (* TODO: if [pair] is [None],
-                       we should return a default system value. *)
+        | None ->
+          hard_failure ?loc
+            (Tactics.Failure
+               "a sequent with equiv ≠ None is required here")
+            (* TODO: if [pair] is [None],
+               we should return a default system value. *)
       end 
-          
+
     | _ -> assert false     (* impossible *)
 
   (*------------------------------------------------------------------*)
@@ -2376,7 +2377,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     match args with
     | [Args.Induction (None, None)] -> induction s
     | [Args.Induction (None, _)] ->
-      hard_failure (Failure "System can only be specified when generalizing")
+      hard_failure (Failure "system can only be specified when generalizing")
     | [Args.Induction (Some t, system)] ->
       let in_system =
         match system with 
@@ -2387,14 +2388,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
           SE.Parse.parse ~implicit:false ~se_env table system |>
           snd
       in
-      begin
-        match 
-          convert_args s [Args.Term_parsed t] (Args.Sort Args.Message)
-        with
-        | Args.Arg (Args.Message (t, _)) -> 
-          induction_gen ~dependent ~in_system t s
-        | _ -> hard_failure (Failure "ill-formed arguments")
-      end
+      let t, _ = convert ~system:{set=in_system; pair=None} s t in
+      induction_gen ~dependent ~in_system t s
     | _ -> bad_args ()
 
 
