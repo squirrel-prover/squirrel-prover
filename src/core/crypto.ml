@@ -3218,7 +3218,7 @@ let prove
             rec_target_cond @  (* [A i < B j], if [target] is recursive *)
             (Term.subst s (oget source.rec_predicate)) :: (* A i ≤ τ₀ *)
             term.conds;
-          vars = source_vars;
+          vars = source_vars@term.vars;
           term = term.term;
         }
       ) source.extra_outputs
