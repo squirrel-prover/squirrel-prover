@@ -1342,9 +1342,10 @@ let transitivity_get_next_query
   =
   (* TODO : remove folowing line : it doesn't follow semantics*)
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
-  let output = List.map
-                 (fun (t:CondTerm.t) -> TSet.{term=t.term;conds = t.conds; vars = []})
-                 output_term
+  let output =
+    List.map
+      (fun (t:CondTerm.t) -> TSet.{term=t.term;conds = t.conds; vars = []})
+      output_term
   in
   {
     old_query with
@@ -2259,18 +2260,21 @@ let rec bideduce_term_strict
       Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars in
     let env = {query.env with vars} in
     notify_bideduce_term_strict query "Quantificator";
-    let result =  bideduce_fp es { query with env }
+    let result =
+      bideduce_fp es { query with env }
         [CondTerm.mk ~term ~conds:output_term.conds]
     in
     (* Generalising constraints, subgoals and extra/save outputs*)
     let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
     (*building lambda term that contains all computed extra and save outputs*)
-    let extra_outputs = List.map  (fun (t:TSet.t):TSet.t -> 
-      { term= t.term;
-        conds =t.conds;
-        vars = es@t.vars;
-      }) result.extra_outputs
+    let extra_outputs =
+      List.map
+        (fun (t:TSet.t):TSet.t -> 
+           { term  = t.term;
+             conds = t.conds;
+             vars  = es@t.vars; })
+        result.extra_outputs
     in
     some {result with consts;subgoals;extra_outputs;}
 
@@ -2370,10 +2374,9 @@ and bideduce_oracle
       let args      = List.map CondTerm.mk_simpl args in
       let conds     = Term.mk_ors conds in
       let not_conds = Term.mk_ands not_conds in
-      (*let output_conds = List.map CondTerm.mk_simpl output_term.conds in*)
       let cterm = {output_term with conds = not_conds::output_term.conds} in
       (* By sematnic of conditional tset, the condition are also in the inputs, so ne need to
-      bideduce them*)
+         bideduce them*)
       let to_deduce = args(*@conds_true@output_conds*) in
       (* FEATURE: conds_false might be always false, in which case it
          is not necessary to call the oracle. *)
@@ -2381,12 +2384,12 @@ and bideduce_oracle
       match bideduce {query with allow_oracle=false} to_deduce
       with
       | Some result ->
-         let query_start = transitivity_get_next_query query to_deduce result in
-         let input_cond = TSet.{term = conds; conds = []; vars = [] } in
+        let query_start = transitivity_get_next_query query to_deduce result in
+        let input_cond = TSet.{term = conds; conds = []; vars = [] } in
         let query_start = {query_start with inputs = input_cond::query.inputs} in
-            cterm,query_start,result
-      | None -> output_term,query, (empty_result query.initial_mem)
-    else output_term,query,(empty_result query.initial_mem) 
+        cterm,query_start,result
+      | None -> (output_term, query, empty_result query.initial_mem)
+    else (output_term, query, empty_result query.initial_mem)
   in
     (* Given an oracle match, check whether the full inputs
      (standard inputs + randomness indices + conditions) are
@@ -2411,11 +2414,11 @@ and bideduce_oracle
         |> oget_exn ~exn:Failed
       in
       (* add the subgoals required by the [oracle_match] to the state *)
-      let extra_outputs =
-        if index_cond = [] then
-          [TSet.{term = output_term.term; conds = output_term.conds; vars = []}] 
-        else
-          [TSet.{term = output_term.term ; conds = index_cond@output_term.conds;vars = []} ]
+      let extra_outputs = [ TSet.{
+          term  = output_term.term ;
+          conds = index_cond@output_term.conds ;
+          vars  = [] ;
+        } ]
       in
       let result_call =
         { subgoals = mem_subgoals @ subgoals;
