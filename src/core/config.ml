@@ -37,12 +37,6 @@ let decl name ?check default (params : params) =
 (** list of parameters strings (to be set in *.sp files) and
    default value. *)
 
-let s_debug_constr = "debugConstr"
-let v_debug_constr = Param_bool false
-
-let s_debug_completion = "debugCompletion"
-let v_debug_completion = Param_bool false
-
 let s_debug_tactics = "debugTactics"
 let v_debug_tactics = Param_bool false
 
@@ -51,8 +45,6 @@ let v_debug_tactics = Param_bool false
     Add one line for each new parameter. *)
 let default_params =
   M.empty
-  |> decl s_debug_constr     v_debug_constr      
-  |> decl s_debug_completion v_debug_completion
   |> decl s_debug_tactics    v_debug_tactics
 
 (*------------------------------------------------------------------*)
@@ -71,8 +63,6 @@ let set_params p = params := p
 (*------------------------------------------------------------------*)
 (** {2 look-up functions} *)
 
-let debug_constr     () = get_bool (M.find s_debug_constr     !params)
-let debug_completion () = get_bool (M.find s_debug_completion !params)
 let debug_tactics    () = get_bool (M.find s_debug_tactics    !params)
 
 let pp_kind fmt = function

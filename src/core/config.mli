@@ -30,12 +30,6 @@ val set_params : params -> unit
 (*------------------------------------------------------------------*)
 (** {2 Getters} *)
 
-(** Debug information for the constraint checker. *)
-val debug_constr : unit -> bool
-
-(** Debug information for the completion checker. *)
-val debug_completion : unit -> bool
-
 (** Debug information for tactics. *)
 val debug_tactics : unit -> bool
 
