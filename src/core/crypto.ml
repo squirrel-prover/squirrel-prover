@@ -2262,55 +2262,73 @@ let rec bideduce_term_strict
     end
 
   | Term.Quant (_,es,term) when 
-         List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es
+      List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es
     ->
-     let es, subst = Term.refresh_vars es in
-     let term = Term.subst subst term in
-     let vars =
-       Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars
-     in
-     let env = {query.env with vars} in
-     notify_bideduce_term_strict query "Quantificator";
-     let result =  bideduce_fp es { query with env }
-                     [CondTerm.mk ~term ~conds:output_term.conds]
-     in
-     let ty_vars = (Type.tuple (List.map (fun v -> (Vars.ty v)) es)) in
-     let result = 
-       if Symbols.TyInfo.is_finite query.env.table ty_vars
-          && Symbols.TyInfo.is_fixed query.env.table ty_vars
-          && Symbols.TyInfo.is_well_founded query.env.table ty_vars
-          && result.extra_outputs <> []
-       then
-         let extra_outputs = result.extra_outputs in
-         let new_vars, new_subst = Term.refresh_vars es in 
-         let extra_inputs =
-           List.map
-             (fun (t:TSet.t):TSet.t
-                             ->
-                             let term = Term.subst new_subst t.term in
-                             let new_conds =
-                               Term.mk_lt (Term.mk_tuple (Term.mk_vars new_vars)) (Term.mk_tuple (Term.mk_vars es))
-                             in
-                             let conds = new_conds :: (List.map (Term.subst new_subst) t.conds) in
-                             {term;conds;vars=new_vars@t.vars})
-             extra_outputs
-         in
-         notify_bideduce_loop query extra_inputs;
-         bideduce_fp es
-           {query with env; extra_inputs = extra_inputs@query.extra_inputs }
-           [CondTerm.mk ~term ~conds:output_term.conds]
-       else result
-       in
-       (* Generalising constraints, subgoals and extra/save outputs*)
-       let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
-       let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
-       (*building lambda term that contains all computed extra and save outputs*)
-       let extra_outputs =
-         List.map
-           (fun (t:TSet.t):TSet.t -> {term = t.term; conds = output_term.conds; vars = es@t.vars})
-           result.extra_outputs
-       in
-       some {result with consts;subgoals;extra_outputs;}
+    let es, subst = Term.refresh_vars es in
+    let term = Term.subst subst term in
+    let vars =
+      Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars
+    in
+    let env = {query.env with vars} in
+    notify_bideduce_term_strict query "Quantifier";
+
+    (* the quantifier's body that must be deduced  *)
+    let output_body = [CondTerm.mk ~term ~conds:output_term.conds] in
+    
+    (* first pass *)
+    let result =
+      bideduce_fp es { query with env } output_body
+    in
+
+    let ty_vars = Type.tuple (List.map (fun v -> (Vars.ty v)) es) in
+    let result = 
+      if Symbols.TyInfo.is_finite query.env.table ty_vars
+      && Symbols.TyInfo.is_fixed query.env.table ty_vars
+      && result.extra_outputs <> []
+      then begin
+        (* if the type is finite+fixed, start a second pass, using the
+           extra outputs computed during the first pass *)
+        let extra_outputs = result.extra_outputs in
+        let new_vars, new_subst = Term.refresh_vars es in 
+        let extra_inputs =
+          List.map
+            (fun (t:TSet.t) ->
+               let term = Term.subst new_subst t.term in
+               let new_conds =
+                 Term.mk_lt (Term.mk_tuple (Term.mk_vars new_vars)) (Term.mk_tuple (Term.mk_vars es))
+               in
+               let conds = new_conds :: (List.map (Term.subst new_subst) t.conds) in
+               TSet.{ term; conds; vars = new_vars @ t.vars; })
+            extra_outputs
+        in
+        
+        notify_bideduce_loop query extra_inputs;
+
+        (* TODO: check that extra inputs are indeed computed as
+           expected during the second pass *)
+        bideduce_fp es
+          {query with env; extra_inputs = extra_inputs @ query.extra_inputs }
+          output_body
+      end
+      else result
+    in
+    
+    (* generalize constraints, subgoals and extra/save outputs *)
+    let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
+    let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
+
+    (* build the [TSet] containing all computed extra and save outputs *)
+    let extra_outputs =
+      List.map
+        (fun (t:TSet.t) ->
+           TSet.{
+             term  = t.term;
+             conds = output_term.conds;
+             vars  = es @ t.vars;
+           })
+        result.extra_outputs
+    in
+    some {result with consts;subgoals;extra_outputs;}
 
   | Term.Proj (_,l) ->
     notify_bideduce_term_strict query "Projection";
@@ -3276,6 +3294,9 @@ let prove
   let direct_bided_subgs = 
     add_extra_inputs ~kind:`Direct direct_bided_subgs 
   in
+
+  (* TODO: check that extra inputs are indeed computed as
+     expected during the second pass *)
   let _, res = 
     bideduce_all_goals
       game_loc
