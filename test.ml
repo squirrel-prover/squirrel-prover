@@ -52,16 +52,11 @@ let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [>
 
 let () =
   List.iter (fun (s,t) -> Squirrelcore.Checks.add_suite s t) test_suites;
-  (* let runner = Squirrelprover.Prover.run in *)
   let runner = Squirrellib.Main.run in
-  match Smt.files () with 
-    |None -> ()
-    |Some folder ->   Squirrelcore.Checks.add_suite folder (alcotests runner "tests/smt");
+  begin match Smt.files () with 
+    | None -> ()
+    | Some folder -> 
+      Squirrelcore.Checks.add_suite folder (alcotests runner folder);
+  end;
   Squirrelcore.Checks.add_suite "tests/ok/" (alcotests runner "tests/ok");
-  Format.eprintf "Running Alcotests on test suites :\n";
-  List.iter (fun (n,_) -> 
-    Format.eprintf "\t%s\n" n;
-  ) (!Squirrelcore.Checks.suites);
-  Format.eprintf "@.";
-
   Squirrelcore.Checks.run ()
