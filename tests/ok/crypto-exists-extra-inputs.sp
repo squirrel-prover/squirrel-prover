@@ -57,7 +57,23 @@ Abort.
 
 
 global lemma _ : 
-equiv((fun (j:index) => diff(n(i),a)), diff(n(i),a)).
+equiv(
+  fun (j:index) => diff(n(i),a), 
+  diff(n(i),a)
+).
+Proof.
+crypto Random.
+intro k k0.
+intro [H H0].
+intro Neq.
+by have min := min_index k0 k H0 H.
+Qed.
+
+global lemma _ : 
+equiv(
+  fun (j:index) => (diff(n(i),a), diff(n(i),a)),
+  diff(n(i),a)
+).
 Proof.
 crypto Random.
 intro k k0.
