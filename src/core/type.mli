@@ -115,6 +115,9 @@ val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
 
+val ttuple     : ty list -> ty
+val tfun       : ty -> ty -> ty
+
 (*------------------------------------------------------------------*)
 (** Prelude types *)
 

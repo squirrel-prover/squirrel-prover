@@ -200,8 +200,8 @@ Proof.
       fresh 1; 1:auto.
       by apply IH.
     * crypto PRF (key : key i) => //.
-      intro j Hlt Meq; by fresh Meq.
-      intro j Hlt Meq; by fresh Meq.
+      intro j k0. intro Hlt Meq. by fresh Meq.
+      intro j k0  Hlt Meq; by fresh Meq.
     * crypto PRF (key : key'(i,k)) => //.
       intro j Hlt Meq; by fresh Meq.
       intro j Hlt Meq; by fresh Meq.

@@ -140,6 +140,8 @@ let tboolean   = Boolean
 let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
+let ttuple (tyl : ty list)= Tuple tyl
+let tfun (ty0 : ty) (ty1 :ty ) = Fun (ty0, ty1)
 
 (*------------------------------------------------------------------*)
 (** Prelude types *)

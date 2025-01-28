@@ -2129,6 +2129,15 @@ let notify_bideduce_term_strict (query : query) (rule:string) =
 let notify_bideduce_immediate (query : query) =
   if not query.vbs && not query.dbg then () else
     Printer.pr "Outputs adversarial or in inputs@."
+
+let notify_bideduce_loop
+      (query : query)
+      (extra_inputs : TSet.t list)
+  =
+  if not query.vbs && not query.dbg then () else
+    let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
+    Printer.pr "Starting second pass in the loop with extra inputs :@. %a@."
+      (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
     
 let notify_bideduce_oracle_extra_inputs
     (query : query)
@@ -2172,7 +2181,7 @@ let notify_bideduce_oracle_already_call (query : query) already_called =
   let already_called = List.map (fun (x,y,_) -> x,y) already_called in
   let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
   if not query.vbs && not query.dbg then () else
-    Printer.pr "Already called : %a"
+    Printer.pr "Already called : %a@."
       (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
 
 let notify_query_goal_start ((qs,_) as query : query * _) =
@@ -2253,30 +2262,55 @@ let rec bideduce_term_strict
     end
 
   | Term.Quant (_,es,term) when 
-      List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es ->
-    let es, subst = Term.refresh_vars es in
-    let term = Term.subst subst term in
-    let vars =
-      Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars in
-    let env = {query.env with vars} in
-    notify_bideduce_term_strict query "Quantificator";
-    let result =
-      bideduce_fp es { query with env }
-        [CondTerm.mk ~term ~conds:output_term.conds]
-    in
-    (* Generalising constraints, subgoals and extra/save outputs*)
-    let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
-    let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
-    (*building lambda term that contains all computed extra and save outputs*)
-    let extra_outputs =
-      List.map
-        (fun (t:TSet.t):TSet.t -> 
-           { term  = t.term;
-             conds = t.conds;
-             vars  = es@t.vars; })
-        result.extra_outputs
-    in
-    some {result with consts;subgoals;extra_outputs;}
+         List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es
+    ->
+     let es, subst = Term.refresh_vars es in
+     let term = Term.subst subst term in
+     let vars =
+       Vars.add_vars (Vars.Tag.global_vars ~adv:true es) query.env.vars
+     in
+     let env = {query.env with vars} in
+     notify_bideduce_term_strict query "Quantificator";
+     let result =  bideduce_fp es { query with env }
+                     [CondTerm.mk ~term ~conds:output_term.conds]
+     in
+     let ty_vars = (Type.tuple (List.map (fun v -> (Vars.ty v)) es)) in
+     let result = 
+       if Symbols.TyInfo.is_finite query.env.table ty_vars
+          && Symbols.TyInfo.is_fixed query.env.table ty_vars
+          && Symbols.TyInfo.is_well_founded query.env.table ty_vars
+          && result.extra_outputs <> []
+       then
+         let extra_outputs = result.extra_outputs in
+         let new_vars, new_subst = Term.refresh_vars es in 
+         let extra_inputs =
+           List.map
+             (fun (t:TSet.t):TSet.t
+                             ->
+                             let term = Term.subst new_subst t.term in
+                             let new_conds =
+                               Term.mk_lt (Term.mk_tuple (Term.mk_vars new_vars)) (Term.mk_tuple (Term.mk_vars es))
+                             in
+                             let conds = new_conds :: (List.map (Term.subst new_subst) t.conds) in
+                             {term;conds;vars=new_vars@t.vars})
+             extra_outputs
+         in
+         notify_bideduce_loop query extra_inputs;
+         bideduce_fp es
+           {query with env; extra_inputs = extra_inputs@query.extra_inputs }
+           [CondTerm.mk ~term ~conds:output_term.conds]
+       else result
+       in
+       (* Generalising constraints, subgoals and extra/save outputs*)
+       let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
+       let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
+       (*building lambda term that contains all computed extra and save outputs*)
+       let extra_outputs =
+         List.map
+           (fun (t:TSet.t):TSet.t -> {term = t.term; conds = output_term.conds; vars = es@t.vars})
+           result.extra_outputs
+       in
+       some {result with consts;subgoals;extra_outputs;}
 
   | Term.Proj (_,l) ->
     notify_bideduce_term_strict query "Projection";
