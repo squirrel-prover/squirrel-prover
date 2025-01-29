@@ -903,7 +903,7 @@ module TSet = struct
   (* alias ... *)
   let _refresh = refresh
 
-  let alpha_conv ?(refresh = false) tset1 tset2 =
+  let alpha_conv ?(refresh = true) tset1 tset2 =
     if not (Type.equal (Term.ty tset1.term) (Term.ty tset2.term)) then  false 
     else 
       let tset1 = if refresh then _refresh tset1 else tset1 in
@@ -2276,19 +2276,18 @@ let rec bideduce_term_strict
     let output_body = [CondTerm.mk ~term ~conds:output_term.conds] in
     
     (* first pass *)
-    let result =
+    let result0 =
       bideduce_fp es { query with env } output_body
     in
 
-    let ty_vars = Type.tuple (List.map (fun v -> (Vars.ty v)) es) in
     let result = 
-      if Symbols.TyInfo.is_finite query.env.table ty_vars
-      && Symbols.TyInfo.is_fixed query.env.table ty_vars
-      && result.extra_outputs <> []
+      if List.for_all (Symbols.TyInfo.is_finite query.env.table -| Vars.ty) es
+      && List.for_all (Symbols.TyInfo.is_fixed  query.env.table -| Vars.ty) es
+      && result0.extra_outputs <> []
       then begin
         (* if the type is finite+fixed, start a second pass, using the
            extra outputs computed during the first pass *)
-        let extra_outputs = result.extra_outputs in
+        let extra_outputs = result0.extra_outputs in
         let new_vars, new_subst = Term.refresh_vars es in 
         let extra_inputs =
           List.map
@@ -2310,7 +2309,7 @@ let rec bideduce_term_strict
           {query with env; extra_inputs = extra_inputs @ query.extra_inputs }
           output_body
       end
-      else result
+      else result0
     in
     
     (* generalize constraints, subgoals and extra/save outputs *)
@@ -2323,10 +2322,13 @@ let rec bideduce_term_strict
         (fun (t:TSet.t) ->
            TSet.{
              term  = t.term;
-             conds = output_term.conds;
+             conds = t.conds;
              vars  = es @ t.vars;
            })
-        result.extra_outputs
+        result0.extra_outputs
+        (* use [result0] and not [result], as the former is the one
+           that indeeds contains the additional terms computed during
+           the recursive evaluation *)
     in
     some {result with consts;subgoals;extra_outputs;}
 
