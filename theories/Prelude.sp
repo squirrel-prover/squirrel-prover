@@ -3,16 +3,16 @@
   Can only be used to declare objects in the symbol table.
 *)
 
-abstract (= ) ['a] : 'a -> 'a -> bool.
-abstract (<>) ['a] : 'a -> 'a -> bool. 
-abstract (<=) ['a] : 'a -> 'a -> bool. 
-abstract (< ) ['a] : 'a -> 'a -> bool. 
-abstract (>=) ['a] : 'a -> 'a -> bool. 
-abstract (> ) ['a] : 'a -> 'a -> bool. 
+op (= ) ['a] : 'a -> 'a -> bool.
+op (<>) ['a] : 'a -> 'a -> bool. 
+op (<=) ['a] : 'a -> 'a -> bool. 
+op (< ) ['a] : 'a -> 'a -> bool. 
+op (>=) ['a] : 'a -> 'a -> bool. 
+op ( > ) ['a] (x : 'a) (y : 'a) = y < x.
 
-abstract witness ['a] : 'a.
+op witness ['a] : 'a.
 
-abstract zeroes : message -> message.
+op zeroes : message -> message.
 
 system Empty = null.
 
