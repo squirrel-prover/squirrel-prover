@@ -23,6 +23,9 @@ module PathCond = Iter.PathCond
 (*   let mode = if Config.verbose_crypto () || force then `Vbs else `Ignore in *)
 (*   Printer.prt mode s *)
 
+let pp_check_mark fmt = Printer.kw `GoalAction fmt "✓"
+let pp_xmark fmt = Printer.kw `Goal fmt "✗"
+
 (*------------------------------------------------------------------*)
 (** a variable declaration, with an initial value *)
 type var_decl = {
@@ -241,9 +244,9 @@ module CondTerm = struct
     if c.conds = [] then
       Fmt.pf fmt "@[%a@]" (Term._pp ppe) c.term
     else
-      Fmt.pf fmt "@[<hov 2>{ @[%a@] |@ @[%a@] }@]"
+      Fmt.pf fmt "@[<hov 2>{ @[%a@] |@ @[<hv 0>%a@] }@]"
         (Term._pp ppe) c.term
-        (Fmt.list ~sep:(Fmt.any " ∧ ") (Term._pp ppe)) c.conds
+        (Fmt.list ~sep:(Fmt.any " ∧@ ") (Term._pp ppe)) c.conds
 
   let mk_simpl term = { term; conds = [] }
 
@@ -605,27 +608,27 @@ module Const = struct
 
   let notify_fresh_checks ~vbs ~dbg =
     if not vbs && not dbg then () else
-      Printer.pr "-----Freshness checks------@."
+      Printer.pr "-----Freshness checks------@;"
 
   let notify_global_checks ~vbs ~dbg =
     if not vbs && not dbg then () else
-      Printer.pr "-----Compatible global names checks------@."
+      Printer.pr "-----Compatible global names checks------@;"
 
   let notify_functional_checks ~vbs ~dbg =
     if not vbs && not dbg then () else
-      Printer.pr "-----Name ownerships checks------@."
+      Printer.pr "-----Name ownerships checks------@;"
   
         
   let notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form : unit =
     if not vbs && not dbg then () else
       let ppe = default_ppe ~table ~dbg () in
-      Printer.pr "Between @[%a@]@. and @[%a@]  @. Corresponding formula : %a@. ---@. "
+      Printer.pr "Between @[%a@]@; and @[%a@]  @; Corresponding formula : %a@; ---@; "
         (Const._pp ppe) const1
         (Const._pp ppe) const2
         (Term._pp  ppe) form
 
   
-  exception InvalidConstraints
+  exception InvalidGlobalConstraints of (Format.formatter -> unit)
 
   let get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
     match
@@ -649,6 +652,19 @@ module Const = struct
       (name : Term.nsymb)
       (terms : Term.terms) : (Term.term * Term.term) list option 
     =
+    let fail existing_consts =
+      raise
+        (InvalidGlobalConstraints
+           (fun fmt ->
+              Fmt.pf fmt
+                "cannot add constraint @[%a@]@ because it clashes with \
+                 one of the existing constraints@ @[%a@]"
+                pp (create otag name ~term:terms ~cond:[])
+                (Fmt.list ~sep:(Fmt.any ",@ ") pp) existing_consts
+           )
+        )
+    in
+    
     let rec subst_with_open_tuple t1 t2 =
       match t1,t2 with
       | x::q, y::p when Term.equal x y -> subst_with_open_tuple q p
@@ -660,12 +676,12 @@ module Const = struct
     let gconst = List.filter (fun  x -> x.tag = otag) const in
     match gconst with
     | [] ->  None
-    | [const] when not (const.vars = []) ->  raise InvalidConstraints
-    | [const] when not (const.cond = []) ->  assert false
-    | [const] when not (name = const.name) -> raise InvalidConstraints
-    | [const] ->
-      Some (subst_with_open_tuple terms const.term)
-    | _ ->  raise InvalidConstraints      
+
+    | [const] when const.cond <> [] ->  assert false
+    | [const] when name <> const.name || const.vars <> [] ->
+      fail [const]
+    | [const] -> Some (subst_with_open_tuple terms const.term)
+    | consts -> fail consts
 
   (** Once a oracle pattern is matched, the matching return a mapping 
       of names variables to terms.
@@ -1488,11 +1504,11 @@ let _pp_query (ppe : ppenv) fmt (query,outputs:query*CondTerm.t list) =
         (AbstractSet._pp_mem ppe) query.initial_mem
   in
   let pp_query fmt =
-    Fmt.pf fmt "@[<hv 0>%t%t@[%t@]@ ▷@ @[%t@]@]"
+    Fmt.pf fmt "@[<hv 0>%t%t@[%t@]@ ▷@ @[%a@]@]"
       pp_constraints
       pp_mem
       pp_all_inputs
-      (fun fmt -> Fmt.pf fmt "%a@;" (Fmt.list (CondTerm._pp ppe)) outputs)
+      (Fmt.list (CondTerm._pp ppe)) outputs
   in
   Fmt.pf fmt "@[<v 0>%t%t@]"
     pp_env
@@ -1920,18 +1936,22 @@ module Game = struct
       _pp_mem_subgoals
       _pp_subgoals
 
-  let pp_call_oracle_res     = _pp_call_oracle_res (default_ppe ~dbg:false ())
-  let pp_call_oracle_res_dbg = _pp_call_oracle_res (default_ppe ~dbg:true  ())
+  let[@warning "-32"] pp_call_oracle_res     =
+    _pp_call_oracle_res (default_ppe ~dbg:false ())
+
+  let[@warning "-32"] pp_call_oracle_res_dbg =
+    _pp_call_oracle_res (default_ppe ~dbg:true  ())
 
   (* ----------------------------------------------------------------- *)
-  let notify_call_oracle_res (query : query) (cor:call_oracle_res option) =
-    if (not query.vbs && not query.dbg) || cor = None then () else
-    if query.dbg then
-      Printer.pr "@[ Oracle call succeeded, yielding:@. %a@]@."
-        (pp_call_oracle_res_dbg) (oget cor)
-    else
-      Printer.pr "@[ Oracle call succeeded, yielding:@. %a@]@."
-        (pp_call_oracle_res) (oget cor)
+  let notify_call_oracle_res
+      (query : query) (oracle_name : string) (cor:call_oracle_res)
+    =
+    if not query.vbs && not query.dbg then () else
+      Printer.pr "@[<v 2>%t oracle call to %a, yield:@;@[%a@]@]\
+                  @]@;@;"  (* close oracle call outer vertical box + double line break *)
+        pp_check_mark
+        (Printer.kws `GoalMacro) oracle_name
+        (pp_call_oracle_res) cor
 
   (* ----------------------------------------------------------------- *)
   (** If a successful match has been found, does the actual symbolic call 
@@ -1939,9 +1959,9 @@ module Game = struct
       It takes as inputs : 
       - a query [query] corresponding to the query state 
         in which the oracle rules in called.
-      - the term [term] matched as an oracle outputs
-      - the matching substitution [mv]
-      - subgoals under which the matching is an oracle match [subgoals]
+      - the term [term] to be matched as an oracle output.
+      - the matching substitution [mv].
+      - subgoals under which the matching is an oracle match [subgoals].
       - data of oracle matching (pattern, name etc.) [oracle_pat, oracle] *)
   let call_oracle
       (query      : query)
@@ -1950,13 +1970,14 @@ module Game = struct
       ~(subgoals  : Term.terms)
       (oracle_pat : oracle_pat)
       (oracle     : oracle)
-    : call_oracle_res option
+    : (call_oracle_res, _) Result.t
     =
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
     let subgoals = List.map (Term.subst subst) subgoals in
     try
       let consts,eqs =
+        (* may raise [InvalidConstraints] *)
         Const.constraints_terms_from_mv
           ~fixed_global_names:true query.game oracle query.consts term.conds mv
       in
@@ -1973,22 +1994,22 @@ module Game = struct
         abstract_boolean query.env query.hyps query.env.table  
           { term  = oracle_conds;
             conds; } query.initial_mem
-      in
-      let mem =
-        let oracle_subst =
-          local_subst query.let_init query.game oracle
-        in
-        update
-          query.env query.hyps mv subst_eqs
-          conds
-          (List.map (fun (x,y) -> (x, Term.subst oracle_subst y)) oracle.updates )
-          query.initial_mem
-      in
-      (* creating the implication is better than substituting *)
-      let subgoals = List.map (Term.mk_impls eqs) subgoals in
-      
+      in     
       match mem_subgoals with
       | Some mem_subgoals ->
+        let mem =
+          let oracle_subst =
+            local_subst query.let_init query.game oracle
+          in
+          update
+            query.env query.hyps mv subst_eqs
+            conds
+            (List.map (fun (x,y) -> (x, Term.subst oracle_subst y)) oracle.updates )
+            query.initial_mem
+        in
+        (* creating the implication is better than substituting *)
+        let subgoals = List.map (Term.mk_impls eqs) subgoals in
+
         let mem_subgoals =
           List.map (Term.mk_impl (Term.mk_ands term.conds)) (mem_subgoals)
         in
@@ -2000,18 +2021,18 @@ module Game = struct
              (Term.fvs mem_subgoals) );
         assert  (Vars.Sv.for_all (Vars.mem query.env.vars)
                    (Term.fvs subgoals) );
-        let res =
-          Some {
-            new_consts = consts;
-            index_cond = eqs;
-            post = mem;
-            mem_subgoals;
-            subgoals;
-          }
+        let res = {
+          new_consts = consts;
+          index_cond = eqs;
+          post = mem;
+          mem_subgoals;
+          subgoals;
+        }
         in
-        notify_call_oracle_res query res; res
-      | None -> None
-    with Const.InvalidConstraints -> None 
+        notify_call_oracle_res query oracle.name res;
+        Result.ok res
+      | None -> Result.error (fun fmt -> Fmt.pf fmt "failed to discharge memory proof-obligations")
+    with Const.InvalidGlobalConstraints err -> Result.error err
         
   let get_initial_pre env hyps (game : game) : mem =
     let glob_mutable =
@@ -2124,11 +2145,17 @@ let knowledge_mem_condterm_sets
 
 let notify_bideduce_term_strict (query : query) (rule:string) =
   if not query.vbs && not query.dbg then () else
-  Printer.pr "@[Opening by %s rule @]@." rule
+    Printer.pr "@[Apply rule %t@]@;@;"
+      (fun fmt -> Printer.kw `GoalName fmt "%s" rule)
 
-let notify_bideduce_immediate (query : query) =
+let notify_bideduce_immediate (query : query) ~(direct : bool) =
   if not query.vbs && not query.dbg then () else
-    Printer.pr "Outputs adversarial or in inputs@."
+  if direct then
+    Printer.pr "%t done: output directly computable@;"
+      pp_check_mark
+  else
+    Printer.pr "%t done: ouptut appears in inputs@;"
+      pp_check_mark
 
 let notify_bideduce_loop
       (query : query)
@@ -2136,8 +2163,8 @@ let notify_bideduce_loop
   =
   if not query.vbs && not query.dbg then () else
     let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
-    Printer.pr "Starting second pass in the loop with extra inputs :@. %a@."
-      (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
+    Printer.pr "Starting second pass in the loop with extra inputs:@; %a@;"
+      (Fmt.list ~sep:(Fmt.any ",@;") (TSet._pp ppe)) extra_inputs
     
 let notify_bideduce_oracle_extra_inputs
     (query : query)
@@ -2146,48 +2173,71 @@ let notify_bideduce_oracle_extra_inputs
   =
   if not query.vbs && not query.dbg then () else
     let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
-    Printer.pr "With extra inputs@ %a@. oracle call is done only under@. %a@."
-      (Fmt.list ~sep:(Fmt.any ",@.") (TSet._pp ppe)) extra_inputs
+    Printer.pr "With extra inputs@ %a@; oracle call is done only under@; %a@;"
+      (Fmt.list ~sep:(Fmt.any ",@;") (TSet._pp ppe)) extra_inputs
       (Term._pp ppe) cond
 
-let notify_bideduce_term_start (query : query) (output:CondTerm.t) =
+let notify_bideduce_term_start (query : query) (output : CondTerm.t) =
   if not query.vbs && not query.dbg then () else
     let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
-    Printer.pr "___Bideducing term %a ___@." (CondTerm._pp ppe) output
+    Printer.pr "@[<hv 2>Bideducing@ @[%a@]@]@;" (CondTerm._pp ppe) output
 
-let notify_bideduce_oracle_inputs_start (query : query) (oracle_name: string) =
+let notify_bideduce_oracle_inputs_start (query : query) (oracle_name : string) =
   if not query.vbs && not query.dbg then () else
-    Printer.pr "___Call %s : Starting oracle's inputs bideduction___@.@["
-      oracle_name
+    Printer.pr "@[<v 2>Start oracle call to %a:@;\
+                Bideduce the oracle's inputs@;\
+                \  @[<v 0>"     (* new nested vertical box for oracle call inputs *)
+      (Printer.kws `GoalMacro) oracle_name
 
 let notify_bideduce_oracle_inputs_end (query : query) (oracle_name : string) =
   if not query.vbs && not query.dbg then () else
-    Printer.pr "@]___Call %s : Ending oracles's inputs bideduction___@."
-      oracle_name
+    (* starts by closing the nested vertical box for oracle call inputs *)
+    Printer.pr "@]@;\
+                %t oracle %a's inputs have been bideduced@;"
+      pp_check_mark
+      (Printer.kws `GoalMacro) oracle_name
 
+let notify_bideduce_oracle_failure
+    (query : query) (oracle_name : string) (err : Format.formatter -> unit)
+  =
+  if not query.vbs && not query.dbg then () else
+    Printer.pr "@[<v 2>%t oracle call %a failed:@ @[%t@]@]\
+                @]@;@;"    (* closes oracle call outer vertical box + double line break*)
+      pp_xmark
+      (Printer.kws `GoalMacro) oracle_name err
+  
 let notify_bideduce_second_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "******************************************@.\
-                __________Starting second pass____________@.\
-                ******************************************@."
+    (* close vertical box of first pass *)
+    Printer.pr "@;@;@]
+                #---------------------------------------#@\n\
+                |              Second pass              |@\n\
+                #---------------------------------------#@.\
+                @[<v 0>" (* start second pass vertical box *)
 
 let notify_bideduce_first_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
-    Printer.pr "*****************************************@.\
-                __________Starting first pass____________@.\
-                *****************************************@."
+    Printer.pr "@\n\
+                #---------------------------------------#@\n\
+                |              First pass               |@\n\
+                #---------------------------------------#@.\
+                @[<v 0>" (* start first pass vertical box *)
 
 let notify_bideduce_oracle_already_call (query : query) already_called =
   let already_called = List.map (fun (x,y,_) -> x,y) already_called in
   let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
   if not query.vbs && not query.dbg then () else
-    Printer.pr "Already called : %a@."
+    Printer.pr "Already called : %a@;"
       (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
 
 let notify_query_goal_start ((qs,_) as query : query * _) =
   let ppe = default_ppe ~table:qs.env.table ~dbg:qs.dbg () in
   if not qs.vbs && not qs.dbg then () else
-    Printer.pr "@. ******* Starting goal ********** @. %a @. ********@. "
+    Printer.pr "@[<v 0>@;\
+                Starting bideduction proof of:@;\
+                ------------------------------@;\
+                \  @[%a@]@;\
+                ------------------------------@;@;@]"
       (_pp_query ppe) query
 
   (*------------------------------------------------------------------------*)
@@ -2231,10 +2281,10 @@ let rec bideduce_term_strict
 
   | Term.(App (Fun _ as fs,l))
     when HighTerm.is_ptime_deducible ~si:true query.env fs ->
-      assert (l <> []);
-      let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
-      notify_bideduce_term_strict query "Function Application";
-      bideduce query l
+    assert (l <> []);
+    let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
+    notify_bideduce_term_strict query "Function Application";
+    bideduce query l
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in
@@ -2274,7 +2324,7 @@ let rec bideduce_term_strict
 
     (* the quantifier's body that must be deduced  *)
     let output_body = [CondTerm.mk ~term ~conds:output_term.conds] in
-    
+
     (* first pass *)
     let result0 =
       bideduce_fp es { query with env } output_body
@@ -2300,7 +2350,7 @@ let rec bideduce_term_strict
                TSet.{ term; conds; vars = new_vars @ t.vars; })
             extra_outputs
         in
-        
+
         notify_bideduce_loop query extra_inputs;
 
         (* TODO: check that extra inputs are indeed computed as
@@ -2311,7 +2361,7 @@ let rec bideduce_term_strict
       end
       else result0
     in
-    
+
     (* generalize constraints, subgoals and extra/save outputs *)
     let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
@@ -2367,12 +2417,12 @@ and bideduce_term
     )
   in
   if
-    HighTerm.is_ptime_deducible ~si:true env output.term ||
-    (to_deduce = some [])
+    (to_deduce = Some []) ||
+    HighTerm.is_ptime_deducible ~si:true env output.term 
   then                          (* deduce conditions *)
-      let result = empty_result query.initial_mem in
-      notify_bideduce_immediate query;
-      Some result 
+    let result = empty_result query.initial_mem in
+    notify_bideduce_immediate query ~direct:(to_deduce <> Some []);
+    Some result 
   else if
     output.conds <> [] &&
     match
@@ -2394,24 +2444,24 @@ and bideduce_term
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
       (* if output.conds =  [] then *)
-        bideduce query (List.map CondTerm.mk_simpl args)
+      bideduce query (List.map CondTerm.mk_simpl args)
     | None ->  bideduction_suite query output
 
 (*------------------------------------------------------------------*)
 
 (* FIXME general : we checks that f is bideducible before conditionned f on t. 
-Do we not add bug when rechecking condtion bideducible when deducing (t|f).
-Could we change the semantic to have the condtions are known to be bi-deducible ?
+   Do we not add bug when rechecking condtion bideducible when deducing (t|f).
+   Could we change the semantic to have the condtions are known to be bi-deducible ?
 *)
 (** Try to show that [output_term] is bi-deducible using an oracle call.
     Fall-back to the main-loop in case of failure. *)
 and bideduce_oracle
     (query : query) (output_term : CondTerm.t) : result option
   =
-   (* First checking that the oracle could have been called before in the computation.
-      I.e, [output ∈ extra_inputs] under [condition] and the fact that
-      [args] can be deduced.
-      Return a list of: [(args, condition, ¬ condition)] *)
+  (* First checking that the oracle could have been called before in the computation.
+     I.e, [output ∈ extra_inputs] under [condition] and the fact that
+     [args] can be deduced.
+     Return a list of: [(args, condition, ¬ condition)] *)
   let already_called =
     knowledge_mem_condterm_sets
       query.env query.hyps
@@ -2445,28 +2495,35 @@ and bideduce_oracle
       | None -> (output_term, query, empty_result query.initial_mem)
     else (output_term, query, empty_result query.initial_mem)
   in
-    (* Given an oracle match, check whether the full inputs
+  (* Given an oracle match, check whether the full inputs
      (standard inputs + randomness indices + conditions) are
      bi-deducible *)
   let find_valid_match (oracle_match : Game.oracle_match) : result option =
-    let exception Failed in     (* return [None] if [Failed] is raised *)
+    let exception Failed of (Format.formatter -> unit) in     (* return [None] if [Failed] is raised *)
+    let oracle_name = oracle_match.oracle.name in
 
     let Game.{ mv; full_inputs; oracle_pat; oracle; subgoals; } =
       oracle_match
     in
     try     
       (* check that inputs are bi-deducible *)
-      notify_bideduce_oracle_inputs_start query oracle_match.oracle.name;
+      notify_bideduce_oracle_inputs_start query oracle_name;
       let result_inputs = 
-        bideduce query full_inputs |> oget_exn ~exn:Failed
+        bideduce query full_inputs |>
+        oget_exn ~exn:(Failed (fun fmt -> Fmt.pf fmt "inputs"))
       in
-      notify_bideduce_oracle_inputs_end query oracle_match.oracle.name;
+      
+      notify_bideduce_oracle_inputs_end query oracle_name;
       (* Building the query for the oracle call *)
       let query_call = transitivity_get_next_query query full_inputs result_inputs in 
       let Game.{ new_consts = consts; index_cond; post; mem_subgoals; subgoals; } =
-        Game.call_oracle query_call output_term mv ~subgoals oracle_pat oracle
-        |> oget_exn ~exn:Failed
+        match
+          Game.call_oracle query_call output_term mv ~subgoals oracle_pat oracle
+        with
+        | Ok r -> r
+        | Error s -> raise (Failed s)
       in
+
       (* add the subgoals required by the [oracle_match] to the state *)
       let extra_outputs = [ TSet.{
           term  = output_term.term ;
@@ -2482,24 +2539,21 @@ and bideduce_oracle
         } in
 
       let result = chain_results result_inputs result_call in
-      if index_cond = [] then
+      let index_cond = Term.mk_ands index_cond in
+      if Term.is_true index_cond then
         (* nothing to do since [index_cond = ⊤] *)     
         Some result
       else
-        begin
-          let index_cond = Term.mk_ands index_cond in
-          if Term.is_true index_cond then
-            Some result
-          else 
-            let query_else = transitivity_get_next_query query [] result in 
-            let result_else =
-              bideduce_term ~bideduction_suite:bideduce_term_strict query_else
-                { output_term with conds = Term.mk_not index_cond :: output_term.conds }
-              |> oget_exn ~exn:Failed
-            in
-            Some (chain_results result result_else)
-        end
-    with Failed -> None         (* not a valid oracle match *)
+        let query_else = transitivity_get_next_query query [] result in 
+        let result_else =
+          bideduce_term ~bideduction_suite:bideduce_term_strict query_else
+            { output_term with conds = Term.mk_not index_cond :: output_term.conds } |>
+          oget_exn ~exn:(Failed (fun fmt -> Fmt.pf fmt "randomness indices"))
+        in
+        Some (chain_results result result_else)
+    with Failed err ->
+      notify_bideduce_oracle_failure query oracle_name err;
+      None         (* not a valid oracle match *)
   in
 
   if query.allow_oracle then 
@@ -2529,6 +2583,8 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
       let next_result = bideduce next_query outputs in
       match next_result with
       | None -> None
+      (* FEAT: we could generate a proof-obligation instead of faling
+         straight away here *)
       | Some next_result -> Some (chain_results result next_result)
 
 
@@ -3145,6 +3201,8 @@ let prove
   (*------------------------------------------------------------------*)
   (** Checking the terms appearing in the initial constraints are
       deducible without oracles nor randomness. *)
+
+  Printer.pr "@[<v 0>"; (* open vertical box of preliminary deductions *)
   
   let query0 =
     { consts = [];
@@ -3195,6 +3253,8 @@ let prove
         (Failure "failed to bideduce initial values")
   in
 
+  Printer.pr "@;@]"; (* close vertical box of preliminary deductions *)
+  
   (*------------------------------------------------------------------*)
   (** first bideduction pass *)
 
@@ -3304,6 +3364,9 @@ let prove
       game_loc
       query_start rec_bided_subgs direct_bided_subgs 
   in
+
+  Printer.pr "@;@]"; (* close vertical box of second pass *)
+  
   match res with
   | Some result -> 
     let oracle_subgoals = result.subgoals in
@@ -3311,16 +3374,16 @@ let prove
     let consts_subgs = Const.to_subgoals ~vbs ~dbg table game final_consts in
 
     Printer.pr
-      "@[<v 2>Constraints are:@ @[<v 0>%a@]@."
+      "@[<v 2>Constraints are:@ @[<v 0>%a@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) final_consts;
     Printer.pr
-      "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@."
+      "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe)) consts_subgs;
     Printer.pr
-      "@[<v 2>Oracle subgoals are:@ %a@]@."
+      "@[<v 2>Oracle subgoals are:@ %a@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
       oracle_subgoals;
-    Printer.pr "@[<2>Final memory is:@ %a@]@." (AbstractSet._pp_mem ppe) result.final_mem;
+    Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) result.final_mem;
 
     let red_param = Reduction.rp_default in
     let params = Env.to_params env in
