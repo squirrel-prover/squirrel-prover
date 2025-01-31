@@ -532,28 +532,27 @@ Common tactics
      as they must be be compatible).
       
 
-.. tacn:: induction {? @term_pat}
+.. tacn:: induction {? @@system:@expr_annot} {? @term_pat}
 
-   Apply the induction scheme to the conclusion. There are
-   several behaviours depending on the type of the current goal
-   and whether an argument is given.
+   Apply the induction scheme to the conclusion. The behaviour of the tactic
+   depends on the type of the current goal, and whether the optional arguments are given.
 
-   For a reachability goal, if no argument is specified, the
+   For a local goal, if no argument is specified, the
    conclusion must start with a universal quantification over a
    well-founded type and the induction is performed over the
    first quantified variable. If a term is manually
    specified, the goal is first generalized (see
-   :tacn:`generalize`) w.r.t. those variables and only then is
-   the induction applied.
+   :tacn:`generalize`) w.r.t. that term, understood in system :n:`@expr_annot`.
+   Only then is the induction applied.
     
-   For an equivalence goal, an argument must always be specified,
+   For a global goal, an argument must always be specified,
    and,
    
-    - if a timestamp variable is given then, a weak induction is
-      performed over this variable as well as a case disjunction over all
+    - if the given term is a timestamp variable, a weak induction is
+      performed over this variable, as well as a case disjunction over all
       possible actions;
     - for any other term argument, the
-      tactic behaves as in the reachability case.
+      tactic behaves as in the local case.
 
    The weak induction variant is in fact the most widely used tactic
    in current Squirrel examples to prove the observational equivalence
@@ -590,7 +589,7 @@ Common tactics
           0: frame@A
        
      
-.. tacn:: dependent induction {? @variable}
+.. tacn:: dependent induction {? @@system:@expr_annot} {? @variable}
     
     Apply the induction scheme to the conclusion. If no argument is
     specified, the conclusion must be a universal quantification over
@@ -632,18 +631,24 @@ Common tactics
     For example, :g:`exists t` transforms the conclusion of a goal
     :n:`(exists x, phi)` into :n:`(phi{x -> t})`.
     
-.. tacn:: generalize {+ @term_pat} {? as {+ @variable}}
+.. tacn:: generalize {? @@system:@expr_annot } {+ @term_pat} {? as {+ @variable}}
    :name: generalize    
 
-   :n:`generalize @term_pat` looks for an instance :n:`@term` of
-   :n:`@term_pat` in the goal. Then, it replaces all occurrences of :n:`@term`
-   by a fresh universally quantified variable
+   :n:`generalize @@system:@expr_annot @term_pat` looks in the conclusion of the sequent for an instance :n:`@term` of
+   :n:`@term_pat` understood in system `@expr_annot`. Then, it replaces all occurrences of :n:`@term`
+   in the conclusion with a fresh universally quantified variable
    (automatically named, or :n:`@variable` if provided).
 
-.. tacn:: generalize dependent {+ @term_pat} {? as {+ @variable}}
+   The :n:`@@system` argument, which specifies in which system the given terms are to be understood,
+   is optional. If no system is provided, terms are by default
+   understood in the current goal's :n:`set` for a local goal,
+   and in its :n:`equiv` in global goals.
+
+
+.. tacn:: generalize dependent {? @@system:@expr_annot} {+ @term_pat} {? as {+ @variable}}
    :name: generalize dependent
     
-   Same as :n:`generalize`, but also generalize in the proof context.
+   Same as :n:`generalize`, but also generalizes in the proof context.
    All hypotheses in which generalization occurred are pushed back into the
    conclusion before the newly added quantified variables.
 
