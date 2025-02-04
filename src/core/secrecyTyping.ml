@@ -1855,7 +1855,7 @@ let check
 (** Project the term [t] with [proj] and unfold any global macro in it. *)
 let preproc (env : Env.t) proj (t : Term.term) : Term.term =
   let t = Term.project1 proj t in
-  let unfold_global (t : Term.term) _ _ _ _ =
+  let unfold_global (t : Term.term) _ _ _ _pos _info =
     match t with
     | Macro(m,indices,ts) ->
       begin

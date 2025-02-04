@@ -123,8 +123,9 @@ let phi_fresh
 
   (* NoHonestRand: variables are allowed as long as they do not depend
      on honest randomness *)
+  (* FEAT: concrete logic for equivalences *)
   let occs =
-    NOS.find_all_occurrences ~mode:Iter.NoHonestRand ~pp_descr:(Some pp_n)
+    NOS.find_all_occurrences ~concrete:false ~mode:Iter.NoHonestRand ~pp_descr:(Some pp_n)
       get_bad context (tt @ n.args)
   in
 
@@ -138,7 +139,7 @@ let phi_fresh
     [n], [tt] in the projection [proj] of [env.system.pair]. *)
 let phi_fresh_proj
     ~(use_path_cond : bool)
-    ?(loc  : L.t option)
+    ?(loc    : L.t option)
     (context : ProofContext.t)
     (n       : Term.term)
     (tt      : Term.terms)
@@ -165,7 +166,7 @@ let phi_fresh_proj
     returns n, t such that hyp is n = t or t = n
     (looks under macros if possible *)
 let fresh_trace_param
-    ~(hyp_loc : L.t) 
+    ~(hyp_loc : L.t)
     (einfo    : O.expand_info) 
     (hyp      : Term.term)
     (s        : TS.sequent)
@@ -191,16 +192,13 @@ let fresh_trace_param
 (** Applies fresh to the trace sequent s and hypothesis m:
     returns the list of subgoals with the added hyp that there is a collision *)
 let fresh_trace
-    (opt_args : Args.named_args) (m : lsymb) (s : TS.sequent) 
+    (opt_args : Args.named_args) (m : lsymb) (s : TS.sequent)
+    (bounds : Term.t option list)
   : TS.sequent list 
   =
   let use_path_cond = p_fresh_arg opt_args in
   let loc = L.loc m in
-  
-  if (TS.bound s) <> None then
-    soft_failure 
-      (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
-  
+
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
@@ -210,19 +208,64 @@ let fresh_trace
       fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, context) hyp s
     in
 
+    let notconcrete =
+      match TS.bound s with
+      | LowConcrete.ReachConc _ -> false
+      | LowConcrete.ReachAsym -> true
+      | _ -> assert false
+    in
+
     Printer.pr "Freshness of %a:@; @[<v 0>" (Term._pp ppe) n;
+
     let phis =
       phi_fresh
-        ~negate:false ~use_path_cond ~checklarge:true ~loc
+        ~negate:false ~use_path_cond ~checklarge:notconcrete ~loc
         context n [t]
     in
     Printer.pr "@]@;";
 
+   let subgoals phis =
+    let module CB = Concrete.BoundManagement(TS) in
+    let s =
+      if notconcrete
+      then s
+      else
+        CB.minus_bound
+          (Library.Concrete.mk_proba_fresh (TS.table s) (Term.ty n))
+          s
+    in
     let g = TS.conclusion s in
-    List.map
-      (fun phi ->
-         TS.set_conclusion (Term.mk_impl ~simpl:false phi g) s)
-      phis
+    let concs = List.map (fun phi -> Term.mk_impl ~simpl:false phi g) phis in
+    let bounds,last_goal = CB.list_bounds_fill bounds concs s in
+    (List.map2
+      (fun c b ->
+        TS.set_conclusion c  (TS.set_bound b s))
+      concs bounds)
+    @ last_goal
+   in
+   if phis = [] then
+     begin
+       if bounds = [] then () else Tactics.soft_failure
+           (Failure "Fresh do not take bounds arguments when there is not subgoals");
+       if notconcrete
+       then []
+       else
+       if
+         LowConcrete.equal
+           (TS.bound s)
+           (LowConcrete.ReachConc (Library.Concrete.mk_proba_fresh (TS.table s) (Term.ty n)))
+       then []
+       else
+         let s =
+           TS.set_conclusion
+             (Term.mk_leq
+                (Library.Concrete.mk_proba_fresh (TS.table s) (Term.ty n))
+                (oget (LowConcrete.to_option (TS.bound s))))
+             s
+         in
+         [TS.set_bound (LowConcrete.ReachConc (Library.Real.mk_zero (TS.table s))) s]
+     end
+   else subgoals phis
   with
   | SE.(Error (_,Expected_fset)) ->
     soft_failure Underspecified_system
@@ -230,12 +273,26 @@ let fresh_trace
 
 (** fresh trace tactic *)
 let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
-  match args with
-  | [Args.Fresh (opt_args, Some (Args.FreshHyp hyp))] ->
-    TraceLT.wrap_fail (fresh_trace opt_args hyp)
-
-  | _ -> bad_args ()
-
+  let do_fresh_trace (args : TacticsArgs.parser_args) (s : TS.sequent) =
+    match args with
+    | (Args.Fresh (opt_args, Some (Args.FreshHyp hyp)))::bounds ->
+      let bounds =
+        let convert_bounds =
+          List.map
+            (fun x -> TraceLT.convert_args s [x] Args.(Sort Term))
+            bounds
+        in
+        let filter x =
+          match x with
+          | Args.Arg (Term(ty, t , _)) when Type.equal ty Library.Real.treal -> t
+          | _ -> bad_args ()
+        in
+        List.map (fun x -> Some (filter x) ) convert_bounds
+      in
+      fresh_trace opt_args hyp s bounds
+    | _ -> bad_args ()
+  in
+  TraceLT.wrap_fail (do_fresh_trace args)
 
 
 
@@ -293,8 +350,14 @@ let fresh_equiv
   let use_path_cond = p_fresh_arg opt_args in
   let loc = L.loc i in 
 
-  let before, t, after = split_equiv_conclusion i s in
+  let before, t, after, bound = split_equiv_conclusion i s in
+  let concrete = bound <> None in
   let biframe = List.rev_append before after in
+
+  (* FEAT: concrete logic for equivalences *)
+  if concrete then
+    soft_failure
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
 
   let phis = phi_fresh_pair ~use_path_cond ~loc s t biframe in
 

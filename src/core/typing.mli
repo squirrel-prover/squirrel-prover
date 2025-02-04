@@ -436,6 +436,7 @@ type pt_cnt =
   | PT_symb     of applied_symb
   | PT_app      of pt_app
   | PT_localize of pt
+  | PT_weak     of pt * term
 
 (** a proof-term *)
 and pt = pt_cnt L.located

@@ -55,35 +55,49 @@ module Pos : sig
       - [vars] are the free variable bound above [t]'s occurrence
       - [conds] are conditions above [t]'s occurrence
       - [p] is the position of [t]'s occurrence
+      - ['info] contains additional information (see iterators below)
 
       If [f t projs vars conds p acc =]:
       - [`Map t'], we found a position and replace it with [t'].
       - [`Continue], we keep looking for positions downwards or upwards. *)
-  type 'a f_map_fold =
+  type ('a,'info) f_map_fold =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     'a ->
     'a * [`Map of Term.term | `Continue]
 
   (** Same as [f_map_fold], but just for a map. *)
-  type f_map =
+  type 'info f_map =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     [`Map of Term.term | `Continue]
 
   (** Same as [f_map_fold], but just for a fold. *)
-  type 'a f_fold =
+  type ('a,'info) f_fold =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     'a ->
     'a
 
   (*------------------------------------------------------------------*)
-  (** Similar to [f_map_fold], but for over [Equiv.form] sub-terms. 
+  (** Where a term occurrence was found in a global formula *)
+  module OccInfo : sig
+    type t = 
+      | Let of Equiv.form       (* the body of the global let binding *)
+      | ReachBound
+      | ReachForm of Term.t option
+      | EquivBound
+      | EquivForm of Term.t option
+      | Pred of Symbols.predicate
+  end
+
+
+  (*------------------------------------------------------------------*)
+  (** Similar to [f_map_fold], but for [Equiv.form] sub-terms. 
       - [SE.context] is the context applying to the current sub-term. *)
   type 'a f_map_fold_g =
     Equiv.form ->
-    SE.context -> Vars.vars -> pos ->
+    SE.context -> Vars.vars -> pos -> 
     'a ->
     'a * [`Map of Equiv.form | `Continue]
 
@@ -106,30 +120,32 @@ module Pos : sig
       Tree traversal can be controlled using [mode]:
       - [`TopDown b]: apply [func] at top-level first, then recurse.
         [b] tells if we recurse under successful maps.
-      - [`BottomUp _]: recurse, then apply [func] at top-level *)
+      - [`BottomUp _]: recurse, then apply [func] at top-level
+
+       [mode] defaults to [`TopDown false] in all folding functions. *)
   val map_fold : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
-    'a f_map_fold ->            (* folding function *)
+    ('a,unit) f_map_fold ->     (* folding function *)
     SE.arbitrary ->
-    'a ->                       (* folding value *)
+    'a ->                       (* initial folding value *)
     Term.term -> 
-    'a * bool * Term.term       (* folding value, `Map found, term *)
+    'a * bool * Term.term       (* final folding value, `Map found, term *)
 
   (** Same as [map_fold] for [Equiv.form]. *)
   val map_fold_e : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
-    'a f_map_fold ->            (* folding function *)
+    ('a,OccInfo.t) f_map_fold -> (* folding function *)
     SE.context ->
-    'a ->                       (* folding value *)
+    'a ->                       (* initial folding value *)
     Equiv.form -> 
-    'a * bool * Equiv.form      (* folding value, `Map found, term *)
+    'a * bool * Equiv.form      (* final folding value, `Map found, term *)
 
   (*------------------------------------------------------------------*)
   (** Same as [map_fold], but only a map. 
       Return: `Map found, term *)
   val map : 
     ?mode:[`TopDown of bool | `BottomUp] ->
-    f_map ->
+    unit f_map ->
     SE.arbitrary ->
     Term.term ->
     bool * Term.term
@@ -138,7 +154,7 @@ module Pos : sig
       Return: `Map found, term *)
   val map_e :
     ?mode:[`TopDown of bool | `BottomUp] ->
-    f_map ->
+    OccInfo.t f_map ->
     SE.context ->
     Equiv.form ->
     bool * Equiv.form
@@ -147,7 +163,7 @@ module Pos : sig
   (** Same as [map_fold], but only a fold. *)
   val fold : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
-    'a f_fold ->
+    ('a,unit) f_fold ->
     SE.arbitrary ->
     'a ->
     Term.term -> 
@@ -156,7 +172,7 @@ module Pos : sig
   (** Same as [map_fold_e], but only a fold. *)
   val fold_e : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
-    'a f_fold ->
+    ('a,OccInfo.t) f_fold ->
     SE.context ->
     'a ->
     Equiv.form -> 
@@ -167,7 +183,7 @@ module Pos : sig
       Takes as additional input the condition at the current point,
       to propagate it when folding *)
   val fold_shallow : 
-    'a f_fold ->          (* function to apply on each subterm at depth 1 *)
+    ('a,unit) f_fold ->   (* function to apply on each subterm at depth 1 *)
     se:SE.arbitrary ->    (* system expr for the current position *)
     fv:Vars.vars ->       (* variables bound above the current position *)
     cond:Term.terms ->    (* conditions for the current position *)
@@ -177,17 +193,19 @@ module Pos : sig
     'a                    (* new folding value *)
 
   (*------------------------------------------------------------------*)
-  (** Same as [map_fold], but for [Equiv.form] sub-terms *)
+  (** [mode] defaults to [`TopDown false] in all folding functions *)
+  
+  (** Same as [map_fold], but for [Equiv.form] sub-terms. *)
   val map_fold_g :
     ?mode:[ `BottomUp | `TopDown of bool ] ->
     'a f_map_fold_g -> SE.context -> 'a -> Equiv.form -> 'a * bool * Equiv.form
 
-  (** Same as [map], but for [Equiv.form] sub-terms *)
+  (** Same as [map], but for [Equiv.form] sub-terms. *)
   val map_g :
     ?mode:[ `BottomUp | `TopDown of bool ] ->
     f_map_g -> SE.context -> Equiv.form -> bool * Equiv.form
 
-  (** Same as [fold], but for [Equiv.form] sub-terms *)
+  (** Same as [fold], but for [Equiv.form] sub-terms. *)
   val fold_g :
     ?mode:[ `BottomUp | `TopDown of bool ] ->
     'a f_fold_g -> SE.context -> 'a -> Equiv.form -> 'a
@@ -277,14 +295,14 @@ val default_param : param
 (** default parameters for cryptographic reasoning, which uses
     - reduction rules: [rp_crypto] 
     - reduction strategy: [MayRedSub { rp_crypto with delta = delta_fast; }] *)
-val crypto_param : param
+val crypto_param :  param
 
 (** default parameters for generic logical reasoning (`apply`,
     `rewrite`, ...), which uses 
     - reduction rules: [rp_crypto] (* FIXME: move to [rp_logic] *)
     - reduction strategy: [MayRedSub { rp_crypto with delta = delta_fast; }] 
       (same as in [crypto_param]). *)
-val logic_param : param
+val logic_param :  param
 
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
@@ -292,7 +310,8 @@ val logic_param : param
 type match_res =
   | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
-(*TODO:Concrete: see if add subgoal to do weaking is necesary*)
+
+val (let*) : match_res -> (Mvar.t -> match_res) -> match_res
 
 (** Module signature of matching.
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
@@ -301,14 +320,6 @@ type match_res =
 module type S = sig
   (** Abstract type of terms we are matching in. *)
   type t
-
-  val pp_pat :
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a Term.pat -> unit
-
-  val pp_pat_op :
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a Term.pat_op -> unit
 
   (** [try_match ... t p] tries to match [p] with [t] (at head position).
       If it succeeds, it returns a map [θ] instantiating the variables 
@@ -323,6 +334,7 @@ module type S = sig
       unchanged (it is reset). *)
   val try_match :
     param:param ->
+    concrete:bool ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
     ?ienv:Infer.env ->
@@ -337,6 +349,7 @@ module type S = sig
       pattern. *)
   val find : 
     param:param ->
+    concrete:bool ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -350,14 +363,13 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
-  
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
 
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 val reduce_delta_def1 :
-  Env.t -> Hyps.TraceHyps.hyps ->
+  ProofContext.t ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
@@ -365,8 +377,7 @@ val reduce_delta_def1 :
 val reduce_delta_macro1 :
   ?unfold_opaque:bool ->
   constr:bool ->
-  Env.t ->
-  ?hyps:Hyps.TraceHyps.hyps ->
+  ProofContext.t ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
@@ -377,7 +388,7 @@ val reduce_delta1 :
   ?unfold_opaque:bool ->
   ?delta:ReductionCore.delta ->
   constr:bool ->
-  Env.t -> Hyps.TraceHyps.hyps ->
+  ProofContext.t ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
@@ -433,8 +444,8 @@ type 'info term_set = {
 
 (** Given a term, return some [known_sets] that can be deduced from it.
     Use ad hoc built-in rules + user-provided deduction rules. *)
-val term_set_strengthen : 
-  Env.t -> TraceHyps.hyps ->
+val term_set_strengthen :
+  ProofContext.t ->
   inputs:info term_set list -> info term_set -> info term_set list
 
 (** [deduce_mem cterm knonw st] try to obtain [cterm] from one of the
@@ -484,7 +495,8 @@ module E : sig
 
   (** Similar as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
-    param:param ->
+    param:param -> 
+    concrete:bool ->
     ?ienv:Infer.env ->
     Symbols.table ->
     SE.context ->

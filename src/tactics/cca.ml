@@ -331,6 +331,7 @@ type indcca_param = {
 (** Finds the parameters of the cca application *)
 let indcca_param
     ~(loc:L.t)
+    ~(concrete:bool)
     (t:term)    (* element in the goal where we want to apply cca *)
     (s:sequent)    
   : indcca_param
@@ -382,10 +383,10 @@ let indcca_param
                        ~ty_arg:(Type.tuple [mty; rty; kty]))];
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
                  (Name.to_term xc);
-     rw_kind   = GlobalEq;
-     rw_bound = Concrete.Glob;
+     rw_kind   = Global;
+     rw_bound = LowConcrete.ReachConc (Real.mk_zero table);
     },
-    (* TODO: Concrete: Probably something to do to create a bounded rewrite *)
+    (* FEAT: concrete logic for equivalences *)
     table,
     xc
   in
@@ -412,15 +413,14 @@ let indcca_param
              let rule, table, xc = mk_rewrule f cty mty rty kty in
              let res =
                Rewrite.rewrite
-                 ~param:Match.crypto_param
+                 ~param:Match.crypto_param ~concrete
                  table (ES.params s)
                  Vars.empty_env (* only local variables,
                                    hence [env] is useless here *)
                  secontx hyps TacticsArgs.Once
                  rule
                  Equiv.(Global (Atom (Equiv {terms = [t]; bound = None})))
-                 (* TODO: Concrete: Probably something to do to create
-                    a bounded goal *)
+                 (* FEAT: concrete logic for equivalences *)
              in
              begin
                match res with
@@ -434,8 +434,9 @@ let indcca_param
     | Found x -> x
   in
 
-  match res with 
-  | enc_f, (ccc, [(_, l)]), table, xc ->
+  match res with
+  (* FEAT: concrete logic for equivalences *)
+  | enc_f, (ccc, [(_, l)], _bound), table, xc ->
     let dec_f, pk_f = (* get the associated dec and pk functions *)
       match Symbols.OpData.get_abstract_data enc_f table with
       | _, [dec_f] -> (* sym enc *)
@@ -455,8 +456,8 @@ let indcca_param
     (* get the context around the ciphertext *)
     let cc =
       match Equiv.any_to_global ccc with
+      (* FEAT: concrete logic for equivalences *)
       | Equiv.(Atom (Equiv {terms = [cc]; bound = None})) -> cc
-      (* TODO: Concrete: Probably something to do to create a bounded goal *)
       | _ -> assert false (* cannot happen given the term we constructed *)
     in
 
@@ -511,6 +512,7 @@ let indcca_param
       This function assumes everything has already been projected,
       and is understood in [context.env.system.set]. *)
 let phi_cca_one_system
+    ~(concrete:bool)
     ~(use_path_cond : bool)
     ?(loc : L.t option)
     (context : ProofContext.t)
@@ -553,14 +555,15 @@ let phi_cca_one_system
 
   (* Find bad occurrences of k and r, and all ciphertexts with k *)
   let get_bad_krc : da:RO.dec_allowed -> EOS.f_fold_occs = 
-    get_bad_occs ~k ~r 
+    get_bad_occs
+      ~k ~r 
       ~enc_f:icp.ip_enc ~dec_f:icp.ip_dec ~pk_f:icp.ip_pk
   in
 
   (* First: in the frame + m + kargs + rargs.
      here, decryption is allowed (we are before the challenge ciphertext) *)
   let occs_krc = 
-    EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
+    EOS.find_all_occurrences ~concrete ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:Allowed)
       context
       (icp.ip_plain :: k.args @ r.args @ frame)
@@ -570,7 +573,7 @@ let phi_cca_one_system
      There, decryption with k is allowed ONLY on subterms that do not contain
      the name which stands for the challenge *)
   let occs_krc' =
-    EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
+    EOS.find_all_occurrences ~concrete ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:(NotAbove icp.ip_cname))
       context
       [icp.ip_context]
@@ -606,7 +609,7 @@ let phi_cca_one_system
 
   let occs_r =
     if icp.ip_pk = None then (* only in the symmetric case *)
-      ROS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_rand)
+      ROS.find_all_occurrences ~concrete ~mode:PTimeNoSI ~pp_descr:(Some pp_rand)
         get_bad_randoms
         context
         (icp.ip_context :: icp.ip_plain :: (Name.to_term k) :: r.args @ frame)
@@ -656,6 +659,7 @@ let phi_cca_one_system
     [hyps] are understood in [env], and all terms ([frame], etc) in
     the projection [proj] of [env.system.pair]. *)
 let phi_cca_proj
+    ~(concrete:bool)
     ~(use_path_cond : bool)
     ?(loc : L.t option)
     (context : ProofContext.t)
@@ -676,7 +680,7 @@ let phi_cca_proj
                        ip_key = efp icp.ip_key; }
   in
 
-  phi_cca_one_system ~use_path_cond ?loc context icpp framep
+  phi_cca_one_system ~concrete ~use_path_cond ?loc context icpp framep
 
 
 
@@ -700,13 +704,19 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
     soft_failure 
       (Tactics.GoalBadShape "IND-CCA does not handle concrete bounds.");
   
-  let before, e, after = LT.split_equiv_conclusion i s in
+  let before, e, after, bound = LT.split_equiv_conclusion i s in
+  let concrete = bound <> None in
   let biframe = List.rev_append before after in
+
+  (* FEAT: concrete logic for equivalences *)
+  if concrete then
+    soft_failure
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
 
   (* get the parameters, enforcing that
      [e] does not contain diffs or binders above the ciphertext.
      (at least the diff part could maybe be relaxed?) *)
-  let icp = indcca_param ~loc e s in
+  let icp = indcca_param ~loc ~concrete e s in
   let env = {env with table=icp.ip_table} in
 
   let phi_cca_p proj =
@@ -720,9 +730,9 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
   in
 
   Printer.pr "@[<v 0>Checking for side conditions on the left@; @[<v 0>";
-  let phi_l = phi_cca_p proj_l in
+  let phi_l = phi_cca_p ~concrete proj_l in
   Printer.pr "@]@,Checking for side conditions on the right@; @[<v 0>";
-  let phi_r = phi_cca_p proj_r in
+  let phi_r = phi_cca_p ~concrete proj_r in
   Printer.pr "@]@]@;";
 
   (* Removing duplicates. We already did that for occurrences, but

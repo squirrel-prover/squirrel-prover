@@ -23,11 +23,11 @@ abstract idD: index -> message.
 (* tag *)
 abstract resp: message.
 (* axioms for different constants *)
-axiom[any] cst_id_idD : forall i j, id i <> idD j.
+axiom[any] cst_id_idD : forall i j, id i <> idD j <: Real.z.
 hint rewrite cst_id_idD.
-axiom[any] cst_resp_id : forall i, id i <> resp.
+axiom[any] cst_resp_id : forall i, id i <> resp <: Real.z.
 hint rewrite cst_resp_id.
-axiom[any] cst_resp_idD : forall i, idD i <> resp.
+axiom[any] cst_resp_idD : forall i, idD i <> resp <: Real.z.
 hint rewrite cst_resp_idD.
 
 (* Ks(i) long-term key shared between id(i) and the server *)

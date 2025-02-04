@@ -129,6 +129,7 @@ val of_s_path : ?args:ty list -> (string list * string) -> ty
 val tquantum_message : ty
 val tmeasure_rnd     : ty
 val tint             : ty
+val treal            : ty
 val tstring          : ty
 
 

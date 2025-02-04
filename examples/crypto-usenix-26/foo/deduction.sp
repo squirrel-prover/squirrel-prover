@@ -10,6 +10,9 @@ include[admit] commitSecrecy.
 include[admit] commitKeySecrecy.
 
 (*------------------------------------------------------------------*)
+set timeout=20.
+
+(*------------------------------------------------------------------*)
 let phiacc = accA && accB.
 let phivote = voteA && voteB.
 
@@ -1959,3 +1962,6 @@ Proof.
   project; 1:auto. by rewrite and_comm.
   deduce with deduce_mop_01. auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+set timeout=1.

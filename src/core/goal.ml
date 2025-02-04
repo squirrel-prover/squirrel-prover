@@ -40,10 +40,11 @@ let pp_init ppe fmt = function
   | Local  j ->
     begin
       match TS.bound j with
-        | None -> Term._pp ppe fmt (TS.conclusion j)
-        | Some e ->  
+        | ReachAsym -> Term._pp ppe fmt (TS.conclusion j)
+        | ReachConc e ->
           Fmt.pf fmt "@[%a@; bound : %a@]"
             (Term._pp ppe) (TS.conclusion j) (Term._pp ppe) e
+        | _ -> assert false
     end
   | Global j -> ES.pp_init ppe fmt j
 
@@ -123,7 +124,7 @@ let to_global_statement ?loc stmt =
 module Parsed = struct
 
   type contents =
-    | Local     of Typing.term * Typing.term option
+    | Local     of Typing.term * [`Some of Typing.term | `None | `Exact]
     | Global    of Typing.global_formula
     | Obs_equiv   (** All the information is in the system expression. *)
 
@@ -216,7 +217,6 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
     in
     Typing.convert_bnds_tagged ~ienv ~mode:(DefaultTag var_tag) env vars
   in
-
   let conv_env = Typing.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
@@ -224,16 +224,18 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       let f,_ = Typing.convert ~ienv conv_env ~ty:Type.tboolean f in
       let e =
         match e with
-        | None -> None
-        | Some e ->
+        | `None -> None
+        | `Exact -> Some (Library.Real.mk_zero table)
+        | `Some e ->
           let e, _ = 
-            let ty = Library.Real.treal conv_env.env.table in
+            let ty = Library.Real.treal in
             Typing.convert ~ienv conv_env ~ty e 
-          in 
+          in
           Some e
       in
       let s = TS.init ~no_sanity_check:true ~env ?bound:e f in
-
+      let bind_bound bound  = List.partition (fun (x,_) -> Sv.mem x (Term.fv bound)) vs in
+      let bound_bind,vs =  omap_dflt ([],vs) bind_bound e in
       (* We split the variable [vs] into [vs_glob] and [vs_loc] such that:
          - [vs = vs_glob @ vs_loc]
          - all variables in [vs_loc] are local variables (i.e. have a local tag) *)
@@ -242,7 +244,7 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
          (wrongly) future instantiation of the lemma. *)
       let vs_glob, vs_loc =
         let rec split vs_loc = function
-          | [] -> [], vs_loc
+          | [] -> bound_bind, vs_loc
           | (v,tag) :: vs ->
             if tag = Vars.Tag.make Vars.Local then
               split ((v,tag) :: vs_loc) vs

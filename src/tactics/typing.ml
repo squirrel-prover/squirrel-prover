@@ -70,6 +70,7 @@ let generate_subgoals_output (s : sequent) (t : term) : sequent list =
       (_ : Vars.vars)
       (conds : Term.term list)
       (_ : Match.Pos.pos)
+      (_info : unit)
       (acc : sequent list) =
     match t with 
     | Macro(msymb, _, ts) when msymb.s_symb = Symbols.Classic.out ->
@@ -96,6 +97,7 @@ let generate_subgoals_states (s : sequent) (t : term) : sequent list =
       (_ : Vars.vars)
       (conds : Term.term list)
       (_ : Match.Pos.pos)
+      (_info : unit)
       (acc : sequent list) =
     match t with 
     | Macro(msymb, _, ts) -> begin

@@ -50,7 +50,7 @@ val pp_euf_rule : euf_rule formatter
     the messages.
     When [global] is true, also checks in global macros. *)
 val key_ssc :
-  ?messages:(Term.term list) ->
+  concrete:bool -> ?messages:(Term.term list) ->
   ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname -> bool) ->
   context:ProofContext.t ->
@@ -61,6 +61,7 @@ val key_ssc :
    function and key in a process.  If drop_head is true, the message stored do
    not contain anymore the head_fn function, else they still do. *)
 val mk_rule :
+  concrete:bool ->
   elems:Equiv.equiv ->
   drop_head:bool ->
   fun_wrap_key:((Symbols.fname -> bool) option) ->

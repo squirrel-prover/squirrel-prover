@@ -1,5 +1,5 @@
 module Sv = Vars.Sv
-module C = Concrete
+module C = LowConcrete
 
 (*------------------------------------------------------------------*)
 let open_pat (type a)

@@ -67,10 +67,14 @@ let err_msg_of_msymb a (ms : Symbols.macro) : Tactics.ssc_error_c =
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
-    ?(messages=[]) ?(elems={Equiv.terms = []; bound = None})
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    ~concrete ?(messages=[]) ?(elems={Equiv.terms = []; bound = None})
+    (* FEAT: concrete logic for equivalences: do not default in
+       [concrete] and [elems] *)
     ~allow_functions ~(context : ProofContext.t) head_fn key_n
   =
+  if concrete then
+    Tactics.hard_failure (Failure "concrete logic unsupported for now ");
+  
   let table = context.env.table in
   let ssc =
     new check_key ~allow_functions ~context head_fn key_n
@@ -84,7 +88,6 @@ let key_ssc
       
   let errors1 = List.filter_map (check E_message) messages in
   let errors2 = List.filter_map (check E_elem) elems.terms in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   (* the system must be concrete, or we cannot check that the
      syntactic conditions hold *)
@@ -156,11 +159,13 @@ let pp_euf_rule ppf rule =
 (** {2 Build the Euf rule} *)
 
 (** Exported *)
-let mk_rule 
+let mk_rule
+    ~(concrete:bool)
     ~(elems : Equiv.equiv) ~drop_head ~fun_wrap_key
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~(context : ProofContext.t) ~mess ~sign ~head_fn ~key_n ~key_is 
   =
+  if concrete then
+    Tactics.hard_failure (Failure "concrete logic unsupported for now ");
 
   let mk_of_hash (action_descr : Term.term) ((is,m) : Term.t list * Term.t) =
     (* Legacy refresh of variables, probably unnecessarily complex. *)
@@ -222,7 +227,6 @@ let mk_rule
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
       ) context (mess :: sign :: (elems.terms)) []
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   
   (* we keep only actions in which the name occurs *)
@@ -257,7 +261,6 @@ let mk_rule
       iter#visit_message mess ;
       iter#visit_message sign ;
       List.iter iter#visit_message elems.terms ;
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
       iter#get_occurrences
     in
     List.map

@@ -22,7 +22,7 @@ Proof.
   rewrite eq_iff; split.
   + intro H. 
     exists (fun x => choose (fun y => phi x y)). (* ce choix intelligent semble nécessaire pour guider les solveurs *)
-    smt ~prover:Z3. (* Ne fonctionne pas avec CVC5 qui requiert d'aller jusqu'au assert de la preuve sans smt, mais fonctionne avec l'option --enum-inst du graphe ou avec Z3. *)
+    smt ~prover:Z3 ~steps:11000. (* Ne fonctionne pas avec CVC5 qui requiert d'aller jusqu'au assert de la preuve sans smt, mais fonctionne avec l'option --enum-inst du graphe ou avec Z3. *)
   + smt.
 Qed.
 

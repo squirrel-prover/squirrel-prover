@@ -20,10 +20,13 @@ module SE   = SystemExpr
 
 module LT = LowTactics
 
+module C = Concrete
+
 module TS = TraceSequent
 
 module TopHyps = Hyps
 (* module Hyps = TS.LocalHyps *)
+
 
 type tac = TS.t Tactics.tac
 type lsymb = Symbols.lsymb
@@ -44,8 +47,17 @@ let soft_failure = Tactics.soft_failure
 (** {2 Logical tactics} *)
 
 let true_intro (s : TS.t) =
-  match TS.conclusion s with
-  | tt when tt = Term.mk_true -> []
+  match TS.conclusion s, TS.bound s with
+  | tt, ReachAsym when tt = Term.mk_true -> []
+  | tt, ReachConc b when tt = Term.mk_true ->
+    let table = TS.table s in
+    if Real.is_zero table b then [] 
+    else 
+      let zero = Real.zero table in
+      [TS.set_conclusion
+         (Term.mk_leq zero b)
+         (TS.set_bound (ReachConc zero) s)]
+
   | _ -> soft_failure (Tactics.Failure "Cannot introduce true")
 
 let () =
@@ -53,9 +65,25 @@ let () =
     (LowTactics.genfun_of_pure_tfun true_intro)
 
 (*------------------------------------------------------------------*)
+
+(*------------------------------------------------------------------*)
+(** type-check the user-provided bounds for a case as reals *)
+let case_bounds_as_real
+    (bounds : Typing.term list option) (s : TS.t) 
+  : Term.term option list 
+  =
+  omap_dflt []   (* FIXME: use [omap] instead to return an option *)
+    (fun bounds ->
+       List.map
+         (some -|             (* FIXME: why is there a some here? *)
+          fst -| TraceLT.convert ~ty:Real.treal s)
+         bounds) 
+    bounds
+
+(*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
-let case_cond orig vars c t e s : sequent list =
+let case_cond orig vars c t e s ~(bounds : Term.t option list) : sequent list =
   let vars, subst = Term.refresh_vars vars in
   let then_c = Term.subst subst c in
   let else_c = Term.mk_forall vars (Term.mk_not then_c) in
@@ -63,7 +91,7 @@ let case_cond orig vars c t e s : sequent list =
   let then_t = Term.subst subst t in
   let else_t = e in
 
-  let mk_case case_vars case_t case_cond : sequent =
+  let mk_case case_vars case_t case_cond  : sequent =
     let case_subst =
       if case_vars = [] then [Term.ESubst (orig, case_t)] else []
     in
@@ -81,89 +109,131 @@ let case_cond orig vars c t e s : sequent list =
         prem
         (Term.subst case_subst (TS.conclusion s))
     in
-    TS.set_conclusion case_conclusion s
+     TS.set_conclusion case_conclusion s
+
   in
-
+  let cases =
   [ mk_case vars then_t then_c;
-    mk_case    [] else_t else_c]
+    mk_case    [] else_t else_c] in
+  let module CB = C.BoundManagement(TS) in
 
-let conditional_case (m : Term.term) s : sequent list =
+  let bounds, last_goal = CB.list_bounds_fill bounds cases s in
+    last_goal@ List.map2 (fun s b -> TS.set_bound b s) cases bounds
+
+(*------------------------------------------------------------------*)
+let conditional_case
+    (params : case_param) (m : Term.term) (s : TS.t) 
+    ~(bounds : Term.t option list)
+  : sequent list 
+  =
+  assert (params.struct_based);
+
+  if params.tags then soft_failure (Failure "~tags unsupported here");
+
   let failed () = Tactics.soft_failure (Failure "message is not a conditional") in
+
   match m with
-  | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
+  | Term.Find (vars,c,t,e) -> case_cond m vars c t e s ~bounds
   | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
-    case_cond m [] c t e s
+    case_cond m [] c t e s ~bounds
 
   | Term.Macro (_,_,_) ->
     begin
       let def =
         let res, has_red =
-          Match.reduce_delta_macro1
-            ~constr:true
-            (TS.env s) ~hyps:(TS.get_trace_hyps s) m
+          Match.reduce_delta_macro1 ~constr:true (TS.proof_context s) m
         in
         if has_red = True then res else failed ()
-          
+
       in
 
       match def with
-      | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
+      | Term.Find (vars,c,t,e) -> case_cond m vars c t e s ~bounds
       | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
-        case_cond m [] c t e s
+        case_cond m [] c t e s ~bounds
       | _ -> failed ()
     end
 
   | _ -> failed ()
 
-let boolean_case b s : sequent list =
+(*------------------------------------------------------------------*)
+let boolean_case
+    (params : case_param) (b : Term.t) (s : sequent) 
+    ~(bounds : Term.term option list) 
+  : sequent list 
+  =
+  assert (params.type_based);
+
+  if params.tags then soft_failure (Failure "~tags unsupported here");
+
   let do_one b_case b_val =
     let g = Term.subst [Term.ESubst (b, b_val)] (TS.conclusion s) in
     TS.set_conclusion (Term.mk_impl ~simpl:false b_case g) s
   in
+  let cases =
   [ do_one b Term.mk_true;
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
+  in
+  let module CB = C.BoundManagement(TS) in
+
+  let bounds, last_goal = CB.list_bounds_fill bounds cases s in
+  last_goal@ List.map2 (fun s b -> TS.set_bound b s) cases bounds
+
 
 (*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : sequent list =
-  let structure_based, type_based, args = match args with
-    | Args.(Named_args [NArg {L.pl_desc="struct"}])::args -> true,false,args
-    | Args.(Named_args [NArg {L.pl_desc="type"}])::args -> false,true,args
-    | Args.Named_args [] :: args -> true,true,args
-    | Args.(Named_args ((NArg s | NList (s,_))::_)) :: _ ->
-      Tactics.(hard_failure ~loc:(L.loc s) (Failure "invalid argument"))
-    | _ ->
-      Tactics.(hard_failure (Failure "incorrect case arguments"))
+  let params, tcase, bounds =
+    match args with
+    | [Args.Case c] -> c
+    | _ -> bad_args ()
   in
-  match Args.as_p_path args with
-  | Some ([],str) when TS.Hyps.mem_name (L.unloc str) s && structure_based ->
-    let id, f = TS.Hyps.by_name_k str Hyp s in
 
-    (* check that [str] is a local hypothesis *)
-    check_local ~loc:(L.loc str) f;
+  (* process the named arguments *)
+  let params = case_process_named_args params in
 
+  match L.unloc tcase with
+  | Typing.Symb { path = ([],str); ty_args = None; se_args = None; } 
+    when TS.Hyps.mem_name (L.unloc str) s && params.struct_based ->
+    let id, _f = TS.Hyps.by_name_k str Hyp s in
+
+    let bounds = case_bounds_as_real bounds s in
     List.map
-      (fun (TraceLT.CHyp _, ss) -> ss)
-      (TraceLT.hypothesis_case ~nb:`Any id s)
+      (fun (_, ss) -> ss)
+      (fst (TraceLT.hypothesis_case ~nb:`Any ~params ~bounds id s))
 
   | _ ->
     let table = TS.table s in
-    match TraceLT.convert_args s args Args.(Sort Term) with
-    | Args.Arg (Term (ty, f, _)) ->
-      if type_based && (Type.equal ty Type.ttimestamp ||
-                        HighType.is_inductive table ty ||
-                        Type.is_tuple ty) then
-        TraceLT.type_based_case f s
-      else if Type.equal ty Type.tboolean && type_based then
-        boolean_case f s
-      else if structure_based then conditional_case f s
-      else bad_args ()
 
-    | _ -> bad_args ()
+    (* type-check the term we are doing a case upon *)
+    let tcase, ty = TraceLT.convert_with_holes s tcase in
+
+    if params.type_based && 
+       (Type.equal ty Type.ttimestamp ||
+        HighType.is_inductive table ty ||
+        Type.is_tuple ty) 
+    then
+      TraceLT.type_based_case ?bounds ~params tcase s
+
+    else if Type.equal ty Type.tboolean && params.type_based then
+      let bounds = case_bounds_as_real bounds s in
+      boolean_case params tcase s ~bounds
+
+    else if params.struct_based then
+      let bounds = case_bounds_as_real bounds s in
+      conditional_case params tcase s ~bounds
+
+    else bad_args ()
 
 let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
 
+(** [simpl_left s] destruct local and (&&) and local exists
+    (introducing new variables) in local hypothesis, and return [None]
+    if false is one of the local hypothesis (possibly after
+    destructing some of the hypothesis). Otherwise, it destruct all
+    the (nested) local and (&&) and local exists and return this new
+    sequent *)
 let rec simpl_left (s : TS.t) =
   let func (id,ldc) =
     match ldc with
@@ -181,7 +251,24 @@ let rec simpl_left (s : TS.t) =
   | Some (id, f) ->
     begin
       match f with
-      | tf when tf = Term.mk_false -> None
+      | tf when tf = Term.mk_false ->
+
+        begin
+          match TS.bound s with
+          | C.ReachAsym -> None
+          | ReachConc e ->
+            let state =
+              Reduction.mk_state0
+                ~system:(TS.system s)
+                ~red_param:Reduction.rp_default
+                (TS.table s) ~concrete:true
+            in
+            let rede = Reduction.reduce_term state e in
+            if Real.ge_zero (TS.table s) rede then None else
+              let s = TS.Hyps.remove id s in
+              simpl_left s
+          | _ -> assert false
+        end
 
       | Term.Quant (Exists,vs,f) ->
         let s = TS.Hyps.remove id s in
@@ -215,41 +302,62 @@ let simpl_left_tac s =
 (*------------------------------------------------------------------*)
 (** [any_assumption s] succeeds (with no subgoal) if the sequent [s]
     can be proved using the axiom rule (plus some other minor rules).
-    If [hyp = Some id], only checks for hypothesis [id]. *)
+    In the concrete local case, it also check that the bound is greater or equal to 0.
+    If [hyp = Some id], only checks for hypothesis [id]
+    and in the concrete local case, succeed only when the bound is 0. *)
 let assumption ?hyp (s : TS.t) =
   let conclusion = TS.conclusion s in
-  let sbound = TS.bound s in
-  let conv_bound sb b =
-    match sb,b with
-    | None, None -> true
-    | Some ve, Some e -> TS.Reduce.conv_term s ve e
-    | _ -> false
-  in
-  let rec assumption_entails (id, f) =
+  let bound_entail sb b = C.entails (TS.table s) (TS.system s) (C.from_option b) sb in
+  let reduce_bound (sb : C.bound) = C.reduce_bound (TS.table s) (TS.system s) sb in
+  let sbound = reduce_bound (TS.bound s) in
+  (*Function that check if a given hypothesis [id,f] entail the conclusion.
+     if a hypothesis was given as an arguement to the tactics, only check for this one.
+  *)
+  let rec hyp_entails (id, f) =
     (hyp = None || hyp = Some id) &&
     match f with
+    (*When the hypothesis is a global hypothesis,
+      check it the bound of the hypothesis entails the one of the conclusion *)
     | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound}))) ->
-      conv_bound sbound bound &&
+
+      bound_entail sbound bound &&
       (TS.Reduce.conv_term s conclusion f  ||
+       (*In the case where there not argument is given to the tactic,
+          check if the formula [f] is a conjunction where one of the sub-formula is the conclusion.
+         When an argument is given to the function, the tactics
+         does not perform such automatisation for testing purposes *)
        (List.exists (fun f ->
-           TS.Reduce.conv_term s conclusion f ||
-           TS.Reduce.conv_term s f Term.mk_false
-         ) (Term.decompose_ands f)) && hyp = None)
+            TS.Reduce.conv_term s conclusion f ||
+            TS.Reduce.conv_term s f Term.mk_false
+          ) (Term.decompose_ands f)) && hyp = None)
+
     | TopHyps.LHyp (Equiv.Local f) ->
+
       (TS.Reduce.conv_term s conclusion f  ||
-     ( List.exists (fun f ->
-          TS.Reduce.conv_term s conclusion f ||
-          TS.Reduce.conv_term s f Term.mk_false
-        ) (Term.decompose_ands f) && hyp = None) )
-     &&
-      (sbound = None || sbound = Some (Library.Real.mk_zero (TS.table s)))
+       ( List.exists (fun f ->
+             TS.Reduce.conv_term s conclusion f ||
+             TS.Reduce.conv_term s f Term.mk_false
+           ) (Term.decompose_ands f) && hyp = None) )
+      &&
+      (*In the case of a local assumption begin used,
+        we need to check that the bound of the conclusion is either asymptotic
+         or greater than zero. In case where a specific hypothesis is given,
+        check only that it is equal to zero for testing purpose*)
+      (sbound = ReachAsym || (
+          (hyp = None && C.ge_zero (TS.table s) sbound)
+          || (hyp = Some id && C.is_zero (TS.table s) sbound)
+        ))
+
     | TopHyps.LHyp (Equiv.Global(Equiv.And (f1,f2) )) ->
       let to_hyp form = TopHyps.LHyp (Equiv.Global form) in
-      hyp = None && (assumption_entails (id,to_hyp f1) || assumption_entails (id,to_hyp f2))
+      hyp = None && (hyp_entails (id,to_hyp f1) || hyp_entails (id,to_hyp f2))
     | TopHyps.LHyp (Equiv.Global _) | TopHyps.LDef _ -> false
   in
-  if conclusion = Term.mk_true ||
-     TS.Hyps.exists assumption_entails s
+  (*Check is the conclusion isn't simply the true term, and if so check that the bound is valid*)
+  let is_true =
+    (conclusion = Term.mk_true) && (sbound = ReachAsym || C.ge_zero (TS.table s) sbound)
+  in
+  if (hyp = None && is_true) || TS.Hyps.exists hyp_entails s
   then []
   else soft_failure Tactics.NotHypothesis
 
@@ -271,23 +379,36 @@ let assumption_tac args = wrap_fail (do_assumption_tac args)
     The generated subgoal is identical to [s] but with a new local
     hypothesis [h'] corresponding to that atom. *)
 let localize h h' s =
+  let table = TS.table s in
   match TS.Hyps.by_name_k h Hyp s with
-    | _,Global (Equiv.Atom (Reach {formula = f; bound = b})) ->
-          let b =
-            match b, TS.bound s with
-            | Some b, Some sb -> Some(Library.Real.mk_add (TS.table s) sb (Library.Real.mk_opp (TS.table s) b))
-            | None, None -> None
-            | Some _, None ->
-              Tactics.(soft_failure(Failure "cannot localize a concrete hypothesis in a asymptotic goal"))
-            | None, Some _ ->
-              Tactics.(soft_failure(Failure "cannot localize a asymptotic hypothesis in a concrete goal"))
-          in
-          let s = TS.set_bound b s in
-          [TS.Hyps.add h' (LHyp (Local f)) s]
-    | _ ->
-        Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
-    | exception Not_found ->
-        Tactics.(soft_failure (Failure "no hypothesis"))
+  | _,Global (Equiv.Atom (Reach {formula = f; bound = b})) ->
+    let b =
+      match b, TS.bound s with
+      | Some b, ReachConc sb ->
+        C.ReachConc (Real.mk_minus ~simpl:true table sb b)
+
+      | None, ReachAsym -> C.ReachAsym
+
+      | Some b, ReachAsym when C.is_zero table (ReachConc b) -> C.ReachAsym
+
+      | Some _, ReachAsym ->
+        Tactics.soft_failure
+          (Failure "cannot localize a concrete non-exact hypothesis in an \
+                    asymptotic goal")
+
+      | None, ReachConc _ ->
+        Tactics.soft_failure (Failure "cannot localize an asymptotic \
+                                       hypothesis in a concrete goal")
+      | _ -> assert false
+    in
+    let s = TS.set_bound b s in
+    [TS.Hyps.add h' (LHyp (Local f)) s]
+
+  | _ ->
+    Tactics.soft_failure (Failure "cannot localize this hypothesis")
+
+  | exception Not_found ->
+    Tactics.soft_failure (Failure "no hypothesis")
 
 let () =
   T.register_general "localize"
@@ -322,7 +443,8 @@ let rewrite_equiv_transform
   let env    = TS.env   s in
   let table  = TS.table s in
   let vars   = TS.vars  s in
-  let param = { Match.crypto_param with mode = `EntailLR } in
+  let concrete = TS.bound s <> ReachAsym in
+  let param = { Match.crypto_param with mode = `EntailLR; } in
   let pair_context = SE.{set = (pair :> SE.t) ; pair = Some pair; } in
   let hyps =
     Hyps.change_trace_hyps_context
@@ -347,7 +469,7 @@ let rewrite_equiv_transform
     let known = Equiv.mk_equiv_atom biframe in
     let match_result =
       Match.E.try_match
-        ~param ~hyps ~env:vars
+        ~param ~concrete ~hyps ~env:vars
         table pair_context known to_deduce
     in
     match match_result with
@@ -364,23 +486,26 @@ let rewrite_equiv_transform
     | Some e -> Some (Term.project1 dst_proj e)
     | None -> None
   in
-  let rec aux (t : Term.term) : Term.term =
+  let rec aux ?_args (t : Term.term) : Term.term =
     (* System-independence needed to leave [t] unchanged when changing
        the system from [src] to [dst].
        (Note that [pair = (src,dst)] or [(dst,src)].) *)
     if HighTerm.is_ptime_deducible ~si:false              env t &&
        HighTerm.is_single_term_in_se ~se:[(pair :> SE.t)] env t then t
-    else if try_bideduce t then t 
+      (*time(t,len(args)) if t is of order 1, time(t) if t order 0, fail otherwise*)
+    else if try_bideduce t then t (* FEAT: concrete logic for equivalences *)
     else
       match assoc t with
       | None -> aux_rec t
-      | Some t' -> t'
+      | Some t' -> t' (* here a table of number of call to make *)
 
   and aux_rec (t : Term.term) : Term.term =
     match t with
     | Term.Tuple l -> Term.mk_tuple (List.map aux l)
+                        (*tuple are "free" since we consider them on multiple tapes*)
 
     | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
+                             (*the order of f is known thanks to the args*)
 
     | Diff (Explicit l) ->
       Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)
@@ -413,7 +538,7 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
 
   if biframe.bound <> None then
     soft_failure ~loc (Failure "concrete logic unsupported");
-  (* TODO: Concrete *)
+  (* FEAT: concrete logic for equivalences *)
   
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
@@ -471,7 +596,12 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
          | LHyp (Global _) -> true)
   in
   (* TODO: use [change_hyps_context] instead? *)
-  let subgoals = List.map (fun f -> TS.set_conclusion f.Equiv.formula s') subgoals in
+  let subgoals = List.map
+      (fun f ->
+         TS.set_conclusion
+           f.Equiv.formula
+           (TS.set_bound (C.from_option f.bound) s'))
+      subgoals in
 
   let ppe = default_ppe ~table () in
   let warn_unsupported t =
@@ -522,26 +652,53 @@ let () =
 (** {2 Structural tactics} *)
 
 (*------------------------------------------------------------------*)
-(** [congruence judge sk fk] try to close the goal using congruence, else
-    calls [fk] *)
-let congruence (s : TS.t) : bool =
-  match simpl_left s with
-  | None -> true
-  | Some s ->
-    let conclusions =
-      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.conclusion s))
-    in
+(** [congruence s] try to close the goal using congruence,
+destructing and and exists in the local hypothesis (using [simpl_left])
+and adding the negation of all disjuctive of the conclusion.
+ Then checking if all the equality (or disequality) atoms
+can be statisfied at the same time*)
 
-    let term_conclusions =
-      List.fold_left (fun acc conc ->
-          Term.Lit.lit_to_form (Term.Lit.neg conc) :: acc
-        ) [] conclusions
-    in
-    let s = List.fold_left (fun s f ->
-        TS.Hyps.add Args.Unnamed (LHyp (Local f)) s
-      ) s term_conclusions
-    in
-    TS.eq_atoms_valid s
+let congruence (s : TS.t) : bool =
+  let table = TS.table s in
+  let state =
+    Reduction.mk_state0
+      ~system:(TS.system s)
+      ~red_param:Reduction.rp_default
+      table ~concrete:true
+  in
+  let cong =
+    match simpl_left s with
+    | None -> true
+    | Some s ->
+      let conclusions =
+        Term.Lit.disjunction_to_literals (TS.conclusion s)
+      in
+
+      let term_conclusions =
+        List.fold_left (fun acc conc ->
+            Term.Lit.lit_to_form (Term.Lit.neg conc) :: acc
+          ) [] conclusions
+      in
+      let s = List.fold_left (fun s f ->
+          TS.Hyps.add Args.Unnamed (LHyp (Local f)) s
+        ) s term_conclusions
+      in
+      let reduce_bound_any_form (f : Equiv.any_form) =
+        match f with
+        | Global Equiv.(Atom (Reach {formula = f; bound = Some b}))  ->
+          let redb = Reduction.reduce_term state b in
+          Equiv.Global Equiv.(Atom (Reach {formula = f; bound = Some redb}))
+        | _ -> f
+      in
+      let s =  TS.Hyps.map ~hyp:reduce_bound_any_form s in
+      TS.eq_atoms_valid s
+  in
+  match TS.bound s with
+  | C.ReachAsym -> cong
+  | ReachConc e ->
+    let rede = Reduction.reduce_term state e in
+    cong && (Real.ge_zero table rede)
+  | _ -> assert false
 
 (** [congruence s] proves the sequent using its message equalities,
     up to equational theories. *)
@@ -557,15 +714,30 @@ let () =
 
 (*------------------------------------------------------------------*)
 let constraints (s : TS.t) =
-  match simpl_left s with
-  | None -> true
-  | Some s ->
-    let s =
-      TS.Hyps.add Args.Unnamed
-        (LHyp (Local (Term.mk_not (TS.conclusion s))))
-        (TS.set_conclusion Term.mk_false s)
-    in
-    TS.constraints_valid ~system:(Some (TS.system s).set) s
+  let system = TS.system s in
+  let state =
+    Reduction.mk_state0
+      ~system
+      ~red_param:Reduction.rp_default
+      (TS.table s) ~concrete:true
+  in
+  let const =
+    match simpl_left s with
+    | None -> true
+    | Some s ->
+      let s =
+        TS.Hyps.add Args.Unnamed
+          (LHyp (Local (Term.mk_not (TS.conclusion s))))
+          (TS.set_conclusion Term.mk_false s)
+      in
+      TS.constraints_valid ~system:(Some system.set) s
+  in
+  match TS.bound s with
+  | C.ReachAsym -> const
+  | C.ReachConc e ->
+    let rede = Reduction.reduce_term state e in
+    const && (Real.ge_zero (TS.table s) rede)
+  | _ -> assert false
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_ttac (s : TS.t) =
@@ -585,12 +757,17 @@ let constraints_tac args : LT.ttac =
     Use the fact that for finite types which do not depend on the
     security parameter η, we have
     [∀ x, phi] ≡ ∀ x. const(x) → [phi]
-    (where the RHS quantification is a global quantification) *)
-let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
+    (where the RHS quantification is a global quantification).
+
+    In the concrete logic, this has a cost therefore it is necessary to allow it case by case
+    and even in the case where it is allowed in concrete sequent,
+    this function does not manage the added cost,
+    it has to be manualy dealt with *)
+let strengthen_const_var ~concrete (s : TS.t) (v : Vars.var) : bool =
   let table = TS.table s in
   if HighType.is_finite table (Vars.ty v) &&
-     HighType.is_fixed  table (Vars.ty v) then
-
+     HighType.is_fixed  table (Vars.ty v) &&
+     (TS.bound s = ReachAsym || concrete) then
     (* Check that [v] does not appear
        in any global hypothesis or definition. *)
     TS.Hyps.fold (fun _ hyp b ->
@@ -600,28 +777,48 @@ let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
         | LHyp (Equiv.Global f) ->
           b && not (Sv.mem v (Equiv.fv f))
       ) s true
-
   else false
 
 (*------------------------------------------------------------------*)
 (** Try to add the [const] tag to all variables of the sequent.
     Added in [simpl]. *)
-let strengthen_const_vars (s : TS.t) : TS.t =
+let strengthen_const_vars ~concrete (s : TS.t) : TS.t =
   let vars =
     Vars.map_tag (fun v (tag : Vars.Tag.t) ->
-        { tag with const = tag.const || strengthen_const_var s v }
+        { tag with const = tag.const || strengthen_const_var ~concrete s v }
       ) (TS.vars s)
   in
   TS.set_vars vars s
 
 (*------------------------------------------------------------------*)
-let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
+let const
+    (ty : Type.ty) (f : Term.term) (loc : L.t)
+    (bound : Term.term option) (s : TS.t) 
+  =
   let table = TS.table s in
+  let concrete = TS.concrete s in
 
-  if not (HighType.is_finite table ty &&
-          HighType.is_fixed  table ty   ) then
+  if not concrete && bound <> None then
     soft_failure ~loc
-      (Failure "only applies to finite and fixed (η-independent) types");
+      (Failure "const does not take a bound when the sequent is asymptotic");
+
+  if concrete && bound = None then
+    soft_failure ~loc
+      (Failure "const requires a bound when the sequent is concrete");
+
+  if not concrete &&
+     not (HighType.is_finite table ty &&
+          (HighType.is_fixed table ty)) then
+    soft_failure ~loc
+      (Failure "asymptotic `const` only applies to finite and fixed types");
+
+  if concrete && not (HighType.is_finite table ty) then
+    soft_failure ~loc
+      (Failure "concrete `const` only applies to finite types");
+
+  (* We keep a exact copy of s without changing any thing on the hypothesis,
+      for the auxillary proof obligation in the concrete case *)
+  let s_leq = s in
 
   let v =
     match f with
@@ -629,6 +826,8 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
     | _ -> soft_failure ~loc (Failure "must be a variable");
   in
 
+  (* compute the list of global hypotheses depending on [v] that must
+     be localized before making [v] const. *)
   let to_lower =
     TS.Hyps.fold (fun id hyp to_lower ->
         match hyp with
@@ -636,7 +835,6 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
 
         | LHyp (Equiv.(Global (Atom (Reach hyp)))) ->
           if Sv.mem v (Term.fv hyp.formula) then (id, hyp) :: to_lower else to_lower
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
         | LHyp (Equiv.Global hyp) ->
           if Sv.mem v (Equiv.fv hyp) then
@@ -651,8 +849,7 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
           if Sv.mem v (Term.fv t) then
             soft_failure ~loc
               (Failure
-                 (Fmt.str "%a appears in definition %a \
-                           (revert it?)"
+                 (Fmt.str "%a appears in definition %a (revert it?)"
                     Vars.pp v Ident.pp id))
           else to_lower
       ) s []
@@ -663,22 +860,83 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
       "@[<hov 2>localize:@ %a@]"
       (Fmt.list ~sep:Fmt.sp Ident.pp) (List.map fst to_lower);
 
+  (* remove global hypotheses in [to_lower] from [s] *)
   let s = TS.Hyps.filter (fun (id, _) -> not (List.mem_assoc id to_lower)) s in
+
+  (* add [to_lower] as local hypotheses in [s] *)
   let s =
     let to_lower =
       List.map
-        (fun (id,hyp) -> (Args.Named (Ident.name id), TopHyps.LHyp (Equiv.Local hyp.Equiv.formula)) )
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        (fun (id,hyp) -> 
+           (Args.Named (Ident.name id), 
+            TopHyps.LHyp (Equiv.Local hyp.Equiv.formula)))
         to_lower 
     in
     TS.Hyps.add_list to_lower s
   in
-  [strengthen_const_vars s]
 
-let () =
-  T.register_typed "const"
-    (LowTactics.genfun_of_pure_tfun_arg const_tac)
-    Args.((Term : _ sort))
+  (* Update the bound to pay the lowering cost (for the concrete
+     logic) and sum over all values of [v]. *)
+  match TS.bound s with
+  | Glob -> assert false
+  | ReachAsym ->
+    List.iter (fun (id, hyp) ->
+        (* check that we only lowered asymptotic global hypotheses *)
+        if hyp.Equiv.bound <> None then
+          soft_failure ~loc
+            (Failure
+               (Fmt.str "%a appears in concrete definition %a (clear it?)"
+                  Vars.pp v Ident.pp id));
+      ) to_lower;
+
+    let s = TS.set_bound C.ReachAsym s in
+    [strengthen_const_vars ~concrete  s]
+
+  | ReachConc obound ->
+    let bound = oget bound in
+    let orignal_sequent_bound =
+      List.fold_left (fun (bound : Term.term) (id,hyp) ->
+          (* check that we only lowered concrete global hypotheses *)
+          if hyp.Equiv.bound = None then
+            soft_failure ~loc
+              (Failure
+                 (Fmt.str "%a appears in asymptotic definition %a (clear it?)"
+                    Vars.pp v Ident.pp id));
+
+          Library.Real.mk_minus table bound (oget hyp.bound)
+        ) obound to_lower
+
+    in
+    let sum_bound =
+      (* for the concrete logic, sum the advantage over all possible
+         values of [v] *)
+      Library.Real.mk_sum table
+        (Term.mk_lambda [v] Term.mk_true)
+        (Term.mk_lambda [v] (Term.mk_app ~simpl:true bound [Term.mk_var v]))
+    in
+
+    let new_bound = C.ReachConc (Term.mk_app ~simpl:true bound [f]) in
+
+    let s_leq =
+      TS.set_bound
+        (C.ReachConc (Real.mk_zero table))
+        (TS.set_conclusion (Term.mk_leq sum_bound orignal_sequent_bound) s_leq)
+    in
+    let s = TS.set_bound new_bound s in
+    [s_leq; strengthen_const_vars ~concrete s]
+
+let do_const_tac
+    (term : Typing.term) (bound : Typing.term option) (s : TS.t) 
+  =
+  let f,ty  = TraceLT.convert s term in
+  let ty_bounds = Type.func ty Library.Real.treal in
+  let bound = Option.map (fst -| TraceLT.convert ~ty:ty_bounds s) bound in
+  const ty f (term.pl_loc) bound s
+
+let const_tac args : LT.ttac =
+  match args with
+  | [TacticsArgs.Const (term,bound)] -> wrap_fail (do_const_tac term bound)
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** Eq-Indep Axioms *)
@@ -695,6 +953,10 @@ let eq_names (s : TS.t) =
     TS.Hyps.add Args.Unnamed (LHyp (Local c)) s
   in
 
+  (* [eqnames] is not sound in the concrete logic *)
+  if TS.concrete s then
+    soft_failure (Failure "concrete logic unsupported");
+  
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
   let trs = TS.get_trs s in
@@ -733,7 +995,7 @@ type deprecated_fresh_occ = (Term.term * Term.terms) Iter.occ
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
 let deprecated_fresh_occ_incl
-    table system
+    table system ~(concrete:bool)
     (o1 : deprecated_fresh_occ) (o2 : deprecated_fresh_occ) : bool
   =
   (* for now, positions not allowed here *)
@@ -763,7 +1025,7 @@ let deprecated_fresh_occ_incl
   let context = SE.reachability_context system in
   match
     Match.T.try_match
-      ~param:Match.default_param
+      ~param:Match.default_param ~concrete
       table context (mk_dum a1 is1 cond1) pat2
   with
   | Match.NoMatch _ -> false
@@ -771,34 +1033,35 @@ let deprecated_fresh_occ_incl
 
 (** Add a new fresh rule case, if it is not redundant. *)
 let deprecated_add_fresh_case
-    table (system : SE.t)
+    table (system : SE.t) ~(concrete:bool)
     (c : deprecated_fresh_occ)
     (l : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
-  if List.exists (fun c' -> deprecated_fresh_occ_incl table system c c') l
+  if List.exists (fun c' -> deprecated_fresh_occ_incl ~concrete table system c c') l
   then l
   else
     (* remove any old case which is subsumed by [c] *)
     let l' =
       List.filter (fun c' ->
-          not (deprecated_fresh_occ_incl table system c' c)
+          not (deprecated_fresh_occ_incl ~concrete table system c' c)
         ) l
     in
     c :: l'
 
 (** Add many new fresh rule cases, if they are not redundant. *)
 let deprecated_add_fresh_cases
-    table (system : SE.t)
+    table (system : SE.t) ~(concrete:bool)
     (l1 : deprecated_fresh_occ list)
     (l2 : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
   List.fold_left
-    (fun l2 c -> deprecated_add_fresh_case table system c l2)
+    (fun l2 c -> deprecated_add_fresh_case ~concrete table system c l2)
     l2 l1
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let deprecated_mk_fresh_indirect_cases
-    (context : ProofContext.t)
+    ~(concrete:bool)
+    (context : ProofContext.t) 
     (ns : Term.nsymb)
     (ns_args : Term.terms)
     (terms : Term.term list)
@@ -840,7 +1103,7 @@ let deprecated_mk_fresh_indirect_cases
 
         List.assoc_up_dflt rec_arg []
           (fun l ->
-             deprecated_add_fresh_cases env.table env.system.set new_cases l
+             deprecated_add_fresh_cases ~concrete env.table env.system.set new_cases l
           ) macro_cases
       ) context terms []
   in
@@ -871,7 +1134,7 @@ let substitute_mess (m1, m2) s =
 
 let substitute_ts (ts1, ts2) s =
   let subst =
-      if TS.query ~precise:true s [Term.mk_eq ts1 ts2] then
+      if TS.query ~concrete:true ~precise:true s [Term.mk_eq ts1 ts2] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -889,7 +1152,7 @@ let substitute_idx (i1 , i2 : Term.term * Term.term) s =
   in
 
   let subst =
-    if TS.query ~precise:true s [Term.mk_eq i1 i2] then
+    if TS.query ~concrete:true ~precise:true s [Term.mk_eq i1 i2] then
       [Term.ESubst (i1,i2)]
     else
       soft_failure Tactics.NotEqualArguments
@@ -923,6 +1186,10 @@ let () =
 (* This was purposely not adapted to support alternative execution
    models (such as `Quantum`), as this tactic is deprecated. *)
 let exec (Args.Message (a,_)) s =
+  if (TS.bound s) <> ReachAsym then
+    soft_failure (Failure "This tactics is deprecated, \
+                           and has no concrete variant.");
+  
   let _,var = Vars.make `Approx (TS.vars s) Type.ttimestamp "t" TS.var_info in
   let formula =
     Term.mk_forall ~simpl:false
@@ -950,7 +1217,7 @@ let () =
     conclusions [u_i=v_i]. We only implement it for the constructions
     [C] that congruence closure does not support: conditionals,
     sequences, etc. *)
-let fa s =
+let fa (bounds : Term.term option list) s =
   let table = TS.table s in
 
   let unsupported () = soft_failure (Failure "equality expected") in
@@ -986,7 +1253,10 @@ let fa s =
   let is_finite_fixed ty =
     HighType.is_finite table ty && HighType.is_fixed table ty
   in
-
+  let bounds_handler =
+    let module CB =  Concrete.BoundManagement(TS) in
+    CB.list_bounds_fill
+  in
   let u, v =
     match TS.Reduce.destr_eq s Local_t (TS.conclusion s) with
     | Some (u,v) -> u, v
@@ -994,10 +1264,16 @@ let fa s =
   in
   match u,v with
   | Term.Tuple l, Term.Tuple l' ->
+    let subgoals =
+      List.map2
+        (fun t t' ->
+           s |> TS.set_conclusion (Term.mk_eq t t'))
+        l l'
+    in
+    let bounds,last_goal = bounds_handler bounds subgoals s in
+    last_goal @
     List.map2
-      (fun t t' ->
-         s |> TS.set_conclusion (Term.mk_eq t t'))
-      l l'
+      (fun s b ->  TS.set_bound b s ) subgoals bounds
 
   | Term.App (Term.Fun (f,_),[c;t;e]), Term.App (Term.Fun (f',_),[c';t';e'])
     when f = Term.f_ite && f' = Term.f_ite ->
@@ -1008,7 +1284,7 @@ let fa s =
       (
         if not cond_conv then
           [ s |> set_conclusion (Term.mk_impl c c') ;
-            
+
             s |> set_conclusion (Term.mk_impl c' c) ]
         else []
       )
@@ -1021,7 +1297,7 @@ let fa s =
              (if cond_conv then [c] else [c;c'])
              (Term.mk_eq t t')
           );
-        
+
         s |>
         set_conclusion
           (Term.mk_impls
@@ -1032,7 +1308,10 @@ let fa s =
           );
       ]
     in
-    subgoals
+    let bounds,last_goal = bounds_handler bounds subgoals s in
+    last_goal @
+    List.map2
+      (fun s b ->  TS.set_bound b s ) subgoals bounds
 
   | Term.Quant (q, vars,t), Term.Quant (q', vars',t') when q = q' ->
     check_vars vars vars';
@@ -1067,9 +1346,48 @@ let fa s =
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
     let subgoals =
-      [ TS.set_conclusion (Term.mk_eq t t') s ]
+      TS.set_conclusion (Term.mk_eq t t') s
     in
-    subgoals
+    begin
+      match TS.bound s, bounds with
+      | ReachAsym, [] ->  [subgoals]
+      | ReachConc _, [] when C.is_zero table (TS.bound s) -> [subgoals]
+      | ReachConc b, [Some e] ->
+        let e =
+          if Real.is_zero table e then e
+          else List.fold_right
+              (fun x y ->
+                 Library.Real.mk_mul table
+                   (Library.FiniteTypes.mk_card table (Vars.ty x)) y)
+              vars e
+        in
+        let sleq =
+          if TS.Reduce.conv_term s b e
+          then []
+          else
+            let sleq =
+              TS.Hyps.filter (fun (_,y) ->
+                  match y with
+                  | LHyp (Global _) -> true
+                  | _ -> false) s
+            in
+            [TS.set_conclusion
+               (Term.mk_leq e b)
+               (TS.set_bound (ReachConc (Real.of_int table 0)) sleq)] in
+        sleq @ [TS.set_bound (ReachConc e) subgoals]
+
+      | ReachConc b, [] ->
+        let card1 = Library.FiniteTypes.mk_card table (Vars.ty (List.hd vars)) in
+        let cards = List.fold_right
+            (fun x y ->
+               Library.Real.mk_mul table
+                 (Library.FiniteTypes.mk_card table (Vars.ty x)) y)
+            (List.tl vars) card1
+        in
+        let e = Library.Real.mk_div table b cards in
+        [TS.set_bound (ReachConc e) subgoals]
+      | _ -> bad_args ()
+    end
 
   | Term.Find (vs,c,t,e),
     Term.Find (vars',c',t',e') ->
@@ -1083,14 +1401,14 @@ let fa s =
 
     (* We verify that [e = e'],
        and that [t = t'] and [c <=> c'] for fresh index variables.
-      
+
        We do something more general for the conditions,
        which is useful for cases arising from diff-equivalence
        where some indices are unused on one side:
-      
+
        Assume [vars = used@unused]
        where [unusued] variables are unused in [c] and [t].
-      
+
        We verify that [forall used. (c <=> exists unused. c')]:
        this ensures that if one find succeeds, the other does
        too, and also that the selected indices will match
@@ -1139,28 +1457,55 @@ let fa s =
 
         set_conclusion (Term.mk_eq e e') s]
     in
-    subgoals
-      
+    let bounds,last_goal = bounds_handler bounds subgoals s in
+    last_goal @
+    List.map2
+      (fun s b ->  TS.set_bound b s ) subgoals bounds
+
   | Term.App(f,fargs), Term.App(g,gargs) ->
     let open TraceSequent in
 
     check_args fargs gargs;
-    
+
     let equal_fun =
       if Reduce.conv_term s f g then [] else [set_conclusion (Term.mk_eq f g) s]
     in
-    equal_fun @
-    List.flatten
-      (List.map2
-         (fun x y ->
-            if Reduce.conv_term s x y then []
-            else [set_conclusion (Term.mk_eq x y) s]
-         ) fargs gargs)
+    let subgoals =
+      equal_fun @
+      List.flatten
+        (List.map2
+           (fun x y ->
+              if Reduce.conv_term s x y then []
+              else [set_conclusion (Term.mk_eq x y) s]
+           ) fargs gargs)
+    in
+    let bounds,last_goal = bounds_handler bounds subgoals s in
+    last_goal @
+    List.map2
+      (fun s b ->  TS.set_bound b s ) subgoals bounds
 
   | _ -> Tactics.soft_failure (Failure "unsupported equality")
 
+let do_fa_tac args s =
+  assert (List.length args > 0);
+  let bounds =
+    let convert_bounds =
+      List.map
+        (fun x -> TraceLT.convert s x)
+        (List.tl args)
+    in
+    let filter x =
+      match x with
+      | (t,ty) when Type.equal ty Library.Real.treal -> t
+      | _ -> bad_args ()
+    in
+    List.map (fun x -> (Some(filter x)) ) convert_bounds
+  in
+  fa bounds s
+
 let fa_tac args = match args with
-  | [] -> wrap_fail fa
+  | [TacticsArgs.Fa (Local None)] -> wrap_fail (fa [])
+  | [TacticsArgs.Fa (Local Some args)] -> wrap_fail (do_fa_tac args)
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
@@ -1168,29 +1513,32 @@ let fa_tac args = match args with
 
 let new_simpl ~red_param ~congr ~constr s =
   let s = TraceLT.reduce_sequent red_param s in
-  let s = strengthen_const_vars s in
+  let s = strengthen_const_vars ~concrete:false s in
 
   let goals = Term.decompose_ands (TS.conclusion s) in
   let s = TS.set_conclusion Term.mk_false s in
-  let goals = List.filter_map (fun goal ->
-      if TS.Hyps.is_hyp (Local goal) s || Term.f_triv goal then None
-      else
-        (* FIXME: simplify *)
-        let at = Term.Lit.form_to_xatom goal in
-        match at, Term.Lit.ty_xatom at with
-        | _, Type.Index | _, Type.Timestamp ->
-          if constr && TS.query ~precise:true s [goal]
-          then None
-          else Some goal
+  let concrete = TS.concrete s in
+  let goals =
+    List.filter_map (fun goal ->
+        if TS.Hyps.is_hyp (Local goal) s || Term.f_triv goal then None
+        else
+          (* FIXME: simplify *)
+          let at = Term.Lit.form_to_xatom goal in
+          match at, Term.Lit.ty_xatom at with
+          | _, Type.Index | _, Type.Timestamp ->
+            if constr && TS.query ~concrete ~precise:true s [goal]
+            then None
+            else Some goal
 
-        | Comp (`Eq, t1, t2), _ ->
-          if congr &&
-             Completion.check_equalities (TS.get_trs s) [(t1,t2)]
-          then None
-          else Some goal
-              
-        | _ -> Some goal
-    ) goals in
+          | Comp (`Eq, t1, t2), _ ->
+            if congr &&
+               Completion.check_equalities (TS.get_trs s) [(t1,t2)]
+            then None
+            else Some goal
+
+          | _ -> Some goal
+      ) goals
+  in
   [TS.set_conclusion (Term.mk_ands goals) s]
 
 
@@ -1205,7 +1553,7 @@ let _simpl ~red_param ~close ~strong =
 
   let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
 
-  let strengthen_const_vars s sk fk = sk [strengthen_const_vars s] fk in
+  let strengthen_const_vars s sk fk = sk [strengthen_const_vars ~concrete:false s] fk in
 
   let new_simpl ~congr ~constr =
     if strong
@@ -1230,7 +1578,7 @@ let _simpl ~red_param ~close ~strong =
                     wrap_fail simpl_left_tac] else []) @
     assumption @
     expand_all @
-    (if strong then [wrap_fail eq_names] else []) @
+    (if strong then [try_tac (wrap_fail eq_names)] else []) @
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @
     [clear_triv]
@@ -1268,8 +1616,7 @@ let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
         then fun _ -> fk (None, GoalNotClosed)
         else fun _ -> sk [g] fk
       in
-      (wrap_fail (TraceLT.and_right None)) g
-        (*TODO:Concrete : Check if is possible to do better*)
+      (wrap_fail (TraceLT.and_right [])) g
         (fun l _ -> match l with
            | [g1;g2] ->
              simpl_aux ~close g1

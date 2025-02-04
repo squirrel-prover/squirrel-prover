@@ -114,7 +114,9 @@ let process_parsing =
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract;
-            op_terby = None}])
+            op_terby     = None;
+            op_annots    = [];
+          }])
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl in
@@ -130,7 +132,9 @@ let process_parsing =
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract;
-            op_terby = None}])
+            op_terby     = None;
+            op_annots    = [];
+          }])
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl
@@ -144,7 +148,9 @@ let process_parsing =
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
             op_body      = `Abstract;
-            op_terby = None}])            
+            op_terby     = None;
+            op_annots    = [];
+          }])
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in

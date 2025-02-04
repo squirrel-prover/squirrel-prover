@@ -36,7 +36,7 @@ name R : index * index * index -> message, Rand.
 name Ksign : index -> message, SSK[sign, Cst a * Low + Cst ad * Low].
 name Kenc : index -> message, AK[enc, High].
 (* Axioms *)
-axiom[any] cst_a_ad : forall i j, a i <> ad j.
+axiom[any] cst_a_ad : forall i j, a i <> ad j <: Real.z.
 hint rewrite cst_a_ad.
 
 process A(i : index, j : index, k : index) =

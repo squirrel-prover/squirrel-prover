@@ -40,6 +40,8 @@ type kind_path =
 
 (*------------------------------------------------------------------*)
 val quote : kind_path -> Env.t -> Infer.env -> Term.t -> Term.t * Term.t
+val make_evalenv : Env.t -> kind_path -> Term.t
+val quote_term : Symbols.table -> Infer.env -> Term.t -> Term.t
 
 val unquote : Env.t -> Term.t -> Term.t option
   

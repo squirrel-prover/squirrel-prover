@@ -10,7 +10,7 @@ mutable s : message = empty.
 system A = !_i O: (in(c,x); out(c, <x,f>)).
 system B = !_i O: (in(c,x); out(c, a)).
 
-axiom [any] fst_pair (x, y: message) : fst (<x, y>) = x.
+axiom [any] fst_pair (x, y: message) : fst (<x, y>) = x <: Real.z.
 hint rewrite fst_pair.
 
 lemma [A] _ (t : timestamp, i : index) : 

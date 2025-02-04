@@ -281,22 +281,27 @@ let table j = j.env.table
 let set_table table j = update ~table j
 
 let conclusion j = j.conclusion
-let bound _ = assert false
-let set_bound _ = assert false
+
+let bound _ = LowConcrete.Glob
+let set_bound b s =
+  assert (b = LowConcrete.Glob);
+  s
+
+let concrete _s = false
+let concrete_ = concrete
 
 let ty_vars j = j.env.ty_vars
 
 let set_conclusion conclusion j = { j with conclusion }
 
 let set_reach_conclusion f s = set_conclusion Equiv.(Atom (Reach {formula = f; bound = None})) s
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete: implement the concrete equiv logic *)
 
 let get_frame proj j = match j.conclusion with
   | Equiv.Atom (Equiv.Equiv e) ->
     Some ({Equiv.terms = List.map (Term.project1 proj) e.terms; bound = None})
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete: implement the concrete equiv logic *)
   | _ -> None
-
 
 let get_all_equiv j =
   (* [get_equivs acc_forms vars phi] recursively explores [phi],
@@ -315,6 +320,11 @@ let get_all_equiv j =
       get_equivs acc_forms vars f2
   in
   get_equivs [] [] j.conclusion
+
+let get_bound j = match j.conclusion with
+  | Equiv.Atom (Equiv.Equiv e) -> e.bound
+  |  Equiv.Atom (Equiv.Reach r) -> r.bound
+  | _ -> None
 
 (*------------------------------------------------------------------*)
 let subst subst s =
@@ -346,7 +356,11 @@ let conclusion_is_equiv s = match conclusion s with
 
 let conclusion_as_equiv s = match conclusion s with
   | Atom (Equiv.Equiv e) when e.bound = None -> e
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+
+  | Atom (Equiv.Equiv e) when e.bound <> None -> 
+    Tactics.hard_failure (Tactics.GoalBadShape "concrete equivalence not supported")
+  (* FEAT: concrete: implement the concrete equiv logic *)
+
   | _ ->
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
@@ -395,18 +409,19 @@ let get_trace_hyps ?in_system s =
     (to_trace_sequent (set_reach_conclusion Term.mk_false s))
 
 (*------------------------------------------------------------------*)
-let get_models (system : 'a SE.expr option) (s : t) =
+let get_models ~concrete (system : 'a SE.expr option) (s : t) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
-  TS.get_models system s
+  TS.get_models ~concrete system s
 
-let proof_context ?(in_system : SE.context option) (s : t) =
+let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
   let env =
     match in_system with
     | None -> s.env
     | Some system -> { s.env with system; }
   in
+  let concrete = odflt (concrete_ s) concrete in
   ProofContext.make
-    ~env
+    ~env ~concrete
     ~hyps:(get_trace_hyps ~in_system:env.system s)
 
 let pair_proof_context (s : sequent) : ProofContext.t =
@@ -416,9 +431,9 @@ let pair_proof_context (s : sequent) : ProofContext.t =
   proof_context ~in_system s 
     
 (*------------------------------------------------------------------*)
-let query_happens ~precise (s : t) (a : Term.term) =
+let query_happens ~concrete ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
-  TS.query_happens ~precise s a
+  TS.query_happens ~concrete ~precise s a
 
 (*------------------------------------------------------------------*)
 let set_equiv_conclusion e j =
@@ -440,14 +455,12 @@ let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) conclusion =
 let mem_felem i s =
   conclusion_is_equiv s &&
   i < List.length (conclusion_as_equiv s).terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 let change_felem ?loc i elems s =
   try
     let before, _, after = List.splitat i (conclusion_as_equiv s).terms in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     set_equiv_conclusion {terms = (List.rev_append before (elems @ after)); bound = None} s
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete: implement the concrete equiv logic *)
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
@@ -455,7 +468,7 @@ let change_felem ?loc i elems s =
 let get_felem ?loc i s =
   try
     let _, t, _ = List.splitat i (conclusion_as_equiv s).terms in t
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete: implement the concrete equiv logic *)
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 

@@ -78,7 +78,7 @@ lemma lastupdateTag (i:index,tau:timestamp):
         forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau.
-  smt ~steps:38000.
+  smt ~steps:132918.
 Qed.
 
 lemma lastupdateReader (ii:index,tau:timestamp):

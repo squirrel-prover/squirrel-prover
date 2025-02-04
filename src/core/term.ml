@@ -17,12 +17,21 @@ type macro_info = {
   pp_style : [`At | `Standard];
   is_rec : bool;
   is_match : bool;
-  has_dist_param : bool;       
+  has_dist_param : bool;
+
+  is_ptime : bool;
+  (** can the macro be evaluated in polynomial-time (without access to
+      protocol randomness). *)
 }
 
 (** macro information for builtin symbols *)
-let macro_info_builtin : macro_info =
-  { pp_style = `At; has_dist_param = true; is_rec = true; is_match = true; } 
+let macro_info_builtin : macro_info = { 
+  pp_style       = `At; 
+  has_dist_param = true; 
+  is_rec         = true; 
+  is_match       = true; 
+  is_ptime       = false; 
+} 
 
 (*------------------------------------------------------------------*)
 (** A typed symbol.
@@ -1955,14 +1964,12 @@ module Lit = struct
     lits
 
   (*------------------------------------------------------------------*)
-  let disjunction_to_literals f : literal list option =
-    let rec aux_l = function
+  let rec disjunction_to_literals f : literals =
+    match f with
       | tf when tf = mk_false -> []
-      | App (Fun (fsor,_), [a; b]) when fsor = f_or -> aux_l a @ aux_l b
+      | App (Fun (fsor,_), [a; b]) when fsor = f_or ->
+        disjunction_to_literals a @ disjunction_to_literals b
       | f -> [form_to_literal f]
-    in
-
-    Some (aux_l f)
 
   let mk_atom (o : ord) (t1 : term) (t2 : term) : term = 
     match o with
@@ -2488,6 +2495,20 @@ type 'a pat_op = {
   pat_op_term   : 'a;
 }
 
+(*------------------------------------------------------------------*)
+let pp_pat pp_t fmt p =
+  Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
+    pp_t p.pat_term
+    Params.pp p.pat_params
+    Vars.pp_typed_tagged_list p.pat_vars
+
+let pp_pat_op pp_t fmt p =
+  Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
+    pp_t p.pat_op_term
+    Params.Open.pp p.pat_op_params
+    Vars.pp_typed_tagged_list p.pat_op_vars
+
+(*------------------------------------------------------------------*)
 let project_tpat (projs : Projection.t list) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }
 

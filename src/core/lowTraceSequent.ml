@@ -111,7 +111,7 @@ end = struct
     match s.bound with
     | None -> Fmt.pf fmt "@;%a@]" (Term._pp ppe) s.conclusion
     | Some ve ->
-      Fmt.pf fmt "@;%a@;bound : %a@]" (Term._pp ppe) s.conclusion (Term._pp ppe) ve
+      Fmt.pf fmt "@;%a@;@[<hov 2>bound:@ @[%a@]@]@]" (Term._pp ppe) s.conclusion (Term._pp ppe) ve
 
   let pp     = _pp (default_ppe ~dbg:false ())
   let pp_dbg = _pp (default_ppe ~dbg:true ())
@@ -145,7 +145,6 @@ end = struct
       (Type.Fv.union h_vars (Term.ty_fv s.conclusion))
       (omap_dflt Type.Fv.empty Term.ty_fv s.bound)
 
-  (**TODO:Concrete: check that the possible variable in the bound are taken into account*)
   let sanity_check s : unit =
     Vars.sanity_check s.env.Env.vars;
 
@@ -154,8 +153,8 @@ end = struct
         Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@.\
                  Fail on %a @.not in %a @.@."
           pp_dbg s
-          Vars.pp_list (Vars.Sv.elements (fv s))
-          Vars.pp_list (Vars.Sv.elements (Vars.to_vars_set s.env.Env.vars))
+          Vars.pp_list_dbg (Vars.Sv.elements (fv s))
+          Vars.pp_list_dbg (Vars.Sv.elements (Vars.to_vars_set s.env.Env.vars))
       in
       assert false
     else ();
@@ -174,14 +173,16 @@ end = struct
     s
 
   let update ?env ?proof_context ?bound ?conclusion t =
-    let env           = Utils.odflt t.env env
-    and proof_context = Utils.odflt t.proof_context proof_context
-    and bound = match t.bound, bound with
+    let env = Utils.odflt t.env env in
+    let proof_context = Utils.odflt t.proof_context proof_context in
+    let bound = 
+      match t.bound, bound with
       | Some _, Some _ -> bound
-      | Some _, None -> t.bound
+      | Some _, None   -> t.bound
+      | None, Some _ -> assert false (* should we allow this? *)
       | None, None -> None
-      | _ -> Tactics.soft_failure (Failure "Not a concrete local judement")
-    and conclusion    = Utils.odflt t.conclusion conclusion in
+    in
+    let conclusion = Utils.odflt t.conclusion conclusion in
     { env; proof_context; bound; conclusion; }
 end
 
@@ -202,8 +203,11 @@ let get_trace_hyps ?in_system (s : sequent) =
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
-  let atoms = List.map snd (Hyps.get_atoms_of_hyps s.proof_context) in
-  (*TODO:Concrete : Probably something to here but not sure for now*)
+  (* get all atoms, including atoms that are not concrete *)
+  let atoms =
+    List.map snd
+      (Hyps.get_atoms_of_hyps ~concrete:false s.env.table s.proof_context)
+  in
   let atoms =
     Term.Lit.form_to_xatom s.conclusion :: atoms
   in
@@ -215,28 +219,41 @@ let get_all_messages (s : sequent) =
     ) [] atoms
 
 (*------------------------------------------------------------------*)
+let concrete s = s.bound <> None
+let concrete_ = concrete
+
+(*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let get_models (system : 'a SE.expr option) (s : sequent) =
-  Hyps.get_models s.env.table ~system s.proof_context
+let get_models ~(concrete:bool) (system : 'a SE.expr option) (s : sequent) =
+  let rp = Reduction.rp_default in
+  let red_state =
+    Reduction.mk_state0
+      ~system:s.env.system ~red_param:rp s.env.table ~concrete
+  in
+  let red_fun = Reduction.reduce_term red_state in
+  Hyps.get_models ~concrete s.env.table ~red_fun ~system s.proof_context
 
 (*------------------------------------------------------------------*)
 (** General version of query, which subsumes the functions
     constraints_valid and query that will eventually be exported,
     and provides joint benchmarking support. *)
 
-let query ?(system : 'a SE.expr option = None) ~precise s = function
-  | None -> not (Constr.m_is_sat (get_models system s))
-  | Some q -> Constr.query ~precise (get_models system s) q
+let query
+    ?(system : 'a SE.expr option = None) ~(concrete:bool)
+    ~precise s
+  = function
+  | None -> not (Constr.m_is_sat (get_models ~concrete system s))
+  | Some q -> Constr.query ~precise (get_models ~concrete system s) q
 
 module ConstrBenchmark = Benchmark.Make(struct
-  type input =  SE.arbitrary option * bool * sequent * Term.terms option
+  type input =  SE.arbitrary option * bool * bool * sequent * Term.terms option
   type output = bool
   let default =
     "Constr",
-    (fun (system,precise,s,q) -> query ~system ~precise s q)
+    (fun (system,precise,concrete,s,q) -> query ~system ~precise ~concrete s q)
   let basename = "squirrel_bench_constr_"
-  let pp_input ch (_,_,_,q) = match q with
+  let pp_input ch (_,_,_,_,q) = match q with
     | None -> Format.fprintf ch "false"
     | Some q -> (Fmt.list ~sep:(Fmt.any ",@ ") Term.pp) ch q
   let pp_result ch = function
@@ -247,29 +264,34 @@ end)
 let register_query_alternative name alt =
   ConstrBenchmark.register_alternative
     name
-    (fun (system,precise,s,q) -> alt ~system ~precise s q)
+    (fun (system,precise,concrete,s,q) -> alt ~system ~precise ~concrete s q)
 
-let query ?(system : SE.arbitrary option = None) ~precise s q =
-  ConstrBenchmark.run (system,precise,s,q)
+let query ?(system : SE.arbitrary option = None) ~precise ~concrete s q =
+  ConstrBenchmark.run (system,precise,concrete,s,q)
 
 (** Exported versions of query and its alternatives. *)
 
-let query_happens ~precise s a =
-  query ~precise s (Some [Term.mk_happens a])
+let query_happens ~concrete ~precise s a =
+  query ~concrete ~precise s (Some [Term.mk_happens a])
 
 let constraints_valid ?(system : 'a SE.expr option = None) s =
+  let concrete = concrete s in
   (* The precise flag is irrelevant in that case. *)
-  query ~system ~precise:true s None
+  query ~system ~concrete ~precise:true s None
 
-let query ?(system : SE.arbitrary option = None) ~precise s q =
-   query ~system ~precise s (Some q)
+let query ?(system : SE.arbitrary option = None) ~concrete ~precise s q =
+   query ~system ~concrete ~precise s (Some q)
 
+(*------------------------------------------------------------------*)
 (** Other uses of Constr *)
 
-let get_ts_equalities ~precise s =
-  let models = get_models None s in
-  let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.proof_context)
-             |>  Atom.trace_atoms_ts in
+let get_ts_equalities ~concrete ~precise s =
+  let models = get_models ~concrete None s in
+  let ts =
+    List.map
+      (fun (_,x) -> x)
+      (Hyps.get_trace_literals ~concrete s.env.table s.proof_context)
+    |>  Atom.trace_atoms_ts in
   Constr.get_ts_equalities ~precise models ts
 
 (*------------------------------------------------------------------*)  
@@ -383,12 +405,16 @@ let set_table table s =
 
 (*------------------------------------------------------------------*)
 let set_conclusion a s = S.update ~conclusion:a s 
-let set_bound b s = S.update ?bound:b s
-
+let set_bound b s =
+  match b with
+  | LowConcrete.ReachAsym -> S.update ?bound:None s
+  | ReachConc c -> S.update ?bound:(Some c) s
+  | _ -> assert false
+ 
  (** See `.mli` *)
 let set_conclusion_in_context ?update_local ?bound system conc s =
   if system = s.env.system && update_local = None then
-    let s = set_conclusion conc s in set_bound bound s
+    let s = set_conclusion conc s in S.update ?bound s
   else
 
   (* Update hypotheses. *)
@@ -417,7 +443,14 @@ let pi projection s =
     let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
     { context with set = new_set }
   in
+  let bound =
+    omap_dflt
+      None
+      (fun x -> Some (Term.project1 projection x))
+      s.bound
+  in
   set_conclusion_in_context
+    ?bound
     new_context
     (Term.project1 projection s.conclusion)
     s
@@ -427,7 +460,7 @@ let init ?(no_sanity_check = false) ~env ?bound conclusion =
   init_sequent ~no_sanity_check ~env ~bound ~conclusion
 
 let conclusion s = s.conclusion
-let bound s = s.bound
+let bound s = LowConcrete.from_option s.bound
 
 (*------------------------------------------------------------------*)
 let subst subst s =
@@ -475,22 +508,23 @@ let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
 (*------------------------------------------------------------------*)
 (** TRS *)
 
-let get_eqs_neqs (proof_context : H.hyps) =
+let get_eqs_neqs ~concrete (table : Symbols.table) (proof_context : H.hyps) =
   List.fold_left (fun (eqs, neqs) (atom : Term.Lit.xatom) -> match atom with
       | Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
       | Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | _ -> assert false
-    ) ([],[]) (get_eq_atoms proof_context)
+    ) ([],[]) (get_eq_atoms ~concrete table proof_context)
 
-let get_trs (s : sequent) = 
-  let eqs,_ = get_eqs_neqs s.proof_context in
+let get_trs (s : sequent) =
+  let concrete = concrete s in
+  let eqs,_ = get_eqs_neqs ~concrete s.env.table s.proof_context in
   Completion.complete s.env.table eqs
 
 let eq_atoms_valid s =
   let trs = get_trs s in
   let () = dbg s.env.table "trs: %a" Completion.pp_state trs in
-
-  let _, neqs = get_eqs_neqs s.proof_context in
+  let concrete = concrete s in
+  let _, neqs = get_eqs_neqs ~concrete s.env.table s.proof_context in
   List.exists (fun (Term.ESubst (a, b)) ->
       if Completion.check_equalities trs [(a,b)] then
         let () =
@@ -507,14 +541,15 @@ let eq_atoms_valid s =
     neqs
 
 (*------------------------------------------------------------------*)
-let proof_context ?(in_system : SE.context option) (s : t) =
+let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
   let env =
     match in_system with
     | None -> s.env
     | Some system -> { s.env with system; }
   in
+  let concrete = odflt (concrete_ s) concrete in
   ProofContext.make
-    ~env
+    ~env ~concrete
     ~hyps:(get_trace_hyps ~in_system:env.system s)
 
 (*------------------------------------------------------------------*)

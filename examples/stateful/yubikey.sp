@@ -148,7 +148,7 @@ reasoning. *)
 
 include Core.
 
-lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x <: Real.z.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 

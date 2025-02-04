@@ -190,6 +190,10 @@ module Any : sig
   val convert_to : ?loc:Location.t -> 'a f_kind -> any_form -> 'a
 
   module Smart : SmartFO.S with type form = any_form
+
+  val is_global_or   : t -> bool
+  val is_global_and  : t -> bool
+  val is_global_impl : t -> bool
 end
 
 (** Conversions between formula kinds and generic functionalities
@@ -224,6 +228,9 @@ val destr_equiv : form -> equiv option
 val is_equiv : form -> bool
 val is_reach : form -> bool
 
+val is_global_or   : form -> bool
+val is_global_and  : form -> bool
+val is_global_impl : form -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Generalized statements} *)

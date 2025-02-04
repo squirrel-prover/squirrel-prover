@@ -37,11 +37,10 @@ let deprecated_get_name_indices_ext
   : deprecated_name_occs
   =
   let context fv =
-    let env = 
-      Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) context.env.vars) 
-        context.env
-    in 
-    ProofContext.make ~env ~hyps:context.hyps
+    let vars =
+      Vars.add_vars (Vars.Tag.global_vars ~const:true fv) context.env.vars
+    in
+    ProofContext.set_vars vars context
   in
   let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : deprecated_name_occs =
     match t with
@@ -75,19 +74,23 @@ let deprecated_pp_ts_occ fmt (occ : deprecated_ts_occ) : unit = Iter.pp_occ Term
 
 (** Check if [t1] is included in the patterm [pat2], i.e. [t1 ∈ occ2]. *)
 let deprecated_pat_subsumes
+    ~(concrete:bool)
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
     (t1 : Term.term) (pat2 : Term.term Term.pat_op) 
   : Match.Mvar.t option
   =
   assert (pat2.pat_op_params = Params.Open.empty);
-  match Match.T.try_match ~mv ~param:Match.default_param table context t1 pat2
+  match
+    Match.T.try_match ~mv ~param:Match.default_param ~concrete
+      table context t1 pat2
   with
   | NoMatch _ -> None
   | Match mv -> Some mv 
 
 (** Check if the term occurrence [occ2] subsumes [occ1], i.e. [occ1 ⊆ occ2]. *)
 let[@warning "-27"] deprecated_term_occ_subsumes
+    ~(concrete:bool)
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
     (occ1 : Term.term Iter.occ) (occ2 : Term.term Iter.occ) 
@@ -101,7 +104,7 @@ let[@warning "-27"] deprecated_term_occ_subsumes
       pat_op_params = Params.Open.empty;
       pat_op_vars   = Vars.Tag.local_vars occ2.occ_vars; 
     } in
-  match deprecated_pat_subsumes table context occ1.occ_cnt pat2 with
+  match deprecated_pat_subsumes ~concrete table context occ1.occ_cnt pat2 with
   | None -> false
   | Some mv ->
     (* start from the matching substutition [mv], and try to match all
@@ -113,7 +116,7 @@ let[@warning "-27"] deprecated_term_occ_subsumes
     List.for_all (fun cond1 ->
         List.exists (fun cond2 ->
             match 
-              deprecated_pat_subsumes ~mv:(!mv) table context cond1 (mk_cond2 cond2)
+              deprecated_pat_subsumes ~concrete ~mv:(!mv) table context cond1 (mk_cond2 cond2)
             with 
             | None -> false
             | Some mv' -> mv := mv'; true
@@ -123,12 +126,13 @@ let[@warning "-27"] deprecated_term_occ_subsumes
 
 (** remove duplicates from [occs] using a subsuming relation. *)
 let deprecated_remove_duplicate_term_occs
+    ~(concrete:bool)
     table (system : SE.arbitrary)
     (occs : Term.term Iter.occs) : Term.term Iter.occs
   =
   let subsumes (occ1 : Term.term Iter.occ) (occ2 : deprecated_ts_occ) =
     let context = SE.{ set = system; pair = None; } in
-    deprecated_term_occ_subsumes table context occ1 occ2
+    deprecated_term_occ_subsumes ~concrete table context occ1 occ2
   in
 
   let occs =
@@ -165,8 +169,7 @@ let deprecated_get_actions_ext
         List.concat_map (get ~fv ~cond) (ts :: l)
       in
       let res, has_red =
-        Match.reduce_delta_macro1
-          ~constr:true context.env ~hyps:context.hyps t
+        Match.reduce_delta_macro1 ~constr:true context t
       in
       if has_red = True then get ~fv ~cond res else get_macro_default ()
     | _ ->
@@ -185,6 +188,7 @@ let deprecated_get_actions_ext
 
 (** Return timestamps occuring in macros in a set of terms *)
 let deprecated_get_macro_actions
+    ~(concrete:bool)
     (context : ProofContext.t)
     (sources : Term.terms) : deprecated_ts_occs
   =
@@ -195,7 +199,7 @@ let deprecated_get_macro_actions
     List.concat_map (deprecated_get_actions_ext context) sources
   in
   deprecated_remove_duplicate_term_occs
-    table system.set actions
+    ~concrete table system.set actions
 
 (** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs
     before the macro timestamp occurrence [occ]. *)

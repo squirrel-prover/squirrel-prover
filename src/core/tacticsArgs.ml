@@ -87,7 +87,9 @@ type rw_arg =
 
 (*------------------------------------------------------------------*)
 (** Function application argument *)
-type fa_arg = rw_count * Typing.term
+type fa_arg =
+  | Global of (rw_count * Typing.term) list
+  | Local of (Typing.term list) option
 
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
@@ -102,7 +104,7 @@ type naming_pat =
   | Approx  of string        (** only used internally *)
 
 type and_or_pat =
-  | Or      of simpl_pat list
+  | Or      of or_pat list
   (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
 
   | Split
@@ -115,6 +117,8 @@ and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
   | Srewrite of rw_dir      (** [->] or [<-] *)
+
+and or_pat = simpl_pat  * Typing.term option
 
 type intro_pattern =
   | SClear of lsymb list    (** [{H H' ...}] *)
@@ -147,6 +151,18 @@ type weak_ip =
 
 type weak_arg = weak_ip * apply_in
 
+(*------------------------------------------------------------------*)
+(** {3 Case tactic arguments} *)
+
+(** named arguments, case term, optional bounds *)
+type case_arg =
+  named_args * Typing.term * Typing.term list option
+
+(*------------------------------------------------------------------*)
+(** {3 Const tactic arguments} *)
+
+(** const term, optional bound *)
+type const_arg = Typing.term * Typing.term option
 
 (*------------------------------------------------------------------*)
 (** {3 Have tactic arguments} *)
@@ -212,6 +228,8 @@ type parser_arg =
   | RewriteOracle  of Typing.term * named_args * int L.located option
   | Trans          of trans_arg
   | ApplyIn        of named_args * Typing.pt * apply_in
+  | Case           of case_arg
+  | Const          of const_arg
   | Weak           of weak_arg
   | Have           of have_arg
   | HavePt         of have_pt_arg
@@ -225,11 +243,10 @@ type parser_arg =
   | Remember       of Typing.term * lsymb
   | Generalize     of Typing.term list * naming_pat list option *
                       SystemExpr.Parse.t option
-  | Induction      of Typing.term option * SystemExpr.Parse.t option
+  | Induction      of named_args * Typing.term option * SystemExpr.Parse.t option
   | Set            of naming_pat * SystemExpr.Parse.t option * Typing.term
   (** [set @system x := t]  *)
-  | Fa             of fa_arg list
-  | TermPat        of int * Typing.term
+  | Fa             of fa_arg
   | DH             of dh_arg
   | Crypto         of named_args * Symbols.p_path * crypto_args
   | Deduce         of named_args * int L.located list option * Typing.pt option

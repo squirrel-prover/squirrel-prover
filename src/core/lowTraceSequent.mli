@@ -36,21 +36,28 @@ val pi : Projection.t -> sequent -> sequent
 val get_trs : sequent -> Completion.state 
 
 (** See [Constr.query] *)
-val query :  ?system : SystemExpr.arbitrary option -> precise:bool -> t -> Term.terms -> bool
+val query :
+  ?system : SystemExpr.arbitrary option ->
+  concrete:bool ->
+  precise:bool ->
+  t -> Term.terms -> bool
 
 (** [register_query_alternative name f] adds an alternative method
     for solving queries (in a form that subsumes [query] and
     [constraints_valid]) which will be benchmarked against the default
     implementation.
-    For each call to [query ~precise s q], [f ~precise s (Some q)]
+    For each call to [query ~precise ~concrete s q], [f ~precise ~concrete s (Some q)]
     will be ran and timed and its result (including potential errors)
     will be logged in "BENCHMARK_DIR/squirrel_bench_constr_XXX.txt".
     For each call to [constraints_valid s q], [f ~precise:true s None]
     will be similarly executed. *)
 val register_query_alternative :
-  string -> (system : SystemExpr.arbitrary option  -> precise:bool -> t -> Term.terms option -> bool) -> unit
-
-val query_happens : precise:bool -> t -> Term.term -> bool
+  string ->
+  (system : SystemExpr.arbitrary option ->
+   precise:bool ->
+   concrete:bool ->
+   t -> Term.terms option -> bool) ->
+  unit
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
     terms on both sides of the sequents make the sequent valid.
@@ -61,13 +68,15 @@ val eq_atoms_valid : sequent -> bool
     taking into account constraint trace formula hypotheses and atomic
     constraint conclusion.
     May timeout. *)
-val constraints_valid :  ?system : SystemExpr.arbitrary option -> sequent -> bool 
+val constraints_valid :
+  ?system : SystemExpr.arbitrary option ->
+  sequent -> bool 
 
 (** [get_ts_equalities s] returns all the equalities between timestamps
     derivable from its hypothesis. 
     May timeout. *)
 val get_ts_equalities :
-  precise:bool -> sequent -> Term.terms list
+  concrete:bool -> precise:bool -> sequent -> Term.terms list
 
 (** [get_all_messages s] returns all the messages appearing at toplevel
     in [s]. *)

@@ -100,3 +100,9 @@ val security_types : Symbols.table -> bool
 val smt_classic : Symbols.table -> bool
 val smt_quantum : Symbols.table -> bool
 val smt_steps : Symbols.table -> int
+
+(** Configure higher-order unification
+    - ["All"] unrestricted η-expansion
+    - ["BoundVars"] η-expand bound variables
+    - ["None"] do not use higher-order unification *)
+val higher_order_unif : Symbols.table -> string

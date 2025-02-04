@@ -15,10 +15,11 @@ module PT : sig
     args   : (Vars.var * Vars.Tag.t) list;
     (** in reversed order w.r.t. introduction *)
 
-    mv     : Mvar.t;
-    subgs  : Equiv.any_form list;
-    bound  : Concrete.bound;
-    form   : Equiv.any_form;
+    mv    : Mvar.t;
+    subgs : Equiv.any_form list;
+    kind  : LowRewrite.kind;
+    bound : LowConcrete.bound;
+    form  : Equiv.any_form;
   }
 
   val pp     : t formatter

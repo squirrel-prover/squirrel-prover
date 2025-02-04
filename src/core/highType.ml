@@ -1,3 +1,6 @@
+open Utils
+
+(*------------------------------------------------------------------*)
 module L = Location
 
 (*------------------------------------------------------------------*)
@@ -83,6 +86,30 @@ let get_ty_infos table (ty : Type.ty) : infos =
 
   | _ -> []
 
+
+(*------------------------------------------------------------------*)
+(** {2 Inductive types utilities} *)
+
+let is_inductive table (ty : Type.ty) : bool =
+  match ty with
+  | Type.TConstr (p,_args) ->
+    begin
+      match get_data (Symbols.Ty.of_s_path p) table with
+      | Abstract _ -> false
+      | Inductive _d -> true
+    end
+  | _ -> false
+
+let constructors table (ty : Type.ty) : (Symbols.fname list * Type.ty list) option =
+  match ty with
+  | Type.TConstr (p,args) ->
+    begin
+      match get_data (Symbols.Ty.of_s_path p) table with
+      | Abstract _ -> None
+      | Inductive d -> Some (d.constructors, args)
+    end
+  | _ -> None
+
 (*------------------------------------------------------------------*)
 (** {2 Check that a type has some properties. } *)
 
@@ -115,7 +142,7 @@ let is_name_fixed_length table ty : bool =
 
 (** See `.mli` *)
 let serializability_order
-    ?(quantum = false) table ty : int option 
+    ?(quantum = false) table (ty : Type.ty) : int option 
   =
   let exception Unknown in
   let rec order : Type.ty -> int = function
@@ -129,14 +156,22 @@ let serializability_order
       if is_finite table t1 && o1 = 0 then o2 else max (o1 + 1) o2
 
     | TConstr (_s,args) as ty ->
-      (* FIXME: inductive: have a more precise test, as this reject valid
-         cases, e.g. `list int` *)
-      if args <> [] then raise Unknown;
+      let order0_arguments = List.for_all ((=) 0 -| order) args in
 
-      if check_ty_info table ty Serializable || 
-         check_ty_info table ty Finite ||
-         (quantum && Type.equal ty Type.tquantum_message)
-      then 0 else raise Unknown
+      if is_inductive table ty then
+        let _, constructors_tys = oget @@ constructors table ty in
+        let order1_constructors =
+          List.for_all (fun ty -> order ty <= 1) constructors_tys
+        in
+        if not (order1_constructors && order0_arguments) then raise Unknown;
+        0
+        
+      else if order0_arguments &&
+              ( check_ty_info table ty Serializable || 
+                check_ty_info table ty Finite ||
+                (quantum && Type.equal ty Type.tquantum_message))
+      then 0
+      else raise Unknown
 
     | TVar _ | TUnivar _ -> raise Unknown
   in    
@@ -188,26 +223,3 @@ let rec is_quantum : Type.ty -> bool = function
 
   | Tuple ls -> List.exists is_quantum ls
   | Fun (i,o) -> is_quantum i || is_quantum o
-
-(*------------------------------------------------------------------*)
-(** {3 Inductive types} *)
-
-let is_inductive table (ty : Type.ty) : bool =
-  match ty with
-  | Type.TConstr (p,_args) ->
-    begin
-      match get_data (Symbols.Ty.of_s_path p) table with
-      | Abstract _ -> false
-      | Inductive _d -> true
-    end
-  | _ -> false
-
-let constructors table (ty : Type.ty) : (Symbols.fname list * Type.ty list) option =
-  match ty with
-  | Type.TConstr (p,args) ->
-    begin
-      match get_data (Symbols.Ty.of_s_path p) table with
-      | Abstract _ -> None
-      | Inductive d -> Some (d.constructors, args)
-    end
-  | _ -> None

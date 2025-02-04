@@ -409,3 +409,100 @@ Proof.
   apply ax1.
   apply H.
 Qed.
+
+
+(*------------------------------------------------------------------*)
+global lemma _ (t,u : index -> message) :
+  [forall i, t i = u i] ->
+  [exists i, u i = witness] ->
+  [let phi = exists i, t i = witness in
+   phi].
+Proof.
+  intro E H. 
+  rewrite E.
+  assumption H.
+Qed.
+
+global lemma _ (t,u : index -> message) :
+  [forall i, t i = u i] ->
+  [exists i, u i = witness] ->
+  Let phi = exists i, t i = witness in
+  [phi].
+Proof.
+  intro E H. 
+  rewrite E.
+  intro phi @/phi. 
+  assumption H.
+Qed.
+
+(*------------------------------------------------------------------*)
+include Real. open Real.
+
+global lemma _ (t,u : index -> message) :
+  [forall i, t i = u i] ->
+  [exists i, u i = witness] ->
+  Let phi = exists i, t i = witness in
+  [phi <: z]. 
+Proof.
+  intro E H. 
+  (* the conclusion contains an exact atom, 
+     so we cannot do an approximated rewriting *)
+  checkfail rewrite E exn NothingToRewrite.
+Abort.
+
+global lemma _ (t,u : index -> message) :
+  [forall i, t i = u i <: Real.z] ->
+  [exists i, u i = witness <: z] ->
+  Let phi = exists i, t i = witness in
+  [phi <: z]. 
+Proof.
+  intro E H. 
+  (* now we do an exact rewriting, so this works *)
+  rewrite E.
+  intro phi @/phi. 
+  assumption H.
+Qed.
+
+(*------------------------------------------------------------------*)
+global lemma _ (p : _ -> _) (b1,b2:Real.t) :
+  [p b2] ->
+  [b1 = b2] ->
+  Let b = b1 in
+  [p b]. 
+Proof.
+  intro H E. 
+  rewrite E.
+  intro {E} phi @/phi. 
+  assumption H.
+Qed.
+
+global lemma _ (p : _ -> _) (b1,b2:Real.t) :
+  [b1 = b2] ->
+  Let b = b1 in
+  [p b <: b]. 
+Proof.
+  intro E. 
+  checkfail rewrite E exn NothingToRewrite.
+Abort.
+
+global lemma _ (p : _ -> _) (b1,b2,b':Real.t) :
+  [p b2] ->
+  [b1 = b2 <: b'] ->
+  Let b = b1 in
+  [p b <: b]. 
+Proof.
+  intro H E. 
+  checkfail rewrite E exn NothingToRewrite.
+Abort.
+
+global lemma _ (p : _ -> _) (b1,b2,b':Real.t) :
+  [p b2 <: b2] ->
+  [b1 = b2 <: z] ->
+  Let b = b1 in
+  [p b <: b]. 
+Proof.
+  intro H E. 
+  rewrite E.
+  intro {E} phi @/phi. 
+  assumption H.
+Qed.

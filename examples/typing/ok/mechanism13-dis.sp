@@ -23,18 +23,18 @@ senc enc,dec.
 abstract id : index -> message.
 (* idD(i) is the identifier of dishonest agent i *)
 abstract idD : index -> message.
-axiom[any] cst_id_idD : forall i j, id i <> idD j.
+axiom[any] cst_id_idD : forall i j, id i <> idD j <: Real.z.
 hint rewrite cst_id_idD.
 
 (* tag *)
 abstract tag1: message. 
 abstract tag2: message. 
 abstract tag3: message.
-axiom[any] cst12_diff : tag1 <> tag2.
+axiom[any] cst12_diff : tag1 <> tag2 <: Real.z.
 hint rewrite cst12_diff.
-axiom[any] cst13_diff : tag1 <> tag3.
+axiom[any] cst13_diff : tag1 <> tag3 <: Real.z.
 hint rewrite cst13_diff.
-axiom[any] cst23_diff : tag2 <> tag3.
+axiom[any] cst23_diff : tag2 <> tag3 <: Real.z.
 hint rewrite cst23_diff.
 
 (* Ks(i) long-term key shared between id(i) and the server *)

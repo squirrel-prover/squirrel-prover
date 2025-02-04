@@ -1,6 +1,6 @@
 namespace A.
-  axiom [any] ax  : false = true.
-  axiom [any] ax' : false = true.
+  axiom [any] ax  : false = true <: Real.z.
+  axiom [any] ax' : false = true <: Real.z.
 end A.
 
 lemma [any] _ : false.

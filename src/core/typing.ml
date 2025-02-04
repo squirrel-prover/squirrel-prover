@@ -1674,34 +1674,59 @@ let rec convert_g (st : conv_state) (p : global_formula) : Equiv.form =
   | POr   (f1, f2) -> Equiv.Or   (convert_g st f1, convert_g st f2)
 
   | PEquiv (p_e, p_t) ->
-    begin match st.env.system with
-      | SE.{ pair = Some p } ->
-        let system = SE.{ set = (p :> SE.t) ; pair = None } in
-        let env = Env.update ~system st.env in
-        let st = { st with env } in
-        let e =
-          List.map (fun t ->
-              let ty = Type.univar (Infer.mk_ty_univar st.ienv) in
-              convert st t ty
-            ) p_e
-        in
-        let b =
-          match p_t with
-            | None -> None
-            | Some b -> Some (convert st b (Library.Real.treal st.env.table))
-        in
-        Equiv.Atom (Equiv.Equiv {terms = e; bound = b})
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-      | _ ->
-        error (L.loc p) MissingSystem
-    end
+    if st.env.system.pair = None then error (L.loc p) MissingSystem ;
+    let p = oget st.env.system.pair in
+    let system = SE.{set= (p :> SE.t); pair= None} in
+    let env = Env.update ~system st.env in
+    let st = {st with env} in
+    let e =
+      List.map
+        (fun t ->
+           let ty = Type.univar (Infer.mk_ty_univar st.ienv) in
+           convert st t ty )
+        p_e
+    in
+    if p_t = None then Equiv.Atom (Equiv.Equiv {terms= e; bound= None})
+    else
+      let orders =
+        List.map
+          (fun t ->
+             HighType.serializability_order st.env.table
+               (Term.ty ~ienv:st.ienv t) )
+          e
+      in
+      let ty_int = Library.Int.tint st.env.table in
+      let ty_real = Library.Real.treal  in
+      let ty =
+        List.fold_right2
+          (fun o p t ->
+             match o with
+             | Some 0 ->
+               t
+             | Some 1 ->
+               Type.func ty_int t
+             | None ->
+               Tactics.hard_failure ~loc:(L.loc p)
+                 (Failure "could not infer the order")
+             | _ ->
+               Tactics.hard_failure ~loc:(L.loc p)
+                 (Failure "order must be at-most 1") )
+          orders p_e (Type.func ty_int ty_real)
+      in
+      let system = SE.context_any in
+      let env = Env.update ~system st.env in
+      let st = {st with env} in
+      let b =
+        match p_t with None -> None | Some b -> Some (convert st b ty)
+      in
+      Equiv.Atom (Equiv.Equiv {terms= e; bound= b})
 
   | PReach (f,e) ->
     let f = convert st f Type.tboolean in
     let e =
         match e with
           | None -> None
-          | Some e -> Some (convert st e (Library.Real.treal st.env.table)) in
+          | Some e -> Some (convert st e Library.Real.treal ) in
     Equiv.Atom (Equiv.Reach {formula = f; bound = e})
 
   | PPred ppa ->
@@ -1856,6 +1881,7 @@ type pt_cnt =
   | PT_symb     of applied_symb
   | PT_app      of pt_app
   | PT_localize of pt
+  | PT_weak     of pt * term
 
 (** a proof-term *)
 and pt = pt_cnt L.located

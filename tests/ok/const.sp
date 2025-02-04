@@ -1,3 +1,6 @@
+include Real.
+open Real.
+
 system null.
 
 global axiom foo (i : index[const]) : [false].
@@ -13,8 +16,6 @@ Proof.
   apply foo i.
 Qed.
 
-global axiom bar (i : index) : [i = i] -> [false].
-
 abstract a : index.
 
 global lemma _ (i : index) : [i = a] -> [false].
@@ -24,3 +25,4 @@ Proof.
   const i.
   apply foo i.
 Qed.
+

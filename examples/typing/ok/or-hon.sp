@@ -23,7 +23,7 @@ abstract id : index -> message.
 (* tag *)
 abstract req: message. 
 abstract rep: message. 
-axiom[any] cst_diff1 : rep <> req.
+axiom[any] cst_diff1 : rep <> req <: Real.z.
 hint rewrite cst_diff1.
 
 (* Ks(i) long-term key shared between id(i) and the server *)

@@ -57,7 +57,7 @@ let rp_default = {
   proj    = true;
   diff    = false;
   constr  = false;
-  builtin = true; 
+  builtin = true;
 }
 
 let rp_full = { 
@@ -143,6 +143,7 @@ module type Sig = sig
     ?params:Params.t ->
     system:SE.context ->
     ?vars:Vars.env ->
+    concrete:bool ->
     red_param:red_param -> 
     Symbols.table -> 
     state

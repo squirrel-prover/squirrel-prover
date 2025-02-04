@@ -26,6 +26,7 @@
 
 (defvar squirrel-global-keywords '(
   "include"
+  "exact"
   "set"
   "axiom"
   "lemma"
@@ -97,7 +98,8 @@
 (defvar squirrel-operator-type-var "'[a-z]*[a-z_'1-9]*")
 
 (defvar squirrel-tactic-keywords '(
-  "anyintro"
+  "refl"
+  "assumption"
   "use"
   "namelength"
   "with"
@@ -180,12 +182,10 @@
 (defvar squirrel-closing-keywords '(
   "by"
   "discriminate"
-  "assumption"
   "congruence"
   "constraints"
   "auto"
   "smt"
-  "refl"
   "typing"
   "hint"
 ))

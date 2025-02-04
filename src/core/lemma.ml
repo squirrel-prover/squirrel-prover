@@ -125,7 +125,8 @@ let print_all fmt table : unit =
 
 (** Build the sequential dependency lemma between [descr] and [descr']. *)
 let mk_depends_lemma
-    (s : Symbols.system) (descr : Action.descr) (descr' : Action.descr)
+    (tbl : Symbols.table) (s : Symbols.system)
+    (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
   assert (Action.depends
@@ -155,14 +156,14 @@ let mk_depends_lemma
     name;
     params  = { Params.empty with se_vars = [v,[SE.Var.Compatible_with s]]; };
     system  = { set = SE.var v; pair = None; };
-    formula = Equiv.LocalS {formula = form; bound = None};
+    formula = Equiv.LocalS {formula = form; bound = Some (Real.mk_zero tbl)};
   } 
-  (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
 (** Build the mutual exlusivity lemma between [descr] and [descr']. *)
 let mk_mutex_lemma
-    (s : Symbols.system) (descr : Action.descr) (descr' : Action.descr)
+    (tbl : Symbols.table) (s : Symbols.system)
+    (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
   let shape  = Action.get_shape_v  descr.action in
@@ -195,9 +196,8 @@ let mk_mutex_lemma
     name;
     params  = { Params.empty with se_vars = [v,[SE.Var.Compatible_with s]]; };
     system  = { set = SE.var v; pair = None; };
-    formula = Equiv.LocalS {formula; bound = None};
+    formula = Equiv.LocalS {formula; bound = Some (Real.mk_zero tbl)};
   }
-  (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
 (** {2 Namelength } *)
@@ -247,8 +247,7 @@ let mk_namelength_statement
   (* len(n) = cst *)
   let eq = Term.mk_eq (Term.mk_len tn) (cst) in
   (* forall i_: len(n(i_)) = cst *)
-  let f = Equiv.Atom (Reach {formula = (Term.mk_forall vars eq); bound = None}) in
-  (*TODO:Concrete : Put bound at zero here (exact) by default and then use it  as is, probably a bit of  inference to do*)
+  let f = Equiv.Atom (Reach {formula = Term.mk_forall vars eq; bound = Some (Real.mk_zero table)}) in
 
   let v = SE.Var.of_ident (Ident.create "'P") in (* fresh system variable *)
   let params =
@@ -299,9 +298,9 @@ let mk_depends_mutex
   System.Msh.fold (fun shape (descr : Action.descr) lems ->
       System.Msh.fold (fun shape' (descr' : Action.descr) lems ->
           if Action.depends shape shape' then
-            mk_depends_lemma system descr descr' :: lems
+            mk_depends_lemma table system descr descr' :: lems
           else if Action.mutex shape shape' then
-            mk_mutex_lemma system descr descr' :: lems
+            mk_mutex_lemma table system descr descr' :: lems
           else lems
         ) descrs lems
     ) descrs []

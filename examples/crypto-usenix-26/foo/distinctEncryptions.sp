@@ -39,11 +39,11 @@ len zero_enc1 = len (format n).
 axiom [any] len2 (n:mess_len2):
 len zero_enc2 = len (format n).
 
-axiom [any] format_mess_len1   (x : mess_len1) : read (format x) = x.
+exact axiom [any] format_mess_len1   (x : mess_len1) : read (format x) = x.
 hint rewrite format_mess_len1.
 
 
-axiom [any] format_mess_len2   (x : mess_len2) : read (format x) = x.
+exact axiom [any] format_mess_len2   (x : mess_len2) : read (format x) = x.
 hint rewrite format_mess_len2.
 
 (*------------------------------------------------------------------*)

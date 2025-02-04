@@ -20,7 +20,7 @@ let _pp_terms ppe fmt (terms : Term.term list) =
     terms
 
 let _pp_equiv ppe fmt ({terms; bound} : equiv)= match bound with
-  | Some ve -> Fmt.pf fmt "equiv(%a) <: %a" (_pp_terms ppe) terms (Term._pp ppe) ve
+  | Some ve -> Fmt.pf fmt "equiv(%a <: %a)" (_pp_terms ppe) terms (Term._pp ppe) ve
   | None ->     Fmt.pf fmt "equiv(%a)" (_pp_terms ppe) terms
 
 let pp_equiv = _pp_equiv (default_ppe ~dbg:false ())
@@ -71,13 +71,13 @@ type bform = {formula : Term.term; bound : Term.term option}
 (*------------------------------------------------------------------*)
 let _pp_bform_conclusion ppe fmt = function
   | {formula; bound = Some ve} -> 
-    Fmt.pf fmt "[@[%a@]@;bound : @[%a@]]@;" (Term._pp ppe) formula (Term._pp ppe) ve
+    Fmt.pf fmt "@[[@[%a@]@ <: @[%a@]]@]@;" (Term._pp ppe) formula (Term._pp ppe) ve
   | {formula; bound = None} -> 
     Fmt.pf fmt "[@[%a@]]" (Term._pp ppe) formula
 
 let _pp_bform ppe fmt = function
   | {formula; bound = Some ve} -> 
-    Fmt.pf fmt "@[%a <: %a@]" (Term._pp ppe) formula (Term._pp ppe) ve
+    Fmt.pf fmt "@[<hv 0>@[%a@]@ <: @[%a@]@]" (Term._pp ppe) formula (Term._pp ppe) ve
   | {formula; bound = None} -> 
     Fmt.pf fmt "@[%a@]" (Term._pp ppe) formula
 
@@ -797,17 +797,16 @@ module Smart : SmartFO.S with type form = _form = struct
 
           | Some (f1,f2), Some bound when mode = `RL ->
             (* [ψ₁ <: ε/2] ∧ [ψ₂ <: ε/2] ⇒ [ϕ <: ε]*)
+            let two = Real.mk_of_int env.table (Term.mk_int (Z.of_int 2)) in
             let new_bound =
-              Real.mk_div env.table bound (Real.mk_two env.table) |>
+              Real.mk_div env.table bound two  |>
               some
             in
             Some
               (Atom (Reach {formula = f1; bound = new_bound; }),
                Atom (Reach {formula = f2; bound = new_bound; }))
-
-          | None, None -> None
-            
-          | _ -> assert false
+           
+          | _ -> None
         end
     | _ -> None
 
@@ -867,7 +866,7 @@ module Smart : SmartFO.S with type form = _form = struct
            let f1_bound =
              match bound with
              | None   -> None
-             | Some _ -> some (Real.mk_zero env.table)
+             | Some _ -> Some (Real.mk_zero env.table)
            in
            Some (Atom (Reach {formula = f1; bound = f1_bound; }),
                  Atom (Reach {formula = f2; bound = bound;    }))
@@ -1011,6 +1010,8 @@ module Smart : SmartFO.S with type form = _form = struct
     in
     last forms
 end
+(*------------------------------------------------------------------*)
+(** {2 Functions specific to global formulas} *)
 
 let destr_reach = function
   | Atom (Reach f) -> Some f
@@ -1023,6 +1024,18 @@ let destr_equiv = function
   | _ -> None
 
 let is_equiv f = destr_equiv f <> None
+
+let is_global_or = function
+  | Or (_,_) -> true
+  | _ -> false
+
+let is_global_and = function
+  | And (_,_) -> true
+  | _ -> false
+
+let is_global_impl = function
+  | Impl (_,_) -> true
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
@@ -1054,6 +1067,7 @@ let is_local = function
 let is_global = function
   | Local  _ -> false
   | Global _ -> true
+
 
 (*------------------------------------------------------------------*)
 type local_form = Term.term
@@ -1535,7 +1549,19 @@ module Any = struct
         let l,f = Smart.decompose_impls_last ~env f in
         List.map (fun x -> Global x) l, Global f
   end
+  (*------------------------------------------------------------------*)
 
+  let is_global_or = function
+    | Local _ -> false
+    | Global f -> is_global_or f
+
+  let is_global_and = function
+    | Local _ -> false
+    | Global f -> is_global_and f
+
+  let is_global_impl = function
+    | Local _ -> false
+    | Global f -> is_global_impl f
 end
 
 (*------------------------------------------------------------------*)

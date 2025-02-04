@@ -11,7 +11,7 @@ type nat[well_founded, serializable, fixed].
 (* `≤` *)
 
 (* Holds for every type but `timestamp`. *)
-axiom [any] le_refl_i (i : nat) : i <= i.
+axiom [any] le_refl_i (i : nat) : i <= i <: Real.z.
 hint rewrite le_refl_i.
 
 (* Holds for every type but `timestamp`. *)

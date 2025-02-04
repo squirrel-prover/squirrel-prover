@@ -4,7 +4,7 @@ lemma _ (x,y : message) : x = y => diff(x,x) = y.
 Proof.
   intro H. 
   simpl ~diffr.
-  assumption H.
+  true.
 Qed. 
 
 lemma _ (x,y : message) : x = y => diff(x,x) = y.

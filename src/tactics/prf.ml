@@ -212,7 +212,7 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
   Term.term * ((SE.fset * Term.terms) list) =
   let conds,_,t' =
     Match.Pos.map_fold ~mode:(`TopDown false)
-      (fun t' se fv cond _ acc_conds ->
+      (fun t' se fv cond _ _info acc_conds ->
          assert (fv = []); (* sanity check: we never go under binders *)
          let se = SE.to_fset se in (* will always succeed *)
          if t' = u then (* found u: replace and add current condition to list *)
@@ -399,7 +399,7 @@ let phi_proj
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
   let occs =
-    IOS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_k)
+    IOS.find_all_occurrences ~concrete:false ~mode:PTimeSI ~pp_descr:(Some pp_k)
       get_bad context (cc_nprf :: m :: k.args @ frame)
   in
   (* sort the occurrences: first the key occs, then the hash occs *)
@@ -439,8 +439,14 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let proj_l, proj_r = ES.get_system_pair_projs s in
   let system = ((Utils.oget env.system.pair) :> SE.fset) in
 
-  let before, e, after = LT.split_equiv_conclusion i s in
+  let before, e, after, bound = LT.split_equiv_conclusion i s in
+  let concrete = bound <> None in
   let biframe = List.rev_append before after in
+
+  (* FEAT: concrete logic for equivalences *)
+  if concrete then
+    soft_failure
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
 
   (* get the parameters, enforcing that
      cc does not contain diffs or binders above xc.
@@ -526,7 +532,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
   let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table s) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
 
 
   (* copied from old prf for the composition stuff *)

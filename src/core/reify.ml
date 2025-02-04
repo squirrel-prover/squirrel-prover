@@ -37,7 +37,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 let assert_ty (ty : Type.ty) (t : Term.t) : Term.t =
-  assert(Term.ty t = ty);
+  assert(Type.equal (Term.ty t) ty);
   t
 
 (*------------------------------------------------------------------*)
@@ -1092,8 +1092,8 @@ let unquote (env : Env.t) (t : Term.t) : Term.t option =
     Some begin
       match t with
       | Term.Tuple [term;eval] ->
-        if Type.equal (R.Term.ty env.table) (Term.ty term) then unquote_failed ();
-        let eval = assert_ty (R.EvalEnv.ty env.table) eval in
+        if not (Type.equal (R.Term.ty env.table) (Term.ty term)) then unquote_failed ();
+        if not (Type.equal (R.EvalEnv.ty env.table) (Term.ty eval)) then unquote_failed ();
         let us   = get_unquote_state env eval in
         unquote_term us term
       | _ -> unquote_failed ()

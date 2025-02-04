@@ -277,7 +277,7 @@ let include_ite () =
     Prover.exec_all ~test:true st
         "
         lemma [any] if_true ['a] (b : boolean, x,y : 'a):
-         b => if b then x else y = x.
+         b => if b then x else y = x <: Real.z.
         Proof.
           intro *.
           case (if b then x else y).
@@ -286,14 +286,14 @@ let include_ite () =
         Qed.
 
         lemma [any] if_true0 ['a] (x,y : 'a):
-         if true then x else y = x.
+         if true then x else y = x <: Real.z.
         Proof.
           by rewrite if_true. 
         Qed.
         hint rewrite if_true0.
 
         lemma [any] if_false ['a] (b : boolean, x,y : 'a):
-         (not b) => if b then x else y = y.
+         (not b) => if b then x else y = y <: Real.z.
         Proof. 
           intro *; case (if b then x else y).
           + intro [H1 H2]. 
@@ -302,7 +302,7 @@ let include_ite () =
         Qed.
 
         lemma [any] if_false0 ['a] (x,y : 'a):
-         if false then x else y = y.
+         if false then x else y = y <: Real.z.
         Proof.
           by rewrite if_false.
         Qed.

@@ -176,13 +176,23 @@ module EquivHyps : S with type hyp = Equiv.form
 
 module TraceHyps : S with type hyp = Equiv.any_form
 
-val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals 
-val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
-val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
-val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list
+val get_atoms_of_hyps  :
+  concrete:bool ->  Symbols.table ->
+  TraceHyps.hyps -> Term.Lit.literals
+val get_trace_literals :
+  concrete:bool ->  Symbols.table ->
+  TraceHyps.hyps -> Term.Lit.literals
+val get_eq_atoms       :
+  concrete:bool -> Symbols.table ->
+  TraceHyps.hyps -> Term.Lit.xatom list
 
 val get_models :
   ?exn:exn ->
+  concrete:bool ->
+  (* This is to deal with circual dependency between Reduction and Hyps,
+      The assumption on this function is that it is a function on
+      term of type Real that keep the semantics of the term unchanged *)
+  ?red_fun : (Term.term -> Term.term) ->
   Symbols.table ->
   ?timeout:int ->
   ?system:'a SE.expr option ->

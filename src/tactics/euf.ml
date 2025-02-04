@@ -266,9 +266,11 @@ let euf_param
 
 
 (*------------------------------------------------------------------*)
-let euf (h : lsymb) (s : sequent) : sequent list =
+let euf (h : lsymb) (bounds : Term.t option list) (s : sequent) : sequent list =
   let ppe = default_ppe ~table:(TS.table s) () in
   (* find parameters *)
+  let table = TS.table s in
+  
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
   let context = TS.proof_context s in
@@ -287,8 +289,38 @@ let euf (h : lsymb) (s : sequent) : sequent list =
 
   (* get all occurrences *)
   let occs =
-    IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_k)
+    IOS.find_all_occurrences ~concrete:false ~mode:PTimeNoSI ~pp_descr:(Some pp_k)
       get_bad context (t :: m :: k.Name.args)
+  in
+
+  let concrete =
+    match TS.bound s with
+    | LowConcrete.ReachConc _ -> true
+    | LowConcrete.ReachAsym -> false
+    | _ -> assert false
+  in
+
+  let bound =
+    lazy (
+      assert concrete;
+
+      let quote t =
+        let e, t = Reify.quote Reify.Set (TS.env s) (Infer.mk_env ()) t in
+        Term.mk_tuple [t;e]
+      in
+      let mk_fun f = Term.mk_fun table f [] in
+      let  to_termo t = match t with
+        | None -> Library.Concrete.ReifyOption.mk_none table
+        | Some t -> Library.Concrete.ReifyOption.mk_some table t
+      in
+      Library.Concrete.mk_adv_euf
+        table
+        (quote (Name.to_term k))
+        (quote m)
+        (quote t)
+        (quote (mk_fun int_f))
+        (to_termo (Utils.omap (fun x -> quote (mk_fun x)) pk_f))
+    )
   in
 
   (* sort the occurrences: first the key occs, then the integrity occs *)
@@ -301,57 +333,101 @@ let euf (h : lsymb) (s : sequent) : sequent list =
       occs
   in
   let occs = occs_key @ occs_int in
-  
+
   (* compute the formulas stating that one of the occs is a collision *)
   let phis = List.map (IOF.occurrence_formula (TS.env s) ~negate:false) occs in
 
-  (* finally generate all corresponding goals *)
-  let g = TS.conclusion s in 
-  let integrity_goals =
-    List.map
-      (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
-      phis
-  in
-  
-  (* copied from old euf, handles the composition goals *)
-  let tag_s =
-    match Oracle.get_oracle int_f (TS.table s) with
-    (* if the hash is not tagged, we don't create another goal. *)
-    | None -> []
-    | Some f ->
-      (* else, we create a goal where m,sk satisfy the axiom *)
-      let uvarm, uvarkey,f = match f with
-        | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
-        | _ -> assert false
-      in
+  let subgoals phis =
+    (* finally generate all corresponding goals *)
+    let module CB = Concrete.BoundManagement(TS) in
+    let s = if concrete then CB.minus_bound (Lazy.force bound) s else s in
+    let g = TS.conclusion s in
+    let integrity_goals =
+      List.map
+        (fun phi -> (mk_impl ~simpl:false phi g))
+        phis
+    in
+    let bounds,last_goal = CB.list_bounds_fill bounds integrity_goals s in
+    let integrity_goals = (List.map2
+                              (fun c b ->
+                                 TS.set_conclusion c  (TS.set_bound b s))
+                              integrity_goals bounds)
+                           @ last_goal
+    in
 
-      match Vars.ty uvarm,Vars.ty uvarkey with
-      | Type.(Message, Message) -> 
-        let f = 
-          Term.subst [
-            ESubst (Term.mk_var uvarm,m);
-            ESubst (Term.mk_var uvarkey, Term.mk_name k.symb k.args);]
-            f 
+    (* copied from old euf, handles the composition goals *)
+    let tag_s =
+      match Oracle.get_oracle int_f (TS.table s) with
+      (* if the hash is not tagged, we don't create another goal. *)
+      | None -> []
+      | Some f ->
+        if concrete
+        then
+          Tactics.soft_failure (Failure "Tags are not supported in the concrete version")
+        else
+          (* else, we create a goal where m,sk satisfy the axiom *)
+          let uvarm, uvarkey,f = match f with
+            | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
+            | _ -> assert false
+          in
+
+          match Vars.ty uvarm,Vars.ty uvarkey with
+          | Type.(Message, Message) ->
+            let f =
+              Term.subst [
+                ESubst (Term.mk_var uvarm,m);
+                ESubst (Term.mk_var uvarkey, Term.mk_name k.symb k.args);]
+                f
+            in
+            [TS.set_conclusion
+               (Term.mk_impl f (TS.conclusion s)) s]
+
+          | _ -> assert false
+    in
+    tag_s @ integrity_goals
+  in
+  if phis = [] then
+    begin
+      if bounds = [] then () else Tactics.soft_failure
+          (Failure "Euf do not take bounds arguments when there is not subgoals");
+      if concrete
+      then
+        let bound = Lazy.force bound in
+        let s_bound =
+          match TS.bound s with ReachConc b -> b | _ -> assert false
         in
-        [TS.set_conclusion
-           (Term.mk_impl f (TS.conclusion s)) s]
-
-      | _ -> assert false 
-  in
-    
-  tag_s @ integrity_goals
-
+        if Term.equal s_bound bound
+        then []
+        else
+          let s = TS.set_conclusion (Term.mk_leq bound s_bound) s in
+          [TS.set_bound (LowConcrete.ReachConc (Library.Real.mk_zero table)) s]
+      else []
+    end
+  else subgoals phis
 
 (*------------------------------------------------------------------*)
 let euf_tac args s =
-  let hyp = match args with
-    | [hyp] -> hyp
-    | _ -> 
+  let hyp,bounds = match args with
+    | hyp::bounds -> hyp,bounds
+    | _ ->
       hard_failure
         (Failure "euf requires one argument: hypothesis")
   in
+      let bounds =
+        let convert_bounds =
+          List.map
+            (fun x -> TraceLT.convert_args s [x] Args.(Sort Term))
+            bounds
+        in
+        let filter x =
+          match x with
+          | Args.Arg (Term(ty, t , _)) when Type.equal ty Library.Real.treal -> t
+          | _ -> bad_args ()
+        in
+        List.map (fun x -> Some (filter x) ) convert_bounds
+      in
   match TraceLT.convert_args s [hyp] (Args.Sort Args.String) with
-  | Args.Arg (Args.String hyp) -> wrap_fail (euf hyp) s
+  | Args.Arg (Args.String hyp) -> wrap_fail (euf hyp bounds) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)

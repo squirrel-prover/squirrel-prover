@@ -22,9 +22,9 @@ senc enc,dec.
 abstract id : index -> message.
 (* idD(i) is the identifier of dishonest agent i *)
 abstract idD : index -> message.
-axiom[any] cst_id_idD : forall i j, id i <> idD j.
+axiom[any] cst_id_idD : forall i j, id i <> idD j <: Real.z.
 hint rewrite cst_id_idD.
-lemma[any] cst_idD_id : forall i j, idD i <> id j.
+lemma[any] cst_idD_id : forall i j, idD i <> id j <: Real.z.
 Proof.
   intro i j H1.
   have H2 := cst_id_idD j i.

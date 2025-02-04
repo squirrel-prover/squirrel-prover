@@ -41,16 +41,17 @@ lemma [any] try_find_simpl
 Proof.
   intro Hphi.
   case try find (t0 : timestamp) such that _ in _ else t_else2.
-  + intro [t1 [[_ G] ->]]. 
-    repeat destruct G as [_ G]. 
+  + intro [t1 [[_ HG] ->]]. 
+    repeat destruct HG as [_ HG]. 
     case try find (a : index) such that _ in _ else t_else1.
     ++ intro [_ [G0 ->]]. 
        repeat destruct G0 as [_ G0]. 
-       have [_ Eq ] := Hphi _ _ G; rewrite Eq in *; clear Eq.
+
+       have [_ Eq ] := Hphi _ _ HG; rewrite Eq in *; clear Eq.
        have [_ Eq0] := Hphi _ _ G0; rewrite Eq0 in *; clear Eq0.
        by rewrite if_true //.
     ++ intro [H0 _].
-       have [_ Eq] := Hphi _ _ G; rewrite Eq in *; clear Eq.
+       have [_ Eq] := Hphi _ _ HG; rewrite Eq in *; clear Eq.
        have H0' := H0 a0. 
        by use H0'. 
   + intro [U _].

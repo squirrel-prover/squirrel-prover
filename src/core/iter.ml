@@ -268,8 +268,7 @@ let tfold_occ (type a)
       | `NoDelta -> default (l @ [ts])
       | `Delta constr ->
         let res, has_red =
-          Match.reduce_delta_macro1
-            ~constr:true constr.env ~hyps:constr.hyps t
+          Match.reduce_delta_macro1 ~constr:true constr t
         in
         if has_red = True then default @@ [res] else default (l @ [ts])     
     end
@@ -731,7 +730,7 @@ end = struct
     let system = SE.reachability_context sexpr in
     match
       Match.T.try_match
-        ~param:Match.default_param
+        ~param:Match.default_param ~concrete:true
         table system term1 pat2
     with
     | Match _ -> true
@@ -848,8 +847,7 @@ let update_context
   : ProofContext.t
   =
   let vars = Vars.add_vars (Vars.Tag.global_vars ~const:true extra_vars) context.env.vars in
-  let env = Env.update ~vars context.env in
-  ProofContext.make ~env ~hyps:context.hyps |>
+  ProofContext.set_vars vars context |>
   ProofContext.change_system ~system 
   (* need to call [change_system] separately, to properly deal with
      hypotheses *)
@@ -883,9 +881,13 @@ let qatt_pat =
 let is_valid_qatt_occ (context : ProofContext.t) t =
   let table  = context.env.table  in
   let system = context.env.system in  
-   match Match.T.try_match ~param:Match.crypto_param table system t qatt_pat with
-        | Match _ -> true
-        | NoMatch _ -> false
+   match 
+     Match.T.try_match
+       ~param:Match.crypto_param ~concrete:true table system 
+       t qatt_pat 
+   with
+   | Match _ -> true
+   | NoMatch _ -> false
 
 (*------------------------------------------------------------------*)
 (** Internal. 

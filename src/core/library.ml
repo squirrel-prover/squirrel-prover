@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 (*------------------------------------------------------------------*)
@@ -15,6 +17,7 @@ let mk_one   f table x       = Term.mk_fun table (f table) [x]
 let mk_two   f table x y     = Term.mk_fun table (f table) [x;y]
 let mk_three f table x y z   = Term.mk_fun table (f table) [x;y;z]
 let mk_four  f table x y z t = Term.mk_fun table (f table) [x;y;z;t]
+let mk_five  f table x y z t u = Term.mk_fun table (f table) [x;y;z;t;u]
 (*------------------------------------------------------------------*)
 module Prelude = struct
   let mk_fun table str ~ty_args args =
@@ -114,10 +117,19 @@ module[@warning "-32"] Real = struct
 
   (* namespace path *)
   let real_p = ["Real"]
- 
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], "Real") table
+
   let check_load table =
     if not (Symbols.Import.mem_sp ([],"Real") table) then
       Tactics.hard_failure (Failure "theory Real is not loaded")
+
+  let fs_of_int = get_fsymb (real_p,"of_int")
+
+  let fs_zero = get_fsymb (real_p,"z")
+
+  let treal = Type.of_s_path (real_p, Symbols.to_string (get_type (real_p,"t")).s)
 
   let get_fsymb table s =
     check_load table;
@@ -126,8 +138,6 @@ module[@warning "-32"] Real = struct
   let get_type table s =
     check_load table;
     get_type  (real_p,s)
-
-  let treal table = Type.of_s_path (real_p, Symbols.to_string (get_type table "real").s)
 
   (*------------------------------------------------------------------*)
   let fs_add   table = get_fsymb table "+"
@@ -138,9 +148,8 @@ module[@warning "-32"] Real = struct
   let fs_div   table = get_fsymb table "div"
   let fs_inv   table = get_fsymb table "inv"
 
-  let fs_zero  table = get_fsymb table "z_r"
-  let fs_one   table = get_fsymb table "o_r"
-  let fs_two   table = get_fsymb table "t_r"
+
+  let fs_sum   table = get_fsymb table "sum"
 
   (*------------------------------------------------------------------*)
   let mk_add   table x y = Term.mk_fun table (fs_add table)   [x;y]
@@ -151,9 +160,24 @@ module[@warning "-32"] Real = struct
   let mk_div   table x y = Term.mk_fun table (fs_div table)   [x;y]
   let mk_inv   table x   = Term.mk_fun table (fs_inv table)   [x]
 
-  let mk_zero  table     = Term.mk_fun table (fs_zero table)  []
-  let mk_one   table     = Term.mk_fun table (fs_one  table)  []
-  let mk_two   table     = Term.mk_fun table (fs_two  table)  []
+  let mk_of_int table x   = Term.mk_fun table (fs_of_int)   [x]
+
+  let mk_zero table = Term.mk_fun table fs_zero  []
+
+  (* [x] of type ['a -> bool], [y] of type ['a -> real] *)
+  let mk_sum   table x y = 
+    let tys, ty_b = Type.decompose_funs (Term.ty x) in
+    let ty0 = as_seq1 tys in       (* must be a single value *)
+
+    let tys', ty_r = Type.decompose_funs (Term.ty y) in
+    let ty0' = as_seq1 tys' in       (* must be a single value *)
+
+    assert (
+      Type.equal ty0 ty0' && 
+      Type.equal ty_b Type.tboolean && 
+      Type.equal ty_r treal);
+
+    Term.mk_fun table ~ty_args:[ty0] (fs_sum  table)  [x;y]
 end
 
 (*------------------------------------------------------------------*)
@@ -206,6 +230,70 @@ module Deduction = struct
 
   let uniform_deduction table = get_predicate table "|1>"
 end  
+
+(*------------------------------------------------------------------*)
+module FiniteTypes = struct
+  let name = "FiniteTypes"
+
+  (* namespace path *)
+  let namespace = [name]
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], name) table
+
+  let check_load table =
+    if not (Symbols.Import.mem_sp ([],name) table) then
+      Tactics.hard_failure (Failure ("theory" ^ name ^ "is not loaded"))
+
+  let get_fsymb table s =
+    check_load table;
+    get_fsymb (namespace,s)
+
+  let fs_card  table = get_fsymb table "card"
+  let mk_card table ty = Term.mk_fun table ~ty_args:[ty] (fs_card table) []
+end
+
+(*------------------------------------------------------------------*)
+module Concrete = struct
+  let name = "Concrete"
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], name) table
+
+  let check_load table =
+    if not (Symbols.Import.mem_sp ([],name) table) then
+      Tactics.hard_failure (Failure ("theory" ^ name ^ "is not loaded"))
+
+  let get_fsymb table ?path:(x = ["ConcreteCrypto"]) s =
+    check_load table;
+    get_fsymb (x,s)
+
+  let get_type table ?path:(x = ["ConcreteCrypto"]) s =
+    check_load table;
+    get_type  (x,s)
+
+  let fs_proba_fresh table = get_fsymb table "proba_fresh"
+  let fs_adv_intctxt table = get_fsymb table "adv_intctxt"
+  let fs_adv_euf table = get_fsymb table "adv_euf"
+
+  module ReifyOption = struct
+    let ty table =
+      Type.of_s_path
+        (["ConcreteCrypto"; "ReifyOption"],
+         Symbols.to_string
+           (get_type table ~path:["ConcreteCrypto; ReifyOption"] "t").s)
+
+    let fs_some table = get_fsymb table ~path:["ConcreteCrypto"; "ReifyOption"]  "some"
+    let fs_none table = get_fsymb table ~path:["ConcreteCrypto"; "ReifyOption"]  "none"
+    let mk_some       = mk_one  fs_some
+    let mk_none       = mk_zero fs_none
+  end (*ReifyOption*)
+
+
+  let mk_proba_fresh table ty = Term.mk_fun table ~ty_args:[ty] (fs_proba_fresh table) []
+  let mk_adv_intctxt          = mk_five fs_adv_intctxt
+  let mk_adv_euf              = mk_five fs_adv_euf
+end (*Concrete*)
 
 (*------------------------------------------------------------------*)
 module Reify = struct

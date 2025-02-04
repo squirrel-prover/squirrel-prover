@@ -438,14 +438,16 @@ let search_about
     in
 
     (* allow capture of bound variables when matching *)
-    let param = { Match.default_param with allow_capture = true; } in
+    let param = { Match.default_param with allow_capture = true } in
     
-    Symbols.Lemma.fold begin fun _ data acc -> 
+    Symbols.Lemma.fold (fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | GlobalS f -> Match.E.find ~param env.table sys pat f
-        | LocalS  f -> Match.T.find ~param env.table sys pat f.formula
+        | GlobalS f -> 
+          Match.E.find ~param ~concrete:false env.table sys pat f
+        | LocalS  f -> 
+          Match.T.find ~param ~concrete:false env.table sys pat f.formula
         end in
         begin match res with
           | [] -> acc
@@ -454,7 +456,7 @@ let search_about
               List.map (fun x -> Equiv.Local x) res in
             (g,any_res)::acc
         end
-    end [] env.table in
+      ) [] env.table in
 
   match t with
   | Local p -> 
@@ -480,15 +482,14 @@ let search_about
         pat_op_term = t; } in
 
     (* allow capture of bound variables when matching *)
-    let param = { Match.default_param with allow_capture = true; } in
+    let param = { Match.default_param with allow_capture = true } in
 
     Symbols.Lemma.fold (fun _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | GlobalS f -> Match.E.find_glob ~param env.table sys pat f
-        | LocalS  _ -> [] (* can't find Equiv.form in
-                                      Term.term ? *)
+        | GlobalS f -> Match.E.find_glob ~param ~concrete:false env.table sys pat f
+        | LocalS  _ -> [] 
         end in
         begin match res with
         | [] -> acc

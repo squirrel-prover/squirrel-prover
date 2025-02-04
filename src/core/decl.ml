@@ -73,6 +73,7 @@ type fun_decl = {
   op_symb_type : Symbols.symb_type;
   op_args      : Typing.ext_bnds;
   op_tyout     : Typing.ty option;
+  op_annots    : (Symbols.lsymb TacticsArgs.named_arg) list;
   op_body      : [
     | `Concrete of Typing.term
     | `Match    of Typing.match_body

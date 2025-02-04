@@ -8,7 +8,6 @@ module Sv   = Vars.Sv
 include LowRewrite
 
 (*------------------------------------------------------------------*)
-let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
@@ -18,6 +17,7 @@ let soft_failure = Tactics.soft_failure
     - [system]: systems applying to the instance found 
     - [cond] and [vars]: conditions and variables applying at the subterm 
       where the instance was found.
+    - [bound] : the bound of the instance of the rule that has been found
 
     Type unification environments has already been closed. *) 
 type found = { 
@@ -28,6 +28,7 @@ type found = {
   conds  : Term.terms;
   vars   : Vars.vars;
   subgs  : Term.term list;      (* [vars] and [conds] not yet added *)
+  bound  : LowConcrete.bound;
 }
 
 (** Build the final subgoals associated to a instance found. *)
@@ -48,7 +49,7 @@ type open_rw_rule = {
   subs  : Term.term list;
   pat   : Term.term Term.pat_op;
   right : Term.term;
-  
+  bound : LowConcrete.bound;
   ienv : Infer.env;
 }
 
@@ -60,14 +61,6 @@ type rw_state = [ `False | `Found of found ]
 type error = 
   | NothingToRewrite
   | MaxNestedRewriting
-
-(*------------------------------------------------------------------*)
-(** Recast a rewrite error as a [Tactic] error *)
-let recast_error ~loc = function
-  | NothingToRewrite -> soft_failure ~loc Tactics.NothingToRewrite
-
-  | MaxNestedRewriting ->
-    hard_failure ~loc (Failure "max nested rewriting reached (1000)")
 
 (*------------------------------------------------------------------*)
 (** Not exported *)
@@ -127,6 +120,11 @@ let open_rw_rule table (rule : rw_rule) (system : SE.t) : open_rw_rule =
 
   (* combine [mk_form_proj] with [gsubst] *)
   let mk_form f = mk_form_proj f |> Term.gsubst gsubst in
+  let mk_bound = function
+    | LowConcrete.Glob -> LowConcrete.Glob
+    | ReachAsym -> ReachAsym
+    | ReachConc e -> ReachConc (mk_form e)
+  in
 
   let pat : Term.term Term.pat_op = 
     { 
@@ -141,6 +139,7 @@ let open_rw_rule table (rule : rw_rule) (system : SE.t) : open_rw_rule =
     system = rule_system;
     pat;
     right = mk_form right;
+    bound = mk_bound rule.rw_bound;
     subs  = List.map mk_form rule.rw_conds;
     ienv;
   }
@@ -152,53 +151,77 @@ let hyps_add_conds hyps (conds : Term.terms) =
     ) hyps conds
 
 (*------------------------------------------------------------------*)
+(** Given the information on where a term occurrence was found, try to
+    determine whether we may do an asymptotic/concrete rewriting (an
+    exact rewriting is always sound). *)
+let occurrence_kind
+    (table : Symbols.table) (info : Match.Pos.OccInfo.t) 
+  : [`Exact | `Concrete | `Asym]
+  = 
+  let exception Unknown in
+
+  (* [true] means [`Asym], [false] means [`Concrete] *)
+  let rec doit_atom (a : Equiv.atom) =
+    match a with
+    | Equiv {terms = _; bound} -> bound = None
+    | Reach {formula = _; bound} -> bound = None
+    | Pred p  ->
+      let p = Predicate.get table p.psymb in
+      match p.body with
+      | Abstract -> raise Unknown
+      | Concrete f -> doit_form f
+
+  and doit_form (f : Equiv.form) =
+    match f with
+    | Quant (_, _, f) | Let (_, _, f) -> doit_form f
+    | Atom a -> doit_atom a
+    | Impl (f1, f2) | And (f1, f2) | Or (f1, f2) -> 
+      doit_form f1 && doit_form f2
+  in
+
+  try
+    let res =
+      match info with
+      | Let f -> doit_form f
+
+      | EquivForm bound
+      | ReachForm bound -> bound = None
+
+      (* we may only do exact rewritings in the bound *)
+      | EquivBound | ReachBound -> raise Unknown
+
+      | Pred symb -> 
+        let p = Predicate.get table symb in
+        match p.body with
+        | Abstract -> false
+        | Concrete f -> doit_form f
+    in
+    if res then `Asym else `Concrete
+  with Unknown -> `Exact
+
+(*------------------------------------------------------------------*)
 (** If there is a match (with [mv]), substitute [occ] by [right] where
     free variables are instantiated according to [mv], and variables
     bound above the matched occurrences are universally quantified in
     the generated sub-goals. *)
-let rw_inst
-    ~(param : Match.param)
+let rewrite_instance
+    ~(param : Match.param) ~(concrete:bool)
     (table : Symbols.table) (params : Params.t)
     (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
     (rule : rw_rule)
-  : rw_state Pos.f_map_fold 
+  : (rw_state, unit) Pos.f_map_fold
   = 
   let doit
       (occ : Term.term)
-      (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p
+      (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p 
+      (_info : unit)
       (s : rw_state) 
     =
     (* adds [conds] in [hyps] *)
     let hyps = hyps_add_conds hyps conds in
 
-    match s with
-    | `Found inst -> 
-      (* we already found the rewrite instance earlier *)
-
-      (* check if the same system apply to the subterm *)
-      if not (SE.equal table se inst.system) then 
-        s, `Continue 
-      else
-        let ienv = inst.ienv in (* FIXME: why keep using [ienv]? *)
-        let context = SE.reachability_context se in
-        begin
-          match 
-            Match.T.try_match
-              ~param 
-              ~ienv ~hyps ~env table context occ inst.pat 
-          with
-          | NoMatch _ -> s, `Continue
-          | Match _mv -> 
-            (* When we found another occurrence of the same rewrite
-               instance, we clear the conditions that are not shared by 
-               both occurrences (i.e. we keep only common conditions) *)
-            let conds = List.filter (fun cond -> List.mem cond conds) inst.conds in
-            let s = `Found { inst with conds } in
-
-            s, `Map inst.right
-        end
-
-    | `False ->
+    (* if we have not yet found an instance, try to find one *)
+    let doit_find_instance () =
       let context = SE.reachability_context se in
 
       match
@@ -206,7 +229,7 @@ let rw_inst
         let op_rule = open_rw_rule table rule se in
         let res_match =
           Match.T.try_match
-            ~param
+            ~param ~concrete
             ~ienv:op_rule.ienv
             ~hyps ~env table context occ op_rule.pat
         in
@@ -221,7 +244,7 @@ let rw_inst
         Match.Mvar.check_args_inferred op_rule.pat mv;
 
         let ienv = op_rule.ienv in
-        
+
         let pat_vars =
           Vars.add_vars op_rule.pat.pat_op_vars env
           (* vars in the pattern are restricted according to what the
@@ -266,6 +289,7 @@ let rw_inst
           let right = do_subst op_rule.right in
           let found_conds = List.map do_subst conds in
           let found_subs  = List.map do_subst op_rule.subs in
+          let bound = LowConcrete.gsubst tsubst (LowConcrete.subst subst op_rule.bound) in
 
           let found_pat = Term.{ 
               pat_op_term   = left;
@@ -280,13 +304,80 @@ let rw_inst
               pat    = found_pat;
               right;
               system = se;
-              vars; 
+              vars;
+              bound;
               conds  = found_conds;
               subgs  = found_subs;
             }
           in
-          
-          found_instance, `Map right
+
+          (found_instance, `Map right)
+    in
+
+    (* we already found the rewrite instance earlier *)
+    let doit_from_instance (inst : found) =
+      (* check if the same system apply to the subterm *)
+      if not (SE.equal table se inst.system) then 
+        s, `Continue 
+      else
+        let ienv = inst.ienv in (* FIXME: why keep using [ienv]? *)
+        let context = SE.reachability_context se in
+        begin
+          match 
+            Match.T.try_match
+              ~param ~concrete
+              ~ienv ~hyps ~env table context occ inst.pat 
+          with
+          | NoMatch _ -> s, `Continue
+          | Match _mv -> 
+            (* When we found another occurrence of the same rewrite
+               instance, we clear the conditions that are not shared by 
+               both occurrences (i.e. we keep only common conditions) *)
+            let conds = List.filter (fun cond -> List.mem cond conds) inst.conds in
+            let s = `Found { inst with conds } in
+
+            s, `Map inst.right
+        end
+    in
+
+    match s with
+    | `Found inst -> doit_from_instance inst
+    | `False      -> doit_find_instance ()
+  in
+  doit
+
+(*------------------------------------------------------------------*)
+(** Same as [rewrite_instance], but in a global formula. This function
+    additionally checks that rewriting is allowed (w.r.t. exactness).  *)
+let rewrite_instance_in_global
+    ~(param : Match.param) ~(concrete : bool)
+    (table : Symbols.table) (params : Params.t)
+    (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
+    (rule : rw_rule)
+  : (rw_state, Match.Pos.OccInfo.t) Pos.f_map_fold
+  = 
+  let asym_rule, concrete_rule, exact_rule =
+    match rule.rw_bound with
+    | ReachAsym   -> true , false, false
+    | ReachConc b -> false, true , Real.is_zero table b
+    | Glob -> assert false
+  in
+
+  let doit
+      (occ : Term.term)
+      (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p 
+      (info : Match.Pos.OccInfo.t)
+      (s : rw_state) 
+    =
+    let occ_kind = occurrence_kind table info in
+    if exact_rule ||
+       (occ_kind = `Concrete && concrete_rule) ||
+       (occ_kind = `Asym     && asym_rule) 
+    then
+      rewrite_instance
+        ~param ~concrete table params env hyps rule 
+        occ se vars conds _p () s
+    else (s, `Continue) 
   in
   doit
 
@@ -295,7 +386,7 @@ let rw_inst
 
 (** Exported *)
 let rewrite_head
-    ~(param : Match.param)
+    ~(param : Match.param) ~(concrete : bool)
     (table  : Symbols.table)
     (params : Params.t)
     (env    : Vars.env)
@@ -304,11 +395,11 @@ let rewrite_head
     (rule   : rw_rule)
     (t      : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
-  assert (rule.rw_kind = GlobalEq);
+  assert (rule.rw_kind = Global);
   match 
-    rw_inst
-      ~param table params env hyps rule
-      t sexpr [] [] Pos.root `False 
+    rewrite_instance
+      ~param ~concrete table params env hyps rule
+      t sexpr [] [] Pos.root () `False 
   with
   | _, `Continue -> None
   | `Found inst, `Map t ->
@@ -318,7 +409,10 @@ let rewrite_head
 (*------------------------------------------------------------------*)
 (** {2 Whole-term rewriting} *)
 
-type rw_res = Equiv.any_form * (SE.context * Term.term) list
+type rw_res =
+  Equiv.any_form *
+  (SE.context * Term.term) list *
+  LowConcrete.bound list
 
 type rw_res_opt = 
   | RW_Result of rw_res
@@ -327,7 +421,7 @@ type rw_res_opt =
 (*------------------------------------------------------------------*)
 (** Internal *)
 let do_rewrite
-    ~(param : Match.param)
+    ~(param : Match.param) ~(concrete : bool)
     (table  : Symbols.table)
     (params : Params.t)
     (env    : Vars.env)
@@ -344,71 +438,70 @@ let do_rewrite
         raise (Failed MaxNestedRewriting);
       incr cpt_occ;
   in
-
+  
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
-     Return: (f, subs) *)
+     Return: (f, subs, bounds) *)
   let rec do_rewrite1
       (mult : Args.rw_count) (f : Equiv.any_form) 
-    : 
-      Equiv.any_form * (SE.t * Term.term) list
+    : Equiv.any_form * (SE.t * Term.term) list * LowConcrete.bound list
     =
     check_max_rewriting ();
-
 
     let s, f = 
       let s = `False in      (* we haven't found a instance yet *)
       match f with
-      | Global f when rule.rw_kind = GlobalEq ->
+      | Global f ->
+        assert (rule.rw_kind = Global);
         let s, _, f = 
           Pos.map_fold_e
-            (rw_inst ~param table params env hyps rule) 
-            system s f 
+            (rewrite_instance_in_global ~param ~concrete table params env hyps rule) 
+            system s f
         in
         s, Equiv.Global f
 
-      | Local f ->
-        let s, _, f = 
+      | Local t -> 
+        let s, _, t = 
           Pos.map_fold
-            (rw_inst ~param table params env hyps rule) 
-            system.set s f 
+            (rewrite_instance ~param ~concrete table params env hyps rule) 
+            system.set s t
         in
-        s, Equiv.Local f
-
-      | _ -> s, f
+        s, Equiv.Local t
     in
 
     match mult, s with
-    | (Args.Any | Args.Exact 0), `False -> f, []
+    | (Args.Any | Args.Exact 0), `False -> (f, [], [])
 
-    | (Args.Once | Args.Many | Args.Exact _), `False -> 
+    | (Args.Once | Args.Many | Args.Exact _), `False ->
       raise (Failed NothingToRewrite)
 
-    | Args.Once, `Found inst -> f, subgoals_of_found inst
+    | Args.Once, `Found inst ->
+      (f, subgoals_of_found inst, [inst.bound])
 
     | Args.Exact i, `Found inst ->
       let inst_subgs = subgoals_of_found inst in
-      if i = 1 then f, inst_subgs 
+      if i = 1 then f, inst_subgs, [inst.bound]
       else
-        let f, rsubs' = do_rewrite1 Args.(Exact (i - 1)) f in
-        f, List.rev_append inst_subgs rsubs'
+        let f, rsubs',bounds = do_rewrite1 Args.(Exact (i - 1)) f in
+        (f, List.rev_append inst_subgs rsubs', inst.bound :: bounds)
 
     | (Args.Many | Args.Any), `Found inst  ->
       let inst_subgs = subgoals_of_found inst in
-      let f, rsubs' = do_rewrite1 Args.Any f in
-      f, List.rev_append inst_subgs rsubs'
+      let f, rsubs',bounds = do_rewrite1 Args.Any f in
+      (f, List.rev_append inst_subgs rsubs', inst.bound :: bounds)
   in
 
-  let f, subs = 
-    if mult = Args.Exact 0 then (target, []) else do_rewrite1 mult target 
+  let f, subs, bounds =
+    if mult = Args.Exact 0 then (target,[],[]) else do_rewrite1 mult target
   in
   let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
-  f, subs
+  (f,subs,bounds)
+
 
 (*------------------------------------------------------------------*)
 (** Exported *)
 let rewrite
-    ~(param : Match.param)
+    ~(param : Match.param) ~(concrete : bool)
     (table  : Symbols.table)
     (params : Params.t)
     (env    : Vars.env)
@@ -420,65 +513,8 @@ let rewrite
   =
   try
     let r =
-      do_rewrite ~param table params env system hyps mult rule target
+      do_rewrite ~param ~concrete table params env system hyps mult rule target
     in
     RW_Result r
   with
   | Failed e -> RW_Failed e
-
-(** Exported *)
-let rewrite_exn   
-    ~(loc   : L.t)
-    ~(param : Match.param)
-    (table  : Symbols.table)
-    (params : Params.t)
-    (env    : Vars.env)
-    (system : SE.context)
-    (hyps   : Hyps.TraceHyps.hyps)
-    (mult   : Args.rw_count)
-    (rule   : rw_rule)
-    (target : Equiv.any_form) : rw_res
-  =
-  try
-    do_rewrite ~param table params env system hyps mult rule target
-  with
-  | Failed e -> recast_error ~loc e
-
-(*------------------------------------------------------------------*)
-(** {2 Higher-level rewrite} *)
-
-let high_rewrite
-    ~(mode   : [`TopDown of bool | `BottomUp])
-    ~(strict : bool)
-    (table   : Symbols.table)
-    (params  : Params.t)
-    (env     : Vars.env)
-    (system  : SE.t)
-    (mk_rule : Vars.vars -> Pos.pos -> rw_rule option) 
-    (t       : Term.term)
-  : Term.term 
-  =
-  let hyps = Hyps.TraceHyps.empty in
-  let param = Match.default_param in
-
-  let rw_inst : Pos.f_map = 
-    fun occ se vars conds p ->
-      (* build the rule to apply at position [p] using mk_rule *)
-      match mk_rule vars p with
-      | None -> `Continue
-      | Some rule ->
-        assert (rule.rw_kind = GlobalEq);
-        assert (rule.rw_conds = []);
-        
-        let s = `False in       (* we have not found an instance yet *)
-        match 
-          rw_inst 
-            ~param table params env hyps rule 
-            occ se vars conds p s 
-        with
-        | _, `Continue -> assert (not strict); `Continue
-        | _, `Map t -> `Map t
-  in
-
-  let _, f = Pos.map ~mode rw_inst system t in
-  f

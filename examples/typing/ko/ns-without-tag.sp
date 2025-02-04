@@ -21,7 +21,7 @@ senc enc,dec.
 abstract id : index -> message.
 (* idD(i) is the identifier of dishonest agent i *)
 abstract idD: index -> message.
-axiom[any] cst_id_idD : forall i j, id i <> idD j.
+axiom[any] cst_id_idD : forall i j, id i <> idD j <: Real.z.
 hint rewrite cst_id_idD.
 
 (* Ks(i) long-term key shared between id(i) and the server *)

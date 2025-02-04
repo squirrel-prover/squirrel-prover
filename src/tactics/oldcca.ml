@@ -22,7 +22,13 @@ class deprecated_check_symenc_key ~context enc_fn dec_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
-let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~context enc_fn dec_fn key_n =
+let deprecated_symenc_key_ssc
+    ?(concrete = true)
+    ?(messages=[]) ?(elems=[]) ~context enc_fn dec_fn key_n
+  =
+  if concrete then
+    Tactics.hard_failure (Failure "concrete logic unsupported for now ");
+  
   let ssc = new deprecated_check_symenc_key ~context enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_message elems ;
@@ -161,14 +167,19 @@ let deprecated_check_encryption_randomness
     Tactics.soft_failure Tactics.SEncSharedRandom
 
 
-let deprecated_symenc_rnd_ssc ~context head_fn ~key ~key_is elems =
+let deprecated_symenc_rnd_ssc ~concrete ~context head_fn ~key ~key_is elems =
   let rule =
     OldEuf.mk_rule
-      ~fun_wrap_key:None
+      ~concrete ~fun_wrap_key:None
       ~elems ~drop_head:false
       ~context ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n:key.Term.s_symb ~key_is
   in
+
+  (* FEAT: concrete logic for equivalences *)
+  if concrete then
+    Tactics.soft_failure
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
+
   deprecated_check_encryption_randomness ~context
     rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems.terms
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)

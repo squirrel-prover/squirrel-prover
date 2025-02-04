@@ -162,6 +162,7 @@ let tunit = Tuple []
 let tquantum_message = of_s_path ([], "quantum_message"     ) ~args:[]
 let tmeasure_rnd     = of_s_path ([], "quantum_measures_rnd") ~args:[]
 let tint             = of_s_path ([], "int"                 ) ~args:[]
+let treal            = of_s_path (["Real"], "t"             ) ~args:[]
 let tstring          = of_s_path ([], "string"              ) ~args:[]
 
 (*------------------------------------------------------------------*)

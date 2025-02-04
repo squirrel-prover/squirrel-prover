@@ -7,6 +7,8 @@ include[admit] macros.
 include[admit] voteHiding.
 include[admit] deduction.
 
+(*------------------------------------------------------------------*)
+set timeout=10.
 
 (******************************************************************************
 # Reduction of equiv to equiv without macros by bideduction
@@ -22,6 +24,10 @@ Proof.
   rewrite H.
   apply eq_refl.
 Qed.
+
+lemma pair_aux @system:any ['a 'b] (x,x' : 'a) (y,y':'b) :
+  x = x' => y = y' => (x,y) = (x',y').
+Proof. auto. Qed.
 
 (*------------------------------------------------------------------*)
 global lemma [Privacy_CCA] deduction_p2_01 :
@@ -145,8 +151,11 @@ exists fun x =>
 reduce.
 rewrite hphi.
 rewrite and_comm.
-rewrite hframe. 
-auto.
+rewrite hframe.
+apply pair_aux; 1: apply eq_refl. 
+case (phi_out = true).
++ intro -> /=. true.
++ smt ~no_macros.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -511,7 +520,8 @@ cs phi.
   induction t. 
   - by deduce.
 
-  - have ? := depends_Start_MVP _; by constraints.
+  - depends Start, MVP; 1:auto. 
+    intro ?; constraints.
 
   - (* [MVP < Aauth < MOP]: impossible *)
     have ? := Trace.Aauth_MVP _; 1: constraints.
@@ -754,5 +764,7 @@ cs phi.
   clear H.
   clear.
   apply voteHiding.
-
 Qed.
+
+(*------------------------------------------------------------------*)
+set timeout=1.

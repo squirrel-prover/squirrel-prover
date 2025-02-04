@@ -245,7 +245,7 @@ Qed.
 
 include Core.
 
-lemma [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+exact lemma [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 

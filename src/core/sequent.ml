@@ -33,11 +33,13 @@ module PT = struct
          probably yields worse performance rather than a better
          one, because we substitute in several places during the
          construction of the proof term to avoid imprecision issues *)
-    subgs  : Equiv.any_form list;
+    subgs : Equiv.any_form list;
       (** subgoals *)
-    bound  : Concrete.bound;
+    kind : LowRewrite.kind;
+      (** whether local hypotheses are used in this proof term *)
+    bound : LowConcrete.bound;
       (** concrete security bound *)
-    form   : Equiv.any_form;
+    form : Equiv.any_form;
       (** conclusion of the proof term *)
   }
 
@@ -55,7 +57,8 @@ module PT = struct
       args   = List.map (fun (v,tags) -> (Infer.norm_var ienv v, tags)) pt.args;
       mv     = Match.Mvar.map (Term.gsubst s) pt.mv;
       subgs  = List.map (Equiv.Any.gsubst s) pt.subgs;
-      bound  = Concrete.gsubst s pt.bound;
+      kind = pt.kind;
+      bound  = LowConcrete.gsubst s pt.bound;
       form   = Equiv.Any.gsubst s pt.form;
     }
 
@@ -71,12 +74,14 @@ module PT = struct
           (Mvar._pp ppe) pt.mv
     in
     Fmt.pf fmt "@[<v 0>\
-                %a judgement@;\
+                %a@;\
+                %a @;\
                 formula: @[%a@]@;\
                 @[system: @[%a@]@]@;\
                 %t\
                 @[vars: @[%a@]@]@]"
-      (Concrete._pp ppe) pt.bound (* prints bound + judgement kind *)
+      (LowConcrete._pp ppe) pt.bound (* prints bound + judgement kind *)
+      LowRewrite.pp_kind pt.kind
       (Equiv.Any._pp ppe ?context:None) pt.form
       SE.pp_context pt.system
       pp_subgoals_and_mv
@@ -182,23 +187,37 @@ module PT = struct
       mv     = Match.Mvar.map (Term.project projs) pt.mv;
       system = new_system ;
       subgs  = List.map (do_proj false) pt.subgs;
-      bound  = Concrete.bound_projs projs pt.bound;
+      bound  = LowConcrete.bound_projs projs pt.bound;
+      kind = pt.kind;
       form   = do_proj true pt.form; }
 
 end
+
+(*------------------------------------------------------------------*)
+let leq_subgs
+    (table : Symbols.table) (b1 : Term.t) (b2 : Term.t) 
+  : Equiv.any_form 
+  =
+  let e = Real.zero table in
+  let f_leq = Term.mk_leq b1 b2 in
+  Equiv.Global (Equiv.mk_reach_atom ~e f_leq)
+
+(*------------------------------------------------------------------*)
+let pt_arg_is_pat (pt_arg : Typing.pt_app_arg) : bool =
+  match pt_arg with
+  | Typing.PTA_term { pl_desc = Typing.Tpat } -> true
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 (** Check that a proof-term is well-formed *)
 let well_formed (pt : PT.t) : unit =
   begin (* check the bound *)
     match pt.form, pt.bound with
-    | Global _, Concrete.Glob      -> ()
-    | Global _, Concrete.LocHyp    -> assert false
-    | Global _,                  _ -> assert false
-    |        _, Concrete.Glob      -> assert false
-    | Local  _, Concrete.LocAsym   -> ()
-    | Local  _, Concrete.LocHyp    -> ()
-    | Local  _, Concrete.LocConc _ -> ()
+    | Global _, LowConcrete.Glob        -> ()
+    | Global _, _                       -> assert false
+    |        _, LowConcrete.Glob        -> assert false
+    | Local  _, LowConcrete.ReachAsym   -> ()
+    | Local  _, LowConcrete.ReachConc _ -> ()
   end;
 
   begin (* check the subgoals *)
@@ -209,14 +228,17 @@ let well_formed (pt : PT.t) : unit =
 
 (*------------------------------------------------------------------*)
 (** Try to localize [pt] *)
-let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
+let pt_try_localize
+    ~(failed : unit -> PT.t) (pt : PT.t) : PT.t 
+  =
   let rec doit (pt : PT.t) : PT.t =
     match pt.form with
     | Local _ -> pt
     | Global (Atom (Reach f)) ->
-      assert(pt.bound = Glob || pt.bound = LocAsym);
+      assert(pt.bound = Glob || pt.bound = ReachAsym);
       let bound =
-        if f.bound = None then Concrete.LocAsym else LocConc (oget f.bound)
+        if f.bound = None then LowConcrete.ReachAsym
+        else ReachConc (oget f.bound)
       in
       { pt with form = Local f.formula; bound = bound }
 
@@ -285,7 +307,7 @@ let pt_rename_system_pair (pt : PT.t) (system_pair : SE.pair option) : PT.t =
     { pt with
       subgs = List.map psubst pt.subgs;
       form  = psubst pt.form;
-      bound = Concrete.bound_subst_projs proj_subst pt.bound;
+      bound = LowConcrete.bound_subst_projs proj_subst pt.bound;
       system; }
 
 
@@ -316,7 +338,7 @@ let pt_project_system_set
       in
       let pt =
         { pt with subgs = List.map psubst pt.subgs;
-                  bound = Concrete.bound_subst_projs proj_subst pt.bound;
+                  bound = LowConcrete.bound_subst_projs proj_subst pt.bound;
                   (* FIXME shouldn't we subst_projs for mvars? *)
                   form  = psubst pt.form;
                   system = new_system }
@@ -569,23 +591,47 @@ module Mk (Args : MkArgs) : S with
     | PTA_term  t -> L.loc t
     | PTA_sub  pt -> L.loc pt
 
-  let pt_app_arg_as_term (p_arg : Typing.pt_app_arg) : Typing.term =
+  (*------------------------------------------------------------------*)
+  let try_convert_pt_app_arg_as_term
+      (ienv : Infer.env) (s : S.t) (p_arg : Typing.pt_app_arg) 
+    : (Term.t * L.t) option 
+    =
+    let ienv0 = Infer.copy ienv in
+    let failed () = 
+      Infer.set ~tgt:ienv ~value:ienv0; 
+      None
+    in
+
     match p_arg with
-    | Typing.PTA_term t -> t
-    | _ ->
-      hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
+    | Typing.PTA_term p_arg -> 
+      let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
+      begin
+        try
+          let arg, _ =
+            Typing.convert
+              ~option:{Typing.Option.default with pat = `Holes; }
+              ~ienv cenv p_arg
+          in
+          Some (arg, L.loc p_arg)
+        with Typing.Error _ -> failed ()
+      end
+    | _ -> failed ()
 
-  (** A proof term with type [f1 -> f2] argument is either:
-      - another proof term whose type [f'] must match [f1]
-      - an underscore, which generates a subgaol for [f1] *)
-  type pt_impl_arg = [`Pt of Typing.pt | `Subgoal]
+  (*------------------------------------------------------------------*)
+  let check_unify_ty ~loc (ienv : Infer.env) (t : Term.t) (ty : Type.ty) =
+    let t_ty = Term.ty t in
+    match Infer.unify_ty ienv ty t_ty with
+    | `Ok -> ()
+    | `Fail -> Typing.ty_error ienv loc t ~got:t_ty ~expected:ty
 
-  (** Try to interpret a proof term argument as a proof term. *)
+  (*------------------------------------------------------------------*)
+  (** Try to interpret a proof term argument as a proof term. 
+      The proof-term must not be a discharge. *)
   let pt_app_arg_as_pt
-    (p_arg : Typing.pt_app_arg) : [`Pt of Typing.pt | `Subgoal]
+    (p_arg : Typing.pt_app_arg) : Typing.pt
   =
     match p_arg with
-    | Typing.PTA_sub pt -> `Pt pt
+    | Typing.PTA_sub pt -> pt
 
     (* if we gave a term, re-interpret it as a proof term *)
     | Typing.PTA_term ({ pl_desc = Symb applied_symb } as t) 
@@ -606,12 +652,13 @@ module Mk (Args : MkArgs) : S with
           pta_loc  = loc;
         }
       in
-      `Pt (L.mk_loc loc pt_cnt)
+      L.mk_loc loc pt_cnt
 
-    | Typing.PTA_term { pl_desc = Typing.Tpat } -> `Subgoal
+    | Typing.PTA_term { pl_desc = Typing.Tpat } -> 
+      assert false (* cannot happen, we already handle discharge *)
 
     | _ ->
-      hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
+      hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a proof-term")
 
   (*------------------------------------------------------------------*)
   let error_pt_nomatch loc table ~(prove : PT.t) ~(target : PT.t) =
@@ -705,6 +752,10 @@ module Mk (Args : MkArgs) : S with
       in
       L.mk_loc loc (Typing.PT_app app)
 
+    | PT_weak (pt,bound) -> 
+      L.mk_loc loc (Typing.PT_weak (resolve_pt s pt, bound))
+
+
   (*------------------------------------------------------------------*)
   (** Internal
       Get a proof-term conclusion by name (from a lemma, axiom or hypothesis).
@@ -720,22 +771,30 @@ module Mk (Args : MkArgs) : S with
     let top, sub = fst p, snd p in
     if top = [] && Hyps.mem_name (L.unloc sub) s then
       let id, f = Hyps.by_name_k sub Hyp s in
-      let g : (Equiv.any_form * Concrete.bound) =
+      let g : (Equiv.any_form * LowConcrete.bound * LowRewrite.kind) =
         match S.hyp_kind with
-        | Equiv.Any_t -> f, if Equiv.is_local f then Concrete.LocHyp else Glob
+        | Equiv.Any_t ->
+          if Equiv.is_local f
+          then f, LowConcrete.ReachConc (Real.of_int (S.table s) 0), UseLocalContext
+          else f, Glob, Any
         | Equiv.Local_t as src ->
-          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, LocHyp
+          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f,
+          LowConcrete.ReachConc (Real.of_int (S.table s) 0),
+          UseLocalContext
         | Equiv.Global_t as src ->
-          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f, Glob
+          Equiv.Babel.convert ~loc:(L.loc sub) ~src ~dst:Equiv.Any_t f,
+          Glob,
+          Global
       in
-      let f, bound = g in
+      let f, bound, kind = g in
 
       `Hyp id,
       { system = S.system s;
         subgs  = [];
         mv     = Mvar.empty;
         args   = [];
-        bound= bound;
+        kind   = kind;
+        bound  = bound;
         form   = f; }
 
     else
@@ -796,18 +855,18 @@ module Mk (Args : MkArgs) : S with
       if Equiv.is_local_statement form
       then
         (* a local lemma or axiom is actually a global reachability formula *)
-        let form, bound =
+        let form, bound, (kind : LowRewrite.kind) =
           match S.conc_kind, form with
           (* we already downgraded it for local sequents *)
           | Equiv.Local_t, Equiv.LocalS {formula; bound = Some ve } ->
-            Equiv.Local formula, Concrete.LocConc ve
+            Equiv.Local formula, LowConcrete.ReachConc ve, Any
 
           | Equiv.Local_t, Equiv.LocalS {formula; bound = None    } ->
-            Equiv.Local formula, Concrete.LocAsym
+            Equiv.Local formula, LowConcrete.ReachAsym, Any
 
           (* in global sequent, we use it as a global formula  *)
           | Equiv.Global_t, Equiv.LocalS f ->
-            Equiv.Global (Atom (Reach f)), Glob
+            Equiv.Global (Atom (Reach f)), Glob, Global
 
           | _ -> assert false (* impossible *)
         in
@@ -817,17 +876,18 @@ module Mk (Args : MkArgs) : S with
           mv     = Mvar.empty;
           subgs  = [];
           args   = [];
+          kind;
           bound;
           form; }
       else
       (* a local lemma or axiom is actually a global reachability formula *)
-      let form =
+      let form, (kind : LowRewrite.kind) =
         match S.conc_kind, form with
         (* we already downgrade it for local sequents *)
-        | Equiv.Local_t, Equiv.GlobalS f -> Equiv.Global f
+        | Equiv.Local_t, Equiv.GlobalS f -> Equiv.Global f, Any
         (* in global sequent, we use it as a global formula  *)
-        | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f))
-        | Equiv.Global_t, Equiv.GlobalS f -> Equiv.Global f
+        | Equiv.Global_t, Equiv.LocalS f -> Equiv.Global (Atom (Reach f)), Global
+        | Equiv.Global_t, Equiv.GlobalS f -> Equiv.Global f, Global
         | _  -> assert false (* impossible *)
       in
 
@@ -836,6 +896,7 @@ module Mk (Args : MkArgs) : S with
           mv     = Mvar.empty;
           subgs  = [];
           args   = [];
+          kind = kind;
           bound = Glob;
           form; }
 
@@ -884,6 +945,15 @@ module Mk (Args : MkArgs) : S with
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
+  let subst_of_pt ~loc ienv table (vars : Vars.env) (pt : PT.t) : Term.subst =
+    let pt_venv = venv_of_pt vars pt in
+    match Mvar.to_subst ~ienv ~mode:`Unif table pt_venv pt.mv with
+    | `Subst sbst -> sbst
+    | `BadInst pp_err ->
+      soft_failure ~loc
+        (Failure (Fmt.str "@[<hv 2>proof-term failed:@ @[%t@]@]" pp_err))
+
+  (*------------------------------------------------------------------*)
   let pt_decompose_forall (pt : PT.t) : PT.t =
     let f_args, form = decompose_forall_tagged_k Equiv.Any_t pt.form in
     let f_args, subst = Term.refresh_vars_w_info f_args in
@@ -892,6 +962,75 @@ module Mk (Args : MkArgs) : S with
     let args = List.append f_args pt.args in
 
     { pt with form; args; }
+
+  (*------------------------------------------------------------------*)
+  (** If [pt.form] does not start with the wanted construct, try
+      to reduce it once. *)
+  let try_reduce_head1 ~failed (pt : PT.t) (s : S.t) : PT.t =
+    let form, has_red =
+      match pt.form with
+      | Equiv.Local f -> 
+        let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Local_t f in
+        Equiv.Local f, has_red
+      | Equiv.Global f ->
+        let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t f in
+        Equiv.Global f, has_red
+    in
+    let pt = { pt with form } in
+
+    if has_red = True then pt
+    else failed pt
+
+  (** Decompose [pt.form] as an implication [f1 → f2], possibly
+      reducing [pt] *)
+  let rec decompose_impl
+      ~failed ~loc
+      (s : S.t) (ienv : Infer.env) (pt : PT.t) 
+    : Equiv.any_form * Equiv.any_form * PT.t 
+    =
+    let table = S.table s in
+    let pt_env = env_of_pt table (S.system s) (S.vars s) pt in
+    (* try to destruct [pt.form] as an implication *)
+    match destr_impl_k Equiv.Any_t pt_env pt.form with
+    | Some (f1, f2) -> (f1, f2, pt)
+    | None ->
+      (* destruct failed, applying the pending substitution and try to
+         destruct again *)
+      let subst =
+        subst_of_pt ~loc ienv table (S.vars s) pt 
+      in
+      let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
+      match
+        destr_impl_k Equiv.Any_t pt_env pt.form
+      with
+      | Some (f1, f2) -> (f1, f2, pt)
+      | None -> 
+        let pt = try_reduce_head1 ~failed pt s in
+        decompose_impl ~failed ~loc s ienv pt
+
+  (** Decompose [pt.form] as a forall, possibly reducing [pt] *)
+  let rec decompose_forall
+      ~failed ~loc
+      (s : S.t) (ienv : Infer.env) 
+      (pt : PT.t) : (Vars.tagged_var * Equiv.any_form) * PT.t 
+    =
+    let table = S.table s in
+    match destr_forall1_tagged_k Equiv.Any_t pt.form with
+    | Some x -> x, pt
+    | None ->
+      (* destruct failed, applying the pending substitution and try to
+         destruct again *)
+      let subst =
+        subst_of_pt ~loc ienv table (S.vars s) pt 
+      in
+      let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
+      match
+        destr_forall1_tagged_k Equiv.Any_t pt.form
+      with
+      | Some x -> x, pt
+      | None -> 
+        let pt = try_reduce_head1 ~failed pt s in
+        decompose_forall ~failed ~loc s ienv pt
     
   (*------------------------------------------------------------------*)
   (** Apply proof-term ([PT.t]) to some term ([Term.term]):
@@ -947,7 +1086,7 @@ module Mk (Args : MkArgs) : S with
       Mvar.add (f_arg, f_arg_tag) pt.system.set pt_arg pt.mv
     in
     { subgs = pt.subgs; args; mv; form = f;
-      bound = pt.bound; system = pt.system }
+      kind = pt.kind; bound = pt.bound; system = pt.system }
 
   (*------------------------------------------------------------------*)
   let pt_downgrade_warning table ~(pt : PT.t) ~(arg : PT.t) : unit =
@@ -976,15 +1115,6 @@ module Mk (Args : MkArgs) : S with
       (Failure "cannot apply a concrete implication \
                 with an asymptotic hypothesis")
 
-   (*------------------------------------------------------------------*)
-  let subst_of_pt ~loc ienv table (vars : Vars.env) (pt : PT.t) : Term.subst =
-    let pt_venv = venv_of_pt vars pt in
-    match Mvar.to_subst ~ienv ~mode:`Unif table pt_venv pt.mv with
-    | `Subst sbst -> sbst
-    | `BadInst pp_err ->
-      soft_failure ~loc
-        (Failure (Fmt.str "@[<hv 2>proof-term failed:@ @[%t@]@]" pp_err))
-
   (*------------------------------------------------------------------*)
   (** Apply [pt] to [arg] when [pt] is an implication.
       Pop the first implication [f1] of [pt.form], instantiate (by matching) it
@@ -993,7 +1123,7 @@ module Mk (Args : MkArgs) : S with
       Remark: [arg]'s substitution must be an extention of
       [pt]'s substitution. *)
   let pt_apply_var_impl
-      (* ~(loc : L.t)  *) ~(loc_arg : L.t)
+      ~loc ~(loc_arg : L.t)
       (ienv : Infer.env) (s : S.t)
       (pt : PT.t) (arg : PT.t)
     : PT.t
@@ -1011,22 +1141,27 @@ module Mk (Args : MkArgs) : S with
       | Equiv.Global _, Equiv.Global _ -> pt, arg
       | Equiv.Local  _, Equiv.Global _ ->
         (* downgrade [arg] *)
-        let down_arg = pt_try_localize ~failed:apply_kind_error arg in
+        let down_arg =
+          pt_try_localize ~failed:apply_kind_error arg
+        in
         pt, down_arg
 
       | Equiv.Global _, Equiv.Local  _ ->
         (* downgrade [pt] *)
-        let down_pt = pt_try_localize ~failed:apply_kind_error pt in
+        let down_pt =
+          pt_try_localize ~failed:apply_kind_error pt
+        in
         pt_downgrade_warning table ~pt ~arg;
+
+
         down_pt, arg
     in
 
-    let f1, f2 =
-      let pt_env = env_of_pt (S.table s) (S.system s) (S.vars s) pt in
-      oget (destr_impl_k Equiv.Any_t pt_env pt.form)
-    in
+    let failed _pt = apply_kind_error () in
+
+    let f1, f2, pt = decompose_impl ~failed ~loc s ienv pt in
+
     (* Specializing [pt.form] by an extention of [pt.mv]. *)
-    (* FIXME: correct location? *)
     let sbst = subst_of_pt ~loc:loc_arg ienv table (S.vars s) arg in
     let f1 = Equiv.Any.subst sbst f1 in
     let pat_f1 = Term.{
@@ -1045,25 +1180,59 @@ module Mk (Args : MkArgs) : S with
       pt_unify_systems ~failed:(pt_apply_error arg) table ienv (S.vars s) ~pt ~arg
     in
 
+    let bound =
+      match pt.bound, arg.bound with
+      | ReachConc b, ReachConc b_arg ->
+        LowConcrete.ReachConc (Real.mk_add ~simpl:true table b b_arg)
+      | f, g when LowConcrete.entails table (S.system s) g f  -> f
+      | _ -> error_pt_apply_asymptotic_concrete ()
+    in
+
+    let concrete = bound <> ReachAsym in
+    (* variable environment with both [pt] and [arg] variables
+       (with their tags). *)
+    let full_env = Vars.add_vars (arg.args @ pt.args) (S.vars s) in
+
+    let try_match_term mv f_arg f1 =
+      let pat_f1 = { pat_f1 with pat_op_term = f1 } in
+      Match.T.try_match
+        ~param:Match.logic_param ~concrete
+        ~ienv ~mv ~env:full_env
+        table pt.system f_arg pat_f1
+    in
+
+    let bound_subg = ref None in
     let match_res =
-      (* variable environment with both [pt] and [arg] variables
-         (with their tags). *)
-      let env = Vars.add_vars (arg.args @ pt.args) (S.vars s) in
-
+      let (let*) = Match.(let*) in
       match f1, arg.form with
+      (* local/local *)
       | Local f1, Local f_arg ->
-        let pat_f1 = { pat_f1 with pat_op_term = f1 } in
-        Match.T.try_match
-          ~param:Match.logic_param
-          ~ienv ~mv:arg.mv ~env
-          table pt.system f_arg pat_f1
+        try_match_term arg.mv f_arg f1
 
+      (* global [f1 <: b1]/ global [f_arg <: b_arg] *)
+      | Global (Atom (Reach {formula = f1;    bound = Some b1;   })),
+        Global (Atom (Reach {formula = f_arg; bound = Some b_arg;})) ->
+        assert(pt.bound = Glob && arg.bound = Glob);
+        let* mv = try_match_term arg.mv f_arg f1 in
+        begin
+          match try_match_term mv b_arg b1 with
+          (* formulas and bounds match *)
+          | Match.Match _ as mr -> mr
+
+          (* formulas match, bounds do not *)
+          | Match.NoMatch _ ->
+            let subg = leq_subgs table b_arg b1 in
+            bound_subg := Some subg;
+            Match.Match mv
+        end
+
+      (* global/global *)
       | Global f1, Global f_arg  ->
         assert(pt.bound = Glob && arg.bound = Glob);
         let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
-          ~param:Match.logic_param
-          ~ienv ~mv:arg.mv ~env
+          ~param:Match.logic_param ~concrete
+          ~ienv ~mv:arg.mv ~env:full_env
           table pt.system f_arg pat_f1
 
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
@@ -1072,25 +1241,14 @@ module Mk (Args : MkArgs) : S with
       | Match.NoMatch _  -> pt_apply_error arg ()
       | Match.Match   mv -> mv
     in
+    let kind = LowRewrite.kind_comp pt.kind arg.kind in
 
     (* Add to [pt.args] the new variables that must be instantiated in
        the proof term [p_arg]. *)
     let args = List.rev_append arg.args pt.args in
-    let subgs = arg.subgs @ pt.subgs in
-    let bound =
-      match pt.bound, arg.bound with
-      | LocConc b, LocConc sb ->
-        Concrete.LocConc
-          (Library.Real.mk_add table sb (Library.Real.mk_opp table b))
-      | f, g when Concrete.equal f g  -> f
-      | LocAsym  , LocHyp    -> LocAsym
-      | LocHyp   , LocAsym   -> LocAsym
-      | LocHyp   , LocConc _ -> arg.bound
-      | LocConc _, LocHyp    -> pt.bound
-      | _ -> error_pt_apply_asymptotic_concrete ()
-    in
-    { subgs; mv; args; form = f2; bound; system = pt.system; }
-
+    let subgs = Option.to_list !bound_subg @ arg.subgs @ pt.subgs in
+    { subgs; mv; args; form = f2; kind; bound; system = pt.system; }
+    
   (*------------------------------------------------------------------*)
   let error_pt_cannot_apply loc table (pt : PT.t) =
     let ppe = default_ppe ~table () in
@@ -1110,6 +1268,15 @@ module Mk (Args : MkArgs) : S with
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
+  let error_cannot_weaken_asymptotic loc table (pt : PT.t) =
+    let ppe = default_ppe ~table () in
+    let err_str =
+      Fmt.str "@[<v 0>cannot weaken an asymptotic proof term:@;  @[%a@]@;@]"
+        (PT._pp ppe) pt
+    in
+    soft_failure ~loc (Failure err_str)
+
+  (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec do_convert_pt_gen
       (ienv : Infer.env)
@@ -1122,18 +1289,67 @@ module Mk (Args : MkArgs) : S with
       match L.unloc p_pt with
       | Typing.PT_symb applied_symb ->
         do_convert_path ienv mv applied_symb s
-      | Typing.PT_app pt_app -> do_convert_pt_app ienv mv pt_app s
+      | Typing.PT_app pt_app ->
+        do_convert_pt_app ienv mv pt_app s
+
       | Typing.PT_localize p_sub_pt -> 
         let ghyp, sub_pt = do_convert_pt_gen ienv mv p_sub_pt s in
         let pt = 
-          pt_try_localize
+          pt_try_localize 
             ~failed:(error_pt_cannot_localize (L.loc p_sub_pt) table sub_pt)
             sub_pt
         in
         ghyp, pt
+
+      | PT_weak (p_sub_pt,bound) -> 
+        do_convert_pt_weak ienv mv p_sub_pt bound s
     in
     well_formed pt;             (* sanity check *)
     ghyp, pt
+
+  and do_convert_pt_weak
+      (ienv : Infer.env) (mv : Mvar.t) 
+      (p_pt : Typing.pt) (bound : Typing.term)
+      (s : S.t)
+    : ghyp * PT.t
+    =
+    let loc = L.loc p_pt in
+    let table = S.table s in
+
+    (* convert the proof-term *)
+    let ghyp, pt = do_convert_pt_gen ienv mv p_pt s in
+
+    (* localize it *)
+    let pt = 
+      pt_try_localize
+        ~failed:(error_pt_cannot_localize loc table pt)
+        pt
+    in
+
+    (* check that [pt] is concrete and obtain its bound *)
+    let pt_bound = 
+      match pt.bound with
+      | LowConcrete.ReachConc b -> b
+      | _ -> error_cannot_weaken_asymptotic loc table pt
+    in
+
+    (* parse the user-provided bound *)
+    let bound, _ = 
+      let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
+      Typing.convert
+        ~option:{Typing.Option.default with pat = `Holes; }
+        ~ienv cenv ~ty:Type.treal bound
+    in
+
+    (* build the inequality sub-goal weakening to [bound] *)
+    let leq_subg = leq_subgs table pt_bound bound in
+    let pt = { 
+      pt with subgs = leq_subg :: pt.subgs; 
+              bound = ReachConc bound; 
+    } 
+    in
+
+    (ghyp, pt)
 
   and do_convert_path
       (ienv  : Infer.env)
@@ -1169,73 +1385,13 @@ module Mk (Args : MkArgs) : S with
     let exception CannotApply of PT.t in
 
     let table, env = S.table s, S.vars s in
+    let loc = pt_app.pta_loc in
 
-    let lem_name, init_pt = 
+    let lem_name, init_pt =
       do_convert_pt_gen ienv init_mv pt_app.pta_head s 
     in
-
+    
     let cenv = Typing.{ env = S.env s; cntxt = InGoal; } in
-
-    (** If [pt.form] does not start with the wanted construct, try
-        to reduce it once. *)
-    let try_reduce_head1 (pt : PT.t) : PT.t =
-      let form, has_red = 
-        match pt.form with
-        | Equiv.Local f -> 
-          let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Local_t f in
-          Equiv.Local f, has_red
-        | Equiv.Global f ->
-          let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t f in
-          Equiv.Global f, has_red
-      in
-      let pt = { pt with form } in
-
-      if has_red = True then pt
-      else raise (CannotApply pt)
-    in
-
-    (** decompose [pt.form] as an implication [f1 → f2], possibly
-        reducing [pt] *)
-    let rec decompose_impl
-        (pt : PT.t) : Equiv.any_form * Equiv.any_form * PT.t 
-      =
-      let pt_env = env_of_pt (S.table s) (S.system s) (S.vars s) pt in
-      (* try to destruct [pt.form] as an implication *)
-      match destr_impl_k Equiv.Any_t pt_env pt.form with
-      | Some (f1, f2) -> (f1, f2, pt)
-      | None ->
-        (* destruct failed, applying the pending substitution and try to
-           destruct again *)
-        let subst =
-          subst_of_pt ~loc:pt_app.pta_loc ienv table (S.vars s) pt 
-        in
-        let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
-        match
-          destr_impl_k Equiv.Any_t pt_env pt.form
-        with
-        | Some (f1, f2) -> (f1, f2, pt)
-        | None -> decompose_impl (try_reduce_head1 pt)
-    in
-
-    (** decompose [pt.form] as a forall, possibly reducing [pt] *)
-    let rec decompose_forall
-        (pt : PT.t) : (Vars.tagged_var * Equiv.any_form) * PT.t 
-      =
-      match destr_forall1_tagged_k Equiv.Any_t pt.form with
-      | Some x -> x, pt
-      | None ->
-        (* destruct failed, applying the pending substitution and try to
-           destruct again *)
-        let subst =
-          subst_of_pt ~loc:pt_app.pta_loc ienv table (S.vars s) pt 
-        in
-        let pt = { pt with form = Equiv.Any.subst subst pt.form; } in
-        match
-          destr_forall1_tagged_k Equiv.Any_t pt.form
-        with
-        | Some x -> x, pt
-        | None -> decompose_forall (try_reduce_head1 pt)
-    in
 
     (** Apply [pt] to [p_arg] when [pt] is a forall. *)
     let do_var
@@ -1251,30 +1407,45 @@ module Mk (Args : MkArgs) : S with
       pt_apply_var_forall ~arg_loc:(L.loc p_arg) ienv table env pt arg
     in
 
+    let failed pt = raise (CannotApply pt) in
+
+    (** Try to apply [pt] to [_]. *)
+    let do_impl_subgoal ~loc s ienv (pt : PT.t) : PT.t =
+      let f1, f2, pt = decompose_impl ~failed ~loc s ienv pt in
+      { PT.system = pt.system;
+        subgs  = f1 :: pt.subgs;
+        mv     = pt.mv;
+        args   = pt.args;
+        kind = pt.kind;
+        bound  = pt.bound;
+        form   = f2; }
+    in
+    
+    let do_discharge (pt : PT.t) =
+      try (* try as a [f1 → f2] *)
+        do_impl_subgoal ~loc s ienv pt
+      with CannotApply _ ->             
+      try (* try as a [∀ x. f1] *)
+        let (v, _f1), pt = decompose_forall ~failed ~loc s ienv pt in
+        do_var pt v (L.mk_loc L._dummy Typing.Tpat)
+
+      with CannotApply pt -> (* failed, reports to the user *)
+        error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
+    in
+
     (** Apply [pt] to [p_arg] when [pt] is an implication.
         We must have [pt.form = f1 → f2]. *)
     let do_impl
         (ienv : Infer.env)
         (pt : PT.t)
-        (f1 : Equiv.any_form) (f2 : Equiv.any_form) 
-        (pt_impl_arg : pt_impl_arg)
+        (p_arg : Typing.pt)
       : PT.t
       =
-      match pt_impl_arg with
-      | `Subgoal ->             (* discharge the subgoal *)
-        { PT.system = pt.system;
-          subgs  = f1 :: pt.subgs;
-          mv     = pt.mv;
-          args   = pt.args;
-          bound  = pt.bound;
-          form   = f2; }
-
-      | `Pt p_arg ->
-        let _, pt_arg = do_convert_pt_gen ienv pt.mv p_arg s in
-        pt_apply_var_impl
-          ~loc_arg:(L.loc p_arg)
-          ienv s
-          pt pt_arg
+      let _, pt_arg = do_convert_pt_gen ienv pt.mv p_arg s in
+      pt_apply_var_impl
+        ~loc ~loc_arg:(L.loc p_arg)
+        ienv s
+        pt pt_arg
     in
 
     (* fold through the provided arguments and [f],
@@ -1282,17 +1453,31 @@ module Mk (Args : MkArgs) : S with
        and accumulating proof obligations. *)
     let pt =
       List.fold_left (fun (pt : PT.t) (p_arg : Typing.pt_app_arg) ->
-          try (* try as a [f1 → f2] *)
-            let f1, f2, pt = decompose_impl pt in
-            do_impl ienv pt f1 f2 (pt_app_arg_as_pt p_arg)
-          with CannotApply _ ->
 
-          try (* try as a [∀ x. f1] *)
-            let (v, _f1), pt = decompose_forall pt in
-            do_var pt v (pt_app_arg_as_term p_arg)
+          (* if [arg] is a term hole [_], do a discharge *)
+          if pt_arg_is_pat p_arg then do_discharge pt
 
-          with CannotApply pt -> (* failed, reports to the user *)
-            error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
+          (* Otherwise, decide if [pt] should be elaborated as a [∀
+             x. f1] or a [f1 → f2] according to whether [p_arg] can be
+             parsed as a term. *)
+          else
+            let arg = try_convert_pt_app_arg_as_term ienv s p_arg in
+            match arg with
+            (* [arg] is a term, decompose [pt] as a [∀ x. f1] *)
+            | Some (arg, loc) ->
+              (* FIXME: concrete: match the paper rules *)
+              let ((v,_), _f1), pt = 
+                try decompose_forall ~failed ~loc s ienv pt with
+                | CannotApply pt -> (* failed, reports to the user *)
+                  error_pt_cannot_apply (L.loc pt_app.pta_head) table pt
+              in
+
+              check_unify_ty ~loc ienv arg (Vars.ty v);
+
+              pt_apply_var_forall ~arg_loc:loc ienv table env pt arg
+
+            (* [arg] is not a term, decompose [pt] as [f1 → f2] *)
+            | None -> do_impl ienv pt (pt_app_arg_as_pt p_arg)
         ) init_pt pt_app.pta_args
     in
 
@@ -1310,12 +1495,25 @@ module Mk (Args : MkArgs) : S with
       List.filter (fun (v, _) -> not (Mvar.mem v pt.mv)) pt.args
     in
     (* instantiate infered variables *)
-    (* FIXME why don't we substitute in [pt.bound]? *)
     let subst = subst_of_pt ~loc ienv table env pt in 
     let form = Equiv.Any.subst subst pt.form in
+    let bound = LowConcrete.subst subst pt.bound in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
+
+
     (* the only remaining variables are pattern holes '_' *)
-    assert (List.for_all (fst_map Vars.is_hole) args);
+    if not (List.for_all (fst_map Vars.is_hole) args) then begin
+      let vars =
+        List.filter (fun (v,_) -> not @@ Vars.is_hole v) args |> 
+        List.map fst
+      in
+      let err_msg = 
+        Fmt.str "some arguments could not be inferred: @[%a@]"
+          (Fmt.list ~sep:Fmt.comma Vars.pp) vars
+      in
+      soft_failure ~loc (Failure err_msg)
+    end;
+
 
     (* rename remaining pattern variables,
        to avoid having variables named '_' in the rest of the prover. *)
@@ -1329,7 +1527,7 @@ module Mk (Args : MkArgs) : S with
     in
     let form = Equiv.Any.subst subst form in
     let subgs = List.map (Equiv.Any.subst subst) subgs in
-    { pt with mv = Mvar.empty; subgs; args; form; }
+    { pt with mv = Mvar.empty; subgs; args; form; bound; }
 
   (*------------------------------------------------------------------*)
   let error_pt_bad_system loc table ienv (pt : PT.t) =
@@ -1475,7 +1673,7 @@ module Mk (Args : MkArgs) : S with
     let table  = S.table  s in
     let env    = S.env    s in
     let system = S.system s in
-    
+
     (* resolve (to some extent) parser ambiguities in [s] *)
     let p_pt = resolve_pt s p_pt in
     let loc = L.loc p_pt in

@@ -34,8 +34,9 @@ include Sequent.Mk(struct
             | LHyp (Global f) -> ES.Hyps.add (Args.Named (Ident.name id)) (LHyp f) es
             | LHyp (Local f) ->
               begin
+                let z_r = Real.mk_zero (S.table s) in
                 match bound s with
-                | None ->       (* asymptotic logic *)
+                | ReachAsym ->       (* asymptotic logic *)
                   if HighTerm.is_constant                               env f &&
                      HighTerm.is_single_term_in_se ~se:[env.system.set] env f
                      (* We can keep an hypothesis ϕ if it is constant
@@ -55,11 +56,20 @@ include Sequent.Mk(struct
                     ES.Hyps.add
                       (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom f)) es
                   else es
+
+                | ReachConc _ as e when Concrete.ge_zero (S.table s) e ->       (* concrete logic *)
+                  if HighTerm.is_constant                               env f &&
+                     HighTerm.is_single_term_in_se ~se:[env.system.set] env f
+                       (* for systems, look to the asymptotic case *)
+                       (* A constant boolean is either always true or always false, so we can assume that it is always true *)
+                  then
+                    ES.Hyps.add
+                      (Args.Named (Ident.name id)) (LHyp (Equiv.mk_reach_atom ~e:z_r f)) es
+                     (*FEAT:Concrete: We could also make it exact in the asymptotic case, but not sure it is useful*)
+                  else es
                     
-                | Some _ -> es
-                  (* TODO:Concrete allow to keep the local hypothesis
-                     with bound 0 when the bound of the conclusion is
-                     more than 0*)
+                | ReachConc _ -> es
+                | _ -> assert false
               end
             | LDef (se,t) -> 
               let id', es = ES.Hyps._add ~force:true id (LDef (se,t)) es in

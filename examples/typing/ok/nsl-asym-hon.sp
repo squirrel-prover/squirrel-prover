@@ -23,11 +23,11 @@ abstract id : index -> message.
 abstract tag1: message. 
 abstract tag2: message. 
 abstract tag3: message.
-axiom[any] cst12_diff : tag1 <> tag2.
+axiom[any] cst12_diff : tag1 <> tag2 <: Real.z.
 hint rewrite cst12_diff.
-axiom[any] cst13_diff : tag1 <> tag3.
+axiom[any] cst13_diff : tag1 <> tag3 <: Real.z.
 hint rewrite cst13_diff.
-axiom[any] cst23_diff : tag2 <> tag3.
+axiom[any] cst23_diff : tag2 <> tag3 <: Real.z.
 hint rewrite cst23_diff.
 
 (* sKey(i) long-term private key of (honest) agent id(i) *)

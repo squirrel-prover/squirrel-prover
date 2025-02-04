@@ -307,7 +307,6 @@ module CondTerm = struct
      - removing duplicates in conds *)
   let polish_conds (pc : ProofContext.t) (c:t) =
     let st =
-      let pc = ProofContext.make ~env:pc.env ~hyps:pc.hyps in
       Reduction.mk_state pc ~red_param:ReductionCore.rp_crypto
     in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
@@ -330,7 +329,7 @@ module CondTerm = struct
         ) pc.hyps c.conds
     in
     let st =
-      let pc = ProofContext.make ~env:pc.env ~hyps in
+      let pc = ProofContext.set_hyps hyps pc in
       Reduction.mk_state pc ~red_param
     in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
@@ -1129,9 +1128,10 @@ module TSet = struct
 
       Note that [input]'s variables have been refreshed. *)
   let cterm_mem_cond
-      (env : Env.t) hyps ~(output : CondTerm.t) ~(input: t)
+      (pc : ProofContext.t) ~(output : CondTerm.t) ~(input: t)
     : Mvar.t option * Vars.vars * Term.terms
     =
+    let env = pc.env in
     let input = _refresh input in
     let input_pat = 
       Term.{ 
@@ -1148,13 +1148,13 @@ module TSet = struct
            TraceHyps.add
              TacticsArgs.AnyName
              (LHyp (Equiv.Local cond)) hyps)
-        hyps
+        pc.hyps
         (output.conds @ input.conds)
     in 
     let res = 
       match 
         Match.T.try_match
-          ~param:Match.crypto_param
+          ~param:Match.crypto_param ~concrete:pc.concrete
           ~env:env.vars ~hyps env.table env.system
           output.term input_pat
       with Match mv -> Some mv | _ -> None
@@ -1719,9 +1719,14 @@ end
     we a value [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary
     can get [φ v, if φ v then t v] for any [v] it can compute. *)
 type query = {
-  env  : Env.t;
   game : game;
+
+  (* FIXME: merge fields below in a [ProofContext.t] *)
+  env  : Env.t;
   hyps : TraceHyps.hyps;
+  concrete : bool;
+  (** Are we doing a concrete or asymptotic reduction
+      (for now, only the asymptotic reduction is supported) *)
 
   param : param;
 
@@ -1770,6 +1775,10 @@ let empty_result (mem: AbstractSet.mem) : result =
     extra_outputs = [];
     final_mem     = mem;
     consts        = [];}
+
+(*------------------------------------------------------------------*)
+let pc_of_query (q : query) : ProofContext.t =
+  ProofContext.make ~env:q.env ~hyps:q.hyps ~concrete:q.concrete 
 
 (*------------------------------------------------------------------*)
 (** Functions to chain query and result trought transitivity rules *)
@@ -1844,8 +1853,13 @@ let chain_results (res1 : result) (res2 : result) : result=
     function below.
 *)
 type goal = {
+  (* FIXME: merge fields below in a [ProofContext.t] *)
   env  : Env.t;                 (** E *)
   hyps : TraceHyps.hyps;        (** Γ *)
+  concrete : bool;
+  (** Are we doing a concrete or asymptotic reduction
+      (for now, only the asymptotic reduction is supported) *)
+
   game : game ;                 (** G *)
 
   (** universally quantified variables [x] *)
@@ -1891,6 +1905,7 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
     output_term   = Term.subst subst goal.output_term;
     output_conds  = List.map (Term.subst subst) goal.output_conds;
     rec_predicate = omap (Term.subst subst) goal.rec_predicate;
+    concrete      = goal.concrete;
     vbs           = goal.vbs;
     dbg           = goal.dbg;
   }
@@ -2117,7 +2132,7 @@ module Game = struct
       This is done modulo reduction. *)
   let game_random_to_names
       (red_param : ReductionCore.red_param)
-      ~(env : Env.t) ~(hyps : TraceHyps.hyps)
+      ~(pc : ProofContext.t)
       (mv : Mvar.t) (oracle_pat : oracle_pat)
     : Mvar.t option
     = 
@@ -2125,7 +2140,6 @@ module Game = struct
 
     (* reduction state and parameters *)
     let strat = Reduction.MayRedSub red_param in
-    let pc = ProofContext.make ~env ~hyps in
     let st = Reduction.mk_state pc ~red_param in
 
     (* ensure that [mv] only maps the game random values to logical
@@ -2224,6 +2238,7 @@ module Game = struct
       : oracle_match option
       =
       let param = Match.crypto_param in
+      let pc = pc_of_query query in
       let match_res =
         let vars = oracle_pat.loc_names @ oracle_pat.glob_names @ oracle_pat.args in
         let pat =
@@ -2234,7 +2249,7 @@ module Game = struct
           }
         in
         Match.T.try_match
-          ~param
+          ~param:Match.crypto_param ~concrete:query.concrete
           ~env:env.vars ~hyps:query.hyps env.table env.system
           term.term pat
       in
@@ -2245,7 +2260,7 @@ module Game = struct
         (* [game_mv ⊆ mv] and is the partial instantiation of the game
            randomly sampled values we inferred by matching. *)
         let mv =
-          game_random_to_names param.red_param ~env ~hyps:query.hyps mv oracle_pat
+          game_random_to_names param.red_param ~pc mv oracle_pat
         in
         match mv with
         | None -> None
@@ -2424,6 +2439,7 @@ module Game = struct
       (oracle     : oracle)
     : (call_oracle_res, _) Result.t
     =
+    let context = pc_of_query query in
     let subst = Mvar.to_subst_locals ~mode:`Match mv in
     let oracle_cond = Term.subst subst (Term.mk_ands oracle_pat.cond) in
     let subgoals = List.map (Term.subst subst) subgoals in
@@ -2444,7 +2460,7 @@ module Game = struct
       let oracle_conds = Term.subst subst_eqs oracle_cond in
       let mem_subgoals =
         abstract_bool
-          (ProofContext.make ~env:query.env ~hyps:query.hyps)
+          context
           { term  = oracle_conds; conds; } 
           query.initial_mem
       in     
@@ -2455,7 +2471,7 @@ module Game = struct
             local_subst query.let_init query.game oracle
           in
           update
-            (ProofContext.make ~env:query.env ~hyps:query.hyps)
+            context
             mv subst_eqs
             conds
             (List.map (fun (x,y) -> (x, Term.subst oracle_subst y)) oracle.updates )
@@ -2603,7 +2619,7 @@ let knowledge_mem_condterm_sets
   let table = pc.env.table in
   
   let is_in (input : TSet.t) : (Term.terms * Term.term * Term.term) option =
-    match TSet.cterm_mem_cond pc.env pc.hyps ~output ~input with
+    match TSet.cterm_mem_cond pc ~output ~input with
     | (None,_,_) -> None
 
     | (Some mv, vars, conds) -> 
@@ -2859,7 +2875,7 @@ let rec bideduce_term_strict
     (query : query)
     (output_term : CondTerm.t) : result option
   =
-  let pc = ProofContext.make ~env:query.env ~hyps:query.hyps in
+  let pc = pc_of_query query in
   let output_term = CondTerm.whnf_term ~red_param:ReductionCore.rp_crypto pc output_term in
   let conds = output_term.conds in
   match output_term.term with
@@ -3044,7 +3060,7 @@ and bideduce_term
   : result option
   =
   let env = query.env in
-  let pc = ProofContext.make ~env:query.env ~hyps:query.hyps in
+  let pc = pc_of_query query in
   let output = CondTerm.polish_conds pc output in
   let output = 
     CondTerm.whnf_term ~red_param:ReductionCore.rp_default pc output
@@ -3105,14 +3121,14 @@ and bideduce_term
 and bideduce_oracle
     (query : query) (initial_output : CondTerm.t) : result option
   =
+  let pc = pc_of_query query in
   (* First checking that the oracle could have been called before in the computation.
      I.e, [output ∈ extra_inputs] under [condition] and the fact that
      [args] can be deduced.
      Return a list of: [(args, condition, ¬ condition)] *)
   let already_called =
     knowledge_mem_condterm_sets
-      (ProofContext.make ~env:query.env ~hyps:query.hyps)
-      initial_output query.extra_inputs
+      pc initial_output query.extra_inputs
   in
   let output_term,query,result_start = 
     if already_called <> [] then
@@ -3304,7 +3320,9 @@ and bideduce_fp
     let post = result.final_mem in    (* [ψ] *)
     let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
-    let pc = ProofContext.make ~env ~hyps:query.hyps in
+    let pc =
+      ProofContext.make ~env ~hyps:query.hyps ~concrete:query.concrete
+    in
 
     if AbstractSet.is_eq pc pre  gen_post && (* [φ ⇔ ψ₀] *)
        AbstractSet.is_eq pc post gen_post    (* [ψ ⇔ ψ₀] *)
@@ -3359,7 +3377,7 @@ let derecursify_term
   let table = pc.env.table in
 
   let t_fold : _ Match.Pos.f_map_fold = 
-    fun t se vars conds p acc ->
+    fun t se vars conds p _info acc ->
       (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
          
          Must be synchronized with corresponding code in [Occurrences]
@@ -3407,17 +3425,16 @@ let derecursify_term
 (** Given a term, return some corresponding [known_sets] using
     built-in rules + user-given deduction rules *)
 let term_set_strengthen (pc : ProofContext.t) (k : TSet.t) : TSet.t list =
-  let env = pc.env in
   (* convert [k] from a [TSet.t] to a [Match.term_set] *)
   let k = Match.{
       term = k.term; 
       vars = Vars.Tag.global_vars ~const:false ~adv:true k.vars; 
       cond = k.conds; 
-      se = env.system.set;       
+      se = pc.env.system.set;       
       info = {used = false; };
     }
   in
-  let l = Match.term_set_strengthen ~inputs:[] env pc.hyps k in (* FIXME: provide useful inputs *)
+  let l = Match.term_set_strengthen pc ~inputs:[] k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
   List.map (fun (k : Match.info Match.term_set) ->
       assert (
@@ -3573,6 +3590,7 @@ let derecursify
       rec_fun; rec_arg; rec_predicate;
       env; game; vbs; dbg;
       hyps;
+      concrete = pc.concrete;
       rec_inputs    = rec_terms;
       extra_inputs  = [];
       extra_outputs = [];
@@ -3602,6 +3620,7 @@ let derecursify
            [iocc_cond] to hyps? Or the added hypotheses below? *)
         let rec_arg_occs =
           Occurrences.get_macro_rec_args
+            ~concrete:pc.concrete
             ~mode:PTimeSI ~context:pc
             iocc.iocc_sources
         in
@@ -3707,6 +3726,7 @@ let goal_to_query
     extra_inputs = goal.extra_inputs;
     initial_mem;
     consts       = initial_constraints ;
+    concrete     = goal.concrete;
   }
 
 (** Deduction proof-search for (non-empty) list of recursive subgoals.
@@ -4356,6 +4376,7 @@ let prove
       inputs = [];
       rec_inputs = [];
       extra_inputs = [];
+      concrete = pc.concrete;
     }
   in
   let res0 =

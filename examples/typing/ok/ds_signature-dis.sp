@@ -35,7 +35,7 @@ name Nfresh : index * index * index -> message, High.
 name Ksign : index -> message, SSK[sign, ((Cst a * Cst a) * High) + ((Cst a * Cst ad) * Low)].
 name Kenc : index -> message, AK[enc, (((Cst a * Cst a) * High) * Msg) + (((Cst a * Cst ad) * Low) * Msg)].
 
-axiom[any] cst_diff : forall i j, a i <> ad j.
+axiom[any] cst_diff : forall i j, a i <> ad j <: Real.z.
 hint rewrite cst_diff.
 
 process A(i : index, j : index, k : index) =

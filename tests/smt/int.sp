@@ -4,7 +4,6 @@ include Core.
 include Int.
 open Int.
 
-
 lemma[any] _ (x:int,y:int) : x<y || y<x || x=y. Proof. smt. Qed.
 
 lemma[any] _ (x:int) : not (exists y:int, y>x && y<x+1). Proof. smt. Qed. 

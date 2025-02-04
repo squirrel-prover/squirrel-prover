@@ -1,37 +1,52 @@
 op assoc ['a] (f : 'a -> 'a ->  'a) =
    forall x y z, f (f x y) z = f x (f y z).
 
+op commutative ['a] (f : 'a -> 'a ->  'a) =
+   forall x y, f x y = f y x.
+
+op left_neutral ['a] (x : 'a) (f : 'a -> 'a -> 'a) =
+  forall y, f x y = y.
+
+op right_neutral ['a] (x : 'a) (f : 'a -> 'a -> 'a) =
+  forall y, f y x = y.
+
+op left_absorbing ['a] (x : 'a) (f : 'a -> 'a -> 'a) =
+  forall y, f x y = x.
+
+op right_absorbing ['a] (x : 'a) (f : 'a -> 'a -> 'a) =
+  forall y, f y x = x.
+
 (*------------------------------------------------------------------*)
 (* equality *)
 
-axiom [any] eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+exact axiom [any] eq_iff (x, y : boolean) : (x = y) = (x <=> y).
 
-axiom [any] eq_not (x, y : boolean) : (not(x) = not(y)) = (x = y).
+exact axiom [any] eq_not (x, y : boolean) : (not(x) = not(y)) = (x = y).
 
-lemma [any] eq_sym ['a] (x,y : 'a) : (x = y) = (y = x).
+exact lemma [any] eq_sym ['a] (x,y : 'a) : (x = y) = (y = x).
+Proof. by rewrite eq_iff.  Qed.
+
+exact lemma [any] neq_sym ['a] (x,y : 'a) : (x <> y) = (y <> x).
 Proof. by rewrite eq_iff. Qed.
 
-lemma [any] neq_sym ['a] (x,y : 'a) : (x <> y) = (y <> x).
-Proof. by rewrite eq_iff. Qed.
-
-lemma [any] eq_refl_e ['a] (x : 'a) : (x = x) = true.
+exact lemma [any] eq_refl_e ['a] (x : 'a) : (x = x) = true.
 Proof.
   by rewrite eq_iff.
 Qed.
 hint rewrite eq_refl_e.
 
-lemma [any] eq_refl ['a] (x : 'a) : x = x.
-Proof.
+exact lemma [any] eq_refl ['a] (x : 'a) : x = x.
+Proof. 
   by rewrite eq_refl_e.
 Qed.
 
-lemma [any] neq_irrefl ['a] (x : 'a) : (x <> x) <=> false.
+exact lemma [any] neq_irrefl ['a] (x : 'a) : (x <> x) <=> false.
 Proof. by split. Qed.
 hint rewrite neq_irrefl.
 
 
-lemma [any] eq_assoc (b0,b1,b2: boolean) : ((b0 = b1) = b2) = (b0 = (b1 = b2)).
-Proof.
+exact lemma [any] eq_assoc (b0,b1,b2: boolean) : ((b0 = b1) = b2) = (b0 = (b1 = b2)).
+Proof. 
 (* smaller proof if put after section true/false *)
 assert((true = false) = false) as true_false by rewrite eq_iff.
 assert((false = true) = false) as false_true by rewrite eq_iff.
@@ -41,64 +56,64 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* extentionality *)
-axiom [any] fun_ext ['a 'b] (f, g : 'a -> 'b) :
+exact axiom [any] fun_ext ['a 'b] (f, g : 'a -> 'b) : 
   (forall x, f x = g x) => f = g.
 
 (*------------------------------------------------------------------*)
 (* true/false *)
 
-lemma [any] true_false : (true = false) = false.
+exact lemma [any] true_false : (true = false) = false.
 Proof. by rewrite eq_iff. Qed.
 hint rewrite true_false.
 
-lemma [any] false_true : (false = true) = false.
-Proof.
+exact lemma [any] false_true : (false = true) = false.
+Proof. 
   by rewrite (eq_sym false true).
 Qed.
 hint rewrite false_true.
 
-lemma [any] eq_true (b:boolean) : (b = true) = b.
+exact lemma [any] eq_true (b:boolean) : (b = true) = b.
 Proof. by case b. Qed.
 hint rewrite eq_true.
 
-lemma [any] eq_true2 (b:boolean) : (true = b) = b.
+exact lemma [any] eq_true2 (b:boolean) : (true = b) = b.
 Proof. by case b. Qed.
 hint rewrite eq_true2.
 
 (*------------------------------------------------------------------*)
 (* not *)
 
-axiom [any] not_true : not(true) = false.
+exact axiom [any] not_true : not(true) = false.
 hint rewrite not_true.
 
-axiom [any] not_false : not(false) = true.
+exact axiom [any] not_false : not(false) = true.
 hint rewrite not_false.
 
 
-lemma [any] not_not (b : boolean): not (not b) = b.
+exact lemma [any] not_not (b : boolean): not (not b) = b.
 Proof.
   by case b.
 Qed.
 hint rewrite not_not.
 
-lemma [any] not_eq ['a] (x, y : 'a): not (x = y) = (x <> y).
-Proof.
-by rewrite eq_iff.
+exact lemma [any] not_eq ['a] (x, y : 'a): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
 Qed.
 hint rewrite not_eq.
 
-lemma [any] not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
-Proof.
-by rewrite eq_iff.
+exact lemma [any] not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
 Qed.
 hint rewrite not_neq.
 
-lemma [any] not_eqfalse (b:boolean) : (b = false) = not(b).
+exact lemma [any] not_eqfalse (b:boolean) : (b = false) = not(b).
 Proof.
  by case b.
 Qed.
 
-lemma [any] not_impl (a, b:bool) : not (a => b) = (a && not b).
+exact lemma [any] not_impl (a, b:bool) : not (a => b) = (a && not b).
 Proof.
   rewrite eq_iff; split; intro H.
   + split.
@@ -116,8 +131,8 @@ Qed.
 (*------------------------------------------------------------------*)
 (* disequality *)
 
-lemma [any] eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
-Proof.
+exact lemma [any] eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
+Proof. 
 rewrite -not_eq. case (x = y) => _. simpl. auto.
 by rewrite eq_iff.
 Qed.
@@ -126,102 +141,102 @@ hint rewrite eq_false.
 (*------------------------------------------------------------------*)
 (* and *)
 
-axiom [any] and_comm (b,b' : boolean) : (b && b') = (b' && b).
+exact axiom [any] and_comm (b,b' : boolean) : (b && b') = (b' && b).
 
-lemma [any] and_dist (b0,b1,b2: boolean) : ((b0 || b1) && b2) = ((b0 && b2) || (b1 && b2)).
+exact lemma [any] and_dist (b0,b1,b2: boolean) : ((b0 || b1) && b2) = ((b0 && b2) || (b1 && b2)).
 Proof. rewrite eq_iff. by split. Qed.
 
-axiom [any] and_true_l (b : boolean) : (true && b) = b.
+exact axiom [any] and_true_l (b : boolean) : (true && b) = b.
 hint rewrite and_true_l.
 
-lemma [any] and_true_r (b : boolean) : (b && true) = b.
+exact lemma [any] and_true_r (b : boolean) : (b && true) = b.
 Proof. by rewrite and_comm and_true_l. Qed.
 hint rewrite and_true_r.
 
-axiom [any] and_false_l (b : boolean) : (false && b) = false.
+exact axiom [any] and_false_l (b : boolean) : (false && b) = false.
 hint rewrite and_false_l.
 
-lemma [any] and_false_r (b : boolean) : (b && false) = false.
+exact lemma [any] and_false_r (b : boolean) : (b && false) = false.
 Proof. by rewrite and_comm and_false_l. Qed.
 hint rewrite and_false_r.
 
 
-lemma [any] and_double (b:boolean) : (b && b) = b.
+exact lemma [any] and_double (b:boolean) : (b && b) = b.
 Proof.  by case b. Qed.
 
 
 (*------------------------------------------------------------------*)
 (* or *)
-axiom [any] or_comm (b,b' : boolean) : (b || b') = (b' || b).
+exact axiom [any] or_comm (b,b' : boolean) : (b || b') = (b' || b).
 
-lemma [any] or_dist (b0,b1,b2: boolean) : ((b0 || b2) && (b1 || b2)) =  ((b0 && b1) || b2).
+exact lemma [any] or_dist (b0,b1,b2: boolean) : ((b0 || b2) && (b1 || b2)) =  ((b0 && b1) || b2).
 Proof. rewrite eq_iff. by split. Qed.
 
-axiom [any] or_false_l (b : boolean) : (false || b) = b.
+exact axiom [any] or_false_l (b : boolean) : (false || b) = b.
 hint rewrite or_false_l.
 
-lemma [any] or_false_r (b : boolean) : (b || false) = b.
+exact lemma [any] or_false_r (b : boolean) : (b || false) = b.
 Proof. by rewrite or_comm or_false_l. Qed.
 hint rewrite or_false_r.
 
-axiom [any] or_true_l (b : boolean) : (true || b) = true.
+exact axiom [any] or_true_l (b : boolean) : (true || b) = true.
 hint rewrite or_true_l.
 
-lemma [any] or_true_r (b : boolean) : (b || true) = true.
+exact lemma [any] or_true_r (b : boolean) : (b || true) = true.
 Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
 
-lemma [any] or_double (b:boolean) : (b || b) = b.
+exact lemma [any] or_double (b:boolean) : (b || b) = b.
 Proof. by case b. Qed.
 
 
 (*------------------------------------------------------------------*)
 (* impl *)
-lemma [any] impl_charac (b,b' : boolean) : (b => b') = ((not b) || b').
-Proof.
-  rewrite eq_iff; split; case b; case b' => //=.
+exact lemma [any] impl_charac (b,b' : boolean) : (b => b') = ((not b) || b').
+Proof. 
+  rewrite eq_iff; split; case b; case b' => //=. 
 Qed.
 
-lemma [any] impl_false_l (b : boolean) : (false => b) = true.
+exact lemma [any] impl_false_l (b : boolean) : (false => b) = true.
 Proof. by rewrite eq_iff; case b. Qed.
 hint rewrite impl_false_l.
 
-lemma [any] impl_true_r (b : boolean) : (b => true) = true.
+exact lemma [any] impl_true_r (b : boolean) : (b => true) = true.
 Proof. auto. Qed.
 hint rewrite impl_true_r.
 
-lemma [any] impl_true_l (b: boolean) : (true => b) = b.
+exact lemma [any] impl_true_l (b: boolean) : (true => b) = b.
 Proof. by rewrite eq_iff. Qed.
 hint rewrite impl_true_l.
 
-lemma [any] impl_contra (b,c:boolean) : (b => c) = (not c => not b).
+exact lemma [any] impl_contra (b,c:boolean) : (b => c) = (not c => not b).
 Proof.
   rewrite !impl_charac /=.
   by rewrite or_comm.
 Qed.
 
-lemma [any] absurd (a:boolean) : not (not a) => a.
+exact lemma [any] absurd (a:boolean) : not (not a) => a.
 Proof. auto. Qed.
 
 (*------------------------------------------------------------------*)
-(* not: more lemmas *)
+(* not: more exact lemmas *)
 
-lemma [any] not_and (a, b : boolean): not (a && b) = (not a || not b).
-Proof.
-  rewrite eq_iff.
+exact lemma [any] not_and (a, b : boolean): not (a && b) = (not a || not b).
+Proof. 
+  rewrite eq_iff. 
   case a; case b => //=.
 Qed.
 
-lemma [any] not_or (a, b : boolean): not (a || b) = (not a && not b).
-Proof.
-  rewrite eq_iff.
+exact lemma [any] not_or (a, b : boolean): not (a || b) = (not a && not b).
+Proof. 
+  rewrite eq_iff. 
   case a; case b => //=.
 Qed.
 
 (*------------------------------------------------------------------*)
 (* if *)
 
-lemma [any] if_true ['a] (b : boolean, x,y : 'a):
+exact lemma [any] if_true ['a] (b : boolean, x,y : 'a):
   b => if b then x else y = x.
 Proof.
   intro *.
@@ -230,36 +245,36 @@ Proof.
   + intro [HH _]. by use HH.
 Qed.
 
-lemma [any] if_true0 ['a] (x,y : 'a):
+exact lemma [any] if_true0 ['a] (x,y : 'a):
   if true then x else y = x.
 Proof.
   by rewrite if_true.
 Qed.
 hint rewrite if_true0.
 
-lemma [any] if_false ['a] (b : boolean, x,y : 'a):
+exact lemma [any] if_false ['a] (b : boolean, x,y : 'a):
   (not b) => if b then x else y = y.
-Proof.
+Proof. 
   intro *; case (if b then x else y).
   + intro [H1 H2].
     by rewrite H1 in H2.
   + auto.
 Qed.
 
-lemma [any] if_false0 ['a] (x,y : 'a):
+exact lemma [any] if_false0 ['a] (x,y : 'a):
   if false then x else y = y.
 Proof.
   by rewrite if_false.
 Qed.
 hint rewrite if_false0.
 
-lemma [any] if_then_then ['a] (b,b' : boolean, x,y : 'a):
+exact lemma [any] if_then_then ['a] (b,b' : boolean, x,y : 'a):
   if b then (if b' then x else y) else y = if (b && b') then x else y.
-Proof.
+Proof.  
   by case b; case b'.
 Qed.
 
-lemma [any] if_then_or (b0,b1: boolean, m0,m1:message):
+exact lemma [any] if_then_or (b0,b1: boolean, m0,m1:message): 
   if b0 then m0 else (if b1 then m0 else m1) = if b0 || b1 then m0 else m1.
 (* It would have been more logical to call it if_then_else to match the name if_then_then,
    but if_then_else is a pretty bad name so I used if_then_or *)
@@ -269,118 +284,119 @@ assert(b1 || not(b1)) as [_|_] by auto. rewrite if_false => //. rewrite !if_true
 rewrite !if_false => //.
 Qed.
 
-lemma [any] if_then_implies ['a] (b,b' : boolean, x,y,z : 'a):
+exact lemma [any] if_then_implies ['a] (b,b' : boolean, x,y,z : 'a):
   if b then (if b' then x else y) else z =
   if b then (if b => b' then x else y) else z.
 Proof.
   case b; intro H; case b'; intro H'; simpl; try auto.
 Qed.
 
-lemma [any] if_same ['a] (b : boolean, x : 'a):
+exact lemma [any] if_same ['a] (b : boolean, x : 'a):
   if b then x else x = x.
 Proof.
   by case b.
 Qed.
 hint rewrite if_same.
 
-lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
- b = b' =>
- if b then (if b' then x else y) else z =
+exact lemma [any] if_then ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then (if b' then x else y) else z = 
  if b then x else z.
 Proof.
   by intro ->; case b'.
 Qed.
 hint rewrite if_then.
 
-lemma [any] if_then_inv (b:boolean, m0,m1:message):
+exact lemma [any] if_then_inv (b:boolean, m0,m1:message): 
   if b then m0 else m1 = if b then (if b then m0) else m1.
-  (* More practical than the previous lemma when you want to expand. *)
+  (* More practical than the previous exact lemma when you want to expand. *)
 Proof. auto. Qed.
 
-lemma [any] if_else ['a] (b,b' : boolean, x,y,z : 'a):
- b = b' =>
- if b then x else (if b' then y else z) =
+exact lemma [any] if_else ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then x else (if b' then y else z) = 
  if b then x else z.
 Proof.
   by intro ->; case b'.
 Qed.
 hint rewrite if_else.
 
-lemma [any] if_else_inv (b:boolean, m0,m1:message):
+exact lemma [any] if_else_inv (b:boolean, m0,m1:message):
   if b then m0 else m1 = if b then m0 else (if not b then m1).
 Proof. by case b. Qed.
 
-lemma [any] if_push (b:boolean, m0,m1:message):
+exact lemma [any] if_push (b:boolean, m0,m1:message):
   if b then m0 else m1 = if b then (if b then m0) else (if (not b) then m1).
 Proof. by rewrite if_else_inv if_then_inv. Qed.
 
-lemma [any] if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
- b = not b' =>
- if b then (if b' then x else y) else z =
+exact lemma [any] if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
+ b = not b' => 
+ if b then (if b' then x else y) else z = 
  if b then y else z.
 Proof.
   by intro ->; case b'.
 Qed.
 hint rewrite if_then_not.
 
-lemma [any] if_else_not ['a] (b,b' : boolean, x,y,z : 'a):
-  b = not b' =>
- if b then x else (if b' then y else z) =
+exact lemma [any] if_else_not ['a] (b,b' : boolean, x,y,z : 'a):
+  b = not b' => 
+ if b then x else (if b' then y else z) = 
  if b then x else y.
-Proof.
+Proof.  
   by intro ->; case b'.
 Qed.
 hint rewrite if_else_not.
 
-lemma [any] if_app ['a 'b] (f:'a->'b) (c:bool) (x,y:'a) :
+exact lemma [any] if_app ['a 'b] (f:'a->'b) (c:bool) (x,y:'a) :
   f (if c then x else y) = if c then f x else f y.
 Proof. by case c. Qed.
 
 (*------------------------------------------------------------------*)
 (* some functional properties *)
 
-lemma [any] fst_pair (x,y : message) : fst (<x,y>) = x.
+exact lemma [any] fst_pair (x,y : message) : fst (<x,y>) = x.
 Proof. auto. Qed.
 hint rewrite fst_pair.
 
-lemma [any] snd_pair (x,y : message) : snd (<x,y>) = y.
+exact lemma [any] snd_pair (x,y : message) : snd (<x,y>) = y.
 Proof. auto. Qed.
 hint rewrite snd_pair.
 
 (*------------------------------------------------------------------*)
 (* if-and-only-if *)
 
-lemma [any] iff_def (x,y : boolean) : (x <=> y) = ((x => y) && (y => x)).
-Proof.
+exact lemma [any] iff_def (x,y : boolean) : (x <=> y) = ((x => y) && (y => x)).
+Proof. 
  rewrite eq_iff; split.
  by intro ->.
  auto.
 Qed.
 
-lemma [any] iff_refl (x : boolean) : (x <=> x) = true.
+exact lemma [any] iff_refl (x : boolean) : (x <=> x) = true.
 Proof.
  by rewrite eq_iff.
 Qed.
 hint rewrite iff_refl.
 
-lemma [any] iff_sym (x, y: boolean) : (x <=> y) = (y <=> x).
+exact lemma [any] iff_sym (x, y: boolean) : (x <=> y) = (y <=> x).
 Proof.
  by rewrite eq_iff !iff_def.
 Qed.
 
-lemma [any] true_iff_false : (true <=> false) = false.
+exact lemma [any] true_iff_false : (true <=> false) = false.
 Proof.
  by rewrite -eq_iff.
 Qed.
 hint rewrite true_iff_false.
 
-lemma [any] false_iff_true : (false <=> true) = false.
+exact lemma [any] false_iff_true : (false <=> true) = false.
 Proof.
  by rewrite -eq_iff.
 Qed.
 hint rewrite false_iff_true.
 
-lemma [any] contra_iff (x, y : boolean) : ((not x) <=> y) = (x <=> (not y)).
+
+exact lemma [any] contra_iff (x, y : boolean) : ((not x) <=> y) = (x <=> (not y)).
 Proof.
   rewrite eq_iff.
   split; by rewrite !-eq_iff -eq_not.
@@ -389,27 +405,27 @@ Qed.
 (*------------------------------------------------------------------*)
 (* exists *)
 
-lemma [any] exists_false1 ['a]:
+exact lemma [any] exists_false1 ['a]:
 (exists (a:'a), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
-lemma [any] exists_false2 ['a 'b]:
+exact lemma [any] exists_false2 ['a 'b]:
 (exists (a:'a, b:'b), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
-lemma [any] exists_false3 ['a 'b 'c]:
+exact lemma [any] exists_false3 ['a 'b 'c]:
 (exists (a:'a, b:'b, c:'c), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
-lemma [any] exists_false4 ['a 'b 'c 'd]:
+exact lemma [any] exists_false4 ['a 'b 'c 'd]:
 (exists (a:'a, b:'b, c:'c, d:'d), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
-lemma [any] exists_false5 ['a 'b 'c 'd 'e]:
+exact lemma [any] exists_false5 ['a 'b 'c 'd 'e]:
 (exists (a:'a, b:'b, c:'c, d:'d, e:'e), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
-lemma [any] exists_false6 ['a 'b 'c 'd 'e 'f]:
+exact lemma [any] exists_false6 ['a 'b 'c 'd 'e 'f]:
 (exists (a:'a, b:'b, c:'c, d:'d, e:'e, f:'f), false) = false.
 Proof. by rewrite not_eqfalse. Qed.
 
@@ -419,27 +435,27 @@ Proof. by rewrite not_eqfalse. Qed.
 (* forall *)
 
 
-lemma [any] forall_true1 ['a]:
+exact lemma [any] forall_true1 ['a]:
 (forall (a:'a), true) = true.
 Proof. auto. Qed.
 
-lemma [any] forall_true2 ['a 'b]:
+exact lemma [any] forall_true2 ['a 'b]:
 (forall (a:'a, b:'b), true) = true.
 Proof. auto. Qed.
 
-lemma [any] forall_true3 ['a 'b 'c]:
+exact lemma [any] forall_true3 ['a 'b 'c]:
 (forall (a:'a, b:'b, c:'c), true) = true.
 Proof. auto. Qed.
 
-lemma [any] forall_true4 ['a 'b 'c 'd]:
+exact lemma [any] forall_true4 ['a 'b 'c 'd]:
 (forall (a:'a, b:'b, c:'c, d:'d), true) = true.
 Proof. auto. Qed.
 
-lemma [any] forall_true5 ['a 'b 'c 'd 'e]:
+exact lemma [any] forall_true5 ['a 'b 'c 'd 'e]:
 (forall (a:'a, b:'b, c:'c, d:'d, e:'e), true) = true.
 Proof. auto. Qed.
 
-lemma [any] forall_true6 ['a 'b 'c 'd 'e 'f]:
+exact lemma [any] forall_true6 ['a 'b 'c 'd 'e 'f]:
 (forall (a:'a, b:'b, c:'c, d:'d, e:'e, f:'f), true) = true.
 Proof. auto. Qed.
 
@@ -447,26 +463,27 @@ Proof. auto. Qed.
 (*------------------------------------------------------------------*)
 (* length *)
 
-axiom [any] len_zeroes (x:message) : len(zeroes(x)) = len(x).
+exact axiom [any] len_zeroes (x:message) : len(zeroes(x)) = len(x).
 hint rewrite len_zeroes.
 
 (*------------------------------------------------------------------*)
 (* tuples *)
 
-axiom [any] tuple2_surj ['a 'b] (x:'a*'b) :
+exact axiom [any] tuple2_surj ['a 'b] (x:'a*'b) :
   x = (x#1,x#2).
-axiom [any] tuple3_surj ['a 'b 'c] (x:'a*'b*'c) :
+exact axiom [any] tuple3_surj ['a 'b 'c] (x:'a*'b*'c) :
   x = (x#1,x#2,x#3).
-axiom [any] tuple4_surj ['a 'b 'c 'd] (x:'a*'b*'c*'d) :
+exact axiom [any] tuple4_surj ['a 'b 'c 'd] (x:'a*'b*'c*'d) :
   x = (x#1,x#2,x#3,x#4).
-axiom [any] tuple5_surj ['a 'b 'c 'd 'e] (x:'a*'b*'c*'d*'e) :
+exact axiom [any] tuple5_surj ['a 'b 'c 'd 'e] (x:'a*'b*'c*'d*'e) :
   x = (x#1,x#2,x#3,x#4,x#5).
 
 (*------------------------------------------------------------------*)
-lemma [any] f_apply ['a 'b] (f : 'a -> 'b) (x, y : 'a) : x = y => f x = f y.
+
+exact lemma [any] f_apply ['a 'b] (f : 'a -> 'b) (x, y : 'a) : x = y => f x = f y.
 Proof. by intro ->. Qed.
 
-lemma [any] not_exists_1 ['a] (phi:'a -> bool) :
+exact lemma [any] not_exists_1 ['a] (phi:'a -> bool) :
  not (exists (a:'a), phi a) = forall (a:'a), not (phi a).
 Proof.
   rewrite eq_iff.
@@ -478,7 +495,7 @@ Proof.
     by use H with a.
 Qed.
 
-lemma [any] not_exists_2 ['a 'b] (phi:'a -> 'b -> bool) :
+exact lemma [any] not_exists_2 ['a 'b] (phi:'a -> 'b -> bool) :
  not (exists (a:'a, b:'b), phi a b) = forall (a:'a, b:'b), not (phi a b).
 Proof.
   rewrite eq_iff.
@@ -490,10 +507,10 @@ Proof.
     by use H with a, b.
 Qed.
 
-axiom [any] not_forall_1 ['a] (phi:'a -> bool) :
+exact axiom [any] not_forall_1 ['a] (phi:'a -> bool) :
  not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
 
-axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
+exact axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
  not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
 
 (*------------------------------------------------------------------*)
@@ -505,11 +522,11 @@ axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
     each type as, namely as (choose (fun _ => false)). *)
 abstract choose ['a] : ('a -> bool) -> 'a.
 
-axiom [any] try_carac_1 ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) :
+exact axiom [any] try_carac_1 ['a 'b] (phi:'a->bool) (f:'a->'b) (g:'b) :
   (try find x such that phi x in f x else g) =
   (if exists x, phi x then f (choose phi) else g).
 
-axiom [any] try_carac_2 ['a 'aa 'b] :
+exact axiom [any] try_carac_2 ['a 'aa 'b] :
   forall (phi:'a->'aa->bool) (f:'a->'aa->'b) (g:'b),
   (try find x y such that phi x y in f x y else g) =
   (if exists (xy:'a*'aa), phi (xy#1) (xy#2) then
@@ -517,7 +534,7 @@ axiom [any] try_carac_2 ['a 'aa 'b] :
        (choose (fun (xy:'a*'aa) => phi (xy#1) (xy#2)) # 2)
    else g).
 
-axiom [any] try_carac_3 ['a 'aa 'aaa 'b] :
+exact axiom [any] try_carac_3 ['a 'aa 'aaa 'b] :
   forall (phi:'a->'aa->'aaa->bool) (f:'a->'aa->'aaa->'b) (g:'b),
   (try find x y z such that phi x y z in f x y z else g) =
   (if exists (xyz:'a*'aa*'aaa), phi (xyz#1) (xyz#2) (xyz#3) then
@@ -528,7 +545,7 @@ axiom [any] try_carac_3 ['a 'aa 'aaa 'b] :
 
 (* This could be the defining axiom for choose,
    but it is actually a consequence of `try_carac_1`. *)
-lemma [any] choose_spec ['a] (phi:'a->bool) (x:'a) :
+exact lemma [any] choose_spec ['a] (phi:'a->bool) (x:'a) :
   phi x =>
   phi (choose phi).
 Proof.
@@ -545,7 +562,7 @@ Proof.
   + intro [HH _]; by use HH with x.
 Qed.
 
-lemma [any] try_true_1 ['a 'b] :
+exact lemma [any] try_true_1 ['a 'b] :
   forall (phi:'a->bool, f:'a->'b, g:'b),
     (exists x, phi x) =>
     try find x:'a such that phi x in f x else g =
@@ -556,7 +573,7 @@ Proof.
   rewrite if_true => //.
 Qed.
 
-lemma [any] try_true_2 ['a 'aa 'b] :
+exact lemma [any] try_true_2 ['a 'aa 'b] :
   forall (phi:'a->'aa -> bool, f:'a->'aa ->'b, g:'b),
     (exists x y, phi x y) =>
     try find (x:'a) (y:'aa) such that phi x y in f x y else g =
@@ -569,7 +586,7 @@ Proof.
   by exists (x,y).
 Qed.
 
-lemma [any] try_true_3 ['a 'aa 'aaa 'b] :
+exact lemma [any] try_true_3 ['a 'aa 'aaa 'b] :
   forall (phi:'a->'aa->'aaa->bool, f:'a->'aa->'aaa->'b, g:'b),
     (exists x y z, phi x y z) =>
     try find (x:'a) (y:'aa) (z:'aaa) such that phi x y z in f x y z else g =
@@ -583,7 +600,7 @@ Proof.
   by exists (x,y,z).
 Qed.
 
-lemma [any] try_false_1 ['a 'b] :
+exact lemma [any] try_false_1 ['a 'b] :
   forall (phi:'a->bool, f:'a->'b, g:'b),
     (forall x, phi x => false) =>
     try find x:'a such that phi x in f x else g =
@@ -596,7 +613,7 @@ Proof.
   intro x H'. by apply H x.
 Qed.
 
-lemma [any] try_false_2 ['a 'aa 'b] :
+exact lemma [any] try_false_2 ['a 'aa 'b] :
   forall (phi:'a->'aa->bool, f:'a->'aa->'b, g:'b),
     (forall x y, phi x y => false) =>
     try find x y such that phi x y in f x y else g =
@@ -609,7 +626,7 @@ Proof.
   intro xy H'. by apply H (xy#1) (xy#2).
 Qed.
 
-lemma [any] try_false_3 ['a 'aa 'aaa 'b] :
+exact lemma [any] try_false_3 ['a 'aa 'aaa 'b] :
   forall (phi:'a->'aa->'aaa->bool, f:'a->'aa->'aaa->'b, g:'b),
     (forall x y z, phi x y z => false) =>
     try find x y z such that phi x y z in f x y z else g =
@@ -624,7 +641,7 @@ Qed.
 
 (** Quantifier commutations. *)
 
-lemma [any] forall_exists ['a 'b] (phi:'a->'b->bool) :
+exact lemma [any] forall_exists ['a 'b] (phi:'a->'b->bool) :
   (forall x:'a, exists y:'b, phi x y) =
   (exists y':'a->'b, forall x:'a, phi x (y' x)).
 Proof.
@@ -644,7 +661,7 @@ Proof.
     by apply H.
 Qed.
 
-lemma [any] implies_exists ['a] (phi:bool,psi:'a->bool) :
+exact lemma [any] implies_exists ['a] (phi:bool,psi:'a->bool) :
   (phi => exists j:'a, psi(j)) =
   (exists x:'a, phi => psi(x)).
 Proof.
@@ -672,45 +689,50 @@ op well_founded ['a] (ord : 'a -> 'a ->  bool) =
 
 (* We assume that lt is well_founded over all type.
    This does not cause any contradictions, as we will not assume it is total over any type. *)
-axiom [any] lt_wf ['a] : well_founded (fun (x,y:'a) => x < y).
+exact axiom [any] lt_wf ['a] : well_founded (fun (x,y:'a) => x < y).
 
-axiom [any] le_trans    ['a] (x,y,z : 'a) : x <= y => y <= z => x <= z.
-axiom [any] lt_trans    ['a] (x,y,z : 'a) : x < y  => y < z  => x < z.
-axiom [any] lt_le_trans ['a] (x,y,z : 'a) : x < y  => y <= z => x < z.
-axiom [any] le_lt_trans ['a] (x,y,z : 'a) : x <= y => y < z  => x < z.
+exact axiom [any] le_trans    ['a] (x,y,z : 'a) : x <= y => y <= z => x <= z.
+exact axiom [any] lt_trans    ['a] (x,y,z : 'a) : x < y  => y < z  => x < z.
+exact axiom [any] lt_le_trans ['a] (x,y,z : 'a) : x < y  => y <= z => x < z.
+exact axiom [any] le_lt_trans ['a] (x,y,z : 'a) : x <= y => y < z  => x < z.
 
-axiom [any] lt_charac ['a] (x,y : 'a) : x < y <=> (x <> y && x <= y).
+exact axiom [any] lt_charac ['a] (x,y : 'a) : x < y <=> (x <> y && x <= y).
 
-axiom [any] le_not_lt_impl_eq ['a] (x,y : 'a) : x <= y => not (x < y) => x = y.
+exact axiom [any] le_not_lt_impl_eq ['a] (x,y : 'a) : x <= y => not (x < y) => x = y.
 
-lemma [any] lt_impl_le ['a] (x,y : 'a) : x < y => x <= y.
+exact lemma [any] lt_impl_le ['a] (x,y : 'a) : x < y => x <= y.
 Proof. by rewrite lt_charac. Qed.
 
-lemma [any] not_lt_refl ['a] (x:'a) : not (x < x).
+exact lemma [any] not_lt_refl ['a] (x:'a) : not (x < x).
 Proof. auto. Qed.
 
-lemma [any] lt_irrefl ['a] (x : 'a) : x < x <=> false.
+exact lemma [any] lt_irrefl ['a] (x : 'a) : x < x <=> false.
 Proof. auto. Qed.
 
-(* The next lemma could be strengthened as an equivalence for all
+(* The next exact lemma could be strengthened as an equivalence for all
    types except timestamps. *)
-axiom [any] le_impl_eq_lt ['a] (x,y : 'a) : x <= y => (x = y || x < y).
+exact axiom [any] le_impl_eq_lt ['a] (x,y : 'a) : x <= y => (x = y || x < y).
 
 (* The ordering is not well-behaved on timestamps,
    hence some properties do not hold on all types;
-   specific lemmas are given below for useful types. *)
-axiom [any] le_refl_index (x:index) : x <= x.
-lemma [any] le_refl_index_eq (x:index) : (x <= x) = true.
+   specific exact lemmas are given below for useful types. *)
+exact axiom [any] le_refl_index (x:index) : x <= x.
+exact lemma [any] le_refl_index_eq (x:index) : (x <= x) = true.
 Proof.
   by rewrite le_refl_index.
 Qed.
 hint rewrite le_refl_index_eq.
 
-lemma [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
+exact lemma [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
 Proof. by rewrite eq_iff. Qed.
 
-lemma [any] neq_le_pred_le (t, t' : timestamp):
+exact lemma [any] neq_le_pred_le (t, t' : timestamp):
   t<>t' => (t <= t') = (t <= pred(t')).
 Proof. by rewrite eq_iff. Qed.
 
-axiom [any] le_lt ['a] (x, x' : 'a): x <> x' => (x <= x') = (x < x').
+exact axiom [any] le_lt ['a] (x, x' : 'a): x <> x' => (x <= x') = (x < x').
+
+(*------------------------------------------------------------------*)
+(* Utilities *)
+
+op tpred ['a] = fun(x : 'a) => true.

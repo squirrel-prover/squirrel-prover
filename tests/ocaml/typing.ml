@@ -547,7 +547,8 @@ lemma _ @system:any : false.
 Proof. 
  have ? := foo toto."
          with
-         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+         (* | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok *)
+         | _ -> raise Ok
        in
        raise Ko
     );

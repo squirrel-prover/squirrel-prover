@@ -109,24 +109,20 @@ let case_study () =
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,ZERO"
     ~actual:(List.hd terms.terms )
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_zero);
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → TRUE,zero"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let terms = get_seq_in_nth_goal st 1 in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,EMPTY"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.empty);
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → TRUE,empty"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   (* deux sous-buts, l'un avec true,zero, l'autre true,empty *)
@@ -147,18 +143,15 @@ let case_study () =
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → true,ZERO,n"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_zero);
   let n = mk_message st "n" in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,zero,N"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(n);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → TRUE,zero,n"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -166,19 +159,16 @@ let case_study () =
     ~msg:"equiv(if true then zero else empty, if true then n else m) →
     true,EMPTY,m"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.empty);
   let m = mk_message st "m" in
   Alcotest.(check' term_testable) 
     ~msg:"if true then zero else empty → true,empty,M"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(m);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) →
     TRUE,empty,m"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let st = Prover.exec_all ~test:true st
@@ -203,7 +193,6 @@ let case_study () =
     IF TRUE THEN ZERO ELSE EMPTY,
     n"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_ite ~simpl:false (Term.mk_true) (Term.mk_zero) (Term.empty));
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
@@ -211,7 +200,6 @@ let case_study () =
     if true then zero else empty,
     n"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
@@ -219,7 +207,6 @@ let case_study () =
     if true then zero else empty,
     N"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(n);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -229,7 +216,6 @@ let case_study () =
     IF TRUE THEN ZERO ELSE EMPTY,
     m"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_ite ~simpl:false (Term.mk_true) (Term.mk_zero) (Term.empty));
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
@@ -237,7 +223,6 @@ let case_study () =
     if true then zero else empty,
     m"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(if true then zero else empty, if true then n else m) → 
@@ -245,7 +230,6 @@ let case_study () =
     if true then zero else empty,
     M"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(m);
 
   let st = Prover.exec_all ~test:true st
@@ -266,15 +250,13 @@ let case_study () =
     true,
     F DIFF(N,M)"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (Prover.get_table st) f
        [Term.mk_diff [Projection.left,n;Projection.right,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     TRUE,
     f diff(n,m)"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -283,15 +265,13 @@ let case_study () =
     true,
     F EMPTY"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (Prover.get_table st) f
        [Term.empty]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(if true then diff(n,m) else empty)) →
     TRUE,
     f empty"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
 
@@ -311,15 +291,13 @@ let case_study () =
     true,
     F DIFF(N,M)"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (Prover.get_table st) f
        [Term.mk_diff [Projection.left,n;Projection.right,m]]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
     TRUE,
     f diff(n,m)"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -328,15 +306,13 @@ let case_study () =
     true,
     F EMPTY"
     ~actual:(List.hd terms.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~expected:(Term.mk_fun (Prover.get_table st) f  
+    ~expected:(Term.mk_fun (Prover.get_table st) f
        [Term.empty]);
   Alcotest.(check' term_testable) 
     ~msg:"equiv(f(diff(if true then n else empty,if true then m else empty)))
     TRUE,
     f empty"
     ~actual:(List.nth terms.terms 1)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_true);
 
   let st = Prover.exec_all ~test:true st
@@ -376,7 +352,6 @@ let case_study () =
     X,
     exec@tau"
     ~actual:(List.nth terms.terms 3)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(x);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
@@ -391,7 +366,6 @@ let case_study () =
     x,
     exec@tau"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -406,7 +380,6 @@ let case_study () =
     Y,
     exec@tau"
     ~actual:(List.nth terms.terms 3)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(y);
 
   let st = Prover.exec_all ~test:true st
@@ -442,7 +415,6 @@ let case_study () =
     X,
     exec@tau"
     ~actual:(List.nth terms.terms 3)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(x);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
@@ -459,7 +431,6 @@ let case_study () =
     x,
     exec@tau"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -477,7 +448,6 @@ let case_study () =
     Y,
     exec@tau"
     ~actual:(List.nth terms.terms 3)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(y);
   let exectau' = find_in_sys_from_string "exec@tau'" st in
   Alcotest.(check' term_testable) 
@@ -494,7 +464,6 @@ let case_study () =
     y,
     exec@tau"
     ~actual:(List.nth terms.terms 2)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(Term.mk_ite ~simpl:false (exectau') (x) (y));
 
 
@@ -531,7 +500,6 @@ let case_study () =
     exec@tau,
     X"
     ~actual:(List.nth terms.terms 4)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(x);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -549,7 +517,6 @@ let case_study () =
     exec@tau,
     Y"
     ~actual:(List.nth terms.terms 4)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(y);
 
 
@@ -586,7 +553,6 @@ let case_study () =
     exec@tau,
     X"
     ~actual:(List.nth terms.terms 4)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(x);
 
   let terms = get_seq_in_nth_goal st 1 in
@@ -604,7 +570,6 @@ let case_study () =
     exec@tau,
     Y"
     ~actual:(List.nth terms.terms 4)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
     ~expected:(y)
 
 let namelength () =

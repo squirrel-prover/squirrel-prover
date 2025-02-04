@@ -7,9 +7,9 @@ mutable s = empty.
 system P = null.
 system Q = null.
 
-axiom fooP @system:P t : s@t = p.
+axiom fooP @system:P t : s@t = p <: Real.z.
 hint rewrite fooP.
-axiom fooQ @system:Q t : s@t = q.
+axiom fooQ @system:Q t : s@t = q <: Real.z.
 hint rewrite fooQ.
 
 lemma _ @system:any t : s@t = p.

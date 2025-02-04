@@ -19,7 +19,7 @@ abstract b : message
 name r : message, Rand
 mutable s : message, Cst a + Cst b = a.
 
-axiom[any] cte : a <> b.
+axiom[any] cte : a <> b <: Real.z.
 hint rewrite cte.
 
 (* Uses [r] in two different encryptions, in two different branches induced by Break-Sum. *)

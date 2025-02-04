@@ -123,7 +123,16 @@ let tags_of_term
       let merged = doit_subterms env t in
       { merged with det = false; const = false; adv = false; }
 
-    | Macro _ -> mk_tags ~no_diff:true ()
+    | Macro (f,_,_) -> 
+      let info = Macros.get_macro_info env.table f.s_symb in
+      let merged = doit_subterms env t in
+
+      (* We throw away all tags, but for [adv]. 
+
+         FEAT: analyze the macro body to see whether it preserves
+         [const], [si], [det], or [adv] (for the latter, we currently
+         only rely on admitted user-annotations. *)
+      { (mk_tags ~no_diff:true ()) with adv = info.is_ptime && merged.adv; }
     (* TODO: multi-terms: once macros are decorated by system
        expressions, this needs to change *)
 

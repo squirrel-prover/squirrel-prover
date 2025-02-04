@@ -80,7 +80,6 @@ kw<Term> { @specialize[@name={Term}]<ID, Term> }
   /* adv[@name=tackeyw] { kw<"adv"> } */
   collision[@name=tackeyw] { kw<"collision"> }
   eqnames[@name=tackeyw] { kw<"eqnames"> }
-  ANYINTRO[@name=tackeyw] { kw<"anyintro"> }
   euf[@name=tackeyw] { kw<"euf"> }
   executable[@name=tackeyw] { kw<"executable"> }
   DESTRUCT[@name=tackeyw] { kw<"destruct"> }
@@ -314,8 +313,6 @@ tac {
   | left
   | project
   | cca1 INT
-  // TODO ↓ Never used !
-  | ANYINTRO
   /* | adv */
   | notleft
   | simpl_left

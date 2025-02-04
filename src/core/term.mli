@@ -28,6 +28,10 @@ type macro_info = {
 
       - when [false], the last field [x] of the macro constructor
         [Macros (_,_,x)] is set to the default (unprinted) [unit]. *)
+
+  is_ptime : bool;
+  (** can the macro be evaluated in polynomial-time (without access to
+      protocol randomness). *)
 }
 
 (** macro information for builtin symbols *)
@@ -166,7 +170,7 @@ module Lit : sig
 
   val neg : literal -> literal
 
-  val disjunction_to_literals : term -> literal list option
+  val disjunction_to_literals : term -> literals
 
   val form_to_xatom   : term ->   xatom
   val form_to_literal : term -> literal
@@ -738,6 +742,16 @@ type 'a pat_op = {
   pat_op_term   : 'a;
 }
 
+(*------------------------------------------------------------------*)
+val pp_pat :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a pat -> unit
+
+val pp_pat_op :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a pat_op -> unit
+
+(*------------------------------------------------------------------*)
 val project_tpat        : Projection.t list        -> term pat -> term pat
 val project_tpat_opt    : Projection.t list option -> term pat -> term pat
 val project_tpat_op_opt : Projection.t list option -> term pat_op -> term pat_op

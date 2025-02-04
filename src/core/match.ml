@@ -2,6 +2,7 @@ open Utils
 open Ppenv
 open Term
 
+(*------------------------------------------------------------------*)
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
@@ -11,6 +12,7 @@ module TraceHyps = Hyps.TraceHyps
                      
 module SE = SystemExpr
 
+(*------------------------------------------------------------------*)
 let dbg ?(force=true) s =
   if force then Printer.prt `Dbg s
   else Printer.prt `Ignore s
@@ -174,9 +176,11 @@ module Pos = struct
         sel_g sp ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) f
         
       | Equiv.Atom (Reach t) ->
+        assert (t.bound = None); (* FIXME *)
         sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t.formula
 
       | Equiv.Atom (Equiv e) -> 
+        assert (e.bound = None); (* FIXME *)
         sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e.terms
 
       | Equiv.Atom (Pred pa) ->
@@ -203,22 +207,32 @@ module Pos = struct
 
     sel_g Sp.empty ~vars:[] ~conds:[] ~p:[] t
 
+  (*------------------------------------------------------------------*)
+  module OccInfo = struct
+    type t = 
+      | Let of Equiv.form
+      | ReachBound
+      | ReachForm of Term.t option
+      | EquivBound
+      | EquivForm of Term.t option
+      | Pred of Symbols.predicate
+  end
 
   (*------------------------------------------------------------------*)
-  type 'a f_map_fold =
+  type ('a,'info) f_map_fold =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     'a ->
     'a * [`Map of Term.term | `Continue]
 
-  type f_map =
+  type 'info f_map =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     [`Map of Term.term | `Continue]
 
-  type 'a f_fold =
+  type ('a,'info) f_fold =
     Term.term ->
-    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 'info ->
     'a ->
     'a
 
@@ -246,7 +260,7 @@ module Pos = struct
 
   (** Internal *)
   let rec map_fold
-      (func   : 'a f_map_fold) 
+      (func   : ('a,'info) f_map_fold) 
       (mode   : [`TopDown of bool | `BottomUp])
       (* - [`TopDown b]: apply [func] at top-level first, then recurse.
            [b] tells if we recurse under successful maps.
@@ -257,14 +271,15 @@ module Pos = struct
       ~(conds : Term.term list)    (* conditions above the current pos. *)
       ~(p     : pos)               (* current position *)
       ~(acc   : 'a)                (* folding value *)
+      ~(info  : 'info)
       (ti     : Term.term)         
     : 'a * bool * Term.term        (* folding value, `Map found, term *)
     =
     let map_fold ~se ?(vars = vars) ?(conds = conds) = 
-      map_fold func mode ~se ~vars ~conds 
+      map_fold func mode ~se ~vars ~conds ~info
     in
     let map_fold_l ~se ?(vars = vars) ?(conds = conds) =
-      map_fold_l func mode ~se ~vars ~conds 
+      map_fold_l func mode ~se ~vars ~conds ~info
     in
 
     (* recurse strictly one level below *)
@@ -453,7 +468,7 @@ module Pos = struct
     match mode with
     | `TopDown b ->
       begin
-        match func ti se vars conds p acc with
+        match func ti se vars conds p info acc with
         | acc, `Map t -> 
           if b then
             let acc, _, t = map_fold ~se ~p ~acc:acc t in
@@ -466,14 +481,14 @@ module Pos = struct
 
     | `BottomUp ->
       let acc, found, ti = rec_strict_subterm ti acc in
-      match func ti se vars conds p acc with
+      match func ti se vars conds p info acc with
       | acc, `Map ti   -> acc, true,  ti
       | acc, `Continue -> acc, found, ti
 
 
   and map_fold_l
       func mode      
-      ~se ~vars ~conds ~(p : pos) ~acc
+      ~se ~vars ~conds ~(p : pos) ~acc ~info
       ?projlabels            (* optional list of projection labels *)
       (l : Term.terms)
     =
@@ -484,7 +499,7 @@ module Pos = struct
             | Some labels -> SE.project [List.nth labels i] se
           in
           let acc, found', ti =
-            map_fold func mode ~se ~vars ~conds ~p:(i :: p) ~acc ti
+            map_fold func mode ~se ~vars ~conds ~p:(i :: p) ~acc ~info ti
           in
           (acc, found || found'), ti
         ) (acc, false) l 
@@ -493,8 +508,8 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   (** Internal *)
-  let rec map_fold_e
-      (func   : 'a f_map_fold) 
+  let rec map_fold_e 
+      (func   : ('a,OccInfo.t) f_map_fold) 
       (mode   : [`TopDown of bool | `BottomUp])
       (* - [`TopDown b]: apply [func] at top-level first, then recurse.
            [b] tells if we recurse under successful maps.
@@ -508,6 +523,15 @@ module Pos = struct
       (ti      : Equiv.form)       
      : 'a * bool * Equiv.form    (* folding value, `Map found, term *)
     = 
+    let map_fold_opt
+        func mode ~se ?(vars = vars) ?(conds = conds) ~p ~acc ~info
+      =
+      function
+      | None -> acc, false, None
+      | Some t ->
+        let acc, found, t = map_fold func mode ~se ~vars ~conds ~p ~acc ~info t in
+        acc, found, Some t
+    in
     let map_fold_e ?(system = system) ?(vars = vars) ?(conds = conds) = 
       map_fold_e func mode ~system ~vars ~conds 
     in
@@ -535,7 +559,8 @@ module Pos = struct
 
       let acc, found1, t =
         let se = (oget system.pair :> SE.t) in
-        map_fold func mode ~se ~vars ~conds ~p:(0 :: p) ~acc t
+        let info = OccInfo.Let f in
+        map_fold func mode ~se ~vars ~conds ~p:(0 :: p) ~acc ~info t
       in
       let acc, found2, f =
         map_fold_e ~system ~vars:(v :: vars) ~conds:(ceq :: conds) ~p:(1 :: p) ~acc f
@@ -547,21 +572,39 @@ module Pos = struct
 
     | Equiv.Atom (Reach t) -> 
       let se = system.set in
-      let acc, found, t =
-        map_fold func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t.formula
+      let acc, found0, formula =
+        let info = OccInfo.ReachForm t.bound in
+        map_fold
+          func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc ~info 
+          t.formula
       in
-      let ti' = Equiv.Atom (Reach {formula = t; bound = None}) in
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      let acc, found1, bound =
+        let info = OccInfo.ReachBound in
+        map_fold_opt
+          func mode ~se ~vars ~conds ~p:(0 :: 1 :: p) ~acc ~info
+          t.bound
+      in
+      let ti' = Equiv.Atom (Reach {formula; bound}) in
+      let found = found0 || found1 in
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
-      let se = (oget system.pair :> SE.t) in
-      let acc, found, l =
-        map_fold_l func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e.terms
-        (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      let acc, found0, l =
+        let se = (oget system.pair :> SE.t) in
+        let info = OccInfo.EquivForm e.bound in
+        map_fold_l
+          func mode ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc ~info
+          e.terms
       in
-      let ti' = Equiv.Atom (Equiv {terms = l; bound = None}) in
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      let acc, found1, bound =
+        let se = (SE.of_list [] :> SE.t) in
+        let info = OccInfo.EquivBound in
+        map_fold_opt
+          func mode ~se ~vars ~conds ~p:(0 :: 1 :: p) ~acc ~info
+          e.bound
+      in
+      let ti' = Equiv.Atom (Equiv {terms = l; bound}) in
+      let found = found0 || found1 in
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Pred pa) ->
@@ -570,7 +613,10 @@ module Pos = struct
       let (acc, found0), multi_args =
         List.mapi_fold (fun i (acc, found) (se, args) ->
             let acc, found', args =
-              map_fold_l func mode ~se ~vars ~conds ~p:(i :: p) ~acc args
+              let info = OccInfo.Pred pa.psymb in
+              map_fold_l
+                func mode ~se ~vars ~conds ~p:(i :: p) ~acc ~info 
+                args
             in
             (acc, found || found'), (se, args)
           ) (acc, false) pa.multi_args
@@ -579,7 +625,10 @@ module Pos = struct
       let acc, found1, simpl_args =
         let se = (SE.of_list [] :> SE.t) in (* empty system expression *)
         let p = List.length pa.multi_args :: p in
-        map_fold_l func mode ~se ~vars ~conds ~p ~acc pa.simpl_args
+        let info = OccInfo.Pred pa.psymb in
+        map_fold_l
+          func mode ~se ~vars ~conds ~p ~acc ~info 
+          pa.simpl_args
       in
 
       let found = found0 || found1 in
@@ -709,26 +758,26 @@ module Pos = struct
   (*------------------------------------------------------------------*)
   (** Exported *)
   let map
-      ?(mode=`TopDown false) (func : f_map)
+      ?(mode=`TopDown false) (func : unit f_map)
       (se : SE.arbitrary) (t : Term.term)
     : bool * Term.term
     =
-    let func : unit f_map_fold = 
-      fun t projs vars conds p () -> (), func t projs vars conds p 
+    let func : (unit,unit) f_map_fold = 
+      fun t projs vars conds p () () -> (), func t projs vars conds p ()
     in
     let (), found, t =
-      map_fold func mode ~se ~vars:[] ~conds:[] ~p:[] ~acc:() t
+      map_fold func mode ~se ~vars:[] ~conds:[] ~p:[] ~acc:() ~info:() t
     in
     found, t
 
   (** Exported *)
   let map_e
-      ?(mode=`TopDown false) (func : f_map)
+      ?(mode=`TopDown false) (func : OccInfo.t f_map)
       (system : SE.context) (t : Equiv.form)
     : bool * Equiv.form
     =
-    let func : unit f_map_fold = 
-      fun t projs vars conds p () -> (), func t projs vars conds p 
+    let func : (unit,OccInfo.t) f_map_fold = 
+      fun t projs vars conds p info () -> (), func t projs vars conds p info
     in
     let (), found, t = 
       map_fold_e func mode ~system ~vars:[] ~conds:[] ~p:[] ~acc:() t
@@ -754,25 +803,25 @@ module Pos = struct
   (** Exported *)
   let fold
       ?(mode=`TopDown false) 
-      (func : 'a f_fold)
+      (func : ('a,unit) f_fold)
       (se : SE.arbitrary) 
       (acc : 'a) (t : Term.term) 
     =
-    let f:'a f_map_fold =
-      fun t se v ts p acc -> (func t se v ts p acc, `Continue)
+    let f : ('a,unit) f_map_fold =
+      fun t se v ts p () acc -> (func t se v ts p () acc, `Continue)
     in
-    let a, _, _ = map_fold f mode ~se ~vars:[] ~conds:[] ~p:[] ~acc t in
+    let a, _, _ = map_fold f mode ~se ~vars:[] ~conds:[] ~p:[] ~acc ~info:() t in
     a
 
   (** Exported *)
   let fold_e 
       ?(mode=`TopDown false) 
-      (func : 'a f_fold)
+      (func : ('a,OccInfo.t) f_fold)
       (system : SE.context) 
       (acc : 'a) (t : Equiv.form) 
     =
-    let f:'a f_map_fold =
-      fun t se v ts p acc -> (func t se v ts p acc, `Continue)
+    let f : ('a,OccInfo.t) f_map_fold =
+      fun t se v ts p info acc -> (func t se v ts p info acc, `Continue)
     in   
     let a, _, _ = map_fold_e f mode ~system ~vars:[] ~conds:[] ~p:[] ~acc t in
     a
@@ -793,36 +842,38 @@ module Pos = struct
   (*------------------------------------------------------------------*)
   (** Exported *)
   let fold_shallow
-      (func : 'a f_fold)
+      (func : ('a,unit) f_fold)
       ~(se : SE.arbitrary)
       ~(fv:Vars.vars)
       ~(cond:Term.terms)
       ~(p:pos)
       (acc : 'a) (t : Term.term) 
     =
-    let f tt se v c p acc =
+    let f tt se v c p () acc =
       if tt = t then
         acc, `Continue
       else
-        func tt se v c p acc, `Map tt
+        func tt se v c p () acc, `Map tt
     in
-    let a, _, _ = map_fold f (`TopDown false) ~se ~vars:fv ~conds:cond ~p ~acc t in
+    let a, _, _ = 
+      map_fold f (`TopDown false) ~se ~vars:fv ~conds:cond ~p ~acc ~info:() t 
+    in
     a 
 
   (*------------------------------------------------------------------*)
   (** Exported *)
   let map_fold
       ?(mode=`TopDown false) 
-      (func : 'a f_map_fold)
+      (func : ('a,unit) f_map_fold)
       (se : SE.arbitrary) 
       (acc : 'a) (t : Term.term) 
     =
-    map_fold func mode ~se ~vars:[] ~conds:[] ~p:[] ~acc t
+    map_fold func mode ~se ~vars:[] ~conds:[] ~p:[] ~acc ~info:() t
 
   (** Exported *)
   let map_fold_e 
       ?(mode=`TopDown false) 
-      (func : 'a f_map_fold)
+      (func : ('a,OccInfo.t) f_map_fold)
       (system : SE.context) 
       (acc : 'a) (t : Equiv.form) 
     =
@@ -1163,8 +1214,15 @@ exception NoMatch of (term list * match_infos) option
 
 let no_unif ?infos () = raise (NoMatch infos)
 
-
 (*------------------------------------------------------------------*)
+let higher_order_unif (table : Symbols.table) =
+  match TConfig.higher_order_unif table with
+  | "All" -> `All
+  | "BoundVars" -> `BoundVars
+  | "None" -> `None
+  | _ -> assert false
+
+
 (** {2 Unification parameters} *)
 
 (** unification parameters *)
@@ -1184,21 +1242,21 @@ type param = {
 }
 
 (*------------------------------------------------------------------*)
-let default_param = { 
+let default_param = {
   mode           = `Eq;
   red_param      = ReductionCore.rp_empty;
   red_strat      = ReductionCore.Std;
   use_fadup      = false; 
-  allow_capture  = false; 
+  allow_capture  = false;
 }
 
-let crypto_param = { 
+let crypto_param = {
   mode           = `Eq;
   red_param      = ReductionCore.rp_crypto;
   red_strat      = 
     ReductionCore.(MayRedSub { rp_crypto with delta = ReductionCore.delta_fast; });
   use_fadup      = false; 
-  allow_capture  = false; 
+  allow_capture  = false;
 }
 
 let logic_param = {
@@ -1226,10 +1284,15 @@ type unif_state = {
 
   support : Vars.tagged_vars; (** free variable which we are trying to match *)
 
-  env     : Vars.env;         (** rigid free variables (disjoint from [support]) *)
-  table   : Symbols.table;
-  system  : SE.context;       (** system context applying at the current position *)
-  params  : Params.t;
+  (* FIXME: use a proof-context *)
+  env      : Vars.env;         (** rigid free variables (disjoint from [support]) *)
+  table    : Symbols.table;
+  system   : SE.context;       (** system context applying at the current position *)
+  params   : Params.t;
+  concrete : bool;
+  (** Are we unify overwhelmingly or exactly? E.g., can we use
+      [happens(t)] or should we require the stronger property
+      [happens(t) <: Real.z] *)
   
   ienv    : Infer.env;
 
@@ -1240,13 +1303,15 @@ type unif_state = {
 
   red_param : ReductionCore.red_param;
   red_strat : ReductionCore.red_strat;
+
+  higher_order_unif : [`All | `BoundVars | `None];
   
   use_fadup     : bool;
   allow_capture : bool;
 }
 
 let mk_unif_state
-    ~(param   : param) (pc : ProofContext.t) ~(support : Vars.vars)
+    ~(param : param) (pc : ProofContext.t) ~(support : Vars.vars)
   : unif_state
   =
   assert (param.mode = `Eq);
@@ -1267,9 +1332,12 @@ let mk_unif_state
 
     red_param = param.red_param;
     red_strat = param.red_strat;
-    
+
+    higher_order_unif = higher_order_unif pc.env.table;
+
     use_fadup      = param.use_fadup;
     allow_capture  = param.allow_capture;
+    concrete       = pc.concrete;
   }
   
 (*------------------------------------------------------------------*)
@@ -1290,9 +1358,9 @@ let to_env (st : unif_state) : Env.t =
     ~ty_vars:st.params.ty_vars ~se_vars:st.params.se_vars
     ~table:st.table ()
 
-(* let to_pc (st : unif_state) : ProofContext.t = *)
-(*   let env = to_env st in *)
-(*   ProofContext.make ~env ~hyps:st.hyps *)
+let to_pc (st : unif_state) : ProofContext.t =
+  let env = to_env st in
+  ProofContext.make ~env ~hyps:st.hyps ~concrete:st.concrete
     
 (*------------------------------------------------------------------*)
 let env_of_unif_state (st : unif_state) : Env.t =
@@ -1306,6 +1374,7 @@ let env_of_unif_state (st : unif_state) : Env.t =
 let whnf0
     ~(red_param : ReductionCore.red_param)
     ~(strat : ReductionCore.red_strat)
+    ~(concrete : bool)
     ~(hyps : TraceHyps.hyps) ~(system : SE.context)
     ~(vars : Vars.env) ~(table : Symbols.table)
     (t : Term.term) 
@@ -1314,7 +1383,7 @@ let whnf0
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let red_st = R.mk_state0 ~hyps ~system ~vars ~red_param table in
+  let red_st = R.mk_state0 ~hyps ~system ~vars ~red_param ~concrete table in
   R.whnf_term ~strat red_st t
 
 (** Put [t] in weak-head normal form w.r.t. [st]. *)
@@ -1327,7 +1396,7 @@ let whnf
   let vars = Vars.add_vars st.bvs st.env in
   whnf0
     ~hyps:st.hyps ~system:st.system
-    ~vars ~red_param ~strat ~table:st.table t
+    ~vars ~red_param ~strat ~table:st.table ~concrete:st.concrete t
 
 (*------------------------------------------------------------------*)
 (** Reduce [t] once in head position w.r.t. [st]. *)
@@ -1343,12 +1412,13 @@ let reduce_head1
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
     R.mk_state0
-      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
+      ~hyps:st.hyps ~system:st.system ~vars ~red_param
+      ~concrete:st.concrete st.table
   in
   R.reduce_head1_term ~strat red_st t
 
 (*------------------------------------------------------------------*)
-(** Reduce [t] once in head position w.r.t. [st]. *)
+(** Try to convert [t1] to [t2]  w.r.t. [st]. *)
 let conv_term
     (red_param : ReductionCore.red_param) (st : unif_state)
     (t1 : Term.term) (t2 : Term.term)
@@ -1360,9 +1430,28 @@ let conv_term
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
     R.mk_state0
-      ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
+      ~hyps:st.hyps ~system:st.system ~vars ~red_param
+      ~concrete:st.concrete st.table
   in
   R.conv red_st t1 t2
+
+(*------------------------------------------------------------------*)
+(** Fully reduce [t]. *)
+let reduce_term
+    ?(red_param = ReductionCore.rp_default)
+    ~(concrete : bool)
+    ~(hyps : TraceHyps.hyps) ~(system : SE.context)
+    ~(table : Symbols.table)
+    (t : Term.term)
+  : Term.term
+  =
+  let module R : ReductionCore.Sig =
+    (val ReductionCore.Register.get ())
+  in
+  let red_st =
+    R.mk_state0 ~hyps ~system ~red_param ~concrete table
+  in
+  R.reduce_term red_st t
 
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
@@ -1371,11 +1460,11 @@ let conv_term
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 let reduce_delta_def1
-    (env : Env.t)
-    (hyps : Hyps.TraceHyps.hyps)
+    (pc : ProofContext.t)
     (t : Term.term) 
   : Term.term * ReductionCore.head_has_red
   =
+  let env = pc.env in
   match t with
   | Var v ->
     let t' =
@@ -1392,7 +1481,7 @@ let reduce_delta_def1
               Some t'
             else None
           | _, LHyp _ -> None
-        ) hyps
+        ) pc.hyps
     in
     begin
       match t' with
@@ -1405,25 +1494,36 @@ let reduce_delta_def1
 (*------------------------------------------------------------------*)
 (** Try to find a action term [t0] equal to [t]. *)
 let as_action
-    (* (table : Symbols.table) (sexpr : SE.t)  *)(hyps : Hyps.TraceHyps.hyps)
+    ~concrete
+    (table : Symbols.table) (sexpr : SE.context)
+    (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term)
   : term option
   =
+  let is_zero b =
+    Real.is_zero table
+      (reduce_term
+         ~red_param:ReductionCore.rp_default
+         ~concrete ~hyps ~system:sexpr ~table b)
+  in
   TraceHyps.find_map (fun (_x, f) ->
+      let doit f =
+        match Term.decompose_app f with
+        | Term.Fun (fs,_), [t0; t1] ->
+          if Symbols.path_equal fs Symbols.fs_eq then
+            if      Term.is_action t1 && Term.equal t t0 then Some t1
+            else if Term.is_action t0 && Term.equal t t1 then Some t0
+            else None
+          else None
+
+        | _ -> None
+      in
       match f with
       | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = None})))
-      | LHyp (Local f) ->
-        begin
-          match Term.decompose_app f with
-          | Term.Fun (fs,_), [t0; t1] ->
-            if Symbols.path_equal fs Symbols.fs_eq then
-              if      Term.is_action t1 && Term.equal t t0 then Some t1 
-              else if Term.is_action t0 && Term.equal t t1 then Some t0
-              else None
-            else None
-              
-          | _ -> None
-        end
+        when not concrete  -> doit f
+      | LHyp (Global Equiv.(Atom (Reach {formula = f; bound = Some b})))
+        when is_zero b -> doit f
+      | LHyp (Local f) -> doit f
       | _ -> None
     ) hyps 
 
@@ -1523,14 +1623,19 @@ let rec happens_term
     Return the list of atoms in [conds] that cannot be proved. *)
 let check_conds
     (table : Symbols.table)
+    ~(concrete : bool)
     ~(equal_ts : Term.terms)
     ?(hyps : TraceHyps.hyps = TraceHyps.empty)
     ?(hyps_list : Term.terms = [])
+    (system : SE.context)
     (conds : Term.term) 
   : Term.term list
   =
   (* starts from [conds] decomposed as a list of elementary conditions *)
   let conds = ref (flatten_simplify conds) in
+  let is_zero b =
+    Real.is_zero table (reduce_term ~hyps ~system ~table ~concrete b)
+  in
 
   (* remove from [conds] the formulas that can be proved using
      [hyp]. *)
@@ -1546,18 +1651,21 @@ let check_conds
            | _ -> true)
         !conds
   in
-  
+
   (* iter over the hypotheses in [hyps] *)
   TraceHyps.iter (fun _ hyp ->
       match hyp with
-      | LHyp (Local hyp)
-      | LHyp (Global Equiv.(Atom (Reach {formula = hyp; bound = None}))) -> check1 hyp
+      | LHyp (Local hyp) -> check1 hyp
+      | LHyp (Global Equiv.(Atom (Reach {formula = hyp; bound = None})))
+        when not concrete -> check1 hyp
+      | LHyp (Global Equiv.(Atom (Reach {formula = hyp; bound = Some b})))
+        when is_zero b -> check1 hyp
       | _ -> ()
     ) hyps;
 
   (* same on [hyps_list] *)
   List.iter check1 hyps_list;
-  
+
   (* return the remaining formulas that could not be proved *)
   !conds
 
@@ -1575,19 +1683,31 @@ let is_happen : Term.t list -> bool = function
 (** Perform δ-reduction once for macro at head position. *)
 let reduce_delta_macro1
     ?(unfold_opaque=false)
-    ~(constr : bool)    
-    (env : Env.t)
-    ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
+    ~(constr : bool)
+    (pc : ProofContext.t)
     (t : Term.term)
   : Term.term * ReductionCore.head_has_red
   =
+  let env = pc.env in
+  let concrete = pc.concrete in
+  let hyps = pc.hyps in
   match t with
   | Term.Macro (ms, l, ts) ->
       let models = 
         let exception NoExp in
+        let module R : ReductionCore.Sig =
+          (val ReductionCore.Register.get ())
+        in
+        let rp = ReductionCore.rp_default in
+        let red_state =
+          R.mk_state0 ~system:env.system ~red_param:rp ~concrete env.table
+        in
+        let red_fun = R.reduce_term red_state in
         try
           if constr then
-            Hyps.get_models ~exn:NoExp ~system:(Some env.system.set) env.table hyps
+            Hyps.get_models
+              ~concrete ~red_fun ~exn:NoExp
+              ~system:(Some env.system.set) env.table hyps
           else Constr.empty_model
         with NoExp -> Constr.empty_model
       in
@@ -1595,7 +1715,7 @@ let reduce_delta_macro1
       let ts_list, ta = 
         let ta =
           if constr then Constr.find_eq_action models ts 
-          else as_action hyps ts
+          else as_action ~concrete env.table env.system hyps ts
         in
         match ta with
         | None -> [], ts
@@ -1612,7 +1732,8 @@ let reduce_delta_macro1
           if p.Macros.pattern = None then
             let remaining_conds = 
               check_conds
-                env.table ~equal_ts:ts_list ~hyps
+                ~concrete env.table ~equal_ts:ts_list ~hyps
+                env.system
                 p.when_cond 
             in
             (* FEATURE: we could try to check convertibility of
@@ -1640,25 +1761,25 @@ let reduce_delta1
     ?(unfold_opaque=false)
     ?(delta = ReductionCore.delta_full)
     ~(constr : bool)
-    (env : Env.t)
-    (hyps : Hyps.TraceHyps.hyps)
+    (pc : ProofContext.t)
     (t : Term.term) 
   : Term.term * ReductionCore.head_has_red
   = 
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~unfold_opaque ~constr env ~hyps t
+    reduce_delta_macro1 ~unfold_opaque ~constr pc t
 
   (* definition *)
   | Var   _ when delta.def ->
-    reduce_delta_def1 env hyps t
+    reduce_delta_def1 pc t
 
   (* concrete operators *)
   | Fun (fs, { ty_args })
   | App (Fun (fs, { ty_args }), _)
-    when delta.op && Operator.is_concrete_operator env.table fs -> 
+    when delta.op && Operator.is_concrete_operator pc.env.table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
+    let env = pc.env in
     let t = Operator.unfold env.table env.system.set fs ty_args args in
     t, True
     
@@ -1704,21 +1825,19 @@ type match_res =
   | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
 
+let (let*) (x : match_res) (f : Mvar.t -> match_res) =
+  match x with
+  | NoMatch _ as r -> r
+  | Match mv -> f mv
+
 (** Module signature of matching.
     The type of term we match into is abstract. *)
 module type S = sig
   type t
 
-  val pp_pat :
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a pat -> unit
-
-  val pp_pat_op :
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a pat_op -> unit
-
   val try_match :
-    param:param ->
+    param:param -> 
+    concrete:bool ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->
     ?ienv:Infer.env ->
@@ -1731,6 +1850,7 @@ module type S = sig
 
   val find : 
     param:param ->
+    concrete:bool ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
     Symbols.table ->
@@ -1752,6 +1872,7 @@ let unif_gen (type a)
     (fmatch  : 
        mode:[`EntailLR | `EntailRL | `Eq] -> a -> a -> unif_state -> Mvar.t) 
     ~(param  : param)
+    ~(concrete : bool)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
     ?(ienv : Infer.env option)
@@ -1815,9 +1936,12 @@ let unif_gen (type a)
 
     red_param = param.red_param;
     red_strat = param.red_strat;
-    
+
+    higher_order_unif = higher_order_unif table;
+
     use_fadup     = param.use_fadup;
-    allow_capture = param.allow_capture; 
+    allow_capture = param.allow_capture;
+    concrete;
   } in
 
   (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
@@ -1836,18 +1960,6 @@ let unif_gen (type a)
 
 module T (* : S with type t = Term.term *) = struct
   type t = term
-
-  let pp_pat pp_t fmt p =
-    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
-      pp_t p.pat_term
-      Params.pp p.pat_params
-      Vars.pp_typed_tagged_list p.pat_vars
-
-  let pp_pat_op pp_t fmt p =
-    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
-      pp_t p.pat_op_term
-      Params.Open.pp p.pat_op_params
-      Vars.pp_typed_tagged_list p.pat_op_vars
 
   (*------------------------------------------------------------------*)
   let is_bvs (st : unif_state) = function
@@ -1945,16 +2057,12 @@ module T (* : S with type t = Term.term *) = struct
       if not (Macros.is_global st.table s.s_symb) then default ()
       else begin
         let t,t_red =
-          reduce_delta_macro1
-            ~constr:false
-            (to_env st) t
+          reduce_delta_macro1 ~constr:false (to_pc st) t
         in
         if t_red <> True then default ()
         else 
           let pat,pat_red =
-            reduce_delta_macro1
-              ~constr:false
-              (to_env st) pat
+            reduce_delta_macro1 ~constr:false (to_pc st) pat
           in
           if pat_red <> True then default () else tunif t pat st
       end
@@ -1998,7 +2106,8 @@ module T (* : S with type t = Term.term *) = struct
   and tunif_eta_expand
       (st : unif_state) (t : term) ((f', l') : term * term list)
     =
-    if not (List.for_all (is_bvs st) l')
+    let mode = st.higher_order_unif in
+    if   mode = `None || (mode = `BoundVars && not (List.for_all (is_bvs st) l'))
     then try_reduce_head1 t (Term.mk_app f' l') st
     else
       match f' with  
@@ -2135,7 +2244,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported.
       Remark: term matching ignores [mode]. *)
   let try_match
-      ~param ?mv ?env ?ienv ?hyps
+      ~(param : param) ~concrete ?mv ?env ?ienv ?hyps
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
@@ -2146,7 +2255,7 @@ module T (* : S with type t = Term.term *) = struct
       (fun[@warning "-27"] ~mode -> tunif)
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ~param ?mv ?env ?ienv ?hyps 
+      ~param ~concrete ?mv ?env ?ienv ?hyps 
       table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
@@ -2162,20 +2271,24 @@ module T (* : S with type t = Term.term *) = struct
   (*------------------------------------------------------------------*)
   let unify_opt 
       ?mv
+      ~concrete
       (table : Symbols.table)
       (system  : SE.context)
       (t1    : term pat_op)
       (t2    : term pat_op) 
     : Mvar.t option
     =
-    match unify ?mv ~param:default_param table system t1 t2 with
+    let u =
+      unify ?mv ~param:default_param ~concrete table system t1 t2
+    in
+    match u with
     | NoMatch _ -> None
     | Match mv -> Some mv
 
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Term.term] *)
   let find
-      ~param
+      ~param ~concrete
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -2190,12 +2303,12 @@ module T (* : S with type t = Term.term *) = struct
       | Some in_system -> SE.equal table in_system 
     in
       
-    let f_fold : Term.terms Pos.f_map_fold = 
-      fun e se _vars _conds _p acc ->
+    let f_fold : (Term.terms,unit) Pos.f_map_fold = 
+      fun e se _vars _conds _p () acc ->
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match
-            try_match ?ienv ~param table subterm_system e pat
+            try_match ?ienv ~param ~concrete table subterm_system e pat
           with
           | Match _ -> e :: acc, `Continue
           | _       -> acc, `Continue
@@ -2490,14 +2603,21 @@ let known_set_check_exec_case
 
 
 (*------------------------------------------------------------------*)
-let get_local_of_hyps (hyps : TraceHyps.hyps) =
+let get_local_of_hyps
+    ~(concrete : bool)
+    (table : Symbols.table) (hyps : TraceHyps.hyps)
+  =
   let hyps =
     TraceHyps.fold_hyps (fun _ hyp acc ->
         match hyp with
-        | Equiv.Local f
+        | Equiv.Local f -> f :: acc
+
+        | Equiv.(Global Atom( (Reach {formula = f; bound = Some b}))) ->
+          if Real.is_zero table b then f :: acc else acc
+
         | Equiv.(Global Atom( (Reach {formula = f; bound = None}))) ->
-          (*TODO:Concrete : Probably something to do to create a bounded goal*)
-          f:: acc
+          if concrete then acc else f :: acc
+
         | _ -> acc 
       ) hyps []
   in hyps
@@ -2526,7 +2646,7 @@ let known_set_check_impl
   (* [mv] is only useful if a [mv] was provided to
      [known_set_check_impl], meaning when [has_mv]. *)
   let mv, has_mv = odflt Mvar.empty mv, mv <> None in
-  
+
   (* Decompose the top-level conjunctions, modulo reduction if
      [st ≠ None]. 
      Does not reduce recursively (i.e. reduction is only used at head
@@ -2556,7 +2676,12 @@ let known_set_check_impl
 
   (* flattened [hyp] + proof-context hypotheses *)
   let hyps =
-    ( hyp :: omap_dflt [] (fun (st : unif_state) -> get_local_of_hyps st.hyps) st ) |>
+    (
+      hyp ::
+      omap_dflt []
+        (fun (st : unif_state) ->
+           get_local_of_hyps ~concrete:st.concrete table st.hyps) st
+    ) |>
     List.concat_map flatten_ands |>
     List.remove_duplicate Term.equal
   in
@@ -3031,7 +3156,8 @@ let term_set_of_term (se : SE.t) (term : Term.term) : info term_set =
 (** Apply the user deduction rules to [k].
     Do it only once: we do not try to reach a fixpoint.
     (We could do a fixpoint computation, with proper entailment pruning.) *)
-let apply_user_deduction_rules (env : Env.t) (k : 'info term_set) : 'info term_set list =
+let apply_user_deduction_rules (pc : ProofContext.t) (k : 'info term_set) : 'info term_set list =
+  let env = pc.env in
   let deduction_rules = Hint.get_deduce_db env.table in
 
   List.filter_map (fun (hint : Hint.deduce_hint) ->
@@ -3048,18 +3174,23 @@ let apply_user_deduction_rules (env : Env.t) (k : 'info term_set) : 'info term_s
 
       let ienv = Infer.mk_env () in
       let pat = Term.{
-        pat_term   = left;
-        pat_params = rule.params;
-        pat_vars   = Vars.Tag.local_vars args;
-        (* variables are local in deduction rules *)
-      } in
+          pat_term   = left;
+          pat_params = rule.params;
+          pat_vars   = Vars.Tag.local_vars args;
+          (* variables are local in deduction rules *)
+        } in
       let gsubst, pat = Pattern.open_pat Equiv.Local_t ienv pat in
       let rule_system = SE.gsubst gsubst rule.system in
 
       if Infer.unify_se ienv k.se rule_system = `Fail then None else
         begin
-          let context = SE.{ set = k.se; pair = None; } in 
-          match T.try_match ~param:default_param env.table context k.term pat with
+          let context = SE.{ set = k.se; pair = None; } in
+          let try_match =
+            T.try_match
+              ~param:default_param ~concrete:pc.concrete
+              env.table context k.term pat
+          in
+          match try_match with
           | NoMatch _ -> None
           | Match  mv ->
             (* substitute type variables in [right] and [left], which we
@@ -3105,7 +3236,7 @@ let apply_user_deduction_rules (env : Env.t) (k : 'info term_set) : 'info term_s
     - [(k1,...,kn)] is deducible from [inputs,k]
     - [k] is deducible from [inputs,(k1, ..., kn)] *)
 let term_set_decompose
-    (env : Env.t) (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     ~(inputs: info term_set list) (known : info term_set) : info term_set list 
   =
   let inputs = 
@@ -3124,15 +3255,15 @@ let term_set_decompose
        simply build a different unif state, without forgetting of
        changing the set of hypotheses according to the system
        change. *)
-    assert (t.se = env.system.set);
+    assert (t.se = pc.env.system.set);
 
     (* binder variables are declared global, constant and adv,
        as these are inputs (hence known values) to the adversary  *)
-    let env = { env with vars = Vars.add_vars t.vars env.vars} in
+    let env = { pc.env with vars = Vars.add_vars t.vars pc.env.vars} in
     let unif_state =
       mk_unif_state
-        ~param:crypto_param (* FIXME: should always take a default value? *)
-        (ProofContext.make ~env ~hyps)
+        ~param:crypto_param
+        (ProofContext.set_env env pc)
         ~support:[]
     in
     let st = 
@@ -3152,6 +3283,7 @@ let term_set_decompose
       ~(inputs: info term_set list) (k : info term_set) : 
     info term_set list 
     =
+    let env = pc.env in
     (* deduction parametrizes reduction its own way for now
        (i.e. we do not use [st.red_param] and [st.red_strat]) 
         
@@ -3172,9 +3304,9 @@ let term_set_decompose
     in
     let strat = ReductionCore.(MayRedSub rp_crypto) in
     let term, _ = 
-      whnf0 
-        ~red_param ~strat ~hyps ~vars:env.vars
-        ~table:env.table ~system:env.system
+      whnf0
+        ~red_param ~strat ~hyps:pc.hyps ~vars:env.vars
+        ~table:env.table ~system:env.system ~concrete:pc.concrete
         k.term
     in
     match term with
@@ -3229,30 +3361,33 @@ let term_set_decompose
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli` *)
 let term_set_strengthen
-    (env : Env.t) (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     ~(inputs: info term_set list) (k : info term_set) : info term_set list 
   =
-  let k_decomposed = term_set_decompose ~inputs env hyps k in
-  let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
+  let k_decomposed = term_set_decompose pc ~inputs k in
+  let k_decomposed' =
+    List.concat_map
+      (apply_user_deduction_rules pc)
+      k_decomposed
+  in
   term_set_union k_decomposed k_decomposed'
 
 (** Given a term [term], return some corresponding [known_sets] such that:
     [inputs, term ▷ knowns] *)
 let term_set_list_of_term
-    (env : Env.t) (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     ~(inputs: info term_set list) (term : Term.term) : info term_set list 
   =
-  let k = term_set_of_term env.system.set term in
-  term_set_strengthen ~inputs env hyps k
+  let k = term_set_of_term pc.env.system.set term in
+  term_set_strengthen pc ~inputs k
 
-let known_sets_of_terms 
-    (env : Env.t) (hyps : TraceHyps.hyps)
-    (terms : Term.terms) 
+let known_sets_of_terms
+    (pc : ProofContext.t) (terms : Term.terms) 
   : info known_sets 
   =
   List.fold_left (fun inputs term ->
       term_set_union
-        (term_set_list_of_term ~inputs env hyps term)
+        (term_set_list_of_term pc ~inputs term)
         inputs
     ) [] terms 
 
@@ -3406,7 +3541,8 @@ let msets_add (mset : MCset.t) (msets : msets) : msets =
 
 (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
     members of [s2]. *)
-let mset_incl 
+let mset_incl
+    ~concrete
     (table : Symbols.table) (system : SE.arbitrary) 
     (s1 : MCset.t) (s2 : MCset.t) : bool
   =
@@ -3428,7 +3564,7 @@ let mset_incl
   let context = SE.{ set = system; pair = None; } in
   match 
     T.try_match
-      ~param:default_param 
+      ~param:default_param ~concrete
       table context
       term1 pat2
   with
@@ -3437,7 +3573,8 @@ let mset_incl
 
 
 (** [msets_incl tbl system s1 s2] check if [msets] is included in [msets2] *)
-let msets_incl 
+let msets_incl
+    ~concrete
     (table : Symbols.table) (system : SE.arbitrary)
     (msets1 : msets) (msets2 : msets) : bool 
   =
@@ -3447,14 +3584,15 @@ let msets_incl
 
       List.for_all (fun mset1 ->
           List.exists (fun mset2 ->
-              mset_incl table system mset1 mset2
+              mset_incl ~concrete table system mset1 mset2
             ) mset2_l
         ) mset1_l
     ) msets1
 
 
 (** remove any set which is subsumed by some other set. *)
-let mset_list_simplify 
+let mset_list_simplify
+    ~concrete
     (table : Symbols.table) (system : SE.arbitrary)
     (msets : MCset.t list) : MCset.t list 
   =
@@ -3464,7 +3602,7 @@ let mset_list_simplify
     | mset :: after ->
       let clear =
         List.exists (fun mset' ->
-            mset_incl table system mset mset'
+            mset_incl ~concrete table system mset mset'
           ) (before @ after)
       in
       if clear then
@@ -3491,6 +3629,7 @@ let mset_subst env subst (mset : MCset.t) : MCset.t =
 
 (** Compute the intersection of two msets with the same condition. Exact. *)
 let mset_inter
+    ~concrete
     table system (env : Vars.env)
     (s1 : MCset.t) (s2 : MCset.t)
   : MCset.t option
@@ -3518,7 +3657,7 @@ let mset_inter
     }
   in
   let sys_cntxt = SE.{ set = system; pair = None; } in
-  match T.unify_opt table sys_cntxt pat1 pat2 with
+  match T.unify_opt ~concrete table sys_cntxt pat1 pat2 with
   | None -> None
   | Some mv ->
 
@@ -3535,6 +3674,7 @@ let mset_inter
 (** Intersets two list of [mset]s by doing:
     (∪ᵢ sᵢ) ∩ (∪ᵢ sᵢ) = ∪ᵢ,ⱼ (sᵢ∩sⱼ) *)
 let mset_list_inter
+    ~concrete
     (table   : Symbols.table)
     (system  : SE.t)
     (env     : Vars.env)
@@ -3544,19 +3684,20 @@ let mset_list_inter
   let mset_l =
     List.fold_left (fun acc mset1 ->
         List.fold_left (fun acc mset2 ->
-            match mset_inter table system env mset1 mset2 with
+            match mset_inter ~concrete table system env mset1 mset2 with
             | None -> acc
             | Some s -> s :: acc
           ) acc mset_l1
       ) [] mset_l2
   in
-  mset_list_simplify table system mset_l  
+  mset_list_simplify ~concrete table system mset_l
 
 (*------------------------------------------------------------------*)
 (** {3 Deduction: automated inductive reasoning} *)
 
 (** Return a specialization of [cand] that is a subset of [known]. *)
 let specialize
+    ~concrete
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
@@ -3571,7 +3712,7 @@ let specialize
   in
 
   let sys_cntxt = SE.{ set = (system :> SE.t); pair = None; } in
-  match T.unify_opt ~mv table sys_cntxt c_pat e_pat with
+  match T.unify_opt ~mv ~concrete table sys_cntxt c_pat e_pat with
   | None -> None
   | Some mv -> (* [mv] represents substitution [θ] *)
     let subst = Mvar.to_subst_locals ~mode:`Unif mv in
@@ -3594,6 +3735,7 @@ let specialize
 
 (*------------------------------------------------------------------*)
 let specialize_all
+    ~concrete
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
@@ -3604,7 +3746,7 @@ let specialize_all
     List.fold_left (fun acc (known : info term_set) ->
         let head = Term.get_head known.term in
         if cand_head = HVar || head = HVar || cand_head = head then
-          specialize table system cand known :: acc
+          specialize ~concrete table system cand known :: acc
         else acc
       ) [] known_sets
   in
@@ -3619,20 +3761,22 @@ let specialize_all
     This includes both direct specialization, and specialization relying on
     the Function Application rule. *)
 let rec specialize_deduce
+    ~concrete
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
     (cand   : cand_set)
     (known_sets : info known_sets) : cand_sets
   =
-  let direct_deds = specialize_all table system cand known_sets in
-  let fa_deds = specialize_deduce_fa table env system cand known_sets in
+  let direct_deds = specialize_all ~concrete table system cand known_sets in
+  let fa_deds = specialize_deduce_fa ~concrete table env system cand known_sets in
 
   direct_deds @ fa_deds
 
 (** Return a list of specialization of the tuples in [cand] deducible from
     [terms] and [pseqs]. *)
 and specialize_deduce_list
+    ~concrete
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
@@ -3643,7 +3787,11 @@ and specialize_deduce_list
   | [] -> [cand]
   | t :: tail ->
     (* find deducible specialization of the first term of the tuple. *)
-    let t_deds = specialize_deduce table env system { cand with term = t } known_sets in
+    let t_deds =
+      specialize_deduce
+        ~concrete table env
+        system { cand with term = t } known_sets
+    in
 
     (* for each such specialization, complete it into a specialization of
        the full tuple. *)
@@ -3651,7 +3799,11 @@ and specialize_deduce_list
         (* find a deducible specialization of the tail of the tuple,
            starting from the  specialization of [t]. *)
         let cand_tail : cand_tuple_set = { t_ded with term = tail } in
-        let tail_deds = specialize_deduce_list table env system cand_tail known_sets in
+        let tail_deds =
+          specialize_deduce_list
+            ~concrete table env
+            system cand_tail known_sets
+        in
 
         (* build the deducible specialization of the full tuple. *)
         List.map (fun (tail_ded : cand_tuple_set) ->
@@ -3663,6 +3815,7 @@ and specialize_deduce_list
     using Function Application.
     Does not include direct specialization. *)
 and specialize_deduce_fa
+    ~concrete
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
@@ -3676,7 +3829,11 @@ and specialize_deduce_fa
     : cand_sets 
     =
     let terms_cand = { cand with term = terms } in
-    let terms_deds = specialize_deduce_list table env system terms_cand known_sets in
+    let terms_deds =
+      specialize_deduce_list
+        ~concrete table env
+        system terms_cand known_sets
+    in
     List.map (fun (terms_ded : cand_tuple_set) ->
         { terms_ded with
           term = mk_cand_of_terms terms_ded.term }
@@ -3696,32 +3853,33 @@ and specialize_deduce_fa
   | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
 
   | Term.Macro (ms, l, ts) ->
-     begin
-       let res =
-         let env =
-           Env.init ~system:(SE.{ set = (system :> SE.t); pair = None; }) ~table ()
-         in
-         match Macros.unfold env ms l ts with
-         | `Results r -> r
-         | `Unknown -> []
-       in
-       let res =
-         List.find_map (fun p ->
-             if p.Macros.pattern = None &&
-                check_conds
-                  table ~equal_ts:[]
-                  ~hyps_list:[cand.cond; Term.mk_happens ts]
-                  p.Macros.when_cond
-                = []
-             then Some p.out
-             else None)
-           res
-       in
-       match res with
-       | None -> []
-       | Some body ->               
-          specialize_deduce table env system { cand with term = body } known_sets
-     end
+    begin
+      let res =
+        let env =
+          Env.init ~system:(SE.{ set = (system :> SE.t); pair = None; }) ~table ()
+        in
+        match Macros.unfold env ms l ts with
+        | `Results r -> r
+        | `Unknown -> []
+      in
+      let res =
+        List.find_map (fun p ->
+            if p.Macros.pattern = None &&
+               check_conds
+                 table ~concrete ~equal_ts:[]
+                 ~hyps_list:[cand.cond; Term.mk_happens ts]
+                 {set = (system :> SE.arbitrary); pair = None}
+                 p.Macros.when_cond
+               = []
+            then Some p.out
+            else None)
+          res
+      in
+      match res with
+      | None -> []
+      | Some body ->
+        specialize_deduce ~concrete table env system { cand with term = body } known_sets
+    end
 
   | Term.Proj (i,t) -> 
     comp_deds (fun t -> Term.mk_proj i (as_seq1 t)) [t]
@@ -3745,6 +3903,7 @@ and specialize_deduce_fa
 (** [strenghten tbl system terms] strenghten [terms] by finding an inductive
     invariant on deducible messages which contains [terms]. *)
 let strengthen
+    ~concrete
     (table  : Symbols.table)
     (system : SE.fset)
     (env    : Vars.env)
@@ -3781,8 +3940,9 @@ let strengthen
     let res =
       List.find_map (fun p ->
           if p.Macros.pattern = None &&
-             check_conds ~equal_ts:[] 
+             check_conds ~concrete ~equal_ts:[]
                table ~hyps_list:[Term.mk_happens ts]
+               {set = (system :> SE.t) ; pair = None }
                p.Macros.when_cond
              = []
           then Some p.out
@@ -3812,7 +3972,10 @@ let strengthen
         in
         term_set_union init_terms known_sets
       in
-      let ded_sets = specialize_deduce table env system cand_set all_known_sets in
+      let ded_sets = specialize_deduce
+          ~concrete table env system
+          cand_set all_known_sets
+      in
 
       let mset_l =
         List.fold_left (fun mset_l ded_set ->
@@ -3839,7 +4002,7 @@ let strengthen
             mset :: mset_l
           ) [] ded_sets
       in
-      mset_list_simplify table (system:>SE.t) mset_l
+      mset_list_simplify ~concrete table (system:>SE.t) mset_l
   in
 
   let filter_specialize_deduce_action_list
@@ -3855,7 +4018,7 @@ let strengthen
               filter_specialize_deduce_action a cand init_terms known_sets
             ) cand_l
         in
-        (mname, mset_list_inter table (system:>SE.t) env cand_l mset_l)
+        (mname, mset_list_inter ~concrete table (system:>SE.t) env cand_l mset_l)
       ) cands
   in
 
@@ -3884,7 +4047,7 @@ let strengthen
     dbg "deduce_fixpoint:@.%a@." pp_msets cands';
 
     (* check if [cands] is included in [cands'] *)
-    if msets_incl table (system:>SE.t) cands cands'
+    if msets_incl ~concrete table (system:>SE.t) cands cands'
     then cands'
     else specialize_deduce_fixpoint cands' init_terms
   in
@@ -3935,7 +4098,8 @@ let strengthen
   let init_terms = 
     let context = SE.{ set= (system :> SE.t); pair = None; } in
     let env = Env.init ~table ~system:context ~vars:env () in
-    known_sets_of_terms env hyps init_terms 
+    let pc = ProofContext.make ~env ~hyps ~concrete in
+    known_sets_of_terms pc init_terms
   in
 
   dbg "init_terms:@.%a@." (_pp_known_sets ppe) init_terms;
@@ -4030,6 +4194,8 @@ let deduce_terms
   let env = Env.init ~table ~system ~vars () in
   let se = system.set in
 
+  let pc = to_pc unif_state in
+
   (* check that this is a supported deduction query *)
   let is_supported, inputs = 
     check_deduce_args ~quantum_reduction ~outputs ~inputs env
@@ -4044,7 +4210,9 @@ let deduce_terms
          && not (TConfig.post_quantum_equivs table)
       then
         let system = SE.to_fset se in
-        let msets = strengthen table system vars hyps inputs in
+        let msets = 
+          strengthen ~concrete:unif_state.concrete table system vars hyps inputs 
+        in
         msets_to_list msets
       else []
     in
@@ -4055,7 +4223,7 @@ let deduce_terms
     let inputs =
       term_set_union
         (known_sets_of_mset_l se mset_l)
-        (known_sets_of_terms env hyps inputs)
+        (known_sets_of_terms pc inputs)
     in
 
     let init_deduce_result = {
@@ -4303,7 +4471,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let try_match
-      ~param ?mv ?env ?ienv ?hyps
+      ~param ~concrete ?mv ?env ?ienv ?hyps
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Equiv.form)
@@ -4314,14 +4482,14 @@ module E = struct
        unif_global
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ~param ?mv ?env ?ienv ?hyps table system
+      ~param ~concrete ?mv ?env ?ienv ?hyps table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
   
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Equiv.form] *)
   let find
-      ~param
+      ~param ~concrete
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -4336,12 +4504,12 @@ module E = struct
       | Some in_system -> SE.equal table in_system 
     in
 
-    let f_fold : Term.terms Pos.f_map_fold = 
-      fun e se _vars _conds _p acc ->
+    let f_fold : (Term.terms,_) Pos.f_map_fold = 
+      fun e se _vars _conds _p _info acc ->
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match 
-            T.try_match ?ienv ~param table subterm_system e pat 
+            T.try_match ?ienv ~param ~concrete table subterm_system e pat 
           with
           | Match _ -> e :: acc, `Continue
           | _       ->      acc, `Continue
@@ -4352,7 +4520,7 @@ module E = struct
   (** Exported.
       Similar to [find], but over [Equiv.form] sub-terms. *)
   let find_glob
-      ~param
+      ~param ~concrete
       ?ienv
       (table  : Symbols.table) 
       (system : SE.context) 
@@ -4363,7 +4531,7 @@ module E = struct
     let f_fold : (Equiv.form list) Pos.f_map_fold_g =
       fun e se _vars _p acc ->
         match 
-          try_match ?ienv ~param table se e pat
+          try_match ?ienv ~param ~concrete table se e pat
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

@@ -14,6 +14,7 @@ let as_p_path (parser_args : parser_arg list) : Symbols.p_path option =
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli` *)
 let occurrences_of_pat
+    ~concrete
     ?(ienv : Infer.env option) ?(in_system : SE.t option)
     (env : Env.t)
     (pat : Term.t) ~(target : Equiv.any_form)
@@ -23,11 +24,17 @@ let occurrences_of_pat
 
   let pat = Pattern.op_pat_of_term pat in
   
-  let param = { Match.default_param with allow_capture = true; } in
+  let param = { Match.default_param with allow_capture = true } in
   let res : Term.terms = 
     match target with
-    | Local  form -> Match.T.find ~param ?in_system ~ienv env.table env.system pat form
-    | Global form -> Match.E.find ~param ?in_system ~ienv env.table env.system pat form
+    | Local  form -> 
+      Match.T.find
+        ~param ~concrete ?in_system ~ienv env.table env.system 
+        pat form
+    | Global form -> 
+      Match.E.find
+        ~param ~concrete ?in_system ~ienv env.table env.system 
+        pat form
   in
 
   (* close [ienv] if at least one match was found *)
@@ -48,28 +55,20 @@ let occurrences_of_pat
 
 
 (*------------------------------------------------------------------*)
-let convert_pat_arg
-    (sel : int) conv_cntxt (p : Typing.term) (conc : Equiv.any_form)
+let convert_with_holes
+    ?ty conv_cntxt (p : Typing.term) (conc : Equiv.any_form)
   =
-  let ienv = Infer.mk_env () in
-  let t, ty =
-    Typing.convert
-      ~option:{Typing.Option.default with pat = `Holes; }
-      conv_cntxt ~ienv p
-  in
-  let res = occurrences_of_pat ~ienv conv_cntxt.env t ~target:conc in
-  let message =
-    match List.nth_opt res (sel-1) with
-    | Some et -> et
-    | None -> 
-      raise Typing.(Error (L.loc p,
-                           Tactic_type
-                             ("Could not extract the element "
-                              ^ string_of_int (sel)
-                              ^ " out of " ^ string_of_int (List.length res)
-                              ^ " matches found")))
-  in
-  (message, ty)
+  try Typing.convert ?ty conv_cntxt p with
+  | Typing.(Error (_,PatNotAllowed)) ->
+    let ienv = Infer.mk_env () in
+    let t, ty =
+      Typing.convert ?ty
+        ~option:{Typing.Option.default with pat = `Holes; }
+        conv_cntxt ~ienv p
+    in
+    match occurrences_of_pat ~concrete:false ~ienv conv_cntxt.env t ~target:conc with
+    | et :: _ -> et, ty
+    | [] -> t, ty
 
 (*------------------------------------------------------------------*)
 let convert_args env parser_args tactic_type conc =
@@ -81,16 +80,10 @@ let convert_args env parser_args tactic_type conc =
       let f, _ = Typing.convert conv_cntxt ~ty:Type.ttimestamp p in
       Arg (Message (f, Type.ttimestamp))
 
-    | [TermPat (sel, p)], Sort Message ->
-      let (m, ty) = convert_pat_arg sel conv_cntxt p conc in
-      Arg (Message (m, ty))
-
     | [Term_parsed p], Sort Message ->
-      begin match Typing.convert conv_cntxt p with
+      begin
+        match convert_with_holes conv_cntxt p conc with
         | (t, ty) -> Arg (Message (t, ty))
-        | exception Typing.(Error (_,PatNotAllowed)) ->
-          let (m, ty) = convert_pat_arg 1 conv_cntxt p conc in
-          Arg (Message (m, ty))
       end
 
     | [Term_parsed p], Sort Boolean ->
@@ -99,12 +92,8 @@ let convert_args env parser_args tactic_type conc =
 
     | [Term_parsed p], Sort Term ->
       let et = 
-        try
-          let et, ty = Typing.convert conv_cntxt p in
-          Term (ty,et,L.loc p)
-        with Typing.(Error (_,PatNotAllowed)) ->
-          let (m,ty) = convert_pat_arg 1 conv_cntxt p conc in
-          Term (ty, m, L.loc p)
+        let (m,ty) = convert_with_holes conv_cntxt p conc in
+        Term (ty, m, L.loc p)
       in
       Arg et
 

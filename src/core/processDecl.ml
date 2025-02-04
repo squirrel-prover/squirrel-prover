@@ -745,7 +745,9 @@ module PatternMatching = struct
             omap (fun system -> SE.{ set = system; pair = None; }) system
           in
           let env = Env.init ~table ?system ~se_vars () in
-          let pc = ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty in
+          let pc =
+            ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty ~concrete:true
+          in
           Reduction.mk_state pc ~red_param:Reduction.rp_full
         )
       in
@@ -931,7 +933,7 @@ let get_rec_occs
     (* for each macro_name@ts occurence in t under cond with fv,
        builds the formula forall fv, cond => t < rec_arg *)
     Match.Pos.fold
-      (fun t' _ fv cond _ occs ->
+      (fun t' _ fv cond _ _info occs ->
          match t' with
          | Macro (m, _, ts) when List.mem m.s_symb names ->
              {parent_call=macro_name;
@@ -974,6 +976,22 @@ let get_rec_occs
 
     )
     [] bodies 
+
+(*------------------------------------------------------------------*)
+type op_annot = { is_ptime : bool; }
+
+let[@warning "-23"] 
+  parse_op_annot (annots : (_ TacticsArgs.named_arg) list) 
+  : op_annot 
+  =
+  let doit annot (arg : _ Args.named_arg) =
+    match arg with
+    (* disable the opposite case if asked to *)
+    | NArg {L.pl_desc="admit_ptime"} -> { annot with is_ptime = true; }
+    | NArg l | NList (l, _) ->
+      Tactics.hard_failure ~loc:(L.loc l) (Failure "invalid argument")
+  in
+  List.fold_left doit { is_ptime = false; } annots
 
 (*------------------------------------------------------------------*)
 (** Parse an abstract or concrete list of function declarations. *)
@@ -1209,6 +1227,8 @@ let parse_fun_decls
           (* is the declaration defined by pattern-matching *)
           let is_match  = match pd.decl.Decl.op_body with `Match _ -> true | _ -> false in 
 
+          let { is_ptime } = parse_op_annot pd.decl.Decl.op_annots in
+
           let table, name, info =
             match op_kind with
             | `Op ->
@@ -1225,6 +1245,7 @@ let parse_fun_decls
                   pp_style = `Standard;
                   (* the `@` notation is currently reserved to builtin (this
                    could be changed) *)
+                  is_ptime;
                 } 
               in
               table, Some name, Some info
@@ -2080,10 +2101,9 @@ let add_hint_rewrite table (s : Symbols.p_path) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
 
-  (* TODO: concrete: only support exact hint rather *)
-  if bound <> None then
+  if bound = None || not (Real.is_zero table (oget bound)) then
     Tactics.hard_failure ~loc:(L.loc (snd s))
-      (Failure "rewrite hints must be asymptotic or exact");
+      (Failure "rewrite hints must be exact");
 
   assert (lem.system.pair = None;); (* as we only forward [system.set] below *)
 

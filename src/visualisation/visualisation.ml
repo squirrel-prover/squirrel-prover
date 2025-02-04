@@ -20,7 +20,7 @@ module SE = SystemExpr
 
 (** Get the non-repeating list of timestamps appearing in hypotheses of sequent
     [j], plus init. *)
-let get_timstamps (j : LowTraceSequent.t) : Term.terms =
+let get_timestamps (j : LowTraceSequent.t) : Term.terms =
   let load (set : Term.St.t) (lit : Term.Lit.literal) =
     match Term.Lit.ty lit, lit with
     | Type.Timestamp, (_, Comp(_, ts1, ts2)) ->
@@ -29,8 +29,9 @@ let get_timstamps (j : LowTraceSequent.t) : Term.terms =
         Term.St.add ts set
     | _, _ -> set
   in
+  let table = LowTraceSequent.table j in
   let hyps = LowTraceSequent.get_trace_hyps j in
-  let atoms = Hyps.get_atoms_of_hyps hyps in
+  let atoms = Hyps.get_atoms_of_hyps ~concrete:false table hyps in
   let set = List.fold_left load (Term.St.singleton Term.init) atoms in
   Term.St.elements set
 
@@ -255,8 +256,9 @@ let pp_layout ppf (layout : Term.term list list) =
 (** Print the data for the visualisation of the trace sequent [j] in JSON format. *)
 let pp ppf j =
   let cntxt = LowTraceSequent.proof_context j in
-  let models = LowTraceSequent.get_models None j in  
-  let terms = get_classes_rep models (get_timstamps j) in
+  let models = LowTraceSequent.get_models None j ~concrete:false in
+  (* FIXME: the value of [concrete] could be incorrect *)
+  let terms = get_classes_rep models (get_timestamps j) in
   let dep = build_dependence models terms in
   let layout = get_layout dep in
   Format.fprintf ppf "@[<v 2>{@;%a,@;%a@]@;}@?"

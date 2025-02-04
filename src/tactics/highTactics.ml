@@ -41,6 +41,12 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
+  T.register_general "const"
+    (LT.gentac_of_any_tac_arg TraceTactics.const_tac
+        (fun _ -> soft_failure (Failure "local sequent expected")))
+
+(*------------------------------------------------------------------*)
+let () =
   T.register_general "fa"
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)
 

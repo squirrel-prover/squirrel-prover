@@ -26,7 +26,7 @@ abstract read ['a] : message -> 'a.
 (* ------------------------------------------------------------------- *)
 (* Formatting axioms *)
 
-axiom [any] format_encr    (x : ctxt) : read (format x) = x.
+axiom [any] format_encr    (x : ctxt) : read (format x) = x <: Real.z.
 hint rewrite format_encr.
 
 

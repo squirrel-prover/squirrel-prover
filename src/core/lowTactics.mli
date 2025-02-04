@@ -23,12 +23,25 @@ val check_global : loc:L.t -> Equiv.any_form -> unit
 val as_global : ?loc:L.t -> Equiv.any_form -> Equiv.form
 
 (*------------------------------------------------------------------*)
-val bad_args : unit -> 'a
+val bad_args : ?dbg:string -> unit -> 'a
 
 val check_ty_eq  : ?loc:L.t -> Type.ty  -> Type.ty  -> unit
 
 (** raise a user-level error if any type or system variables remain *)
 val check_empty_params : Params.t -> unit
+
+(*------------------------------------------------------------------*)
+(** {3 Utilities for case analysis} *)
+
+type case_param = { 
+  struct_based : bool; (** on the structure of the term (branching, ...) *)
+  type_based   : bool; (** on the type of the term *)
+  tags         : bool; (** infer tag information but auto-introduced (type-based only) *)
+}
+
+val default_case_param : case_param
+
+val case_process_named_args : Args.named_args -> case_param
 
 (*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
@@ -80,6 +93,13 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val convert_args :
     S.t -> Args.parser_arg list -> Args.esort -> Args.earg
 
+  (** see [Args.convert_pat] *)
+  val convert_with_holes :
+    ?ty:Type.ty ->
+    ?system:SE.context ->
+    S.t -> Typing.term -> 
+    Term.term * Type.ty
+
   val convert :
     ?ty:Type.ty -> ?option:Typing.Option.t ->
     ?system:SE.context -> ?ienv:Infer.env -> 
@@ -119,7 +139,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
         hyp_id : Ident.t option;  (** ident of the hyp the rule 
                                       came from (if any)  *)
         loc   : L.t;              (** location *)
-        subgs : Term.term list;   (** subgoals *)
+        subgs : Equiv.any_form list;   (** subgoals *)
         rule  : Rewrite.rw_rule;  (** rule *)
       }
 
@@ -139,6 +159,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val p_rw_expand_arg : S.t -> Typing.term -> expand_kind 
 
   val expand_term :
+    concrete:bool ->
     is_rec:bool ->
     ?force_exhaustive:bool ->
     expand_kind -> S.sequent ->
@@ -152,17 +173,27 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (** Type for case and destruct tactics handlers *)
   type c_handler =
     | CHyp of Ident.t
+    | BoundGoal
 
   type c_res = c_handler * S.sequent
 
   (** Case analysis on [timestamp] or an inductive type. *)
-  val type_based_case : Term.t -> S.t -> S.t list
-    
+  val type_based_case : 
+    ?bounds:Typing.term list -> 
+    params:case_param ->
+    Term.t -> S.t -> S.t list
+
   (** Case analysis on disjunctions in an hypothesis.
       When [nb=`Any], recurses.
-      When [nb=`Some l], destruct at most [l]. *)
+      When [nb=`Some l], destruct at most [l].
+      The return value also tell if a goal was added to manage the
+      user-provided bounds. *)
   val hypothesis_case :
-    nb:[`Any | `Some of int ] -> Ident.ident -> S.t -> c_res list
+    nb:[`Any | `Some of int ] -> 
+    ?bounds:Term.term option list -> 
+    ?params:case_param ->
+    Ident.ident -> S.t ->
+    c_res list * [`Added | `None]
 
   (*------------------------------------------------------------------*)
   (** {3 Reduce} *)
@@ -185,7 +216,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     S.t Tactics.tac
 
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
-  val and_right : Term.term option -> S.t ->  S.t list
+  val and_right : Term.terms -> S.t ->  S.t list
 end
 
 (*------------------------------------------------------------------*)
@@ -286,10 +317,11 @@ val wrap_fail :
   ('b -> (Tactics.tac_error -> 'c) -> 'c) ->
   (Tactics.tac_error -> 'c) -> 'c
 
+(** left terms, i-th term, right terms, bound *)
 val split_equiv_conclusion :
   int L.located -> 
   ES.t -> 
-  Term.term list * Term.term * Term.term list
+  Term.term list * Term.term * Term.term list * Term.term option
 
 (*------------------------------------------------------------------*)
 (** {2 Basic tactics} *)

@@ -7,9 +7,20 @@ module L   = Location
 module SE  = SystemExpr
 
 (*------------------------------------------------------------------*)
-(** Local equalities can be rewritten only in local terms.
-    Global equalities can be rewritten in local and global terms. *)
-type rw_kind = LocalEq | GlobalEq
+(** If an equality use the kind [UseLocalContext] then it cannot be
+    rewritten in a global hypothesis nor in the bound.
+
+    If it is [Global], it can be rewritten anywhere (putting aside the
+    question of concrete vs asymptotic).
+
+    Finally, if it is [Any] then it can be used as a [UseLocalContext]
+    or [Global]. If it is used as [Global], the conditions in
+    [rw_conds] may not use local hypotheses. *)
+type kind =  UseLocalContext | Global | Any
+
+val kind_comp : kind -> kind -> kind
+
+val pp_kind : Format.formatter -> kind -> unit
 
 (*------------------------------------------------------------------*)
 (** A rewrite rule.
@@ -24,8 +35,8 @@ type rw_rule = {
   rw_vars   : Vars.tagged_vars;      (** term variables *)
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
-  rw_kind   : rw_kind;
-  rw_bound  : Concrete.bound;
+  rw_kind   : kind;
+  rw_bound  : LowConcrete.bound;
 }
 
 val pp_rw_rule : rw_rule formatter_p
@@ -38,16 +49,13 @@ val pat_to_rw_rule :
   destr_eq  : (Term.term -> (Term.term * Term.term) option) ->
   destr_not : (Term.term -> (            Term.term) option) ->
   SE.t ->
-  rw_kind ->
+  kind ->
   [< `LeftToRight | `RightToLeft ] ->
-  (Term.term*Concrete.bound) Term.pat ->
+  (Term.term*LowConcrete.bound) Term.pat ->
   rw_rule
 
 (** Create a simple **exact** rewriting rule [left ↦ right] that can
     be used in any context. *)
 val simple_rw_rule :
-  ?params:Params.t ->
-  ?vars:Vars.tagged_vars ->
-  ?conds:Term.term list ->
-  SE.arbitrary -> 
+  SE.arbitrary -> Symbols.table ->
   left:Term.term -> right:Term.term -> rw_rule

@@ -64,8 +64,9 @@ module type S = sig
   val conclusion : t -> conc_form
   val set_conclusion : conc_form -> t -> t
 
-  val bound : t -> Term.term option
-  val set_bound : Term.term option -> t -> t
+  val concrete : t -> bool
+  val bound : t -> LowConcrete.bound
+  val set_bound : LowConcrete.bound -> t -> t
 
   val system : t -> SE.context
 
@@ -108,11 +109,12 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 Automated reasoning} *)
 
-  val query_happens : precise:bool -> t -> Term.term -> bool
+  val query_happens : concrete:bool -> precise:bool -> t -> Term.term -> bool
 
   (** Returns the proof-context of a sequent.
-      Option projections to restrict the systems considered. *)
-  val proof_context : ?in_system:SE.context -> t -> ProofContext.t
+      Option to change the system or concrete status. *)
+  val proof_context :
+    ?in_system:SE.context -> ?concrete:bool -> t -> ProofContext.t
 
   (** Return a set of hypotheses that are a consequence of the
       hypotheses of the sequent, and are taken in the system context
@@ -128,6 +130,7 @@ module type S = sig
       @raise Tactics.Tactic_hard_failure
          with parameter {!Tactics.TacTimeout} in case of timeout. *)
   val get_models :
+    concrete:bool ->
     SE.arbitrary option ->
     t -> Constr.models
 

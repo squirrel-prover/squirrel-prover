@@ -184,6 +184,7 @@ module type SimpleOcc = sig
       In principle it should be fine, if not just give
       a different occ_formula that doesn't simplify anything. *)
   val aux_occ_incl :
+    concrete:bool ->
     Symbols.table -> SE.fset -> ?mv:Match.Mvar.t ->
     simple_occ -> simple_occ -> Match.Mvar.t option
 
@@ -197,11 +198,15 @@ module type SimpleOcc = sig
       in an instance of its action, with a STRONGER condition
        (not weaker, watch out we've made that mistake before) *)
   val occ_incl :
-    Symbols.table -> SE.fset -> simple_occ -> simple_occ -> bool
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    simple_occ -> simple_occ -> bool
 
   (** Removes subsumed occurrences from a list *)
   val clear_subsumed :
-    Symbols.table -> SE.fset -> simple_occs -> simple_occs
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    simple_occs -> simple_occs
 
   (** Prints a description of the occurrence *)
   val pp : simple_occ formatter_p
@@ -266,11 +271,15 @@ module type ExtOcc = sig
       Checks if all instances of [occ1] are instances of [occ2]
       (ie [occ2] subsumes [occ1]). *)
   val ext_occ_incl :
-    Symbols.table -> SE.fset -> ext_occ -> ext_occ -> bool
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    ext_occ -> ext_occ -> bool
 
   (** Removes subsumed extended occurrences from a list *)
   val clear_subsumed :
-    Symbols.table -> SE.fset -> ext_occs -> ext_occs
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    ext_occs -> ext_occs
 
   (** Prints a description of the occurrence. *)
   val pp : ext_occ formatter_p
@@ -337,6 +346,7 @@ val check_single_quantum_component :
     Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)
 val get_macro_rec_args :
+  concrete:bool ->
   mode:Iter.allowed ->
   context:ProofContext.t ->
   Term.terms ->
@@ -386,6 +396,7 @@ module type OccurrenceSearch = sig
       Takes care of macro expansion and going through all terms,
       using [fold_macro_support] and [map_fold]. *)
   val find_all_occurrences :
+    concrete:bool ->
     mode:Iter.allowed -> (* allowed sub-terms without further checks *)
     ?pp_descr:unit Fmt.t option -> (* prints what we're looking for *)
     f_fold_occs ->

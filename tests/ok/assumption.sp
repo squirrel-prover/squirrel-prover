@@ -17,6 +17,7 @@ Qed.
 lemma _ (x,y : message) : x = y => True.
 Proof.
  intro H. 
+ checkfail assumption H exn NotHypothesis. 
  assumption.
 Qed.
 

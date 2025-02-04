@@ -48,6 +48,12 @@ val set_equiv_conclusion : Equiv.equiv -> t -> t
     @return [None] if the conclusion is not an equivalence atom. *)
 val get_frame : Projection.t -> t -> Equiv.equiv option
 
+(** Get the bound of the conclusion,
+    @return [None] if the conclusion is not an bounded atom
+    ( it may be a asymptotic atom or a more complex formula). *)
+val get_bound : t -> Term.term option
+
+
 val conclusion_is_equiv : t -> bool
 
 val conclusion_as_equiv : t -> Equiv.equiv
@@ -69,11 +75,6 @@ val to_trace_sequent : t -> LowTraceSequent.t
 val conclusion_is_computability : t -> bool 
 
 val conclusion_as_computability : t -> ComputePredicates.form
-
-(*------------------------------------------------------------------*)
-(** {2 Automated reasoning} *)
-
-val query_happens : precise:bool -> t -> Term.term -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)

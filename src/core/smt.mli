@@ -11,6 +11,7 @@ val is_valid :
   provers:(string*string) list->
   cmd_flag:string ->
   poly:bool ->
+  exact:bool ->
   hint_tables:string list ->
   Env.t -> 
   Symbols.table ->

@@ -14,11 +14,22 @@ Proof.
  auto.
 Qed.
 
-lemma injectivity :
-forall (i:index,j:index),
-i <> j =>
- m1(i) <> m1(j).
-Proof.
+lemma _ :
+  forall (i:index,j:index),
+  i <> j =>
+  m1(i) <> m1(j).
+Proof. intro *. eqnames.
  auto.
 Qed.
+
+(* check that `eqnames` does not work in the concrete logic *)
+lemma _ :
+  forall (i:index,j:index),
+  i <> j =>
+  m1(i) <> m1(j) <: Real.z.
+Proof.
+ checkfail auto exn GoalNotClosed.
+ intro *. 
+ checkfail eqnames exn Failure.
+Abort.
  

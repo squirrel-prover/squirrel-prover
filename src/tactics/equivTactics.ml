@@ -73,7 +73,7 @@ let[@warning "-32"] happens_premise (s : ES.t) (a : Term.term) =
 let check_no_macro_or_var (env : Env.t) ~refl_system (t : Term.term) =
   let exception Failed in
 
-  let check : Match.Pos.f_map = fun t _system fv _conds _p ->
+  let check : _ Match.Pos.f_map = fun t _system fv _conds _p _info ->
     match t with
     | Term.Var _ -> 
       let env =
@@ -92,7 +92,7 @@ let check_no_macro_or_var (env : Env.t) ~refl_system (t : Term.term) =
   with Failed -> false
 
 (** Closes the goal if it is an equivalence
- * where the two frames are identical. *)
+    where the two frames are identical. *)
 let refl (e : Equiv.equiv) (s : ES.t) =
   let system_pair = Utils.oget ((ES.env s).system.pair) in
   let env_pair = Env.update ~system:{ set = (system_pair :> SE.t); pair = None; } (ES.env s) in
@@ -101,14 +101,12 @@ let refl (e : Equiv.equiv) (s : ES.t) =
   in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   if not (List.for_all (check_no_macro_or_var env_pair ~refl_system) e.terms)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
   then `NoReflMacroVar
   else
     match ES.get_frame l_proj s, ES.get_frame r_proj s with
     | Some el, Some er ->
       let system = { (ES.system s) with set = (system_pair :> SE.t); } in
       if List.for_all2 (ES.Reduce.conv_term ~system s) el.terms er.terms
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
       then `True
       else `NoRefl
 
@@ -120,6 +118,8 @@ let refl (e : Equiv.equiv) (s : ES.t) =
 let refl_tac (s : ES.t) =
   match refl (ES.conclusion_as_equiv s) s with
   | `True           -> []
+  (* FEAT: concrete logic for equivalences:
+     check that bound is zero or positive *)
   | `NoRefl         -> soft_failure (Tactics.NoRefl)
   | `NoReflMacroVar -> soft_failure (Tactics.NoReflMacroVar)
 
@@ -132,7 +132,7 @@ let sym_tac (s : ES.t) : Goal.t list =
   check_conclusion_is_equiv s;
 
   let l_proj, r_proj = ES.get_system_pair_projs s in
-
+  let equiv_bound = ES.get_bound s in
   let equiv_left = ES.get_frame l_proj s |> Utils.oget in
   let equiv_right = ES.get_frame r_proj s |> Utils.oget in
   let old_context = (ES.env s).system in
@@ -145,8 +145,7 @@ let sym_tac (s : ES.t) : Goal.t list =
   [ Goal.Global
       (ES.set_conclusion_in_context
          new_context
-         (Atom (Equiv {terms = (List.map2 diff equiv_right.terms equiv_left.terms); bound = None}))
-         (*TODO:Concrete : Probably something to do to create a bounded goal*)
+         (Atom (Equiv {terms = (List.map2 diff equiv_right.terms equiv_left.terms); bound = equiv_bound}))
          s) ]
 
 let () =
@@ -219,7 +218,7 @@ let transitivity_internal
   in
 
   (* the two sequents *)
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
   let mk_s c e =
     ES.set_conclusion_in_context c (Atom (Equiv {terms = e; bound = None})) s
   in
@@ -380,42 +379,48 @@ let () =
 
 (*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : ES.t list =
-  let structure_based, type_based, args = match args with
-    | Args.(Named_args [NArg {L.pl_desc="struct"}])::args -> true,false,args
-    | Args.(Named_args [NArg {L.pl_desc="type"}])::args -> false,true,args
-    | Args.Named_args [] :: args -> true,true,args
-    | Args.(Named_args ((NArg s | NList (s,_))::_)) :: _ ->
-      Tactics.(hard_failure ~loc:(L.loc s) (Failure "invalid argument"))
-    | _ ->
-      Tactics.(hard_failure (Failure "incorrect case arguments"))
+  let params, tcase, bounds =
+    match args with
+    | [Args.Case c] -> c
+    | _ -> bad_args ()
   in
-  match Args.as_p_path args with
-  | Some ([],str) when Hyps.mem_name (L.unloc str) s && structure_based ->
+  let loc = L.loc tcase in
+
+  if bounds <> None then
+    hard_failure ~loc (Failure "global case expected no bounds");
+
+  (* process the named arguments *)
+  let params = LT.case_process_named_args params in
+
+  match L.unloc tcase with
+  | Typing.Symb { path = ([],str); ty_args = None; se_args = None; } 
+    when ES.Hyps.mem_name (L.unloc str) s && params.struct_based ->
     let id, _ = Hyps.by_name str s in
     List.map
-      (fun (EquivLT.CHyp _, ss) -> ss)
-      (EquivLT.hypothesis_case ~nb:`Any id s)
+      (fun (_, ss) -> ss)
+      (fst (EquivLT.hypothesis_case ~params ~nb:`Any id s))
 
   | _ ->
     let table = ES.table s in
-    match EquivLT.convert_args s args Args.(Sort Term) with
-    | Args.Arg (Term (ty, f, loc)) ->
-      if type_based && (Type.equal ty Type.ttimestamp ||
-                        HighType.is_inductive table ty) then
-        begin
-          let env = ES.env s in
-          if not (HighTerm.is_constant     env f &&
-                  HighTerm.is_system_indep env f   ) then
-            hard_failure ~loc
-              (Failure "global case must be on a constant and \
-                        system-independent term");
 
-          EquivLT.type_based_case f s
-        end
-        
-        else bad_args ()
+    (* type-check the term we are doing a case upon *)
+    let tcase, ty = EquivLT.convert_with_holes s tcase in
 
-    | _ -> bad_args ()
+    if params.type_based && 
+       (Type.equal ty Type.ttimestamp ||
+        HighType.is_inductive table ty) then
+      begin
+        let env = ES.env s in
+        if not (HighTerm.is_constant     env tcase &&
+                HighTerm.is_system_indep env tcase   ) then
+          hard_failure ~loc
+            (Failure "\nglobal case must be on a constant and \
+                      system-independent term");
+
+        EquivLT.type_based_case ~params tcase s
+      end
+
+    else bad_args ()
 
 let case_tac (args : Args.parser_args) : LT.etac =
   wrap_fail (do_case_tac args)
@@ -432,7 +437,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
 
   let is_false = function
     | Equiv.Reach {formula = f; bound = None} -> ES.Reduce.conv_term s f Term.mk_false
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
     | _ -> false
   in
 
@@ -441,10 +446,10 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
        an existing equivalence hypothesis *)
     if ES.conclusion_is_equiv s then
       let conclusion = (ES.conclusion_as_equiv s).terms in
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (* FEAT: concrete logic for equivalences *)
       (function
         | Equiv.Equiv {terms = equiv; bound = None}  ->
-          (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          (* FEAT: concrete logic for equivalences *)
 
           (* In classical mode, check for inclusion modulo duplication. 
              In quantum mode, we use a less powerful check as we must 
@@ -462,7 +467,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
         | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false
         |_ -> false)
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (* FEAT: concrete logic for equivalences *)
 
     else (fun at -> ES.Reduce.conv_global s (Equiv.Atom at) conclusion)
   in
@@ -502,7 +507,7 @@ let () =
 (*------------------------------------------------------------------*)
 let constraints (s : ES.t) : ES.t list =
   let s = ES.set_conclusion (Equiv.Atom (Equiv.Reach {formula = (Term.mk_false); bound = None})) s in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
   let trace_s = ES.to_trace_sequent s in
   List.map (fun s_t -> 
       ES.set_conclusion (Equiv.Atom (Equiv.Reach {formula = (TS.conclusion s_t); bound = None})) s
@@ -621,8 +626,8 @@ let old_induction Args.(Message (ts,_)) s =
   if not (HighTerm.is_constant                                   env ts &&
           HighTerm.is_single_term_in_context ~context:env.system env ts   ) then
     hard_failure 
-      (Failure "simple global induction must be on a constant and \
-                system-independent timestamp term (maybe try dependent induction ?)");
+      (Failure "\nglobal asymptotic induction must be on a constant and system-independent\n\
+                value (maybe try dependent or concrete induction ?)");
 
   let env = ES.env s in
   if not (Term.is_var ts) then
@@ -694,10 +699,12 @@ let old_or_new_induction args : etac =
        (* flag newInduction is set: always use the new induction *)
        (EquivLT.induction_tac ~dependent:false) args s sk fk
      else
-       (* use the old induction only if 1) a timestamp parameter is given
-          and 2) no system is provided *)
+       (* use the old induction only if:
+          1) a timestamp parameter is given;
+          2) no system is provided;
+          3) no named arguments (e.g. [~concrete]) are provided. *)
        match args with
-       | [Args.Induction (Some t, None) ] ->
+       | [Args.Induction ([], Some t, None) ] ->
          begin
            match EquivLT.convert_args s [Args.Term_parsed t] (Args.Sort Args.Message) with
            | Args.Arg (Args.Message (ts,ty)) ->
@@ -715,9 +722,14 @@ let old_or_new_induction args : etac =
 
 (*------------------------------------------------------------------*)
 let enrich _ty f _loc (s : ES.t) =
-  ES.set_equiv_conclusion {terms = f :: (ES.conclusion_as_equiv s).terms; bound = None} s
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+  ES.set_equiv_conclusion
+    { terms = f :: (ES.conclusion_as_equiv s).terms;
+      bound = ES.get_bound s }
+    s
 
+(* FEAT: concrete logic for equivalences
+   check that the added term is of a order 0 or 1 type 
+   + update the bound for order 1 types? *)
 let enrich_a arg s =
   match 
     let env = ES.env s in
@@ -726,7 +738,7 @@ let enrich_a arg s =
            system = SE.{set = (ES.get_system_pair s :> SE.arbitrary);
                         pair = None;} }
     in
-    Args.convert_args env [arg] Args.(Sort Term) (Global (ES.conclusion s)) 
+    Args.convert_args env [arg] Args.(Sort Term) (Global (ES.conclusion s))
   with
   | Args.Arg (Term (ty, t, loc)) -> enrich ty t loc s
   | _ -> bad_args ()
@@ -751,19 +763,22 @@ let () =
 
 (** Select a frame element matching a pattern. *)
 let fa_select_felems ~ienv (pat : Term.term Term.pat_op) (s : ES.t) : int option =
-  let param = { Match.default_param with allow_capture = true; } in
+  (* [concrete = false] as this is not part of the TCB *)
+  let param = { Match.default_param with allow_capture = true } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
     | Some p -> SE.reachability_context p
   in
   List.find_mapi (fun i e ->
       match 
-        Match.T.try_match ~ienv ~param ~env:(ES.vars s) (ES.table s) system e pat 
+        Match.T.try_match
+          ~ienv ~param ~concrete:true
+          ~env:(ES.vars s) (ES.table s) system 
+          e pat 
       with
       | NoMatch _ -> None
       | Match _   -> Some i
     ) (ES.conclusion_as_equiv s).terms
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (*------------------------------------------------------------------*)
 exception No_FA of [`HeadDiff | `HeadNoFun | `QuantumFun of Format.formatter -> unit]
@@ -894,7 +909,7 @@ let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
 
 (** Applies Function Application on a given frame element *)
 let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
-  let before, e, after = split_equiv_conclusion i s in
+  let before, e, after, _bound = split_equiv_conclusion i s in
 
   let make_freshness_sequents (freshness_subgoals : Term.terms) =
     if freshness_subgoals = [] then [] else
@@ -934,7 +949,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
       let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
       ( ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s),
         [] )
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
 
     | Quant ((Seq | Lambda),vars,t) ->
       (* this rules applies to [Seq] and [Lambda] over arbitrary types *)
@@ -951,7 +966,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
         ES.set_equiv_conclusion {terms = biframe; bound = None} s,
         freshness_subgoals
       )
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
 
     | _ ->
       let terms, freshness_subgoals =
@@ -965,8 +980,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
   in
   
   (new_terms, make_freshness_sequents freshness_subgoals)
-  
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
 
 (** [do_fa_felem] with user-level errors *)
 let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
@@ -983,7 +997,7 @@ let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
       (Tactics.Failure (Fmt.str "Quantum.FA not applicable:@ %t" err))
 
 (*------------------------------------------------------------------*)
-let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
+let do_fa_tac (args : (TacticsArgs.rw_count * Typing.term) list) (s : ES.t) : ES.t list =
 
   (* parsing context for [fa_arg] *)
   let cntxt = 
@@ -1020,7 +1034,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
   in
 
   let rec do1
-      (s, subgoals : ES.t * (ES.t list) ) (mult, arg_pat : Args.fa_arg)
+      (s, subgoals : ES.t * (ES.t list) ) (mult, arg_pat : TacticsArgs.rw_count * Typing.term)
     : ES.t * (ES.t list)
     =
     (* Create a new type unification environement.
@@ -1062,8 +1076,8 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
   subgoals @ [main_goal]
 
 let fa_tac args = match args with
-  | [Args.Fa [Once, { pl_desc = Int i}]] -> wrap_fail (fa_felem i)
-  | [Args.Fa args] -> wrap_fail (do_fa_tac args)
+  | [Args.Fa Global([Once, { pl_desc = Int i}])] -> wrap_fail (fa_felem i)
+  | [Args.Fa Global(args)] -> wrap_fail (do_fa_tac args)
   | _ -> bad_args ()
 
 
@@ -1179,7 +1193,7 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
       let fa_succ, fa_rem =  is_fa_dup (res @ els) e in
       if fa_succ then doit (fa_rem @ res) {terms = els; bound = None}
       else doit (e :: res) {terms = els; bound = None}
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (* FEAT: concrete logic for equivalences *)
   in
   doit [] elems
 
@@ -1193,7 +1207,7 @@ let fa_dup (s : ES.t) : ES.t list =
     Hyps.find_map (fun (_, hyp) ->
         match hyp with
         | TopHyps.LHyp (Equiv.Atom (Equiv {terms = e; bound = None})) -> Some e
-        (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        (* FEAT: concrete logic for equivalences *)
         | _ -> None) s
   in
 
@@ -1202,11 +1216,11 @@ let fa_dup (s : ES.t) : ES.t list =
   let biframe =
     ES.conclusion_as_equiv s
     |> fun e -> {terms = List.rev e.terms; bound = None}
-                (*TODO:Concrete : Probably something to do to create a bounded goal*)
+                (* FEAT: concrete logic for equivalences *)
                 |> filter_fa_dup s hyp
   in
   [ES.set_equiv_conclusion {terms = biframe; bound = None} s]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 (*------------------------------------------------------------------*)
 (** Deduce. *)
@@ -1220,6 +1234,9 @@ let filter_deduce
   : Term.terms
   =
   let st =
+    (* FEAT: concrete logic for equivalences: the value of the
+       [concrete] field in the proof-context should depend of the
+       equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
       (ES.proof_context ~in_system s)
@@ -1285,9 +1302,11 @@ let deduce_all
     ?(with_hyp: CP.form option) (s : ES.t) : ES.t list 
   =
   let equiv = ES.conclusion_as_equiv s in
-  if equiv.bound <> None then (* TODO: concrete *)
+
+  (* FEAT: concrete logic for equivalences *)
+  if equiv.bound <> None then
     soft_failure
-      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
 
   let system =
     let system_s = ES.system s in
@@ -1317,9 +1336,11 @@ let deduce_all
     from the other ones, and if so removes it. *)
 let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
   let equiv = ES.conclusion_as_equiv s in
-  if equiv.bound <> None then (* TODO: concrete *)
+
+  (* FEAT: concrete logic for equivalences *)
+  if equiv.bound <> None then
     soft_failure
-      (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
+      (Tactics.GoalBadShape "concrete equivalence logic not yet implemented");
 
   let in_system =
     let system_s = ES.system s in
@@ -1339,6 +1360,9 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
   in
 
   let st =
+    (* FEAT: concrete logic for equivalences: the value of the
+       [concrete] field in the proof-context should depend of the
+       equivalence under target. *)
     Match.mk_unif_state ~param:Match.crypto_param pc ~support:[]
   in
 
@@ -1346,7 +1370,8 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     Match.deduce_terms ~quantum_reduction ~outputs ~inputs st
   in
   match match_result with
-  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+  | NoMatch minfos ->
+    soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
     [ES.set_equiv_conclusion {terms = inputs; bound = None} s]
@@ -1411,6 +1436,9 @@ let deduce_predicate
   in
 
   let st =
+    (* FEAT: concrete logic for equivalences: the value of the
+       [concrete] field in the proof-context should depend of the
+       equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
       (ES.proof_context ~in_system:system s)
@@ -1538,6 +1566,9 @@ let deduce_predicate_int
   in
 
   let st =
+    (* FEAT: concrete logic for equivalences: the value of the
+       [concrete] field in the proof-context should depend of the
+       equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
       (ES.proof_context ~in_system:system s) ~support:[]
@@ -1632,7 +1663,6 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
     | _ -> assert false         (* guaranteed by the parser *)
   in
   let all, side = p_deduce_named_args nargs in
-
   let table = ES.table s in
   let subgs, with_hyp =
     match with_hyps_opt with
@@ -1703,7 +1733,7 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
         (Tactics.GoalBadShape 
            "expected an equivalence or secrecy goal.")
   in
-  let subgs = 
+  let subgs =
     List.map (function 
         | Equiv.Global f -> ES.set_conclusion f s
         | Equiv.Local _ -> assert false (* cannot happen
@@ -1754,30 +1784,30 @@ let case_study arg s : ES.sequents =
     let founds,e1 =
       List.split
         (List.map (cs_proj fst b false) (ES.conclusion_as_equiv s).terms) in
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
     let e2 =
       List.map (fun t -> snd (cs_proj snd b false t)) (ES.conclusion_as_equiv s).terms in
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
     if not (List.exists (fun x -> x) founds) then
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
     [ES.set_equiv_conclusion {terms = (e1@[b]); bound = None} s;
-     (*TODO:Concrete : Probably something to do to create a bounded goal*)
+     (* FEAT: concrete logic for equivalences *)
      ES.set_equiv_conclusion {terms = (e2@[b]); bound = None} s]
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
 
   | Some (Args.Int i) ->
     (* Project in i-th item. *)
-    let before, e, after = split_equiv_conclusion i s in
+    let before, e, after, _bound = split_equiv_conclusion i s in
     let found,e1 = cs_proj fst b false e in
     let _,e2 = cs_proj snd b false e in
     if not found then
       Tactics.(soft_failure
                  (Failure "did not find any conditional to analyze")) ;
     [ES.set_equiv_conclusion {terms = (before@b::[e1]@after); bound = None} s;
-     (*TODO:Concrete : Probably something to do to create a bounded goal*)
+     (* FEAT: concrete logic for equivalences *)
      ES.set_equiv_conclusion {terms = (before@b::[e2]@after); bound = None} s]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 let () =
   T.register_typed "cs"
@@ -1835,6 +1865,7 @@ let deprecated_fresh_mk_indirect
 (* kept for enckp and xor. *)
 (** Construct the formula expressing freshness for some projection. *)
 let deprecated_mk_phi_proj
+    ~(concrete:bool)
     (context : ProofContext.t)
     ((n,n_args) : Term.nsymb * Term.terms)
     (frame      : Term.terms)
@@ -1852,11 +1883,12 @@ let deprecated_mk_phi_proj
     let phi_frame = List.map (deprecated_fresh_mk_direct (n,n_args)) frame_indices in
 
     let frame_actions : OldFresh.deprecated_ts_occs =
-      OldFresh.deprecated_get_macro_actions context frame
+      OldFresh.deprecated_get_macro_actions ~concrete context frame
     in
 
     let macro_cases =
-      TraceTactics.deprecated_mk_fresh_indirect_cases context n n_args frame
+      TraceTactics.deprecated_mk_fresh_indirect_cases
+        ~concrete context n n_args frame
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -1883,7 +1915,7 @@ let deprecated_mk_phi_proj
     soft_failure
       (Failure "cannot apply fresh: the formula contains a term variable")
 
-let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
+let deprecated_fresh_cond (s : ES.t) ~(concrete:bool) t biframe : Term.term = 
   let system = Utils.oget (ES.system s).pair in
   let old_context = ES.system s in
   let lproj, rproj = ES.get_system_pair_projs s in
@@ -1901,7 +1933,7 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let context_left = ES.proof_context ~in_system:system_left s in
   let phi_left =
     let frame = List.map (Term.project1 lproj) biframe in
-    deprecated_mk_phi_proj context_left (n_left, n_left_args) frame 
+    deprecated_mk_phi_proj ~concrete context_left (n_left, n_left_args) frame 
   in
 
   let system_right = 
@@ -1910,7 +1942,7 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let context_right = ES.proof_context ~in_system:system_right s in
   let phi_right =
     let frame = List.map (Term.project1 rproj) biframe in
-    deprecated_mk_phi_proj context_right (n_right, n_right_args) frame 
+    deprecated_mk_phi_proj ~concrete context_right (n_right, n_right_args) frame 
   in
 
   Term.mk_ands
@@ -2003,7 +2035,7 @@ let equiv_autosimpl s =
 (** implement the SplitSeq rule of CSF'21, modified when moving
     to the higher-order logic. *)
 let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.sequent =
-  let before, t, after = split_equiv_conclusion li s in
+  let before, t, after, _bound = split_equiv_conclusion li s in
   let i = L.unloc li in
 
   (* no differences between seq and lambda, except that we keep using a sequence 
@@ -2056,7 +2088,7 @@ let split_seq (li : int L.located) (htcond : Typing.term) ~else_branch s : ES.se
   let frame = List.rev_append before ([mk_seq_or_lambda is ti_t;
                                        mk_seq_or_lambda is ti_f] @ after) in
   ES.set_equiv_conclusion {terms = frame; bound = None} s
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 let split_seq_args args s : ES.sequent list =
   match args with
@@ -2071,8 +2103,8 @@ let () =
 
 (*------------------------------------------------------------------*)
 let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
-  let before, t, after = split_equiv_conclusion i_l s in
-  let _, seq, _ = split_equiv_conclusion j_l s in
+  let before, t, after, _bound = split_equiv_conclusion i_l s in
+  let _, seq, _, _bound2 = split_equiv_conclusion j_l s in
 
   let seq_vars, seq_term = match seq with
     | Quant ((Seq | Lambda), vs, t) -> vs, t
@@ -2098,7 +2130,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
 
   let frame = List.rev_append before after in
   [subgoal; Goal.Global (ES.set_equiv_conclusion {terms = frame; bound = None} s)]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 let mem_seq_args args s : Goal.t list =
   match args with
@@ -2117,7 +2149,7 @@ let const_seq
     ((li, b_t_terms) : int L.located * (Typing.term * Typing.term) list)
     (s : ES.t) : Goal.t list
   =
-  let before, e, after = split_equiv_conclusion li s in
+  let before, e, after, _bound = split_equiv_conclusion li s in
   let i = L.unloc li in
 
   let e_is, e_ti = match e with
@@ -2180,7 +2212,7 @@ let const_seq
   [ Goal.Local subg1;
     Goal.Local subg2;
     Goal.Global (ES.set_equiv_conclusion {terms = frame; bound = None} s) ]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 let const_seq_args args s : Goal.t list =
   match args with
@@ -2204,8 +2236,10 @@ let enckp arg (s : ES.t) =
       i, m1, m2
     | _ -> assert false
   in
-  let before, e, after = split_equiv_conclusion i s in
+  let before, e, after, bound = split_equiv_conclusion i s in
 
+  let concrete = bound <> None in
+  
   let biframe = List.rev_append before after in
   let context = ES.pair_proof_context s in
   let table = ES.table s in
@@ -2238,13 +2272,14 @@ let enckp arg (s : ES.t) =
              let frame = List.map (Term.project1 proj) biframe in
 
              Oldcca.deprecated_symenc_key_ssc
-               ~context fnenc fndec
+               ~concrete ~context fnenc fndec
+               (* FEAT: concrete logic for equivalences *)
                ~elems:(List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
-               (*TODO:Concrete : Probably something to do to create a bounded goal*)
                sk.Name.symb.s_symb;
+
+             (* FEAT: concrete logic for equivalences *)
              Oldcca.deprecated_symenc_rnd_ssc
-               ~context fnenc ~key:sk.Name.symb ~key_is:sk.Name.args {terms = frame; bound = None}),
-          (*TODO:Concrete : Probably something to do to create a bounded goal*)
+               ~concrete ~context fnenc ~key:sk.Name.symb ~key_is:sk.Name.args {terms = frame; bound = None}),
           (fun x -> x),
           k
         | _ -> assert false
@@ -2256,10 +2291,10 @@ let enckp arg (s : ES.t) =
              let system = SE.{ context.env.system with set = (se :> SE.t); } in
              let context = ProofContext.change_system ~system context in
              let errors =
+               (* FEAT: concrete logic for equivalences *)
                OldEuf.key_ssc
-                 ~context
+                 ~concrete ~context
                  ~elems:{terms = (List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
-                        (*TODO:Concrete : Probably something to do to create a bounded goal*)
                         ; bound = None}
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.Name.symb.s_symb
              in
@@ -2315,10 +2350,9 @@ let enckp arg (s : ES.t) =
               (new_skr, rproj, rsys)]) ;
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] {terms = [e]; bound = None}
-          (*TODO:Concrete : Probably something to do to create a bounded goal*)
+          (* FEAT: concrete logic for equivalences *)
         in
-        deprecated_fresh_cond s (Term.mk_name r.symb r.args) (context.terms@biframe)
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+        deprecated_fresh_cond ~concrete s (Term.mk_name r.symb r.args) (context.terms@biframe)
       with Oldcca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
@@ -2331,14 +2365,14 @@ let enckp arg (s : ES.t) =
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] {terms = [e]; bound = None}
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (* FEAT: concrete logic for equivalences *)
     in
     let biframe = (List.rev_append before (new_elem.terms @ after)) in
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
 
     [Goal.Local fresh_goal;
      Goal.Global (ES.set_equiv_conclusion {terms = biframe; bound = None} s)]
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
 
   in
 
@@ -2410,7 +2444,7 @@ let remove_name_occ (n,a) l = match l with
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
 let mk_xor_phi_base
-    (s : ES.t) biframe
+    (s : ES.t) ~(concrete : bool) (biframe : Term.terms)
     ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) 
   =
   let system = Utils.oget (ES.system s).pair in
@@ -2427,7 +2461,7 @@ let mk_xor_phi_base
   let context_left = ES.proof_context ~in_system:system_left s in
   let phi_left =
     let frame = List.map (Term.project1 lproj) biframe in
-    deprecated_mk_phi_proj context_left (n_left, n_left_args) frame
+    deprecated_mk_phi_proj ~concrete context_left (n_left, n_left_args) frame
   in
 
   let system_right = 
@@ -2436,7 +2470,7 @@ let mk_xor_phi_base
   let context_right = ES.proof_context ~in_system:system_right s in
   let phi_right =
     let frame = List.map (Term.project1 rproj) biframe in
-    deprecated_mk_phi_proj context_right (n_right, n_right_args) frame 
+    deprecated_mk_phi_proj ~concrete context_right (n_right, n_right_args) frame 
   in
 
   let len_left =
@@ -2501,7 +2535,8 @@ let xor arg (s : ES.t) =
                 "The optional arguments of xor can only be a name and/or \
                  the target xored term.")
   in
-  let before, e, after = split_equiv_conclusion i s in
+  let before, e, after, bound = split_equiv_conclusion i s in
+  let concrete = bound <> None in
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
@@ -2563,7 +2598,7 @@ let xor arg (s : ES.t) =
       end
   in
   let phi =
-    mk_xor_phi_base s biframe
+    mk_xor_phi_base ~concrete s biframe
       ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term)
   in
   let n_fty = Type.mk_ftype [] [] Type.tmessage in
@@ -2583,12 +2618,12 @@ let xor arg (s : ES.t) =
 
   let new_elem =
     Equiv.subst_equiv [Term.ESubst (t,if_term)] {terms = [e]; bound = None}
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
+    (* FEAT: concrete logic for equivalences *)
   in
   let biframe = List.rev_append before (new_elem.terms @ after) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  (* FEAT: concrete logic for equivalences *)
   [ES.set_equiv_conclusion {terms = biframe; bound = None} s]
-(*TODO:Concrete : Probably something to do to create a bounded goal*)
+(* FEAT: concrete logic for equivalences *)
 
 
 let () =
@@ -2745,7 +2780,7 @@ let ddh
   let l_proj, r_proj = ES.get_system_pair_projs s in
   if is_ddh_context ~gen ~exp ~context ~l_proj ~r_proj
       na nb nc (ES.conclusion_as_equiv s).terms
-      (*TODO:Concrete : Probably something to do to create a bounded goal*)
+      (* FEAT: concrete logic for equivalences *)
   then []
   else soft_failure Tactics.NotDDHContext
 
@@ -2768,7 +2803,7 @@ let () =
 let crypto
     (param : Crypto.param) 
     (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) 
-  =
+  =   
   let frame = ES.conclusion_as_equiv s in
   let old_system = ES.system s in
   let new_system = { old_system with set = (oget old_system.pair :> SE.t); } in

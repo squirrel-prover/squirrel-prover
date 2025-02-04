@@ -86,7 +86,7 @@ let rec token buf =
   | "||" -> OR
   | '<' -> LANGLE
   | '>' -> RANGLE
-  (*| "<:" -> LANGLECOLON*)
+  | "<:" -> LANGLECOLON
   | '[' -> LBRACKET
   | ']' -> RBRACKET
   | '{' -> LBRACE
@@ -152,6 +152,7 @@ let rec token buf =
   | "channel" -> !?CHANNEL
   | "checkfail" -> !?CHECKFAIL
   | "clear" -> !?CLEAR
+  | "const" -> !?CONST
   | "constseq" -> !?CONSTSEQ
   | "crypto" -> !?CRYPTO
   | "cs" -> !?CS
@@ -165,6 +166,7 @@ let rec token buf =
   | "diff" -> !?DIFF
   | "else" -> !?ELSE
   | "equiv" -> !?EQUIV
+  | "exact" -> !?EXACT
   | "exists" -> !?EXISTS
   | "Exists" -> !?UEXISTS
   | "end" -> !?END

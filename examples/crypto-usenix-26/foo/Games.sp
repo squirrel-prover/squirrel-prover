@@ -83,23 +83,23 @@ op find_bb ((c,s):(message*signed)) (bb: (index -> (message*signed))) =
 (* Formatting axioms *)
 
 (*axiom format_pkb (pk:pk_bsign) : read_pkb (format_pkb pk) = pk.*)
-axiom [any] format_blind   (x : blinded                     ) : read (format x) = x.
+exact axiom [any] format_blind   (x : blinded                     ) : read (format x) = x.
 hint rewrite format_blind.
-axiom [any] format_bsign   (x : bsigned                     ) : read (format x) = x.
+exact axiom [any] format_bsign   (x : bsigned                     ) : read (format x) = x.
 hint rewrite format_bsign.
-axiom [any] format_pk_sign (x : pk_sign                     ) : read (format x) = x.
+exact axiom [any] format_pk_sign (x : pk_sign                     ) : read (format x) = x.
 hint rewrite format_pk_sign.
-axiom [any] format_sign    (x : signed                      ) : read (format x) = x.
+exact axiom [any] format_sign    (x : signed                      ) : read (format x) = x.
 hint rewrite format_sign.
-axiom [any] format_encr    (x : ctxt                        ) : read (format x) = x.
+exact axiom [any] format_encr    (x : ctxt                        ) : read (format x) = x.
 hint rewrite format_encr.
-axiom [any] format_pk_enc  (x : pk_enc                      ) : read (format x) = x.
+exact axiom [any] format_pk_enc  (x : pk_enc                      ) : read (format x) = x.
 hint rewrite format_pk_enc.
-axiom [any] format_kc      (x : k_comm                      ) : read (format x) = x.
+exact axiom [any] format_kc      (x : k_comm                      ) : read (format x) = x.
 hint rewrite format_kc.
-axiom [any] format_bb      (x : (index -> (message*signed)) ) : read (format x) = x.
+exact axiom [any] format_bb      (x : (index -> (message*signed)) ) : read (format x) = x.
 hint rewrite format_bb.
-axiom [any] format_index   (x : index                       ) : read (format x) = x.
+exact axiom [any] format_index   (x : index                       ) : read (format x) = x.
 hint rewrite format_index.
 
 axiom [any] format_inj ['a] (x,y:'a) : format x = format y => x = y.

@@ -4,7 +4,22 @@ module Sv   = Vars.Sv
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
-type rw_kind = LocalEq | GlobalEq
+type kind = UseLocalContext | Global | Any
+
+let kind_comp k1 k2 =
+  match k1, k2 with
+  | UseLocalContext, _ -> UseLocalContext
+  | _, UseLocalContext -> UseLocalContext
+  | Any, _ -> Any
+  | _, Any -> Any
+  | Global, Global -> Global
+
+let pp_kind fmt kind =
+  match kind with
+  | UseLocalContext -> Fmt.pf fmt "may use local hypotheses"
+  | Any             -> Fmt.pf fmt "may or may not use local hypotheses"
+  | Global          -> Fmt.pf fmt "must not use local hypotheses"
+
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
@@ -14,8 +29,8 @@ type rw_rule = {
   rw_vars   : Vars.tagged_vars;      
   rw_conds  : Term.term list; 
   rw_rw     : Term.term * Term.term; 
-  rw_kind   : rw_kind;
-  rw_bound  : Concrete.bound;
+  rw_kind   : kind;
+  rw_bound  : LowConcrete.bound;
 }
 
 let pp_rw_rule ppe fmt (rw : rw_rule) =
@@ -29,11 +44,13 @@ let pp_rw_rule ppe fmt (rw : rw_rule) =
   in
   
   let src, dst = rw.rw_rw in
-  Fmt.pf fmt "%a%a: %a -> %a%a"
+  Fmt.pf fmt "%a%a: %a -> %a%a <: %a %a"
     Params.pp rw.rw_params
     pp_vars rw.rw_vars
     (Term._pp ppe) src Term.pp dst
     pp_conds rw.rw_conds
+    LowConcrete.pp rw.rw_bound
+    pp_kind rw.rw_kind
 
 (*------------------------------------------------------------------*)
 (** Check that the rule is correct. *)
@@ -51,9 +68,9 @@ let pat_to_rw_rule ?loc
     ~(destr_eq  : Term.term -> (Term.term * Term.term) option)
     ~(destr_not : Term.term -> (            Term.term) option)
     (system    : SE.arbitrary) 
-    (rw_kind   : rw_kind)
+    (rw_kind   : kind)
     (dir       : [< `LeftToRight | `RightToLeft ])
-    (p         : (Term.term * Concrete.bound) Term.pat)
+    (p         : (Term.term * LowConcrete.bound) Term.pat)
   : rw_rule 
   =
   let _ = loc in                (* unused *)
@@ -75,6 +92,7 @@ let pat_to_rw_rule ?loc
       t2,t1
   in
 
+
   let rule = {
     rw_params = p.pat_params;
     rw_system = system;
@@ -83,8 +101,9 @@ let pat_to_rw_rule ?loc
     rw_rw     = e;
     rw_kind;
     rw_bound;
-  } in
-  
+  }
+  in
+
   (* We check that the rule is valid *)
   check_rule rule;
 
@@ -92,21 +111,20 @@ let pat_to_rw_rule ?loc
 
 (*------------------------------------------------------------------*)
 let simple_rw_rule
-    ?(params = Params.empty) ?(vars = []) ?(conds = [])
-    (system  : SE.arbitrary) 
+    (system  : SE.arbitrary)
+    (table : Symbols.table)
     ~(left : Term.t) ~(right : Term.t)
   : rw_rule 
   =
   let rule = {
-    rw_params = params;
+    rw_params = Params.empty;
     rw_system = system;
-    rw_vars   = vars;
-    rw_conds  = conds;
+    rw_vars   = [];
+    rw_conds  = [];
     rw_rw     = (left,right);
-    rw_kind   = GlobalEq;
-    rw_bound = Glob;
-    (* FIXME: we want to say that the rule is exact. *)
-  } 
+    rw_kind   = Global;
+    rw_bound = ReachConc (Library.Real.mk_zero table);
+  }
   in
   
   (* We check that the rule is valid *)

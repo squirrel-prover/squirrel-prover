@@ -167,13 +167,16 @@ module type SimpleOcc = sig
     sub:Term.term -> show:occ_show -> simple_occ
 
   val aux_occ_incl :
+    concrete:bool ->
     Symbols.table -> SE.fset -> ?mv:Match.Mvar.t ->
     simple_occ -> simple_occ -> Match.Mvar.t option
 
   val occ_incl :
+    concrete:bool ->
     Symbols.table -> SE.fset -> simple_occ -> simple_occ -> bool
 
   val clear_subsumed :
+    concrete:bool ->
     Symbols.table -> SE.fset -> simple_occs -> simple_occs
 
   val pp : simple_occ formatter_p
@@ -230,6 +233,7 @@ struct
       Checks if [t1] is included in the patterm [pat2], i.e. [t1 ∈ occ2].
       Starting from a matching function mv, returns the new mv *)
   let pat_subsumes
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       ?(mv : Match.Mvar.t = Match.Mvar.empty)
@@ -238,7 +242,10 @@ struct
     =
     assert (pat2.pat_op_params = Params.Open.empty);
     let context = SE.reachability_context system in
-    match Match.T.try_match ~param:Match.crypto_param ~mv table context t1 pat2
+    match 
+      Match.T.try_match
+        ~param:Match.crypto_param ~concrete ~mv table context 
+        t1 pat2
     with
     | NoMatch _ -> None
     | Match mv -> Some mv
@@ -247,6 +254,7 @@ struct
 
   (** Exported (see `.mli`) *)
   let aux_occ_incl
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       ?(mv : Match.Mvar.t = Match.Mvar.empty)
@@ -284,7 +292,7 @@ struct
           }
         in
 
-        let mv = pat_subsumes ~mv table system (mk_dummy o1) pat2 in
+        let mv = pat_subsumes ~concrete ~mv table system (mk_dummy o1) pat2 in
         match mv with
         | None -> None
         | Some mv -> (* only the condition is left to check.
@@ -302,7 +310,7 @@ struct
             List.for_all (fun cond2 ->
                 List.exists (fun cond1 ->
                     match
-                      pat_subsumes ~mv:(!mv) table system
+                      pat_subsumes ~concrete ~mv:(!mv) table system
                         cond1 (mk_cond2 cond2)
                     with
                     | None -> false
@@ -315,23 +323,25 @@ struct
 
   (** Exported (see `.mli`) *)
   let occ_incl
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (o1 : simple_occ)
       (o2 : simple_occ)
     : bool =
-    match aux_occ_incl table system o1 o2 with
+    match aux_occ_incl ~concrete table system o1 o2 with
     | Some _ -> true
     | None -> false
 
 
   (** Exported (see `.mli`) *)
   let clear_subsumed
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (occs : simple_occs) :
     simple_occs =
-    List.clear_subsumed (occ_incl table system) occs
+    List.clear_subsumed (occ_incl ~concrete table system) occs
 
 
   (** Internal.
@@ -380,13 +390,14 @@ struct
 
   (** Overwrite the standard aux function to handle pred more precisely *)
   let aux_occ_incl
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       ?(mv : Match.Mvar.t = Match.Mvar.empty)
       (ts1 : simple_occ)
       (ts2 : simple_occ)
     : Match.Mvar.t option =
-    let f = aux_occ_incl table system in
+    let f = aux_occ_incl ~concrete table system in
     match f ~mv ts1 ts2 with
     | Some mv -> Some mv
     | None ->
@@ -404,23 +415,25 @@ struct
 
   (** Overwrite the standard occ_incl to use the precise aux function *)
   let occ_incl
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (ts1 : simple_occ)
       (ts2 : simple_occ)
     : bool =
-    match aux_occ_incl table system ts1 ts2 with
+    match aux_occ_incl ~concrete table system ts1 ts2 with
     | Some _ -> true
     | None -> false
 
 
   (** Overwrite the standard clear_subsumed to use the precise occ_incl *)
   let clear_subsumed
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (occs : simple_occs) :
     simple_occs =
-    List.clear_subsumed (occ_incl table system) occs
+    List.clear_subsumed (occ_incl ~concrete table system) occs
 end 
 
 type rec_arg_occ = RecArgOcc.simple_occ
@@ -452,10 +465,14 @@ module type ExtOcc = sig
   type ext_occs = ext_occ list
 
   val ext_occ_incl :
-    Symbols.table -> SE.fset -> ext_occ -> ext_occ -> bool
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    ext_occ -> ext_occ -> bool
 
   val clear_subsumed :
-    Symbols.table -> SE.fset -> ext_occs -> ext_occs
+    concrete:bool ->
+    Symbols.table -> SE.fset ->
+    ext_occs -> ext_occs
 
   val pp : ext_occ formatter_p
 
@@ -483,12 +500,13 @@ struct
 
   (** Exported (see `.mli`) *)
   let ext_occ_incl
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (occ1 : ext_occ)
       (occ2 : ext_occ)
     : bool =
-    let mv = SO.aux_occ_incl table system occ1.eo_occ occ2.eo_occ in
+    let mv = SO.aux_occ_incl ~concrete table system occ1.eo_occ occ2.eo_occ in
     match mv with
     | None -> false
     | Some mv ->
@@ -505,7 +523,7 @@ struct
       List.for_all (fun ts1 ->
           List.exists (fun ts2 ->
               match
-                RecArgOcc.aux_occ_incl ~mv:(!mv) table system ts1 ts2
+                RecArgOcc.aux_occ_incl ~concrete ~mv:(!mv) table system ts1 ts2
               with
               | None -> false
               | Some mv' -> mv := mv'; true
@@ -515,11 +533,12 @@ struct
 
   (** Exported (see `.mli`) *)
   let clear_subsumed
+      ~concrete
       (table : Symbols.table)
       (system : SE.fset)
       (occs : ext_occs)
     : ext_occs =
-    List.clear_subsumed (ext_occ_incl table system) occs
+    List.clear_subsumed (ext_occ_incl ~concrete table system) occs
 
   (** Exported (see `.mli`) *)
   let pp ppe (fmt:Format.formatter) (occ:ext_occ) : unit =
@@ -566,8 +585,7 @@ let expand_macro_check_once
       match ot with
       | EI_direct ->
         let res, has_red =
-          Match.reduce_delta_macro1
-            ~constr:true c.env ~hyps:c.hyps t
+          Match.reduce_delta_macro1 ~constr:true c t
         in
         if has_red = True then Some res else None
       | EI_indirect _ ->
@@ -585,7 +603,9 @@ let expand_macro_check_once
   | _ -> None
 
 (** Exported (see `.mli`) *)
-let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
+let rec expand_macro_check_all
+    (info:expand_info) (t:Term.term) : Term.term
+  =
   match expand_macro_check_once info t with
   | Some t' -> expand_macro_check_all info t'
   | None -> t
@@ -657,7 +677,7 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
     p(q)time checks from the occurence check.
  *)
 let get_rec_args_ext
-    ~(mode : Iter.allowed ) (* allowed sub-terms without further checks *)
+    ~(mode : Iter.allowed) (* allowed sub-terms without further checks *)
     (t : Term.term)
     (info : expand_info)
   : rec_arg_occs
@@ -824,7 +844,7 @@ let get_rec_args_ext
       check_top_quantifier_enumerable table t;
 
       MP.fold_shallow
-        (fun t' se fv cond p occs ->
+        (fun t' se fv cond p _info occs ->
            occs @ (get t' ~fv ~cond ~p ~se))
         ~se ~fv ~p ~cond [] t
   in
@@ -876,7 +896,7 @@ let check_single_quantum_component (pc : ProofContext.t) (terms:Term.terms)
             let models = 
               let exception TO in
               try
-                Hyps.get_models ~exn:TO ~system:(Some env.system.set) table pc.hyps
+                Hyps.get_models ~concrete:pc.concrete ~exn:TO ~system:(Some env.system.set) table pc.hyps
               with TO -> Constr.empty_model
             in
 
@@ -962,6 +982,7 @@ let check_single_quantum_component (pc : ProofContext.t) (terms:Term.terms)
     
 *)
 let get_macro_rec_args
+    ~concrete
     ~(mode    : Iter.allowed)   (* allowed sub-terms without further checks *)
     ~(context : ProofContext.t)
     (sources  : Term.terms) : rec_arg_occs
@@ -972,7 +993,7 @@ let get_macro_rec_args
     List.concat_map (fun t -> get_rec_args_ext ~mode t ei) sources
   in
   let rec_arg_occs =
-    RecArgOcc.clear_subsumed env.table (SE.to_fset env.system.set) actions
+    RecArgOcc.clear_subsumed ~concrete env.table (SE.to_fset env.system.set) actions
   in
   if TConfig.post_quantum_equivs context.env.table then
     let _ =
@@ -1015,6 +1036,7 @@ module type OccurrenceSearch = sig
     simple_occs
 
   val find_all_occurrences :
+    concrete:bool ->
     mode:Iter.allowed ->
     ?pp_descr:unit Fmt.t option ->
     f_fold_occs ->
@@ -1103,7 +1125,7 @@ struct
 
         | _ ->
           MP.fold_shallow
-            (fun t' se fv cond p acc ->
+            (fun t' se fv cond p (_info:unit) acc ->
                let context =
                  ProofContext.change_system
                    ~system:{ context.env.system with set = se; }
@@ -1140,6 +1162,7 @@ struct
       Relies on [fold_macro_support] to look through
       all macros in the term. *)
   let find_all_occurrences
+      ~concrete
       ~(mode        : Iter.allowed)   (* allowed sub-terms without further checks *)
       ?(pp_descr    : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
@@ -1171,7 +1194,7 @@ struct
       List.fold_left
         (fun dir_occs t -> (* find direct occurrences in t *)
            (* recursive arguments occurring in t *)
-           let rec_arg  = get_macro_rec_args ~mode ~context [t] in
+           let rec_arg  = get_macro_rec_args ~concrete ~mode ~context [t] in
            (* name occurrences in t *)
            let occs = find_occs ~fv:[] (EI_direct, context) t in
            (* add the info to the occurrences *)
@@ -1221,7 +1244,7 @@ struct
                     (Term.fv a)
                     (Vars.Sv.union sfv (Vars.to_vars_set env.vars)));
           (* recursive arguments occurring in sources (not in the indirect occs!) *)
-          let rec_arg = get_macro_rec_args ~mode ~context src in
+          let rec_arg = get_macro_rec_args ~concrete ~mode ~context src in
           (* indirect occurrences in iocc *)
           let occs =
             find_occs
@@ -1255,7 +1278,7 @@ struct
     let loccs = List.length (filter_show occs) in
 
     (* todo: this would need to change if the system depends on the occ *)
-    let occs = EO.clear_subsumed table system occs in
+    let occs = EO.clear_subsumed ~concrete table system occs in
     let loccs' = List.length (filter_show occs) in
     let lsub = loccs - loccs' in
 

@@ -232,10 +232,12 @@ let intctxt_param
 let intctxt
     ?(use_path_cond : bool = false)
     (h : lsymb)
+    (bounds : Term.t option list)
     (s : sequent)
   : sequent list
   =
-  let ppe = default_ppe ~table:(TS.table s) () in
+  let table = TS.table s in
+  let ppe = default_ppe ~table () in
   let loc = L.loc h in
 
   (* Find parameters *)
@@ -256,8 +258,33 @@ let intctxt
       ~enc_f:icp.ip_enc ~dec_f:icp.ip_dec ~hash_f:icp.ip_hash
   in
 
+  let concrete = TS.concrete s in
+
+  let bound =
+    lazy (
+      assert concrete;
+      
+      let quote t =
+        let e, t = Reify.quote Reify.Set (TS.env s) (Infer.mk_env ()) t in
+        Term.mk_tuple [t;e]
+      in
+      let mk_fun f = Term.mk_fun table f [] in
+      let  to_termo t = match t with
+        | None -> Library.Concrete.ReifyOption.mk_none table
+        | Some t -> Library.Concrete.ReifyOption.mk_some table t
+      in
+      Library.Concrete.mk_adv_intctxt
+        table
+        (quote (mk_fun icp.ip_dec))
+        (to_termo (Utils.omap (fun x -> quote (mk_fun x)) icp.ip_hash))
+        (quote icp.ip_c)
+        (quote (Name.to_term icp.ip_k))
+        (to_termo (Utils.omap quote icp.ip_t))
+    )
+  in
+
   let occs_kc =
-    EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_k)
+    EOS.find_all_occurrences ~concrete ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_k)
       get_bad_kc
       context
       (icp.ip_c :: icp.ip_k.args)
@@ -298,7 +325,7 @@ let intctxt
   in
 
   let occs_r =
-    ROS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_rand)
+    ROS.find_all_occurrences ~concrete ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_rand)
       get_bad_randoms
       context
       [icp.ip_c; Name.to_term icp.ip_k]
@@ -336,50 +363,91 @@ let intctxt
 
   let phis = phi_t @ phis_k @ phis_r @ phis_c in
 
-  let g = TS.conclusion s in 
-  let ciphertext_goals =
-    List.map
-      (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
-      phis
+  let subgoals phis =
+    let module CB = Concrete.BoundManagement(TS) in
+    let s = if concrete then CB.minus_bound (Lazy.force bound) s else s in
+    let g = TS.conclusion s in
+    let ciphertext_goals = List.map (fun phi -> (mk_impl ~simpl:false phi g)) phis in
+    let bounds,last_goal = CB.list_bounds_fill bounds ciphertext_goals s in
+    let ciphertext_goals = (List.map2
+                              (fun c b ->
+                                 TS.set_conclusion c  (TS.set_bound b s))
+                              ciphertext_goals bounds)
+                           @ last_goal
+    in
+
+    (* copied from old euf, handles the composition goals *)
+    let tag_s =
+      match Oracle.get_oracle icp.ip_enc table with
+      (* if the hash is not tagged, we don't create another goal. *)
+      | None -> []
+      | Some f ->
+        if concrete
+        then
+          Tactics.soft_failure (Failure "Tags are not supported in the concrete version")
+        else
+          (* else, we create a goal where m,sk satisfy the axiom *)
+          let uvarm, uvarkey,f = match f with
+            | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
+            | _ -> assert false
+          in
+
+          match Vars.ty uvarm,Vars.ty uvarkey with
+          | Type.(Message, Message) -> let f = Term.subst [
+              ESubst (Term.mk_var uvarm, icp.ip_c);
+              ESubst (Term.mk_var uvarkey, Name.to_term icp.ip_k);] f in
+            [TS.set_conclusion
+               (Term.mk_impl f (TS.conclusion s)) s]
+
+          | _ -> assert false
+    in
+    tag_s @ ciphertext_goals
   in
 
-
-  (* copied from old euf, handles the composition goals *)
-  let tag_s =
-    match Oracle.get_oracle icp.ip_enc (TS.table s) with
-    (* if the hash is not tagged, we don't create another goal. *)
-    | None -> []
-    | Some f ->
-      (* else, we create a goal where m,sk satisfy the axiom *)
-      let uvarm, uvarkey,f = match f with
-        | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
-        | _ -> assert false
-      in
-
-      match Vars.ty uvarm,Vars.ty uvarkey with
-      | Type.(Message, Message) -> let f = Term.subst [
-          ESubst (Term.mk_var uvarm, icp.ip_c);
-          ESubst (Term.mk_var uvarkey, Name.to_term icp.ip_k);] f in
-        [TS.set_conclusion
-           (Term.mk_impl f (TS.conclusion s)) s]
-
-      | _ -> assert false 
-  in
-
-  tag_s @ ciphertext_goals
+  if phis = [] then
+    begin
+      if bounds = [] then () else Tactics.soft_failure
+          (Failure "Intctxt do not take bounds arguments when there is not subgoals");
+      if concrete
+      then
+        let bound = Lazy.force bound in
+        let s_bound =
+          match TS.bound s with ReachConc b -> b | _ -> assert false
+        in
+        if Term.equal s_bound bound
+        then []
+        else
+          let s = TS.set_conclusion (Term.mk_leq bound s_bound) s in
+          [TS.set_bound (LowConcrete.ReachConc (Library.Real.mk_zero table)) s]
+      else []
+    end
+  else subgoals phis
 
 
 
 (*------------------------------------------------------------------*)
 let intctxt_tac args s =
-  let hyp = match args with
-    | [hyp] -> hyp
+  let hyp,bounds = match args with
+    | hyp::bounds -> hyp,bounds
     | _ -> 
       hard_failure
         (Failure "intctxt requires one argument: hypothesis")
   in
+      let bounds =
+        let convert_bounds =
+          List.map
+            (fun x -> LT.TraceLT.convert_args s [x] Args.(Sort Term))
+            bounds
+        in
+        let filter x =
+          match x with
+          | Args.Arg (Term(ty, t , _)) when Type.equal ty Library.Real.treal -> t
+          | _ -> LT.bad_args ()
+        in
+        List.map (fun x -> Some (filter x) ) convert_bounds
+      in
   match LT.TraceLT.convert_args s [hyp] (Args.Sort Args.String) with
-  | Args.Arg (Args.String hyp) -> wrap_fail (intctxt hyp) s
+  | Args.Arg (Args.String hyp) -> wrap_fail (intctxt hyp bounds) s
 
   | _ -> LT.bad_args ()
 

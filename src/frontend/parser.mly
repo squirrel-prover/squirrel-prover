@@ -28,8 +28,8 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
-%token LANGLE RANGLE (*LANGLECOLON*) LQUOTED RQUOTED
-%token GAND GOR AND OR NOT TRUE FALSE 
+%token LANGLE RANGLE LANGLECOLON LQUOTED RQUOTED
+%token GAND GOR AND OR NOT TRUE FALSE
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
 %token LLET LET REC TERMINATIONBY TAND IN
@@ -41,7 +41,7 @@
 %token HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
 %token TYPE FUN INDUCTIVE
 %token MUTABLE MUTEX SYSTEM LIKE SET
-%token LEMMA THEOREM
+%token LEMMA THEOREM EXACT
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token MSG HIGH LOW SBOOL CST SK AK SSK RAND
 %token EXISTS FORALL QUANTIF EQUIV DARROW DEQUIVARROW AXIOM
@@ -56,7 +56,7 @@
 %token REDUCE SIMPL AUTO
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
-%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO DEDUCE
+%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO DEDUCE CONST
 %token PROOF QED RESET UNDO ABORT HINT
 %token TACTIC
 %token INCLUDE PRINT SEARCH PROF
@@ -309,6 +309,9 @@ term_i:
 | t=term s=infix_s0 t0=term       
    { Typing.mk_app_i (Typing.mk_symb (top_path,s)) [t;t0] }
 
+| l=lloc(MINUS) t=term       
+   { Typing.mk_app_i (Typing.mk_symb (top_path,L.mk_loc l "opp")) [t] }
+
 | t=term SHARP i=loc(INT)
     { Typing.Proj (i,t) }
 
@@ -395,7 +398,10 @@ multi_term_bnds:
 /* variable tags */
 var_tags:
 |                                             { []   }
-| LBRACKET tags=slist1(lsymb, COMMA) RBRACKET { tags }
+| enable_kwd_as_id              /* start lexical feedback hack */
+  LBRACKET tags=slist1(lsymb, COMMA) RBRACKET 
+  disable_kwd_as_id             /* end lexical feedback hack */
+  { tags }
 
 /* type with tags */
 ty_tagged:
@@ -471,9 +477,8 @@ top_process:
 colon_ty:
 | COLON t=ty { t }
 
-(*concrete_term:
-| LANGLECOLON t=term { t }*)
-
+concrete_term:
+| LANGLECOLON t=term %prec tac_prec { t }
 
 (* identifier with '$' allowed at the beginning or end *) 
 %inline alias_name:
@@ -793,7 +798,9 @@ declaration_i:
           op_args      = [];
           op_tyout     = Some tyo;
           op_body      = `Abstract;
-          op_terby     = None}])
+          op_terby     = None;
+          op_annots    = [];
+        }])
     }
 
 | OP e=lsymb_gen_decl tyvars=ty_vars args=ext_bnds_tagged_strict tyo=colon_ty? body=op_body
@@ -804,7 +811,9 @@ declaration_i:
           op_args      = args;
           op_tyout     = tyo;
           op_body      = body;
-          op_terby     = None}])
+          op_terby     = None;
+          op_annots    = [];
+        }])
     }
 
 | PREDICATE e=lsymb_gen_decl
@@ -849,8 +858,8 @@ declaration_i:
 | PROCESS id=lsymb projs=projs args=bnds EQ proc=process
                           { Decl.Decl_process {id; projs; args; proc} }
 
-|        AXIOM s=local_statement  { Decl.Decl_axiom s }
-|  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
+|  EXACT LOCAL? AXIOM s=local_statement(exact_bound   ) { Decl.Decl_axiom s }
+|        LOCAL? AXIOM s=local_statement(concrete_bound) { Decl.Decl_axiom s }
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
 /* declares the default system */
@@ -883,17 +892,19 @@ rec_decl:
 
 mutual_rec_decl:
 | TAND e=lsymb_gen_decl
+  op_annots=simpl_named_args
   args=ext_bnds_tagged_strict
   tyo=colon_ty?
   body=let_body
   terminationby = termination_by?
     { let symb_type, name = e in
       Decl.{ 
-               op_name      = name;
-               op_symb_type = symb_type;
-               op_args      = args;
-               op_tyout     = tyo;
-               op_body      = body;
+         op_name      = name;
+         op_symb_type = symb_type;
+         op_args      = args;
+         op_tyout     = tyo;
+         op_body      = body;
+         op_annots;
 	       op_terby     = terminationby;
       }     
     }
@@ -910,6 +921,7 @@ declaration_no_concat_i:
 | LET is_rec=rec_decl e=lsymb_gen_decl
   sa=in_system_annot
   tyvars=ty_vars
+  op_annots=simpl_named_args
   args=ext_bnds_tagged_strict
   tyo=colon_ty? 
   body=let_body
@@ -923,7 +935,8 @@ declaration_no_concat_i:
         op_args      = args;
         op_tyout     = tyo;
         op_body      = body;
-	op_terby     = terminationby;
+	      op_terby     = terminationby;
+        op_annots;
       }
       :: ands )
   }
@@ -1108,7 +1121,7 @@ naming_pat:
 and_or_ip:
 | LBRACKET s=simpl_ip          ips=slist(simpl_ip, empty)    RBRACKET
                     { TacticsArgs.And (s :: ips) }
-| LBRACKET s=simpl_ip PARALLEL ips=slist(simpl_ip, PARALLEL) RBRACKET
+| LBRACKET s=or_ip PARALLEL ips=slist(or_ip, PARALLEL) RBRACKET
                     { TacticsArgs.Or  (s :: ips) }
 | LBRACKET RBRACKET { TacticsArgs.Split }
 
@@ -1116,9 +1129,11 @@ rewrite_ip:
 | ARROW  { `LeftToRight }
 | RARROW { `RightToLeft }
 
+or_ip: s=simpl_ip t=concrete_term? {(s,t)}
+
 simpl_ip:
 | n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
-| ao_ip=and_or_ip { TacticsArgs.SAndOr ao_ip }
+| ao_ip=and_or_ip  { TacticsArgs.SAndOr ao_ip }
 | d=loc(rewrite_ip) { TacticsArgs.Srewrite d }
 
 s_item_body:
@@ -1154,6 +1169,9 @@ selector:
 tac_term:
 | f=term  %prec tac_prec { f }
 
+tac_bounds:
+| LANGLECOLON l=slist1(tac_term, COMMA) {l}
+
 as_n_ips:
 | AS n_ips=slist1(naming_pat, empty) { n_ips }
 
@@ -1180,6 +1198,8 @@ pt_cnt:
     { let pta_loc = L.make $startpos $endpos in
       let app = Typing.{ pta_head = head; pta_args = args; pta_loc; } in
       Typing.PT_app app }
+
+| pt=spt LANGLECOLON t=term %prec tac_prec { Typing.PT_weak (pt,t) }
 
 pt:
 | pt=loc(pt_cnt) { pt }
@@ -1267,13 +1287,13 @@ have_ip:
 
 %inline have_tac:
 /* legacy syntax */
-| l=lloc(ASSERT) p=tac_term ip=as_have_ip? 
-    { mk_abstract l "have" [TacticsArgs.Have (ip, Typing.Local p)] }
-
+| l=lloc(ASSERT) p=tac_term tl=tac_bounds? ip=as_have_ip?
+    { mk_abstract l "have" ([TacticsArgs.Have (ip, Typing.Local p)]
+                                            @ (Utils.omap_dflt [] (List.map (fun x -> TacticsArgs.Term_parsed x)) tl)) }
 /* have ip : any_form */
-| l=lloc(HAVE) ip=have_ip COLON p=tac_any_form
-    { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
-
+| l=lloc(HAVE) ip=have_ip COLON p=tac_any_form tl=tac_bounds?
+    { mk_abstract l "have" ([TacticsArgs.Have (Some ip, p)]
+                                            @ (Utils.omap_dflt [] (List.map (fun x -> TacticsArgs.Term_parsed x)) tl)) }
 /* have ip : global_form */
 | l=lloc(GHAVE) ip=have_ip COLON p=global_formula
     { mk_abstract l "have" [TacticsArgs.Have (Some ip, Typing.Global p)] }
@@ -1318,6 +1338,7 @@ enable_kwd_as_id:
 disable_kwd_as_id:
 | { Feedback.disable_keywords_as_ids () }
 
+(*------------------------------------------------------------------*)
 named_arg_gen(X):
 | enable_kwd_as_id TILDE l=lsymb disable_kwd_as_id
   { TacticsArgs.NArg l }
@@ -1333,6 +1354,14 @@ named_args_gen(X):
 
 named_args:
 | named_args_gen(lsymb) { $1 }
+
+(*------------------------------------------------------------------*)
+simpl_named_arg:
+| enable_kwd_as_id TILDE l=lsymb disable_kwd_as_id
+  { TacticsArgs.NArg l }
+
+simpl_named_args:
+| slist(simpl_named_arg,empty) { $1 }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -1369,8 +1398,8 @@ tac:
     { mk_abstract l "cdh" [TacticsArgs.DH arg] }
 
   (* Case *)
-  | l=lloc(CASE) a=named_args t=tac_term
-    { mk_abstract l "case" [TacticsArgs.Named_args a; Term_parsed t] }
+  | l=lloc(CASE) a=named_args t=tac_term tl=tac_bounds?
+    { mk_abstract l "case" ([TacticsArgs.Case (a,t,tl)]) }
 
   (* SMT *)
   | l=lloc(SMT) a=named_args_gen(tacargs_string_int)
@@ -1399,11 +1428,15 @@ tac:
 
   (* FA, equiv tactic, patterns *)
   | l=lloc(FA) args=slist1(fa_arg, COMMA)
-    { mk_abstract l "fa" [TacticsArgs.Fa args] }
+    { mk_abstract l "fa" [TacticsArgs.Fa (Global args)] }
 
   (* FA, trace tactic *)
-  | l=lloc(FA) 
-    { mk_abstract l "fa" [] }
+  | l=lloc(FA) tl=tac_bounds?
+    { mk_abstract l "fa" [TacticsArgs.Fa (Local tl)] }
+
+  (* Const, trace tactic *)
+  | l=lloc(CONST) t= tac_term tl=concrete_term?
+    { mk_abstract l "const" [TacticsArgs.Const (t,tl)] }
 
   | l=lloc(INTRO) p=intro_pat_list
     { mk_abstract l "intro" [TacticsArgs.IntroPat p] }
@@ -1457,11 +1490,11 @@ tac:
     { mk_abstract l "generalize dependent"
                   [TacticsArgs.Generalize (terms, n_ips_o, system)] }
 
-  | l=lloc(INDUCTION) system=at_X_annot(SYSTEM)? t=tac_term? 
-    { mk_abstract l "induction" [TacticsArgs.Induction (t, system)] }
+  | l=lloc(INDUCTION) a=named_args system=at_X_annot(SYSTEM)? t=tac_term? 
+    { mk_abstract l "induction" [TacticsArgs.Induction (a, t, system)] }
 
-  | l=lloc(dependent_induction) system=at_X_annot(SYSTEM)? t=tac_term?
-    { mk_abstract l "dependent induction" [TacticsArgs.Induction (t, system)] }
+  | l=lloc(dependent_induction) a=named_args system=at_X_annot(SYSTEM)? t=tac_term?
+    { mk_abstract l "dependent induction" [TacticsArgs.Induction (a, t, system)] }
 
   | l=lloc(SET) n_ip=naming_pat system=at_X_annot(SYSTEM)? COLONEQ term=term %prec tac_prec
     { mk_abstract l "set" [TacticsArgs.Set (n_ip, system, term)] }
@@ -1506,11 +1539,13 @@ tac:
   | l=lloc(TRANS) a=named_args s=at_X_annot(SYSTEM)? arg=trans_arg
     { mk_abstract l "trans" [TacticsArgs.(Trans (TransTerms (a, s, arg)))] }
 
-  | l=lloc(FRESH) a=named_args arg=fresh_arg
-    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,Some arg)] }
+  | l=lloc(FRESH) a=named_args arg=fresh_arg tl=tac_bounds?
+    { mk_abstract l "fresh" ([TacticsArgs.Fresh (a,Some arg)]
+                                            @ (Utils.omap_dflt [] (List.map (fun x -> TacticsArgs.Term_parsed x)) tl)) }
 
-  | l=lloc(FRESH) a=named_args
-    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,None)] }
+  | l=lloc(FRESH) a=named_args tl=tac_bounds?
+    { mk_abstract l "fresh" ([TacticsArgs.Fresh (a,None)]
+                                            @ (Utils.omap_dflt [] (List.map (fun x -> TacticsArgs.Term_parsed x)) tl)) }
 
   | l=lloc(AUTO) a=named_args 
     { mk_abstract l "auto" [TacticsArgs.Named_args a] }
@@ -1562,8 +1597,8 @@ se_args:
 
 /* ----------------------------------------------------------------------- */
 global_formula_i:
-| LBRACKET f=term (*t=concrete_term?*) RBRACKET         { Typing.PReach (f,None(*t*)) }
-| EQUIV LPAREN e=biframe (*t=concrete_term?*) RPAREN    { Typing.PEquiv (e,None(*t*)) }
+| LBRACKET f=term t=concrete_term? RBRACKET         { Typing.PReach (f,t) }
+| EQUIV LPAREN e=biframe t=concrete_term? RPAREN    { Typing.PEquiv (e,t) }
 | LPAREN f=global_formula_i RPAREN { f }
 
 | f=global_formula ARROW f0=global_formula { Typing.PImpl (f,f0) }
@@ -1702,18 +1737,25 @@ statement_name:
 | i=lsymb    { Some i }
 | UNDERSCORE { None }
 
-local_statement:
+exact_bound: 
+| { `Exact }
+
+concrete_bound: 
+| b=concrete_term { `Some b }
+|                 { `None }
+
+local_statement(BOUND):
 | s=old_system_annot
   name=statement_name
   se_vars=se_bnds
   s2=system_annot?
   ty_vars=ty_vars 
   vars=bnds_tagged
-  COLON f=term (*e=concrete_term?*)
+  COLON f=term e=BOUND
 
   {
     let system = `Local, (Utils.odflt s s2) in
-    let formula = Goal.Parsed.Local (f,None (*e*)) in
+    let formula = Goal.Parsed.Local (f,e) in
     Goal.Parsed.{ name; se_vars; ty_vars; vars; system; formula } 
   }
 
@@ -1748,12 +1790,12 @@ lemma_head:
 
 (*------------------------------------------------------------------*) 
 _lemma:
-|        lemma_head s=local_statement     { s }
-|  LOCAL lemma_head s=local_statement     { s }
+|  EXACT LOCAL? lemma_head s=local_statement(exact_bound   ) { s }
+|        LOCAL? lemma_head s=local_statement(concrete_bound) { s }
 | GLOBAL lemma_head s=global_statement    { s }
 | EQUIV  s=obs_equiv_statement            { s }
-| EQUIV s=old_system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) (*t=concrete_term?*)
-    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b,None (*t*))) in
+| EQUIV s=old_system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) t=concrete_term?
+    { let f = L.mk_loc (L.loc b) (Typing.PEquiv (L.unloc b, t)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; se_vars = []; vars; formula = Global f } }
 

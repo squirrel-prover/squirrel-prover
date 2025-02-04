@@ -4,6 +4,9 @@
     Allow to avoid the cyclic dependency between [Reduction] and
     [Match] (see [ReductionCore] for details). *)
 
+(** Reduction is exact without any probabilistic approximation but for
+    the happens hypotheses used. *)
+
 include module type of ReductionCore
 
 include ReductionCore.Sig
@@ -16,60 +19,67 @@ module type S = sig
   type t                        (** sequent type *)
 
   (*------------------------------------------------------------------*)
-  (** Build a conversion state from a sequent.  
+  (** Build a reduction state from a sequent.  
       The term to be reduced is taken in [system.set]. *)
   val to_state :
     ?system:SE.context ->
     ?vars:Vars.env ->
-    red_param -> t -> state
+    red_param -> ?concrete:bool -> t -> state
 
   (*------------------------------------------------------------------*)
   val reduce_global :
     ?system:SE.context ->
-    red_param -> t -> Equiv.form -> Equiv.form
-
+    red_param -> t -> 
+    Equiv.form -> Equiv.form
+  
   val reduce :
     ?system:SE.context ->
-    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
-
+    red_param -> ?concrete:bool -> t -> 
+    'a Equiv.f_kind -> 'a -> 'a
+  
   (** Reduces once at head position *)
   val reduce_head1 :
     ?system:SE.context ->
-    red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
-
+    red_param -> ?concrete:bool -> t -> 
+    'a Equiv.f_kind -> 'a -> 'a * head_has_red
+  
   (*------------------------------------------------------------------*)
   (** {2 Expantion and destruction modulo } *)
 
   val destr_eq :
-    t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
+    ?concrete:bool -> t -> 
+    'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
   val destr_not :
-    t -> 'a Equiv.f_kind -> 'a -> Term.term option
+    ?concrete:bool -> t ->
+    'a Equiv.f_kind -> 'a -> Term.term option
 
   val destr_or :
-    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+    ?concrete:bool -> t ->
+    'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   val destr_and :
-    t -> mode:SmartFO.mode -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+    ?concrete:bool -> t ->
+    mode:SmartFO.mode -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   (*------------------------------------------------------------------*)
   (** {2 Conversion from a sequent } *)
 
   val conv_term :
     ?system:SE.context ->
-    ?param:red_param ->
+    ?param:red_param -> ?concrete:bool ->
     t ->
     Term.term -> Term.term -> bool
 
   val conv_global :
     ?system:SE.context ->
-    ?param:red_param ->
+    ?param:red_param -> 
     t ->
     Equiv.form -> Equiv.form -> bool
 
   val conv_kind :
     ?system:SE.context ->
-    ?param:red_param ->
+    ?param:red_param -> ?concrete:bool -> 
     t -> 'a Equiv.f_kind ->
     'a -> 'a -> bool
 

@@ -250,7 +250,7 @@ type ct_memo = {
 let mk_ct_memo table : ct_memo = 
   let system = SystemExpr.context_any in
   let red_param = Reduction.rp_default in
-  let cstate = Reduction.mk_state0 ~system table ~red_param in
+  let cstate = Reduction.mk_state0 ~system table ~red_param ~concrete:true in
   { cstate; memo = Mt.empty; }
 
 (** Box a term. 

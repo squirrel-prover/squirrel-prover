@@ -511,17 +511,22 @@ module TraceHyps = Mk(struct
   end)
 
 
-let get_models ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
+let get_models
+    ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
+    ~(concrete:bool)
+    ?(red_fun : Term.term -> Term.term  = fun x -> x)
     (table : Symbols.table)
     ?(timeout=TConfig.solver_timeout table)
     ?(system : 'a SE.expr option = None)     
     (hyps : TraceHyps.hyps) =
-    let proof_context = 
+  let proof_context =
     TraceHyps.fold (fun id f acc ->
         match f, system with
-        | LHyp (Local f), _
-        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = _}))), _ -> f :: acc
-        (*TODO:Concrete : Make sure it is right*)
+        | LHyp (Local f), _ -> f :: acc
+        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = None}))),_
+          when not concrete -> f :: acc
+        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = Some b}))),_ ->
+          if Real.is_zero table (red_fun b) then f::acc else acc
         | LHyp (Global _), _ -> acc
         | LDef (se, f), Some system when SE.equal table se system ->
           let f = Term.mk_eq f (Term.mk_var (Vars.mk id (Term.ty f))) in
@@ -538,38 +543,36 @@ let get_models ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
 
-let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
+let get_atoms_of_hyps
+    ~concrete
+    (t : Symbols.table )
+    (hyps : TraceHyps.hyps) : Term.Lit.literals =
   TraceHyps.fold_hyps (fun _ f acc ->
       match f with
-      | Local f
-      | Global Equiv.(Atom (Reach {formula = f; bound = None})) ->
+      | Local f -> Term.Lit.form_to_literals f @ acc
+      | Global Equiv.(Atom (Reach {formula = f; bound = None})) when not concrete ->
         Term.Lit.form_to_literals f @ acc
-      | Global _ -> acc
-    ) hyps []
+      | Global Equiv.(Atom (Reach {formula = f; bound = Some b}))  ->
+        if Real.is_zero  t b then
+          Term.Lit.form_to_literals f @ acc else acc
+      | _ -> acc
+    ) hyps [] 
 
-
-let get_message_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
-  let do1 (at : Term.Lit.literal) : Term.Lit.xatom option =
-    match Term.Lit.ty at with
-    | Type.Timestamp | Type.Index -> None
-    | _ ->
-      (* FIXME: move simplifications elsewhere *)
-      match at with 
-      | `Pos, (Comp _ as at)       -> Some at
-      | `Neg, (Comp (`Eq, t1, t2)) -> Some (Comp (`Neq, t1, t2))
-      | _ -> None
-  in
-  List.filter_map do1 (get_atoms_of_hyps hyps)
-
-let get_trace_literals (hyps : TraceHyps.hyps) : Term.Lit.literals =
+let get_trace_literals
+    ~concrete
+    (t : Symbols.table )
+    (hyps : TraceHyps.hyps) : Term.Lit.literals =
   let do1 (lit : Term.Lit.literal) : Term.Lit.literal option =
     match Term.Lit.ty lit with 
     | Type.Index | Type.Timestamp -> Some lit
     | _ -> None
   in
-  List.filter_map do1 (get_atoms_of_hyps hyps)
+  List.filter_map do1 (get_atoms_of_hyps ~concrete t hyps)
 
-let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
+let get_eq_atoms
+    ~concrete
+    (t : Symbols.table )
+    (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
   let do1 (lit : Term.Lit.literal) : Term.Lit.xatom option =
     match lit with 
     | `Pos, (Comp ((`Eq | `Neq), _, _) as at) -> Some at
@@ -579,10 +582,10 @@ let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
 
     | `Pos, Atom f -> Some (Comp (`Eq,  f, Term.mk_true))
     | `Neg, Atom f -> Some (Comp (`Neq, f, Term.mk_true))
-                        
+
     | _ -> None
   in
-  List.filter_map do1 (get_atoms_of_hyps hyps)
+  List.filter_map do1 (get_atoms_of_hyps ~concrete t  hyps)
 
 (*------------------------------------------------------------------*) 
 (** {2 Changing the context of a set of hypotheses} *)

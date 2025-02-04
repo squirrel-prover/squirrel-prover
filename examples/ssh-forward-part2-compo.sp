@@ -467,7 +467,6 @@ Proof.
        use S_charac => //.
        - depends Sok, Sfail => // _.
          by apply exec_le Sfail. 
-       - rewrite /exec // in Hfail. 
      }
      by rewrite if_false in 17.
 
@@ -479,7 +478,6 @@ Proof.
       use P_charac; try auto.
       - depends PDIS5, Pfail => // _.
         by apply exec_le Pfail.
-       - rewrite /exec // in Hfail.
   }
   by rewrite if_false in 17.
 Qed.

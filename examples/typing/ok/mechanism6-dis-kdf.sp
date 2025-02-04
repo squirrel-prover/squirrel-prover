@@ -37,7 +37,7 @@ abstract idD : index -> message.
 (* tags *)
 abstract tag1: message. 
 abstract tag2: message.
-axiom[any] cst_diff1 : tag1 <> tag2.
+axiom[any] cst_diff1 : tag1 <> tag2 <: Real.z.
 hint rewrite cst_diff1.
 
 

@@ -69,7 +69,8 @@ PROVER_EXAMPLES =\
   $(wildcard examples/typing/ok/*.sp)           \
   $(wildcard examples/typing/ko/*.sp)           \
   $(wildcard examples/crypto-usenix-26/*.sp)    \
-  $(wildcard examples/crypto-usenix-26/foo/*.sp)    
+  $(wildcard examples/crypto-usenix-26/foo/*.sp)\
+  $(wildcard examples/concrete/*.sp)
 
 # Check if why3 is installed before adding the smt case studies
 
@@ -103,7 +104,7 @@ bench_preamble:
 
 # Populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 tac_count_examples: squirrel
-	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp and examples/crypto/*.sp ."
+	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp, examples/crypto/*.sp and examples/concrete/*.sp."
 	@for example in $(PROVER_EXAMPLES); do \
 		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
 		mkdir -p `dirname $${stat_name}`;\
@@ -120,7 +121,7 @@ tac_count_examples: squirrel
 # README → /usr/bin/time is not always installed by default in your OS !
 # In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
-	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp and examples/crypto/*.sp."
+	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp, examples/postQuantumKE/*.sp, examples/crypto/*.sp and examples/concrete/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for example in $(PROVER_EXAMPLES); do \
@@ -176,7 +177,7 @@ $(BENCHDIR)/all/last.json:
 example: squirrel
 	@rm -rf `$(RUNLOGDIR)/examples` tests/tests.ko
 	@$(ECHO) "================== EXAMPLES ======================"
-	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp,  examples/postQuantumKE/*.sp and examples/crypto/*.sp."
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/basic-tutorial/*.sp, examples/stateful/*.sp,  examples/postQuantumKE/*.sp, examples/crypto/*.sp and examples/concrete/*.sp."
 	@$(MAKE) -j4 examples_end
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.

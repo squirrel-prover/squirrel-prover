@@ -26,7 +26,7 @@ abstract toG : message -> G.
 abstract agent : index -> message.
 
 axiom [any] agent_inj (A, B:index) :
-  (agent(A) = agent(B)) = (A = B).
+  (agent(A) = agent(B)) = (A = B) <: Real.z.
 hint rewrite agent_inj.
 
 abstract tag1:message.
@@ -97,6 +97,7 @@ system default = protocol.
 
 (*------------------------------------------------------------------*)
 include Core.
+include Real.
 
 abstract Some : message -> message.
 abstract None : message.

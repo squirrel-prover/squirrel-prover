@@ -39,15 +39,19 @@ let soft_failure = Tactics.soft_failure
 (** Returns the list of factors of t for the given multiplication
     (if mult = none then t is its own only factor)
     (unfolds the macros when possible) *)
-let rec factors (mult:Symbols.fname option) (info:O.expand_info)
-    (t:term) : (term list) =
+let rec factors
+    ~(concrete:bool)
+    (mult:Symbols.fname option) (info:O.expand_info)
+    (t:term)
+  : (term list)
+  =
   match t with
   | App (Fun (f, _), [t1; t2]) when mult = Some f ->
-    factors mult info t1 @ factors mult info t2
+    factors ~concrete mult info t1 @ factors ~concrete mult info t2
   | Macro _ ->
     begin
       match O.expand_macro_check_once info t with
-      | Some t' -> factors mult info t'
+      | Some t' -> factors ~concrete mult info t'
       | None -> [t]
     end
   | _ -> [t]
@@ -57,19 +61,20 @@ let rec factors (mult:Symbols.fname option) (info:O.expand_info)
     and m is not itself an exponential.
     (unfolds the macros when possible) *) 
 let rec powers
+    ~concrete
     (exp : Symbols.fname) (mult : Symbols.fname option)
     (info : O.expand_info)
     (t : term) : term * (term list) 
   =
   match t with
   | App (Fun (f, _), [t1; t2]) when f = exp ->
-    let (m, ps) = powers exp mult info t1 in
-    let fs = factors mult info t2 in
+    let (m, ps) = powers ~concrete exp mult info t1 in
+    let fs = factors ~concrete mult info t2 in
     (m, ps@fs)
   | Macro _ ->
     begin
       match O.expand_macro_check_once info t with
-      | Some t' -> powers exp mult info t'
+      | Some t' -> powers ~concrete exp mult info t'
       | None -> (t, [])
     end
   | _ -> (t, [])
@@ -106,6 +111,7 @@ let partition_powers
     Otherwise, gives up, and asks [occurrence_goals] to be called
     again on subterms. *)
 let get_bad_occs
+    ~(concrete:bool)
     (gdh_oracles : bool) (g : term) (exp : Symbols.fname) 
     (mult : Symbols.fname option)
     (nab : Name.t list) 
@@ -158,7 +164,7 @@ let get_bad_occs
     occs1 @ occs2
 
   | App (Fun (f, _), _) when f = exp ->
-    let (m, pows) = powers exp mult (O.get_expand_info info) t in
+    let (m, pows) = powers ~concrete exp mult (O.get_expand_info info) t in
     (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
     get_illegal_powers m pows info
 
@@ -168,8 +174,9 @@ let get_bad_occs
        Then we recurse on the rest, using illegal powers
        so we don't need to reconstruct the term.
        Also recurse on the args of the n that was dropped, if any *)
-    let (u, pows) = powers exp mult (O.get_expand_info info) t1 in
-    let (v, qows) = powers exp mult (O.get_expand_info info) t2 in
+    let einfo = O.get_expand_info info in
+    let (u, pows) = powers ~concrete exp mult einfo t1 in
+    let (v, qows) = powers ~concrete exp mult einfo t2 in
     let (bad_pows, other_pows) = partition_powers nab pows in
     let (bad_qows, other_qows) = partition_powers nab qows in
     let bad_pows_minus_1 = List.drop_right 1 bad_pows in
@@ -225,7 +232,8 @@ let has_cgdh
     (if true) assumption. *)
 let dh_param
     ~(hyp_loc    : L.t)
-    (gdh_oracles : bool)
+    ~(gdh_oracles: bool)
+    ~(concrete   : bool)
     (context     : ProofContext.t)
     (hyp         : term)
     (g           : Symbols.p_path)
@@ -261,8 +269,8 @@ let dh_param
                 (Tactics.Failure
                    "can only be applied on an equality hypothesis")
   in
-  let (u, pows) = powers exp_n mult_n einfo m1 in
-  let (v, qows) = powers exp_n mult_n einfo m2 in
+  let (u, pows) = powers ~concrete exp_n mult_n einfo m1 in
+  let (v, qows) = powers ~concrete exp_n mult_n einfo m2 in
 
   let (t, a, b) = match (u,pows,v,qows) with
     | (_, _, _, [Name _ as n1; Name _ as n2]) when v = gen ->
@@ -284,7 +292,8 @@ let dh_param
     returns the list of new proof obligations, i.e. with the added
     hyp that there is a collision. *) 
 let cgdh
-    (gdh_oracles : bool)
+    ~(concrete:bool)
+    ~(gdh_oracles : bool)
     (m : lsymb)
     (g : Symbols.p_path)
     (s : sequent)
@@ -294,13 +303,18 @@ let cgdh
   if TConfig.post_quantum_equivs (TS.table s) then
     soft_failure Tactics.TacticNotPQSound;
 
+  (* FEAT: concrete logic for trace *)
+  if concrete then
+    soft_failure
+      (Tactics.GoalBadShape "concrete logic not yet implemented");
+
   let ppe = default_ppe ~table:(TS.table s) () in
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
   let context = TS.proof_context s in
 
   let (gen, exp_s, mult_s, t, na, nb) =
-    dh_param ~hyp_loc:(L.loc m) gdh_oracles context hyp g s
+    dh_param ~concrete ~hyp_loc:(L.loc m) ~gdh_oracles context hyp g s
   in
   let pp_nab =
     fun ppf () -> 
@@ -308,11 +322,11 @@ let cgdh
         (Name.pp ppe) na (Name.pp ppe) nb
   in
   let get_bad : NOS.f_fold_occs =
-    get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]
+    get_bad_occs ~concrete gdh_oracles gen exp_s mult_s [na; nb]
   in
 
   let occs =
-    NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_nab)
+    NOS.find_all_occurrences ~concrete ~mode:PTimeNoSI ~pp_descr:(Some pp_nab)
       get_bad
       context [t]
   in
@@ -327,8 +341,10 @@ let cgdh
 
 (*------------------------------------------------------------------*)
 let cdh_tac args s =
+  let concrete = TS.concrete s in
   match args with
-  | [Args.DH (CDH { hyp; gen; })] -> wrap_fail (cgdh false hyp gen) s
+  | [Args.DH (CDH { hyp; gen; })] ->
+    wrap_fail (cgdh ~concrete ~gdh_oracles:false hyp gen) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
@@ -338,8 +354,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 let gdh_tac args s =
+  let concrete = TS.concrete s in
   match args with
-  | [Args.DH (GDH { hyp; gen; })] -> wrap_fail (cgdh true hyp gen) s
+  | [Args.DH (GDH { hyp; gen; })] ->
+    wrap_fail (cgdh ~concrete ~gdh_oracles:true hyp gen) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)

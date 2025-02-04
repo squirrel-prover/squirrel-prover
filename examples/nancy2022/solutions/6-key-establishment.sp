@@ -54,7 +54,7 @@ abstract eta : message.
 
 (* We assume that this constant has the same length than all names, 
    in particular sk.  *)
-axiom [any] len_sk : len(sk) = len(eta).
+axiom [any] len_sk : len(sk) = len(eta) <: Real.z.
 hint rewrite len_sk.
 
 (* ------------------------------------------------------------------- *)

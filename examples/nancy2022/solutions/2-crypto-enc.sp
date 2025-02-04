@@ -48,8 +48,8 @@ abstract b : message.
 abstract eta : message.
 
 (* We then assume that this constant is the length of `a` and `b`. *)
-axiom [any] len_a : len(a) = eta.
-axiom [any] len_b : len(b) = eta.
+axiom [any] len_a : len(a) = eta <: Real.z.
+axiom [any] len_b : len(b) = eta <: Real.z.
 hint rewrite len_a.
 hint rewrite len_b.
 

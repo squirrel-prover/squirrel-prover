@@ -169,13 +169,20 @@ type context = {
   table : Symbols.table;
   system : SystemExpr.fset option;
 
+  real_export : Why3.Theory.namespace;
   int_export : Why3.Theory.namespace;
+  from_int_export : Why3.Theory.namespace;
   tm_export : Why3.Theory.namespace;
 
   int_leq_symb : Why3.Term.lsymbol;
   int_geq_symb : Why3.Term.lsymbol;
   int_lt_symb : Why3.Term.lsymbol;
   int_gt_symb : Why3.Term.lsymbol;
+
+  real_leq_symb : Why3.Term.lsymbol;
+  real_geq_symb : Why3.Term.lsymbol;
+  real_lt_symb : Why3.Term.lsymbol;
+  real_gt_symb : Why3.Term.lsymbol;
 
   leq_symb : Why3.Term.lsymbol;
   happens_symb : Why3.Term.lsymbol;
@@ -187,6 +194,7 @@ type context = {
   ts_ty : Why3.Ty.ty;
   index_ty : Why3.Ty.ty;
   int_ty : Why3.Ty.ty;
+  real_ty : Why3.Ty.ty;
 
   vars : Vars.var list;
 
@@ -217,16 +225,28 @@ let id_fresh context name =
 exception InternalError
 
 let context_init ~poly tm_theory evars sqenv table system =
-  let int_theory = try
-      Why3.Env.read_theory env ["int"] (String.capitalize_ascii "int")
+  let int_theory, real_theory, from_int_theory =
+    try
+      let int_theory = 
+        Why3.Env.read_theory env ["int"] "Int"
+      in
+      let real_theory = 
+        Why3.Env.read_theory env ["real"] "RealInfix"
+      in
+      let from_int_theory = 
+        Why3.Env.read_theory env ["real"] "FromInt"
+      in
+      (int_theory, real_theory, from_int_theory)
     with
     | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
     | Why3.Env.AmbiguousPath   _ | Why3.Env.TheoryNotFound  _ ->
       Format.printf "SMT: error while loading SMT theory file\n";
       raise InternalError
   in
-  let tm_export = tm_theory.Why3.Theory.th_export
-  and int_export = int_theory.Why3.Theory.th_export in
+  let tm_export = tm_theory.Why3.Theory.th_export in
+  let int_export = int_theory.Why3.Theory.th_export in
+  let real_export = real_theory.Why3.Theory.th_export in
+  let from_int_export = from_int_theory.Why3.Theory.th_export in
   let index_symb = Why3.Theory.ns_find_ts tm_export ["index"]
   and msg_symb = Why3.Theory.ns_find_ts tm_export ["message"]
   and ts_symb = Why3.Theory.ns_find_ts tm_export ["timestamp"]
@@ -237,6 +257,10 @@ let context_init ~poly tm_theory evars sqenv table system =
         tm_theory
     )
   in
+  theory := Why3.Theory.use_export !theory int_theory; 
+  theory := Why3.Theory.use_export !theory real_theory; 
+  theory := Why3.Theory.use_export !theory from_int_theory; 
+
   let choose_tbl = Hashtbl.create 12 in
   Hashtbl.add choose_tbl 1 [(Why3.Theory.ns_find_ls tm_export ["choose"])];
   {
@@ -245,12 +269,19 @@ let context_init ~poly tm_theory evars sqenv table system =
     system = system;
 
     int_export = int_export;
+    real_export = real_export;
+    from_int_export = from_int_export;
     tm_export = tm_export;
 
     int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
     int_geq_symb = Why3.Theory.ns_find_ls int_export ["infix >="];
     int_lt_symb = Why3.Theory.ns_find_ls int_export ["infix <"];
     int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"];
+
+    real_leq_symb = Why3.Theory.ns_find_ls real_export ["infix <=."];
+    real_geq_symb = Why3.Theory.ns_find_ls real_export ["infix >=."];
+    real_lt_symb = Why3.Theory.ns_find_ls real_export ["infix <."];
+    real_gt_symb = Why3.Theory.ns_find_ls real_export ["infix >."];
 
     leq_symb     = Why3.Theory.ns_find_ls tm_export ["infix <~"];
     happens_symb = Why3.Theory.ns_find_ls tm_export ["happens"];
@@ -262,6 +293,7 @@ let context_init ~poly tm_theory evars sqenv table system =
     ts_ty    = Why3.Ty.ty_app ts_symb [];
     index_ty = Why3.Ty.ty_app index_symb [];
     int_ty = Why3.Ty.ty_app int_symb [];
+    real_ty = Why3.Ty.ty_real;
     vars = evars;
     ty_tbl = Hashtbl.create 12;
     tyvar_tbl = Hashtbl.create 12;
@@ -299,6 +331,10 @@ let rec convert_type context = function
       when Symbols.s_path_to_string (ns,t) = "int" ->
       assert (args=[]);
       context.int_ty
+  | Type.TConstr ((ns,t),args)
+      when Symbols.s_path_to_string (ns,t) = "Real.t" ->
+      assert (args=[]);
+      context.real_ty
   | Type.TConstr ((ns,t),args)
       when Symbols.s_path_to_string (ns,t) = "string" ->
       assert (args=[]);
@@ -478,6 +514,11 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
       begin match symb with
         | _ when symb=f_false -> t_false
         | _ when symb=f_true ->  t_true
+        | _ when (path_to_string symb) = "Real_z" ->
+          let z = Why3.BigInt.of_string  "0" in
+          Why3.Term.t_app_infer 
+            (Why3.Theory.ns_find_ls context.from_int_export ["from_int"]) 
+            [Why3.Term.t_int_const z]
         | _
           when (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> []
             && not context.poly
@@ -578,6 +619,23 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
         | [t1;t2] when symb = f_gt && (Term.ty t1) = Type.tint ->
           t_app_infer
             (context.int_gt_symb)
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
+
+        | [t1;t2] when symb = f_leq && (Term.ty t1) = Type.treal ->
+          t_app_infer
+            (context.real_leq_symb)
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
+        | [t1;t2] when symb = f_geq && (Term.ty t1) = Type.treal ->
+          t_app_infer
+            (context.real_geq_symb)
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
+        | [t1;t2] when symb = f_lt && (Term.ty t1) = Type.treal ->
+          t_app_infer
+            (context.real_lt_symb)
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
+        | [t1;t2] when symb = f_gt && (Term.ty t1) = Type.treal ->
+          t_app_infer
+            (context.real_gt_symb)
             [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
 
         | [cond;f1;f2] when symb=f_ite ->
@@ -901,6 +959,29 @@ let add_functions context =
       ("Int_-","infix -");
       ("Int_*","infix *");
       ("Int_opp","prefix -");
+    ];
+  List.iter
+    (fun (fname,symb) ->
+      Hashtbl.add 
+        context.functions_tbl
+        (fname)
+        (Why3.Theory.ns_find_ls context.real_export [symb],[])
+    )
+    [("Real_+","infix +.");
+      ("Real_-","infix -.");
+      ("Real_*","infix *.");
+      ("Real_opp","prefix -.");
+      ("Real_div","infix /.");
+      ("Real_inv","inv");
+    ];
+  List.iter
+    (fun (fname,symb) ->
+      Hashtbl.add 
+        context.functions_tbl
+        (fname)
+        (Why3.Theory.ns_find_ls context.from_int_export [symb],[])
+    )
+    [("Real_of_int","from_int");
     ]
 
 
@@ -1533,8 +1614,11 @@ let add_hint context system hint =
         (sqterm_to_wfmla context hint.Hint.formula.Equiv.formula)
         (id_fresh context name);
   end
-let build_task ~macro_axioms ~poly ~hint_tables env table system
-    evars hypotheses hints conclusion tm_theory =
+let build_task
+    ~macro_axioms ~poly ~exact ~hint_tables
+    (env : Env.t) (table : Symbols.table) (system : SE.t)
+    evars hypotheses hints conclusion tm_theory
+  =
   let system_fset = match SystemExpr.to_fset system with
     | exception SystemExpr.(Error (_,Expected_fset)) -> None
     | fsys -> Some fsys
@@ -1553,10 +1637,16 @@ let build_task ~macro_axioms ~poly ~hint_tables env table system
         (fun hint -> add_hint context system hint)
         (Utils.oget_dflt [] (Utils.Ms.find_opt hint_table hints))
     ) hint_tables;
+  
   if macro_axioms then add_macro_axioms context;
+
   if system_fset<>None then add_timestamp_axioms context;
-  add_name_axioms context;
+
+  (* only add injectivity of names for the asymptotic logic *)
+  if not exact then add_name_axioms context;
+  
   let top_level_var = add_var context in
+  
   (* Converts hypotheses with 'and' at top level to two (or more) hypotheses. *)
   let rec convert_hypotheses hypotheses= match hypotheses with
     | [] -> []
@@ -1604,7 +1694,9 @@ let unique_id =
   fun () -> incr id ; !id
 
 let is_valid
-    ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
+    ~macro_axioms ~timeout ~steps ~provers ~cmd_flag
+    ~(poly : bool) ~(exact : bool) (* [poly] refers to polymorphism *)
+    ~hint_tables
     sqenv table system evars hypotheses hints conclusion
   =
   if disable_smt then
@@ -1617,7 +1709,7 @@ let is_valid
   in
   let task =
     build_task
-      ~poly
+      ~poly ~exact
       ~macro_axioms ~hint_tables
       sqenv table system
       evars hypotheses hints conclusion
@@ -1639,7 +1731,8 @@ let is_valid
 (* Tactic registration. *)
 
 let sequent_is_valid
-    ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
+    ~timeout ~steps ~provers ~cmd_flag
+    ~poly ~exact ~hint_tables
     (s:TraceSequent.t)
   =
   let env = TraceSequent.env s in
@@ -1650,8 +1743,13 @@ let sequent_is_valid
     List.filter_map
       (function
         | _, Hyps.LHyp (Equiv.Local h) -> Some h
-        | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = None})))
-          -> Some f
+
+        | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = None}))) ->
+          if exact then None else Some f
+
+        | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = Some b}))) ->
+          if Real.is_zero table b then Some f else None
+               
         | id, Hyps.LDef (def_sys, def) ->
           let v = Vars.mk id (Term.ty def) in
           if SE.subset_modulo table system def_sys then begin
@@ -1666,13 +1764,12 @@ let sequent_is_valid
             raise InternalError
         | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
-  and hints = Hint.get_smt_db table
-  in
+  and hints = Hint.get_smt_db table in
   let conclusion = LowTraceSequent.conclusion s in
-  try is_valid ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
+  is_valid
+    ~timeout ~steps ~provers ~cmd_flag
+    ~poly ~exact ~hint_tables
     env table system evars hypotheses hints conclusion
-  with
-  | e -> raise e
 
 type parameters = {
   timeout : int;
@@ -1773,10 +1870,11 @@ let parse_arg parameters = let open TacticsArgs in function
 let parse_args args table =
   List.fold_left parse_arg (default_parameters table) args
 
+(*------------------------------------------------------------------*)
 let () =
   if not disable_smt then
     ProverTactics.register_general "smt"
-      (fun args s sk fk ->
+      (fun args (s : Goal.t) sk fk ->
           let args = match args with
             | [Named_args_gen args] -> args
             | _ -> assert false
@@ -1786,22 +1884,35 @@ let () =
               Tactics.(hard_failure (Failure "SMT not available"))
             | Goal.Local s -> s
           in
+          let table = (TraceSequent.env s).table in
           let {timeout;steps;
               provers;macro_axioms;poly;hint_tables} =
-            parse_args args ((TraceSequent.env s).table)
+            parse_args args table
           in
           let cmd_flag = match provers with
             | ["CVC5",_] -> "--enum-inst"
             | _ -> ""
-          in if
+          in
+          let exact =
+            match TraceSequent.bound s with
+            | ReachAsym -> false
+            | ReachConc t ->
+              if not (Real.is_zero table t) then
+                Tactics.hard_failure
+                  (Failure "concrete SMT requires a zero bound");
+              true;
+            | Glob -> assert false
+          in
+          if
             sequent_is_valid
               ~macro_axioms ~timeout
-              ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+              ~steps ~provers ~cmd_flag ~poly ~exact ~hint_tables s
           then
             sk [] fk
           else
             fk (None, Tactics.Failure "SMT cannot prove sequent"))
 
+(*------------------------------------------------------------------*)
 let () =
   let provers = match Sys.getenv_opt "SMT_PROVERS" with
     | None -> ["CVC5",""]
@@ -1840,13 +1951,15 @@ let () =
     let cmd_flag = if cmd_flag="" then cmd_flag else "_" ^ cmd_flag in
     Format.sprintf "SMT_%s%s%s" prover alt cmd_flag
   in
-  let sequent_is_valid = sequent_is_valid ~macro_axioms:true in
+  let sequent_is_valid =
+    sequent_is_valid ~macro_axioms:true 
+  in
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
             TraceSequent.register_query_alternative
               (bench_name prover alt "")
-              (fun ~system:_ ~precise:_ s q ->
+              (fun ~system:_ ~precise:_ ~concrete s q ->
                   let s =
                     match q with
                     | None -> s
@@ -1860,6 +1973,7 @@ let () =
                     ~provers:[prover,alt]
                     ~cmd_flag:""
                     ~poly:poly
+                    ~exact:concrete
                     ~hint_tables:[]
                     s))
       provers;
@@ -1876,6 +1990,7 @@ let () =
                     ~provers:[prover,alt]
                     ~cmd_flag:cmd_flag
                     ~poly:poly
+                    ~exact:(LowTraceSequent.concrete s)
                     ~hint_tables:[]
                     s,
                   None);
@@ -1903,6 +2018,7 @@ let () =
                       ~provers:[prover,alt]
                       ~cmd_flag:""
                       ~poly:poly
+                      ~exact:(LowTraceSequent.concrete s)
                       ~hint_tables:[]
                       s))
       provers
