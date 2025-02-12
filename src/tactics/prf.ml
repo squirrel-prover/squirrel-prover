@@ -10,6 +10,7 @@ module SE = SystemExpr
 module ES = EquivSequent
 module LT = LowTactics
 module T = ProverTactics
+module CP = ComputePredicates
 
 type sequent = ES.sequent
 
@@ -570,17 +571,147 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   tag_f @ tracegoals @ [equiv_sequent]
 
 
+
+
+(*----*)
+(* attempt at deduction prf without rewriting everything *)
+
+(** In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
+   or [v] as [v1, th, v2] (depending on [side]), where [th] is the [i]-th
+   element. Fails if that element is not a a hash.
+   Returns the sequent with an updated conclusion [u1, n, u2 *> v] or
+   [u *> v1, n, v2], where [n] is a freshly generated name;
+   as well as all proof obligations required by [prf].
+   This is done by creating a sequent with conclusion
+   [equiv(diff(th, n_PRF), w)] (where [w] is [u1, u2, v] or [u, v1, v2]),
+   calling the [prf] equivalence tactic, and keeping only the 
+   proof obligations from the goals it generates 
+   (ie not the remaining equivalence). 
+   Since the equivalence can only be over a single system, does this once 
+   per system in S, and gathers all resulting obligations. *)
+let prf_secrecy ~(side:CP.side) (i:int L.located) (s:sequent) : sequent list =
+  let loc = L.loc i in
+  let table = ES.table s in
+  
+  (* get the components of the secrecy predicate, incl. the system *)
+  let sgoal = ES.conclusion_as_computability s in
+  
+  let system = CP.system sgoal in
+  if not (SE.is_fset system) then
+    soft_failure (Failure "the conclusion must be over a concrete system");
+  let system = SE.to_fset system in
+  
+
+  (* get the hash th, and the remaining terms w *)
+  let ii = L.unloc i in
+  let ts = CP.terms ~side sgoal in 
+  let rs = CP.terms ~side:(CP.other side) sgoal in
+  let t1, th, t2 =
+    try List.splitat ii ts
+    with 
+    | List.Out_of_range ->
+      soft_failure ~loc
+        (Tactics.Failure 
+           ("invalid position "^(string_of_int ii)^" in the conclusion"));
+  in
+  let w = 
+    match side with
+    | CP.Left -> t1 @ t2 @ rs
+    | CP.Right -> rs @ t1 @ t2
+  in
+
+  (* check that the term th is indeed a hash, extract types *)
+  let hty =
+    match th with
+    | Term.App (Fun (hash_f, hty), [Tuple [_; Name _]])
+      when is_hash table hash_f -> hty.fty.fty_out
+    | _ -> soft_failure ~loc
+             (Tactics.Failure ("element "^(string_of_int ii)^" is not a hash"))
+  in
+  
+  (* generate a new name n_PRF to replace the hash with *)
+  let n_fty = Type.mk_ftype [] [] hty in
+  let nprfdef = Symbols.Name {n_fty} in
+  let sn_prf = L.mk_loc L._dummy "n_PRF" in
+  let table, nprfs =
+    Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
+  in
+  let table = Process.add_namelength_axiom table nprfs n_fty in
+  let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
+
+  (* update the sequent's table *)
+  let s = ES.set_table table s in
+  
+  (* get all single systems in the predicate's set *)
+  let single_systems =
+    match SE.to_list_any system with
+    | Some l -> l
+    | None -> soft_failure ~loc
+                (Tactics.Failure
+                   "the system in the conclusion must be explicit")
+  in
+  
+  (* for each single system, generate an equivalence goal, and call prf *)
+  let prf_subgoals =
+    List.concat_map
+      (fun (proj, sys) ->
+         (* project all terms *)
+         let wp = List.map (Term.project1 proj) w in
+         let thp = Term.project1 proj th in
+         (* generate the equivalence goal with the correct pair *)
+         let oldsystem = ES.system s in
+         let pair =
+           SE.make_pair (Projection.left, sys) (Projection.right, sys)
+         in
+         let newsystem = {oldsystem with pair=Some pair} in
+         let eq_goal =
+           Equiv.mk_equiv_atom
+             ((Term.mk_diff [Projection.left, thp;
+                            Projection.right, Name.to_term nprf]) :: wp)
+         in
+         let eq_seq = ES.set_conclusion_in_context newsystem eq_goal s in
+         (* call prf, then keep only the proof obligations *)
+         let zero = L.mk_loc L._dummy 0 in
+         let subgoals = prf zero (Some thp) eq_seq in
+         List.filter (fun x -> not (ES.conclusion_is_equiv x)) subgoals)
+      single_systems
+  in
+
+  (* construct the updated sequent *)
+  let new_sgoal = 
+    CP.update_terms ~side (t1 @ [Name.to_term nprf] @ t2) sgoal 
+  in
+  prf_subgoals @ [ES.set_conclusion (CP.to_global new_sgoal) s]
+
+
+
+
+
 (*------------------------------------------------------------------*)
-let prf_tac arg =
-  match arg with
-  | Args.(Pair (Int i, Opt (Message, p))) ->
-    (match p with
-     | None -> prf i None
-     | Some (Message (p, _)) -> prf i (Some p))
-  | _ -> assert false
+let prf_global_tac arg : LowTactics.pure_efun =
+    (fun s ->
+       let table = ES.table s in
+       let i, p =
+         match arg with
+         | Args.(Pair (Int i, Opt (Message, p))) ->
+           let p = omap (function | (Args.Message (p, _)) -> p) p in
+           (i, p)
+         | _ -> LT.bad_args ()
+       in 
+       if ES.conclusion_is_equiv s then      
+         prf i p s
+       else if
+         ES.conclusion_is_computability s &&
+         CP.kind table (ES.conclusion_as_computability s) = CP.NotDeduce &&
+         p = None
+       then
+         prf_secrecy ~side:CP.Right i s
+           (* todo add the side as an argument *)
+       else
+         LT.bad_args ())
 
 
 let () =
   T.register_typed "prf"
-    (LT.genfun_of_pure_efun_arg prf_tac)
-    Args.(Pair (Int, Opt Message))
+    (LT.genfun_of_pure_efun_arg prf_global_tac)
+    (Args.(Pair (Int, Opt Message)))
