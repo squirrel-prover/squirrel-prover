@@ -1,4 +1,14 @@
 include Core.
+
+abstract t : int -> message.
+axiom [any] t12 : t(12) = t(13).
+
+lemma [any] _ : t(12) = t(13).
+Proof.
+simpl.
+rewrite t12 //=.
+Qed.
+
 include Int.
 open Int.
 

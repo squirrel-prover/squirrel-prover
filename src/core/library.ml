@@ -58,7 +58,10 @@ end
 module Int = struct
   (* namespace path *)
   let int_p = ["Int"]
- 
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], "Int") table
+
   let check_load table =
     if not (Symbols.Import.mem_sp ([],"Int") table) then
       Tactics.hard_failure (Failure "theory Int is not loaded")

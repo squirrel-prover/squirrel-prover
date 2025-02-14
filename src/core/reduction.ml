@@ -441,7 +441,7 @@ module Core (* : ReductionCore.S *) = struct
       ~mode:st.expand_context st.table st.system st.hyps t
 
   and reduce_builtin1 (st : state) (t : Term.t) : Term.t * head_has_red =
-    if not st.red_param.builtin then t, False
+    if not (st.red_param.builtin && Library.Int.is_loaded st.table) then t, False
     else
       let open Library.Int in
       let table = st.table in

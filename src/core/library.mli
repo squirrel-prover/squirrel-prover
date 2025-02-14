@@ -27,6 +27,7 @@ end
 
 (*------------------------------------------------------------------*)
 module Int : sig
+  val is_loaded : Symbols.table -> bool
   val check_load : Symbols.table -> unit
   val get_fsymb  : Symbols.table -> string -> Symbols.fname
   val get_btype  : Symbols.table -> string -> Symbols.btype
