@@ -181,7 +181,80 @@ let get_bad_occs
 
 
 (*------------------------------------------------------------------*)
-(** PRF tactic *)
+(** PRF tactic parameters *)
+
+(** Find the first hash in the given term
+    (not under binders, does not unfold macros) *)
+let find_hash_no_pattern
+    ?(loc:L.t option)
+    ~(table:Symbols.table) 
+    (t:Term.term) : Term.term =
+  let rec find t =
+    match t with
+    | App (Fun (f,_), [Tuple [_; _]]) when is_hash table f -> Some t
+    | _ when is_binder t -> None
+    |_ -> Term.tfold
+            (fun t' op -> 
+               if op = None then find t' else op)
+            t
+            None
+  in
+  match find t with 
+  | None -> soft_failure ?loc (Failure "no hash found");
+  | Some t -> t
+
+
+(** Finds an instance of pattern [pat] in term [t]
+    (* mostly copied from [generalize1] in LowTactics *) 
+    (* TO DO: avoid code duplication *) *)
+let find_hash_pattern 
+    ?(loc : L.t option)
+    ?(ienv : Infer.env option)
+    ~(env : Env.t)
+    (pat : Term.term) 
+    (t : Term.term) :
+  Term.term =
+
+  (* are there any _ in [pat]? *)
+  let no_term_holes = Sv.for_all (not -| Vars.is_hole) (Term.fv pat) in
+  let ty_subst_opt =
+    obind
+      (fun ienv ->
+         match Infer.close env ienv with
+         | Infer.Closed s -> Some s
+         | _ -> None)
+      ienv
+  in
+  (* If there are no term holes and type holes can be inferred, we
+         are done. *)
+  if no_term_holes && ty_subst_opt <> None then
+    Term.gsubst (oget ty_subst_opt) pat
+      
+  (* Otherwise, try to infer term and type variables by matching in t *)
+  else
+    let target = Equiv.Local t in
+    let occurrences =
+      HighTacticsArgs.occurrences_of_pat ~concrete:false ?ienv env pat ~target
+    in
+    if occurrences = [] then
+      soft_failure ?loc (Failure "no occurrence of the pattern found");
+    List.hd occurrences
+
+
+(** Finds a hash on which to apply prf in the given term,
+    using the pattern if one is provided. *)
+let find_hash
+  ?(loc : L.t option)
+  ~(env : Env.t) 
+  ~(table : Symbols.table)
+  ?(opat : (Term.term * L.t option * Infer.env option) option)
+  (t : Term.term) :
+  Term.term =
+  match opat with 
+  | Some (p, _, ienv) -> find_hash_pattern ?loc ?ienv ~env p t
+  | None -> find_hash_no_pattern ?loc ~table t
+
+
 
 (** parameters for the prf tactic *)
 type prf_param = { (* info on the h(m,k) we want to apply prf to *)
@@ -260,41 +333,28 @@ let project_conditions
 
 
 
-(** Finds the first hash in the term
-    (not under binders, does not unfold macros) *)
-let rec find_hash (table:Symbols.table) (t:Term.term) : Term.term option =
-  match t with
-  | App (Fun (f,_), [Tuple [_; _]]) when is_hash table f -> Some t
-  | _ when is_binder t -> None
-  |_ -> Term.tfold
-          (fun t' op -> if op = None then find_hash table t' else op)
-          t
-          None
-
-
-(** Finds the parameters of the prf application when a pattern selecting the
-    hash to use is specified
-    (the pattern is in fact a term, as it gets instantiated before
-    it's given to the tactic)
-    Fails if the pattern given is not a hash *)
-let prf_param_pattern
+(** Finds the parameters of the prf application, optionally using a pattern *)
+let prf_param
     ~(loc:L.t)
+    ?(opat : (Term.term * L.t option * Infer.env option) option)
     (t:Term.term)    (* element in the goal where we want to apply prf *)
-    (p:Term.term)    (* (supposedly) the hash to use *)
     (s:sequent)    
   : prf_param
   = 
   let table = ES.table s in
   let sys = ES.get_system_pair s in
+  let env = ES.env s in
 
-  (* check that the pattern p is indeed a hash, extract the msg and key *)
+  let p = find_hash ~loc ?opat ~table ~env t in
+
+  (* check that p is indeed a hash, extract the msg and key *)
   let hash_f, hty, m, k =
     match p with
     | Term.App (Fun (hash_f, hty), [Tuple [m; k]])
       when is_hash table hash_f ->
       hash_f, hty.fty.fty_out, m, k
     | _ -> soft_failure ~loc
-             (Tactics.Failure "the pattern given to prf is not a hash")
+             (Tactics.Failure "prf only applies to hashes")
   in
 
   (* generate a new name n_PRF to replace the hash with *)
@@ -328,27 +388,8 @@ let prf_param_pattern
    pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table}
 
 
-(** Finds the parameters of the prf application *)
-let prf_param
-    ~(loc:L.t)
-    (t:Term.term)    (* element in the goal where we want to apply prf *)
-    (op:Term.term option) (* optional: the hash we want to replace *)
-    (s:sequent)
-  : prf_param
-  = 
-  let table = ES.table s in
-  let p =
-    match op with
-    | Some p -> p (* use the given pattern *)
-    | None ->
-      match find_hash table t with
-      | Some p -> p (* find some hash in the term *)
-      | None -> (* no usable hash in the term *)
-        soft_failure ~loc (Tactics.Failure "no hash found")    
-  in
-  prf_param_pattern ~loc t p s
-
-
+(*------------------------------------------------------------------*)
+(** PRF formula *)
 
 (** Constructs the formula expressing that in the proj
     of (the biframe + the context cc_nprf, the message m, the key k):
@@ -430,9 +471,16 @@ let phi_proj
   phi
 
 
+
+
 (*------------------------------------------------------------------*)
 (** The PRF tactic *)
-let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
+
+(** PRF on an equivalence goal *)
+let prf_equiv
+    (i:int L.located)
+    ?(opat : (Term.term * L.t option * Infer.env option) option)
+    (s:sequent) : sequent list =
   let loc = L.loc i in
 
   if not (ES.conclusion_is_equiv s) then 
@@ -458,14 +506,15 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
      cc does not contain diffs or binders above xc.
      (at least the diff part could maybe be relaxed?) *)
   let {pp_hash_f=hash_f; pp_key=k; pp_msg=m;
-       pp_context_nprf=cc_nprf; pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table} =
-    prf_param ~loc e p s
+       pp_context_nprf=cc_nprf; 
+       pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table_nprf} =
+    prf_param ~loc ?opat e s
   in
   (* let context = {context with table=table_nprf} in *)
 
   Printer.pr
     "@[<v 0>Applying PRF to %a@;@;"
-    (Term._pp ppe) (Term.mk_fun table hash_f [Term.mk_tuple [m;k]]);  
+    (Term._pp ppe) (Term.mk_fun table_nprf hash_f [Term.mk_tuple [m;k]]);  
 
   let phi_proj proj () =
     let se = SE.project [proj] system in
@@ -537,8 +586,13 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   in
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
+<<<<<<< HEAD
   let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table s) in
   (* FEAT: concrete logic for equivalences *)
+=======
+  let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table_nprf s) in
+  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+>>>>>>> 5ab28637 (prf tactic for non-deduction goals)
 
 
   (* copied from old prf for the composition stuff *)
@@ -573,9 +627,6 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
 
 
 
-(*----*)
-(* attempt at deduction prf without rewriting everything *)
-
 (** In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
    or [v] as [v1, th, v2] (depending on [side]), where [th] is the [i]-th
    element. Fails if that element is not a a hash.
@@ -589,9 +640,12 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
    (ie not the remaining equivalence). 
    Since the equivalence can only be over a single system, does this once 
    per system in S, and gathers all resulting obligations. *)
-let prf_secrecy ~(side:CP.side) (i:int L.located) (s:sequent) : sequent list =
+let prf_secrecy 
+    ?(side:CP.side option) (i:int L.located) (s:sequent) : sequent list =
   let loc = L.loc i in
   let table = ES.table s in
+
+  let side = oget_dflt CP.Right side in
   
   (* get the components of the secrecy predicate, incl. the system *)
   let sgoal = ES.conclusion_as_computability s in
@@ -637,7 +691,7 @@ let prf_secrecy ~(side:CP.side) (i:int L.located) (s:sequent) : sequent list =
     Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
   in
   let table = Process.add_namelength_axiom table nprfs n_fty in
-  let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
+  let nprf = Name.{symb=Term.nsymb nprfs hty; args=[]} in
 
   (* update the sequent's table *)
   let s = ES.set_table table s in
@@ -672,7 +726,7 @@ let prf_secrecy ~(side:CP.side) (i:int L.located) (s:sequent) : sequent list =
          let eq_seq = ES.set_conclusion_in_context newsystem eq_goal s in
          (* call prf, then keep only the proof obligations *)
          let zero = L.mk_loc L._dummy 0 in
-         let subgoals = prf zero (Some thp) eq_seq in
+         let subgoals = prf_equiv zero eq_seq in
          List.filter (fun x -> not (ES.conclusion_is_equiv x)) subgoals)
       single_systems
   in
@@ -688,30 +742,60 @@ let prf_secrecy ~(side:CP.side) (i:int L.located) (s:sequent) : sequent list =
 
 
 (*------------------------------------------------------------------*)
-let prf_global_tac arg : LowTactics.pure_efun =
-    (fun s ->
-       let table = ES.table s in
-       let i, p =
-         match arg with
-         | Args.(Pair (Int i, Opt (Message, p))) ->
-           let p = omap (function | (Args.Message (p, _)) -> p) p in
-           (i, p)
-         | _ -> LT.bad_args ()
-       in 
-       if ES.conclusion_is_equiv s then      
-         prf i p s
-       else if
-         ES.conclusion_is_computability s &&
-         CP.kind table (ES.conclusion_as_computability s) = CP.NotDeduce &&
-         p = None
-       then
-         prf_secrecy ~side:CP.Right i s
-           (* todo add the side as an argument *)
-       else
-         LT.bad_args ())
+(** Parses the arguments and calls the appropriate version of PRF.
+    TO DO: this is largely copied from fa and generalize… *)
+let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
+  if ES.conclusion_is_equiv s then 
+    match args with 
+    | [TacticsArgs.Prf ([], i, opat)] ->
+      let opat =
+        omap 
+          (fun p ->
+             let ienv = Infer.mk_env () in
+             let cenv = Typing.{env = ES.env s; cntxt = InGoal; } in
+             let a, _ty =
+               Typing.convert ~option:{Typing.Option.default with pat=true}
+                 ~ienv cenv p
+             in
+             (a, Some (L.loc p), Some ienv))
+          opat
+      in
+      prf_equiv i ?opat s
+    | _ -> LowTactics.bad_args ()
+
+  else if ES.conclusion_is_computability s &&
+          CP.kind (ES.table s) (ES.conclusion_as_computability s) 
+          = CP.NotDeduce 
+  then 
+    match args with 
+    | [TacticsArgs.Prf (nargs, i, None)] ->
+      let side =
+        List.fold_left
+          (fun side narg ->
+             match narg with
+             | Args.NArg L.{ pl_loc = loc; pl_desc = "left" } -> 
+               if side = None then 
+                 Some CP.Left
+               else
+                 Tactics.hard_failure ~loc (Failure "incompatible arguments")
+             | Args.NArg L.{ pl_loc = loc; pl_desc = "right" } -> 
+               if side = None then 
+                 Some CP.Right
+               else
+                 Tactics.hard_failure ~loc (Failure "incompatible arguments")
+             | Args.NList (l,_) 
+             | Args.NArg  l     ->
+               Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument"))
+          None
+          nargs 
+      in
+      prf_secrecy ?side i s
+    | _ -> LowTactics.bad_args ()
+
+  else 
+    LowTactics.bad_args ()
 
 
 let () =
-  T.register_typed "prf"
-    (LT.genfun_of_pure_efun_arg prf_global_tac)
-    (Args.(Pair (Int, Opt Message)))
+  T.register_general "prf"
+    (LT.gentac_of_etac_arg (fun x -> LowTactics.wrap_fail (prf_tac x)))

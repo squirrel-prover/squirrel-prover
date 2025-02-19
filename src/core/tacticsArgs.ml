@@ -252,6 +252,8 @@ type parser_arg =
   | Crypto         of named_args * Symbols.p_path * crypto_args
   | Deduce         of named_args * int L.located list option * Typing.pt option
   (** optional target, option hypotheses provided by `with H1` *)
+  | Prf            of named_args * int L.located * Typing.term option
+
 
 type parser_args = parser_arg list
       

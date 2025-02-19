@@ -219,6 +219,7 @@ let rec token buf =
   | "oracle" -> !?ORACLE
   | "out" -> !?OUT
   | "predicate" -> !?PREDICATE
+  | "prf" -> !?PRF
   | "print" -> !?PRINT
   | "process" -> !?PROCESS
   | "prof" -> !?PROF

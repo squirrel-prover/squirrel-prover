@@ -52,7 +52,7 @@
 %token GAME VAR RND RETURN
 %token TIME WHERE WITH WHEN ORACLE EXN
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE PRF
 %token REDUCE SIMPL AUTO
 %token REWRITE PUNCTURE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -1533,6 +1533,13 @@ tac:
   (*------------------------------------------------------------------*)
   | l=lloc(DEDUCE) a=named_args i=slist1(loc(int),COMMA)? w=deduce_with?
     { mk_abstract l "deduce" [TacticsArgs.Deduce (a,i,w)] }
+
+  | l=lloc(PRF) nargs=named_args i=loc(int) COMMA arg=tac_term
+    { mk_abstract l "prf" [TacticsArgs.Prf (nargs,i,Some arg)] }
+
+  | l=lloc(PRF) nargs=named_args i=loc(int)
+    { mk_abstract l "prf" [TacticsArgs.Prf (nargs,i,None)] }
+
 
   (*------------------------------------------------------------------*)
 
