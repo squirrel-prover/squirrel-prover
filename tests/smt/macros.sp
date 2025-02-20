@@ -1,7 +1,9 @@
 channel c
 abstract m : message
 abstract n : message
+abstract f : message -> message
 mutable s : message = m.
+mutable ho : message->message = f.
 
 process A = 
 	s:=m;

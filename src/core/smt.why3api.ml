@@ -65,15 +65,15 @@ let create_call limit_time steps prover config_prover task :
       close_out oc 
     end;
 
-    let limit = match steps with 
-      | None -> { Why3.Call_provers.empty_limit with limit_time = float_of_int limit_time}
-      | Some s -> { Why3.Call_provers.empty_limit with limit_steps = s}
+    let limits = match steps with 
+      | None -> { Why3.Call_provers.empty_limits with limit_time = float_of_int limit_time}
+      | Some s -> { Why3.Call_provers.empty_limits with limit_steps = s}
     in
     Some
       (Why3.Driver.prove_task
         ~config:main
         ~command:config_prover.command
-        ~limit
+        ~limits
         driver
         task)
   with e ->
@@ -191,7 +191,7 @@ type context = {
   actions_tbl : (string, Why3.Term.lsymbol * int) Hashtbl.t;
   vars_tbl : (int,Why3.Term.term) Hashtbl.t;
   functions_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
-  macros_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
+  macros_tbl : (string, Why3.Term.lsymbol * Symbols.macro) Hashtbl.t;
   names_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   unsupp_tbl : (Term.term*(Why3.Term.term list), Why3.Term.lsymbol) Hashtbl.t;
 
@@ -311,7 +311,7 @@ let rec convert_type context ?(decl_fun=false) = function
   | TVar _ -> raise InternalError
   | Fun (t1,t2) -> 
     if decl_fun then raise InternalError else 
-      Why3.Ty.ty_func (convert_type context t1) (convert_type context t2)
+      Why3.Ty.ty_func (convert_type context ~decl_fun:true t1) (convert_type context ~decl_fun:true t2)
   | TUnivar _ as ty->
     Format.printf
       "smt: unsupported argument type %a@."
@@ -336,7 +336,7 @@ let unsupported_term context fmla str =
     Why3.Term.create_fsymbol
       (id_fresh context str)
       (List.map t_type var_list)
-      (convert_type context (Term.ty fmla))
+      (convert_type context ~decl_fun:true (Term.ty fmla))
     in Hashtbl.add context.unsupp_tbl (fmla, var_list) s;
     context.uc := Why3.Theory.add_decl_with_tuples 
       !(context.uc) 
@@ -438,8 +438,8 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
               )
               (t_not @@ ts_equ context 
                 (msg_to_fmla context t2) (msg_to_fmla context t1)
-              ) 
-      (*Je dois peut-être ajouter un test sur les types ici.*)
+              )
+
       | [t1;t2] when symb = f_leq && (convert_type context (Term.ty t1) = context.int_ty)->
         t_app_infer 
           (context.int_leq_symb)
@@ -484,10 +484,14 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> [] ->
         unsupported_term context fmla "unsupp_poly"
       | _ -> 
-        let f = find_fn context symb in 
-        t_app_infer
-          f 
-          (prop_list_to_bool context terms)
+        begin
+          try
+          let f = find_fn context symb in 
+          t_app_infer
+            f 
+            (prop_list_to_bool context terms)
+          with Not_found -> unsupported_term context fmla "unsupp_fun_not_found"
+        end
       end
     | Term.App (_,_) -> unsupported_term context fmla "unsupported_app"
     | Term.Proj (_,_) -> unsupported_term context fmla "unsupported_proj" 
@@ -516,11 +520,11 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   | Macro (ms,l,ts) -> 
     (match l with 
       |[Tuple l_list] ->t_app_infer
-        (Hashtbl.find context.macros_tbl (path_to_string ms.s_symb))
+        (fst(Hashtbl.find context.macros_tbl (path_to_string ms.s_symb)))
         (List.map (msg_to_fmla context) l_list @
         [msg_to_fmla context ts])
       |_ ->t_app_infer
-        (Hashtbl.find context.macros_tbl (path_to_string ms.s_symb))
+        (fst(Hashtbl.find context.macros_tbl (path_to_string ms.s_symb)))
         (List.map (msg_to_fmla context) l @
         [msg_to_fmla context ts])
     )
@@ -709,7 +713,7 @@ let add_macros context =
     let def = Symbols.get_macro_data mn context.table in
     let str = path_to_string mn in
     let indices = match def with
-      | General _ -> 0 (*TODO regarder ce que ça veut dire*)
+      | General _ -> 0 
       | State (i,_,_) -> i
       | Global (i,_,_) -> i
     in
@@ -722,33 +726,37 @@ let add_macros context =
     in
     match str with 
       |"Classic_exec" -> Hashtbl.add context.macros_tbl str 
-                  (context.macro_exec_symb)
+                  (context.macro_exec_symb,mn)
       |"Classic_cond" ->Hashtbl.add context.macros_tbl str 
-                  (context.macro_cond_symb)
+                  (context.macro_cond_symb,mn)
       |"Classic_input" ->Hashtbl.add context.macros_tbl str 
-                  (context.input_symb)
+                  (context.input_symb,mn)
       |"Classic_output" ->Hashtbl.add context.macros_tbl str 
-                  (context.output_symb)
+                  (context.output_symb,mn)
       |"Classic_frame" ->Hashtbl.add context.macros_tbl str
-                  (context.frame_symb)
+                  (context.frame_symb,mn)
       |_ -> 
-        let ty = match def with (*TODO regarder ce que ça veut dire*)
-          | General d ->
-            begin
-              match Macros.get_general_macro_data d with
-              | Structured d ->
-                (* for now, only support recurrence over timestamps *)
-                assert (Type.equal d.rec_ty Type.ttimestamp);
-                convert_type context d.ty
-              | ProtocolMacro (`Output,_) -> convert_type context Type.tmessage
-              | ProtocolMacro (`Cond  ,_) -> convert_type context Type.tboolean
-            end
-              
-          |State(_,t,_) | Global(_,t,_) -> convert_type context t 
-        in
-        Hashtbl.add context.macros_tbl str (symb ty)
+        begin try
+          let ty = match def with 
+            | General d ->
+              begin
+                match Macros.get_general_macro_data d with
+                | Structured d ->
+                  (* for now, only support recurrence over timestamps *)
+                  assert (Type.equal d.rec_ty Type.ttimestamp);
+                  convert_type context d.ty
+                | ProtocolMacro (`Output,_) -> convert_type context Type.tmessage
+                | ProtocolMacro (`Cond  ,_) -> convert_type context Type.tboolean
+              end
+                
+            |State(_,t,_) | Global(_,t,_) -> convert_type ~decl_fun:true context t 
+          in
+          Hashtbl.add context.macros_tbl str (symb ty, mn)
+          with InternalError -> if smt_debug then Format.printf "Cannot declare %s@." str 
+        end
   ) context.table;
-  context.uc:= Hashtbl.fold (fun _ (symb) uc ->
+  Hashtbl.iter (fun s _ -> Format.printf "Macro %s@." s) context.macros_tbl;
+  context.uc:= Hashtbl.fold (fun _ (symb,_) uc ->
     begin try 
       Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb)
     with _ -> uc 
@@ -1142,11 +1150,10 @@ let add_macro_axioms context =
                           t_forall_close !quantified_vars [] ax_cond) ::
                         !macro_axioms;
         
-        Symbols.Macro.iter (fun mn _ ->
-          try
+        Hashtbl.iter (fun _ (_,mn) ->
             let mdef = Symbols.get_macro_data mn context.table in
             let m_str  = path_to_string mn in
-            let m_symb = Hashtbl.find context.macros_tbl m_str in
+            let m_symb = fst(Hashtbl.find context.macros_tbl m_str) in
             let macro_wterm_eq indices msg =
               t_equ (t_app_infer m_symb (indices@[ts])) msg in
             let ax_option =
@@ -1156,9 +1163,13 @@ let add_macro_axioms context =
               | _ when mn = Symbols.Classic.cond || mn = Symbols.Classic.exec -> None
               | _ when mn = Symbols.Classic.out ->
                 (* output@A(i1,...) = output *)
-                Some (macro_wterm_eq
+                begin 
+                  try 
+                  Some (macro_wterm_eq
                         []
                         (msg_to_fmla context (snd descr.Action.output)))
+                  with InternalError -> None
+                end
               | Symbols.Global (arity, gty, _) -> begin 
                   (* for now, handle only the case where the indices of the macro
                       coincide with those of the action TODO *)
@@ -1172,23 +1183,28 @@ let add_macro_axioms context =
                       Hashtbl.add context.vars_tbl (Vars.hash v) (t_var vsymb);
                       vsymb
                     )m_idx in
-                  let ax = match
-                    Macros.get_definition_nocntxt 
-                      (Option.get context.system) context.table
-                      (Term.mk_symb mn gty) ~args:(Term.mk_vars m_idx)
-                      descr.name (Term.mk_vars descr.indices)
-                  with
-                  | `Undef   -> None
-                  | `Def msg ->  
-                    Some (t_forall_close quantified_indices [] (macro_wterm_eq
-                            (List.map (index_var_to_wterm context) m_idx) 
-                            (
-                              (if gty=Type.tboolean 
-                                then prop_to_bool else (fun x -> x)
+                  let ax = 
+                  begin 
+                    try 
+                    match
+                      Macros.get_definition_nocntxt 
+                        (Option.get context.system) context.table
+                        (Term.mk_symb mn gty) ~args:(Term.mk_vars m_idx)
+                        descr.name (Term.mk_vars descr.indices)
+                    with
+                    | `Undef   -> None
+                    | `Def msg ->  
+                      Some (t_forall_close quantified_indices [] (macro_wterm_eq
+                              (List.map (index_var_to_wterm context) m_idx) 
+                              (
+                                (if gty=Type.tboolean 
+                                  then prop_to_bool else (fun x -> x)
+                                )
+                                (msg_to_fmla context msg)
                               )
-                              (msg_to_fmla context msg)
-                            )
-                          ))
+                            ))
+                    with InternalError -> None
+                  end
                 in 
                 List.iter 
                   (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) 
@@ -1196,76 +1212,79 @@ let add_macro_axioms context =
                 ax
                 end
               | Symbols.State (arity,sty, _) -> 
+                begin 
+                  try
                 (* TODO: could probably be treated by calling
                     Macros.get_definition_nocntxt, instead of copying its code
                     (but it would be annoying to handle fresh index variables)*)
-                let quantified_indices =
-                  List.init arity
-                    (fun _ ->
-                        Why3.(Term.create_vsymbol 
-                        (Ident.id_fresh "i") context.index_ty)
-                    )
-                in
-                let indices = List.map t_var quantified_indices in
-                let expansion =
-                  let same_as_pred =
-                    t_app_infer m_symb
-                      (indices @ [t_app_infer context.pred_symb [ts]]) in
-                  try
-                    let (_ns, ns_args, msg) =
-                      List.find
-                        (fun (ns,_,_) -> ns = mn)
-                        descr.Action.updates
-                    in
-                    if descr.Action.name = Symbols.init_action then (
-                      quantified_vars:=List.map (fun t -> 
-                        match t with 
-                          |Term.Var v -> 
-                            let vsymb = create_vsymbol 
-                              (id_fresh context (Vars.name v))
-                              (Why3.Ty.ty_app context.index_symb []) 
-                            in
-                            Hashtbl.add context.vars_tbl 
-                              (Vars.hash v) (t_var vsymb);
-                            vsymb
-                          |_ -> assert false 
+                  let quantified_indices =
+                    List.init arity
+                      (fun _ ->
+                          Why3.(Term.create_vsymbol 
+                          (Ident.id_fresh "i") context.index_ty)
                       )
-                      ns_args
-                    );
-                    let expansion_ok = 
-                      (if sty=Type.tboolean then prop_to_bool else (fun x -> x)) 
-                      (msg_to_fmla context msg) 
-                    in
-                    if descr.Action.name = Symbols.init_action then
-                      (List.iter (fun t -> 
+                  in
+                  let indices = List.map t_var quantified_indices in
+                  let expansion =
+                    let same_as_pred =
+                      t_app_infer m_symb
+                        (indices @ [t_app_infer context.pred_symb [ts]]) in
+                    try
+                      let (_ns, ns_args, msg) =
+                        List.find
+                          (fun (ns,_,_) -> ns = mn)
+                          descr.Action.updates
+                      in
+                      if descr.Action.name = Symbols.init_action then (
+                        quantified_vars:=List.map (fun t -> 
                           match t with 
                             |Term.Var v -> 
-                              Hashtbl.remove context.vars_tbl (Vars.hash v)
-                            |_-> assert false
-                        ) ns_args;
-                      expansion_ok
-                      )
-                    else
-                      ((*assert (List.inclusion (ns_args) (Term.mk_vars descr.indices));*)
-                      t_if
-                        (if context.separate_tuple then 
-                          equal_lists 
-                            context 
-                            (indices) 
-                            (List.map (msg_to_fmla context) ns_args)
-                        else 
-                          t_equ
-                            (t_tuple indices)
-                            (t_tuple (List.map (msg_to_fmla context) ns_args))
+                              let vsymb = create_vsymbol 
+                                (id_fresh context (Vars.name v))
+                                (Why3.Ty.ty_app context.index_symb []) 
+                              in
+                              Hashtbl.add context.vars_tbl 
+                                (Vars.hash v) (t_var vsymb);
+                              vsymb
+                            |_ -> assert false 
                         )
+                        ns_args
+                      );
+                      let expansion_ok = 
+                        (if sty=Type.tboolean then prop_to_bool else (fun x -> x)) 
+                        (msg_to_fmla context msg) 
+                      in
+                      if descr.Action.name = Symbols.init_action then
+                        (List.iter (fun t -> 
+                            match t with 
+                              |Term.Var v -> 
+                                Hashtbl.remove context.vars_tbl (Vars.hash v)
+                              |_-> assert false
+                          ) ns_args;
                         expansion_ok
-                        same_as_pred)
-                  with Not_found -> same_as_pred in
-                Some (t_forall_close quantified_indices []
-                        (macro_wterm_eq indices expansion))
-              | _ -> None (* input/frame, see earlier TODO *)
+                        )
+                      else
+                        ((*assert (List.inclusion (ns_args) (Term.mk_vars descr.indices));*)
+                        t_if
+                          (if context.separate_tuple then 
+                            equal_lists 
+                              context 
+                              (indices) 
+                              (List.map (msg_to_fmla context) ns_args)
+                          else 
+                            t_equ
+                              (t_tuple indices)
+                              (t_tuple (List.map (msg_to_fmla context) ns_args))
+                          )
+                          expansion_ok
+                          same_as_pred)
+                    with Not_found -> same_as_pred in
+                  Some (t_forall_close quantified_indices []
+                          (macro_wterm_eq indices expansion))
+                  with InternalError -> None
+                end
+              | _ -> None (* input/frame : in theory *)
               end 
-              (* TODO: do not do an exception catch-all *)
             in
             match ax_option with
             | None -> ()
@@ -1279,8 +1298,7 @@ let add_macro_axioms context =
                                   )
                               )
                               :: !macro_axioms
-          with _ -> if smt_debug then Format.printf "Macro %s unexpandable" (path_to_string mn);
-          ) context.table; 
+          ) context.macros_tbl; 
         (* cleanup scope  *)
         List.iter
           (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) descr.indices;
