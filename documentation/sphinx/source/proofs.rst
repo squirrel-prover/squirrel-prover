@@ -1099,15 +1099,6 @@ Local tactics
     If :g:`n(i) = n(j)` then :g:`i = j`. This is checked on all name
     equality entailed by the current context.
 
-.. tact:: eqtrace
-   :name: eqtrace
-
-    Add term constraints resulting from timestamp and index
-    equalities. 
-
-    Whenever :g:`i=j` or :g:`ts=ts'`, we can substitute one by another
-    in the other terms.
-
 .. tact:: executable @term
    :name: executable
     

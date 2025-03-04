@@ -108,7 +108,6 @@
   "collision"
   "depends"
   "eqnames"
-  "eqtraces"
   "euf"
   "executable"
   "exists"
