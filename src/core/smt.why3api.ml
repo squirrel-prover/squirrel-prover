@@ -494,7 +494,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         end
       end
     | Term.App (_,_) -> unsupported_term context fmla "unsupported_app"
-    | Term.Proj (_,_) -> unsupported_term context fmla "unsupported_proj" 
+    | Term.Proj (i,t) -> unsupported_term context fmla "unsupported_proj"  
     | Term.Quant (ForAll, vs, f) -> msg_to_fmla_q context t_forall_close vs f fmla
     | Term.Quant (Exists, vs, f) -> msg_to_fmla_q context t_exists_close vs f fmla
     | Term.Quant (Seq,_,_) | Term.Quant (Lambda,_,_) -> unsupported_term context fmla "unsupp_quant" 
@@ -528,7 +528,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         (List.map (msg_to_fmla context) l @
         [msg_to_fmla context ts])
     )
-    
+    (*TODO est-ce que àa sert vraiment ? soit supprimer soit vérifier ce que ça fait avec les noms unsupported/*)
   | Name (ns,args) ->
       (match args with 
       |[Tuple args_list] -> t_app_infer
@@ -712,11 +712,13 @@ let add_macros context =
   Symbols.Macro.iter (fun mn _ ->
     let def = Symbols.get_macro_data mn context.table in
     let str = path_to_string mn in
+    Format.printf "Macro : %s@." str;
     let indices = match def with
       | General _ -> 0 
       | State (i,_,_) -> i
       | Global (i,_,_) -> i
     in
+    Format.printf "Indices : %s@." (string_of_int indices);
     let indices = List.init indices (fun _ -> context.index_ty) in
     let symb ty =
       Why3.Term.create_fsymbol
@@ -749,13 +751,12 @@ let add_macros context =
                 | ProtocolMacro (`Cond  ,_) -> convert_type context Type.tboolean
               end
                 
-            |State(_,t,_) | Global(_,t,_) -> convert_type ~decl_fun:true context t 
+            |State(_,t,_) | Global(_,t,_) -> Format.printf "Type : %a@." Type.pp t; convert_type ~decl_fun:true context t 
           in
           Hashtbl.add context.macros_tbl str (symb ty, mn)
           with InternalError -> if smt_debug then Format.printf "Cannot declare %s@." str 
         end
   ) context.table;
-  Hashtbl.iter (fun s _ -> Format.printf "Macro %s@." s) context.macros_tbl;
   context.uc:= Hashtbl.fold (fun _ (symb,_) uc ->
     begin try 
       Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb)
@@ -770,25 +771,27 @@ let rec calc_arity l = match l with
 
  let rec convert_type_no_tuple context t = match t with 
     |Type.Tuple l -> List.concat (List.map (convert_type_no_tuple context) l)
-    |t -> [convert_type context t]
+    |t -> [convert_type ~decl_fun:true context t]
 
 let add_names context = 
   Symbols.Name.iter (fun name _ ->
     let def = Symbols.get_name_data name context.table in
     let str = path_to_string name in
-    let symb =
-      Why3.Term.create_fsymbol
-        (id_fresh context str)
-        (List.concat (List.map (convert_type_no_tuple context) 
-        def.n_fty.fty_args))
-        (convert_type context def.n_fty.fty_out)
-      in
-      Hashtbl.add context.names_tbl str (symb)
-
-    
+    begin try 
+      let symb =
+        Why3.Term.create_fsymbol
+          (id_fresh context str)
+          (List.concat (List.map (convert_type_no_tuple context) 
+          def.n_fty.fty_args))
+          (convert_type ~decl_fun:true context def.n_fty.fty_out)
+        in
+        Hashtbl.add context.names_tbl str (symb)   
+      with InternalError -> if smt_debug then Format.printf "Cannot declare %s@." str 
+    end
   ) context.table;
   context.uc:= Hashtbl.fold 
     (fun _ (symb) uc -> 
+      Format.printf "Symb : %a@." Why3.Pretty.print_ls symb;
       Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb))
     context.names_tbl !(context.uc)
  
@@ -1319,31 +1322,34 @@ let add_name_axioms context =
     Symbols.Name.fold (fun n1 _ acc1 ->
       let def1 = Symbols.get_name_data n1 context.table in
       Symbols.Name.fold (fun n2 _ acc2 ->
-        let def2 = Symbols.get_name_data n2 context.table in
-        if (
-          (def1.n_fty.fty_out = def2.n_fty.fty_out) && 
-          (Symbols.TyInfo.check_bty_info context.table def1.n_fty.fty_out Large)
-        ) then begin 
-        let ar1,ar2 = calc_arity def1.n_fty.fty_args,
-          calc_arity def2.n_fty.fty_args 
-        in if n1 > n2 then acc2 else (* to avoid redundancy *)
-        let l1,l2 = 
-          vsymbol_list context "i" (List.init ar1 (fun _ -> context.index_ty)), 
-          vsymbol_list context "j" (List.init ar2 (fun _ -> context.index_ty)) 
-        in 
-        let tl1,tl2 = List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 in
-          let ineq = t_neq
-              (t_app_infer (Hashtbl.find context.names_tbl
-                              (path_to_string n1)) tl1)
-              (t_app_infer (Hashtbl.find context.names_tbl
-                              (path_to_string n2)) tl2) in
-          t_forall_close (l1@l2) []
-            (if n1 = n2
-              then t_implies (t_not (equal_lists context tl1 tl2)) ineq
-              else ineq)
-          :: acc2
+        begin try 
+          let def2 = Symbols.get_name_data n2 context.table in
+          if (
+            (def1.n_fty.fty_out = def2.n_fty.fty_out) && 
+            (Symbols.TyInfo.check_bty_info context.table def1.n_fty.fty_out Large)
+          ) then begin 
+          let ar1,ar2 = calc_arity def1.n_fty.fty_args,
+            calc_arity def2.n_fty.fty_args 
+          in if n1 > n2 then acc2 else (* to avoid redundancy *)
+          let l1,l2 = 
+            vsymbol_list context "i" (List.init ar1 (fun _ -> context.index_ty)), 
+            vsymbol_list context "j" (List.init ar2 (fun _ -> context.index_ty)) 
+          in 
+          let tl1,tl2 = List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 in
+            let ineq = t_neq
+                (t_app_infer (Hashtbl.find context.names_tbl
+                                (path_to_string n1)) tl1)
+                (t_app_infer (Hashtbl.find context.names_tbl
+                                (path_to_string n2)) tl2) in
+            t_forall_close (l1@l2) []
+              (if n1 = n2
+                then t_implies (t_not (equal_lists context tl1 tl2)) ineq
+                else ineq)
+            :: acc2
+          end
+          else acc2 
+          with Not_found -> acc2
         end
-        else acc2 
       ) acc1 context.table) [] context.table 
   in
   context.uc:=List.fold_left 
