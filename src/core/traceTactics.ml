@@ -1061,9 +1061,10 @@ let fa s =
     in
     subgoals
 
-  | Term.Quant (_, vars,t), Term.Quant (_, vars',t')
-    when List.for_all (is_finite_fixed -| Vars.ty) vars ->
+  | Term.Quant (_, vars,t), Term.Quant (_, vars',t') ->
     check_vars vars vars';
+    if not (List.for_all (is_finite_fixed -| Vars.ty) vars)
+    then soft_failure (Failure "FA: Quantification must be over finite and fixed types");
 
     (* refresh variables *)
     let vars, t =
@@ -1098,9 +1099,13 @@ let fa s =
     subgoals
 
   | Term.Find (vs,c,t,e),
-    Term.Find (vars',c',t',e')
-    when List.for_all (is_finite_fixed -| Vars.ty) vs &&
-         List.length vs = List.length vars' ->
+    Term.Find (vars',c',t',e') ->
+    if List.length vs <> List.length vars'
+    then soft_failure (Failure "FA: not the same numbers of variables");
+    if not (List.for_all (is_finite_fixed -| Vars.ty) vs)
+    then soft_failure (Failure "FA: variables must of finite and fixed types");
+    if not (List.for_all (is_finite_fixed -| Vars.ty) vars')
+    then soft_failure (Failure "FA: variables must of finite and fixed types");
     (* We verify that [e = e'],
      * and that [t = t'] and [c <=> c'] for fresh index variables.
      *
