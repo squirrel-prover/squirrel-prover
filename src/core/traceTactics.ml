@@ -997,6 +997,20 @@ let fa s =
 
   in
 
+  let check_args args args'  =
+    if List.length args <> List.length args' then
+      soft_failure (Failure "FA: not the same numbers of arguments");
+
+    let tys_compatible =
+      List.for_all2 (fun v1 v2 ->
+          Type.equal (Term.ty v1) (Term.ty v2)
+        ) args args'
+    in
+    if not tys_compatible then
+      soft_failure (Failure "FA: arguments with different types");
+
+  in
+
   let is_finite_fixed ty =
     Symbols.TyInfo.is_finite table ty && Symbols.TyInfo.is_fixed table ty
   in
@@ -1046,7 +1060,6 @@ let fa s =
                                  (Term.mk_atom `Eq e e')) ]
     in
     subgoals
-
 
   | Term.Quant (_, vars,t), Term.Quant (_, vars',t')
     when List.for_all (is_finite_fixed -| Vars.ty) vars ->
@@ -1147,6 +1160,20 @@ let fa s =
         set_conclusion (Term.mk_atom `Eq e e') s]
     in
     subgoals
+      
+  | Term.App(f,fargs), Term.App(g,gargs) ->
+    let open TraceSequent in
+    check_args fargs gargs;
+    let equal_fun =
+      if Reduce.conv_term s f g then [] else [set_conclusion (Term.mk_atom `Eq f g) s]
+    in
+    equal_fun @
+    List.flatten
+      (List.map2
+         (fun x y ->
+            if Reduce.conv_term s x y then []
+            else [set_conclusion (Term.mk_atom `Eq x y) s]
+         ) fargs gargs)
 
   | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
 
