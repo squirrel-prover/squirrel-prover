@@ -494,7 +494,28 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         end
       end
     | Term.App (_,_) -> unsupported_term context fmla "unsupported_app"
-    | Term.Proj (i,t) -> unsupported_term context fmla "unsupported_proj"  
+    | Term.Proj (i,t) -> 
+      begin match (Term.ty t) with 
+        |Type.Tuple l -> 
+          let pat_list,len,v = List.fold_left 
+          (fun (acc,j,v) ty ->
+            let ty' = (convert_type context ty)  in
+            if i=j then begin
+              let v' = Why3.Term.create_vsymbol ((id_fresh context ("temp"))) ty' in
+              ((pat_as (pat_wild ty') v')::acc,j+1,Some v')
+            end
+            else ((pat_wild ty')::acc,j+1,v)
+          ) ([],1,None) l 
+          in Why3.Term.t_case_close 
+            (msg_to_fmla context t) 
+            [pat_app 
+              (fs_tuple (len-1)) 
+              pat_list 
+              (Why3.Ty.ty_tuple (List.map (convert_type context) l))
+            , t_var (Option.get v)]
+
+          | _ -> assert false 
+      end
     | Term.Quant (ForAll, vs, f) -> msg_to_fmla_q context t_forall_close vs f fmla
     | Term.Quant (Exists, vs, f) -> msg_to_fmla_q context t_exists_close vs f fmla
     | Term.Quant (Seq,_,_) | Term.Quant (Lambda,_,_) -> unsupported_term context fmla "unsupp_quant" 
@@ -712,13 +733,11 @@ let add_macros context =
   Symbols.Macro.iter (fun mn _ ->
     let def = Symbols.get_macro_data mn context.table in
     let str = path_to_string mn in
-    Format.printf "Macro : %s@." str;
     let indices = match def with
       | General _ -> 0 
       | State (i,_,_) -> i
       | Global (i,_,_) -> i
     in
-    Format.printf "Indices : %s@." (string_of_int indices);
     let indices = List.init indices (fun _ -> context.index_ty) in
     let symb ty =
       Why3.Term.create_fsymbol
@@ -751,7 +770,7 @@ let add_macros context =
                 | ProtocolMacro (`Cond  ,_) -> convert_type context Type.tboolean
               end
                 
-            |State(_,t,_) | Global(_,t,_) -> Format.printf "Type : %a@." Type.pp t; convert_type ~decl_fun:true context t 
+            |State(_,t,_) | Global(_,t,_) -> convert_type ~decl_fun:true context t 
           in
           Hashtbl.add context.macros_tbl str (symb ty, mn)
           with InternalError -> if smt_debug then Format.printf "Cannot declare %s@." str 
@@ -791,7 +810,6 @@ let add_names context =
   ) context.table;
   context.uc:= Hashtbl.fold 
     (fun _ (symb) uc -> 
-      Format.printf "Symb : %a@." Why3.Pretty.print_ls symb;
       Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb))
     context.names_tbl !(context.uc)
  
