@@ -983,7 +983,7 @@ let fa s =
 
   let unsupported () = soft_failure (Failure "equality expected") in
 
-  let check_vars vars vars' =
+  let check_vars vars vars'  =
     if List.length vars <> List.length vars' then
       soft_failure (Failure "FA: not the same numbers of variables");
 
@@ -994,6 +994,7 @@ let fa s =
     in
     if not tys_compatible then
       soft_failure (Failure "FA: variables with different types");
+
   in
 
   let is_finite_fixed ty =
@@ -1015,18 +1016,34 @@ let fa s =
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
       let open TraceSequent in
-      [ s |> set_conclusion (Term.mk_impl c c') ;
+      if Reduce.conv_term s c c'
+      then
+        [
+          s |> set_conclusion
+            (Term.mk_impl
+               c
+               (Term.mk_atom `Eq t t')
+            );
 
-        s |> set_conclusion (Term.mk_impl c' c) ;
+          s |> set_conclusion
+            (Term.mk_impl
+               (Term.mk_not c)
+               (Term.mk_atom `Eq e e')
+            );
+        ]
+      else
+        [ s |> set_conclusion (Term.mk_impl c c') ;
 
-        s |> set_conclusion (Term.mk_impls
-                         (if TS.Reduce.conv_term s c c' then [c] else [c;c'])
-                         (Term.mk_atom `Eq t t'));
+          s |> set_conclusion (Term.mk_impl c' c) ;
 
-        s |> set_conclusion (Term.mk_impls
-                         [Term.mk_not c;
-                          Term.mk_not c']
-                         (Term.mk_atom `Eq e e')) ]
+          s |> set_conclusion (Term.mk_impls
+                                 [c;c']
+                                 (Term.mk_atom `Eq t t'));
+
+          s |> set_conclusion (Term.mk_impls
+                                 [Term.mk_not c;
+                                  Term.mk_not c']
+                                 (Term.mk_atom `Eq e e')) ]
     in
     subgoals
 

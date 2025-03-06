@@ -231,8 +231,7 @@ Proof.
       project.
 
       (* Left *)
-      * fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
-             4: auto].
+      * fa; [2: auto].
         intro [_ [i t _]].
         fa; 2,3,4: intro *; expand output; auto.
         intro Meq.
@@ -241,8 +240,7 @@ Proof.
         by expand output; exists t.
 
       (* Right *)
-      * fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
-             4: auto].
+      * fa; [2 : auto].
         intro [_ [i t _]].
         fa; 2,3,4: intro *; expand output; auto.
         intro Meq; simpl.
