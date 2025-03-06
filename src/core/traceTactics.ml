@@ -985,7 +985,7 @@ let fa s =
 
   let check_vars vars vars' =
     if List.length vars <> List.length vars' then
-      soft_failure (Failure "FA: sequences with different lengths");
+      soft_failure (Failure "FA: not the same numbers of variables");
 
     let tys_compatible =
       List.for_all2 (fun v1 v2 ->
@@ -993,7 +993,11 @@ let fa s =
         ) vars vars'
     in
     if not tys_compatible then
-      soft_failure (Failure "FA: sequences with different types");
+      soft_failure (Failure "FA: variables with different types");
+  in
+
+  let is_finite_fixed ty =
+    Symbols.TyInfo.is_finite table ty && Symbols.TyInfo.is_fixed table ty
   in
 
   let u, v = match TS.Reduce.destr_eq s Local_t (TS.conclusion s) with
@@ -1026,9 +1030,9 @@ let fa s =
     in
     subgoals
 
-  (* FIXME: allow ForAll and Exists? *)
-  | Term.Quant (Seq, vars,t), Term.Quant (Seq, vars',t')
-    when List.for_all (Symbols.TyInfo.is_finite table -| Vars.ty) vars ->
+
+  | Term.Quant (_, vars,t), Term.Quant (_, vars',t')
+    when List.for_all (is_finite_fixed -| Vars.ty) vars ->
     check_vars vars vars';
 
     (* refresh variables *)
@@ -1065,7 +1069,7 @@ let fa s =
 
   | Term.Find (vs,c,t,e),
     Term.Find (vars',c',t',e')
-    when List.for_all (Symbols.TyInfo.is_finite table -| Vars.ty) vs &&
+    when List.for_all (is_finite_fixed -| Vars.ty) vs &&
          List.length vs = List.length vars' ->
     (* We verify that [e = e'],
      * and that [t = t'] and [c <=> c'] for fresh index variables.
