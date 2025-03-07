@@ -1061,7 +1061,7 @@ let fa s =
     in
     subgoals
 
-  | Term.Quant (_, vars,t), Term.Quant (_, vars',t') ->
+  | Term.Quant (q, vars,t), Term.Quant (q', vars',t') when q = q' ->
     check_vars vars vars';
     if not (List.for_all (is_finite_fixed -| Vars.ty) vars)
     then soft_failure (Failure "FA: Quantification must be over finite and fixed types");

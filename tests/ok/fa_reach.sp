@@ -75,6 +75,12 @@ Proof.
    fa; auto.
 Qed.
 
+lemma _ :
+    (forall (a : index), a = witness) = (exists (b : index), b = witness).
+Proof.
+   checkfail fa exn Failure.
+Abort.
+
 lemma _ i j : a i = b j.
 Proof.
    fa.
