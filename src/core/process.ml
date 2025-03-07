@@ -998,7 +998,7 @@ let process_system_decl
         match proc with
         | Alias (_,name) -> UserName name
         | _ when is_user_name penv.alias -> penv.alias
-        | _ -> Hint (Symbols.path_to_string id)
+        | _ -> Hint (Symbols.to_string id.s)
       in
 
       (* substitute in every user-proveded alias in [proc] the 
