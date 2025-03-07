@@ -1046,7 +1046,7 @@ module AbstractSet = struct
             else x :: lnorm)
           [] lnorm
       in 
-      Sets lnorm
+      Sets (List.rev lnorm)
 
   (** Compute the union [s1 ∪ s2].
       No over-approximation. *)
