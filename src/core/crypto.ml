@@ -1006,30 +1006,35 @@ end
 module AbstractSet = struct 
   (** abstract set of terms *)
   type t =
-    | Top
+    | Top                    (** the full set, containing any term *)
     | Sets of TSet.t list    (** [[t1;...;tN]] represents [t1 ∪ ... ∪ tN] *)
 
-  let _pp ppe fmt (t:t) = match t with
+  let _pp ppe fmt (t:t) =
+    match t with
     | Top -> Fmt.pf fmt "T"
     | Sets tl -> Fmt.pf fmt "@[[%a ]@]" (Fmt.list ~sep:Fmt.comma (TSet._pp ppe)) tl
 
   let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
   let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true  ())
 
-  let fv_t set = match set with
+  let fv_t set =
+    match set with
     | Top -> Vars.Sv.empty
     | Sets tl ->
       List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
 
   let is_included (env : Env.t) (hyps : TraceHyps.hyps) (s1 : t) (s2 : t) =
     match s1,s2 with
-    | _,Top -> true
-    | Top,_ -> false
+    | _, Top -> true
+    | Top, _ -> false
     | Sets tl1,Sets tl2 ->
       List.for_all
         (fun tset1 -> List.exists (fun tset2 -> TSet.is_leq env hyps tset1 tset2) tl2)
         tl1
-        
+
+  (** [normalize ... s] and [s] represents the same set of terms,
+      but [s]'s representation has been simplified.
+      No over-approximation. *)
   let normalize env hyps (s : t) : t =
     match s with
     | Top -> Top
@@ -1043,7 +1048,9 @@ module AbstractSet = struct
       in 
       Sets lnorm
 
-  let union env hyps (s1 : t) (s2 : t) : t=
+  (** Compute the union [s1 ∪ s2].
+      No over-approximation. *)
+  let union env hyps (s1 : t) (s2 : t) : t =
     match s1,s2 with
     | Sets tl1, Sets tl2 -> normalize env hyps (Sets (tl1 @ tl2))
     | _ -> Top
@@ -1138,30 +1145,75 @@ module AbstractSet = struct
   let widening env hyps (old_mem : mem) (new_mem : mem) = 
     join env hyps old_mem new_mem
 
-  (* abstract evaluation of a term of type [Set.t] *)
+  (*-----------------------------------------------------------------*)
+  (** abstract evaluation of a term of type [Set.t] as an
+      over-approximation of [term]. *)
   let abstract_set
       (env : Env.t) (hyps : TraceHyps.hyps)
       (term : Term.term)
       (conds : Term.terms)
-      (assertion : mem): t
+      (mem : mem): t
     =
     let rec doit = function
       (* variable *)
-      | Term.Var v when mem_domain v assertion -> find v assertion
+      | Term.Var v when mem_domain v mem -> find v mem
 
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (add,_), [t;s] )
         when add = Library.Set.fs_add env.table ->
-        union env hyps (doit s) (Sets [(TSet.singleton t conds)])
+        union env hyps (doit s) (Sets [TSet.singleton t conds])
 
       (* ∅ *)
       | Term.Fun(empty_set,_)
-        when empty_set = Library.Set.const_emptyset env.table -> Sets []
+        when empty_set = Library.Set.fs_empty env.table -> Sets []
 
       | _ -> Top
     in
     doit term
 
+  (** abstract evaluation of a term of type [Set.t] as an
+      **under**-approximation of [term]. *)
+  let abstract_set_underapprox
+      (env : Env.t) (hyps : TraceHyps.hyps)
+      (term : Term.term)
+      (conds : Term.terms)
+      (_mem : mem): t
+    =
+    let red_param = ReductionCore.rp_crypto in
+    let st =
+      Reduction.mk_state
+        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
+    in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    
+    let rec doit = function
+      (* variable, for now [mem] only contain over-approximation of
+         [v]'s content *)
+      | Term.Var _ -> Sets []
+
+      (* [{t} ∪ s] *)
+      | Term.App (Term.Fun (add,_), [t;s] )
+        when add = Library.Set.fs_add env.table ->
+        union env hyps (doit s) (Sets [TSet.singleton t conds])
+
+      (* ∅ *)
+      | Term.Fun(empty_set,_)
+        when empty_set = Library.Set.fs_empty env.table -> Sets []
+
+      (* otherwise, try to reduce [t] once in head position *)
+      | t ->
+        let t, has_red = Reduction.reduce_head1_term ~strat st t in
+        
+        if has_red = True then
+          doit t   (* try again to evaluate [t] *)
+        else
+        (* cannot reduce [t], the empty set is always a sound
+           under-approximation *)
+          Sets []   
+    in
+    doit term
+    
+  (*-----------------------------------------------------------------*)
   let rec remove (var:Vars.var) (mem : mem) =
     match mem with
     | [] -> []
@@ -1202,12 +1254,16 @@ module AbstractSet = struct
     | Term.Var v when mem_domain v assertion -> true
 
     | Term.Fun(empty_set,_)
-      when empty_set = Library.Set.const_emptyset env.table -> true
+      when empty_set = Library.Set.fs_empty env.table -> true
 
     | t when t = Term.mk_false || t = Term.mk_true -> true
 
     | Term.App (Term.Fun (f_mem,_),[_;_])
       when f_mem = Library.Set.fs_mem env.table->
+      true
+
+    | Term.App (Term.Fun (f_subseteq,_),[_;_])
+      when f_subseteq = Library.Set.fs_subseteq env.table->
       true
 
     | Term.App (Term.Fun (add,_), [_;_] )
@@ -1251,6 +1307,45 @@ module AbstractSet = struct
               not_in_tset_subgoals env hyps {term = t; conds = bool_term.conds } tl
             in 
             None, Some true, not_in_subgs
+        end
+
+      (* [set0 ⊆ set1] *)
+      | Term.App ( Term.Fun (f_subseteq,_),[set0;set1])
+        when f_subseteq = Library.Set.fs_subseteq table ->
+
+        (* over-approximation of [set0] *)
+        let over_set0 = abstract_set env hyps set0 bool_term.conds mem in
+
+        (* under-approximation of [set1] *)
+        let under_set1 = abstract_set_underapprox env hyps set1 bool_term.conds mem in
+        
+        (* if [over_set0 ⊆ under_set1] then [set0 ⊆ set1] *)
+        begin
+          match over_set0, under_set1 with
+          | _  , Top     -> Some true , Some false, []
+          | _  , Sets [] -> Some false, Some true , []
+          | Top, _       -> None      , None      , []
+          | Sets over_set0, Sets under_set1 ->
+            let conds =
+              (* for any set [t0] in [over_set0], check that there
+                 exists [t1] in [under_set1] such that [t0 ⊆ t1]
+                 (generating proof-obligation for this) *)
+              List.map (fun (t0 : TSet.t) ->
+                  Term.mk_forall t0.vars
+                    (Term.mk_impls ~simpl:true
+                       t0.conds
+                       (Term.mk_ors ~simpl:true @@
+                        (List.map
+                           (fun (t1 : TSet.t) ->
+                              Term.mk_exists t1.vars
+                                (Term.mk_ands ~simpl:true (Term.mk_eq t0.term t1.term :: t1.conds)))
+                           under_set1
+                        )
+                       )
+                    )
+                ) over_set0
+            in
+            Some true, None, conds
         end
 
       (* ¬ *)
