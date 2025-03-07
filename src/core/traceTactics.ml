@@ -1015,7 +1015,8 @@ let fa s =
     Symbols.TyInfo.is_finite table ty && Symbols.TyInfo.is_fixed table ty
   in
 
-  let u, v = match TS.Reduce.destr_eq s Local_t (TS.conclusion s) with
+  let u, v =
+    match TS.Reduce.destr_eq s Local_t (TS.conclusion s) with
     | Some (u,v) -> u, v
     | None -> unsupported ()
   in
@@ -1030,41 +1031,41 @@ let fa s =
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
       let open TraceSequent in
-      if Reduce.conv_term s c c'
-      then
-        [
-          s |> set_conclusion
-            (Term.mk_impl
-               c
-               (Term.mk_atom `Eq t t')
-            );
-
-          s |> set_conclusion
-            (Term.mk_impl
-               (Term.mk_not c)
-               (Term.mk_atom `Eq e e')
-            );
-        ]
-      else
-        [ s |> set_conclusion (Term.mk_impl c c') ;
-
-          s |> set_conclusion (Term.mk_impl c' c) ;
-
-          s |> set_conclusion (Term.mk_impls
-                                 [c;c']
-                                 (Term.mk_atom `Eq t t'));
-
-          s |> set_conclusion (Term.mk_impls
-                                 [Term.mk_not c;
-                                  Term.mk_not c']
-                                 (Term.mk_atom `Eq e e')) ]
+      let cond_conv = Reduce.conv_term s c c' in
+      (* if condition are not convertible, check that [c <=> c'] *)
+      (
+        if not cond_conv then
+          [ s |> set_conclusion (Term.mk_impl c c') ;
+            
+            s |> set_conclusion (Term.mk_impl c' c) ]
+        else []
+      )
+      @
+      (* ask that [(c ∧ c') → t = t'] and [(¬c ∧ ¬c') → e = e'] *)
+      [
+        s |>
+        set_conclusion
+          (Term.mk_impls
+             (if cond_conv then [c] else [c;c'])
+             (Term.mk_eq t t')
+          );
+        
+        s |>
+        set_conclusion
+          (Term.mk_impls
+             (if cond_conv
+              then [Term.mk_not c]
+              else [Term.mk_not c; Term.mk_not c'])
+             (Term.mk_eq e e')
+          );
+      ]
     in
     subgoals
 
   | Term.Quant (q, vars,t), Term.Quant (q', vars',t') when q = q' ->
     check_vars vars vars';
-    if not (List.for_all (is_finite_fixed -| Vars.ty) vars)
-    then soft_failure (Failure "FA: Quantification must be over finite and fixed types");
+    if not (List.for_all (is_finite_fixed -| Vars.ty) vars) then
+      soft_failure (Failure "FA: quantification must be over finite and fixed types");
 
     (* refresh variables *)
     let vars, t =
@@ -1094,33 +1095,35 @@ let fa s =
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
     let subgoals =
-      [ TS.set_conclusion (Term.mk_atom `Eq t t') s ]
+      [ TS.set_conclusion (Term.mk_eq t t') s ]
     in
     subgoals
 
   | Term.Find (vs,c,t,e),
     Term.Find (vars',c',t',e') ->
-    if List.length vs <> List.length vars'
-    then soft_failure (Failure "FA: not the same numbers of variables");
-    if not (List.for_all (is_finite_fixed -| Vars.ty) vs)
-    then soft_failure (Failure "FA: variables must of finite and fixed types");
-    if not (List.for_all (is_finite_fixed -| Vars.ty) vars')
-    then soft_failure (Failure "FA: variables must of finite and fixed types");
+    if List.length vs <> List.length vars' then
+      soft_failure (Failure "FA: not the same numbers of variables");
+
+    if not (List.for_all (is_finite_fixed -| Vars.ty) vs) ||
+       not (List.for_all (is_finite_fixed -| Vars.ty) vars')
+    then
+      soft_failure (Failure "FA: variables must of finite and fixed types");
+
     (* We verify that [e = e'],
-     * and that [t = t'] and [c <=> c'] for fresh index variables.
-     *
-     * We do something more general for the conditions,
-     * which is useful for cases arising from diff-equivalence
-     * where some indices are unused on one side:
-     *
-     * Assume [vars = used@unused]
-     * where [unusued] variables are unused in [c] and [t].
-     *
-     * We verify that [forall used. (c <=> exists unused. c')]:
-     * this ensures that if one find succeeds, the other does
-     * too, and also that the selected indices will match
-     * except for the [unused] indices on the left, which does
-     * not matter since they do not appear in [t]. *)
+       and that [t = t'] and [c <=> c'] for fresh index variables.
+      
+       We do something more general for the conditions,
+       which is useful for cases arising from diff-equivalence
+       where some indices are unused on one side:
+      
+       Assume [vars = used@unused]
+       where [unusued] variables are unused in [c] and [t].
+      
+       We verify that [forall used. (c <=> exists unused. c')]:
+       this ensures that if one find succeeds, the other does
+       too, and also that the selected indices will match
+       except for the [unused] indices on the left, which does
+       not matter since they do not appear in [t]. *)
 
     (* Refresh bound variables in c and t *)
     let env = TS.vars s in
@@ -1160,27 +1163,29 @@ let fa s =
 
         set_conclusion (Term.mk_impl c' c) s;
 
-        set_conclusion (Term.mk_impls [c;c'] (Term.mk_atom `Eq t t')) s;
+        set_conclusion (Term.mk_impls [c;c'] (Term.mk_eq t t')) s;
 
-        set_conclusion (Term.mk_atom `Eq e e') s]
+        set_conclusion (Term.mk_eq e e') s]
     in
     subgoals
       
   | Term.App(f,fargs), Term.App(g,gargs) ->
     let open TraceSequent in
+
     check_args fargs gargs;
+    
     let equal_fun =
-      if Reduce.conv_term s f g then [] else [set_conclusion (Term.mk_atom `Eq f g) s]
+      if Reduce.conv_term s f g then [] else [set_conclusion (Term.mk_eq f g) s]
     in
     equal_fun @
     List.flatten
       (List.map2
          (fun x y ->
             if Reduce.conv_term s x y then []
-            else [set_conclusion (Term.mk_atom `Eq x y) s]
+            else [set_conclusion (Term.mk_eq x y) s]
          ) fargs gargs)
 
-  | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
+  | _ -> Tactics.soft_failure (Failure "unsupported equality")
 
 let fa_tac args = match args with
   | [] -> wrap_fail fa
