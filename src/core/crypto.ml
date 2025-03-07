@@ -824,10 +824,13 @@ module Const = struct
   let to_subgoals table ~vbs ~dbg (game : game) (consts : t list) : Term.terms =
     notify_global_checks ~vbs ~dbg;
     let global = global_all_formulas table ~vbs ~dbg game consts in
+
     notify_functional_checks ~vbs ~dbg;
     let functional = function_all_formulas table ~vbs ~dbg consts in
+
     notify_fresh_checks ~vbs ~dbg;
     let freshness = fresh_all_formulas table ~vbs ~dbg consts in
+
     List.filter
       (fun x -> not (Term.Smart.is_true x))
       (global @ functional @ freshness)
@@ -3387,10 +3390,13 @@ let prove
   | Some result -> 
     let oracle_subgoals = result.subgoals in
     let final_consts = result.consts in
-    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game final_consts in
 
+    Printer.pr "@[<v 0>"; (* open vertical box of final result *)
+
+    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game final_consts in
+    
     Printer.pr
-      "@[<v 2>Constraints are:@ @[<v 0>%a@]@;"
+      "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) final_consts;
     Printer.pr
       "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@;"
@@ -3401,6 +3407,8 @@ let prove
       oracle_subgoals;
     Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) result.final_mem;
 
+    Printer.pr "@;@]"; (* close vertical box of final result *)
+    
     let red_param = Reduction.rp_default in
     let params = Env.to_params env in
     let state = 
