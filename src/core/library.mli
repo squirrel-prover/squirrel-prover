@@ -24,6 +24,7 @@ module Set : sig
 
   val fs_mem      : Symbols.table -> Symbols.fname
   val fs_add      : Symbols.table -> Symbols.fname
+  val fs_union    : Symbols.table -> Symbols.fname
   val fs_subseteq : Symbols.table -> Symbols.fname
   val fs_empty    : Symbols.table -> Symbols.fname
 end

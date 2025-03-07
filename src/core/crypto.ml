@@ -1159,13 +1159,18 @@ module AbstractSet = struct
       | Term.Var v when mem_domain v mem -> find v mem
 
       (* [{t} ∪ s] *)
-      | Term.App (Term.Fun (add,_), [t;s] )
-        when add = Library.Set.fs_add env.table ->
+      | Term.App (Term.Fun (f,_), [t;s] )
+        when f = Library.Set.fs_add env.table ->
         union env hyps (doit s) (Sets [TSet.singleton t conds])
 
+      (* [s1 ∪ 2] *)
+      | Term.App (Term.Fun (f,_), [s1;s2] )
+        when f = Library.Set.fs_union env.table ->
+        union env hyps (doit s1) (doit s2)
+
       (* ∅ *)
-      | Term.Fun(empty_set,_)
-        when empty_set = Library.Set.fs_empty env.table -> Sets []
+      | Term.Fun(f,_)
+        when f = Library.Set.fs_empty env.table -> Sets []
 
       | _ -> Top
     in
@@ -1192,13 +1197,18 @@ module AbstractSet = struct
       | Term.Var _ -> Sets []
 
       (* [{t} ∪ s] *)
-      | Term.App (Term.Fun (add,_), [t;s] )
-        when add = Library.Set.fs_add env.table ->
+      | Term.App (Term.Fun (f,_), [t;s] )
+        when f = Library.Set.fs_add env.table ->
         union env hyps (doit s) (Sets [TSet.singleton t conds])
 
+      (* [{t} ∪ s] *)
+      | Term.App (Term.Fun (f,_), [s1;s2] )
+        when f = Library.Set.fs_union env.table ->
+        union env hyps (doit s1) (doit s2)
+
       (* ∅ *)
-      | Term.Fun(empty_set,_)
-        when empty_set = Library.Set.fs_empty env.table -> Sets []
+      | Term.Fun(f,_)
+        when f = Library.Set.fs_empty env.table -> Sets []
 
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
@@ -1253,25 +1263,29 @@ module AbstractSet = struct
     match bool_term with
     | Term.Var v when mem_domain v assertion -> true
 
-    | Term.Fun(empty_set,_)
-      when empty_set = Library.Set.fs_empty env.table -> true
+    | Term.Fun(f,_)
+      when f = Library.Set.fs_empty env.table -> true
 
     | t when t = Term.mk_false || t = Term.mk_true -> true
 
-    | Term.App (Term.Fun (f_mem,_),[_;_])
-      when f_mem = Library.Set.fs_mem env.table->
+    | Term.App (Term.Fun (f,_),[_;_])
+      when f = Library.Set.fs_mem env.table->
       true
 
-    | Term.App (Term.Fun (f_subseteq,_),[_;_])
-      when f_subseteq = Library.Set.fs_subseteq env.table->
+    | Term.App (Term.Fun (f,_),[_;_])
+      when f = Library.Set.fs_subseteq env.table->
       true
 
-    | Term.App (Term.Fun (add,_), [_;_] )
-      when add = Library.Set.fs_add env.table ->
+    | Term.App (Term.Fun (f,_), [_;_] )
+      when f = Library.Set.fs_add env.table ->
       true   
 
-    | Term.App (Term.Fun(f_not, _),[t])
-      when Term.f_not = f_not ->  bool_abstraction_supported env assertion t
+    | Term.App (Term.Fun (f,_), [_;_] )
+      when f = Library.Set.fs_union env.table ->
+      true   
+
+    | Term.App (Term.Fun(f, _),[t])
+      when f = Term.f_not -> bool_abstraction_supported env assertion t
 
     | Term.App (Term.Fun(f, _),[t1;t2]) when f = Term.f_and || f = Term.f_or ->
       let b1 = bool_abstraction_supported env assertion t1 in

@@ -53,6 +53,7 @@ module Set = struct
 
   let fs_mem      table = get_fsymb table "mem"
   let fs_add      table = get_fsymb table "add"
+  let fs_union    table = get_fsymb table "union"
   let fs_subseteq table = get_fsymb table "subseteq"
   let fs_empty    table = get_fsymb table "empty_set"
 end  
