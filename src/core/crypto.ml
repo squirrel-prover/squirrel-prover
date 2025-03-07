@@ -1154,6 +1154,13 @@ module AbstractSet = struct
       (conds : Term.terms)
       (mem : mem): t
     =
+    let red_param = ReductionCore.rp_crypto in
+    let st =
+      Reduction.mk_state
+        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
+    in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+
     let rec doit = function
       (* variable *)
       | Term.Var v when mem_domain v mem -> find v mem
@@ -1172,7 +1179,15 @@ module AbstractSet = struct
       | Term.Fun(f,_)
         when f = Library.Set.fs_empty env.table -> Sets []
 
-      | _ -> Top
+      (* otherwise, try to reduce [t] once in head position *)
+      | t ->
+        let t, has_red = Reduction.reduce_head1_term ~strat st t in
+        
+        if has_red = True then
+          doit t   (* try again to evaluate [t] *)
+        else
+          Top (* cannot reduce [t], use [Top] as over-approximation *)
+
     in
     doit term
 
@@ -1303,6 +1318,13 @@ module AbstractSet = struct
       (bool_term : CondTerm.t) 
       (mem : mem) : Term.terms option
     =
+    let red_param = ReductionCore.rp_crypto in
+    let st =
+      Reduction.mk_state
+        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
+    in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+
     let rec abstract_bool_and_not
         (term : Term.term)
       : bool option * bool option * Term.terms
@@ -1385,7 +1407,15 @@ module AbstractSet = struct
       (* ⊥ *)
       | t when t = Term.mk_false -> Some false, Some true , []
 
-      | _ -> None, None, []
+      (* otherwise, try to reduce [t] once in head position *)
+      | t ->
+        let t, has_red = Reduction.reduce_head1_term ~strat st t in
+        
+        if has_red = True then
+          abstract_bool_and_not t   (* try again to evaluate [t] *)
+        else
+          (* cannot reduce [t], default sound value *)
+          (None, None, [])
     in
     let b,_,eqs = abstract_bool_and_not bool_term.term in
     match b with
