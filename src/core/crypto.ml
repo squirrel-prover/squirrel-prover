@@ -331,13 +331,14 @@ let constant_name_to_var
   in
   let terms,set = replace_names (term.term::term.conds) [] in
   let subst =
-    List.map (fun (term,var) -> Term.ESubst((Term.mk_var var), term)) set
+    List.map (fun (term,var) -> Term.ESubst (Term.mk_var var, term)) set
   in
-  let term = match terms with
+  let term =
+    match terms with
     | t::conds -> CondTerm.mk ~term:t ~conds
     | _ -> assert false
   in
-  term,subst
+  term, subst
 
 
 (** Return conditions under wich two names are not equal.*)
@@ -376,10 +377,11 @@ let equal_term_name_eq
   =
   let system = env.system in
 
+  let target = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
+
   let term,subst = constant_name_to_var env known in
-  let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
   let name_vars = subst_support subst in
-  let known_set = 
+  let known = 
     Match.{ 
       term = term.term; 
       cond = term.conds; 
@@ -392,7 +394,7 @@ let equal_term_name_eq
       ~param:Match.crypto_param
       ~env:env.vars env.table system hyps ~support:name_vars
   in 
-  let mv = Match.deduce_mem cterm known_set unif_state in
+  let mv = Match.deduce_mem target known unif_state in
   match mv with
   | Some mv ->
     (* If the matching found a substitution, get all equalities in name the 
@@ -402,30 +404,12 @@ let equal_term_name_eq
       match subst_res with
       | `Subst subst_res ->
         let eqs = List.map (get_name_neq_condition subst subst_res) name_vars in
-        if List.mem (Term.mk_false) eqs then None
+        if List.mem Term.mk_false eqs then None
         else Some eqs
       | _ -> None
     end
   | None -> None
-
-
-let never_equal_subgoals
-    (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(target : CondTerm.t)
-    ~(known : CondTerm.t)
-    (vars : Vars.vars) : Term.term option
-  =
-  let eqs = equal_term_name_eq env hyps ~target ~known in
-  match eqs with
-  | Some eqs when (List.mem (Term.mk_true) eqs)
-    -> Some Term.mk_true
-  | Some eqs
-    -> Some (Term.mk_ors ~simpl:true eqs)
-  | None
-    -> Some (Term.mk_forall vars (Term.mk_impl 
-                                    (Term.mk_ands (target.conds @ known.conds))
-                                    (Term.mk_neq target.term known.term)))
-
+      
 
 (* ----------------------------------------------------------------- *)
 (** An oracle output pattern, which returns [term] when [cond] is true.
@@ -1020,7 +1004,7 @@ module AbstractSet = struct
   (** abstract set of terms *)
   type t =
     | Top
-    | Sets of TSet.t list
+    | Sets of TSet.t list    (** [[t1;...;tN]] represents [t1 ∪ ... ∪ tN] *)
 
   let _pp ppe fmt (t:t) = match t with
     | Top -> Fmt.pf fmt "T"
@@ -1036,9 +1020,8 @@ module AbstractSet = struct
 
   let is_included (env : Env.t) (hyps : TraceHyps.hyps) (s1 : t) (s2 : t) =
     match s1,s2 with
-    | Top,Top -> true
-    | Top,_ -> false
     | _,Top -> true
+    | Top,_ -> false
     | Sets tl1,Sets tl2 ->
       List.for_all
         (fun tset1 -> List.exists (fun tset2 -> TSet.is_leq env hyps tset1 tset2) tl2)
@@ -1059,7 +1042,7 @@ module AbstractSet = struct
 
   let union env hyps (s1 : t) (s2 : t) : t=
     match s1,s2 with
-    | (Sets tl1), Sets tl2 -> normalize env hyps (Sets (tl1 @ tl2))
+    | Sets tl1, Sets tl2 -> normalize env hyps (Sets (tl1 @ tl2))
     | _ -> Top
 
   let generalize_set (vars : Vars.vars) (set : t) : t=
@@ -1067,31 +1050,41 @@ module AbstractSet = struct
     | Top -> Top
     | Sets tl -> Sets (List.map (TSet.generalize vars) tl)
 
-  let not_in_tset_under_cond
+  (** compute a list of conditions under which [∀ vars. target ≠ know] *)
+  let never_equal_subgoals
+      (env : Env.t) (hyps : TraceHyps.hyps)
+      ~(target : CondTerm.t)
+      ~(known : CondTerm.t)
+      (vars : Vars.vars) : Term.term 
+    =
+    let eqs = equal_term_name_eq env hyps ~target ~known in
+    match eqs with
+    | Some eqs when List.mem Term.mk_true eqs -> Term.mk_true
+    | Some eqs -> Term.mk_ors ~simpl:true eqs
+    | None ->
+      Term.mk_forall vars
+        (Term.mk_impl 
+           (Term.mk_ands (target.conds @ known.conds))
+           (Term.mk_neq target.term known.term))
+
+  (** compute a list of conditions under which [term ∉ tsets] *)
+  let not_in_tset_subgoals
       (env   : Env.t)
       (hyps  : TraceHyps.hyps)
       (term  : CondTerm.t)
-      (tsets : TSet.t list) : bool * Term.terms
+      (tsets : TSet.t list) : Term.terms
     =
-    let rec not_in_tset (tsets : TSet.t list) (subgoals : Term.terms)  =
-      match tsets with
-      | [] -> Some subgoals
-      | tset::q ->
-        let tset = TSet.refresh tset in
-        let subgoal =
-          never_equal_subgoals env hyps
-            ~target:term
-            ~known:{term = tset.term; conds = tset.conds}
-            tset.vars
-        in
-        match  subgoal with
-        | Some subgoal ->
-          not_in_tset q (((Term.mk_forall ~simpl:true tset.vars) subgoal)::subgoals )
-        | None -> None
+    let not_in_tset (tset : TSet.t) =
+      let tset = TSet.refresh tset in
+      let subgoal =
+        never_equal_subgoals env hyps
+          ~target:term
+          ~known:{term = tset.term; conds = tset.conds}
+          tset.vars
+      in
+      Term.mk_forall ~simpl:true tset.vars subgoal
     in
-    match not_in_tset tsets [] with
-    | Some eqs -> true,eqs
-    | None -> false,[]
+    List.rev_map not_in_tset tsets
 
 
   (** Abstract memory represented by an association list *)
@@ -1118,9 +1111,9 @@ module AbstractSet = struct
   let generalize (vars:Vars.vars) (mem:mem) =
     List.map (fun (v,set) -> (v,generalize_set vars set)) mem
 
-  (** Checks that var is in the domain *)
-  let mem (var:Vars.var) (mem : mem) =
-    let res =  List.mem_assoc var  mem in  res
+  (** Checks that [var] is in the domain *)
+  let mem_domain (var:Vars.var) (mem : mem) : bool =
+    List.mem_assoc var mem
 
   let find (var:Vars.var) (mem : mem) = List.assoc var mem
 
@@ -1138,23 +1131,30 @@ module AbstractSet = struct
   let join env hyps (mem1 : mem) (mem2 : mem) : mem =
     List.fold_left (fun mem1 (v, l) -> append env hyps v l mem1) mem1 mem2
 
-  (* FIXME: convergence is not guaranteed, only soundness *)
+  (* convergence is not guaranteed, only soundness *)
   let widening env hyps (old_mem : mem) (new_mem : mem) = 
     join env hyps old_mem new_mem
 
-  let abstract_term
-      (env : Env.t) hyps
+  (* abstract evaluation of a term of type [Set.t] *)
+  let abstract_set
+      (env : Env.t) (hyps : TraceHyps.hyps)
       (term : Term.term)
       (conds : Term.terms)
       (assertion : mem): t
     =
     let rec doit = function
-      | Term.Var v when mem v assertion  -> (find v assertion)
-      | Term.App (Term.Fun (add,_), [t1;t2] )
+      (* variable *)
+      | Term.Var v when mem_domain v assertion -> find v assertion
+
+      (* [{t} ∪ s] *)
+      | Term.App (Term.Fun (add,_), [t;s] )
         when add = Library.Set.fs_add env.table ->
-        union env hyps (doit t2) (Sets [(TSet.singleton t1  conds)])
+        union env hyps (doit s) (Sets [(TSet.singleton t conds)])
+
+      (* ∅ *)
       | Term.Fun(empty_set,_)
         when empty_set = Library.Set.const_emptyset env.table -> Sets []
+
       | _ -> Top
     in
     doit term
@@ -1179,93 +1179,108 @@ module AbstractSet = struct
       | [] -> mem
       | (var,term)::q ->
         let term = Term.subst cond_subst (Term.subst subst term) in
-        let abstract_term = abstract_term env hyps term conds mem in
+        let abstract_term = abstract_set env hyps term conds mem in
         compute_decls q (append env hyps var abstract_term mem) 
     in
     let new_mem = compute_decls decls mem in 
     (List.fold_left (fun x -> fun y -> remove y x) new_mem [])
 
-  (* compute the inital abstract memory from a list of mutable
-     variables and their initial values *)
+  (** compute the inital abstract memory from a list of mutable
+      variables and their initial values *)
   let init env hyps (mutable_var_decls : (Vars.var * Term.t) list) : mem =
     update env hyps Mvar.empty [] [] mutable_var_decls []
 
-  let rec boolean_abstraction_supported
+  let rec bool_abstraction_supported
       (env : Env.t)
       (assertion : mem)
-      (bool_term : Term.term)
+      (bool_term : Term.term) : bool
     =
     match bool_term with
-    | Term.Var(v) when mem v assertion -> true
+    | Term.Var v when mem_domain v assertion -> true
+
     | Term.Fun(empty_set,_)
       when empty_set = Library.Set.const_emptyset env.table -> true
+
     | t when t = Term.mk_false || t = Term.mk_true -> true
+
     | Term.App (Term.Fun (f_mem,_),[_;_])
       when f_mem = Library.Set.fs_mem env.table->
       true
+
     | Term.App (Term.Fun (add,_), [_;_] )
       when add = Library.Set.fs_add env.table ->
       true   
+
     | Term.App (Term.Fun(f_not, _),[t])
-      when Term.f_not = f_not ->  boolean_abstraction_supported env assertion t
-    | Term.App (Term.Fun(f_and, _),[t1;t2]) when f_and = Term.f_and ->
-      let b1 = boolean_abstraction_supported env assertion t1 in
-      let b2 = boolean_abstraction_supported env assertion t2 in
+      when Term.f_not = f_not ->  bool_abstraction_supported env assertion t
+
+    | Term.App (Term.Fun(f, _),[t1;t2]) when f = Term.f_and || f = Term.f_or ->
+      let b1 = bool_abstraction_supported env assertion t1 in
+      let b2 = bool_abstraction_supported env assertion t2 in
       b1 && b2 
-    | Term.App (Term.Fun(f_or, _),[t1;t2]) when f_or = Term.f_or ->
-      let b1 = boolean_abstraction_supported env assertion t1 in
-      let b2 = boolean_abstraction_supported env assertion t2 in
-      b1 && b2 
+
     | _ -> false
  
 
-  (** Abstractly evaluate [bool_term] in [mem] *)
-  let abstract_boolean
+  (** Abstract evaluation of a boolean term [bool_term] in [mem] *)
+  let abstract_bool
       (env : Env.t)
       (hyps : TraceHyps.hyps)
       (table : Symbols.table)
       (bool_term : CondTerm.t) 
-      (mem : mem)     
+      (mem : mem) : Term.terms option
     =
-    let rec abstract_boolean_and_not (term:Term.term) = 
+    let rec abstract_bool_and_not
+        (term : Term.term)
+      : bool option * bool option * Term.terms
+      = 
       match term with
-      | Term.App ( Term.Fun (f_mem,_),[t_el;t_set])
-        when f_mem = Library.Set.fs_mem table->
-        let set = abstract_term env hyps t_set bool_term.conds mem in
+      (* [t ∈ set] *)
+      | Term.App ( Term.Fun (f_mem,_),[t;set])
+        when f_mem = Library.Set.fs_mem table ->
+        let set = abstract_set env hyps set bool_term.conds mem in
         begin
           match set with
-          | Top -> None,None,[]
-          | Sets [] -> (Some false),(Some true),[]
+          | Top -> None, None, []
+          | Sets [] -> Some false, Some true, []
           | Sets tl ->
-            let not_in =
-              not_in_tset_under_cond env hyps {term = t_el; conds = bool_term.conds } tl
+            let not_in_subgs =
+              not_in_tset_subgoals env hyps {term = t; conds = bool_term.conds } tl
             in 
-            if fst not_in
-            then None ,Some true, snd not_in
-            else None ,None     , []           
+            None, Some true, not_in_subgs
         end
+
+      (* ¬ *)
       | Term.App (Term.Fun(f_not, _),[t]) when Term.f_not = f_not ->
-        let bool,not_bool,eqs = abstract_boolean_and_not t in
-        (not_bool, bool, eqs)
+        let bool, not_bool, eqs = abstract_bool_and_not t in
+        not_bool, bool, eqs
+
+      (* ∧ *)
       | Term.App (Term.Fun(f_and, _),[t1;t2]) when f_and = Term.f_and ->
-        let bool1,not_bool1,eq1 = abstract_boolean_and_not t1 in
-        let bool2,not_bool2,eq2 = abstract_boolean_and_not t2 in
-        omap2 (&&) bool1 bool2 , omap2 (||) not_bool1 not_bool2, eq1 @ eq2
+        let bool1,not_bool1,eq1 = abstract_bool_and_not t1 in
+        let bool2,not_bool2,eq2 = abstract_bool_and_not t2 in
+        omap2 (&&) bool1 bool2, omap2 (||) not_bool1 not_bool2, eq1 @ eq2
+
+      (* ∨ *)
       | Term.App (Term.Fun(f_or, _),[t1;t2]) when f_or = Term.f_or ->
-        let bool1,not_bool1,eq1 = abstract_boolean_and_not t1 in
-        let bool2,not_bool2,eq2 = abstract_boolean_and_not t2 in
+        let bool1,not_bool1,eq1 = abstract_bool_and_not t1 in
+        let bool2,not_bool2,eq2 = abstract_bool_and_not t2 in
         omap2 (||) bool1 bool2, omap2 (&&) not_bool1 not_bool2, eq1 @ eq2
-                                                                                 
-      | t when t = Term.mk_true  ->  Some true , Some false, []
-      | t when t = Term.mk_false ->  Some false, Some true , []
-      | _ -> None,None,[]
+
+      (* ⊤ *)
+      | t when t = Term.mk_true  -> Some true , Some false, []
+
+      (* ⊥ *)
+      | t when t = Term.mk_false -> Some false, Some true , []
+
+      | _ -> None, None, []
     in
-    let b,_,eqs = abstract_boolean_and_not bool_term.term in
+    let b,_,eqs = abstract_bool_and_not bool_term.term in
     match b with
     | Some b when b -> Some eqs
     | _ -> None
 
-
+  (*-----------------------------------------------------------------*)
   (** Check that [mem1] is included in [mem2], i.e. 
       for each variable [v], [mem1(v) ⊆ mem2(v)] *)
   let is_leq
@@ -1277,6 +1292,7 @@ module AbstractSet = struct
     in
     List.for_all check_var mem1
 
+  (*-----------------------------------------------------------------*)
   (** Check that [mem1] is equal to [mem2], i.e. for each variable
       [v], [mem1(v) = mem2(v)] *)
   let is_eq
@@ -1651,7 +1667,7 @@ module Game = struct
     =
     match output with
     | Term.App (Term.Fun(f,_),[t0;t1;t2] ) when f=Term.f_ite ->
-      if not (boolean_abstraction_supported env mem t0)
+      if not (bool_abstraction_supported env mem t0)
       then [output,[]]
       else
         let l1 = term_and_cond env mem t1 in
@@ -1991,7 +2007,7 @@ module Game = struct
       in
       let oracle_conds = Term.subst subst_eqs oracle_cond in
       let mem_subgoals =
-        abstract_boolean query.env query.hyps query.env.table  
+        abstract_bool query.env query.hyps query.env.table  
           { term  = oracle_conds;
             conds; } query.initial_mem
       in     
