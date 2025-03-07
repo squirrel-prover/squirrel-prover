@@ -394,7 +394,7 @@ let global_prf
     let ns = Term.mk_symb n Type.tmessage in
     Term.mk_find is Term.(
         mk_and
-          (mk_atom `Eq (Term.mk_var fresh_x_var) h_cnt)
+          (mk_eq (Term.mk_var fresh_x_var) h_cnt)
           (mk_eqs ~simpl_tuples:true left_key_ids h_key.args)
       ) (Term.mk_name_with_tuple_args ns (Term.mk_vars is)) hash_pattern
   in
@@ -573,7 +573,7 @@ let global_cca
      in plaintext *)
   let tryfind_dec =
     Term.mk_find is Term.(
-        (mk_atom `Eq (Term.mk_var fresh_x_var) new_enc)
+        (mk_eq (Term.mk_var fresh_x_var) new_enc)
       ) (plaintext) dec_pattern
   in
 

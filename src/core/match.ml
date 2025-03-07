@@ -2337,7 +2337,7 @@ let known_set_check_exec_case
       | Term.Macro (ms, _, ts) when is_exec ms && ms = ms' ->
         begin
           let term_impl =
-            Term.mk_impl (Term.mk_ands hyps) (Term.mk_atom `Leq ts' ts)
+            Term.mk_impl (Term.mk_ands hyps) (Term.mk_leq ts' ts)
           in
           try Constr.is_tautology ~exn:Fail ~table ~timeout term_impl with Fail -> false
         end
@@ -3062,12 +3062,12 @@ let term_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : term_set =
     let cond_le = match mset.cond_le with
       | None -> []
       | Some cond_le ->
-        [Term.mk_atom `Leq (Term.mk_var t) cond_le]
+        [Term.mk_leq (Term.mk_var t) cond_le]
     in
     let extra_cond_le = match extra_cond_le with
       | None -> []
       | Some ts' ->
-        [Term.mk_atom `Lt (Term.mk_var t) ts']
+        [Term.mk_lt (Term.mk_var t) ts']
     in
     cond_le @ extra_cond_le
   in
@@ -3444,7 +3444,7 @@ let strengthen
     | `Def body ->
       let cond = match cand.cond_le with
         | Some cond_le ->
-          Term.mk_atom `Leq ts cond_le
+          Term.mk_leq ts cond_le
         | None -> Term.mk_true
       in
 

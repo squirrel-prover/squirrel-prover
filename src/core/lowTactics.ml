@@ -965,7 +965,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let conclusion = S.subst_conc ts_subst (S.conclusion s) in
         let prem =
           S.Conc.mk_exists_tagged ~simpl:false indices
-            (S.unwrap_conc (Local (Term.mk_atom `Eq ts ts_case)))
+            (S.unwrap_conc (Local (Term.mk_eq ts ts_case)))
         in
         S.set_conclusion (S.Conc.mk_impl ~simpl:false prem conclusion) s
       ) cases
@@ -1524,7 +1524,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else if S.Conc.is_neq form then
         begin
           let u, v = oget (S.Conc.destr_neq form) in
-          let h = Term.mk_atom `Eq u v in
+          let h = Term.mk_eq u v in
           let h = S.unwrap_hyp (Local h) in
           let id, s = Hyps.add_i Args.Unnamed (LHyp h) s in
           let s = S.set_conclusion S.Conc.mk_false s in
@@ -2340,7 +2340,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         Equiv.Babel.convert
           ~dst:S.conc_kind
           ~src:Equiv.Local_t
-          (Term.mk_atom `Lt (Term.mk_var v') (Term.mk_var v))
+          (Term.mk_lt (Term.mk_var v') (Term.mk_var v))
       in
 
       S.Conc.mk_forall_tagged ~simpl:false
@@ -2990,7 +2990,7 @@ type form_type =
       if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
         let atom =
           Equiv.Babel.convert
-            (Term.mk_atom `Lt a1 a2)
+            (Term.mk_lt a1 a2)
             ~src:Equiv.Local_t ~dst:S.conc_kind in
         let g = S.Conc.mk_impl ~simpl:false atom (S.conclusion s) in
         [happens_premise s a2;
@@ -3017,7 +3017,7 @@ type form_type =
     let s = S.subst subst (S.set_vars env s) in
     let eq =
       Equiv.Babel.convert
-        (Term.mk_atom `Eq (Term.mk_var x) t)
+        (Term.mk_eq (Term.mk_var x) t)
         ~src:Equiv.Local_t ~dst:S.conc_kind in
     S.set_conclusion (S.Conc.mk_impl ~simpl:false eq (S.conclusion s)) s
 

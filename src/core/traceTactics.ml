@@ -74,7 +74,7 @@ let case_cond orig vars c t e s : sequent list =
         case_vars
         (Term.mk_and ~simpl:false
            case_cond
-           (Term.mk_atom `Eq orig case_t))
+           (Term.mk_eq orig case_t))
     in
 
     let case_conclusion =
@@ -763,7 +763,7 @@ let deprecated_fresh_occ_incl
   let mk_dum a is cond =
     let action = SE.action_to_term table system a in
     Term.mk_ands ~simpl:false
-      ((Term.mk_atom `Eq Term.init action) ::
+      ((Term.mk_eq Term.init action) ::
        (Term.mk_ands (List.map2 (Term.mk_eq ~simpl:false) is is)) ::
        [cond])
   in
@@ -1485,7 +1485,7 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
          | Term.App (Fun (hash1, _), [Tuple [m1; Name (key1,args1)]]),
            Term.App (Fun (hash2, _), [Tuple [m2; Name (key2,args2)]])
            when hash1 = hash2 && (key1,args1) = (key2,args2) ->
-           Term.mk_atom `Eq m1 m2 :: acc
+           Term.mk_eq m1 m2 :: acc
          | _ -> acc)
       [] hash_eqs
   in

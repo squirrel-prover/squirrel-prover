@@ -553,7 +553,6 @@ val mk_timestamp_leq : term -> term -> term
 val mk_neqs : ?simpl:bool -> ?simpl_tuples:bool -> terms -> terms -> term
 val mk_eqs  : ?simpl:bool -> ?simpl_tuples:bool -> terms -> terms -> term
 
-val mk_atom : Lit.ord -> term -> term -> term
 val mk_happens : term -> term
 
 val mk_seq    : ?simpl:bool -> Vars.vars -> term -> term

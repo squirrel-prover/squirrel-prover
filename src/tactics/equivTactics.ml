@@ -1907,7 +1907,7 @@ let global_diff_eq (s : ES.t) =
                     (List.map Term.mk_happens ts_list
                      @ List.map (fun t -> Term.mk_macro Macros.Classic.exec [] t) ts_list
                      @ [cond])
-                    (Term.mk_atom `Eq s1 s2))
+                    (Term.mk_eq s1 s2))
               ))
            s
         )
@@ -2012,7 +2012,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   let subgoal =
     let form =
       Term.mk_exists ~simpl:true seq_vars
-        (Term.mk_atom `Eq t seq_term)
+        (Term.mk_eq t seq_term)
     in
     let trace_s = ES.to_trace_sequent (ES.set_reach_conclusion form s) in
     Goal.Local trace_s
@@ -2089,7 +2089,7 @@ let const_seq
   (* second sub-goal: (∧ᵢ (∀ e_is, bᵢ → tᵢ = e_ti) *)
   let eqs = List.map (fun (t_bool, term) ->
       Term.mk_forall ~simpl:true e_is
-        (Term.mk_impl t_bool (Term.mk_atom `Eq e_ti term))
+        (Term.mk_impl t_bool (Term.mk_eq e_ti term))
     ) b_t_terms
   in
   let cond2 = Term.mk_ands ~simpl:true eqs in

@@ -1938,8 +1938,6 @@ module Lit = struct
 
 end
 
-let mk_atom = Lit.mk_atom
-
 (*------------------------------------------------------------------*)
 let eq_triv f = match destr_eq f with
   | Some (t1,t2) when t1=t2 ->
