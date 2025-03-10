@@ -429,7 +429,6 @@ let mk_vars (l : Vars.vars) : terms = List.map mk_var l
 let mk_action a is = Action (a,is)
 
 let mk_tuple l = match l with
-  | [] -> assert false
   | [a] -> a
   | _ -> Tuple l
 
