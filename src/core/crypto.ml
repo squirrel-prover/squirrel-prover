@@ -1012,6 +1012,7 @@ module AbstractSet = struct
   let _pp ppe fmt (t:t) =
     match t with
     | Top -> Fmt.pf fmt "T"
+    | Sets [] -> Fmt.pf fmt "∅"
     | Sets tl -> Fmt.pf fmt "@[[%a ]@]" (Fmt.list ~sep:Fmt.comma (TSet._pp ppe)) tl
 
   let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
@@ -1102,9 +1103,9 @@ module AbstractSet = struct
 
   let _pp_mem ppe (fmt : Format.formatter) (ass : mem)  : unit =  
     let pp (fmt) (v,t) =
-      Fmt.pf fmt "@[%a -> %a @]" (Vars._pp ppe) v (_pp ppe) t
+      Fmt.pf fmt "@[%a → %a@]" (Vars._pp ppe) v (_pp ppe) t
     in
-    Fmt.pf fmt "@[{%a }@]" (Fmt.list pp) ass
+    Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp) ass
 
   let[@warning "-32"] pp_mem     = _pp_mem (default_ppe ~dbg:false ())
   let[@warning "-32"] pp_mem_dbg = _pp_mem (default_ppe ~dbg:true ())
@@ -1658,7 +1659,7 @@ let _pp_query (ppe : ppenv) fmt (query,outputs:query*CondTerm.t list) =
   in
   let pp_mem fmt =
     if query.initial_mem = [] then Fmt.pf fmt "" else
-      Fmt.pf fmt "@[<hov 2>mem:@ @[%a@]@]@;"
+      Fmt.pf fmt "@[<hv 2>memory:@ %a@]@;"
         (AbstractSet._pp_mem ppe) query.initial_mem
   in
   let pp_query fmt =
@@ -2084,7 +2085,7 @@ module Game = struct
         ((AbstractSet._pp_mem ppe)) cor.post
     in
     Fmt.pf fmt "@[<hv 0>New constraints: %t@ \
-                Post-condition:%t@ \
+                @[<hv 2>Post-condition:@ %t@]@ \
                 Under index condition: %t@ \
                 Under memory condition: %t@ \
                 Under additional subgoals: %t@ @]"
