@@ -60,10 +60,25 @@
 
  (defun display-ansi-colors ()
   (proof-with-current-buffer-if-exists proof-response-buffer
-  (let ((inhibit-read-only t))
+  (let (
+      ;; inhibit read-only mode to apply ANSI escape codes
+      (inhibit-read-only t)
+      ;; use text properties rather than overlays improves performances
+      ;; https://emacs.stackexchange.com/a/38608
+      (ansi-color-apply-face-function
+       (lambda (beg end face)
+         (when face
+           (put-text-property beg end 'font-lock-face face))))
+    )
     (ansi-color-apply-on-region (point-min) (point-max))))
   (proof-with-current-buffer-if-exists proof-goals-buffer
-  (let ((inhibit-read-only t))
+  (let (
+      ;; same as above
+      (inhibit-read-only t)
+      (ansi-color-apply-face-function
+       (lambda (beg end face)
+         (when face
+           (put-text-property beg end 'font-lock-face face)))))
     (ansi-color-apply-on-region (point-min) (point-max)))))
 
  (add-hook 'proof-shell-handle-delayed-output-hook
