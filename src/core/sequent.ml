@@ -1502,6 +1502,9 @@ module Mk (Args : MkArgs) : S with
         assert false
       (* cannot happen (thanks to generalization in [gen_and_close]) *)
  
+      | Cycle ->
+        Tactics.soft_failure ~loc (Failure (Fmt.str "%a" Infer.pp_error_result Cycle))
+
       | BadInstantiation e ->
         Tactics.soft_failure ~loc (Failure (Fmt.str "%t" e))
     in

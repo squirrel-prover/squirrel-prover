@@ -76,6 +76,7 @@ val unify_se_context : env -> SE.context -> SE.context -> [`Fail | `Ok]
 
 (*------------------------------------------------------------------*)
 type 'a result =
+  | Cycle 
   | FreeTyVars
   | FreeSystemVars
   | BadInstantiation of (Format.formatter -> unit)

@@ -244,6 +244,7 @@ let rw_inst
         (* Check that all type variables have been infered.
            Remark: type unification environments are stateful *)
         match Infer.close env ienv with
+        | Infer.Cycle
         | Infer.FreeTyVars
         | Infer.FreeSystemVars
         | Infer.BadInstantiation _ ->

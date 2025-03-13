@@ -275,19 +275,21 @@ let make (table : Symbols.table) (parsed_goal : Parsed.t) : statement * t =
       make_obs_equiv table system
   in
 
+  let name = oget name in
+
   (* close the typing environment and substitute *)
   let subst =
     match Infer.close env ienv with        
     | Infer.Closed subst -> subst
 
     | _ as e ->
-      Tactics.hard_failure (Failure (Fmt.str "%a" Infer.pp_error_result e))
+      Typing.error (L.loc name) (Failure (Fmt.str "%a" Infer.pp_error_result e))
   in
 
   let formula = Equiv.Any_statement.gsubst subst formula in
   let goal = map (TS.gsubst subst) (ES.gsubst subst) goal in
 
-  let name = L.unloc (oget name) in
+  let name = L.unloc name in
 
   { name; params = { se_vars; ty_vars; }; system; formula },
   goal

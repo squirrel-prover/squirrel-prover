@@ -11,6 +11,10 @@ module Typing = Squirrelcore.Typing
 open Util
 
 (*------------------------------------------------------------------*)
+exception Ok 
+exception Ko
+  
+(*------------------------------------------------------------------*)
 (** utility to parse a term from a string. *)
 let term_of_string st string : Term.term =
   let t_p = Util.parse_from_string Parser.top_formula string in
@@ -119,8 +123,6 @@ This function test that the reification of t (in the prover state st) is pretty-
 (*------------------------------------------------------------------*)
 (*------------------------------------------------------------------*)
 let namespaces () =
-  let exception Ok in
-  let exception Ko in
   let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
       "\
@@ -214,10 +216,7 @@ end C2.
 
 (*------------------------------------------------------------------*)
 let crypto_parsing () =
-  let exception Ok in
-  let exception Ko in
 
-  (*------------------------------------------------------------------*)
   let ill_formed_game () =
     let st = Prover.init () in
     Prover.exec_all ~test:true st 
@@ -319,8 +318,6 @@ game G = {
 
 (*------------------------------------------------------------------*)
 let type_arguments () =
-  let exception Ok in
-  let exception Ko in
   let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
       "\
@@ -373,8 +370,6 @@ op bar ['a 'b] : ('a * 'b).
 
 (*------------------------------------------------------------------*)
 let generic_typing () =
-  let exception Ok in
-  let exception Ko in
   let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
       "\
@@ -414,7 +409,29 @@ type T.
     );
 
     ()
-    
+
+(*------------------------------------------------------------------*)
+let cycle_detection () =
+  let st = Prover.init () in
+
+  (* positive tests *)
+  let _ : Prover.state =
+    Prover.exec_all ~test:true st "lemma [any] _ x : x = 1." 
+  in
+
+  (* negative tests *)
+  Alcotest.check_raises "type inferrence cycle 1" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "lemma [any] _ x : x = (x,1)." with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
+  ()
+
+
 (*------------------------------------------------------------------*)
 let tests = [
   ("generic typing", `Quick, Util.catch_error generic_typing);
@@ -422,4 +439,5 @@ let tests = [
   ("type arguments", `Quick, Util.catch_error type_arguments);
   ("game parsing"  , `Quick, Util.catch_error crypto_parsing);
   ("reify"  , `Quick, Util.catch_error reify);
+  ("cycle detection", `Quick, Util.catch_error cycle_detection);
 ]

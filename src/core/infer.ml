@@ -4,6 +4,7 @@ open Utils
 module SE = SystemExprSyntax
 
 module Mid = Ident.Mid
+module Sid = Ident.Sid
 module Msv = SE.Var.M
 
 (*------------------------------------------------------------------*)
@@ -106,19 +107,31 @@ let open_params (env : env) (p : Params.t) =
   Params.Open.{ ty_vars; se_vars; }, subst
 
 (*------------------------------------------------------------------*)
-let norm_ty (env : env) (t : Type.ty) : Type.ty =
-  let rec doit : Type.ty -> Type.ty = function
+(** Internal exception *)
+exception Cycle
+
+(** When [fail_on_cycles] is [false], do not fail but return the type
+    partially normalized.
+
+    This is currently used in several exported functions, which use
+    [norm_ty] to clean-up the types (e.g. before printing some
+    user-level error). *)
+let norm_ty ?(fail_on_cycles = true) (env : env) (t : Type.ty) : Type.ty =
+  let rec doit (seen : Sid.t) : Type.ty -> Type.ty = function
     | TUnivar u as t ->
-      let u' = Mid.find_dflt t u !env.ty in
-      if Type.equal t u' then u' else doit u'
+      if Sid.mem u seen then 
+        if fail_on_cycles then raise Cycle else t
+      else
+        let u' = Mid.find_dflt t u !env.ty in
+        if Type.equal t u' then u' else doit (Sid.add u seen) u'
 
-    | Fun (t1, t2) -> Type.func (doit t1) (doit t2)
+    | Fun (t1, t2) -> Type.func (doit seen t1) (doit seen t2)
 
-    | Tuple l -> Type.tuple (List.map doit l)
+    | Tuple l -> Type.tuple (List.map (doit seen) l)
 
     | Message | Boolean | Index | Timestamp | TBase _ | TVar _ as t -> t
   in
-  doit t
+  doit Sid.empty t
 
 let norm_se0 (env : env) (se : SE.exposed) : SE.exposed =
   let rec doit (se : SE.exposed) : SE.exposed =
@@ -137,14 +150,18 @@ let norm_se (type a) (env : env) (se : a SE.expr) : a SE.expr =
 let norm_se_context (env : env) (c : SE.context) : SE.context =
   { set = norm_se env c.set; pair = omap (norm_se env) c.pair; }
 
-let norm_var (env : env) (v : Vars.var) = Vars.mk v.id (norm_ty env v.ty)
+(** Exported *)
+let norm_var (env : env) (v : Vars.var) = Vars.mk v.id (norm_ty ~fail_on_cycles:false env v.ty)
 
 (*------------------------------------------------------------------*)
-let norm_env (env : env) : unit =
-  env := {
-    ty = Mid.map (norm_ty env)             !env.ty;
-    se = Msv.map (fst_bind (norm_se0 env)) !env.se;
-  }
+let norm_env (env : env) : [`Ok | `Cycle] =
+  try
+    env := {
+      ty = Mid.map (norm_ty env)             !env.ty;
+      se = Msv.map (fst_bind (norm_se0 env)) !env.se;
+    };
+    `Ok
+  with Cycle -> `Cycle
 
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli`. *)
@@ -192,6 +209,7 @@ let check_se_subst
 
 (*------------------------------------------------------------------*)
 type 'a result =
+  | Cycle
   | FreeTyVars
   | FreeSystemVars
   | BadInstantiation of (Format.formatter -> unit)
@@ -199,6 +217,7 @@ type 'a result =
 
 let pp_error_result fmt = function
   | Closed _           -> assert false
+  | Cycle              -> Fmt.pf fmt "cycle in type inferrence"
   | FreeTyVars         -> Fmt.pf fmt "free type variables remaining"
   | FreeSystemVars     -> Fmt.pf fmt "free system variables remaining"
   | BadInstantiation e -> Fmt.pf fmt "bad system variable instantiation:@;%t" e
@@ -236,9 +255,12 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
         | `BadInst err -> Some err
       ) !ienv.se
   in
-  norm_env ienv;
+  
+  (* normalize the environment (by side-effects) + detect cycles *)
+  if norm_env ienv <> `Ok then
+    Cycle
 
-  if not (Mid.for_all (fun _ -> check_ty) !ienv.ty) then
+  else if not (Mid.for_all (fun _ -> check_ty) !ienv.ty) then
     FreeTyVars
 
   else if not (Msv.for_all (fun _ (se,_) -> check_se se) !ienv.se) then
@@ -256,14 +278,11 @@ let close (env : Env.t) (ienv : env) : Subst.t result =
       
 (*------------------------------------------------------------------*)
 (** Generalize unification variables and close the inference
-    environment. *)
-let gen_and_close
+    environment.
+    Must be called on a normalized environment. *)     
+let gen_and_close0
     (env : Env.t) (ienv : env) : (Params.t * Subst.t) result
   =
-
-  (* normalize the inference environment *)
-  norm_env ienv;
-
   (*------------------------------------------------------------------*)
   (* Find all type univars that are unconstrained and generalize them.
      Compute:
@@ -341,7 +360,7 @@ let gen_and_close
     Msv.fold (fun v se acc -> check_and_gen_se_vars v se acc) !ienv.se ([], [])
   in
   let failed = List.rev failed in (* put [failed] in the correct order *)
-  
+
   (* close the resulting environment *)
   match failed with
   | [] -> 
@@ -356,6 +375,14 @@ let gen_and_close
            failed)
 
 (*------------------------------------------------------------------*)
+(** normalize [ienv] then call [gen_and_close0] *)
+let gen_and_close (env : Env.t) (ienv : env) =
+  (* normalize the environment (by side-effects) + detect cycles *)
+  if norm_env ienv <> `Ok then
+    Cycle
+  else gen_and_close0 env ienv
+
+(*------------------------------------------------------------------*)
 (** [univar] are maximal for this ordering *)
 (* FIXME: why don't we restrict ourselves to [univar] in the domain of
    the inference environment? (as in [compare_se] below) *)
@@ -368,9 +395,6 @@ let compare_ty (t : Type.ty) (t' : Type.ty) : int =
 
 (*------------------------------------------------------------------*)
 let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
-  let t  = norm_ty env t
-  and t' = norm_ty env t' in
-
   let rec do_unif t t' : bool =
     let t, t' = if compare_ty t t' < 0 then t', t else t, t' in
 
@@ -389,7 +413,11 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
 
   and do_unifs l l' = List.for_all2 do_unif l l' in
 
-  if do_unif t t' then `Ok else `Fail
+  try
+    let t  = norm_ty env t
+    and t' = norm_ty env t' in
+    if do_unif t t' then `Ok else `Fail
+  with Cycle -> `Fail
 
 (*------------------------------------------------------------------*)
 (** system unification variables (i.e. variable in the domain of
@@ -431,3 +459,7 @@ let unify_se_context
     | Some p, Some p' -> unify_se env (p :> SE.t) (p' :> SE.t)
     | None, None -> `Ok
     | _ -> `Fail
+
+(*------------------------------------------------------------------*)
+(** Exported version of [norm_ty], with [fail_on_cycles] set to [false]. *)
+let norm_ty = norm_ty ~fail_on_cycles:false
