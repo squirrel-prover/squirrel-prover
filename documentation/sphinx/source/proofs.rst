@@ -726,7 +726,7 @@ Common tactics
 .. tacn:: rewrite {* @rw_arg} {? in @rw_target}
     
    .. prodn:: rw_arg ::= {| @s_item | @rw_item }
-               rw_item ::= {? {| {? @natural} ! | ?}} {? <-} {| (@proof_term) | /@ident | /( @infix_op) | /*}
+               rw_item ::= {? {| {? @natural} ! | ?}} {? -} {| (@proof_term) | /@ident | /( @infix_op) | /*}
                rw_target ::= {| @hypothesis_id | *}
        
    Apply a sequence of :term:`rewriting <rewrite ip item>`
@@ -745,7 +745,7 @@ Common tactics
        term unification environment --- as a local formula :n:`F` or
        global formula :n:`[F]` where 
        :n:`F = forall x1...xn, H1=>...=>Hn=> l = r`. 
-       At that point, :n:`l` and :n:`r` are swapped if the rewrite item is prefixed by :n:`<-`.
+       At that point, :n:`l` and :n:`r` are swapped if the rewrite item is prefixed by :n:`-`.
 
      + Then, Squirrel tries to unify :n:`l` with a sub-term of the
        rewrite target, where :n:`x1...xn` are handled as term
