@@ -789,9 +789,15 @@ Common tactics
     variables of the conclusion as specified by the given introduction
     patterns.
 
-.. tacn:: clear {* @hypothesis_id}
+.. tacn:: clear {* @ident}
+
+    :g:`clear id` drops the specified hypothesis, variable declaration or 
+    definition, as long as :g:`id` is not used elsewhere in the sequent.
     
-    Drop the specified hypotheses. 
+    :g:`clear id1 ... idN` is syntactic sugar for :g:`clear id1; ...; clear idN`.
+
+    Calling :g:`clear` without arguments clears all possible unused
+    variable declarations and definitions.
 
 .. tacn:: reduce {? @simpl_flags}
 
