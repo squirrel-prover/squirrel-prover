@@ -5,7 +5,6 @@
 (* R --> T: h(<h(<nR, nT, tag1>, k), nr, tag2>, k)*)
 
 set postQuantumSound = true.
-set timout=10.
 
 include Core.
 
