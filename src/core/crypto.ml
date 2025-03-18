@@ -25,6 +25,7 @@ module PathCond = Iter.PathCond
 
 let pp_check_mark fmt = Printer.kw `GoalAction fmt "✓"
 let pp_xmark fmt = Printer.kw `Goal fmt "✗"
+let pp_yellow_xmark fmt = Printer.kw `GoalName fmt "✗"
 
 (*------------------------------------------------------------------*)
 (** a variable declaration, with an initial value *)
@@ -2301,7 +2302,16 @@ let knowledge_mem_condterm_sets
   (*------------------------------------------------------------------------*)
 (** {2 Notify functions to print bi-deduction flow} *)
 
-
+let notify_drop_deduction (query : query) (subg : Term.t) =
+  let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
+  if not query.vbs && not query.dbg then () else
+    Printer.pr "@[<hov 2>\
+                %t Abandoning bideduction, add \
+                unreachability subgoal:@ @[%a@]\
+                @]@;@;"
+      pp_yellow_xmark
+      (Term._pp ppe) subg
+  
 let notify_bideduce_term_strict (query : query) (rule:string) =
   if not query.vbs && not query.dbg then () else
     Printer.pr "@[Apply rule %t@]@;@;"
@@ -2732,7 +2742,23 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
   | [] -> some (empty_result query.initial_mem)
   | term :: outputs ->
     match bideduce_term query term with
-    | None -> None
+    | None ->
+      (* Abandon the bideduction of [term], instead we ask the user to
+         prove that [term.conds] is unsatisfiable (thus, we must
+         bideduce [(witness | false)], which is trivial). *)
+      begin
+        let subg =
+          Term.mk_ors ~simpl:true (List.map Term.mk_not term.conds)
+        in
+        
+        notify_drop_deduction query subg;
+        
+        match bideduce query outputs with
+        | None -> None
+        | Some result ->
+          Some { result with subgoals = subg :: result.subgoals; }
+      end
+      
     | Some result ->
       (* Next query : following terms passing on deduced term and extras as inputs
          on the final memory of first bideduction.
@@ -2742,8 +2768,6 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
       let next_result = bideduce next_query outputs in
       match next_result with
       | None -> None
-      (* FEAT: we could generate a proof-obligation instead of faling
-         straight away here *)
       | Some next_result -> Some (chain_results result next_result)
 
 
