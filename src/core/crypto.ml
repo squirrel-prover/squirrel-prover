@@ -2739,7 +2739,7 @@ and bideduce_oracle
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
 and bideduce (query : query) (outputs : CondTerm.t list) : result option =
   match outputs with
-  | [] -> some (empty_result query.initial_mem)
+  | [] -> Some (empty_result query.initial_mem)
   | term :: outputs ->
     match bideduce_term query term with
     | None ->
@@ -2760,13 +2760,12 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
       end
       
     | Some result ->
-      (* Next query : following terms passing on deduced term and extras as inputs
+      (* Next query: following terms passing on deduced term and extras as inputs
          on the final memory of first bideduction.
          We also add global and adversarial constraints to help oracle call 
          in next query constraints  *)
       let next_query = transitivity_get_next_query query [term] result in 
-      let next_result = bideduce next_query outputs in
-      match next_result with
+      match bideduce next_query outputs with
       | None -> None
       | Some next_result -> Some (chain_results result next_result)
 
@@ -3552,23 +3551,20 @@ let prove
   
   match res with
   | Some result -> 
-    let oracle_subgoals = result.subgoals in
-    let final_consts = result.consts in
-
     Printer.pr "@[<v 0>"; (* open vertical box of final result *)
 
-    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game final_consts in
+    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game result.consts in
     
     Printer.pr
       "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"
-      (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) final_consts;
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) result.consts;
     Printer.pr
       "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe)) consts_subgs;
     Printer.pr
       "@[<v 2>Oracle subgoals are:@ %a@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
-      oracle_subgoals;
+      result.subgoals;
     Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) result.final_mem;
 
     Printer.pr "@;@]"; (* close vertical box of final result *)
@@ -3579,7 +3575,7 @@ let prove
       Reduction.mk_state
         ~hyps ~system:env.system ~params ~red_param env.table
     in
-    List.remove_duplicate (Reduction.conv state) (consts_subgs @ oracle_subgoals)
+    List.remove_duplicate (Reduction.conv state) (consts_subgs @ result.subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
 
