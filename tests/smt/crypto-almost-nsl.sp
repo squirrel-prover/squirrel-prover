@@ -2,8 +2,6 @@
 
 include Core.
 
-set timout=10.
-
 name k:message.
 abstract h : message -> message .
 

@@ -150,7 +150,7 @@ let start_main_loop ?(test=false) driver : unit =
   let prover_state =
     Prover.do_set_option
       state.prover_state
-      (TConfig.s_interactive, Config.Param_bool !interactive)
+      (L.mk_loc L._dummy TConfig.s_interactive, TConfig.Param_bool !interactive)
   in
   let state = { state with prover_state } in
   main_loop ~test state

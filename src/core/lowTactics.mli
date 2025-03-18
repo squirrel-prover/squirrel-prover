@@ -7,8 +7,6 @@ module SE = SystemExpr
 module St = Term.St
 module Sv = Vars.Sv
 
-val dbg : ?force:bool -> ('a, Format.formatter, unit) format -> 'a
-
 (*------------------------------------------------------------------*)
 (** {3 Miscellaneous} *)
 

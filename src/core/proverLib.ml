@@ -48,7 +48,7 @@ type bulleted_tactics = bulleted_tactic list
 (** Prover input *)
 type input = 
   | InputDescr of Decl.declarations
-  | SetOption of Config.p_set_param
+  | SetOption of TConfig.p_set_param
   | Tactic of bulleted_tactics
   | Print of print_query
   | Search of search_query

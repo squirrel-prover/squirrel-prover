@@ -1,12 +1,22 @@
 (** {1 Config Table} 
     Manipulation of Squirrel settings in the table. *)
 
-(** Reset all setting to their default values in the table. *)
-val reset_params : Symbols.table -> Symbols.table
+(*------------------------------------------------------------------*)
+type p_param_val =
+  | Param_bool   of bool
+  | Param_string of string
+  | Param_int    of int
+
+type p_set_param = Symbols.lsymb * p_param_val
+
+(*------------------------------------------------------------------*)
+(** Initialize all setting to their default values in the table. *)
+val init_params : Symbols.table -> Symbols.table
 
 (** Change a setting in the table. *)
-val set_param : (string * Config.p_param_val) -> Symbols.table -> Symbols.table
+val set : Symbols.lsymb -> p_param_val -> Symbols.table -> Symbols.table
 
+(*------------------------------------------------------------------*)
 (** {2 Look-up functions} *)
 
 (** Timeout for the solvers (completion.ml and constr.ml) in seconds. *)

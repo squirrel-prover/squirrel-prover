@@ -32,11 +32,6 @@ let wrap_fail f s sk fk =
   | exception Tactics.Tactic_soft_failure e -> fk e
 
 (*------------------------------------------------------------------*)
-let dbg ?(force=false) s =
-  let mode = if Config.debug_tactics () || force then `Dbg else `Ignore in
-  Printer.prt mode s
-
-(*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 let soft_failure_arg ?loc e = Tactics.Tactic_soft_failure (loc,e)
@@ -1044,7 +1039,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Clear} *)
 
-  let clear_lsymb (name : lsymb) s : S.t =
+  (** clear [name] from the proof-context *)
+  let clear_lsymb (name : lsymb) (s : S.t) : S.t =
     let env = S.vars s in
     let name_s = L.unloc name in
 
@@ -1082,13 +1078,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure ~loc:(L.loc name)
         (Failure ("unknown identifier " ^ name_s))
 
+  (* let clear_all (s : S.t) : S.t = s *)
 
   let clear_tac_args (args : Args.parser_arg list) s : S.t list =
     let s =
-      List.fold_left (fun s arg -> match arg with
+      List.fold_left (fun s arg ->
+          match arg with
           | Args.String_name arg -> clear_lsymb arg s
           | _ -> bad_args ()
-        ) s args in
+        ) s args
+    in
     [s]
 
   let clear_tac args = wrap_fail (clear_tac_args args)

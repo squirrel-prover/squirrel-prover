@@ -2,7 +2,6 @@
 
 (** Prover tactics, and tables for storing them. *)
 
-val dbg : ('a, Format.formatter, unit) format -> 'a
 val bad_args : unit -> 'a
 
 type judgment = Goal.t

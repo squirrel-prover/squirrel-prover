@@ -252,10 +252,8 @@ let assumption ?hyp (s : TS.t) =
   in
   if conclusion = Term.mk_true ||
      TS.Hyps.exists assumption_entails s
-  then begin
-    dbg "assumption %a" Term.pp conclusion;
-    []
-  end else soft_failure Tactics.NotHypothesis
+  then []
+  else soft_failure Tactics.NotHypothesis
 
 let do_assumption_tac args (s : TS.t) : TS.t list =
   let hyp =
@@ -548,13 +546,9 @@ let congruence (s : TS.t) : bool =
     up to equational theories. *)
 let congruence_tac (s : TS.t) =
   match congruence s with
-  | true ->
-    let () = dbg "closed by congruence" in
-    []
+  | true -> []
 
-  | false ->
-    let () = dbg "congruence failed" in
-    soft_failure Tactics.CongrFail
+  | false -> soft_failure Tactics.CongrFail
 
 let () =
   T.register "congruence"
@@ -577,13 +571,9 @@ let constraints (s : TS.t) =
 let constraints_ttac (s : TS.t) =
   let s = as_seq1 (TraceLT.intro_all s) in
   match constraints s with
-  | true ->
-    let () = dbg "closed by constraints" in
-    []
+  | true -> []
 
-  | false ->
-   let () = dbg "constraints failed" in
-   soft_failure (Tactics.Failure "constraints satisfiable")
+  | false -> soft_failure (Tactics.Failure "constraints satisfiable")
 
 let constraints_tac args : LT.ttac =
   match args with
@@ -703,7 +693,6 @@ let eq_names (s : TS.t) =
   let env   = TS.env   s in
 
   let add_hyp s c =
-    let () = dbg "new equalities (eqnames): %a" Term.pp c in
     TS.Hyps.add Args.Unnamed (LHyp (Local c)) s
   in
 

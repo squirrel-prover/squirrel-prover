@@ -84,4 +84,4 @@ val search_about :
   state -> ProverLib.search_query ->
   (Lemma.lemma * Equiv.any_form list) list
 
-val do_set_option : state -> Config.p_set_param -> state
+val do_set_option : state -> TConfig.p_set_param -> state

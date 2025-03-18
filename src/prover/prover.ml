@@ -31,7 +31,7 @@ type state = {
 (* GoalMode is always the initial prover_mode *)
 let init' () : state = 
 { goals         = [];
-  table         = TConfig.reset_params (Symbols.builtins_table ());
+  table         = TConfig.init_params (Symbols.builtins_table ());
   current_goal  = None;
   bullets       = Bullets.empty_path;
   subgoals      = [];
@@ -50,8 +50,8 @@ let get_subgoals (ps:state) : Goal.t list =
 let set_table (ps:state) (table: Symbols.table) : state =
   { ps with table }
 
-let do_set_option (st:state) (sp:Config.p_set_param) : state =
-  { st with table = TConfig.set_param sp st.table }
+let do_set_option (st:state) ((v,value):TConfig.p_set_param) : state =
+  { st with table = TConfig.set v value st.table }
 
 let add_hint (ps:state) (h: Hint.p_hint) : state =
   { ps with table = ProcessDecl.add_hint ps.table h; }

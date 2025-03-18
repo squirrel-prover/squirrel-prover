@@ -20,7 +20,7 @@ module TacTable : sig
 
   val add_tac : string -> Goal.t tac_infos -> unit
 
-  val pp_goal_concl : Goal.t formatter
+  val[@warning "-32"] pp_goal_concl : Goal.t formatter
 end = struct
   let table = Hashtbl.create 97
   let tac_count_table = Hashtbl.create 97
@@ -82,7 +82,7 @@ end)
 
 (* ----------------------------------------------------------------------- *)
 
-let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
+(* let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s *)
 
 let bad_args () = Tactics.hard_failure (Failure "improper arguments")
 
@@ -96,8 +96,8 @@ let register_general id ?(pq_sound=false) f =
   let () = assert (not (Hashtbl.mem table id)) in
 
   let f args s sk fk =
-    dbg "@[<hov>calling tactic %s on@ @[%a@]@]"
-      id TacTable.pp_goal_concl s;
+    (* dbg "@[<hov>calling tactic %s on@ @[%a@]@]" *)
+    (*   id TacTable.pp_goal_concl s; *)
     f args s sk fk
   in
 

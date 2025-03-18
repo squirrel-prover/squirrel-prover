@@ -1610,16 +1610,16 @@ lemma:
 
 (*------------------------------------------------------------------*)
 option_param:
-| TRUE  { Config.Param_bool true  }
-| FALSE { Config.Param_bool false }
+| TRUE  { TConfig.Param_bool true  }
+| FALSE { TConfig.Param_bool false }
 | n=id  {
-        if n = "true" then (Config.Param_bool true)
-        else if n = "false" then (Config.Param_bool false)
-        else Config.Param_string n   }
-| i=INT { Config.Param_int i      }
+        if n = "true" then (TConfig.Param_bool true)
+        else if n = "false" then (TConfig.Param_bool false)
+        else TConfig.Param_string n   }
+| i=INT { TConfig.Param_int i      }
 
 set_option:
-| SET n=id EQ param=option_param TERMINAL   { (n, param) }
+| SET n=lsymb EQ param=option_param TERMINAL   { (n, param) }
 
 (*------------------------------------------------------------------*)
 _hint:

@@ -14,9 +14,6 @@ module Sv = Vars.Sv
 type lsymb = Typing.lsymb
 
 (*------------------------------------------------------------------*)
-let dbg = LT.dbg
-
-(*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 

@@ -21,8 +21,8 @@ let var_info = Vars.Tag.make Vars.Local
 
 (*------------------------------------------------------------------*)
 (* For debugging *)
-let dbg ?(force=false) s =
-  let mode = if Config.debug_tactics () || force then `Dbg else `Ignore in
+let dbg ?(force=false) table s =
+  let mode = if TConfig.debug_tactics table || force then `Dbg else `Ignore in
   Printer.prt mode s
 
 (*------------------------------------------------------------------*)
@@ -509,16 +509,21 @@ let get_trs (s : sequent) =
 
 let eq_atoms_valid s =
   let trs = get_trs s in
-  let () = dbg "trs: %a" Completion.pp_state trs in
+  let () = dbg s.env.table "trs: %a" Completion.pp_state trs in
 
   let _, neqs = get_eqs_neqs s.proof_context in
   List.exists (fun (Term.ESubst (a, b)) ->
       if Completion.check_equalities trs [(a,b)] then
-        let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
+        let () =
+          dbg s.env.table "dis-equality %a ≠ %a violated"
+            Term.pp a Term.pp b
+        in
         true
       else
-        let () = dbg "dis-equality %a ≠ %a: no violation"
-            Term.pp a Term.pp b in
+        let () =
+          dbg s.env.table "dis-equality %a ≠ %a: no violation"
+            Term.pp a Term.pp b
+        in
         false)
     neqs
 
