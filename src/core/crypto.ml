@@ -2320,10 +2320,10 @@ let notify_bideduce_term_strict (query : query) (rule:string) =
 let notify_bideduce_immediate (query : query) ~(direct : bool) =
   if not query.vbs && not query.dbg then () else
   if direct then
-    Printer.pr "%t done: output directly computable@;"
+    Printer.pr "%t done: output directly computable@;@;"
       pp_check_mark
   else
-    Printer.pr "%t done: ouptut appears in inputs@;"
+    Printer.pr "%t done: ouptut appears in inputs@;@;"
       pp_check_mark
 
 let notify_bideduce_loop
