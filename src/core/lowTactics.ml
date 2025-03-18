@@ -1039,6 +1039,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Clear} *)
 
+  (** can a definition [v] be cleared from [s] *)
+  let can_clear_definition (v : Ident.t) (s : S.t) : bool =
+    let fv =
+      let s = Hyps.remove v s in
+      S.fv s
+    in
+    Sv.for_all (fun v' -> v'.id <> v) fv 
+
+  (** clear a variable definition [v : ty] from [s] *)
+  let clear_definition (id : Ident.t) ty (s : S.t) : S.t =
+    let env = S.vars s in
+    Hyps.remove id s |>
+    S.set_vars (Vars.rm_var (Vars.mk id ty) env)
+
+  (** can a variable declaration [v] be cleared from [s] *)
+  let can_clear_declaration (v : Vars.var) (s : S.t) : bool =
+    Sv.for_all (not -| Vars.equal v) (S.fv s) 
+
+  (** clear variable declaration [v] from [s] *)
+  let clear_declaration (v : Vars.var) (s : S.t) : S.t =
+    let env = S.vars s in
+    S.set_vars (Vars.rm_var v env) s
+
   (** clear [name] from the proof-context *)
   let clear_lsymb (name : lsymb) (s : S.t) : S.t =
     let env = S.vars s in
@@ -1046,21 +1069,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     if Hyps.mem_name name_s s then
       begin (* clear an hypothesis or a definition *)
-        let hid,_ = Hyps.by_name name s in
-        match Hyps.by_id hid s with
-        | LHyp _ -> Hyps.remove hid s
+        let id,_ = Hyps.by_name name s in
+        match Hyps.by_id id s with
+        | LHyp _ -> Hyps.remove id s
         | LDef (_,t) ->
-
-          let fv =
-            let s = Hyps.remove hid s in
-            S.fv s
-          in
-          if Sv.exists (fun v -> v.id = hid) fv then
+          if not (can_clear_definition id s) then
             soft_failure ~loc:(L.loc name)
               (Failure "cannot clear definition: used in the sequent");
 
-          Hyps.remove hid s |>
-          S.set_vars (Vars.rm_var (Vars.mk hid (Term.ty t)) env)
+          clear_definition id (Term.ty t) s
       end
       
     else if Vars.mem_s env name_s then
@@ -1068,27 +1085,61 @@ module MkCommonLowTac (S : Sequent.S) = struct
          sequent. *)
       let v,_ = as_seq1 (Vars.find env name_s) in
 
-      if Sv.exists (Vars.equal v) (S.fv s) then
+      if not (can_clear_declaration v s) then
         soft_failure ~loc:(L.loc name)
           (Failure "cannot clear variable: used in the sequent");
 
-      S.set_vars (Vars.rm_var v env) s
+      clear_declaration v s
 
     else 
       soft_failure ~loc:(L.loc name)
         (Failure ("unknown identifier " ^ name_s))
 
-  (* let clear_all (s : S.t) : S.t = s *)
+  (** clear all unused definition and variable declaration from [s] *)
+  let rec clear_all (s : S.t) : S.t = 
+    let cleared1 = ref false in
+
+    (* clear unused definitions *)
+    let s = 
+      Hyps.fold (fun v decl s ->
+          match decl with
+          | LDef (_,t) -> 
+            if can_clear_definition v s 
+            then begin
+              cleared1 := true; 
+              clear_definition v (Term.ty t) s 
+            end
+            else s
+          | LHyp _ -> s
+        ) s s
+    in
+
+    (* clear unused declaration *)
+    let s = 
+      List.fold_left (fun s v ->
+          if can_clear_declaration v s then begin
+            cleared1 := true;
+            clear_declaration v s
+          end
+          else s
+        ) s (Vars.to_vars_list (S.vars s)) 
+    in
+    
+    (* fixpoint until [s] stable *)
+    if !cleared1 then clear_all s else s
 
   let clear_tac_args (args : Args.parser_arg list) s : S.t list =
-    let s =
-      List.fold_left (fun s arg ->
-          match arg with
-          | Args.String_name arg -> clear_lsymb arg s
-          | _ -> bad_args ()
-        ) s args
-    in
-    [s]
+    match args with
+    | [] -> [clear_all s]
+    | _ ->
+      let s =
+        List.fold_left (fun s arg ->
+            match arg with
+            | Args.String_name arg -> clear_lsymb arg s
+            | _ -> bad_args ()
+          ) s args
+      in
+      [s]
 
   let clear_tac args = wrap_fail (clear_tac_args args)
 

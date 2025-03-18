@@ -58,3 +58,34 @@ Proof.
     intro {y}.
     admit.
 Qed.
+
+(* test whole-sequent clearing tactic `clear`  *)
+global lemma _ (y : message) :  
+  Let x = empty in
+  Let z = x in
+  Let z2 = (x,y,z) in
+  [x = y] /\ [false] /\ [z2 = witness] /\ [false].
+Proof. 
+  intro *.
+  try repeat split.
+  + clear. 
+    (* check that `x` and `y` have not been cleared *)
+    have ?: x = y by admit.
+    admit.
+  + clear. 
+    (* check that `x` and `y` have been cleared *)
+    set x := 42. 
+    set y := 42.
+    admit.
+  + clear.
+    (* check that `x,y,z,z2` have not been cleared *)
+    have ?: x = y && z = witness && z2 = witness by admit.
+    admit.
+  + clear.
+    (* check that `x,y,z,z2` have been cleared *)
+    set x  := 42. 
+    set y  := 42.
+    set z  := 42.
+    set z2 := 42.
+    admit.
+Qed.

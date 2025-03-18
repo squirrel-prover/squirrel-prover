@@ -1324,7 +1324,7 @@ tac:
   | l=lloc(SET) n_ip=naming_pat system=at_X_annot(SYSTEM)? COLONEQ term=term %prec tac_prec
     { mk_abstract l "set" [TacticsArgs.Set (n_ip, system, term)] }
 
-  | l=lloc(CLEAR) ids=slist1(lsymb, empty)
+  | l=lloc(CLEAR) ids=slist(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
 
