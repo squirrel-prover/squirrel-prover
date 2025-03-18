@@ -34,7 +34,7 @@ Abort.
 global lemma [T] _ (i,j:index[adv]) (b:bool): equiv(
 if b then <n(i),m(j)> else <n(i),m(j)>).
 Proof.
-checkfail crypto ALEA exn Failure.
+checkfail crypto ~no_subgoal_on_failure ALEA exn Failure.
 Abort.
 
 

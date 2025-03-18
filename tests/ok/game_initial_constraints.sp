@@ -41,8 +41,8 @@ Qed.
 
 global lemma [E] _ : equiv(diff(sn1,sn2)).
 Proof.
-  checkfail by crypto LR (k2 : sn1) exn Failure.
-  checkfail by crypto LR (k1 : sn2) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure LR (k2 : sn1) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure LR (k1 : sn2) exn Failure.
 Abort.
 
 (* ========================================================= *)
@@ -97,9 +97,9 @@ Qed.
 (* --------------------------------------------------------- *)
 global lemma [E] _ : equiv(diff(n1 i0,n2 j0)).
 Proof.
-  checkfail by crypto LR (k2 : n1 i0) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure LR (k2 : n1 i0) exn Failure.
   (* checkfail by crypto LR (k2 : n1 i : i, i = i0) exn GoalNotClosed. *)
 
-  checkfail by crypto LR (k1 : n2 j0) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure LR (k1 : n2 j0) exn Failure.
   (* checkfail by crypto LR (k1 : n2 j : j, j = j0) exn GoalNotClosed. *)
 Abort.

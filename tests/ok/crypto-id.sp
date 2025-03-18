@@ -11,7 +11,7 @@ abstract b: message.
 global lemma _ : 
 equiv(diff(a,b)).
 Proof.
-checkfail crypto FOO exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO exn Failure.
 Abort.
 
 
@@ -26,7 +26,7 @@ Qed.
 global lemma _ : 
 equiv(fun (x:message) => (x,diff(a,b))).
 Proof.
-checkfail crypto FOO exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO exn Failure.
 Abort.
 
 
@@ -34,5 +34,5 @@ abstract h: message -> message.
 global lemma _ : 
 equiv(fun (x:message) => h x, h diff(a,b)).
 Proof.
-checkfail crypto FOO exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO exn Failure.
 Abort.

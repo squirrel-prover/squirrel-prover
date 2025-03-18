@@ -57,13 +57,25 @@ val _pp_oracle   : oracle formatter_p
 val _pp_game     : game   formatter_p
 
 (*------------------------------------------------------------------*)
+type param = { 
+  subgoal_on_failure : bool; 
+  (** When [crypto] cannot deduce a term [(t | ϕ)], does it abandon
+      the proof and fail ([subgoal_on_failure=true]) or generate a
+      proof-obligation. *)
+}
+
+(** default options *)
+val param : param
+
+(*------------------------------------------------------------------*)
 val prove :
-    Env.t                   ->
-    Hyps.TraceHyps.hyps     ->
-    Symbols.p_path          ->
-    TacticsArgs.crypto_args ->
-    Equiv.equiv             ->
-    Term.terms
+  param:param             ->
+  Env.t                   ->
+  Hyps.TraceHyps.hyps     ->
+  Symbols.p_path          ->
+  TacticsArgs.crypto_args ->
+  Equiv.equiv             ->
+  Term.terms
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end types and parsing} *)

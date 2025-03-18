@@ -17,7 +17,7 @@ Qed.
 
 global lemma _ @system:P : equiv(diff(0,1)).
 Proof.
-  checkfail crypto A exn Failure.
+  checkfail crypto ~no_subgoal_on_failure A exn Failure.
 Abort.
 
 (* --------------------------------------------------------- *)
@@ -32,7 +32,7 @@ game B = {
 
 global lemma _ @system:P : equiv(diff(1,0)).
 Proof.
-  checkfail crypto B exn Failure.
+  checkfail crypto ~no_subgoal_on_failure B exn Failure.
 Abort.
 
 global lemma _ @system:P : equiv(diff(0,1)).
@@ -73,6 +73,6 @@ Qed.
 
 global lemma _ @system:P : equiv(diff(1,0)).
 Proof.
-  checkfail crypto D exn Failure.
+  checkfail crypto ~no_subgoal_on_failure D exn Failure.
 Abort.
 

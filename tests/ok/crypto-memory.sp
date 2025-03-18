@@ -25,7 +25,7 @@ system null.
 
 global lemma _ : equiv(diff(ok,ko)).
 Proof.
-checkfail crypto FOO exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO exn Failure.
 Abort.
 
 game FOO3 = {

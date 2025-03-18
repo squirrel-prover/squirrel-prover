@@ -42,14 +42,14 @@ Qed.
 global lemma [E] _ (i:index, x : message[adv]) :
   equiv(m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto ~no_subgoal_on_failure Bar0 exn Failure.
 Abort.
 
 (* fails if `x` is not adv *)
 global lemma [E] _ (i:index[adv], x : message) :
   equiv(m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto ~no_subgoal_on_failure Bar0 exn Failure.
 Abort.
 
 (* --------------------------------------------------------- *)
@@ -65,14 +65,14 @@ Qed.
 global lemma [E] _ (i:index, x : message[adv]) :
   equiv(m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar1 exn Failure.
+  checkfail crypto ~no_subgoal_on_failure Bar1 exn Failure.
 Abort.
 
 (* fails if `x` is not adv *)
 global lemma [E] _ (i:index[adv], x : message) :
   equiv(m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar1 exn Failure.
+  checkfail crypto ~no_subgoal_on_failure Bar1 exn Failure.
 Abort.
 
 (* --------------------------------------------------------- *)
@@ -164,7 +164,7 @@ global lemma _ @system:Y (tau:timestamp[adv]) :
   [happens(tau)] -> equiv(output@tau).
 Proof.
   intro Hap. 
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto  ~no_subgoal_on_failure~no_subgoal_on_failure Bar0 exn Failure.
 Abort.
 
 (* idem, but with `Y` only as `set` (thus, this should succeed). *)
@@ -180,7 +180,7 @@ global lemma _ @set:X @equiv:Y (tau:timestamp[adv]) :
   [happens(tau)] -> equiv(output@tau).
 Proof.
   intro Hap. 
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto  ~no_subgoal_on_failure~no_subgoal_on_failure Bar0 exn Failure.
 Abort.
 
 (* ========================================================= *)
@@ -191,11 +191,11 @@ abstract P : message -> bool.
 global lemma [E] _ (i:index[adv], x : message[adv]) :
   equiv( (forall x, P x), m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto  ~no_subgoal_on_failure~no_subgoal_on_failure Bar0 exn Failure.
 Abort.
 
 global lemma [E] _ (i:index[adv], x : message[adv]) :
   equiv( (exists x, P x), m i x (diff(a,b))).
 Proof.
-  checkfail crypto Bar0 exn Failure.
+  checkfail crypto  ~no_subgoal_on_failure~no_subgoal_on_failure Bar0 exn Failure.
 Abort.

@@ -13,9 +13,9 @@ system null.
 
 global lemma _ : equiv(diff( (24,42), (0,1) )).
 Proof.
-  checkfail crypto G0 (v : 24) (w : (0,2)) exn Failure.
-  checkfail crypto G0 (v : 24) (w : (1,1)) exn Failure.
-  checkfail crypto G0 (v : 10) (w : (0,1)) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure G0 (v : 24) (w : (0,2)) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure G0 (v : 24) (w : (1,1)) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure G0 (v : 10) (w : (0,1)) exn Failure.
   crypto G0 (v : 24) (w : (0,1)). 
 Qed.
 
@@ -32,7 +32,7 @@ game G1 = {
 global lemma _ : equiv(diff(0,1)).
 Proof.
  (* the diff-term `diff("a", "b")` is not bi-deducible *)
-  checkfail crypto G1 (a : diff("a", "b")) exn Failure.
+  checkfail crypto ~no_subgoal_on_failure G1 (a : diff("a", "b")) exn Failure.
   crypto G1 (a : "foo").
 Qed.
 
@@ -52,6 +52,6 @@ name r : message.
 
 global lemma _ : equiv(diff(enc 0 r "bar", enc 1 r "bar")).
 Proof.
-  checkfail crypto G (pk : "foo") exn Failure.
+  checkfail crypto ~no_subgoal_on_failure G (pk : "foo") exn Failure.
   crypto G (pk : "bar").
 Qed.

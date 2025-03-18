@@ -52,7 +52,7 @@ Qed.
 global lemma _ : 
 equiv((fun (j:message) => diff(n(i),a))).
 Proof.
-checkfail crypto Random exn Failure.
+checkfail crypto ~no_subgoal_on_failure Random exn Failure.
 Abort.
 
 (*------------------------------------------------------------------*)

@@ -80,7 +80,7 @@ Qed.
 global lemma _ (m: _ [adv]) x y:  
 equiv(diff(att(<x,y>)<>h(m,k),true)).
 Proof.
-checkfail (crypto EUF) exn Failure.
+checkfail crypto ~no_subgoal_on_failure EUF exn Failure.
 Abort.
 
 
@@ -92,5 +92,5 @@ Let x = diff(a,b) in
 equiv(h(x,k)).
 Proof.
 intro x.
-checkfail crypto EUF exn Failure.
+checkfail crypto ~no_subgoal_on_failure EUF exn Failure.
 Abort.

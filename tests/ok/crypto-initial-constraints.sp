@@ -17,7 +17,7 @@ system null.
 global lemma _ : 
 equiv( n a).
 Proof.
-checkfail (crypto EMPTY (key: m (diff(a,b)))) exn Failure.
+checkfail (crypto ~no_subgoal_on_failure EMPTY (key: m (diff(a,b)))) exn Failure.
 Abort.
 
 global lemma _ (i:index[adv]) :
@@ -29,7 +29,7 @@ Qed.
 global lemma _ (i:index[adv]):
 equiv(n a).
 Proof.
-checkfail crypto EMPTY (key: m (n i)) exn Failure.
+checkfail crypto ~no_subgoal_on_failure EMPTY (key: m (n i)) exn Failure.
 Abort.
 
 abstract h : message* message -> index.
@@ -44,6 +44,6 @@ global lemma _ (i:index[adv]):
 [false] -> equiv( h(m(i),k2)).
 Proof.
 intro H.
-checkfail crypto HASH (key: k (h(zero,k2))) exn Failure.
+checkfail crypto ~no_subgoal_on_failure HASH (key: k (h(zero,k2))) exn Failure.
 auto.
 Qed.

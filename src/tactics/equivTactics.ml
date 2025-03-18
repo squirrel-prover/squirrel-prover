@@ -2675,7 +2675,10 @@ let () =
       | _ -> bad_args ())
 
 (*------------------------------------------------------------------*)
-let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
+let crypto
+    (param : Crypto.param) 
+    (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) 
+  =
   let frame = ES.conclusion_as_equiv s in
   let old_context = ES.system s in
   let new_context = { old_context with set = (oget old_context.pair :> SE.t); } in
@@ -2686,16 +2689,31 @@ let crypto (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) =
       ~table:env.table ~vars:env.vars
       (ES.get_trace_hyps s)
   in
-  let subgs = Crypto.prove env hyps game args frame in
+  let subgs = Crypto.prove ~param env hyps game args frame in
   let s = (* change the system context and hypotheses in [s] *)
     let dummy = Equiv.mk_reach_atom Term.mk_false in
     ES.set_conclusion_in_context new_context dummy s 
   in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
 
+(** for now, [crypto] has a single named arguments *)
+let[@warning "-23"] parse_crypto_named_args (nargs : Args.named_args) : Crypto.param =
+  List.fold_left (fun option narg ->
+  match narg with
+  | Args.NArg L.{ pl_desc = "no_subgoal_on_failure" } -> 
+    Crypto.{ option with subgoal_on_failure = false; }
+
+  | Args.NList (l,_) 
+  | Args.NArg  l     ->
+    hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+    ) Crypto.param nargs
+
+(** the [crypto] tactic *)
 let crypto_tac args (s : ES.t) =
   match args with
-  | [Args.Crypto (game, args)] -> wrap_fail (crypto game args) s
+  | [Args.Crypto (named_args, game, args)] -> 
+    let param = parse_crypto_named_args named_args in
+    wrap_fail (crypto param game args) s
   | _ -> bad_args ()
 
 let () =

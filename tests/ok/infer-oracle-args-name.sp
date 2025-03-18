@@ -43,7 +43,7 @@ name r :message.
 global lemma _ : [h r = h zero] -> equiv(diff(foo,oof)).
 Proof.
 intro *.
-checkfail crypto FOO2 exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO2 exn Failure.
 crypto FOO2 (key:r).
 auto.
 Qed.
@@ -51,5 +51,5 @@ Qed.
 
 global lemma _ : equiv(diff(foo,oof)).
 Proof.
-checkfail crypto FOO3 exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO3 exn Failure.
 Abort.

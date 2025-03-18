@@ -11,14 +11,11 @@ list := add ok list;
 return if mem ok list then diff(a,b) else zero
 }}.
 
-
-
-
 system null.
 
 
 (*Abstract list are over approximation, we cannot conclude mem *)
 global lemma _ : equiv(diff(a,b)).
 Proof.
-checkfail crypto FOO exn Failure.
+checkfail crypto ~no_subgoal_on_failure FOO exn Failure.
 Abort.

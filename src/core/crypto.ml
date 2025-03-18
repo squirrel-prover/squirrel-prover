@@ -187,7 +187,16 @@ let _pp_game ppe fmt (g : game) : unit =
     (Fmt.list ~sep:Fmt.sp (_pp_oracle ppe)) g.oracles
 
 (*------------------------------------------------------------------*)
+type param = { 
+  subgoal_on_failure : bool; 
+  (** When [crypto] cannot deduce a term [(t | ϕ)], does it abandon
+      the proof and fail ([subgoal_on_failure=true]) or generate a
+      proof-obligation. *)
+}
 
+let param = { subgoal_on_failure = true; }
+
+(*------------------------------------------------------------------*)
 (** Tagging module for names-tagging. There are three different tags :
     - [Gloc], for local oracle names;
     - [Gglob], for global game names;
@@ -1453,6 +1462,8 @@ type query = {
   env  : Env.t;
   game : game;
   hyps : TraceHyps.hyps;
+
+  param : param;
 
   allow_oracle : bool;
   consts     : Const.t list;
@@ -2743,22 +2754,23 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
   | term :: outputs ->
     match bideduce_term query term with
     | None ->
-      (* Abandon the bideduction of [term], instead we ask the user to
-         prove that [term.conds] is unsatisfiable (thus, we must
-         bideduce [(witness | false)], which is trivial). *)
-      begin
+      if not query.param.subgoal_on_failure then None 
+      else begin
+        (* Abandon the bideduction of [term], instead we ask the user to
+           prove that [term.conds] is unsatisfiable (thus, we must
+           bideduce [(witness | false)], which is trivial). *)
         let subg =
           Term.mk_ors ~simpl:true (List.map Term.mk_not term.conds)
         in
-        
+
         notify_drop_deduction query subg;
-        
+
         match bideduce query outputs with
         | None -> None
         | Some result ->
           Some { result with subgoals = subg :: result.subgoals; }
       end
-      
+
     | Some result ->
       (* Next query: following terms passing on deduced term and extras as inputs
          on the final memory of first bideduction.
@@ -2800,7 +2812,7 @@ and bideduce_fp
     in
     let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
       { env;
-        vbs = query.vbs; dbg = query.dbg;
+        vbs = query.vbs; dbg = query.dbg; param = query.param;
         game = query.game;
         hyps = query.hyps;
         let_init = query.let_init;
@@ -3138,6 +3150,7 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
     env          = goal.env;
     vbs          = goal.vbs; 
     dbg          = goal.dbg;
+    param        = query.param;
     game         = goal.game;
     hyps         = goal.hyps;
     let_init     = query.let_init;
@@ -3355,6 +3368,7 @@ let bideduce_all_goals
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
+    ~(param : param)
     (env   : Env.t)
     (hyps  : TraceHyps.hyps)    (* in system [env.system] *)
     (pgame : Symbols.p_path)
@@ -3387,7 +3401,7 @@ let prove
   Printer.pr "@[<v 0>"; (* open vertical box of preliminary deductions *)
   
   let query0 =
-    { consts = [];
+    { consts = []; param;
       let_init = Mv.empty;
       (* the game's oracle cannot yet be called, so this field is
          irrelevant for now *)

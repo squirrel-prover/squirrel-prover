@@ -1226,8 +1226,8 @@ tac:
    * because they are reserved. *)
 
   (* Crypto tactic *)
-  | l=lloc(CRYPTO) game=path args=slist(crypto_arg,empty)
-    { mk_abstract l "crypto" [TacticsArgs.Crypto (game,args)] }
+  | l=lloc(CRYPTO) a=named_args game=path args=slist(crypto_arg,empty)
+    { mk_abstract l "crypto" [TacticsArgs.Crypto (a, game,args)] }
 
   | l=lloc(DDH) arg=ddh_arg
     { mk_abstract l "ddh" [TacticsArgs.DH arg] }
