@@ -427,7 +427,11 @@ val term_set_strengthen :
   Env.t -> TraceHyps.hyps ->
   inputs:term_set list -> term_set -> term_set list
 
-(** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
+(** [deduce_mem cterm knonw st] try to obtain [cterm] from one of the
+    value (or oracle) in [known], possibly instantiating
+    [known.vars] and [st.support]. 
+    The returned substitution has domain [st.support] ([known.vars] is
+    cleared). *)
 val deduce_mem :
   cond_term ->
   term_set ->

@@ -303,6 +303,37 @@ module CondTerm = struct
 
 end
 
+(* ----------------------------------------------------------------- *)
+(** The function [deduce_mem] returns a substitution [sigma]
+    of the variables [vars] such that: 
+    - [target.term σ = known.term σ]
+    - [known.cond σ ⇒ target.cond σ]
+*)
+let deduce_mem
+    ~(vars   : Vars.vars)
+    (env     : Env.t)
+    (hyps    : TraceHyps.hyps)
+    ~(target : CondTerm.t)
+    ~(known  : CondTerm.t) : Mvar.t option
+  =
+  let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
+  let known_set = 
+    Match.{ 
+      term = known.term; 
+      cond = known.conds; 
+      vars = []; 
+      (* Use [support] rather than [vars] to give the variables to be
+         instantiated, as the latter is cleared from the substitution
+         returned by [deduce_mem]. *)
+      se   = env.system.set; 
+    }
+  in
+  let unif_state =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:env.vars env.table env.system hyps ~support:vars
+  in
+  Match.deduce_mem cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 (** Replace every name whose argument are constant by a var and return
@@ -377,7 +408,7 @@ let subst_support subst =
       | _ -> assert false)
     subst
 
-
+(* ----------------------------------------------------------------- *)
 (** Function to access on matching in Match with running options...*)
 let equal_term_name_eq
     (env : Env.t)
@@ -385,27 +416,10 @@ let equal_term_name_eq
     ~(target : CondTerm.t)
     ~(known : CondTerm.t) : Term.term list option
   =
-  let system = env.system in
-
-  let target = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
-
-  let term,subst = constant_name_to_var env known in
+  let known,subst = constant_name_to_var env known in
   let name_vars = subst_support subst in
-  let known = 
-    Match.{ 
-      term = term.term; 
-      cond = term.conds; 
-      vars = []; 
-      se   = (system.set :> SE.t); 
-    }
-  in
-  let unif_state =
-    Match.mk_unif_state
-      ~param:Match.crypto_param
-      ~env:env.vars env.table system hyps ~support:name_vars
-  in 
-  let mv = Match.deduce_mem target known unif_state in
-  match mv with
+
+  match deduce_mem env hyps ~vars:name_vars ~target ~known with
   | Some mv ->
     (* If the matching found a substitution, get all equalities in name the 
        substitution yield*)
@@ -420,7 +434,6 @@ let equal_term_name_eq
     end
   | None -> None
       
-
 (* ----------------------------------------------------------------- *)
 (** An oracle output pattern, which returns [term] when [cond] is true.
     It has three type of arguments:
@@ -434,35 +447,6 @@ type oracle_pat = {
   args       : Vars.vars;
   cond       : Term.terms
 }
-
-(* ----------------------------------------------------------------- *)
-(** The function [exact_eq_under_cond] returns a substitution [sigma]
-    of the variables [unif_vars] such that: 
-    - [target.term σ = known.term σ]
-    - [known.cond σ ⇒ target.cond σ]
-*)
-let exact_eq_under_cond
-    ?(unif_vars : Vars.vars = [])
-    (env        : Env.t)
-    (hyps       : TraceHyps.hyps)
-    ~(target    : CondTerm.t)
-    ~(known     : CondTerm.t) : Mvar.t option
-  =
-  let cterm = Match.mk_cond_term target.term (Term.mk_ands target.conds) in
-  let known_set = 
-    Match.{ 
-      term = known.term; 
-      cond = known.conds; 
-      vars = []; 
-      se   = env.system.set; 
-    }
-  in
-  let unif_state =
-    Match.mk_unif_state
-      ~param:Match.crypto_param
-      ~env:env.vars env.table env.system hyps ~support:unif_vars
-  in
-  Match.deduce_mem cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 (** unknow global samples assignments *)
@@ -933,8 +917,7 @@ module TSet = struct
     let tset2 = if refresh then _refresh tset2 else tset2 in
     let term1 = CondTerm.{ term = tset1.term; conds = tset1.conds} in
     let term2 = CondTerm.{ term = tset2.term; conds = tset2.conds} in
-    exact_eq_under_cond env hyps
-      ~unif_vars:tset2.vars ~target:term1 ~known:term2 
+    deduce_mem env hyps ~vars:tset2.vars ~target:term1 ~known:term2 
 
   let singleton_incl ?(refresh = false) env hyps tset1 tset2 =
     let tset2 = if refresh then _refresh tset2 else tset2 in
@@ -944,8 +927,7 @@ module TSet = struct
       let term1 = CondTerm.{term = Term.mk_ands tset1.conds; conds = []} in
       let term2 = CondTerm.{term = Term.mk_ands tset2.conds; conds = []} in
       let res =
-        exact_eq_under_cond env hyps ~unif_vars:tset2.vars
-          ~target:term1 ~known:term2
+        deduce_mem env hyps ~vars:tset2.vars ~target:term1 ~known:term2
       in
       res <> None
     else false
