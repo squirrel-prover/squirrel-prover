@@ -2541,8 +2541,15 @@ let deduce_mem
   *)
   match deduce_mem0 cterm known st with
   | Some mv -> Some mv
-  | None -> (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
-    if st.bvs = [] && st.support = [] then None
+  | None ->
+    (* try again, with empty [support] and [bvs], moving [bvs] to [env] *)
+
+    (* There is no use to try again in the following cases:
+       - if [st.bvs = [] && st.support = []], as this means that the condition
+         over [θ] always hold. 
+       - if [known.vars = []], as the problematic condition is only checked 
+         for [st.support], which is what we want.*)
+    if (st.bvs = [] && st.support = []) || known.vars = [] then None
     else
       let env = Vars.add_vars st.bvs st.env in
       let st = { st with bvs = []; support = []; env; } in
