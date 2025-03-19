@@ -334,17 +334,44 @@ module CondTerm = struct
   let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
 
 end
+
 (*------------------------------------------------------------------*)
-module TSet0 = struct
+module TSet0 : sig
+  type t = private {
+    conds : Term.terms ;          (** conditions  *)
+    term  : Term.term ;           (** term of the set *)
+    vars  : Vars.vars ;           (** free variables  *)
+    tag   : int;                  (** unique identifier, for memoization *)
+  }
+
+  val make : term:Term.term -> conds:Term.terms -> vars:Vars.vars -> t
+
+  val fv : t -> Sv.t
+
+  val subst : Term.subst -> t -> t
+
+  val _pp : t formatter_p
+
+end = struct
 
   (** [{cond; term; vars}] represents [{ term | ∀ vars s.t. cond }]  *)
   type t = {
     conds : Term.terms ;          (** conditions  *)
     term  : Term.term ;           (** term of the set *)
     vars  : Vars.vars ;           (** free variables  *)
+    tag   : int;                  (** unique identifier, for memoization *)
   }
 
-  let fv tset =
+  let cpt = ref 0
+
+  (* FIXME: hashconsing *)
+  let make ~term ~conds ~vars : t = {
+    conds; term; vars;
+    tag = (incr cpt; !cpt);
+  }
+      
+  (*------------------------------------------------------------------*)
+  let fv (tset : t) =
     let fvs = Term.fvs (tset.term :: tset.conds) in
     let bound_vars = Vars.Sv.of_list tset.vars in
     Vars.Sv.filter (fun x -> not (Vars.Sv.mem x bound_vars)) fvs
@@ -357,9 +384,10 @@ module TSet0 = struct
         ) ([],subst) tset.vars
     in
     let vars = List.rev vars in
-    { conds = List.map (Term.subst subst) tset.conds;
-      term  = Term.subst subst tset.term;
-      vars; }
+    make
+      ~conds:(List.map (Term.subst subst) tset.conds)
+      ~term:(Term.subst subst tset.term)
+      ~vars
 
   let _pp ppe fmt (tset : t) =
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -419,7 +447,7 @@ let deduce_mem
 (*------------------------------------------------------------------*)
 let record_deduce_mem_query =
   QueryLogger.make 
-    ~pp_query:(fun fmt (table, target, vars, known, res, time) ->
+    ~pp_query:(fun fmt (table, target, vars, (known : CondTerm.t), res, time) ->
         let ppe = default_ppe ~table () in
         Fmt.pf fmt "(%s) [%stime: %f]:@ @[<v 0>@[%a@]@;∈@;@[%a@]@]"
           (if res then "success" else "failed")
@@ -427,7 +455,7 @@ let record_deduce_mem_query =
           (if time > 1.0 then "*" else "") 
           time
           (CondTerm._pp ppe) target
-          (TSet0._pp ppe) { term = known.CondTerm.term; conds = known.CondTerm.conds; vars; })
+          (TSet0._pp ppe) (TSet0.make ~term:known.term ~conds:known.conds ~vars))
 
 (*------------------------------------------------------------------*)
 (** Wrapper around [deduce_mem] adding logging (if instructed). *)
@@ -952,23 +980,52 @@ end
 module TSet = struct
   include TSet0
 
-  let normalize tset = 
-    let fvs = Term.fvs (tset.term :: tset.conds) in
-    let vars = List.filter (fun v -> Sv.mem v fvs) tset.vars in
-    { tset with vars = List.sort_uniq Stdlib.compare vars }
+  (*------------------------------------------------------------------*)
+  module O = struct
+    type _t = t
+    type t = _t
+    let hash t = t.tag
+    let equal t t' = t.tag = t'.tag
+  end
 
+  (** weak hash-tables, for memoization *)
+  module Memo1 = Ephemeron.K1.Make(O)
+  module Memo2 = Ephemeron.K2.Make(O)(O)
+
+  (*------------------------------------------------------------------*)
+  let normalize (tset : t) : t = 
+    let fvs = Term.fvs (tset.term :: tset.conds) in
+    let vars =
+      List.filter (fun v -> Sv.mem v fvs) tset.vars |>
+      List.sort_uniq Stdlib.compare
+    in
+    make ~term:tset.term ~conds:tset.conds ~vars
+
+  (** add memoization *)
+  let normalize (tset : t) : t =
+    let memo = Memo1.create 1024 in
+    try Memo1.find memo tset with
+    | Not_found ->
+      let r = normalize tset in
+      Memo1.add memo tset r;
+      r
+
+  (*------------------------------------------------------------------*)
   let refresh (tset : t) : t =
     let vars, subst = Term.refresh_vars tset.vars in
     let term  = Term.subst subst tset.term in
     let conds = List.map (Term.subst subst) tset.conds in
-    {conds; term; vars}
+    make ~conds ~term ~vars
 
-  let singleton (term : Term.term) (conds : Term.terms) = {term; conds; vars = []}
+  let singleton ~(term : Term.term) ~(conds : Term.terms) : t =
+    make ~term ~conds ~vars:[]
 
   let generalize (vars : Vars.vars) (tset: t) =
     let vars = vars @ tset.vars in
-    normalize { tset with vars }
+    normalize @@
+    make ~term:tset.term ~conds:tset.conds ~vars
 
+  (*------------------------------------------------------------------*)
   (* alias ... *)
   let _refresh = refresh
 
@@ -1004,23 +1061,44 @@ module TSet = struct
       res <> None
     else false
 
-        
-  (** Check if [tset1 ⊆ tset2] *)
-  let is_leq env hyps tset1 tset2 =  
+  (*------------------------------------------------------------------*)
+  (** check if [tset1 ⊆ tset2] *)
+  let is_leq env hyps (tset1 : t) (tset2 : t) : bool =
     let tset1 = refresh tset1 in
     let tset2 = refresh tset2 in
     alpha_conv ~refresh:false tset1 tset2 ||
     check_incl ~refresh:false env hyps tset1 tset2 <> None ||
     singleton_incl ~refresh:false env hyps tset1 tset2
 
-  
+  (** add memoization *)
+  let is_leq env hyps (tset1 : t) (tset2 : t) : bool =
+    let memo = Memo2.create 1024 in
+    try
+      (* We do not track the environment and hypotheses in the weak
+         hash-table, as we have no cheap way of doing so for now (with
+         term hashconsing, doing so for the hypotheses would be
+         cheap).
+
+         Instead, each entry in the hashtable records the environment
+         and hypotheses it corresponds to, and we check consistency at
+         retrieval (and replace the record in case of mismatch) *)
+      (* FIXME: term hashconsing *)
+      let env0, hyps0, r = Memo2.find memo (tset1, tset2) in
+      if env0 == env && hyps0 == hyps then r else raise Not_found
+    with
+    | Not_found ->
+      let r = is_leq env hyps tset1 tset2 in
+      Memo2.add memo (tset1, tset2) (env, hyps, r);
+      r
+
+  (*------------------------------------------------------------------*)    
   (** Check if [cond_term ∈ tset] and returns the instantiation of 
       [tset2] variable witnessing it. *)
   let cterm_mem env hyps (cond_term : CondTerm.t) tset : Mvar.t option =
-    let tset0 = { term = cond_term.term; conds = cond_term.conds; vars = [] } in
+    let tset0 = make ~term:cond_term.term ~conds:cond_term.conds ~vars:[] in
     check_incl env hyps tset0 tset
 
-
+  (*------------------------------------------------------------------*)
   (** Check if [output ∈ input] and returns the instantiation of
       [input]'s variables witnessing it, [input]'s variables, and
       the condition under which it holds. 
@@ -1233,7 +1311,7 @@ module AbstractSet = struct
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [t;s] )
         when f = Library.Set.fs_add env.table ->
-        union env hyps (doit s) (Sets [TSet.singleton t conds])
+        union env hyps (doit s) (Sets [TSet.singleton ~term:t ~conds])
 
       (* [s1 ∪ 2] *)
       | Term.App (Term.Fun (f,_), [s1;s2] )
@@ -1279,7 +1357,7 @@ module AbstractSet = struct
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [t;s] )
         when f = Library.Set.fs_add env.table ->
-        union env hyps (doit s) (Sets [TSet.singleton t conds])
+        union env hyps (doit s) (Sets [TSet.singleton ~term:t ~conds])
 
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [s1;s2] )
@@ -1586,7 +1664,7 @@ let transitivity_get_next_query
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
   let output =
     List.map
-      (fun (t:CondTerm.t) -> TSet.{term=t.term;conds = t.conds; vars = []})
+      (fun (t:CondTerm.t) -> TSet.make ~term:t.term ~conds:t.conds ~vars:[])
       output_term
   in
   {
@@ -2641,7 +2719,7 @@ let rec bideduce_term_strict
                  Term.mk_lt (Term.mk_tuple (Term.mk_vars new_vars)) (Term.mk_tuple (Term.mk_vars es))
                in
                let conds = new_conds :: (List.map (Term.subst new_subst) t.conds) in
-               TSet.{ term; conds; vars = new_vars @ t.vars; })
+               TSet.make ~term ~conds ~vars:(new_vars @ t.vars))
             extra_outputs
         in
 
@@ -2664,11 +2742,10 @@ let rec bideduce_term_strict
     let extra_outputs =
       List.map
         (fun (t:TSet.t) ->
-           TSet.{
-             term  = t.term;
-             conds = t.conds;
-             vars  = es @ t.vars;
-           })
+           TSet.make
+             ~term:t.term
+             ~conds:t.conds
+             ~vars:(es @ t.vars))
         result0.extra_outputs
         (* use [result0] and not [result], as the former is the one
            that indeeds contains the additional terms computed during
@@ -2800,7 +2877,7 @@ and bideduce_oracle
       with
       | Some result ->
         let query_start = transitivity_get_next_query query to_deduce result in
-        let input_cond = TSet.{term = conds; conds = []; vars = [] } in
+        let input_cond = TSet.make ~term:conds ~conds:[] ~vars:[] in
         let query_start = {query_start with inputs = input_cond::query.inputs} in
         cterm,query_start,result
       | None -> (output_term, query, empty_result query.initial_mem)
@@ -2836,11 +2913,12 @@ and bideduce_oracle
       in
 
       (* add the subgoals required by the [oracle_match] to the state *)
-      let extra_outputs = [ TSet.{
-          term  = output_term.term ;
-          conds = index_cond@output_term.conds ;
-          vars  = [] ;
-        } ]
+      let extra_outputs = [
+        TSet.make
+          ~term:output_term.term
+          ~conds:(index_cond@output_term.conds)
+          ~vars:[]
+      ]
       in
       let result_call =
         { subgoals = mem_subgoals @ subgoals;
@@ -3081,7 +3159,7 @@ let term_set_strengthen
           k.vars
       );
       let vars = List.map fst k.vars in
-      TSet.{ term = k.term; vars; conds = k.cond; } 
+      TSet.make ~term:k.term ~vars ~conds:k.cond
     ) l
 
 (* compute a set of known macros from a occurrence of a recursive call *)
@@ -3091,7 +3169,7 @@ let term_set_of_occ
   =
   let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
-  term_set_strengthen env hyps TSet.{ term = body; conds; vars = k.occ_vars; }
+  term_set_strengthen env hyps (TSet.make ~term:body ~conds ~vars:k.occ_vars)
 
 (*------------------------------------------------------------------*)
 (** Ad hoc simplification for happens conditions in recursive
@@ -3657,14 +3735,13 @@ let prove
     in      
     List.map (fun (term : TSet.t) ->
         let term = TSet.subst s term in
-        TSet.{
-          conds = 
+        TSet.make
+          ~conds:( 
             rec_target_cond @  (* [A i < B j], if [target] is recursive *)
             (Term.subst s (oget source.rec_predicate)) :: (* A i ≤ τ₀ *)
-            term.conds;
-          vars = source_vars@term.vars;
-          term = term.term;
-        }
+            term.conds)
+          ~vars:(source_vars@term.vars)
+          ~term:term.term
       ) source.extra_outputs
   in
 
