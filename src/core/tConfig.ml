@@ -78,6 +78,9 @@ let v_verbose_crypto = Param_bool false
 let s_log_unsat_crypto = "logUnsatCrypto"
 let v_log_unsat_crypto = Param_string ""
 
+let s_log_mem_crypto = "logMemCrypto"
+let v_log_mem_crypto = Param_string ""
+
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
@@ -111,6 +114,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_post_quantum          v_post_quantum
   |> declare s_verbose_crypto        v_verbose_crypto
   |> declare s_log_unsat_crypto      v_log_unsat_crypto
+  |> declare s_log_mem_crypto        v_log_mem_crypto
   |> declare s_prettyprint_reify     v_prettyprint_reify
 
 (*------------------------------------------------------------------*)
@@ -149,4 +153,5 @@ let new_ind                 = get_bool   s_new_ind
 let post_quantum            = get_bool   s_post_quantum
 let verbose_crypto          = get_bool   s_verbose_crypto
 let log_unsat_crypto        = get_string s_log_unsat_crypto
+let log_mem_crypto          = get_string s_log_mem_crypto
 let prettyprint_reify       = get_bool   s_prettyprint_reify

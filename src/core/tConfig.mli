@@ -67,5 +67,9 @@ val verbose_crypto : Symbols.table -> bool
     An empty path [""] means that we should not log queries. *)
 val log_unsat_crypto : Symbols.table -> string
 
+(** Path to log membership deduction queries in crypto.
+    An empty path [""] means that we should not log queries. *)
+val log_mem_crypto : Symbols.table -> string
+
 (** Pretty-print the refication of terms *)
 val prettyprint_reify : Symbols.table -> bool

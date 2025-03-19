@@ -28,6 +28,38 @@ let pp_xmark fmt = Printer.kw `Goal fmt "✗"
 let pp_yellow_xmark fmt = Printer.kw `GoalName fmt "✗"
 
 (*------------------------------------------------------------------*)
+module QueryLogger = struct
+  (** Make a query logger that records query of type ['a] *)
+  let make 
+      ~(pp_query : 'a formatter) (* enclosed in a vertical box *)
+    : string -> 'a -> unit
+    =
+    (* keep track of opened files for this logger *)
+    let chans = Hashtbl.create 16 in
+
+    (* count the number of queries on this logger *)
+    let cpt = ref 0 in 
+
+    (* the created logger: record [query] on file [chan_name] *)
+    fun (chan_name : string) (query : 'a) : unit ->
+      (* retrieve the channel for file [chan_name], or open it if
+         needed *)
+      let chan_fmt =
+        try Hashtbl.find chans chan_name with
+        | Not_found -> 
+          let chan_fmt =
+            open_out chan_name |> 
+            Format.formatter_of_out_channel
+          in
+          Hashtbl.add chans chan_name chan_fmt;
+          chan_fmt
+      in
+      
+      incr cpt;                   (* increment the query counter *)
+      Fmt.pf chan_fmt "@[<v 2>Query %d %a@]@.@." !cpt pp_query query
+end
+
+(*------------------------------------------------------------------*)
 (** a variable declaration, with an initial value *)
 type var_decl = {
   var  : Vars.var ;
@@ -302,6 +334,55 @@ module CondTerm = struct
   let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
 
 end
+(*------------------------------------------------------------------*)
+module TSet0 = struct
+
+  (** [{cond; term; vars}] represents [{ term | ∀ vars s.t. cond }]  *)
+  type t = {
+    conds : Term.terms ;          (** conditions  *)
+    term  : Term.term ;           (** term of the set *)
+    vars  : Vars.vars ;           (** free variables  *)
+  }
+
+  let fv tset =
+    let fvs = Term.fvs (tset.term :: tset.conds) in
+    let bound_vars = Vars.Sv.of_list tset.vars in
+    Vars.Sv.filter (fun x -> not (Vars.Sv.mem x bound_vars)) fvs
+
+  let subst subst tset =
+    let vars, subst = 
+      List.fold_left (fun (vars, subst) v ->
+          let v, subst = Term.subst_binding v subst in
+          (v :: vars, subst)
+        ) ([],subst) tset.vars
+    in
+    let vars = List.rev vars in
+    { conds = List.map (Term.subst subst) tset.conds;
+      term  = Term.subst subst tset.term;
+      vars; }
+
+  let _pp ppe fmt (tset : t) =
+    let fvs = Term.fvs (tset.term :: tset.conds) in
+    let _, vars, sbst = 
+      Term.add_vars_simpl_env (Vars.of_set fvs) tset.vars
+    in
+    let term  = Term.subst sbst tset.term in
+    let conds = List.map (Term.subst sbst) tset.conds in
+
+    if vars = [] then
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
+      (Term._pp ppe) term
+      (Term._pp ppe)(Term.mk_ands conds)
+    else
+      Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
+      (Term._pp ppe) term
+      (Vars._pp_list ppe) vars
+      (Term._pp ppe)(Term.mk_ands conds)
+
+  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
+  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
+end
+
 
 (* ----------------------------------------------------------------- *)
 (** The function [deduce_mem] returns a substitution [sigma]
@@ -334,6 +415,41 @@ let deduce_mem
       ~env:env.vars env.table env.system hyps ~support:vars
   in
   Match.deduce_mem cterm known_set unif_state
+
+(*------------------------------------------------------------------*)
+let record_deduce_mem_query =
+  QueryLogger.make 
+    ~pp_query:(fun fmt (table, target, vars, known, res, time) ->
+        let ppe = default_ppe ~table () in
+        Fmt.pf fmt "(%s) [%stime: %f]:@ @[<v 0>@[%a@]@;∈@;@[%a@]@]"
+          (if res then "success" else "failed")
+          (* mark slow queries for an easier inspection *)
+          (if time > 1.0 then "*" else "") 
+          time
+          (CondTerm._pp ppe) target
+          (TSet0._pp ppe) { term = known.CondTerm.term; conds = known.CondTerm.conds; vars; })
+
+(*------------------------------------------------------------------*)
+(** Wrapper around [deduce_mem] adding logging (if instructed). *)
+let deduce_mem
+    ~(vars   : Vars.vars)
+    (env     : Env.t)
+    (hyps    : TraceHyps.hyps)
+    ~(target : CondTerm.t)
+    ~(known  : CondTerm.t) : Mvar.t option
+  =
+  let path = TConfig.log_mem_crypto env.table in
+  if path = "" then
+    deduce_mem ~vars env hyps ~target ~known
+  else begin
+    let t = Sys.time () in
+    let res = deduce_mem ~vars env hyps ~target ~known in
+    let t0 = Sys.time () in
+    
+    record_deduce_mem_query path (env.table, target, vars, known, res <> None, t0 -. t);
+    
+    res
+  end
 
 (*------------------------------------------------------------------*)
 (** Replace every name whose argument are constant by a var and return
@@ -831,54 +947,10 @@ module Const = struct
 
 end
 
-
 (*------------------------------------------------------------------*)
+(** Extends [TSet0] with more functionalities *)
 module TSet = struct
-
-  (** [{cond; term; vars}] represents [{ term | ∀ vars s.t. cond }]  *)
-  type t = {
-    conds : Term.terms ;          (** conditions  *)
-    term  : Term.term ;           (** term of the set *)
-    vars  : Vars.vars ;           (** free variables  *)
-  }
-
-  let fv tset =
-    let fvs = Term.fvs (tset.term :: tset.conds) in
-    let bound_vars = Vars.Sv.of_list tset.vars in
-    Vars.Sv.filter (fun x -> not (Vars.Sv.mem x bound_vars)) fvs
-
-  let subst subst tset =
-    let vars, subst = 
-      List.fold_left (fun (vars, subst) v ->
-          let v, subst = Term.subst_binding v subst in
-          (v :: vars, subst)
-        ) ([],subst) tset.vars
-    in
-    let vars = List.rev vars in
-    { conds = List.map (Term.subst subst) tset.conds;
-      term  = Term.subst subst tset.term;
-      vars; }
-
-  let _pp ppe fmt (tset : t) =
-    let fvs = Term.fvs (tset.term :: tset.conds) in
-    let _, vars, sbst = 
-      Term.add_vars_simpl_env (Vars.of_set fvs) tset.vars
-    in
-    let term  = Term.subst sbst tset.term in
-    let conds = List.map (Term.subst sbst) tset.conds in
-
-    if vars = [] then
-      Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
-      (Term._pp ppe) term
-      (Term._pp ppe)(Term.mk_ands conds)
-    else
-      Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
-      (Term._pp ppe) term
-      (Vars._pp_list ppe) vars
-      (Term._pp ppe)(Term.mk_ands conds)
-
-  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
-  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
+  include TSet0
 
   let normalize tset = 
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -2250,38 +2322,19 @@ let unsatisfiable
   | `Ok (Some _) -> assert false (* impossible since we used [?mv:None] *)
 
 (*------------------------------------------------------------------*)
-(** record the query to [form] on file [chan_name] *)
-let record_unsat_query 
-    chans cpt                   (* fixed value set below *)
-    (chan_name : string) (table : Symbols.table) 
-    (form : Term.t) (unsat : bool) (time : float) : unit 
-  =
-  (* retrieve the channel for file [chan_name], or open it if
-     needed *)
-  let chan_fmt =
-    try Hashtbl.find chans chan_name with
-    | Not_found -> 
-      let chan_fmt =
-        open_out chan_name |> 
-        Format.formatter_of_out_channel
-      in
-      Hashtbl.add chans chan_name chan_fmt;
-      chan_fmt
-  in
-
-  incr cpt;
-  let ppe = default_ppe ~table () in
-  Fmt.pf chan_fmt "@[<v 2>%sQuery (%s) [%d, time: %f]:@ @[%a@]@]@.@."
-    (* mark slow queries for an easier inspection *)
-    (if time > 1.0 then "*" else "") 
-    (if unsat then "unsat" else "unknown")
-    !cpt time (Term._pp ppe) form
-
-let record_unsat_query = record_unsat_query (Hashtbl.create 16) (ref 0) 
+(** Logger for unsatisfiability queries *)
+let record_unsat_query =
+  QueryLogger.make
+    ~pp_query:(fun fmt (table, form, unsat, time) ->
+        let ppe = default_ppe ~table () in
+        Fmt.pf fmt "(%s) [%stime: %f]:@ @[%a@]"
+          (if unsat then "unsat" else "unknown")
+          (* mark slow queries for an easier inspection *)
+          (if time > 1.0 then "*" else "") 
+          time (Term._pp ppe) form)
 
 (*------------------------------------------------------------------*)
-(** Wrapper around [unsatisfiable] adding logging (if instructed to do
-    so). *)
+(** Wrapper around [unsatisfiable] adding logging (if instructed). *)
 let unsatisfiable
     (env : Env.t) (hyps : TraceHyps.hyps) (form : Term.term) : bool 
   =
@@ -2293,7 +2346,7 @@ let unsatisfiable
     let unsat = unsatisfiable env hyps form in
     let t0 = Sys.time () in
     
-    record_unsat_query path env.table form unsat (t0 -. t);
+    record_unsat_query path (env.table, form, unsat, t0 -. t);
     
     unsat
   end
