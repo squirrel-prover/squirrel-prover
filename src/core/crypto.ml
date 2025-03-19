@@ -2151,11 +2151,13 @@ module Game = struct
       Fmt.pf fmt "@[<hov 2>%a @]"
         ((AbstractSet._pp_mem ppe)) cor.post
     in
-    Fmt.pf fmt "@[<hv 0>New constraints: %t@ \
-                @[<hv 2>Post-condition:@ %t@]@ \
-                Under index condition: %t@ \
-                Under memory condition: %t@ \
-                Under additional subgoals: %t@ @]"
+    Fmt.pf fmt "@[<hv 0>\
+                @[<hv 2>New constraints:@ %t@]@;\
+                @[<hv 2>Post-condition:@ %t@]@;\
+                @[<hv 2>Under index condition:@ %t@]@;\
+                @[<hv 2>Under memory condition:@ %t@]@;\
+                @[<hv 2>Under additional subgoals:@ %t@]@;\
+                @]"
       _pp_new_const
       _pp_mem
       _pp_index_cond
@@ -2172,12 +2174,13 @@ module Game = struct
   let notify_call_oracle_res
       (query : query) (oracle_name : string) (cor:call_oracle_res)
     =
+    let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
     if not query.vbs && not query.dbg then () else
       Printer.pr "@[<v 2>%t oracle call to %a, yield:@;@[%a@]@]\
                   @]@;@;"  (* close oracle call outer vertical box + double line break *)
         pp_check_mark
         (Printer.kws `GoalMacro) oracle_name
-        (pp_call_oracle_res) cor
+        (_pp_call_oracle_res ppe) cor
 
   (* ----------------------------------------------------------------- *)
   (** If a successful match has been found, does the actual symbolic call 
@@ -2491,7 +2494,8 @@ let notify_bideduce_oracle_failure
 let notify_bideduce_second_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
     (* close vertical box of first pass *)
-    Printer.pr "@;@;@]
+    Printer.pr "@;@]\
+                @.
                 #---------------------------------------#@\n\
                 |              Second pass              |@\n\
                 #---------------------------------------#@.\
