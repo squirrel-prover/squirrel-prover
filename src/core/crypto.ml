@@ -2664,7 +2664,8 @@ and bideduce_term
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
       (* FIXME: add notify function *)
-      bideduce query (List.map CondTerm.mk_simpl args)
+      bideduce query
+        (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) args)
 
     | None -> bideduction_suite query output
 
