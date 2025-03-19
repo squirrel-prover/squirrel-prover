@@ -2246,7 +2246,26 @@ let knowledge_mem_tsets
   in
   List.find_map is_in rec_inputs
 
+(*------------------------------------------------------------------*)
+(** return [true] if [form] can be shown to be unsatisfiable *)
+let unsatisfiable
+    (env : Env.t) (hyps : TraceHyps.hyps) (form : Term.term) : bool 
+  =
+  let st : Match.unif_state =
+    Match.mk_unif_state
+      ~param:Match.crypto_param
+      ~env:env.vars env.table env.system hyps ~support:[]
+  in
+  match
+    Match.known_set_check_impl
+      env.table ~st ?mv:None
+      form Term.mk_false
+  with
+  | `Failed  -> false
+  | `Ok None -> true
+  | `Ok (Some _) -> assert false (* impossible since we used [?mv:None] *)
 
+(*------------------------------------------------------------------*)
 (** Checks whether [output = (t|f)] can be obtained from [extra_inputs].
 
     For any [(t'| vars : f') ∈ extra_inputs], look for a
@@ -2290,23 +2309,19 @@ let knowledge_mem_condterm_sets
         Term.mk_forall ~simpl:true free_vars
           (Term.mk_ors (List.map Term.mk_not conds))
       in
-      let st =
-        Match.mk_unif_state
-          ~param:Match.crypto_param
-          ~env:env.vars env.table env.system hyps ~support:[]
-      in
-      (* FIXME: updating [st] above (notably [support]) and forwarding
-         [mv] to [Match] would allow to conclude more often *)
+      (* FIXME: we could forward [mv] to [Match] (through
+         [unsatisfiable]) and update [support] (in [unsatisfiable]
+         accordingly to conclude more often *)
       
       (* Discard any extra input that we know will never be useful (by
          trying to show that the condition for this input never
          holds). *)
-      match
-        Match.known_set_check_impl env.table ~st ?mv:None phi Term.mk_false
-      with
-      | `Failed  -> Some (args,phi,not_phi) (* [input] may be useful, keep it  *)
-      | `Ok None -> None                    (* [input] never useful, discard it  *)
-      | `Ok (Some _) -> assert false        (* impossible since we used [?mv:None] *)
+      if unsatisfiable env hyps phi then
+        (* [input] never useful, we can discard it *)
+        None
+      else
+        (* [input] may be useful, keep it  *)
+        Some (args,phi,not_phi)
   in
   List.filter_map is_in extra_inputs
 
@@ -2328,13 +2343,14 @@ let notify_bideduce_term_strict (query : query) (rule:string) =
     Printer.pr "@[Apply rule %t@]@;@;"
       (fun fmt -> Printer.kw `GoalName fmt "%s" rule)
 
-let notify_bideduce_immediate (query : query) ~(direct : bool) =
+let notify_bideduce_in_input (query : query) =
   if not query.vbs && not query.dbg then () else
-  if direct then
-    Printer.pr "%t done: output directly computable@;@;"
-      pp_check_mark
-  else
     Printer.pr "%t done: ouptut appears in inputs@;@;"
+      pp_check_mark
+
+let notify_bideduce_directly_computable (query : query) =
+  if not query.vbs && not query.dbg then () else
+    Printer.pr "%t done: output directly computable@;@;"
       pp_check_mark
 
 let notify_bideduce_loop
@@ -2437,7 +2453,7 @@ let rec bideduce_term_strict
     let outputs = [b;t0;t1] in
     notify_bideduce_term_strict query "If then else" ;
     bideduce query outputs 
-      
+
   | Term.(App (Fun(fs,_),[t0;t1])) when fs = Term.f_impl ->
     let t1 = CondTerm.mk ~term:t1  ~conds:( t0::conds) in
     let t0 = CondTerm.mk ~term:t0  ~conds in
@@ -2579,6 +2595,8 @@ let rec bideduce_term_strict
   | _ -> None
 
 (*------------------------------------------------------------------*)
+(** try to show that [inputs, rec_inputs ▷ (t | ϕ)] 
+    where [output = (t | ϕ)] *)
 and bideduce_term
     ?(bideduction_suite = bideduce_oracle) 
     (query: query) (output : CondTerm.t)
@@ -2586,46 +2604,54 @@ and bideduce_term
   =
   let env = query.env in
   let output = CondTerm.polish output query.hyps env in
+
   assert (AbstractSet.well_formed env query.initial_mem);
+
   notify_bideduce_term_start query output;
-  let to_deduce = knowledge_mem_tsets env query.hyps output query.inputs in
-  let st : Match.unif_state Lazy.t =
-    lazy(
-      Match.mk_unif_state
-        ~param:Match.crypto_param
-        ~env:env.vars env.table env.system query.hyps ~support:[]
-    )
-  in
-  if
-    (to_deduce = Some []) ||
-    HighTerm.is_ptime_deducible ~si:true env output.term 
-  then                          (* deduce conditions *)
-    let result = empty_result query.initial_mem in
-    notify_bideduce_immediate query ~direct:(to_deduce <> Some []);
-    Some result 
+
+  (* we know that [▷ args] implies [▷ (t | ϕ)] *)
+  let args = knowledge_mem_tsets env query.hyps output query.inputs in
+
+  (* [args = ∅], we are done *)
+  if args = Some [] then begin
+    notify_bideduce_in_input query;
+    Some (empty_result query.initial_mem)
+  end
+
+  (* if [adv(t)] and [ϕ] is bi-deducible, we are done *)
+  else if HighTerm.is_ptime_deducible ~si:true env output.term then begin
+    notify_bideduce_directly_computable query;
+    Some (empty_result query.initial_mem)
+    (* TODO: we must check that [output.cond] is bideducible *)
+  end
+
+  (* if [ϕ] is unsatisfiable, there is nothing to bideduce *)
   else if
-    output.conds <> [] &&
-    match
-      Match.known_set_check_impl
-        env.table ~st:(Lazy.force st) ?mv:None
-        (Term.mk_ands output.conds) Term.mk_false
-    with
-    | `Failed -> false
-    | `Ok None -> true
-    | `Ok (Some _) -> assert false (* impossible since we used [?mv:None] *)
+    output.conds <> [] && 
+    unsatisfiable env query.hyps (Term.mk_ands output.conds) 
   then
+    (* FIXME: add notify function *)
     Some (empty_result query.initial_mem)
 
-  else if (Option.is_some to_deduce) then
+  (* [args ≠ ∅], recursively check if [▷ args] *)
+  else if Option.is_some args then
+    (* FIXME: add notify function *)
+    (* since [args ≠ ∅], we know that the list below is not empty,
+       which ensure that we will check that [output.conds] is bideducible *)
     bideduce query
-      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget to_deduce))
+      (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget args))
+
+  (* same as with [query.inputs], but this time with [query.rec_inputs] *)
   else 
     (* [output ∈ rec_inputs] *)
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
+      (* FIXME: add notify function *)
       (* if output.conds =  [] then *)
       bideduce query (List.map CondTerm.mk_simpl args)
-    | None ->  bideduction_suite query output
+    (* TODO: check that [output.conds] is bi-deducible *)
+
+    | None -> bideduction_suite query output
 
 (*------------------------------------------------------------------*)
 
@@ -2692,7 +2718,7 @@ and bideduce_oracle
         bideduce query full_inputs |>
         oget_exn ~exn:(Failed (fun fmt -> Fmt.pf fmt "inputs"))
       in
-      
+
       notify_bideduce_oracle_inputs_end query oracle_name;
       (* Building the query for the oracle call *)
       let query_call = transitivity_get_next_query query full_inputs result_inputs in 
