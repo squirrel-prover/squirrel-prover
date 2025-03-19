@@ -2415,7 +2415,8 @@ let known_set_check_impl
   (* flattened [hyp] + proof-context hypotheses *)
   let hyps =
     ( hyp :: omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st ) |>
-    List.concat_map flatten_ands 
+    List.concat_map flatten_ands |>
+    List.remove_duplicate Term.equal
   in
 
   let known_set_check_unify ~mv ~cond =
