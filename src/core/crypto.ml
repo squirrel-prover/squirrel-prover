@@ -1457,7 +1457,13 @@ end
 
 (*-----------------------------------------------------------------*)
 
-(** Query and result states for bideduction.*)
+(** Query and result states for bideduction.
+    A query [q] defines some input knowledge
+
+    [inputs, rec_inputs, extra_inputs]
+
+    we a value [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary
+    can get [φ v, if φ v then t v] for any [v] it can compute. *)
 type query = {
   env  : Env.t;
   game : game;
@@ -1480,15 +1486,10 @@ type query = {
   (** inputs provided to the adversary *)
   
   rec_inputs : TSet.t list;
-  (** Special inputs for recursive calls.
-      [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary can get [φ v, if φ v then t v] 
-      for any [v] it can compute.*)
+  (** Special inputs for recursive calls. *)
 
   extra_inputs : TSet.t list;
-  (** Special inputs for potentiall already computed oracle calls.
-       [{ t | ∀ v, φ } = λv.(t|φ)] means that the adversary can get [φ v, if φ v then t v] 
-      for any [v] it can compute
-  *)
+  (** Special inputs for potentiall already computed oracle calls. *)
 
   vbs : bool;       (** verbose printing *)
   dbg : bool;       (** debug printing *)
@@ -2439,13 +2440,21 @@ let notify_query_goal_start ((qs,_) as query : query * _) =
   (*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
 
+(** Try to show that [knownledge, ϕ ▷ (t | ϕ)] where [knownledge] is
+    specified by [query].
+
+    Note that [ϕ] is supposed already bi-deducible as appears on the
+    left of [▷]: this is an invariant of the bi-deduction
+    proof-search.
+
+    Recursor trying to open [t] using one of the available rule and
+    bideducing its subterms. *)
 let rec bideduce_term_strict
     (query : query)
     (output_term : CondTerm.t) : result option
   =
   let conds = output_term.conds in
-  let term = output_term.term in
-  match term with
+  match output_term.term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
     let t0 = CondTerm.mk ~term:t0 ~conds:(b::conds ) in
     let t1 = CondTerm.mk ~term:t1 ~conds:(Term.mk_not b :: conds) in
@@ -2595,8 +2604,15 @@ let rec bideduce_term_strict
   | _ -> None
 
 (*------------------------------------------------------------------*)
-(** try to show that [inputs, rec_inputs ▷ (t | ϕ)] 
-    where [output = (t | ϕ)] *)
+(** Try to show that [knownledge, ϕ ▷ (t | ϕ)] where [knownledge] is
+    specified by [query] and [output = (t | ϕ)]. 
+
+    [ϕ] is assumed to be already bi-deduced (see [bideduce_term_strict]).
+
+    Try to conclude right-away, exploiting [knowledge] or showing that
+    [t] is trivially computable.
+    We do not exploit [query.extra_inputs] here, this particular
+    knowledge is done in a dedicated way during oracle calls. *)
 and bideduce_term
     ?(bideduction_suite = bideduce_oracle) 
     (query: query) (output : CondTerm.t)
@@ -2612,23 +2628,26 @@ and bideduce_term
   (* we know that [▷ args] implies [▷ (t | ϕ)] *)
   let args = knowledge_mem_tsets env query.hyps output query.inputs in
 
+  let conds = Term.mk_ands output.conds in
+
   (* [args = ∅], we are done *)
   if args = Some [] then begin
     notify_bideduce_in_input query;
     Some (empty_result query.initial_mem)
   end
 
-  (* if [adv(t)] and [ϕ] is bi-deducible, we are done *)
-  else if HighTerm.is_ptime_deducible ~si:true env output.term then begin
-    notify_bideduce_directly_computable query;
-    Some (empty_result query.initial_mem)
-    (* TODO: we must check that [output.cond] is bideducible *)
-  end
+  (* if [adv(t)] and [ϕ] is already bi-deduced (invariant of the
+     proof-search), we are done *)
+  else if HighTerm.is_ptime_deducible ~si:true env output.term then
+    begin
+      notify_bideduce_directly_computable query;
+      Some (empty_result query.initial_mem)
+    end
 
   (* if [ϕ] is unsatisfiable, there is nothing to bideduce *)
   else if
     output.conds <> [] && 
-    unsatisfiable env query.hyps (Term.mk_ands output.conds) 
+    unsatisfiable env query.hyps conds
   then
     (* FIXME: add notify function *)
     Some (empty_result query.initial_mem)
@@ -2636,8 +2655,6 @@ and bideduce_term
   (* [args ≠ ∅], recursively check if [▷ args] *)
   else if Option.is_some args then
     (* FIXME: add notify function *)
-    (* since [args ≠ ∅], we know that the list below is not empty,
-       which ensure that we will check that [output.conds] is bideducible *)
     bideduce query
       (List.map (fun term -> CondTerm.mk ~term ~conds:output.conds) (oget args))
 
@@ -2647,9 +2664,7 @@ and bideduce_term
     match knowledge_mem_tsets env query.hyps output query.rec_inputs with
     | Some args ->
       (* FIXME: add notify function *)
-      (* if output.conds =  [] then *)
       bideduce query (List.map CondTerm.mk_simpl args)
-    (* TODO: check that [output.conds] is bi-deducible *)
 
     | None -> bideduction_suite query output
 
