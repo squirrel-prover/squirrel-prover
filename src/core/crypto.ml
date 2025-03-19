@@ -270,7 +270,7 @@ module CondTerm = struct
         ~red_param:ReductionCore.rp_crypto
         env.table
     in
-    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
     (* Removing duplicates *)
     let conds = List.remove_duplicate Term.equal c.conds in
@@ -1170,7 +1170,7 @@ module AbstractSet = struct
       Reduction.mk_state
         ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
     in
-    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
     let rec doit = function
       (* variable *)
@@ -1215,7 +1215,7 @@ module AbstractSet = struct
       Reduction.mk_state
         ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
     in
-    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
     
     let rec doit = function
       (* variable, for now [mem] only contain over-approximation of
@@ -1334,7 +1334,7 @@ module AbstractSet = struct
       Reduction.mk_state
         ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
     in
-    let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
     let rec abstract_bool_and_not
         (term : Term.term)
