@@ -1617,6 +1617,7 @@ option_param:
         else if n = "false" then (TConfig.Param_bool false)
         else TConfig.Param_string n   }
 | i=INT { TConfig.Param_int i      }
+| s=QUOTED_STRING {TConfig.Param_string s}
 
 set_option:
 | SET n=lsymb EQ param=option_param TERMINAL   { (n, param) }

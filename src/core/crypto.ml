@@ -2257,14 +2257,64 @@ let unsatisfiable
       ~param:Match.crypto_param
       ~env:env.vars env.table env.system hyps ~support:[]
   in
-  match
+  let res =  
     Match.known_set_check_impl
       env.table ~st ?mv:None
       form Term.mk_false
-  with
+  in
+  match res with
   | `Failed  -> false
   | `Ok None -> true
   | `Ok (Some _) -> assert false (* impossible since we used [?mv:None] *)
+
+(*------------------------------------------------------------------*)
+(** record the query to [form] on file [chan_name] *)
+let record_unsat_query 
+    chans cpt                   (* fixed value set below *)
+    (chan_name : string) (table : Symbols.table) 
+    (form : Term.t) (unsat : bool) (time : float) : unit 
+  =
+  (* retrieve the channel for file [chan_name], or open it if
+     needed *)
+  let chan_fmt =
+    try Hashtbl.find chans chan_name with
+    | Not_found -> 
+      let chan_fmt =
+        open_out chan_name |> 
+        Format.formatter_of_out_channel
+      in
+      Hashtbl.add chans chan_name chan_fmt;
+      chan_fmt
+  in
+
+  incr cpt;
+  let ppe = default_ppe ~table () in
+  Fmt.pf chan_fmt "@[<v 2>%sQuery (%s) [%d, time: %f]:@ @[%a@]@]@.@."
+    (* mark slow queries for an easier inspection *)
+    (if time > 1.0 then "*" else "") 
+    (if unsat then "unsat" else "unknown")
+    !cpt time (Term._pp ppe) form
+
+let record_unsat_query = record_unsat_query (Hashtbl.create 16) (ref 0) 
+
+(*------------------------------------------------------------------*)
+(** Wrapper around [unsatisfiable] adding logging (if instructed to do
+    so). *)
+let unsatisfiable
+    (env : Env.t) (hyps : TraceHyps.hyps) (form : Term.term) : bool 
+  =
+  let path = TConfig.log_unsat_crypto env.table in
+  if path = "" then
+    unsatisfiable env hyps form
+  else begin
+    let t = Sys.time () in
+    let unsat = unsatisfiable env hyps form in
+    let t0 = Sys.time () in
+    
+    record_unsat_query path env.table form unsat (t0 -. t);
+    
+    unsat
+  end
 
 (*------------------------------------------------------------------*)
 (** Checks whether [output = (t|f)] can be obtained from [extra_inputs].

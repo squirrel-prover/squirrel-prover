@@ -63,5 +63,9 @@ val post_quantum : Symbols.table -> bool
 (** Verbose mode for crypto tactic *)
 val verbose_crypto : Symbols.table -> bool
 
+(** Path to log unsatisfiability queries in crypto.
+    An empty path [""] means that we should not log queries. *)
+val log_unsat_crypto : Symbols.table -> string
+
 (** Pretty-print the refication of terms *)
 val prettyprint_reify : Symbols.table -> bool

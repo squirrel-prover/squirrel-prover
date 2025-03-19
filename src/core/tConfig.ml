@@ -75,6 +75,9 @@ let v_debug_tactics = Param_bool false
 let s_verbose_crypto = "verboseCrypto"
 let v_verbose_crypto = Param_bool false
 
+let s_log_unsat_crypto = "logUnsatCrypto"
+let v_log_unsat_crypto = Param_string ""
+
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
@@ -107,9 +110,10 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_new_ind               v_new_ind
   |> declare s_post_quantum          v_post_quantum
   |> declare s_verbose_crypto        v_verbose_crypto
+  |> declare s_log_unsat_crypto      v_log_unsat_crypto
   |> declare s_prettyprint_reify     v_prettyprint_reify
 
-
+(*------------------------------------------------------------------*)
 let get_int s table : int =
   let s = L.mk_loc L._dummy s in
   let ns = Symbols.Config.convert_path ([], s) table in
@@ -124,16 +128,25 @@ let get_bool s table : bool =
   | Param_bool i -> i
   | _ -> assert false
 
-let solver_timeout        = get_int s_timeout
-let print_trs_equations   = get_bool s_print_equ
-let interactive           = get_bool s_interactive
-let debug_constr          = get_bool s_debug_constr
-let debug_completion      = get_bool s_debug_completion
-let debug_tactics         = get_bool s_debug_tactics
-let strict_alias_mode     = get_bool s_strict_alias_mode
-let show_strengthened_hyp = get_bool s_show_strengthened_hyp
-let auto_fadup            = get_bool s_auto_fadup
-let new_ind               = get_bool s_new_ind
-let post_quantum          = get_bool s_post_quantum
-let verbose_crypto        = get_bool s_verbose_crypto
-let prettyprint_reify     = get_bool s_prettyprint_reify
+let get_string s table : string =
+  let s = L.mk_loc L._dummy s in
+  let ns = Symbols.Config.convert_path ([], s) table in
+  match as_data (Symbols.Config.get_data ns table) with
+  | Param_string s -> s
+  | _ -> assert false
+
+(*------------------------------------------------------------------*)
+let solver_timeout          = get_int    s_timeout
+let print_trs_equations     = get_bool   s_print_equ
+let interactive             = get_bool   s_interactive
+let debug_constr            = get_bool   s_debug_constr
+let debug_completion        = get_bool   s_debug_completion
+let debug_tactics           = get_bool   s_debug_tactics
+let strict_alias_mode       = get_bool   s_strict_alias_mode
+let show_strengthened_hyp   = get_bool   s_show_strengthened_hyp
+let auto_fadup              = get_bool   s_auto_fadup
+let new_ind                 = get_bool   s_new_ind
+let post_quantum            = get_bool   s_post_quantum
+let verbose_crypto          = get_bool   s_verbose_crypto
+let log_unsat_crypto        = get_string s_log_unsat_crypto
+let prettyprint_reify       = get_bool   s_prettyprint_reify
