@@ -13,6 +13,8 @@ module Args = TacticsArgs
 module type Hyp = sig 
   type t 
 
+  val def_system : [`Set | `Equiv]
+
   val pp_hyp     :                        t formatter
   val pp_hyp_dbg :                        t formatter
   val _pp_hyp    : ?context:SE.context -> t formatter_p 

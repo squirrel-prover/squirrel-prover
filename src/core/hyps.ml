@@ -18,6 +18,8 @@ let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 module type Hyp = sig 
   type t 
 
+  val def_system : [`Set | `Equiv]
+
   val pp_hyp     :                        t formatter
   val pp_hyp_dbg :                        t formatter
   val _pp_hyp    : ?context:SE.context -> t formatter_p 
@@ -198,10 +200,18 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
     | LHyp _ -> Fmt.pf fmt "hypothesis"
     | LDef _ -> Fmt.pf fmt "definition"
 
+  (** The default system the definitions are interpreted in. *)
+  let def_default_system (context : SE.context option) =
+    match context, H.def_system with
+    | None       , _       -> None
+    | Some context, `Set   -> Some context.set
+    | Some context, `Equiv -> omap (fun s -> (s :> SE.t)) context.pair
+
   let _pp_ldecl_cnt ppe ?context fmt = function
     | LHyp h     -> H._pp_hyp ?context ppe fmt h
-    | LDef (se,t) -> 
-      if context <> None && SE.equal0 (oget context).set se then
+    | LDef (se,t) ->
+      let default_system = def_default_system context in
+      if default_system <> None && SE.equal0 (oget default_system) se then
         Term._pp ppe fmt t
       else
         Fmt.pf fmt "[%a] : %a"
@@ -216,7 +226,8 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
       Fmt.pf fmt "%t: %a@;"
         pp_id (H._pp_hyp ?context ppe) h
     | LDef (se,t) ->
-      if context <> None && SE.equal0 (oget context).set se then
+      let default_system = def_default_system context in
+      if default_system <> None && SE.equal0 (oget default_system) se then
         Fmt.pf fmt "%t := %a@;" pp_id (Term._pp ppe) t
       else
         Fmt.pf fmt "@[<hv 2>@[<hv 2>%t :=@ [%a]@]@ : %a@]@;"
@@ -439,6 +450,8 @@ module EquivHyps = Mk
     (struct
       type t = Equiv.form
 
+      let def_system = `Equiv
+
       let pp_hyp     = Equiv.pp
       let _pp_hyp    = Equiv._pp
       let pp_hyp_dbg = Equiv.pp_dbg
@@ -461,6 +474,9 @@ let get_ord (at : Term.Lit.xatom ) : Term.Lit.ord =
 (*------------------------------------------------------------------*)
 module TraceHyps = Mk(struct
     type t = Equiv.any_form
+
+    let def_system = `Set
+
     let pp_hyp     = Equiv.Any.pp
     let pp_hyp_dbg = Equiv.Any.pp_dbg
     let _pp_hyp    = Equiv.Any._pp
