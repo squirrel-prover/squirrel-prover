@@ -11,14 +11,20 @@ type models
     seconds.
     - [exn] is thrown if the tactic runs out of time.
       Default to [Tactics.Tactic_hard_failure TacTimeout]. *)
-val models_conjunct : ?exn:exn -> timeout:int -> table:Symbols.table -> Term.terms -> models 
+val models_conjunct :
+  ?exn:exn -> timeout:int ->
+  ?allow_disjunction:bool ->
+  table:Symbols.table -> Term.terms -> models 
 
 val m_is_sat : models -> bool
 
 (** [is_tautology max ?exn t] check whether [t] is a tautology.
     The [max] and [exn] paramaters have the same meaning as in
     [models_conjunct].  *)
-val is_tautology : ?exn:exn -> timeout:int -> table:Symbols.table -> Term.term -> bool
+val is_tautology :
+  ?exn:exn -> timeout:int ->
+  ?allow_disjunction:bool ->
+  table:Symbols.table -> Term.term -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
     is always true in [models].

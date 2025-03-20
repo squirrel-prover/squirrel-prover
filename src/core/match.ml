@@ -2276,10 +2276,13 @@ let known_set_check_impl_sat
   =
   let exception Fail in
   let timeout = TConfig.solver_timeout table in
-  let hyp = Term.mk_ands hyps in 
-  let t_impl = Term.mk_impl hyp cond in
-  try Constr.(is_tautology ~exn:Fail ~table ~timeout t_impl) with Fail -> false
-
+  try
+    not @@
+    Constr.m_is_sat @@
+    Constr.models_conjunct
+      ~exn:Fail ~allow_disjunction:false ~timeout ~table
+      (Term.mk_not cond :: hyps)
+  with Fail -> false
 
 (*------------------------------------------------------------------*) 
 (** Check that [hyp] implies [cond] for the special case when [cond] is 

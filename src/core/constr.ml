@@ -281,7 +281,10 @@ module Form = struct
 
   (*------------------------------------------------------------------*)
   (** Builds a conjunction of clauses form a trace literal *)
-  let mk (memo : memo) (lit : Term.Lit.literal) : conjunction =
+  let mk
+      ~allow_disjunction (memo : memo) (lit : Term.Lit.literal)
+    : conjunction
+    =
     let _mk atom =
       List.map (fun (od,t1,t2) ->
           Lit (od, term_to_ut memo t1, term_to_ut memo t2)
@@ -340,10 +343,10 @@ module Form = struct
         if Term.is_and f then
           let forms = Term.decompose_ands f in
           [conj (List.map doit_form forms)]
-        else if Term.is_or f then
+        else if allow_disjunction && Term.is_or f then
           let forms = Term.decompose_ors f in
           [disj (List.map doit_form forms)]
-        else if Term.is_impl f then
+        else if allow_disjunction && Term.is_impl f then
           let f1, f2 = oget (Term.destr_impl f) in
           [disj [doit_form (Term.mk_not f1); doit_form f2]]
         else if Term.is_not f then
@@ -353,7 +356,7 @@ module Form = struct
 
       (* Idem as in [`Pos, Atom f], negating everything. *)
       | `Neg, Atom f ->
-        if Term.is_and f then
+        if allow_disjunction && Term.is_and f then
           let forms = Term.decompose_ands f in
           [disj (List.map (fun f -> doit_form (Term.mk_not f)) forms)]
         else if Term.is_or f then
@@ -374,14 +377,14 @@ module Form = struct
     in
     doit lit
 
-  let mk_list memo (l : Term.terms) : conjunction =
+  let mk_list ~allow_disjunction memo (l : Term.terms) : conjunction =
     let l =
       List.concat_map (fun t ->
           Term.Lit.form_to_literals t 
         ) l
     in
     List.concat_map (fun t ->       
-        try mk memo t with
+        try mk ~allow_disjunction memo t with
         | Unsupported ->
           if dbg then pp_dbg "@[<v 2>Dropping unsupported literal:@, @[%a@]@]"
               Term.Lit.pp t;
@@ -1370,30 +1373,36 @@ let split_models instance =
 type models = memo * model list
 
 (*------------------------------------------------------------------*)
-let models_conjunct table (terms : Term.terms) : models =
+let models_conjunct ~allow_disjunction table (terms : Term.terms) : models =
   let memo = mk_memo () in
-  let l = Form.mk_list memo terms in
+  let l = Form.mk_list ~allow_disjunction memo terms in
   let instance = mk_instance table memo l in
   (memo, split_models instance)
 
 (*------------------------------------------------------------------*)
-(** Memoisation of arrays of terms and the table *)
+(** Memoisation of:
+    - arrays of terms
+    - the table
+    - a boolean option *)
 module Args : sig
-  type t = Term.term array * int
-  val mk : Term.term list -> Symbols.table -> t
+  type t = Term.term array * int * bool
+  val mk : allow_disjunction:bool -> Term.term list -> Symbols.table -> t
   module Memo : Ephemeron.S with type key = t
 end = struct
-  type t = Term.term array * int
+  type t = Term.term array * int * bool
 
-  let mk l table =
-    (Array.of_list (List.sort_uniq Stdlib.compare l), Symbols.tag table)
+  let mk ~allow_disjunction l table : t =
+    (Array.of_list (List.sort_uniq Stdlib.compare l), Symbols.tag table, allow_disjunction)
 
-  let equal (a,t) (a',t') =
+  let equal (a,t,b) (a',t',b') =
+    b = b' &&
     t = t' &&
     Array.length a = Array.length a' &&
     Array.for_all2 Term.equal a a'
 
-  let hash ((a,t) : t) : int = hcombine_array Term.hash t a
+  let hash ((a,t,b) : t) : int =
+    let h = hcombine t (if b then 0 else 1) in
+    hcombine_array Term.hash h a
 
   module Memo = Ephemeron.K1.Make(struct
       type _t = t
@@ -1407,23 +1416,25 @@ end
 (** Memoisation *)
 let models_conjunct =
   let memo = Args.Memo.create 256 in
-  fun table (terms : Term.terms) ->
-    let terms_array = Args.mk terms table in
+  fun ~allow_disjunction table (terms : Term.terms) ->
+    let terms_array = Args.mk ~allow_disjunction terms table in
     try Args.Memo.find memo terms_array with
     | Not_found ->
-      let res = models_conjunct table terms in
+      let res = models_conjunct ~allow_disjunction table terms in
       Args.Memo.add memo terms_array res;
       res
 
 (** Exported.
     [models_conjunct] with a timeout. *)
-let models_conjunct 
+let models_conjunct
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
     ~(timeout : int)
+    ?(allow_disjunction : bool = true)
     ~table
     (terms : Term.terms)
+  : models
   =
-  Utils.timeout exn timeout (models_conjunct table) terms
+  Utils.timeout exn timeout (models_conjunct ~allow_disjunction table) terms
 
 (*------------------------------------------------------------------*)
 (** Exported. *)
@@ -1434,10 +1445,11 @@ let m_is_sat (models : models) = (snd models) <> []
 let is_tautology
     ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
     ~(timeout:int)
+    ?(allow_disjunction : bool = true)
     ~table
     (t:Term.term)
   =
-  not (m_is_sat (models_conjunct ~exn:exn ~timeout ~table [Term.mk_not t]))
+  not (m_is_sat (models_conjunct ~exn ~allow_disjunction ~timeout ~table [Term.mk_not t]))
 
 (*------------------------------------------------------------------*)
 (** [ext_support model ut] adds [ut] to the model union-find, if necessary, and
@@ -1479,7 +1491,7 @@ let rec query_form model (form : Form.form) = match form with
 
 let query_one (memo : memo) (model : model) (t : Term.term) : bool =
   try
-    let cnf = Form.mk_list memo [t] in
+    let cnf = Form.mk_list ~allow_disjunction:true memo [t] in
     List.for_all (query_form model) cnf
   with Unsupported -> false
 
@@ -1499,7 +1511,7 @@ let query ~precise (models : models) (terms : Term.terms) =
       (* compute [form = (⋁ ¬ atᵢ)] *)
       let form =
         List.map (fun at ->
-            Form.conj (Form.mk_list memo [Term.mk_not at])
+            Form.conj (Form.mk_list ~allow_disjunction:true memo [Term.mk_not at])
           ) terms
         |> Form.disj
       in
