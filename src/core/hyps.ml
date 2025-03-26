@@ -716,7 +716,7 @@ let change_trace_hyps_context
     (hyps : TraceHyps.hyps)
   : TraceHyps.hyps
   =
-  if SE.equal_context0 old_context new_context then hyps else
+  if SE.equal_context0 old_context new_context && update_local = None then hyps else
 
     let default_update_local,update_global =
       setup_change_hyps_context 
