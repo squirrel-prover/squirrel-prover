@@ -461,6 +461,8 @@ let convert_qualified_npath
 let convert_npath (p_n : p_npath) (table : table) : npath =
   match p_n with
   | [] -> top_npath
+  | [{ pl_desc = "Top"}] -> top_npath
+
   | s :: sub ->   (* [p_n = s.sub], where [s] is a single symbol *)
     let s_symb = { group = namespace_group; name = L.unloc s; } in
     let s_np : _namespace t list =

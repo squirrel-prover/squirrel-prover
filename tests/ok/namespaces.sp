@@ -94,3 +94,14 @@ namespace Foo.
   namespace Bar.
   end Bar.
 end Foo.
+
+
+(* --------------------------------------------------------- *)
+op ifoo = 1.
+
+namespace A.
+  op ifoo = 2.
+
+  lemma _ @system:any : Top.ifoo = 1. 
+  Proof. auto. Qed.
+end A.
