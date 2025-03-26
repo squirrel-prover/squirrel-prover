@@ -938,7 +938,7 @@ let namespace_exit (t : table) (nl : p_npath): table =
     let top, n' =
       let scope = table.scope.npath in
       try List.takedrop (List.length scope - 1) scope with
-      | Not_found ->
+      | Stdlib.Failure _ ->
         symb_err (L.loc n)
           (Failure ("already at top-level: cannot exit namespace " ^ (L.unloc n)));
     in
