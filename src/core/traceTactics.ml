@@ -405,7 +405,12 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
-      | _ -> soft_failure ~loc (Failure "invalid assumption")
+      | _ as f -> 
+        let f, has_red = 
+          TS.Reduce.reduce_head1
+            ~system:ass_context Reduction.rp_full s Equiv.Global_t f 
+        in
+        if has_red = True then aux f else soft_failure ~loc (Failure "invalid assumption")
     in aux ass
   in
 
