@@ -38,7 +38,31 @@ let as_lemma : Symbols.data -> lemma = function
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let find path table : lemma =
+(** error message: many lemma with a given type *)
+let failure_cannot_desambiguate 
+    loc table (lemmas : (Symbols.lemma * lemma) list) 
+  =
+  let ppe = default_ppe ~table () in
+  let err = 
+    Fmt.str "could not desambiguate between lemmas:@;<1 2>@[<v 0>%a@]"  
+      (Fmt.list ~sep:(Fmt.any "@;@;")
+         (fun fmt (_path, lemma) ->
+            Fmt.pf fmt "%a" (_pp ppe) lemma
+         )
+      ) lemmas
+  in
+  Typing.error loc (Failure err) 
+
+(*------------------------------------------------------------------*)
+let find (path : Symbols.p_path) table : lemma =
+  let lemmas = 
+    Symbols.Lemma.convert path table |>
+    List.map (snd_bind as_lemma)
+  in
+
+  if List.length lemmas > 1 then
+    failure_cannot_desambiguate (Symbols.p_path_loc path) table lemmas;
+
   as_lemma (snd (Symbols.Lemma.convert1 path table))
 
 let find_opt path table : lemma option =
