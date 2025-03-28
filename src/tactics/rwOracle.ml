@@ -11,7 +11,8 @@ module LT = LowTactics
 module L = Location
 module Args = HighTacticsArgs
 
-
+open Utils
+    
 (*------------------------------------------------------------------*)
 let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
@@ -254,37 +255,79 @@ let puncture_oracle_args (args : Args.parser_arg list) (s : ES.t) : ES.t list =
       (Failure "puncture oracle not supported for quantum adversaries");
 
   match args with
-  | [Args.PunctureOracle (pos, punc_term)] -> 
-    (match get_mode s with
-     | Deduction concl ->
-       let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
-       let punc_term, ty = Typing.convert cenv punc_term in
-       let terms = get_terms (Deduction concl) in
-       let oracle, ty  =
-         if (L.unloc pos) < 0 || (L.unloc pos) >= List.length terms then
-           soft_failure ~loc:(L.loc pos) 
+  | [Args.PunctureOracle (i, punc_point, punc_val)] -> 
+    (* check that the conclusion is a non-deduction goal *)
+    let goal =
+      match get_mode s with
+      | Deduction concl when
+          CP.kind (ES.table s) concl = CP.NotDeduce ->
+        concl
+      | _ -> LT.bad_args ()
+    in
+
+    (* get the oracle and its type *)
+    let terms = CP.lefts goal in
+    let oracle =
+      try List.nth terms (L.unloc i) with
+      | _ -> soft_failure ~loc:(L.loc i) 
              (GoalBadShape "Wrong number of deduction items.");
-         let oracle = List.nth terms (L.unloc pos) in
-         match Term.ty oracle with
-         | Fun (ty1, _) -> 
-           (if not (Type.equal ty1 ty) then
-              soft_failure (Failure "The given item in the goal \
-                                     must have the same type as the argument.")
-            else 
-              oracle, ty1)
-         | _ -> soft_failure (Failure "Expected a function");
-       in
-       let x = Vars.make_fresh ty "x" in
-       let secret = CP.right concl in
-       let new_oracle = Term.mk_quant Term.Lambda  [x]
-           (Term.mk_ite
-              (Term.mk_eq (Term.mk_var x) secret)
-              punc_term
-              (Term.mk_app oracle [Term.mk_var x])) in
-       let goal = mk_maingoal ~new_oracle (Deduction concl) (L.unloc pos) s in
-       [goal]      
-     | _ -> hard_failure (Failure "improper arguments."))
-  | _ -> hard_failure (Failure "improper arguments.")
+    in
+    let ty_o = Term.ty oracle in
+    
+    (* get the point at which to puncture the oracle.
+       by default: the right-hand side of the conclusion.
+       otherwise: parse the given term, check its type. *)
+    let cenv = Typing.{ env = ES.env s; cntxt = InGoal; } in
+    let punc_point, ty_pp =
+      match punc_point with
+      | None ->
+        let p = CP.right goal in
+        p, Term.ty p
+      | Some p ->
+        Typing.convert cenv p
+    in
+    
+    (* get the value to use for that point in the punctured oracle *)
+    let punc_val, ty_pv = Typing.convert cenv punc_val in
+    
+    (* check that all types agree *)
+    begin
+      match ty_o with
+      | Fun (ty1, ty2) when (Type.equal ty1 ty_pp) && (Type.equal ty2 ty_pv) ->
+        ()
+      | _ -> soft_failure (Failure
+                             "the types of the oracle and the given \
+                              point/values do not match");
+    end;
+    
+    (* construct the punctured oracle *) 
+    let x = Vars.make_fresh ty_pp "x" in
+    let new_oracle =
+      Term.mk_quant Term.Lambda [x]
+        (Term.mk_ite
+           (Term.mk_eq (Term.mk_var x) punc_point)
+           punc_val
+           (Term.mk_app oracle [Term.mk_var x]))
+    in
+  
+    (* construct the new goal *)
+    let newgoal = mk_maingoal ~new_oracle (Deduction goal) (L.unloc i) s in
+
+    (* construct the subgoal: the point at which we puncture must not
+       be deducible (when that point is the same as the right-hand side
+       of the conclusion, the subgoal and the main goal are the same) *)
+    let subgoals =
+      if Term.equal (CP.right goal) punc_point then
+        []
+      else
+        let nded = CP.update_rights [punc_point] goal in
+        (* no need to update the systems or anything *)
+        [ES.set_conclusion (CP.to_global nded) s]
+    in
+    subgoals @ [newgoal]
+  | _ -> LT.bad_args ()
+
+
 
 (** Declare the tactic. *)
 let puncture_oracle_tac args s sk fk =

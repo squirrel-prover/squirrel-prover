@@ -1575,8 +1575,11 @@ tac:
   | l=lloc(rewrite_oracle) a=named_args t=sterm pos=rewrite_oracle_in
     { mk_abstract l "rewrite oracle" [TacticsArgs.RewriteOracle (t, a, pos)] }
 
-  | l=lloc(puncture_oracle) pos=loc(INT) t=sterm
-    { mk_abstract l "puncture oracle" [TacticsArgs.PunctureOracle (pos, t)] }
+  | l=lloc(puncture_oracle) pos=loc(INT) v=sterm
+    { mk_abstract l "puncture oracle" [TacticsArgs.PunctureOracle (pos, None, v)] }
+
+  | l=lloc(puncture_oracle) pos=loc(INT) u=sterm v=sterm
+    { mk_abstract l "puncture oracle" [TacticsArgs.PunctureOracle (pos, Some u, v)] }
 
   | l=lloc(APPLY) a=named_args t=pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
