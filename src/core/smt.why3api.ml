@@ -155,29 +155,21 @@ type context = {
   table : Symbols.table;
   system : SystemExpr.fset option;
 
+  int_export : Why3.Theory.namespace;
+  tm_export : Why3.Theory.namespace;
+
   eqv_symb : Why3.Term.lsymbol option;
   int_leq_symb : Why3.Term.lsymbol;
   int_geq_symb : Why3.Term.lsymbol;
   int_lt_symb : Why3.Term.lsymbol;
   int_gt_symb : Why3.Term.lsymbol;  
-  int_add_symb : Why3.Term.lsymbol;
-  int_sub_symb : Why3.Term.lsymbol;
-  int_mul_symb : Why3.Term.lsymbol;
-  int_opp_symb : Why3.Term.lsymbol;
 
   leq_symb : Why3.Term.lsymbol;
   happens_symb : Why3.Term.lsymbol;
   init_symb : Why3.Term.lsymbol;
   pred_symb : Why3.Term.lsymbol;
-  xor_symb : Why3.Term.lsymbol;
   macro_cond_symb : Why3.Term.lsymbol;
   macro_exec_symb : Why3.Term.lsymbol;
-  empty_symb : Why3.Term.lsymbol;
-  pair_symb : Why3.Term.lsymbol;
-  fst_symb : Why3.Term.lsymbol;
-  snd_symb : Why3.Term.lsymbol;
-  att_symb : Why3.Term.lsymbol;
-  of_bool_symb : Why3.Term.lsymbol;
   input_symb : Why3.Term.lsymbol;
   output_symb : Why3.Term.lsymbol;
   frame_symb : Why3.Term.lsymbol;
@@ -239,28 +231,20 @@ let context_init ~timestamp_style tm_theory evars table system =
     eqv_symb     =  if (timestamp_style=Abstract_eq) then None 
                     else Some (Why3.Theory.ns_find_ls tm_export ["infix ~~"]); 
 
+    int_export = int_export;
+    tm_export = tm_export;
+
     int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
     int_geq_symb = Why3.Theory.ns_find_ls int_export ["infix >="];
     int_lt_symb = Why3.Theory.ns_find_ls int_export ["infix <"];
     int_gt_symb = Why3.Theory.ns_find_ls int_export ["infix >"]; 
-    int_add_symb = Why3.Theory.ns_find_ls int_export ["infix +"];
-    int_sub_symb = Why3.Theory.ns_find_ls int_export ["infix -"];
-    int_mul_symb = Why3.Theory.ns_find_ls int_export ["infix *"];
-    int_opp_symb = Why3.Theory.ns_find_ls int_export ["prefix -"];
 
     leq_symb     = Why3.Theory.ns_find_ls tm_export ["infix <~"];
     happens_symb = Why3.Theory.ns_find_ls tm_export ["happens"];
     init_symb    = Why3.Theory.ns_find_ls tm_export ["init"];
     pred_symb    = Why3.Theory.ns_find_ls tm_export ["pred"];
-    xor_symb     = Why3.Theory.ns_find_ls tm_export ["xoxo"];
     macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"];
     macro_exec_symb  = Why3.Theory.ns_find_ls tm_export ["macro_exec"];
-    empty_symb = Why3.Theory.ns_find_ls tm_export ["empty"];
-    pair_symb = Why3.Theory.ns_find_ls tm_export ["pair"];
-    fst_symb = Why3.Theory.ns_find_ls tm_export ["fst"];
-    snd_symb = Why3.Theory.ns_find_ls tm_export ["snd"];
-    att_symb = Why3.Theory.ns_find_ls tm_export ["att"];
-    of_bool_symb = Why3.Theory.ns_find_ls tm_export ["of_bool"];
     input_symb = Why3.Theory.ns_find_ls tm_export ["input"];
     output_symb = Why3.Theory.ns_find_ls tm_export ["output"];
     frame_symb = Why3.Theory.ns_find_ls tm_export ["frame"];
@@ -379,6 +363,9 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         -> unsupported_term context fmla "unsupp_poly"
       | _ -> t_app_infer (find_fn context symb) []
     end
+    (* For function applications, we need to handle separately 
+    the boolean connectors and the functions where the translation 
+    varies depending on the type of the terms. *)
     | Term.App (Fun (symb,_),terms) ->  
       begin match terms with 
       | [f] when symb=f_not -> t_not (msg_to_fmla context f)
@@ -390,13 +377,6 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         t_implies (msg_to_fmla context f1) (msg_to_fmla context f2)  
       | [f1;f2] when symb=f_iff -> 
         t_iff (msg_to_fmla context f1) (msg_to_fmla context f2)  
-      | [f] when symb=f_pred -> 
-        t_app_infer context.pred_symb [msg_to_fmla context f]
-      | [t1;t2] when symb=f_xor -> 
-        t_app_infer 
-        (context.xor_symb)
-          [msg_to_fmla context t1; 
-          msg_to_fmla context t2]
       | [t1;t2] when symb = f_eq -> if Term.ty t1 = Type.tboolean then 
           t_iff (msg_to_fmla context t1) (msg_to_fmla context t2) 
           else 
@@ -456,25 +436,6 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
             (context.int_gt_symb)
             [msg_to_fmla context t1;msg_to_fmla context t2] 
 
-      | [t1;t2] when (path_to_string symb) = "Int_+" ->
-        t_app_infer 
-          (context.int_add_symb)
-          [msg_to_fmla context t1;msg_to_fmla context t2] 
-      | [t1;t2] when (path_to_string symb) = "Int_-" ->
-        t_app_infer 
-          (context.int_sub_symb)
-          [msg_to_fmla context t1;msg_to_fmla context t2] 
-      | [t1;t2] when (path_to_string symb) = "Int_*" ->
-        t_app_infer 
-          (context.int_mul_symb)
-          [msg_to_fmla context t1;msg_to_fmla context t2] 
-      | [t1] when (path_to_string symb) = "Int_opp" ->
-        t_app_infer 
-          (context.int_opp_symb)
-          [msg_to_fmla context t1] 
-      
-      | [t1] when symb = f_happens -> 
-        t_app_infer context.happens_symb [msg_to_fmla context t1]
       | [cond;f1;f2] when symb=f_ite -> 
         t_if (msg_to_fmla context cond) 
           (msg_to_fmla context f1) 
@@ -649,29 +610,17 @@ let add_functions context =
       let data = Symbols.OpData.get_data fname context.table in
       let ftype = data.ftype in
       let str = path_to_string fname in
-      (* special treatment of xor for two reasons:
-      *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
-      *   - allows us to declare the equations for xor in the .why file *)
-      let predeclared_symbols =
+      (* We do not declare boolean connectors, 
+      instead we will use Why3 builtin connectors. *)
+      let boolean_connectors =
         [
-          Symbols.fs_xor; Symbols.fs_pair;
-          Symbols.fs_fst; Symbols.fs_snd;
-          Symbols.fs_att; Symbols.fs_of_bool;
-          Symbols.fs_empty; Symbols.fs_pred;
-          Symbols.fs_happens; Symbols.fs_or;
+          Symbols.fs_or;
           Symbols.fs_and; Symbols.fs_true;
           Symbols.fs_false; Symbols.fs_iff;
           Symbols.fs_impl; Symbols.fs_not;
-          Symbols.fs_diff
         ]
-      and predeclared_str = 
-          [
-            "Int_+"; "Int_-"; 
-            "Int_*"; "Int_opp"
-          ]
       in
-      if not (List.mem fname predeclared_symbols) &&
-        not (List.mem str predeclared_str) 
+      if not (List.mem fname boolean_connectors) 
       then begin
         try 
           let symb =
@@ -695,18 +644,33 @@ let add_functions context =
          Why3.Theory.add_decl_with_tuples theory
            (Why3.Decl.create_param_decl symb))
       context.functions_tbl !(context.theory);
+  (* Some builtin functions are declared twice, this is not an issue 
+  as the new mapping will replace the previous one. *)
   List.iter
     (fun (fname,symb) ->
        Hashtbl.add context.functions_tbl
          (Symbols.path_to_string fname)
-         (symb))
-    [(Symbols.fs_pair,(context.pair_symb));
-     (Symbols.fs_fst,(context.fst_symb));
-     (Symbols.fs_snd,(context.snd_symb));
+         (Why3.Theory.ns_find_ls context.tm_export [symb]))
+    [(Symbols.fs_pair,"pair");
+     (Symbols.fs_fst,"fst");
+     (Symbols.fs_snd,"snd");
      (* TODO: quantum: add quantum adversarial symbol *) 
-     (Symbols.fs_att,(context.att_symb));
-     (Symbols.fs_of_bool,(context.of_bool_symb));
-     (Symbols.fs_empty,(context.empty_symb));
+     (Symbols.fs_att,"att");
+     (Symbols.fs_of_bool,"of_bool");
+     (Symbols.fs_empty,"empty");
+     (Symbols.fs_xor,"xor");
+     (Symbols.fs_pred,"pred");
+     (Symbols.fs_happens,"happens")
+    ];
+    List.iter
+    (fun (fname,symb) ->
+       Hashtbl.add context.functions_tbl
+         (fname)
+         (Why3.Theory.ns_find_ls context.int_export [symb]))
+    [("Int_+","infix +");
+    ("Int_-","infix -");
+    ("Int_*","infix *");
+    ("Int_opp","prefix -");
     ]
 
 

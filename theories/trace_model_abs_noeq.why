@@ -59,11 +59,11 @@ theory Trace_model_abs_noeq
 
   (*Definition and specification of various functions*)
 
-  function xoxo message message : message 
+  function xor message message : message 
   axiom xor_assoc : forall x y z : message.
-    xoxo x (xoxo y z) = xoxo (xoxo x y) z
-  axiom xor_comm : forall x y : message. xoxo x y = xoxo y x
-  axiom xor_nil : forall x y : message. xoxo (xoxo x x) y = y
+    xor x (xor y z) = xor (xor x y) z
+  axiom xor_comm : forall x y : message. xor x y = xor y x
+  axiom xor_nil : forall x y : message. xor (xor x x) y = y
   predicate msg_is_true message
   constant empty : message
   function pair message message : message 
