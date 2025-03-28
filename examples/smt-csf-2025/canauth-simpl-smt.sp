@@ -103,7 +103,7 @@ lemma ctrIncA (t, t':timestamp, i:index):
   ( cellA(i)@t' ~< cellA(i)@t ||
     cellA(i)@t' = cellA(i)@t).
 Proof.
-induction t. smt ~steps:21281.
+induction t. smt ~steps:21115.
 Qed.
 
 (* Authentication w.r.t. A *)
@@ -116,7 +116,7 @@ lemma authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [H1 H2 H3].
   use ctrIncA.
-  euf H3; smt ~steps:22076.
+  euf H3; smt ~steps:23546.
 Qed.
 
 lemma noReplay (i,i',j,j':index) : 
@@ -125,5 +125,5 @@ lemma noReplay (i,i',j,j':index) :
    => (i<>i' || j<>j')  
    => fst(input@RA(i,j)) <> fst(input@RA(i',j')).
 Proof. 
- use authA. use ctrIncA. smt ~steps:280307.
+ use authA. use ctrIncA. smt ~prover:Z3 ~steps:109224.
 Qed.

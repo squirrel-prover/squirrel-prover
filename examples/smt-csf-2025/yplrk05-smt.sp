@@ -112,7 +112,7 @@ Proof.
   generalize jj ii.
   induction t => t IH0 ii jj Hap [Ht0 Hexec].
   destruct Hexec as [_ Meq].
-  euf Meq; smt  ~steps:138893.
+  euf Meq; smt  ~steps:138919.
 Qed.
 
 lemma auth_T1_induction (t:timestamp, i,j:index):

@@ -112,7 +112,7 @@ lemma counterIncreaseA (t, t':timestamp, i:index):
   ( cellA(i)@t' ~< cellA(i)@t ||
     cellA(i)@t' = cellA(i)@t).
 Proof.
-induction t. smt ~steps:27672.
+induction t. smt ~steps:26420.
 Qed.
 
 lemma counterIncreaseB (t, t':timestamp, i:index):
@@ -122,7 +122,7 @@ lemma counterIncreaseB (t, t':timestamp, i:index):
   ( cellB(i)@t' ~< cellB(i)@t ||
     cellB(i)@t' = cellB(i)@t).
 Proof.
-induction t. smt ~steps:51030.
+induction t. smt ~steps:89137.
 Qed.
 
 
@@ -134,7 +134,7 @@ lemma counterIncreaseStrictSA(i,j1:index, t:timestamp):
     (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@SenderA(i,j1).
 Proof.
-use counterIncreaseA. smt ~steps:25282.
+use counterIncreaseA. smt ~steps:18245.
 Qed.
 
 lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
@@ -142,7 +142,7 @@ lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
 Proof.
-  use counterIncreaseA. smt ~steps:18862.
+  use counterIncreaseA. smt ~steps:22516.
 Qed.
 
 (* The counter cellB(i) strictly increases between t and t'
@@ -153,7 +153,7 @@ lemma counterIncreaseStrictSB (i,j1:index, t:timestamp):
     (t < SenderB(i,j1) && exec@SenderB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@SenderB(i,j1).
 Proof.
- use counterIncreaseB. smt ~steps:27933.
+ use counterIncreaseB. smt ~steps:24389.
 Qed.
 
 lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
@@ -161,7 +161,7 @@ lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
 Proof.
- use counterIncreaseB. smt ~steps:24767.
+ use counterIncreaseB. smt ~steps:30898.
 Qed.
 
 (* SECURITY PROPERTIES *)
@@ -185,7 +185,7 @@ lemma authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   use counterIncreaseStrictRA.
-  euf H3; smt ~steps:12127.
+  euf H3; smt ~steps:12695.
 Qed.
 
 
@@ -201,7 +201,7 @@ lemma authB(i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   use counterIncreaseStrictRB.
-  euf H3; smt ~steps:15498.
+  euf H3; smt ~steps:16178.
 Qed.
 
 
@@ -218,7 +218,7 @@ lemma injectivity(i,j,j':index) :
 Proof.
 use counterIncreaseStrictSB.
 use authA.
-smt ~steps:42768.  
+smt ~steps:66925.  
 Qed.
 
 
@@ -237,7 +237,7 @@ use counterIncreaseStrictRB.
 use counterIncreaseStrictRA.
 use authA.
 use authB.
-smt ~steps:45066.  
+smt ~steps:82495.  
  Qed.
 
 

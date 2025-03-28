@@ -31,15 +31,16 @@ let env =
 
 let load_theory ~timestamp_style env = 
   try 
-    let theory = "trace_model"^
-                  (match timestamp_style with 
-                    |Abstract -> "_abs_noeq" | Abstract_eq -> "_abs" | _ ->"") 
+    let theory = 
+      "trace_model"^
+      (match timestamp_style with 
+      |Abstract -> "_abs_noeq" | Abstract_eq -> "_abs" | _ ->"") 
     in
     Some (Why3.Env.read_theory env [theory] (String.capitalize_ascii theory))
   with
-    | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
-    | Why3.Env.AmbiguousPath   _ | Why3.Env.TheoryNotFound  _ ->
-      Format.printf "SMT: error while loading SMT theory file\n"; None
+  | Why3.Env.LibraryConflict _ | Why3.Env.LibraryNotFound _
+  | Why3.Env.AmbiguousPath   _ | Why3.Env.TheoryNotFound  _ ->
+    Format.printf "SMT: error while loading SMT theory file\n"; None
 
 let create_call limit_time steps prover config_prover task :
   Why3.Call_provers.prover_call option =
@@ -61,11 +62,11 @@ let create_call limit_time steps prover config_prover task :
       let oc = open_out_gen [Open_append;Open_creat] 0o644 fname in 
       let ppf = Format.formatter_of_out_channel oc in 
       Format.fprintf ppf "Task: @.@.%a@." Why3.Pretty.print_task task;
-      Format.fprintf ppf "Prepared Task: @.@.%a@." 
+      Format.fprintf ppf "Prepared task: @.@.%a@." 
         Why3.Pretty.print_task (Why3.Driver.prepare_task driver task);
       close_out oc 
     end;
-
+    (* TODO : currently steps limits are broken due to Why3. *)
     let limits = match steps with 
       | None -> 
         { Why3.Call_provers.empty_limits 
@@ -85,8 +86,8 @@ let create_call limit_time steps prover config_prover task :
       prover.Why3.Whyconf.prover_name Why3.Exn_printer.exn_printer e;
       None
 
-(*TODO : bugged when calling several provers in parallel. Some results 
-are reused in later calls*)
+(* TODO : bugged when calling several provers in parallel. Some results 
+   are reused in later calls. *)
 let run_all_async ~timeout ~steps ~provers task =
   Why3.Prove_client.set_max_running_provers 4;
   let timer = start_timer () in
@@ -154,10 +155,6 @@ type context = {
   table : Symbols.table;
   system : SystemExpr.fset option;
 
-  index_symb : Why3.Ty.tysymbol;
-  msg_symb : Why3.Ty.tysymbol;
-  ts_symb : Why3.Ty.tysymbol;
-  int_symb : Why3.Ty.tysymbol; 
   eqv_symb : Why3.Term.lsymbol option;
   int_leq_symb : Why3.Term.lsymbol;
   int_geq_symb : Why3.Term.lsymbol;
@@ -189,40 +186,33 @@ type context = {
   index_ty : Why3.Ty.ty;
   int_ty : Why3.Ty.ty; 
 
-  indices : Vars.var list;
-  tsvars : Vars.var list;
-  msgvars : Vars.var list;
+  vars : Vars.var list;
 
   actions_tbl : (string, Why3.Term.lsymbol * int) Hashtbl.t;
   vars_tbl : (int,Why3.Term.term) Hashtbl.t;
   functions_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
   macros_tbl : (string, Why3.Term.lsymbol * Symbols.macro) Hashtbl.t;
   names_tbl : (string, Why3.Term.lsymbol) Hashtbl.t;
+  (* Hashtbl to store the terms translated opaquely. 
+     If a term has already been translated with the same context of 
+     free variables, then we reuse the same opaque translation. *)
   unsupp_tbl : (Term.term*(Why3.Term.term list), Why3.Term.lsymbol) Hashtbl.t;
-
-  uc : Why3.Theory.theory_uc ref;
+  (* Why3 theory under construction. *)
+  theory : Why3.Theory.theory_uc ref;
 
   timestamp_style : timestamp_style;
-  separate_tuple : bool;
   fresh : int ref;
 }
 
-let filter_ty t = List.filter (fun x -> Vars.ty x = t)
-let filter_msg = List.filter (fun x -> let t = Vars.ty x in
-                                t <> Type.tindex && t <> Type.ttimestamp)
-
-(*Custom fresh IDs;
+(* Custom fresh IDs;
  for some reason there were issues when relying only on Why3.Ident.id_fresh*)
 let id_fresh context name = 
   context.fresh:=!(context.fresh)+1;
   Why3.Ident.id_fresh (name^(string_of_int !(context.fresh)))
 
-let mk_const_symb context x ty =
-  Why3.Term.create_fsymbol (id_fresh context x) [] (ty)
-
 exception InternalError
 
-let context_init ~timestamp_style ~separate_tuple tm_theory evars table system = 
+let context_init ~timestamp_style tm_theory evars table system = 
   let int_theory = try 
     Why3.Env.read_theory env ["int"] (String.capitalize_ascii "int")
   with
@@ -237,21 +227,18 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
   and msg_symb = Why3.Theory.ns_find_ts tm_export ["message"]
   and ts_symb = Why3.Theory.ns_find_ts tm_export ["timestamp"]
   and int_symb = Why3.Theory.ns_find_ts tm_export ["int"]; 
-  and uc = ref (Why3.Theory.use_export 
-    (Why3.Theory.create_theory (Why3.Ident.id_fresh "MyTheory")) 
-    tm_theory
-  )
+  and theory = 
+    ref (Why3.Theory.use_export
+      (Why3.Theory.create_theory (Why3.Ident.id_fresh "MyTheory")) 
+      tm_theory
+    )
   in 
   {
     table = table;
     system = system;
-    index_symb   = index_symb;
-    msg_symb     = msg_symb;
-    ts_symb      = ts_symb;
     eqv_symb     =  if (timestamp_style=Abstract_eq) then None 
                     else Some (Why3.Theory.ns_find_ls tm_export ["infix ~~"]); 
 
-    int_symb = int_symb; 
     int_leq_symb = Why3.Theory.ns_find_ls int_export ["infix <="];
     int_geq_symb = Why3.Theory.ns_find_ls int_export ["infix >="];
     int_lt_symb = Why3.Theory.ns_find_ls int_export ["infix <"];
@@ -278,13 +265,11 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
     output_symb = Why3.Theory.ns_find_ls tm_export ["output"];
     frame_symb = Why3.Theory.ns_find_ls tm_export ["frame"];
 
-    msg_ty   = Why3.Ty.ty_app (msg_symb) [];
+    msg_ty   = Why3.Ty.ty_app msg_symb [];
     ts_ty    = Why3.Ty.ty_app ts_symb [];
     index_ty = Why3.Ty.ty_app index_symb [];
     int_ty = Why3.Ty.ty_app int_symb []; 
-    indices = filter_ty Type.tindex evars;
-    tsvars = filter_ty Type.ttimestamp evars;
-    msgvars = filter_msg evars;
+    vars = evars;
     actions_tbl = Hashtbl.create 12;
     vars_tbl = Hashtbl.create 193;
     functions_tbl = Hashtbl.create 12;
@@ -292,26 +277,25 @@ let context_init ~timestamp_style ~separate_tuple tm_theory evars table system =
     names_tbl = Hashtbl.create 12;
     unsupp_tbl = Hashtbl.create 12;
 
-    uc = uc;
+    theory = theory;
     timestamp_style = timestamp_style;
-    separate_tuple = separate_tuple;
     fresh = ref 0;
   }
 
 (* Macro to use the correct equality depending on the theory *)
 let ts_equ context t1 t2 = match context.timestamp_style with 
   | Abstract_eq -> Why3.Term.t_equ t1 t2 
-  |_-> Why3.Term.t_app_infer (Option.get context.eqv_symb) [t1;t2]
+  | _ -> Why3.Term.t_app_infer (Option.get context.eqv_symb) [t1;t2]
 
-(*Type conversion from Squirrel to Why3. 
-  The internal error raised is notably used 
-  to know when to translate in an opaque way*)
+(* Type conversion from Squirrel to Why3. 
+   The internal error raised is notably used 
+   to know when to translate in an opaque way *)
 let rec convert_type context = function
   | Type.Message -> context.msg_ty
   | Type.Timestamp -> context.ts_ty
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
-  | Type.Index -> Why3.Ty.ty_app context.index_symb []
+  | Type.Index -> context.index_ty
   | Type.TBase (ns,t) 
       when Symbols.s_path_to_string (ns,t) = "int" -> 
       context.int_ty
@@ -344,8 +328,8 @@ let unsupported_term context fmla str =
       (List.map t_type var_list)
       (convert_type context (Term.ty fmla))
     in Hashtbl.add context.unsupp_tbl (fmla, var_list) s;
-    context.uc := Why3.Theory.add_decl_with_tuples 
-      !(context.uc) 
+    context.theory := Why3.Theory.add_decl_with_tuples 
+      !(context.theory) 
       (Why3.Decl.create_param_decl s);
     s 
   end
@@ -354,13 +338,19 @@ let unsupported_term context fmla str =
 
 (*Why3 makes a distinction between terms and formulas.
 These two functions allows us to go back and forth between terms and formulas.*)
-let bool_to_prop t = 
+
+(* Transforms a boolean term to a formula. *)
+let term_to_fmla t = 
   if Term.ty t = Type.tboolean then Why3.Term.to_prop else (fun x -> x)
 
-let prop_to_bool p = Why3.Term.(t_if p t_bool_true t_bool_false) 
-let rec prop_list_to_bool context terms = 
+(* Transforms a formula to a boolean term. *)
+let fmla_to_term p = Why3.Term.(t_if p t_bool_true t_bool_false) 
+
+(* Transforms a list of terms that can contain formulas to a list of term 
+   without formulas. *)
+let rec fmlas_to_terms context terms = 
   List.map
-    (fun (t,b) ->  if b then (prop_to_bool t) else t)
+    (fun (t,b) ->  if b then (fmla_to_term t) else t)
     (List.map 
       (fun t -> ((msg_to_fmla context) t, Term.ty t=Type.tboolean))
       terms
@@ -371,7 +361,7 @@ let rec prop_list_to_bool context terms =
 and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla -> 
   let open Term in
   let open Why3.Term in
-  (bool_to_prop fmla) (match fmla with
+  (term_to_fmla fmla) (match fmla with
     | Term.Int i ->
       let i = Why3.BigInt.of_string (Z.to_string i) in
       Why3.Term.t_int_const i
@@ -449,23 +439,19 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
                 (msg_to_fmla context t2) (msg_to_fmla context t1)
               )
 
-      | [t1;t2] when symb = f_leq && 
-        (convert_type context (Term.ty t1) = context.int_ty)->
+      | [t1;t2] when symb = f_leq && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_leq_symb)
             [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_geq &&
-        (convert_type context (Term.ty t1) = context.int_ty)->
+      | [t1;t2] when symb = f_geq && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_geq_symb) 
             [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_lt &&
-        (convert_type context (Term.ty t1) = context.int_ty)-> 
+      | [t1;t2] when symb = f_lt && (Term.ty t1) = Type.tint -> 
           t_app_infer 
             (context.int_lt_symb)
             [msg_to_fmla context t1;msg_to_fmla context t2]
-      | [t1;t2] when symb = f_gt &&
-        (convert_type context (Term.ty t1) = context.int_ty)->
+      | [t1;t2] when symb = f_gt && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_gt_symb)
             [msg_to_fmla context t1;msg_to_fmla context t2] 
@@ -502,7 +488,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           let f = find_fn context symb in 
           t_app_infer
             f 
-            (prop_list_to_bool context terms)
+            (fmlas_to_terms context terms)
           with Not_found -> unsupported_term context fmla "unsupp_fun_not_found"
         end
       end
@@ -514,6 +500,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           (fun (acc,j,v) ty ->
             let ty' = (convert_type context ty)  in
             if i=j then begin
+              (* We create a temp var symbol used for the pattern matching. *)
               let v' = Why3.Term.create_vsymbol 
                 ((id_fresh context ("temp"))) ty' 
               in ((pat_as (pat_wild ty') v')::acc,j+1,Some v')
@@ -528,7 +515,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
               (Why3.Ty.ty_tuple (List.map (convert_type context) l))
             , t_var (Option.get v)]
 
-          | _ -> assert false 
+        | _ -> assert false 
       end
     | Term.Quant (ForAll, vs, f) -> 
       msg_to_fmla_q context t_forall_close vs f fmla
@@ -546,17 +533,17 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         [msg_to_fmla context ts]
     | Action (a,indices) -> 
         t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a))) 
-        (prop_list_to_bool context indices)
+        (fmlas_to_terms context indices)
     | Macro (ms,l,ts) -> 
       t_app_infer
           (fst(Hashtbl.find context.macros_tbl (path_to_string ms.s_symb)))
-          (prop_list_to_bool context l @
+          (fmlas_to_terms context l @
           [msg_to_fmla context ts])
 
     | Name (ns,args) ->
         t_app_infer
           (Hashtbl.find context.names_tbl (path_to_string ns.s_symb))
-          (prop_list_to_bool context args)
+          (fmlas_to_terms context args)
 
     | Diff  _ | Find _ -> 
       unsupported_term context fmla "diff_find"
@@ -565,7 +552,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         | Not_found -> raise InternalError
       end
 
-    | Tuple l -> t_tuple (prop_list_to_bool context l)
+    | Tuple l -> t_tuple (fmlas_to_terms context l)
 
     | Let (_,_,_) -> 
       unsupported_term context fmla "let"
@@ -585,6 +572,10 @@ and msg_to_fmla_q context quantifier vs f fmla=
     Hashtbl.add tbl (Vars.hash v) (t_var vsymb);
     vsymb
   and rem_var tbl v = Hashtbl.remove tbl (Vars.hash v) in
+  (* If we quantify over an unsupported variable,
+     we translate the quantifier opaquely. 
+     This could be done more precisely by only keeping the supported variables 
+     and translating opaquely when encountering the undeclared variable.*)
   let quantified_vars = try 
     Some (List.map 
       (fun v -> 
@@ -610,7 +601,7 @@ let add_actions context =
     SystemExpr.iter_descrs context.table (Option.get context.system)
       (fun descr ->
         if descr.name <> Symbols.init_action then
-          let str = Symbols.path_to_string descr.name in
+          let str = path_to_string descr.name in
           let symb_act = Why3.Term.create_fsymbol
               (id_fresh context str)
               (List.init (List.length descr.indices) (fun _ -> context.index_ty))
@@ -620,40 +611,38 @@ let add_actions context =
               context.actions_tbl
               str
               (symb_act,List.length descr.indices)));
-  context.uc :=
+  context.theory :=
     Hashtbl.fold
-      (fun _ (symb,_) uc ->
-         Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb))
-      context.actions_tbl !(context.uc);
+      (fun _ (symb,_) theory ->
+         Why3.Theory.add_decl_with_tuples theory (Why3.Decl.create_param_decl symb))
+      context.actions_tbl !(context.theory);
   Hashtbl.add
     context.actions_tbl
     Symbols.(path_to_string init_action)
     (context.init_symb,0)
 
 let add_var context = 
-  let add_tbl_var tbl ty uc var=
-    let symb = mk_const_symb context (Vars.name var) ty in
+  let add_tbl_var tbl ty theory var=
+    let symb = 
+      Why3.Term.create_fsymbol (id_fresh context (Vars.name var)) [] (ty) in
     Hashtbl.add tbl (Vars.hash var) (Why3.Term.t_app_infer symb []);
-    uc := Why3.Theory.add_decl_with_tuples !uc (Why3.Decl.create_param_decl symb)
+    theory := Why3.Theory.add_decl_with_tuples
+      !theory
+      (Why3.Decl.create_param_decl symb)
   in
-  List.iter 
-    (add_tbl_var context.vars_tbl context.index_ty context.uc) 
-    context.indices;
-  List.iter 
-    (add_tbl_var context.vars_tbl context.ts_ty context.uc) 
-    context.tsvars;
   List.iter 
     (fun var -> 
       try 
         add_tbl_var 
           context.vars_tbl 
           (convert_type context (Vars.ty var))
-          context.uc
+          context.theory
           var
     with InternalError -> ()
     ) 
-    context.msgvars
+    context.vars
 
+(* Add all function/predicate symbols that are neither names nor macros. *)
 let add_functions context =
   Symbols.Operator.iter 
     (fun fname _ ->
@@ -675,22 +664,22 @@ let add_functions context =
           Symbols.fs_impl; Symbols.fs_not;
           Symbols.fs_diff
         ]
-      and predeclared_names = 
+      and predeclared_str = 
           [
             "Int_+"; "Int_-"; 
             "Int_*"; "Int_opp"
           ]
       in
       if not (List.mem fname predeclared_symbols) &&
-        not (List.mem str predeclared_names) 
+        not (List.mem str predeclared_str) 
       then begin
         try 
           let symb =
             Why3.Term.create_fsymbol
               (id_fresh context str)
-              (List.fold_left 
-                (fun acc t -> acc@[convert_type context t]) 
-                [] ftype.fty_args
+              (List.map 
+                (fun t -> convert_type context t) 
+                ftype.fty_args
               )
               (convert_type context ftype.fty_out)
           in
@@ -700,12 +689,12 @@ let add_functions context =
             Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
       end)
     context.table;
-  context.uc :=
+  context.theory :=
     Hashtbl.fold
-      (fun _ (symb) uc ->
-         Why3.Theory.add_decl_with_tuples uc
+      (fun _ (symb) theory ->
+         Why3.Theory.add_decl_with_tuples theory
            (Why3.Decl.create_param_decl symb))
-      context.functions_tbl !(context.uc);
+      context.functions_tbl !(context.theory);
   List.iter
     (fun (fname,symb) ->
        Hashtbl.add context.functions_tbl
@@ -721,6 +710,7 @@ let add_functions context =
     ]
 
 
+(* Add all supported macro symbols. *)
 let add_macros context = 
   Symbols.Macro.iter (fun mn _ ->
     let def = Symbols.get_macro_data mn context.table in
@@ -771,12 +761,12 @@ let add_macros context =
             if smt_debug then Format.printf "Cannot declare %s@." str 
         end
   ) context.table;
-  context.uc:= Hashtbl.fold (fun _ (symb,_) uc ->
+  context.theory:= Hashtbl.fold (fun _ (symb,_) theory ->
     begin try 
-      Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb)
-    with _ -> uc 
+      Why3.Theory.add_decl_with_tuples theory (Why3.Decl.create_param_decl symb)
+    with _ -> theory 
     end
-    ) context.macros_tbl !(context.uc)
+    ) context.macros_tbl !(context.theory)
 
 let add_names context = 
   Symbols.Name.iter (fun name _ ->
@@ -787,7 +777,7 @@ let add_names context =
         Why3.Term.create_fsymbol
           (id_fresh context str)
           (List.fold_left 
-            (fun acc t -> acc@[convert_type context t]@acc) 
+            (fun acc t -> acc@[convert_type context t]) 
             [] def.n_fty.fty_args
           )
           (convert_type context def.n_fty.fty_out)
@@ -797,10 +787,10 @@ let add_names context =
         if smt_debug then Format.printf "Cannot declare %s@." str 
     end
   ) context.table;
-  context.uc:= Hashtbl.fold 
-    (fun _ (symb) uc -> 
-      Why3.Theory.add_decl_with_tuples uc (Why3.Decl.create_param_decl symb))
-    context.names_tbl !(context.uc)
+  context.theory:= Hashtbl.fold 
+    (fun _ (symb) theory -> 
+      Why3.Theory.add_decl_with_tuples theory (Why3.Decl.create_param_decl symb))
+    context.names_tbl !(context.theory)
  
 let rec vsymbol_list context c ty_list = match ty_list with 
   |[] -> []
@@ -823,8 +813,14 @@ let add_timestamp_axioms context =
     Hashtbl.fold (fun k' (a',n') acc' ->
         if k < k'
           then let l1,l2 = 
-            vsymbol_list context "i" (List.init n (fun _ -> context.index_ty)),
-            vsymbol_list context "j" (List.init n' (fun _ -> context.index_ty))
+            vsymbol_list 
+              context 
+              "i" 
+              (List.init n (fun _ -> context.index_ty)),
+            vsymbol_list 
+              context 
+              "j" 
+              (List.init n' (fun _ -> context.index_ty))
           in 
           let tl1,tl2 =
             List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 
@@ -846,8 +842,14 @@ let add_timestamp_axioms context =
   and injective_timestamps = 
     let axiom_injective_ts a n =
       let l1,l2 = 
-        vsymbol_list context "i" (List.init n (fun _ -> context.index_ty)),
-        vsymbol_list context "j" (List.init n (fun _ -> context.index_ty))
+        vsymbol_list 
+          context 
+          "i" 
+          (List.init n (fun _ -> context.index_ty)),
+        vsymbol_list 
+          context 
+          "j" 
+          (List.init n (fun _ -> context.index_ty))
       in 
       let tl1,tl2 = List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 in 
       Why3.Term.(t_forall_close l1 [](t_forall_close l2 [](
@@ -867,21 +869,24 @@ let add_timestamp_axioms context =
   in
   (*Rem: we use "=" instead of "~~" since we assume that the timestamps happen
   Case disjunction for timestamps. 
-  We give two versions since it helps to close goals
-  First version : one axiom is generated for each timestamp variable*)
-  let case_timestamps = 
+  We give two versions since it helps to close goals.
+  The core of both versions is the same *)
+  let cases t _ (a,n) fml = 
+    let l1 = 
+      vsymbol_list 
+        context 
+        "i" 
+        (List.init n (fun _ -> context.index_ty)) 
+    in let tl1 = List.map Why3.Term.t_var l1 in 
+    Why3.Term.(t_or (t_exists_close l1 [](t_equ (t) (t_app_infer a tl1))) fml)
+  in 
+
+  (* First version : one axiom is generated for each timestamp variable *)
+  let case_variables = 
     let axiom_case_ts t = 
-      Why3.Term.t_implies (Why3.Term.t_app_infer context.happens_symb [t]) (
-      Hashtbl.fold (fun _ (a,n) fml ->
-        let l1 = 
-          vsymbol_list context "i" (List.init n (fun _ -> context.index_ty)) 
-        in let tl1 = List.map Why3.Term.t_var l1 in 
-        Why3.Term.(t_or
-          (t_exists_close l1 [](t_equ (t) (t_app_infer a tl1)))
-          fml
-        )
-        ) context.actions_tbl (Why3.Term.t_false)
-      )
+      Why3.Term.t_implies 
+        (Why3.Term.t_app_infer context.happens_symb [t]) 
+        (Hashtbl.fold (cases t) context.actions_tbl (Why3.Term.t_false))
     in
     Hashtbl.fold (fun _ t acc -> if t.Why3.Term.t_ty = Some(context.ts_ty)
         then (axiom_case_ts t)::acc
@@ -890,25 +895,16 @@ let add_timestamp_axioms context =
   in
 
   (*Second version : the axiom is universally quantified over timestamps*)
-  let case_timestamp = 
+  let case_quantified = 
     let t_vsymb = Why3.Term.create_vsymbol 
       (id_fresh context "t") 
       context.ts_ty 
     in 
     let t = Why3.Term.t_var t_vsymb in 
     Why3.Term.t_forall_close [t_vsymb] [] (
-      Why3.Term.t_implies (Why3.Term.t_app_infer context.happens_symb [t]) (
-      Hashtbl.fold (fun _ (a,n) fml ->
-        let l1 = 
-          vsymbol_list context "i" 
-          (List.init n (fun _ -> context.index_ty)) 
-        in let tl1 = List.map Why3.Term.t_var l1 in 
-        Why3.Term.(t_or 
-          (t_exists_close l1 [](t_equ (t) (t_app_infer a tl1) )) 
-          fml
-        )
-        ) context.actions_tbl (Why3.Term.t_false)
-      ))
+      Why3.Term.t_implies 
+        (Why3.Term.t_app_infer context.happens_symb [t]) 
+        (Hashtbl.fold (cases t) context.actions_tbl (Why3.Term.t_false)))
   in
 
   (* Add axioms for action dependencies to above mutable list *)
@@ -974,7 +970,7 @@ let add_timestamp_axioms context =
       context.table (Option.get context.system) [] 
   
   in  
-  context.uc:=List.fold_left 
+  context.theory:=List.fold_left 
     (fun acc (id_ax, ax) -> 
       Why3.Theory.add_decl_with_tuples acc 
       (Why3.Decl.create_prop_decl 
@@ -983,11 +979,11 @@ let add_timestamp_axioms context =
         ax
       )
     ) 
-    !(context.uc) (List.map (fun x -> ("axiom_distinct", x)) 
+    !(context.theory) (List.map (fun x -> ("axiom_distinct", x)) 
                         (distinct_actions_axioms)
-                        @ [("case_timestamp", case_timestamp)]
-                        @ (List.map (fun x -> ("case_timsetamps", x))
-                        case_timestamps) 
+                        @ [("case_quantified", case_quantified)]
+                        @ (List.map (fun x -> ("case_variables", x))
+                        case_variables) 
                         @ (List.map (fun x -> ("axiom_depends", x))
                         depends) 
                         @ (List.map (fun x -> ("axiom_injective", x))
@@ -1005,9 +1001,9 @@ let nth_tuple ty n = let open Why3.Ty in match ty.ty_node with
 let add_equational_axioms context = 
   let axiom_pair =
     let vx = Why3.(Term.create_vsymbol (Ident.id_fresh "x")
-                      (Ty.ty_app (context.msg_symb) [])) in
+                      context.msg_ty) in
     let vy = Why3.(Term.create_vsymbol (Ident.id_fresh "y")
-                      (Ty.ty_app (context.msg_symb) [])) in
+                      context.msg_ty) in
     [(Symbols.fs_fst, vx); (Symbols.fs_snd, vy)]
     |> List.map (fun (proj, v) ->
         t_equ
@@ -1125,7 +1121,7 @@ let add_equational_axioms context =
         else acc
       ) [("axiom_pair", axiom_pair)] context.table 
   in
-  context.uc:=List.fold_left 
+  context.theory:=List.fold_left 
     (fun acc (id_ax, ax) ->
       Why3.Theory.add_decl_with_tuples acc 
       (Why3.Decl.create_prop_decl 
@@ -1134,7 +1130,7 @@ let add_equational_axioms context =
         ax
       )
     ) 
-    !(context.uc) (equational_axioms)
+    !(context.theory) (equational_axioms)
 
 (*Expansion of macros*)
 let add_macro_axioms context = 
@@ -1142,10 +1138,11 @@ let add_macro_axioms context =
     SystemExpr.iter_descrs context.table (Option.get context.system) 
       (fun descr ->
         let name_str = path_to_string descr.name in
+        Format.printf "Nom : %s@." name_str;
         (* TODO: quantified_vars is a recurring pattern *)
         let quantified_vars = ref (List.map (fun v ->
             let vsymb = create_vsymbol (id_fresh context (Vars.name v))
-              (Why3.Ty.ty_app context.index_symb []) 
+              context.index_ty 
             in
             (* add to scope (shadow previous hash table binding) *)
             Hashtbl.add context.vars_tbl (Vars.hash v) (t_var vsymb);
@@ -1194,7 +1191,7 @@ let add_macro_axioms context =
                   let quantified_indices = List.map 
                     (fun v -> 
                       let vsymb = create_vsymbol (id_fresh context (Vars.name v))
-                      (Why3.Ty.ty_app context.index_symb []) 
+                      context.index_ty
                       in
                       Hashtbl.add context.vars_tbl (Vars.hash v) (t_var vsymb);
                       vsymb
@@ -1214,7 +1211,7 @@ let add_macro_axioms context =
                               (List.map (index_var_to_wterm context) m_idx) 
                               (
                                 (if gty=Type.tboolean 
-                                  then prop_to_bool else (fun x -> x)
+                                  then fmla_to_term else (fun x -> x)
                                 )
                                 (msg_to_fmla context msg)
                               )
@@ -1257,7 +1254,7 @@ let add_macro_axioms context =
                             |Term.Var v -> 
                               let vsymb = create_vsymbol 
                                 (id_fresh context (Vars.name v))
-                                (Why3.Ty.ty_app context.index_symb []) 
+                                context.index_ty
                               in
                               Hashtbl.add context.vars_tbl 
                                 (Vars.hash v) (t_var vsymb);
@@ -1267,7 +1264,7 @@ let add_macro_axioms context =
                         ns_args
                       );
                       let expansion_ok = 
-                        (if sty=Type.tboolean then prop_to_bool else (fun x -> x)) 
+                        (if sty=Type.tboolean then fmla_to_term else (fun x -> x)) 
                         (msg_to_fmla context msg) 
                       in
                       if descr.Action.name = Symbols.init_action then
@@ -1281,15 +1278,10 @@ let add_macro_axioms context =
                         )
                       else
                         (t_if
-                          (if context.separate_tuple then 
-                            equal_lists 
-                              context 
-                              (indices) 
-                              (List.map (msg_to_fmla context) ns_args)
-                          else 
-                            t_equ
-                              (t_tuple indices)
-                              (t_tuple (List.map (msg_to_fmla context) ns_args))
+                          (equal_lists 
+                            context 
+                            (indices) 
+                            (List.map (msg_to_fmla context) ns_args)
                           )
                           expansion_ok
                           same_as_pred)
@@ -1318,7 +1310,7 @@ let add_macro_axioms context =
         List.iter
           (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) descr.indices;
       );
-  context.uc:=List.fold_left 
+  context.theory:=List.fold_left 
     (fun acc (id_ax, ax) ->
       Why3.Theory.add_decl_with_tuples acc 
       (Why3.Decl.create_prop_decl 
@@ -1327,7 +1319,7 @@ let add_macro_axioms context =
         ax
       )
     )
-    !(context.uc) (!macro_axioms)
+    !(context.theory) (!macro_axioms)
 
 let rec calc_arity l = match l with 
   |[] -> 0
@@ -1345,16 +1337,27 @@ let add_name_axioms context =
           let def2 = Symbols.get_name_data n2 context.table in
           if (
             (def1.n_fty.fty_out = def2.n_fty.fty_out) && 
-            (Symbols.TyInfo.check_bty_info context.table def1.n_fty.fty_out Large)
+            (Symbols.TyInfo.check_bty_info
+              context.table 
+              def1.n_fty.fty_out
+              Large)
           ) then begin 
             let ar1,ar2 = calc_arity def1.n_fty.fty_args,
               calc_arity def2.n_fty.fty_args  
             in if n1 > n2 then acc2 else (* to avoid redundancy *)
             let l1,l2 = 
-              vsymbol_list context "i" (List.init ar1 (fun _ -> context.index_ty)), 
-              vsymbol_list context "j" (List.init ar2 (fun _ -> context.index_ty))  
+              vsymbol_list
+                context 
+                "i" 
+                (List.init ar1 (fun _ -> context.index_ty)), 
+              vsymbol_list 
+                context 
+                "j" 
+                (List.init ar2 (fun _ -> context.index_ty))  
             in 
-            let tl1,tl2 = List.map Why3.Term.t_var l1,List.map Why3.Term.t_var l2 
+            let tl1,tl2 = 
+              List.map Why3.Term.t_var l1,
+              List.map Why3.Term.t_var l2 
             in let rec args_list ty_list var_list = match ty_list with 
               | [] -> []
               | (Type.Tuple l)::q -> let n = calc_arity l in 
@@ -1380,29 +1383,26 @@ let add_name_axioms context =
         end
       ) acc1 context.table) [] context.table 
   in
-  context.uc:=List.fold_left 
-    (fun acc (id_ax, ax) ->
-      Why3.Theory.add_decl_with_tuples acc 
-      (Why3.Decl.create_prop_decl 
-        Why3.Decl.Paxiom
-        (Why3.Decl.create_prsymbol @@ id_fresh context id_ax)
-        ax
-      )
-    )
-    !(context.uc) 
+  context.theory:=
+    List.fold_left 
+      (fun acc (id_ax, ax) ->
+        Why3.Theory.add_decl_with_tuples acc 
+        (Why3.Decl.create_prop_decl 
+          Why3.Decl.Paxiom
+          (Why3.Decl.create_prsymbol @@ id_fresh context id_ax)
+          ax))
+    !(context.theory) 
     (List.map (fun x -> ("axiom_distinct", x)) (name_inj_axioms))
   
 
-let build_task ~timestamp_style ~separate_tuple table system
+let build_task ~timestamp_style table system
                 evars hypotheses conclusion tm_theory = 
 
   let context = 
-    context_init ~timestamp_style ~separate_tuple tm_theory evars table system
+    context_init ~timestamp_style tm_theory evars table system
   in 
   add_actions context; 
-  if system<>None then (   
-      add_timestamp_axioms context
-  );
+  if system<>None then (add_timestamp_axioms context);
   add_var context;
   add_functions context;
   add_macros context;
@@ -1412,10 +1412,11 @@ let build_task ~timestamp_style ~separate_tuple table system
   add_name_axioms context;
     
 
-(*Converts hypotheses with 'and' at top level to two hypotheses*)
+(*Converts hypotheses with 'and' at top level to two (or more) hypotheses*)
   let rec convert_hypotheses hypotheses= match hypotheses with 
-    |[]->[]
-    |t::q -> match Term.destr_and t with
+    | [] -> []
+    | t::q -> 
+      match Term.destr_and t with
       |Some (t1, t2) -> t1::(convert_hypotheses (t2::q))
       |None -> t::(convert_hypotheses q)
   in 
@@ -1433,22 +1434,22 @@ let build_task ~timestamp_style ~separate_tuple table system
           (try msg_to_fmla context conclusion with 
             InternalError -> Why3.Term.t_false))))
   in
-  let uc : Why3.Theory.theory_uc =
+  let theory : Why3.Theory.theory_uc =
     let module Mid = Why3.Ident.Mid in
     let module Sid = Why3.Ident.Sid in
     let used_syms : Sid.t = Why3.Decl.get_used_syms_decl decl in 
-    let unknown_tsyms = Mid.set_diff used_syms !(context.uc).uc_known in
+    let unknown_tsyms = Mid.set_diff used_syms !(context.theory).uc_known in
     Sid.fold
-      (fun symb uc ->
+      (fun symb theory ->
         match Why3.Ty.is_ts_tuple_id symb with
-        | Some n -> Why3.Theory.(use_export uc (tuple_theory n))
+        | Some n -> Why3.Theory.(use_export theory (tuple_theory n))
         | None ->
           assert (Why3.Term.is_fs_tuple_id symb <> None);
-          uc)
+          theory)
       unknown_tsyms
-      !(context.uc)
+      !(context.theory)
   in
-  let task = Why3.Task.use_export None (Why3.Theory.close_theory uc) in
+  let task = Why3.Task.use_export None (Why3.Theory.close_theory theory) in
   Why3.Task.add_decl task decl
 
 
@@ -1457,15 +1458,15 @@ let unique_id =
   fun () -> incr id ; !id
 
 let is_valid
-    ~timestamp_style ~separate_tuple ~timeout ~steps ~provers
+    ~timestamp_style ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   =
   let theory = match load_theory ~timestamp_style env with
     | Some theory -> theory
-    | None -> Format.printf "Load theory failed@."; raise InternalError
+    | None -> raise InternalError
   in
   let task = build_task
-    ~timestamp_style ~separate_tuple
+    ~timestamp_style
     table system
     evars hypotheses conclusion
     theory 
@@ -1486,7 +1487,7 @@ let is_valid
 (* Tactic registration *)
 
 let sequent_is_valid
-    ~timestamp_style ~timeout ~steps ~separate_tuple ~provers (s:TraceSequent.t)
+    ~timestamp_style ~timeout ~steps ~provers (s:TraceSequent.t)
   =
   let env = TraceSequent.env s in
   let table = env.table in
@@ -1506,7 +1507,7 @@ let sequent_is_valid
       (LowTraceSequent.Hyps.to_list s)
   in
   let conclusion = LowTraceSequent.conclusion s in
-  try is_valid ~timestamp_style ~timeout ~steps ~separate_tuple ~provers
+  try is_valid ~timestamp_style ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   with 
     |e -> raise e
@@ -1515,7 +1516,6 @@ type parameters = {
   timestamp_style : timestamp_style;
   timeout : int;
   steps : int option;
-  separate_tuple : bool;
   provers : (string*string) list
 }
 let default_prover = 
@@ -1536,7 +1536,6 @@ let default_parameters = {
   timestamp_style = Nat;
   timeout = 1;
   steps = None;
-  separate_tuple = true ;
   provers = default_prover
 }
 
@@ -1594,15 +1593,6 @@ let parse_arg parameters =
   | NList ({Location.pl_desc="steps"},
                        [Int_parsed {Location.pl_desc=s}]) ->
     { parameters with steps=Some s}
-
-  | NArg {Location.pl_desc="separate_tuple"}
-  | NList ({Location.pl_desc="separate_tuple"},
-                       [String_name {Location.pl_desc="true"}]) ->
-    { parameters with separate_tuple=true }
-  | NList ({Location.pl_desc="separate_tuple"},
-                       [String_name {Location.pl_desc="false"}]) ->
-    { parameters with separate_tuple=false }
-
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
 
 let parse_args args =
@@ -1619,11 +1609,11 @@ let () =
         | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
         | Goal.Local s -> s
       in
-      let {timestamp_style;timeout;steps;separate_tuple;provers} = 
+      let {timestamp_style;timeout;steps;provers} = 
         parse_args args 
       in if
         sequent_is_valid
-          ~timestamp_style ~timeout ~steps ~separate_tuple ~provers s
+          ~timestamp_style ~timeout ~steps ~provers s
        then
           sk [] fk
        else
@@ -1648,15 +1638,6 @@ let () =
       Format.eprintf "If set and non-empty, \
                       SMT_STYLE must be Nat, Abs, or AbsNoEq.@.";
       exit 1
-  in
-  let separate_tuple = match Sys.getenv_opt "SMT_TUPLES" with 
-  |Some "false" |Some "False" -> false 
-  |Some "true" |Some "True" |None -> true 
-  | _ -> 
-    Format.eprintf "Unknown tuple separation flag!@.";
-    Format.eprintf "If set and non-empty, \
-                    SMT_TUPLES should be true or false@.";
-    exit 1 
   in
   let benchmarks =
     match Sys.getenv_opt "SMT_BENCHMARKS" with
@@ -1684,7 +1665,6 @@ let () =
                 ~timestamp_style
                 ~timeout:10
                 ~steps:None
-                ~separate_tuple
                 ~provers:[prover,alt]
                 s))
       provers;
@@ -1698,7 +1678,6 @@ let () =
                 ~timestamp_style
                 ~timeout:10
                 ~steps:None
-                ~separate_tuple
                 ~provers:[prover,alt]
                 s,
               None);
@@ -1721,7 +1700,6 @@ let () =
                 ~timestamp_style
                 ~timeout:10
                 ~steps:None
-                ~separate_tuple
                 ~provers:[prover,alt]
                 s))
       provers

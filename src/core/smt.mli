@@ -12,7 +12,6 @@ type timestamp_style =
     Other arguments allow to tweak this translation. *)
 val is_valid :
 timestamp_style:timestamp_style ->
-  separate_tuple:bool -> 
   timeout:int ->
   steps:int option -> 
   provers:(string*string) list->
