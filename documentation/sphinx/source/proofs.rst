@@ -1166,26 +1166,23 @@ Local tactics
           ----------------------------------------
           n <> m
       
-.. tact:: smt {? ~prover} {? ~separate_tuple} {?~ pure} {? ~style}
+.. tact:: smt {? ~prover} {? ~style} {? ~timeout}
    :name: smt
     
     Try to discharge the current goal using an SMT solver. 
 
-    The provers called can be chosen using the flag `~prover`, any combination 
-    of CVC4 (`CVC4`) Z3 (`Z3`) and Alt-Ergo (`AltErgo`) can be used. 
+    The prover called can be chosen using the flag `~prover`, supported provers include 
+    CVC5 (`CVC5`), Z3 (`Z3`) and Alt-Ergo (`AltErgo`). 
     The alternative counterexamples can be used by adding (`_counterexamples`) 
     after the name of the prover. The same goes with alternatives (`_BV`) for 
     Alt-Ergo and (`_noBV`) for Z3. 
 
-    The time before the timeout can be set with the flag `~slow` (in seconds). 
+    The time before the timeout can be set with the flag `~timeout` (in seconds). 
     By default it is 1s.
 
     The theory used to translate timestamps is chosen using the flag `~style`. 
     We can chose to translate timestamps to integers (`nat`) or to an abstract 
     type with the usual equality (`abstract`) or not (`abstract_noeq`).
-
-    The flag `~separate_tuple` expands some tuple equalities. It is `true` by 
-    default and it should probably stay that way most of the time. 
 
 .. tact:: subst @term, @term
    :name: subst
