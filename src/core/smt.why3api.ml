@@ -297,7 +297,7 @@ let index_var_to_wterm context i = Hashtbl.find context.vars_tbl (Vars.hash i)
 let ilist_to_wterm_ts context l = List.map (index_var_to_wterm context) l 
 
 let find_fn context f = 
-  Hashtbl.find context.functions_tbl (Symbols.path_to_string f)
+  Hashtbl.find context.functions_tbl (path_to_string f)
 
 (*Opaque translation of unsupported terms*)
 let unsupported_term context fmla str = 
@@ -649,7 +649,7 @@ let add_functions context =
   List.iter
     (fun (fname,symb) ->
        Hashtbl.add context.functions_tbl
-         (Symbols.path_to_string fname)
+         (path_to_string fname)
          (Why3.Theory.ns_find_ls context.tm_export [symb]))
     [(Symbols.fs_pair,"pair");
      (Symbols.fs_fst,"fst");
@@ -660,7 +660,7 @@ let add_functions context =
      (Symbols.fs_empty,"empty");
      (Symbols.fs_xor,"xor");
      (Symbols.fs_pred,"pred");
-     (Symbols.fs_happens,"happens")
+     (Term.f_happens,"happens")
     ];
     List.iter
     (fun (fname,symb) ->
@@ -1102,7 +1102,6 @@ let add_macro_axioms context =
     SystemExpr.iter_descrs context.table (Option.get context.system) 
       (fun descr ->
         let name_str = path_to_string descr.name in
-        Format.printf "Nom : %s@." name_str;
         (* TODO: quantified_vars is a recurring pattern *)
         let quantified_vars = ref (List.map (fun v ->
             let vsymb = create_vsymbol (id_fresh context (Vars.name v))
@@ -1366,13 +1365,13 @@ let build_task ~timestamp_style table system
     context_init ~timestamp_style tm_theory evars table system
   in 
   add_actions context; 
-  if system<>None then (add_timestamp_axioms context);
   add_var context;
   add_functions context;
   add_macros context;
   add_names context;
   add_equational_axioms context;
   if system<>None then add_macro_axioms context;
+  if system<>None then (add_timestamp_axioms context);
   add_name_axioms context;
     
 
