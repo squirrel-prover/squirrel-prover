@@ -181,7 +181,7 @@ let get_bad_occs
 
 
 (*------------------------------------------------------------------*)
-(** PRF tactic parameters *)
+(** PRF equivalence tactic parameters *)
 
 (** Find the first hash in the given term
     (not under binders, does not unfold macros) *)
@@ -304,7 +304,7 @@ let subst_term (se:SE.pair) (u:Term.term) (v:Term.term) (t:Term.term) :
 
 
 (** Takes a projection, and a list of (system, condition list),
-    select the elements where the proj is in the system, and returns
+    selects the elements where the proj is in the system, and returns
     the 'or' of the 'and' of each element. 
     Each element is meant to be the list of conditions whose 'and' is the 
     condition above an occurrence of the has we replace, either on one 
@@ -333,7 +333,8 @@ let project_conditions
 
 
 
-(** Finds the parameters of the prf application, optionally using a pattern *)
+(** Finds the parameters of the prf application for equivalence goals,
+    optionally using a pattern *)
 let prf_param
     ~(loc:L.t)
     ?(opat : (Term.term * L.t option * Infer.env option) option)
@@ -391,95 +392,209 @@ let prf_param
 (*------------------------------------------------------------------*)
 (** PRF formula *)
 
-(** Constructs the formula expressing that in the proj
-    of (the biframe + the context cc_nprf, the message m, the key k):
-    - the proj of k is correctly used
-    - the message m is not hashed anywhere else.
-      Fails if the resulting formula still contains n_PRF.
-      That case could be handled similarly to what's done in IND-CCA,
-      but it is complicated and the usefulness is unclear.
-      Alternately, we could find syntactic conditions on cc_nprf that guarantee
-      this won't happen, but again it's unclear whether that's useful. *)
-let phi_proj
-    (loc     : L.t)
+(** Constructs the formula expressing that in
+    [terms], [terms_no_adv], [msg], and the indices of [key]:
+    - [key] is correctly used (only as hash key)
+    - the message [msg] is not hashed with [key].
+
+    When [under_hash] is set to [true], ignores occurrences of hashes
+    inside [msg] (the message being hashed in PRF), though occs of [key] are 
+    still recorded. This option is useful when dealing with non-deduction goals.
+
+    When [oracle] is set to [true], ignores the occurrences of a hash
+    caused by the presence of a hash oracle [lambda x. (hash x key)] in [terms],
+    and generates instead (if such an oracle was indeed present)
+    the formula [terms *> msg], which is the second return value 
+    of the function. [terms_no_adv] is meant to contain terms in which we wish 
+    to search for occurrences, but which are not given to the adversary, and 
+    thus oracles there are not ignored. 
+
+    Fails if the resulting formula still contains the optional [nprf].
+    That is useful in the equivalence case: since we apply PRF under a context,
+    the formula could contain a hole (represented by [nprf]).
+    That case could be handled similarly to what's done in IND-CCA,
+    but it is complicated and the usefulness is unclear.
+    Alternately, we could find syntactic conditions on cc_nprf that guarantee
+    this won't happen, but again it's unclear whether that's useful. *)
+let phi_prf
+    ?(use_path_cond=false)
+    ?(under_hash=true)  (* do we also look for occurrences
+                           in the m being hashed *)
+    ?(oracle=false)  (* finer handling of the hashing oracle *)
+    ?(nprf : Name.t option)  (* a name which must not appear in the 
+                                resulting formula. typically, the n_prf
+                                which stands for the hash in the context. *)
+    (loc : L.t)
     (context : ProofContext.t)
-    (hash_f  : Symbols.fname)
-    ~(biframe : Term.terms)
-    ~(cc_nprf : Term.term)
-    ~(m       : Term.term)
-    ~(k       : Term.term)
-    ~(nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
-    (proj    : Projection.t)
-  : Term.terms
+    ~(hash_f : Symbols.fname)  (* hash function symbol *)
+    ~(terms : Term.terms)  (* terms in which to look for occurrences *)
+    ~(terms_no_adv : Term.terms)  (* terms in which we must also look for 
+                                     occurrences, but which are not given
+                                     to the adversary and thus not concerned
+                                     by [oracle] *)
+    ~(msg : Term.term)  (* message hashed *)
+    ~(key : Term.term)  (* key *)
+  : Term.terms * CP.form option
   =
   let env = context.env in
   let ppe = default_ppe ~table:env.table () in
 
-  let cc_nprf = Term.project1 proj cc_nprf in
-  let m = Term.project1 proj m in
-
-  (* check that the key, once projected, is a name. *)
-  let k = 
-    match Term.project1 proj k with
-    | Name _ as kp -> 
-      Name.of_term kp
+  (* check that the key is a name *)
+  let k = match key with
+    | Name _ as k -> Name.of_term k
     | _ -> soft_failure ~loc
              (Tactics.Failure "Can only be applied on a hash where \
                                the key is a name.")
   in
-  let frame = List.map (Term.project1 proj) biframe in
+  
+  (* check if a term is in fact the oracle lambda x. h(x,k) *)
+  let is_oracle (t:term) =
+    match t with
+    | Quant (Lambda, [x], Term.App
+                           (Term.Fun (f, _), [Term.Tuple [y; k']]))
+      when f = hash_f &&
+           Term.equal y (mk_var x) &&
+           Term.equal k' key ->
+      true
+    | _ -> false
+  in
+  
 
+  (* pretty printer for the occurrence search *)
   let pp_k ppf () = 
     Fmt.pf ppf "bad occurrences of key %a,@ and messages hashed by it" 
       (Name.pp ppe) k
   in
 
   (* first construct the IOS.folds_occs *)
-  let get_bad = get_bad_occs m k hash_f in
+  let get_bad = get_bad_occs msg k hash_f in
+  
+  (* function to check whether an occ is a key occ or hash occ *)
+  let is_key_occ x =
+    match IOS.EO.(x.eo_occ.SO.so_cnt) with
+    | BadKey _ -> true
+    | IntegrityMsg _ -> false
+  in
+
+  (* get the bad key occs, and the messages hashed *)
+
+  (* the messages where we look for occurrences *)
+  (* if [under_hash] is set to false, we ignore [msg]
+     and handle it separately *)
+  (* in addition we ignore the oracle in [terms] if [oracle] *)
+  let terms_occ = 
+    if oracle then List.filter (fun x -> not (is_oracle x)) terms
+    else terms
+  in
+  let terms_occ = k.args @ terms_occ @ terms_no_adv in
+  let terms_occ = if under_hash then msg :: terms_occ else terms_occ in
 
 
-  (* get the bad key occs, and the messages hashed,
-     in frame + cc + m + kargs *) 
   let occs =
     IOS.find_all_occurrences ~concrete:false ~mode:PTimeSI ~pp_descr:(Some pp_k)
-      get_bad context (cc_nprf :: m :: k.args @ frame)
+      get_bad context terms_occ
   in
+  
+  let occs =
+    if under_hash then occs
+    else 
+      (* Search separately in [msg], and there only keep key occs. *)
+      let occs_m = 
+        IOS.find_all_occurrences ~concrete:false ~mode:PTimeSI ~pp_descr:(Some pp_k)
+          get_bad context [msg]
+      in
+      let occs_m = List.filter is_key_occ occs_m in
+      occs_m @ occs 
+  in
+
+
   (* sort the occurrences: first the key occs, then the hash occs *)
-  let occs_key, occs_hash =
-    List.partition
-      (fun x ->
-         match IOS.EO.(x.eo_occ.SO.so_cnt) with
-         | BadKey _ -> true
-         | IntegrityMsg _ -> false)
-      occs
-  in
+  let occs_key, occs_hash = List.partition is_key_occ occs in
   let occs = occs_key @ occs_hash in
 
   (* compute the formulas stating that none of the occs is a collision *)
   let phi = 
-    List.map (IOF.occurrence_formula env ~use_path_cond:false ~negate:true) occs
+    List.map (IOF.occurrence_formula env ~use_path_cond:use_path_cond ~negate:true) occs
   in
 
   (* finally, fail if the generated formula contains the context's hole,
-     ie name xc.
-     TODO it should be possible to handle that case, see how. *)
+     ie name nprf.
+     TODO it should be possible to handle that case? *)
+  let _ =
+    match nprf with 
+    | None -> ()
+    | Some nprf ->
+      if List.exists (Name.has_name nprf) phi then
+        soft_failure ~loc
+          (Tactics.Failure 
+             "The hash was in a bad context, the generated formula has holes")
+  in
+  
+  (* Additionally, if [oracle] and if a hashing oracle was indeed present,
+     generate a subgoal asking that terms *> msg (note that the oracle
+     is in terms, and that terms_no_adv are ignored.) *)
+  let ded_goal =
+    if oracle && (List.exists is_oracle terms) then
+      Some (CP.make 
+              env.table CP.NotDeduce
+              (SE.to_fset env.system.set)
+              ~left_tys:(List.map Term.ty terms)
+              ~right_ty:(Term.ty msg)
+              ~left:terms 
+              ~right:msg)
+    else 
+      None
+  in
+  phi, ded_goal
 
-  if List.exists (Name.has_name nprf) phi then
-    soft_failure ~loc
-      (Tactics.Failure 
-         "The hash was in a bad context, the generated formula has holes");
-  phi
 
+
+(** Projects on projs, and then calls phi_prf *)
+let phi_prf_proj
+    ?(use_path_cond=false)
+    ?(under_hash=true)       (* do we also look for occurrences
+                                in the m being hashed *)
+    ?(oracle=false)          (* finer handling of the hashing oracle *)
+    ?(nprf : Name.t option)  (* a name which must not appear in the 
+                                resulting formula. typically, the n_prf
+                                which stands for the hash in the context. *)
+    (loc : L.t)
+    (context : ProofContext.t)
+    ~(hash_f : Symbols.fname)  (* hash function symbol *)
+    ~(terms : Term.terms)  (* terms in which to look for occurrences *)
+    ~(terms_no_adv : Term.terms)  (* terms in which we must also look for 
+                                     occurrences, but which are not given
+                                     to the adversary and thus not concerned
+                                     by [oracle] *)
+    ~(msg : Term.term)  (* message hashed *)
+    ~(key : Term.term)  (* key *)
+    (projs : Projection.t list)
+  : Term.terms * CP.form option
+  =
+  let env = context.env in  
+  let se = SE.project projs env.system.set in
+  let new_system = { env.system with set = (se :> SE.arbitrary); } in
+  let context = ProofContext.change_system ~system:new_system context in
+  
+  let terms = List.map (Term.project projs) terms in
+  let terms_no_adv = List.map (Term.project projs) terms_no_adv in
+  let msg = Term.project projs msg in 
+  let key = Term.project projs key in
+
+  phi_prf ~use_path_cond ~under_hash ~oracle ?nprf 
+    loc context ~hash_f ~terms ~terms_no_adv ~msg ~key
+  
 
 
 
 (*------------------------------------------------------------------*)
 (** The PRF tactic *)
 
-(** PRF on an equivalence goal *)
+(** PRF on an equivalence goal. *)
 let prf_equiv
     (i:int L.located)
     ?(opat : (Term.term * L.t option * Infer.env option) option)
+    ?(oracle:bool = false)
     (s:sequent) : sequent list =
   let loc = L.loc i in
 
@@ -515,23 +630,25 @@ let prf_equiv
   Printer.pr
     "@[<v 0>Applying PRF to %a@;@;"
     (Term._pp ppe) (Term.mk_fun table_nprf hash_f [Term.mk_tuple [m;k]]);  
-
-  let phi_proj proj () =
-    let se = SE.project [proj] system in
+let phi_prf_proj p =
+    let se = SE.project [p] system in
     let new_system = { env.system with set = (se :> SE.arbitrary); } in
     let context = ES.proof_context ~in_system:new_system s in
+  
+    phi_prf_proj ~use_path_cond:false ~under_hash:true ~oracle ~nprf loc
+      context ~hash_f 
+      ~terms:(cc_nprf::biframe) ~terms_no_adv:[] ~msg:m ~key:k [p]
+      (* FEATURE: allow the user to set [use_path_cond] to true *)
 
-    phi_proj loc
-      context hash_f ~biframe ~cc_nprf ~m ~k ~nprf proj
   in
 
   Printer.pr "@[<v 0>Checking for occurrences on the left@; @[<v 0>";
   (* get proof obligation for occurrences *)
-  let phi_l = phi_proj proj_l () in
+  let phi_l, nded_l = phi_prf_proj proj_l in
 
   Printer.pr "@]@,Checking for occurrences on the right@; @[<v 0>";
   (* get proof obligation for occurrences *)
-  let phi_r = phi_proj proj_r () in
+  let phi_r, nded_r = phi_prf_proj proj_r in
 
   Printer.pr "@]@]@;";
 
@@ -560,6 +677,8 @@ let prf_equiv
      - phi_l in the previous sequent on the left system
      - phi_r in the previous sequent on the right system
      - if needed, phi_lr in the previous sequent
+     - if [oracle], the secrecy subgoals generated by each phi
+       (no need to change the system, as it's included in the secrecy predicate)
      - frame with t replaced with cc_nprf, with the updated table *) 
   let oldcontext = ES.system s in
   let oldpair = oget (oldcontext.pair) in
@@ -585,14 +704,22 @@ let prf_equiv
       [left_sequent; leftright_sequent; right_sequent]
   in
 
+  (* non-deduction sequents *)
+  let nded_sequents =
+    if oracle then 
+      let mk_nded nd =
+        match nd with 
+        | None -> []
+        | Some nd -> [ES.set_conclusion (CP.to_global nd) s]
+      in
+      List.concat_map mk_nded [nded_l; nded_r]
+    else
+      []
+  in
+
   let new_biframe = List.rev_append before (cc_nprf::after) in
-<<<<<<< HEAD
-  let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table s) in
-  (* FEAT: concrete logic for equivalences *)
-=======
   let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table_nprf s) in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
->>>>>>> 5ab28637 (prf tactic for non-deduction goals)
+  (* FEAT: concrete logic for equivalences *)
 
 
   (* copied from old prf for the composition stuff *)
@@ -622,32 +749,29 @@ let prf_equiv
   in
 
 
-  tag_f @ tracegoals @ [equiv_sequent]
+  tag_f @ tracegoals @ nded_sequents @ [equiv_sequent]
 
 
 
 
-(** In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
-   or [v] as [v1, th, v2] (depending on [side]), where [th] is the [i]-th
+(** PRF for secrecy goals.
+   In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
+   or [v] as [v1, th, v2] (depending on [side]), where [th=h(m,k)] is the [i]-th
    element. Fails if that element is not a a hash.
-   Returns the sequent with an updated conclusion [u1, n, u2 *> v] or
-   [u *> v1, n, v2], where [n] is a freshly generated name;
-   as well as all proof obligations required by [prf].
-   This is done by creating a sequent with conclusion
-   [equiv(diff(th, n_PRF), w)] (where [w] is [u1, u2, v] or [u, v1, v2]),
-   calling the [prf] equivalence tactic, and keeping only the 
-   proof obligations from the goals it generates 
-   (ie not the remaining equivalence). 
-   Since the equivalence can only be over a single system, does this once 
-   per system in S, and gathers all resulting obligations. *)
-let prf_secrecy 
-    ?(side:CP.side option) (i:int L.located) (s:sequent) : sequent list =
+   Returns the sequent with an updated conclusion [u1, u2 *> v],
+   or closes the goal, and adds all proof obligations required by [prf].
+   This is done by checking that [u1, u2, v] (left) or [u] (right)
+   does not hash [m] with [k] and correctly uses [k].
+   [m] itself must also correctly use [k] (but no conditions on hashes in it).
+   If [u1, u2] (left) or [u] (right) contain a hash oracle [lambda x. h(x,k)],
+   ignores the corresponding occurrence, and adds a subgoal [u *> m]. *)
+let prf_secrecy
+    ?(side:CP.side=CP.Right) (i:int L.located) (s:sequent) : sequent list =
+  let ppe = default_ppe ~table:(ES.table s) () in
   let loc = L.loc i in
   let table = ES.table s in
 
-  let side = oget_dflt CP.Right side in
-  
-  (* get the components of the secrecy predicate, incl. the system *)
+  (* find the system in the secrecy predicate *)
   let sgoal = ES.conclusion_as_computability s in
   
   let system = CP.system sgoal in
@@ -655,87 +779,96 @@ let prf_secrecy
     soft_failure (Failure "the conclusion must be over a concrete system");
   let system = SE.to_fset system in
   
+  (* hyps and trace context needed by phi_prf, with the same system *)
+  let new_system = {(ES.system s) with set=(system :> SE.arbitrary)} in
+  let context = ES.proof_context ~in_system:new_system s in  
 
-  (* get the hash th, and the remaining terms w *)
+
+  (* get the hash th (on the left or right), and the remaining terms us, vs *)
   let ii = L.unloc i in
-  let ts = CP.terms ~side sgoal in 
-  let rs = CP.terms ~side:(CP.other side) sgoal in
-  let t1, th, t2 =
-    try List.splitat ii ts
+  let us = CP.lefts sgoal in
+  let vs = CP.rights sgoal in
+  
+  let th, us, vs = 
+    try 
+      match side with 
+      | CP.Left ->
+        let u1, th, u2 = List.splitat ii us in 
+        th, (List.rev_append u1 u2), vs
+      | CP.Right ->
+        let v1, th, v2 = List.splitat ii vs in 
+        th, us, (List.rev_append v1 v2)
     with 
     | List.Out_of_range ->
       soft_failure ~loc
         (Tactics.Failure 
            ("invalid position "^(string_of_int ii)^" in the conclusion"));
   in
-  let w = 
-    match side with
-    | CP.Left -> t1 @ t2 @ rs
-    | CP.Right -> rs @ t1 @ t2
-  in
 
-  (* check that the term th is indeed a hash, extract types *)
-  let hty =
+
+  (* check that the term th is indeed a hash, get the key and hashed message *)
+  let hash_f, msg, key =
     match th with
-    | Term.App (Fun (hash_f, hty), [Tuple [_; Name _]])
-      when is_hash table hash_f -> hty.fty.fty_out
+    | Term.App (Fun (hash_f, _), [Tuple [msg; key]])
+      when is_hash table hash_f -> hash_f, msg, key
     | _ -> soft_failure ~loc
              (Tactics.Failure ("element "^(string_of_int ii)^" is not a hash"))
   in
-  
-  (* generate a new name n_PRF to replace the hash with *)
-  let n_fty = Type.mk_ftype [] [] hty in
-  let nprfdef = Symbols.Name {n_fty} in
-  let sn_prf = L.mk_loc L._dummy "n_PRF" in
-  let table, nprfs =
-    Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
-  in
-  let table = Process.add_namelength_axiom table nprfs n_fty in
-  let nprf = Name.{symb=Term.nsymb nprfs hty; args=[]} in
 
-  (* update the sequent's table *)
-  let s = ES.set_table table s in
-  
-  (* get all single systems in the predicate's set *)
-  let single_systems =
-    match SE.to_list_any system with
-    | Some l -> l
-    | None -> soft_failure ~loc
-                (Tactics.Failure
-                   "the system in the conclusion must be explicit")
+  (* for prf left, we search for occs in [vs] but don't give it to the
+     adversary. 
+     for prf right, we ignore [vs] (since we'll show that the hash is secret 
+     anyway). *)
+  let terms_no_adv = if side = CP.Left then vs else [] in
+
+  (* compute the prf formula + non-deduction goal (if needed). 
+     note that we do not project here, and work directly on the predicate's set.
+     that may cause the tactic to fail e.g. if the key was diff(k1, k2):
+     in that case, project before applying the tactic? *)
+  Printer.pr
+    "@[<v 0>Applying PRF to %a@;@;"
+    (Term._pp ppe) (Term.mk_fun table hash_f [Term.mk_tuple [msg;key]]);  
+  let phi, nded =
+    phi_prf ~use_path_cond:false ~under_hash:false ~oracle:true
+      loc context ~hash_f 
+      ~terms:us ~terms_no_adv ~msg ~key
   in
-  
-  (* for each single system, generate an equivalence goal, and call prf *)
-  let prf_subgoals =
-    List.concat_map
-      (fun (proj, sys) ->
-         (* project all terms *)
-         let wp = List.map (Term.project1 proj) w in
-         let thp = Term.project1 proj th in
-         (* generate the equivalence goal with the correct pair *)
-         let oldsystem = ES.system s in
-         let pair =
-           SE.make_pair (Projection.left, sys) (Projection.right, sys)
-         in
-         let newsystem = {oldsystem with pair=Some pair} in
-         let eq_goal =
-           Equiv.mk_equiv_atom
-             ((Term.mk_diff [Projection.left, thp;
-                            Projection.right, Name.to_term nprf]) :: wp)
-         in
-         let eq_seq = ES.set_conclusion_in_context newsystem eq_goal s in
-         (* call prf, then keep only the proof obligations *)
-         let zero = L.mk_loc L._dummy 0 in
-         let subgoals = prf_equiv zero eq_seq in
-         List.filter (fun x -> not (ES.conclusion_is_equiv x)) subgoals)
-      single_systems
+  Printer.pr "@]@;";
+
+  (* reachability goal *)
+  let phi = Term.mk_ands ~simpl:true phi in
+  let reach_sequent =
+    if not (Term.equal phi Term.mk_true) then 
+      [ES.set_conclusion_in_context new_system (Equiv.mk_reach_atom phi) s]
+    else 
+      []
   in
 
-  (* construct the updated sequent *)
-  let new_sgoal = 
-    CP.update_terms ~side (t1 @ [Name.to_term nprf] @ t2) sgoal 
+  (* remaining secrecy goal [us *> vs], only for the left case *)
+  let remaining_sgoal = CP.update_lefts us sgoal in
+  let remaining_sequent =
+    match side with 
+    | CP.Left -> [ES.set_conclusion (CP.to_global remaining_sgoal) s]
+    | CP.Right -> []
+  in  
+
+  (* non-deduction sequent *)
+  let nded_sequent =
+    match nded with 
+    | None -> []
+    | Some nded when (* when the additional non-deduction subgoal is the same
+                        as the remaining sequent *)
+        (Term.equal (CP.right sgoal) (CP.right nded))
+        && (Term.equal (CP.left remaining_sgoal) (CP.left nded))
+        && side = CP.Left ->
+      []
+    | Some nded
+      -> [ES.set_conclusion (CP.to_global nded) s]
   in
-  prf_subgoals @ [ES.set_conclusion (CP.to_global new_sgoal) s]
+
+
+  reach_sequent @ nded_sequent @ remaining_sequent
+
 
 
 
@@ -754,8 +887,7 @@ let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
              let ienv = Infer.mk_env () in
              let cenv = Typing.{env = ES.env s; cntxt = InGoal; } in
              let a, _ty =
-               Typing.convert ~option:{Typing.Option.default with pat=true}
-                 ~ienv cenv p
+               Typing.convert ~ienv cenv p
              in
              (a, Some (L.loc p), Some ienv))
           opat
