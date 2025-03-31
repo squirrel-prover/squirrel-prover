@@ -85,20 +85,6 @@ axiom [any] int_msg (n:int) : msg_to_int(int_to_msg(n)) = n.
 
 hint smt int_msg. 
 
-(*axiom [any] orderSucc (n,n':message): n = n' => n ~< mySucc(n').
-
-axiom [any] orderTrans (n1,n2,n3:message): (n1 ~< n2 && n2 ~< n3) => n1 ~< n3.
-
-axiom [any] orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
-
-axiom [any] orderEqSucc (n1,n2:message):
-  (n1 ~< mySucc(n2)) => ((n1 = n2) || n1 ~< n2).
-
-hint smt orderSucc.
-hint smt orderTrans.
-hint smt orderStrict.
-hint smt orderEqSucc.
-*)
 (* The counter increases (not strictly) between t' and t when t' < t. *)
 
 lemma ctrIncA (t, t':timestamp, i:index):
