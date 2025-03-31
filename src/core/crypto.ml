@@ -1992,18 +1992,39 @@ module Game = struct
     List.map build_fresh_set outputs
 
   (* ----------------------------------------------------------------- *)
-  (** Checks that the substitution maps samplings to names. *)
-  let subst_check (subst : Mvar.t ) (oracle_pat : oracle_pat) : bool =
-    let check_names_subst subst var =
-      try 
-        match Mvar.find var subst with
-        | Term.Name _  -> true
-        | _ -> false
-      with Not_found -> true
+  (** Given a substitution [mv], ensure that the subset [mv0] of [mv]
+      instantiating randomly sampled variables of the game only maps
+      to (logical) names.
+
+      This is done modulo reduction. *)
+  let game_random_to_names
+      (red_param : ReductionCore.red_param)
+      ~(env : Env.t) ~(hyps : TraceHyps.hyps)
+      (mv : Mvar.t) (oracle_pat : oracle_pat)
+    : Mvar.t option
+    = 
+    let exception Failed in
+
+    (* reduction state and parameters *)
+    let strat = Reduction.MayRedSub red_param in
+    let st =
+      Reduction.mk_state
+        ~hyps ~system:env.system ~vars:env.vars
+        ~params:(Env.to_params env) ~red_param env.table
     in
-    List.for_all
-      (check_names_subst subst)
-      ( oracle_pat.loc_names @ oracle_pat.glob_names )
+
+    (* ensure that [mv] only maps the game random values to logical
+       names *)
+    let to_name v _ t =
+      if List.mem v (oracle_pat.loc_names @ oracle_pat.glob_names) then 
+        if Term.is_name t then t else
+          let t, has_red = Reduction.whnf_term ~strat st t in
+          if has_red && Term.is_name t then t
+          else raise Failed
+      else t
+    in
+    
+    try Some (Mvar.mapi to_name mv) with Failed -> None
 
   (* ----------------------------------------------------------------- *)
   (** The result of a tentative oracle match. *)
@@ -2074,7 +2095,7 @@ module Game = struct
     in
     if loc_smpls = [] then mv else raise LocSmplToInfer
 
-  
+  (* ----------------------------------------------------------------- *)
   (** Return the list for each oracle pattern of the successful oracle
       matches in query bideduction goal [query] . *)
   let match_oracle (query : query) (term : CondTerm.t) : oracle_match list = 
@@ -2087,6 +2108,7 @@ module Game = struct
         (oracle : oracle) (subgoals : Term.terms) (oracle_pat : oracle_pat)
       : oracle_match option
       =
+      let param = Match.crypto_param in
       let match_res =
         let vars = oracle_pat.loc_names @ oracle_pat.glob_names @ oracle_pat.args in
         let pat =
@@ -2097,63 +2119,71 @@ module Game = struct
           }
         in
         Match.T.try_match
-          ~param:Match.crypto_param
+          ~param
           ~env:env.vars ~hyps:query.hyps env.table env.system
           term.term pat
       in
+
       match match_res with
-      | Match mv when subst_check mv oracle_pat->
-        (* indices of logical names mapped to local and global randomness 
-           (which must be provided, hence computed, by the adversary) *)
-        let name_indices_inputs =
-          let used_names =
-            List.filter
-              (fun x -> Mvar.mem x mv)
-              ( oracle.loc_smpls @ query.game.glob_smpls )
+      | NoMatch _ -> None
+      | Match mv ->
+        (* [game_mv ⊆ mv] and is the partial instantiation of the game
+           randomly sampled values we inferred by matching. *)
+        let mv =
+          game_random_to_names param.red_param ~env ~hyps:query.hyps mv oracle_pat
+        in
+        match mv with
+        | None -> None
+        | Some mv ->
+          (* indices of logical names mapped to local and global randomness 
+             (which must be provided, hence computed, by the adversary) *)
+          let name_indices_inputs =
+            let used_names =
+              List.filter
+                (fun x -> Mvar.mem x mv)
+                ( oracle.loc_smpls @ query.game.glob_smpls )
+            in
+            let mk_cinput_name n =
+              match n with
+              | Term.Name (_,n_args) ->
+                List.map (fun x -> CondTerm.{term = x;conds=term.conds}) n_args
+              | _ -> assert false
+            in 
+            List.concat_map
+              mk_cinput_name
+              (List.map (fun v -> Mvar.find v mv ) used_names)
           in
-          let mk_cinput_name n =
-            match n with
-            | Term.Name (_,n_args) ->
-              List.map (fun x -> CondTerm.{term = x;conds=term.conds}) n_args
-            | _ -> assert false
-          in 
-          List.concat_map
-            mk_cinput_name
-            (List.map (fun v -> Mvar.find v mv ) used_names)
-        in
 
-        (* inputs of the oracle, provided by the adversary *)
-        let oracle_inputs =
-          List.map (fun t -> CondTerm.mk ~term:t ~conds:term.conds)
-            (List.concat_map
-               (fun v -> try [Mvar.find v mv] with Not_found -> [] )
-               oracle.args)
-        in
-        
-        (* full inputs = condition + names indices + standard inputs *)
-        let full_inputs =
-          CondTerm.{ term = Term.mk_true; conds = term.conds} ::
-          oracle_inputs @
-          name_indices_inputs
-        in
+          (* inputs of the oracle, provided by the adversary *)
+          let oracle_inputs =
+            List.map (fun t -> CondTerm.mk ~term:t ~conds:term.conds)
+              (List.concat_map
+                 (fun v -> try [Mvar.find v mv] with Not_found -> [] )
+                 oracle.args)
+          in
 
-        (* FIXME : now that there are subgoals : there could be variables used 
-                   in the subgoal 
-                   but not used by the output, hence not seen by the matching 
-                   (ex : names not used) *)
-        
-        (* complete [mv] with a default [witness] value for all (standard) 
-           oracle inputs that are not needed and try to infer global name with constraints*)
-        begin
-          try 
-            let mv = infer_args_and_name query mv oracle_pat oracle subgoals in
-            Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
-          with
-          | UnknowGlobalSmplsAssign -> None
-          | LocSmplToInfer -> None
-        end
-          
-      | _ -> None
+          (* full inputs = condition + names indices + standard inputs *)
+          let full_inputs =
+            CondTerm.{ term = Term.mk_true; conds = term.conds} ::
+            oracle_inputs @
+            name_indices_inputs
+          in
+
+          (* FIXME : now that there are subgoals : there could be variables used 
+                     in the subgoal 
+                     but not used by the output, hence not seen by the matching 
+                     (ex : names not used) *)
+
+          (* complete [mv] with a default [witness] value for all (standard) 
+             oracle inputs that are not needed and try to infer global name with constraints*)
+          begin
+            try 
+              let mv = infer_args_and_name query mv oracle_pat oracle subgoals in
+              Some { mv; full_inputs; oracle_pat; oracle; subgoals; }
+            with
+            | UnknowGlobalSmplsAssign -> None
+            | LocSmplToInfer -> None
+          end
     in
 
     let rec try_match_oracle
