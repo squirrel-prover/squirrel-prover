@@ -39,10 +39,11 @@ let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [>
   let make_test filename =
     filename, `Quick, begin fun () ->
       try runner ~test:true filename with e ->
+        let table = Squirrelcore.Symbols.builtins_table () in
         Squirrelcore.Printer.prt `Error "%a"
           (Squirrelprover.Errors.pp_toplevel_error
              ~test:true
-             Squirrelprover.Driver.dummy)
+             Squirrelprover.Driver.dummy table)
           e;
         raise e
     end
