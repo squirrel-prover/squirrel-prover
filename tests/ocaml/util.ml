@@ -10,9 +10,10 @@ let catch_error (f:unit -> unit) () : unit  =
   try 
     f ();()
   with e ->
+    let table = Symbols.builtins_table () in
     Squirrelcore.Printer.prt `Error "%a"
-      (Squirrelprover.Errors.pp_toplevel_error ~test:true
-         Squirrelprover.Driver.dummy) e;
+      (Squirrelprover.Errors.pp_toplevel_error ~test:true 
+         Squirrelprover.Driver.dummy table) e;
     raise e
 
 let parse_from_string 

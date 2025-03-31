@@ -1,4 +1,5 @@
 open Utils
+open Ppenv
 
 module SE = SystemExpr
 module L  = Location
@@ -180,7 +181,7 @@ exception Error of conversion_error
 
 let error loc e = raise (Error (loc,e))
 
-let pp_error_i ppf = function
+let pp_error_i ppe ppf = function
   | Arity_error (s,i,j) ->
     Fmt.pf ppf "symbol %s given %i arguments, but has arity %i" s i j
 
@@ -190,7 +191,7 @@ let pp_error_i ppf = function
                 of type@ @[%a@]@ \
                 is not of type @[%a@]\
                 @]"
-      Term.pp s
+      (Term._pp ppe) s
       Type.pp ty
       Type.pp ty_expected
 
@@ -255,10 +256,10 @@ let pp_error_i ppf = function
 
   | Failure s -> Fmt.string ppf s
       
-let pp_error pp_loc_err ppf (loc,e) =
+let pp_error pp_loc_err ppe ppf (loc,e) =
   Fmt.pf ppf "%aConversion error:@ %a"
     pp_loc_err loc
-    pp_error_i e
+    (pp_error_i ppe) e
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
@@ -950,16 +951,20 @@ and convert0
     
     let t = convert_app state (L.loc tm) applied_symb terms app_cntxt ty in
 
-    if is_in_proc state.cntxt then 
+    if is_in_proc state.cntxt then begin
+      let ppe = default_ppe ~table:state.env.table () in
       Printer.prt `Warning 
         "Potential well-foundedness issue: \
          macro %a with explicit timestamp in process declaration."
-        Term.pp t;
+        (Term._pp ppe) t
+    end;
+
     t
 
   | AppAt (t,_) ->              (* failure *)
     let t = conv ty t in
-    error loc (Timestamp_unexpected (Fmt.str "%a" Term.pp t))
+    let ppe = default_ppe ~table:state.env.table () in
+    error loc (Timestamp_unexpected (Fmt.str "%a" (Term._pp ppe) t))
 
   (* application, special case *)
   | Symb applied_symb

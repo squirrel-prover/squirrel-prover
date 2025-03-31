@@ -2,6 +2,10 @@
     functions to type-check them, and convert them to proper
     terms and formulas of the logic. *)
 
+open Ppenv
+open Utils
+
+(*------------------------------------------------------------------*)
 module L  = Location
 module SE = SystemExpr
 module Mv = Vars.Mv
@@ -293,8 +297,8 @@ exception Error of conversion_error
 val error : L.t -> conversion_error_i -> 'a
     
 val pp_error :
-  (Format.formatter -> L.t -> unit) ->
-  Format.formatter -> conversion_error -> unit
+  L.t formatter ->
+  conversion_error formatter_p
 
 val check : 
   Env.t ->

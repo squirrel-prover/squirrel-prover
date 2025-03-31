@@ -1,5 +1,8 @@
 include Squirrelfront
 include Squirrelcore
+
+open Ppenv
+
 include Driver
 
 (*------------------------------------------------------------------*)
@@ -35,11 +38,14 @@ let pp_toplevel_error
     ?(interactive=true)
     ~test
     (driver : Driver.t)
+    (table : Symbols.table)
     (fmt : Format.formatter)
     (e : exn) : unit
   =
   let pp_loc_error     = pp_loc_error     driver in
   let pp_loc_error_opt = pp_loc_error_opt driver in
+
+  let ppe = default_ppe ~table () in
 
   match e with
   | Parserbuf.Error s ->
@@ -58,7 +64,7 @@ let pp_toplevel_error
     (ProcessDecl.pp_error pp_loc_error) fmt e
 
   | Typing.Error e when not test ->
-    (Typing.pp_error pp_loc_error) fmt e
+    Typing.pp_error pp_loc_error ppe fmt e
 
   | Symbols.Error e when not test ->
     (Symbols.pp_error pp_loc_error) fmt e

@@ -712,7 +712,7 @@ and do_include
           let err_mess fmt =
             Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
               (L.unloc (ProverLib.lsymb_of_load_path i.th_name))
-              (Errors.pp_toplevel_error ~interactive:interactive ~test driver) e
+              (Errors.pp_toplevel_error ~interactive ~test driver st.table) e
           in
           Driver.close driver;
           Command.cmd_error (IncludeFailed err_mess)

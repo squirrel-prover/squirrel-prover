@@ -116,9 +116,10 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
   (* error handling *)
   | exception e
     when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
+    let table = Prover.get_table state.prover_state in
     Printer.prt `Error "%a"
       (Errors.pp_toplevel_error
-         ~interactive:!interactive ~test state.driver) e;
+         ~interactive:!interactive ~test state.driver table) e;
     main_loop_error ~test state
 
 and main_loop_error ~test (state : driver_state) : unit =
