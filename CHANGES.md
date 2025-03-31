@@ -1,3 +1,16 @@
+### smt update
+  [commit: 9655f18c] 
+
+SMT tactic updated to rely on why3 1.8.
+
+Improved the handling of polymorphic and higher-order terms. 
+They don't crash smt anymore thanks to an opaque translation.
+
+Support for the translation of squirrel's integers. 
+
+Syntax update: the timeout for smt is defined with the optional 
+integer argument ~timeout.
+
 ### reification of terms
   [commit: `04a01497`]
 
