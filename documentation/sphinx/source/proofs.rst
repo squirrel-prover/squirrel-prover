@@ -1166,7 +1166,7 @@ Local tactics
           ----------------------------------------
           n <> m
       
-.. tact:: smt {? ~prover} {? ~style} {? ~timeout}
+.. tact:: smt {? ~prover} {? ~style} {? ~timeout:@natural}
    :name: smt
     
     Try to discharge the current goal using an SMT solver. 
