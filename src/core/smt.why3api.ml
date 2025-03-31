@@ -325,27 +325,27 @@ let unsupported_term context fmla str =
 
 (* Transforms a Why3 term to a formula if it was of type bool,
   else acts as the identity. *)
-let term_to_fmla t = 
+let wbool_to_wfmla t = 
   if Term.ty t = Type.tboolean then Why3.Term.to_prop else (fun x -> x)
 
 (* Transforms a Why3 formula to a boolean term. *)
-let fmla_to_term p = Why3.Term.(t_if p t_bool_true t_bool_false) 
+let wfmla_to_wbool p = Why3.Term.(t_if p t_bool_true t_bool_false) 
 
 (* Transforms a list of Squirrel terms to a list of Why3 terms. *)
-let rec fmlas_to_terms context terms = 
+let rec sqfmlas_to_wterms context terms = 
   List.map
-    (fun (t,b) ->  if b then (fmla_to_term t) else t)
+    (fun (t,b) ->  if b then (wfmla_to_wbool t) else t)
     (List.map 
-      (fun t -> ((msg_to_fmla context) t, Term.ty t=Type.tboolean))
+      (fun t -> ((sqterm_to_wfmla context) t, Term.ty t=Type.tboolean))
       terms
     )
    
 (* Main translation function. It converts a Squirrel term to a Why3 term
    (or formula if its type is bool). *)
-and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla -> 
+and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla -> 
   let open Term in
   let open Why3.Term in
-  (term_to_fmla fmla) (match fmla with
+  (wbool_to_wfmla fmla) (match fmla with
     | Term.Int i ->
       let i = Why3.BigInt.of_string (Z.to_string i) in
       Why3.Term.t_int_const i
@@ -368,78 +368,78 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
     varies depending on the type of the terms. *)
     | Term.App (Fun (symb,_),terms) ->  
       begin match terms with 
-      | [f] when symb=f_not -> t_not (msg_to_fmla context f)
+      | [f] when symb=f_not -> t_not (sqterm_to_wfmla context f)
       | [f1;f2] when symb=f_and ->
-        t_and (msg_to_fmla context f1) (msg_to_fmla context f2)
+        t_and (sqterm_to_wfmla context f1) (sqterm_to_wfmla context f2)
       | [f1;f2] when symb=f_or ->
-        t_or (msg_to_fmla context f1) (msg_to_fmla context f2)
+        t_or (sqterm_to_wfmla context f1) (sqterm_to_wfmla context f2)
       | [f1;f2] when symb=f_impl ->
-        t_implies (msg_to_fmla context f1) (msg_to_fmla context f2)  
+        t_implies (sqterm_to_wfmla context f1) (sqterm_to_wfmla context f2)  
       | [f1;f2] when symb=f_iff -> 
-        t_iff (msg_to_fmla context f1) (msg_to_fmla context f2)  
+        t_iff (sqterm_to_wfmla context f1) (sqterm_to_wfmla context f2)  
       | [t1;t2] when symb = f_eq -> if Term.ty t1 = Type.tboolean then 
-          t_iff (msg_to_fmla context t1) (msg_to_fmla context t2) 
+          t_iff (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2) 
           else 
             (if Term.ty t1 = Type.ttimestamp then 
-            ts_equ context (msg_to_fmla context t1) (msg_to_fmla context t2)
+            ts_equ context (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2)
             else
-            t_equ (msg_to_fmla context t1) (msg_to_fmla context t2) )
+            t_equ (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2) )
       | [t1;t2] when symb = f_neq -> if Term.ty t1 = Type.tboolean then 
-        t_not (t_iff (msg_to_fmla context t1) (msg_to_fmla context t2)) 
+        t_not (t_iff (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2)) 
         else 
           (if Term.ty t1 = Type.ttimestamp then 
           t_not 
-            (ts_equ context (msg_to_fmla context t1) (msg_to_fmla context t2))
+            (ts_equ context (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2))
           else
-          t_not (t_equ (msg_to_fmla context t1) (msg_to_fmla context t2) ))
+          t_not (t_equ (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2) ))
       | [t1;t2] when symb = f_leq && (Term.ty t1 = Type.ttimestamp) ->
         t_app_infer 
           context.leq_symb 
-          [msg_to_fmla context t1;msg_to_fmla context t2]
+          [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
       | [t1;t2] when symb = f_geq && (Term.ty t1 = Type.ttimestamp) ->
         t_app_infer 
           context.leq_symb 
-          [msg_to_fmla context t2;msg_to_fmla context t1]
+          [sqterm_to_wfmla context t2;sqterm_to_wfmla context t1]
       | [t1;t2] when symb = f_lt && (Term.ty t1 = Type.ttimestamp) ->
             t_and 
               (t_app_infer 
                 context.leq_symb
-                [msg_to_fmla context t1;msg_to_fmla context t2]
+                [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
               )
               (t_not @@ ts_equ context 
-                (msg_to_fmla context t1) (msg_to_fmla context t2)
+                (sqterm_to_wfmla context t1) (sqterm_to_wfmla context t2)
               )
       | [t1;t2] when symb = f_gt && (Term.ty t1 = Type.ttimestamp) ->
             t_and 
               (t_app_infer 
                 context.leq_symb
-                [msg_to_fmla context t2;msg_to_fmla context t1]
+                [sqterm_to_wfmla context t2;sqterm_to_wfmla context t1]
               )
               (t_not @@ ts_equ context 
-                (msg_to_fmla context t2) (msg_to_fmla context t1)
+                (sqterm_to_wfmla context t2) (sqterm_to_wfmla context t1)
               )
 
       | [t1;t2] when symb = f_leq && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_leq_symb)
-            [msg_to_fmla context t1;msg_to_fmla context t2]
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
       | [t1;t2] when symb = f_geq && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_geq_symb) 
-            [msg_to_fmla context t1;msg_to_fmla context t2]
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
       | [t1;t2] when symb = f_lt && (Term.ty t1) = Type.tint -> 
           t_app_infer 
             (context.int_lt_symb)
-            [msg_to_fmla context t1;msg_to_fmla context t2]
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
       | [t1;t2] when symb = f_gt && (Term.ty t1) = Type.tint ->
           t_app_infer 
             (context.int_gt_symb)
-            [msg_to_fmla context t1;msg_to_fmla context t2] 
+            [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2] 
 
       | [cond;f1;f2] when symb=f_ite -> 
-        t_if (msg_to_fmla context cond) 
-          (msg_to_fmla context f1) 
-          (msg_to_fmla context f2)
+        t_if (sqterm_to_wfmla context cond) 
+          (sqterm_to_wfmla context f1) 
+          (sqterm_to_wfmla context f2)
       | _ when
           (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> [] ->
         unsupported_term context fmla "unsupp_poly"
@@ -449,7 +449,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
           let f = find_fn context symb in 
           t_app_infer
             f 
-            (fmlas_to_terms context terms)
+            (sqfmlas_to_wterms context terms)
           with Not_found -> unsupported_term context fmla "unsupp_fun_not_found"
         end
       end
@@ -469,7 +469,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
             else ((pat_wild ty')::acc,j+1,v)
           ) ([],1,None) l 
           in Why3.Term.t_case_close 
-            (msg_to_fmla context t) 
+            (sqterm_to_wfmla context t) 
             [pat_app 
               (fs_tuple (len-1)) 
               pat_list 
@@ -479,32 +479,32 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         | _ -> assert false 
       end
     | Term.Quant (ForAll, vs, f) -> 
-      msg_to_fmla_q context t_forall_close vs f fmla
+      sqterm_to_wfmla_q context t_forall_close vs f fmla
     | Term.Quant (Exists, vs, f) -> 
-      msg_to_fmla_q context t_exists_close vs f fmla
+      sqterm_to_wfmla_q context t_exists_close vs f fmla
     | Term.Quant (Seq,_,_) | Term.Quant (Lambda,_,_) -> 
       unsupported_term context fmla "unsupp_quant" 
     | Macro (ms,[],ts) when ms.s_symb = Symbols.Classic.cond ->
       t_app_infer 
         (context.macro_cond_symb)
-        [msg_to_fmla context ts]
+        [sqterm_to_wfmla context ts]
     | Macro (ms,[],ts) when ms.s_symb = Symbols.Classic.exec ->
       t_app_infer 
         (context.macro_exec_symb) 
-        [msg_to_fmla context ts]
+        [sqterm_to_wfmla context ts]
     | Action (a,indices) -> 
         t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a))) 
-        (fmlas_to_terms context indices)
+        (sqfmlas_to_wterms context indices)
     | Macro (ms,l,ts) -> 
       t_app_infer
           (fst(Hashtbl.find context.macros_tbl (path_to_string ms.s_symb)))
-          (fmlas_to_terms context l @
-          [msg_to_fmla context ts])
+          (sqfmlas_to_wterms context l @
+          [sqterm_to_wfmla context ts])
 
     | Name (ns,args) ->
         t_app_infer
           (Hashtbl.find context.names_tbl (path_to_string ns.s_symb))
-          (fmlas_to_terms context args)
+          (sqfmlas_to_wterms context args)
 
     | Diff  _ | Find _ -> 
       unsupported_term context fmla "diff_find"
@@ -513,7 +513,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
         | Not_found -> raise InternalError
       end
 
-    | Tuple l -> t_tuple (fmlas_to_terms context l)
+    | Tuple l -> t_tuple (sqfmlas_to_wterms context l)
 
     | Let (_,_,_) -> 
       unsupported_term context fmla "let"
@@ -521,7 +521,7 @@ and msg_to_fmla context : Term.term -> Why3.Term.term = fun fmla ->
   )
 
 (* Auxiliary function to handle quantified formulas. *)
-and msg_to_fmla_q context quantifier vs f fmla=
+and sqterm_to_wfmla_q context quantifier vs f fmla=
   (* NOTE: here we use the fact that OCaml hashtables can have multiple
    *       bindings, and the newer ones shadow the older ones
    * thus we can use Hashtbl.(add|remove) to handle bound variable scope. *)
@@ -549,7 +549,7 @@ and msg_to_fmla_q context quantifier vs f fmla=
       unsupported_term context fmla "unsupported_quant"
     | Some qv -> 
       (* At this stage the variables are added to the scope, we can recurse *)
-      let subfmla = msg_to_fmla context f in
+      let subfmla = sqterm_to_wfmla context f in
       (* and then cleanup. *)
       List.iter (rem_var context.vars_tbl) vs;
       quantifier qv [] subfmla
@@ -894,7 +894,7 @@ let add_timestamp_axioms context =
                  [Term.mk_happens a2]
                  (Term.mk_lt a1 a2))
           in
-          (msg_to_fmla context axiom)::acc'
+          (sqterm_to_wfmla context axiom)::acc'
       end 
       else acc'
       ) context.table (Option.get context.system) acc
@@ -926,7 +926,7 @@ let add_timestamp_axioms context =
                  (Term.mk_not (Term.mk_happens a1))
                  (Term.mk_not (Term.mk_happens a2)))
           in          
-          (msg_to_fmla context axiom)::acc'
+          (sqterm_to_wfmla context axiom)::acc'
         end 
         else acc'
         ) context.table (Option.get context.system) acc
@@ -1121,7 +1121,7 @@ let add_macro_axioms context =
         let ax_cond = t_implies (t_app_infer context.happens_symb [ts])
             (t_iff 
                 (t_app_infer (context.macro_cond_symb) [ts])
-                (msg_to_fmla context (snd descr.Action.condition))) in 
+                (sqterm_to_wfmla context (snd descr.Action.condition))) in 
         macro_axioms := ("expand_cond_" ^ name_str,
                           t_forall_close !quantified_vars [] ax_cond) ::
                         !macro_axioms;
@@ -1144,7 +1144,7 @@ let add_macro_axioms context =
                     try 
                     Some (macro_wterm_eq
                           []
-                          (msg_to_fmla context (snd descr.Action.output)))
+                          (sqterm_to_wfmla context (snd descr.Action.output)))
                     with InternalError -> None
                   end
                 | Symbols.Global (arity, gty, _) -> begin 
@@ -1181,8 +1181,8 @@ let add_macro_axioms context =
                               (List.map (index_var_to_wterm context) m_idx) 
                               (
                               (if gty=Type.tboolean then
-                                fmla_to_term else (fun x -> x))
-                                (msg_to_fmla context msg)
+                                wfmla_to_wbool else (fun x -> x))
+                                (sqterm_to_wfmla context msg)
                               )))
                       with InternalError -> None
                     end
@@ -1233,10 +1233,10 @@ let add_macro_axioms context =
                         );
                         let expansion_ok = 
                           (if sty=Type.tboolean then 
-                            fmla_to_term
+                            wfmla_to_wbool
                           else
                             (fun x -> x)) 
-                          (msg_to_fmla context msg) 
+                          (sqterm_to_wfmla context msg) 
                         in
                         if descr.Action.name = Symbols.init_action then
                           (List.iter (fun t -> 
@@ -1252,7 +1252,7 @@ let add_macro_axioms context =
                             (equal_lists 
                               context 
                               (indices) 
-                              (List.map (msg_to_fmla context) ns_args)
+                              (List.map (sqterm_to_wfmla context) ns_args)
                             )
                             expansion_ok
                             same_as_pred)
@@ -1398,10 +1398,10 @@ let build_task ~timestamp_style table system
         (Why3.Term.t_and_l
           (List.filter_map
             (fun h ->
-              try Some (msg_to_fmla context h) with InternalError -> None)
+              try Some (sqterm_to_wfmla context h) with InternalError -> None)
             (convert_hypotheses hypotheses)))
         (Why3.Term.t_not 
-          (try msg_to_fmla context conclusion with 
+          (try sqterm_to_wfmla context conclusion with 
             InternalError -> Why3.Term.t_false))))
   in
   let theory : Why3.Theory.theory_uc =
