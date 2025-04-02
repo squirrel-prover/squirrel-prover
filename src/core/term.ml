@@ -1781,7 +1781,7 @@ and pp_and_happens info fmt f =
     | App (Fun (s, _), [ts]) when s = f_happens -> ts :: acc
     | _ as f ->
       let l, r = oget (destr_and f) in
-      collect (collect acc l) r
+      collect (collect acc r) l
   in
 
   pp_happens info fmt (collect [] f)
