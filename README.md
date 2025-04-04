@@ -101,16 +101,30 @@ still compile, but the `smt` tactic won't work. Note that you will
 need to recompile Squirrel *after* the `why3` package has been
 installed.
 
-1. Install Why3, Alt-Ergo and Z3 using opam:
+1. Install Why3 using opam:
    
    ```
    opam install why3 alt-ergo
-   opam install z3.4.12.6
    ```
 
    This also installs the Why3 OCaml library used by Squirrel.
 
-2. Then tell Why3 to automatically detect supported SMT provers and update its
+2. Install CVC5 and Z3. This can be done by downloading the binaries 
+   from their respective websites, copying them in `/usr/local/bin/`,
+   renaming them respectively `cvc5` and `z3` and making them executable:
+
+   ```
+   chmod +x cvc5
+   ```
+
+   To avoid warnings, we recommand CVC5 1.0.* and Z3 4.12.*.
+   Alternatively a specific version of Z3 can also be installed using opam:
+  
+   ```
+   opam install z3.4.12.6
+   ```
+  
+3. Then tell Why3 to automatically detect supported SMT provers and update its
    configuration accordingly:
 
    ```
