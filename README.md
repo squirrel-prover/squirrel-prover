@@ -125,7 +125,7 @@ installed.
    ```
    opam install z3.4.13.2
    ```
-  
+
 3. Then tell Why3 to automatically detect supported SMT provers and update its
    configuration accordingly:
 
@@ -133,13 +133,15 @@ installed.
    why3 config detect
    ```
 
-3. Recompile Squirrel:
+4. Recompile Squirrel:
    
    ```
    eval $(opam env)
    make
    ```
 
+If the calls to SMT solvers fail, this might be caused by an old Why3 config 
+file. To fix this, try to delete the file `~/.why3.conf` and redo step 3.
 ### Installing the Proof General mode for Emacs (optional, recommended)
 
 The required `.el` files are inside the `utils/` folder. 
