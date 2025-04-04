@@ -119,11 +119,11 @@ installed.
    chmod +x cvc5
    ```
 
-   To avoid warnings, we recommand CVC5 1.0.* and Z3 4.12.*.
+   We recommand CVC5 1.0.8 and Z3 4.13.2 as they are the versions deployed on the CI.
    Alternatively a specific version of Z3 can also be installed using opam:
   
    ```
-   opam install z3.4.12.6
+   opam install z3.4.13.2
    ```
   
 3. Then tell Why3 to automatically detect supported SMT provers and update its
