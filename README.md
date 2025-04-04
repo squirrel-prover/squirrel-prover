@@ -109,7 +109,9 @@ installed.
 
    This also installs the Why3 OCaml library used by Squirrel.
 
-2. Install CVC5 and Z3. This can be done by downloading the binaries 
+2. Install [CVC5](https://github.com/cvc5/cvc5/releases/)
+   and [Z3](https://github.com/z3prover/z3/releases). 
+   This can be done by downloading the binaries 
    from their respective websites, copying them in `/usr/local/bin/`,
    renaming them respectively `cvc5` and `z3` and making them executable:
 
