@@ -3227,7 +3227,10 @@ let simplify_rec_goal table (goal : goal) : goal =
           | _ -> true
         ) goal.output.conds
     in
-    let output = { goal.output with conds = rec_pred :: conds; } in
+    let conds = if List.mem rec_pred conds then conds else rec_pred::conds in 
+    (* There are some cases where (List.mem rec_pred conds);
+        We add it to conds otherwise.*)
+    let output = { goal.output with conds; } in
     { goal with output; }
 
 (*------------------------------------------------------------------*)
@@ -3421,11 +3424,11 @@ let bideduce_recursive_subgoals
     let result_fp = bideduce_fp ~loc togen query [output] in
     let consts = Const.generalize togen result_fp.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true togen) result_fp.subgoals in
-    (*building lambda term that contains all computed extra and save outputs*)
     {
-      result_fp with
       consts; subgoals;
+      (* no changes for extra ouptuts and memory*)
       extra_outputs = result_fp.extra_outputs;
+      final_mem = result_fp.final_mem;
     }
   in
   
@@ -3762,13 +3765,14 @@ let prove
         [Term.mk_leq source_rec_arg target_rec_arg]  (* A i < B j *)
         
       | `Direct -> []
-    in      
+    in
     List.map (fun (term : TSet.t) ->
         let term = TSet.subst s term in
+        (* Making sure we did not lose (\* A i ≤ τ₀ *\) in term.conds *)
+        assert (List.mem  (Term.subst s (oget source.rec_predicate)) term.conds);
         TSet.make
           ~conds:( 
             rec_target_cond @  (* [A i < B j], if [target] is recursive *)
-            (Term.subst s (oget source.rec_predicate)) :: (* A i ≤ τ₀ *)
             term.conds)
           ~vars:(source_vars@term.vars)
           ~term:term.term
