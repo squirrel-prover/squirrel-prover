@@ -277,7 +277,7 @@ module CondTerm = struct
 
   let[@warning "-32"] fv (c : t) : Sv.t = Term.fvs (c.term :: c.conds)
 
-  let subst subst (c : t) = {
+  let[@warning "-32"] subst subst (c : t) = {
     term  = Term.subst subst c.term;
     conds = List.map (Term.subst subst) c.conds;
   }
@@ -1747,7 +1747,8 @@ type goal = {
   extra_inputs : TSet.t list;
 
   (** outputs [v = (vₒ, vₑ)] *)
-  output        : CondTerm.t;
+  output_term   : Term.term;
+  output_conds  : Term.terms;
   extra_outputs : TSet.t list;
 
   (** [None  ]: direct subgoals
@@ -1773,7 +1774,8 @@ let subst_goal (subst : Term.subst) (goal:goal) : goal =
     rec_inputs    = List.map (TSet.subst subst) goal.rec_inputs;
     extra_inputs  = List.map (TSet.subst subst) goal.extra_inputs;
     extra_outputs = List.map (TSet.subst subst) goal.extra_outputs;
-    output        = CondTerm.subst subst goal.output;
+    output_term   = Term.subst subst goal.output_term;
+    output_conds  = List.map (Term.subst subst) goal.output_conds;
     rec_predicate = omap (Term.subst subst) goal.rec_predicate;
     vbs           = goal.vbs;
     dbg           = goal.dbg;
@@ -1843,7 +1845,9 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
         (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
         (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) st.extra_inputs
   in
-  let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe) goal.output in
+  let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe)
+      (CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds)
+  in
   let pp_extra_outputs fmt =
     if not ppe.dbg || goal.extra_outputs = [] then Fmt.pf fmt "" else
       Fmt.pf fmt ",@ @[%a@]"
@@ -3225,13 +3229,12 @@ let simplify_rec_goal table (goal : goal) : goal =
               | Failed -> true
             end
           | _ -> true
-        ) goal.output.conds
+        ) goal.output_conds
     in
-    let conds = if List.mem rec_pred conds then conds else rec_pred::conds in 
+    let output_conds = if List.mem rec_pred conds then conds else rec_pred::conds in 
     (* There are some cases where (List.mem rec_pred conds);
         We add it to conds otherwise.*)
-    let output = { goal.output with conds; } in
-    { goal with output; }
+    { goal with output_conds; }
 
 (*------------------------------------------------------------------*)
 (** Notify the user of the bi-deduction subgoals generated. *) 
@@ -3326,7 +3329,8 @@ let derecursify
       rec_inputs    = rec_terms;
       extra_inputs  = [];
       extra_outputs = [];
-      output = CondTerm.{ term; conds; }
+      output_term  = term;
+      output_conds = conds;
     }
   in
 
@@ -3361,8 +3365,8 @@ let derecursify
         let time_form = Occurrences.time_formula ts ~path_cond ts_occs in
 
         let hyps =
-          TraceHyps.add Args.AnyName (LHyp (Local (Term.mk_happens ts))) hyps |>
-          TraceHyps.add Args.AnyName (LHyp (Local time_form))
+          TraceHyps.add Args.AnyName (LHyp (Local (Term.mk_happens ts))) hyps (*|>*)
+          (* TraceHyps.add Args.AnyName (LHyp (Local time_form)) *)
         in
         let togen = Sv.elements iocc.iocc_vars in
         let goal =
@@ -3382,8 +3386,11 @@ let derecursify
   notify_bideduction_subgoals env.table ~direct ~recursive;
   recursive, direct
 
-(*------------------------------------------------------------------*)  
-(* previous query, previous result, next goal *)
+(*------------------------------------------------------------------*)
+(** Given the previous query [query] and the result [result] obtained
+    when bideducing [query], build the next query for the bideduction
+    goal [goal].
+*)
 let goal_to_query (query:query) (result : result) (goal:goal) : query =
   assert (query.env = goal.env);
   assert (query.game = goal.game);
@@ -3404,24 +3411,22 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
     initial_mem  = result.final_mem;
   }
 
-(** Bideduction of rececruive subgoals.
+(** Bideduction of recursive subgoals.
     
     Takes as inputs a list of bideduction goals each of the form 
     [env \cup vars ,hyps, _ , _ : inputs, rec_inputs |> outputs ],
-    a precondition [init_pre], and constraints [init_consts]. 
-    Returns a result state such 
-    TODO
-
+    a precondition [init_pre], and constraints [init_consts].
+    FIXME: finish specification
 *)
 let bideduce_recursive_subgoals
     loc (query : query) (bided_subgoals : goal list) : goal list * result
   =
   let doit
-      (query  : query) ~(togen  : Vars.vars) (output : CondTerm.t) 
+      (query : query) ~(togen : Vars.vars) (output : CondTerm.t list) 
     : result 
     =
-    notify_query_goal_start (query,[output]);
-    let result_fp = bideduce_fp ~loc togen query [output] in
+    notify_query_goal_start (query,output);
+    let result_fp = bideduce_fp ~loc togen query output in
     let consts = Const.generalize togen result_fp.consts in (* final constraints [∀ x, C] *)
     let subgoals = List.map (Term.mk_forall ~simpl:true togen) result_fp.subgoals in
     {
@@ -3436,18 +3441,42 @@ let bideduce_recursive_subgoals
     let query,_,next_goals,result = 
     List.fold_left 
       (fun (previous_query,previous_result,acc,result) goal ->
+         
          let query = goal_to_query previous_query previous_result goal in
-         let result_fp = doit query ~togen:goal.vars goal.output in
+         (** The bideduction goal ask to bideduce
+                [(output_conds, if output_conds then output_terms)].
+             
+             Starting with [query], we proceed as follows:
+             - first compute [output_conds], 
+             - then [(output_term|output_conds)].
+         *)
+         
+         (** deduce [output_conds] *)
+         let cond_term_conds =
+           List.map (fun cond -> CondTerm.mk ~term:cond ~conds:[]) goal.output_conds
+         in
+         let result_fp = doit query ~togen:goal.vars cond_term_conds  in
+         let result = chain_results result result_fp in
+         let query = transitivity_get_next_query query cond_term_conds result_fp in 
+
+         (** deduce [(output_term | output_conds)] *)
+         let result_fp =
+           doit query
+             ~togen:goal.vars
+             [CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds]
+         in
          let result = chain_results result result_fp in
          
-        (* Building new goal by adding the extra_outputs to it.*)
+        (* build the new goal by adding the [extra_outputs] to it.*)
          let extra_outputs = result_fp.extra_outputs in
-         let goal = {goal with extra_outputs = goal.extra_outputs @ extra_outputs} in
-         query,result_fp,goal::acc,result)
-      (start_query, start_res,[],empty_result start_query.initial_mem )     
+         let goal =
+           {goal with extra_outputs = goal.extra_outputs @ extra_outputs}
+         in
+         ( query, result_fp, goal::acc, result ) )
+      (start_query, start_res, [], empty_result start_query.initial_mem)
       bided_subgoals
     in
-    List.rev next_goals,query,result
+    (List.rev next_goals, query, result)
   in
 
   
@@ -3596,10 +3625,15 @@ let bideduce_all_goals
     bideduce_recursive_subgoals 
       locate query_start rec_bided_subgs
   in
+  let output =
+    CondTerm.mk
+      ~term:direct_bided_subgs.output_term
+      ~conds:direct_bided_subgs.output_conds
+  in
   let query_dir = goal_to_query query_start result_rec direct_bided_subgs in
-  notify_query_goal_start (query_dir,[direct_bided_subgs.output]);
+  notify_query_goal_start (query_dir,[output]);
   match
-    bideduce query_dir [direct_bided_subgs.output]
+    bideduce query_dir [output]
   with
   | Some result_dir ->
     let result = chain_results result_rec result_dir in
