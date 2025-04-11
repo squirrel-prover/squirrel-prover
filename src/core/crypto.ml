@@ -2871,10 +2871,6 @@ and bideduce_term
 
 (*------------------------------------------------------------------*)
 
-(* FIXME general : we checks that f is bideducible before conditionned f on t. 
-   Do we not add bug when rechecking condtion bideducible when deducing (t|f).
-   Could we change the semantic to have the condtions are known to be bi-deducible ?
-*)
 (** Try to show that [output_term] is bi-deducible using an oracle call.
     Fall-back to the main-loop in case of failure. *)
 and bideduce_oracle
