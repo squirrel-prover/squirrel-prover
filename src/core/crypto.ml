@@ -2925,7 +2925,7 @@ and bideduce_term
 (** Try to show that [output_term] is bi-deducible using an oracle call.
     Fall-back to the main-loop in case of failure. *)
 and bideduce_oracle
-    (query : query) (output_term : CondTerm.t) : result option
+    (query : query) (initial_output : CondTerm.t) : result option
   =
   (* First checking that the oracle could have been called before in the computation.
      I.e, [output ∈ extra_inputs] under [condition] and the fact that
@@ -2934,7 +2934,7 @@ and bideduce_oracle
   let already_called =
     knowledge_mem_condterm_sets
       (ProofContext.make ~env:query.env ~hyps:query.hyps)
-      output_term query.extra_inputs
+      initial_output query.extra_inputs
   in
   let output_term,query,result_start = 
     if already_called <> [] then
@@ -2947,7 +2947,7 @@ and bideduce_oracle
       let args      = List.map CondTerm.mk_simpl args in
       let conds     = Term.mk_ors conds in
       let not_conds = Term.mk_ands not_conds in
-      let cterm = {output_term with conds = not_conds::output_term.conds} in
+      let cterm = {initial_output with conds = not_conds::initial_output.conds} in
       (* By sematnic of conditional tset, the condition are also in the inputs, so ne need to
          bideduce them*)
       let to_deduce = args(*@conds_true@output_conds*) in
@@ -2961,8 +2961,8 @@ and bideduce_oracle
         let input_cond = TSet.make ~term:conds ~conds:[] ~vars:[] in
         let query_start = {query_start with inputs = input_cond::query.inputs} in
         cterm,query_start,result
-      | None -> (output_term, query, empty_result query.initial_mem)
-    else (output_term, query, empty_result query.initial_mem)
+      | None -> (initial_output, query, empty_result query.initial_mem)
+    else (initial_output, query, empty_result query.initial_mem)
   in
   (* Given an oracle match, check whether the full inputs
      (standard inputs + randomness indices + conditions) are
@@ -2994,33 +2994,43 @@ and bideduce_oracle
       in
 
       (* add the subgoals required by the [oracle_match] to the state *)
-      let extra_outputs = [
-        TSet.make
-          ~term:output_term.term
-          ~conds:(index_cond@output_term.conds)
-          ~vars:[]
-      ]
-      in
       let result_call =
         { subgoals = mem_subgoals @ subgoals;
           final_mem = post;
           consts;
-          extra_outputs;
+          extra_outputs = [];   (* we do not produce the extra output yet *)
         } in
-
       let result = chain_results result_inputs result_call in
+
+      (* if we only bideduced the terms assuming [index_cond], check
+         that it remains bideducible without it *)
       let index_cond = Term.mk_ands index_cond in
-      if Term.is_true index_cond then
-        (* nothing to do since [index_cond = ⊤] *)     
-        Some result
-      else
-        let query_else = transitivity_get_next_query query [] result in 
-        let result_else =
-          bideduce_term ~bideduction_suite:bideduce_term_strict query_else
-            { output_term with conds = Term.mk_not index_cond :: output_term.conds } |>
-          oget_exn ~exn:(Failed (fun fmt -> Fmt.pf fmt "randomness indices"))
-        in
-        Some (chain_results result result_else)
+      let result =
+        if Term.is_true index_cond then
+          (* nothing to do since [index_cond = ⊤] *)     
+          result
+        else
+          let query_else = transitivity_get_next_query query [] result in 
+          let result_else =
+            bideduce_term ~bideduction_suite:bideduce_term_strict query_else
+              { output_term with conds = Term.mk_not index_cond :: output_term.conds } |>
+            oget_exn ~exn:(Failed (fun fmt -> Fmt.pf fmt "randomness indices"))
+          in
+          chain_results result result_else
+      in
+
+      (* We bideduced [initial_output], add it to the [extra_outputs].
+         Remark that we added the full value [initial_output], not
+         just the result of the oracle calls.
+         Our heuristics only value when oracles are involed. *)
+      let extra_outputs = 
+        TSet.make
+          ~term:initial_output.term
+          ~conds:initial_output.conds
+          ~vars:[]
+      in
+      Some { result with extra_outputs = extra_outputs :: result.extra_outputs; }
+
     with Failed err ->
       notify_bideduce_oracle_failure query oracle_name err;
       None         (* not a valid oracle match *)
