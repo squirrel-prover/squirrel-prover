@@ -1701,28 +1701,21 @@ let empty_result (mem: AbstractSet.mem) : result =
 (*------------------------------------------------------------------*)
 (** Functions to chain query and result trought transitivity rules *)
 
-(** When the state build with [old_query] and [result] is a valid bidedcution goal 
-    for [output_term], then build the query the next bideduction. *)
+(** When the state build with [old_query] and [result] is a valid
+    bidedcution goal, builds the query the next bideduction. *)
 let transitivity_get_next_query
     (old_query   : query)
-    (output_term : CondTerm.t list)
     (result      : result) 
   : query
   =
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
-  let output =
-    List.map
-      (fun (t:CondTerm.t) -> TSet.make ~term:t.term ~conds:t.conds ~vars:[])
-      output_term
-  in
   {
     old_query with
     consts      = old_query.consts @ consts;
     initial_mem = result.final_mem;
     inputs      = 
-      output
-      @ old_query.inputs
-      @ result.extra_outputs;
+      old_query.inputs @
+      result.extra_outputs;
   }
 
 let chain_results (res1 : result) (res2 : result) : result=
@@ -2957,7 +2950,7 @@ and bideduce_oracle
       match bideduce {query with allow_oracle=false} to_deduce
       with
       | Some result ->
-        let query_start = transitivity_get_next_query query to_deduce result in
+        let query_start = transitivity_get_next_query query result in
         let input_cond = TSet.make ~term:conds ~conds:[] ~vars:[] in
         let query_start = {query_start with inputs = input_cond::query.inputs} in
         cterm,query_start,result
@@ -2984,7 +2977,7 @@ and bideduce_oracle
 
       notify_bideduce_oracle_inputs_end query oracle_name;
       (* Building the query for the oracle call *)
-      let query_call = transitivity_get_next_query query full_inputs result_inputs in 
+      let query_call = transitivity_get_next_query query result_inputs in 
       let Game.{ new_consts = consts; index_cond; post; mem_subgoals; subgoals; } =
         match
           Game.call_oracle query_call output_term mv ~subgoals oracle_pat oracle
@@ -3010,7 +3003,7 @@ and bideduce_oracle
           (* nothing to do since [index_cond = ⊤] *)     
           result
         else
-          let query_else = transitivity_get_next_query query [] result in 
+          let query_else = transitivity_get_next_query query result in 
           let result_else =
             bideduce_term ~bideduction_suite:bideduce_term_strict query_else
               { output_term with conds = Term.mk_not index_cond :: output_term.conds } |>
@@ -3076,7 +3069,7 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
          on the final memory of first bideduction.
          We also add global and adversarial constraints to help oracle call 
          in next query constraints  *)
-      let next_query = transitivity_get_next_query query [term] result in 
+      let next_query = transitivity_get_next_query query result in 
       match bideduce next_query outputs with
       | None -> None
       | Some next_result -> Some (chain_results result next_result)
@@ -3510,7 +3503,7 @@ let bideduce_recursive_subgoals
          in
          let result_fp = doit query ~togen:goal.vars cond_term_conds  in
          let result = chain_results result result_fp in
-         let query = transitivity_get_next_query query cond_term_conds result_fp in 
+         let query = transitivity_get_next_query query result_fp in 
 
          (** deduce [(output_term | output_conds)] *)
          let result_fp =
@@ -3764,9 +3757,7 @@ let prove
       allowing randomness (as opposed to terms appearing in
       constraints, there is not well-foundness issue there). *)
 
-  let query0 =
-    transitivity_get_next_query query0 init_consts_terms res0
-  in
+  let query0 = transitivity_get_next_query query0 res0 in
   assert (query0.consts = []);
   let res0 =
     let let_init_terms =
@@ -3787,9 +3778,7 @@ let prove
   notify_bideduce_first_pass ~dbg ~vbs;
 
   let query_start =
-    let query =
-      transitivity_get_next_query query0 init_consts_terms res0
-    in
+    let query = transitivity_get_next_query query0 res0 in
     (* the game is now initialized using values in [let_init], and
        initial constraints [init_consts]. *)
     { query with 
