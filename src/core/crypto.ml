@@ -356,8 +356,9 @@ module TSet0 : sig
 
   val subst : Term.subst -> t -> t
 
-  val _pp : t formatter_p
-
+  val[@warning "-32"] pp     : t formatter
+  val[@warning "-32"] pp_dbg : t formatter
+  val _pp    : t formatter_p
 end = struct
 
   (** [{cond; term; vars}] represents [{ term | ∀ vars s.t. cond }]  *)
@@ -413,8 +414,8 @@ end = struct
       (Vars._pp_list ppe) vars
       (Term._pp ppe)(Term.mk_ands conds)
 
-  let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
-  let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
+  let pp     = _pp (default_ppe ~dbg:false ())
+  let pp_dbg = _pp (default_ppe ~dbg:true ())
 end
 
 
@@ -1153,9 +1154,59 @@ end
 
 
 (*------------------------------------------------------------------*)
-(** Ad-hoc functions for growing list abstract analysis *)
+(** Abstract memories and related operations *)
 
-module AbstractSet = struct 
+module[@warning "-32"] AbstractSet : sig
+
+  (*------------------------------------------------------------------*)
+  (** an abstract set of terms *)
+  type t = Top | Sets of TSet0.t list
+
+  val _pp : ppenv -> Format.formatter -> t -> unit
+  val pp : Format.formatter -> t -> unit
+  val pp_dbg : Format.formatter -> t -> unit
+
+  (*------------------------------------------------------------------*)
+  (** an abstract memory *)
+  type mem = (Vars.var * t) list
+
+  val _pp_mem : ppenv -> Format.formatter -> mem -> unit
+  val pp_mem : Format.formatter -> mem -> unit
+  val pp_mem_dbg : Format.formatter -> mem -> unit
+
+  val well_formed : Env.t -> mem -> bool
+
+  val generalize : Vars.vars -> mem -> (Vars.var * t) list
+
+  val join     : ProofContext.t -> mem -> mem -> mem
+  val widening : ProofContext.t -> mem -> mem -> mem
+
+  (*------------------------------------------------------------------*)
+  (** abstract operation on the memory *)
+
+  val update :
+    ProofContext.t ->
+    Mvar.t ->
+    Term.subst -> Term.terms -> (Vars.var * Term.term) list -> mem -> mem
+  val init : ProofContext.t -> (Vars.var * Term.term) list -> mem
+
+  (*------------------------------------------------------------------*)
+  (** abstract evaluation of terms *)
+
+  val abstract_set :
+    ProofContext.t -> Term.term -> Term.terms -> mem -> t
+  val abstract_set_underapprox :
+    ProofContext.t -> Term.term -> Term.terms -> mem -> t
+  val bool_abstraction_supported : Env.t -> mem -> Term.term -> bool
+  val abstract_bool :
+    ProofContext.t -> CondTerm.t -> mem -> Term.terms option
+
+  (*------------------------------------------------------------------*)
+  (** comparison of abstract memories *)
+
+  val is_leq : ProofContext.t -> mem -> mem -> bool
+  val is_eq  : ProofContext.t -> mem -> mem -> bool
+end = struct 
   (** abstract set of terms *)
   type t =
     | Top                    (** the full set, containing any term *)
@@ -1602,8 +1653,9 @@ type query = {
   param : param;
 
   allow_oracle : bool;
-  consts     : Const.t list;
-  (** name constraints *)
+
+  consts : Const.t list;
+  (** initial name constraints, used to guide bi-deduction *)
   
   initial_mem : AbstractSet.mem;
   (** abstract memory *)
@@ -1650,15 +1702,13 @@ let empty_result (mem: AbstractSet.mem) : result =
 (** Functions to chain query and result trought transitivity rules *)
 
 (** When the state build with [old_query] and [result] is a valid bidedcution goal 
-    for list of terms [output_term], then 
-    [transitivity_get_next_query] build the query a following term. *)
+    for [output_term], then build the query the next bideduction. *)
 let transitivity_get_next_query
     (old_query   : query)
     (output_term : CondTerm.t list)
     (result      : result) 
   : query
   =
-  (* TODO : remove folowing line : it doesn't follow semantics*)
   let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
   let output =
     List.map
@@ -1675,11 +1725,11 @@ let transitivity_get_next_query
       @ result.extra_outputs;
   }
 
-let chain_results  (res1 : result) (res2 : result):result=
+let chain_results (res1 : result) (res2 : result) : result=
   { subgoals      = res1.subgoals @ res2.subgoals;
     extra_outputs = res1.extra_outputs @ res2.extra_outputs;
     final_mem     = res2.final_mem;
-    consts        = res1.consts @ res2.consts}
+    consts        = res1.consts @ res2.consts; }
 
 (*------------------------------------------------------------------*)
 (** A sub-goal of a recursive bi-deduction proof, which should be read as:
@@ -3411,7 +3461,7 @@ let goal_to_query (query:query) (result : result) (goal:goal) : query =
     FIXME: finish specification
 *)
 let bideduce_recursive_subgoals
-    loc (query : query) (bided_subgoals : goal list) : goal list * result
+    loc (initial_query : query) (bided_subgoals : goal list) : goal list * result
   =
   let doit
       (query : query) ~(togen : Vars.vars) (output : CondTerm.t list) 
@@ -3429,7 +3479,7 @@ let bideduce_recursive_subgoals
     }
   in
   
-  let step (start_query : query) (start_res : result) =
+  let step (initial_mem : AbstractSet.mem) : goal list * query * result =
     let query,_,next_goals,result = 
     List.fold_left 
       (fun (previous_query,previous_result,acc,result) goal ->
@@ -3465,29 +3515,26 @@ let bideduce_recursive_subgoals
            {goal with extra_outputs = goal.extra_outputs @ extra_outputs}
          in
          ( query, result_fp, goal::acc, result ) )
-      (start_query, start_res, [], empty_result start_query.initial_mem)
+      (initial_query, empty_result initial_mem, [], empty_result initial_mem)
       bided_subgoals
     in
     (List.rev next_goals, query, result)
   in
 
   
-  let rec fp mem: goal list * result =
-    let res0 = empty_result mem in
-    if bided_subgoals = [] then [],res0
+  let rec fp (mem : AbstractSet.mem) : goal list * result =
+    let next_goals,query,result = step mem in
+    if
+      AbstractSet.is_leq
+        (ProofContext.make ~env:query.env ~hyps:query.hyps)
+        result.final_mem mem
+    then
+      next_goals,result
     else
-      let next_goals,query,result = step query res0  in
-      if
-        AbstractSet.is_leq
-          (ProofContext.make ~env:query.env ~hyps:query.hyps)
-          result.final_mem mem
-      then
-        next_goals,result
-      else
-        fp result.final_mem
+      fp result.final_mem
   in
 
-  fp query.initial_mem  
+  fp initial_query.initial_mem  
 
 (*------------------------------------------------------------------*)
 (** {2 Top-level bi-deduction function } *)
