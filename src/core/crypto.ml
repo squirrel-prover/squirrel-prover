@@ -1678,7 +1678,7 @@ type query = {
 }
 
 (*------------------------------------------------------------------*)
-(** Results state *)
+(** Results state of a bideduction computation. *)
 type result = {
   subgoals     : Term.terms;
   (** TODO: all these subgoals must be always true, not simply almost always true. 
@@ -3437,35 +3437,49 @@ let derecursify
     when bideducing [query], build the next query for the bideduction
     goal [goal].
 *)
-let goal_to_query (query:query) (result : result) (goal:goal) : query =
-  assert (query.env = goal.env);
-  assert (query.game = goal.game);
-  let consts = List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) result.consts in
+let goal_to_query 
+  ~(initial_mem : AbstractSet.mem)
+  ~(initial_constraints : Const.t list)
+  ~(let_init : Term.t Mv.t)
+  ~(param : param)
+  (goal:goal) : query 
+  =
+  let initial_constraints =
+    List.filter (fun x -> not (Tag.is_Gloc Const.(x.tag))) initial_constraints 
+  in
   {
     env          = goal.env;
     vbs          = goal.vbs; 
     dbg          = goal.dbg;
-    param        = query.param;
+    param;
     game         = goal.game;
     hyps         = goal.hyps;
-    let_init     = query.let_init;
-    allow_oracle = query.allow_oracle;
-    consts       = query.consts @ consts ;
+    let_init;
+    allow_oracle = true;
     inputs       = [];
     rec_inputs   = goal.rec_inputs;
     extra_inputs = goal.extra_inputs;
-    initial_mem  = result.final_mem;
+    initial_mem;
+    consts       = initial_constraints ;
   }
 
 (** Bideduction of recursive subgoals.
     
     Takes as inputs a list of bideduction goals each of the form 
     [env \cup vars ,hyps, _ , _ : inputs, rec_inputs |> outputs ],
-    a precondition [init_pre], and constraints [init_consts].
+    a precondition [initial_mem], 
+    and initial constraints [initial_constraints].
+
     FIXME: finish specification
 *)
 let bideduce_recursive_subgoals
-    loc (initial_query : query) (bided_subgoals : goal list) : goal list * result
+    (loc : L.t) env hyps
+    ~(initial_mem : AbstractSet.mem)
+    ~(initial_constraints : Const.t list)
+    ~(let_init : Term.t Mv.t)
+    ~(param : param)
+    (bided_subgoals : goal list) 
+  : goal list * Const.t list * AbstractSet.mem * Term.t list
   =
   let doit
       (query : query) ~(togen : Vars.vars) (output : CondTerm.t list) 
@@ -3483,12 +3497,29 @@ let bideduce_recursive_subgoals
     }
   in
   
-  let step (initial_mem : AbstractSet.mem) : goal list * query * result =
-    let query,_,next_goals,result = 
+  let step
+      (initial_mem : AbstractSet.mem)
+    : goal list * Const.t list * AbstractSet.mem * Term.t list
+    =
+    let next_goals, constraints, memory, subgoals = 
     List.fold_left 
-      (fun (previous_query,previous_result,acc,result) goal ->
-         
-         let query = goal_to_query previous_query previous_result goal in
+      (fun (goals,initial_constraints,initial_mem,subgoals) goal ->
+         let query = 
+           goal_to_query
+             ~initial_constraints
+             ~initial_mem
+             ~let_init ~param
+             goal 
+         in
+         let result = {         (* initial result for this precise [goal] *)
+           extra_outputs = [];
+           consts       = initial_constraints;
+           final_mem    = initial_mem;
+           subgoals     = subgoals;
+         };
+         in
+
+         (*------------------------------------------------------------------*)
          (** The bideduction goal ask to bideduce
                 [(output_conds, if output_conds then output_terms)].
              
@@ -3497,6 +3528,7 @@ let bideduce_recursive_subgoals
              - then [(output_term|output_conds)].
          *)
          
+         (*------------------------------------------------------------------*)
          (** deduce [output_conds] *)
          let cond_term_conds =
            List.map (fun cond -> CondTerm.mk ~term:cond ~conds:[]) goal.output_conds
@@ -3505,6 +3537,7 @@ let bideduce_recursive_subgoals
          let result = chain_results result result_fp in
          let query = transitivity_get_next_query query result_fp in 
 
+         (*------------------------------------------------------------------*)
          (** deduce [(output_term | output_conds)] *)
          let result_fp =
            doit query
@@ -3512,33 +3545,31 @@ let bideduce_recursive_subgoals
              [CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds]
          in
          let result = chain_results result result_fp in
-         
-        (* build the new goal by adding the [extra_outputs] to it.*)
-         let extra_outputs = result_fp.extra_outputs in
+
+         (*------------------------------------------------------------------*)
+         (* build the new goal by adding the [extra_outputs] to it.*)
          let goal =
-           {goal with extra_outputs = goal.extra_outputs @ extra_outputs}
+           {goal with extra_outputs = result_fp.extra_outputs; }
          in
-         ( query, result_fp, goal::acc, result ) )
-      (initial_query, empty_result initial_mem, [], empty_result initial_mem)
+         ( goal :: goals, result.consts, result.final_mem, result.subgoals ) )
+      ( [],                   (* goals *)
+        initial_constraints,
+        initial_mem,
+        []                    (* subgoals *))
       bided_subgoals
     in
-    (List.rev next_goals, query, result)
+    (List.rev next_goals, constraints, memory, subgoals)
   in
-
   
-  let rec fp (mem : AbstractSet.mem) : goal list * result =
-    let next_goals,query,result = step mem in
-    if
-      AbstractSet.is_leq
-        (ProofContext.make ~env:query.env ~hyps:query.hyps)
-        result.final_mem mem
-    then
-      next_goals,result
-    else
-      fp result.final_mem
+  let rec fp (mem : AbstractSet.mem) =
+    let (_next_goals, _constraints, final_memory, _subgoals) as r = step mem in
+    let pc = ProofContext.make ~env ~hyps in
+    if AbstractSet.is_leq pc final_memory mem 
+    then r
+    else fp final_memory
   in
 
-  fp initial_query.initial_mem  
+  fp initial_mem  
 
 (*------------------------------------------------------------------*)
 (** {2 Top-level bi-deduction function } *)
@@ -3663,36 +3694,49 @@ let parse_crypto_args
 (** Function that takes a list of bideduction goal, recursive and direct 
     and try to bideduce them all in the list order.*)
 let bideduce_all_goals
-    (locate : L.t)
-    (query_start : query)
+    (locate : L.t) env hyps
+    ~(initial_mem : AbstractSet.mem)
+    ~(initial_constraints : Const.t list)
+    ~(let_init : Term.t Mv.t)
+    ~(param : param)
     (rec_bided_subgs : goal list)
-    (direct_bided_subgs : goal) : goal list * result option
+    (direct_bided_subgs : goal)
+  : goal list * (Const.t list * AbstractSet.mem * Term.t list) option
+  (* next goals, constraints, memory, subgoals to discharge *)
   =
-  let next_goals,result_rec =
-    bideduce_recursive_subgoals 
-      locate query_start rec_bided_subgs
+  let next_goals, constraints_rec, memory_rec, subgoals_rec =
+    bideduce_recursive_subgoals
+      locate env hyps
+      ~let_init ~param
+      ~initial_constraints ~initial_mem
+      rec_bided_subgs
   in
   let output =
     CondTerm.mk
       ~term:direct_bided_subgs.output_term
       ~conds:direct_bided_subgs.output_conds
   in
-  let query_dir = goal_to_query query_start result_rec direct_bided_subgs in
-  notify_query_goal_start (query_dir,[output]);
-  match
-    bideduce query_dir [output]
-  with
-  | Some result_dir ->
-    let result = chain_results result_rec result_dir in
-    let result = {result with consts = (query_dir.consts@result.consts)} in
-    next_goals,Some result
-  | None -> next_goals,None
+  let query_direct = 
+    goal_to_query
+      ~initial_constraints:constraints_rec
+      ~initial_mem:memory_rec
+      ~let_init
+      ~param
+      direct_bided_subgs 
+  in
+  notify_query_goal_start (query_direct,[output]);
+  match bideduce query_direct [output] with
+  | Some result_direct ->
+    let constraints = constraints_rec @ result_direct.consts in
+    let subgoals = subgoals_rec @ result_direct.subgoals in
+    next_goals, Some (constraints, result_direct.final_mem, subgoals)
+  | None -> next_goals, None
     
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
     ~(param  : param)
-    (pc : ProofContext.t)
+    (pc      : ProofContext.t)
     (pgame   : Symbols.p_path)
     (args    : Args.crypto_args)
     (terms   : Equiv.equiv)       (* in system [context.env.system.set] (and not [pair]!) *)
@@ -3773,19 +3817,14 @@ let prove
   Printer.pr "@;@]"; (* close vertical box of preliminary deductions *)
   
   (*------------------------------------------------------------------*)
-  (** first bideduction pass *)
+  (** First bideduction pass.
+
+      The game is now initialized using values in [let_init], and
+      initial constraints [init_consts]. 
+      We starts from the memory and constraints after computing the
+      initialization of [let_init] and [init_consts]. *)
 
   notify_bideduce_first_pass ~dbg ~vbs;
-
-  let query_start =
-    let query = transitivity_get_next_query query0 res0 in
-    (* the game is now initialized using values in [let_init], and
-       initial constraints [init_consts]. *)
-    { query with 
-      allow_oracle = true;
-      let_init;
-      consts = query.consts @ init_consts; } 
-  in
 
   let rec_bided_subgs, direct_bided_subgs =
     derecursify pc terms.terms game 
@@ -3793,7 +3832,12 @@ let prove
 
   (* First pass on bideduction, to find extra inputs.*)
   let next_bided_subgs, _  =
-    bideduce_all_goals game_loc query_start rec_bided_subgs direct_bided_subgs 
+    bideduce_all_goals
+      game_loc env pc.hyps
+      ~param ~let_init 
+      ~initial_constraints:(res0.consts @ init_consts)
+      ~initial_mem:res0.final_mem
+      rec_bided_subgs direct_bided_subgs 
   in
 
   (*------------------------------------------------------------------*)
@@ -3893,35 +3937,37 @@ let prove
      expected during the second pass *)
   let _, res = 
     bideduce_all_goals
-      game_loc
-      query_start rec_bided_subgs direct_bided_subgs 
+      game_loc env pc.hyps
+      ~param ~let_init
+      ~initial_constraints:(res0.consts @ init_consts)
+      ~initial_mem:res0.final_mem
+      rec_bided_subgs direct_bided_subgs 
   in
 
   Printer.pr "@;@]"; (* close vertical box of second pass *)
-  
   match res with
-  | Some result -> 
+  | Some (constraints, final_memory, subgoals) -> 
     Printer.pr "@[<v 0>"; (* open vertical box of final result *)
 
-    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game result.consts in
+    let consts_subgs = Const.to_subgoals ~vbs ~dbg table game constraints in
     
     Printer.pr
       "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"
-      (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) result.consts;
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) constraints;
     Printer.pr
       "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe)) consts_subgs;
     Printer.pr
       "@[<v 2>Oracle subgoals are:@ %a@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
-      result.subgoals;
-    Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) result.final_mem;
+      subgoals;
+    Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) final_memory;
 
     Printer.pr "@;@]"; (* close vertical box of final result *)
     
     let red_param = Reduction.rp_default in
     let state = Reduction.mk_state pc ~red_param in
-    List.remove_duplicate (Reduction.conv state) (consts_subgs @ result.subgoals)
+    List.remove_duplicate (Reduction.conv state) (consts_subgs @ subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
 
