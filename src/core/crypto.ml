@@ -1349,8 +1349,12 @@ end = struct
     join pc old_mem new_mem
 
   (*-----------------------------------------------------------------*)
-  (** abstract evaluation of a term of type [Set.t] as an
-      over-approximation of [term]. *)
+  (** Abstract evaluation of a term of type [Set.t] as an
+      over-approximation of [term]. 
+
+      This abstract evaluation must be **monotonous** w.r.t. [mem] (see
+      [bideduce_recursive_subgoals] for an explanation of why this is
+      necessary). *)
   let abstract_set
       (pc : ProofContext.t)
       (term : Term.term)
@@ -1391,8 +1395,15 @@ end = struct
     in
     doit term
 
-  (** abstract evaluation of a term of type [Set.t] as an
-      **under**-approximation of [term]. *)
+  (** Abstract evaluation of a term of type [Set.t] as an
+      **under**-approximation of [term]. 
+
+      This abstract evaluation must be **monotonous** w.r.t. [mem]
+      (see [bideduce_recursive_subgoals] for an explanation of why
+      this is necessary). 
+
+      To make the latter obvious, the memory [mem] is purposedly
+      **not** used. *)
   let abstract_set_underapprox
       (pc : ProofContext.t)
       (term : Term.term)
@@ -1442,6 +1453,11 @@ end = struct
     | (v,_)::q when Vars.equal var v -> q
     | _::q -> remove var q
 
+  (** Abstract evaluation of memory updates of the form [x ← add x t]. 
+
+      This abstract operation must be **monotonous** w.r.t. [mem] (see
+      [bideduce_recursive_subgoals] for an explanation of why this is
+      necessary). *)
   let update
       (pc : ProofContext.t)
       (mv : Mvar.t)
@@ -1507,7 +1523,11 @@ end = struct
     | _ -> false
  
 
-  (** Abstract evaluation of a boolean term [bool_term] in [mem] *)
+  (** Abstract evaluation of a boolean term [bool_term] in [mem].
+
+      This abstract evaluation must be **monotonous** w.r.t. [mem] (see
+      [bideduce_recursive_subgoals] for an explanation of why this is
+      necessary). *)
   let abstract_bool
       (pc : ProofContext.t)
       (bool_term : CondTerm.t) 
@@ -1528,8 +1548,7 @@ end = struct
         let set = abstract_set pc set bool_term.conds mem in
         begin
           match set with
-          | Top -> None, None, []
-          | Sets [] -> Some false, Some true, []
+          | Top -> None, Some true, [Term.mk_false]
           | Sets tl ->
             let not_in_subgs =
               not_in_tset_subgoals pc {term = t; conds = bool_term.conds } tl
@@ -1552,7 +1571,7 @@ end = struct
           match over_set0, under_set1 with
           | _  , Top     -> Some true , Some false, []
           | _  , Sets [] -> Some false, Some true , []
-          | Top, _       -> None      , None      , []
+          | Top, _       -> Some true , None      , [Term.mk_false]
           | Sets over_set0, Sets under_set1 ->
             let conds =
               (* for any set [t0] in [over_set0], check that there
@@ -3469,6 +3488,10 @@ let goal_to_query
     [env \cup vars ,hyps, _ , _ : inputs, rec_inputs |> outputs ],
     a precondition [initial_mem], 
     and initial constraints [initial_constraints].
+
+    Relies on the fact that abstract operations and evaluations are
+    **monotonous** w.r.t. [mem] (monotonicity is used to handle memory
+    invariant inference in time-sensitive mode).
 
     FIXME: finish specification
 *)
