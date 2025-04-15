@@ -6,12 +6,19 @@
 module Prelude : sig
   val fs_witness : Symbols.fname
   val fs_zeroes  : Symbols.fname
+
   val fs_leq     : Symbols.fname
+  val fs_lt     : Symbols.fname                     
+
+  val mk_leq     : Symbols.table -> Term.term -> Term.term -> Term.term
+
+  val fs_eq      : Symbols.fname
+  val fs_neq     : Symbols.fname
 
   val mk_witness : Symbols.table -> ty_arg:Type.ty -> Term.term
   val mk_zeroes  : Symbols.table -> Term.term -> Term.term
-
-  val mk_leq     : Symbols.table -> Term.term -> Term.term -> Term.term
+  val mk_eq      : Symbols.table -> Term.term -> Term.term -> Term.term
+  val mk_neq     : Symbols.table -> Term.term -> Term.term -> Term.term
 
   val tstring    : Type.ty
 end
@@ -89,6 +96,10 @@ module Real : sig
   val mk_one   : Symbols.table                           -> Term.term
   val mk_two   : Symbols.table                           -> Term.term
 end  
+
+module Logic : sig
+  val fs_well_founded  : Symbols.table -> Symbols.fname
+end
 
 module Secrecy : sig
   val is_loaded : Symbols.table -> bool

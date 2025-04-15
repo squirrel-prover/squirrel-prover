@@ -167,7 +167,7 @@ let intctxt_param
   =
   let table = TS.table s in
 
-  let contx = TS.mk_trace_cntxt s in
+  let contx = TS.proof_context s in
   let info = O.EI_direct, contx in
 
   let exception NotDec in
@@ -241,9 +241,8 @@ let intctxt
   (* Find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = LT.as_local ~loc hyp in (* FIXME: allow global hyps? *)
-  let contx = TS.mk_trace_cntxt s in
-  let env = TS.env s in
-  let hyps = TS.get_trace_hyps s in
+  let context = TS.proof_context s in
+  let env = context.env in
 
   let icp = intctxt_param ~loc hyp s in
 
@@ -260,7 +259,7 @@ let intctxt
   let occs_kc =
     EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_k)
       get_bad_kc
-      hyps contx env
+      context
       (icp.ip_c :: icp.ip_k.args)
   in
 
@@ -284,13 +283,13 @@ let intctxt
      We do not generate formulas for the ciphertexts occs: these are only used
      to check the randomness conditions afterwards. *)
   let phis_k =
-    List.map (EOF.occurrence_formula ~negate:false ~use_path_cond) occs_k
+    List.map (EOF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_k
   in
 
   (* We also generate the formulas for each ciphertext found.
      (we do that separately just so they don't get mixed with the bad occs) *)
   let phis_c =
-    List.map (EOF.occurrence_formula ~negate:false ~use_path_cond) occs_c
+    List.map (EOF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_c
   in
 
   (* We now search for bad use of all randoms used in occs_c *)
@@ -301,12 +300,12 @@ let intctxt
   let occs_r =
     ROS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_rand)
       get_bad_randoms
-      hyps contx env
+      context
       [icp.ip_c; Name.to_term icp.ip_k]
   in
 
   let phis_r =
-    List.map (ROF.occurrence_formula ~negate:false ~use_path_cond) occs_r
+    List.map (ROF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_r
   in
 
   (* Finally, in case the term [t] equal to the decryption was not [fail],

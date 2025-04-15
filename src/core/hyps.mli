@@ -131,6 +131,8 @@ module type S1 = sig
     hyps -> hyps
 
   (*------------------------------------------------------------------*)
+  val iter : (Ident.t -> ldecl_cnt -> unit) -> hyps -> unit
+
   val fold      : (Ident.t -> ldecl_cnt -> 'a -> 'a) -> hyps -> 'a -> 'a
   val fold_hyps : (Ident.t -> hyp       -> 'a -> 'a) -> hyps -> 'a -> 'a
 
@@ -178,6 +180,14 @@ val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals
 val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
 val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
 val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list
+
+val get_models :
+  ?exn:exn ->
+  Symbols.table ->
+  ?timeout:int ->
+  ?system:'a SE.expr option ->
+  TraceHyps.hyps ->
+  Constr.models
 
 (*------------------------------------------------------------------*)
 (** {2 Changing the context of a set of hypotheses} *)

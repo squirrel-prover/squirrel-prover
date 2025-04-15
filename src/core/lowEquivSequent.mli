@@ -75,10 +75,12 @@ val conclusion_as_computability : t -> ComputePredicates.form
 
 val query_happens : precise:bool -> t -> Term.term -> bool
 
-(** Utility *)
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
 
-(* Constructs the trace context for the pair of systems. *)
-val mk_pair_trace_cntxt : sequent -> Constr.trace_cntxt
+(** constructs a proof-context for the system context whose [set] is
+    the sequent's [pair] *)
+val pair_proof_context : sequent -> ProofContext.t
 
-(* Fails if the goal is not an equivalence. *)
+(** fails if the goal is not an equivalence *)
 val check_conclusion_is_equiv : sequent -> unit

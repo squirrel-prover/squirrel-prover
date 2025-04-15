@@ -110,24 +110,26 @@ module type S = sig
 
   val query_happens : precise:bool -> t -> Term.term -> bool
 
-  (** Returns trace context, corresponding to [s.env.system.set] for
-      both kinds of sequents.
+  (** Returns the proof-context of a sequent.
       Option projections to restrict the systems considered. *)
-  val mk_trace_cntxt : ?se:SE.fset -> t -> Constr.trace_cntxt
+  val proof_context : ?in_system:SE.context -> t -> ProofContext.t
 
   (** Return a set of hypotheses that are a consequence of the
       hypotheses of the sequent, and are taken in the system context
       [in_system].
 
-      [in_system] defaults to a[s]'s system. *)
+      [in_system] defaults to [s]'s system. *)
   val get_trace_hyps : ?in_system:SE.context -> t -> TraceHyps.hyps
 
   (** [get_models s] returns a set of minimal models corresponding to the
       trace atoms in the sequent [s].
+      Definitions inside [s] are kept if they follow the optional [system].
       See module {!Constr}.
       @raise Tactics.Tactic_hard_failure
          with parameter {!Tactics.TacTimeout} in case of timeout. *)
-  val get_models : t -> Constr.models
+  val get_models :
+    SE.arbitrary option ->
+    t -> Constr.models
 
   (*------------------------------------------------------------------*)
   (** {2 Substitution} *)

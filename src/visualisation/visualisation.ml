@@ -16,6 +16,8 @@
 
 open Squirrelcore
 
+module SE = SystemExpr
+
 (** Get the non-repeating list of timestamps appearing in hypotheses of sequent
     [j], plus init. *)
 let get_timstamps (j : LowTraceSequent.t) : Term.terms =
@@ -194,7 +196,8 @@ let pp_option pp ppf (property, opt) =
 
 (** Print the node corresponding to term [t].
     [cntxt] and [dependence] are used to find informations about [t] *)
-let pp_node (cntxt : Constr.trace_cntxt) (dep : dependence) ppf (t : Term.term) =
+let pp_node (cntxt : ProofContext.t) (dep : dependence) ppf (t : Term.term) =
+  let table = cntxt.env.table in
   let mk_option condition value =
     if condition then
       Some value
@@ -204,8 +207,10 @@ let pp_node (cntxt : Constr.trace_cntxt) (dep : dependence) ppf (t : Term.term) 
   (*We read in [cntxt] to find if the timestamp represented by [t] has some condition, state updates or output.*)
   let (cond, state, output) = match t with
     | Term.Action (asymb, idx) ->
-        let action = Action.of_term asymb idx cntxt.table in
-        let descr, subst = SystemExpr.descr_of_action cntxt.table cntxt.system action in
+        let action = Action.of_term asymb idx table in
+        let descr, subst = 
+          SE.descr_of_action table (SE.to_fset cntxt.env.system.set) action 
+        in
         let descr = Action.subst_descr subst descr in
         (
           mk_option (not (Term.f_triv (snd descr.condition))) (snd descr.condition),
@@ -229,7 +234,7 @@ let pp_node (cntxt : Constr.trace_cntxt) (dep : dependence) ppf (t : Term.term) 
       (*property "children". Only print children's id.*)
 
 (** Print the property "nodes" of the data. *)
-let pp_nodes (cntxt : Constr.trace_cntxt) (dep : dependence) ppf (l : Term.terms) =
+let pp_nodes (cntxt : ProofContext.t) (dep : dependence) ppf (l : Term.terms) =
   Format.fprintf ppf "@[<v 2>\"nodes\": [@;%a@]@;]"
     (Format.pp_print_list ~pp_sep:pp_comma (pp_node cntxt dep)) l
   
@@ -249,13 +254,12 @@ let pp_layout ppf (layout : Term.term list list) =
 
 (** Print the data for the visualisation of the trace sequent [j] in JSON format. *)
 let pp ppf j =
-  let cntxt = LowTraceSequent.mk_trace_cntxt j in
-  match cntxt.models with
-  | Some models ->
-      let terms = get_classes_rep models (get_timstamps j) in
-      let dep = build_dependence models terms in
-      let layout = get_layout dep in
-      Format.fprintf ppf "@[<v 2>{@;%a,@;%a@]@;}@?"
-        (pp_nodes cntxt dep) terms
-        pp_layout layout
-  | None -> ()
+  let cntxt = LowTraceSequent.proof_context j in
+  let models = LowTraceSequent.get_models None j in  
+  let terms = get_classes_rep models (get_timstamps j) in
+  let dep = build_dependence models terms in
+  let layout = get_layout dep in
+  Format.fprintf ppf "@[<v 2>{@;%a,@;%a@]@;}@?"
+    (pp_nodes cntxt dep) terms
+    pp_layout layout
+

@@ -1,14 +1,24 @@
+include Logic.
+
 (*------------------------------------------------------------------*)
 (* exec and cond *)
 
 namespace Classic.
-  (* Squirrel can only expand exec for specific actions.
-     This axiom allows to go beyond this. It would be provable
-     in any system, by performing a case analysis on tau. *)
-  axiom [any] exec_not_init (tau:timestamp) :
+  lemma [any] exec_not_init (tau:timestamp) :
     init < tau => exec@tau = (exec@pred(tau) && cond@tau).
+  Proof.
+    intro Ord.
+    expand ~def exec@tau. 
+    auto ~constr.
+  Qed.  
   
-  axiom [any] exec_init (tau:timestamp) : tau = init => exec@tau = true.
+  lemma [any] exec_init (tau:timestamp) : tau = init => exec@tau = true.
+  Proof.
+    intro Eq.
+    expand ~def exec@tau.
+    rewrite if_false //.
+  Qed.   
+  
   axiom [any] cond_init (tau:timestamp) : tau = init => cond@tau = true.
   
   lemma [any] exec_le (tau,tau':timestamp) : tau' <= tau => exec@tau => exec@tau'.
@@ -33,6 +43,21 @@ namespace Classic.
    happens(t) => 
    exec@t => 
    forall (t0:timestamp), t0 <= t => exec@t0.
+
+  lemma [any] frame_not_init (tau:timestamp) :
+    init < tau => 
+    frame@tau = <frame@pred(tau), <of_bool (exec@tau), if exec@tau then output@tau>>.
+  Proof.
+    intro Neq.
+    expand ~def frame@tau.
+    auto ~constr.
+  Qed.  
+  
+  lemma [any] frame_init :
+    frame@init = zero.
+  Proof.
+    auto.
+  Qed.
 end Classic.
 
 open Classic.

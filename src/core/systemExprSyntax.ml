@@ -14,6 +14,7 @@ type error_i =
   | Expected_compatible
   | Expected_fset
   | Expected_pair
+  | Failure of string
 
 type error = L.t option * error_i
 
@@ -28,6 +29,7 @@ let pp_error_i fmt = function
   | Expected_compatible  -> Fmt.pf fmt "expected a compatible system expression"
   | Expected_fset        -> Fmt.pf fmt "expected a finite system set expression"
   | Expected_pair        -> Fmt.pf fmt "expected a system expression pair"
+  | Failure s            -> Fmt.pf fmt "%s" s
 
 let pp_error pp_loc_err_opt fmt (loc,e) =
   Fmt.pf fmt "%aSystem error: %a"

@@ -226,15 +226,15 @@ let has_cgdh
 let dh_param
     ~(hyp_loc    : L.t)
     (gdh_oracles : bool)
-    (contx       : Constr.trace_cntxt)
+    (context     : ProofContext.t)
     (hyp         : term)
     (g           : Symbols.p_path)
     (s           : TS.sequent)
   : term * Symbols.fname * Symbols.fname option * term * Name.t * Name.t
   =
 
-  let einfo = O.EI_direct, contx in
-  let table = contx.table in
+  let einfo = O.EI_direct, context in
+  let table = context.env.table in
   (* get generator *)
   let gen_n = Symbols.Operator.convert_path g table in
   let gen = Term.mk_fun table gen_n [] in
@@ -293,11 +293,10 @@ let cgdh
   let ppe = default_ppe ~table:(TS.table s) () in
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
-  let contx = TS.mk_trace_cntxt s in
-  let env = TS.env s in
+  let context = TS.proof_context s in
 
   let (gen, exp_s, mult_s, t, na, nb) =
-    dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
+    dh_param ~hyp_loc:(L.loc m) gdh_oracles context hyp g s
   in
   let pp_nab =
     fun ppf () -> 
@@ -311,10 +310,10 @@ let cgdh
   let occs =
     NOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_nab)
       get_bad
-      (TS.get_trace_hyps s) contx env [t]
+      context [t]
   in
 
-  let phis = List.map (NOF.occurrence_formula ~negate:false) occs in
+  let phis = List.map (NOF.occurrence_formula (TS.table s) ~negate:false) occs in
 
   let g = TS.conclusion s in
   List.map

@@ -33,11 +33,11 @@ module Sts = Set.Make (Term)
 (** Sets of terms, intended to store macros. *)
 module Stt = Set.Make (Term)
 
-class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
+class collect_max_ts ~(context:ProofContext.t) = object (self)
   (* We fold over the terms, collecting all the timestamps, and maintaining a
      list of timestamps that are smaller than another timestamp. *)
   (* TODO: remove deprecated fold *)
-  inherit [Sts.t * Sts.t] Iter.deprecated_fold ~cntxt as super
+  inherit [Sts.t * Sts.t] Iter.deprecated_fold ~context as super
 
   method extract_ts_atoms phi =
     List.partition (fun t ->
@@ -98,10 +98,10 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
 end
 
-class collect_macros ~(cntxt:Constr.trace_cntxt) = object (_self)
+class collect_macros ~(context:ProofContext.t) = object (_self)
 
   (* TODO: drop deprecated *)
-  inherit [Stt.t] Iter.deprecated_fold ~cntxt as super
+  inherit [Stt.t] Iter.deprecated_fold ~context as super
 
   (* We collect all the macros occurring inside terms, that are not under
      a diff. *)
@@ -114,11 +114,11 @@ end
 
 
 
-class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
+class check_att ~(context:ProofContext.t) = object (self)
   (* we check that all occurences of the att symbol are of the form
      att(frame@T), and thus in fact correspond to an input. *)
   (* TODO: drop deprecated *)                                                     
-  inherit [bool] Iter.deprecated_fold ~cntxt as super
+  inherit [bool] Iter.deprecated_fold ~context as super
 
   method fold_message aux t = match t with
     (* TODO: quantum: new symbol is [fs_qatt] *)
@@ -128,20 +128,20 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
     (* TODO: quantum: new symbol is [fs_qatt] *)
     | App (Fun (sf, _), _) when sf = Symbols.fs_att -> false
     (* we reject any other att(x) *)
-    | Macro (ms,l,a) ->
-      begin
-        match Macros.get_definition cntxt ms ~args:l ~ts:a with
-        (* TODO: explore indirect occurences *)
-        | `Undef | `MaybeDef -> true
-        | `Def t -> self#fold_message aux t
-      end
+    | Macro _ ->
+      let res, has_red =
+        Match.reduce_delta_macro1
+          ~constr:true
+          context.env ~hyps:context.hyps t
+      in
+      if has_red = True then self#fold_message aux res else true
     | _ -> super#fold_message aux t
 
 end
 
 
-let is_attacker_call_synchronized cntxt models biframe =
-  let iter_att = new check_att ~cntxt in
+let is_attacker_call_synchronized context models biframe =
+  let iter_att = new check_att ~context in
   let check_att =
     List.fold_left
       (fun acc t -> iter_att#fold_message true t && acc)
@@ -150,7 +150,7 @@ let is_attacker_call_synchronized cntxt models biframe =
   in
   if not check_att then false else
     let (max_ts, _) =
-      let iter = new collect_max_ts ~cntxt in
+      let iter = new collect_max_ts ~context in
       List.fold_left
         (fun (max_ts,_) t-> iter#fold_message (max_ts, Sts.empty) t)
         (Sts.empty, Sts.empty) biframe
@@ -168,7 +168,7 @@ let is_attacker_call_synchronized cntxt models biframe =
       Constr.maximal_elems ~precise:false models (Sts.elements maximal_elems)
     in
     let macros =
-      let iter = new collect_macros ~cntxt in
+      let iter = new collect_macros ~context in
       List.fold_left (fun acc t-> iter#fold_message acc t)
         Stt.empty biframe
     in

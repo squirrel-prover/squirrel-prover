@@ -51,7 +51,7 @@ let pat_of_form (t : Term.term) =
 (*------------------------------------------------------------------*)
 let op_pat_of_term (t : Term.term) =
   let vars =
-    Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
+    Sv.elements (Sv.filter (fun v -> Vars.is_hole v) (Term.fv t))
   in
   Term.{
     pat_op_params = Params.Open.empty;

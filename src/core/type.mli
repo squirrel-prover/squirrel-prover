@@ -115,8 +115,8 @@ val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
 
-val ttuple     : ty list -> ty
-val tfun       : ty -> ty -> ty
+(** unit is an alias for the 0-ary tuple *)
+val tunit : ty
 
 (*------------------------------------------------------------------*)
 (** Prelude types *)

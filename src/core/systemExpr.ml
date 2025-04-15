@@ -6,7 +6,7 @@ include SystemExprSyntax
 (** {2 General operations} *)
 
 (*------------------------------------------------------------------*)
-let subset (type a) _table (e1 : a expr) (e2 : a expr) : bool =
+let subset (type a b) _table (e1 : a expr) (e2 : b expr) : bool =
   match (e1 :> exposed).cnt, (e2 :> exposed).cnt with
   | Var v1, Var v2 -> Var.equal v1 v2
     
@@ -18,18 +18,18 @@ let subset (type a) _table (e1 : a expr) (e2 : a expr) : bool =
   | _, Any -> true
   | _ -> false
 
-let equal (type a) table (e1 : a expr) (e2 : a expr) : bool =
+let equal (type a b) table (e1 : a expr) (e2 : b expr) : bool =
   subset table e1 e2 && subset table e2 e1
 
 (*------------------------------------------------------------------*)
-let subset_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
+let subset_modulo (type a b) table (e1 : a expr) (e2 : b expr) : bool =
   match (e1 :> exposed).cnt, (e2 :> exposed).cnt with
   | List l1, List l2 ->
     List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
 
   | _ -> subset table e1 e2
 
-let equal_modulo (type a) table (e1 : a expr) (e2 : a expr) : bool =
+let equal_modulo (type a b) table (e1 : a expr) (e2 : b expr) : bool =
   subset_modulo table e1 e2 && subset_modulo table e2 e1
 
 (*------------------------------------------------------------------*)
@@ -354,10 +354,13 @@ module Parse = struct
     let parse_set_pair = parse_set_pair ~loc ~implicit ~se_env table in
     match L.unloc c with
     | System                   (* [c = any] *)
-        {
+        { pl_loc;
           pl_desc = [{ system = ([], { pl_desc = "any"}); 
                        projection = p; 
                        alias = None}] } ->
+      if not implicit then 
+        error ~loc:pl_loc (Failure "implicit unsupported");
+
       parse_any ~mode:`Local ~se_env table p
 
     | NoSystem       -> parse_set_pair ~set:empty ~pair:None
@@ -373,9 +376,13 @@ module Parse = struct
     let parse_set_pair = parse_set_pair ~loc ~implicit ~se_env table in
     match L.unloc c with
     | System                    (* [c = any] *)
-        {pl_desc = [{ system = ([], { pl_desc = "any"}); 
-                      projection = p; 
-                      alias = None}] } ->
+        { pl_loc;
+          pl_desc = [{ system = ([], { pl_desc = "any"}); 
+                       projection = p; 
+                       alias = None}] } ->
+      if not implicit then 
+        error ~loc:pl_loc (Failure "implicit unsupported");
+
       parse_any ~mode:`Global ~se_env table p
 
     | NoSystem       -> parse_set_pair ~set:empty ~pair:(Some empty)

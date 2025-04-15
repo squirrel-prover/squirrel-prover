@@ -180,12 +180,6 @@ end Deduction.
 # Frames
 *)
 
-axiom [any] frame_not_init (tau:timestamp) :
-  init < tau => 
-  frame@tau = <frame@pred(tau), <of_bool (exec@tau), if exec@tau then output@tau>>.
-
-axiom [any] frame_init :
-  frame@init = zero.
 
 global lemma frame_ded_past
  {P : system[pair]}

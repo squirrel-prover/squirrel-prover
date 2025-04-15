@@ -45,6 +45,9 @@ val debug_completion : Symbols.table -> bool
 (** Debug information for tactics. *)
 val debug_tactics : Symbols.table -> bool
 
+(** Debug information for macros. *)
+val debug_macros : Symbols.table -> bool
+
 (** Strict alias mode for processus. *)
 val strict_alias_mode : Symbols.table -> bool
 

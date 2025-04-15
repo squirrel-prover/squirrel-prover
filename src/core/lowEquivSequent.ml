@@ -210,6 +210,8 @@ module Hyps
 
   let remove id s = { s with proof_context = H.remove id s.proof_context }
 
+  let iter func s = H.iter func s.proof_context
+
   let fold      func s init = H.fold      func s.proof_context init
   let fold_hyps func s init = H.fold_hyps func s.proof_context init
 
@@ -374,18 +376,26 @@ let get_trace_hyps ?in_system s =
     (to_trace_sequent (set_reach_conclusion Term.mk_false s))
 
 (*------------------------------------------------------------------*)
-let get_models (s : t) =
+let get_models (system : 'a SE.expr option) (s : t) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
-  TS.get_models s
+  TS.get_models system s
 
-let mk_trace_cntxt ?(se : SE.fset option) (s : t) =
-  let system = odflt (SE.to_fset s.env.system.set) se in
-  Constr.{
-    table  = s.env.table;
-    system;
-    models = Some (get_models s);
-  }
+let proof_context ?(in_system : SE.context option) (s : t) =
+  let env =
+    match in_system with
+    | None -> s.env
+    | Some system -> { s.env with system; }
+  in
+  ProofContext.make
+    ~env
+    ~hyps:(get_trace_hyps ~in_system:env.system s)
 
+let pair_proof_context (s : sequent) : ProofContext.t =
+  let in_system = 
+    { s.env.system with set = (oget s.env.system.pair :> SE.t) ; } 
+  in
+  proof_context ~in_system s 
+    
 (*------------------------------------------------------------------*)
 let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
@@ -395,12 +405,8 @@ let query_happens ~precise (s : t) (a : Term.term) =
 let check_pq_sound_sequent s =
   match conclusion s with
   | Atom (Equiv.Equiv e) ->
-      let models = get_models s in
-      let cntxt = Constr.{
-        table = s.env.table;
-        system = (Utils.oget s.env.system.pair:>SystemExpr.fset);
-        models = Some (get_models s)
-      } in
+      let models = get_models None s in
+      let cntxt = pair_proof_context s in
       if not (PostQuantum.is_attacker_call_synchronized cntxt models e.terms) then
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
         Tactics.hard_failure Tactics.GoalNotPQSound
@@ -460,10 +466,6 @@ let get_system_pair_projs t : Projection.t * Projection.t =
   fst (SE.fst p), fst (SE.snd p)
 
 (*------------------------------------------------------------------*)
-let mk_pair_trace_cntxt (s : sequent) : Constr.trace_cntxt =
-  let se = (Utils.oget ((env s).system.pair) :> SE.fset) in
-  mk_trace_cntxt ~se s 
-
 let check_conclusion_is_equiv (s : sequent) : unit =
   if not (Equiv.is_equiv (conclusion s)) then
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")

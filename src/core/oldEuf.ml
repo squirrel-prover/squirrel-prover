@@ -1,6 +1,8 @@
 (* DEPRECATED should no longer be used *)
 (** {2 SSCs checking} *)
 open Utils
+
+module SE = SystemExpr
     
 (** Internal exception *)
 exception Bad_ssc_
@@ -14,9 +16,9 @@ exception Bad_ssc_
     inspecting each of the multiple expansions of a same macro. *)
 class check_key
     ~allow_functions
-    ~cntxt head_fn key_n = object (self)
+    ~context head_fn key_n = object (self)
 
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~context as super
 
   method visit_message t = match t with
     | Term.App (Fun (fn, _), [Tuple [m;Term.Name _]]) when fn = head_fn ->
@@ -45,11 +47,11 @@ end
 (** Collect occurences of some function and key,
     as in [Iter.deprecated_get_f_messages] but ignoring boolean terms,
     cf. Koutsos' PhD. *)
-class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = 
+class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~context head_fn key_n = 
   object (_self)
 
   inherit Iter.deprecated_get_f_messages
-      ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
+      ~fun_wrap_key ~drop_head ~context head_fn key_n as super
 
   method visit_message t =
     if Term.ty t = Type.tboolean then () else super#visit_message t
@@ -65,11 +67,13 @@ let err_msg_of_msymb a (ms : Symbols.macro) : Tactics.ssc_error_c =
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
-    ~globals ?(messages=[]) ?(elems={Equiv.terms = []; bound = None})
+    ?(messages=[]) ?(elems={Equiv.terms = []; bound = None})
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~allow_functions ~cntxt head_fn key_n =
+    ~allow_functions ~(context : ProofContext.t) head_fn key_n
+  =
+  let table = context.env.table in
   let ssc =
-    new check_key ~allow_functions ~cntxt head_fn key_n
+    new check_key ~allow_functions ~context head_fn key_n
   in
 
   (* [e_case] is the error message to be thrown in case of error *)
@@ -82,17 +86,21 @@ let key_ssc
   let errors2 = List.filter_map (check E_elem) elems.terms in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
+  (* the system must be concrete, or we cannot check that the
+     syntactic conditions hold *)
+  let system = SE.to_fset context.env.system.set in
+
   let errors3 =
     SystemExpr.fold_descrs (fun descr acc ->
         let name = descr.name in
-        Iter.fold_descr ~globals (fun ms _a_is ~args ~body acc ->
+        Iter.fold_descr (fun ms _a_is ~args ~body acc ->
             let _ = args in
             let err_msg = err_msg_of_msymb name ms in
             match check err_msg body with
             | None -> acc
             | Some x -> x :: acc
-          ) cntxt.table cntxt.system descr acc
-      ) cntxt.table cntxt.system []
+          ) context.env descr acc
+      ) table system []
   in
   errors1 @ errors2 @ errors3
 
@@ -100,8 +108,7 @@ let key_ssc
 (** {2 Euf rules datatypes} *)
 
 type euf_schema = {
-  action_name  : Symbols.action;
-  action       : Action.action_v;
+  rec_arg      : Term.term;
   message      : Term.term;
   key_indices  : Term.terms;
   env          : Vars.env;
@@ -110,7 +117,7 @@ type euf_schema = {
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Symbols.pp_path case.action_name
+    Term.pp case.rec_arg
     Term.pp case.message
 
 (** Type of a direct euf axiom case.
@@ -149,22 +156,22 @@ let pp_euf_rule ppf rule =
 (** {2 Build the Euf rule} *)
 
 (** Exported *)
-let[@warning "-27"] mk_rule 
+let mk_rule 
     ~(elems : Equiv.equiv) ~drop_head ~fun_wrap_key
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    ~allow_functions ~cntxt ~(env : Env.t) ~mess ~sign ~head_fn ~key_n ~key_is 
+    ~(context : ProofContext.t) ~mess ~sign ~head_fn ~key_n ~key_is 
   =
 
-  let mk_of_hash action_descr ((is,m) : Term.t list * Term.t) =
+  let mk_of_hash (action_descr : Term.term) ((is,m) : Term.t list * Term.t) =
     (* Legacy refresh of variables, probably unnecessarily complex. *)
-    let env = ref env.vars in
+    let env = ref context.env.vars in
 
     (* Refresh action indices. *)
     let subst_fresh =
       List.map (fun i ->
           Term.(ESubst (mk_var i,
                         mk_var (Vars.make_approx_r env i (Vars.Tag.gtag)))))
-        action_descr.Action.indices
+        (Vars.Sv.elements @@ Term.fv action_descr)
     in
 
     (* Refresh bound variables from m and is, except those already
@@ -180,7 +187,7 @@ let[@warning "-27"] mk_rule
       in
       (* Remove already handled variables, create substitution. *)
       let index_not_seen i =
-        not (List.mem i action_descr.Action.indices)
+        not (Vars.Sv.mem i @@ Term.fv action_descr)
       in
       let not_seen = fun v ->
         match Vars.ty v with
@@ -197,27 +204,24 @@ let[@warning "-27"] mk_rule
     in
 
     let subst = subst_fresh @ subst_bv in
-    let action = Action.subst_action_v subst action_descr.action in
-    { action_name = action_descr.name;     
-      action;
+    let action = Term.subst subst action_descr in
+    { rec_arg = action;
       message = Term.subst subst m ;
       key_indices = List.map (Term.subst subst) is ; 
       env = !env }
   in
 
-  let empty_hyps = Hyps.TraceHyps.empty in (* FIXME: get hyps from sequent *)
-  
   let hash_cases =
     Iter.fold_macro_support1 (fun descr t hash_cases ->
         let iter =
           new deprecated_get_f_messages
-            ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
+            ~fun_wrap_key ~drop_head ~context head_fn key_n
         in
         iter#visit_message t;
         let new_hashes = iter#get_occurrences in
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
-      ) cntxt env empty_hyps (mess :: sign :: (elems.terms)) []
+      ) context (mess :: sign :: (elems.terms)) []
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
   in
   
@@ -248,7 +252,7 @@ let[@warning "-27"] mk_rule
     let hashes =
       let iter =
         new deprecated_get_f_messages
-          ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
+          ~fun_wrap_key ~drop_head ~context head_fn key_n
       in
       iter#visit_message mess ;
       iter#visit_message sign ;

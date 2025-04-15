@@ -9,6 +9,7 @@ type error_i =
   | InvalidCtySpace of string list
   | DuplicateCty of string
   | NonDetOp
+  | NotExhaustive of string
   | Failure of string
 
 type dkind = KDecl | KLemma

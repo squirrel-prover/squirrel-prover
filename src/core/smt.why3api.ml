@@ -1,5 +1,7 @@
 open Utils
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (* use [_] instead of [.] in path when building Why3 names. *)
 let path_to_string p = Symbols.path_to_string ~sep:"_" p
@@ -700,29 +702,35 @@ let add_macros context =
         Hashtbl.add context.macros_tbl str (context.output_symb,mn)
       | "Classic_frame" ->
         Hashtbl.add context.macros_tbl str (context.frame_symb,mn)
-      | _ -> 
+      | _ ->
+        let exception Unsupported in
         begin try
           let ty = match def with 
             | General d ->
               begin
                 match Macros.get_general_macro_data d with
                 | Structured d ->
-                  (* For now, only support recurrence over timestamps. *)
-                  assert (Type.equal d.rec_ty Type.ttimestamp);
+                  if d.dist_param = None then raise Unsupported; (* FIXME *)
+
+                  let ty = (oget d.dist_param).ty in
+                  (* for now, only support recurrence over timestamps *)
+                  if (Type.equal ty Type.ttimestamp) then raise Unsupported;
+
                   convert_type context d.ty
-                | ProtocolMacro (`Output,_) ->
+                | ProtocolMacro `Output ->
                   convert_type context Type.tmessage
-                | ProtocolMacro (`Cond  ,_) ->
+                | ProtocolMacro `Cond ->
                   convert_type context Type.tboolean
               end  
             | State(_,t,_) | Global(_,t,_) -> 
               convert_type context t 
           in
           Hashtbl.add context.macros_tbl str (symb ty, mn)
-          with InternalError -> 
+          with InternalError | Unsupported -> 
             if smt_debug then Format.printf "Cannot declare %s@." str 
         end
-  ) context.table;
+    ) context.table;
+
   context.theory:= Hashtbl.fold (fun _ (symb,_) theory ->
     begin try 
       Why3.Theory.add_decl_with_tuples theory (Why3.Decl.create_param_decl symb)
@@ -1125,8 +1133,11 @@ let add_macro_axioms context =
         macro_axioms := ("expand_cond_" ^ name_str,
                           t_forall_close !quantified_vars [] ax_cond) ::
                         !macro_axioms;
-        
-        Hashtbl.iter (fun _ (_,mn) ->
+        (* TODO: macros have been generalized, they should all be
+           translated generically using the Macros.unfold_result
+           list. *) 
+        Symbols.Macro.iter (fun mn _ ->
+            try
             let mdef = Symbols.get_macro_data mn context.table in
             let m_str  = path_to_string mn in
             let m_symb = fst(Hashtbl.find context.macros_tbl m_str) in
@@ -1166,32 +1177,42 @@ let add_macro_axioms context =
                         vsymb
                       )m_idx in
                     let ax = 
-                    begin 
-                      try 
                       match
-                        Macros.get_definition_nocntxt 
-                          (Option.get context.system) context.table
-                          (Term.mk_symb mn gty) ~args:(Term.mk_vars m_idx)
-                          descr.name (Term.mk_vars descr.indices)
+                        Macros.unfold
+                          (Env.init 
+                             ~system:SE.{set = (Option.get context.system :> SE.t); pair = None; }
+                             ~table:context.table ())
+                          (Macros.msymb context.table mn) (Term.mk_vars m_idx)
+                        @@ Term.mk_action descr.name (Term.mk_vars descr.indices)
                       with
-                        | `Undef   -> None
-                        | `Def msg ->  
-                          Some (t_forall_close
-                            quantified_indices [] (macro_wterm_eq
-                              (List.map (index_var_to_wterm context) m_idx) 
-                              (
-                              (if gty=Type.tboolean then
-                                wfmla_to_wbool else (fun x -> x))
-                                (sqterm_to_wfmla context msg)
-                              )))
-                      with InternalError -> None
-                    end
-                  in 
+                      | `Results [res] ->
+                        begin
+                          match Term.decompose_app res.when_cond with
+                          | Term.Fun (fs,_), _ when Symbols.path_equal fs Symbols.fs_true ->
+                            begin
+                              try 
+                                Some
+                                  (t_forall_close
+                                     quantified_indices []
+                                     (macro_wterm_eq
+                                        (List.map (index_var_to_wterm context) m_idx) 
+                                        (
+                                          (if gty=Type.tboolean then
+                                             wfmla_to_wbool else (fun x -> x))
+                                            (sqterm_to_wfmla context res.out)
+                                        )))
+                              with InternalError -> None
+                            end
+                          | _ -> None
+                        end
+                      | _ -> None
+                    in
                   List.iter 
                     (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) 
                     m_idx;
                   ax
                   end
+
                 | Symbols.State (arity,sty, _) -> 
                   begin 
                     try
@@ -1276,7 +1297,8 @@ let add_macro_axioms context =
                                     )
                                 )
                                 :: !macro_axioms
-          ) context.macros_tbl; 
+            with _ -> if smt_debug then Format.printf "Macro %s unexpandable" (path_to_string mn);
+          ) context.table; 
         (* Cleanup scope. *)
         List.iter
           (fun v -> Hashtbl.remove context.vars_tbl (Vars.hash v)) descr.indices;
@@ -1625,7 +1647,7 @@ let () =
       (fun (prover,alt) ->
          TraceSequent.register_query_alternative
            (bench_name prover alt)
-           (fun ~precise:_ s q ->
+           (fun ~system:_ ~precise:_ s q ->
               let s =
                 match q with
                 | None -> s

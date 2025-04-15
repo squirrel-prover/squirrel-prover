@@ -4,7 +4,7 @@ open Ppenv
 module L = Location
 module S = System
 module SE = SystemExpr
-
+module Mv = Vars.Mv
 (*------------------------------------------------------------------*)
 (** {2 Macro for mutable state} *)
 
@@ -21,26 +21,156 @@ let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
 
 (*------------------------------------------------------------------*)
 (** {2 General macro definitions} *)
-    
-(*------------------------------------------------------------------*)
-(** A definition of a general structured recursive macro definition:
-    [m = λτ ↦ if not (happens τ) then default
-              else if τ = init then tinit
-              else body τ] *)
-type structed_macro_data = {
-  name    : Symbols.macro;        (** a macro [m] *)
-  default : Term.term;            (** [m@τ] if not [happens(τ)] *)
-  tinit   : Term.term;            (** [m@init] *)
-  body    : Vars.var * Term.term; (** [λτ. m@τ] when [happens(τ) ∧ τ≠init] *)
-  rec_ty  : Type.ty;              (** The type of [τ] *)
-  ty      : Type.ty;              (** The type of the **body** of [m] *)
+
+(** See `.mli`. *)
+type body = {
+  vars      : Vars.vars;         (** The free variables of the pattern matching. *)
+  pattern   : Term.term option;  (** The optional pattern *)
+  when_cond : Term.term;         (** The condition *)
+  out       : Term.term;         (** The output *)
 }
 
+
+let _pp_body ppe fmt (b : body) : unit =
+  Fmt.pf fmt "@[<v>vars: @[%a@]@;\
+              pattern: @[%a@]@;\
+              when_cond: @[%a@]@;\
+              out: @[%a@]@;\
+              @]%!"    
+    (Vars._pp_typed_list ppe) b.vars
+    (Fmt.option (Term._pp ppe)) b.pattern
+    (Term._pp ppe) b.when_cond
+    (Term._pp ppe) b.out
+
+let pp_body     = _pp_body (default_ppe ~dbg:false ())
+let pp_body_dbg = _pp_body (default_ppe ~dbg:true  ())
+
+(* note that there is a nicer pretty-printer in the
+   [structed_macro_data] pretty-printer *)
+
+(*------------------------------------------------------------------*)
+(** See `.mli`. *)
+type rw_strategy = Exhaustive | Exact |  Opaque
+
+(*------------------------------------------------------------------*)
+(** See `.mli`. *)
+type in_systems =
+  | Any 
+  | Like of System.t 
+  | Systems of SE.t 
+
+(*------------------------------------------------------------------*)
+(** See `.mli`. *)
+type structured_macro_data = {
+  name                : Symbols.macro;
+  params              : Vars.vars;
+  dist_param          : Vars.var option;
+  bodies              : body list;
+  ty                  : Type.ty;
+  in_systems          : in_systems;
+  rw_strat            : rw_strategy;
+  info                : Term.macro_info;
+  decreasing_quantity : Term.term option;
+  decreasing_measure  : Symbols.fname;
+}
+
+(*------------------------------------------------------------------*)
+let _pp_structured_macro_data ppe fmt s =
+  let pp_in_systems fmt =
+    match s.in_systems with
+    | Any -> ()
+    | Systems p -> Fmt.pf fmt " @system:(%a)" SE.pp p
+    | Like    s -> Fmt.pf fmt " @like:%a" Symbols.pp_path s
+  in
+  let pp_body fmt b =
+    let pp_pattern fmt =
+      match b.pattern with
+      | None -> Fmt.pf fmt "_"
+      | Some pattern ->
+        Fmt.pf fmt "%a" (Term._pp ppe) pattern
+    in
+    let pp_when fmt =
+      if not (Term.equal b.when_cond Term.mk_true) then
+        Fmt.pf fmt "when %a " (Term._pp ppe) b.when_cond
+    in
+    Fmt.pf fmt "@[<hov 2>@[| @[%t@] @[%t@]@]->@ %a@]"
+      pp_pattern pp_when
+      (Term._pp ppe) b.out
+  in
+  let pp_args fmt args =
+    if args = [] then () 
+    else
+      Fmt.pf fmt "(%a) " (Vars._pp_typed_list ppe) args
+  in
+  let pp_bodies fmt =
+    if s.info.is_match then
+      Fmt.pf fmt "with@ @[<v 0>%a@]"
+        (Fmt.list ~sep:(Fmt.any "@;") pp_body) s.bodies
+    else 
+      begin
+        let single_body = as_seq1 s.bodies in
+        assert (Term.equal single_body.when_cond Term.mk_true && 
+                single_body.pattern = None &&
+                single_body.vars = []);
+        Fmt.pf fmt "=@ @[%a@]" (Term._pp ppe) single_body.out
+      end
+  in
+  Fmt.pf fmt "@[<hv 2>@[let%s %a%t %a: %a @]%t@]"
+    (if s.info.is_rec then " rec" else "")
+    Symbols.pp_path s.name 
+    pp_in_systems
+    pp_args (s.params @ Option.to_list s.dist_param)
+    Type.pp s.ty
+    pp_bodies
+
+(*------------------------------------------------------------------*)
+let pp_structured_macro_data = 
+  _pp_structured_macro_data (default_ppe ~dbg:false ())
+
+let pp_structured_macro_data_dbg = 
+  _pp_structured_macro_data (default_ppe ~dbg:true ())
+ 
+(*------------------------------------------------------------------*)
+(* Given a body, refreshes the free variables.  Can be safely called
+   over the result of Macros.unfold, which must make sure that
+   body.vars contains the remaining free variables after unfolding. *)
+let refresh_body (body:body) =
+  let vars, subst = Term.refresh_vars body.vars in
+  let out = Term.subst subst body.out in
+  let when_cond = Term.subst subst body.when_cond in
+  let pattern =
+    match body.pattern with
+      None -> None
+    | Some pat -> Some (Term.subst subst pat) in
+  {vars; pattern; out; when_cond}
+
+
+let mk_term_of_bodies table (bodies : body list) (match_param : Term.term)  =
+  match bodies with
+  | [] -> assert false
+  | p::_ ->
+    let out_type = Term.ty p.out in
+    List.fold_left
+      (fun acc body ->
+         let when_cond =
+           match body.pattern with
+           | None ->  body.when_cond
+           | Some pat -> Term.mk_and (Term.mk_eq match_param pat) body.when_cond
+         in
+         if body.vars = [] then
+           Term.mk_ite when_cond body.out acc
+         else           
+           Term.mk_find body.vars when_cond body.out acc           
+      )
+      (Library.Prelude.mk_witness table ~ty_arg:out_type)
+      bodies
+
 (** A general macro definition. *)
+type general_macro_data =
+  | Structured of structured_macro_data
+  | ProtocolMacro of [`Output | `Cond]
 (* FIXME: quantum: move all macro definitions in this type *)
-type general_macro_data = 
-  | Structured of structed_macro_data
-  | ProtocolMacro of [`Output | `Cond] * Action.exec_model
+
   (** ad hoc macro definitions using action descriptions *)
 
 type Symbols.general_macro_def += Macro_data of general_macro_data
@@ -48,14 +178,63 @@ type Symbols.general_macro_def += Macro_data of general_macro_data
 let get_general_macro_data : Symbols.general_macro_def -> general_macro_data = function
     | Macro_data g -> g
     | _ -> assert false
-    
+
 let as_general_macro : Symbols.data -> general_macro_data = function
-  | Symbols.Macro (General g) -> get_general_macro_data g 
+  | Symbols.Macro (General g) -> get_general_macro_data g
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
+let get_rw_strat
+    (table : Symbols.table) (symb : Term.msymb) : rw_strategy
+  =
+  match Symbols.get_macro_data symb.s_symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data -> data.rw_strat
+      | ProtocolMacro _ -> Exact
+    end        
+  | State _ -> Exact
+  | Global (_,_,_) -> Exact
+
+let get_macro_info
+    (table : Symbols.table) (symb : Symbols.macro) : Term.macro_info
+  =
+  match Symbols.get_macro_data symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data -> data.info
+      | ProtocolMacro _ -> Term.macro_info_builtin
+    end        
+  | State _ | Global _ -> Term.macro_info_builtin
+
+
+let get_macro_deacreasing_info 
+    (table : Symbols.table) (symb : Symbols.macro) (rec_arg : Term.term) : Term.term * Symbols.fname
+  =
+  let lt = Library.Prelude.fs_lt in
+  match Symbols.get_macro_data symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data ->
+        begin
+          match data.decreasing_quantity with
+          | None -> rec_arg, lt
+          | Some t ->
+            let dist_param = oget data.dist_param in
+            let subst = [Term.ESubst (Term.mk_var dist_param, rec_arg)] in
+            Term.subst subst t, data.decreasing_measure
+        end
+      | ProtocolMacro _ -> rec_arg, lt
+    end        
+  | State _ | Global _ -> rec_arg, lt
+
+
+(*------------------------------------------------------------------*)
 (** {2 Execution models} *)
-    
+
 type exec_model_def = {
   np : Symbols.npath;
   (** namespace where this execution model will define its macros *)
@@ -83,6 +262,28 @@ type exec_model_def = {
     the code in `Iter.ml` must be adapted accordingly. *)
 
 (*------------------------------------------------------------------*)
+(** For all cases except [init]. *)
+let mk_timestamp_body table (ts : Term.t) (out : Term.t) : body =
+  { vars      = [];
+    pattern   = None;
+    when_cond = Term.mk_and (Library.Prelude.mk_neq table ts Term.init) (Term.mk_happens ts);
+    out       = out}
+
+(** For [init]. *)
+let mk_timestamp_body_init out : body =
+  { vars      = [];
+    pattern   = Some Term.init;
+    when_cond = Term.mk_true; (* init always happens, no need to check it *)
+    out       = out}
+
+(** For not happens case. *)
+let mk_timestamp_body_default ts default : body =
+  { vars      = [];
+    pattern   = None;
+    when_cond = Term.mk_not (Term.mk_happens ts);
+    out       = default}
+
+
 module Classic = struct
 
   let out_ty   = Type.tmessage
@@ -91,19 +292,22 @@ module Classic = struct
   let frame_ty = Type.tmessage
   let exec_ty  = Type.tboolean
 
-  let inp   : Term.msymb = Term.mk_symb Symbols.Classic.inp   inp_ty
-  let out   : Term.msymb = Term.mk_symb Symbols.Classic.out   out_ty
-  let frame : Term.msymb = Term.mk_symb Symbols.Classic.frame frame_ty
-  let cond  : Term.msymb = Term.mk_symb Symbols.Classic.cond  cond_ty
-  let exec  : Term.msymb = Term.mk_symb Symbols.Classic.exec  exec_ty
+  let info = Term.macro_info_builtin
 
-  let model _table =
+  let inp   : Term.msymb = Term.mk_symb Symbols.Classic.inp ~info inp_ty
+  let out   : Term.msymb = Term.mk_symb Symbols.Classic.out ~info out_ty
+  let frame : Term.msymb = Term.mk_symb Symbols.Classic.frame ~info frame_ty
+  let cond  : Term.msymb = Term.mk_symb Symbols.Classic.cond ~info cond_ty
+  let exec  : Term.msymb = Term.mk_symb Symbols.Classic.exec ~info exec_ty
+
+  let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts   = Term.mk_var ts_v in
 
     (*------------------------------------------------------------------*)
     let frame_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_pair
           (Term.mk_macro frame [] (Term.mk_pred ts))
           (Term.mk_pair
@@ -112,54 +316,71 @@ module Classic = struct
                 (Term.mk_macro exec [] ts)
                 (Term.mk_macro out [] ts)
                 Term.mk_zero))
-      in 
+      and body_init = mk_timestamp_body_init Term.mk_zero
+      and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
-        name    = Symbols.Classic.frame;
-        default = Term.empty;
-        tinit   = Term.mk_zero;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = frame_ty;
+        name                = Symbols.Classic.frame;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = frame_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
 
     (*------------------------------------------------------------------*)
     let input_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_fun0
           Symbols.fs_att { fty = Symbols.ftype_builtin Symbols.fs_att; ty_args = [] }
           [Term.mk_macro frame [] (Term.mk_pred ts)]
-      in 
+      and body_init = mk_timestamp_body_init Term.empty
+      and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
-        name    = Symbols.Classic.inp;
-        default = Term.empty;
-        tinit   = Term.empty;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = inp_ty;
+        name                = Symbols.Classic.inp;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = inp_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
 
     (*------------------------------------------------------------------*)
     let exec_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_and
           (Term.mk_macro exec [] (Term.mk_pred ts))
           (Term.mk_macro cond [] ts)
-      in 
+      and body_init = mk_timestamp_body_init Term.mk_true
+      and body_default = mk_timestamp_body_default ts Term.mk_false in
       Structured {
-        name    = Symbols.Classic.exec;
-        default = Term.mk_false;
-        tinit   = Term.mk_true;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = exec_ty;
+        name                = Symbols.Classic.exec;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = exec_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
 
     (*------------------------------------------------------------------*)
-    let output_data = ProtocolMacro (`Output, Classic) in
-    let cond_data   = ProtocolMacro (`Cond  , Classic) in
+    let output_data = ProtocolMacro `Output in
+    let cond_data   = ProtocolMacro `Cond in
 
     (*------------------------------------------------------------------*)
     {
@@ -187,41 +408,50 @@ module Quantum = struct
   let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage]
   let exec_ty       = Type.tboolean
 
-  let out        : Term.msymb = Term.mk_symb Symbols.Quantum.out        out_ty
-  let cond       : Term.msymb = Term.mk_symb Symbols.Quantum.cond       cond_ty
-  let inp        : Term.msymb = Term.mk_symb Symbols.Quantum.inp        inp_ty
-  let transcript : Term.msymb = Term.mk_symb Symbols.Quantum.transcript transcript_ty
-  let state      : Term.msymb = Term.mk_symb Symbols.Quantum.state      state_ty
-  let frame      : Term.msymb = Term.mk_symb Symbols.Quantum.frame      frame_ty
-  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       exec_ty 
+  let info = Term.macro_info_builtin
+  
+  let out        : Term.msymb = Term.mk_symb Symbols.Quantum.out        ~info out_ty
+  let cond       : Term.msymb = Term.mk_symb Symbols.Quantum.cond       ~info cond_ty
+  let inp        : Term.msymb = Term.mk_symb Symbols.Quantum.inp        ~info inp_ty
+  let transcript : Term.msymb = Term.mk_symb Symbols.Quantum.transcript ~info transcript_ty
+  let state      : Term.msymb = Term.mk_symb Symbols.Quantum.state      ~info state_ty
+  let frame      : Term.msymb = Term.mk_symb Symbols.Quantum.frame      ~info frame_ty
+  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       ~info exec_ty 
 
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts   = Term.mk_var ts_v in
-    
+
     let qwitness = Library.Prelude.mk_witness table ~ty_arg:(Type.tquantum_message) in
 
     (*------------------------------------------------------------------*)
     let frame_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_tuple
           [ts;
            Term.mk_macro state      [] ts;
            Term.mk_macro transcript [] ts; ]
-      in 
+      and body_init = mk_timestamp_body_init @@ Term.mk_tuple [Term.init; qwitness; Term.empty]
+      and body_default = mk_timestamp_body_default ts @@ Term.mk_tuple [Term.init; qwitness; Term.empty  ] in
       Structured {
-        name    = Symbols.Quantum.frame;
-        default = Term.mk_tuple [Term.init; qwitness; Term.empty  ];
-        tinit   = Term.mk_tuple [Term.init; qwitness; Term.empty];
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = frame_ty;
+        name                = Symbols.Quantum.frame;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = frame_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
 
     (*------------------------------------------------------------------*)
     let transcript_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@        
         Term.mk_pair 
           (Term.mk_macro transcript [] (Term.mk_pred ts))
           (Term.mk_pair
@@ -231,73 +461,95 @@ module Quantum = struct
                 (Term.mk_ite (Term.mk_macro exec [] ts) (Term.mk_macro out [] ts) Term.mk_zero)
              )
           )
-      in 
+      and body_init = mk_timestamp_body_init Term.empty
+      and body_default = mk_timestamp_body_default ts Term.empty
+      in
       Structured {
-        name    = Symbols.Quantum.transcript;
-        default = Term.empty;
-        tinit   = Term.empty;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = transcript_ty;
-      }
-    in
+        name                = Symbols.Quantum.transcript;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = transcript_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
+        }
 
+    in
     (*------------------------------------------------------------------*)
     let state_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_proj 2 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
           [ Term.mk_macro frame [] (Term.mk_pred ts) ]
-      in 
+      and body_init = mk_timestamp_body_init qwitness
+      and body_default = mk_timestamp_body_default ts qwitness in      
       Structured {
-        name    = Symbols.Quantum.state;
-        default = qwitness;
-        tinit   = qwitness;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = state_ty;
+        name                =  Symbols.Quantum.state;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = state_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
 
     (*------------------------------------------------------------------*)
     let input_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_proj 1 @@
         Term.mk_fun0
           Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
           [ Term.mk_macro frame [] (Term.mk_pred ts) ]
-      in 
+      and body_init = mk_timestamp_body_init Term.empty
+      and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
-        name    = Symbols.Quantum.inp;
-        default = Term.empty;
-        tinit   = Term.empty;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = inp_ty;
+        name                =  Symbols.Quantum.inp;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = inp_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
-
     (*------------------------------------------------------------------*)
     let exec_data =
-      let body =
+      let body_main =
+        mk_timestamp_body table ts @@
         Term.mk_and
           (Term.mk_macro exec [] (Term.mk_pred ts))
           (Term.mk_macro cond [] ts)
-      in 
+      and body_init = mk_timestamp_body_init Term.mk_true
+      and body_default = mk_timestamp_body_default ts Term.mk_false in
       Structured {
-        name    = Symbols.Quantum.exec;
-        default = Term.mk_false;
-        tinit   = Term.mk_true;
-        body    = (ts_v, body);
-        rec_ty  = Type.ttimestamp;
-        ty      = Type.tboolean;
+        name                = Symbols.Quantum.exec;
+        params              = [];
+        dist_param          = Some ts_v;
+        bodies              = [body_main; body_init; body_default];
+        ty                  = exec_ty;
+        rw_strat            = Exact;
+        in_systems          = Any;
+        info                = Term.macro_info_builtin;
+        decreasing_quantity = None;
+        decreasing_measure  = Library.Prelude.fs_lt;
       }
     in
-
     (*------------------------------------------------------------------*)
-    let output_data = ProtocolMacro (`Output, PostQuantum) in
-    let cond_data   = ProtocolMacro (`Cond  , PostQuantum) in 
+    let output_data = ProtocolMacro `Output in
+    let cond_data   = ProtocolMacro `Cond in 
 
   (*------------------------------------------------------------------*)
     {
@@ -319,9 +571,9 @@ end (* PostQuantum *)
   (*------------------------------------------------------------------*)
 let builtin_exec_models table = [Classic.model table; Quantum.model table]
 
-let define_execution_models table : Symbols.table = 
+let define_execution_models table : Symbols.table =
   List.fold_left (fun table em ->
-      List.fold_left (fun table (name,data) -> 
+      List.fold_left (fun table (name,data) ->
           let data = Symbols.Macro (General (Macro_data data)) in
           Symbols.Macro.redefine table ~data name
         ) table em.macros
@@ -330,7 +582,7 @@ let define_execution_models table : Symbols.table =
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
-(** Data associated with global macro symbols.
+(** Data as.sociated with global macro symbols.
     The definition of these macros is not naturally stored as part
     of action descriptions, but directly in the symbols table. *)
 type global_data = {
@@ -355,7 +607,7 @@ type global_data = {
 
   exec_model : Action.exec_model; 
   (** The execution model this macro was declared in*)
-  
+
   ty : Type.ty;
   (** The type of the macro, which does not depends on the system. *)
 }
@@ -393,9 +645,9 @@ let pp_dbg = _pp (default_ppe ~dbg:true  ())
 let get_global_data : Symbols.global_macro_def -> global_data = function
   | Global_data g -> g
   | _ -> assert false
-    
+
 let as_global_macro : Symbols.data -> global_data = function
-  | Symbols.Macro Global (_, _, g) -> get_global_data g 
+  | Symbols.Macro Global (_, _, g) -> get_global_data g
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -428,43 +680,60 @@ let declare_global
       (System.projections table system)
   in
   let glob_data =
-    {action = (suffix, action); 
-     inputs; indices; ts; bodies; ty; 
+    {action = (suffix, action);
+     inputs; indices; ts; bodies; ty;
      exec_model; }
-  in  
+  in
   let data = data_of_global_data glob_data in
-  Symbols.Macro.declare ~approx:true table macro ~data 
+  Symbols.Macro.declare ~approx:true table macro ~data
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-(** Get the ftype of a macro. 
-    The second argument is the type of the variable we are recursing
-    upon (i.e. the variable after the `@` *)
-let fty (table : Symbols.table) (ms : Symbols.macro) : Type.ftype * Type.ty =
+type rec_arg_ty = [`At of Type.ty | `Standard of Type.ty | `None]
+
+(** see `.mli` *)
+let fty
+    (table : Symbols.table) 
+    (ms : Symbols.macro) 
+  : Type.ftype * rec_arg_ty
+  =
   let fty_args, fty_out, rec_ty =
     match Symbols.get_macro_data ms table with
     | Symbols.Global (_, ty, data) ->
       let data = get_global_data data in
-      List.map Vars.ty data.indices, ty, Type.ttimestamp
+      List.map Vars.ty data.indices, ty, `At Type.ttimestamp
     | General def ->
       begin
         match get_general_macro_data def with
-        | Structured     data       -> [],       data.ty, data.rec_ty
-        | ProtocolMacro (`Output,_) -> [], Type.tmessage, Type.ttimestamp
-        | ProtocolMacro (`Cond  ,_) -> [], Type.tboolean, Type.ttimestamp
+        | Structured     data   ->
+          let rec_ty =
+            match data.dist_param with
+            | None -> `None
+            | Some v -> 
+              match data.info.pp_style with
+              | `At        -> `At (Vars.ty v) 
+              | `Standard -> `Standard (Vars.ty v)
+          in
+          List.map Vars.ty data.params, data.ty, rec_ty
+        | ProtocolMacro `Output -> [], Type.tmessage, `At Type.ttimestamp
+        | ProtocolMacro `Cond   -> [], Type.tboolean, `At Type.ttimestamp
       end
 
     | Symbols.State (_,ty,data) ->
       begin
         match data with
-        | StateInit_data (vs,_) -> List.map Vars.ty vs, ty, Type.ttimestamp
+        | StateInit_data (vs,_) -> List.map Vars.ty vs, ty, `At Type.ttimestamp
         | _ -> assert false
       end
   in
-  (* FIXME: quantum: allow other types than [timestamp] *)
-  assert (Type.equal rec_ty Type.ttimestamp);
   Type.mk_ftype [] fty_args fty_out, rec_ty
+
+(*------------------------------------------------------------------*)
+let msymb (table : Symbols.table) (symb : Symbols.macro) : Term.msymb =
+  let fty, _ = fty table symb in
+  let info = get_macro_info table symb in
+  Term.mk_symb symb ~info fty.fty_out
 
 (*------------------------------------------------------------------*)
 let is_global table (ms : Symbols.macro) : bool =
@@ -475,9 +744,6 @@ let is_global table (ms : Symbols.macro) : bool =
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
-let is_action = function Term.Action _ -> true | _ -> false
-let get_action_symb = function Term.Action (a,_) -> a | _ -> assert false
-
 let is_prefix strict a b =
   match Action.distance a b with
   | None -> false     (* [a] not prefix of [b] *)
@@ -485,58 +751,37 @@ let is_prefix strict a b =
     | `Large -> true
     | `Strict -> i > 0
 
-(** Check is not done modulo equality.
-    Not exported. *)
-let can_expand (name : Symbols.macro) (a : Term.term) table =
-  match Symbols.get_macro_data name table with
-  | General _ -> 
-    (* A structed macro [m@A] can be always be expanded if [A] is an action. *)
-    (* FIXME: quantum: this could be relaxed, as only [output] and [cond] can 
-       only be expanded on precise actions. Other structed macros can be 
-       safely expanded for any action that happens (e.g. [frame]). *)
-    is_action a
-
-  | State _ -> is_action a
-  (* FIXME: quantum: same, this expantion condition can likely be relaxed *)
-
-  | Global (_, _, Global_data {action = (strict,a0) }) ->
-    (* We can only expand a global macro when [a0] is a prefix of [a],
-       because a global macro m(...)@A refer to inputs of A and
-       its sequential predecessors. *)
-    if not (is_action a) then false
-    else
-      let asymb = get_action_symb a in
-      let _, action = Action.get_def asymb table in
-      is_prefix strict a0 (Action.get_shape action)
-
-  | Global _ -> assert false    (* impossible *)
-
 (*------------------------------------------------------------------*)
-(** Give the **internal** definition of a global macro. 
-    Meaningless when working in a sequent. 
+(** Give the **internal** definition of a global macro.
+    Meaningless when working in a sequent.
     Used for global rewriting, when rewriting in another global macro. *)
 let get_def_glob_internal
-    (table : Symbols.table) (system : SE.fset) 
+    (table : Symbols.table) (system : SE.fset)
     (symb : Term.msymb)  ~(args : Term.term list)
-    ~(ts : Term.term) (inputs : Vars.vars)
-  : Term.term 
+    ~(ts : Term.term) (inputs : Vars.vars option)
+  : Term.term * Vars.vars
   =
   assert (is_global table symb.s_symb);
 
   let data = as_global_macro (Symbols.Macro.get_data symb.s_symb table) in
   let body = get_body table system data in
-  let prefix_inputs = List.take (List.length data.inputs) inputs in
+
   let subst =
-    List.map2
-      (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
-      data.inputs prefix_inputs
+    (match inputs with
+     | None -> []
+     | Some inputs ->
+       let prefix_inputs = List.take (List.length data.inputs) inputs in       
+       List.map2
+         (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
+         data.inputs prefix_inputs
+    )
     @
     List.map2
       (fun i t' -> Term.ESubst (Term.mk_var i, t'))
       data.indices args
   in
   let subst = Term.ESubst (Term.mk_var data.ts, ts) :: subst in
-  Term.subst subst body
+  (Term.subst subst body, data.inputs)
 
 (*------------------------------------------------------------------*)
 (** Exported, see `.mli`. *)
@@ -614,7 +859,7 @@ let get_def_glob
     drop (List.length action - List.length data.inputs) (List.rev action)
   in
 
-  let input_macro = 
+  let input_macro =
     match data.exec_model with
     | Classic     -> Classic.inp
     | PostQuantum -> Quantum.inp
@@ -640,159 +885,543 @@ let get_def_glob
   Term.simple_bi_term (SE.to_projs system) t
 
 (*------------------------------------------------------------------*)
-(** Exported *)
-let get_definition_nocntxt
-    (system : SE.fset)
-    (table  : Symbols.table)
-    (symb   : Term.msymb)
-    ~(args  : Term.term list)
-    (asymb  : Symbols.action)
-    (aidx   : Term.term list) : [ `Def of Term.term | `Undef ]
+(** Match a pattern [pattern] with [t]. 
+    [pattern] must be a pattern-matching pattern (see
+    [ProcessDecl.check_pattern]): notably, no variable may occur more
+    than once in [pattern]. *)
+let basic_match
+    (table : Symbols.table) 
+    ~(term : Term.term) ~(pattern : Term.term)
+  : [`Match of Term.subst | `MatchFailure | `Unknown]
   =
-  let exception Failed in
-  let failed () = raise Failed in
+  let exception Failure in
+  let exception Unknown in
+  
+  let mv : (Vars.var, Term.term) Hashtbl.t = Hashtbl.create 32 in
 
-  let init_or_generic ~init ~body =
-    let var, t = body in
-    let subst = Term.ESubst (Term.mk_var var, Term.mk_action asymb aidx) in
-    `Def (if asymb = Symbols.init_action
-          then init
-          else Term.subst [subst] t)
+  let add_or_fail (v : Vars.var) t =
+    (* each variable may only appear once in a pattern (see
+       [ProcessDecl.check_pattern]) *)
+    assert (not (Hashtbl.mem mv v));
+    Hashtbl.add mv v t 
+  in
+  
+  let rec aux (t1 : Term.term) (t2 : Term.term) : unit =
+    match t1, t2 with
+    | Term.Int i1, Term.Int i2 -> if not (Z.equal i1 i2) then raise Failure
+
+    (* Int.( x1 + i1, i2) where [i2 >= i1] and [i1,i2] are concrete
+       values *)
+    | Term.App (Fun (fs1,_), [Var x1     ; Int i1]), Int i2
+      when fs1 = Library.Int.add table && Z.leq i1 i2 ->
+      add_or_fail x1 (Term.mk_int Z.(i2 - i1))
+
+    (* Int.( x1 + i1, x2 + i2) where [i1 <= i2] and [i1,i2] are concrete
+       values *)
+    | Term.App (Fun (fs1,_), [Var x1     ; Int i1]),
+      Term.App (Fun (fs2,_), [Var _ as x2; Int i2])
+      when fs1 = Library.Int.add table &&
+           fs2 = Library.Int.add table &&
+           Z.leq i1 i2 ->
+      add_or_fail x1 (Library.Int.mk_add table x2 (Term.mk_int Z.(i2 - i1)))
+
+    | Term.Action (asymb1, aidx1), Term.Action (asymb2, aidx2) ->
+      if asymb1 <> asymb2 then
+        raise Failure;
+
+      List.iter2 aux aidx1 aidx2
+
+    | Term.App (t1,tl1), Term.App (t2,tl2) -> aux t1 t2; List.iter2 aux tl1 tl2
+
+    | Term.Var x, _ -> add_or_fail x t2
+
+    | _ -> raise Unknown
+  in
+  try
+    aux pattern term;
+    `Match
+      (List.map (fun (v, t) ->
+           Term.ESubst (Term.mk_var v, t))
+          (Hashtbl.to_list mv))
+  with
+  | Failure -> `MatchFailure
+  | Unknown -> `Unknown
+
+(** not exported *)
+exception UnfoldFailed
+let unfold_failed () = raise UnfoldFailed
+
+let unfold_structured_macro
+    (env     : Env.t)
+    (data    : structured_macro_data)
+    (args    : Term.term list)
+    (rec_arg : Term.term)
+  : body list
+  =
+  let system = env.system.set in
+  let table = env.table in
+
+  (* Compute the projection substitution, if necessary *)
+  let do_proj_subst =
+    match data.in_systems with
+    | Any -> fun x -> x
+    | Like s ->
+      begin
+        match SE.get_compatible_system env.se_vars system with
+        | None -> unfold_failed ()
+        | Some p0 -> 
+          if not (SystemSyntax.compatible table p0 s) then unfold_failed ()
+      end;
+      fun x -> x
+
+    | Systems p ->
+      if SE.is_var system then unfold_failed ();
+      let system = SE.to_arbitrary system in
+      (* FIXME: replace with subset_modulo + projection, as already
+         done in [sequent.ml] *)
+      if not (SE.subset_modulo table system p) then unfold_failed ();
+
+      (* The macro was defined using the projections in [p], but we
+         want to unfold the macro in [system]. 
+         C.f. description of the [in_systems] data-type. 
+         (Note [p]'s projections are all distincts.) *)
+      let _, proj_subst =
+        SE.mk_proj_subst ~strict:false ~src:p ~dst:system
+      in
+      Term.subst_projs ~project:true proj_subst 
   in
 
-  let doit () =
-  let action = Action.of_term asymb aidx table in
-
-  (* we do not apply the substitution right away, as it may fail by
-     trying to substitute indices by non-variable terms. *)
-  let unapplied_descr, descr_subst =
-    SE.descr_of_action table system action
+  let subst =
+    (omap_dflt []
+       (fun dist_param -> [Term.ESubst (Term.mk_var dist_param, rec_arg)]) 
+       data.dist_param
+    )
+    @
+    (List.map2
+       (fun i t -> Term.ESubst (Term.mk_var i, t))
+       data.params
+       args
+    )
   in
+
+  (* apply the projection substitution and the substitution [subst]
+     to [body] *)
+  let do_subst subst body =
+    let doit = do_proj_subst -| Term.subst subst in
+    { body with
+      when_cond = doit body.when_cond;
+      out       = doit body.out;
+    }
+  in
+
+  (* compute the bodies *)
+  List.fold_left (fun acc body ->
+      (* avoid capture between [subst]'s domain and [body.vars] *)
+      let body = refresh_body body in
+      match body.pattern with
+      | None -> do_subst subst body :: acc
+      | Some pat ->
+        match basic_match table ~pattern:pat ~term:rec_arg with
+        | `Match rec_subst -> 
+          (* the match succeeded, so we clear the match and
+             pattern variables *)
+          let body = { body with vars = []; pattern = None; } in
+          do_subst (rec_subst @ subst) body
+          :: acc
+        | `Unknown         -> do_subst (subst) body :: acc
+        | `MatchFailure -> acc
+    ) [] data.bodies
+
+(*------------------------------------------------------------------*)
+type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
+
+
+let not_happens_macro_body ty ts =
+  { vars=[];
+    pattern=None;
+    when_cond=(
+      let hap = (Term.mk_happens ts) in
+      Term.mk_not hap);
+    out = if ty = Type.tboolean then Term.mk_false else Term.empty;
+    (* In general, we would need a default value for every possible type. *)
+  }
+
+let init_macro_body ty =
+  { vars=[];
+    pattern=Some Term.init;
+    when_cond=Term.mk_true;
+    out = if ty = Type.tboolean then Term.mk_true else Term.empty;
+    (* In general, we would need a default value for every possible type. *)
+    }
+
+(*------------------------------------------------------------------*)
+let _unfold
+    ?(expand_context = InSequent)
+    (env     : Env.t)
+    (symb    : Term.msymb)
+    (args    : Term.term list)
+    (rec_arg : Term.term)
+  : body list
+  =
+  let exception MatchFailed in
+  let match_failed () = raise MatchFailed in
+  let table = env.table in
+  let system = env.system.set in
+
+  (* fails if the action is not defined in the current system
+     (because it comes from another uncompatible system) *)
   match Symbols.get_macro_data symb.s_symb table with
   | General data ->
     begin
       match get_general_macro_data data with
-      | Structured data -> init_or_generic ~init:data.tinit ~body:data.body
-      | ProtocolMacro (`Output, exec_model) -> 
-        if exec_model <> unapplied_descr.exec_model then failed ();
+      | Structured data ->
+        unfold_structured_macro env data args rec_arg
 
-        `Def (Term.subst descr_subst (snd unapplied_descr.output))
+      | ProtocolMacro `Output ->
+        if not (SE.is_fset system) then unfold_failed ();
+        let fset_system = SE.to_fset system in
 
-      | ProtocolMacro (`Cond, exec_model) ->
-        if exec_model <> unapplied_descr.exec_model then failed ();
+        begin
+          try
+            let unapplied_descr, descr_subst =
+              match rec_arg with
+              |Term.Action(asymb, aidx) ->
+                let action = Action.of_term asymb aidx table in
+                (try SE.descr_of_action table fset_system action with
+                 | Not_found ->
+                   (* output{se}@A when A not in SE is a typing error. *)
+                   assert false)
+              | _ -> match_failed ()
+            in
+            [{
+              vars =[];
+              pattern = None;
+              when_cond =
+                if Term.equal rec_arg Term.init then
+                  Term.mk_true
+                else Term.mk_happens rec_arg;
+              out = Term.subst descr_subst (snd unapplied_descr.output)
+            }]
+          with
+          | MatchFailed->
+            (* output@tau when not(happens(tau)) *)
+            (not_happens_macro_body Type.tmessage rec_arg)
+            ::
+            (* output@init *)
+            (init_macro_body Type.tmessage)
+            (* output@A for all actions A *)
+            ::                           
+            SE.fold_descrs
+              (fun (descr : Action.descr) (bodies : body list) ->
+                 let action =
+                   SE.action_to_term table fset_system @@
+                   Action.to_action descr.action
+                 in
+                 (* init is covered by fold_descrs, but
+                    we handle it more cleanly before *)
+                 if Term.equal action Term.init then
+                   bodies
+                 else
+                   {vars=Action.get_args_v descr.action;
+                    pattern= Some action;
+                    when_cond =
+                      if Term.equal action Term.init then
+                        Term.mk_true
+                      else Term.mk_happens action;
+                    out = snd descr.output} :: bodies
+              ) table fset_system []
+        end
 
-        `Def (Term.subst descr_subst (snd unapplied_descr.condition))
+      | ProtocolMacro `Cond ->
+        if not (SE.is_fset system) then unfold_failed ();
+        let fset_system = SE.to_fset system in
+
+        begin
+          try
+            let unapplied_descr, descr_subst =
+              match rec_arg with
+              |Term.Action(asymb, aidx) ->
+                let action = Action.of_term asymb aidx table in
+                (try SE.descr_of_action table fset_system action with
+                 | Not_found -> 
+                   (* cond{se}@A when A not in SE is a typing error. *)
+                   assert false)
+              | _ -> match_failed ()
+            in
+            [{
+              vars =[];
+              pattern = None;
+              when_cond =
+                if Term.equal rec_arg Term.init then
+                  Term.mk_true
+                else Term.mk_happens rec_arg;
+              out = Term.subst descr_subst (snd unapplied_descr.condition)
+            }]
+
+          with
+          | MatchFailed->
+            (* cond@tau when not(happens(tau)) *)
+            (not_happens_macro_body Type.tboolean rec_arg)
+            ::
+            (* cond@init  *)
+            (init_macro_body Type.tboolean)
+            (* cond@A for all actions A *)
+            ::                           
+            SE.fold_descrs
+              (fun (descr : Action.descr) (bodies : body list) ->
+                 let action = SE.action_to_term table fset_system
+                   @@ Action.to_action descr.action
+                 in
+                 (* init is covered by fold_descrs, but
+                    we handle it more cleanly before *)
+                 if Term.equal action Term.init then
+                   bodies
+                 else                              
+                   {vars=Action.get_args_v descr.action;
+                    pattern= Some action;
+                    when_cond =
+                      if Term.equal action Term.init then
+                        Term.mk_true
+                      else Term.mk_happens action;
+                    out = snd descr.condition} :: bodies                      
+              ) table fset_system []
+        end
     end
 
   | State _ ->
-    `Def begin
-      try
+    if not (SE.is_fset system) then unfold_failed ();
+    let fset_system = SE.to_fset system in
+
+    begin
+      try    
+        let unapplied_descr, descr_subst =
+          match rec_arg with
+          |Term.Action(asymb, aidx) ->
+            let action = Action.of_term asymb aidx table in
+            (try
+               SE.descr_of_action table fset_system action
+             with Not_found ->
+               (* state{se}@A with A not in se *)
+               assert false)
+          | _ -> match_failed ()
+        in
+
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
-        let (ns_args, msg) : Term.terms * Term.term =
-          let _, ns_args, msg =
-            List.find (fun (ns,ns_args,_) ->
+        let (ns_params, msg) : Term.terms * Term.term =
+          let _, ns_params, msg =
+            List.find (fun (ns,ns_params,_) ->
                 ns = symb.s_symb &&
-                List.length ns_args = List.length args
+                List.length ns_params = List.length args
               ) unapplied_descr.updates
           in
-          List.map (Term.subst descr_subst) ns_args, Term.subst descr_subst msg
+          List.map (Term.subst descr_subst) ns_params, Term.subst descr_subst msg
         in
 
         (* Init case: we substitute the indices by their definition. *)
-        if asymb = Symbols.init_action then
+        if Term.equal rec_arg Term.init then
           let s = List.map2 (fun i1 i2 ->
               match i1 with
               | Term.Var _ -> Term.ESubst (i1, i2)
               | _ -> assert false
               (* impossible for well-formed action description for init *)
-            ) ns_args args
+            ) ns_params args
           in
-          Term.subst s msg
+          [{ vars = [];
+             pattern = None;
+             when_cond = Term.mk_true;
+             out = Term.subst s msg}]
 
-        (* If indices [args] of the macro we want to expand
-           are equal to indices [ns_args] corresponding to this macro
+        (* If indices [params] of the macro we want to expand
+           are equal to indices [ns_params] corresponding to this macro
            in the action description, then the macro is expanded as defined
            by the update term. *)
-        else if List.for_all2 Term.equal args ns_args then
-          msg
-
-        (* Otherwise, we need to take into account the possibility that
-           [arg] and [ns_args] might be equal, and generate a conditional.  *)
+        else if List.for_all2 Term.equal args ns_params then
+          [{ vars = [];
+             pattern = None;
+             when_cond = Term.mk_happens rec_arg;
+             out = msg}]
+          (* Otherwise, we need to take into account the possibility that
+             [param] and [ns_params] might be equal, and generate a conditional.  *)
         else
-          let def =
-            Term.mk_ite
-              (Term.mk_eqs ~simpl:true args ns_args)
-              msg
-              (Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))) 
-          in
-          def
-      with Not_found ->
-        Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))
+          [{ vars = [];
+             pattern = None;
+             when_cond = Term.mk_happens rec_arg;
+             out = 
+               Term.mk_ite
+                 (Term.mk_eqs ~simpl:true args ns_params)
+                 msg
+                 (Term.mk_macro symb args (Term.mk_pred rec_arg))
+           }]                  
+
+      with
+      | Not_found ->
+        (* state{se}@A with state not updated by A *)
+        [{ vars = [];
+           pattern = None;
+           when_cond =
+             if Term.equal rec_arg Term.init then
+               Term.mk_true
+             else Term.mk_happens rec_arg;         
+           out = Term.mk_macro symb args (Term.mk_pred rec_arg)
+         }]
+
+      | MatchFailed ->
+        (* we are unfolding symb(args)@tau *)
+        let st_bodies =
+          SE.fold_descrs
+            (fun (descr : Action.descr) (acc : body list) ->
+               List.fold_left (fun acc (msymb, margs, body) ->
+                   (* Represent the update [msymb(margs)@descr.action := body]. *)
+                   if msymb = symb.s_symb then
+                     let action = SE.action_to_term table fset_system
+                       @@ Action.to_action descr.action
+                     in                        
+                     if Term.equal action Term.init then
+                       (* we instantiate the arguments *)                                          
+                       let subst =
+                         List.map2 (fun i1 i2 ->
+                             (* [i1] must be a variable for
+                                well-formed init action *)
+                             assert (Term.is_var i1);
+                             Term.ESubst (i1, i2)
+                         ) margs args
+                       in
+                       {vars= [];
+                        pattern= Some Term.init ;
+                        when_cond = Term.mk_true;
+                        out = Term.subst subst body} :: acc
+                     else
+                       (* we build two possible results *)
+                       let subst =
+                         List.map2 (fun marg arg ->
+                             Term.ESubst (marg, arg)
+                           ) margs args
+                       in                   
+                       (* msymb(margs)@A[descr.action.args_v] *)
+                       (* we are looking for possible unfolding of symb(args)@tau *)
+                       (* The possibility is:
+                          symb(args)@A[descr.action.args_v] :=
+                             if margs=args then
+                                body
+                             else
+                               symb(args)@pred(A[...])
+
+                          This is in fact for instance S i @ A i' := 
+                             if i=i' then
+                                body
+                             else
+                                S i @pred(A i')
+                       *)
+                       (* we instantiate this with two different
+                          bodies to improve path conditions, by in
+                          fact saying that we have two possible
+                          unrolings,, which are for `S i @ A i` and
+                          `S i @ A i'` with `i<>i'`.
+                       *)                                                       
+                       {vars= Action.get_args_v descr.action;
+                        pattern= Some action ;
+                        when_cond = Term.mk_and
+                            (Term.mk_happens action)
+                            (Term.mk_not ((Term.mk_eqs ~simpl:true args margs)))
+                       ;
+                        out = (Term.mk_macro symb args (Term.mk_pred rec_arg))}
+
+                       ::                              
+                       {vars= Action.get_args_v descr.action;
+                        pattern= Some (Term.subst subst action) ;
+                        when_cond = Term.mk_happens @@ Term.subst subst action;
+                        out = Term.subst subst body}
+                       :: acc
+                   else
+                     acc
+                 )
+                 acc descr.updates                 
+            )
+            table fset_system []
+        in
+        st_bodies
     end
 
-  | Global (_,_,gdata) ->
-    let {action = (strict, glob_a)} as gdata = get_global_data gdata in
-    if is_prefix strict glob_a (Action.get_shape action)
-    then `Def (get_def_glob ~allow_dummy:false system table
-                 symb ~args action gdata)
-    else `Undef
+  | Global (_,_,gdat) ->
+    if not (SE.is_fset system) then unfold_failed ();
+    let fset_system = SE.to_fset system in
+    
+    try
+      begin
+        match expand_context with
+        | InSequent ->
+          begin
+            let action =
+              match rec_arg with
+              |Term.Action(asymb, aidx) -> Action.of_term asymb aidx table
+              | _ -> match_failed ()
+            in
+            let {action = (strict, glob_a)} as gdata = get_global_data gdat in
 
-  in try doit () with Failed -> `Undef
+            (* We are unfolding [m@B] for a global macro [m] that we
+               know is not defined at [B]. We decided to refuse to
+               unfold the macro. Alternatively, we could decide to
+               return a default value (e.g. [witness]). *)
+            if not (is_prefix strict glob_a (Action.get_shape action)) then
+              unfold_failed ();
+            
+            [{
+              vars = [];
+              pattern = None;
+              when_cond = Term.mk_true;
+              out = get_def_glob ~allow_dummy:false fset_system table
+                  symb ~args action gdata}]
+          end
 
-(*------------------------------------------------------------------*)
-type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
+        | InGlobal ins ->
+          let t, _ =
+            get_def_glob_internal
+              table fset_system
+              symb ~args ~ts:rec_arg (Some ins.inputs)
+          in
+          [{ vars = [];
+             pattern = None;
+             when_cond = Term.mk_true;
+             out = t}]
+      end
 
-(** See [.mli] *)
-type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
-
-(** Not exported *)
-let get_definition_in_sequent
-    (cntxt : Constr.trace_cntxt)
-    (symb  : Term.msymb)
-    ~(args : Term.term list)
-    ~(ts   : Term.term)
-  : def_result
-  =
-  if not (SE.is_fset cntxt.system) then `MaybeDef else
-    match SE.to_fset cntxt.system with
-    | system ->
-      (* Try to find an action equal to [ts] in [cntxt]. *)
-      let ts_action =
-        if can_expand symb.s_symb ts cntxt.table
-        then ts
-        else
-          omap_dflt ts (fun models ->
-              odflt ts (Constr.find_eq_action models ts)
-            ) cntxt.models
+    with MatchFailed ->
+      let {action = (strict, glob_a)} as gdata = get_global_data gdat in      
+      let glob_bodies =
+        SE.fold_descrs
+          (fun (descr : Action.descr) (acc : body list) ->
+             if is_prefix strict glob_a (Action.get_shape_v descr.action)
+             then
+               let action = Action.to_action descr.action in
+               {vars=Action.get_args_v descr.action;
+                pattern= Some (SE.action_to_term table fset_system @@ action);
+                when_cond =
+                  if Term.equal rec_arg Term.init then
+                    Term.mk_true
+                  else Term.mk_happens rec_arg;                                 
+                out = get_def_glob ~allow_dummy:false fset_system table
+                    symb ~args action gdata}
+               :: acc
+             else
+               acc
+          )
+          table fset_system []
       in
-      match ts_action with
-      | Term.Action (asymb, idx) -> begin
-          match get_definition_nocntxt system cntxt.table symb ~args asymb idx with
-          | `Undef    -> `Undef
-          | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
-        end
-      | _ -> `MaybeDef
+      glob_bodies
 
-  (*------------------------------------------------------------------*)
-(** Exported *)
-let get_definition
-    ?(mode : expand_context = InSequent)
-    (cntxt : Constr.trace_cntxt)
-    (symb  : Term.msymb)
-    ~(args : Term.term list)
-    ~(ts   : Term.term)
-  : def_result
+let unfold
+    ?(expand_context = InSequent)
+    (env     : Env.t)
+    (symb    : Term.msymb)
+    (args    : Term.term list)
+    (rec_arg : Term.term) :
+  [ `Results of body list | `Unknown ]
   =
-  (* first try to get the definition as in a sequent. *)
-  match get_definition_in_sequent cntxt symb ~args ~ts, mode with 
-  | `MaybeDef, InGlobal { inputs } 
-    when is_global cntxt.table symb.Term.s_symb -> 
-    (* if that fails, and if we are in [InGlobal] mode, get the internal def. *)
-    `Def (get_def_glob_internal cntxt.table cntxt.system symb ~args ~ts inputs)
-  | res, _ -> res
-
+  match _unfold ~expand_context env symb args rec_arg with
+  | exception UnfoldFailed -> `Unknown
+  | bodies -> `Results (List.rev bodies)
 
 (*------------------------------------------------------------------*)
 (** Exported *)
@@ -800,7 +1429,7 @@ let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.fset)
     (symb   : Term.msymb)
-    ~(args : Term.term list)
+    ~(args  : Term.term list)
   : Term.term
   =
   let { action = strict,action; } as gdata =
@@ -823,8 +1452,8 @@ let get_dummy_definition
 
 (*------------------------------------------------------------------*)
 type system_map_arg =
-  | ADescr  of Action.descr 
-  | AGlobal of { is : Vars.vars; ts : Vars.var; 
+  | ADescr  of Action.descr
+  | AGlobal of { is : Vars.vars; ts : Vars.var;
                  ac_descrs : Action.descr list; inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
@@ -838,10 +1467,10 @@ let update_global_data
     (ms         : Symbols.macro)
     (old_system : System.Single.t)
     (new_system : System.Single.t)
-    (func       : 
+    (func       :
        (system_map_arg ->
-        Symbols.macro -> 
-        Term.term -> 
+        Symbols.macro ->
+        Term.term ->
         Term.term))
   : Symbols.table
   =
@@ -853,14 +1482,14 @@ let update_global_data
     else
       begin
         assert (not (List.mem_assoc new_system gdata.bodies));
-        let body = 
+        let body =
           (* old body *)
           let body = get_single_body table old_system gdata in
           (* find all actions in the old system that have a shape where
              the macro is defined *)
           let actions_map = System.descrs table old_system.system in
           let strict, prefix_shape = gdata.action in
-          let possible_actions = 
+          let possible_actions =
             S.Msh.fold
               (fun shape act acs->
                  let right_shape = is_prefix strict prefix_shape shape in
@@ -868,18 +1497,17 @@ let update_global_data
               actions_map
               []
           in
-          let aglob = AGlobal { 
-              is = gdata.indices; 
-              ts = gdata.ts; 
+          let aglob = AGlobal {
+              is = gdata.indices;
+              ts = gdata.ts;
               ac_descrs = possible_actions;
               inputs = gdata.inputs ;
             } in
-          func aglob ms body 
+          func aglob ms body
         in
         let data =
-          data_of_global_data 
+          data_of_global_data
             { gdata with bodies = (new_system, body) :: gdata.bodies }
         in
-        Symbols.Macro.redefine table ~data ms 
+        Symbols.Macro.redefine table ~data ms
       end
-

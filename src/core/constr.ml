@@ -1372,6 +1372,12 @@ let split_models instance =
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = memo * model list
 
+let empty_model = mk_memo (), []
+
+let empty_models ((_,ms):models) : bool =
+  ms = []
+  
+
 (*------------------------------------------------------------------*)
 let models_conjunct ~allow_disjunction table (terms : Term.terms) : models =
   let memo = mk_memo () in
@@ -1607,13 +1613,3 @@ let find_eq_action (models : models) (t : Term.term) =
       if query ~precise:true models [Term.mk_eq t term]
       then Some term
       else None
-
-(*------------------------------------------------------------------*)
-(** Context of a trace model *)
-type trace_cntxt = {
-  table  : Symbols.table;
-  system : SE.fset;
-  models : models option;
-}
-
-let make_context ~table ~system = { table ; system ; models = None }

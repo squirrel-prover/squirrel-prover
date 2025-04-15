@@ -268,15 +268,6 @@ let include_search () =
     ~actual:(List.length matches) ~expected:2;
   Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
-
-  let st = Prover.init () in
-  let st = Prover.exec_all ~test:true st "include Logic." in
-  let matches = 
-    Prover.search_about st
-      (ProverLib.Srch_term (term_from_string "<_,_>"))
-  in
-  Alcotest.(check' int) ~msg:"Found 2 lemmas with <_,_>"
-    ~actual:(List.length matches) ~expected:2;
   ()
 
 (*------------------------------------------------------------------*)

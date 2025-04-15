@@ -903,7 +903,7 @@ module Mk (Args : MkArgs) : S with
     let f_arg = as_seq1 f_arg in
 
     (* collect hole vars in the argument [pt_arg] *)
-    let new_p_vs = Sv.filter Vars.is_pat (Term.fv pt_arg) in
+    let new_p_vs = Sv.filter Vars.is_hole (Term.fv pt_arg) in
     (* hole vars are global if [pt]'s conclusion is a global quant., i.e.
        if [f_arg_kind] is [`Global]. *)
     let args =
@@ -1305,7 +1305,7 @@ module Mk (Args : MkArgs) : S with
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
     (* the only remaining variables are pattern holes '_' *)
-    assert (List.for_all (fst_map Vars.is_pat) args);
+    assert (List.for_all (fst_map Vars.is_hole) args);
 
     (* rename remaining pattern variables,
        to avoid having variables named '_' in the rest of the prover. *)

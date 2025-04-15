@@ -217,45 +217,26 @@ let get_all_messages (s : sequent) =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let get_models table (proof_context : H.hyps) =
-  let proof_context = 
-    H.fold (fun _ f acc ->
-        match f with
-        | LHyp (Local f)
-        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = _}))) -> f :: acc
-        (*TODO:Concrete : Make sure it is right*)
-        | LHyp (Global _) -> acc
-        | LDef (_se, _t) -> acc
-        (* FIXME: we cannot translate definitions, as doing so
-           requires checking in which system `id` appears, which is
-           not easy (this will be possible once macros are decorated
-           with the system used to interpret them) *)
-      ) proof_context [] 
-  in
-  Constr.models_conjunct
-    ~timeout:(TConfig.solver_timeout table)
-    ~table
-    proof_context
-
-let get_models (s : sequent) = get_models s.env.table s.proof_context
+let get_models (system : 'a SE.expr option) (s : sequent) =
+  Hyps.get_models s.env.table ~system s.proof_context
 
 (*------------------------------------------------------------------*)
 (** General version of query, which subsumes the functions
     constraints_valid and query that will eventually be exported,
     and provides joint benchmarking support. *)
 
-let query ~precise s = function
-  | None -> not (Constr.m_is_sat (get_models s))
-  | Some q -> Constr.query ~precise (get_models s) q
+let query ?(system : 'a SE.expr option = None) ~precise s = function
+  | None -> not (Constr.m_is_sat (get_models system s))
+  | Some q -> Constr.query ~precise (get_models system s) q
 
 module ConstrBenchmark = Benchmark.Make(struct
-  type input = bool * sequent * Term.terms option
+  type input =  SE.arbitrary option * bool * sequent * Term.terms option
   type output = bool
   let default =
     "Constr",
-    (fun (precise,s,q) -> query ~precise s q)
+    (fun (system,precise,s,q) -> query ~system ~precise s q)
   let basename = "squirrel_bench_constr_"
-  let pp_input ch (_,_,q) = match q with
+  let pp_input ch (_,_,_,q) = match q with
     | None -> Format.fprintf ch "false"
     | Some q -> (Fmt.list ~sep:(Fmt.any ",@ ") Term.pp) ch q
   let pp_result ch = function
@@ -266,31 +247,31 @@ end)
 let register_query_alternative name alt =
   ConstrBenchmark.register_alternative
     name
-    (fun (precise,s,q) -> alt ~precise s q)
+    (fun (system,precise,s,q) -> alt ~system ~precise s q)
 
-let query ~precise s q =
-  ConstrBenchmark.run (precise,s,q)
+let query ?(system : SE.arbitrary option = None) ~precise s q =
+  ConstrBenchmark.run (system,precise,s,q)
 
 (** Exported versions of query and its alternatives. *)
 
 let query_happens ~precise s a =
   query ~precise s (Some [Term.mk_happens a])
 
-let constraints_valid s =
+let constraints_valid ?(system : 'a SE.expr option = None) s =
   (* The precise flag is irrelevant in that case. *)
-  query ~precise:true s None
+  query ~system ~precise:true s None
 
-let query ~precise s q =
-   query ~precise s (Some q)
+let query ?(system : SE.arbitrary option = None) ~precise s q =
+   query ~system ~precise s (Some q)
 
 (** Other uses of Constr *)
 
 let maximal_elems ~precise s tss =
-  let models = get_models s in
+  let models = get_models None s in
   Constr.maximal_elems ~precise models tss
 
 let get_ts_equalities ~precise s =
-  let models = get_models s in
+  let models = get_models None s in
   let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.proof_context)
              |>  Atom.trace_atoms_ts in
   Constr.get_ts_equalities ~precise models ts
@@ -354,6 +335,8 @@ module Hyps
   let add_list l s = snd (add_i_list l s)
   
   let remove id s = S.update ~proof_context:(H.remove id s.proof_context) s
+
+  let iter func s = H.iter func s.proof_context
 
   let fold      func s init = H.fold      func s.proof_context init
   let fold_hyps func s init = H.fold_hyps func s.proof_context init
@@ -528,13 +511,15 @@ let eq_atoms_valid s =
     neqs
 
 (*------------------------------------------------------------------*)
-let mk_trace_cntxt ?se s =
-  let system = odflt (SE.to_fset s.env.system.set) se in
-  Constr.{
-    table  = table s;
-    system;
-    models = Some (get_models s);
-  }
+let proof_context ?(in_system : SE.context option) (s : t) =
+  let env =
+    match in_system with
+    | None -> s.env
+    | Some system -> { s.env with system; }
+  in
+  ProofContext.make
+    ~env
+    ~hyps:(get_trace_hyps ~in_system:env.system s)
 
 (*------------------------------------------------------------------*)
 let mem_felem _ _ = false

@@ -108,13 +108,13 @@ let process_parsing =
     "If", `Quick, begin fun () ->
       let table, _ =
         let decl_i =
-          Decl.Decl_operator {
+          Decl.Decl_funs (`Op, `Any, [], [{
             op_name      = L.mk_loc L._dummy "error";
             op_symb_type = `Prefix;
-            op_tyargs    = [];
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
-            op_body      = `Abstract; }
+            op_body      = `Abstract;
+            op_terby = None}])
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl in
@@ -124,13 +124,13 @@ let process_parsing =
     "Try", `Quick, begin fun () ->
       let table, _ =
         let decl_i =
-          Decl.Decl_operator {
+          Decl.Decl_funs (`Op, `Any, [], [{
             op_name      = L.mk_loc L._dummy "ok";
             op_symb_type = `Prefix;
-            op_tyargs    = [];
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
-            op_body      = `Abstract; }
+            op_body      = `Abstract;
+            op_terby = None}])
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl
@@ -138,13 +138,13 @@ let process_parsing =
       
       let table, _ =
         let decl_i =
-          Decl.Decl_operator {
+          Decl.Decl_funs (`Op, `Any, [], [{
             op_name      = L.mk_loc L._dummy "error";
             op_symb_type = `Prefix;
-            op_tyargs    = [];
             op_args      = [];
             op_tyout     = L.mk_loc L._dummy Typing.P_message |> Utils.some;
-            op_body      = `Abstract; }
+            op_body      = `Abstract;
+            op_terby = None}])            
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in

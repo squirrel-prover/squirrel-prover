@@ -79,6 +79,7 @@ let get_bad_occs
 
 
 
+(*------------------------------------------------------------------*)
 (** For a name [n] and terms [tt],
     computes a list of formulas whose disjunction expresses that
     [n] occurs in [tt] or [n.args].
@@ -86,21 +87,18 @@ let get_bad_occs
     conjunction expresses the freshness of [n] in [tt] and [n.args].
     If [checklarge] is set to [true] : ensures that [n]'s type is [large].
     [hyps] are understood in environment [env], and
-    [n], [tt] in [env.system.set], which must be the system in [contx]. *)
-let phi_fresh_same_system
+    [n], [tt] in [env.system.set]. *)
+let phi_fresh
     ~(negate : bool)
     ~(use_path_cond : bool)
     ~(checklarge : bool)
     ?(loc : L.t option)
-    (hyps : Hyps.TraceHyps.hyps) 
-    (contx : Constr.trace_cntxt)
-    (env : Env.t)
+    (context : ProofContext.t)
     (n : Term.term)
     (tt : Term.terms)
-  : Term.terms =
-  (* sanity check: contx and env should agree *)
-  assert (SE.equal0 env.system.set ((contx.system) :> SE.arbitrary));
-  
+  : Term.terms
+  =
+  let table = context.env.table in
   let err = Format.asprintf "%a" Term.pp n in
 
   let n : Name.t = 
@@ -113,11 +111,11 @@ let phi_fresh_same_system
   (* ensure that the type of the name is large *)
   let ty = n.Name.symb.s_typ in
   if checklarge 
-  && not Symbols.TyInfo.(check_bty_info env.table ty Large) then
+  && not Symbols.TyInfo.(check_bty_info table ty Large) then
     Tactics.soft_failure ?loc
       (Tactics.Failure ("the type of term "^err^" is not [large]"));
 
-  let ppe = default_ppe ~table:env.table () in
+  let ppe = default_ppe ~table () in
   let pp_n ppf () = Fmt.pf ppf "occurrences of %a" (Name.pp ppe) n in
 
   let get_bad : NOS.f_fold_occs = get_bad_occs n in
@@ -126,85 +124,37 @@ let phi_fresh_same_system
      on honest randomness *)
   let occs =
     NOS.find_all_occurrences ~mode:Iter.NoHonestRand ~pp_descr:(Some pp_n)
-      get_bad
-      hyps contx env (tt @ n.args)
+      get_bad context (tt @ n.args)
   in
 
-  List.map (NOF.occurrence_formula ~negate ~use_path_cond) occs
+  List.map (NOF.occurrence_formula table ~negate ~use_path_cond) occs
 
-
-
-(** Like [phi_fresh_same_system], except that the [hyps] are
-    originally understood in environment [env], and
-    [n], [tt] in [contx.system], which may refer to different systems.
-    Used e.g. when the terms come from a projection, or a system other than
-    the sequent's [set]. *)
-let phi_fresh
-    ~(negate : bool)
-    ~(use_path_cond : bool)
-    ~(checklarge : bool)
-    ?(loc : L.t option)
-    (hyps : Hyps.TraceHyps.hyps) 
-    (contx : Constr.trace_cntxt)
-    (env : Env.t)
-    (n : Term.term)
-    (tt : Term.terms)
-  : Term.terms =
-  (* the new environment, where the generated formulas are to be understood *)
-  let envp_context = {env.system with set=((contx.system) :> SE.arbitrary)} in
-  let envp = Env.update ~system:envp_context env in
-
-  (* keep what trace hypotheses we can going from env.system to
-     {set:contx.system, pair:env.system.pair} *)
-  let hypsp =
-    Hyps.change_trace_hyps_context
-      ~old_context:env.system
-      ~new_context:envp.system
-      ~vars:env.vars ~table:env.table
-      hyps
-  in
-
-  phi_fresh_same_system
-    ~negate ~use_path_cond ~checklarge ?loc
-    hypsp contx envp n tt
-
-
+(*------------------------------------------------------------------*)
 (** For a term [n] and terms [tt],
     computes a list of formulas whose conjunction expresses that
     [n] is fresh in [tt] and [n.args], after projecting on [proj].
     [hyps] are understood in environment [env], and
-    [n], [tt] in [env.system.pair], which must be the system in [contx]. *)
+    [n], [tt] in the projection [proj] of [env.system.pair]. *)
 let phi_fresh_proj
     ~(use_path_cond : bool)
     ?(loc  : L.t option)
-    (hyps  : Hyps.TraceHyps.hyps) 
-    (contx : Constr.trace_cntxt)
-    (env   : Env.t)
-    (n     : Term.term)
-    (tt    : Term.terms)
-    (proj  : Projection.t)
+    (context : ProofContext.t)
+    (n       : Term.term)
+    (tt      : Term.terms)
+    (proj    : Projection.t)
   : Term.terms 
   =
-  let system = ((Utils.oget env.system.pair) :> SE.fset) in
-
-  (* sanity check: contx and env should agree *)
-  assert (SE.equal0 system contx.system);
-
-  (* get the projected system and context
-     in which terms are now to be understood *)
-  let systemp = SE.project [proj] system in
-  let contxp = { contx with system = systemp } in
-  let infop = (O.EI_direct, contxp) in
+  let infop = (O.EI_direct, context) in
 
   (* project tt on proj *)
-  let ttp = List.map (Term.project1 proj) tt in
+  let tt = List.map (Term.project1 proj) tt in
 
   (* project n on proj *)
-  let np = O.expand_macro_check_all infop (Term.project1 proj n) in
+  let n = O.expand_macro_check_all infop (Term.project1 proj n) in
 
   phi_fresh
     ?loc ~checklarge:false ~negate:true ~use_path_cond
-    hyps contxp env np ttp
+    context n tt
 
 
 (*------------------------------------------------------------------*)
@@ -253,21 +203,16 @@ let fresh_trace
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
-    let contx = TS.mk_trace_cntxt s in
-    let env = TS.env s in
+    let context = TS.proof_context s in
     let (n, t) =
-      fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, contx) hyp s
+      fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, context) hyp s
     in
 
     Printer.pr "Freshness of %a:@; @[<v 0>" Term.pp n;
     let phis =
-      phi_fresh_same_system (* phi_fresh would work as well *) 
+      phi_fresh
         ~negate:false ~use_path_cond ~checklarge:true ~loc
-        (TS.get_trace_hyps s)
-        contx
-        env
-        n
-        [t]
+        context n [t]
     in
     Printer.pr "@]@;";
 
@@ -284,7 +229,7 @@ let fresh_trace
 (** fresh trace tactic *)
 let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
   match args with
-  | [Args.Fresh (opt_args, Some (Args.FreshHyp hyp))] -> 
+  | [Args.Fresh (opt_args, Some (Args.FreshHyp hyp))] ->
     TraceLT.wrap_fail (fresh_trace opt_args hyp)
 
   | _ -> bad_args ()
@@ -307,9 +252,9 @@ let fresh_equiv
   let loc = L.loc i in
 
   let env = ES.env s in
-  let pair_context = ES.mk_pair_trace_cntxt s in
   let proj_l, proj_r = ES.get_system_pair_projs s in
-
+  let system = ((Utils.oget env.system.pair) :> SE.fset) in
+  
   if (ES.conclusion_as_equiv s).bound <> None then 
     soft_failure 
       (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
@@ -318,17 +263,20 @@ let fresh_equiv
   let biframe = List.rev_append before after in
 
   (* compute the freshness conditions *)
-  let phi_fresh_p =
-    phi_fresh_proj ~use_path_cond ~loc
-      (ES.get_trace_hyps s)
-      pair_context
-      env
-      t biframe
+  let phi_fresh_proj proj =
+    let se = SE.project [proj] system in
+    let system = {env.system with set=(se :> SE.arbitrary)} in
+    let context = ES.proof_context ~in_system:system s in   
+
+    phi_fresh_proj
+      ~use_path_cond ~loc
+      context
+      t biframe proj
   in
   Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
-  let phi_l = phi_fresh_p proj_l in
+  let phi_l = phi_fresh_proj proj_l in
   Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
-  let phi_r = phi_fresh_p proj_r in
+  let phi_r = phi_fresh_proj proj_r in
   Printer.pr "@]@]@;";
 
   (* Removing duplicates. We already did that for occurrences, but
@@ -346,7 +294,7 @@ let fresh_equiv
 
   let freshness_sequent =
     ES.set_conclusion_in_context
-      {env.system with set=((pair_context.system) :> SE.arbitrary)}
+      {env.system with set = (system :> SE.arbitrary); }
       (Equiv.mk_reach_atom phi)
       s
   in
@@ -376,18 +324,16 @@ let freshR_secrecy
   if not (SE.is_fset system) then
     soft_failure (Failure "the conclusion must be over a concrete system");
   let system = SE.to_fset system in
-  
-  let sec_context = Constr.make_context ~table:env.table ~system in
-
-  
-  
+    
   (* compute the freshness conditions *)
   Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
   let phis =
-    phi_fresh ~negate:true ~use_path_cond ~checklarge:true
-      (ES.get_trace_hyps s)
-      sec_context
-      env
+    let system = {env.system with set=(system :> SE.arbitrary)} in
+    let context = ES.proof_context ~in_system:system s in
+
+    phi_fresh
+      ~negate:true ~use_path_cond ~checklarge:true
+      context
       (CP.right sgoal)
       (CP.lefts sgoal)
   in
@@ -400,7 +346,7 @@ let freshR_secrecy
   else 
     let freshness_sequent =
       ES.set_conclusion_in_context
-        {env.system with set=((sec_context.system) :> SE.arbitrary)}
+        {env.system with set=( system :> SE.arbitrary)}
         (Equiv.mk_reach_atom phi)
         s
     in
@@ -428,27 +374,24 @@ let freshL_secrecy
     soft_failure (Failure "the conclusion must be over a concrete system");
   let system = SE.to_fset system in
   
-  let sec_context = 
-    Constr.make_context ~table:env.table ~system
-  in
-
   (* get n *)
   let ii = L.unloc i in
   let uu, n, vv =
     try List.splitat ii (CP.lefts sgoal) with
     | List.Out_of_range ->
-       soft_failure ~loc
-         (Tactics.Failure 
-            ("invalid position "^(string_of_int ii)^" on the left of the predicate"));
+      soft_failure ~loc
+        (Tactics.Failure 
+           ("invalid position "^(string_of_int ii)^" on the left of the predicate"));
   in
   (* compute the freshness conditions *)
   Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
   let phis =
-    phi_fresh ~negate:true ~use_path_cond ~checklarge:true ~loc
-      (ES.get_trace_hyps s)
-      sec_context
-      env
-      n
+    let system = {env.system with set=(system :> SE.arbitrary)} in
+    let context = ES.proof_context ~in_system:system s in
+
+    phi_fresh
+      ~negate:true ~use_path_cond ~checklarge:true ~loc
+      context n
       (uu @ vv @ [CP.right sgoal])
   in
   Printer.pr "@]@]@;";
@@ -467,7 +410,7 @@ let freshL_secrecy
   else 
     let freshness_sequent =
       ES.set_conclusion_in_context
-        {env.system with set=((sec_context.system) :> SE.arbitrary)}
+        {env.system with set=(system :> SE.arbitrary)}
         (Equiv.mk_reach_atom phi)
         s
     in

@@ -1,3 +1,4 @@
+include Int.
 include Reify.
 
 type T.

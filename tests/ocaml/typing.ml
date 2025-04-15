@@ -367,6 +367,92 @@ op bar ['a 'b] : ('a * 'b).
     );
 
   ()
+  
+(*------------------------------------------------------------------*)
+let let_def () =
+  let init = Prover.init () in
+
+  let let_def_type_error st s = 
+    try ignore (Prover.exec_all ~test:true st s : Prover.state); false with
+    | Squirrelcore.Typing.Error (_, _) -> true
+  in
+
+  let st = 
+    Prover.exec_all ~test:true init "\
+channel c.
+system P = !_i in(c,x); A: out(c,x); !_j B:out(c,x) | D: out(c,empty).
+system Q = !_i in(c,x); A: out(c,x).\
+"
+  in
+
+  Alcotest.(check' bool) ~msg:"unknown action in system" 
+    ~expected:true
+    ~actual:(let_def_type_error st "\
+let gfailed @like:Q (x : int) t with
+| B (_,_) -> 1.
+");
+
+  Alcotest.(check' bool) ~msg:"unknown action in system2" 
+    ~expected:true
+    ~actual:(let_def_type_error st "\
+let gfailed2 @like:Q (x : int) t with
+| D -> 1.
+");
+
+  Alcotest.(check' bool) ~msg:"unknown action in system" 
+    ~expected:true
+    ~actual:(let_def_type_error st "\
+let gfailed @like:Q (x : int) t with
+| B (_,_) -> 1.
+");
+
+  (*------------------------------------------------------------------*)
+
+  (* positive exhaustiveness checks *)
+  let _ : Prover.state = 
+    Prover.exec_all ~test:true init "\
+let bool_to_int (x : bool) with
+| true  -> 1
+| false -> 0.
+"
+  in
+  let _ : Prover.state = 
+    Prover.exec_all ~test:true init "\
+let test1 (x : bool * bool) with
+| (true , _) -> 1
+| (false, _) -> 0.
+"
+  in
+  let _ : Prover.state = 
+    Prover.exec_all ~test:true init "\
+let test2 (x : bool * bool) with
+| (true , _) -> 1
+| (false, false) -> 0
+| (false, true ) -> 2.
+"
+  in
+
+  (*------------------------------------------------------------------*)
+  let stP = 
+    Prover.exec_all ~test:true (Prover.init ()) "\
+channel c.
+system P = !_i in(c,x); A: out(c,empty).
+op prop : bool.
+" 
+  in
+
+  (* should succeed *)
+  let _ = 
+    Prover.exec_all ~test:true stP "\
+let f @system:P (x : int) u with
+| A i     when happens (A i)     -> 0
+| init                           -> 1
+| _       when not (happens u)   -> 2.
+"
+  in
+
+  ()
+
 
 (*------------------------------------------------------------------*)
 let generic_typing () =
@@ -429,15 +515,25 @@ let cycle_detection () =
        raise Ko
     );
 
+  Alcotest.check_raises "type inferrence cycle 2" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "let rec f n =  (f (n-1), empty)." with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
   ()
 
 
 (*------------------------------------------------------------------*)
 let tests = [
-  ("generic typing", `Quick, Util.catch_error generic_typing);
-  ("namespaces"    , `Quick, Util.catch_error namespaces);
-  ("type arguments", `Quick, Util.catch_error type_arguments);
-  ("game parsing"  , `Quick, Util.catch_error crypto_parsing);
-  ("reify"  , `Quick, Util.catch_error reify);
+  ("generic typing" , `Quick, Util.catch_error generic_typing);
+  ("namespaces"     , `Quick, Util.catch_error namespaces);
+  ("type arguments" , `Quick, Util.catch_error type_arguments);
+  ("game parsing"   , `Quick, Util.catch_error crypto_parsing);
+  ("let def"        , `Quick, Util.catch_error let_def);
+  ("reify"          , `Quick, Util.catch_error reify);
   ("cycle detection", `Quick, Util.catch_error cycle_detection);
 ]

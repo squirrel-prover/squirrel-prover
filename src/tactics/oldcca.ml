@@ -2,10 +2,12 @@ open Squirrelcore
 (** Old utilities for CCA-based tactics.
     will disappear soon, only left here for enc-kp *)
 
+module SE = SystemExpr
+  
 exception Bad_ssc
 
-class deprecated_check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
+class deprecated_check_symenc_key ~context enc_fn dec_fn key_n = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~context as super
   method visit_message t = match t with
     | Term.App (Fun (fn, _), [Tuple [m;r;k]]) when fn = enc_fn && Term.diff_names k ->
       self#visit_message m; self#visit_message r
@@ -20,11 +22,11 @@ class deprecated_check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
-let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
-  let ssc = new deprecated_check_symenc_key ~cntxt enc_fn dec_fn key_n in
+let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~context enc_fn dec_fn key_n =
+  let ssc = new deprecated_check_symenc_key ~context enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_message elems ;
-  SystemExpr.iter_descrs cntxt.table cntxt.system
+  SystemExpr.iter_descrs context.env.table (SE.to_fset context.env.system.set)
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -35,8 +37,8 @@ let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn ke
 
 (* Iterator to check that the given randoms are only used in random seed
    position for encryption. *)
-class deprecated_check_rand ~cntxt enc_fn randoms = object (self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
+class deprecated_check_rand ~context enc_fn randoms = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~context as super
   method visit_message t = match t with
     | Term.App (Fun (fn, _), [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
@@ -60,11 +62,12 @@ end
    encryption. *)
 let deprecated_random_ssc
     ?(messages=[]) ?(elems=[])
-    ~cntxt enc_fn randoms =
-  let ssc = new deprecated_check_rand ~cntxt enc_fn randoms in
+    ~context enc_fn randoms
+  =
+  let ssc = new deprecated_check_rand ~context enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_message elems;
-  SystemExpr.iter_descrs cntxt.table cntxt.system
+  SystemExpr.iter_descrs context.env.table (SE.to_fset context.env.system.set)
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -88,11 +91,12 @@ let deprecated_random_ssc
      based ourselves on messages produced by OldEuf.mk_rule, which should simplify
      such extension if need. *)
 let deprecated_check_encryption_randomness
-    ~cntxt case_schemata cases_direct enc_fn messages elems =
+    ~context case_schemata cases_direct enc_fn messages elems
+  =
   let encryptions : (Term.term * Vars.var list) list =
     List.map (fun case ->
         case.OldEuf.message,
-        Action.get_args_v case.OldEuf.action
+        Vars.Sv.elements @@ Term.fv case.rec_arg
       ) case_schemata
     @
     List.map (fun case -> case.OldEuf.d_message, []) cases_direct
@@ -105,7 +109,7 @@ let deprecated_check_encryption_randomness
         | _ ->  Tactics.soft_failure Tactics.SEncNoRandom
       ) encryptions
   in
-  deprecated_random_ssc ~elems ~messages ~cntxt enc_fn randoms;
+  deprecated_random_ssc ~elems ~messages ~context enc_fn randoms;
 
   (* TODO: AST: this test is insufficient. Crypto tactic rework ? *)
   (* we check that encrypted messages based on indices, do not depend on free
@@ -157,15 +161,14 @@ let deprecated_check_encryption_randomness
     Tactics.soft_failure Tactics.SEncSharedRandom
 
 
-let deprecated_symenc_rnd_ssc ~cntxt env head_fn ~key ~key_is elems =
+let deprecated_symenc_rnd_ssc ~context head_fn ~key ~key_is elems =
   let rule =
     OldEuf.mk_rule
       ~fun_wrap_key:None
       ~elems ~drop_head:false
-      ~allow_functions:(fun _ -> false)
-      ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
+      ~context ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n:key.Term.s_symb ~key_is
   in
-  deprecated_check_encryption_randomness ~cntxt
+  deprecated_check_encryption_randomness ~context
     rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems.terms
   (*TODO:Concrete : Probably something to do to create a bounded goal*)

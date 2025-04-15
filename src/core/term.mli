@@ -15,25 +15,49 @@ module Sv = Vars.Sv
 (** {2 Symbols}
 
     We have function, name and macro symbols.
-    Each symbol can then be indexed.
-    TODO document the more general treatment of function symbols. *)
+    Each symbol can then be indexed. *)
 
-(** A typed symbol.
-    Invariant: [s_typ] do not contain tvar or univars. *)
-type 'a isymb = private {
-  s_symb : 'a;
-  s_typ  : Type.ty;
+(*------------------------------------------------------------------*)
+(** informations attached to a macro symbol *)
+type macro_info = {
+  pp_style : [`At | `Standard]; (** print with a `@` or not *)
+  is_rec : bool;
+  is_match : bool;
+  has_dist_param : bool;       
+  (** Is the macro using a distinguished param:
+
+      - when [false], the last field [x] of the macro constructor
+        [Macros (_,_,x)] is set to the default (unprinted) [unit]. *)
 }
 
-val mk_symb : 'a -> Type.ty -> 'a isymb
+(** macro information for builtin symbols *)
+val macro_info_builtin : macro_info 
 
+(*------------------------------------------------------------------*)
+(** A typed symbol.
+    Invariant: [s_typ] do not contain tvar or univars *)
+type ('a, 'info) isymb = {
+  s_symb : 'a;
+  s_typ  : Type.ty;
+  s_info : 'info;
+}
+
+val mk_symb : 'a -> info:'info -> Type.ty -> ('a,'info) isymb
+
+(*------------------------------------------------------------------*)
 (** Names represent random values of length the security parameter. *)
-type nsymb = Symbols.name isymb
+type nsymb = (Symbols.name , unit ) isymb
 
+(** create a name symbol *)
+val nsymb : Symbols.name -> Type.ty -> nsymb
+
+(*------------------------------------------------------------------*)
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
     translating the meta-logic to the base logic. *)
-type msymb = Symbols.macro isymb
+type msymb = (Symbols.macro, macro_info) isymb
+
+(** To create a macro symbol, use [Macros.msymb]. *)
 
 (*------------------------------------------------------------------*)
 (** An applied function type.
@@ -171,7 +195,12 @@ val set_resolve_path :
     Symbols.p_path ->               (* surface path [p] *)
     ty_args:Type.ty list option ->  (* optional type arguments of [p] *)
     args_ty:Type.ty list ->         (* types of [p]'s (term) arguments  *)
-    ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown] ->
+    ty_rec:[
+        | `Standard of Type.ty
+        | `At of Type.ty
+        | `MaybeAt of Type.ty
+        | `NoAt | `Unknown
+      ] ->
     ([
       `Operator of Symbols.fname  |
       `Name     of Symbols.name   |
@@ -491,6 +520,7 @@ val mk_string : String.t -> term
 val mk_vars   : Vars.var list -> term list
 val mk_action : Symbols.action -> term list -> term
 val mk_tuple  : term list -> term
+val mk_unit   : term
 val mk_app    : ?simpl:bool -> term -> term list -> term
 val mk_proj   : ?simpl:bool -> int -> term -> term
 

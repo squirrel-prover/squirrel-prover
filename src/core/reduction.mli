@@ -17,7 +17,7 @@ module type S = sig
 
   (*------------------------------------------------------------------*)
   (** Build a conversion state from a sequent.  
-      [se] is the system of the term being reduced. *)
+      The term to be reduced is taken in [system.set]. *)
   val to_state :
     ?expand_context:Macros.expand_context  ->
     ?system:SE.context ->

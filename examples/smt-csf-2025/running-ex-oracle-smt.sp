@@ -221,7 +221,9 @@ Proof.
          intro Hf; by fresh Hf.
        * intro j0 H.
          by apply unique_queries.
-       * intro i0 j0 H.
+       * simpl ~constr.
+         have -> : forall b, (b && b) = b by smt.
+         intro i0 j0 H.
          have ? : happens(pred (A(i0, j0))) by auto. 
          rewrite equiv IH i0 (pred(A(i0,j0))) => //. 
          intro Hf; by fresh Hf.

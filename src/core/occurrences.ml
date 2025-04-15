@@ -57,30 +57,39 @@ sig
   val pp_data : data formatter_p
 end
 
+type rec_content = {
+  value : Term.term;
+  order : Symbols.fname;
+}
+
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module TSContent : OccurrenceContent with type content = Term.term
+module RecArgContent : OccurrenceContent with type content = rec_content
                                       and type data = unit =
 struct
-  type content = Term.term
+  type content = rec_content
   type data = unit
 
   let collision_formula 
-      ~(negate : bool) ~(content : Term.term) ~(collision : Term.term)
+      ~(negate : bool) ~(content : content) ~(collision : content)
       ~(data : unit) 
     : Term.term 
     =
     ignore data;
-    if not negate then
-      Term.mk_eq ~simpl:true content collision
+    let content, collision = content.value, collision.value in
+    if Type.equal (Term.ty content) (Term.ty collision) then
+      if not negate then
+        Term.mk_eq ~simpl:true content collision
+      else
+        Term.mk_not ~simpl:false (Term.mk_eq ~simpl:false content collision)
     else
-      Term.mk_not ~simpl:false (Term.mk_eq ~simpl:false content collision)
+      if negate then Term.mk_true else Term.mk_false
 
-  let subst_content = Term.subst
+  let subst_content s c = {c with value = Term.subst s c.value}
 
   let subst_data _ () = ()
 
-  let pp_content = Term._pp
+  let pp_content ppe fmt t = Fmt.pf fmt "(%a,%a)" (Term._pp ppe) t.value (Symbols.pp_path) t.order
 
   let pp_data _ppe (fmt : Format.formatter) () : unit =
     Fmt.pf fmt ""
@@ -117,14 +126,14 @@ end
 (** Exported (see `.mli`) *)
 type occ_type =
   | EI_direct
-  | EI_indirect of Term.term
+  | EI_indirect of Term.term * Symbols.macro
 
 
 (** Exported (see `.mli`) *)
 let subst_occtype (sigma : Term.subst) (ot : occ_type) : occ_type =
   match ot with
   | EI_direct -> EI_direct
-  | EI_indirect a -> EI_indirect (Term.subst sigma a)
+  | EI_indirect (a,f) -> EI_indirect (Term.subst sigma a,f)
 
 (** Exported (see `.mli`) *)
 type occ_show = Show | Hide | ShowContentOnly
@@ -259,7 +268,7 @@ struct
               ~collision:o.so_coll ~data:o.so_ad in
           let phi_ac = match o.so_occtype with
             | EI_direct -> Term.mk_eq ~simpl:false Term.mk_false Term.mk_false
-            | EI_indirect a -> Term.mk_eq ~simpl:false a a
+            | EI_indirect (a,_) -> Term.mk_eq ~simpl:false a a
           in
           Term.mk_ands ~simpl:false [phi_f; phi_ac]
         in
@@ -328,7 +337,7 @@ struct
     (* we don't print the data. maybe we would like to sometimes?*)
     match o.so_show, o.so_occtype with
     | Hide, _ -> ()
-    | Show, EI_indirect a ->
+    | Show, EI_indirect (a,_) ->
       Fmt.pf ppf
         "@[%a@] @,(collision with @[%a@])@ in action \
          @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
@@ -336,7 +345,7 @@ struct
         (OC.pp_content ppe) o.so_coll
         (Term._pp      ppe) a
         (Term._pp      ppe) o.so_subterm
-    | ShowContentOnly, EI_indirect a ->
+    | ShowContentOnly, EI_indirect (a,_) ->
       Fmt.pf ppf
         "@[%a@] @,in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
         (OC.pp_content ppe) o.so_cnt
@@ -362,9 +371,9 @@ end
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-module TSOcc : (SimpleOcc with module OC = TSContent) =
+module RecArgOcc : (SimpleOcc with module OC = RecArgContent) =
 struct
-  include MakeSO(TSContent)
+  include MakeSO(RecArgContent)
 
   (** Overwrite the standard aux function to handle pred more precisely *)
   let aux_occ_incl
@@ -377,7 +386,14 @@ struct
     let f = aux_occ_incl table system in
     match f ~mv ts1 ts2 with
     | Some mv -> Some mv
-    | None -> f ~mv ts1 {ts2 with so_cnt = Term.mk_pred ts2.so_cnt}
+    | None ->
+      if Type.equal (Term.ty ts1.so_cnt.value) Type.ttimestamp
+      && Type.equal (Term.ty ts2.so_cnt.value) Type.ttimestamp
+      && Symbols.path_equal ts1.so_cnt.order Library.Prelude.fs_lt
+      && Symbols.path_equal ts2.so_cnt.order Library.Prelude.fs_lt                                
+      then
+        f ~mv ts1 {ts2 with so_cnt = {ts2.so_cnt with value = Term.mk_pred ts2.so_cnt.value}}
+      else None
   (* if ts1 not incl in ts2, also try ts1 incl in pred(ts2) *)
   (* as "t <= pred(ts2) \/ t <= ts2" is the same as "t <= ts2" *)
   (* Note that this works because we only use ts_occs to generate
@@ -405,8 +421,8 @@ struct
     List.clear_subsumed (occ_incl table system) occs
 end 
 
-type ts_occ = TSOcc.simple_occ
-type ts_occs = TSOcc.simple_occs
+type rec_arg_occ = RecArgOcc.simple_occ
+type rec_arg_occs = RecArgOcc.simple_occs
 
 
 (** Exported (see `.mli`) *)
@@ -425,10 +441,10 @@ module type ExtOcc = sig
   type simple_occ = SO.simple_occ
 
   type ext_occ = {
-    eo_occ       : simple_occ;
-    eo_source    : Term.terms;
-    eo_source_ts : ts_occs;
-    eo_path_cond : Iter.PathCond.t;
+    eo_occ            : simple_occ;
+    eo_source         : Term.terms;
+    eo_source_rec_arg : rec_arg_occs;
+    eo_path_cond      : Iter.PathCond.t;
   }
 
   type ext_occs = ext_occ list
@@ -455,10 +471,10 @@ struct
 
   (** Exported (see `.mli`) *)
   type ext_occ = {
-    eo_occ       : simple_occ;
-    eo_source    : Term.terms;
-    eo_source_ts : ts_occs;
-    eo_path_cond : Iter.PathCond.t;
+    eo_occ            : simple_occ;
+    eo_source         : Term.terms;
+    eo_source_rec_arg : rec_arg_occs;     
+    eo_path_cond      : Iter.PathCond.t;
   }
 
   type ext_occs = ext_occ list
@@ -487,12 +503,12 @@ struct
       List.for_all (fun ts1 ->
           List.exists (fun ts2 ->
               match
-                TSOcc.aux_occ_incl ~mv:(!mv) table system ts1 ts2
+                RecArgOcc.aux_occ_incl ~mv:(!mv) table system ts1 ts2
               with
               | None -> false
               | Some mv' -> mv := mv'; true
-            ) occ2.eo_source_ts
-        ) occ1.eo_source_ts
+            ) occ2.eo_source_rec_arg
+        ) occ1.eo_source_rec_arg
 
 
   (** Exported (see `.mli`) *)
@@ -524,18 +540,18 @@ end
 type pos_info =
   { pi_pos     : MP.pos;
     pi_occtype : occ_type;
-    pi_trctxt  : Constr.trace_cntxt;
+    pi_context : ProofContext.t;
     pi_vars    : Vars.vars;
     pi_cond    : Term.terms;
     pi_subterm : Term.term;
   }
 
 (** Exported (see `.mli`) *)
-type expand_info = occ_type * Constr.trace_cntxt
+type expand_info = occ_type * ProofContext.t
 
 (** Exported (see `.mli`) *)
 let get_expand_info (pi : pos_info) : expand_info =
-  (pi.pi_occtype, pi.pi_trctxt)
+  (pi.pi_occtype, pi.pi_context)
 
 
 (** Exported (see `.mli`) *)
@@ -544,26 +560,27 @@ let expand_macro_check_once
   =
   match t with
   | Macro (m, l, ts) ->
-    if match ot with
+    begin
+      match ot with
       | EI_direct ->
+        let res, has_red =
+          Match.reduce_delta_macro1
+            ~constr:true c.env ~hyps:c.hyps t
+        in
+        if has_red = True then Some res else None
+      | EI_indirect _ ->
         begin
-          match c.models with
-          | Some m -> Constr.query ~precise:true m [Term.mk_happens ts]
-          | None -> false
+          (* In the indirect case, we always expand, so we ignore the potential cond *)
+          match Macros.unfold c.env m l ts with
+          | `Results [r] ->            
+            Some (Term.mk_ite
+                    r.when_cond
+                    r.out
+                    (Library.Prelude.mk_witness c.env.table ~ty_arg:(Term.ty r.out)))
+          | _ -> None
         end
-      | EI_indirect _ -> true
-      (* as long as we call on ioccs produced by fold_macro_support,
-         invariant: expansion is always allowed *)
-      (* we need to know that if a macro does not expand here,
-         then it will be handled by another iocc *)
-    then
-      match Macros.get_definition c m ~args:l ~ts with
-      | `Def t' -> Some t'
-      | `Undef | `MaybeDef -> None
-    else
-      None
+    end
   | _ -> None
-
 
 (** Exported (see `.mli`) *)
 let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
@@ -593,32 +610,30 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
   | _ -> ()
 
 (*------------------------------------------------------------------*)
-let get_actions_ext
-    ~(mode  : Iter.allowed ) (* allowed sub-terms without further checks *)
-    ~(env   : Env.t)
-    ~(hyps  : TraceHyps.hyps)
+let get_rec_args_ext
+    ~(mode : Iter.allowed ) (* allowed sub-terms without further checks *)
     (t : Term.term)
-    (info:expand_info)
-  : ts_occs
+    (info : expand_info)
+  : rec_arg_occs
   =
-  let env fv =
-    Env.update 
-      ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) 
-      env
-  in
-
-  let ot, contx = info in
+  let occ_type, context = info in
   (* sanity check: this function is meant to be called on the initial
      direct terms (the sources from which other occs come),
      not inside indirect occs *)
-  assert (ot = EI_direct); 
-  let system = contx.system in
-  let se = (SE.reachability_context system).set in
+  assert (occ_type = EI_direct);
 
-  let rec get (t : Term.term)
+  let env    = context.env in
+  let table  = env.table in
+  let system = env.system in
+
+  let rec get 
+      (t : Term.term)
       ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary)
-    : ts_occs =
-    let env = env fv in
+    : rec_arg_occs
+    =
+    let system = { system with set = se; } in
+    let context = Iter.update_context ~extra_vars:fv system context in
+    let env = context.env in
     assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
 
     (* Put [t] in weak head normal form w.r.t. rules in
@@ -627,14 +642,8 @@ let get_actions_ext
        Must be synchronized with corresponding code in [fold_bad_occs]
        and [Occurrences.fold_bad_occs]. *)
     let t =
-      let system = SE.{ set = se; pair = None; } in
-      let params = Env.to_params env in
       let red_param = Reduction.rp_crypto in
-      (* FIXME: add tag information in [fv] *)
-      let vars = Vars.of_list (Vars.Tag.local_vars fv) in
-      let st =
-        Reduction.mk_state ~hyps ~system ~vars ~params ~red_param contx.table
-      in
+      let st = Reduction.mk_state context ~red_param in
       let strat = Reduction.(MayRedSub rp_full) in
       fst (Reduction.whnf_term ~strat st t)
     in
@@ -660,7 +669,10 @@ let get_actions_ext
 
     | Macro (m, l, ts) ->
       begin
-        let info = fst info, { (snd info) with system = SE.to_fset se } in
+        let info =
+          ( occ_type,
+            ProofContext.change_system ~system:{ system with set = se; } context)
+        in
         match expand_macro_check_once info t with
         | Some t' -> get ~fv ~cond ~p ~se t'
         | None ->
@@ -670,56 +682,59 @@ let get_actions_ext
             if m.s_symb = Symbols.Classic.inp   || 
                m.s_symb = Symbols.Quantum.inp   || 
                m.s_symb = Symbols.Quantum.state 
-            then Term.mk_pred ts
-            else ts
+            then {value = Term.mk_pred ts; order = Library.Prelude.fs_lt}
+            else
+              let value, order =
+                Macros.get_macro_deacreasing_info table m.s_symb ts
+              in
+              {value; order}
           in
           let occ =
-            TSOcc.mk_simple_occ
+            RecArgOcc.mk_simple_occ
               ~content:ts
               ~collision:
-                (Library.Prelude.mk_witness contx.table ~ty_arg:Type.ttimestamp)
+                {value =Library.Prelude.mk_witness table ~ty_arg:Type.ttimestamp;
+                 order= Library.Prelude.fs_lt
+                }
               (* unused, so always set to some arbitrary value *)
               ~data:() (* unused *)
               ~vars:(List.rev fv) (* rev nicer for printing *)
               ~cond:cond
-              ~typ:ot
+              ~typ:occ_type
               ~sub:Term.mk_false (* unused *)
               ~show:Hide
           in
           [occ] @ 
           List.concat_map (fun t ->
               get ~fv ~cond ~p ~se t
-            ) (ts :: l)
+            ) (ts.value :: l)
       end
 
     | _ ->
-      check_top_quantifier_enumerable env.table t;
+      check_top_quantifier_enumerable table t;
 
       MP.fold_shallow
         (fun t' se fv cond p occs ->
            occs @ (get t' ~fv ~cond ~p ~se))
         ~se ~fv ~p ~cond [] t
   in
-  get t ~fv:[] ~cond:[] ~p:MP.root ~se
+  get t ~fv:[] ~cond:[] ~p:MP.root ~se:system.set
 
 
-(** Returns all timestamps occuring in macros in a list of terms.
+(** Returns all recursive arguments occuring in macros in a list of terms.
     Should only be used when sources are directly occurring,
     not themselves produced by unfolding macros. *)
-let get_macro_actions
-    ~(mode  : Iter.allowed)   (* allowed sub-terms without further checks *)
-    ~(env   : Env.t)
-    ~(hyps  : TraceHyps.hyps)
-    (contx : Constr.trace_cntxt)
-    (sources : Term.terms) : ts_occs
+let get_macro_rec_args
+    ~(mode    : Iter.allowed)   (* allowed sub-terms without further checks *)
+    ~(context : ProofContext.t)
+    (sources  : Term.terms) : rec_arg_occs
   =
-  let ei = (EI_direct, contx) in
+  let ei = (EI_direct, context) in
+  let env = context.env in
   let actions =
-    List.concat_map (fun t -> get_actions_ext ~mode ~env ~hyps t ei) sources
+    List.concat_map (fun t -> get_rec_args_ext ~mode t ei) sources
   in
-  let table = contx.table in
-  let system = contx.system in
-  TSOcc.clear_subsumed table system actions
+  RecArgOcc.clear_subsumed env.table (SE.to_fset env.system.set) actions
 
 (*------------------------------------------------------------------*)
 (** Occurrence search *)
@@ -744,9 +759,7 @@ module type OccurrenceSearch = sig
     mode:Iter.allowed ->
     ?pp_descr:unit Fmt.t option ->
     f_fold_occs ->
-    TraceHyps.hyps ->
-    Constr.trace_cntxt ->
-    Env.t ->
+    ProofContext.t ->
     Term.terms ->
     ext_occs
 end
@@ -789,17 +802,13 @@ struct
   let fold_bad_occs
       (get_bad_occs     : f_fold_occs)         (* bad occurrence function *)
       ~(fv              : Vars.vars)           (* initial free variables *)
-      (hyps             : TraceHyps.hyps)      (* initial hypotheses *)
-      ((occtype,trctxt) : expand_info)         (* initial trace context *)
+      ((occtype, context) : expand_info)       (* initial proof-context *)
       (t                : Term.term)           (* initial term *)
     : simple_occs
     =
-    let table = trctxt.table in
-
     (* instantiation of [get_bad_occs] on its continuation *)
     let rec get (pi : pos_info) (t : Term.term) : simple_occs =
-      let se = SE.to_arbitrary pi.pi_trctxt.system in
-      let system = SE.{ set = se; pair = None; } in
+      let context = pi.pi_context in
 
       (* Put [t] in weak head normal form w.r.t. rules in
          [Reduction.rp_crypto].
@@ -808,9 +817,13 @@ struct
          [get_actions_ext], [Iter.fold_macro_support] and [Crypto]. *)
       let t =
         let red_param = Reduction.rp_crypto in
-        (* FIXME: add tag information in [pos_info] *)
-        let vars = Vars.of_list (Vars.Tag.local_vars pi.pi_vars) in
-        let st = Reduction.mk_state ~hyps ~system ~vars ~red_param table in
+        let context =
+          Iter.update_context
+            ~extra_vars:pi.pi_vars
+            context.env.system  (* use the same system, as we only add more vars *)
+            context
+        in
+        let st = Reduction.mk_state context ~red_param in
         let strat = Reduction.(MayRedSub rp_full) in
         fst (Reduction.whnf_term ~strat st t)
       in
@@ -821,27 +834,30 @@ struct
         match t with
         | Macro _ -> (* expand if possible *)
           begin
-            let trctxt = {trctxt with system = SE.to_fset se} in
-            match expand_macro_check_once (occtype, trctxt) t with
+            match expand_macro_check_once (occtype, context) t with
             | Some t' -> get pi t'
             | None -> []
             (* if we can't expand, do nothing.
-               fold_macro_support will create another iocc
+               [fold_macro_support] will create another iocc
                for that macro, and it will be checked separately *)
           end
 
         | _ ->
           MP.fold_shallow
             (fun t' se fv cond p acc ->
-               let trctxt = {trctxt with system = SE.to_fset se} in
+               let context =
+                 ProofContext.change_system
+                   ~system:{ context.env.system with set = se; }
+                   context
+               in
                let new_st = if Term.is_binder t then t' else pi.pi_subterm in
                let pi =
-                 {pi_pos=p; pi_occtype=pi.pi_occtype; pi_trctxt=trctxt;
+                 {pi_pos=p; pi_occtype=pi.pi_occtype; pi_context=context;
                   pi_vars=fv; pi_cond=cond; pi_subterm = new_st}
                in
                let newacc = get pi t' in
                acc @ newacc)
-            ~se ~fv:pi.pi_vars ~p:pi.pi_pos ~cond:pi.pi_cond [] t
+            ~se:context.env.system.set ~fv:pi.pi_vars ~p:pi.pi_pos ~cond:pi.pi_cond [] t
       in
 
       get_bad_occs ~retry:retry_on_subterms ~rec_call:get pi t
@@ -849,7 +865,7 @@ struct
 
     (* initial position information *)
     let pi0 =
-      {pi_pos=MP.root; pi_occtype=occtype; pi_trctxt=trctxt;
+      {pi_pos=MP.root; pi_occtype=occtype; pi_context=context;
        pi_vars=fv; pi_cond=[]; pi_subterm=t}
     in
     get pi0 t
@@ -868,17 +884,16 @@ struct
       ~(mode        : Iter.allowed)   (* allowed sub-terms without further checks *)
       ?(pp_descr    : unit Fmt.t option = None)
       (get_bad_occs : f_fold_occs)
-      (hyps         : TraceHyps.hyps)
-      (contx        : Constr.trace_cntxt)
-      (env          : Env.t)
+      (context      : ProofContext.t)
       (sources      : Term.terms) 
     : ext_occs
     =
-    let ppe = default_ppe ~table:contx.table () in
-    let find_occs = fold_bad_occs get_bad_occs in
+    let env = context.env in
+    let system = SE.to_fset env.system.set in
+    let table = env.table in
+    let ppe = default_ppe ~table () in
 
-    let system = contx.system in
-    let table = contx.table in
+    let find_occs = fold_bad_occs get_bad_occs in
 
     (* printer for the thing we're looking for *)
     let ppp ppf = match pp_descr with
@@ -896,14 +911,14 @@ struct
     let dir_occs =
       List.fold_left
         (fun dir_occs t -> (* find direct occurrences in t *)
-           (* timestamps occurring in t *)
-           let ts = get_macro_actions ~mode ~env ~hyps contx [t] in
+           (* recursive arguments occurring in t *)
+           let rec_arg  = get_macro_rec_args ~mode ~context [t] in
            (* name occurrences in t *)
-           let occs = find_occs ~fv:[] hyps (EI_direct, contx) t in
+           let occs = find_occs ~fv:[] (EI_direct, context) t in
            (* add the info to the occurrences *)
            let occs = 
              List.map
-               (fun o -> EO.{eo_occ=o; eo_source=[t]; eo_source_ts=ts;
+               (fun o -> EO.{eo_occ=o; eo_source=[t]; eo_source_rec_arg=rec_arg;
                              eo_path_cond = Iter.PathCond.Top; }) 
                occs
            in
@@ -925,7 +940,7 @@ struct
       Iter.fold_macro_support ~mode (fun iocc ind_occs ->
           (* todo: if fold_macro_support stored in iocc the fset
              for the place where the iocc was found, we could give it
-             instead of contx to find_occs *)
+             instead of [context] to find_occs *)
           (* todo: we could print which source the indirect occs came from,
              not sure that's useful though *)
           (* FIXME: quantum: we build the tuple [(iocc_cond, iocc_cnt)],
@@ -933,32 +948,40 @@ struct
              [iocc_cond] is new). This makes the printing slightly less
              useful. How can this be fixed? (check this with Joseph). *)
           let t = Term.mk_tuple [iocc.iocc_cond; iocc.iocc_cnt] in
+          (* For legacy reasons, we can't build t as what we ideally want, i.e: 
+          let t = Term.mk_ite iocc.iocc_cond iocc.iocc_cnt
+              (Library.Prelude.mk_witness table ~ty_arg:(Term.ty iocc.iocc_cnt)) in
+          *)
+          
           let sfv = iocc.iocc_vars in
           let src = iocc.iocc_sources in
           let a = iocc.iocc_rec_arg in
+
           (* a's free variables should always be in fv \cup env *)
           assert (Vars.Sv.subset
                     (Term.fv a)
                     (Vars.Sv.union sfv (Vars.to_vars_set env.vars)));
-          (* timestamps occurring in sources (not in the indirect occs!) *)
-          let ts = get_macro_actions ~mode ~env ~hyps contx src in
+          (* recursive arguments occurring in sources (not in the indirect occs!) *)
+          let rec_arg = get_macro_rec_args ~mode ~context src in
           (* indirect occurrences in iocc *)
           let occs =
-            find_occs ~fv:(Vars.Sv.elements sfv) hyps (EI_indirect a, contx) t
+            find_occs
+              ~fv:(Vars.Sv.elements sfv) 
+              (EI_indirect (a, iocc.iocc_fun), context) t
           in
           (* add the info *)
           let occs = 
             List.map
               (fun o -> 
-                 EO.{ eo_occ       = o; 
-                      eo_source    = src; 
-                      eo_source_ts = ts; 
-                      eo_path_cond = iocc.iocc_path_cond; }
+                 EO.{ eo_occ            = o; 
+                      eo_source         = src;
+                      eo_source_rec_arg = rec_arg; 
+                      eo_path_cond      = iocc.iocc_path_cond; }
               )
               occs
           in
           ind_occs @ occs)
-        contx env hyps sources []
+        context sources []
     in
 
     (* printing *)
@@ -999,26 +1022,37 @@ end
 
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
-let time_formula
-    (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs)
+let rec_arg_formula
+    (table : Symbols.table)
+    (a : Term.term) (caller : Symbols.macro) ?(path_cond : PathCond.t = PathCond.Top) (rec_args:rec_arg_occs)
   : Term.term =
+  let a, ord = Macros.get_macro_deacreasing_info table caller a in
   let phis =
-    List.map (fun (ti:ts_occ) ->
+    List.map (fun (ti:rec_arg_occ) ->
         (* refresh probably not necessary, but doesn't hurt *)
         let tivs, s = Term.refresh_vars ti.so_vars in
-        let ticnt   = Term.subst s ti.so_cnt in
+        let ticnt   = RecArgContent.subst_content s ti.so_cnt in
         let ticond  = List.map (Term.subst s) ti.so_cond in
-
-        Term.mk_exists ~simpl:true
-          tivs
-          (Term.mk_ands ~simpl:true
-             ( PathCond.apply path_cond a ticnt :: ticond))
-          (* in the simplest cases (when [path_cond = PathCond.Top]), 
+        let pcond =
+          if Type.equal (Term.ty a) (Term.ty ticnt.value)
+          && Symbols.path_equal ord ticnt.order 
+          then
+            PathCond.apply table path_cond a ticnt.value ticnt.order
+            (* in the simplest cases (when [path_cond = PathCond.Top]),
+               and we are over timestamps,
              [PathCond.apply path_cond a ticnt] 
              is just
              [Term.mk_timestamp_leq a ticnt] 
           *)
-      ) ts
+          else
+            Term.mk_true
+        in
+        Term.mk_exists ~simpl:true
+          tivs
+          (Term.mk_ands ~simpl:true
+             (pcond :: ticond))
+
+      ) rec_args
   in
   Term.mk_ors ~simpl:true phis
 
@@ -1029,7 +1063,7 @@ module type OccurrenceFormulas = sig
   type ext_occs = ext_occ list
 
   val occurrence_formula :
-    ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
+    Symbols.table -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
 (** Exported (see `.mli`) *)
@@ -1195,6 +1229,7 @@ struct
   (*------------------------------------------------------------------*)
   (** Exported (see `.mli`) *)
   let occurrence_formula
+      (table : Symbols.table)
       ?(use_path_cond = false)
       ~(negate : bool)
       (occ     : ext_occ)
@@ -1202,9 +1237,8 @@ struct
     =
     let o    = occ.eo_occ in
     let fv   = o.so_vars in
-    let ts   = occ.eo_source_ts in
+    let ts   = occ.eo_source_rec_arg in
     let cond = o.so_cond in
-
     (* the formula "cnt is a collision" (or its negation) *)
     let phi_cnt =
       OC.collision_formula ~negate
@@ -1234,7 +1268,7 @@ struct
     in
 
     match o.so_occtype with
-    | EI_indirect a ->
+    | EI_indirect (a,f) ->
       (* indirect occurrence: we also generate the timestamp inequalities *)
       let a = Term.subst sigma a in
       (* no need to substitute ts. *)
@@ -1251,9 +1285,8 @@ struct
           if use_path_cond then occ.eo_path_cond
           else PathCond.Top
         in
-        time_formula ~path_cond a ts
+        rec_arg_formula ~path_cond table a f ts
       in
-
       if not negate then
         Term.mk_exists ~simpl:true fv
           (Term.mk_and  ~simpl:true phi_time phi_cond_cnt)

@@ -16,5 +16,5 @@ lemma test (i,j:index):
 
 Proof.
  intro Hneq Heq.
- fresh Heq => [] _; auto.
+ fresh Heq; auto.
 Qed.

@@ -137,6 +137,8 @@ module type S1 = sig
     hyps -> hyps
 
   (*------------------------------------------------------------------*)
+  val iter : (Ident.t -> ldecl_cnt -> unit) -> hyps -> unit
+
   val fold      : (Ident.t -> ldecl_cnt -> 'a -> 'a) -> hyps -> 'a -> 'a
   val fold_hyps : (Ident.t -> hyp       -> 'a -> 'a) -> hyps -> 'a -> 'a
 
@@ -432,6 +434,7 @@ module Mk (H : Hyp) : S with type hyp = H.t = struct
 
   (*------------------------------------------------------------------*)
   let fold func (hyps : hyps) init = Mid.fold func hyps init
+  let iter func (hyps : hyps) = Mid.iter func hyps
 
   let fold_hyps func (hyps : hyps) init = 
     Mid.fold (fun id ldc a -> 
@@ -508,9 +511,33 @@ module TraceHyps = Mk(struct
   end)
 
 
+let get_models ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
+    (table : Symbols.table)
+    ?(timeout=TConfig.solver_timeout table)
+    ?(system : 'a SE.expr option = None)     
+    (hyps : TraceHyps.hyps) =
+    let proof_context = 
+    TraceHyps.fold (fun id f acc ->
+        match f, system with
+        | LHyp (Local f), _
+        | LHyp (Global Equiv.(Atom (Reach {formula = f;bound = _}))), _ -> f :: acc
+        (*TODO:Concrete : Make sure it is right*)
+        | LHyp (Global _), _ -> acc
+        | LDef (se, f), Some system when SE.equal table se system ->
+          let f = Term.mk_eq f (Term.mk_var (Vars.mk id (Term.ty f))) in
+          f :: acc
+        | LDef (_se, _f), _  -> acc
+      ) hyps [] 
+  in
+  Constr.models_conjunct
+    ~exn
+    ~timeout
+    ~table
+    proof_context
+
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
-  
+
 let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
   TraceHyps.fold_hyps (fun _ f acc ->
       match f with
@@ -518,7 +545,8 @@ let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
       | Global Equiv.(Atom (Reach {formula = f; bound = None})) ->
         Term.Lit.form_to_literals f @ acc
       | Global _ -> acc
-    ) hyps [] 
+    ) hyps []
+
 
 let get_message_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
   let do1 (at : Term.Lit.literal) : Term.Lit.xatom option =

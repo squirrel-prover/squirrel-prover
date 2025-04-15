@@ -140,8 +140,8 @@ let tboolean   = Boolean
 let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
-let ttuple (tyl : ty list)= Tuple tyl
-let tfun (ty0 : ty) (ty1 :ty ) = Fun (ty0, ty1)
+
+let tunit = Tuple []
 
 (*------------------------------------------------------------------*)
 (** Prelude types *)
@@ -208,6 +208,8 @@ let _pp ~dbg : ty formatter =
         Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
     | TVar id   -> _pp_tvar ~dbg ppf id
     | TUnivar u -> pp_univar ppf u
+
+    | Tuple [] -> Fmt.pf ppf "unit"
 
     | Tuple tys -> 
       let pp ppf () =
@@ -306,7 +308,6 @@ let decompose_tuple t = match t with Tuple l -> l | _ -> [t]
 
 (*------------------------------------------------------------------*)
 let tuple = function
-  | [] -> assert false
   | [t] -> t
   | l -> Tuple l
 

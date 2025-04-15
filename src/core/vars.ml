@@ -71,7 +71,7 @@ type tagged_var = var * Tag.t
 type tagged_vars = (var * Tag.t) list
 
 (*------------------------------------------------------------------*)
-let is_pat v = v.id.name = "_"
+let is_hole v = v.id.name = "_"
 
 (*------------------------------------------------------------------*)
 let id v   = v.id
@@ -259,6 +259,7 @@ let add_vars_simpl vs (e : simpl_env) : simpl_env =
     
 (*------------------------------------------------------------------*)
 let of_list vs : 'a genv = add_vars vs empty_env
+let of_list_simpl vs : simpl_env = add_vars_simpl vs empty_env
 
 let of_set s : simpl_env = 
   Sv.fold (fun v e -> 
@@ -288,12 +289,16 @@ let rm_vars vs (e : 'a genv) : 'a genv =
   List.fold_left (fun e v -> rm_var v e) e vs
 
 (*------------------------------------------------------------------*)
-let map_tag (f : var -> Tag.t -> Tag.t) (e : env) : env =
+let map_tag (f : var -> 'a -> 'a) (e : 'a genv) : 'a genv =
   Ms.map (fun l -> List.map (fun (v,t) -> v, f v t) l) e
 
 (*------------------------------------------------------------------*)
-let map (f : var -> Tag.t -> var * Tag.t) (e : env) : env =
+let map (f : var -> 'a -> var * 'a) (e : 'a genv) : 'a genv =
   Ms.map (fun l -> List.map (fun (v,t) -> f v t) l) e
+
+(*------------------------------------------------------------------*)
+let filter (f : var -> 'a -> bool) (e : 'a genv) : 'a genv =
+  Ms.map (fun l -> List.filter (fun (v,t) -> f v t) l) e
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)

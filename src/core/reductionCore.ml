@@ -131,8 +131,15 @@ module type Sig = sig
   type state
 
   (*------------------------------------------------------------------*)
-  (** Make a reduction state directly *)
+  (** Make a reduction state directly (using a proof-context) *)
   val mk_state :
+    ?expand_context:Macros.expand_context ->
+    ProofContext.t ->
+    red_param:red_param -> 
+    state
+
+  (** Make a reduction state directly (with partial proof-context data) *)
+  val mk_state0 :
     ?expand_context:Macros.expand_context ->
     ?hyps:THyps.hyps ->
     ?params:Params.t ->

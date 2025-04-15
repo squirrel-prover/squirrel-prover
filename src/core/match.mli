@@ -351,7 +351,6 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Reduction utilities} *)
 
-val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
   
 (*------------------------------------------------------------------*)
 (** {3 Term reduction utilities} *)
@@ -359,24 +358,29 @@ val happens : Symbols.table -> Hyps.TraceHyps.hyps -> Term.term -> bool
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 val reduce_delta_def1 :
-  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
+  Env.t -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
+  ?force_happens:bool ->
+  constr:bool ->
   ?mode:Macros.expand_context ->
-  Symbols.table -> SE.context -> 
+  Env.t ->
   ?hyps:Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
+(*------------------------------------------------------------------*)
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 val reduce_delta1 :
+  ?force_happens:bool ->
   ?delta:ReductionCore.delta ->
+  constr:bool ->
   mode:Macros.expand_context ->
-  Symbols.table -> SE.context -> Hyps.TraceHyps.hyps ->
+  Env.t -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 
 
@@ -394,8 +398,7 @@ type unif_state
 
 val mk_unif_state :
   param:param ->
-  env:Vars.env -> Symbols.table -> 
-  SE.context -> Hyps.TraceHyps.hyps ->
+  ProofContext.t ->
   support:Vars.vars -> 
   unif_state
 

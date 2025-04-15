@@ -138,7 +138,7 @@ Proof.
   expand exec, cond.
   destruct Hexec as [H1 Meq].
   euf Meq.
-
+  cycle 2.
     (* case 1/3: equality with hashed message in update@R1 *)
   + intro [jj0 [Ht Heq]].
     executable pred(R1(jj,ii)) => // H.

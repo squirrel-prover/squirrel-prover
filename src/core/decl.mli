@@ -75,16 +75,31 @@ type system_modifier = {
   modifier : global_rule;
   name     : Symbols.lsymb
 }
-                          
+
+type op_kind =  [`Op | `Let of [`NoRec | `Rec | `RecWithOrd of Symbols.p_path]]
+  (** - [`Op] is for an abstract or concrete operator (i.e. `adv`)
+      - [`Let is_rec] is for a arbitrary functions, which are:
+        * [`Rec] recursive and well-founded with the ordering <
+        * [`RecWithOrd sx] recursive and well-founded with the ordering [sx]
+        * [`NoRec] not recursive.
+  *)
+
+type  op_in_system = [`Any | `Systems of SE.Parse.t | `Like of Symbols.p_path]
+type  op_tyargs    = lsymb list
+
 (*------------------------------------------------------------------*)
-(** Information for an operator declaration *)
-type operator_decl = { 
+(** An operator or a let definition or declaration. *)
+type fun_decl = { 
   op_name      : Symbols.lsymb;
   op_symb_type : Symbols.symb_type;
-  op_tyargs    : lsymb list;
   op_args      : Typing.ext_bnds;
   op_tyout     : Typing.ty option;
-  op_body      : [`Concrete of Typing.term | `Abstract];
+  op_body      : [
+    | `Concrete of Typing.term
+    | `Match    of Typing.match_body
+    | `Abstract
+  ];
+ op_terby      : Typing.term option
 }
 
 (*------------------------------------------------------------------*)
@@ -153,7 +168,7 @@ type declaration_i =
   | Decl_action    of action_decl
   | Decl_name      of lsymb * Typing.ty
   | Decl_state     of state_macro_decl
-  | Decl_operator  of operator_decl
+  | Decl_funs      of op_kind * op_in_system * op_tyargs * fun_decl list
   | Decl_predicate of predicate_decl
   | Decl_bty       of bty_decl
   | Decl_game      of Crypto.Parse.game_decl

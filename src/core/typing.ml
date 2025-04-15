@@ -64,7 +64,7 @@ type applied_symb = {
 type quant = Term.quant
 
 type term_i =
-  | Tpat
+  | Tpat                        (** anonymous pattern variable *)
 
   | Int    of int L.located
   | String of string L.located
@@ -81,6 +81,16 @@ type term_i =
   | Quote of term
 
 and term = term_i L.located
+
+(*------------------------------------------------------------------*)
+(** [pattern when when_cond => out] *)
+type match_item = {
+  pattern   : term option;
+  when_cond : term option;
+  out       : term;
+}
+
+type match_body = match_item list
 
 (*------------------------------------------------------------------*)
 let mk_applied_symb (s : Symbols.p_path) : applied_symb =
@@ -284,9 +294,11 @@ let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
     in
     Type.tvar tv
 
+  (* ad hoc parsing rule for [unit] *)
+  | P_tbase ([], { pl_desc = "unit"; }) -> Type.tunit
+
   | P_tbase tb_l ->
     let s = Symbols.BType.convert_path tb_l env.table in
-    (* FIXME: namespace: use the safe API *)
     let top, sub =
       List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
     in
@@ -355,6 +367,7 @@ type conv_state = {
   cntxt : conv_cntxt;
 
   option : Option.t;
+
   type_checking : bool;
   (** if [true], we are only type-checking the term *)
 
@@ -373,7 +386,7 @@ let mk_state ?(type_checking=false) ~system_info env cntxt option ienv =
 let ty_error ienv loc (t : Term.term) ~(got : Type.ty) ~(expected : Type.ty) =
   let got      = Infer.norm_ty ienv got in
   let expected = Infer.norm_ty ienv expected in
-  Error (loc, Type_error (t, expected, got))
+  raise (Error (loc, Type_error (t, expected, got)))
 
 let check_ty_eq
     (state : conv_state) ~loc ~(of_t : Term.term) (t_ty : Type.ty) (ty : Type.ty) 
@@ -381,8 +394,7 @@ let check_ty_eq
   =
   match Infer.unify_ty state.ienv t_ty ty with
   | `Ok -> ()
-  | `Fail ->
-    raise (ty_error state.ienv loc of_t ~got:t_ty ~expected:ty)
+  | `Fail -> ty_error state.ienv loc of_t ~got:t_ty ~expected:ty
 
 let check_term_ty (state : conv_state) ~loc (t : Term.term) (ty : Type.ty) : unit =
   check_ty_eq state ~loc ~of_t:t (Term.ty ~ienv:state.ienv t) ty
@@ -719,7 +731,12 @@ let resolve_path
     (table    : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list option)
     ~(args_ty : Type.ty list)
-    ~(ty_rec  : [`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown])
+    ~(ty_rec  : [
+        | `Standard of Type.ty
+        | `At of Type.ty
+        | `MaybeAt of Type.ty
+        | `NoAt | `Unknown
+      ])
   : 
     ([
       `Operator of Symbols.fname  |
@@ -741,7 +758,7 @@ let resolve_path
      [ty_rec_symb]) is comptatible with the information provided
      (i.e. [ty_args], [args_ty] and [ty_rec]) *)
   let check_arg_tys
-      ?(ty_rec_symb : Type.ty option) (fty : Type.ftype) 
+      ?(ty_rec_symb : Macros.rec_arg_ty = `None) (fty : Type.ftype) 
     :
       Type.ftype_op * Term.applied_ftype * Infer.env
     =
@@ -765,7 +782,10 @@ let resolve_path
         
     let symb_args_ty =
       let extra_args, _ = Type.decompose_funs fty_op.fty_out in
-      fty_op.fty_args @ extra_args
+      fty_op.fty_args @ 
+      (* a standard match argument is handled like the other arguments *)
+      (match ty_rec_symb with `Standard ty -> [ty] | _ -> []) @
+      extra_args
     in
     (* keep as many arguments as possible from [args_ty] and [op_args_ty] *)
     let n = min args_ty_len (List.length symb_args_ty) in
@@ -777,11 +797,16 @@ let resolve_path
 
     let () =
       match ty_rec, ty_rec_symb with
-      | (`At ty | `MaybeAt ty), Some ty' -> check_ty ty ty'
+      | `Standard ty, `Standard ty'
+      | (`At ty | `MaybeAt ty), `At ty' -> check_ty ty ty'
+
       (* maybe parsing in a processus declaration *)
-      | `MaybeAt _, None -> () 
-      | `At _, None | `NoTS , Some _ -> failed ()
-      | `NoTS , None -> ()
+      | `MaybeAt _, (`None | `Standard _) -> () 
+
+      | `Standard _, (`None | `At _) 
+      | `At _, (`None | `Standard _) | `NoAt , `At _ -> failed ()
+
+      | `NoAt , (`None | `Standard _) -> ()
       | `Unknown, _ -> ()
     in
 
@@ -881,6 +906,21 @@ let is_symb (t : term) (s : string) : bool =
     top = [] && L.unloc sub = s
   | _ -> false
 
+
+let app_cntxt state =
+  match state.cntxt with
+  | InGoal -> NoTS
+  | InProc (_, ts) -> MaybeAt ts 
+ 
+(*------------------------------------------------------------------*)
+let make_pat (state : conv_state) (name : string) (ty : Type.ty) =
+  let _, p =
+    Vars.make
+      ~allow_pat:true `Approx
+      state.env.vars ty name (Vars.Tag.make Vars.Local)
+  in
+  Term.mk_var p
+
 (*------------------------------------------------------------------*)
 (* internal function to Typing.ml *)
 let rec convert 
@@ -918,12 +958,7 @@ and convert0
     if not state.option.pat then
       error (L.loc tm) PatNotAllowed;
 
-    let _, p =
-      Vars.make
-        ~allow_pat:true `Approx
-        state.env.vars ty "_" (Vars.Tag.make Vars.Local)
-    in
-    Term.mk_var p
+    make_pat state "_" ty
 
   (*------------------------------------------------------------------*)
   (* particular cases for init and happens *)
@@ -945,10 +980,10 @@ and convert0
   | AppAt ({ pl_desc = Symb applied_symb } as tapp, ts) 
   | AppAt ({ pl_desc = App ({ pl_desc = Symb applied_symb },_)} as tapp, ts)
     when not (is_var applied_symb.path) ->
-    
+
     let _f, terms = decompose_app tapp in
     let app_cntxt = At (conv Type.ttimestamp ts) in
-    
+
     let t = convert_app state (L.loc tm) applied_symb terms app_cntxt ty in
 
     if is_in_proc state.cntxt then begin
@@ -966,35 +1001,45 @@ and convert0
     let ppe = default_ppe ~table:state.env.table () in
     error loc (Timestamp_unexpected (Fmt.str "%a" (Term._pp ppe) t))
 
-  (* application, special case *)
-  | Symb applied_symb
-  | App ({ pl_desc = Symb applied_symb}, _ (* = _args *) ) when not (is_var applied_symb.path) ->
-    let f = applied_symb.path in
-    let _top, sub = f in
-    let _f, args = decompose_app tm in (* [args = _args] *)
+  (* application *)
+  | App ({ pl_desc = Symb applied_symb}, args) when not (is_var applied_symb.path) ->
+    convert_app state (L.loc tm) applied_symb args (app_cntxt state) ty
 
-    (* check that we are not in one of the special cases above *)
-    if L.unloc sub = "init" || L.unloc sub = "happens" then 
-      error loc (Arity_error (Symbols.p_path_to_string f, 
-                                 (if L.unloc sub = "init" then 0 else 1), 
-                                 List.length args));
-
-    let app_cntxt =
-      match state.cntxt with
-      | InGoal -> NoTS
-      | InProc (_, ts) -> MaybeAt ts 
-    in
-    
-    convert_app state (L.loc tm) applied_symb args app_cntxt ty
-
+  (* a single symbol, possibly applied to some system or type arguments *)
   | Symb applied_symb -> 
-    let (top, _) as f = applied_symb.path in
-    assert(is_var f && top = []);
+    let (top, sub) as f = applied_symb.path in
 
-    if applied_symb.ty_args <> None then error loc (Failure "cannot apply type arguments here");
-    if applied_symb.se_args <> None then error loc (Failure "cannot apply system arguments here");
+    if is_var f && top = [] then
+      begin
+        (* we know that [f] must be parsed as a variable *)
+        if applied_symb.ty_args <> None then
+          error loc (Failure "cannot apply type arguments here");
+        if applied_symb.se_args <> None then
+          error loc (Failure "cannot apply system arguments here");
 
-    convert_var state (snd f) ty
+        convert_var state (snd f) ty
+      end
+    else
+      begin
+        (* try to parse [f] as a symbol from the symbol table *)
+        try 
+          convert_app state (L.loc tm) applied_symb [] (app_cntxt state) ty
+
+        (* in case of failure, and if pattern variables are allowed,
+           create a fresh variable *)
+        with Error _ when state.option.pat && top = [] -> 
+          if applied_symb.ty_args <> None then
+            error loc (Failure "cannot apply type arguments here");
+          if applied_symb.se_args <> None then
+            error loc (Failure "cannot apply system arguments here");
+
+          let first_char = (L.unloc sub).[0] in
+          if Char.uppercase_ascii first_char = first_char then
+            error loc (Failure "pattern variables must start with a \
+                                lower-case character");
+
+          make_pat state (L.unloc sub) ty
+      end
 
   (* application, general case *)
   | App (t1, l) -> 
@@ -1151,7 +1196,7 @@ and convert_app
     match app_cntxt with
     | At t      -> `At      (Term.ty t)
     | MaybeAt t -> `MaybeAt (Term.ty t)
-    | NoTS      -> `NoTS
+    | NoTS      -> `NoAt
   in
   (* resolve [f] as a list of symbols exploiting the types of its
      arguments *)
@@ -1177,29 +1222,48 @@ and convert_app
   (* store the typing environement of the symbol that was selected *)
   Infer.set ~tgt:state.ienv ~value:ienv;
 
-  let nb_args = List.length applied_fty.fty.fty_args in
+  let nb_args = 
+    List.length applied_fty.fty.fty_args 
+    +
+    begin (* special case for macros without the `@` notation *)
+      match symb with
+      | `Operator _ | `Name _ | `Action _ -> 0         
+      | `Macro m ->
+        let i = Macros.get_macro_info state.env.table m in
+        if i.has_dist_param && i.pp_style = `Standard then 1 else 0
+    end
+  in
   let args, args' = List.takedrop nb_args args in
 
   let t0 =
     match symb with
     | `Operator f -> Term.mk_fun0 f applied_fty args
-    | `Name     n -> Term.mk_name (Term.mk_symb n fty_op.fty_out) args
+    | `Name     n -> Term.mk_name (Term.nsymb n fty_op.fty_out) args
 
     | `Action   a -> 
       let args = match args with | [Term.Tuple args] -> args | _ -> args in
       Term.mk_action a args
 
     | `Macro    m ->
-      if args' <> [] then
-        error (Symbols.p_path_loc f) (Failure "too many arguments");
+      let ms = Macros.msymb state.env.table m in
+      let i = ms.s_info in
+      let args, rec_arg =
+        if i.has_dist_param then
+          match app_cntxt with
+          | At ts | MaybeAt ts when i.pp_style = `At -> args, ts
 
-      let tau =
-        match app_cntxt with
-        | At ts | MaybeAt ts -> ts
-        | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
+          | _ when i.pp_style = `Standard -> 
+            let args, rec_arg = List.takedrop (nb_args - 1) args in
+
+            if rec_arg = [] then error loc (Failure "missing arguments");
+
+            args, as_seq1 rec_arg
+
+          | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
+        else (args, Term.mk_unit)       (* [unit] used as a spurious value *)
       in
 
-      Term.mk_macro (Term.mk_symb m fty_op.fty_out) args tau
+      Term.mk_macro ms args rec_arg
   in
 
   let ty0 = 

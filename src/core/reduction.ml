@@ -55,13 +55,14 @@ module Core (* : ReductionCore.S *) = struct
 
   (*------------------------------------------------------------------*)
   (** reduction state *)
-  type state = { 
+  type state = {
     table     : Symbols.table;
     params    : Params.t;
     vars      : Vars.env;         (* used to get variable tags *)
     system    : SE.context;
-    red_param : red_param;
     hyps      : THyps.hyps;
+
+    red_param : red_param;
 
     expand_context : Macros.expand_context;
     (** expantion mode for macros. See [Macros.expand_context]. *)
@@ -69,7 +70,7 @@ module Core (* : ReductionCore.S *) = struct
 
   (*------------------------------------------------------------------*)
   (** Make a reduction state directly *)
-  let mk_state
+  let mk_state0
       ?(expand_context = Macros.InSequent)
       ?(hyps      = THyps.empty)
       ?(params    = Params.empty )
@@ -81,6 +82,21 @@ module Core (* : ReductionCore.S *) = struct
     =
     { table; system; params; red_param; hyps; expand_context; vars; }
 
+  let mk_state
+      ?(expand_context = Macros.InSequent)
+      (pc : ProofContext.t) ~red_param
+    : state
+    =
+    let env = pc.env in
+    {
+      table  = env.table;
+      system = env.system;
+      params = Env.to_params env;
+      vars   = env.vars;
+      hyps   = pc.hyps; 
+      red_param;
+      expand_context;
+    }
 
   (*------------------------------------------------------------------*)
   (** Change the system context of a [state], updating its hypotheses
@@ -92,6 +108,12 @@ module Core (* : ReductionCore.S *) = struct
         ~table:st.table ~vars:st.vars st.hyps
     in
     { st with system = new_context; hyps; } 
+
+  let to_env (st : state) : Env.t =
+    Env.init
+      ~vars:st.vars ~system:st.system
+      ~ty_vars:st.params.ty_vars ~se_vars:st.params.se_vars
+      ~table:st.table ()
 
   (*------------------------------------------------------------------*)
   let add_hyp (f : Term.term) hyps : THyps.hyps =
@@ -427,41 +449,94 @@ module Core (* : ReductionCore.S *) = struct
       let exception NoExp in
       try
         let timeout = TConfig.solver_timeout st.table in
-        if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table t )
-        then Term.mk_true,True
-        else if Constr.(is_tautology ~exn:NoExp ~timeout ~table:st.table (Term.mk_not t))
-        then Term.mk_false,True
-        else t,False
-      with NoExp -> (t,False)
+        let models = Hyps.get_models ~exn:NoExp ~timeout st.table st.hyps in
+        if Constr.empty_models models then
+          t, False
+        else
+        if Constr.query ~precise:true models [t]
+        then Term.mk_true, True
+        else if Constr.query ~precise:true models [Term.mk_not t]
+        then Term.mk_false, True
+        else t, False
+      with NoExp -> t, False
 
   (* Expand once at head position *)
   and reduce_delta1 (st : state) (t : Term.term) : Term.term * head_has_red = 
     Match.reduce_delta1
+      ~constr:st.red_param.constr
       ~delta:st.red_param.delta
-      ~mode:st.expand_context st.table st.system st.hyps t
+      ~mode:st.expand_context (to_env st) st.hyps t
 
   and reduce_builtin1 (st : state) (t : Term.t) : Term.t * head_has_red =
     if not (st.red_param.builtin && Library.Int.is_loaded st.table) then t, False
     else
-      let open Library.Int in
+      let module Int = Library.Int in
       let table = st.table in
 
       match Term.decompose_app t with
       (* Int.( + ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = add table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.add table ->
         Term.mk_int Z.(i1 + i2), True
 
+      (* Int.( i + 0 = i) *)
+      | Fun (fs,_), [i; Int i0] when fs = Int.add table && Z.equal i0 Z.zero ->
+        i, True
+
+      (* Int.( 0 + i = i) *)
+      | Fun (fs,_), [Int i0; i] when fs = Int.add table && Z.equal i0 Z.zero ->
+        i, True
+
       (* Int.( - ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = minus table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.minus table ->
         Term.mk_int Z.(i1 - i2), True
 
+      (* Int.( i - 0 = i) *)
+      | Fun (fs,_), [i; Int i0] when fs = Int.minus table && Z.equal i0 Z.zero ->
+        i, True
+
+      (* Int.( 0 - i = -i) *)
+      | Fun (fs,_), [Int i0; i] when fs = Int.minus table && Z.equal i0 Z.zero ->
+        Int.mk_opp table i, True
+
       (* Int.( * ) *)
-      | Fun (fs,_), [Int i1; Int i2] when fs = mul table ->
+      | Fun (fs,_), [Int i1; Int i2] when fs = Int.mul table ->
         Term.mk_int Z.(i1 * i2), True
 
+      (* Int.( i * 1 = i) *)
+      | Fun (fs,_), [i; Int i1] when fs = Int.mul table && Z.equal i1 (Z.of_int 1) ->
+        i, True
+
+      (* Int.( 1 * i = i) *)
+      | Fun (fs,_), [Int i1; i] when fs = Int.mul table && Z.equal i1 (Z.of_int 1) ->
+        i, True
+
       (* Int.opp *)
-      | Fun (fs,_), [Int i]          when fs = opp table ->
+      | Fun (fs,_), [Int i] when fs = Int.opp table ->
         Term.mk_int Z.(- i), True
+
+      (* Int.( = ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_eq ->
+        (if Z.equal i1 i2 then Term.mk_true else Term.mk_false), True
+
+      (* Int.( <> ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_neq ->
+        (if not (Z.equal i1 i2) then Term.mk_true else Term.mk_false), True
+
+      (* Int.( < ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_gt ->
+        (if Z.gt i1 i2 then Term.mk_true else Term.mk_false), True
+
+      (* Int.( <= ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_geq ->
+        (if Z.geq i1 i2 then Term.mk_true else Term.mk_false), True
+
+      (* Int.( > ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_lt ->
+        (if Z.lt i1 i2 then Term.mk_true else Term.mk_false), True
+
+      (* Int.( >= ) *)
+      | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_leq ->
+        (if Z.leq i1 i2 then Term.mk_true else Term.mk_false), True
 
       | _ -> t, NeedSub  (* FIXME: be more precise? *)
 

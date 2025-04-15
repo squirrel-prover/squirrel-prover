@@ -29,7 +29,7 @@ let mk_p c = [], L.mk_loc L._dummy c
 
 let mk_message st s =
   let n = Symbols.Name.convert_path (mk_p s) (Prover.get_table st) in
-  Term.mk_name (Term.mk_symb n Type.tmessage) []
+  Term.mk_name (Term.nsymb n Type.tmessage) []
 
 (** Check that case study fails when there is no conditional
     with the target condition. *)
@@ -635,7 +635,7 @@ let namelength () =
   Printer.pr "Term m: %a@." Term.pp stmt_m.formula.formula;
 
   let n = Symbols.Name.convert_path (mk_p "n") table in
-  let tn = Term.mk_name (Term.mk_symb n tyn) [] in
+  let tn = Term.mk_name (Term.nsymb n tyn) [] in
   
   let cst = Type.to_string tyn in
   let name_hash = "namelength_" ^ cst in
@@ -684,7 +684,7 @@ let namelength2 () =
   Printer.pr "Term n: %a@." Term.pp stmt_n.formula.formula;
 
   let n = Symbols.Name.convert_path (mk_p "n") table in
-  let tn = Term.mk_name (Term.mk_symb n tyn) [] in
+  let tn = Term.mk_name (Term.nsymb n tyn) [] in
   
   let cst = Type.to_string tyn in
   let name_hash = "namelength_" ^ cst in

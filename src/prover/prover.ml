@@ -424,7 +424,7 @@ let search_about
   let find (t:Term.term) =
     let pat_op_vars =
       Vars.Tag.local_vars ~const:true
-        (Sv.elements (Vars.Sv.filter Vars.is_pat (Term.fv t)))
+        (Sv.elements (Vars.Sv.filter Vars.is_hole (Term.fv t)))
     in
     let pat = Term.{
         pat_op_params = Params.Open.empty;
@@ -467,7 +467,7 @@ let search_about
     in
     let pat_op_vars =
       Vars.Tag.local_vars ~const:true
-        (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))
+        (Sv.elements (Sv.filter Vars.is_hole (Equiv.fv t)))
     in
     let pat = Term.{
         pat_op_params = Params.Open.empty;

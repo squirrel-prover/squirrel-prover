@@ -17,22 +17,36 @@ let mk_three f table x y z   = Term.mk_fun table (f table) [x;y;z]
 let mk_four  f table x y z t = Term.mk_fun table (f table) [x;y;z;t]
 (*------------------------------------------------------------------*)
 module Prelude = struct
-  let mk_fun table str ?ty_args args =
+  let mk_fun table str ~ty_args args =
     let symb = get_fsymb str in
-    Term.mk_fun table symb ?ty_args args
+    Term.mk_fun table symb ~ty_args args
+
+  let mk_fun_infer_tyargs table str args =
+    let symb = get_fsymb str in
+    Term.mk_fun_infer_tyargs table symb args
 
   (*------------------------------------------------------------------*)
-  let witness_p = ([],"witness")
-  let fs_witness = get_fsymb witness_p
-  let mk_witness table ~ty_arg = mk_fun table witness_p ~ty_args:[ty_arg] []
+  (*------------------------------------------------------------------*)
+  
+  let witness_p = ([], "witness" )
+  let zeroes_p  = ([], "zeroes"  )
+  let eq_p      = ([], "="       )
+  let neq_p     = ([], "<>"      )
+  let leq_p     = ([], "<="      )
+  let lt_p      = ([], "<"      )
 
-  let zeroes_p = ([],"zeroes")
+  let fs_witness = get_fsymb witness_p  
   let fs_zeroes = Symbols.Operator.of_s_path zeroes_p
-  let mk_zeroes table term = mk_fun table zeroes_p [term]
-
-  let leq_p = ([],"<=")
+  let fs_eq      = get_fsymb eq_p
+  let fs_neq     = get_fsymb neq_p 
   let fs_leq = Symbols.Operator.of_s_path leq_p
-  let mk_leq table x y = mk_fun table leq_p [x;y]
+  let fs_lt = Symbols.Operator.of_s_path lt_p           
+
+  let mk_witness table ~ty_arg = mk_fun table witness_p ~ty_args:[ty_arg] []
+  let mk_zeroes  table term    = mk_fun table zeroes_p  ~ty_args:[]       [term]  
+  let mk_eq      table t1 t2   = mk_fun_infer_tyargs table eq_p  [t1;t2]
+  let mk_neq     table t1 t2   = mk_fun_infer_tyargs table neq_p [t1;t2]
+  let mk_leq     table t1 t2   = mk_fun_infer_tyargs table leq_p [t1;t2]
 
   (*------------------------------------------------------------------*)
   let tstring = Type.base [] (Symbols.to_string (get_btype ([],"string")).s)
@@ -158,6 +172,25 @@ module Secrecy = struct
   let symb_deduce table = get_predicate table "|>"
   let symb_not_deduce table = get_predicate table "*>"
 end
+
+(*------------------------------------------------------------------*)
+module Logic = struct
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], "Logic") table
+      
+  let check_load table =
+    if not (is_loaded table) then
+      Tactics.hard_failure (Failure "theory Logic is not loaded")
+
+
+  let get_fsymb table s =
+    check_load table;
+    get_fsymb ([],s)
+  
+  let fs_well_founded table = get_fsymb table "well_founded"
+end
+
 
 (*------------------------------------------------------------------*)
 module Deduction = struct

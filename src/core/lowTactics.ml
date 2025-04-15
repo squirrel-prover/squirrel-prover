@@ -311,84 +311,86 @@ module MkCommonLowTac (S : Sequent.S) = struct
       The sequent [s] is used to discharge Happens subgoals.
       If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
   let unfold_term_exn
-      ?(mode : Macros.expand_context = InSequent)
-      ?(force_happens=false)
-      (t     : Term.term)
-      (se    : SE.arbitrary)
-      (s     : S.sequent)
+      ?(force_happens = false)
+      ?(mode   : Macros.expand_context = InSequent)
+      ~(force_exhaustive:bool)      
+      ~(is_rec : bool)
+      (t       : Term.term)
+      (se      : SE.arbitrary)
+      (s       : S.sequent)
     : Term.term
     =
     let failed () = soft_failure (Tactics.Failure "nothing to expand") in
 
-    let () =                    (* abort early if possible *)
-      match t with
-      | Macro _ | Fun _ | App _ | Var _ -> ()
+    let table = S.table s in
+    let env   = S.env   s in
+    let new_context = { (S.system s) with set = (se :> SE.t); } in
+
+    let pc = lazy (S.proof_context ~in_system:new_context s) in
+
+    (* expand a macro into the exhaustive list of cases *)
+    let expand_full = function
+      | Term.Macro (ms,l,ts) -> 
+        let ta =
+          let exception NoExp in
+          let models = TopHyps.get_models ~exn:NoExp ~system:(Some se) table (Lazy.force pc).hyps in
+          try Constr.find_eq_action models ts with NoExp -> None
+        in
+        let ta = odflt ts ta in
+        begin
+          match Macros.unfold ~expand_context:mode env ms l ta with
+          | `Results cases -> Macros.mk_term_of_bodies table cases ta
+          | `Unknown -> failed ()
+        end
       | _ -> failed ()
     in
 
-    let hyps  = S.get_trace_hyps s in
-    let table = S.table          s in
-    let vars  = S.vars           s in
-
-    let old_context = S.system s in
-    let new_context = { old_context with set = (se :> SE.t); } in
-    let new_hyps =  (* [hyps] in [new_context] *)
-      TopHyps.change_trace_hyps_context
-        ~old_context ~new_context
-        ~table ~vars
-        hyps
+    (* try to expand a macro using reduction *)
+    let try_expand target =
+      (* we reduce, not allowing exhaustive expansion of macro when we are recursive. *)
+      Match.reduce_delta1
+        ~force_happens ~delta:ReductionCore.delta_full ~constr:true
+        ~mode (Lazy.force pc).env (Lazy.force pc).hyps target
     in
-    (* FIXME: do not recompute [new_hyps] at each sub-term, but
-       propagate and update it during the downward exploration
-       (through [Match.Pos.*]) of the term in [expand_term]. *)
-
+    
     match t with
-    (* we do not use [Match.reduce_delta1] for macros, to have sensible error
-       messages. *)
-    | Macro (ms,l,a) ->     
-      if not (force_happens) &&
-         not (S.query_happens ~precise:true s a || Match.happens table hyps a) then
-        soft_failure (Tactics.MustHappen a);
-
-      if not (SE.is_fset se) then failed ();
-      let se = SE.to_fset se in
-
-      begin
-        (* Put `a` in weak-head normal form before trying to expand the macro,
-           to try to make the action symbol appear. *)
-        let red_state =
-          Reduction.mk_state
-            ~hyps:new_hyps ~system:new_context
-            ~vars ~params:(S.params s)
-            ~red_param:Reduction.rp_full
-            table
-        in
-        let a, _ = Reduction.whnf_term ~strat:Std red_state a in
-        match Macros.get_definition ~mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a with
-        | `Undef | `MaybeDef -> failed ()
-        | `Def mdef -> mdef
-      end                         
+    | Macro (ms,args,ts) -> 
+      let red_state =
+        Reduction.mk_state (Lazy.force pc) ~red_param:Reduction.rp_full
+      in
+      let ts, _ = Reduction.whnf_term ~strat:Std red_state ts in
+      let t = Term.mk_macro ms args ts in
+      if force_exhaustive then expand_full t
+      else
+        begin
+          let t, has_red = try_expand t in
+          if has_red = True then t else 
+          if not is_rec && 
+             Macros.get_rw_strat table ms = Exhaustive 
+          then expand_full t
+          else failed ()
+        end
 
     | Fun _ | App _ | Var _ ->
-      let t, has_red =
-        Match.reduce_delta1
-          ~delta:ReductionCore.delta_full ~mode table new_context new_hyps t
-      in      
+      let t, has_red = try_expand t in
       if has_red = True then t else failed ()
-      
+
     | _ -> failed ()
+
 
   (** If [strict] is true, the unfolding must succeed. *)
   let unfold_local
+      ?(force_happens = false)
+      ~(force_exhaustive:bool)         
       ?(mode   : Macros.expand_context option)
-      ?(force_happens=false)
+      ~(is_rec : bool)
       ~(strict : bool)
       (t       : Term.term)
       (se      : SE.arbitrary)
       (s       : S.sequent)
     : Term.term option
     =
-    try Some (unfold_term_exn ~force_happens ?mode t se s) with
+    try Some (unfold_term_exn ~force_happens ~force_exhaustive ?mode ~is_rec t se s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   type expand_kind = 
@@ -438,8 +440,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Mterm _           -> false
 
   let expand_term
-      ?(m_rec = false)
       ~(mode  : Macros.expand_context)
+      ~(is_rec: bool)
+      ?(force_exhaustive=false)
       (target : expand_kind)
       (s      : S.sequent)
       (f      : Equiv.any_form) (* term being expanded *)
@@ -458,7 +461,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* unfold in local sub-terms *)
     let unfold_term (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
-      match unfold_local ~mode ~strict occ se s with
+      match unfold_local ~force_exhaustive ~mode ~is_rec ~strict occ se s with
       | None -> `Continue
       | Some t ->
         found1 := true;
@@ -482,7 +485,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       fun occ se _vars conds _p ->
         match occ with
         | Term.Macro (ms, _, _) ->
-          if found_occ_macro target ms occ then
+          if found_occ_macro target ms occ &&
+             (* if a macro is recursive and not defined by pattern
+                matching, we do not unfold it when [is_rec] (this
+                would likely yield an infinite loop) *)
+             not (is_rec && ms.s_info.is_rec && not ms.s_info.is_match) then
             let s = (* adds [conds] in [s], only useful for macros *)
               List.fold_left (fun s cond ->
                   S.Hyps.add AnyName (LHyp (S.unwrap_hyp (Local cond))) s
@@ -525,25 +532,26 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Global f ->
       let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown m_rec) expand_inst   system f 
+          ~mode:(`TopDown is_rec) expand_inst   system f 
       in
       let _, f =
         Match.Pos.map_g
-          ~mode:(`TopDown m_rec) expand_inst_g system f
+          ~mode:(`TopDown is_rec) expand_inst_g system f
       in
       !found1, Global f
 
     | Local f ->
       let _, f =
         Match.Pos.map
-          ~mode:(`TopDown m_rec) expand_inst system.set f
+          ~mode:(`TopDown is_rec) expand_inst system.set f
       in
       !found1, Local f
 
 
-  (** If [m_rec = true], recurse on expanded sub-terms. *)
+  (** If [is_rec = true], recurse on expanded sub-terms. *)
   let expand
-      ?(m_rec = false)
+      ~(force_exhaustive:bool)
+      ~(is_rec : bool)
       (targets: target list)
       (target : expand_kind)
       (s : S.sequent) : bool * S.sequent
@@ -554,7 +562,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let doit : do_target_func =
       fun (f,system,_) ->
         let found1', f =
-          expand_term ~mode:Macros.InSequent ~m_rec target s f system
+          expand_term ~force_exhaustive ~mode:Macros.InSequent ~is_rec target s f system
         in
         found1 := found1' || !found1;
         f, []
@@ -567,7 +575,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** expand all macros (not operators) in a term relatively to a system *)
   let expand_all_macros
-      ?(force_happens=false)
+      ?(force_happens = false)    
       (f : Term.term)
       (sexpr : SE.arbitrary)
       (s : S.t)
@@ -584,7 +592,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
                 ) s conds
             in
             match
-              unfold_local ~strict:false ~force_happens occ se s
+              unfold_local ~is_rec:true ~force_exhaustive:false ~force_happens ~strict:false occ se s
             with
             | None -> `Continue
             | Some t -> `Map t
@@ -600,7 +608,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** expand all macro of some targets in a sequent *)
   let expand_all targets (s : S.sequent) : S.sequent =
-    let _, s = expand ~m_rec:true targets Any s in
+    let _, s = expand ~is_rec:true ~force_exhaustive:false targets Any s in
     s
 
   (** exported *)
@@ -622,23 +630,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
         hard_failure ~loc:(L.loc arg)
           (Tactics.Failure "expected a term of sort message")
 
-  let expand_arg (targets : target list) (arg : Typing.term) (s : S.t) : S.t =
+  let expand_arg ~(force_exhaustive:bool) (targets : target list) (arg : Typing.term) (s : S.t) : S.t =
     let expnd_arg = p_rw_expand_arg s arg in
-    let found, s = expand targets expnd_arg s in
+    let found, s = expand ~force_exhaustive ~is_rec:false targets expnd_arg s in
     if not found then
       soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");
     s
 
-  let expands (args : Typing.term list) (s : S.t) : S.t =
-    List.fold_left (fun s arg -> expand_arg (target_all s) arg s) s args
+  let expands ~(force_exhaustive:bool) (args : Typing.term list) (s : S.t) : S.t =
+    List.fold_left (fun s arg -> expand_arg ~force_exhaustive (target_all s) arg s) s args
 
-  let expand_tac args s =
-    let args = List.map (function
-        | Args.Term_parsed t -> t
-        | _ -> bad_args ()
-      ) args
+  let expand_tac tac_args s =
+    let rec parse_args = function
+      | [] -> [], false
+      | (Args.Term_parsed t) :: q ->
+        let (args, force_exhaustive) = parse_args q in
+        (t :: args, force_exhaustive)
+      | (Args.Named_args [Args.NArg L.{ pl_desc = "def" }]) :: q ->
+        let (args, _) = parse_args q in
+        (args, true) 
+      | _ -> bad_args ()
     in
-    [expands args s]
+    let (args, force_exhaustive) = parse_args tac_args in
+    [expands ~force_exhaustive args s]
 
   let expand_tac args = wrap_fail (expand_tac args)
 
@@ -851,7 +865,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       subs @                      (* prove instances premisses *)
       [s]                         (* final sequent *)
 
-    | Rw_expand arg -> [expand_arg targets arg s]
+    | Rw_expand arg -> [expand_arg ~force_exhaustive:false targets arg s]
 
     | Rw_expandall _ -> [expand_all targets s]
 
@@ -1693,7 +1707,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* find an occurrence of [pat] in the conclusion *)
     let term =
-      let no_term_holes = Sv.for_all (not -| Vars.is_pat) (Term.fv pat) in
+      let no_term_holes = Sv.for_all (not -| Vars.is_hole) (Term.fv pat) in
       let ty_subst_opt =
         obind
           (fun ienv ->
@@ -1811,7 +1825,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             (fun vars t -> Sv.union vars (Term.fv t))
             Sv.empty (List.map (fun (x,_,_) -> x) terms)
           |>
-          Sv.filter (not -| Vars.is_pat)
+          Sv.filter (not -| Vars.is_hole)
         in
         try_clean_env t_fv s
       | `Def -> s
@@ -3025,7 +3039,7 @@ type form_type =
 
   let depends Args.(Pair (Message (a1,_), Message (a2,_))) s =
     let ppe = default_ppe ~table:(S.table s) () in
-    let models = S.get_models s in
+    let models = S.get_models None s in
     let get_action ts =
       match Constr.find_eq_action models ts with
       | Some ts -> ts

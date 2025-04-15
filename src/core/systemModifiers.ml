@@ -212,10 +212,16 @@ let global_rename
   in
 
   (* We check that n2 does not occur in the old system using fresh. *)
-  let cntxt =
-    Constr.make_context ~table ~system:(SE.singleton old_single_system)
-  in
-  let iter = new OldFresh.deprecated_find_name ~cntxt true ns2.symb.s_symb in
+  let env =
+    Env.init
+      ~table
+      ~system:{ set = (SE.singleton old_single_system :> SE.t); pair = None; } ()
+  in  
+  let context =
+    ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty
+  in  
+
+  let iter = new OldFresh.deprecated_find_name ~context true ns2.symb.s_symb in
   let () =
     try
       SystemExpr.iter_descrs
@@ -336,8 +342,13 @@ let global_prf
     conv_term table context ~bnds hash
   in
 
-  let cntxt =
-    Constr.make_context ~table ~system:(SE.singleton old_single_system)
+  let env =
+    Env.init
+      ~table
+      ~system:{ set = (SE.singleton old_single_system :> SE.t); pair = None; } ()
+  in  
+  let context =
+    ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty
   in
 
   let (h_fn, h_cnt, h_key) =
@@ -351,10 +362,10 @@ let global_prf
 
   (* Check syntactic side condition. *)
   let errors =
-    OldEuf.key_ssc ~globals:true
+    OldEuf.key_ssc
       ~elems:{terms = []; bound = None} ~allow_functions:(fun _ -> false)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
-      ~cntxt h_fn h_key.symb.s_symb
+      ~context h_fn h_key.symb.s_symb
   in
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
@@ -391,7 +402,7 @@ let global_prf
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind =
-    let ns = Term.mk_symb n Type.tmessage in
+    let ns = Term.nsymb n Type.tmessage in
     Term.mk_find is Term.(
         mk_and
           (mk_eq (Term.mk_var fresh_x_var) h_cnt)
@@ -440,7 +451,7 @@ let global_prf
                  [Projection.left, Name.to_term h_key;
                   Projection.right,
                   Term.mk_name_with_tuple_args
-                    (Term.mk_symb n Type.tmessage) (Term.mk_vars is)]]; bound = None})
+                    (Term.nsymb n Type.tmessage) (Term.mk_vars is)]]; bound = None})
         (*TODO:Concrete: Probably something to bound to create a bounded goal*)
     in
     let concl = 
@@ -481,8 +492,13 @@ let global_cca
     conv_term table context ~bnds p_enc
   in
 
-  let cntxt =
-    Constr.make_context ~table ~system:(SE.singleton old_single_system)
+  let env =
+    Env.init
+      ~table
+      ~system:{ set = (SE.singleton old_single_system :> SE.t); pair = None; } ()
+  in  
+  let context =
+    ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty
   in
 
   let enc_fn, (enc_key : Name.t), plaintext, enc_pk, (enc_rnd : Name.t) =
@@ -507,9 +523,9 @@ let global_cca
     | _, [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
-        OldEuf.key_ssc ~globals:true
+        OldEuf.key_ssc
           ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
-          ~cntxt fndec enc_key.symb.s_symb
+          ~context fndec enc_key.symb.s_symb
       in
       
       if errors <> [] then
@@ -553,7 +569,7 @@ let global_cca
   
   let mess_replacement =
     if Term.is_name plaintext then
-      let ns = Term.mk_symb n Type.tmessage in
+      let ns = Term.nsymb n Type.tmessage in
       Term.mk_name_with_tuple_args ns enc_rnd.args
     else
       Library.Prelude.mk_zeroes table (Term.mk_len plaintext) in
@@ -680,12 +696,12 @@ let do_rw_item
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
-    let _, t = TLT.expand_term ~mode:expand_context arg s (Local t) (TS.system s) in
+    let _, t = TLT.expand_term ~is_rec:false ~mode:expand_context arg s (Local t) (TS.system s) in
     Equiv.any_to_local t, []
   
   | Rw_expandall _ ->
-    let _, t = TLT.expand_term ~mode:expand_context Any s (Local t) (TS.system s) in
-    Equiv.any_to_local t, []    
+    let _, t = TLT.expand_term ~is_rec:false ~mode:expand_context Any s (Local t) (TS.system s) in
+    Equiv.any_to_local t, []
 
 let do_s_item
     (expand_context : Macros.expand_context)

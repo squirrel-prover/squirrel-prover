@@ -530,7 +530,12 @@ Proof.
         fa 1.
         rewrite /AEAD in 4.
         rewrite /* in 0.
-        cca1 2; [1:auto].
+        cca1 2.
+          split.     
+          intro pid0. 
+          intro C. 
+          case C; auto.
+          auto.
         rewrite !len_pair in 2.
         rewrite len_diff in 2.
         rewrite namelength_k namelength_k_dummy in 2. 
@@ -548,12 +553,14 @@ Proof.
            enc (tlen, rinit(pid), diff(mkey,keyFresh))
           by project. 
           rewrite Eq_len.
-            enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh;
-            1: auto.
-
+          enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh.
+          intro pid0 K; case K => //.
           fa 2; fa 2.
           fresh 4; 1:auto.
-          fresh 3; 1:auto.
+          fresh 3. 
+           intro pid0.                    
+           intro C. case C; auto.
+
           rewrite /* in 0.
           by apply Hind (pred t).
         * have ->:
@@ -562,10 +569,12 @@ Proof.
               enc (tlen, rinit(pid), mkey))
             =
             enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project.
-          rewrite Eq_len; enckp 2; 1: auto.
+          rewrite Eq_len; enckp 2; 1: intro j0 K; by case K.
           fa 2; fa 2.
           fresh 4; 1:auto.
-          fresh 3; 1:auto.
+          fresh 3. 
+           intro pid0.
+           intro C. case C; auto.
           refl.
 
   + (* Decode(pid,j) *)

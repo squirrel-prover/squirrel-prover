@@ -72,6 +72,9 @@ let v_debug_completion = Param_bool false
 let s_debug_tactics = "debugTactics"
 let v_debug_tactics = Param_bool false
 
+let s_debug_macros = "debugMacros"
+let v_debug_macros = Param_bool false
+
 let s_verbose_crypto = "verboseCrypto"
 let v_verbose_crypto = Param_bool false
 
@@ -107,6 +110,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_debug_constr          v_debug_constr
   |> declare s_debug_completion      v_debug_completion
   |> declare s_debug_tactics         v_debug_tactics
+  |> declare s_debug_macros          v_debug_macros    
   |> declare s_strict_alias_mode     v_strict_alias_mode
   |> declare s_show_strengthened_hyp v_show_strengthened_hyp
   |> declare s_auto_fadup            v_auto_fadup
@@ -146,6 +150,7 @@ let interactive             = get_bool   s_interactive
 let debug_constr            = get_bool   s_debug_constr
 let debug_completion        = get_bool   s_debug_completion
 let debug_tactics           = get_bool   s_debug_tactics
+let debug_macros            = get_bool   s_debug_macros
 let strict_alias_mode       = get_bool   s_strict_alias_mode
 let show_strengthened_hyp   = get_bool   s_show_strengthened_hyp
 let auto_fadup              = get_bool   s_auto_fadup

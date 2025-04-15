@@ -294,13 +294,10 @@ module CondTerm = struct
 
   (* Function polishing a conditional term: 
      - removing duplicates in conds *)
-  let polish (c:t) (hyps : TraceHyps.hyps) (env : Env.t) =
+  let polish (pc : ProofContext.t) (c:t) =
     let reduction_state hyps =
-      Reduction.mk_state
-        ~hyps ~system:env.system ~vars:env.vars
-        ~params:(Env.to_params env)
-        ~red_param:ReductionCore.rp_crypto
-        env.table
+      let pc = ProofContext.make ~env:pc.env ~hyps in
+      Reduction.mk_state pc ~red_param:ReductionCore.rp_crypto
     in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
@@ -310,14 +307,14 @@ module CondTerm = struct
     (* Redution in whnf *)
     let conds =
       List.map (fun cond -> fst (
-        Reduction.whnf_term ~strat (reduction_state hyps) cond))
+        Reduction.whnf_term ~strat (reduction_state pc.hyps) cond))
         conds
     in
     let term, _ =
       let extended_hyps = 
         List.fold_left (fun h f ->
             TraceHyps.add Args.AnyName (LHyp (Local f)) h
-          ) hyps conds
+          ) pc.hyps conds
       in
       Reduction.whnf_term ~strat (reduction_state extended_hyps) c.term
     in
@@ -420,8 +417,7 @@ end
 *)
 let deduce_mem
     ~(vars   : Vars.vars)
-    (env     : Env.t)
-    (hyps    : TraceHyps.hyps)
+    ~(pc     : ProofContext.t)
     ~(target : CondTerm.t)
     ~(known  : CondTerm.t) : Mvar.t option
   =
@@ -434,13 +430,13 @@ let deduce_mem
       (* Use [support] rather than [vars] to give the variables to be
          instantiated, as the latter is cleared from the substitution
          returned by [deduce_mem]. *)
-      se   = env.system.set; 
+      se   = pc.env.system.set; 
     }
   in
   let unif_state =
     Match.mk_unif_state
       ~param:Match.crypto_param
-      ~env:env.vars env.table env.system hyps ~support:vars
+      pc ~support:vars
   in
   Match.deduce_mem cterm known_set unif_state
 
@@ -461,20 +457,20 @@ let record_deduce_mem_query =
 (** Wrapper around [deduce_mem] adding logging (if instructed). *)
 let deduce_mem
     ~(vars   : Vars.vars)
-    (env     : Env.t)
-    (hyps    : TraceHyps.hyps)
+    ~(pc     : ProofContext.t)
     ~(target : CondTerm.t)
     ~(known  : CondTerm.t) : Mvar.t option
   =
-  let path = TConfig.log_mem_crypto env.table in
+  let path = TConfig.log_mem_crypto pc.env.table in
   if path = "" then
-    deduce_mem ~vars env hyps ~target ~known
+    deduce_mem ~vars ~pc ~target ~known
   else begin
     let t = Sys.time () in
-    let res = deduce_mem ~vars env hyps ~target ~known in
+    let res = deduce_mem ~vars ~pc ~target ~known in
     let t0 = Sys.time () in
     
-    record_deduce_mem_query path (env.table, target, vars, known, res <> None, t0 -. t);
+    record_deduce_mem_query
+      path (pc.env.table, target, vars, known, res <> None, t0 -. t);
     
     res
   end
@@ -555,15 +551,15 @@ let subst_support subst =
 (* ----------------------------------------------------------------- *)
 (** Function to access on matching in Match with running options...*)
 let equal_term_name_eq
-    (env : Env.t)
-    (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     ~(target : CondTerm.t)
     ~(known : CondTerm.t) : Term.term list option
   =
+  let env = pc.env in
   let known,subst = constant_name_to_var env known in
   let name_vars = subst_support subst in
 
-  match deduce_mem env hyps ~vars:name_vars ~target ~known with
+  match deduce_mem ~pc ~vars:name_vars ~target ~known with
   | Some mv ->
     (* If the matching found a substitution, get all equalities in name the 
        substitution yield*)
@@ -1041,14 +1037,14 @@ module TSet = struct
   (** Internal function checking [tset] inclusion and returning the
       matching substitution.
       Careful, [mv] may use bound (and refreshed) variables of [tset1]. *)
-  let check_incl ?(refresh = false) env hyps tset1 tset2 =
+  let check_incl ?(refresh = false) (pc : ProofContext.t) tset1 tset2 =
     let tset1 = if refresh then _refresh tset1 else tset1 in
     let tset2 = if refresh then _refresh tset2 else tset2 in
     let term1 = CondTerm.{ term = tset1.term; conds = tset1.conds} in
     let term2 = CondTerm.{ term = tset2.term; conds = tset2.conds} in
-    deduce_mem env hyps ~vars:tset2.vars ~target:term1 ~known:term2 
+    deduce_mem ~pc ~vars:tset2.vars ~target:term1 ~known:term2 
 
-  let singleton_incl ?(refresh = false) env hyps tset1 tset2 =
+  let singleton_incl ?(refresh = false) (pc : ProofContext.t) tset1 tset2 =
     let tset2 = if refresh then _refresh tset2 else tset2 in
     if tset1.vars <> [] then false
     else if Term.equal tset1.term tset2.term
@@ -1056,23 +1052,25 @@ module TSet = struct
       let term1 = CondTerm.{term = Term.mk_ands tset1.conds; conds = []} in
       let term2 = CondTerm.{term = Term.mk_ands tset2.conds; conds = []} in
       let res =
-        deduce_mem env hyps ~vars:tset2.vars ~target:term1 ~known:term2
+        deduce_mem ~pc ~vars:tset2.vars ~target:term1 ~known:term2
       in
       res <> None
     else false
 
   (*------------------------------------------------------------------*)
-  (** check if [tset1 ⊆ tset2] *)
-  let is_leq env hyps (tset1 : t) (tset2 : t) : bool =
+  (** Check if [tset1 ⊆ tset2] *)
+  let is_leq (pc : ProofContext.t) tset1 tset2 =
     let tset1 = refresh tset1 in
     let tset2 = refresh tset2 in
     alpha_conv ~refresh:false tset1 tset2 ||
-    check_incl ~refresh:false env hyps tset1 tset2 <> None ||
-    singleton_incl ~refresh:false env hyps tset1 tset2
+    check_incl ~refresh:false pc tset1 tset2 <> None ||
+    singleton_incl ~refresh:false pc tset1 tset2
 
   (** add memoization *)
-  let is_leq env hyps (tset1 : t) (tset2 : t) : bool =
+  let is_leq (pc : ProofContext.t) (tset1 : t) (tset2 : t) : bool =
     let memo = Memo2.create 1024 in
+    let env, hyps = pc.env, pc.hyps in
+    (* FIXME: see if using pc.tag to memoize is enough *)
     try
       (* We do not track the environment and hypotheses in the weak
          hash-table, as we have no cheap way of doing so for now (with
@@ -1087,16 +1085,19 @@ module TSet = struct
       if env0 == env && hyps0 == hyps then r else raise Not_found
     with
     | Not_found ->
-      let r = is_leq env hyps tset1 tset2 in
+      let r = is_leq pc tset1 tset2 in
       Memo2.add memo (tset1, tset2) (env, hyps, r);
       r
 
   (*------------------------------------------------------------------*)    
   (** Check if [cond_term ∈ tset] and returns the instantiation of 
       [tset2] variable witnessing it. *)
-  let cterm_mem env hyps (cond_term : CondTerm.t) tset : Mvar.t option =
+  let cterm_mem
+      (pc : ProofContext.t) (cond_term : CondTerm.t) (tset : t)
+    : Mvar.t option
+    =
     let tset0 = make ~term:cond_term.term ~conds:cond_term.conds ~vars:[] in
-    check_incl env hyps tset0 tset
+    check_incl pc tset0 tset
 
   (*------------------------------------------------------------------*)
   (** Check if [output ∈ input] and returns the instantiation of
@@ -1166,25 +1167,25 @@ module AbstractSet = struct
     | Sets tl ->
       List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
 
-  let is_included (env : Env.t) (hyps : TraceHyps.hyps) (s1 : t) (s2 : t) =
+  let is_included (pc : ProofContext.t) (s1 : t) (s2 : t) =
     match s1,s2 with
     | _, Top -> true
     | Top, _ -> false
     | Sets tl1,Sets tl2 ->
       List.for_all
-        (fun tset1 -> List.exists (fun tset2 -> TSet.is_leq env hyps tset1 tset2) tl2)
+        (fun tset1 -> List.exists (fun tset2 -> TSet.is_leq pc tset1 tset2) tl2)
         tl1
 
   (** [normalize ... s] and [s] represents the same set of terms,
       but [s]'s representation has been simplified.
       No over-approximation. *)
-  let normalize env hyps (s : t) : t =
+  let normalize (pc : ProofContext.t) (s : t) : t =
     match s with
     | Top -> Top
     | Sets lnorm -> 
       let lnorm =
         List.fold_left (fun lnorm x -> 
-            if List.exists (TSet.is_leq env hyps x) lnorm
+            if List.exists (TSet.is_leq pc x) lnorm
             then lnorm
             else x :: lnorm)
           [] lnorm
@@ -1193,9 +1194,9 @@ module AbstractSet = struct
 
   (** Compute the union [s1 ∪ s2].
       No over-approximation. *)
-  let union env hyps (s1 : t) (s2 : t) : t =
+  let union (pc : ProofContext.t) (s1 : t) (s2 : t) : t =
     match s1,s2 with
-    | Sets tl1, Sets tl2 -> normalize env hyps (Sets (tl1 @ tl2))
+    | Sets tl1, Sets tl2 -> normalize pc (Sets (tl1 @ tl2))
     | _ -> Top
 
   let generalize_set (vars : Vars.vars) (set : t) : t=
@@ -1205,12 +1206,12 @@ module AbstractSet = struct
 
   (** compute a list of conditions under which [∀ vars. target ≠ know] *)
   let never_equal_subgoals
-      (env : Env.t) (hyps : TraceHyps.hyps)
+      (pc : ProofContext.t)
       ~(target : CondTerm.t)
       ~(known : CondTerm.t)
       (vars : Vars.vars) : Term.term 
     =
-    let eqs = equal_term_name_eq env hyps ~target ~known in
+    let eqs = equal_term_name_eq pc ~target ~known in
     match eqs with
     | Some eqs when List.mem Term.mk_true eqs -> Term.mk_true
     | Some eqs -> Term.mk_ors ~simpl:true eqs
@@ -1222,15 +1223,14 @@ module AbstractSet = struct
 
   (** compute a list of conditions under which [term ∉ tsets] *)
   let not_in_tset_subgoals
-      (env   : Env.t)
-      (hyps  : TraceHyps.hyps)
+      (pc : ProofContext.t)
       (term  : CondTerm.t)
       (tsets : TSet.t list) : Term.terms
     =
     let not_in_tset (tset : TSet.t) =
       let tset = TSet.refresh tset in
       let subgoal =
-        never_equal_subgoals env hyps
+        never_equal_subgoals pc
           ~target:term
           ~known:{term = tset.term; conds = tset.conds}
           tset.vars
@@ -1271,37 +1271,34 @@ module AbstractSet = struct
   let find (var:Vars.var) (mem : mem) = List.assoc var mem
 
   let rec append 
-      env hyps
+      (pc : ProofContext.t)
       (var : Vars.var)
       (abstract_var : t)
       (mem : mem) : mem
     =
     match mem with
     | [] -> [var,abstract_var]
-    | (v,tl)::q when Vars.equal var v -> (v, (union env hyps  tl abstract_var))::q
-    | head::q -> head::(append env hyps var abstract_var q)
+    | (v,tl)::q when Vars.equal var v -> (v, (union pc tl abstract_var))::q
+    | head::q -> head::(append pc var abstract_var q)
 
-  let join env hyps (mem1 : mem) (mem2 : mem) : mem =
-    List.fold_left (fun mem1 (v, l) -> append env hyps v l mem1) mem1 mem2
+  let join (pc : ProofContext.t) (mem1 : mem) (mem2 : mem) : mem =
+    List.fold_left (fun mem1 (v, l) -> append pc v l mem1) mem1 mem2
 
   (* convergence is not guaranteed, only soundness *)
-  let widening env hyps (old_mem : mem) (new_mem : mem) = 
-    join env hyps old_mem new_mem
+  let widening (pc : ProofContext.t) (old_mem : mem) (new_mem : mem) = 
+    join pc old_mem new_mem
 
   (*-----------------------------------------------------------------*)
   (** abstract evaluation of a term of type [Set.t] as an
       over-approximation of [term]. *)
   let abstract_set
-      (env : Env.t) (hyps : TraceHyps.hyps)
+      (pc : ProofContext.t)
       (term : Term.term)
       (conds : Term.terms)
       (mem : mem): t
     =
     let red_param = ReductionCore.rp_crypto in
-    let st =
-      Reduction.mk_state
-        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
-    in
+    let st = Reduction.mk_state pc ~red_param in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
     let rec doit = function
@@ -1310,17 +1307,17 @@ module AbstractSet = struct
 
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [t;s] )
-        when f = Library.Set.fs_add env.table ->
-        union env hyps (doit s) (Sets [TSet.singleton ~term:t ~conds])
+        when f = Library.Set.fs_add pc.env.table ->
+        union pc (doit s) (Sets [TSet.singleton ~term:t ~conds])
 
       (* [s1 ∪ 2] *)
       | Term.App (Term.Fun (f,_), [s1;s2] )
-        when f = Library.Set.fs_union env.table ->
-        union env hyps (doit s1) (doit s2)
+        when f = Library.Set.fs_union pc.env.table ->
+        union pc (doit s1) (doit s2)
 
       (* ∅ *)
       | Term.Fun(f,_)
-        when f = Library.Set.fs_empty env.table -> Sets []
+        when f = Library.Set.fs_empty pc.env.table -> Sets []
 
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
@@ -1337,16 +1334,13 @@ module AbstractSet = struct
   (** abstract evaluation of a term of type [Set.t] as an
       **under**-approximation of [term]. *)
   let abstract_set_underapprox
-      (env : Env.t) (hyps : TraceHyps.hyps)
+      (pc : ProofContext.t)
       (term : Term.term)
       (conds : Term.terms)
       (_mem : mem): t
     =
     let red_param = ReductionCore.rp_crypto in
-    let st =
-      Reduction.mk_state
-        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
-    in
+    let st = Reduction.mk_state pc ~red_param in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
     
     let rec doit = function
@@ -1356,17 +1350,17 @@ module AbstractSet = struct
 
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [t;s] )
-        when f = Library.Set.fs_add env.table ->
-        union env hyps (doit s) (Sets [TSet.singleton ~term:t ~conds])
+        when f = Library.Set.fs_add pc.env.table ->
+        union pc (doit s) (Sets [TSet.singleton ~term:t ~conds])
 
       (* [{t} ∪ s] *)
       | Term.App (Term.Fun (f,_), [s1;s2] )
-        when f = Library.Set.fs_union env.table ->
-        union env hyps (doit s1) (doit s2)
+        when f = Library.Set.fs_union pc.env.table ->
+        union pc (doit s1) (doit s2)
 
       (* ∅ *)
       | Term.Fun(f,_)
-        when f = Library.Set.fs_empty env.table -> Sets []
+        when f = Library.Set.fs_empty pc.env.table -> Sets []
 
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
@@ -1389,7 +1383,7 @@ module AbstractSet = struct
     | _::q -> remove var q
 
   let update
-      env hyps
+      (pc : ProofContext.t)
       (mv : Mvar.t)
       (cond_subst : Term.subst)
       (conds : Term.terms)
@@ -1402,16 +1396,16 @@ module AbstractSet = struct
       | [] -> mem
       | (var,term)::q ->
         let term = Term.subst cond_subst (Term.subst subst term) in
-        let abstract_term = abstract_set env hyps term conds mem in
-        compute_decls q (append env hyps var abstract_term mem) 
+        let abstract_term = abstract_set pc term conds mem in
+        compute_decls q (append pc var abstract_term mem) 
     in
     let new_mem = compute_decls decls mem in 
     (List.fold_left (fun x -> fun y -> remove y x) new_mem [])
 
   (** compute the inital abstract memory from a list of mutable
       variables and their initial values *)
-  let init env hyps (mutable_var_decls : (Vars.var * Term.t) list) : mem =
-    update env hyps Mvar.empty [] [] mutable_var_decls []
+  let init (pc : ProofContext.t) (mutable_var_decls : (Vars.var * Term.t) list) : mem =
+    update pc Mvar.empty [] [] mutable_var_decls []
 
   let rec bool_abstraction_supported
       (env : Env.t)
@@ -1455,17 +1449,12 @@ module AbstractSet = struct
 
   (** Abstract evaluation of a boolean term [bool_term] in [mem] *)
   let abstract_bool
-      (env : Env.t)
-      (hyps : TraceHyps.hyps)
-      (table : Symbols.table)
+      (pc : ProofContext.t)
       (bool_term : CondTerm.t) 
       (mem : mem) : Term.terms option
     =
     let red_param = ReductionCore.rp_crypto in
-    let st =
-      Reduction.mk_state
-        ~hyps ~system:env.system ~vars:env.vars ~params:(Env.to_params env) ~red_param env.table
-    in
+    let st = Reduction.mk_state pc ~red_param in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
 
     let rec abstract_bool_and_not
@@ -1475,28 +1464,28 @@ module AbstractSet = struct
       match term with
       (* [t ∈ set] *)
       | Term.App ( Term.Fun (f_mem,_),[t;set])
-        when f_mem = Library.Set.fs_mem table ->
-        let set = abstract_set env hyps set bool_term.conds mem in
+        when f_mem = Library.Set.fs_mem pc.env.table ->
+        let set = abstract_set pc set bool_term.conds mem in
         begin
           match set with
           | Top -> None, None, []
           | Sets [] -> Some false, Some true, []
           | Sets tl ->
             let not_in_subgs =
-              not_in_tset_subgoals env hyps {term = t; conds = bool_term.conds } tl
+              not_in_tset_subgoals pc {term = t; conds = bool_term.conds } tl
             in 
             None, Some true, not_in_subgs
         end
 
       (* [set0 ⊆ set1] *)
       | Term.App ( Term.Fun (f_subseteq,_),[set0;set1])
-        when f_subseteq = Library.Set.fs_subseteq table ->
+        when f_subseteq = Library.Set.fs_subseteq pc.env.table ->
 
         (* over-approximation of [set0] *)
-        let over_set0 = abstract_set env hyps set0 bool_term.conds mem in
+        let over_set0 = abstract_set pc set0 bool_term.conds mem in
 
         (* under-approximation of [set1] *)
-        let under_set1 = abstract_set_underapprox env hyps set1 bool_term.conds mem in
+        let under_set1 = abstract_set_underapprox pc set1 bool_term.conds mem in
         
         (* if [over_set0 ⊆ under_set1] then [set0 ⊆ set1] *)
         begin
@@ -1569,11 +1558,11 @@ module AbstractSet = struct
   (** Check that [mem1] is included in [mem2], i.e. 
       for each variable [v], [mem1(v) ⊆ mem2(v)] *)
   let is_leq
-      (env : Env.t) (hyps : TraceHyps.hyps) (mem1 : mem) (mem2 : mem)
+      (pc : ProofContext.t) (mem1 : mem) (mem2 : mem)
     =
     let check_var (var,set1) =
       let set2 = List.assoc_dflt (Sets []) var mem2 in
-      is_included env hyps set1 set2
+      is_included pc set1 set2
     in
     List.for_all check_var mem1
 
@@ -1581,9 +1570,9 @@ module AbstractSet = struct
   (** Check that [mem1] is equal to [mem2], i.e. for each variable
       [v], [mem1(v) = mem2(v)] *)
   let is_eq
-      (env : Env.t) (hyps : TraceHyps.hyps) (mem1 : mem) (mem2 : mem)
+      (pc : ProofContext.t) (mem1 : mem) (mem2 : mem)
     =
-    is_leq env hyps mem1 mem2 && is_leq env hyps mem2 mem1
+    is_leq pc mem1 mem2 && is_leq pc mem2 mem1
 end
 
 
@@ -2011,11 +2000,8 @@ module Game = struct
 
     (* reduction state and parameters *)
     let strat = Reduction.MayRedSub red_param in
-    let st =
-      Reduction.mk_state
-        ~hyps ~system:env.system ~vars:env.vars
-        ~params:(Env.to_params env) ~red_param env.table
-    in
+    let pc = ProofContext.make ~env ~hyps in
+    let st = Reduction.mk_state pc ~red_param in
 
     (* ensure that [mv] only maps the game random values to logical
        names *)
@@ -2332,9 +2318,10 @@ module Game = struct
       in
       let oracle_conds = Term.subst subst_eqs oracle_cond in
       let mem_subgoals =
-        abstract_bool query.env query.hyps query.env.table  
-          { term  = oracle_conds;
-            conds; } query.initial_mem
+        abstract_bool
+          (ProofContext.make ~env:query.env ~hyps:query.hyps)
+          { term  = oracle_conds; conds; } 
+          query.initial_mem
       in     
       match mem_subgoals with
       | Some mem_subgoals ->
@@ -2343,7 +2330,8 @@ module Game = struct
             local_subst query.let_init query.game oracle
           in
           update
-            query.env query.hyps mv subst_eqs
+            (ProofContext.make ~env:query.env ~hyps:query.hyps)
+            mv subst_eqs
             conds
             (List.map (fun (x,y) -> (x, Term.subst oracle_subst y)) oracle.updates )
             query.initial_mem
@@ -2375,7 +2363,7 @@ module Game = struct
       | None -> Result.error (fun fmt -> Fmt.pf fmt "failed to discharge memory proof-obligations")
     with Const.InvalidGlobalConstraints err -> Result.error err
         
-  let get_initial_pre env hyps (game : game) : mem =
+  let get_initial_pre (pc : ProofContext.t) (game : game) : mem =
     let glob_mutable =
       List.filter_map (fun (v,d) ->
           match d with
@@ -2383,7 +2371,7 @@ module Game = struct
           | Mutable t -> Some (v, t)
         ) game.glob_vars
     in
-    init env hyps glob_mutable
+    init pc glob_mutable
 end 
  
 
@@ -2392,14 +2380,13 @@ end
     returns the instanciation of the arguments, which must be computed
     by the adversary to obtain the needed value. *)
 let knowledge_mem_tsets
-    (env : Env.t)
-    (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     (output : CondTerm.t)
     (rec_inputs : TSet.t list)
   =
   let is_in (input : TSet.t) : Term.terms option =
     let input = TSet.refresh input in
-    match TSet.cterm_mem env hyps output input with
+    match TSet.cterm_mem pc output input with
     | None -> None
     | Some mv ->
       (* We found an instantiation of [input.vars] that allows to
@@ -2410,7 +2397,7 @@ let knowledge_mem_tsets
       List.map (fun x ->
           if Mvar.mem x mv
           then Term.subst subst (Term.mk_var x)
-          else Library.Prelude.mk_witness env.table ~ty_arg:(Vars.ty x)
+          else Library.Prelude.mk_witness pc.env.table ~ty_arg:(Vars.ty x)
         ) input.vars
       |> some
   in
@@ -2419,16 +2406,15 @@ let knowledge_mem_tsets
 (*------------------------------------------------------------------*)
 (** return [true] if [form] can be shown to be unsatisfiable *)
 let unsatisfiable
-    (env : Env.t) (hyps : TraceHyps.hyps) (form : Term.term) : bool 
+    (pc : ProofContext.t) (form : Term.term) : bool 
   =
   let st : Match.unif_state =
     Match.mk_unif_state
-      ~param:Match.crypto_param
-      ~env:env.vars env.table env.system hyps ~support:[]
+      ~param:Match.crypto_param pc ~support:[]
   in
   let res =  
     Match.known_set_check_impl
-      env.table ~st ?mv:None
+      pc.env.table ~st ?mv:None
       form Term.mk_false
   in
   match res with
@@ -2451,17 +2437,17 @@ let record_unsat_query =
 (*------------------------------------------------------------------*)
 (** Wrapper around [unsatisfiable] adding logging (if instructed). *)
 let unsatisfiable
-    (env : Env.t) (hyps : TraceHyps.hyps) (form : Term.term) : bool 
+    (pc : ProofContext.t) (form : Term.term) : bool 
   =
-  let path = TConfig.log_unsat_crypto env.table in
+  let path = TConfig.log_unsat_crypto pc.env.table in
   if path = "" then
-    unsatisfiable env hyps form
+    unsatisfiable pc form
   else begin
     let t = Sys.time () in
-    let unsat = unsatisfiable env hyps form in
+    let unsat = unsatisfiable pc form in
     let t0 = Sys.time () in
     
-    record_unsat_query path (env.table, form, unsat, t0 -. t);
+    record_unsat_query path (pc.env.table, form, unsat, t0 -. t);
     
     unsat
   end
@@ -2482,14 +2468,13 @@ let unsatisfiable
     Return the list of all such tuples.
 *)
 let knowledge_mem_condterm_sets
-    (env : Env.t)
-    (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
     (output : CondTerm.t)
     (extra_inputs : TSet.t list) 
   : (Term.terms * Term.term * Term.term) list
   =
   let is_in (input : TSet.t) : (Term.terms * Term.term * Term.term) option =
-    match TSet.cterm_mem_cond env hyps ~output ~input with
+    match TSet.cterm_mem_cond pc.env pc.hyps ~output ~input with
     | (None,_,_) -> None
 
     | (Some mv, vars, conds) -> 
@@ -2517,7 +2502,7 @@ let knowledge_mem_condterm_sets
       (* Discard any extra input that we know will never be useful (by
          trying to show that the condition for this input never
          holds). *)
-      if unsatisfiable env hyps phi then
+      if unsatisfiable pc phi then
         (* [input] never useful, we can discard it *)
         None
       else
@@ -2819,14 +2804,15 @@ and bideduce_term
   : result option
   =
   let env = query.env in
-  let output = CondTerm.polish output query.hyps env in
+  let pc = ProofContext.make ~env:query.env ~hyps:query.hyps in
+  let output = CondTerm.polish pc output in
 
   assert (AbstractSet.well_formed env query.initial_mem);
 
   notify_bideduce_term_start query output;
 
   (* we know that [▷ args] implies [▷ (t | ϕ)] *)
-  let args = knowledge_mem_tsets env query.hyps output query.inputs in
+  let args = knowledge_mem_tsets pc output query.inputs in
 
   let conds = Term.mk_ands output.conds in
 
@@ -2847,7 +2833,7 @@ and bideduce_term
   (* if [ϕ] is unsatisfiable, there is nothing to bideduce *)
   else if
     output.conds <> [] && 
-    unsatisfiable env query.hyps conds
+    unsatisfiable pc conds
   then
     (* FIXME: add notify function *)
     Some (empty_result query.initial_mem)
@@ -2861,7 +2847,7 @@ and bideduce_term
   (* same as with [query.inputs], but this time with [query.rec_inputs] *)
   else 
     (* [output ∈ rec_inputs] *)
-    match knowledge_mem_tsets env query.hyps output query.rec_inputs with
+    match knowledge_mem_tsets pc output query.rec_inputs with
     | Some args ->
       (* FIXME: add notify function *)
       bideduce query
@@ -2882,7 +2868,7 @@ and bideduce_oracle
      Return a list of: [(args, condition, ¬ condition)] *)
   let already_called =
     knowledge_mem_condterm_sets
-      query.env query.hyps
+      (ProofContext.make ~env:query.env ~hyps:query.hyps)
       output_term query.extra_inputs
   in
   let output_term,query,result_start = 
@@ -3038,7 +3024,6 @@ and bideduce_fp
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   : result
   =
-  let hyps      = query.hyps        in
   let pre0      = query.initial_mem in    (* [φ₀] *)
   let consts0   = query.consts      in    (* [C₀] *)
 
@@ -3049,6 +3034,7 @@ and bideduce_fp
         query.env
         (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) query.env.vars)
     in
+    let pc = ProofContext.make ~env ~hyps:query.hyps in
     let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
       { env;
         vbs = query.vbs; dbg = query.dbg; param = query.param;
@@ -3067,15 +3053,15 @@ and bideduce_fp
       let post = result.final_mem in    (* [ψ] *)
       let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
-      if AbstractSet.is_eq env hyps pre  gen_post && (* [φ ⇔ ψ₀] *)
-         AbstractSet.is_eq env hyps post gen_post    (* [ψ ⇔ ψ₀] *)
+      if AbstractSet.is_eq pc pre  gen_post && (* [φ ⇔ ψ₀] *)
+         AbstractSet.is_eq pc post gen_post    (* [ψ ⇔ ψ₀] *)
       then
         begin
-          assert (AbstractSet.is_leq env hyps pre0 pre); (* [φ₀ ⇒ φ] *)
+          assert (AbstractSet.is_leq pc pre0 pre); (* [φ₀ ⇒ φ] *)
           Some {result with final_mem = gen_post}
         end
       else
-        let pre = AbstractSet.widening env hyps pre gen_post in
+        let pre = AbstractSet.widening pc pre gen_post in
         compute_fp pre 
 
     | None ->
@@ -3102,43 +3088,37 @@ type rec_call = {
   ty      : Type.ty;            (** type of [f args rec_args] *)
 }
 
+
+let[@warning "-32"] pp_rec_call fmt (m : rec_call) =
+    Fmt.pf fmt "@[<hv 2>{ @[%a(%a)@]@@_ |@ %a}@]"
+      Symbols.pp_path m.macro.s_symb
+      (Fmt.list Term.pp)  m.args
+      Term.pp  m.rec_arg
+
+
 (** Occurrence of a call to a recursive function *)
 type rec_call_occ = rec_call Iter.occ
 
 let derecursify_term
-    (hyps : TraceHyps.hyps)
-    (params : Params.t) (venv : Vars.env)
-    (constr : Constr.trace_cntxt) (system : SE.context) (t_init : Term.term)
+    (pc : ProofContext.t) (t_init : Term.term)
   : rec_call_occ list
   =
-  let table = constr.table in
-  
+  let table = pc.env.table in
+
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p acc ->
       (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
          
          Must be synchronized with corresponding code in [Occurrences]
          and [Iter]. *)
-      let new_context = { system with set = se; } in
+      let new_system = { pc.env.system with set = se; } in
+      let pc = Iter.update_context ~extra_vars:vars new_system pc in
       let t, has_red =
-        let hyps = 
-          Hyps.change_trace_hyps_context
-            ~old_context:system ~new_context
-            ~table ~vars:venv
-            hyps
-        in
-
         let red_param = ReductionCore.rp_crypto in
-        (* FIXME: add tag information in [fv] *)
-        let vars = Vars.of_list (Vars.Tag.local_vars vars) in
-        let st =
-          Reduction.mk_state
-            ~hyps ~system:new_context ~vars ~params ~red_param table
-        in
+        let st = Reduction.mk_state pc ~red_param in
         let strat = Reduction.(MayRedSub ReductionCore.rp_full) in
         Reduction.whnf_term ~strat st t
       in
-
       match t with
       | Term.Macro (ms,l,ts) -> (* [m l @ ts] *)
         let mk_rec_call () =
@@ -3152,24 +3132,28 @@ let derecursify_term
           rec_occ :: acc, if has_red then `Map t else `Continue 
         in
         begin
-          match Macros.get_definition { constr with system = SE.to_fset se } ms ~args:l ~ts with
-          | `Def t -> acc, `Map t
-          | `Undef | `MaybeDef -> mk_rec_call ()
+          match Macros.unfold pc.env ms l ts with
+          | `Results [r]  -> acc, `Map (
+              Term.mk_ite
+                r.when_cond
+                r.out
+                (Library.Prelude.mk_witness table ~ty_arg:(Term.ty r.out)))
+          | _ -> mk_rec_call ()
         end
-            
+
       | _ -> acc, if has_red then `Map t else `Continue 
   in
   let acc, _, _ = 
-    Match.Pos.map_fold ~mode:(`TopDown true) t_fold system.set [] t_init
+    Match.Pos.map_fold
+      ~mode:(`TopDown true) 
+      t_fold pc.env.system.set [] t_init
   in
   acc
 
 (** Given a term, return some corresponding [known_sets] using
     built-in rules + user-given deduction rules *)
-let term_set_strengthen
-    (env : Env.t) (hyps : TraceHyps.hyps) (k : TSet.t) 
-  : TSet.t list 
-  =
+let term_set_strengthen (pc : ProofContext.t) (k : TSet.t) : TSet.t list =
+  let env = pc.env in
   (* convert [k] from a [TSet.t] to a [Match.term_set] *)
   let k = Match.{
       term = k.term; 
@@ -3177,7 +3161,7 @@ let term_set_strengthen
       cond = k.conds; 
       se = env.system.set; } 
   in
-  let l = Match.term_set_strengthen ~inputs:[] env hyps k in (* FIXME: provide useful inputs *)
+  let l = Match.term_set_strengthen ~inputs:[] env pc.hyps k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
   List.map (fun (k : Match.term_set) ->
       assert (
@@ -3193,13 +3177,13 @@ let term_set_strengthen
     ) l
 
 (* compute a set of known macros from a occurrence of a recursive call *)
-let term_set_of_occ 
-    (env : Env.t) (hyps : TraceHyps.hyps) ~cond (k : rec_call_occ) 
+let term_set_of_occ
+    (pc : ProofContext.t) ~cond (k : rec_call_occ) 
   : TSet.t list 
   =
   let conds = cond @ k.occ_cond in
   let body = Term.mk_macro k.occ_cnt.macro k.occ_cnt.args k.occ_cnt.rec_arg in
-  term_set_strengthen env hyps (TSet.make ~term:body ~conds ~vars:k.occ_vars)
+  term_set_strengthen pc (TSet.make ~term:body ~conds ~vars:k.occ_vars)
 
 (*------------------------------------------------------------------*)
 (** Ad hoc simplification for happens conditions in recursive
@@ -3279,15 +3263,13 @@ let notify_bideduction_subgoals table ~direct ~recursive : unit =
     Note that in practice, these subgoals are tailored to Squirrel
     macros, and may be of a different form than the sub-goal above. *)
 let derecursify
-    (env : Env.t) (targets : Term.terms)
-    (game : game) (hyps : TraceHyps.hyps)
+    (pc : ProofContext.t)
+    (targets : Term.terms)
+    (game : game) 
   : goal list * goal            (* recursive subgoals, direct subgoals *)
   =
-  let system = env.system in
-  let params = Env.to_params env in
-  let trace_context =
-    Constr.make_context ~table:env.table ~system:(SE.to_fset system.set)
-  in
+  let env  = pc.env in
+  let hyps = pc.hyps in
   let vbs = TConfig.verbose_crypto env.table in
   let dbg = TConfig.debug_tactics  env.table in
 
@@ -3301,17 +3283,17 @@ let derecursify
     let rec_term_occs =
       (* we must mimick the behavior of [fold_macro_support] *)
       derecursify_term
-        hyps params env.vars trace_context system
+        pc
         (Term.mk_tuple (term :: conds))
         (* extending [env.vars] with [vars] would not be useful as
            [vars] are local, unrestricted, variables. *)
     in
     (* let extra_cond = odflt Term.mk_true form in *)
-    let rec_terms = List.concat_map (term_set_of_occ env hyps ~cond:[] ) rec_term_occs in
+    let rec_terms = List.concat_map (term_set_of_occ pc ~cond:[] ) rec_term_occs in
     (* remove duplicates *)
     let rec_terms =
       List.fold_left (fun rec_terms t ->
-          if List.exists (fun y -> TSet.is_leq env hyps t y) rec_terms then
+          if List.exists (fun y -> TSet.is_leq pc t y) rec_terms then
             rec_terms
           else
             t :: rec_terms
@@ -3348,20 +3330,20 @@ let derecursify
         let ts = iocc.iocc_rec_arg in
         (* TODO: can we add [iocc_vars] to [env]? And what about
            [iocc_cond] to hyps? Or the added hypotheses below? *)
-        let ts_occs =
-          Occurrences.get_macro_actions
-            ~mode:PTimeSI ~env ~hyps
-            trace_context iocc.iocc_sources
+        let rec_arg_occs =
+          Occurrences.get_macro_rec_args
+            ~mode:PTimeSI ~context:pc
+            iocc.iocc_sources
         in
         let path_cond =         (* FIXME: add a flag [~precise] *)
           if false (* use_path_cond *)
           then iocc.iocc_path_cond
           else PathCond.Top
         in
-        let time_form = Occurrences.time_formula ts ~path_cond ts_occs in
+        let time_form = Occurrences.rec_arg_formula env.table ts iocc.iocc_fun ~path_cond rec_arg_occs in
 
         let hyps =
-          TraceHyps.add Args.AnyName (LHyp (Local (Term.mk_happens ts))) hyps (*|>*)
+          TraceHyps.add Args.AnyName (LHyp (Local (iocc.iocc_cond))) hyps (*|>*)
           (* TraceHyps.add Args.AnyName (LHyp (Local time_form)) *)
         in
         let togen = Sv.elements iocc.iocc_vars in
@@ -3373,7 +3355,7 @@ let derecursify
             ~term:iocc.iocc_cnt ~conds:[time_form; iocc.iocc_cond]
         in
         goal :: goals
-      ) trace_context env hyps targets []
+      ) pc targets [] 
   in
 
   let recursive = List.map (simplify_rec_goal env.table) recursive in
@@ -3481,7 +3463,11 @@ let bideduce_recursive_subgoals
     if bided_subgoals = [] then [],res0
     else
       let next_goals,query,result = step query res0  in
-      if AbstractSet.is_leq query.env query.hyps result.final_mem mem then
+      if
+        AbstractSet.is_leq
+          (ProofContext.make ~env:query.env ~hyps:query.hyps)
+          result.final_mem mem
+      then
         next_goals,result
       else
         fp result.final_mem
@@ -3640,13 +3626,13 @@ let bideduce_all_goals
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
-    ~(param : param)
-    (env   : Env.t)
-    (hyps  : TraceHyps.hyps)    (* in system [env.system] *)
-    (pgame : Symbols.p_path)
-    (args  : Args.crypto_args)
-    (terms : Equiv.equiv)       (* in system [env.system.set] (and not [pair]!) *)
+    ~(param  : param)
+    (pc : ProofContext.t)
+    (pgame   : Symbols.p_path)
+    (args    : Args.crypto_args)
+    (terms   : Equiv.equiv)       (* in system [context.env.system.set] (and not [pair]!) *)
   =
+  let env = pc.env in
   let table = env.table in
   let ppe = default_ppe ~table () in
 
@@ -3658,7 +3644,7 @@ let prove
   let dbg = TConfig.debug_tactics  env.table in
 
   let game = find env.table pgame in
-  let initial_mem = Game.get_initial_pre env hyps game in
+  let initial_mem = Game.get_initial_pre pc game in
 
   let init_consts, let_init = parse_crypto_args env game args in
   let init_consts_terms =
@@ -3679,7 +3665,7 @@ let prove
          irrelevant for now *)
       env; vbs; dbg;
       initial_mem;
-      game; hyps;
+      game; hyps = pc.hyps;
       allow_oracle = false;
       inputs = [];
       rec_inputs = [];
@@ -3741,7 +3727,7 @@ let prove
   in
 
   let rec_bided_subgs, direct_bided_subgs =
-    derecursify env terms.terms game hyps
+    derecursify pc terms.terms game 
   in
 
   (* First pass on bideduction, to find extra inputs.*)
@@ -3791,8 +3777,25 @@ let prove
     let rec_target_cond = (* additional condition for the recursive case only *)
       match kind with
       | `Recursive ->
-        let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
-        [Term.mk_leq source_rec_arg target_rec_arg]  (* A i < B j *)
+        let target_rec_arg, order1 = Macros.get_macro_deacreasing_info target.env.table (oget target.rec_fun) (oget target.rec_arg) in
+        let source_rec_arg, order2 = Macros.get_macro_deacreasing_info target.env.table (oget source.rec_fun) source_rec_arg in
+
+        if Type.equal (Term.ty target_rec_arg) (Term.ty source_rec_arg) 
+        && Symbols.path_equal order1 order2
+           (* the two calls correspond to comparable mutuially recursive calls *)
+        then
+          begin
+        if Type.equal (Term.ty target_rec_arg) Type.ttimestamp             
+          && Symbols.path_equal order1 Library.Prelude.fs_lt then
+          let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
+          [Term.mk_leq source_rec_arg target_rec_arg]  (* A i < B j, writtent as A i <= pred(B j) *)
+        else
+          [Term.mk_fun_infer_tyargs table order1 [source_rec_arg; target_rec_arg]]            
+          end          
+        else
+          []
+          
+
         
       | `Direct -> []
     in
@@ -3856,11 +3859,7 @@ let prove
     Printer.pr "@;@]"; (* close vertical box of final result *)
     
     let red_param = Reduction.rp_default in
-    let params = Env.to_params env in
-    let state = 
-      Reduction.mk_state
-        ~hyps ~system:env.system ~params ~red_param env.table
-    in
+    let state = Reduction.mk_state pc ~red_param in
     List.remove_duplicate (Reduction.conv state) (consts_subgs @ result.subgoals)
   | None ->
     Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )

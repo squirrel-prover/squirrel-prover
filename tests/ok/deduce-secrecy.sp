@@ -71,8 +71,8 @@ Qed.
 global lemma[set:P/left; equiv:none] _:
   $(empty |> (frame@init,exec@init)).
 Proof.
-  checkfail (deduce ~all) exn ApplyMatchFailure.
-Abort.
+  deduce ~all.
+Qed.
 
 op a : message.
 op b = a.

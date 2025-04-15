@@ -304,7 +304,7 @@ let prf_param_pattern
     Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef
   in
   let table = Process.add_namelength_axiom table nprfs n_fty in
-  let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
+  let nprf = Name.{symb=Term.nsymb nprfs hty; args=[]} in
 
   (* replace instances of p with n_PRF, everywhere in t *)
   (* t_nprf is both the context in which prf will be applied,
@@ -359,37 +359,25 @@ let prf_param
       Alternately, we could find syntactic conditions on cc_nprf that guarantee
       this won't happen, but again it's unclear whether that's useful. *)
 let phi_proj
-    ?(use_path_cond=false)
     (loc     : L.t)
-    (env     : Env.t)
-    (contx   : Constr.trace_cntxt)
-    (hyps    : Hyps.TraceHyps.hyps)
+    (context : ProofContext.t)
     (hash_f  : Symbols.fname)
-    (biframe : Term.terms)
-    (cc_nprf : Term.term)
-    (m       : Term.term)
-    (k       : Term.term)
-    (nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
+    ~(biframe : Term.terms)
+    ~(cc_nprf : Term.term)
+    ~(m       : Term.term)
+    ~(k       : Term.term)
+    ~(nprf    : Name.t) (* stand-in for the hash in cc_nprf. *)
     (proj    : Projection.t)
   : Term.terms
   =
+  let env = context.env in
   let ppe = default_ppe ~table:env.table () in
-  (* project everything *)
-  let system_p = SE.project [proj] contx.system in
-  let new_context = { env.system with set = (system_p :> SE.arbitrary); } in
-  let env = Env.update ~system:new_context env in
-  let contx_p = { contx with system = system_p } in
-  let cc_nprf_p = Term.project1 proj cc_nprf in
-  let m_p = Term.project1 proj m in
 
-  let hyps =
-    Hyps.change_trace_hyps_context
-      ~old_context:env.system ~new_context:new_context
-      ~vars:env.vars ~table:env.table hyps
-  in
+  let cc_nprf = Term.project1 proj cc_nprf in
+  let m = Term.project1 proj m in
 
   (* check that the key, once projected, is a name. *)
-  let k_p = 
+  let k = 
     match Term.project1 proj k with
     | Name _ as kp -> 
       Name.of_term kp
@@ -397,22 +385,22 @@ let phi_proj
              (Tactics.Failure "Can only be applied on a hash where \
                                the key is a name.")
   in
-  let frame_p = List.map (Term.project1 proj) biframe in
+  let frame = List.map (Term.project1 proj) biframe in
 
   let pp_k ppf () = 
     Fmt.pf ppf "bad occurrences of key %a,@ and messages hashed by it" 
-      (Name.pp ppe) k_p
+      (Name.pp ppe) k
   in
 
   (* first construct the IOS.folds_occs *)
-  let get_bad = get_bad_occs m_p k_p hash_f in
+  let get_bad = get_bad_occs m k hash_f in
 
 
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
-  let occs = IOS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_k)
-      get_bad
-      hyps contx_p env (cc_nprf_p :: m_p :: k_p.args @ frame_p)
+  let occs = 
+    IOS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_k)
+      get_bad context (cc_nprf :: m :: k.args @ frame)
   in
   (* sort the occurrences: first the key occs, then the hash occs *)
   let occs_key, occs_hash =
@@ -427,7 +415,7 @@ let phi_proj
 
   (* compute the formulas stating that none of the occs is a collision *)
   let phi = 
-    List.map (IOF.occurrence_formula ~use_path_cond ~negate:true) occs
+    List.map (IOF.occurrence_formula env.table ~use_path_cond:false ~negate:true) occs
   in
 
   (* finally, fail if the generated formula contains the context's hole,
@@ -445,11 +433,11 @@ let phi_proj
 (** The PRF tactic *)
 let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let ppe = default_ppe ~table:(ES.table s) () in
-  let contx = ES.mk_pair_trace_cntxt s in
   let env = ES.env s in
   let loc = L.loc i in
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
+  let system = ((Utils.oget env.system.pair) :> SE.fset) in
 
   let before, e, after = LT.split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
@@ -458,27 +446,31 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
      cc does not contain diffs or binders above xc.
      (at least the diff part could maybe be relaxed?) *)
   let {pp_hash_f=hash_f; pp_key=k; pp_msg=m;
-       pp_context_nprf=cc_nprf; pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table_nprf} =
+       pp_context_nprf=cc_nprf; pp_nprf=nprf; pp_cond=(cond_l,cond_r); pp_table=table} =
     prf_param ~loc e p s
   in
-  let contx_nprf = {contx with table=table_nprf} in
+  (* let context = {context with table=table_nprf} in *)
 
   Printer.pr
     "@[<v 0>Applying PRF to %a@;@;"
-    (Term._pp ppe) (Term.mk_fun contx.table hash_f [Term.mk_tuple [m;k]]);  
-  let phi_proj =
-    phi_proj ~use_path_cond:false loc
-      env contx_nprf (ES.get_trace_hyps s) hash_f biframe cc_nprf m k nprf 
-      (* FEATURE: allow the user to set [use_path_cond] to true *)
+    (Term._pp ppe) (Term.mk_fun table hash_f [Term.mk_tuple [m;k]]);  
+
+  let phi_proj proj () =
+    let se = SE.project [proj] system in
+    let new_system = { env.system with set = (se :> SE.arbitrary); } in
+    let context = ES.proof_context ~in_system:new_system s in
+
+    phi_proj loc
+      context hash_f ~biframe ~cc_nprf ~m ~k ~nprf proj
   in
 
   Printer.pr "@[<v 0>Checking for occurrences on the left@; @[<v 0>";
   (* get proof obligation for occurrences *)
-  let phi_l = phi_proj proj_l in
+  let phi_l = phi_proj proj_l () in
 
   Printer.pr "@]@,Checking for occurrences on the right@; @[<v 0>";
   (* get proof obligation for occurrences *)
-  let phi_r = phi_proj proj_r in
+  let phi_r = phi_proj proj_r () in
 
   Printer.pr "@]@]@;";
 
@@ -533,7 +525,7 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   in
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
-  let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table_nprf s) in
+  let equiv_sequent = ES.set_equiv_conclusion {terms= new_biframe; bound = None} (ES.set_table table s) in
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 

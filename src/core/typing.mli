@@ -81,7 +81,7 @@ type applied_symb = {
 type quant = Term.quant
 
 type term_i =
-  | Tpat
+  | Tpat                        (** anonymous pattern variable *)
 
   | Int    of int L.located
   | String of string L.located
@@ -102,6 +102,16 @@ type term_i =
   | Quote of term
 
 and term = term_i L.located
+
+(*------------------------------------------------------------------*)
+(** [pattern as t when when_cond => out] *)
+type match_item = {
+  pattern   : term option;
+  when_cond : term option;
+  out       : term;
+}
+
+type match_body = match_item list
 
 (*------------------------------------------------------------------*)
 val mk_applied_symb : Symbols.p_path -> applied_symb 
@@ -293,6 +303,9 @@ type conversion_error_i =
 type conversion_error = L.t * conversion_error_i
 
 exception Error of conversion_error
+
+val ty_error :
+  Infer.env -> L.t -> Term.term -> got:Type.ty -> expected:Type.ty -> 'a
 
 val error : L.t -> conversion_error_i -> 'a
     

@@ -192,6 +192,8 @@ let rec token buf =
   | "lemma" -> !?LEMMA
   | "let" -> !?LET
   | "Let" -> !?LLET
+  | "rec" -> !?REC
+  | "and" -> !?TAND
   | "localize" -> !?LOCALIZE
   | "local" -> !?LOCAL
   | "memseq" -> !?MEMSEQ
@@ -227,10 +229,12 @@ let rec token buf =
   | "signature" -> !?SIGNATURE
   | "simpl" -> !?SIMPL
   | "smt" -> !?SMT
+  | "termination_by" -> !?TERMINATIONBY
   | "deduce" -> !?DEDUCE
   | "splitseq" -> !?SPLITSEQ
   | "such that" -> !?SUCHTHAT
   | "system" -> !?SYSTEM
+  | "like" -> !?LIKE
   | "tactic" -> !?TACTIC
   | "then" -> !?THEN
   | "theorem" -> !?THEOREM
@@ -247,6 +251,7 @@ let rec token buf =
   | "weak" -> !?WEAK
   | "where" -> !?WHERE
   | "with" -> !?WITH
+  | "when" -> !?WHEN
   | "XOR" -> !?XOR
 
   (* terminal symbol, delimiting a sentence to be parsed. *)

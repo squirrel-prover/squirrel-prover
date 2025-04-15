@@ -20,8 +20,8 @@ exception Deprecated_Not_name
 
 (*------------------------------------------------------------------*)
 (** Deprecated. *)
-class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (_self)
-  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
+class deprecated_find_name ~(context:ProofContext.t) exact name = object (_self)
+  inherit Iter.deprecated_iter_approx_macros ~exact ~context as super
 
   method visit_message t = match t with
     | Term.Name (ns,_) -> if ns.s_symb = name then raise Deprecated_Name_found
@@ -34,8 +34,8 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (_sel
 end
 
 (** Deprecated, use [get_actions_ext]. *)
-class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (_self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
+class deprecated_get_actions ~(context:ProofContext.t) = object (_self)
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~context as super
 
   val mutable actions : Term.term list = []
   method get_actions = actions
@@ -69,19 +69,22 @@ let deprecated_pp_name_occ fmt (occ : deprecated_name_occ) : unit =
 (** Looks for indices at which a name occurs.
     @raise Var_found if a term variable occurs in the term. *)
 let deprecated_get_name_indices_ext
-    ~(env:Env.t)
     ?(fv=[])
-    (constr : Constr.trace_cntxt)
+    (context : ProofContext.t)
     (nsymb : Symbols.name)
     (t : Term.term)
   : deprecated_name_occs
   =
-  let env fv =
-    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  let context fv =
+    let env = 
+      Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) context.env.vars) 
+        context.env
+    in 
+    ProofContext.make ~env ~hyps:context.hyps
   in
   let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : deprecated_name_occs =
     match t with
-    | _ when HighTerm.is_ptime_deducible ~si:false (env fv) t -> []
+    | _ when HighTerm.is_ptime_deducible ~si:false (context fv).env t -> []
 
     | Var _ -> raise Deprecated_Var_found
 
@@ -95,7 +98,7 @@ let deprecated_get_name_indices_ext
       [occ]
 
     | _ ->
-      Iter.tfold_occ ~mode:(`Delta constr)
+      Iter.tfold_occ ~mode:(`Delta (context fv))
         (fun ~fv ~cond t occs ->
            get t ~fv ~cond @ occs
         ) ~fv ~cond t []
@@ -178,8 +181,9 @@ let deprecated_remove_duplicate_term_occs
   List.rev occs
 
 (** Looks for timestamps at which macros occur in a term. *)
-let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : deprecated_ts_occs =
-
+let deprecated_get_actions_ext
+    (context : ProofContext.t) (t : Term.term) : deprecated_ts_occs
+  =   
   let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : deprecated_ts_occs =
     match t with
     | Term.Macro (m, l, ts) ->
@@ -199,12 +203,11 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
         [occ] @ 
         List.concat_map (get ~fv ~cond) (ts :: l)
       in
-
-      begin match Macros.get_definition constr m ~args:l ~ts with
-        | `Def t -> get ~fv ~cond t
-        | `Undef | `MaybeDef -> get_macro_default ()
-      end
-
+      let res, has_red =
+        Match.reduce_delta_macro1
+          ~constr:true context.env ~hyps:context.hyps t
+      in
+      if has_red = True then get ~fv ~cond res else get_macro_default ()
     | _ ->
       (* Remark: we use [`NoDelta] because we want to have a different
          behavior depending on whether the macro can be expended or not. *)
@@ -221,14 +224,17 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
 
 (** Return timestamps occuring in macros in a set of terms *)
 let deprecated_get_macro_actions
-    (cntxt : Constr.trace_cntxt)
+    (context : ProofContext.t)
     (sources : Term.terms) : deprecated_ts_occs
   =
+  let table  = context.env.table  in
+  let system = context.env.system in
+
   let actions =
-    List.concat_map (deprecated_get_actions_ext cntxt) sources
+    List.concat_map (deprecated_get_actions_ext context) sources
   in
   deprecated_remove_duplicate_term_occs
-    cntxt.table (cntxt.system :> SE.arbitrary) actions
+    table system.set actions
 
 (** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs
     before the macro timestamp occurrence [occ]. *)

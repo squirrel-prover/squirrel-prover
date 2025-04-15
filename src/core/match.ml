@@ -1225,14 +1225,16 @@ type unif_state = {
   (** vars already substituted (for cycle detection during unification) *)
 
   support : Vars.tagged_vars; (** free variable which we are trying to match *)
-  env     : Vars.env;         (** rigid free variables (disjoint from [support]) *)
 
+  env     : Vars.env;         (** rigid free variables (disjoint from [support]) *)
+  table   : Symbols.table;
+  system  : SE.context;       (** system context applying at the current position *)
+  params  : Params.t;
+  
   expand_context : Macros.expand_context; 
   (** expantion mode for macros. See [Macros.expand_context]. *)
 
   ienv    : Infer.env;
-  table   : Symbols.table;
-  system  : SE.context; (** system context applying at the current position *)
 
   hyps : Hyps.TraceHyps.hyps; (** hypotheses, taken in [system] *)
 
@@ -1247,25 +1249,25 @@ type unif_state = {
 }
 
 let mk_unif_state
-    ~(param   : param)
-    ~(env     : Vars.env)
-    (table    : Symbols.table)
-    (system   : SE.context)
-    (hyps     : Hyps.TraceHyps.hyps)
-    ~(support : Vars.vars) : unif_state
+    ~(param   : param) (pc : ProofContext.t) ~(support : Vars.vars)
+  : unif_state
   =
   assert (param.mode = `Eq);
+  let env = pc.env in
   { mode           = `Unif;
     mv             = Mvar.empty;
     bvs            = [];
     subst_vs       = Sv.empty;
     support        = Vars.Tag.local_vars support;
-    env;
     expand_context = Macros.InSequent;
     ienv           = Infer.mk_env () ;
-    table;
-    system;
-    hyps;
+
+    env    = pc.env.vars;
+    table  = env.table;
+    system = env.system;
+    params = Env.to_params env;
+
+    hyps = pc.hyps;
 
     red_param = param.red_param;
     red_strat = param.red_strat;
@@ -1286,6 +1288,16 @@ let st_change_context (st : unif_state) (new_context : SE.context) : unif_state 
   in
   { st with system = new_context; hyps = change_hyps st.hyps; }
 
+let to_env (st : unif_state) : Env.t =
+  Env.init
+    ~vars:st.env ~system:st.system
+    ~ty_vars:st.params.ty_vars ~se_vars:st.params.se_vars
+    ~table:st.table ()
+
+(* let to_pc (st : unif_state) : ProofContext.t = *)
+(*   let env = to_env st in *)
+(*   ProofContext.make ~env ~hyps:st.hyps *)
+    
 (*------------------------------------------------------------------*)
 let env_of_unif_state (st : unif_state) : Env.t =
   let vars = Vars.add_vars st.bvs st.env in
@@ -1306,7 +1318,7 @@ let whnf0
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let red_st = R.mk_state ~hyps ~system ~vars ~red_param table in
+  let red_st = R.mk_state0 ~hyps ~system ~vars ~red_param table in
   R.whnf_term ~strat red_st t
 
 (** Put [t] in weak-head normal form w.r.t. [st]. *)
@@ -1334,7 +1346,7 @@ let reduce_head1
   in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
-    R.mk_state
+    R.mk_state0
       ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
   R.reduce_head1_term ~strat red_st t
@@ -1351,7 +1363,7 @@ let conv_term
   in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
-    R.mk_state
+    R.mk_state0
       ~hyps:st.hyps ~system:st.system ~vars ~red_param st.table
   in
   R.conv red_st t1 t2
@@ -1363,7 +1375,7 @@ let conv_term
 (** Perform δ-reduction once at head position
     (definition unrolling). *)
 let reduce_delta_def1
-    (table : Symbols.table) (system : SE.context) 
+    (env : Env.t)
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * ReductionCore.head_has_red
@@ -1374,11 +1386,11 @@ let reduce_delta_def1
       Hyps.TraceHyps.find_map (function
           | v', LDef (se',t') ->
             if Ident.equal v' v.id &&
-               SE.subset table system.set se' 
+               SE.subset env.table env.system.set se' 
                (* we must use [subset] and not [subset_modulo] here! *)
             then
               let _, subst = 
-                SE.mk_proj_subst ~strict:false ~src:se' ~dst:system.set 
+                SE.mk_proj_subst ~strict:false ~src:se' ~dst:env.system.set 
               in
               let t' = Term.subst_projs ~project:true subst t' in
               Some t'
@@ -1419,7 +1431,9 @@ let as_action
       | _ -> None
     ) hyps 
 
+
 (*------------------------------------------------------------------*)
+(** Fast function checking if [t ≤ t'] holds. *) 
 let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
   let rec leq t t' =
     match t,t' with
@@ -1437,74 +1451,207 @@ let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
   leq t t'
 
 (*------------------------------------------------------------------*)
-(** Fast function checking if [t] happens using [form]. *)
-let rec happens_term table ~(t : Term.t) ~(form : Term.t) : bool = 
-  match Term.decompose_app form with
-  (* [happens(t)] *)
+(** Flattens a conjunction [cond], yielding the corresponding atoms,
+    while dropping trivially true ones. *) 
+let rec flatten_simplify (cond : Term.term) : Term.term list =
+  match cond with
+  (* [cond → true] *)
+  | t when Term.equal t Term.mk_true -> []
+
+  (* [cond → happens(init)] *)
+  | App (Term.Fun (fs,_), [t])
+    when Symbols.path_equal fs Symbols.fs_happens
+      && Term.equal t Term.init -> []
+
+  (* [cond → t = t] *)
+  | App (Term.Fun (fs,_), [t1; t2])
+    when Symbols.path_equal fs Symbols.fs_eq
+      && Term.equal t1 t2 -> []
+
+  (* [cond → (A j ≠ B k) or (init ≠ A k) *)
+  | App (Term.Fun (fs,_), [t1; t2]) as u
+    when Symbols.path_equal fs Symbols.fs_neq
+      && Term.is_action t1 && Term.is_action t2 ->
+    begin
+      match Term.destr_action t1, Term.destr_action t2 with
+      | Some (a1, _), Some(a2, _) when not (Symbols.path_equal a1 a2) -> []
+      | _ -> [u]
+    end
+
+  (* [cont → c1 && c2] *)
+  | App (Term.Fun (fs,_), [t1;t2]) when Symbols.path_equal fs Symbols.fs_and ->
+    flatten_simplify t1 @ flatten_simplify t2
+
+  | u -> [u]
+
+(*------------------------------------------------------------------*)
+(** Check if [t] happens using [hyp],
+    assuming that all terms in [equal_ts] are equal. *)
+let rec happens_term
+    (table : Symbols.table)
+    ~(equal_ts : Term.terms)
+    ~(hyp : Term.term)
+    ~(t : Term.term) 
+  : bool
+  =
+  match Term.decompose_app hyp with
+  (* [hyp1 ∧ hyp2] *)
+  | Term.Fun (fs,_), [hyp1; hyp2] when Symbols.path_equal fs Symbols.fs_and ->
+    happens_term table ~equal_ts ~t ~hyp:hyp1 ||
+    happens_term table ~equal_ts ~t ~hyp:hyp2
+
+  (* [happens(t0)] *)
   | Term.Fun (fs,_), [t0] when Symbols.path_equal fs Symbols.fs_happens ->
-    leq_tauto table t t0
+    leq_tauto table t t0 ||
+    ( List.exists (Term.equal t) equal_ts &&
+      List.exists (fun t' -> leq_tauto table t' t0) equal_ts)
 
-  (* [t < t'], or [t' < t] (idem for ≤) *)
+  (* [t0 < t1], or [t1 < t0] (idem for ≤) *)
   | Term.Fun (fs,_), [t0; t1] 
-    when Symbols.path_equal fs Symbols.fs_leq || 
+    when Symbols.path_equal fs Symbols.fs_leq ||
          Symbols.path_equal fs Symbols.fs_lt ->
-    leq_tauto table t t0 || leq_tauto table t t1
-
-  (* [f0 ∧ f1] *)
-  | Term.Fun (fs,_), [f0; f1] when Symbols.path_equal fs Symbols.fs_and ->
-    happens_term table ~t ~form:f0 ||
-    happens_term table ~t ~form:f1 
-
+    leq_tauto table t t0 ||
+    leq_tauto table t t1 ||
+    ( List.exists (Term.equal t) equal_ts &&
+      List.exists
+        (fun t' ->
+           leq_tauto table t' t0 ||
+           leq_tauto table t' t1   ) equal_ts )
+    
   | _ -> false
 
-let happens table (hyps : Hyps.TraceHyps.hyps) (t : Term.term) : bool =
-  TraceHyps.exists (fun (_x,f) ->
-      match f with
-      | LHyp (Global Equiv.(Atom (Reach {formula = form; bound = None})))
-      | LHyp (Local form) -> happens_term table ~t ~form
-      | LHyp (Global _) -> false
-      | LDef _ -> false
-    ) hyps
+(*------------------------------------------------------------------*)
+(** Check if hypotheses [hyps] imply [conds],
+    assuming that all terms in [equal_ts] are equal.
+
+    Return the list of atoms in [conds] that cannot be proved. *)
+let check_conds
+    ?(force_happens=false) (table : Symbols.table)
+    ~(equal_ts : Term.terms)
+    ?(hyps : TraceHyps.hyps = TraceHyps.empty)
+    ?(hyps_list : Term.terms = [])
+    (conds : Term.term) 
+  : Term.term list
+  =
+  (* starts from [conds] decomposed as a list of elementary conditions *)
+  let conds = ref (flatten_simplify conds) in
+
+  (* remove from [conds] the formulas that can be proved using
+     [hyp]. *)
+  let check1 hyp = 
+    conds :=
+      List.filter
+        (fun cond ->
+           (* for now, we only support the [happens] condition here *)
+           match Term.decompose_app cond with
+           (* [happens(t)] *)
+           | Term.Fun (fs,_), [t] when Symbols.path_equal fs Symbols.fs_happens ->
+             if force_happens then false
+             else not (happens_term table ~hyp ~t ~equal_ts)
+           | _ -> true)
+        !conds
+  in
+  
+  (* iter over the hypotheses in [hyps] *)
+  TraceHyps.iter (fun _ hyp ->
+      match hyp with
+      | LHyp (Local hyp)
+      | LHyp (Global Equiv.(Atom (Reach {formula = hyp; bound = None}))) -> check1 hyp
+      | _ -> ()
+    ) hyps;
+
+  (* same on [hyps_list] *)
+  List.iter check1 hyps_list;
+  
+  (* return the remaining formulas that could not be proved *)
+  !conds
+
+(*------------------------------------------------------------------*)
+let is_happen : Term.t list -> bool = function
+  | [t]  ->
+    begin
+      match Term.decompose_app t with
+      | Term.Fun (fs,_), [_] when Symbols.path_equal fs Symbols.fs_happens -> true
+      | _ -> false
+    end
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 (** Perform δ-reduction once for macro at head position. *)
 let reduce_delta_macro1
+    ?(force_happens=false)
+    ~(constr : bool)    
     ?(mode : Macros.expand_context = InSequent)
-    (table : Symbols.table) (system : SE.context) 
+    (env : Env.t)
     ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
     (t : Term.term)
   : Term.term * ReductionCore.head_has_red
   =
-  (* let module Reduction : ReductionCore.S =  *)
-  (*   (val ReductionCore.Register.get ())  *)
-  (* in *)
-  let exception FailedBadSystem in
-  try
-    match t with
-    | Term.Macro (ms, l, ts) ->
-      let cntxt () =
-        let se = try SE.to_fset system.set with SE.Error _ -> raise FailedBadSystem in
-        Constr.{ table; system = se; models = None; }
+  match t with
+  | Term.Macro (ms, l, ts) ->
+    let rw_strat = Macros.get_rw_strat env.table ms in
+    if rw_strat = Opaque then
+      t, False
+    else
+      let models = 
+        let exception NoExp in
+        try
+          if constr then
+            Hyps.get_models ~exn:NoExp ~system:(Some env.system.set) env.table hyps
+          else Constr.empty_model
+        with NoExp -> Constr.empty_model
       in
-      let ta_opt = as_action hyps ts in
-      let ta = odflt ts ta_opt in (* [ta = ts] *)
+      (* we have that [ts = ta] and [List.for_all ((=) ts) ts_list] *)
+      let ts_list, ta = 
+        let ta =
+          if constr then Constr.find_eq_action models ts 
+          else as_action hyps ts
+        in
+        match ta with
+        | None -> [], ts
+        | Some ta -> [ts; ta], ta
+      in 
 
-      if happens table hyps ta || (ta_opt <> None && happens table hyps ts) then
-        match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts:ta with
-        | `Def mdef -> Term.subst [Term.ESubst (ta, ts)] mdef, True
-        | _ -> t, NeedSub
-      else t, NeedSub
+      let cases =
+        match Macros.unfold ~expand_context:mode env ms l ta with
+        | `Results r -> r
+        | `Unknown -> []
+      in
 
-    | _ -> t, NeedSub
-  with FailedBadSystem -> t, False
+      List.find_map (fun p ->
+          if p.Macros.pattern = None then
+            let remaining_conds = 
+              check_conds
+                ~force_happens env.table ~equal_ts:ts_list ~hyps
+                p.when_cond 
+            in
+            (* FEATURE: we could try to check convertibility of
+               [remaining_conds] and [true] to discharge it. *)
+            if
+              remaining_conds = []
+              ||
+              (constr && is_happen remaining_conds && 
+               not (Constr.empty_models models) && 
+               Constr.query ~precise:true models remaining_conds)
+            then
+              Some (Term.subst [Term.ESubst (ta, ts)] p.out, ReductionCore.True)
+            else None
+          else None
+        ) cases
+      |>
+      odflt (t, ReductionCore.NeedSub)
+  | _ -> t, False
+
 
 (*------------------------------------------------------------------*)
 (** Perform δ-reduction once at head position
-    (macro, operator and definition unrolling). *)
+    (macro, operator and definition unfolding). *)
 let reduce_delta1
+    ?(force_happens=false)
     ?(delta = ReductionCore.delta_full)
+    ~(constr : bool)
     ~(mode : Macros.expand_context)
-    (table : Symbols.table) (system : SE.context) 
+    (env : Env.t)
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
   : Term.term * ReductionCore.head_has_red
@@ -1512,18 +1659,18 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~mode table system ~hyps t
+    reduce_delta_macro1 ~force_happens ~constr ~mode env ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->
-    reduce_delta_def1 table system hyps t
+    reduce_delta_def1 env hyps t
 
   (* concrete operators *)
   | Fun (fs, { ty_args })
   | App (Fun (fs, { ty_args }), _)
-    when delta.op && Operator.is_concrete_operator table fs -> 
+    when delta.op && Operator.is_concrete_operator env.table fs -> 
     let args = match t with App (_, args) -> args | _ -> [] in
-    let t = Operator.unfold table system.set fs ty_args args in
+    let t = Operator.unfold env.table env.system.set fs ty_args args in
     t, True
     
   | _ -> t, False
@@ -1677,6 +1824,8 @@ let unif_gen (type a)
 
     expand_context;
 
+    params = Params.empty;      (* FIXME: LPC *)
+    
     table; system; env; support; ienv; hyps;
 
     red_param = param.red_param;
@@ -1812,15 +1961,17 @@ module T (* : S with type t = Term.term *) = struct
       else begin
         let t,t_red =
           reduce_delta_macro1
+            ~constr:false
             ~mode:st.expand_context
-            st.table st.system ~hyps:st.hyps t
+            (to_env st) t
         in
         if t_red <> True then default ()
         else 
           let pat,pat_red =
             reduce_delta_macro1
+              ~constr:false
               ~mode:st.expand_context
-              st.table st.system ~hyps:st.hyps pat
+              (to_env st) pat
           in
           if pat_red <> True then default () else tunif t pat st
       end
@@ -2417,7 +2568,7 @@ let known_set_check_impl
 
   (* flattened [hyp] + proof-context hypotheses *)
   let hyps =
-    ( hyp :: omap_dflt [] (fun st -> get_local_of_hyps st.hyps) st ) |>
+    ( hyp :: omap_dflt [] (fun (st : unif_state) -> get_local_of_hyps st.hyps) st ) |>
     List.concat_map flatten_ands |>
     List.remove_duplicate Term.equal
   in
@@ -2839,11 +2990,11 @@ let term_set_decompose
 
     (* binder variables are declared global, constant and adv,
        as these are inputs (hence known values) to the adversary  *)
-    let venv = Vars.add_vars t.vars env.vars in
+    let env = { env with vars = Vars.add_vars t.vars env.vars} in
     let st =
       mk_unif_state
         ~param:crypto_param (* FIXME: should always take a default value? *)
-        ~env:venv env.table env.system hyps
+        (ProofContext.make ~env ~hyps)
         ~support:[]
     in
     let _, minfos = deduce ~inputs ~output st init_minfos in
@@ -2856,13 +3007,13 @@ let term_set_decompose
     (* deduction parametrizes reduction its own way for now
        (i.e. we do not use [st.red_param] and [st.red_strat]) 
         
-       heuristic: we do not unroll macros on the left, as this may
+       heuristic: we do not unfold macros on the left, as this may
        prevent applying useful user deduction rules. E.g.
 
        - [frame@A] yields [{frame@t | t: t ≤ A}] thanks to a standard
          user deduction rule;
 
-       - but it unrolls into [<frame@pred A, ...>], which only yields
+       - but it unfolds into [<frame@pred A, ...>], which only yields
          the weaker set of terms [{frame@t | t: t ≤ pred A}] thanks to 
          the same user rule. *)
     let red_param = 
@@ -3393,13 +3544,32 @@ and specialize_deduce_fa
   | _ as f when HighTerm.is_ptime_deducible ~si:true cand_env f -> [cand]
 
   | Term.Macro (ms, l, ts) ->
-    begin
-      let cntxt = Constr.make_context ~system ~table in
-      match Macros.get_definition cntxt ms ~args:l ~ts with
-      | `Undef | `MaybeDef -> []
-      | `Def body ->
-        specialize_deduce table env system { cand with term = body } known_sets
-    end
+     begin
+       let res =
+         let env =
+           Env.init ~system:(SE.{ set = (system :> SE.t); pair = None; }) ~table ()
+         in
+         match Macros.unfold env ms l ts with
+         | `Results r -> r
+         | `Unknown -> []
+       in
+       let res =
+         List.find_map (fun p ->
+             if p.Macros.pattern = None &&
+                check_conds
+                  table ~equal_ts:[]
+                  ~hyps_list:[cand.cond; Term.mk_happens ts]
+                  p.Macros.when_cond
+                = []
+             then Some p.out
+             else None)
+           res
+       in
+       match res with
+       | None -> []
+       | Some body ->               
+          specialize_deduce table env system { cand with term = body } known_sets
+     end
 
   | Term.Proj (i,t) -> 
     comp_deds (fun t -> Term.mk_proj i (as_seq1 t)) [t]
@@ -3447,13 +3617,30 @@ let strengthen
     in
     let ts = Term.mk_action a (List.map Term.mk_var is) in
 
-    (* we unroll the definition of [cand] at time [ts] *)
-    let cntxt = Constr.make_context ~system ~table in
-    match Macros.get_definition cntxt cand.msymb ~args:cand.args ~ts with
-    | `Undef | `MaybeDef -> []
-
-    | `Def body ->
-      let cond = match cand.cond_le with
+    (* we unfold the definition of [cand] at time [ts] *)
+    let res =
+      let env =
+        Env.init ~system:(SE.{ set = (system :> SE.t); pair = None; }) ~table ()
+      in
+      match Macros.unfold env cand.msymb cand.args ts with
+      | `Results r -> r
+      | `Unknown -> []
+    in
+    let res =
+      List.find_map (fun p ->
+          if p.Macros.pattern = None &&
+             check_conds ~equal_ts:[] 
+               table ~hyps_list:[Term.mk_happens ts]
+               p.Macros.when_cond
+             = []
+          then Some p.out
+          else None
+        ) res
+    in
+    match res with
+    | None -> []
+    | Some body ->
+       let cond = match cand.cond_le with
         | Some cond_le ->
           Term.mk_leq ts cond_le
         | None -> Term.mk_true
@@ -3581,7 +3768,7 @@ let strengthen
               | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
               | _ -> assert false
             in
-            let ms = Term.mk_symb mn ty in
+            let ms = Term.mk_symb mn ~info:(Macros.get_macro_info table mn) ty in
             let mset = 
               MCset.mk ~env
                 ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 

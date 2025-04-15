@@ -10,8 +10,7 @@ open Utils
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = {
-  action_name  : Symbols.action;
-  action       : Action.action_v;
+  rec_arg      : Term.term;
   message      : Term.term;
   key_indices  : Term.terms;
   env          : Vars.env 
@@ -51,11 +50,10 @@ val pp_euf_rule : euf_rule formatter
     the messages.
     When [global] is true, also checks in global macros. *)
 val key_ssc :
-  globals:bool ->
   ?messages:(Term.term list) ->
   ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname -> bool) ->
-  cntxt:Constr.trace_cntxt ->
+  context:ProofContext.t ->
   Symbols.fname -> Symbols.name -> Tactics.ssc_error list
 
 (*------------------------------------------------------------------*)
@@ -66,7 +64,6 @@ val mk_rule :
   elems:Equiv.equiv ->
   drop_head:bool ->
   fun_wrap_key:((Symbols.fname -> bool) option) ->
-  allow_functions:(Symbols.fname -> bool) ->
-  cntxt:Constr.trace_cntxt ->
-  env:Env.t -> mess:Term.term -> sign:Term.term ->
+  context:ProofContext.t ->
+  mess:Term.term -> sign:Term.term ->
   head_fn:Symbols.fname -> key_n:Symbols.name -> key_is:Term.terms -> euf_rule

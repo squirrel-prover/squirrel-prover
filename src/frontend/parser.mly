@@ -32,13 +32,13 @@
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
-%token LLET LET IN IF THEN ELSE FIND SUCHTHAT
+%token LLET LET REC TERMINATIONBY TAND IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS
 %token HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
 %token TYPE FUN
-%token MUTABLE SYSTEM SET
+%token MUTABLE SYSTEM LIKE SET
 %token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF EQUIV DARROW DEQUIVARROW AXIOM
@@ -47,7 +47,7 @@
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token SHARP DOLLAR SHARPINIT
 %token GAME VAR RND RETURN
-%token TIME WHERE WITH ORACLE EXN
+%token TIME WHERE WITH WHEN ORACLE EXN
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE
 %token REDUCE SIMPL AUTO
@@ -283,7 +283,7 @@ sterm_i:
 
 | l=lloc(TRUE)   { Typing.mk_symb_i (top_path, L.mk_loc l "true") }
 
-| l=paren(slist1(term,COMMA))
+| l=paren(slist(term,COMMA))
     { match l with
       | [t] -> L.unloc t
       | _ -> Typing.Tuple l }
@@ -437,6 +437,7 @@ ext_bnds_tagged:
   (e.g. `pair`, of `like P`). */
 %inline se_info:
 | i=slist1(lsymb,empty) { i }
+| l=lloc(LIKE) p=lsymb  { [L.mk_loc l "like"; p] }
 
 /* a list of system infos */
 %inline se_infos:
@@ -672,8 +673,25 @@ system_modifier:
 se_bnds_group_or_empty_group:
 | l=se_bnds_group { l  }
 | LBRACE RBRACE   { [] }
-       
+
 (*------------------------------------------------------------------*)
+match_when:
+| WHEN t=term { t }
+
+match_item:
+| p=term when_cond=match_when? ARROW out=term
+    { Typing.{ pattern = Some p; when_cond; out; } }
+
+match_body:
+| PARALLEL? l=slist1(match_item,PARALLEL) { l }
+
+(*------------------------------------------------------------------*)
+let_body:
+| EQ t=term            { `Concrete t }
+| WITH body=match_body { `Match body }
+
+(*------------------------------------------------------------------*)
+/* declaration that may not be followed by the terminator symbol `.` */
 declaration_i:
 | HASH e=lsymb ctys=c_tys
                           { Decl.Decl_hash (e, None, ctys) }
@@ -717,23 +735,25 @@ declaration_i:
 
 | ABSTRACT e=lsymb_gen_decl tyvars=ty_vars COLON tyo=ty
     { let symb_type, name = e in
-      Decl.(Decl_operator
-              { op_name      = name;
-                op_symb_type = symb_type;
-                op_tyargs    = tyvars;
-                op_args      = [];
-                op_tyout     = Some tyo;
-                op_body      = `Abstract }) }
+      Decl.Decl_funs (`Op, `Any, tyvars ,[{
+          op_name      = name;
+          op_symb_type = symb_type;
+          op_args      = [];
+          op_tyout     = Some tyo;
+          op_body      = `Abstract;
+          op_terby     = None}])
+    }
 
 | OP e=lsymb_gen_decl tyvars=ty_vars args=ext_bnds_tagged_strict tyo=colon_ty? body=op_body
     { let symb_type, name = e in
-      Decl.(Decl_operator
-              { op_name      = name;
-                op_symb_type = symb_type;
-                op_tyargs    = tyvars;
-                op_args      = args;
-                op_tyout     = tyo;
-                op_body      = body; }) }
+      Decl.Decl_funs (`Op, `Any, tyvars ,[{ 
+          op_name      = name;
+          op_symb_type = symb_type;
+          op_args      = args;
+          op_tyout     = tyo;
+          op_body      = body;
+          op_terby     = None}])
+    }
 
 | PREDICATE e=lsymb_gen_decl
   tyvars=ty_vars 
@@ -788,6 +808,32 @@ declaration_i:
  | OPEN      n=npath { Decl.Namespace_cmd (Open  n) }
  | CLOSE     n=npath { Decl.Namespace_cmd (Close n) }
 
+rec_decl:
+  | lloc(REC) AT OP COLON t=lpath  { `RecWithOrd t }
+  | lloc(REC) { `Rec }
+  | { `NoRec }
+
+mutual_rec_decl:
+| TAND e=lsymb_gen_decl
+  args=ext_bnds_tagged_strict
+  tyo=colon_ty?
+  body=let_body
+  terminationby = termination_by?
+    { let symb_type, name = e in
+      Decl.{ 
+               op_name      = name;
+               op_symb_type = symb_type;
+               op_args      = args;
+               op_tyout     = tyo;
+               op_body      = body;
+	       op_terby     = terminationby;
+      }     
+    }
+
+termination_by:
+| TERMINATIONBY t=sterm {t}
+
+(*------------------------------------------------------------------*)
 /* declaration that must always be followed by the terminator symbol `.` */
 declaration_no_concat_i:
 | TACTIC lsymb EQ tac                     { Decl.Tactic ($2,$4) }
@@ -799,6 +845,28 @@ declaration_no_concat_i:
                 modifier;
                 name = id}) }
 
+/* declares a new generalized function */
+| LET is_rec=rec_decl e=lsymb_gen_decl
+  sa=in_system_annot
+  tyvars=ty_vars
+  args=ext_bnds_tagged_strict
+  tyo=colon_ty? 
+  body=let_body
+  terminationby = termination_by?
+  ands=slist(mutual_rec_decl, empty)
+  {
+    let symb_type, name = e in
+    Decl.Decl_funs (`Let is_rec, sa, tyvars ,{ 
+        op_name      = name;
+        op_symb_type = symb_type;
+        op_args      = args;
+        op_tyout     = tyo;
+        op_body      = body;
+	op_terby     = terminationby;
+      }
+      :: ands )
+  }
+
 (*------------------------------------------------------------------*)
 declaration:
 | ldecl=loc(declaration_i)                { ldecl }
@@ -808,9 +876,8 @@ declaration_no_concat:
 
 (*------------------------------------------------------------------*)
 declaration_list:
-| decl=declaration                        { [decl] }
 | decl=declaration_no_concat              { [decl] }
-| decl=declaration decls=declaration_list { decl :: decls }
+| decls=slist1(declaration,empty)         { decls }
 
 declarations:
 | decls=declaration_list TERMINAL { decls }
@@ -1220,7 +1287,11 @@ tac:
   | l=tac PLUS r=tac                   { T.OrElse [l;r] }
   | TRY l=tac                          { T.Try l }
   | REPEAT t=tac                       { T.Repeat t }
-  | id=lsymb t=tactic_params           { mk_abstract (L.loc id) (L.unloc id) t }
+  | id=lsymb u=named_args t=tactic_params     
+    { 
+      let args = if u=[] then t else (TacticsArgs.Named_args u :: t) in
+      mk_abstract (L.loc id) (L.unloc id) args 
+    }
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
@@ -1516,6 +1587,12 @@ system_context_i:
 
 system_context:
 | x=loc(system_context_i) { x }
+
+/* ----------------------------------------------------------------------- */
+in_system_annot:
+|                                 { `Any }
+| AT SYSTEM COLON s=s_system_expr { `Systems s }
+| AT LIKE COLON p=path            { `Like p }
 
 /* ----------------------------------------------------------------------- */
 %inline old_system_annot:

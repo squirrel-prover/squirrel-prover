@@ -701,7 +701,7 @@ let mk_namelength_statement
 
   let tvars = Term.mk_vars vars in
   (* build name term n *)
-  let tn = Term.mk_name (Term.mk_symb n tyn) tvars in
+  let tn = Term.mk_name (Term.nsymb n tyn) tvars in
 
   (* cst hash is built from hash of output type of n : tyn *)
   let cst = Type.to_string tyn in
@@ -1037,7 +1037,7 @@ let process_system_decl
       let table = add_namelength_axiom table nsymb n_fty in
 
       let n_term =
-        let nsymb = Term.mk_symb nsymb ty in
+        let nsymb = Term.nsymb nsymb ty in
         Term.mk_name_with_tuple_args nsymb (Term.mk_vars (List.rev penv.indices))
       in
 
@@ -1094,7 +1094,7 @@ let process_system_decl
       in
 
       let args = Term.mk_vars (List.rev penv.indices) in
-      let x'_t = Term.mk_macro (Term.mk_symb x' ty) args (Term.mk_var ts) in
+      let x'_t = Term.mk_macro (Macros.msymb table x') args (Term.mk_var ts) in
 
       let penv = penv_add_var x penv in
 

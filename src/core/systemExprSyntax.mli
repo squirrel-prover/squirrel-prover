@@ -136,7 +136,7 @@ val hash : 'a expr -> int
 
 val pp : 'a expr formatter
 
-val equal0 : 'a expr -> 'a expr -> bool
+val equal0 : 'a expr -> 'b expr -> bool
 
 (*------------------------------------------------------------------*)
 (** Create a system expression from a system expression variable. *)
@@ -144,7 +144,7 @@ val var : Var.t -> arbitrary
 
 (*------------------------------------------------------------------*)
 val is_var  :                'a expr -> bool
-val is_fset :                'a expr -> bool
+val is_fset :                'a expr -> bool (* FIXME: rename in is_concrete *)
 val is_any  :                'a expr -> bool
 val is_pair : ?se_env:env -> 'a expr -> bool
 
@@ -158,6 +158,7 @@ type error_i =
   | Expected_compatible
   | Expected_fset
   | Expected_pair
+  | Failure of string
 
 type error = L.t option * error_i
 

@@ -86,11 +86,18 @@ module type OccurrenceContent = sig
 end
 
 (*------------------------------------------------------------------*)
-(** Predefined instance of [OccurrenceContent] for timestamps,
-    plus a dummy occurrence with no content *)
+(** Predefined instance of [OccurrenceContent] for recursive arguments
+    with their dedicated well_founded ordering operator
+    (typically timestamps), plus a dummy occurrence with no content *)
 
-module TSContent : OccurrenceContent 
-  with type content = Term.term
+
+type rec_content = {
+  value : Term.term;
+  order : Symbols.fname;
+}
+
+module RecArgContent : OccurrenceContent 
+  with type content = rec_content
    and type data = unit
 
 module EmptyContent : OccurrenceContent 
@@ -100,11 +107,12 @@ module EmptyContent : OccurrenceContent
 (*------------------------------------------------------------------*)
 (** {2 Simple occurrences} *)
 
-(** Tag indicating whether an occurrence is direct,
-    or indirectly caused by some action given as a {!Term.term}. *)
+(** Tag indicating whether an occurrence is direct, or indirectly
+    caused by some recursive call to {!Symbols.macro} with argument
+    {!Term.term}. *)
 type occ_type =
   | EI_direct
-  | EI_indirect of Term.term
+  | EI_indirect of Term.term * Symbols.macro
 
 (** Applies a substitution to an {!occ_type}. *)
 val subst_occtype : Term.subst -> occ_type -> occ_type
@@ -206,11 +214,12 @@ module MakeSO :
     (SimpleOcc with module OC = OC)
 
 (*------------------------------------------------------------------*)
-(** module for timestamp occurrences *)
-module TSOcc : (SimpleOcc with module OC = TSContent)
+(** module for recursive arguments occurences
+    (which are most often timestamp occurrences). *)
+module RecArgOcc : (SimpleOcc with module OC = RecArgContent)
 
-type ts_occ  = TSOcc.simple_occ
-type ts_occs = TSOcc.simple_occs
+type rec_arg_occ  = RecArgOcc.simple_occ
+type rec_arg_occs = RecArgOcc.simple_occs
 
 (*------------------------------------------------------------------*)
 (** module for empty simple occurrences
@@ -241,15 +250,14 @@ module type ExtOcc = sig
   (** Occurrence with additional info about where it was found. *)
   type ext_occ = {
     eo_occ       : simple_occ;
-    eo_source    : Term.terms;     
+    eo_source    : Term.terms;
     (** Original terms where the occurrence was found. *)
-    eo_source_ts : ts_occs; 
-    (** Timestamps occurring in the source terms. *)
+    eo_source_rec_arg : rec_arg_occs; 
+    (** Recursive arguments call occurring in the source terms. *)    
     eo_path_cond : Iter.PathCond.t; 
-    (** Path condition on the timestamps [τ] at which the occurrence
-        can occur: 
-        for any source timestamp [τ_src] (in [eo_sources_ts]), 
-        [path_cond τ τ_src] *)
+    (** Path condition on the rec_arg [τ] at which the occurrence can
+        occur: for any source recursive argument [τ_src] (in
+        [eo_sources_ts]), [path_cond τ τ_src] *)
   }
 
   type ext_occs = ext_occ list
@@ -285,23 +293,22 @@ module MakeEO :
 type pos_info =
   { pi_pos     : MP.pos;             (** the position *)
     pi_occtype : occ_type;           (** are we in a direct or indirect term *)
-    pi_trctxt  : Constr.trace_cntxt; (** system+table at the position *)
+    pi_context : ProofContext.t;     (** proof-context at the position *)
     pi_vars    : Vars.vars;          (** variables bound above the position *)
     pi_cond    : Term.terms;         (** conditions above the position *)
-    pi_subterm : Term.term;          (** subterm of the position
-                                         (for printing) *)
+    pi_subterm : Term.term;          (** subterm of the position (for printing) *)
   }
 
 (** Information used to check if a macro can be expanded in a term:
     - a tag indicating the occurrence type (and provenance);
-    - the trace context. *)
-type expand_info = occ_type * Constr.trace_cntxt
+    - the proof context. *)
+type expand_info = occ_type * ProofContext.t
 
 (** Extracts the expand_info from the pos_info *)
 val get_expand_info : pos_info -> expand_info
 
 (** Expands a term [t] if it is a macro
-    and we can check that its timestamp happens
+    and we can check that it does expand
     using [info] (not recursively).
     Returns [Some t'] if [t] expands to [t'],
     [None] if no expansion has been performed. *)
@@ -311,16 +318,14 @@ val expand_macro_check_once : expand_info -> Term.term -> Term.term option
     (only at toplevel, not in subterms). *)
 val expand_macro_check_all : expand_info -> Term.term -> Term.term
 
-(** Returns all timestamps occuring in macros in a list of terms.
+(** Returns all recursive arguments used for macros in a list of terms.
     Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)
-val get_macro_actions :
+val get_macro_rec_args :
   mode:Iter.allowed ->
-  env:Env.t ->
-  hyps:TraceHyps.hyps ->
-  Constr.trace_cntxt ->
+  context:ProofContext.t ->
   Term.terms ->
-  ts_occs
+  rec_arg_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Occurrence search} *)
@@ -369,9 +374,7 @@ module type OccurrenceSearch = sig
     mode:Iter.allowed -> (* allowed sub-terms without further checks *)
     ?pp_descr:unit Fmt.t option -> (* prints what we're looking for *)
     f_fold_occs ->
-    TraceHyps.hyps ->
-    Constr.trace_cntxt ->
-    Env.t ->
+    ProofContext.t ->
     Term.terms ->
     ext_occs
 end
@@ -386,13 +389,14 @@ module MakeSearch :
 (** {2 Formula construction and simplification} *)
 
 
-(** [time_formula τ ts_occs] constructs the formula:
+(** [rec_arg_formula table τ macro ts_occs] constructs the formula:
 
       [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
 
-    where [vi], [tsi] are the variables and content of [ts_occ]. 
+    where [vi], [tsi] are the variables and content of [rec_arg_occ]. 
     (for example, [path_cond x y] can be [x ≤ y]). *)
-val time_formula : Term.term -> ?path_cond:PathCond.t -> ts_occs -> Term.term
+val rec_arg_formula :
+  Symbols.table -> Term.term -> Symbols.macro -> ?path_cond:PathCond.t -> rec_arg_occs -> Term.term
 
 (** Module containing functions to produce formulas (proof goals)
     expressing that extended occurrences of the given type are
@@ -424,7 +428,7 @@ module type OccurrenceFormulas = sig
       If [negate] is set to [true], returns instead
       the negation of that formula. *)
   val occurrence_formula :
-    ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
+    Symbols.table -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
 

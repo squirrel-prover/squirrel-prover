@@ -362,7 +362,7 @@ let indcca_param
     in
 
     (* constructing the name X, and the variables M, R, K *)
-    let xc = Name.{symb=Term.mk_symb xcs cty; args=[]} in
+    let xc = Name.{symb=Term.nsymb xcs cty; args=[]} in
     let xm = Vars.make_fresh mty "M" in
     let xr = Vars.make_fresh rty "R" in
     let xk = Vars.make_fresh kty "K" in
@@ -508,24 +508,18 @@ let indcca_param
       actual ciphertext, once with the encryption of its length. 
       Indeed, the formula must hold on the real and ideal sides if we want to 
       apply ind-cca. 
-      This function assumes everything (the [hyps], the terms)
-      has already been projected,
-      and is understood in [env.system.set]. *)
+      This function assumes everything has already been projected,
+      and is understood in [context.env.system.set]. *)
 let phi_cca_one_system
     ~(use_path_cond : bool)
     ?(loc : L.t option)
-    (hyps : Hyps.TraceHyps.hyps)
-    (contx : Constr.trace_cntxt)
-    (env : Env.t)
+    (context : ProofContext.t)
     (icp : indcca_param)
     (frame : terms)
   : Term.terms
   =
-
-  (* sanity check: contx and env should agree *)
-  assert (SE.equal0 env.system.set ((contx.system) :> SE.arbitrary));
-
-  let ppe = default_ppe ~table:env.table () in
+  let table = context.env.table in
+  let ppe = default_ppe ~table:table () in
 
   (* Check that the random and key provided in icp are in fact names/pubkeys. *)
   let k, r = 
@@ -568,7 +562,7 @@ let phi_cca_one_system
   let occs_krc = 
     EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:Allowed)
-      hyps contx env
+      context
       (icp.ip_plain :: k.args @ r.args @ frame)
   in
 
@@ -578,7 +572,7 @@ let phi_cca_one_system
   let occs_krc' =
     EOS.find_all_occurrences ~mode:Iter.PTimeNoSI ~pp_descr:(Some pp_kr)
       (get_bad_krc ~da:(NotAbove icp.ip_cname))
-      hyps contx env
+      context
       [icp.ip_context]
   in
 
@@ -602,19 +596,19 @@ let phi_cca_one_system
      We do not generate formulas for the ciphertexts occs: these are only used
      to check the randomness conditions afterwards. *)
   let phis_kr =
-    List.map (EOF.occurrence_formula ~negate:true ~use_path_cond) occs_kr
+    List.map (EOF.occurrence_formula table ~negate:true ~use_path_cond) occs_kr
   in
 
   (* We now search for bad use of all randoms used in occs_c *)
   let get_bad_randoms : ROS.f_fold_occs = 
-    RO.get_bad_randoms env ~k ~enc_f:icp.ip_enc ~ciphertexts:occs_c
+    RO.get_bad_randoms context.env ~k ~enc_f:icp.ip_enc ~ciphertexts:occs_c
   in
 
   let occs_r =
     if icp.ip_pk = None then (* only in the symmetric case *)
       ROS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_rand)
         get_bad_randoms
-        hyps contx env
+        context
         (icp.ip_context :: icp.ip_plain :: (Name.to_term k) :: r.args @ frame)
         (* in principle kargs (not k) should suffice: if k occurred as
            a random somewhere, a bad occ would have been generated for that 
@@ -624,7 +618,7 @@ let phi_cca_one_system
   in
 
   let phis_r = 
-    List.map (ROF.occurrence_formula ~negate:true ~use_path_cond) occs_r
+    List.map (ROF.occurrence_formula table ~negate:true ~use_path_cond) occs_r
   in
 
   (* Finally, we apply the substitution to the name representing 
@@ -656,52 +650,25 @@ let phi_cca_one_system
 
 
 (*------------------------------------------------------------------*)
-(** Constructs a list of formulas whose conjunction expresses
-    the conditions to apply ind-cca to a given challenge ciphertext
-    (with the context, etc. specified in [icp]), after projecting on [proj].
+(** Constructs a list of formulas whose conjunction expresses the
+    conditions to apply ind-cca to a given challenge ciphertext (with
+    the context, etc. specified in [icp]), after projecting on [proj].
     [hyps] are understood in [env], and all terms ([frame], etc) in
-    [env.system.pair], which must be the system in [contx]. *)
+    the projection [proj] of [env.system.pair]. *)
 let phi_cca_proj
     ~(use_path_cond : bool)
     ?(loc : L.t option)
-    (hyps : Hyps.TraceHyps.hyps)
-    (contx : Constr.trace_cntxt)
-    (env : Env.t)
+    (context : ProofContext.t)
     (icp : indcca_param)
     (frame : terms)
     (proj : Projection.t)
   : Term.terms
-  =
-
-  let system = ((Utils.oget env.system.pair) :> SE.fset) in
-
-  (* sanity check: contx and env should agree *)
-  assert (SE.equal0 system contx.system);
-
-  (* get the projected system and context
-     in which terms are now to be understood *)
-  let systemp = SE.project [proj] system in
-  let contxp = { contx with system = systemp } in
-  let infop = (O.EI_direct, contxp) in
-
-  (* the new environment,
-     where the generated formulas are to be understood:
-     {set = proj of env.system.pair, pair = env.system.pair} *)
-  let envp_context = {env.system with set=(systemp :> SE.arbitrary)} in
-  let envp = Env.update ~system:envp_context env in
-
-  (* keep what hypotheses we can *)
-  let hypsp =
-    Hyps.change_trace_hyps_context
-      ~old_context:env.system
-      ~new_context:envp.system
-      ~vars:env.vars ~table:env.table
-      hyps
-  in
+  = 
+  let info = (O.EI_direct, context) in
 
   (* project the parameters on proj *)
   let fp = Term.project1 proj in
-  let efp x = O.expand_macro_check_all infop (fp x) in
+  let efp x = O.expand_macro_check_all info (fp x) in
   let framep = List.map (Term.project1 proj) frame in
   let icpp = {icp with ip_context = fp icp.ip_context;
                        ip_plain = fp icp.ip_plain;
@@ -709,9 +676,7 @@ let phi_cca_proj
                        ip_key = efp icp.ip_key; }
   in
 
-  phi_cca_one_system 
-    ~use_path_cond ?loc
-    hypsp contxp envp icpp framep
+  phi_cca_one_system ~use_path_cond ?loc context icpp framep
 
 
 
@@ -728,9 +693,9 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
   let loc = L.loc i in
 
   let env = ES.env s in
-  let pair_context = ES.mk_pair_trace_cntxt s in
   let proj_l, proj_r = ES.get_system_pair_projs s in
-
+  let system = ((Utils.oget env.system.pair) :> SE.fset) in
+  
   if (ES.conclusion_as_equiv s).bound <> None then 
     soft_failure 
       (Tactics.GoalBadShape "IND-CCA does not handle concrete bounds.");
@@ -738,19 +703,20 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
   let before, e, after = LT.split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
 
-
   (* get the parameters, enforcing that
-     e does not contain diffs or binders above the ciphertext.
+     [e] does not contain diffs or binders above the ciphertext.
      (at least the diff part could maybe be relaxed?) *)
   let icp = indcca_param ~loc e s in
-  let pair_context_ex = {pair_context with table=icp.ip_table} in
-  let env_ex = {env with table=icp.ip_table} in
+  let env = {env with table=icp.ip_table} in
 
-  let phi_cca_p =
-    phi_cca_proj ~use_path_cond ~loc 
-      (ES.get_trace_hyps s) 
-      pair_context_ex env_ex icp biframe
-      (* FEATURE: allow the user to set [use_path_cond] to true *)
+  let phi_cca_p proj =
+    (* get the projected system and context
+       in which terms are now to be understood 
+       [{set = proj of env.system.pair, pair = env.system.pair}] *)
+    let se = SE.project [proj] system in
+    let system = {env.system with set=(se :> SE.arbitrary)} in
+    let context = ES.proof_context ~in_system:system s in
+    phi_cca_proj ~use_path_cond ~loc context icp biframe proj
   in
 
   Printer.pr "@[<v 0>Checking for side conditions on the left@; @[<v 0>";
@@ -783,7 +749,7 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
      It would be more precise to have diff(phi_l, phi_r). *)
   let cca_sequent =
     ES.set_conclusion_in_context
-      {env.system with set=(pair_context.system :> SE.arbitrary)}
+      {env.system with set = (system :> SE.arbitrary)}
       (Equiv.mk_reach_atom phi)
       s
   in

@@ -639,6 +639,12 @@ let infer_type (st : unquote_state) (t : Term.term) : Type.ty option =
       let fty, rec_ty = Macros.fty st.table ms.s_symb in
       assert (fty.fty_vars = []);
 
+      let rec_ty = 
+        match rec_ty with
+        | `At ty | `Standard ty -> ty
+        | `None -> Type.tunit
+      in
+
       (* must be used in η-long form *)
       check_length fty.fty_args args;
       check_tys_eq fty.fty_args (infer_tys st args);
@@ -859,15 +865,14 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     let terms =
       AList.unquote_list Term st.table (unquote_term0 st) args
     in
-    Term.mk_name (Term.mk_symb nn nftype.fty_out) terms
+    Term.mk_name (Term.nsymb nn nftype.fty_out) terms
 
   | Term.App (Term.Fun (fn,_), [m;terms;arg]) when fn = R.Term.fs_macro st.table ->
     let m = unquote_path_macro st.table m in
-    let mftype, _ = Macros.fty st.table m in
     let terms =
       AList.unquote_list Term st.table (unquote_term0 st) terms in
     let arg = unquote_term0 st arg in
-    Term.mk_macro (Term.mk_symb m mftype.fty_out) terms arg
+    Term.mk_macro (Macros.msymb st.table m) terms arg
 
   | Term.App (Term.Fun (fn,_), [a;terms]) when fn = R.Term.fs_action st.table ->
     let a = unquote_path_action st.table a in

@@ -205,10 +205,15 @@ Proof.
         rewrite equiv IH (pred(A(i'))) => //.
         intro Hf; by fresh Hf.
     * intro _ _. by apply unique_queries.
-    * intro i' _.
+    * split. intro i' _.
+      have ? : happens(pred (A(i'))) by auto.
+        rewrite equiv IH (pred(A(i'))) => //.
+        intro H Hf; by fresh Hf.    
+intro i' _.
       have ? : happens(pred (A(i'))) by auto.
         rewrite equiv IH (pred(A(i'))) => //.
         intro Hf; by fresh Hf.    
+
     * fresh 1; 1:auto.
       prf 1. 
       + split; intro i' H; try destruct H as [H|H];

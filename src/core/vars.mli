@@ -147,7 +147,7 @@ val compare : var -> var -> int
 val check_type_vars : vars -> Type.ty list -> (unit -> unit) -> unit
 
 (** Check if a variable is a pattern hole. *)
-val is_pat : var -> bool
+val is_hole : var -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Set and Maps} *)
@@ -207,6 +207,7 @@ val to_map      : 'a genv -> 'a Mv.t
   
 (*------------------------------------------------------------------*)
 val of_list : (var * 'a) list -> 'a genv
+val of_list_simpl : var list -> simpl_env
 val of_map  : 'a Mv.t -> 'a genv 
 val of_set  : Sv.t -> simpl_env
 
@@ -233,8 +234,9 @@ val rm_var : var -> 'a genv -> 'a genv
 val rm_vars : vars -> 'a genv -> 'a genv
 
 (*------------------------------------------------------------------*)
-val map_tag : (var -> Tag.t -> Tag.t) -> env -> env
-val map     : (var -> Tag.t -> var * Tag.t) -> env -> env
+val map_tag : (var -> 'a -> 'a) -> 'a genv -> 'a genv
+val map     : (var -> 'a -> var * 'a) -> 'a genv -> 'a genv
+val filter  : (var -> 'a -> bool) -> 'a genv -> 'a genv
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)

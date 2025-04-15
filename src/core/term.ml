@@ -11,25 +11,51 @@ module Sid = Ident.Sid
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
-(** A typed symbol.
-    Invariant: [s_typ] do not contain tvar or univars *)
-type 'a isymb = {
-  s_symb    : 'a;
-  s_typ     : Type.ty;
+(*------------------------------------------------------------------*)
+(** see `.mli` *)
+type macro_info = {
+  pp_style : [`At | `Standard];
+  is_rec : bool;
+  is_match : bool;
+  has_dist_param : bool;       
 }
 
-let mk_symb (s : 'a) (t : Type.ty) =
-  let () = match t with
+(** macro information for builtin symbols *)
+let macro_info_builtin : macro_info =
+  { pp_style = `At; has_dist_param = true; is_rec = true; is_match = true; } 
+
+(*------------------------------------------------------------------*)
+(** A typed symbol.
+    Invariant: [s_typ] do not contain tvar or univars *)
+type ('a, 'info) isymb = {
+  s_symb : 'a;
+  s_typ  : Type.ty;
+  s_info : 'info;
+}
+
+let mk_symb (s : 'a) ~(info : 'b) (t : Type.ty) =
+  let () = 
+    match t with
     | Type.TVar _ | Type.TUnivar _ -> assert false;
     | _ -> ()
   in
-  { s_symb = s;
-    s_typ  = t; }
+  {
+    s_symb = s;
+    s_typ  = t; 
+    s_info = info; 
+  }
 
+(*------------------------------------------------------------------*)
 let hash_isymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
 
-type nsymb = Symbols.name  isymb
-type msymb = Symbols.macro isymb
+(*------------------------------------------------------------------*)
+type nsymb = (Symbols.name ,      unit ) isymb
+type msymb = (Symbols.macro, macro_info) isymb
+
+(** create a name symbol *)
+let nsymb (s : Symbols.name) (t : Type.ty) = mk_symb s ~info:() t
+
+(** To create a macro symbol, use [Macros.msymb]. *)
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
@@ -57,7 +83,12 @@ let[@warning "-27"] resolve_path =
   ref ( 
     fun
       ?(ienv) _ _ ~ty_args ~args_ty 
-      ~(ty_rec:[`At of Type.ty | `MaybeAt of Type.ty | `NoTS | `Unknown]) ->
+      ~(ty_rec  : [
+          | `Standard of Type.ty
+          | `At of Type.ty
+        | `MaybeAt of Type.ty
+          | `NoAt | `Unknown
+        ]) ->
       assert false)
 
 let set_resolve_path f = resolve_path := f
@@ -112,7 +143,7 @@ let pp_fname
   let fp = s_path_to_p_path ([],Symbols.to_string f.s) in
   let mode =
     (* set [ty_args] to [None], as we do not know if the user provided them manually *)
-    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoTS with
+    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoAt with
     | [(symb, _, _, _)] when symb = `Operator f -> `Short 
     | _                                         -> `Qualified
   in
@@ -127,7 +158,7 @@ let _pp_name
   let fp = s_path_to_p_path ([],Symbols.to_string n.s) in
   let mode =
     (* set [ty_args] to [None], as we do not know if the user provided them manually *)
-    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoTS with
+    match !resolve_path ppe.table fp ~ty_args:None ~args_ty ~ty_rec:`NoAt with
     | [(symb, _, _, _)] when symb = `Name n -> `Short 
     | _                                     -> `Qualified
   in
@@ -139,7 +170,7 @@ let _pp_macro
      ?(ty_rec : Type.ty option) 
      (ppe : ppenv) (fmt : Format.formatter) (m : Symbols.macro) 
   =
-  let ty_rec = omap_dflt `Unknown (fun ty -> `At ty) ty_rec in
+  let ty_rec = omap_dflt `Unknown (fun ty -> `MaybeAt ty) ty_rec in
   let fp = s_path_to_p_path ([],Symbols.to_string m.s) in
   let mode =
     (* set [ty_args] to [None], as we do not know if the user provided them manually *)
@@ -431,6 +462,8 @@ let mk_action a is = Action (a,is)
 let mk_tuple l = match l with
   | [a] -> a
   | _ -> Tuple l
+
+let mk_unit = mk_tuple []
 
 (* application, no simplification *)
 let mk_app_ns t args =
@@ -1098,7 +1131,7 @@ let tforall (f : term -> bool) (t : term) : bool =
   tfold (fun t b -> f t && b) t true
 
 (*------------------------------------------------------------------*)
-let isymb_ty_fv (s : 'a isymb) : Type.Fv.t = 
+let isymb_ty_fv (s : _ isymb) : Type.Fv.t = 
   Type.fv s.s_typ
 
 let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t = 
@@ -1409,7 +1442,7 @@ let other_infix_fixity = 50 , `Infix `Right
 
 let seq_fixity     = 1000 , `Prefix
 let find_fixity    = 1000 , `Prefix
-let macro_fixity   = 1000 , `NoParens
+let macro_fixity   = 1000 , `Infix `Left
 let diff_fixity    = 1000 , `NoParens
 let happens_fixity = 1000 , `NoParens
 let tuple_fixity   = 1000 , `NoParens
@@ -1537,16 +1570,25 @@ and _pp
 
   (* macro *)
   | Macro (m, l, ts) ->
+    let fixity = 
+      if m.s_info.pp_style = `At then macro_fixity else app_fixity
+    in
     let args_ty, ty_rec = (List.map ty l, ty ts) in
+    let pp_last_arg fmt =
+      if m.s_info.has_dist_param then
+        pp (fixity, `Right) fmt ts
+      else (assert (equal ts (Tuple []))) (* [unit] used as spurious argument *)
+    in
     let pp fmt () =
-      Fmt.pf fmt "@[%a%a@%a@]"
+      Fmt.pf fmt "@[%a%a%s%t@]"
         (_pp_macro ~args_ty ~ty_rec info.ppe) m.s_symb
         (Utils.pp_ne_list
            "@[<hov> %a@]"
-           (Fmt.list ~sep:(Fmt.any " ") (pp (macro_fixity, `NonAssoc)))) l
-        (pp (macro_fixity, `NonAssoc)) ts
+           (Fmt.list ~sep:(Fmt.any " ") (pp (fixity, `Right)))) l
+        (if m.s_info.pp_style = `At then "@" else " ")
+        pp_last_arg
     in
-    maybe_paren ~outer ~side ~inner:macro_fixity pp fmt ()
+    maybe_paren ~outer ~side ~inner:fixity pp fmt ()
 
   (* action *)
   | Action (symb,indices) ->

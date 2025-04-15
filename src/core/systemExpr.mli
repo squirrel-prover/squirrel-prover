@@ -4,17 +4,17 @@ include module type of SystemExprSyntax
 (** {2 General operations} *)
 
 (** [subset s1 s2] iff [s1] is included in [s2]. *)
-val subset : Symbols.table -> 'a expr -> 'a expr -> bool
+val subset : Symbols.table -> 'a expr -> 'b expr -> bool
 
 (*------------------------------------------------------------------*)
 (** Use equality over systems ([equal] or [equal0]) and not [Stdlib.(=)]! *)
-val equal  : Symbols.table -> 'a expr -> 'a expr -> bool
+val equal  : Symbols.table -> 'a expr -> 'b expr -> bool
 
 (*------------------------------------------------------------------*)
 (** [subset s1 s2] iff [s1] is included in [s2] modulo renaming projections *)
-val subset_modulo : Symbols.table -> 'a expr -> 'a expr -> bool
+val subset_modulo : Symbols.table -> 'a expr -> 'b expr -> bool
 
-val equal_modulo  : Symbols.table -> 'a expr -> 'a expr -> bool
+val equal_modulo  : Symbols.table -> 'a expr -> 'b expr -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Operations on finite sets} *)

@@ -87,7 +87,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
     Term.term * Type.ty
 
   (*------------------------------------------------------------------*)
-  (** {3 Expantion} *)
+  (** {3 Expansion} *)
 
   (** expand all macros (not operators) in a term relatively to a system *)
   val expand_all_macros :
@@ -143,8 +143,9 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val p_rw_expand_arg : S.t -> Typing.term -> expand_kind 
 
   val expand_term :
-    ?m_rec:bool -> 
     mode:Macros.expand_context ->
+    is_rec:bool ->
+    ?force_exhaustive:bool ->
     expand_kind -> S.sequent ->
     Equiv.any_form ->           (* term being expanded *)
     SE.context ->               (* system context of the term *)

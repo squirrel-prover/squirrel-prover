@@ -70,8 +70,7 @@ val param : param
 (*------------------------------------------------------------------*)
 val prove :
   param:param             ->
-  Env.t                   ->
-  Hyps.TraceHyps.hyps     ->
+  ProofContext.t          ->
   Symbols.p_path          ->
   TacticsArgs.crypto_args ->
   Equiv.equiv             ->

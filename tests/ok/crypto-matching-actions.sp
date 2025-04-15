@@ -70,12 +70,14 @@ global lemma [Foo] _ (t:_[const]) : [happens(t)] -> equiv(frame@t).
 Proof. 
 intro *.
 crypto FOO (key:sk_mix).
+cycle 2.
 + auto.
+cycle 1.
 + intro i. intro H0. 
 destruct H0.
 destruct H1.
 destruct H1.
-have H2:= H0 i.
+have H2:= H1 i.
 simpl.
 assert Avote < MVC(i) || MVC(i) < Avote as Hl.
 auto.
@@ -83,15 +85,10 @@ case Hl.
 auto.
 auto.
 + intro i i0.
-  intro *.
-  destruct H0.
-  destruct H1.
-  destruct H1.
-  destruct H0.
-  destruct H1.
+  intro [[H0 ?] ? [H3 ?] ?] ?. 
   assert MVC(i) < MVC(i0) || MVC(i0) < MVC(i) as Hl by auto.
-  have H4:= H2 i0.
-  have H5:= H3 i.
+  have ? := H0 i0.
+  have ? := H3 i.
   case Hl.
   auto.
   auto.

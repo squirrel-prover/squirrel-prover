@@ -59,9 +59,8 @@ let get_elems (l : int L.located list) (terms : Term.terms) : Term.terms * Term.
   List.partitioni (fun i _ -> List.mem i l) terms
 
 (*------------------------------------------------------------------*)
-let mk_pair_trace_cntxt = ES.mk_pair_trace_cntxt
-
 let check_conclusion_is_equiv = ES.check_conclusion_is_equiv
+
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
@@ -839,7 +838,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
         ~ienv cntxt tpat
     in
     let vars =
-      Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
+      Sv.elements (Sv.filter (fun v -> Vars.is_hole v) (Term.fv t))
     in
     let pat = Term.{
         pat_op_params = Params.Open.empty;
@@ -1026,17 +1025,16 @@ let fa_dup (s : ES.t) : ES.t list =
 (** [filter_deduce ~knows to_filter] returns a subset [results] of [to_filter]
     such that [knows, results ▷ to_filter]. *)
 let filter_deduce
-    (system : SE.context) (s : ES.t) 
+    (in_system : SE.context) (s : ES.t) 
     ?(knows: Term.terms = [])
     (to_filter_init : Term.terms) 
   : Term.terms
   =
-  let table = ES.table s in
-  let hyps = ES.get_trace_hyps ~in_system:system s in
   let st =
     Match.mk_unif_state
       ~param:Match.crypto_param
-      ~env:(ES.vars s) table system hyps ~support:[]
+      (ES.proof_context ~in_system s)
+      ~support:[]
   in
 
   (** Invariant: [knows, results, to_filter ▷ to_filter_init] *)
@@ -1124,19 +1122,17 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     soft_failure
       (Tactics.GoalBadShape "expected an asymptotic equivalence goal");
 
-  let system =
+  let in_system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
 
   let to_deduce, rest = get_elems l equiv.terms in
 
-  let table = ES.table s in
-  let hyps = ES.get_trace_hyps ~in_system:system s in
   let st =
     Match.mk_unif_state
       ~param:Match.crypto_param
-      ~env:(ES.vars s) table system hyps ~support:[]
+      (ES.proof_context ~in_system s) ~support:[]
   in
 
   let match_result = 
@@ -1207,11 +1203,11 @@ let deduce_predicate
     SE.{ (ES.system s) with set = system_secrecy; }
   in
 
-  let hyps = ES.get_trace_hyps ~in_system:system s in
   let st =
     Match.mk_unif_state
       ~param:Match.crypto_param
-      ~env:(ES.vars s) table system hyps ~support:[]
+      (ES.proof_context ~in_system:system s)
+      ~support:[]
   in
 
   let left  = CP.lefts  goal in
@@ -1334,11 +1330,10 @@ let deduce_predicate_int
     SE.{ (ES.system s) with set = system_secrecy; }
   in
 
-  let hyps = ES.get_trace_hyps ~in_system:system s in
   let st =
     Match.mk_unif_state
       ~param:Match.crypto_param
-      ~env:(ES.vars s) table system hyps ~support:[]
+      (ES.proof_context ~in_system:system s) ~support:[]
   in
 
   let side = pick_side ?side goal_kind in
@@ -1599,7 +1594,6 @@ let deprecated_fresh_mk_direct
     (Term.mk_impl cond (Term.mk_neqs ~simpl_tuples:true n_args j))
 
 let deprecated_fresh_mk_indirect
-    (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     ((_n, n_args) : Term.nsymb * Term.terms)
     (frame_actions : OldFresh.deprecated_ts_occs)
@@ -1607,19 +1601,17 @@ let deprecated_fresh_mk_indirect
   =  
   (* for each action [a] in which [name] occurs with indices from [occ] *)
   let bv = occ.Iter.occ_vars in
-  let action, occ = occ.Iter.occ_cnt in
+  let rec_arg, occ = occ.Iter.occ_cnt in
 
   assert ( Sv.subset
-             (Action.fv_action action)
+             (Term.fv rec_arg)
              (Sv.union (Vars.to_vars_set env) (Sv.of_list bv)));
 
   let bv, subst = Term.refresh_vars bv in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
-  let action =
-    SE.action_to_term cntxt.table cntxt.system
-      (Action.subst_action subst action)
+  let action =Term.subst subst rec_arg
   in
 
   let occ = List.map (Term.subst subst) occ in
@@ -1637,21 +1629,15 @@ let deprecated_fresh_mk_indirect
 (* kept for enckp and xor. *)
 (** Construct the formula expressing freshness for some projection. *)
 let deprecated_mk_phi_proj
-    (cntxt      : Constr.trace_cntxt)
-    (hyps       : TopHyps.TraceHyps.hyps)      (* initial hypotheses *)
-    (venv       : Vars.env)
+    (context : ProofContext.t)
     ((n,n_args) : Term.nsymb * Term.terms)
     (frame      : Term.terms)
   : Term.terms
   =
-  let env =
-    Env.init
-      ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv ()
-  in
   try
     let frame_indices : OldFresh.deprecated_name_occs =
       List.fold_left (fun acc t ->
-          OldFresh.deprecated_get_name_indices_ext ~env cntxt n.s_symb t @ acc
+          OldFresh.deprecated_get_name_indices_ext context n.s_symb t @ acc
         ) [] frame
     in
     let frame_indices = List.sort_uniq Stdlib.compare frame_indices in
@@ -1660,11 +1646,11 @@ let deprecated_mk_phi_proj
     let phi_frame = List.map (deprecated_fresh_mk_direct (n,n_args)) frame_indices in
 
     let frame_actions : OldFresh.deprecated_ts_occs =
-      OldFresh.deprecated_get_macro_actions cntxt frame
+      OldFresh.deprecated_get_macro_actions context frame
     in
 
     let macro_cases =
-      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt hyps venv n n_args frame
+      TraceTactics.deprecated_mk_fresh_indirect_cases context n n_args frame
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -1672,7 +1658,7 @@ let deprecated_mk_phi_proj
       List.fold_left (fun forms (_, cases) ->
           let cases =
             List.map
-              (deprecated_fresh_mk_indirect cntxt venv (n,n_args) frame_actions)
+              (deprecated_fresh_mk_indirect context.env.vars (n,n_args) frame_actions)
               cases
           in
           cases @ forms
@@ -1680,10 +1666,7 @@ let deprecated_mk_phi_proj
     in
     let state = 
       let red_param = Reduction.rp_default in
-      let context = 
-        SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
-      in
-      Reduction.mk_state cntxt.table ~system:context ~red_param
+      Reduction.mk_state context ~red_param
     in
     List.remove_duplicate (Reduction.conv state) (phi_frame @ phi_actions)
 
@@ -1695,9 +1678,8 @@ let deprecated_mk_phi_proj
       (Failure "cannot apply fresh: the formula contains a term variable")
 
 let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
-  let cntxt = mk_pair_trace_cntxt s in
-  let env   = ES.vars s in
-  let hyps  = ES.get_trace_hyps s in
+  let system = Utils.oget (ES.system s).pair in
+  let old_context = ES.system s in
   let lproj, rproj = ES.get_system_pair_projs s in
 
   let n_left, n_left_args, n_right, n_right_args =
@@ -1707,18 +1689,22 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
     | _ -> raise OldFresh.Deprecated_Not_name
   in
 
-  let system_left = SE.project [lproj] cntxt.system in
-  let cntxt_left = { cntxt with system = system_left } in
+  let system_left = 
+    { old_context with set = (SE.project [lproj] system :> SE.t) ; } 
+  in
+  let context_left = ES.proof_context ~in_system:system_left s in
   let phi_left =
     let frame = List.map (Term.project1 lproj) biframe in
-    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) frame 
+    deprecated_mk_phi_proj context_left (n_left, n_left_args) frame 
   in
 
-  let system_right = SE.project [rproj] cntxt.system in
-  let cntxt_right = { cntxt with system = system_right } in
+  let system_right = 
+    { old_context with set = (SE.project [rproj] system :> SE.t) ; } 
+  in
+  let context_right = ES.proof_context ~in_system:system_right s in
   let phi_right =
     let frame = List.map (Term.project1 rproj) biframe in
-    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
+    deprecated_mk_phi_proj context_right (n_right, n_right_args) frame 
   in
 
   Term.mk_ands
@@ -1810,7 +1796,8 @@ let equiv_autosimpl s =
 let global_diff_eq (s : ES.t) =
   let frame = ES.conclusion_as_equiv s in
   let system = Utils.oget (ES.system s).pair in
-  let cntxt = mk_pair_trace_cntxt s in
+  let table = ES.table s in
+  let context = ES.pair_proof_context s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
 
   (* Collect in ocs the list of diff terms that occur (directly or not)
@@ -1822,13 +1809,13 @@ let global_diff_eq (s : ES.t) =
     let t = Term.mk_diff [l_proj, Term.project1 l_proj t;
                           r_proj, Term.project1 r_proj t] in
     ocs := ( List.map (fun u -> (x,y,u))
-               (Iter.get_diff ~cntxt (Term.simple_bi_term_no_alpha_find [l_proj; r_proj] t)))
+               (Iter.get_diff ~context (Term.simple_bi_term_no_alpha_find [l_proj; r_proj] t)))
            @ !ocs 
   in
   List.iter (iter [] []) frame.terms;
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
-  SE.iter_descrs cntxt.table system
+  SE.iter_descrs table system
     (fun action_descr ->
        let miter = iter [action_descr.Action.name] action_descr.Action.indices in
        miter (snd action_descr.Action.output) ;
@@ -1850,7 +1837,7 @@ let global_diff_eq (s : ES.t) =
         t.Iter.occ_vars @ Sv.elements (Term.fv subterm)
       in
       let pred_ts_list =
-        let iter = new OldFresh.deprecated_get_actions ~cntxt in
+        let iter = new OldFresh.deprecated_get_actions ~context in
         iter#visit_message subterm;
         iter#visit_message cond;
         iter#get_actions
@@ -1911,6 +1898,7 @@ let global_diff_eq (s : ES.t) =
               ))
            s
         )
+
     | _ -> assert false
   in
   List.map subgoal_of_occ !ocs
@@ -2129,9 +2117,8 @@ let enckp arg (s : ES.t) =
   let before, e, after = split_equiv_conclusion i s in
 
   let biframe = List.rev_append before after in
-  let cntxt = mk_pair_trace_cntxt s in
-  let table = cntxt.table in
-  let env = ES.env s in
+  let context = ES.pair_proof_context s in
+  let table = ES.table s in
   let lproj, rproj = ES.get_system_pair_projs s in
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
@@ -2155,20 +2142,18 @@ let enckp arg (s : ES.t) =
       if Symbols.OpData.(is_abstract_with_ftype fnenc SEnc table) then
         match Symbols.OpData.get_abstract_data fnenc table with
         | _, [fndec] ->
-          (fun (sk,proj,system) ->
-             let cntxt = Constr.{ cntxt with system } in
-             let env =
-               Env.update ~system:SE.{ set = (system :> SE.t); pair = None } env
-             in
+          (fun (sk,proj,se) ->
+             let system = SE.{ context.env.system with set = (se :> SE.t); } in
+             let context = ProofContext.change_system ~system context in
              let frame = List.map (Term.project1 proj) biframe in
 
              Oldcca.deprecated_symenc_key_ssc
-               ~cntxt fnenc fndec
+               ~context fnenc fndec
                ~elems:(List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
                (*TODO:Concrete : Probably something to do to create a bounded goal*)
                sk.Name.symb.s_symb;
              Oldcca.deprecated_symenc_rnd_ssc
-               ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args {terms = frame; bound = None}),
+               ~context fnenc ~key:sk.Name.symb ~key_is:sk.Name.args {terms = frame; bound = None}),
           (*TODO:Concrete : Probably something to do to create a bounded goal*)
           (fun x -> x),
           k
@@ -2177,12 +2162,12 @@ let enckp arg (s : ES.t) =
       else
         match Symbols.OpData.get_abstract_data fnenc table with
         | _, [fndec;fnpk] ->
-          (fun (sk,proj,system) ->
-             let cntxt = Constr.{ cntxt with system } in
+          (fun (sk,proj,se) ->
+             let system = SE.{ context.env.system with set = (se :> SE.t); } in
+             let context = ProofContext.change_system ~system context in
              let errors =
-               (* TODO: set globals to true *)
-               OldEuf.key_ssc ~globals:false
-                 ~cntxt
+               OldEuf.key_ssc
+                 ~context
                  ~elems:{terms = (List.map (Term.project1 proj) (ES.conclusion_as_equiv s).terms)
                         (*TODO:Concrete : Probably something to do to create a bounded goal*)
                         ; bound = None}
@@ -2335,29 +2320,34 @@ let remove_name_occ (n,a) l = match l with
   | _ ->
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
-let mk_xor_phi_base (s : ES.t) biframe
-    ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) =
-  let cntxt = mk_pair_trace_cntxt s in
-  let env   = ES.vars s in
-  let hyps  = ES.get_trace_hyps s in
+let mk_xor_phi_base
+    (s : ES.t) biframe
+    ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) 
+  =
+  let system = Utils.oget (ES.system s).pair in
+  let old_context = ES.system s in
   let lproj, rproj = ES.get_system_pair_projs s in
 
   let biframe =
     Term.mk_diff [lproj,l_left;rproj,l_right] :: biframe
   in
 
-  let system_left = SE.project [lproj] cntxt.system in
-  let cntxt_left = { cntxt with system = system_left } in
+  let system_left = 
+    { old_context with set = (SE.project [lproj] system :> SE.t) ; } 
+  in
+  let context_left = ES.proof_context ~in_system:system_left s in
   let phi_left =
     let frame = List.map (Term.project1 lproj) biframe in
-    deprecated_mk_phi_proj cntxt_left hyps env (n_left, n_left_args) frame
+    deprecated_mk_phi_proj context_left (n_left, n_left_args) frame
   in
 
-  let system_right = SE.project [rproj] cntxt.system in
-  let cntxt_right = { cntxt with system = system_right } in
+  let system_right = 
+    { old_context with set = (SE.project [rproj] system :> SE.t) ; } 
+  in
+  let context_right = ES.proof_context ~in_system:system_right s in
   let phi_right =
     let frame = List.map (Term.project1 rproj) biframe in
-    deprecated_mk_phi_proj cntxt_right hyps env (n_right, n_right_args) frame 
+    deprecated_mk_phi_proj context_right (n_right, n_right_args) frame 
   in
 
   let len_left =
@@ -2495,7 +2485,7 @@ let xor arg (s : ES.t) =
   in
   let table = Process.add_namelength_axiom table n n_fty in
 
-  let ns = Term.mk_symb n Type.tmessage in
+  let ns = Term.nsymb n Type.tmessage in
   let s = ES.set_table table s in
 
   let then_branch = Term.mk_name ns [] in
@@ -2523,13 +2513,13 @@ let () =
 exception Not_context
 
 class ddh_context
-    ~(cntxt:Constr.trace_cntxt) ~gen ~exp ~l_proj ~r_proj exact a b c
+    ~(context:ProofContext.t) ~gen ~exp ~l_proj ~r_proj exact a b c
   = object (_self)
 
-    inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
+    inherit Iter.deprecated_iter_approx_macros ~exact ~context as super
 
     method visit_macro ms args a =
-      match Symbols.get_macro_data ms.s_symb cntxt.table with
+      match Symbols.get_macro_data ms.s_symb context.env.table with
       | _ when Symbols.is_quantum_macro ms.s_symb ->
         soft_failure (Failure "DDH is unsupported for quantum adversaries")
 
@@ -2572,11 +2562,11 @@ class ddh_context
 (*------------------------------------------------------------------*)
 exception Macro_found
 
-class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
-  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
+class find_macros ~(context:ProofContext.t) exact = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact ~context as super
 
   method visit_macro ms args a =
-    match Symbols.get_macro_data ms.s_symb cntxt.table with
+    match Symbols.get_macro_data ms.s_symb context.env.table with
     | _ when Symbols.is_quantum_macro ms.s_symb ->
       soft_failure (Failure "DDH is unsupported for quantum adversaries")
 
@@ -2593,14 +2583,18 @@ end
     all the names appearing inside the terms are only used inside those, returns
     true. *)
 let is_ddh_context
-    ~(cntxt : Constr.trace_cntxt)
+    ~(context : ProofContext.t)
     ~l_proj ~r_proj
-    ~gen ~exp a b c elem_list =
-  let a,b,c = Symbols.Name.convert_path a cntxt.table,
-              Symbols.Name.convert_path b cntxt.table,
-              Symbols.Name.convert_path c cntxt.table in
-  let iter = new ddh_context ~cntxt ~l_proj ~r_proj ~gen ~exp false a b c in
-  let iterfm = new find_macros ~cntxt false in
+    ~gen ~exp a b c elem_list
+  =
+  let table = context.env.table in
+  let a,b,c =
+    Symbols.Name.convert_path a table,
+    Symbols.Name.convert_path b table,
+    Symbols.Name.convert_path c table
+  in
+  let iter = new ddh_context ~context ~l_proj ~r_proj ~gen ~exp false a b c in
+  let iterfm = new find_macros ~context false in
   let exists_macro =
     try List.iter iterfm#visit_message elem_list; false
     with Macro_found -> true
@@ -2610,7 +2604,7 @@ let is_ddh_context
     (* we check that a b and c only occur in the correct form inside the system,
        if the elements contain some macro based on the system.*)
     if exists_macro then
-      SE.iter_descrs cntxt.table cntxt.system (
+      SE.iter_descrs table (SE.to_fset context.env.system.set) (
         fun d ->
           iter#visit_message (snd d.condition) ;
           iter#visit_message (snd d.output) ;
@@ -2654,9 +2648,9 @@ let ddh
   let gen = Term.mk_fun tbl gen_symb [] in
   let exp = exp_symb in
 
-  let cntxt = mk_pair_trace_cntxt s in
+  let context = ES.pair_proof_context s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
-  if is_ddh_context ~gen ~exp ~cntxt ~l_proj ~r_proj
+  if is_ddh_context ~gen ~exp ~context ~l_proj ~r_proj
       na nb nc (ES.conclusion_as_equiv s).terms
       (*TODO:Concrete : Probably something to do to create a bounded goal*)
   then sk [] fk
@@ -2680,19 +2674,13 @@ let crypto
     (game : Symbols.p_path) (args : Args.crypto_args) (s : ES.t) 
   =
   let frame = ES.conclusion_as_equiv s in
-  let old_context = ES.system s in
-  let new_context = { old_context with set = (oget old_context.pair :> SE.t); } in
-  let env = Env.{ (ES.env s) with system = new_context; } in
-  let hyps =
-    TopHyps.change_trace_hyps_context
-      ~old_context ~new_context
-      ~table:env.table ~vars:env.vars
-      (ES.get_trace_hyps s)
-  in
-  let subgs = Crypto.prove ~param env hyps game args frame in
+  let old_system = ES.system s in
+  let new_system = { old_system with set = (oget old_system.pair :> SE.t); } in
+  let context = ES.proof_context ~in_system:new_system s in
+  let subgs = Crypto.prove ~param context game args frame in
   let s = (* change the system context and hypotheses in [s] *)
     let dummy = Equiv.mk_reach_atom Term.mk_false in
-    ES.set_conclusion_in_context new_context dummy s 
+    ES.set_conclusion_in_context new_system dummy s 
   in
   List.map (fun subg -> ES.set_reach_conclusion subg s) subgs
 

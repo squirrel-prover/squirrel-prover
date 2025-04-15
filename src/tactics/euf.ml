@@ -208,7 +208,7 @@ type euf_param = {
     if any *)
 let euf_param
     ~(hyp_loc : L.t)
-    (contx : Constr.trace_cntxt)
+    (context : ProofContext.t)
     (hyp : term)
     (s : TS.sequent)
   : euf_param
@@ -218,8 +218,8 @@ let euf_param
       (Tactics.Failure "can only be applied on an hypothesis of the form \
                         checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
   in
-  let einfo = O.EI_direct, contx in
-  let table = contx.table in
+  let einfo = O.EI_direct, context in
+  let table = context.env.table in
 
   (* try to write hyp as u = v *)
   match TS.Reduce.destr_eq s Equiv.Local_t hyp with
@@ -271,11 +271,10 @@ let euf (h : lsymb) (s : sequent) : sequent list =
   (* find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
-  let contx = TS.mk_trace_cntxt s in
-  let env = TS.env s in
+  let context = TS.proof_context s in
 
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
-    euf_param ~hyp_loc:(L.loc h) contx hyp s
+    euf_param ~hyp_loc:(L.loc h) context hyp s
   in
 
   let pp_k ppf () =
@@ -289,8 +288,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
   (* get all occurrences *)
   let occs =
     IOS.find_all_occurrences ~mode:PTimeNoSI ~pp_descr:(Some pp_k)
-      get_bad
-      (TS.get_trace_hyps s) contx env (t :: m :: k.Name.args)
+      get_bad context (t :: m :: k.Name.args)
   in
 
   (* sort the occurrences: first the key occs, then the integrity occs *)
@@ -303,9 +301,9 @@ let euf (h : lsymb) (s : sequent) : sequent list =
       occs
   in
   let occs = occs_key @ occs_int in
-
+  
   (* compute the formulas stating that one of the occs is a collision *)
-  let phis = List.map (IOF.occurrence_formula ~negate:false) occs in
+  let phis = List.map (IOF.occurrence_formula (TS.table s) ~negate:false) occs in
 
   (* finally generate all corresponding goals *)
   let g = TS.conclusion s in 
@@ -314,7 +312,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
       (fun phi -> TS.set_conclusion (mk_impl ~simpl:false phi g) s)
       phis
   in
-
+  
   (* copied from old euf, handles the composition goals *)
   let tag_s =
     match Oracle.get_oracle int_f (TS.table s) with
@@ -340,7 +338,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
 
       | _ -> assert false 
   in
-
+    
   tag_s @ integrity_goals
 
 

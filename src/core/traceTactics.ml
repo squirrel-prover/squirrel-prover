@@ -89,35 +89,32 @@ let case_cond orig vars c t e s : sequent list =
     mk_case    [] else_t else_c]
 
 let conditional_case (m : Term.term) s : sequent list =
+  let failed () = Tactics.soft_failure (Failure "message is not a conditional") in
   match m with
   | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
   | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
     case_cond m [] c t e s
 
-  | Term.Macro (ms,args,ts) ->
-
-    if not (TS.query_happens ~precise:true s ts) then
-      soft_failure (Tactics.MustHappen ts);
-
+  | Term.Macro (_,_,_) ->
     begin
-      let def = 
-        match Macros.get_definition (TS.mk_trace_cntxt s) ms ~args ~ts with
-        | `Undef ->
-          soft_failure (Failure "cannot expand this macro: macro is undefined");
-        | `MaybeDef ->
-          soft_failure (Failure "cannot expand this macro: undetermined action")
-        | `Def mdef -> mdef
+      let def =
+        let res, has_red =
+          Match.reduce_delta_macro1
+            ~constr:true
+            (TS.env s) ~hyps:(TS.get_trace_hyps s) m
+        in
+        if has_red = True then res else failed ()
+          
       in
 
       match def with
       | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
       | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
         case_cond m [] c t e s
-      | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
+      | _ -> failed ()
     end
 
-  | _ ->
-    Tactics.(soft_failure (Failure "message is not a conditional"))
+  | _ -> failed ()
 
 let boolean_case b s : sequent list =
   let do_one b_case b_val =
@@ -570,7 +567,7 @@ let constraints (s : TS.t) =
         (LHyp (Local (Term.mk_not (TS.conclusion s))))
         (TS.set_conclusion Term.mk_false s)
     in
-    TS.constraints_valid s
+    TS.constraints_valid ~system:(Some (TS.system s).set) s
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_ttac (s : TS.t) =
@@ -613,7 +610,7 @@ let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
     Added in [simpl]. *)
 let strengthen_const_vars (s : TS.t) : TS.t =
   let vars =
-    Vars.map_tag (fun v tag ->
+    Vars.map_tag (fun v (tag : Vars.Tag.t) ->
         { tag with const = tag.const || strengthen_const_var s v }
       ) (TS.vars s)
   in
@@ -735,7 +732,7 @@ let () =
 (* no longer used for fresh.
    left here temporarily, for compatibility *)
 (** triple of the action and the name indices *)
-type deprecated_fresh_occ = (Action.action * Term.terms) Iter.occ
+type deprecated_fresh_occ = (Term.term * Term.terms) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
@@ -754,8 +751,7 @@ let deprecated_fresh_occ_incl
 
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
-  let mk_dum a is cond =
-    let action = SE.action_to_term table system a in
+  let mk_dum action is cond =
     Term.mk_ands ~simpl:false
       ((Term.mk_eq Term.init action) ::
        (Term.mk_ands (List.map2 (Term.mk_eq ~simpl:false) is is)) ::
@@ -779,7 +775,7 @@ let deprecated_fresh_occ_incl
 
 (** Add a new fresh rule case, if it is not redundant. *)
 let deprecated_add_fresh_case
-    table system
+    table (system : SE.t)
     (c : deprecated_fresh_occ)
     (l : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
@@ -796,7 +792,7 @@ let deprecated_add_fresh_case
 
 (** Add many new fresh rule cases, if they are not redundant. *)
 let deprecated_add_fresh_cases
-    table system
+    table (system : SE.t)
     (l1 : deprecated_fresh_occ list)
     (l2 : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
@@ -806,9 +802,7 @@ let deprecated_add_fresh_cases
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let deprecated_mk_fresh_indirect_cases
-    (cntxt : Constr.trace_cntxt)
-    (hyps : Hyps.TraceHyps.hyps)      (* initial hypotheses *)
-    (venv : Vars.env)
+    (context : ProofContext.t)
     (ns : Term.nsymb)
     (ns_args : Term.terms)
     (terms : Term.term list)
@@ -820,49 +814,39 @@ let deprecated_mk_fresh_indirect_cases
           Sv.union s (Term.fv t)
         ) (Term.fvs ns_args) terms
     in
-    Sv.subset all_fv (Vars.to_vars_set venv));
+    Sv.subset all_fv (Vars.to_vars_set context.env.vars));
 
-  let env =
-    Env.init
-      ~table:cntxt.table ~system:(SE.reachability_context cntxt.system)
-      ~vars:venv ()
-  in
+  let env = context.env in
 
   let macro_cases =
     Iter.fold_macro_support (fun iocc macro_cases ->
-        let action_name, a =
-          match iocc.iocc_rec_arg with
-          | Term.Action (a, is) -> a, Action.of_term a is cntxt.table
-          | _ -> assert false
-          (* Recursion unsupported on something else than an action. 
-             FIXME: port this code to use the [Occurrences] module. *)
-        in
-        let t = Term.mk_tuple [iocc.iocc_cond; iocc.iocc_cnt] in
+        let rec_arg = iocc.iocc_rec_arg  in
+        let t           = iocc.iocc_cnt    in
 
         let fv =
           Sv.diff
-            (Sv.union (Action.fv_action a) (Term.fv t))
-            (Vars.to_vars_set venv)
+            (Sv.union (Term.fv rec_arg) (Term.fv t))
+            (Vars.to_vars_set context.env.vars)
         in
 
         let new_cases =
           let fv = List.rev (Sv.elements fv) in
           OldFresh.deprecated_get_name_indices_ext
-            ~env:env ~fv cntxt ns.s_symb t
+            ~fv context ns.s_symb t
         in
         let new_cases =
           List.map (fun (case : OldFresh.deprecated_name_occ) ->
               { case with
-                occ_cnt = (a, case.occ_cnt);
+                occ_cnt = (rec_arg, case.occ_cnt);
                 occ_cond = case.occ_cond; }
             ) new_cases
         in
 
-        List.assoc_up_dflt action_name []
+        List.assoc_up_dflt rec_arg []
           (fun l ->
-             deprecated_add_fresh_cases cntxt.table cntxt.system new_cases l
+             deprecated_add_fresh_cases env.table env.system.set new_cases l
           ) macro_cases
-      ) cntxt env hyps terms []
+      ) context terms []
   in
   (* we keep only action names in which the name occurs *)
   List.filter (fun (_, occs) -> occs <> []) macro_cases
@@ -1408,20 +1392,20 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
+let valid_hash (context : ProofContext.t) (t : Term.term) =
   match t with
   | Term.App (Fun (hash, _), [Tuple [_msg; Name (_key, _)]]) ->
-    Symbols.OpData.(is_abstract_with_ftype hash Hash cntxt.table)
+    Symbols.OpData.(is_abstract_with_ftype hash Hash context.env.table)
 
   | _ -> false
 
 (** We collect all hashes appearing inside the hypotheses, and which satisfy
     the syntactic side condition. *)
 let top_level_hashes s =
-  let cntxt = TS.mk_trace_cntxt s in
+  let context = TS.proof_context s in
 
   let hashes =
-    List.filter (valid_hash cntxt) (TS.get_all_messages s)
+    List.filter (valid_hash context) (TS.get_all_messages s)
     |> List.sort_uniq Stdlib.compare
   in
 
@@ -1464,8 +1448,8 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
       let h = as_local ~loc:(L.loc p_h) h in
       match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
-        let cntxt = TS.mk_trace_cntxt s in
-        if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then
+        let context = TS.proof_context s in
+        if not (valid_hash context t1) || not (valid_hash context t2) then
           soft_failure Tactics.NoSSC;
 
         [t1,t2]

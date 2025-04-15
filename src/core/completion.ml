@@ -250,7 +250,7 @@ type ct_memo = {
 let mk_ct_memo table : ct_memo = 
   let system = SystemExpr.context_any in
   let red_param = Reduction.rp_default in
-  let cstate = Reduction.mk_state ~system table ~red_param in
+  let cstate = Reduction.mk_state0 ~system table ~red_param in
   { cstate; memo = Mt.empty; }
 
 (** Box a term. 
@@ -315,7 +315,7 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
 
 
 (*------------------------------------------------------------------*)
-let term_of_cterm (_table : Symbols.table) (c : cterm) : Term.term =
+let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
   let term_of_cst (c : Cst.t) (args : Term.terms) : Term.term =
     match c with
     | Cst.GFun gf ->
@@ -332,17 +332,17 @@ let term_of_cterm (_table : Symbols.table) (c : cterm) : Term.term =
           let term = as_seq1 args in
           Term.mk_proj i term
 
-        | M (m,ek) -> 
+        | M (m,_) -> 
           let is, ts = List.takedrop (List.length args - 1) args in
           let ts = as_seq1 ts in
-          let m = Term.mk_symb m ek in
+          let m = Macros.msymb table m in
           Term.mk_macro m is ts
 
         | A a -> 
           Term.mk_action a args
 
         | N (n,nty) -> 
-          let ns = Term.mk_symb n nty in
+          let ns = Term.nsymb n nty in
           Term.mk_name ns args
       end
 

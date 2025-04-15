@@ -146,7 +146,7 @@ Proof.
     fresh 5; 1:auto.
     apply IH.
   + (* Bout *)
-    expandall; fa !<_,_>.
+    rewrite /frame /output /exec /cond; fa !<_,_>.
     rewrite correct_key; 1,2:auto.
     apply IH.
   (* END EXO *)
