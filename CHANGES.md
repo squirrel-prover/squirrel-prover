@@ -1,3 +1,101 @@
+### Support user-defined functions
+  [commit: `543810eb`, **breaking change**]
+
+Add support for user-defined functions which can use probabilistic
+constructs, mutual recursion, system-dependency and pattern
+matching. This generalizes the pre-existing notion of macros
+(e.g. `frame@t, output@t`) that could only be defined through systems.
+
+**Note (breaking change):** Supporting user-defined functions required
+to adapt the mechanism dealing with recursion in cryptographic
+reasoning tactics, in a way that may modify the behavior of said
+tactics. Notably, generated subgoals may be different.
+
+*A first example:*
+Consider a system `Q` containing actions `A i` and `B j`. We can
+define a function returning the index of the action using
+```
+let get_id @system:Q (u : timestamp) with
+| A i when happens(u)    -> i
+| B j when happens(u)    -> j
+| init                   -> default0
+| _ when not (happens u) -> default1.
+```
+
+*Pattern-matching:*
+User-defined functions can optionally be defined using
+pattern-matching, as above. A valid pattern-matching definition must be
+exhaustive and use mutually exclusive cases. An automated procedure tries
+to verify both conditions. If that procedure fails, these properties
+must be established by the user manually.
+
+*Unfolding:*
+Unfolding of functions is done at the level of
+patterns. E.g. `rewrite /get_id` will unfold a term `get_id t` into
+one of the four cases of `get_id`'s definition, assuming the `when`
+pattern conditions can be automatically discharged.
+
+The tactic `expand ~def function_name` forces the unfolding of a function
+into its full definition (using conditionals for the `when` conditions
+and quantifiers for variables bound by each case). For example, this
+allows proving lemmas that depend on `exec@tau` for a non-instantiated
+`tau`, see `theories/Classic.sp`.
+
+*Recursion:*
+Functions can be recursive:
+```
+let rec fac (x : int) = if x <= 0 then 1 else x * fac (x - 1).
+```
+Termination of recursive functions must be proved by the user. By
+default, Squirrel uses the generic well-founded order `<` over the
+arguments.
+
+Functions can be mutually recursive and system dependent. Further, the
+termination order can be manually specified using the `termination_by
+d` syntax, where `d` is a decreasing quantity.  Here is an example
+relying on these features, where we manually give alternative
+definitions of the `frame/output/state` macros (we omitted most
+pattern-matching bodies):
+```
+let rec my_output @system:P t with
+| A i when happens t -> ...
+| init -> ...
+| _ when not (happens t) -> ...
+termination_by (t,1)
+
+and stA i with
+| _ when not(happens(A i)) -> ...
+| null_i when happens (A null_i) -> ...
+| _ when (happens (A i) && i <> null_i)-> ...
+termination_by (A i,0)
+
+and my_frame t with
+| t when happens t && t<> init -> <my_frame (pred t), my_output t>
+| init -> empty
+| _ when not (happens t) -> empty
+termination_by (t,2).
+```
+
+*More examples:*
+Detailed examples can be found in `tests/ok/`:
+ * `let-macro.sp`
+ * `macro-let-rec.sp`
+ * `macro-let-rec-crypto.sp`
+ 
+
+*Details for developers:*
+See `macros.mli` for the new definition of recursive functions. Most
+of the code outside of `Macros` deals with user-defined functions in a
+uniform fashion using the `Macros`'s API. We should gradually get rid
+of specific treatments of the old macros `input`, `frame`, relying on
+the generic mecanism instead.
+ 
+The generalization of recursive definitions leads to an increased
+number of occurrences finding and macro unfolding. This impacts
+performance, but the update paves the way for a better treatment of
+direct/indirect occurences.
+
+
 ### smt update
   [commit: 9655f18c] 
 
