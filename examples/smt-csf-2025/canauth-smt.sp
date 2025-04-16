@@ -237,7 +237,7 @@ use counterIncreaseStrictRB.
 use counterIncreaseStrictRA.
 use authA.
 use authB.
-smt ~steps:82495.  
+smt ~prover:CVC5 ~steps:82495.  
  Qed.
 
 
