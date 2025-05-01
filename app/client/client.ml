@@ -39,7 +39,7 @@ let rec obj_to_json (cobj : < .. > Js.t) : Yojson.Safe.t =
 let jscoq_cmd_of_obj (cobj : < .. > Js.t) =
   let ojson = obj_to_json cobj in
   (* will show in console the json object for debug info ↓ *)
-  Firebug.console##log 
+  Console.console##log 
     ("cmd in json : " ^ (Yojson.Safe.pretty_to_string ojson));
   SquirrelWorker.jsquirrel_cmd_of_yojson @@ obj_to_json cobj
 
@@ -47,11 +47,11 @@ let jscoq_cmd_of_obj (cobj : < .. > Js.t) =
 let on_msg msg =
   let yo = obj_to_json msg in
   (* show json object received for debug info ↓ *)
-  Firebug.console##log ("Got : " ^ (Yojson.Safe.pretty_to_string yo));
+  Console.console##log ("Got : " ^ (Yojson.Safe.pretty_to_string yo));
 
   match jscoq_cmd_of_obj msg with
   | Result.Ok cmd  -> SquirrelWorker.execute_cmd cmd
-  | Result.Error s -> Firebug.console##log  
+  | Result.Error s -> Console.console##log  
         ("Error in JSON conv: " ^ s ^ " | " ^ (Js.to_string (Json.output msg)))
 
 (* This code is executed on Worker initialization *)

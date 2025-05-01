@@ -6,7 +6,7 @@
 
 include Squirrelcore
 include Squirrelprover
-
+module L = Location
 (* Needed to register the tactics *)
 include Squirreltactics
 
@@ -30,7 +30,7 @@ let prover_stack : (state list) option ref = ref None
 let init s =
   let init_state = Prover.init ~with_string_prelude:(Some s) () in
   prover_state := Some (Prover.do_set_option 
-      init_state (TConfig.s_interactive,Config.Param_bool true));
+      init_state (L.mk_loc L._dummy TConfig.s_interactive, TConfig.Param_bool true));
   prover_stack := Some [{ps= init_state; output=firstOutput}]
 
 
@@ -135,8 +135,10 @@ let exec_sentence ?(check=`Check) s : bool * string =
     (true,info)
   with e -> 
     Printer.prthtml `Error "Exec failed: %a"
-      (Errors.pp_toplevel_error ~test:false 
-         (Driver.from_string s)) e;
+      (Errors.pp_toplevel_error ~test:false         
+         (Driver.from_string s)
+         (Prover.get_table (get_state_or_fail ()))
+      ) e;
     (false,
      (* return the exception info as string *)
      Format.flush_str_formatter ())
@@ -149,8 +151,8 @@ let exec_command ?(check=`Check) s : string =
     info
   with e -> 
     Printer.prthtml `Error "Run failed: %a"
-      (Errors.pp_toplevel_error ~test:false 
-         (Driver.from_string s)) e;
+      (Errors.pp_toplevel_error ~test:false
+         (Driver.from_string s) (Prover.get_table (get_state_or_fail ()))) e;
     Format.flush_str_formatter () (* will print the exception info *)
 
 (* return visualisation as string *)

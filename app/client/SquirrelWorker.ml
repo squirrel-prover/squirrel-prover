@@ -65,20 +65,20 @@ let answer_to_jsobj msg =
 let show_goal () =
   Common.print_goal (); (* will printout the current goal *)
   let goal_output = Format.flush_str_formatter () in
-  Firebug.console##log goal_output;
+  Console.console##log goal_output;
 
   let visu : string = Common.visualisation () in
   Worker.post_message (answer_to_jsobj (Goal (goal_output,visu)))
 
 (* send given string to output in goal panel *)
 let show_in_goal (goal_output:string) =
-  Firebug.console##log goal_output;
+  Console.console##log goal_output;
   let visu : string = Common.visualisation () in
   Worker.post_message (answer_to_jsobj (Goal (goal_output,visu)))
 
 (* send given string to output in info panel *)
 let show_info (info:string) : unit =
-  Firebug.console##log info;
+  Console.console##log info;
   Worker.post_message (answer_to_jsobj (Info info))
 
 (* send OK with number of sentence well executed *)

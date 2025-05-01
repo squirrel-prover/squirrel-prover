@@ -2,7 +2,7 @@
  (name client)
  (modes js)
  (promote (until-clean))
- (libraries yojson jsquirrel js_of_ocaml js_of_ocaml-tyxml )
+ (libraries yojson jsquirrel js_of_ocaml js_of_ocaml-tyxml zarith_stubs_js)
  (js_of_ocaml
     (javascript_files
     ; can get some js import with ↓
