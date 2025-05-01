@@ -92,7 +92,7 @@ system (let pkB = enc_pk(skB) in
 
 (* Load basic library of axioms, and add some complement. *)
 
-include Core.
+include Logic.
 
 (* This axiom holds for any bi-system.
    It cannot be stated for [any] hence it is not in the standard library. *)
