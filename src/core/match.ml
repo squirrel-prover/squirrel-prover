@@ -2645,6 +2645,7 @@ let deduce_mem0
   let st = { st with support = known.vars @ st.support; } in
 
   (* adding [cterm.cond] as hypotheses before matching *)
+  (* FEATURE: could we add [known.cond] too? *)
   let st =
     let hyps =
       TraceHyps.add

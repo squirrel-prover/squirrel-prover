@@ -294,9 +294,9 @@ module CondTerm = struct
 
   (* Function polishing a conditional term: 
      - removing duplicates in conds *)
-  let polish (pc : ProofContext.t) (c:t) =
-    let reduction_state hyps =
-      let pc = ProofContext.make ~env:pc.env ~hyps in
+  let polish_conds (pc : ProofContext.t) (c:t) =
+    let st =
+      let pc = ProofContext.make ~env:pc.env ~hyps:pc.hyps in
       Reduction.mk_state pc ~red_param:ReductionCore.rp_crypto
     in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
@@ -307,18 +307,27 @@ module CondTerm = struct
     (* Redution in whnf *)
     let conds =
       List.map (fun cond -> fst (
-        Reduction.whnf_term ~strat (reduction_state pc.hyps) cond))
+        Reduction.whnf_term ~strat st cond))
         conds
     in
-    let term, _ =
-      let extended_hyps = 
-        List.fold_left (fun h f ->
-            TraceHyps.add Args.AnyName (LHyp (Local f)) h
-          ) pc.hyps conds
-      in
-      Reduction.whnf_term ~strat (reduction_state extended_hyps) c.term
+    { term = c.term; conds; }
+
+  let whnf_term ~red_param (pc : ProofContext.t) (c:t) =
+    let hyps = 
+      List.fold_left (fun h f ->
+          TraceHyps.add Args.AnyName (LHyp (Local f)) h
+        ) pc.hyps c.conds
     in
-    { term; conds; }
+    let st =
+      let pc = ProofContext.make ~env:pc.env ~hyps in
+      Reduction.mk_state pc ~red_param
+    in
+    let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
+
+    let term, _ =
+      Reduction.whnf_term ~strat st c.term
+    in
+    { term; conds = c.conds; }
 
   let mk ~term ~conds =
     (* All ands terms set into list *)
@@ -2639,6 +2648,8 @@ let rec bideduce_term_strict
     (query : query)
     (output_term : CondTerm.t) : result option
   =
+  let pc = ProofContext.make ~env:query.env ~hyps:query.hyps in
+  let output_term = CondTerm.whnf_term ~red_param:ReductionCore.rp_crypto pc output_term in
   let conds = output_term.conds in
   match output_term.term with
   | Term.(App (Fun(fs,_),[b;t0;t1])) when fs = Term.f_ite ->
@@ -2805,7 +2816,10 @@ and bideduce_term
   =
   let env = query.env in
   let pc = ProofContext.make ~env:query.env ~hyps:query.hyps in
-  let output = CondTerm.polish pc output in
+  let output = CondTerm.polish_conds pc output in
+  let output = 
+    CondTerm.whnf_term ~red_param:ReductionCore.rp_default pc output
+  in
 
   assert (AbstractSet.well_formed env query.initial_mem);
 

@@ -95,7 +95,6 @@ global lemma [T] _ (i:index[adv]) :
  equiv(forall (j:index),  <n j, m i> = < n j, m i>).
 Proof.
 crypto ALEA.
-auto.
 Qed.
 
 global lemma [T] _ (i,j,k:index[adv]) : 
