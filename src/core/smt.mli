@@ -11,7 +11,8 @@ type timestamp_style =
     which is guaranteed correct but not complete.
     Other arguments allow to tweak this translation. *)
 val is_valid :
-timestamp_style:timestamp_style ->
+  timestamp_style:timestamp_style ->
+  macro_axioms:bool ->
   timeout:int ->
   steps:int option -> 
   provers:(string*string) list->

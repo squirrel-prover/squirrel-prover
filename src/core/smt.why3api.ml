@@ -1388,9 +1388,8 @@ let add_name_axioms context =
     (List.map (fun x -> ("axiom_distinct", x)) (name_inj_axioms))
   
 
-let build_task ~timestamp_style table system
+let build_task ~timestamp_style ~macro_axioms table system
                 evars hypotheses conclusion tm_theory = 
-
   let context = 
     context_init ~timestamp_style tm_theory evars table system
   in 
@@ -1400,8 +1399,8 @@ let build_task ~timestamp_style table system
   add_macros context;
   add_names context;
   add_equational_axioms context;
-  if system<>None then add_macro_axioms context;
-  if system<>None then (add_timestamp_axioms context);
+  if system<>None && macro_axioms then add_macro_axioms context;
+  if system<>None then add_timestamp_axioms context;
   add_name_axioms context;
     
 
@@ -1450,18 +1449,20 @@ let unique_id =
   fun () -> incr id ; !id
 
 let is_valid
-    ~timestamp_style ~timeout ~steps ~provers
+    ~timestamp_style ~macro_axioms ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   =
   let theory = match load_theory ~timestamp_style env with
     | Some theory -> theory
     | None -> raise InternalError
   in
-  let task = build_task
-    ~timestamp_style
-    table system
-    evars hypotheses conclusion
-    theory 
+  let task =
+    build_task
+      ~timestamp_style
+      ~macro_axioms
+      table system
+      evars hypotheses conclusion
+      theory
   in
   begin match Sys.getenv_opt "SMT_VERBOSE" with
     | None -> ()
@@ -1509,32 +1510,37 @@ type parameters = {
   timestamp_style : timestamp_style;
   timeout : int;
   steps : int option;
-  provers : (string*string) list
+  provers : (string*string) list;
+  macro_axioms : bool (** [true] when macro axioms should be sent to solvers *)
 }
-let default_prover = 
-  let l = (List.map 
-    (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern)) 
-    (Why3.Whyconf.Mprover.keys why3_provers)
-  ) in 
-  match l with 
+
+let default_prover =
+  let l =
+    List.map
+      (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
+      (Why3.Whyconf.Mprover.keys why3_provers)
+  in
+  match l with
     | [] -> Tactics.(hard_failure (Failure "No SMT solvers detected"))
-    | _ -> 
-      if (List.mem ("CVC5","") l) then 
+    | _ ->
+      if List.mem ("CVC5","") l then
         ["CVC5",""]
-      else if (List.mem ("Z3","") l) then 
+      else if List.mem ("Z3","") l then
         ["Z3",""]
-      else [List.hd l]
-  
+      else
+        [List.hd l]
+
 let default_parameters = {
   timestamp_style = Nat;
   timeout = 1;
   steps = None;
-  provers = default_prover
+  provers = default_prover;
+  macro_axioms = true
 }
 
 let parse_prover_arg prover_alt =
   let add_dash s = if s = "AltErgo" then "Alt-Ergo" else s in
-  let add_plus alt = 
+  let add_plus alt =
     if alt = "stringscounterexamples" then "strings+counterexamples" else alt in
   match String.split_on_char '_' prover_alt with
     | [p;alt] -> add_dash p, add_plus alt
@@ -1556,12 +1562,15 @@ let parse_arg parameters = let open TacticsArgs in function
 
   (* Provers. *)
   | NList ({Location.pl_desc="prover"},[String_name {Location.pl_desc="All"}])
-  | NList ({Location.pl_desc="provers"},[String_name {Location.pl_desc="All"}]) 
-    -> let l = List.filter (fun (name,_) -> name<>"CVC4") (List.map 
-      (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern)) 
-      (Why3.Whyconf.Mprover.keys why3_provers)
-      )
-    in 
+  | NList ({Location.pl_desc="provers"},[String_name {Location.pl_desc="All"}])
+    ->
+    let l =
+      List.filter
+        (fun (name,_) -> name <> "CVC4")
+        (List.map
+           (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
+           (Why3.Whyconf.Mprover.keys why3_provers))
+    in
     {parameters with provers = l}
   | NList ({Location.pl_desc="prover"},l)
   | NList ({Location.pl_desc="provers"},l) ->
@@ -1584,6 +1593,8 @@ let parse_arg parameters = let open TacticsArgs in function
   | NList ({Location.pl_desc="steps"},
                        [Int_parsed {Location.pl_desc=s}]) ->
     { parameters with steps=Some s}
+  | NArg {Location.pl_desc="no_macros"} ->
+    { parameters with macro_axioms = false }
   | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
 
 let parse_args args =
@@ -1592,23 +1603,25 @@ let parse_args args =
 let () =
   ProverTactics.register_general "smt" ~pq_sound:true
     (fun args s sk fk ->
-      let args = match args with
-        | [Named_args_gen args] -> args 
-        | _ -> assert false
-      in
-      let s = match s with
-        | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
-        | Goal.Local s -> s
-      in
-      let {timestamp_style;timeout;steps;provers} = 
-        parse_args args 
-      in if
-        sequent_is_valid
-          ~timestamp_style ~timeout ~steps ~provers s
+       let args = match args with
+         | [Named_args_gen args] -> args
+         | _ -> assert false
+       in
+       let s = match s with
+         | Goal.Global _ ->
+           Tactics.(hard_failure (Failure "SMT not available"))
+         | Goal.Local s -> s
+       in
+       let {timestamp_style;timeout;steps;provers;macro_axioms} =
+         parse_args args
+       in
+       if
+         sequent_is_valid
+           ~timestamp_style ~macro_axioms ~timeout ~steps ~provers s
        then
-          sk [] fk
+         sk [] fk
        else
-          fk (None, Tactics.Failure "SMT cannot prove sequent"))
+         fk (None, Tactics.Failure "SMT cannot prove sequent"))
 
 let () =
   let provers = match Sys.getenv_opt "SMT_PROVERS" with
@@ -1642,6 +1655,7 @@ let () =
     let alt = if alt = "" then alt else "_" ^ alt in
     Format.sprintf "SMT_%s%s" prover alt
   in
+  let sequent_is_valid = sequent_is_valid ~macro_axioms:true in
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
