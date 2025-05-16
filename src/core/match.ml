@@ -3945,14 +3945,15 @@ module E = struct
         | _ -> no_unif ()
       end
 
-    (* Deduction atoms [· ▷ ·], special case when
+    (* Deduction atom [· ▷ ·] or secrecy atom [· *> ·], special case when
        - [mode] is [→] or [←] 
        - the support is empty (we do not know how to mix deduction and
          variable inference) *)
     | Atom (Pred p), Atom (Pred ppat) when
         p.psymb = ppat.psymb && 
         ( Secrecy.is_loaded st.table &&
-          p.psymb = Secrecy.symb_deduce st.table ) &&
+          (p.psymb = Secrecy.symb_deduce st.table || 
+           p.psymb = Secrecy.symb_not_deduce st.table) ) &&
         mode <> `Eq && st.support = [] ->
 
       (* unify system arguments *)
@@ -3983,13 +3984,22 @@ module E = struct
         | `EntailRL -> l0, r0, l, r
         | _ -> assert false
       in
-      
-      (* We check if:
+
+      if p.psymb = Secrecy.symb_deduce st.table then begin
+        (* We check if:
            [(l ▷ r) → (l0 ▷ r0)] 
-         using the transitivity rule:
+           using the transitivity rule:
            [l0 ▷ l] and [l0,r ▷ r0] *)
-      let mv = tunif_deduce ~mode:`EntailLR [l0] [l] st in
-      tunif_deduce ~mode:`EntailLR [l0; r] [r0] { st with mv }
+        let mv = tunif_deduce ~mode:`EntailLR [l0] [l] st in
+        tunif_deduce ~mode:`EntailLR [l0; r] [r0] { st with mv }
+      end else begin      
+        (* We check if:
+             [(l *> r) → (l0 *> r0)] 
+           by checking the left and right weakening hypotheses:
+             [l ▷ l0] and [r0 ▷ r] *)
+        let mv = tunif_deduce ~mode:`EntailLR [l ] [l0] st in
+        tunif_deduce ~mode:`EntailLR [r0] [r ] { st with mv }
+      end
 
     | Atom (Pred p), Atom (Pred ppat) when p.psymb = ppat.psymb ->
       (* unify types *)
