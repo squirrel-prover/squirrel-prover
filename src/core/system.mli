@@ -8,11 +8,14 @@ open Utils
 include module type of SystemSyntax
 
 (*------------------------------------------------------------------*)
-(** Indicates the list of projections of a system. *)
+(** The list of projections of a system. *)
 val projections : Symbols.table -> t -> Projection.t list
 
-(** Indicates whether a system supports a given projection. *)
+(** Check whether a system supports a given projection. *)
 val valid_projection : Symbols.table -> t -> Projection.t -> bool
+
+(** The execution model of a system. *)
+val exec_model : Symbols.table -> t -> Action.exec_model
 
 (*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
@@ -48,11 +51,12 @@ val symbs :
 (*------------------------------------------------------------------*)
 (** {2 Creating new systems and actions} *)
 
-(** Declare a new n-system with associated projections,
-    without any associated actions.
-    Fails if name is already in use. *)
+(** Declare a new n-system with associated execution model, 
+    projections, and without any associated actions.
+    Fails if [name] is already in use. *)
 val declare_empty :
-  Symbols.table -> Symbols.lsymb -> Projection.t list-> Symbols.table * t
+  Symbols.table -> Action.exec_model -> Symbols.lsymb -> Projection.t list-> 
+  Symbols.table * t
 
 (** Register an action symbol in a system,
     associating it with an action description.

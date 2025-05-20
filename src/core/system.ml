@@ -9,16 +9,17 @@ module Msh = Map.Make (Action.Shape)
     the system's arity) and a map from action shapes to action descriptions,
     which also contain action symbols. *)
 type data = {
+  exec_model  : Action.exec_model;
   projections : Projection.t list;
   actions     : Action.descr Msh.t
 }
 
 type Symbols.data += System_data of data
 
-let declare_empty table system_name projections =
+let declare_empty table exec_model system_name projections =
   assert (List.length (List.sort_uniq Stdlib.compare projections) =
           List.length projections);
-  let data = System_data {projections;actions=Msh.empty} in
+  let data = System_data { projections; actions=Msh.empty; exec_model; } in
   Symbols.System.declare ~approx:false table system_name ~data 
 
 let get_data table (s_symb : Symbols.system) =
@@ -29,6 +30,8 @@ let get_data table (s_symb : Symbols.system) =
 let projections table s = (get_data table s).projections
 
 let valid_projection table s proj = List.mem proj (projections table s)
+
+let exec_model table s = (get_data table s).exec_model
 
 let descrs table s = Msh.map Action.refresh_descr (get_data table s).actions
 

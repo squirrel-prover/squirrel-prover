@@ -55,7 +55,12 @@ let clone_system
   =
   let projections = List.map fst (SE.to_list old_system) in
   let old_actions = SE.descrs table old_system in
-  let table, new_system = System.declare_empty table new_system projections in
+  let exec_model = 
+    System.exec_model table (oget @@ SE.get_compatible_system [] old_system) 
+  in
+  let table, new_system = 
+    System.declare_empty table exec_model new_system projections 
+  in
   let table =
     System.Msh.fold
       (fun _ descr table ->

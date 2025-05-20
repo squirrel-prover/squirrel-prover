@@ -1728,7 +1728,9 @@ let declare_system
     | Some lsymb -> lsymb
     | None -> L.mk_loc Location._dummy "default"
   in
-  let table,system_name = System.declare_empty table system_name projections in
+  let table,system_name =
+    System.declare_empty table exec_model system_name projections
+  in
 
   (* we register the init action before parsing the system *)
   let init_descr = Action.{
