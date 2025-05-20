@@ -237,7 +237,7 @@ let get_macro_info
   | State _ | Global _ -> Term.macro_info_builtin
 
 
-let get_macro_deacreasing_info 
+let decreasing_info 
     (table : Symbols.table) (symb : Symbols.macro) (rec_arg : Term.term) : Term.term * Symbols.fname
   =
   let lt = Library.Prelude.fs_lt in

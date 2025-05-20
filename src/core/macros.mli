@@ -156,7 +156,7 @@ val get_rw_strat   : Symbols.table -> Term.msymb    -> rw_strategy
 val get_macro_info : Symbols.table -> Symbols.macro -> Term.macro_info
 
 (* For a call m@t, returns the corresponding decreasing quantity with its order. *)
-val get_macro_deacreasing_info :
+val decreasing_info :
   Symbols.table -> Symbols.macro -> Term.term -> Term.term * Symbols.fname
 
 val msymb : Symbols.table -> Symbols.macro -> Term.msymb

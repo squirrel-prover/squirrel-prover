@@ -3905,26 +3905,30 @@ let prove
     let rec_target_cond = (* additional condition for the recursive case only *)
       match kind with
       | `Recursive ->
-        let target_rec_arg, order1 = Macros.get_macro_deacreasing_info target.env.table (oget target.rec_fun) (oget target.rec_arg) in
-        let source_rec_arg, order2 = Macros.get_macro_deacreasing_info target.env.table (oget source.rec_fun) source_rec_arg in
+        let target_rec_arg, order1 = 
+          Macros.decreasing_info table (oget target.rec_fun) (oget target.rec_arg) 
+        in
+        let source_rec_arg, order2 = 
+          Macros.decreasing_info table (oget source.rec_fun) source_rec_arg
+        in
 
-        if Type.equal (Term.ty target_rec_arg) (Term.ty source_rec_arg) 
-        && Symbols.path_equal order1 order2
-           (* the two calls correspond to comparable mutuially recursive calls *)
+        if Type.equal (Term.ty target_rec_arg) (Term.ty source_rec_arg) &&
+           Symbols.path_equal order1 order2
+           (* the two calls correspond to comparable mutually recursive calls *)
         then
           begin
-        if Type.equal (Term.ty target_rec_arg) Type.ttimestamp             
-          && Symbols.path_equal order1 Library.Prelude.fs_lt then
-          let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
-          [Term.mk_leq source_rec_arg target_rec_arg]  (* A i < B j, writtent as A i <= pred(B j) *)
-        else
-          [Term.mk_fun_infer_tyargs table order1 [source_rec_arg; target_rec_arg]]            
+            if Type.equal (Term.ty target_rec_arg) Type.ttimestamp && 
+               Symbols.path_equal order1 Library.Prelude.fs_lt 
+            then
+              let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
+              [Term.mk_leq source_rec_arg target_rec_arg]  
+              (* [A i < B j], written as [A i <= pred(B j)] *)
+            else
+              [Term.mk_fun_infer_tyargs table order1 [source_rec_arg; target_rec_arg]]            
           end          
         else
           []
-          
 
-        
       | `Direct -> []
     in
     List.map (fun (term : TSet.t) ->

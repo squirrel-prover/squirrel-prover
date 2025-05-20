@@ -691,7 +691,7 @@ let get_rec_args_ext
             then {value = Term.mk_pred ts; order = Library.Prelude.fs_lt}
             else
               let value, order =
-                Macros.get_macro_deacreasing_info table m.s_symb ts
+                Macros.decreasing_info table m.s_symb ts
               in
               {value; order}
           in
@@ -1030,9 +1030,11 @@ end
 (** Exported (see `.mli`) *)
 let rec_arg_formula
     (table : Symbols.table)
-    (a : Term.term) (caller : Symbols.macro) ?(path_cond : PathCond.t = PathCond.Top) (rec_args:rec_arg_occs)
-  : Term.term =
-  let a, ord = Macros.get_macro_deacreasing_info table caller a in
+    (a : Term.term) (caller : Symbols.macro) 
+    ?(path_cond : PathCond.t = PathCond.Top) (rec_args:rec_arg_occs)
+  : Term.term 
+  =
+  let a, ord = Macros.decreasing_info table caller a in
   let phis =
     List.map (fun (ti:rec_arg_occ) ->
         (* refresh probably not necessary, but doesn't hurt *)
@@ -1055,9 +1057,7 @@ let rec_arg_formula
         in
         Term.mk_exists ~simpl:true
           tivs
-          (Term.mk_ands ~simpl:true
-             (pcond :: ticond))
-
+          (Term.mk_ands ~simpl:true (pcond :: ticond))
       ) rec_args
   in
   Term.mk_ors ~simpl:true phis

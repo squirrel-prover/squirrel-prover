@@ -1450,10 +1450,10 @@ let parse_fun_decls
       List.map
         (fun rec_occ ->
            let parent_quantity, _ =
-             Macros.get_macro_deacreasing_info table rec_occ.parent_call (Term.mk_var rec_occ.rec_arg)
+             Macros.decreasing_info table rec_occ.parent_call (Term.mk_var rec_occ.rec_arg)
            in
            let child_quantity, _ =
-             Macros.get_macro_deacreasing_info table rec_occ.child_call rec_occ.arg_call
+             Macros.decreasing_info table rec_occ.child_call rec_occ.arg_call
            in
            let conc = rec_occ.when_cond_builder
                (Term.mk_fun_infer_tyargs table rec_op [child_quantity; parent_quantity])
