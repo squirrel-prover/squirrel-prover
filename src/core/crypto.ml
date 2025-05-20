@@ -2731,12 +2731,13 @@ let rec bideduce_term_strict
     notify_bideduce_term_strict query "Function Or" ;
     bideduce query outputs
 
-  | Term.(App (Fun _ as fs,l))
+  | Term.(Fun _ as fs)
+  | Term.(App (Fun _ as fs,_))
     when HighTerm.is_ptime_deducible ~si:true query.env fs ->
-    assert (l <> []);
-    let l = List.map (fun x -> CondTerm.{term=x; conds}) l in
+    let _, args = Term.decompose_app output_term.term in
+    let args = List.map (fun x -> CondTerm.{term=x; conds}) args in
     notify_bideduce_term_strict query "Function Application";
-    bideduce query l
+    bideduce query args
 
   | Term.App (f,t) ->
     let t = List.map (fun x -> CondTerm.{term=x; conds}) t in

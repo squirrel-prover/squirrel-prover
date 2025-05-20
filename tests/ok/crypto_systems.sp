@@ -1,8 +1,12 @@
+include Core.
+
 type E[large, finite].
 
 gdh g, (^), ( ** ) where group:message exponents:E.
 
 (* cdh gg, (^^) where group:message exponents:E. *)
+
+(* set verboseCrypto=true. *)
 
 game CDH = {
    rnd a : E;
@@ -29,7 +33,7 @@ global lemma _ (f0 : E -> message[adv], i,i0 : index[adv]):
 Proof.
   intro A. 
   ghave H : equiv( diff(f0 (a i0) <> g^ (a i ** b i), true) ). {
-    crypto CDH.
+    crypto ~no_subgoal_on_failure CDH.
     by apply A.
   }.
   true.
@@ -42,6 +46,6 @@ Proof.
   intro Hap.
   ghave H :
     equiv( diff(f0 (frame@A(i)) <> g^ (a i ** b i), true) ).
-  by crypto CDH (a : a i) (b : b i).
+  by crypto ~no_subgoal_on_failure CDH (a : a i) (b : b i).
   true.
 Qed.
