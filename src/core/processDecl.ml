@@ -1297,7 +1297,7 @@ let parse_fun_decls
         in
         let table = Symbols.Macro.define table ~data name in
 
-        let ppe = default_ppe ~table  ~dbg:true  () in
+        let ppe = default_ppe ~table () in
         Printer.prt `Result "%a@." (Macros._pp_structured_macro_data ppe) data0;
 
         table, rec_occs, ex_formulas
@@ -1356,7 +1356,7 @@ let parse_fun_decls
 let parse_game_decl loc table (decl : Crypto.Parse.game_decl) =
   let g = Crypto.Parse.parse loc table decl in
 
-  let ppe = default_ppe ~table ~dbg:false () in
+  let ppe = default_ppe ~table () in
   Printer.prt `Result "%a" (Crypto._pp_game ppe) g;
 
   let table, _ =
