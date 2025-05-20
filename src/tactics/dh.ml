@@ -313,7 +313,7 @@ let cgdh
       context [t]
   in
 
-  let phis = List.map (NOF.occurrence_formula (TS.table s) ~negate:false) occs in
+  let phis = List.map (NOF.occurrence_formula (TS.env s) ~negate:false) occs in
 
   let g = TS.conclusion s in
   List.map

@@ -59,7 +59,7 @@ end
 
 type rec_content = {
   value : Term.term;
-  order : Symbols.fname;
+  decreasing_info : Macros.decreasing_info;
 }
 
 (*------------------------------------------------------------------*)
@@ -89,7 +89,10 @@ struct
 
   let subst_data _ () = ()
 
-  let pp_content ppe fmt t = Fmt.pf fmt "(%a,%a)" (Term._pp ppe) t.value (Symbols.pp_path) t.order
+  let pp_content ppe fmt (t : rec_content) = 
+    Fmt.pf fmt "(%a,%a)" 
+      (Term._pp ppe) t.value
+      Symbols.pp_path t.decreasing_info.order
 
   let pp_data _ppe (fmt : Format.formatter) () : unit =
     Fmt.pf fmt ""
@@ -387,10 +390,9 @@ struct
     match f ~mv ts1 ts2 with
     | Some mv -> Some mv
     | None ->
-      if Type.equal (Term.ty ts1.so_cnt.value) Type.ttimestamp
-      && Type.equal (Term.ty ts2.so_cnt.value) Type.ttimestamp
-      && Symbols.path_equal ts1.so_cnt.order Library.Prelude.fs_lt
-      && Symbols.path_equal ts2.so_cnt.order Library.Prelude.fs_lt                                
+      if ts1.so_cnt.decreasing_info.group = ts1.so_cnt.decreasing_info.group &&
+         (ts1.so_cnt.decreasing_info.group = `Builtin Action.Classic ||
+          ts1.so_cnt.decreasing_info.group = `Builtin Action.PostQuantum)
       then
         f ~mv ts1 {ts2 with so_cnt = {ts2.so_cnt with value = Term.mk_pred ts2.so_cnt.value}}
       else None
@@ -685,24 +687,28 @@ let get_rec_args_ext
           let ts =
             (* we force the unfolding of the following macros, 
                for a more precise rule *)
-            if m.s_symb = Symbols.Classic.inp   || 
-               m.s_symb = Symbols.Quantum.inp   || 
-               m.s_symb = Symbols.Quantum.state 
-            then {value = Term.mk_pred ts; order = Library.Prelude.fs_lt}
+            if m.s_symb = Symbols.Classic.inp
+            then
+              { value = Term.mk_pred ts; 
+                decreasing_info = Macros.builtin_decreasing_info Action.Classic; }
+            else if m.s_symb = Symbols.Quantum.inp   || 
+                    m.s_symb = Symbols.Quantum.state 
+            then
+              { value = Term.mk_pred ts; 
+                decreasing_info = Macros.builtin_decreasing_info Action.PostQuantum; }
             else
-              let value, order =
-                Macros.decreasing_info table m.s_symb ts
+              let value, decreasing_info =
+                Macros.decreasing_info table ~env m.s_symb ts
               in
-              {value; order}
+              {value; decreasing_info}
           in
           let occ =
             RecArgOcc.mk_simple_occ
               ~content:ts
               ~collision:
                 {value =Library.Prelude.mk_witness table ~ty_arg:Type.ttimestamp;
-                 order= Library.Prelude.fs_lt
-                }
-              (* unused, so always set to some arbitrary value *)
+                 decreasing_info= { group = `Builtin Action.Classic; order = Library.Prelude.fs_lt; }
+                } (* unused, so always set to some arbitrary value *)
               ~data:() (* unused *)
               ~vars:(List.rev fv) (* rev nicer for printing *)
               ~cond:cond
@@ -1029,12 +1035,12 @@ end
 (*------------------------------------------------------------------*)
 (** Exported (see `.mli`) *)
 let rec_arg_formula
-    (table : Symbols.table)
+    (env : Env.t)
     (a : Term.term) (caller : Symbols.macro) 
     ?(path_cond : PathCond.t = PathCond.Top) (rec_args:rec_arg_occs)
   : Term.term 
   =
-  let a, ord = Macros.decreasing_info table caller a in
+  let a, info = Macros.decreasing_info env.table ~env caller a in
   let phis =
     List.map (fun (ti:rec_arg_occ) ->
         (* refresh probably not necessary, but doesn't hurt *)
@@ -1042,10 +1048,10 @@ let rec_arg_formula
         let ticnt   = RecArgContent.subst_content s ti.so_cnt in
         let ticond  = List.map (Term.subst s) ti.so_cond in
         let pcond =
-          if Type.equal (Term.ty a) (Term.ty ticnt.value)
-          && Symbols.path_equal ord ticnt.order 
+          if Type.equal (Term.ty a) (Term.ty ticnt.value) &&
+             info.group = ticnt.decreasing_info.group
           then
-            PathCond.apply table path_cond a ticnt.value ticnt.order
+            PathCond.apply env.table path_cond a ticnt.value ticnt.decreasing_info.order
             (* in the simplest cases (when [path_cond = PathCond.Top]),
                and we are over timestamps,
              [PathCond.apply path_cond a ticnt] 
@@ -1069,7 +1075,7 @@ module type OccurrenceFormulas = sig
   type ext_occs = ext_occ list
 
   val occurrence_formula :
-    Symbols.table -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
+    Env.t -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
 (** Exported (see `.mli`) *)
@@ -1235,7 +1241,7 @@ struct
   (*------------------------------------------------------------------*)
   (** Exported (see `.mli`) *)
   let occurrence_formula
-      (table : Symbols.table)
+      (env : Env.t)
       ?(use_path_cond = false)
       ~(negate : bool)
       (occ     : ext_occ)
@@ -1291,7 +1297,7 @@ struct
           if use_path_cond then occ.eo_path_cond
           else PathCond.Top
         in
-        rec_arg_formula ~path_cond table a f ts
+        rec_arg_formula ~path_cond env a f ts
       in
       if not negate then
         Term.mk_exists ~simpl:true fv

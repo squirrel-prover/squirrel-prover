@@ -596,7 +596,7 @@ let phi_cca_one_system
      We do not generate formulas for the ciphertexts occs: these are only used
      to check the randomness conditions afterwards. *)
   let phis_kr =
-    List.map (EOF.occurrence_formula table ~negate:true ~use_path_cond) occs_kr
+    List.map (EOF.occurrence_formula context.env ~negate:true ~use_path_cond) occs_kr
   in
 
   (* We now search for bad use of all randoms used in occs_c *)
@@ -618,7 +618,7 @@ let phi_cca_one_system
   in
 
   let phis_r = 
-    List.map (ROF.occurrence_formula table ~negate:true ~use_path_cond) occs_r
+    List.map (ROF.occurrence_formula context.env ~negate:true ~use_path_cond) occs_r
   in
 
   (* Finally, we apply the substitution to the name representing 

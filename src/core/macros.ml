@@ -64,6 +64,18 @@ type in_systems =
 
 (*------------------------------------------------------------------*)
 (** See `.mli`. *)
+type decreasing_info = {
+  group : [`Builtin of Action.exec_model | `UserDefined of Symbols.macro];
+  order : Symbols.fname;
+}
+
+let builtin_decreasing_info exec_model = { 
+  group = `Builtin exec_model;
+  order = Library.Prelude.fs_lt;
+}
+
+(*------------------------------------------------------------------*)
+(** See `.mli`. *)
 type structured_macro_data = {
   name                : Symbols.macro;
   params              : Vars.vars;
@@ -74,7 +86,7 @@ type structured_macro_data = {
   rw_strat            : rw_strategy;
   info                : Term.macro_info;
   decreasing_quantity : Term.term option;
-  decreasing_measure  : Symbols.fname;
+  decreasing_info     : decreasing_info;
 }
 
 (*------------------------------------------------------------------*)
@@ -196,8 +208,6 @@ let mk_term_of_bodies table (bodies : body list) (match_param : Term.term)  =
 type general_macro_data =
   | Structured of structured_macro_data
   | ProtocolMacro of [`Output | `Cond]
-(* FIXME: quantum: move all macro definitions in this type *)
-
   (** ad hoc macro definitions using action descriptions *)
 
 type Symbols.general_macro_def += Macro_data of general_macro_data
@@ -235,29 +245,6 @@ let get_macro_info
       | ProtocolMacro _ -> Term.macro_info_builtin
     end        
   | State _ | Global _ -> Term.macro_info_builtin
-
-
-let decreasing_info 
-    (table : Symbols.table) (symb : Symbols.macro) (rec_arg : Term.term) : Term.term * Symbols.fname
-  =
-  let lt = Library.Prelude.fs_lt in
-  match Symbols.get_macro_data symb table with
-  | General data ->
-    begin
-      match get_general_macro_data data with
-      | Structured data ->
-        begin
-          match data.decreasing_quantity with
-          | None -> rec_arg, lt
-          | Some t ->
-            let dist_param = oget data.dist_param in
-            let subst = [Term.ESubst (Term.mk_var dist_param, rec_arg)] in
-            Term.subst subst t, data.decreasing_measure
-        end
-      | ProtocolMacro _ -> rec_arg, lt
-    end        
-  | State _ | Global _ -> rec_arg, lt
-
 
 (*------------------------------------------------------------------*)
 (** {2 Execution models} *)
@@ -355,7 +342,7 @@ module Classic = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.Classic;
       }
     in
 
@@ -378,7 +365,7 @@ module Classic = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.Classic;
       }
     in
 
@@ -401,7 +388,7 @@ module Classic = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.Classic;
       }
     in
 
@@ -471,7 +458,7 @@ module Quantum = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.PostQuantum;
       }
     in
 
@@ -501,7 +488,7 @@ module Quantum = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.PostQuantum;
         }
 
     in
@@ -525,7 +512,7 @@ module Quantum = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.PostQuantum;
       }
     in
 
@@ -549,7 +536,7 @@ module Quantum = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.PostQuantum;
       }
     in
     (*------------------------------------------------------------------*)
@@ -571,7 +558,7 @@ module Quantum = struct
         in_systems          = Any;
         info                = Term.macro_info_builtin;
         decreasing_quantity = None;
-        decreasing_measure  = Library.Prelude.fs_lt;
+        decreasing_info     = builtin_decreasing_info Action.PostQuantum;
       }
     in
     (*------------------------------------------------------------------*)
@@ -646,6 +633,15 @@ let data_of_global_data (d : global_data) : Symbols.data =
   Symbols.Macro (Global (List.length d.indices, d.ty, Global_data d))
 
 (*------------------------------------------------------------------*)
+let get_global_data : Symbols.global_macro_def -> global_data = function
+  | Global_data g -> g
+  | _ -> assert false
+
+let as_global_macro : Symbols.data -> global_data = function
+  | Symbols.Macro Global (_, _, g) -> get_global_data g
+  | _ -> assert false
+
+(*------------------------------------------------------------------*)
 let _pp ppe fmt (g : global_data) : unit =
   let pp_strict fmt = function
     | `Strict -> Fmt.pf fmt "Strict"
@@ -669,15 +665,6 @@ let pp     = _pp (default_ppe ~dbg:false ())
 let pp_dbg = _pp (default_ppe ~dbg:true  ())
 
 (*------------------------------------------------------------------*)
-let get_global_data : Symbols.global_macro_def -> global_data = function
-  | Global_data g -> g
-  | _ -> assert false
-
-let as_global_macro : Symbols.data -> global_data = function
-  | Symbols.Macro Global (_, _, g) -> get_global_data g
-  | _ -> assert false
-
-(*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
 let get_single_body table (single : S.Single.t) (data : global_data) : Term.term =
   try List.assoc single data.bodies with
@@ -699,6 +686,44 @@ let compatible_vars (l1 : Vars.var list) (l2 : Vars.var list) : bool =
   List.length l1 = List.length l2 &&
   List.for_all2 (fun v1 v2 -> Type.equal v1.Vars.ty v2.Vars.ty) l1 l2
 
+let builtin_decreasing_info_from_system (env : Env.t option) =
+  let env = oget env in
+  let system = 
+    SE.get_compatible_system env.se_vars env.system.set |>
+    oget
+  in
+  let exec_model = System.exec_model env.table system in
+  builtin_decreasing_info exec_model
+
+let decreasing_info
+    (table : Symbols.table) ?(env : Env.t option)
+    (symb : Symbols.macro)
+    (rec_arg : Term.term) 
+  : Term.term * decreasing_info
+  =
+  match Symbols.get_macro_data symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data ->
+        begin
+          match data.decreasing_quantity with
+          | None -> rec_arg, data.decreasing_info
+          | Some t ->
+            let dist_param = oget data.dist_param in
+            let subst = [Term.ESubst (Term.mk_var dist_param, rec_arg)] in
+            Term.subst subst t, data.decreasing_info
+        end
+      | ProtocolMacro _ -> 
+        rec_arg, builtin_decreasing_info_from_system env
+    end
+  | State _ -> rec_arg, builtin_decreasing_info_from_system env
+  | Global (_,_,global_data) -> 
+    let exec_model = (get_global_data global_data).exec_model in
+    rec_arg, builtin_decreasing_info exec_model
+
+
+(*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global
     table system exec_model macro ~suffix ~action ~inputs ~indices ~ts body ty

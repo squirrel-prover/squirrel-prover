@@ -86,15 +86,15 @@ module type OccurrenceContent = sig
 end
 
 (*------------------------------------------------------------------*)
+type rec_content = {
+  value : Term.term;
+  decreasing_info : Macros.decreasing_info;
+}
+
+(*------------------------------------------------------------------*)
 (** Predefined instance of [OccurrenceContent] for recursive arguments
     with their dedicated well_founded ordering operator
     (typically timestamps), plus a dummy occurrence with no content *)
-
-
-type rec_content = {
-  value : Term.term;
-  order : Symbols.fname;
-}
 
 module RecArgContent : OccurrenceContent 
   with type content = rec_content
@@ -396,7 +396,7 @@ module MakeSearch :
     where [vi], [tsi] are the variables and content of [rec_arg_occ]. 
     (for example, [path_cond x y] can be [x ≤ y]). *)
 val rec_arg_formula :
-  Symbols.table -> Term.term -> Symbols.macro -> ?path_cond:PathCond.t -> rec_arg_occs -> Term.term
+  Env.t -> Term.term -> Symbols.macro -> ?path_cond:PathCond.t -> rec_arg_occs -> Term.term
 
 (** Module containing functions to produce formulas (proof goals)
     expressing that extended occurrences of the given type are
@@ -428,7 +428,7 @@ module type OccurrenceFormulas = sig
       If [negate] is set to [true], returns instead
       the negation of that formula. *)
   val occurrence_formula :
-    Symbols.table -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
+    Env.t -> ?use_path_cond:bool -> negate:bool -> ext_occ -> Term.term
 end
 
 

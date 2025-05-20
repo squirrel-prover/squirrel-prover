@@ -1228,6 +1228,15 @@ let parse_fun_decls
       decls
   in
 
+  (** In case of `let` definition, return the symbol of the first
+      function defined by the user. 
+      This function is used to characterize the group of mutually 
+      defined functions. *)
+  let get_group () : Symbols.macro = 
+    let first_decl = List.hd decls in
+    oget first_decl.name 
+  in
+
   let rec_op, wf_goals =
     match op_kind with       
     | `Let (`RecWithOrd op) ->
@@ -1255,10 +1264,7 @@ let parse_fun_decls
     | _ -> Symbols.fs_lt, []
   in                  
 
-  let finalize_decl
-      table
-      fdecl
-    =
+  let finalize_decl table fdecl =
     match op_kind with
     | `Op ->                    (* deterministic operator *)
       begin
@@ -1415,7 +1421,10 @@ let parse_fun_decls
             rw_strat = Exact;
             info;
             decreasing_quantity;            
-            decreasing_measure=rec_op;
+            decreasing_info = {
+              group = `UserDefined (get_group ()); 
+              order = rec_op;
+            };
           }
         in
 

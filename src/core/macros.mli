@@ -74,6 +74,23 @@ type in_systems =
   | Systems of SE.t 
 
 (*------------------------------------------------------------------*)
+type decreasing_info = {
+  group : [`Builtin of Action.exec_model | `UserDefined of Symbols.macro];
+  (** Characterizes a group of mutually defined functions (in the
+      [`UserDefined] case, the symbol is the first function the user
+      defined in the group). *)
+
+  order : Symbols.fname;
+  (** Common order used to compare the decreasing quantities of the 
+      functions in this group. 
+      Must be a well-founded relation. 
+      The decreasing quantity can be different for each functions 
+      of the group. *)
+}
+
+val builtin_decreasing_info : Action.exec_model -> decreasing_info
+
+(*------------------------------------------------------------------*)
 (** A macro with [name = m] is a recursive procedure defined in a given system [se] as:
 
     [let rec m x1 ... xn r =  
@@ -116,15 +133,13 @@ type structured_macro_data = {
   (** the systems in which the macro is defined (see [in_systems]'s type definition) *)
   rw_strat            : rw_strategy;          (** the rewrite strategy of the macro *)
   info                : Term.macro_info;      (** macro information (for printing) *)
+
   decreasing_quantity : Term.term option;
   (** The quantity for which the (recursive) function terminates.
-      A term of type 'a, with free variable dist_param.
-      Is None unless manually specified by the user input.
+      A term of type ['a], with free variable [dist_param].
+      Is [None] unless manually specified by the user input.
   *)
-  decreasing_measure  : Symbols.fname;
-  (** the order over the quantity, which must well_founded.
-      A term symbol of type fun : a'-> 'a -> bool.
-      It always defaults to Library.Prelude.fs_lt *)   
+  decreasing_info     : decreasing_info;
 }
 
 (*------------------------------------------------------------------*)
@@ -155,9 +170,11 @@ val as_general_macro : Symbols.data -> general_macro_data
 val get_rw_strat   : Symbols.table -> Term.msymb    -> rw_strategy
 val get_macro_info : Symbols.table -> Symbols.macro -> Term.macro_info
 
-(* For a call m@t, returns the corresponding decreasing quantity with its order. *)
+(** For a call [m@t], returns the corresponding decreasing quantity
+    and decreasing info (the latter includes the well-founded order
+    used to compare decreasing quantities). *)
 val decreasing_info :
-  Symbols.table -> Symbols.macro -> Term.term -> Term.term * Symbols.fname
+  Symbols.table -> ?env:Env.t -> Symbols.macro -> Term.term -> Term.term * decreasing_info
 
 val msymb : Symbols.table -> Symbols.macro -> Term.msymb
 

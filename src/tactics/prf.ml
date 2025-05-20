@@ -415,7 +415,7 @@ let phi_proj
 
   (* compute the formulas stating that none of the occs is a collision *)
   let phi = 
-    List.map (IOF.occurrence_formula env.table ~use_path_cond:false ~negate:true) occs
+    List.map (IOF.occurrence_formula env ~use_path_cond:false ~negate:true) occs
   in
 
   (* finally, fail if the generated formula contains the context's hole,

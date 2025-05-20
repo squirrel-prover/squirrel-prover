@@ -127,7 +127,7 @@ let phi_fresh
       get_bad context (tt @ n.args)
   in
 
-  List.map (NOF.occurrence_formula table ~negate ~use_path_cond) occs
+  List.map (NOF.occurrence_formula context.env ~negate ~use_path_cond) occs
 
 (*------------------------------------------------------------------*)
 (** For a term [n] and terms [tt],

@@ -3427,7 +3427,7 @@ let derecursify
           then iocc.iocc_path_cond
           else PathCond.Top
         in
-        let time_form = Occurrences.rec_arg_formula env.table ts iocc.iocc_fun ~path_cond rec_arg_occs in
+        let time_form = Occurrences.rec_arg_formula env ts iocc.iocc_fun ~path_cond rec_arg_occs in
 
         let hyps =
           TraceHyps.add Args.AnyName (LHyp (Local (iocc.iocc_cond))) hyps (*|>*)
@@ -3906,28 +3906,36 @@ let prove
       match kind with
       | `Recursive ->
         let target_rec_arg, order1 = 
-          Macros.decreasing_info table (oget target.rec_fun) (oget target.rec_arg) 
+          Macros.decreasing_info table ~env (oget target.rec_fun) (oget target.rec_arg) 
         in
         let source_rec_arg, order2 = 
-          Macros.decreasing_info table (oget source.rec_fun) source_rec_arg
+          Macros.decreasing_info table ~env (oget source.rec_fun) source_rec_arg
         in
 
-        if Type.equal (Term.ty target_rec_arg) (Term.ty source_rec_arg) &&
-           Symbols.path_equal order1 order2
-           (* the two calls correspond to comparable mutually recursive calls *)
+        if order1.group = order2.group
+        (* The two calls correspond to mutually recursively defined
+           functions that can thus be compared. *)
         then
           begin
-            if Type.equal (Term.ty target_rec_arg) Type.ttimestamp && 
-               Symbols.path_equal order1 Library.Prelude.fs_lt 
-            then
+            assert (Type.equal (Term.ty target_rec_arg) (Term.ty source_rec_arg));
+
+            if order1.group = `Builtin Action.Classic ||
+               order1.group = `Builtin Action.PostQuantum
+            then begin
+              assert (Type.equal (Term.ty target_rec_arg) Type.ttimestamp);
               let target_rec_arg = Term.mk_pred (oget target.rec_arg) in
               [Term.mk_leq source_rec_arg target_rec_arg]  
               (* [A i < B j], written as [A i <= pred(B j)] *)
+            end
             else
-              [Term.mk_fun_infer_tyargs table order1 [source_rec_arg; target_rec_arg]]            
-          end          
+              [Term.mk_fun_infer_tyargs table order1.order [source_rec_arg; target_rec_arg]]            
+          end
         else
-          []
+          (* No memoization can take place across two independent
+             recursive functions (i.e. in different groups of mutually
+             recursive definitions), as the current approach does not
+             fix the relative ordering across these two functions. *)
+          [Term.mk_false]
 
       | `Direct -> []
     in

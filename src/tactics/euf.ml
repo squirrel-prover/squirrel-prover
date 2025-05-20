@@ -303,7 +303,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
   let occs = occs_key @ occs_int in
   
   (* compute the formulas stating that one of the occs is a collision *)
-  let phis = List.map (IOF.occurrence_formula (TS.table s) ~negate:false) occs in
+  let phis = List.map (IOF.occurrence_formula (TS.env s) ~negate:false) occs in
 
   (* finally generate all corresponding goals *)
   let g = TS.conclusion s in 

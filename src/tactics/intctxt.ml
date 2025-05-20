@@ -283,13 +283,13 @@ let intctxt
      We do not generate formulas for the ciphertexts occs: these are only used
      to check the randomness conditions afterwards. *)
   let phis_k =
-    List.map (EOF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_k
+    List.map (EOF.occurrence_formula (TS.env s) ~negate:false ~use_path_cond) occs_k
   in
 
   (* We also generate the formulas for each ciphertext found.
      (we do that separately just so they don't get mixed with the bad occs) *)
   let phis_c =
-    List.map (EOF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_c
+    List.map (EOF.occurrence_formula (TS.env s) ~negate:false ~use_path_cond) occs_c
   in
 
   (* We now search for bad use of all randoms used in occs_c *)
@@ -305,7 +305,7 @@ let intctxt
   in
 
   let phis_r =
-    List.map (ROF.occurrence_formula (TS.table s) ~negate:false ~use_path_cond) occs_r
+    List.map (ROF.occurrence_formula (TS.env s) ~negate:false ~use_path_cond) occs_r
   in
 
   (* Finally, in case the term [t] equal to the decryption was not [fail],
