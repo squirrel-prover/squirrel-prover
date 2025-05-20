@@ -171,6 +171,8 @@ val fty : Symbols.table -> Symbols.action -> Type.ftype
 (** An execution model *)
 type exec_model = Classic | PostQuantum
 
+val exec_model_to_string : exec_model -> string
+
 (** Type of action descriptions. *)
 type descr = {
   name      : Symbols.action ;

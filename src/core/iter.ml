@@ -1175,6 +1175,35 @@ let fold_macro_support
       ) Mp.empty indirect_sm
   in 
 
+  (* Check that we have a single mutually recursive group of functions
+     involved. This limitation can likely be lifted, but this would
+     require a rework of how inductive reasoning is handled.
+
+     For example, the set of sources would not cover all initial
+     entry-point in the infinite call-tree of a macros's definition,
+     as a macro [f] in group 1 could be reachable from the body of a
+     macro [g] in group 2. *)
+  let () =
+    let decreasing_infos = 
+      List.map
+        (fun (m,_) -> Macros.decreasing_info0 table ~env m) 
+        (Mp.bindings macro_ind_occs) |>
+      List.sort_uniq Stdlib.compare
+    in
+    let groups = List.map (fun x -> x.Macros.group) decreasing_infos in
+
+    if List.length groups > 2 then
+      let err_message =
+        Fmt.str
+          "@[<hov 2>\
+           Inductive reasoning over multiple distinct groups of \
+           functions is not supported:@ @[%a@]\
+           @]"
+          (Fmt.list ~sep:(Fmt.any ",@ ") Macros.pp_group) groups
+      in
+      Tactics.soft_failure (Tactics.Failure err_message)
+  in
+
   List.fold_left
     (fun acc (_, ((srcs, mset) : _ * Mset.t)) ->
        let tv_var = Vars.make_fresh mset.rec_arg_type "t" in
@@ -1191,17 +1220,17 @@ let fold_macro_support
              in
 
              let iocc_out = {
-                 iocc_fun             = mset.msymb.s_symb;                
-                 iocc_vars            = out_iocc_vars;
-                 iocc_rec_arg;                                           
-                 iocc_cnt             = body.out;
-                 iocc_cond            = body.when_cond;
-                 iocc_sources         = srcs;
-                 iocc_path_cond       = mset.path_cond;
+               iocc_fun             = mset.msymb.s_symb;
+               iocc_vars            = out_iocc_vars;
+               iocc_rec_arg;
+               iocc_cnt             = body.out;
+               iocc_cond            = body.when_cond;
+               iocc_sources         = srcs;
+               iocc_path_cond       = mset.path_cond;
                (* TODO: here, path_cond could have been built in a smarter
                   way, accumulating the when_cond of all macros on the
                   path. *)
-                 iocc_explored_macros = mset_indirects;
+               iocc_explored_macros = mset_indirects;
              } in
              if TConfig.debug_macros table then
                Printer.prt `Default "@.ioccout: %a@." pp_iocc iocc_out;

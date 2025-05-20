@@ -63,6 +63,13 @@ type in_systems =
   | Systems of SE.t 
 
 (*------------------------------------------------------------------*)
+type group = [`Builtin of Action.exec_model | `UserDefined of Symbols.macro]
+
+let pp_group fmt = function
+  | `Builtin em -> Fmt.pf fmt "builtin(%s)" (Action.exec_model_to_string em)
+  | `UserDefined m -> Symbols.pp_path fmt m
+
+(*------------------------------------------------------------------*)
 (** See `.mli`. *)
 type decreasing_info = {
   group : [`Builtin of Action.exec_model | `UserDefined of Symbols.macro];
@@ -695,12 +702,32 @@ let builtin_decreasing_info_from_system (env : Env.t option) =
   let exec_model = System.exec_model env.table system in
   builtin_decreasing_info exec_model
 
+let decreasing_info0
+    (table : Symbols.table) ?(env : Env.t option) (symb : Symbols.macro)
+  : decreasing_info
+  =
+  match Symbols.get_macro_data symb table with
+  | General data ->
+    begin
+      match get_general_macro_data data with
+      | Structured data -> data.decreasing_info
+      | ProtocolMacro _ -> 
+        builtin_decreasing_info_from_system env
+    end
+  | State _ -> builtin_decreasing_info_from_system env
+  | Global (_,_,global_data) -> 
+    let exec_model = (get_global_data global_data).exec_model in
+    builtin_decreasing_info exec_model
+
+(** Extends [decreasing_info0] with the decreasing quantity evaluated
+    at a given point. *)
 let decreasing_info
     (table : Symbols.table) ?(env : Env.t option)
     (symb : Symbols.macro)
     (rec_arg : Term.term) 
   : Term.term * decreasing_info
   =
+  let info = decreasing_info0 table ?env symb in
   match Symbols.get_macro_data symb table with
   | General data ->
     begin
@@ -708,19 +735,15 @@ let decreasing_info
       | Structured data ->
         begin
           match data.decreasing_quantity with
-          | None -> rec_arg, data.decreasing_info
+          | None -> rec_arg, info
           | Some t ->
             let dist_param = oget data.dist_param in
             let subst = [Term.ESubst (Term.mk_var dist_param, rec_arg)] in
-            Term.subst subst t, data.decreasing_info
+            Term.subst subst t, info
         end
-      | ProtocolMacro _ -> 
-        rec_arg, builtin_decreasing_info_from_system env
+      | ProtocolMacro _ -> rec_arg, info
     end
-  | State _ -> rec_arg, builtin_decreasing_info_from_system env
-  | Global (_,_,global_data) -> 
-    let exec_model = (get_global_data global_data).exec_model in
-    rec_arg, builtin_decreasing_info exec_model
+  | State _ | Global _ -> rec_arg, info
 
 
 (*------------------------------------------------------------------*)

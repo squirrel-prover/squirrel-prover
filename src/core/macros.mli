@@ -74,8 +74,12 @@ type in_systems =
   | Systems of SE.t 
 
 (*------------------------------------------------------------------*)
+type group = [`Builtin of Action.exec_model | `UserDefined of Symbols.macro]
+
+val pp_group : group formatter
+
 type decreasing_info = {
-  group : [`Builtin of Action.exec_model | `UserDefined of Symbols.macro];
+  group : group;
   (** Characterizes a group of mutually defined functions (in the
       [`UserDefined] case, the symbol is the first function the user
       defined in the group). *)
@@ -170,9 +174,14 @@ val as_general_macro : Symbols.data -> general_macro_data
 val get_rw_strat   : Symbols.table -> Term.msymb    -> rw_strategy
 val get_macro_info : Symbols.table -> Symbols.macro -> Term.macro_info
 
+(** For a call [m@t], returns the corresponding decreasing decreasing
+    info, which includes the well-founded order used to compare
+    decreasing quantities. *)
+val decreasing_info0 :
+  Symbols.table -> ?env:Env.t -> Symbols.macro -> decreasing_info
+
 (** For a call [m@t], returns the corresponding decreasing quantity
-    and decreasing info (the latter includes the well-founded order
-    used to compare decreasing quantities). *)
+    and decreasing info. *)
 val decreasing_info :
   Symbols.table -> ?env:Env.t -> Symbols.macro -> Term.term -> Term.term * decreasing_info
 

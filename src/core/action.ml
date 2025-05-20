@@ -309,6 +309,10 @@ let pp_parsed_action fmt a = pp_action_f pp_strings (0,[]) fmt a
 (** An execution model *)
 type exec_model = Classic | PostQuantum
 
+let exec_model_to_string = function
+  | Classic -> "classic"
+  | PostQuantum -> "postquantum"
+
 (*------------------------------------------------------------------*)
 (** An action description features an input, a condition (which sums up
     several [Exist] constructs which might have succeeded or not) and
