@@ -1025,14 +1025,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Reduce the full sequent *)
   let reduce_sequent param s =
-    let reduce ?system k f = S.Reduce.reduce ?system param s k f in
+    let reduce ?id ?system k f = 
+      let s = omap_dflt s (fun id -> S.Hyps.remove id s) id in
+      S.Reduce.reduce ?system param s k f 
+    in
     let conclusion = reduce S.conc_kind (S.conclusion s) in
-    S.Hyps.map
-      ~hyp:(reduce S.hyp_kind)
-      ~def:(fun (se,t) ->
-          se, reduce ~system:(SE.reachability_context se) Equiv.Local_t t
+    S.Hyps.mapi
+      ~hyp:(fun id hyp -> reduce ~id S.hyp_kind hyp)
+      ~def:(fun id (se,t) ->
+          se, reduce ~id ~system:(SE.reachability_context se) Equiv.Local_t t
         )
       (S.set_conclusion conclusion s)
+
 
   (** Reduce the conclusion *)
   let reduce_conclusion param s =
