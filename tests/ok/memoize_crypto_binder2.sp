@@ -61,3 +61,13 @@ Proof.
   + intro i If_failed [Hap0 Hin_log].
     auto.
 Qed.
+
+global lemma _ @system:Q (t:_[adv]) :
+  [happens t] -> [happens A] -> 
+  equiv(frame@t, enc (diff(input@A, empty)) r k).
+Proof.
+  intro Hap HapA.
+
+  checkfail by crypto CCA2 exn GoalNotClosed.
+  crypto ~time_sensitive CCA2 => //.
+Qed.

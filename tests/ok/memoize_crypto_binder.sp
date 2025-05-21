@@ -46,10 +46,28 @@ global lemma _ @system:Q (t:_[adv]) :
 Proof.
   intro Hap.
 
+  checkfail by crypto CCA2 exn GoalNotClosed.
+
   crypto ~time_sensitive CCA2 => //.
   rewrite !not_exists_1 /=.
   intro [H0 H1] i [G0 G1 G2 G3].
   clear H0 H1 G3. (* duplicated hypotheses *)
   have ? := G0 i.
+  auto. 
+Qed.
+
+global lemma _ @system:Q (t,i:_[adv]) :
+  [happens t] -> [happens (A i)] -> 
+  equiv(frame@t, enc (diff(input@A i, format i)) (r i) k).
+Proof.
+  intro Hap HapA.
+
+  checkfail by crypto CCA2 exn GoalNotClosed.
+
+  crypto ~time_sensitive CCA2 => //.
+  rewrite !not_exists_1 /=.
+  intro [H0 H1] i0 [G0 G1 G2 G3].
+  clear H0 H1 G3. (* duplicated hypotheses *)
+  have ? := G0 i0.
   auto. 
 Qed.

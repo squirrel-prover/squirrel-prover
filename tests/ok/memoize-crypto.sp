@@ -52,3 +52,18 @@ Proof.
 
   crypto ~time_sensitive CCA2 => //. 
 Qed.
+
+global lemma _ @system:P (t:_[adv]) :
+  [happens t] -> [happens A] -> 
+  equiv(frame@t, enc (diff(input@A,empty)) r k).
+Proof.
+  intro Hap HapA.
+
+  (* Without `~time_sensitive`, if `A < B`, the decryption `dec x k`
+     in B's output is not guarded by `x <> enc diff(input@A,empty)`, but
+     `crypto` does not realize that it does not need it. We are
+     stuck, and cannot conclude. *)
+  checkfail by crypto CCA2 => // exn GoalNotClosed.
+
+  crypto ~time_sensitive CCA2 => //. 
+Qed.
