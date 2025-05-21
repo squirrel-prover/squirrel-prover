@@ -2748,10 +2748,13 @@ let[@warning "-23"] parse_crypto_named_args (nargs : Args.named_args) : Crypto.p
   | Args.NArg L.{ pl_desc = "no_subgoal_on_failure" } -> 
     Crypto.{ option with subgoal_on_failure = false; }
 
+  | Args.NArg L.{ pl_desc = "time_sensitive" } -> 
+    Crypto.{ option with time_sensitive = true; }
+
   | Args.NList (l,_) 
   | Args.NArg  l     ->
     hard_failure ~loc:(L.loc l) (Failure "unknown argument")
-    ) Crypto.param nargs
+    ) Crypto.default_param nargs
 
 (** the [crypto] tactic *)
 let crypto_tac args (s : ES.t) =

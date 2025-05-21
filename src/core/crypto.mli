@@ -62,10 +62,13 @@ type param = {
   (** When [crypto] cannot deduce a term [(t | ϕ)], does it abandon
       the proof and fail ([subgoal_on_failure=true]) or generate a
       proof-obligation. *)
+
+  time_sensitive : bool;
+  (** Do we infer a time-sensitive memory invariant or not. *)
 }
 
-(** default options *)
-val param : param
+(** Default parameters for the `crypto` tactic. *)
+val default_param : param
 
 (*------------------------------------------------------------------*)
 val prove :

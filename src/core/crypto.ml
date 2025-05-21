@@ -219,14 +219,16 @@ let _pp_game ppe fmt (g : game) : unit =
     (Fmt.list ~sep:Fmt.sp (_pp_oracle ppe)) g.oracles
 
 (*------------------------------------------------------------------*)
+(** See `.mli` *)
 type param = { 
   subgoal_on_failure : bool; 
-  (** When [crypto] cannot deduce a term [(t | ϕ)], does it abandon
-      the proof and fail ([subgoal_on_failure=true]) or generate a
-      proof-obligation. *)
+  time_sensitive     : bool;
 }
 
-let param = { subgoal_on_failure = true; }
+let default_param = { 
+  subgoal_on_failure = true; 
+  time_sensitive     = false;
+}
 
 (*------------------------------------------------------------------*)
 (** Tagging module for names-tagging. There are three different tags :
@@ -1165,6 +1167,8 @@ module[@warning "-32"] AbstractSet : sig
   val pp : Format.formatter -> t -> unit
   val pp_dbg : Format.formatter -> t -> unit
 
+  val subst : Term.subst -> t -> t
+
   (*------------------------------------------------------------------*)
   (** an abstract memory *)
   type mem = (Vars.var * t) list
@@ -1173,12 +1177,20 @@ module[@warning "-32"] AbstractSet : sig
   val pp_mem : Format.formatter -> mem -> unit
   val pp_mem_dbg : Format.formatter -> mem -> unit
 
+  val subst_mem : Term.subst -> mem -> mem
+
+  val empty_mem : mem
+
   val well_formed : Env.t -> mem -> bool
 
   val generalize : Vars.vars -> mem -> (Vars.var * t) list
 
   val join     : ProofContext.t -> mem -> mem -> mem
   val widening : ProofContext.t -> mem -> mem -> mem
+
+  (** Replace the last formula in [mem] by the provided list of arguments.
+      Essentially, this is a weakening followed by a [join] with an assertion. *)
+  val change_last_form : mem -> Term.t list -> mem
 
   (*------------------------------------------------------------------*)
   (** abstract operation on the memory *)
@@ -1225,6 +1237,11 @@ end = struct
     | Top -> Vars.Sv.empty
     | Sets tl ->
       List.fold_left (fun x tset -> Vars.Sv.union x (TSet.fv tset)) Vars.Sv.empty tl
+
+  let subst (s : Term.subst) (set : t) =
+    match set with
+    | Top -> Top
+    | Sets tsets -> Sets (List.map (TSet.subst s) tsets)
 
   let is_included (pc : ProofContext.t) (s1 : t) (s2 : t) =
     match s1,s2 with
@@ -1311,6 +1328,9 @@ end = struct
   let[@warning "-32"] pp_mem     = _pp_mem (default_ppe ~dbg:false ())
   let[@warning "-32"] pp_mem_dbg = _pp_mem (default_ppe ~dbg:true ())
 
+  let subst_mem (s : Term.subst) (mem : mem) : mem =
+    List.map (fun (l,set) -> (l, subst s set)) mem
+
   let fv_mem (mem : mem) : Sv.t =
     List.fold_left
       (fun fv (_,set) -> Vars.Sv.union fv (fv_t set))
@@ -1319,6 +1339,8 @@ end = struct
   let well_formed (env : Env.t) (mem : mem) =
     let fvs = fv_mem mem in
     Vars.Sv.for_all (Vars.mem env.vars) fvs 
+
+  let empty_mem = []
 
   let generalize (vars:Vars.vars) (mem:mem) =
     List.map (fun (v,set) -> (v,generalize_set vars set)) mem
@@ -1339,6 +1361,21 @@ end = struct
     | [] -> [var,abstract_var]
     | (v,tl)::q when Vars.equal var v -> (v, (union pc tl abstract_var))::q
     | head::q -> head::(append pc var abstract_var q)
+
+  let change_last_form (mem : mem) (forms : Term.t list) : mem =
+    List.map (fun (v, sets) ->
+        match sets with
+        | Top -> (v, Top)
+        | Sets sets ->
+          let sets =
+            List.map (fun (set : TSet.t) ->
+                assert (set.conds <> []);
+                let conds, _last = List.takedrop (List.length set.conds - 1) set.conds in
+                TSet.make ~term:set.term ~conds:(conds @ forms) ~vars:set.vars
+              ) sets
+          in
+          (v, Sets sets)
+      ) mem
 
   let join (pc : ProofContext.t) (mem1 : mem) (mem2 : mem) : mem =
     List.fold_left (fun mem1 (v, l) -> append pc v l mem1) mem1 mem2
@@ -1412,7 +1449,7 @@ end = struct
     let red_param = ReductionCore.rp_crypto in
     let st = Reduction.mk_state pc ~red_param in
     let strat = Reduction.(MayRedSub ReductionCore.rp_crypto) in
-    
+
     let rec doit = function
       (* variable, for now [mem] only contain over-approximation of
          [v]'s content *)
@@ -1435,16 +1472,16 @@ end = struct
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
         let t, has_red = Reduction.reduce_head1_term ~strat st t in
-        
+
         if has_red = True then
           doit t   (* try again to evaluate [t] *)
         else
-        (* cannot reduce [t], the empty set is always a sound
-           under-approximation *)
+          (* cannot reduce [t], the empty set is always a sound
+             under-approximation *)
           Sets []   
     in
     doit term
-    
+
   (*-----------------------------------------------------------------*)
   let rec remove (var:Vars.var) (mem : mem) =
     match mem with
@@ -1703,7 +1740,7 @@ type result = {
       Currently, we cannot create such subgoals in Squirrel. *)    
   extra_outputs : TSet.t list;
   (** Sequence of oracles input (game trace) during the bideduction goal with this state. *)
-  
+
   final_mem    : AbstractSet.mem;
   (** abstract memory *)
   consts       : Const.t list;
@@ -1995,7 +2032,7 @@ module Game = struct
     (* first, take the substitution for the initial global
        declarations *)
     let subst = global_lets_to_subst let_init game in
-    
+
     (* then, process declarations of the form [var x = t] *)
     let mk_subst (subst : Term.subst) (vd : var_decl) =
       let term = Term.subst subst vd.init in
@@ -2083,7 +2120,7 @@ module Game = struct
           else raise Failed
       else t
     in
-    
+
     try Some (Mvar.mapi to_name mv) with Failed -> None
 
   (* ----------------------------------------------------------------- *)
@@ -2691,6 +2728,28 @@ let notify_query_goal_start ((qs,_) as query : query * _) =
                 ------------------------------@;@;@]"
       (_pp_query ppe) query
 
+(*------------------------------------------------------------------*)
+let get_result_or_fail
+    ?loc (query : query) (outputs : CondTerm.t list) : result option -> result 
+  = 
+  function
+  | Some result -> result
+  | None ->
+    let err_str = 
+      Fmt.str "@[<v 2>failed to apply the game:@;\
+               bideduction goal failed:@;@[%a@]@]"
+        (_pp_query (default_ppe ~table:query.env.table ())) (query,outputs)
+    in
+    Tactics.hard_failure ?loc (Failure err_str)
+
+let query_add_vars_to_env (query : query) (vars : Vars.vars) : query =
+  let env =
+    Env.set_vars
+      query.env
+      (Vars.add_vars (Vars.Tag.global_vars ~adv:true vars) query.env.vars)
+  in
+  { query with env; } 
+
 (*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
 
@@ -2957,17 +3016,23 @@ and bideduce_oracle
       let conds     = Term.mk_ors conds in
       let not_conds = Term.mk_ands not_conds in
       let cterm = {initial_output with conds = not_conds::initial_output.conds} in
-      (* By sematnic of conditional tset, the condition are also in the inputs, so ne need to
-         bideduce them*)
-      let to_deduce = args(*@conds_true@output_conds*) in
+      (* By the semantics of term sets, the condition are also in the
+         inputs, so ne need to bideduce them. *)
+      let to_deduce = args in
+
       (* FEATURE: conds_false might be always false, in which case it
          is not necessary to call the oracle. *)
+      
       notify_bideduce_oracle_extra_inputs query query.extra_inputs not_conds;
-      match bideduce {query with allow_oracle=false} to_deduce
-      with
+      
+      (* We deduce the arguments without oracle. This is for
+         efficiency, but may be unnecessary. *)
+      match bideduce {query with allow_oracle=false} to_deduce with
       | Some result ->
         let query_start = transitivity_get_next_query query result in
         let input_cond = TSet.make ~term:conds ~conds:[] ~vars:[] in
+        (* TODO: adding [input_cond] on the left is sound but may no
+           longer be useful. *)
         let query_start = {query_start with inputs = input_cond::query.inputs} in
         cterm,query_start,result
       | None -> (initial_output, query, empty_result query.initial_mem)
@@ -3090,7 +3155,7 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
       | None -> None
       | Some next_result -> Some (chain_results result next_result)
 
-
+(*------------------------------------------------------------------*)
 (** Assume [togen = x] of type [τ] which is [finite] and [well_founded],
     then for [outputs=v], [query] is the bi-deduction goal [x, φ₀, _, C₀._, u ▷ v,_], 
     computes [ψ₀,C,v'] s.t. there exists predicates [ψ] and [φ] s.t.
@@ -3449,6 +3514,43 @@ let derecursify
   recursive, direct
 
 (*------------------------------------------------------------------*)
+(** Given a list of **recursive** subgoals, return:
+    - the type of the well-founded decreasing quantity (common to all subgoals);
+    - the decreasing information associated to the macros.
+
+    Further, ensure that all subgoals are for recursive functions in
+    the same group (i.e. that were mutually defined). 
+    (The latter is currently done through an assert, 
+    as this is guaranteed by [Iter.fold_macro_support].) *)
+let get_rec_infos
+    (env : Env.t) (subgoals : goal list) 
+  : Type.ty * Macros.decreasing_info
+  =
+  let sg = List.hd subgoals in
+
+  (* both values below are never [None] for recursive subgoals *)
+  let rec_arg = oget sg.rec_arg in
+  let rec_fun = oget sg.rec_fun in
+
+  let dec_quantity, info = 
+    Macros.decreasing_info env.table ~env rec_fun rec_arg 
+  in
+  let ty_dec_quantity = Term.ty dec_quantity in
+
+  List.iter (fun (sg' : goal) ->
+      let rec_arg' = oget sg'.rec_arg in
+      let rec_fun' = oget sg'.rec_fun in
+
+      let dec_quantity', info' = 
+        Macros.decreasing_info env.table ~env rec_fun' rec_arg'
+      in
+
+      assert (Type.equal ty_dec_quantity (Term.ty dec_quantity'));
+      assert (info' = info)
+    ) (List.tl subgoals);
+  ty_dec_quantity, info
+
+(*------------------------------------------------------------------*)
 (** Given the previous query [query] and the result [result] obtained
     when bideducing [query], build the next query for the bideduction
     goal [goal].
@@ -3458,6 +3560,7 @@ let goal_to_query
   ~(initial_constraints : Const.t list)
   ~(let_init : Term.t Mv.t)
   ~(param : param)
+  ?(extra_inputs : TSet.t list = [])
   (goal:goal) : query 
   =
   let initial_constraints =
@@ -3472,14 +3575,14 @@ let goal_to_query
     hyps         = goal.hyps;
     let_init;
     allow_oracle = true;
-    inputs       = [];
+    inputs       = extra_inputs; 
     rec_inputs   = goal.rec_inputs;
     extra_inputs = goal.extra_inputs;
     initial_mem;
     consts       = initial_constraints ;
   }
 
-(** Bideduction of recursive subgoals.
+(** Deduction proof-search for (non-empty) list of recursive subgoals.
     
     Takes as inputs a list of bideduction goals each of the form 
     [env \cup vars ,hyps, _ , _ : inputs, rec_inputs |> outputs ],
@@ -3490,106 +3593,255 @@ let goal_to_query
     **monotonous** w.r.t. [mem] (monotonicity is used to handle memory
     invariant inference in time-sensitive mode).
 
+    The function behaves differently depending on the value of [pass]:
+    - When [pass = `InferMemoizedValues], we only run the
+      bideduction proof-search to infer the terms that must be
+      memoized by final simulator. We do not check that the synthesized 
+      simulator is valid (e.g. the memory invariant is not computed, 
+      the subgoals generated during proof-search are ignored, etc).
+
+    - When [pass = `Standard], we run the bideduction proof-search as
+      normal, possibly using memoization hints from a previous
+      [`SynthesizeMemoizedValues] pass.
+
     FIXME: finish specification
 *)
 let bideduce_recursive_subgoals
-    (loc : L.t) env hyps
-    ~(initial_mem : AbstractSet.mem)
+    (loc : L.t) ~(pass : [`InferMemoizedValues | `Standard])
+    (pc                   : ProofContext.t)
+    ~(initial_mem         : AbstractSet.mem)
     ~(initial_constraints : Const.t list)
-    ~(let_init : Term.t Mv.t)
-    ~(param : param)
-    (bided_subgoals : goal list) 
+    ~(let_init            : Term.t Mv.t)
+    ~(param               : param)
+    (bided_subgoals       : goal list) 
   : goal list * Const.t list * AbstractSet.mem * Term.t list
   =
+  let rec_ty, rec_info = get_rec_infos pc.env bided_subgoals in
+
+  (* In time-sensitive mode (i.e. when [param.time_sensitive]),
+     variable used in the memory invariants. *)
+  let rec_var = Vars.make_fresh rec_ty "τ" in
+  let rec_var_t = Term.mk_var rec_var in
+
+  (** When [timed_mem = λv. ϕ], computes [ϕ{v ↦ tau}]. *)
+  let apply_memory (timed_mem : Vars.var * AbstractSet.mem) (tau : Term.t) =
+    assert(param.time_sensitive);
+    let v, mem = timed_mem in
+    AbstractSet.subst_mem [Term.ESubst (Term.mk_var v, tau)] mem
+  in
+
   let doit
       (query : query) ~(togen : Vars.vars) (output : CondTerm.t list) 
     : result 
     =
     notify_query_goal_start (query,output);
-    let result_fp = bideduce_fp ~loc togen query output in
-    let consts = Const.generalize togen result_fp.consts in (* final constraints [∀ x, C] *)
-    let subgoals = List.map (Term.mk_forall ~simpl:true togen) result_fp.subgoals in
-    {
+
+    let result = 
+      (* In time-sensitive mode, we simply run the deduction
+         proof-search. 
+         In time-insensitive mode, we look for a post fix-point 
+         w.r.t. the memory (it is possible that is unecessary, and that convergence 
+         always happens in two steps in time-insensitive mode). *)
+      if query.param.time_sensitive then
+        let query = query_add_vars_to_env query togen in
+        bideduce query output |>
+        get_result_or_fail ~loc query output
+      else  
+        bideduce_fp ~loc togen query output 
+    in
+
+    let consts = Const.generalize togen result.consts in (* final constraints [∀ x, C] *)
+    let subgoals = List.map (Term.mk_forall ~simpl:true togen) result.subgoals in
+    { 
       consts; subgoals;
       (* no changes for extra ouptuts and memory*)
-      extra_outputs = result_fp.extra_outputs;
-      final_mem = result_fp.final_mem;
+      extra_outputs = result.extra_outputs;
+      final_mem = result.final_mem;
     }
   in
-  
+
+  (** Run the proof-search procedure on all deduction subgoal.
+      The outputs of [step] are, in order:
+
+      - The list of subgoals for the next iteration of proof-search,
+        where subgoals have been enriched with the memoization hints in
+        the field [extra_outputs]. This is only used when in mode
+        [`InferMemoizedValues].
+
+      - The final constraints obtained by chaining them during the
+        simulator synthesis.
+
+      - The list of post-conditions corresponding to each deduction
+        subgoals.
+
+        If [step_pass = `InferMemoryInvariant], these memory invariants
+        are post-processed to be of the form [λτ. ϕ] (the [λ] is
+        implicit, using the fixed variable [tau] to represent the bound
+        variable [τ]).  Here, [ϕ] is the contribution to the abstract
+        memory when simulating the corresponding deduction subgoal, and
+        is guarded by a condition guaranteeing that [τ] is indeed
+        executed by the simulator (using [rec_predicate], which itself 
+        relies on the sources in the initial deduction target).
+
+        If [step_pass = `Run], these memory invariant are either
+        checked or known to hold, depending on whether
+        [time_sensitive] is true (known to hold) or false (checked).
+
+      - Return the accumulated list of subgoals to be discharged to the user. 
+
+      Remark: [step_pass] only dictate whether a post-processing is
+      applied to the memory post-conditions. It does not influence the
+      rest of the proof-search. *)
   let step
+      ~(step_pass : [`InferMemoryInvariant | `Run])
       (initial_mem : AbstractSet.mem)
-    : goal list * Const.t list * AbstractSet.mem * Term.t list
+    : goal list * Const.t list * AbstractSet.mem list * Term.t list
     =
-    let next_goals, constraints, memory, subgoals = 
-    List.fold_left 
-      (fun (goals,initial_constraints,initial_mem,subgoals) goal ->
-         let query = 
-           goal_to_query
-             ~initial_constraints
-             ~initial_mem
-             ~let_init ~param
-             goal 
-         in
-         let result = {         (* initial result for this precise [goal] *)
-           extra_outputs = [];
-           consts       = initial_constraints;
-           final_mem    = initial_mem;
-           subgoals     = subgoals;
-         };
-         in
+    let next_goals, constraints, memories, subgoals = 
+      List.fold_left 
+        (fun (goals, initial_constraints, memories, subgoals) (goal : goal) ->
+           let rec_arg = oget goal.rec_arg in (* cannot be [None] for a recursive goal *)          
+           (* decreasing quantity in the body covered by [goal] *)
+           let dec_quantity, _ = 
+             Macros.decreasing_info pc.env.table ~env:pc.env (oget goal.rec_fun) rec_arg
+           in
 
-         (*------------------------------------------------------------------*)
-         (** The bideduction goal ask to bideduce
-                [(output_conds, if output_conds then output_terms)].
-             
-             Starting with [query], we proceed as follows:
-             - first compute [output_conds], 
-             - then [(output_term|output_conds)].
-         *)
-         
-         (*------------------------------------------------------------------*)
-         (** deduce [output_conds] *)
-         let cond_term_conds =
-           List.map (fun cond -> CondTerm.mk ~term:cond ~conds:[]) goal.output_conds
-         in
-         let result_fp = doit query ~togen:goal.vars cond_term_conds  in
-         let result = chain_results result result_fp in
-         let query = transitivity_get_next_query query result_fp in 
+           (* we know that [initial_mem (pred τ)] holds *)
+           let initial_mem =
+             if param.time_sensitive then
+               apply_memory (rec_var, initial_mem) dec_quantity
+             else initial_mem
+           in
+           let goal =
+             if not param.time_sensitive then goal else
+               let env =
+                 Env.set_vars
+                   pc.env
+                   (Vars.add_vars (Vars.Tag.global_vars ~adv:true [rec_var]) goal.env.vars)
+               in
+               { goal with env; }
+           in
 
-         (*------------------------------------------------------------------*)
-         (** deduce [(output_term | output_conds)] *)
-         let result_fp =
-           doit query
-             ~togen:goal.vars
-             [CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds]
-         in
-         let result = chain_results result result_fp in
+           let query = 
+             goal_to_query
+               ~initial_constraints ~initial_mem ~let_init ~param goal 
+           in
+           let result = {         (* initial result for this precise [goal] *)
+             extra_outputs = [];
+             consts       = initial_constraints;
+             final_mem    = initial_mem;
+             subgoals     = subgoals;
+           };
+           in
 
-         (*------------------------------------------------------------------*)
-         (* build the new goal by adding the [extra_outputs] to it.*)
-         let goal =
-           {goal with extra_outputs = result_fp.extra_outputs; }
-         in
-         ( goal :: goals, result.consts, result.final_mem, result.subgoals ) )
-      ( [],                   (* goals *)
-        initial_constraints,
-        initial_mem,
-        []                    (* subgoals *))
-      bided_subgoals
+           (*------------------------------------------------------------------*)
+           (** The bideduction goal ask to bideduce
+                  [(output_conds, if output_conds then output_terms)].
+
+               Starting with [query], we proceed as follows:
+               - first compute [output_conds], 
+               - then [(output_term|output_conds)].
+           *)
+
+           (*------------------------------------------------------------------*)
+           (** deduce [output_conds] *)
+           let cond_term_conds =
+             List.map (fun cond -> CondTerm.mk ~term:cond ~conds:[]) goal.output_conds
+           in
+           let result_fp = doit query ~togen:goal.vars cond_term_conds  in
+           let result = chain_results result result_fp in
+           let query = transitivity_get_next_query query result_fp in 
+
+           (*------------------------------------------------------------------*)
+           (** deduce [(output_term | output_conds)] *)
+           let result_fp =
+             doit query
+               ~togen:goal.vars
+               [CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds]
+           in
+           let result = chain_results result result_fp in
+
+           (*------------------------------------------------------------------*)
+           (* build the new goal by adding the [extra_outputs] to it.*)
+           let goal =
+             {goal with extra_outputs = result_fp.extra_outputs; }
+           in
+
+           let final_mem =
+             if param.time_sensitive && step_pass = `InferMemoryInvariant then begin
+               (* compute the memory invariant *)
+               let mem = result.final_mem in
+
+               let rec_predicate =
+                 Term.subst [Term.ESubst (rec_arg, rec_var_t)] (oget goal.rec_predicate)
+               in
+               let rec_cond =
+                 Term.mk_fun_infer_tyargs 
+                   pc.env.table rec_info.order
+                   [dec_quantity; rec_var_t]
+               in
+               AbstractSet.change_last_form mem [rec_cond; rec_predicate] |>
+               AbstractSet.generalize goal.vars
+             end 
+             else result.final_mem
+           in
+
+           ( goal :: goals, result.consts, final_mem :: memories, result.subgoals ) )
+        ( [],                   (* goals *)
+          initial_constraints,
+          [],                   (* memories *)
+          []                    (* subgoals *))
+        bided_subgoals
     in
-    (List.rev next_goals, constraints, memory, subgoals)
-  in
-  
-  let rec fp (mem : AbstractSet.mem) =
-    let (_next_goals, _constraints, final_memory, _subgoals) as r = step mem in
-    let pc = ProofContext.make ~env ~hyps in
-    if AbstractSet.is_leq pc final_memory mem 
-    then r
-    else fp final_memory
+    (List.rev next_goals, constraints, memories, subgoals)
   in
 
-  fp initial_mem  
+  match pass with
+  | `InferMemoizedValues -> 
+    let next_goals, _constraints, _memories, _subgoals =
+      step initial_mem ~step_pass:`Run
+    in
+
+    let _memory = List.hd _memories in
+    (* all values but [next_goals] are meaningless *)
+    next_goals, _constraints, _memory, _subgoals
+
+  | `Standard ->
+    (* Run proof-search to infer the memory invariant.
+       (The other values produced by this proof-search pass are dropped.) *)
+    let _next_goals, _constraints, memories, _subgoals =
+      step initial_mem ~step_pass:`InferMemoryInvariant
+    in
+
+    (* Compute the candidate invariant. In time-sensitive mode, this
+       is guarantee to be an inductive invariant by constructions.
+
+       Still, we need to re-run the proof-search to compute the
+       subgoals ensuring that the synthesize simulator is valid for
+       this particular abstract memory. *)
+    let memory_pre =
+      List.fold_left (AbstractSet.join pc) initial_mem memories
+    in
+
+    let next_goals, constraints, memories_post, subgoals =
+      step memory_pre ~step_pass:`Run
+    in
+
+    if param.time_sensitive then
+      let memory_pre = AbstractSet.generalize [rec_var] memory_pre in
+      (* let subgoals = List.map (Term.mk_forall ~simpl:true [rec_var]) subgoals in *)
+      (next_goals, constraints, memory_pre, subgoals)
+    else begin
+      (* We assert that we have a post fix-point, as we did not check
+         (on paper) that this is always the case, but it seems to be. *)
+      assert 
+        (List.for_all
+           (fun post -> AbstractSet.is_leq pc post memory_pre) 
+           memories_post);
+
+      (* memory-pre is an inductive invariant *)
+      (next_goals, constraints, memory_pre, subgoals)
+    end
 
 (*------------------------------------------------------------------*)
 (** {2 Top-level bi-deduction function } *)
@@ -3712,46 +3964,68 @@ let parse_crypto_args
   (consts, let_init)
 
 (** Function that takes a list of bideduction goal, recursive and direct 
-    and try to bideduce them all in the list order.*)
+    and try to bideduce them all in the list order.
+    See [bideduce_recursive_subgoals] for a description of the [pass] argument. *)
 let bideduce_all_goals
-    (locate : L.t) env hyps
-    ~(initial_mem : AbstractSet.mem)
+    (locate : L.t) ~(pass : [`InferMemoizedValues | `Standard])
+    ~(pc                  : ProofContext.t)
+    ~(initial_mem         : AbstractSet.mem)
     ~(initial_constraints : Const.t list)
-    ~(let_init : Term.t Mv.t)
-    ~(param : param)
-    (rec_bided_subgs : goal list)
-    (direct_bided_subgs : goal)
+    ~(let_init            : Term.t Mv.t)
+    ~(param               : param)
+    (rec_bided_subgs      : goal list)
+    (direct_bided_subgs   : goal)
   : goal list * (Const.t list * AbstractSet.mem * Term.t list) option
   (* next goals, constraints, memory, subgoals to discharge *)
   =
-  let next_goals, constraints_rec, memory_rec, subgoals_rec =
-    bideduce_recursive_subgoals
-      locate env hyps
-      ~let_init ~param
-      ~initial_constraints ~initial_mem
-      rec_bided_subgs
+  (* First, synthesize a simulator for the recursive part of the target terms. *)
+  let next_recursive_goals, constraints_rec, memory_rec, subgoals_rec =
+    (* If [rec_bided_subgs], no need to call [bideduce_recursive_subgoals]. *)
+    if rec_bided_subgs = [] then [], initial_constraints, initial_mem, [] else
+      bideduce_recursive_subgoals
+        ~pass
+        locate pc
+        ~let_init ~param
+        ~initial_constraints ~initial_mem
+        rec_bided_subgs
   in
-  let output =
-    CondTerm.mk
-      ~term:direct_bided_subgs.output_term
-      ~conds:direct_bided_subgs.output_conds
-  in
-  let query_direct = 
-    goal_to_query
-      ~initial_constraints:constraints_rec
-      ~initial_mem:memory_rec
-      ~let_init
-      ~param
-      direct_bided_subgs 
-  in
-  notify_query_goal_start (query_direct,[output]);
-  match bideduce query_direct [output] with
-  | Some result_direct ->
-    let constraints = constraints_rec @ result_direct.consts in
-    let subgoals = subgoals_rec @ result_direct.subgoals in
-    next_goals, Some (constraints, result_direct.final_mem, subgoals)
-  | None -> next_goals, None
-    
+  match pass with
+  (* When infering the values to be memoized, there is no need to run
+     the deduce the direct part of the target terms. *)
+  | `InferMemoizedValues ->
+    next_recursive_goals, None
+      
+  | `Standard ->
+    (* build the direct output and query *)
+    let output =
+      CondTerm.mk
+        ~term:direct_bided_subgs.output_term
+        ~conds:direct_bided_subgs.output_conds
+    in
+    let query_direct = 
+      goal_to_query
+        ~initial_constraints:constraints_rec
+        ~initial_mem:memory_rec
+        ~let_init
+        ~param
+        direct_bided_subgs 
+    in
+
+    (* notify the user *)
+    notify_query_goal_start (query_direct,[output]);
+
+    (* bideduce the direct part *)
+    let result = 
+      match bideduce query_direct [output] with
+      | Some result_direct ->
+        let constraints = constraints_rec @ result_direct.consts in
+        let subgoals = subgoals_rec @ result_direct.subgoals in
+        Some (constraints, result_direct.final_mem, subgoals)
+      | None -> None
+    in
+    (* first argument is useless in [`Standard] mode *)
+    ([], result)
+
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
@@ -3786,7 +4060,7 @@ let prove
       deducible without oracles nor randomness. *)
 
   Printer.pr "@[<v 0>"; (* open vertical box of preliminary deductions *)
-  
+
   let query0 =
     { consts = []; param;
       let_init = Mv.empty;
@@ -3835,7 +4109,7 @@ let prove
   in
 
   Printer.pr "@;@]"; (* close vertical box of preliminary deductions *)
-  
+
   (*------------------------------------------------------------------*)
   (** First bideduction pass.
 
@@ -3850,10 +4124,11 @@ let prove
     derecursify pc terms.terms game 
   in
 
-  (* First pass on bideduction, to find extra inputs.*)
-  let next_bided_subgs, _  =
+  (* First pass on bideduction, to find values to be memoized.*)
+  let next_bided_subgs, _res =
     bideduce_all_goals
-      game_loc env pc.hyps
+      ~pass:`InferMemoizedValues game_loc
+      ~pc
       ~param ~let_init 
       ~initial_constraints:(res0.consts @ init_consts)
       ~initial_mem:res0.final_mem
@@ -3925,20 +4200,24 @@ let prove
               (* [A i < B j], written as [A i <= pred(B j)] *)
             end
             else
-              [Term.mk_fun_infer_tyargs table order1.order [source_rec_arg; target_rec_arg]]            
+              [Term.mk_fun_infer_tyargs table order1.order [source_rec_arg; target_rec_arg]]
           end
         else
           (* No memoization can take place across two independent
              recursive functions (i.e. in different groups of mutually
              recursive definitions), as the current approach does not
              fix the relative ordering across these two functions. *)
-          [Term.mk_false]
+          (* [Term.mk_false] *)
+          (* FEATURE: currently, `Iter` does not support inductive reasoning over
+             multiple groups of mutually recursive functions. 
+             Thus, this case should never happen. *)
+          assert false
 
       | `Direct -> []
     in
     List.map (fun (term : TSet.t) ->
         let term = TSet.subst s term in
-        (* Making sure we did not lose (\* A i ≤ τ₀ *\) in term.conds *)
+        (* Making sure we did not lose [A i ≤ τ₀] in term.conds *)
         assert (List.mem  (Term.subst s (oget source.rec_predicate)) term.conds);
         TSet.make
           ~conds:( 
@@ -3969,8 +4248,8 @@ let prove
      expected during the second pass *)
   let _, res = 
     bideduce_all_goals
-      game_loc env pc.hyps
-      ~param ~let_init
+      ~pass:`Standard game_loc
+      ~pc ~param ~let_init
       ~initial_constraints:(res0.consts @ init_consts)
       ~initial_mem:res0.final_mem
       rec_bided_subgs direct_bided_subgs 
