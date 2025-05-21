@@ -9,11 +9,11 @@ module Mv = Vars.Mv
 module Sp = Match.Pos.Sp
 
 module Mvar = Match.Mvar
-                
+
 module TraceHyps = Hyps.TraceHyps
 
 module Args = TacticsArgs
-  
+
 module PathCond = Iter.PathCond
 
 
@@ -54,7 +54,7 @@ module QueryLogger = struct
           Hashtbl.add chans chan_name chan_fmt;
           chan_fmt
       in
-      
+
       incr cpt;                   (* increment the query counter *)
       Fmt.pf chan_fmt "@[<v 2>Query %d %a@]@.@." !cpt pp_query query
 end
@@ -85,7 +85,7 @@ type gdecl =
   | LetInit                     (** adversarially-controled non-mutable variable *)
 
 type gvar_decl = Vars.var * gdecl
-                 
+
 (** a cryptographic game *)
 type game = {
   name       : string ;
@@ -306,8 +306,8 @@ module CondTerm = struct
 
     (* Redution in whnf *)
     let conds =
-      List.map (fun cond -> fst (
-        Reduction.whnf_term ~strat st cond))
+      List.map
+        (fun cond -> fst (Reduction.whnf_term ~strat st cond)) 
         conds
     in
     { term = c.term; conds; }
@@ -334,7 +334,7 @@ module CondTerm = struct
     let conds = List.concat_map Term.decompose_ands conds in
     let conds = List.remove_duplicate Term.equal conds in
     {term;conds}                     
-    
+
 
   let[@warning "-32"] pp     = _pp (default_ppe ~dbg:false ())
   let[@warning "-32"] pp_dbg = _pp (default_ppe ~dbg:true ())
@@ -376,7 +376,7 @@ end = struct
     conds; term; vars;
     tag = (incr cpt; !cpt);
   }
-      
+
   (*------------------------------------------------------------------*)
   let fv (tset : t) =
     let fvs = Term.fvs (tset.term :: tset.conds) in
@@ -406,13 +406,13 @@ end = struct
 
     if vars = [] then
       Fmt.pf fmt "@[<hv 4>{ %a |@ @[%a@] }@]"
-      (Term._pp ppe) term
-      (Term._pp ppe)(Term.mk_ands conds)
+        (Term._pp ppe) term
+        (Term._pp ppe)(Term.mk_ands conds)
     else
       Fmt.pf fmt "@[<hv 4>{ %a |@ @[<hv 2>∀ @[%a@] :@ @[%a@]@] }@]"
-      (Term._pp ppe) term
-      (Vars._pp_list ppe) vars
-      (Term._pp ppe)(Term.mk_ands conds)
+        (Term._pp ppe) term
+        (Vars._pp_list ppe) vars
+        (Term._pp ppe)(Term.mk_ands conds)
 
   let pp     = _pp (default_ppe ~dbg:false ())
   let pp_dbg = _pp (default_ppe ~dbg:true ())
@@ -478,10 +478,8 @@ let deduce_mem
     let t = Sys.time () in
     let res = deduce_mem ~vars ~pc ~target ~known in
     let t0 = Sys.time () in
-    
     record_deduce_mem_query
       path (pc.env.table, target, vars, known, res <> None, t0 -. t);
-    
     res
   end
 
@@ -583,7 +581,7 @@ let equal_term_name_eq
       | _ -> None
     end
   | None -> None
-      
+
 (* ----------------------------------------------------------------- *)
 (** An oracle output pattern, which returns [term] when [cond] is true.
     It has three type of arguments:
@@ -745,8 +743,8 @@ module Const = struct
   let notify_functional_checks ~vbs ~dbg =
     if not vbs && not dbg then () else
       Printer.pr "-----Name ownerships checks------@;"
-  
-        
+
+
   let notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form : unit =
     if not vbs && not dbg then () else
       let ppe = default_ppe ~table ~dbg () in
@@ -755,7 +753,7 @@ module Const = struct
         (Const._pp ppe) const2
         (Term._pp  ppe) form
 
-  
+
   exception InvalidGlobalConstraints of (Format.formatter -> unit)
 
   let get_global (x:Vars.var) (consts : t list) (game: game) : Term.term =
@@ -792,7 +790,7 @@ module Const = struct
            )
         )
     in
-    
+
     let rec subst_with_open_tuple t1 t2 =
       match t1,t2 with
       | x::q, y::p when Term.equal x y -> subst_with_open_tuple q p
@@ -862,12 +860,12 @@ module Const = struct
       begin
         let const1 = refresh const1 in
         let const2 = refresh const2 in 
-        let term_equal = Term.mk_neqs (const1.term) (const2.term) in
-        let cond_conjunction = Term.mk_ands (const1.cond@const2.cond) in
+        let term_equal = Term.mk_neqs const1.term const2.term in
+        let cond_conjunction = Term.mk_ands (const1.cond @ const2.cond) in
         let form = 
           Term.mk_forall
             (const1.vars @ const2.vars)
-            (Term.mk_impl (cond_conjunction) term_equal)
+            (Term.mk_impl cond_conjunction term_equal)
         in
         notify_valid_formula table ~vbs ~dbg  ~const1 ~const2 form;
         form
@@ -884,7 +882,8 @@ module Const = struct
         let const2 = refresh const2 in
         let term_not_equal = Term.mk_neqs const1.term const2.term in
         let const_conjunction = Term.mk_ands (const1.cond@const2.cond) in
-        let form = Term.mk_forall
+        let form = 
+          Term.mk_forall
             (const1.vars @ const2.vars)
             (Term.mk_impl const_conjunction term_not_equal)
         in
@@ -1386,7 +1385,7 @@ end = struct
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
         let t, has_red = Reduction.reduce_head1_term ~strat st t in
-        
+
         if has_red = True then
           doit t   (* try again to evaluate [t] *)
         else
@@ -1521,7 +1520,7 @@ end = struct
       b1 && b2 
 
     | _ -> false
- 
+
 
   (** Abstract evaluation of a boolean term [bool_term] in [mem].
 
@@ -1565,7 +1564,7 @@ end = struct
 
         (* under-approximation of [set1] *)
         let under_set1 = abstract_set_underapprox pc set1 bool_term.conds mem in
-        
+
         (* if [over_set0 ⊆ under_set1] then [set0 ⊆ set1] *)
         begin
           match over_set0, under_set1 with
@@ -1621,7 +1620,7 @@ end = struct
       (* otherwise, try to reduce [t] once in head position *)
       | t ->
         let t, has_red = Reduction.reduce_head1_term ~strat st t in
-        
+
         if has_red = True then
           abstract_bool_and_not t   (* try again to evaluate [t] *)
         else
@@ -1675,17 +1674,17 @@ type query = {
 
   consts : Const.t list;
   (** initial name constraints, used to guide bi-deduction *)
-  
+
   initial_mem : AbstractSet.mem;
   (** abstract memory *)
 
   let_init : Term.t Mv.t;
   (** mapping from [let _ = #init;] variables to their values (as
       provided by the user) *)
-  
+
   inputs : TSet.t list;
   (** inputs provided to the adversary *)
-  
+
   rec_inputs : TSet.t list;
   (** Special inputs for recursive calls. *)
 
@@ -1750,7 +1749,7 @@ let chain_results (res1 : result) (res2 : result) : result=
 
     The extra inputs and outputs are parameters of the goal, in the
     sense that if [derecursify] produces the subgoals:
-    
+
     Recursive:
       [E; ∀(x1, t1); Γ1 ⊢ (u1ᵣ,_) ▷ (v1ₒ,_ | ϕ1)] for [f1]
       ...
@@ -1888,11 +1887,11 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
     Term.add_vars_simpl_env (Vars.to_simpl_env goal.env.vars) goal.vars
   in
   let goal = subst_goal sbst goal in
-  
+
   let pp_env fmt =
     if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg goal.env.vars
   in
-  
+
   let pp_vars_togen fmt =
     if togen = [] then () else
       Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ppe) togen
@@ -2104,11 +2103,11 @@ module Game = struct
     subgoals   : Term.terms;    (** (exact) subgoals under which match applies *)
   }
 
-  
+
   (* ----------------------------------------------------------------- *)
   (** Try to infer variables association to un-matched variable in oracle call*)
   exception LocSmplToInfer
-  
+
   let infer_args_and_name
       (query      : query)
       (mv         : Match.Mvar.t)
@@ -2161,7 +2160,7 @@ module Game = struct
       matches in query bideduction goal [query] . *)
   let match_oracle (query : query) (term : CondTerm.t) : oracle_match list = 
     let env = query.env in
-    
+
     (** The function [try_match_oracle0] try to finds terms [inputs]
         and names [n=n_1\,t1,...,n_i\,ti] such that [term] matches a
         given oracle output pattern [oracle_pat]. *)
@@ -2279,9 +2278,9 @@ module Game = struct
       in
       List.concat_map (try_match_oracle oracle ~subgoals:[]) outputs
     in
-    
+
     List.concat_map match_one_oracle query.game.oracles
-      
+
   (* ----------------------------------------------------------------- *)
   type call_oracle_res = {
     new_consts   : Const.t list;    (** new name constraints *)
@@ -2444,7 +2443,7 @@ module Game = struct
     in
     init pc glob_mutable
 end 
- 
+
 
 (*------------------------------------------------------------------------*)
 (** Check if [output] is included in [inputs]. In case of success,
@@ -2517,9 +2516,7 @@ let unsatisfiable
     let t = Sys.time () in
     let unsat = unsatisfiable pc form in
     let t0 = Sys.time () in
-    
     record_unsat_query path (pc.env.table, form, unsat, t0 -. t);
-    
     unsat
   end
 
@@ -2528,7 +2525,7 @@ let unsatisfiable
 
     For any [(t'| vars : f') ∈ extra_inputs], look for a
     substitution [σ] of domain [vars0 ⊆ vars] such that [t = t'σ].
-    
+
     Then, computes the pair of:
     - the image [vars0 σ], which will have to be bi-deduced;
     - [cond] which is the condition [∃ (vars \ vars0). f'σ]
@@ -2569,7 +2566,7 @@ let knowledge_mem_condterm_sets
       (* FIXME: we could forward [mv] to [Match] (through
          [unsatisfiable]) and update [support] (in [unsatisfiable]
          accordingly to conclude more often *)
-      
+
       (* Discard any extra input that we know will never be useful (by
          trying to show that the condition for this input never
          holds). *)
@@ -2582,7 +2579,7 @@ let knowledge_mem_condterm_sets
   in
   List.filter_map is_in extra_inputs
 
-  (*------------------------------------------------------------------------*)
+(*------------------------------------------------------------------------*)
 (** {2 Notify functions to print bi-deduction flow} *)
 
 let notify_drop_deduction (query : query) (subg : Term.t) =
@@ -2594,7 +2591,7 @@ let notify_drop_deduction (query : query) (subg : Term.t) =
                 @]@;@;"
       pp_yellow_xmark
       (Term._pp ppe) subg
-  
+
 let notify_bideduce_term_strict (query : query) (rule:string) =
   if not query.vbs && not query.dbg then () else
     Printer.pr "@[Apply rule %t@]@;@;"
@@ -2611,14 +2608,14 @@ let notify_bideduce_directly_computable (query : query) =
       pp_check_mark
 
 let notify_bideduce_loop
-      (query : query)
-      (extra_inputs : TSet.t list)
+    (query : query)
+    (extra_inputs : TSet.t list)
   =
   if not query.vbs && not query.dbg then () else
     let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
     Printer.pr "Starting second pass in the loop with extra inputs:@; %a@;"
       (Fmt.list ~sep:(Fmt.any ",@;") (TSet._pp ppe)) extra_inputs
-    
+
 let notify_bideduce_oracle_extra_inputs
     (query : query)
     (extra_inputs : TSet.t list)
@@ -2639,7 +2636,7 @@ let notify_bideduce_oracle_inputs_start (query : query) (oracle_name : string) =
   if not query.vbs && not query.dbg then () else
     Printer.pr "@[<v 2>Start oracle call to %a:@;\
                 Bideduce the oracle's inputs@;\
-                \  @[<v 0>"     (* new nested vertical box for oracle call inputs *)
+               \  @[<v 0>"     (* new nested vertical box for oracle call inputs *)
       (Printer.kws `GoalMacro) oracle_name
 
 let notify_bideduce_oracle_inputs_end (query : query) (oracle_name : string) =
@@ -2658,7 +2655,7 @@ let notify_bideduce_oracle_failure
                 @]@;@;"    (* closes oracle call outer vertical box + double line break*)
       pp_xmark
       (Printer.kws `GoalMacro) oracle_name err
-  
+
 let notify_bideduce_second_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
     (* close vertical box of first pass *)
@@ -2690,11 +2687,11 @@ let notify_query_goal_start ((qs,_) as query : query * _) =
     Printer.pr "@[<v 0>@;\
                 Starting bideduction proof of:@;\
                 ------------------------------@;\
-                \  @[%a@]@;\
+               \  @[%a@]@;\
                 ------------------------------@;@;@]"
       (_pp_query ppe) query
 
-  (*------------------------------------------------------------------------*)
+(*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
 
 (** Try to show that [knownledge, ϕ ▷ (t | ϕ)] where [knownledge] is
@@ -3985,7 +3982,7 @@ let prove
     Printer.pr "@[<v 0>"; (* open vertical box of final result *)
 
     let consts_subgs = Const.to_subgoals ~vbs ~dbg table game constraints in
-    
+
     Printer.pr
       "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Const._pp ppe)) constraints;
@@ -3999,7 +3996,7 @@ let prove
     Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) final_memory;
 
     Printer.pr "@;@]"; (* close vertical box of final result *)
-    
+
     let red_param = Reduction.rp_default in
     let state = Reduction.mk_state pc ~red_param in
     List.remove_duplicate (Reduction.conv state) (consts_subgs @ subgoals)
