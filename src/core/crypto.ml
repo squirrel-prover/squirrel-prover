@@ -3173,8 +3173,7 @@ and bideduce_fp
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   : result
   =
-  let pre0      = query.initial_mem in    (* [φ₀] *)
-  let consts0   = query.consts      in    (* [C₀] *)
+  let pre0 = query.initial_mem in    (* [φ₀] *)
 
   (* [pre = φ] *)
   let rec compute_fp pre =
@@ -3183,43 +3182,28 @@ and bideduce_fp
         query.env
         (Vars.add_vars (Vars.Tag.global_vars ~adv:true togen) query.env.vars)
     in
-    let pc = ProofContext.make ~env ~hyps:query.hyps in
-    let query1 = (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
-      { env;
-        vbs = query.vbs; dbg = query.dbg; param = query.param;
-        game = query.game;
-        hyps = query.hyps;
-        let_init = query.let_init;
-        allow_oracle = query.allow_oracle;
-        rec_inputs = query.rec_inputs;
-        inputs     = query.inputs;
-        extra_inputs = query.extra_inputs;
-        consts     = consts0;
-        initial_mem = pre; }
+    (* bi-deduction goal [x, φ, C₀, u ▷ v] *)
+    let query1 = { query with env; initial_mem = pre; } in
+    let result = 
+      bideduce query1 outputs |>  (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
+      get_result_or_fail ?loc query outputs
     in
-    match bideduce query1 outputs with (* ⊧ (x, φ, ψ, C.C₀, u ▷ v)  *)
-    | Some result ->
-      let post = result.final_mem in    (* [ψ] *)
-      let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
-      if AbstractSet.is_eq pc pre  gen_post && (* [φ ⇔ ψ₀] *)
-         AbstractSet.is_eq pc post gen_post    (* [ψ ⇔ ψ₀] *)
-      then
-        begin
-          assert (AbstractSet.is_leq pc pre0 pre); (* [φ₀ ⇒ φ] *)
-          Some {result with final_mem = gen_post}
-        end
-      else
-        let pre = AbstractSet.widening pc pre gen_post in
-        compute_fp pre 
+    let post = result.final_mem in    (* [ψ] *)
+    let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
-    | None ->
-      let err_str = 
-        Fmt.str "@[<v 2>failed to apply the game:@;\
-                 bideduction goal failed:@;@[%a@]@]"
-          (_pp_query (default_ppe ~table:query.env.table ())) (query,outputs)
-      in
-      Tactics.hard_failure ?loc (Failure err_str)
+    let pc = ProofContext.make ~env ~hyps:query.hyps in
+
+    if AbstractSet.is_eq pc pre  gen_post && (* [φ ⇔ ψ₀] *)
+       AbstractSet.is_eq pc post gen_post    (* [ψ ⇔ ψ₀] *)
+    then
+      begin
+        assert (AbstractSet.is_leq pc pre0 pre); (* [φ₀ ⇒ φ] *)
+        Some {result with final_mem = gen_post; }
+      end
+    else
+      let pre = AbstractSet.widening pc pre gen_post in
+      compute_fp pre 
   in
   oget (compute_fp pre0)
 
