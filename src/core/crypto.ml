@@ -2712,11 +2712,11 @@ let notify_bideduce_first_pass ~vbs ~dbg =
                 @[<v 0>" (* start first pass vertical box *)
 
 let notify_bideduce_oracle_already_call (query : query) already_called =
-  let already_called = List.map (fun (x,y,_) -> x,y) already_called in
+  let already_called = List.map (fun (_,y,_) -> y) already_called in
   let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
   if not query.vbs && not query.dbg then () else
-    Printer.pr "Already called : %a@;"
-      (Fmt.list (Fmt.pair (Fmt.list (Term._pp ppe)) (Term._pp ppe))) already_called
+    Printer.pr "@[<hov 2>Already called:@ @[<v 0>%a@]@]@;@;"
+      (Fmt.list ~sep:(Fmt.any "@;") (Term._pp ppe)) already_called
 
 let notify_query_goal_start ((qs,_) as query : query * _) =
   let ppe = default_ppe ~table:qs.env.table ~dbg:qs.dbg () in
