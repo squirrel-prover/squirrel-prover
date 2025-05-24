@@ -48,8 +48,11 @@ val debug_tactics : Symbols.table -> bool
 (** Debug information for macros. *)
 val debug_macros : Symbols.table -> bool
 
-(** Strict alias mode for processus. *)
+(** Strict alias mode for processes. *)
 val strict_alias_mode : Symbols.table -> bool
+
+(** Strict let mode for processes. *)
+val strict_let_mode : Symbols.table -> bool
 
 (** Show hypothesis after strengthening *)
 val show_strengthened_hyp : Symbols.table -> bool

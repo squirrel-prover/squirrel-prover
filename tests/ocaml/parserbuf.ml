@@ -282,3 +282,62 @@ let models =
                                DuplicatedUpdate "s") -> raise Ok)
     end ;
   ]
+
+let conflicts =
+  let test = true in
+  (* Perform first sequence of declarations from filename,
+     expect system declaration for Test at the end, and return
+     the conflicts for that system. *)
+  let conflicts filename =
+    let chan = Stdlib.open_in filename in
+    let lexbuf = Sedlexing.Utf8.from_channel chan in
+    match List.rev (parse_theory_buf ~test lexbuf filename) with
+    | [] -> assert false
+    | last::rev_decls ->
+        let decls = List.rev rev_decls in
+        Stdlib.close_in_noerr chan;
+        let table, subgs =
+          ProcessDecl.declare_list
+            Squirrelprover.Prover.(get_table (init ()))
+            decls
+        in
+        assert (subgs = []);
+        match L.unloc last with
+        | Decl.Decl_system sdecl ->
+            assert (L.unloc (Option.get sdecl.sname) = "Test");
+            let projs = Typing.parse_projs sdecl.sprojs in
+            ProcessSystem.system_conflicts table projs sdecl.sprocess
+        | _ -> assert false
+  in
+  let conflicts f = conflicts ("tests/alcotest/"^f) in
+  [
+    "Write/write conflicts without locks", `Quick, begin fun () ->
+      assert (Hashtbl.length (conflicts "por_test_a.sp") = 0);
+      assert (Hashtbl.length (conflicts "por_test_b.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_c.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_d.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_e.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_f.sp") <> 0);
+    end ;
+    "Write/write conflicts with locks", `Quick, begin fun () ->
+      assert (Hashtbl.length (conflicts "lock_test_b.sp") = 0);
+      assert (Hashtbl.length (conflicts "lock_test_b1.sp") <> 0);
+      assert (Hashtbl.length (conflicts "lock_test_c.sp") = 0);
+      assert (Hashtbl.length (conflicts "lock_test_c1.sp") <> 0);
+    end ;
+    "Write/read conflicts", `Quick, begin fun () ->
+      assert (Hashtbl.length (conflicts "por_test_d.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_e.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_test_f.sp") <> 0);
+    end ;
+    "Conflicts with multi-locks", `Quick, begin fun () ->
+      assert (Hashtbl.length (conflicts "multilock_test_a.sp") <> 0);
+      assert (Hashtbl.length (conflicts "multilock_test_b.sp") <> 0);
+      assert (Hashtbl.length (conflicts "multilock_test_c.sp") <> 0);
+    end ;
+    "Conflicts with multi-updates", `Quick, begin fun () ->
+      assert (Hashtbl.length (conflicts "por_multiupdate_a.sp") = 0);
+      assert (Hashtbl.length (conflicts "por_multiupdate_b.sp") <> 0);
+      assert (Hashtbl.length (conflicts "por_multiupdate_c.sp") = 0);
+    end ;
+  ]

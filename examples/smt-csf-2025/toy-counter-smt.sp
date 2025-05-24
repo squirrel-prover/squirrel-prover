@@ -32,9 +32,13 @@ hint smt orderStrict.
 
 mutable cpt : nat = one.
 
+mutex l : 0.
+
 process A =
+  lock l;
   let m = h(cpt,k) in
   cpt := Succ(cpt);
+  unlock l;
   out(c, m).
 
 system ((!_i A)).

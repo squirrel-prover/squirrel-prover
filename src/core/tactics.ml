@@ -252,6 +252,30 @@ let soft_failure ?loc e = raise (Tactic_soft_failure (loc,e))
 let hard_failure ?loc e = raise (Tactic_hard_failure (loc,e))
 
 let () =
+  Errors.register (function
+    | Tactic_soft_failure (l,e) ->
+        Some { printer =
+          fun pp_loc_error fmt ->
+            let pp_loc = match l with
+              | Some l -> (fun fmt () -> pp_loc_error fmt l)
+              | None -> (fun _ _ -> ())
+            in
+            Format.fprintf fmt "%aTactic failed: %a"
+              pp_loc ()
+              pp_tac_error_i e }
+    | Tactic_hard_failure (l,e) ->
+        Some { printer =
+          fun pp_loc_error fmt ->
+            let pp_loc = match l with
+              | Some l -> (fun fmt () -> pp_loc_error fmt l)
+              | None -> (fun _ _ -> ())
+            in
+            Format.fprintf fmt "%aTactic ill-formed or unapplicable: %a"
+              pp_loc ()
+              pp_tac_error_i e }
+    | _ -> None)
+
+let () =
   let s_lopt = function
     | None   -> ""
     | Some l -> "at " ^ (L.tostring l)

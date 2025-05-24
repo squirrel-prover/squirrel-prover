@@ -35,9 +35,13 @@ mutable sT(i:index) : message = empty
 abstract ok : message
 channel cT
 
+mutex lT:1.
+
 process tag(i:index) =
+  lock lT(i);
   sT(i):=H(sT(i),k);
-  out(cT,G(sT(i),k'))
+  out(cT,G(sT(i),k'));
+  unlock lT(i).
 
 system !_i sT(i):=diff(s0(i),s0b(i)); !_j T: tag(i).
 

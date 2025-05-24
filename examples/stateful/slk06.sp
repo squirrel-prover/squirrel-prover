@@ -53,31 +53,42 @@ mutable TS : message = TSinit
 channel cT
 channel cR
 
+mutex lR:0.
+mutex lS:0.
+mutex lT1:1.
+
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
+  lock lT1(i);
   if fst(x1) = h(snd(x1),k) && TSorder(snd(kT(i)),snd(x1)) = TSorderOk then
-    (out(cT, h1(fst(kT(i)),key1(i)));
+    (out(cT, h1(fst(kT(i)),key1(i))); unlock lT1(i);
     in(cR, x3);
+    lock lT1(i);
     if x3 = h2(<fst(kT(i)),pin(i)>,key2(i)) then
       (kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
-      out(cT, ok))
+      out(cT, ok); unlock lT1(i))
     else
-      out(cT, error))
+      out(cT, error); unlock lT1(i))
   else
-    out(cT, error)
+    out(cT, error); unlock lT1(i).
 
 (* jj = generic reader's session *)
 process reader(jj:index) =
+  lock lS;
   TS := TSnext(TS);
   out(cR, <h(TS,k),TS>);
+  unlock lS;
   in(cT, x2);
+  lock lR;
   try find ii such that x2 = h1(kR(ii), key1(ii)) in
     let m = h2(<kR(ii),pin(ii)>,key2(ii)) in
     kR(ii) := h3(<<kR(ii),pin(ii)>,TS>,key3(ii));
-    out(cR, m)
+    out(cR, m); unlock lR
   else
-    out(cR, error)
+    out(cR, error); unlock lR.
+
+
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 

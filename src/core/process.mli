@@ -10,10 +10,85 @@ open Ppenv
 
 module L = Location
   
+(* {2 Memory cells and multicells} *)
+
+module Cell : sig
+  type t = Symbols.macro * Term.term list
+  val pp : Format.formatter -> t -> unit
+  val map : (Term.term -> Term.term) -> t -> t
+  val fold : ('a -> Term.term -> 'a) -> 'a -> t -> 'a
+end
+module Multicell : sig
+  (** One cell per projection, implicitly in the ambient order. *)
+  type t = Cell.t list
+  val pp : Format.formatter -> t -> unit
+  val map : (Term.term -> Term.term) -> t -> t
+  val fold : ('a -> Term.term -> 'a) -> 'a -> t -> 'a
+end
+
 (*------------------------------------------------------------------*)
 (** Processes, using terms and facts from [Theory] *)
 
 type lsymb = Symbols.lsymb
+
+(*------------------------------------------------------------------*)
+(** {2 Back-end processes}
+    The computational semantics is action-deterministic
+    (e.g. existential lookup is arbitrarily made deterministic) but in the tool
+    some constructs may be non-deterministic: we are reasoning over unknown
+    determinizations.
+
+    It may be useful in the future to check for sources of non-determinism
+    other than existential choices. They may be useful, though, e.g. to
+    model mixnets. *)
+
+type proc =
+  | Null
+  | New      of Vars.var * Type.ty * proc
+  | In       of Symbols.channel * Vars.var * proc
+  | Out      of Symbols.channel * Term.term * proc
+  | Parallel of proc * proc
+  | Set      of (Symbols.macro * Term.term list) list * Term.term * proc
+  | Let      of Vars.var * Term.term * Type.ty * proc
+  | Repl     of Vars.var * proc
+  | Exists   of Vars.vars * Term.term * proc * proc
+  | Apply    of Symbols.process * Term.term list
+  | Lock     of Mutex.Multi.t * proc
+  | Unlock   of Mutex.Multi.t * proc
+  | Alias    of proc * string
+
+(*------------------------------------------------------------------*)
+(* does not recurse *)
+val tfold : ('a -> proc -> 'a) -> 'a -> proc -> 'a
+
+(* does not recurse *)
+val tmap : (proc -> proc) -> proc -> proc
+
+(*------------------------------------------------------------------*)
+(** Free term variable *)
+val fv : proc -> Vars.Sv.t
+
+(*------------------------------------------------------------------*)
+(** Term variable substitution *)
+val subst : Term.subst -> proc -> proc
+
+(** Type variable substitution *)
+val gsubst : Subst.t -> proc -> proc
+
+(*------------------------------------------------------------------*)
+val pp     : proc formatter
+val pp_dbg : proc formatter
+val _pp    : proc formatter_p
+
+(*------------------------------------------------------------------*)
+(** {2 Processes declaration} *)
+
+type proc_decl = {
+  args  : Vars.vars;
+  projs : Projection.t list;
+  time  : Vars.var;             (* type timestamp *)
+  proc  : proc;
+}
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end processes}
@@ -36,8 +111,8 @@ module Parse : sig
     | Out of Symbols.p_path * Typing.term * t     (** Output *)
     | Parallel of t * t                           (** Parallel composition *)
 
-    | Set of Symbols.p_path * Typing.term list * Typing.term * t
-    (** [Set (s,args,t,p)] stores [t] in cell [s(args)] and continues with [p]. 
+    | Set of (Symbols.p_path * Typing.term list) list * Typing.term * t
+    (** [Set (s,t,p)] stores [t] in multicell [s] and continues with [p].
         FIXME: for now, we only allow argument of type index. *)
 
     | Let of lsymb * Typing.term * Typing.ty option * t 
@@ -56,6 +131,12 @@ module Parse : sig
     | Apply of Symbols.p_path * Typing.term list
     (** Process call: [Apply (p,ts)] calls [p(ts)]. *)
 
+    | Lock     of (Symbols.p_path * lsymb list) list * t
+    (** [Lock (m,args)] locks the (multi)mutex [m] *)
+
+    | Unlock   of (Symbols.p_path * lsymb list) list * t
+    (** [Unlock (m,args)] unlocks the (multi)mutex [m] *)
+
     | Alias of t * lsymb
     (** [Alias (p,i)] behaves as [p] but [i] will be used
         as a naming prefix for its actions. *)
@@ -64,59 +145,21 @@ module Parse : sig
 end
 
 (*------------------------------------------------------------------*)
-type proc =
-  | Null
-  | New      of Vars.var * Type.ty * proc
-  | In       of Symbols.channel * Vars.var * proc
-  | Out      of Symbols.channel * Term.term * proc
-  | Parallel of proc * proc
-  | Set      of Symbols.macro * Term.term list * Term.term * proc
-  | Let      of Vars.var * Term.term * Type.ty * proc
-  | Repl     of Vars.var * proc
-  | Exists   of Vars.vars * Term.term * proc * proc
-  | Apply    of Symbols.process * Term.term list
-  | Alias    of proc * string
-
-(*------------------------------------------------------------------*)
-val pp     : proc formatter
-val pp_dbg : proc formatter
-val _pp    : proc formatter_p
-                 
-(*------------------------------------------------------------------*)
-type proc_decl = {
-  args  : Vars.vars;
-  projs : Projection.t list;
-  time  : Vars.var;             (* type timestamp *)
-  proc  : proc;
-}
-(*------------------------------------------------------------------*)
 (** Check that a process is well-typed. *)
 val parse : 
   Symbols.table ->
   args:Typing.bnds -> Projection.t list -> Parse.t -> proc_decl
 
 (*------------------------------------------------------------------*)
+(** {2 Table} *)
 (** Declare a named process. The body of the definition is type-checked. *)
 val declare :
   Symbols.table -> 
   id:lsymb -> args:Typing.bnds -> projs:(lsymb list option) -> Parse.t ->
   Symbols.table
 
-(*------------------------------------------------------------------*)
-(** Add a name length axiom (in the current scope) named using [name] 
-    for symbol [n] with type [ftype], provided that the type 
-    is [Name_fixed_length]. *)
-val add_namelength_axiom : 
-  ?loc:Location.t -> Symbols.table -> Symbols.name -> Type.ftype ->
-  Symbols.table
-
-(*------------------------------------------------------------------*)
-(** Final declaration of the system under consideration,
-    which triggers the computation of its internal representation
-    as a set of actions. In that process, name creations are compiled away.
-    Other constructs are grouped into action descriptions. *)
-val declare_system :
-  Symbols.table -> Action.exec_model -> lsymb option -> Projection.t list -> Parse.t -> Symbols.table
+val get_process_data :
+  Symbols.table -> Symbols.process -> proc_decl
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
@@ -138,3 +181,5 @@ val pp_error :
   Format.formatter -> error -> unit
 
 exception Error of error
+
+val error : ?loc: L.t -> error_i -> unit

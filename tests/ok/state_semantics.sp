@@ -9,22 +9,32 @@ mutable k2(i:index): message = empty.
 
 channel c.
 
+mutex l : 0.
+
 process Tag(i:index,j:index) =
+  lock l;
   k1(i) := h(k1(i),key(i));
   T: out(c, <k1(i),k2(i)>);
+  unlock l;
 
+  lock l;
   k1(i) := h(k1(i),key(i));
   k2(i) := <k1(i),k2(i)>;
   T1: out(c,  <k1(i),k2(i)>);
+  unlock l;
 
+  lock l;
   k1(i) := h(k1(i),key(i));
   let k3 = <k1(i),k2(i)> in
   T2: out(c, k3);
+  unlock l;
 
+  lock l;
   let k4 = <k1(i),k2(i)> in
   k1(i) := h(k1(i),key(i));
   let k5 = <k1(i),k4> in
-  T3: out(c, k5).
+  T3: out(c, k5);
+  unlock l.
 
 system (!_i !_j Tag(i,j)).
 

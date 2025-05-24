@@ -50,7 +50,7 @@ system L = Lreader.
 
 (* ----------------------------------------------------------------- *)
 lemma [L] _ :
-  happens(R) => output@R = <one,zero>.
+  happens(R1) => output@R1 = <one,zero>.
 Proof.
   intro Hap. 
   rewrite /output. 

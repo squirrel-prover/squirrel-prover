@@ -28,6 +28,12 @@ let pp_error fmt e =
   Fmt.pf fmt "reification error: @[%a@]."
     pp_error_i e
 
+let () =
+  Errors.register
+    (function
+      | Error e ->
+        Some { printer = fun _ fmt -> pp_error fmt e }
+      | _ -> None)
 
 (*------------------------------------------------------------------*)
 let assert_ty (ty : Type.ty) (t : Term.t) : Term.t =

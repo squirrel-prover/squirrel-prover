@@ -73,7 +73,6 @@ let pp_systems fmt table =
 let add_action table system descr =
   (* Sanity check *)
   Action.check_descr descr;
-
   let shape = Action.get_shape_v descr.action in
   let { actions } as data = get_data table system in
   assert (not (Msh.mem shape actions));
@@ -86,7 +85,6 @@ let descr_of_shape table system shape =
   let {actions} = get_data table system in
   let descr = Msh.find shape actions in
   Action.check_descr descr;
-
   Action.refresh_descr descr
 
 (** [find_shape table shape] returns [Some (name,indices)] if some

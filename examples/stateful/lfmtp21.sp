@@ -8,9 +8,11 @@ mutable s : message = s0.
 channel o.
 channel c.
 
-system (
+mutex l:0.
+
+system S = (
    (O: !_i in(o,x); out(o,<H(x,k),G(x,k')>)) |
-   (A: !_i s:=H(s,k); out(o,G(s,k')))
+   (A: !_i lock l; s:=H(s,k); out(o,G(s,k')); unlock l)
 ).
 
 include Core.
@@ -20,7 +22,7 @@ include Core.
     from the part that involves message equalities. 
     The pure part is proven both as a local lemma and a global lemma. *)
 
-lemma lastupdate_pure : forall tau,
+lemma [S] lastupdate_pure : forall tau,
   happens(tau) => (
     (forall j, happens(A(j)) => A(j)>tau) ||
     (exists i, happens(A(i)) && A(i) <=tau &&
@@ -51,7 +53,7 @@ Proof.
     repeat split => //).
 Qed.
 
-global lemma lastupdate_pure_glob :
+global lemma [S] lastupdate_pure_glob :
   Forall (tau:timestamp[const]),
   [happens(tau)] -> (
     [forall (j:index), happens(A(j)) => A(j)>tau] \/
@@ -87,7 +89,7 @@ Proof.
     repeat split => //).
 Qed.
 
-lemma lastupdate_init :
+lemma [S] lastupdate_init :
   forall tau,
   happens(tau) =>
   (forall j, happens(A(j)) => A(j)>tau) =>
@@ -106,7 +108,7 @@ Proof.
     by use Htau with i.
 Qed.
 
-lemma lastupdate_A :
+lemma [S] lastupdate_A :
   forall (tau:timestamp,i:index),
   happens(A(i)) && A(i)<=tau &&
   (forall j, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
@@ -127,7 +129,7 @@ Proof.
     assert i=j; [2: auto | 1: by use Hsup with j].
 Qed.
 
-lemma lastupdate :
+lemma [S] lastupdate :
   forall tau,
   happens(tau) =>
     (s@tau = s@init && forall j, happens(A(j)) => A(j)>tau) ||
@@ -146,7 +148,7 @@ Qed.
 
 (** The contents of the memory cell never repeats. *)
 
-lemma non_repeating :
+lemma [S] non_repeating :
   forall (beta,alpha:timestamp), happens(beta) =>
   (exists i, alpha < A(i) && A(i) <= beta) =>
   s@alpha <> s@beta.
@@ -169,11 +171,11 @@ Qed.
 
 (** Strong secrecy *)
 
-axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
+axiom [S] unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 
 name m : message.
 
-global lemma [set:default/left; equiv:default/left,default/left]
+global lemma [set:S/left; equiv:S/left,S/left]
   strong_secrecy (tau:timestamp[const]) : 
     Forall (tau':timestamp[const]),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s@tau',m)).

@@ -397,7 +397,7 @@ let global_prf
   let ndef = Symbols.Name { n_fty } in
   let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
-  let table = Process.add_namelength_axiom table n n_fty in
+  let table = Lemma.add_namelength_axiom table n n_fty in
   
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
@@ -565,7 +565,7 @@ let global_cca
   let ndef = Symbols.Name { n_fty } in
   let s = L.mk_loc L._dummy "n_CCA" in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
-  let table = Process.add_namelength_axiom table n n_fty in
+  let table = Lemma.add_namelength_axiom table n n_fty in
   
   let mess_replacement =
     if Term.is_name plaintext then
@@ -644,7 +644,7 @@ let global_cca
     let rdef = Symbols.Name { n_fty } in
     Symbols.Name.declare ~approx:true table s ~data:rdef
   in
-  let table = Process.add_namelength_axiom table r n_fty in
+  let table = Lemma.add_namelength_axiom table r n_fty in
   None, [], table
 
 (*------------------------------------------------------------------*)

@@ -191,7 +191,7 @@ exception Error of conversion_error
 
 let error loc e = raise (Error (loc,e))
 
-let pp_error_i ppe ppf = function
+let pp_error_i ?ppe ppf = function
   | Arity_error (s,i,j) ->
     Fmt.pf ppf "symbol %s given %i arguments, but has arity %i" s i j
 
@@ -201,7 +201,9 @@ let pp_error_i ppe ppf = function
                 of type@ @[%a@]@ \
                 is not of type @[%a@]\
                 @]"
-      (Term._pp ppe) s
+      (match ppe with
+        | None -> Term.pp
+        | Some ppe -> Term._pp ppe) s
       Type.pp ty
       Type.pp ty_expected
 
@@ -266,10 +268,20 @@ let pp_error_i ppe ppf = function
 
   | Failure s -> Fmt.string ppf s
       
-let pp_error pp_loc_err ppe ppf (loc,e) =
+let pp_error pp_loc_err ?ppe ppf (loc,e) =
   Fmt.pf ppf "%aConversion error:@ %a"
     pp_loc_err loc
-    (pp_error_i ppe) e
+    (pp_error_i ?ppe) e
+
+let () =
+  Errors.register (function
+    | Error e -> Some { printer =
+      fun pp_loc_error fmt -> pp_error pp_loc_error fmt e }
+    | _ -> None)
+
+(* Exported version, with mandatory ppe. *)
+let pp_error pp_loc_err ppe ppf (loc,e) =
+  pp_error pp_loc_err ~ppe ppf (loc,e)
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)

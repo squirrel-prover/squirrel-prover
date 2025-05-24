@@ -6,7 +6,7 @@ process C = Y: B.
 
 system C.
 
-(* check that the action is indeed named `YA` *)
+(* Check that the actions are named `YU` and `YV`. *)
 lemma _ : happens(YU,YV) => output@YU = empty && output@YV = zero. 
 Proof. auto. Qed.
 

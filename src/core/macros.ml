@@ -606,7 +606,7 @@ type global_data = {
   (** Definitions of macro body for single systems where it is defined. *)
 
   exec_model : Action.exec_model; 
-  (** The execution model this macro was declared in*)
+  (** The execution model this macro was declared in. *)
 
   ty : Type.ty;
   (** The type of the macro, which does not depends on the system. *)
@@ -666,6 +666,12 @@ let get_body table (system : SE.fset) (data : global_data) : Term.term =
        (SE.to_list system))
 
 (*------------------------------------------------------------------*)
+(** Check that [l1] and [l2] are list of variables of the same length
+    and with compatible types. *)
+let compatible_vars (l1 : Vars.var list) (l2 : Vars.var list) : bool =
+  List.length l1 = List.length l2 &&
+  List.for_all2 (fun v1 v2 -> Type.equal v1.Vars.ty v2.Vars.ty) l1 l2
+
 (** Exported *)
 let declare_global
     table system exec_model macro ~suffix ~action ~inputs ~indices ~ts body ty
@@ -679,13 +685,65 @@ let declare_global
          Term.project1 projection body)
       (System.projections table system)
   in
-  let glob_data =
-    {action = (suffix, action);
-     inputs; indices; ts; bodies; ty;
-     exec_model; }
+  let gdata =
+    { action = (suffix, action);
+      inputs; indices; ts; bodies; ty;
+      exec_model; }
   in
-  let data = data_of_global_data glob_data in
-  Symbols.Macro.declare ~approx:true table macro ~data
+  let data = data_of_global_data gdata in
+  if not (TConfig.strict_let_mode table) then
+    Symbols.Macro.declare ~approx:true table macro ~data
+  else
+    try
+      Symbols.Macro.declare ~approx:false table macro ~data
+    with
+    | Symbols.(Error (_,Multiple_declarations _)) ->
+      (* Obtain existing macro symbol and corresponding data. *)
+      let msymb = Symbols.(Macro.of_string (scope table) (L.unloc macro)) in
+      let old_gdata = as_global_macro (Symbols.Macro.get_data msymb table) in
+
+      (* Check that existing data is compatible with requested one,
+         i.e. that only bodies and bound variables differ. *)
+      if gdata <>
+         { old_gdata with
+           ts = gdata.ts ;
+           inputs = gdata.inputs ;
+           indices = gdata.indices ;
+           bodies = gdata.bodies } ||
+         not @@ Type.equal gdata.ts.Vars.ty old_gdata.ts.Vars.ty ||
+         not @@ compatible_vars gdata.indices old_gdata.indices ||
+         not @@ compatible_vars gdata.inputs  old_gdata.inputs
+      then begin
+        let e =
+          Symbols.(Multiple_declarations
+                     (scope table, L.unloc macro, Action, symbol_group))
+        in
+        raise (Symbols.Error (macro.L.pl_loc,e));
+      end;
+      
+      (* Substitution for renaming bound variables. *)
+      let subst =
+        Term.(ESubst (mk_var gdata.ts, mk_var old_gdata.ts)) ::
+        List.rev_append
+          (List.map2
+             (fun x x' -> Term.(ESubst (mk_var x, mk_var x')))
+             gdata.inputs old_gdata.inputs)
+          (List.map2
+             (fun i i' -> Term.(ESubst (mk_var i, mk_var i')))
+             gdata.indices old_gdata.indices)
+      in
+      let new_bodies =
+        gdata.bodies |>
+        List.map (fun (proj,tm) -> proj, Term.subst subst tm)
+      in
+      let data =
+        data_of_global_data
+          { old_gdata with
+            bodies = List.rev_append new_bodies old_gdata.bodies }
+      in
+      Symbols.Macro.redefine table ~data msymb,
+      msymb
+
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)

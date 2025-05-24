@@ -201,7 +201,7 @@ process Responder(j,k:index) =
      let ctT = wencap(kT(i,j,k),rTI(i,j,k),ekT) in
      out(cR,<ctR,ctT>);
 
-
+     in(cI,x);
   (* Full common key derivations *)
      let K1 = kdf(s,decap(ctI,dkR(j)) ) in
      let K2 = kdf(s,kR(i,j,k)) in
@@ -215,7 +215,7 @@ process Responder(j,k:index) =
      let ctR = encap(DkR(j,k), F(DrR(j,k),skR(j)) XOR F(sk2R(j),DrR2(j,k)), pkI) in (* we hardcode the public key of I here, we need to add in parallel the responder that wants to talk to anybody *)
      let ctT = wencap(DkT(j,k),DrTI(j,k),ekT) in
      out(cR,<ctR,ctT>);
-
+     in(cI,y);
   (* Full common key derivations *)
      let K1 = kdf(s,decap(ctI,dkR(j)) ) in
      let K2 = kdf(s,DkR(j,k)) in
@@ -296,7 +296,7 @@ process Responder2(j,k:index) =
      let ctT = wencap(kT(i,j,k),rTI(i,j,k),ekT) in
      out(cR,<ctR,ctT>);
 
-
+     in(cI,x);
   (* Full common key derivations *)
      let K1 = kdf(s, decap(ctI,dkR(j))) in
      let K2 = kdf(s,kR(i,j,k)) in
@@ -311,7 +311,7 @@ process Responder2(j,k:index) =
      let ctR = encap(DkR(j,k), F(DrR(j,k),skR(j)) XOR F(sk2R(j),DrR2(j,k)), pkI) in (* we hardcode the public key of I here, we need to add in parallel the responder that wants to talk to anybody *)
      let ctT = wencap(DkT(j,k),DrTI(j,k),ekT) in
      out(cR,<ctR,ctT>);
-
+     in(cI,y);
   (* Full common key derivations *)
      let K1 = kdf(s,decap(ctI,dkR(j))) in
      let K2 = kdf(s,DkR(j,k)) in
@@ -482,7 +482,7 @@ process Responder3(j,k:index) =
      let ctR = encap(n_CCA(i,j,k), rR(i,j,k), pk(dkI(i))) in (* we hardcode the public key of I here, we need to add in parallel the responder that wants to talk to anybody *)
      let ctT = wencap(kT(i,j,k),rTI(i,j,k),ekT) in
      out(cR,<ctR,ctT>);
-
+   in(cI,x);
   (* Full common key derivations *)
      let K1 =
    try find il jl kl such that
@@ -506,7 +506,7 @@ process Responder3(j,k:index) =
      let ctR = encap(DkR(j,k), F(DrR(j,k),skR(j)) XOR F(sk2R(j),DrR2(j,k)), pkI) in (* we hardcode the public key of I here, we need to add in parallel the responder that wants to talk to anybody *)
      let ctT = wencap(DkT(j,k),DrTI(j,k),ekT) in
      out(cR,<ctR,ctT>);
-
+     in(cI,y);
   (* Full common key derivations *)
      let K1 =
    try find il jl kl such that

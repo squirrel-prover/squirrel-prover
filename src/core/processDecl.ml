@@ -56,6 +56,12 @@ exception Error of error
 
 let error loc k e = raise (Error (loc,k,e))
 
+let () =
+  Errors.register (function
+    | Error e -> Some { printer =
+      fun pp_loc_error fmt -> pp_error pp_loc_error fmt e }
+    | _ -> None)
+
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
@@ -1562,7 +1568,7 @@ let declare table decl : Symbols.table * Goal.t list =
       | Some { pl_desc = "postquantum" } -> Action.PostQuantum
       | Some l -> error (L.loc l) KDecl (Failure "unknown system option")
     in
-    Process.declare_system table exec_model sdecl.sname projs sdecl.sprocess, []
+    ProcessSystem.declare_system table exec_model sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table =
@@ -1657,10 +1663,15 @@ let declare table decl : Symbols.table * Goal.t list =
       let data = Symbols.Name Symbols.{ n_fty } in
       Symbols.Name.declare ~approx:false table s ~data
     in
-    Process.add_namelength_axiom table n n_fty, []
+    Lemma.add_namelength_axiom table n n_fty, []
 
   | Decl.Decl_state decl ->
     parse_state_decl table decl, []
+
+  | Decl.Decl_mutex decl ->
+    let data = Mutex.MutexData decl.arity in
+    let table, _ = Symbols.Mutex.declare ~approx:false table decl.name ~data in
+    table, []
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Typing.declare_senc_joint_with_hash table senc sdec h, []

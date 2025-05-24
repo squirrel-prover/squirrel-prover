@@ -200,6 +200,93 @@ let mk_mutex_lemma
   (* TODO: Concrete: put a `0` bound instead *)
 
 (*------------------------------------------------------------------*)
+(** {2 Namelength } *)
+
+(** Creates an axiom [namelength_name] stating that: 
+    [len(s) = namelength_hashS] where [hashS] depending on the output type of
+    the name [s] *)
+let mk_namelength_statement
+    (name  : string)        (* statement name → could be [namelength_s] by default *)
+    (table : Symbols.table) (* the table *)
+    (n     : Symbols.name)  (* targeted name *)
+    (ftype : Type.ftype)    (* type of name term *)
+  : Symbols.table * Goal.statement
+  =
+  let tyn = ftype.fty_out in
+
+  (* create fresh variables regarding to arity of n *)
+  let vars = List.map (fun x -> Vars.make_fresh x "i") ftype.fty_args in
+
+  let tvars = Term.mk_vars vars in
+  (* build name term n *)
+  let tn = Term.mk_name (Term.nsymb n tyn) tvars in
+
+  (* cst hash is built from hash of output type of n : tyn *)
+  let cst = Type.to_string tyn in
+  let cst_name = "namelength_" ^ cst in
+  let lsy = L.mk_loc L._dummy cst_name in
+
+  (* find or build constant function [namelength_hashS] *)
+  let table, fname =
+    if Symbols.Operator.mem_s (Symbols.scope table) cst_name table then
+      let fname = Symbols.Operator.convert_path ([],lsy) table in
+      (table, fname)
+    else
+      let ftype = Type.mk_ftype [] [] Type.tmessage in
+      let data =
+        Symbols.OpData.Operator {
+          ftype; def = Abstract (Abstract `Prefix, [])
+        }
+      in
+      Symbols.Operator.declare ~approx:false table lsy ~data 
+  in
+  let cst = Term.mk_fun table fname [] in
+  (* len(n) = cst *)
+  let eq = Term.mk_eq (Term.mk_len tn) (cst) in
+  (* forall i_: len(n(i_)) = cst *)
+  let f = Equiv.Atom (Reach {formula = (Term.mk_forall vars eq); bound = None}) in
+  (*TODO:Concrete : Put bound at zero here (exact) by default and then use it  as is, probably a bit of  inference to do*)
+
+  let v = SE.Var.of_ident (Ident.create "'P") in (* fresh system variable *)
+  let params =
+    Params.{
+      ty_vars = ftype.fty_vars;
+      se_vars = [v,[]];
+    }
+  in
+
+  (* build statement with name given in arg (often namelength_s with s the
+     symbol of the name) *)
+  let stmt =
+    Goal.{
+      name; params;
+      system  = { set = SE.var v; pair = None; };
+      formula = Equiv.GlobalS f;
+    }
+  in
+  ( table, stmt )
+
+
+(** Exported (see `.mli`) *)
+let add_namelength_axiom
+    ?(loc = L._dummy)
+    (table : Symbols.table) (n : Symbols.name) (ftype : Type.ftype)
+  : Symbols.table
+  =
+  if not @@ Symbols.TyInfo.is_name_fixed_length table ftype.fty_out then
+    table
+  else
+    let name = "namelength_" ^ (Symbols.to_string n.s) in
+    (* if already defined in current scope, return the table unchanged *)
+    if Symbols.Lemma.mem_s (Symbols.scope table) name table 
+    then table
+    else
+      let table, stmt = mk_namelength_statement name table n ftype in
+      add_lemma ~loc `Axiom stmt table
+
+(*------------------------------------------------------------------*)
+(** {2 Depends, Mutex } *)
+
 (** Compute the sequential dependency and mutual exclusion lemmas
     for a given system. *)
 let mk_depends_mutex

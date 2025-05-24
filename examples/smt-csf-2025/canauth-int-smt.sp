@@ -43,33 +43,46 @@ mutable cellB(i:index) : int = 0
 channel cR
 channel cS
 
-(*op ( + ) : int -> int -> int.*)
-
 (* PROCESSES *)
 
+mutex lA:1.
+mutex lB:1.
+
 process ReceiverA(i,j:index) =
+  lock lA(i);
   in(cR,x);
   if  cellA(i) < msg_to_int(fst(fst(x)))
    && snd(x) = hmac(fst(x),sk(i))
   then
     cellA(i) := msg_to_int(fst(fst(x)));
-    out(cS,ok)
+    out(cS,ok);
+    unlock lA(i)
+  else
+    unlock lA(i)
 
 process ReceiverB(i,j:index) =
+  lock lB(i);
   in(cR,x);
   if cellB(i) < msg_to_int(fst(fst(x)))
   && snd(x) = hmac(fst(x),sk(i))
   then
     cellB(i) := msg_to_int(fst(fst(x)));
-    out(cS,ok)
+    out(cS,ok);
+    unlock lB(i)
+  else
+    unlock lB(i)
 
 process SenderA(i,j:index) =
+  lock lA(i);
   cellA(i) := (cellA(i) + 1);
-  out(cR, <<int_to_msg(cellA(i)),msgA(i,j)>, hmac(<int_to_msg(cellA(i)),msgA(i,j)>,sk(i))>)
+  out(cR, <<int_to_msg(cellA(i)),msgA(i,j)>, hmac(<int_to_msg(cellA(i)),msgA(i,j)>,sk(i))>);
+  unlock lA(i)
 
 process SenderB(i,j:index) =
+  lock lB(i);
   cellB(i) := cellB(i)+1;
-  out(cR,<<int_to_msg(cellB(i)),msgB(i,j)>, hmac(<int_to_msg(cellB(i)),msgB(i,j)>,sk(i))>)
+  out(cR,<<int_to_msg(cellB(i)),msgB(i,j)>, hmac(<int_to_msg(cellB(i)),msgB(i,j)>,sk(i))>);
+  unlock lB(i)
 
 system ((!_i !_j RA: ReceiverA(i,j)) | (!_i !_j SA: SenderA(i,j)) |
         (!_i !_j RB: ReceiverB(i,j)) | (!_i !_j SB: SenderB(i,j))).

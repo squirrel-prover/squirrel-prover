@@ -19,15 +19,18 @@ Qed.
 (* ----------------------------------------------------------------------------- *)
 mutable s1 = empty.
 mutable s2 = empty.
+mutex l : 0.
 
 system Q =
   !_i
+  lock l;
   in(c,x);
   s1 := x;
   let a1 = f(<x,s1>) in
   s2 := <a1,x>;
   let b1 = ff(<a1,<s1,s2>>) in
-  A: out(c,b1).
+  A: out(c,b1);
+  unlock l.
 
 lemma [Q] _ (i:index): 
   happens(A(i)) => 

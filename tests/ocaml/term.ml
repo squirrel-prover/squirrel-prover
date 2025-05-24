@@ -4,6 +4,9 @@ open Squirrelcore
 
 let tests = [
   "fresh_forall", `Quick, begin fun () ->
+    (* Next line is to make sure that the default table has builtins.
+       The whole test could be rewritten using Utils, as in Typing suite. *)
+    ignore (Squirrelprover.Prover.init ());
     let x = Vars.make_fresh Type.tindex "i" in
     let y = Vars.make_fresh Type.tindex "i" in
     let t1 =

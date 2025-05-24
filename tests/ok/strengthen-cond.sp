@@ -22,14 +22,21 @@ channel cS
 abstract (~<): message -> message -> boolean.
 
 (*------------------------------------------------------------------*)
+
+mutex l : 1.
+
 process server (i:index) =
   in(cS,x);
   let cipher = snd(snd(x)) in
   let deccipher = dec(cipher,k(i)) in
   let xcpt = snd(deccipher) in
+  lock l(i);
   if SCtr(i) ~< xcpt then
-  SCtr(i) := xcpt;
-  out(cS,accept).
+    SCtr(i) := xcpt;
+    unlock l(i);
+    out(cS,accept)
+  else
+    unlock l(i).
 
 (* note: U's cannot be computed by the adversary if he does not already
    know it (e.g. by giving him the frame *)
@@ -90,14 +97,14 @@ Proof.
   + by rewrite /* in 1. 
 
   (* case `t = U(i)`, which cannot be proved because of `m(i)` *)
-  + repeat destruct Eq as [i Eq].
+  + destruct Eq as [i Eq].
     rewrite /*.
-    fa 1. fa 2. fa 2.
+    fa <_,_>. fa <_,_>. fa (if _ then _).
     (* check that `t = U(i)` *)
     assert (t = U(i)) as _ by auto.
     (* remove the undeducible term m(i) and check that we can conclude 
-       without it. *)
-    assert (m(i) = zero) as -> by admit.
+       without it *)
+    assert m(i) = zero as -> by admit.
     by apply ~inductive Hind (pred(t)).
 Qed.
 

@@ -165,7 +165,7 @@ type error = L.t option * error_i
 exception Error of error
 
 val pp_error :
-  (Format.formatter -> L.t option -> unit) ->
+  (Format.formatter -> L.t -> unit) ->
   Format.formatter -> error -> unit
 
 val error : ?loc:L.t -> error_i -> 'a

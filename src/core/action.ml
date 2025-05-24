@@ -247,13 +247,13 @@ let pp_strings fmt l =
 (** [pp_par_choice_f f] formats [int * 'a] as parallel choices,
     relying on [f] to format ['a]. *)
 let pp_par_choice_f f fmt (k,a) =
-  Fmt.pf fmt "%d%a" k f a
+  Fmt.pf fmt "Π%d%a" k f a
 
 (** [pp_sum_choice_f f d] formats [int * 'a] as sum choices,
     relying on [f] to format ['a]. It does not format
     the default choice [d]. *)
 let pp_sum_choice_f f d fmt (k,a) =
-  if (k,a) <> d then Fmt.pf fmt "/%d%a" k f a
+  if (k,a) <> d then Fmt.pf fmt "/Σ%d%a" k f a
 
 (** [pp_action_f f d] is a formatter for ['a action],
     relying on the formatter [f] for ['a], and ignoring
@@ -261,7 +261,7 @@ let pp_sum_choice_f f d fmt (k,a) =
 let pp_action_f f d fmt a =
   if a = [] then Fmt.pf fmt "ε" 
   else
-    Fmt.list ~sep:(Fmt.any "_")
+    Fmt.list ~sep:(Fmt.any ";")
       (fun fmt { par_choice; sum_choice } ->
          Fmt.pf fmt "%a%a"
            (pp_par_choice_f f) par_choice
@@ -270,7 +270,7 @@ let pp_action_f f d fmt a =
       a
 
 let pp_action_structure fmt (a : action) =
-  Printer.kw `GoalAction fmt "%a" (pp_action_f pp_terms_list (0,[])) a
+  Printer.kw `GoalAction fmt "%a" (pp_action_f pp_terms_list (-1,[])) a
 
 let pp_shape fmt a = pp_action_f pp_int (0,0) fmt a
 

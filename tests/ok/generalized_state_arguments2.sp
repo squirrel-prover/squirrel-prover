@@ -4,6 +4,8 @@ name n : index -> message.
 
 mutable s (i : index) = n i.
 
+mutex l : 0.
+
 abstract i0 : index.
 
 channel c.
@@ -15,7 +17,7 @@ name k : index * index -> message.
 hash h.
 
 (* -------------------------------------------------- *)
-system Q = !_i in(c,x); s (toI (k (i, i0))) := empty; O: out(c,s (toI (k (i, i0)))).
+system Q = !_i lock l; in(c,x); s (toI (k (i, i0))) := empty; O: out(c,s (toI (k (i, i0)))); unlock l.
 
 (* -------------------------------------------------- *)
 (* check that [s] is well-formed *)

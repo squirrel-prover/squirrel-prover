@@ -18,6 +18,7 @@ let test_suites : unit Alcotest.test list =
     ("Equivalence"    , Squirreltests.Main.equivalence);
     ("Channel"        , Squirreltests.Channel.channels);
     ("Models"         , Squirreltests.Parserbuf.models);
+    ("Conflicts"      , Squirreltests.Parserbuf.conflicts);
     ("ProcessParsing" , Squirreltests.Parserbuf.process_parsing);
     ("TermParsing"    , Squirreltests.Parserbuf.term_parsing);
     ("Prover"         , Squirreltests.Prover.tests);
@@ -39,11 +40,9 @@ let alcotests (runner:?test:bool -> string -> unit) (path:string) : (string * [>
   let make_test filename =
     filename, `Quick, begin fun () ->
       try runner ~test:true filename with e ->
-        let table = Squirrelcore.Symbols.builtins_table () in
         Squirrelcore.Printer.prt `Error "%a"
-          (Squirrelprover.Errors.pp_toplevel_error
-             ~test:true
-             Squirrelprover.Driver.dummy table)
+          (Squirrelcore.Errors.pp_user_error
+             Squirrelprover.Driver.(pp_loc_error dummy))
           e;
         raise e
     end

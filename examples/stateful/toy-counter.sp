@@ -54,20 +54,27 @@ In order to model counter values, we use:
 abstract mySucc : message->message
 abstract (~<) : message -> message -> boolean.
 
+mutex l : 0.
+
 (** Processes A and B are defined as follows.
 They both access to the mutable state `d`. *)
 process A =
+  lock l;
   let m = h(<d,secret>,key) in
   d := mySucc(d);
+  unlock l;
   out(cA, m).
 
 process B =
   in(cA,y);
+  lock l;
   if y = h(<d,secret>,key) then
     d := mySucc(d);
+    unlock l;
     out(cB,secret)
   else
     d := mySucc(d);
+    unlock l;
     out(cB,error).
 
 system ((!_i A) | (!_j B)).

@@ -21,6 +21,12 @@ type state_macro_decl = {
 }
 
 (*------------------------------------------------------------------*)
+type mutex_decl = {
+  name      : lsymb;
+  arity : int;
+}
+
+(*------------------------------------------------------------------*)
 type name_decl = {
   n_name : lsymb ;
   n_ty   : Typing.ty list;
@@ -134,6 +140,7 @@ type declaration_i =
   | Decl_action    of action_decl
   | Decl_name      of lsymb * Typing.ty
   | Decl_state     of state_macro_decl
+  | Decl_mutex     of mutex_decl
   | Decl_funs      of op_kind * op_in_system * op_tyargs * fun_decl list
   | Decl_predicate of predicate_decl
   | Decl_bty       of bty_decl

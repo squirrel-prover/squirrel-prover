@@ -44,33 +44,44 @@ abstract mySucc : message -> message
 (* order relation for counter *)
 abstract (~<) : message -> message -> bool
 
+mutex lA:1
+mutex lB:1
 (* PROCESSES *)
 
 process ReceiverA(i,j:index) =
+  lock lA(i);
   in(cR,x);
   if fst(snd(fst(x))) = SIGN
      && cellA(i) ~< snd(snd(fst(x)))
      && snd(x) = hmac(<snd(snd(fst(x))),fst(fst(x))>,sk(i))
   then
     cellA(i) := mySucc(cellA(i));
-    out(cS,ok)
+    out(cS,ok);
+    unlock lA(i)
+  else unlock lA(i).
 
 process ReceiverB(i,j:index) =
+  lock lB(i);
   in(cR,x);
   if fst(snd(fst(x))) = SIGN
      && cellB(i) ~< snd(snd(fst(x)))
      && snd(x) = hmac(<snd(snd(fst(x))),fst(fst(x))>,sk(i))
   then
     cellB(i) := mySucc(cellB(i));
-    out(cS,ok)
+    out(cS,ok); unlock lB(i)
+ else unlock lB(i).
 
 process SenderA(i,j:index) =
+  lock lA(i);
   cellA(i) := mySucc(cellA(i));
-  out(cR,<<msgA(i,j),<SIGN,cellA(i)>>,hmac(<cellA(i),msgA(i,j)>,sk(i))>)
+  out(cR,<<msgA(i,j),<SIGN,cellA(i)>>,hmac(<cellA(i),msgA(i,j)>,sk(i))>);
+  unlock lA(i).
 
 process SenderB(i,j:index) =
+  lock lB(i);
   cellB(i) := mySucc(cellB(i));
-  out(cR,<<msgB(i,j),<SIGN,cellB(i)>>,hmac(<cellB(i),msgB(i,j)>,sk(i))>)
+  out(cR,<<msgB(i,j),<SIGN,cellB(i)>>,hmac(<cellB(i),msgB(i,j)>,sk(i))>);
+  unlock lB(i).
 
 system ((!_i !_j ReceiverA(i,j)) | (!_i !_j SenderA(i,j)) |
         (!_i !_j ReceiverB(i,j)) | (!_i !_j SenderB(i,j))).

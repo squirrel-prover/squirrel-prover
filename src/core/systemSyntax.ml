@@ -20,6 +20,13 @@ exception Error of error
 
 let error e = raise (Error e)
 
+let () =
+  Errors.register (function
+    | Error e ->
+        Some { printer =
+          fun _ fmt -> Format.fprintf fmt "System error: %a" pp_error e }
+    | _ -> None)
+
 (*------------------------------------------------------------------*)
 let store_compatible = ref None
 let compatible table t1 t2 : bool = (oget !store_compatible) table t1 t2

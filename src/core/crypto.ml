@@ -3949,6 +3949,13 @@ module Parse = struct
       pp_loc_err loc
       pp_error_i e
 
+  let () =
+    Errors.register (function
+      | Error e ->
+          Some { printer =
+            fun pp_loc_err fmt -> pp_error pp_loc_err fmt e }
+      | _ -> None)
+
   (*------------------------------------------------------------------*)
   (** {3 Parsing} *)
 

@@ -164,21 +164,26 @@ axiom [any] incr_ne_fail (x : message): incr(x) = fail => false.
 (* ----------------------------------------------------------------- *)
 (** ## Processes *)
 
+mutex lT:1.
+mutex lR:1.
 (* session number `k` of the RFID tag with identity `i` *)
 process tag(i : index, k : index) =
+  lock lT(i);
   cpt(i) := incr(cpt(i));
   new n;
-  T: out(cT, enc(cpt(i), n, key(i))).
+  T: out(cT, enc(cpt(i), n, key(i)));
+  unlock lT(i).
 
 (* session number `j` of the reader R trying to authenticate tag `i` *)
 process reader(j : index, i : index) =
   in(cT,x);
+  lock lR(i);
   let cI = dec(x, key(i)) in
   let c = Rcpt(i) in
   if cI <> fail && c ~< cI then
     Rcpt(i) := cI;
-    R: out(cR, ok)
-  else R1: out(cR, ko).
+    R: out(cR, ok); unlock lR(i)
+  else R1: out(cR, ko); unlock lR(i).
 
 system (
   (!_j !_i reader(j,i) ) | 

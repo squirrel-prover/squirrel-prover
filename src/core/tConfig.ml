@@ -87,6 +87,9 @@ let v_log_mem_crypto = Param_string ""
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
+let s_strict_let_mode = "processStrictLetMode"
+let v_strict_let_mode = Param_bool false
+
 let s_show_strengthened_hyp = "showStrengthenedHyp"
 let v_show_strengthened_hyp = Param_bool false
 
@@ -112,6 +115,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_debug_tactics         v_debug_tactics
   |> declare s_debug_macros          v_debug_macros    
   |> declare s_strict_alias_mode     v_strict_alias_mode
+  |> declare s_strict_let_mode       v_strict_let_mode
   |> declare s_show_strengthened_hyp v_show_strengthened_hyp
   |> declare s_auto_fadup            v_auto_fadup
   |> declare s_new_ind               v_new_ind
@@ -152,6 +156,7 @@ let debug_completion        = get_bool   s_debug_completion
 let debug_tactics           = get_bool   s_debug_tactics
 let debug_macros            = get_bool   s_debug_macros
 let strict_alias_mode       = get_bool   s_strict_alias_mode
+let strict_let_mode         = get_bool   s_strict_let_mode
 let show_strengthened_hyp   = get_bool   s_show_strengthened_hyp
 let auto_fadup              = get_bool   s_auto_fadup
 let new_ind                 = get_bool   s_new_ind

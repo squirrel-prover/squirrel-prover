@@ -32,13 +32,15 @@
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK BACKTICK
-%token LLET LET REC TERMINATIONBY TAND IN IF THEN ELSE FIND SUCHTHAT
+%token LLET LET REC TERMINATIONBY TAND IN
+%token LOCK
+%token IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
-%token NEW OUT PARALLEL NULL
+%token NEW OUT UNLOCK PARALLEL NULL
 %token CHANNEL PROCESS
 %token HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
 %token TYPE FUN
-%token MUTABLE SYSTEM LIKE SET
+%token MUTABLE MUTEX SYSTEM LIKE SET
 %token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF EQUIV DARROW DEQUIVARROW AXIOM
@@ -479,6 +481,21 @@ colon_ty:
 | DOLLAR s=id { "$" ^ s }
 | s=id DOLLAR { "$" ^ s }
 
+lock:
+| id=path LPAREN args=slist(lsymb,COMMA) RPAREN    { id,args }
+| id=path                                          { id,[] }
+
+multilock:
+| l=lock                                           { [l] }
+| DIFF LPAREN locks=slist(lock,COMMA) RPAREN       { locks }
+
+cell:
+| id=path terms=slist(sterm,empty)                 { (id,terms) }
+
+multicell:
+| c=cell                                           { [c] }
+| DIFF LPAREN cells=slist(cell,COMMA) RPAREN       { cells }
+
 process_i:
 | NULL                               { Process.Parse.Null }
 | LPAREN ps=processes_i RPAREN       { ps }
@@ -506,12 +523,14 @@ process_i:
 | LET id=lsymb ty=colon_ty? EQ t=term IN p=process
     { Process.Parse.Let (id,t,ty,p) }
 
+| LOCK m=multilock p=process_cont    { Process.Parse.Lock   (m,p) }
+| UNLOCK m=multilock p=process_cont  { Process.Parse.Unlock (m,p) }
+
 | id=path terms=slist(sterm,empty)   { Process.Parse.Apply (id,terms) }
 (* we have to use a slist(sterm,empty) while we want to just parse a
 tuple (t1,...,tn), to avoid conflicts with the next line *)
 
-| id=path args=slist(sterm,empty) COLONEQ t=term p=process_cont
-    { Process.Parse.Set (id,args,t,p) }
+| s=multicell COLONEQ t=term p=process_cont { Process.Parse.Set (s,t,p) }
 
 | s=loc(BANG) p=process { Process.Parse.Repl (s,p) }
 
@@ -775,6 +794,9 @@ declaration_i:
 
 | MUTABLE name=lsymb args=bnds_strict out_ty=colon_ty? EQ init_body=term
                           { Decl.Decl_state {name; args; out_ty; init_body; }}
+
+| MUTEX name=lsymb COLON arity=INT
+                          { Decl.Decl_mutex {name; arity} }
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 

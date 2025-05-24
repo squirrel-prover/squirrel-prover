@@ -9,6 +9,7 @@ channel c.
 
 process A(v:message)
 =
+in(c,x);
 let cm = comm v in
 let acc = accepte cm in
 out(c,empty).

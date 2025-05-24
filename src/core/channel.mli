@@ -7,7 +7,7 @@ open Utils
 
 type t = Symbols.channel
 
-val pp_channel : t formatter
+val pp : t formatter
 
 (** [of_lsymb table p] retrieves the channel previously declared
     under the name [p] in [table]. *)

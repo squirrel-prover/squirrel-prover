@@ -10,6 +10,12 @@ module L = Location
   * with the given explanation. *)
 exception Error of string
 
+let () =
+  Errors.register (function
+    | Error s ->
+        Some { printer = fun _ fmt -> Format.pp_print_string fmt s }
+    | _ -> None)
+
 (** Given an exception raised during parsing,
   * and a pretty-printer for the location of the error,
   * return [Some pp] where [pp] is a pretty-printer

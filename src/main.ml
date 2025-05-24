@@ -91,6 +91,7 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
           HistoryTP.save_state state.history_state state.prover_state }
     else state
   in
+  let pp_loc_error = Driver.pp_loc_error state.driver in
 
   match
     let cmd = next_input_or_undo ~test state in
@@ -115,11 +116,8 @@ let rec main_loop ~test ?(save=true) (state : driver_state) : unit =
 
   (* error handling *)
   | exception e
-    when Errors.is_toplevel_error ~interactive:!interactive ~test e ->
-    let table = Prover.get_table state.prover_state in
-    Printer.prt `Error "%a"
-      (Errors.pp_toplevel_error
-         ~interactive:!interactive ~test state.driver table) e;
+    when Errors.user_mode ~interactive:!interactive ~test ->
+    Printer.prt `Error "%a" (Errors.pp_user_error pp_loc_error) e;
     main_loop_error ~test state
 
 and main_loop_error ~test (state : driver_state) : unit =

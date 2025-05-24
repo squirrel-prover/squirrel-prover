@@ -43,15 +43,22 @@ abstract ok : message
 channel cT
 channel cR
 
+mutex lT:1.
+mutex lR:0.
+
 process tag(i:index) =
+  lock lT(i);
   sT(i):=H(sT(i),k);
-  out(cT,G(sT(i),k'))
+  out(cT,G(sT(i),k'));
+  unlock lT(i).
 
 process reader =
   in(cT,x);
+  lock lR;
   try find ii such that x = G(H(sR(ii),k),k') in
     sR(ii):=H(sR(ii),k);
-    out(cR,ok)
+    out(cR,ok);
+    unlock lR else unlock lR.
 
 system (!_i !_j T: tag(i) | !_jj R: reader).
 

@@ -103,8 +103,8 @@ type term = private
   | App    of term * term list
   | Fun    of Symbols.fname * applied_ftype
   (** An applied function type, instantiating type variable when [f] 
-      is polymorphique. *)
-  | Name   of nsymb * term list             (** [Name(s,l)] : [l] of length 0 or 1 *)
+      is polymorphic. *)
+  | Name   of nsymb * term list    (** [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
   | Action of Symbols.action * term list
   | Var of Vars.var

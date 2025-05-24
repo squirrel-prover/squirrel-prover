@@ -49,41 +49,44 @@ mutable kR(i:index) : message = <k1init(i),k2init(i)>
 channel cT
 channel cR
 
+mutex lT:1.
+mutex lR:0.
+
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, xr1);
   out(cT, h1(fst(kT(i)) XOR xr1 XOR k(i), key1(i)));
   in(cR, xh2);
+  lock lT(i);
   if xh2 = h2(snd(kT(i)), key2(i)) then
     kT(i) := < fst(kT(i)) XOR h2(snd(kT(i)), key2(i)),
                snd(kT(i)) XOR h1(fst(kT(i)) XOR xr1 XOR k(i), key1(i)) >;
-    out(cT, ok)
+    out(cT, ok); unlock lT(i)
   else
-    out(cT, error)
+    out(cT, error); unlock lT(i).
 
 (* jj = generic reader's session *)
 process reader(jj:index) =
   out(cR, r1(jj));
   in(cT, xh1);
+  lock lR;
   try find ii such that xh1 = h1(fst(kR(ii)) XOR r1(jj) XOR k(ii), key1(ii)) in
     let m = h2(snd(kR(ii)),key2(ii)) in
     kR(ii) := < fst(kR(ii)) XOR h2(snd(kR(ii)), key2(ii)),
                 snd(kR(ii)) XOR h1(fst(kR(ii)) XOR r1(jj) XOR k(ii), key1(ii)) >;
-    out(cT, m)
+    out(cT, m); unlock lR
   else
-    out(cT, error)
+    out(cT, error); unlock lR.
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 (* AXIOMS *)
 
 (* Minimal sequentiality assumption needed for the proofs *)
-axiom  sequentiality (t:timestamp, i,j:index):
+axiom sequentiality (t:timestamp, i,j:index):
   happens(T(i,j),t,T1(i,j)) =>
     T(i,j) < t => t < T1(i,j) =>
       not(exists (j':index), t = T1(i,j') && j <> j').
-
-
 
 (* LIBRARIES *)
 

@@ -28,10 +28,13 @@ name n : index * index -> message
 mutable kT(i:index) : message = seed(i)
 
 channel cT
+mutex lT:1.
 
 process tag(i:index,j:index) =
+  lock lT(i);
   kT(i) := hkey(kT(i),key(i));
-  out(cT, diff(kT(i),n(i,j)))
+  out(cT, diff(kT(i),n(i,j)));
+  unlock lT(i).
 
 system (!_i !_j T: tag(i,j)).
 

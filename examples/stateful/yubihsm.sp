@@ -117,14 +117,19 @@ channel cY
 channel cS
 channel cHSM.
 
+mutex lY:1.
+mutex lS:1.
+
 (* Order over counters. Assumed transitive and strict later through axioms. *)
 abstract (~<): message -> message -> boolean.
 
 (* When the key is plugged for yubikey `pid`, the counter is incremented. *)
 process yubikeyplug (pid:index) =
   in(cY,x1);
+  lock lY(pid);
   YCtr(pid) := mySucc(YCtr(pid));
-  out(cY,endplug).
+  out(cY,endplug);
+  unlock lY(pid).
 
 name nonce : index * index -> message
 name npr : index * index -> message
@@ -134,10 +139,11 @@ name npr : index * index -> message
    - the counter is incremented. *)
 process yubikeypress (pid:index,j:index) =
   in(cY,x2);
+  lock lY(pid);
   let ctr = YCtr(pid) in
   YCtr(pid) := mySucc(YCtr(pid));
   let menc = enc(<sid(pid),ctr>,npr(pid,j),k(pid)) in
-  out(cY,<mpid(pid), <nonce(pid,j), menc>>).
+  out(cY,<mpid(pid), <nonce(pid,j), menc>>); unlock lY(pid).
 
 (* When the server receives a message for pid:
    - it checks whether it corresponds to a pid in its database,
@@ -147,50 +153,56 @@ process yubikeypress (pid:index,j:index) =
    strictly greater than the counter associated to the token,
    - if so, this counter value is used to update the database.
    In our modelling, the server's request to the HSM (to retrieve k(pid)
-   and sid(pid)) has been inlined.
- *)
+   and sid(pid)) has been inlined. *)
 process server (pid:index) =
   in(cS,x); (*x = <pid,<nonce, cipher>> with cipher = enc(<sid,cpt>,r, k)*)
   let cipher = snd(snd(x)) in
   let deccipher = dec(cipher,k(pid)) in
   let xcpt = snd(deccipher) in
+  lock lS(pid);
   if fst(x) = mpid(pid) &&
      deccipher<>fail &&
      fst(deccipher) = sid(pid) &&
      SCtr(pid) ~< xcpt then
-  SCtr(pid) := xcpt;
-  out(cS,accept).
+    SCtr(pid) := xcpt;
+    out(cS,accept);
+    unlock lS(pid)
+  else unlock lS(pid).
 
 (*------------------------------------------------------------------*)
 (* The attacker can read/write AEAD stored in the server's database. *)
+
+mutex AEAD_mutex : 0.
+
 process read_AEAD (pid:index) =
-  out(cS,AEAD(pid)).
+  lock AEAD_mutex;
+  out(cS,AEAD(pid));
+  unlock AEAD_mutex.
 
 process write_AEAD (pid:index)=
   in(cS,x);
-  AEAD(pid) := x.
+  lock AEAD_mutex;
+  AEAD(pid) := x;
+  unlock AEAD_mutex.
 
 (*------------------------------------------------------------------*)
 (* model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
   in(cHSM,xdata);
   (* xdata = <<pid,kh>, <aead, otp>> with
-       otp  = enc(<sid,cpt>,k)
-       aead = enc(<k,<pid,sid>>,mkey)*)
-   if fst(xdata) = <mpid(pid),kh> then
-    let aead = fst(snd(xdata)) in
-    let otp = snd(snd(xdata)) in
-
-    let aead_dec = dec(aead,mkey) in
-
-    let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
-
-    if aead_dec <> fail &&
-       otp_dec <> fail &&
-       fst(otp_dec) = snd(snd(aead_dec)) &&
-       mpid(pid) = fst(snd(aead_dec))
-    then
-      out(cHSM, snd(otp_dec)).
+     otp   = enc(<sid,cpt>,k)
+     aead  = enc(<k,<pid,sid>>,mkey) *)
+  let aead = fst(snd(xdata)) in
+  let otp = snd(snd(xdata)) in
+  let aead_dec = dec(aead,mkey) in
+  let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
+  if fst(xdata) = <mpid(pid),kh> then
+  if aead_dec <> fail &&
+     otp_dec <> fail &&
+     fst(otp_dec) = snd(snd(aead_dec)) &&
+     mpid(pid) = fst(snd(aead_dec))
+  then
+    out(cHSM, snd(otp_dec)).
 
 (*------------------------------------------------------------------*)
 (* real system with ideal system *)

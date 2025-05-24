@@ -246,7 +246,7 @@ let do_decls (st:state) (decls : Decl.declarations) : state =
   let new_prover_state, proof_obls = add_decls st decls in
   let ppe = default_ppe ~table:new_prover_state.table () in
   if proof_obls <> [] then
-    Printer.pr "@[<v 2>proof obligations:@;%a@]"
+    Printer.pr "@[<v 2>proof obligations:@;%a@]@."
       (Fmt.list ~sep:Fmt.cut (Goal.pp_init ppe)) proof_obls;
   new_prover_state
 
@@ -372,9 +372,9 @@ let do_tactic
     in
     match b_tacs with
       | [utac] ->
-          Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.AST.pp utac
+          Printer.prt `Prompt "Line %d: %a@." lnum ProverTactics.AST.pp utac
       | _ ->
-          Printer.prt `Prompt "Line %d: ??" lnum
+          Printer.prt `Prompt "Line %d: ??@." lnum
   end;
   do_tactic' ~check st l
 
@@ -708,11 +708,14 @@ and do_include
           in
           { st with table }
 
-        with e when Errors.is_toplevel_error ~interactive:interactive ~test e ->
+        with e when Errors.is_user_error e &&
+                    Errors.user_mode ~interactive ~test ->
+          let pp_loc_error = Driver.pp_loc_error driver in
           let err_mess fmt =
             Fmt.pf fmt "@[<v 0>Include %S failed:@;@[%a@]@]"
               (L.unloc (ProverLib.lsymb_of_load_path i.th_name))
-              (Errors.pp_toplevel_error ~interactive ~test driver st.table) e
+              (Errors.pp_user_error pp_loc_error)
+              e
           in
           Driver.close driver;
           Command.cmd_error (IncludeFailed err_mess)

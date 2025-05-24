@@ -46,31 +46,46 @@ abstract (~<) : message -> message -> bool
 
 (* PROCESSES *)
 
+mutex lA:1.
+mutex lB:1.
+
 process ReceiverA(i,j:index) =
+  lock lA(i);
   in(cR,x);
   if fst(snd(fst(x))) = SIGN
      && cellA(i) ~< snd(snd(fst(x)))
      && snd(x) = hmac(<snd(snd(fst(x))),fst(fst(x))>,sk(i))
   then
     cellA(i) := mySucc(cellA(i));
-    out(cS,ok)
+    out(cS,ok);
+    unlock lA(i)
+  else
+    unlock lA(i)
 
 process ReceiverB(i,j:index) =
+  lock lB(i);
   in(cR,x);
   if fst(snd(fst(x))) = SIGN
      && cellB(i) ~< snd(snd(fst(x)))
      && snd(x) = hmac(<snd(snd(fst(x))),fst(fst(x))>,sk(i))
   then
     cellB(i) := mySucc(cellB(i));
-    out(cS,ok)
+    out(cS,ok);
+    unlock lB(i)
+  else
+    unlock lB(i)
 
 process SenderA(i,j:index) =
+  lock lA(i);
   cellA(i) := mySucc(cellA(i));
-  out(cR,<<msgA(i,j),<SIGN,cellA(i)>>,hmac(<cellA(i),msgA(i,j)>,sk(i))>)
+  out(cR,<<msgA(i,j),<SIGN,cellA(i)>>,hmac(<cellA(i),msgA(i,j)>,sk(i))>);
+  unlock lA(i)
 
 process SenderB(i,j:index) =
+  lock lB(i);
   cellB(i) := mySucc(cellB(i));
-  out(cR,<<msgB(i,j),<SIGN,cellB(i)>>,hmac(<cellB(i),msgB(i,j)>,sk(i))>)
+  out(cR,<<msgB(i,j),<SIGN,cellB(i)>>,hmac(<cellB(i),msgB(i,j)>,sk(i))>);
+  unlock lB(i)
 
 system ((!_i !_j ReceiverA(i,j)) | (!_i !_j SenderA(i,j)) |
         (!_i !_j ReceiverB(i,j)) | (!_i !_j SenderB(i,j))).
@@ -112,7 +127,7 @@ lemma counterIncreaseA (t, t':timestamp, i:index):
   ( cellA(i)@t' ~< cellA(i)@t ||
     cellA(i)@t' = cellA(i)@t).
 Proof.
-induction t. smt ~steps:26420.
+  induction t. smt ~steps:26420.
 Qed.
 
 lemma counterIncreaseB (t, t':timestamp, i:index):
@@ -122,7 +137,7 @@ lemma counterIncreaseB (t, t':timestamp, i:index):
   ( cellB(i)@t' ~< cellB(i)@t ||
     cellB(i)@t' = cellB(i)@t).
 Proof.
-induction t. smt ~steps:89137.
+  induction t. smt ~steps:89137.
 Qed.
 
 
@@ -134,7 +149,7 @@ lemma counterIncreaseStrictSA(i,j1:index, t:timestamp):
     (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@SenderA(i,j1).
 Proof.
-use counterIncreaseA. smt ~steps:18245.
+  use counterIncreaseA. smt ~steps:18245.
 Qed.
 
 lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
@@ -153,7 +168,7 @@ lemma counterIncreaseStrictSB (i,j1:index, t:timestamp):
     (t < SenderB(i,j1) && exec@SenderB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@SenderB(i,j1).
 Proof.
- use counterIncreaseB. smt ~steps:24389.
+  use counterIncreaseB. smt ~steps:24389.
 Qed.
 
 lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
@@ -161,7 +176,7 @@ lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
 Proof.
- use counterIncreaseB. smt ~steps:30898.
+  use counterIncreaseB. smt ~steps:30898.
 Qed.
 
 (* SECURITY PROPERTIES *)
@@ -172,8 +187,6 @@ Qed.
    also proved a lemma regarding counters.
    Moreover, we use this 1st property (authentication) to prove the
    2nd property (injectivity). *)
-
-
 lemma authA (i,j:index) :
   happens(ReceiverA(i,j)) => exec@ReceiverA(i,j) =>
   (exists (j':index),
@@ -214,11 +227,10 @@ lemma injectivity(i,j,j':index) :
   ||
   (fst(fst(input@ReceiverA(i,j))) <> fst(fst(input@ReceiverA(i,j')))
    && snd(snd(fst(input@ReceiverA(i,j)))) <> snd(snd(fst(input@ReceiverA(i,j'))))).
-
 Proof.
-use counterIncreaseStrictSB.
-use authA.
-smt ~steps:66925.  
+  use counterIncreaseStrictSB.
+  use authA.
+  smt ~steps:66925.  
 Qed.
 
 
@@ -231,15 +243,13 @@ lemma injectivityAB(i,j,j':index) :
   ||
   (fst(fst(input@ReceiverA(i,j))) <> fst(fst(input@ReceiverB(i,j')))
    && snd(snd(fst(input@ReceiverA(i,j)))) <> snd(snd(fst(input@ReceiverB(i,j'))))).
-
 Proof.
-use counterIncreaseStrictRB.
-use counterIncreaseStrictRA.
-use authA.
-use authB.
-smt ~prover:CVC5 ~steps:82495.  
- Qed.
-
+  use counterIncreaseStrictRB.
+  use counterIncreaseStrictRA.
+  use authA.
+  use authB.
+  smt ~prover:CVC5 ~steps:82495.
+Qed.
 
 (* 2nd property w.r.t. B and B *)
 (* Similar to the case w.r.t. A and A *)

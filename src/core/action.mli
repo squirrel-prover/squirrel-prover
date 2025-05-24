@@ -178,13 +178,13 @@ type descr = {
   input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
+
   updates   : (Symbols.macro * Term.terms * Term.term) list ;
   (** State updates, at most one per state symbol.
-      [ At timestamps different from [init], (s, args, body) ] represents:
-        [ s@t := λ x. if x = args then body else s(x)@pred(t) ]
-
-        At [init], [args] must be a list of distinct variables [vars], and
-        [ s@init := λ vars. body] *)
+      At timestamps different from [init], [(s, args, body)] defines
+      [ s@t := λ x. if x = args then body else s(x)@pred(t) ].
+      At [init], [args] must be a list of distinct variables [vars], and
+      [ s@init := λ vars. body ]. *)
   
   output    : Channel.t * Term.term;
   globals   : Symbols.macro list;

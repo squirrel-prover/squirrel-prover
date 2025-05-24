@@ -34,3 +34,10 @@ let pp_cmd_error fmt = function
   | InvalidSetOption s   -> Fmt.pf fmt "Set failed: %s." s
 
 let cmd_error e = raise (Cmd_error e)
+
+let () =
+  Errors.register (function
+    | Cmd_error e ->
+        Some { printer =
+          fun _ fmt -> pp_cmd_error fmt e }
+    | _ -> None)

@@ -196,9 +196,11 @@ let rec token buf =
   | "and" -> !?TAND
   | "localize" -> !?LOCALIZE
   | "local" -> !?LOCAL
+  | "lock" -> !?LOCK
   | "memseq" -> !?MEMSEQ
   | "message" -> !?MESSAGE
   | "mutable" -> !?MUTABLE
+  | "mutex" -> !?MUTEX
   | "name" -> !?NAME
   | "namespace" -> !?NAMESPACE
   | "new" -> !?NEW
@@ -246,6 +248,7 @@ let rec token buf =
   | "try" -> !?TRY
   | "type" -> !?TYPE
   | "undo" -> !?UNDO
+  | "unlock" -> !?UNLOCK
   | "use" -> !?USE
   | "var" -> !?VAR
   | "weak" -> !?WEAK

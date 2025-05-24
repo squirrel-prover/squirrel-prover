@@ -40,9 +40,11 @@ mutable s (i:index) : message = s0(i).
 channel o.
 channel c.
 
+mutex lA:1.
+
 system (
    (O: !_j in(o,x); out(o,<H(x,k),G(x,k')>)) |
-   (A: !_i !_j s(i):=H(s(i),k); out(o,G(s(i),k')))
+   (A: !_i !_j lock lA(i); s(i):=H(s(i),k); out(o,G(s(i),k')); unlock lA(i))
 ).
 
 include Core.

@@ -80,6 +80,14 @@ let pp_error pp_loc_err fmt (loc,s) =
     pp_loc_err loc
     s
 
+let () =
+  Errors.register (function
+    | Error e ->
+        Some { printer =
+          fun pp_loc_error fmt -> pp_error pp_loc_error fmt e }
+    | _ -> None)
+
+
 (* Generate new unnamed goal.
    This uses an internal counter and side effects but
    that seems harmless. *)

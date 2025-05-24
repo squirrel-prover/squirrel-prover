@@ -5,17 +5,24 @@ abstract f : message -> message
 mutable s : message = m.
 mutable ho : message->message = f.
 
+mutex ls:0.
+
 process A = 
+        lock ls;
 	s:=m;
-	out(c,s).
+	out(c,s);
+        unlock ls.
 
 process B =
+        lock ls;
 	if s=m then 
 		s:=n;
-		out(c,s) 
+		out(c,s);
+                unlock ls 
 	else 
 		s:=m;
-		out(c,s).
+		out(c,s);
+                unlock ls.
 
 system !_i (A|B).
 

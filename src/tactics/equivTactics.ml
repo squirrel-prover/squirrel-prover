@@ -2483,7 +2483,7 @@ let xor arg (s : ES.t) =
     let data = Symbols.Name { n_fty } in
     Symbols.Name.declare ~approx:true (ES.table s) sym ~data
   in
-  let table = Process.add_namelength_axiom table n n_fty in
+  let table = Lemma.add_namelength_axiom table n n_fty in
 
   let ns = Term.nsymb n Type.tmessage in
   let s = ES.set_table table s in

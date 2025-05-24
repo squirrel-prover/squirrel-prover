@@ -11,6 +11,8 @@ abstract f : message->message
 
 mutable S : message = empty
 
+mutex l : 0.
+
 name n : message
 name m : message
 name k : message
@@ -19,9 +21,9 @@ hash h
 
 channel c
 
-system t1 = !_i if diff(True,False)  then (S:= diff(ok,koo); out(c,diff(S,ko))).
+system t1 = !_i if diff(True,False)  then (lock l; S:= diff(ok,koo); out(c,diff(S,ko)); unlock l).
 
-system t2 = !_i if diff(False,ok=ok) then (S:= diff(koo,ok); out(c,diff(ko,S))).
+system t2 = !_i if diff(False,ok=ok) then (lock l; S:= diff(koo,ok); out(c,diff(ko,S)); unlock l).
 
 
 equiv [t1/left, t2/right] test.

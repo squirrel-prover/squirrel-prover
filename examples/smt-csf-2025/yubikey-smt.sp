@@ -91,11 +91,16 @@ mutable SCpt(i:index): message = myzero.
 channel cT
 channel cR.
 
+mutex lP:1.
+mutex lS:0.
+
 (** When the key is plugged, its counter is incremented. *)
 process yubikeyplug(i:index,j:index) =
   in(cT, x1);
   if x1 = startplug then
+    lock lP(i);
     YCpt(i) := mySucc(YCpt(i));
+    unlock lP(i);
     out(cT,endplug).
 
 (** When the key is pressed, an OTP is sent with the current value of the
@@ -103,8 +108,10 @@ counter and the counter is incremented. *)
 process yubikeypress(i:index,j:index) =
   in(cT,x2);
   if x2 = startpress then
+    lock lP(i);
     let cpt = YCpt(i) in
     YCpt(i) := mySucc(YCpt(i));
+    unlock lP(i);
     out(cT,<pid(i),<nonce(i,j),enc(<sid(i),cpt>,npr(i,j),k(i))>>).
 
 (** When the server receives a message, it checks whether it corresponds
@@ -114,12 +121,16 @@ If so, the value inside the OTP is used to update the database.
 Now, the counter value associated to this token is this new value. *)
 process server(ii:index) =
   in(cR,y1);
+  lock lS;
   try find i such that fst(y1) = pid(i) in
-    (if dec(snd(snd(y1)),k(i)) <> fail
+    if dec(snd(snd(y1)),k(i)) <> fail
         && SCpt(i) ~< snd(dec(snd(snd(y1)),k(i))) = orderOk
     then
       SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
-      out(cR,accept)).
+      out(cR,accept);
+      unlock lS
+    else unlock lS
+  else unlock lS.
 
 (** In the final system, processes can play in parallel an unbounded number
 of sessions. *)

@@ -31,10 +31,21 @@ let pp_error_i fmt = function
   | Expected_pair        -> Fmt.pf fmt "expected a system expression pair"
   | Failure s            -> Fmt.pf fmt "%s" s
 
-let pp_error pp_loc_err_opt fmt (loc,e) =
+let pp_error pp_loc_err fmt (loc,e) =
+  let pp_loc = match loc with
+    | None -> (fun _ _ -> ())
+    | Some l -> (fun fmt () -> pp_loc_err fmt l)
+  in
   Fmt.pf fmt "%aSystem error: %a"
-    pp_loc_err_opt loc
+    pp_loc ()
     pp_error_i e
+
+let () =
+  Errors.register (function
+    | Error e ->
+        Some { printer =
+          fun pp_loc_err fmt -> pp_error pp_loc_err fmt e }
+    | _ -> None)
 
 (*------------------------------------------------------------------*)
 (** {2 System expression variables} *)

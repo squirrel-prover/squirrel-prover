@@ -4,12 +4,15 @@ mutable pre  : message = empty
 mutable s    : message = empty
 mutable post : message = empty
 
+mutex l : 0
+
 abstract v : message
 
 channel c
 
 system
   !_i
+  lock l;
   in(c,x);
 
   let pre_glob = s in
@@ -19,6 +22,7 @@ system
 
   post := <s,x>;
   let post_glob = s in
+  unlock l;
   out(c,s).
 
 (* --------------------------------------------------------- *)

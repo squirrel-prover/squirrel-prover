@@ -25,46 +25,39 @@ process Voter  (v : message) =
   $vote : out (c,  
    (encr diff( if acc then cm, zero) sk_mix seedA_enc1)).
 
-
 process Alice (v:message) = Voter(v)
-
 
 action Avote : 0.
 
 mutable box ( i:index) :  message = zero.
 
-process mixer_vote_collect
-(cmA : message)  
-= 
-!_i ( 
+process mixer_vote_collect (cmA : message) =
+  !_i ( 
     let acc = baccepte cmA (input@Avote) in
     in(c,m);
-    box(i):= 
-      if m = encr diff(if acc then cmA,zero) (sk_mix) seedA_enc1 
-      then (  cmA)
+    box(i) :=
+      if m = encr diff(if acc then cmA,zero) (sk_mix) seedA_enc1
+      then cmA
       else zero
   ).
 
-
 abstract shuffle : (index -> message) -> message.
+
 process mixer_vote_publish =
   let Box = fun i => box i in 
   let commits = shuffle Box in
   out(c,  commits).
-
-
 
 system Foo = 
    in(c,v0) ; 
    V_1 : out(c,zero);
    let cmA = v0 in
    Start  : out(c,empty);
-   ((MVC : mixer_vote_collect (cmA))
-   | (MVP : mixer_vote_publish                      )
-   | (A : Alice(v0) )
- ).
+   ( (MVC : mixer_vote_collect (cmA)) |
+     (MVP : mixer_vote_publish) |
+     (A : Alice(v0)) ).
 
-
+(* -------------------------------------------------------------------- *)
 
 global lemma [Foo] _ (t:_[const]) : [happens(t)] -> equiv(frame@t). 
 Proof. 

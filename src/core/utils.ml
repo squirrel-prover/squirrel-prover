@@ -716,6 +716,11 @@ let pp_list pp_item ppf l =
     Fmt.pf ppf "(@[<hov>%a@])"
       (Fmt.list ~sep pp_item) l
 
+let pp_hashtbl pp_key_value ppf tbl =
+  Hashtbl.iter
+    (fun k v -> pp_key_value ppf k v)
+    tbl
+
 (*------------------------------------------------------------------*)
 let fst3 (a, _, _) = a
 

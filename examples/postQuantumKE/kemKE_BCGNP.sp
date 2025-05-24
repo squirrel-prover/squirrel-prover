@@ -148,7 +148,7 @@ process Responder(j,k:index) =
    (* to express security properties, we already split wether we recevied an honest or malicious key *)
      let ctR = encap(kR(i,j,k), rR(i,j,k), pk(skI(i))) in
      out(cR,ctR);
-
+     in(cR,x);
    (* common derivations *)
      let kI2 = exct(skex,decap(ctI,skR(j)) ) in
      let kR2 = exct(skex,kR(i,j,k)) in
@@ -218,7 +218,7 @@ process Responder2(j,k:index) =
      let ctR = encap(n_CCA(i,j,k), rR(i,j,k), pk(skI(i))) in
      out(cR,ctR);
    (* first key derivation *)
-
+      in(cR,x);
    (* common derivations *)
      let kI2 =
      try find il jl kl such that

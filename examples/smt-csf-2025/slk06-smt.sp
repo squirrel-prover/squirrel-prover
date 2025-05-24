@@ -1,4 +1,5 @@
 (*******************************************************************************
+
 SLK06
 
 T. van Deursen and S. Radomirović, ‘Attacks on RFID Protocols’,
@@ -19,10 +20,11 @@ R -> T : h(ID,PIN)
 
 COMMENTS
 - In this model we use 3 different keyed hash functions, instead of a single
-(not keyed) hash function as in the specification.
+  (unkeyed) hash function as in the specification.
 
 SECURITY PROPERTIES
 - authentication (reader and tag)
+
 *******************************************************************************)
 
 hash h
@@ -53,31 +55,46 @@ mutable TS : message = TSinit
 channel cT
 channel cR
 
+mutex lT:1
+mutex lS:0
+mutex lR:0
+
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
+  lock lT(i);
   in(cR, x1);
   if fst(x1) = h(snd(x1),k) && TSorder(snd(kT(i)),snd(x1)) = TSorderOk then
-    (out(cT, h1(fst(kT(i)),key1(i)));
+    out(cT, h1(fst(kT(i)),key1(i)));
+    unlock lT(i);
+    lock lT(i);
     in(cR, x3);
     if x3 = h2(<fst(kT(i)),pin(i)>,key2(i)) then
-      (kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
-      out(cT, ok))
+      kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
+      out(cT, ok);
+      unlock lT(i)
     else
-      out(cT, error))
+      out(cT, error);
+      unlock lT(i)
   else
-    out(cT, error)
+    out(cT, error);
+    unlock lT(i)
 
 (* jj = generic reader's session *)
 process reader(jj:index) =
+  lock lS;
   TS := TSnext(TS);
   out(cR, <h(TS,k),TS>);
+  unlock lS;
+  lock lR;
   in(cT, x2);
   try find ii such that x2 = h1(kR(ii), key1(ii)) in
     let m = h2(<kR(ii),pin(ii)>,key2(ii)) in
     kR(ii) := h3(<<kR(ii),pin(ii)>,TS>,key3(ii));
-    out(cR, m)
+    out(cR, m);
+    unlock lR
   else
-    out(cR, error)
+    out(cR, error);
+    unlock lR
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 

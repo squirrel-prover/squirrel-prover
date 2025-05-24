@@ -226,6 +226,9 @@ val pp_ne_list :
 val pp_list :
   (Format.formatter -> 'a -> unit) ->
   Format.formatter -> 'a list -> unit
+val pp_hashtbl :
+  (Format.formatter -> 'a -> 'b -> unit) ->
+  Format.formatter -> ('a,'b) Hashtbl.t -> unit
 
 (*------------------------------------------------------------------*)
 val fst3 : 'a * 'b * 'c -> 'a

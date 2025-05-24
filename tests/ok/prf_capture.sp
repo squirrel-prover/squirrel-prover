@@ -35,7 +35,7 @@ Proof.
   fa 1.
   fa 1.
   prf 1.
-  by intro > _ @/kT; apply H. 
+  by intro > _; apply H.
   fresh 1; 1:auto.
   by apply IH. 
 Qed.

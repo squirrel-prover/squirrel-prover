@@ -55,6 +55,7 @@ type symbol_kind =
   | Action
   | Operator   (** abtract and concrete operators *)
   | Macro
+  | Mutex
   | System
   | Process
   | BType      (** type declarations *)
@@ -73,6 +74,7 @@ let pp_symbol_kind fmt = function
   | Action    -> Fmt.pf fmt "action"
   | Operator  -> Fmt.pf fmt "operator"
   | Macro     -> Fmt.pf fmt "macro"
+  | Mutex     -> Fmt.pf fmt "mutex"
   | System    -> Fmt.pf fmt "system"
   | Process   -> Fmt.pf fmt "process"
   | BType     -> Fmt.pf fmt "type"
@@ -121,6 +123,7 @@ type _name
 type _action
 type _fname
 type _macro
+type _mutex
 type _system
 type _process
 type _btype
@@ -165,6 +168,7 @@ type name      = _name      path
 type action    = _action    path
 type fname     = _fname     path
 type macro     = _macro     path
+type mutex     = _mutex     path
 type system    = _system    path
 type process   = _process   path
 type btype     = _btype     path
@@ -300,6 +304,12 @@ let pp_error pp_loc_err fmt (loc,e) =
 exception Error of error
 
 let symb_err l e = raise (Error (l,e))
+
+let () =
+  Errors.register (function
+    | Error e -> Some { printer =
+      fun pp_loc_error fmt -> pp_error pp_loc_error fmt e }
+    | _ -> None)
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol tables} *)
@@ -819,6 +829,12 @@ end)
 module Macro = Make (struct
   type ns   = _macro
   let kind  = Macro
+  let group = symbol_group
+end)
+
+module Mutex = Make (struct
+  type ns   = _mutex
+  let kind  = Mutex
   let group = symbol_group
 end)
 

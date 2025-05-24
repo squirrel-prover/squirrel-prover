@@ -40,6 +40,16 @@ val mem_global : Symbols.p_path -> Symbols.table -> bool
 val pp_kind : [`Axiom | `Lemma] formatter
 
 (*------------------------------------------------------------------*)
+(** {2 Namelength } *)
+
+(** Add a name length axiom (in the current scope) named using [name] 
+    for symbol [n] with type [ftype], provided that the type 
+    is [Name_fixed_length]. *)
+val add_namelength_axiom : 
+  ?loc:Location.t -> Symbols.table -> Symbols.name -> Type.ftype ->
+  Symbols.table
+
+(*------------------------------------------------------------------*)
 (** {2 Depends, Mutex } *)
 
 (** Add to the symbol table the sequential dependencies and mutual

@@ -3,22 +3,32 @@ channel c.
 
 mutable s = empty.
 
+mutex m:0.
+
 process P =
-  X:in(c,x);
+  X:
+  lock m;
+  in(c,x);
   let a = <x,s> in
   s := <x,<a,s>>;
   out(c,<x,<a,s>>);
+  unlock m;
 
-  Y: in(c,y);
+  Y:
+  lock m;
+  in(c,y);
   s := <x,<y,<a,s>>>;
   let b = <x,<y,<a,s>>> in
-
   out(c,<x,<y,<<a,s>,b>>>);
+  unlock m;
 
-  Z: in(c,z);
+  Z:
+  lock m;
+  in(c,z);
   let d = <x,<y,<z,<<a,s>,b>>>> in
   s := <x,<y,<z,<<a,s>,<b,d>>>>>;
-  out(c,<x,<y,<z,<<a,s>,<b,d>>>>>).
+  out(c,<x,<y,<z,<<a,s>,<b,d>>>>>);
+  unlock m.
 
 system [postquantum] PQ = !_i P.
 

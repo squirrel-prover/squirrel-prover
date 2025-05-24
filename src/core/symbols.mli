@@ -51,6 +51,7 @@ type symbol_kind =
   | Action
   | Operator   (** abtract and concrete operators *)
   | Macro
+  | Mutex
   | System
   | Process
   | BType      (** type declarations *)
@@ -71,6 +72,9 @@ val pp_symbol_kind : symbol_kind formatter
     symbols with the same name can exist in different symbol kind
     groups. *)
 type group
+
+val symbol_group : group
+val namespace_group : group
 
 val group_to_string : group -> string
 
@@ -97,6 +101,7 @@ type _name
 type _action
 type _fname
 type _macro
+type _mutex
 type _system
 type _process
 type _btype
@@ -133,6 +138,7 @@ type name      = _name      path
 type action    = _action    path
 type fname     = _fname     path
 type macro     = _macro     path
+type mutex     = _mutex     path
 type system    = _system    path
 type process   = _process   path
 type btype     = _btype     path
@@ -301,6 +307,7 @@ module Import    : SymbolKind with type ns = _import
 module Predicate : SymbolKind with type ns = _predicate
 module Operator  : SymbolKind with type ns = _fname
 module Macro     : SymbolKind with type ns = _macro
+module Mutex     : SymbolKind with type ns = _mutex
 module Name      : SymbolKind with type ns = _name
 module Namespace : SymbolKind with type ns = _namespace
 
