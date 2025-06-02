@@ -2847,7 +2847,7 @@ let rec deduce
     (* if that fails, decompose [term] through the Function Application
        rule, and recurse. *)
     deduce_fa ~output ~inputs st minfos
-
+      
 (** Check if [inputs ▷ output] using the function application rules. 
     See [deduce] for the precise semantics of [inputs ▷ output]. *)
 and deduce_fa

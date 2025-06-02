@@ -760,9 +760,15 @@ let fa_select_felems ~ienv (pat : Term.term Term.pat_op) (s : ES.t) : int option
 (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (*------------------------------------------------------------------*)
-exception No_FA of [`HeadDiff | `HeadNoFun]
+exception No_FA of [`HeadDiff | `HeadNoFun | `QuantumFun of string]
 
-let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
+
+(* Tries to do function application on the term [t]. With
+   [allow_subgoals], it supports post-quantum function applications
+   which can create freshness subgoals, w.r.t. to terms in
+   [context_terms].
+*)
+let fa_expand ~allow_subgoals ~(context_terms : Term.terms) (s : ES.t) (t : Term.t) : Term.terms * Term.terms =
   let env = ES.env s in
   let is_deducible_vars (l : Term.terms) : bool =
     List.for_all (fun t ->
@@ -770,7 +776,7 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
         HighTerm.is_ptime_deducible ~si:true env t
       ) l
   in
-  let l =
+  let new_els, subgoals =
     let system_pair =
       let system = ES.system s in
       { system with set = (oget system.pair :> SE.t); }
@@ -779,22 +785,56 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
     let st = ES.Reduce.to_state ~system:system_pair red_param s in
     match fst @@ Reduction.whnf_term st t with
     | Tuple l ->
-      if is_deducible_vars l then [] else l
+      if is_deducible_vars l then [], [] else l, []
 
     (* use [tf] to check that the function symbol is pptime computable. *)
     | Fun _ as tf -> 
-      if HighTerm.is_ptime_deducible ~si:true env tf then [] else 
+      if HighTerm.is_ptime_deducible ~si:true env tf then [], [] else 
         raise (No_FA `HeadNoFun)
 
-    | App (Fun _ as tf, [Tuple l]) 
-    | App (Fun _ as tf, l) -> 
-      let l = if is_deducible_vars l then [] else l in
-      let tf = if HighTerm.is_ptime_deducible ~si:true env tf then [] else [tf] in
-      tf @ l
+    | App (Fun (_,fty) as tf, [Tuple l]) 
+    | App (Fun (_,fty) as tf, l) ->
+      (* we check if there is quantum type only in the applied_ftype,
+         otherwise, we will reject fa over any polymorph operator. *)
+      if Type.is_classical_type (Term.apply_ftype fty.fty fty.ty_args) then
+        let l = if is_deducible_vars l then [] else l in
+        let tf = if HighTerm.is_ptime_deducible ~si:true env tf then [] else [tf] in
+        tf @ l, []
+      else
+        begin
+      if not(TConfig.post_quantum_equivs (env.table)) then
+        raise (No_FA (`QuantumFun
+                        (Fmt.str "the head symbol function might be of \
+                                  quantum type %a, but the current \
+                                  equivalence is for a classical \
+                                  attacker"
+            Type.pp (Term.apply_ftype fty.fty fty.ty_args))
+                     ));
 
-    | Proj (_,t) -> if is_deducible_vars [t] then [] else [t]
+      (* block if we can't create subgoals, e.g. for fa_dup *)      
+      if not(allow_subgoals) then raise (No_FA (`QuantumFun ""));
+      
+        (* Here, we are in a quantum equivalence, and looking at a
+             function symbol which is not classical type, the only one
+             we know how to manage is qatt. *)
+        let nmeasure, frame = match (tf, l) with
+          | (Fun (sf,_), [Name _ as nmeasure; frame]) when sf = Symbols.fs_qatt
+            -> nmeasure, frame
+          | _ -> Printer.prt `Default "%a" Term.pp tf;
+            Printer.prt `Default "%a" (Utils.pp_list Term.pp) l;
+            raise (No_FA (`QuantumFun "the only quantum function \
+                                            symbol managed by FA is \
+                                            qatt."))
+        in
 
-    | App (t,l) -> if is_deducible_vars (t :: l) then [] else t :: l
+        let phi_fresh =
+          Fresh.phi_fresh_pair ~use_path_cond:false s nmeasure @@ frame::context_terms
+        in
+        [frame], phi_fresh
+    end
+    | Proj (_,t) -> if is_deducible_vars [t] then ([], []) else [t], []
+
+    | App (t,l) -> if is_deducible_vars (t :: l) then [], [] else t :: l, []
 
     | Diff _      -> raise (No_FA `HeadDiff)
     | _           -> raise (No_FA `HeadNoFun)
@@ -803,7 +843,7 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
   List.map (function
       | Term.App (Term.Fun (f,_),[c]) when f = Term.f_of_bool -> c
       | x -> x
-    ) l
+    ) new_els, subgoals
 
 (*------------------------------------------------------------------*)
 let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
@@ -820,8 +860,21 @@ let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
                    finite and of fixed-sized: %a" Vars.pp_list bad_vars))
 
 (** Applies Function Application on a given frame element *)
-let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
+let do_fa_felem (i : int L.located) (s : ES.t) : ES.t * (ES.t list) =
   let before, e, after = split_equiv_conclusion i s in
+
+  let mk_freshness_sequent (phi_fresh : Term.terms) =
+    if phi_fresh = [] then [] else
+    let env = ES.env s in  
+    let system = ((Utils.oget env.system.pair) :> SE.fset) in
+    let phi = Term.mk_ands ~simpl:true phi_fresh in
+    [ES.set_conclusion_in_context
+      {env.system with set = (system :> SE.arbitrary); }
+      (Equiv.mk_reach_atom phi)
+      s]
+  in
+
+  
   (* Special case for try find, otherwise we use fa_expand *)
   match e with
   | Find (vars,c,t,e) ->
@@ -844,32 +897,44 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
 
     let c_seq = Term.mk_lambda vars c in
     let biframe = List.rev_append before ([ c_seq ; t ; e ] @ after) in
-    ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s)
+    ES.set_vars !env (ES.set_equiv_conclusion {terms = biframe; bound = None} s),
+    []
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   | Quant ((Seq | Lambda),vars,t) ->
     (* this rules applies to [Seq] and [Lambda] over arbitrary types *)
-    let terms = fa_expand s t in
+    let terms, phi_fresh = fa_expand ~allow_subgoals:true ~context_terms:(before@after) s t in
     let biframe =
       List.rev_append
         before
         ((List.map (fun t' -> Term.mk_lambda ~simpl:true vars t') terms) @ after)
     in
-    ES.set_equiv_conclusion {terms = biframe; bound = None} s
+
+    ES.set_equiv_conclusion {terms = biframe; bound = None} s,
+    mk_freshness_sequent phi_fresh
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
   | _ ->
-    let biframe = List.rev_append before (fa_expand s e @ after) in
-    ES.set_equiv_conclusion {terms = biframe; bound = None} s
+    let terms, phi_fresh = fa_expand ~allow_subgoals:true ~context_terms:(before@after) s e in    
+    let biframe = List.rev_append before
+        (terms @ after) in
+    ES.set_equiv_conclusion {terms = biframe; bound = None} s,
+    mk_freshness_sequent phi_fresh
+      
 (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
 (** [do_fa_felem] with user-level errors *)
 let fa_felem (i : int L.located) (s : ES.t) : ES.t list =
-  try [do_fa_felem i s] with
+  try
+    let main_goal, subgoals = do_fa_felem i s in
+    subgoals @ [main_goal]
+  with
   | No_FA `HeadDiff ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "No common construct")
   | No_FA `HeadNoFun ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
+  | No_FA (`QuantumFun s) ->
+    soft_failure ~loc:(L.loc i) (Tactics.Failure ("Quantum FA not applicable : "^s))            
 
 let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
 
@@ -907,7 +972,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     (L.loc tpat, pat)
   in
 
-  let rec do1 (s : ES.t) (mult, arg_pat : Args.fa_arg) : ES.t =
+  let rec do1 (s, subgoals : ES.t * (ES.t list) ) (mult, arg_pat : Args.fa_arg) : ES.t * (ES.t list) =
     (* Create a new type unification environement.
        Remark: we will never close it, as it is only used to selection a
        matching element in the bi-frame. *)
@@ -916,30 +981,33 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     (* parse the function  *)
     let loc, pat = parse_fa_arg_pat ienv arg_pat in
 
-    if mult = Args.Exact 0 then s else
+    if mult = Args.Exact 0 then (s, subgoals) else
       match fa_select_felems ~ienv pat s with
       | None -> 
         if mult = Args.Any 
-        then s
+        then (s, subgoals)
         else soft_failure ~loc (Failure "FA not applicable")
 
       | Some i ->
         (* useless loc, as we know [i] is in range *)
         let i = L.mk_loc L._dummy i in
 
-        let s =
+        let s, new_subgoals =
           try do_fa_felem i s with
           | No_FA _ ->
             soft_failure ~loc (Failure "bad FA pattern")
         in
         match mult with
-        | Args.Once | Args.Exact 1 -> s
+        | Args.Once | Args.Exact 1 -> s, new_subgoals @ subgoals
 
-        | Args.Any | Args.Many -> do1 s (Args.Any, arg_pat)
+        | Args.Any | Args.Many -> do1 (s, new_subgoals @ subgoals) (Args.Any, arg_pat)
 
-        | Args.Exact i -> do1 s (Args.Exact (i - 1), arg_pat)
+        | Args.Exact i -> do1 (s, new_subgoals @ subgoals)  (Args.Exact (i - 1), arg_pat)
   in
-  [List.fold_left do1 s args]
+  let main_goal, subgoals =
+    List.fold_left do1 (s,[]) args
+  in
+  subgoals @ [main_goal]
 
 let fa_tac args = match args with
   | [Args.Fa [Once, { pl_desc = Int i}]] -> wrap_fail (fa_felem i)
@@ -957,6 +1025,8 @@ let fa_tac args = match args with
 let is_dup
     (s : ES.t) (elem  : Term.term) (elems : Term.term list) : bool 
   =
+  if not(Type.is_classical_type @@ Term.ty elem) then false
+  else
   let system =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
@@ -1007,6 +1077,11 @@ let is_dup
           | _ -> false
         ) elems
 
+    (* specific case notably to handle qatt, here we may have a
+       classical term, which is obtained from the projection of a qatt
+       appearing somewhere else. *)    
+    | Proj (_, t) -> List.exists (eq t) elems
+        
     | _ -> false
   end
 
@@ -1032,7 +1107,7 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
       (* otherwise, we go recursively inside the sub-terms produced by function
          application *)
     else try
-        let new_els = fa_expand s e in
+        let new_els, _ = fa_expand ~allow_subgoals:false ~context_terms:[] s e in
         List.fold_left
           (fun (aux1,aux2) e ->
              let (fa_succ,fa_rem) = is_fa_dup elems e in
@@ -1099,6 +1174,15 @@ let filter_deduce
     match to_filter with
     | [] -> List.rev result
     | e :: to_filter0 ->
+      (*
+        We do not eliminate any quantum element from the frame.
+         
+        TODO: this is probably insuficient to be sound, one should
+        work on Match.deduce, but if we disallow to deduce polymorphic
+        elements, we loose some deduce lemmas.  *)
+      if not(Type.is_classical_type (Term.ty e)) then
+        doit (e :: result) to_filter0
+      else
       let inputs = result @ to_filter0 @ knows in (* without [e] *)
       let match_result = 
         Match.deduce_terms ~outputs:[e] ~inputs st

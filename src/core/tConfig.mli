@@ -66,6 +66,9 @@ val new_ind : Symbols.table -> bool
 (** Post-quantum soundness. *)
 val post_quantum : Symbols.table -> bool
 
+(** All equivs become PQ. *)
+val post_quantum_equivs : Symbols.table -> bool
+
 (** Verbose mode for crypto tactic *)
 val verbose_crypto : Symbols.table -> bool
 

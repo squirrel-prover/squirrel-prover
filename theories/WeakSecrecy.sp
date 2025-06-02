@@ -106,6 +106,8 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Equiv *)
+(*
+TODO: manage in the PQ setting. 
 
 global lemma [set: none/left; equiv:none/left,none/left] 
   RwEquiv ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
@@ -151,7 +153,7 @@ Proof.
   auto.
 Qed.
 
-
+*)
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Oracle *)
 

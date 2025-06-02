@@ -131,12 +131,20 @@ val tmeasure_rnd     : ty
 val tint             : ty
 val tstring          : ty
 
+
 (*------------------------------------------------------------------*)
 val univar : univar                -> ty
 val tvar   : tvar                  -> ty
 val func   : ty          -> ty     -> ty
 val fun_l  : ty list     -> ty     -> ty
 val tuple  : ty list     -> ty
+
+(* Check if a type cannot be quantum *)
+val is_classical_type : ty -> bool
+
+(* Check if a type is explicitely quantum, i.e. directly depends on a
+   base quantum type, and not just through variables.  *)
+val is_quantum_type : ty -> bool
 
 (*------------------------------------------------------------------*)  
 (** If [decompose_funs t = (targs, tout)] then:
@@ -178,7 +186,7 @@ val ftype_fv : ftype -> Fv.t
  
 (*------------------------------------------------------------------*)
 val mk_ftype : 'a list -> ty list -> ty -> 'a ftype_g
-
+  
 (** Declare a function of arity one (all arguments are grouped 
     into a tuple). *)
 val mk_ftype_tuple : tvar list -> ty list -> ty -> ftype

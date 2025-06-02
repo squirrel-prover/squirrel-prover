@@ -239,6 +239,46 @@ let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
 
 (*------------------------------------------------------------------*)
 (** {2 Fresh equiv tactic} *)
+           
+(** For a term [n] and terms [biframe], computes a list of formulas
+    whose conjunction expresses that [n] is fresh in [biframe] and
+    [n.args], after projecting on both projections of the system.  *)
+let phi_fresh_pair
+    ~(use_path_cond : bool)
+    ?(loc  = L._dummy )
+    (s : ES.sequent)     
+    (t       : Term.term)
+    (biframe      : Term.terms)
+  =
+  let env = ES.env s in
+  let system = ((Utils.oget env.system.pair) :> SE.fset) in
+
+  if (ES.conclusion_as_equiv s).bound <> None then 
+    soft_failure 
+      (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
+
+  (* compute the freshness conditions *)
+  let phi_fresh_proj proj =
+    let se = SE.project [proj] system in
+    let system = {env.system with set=(se :> SE.arbitrary)} in
+    let context = ES.proof_context ~in_system:system s in
+
+    phi_fresh_proj
+      ~use_path_cond ~loc
+      context
+      t biframe proj
+  in
+  let proj_l, proj_r = ES.get_system_pair_projs s in  
+  Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
+  let phi_l = phi_fresh_proj proj_l in
+  Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
+  let phi_r = phi_fresh_proj proj_r in
+  Printer.pr "@]@]@;";
+
+  (* Removing duplicates. We already did that for occurrences, but
+     only within [phi_l] and [phi_r], not across both *)
+  List.remove_duplicate (ES.Reduce.conv_term s) (phi_l @ phi_r)
+
 
 (** Constructs the sequent where goal [i], when of the form [diff(n_l, n_r)],
     is removed, and an additional proof obligation [phi] is created,
@@ -249,48 +289,22 @@ let fresh_equiv
   : ES.sequents 
   =
   let use_path_cond = p_fresh_arg opt_args in
-  let loc = L.loc i in
-
-  let env = ES.env s in
-  let proj_l, proj_r = ES.get_system_pair_projs s in
-  let system = ((Utils.oget env.system.pair) :> SE.fset) in
-  
-  if (ES.conclusion_as_equiv s).bound <> None then 
-    soft_failure 
-      (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
+  let loc = L.loc i in 
 
   let before, t, after = split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
 
-  (* compute the freshness conditions *)
-  let phi_fresh_proj proj =
-    let se = SE.project [proj] system in
-    let system = {env.system with set=(se :> SE.arbitrary)} in
-    let context = ES.proof_context ~in_system:system s in   
-
-    phi_fresh_proj
-      ~use_path_cond ~loc
-      context
-      t biframe proj
-  in
-  Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
-  let phi_l = phi_fresh_proj proj_l in
-  Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
-  let phi_r = phi_fresh_proj proj_r in
-  Printer.pr "@]@]@;";
-
-  (* Removing duplicates. We already did that for occurrences, but
-     only within [phi_l] and [phi_r], not across both *)
-  let phis =
-    List.remove_duplicate (ES.Reduce.conv_term s) (phi_l @ phi_r)
-  in
+  let phis = phi_fresh_pair ~use_path_cond ~loc s t biframe in
 
   let phi = Term.mk_ands ~simpl:true phis in
+  
   let new_biframe = List.rev_append before after in
 
   (* the sequent for the new proof obligation. *)
   (* TODO: here we ask to prove phi_l & phi_r on [left, right].
      It would be more precise to have diff(phi_l, phi_r). *)
+  let env = ES.env s in
+  let system = ((Utils.oget env.system.pair) :> SE.fset) in
 
   let freshness_sequent =
     ES.set_conclusion_in_context

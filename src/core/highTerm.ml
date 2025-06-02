@@ -42,6 +42,10 @@ type tags = {
   (** [t] is computable in ptime by an adversary with no direct access
       to the protocol randomness *)
 
+  qadv     : bool;
+  (** [t] is computable in quantum ptime by an adversary with no direct access
+      to the protocol randomness *)  
+
   si      : bool; 
   (** [t] system-independent, i.e. its semantics does not change when
       the system does *)
@@ -57,12 +61,13 @@ type tags = {
 let mk_tags
   ?(const   = false)
   ?(adv     = false)
+  ?(qadv    = false)  
   ?(si      = false)
   ?(det     = false)
   ?(no_diff = false)
   ()
   =
-  { const ; adv ; si ; det; no_diff; }
+  { const ; qadv ; adv ; si ; det; no_diff; }
 
 let to_vars_tags (tags : tags) : Vars.Tag.t =
   { const        = tags.const ;
@@ -73,6 +78,7 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
   {
     const   = tags1.const   && tags2.const   ;
     adv     = tags1.adv     && tags2.adv     ;
+    qadv     = tags1.qadv     && tags2.qadv     ;    
     si      = tags1.si      && tags2.si      ;
     det     = tags1.det     && tags2.det     ;
     no_diff = tags1.no_diff && tags2.no_diff ;
@@ -84,7 +90,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
   let rec doit_subterms (env : Env.t) (t : Term.term) : tags =
     Term.tfold
       (fun term tag -> merge_tags tag (doit env term))
-      t { const = true; adv = true; si = true; det = true; no_diff = true; }
+      t { const = true; adv = true; qadv = true; si = true; det = true; no_diff = true; }
 
   and doit (env : Env.t) (t : Term.term) : tags =
     match t with
@@ -92,6 +98,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       {
         const   = true ;
         adv     = true ;
+        qadv    = true ;        
         si      = true ;
         no_diff = true ;
         det     = true ;
@@ -111,6 +118,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       {
         const   = info.const        ;
         adv     = adv               ;
+        qadv    = adv ;                
         si      = info.system_indep ;
         no_diff = true              ;
         det     = info.const        ;
@@ -124,15 +132,25 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
     (* TODO: multi-terms: once macros are decorated by system
        expressions, this needs to change *)
 
-    | Fun (f,_) -> 
-      let is_att = f = Symbols.fs_att || f = Symbols.fs_qatt in
+    | Fun (f,afty) -> 
+      let is_att = f = Symbols.fs_att in
+      let is_qatt = f = Symbols.fs_qatt in
       let is_si = Operator.is_system_indep env.table f in
+      let is_classical_fun =
+        Type.is_classical_type @@
+          apply_ftype afty.fty afty.ty_args
+      in
       {
-        const   = not is_att ;
-        adv     = true       ;
+        const   = not (is_att || is_qatt);
+        adv     = not (is_qatt)  && is_classical_fun;
+        (* all functions BUT qatt are assumed to be adv over explicit
+           types. Indeed, currently, we do not allow declaring user
+           defined quantum functions.  To note, the first check is
+           redundant, with the is_classical_fun test. *)
+        qadv    = true       ;
         si      = is_si      ;
         no_diff = true       ;
-        det     = not is_att ;
+        det     = not (is_att || is_qatt) ;
       }
 
     | Find (vs, _, _, _) | Quant (_,vs,_) ->

@@ -1295,6 +1295,13 @@ let parse_fun_decls
         match fdecl.body with
         | `Abstract (in_tys, out_ty) ->       (* abstract declaration *)
           let in_tys = List.map Vars.ty fdecl.pdecl.args @ in_tys in
+
+          if List.exists Type.is_quantum_type @@ out_ty :: in_tys then
+            error loc KDecl
+              (Failure "Cannot declare an abstract function depending on \
+                        a quantum type, all abstract are assumed to be \
+                        adv, and not qadv.");
+
           let table, _ =
             Typing.declare_abstract table
               ~ty_args:ty_vars ~in_tys ~out_ty

@@ -102,6 +102,9 @@ let v_new_ind = Param_bool false
 let s_post_quantum = "postQuantumSound"
 let v_post_quantum = Param_bool false
 
+let s_post_quantum_equivs = "postQuantumEquivs"
+let v_post_quantum_equivs = Param_bool false
+
 let s_prettyprint_reify = "prettyPrintReify"
 let v_prettyprint_reify = Param_bool true
 
@@ -132,6 +135,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_auto_fadup            v_auto_fadup
   |> declare s_new_ind               v_new_ind
   |> declare s_post_quantum          v_post_quantum
+  |> declare s_post_quantum_equivs   v_post_quantum_equivs    
   |> declare s_verbose_crypto        v_verbose_crypto
   |> declare s_log_unsat_crypto      v_log_unsat_crypto
   |> declare s_log_mem_crypto        v_log_mem_crypto
@@ -177,6 +181,7 @@ let show_strengthened_hyp   = get_bool   s_show_strengthened_hyp
 let auto_fadup              = get_bool   s_auto_fadup
 let new_ind                 = get_bool   s_new_ind
 let post_quantum            = get_bool   s_post_quantum
+let post_quantum_equivs     = get_bool   s_post_quantum_equivs
 let verbose_crypto          = get_bool   s_verbose_crypto
 let log_unsat_crypto        = get_string s_log_unsat_crypto
 let log_mem_crypto          = get_string s_log_mem_crypto
