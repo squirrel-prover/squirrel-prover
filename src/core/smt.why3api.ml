@@ -18,8 +18,18 @@ type timestamp_style =
 let start_timer () =
   let t0 = Unix.gettimeofday () in
   fun () -> Unix.gettimeofday () -. t0
+
+(* If we are running in JS, we disable smt. *)
+let disable_smt =  
+  let exec_dir = Filename.dirname Sys.executable_name in
+  Format.eprintf "Folder test %s" exec_dir;
+  exec_dir = "."
     
-let config = Why3.Whyconf.init_config None
+let config =
+  if disable_smt then
+    Why3.Whyconf.read_config (Some "")
+  else
+    Why3.Whyconf.init_config None
 
 let main = Why3.Whyconf.get_main config
 
@@ -1453,6 +1463,10 @@ let is_valid
     ~timestamp_style ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   =
+  if disable_smt then
+      (Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
+       false)
+  else
   let theory = match load_theory ~timestamp_style env with
     | Some theory -> theory
     | None -> raise InternalError
@@ -1461,7 +1475,7 @@ let is_valid
     ~timestamp_style
     table system
     evars hypotheses conclusion
-    theory 
+    theory
   in
   begin match Sys.getenv_opt "SMT_VERBOSE" with
     | None -> ()
@@ -1511,7 +1525,9 @@ type parameters = {
   steps : int option;
   provers : (string*string) list
 }
-let default_prover = 
+let default_prover =
+  if disable_smt then []
+  else
   let l = (List.map 
     (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern)) 
     (Why3.Whyconf.Mprover.keys why3_provers)
@@ -1524,7 +1540,7 @@ let default_prover =
       else if (List.mem ("Z3","") l) then 
         ["Z3",""]
       else [List.hd l]
-  
+           
 let default_parameters = {
   timestamp_style = Nat;
   timeout = 1;
@@ -1590,113 +1606,119 @@ let parse_args args =
   List.fold_left parse_arg default_parameters args
 
 let () =
-  ProverTactics.register_general "smt" ~pq_sound:true
-    (fun args s sk fk ->
-      let args = match args with
-        | [Named_args_gen args] -> args 
-        | _ -> assert false
-      in
-      let s = match s with
-        | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
-        | Goal.Local s -> s
-      in
-      let {timestamp_style;timeout;steps;provers} = 
-        parse_args args 
-      in if
-        sequent_is_valid
-          ~timestamp_style ~timeout ~steps ~provers s
-       then
-          sk [] fk
-       else
-          fk (None, Tactics.Failure "SMT cannot prove sequent"))
+  if not disable_smt then
+    begin
+      ProverTactics.register_general "smt" ~pq_sound:true
+        (fun args s sk fk ->
+           let args = match args with
+             | [Named_args_gen args] -> args 
+             | _ -> assert false
+           in
+           let s = match s with
+             | Goal.Global _ -> Tactics.(hard_failure (Failure "SMT not available"))
+             | Goal.Local s -> s
+           in
+           let {timestamp_style;timeout;steps;provers} = 
+             parse_args args 
+           in if
+             sequent_is_valid
+               ~timestamp_style ~timeout ~steps ~provers s
+           then
+             sk [] fk
+           else
+             fk (None, Tactics.Failure "SMT cannot prove sequent"))
+    end
 
 let () =
-  let provers = match Sys.getenv_opt "SMT_PROVERS" with
-    | None -> ["CVC5",""]
-    | Some s when s="All" ->
-      List.filter 
-        (fun (name,_) -> name<>"CVC4") 
-        (List.map 
-        (fun p ->
-          Why3.Whyconf.(p.prover_name,p.prover_altern)) 
-        (Why3.Whyconf.Mprover.keys why3_provers)
-        )
-    | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
-  in
-  let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with
-    | Some "AbsNoEq" -> Abstract
-    | Some "Abs" -> Abstract_eq
-    | Some "Nat" | Some "" | None -> Nat
-    | _ ->
-      Format.eprintf "Unknown timestamp style!@.";
-      Format.eprintf "If set and non-empty, \
-                      SMT_STYLE must be Nat, Abs, or AbsNoEq.@.";
-      exit 1
-  in
-  let benchmarks =
-    match Sys.getenv_opt "SMT_BENCHMARKS" with
-    | None -> []
-    | Some s -> String.split_on_char ':' s
-  in
-  let bench_name prover alt =
-    let alt = if alt = "" then alt else "_" ^ alt in
-    Format.sprintf "SMT_%s%s" prover alt
-  in
-  if List.mem "constr" benchmarks then
-    List.iter
-      (fun (prover,alt) ->
-         TraceSequent.register_query_alternative
-           (bench_name prover alt)
-           (fun ~system:_ ~precise:_ s q ->
-              let s =
-                match q with
-                | None -> s
-                | Some q ->
-                  let conclusion = Term.mk_ands q in
-                  TraceSequent.set_conclusion conclusion s
-              in
-              sequent_is_valid
-                ~timestamp_style
-                ~timeout:10
-                ~steps:None
-                ~provers:[prover,alt]
-                s))
-      provers;
-  if List.mem "autosimpl" benchmarks then
-    List.iter
-      (fun (prover,alt) ->
-         TraceTactics.AutoSimplBenchmark.register_alternative
-           (bench_name prover alt)
-           (fun s ->
-              sequent_is_valid
-                ~timestamp_style
-                ~timeout:10
-                ~steps:None
-                ~provers:[prover,alt]
-                s,
-              None);
-          TraceTactics.AutoSimplBenchmark.register_alternative
-            ("AutoSimpl")
-            (fun s -> 
-              match TraceTactics.simpl_direct 
-                ~red_param:Reduction.rp_default 
-                ~strong:true ~close:true s 
-              with
-                | Ok [] -> true,None
-                | Error _ -> false,None
-                | Ok _ -> assert false)
-              )
-      provers;
-  if List.mem "auto" benchmarks then
-    List.iter
-      (fun (prover,alt) ->
-         TraceTactics.AutoBenchmark.register_alternative
-           (bench_name prover alt)
-           (fun (_,s) ->
-              sequent_is_valid
-                ~timestamp_style
-                ~timeout:10
-                ~steps:None
-                ~provers:[prover,alt]
-                s))
-      provers
+  if not disable_smt then
+    begin
+      let provers = match Sys.getenv_opt "SMT_PROVERS" with
+        | None -> ["CVC5",""]
+        | Some s when s="All" ->
+          List.filter 
+            (fun (name,_) -> name<>"CVC4") 
+            (List.map 
+               (fun p ->
+                  Why3.Whyconf.(p.prover_name,p.prover_altern)) 
+               (Why3.Whyconf.Mprover.keys why3_provers)
+            )
+        | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
+      in
+      let timestamp_style = match Sys.getenv_opt "SMT_STYLE" with
+        | Some "AbsNoEq" -> Abstract
+        | Some "Abs" -> Abstract_eq
+        | Some "Nat" | Some "" | None -> Nat
+        | _ ->
+          Format.eprintf "Unknown timestamp style!@.";
+          Format.eprintf "If set and non-empty, \
+                          SMT_STYLE must be Nat, Abs, or AbsNoEq.@.";
+          exit 1
+      in
+      let benchmarks =
+        match Sys.getenv_opt "SMT_BENCHMARKS" with
+        | None -> []
+        | Some s -> String.split_on_char ':' s
+      in
+      let bench_name prover alt =
+        let alt = if alt = "" then alt else "_" ^ alt in
+        Format.sprintf "SMT_%s%s" prover alt
+      in
+      if List.mem "constr" benchmarks then
+        List.iter
+          (fun (prover,alt) ->
+             TraceSequent.register_query_alternative
+               (bench_name prover alt)
+               (fun ~system:_ ~precise:_ s q ->
+                  let s =
+                    match q with
+                    | None -> s
+                    | Some q ->
+                      let conclusion = Term.mk_ands q in
+                      TraceSequent.set_conclusion conclusion s
+                  in
+                  sequent_is_valid
+                    ~timestamp_style
+                    ~timeout:10
+                    ~steps:None
+                    ~provers:[prover,alt]
+                    s))
+          provers;
+      if List.mem "autosimpl" benchmarks then
+        List.iter
+          (fun (prover,alt) ->
+             TraceTactics.AutoSimplBenchmark.register_alternative
+               (bench_name prover alt)
+               (fun s ->
+                  sequent_is_valid
+                    ~timestamp_style
+                    ~timeout:10
+                    ~steps:None
+                    ~provers:[prover,alt]
+                    s,
+                  None);
+             TraceTactics.AutoSimplBenchmark.register_alternative
+               ("AutoSimpl")
+               (fun s -> 
+                  match TraceTactics.simpl_direct 
+                          ~red_param:Reduction.rp_default 
+                          ~strong:true ~close:true s 
+                  with
+                  | Ok [] -> true,None
+                  | Error _ -> false,None
+                  | Ok _ -> assert false)
+          )
+          provers;
+      if List.mem "auto" benchmarks then
+        List.iter
+          (fun (prover,alt) ->
+             TraceTactics.AutoBenchmark.register_alternative
+               (bench_name prover alt)
+               (fun (_,s) ->
+                  sequent_is_valid
+                    ~timestamp_style
+                    ~timeout:10
+                    ~steps:None
+                    ~provers:[prover,alt]
+                    s))
+          provers
+    end
