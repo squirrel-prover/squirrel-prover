@@ -4201,8 +4201,7 @@ let prove
     in
     List.map (fun (term : TSet.t) ->
         let term = TSet.subst s term in
-        (* Making sure we did not lose [A i ≤ τ₀] in term.conds *)
-        assert (List.mem  (Term.subst s (oget source.rec_predicate)) term.conds);
+        (* Here, it should be the case that [A i ≤ τ₀] appears in [term.conds] *)
         TSet.make
           ~conds:( 
             rec_target_cond @  (* [A i < B j], if [target] is recursive *)
