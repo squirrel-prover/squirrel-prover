@@ -136,12 +136,10 @@ let exec_sentence ?(check=`Check) s : bool * string =
     prover_stack := Some (
       push {ps= (get_state_or_fail ()); output= get_goal_print ()});
     (true,info)
-  with e -> 
+  with e ->
+  let pp_loc_error = Driver.pp_loc_error  (Driver.from_string s) in    
     Printer.prthtml `Error "Exec failed: %a"
-      (Errors.pp_toplevel_error ~test:false         
-         (Driver.from_string s)
-         (Prover.get_table (get_state_or_fail ()))
-      ) e;
+      (Errors.pp_user_error pp_loc_error) e;
     (false,
      (* return the exception info as string *)
      Format.flush_str_formatter ())
@@ -152,10 +150,10 @@ let exec_command ?(check=`Check) s : string =
     let _ = Prover.exec_command ~check s (get_state_or_fail ()) in
     let info = Format.flush_str_formatter () in
     info
-  with e -> 
+  with e ->
+  let pp_loc_error = Driver.pp_loc_error  (Driver.from_string s) in        
     Printer.prthtml `Error "Run failed: %a"
-      (Errors.pp_toplevel_error ~test:false
-         (Driver.from_string s) (Prover.get_table (get_state_or_fail ()))) e;
+      (Errors.pp_user_error pp_loc_error) e;
     Format.flush_str_formatter () (* will print the exception info *)
 
 (* return visualisation as string *)
