@@ -1511,8 +1511,7 @@ end = struct
         let abstract_term = abstract_set pc term conds mem in
         compute_decls q (append pc var abstract_term mem) 
     in
-    let new_mem = compute_decls decls mem in 
-    (List.fold_left (fun x -> fun y -> remove y x) new_mem [])
+    compute_decls decls mem 
 
   (** compute the inital abstract memory from a list of mutable
       variables and their initial values *)
