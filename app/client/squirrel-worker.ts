@@ -204,8 +204,12 @@ export class SquirrelWorker {
     this.queueSentences = [];
     this.executedSentences = [];
     // FIXME Should be done somewhere else
-    let sentence = await this.fileManager.getFileString("Prelude.sp");
-    this.sendCommand(["Reset", sentence]);    
+     for (const fname of this.fileManager.lib) {
+         let sentence = await this.fileManager.getFileString(fname);
+	 this.sendCommand(["LoadFile", [fname, sentence]]);
+      };
+
+    this.sendCommand(["Reset"]);    
   }
 
   // TODO check type for sent command ↓
@@ -308,33 +312,14 @@ export class SquirrelWorker {
   // TODO move out
   // tell if a SyntaxNode is an Include command
   isInclude(x: SyntaxNode): boolean {
-    return x.firstChild && x.firstChild.type.name === "P_include";
+    return false; 
   }
 
   async getStringOfNode(
     x: SyntaxNode,
     viewState: EditorState
   ): Promise<string> {
-    if (this.isInclude(x)) {
-      let include_name = x.firstChild.getChild("include_name");
-      // console.warn("include_name : "+include_name);
-      // If there is a path node it is QUOTE PATH QUOTE include
-      let path = include_name.getChild("Lpath");
-      if (path) {
-        // console.warn("path : "+path);
-        let name = viewState.sliceDoc(path.from, path.to);
-        // For the moment there is no subdirectories so juste take the
-        // basename ↓
-        var filename = name.replace(/^.*[\\\/]/, "");
-        // console.warn("filename : "+path);
-        return await this.fileManager.getFileString(filename);
-      } else {
-        let name = viewState.sliceDoc(include_name.from, include_name.to);
-        return await this.fileManager.getFileString(name + ".sp");
-      }
-    } else {
-      return viewState.sliceDoc(x.from, x.to);
-    }
+      return viewState.sliceDoc(x.from, x.to);   
   }
 
   /**

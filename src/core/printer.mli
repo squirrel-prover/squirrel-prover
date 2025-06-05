@@ -37,7 +37,7 @@ type keyword = [
 
 (** {2 Printer initialization} *)
 
-type printer_mode = Test | Interactive | File | Html
+type printer_mode = Test | Interactive | File | Html | Js
 
 (** Current printer_mode. *)
 val printer_mode : printer_mode ref

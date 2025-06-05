@@ -27,11 +27,14 @@ let firstOutput = "Prover initial state : Ready to go !"
 (* initial history is an stack with first prover state *) 
 let prover_stack : (state list) option ref = ref None
 (* function that re-init state and history *)
-let init s =
-  let init_state = Prover.init ~with_string_prelude:(Some s) () in
-  prover_state := Some (Prover.do_set_option 
-      init_state (L.mk_loc L._dummy TConfig.s_interactive, TConfig.Param_bool true));
-  prover_stack := Some [{ps= init_state; output=firstOutput}]
+let init () =
+  (* let init_state = Prover.init ~with_string_prelude:(Some s) () in *)
+  (* Printer.init Js;  (* to enable so JS log console *) *)
+    let init_state = Prover.init () in 
+    print_string "done";
+    prover_state := Some (Prover.do_set_option 
+                            init_state (L.mk_loc L._dummy TConfig.s_interactive, TConfig.Param_bool true));
+    prover_stack := Some [{ps= init_state; output=firstOutput}]
 
 
 exception NonInit

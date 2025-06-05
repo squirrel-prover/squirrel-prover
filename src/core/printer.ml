@@ -12,6 +12,7 @@ type printer_mode =
   | Interactive
   | File
   | Html
+  | Js    
 
 let printer_mode = ref File
 
@@ -23,7 +24,8 @@ let get_std () =
   | Interactive -> Fmt.stdout
   | Html -> Format.str_formatter
   | Test -> Fmt.stdout
-
+  | Js -> stdout
+    
 (** Keywords **)
 
 (* Keyword type *)
@@ -247,6 +249,7 @@ let init_ppf (ppf : formatter) (mode : printer_mode) : unit =
       pp_set_formatter_out_functions
         ppf (html_out_funs ppf)
   | Test -> ()
+  | Js -> ()
 
 (* Initialisation of the standard formatter giving it a mode *)
 let init (mode : printer_mode) : unit =
