@@ -15,7 +15,7 @@ import {EditorView } from "codemirror";
 import { showPanel, Panel } from "@codemirror/view";
 import myJquery from 'jquery';
 
-// Squirrel worker
+// Squirrel workerm
 import { SquirrelWorker } from "./squirrel-worker";
 
 import { StateField, StateEffect } from "@codemirror/state"
@@ -37,6 +37,7 @@ export class FileManager {
   base_path : string;
 
   lib : Array<string>;
+  examples : Array<[string, Array<string>]>;  
   theories_dir: URL;
 
 
@@ -50,6 +51,9 @@ export class FileManager {
       this.theories_dir = new URL("static/theories/", base_path);
 
       // By default we can add the tutorial to the file storage
+      let lib = ["Prelude.sp", "Classic.sp", "DeductionSyntax.sp", "PostQuantum.sp", "Reify.sp", "WeakSecrecy.sp", "Core.sp", "Int.sp", "Set.sp", "Deduction.sp", "Logic.sp", "Real.sp", "String.sp"];
+      this.lib = lib;
+
       let tuto = [
         "0-logic.sp",
         "1-crypto-hash.sp",
@@ -59,9 +63,34 @@ export class FileManager {
         "5-stateful.sp",
         "6-key-establishment.sp",
       ];
-      let lib = ["Prelude.sp", "Classic.sp", "DeductionSyntax.sp", "PostQuantum.sp", "Reify.sp", "WeakSecrecy.sp", "Core.sp", "Int.sp", "Set.sp", "Deduction.sp", "Logic.sp", "Real.sp", "String.sp"];
-      this.lib = lib;
-      let fnames = lib.concat(tuto);
+
+      let ex_sandp = [
+      "basic-hash.sp",
+    "basic-hash-auth.sp",      
+      "feldhofer.sp",
+  "private-authentication.sp",    "signed-ddh-P.sp",  "ssh-forward-part1-compo.sp",  
+      "hash-lock.sp",  "mw.sp",     "signed-ddh-S.sp",  "ssh-forward-part2-compo.sp", 
+  "lak-tags.sp",   "signed-ddh-compo.sp"
+      ];
+
+      let ex_state = [
+            "canauth.sp",
+      "lfmtp21.sp",
+      "running-ex-deduction.sp",
+      "running-ex-secrecy.sp",
+      "running-ex-oracle.sp",
+      "running-ex.sp",      
+      "slk06.sp",
+      "toy-counter.sp",
+      "toy-state-equiv.sp",
+       "yplrk05.sp",
+         "yubikey.sp",
+         "yubihsm.sp",
+      ];
+      
+      this.examples = [ ["Base tutorial", tuto], ["Original examples from SP21", ex_sandp], ["Stateful examples from CSF22", ex_state]];
+      
+      let fnames = lib.concat(tuto).concat(ex_state).concat(ex_sandp);
       fnames.forEach((fname) => {
         this.getFileString(fname);
       })
@@ -281,17 +310,35 @@ export class FileManager {
     var list_id = 'squirrel-local-files';
     var list = myJquery('<ul>');
 
-    localforage.keys().then((keys) => {
-      for (let key of keys) {
-        console.log("Add "+key);
-        var li = myJquery("<li><a class='fileLink'>"+key+"</a></li>")
-        .on('click', _ => { 
-          this.openLocal(key.toString(),view);
+      for (let exampleset of this.examples ) {
+        var sublist = myJquery('<ul>');      
+        console.log("Add "+exampleset[0]);
+        var li = myJquery("<li>"+exampleset[0]+"</li>");
+        list.append(li);
+	
+	 for (let example of exampleset[1] ) {
+             var li = myJquery("<li><a class='fileLink'>"+example+"</a></li>")
+	             .on('click', _ => { 
+          this.openLocal(example.toString(),view);
           view.focus();
         });
-        list.append(li);
-      }
-    });
+        sublist.append(li);
+	};
+	list.append(sublist);
+      };
+
+
+    // localforage.keys().then((keys) => {
+    //   for (let key of keys) {
+    //     console.log("Add "+key);
+    //     var li = myJquery("<li><a class='fileLink'>"+key+"</a></li>")
+    //     .on('click', _ => { 
+    //       this.openLocal(key.toString(),view);
+    //       view.focus();
+    //     });
+    //     list.append(li);
+    //   }
+    // });
 
     let addButton = myJquery("<button id='plus' name='plus'>").on("click", _ => {
        this.openFileDialog(view);
