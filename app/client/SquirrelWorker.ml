@@ -34,6 +34,7 @@ let rec json_to_obj (cobj : < .. > Js.t) (json : Yojson.Safe.t) : < .. > Js.t =
   | `Variant(_,_) -> pure_js_expr "undefined"
 
 type jsquirrel_cmd =
+  | LoadFile of string list
   | Undo    of int (* undo n sentences → set current state as
   current-n in the stack *)
   | Exec    of string list (* execute the given sentences and store
@@ -44,7 +45,7 @@ type jsquirrel_cmd =
   (* run and ouput a specific command without changing state used for
    print or search for example *)
   | Run     of string 
-  | Reset of string (* will reset prover state, given the string corresponding to Prelude.sp *)
+  | Reset (* will reset prover state *)
   | Info (* will show current state output *)
   [@@deriving yojson]
 
@@ -112,23 +113,41 @@ let rec execute_all' ?(check=`Check) (sentences:string list) (nb:int) (info:stri
 let execute_all ?(check=`Check) (sentences:string list) : string =
   execute_all' ~check sentences 0 ""
 
+let file_cache : (string, string) Hashtbl.t = Hashtbl.create 503
+    
+let setup_pseudo_fs () =
+  (* Sys_js.set_channel_flusher stdout (fun s -> Console.console##log s);  *)  (* enable to log all squirrel outputs in Console *)
+  Sys_js.unmount ~path:"/static";
+  Sys_js.mount ~path:"/static" (fun ~prefix ~path ->
+      Console.console##log (Fmt.str "query:%s from %s" path prefix);
+      Hashtbl.find_opt file_cache path
+    )
+
+
+let eof = "&%&JS_EOF"
+
 let execute_cmd (cmd:jsquirrel_cmd) : unit = 
   match cmd with 
-    (* will pop n state from stack and show actual goal *)
-    | Undo n -> let _ = Common.popn n in show_goal ()
-    (* execute a list of sentences and show concatened infos *)
-    | Exec sentences -> 
-        let info = execute_all sentences in
-        show_info info; show_goal ()
-    (* same as Exec but without checking proofs *)
-    | NoCheck sentences -> 
-        let info = execute_all ~check:`NoCheck sentences in
-        show_info info; show_goal ()
-    (* show nth state goal DEPRECATED *)
-    | Show n -> show_in_goal (Common.shown n)
-    (* show actual goal *)
-    | Info -> show_in_goal (Common.show ())
-    (* Run one given command *)
-    | Run s -> show_info (Common.exec_command s)
-    (* Reset prover *)
-    | Reset s -> Common.init s; show_goal ()
+  (* will pop n state from stack and show actual goal *)
+  | LoadFile [name; content] ->
+    (* Sys_js.create_file ~name:"Logic.sp" ~content *)
+    Hashtbl.add file_cache ("theories/"^name) (content^eof)
+  | Undo n -> let _ = Common.popn n in show_goal ()
+  (* execute a list of sentences and show concatened infos *)
+  | Exec sentences -> 
+    let info = execute_all sentences in
+    show_info info; show_goal ()
+  (* same as Exec but without checking proofs *)
+  | NoCheck sentences -> 
+    let info = execute_all ~check:`NoCheck sentences in
+    show_info info; show_goal ()
+  (* show nth state goal DEPRECATED *)
+  | Show n -> show_in_goal (Common.shown n)
+  (* show actual goal *)
+  | Info -> show_in_goal (Common.show ())
+  (* Run one given command *)
+  | Run s -> show_info (Common.exec_command s)
+  (* Reset prover *)
+  | Reset ->  setup_pseudo_fs (); Common.init (); show_goal ()
+  | _ -> assert false
+(* let init () = Common.init "" *)

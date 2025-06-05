@@ -266,6 +266,7 @@ let rec token buf =
   | uid -> UID (Utf8.lexeme buf)
   | lid -> LID (Utf8.lexeme buf)
   | eof -> EOF
+  | "&%&JS_EOF" -> EOF
   | left_infix_symb -> LEFTINFIXSYMB (Utf8.lexeme buf)
   | right_infix_symb -> RIGHTINFIXSYMB (Utf8.lexeme buf)
   | _ -> failwith "Unexpected character"

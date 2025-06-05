@@ -36,6 +36,7 @@ export class FileManager {
   autosave_interval : number;
   base_path : string;
 
+  lib : Array<string>;
   theories_dir: URL;
 
 
@@ -58,7 +59,8 @@ export class FileManager {
         "5-stateful.sp",
         "6-key-establishment.sp",
       ];
-      let lib = ["Basic.sp", "Prelude.sp"];
+      let lib = ["Prelude.sp", "Classic.sp", "DeductionSyntax.sp", "PostQuantum.sp", "Reify.sp", "WeakSecrecy.sp", "Core.sp", "Int.sp", "Set.sp", "Deduction.sp", "Logic.sp", "Real.sp", "String.sp"];
+      this.lib = lib;
       let fnames = lib.concat(tuto);
       fnames.forEach((fname) => {
         this.getFileString(fname);

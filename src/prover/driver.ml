@@ -144,7 +144,7 @@ let locate (dirs : load_paths) (filename : string) =
       dirs
   with
   | Some driver -> driver
-  | None -> Command.cmd_error (IncludeNotFound filename)
+  | None -> Command.cmd_error (IncludeNotFound (filename,dirs))
 
 let check_cycle (driver_stack : t list) (name : string) : unit =
   let has_cycle =

@@ -14,6 +14,7 @@
          ; --pretty
          ; --disable shortvar 
          ; --debug-info
+	 ; --enable with-js-error 	 
          --extern-fs
          --setenv PATH=/bin))
  (link_flags -linkall -no-check-prims)

@@ -6,7 +6,7 @@ type cmd_error =
   | StartProofError   of string
   | InvalidTheoryName of string
   | IncludeCycle      of string
-  | IncludeNotFound   of string
+  | IncludeNotFound   of string * (string list)
   | IncludeFailed     of (Format.formatter -> unit)
   | InvalidSetOption  of string
 
@@ -25,7 +25,8 @@ let pp_cmd_error fmt = function
 
   | IncludeCycle s       -> Fmt.pf fmt "Include cycle (%s)." s
 
-  | IncludeNotFound s    -> Fmt.pf fmt "Could not locate theory %s." s
+  | IncludeNotFound (s, paths)
+    -> Fmt.pf fmt "Could not locate theory %s. Tried to find it inside %a." s (Fmt.list Fmt.string) paths
 
   | InvalidExtension s   -> Fmt.pf fmt "Invalid extension (not a .sp): %s." s
 
