@@ -3829,6 +3829,33 @@ let bideduce_recursive_subgoals
 (*------------------------------------------------------------------*)
 (** {2 Top-level bi-deduction function } *)
 
+
+let check_updates_time_sensitive ~loc ~let_init ~(game : game) =
+  let mutable_vars =
+    List.filter_map (fun (x,decl) ->
+        match decl with Mutable _ -> Some x | _ -> None 
+      ) game.glob_vars
+    |> Sv.of_list
+  in
+  List.iter (fun oracle ->
+      List.iter (fun (x,t) ->
+          let subst = Game.local_subst let_init game oracle in
+          let t = Term.subst subst t in
+          let mutable_support = Vars.Sv.inter (Term.fv t) mutable_vars in
+          if not (Sv.subset mutable_support (Sv.singleton x)) then
+            Tactics.hard_failure ~loc
+              (Failure (
+                  Fmt.str
+                    "@[<v 2>\
+                     @;\
+                     In time-sensitive mode, global state updates may not depend on other@;\
+                     global variables:@;\
+                    \  update %a ← … of oracle %s depends on %a\
+                     @]"
+                    Vars.pp x oracle.name Vars.pp_list (Sv.elements mutable_support)))
+        ) oracle.updates
+    ) game.oracles
+
 let loc_of_crypto_arg (arg : Args.crypto_arg) : L.t =
   L.mergeall (
     Option.to_list (omap L.loc arg.cond )
@@ -4037,6 +4064,10 @@ let prove
     List.concat_map (fun (x:Const.t) -> x.term @ x.cond) init_consts |>
     List.map CondTerm.mk_simpl
   in
+
+  (*------------------------------------------------------------------*)
+  if param.time_sensitive then
+    check_updates_time_sensitive ~loc:game_loc ~let_init ~game;
 
   (*------------------------------------------------------------------*)
   (** Checking the terms appearing in the initial constraints are
