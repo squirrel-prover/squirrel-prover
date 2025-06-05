@@ -14,7 +14,9 @@
  *)
 
 open Js_of_ocaml
+
 open Jsquirrel
+    
 module Html = Dom_html
 
 (* taken from jscoq *)
@@ -116,6 +118,7 @@ let execute_all ?(check=`Check) (sentences:string list) : string =
 let file_cache : (string, string) Hashtbl.t = Hashtbl.create 503
     
 let setup_pseudo_fs () =
+  Console.console##log "Setting up virtual file system for Includes. \n";  
   (* Sys_js.set_channel_flusher stdout (fun s -> Console.console##log s);  *)  (* enable to log all squirrel outputs in Console *)
   Sys_js.unmount ~path:"/static";
   Sys_js.mount ~path:"/static" (fun ~prefix ~path ->
@@ -148,6 +151,6 @@ let execute_cmd (cmd:jsquirrel_cmd) : unit =
   (* Run one given command *)
   | Run s -> show_info (Common.exec_command s)
   (* Reset prover *)
-  | Reset ->  setup_pseudo_fs (); Common.init (); show_goal ()
+  | Reset -> setup_pseudo_fs (); Common.init (); show_goal ()
   | _ -> assert false
 (* let init () = Common.init "" *)

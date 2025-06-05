@@ -18,8 +18,18 @@ type timestamp_style =
 let start_timer () =
   let t0 = Unix.gettimeofday () in
   fun () -> Unix.gettimeofday () -. t0
+
+(* If we are running in JS, we disable smt. *)
+let disable_smt =  
+  let exec_dir = Filename.dirname Sys.executable_name in
+  Format.eprintf "Folder test %s" exec_dir;
+  exec_dir = "."
     
-let config = Why3.Whyconf.init_config None
+let config =
+  if disable_smt then
+    Why3.Whyconf.read_config (Some "")
+  else
+    Why3.Whyconf.init_config None
 
 let main = Why3.Whyconf.get_main config
 
@@ -1452,6 +1462,10 @@ let is_valid
     ~timestamp_style ~macro_axioms ~timeout ~steps ~provers
     table system evars hypotheses conclusion
   =
+  if disable_smt then
+      (Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
+       false)
+  else
   let theory = match load_theory ~timestamp_style env with
     | Some theory -> theory
     | None -> raise InternalError
@@ -1515,6 +1529,8 @@ type parameters = {
 }
 
 let default_prover =
+  if disable_smt then []
+  else  
   let l =
     List.map
       (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
@@ -1601,6 +1617,7 @@ let parse_args args =
   List.fold_left parse_arg default_parameters args
 
 let () =
+  if not disable_smt then
   ProverTactics.register_general "smt" ~pq_sound:true
     (fun args s sk fk ->
        let args = match args with
@@ -1714,3 +1731,4 @@ let () =
                 ~provers:[prover,alt]
                 s))
       provers
+
