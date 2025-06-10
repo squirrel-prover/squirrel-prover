@@ -64,6 +64,9 @@ module Fv = struct
 end
 
 (*------------------------------------------------------------------*)
+(** An untyped path of the form (namespace path, name) *)
+type s_path = string list * string
+
 (** Types of terms *)
 type ty =
   | Message
@@ -72,8 +75,8 @@ type ty =
   | Timestamp
     
   (* FIXME: use a type-safe [Symbols.path] *)
-  | TBase of string list * string (* namespace path, name *)
-  (** User-defined types *)
+  | TConstr of s_path
+  (** user-defined type constructor *)
         
   | TVar of tvar
   (** Type variable *)
@@ -90,7 +93,7 @@ type ty =
 let fold (f : ty -> 'a -> 'a) (ty : ty) (acc : 'a) : 'a =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TBase _ | TVar _ | TUnivar _ ->
+  | TConstr _ | TVar _ | TUnivar _ ->
     acc
     
   | Tuple l -> List.fold_left ((^~) f) acc l
@@ -100,7 +103,7 @@ let fold (f : ty -> 'a -> 'a) (ty : ty) (acc : 'a) : 'a =
 let map (f : ty -> ty) (ty : ty) : ty =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TBase _ | TVar _ | TUnivar _ ->
+  | TConstr _ | TVar _ | TUnivar _ ->
     ty
     
   | Tuple l -> Tuple (List.map f l)
@@ -110,7 +113,7 @@ let map (f : ty -> ty) (ty : ty) : ty =
 let map_fold (f : ty -> 'a -> ty * 'a) (ty : ty) (acc : 'a) : ty * 'a =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TBase _ | TVar _ | TUnivar _ ->
+  | TConstr _ | TVar _ | TUnivar _ ->
     ty, acc
     
   | Tuple l ->
@@ -145,13 +148,13 @@ let tunit = Tuple []
 
 (*------------------------------------------------------------------*)
 (** Prelude types *)
-let tquantum_message = TBase ([], "quantum_message")
-let tint             = TBase ([], "int")
-let tstring          = TBase ([], "string")
+let tquantum_message = TConstr ([], "quantum_message")
+let tint             = TConstr ([], "int")
+let tstring          = TConstr ([], "string")
    
 
 (*------------------------------------------------------------------*)
-let base np s = TBase (np,s)
+let base np s = TConstr (np,s)
 
 let func ty ty' = Fun (ty, ty')
 
@@ -173,7 +176,7 @@ let rec equal (a : ty) (b : ty) : bool =
                                
    | TVar s, TVar s'  -> Ident.equal s s'
 
-   | TBase (np,s), TBase (np',s') -> np = np' && s = s'
+   | TConstr (np,s), TConstr (np',s') -> np = np' && s = s'
 
    | TUnivar u, TUnivar u' -> Ident.equal u u'
 
@@ -201,7 +204,7 @@ let _pp ~dbg : ty formatter =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TBase (np,s) -> 
+    | TConstr (np,s) -> 
       if np = [] then
         Fmt.pf ppf "%s" s
       else 
@@ -238,7 +241,7 @@ let to_string (ty : ty) : string =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TBase (np,s) -> 
+    | TConstr (np,s) -> 
       Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
     | TVar id   -> pp_tvar ppf id
     | TUnivar u -> pp_univar ppf u
@@ -265,7 +268,7 @@ let rec is_bitstring_encodable = function
   | Boolean
   | Index  
   | Timestamp
-  | TBase _  -> true
+  | TConstr _  -> true
 
   | Tuple tys -> List.for_all is_bitstring_encodable tys
 
@@ -279,7 +282,7 @@ let fv (t : ty) : Fv.t =
     | Boolean
     | Index  
     | Timestamp
-    | TBase _  -> acc
+    | TConstr _  -> acc
       
     | TUnivar ui -> Fv.add_uv ui acc
     | TVar    ti -> Fv.add_tv ti acc

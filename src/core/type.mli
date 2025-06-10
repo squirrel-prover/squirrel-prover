@@ -27,6 +27,9 @@ type univars = univar list
 val pp_univar : univar formatter
 
 (*------------------------------------------------------------------*)
+(** An untyped path of the form (namespace path, name) *)
+type s_path = string list * string
+
 (** Types of terms *)
 type ty = private
   | Message
@@ -35,8 +38,8 @@ type ty = private
   | Timestamp
 
   (* FIXME: use a type-safe [Symbols.path] *)
-  | TBase of string list * string (* namespace path, name *)
-  (** user-defined types *)
+  | TConstr of s_path
+  (** user-defined type constructor *)
         
   | TVar of tvar
   (** type variable *)

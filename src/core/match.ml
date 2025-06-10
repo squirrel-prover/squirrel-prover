@@ -2784,7 +2784,7 @@ let fa_decompose
       match q with
       | Lambda -> true
       | Seq | ForAll | Exists ->
-        List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) es
+        List.for_all (fun v -> HighType.is_enum st.table (Vars.ty v)) es
     in
     if not check_quantif then None
     else
@@ -2798,7 +2798,7 @@ let fa_decompose
 
   | Find (is, c, d, e)
     when
-      List.for_all (fun v -> Symbols.TyInfo.is_enum st.table (Vars.ty v)) is
+      List.for_all (fun v -> HighType.is_enum st.table (Vars.ty v)) is
     ->
     let is, subst = Term.refresh_vars is in
     let c, d = Term.subst subst c, Term.subst subst d in

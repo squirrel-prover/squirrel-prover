@@ -273,7 +273,7 @@ let add_namelength_axiom
     (table : Symbols.table) (n : Symbols.name) (ftype : Type.ftype)
   : Symbols.table
   =
-  if not @@ Symbols.TyInfo.is_name_fixed_length table ftype.fty_out then
+  if not @@ HighType.is_name_fixed_length table ftype.fty_out then
     table
   else
     let name = "namelength_" ^ (Symbols.to_string n.s) in

@@ -598,7 +598,7 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
   | Quant ((Seq | ForAll | Exists), es, _) -> 
     let not_enum =
       List.map Vars.ty es |>
-      List.filter (not -| Symbols.TyInfo.is_enum table)
+      List.filter (not -| HighType.is_enum table)
     in
     if not_enum <> [] then
       Tactics.soft_failure

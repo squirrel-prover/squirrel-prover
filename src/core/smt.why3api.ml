@@ -291,10 +291,10 @@ let rec convert_type context = function
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
   | Type.Index -> context.index_ty
-  | Type.TBase (ns,t) 
+  | Type.TConstr (ns,t) 
       when Symbols.s_path_to_string (ns,t) = "int" -> 
       context.int_ty
-  | Type.TBase (ns,t) -> 
+  | Type.TConstr (ns,t) -> 
     let s = Symbols.s_path_to_string (ns,t) in
     Why3.Ty.(ty_var (tv_of_string s))
   | Type.TVar _ -> raise InternalError
@@ -1339,7 +1339,7 @@ let add_name_axioms context =
           let def2 = Symbols.get_name_data n2 context.table in
           if (
             (def1.n_fty.fty_out = def2.n_fty.fty_out) && 
-            (Symbols.TyInfo.check_bty_info
+            (HighType.check_ty_info
               context.table 
               def1.n_fty.fty_out
               Large)

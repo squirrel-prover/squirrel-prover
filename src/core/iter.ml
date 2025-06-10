@@ -175,7 +175,7 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Var m when not (Symbols.TyInfo.is_finite context.env.table (Vars.ty m)) ->
+    | Term.Var m when not (HighType.is_finite context.env.table (Vars.ty m)) ->
       (* TODO: DET: check for ptime_deducible *)
       assert false (* SSC must have been checked first *)
 

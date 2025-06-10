@@ -58,7 +58,7 @@ type symbol_kind =
   | Mutex
   | System
   | Process
-  | BType      (** type declarations *)
+  | Ty         (** type declarations *)
   | Game
   | HintDB
   | Lemma
@@ -77,7 +77,7 @@ let pp_symbol_kind fmt = function
   | Mutex     -> Fmt.pf fmt "mutex"
   | System    -> Fmt.pf fmt "system"
   | Process   -> Fmt.pf fmt "process"
-  | BType     -> Fmt.pf fmt "type"
+  | Ty        -> Fmt.pf fmt "type"
   | Game      -> Fmt.pf fmt "game"
   | HintDB    -> Fmt.pf fmt "hint database"
   | Lemma     -> Fmt.pf fmt "lemma"
@@ -126,7 +126,7 @@ type _macro
 type _mutex
 type _system
 type _process
-type _btype
+type _ty
 type _game
 type _hintdb
 type _lemma
@@ -171,7 +171,7 @@ type macro     = _macro     path
 type mutex     = _mutex     path
 type system    = _system    path
 type process   = _process   path
-type btype     = _btype     path
+type ty        = _ty        path
 type game      = _game      path
 type hintdb    = _hintdb    path
 type lemma     = _lemma     path
@@ -795,9 +795,9 @@ module Oracle = Make (struct
   let group = "oracle"
 end)
 
-module BType = Make (struct
-  type ns   = _btype
-  let kind  = BType
+module Ty = Make (struct
+  type ns   = _ty
+  let kind  = Ty
   let group = "type"
 end)
 
@@ -1201,112 +1201,6 @@ let as_name_data (data : data) : name_data =
 
 let get_name_data (ms : name) (table : table) : name_data =
   as_name_data (Name.get_data ms table)
-
-(*------------------------------------------------------------------*)
-(** {2 Type information} *)
-
-module TyInfo = struct
-  (** Type information associated to base types.
-      Restrict the instantiation domain of a type. *)
-  type t =
-    | Large
-    | Name_fixed_length
-    | Finite
-    | Fixed
-    | Well_founded
-    | Enum
-    | Serializable
-  
-  type data += Type of t list
-
-  (*------------------------------------------------------------------*)
-  let parse (info : lsymb) : t =
-    match L.unloc info with
-    | "name_fixed_length" -> Name_fixed_length
-    | "large"             -> Large
-    | "well_founded"      -> Well_founded
-    | "fixed"             -> Fixed
-    | "finite"            -> Finite
-    | "enum"              -> Enum
-    | "serializable"      -> Serializable
-    | _ -> symb_err (L.loc info) (Failure "unknown type information")
-
-  (*------------------------------------------------------------------*)
-  let get_data (s : btype) table : t list =
-    match BType.get_data s table with Type l -> l | _ -> assert false
-
-  (*------------------------------------------------------------------*)
-  let get_bty_infos table (ty : Type.ty) : t list =
-    match ty with
-    | Type.Index | Type.Timestamp | Type.Boolean ->
-      [Fixed; Finite; Well_founded; Serializable; Enum; ]
-
-    | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length; Serializable; ]
-    | Type.TBase (np,b) ->
-      (* FIXME: very hacky, but we cannot do better as qualified as
-         [Symbols] depends on [Type] *)
-      let np = of_s_npath np in
-      get_data (BType.of_string np b) table
-    | _ -> []
-
-  let check_bty_info table (ty : Type.ty) (info : t) : bool =
-    let infos = get_bty_infos table ty in
-    List.mem info infos
-
-  (*------------------------------------------------------------------*)
-  let check_info_on_closed_term allow_funs table ty def : bool =
-      let rec check : Type.ty -> bool = function
-      | TVar _ | TUnivar _ -> false
-      | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> allow_funs && check t1 && check t2
-      | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-      | TBase _ as ty -> check_bty_info table ty def
-    in
-    check ty
-
-  (** See `.mli` *)
-  let is_finite table ty : bool =
-    check_info_on_closed_term true table ty Finite
-
-  (** See `.mli` *)
-  let is_fixed table ty : bool =
-    check_info_on_closed_term true table ty Fixed
-
-  (** See `.mli` *)
-  let is_name_fixed_length table ty : bool =
-    check_info_on_closed_term false table ty Name_fixed_length
-
-  (** See `.mli` *)
-  let serializability_order table ty : int option =
-    let exception Unknown in
-    let rec order : Type.ty -> int = function
-      | Boolean | Index | Timestamp | Message -> 0
-      | Tuple l -> List.fold_left (fun m t -> max (order t) m) 0 l 
-      | Fun (t1, t2) -> max (order t1 + 1) (order t2)
-      | TBase _ as ty ->
-        if check_bty_info table ty Serializable then 0 else raise Unknown
-      | TVar _ | TUnivar _ -> raise Unknown
-    in    
-    try Some (order ty) with Unknown -> None
-    
-  (** See `.mli` *)
-  let is_enum table ty : bool =
-    let rec check : Type.ty -> bool = function
-      | Boolean | Index | Timestamp -> true
-      | Message -> false
-      | Tuple l -> List.for_all check l
-      | Fun (t1, t2) -> check t1 && check t2
-      | TBase _ as ty -> check_bty_info table ty Enum
-      | _ -> false
-    in
-    check ty ||
-    (serializability_order table ty = Some 0 &&
-     is_finite table ty &&
-     is_fixed table ty)
-
-  let is_well_founded table ty : bool =
-    check_info_on_closed_term false table ty Well_founded
-end
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

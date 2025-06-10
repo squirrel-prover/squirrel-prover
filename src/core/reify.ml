@@ -162,7 +162,7 @@ let quote_type (t : Symbols.table) (ienv : Infer.env) (ty : Type.ty) : Term.t =
     | Boolean   -> R.Ty.mk_boolean   t
     | Index     -> R.Ty.mk_index     t
     | Timestamp -> R.Ty.mk_timestamp t
-    | TBase (sl,s) ->
+    | TConstr (sl,s) ->
       R.Ty.mk_tbase t
         (AList.quote_list St t Term.mk_string sl
          |> assert_ty (AList.ty St t))
@@ -729,7 +729,7 @@ let infer_type (st : unquote_state) (t : Term.term) : Type.ty option =
         | Term.Seq ->
           (* sequences are only over enumerable types *)
           List.iter (fun v ->
-              if not (Symbols.TyInfo.is_enum st.table (Vars.ty v)) then
+              if not (HighType.is_enum st.table (Vars.ty v)) then
                 failed ()
             ) vs;
           Type.tmessage

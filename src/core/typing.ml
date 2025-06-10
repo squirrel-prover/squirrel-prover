@@ -310,7 +310,7 @@ let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
   | P_tbase ([], { pl_desc = "unit"; }) -> Type.tunit
 
   | P_tbase tb_l ->
-    let s = Symbols.BType.convert_path tb_l env.table in
+    let s = Symbols.Ty.convert_path tb_l env.table in
     let top, sub =
       List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
     in
@@ -1152,7 +1152,7 @@ and convert0
           if p_tags <> [] then
             error loc (Failure "tag unsupported here");
 
-          if not (Symbols.TyInfo.is_enum state.env.table (Vars.ty v)) then
+          if not (HighType.is_enum state.env.table (Vars.ty v)) then
             error loc (Failure "sequence must be over enumerable types")
               
         | L_tuple l,_ ->

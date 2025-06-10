@@ -619,12 +619,12 @@ ty_vars:
 |                                            { []  }
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
 
-bty_info:
+ty_info:
 | info=lsymb { info }
 
-bty_infos:
-| LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
-|                                           { [] }
+ty_infos:
+| LBRACKET l=slist(ty_info,COMMA) RBRACKET { l }
+|                                          { [] }
 
 (*------------------------------------------------------------------*)
 (* for declarations, a `X` symbol or a parenthesized infix symbol *)
@@ -749,8 +749,8 @@ declaration_i:
 | ACTION e=lsymb COLON a_arity=int
                           { Decl.Decl_action { a_name = e; a_arity; } }
 
-| TYPE e=lsymb infos=bty_infos
-                          { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
+| TYPE e=lsymb infos=ty_infos
+                          { Decl.Decl_ty { ty_name = e; ty_infos = infos; ty_body = `Abstract; } }
 
 | ABSTRACT e=lsymb_gen_decl tyvars=ty_vars COLON tyo=ty
     { let symb_type, name = e in

@@ -129,7 +129,7 @@ let norm_ty ?(fail_on_cycles = true) (env : env) (t : Type.ty) : Type.ty =
 
     | Tuple l -> Type.tuple (List.map (doit seen) l)
 
-    | Message | Boolean | Index | Timestamp | TBase _ | TVar _ as t -> t
+    | Message | Boolean | Index | Timestamp | TConstr _ | TVar _ as t -> t
   in
   doit Sid.empty t
 

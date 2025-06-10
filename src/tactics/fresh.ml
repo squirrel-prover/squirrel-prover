@@ -111,7 +111,7 @@ let phi_fresh
   (* ensure that the type of the name is large *)
   let ty = n.Name.symb.s_typ in
   if checklarge 
-  && not Symbols.TyInfo.(check_bty_info table ty Large) then
+  && not HighType.(check_ty_info table ty Large) then
     Tactics.soft_failure ?loc
       (Tactics.Failure ("the type of term "^err^" is not [large]"));
 

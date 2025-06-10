@@ -752,8 +752,8 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
 let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
   let bad_vars = 
     List.filter (fun v -> 
-        not (Symbols.TyInfo.is_finite table (Vars.ty v) && 
-             Symbols.TyInfo.is_fixed  table (Vars.ty v))
+        not (HighType.is_finite table (Vars.ty v) && 
+             HighType.is_fixed  table (Vars.ty v))
       ) vs
   in
   if bad_vars <> [] then

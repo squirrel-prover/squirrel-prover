@@ -54,7 +54,7 @@ type symbol_kind =
   | Mutex
   | System
   | Process
-  | BType      (** type declarations *)
+  | Ty         (** type declarations *)
   | Game
   | HintDB
   | Lemma
@@ -104,7 +104,7 @@ type _macro
 type _mutex
 type _system
 type _process
-type _btype
+type _ty
 type _game
 type _hintdb
 type _lemma
@@ -141,7 +141,7 @@ type macro     = _macro     path
 type mutex     = _mutex     path
 type system    = _system    path
 type process   = _process   path
-type btype     = _btype     path
+type ty        = _ty        path
 type game      = _game      path
 type hintdb    = _hintdb    path
 type lemma     = _lemma     path
@@ -296,7 +296,7 @@ end
 module Config    : SymbolKind with type ns = _config
 module Oracle    : SymbolKind with type ns = _oracle
 module Channel   : SymbolKind with type ns = _channel
-module BType     : SymbolKind with type ns = _btype
+module Ty        : SymbolKind with type ns = _ty
 module Game      : SymbolKind with type ns = _game
 module Action    : SymbolKind with type ns = _action
 module System    : SymbolKind with type ns = _system
@@ -345,6 +345,8 @@ val pp_error :
   Format.formatter -> error -> unit
 
 exception Error of error
+
+val symb_err : L.t -> error_i -> 'a
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
@@ -475,63 +477,6 @@ type data += Name of name_data
 
 val as_name_data : data -> name_data
 val get_name_data : name -> table -> name_data
-
-(*------------------------------------------------------------------*)
-(** {3 Type information: Ocaml type declaration}  *)
-
-module TyInfo : sig
-  (** Type information associated to base types.
-      Restrict the instantiation domain of a type. *)
-  type t =
-    | Large               (** collision probabiliy between names is negligible *)
-    | Name_fixed_length   (** for any η, all names have the same length *)
-    | Finite              (** finite for all η *)
-    | Fixed               (** independent from η *)
-    | Well_founded        (** well-founded for all η *)
-    | Enum                (** enumerable in poly time  *)
-    | Serializable        (** bit-string encodable *)
-
-  type data += Type of t list
-
-  (*------------------------------------------------------------------*)
-  val parse : lsymb -> t
-
-  (*------------------------------------------------------------------*)
-  val get_data : btype -> table -> t list
-
-  (*------------------------------------------------------------------*)
-  val get_bty_infos  : table -> Type.ty -> t list
-  val check_bty_info : table -> Type.ty -> t -> bool
-
-  (*------------------------------------------------------------------*)
-  (** Is the type a finite type, e.g. [Index] and [Timestamp] *)
-  val is_finite : table -> Type.ty -> bool
-
-  (** Is the type a fixed set (independent from the security
-      parameter η.
-      (e.g. [Index], [Timestamp] and [Message]) *)
-  val is_fixed : table -> Type.ty -> bool
-
-  (** The serializability order of the term. E.g. 
-      - [message] is serializable as a bit-string (obviously), 
-         and is thus order 0. 
-      - [message -> message]              is order 1. 
-      - [message -> message -> message]   is order 1.
-      - [(message -> message) -> message] is order 2. 
-      Returns [None] if no order could be inferred (e.g. because there
-      are type variables). *)
-  val serializability_order : table -> Type.ty -> int option
-    
-  (** Is the type enumerable in polynomial time. *)
-  val is_enum : table -> Type.ty -> bool
-
-  (** Are the names all of the same length. *)
-  val is_name_fixed_length : table -> Type.ty -> bool
-
-  (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp]
-      or [Message]. *)
-  val is_well_founded : table -> Type.ty -> bool
-end
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)

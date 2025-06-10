@@ -590,8 +590,8 @@ let constraints_tac args : LT.ttac =
     (where the RHS quantification is a global quantification) *)
 let strengthen_const_var (s : TS.t) (v : Vars.var) : bool =
   let table = TS.table s in
-  if Symbols.TyInfo.is_finite table (Vars.ty v) &&
-     Symbols.TyInfo.is_fixed  table (Vars.ty v) then
+  if HighType.is_finite table (Vars.ty v) &&
+     HighType.is_fixed  table (Vars.ty v) then
 
     (* Check that [v] does not appear
        in any global hypothesis or definition. *)
@@ -620,8 +620,8 @@ let strengthen_const_vars (s : TS.t) : TS.t =
 let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
   let table = TS.table s in
 
-  if not (Symbols.TyInfo.is_finite table ty &&
-          Symbols.TyInfo.is_fixed  table ty   ) then
+  if not (HighType.is_finite table ty &&
+          HighType.is_fixed  table ty   ) then
     soft_failure ~loc
       (Failure "only applies to finite and fixed (η-independent) types");
 
@@ -990,7 +990,7 @@ let fa s =
   in
 
   let is_finite_fixed ty =
-    Symbols.TyInfo.is_finite table ty && Symbols.TyInfo.is_fixed table ty
+    HighType.is_finite table ty && HighType.is_fixed table ty
   in
 
   let u, v =

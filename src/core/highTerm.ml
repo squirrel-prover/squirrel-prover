@@ -100,7 +100,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
     | Var v ->
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
       let ty_v = Infer.norm_ty ienv (Vars.ty v) in
-      let is_ty_enum = Symbols.TyInfo.is_enum env.table ty_v in
+      let is_ty_enum = HighType.is_enum env.table ty_v in
       let is_ty_encodable = Type.is_bitstring_encodable ty_v in
       let adv =
         (* FIXME: could be improved into `info.det && is_ty_enum` *)
@@ -138,12 +138,12 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
     | Find (vs, _, _, _) | Quant (_,vs,_) ->
       let vs_tys = List.map (fun v -> Infer.norm_ty ienv (Vars.ty v)) vs in
       let fixed_type_binders =
-        List.for_all (Symbols.TyInfo.is_fixed env.table) vs_tys
+        List.for_all (HighType.is_fixed env.table) vs_tys
       in
       let poly_card_type_binders =
         List.for_all (fun ty ->
-            Symbols.TyInfo.is_fixed  env.table ty &&
-            Symbols.TyInfo.is_finite env.table ty
+            HighType.is_fixed  env.table ty &&
+            HighType.is_finite env.table ty
           ) vs_tys
       in
       let is_lambda = match t with Quant (Lambda,_,_) -> true | _ -> false in

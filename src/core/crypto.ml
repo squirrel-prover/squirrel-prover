@@ -2714,7 +2714,7 @@ let rec bideduce_term_strict
     end
 
   | Term.Quant (_,es,term) when 
-      List.for_all (fun v -> Symbols.TyInfo.is_enum query.env.table (Vars.ty v) ) es
+      List.for_all (fun v -> HighType.is_enum query.env.table (Vars.ty v) ) es
     ->
     let es, subst = Term.refresh_vars es in
     let term = Term.subst subst term in
@@ -2733,8 +2733,8 @@ let rec bideduce_term_strict
     in
 
     let result = 
-      if List.for_all (Symbols.TyInfo.is_finite query.env.table -| Vars.ty) es
-      && List.for_all (Symbols.TyInfo.is_fixed  query.env.table -| Vars.ty) es
+      if List.for_all (HighType.is_finite query.env.table -| Vars.ty) es
+      && List.for_all (HighType.is_fixed  query.env.table -| Vars.ty) es
       && result0.extra_outputs <> []
       then begin
         (* if the type is finite+fixed, start a second pass, using the

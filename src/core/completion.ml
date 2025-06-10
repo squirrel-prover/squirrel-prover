@@ -417,7 +417,7 @@ let is_lname ?of_ty table t =
   else
     let nty = name_ty t in    
     let of_ty = odflt nty of_ty in
-    Symbols.TyInfo.check_bty_info table nty Symbols.TyInfo.Large &&
+    HighType.check_ty_info table nty HighType.Info.Large &&
     nty = of_ty
 
 

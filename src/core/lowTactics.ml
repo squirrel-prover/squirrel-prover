@@ -1524,8 +1524,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
                      parameter η, we have
                      [∀ x, phi] ≡ ∀ x. const(x) → [phi]
                      (where the RHS quantification is a global quantification) *)
-                  Symbols.TyInfo.is_finite table (Vars.ty x) && 
-                  Symbols.TyInfo.is_fixed  table (Vars.ty x) 
+                  HighType.is_finite table (Vars.ty x) && 
+                  HighType.is_fixed  table (Vars.ty x) 
                 in
                 let system_indep = 
                   let set = (S.system s).set in
@@ -2387,7 +2387,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Failure "conclusion must be an universal quantification.")
     in
 
-    if not (Symbols.TyInfo.is_well_founded (S.table s) (Vars.ty v)) then
+    if not (HighType.is_well_founded (S.table s) (Vars.ty v)) then
       soft_failure
         (Failure "induction supports only well-founded types");
 

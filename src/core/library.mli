@@ -41,7 +41,7 @@ module Int : sig
   val is_loaded : Symbols.table -> bool
   val check_load : Symbols.table -> unit
   val get_fsymb  : Symbols.table -> string -> Symbols.fname
-  val get_btype  : Symbols.table -> string -> Symbols.btype
+  val get_type   : Symbols.table -> string -> Symbols.ty
 
   (*------------------------------------------------------------------*)
   val tint : Symbols.table -> Type.ty
@@ -65,7 +65,7 @@ end
 module Real : sig
   val check_load : Symbols.table -> unit
   val get_fsymb : Symbols.table -> string -> Symbols.fname
-  val get_btype : Symbols.table -> string -> Symbols.btype
+  val get_type  : Symbols.table -> string -> Symbols.ty
 
   (*------------------------------------------------------------------*)
   val treal : Symbols.table -> Type.ty
@@ -120,7 +120,7 @@ end
 module Reify : sig
   val check_load : Symbols.table -> unit
   val get_fsymb  : Symbols.table -> ?path:string list -> string -> Symbols.fname
-  val get_btype  : Symbols.table -> ?path:string list -> string -> Symbols.btype
+  val get_type   : Symbols.table -> ?path:string list -> string -> Symbols.ty
 
   module StringList : sig
     val ty       : Symbols.table -> Type.ty

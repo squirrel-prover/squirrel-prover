@@ -39,9 +39,10 @@ type action_decl = {
 }
 
 (*------------------------------------------------------------------*)
-type bty_decl = {
-  bty_name  : lsymb ;
-  bty_infos : lsymb list ;
+type ty_decl = {
+  ty_name  : lsymb;
+  ty_infos : lsymb list;
+  ty_body  : [`Abstract];
 }
 
 (*------------------------------------------------------------------*)
@@ -143,7 +144,7 @@ type declaration_i =
   | Decl_mutex     of mutex_decl
   | Decl_funs      of op_kind * op_in_system * op_tyargs * fun_decl list
   | Decl_predicate of predicate_decl
-  | Decl_bty       of bty_decl
+  | Decl_ty        of ty_decl
   | Decl_game      of Crypto.Parse.game_decl
   | Namespace_cmd  of namespace_info
   | Tactic         of lsymb * ProverTactics.AST.t

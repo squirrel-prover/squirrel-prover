@@ -1655,7 +1655,7 @@ let declare table decl : Symbols.table * Goal.t list =
         (* necessary to ensure that a term semantics is always a random variables
            (indeed, this guarantees that the set of tapes is finite, and can be
            equipped with the discrete sigma-algebra and the uniform distribution) *)
-        if not (Symbols.TyInfo.is_finite table ty) then
+        if not (HighType.is_finite table ty) then
           error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
 
@@ -1696,13 +1696,13 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_predicate decl -> parse_predicate_decl table decl, []
 
-  | Decl.Decl_bty bty_decl ->
+  | Decl.Decl_ty ty_decl ->
     let table, _ =
-      let ty_infos = List.map Symbols.TyInfo.parse bty_decl.bty_infos in
-      Symbols.BType.declare ~approx:false
+      let ty_infos = List.map HighType.Info.parse ty_decl.ty_infos in
+      Symbols.Ty.declare ~approx:false
         table
-        bty_decl.bty_name
-        ~data:(Symbols.TyInfo.Type ty_infos)
+        ty_decl.ty_name
+        ~data:(HighType.Type (Abstract ty_infos))
     in
     table, []
 
