@@ -590,12 +590,12 @@ exception NonExhaustive
     try Some (doit Mt.empty t) with Abort -> None
        
   (*------------------------------------------------------------------*)
-  let exhaustive
+  let exhaustive_and_mutually_exclusive
       (_loc : L.t) (table : Symbols.table)
       (system : SE.t option) (se_vars : SE.tagged_vars)
       ~(match_arg : Vars.var)
       ~(bodies : Macros.body list) (* all of type [arg_ty] *)
-    : unit 
+    : (bool * bool)
     =
     let match_arg_ty = Vars.ty match_arg in
     let match_arg_t = Term.mk_var match_arg in
@@ -625,16 +625,28 @@ exception NonExhaustive
       | UnfoldFailed -> raise NonExhaustive
     in
     
-    (* Check that all [cases] are instances of patterns.
+    (* Check that all [cases] are instances of [patterns].
 
        Any case that is not an instance is speciliazed, up-to depth
-       [max_depth], before recursively running [check]. *)
-    let rec check ~(depth : int) (cases : case list) =
+       [max_depth], before recursively running [check]. 
+
+       Further, assuming that the initial list of cases [cases0] are
+       mutually exclusive, computes a partition of [cases0]
+       (accumulating them in [partition]).
+    *)
+    let rec check
+        ~(depth : int) (cases : case list) ~(partition : case list) 
+      : 
+        [
+          | `Ok of case list      (* partition of [cases] *)
+          | `Missing of case list (* cases which are not instances of [patterns] *)
+        ]
+      =
 
       if depth > max_depth then `Missing cases else
         (* compute cases that are not handled by one of the pattern *)
-        let cases = 
-          List.filter
+        let remaining_cases, covered_cases = 
+          List.partition
             (fun (case : case) -> 
                not @@
                List.exists
@@ -642,17 +654,48 @@ exception NonExhaustive
                  patterns)
             cases
         in
-        if cases = [] then `Ok else
-          let cases = 
-            List.concat_map (fun t -> unfold_case t) cases
+        if remaining_cases = [] then `Ok (covered_cases @ partition) else
+          let remaining_cases = 
+            List.concat_map (fun t -> unfold_case t) remaining_cases
           in
-          check ~depth:(depth + 1) cases
+          check ~depth:(depth + 1) remaining_cases ~partition:(covered_cases @ partition)
     in
 
     let init_case = { term = wildcard match_arg_ty; conds = Mt.empty; } in
-    match check ~depth:0 [init_case] with
-    | `Ok -> ()
-    | `Missing _cases -> raise NonExhaustive
+
+    try
+      (* [partition] is a partition of [init_case] *)
+      let partition =
+        match check ~depth:0 [init_case] ~partition:[] with
+        | `Ok partition -> partition
+        | `Missing _cases -> raise NonExhaustive
+      in
+
+      (* For every match instance, look for a case in [partition] that
+         covers it.
+
+         If each case in [partition] covers at-most a single match
+         instance, we know that they are mutually exclusive. *)
+      let mutually_exclusive =
+        let exception NonMutuallyExclusive in
+        try
+          let used = Array.make (List.length partition) false in
+            List.iter (fun pattern ->
+                List.iteri (fun i case -> 
+                    let is_instance =
+                      is_instance table system ~case:pattern ~pat:case
+                    in
+                    if is_instance then begin
+                      if used.(i) then raise NonMutuallyExclusive;
+                      used.(i) <- true
+                    end
+                  ) partition
+              ) patterns;
+            true
+        with NonMutuallyExclusive -> false
+      in
+      (true, mutually_exclusive)
+    with NonExhaustive -> false, false
 end
 
 (*------------------------------------------------------------------*)
@@ -1250,19 +1293,18 @@ let parse_fun_decls
             let bodies = List.map finalize_body bodies in
             let match_arg = oget fdecl.dist_param in
             (* check that the pattern matching is exhaustive *)
+            let exhaustive, mutually_exclusive =
+              PatternMatching.exhaustive_and_mutually_exclusive loc table system se_vars
+                ~match_arg
+                ~bodies; 
+            in
             let exhs_formulas =
-              try
-                PatternMatching.exhaustive loc table system se_vars
-                  ~match_arg
-                  ~bodies; []
-              with
-                PatternMatching.NonExhaustive ->                  
-                [mk_exhaustive_formula bodies match_arg]
+              if exhaustive then [] else [mk_exhaustive_formula bodies match_arg]
             in
-            let formulas =
-              (mk_exclusive_formula bodies match_arg) :: exhs_formulas
+            let mut_formulas =
+              if mutually_exclusive then [] else [mk_exclusive_formula bodies match_arg]
             in
-            bodies, formulas
+            bodies, (mut_formulas @ exhs_formulas)
 
           | `Concrete t ->
             (* We build a single macro body when `name` is defined by

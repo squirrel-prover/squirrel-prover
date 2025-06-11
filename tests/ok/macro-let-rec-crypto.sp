@@ -91,15 +91,11 @@ case t.
     right. left. auto.
  + auto.
 
-
 split.  auto.
-split. 
 intro i.
 case (i=null_i).
 case happens(A i) => //. 
 auto.
-auto.
-
 Qed.
 
 (* Preimage resistance *)

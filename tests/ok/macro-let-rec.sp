@@ -90,38 +90,6 @@ let fn @system:P u with
 | D       when happens(u)  -> if pD then nD
 | init    -> empty
 | _ when not (happens u) -> empty.
-Proof.
-have H :
-(forall (i:index),
-   happens (A(i)) =>
-   (forall (i0,j:index), B(i0, j) <> A(i) || not (happens (A(i)))) &&
-   (D <> A(i) || not (happens (A(i)))) &&
-   (init <> A(i)) &&
-   forall (x:timestamp), x <> A(i) || happens (A(i))) &&
-(forall (i,j:index),
-   happens (B(i, j)) =>
-   (forall (i0:index), A(i0) <> B(i, j) || not (happens (B(i, j)))) &&
-   (D <> B(i, j) || not (happens (B(i, j)))) &&
-   (init <> B(i, j)) &&
-   forall (x:timestamp), x <> B(i, j) || happens (B(i, j))) &&
-(happens D =>
- (forall (i,j:index), B(i, j) <> D || not (happens D)) &&
- (forall (i:index), A(i) <> D || not (happens D)) &&
- (init <> D) && forall (x:timestamp), x <> D || happens D) 
-&&
-((D <> init || not (happens init)) &&
- (forall (i,j:index), B(i, j) <> init || not (happens init)) &&
- (forall (i:index), A(i) <> init || not (happens init)) &&
- forall (x:timestamp), x <> init || happens init) &&
-forall (x:timestamp),
-  not (happens x) =>
-  (init <> x) &&
-  (D <> x || not (happens x)) &&
-  (forall (i,j:index), B(i, j) <> x || not (happens x)) &&
-  forall (i:index), A(i) <> x || not (happens x)
-by simpl; auto.
-assumption.
-Qed.
 
 lemma _ @system:P t : 
   ((D <= t && pD) => false) =>
@@ -162,40 +130,6 @@ Proof.
 have Hyp: (forall (t:timestamp), D = t => happens(t) => pred t < t) &&
 forall (t:timestamp,x0,x1:index), B(x0, x1) = t => happens(t) => pred t < t 
 by auto.
-assumption.
-Qed.
-Proof.
-have H :
-(forall (x0:index),
-   happens (A(x0)) =>
-   (forall (x1,x2:index), B(x1, x2) <> A(x0) || not (happens (A(x0)))) 
-   &&
-   (D <> A(x0) || not (happens (A(x0)))) &&
-   (init <> A(x0)) &&
-   forall (x1:timestamp), x1 <> A(x0) || happens (A(x0))) &&
-(forall (x0,x1:index),
-   happens (B(x0, x1)) =>
-   (forall (x2:index), A(x2) <> B(x0, x1) || not (happens (B(x0, x1)))) 
-   &&
-   (D <> B(x0, x1) || not (happens (B(x0, x1)))) &&
-   (init <> B(x0, x1)) &&
-   forall (x2:timestamp), x2 <> B(x0, x1) || happens (B(x0, x1))) &&
-(happens D =>
- (forall (x0,x1:index), B(x0, x1) <> D || not (happens D)) &&
- (forall (x0:index), A(x0) <> D || not (happens D)) &&
- (init <> D) && forall (x0:timestamp), x0 <> D || happens D) 
-&&
-((D <> init || not (happens init)) &&
- (forall (x0,x1:index), B(x0, x1) <> init || not (happens init)) &&
- (forall (x0:index), A(x0) <> init || not (happens init)) &&
- forall (x0:timestamp), x0 <> init || happens init) &&
-forall (x0:timestamp),
-  not (happens x0) =>
-  (init <> x0) &&
-  (D <> x0 || not (happens x0)) &&
-  (forall (x1,x2:index), B(x1, x2) <> x0 || not (happens x0)) &&
-  forall (x1:index), A(x1) <> x0 || not (happens x0)
-by simpl; auto.
 assumption.
 Qed.
 
@@ -240,9 +174,7 @@ let bar @system:P ((x,y) : int * int) t with
 | D       when happens t -> x
 | init -> if x =  y then 24 else 42
 | _ when not (happens t) -> 10.
-Proof.
-auto.
-Qed.
+
 lemma [P] _ i j :
 happens(A i, B(i,j),D) =>
   bar (1,2) (A i    ) = 1 &&

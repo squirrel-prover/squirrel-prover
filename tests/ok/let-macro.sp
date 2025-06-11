@@ -34,9 +34,6 @@ let f0 @system:Q (x : int) u with
 | A i     when happens (A i)     -> 0
 | init                           -> 1
 | _       when not (happens u)   -> 2.
-Proof.
-auto.
-Qed.
 
 (*------------------------------------------------------------------*)
 system P = !_i in(c,x); A: out(c,x); !_j B:out(c,x) | D: out(c,empty).
@@ -48,10 +45,6 @@ let f @system:P (x : int) u with
 | D       when happens D         -> format diff(0,1)
 | init                           -> format 0
 | _       when not (happens u)   -> format 13.
-
-Proof. 
-auto. 
-Qed.
 
 lemma [P] _ x i j :
   happens (A i, B (i,j), D) =>
@@ -117,9 +110,6 @@ let g @like:P (x : int) t with
 | D       when happens t -> format 2
 | init                   -> format 42
 | _      when not (happens t) -> format 0.
-Proof.
-auto.
-Qed.
 
 lemma [any/P] _ x i j :
   happens (A i, B (i,j), D) =>
