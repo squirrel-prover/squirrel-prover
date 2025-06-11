@@ -49,11 +49,16 @@ type action_decl = {
 }
 
 (*------------------------------------------------------------------*)
+type inductive_decl = {
+  constructors : (lsymb * Typing.ty) list;
+  (** list of constructors and their types *)
+}
+
 (** Information for a base type declaration *)
 type ty_decl = {
   ty_name  : lsymb;
   ty_infos : lsymb list;
-  ty_body  : [`Abstract];
+  ty_body  : [`Abstract | `Inductive of inductive_decl];
 }
 
 (*------------------------------------------------------------------*)

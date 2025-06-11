@@ -39,7 +39,7 @@
 %token NEW OUT UNLOCK PARALLEL NULL
 %token CHANNEL PROCESS
 %token HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP PREDICATE
-%token TYPE FUN
+%token TYPE FUN INDUCTIVE
 %token MUTABLE MUTEX SYSTEM LIKE SET
 %token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
@@ -710,6 +710,14 @@ let_body:
 | WITH body=match_body { `Match body }
 
 (*------------------------------------------------------------------*)
+inductive_constructor:
+| c=lsymb COLON ty=ty { (c,ty) }
+
+inductive_body:
+| EQ PARALLEL? l=slist1(inductive_constructor, PARALLEL) { Decl.{ constructors = l; } }
+
+
+(*------------------------------------------------------------------*)
 /* declaration that may not be followed by the terminator symbol `.` */
 declaration_i:
 | HASH e=lsymb ctys=c_tys
@@ -750,7 +758,10 @@ declaration_i:
                           { Decl.Decl_action { a_name = e; a_arity; } }
 
 | TYPE e=lsymb infos=ty_infos
-                          { Decl.Decl_ty { ty_name = e; ty_infos = infos; ty_body = `Abstract; } }
+                          { Decl.Decl_ty { ty_name = e; ty_infos = infos; ty_body = `Abstract; }}
+
+| INDUCTIVE e=lsymb body=inductive_body
+                          { Decl.Decl_ty { ty_name = e; ty_infos = []; ty_body = `Inductive body; }}
 
 | ABSTRACT e=lsymb_gen_decl tyvars=ty_vars COLON tyo=ty
     { let symb_type, name = e in

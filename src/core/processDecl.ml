@@ -1147,9 +1147,12 @@ let parse_fun_decls
         match fdecl.body with
         | `Abstract (in_tys, out_ty) ->       (* abstract declaration *)
           let in_tys = List.map Vars.ty fdecl.pdecl.args @ in_tys in
-          Typing.declare_abstract table
-            ~ty_args:ty_vars ~in_tys ~out_ty
-            fdecl.pdecl.decl.Decl.op_name fdecl.pdecl.decl.op_symb_type, [], []
+          let table, _ =
+            Typing.declare_abstract table
+              ~ty_args:ty_vars ~in_tys ~out_ty
+              fdecl.pdecl.decl.Decl.op_name fdecl.pdecl.decl.op_symb_type
+          in
+          table, [], []
 
         | `Concrete body ->         (* concrete declaration *)
           let body = Term.gsubst tsubst body in
@@ -1533,6 +1536,88 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Typing.term) :
          (m:message,sk:message)"
 
 (*------------------------------------------------------------------*)
+(** Check that [ty_path] is only used in positive position in [ty]. *)
+let used_positively (ty_path : Symbols.ty) (ty : Type.ty) : bool =
+  let rec doit is_positive (ty : Type.ty) =
+    match ty with
+    | Type.Message | Type.Boolean | Type.Index | Type.Timestamp -> true
+    | Type.TVar _ | Type.TUnivar _  -> true
+
+    | Type.TConstr path ->
+      let path = Symbols.Ty.of_s_path path in
+      not (Symbols.path_equal path ty_path) || is_positive
+      
+    | Type.Tuple l -> List.for_all (doit is_positive) l
+
+    | Type.Fun (t1, t2) ->
+      doit (not is_positive) t1 &&
+      doit is_positive       t2
+  in
+  doit true ty
+
+let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =  
+  (* reserve the type name to make it available in the
+     constructors (in case the type is recursive) *)
+  let table, name =
+    Symbols.Ty.declare ~approx:false table decl.ty_name
+  in
+  let env = Env.init ~table ~ty_vars:[] () in
+
+  let table, data =
+    match decl.ty_body with
+    | `Abstract ->
+      let ty_infos = List.map HighType.Info.parse decl.ty_infos in
+      table, HighType.Abstract ty_infos
+
+    | `Inductive p_data -> 
+      let ty_decl = HighType.of_path name in
+      let table, constructors =
+        List.map_fold (fun table (c_name, c_ty) -> 
+            let ty = Typing.convert_ty env c_ty in
+            let ty_args, ty_out = Type.decompose_funs ty in
+            
+            (* Let [τ] be the (possibly recursive) type being declared.
+               Check that the constructor declaration is of the form:
+                 [c_name : τ1 → ... → τN → τ]
+               and that for every [i], [τi] uses [τ] only in positive
+               position.  *)
+            let () =
+              (* [τ] used positively *)
+              List.iter (fun arg ->
+                  if not (used_positively name arg) then
+                    error
+                      (L.loc c_ty) KDecl
+                      (Failure
+                         (Fmt.str "@\n@[<hv 0>recursive occurrences of@ @[%a@]@ must be used in \
+                                   positive positions@]"
+                            Symbols.pp name.s));
+                ) ty_args;
+
+              (* constructor outputs values of type [τ] *)
+              if not (Type.equal ty_out ty_decl) then
+                error
+                  (L.loc c_ty) KDecl
+                  (Failure (Fmt.str "final type must be %a" Type.pp ty_decl));
+            in
+
+            (* declare a new constructor *)
+            let table, c_name =
+              Typing.declare_abstract table
+                ~ty_args:[](* ty_vars *) ~in_tys:ty_args ~out_ty:ty_out
+                c_name `Prefix
+            in
+            table, c_name
+          ) table p_data.constructors
+      in
+      table, HighType.Inductive { constructors; }
+  in
+  Symbols.Ty.redefine
+    table
+    name
+    ~data:(HighType.Type data)
+
+    
+(*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
 
 
@@ -1696,15 +1781,7 @@ let declare table decl : Symbols.table * Goal.t list =
 
   | Decl.Decl_predicate decl -> parse_predicate_decl table decl, []
 
-  | Decl.Decl_ty ty_decl ->
-    let table, _ =
-      let ty_infos = List.map HighType.Info.parse ty_decl.ty_infos in
-      Symbols.Ty.declare ~approx:false
-        table
-        ty_decl.ty_name
-        ~data:(HighType.Type (Abstract ty_infos))
-    in
-    table, []
+  | Decl.Decl_ty decl -> parse_ty_decl table decl, []
 
   | Decl.Decl_game game -> parse_game_decl (L.loc decl) table game, []
 

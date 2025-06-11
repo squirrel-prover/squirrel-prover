@@ -247,6 +247,7 @@ let rec token buf =
   | "try find" -> !?FIND
   | "try" -> !?TRY
   | "type" -> !?TYPE
+  | "inductive" -> !?INDUCTIVE
   | "undo" -> !?UNDO
   | "unlock" -> !?UNLOCK
   | "use" -> !?USE

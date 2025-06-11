@@ -230,15 +230,15 @@ val declare_signature :
   lsymb -> lsymb -> lsymb ->
   Symbols.table
        
-(** [declare_abstract n i m] declares a new function symbol
-    of type [index^i -> message^m -> message]. *)
+(** [declare_abstract n i m] declares a new abstract function
+    symbol. *)
 val declare_abstract :
   Symbols.table -> 
   ty_args:Type.tvar list ->
   in_tys:Type.ty list ->
   out_ty:Type.ty ->
   lsymb -> Symbols.symb_type ->
-  Symbols.table
+  Symbols.table * Symbols.fname
 
 (** Sanity checks for a function symbol declaration. *)
 val check_fun_symb :

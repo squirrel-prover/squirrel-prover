@@ -32,10 +32,24 @@ end
 (*------------------------------------------------------------------*)
 type infos = Info.t list
 
-type data = Abstract of infos
+type inductive_data = {
+  constructors : Symbols.fname list;
+}
+
+type data =
+  | Abstract of infos
+  | Inductive of inductive_data
 
 type Symbols.data += Type of data
 
+(*------------------------------------------------------------------*)
+let of_path (s : Symbols.ty) : Type.ty =
+  let top, sub =
+    List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
+  in
+  Type.base top sub
+
+  
 (*------------------------------------------------------------------*)
 let get_data (s : Symbols.ty) table : data =
   match Symbols.Ty.get_data s table with Type l -> l | _ -> assert false
@@ -55,6 +69,10 @@ let get_ty_infos table (ty : Type.ty) : infos =
     begin
       match data with
       | Abstract infos -> infos
+      | Inductive _data -> [Well_founded]
+      (* FIXME: infer more infos depending on the constructors'
+         types. We likely need to add a bunch of ad hoc rules,
+         e.g. because recursive types are not finite, etc. *)
     end
 
   | _ -> []

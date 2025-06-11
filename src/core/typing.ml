@@ -311,10 +311,7 @@ let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
 
   | P_tbase tb_l ->
     let s = Symbols.Ty.convert_path tb_l env.table in
-    let top, sub =
-      List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
-    in
-    Type.base top sub
+    HighType.of_path s
 
   | P_tuple ptys -> Type.tuple (List.map (convert_ty env) ptys)
 
@@ -1456,7 +1453,7 @@ let declare_abstract
 
   let ftype = Type.mk_ftype ty_args in_tys out_ty in
   let data = mk_abstract_op ftype (Abstract f_info) in
-  fst (Symbols.Operator.declare ~approx:false table s ~data)
+  Symbols.Operator.declare ~approx:false table s ~data
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)

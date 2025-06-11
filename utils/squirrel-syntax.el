@@ -58,6 +58,7 @@
   "system"
   "like"
   "type"
+  "inductive"
   "name"
   "action"
   "channel"
@@ -244,7 +245,7 @@
     (cons (proof-ids-to-regexp squirrel-tacticals-keywords) 'proof-tacticals-name-face)
     (cons (proof-ids-to-regexp squirrel-tactic-keywords)    'proof-tactics-name-face)
 
-    (cons (proof-ids-to-regexp squirrel-decl-keywords)      'font-lock-constant-face)
+    (cons (proof-ids-to-regexp squirrel-decl-keywords)      'font-lock-builtin-face)
     (cons (proof-ids-to-regexp squirrel-global-keywords)    'font-lock-builtin-face)
     (cons (proof-ids-to-regexp squirrel-closing-keywords)   'squirrel-tactics-closing-face)
     (cons (proof-ids-to-regexp squirrel-dangerous-keywords) 'squirrel-tactics-dangerous-face)

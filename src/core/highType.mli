@@ -25,9 +25,18 @@ end
 (*------------------------------------------------------------------*)
 type infos = Info.t list
 
-type data = Abstract of infos
+type inductive_data = {
+  constructors : Symbols.fname list;
+}
+
+type data =
+  | Abstract of infos
+  | Inductive of inductive_data
 
 type Symbols.data += Type of data
+
+(*------------------------------------------------------------------*)
+val of_path : Symbols.ty -> Type.ty
 
 (*------------------------------------------------------------------*)
 val get_data : Symbols.ty -> Symbols.table -> data
