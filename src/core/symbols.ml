@@ -278,7 +278,7 @@ let pp_error_i fmt = function
     if np = "" then
       Fmt.pf fmt "unknown %s %s" g s
     else
-      Fmt.pf fmt "unknown %s  %s in %s" g s np
+      Fmt.pf fmt "unknown %s %s in %s" g s np
 
   | Incorrect_kind (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"

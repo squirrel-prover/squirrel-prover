@@ -7,6 +7,7 @@ module SE   = SystemExpr
 module Mv   = Vars.Mv
 module Sv   = Vars.Sv
 module Mt   = Term.Mt
+module Sid  = Ident.Sid
 
 type lsymb = Symbols.lsymb
 
@@ -469,7 +470,19 @@ module PatternMatching = struct
         let cases = List.map unfold_wildcard l in
         List.map (merge Term.mk_tuple) (cartesian_product cases)
 
-      (* FIXME: add cases for ADTs *)
+      | Type.TConstr (p, args) ->
+        begin 
+          let p = Symbols.Ty.of_s_path p in
+          match HighType.get_data p table with
+          | Abstract _ -> raise UnfoldFailed
+          | Inductive data ->
+            List.map (fun (constructor : Symbols.fname) ->
+                let c = Term.mk_fun table constructor ~ty_args:args [] in
+                let ty_args, _ty_out = Type.decompose_funs (Term.ty c) in
+                let args = List.map wildcard ty_args in
+                { term = Term.mk_app c args; conds; }
+              ) data.constructors
+        end
 
       (* we do not know how to generate unfolding of the remaining
          types, so we fail *)
@@ -1536,85 +1549,193 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Typing.term) :
          (m:message,sk:message)"
 
 (*------------------------------------------------------------------*)
-(** Check that [ty_path] is only used in positive position in [ty]. *)
-let used_positively (ty_path : Symbols.ty) (ty : Type.ty) : bool =
-  let rec doit is_positive (ty : Type.ty) =
-    match ty with
-    | Type.Message | Type.Boolean | Type.Index | Type.Timestamp -> true
-    | Type.TVar _ | Type.TUnivar _  -> true
+(** Replace all occurrences of [path args] by [ty_var] in [in_ty]. 
 
-    | Type.TConstr path ->
-      let path = Symbols.Ty.of_s_path path in
-      not (Symbols.path_equal path ty_path) || is_positive
+    Further, ensure that [path] only occurs applied to [args] (thus,
+    after generalization, [path] no longer occurs in [ty]). *)
+let generalize_type
+    (loc : L.t)
+    (path : Symbols.ty) (args : Type.ty list) 
+    (ty_var : Ident.t)
+    ~(in_ty : Type.ty) : Type.ty
+  =
+  let ty_var = Type.tvar ty_var in
+  let rec doit (ty : Type.ty) : Type.ty =
+    match ty with
+    | Type.TConstr (path',args') ->
+      let path' = Symbols.Ty.of_s_path path' in
+      if Symbols.path_equal path path' then 
+        begin
+          if not (List.for_all2 Type.equal args args') then 
+            error loc KDecl
+              (Failure (Fmt.str "%a can only occur as %a" 
+                          Symbols.pp_path path 
+                          Type.pp (HighType.of_path path ~args)));
+          ty_var
+        end
+      else Type.map doit ty
+    | _ -> Type.map doit ty
+  in
+  doit in_ty
+
+(** Return [(pos,neg)], where [pos] is an (over-approximation of) the
+    type variables of [ty] appearing in positive position in [ty].
+
+    Similarly for [neg], except that it is for variables appearing in
+    negative position. 
+
+    Remark that a variable may appear both in [pos] and [neg]. 
+
+    If a variable does not occur in [neg], we know that it is only
+    used positively in [ty] (similarly for [pos] and negatively). *)
+let positive_tvars table (ty : Type.ty) : Sid.t * Sid.t =
+  let rec doit (pos : Sid.t) (neg : Sid.t) (ty : Type.ty) =
+    match ty with
+    | Type.Message | Type.Boolean | Type.Index | Type.Timestamp -> (pos, neg)
+    | Type.TUnivar _  -> assert false (* for now, this should not happen *)
+    | Type.TVar tv -> (Sid.add tv pos, neg)
       
-    | Type.Tuple l -> List.for_all (doit is_positive) l
+    | Type.TConstr (_,[]) -> (pos, neg)
+    | Type.TConstr (path,l) -> 
+      begin 
+        match HighType.get_data (Symbols.Ty.of_s_path path) table with
+        | Abstract _ -> assert (l = []); (pos,neg)
+        | Inductive data ->
+          List.fold_left2 (fun (pos,neg) ty ty_var ->
+              let pos_ty, neg_ty = doit Sid.empty Sid.empty ty in
+              if Sid.mem ty_var data.positive_vars then
+                (Sid.union pos_ty pos, Sid.union neg_ty neg)
+              else
+              if Sid.mem ty_var data.negative_vars then
+                (Sid.union neg_ty pos, Sid.union pos_ty neg)
+              else (* we may have both positive and negative occurrences *)
+                let pn = Sid.union pos_ty neg_ty in
+                (Sid.union pn pos, Sid.union pn neg)
+            ) (pos,neg) l data.ty_vars
+      end
+      
+    | Type.Tuple l -> doit_list pos neg l
 
     | Type.Fun (t1, t2) ->
-      doit (not is_positive) t1 &&
-      doit is_positive       t2
-  in
-  doit true ty
+      let neg, pos = doit neg pos t1 in (* swap pos and neg in [t1] *)
+      doit pos neg t2
 
+  and doit_list pos neg l =
+    List.fold_left (fun (pos,neg) ty -> doit pos neg ty) (pos,neg) l
+  in
+  doit Sid.empty Sid.empty ty
+
+(*------------------------------------------------------------------*)
 let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =  
-  (* reserve the type name to make it available in the
-     constructors (in case the type is recursive) *)
-  let table, name =
-    Symbols.Ty.declare ~approx:false table decl.ty_name
-  in
-  let env = Env.init ~table ~ty_vars:[] () in
-
-  let table, data =
     match decl.ty_body with
     | `Abstract ->
       let ty_infos = List.map HighType.Info.parse decl.ty_infos in
-      table, HighType.Abstract ty_infos
+      let data = HighType.Abstract ty_infos in
+      let table, _ = 
+        Symbols.Ty.declare
+          ~approx:false table decl.ty_name ~data:(HighType.Type data) 
+      in
+      table
+
 
     | `Inductive p_data -> 
-      let ty_decl = HighType.of_path name in
-      let table, constructors =
-        List.map_fold (fun table (c_name, c_ty) -> 
+      assert(decl.ty_infos = []);
+
+      let ty_vars = 
+        List.map (fun l ->
+            Type.mk_tvar (L.unloc l)
+          ) p_data.ty_vars
+      in
+
+      (* pre-declare the type name to make it available in the
+         constructors (in case the type is recursive), and so that
+         [Typing] knows how many type arguments it expects. *)
+      let data = HighType.Inductive { 
+          constructors = [];    (* we will populate this field later *)
+          positive_vars = Sid.empty;
+          negative_vars = Sid.empty;
+          ty_vars; 
+        }
+      in
+      let table, name =
+        Symbols.Ty.declare ~approx:false table decl.ty_name ~data:(HighType.Type data)
+      in
+
+      let env = Env.init ~table ~ty_vars:(List.rev ty_vars) () in
+      (* reverse [ty_vars] to properly handle capture *)
+
+      let (table, positive_vars, negative_vars), constructors =
+        List.map_fold (fun (table,positive_vars, negative_vars) (c_name, c_ty) -> 
             let ty = Typing.convert_ty env c_ty in
-            let ty_args, ty_out = Type.decompose_funs ty in
-            
-            (* Let [τ] be the (possibly recursive) type being declared.
-               Check that the constructor declaration is of the form:
-                 [c_name : τ1 → ... → τN → τ]
+
+            (* Let [τ = path args] be the (possibly recursive) type
+               being declared.
+               Check that the type [ty] of the constructor declaration
+               is of the form:
+                   [c : τ1 → ... → τN → τ]
                and that for every [i], [τi] uses [τ] only in positive
-               position.  *)
-            let () =
-              (* [τ] used positively *)
-              List.iter (fun arg ->
-                  if not (used_positively name arg) then
-                    error
-                      (L.loc c_ty) KDecl
-                      (Failure
-                         (Fmt.str "@\n@[<hv 0>recursive occurrences of@ @[%a@]@ must be used in \
-                                   positive positions@]"
-                            Symbols.pp name.s));
-                ) ty_args;
+               position.
+               Further, [τ = path args] and [path] must not occur
+               anywhere than in [τ] in [ty]. 
+
+               Finally, returns the set of type parameters used in
+               positive and negative position in the constructor. *)
+            let check_inductive_decl_usage
+                loc ~(path : Symbols.ty) ~(args : Type.ty list) (ty : Type.ty) : Sid.t * Sid.t
+              =
+              let ty_decl = HighType.of_path name ~args:(List.map Type.tvar ty_vars) in
+
+              let tau = Ident.create "τ" in
+              let tau_t = Type.tvar tau in
+              let ty = generalize_type loc path args tau ~in_ty:ty in
+              let ty_args, ty_out = Type.decompose_funs ty in
 
               (* constructor outputs values of type [τ] *)
-              if not (Type.equal ty_out ty_decl) then
+              if not (Type.equal ty_out tau_t) then
                 error
                   (L.loc c_ty) KDecl
                   (Failure (Fmt.str "final type must be %a" Type.pp ty_decl));
-            in
 
+              let pos, neg = positive_tvars table (Type.tuple ty_args) in
+
+              (* [τ] must only be used positively *)
+              if Sid.mem tau neg then
+                error
+                  loc KDecl
+                  (Failure
+                     (Fmt.str "@\n@[<hv 0>@[%a@]@ may not be used in \
+                               negative position@]"
+                        Symbols.pp path.s));
+
+              (Sid.remove tau pos, Sid.remove tau neg)
+            in
+            
+            let c_pos, c_neg = 
+              check_inductive_decl_usage
+                (L.loc c_ty) 
+                ~path:name ~args:(List.map Type.tvar ty_vars) ty
+            in
+            (* Remove from [positive_vars] all variables used
+               negatively in the constructor being inspected. *)
+            let positive_vars = Sid.diff positive_vars c_neg in
+
+            (* Idem for negative type variables. *)
+            let negative_vars = Sid.diff negative_vars c_pos in
+
+            let ty_args, ty_out = Type.decompose_funs ty in
             (* declare a new constructor *)
             let table, c_name =
               Typing.declare_abstract table
-                ~ty_args:[](* ty_vars *) ~in_tys:ty_args ~out_ty:ty_out
+                ~ty_args:ty_vars ~in_tys:ty_args ~out_ty:ty_out
                 c_name `Prefix
             in
-            table, c_name
-          ) table p_data.constructors
+            (table,positive_vars, negative_vars), c_name
+          ) (table, Sid.of_list ty_vars, Sid.of_list ty_vars) p_data.constructors
       in
-      table, HighType.Inductive { constructors; }
-  in
-  Symbols.Ty.redefine
-    table
-    name
-    ~data:(HighType.Type data)
+      let data = 
+        HighType.Inductive { ty_vars; positive_vars; negative_vars; constructors; } 
+      in
+      Symbols.Ty.redefine table name ~data:(HighType.Type data) 
 
     
 (*------------------------------------------------------------------*)

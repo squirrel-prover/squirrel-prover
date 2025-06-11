@@ -33,7 +33,10 @@ end
 type infos = Info.t list
 
 type inductive_data = {
-  constructors : Symbols.fname list;
+  ty_vars       : Ident.t list;
+  positive_vars : Ident.Sid.t;
+  negative_vars : Ident.Sid.t;
+  constructors  : Symbols.fname list;
 }
 
 type data =
@@ -43,16 +46,21 @@ type data =
 type Symbols.data += Type of data
 
 (*------------------------------------------------------------------*)
-let of_path (s : Symbols.ty) : Type.ty =
+let of_path ?(args:Type.ty list = []) (s : Symbols.ty) : Type.ty =
   let top, sub =
     List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
   in
-  Type.base top sub
+  Type.of_s_path (top, sub) ~args
 
   
 (*------------------------------------------------------------------*)
 let get_data (s : Symbols.ty) table : data =
   match Symbols.Ty.get_data s table with Type l -> l | _ -> assert false
+
+let arity (table : Symbols.table) (symb : Symbols.ty) : int =
+  match get_data symb table with
+  | Abstract _ -> 0
+  | Inductive data -> List.length data.ty_vars
 
 (*------------------------------------------------------------------*)
 let get_ty_infos table (ty : Type.ty) : infos =
@@ -61,18 +69,16 @@ let get_ty_infos table (ty : Type.ty) : infos =
     [Fixed; Finite; Well_founded; Serializable; Enum; ]
 
   | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length; Serializable; ]
-  | Type.TConstr (np,b) ->
-    (* FIXME: very hacky, but we cannot do better as qualified path
-       in [Symbols] depends on [Type] *)
+  | Type.TConstr ((np,b),_args) ->
     let np = Symbols.of_s_npath np in
     let data = get_data (Symbols.Ty.of_string np b) table in
     begin
       match data with
-      | Abstract infos -> infos
+      | Abstract infos -> assert (_args=[]); infos
       | Inductive _data -> [Well_founded]
-      (* FIXME: infer more infos depending on the constructors'
-         types. We likely need to add a bunch of ad hoc rules,
-         e.g. because recursive types are not finite, etc. *)
+      (* FIXME: inductive: infer more infos depending on the
+         constructors' types. We likely need to add a bunch of ad hoc
+         rules, e.g. because recursive types are not finite, etc. *)
     end
 
   | _ -> []

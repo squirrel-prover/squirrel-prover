@@ -49,7 +49,7 @@ module Prelude = struct
   let mk_leq     table t1 t2   = mk_fun_infer_tyargs table leq_p [t1;t2]
 
   (*------------------------------------------------------------------*)
-  let tstring = Type.base [] (Symbols.to_string (get_type ([],"string")).s)
+  let tstring = Type.of_s_path ([], Symbols.to_string (get_type ([],"string")).s)
 end
 
 (*------------------------------------------------------------------*)
@@ -92,7 +92,7 @@ module Int = struct
     check_load table;
     get_type  (int_p,s)
 
-  let tint table = Type.base [] (Symbols.to_string (get_type table "int").s)
+  let tint table = Type.of_s_path ([], Symbols.to_string (get_type table "int").s)
 
   (*------------------------------------------------------------------*)
   let add   table = get_fsymb table "+"
@@ -127,7 +127,7 @@ module[@warning "-32"] Real = struct
     check_load table;
     get_type  (real_p,s)
 
-  let treal table = Type.base real_p (Symbols.to_string (get_type table "real").s)
+  let treal table = Type.of_s_path (real_p, Symbols.to_string (get_type table "real").s)
 
   (*------------------------------------------------------------------*)
   let fs_add   table = get_fsymb table "+"
@@ -224,9 +224,10 @@ module Reify = struct
 
   module StringList = struct
     let ty table =
-      Type.base ["StringList"]
-                  (Symbols.to_string
-                    (get_type table ~path:["StringList"] "t").s)
+      Type.of_s_path 
+        (["StringList"],
+         Symbols.to_string
+           (get_type table ~path:["StringList"] "t").s)
     let fs_empty table = get_fsymb table ~path:["StringList"]  "empty"
     let fs_add   table = get_fsymb table ~path:["StringList"]  "add"
     let mk_empty       = mk_zero fs_empty
@@ -235,33 +236,36 @@ module Reify = struct
 
   module Ident = struct
     let ty table =
-		  Type.base ["Ident"]
-								  (Symbols.to_string
-									  (get_type table ~path:["Ident"] "t").s)
+		  Type.of_s_path 
+      (["Ident"],
+			 Symbols.to_string
+			(get_type table ~path:["Ident"] "t").s)
     let fs_ident table = get_fsymb table ~path:["Ident"]  "ident"
     let mk_ident       = mk_two fs_ident
   end (*ident*)
 
   module Tvar = struct
     let ty table =
-		  Type.base ["Tvar"]
-								  (Symbols.to_string
-									  (get_type table ~path:["Tvar"] "t").s)
+		  Type.of_s_path 
+      (["Tvar"],
+			 Symbols.to_string (get_type table ~path:["Tvar"] "t").s)
     let fs_tvar table = get_fsymb table ~path:["Tvar"]  "tvar"
     let mk_tvar       = mk_one fs_tvar
   end (*Tvar*)
 
   module Ty = struct
     let ty table =
-		  Type.base ["Type"]
-		              (Symbols.to_string
-                    (get_type table ~path:["Type"] "t").s)
+		  Type.of_s_path 
+      (["Type"],
+		   Symbols.to_string
+       (get_type table ~path:["Type"] "t").s)
 
     module List = struct
       let ty table =
-        Type.base ["Type";"List"]
-                    (Symbols.to_string
-                      (get_type table ~path:["Type";"List"] "t").s)
+        Type.of_s_path 
+          (["Type";"List"],
+             Symbols.to_string
+             (get_type table ~path:["Type";"List"] "t").s)
       let fs_empty table = get_fsymb table ~path:["Type";"List"]  "empty"
       let fs_add   table = get_fsymb table ~path:["Type";"List"]  "add"
       let mk_empty       = mk_zero fs_empty
@@ -289,26 +293,29 @@ module Reify = struct
 
   module Var = struct
     let ty table =
-      Type.base ["Var"]
-                  (Symbols.to_string
-                    (get_type table ~path:["Var"] "t").s)
+      Type.of_s_path 
+        (["Var"],
+         Symbols.to_string
+           (get_type table ~path:["Var"] "t").s)
     let fs_cons table = get_fsymb table ~path:["Var"]  "cons"
     let mk_cons       = mk_one fs_cons
   end (*Var*)
 
   module Binder = struct
     let ty table =
-      Type.base ["Binder"]
-                  (Symbols.to_string
-                    (get_type table ~path:["Binder"] "t").s)
+      Type.of_s_path 
+        (["Binder"],
+           Symbols.to_string
+           (get_type table ~path:["Binder"] "t").s)
     let fs_cons table = get_fsymb table ~path:["Binder"]  "cons"
     let mk_cons       = mk_two fs_cons
 
     module List = struct
       let ty table =
-        Type.base ["Binder";"List"]
-                    (Symbols.to_string
-                      (get_type table ~path:["Binder";"List"] "t").s)
+        Type.of_s_path
+          (["Binder";"List"],
+           Symbols.to_string
+             (get_type table ~path:["Binder";"List"] "t").s)
       let fs_empty table = get_fsymb table ~path:["Binder";"List"]  "empty"
       let fs_add   table = get_fsymb table ~path:["Binder";"List"]  "add"
       let mk_empty    = mk_zero fs_empty
@@ -318,9 +325,10 @@ module Reify = struct
 
   module Quant = struct
     let ty table =
-      Type.base ["Quant"]
-                  (Symbols.to_string
-                    (get_type table ~path:["Quant"] "t").s)
+      Type.of_s_path 
+        (["Quant"],
+         Symbols.to_string
+           (get_type table ~path:["Quant"] "t").s)
     let fs_forall      table = get_fsymb table ~path:["Quant"]  "ForAll"
     let fs_exsitential table = get_fsymb table ~path:["Quant"]  "Exsitential"
     let fs_seq         table = get_fsymb table ~path:["Quant"]  "Seq"
@@ -333,9 +341,10 @@ module Reify = struct
 
   module Projection = struct
       let ty table =
-        Type.base ["Projection"]
-                    (Symbols.to_string
-                      (get_type table ~path:["Projection"] "t").s)
+        Type.of_s_path 
+          (["Projection"],
+           Symbols.to_string
+             (get_type table ~path:["Projection"] "t").s)
       let fs_left  table = get_fsymb table ~path:["Projection"]  "Left"
       let fs_right table = get_fsymb table ~path:["Projection"]  "Right"
       let fs_cons table = get_fsymb table ~path:["Projection"]  "Cons"
@@ -346,8 +355,9 @@ module Reify = struct
 
   module SysVar = struct
     let ty table =
-      Type.base ["SysVar"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["SysVar"],
+         Symbols.to_string
            (get_type table ~path:["SysVar"] "t").s)
     let fs_of_ident table = get_fsymb table ~path:["SysVar"]  "Of_ident"
     let fs_set      table = get_fsymb table ~path:["SysVar"]  "set"
@@ -359,8 +369,9 @@ module Reify = struct
 
   module Single = struct
     let ty table =
-      Type.base ["Single"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["Single"],
+         Symbols.to_string
            (get_type table ~path:["Single"] "t").s)
     let fs_make table = get_fsymb table ~path:["Single"]  "make"
     let mk_make       = mk_two  fs_make
@@ -368,8 +379,9 @@ module Reify = struct
 
   module CntList = struct
     let ty table =
-      Type.base ["CntList"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["CntList"],
+         Symbols.to_string
            (get_type table ~path:["CntList"] "t").s)
     let fs_empty table = get_fsymb table ~path:["CntList"]  "empty"
     let fs_add   table = get_fsymb table ~path:["CntList"]  "add"
@@ -379,8 +391,9 @@ module Reify = struct
 
   module Sys = struct
     let ty table =
-      Type.base ["Sys"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["Sys"],
+         Symbols.to_string
            (get_type table ~path:["Sys"] "t").s)
     let fs_var  table = get_fsymb table ~path:["Sys"]  "Var"
     let fs_any  table = get_fsymb table ~path:["Sys"]  "Any"
@@ -392,8 +405,9 @@ module Reify = struct
 
   module TyDecl = struct
     let ty table =
-      Type.base ["TyDecl"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["TyDecl"],
+         Symbols.to_string
            (get_type table ~path:["TyDecl"] "t").s)
     let fs_make table = get_fsymb table ~path:["TyDecl"]  "make"
     let mk_make t x ty = Term.mk_fun t  (fs_make t) ~ty_args:[ty] [x]
@@ -401,8 +415,9 @@ module Reify = struct
 
   module VarDecl = struct
     let ty table =
-      Type.base ["VarDecl"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["VarDecl"],
+         Symbols.to_string
            (get_type table ~path:["VarDecl"] "t").s)
     let fs_make table = get_fsymb table ~path:["VarDecl"]  "make"
     let mk_make t qx x ty  = Term.mk_fun t (fs_make t) ~ty_args:[ty] [qx;x]
@@ -410,8 +425,9 @@ module Reify = struct
 
   module SysDecl = struct
     let ty table =
-      Type.base ["SysDecl"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["SysDecl"],
+         Symbols.to_string
            (get_type table ~path:["SysDecl"] "t").s)
     let fs_make table = get_fsymb table ~path:["SysDecl"]  "make"
     let mk_make       = mk_one  fs_make
@@ -419,15 +435,17 @@ module Reify = struct
 
   module EvalEnv = struct
     let ty table =
-      Type.base ["EvalEnv"]
-        (Symbols.to_string
+      Type.of_s_path 
+        (["EvalEnv"],
+         Symbols.to_string
            (get_type table ~path:["EvalEnv"] "t").s)
 
     module TyEnv = struct
       let ty table =
-        Type.base ["EvalEnv";"TyEnv"]
-                    (Symbols.to_string
-                      (get_type table ~path:["EvalEnv";"TyEnv"] "t").s)
+        Type.of_s_path 
+          (["EvalEnv";"TyEnv"],
+           Symbols.to_string
+             (get_type table ~path:["EvalEnv";"TyEnv"] "t").s)
       let fs_empty table = get_fsymb table ~path:["EvalEnv";"TyEnv"]  "empty"
       let fs_add   table = get_fsymb table ~path:["EvalEnv";"TyEnv"]  "add"
       let mk_empty       = mk_zero fs_empty
@@ -436,8 +454,9 @@ module Reify = struct
 
     module VarEnv = struct
       let ty table =
-        Type.base ["EvalEnv";"VarEnv"]
-                    (Symbols.to_string
+        Type.of_s_path 
+          (["EvalEnv";"VarEnv"],
+           Symbols.to_string
                       (get_type table ~path:["EvalEnv";"VarEnv"] "t").s)
       let fs_empty table = get_fsymb table ~path:["EvalEnv";"VarEnv"]  "empty"
       let fs_add   table = get_fsymb table ~path:["EvalEnv";"VarEnv"]  "add"
@@ -447,9 +466,10 @@ module Reify = struct
 
     module SysEnv = struct
       let ty table =
-        Type.base ["EvalEnv";"SysEnv"]
-                    (Symbols.to_string
-                      (get_type table ~path:["EvalEnv";"SysEnv"] "t").s)
+        Type.of_s_path 
+          (["EvalEnv";"SysEnv"],
+           Symbols.to_string
+             (get_type table ~path:["EvalEnv";"SysEnv"] "t").s)
       let fs_empty table = get_fsymb table ~path:["EvalEnv";"SysEnv"]  "empty"
       let fs_add   table = get_fsymb table ~path:["EvalEnv";"SysEnv"]  "add"
       let mk_empty       = mk_zero fs_empty
@@ -462,17 +482,19 @@ module Reify = struct
 
   module Term = struct
     let ty table =
-      Type.base ["Term"]
-                  (Symbols.to_string
-                    (get_type table ~path:["Term"] "t").s)
+      Type.of_s_path 
+        (["Term"],
+         Symbols.to_string
+           (get_type table ~path:["Term"] "t").s)
 
     let () = Term.set_reify_type ty
 
     module List = struct
       let ty table =
-        Type.base ["Term";"List"]
-                    (Symbols.to_string
-                      (get_type table ~path:["Term";"List"] "t").s)
+        Type.of_s_path 
+          (["Term";"List"],
+           Symbols.to_string
+             (get_type table ~path:["Term";"List"] "t").s)
       let fs_empty table = get_fsymb table ~path:["Term";"List"]  "empty"
       let fs_add   table = get_fsymb table ~path:["Term";"List"]  "add"
       let mk_empty       = mk_zero fs_empty
@@ -481,9 +503,10 @@ module Reify = struct
 
     module Diff = struct
       let ty table =
-        Type.base ["Term";"Diff"]
-                    (Symbols.to_string
-                      (get_type table ~path:["Term";"Diff"] "t").s)
+        Type.of_s_path 
+          (["Term";"Diff"],
+           Symbols.to_string
+             (get_type table ~path:["Term";"Diff"] "t").s)
       let fs_empty table = get_fsymb table ~path:["Term";"Diff"]  "empty"
       let fs_add   table = get_fsymb table ~path:["Term";"Diff"]  "add"
       let mk_empty       = mk_zero   fs_empty

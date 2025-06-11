@@ -23,6 +23,7 @@ let test_suites : unit Alcotest.test list =
     ("TermParsing"    , Squirreltests.Parserbuf.term_parsing);
     ("Prover"         , Squirreltests.Prover.tests);
     ("Predicate"      , Squirreltests.Predicate.tests);
+    ("Inductive"      , Squirreltests.Inductive.tests);
     ("Search"         , Squirreltests.Search.tests);
     ("NewTactics"     , Squirreltests.Tactics.tests);
     ("Term"           , Squirreltests.Term.tests);

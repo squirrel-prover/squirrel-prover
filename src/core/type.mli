@@ -38,8 +38,8 @@ type ty = private
   | Timestamp
 
   (* FIXME: use a type-safe [Symbols.path] *)
-  | TConstr of s_path
-  (** user-defined type constructor *)
+  | TConstr of s_path * ty list
+  (** user-defined type constructor (path, args) *)
         
   | TVar of tvar
   (** type variable *)
@@ -124,6 +124,9 @@ val tunit : ty
 (*------------------------------------------------------------------*)
 (** Prelude types *)
 
+val of_s_path : ?args:ty list -> (string list * string) -> ty
+
+(*------------------------------------------------------------------*)
 val tquantum_message : ty   
 val tint             : ty
 val tstring          : ty
@@ -131,7 +134,6 @@ val tstring          : ty
 (*------------------------------------------------------------------*)
 val univar : univar                -> ty
 val tvar   : tvar                  -> ty
-val base   : string list -> string -> ty   
 val func   : ty          -> ty     -> ty
 val fun_l  : ty list     -> ty     -> ty
 val tuple  : ty list     -> ty

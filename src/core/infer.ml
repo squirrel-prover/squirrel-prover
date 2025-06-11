@@ -129,7 +129,9 @@ let norm_ty ?(fail_on_cycles = true) (env : env) (t : Type.ty) : Type.ty =
 
     | Tuple l -> Type.tuple (List.map (doit seen) l)
 
-    | Message | Boolean | Index | Timestamp | TConstr _ | TVar _ as t -> t
+    | TConstr (p,args) -> Type.of_s_path p ~args:(List.map (doit seen) args)
+
+    | Message | Boolean | Index | Timestamp | TVar _ as t -> t
   in
   doit Sid.empty t
 
@@ -408,6 +410,10 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
 
       | Fun (t1, t2), Fun (t1', t2') ->
         do_unifs [t1; t2] [t1'; t2']
+
+      | TConstr (p, tl), TConstr (p', tl') ->
+        p = p' &&
+        do_unifs tl tl'
 
       | _ -> false
 

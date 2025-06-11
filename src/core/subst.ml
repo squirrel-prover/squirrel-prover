@@ -51,11 +51,13 @@ let add_se_var s x  se = { s with se_vars = Msv.add x  se s.se_vars; }
 let subst_ty (s : t) (t : Type.ty) : Type.ty =
   let rec doit (t : Type.ty) =
     match t with
-    | Message | Boolean | Index | Timestamp | TConstr _ -> t
+    | Message | Boolean | Index | Timestamp -> t
 
     | TVar id -> Mid.find_dflt t id s.tvars
 
     | TUnivar ui -> Mid.find_dflt t ui s.univars
+
+    | TConstr (p, tys) -> Type.of_s_path p ~args:(List.map doit tys)
 
     | Tuple tys -> Type.tuple (List.map doit tys)
     | Fun (t1, t2) -> Type.func (doit t1) (doit t2)

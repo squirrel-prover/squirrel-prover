@@ -50,6 +50,7 @@ type action_decl = {
 
 (*------------------------------------------------------------------*)
 type inductive_decl = {
+  ty_vars : lsymb list;
   constructors : (lsymb * Typing.ty) list;
   (** list of constructors and their types *)
 }

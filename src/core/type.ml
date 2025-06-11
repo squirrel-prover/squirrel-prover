@@ -75,8 +75,8 @@ type ty =
   | Timestamp
     
   (* FIXME: use a type-safe [Symbols.path] *)
-  | TConstr of s_path
-  (** user-defined type constructor *)
+  | TConstr of s_path * ty list
+  (** user-defined type constructor (path, args) *)
         
   | TVar of tvar
   (** Type variable *)
@@ -93,19 +93,20 @@ type ty =
 let fold (f : ty -> 'a -> 'a) (ty : ty) (acc : 'a) : 'a =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TConstr _ | TVar _ | TUnivar _ ->
+  | TVar _ | TUnivar _ ->
     acc
-    
-  | Tuple l -> List.fold_left ((^~) f) acc l
+
+  | TConstr (_,l) | Tuple l -> List.fold_left ((^~) f) acc l
                  
   | Fun (ty1, ty2) -> f ty1 (f ty2 acc) 
 
 let map (f : ty -> ty) (ty : ty) : ty =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TConstr _ | TVar _ | TUnivar _ ->
+  | TVar _ | TUnivar _ ->
     ty
     
+  | TConstr (p,l) -> TConstr (p, List.map f l)
   | Tuple l -> Tuple (List.map f l)
                  
   | Fun (ty1, ty2) -> Fun (f ty1, f ty2)
@@ -113,9 +114,17 @@ let map (f : ty -> ty) (ty : ty) : ty =
 let map_fold (f : ty -> 'a -> ty * 'a) (ty : ty) (acc : 'a) : ty * 'a =
   match ty with 
   | Message | Boolean | Index | Timestamp
-  | TConstr _ | TVar _ | TUnivar _ ->
+  | TVar _ | TUnivar _ ->
     ty, acc
     
+  | TConstr (p,l) ->
+    let acc, l =
+      List.fold_left_map
+        (fun acc ty -> let acc, ty = f ty acc in ty, acc)
+        acc l
+    in
+    TConstr (p,l), acc
+                 
   | Tuple l ->
     let acc, l =
       List.fold_left_map
@@ -144,18 +153,18 @@ let tmessage   = Message
 let ttimestamp = Timestamp
 let tindex     = Index
 
+let of_s_path ?(args:ty list = []) (np,s) = TConstr ((np,s),args)
+
 let tunit = Tuple []
 
 (*------------------------------------------------------------------*)
 (** Prelude types *)
-let tquantum_message = TConstr ([], "quantum_message")
-let tint             = TConstr ([], "int")
-let tstring          = TConstr ([], "string")
+let tquantum_message = of_s_path ([], "quantum_message") ~args:[]
+let tint             = of_s_path ([], "int"            ) ~args:[]
+let tstring          = of_s_path ([], "string"         ) ~args:[]
    
 
 (*------------------------------------------------------------------*)
-let base np s = TConstr (np,s)
-
 let func ty ty' = Fun (ty, ty')
 
 let rec fun_l tys tyout : ty =
@@ -176,7 +185,8 @@ let rec equal (a : ty) (b : ty) : bool =
                                
    | TVar s, TVar s'  -> Ident.equal s s'
 
-   | TConstr (np,s), TConstr (np',s') -> np = np' && s = s'
+   | TConstr ((np,s),args), TConstr ((np',s'),args') -> 
+     np = np' && s = s' && List.for_all2 equal args args'
 
    | TUnivar u, TUnivar u' -> Ident.equal u u'
 
@@ -193,6 +203,7 @@ let toplevel_prec = 0
 
 let fun_fixity   = 10, `Infix `Right
 let tuple_fixity = 20, `NonAssoc
+let app_fixity   = 10000, `Infix `Left
 
 let _pp ~dbg : ty formatter = 
   let rec _pp 
@@ -204,11 +215,22 @@ let _pp ~dbg : ty formatter =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TConstr (np,s) -> 
-      if np = [] then
-        Fmt.pf ppf "%s" s
-      else 
-        Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
+
+    | TConstr ((np,s),args) -> 
+      let pp_path ppf =
+        if np = [] then
+          Fmt.pf ppf "%s" s
+        else 
+          Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
+      in
+      let pp ppf () =
+        Fmt.pf ppf "@[%t@ %a@]" 
+          pp_path
+          (Fmt.list ~sep:(Fmt.any "@ ") (_pp (app_fixity, `Right))) args
+      in
+      if args = [] then Fmt.pf ppf "%t" pp_path else
+        maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+
     | TVar id   -> _pp_tvar ~dbg ppf id
     | TUnivar u -> pp_univar ppf u
 
@@ -241,8 +263,13 @@ let to_string (ty : ty) : string =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TConstr (np,s) -> 
-      Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
+    | TConstr ((np,s),args) -> 
+      let pp_args ppf =
+      if args = [] then () else
+        Fmt.pf ppf "::%a" (Fmt.list ~sep:(Fmt.any "::") doit) args
+      in
+      Fmt.pf ppf "%a.%s%t" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s pp_args
+
     | TVar id   -> pp_tvar ppf id
     | TUnivar u -> pp_univar ppf u
 
@@ -267,8 +294,12 @@ let rec is_bitstring_encodable = function
   | Message
   | Boolean
   | Index  
-  | Timestamp
-  | TConstr _  -> true
+  | Timestamp -> true
+
+  (* FIXME: inductive: have a more precise test, as this reject valid
+     cases, e.g. `list int` *)
+  | TConstr (_s,args)  -> 
+    args = [] 
 
   | Tuple tys -> List.for_all is_bitstring_encodable tys
 
@@ -281,13 +312,12 @@ let fv (t : ty) : Fv.t =
     | Message
     | Boolean
     | Index  
-    | Timestamp
-    | TConstr _  -> acc
-      
+    | Timestamp -> acc
+     
     | TUnivar ui -> Fv.add_uv ui acc
     | TVar    ti -> Fv.add_tv ti acc
 
-    | Tuple tys -> List.fold_left fuvs acc tys
+    | TConstr (_,tys) | Tuple tys -> List.fold_left fuvs acc tys
     | Fun (t1, t2) -> fuvs (fuvs acc t1) t2
   in
   fuvs Fv.empty t

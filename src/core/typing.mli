@@ -20,8 +20,7 @@ type ty_i =
   | P_boolean
   | P_index  
   | P_timestamp
-  | P_tbase  of Symbols.p_path
-  | P_tvar   of lsymb
+  | P_tpath  of Symbols.p_path * ty list
   | P_fun    of ty * ty
   | P_tuple  of ty list
   | P_ty_pat 
@@ -282,7 +281,6 @@ type conversion_error_i =
   | Assign_no_state      of string
   | BadSymbolKind        of string * Symbols.symbol_kind
   | Freetyunivar
-  | UnknownTypeVar       of string
   | BadPty               of Type.ty list
 
   | BadTermProj          of int * int (* tuple length, given proj *)

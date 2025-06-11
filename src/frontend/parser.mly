@@ -586,6 +586,7 @@ ty_i:
 | ty=sty_i                          { ty }
 | t1=ty ARROW t2=ty                 { Typing.P_fun (t1, t2) }
 | t1=sty STAR tys=slist1(sty, STAR) { Typing.P_tuple (t1 :: tys) }
+| l=path args=slist1(sty,empty)     { Typing.P_tpath (l,args) }
 
 sty_i:
 | MESSAGE                        { Typing.P_message }
@@ -593,8 +594,8 @@ sty_i:
 | TIMESTAMP                      { Typing.P_timestamp }
 | BOOLEAN                        { Typing.P_boolean }
 | BOOL                           { Typing.P_boolean }
-| tv=ty_var                      { Typing.P_tvar tv }
-| l=path                         { Typing.P_tbase l }
+| tv=ty_var                      { Typing.P_tpath (([],tv),[]) }
+| l=path                         { Typing.P_tpath (l,[]) }
 | LPAREN ty=ty_i RPAREN          { ty }
 | UNDERSCORE                     { Typing.P_ty_pat }
 
@@ -607,7 +608,7 @@ ty:
 (*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
-| l=lsymb COLON ty=ty { Decl.{ cty_space = l;
+| l=lsymb COLON ty=sty { Decl.{ cty_space = l;
                                       cty_ty    = ty; } }
 
 /* crypto assumption typed space */
@@ -713,8 +714,8 @@ let_body:
 inductive_constructor:
 | c=lsymb COLON ty=ty { (c,ty) }
 
-inductive_body:
-| EQ PARALLEL? l=slist1(inductive_constructor, PARALLEL) { Decl.{ constructors = l; } }
+inductive_constructors:
+| EQ PARALLEL? l=slist1(inductive_constructor, PARALLEL) { l }
 
 
 (*------------------------------------------------------------------*)
@@ -760,8 +761,11 @@ declaration_i:
 | TYPE e=lsymb infos=ty_infos
                           { Decl.Decl_ty { ty_name = e; ty_infos = infos; ty_body = `Abstract; }}
 
-| INDUCTIVE e=lsymb body=inductive_body
-                          { Decl.Decl_ty { ty_name = e; ty_infos = []; ty_body = `Inductive body; }}
+| INDUCTIVE e=lsymb ty_vars=slist(lsymb,empty) constructors=inductive_constructors
+                          { let ty_body = 
+                              `Inductive Decl.{ constructors; ty_vars; }
+                            in
+                            Decl.Decl_ty { ty_name = e; ty_infos = []; ty_body; }}
 
 | ABSTRACT e=lsymb_gen_decl tyvars=ty_vars COLON tyo=ty
     { let symb_type, name = e in

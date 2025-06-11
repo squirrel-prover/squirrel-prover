@@ -15,8 +15,7 @@ type ty_i =
   | P_boolean
   | P_index
   | P_timestamp
-  | P_tbase  of Symbols.p_path
-  | P_tvar   of lsymb
+  | P_tpath  of Symbols.p_path * ty list
   | P_fun    of ty * ty
   | P_tuple  of ty list
   | P_ty_pat
@@ -167,7 +166,6 @@ type conversion_error_i =
   | Assign_no_state      of string
   | BadSymbolKind        of string * Symbols.symbol_kind
   | Freetyunivar
-  | UnknownTypeVar       of string
   | BadPty               of Type.ty list
 
   | BadTermProj          of int * int (* tuple length, given proj *)
@@ -225,9 +223,6 @@ let pp_error_i ?ppe ppf = function
 
   | Freetyunivar ->
     Fmt.pf ppf "some type variable(s) could not be instantiated"
-
-  | UnknownTypeVar ty ->
-    Fmt.pf ppf "undefined type variable %s" ty
 
   | BadPty l ->
     Fmt.pf ppf "type must be of type %a"
@@ -289,29 +284,50 @@ let pp_error pp_loc_err ppe ppf (loc,e) =
 let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
   let convert_ty = convert_ty ?ienv in
 
+  (* raise [Not_found] in case of failure *)
+  let convert_ty_var (x : lsymb) =
+    let x = L.unloc x in
+    let tv =
+      List.find (fun tv' ->
+          Ident.name tv' = x
+        ) env.ty_vars
+    in
+    Type.tvar tv
+  in
+
+  let convert_type_constructor
+      (path : Symbols.p_path) (args: ty list) 
+    =
+    let s = Symbols.Ty.convert_path path env.table in
+    let arity = HighType.arity env.table s in
+
+    if arity <> List.length args then
+      error
+        (Symbols.p_path_loc path)
+        (Failure (Fmt.str "expected %d type arguments" arity));
+
+    let args = List.map (convert_ty env) args in
+    HighType.of_path s ~args
+  in
+
   match L.unloc pty with
   | P_message        -> Type.tmessage  
   | P_boolean        -> Type.tboolean  
   | P_index          -> Type.tindex    
   | P_timestamp      -> Type.ttimestamp
 
-  | P_tvar tv_l ->
-    let tv =
-      try
-        List.find (fun tv' ->
-            Ident.name tv' = L.unloc tv_l
-          ) env.ty_vars
-      with Not_found ->
-        error (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
-    in
-    Type.tvar tv
-
   (* ad hoc parsing rule for [unit] *)
-  | P_tbase ([], { pl_desc = "unit"; }) -> Type.tunit
+  | P_tpath (([], { pl_desc = "unit"; }),args) -> 
+    if args <> [] then
+      error (L.loc pty) (Failure "too many type arguments");
 
-  | P_tbase tb_l ->
-    let s = Symbols.Ty.convert_path tb_l env.table in
-    HighType.of_path s
+    Type.tunit
+
+  | P_tpath ((top,sub) as path, args) ->
+    if top = [] && args = [] then
+      try convert_ty_var sub with
+      | Not_found -> convert_type_constructor path args
+    else convert_type_constructor path args
 
   | P_tuple ptys -> Type.tuple (List.map (convert_ty env) ptys)
 

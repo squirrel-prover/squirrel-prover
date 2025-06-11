@@ -26,7 +26,10 @@ end
 type infos = Info.t list
 
 type inductive_data = {
-  constructors : Symbols.fname list;
+  ty_vars       : Ident.t list;   (** type parameters *)
+  positive_vars : Ident.Sid.t;    (** is a type parameter used only in positive position *)
+  negative_vars : Ident.Sid.t;    (** is a type parameter used only in negative position *)
+  constructors  : Symbols.fname list;
 }
 
 type data =
@@ -36,10 +39,12 @@ type data =
 type Symbols.data += Type of data
 
 (*------------------------------------------------------------------*)
-val of_path : Symbols.ty -> Type.ty
+val of_path : ?args:(Type.ty list) -> Symbols.ty -> Type.ty
 
 (*------------------------------------------------------------------*)
 val get_data : Symbols.ty -> Symbols.table -> data
+
+val arity : Symbols.table -> Symbols.ty -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Check that a type has some properties. } *)

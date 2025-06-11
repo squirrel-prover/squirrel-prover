@@ -162,7 +162,10 @@ let quote_type (t : Symbols.table) (ienv : Infer.env) (ty : Type.ty) : Term.t =
     | Boolean   -> R.Ty.mk_boolean   t
     | Index     -> R.Ty.mk_index     t
     | Timestamp -> R.Ty.mk_timestamp t
-    | TConstr (sl,s) ->
+    | TConstr ((sl,s),args) ->
+      if args <> [] then failure (Failure "cannot quote parametrized types");
+      (* FIXME: inductive: support parametrized types in reification *)
+
       R.Ty.mk_tbase t
         (AList.quote_list St t Term.mk_string sl
          |> assert_ty (AList.ty St t))
@@ -772,7 +775,8 @@ let rec unquote_type (st : unquote_state) (u : Term.t) : Type.ty =
   | Term.App (Term.Fun (fn,_), [path;name]) when fn = R.Ty.fs_tbase st.table ->
     let path = AList.unquote_list St st.table get_string path in
     let name =  get_string name in
-    Type.base path name
+    Type.of_s_path (path, name)
+  (* FIXME: inductive: unquote type argument here? *)
 
   | Term.App (Term.Fun (fn,_), [var]) when fn = R.Ty.fs_tvar st.table ->
     Type.tvar (unquote_tvar st var)

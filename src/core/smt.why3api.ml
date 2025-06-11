@@ -291,10 +291,12 @@ let rec convert_type context = function
   | Type.Boolean -> Why3.Ty.ty_bool 
   | Type.Tuple l -> Why3.Ty.ty_tuple (List.map (convert_type context) l)
   | Type.Index -> context.index_ty
-  | Type.TConstr (ns,t) 
+  | Type.TConstr ((ns,t),args)
       when Symbols.s_path_to_string (ns,t) = "int" -> 
+      assert (args=[]);
       context.int_ty
-  | Type.TConstr (ns,t) -> 
+  | Type.TConstr ((ns,t),args) -> 
+    if args <> [] then raise InternalError; (* FEAT: support type arguments *)
     let s = Symbols.s_path_to_string (ns,t) in
     Why3.Ty.(ty_var (tv_of_string s))
   | Type.TVar _ -> raise InternalError
