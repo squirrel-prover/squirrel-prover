@@ -159,13 +159,11 @@ let check_match_pattern
         in
         failed ~in_system t;
 
-    (* Int.( x1 + i1) where [i1] is a concrete value *)
-    | Term.App (Fun (fs,_), [Var _; Int _]) when fs = Library.Int.add table -> ()
-
     (* [true], [false] *)
     | Fun (fs,_) when fs = Symbols.fs_true || fs = Symbols.fs_false -> ()
 
-    | Fun (_fs,_) -> if false then failed t    (* FEATURE: add ADT constructors *)
+    | Fun (fs,_) ->
+      if Symbols.OpData.constructor_of fs table = None then failed t;
 
     | Tuple _
     | App _ -> Term.titer valid t
@@ -476,9 +474,9 @@ module PatternMatching = struct
       | Action (a,l) ->
         unfold_list (fun l -> Term.mk_action a l) l t.conds 
 
-      (* FIXME: add rule for ADTs by changing [false] to something
-         appropriate *)
-      | App (Fun (f,app_fty),l) -> (* [f] is a constructor *)
+      | App (Fun (f,app_fty),l) -> 
+        assert (Symbols.OpData.constructor_of f table <> None);
+        (* [f] is a constructor *)
          unfold_list (fun l -> Term.mk_fun0 f app_fty l) l t.conds
 
       (* We decide to fail early here, since [t] cannot be unfolded
@@ -1746,6 +1744,7 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
             let table, c_name =
               Typing.declare_abstract table
                 ~ty_args:ty_vars ~in_tys:ty_args ~out_ty:ty_out
+                ~constructor_of:name
                 c_name `Prefix
             in
             (table,positive_vars, negative_vars), c_name

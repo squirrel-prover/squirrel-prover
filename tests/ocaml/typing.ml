@@ -408,6 +408,29 @@ let gfailed @like:Q (x : int) t with
 
   (*------------------------------------------------------------------*)
 
+  let () =
+    let st = 
+      Prover.exec_all ~test:true init "\
+type t. 
+op u : t.
+op f : t -> t -> t. 
+op g : t -> t -> t."
+    in
+    Alcotest.check_raises "does not use constructors" Ok
+      (fun () ->
+         ignore (
+           try
+             Prover.exec_all ~test:true st "\
+let toto n with
+  | u -> u
+  | f a b  -> g a b."
+           with
+             ProcessDecl.Error (_,_,Failure _) -> raise Ok)
+      );
+  in
+
+  (*------------------------------------------------------------------*)
+
   (* positive exhaustiveness checks *)
   let _ : Prover.state = 
     Prover.exec_all ~test:true init "\

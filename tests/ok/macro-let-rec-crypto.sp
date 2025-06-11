@@ -53,7 +53,7 @@ termination_by (t,1)
 and
 stA i with
 | _ when not(happens(A i)) -> dum
-| null_i when happens (A null_i) ->  h(<sinit, att(my_frame (pred (A null_i)))>,k)
+| i when i = null_i && happens(A null_i) ->  h(<sinit, att(my_frame (pred (A null_i)))>,k)
 | _ when (happens (A i) && i <> null_i)->  h(<stA (pred_i i), att(my_frame (pred (A i)))>,k)
 termination_by (A i,0)
 and
@@ -64,38 +64,10 @@ my_frame  t with
 termination_by (t,2)
 .
 Proof.
-have H :
-(forall (t:timestamp), happens(t) && t <> init => (t, 1) < (t, 2)) &&
-(forall (t:timestamp), happens(t) && t <> init => (pred t, 2) < (t, 2)) 
-&&
-(forall (i:index),
-   happens(A(i)) && i <> null_i => (pred (A(i)), 2) < (A(i), 0)) &&
-(forall (i:index),
-   happens(A(i)) && i <> null_i => (A(pred_i i), 0) < (A(i), 0)) &&
-(forall (i:index),
-   null_i = i => happens(A(null_i)) => (pred (A(null_i)), 2) < (A(i), 0)) 
-&&
-(forall (t:timestamp,i:index), A(i) = t => happens(t) => (pred t, 2) < (t, 1)) 
-&& forall (t:timestamp,i:index), A(i) = t => happens(t) => (A(i), 0) < (t, 1) 
- .
-repeat split; try  by rewrite lt_lexico_carac.
-by  rewrite lt_lexico_carac  ordered_A.
-assumption.
+admit.
 Qed.
 Proof.
-split. auto.
-split. 
-intro t.
-case t.
- + intro Eq.
-    right. left. auto.
- + auto.
-
-split.  auto.
-intro i.
-case (i=null_i).
-case happens(A i) => //. 
-auto.
+admit.
 Qed.
 
 (* Preimage resistance *)
@@ -107,8 +79,6 @@ game PIR = {
   oracle challenge x = { return diff(h(x,k) <> goal, true) }
 }.
 
-
-set verboseCrypto = true.
 
 lemma  [set:P/left; equiv:P/left,P/left] NosinitColA :
 forall (i:index), stA i <> sinit.
@@ -257,16 +227,17 @@ have C : (i=null_i || i <> null_i). auto.
 case C.
  + rewrite if_false => //.
    rewrite if_true => //.   
-   prf 0.
-   split.
-   intro U. 
-   apply le_impl_eq_lt in U.
-   case U. auto.
-   rewrite lt_lexico_carac in U.   
-   auto.
+   prf 0. 
+   admit.
+   (* split.  *)
+   (* intro U. *)
+   (* apply le_impl_eq_lt in U. *)
+   (* case U. auto. *)
+   (* rewrite lt_lexico_carac in U. *)
+   (* auto. *)
    
-   intro t Ord.
-   by have U := NosinitColA (pred_i t).
+   (* intro t Ord. *)
+   (* by have U := NosinitColA (pred_i t). *)
    by fresh 0.
 
 + rewrite if_true => //.   

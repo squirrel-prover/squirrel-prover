@@ -253,20 +253,20 @@ Qed.
 let rec fac2 (x : int) with
 | _ when x < 0 -> 1
 | 0 -> 1
-| y + 1 when x > 0 -> x * fac2 y.
+| _ when x > 0 -> x * fac2 (x - 1).
 Proof. 
- (* smt. *) admit. (* FIXME: smt *)
+ smt. 
 Qed.
 Proof.
   split. 
   + repeat split.
     - intro x0 * /=. 
-     (* smt. *) admit. (* FIXME: smt *)
+      smt.
     - auto. 
-    - intro x.
-     (* smt. *) admit. (* FIXME: smt *)
+    - intro x. 
+      smt.
     - intro x * /=. 
-     (* smt. *) admit. (* FIXME: smt *)
+      smt.
  + intro x /=. have ? : 
 x < 0 || 0 = x || exists (y:int), y + 1 = x && x > 0  by admit.
    case H.
@@ -287,29 +287,26 @@ Proof.
   auto.  
 Qed.
 
-let rec broken_fac2 (x : int) with
-| _ when x < 0 -> 1
-| 0 -> 1
-| x + 1 when x > 0 -> (x + 1) * broken_fac2 x. (* this definition is wrong, we recaptured the x. *)
-Proof. 
-admit.
-Qed.
-Proof.
-split. admit.
-
-have H : forall (x:int), x < 0 || 0 = x || exists (x0:int), x0 + 1 = x && x0 > 0 by admit.
-  (* impossible formula to prove, we are missing the case x=1, as expected *)
-assumption.
-
-Qed.
-
 lemma _ @set:'P x : x + 1 > 0 => fac2 (x + 1) = (x + 1) * fac2 x.
 Proof.
   intro H.
   set a := fac2 x.
   expand ~def fac2 => /=. 
+  have -> : (x + 1) - 1 = x by smt.
   simpl ~delta.
-  by rewrite if_true.
+  rewrite if_true //.
+Qed.
+
+let rec broken_fac2 (x : int) with
+| _ when x < 0 -> 1
+| 0 -> 1
+| x when x - 1 > 0 -> x * broken_fac2 (x - 1).
+(* this definition is wrong, we recaptured the x. *)
+Proof. 
+admit.
+Qed.
+Proof.
+admit.
 Qed.
 
 

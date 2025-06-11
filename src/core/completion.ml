@@ -1631,7 +1631,8 @@ let () =
        let open Symbols.OpData in
        let ftype = Type.mk_ftype [] [] Type.tmessage in
        let data = Operator {
-           ftype; def = Abstract (Abstract `Prefix, []);
+           ftype; 
+           def = Abstract (Abstract { fixity = `Prefix; constructor_of = None; }, []);
          }
        in
        let table,ffs =

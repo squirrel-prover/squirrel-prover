@@ -236,6 +236,7 @@ val declare_abstract :
   ty_args:Type.tvar list ->
   in_tys:Type.ty list ->
   out_ty:Type.ty ->
+  ?constructor_of:Symbols.ty ->
   lsymb -> Symbols.symb_type ->
   Symbols.table * Symbols.fname
 

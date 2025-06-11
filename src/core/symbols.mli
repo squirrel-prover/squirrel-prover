@@ -376,6 +376,11 @@ module OpData : sig
     | DH_CDH
     | DH_GDH
 
+  type abstract_data = {
+    fixity : symb_type;
+    constructor_of : ty option;
+  }
+
   (** Definition on an abstract operator *)
   type abstract_def =
     | Hash
@@ -387,7 +392,7 @@ module OpData : sig
     | Sign
     | CheckSign
     | PublicKey
-    | Abstract of symb_type
+    | Abstract of abstract_data
 
   type associated_fun = fname list
 
@@ -432,6 +437,9 @@ module OpData : sig
   (** Indicates if an abstract function symbol has been defined with
       the specified definition. *)
   val is_abstract_with_ftype : fname -> abstract_def -> table -> bool
+
+  (** Return the type that a function symbol is a constructor of. *)
+  val constructor_of : fname -> table -> ty option
 end
 
 (*------------------------------------------------------------------*)

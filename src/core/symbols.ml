@@ -1075,6 +1075,11 @@ module OpData = struct
     | DH_CDH
     | DH_GDH
 
+  type abstract_data = {
+    fixity : symb_type;
+    constructor_of : ty option;
+  }
+
   (** Definition on an abstract operator *)
   type abstract_def =
     | Hash
@@ -1086,7 +1091,7 @@ module OpData = struct
     | Sign
     | CheckSign
     | PublicKey
-    | Abstract of symb_type
+    | Abstract of abstract_data
 
   type associated_fun = fname list
 
@@ -1153,6 +1158,12 @@ module OpData = struct
     | Abstract _ -> false
     | Concrete _ -> false
     | exception Not_found -> assert false
+
+  let constructor_of s table =
+    match (get_data s table).def with
+    | Abstract (Abstract data, _) -> data.constructor_of
+    | _ -> None
+
 end
 
 
@@ -1306,7 +1317,7 @@ let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) (f : string) arity =
     OpData.(
       Operator {
         ftype = fty;
-        def = Abstract (Abstract f_info, []);
+        def = Abstract (Abstract { fixity = f_info; constructor_of = None; } , []);
       }
     )
   in

@@ -235,7 +235,10 @@ let mk_namelength_statement
       let ftype = Type.mk_ftype [] [] Type.tmessage in
       let data =
         Symbols.OpData.Operator {
-          ftype; def = Abstract (Abstract `Prefix, [])
+          ftype; 
+          def = 
+            Abstract 
+              (Abstract { fixity = `Prefix; constructor_of = None;}, [])
         }
       in
       Symbols.Operator.declare ~approx:false table lsy ~data 

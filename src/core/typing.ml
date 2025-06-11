@@ -1336,18 +1336,22 @@ let declare_dh
       (gen : lsymb)
       ((exp, f_info) : lsymb * Symbols.symb_type)
       (omult : (lsymb * Symbols.symb_type) option)
-    : Symbols.table =
+    : Symbols.table 
+    =
   let open Symbols.OpData in
+  let abstract fixity : abstract_def = 
+    Abstract { fixity; constructor_of = None; } 
+  in
   let gen_fty = mk_ftype [] [] group_ty in
   let exp_fty = mk_ftype [] [group_ty; exp_ty] group_ty in
-  let exp_data = mk_abstract_op exp_fty (Abstract f_info) in
+  let exp_data = mk_abstract_op exp_fty (abstract f_info) in
   let table, exp = Symbols.Operator.declare ~approx:false table exp ~data:exp_data in
   let (table, af) =
     match omult with
     | None -> (table, [exp])
     | Some (mult, mf_info) ->
       let mult_fty = mk_ftype [] [exp_ty; exp_ty] exp_ty in
-      let mult_data = mk_abstract_op mult_fty (Abstract mf_info) in
+      let mult_data = mk_abstract_op mult_fty (abstract mf_info) in
       let table, mult =
         Symbols.Operator.declare ~approx:false table mult ~data:mult_data
       in
@@ -1461,14 +1465,16 @@ let check_fun_symb
       error (L.loc s) BadInfixDecl
 
 let declare_abstract 
-    table ~ty_args ~in_tys ~out_ty 
+    table ~ty_args ~in_tys ~out_ty ?constructor_of
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
   check_fun_symb (List.length in_tys) s f_info;
 
   let ftype = Type.mk_ftype ty_args in_tys out_ty in
-  let data = mk_abstract_op ftype (Abstract f_info) in
+  let data = 
+    mk_abstract_op ftype (Abstract { fixity = f_info; constructor_of; }) 
+  in
   Symbols.Operator.declare ~approx:false table s ~data
 
 (*------------------------------------------------------------------*)
