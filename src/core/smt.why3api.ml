@@ -22,7 +22,6 @@ let start_timer () =
 (* If we are running in JS, we disable smt. *)
 let disable_smt =  
   let exec_dir = Filename.dirname Sys.executable_name in
-  Format.eprintf "Folder test %s" exec_dir;
   exec_dir = "."
     
 let config =
