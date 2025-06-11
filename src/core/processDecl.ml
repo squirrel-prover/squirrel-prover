@@ -528,13 +528,14 @@ module PatternMatching = struct
          bodies)
 
   (*------------------------------------------------------------------*)
-exception NonExhaustive      
-  (* let exhaustiveness_error loc table (cases : case list) = *)
-  (*   let ppe = default_ppe ~table () in *)
-  (*   error loc KDecl *)
-  (*     (NotExhaustive  *)
-  (*        (Fmt.str "@[<v 2>pattern-matching is not exhaustive:@ @[<v 0>%a@]"  *)
-  (*           (Fmt.list ~sep:Fmt.cut (_pp_case ppe)) cases)) *)
+  exception NonExhaustive      
+
+  let[@warning "-32"] exhaustiveness_error loc table (cases : case list) =
+    let ppe = default_ppe ~table () in
+    error loc KDecl
+      (NotExhaustive
+         (Fmt.str "@[<v 2>pattern-matching is not exhaustive:@ @[<v 0>%a@]"
+            (Fmt.list ~sep:Fmt.cut (_pp_case ppe)) cases))
 
   (*------------------------------------------------------------------*)
   (** Compute conditions equivalent to [t], if possible. *)
