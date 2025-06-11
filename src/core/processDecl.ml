@@ -114,30 +114,6 @@ let parse_state_decl
   in
   let table, _ = Symbols.Macro.declare ~approx:false table name ~data in
   table
-
-(*------------------------------------------------------------------*)
-(* FIXME: merge with corresponding code in `reify.ml` once the
-   corresponding git branch is merged. *)
-(** Check if an action [a] is compatible with the system [system]. *)
-let is_compatible
-    (table : Symbols.table) (se_vars : SE.tagged_vars)
-    (system : SE.t) (a : Symbols.action)
-  : bool
-  =
-  let _, action = Action.get_def a table in
-  match SE.get_compatible_system se_vars system with
-  | Some compatible_system ->
-    let compatible_system = SE.of_system table compatible_system in
-    begin 
-      try
-        ignore (SE.action_to_term table compatible_system action : Term.term);
-        true
-      with Not_found -> false
-    end
-
-  | None ->
-    (* the only action that is compatible with all systems is [init] *)
-    a = Symbols.init_action
           
 (*------------------------------------------------------------------*)
 (** Check that [pat] is a valid match pattern:
@@ -175,7 +151,7 @@ let check_match_pattern
         error loc KDecl (Failure (Fmt.str "missing system annotation"));
 
       let system = oget system in
-      if not (is_compatible table se_vars system a) then
+      if not (Reify.is_compatible table se_vars system a) then
         let in_system =
           match SE.get_compatible_system se_vars system with
           | None -> "in system any"
