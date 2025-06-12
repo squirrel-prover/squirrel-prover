@@ -1164,6 +1164,7 @@ module OpData = struct
     | Abstract (Abstract data, _) -> data.constructor_of
     | _ -> None
 
+  let is_constructor s table = (constructor_of s table) <> None
 end
 
 

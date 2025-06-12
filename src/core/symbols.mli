@@ -440,6 +440,8 @@ module OpData : sig
 
   (** Return the type that a function symbol is a constructor of. *)
   val constructor_of : fname -> table -> ty option
+
+  val is_constructor : fname -> table -> bool
 end
 
 (*------------------------------------------------------------------*)

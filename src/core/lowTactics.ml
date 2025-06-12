@@ -3173,14 +3173,231 @@ type form_type =
 
       | _ -> assert false   (* cannot happen, we are in a global sequent *)
 
-let and_right_args args s =
-  match args with
-  | [TacticsArgs.Term_parsed e] -> let e,_ = convert s e in and_right (Some e) s
-  | [] -> and_right None s
-  | _ -> soft_failure (Failure "Not a correct term given to split")
+  let and_right_args args s =
+    match args with
+    | [TacticsArgs.Term_parsed e] -> let e,_ = convert s e in and_right (Some e) s
+    | [] -> and_right None s
+    | _ -> soft_failure (Failure "Not a correct term given to split")
 
-let wrap_and_split args = wrap_fail (and_right_args args)
+  let wrap_and_split args = wrap_fail (and_right_args args)
 
+  (*------------------------------------------------------------------*)
+  (** {3 Discriminate} *)
+
+  (*------------------------------------------------------------------*)
+  (** [hid] is [None] if [f] is the conclusion, and [Some H] if [H :
+      f] appears in the proof-context. *)
+  let discriminate
+      (hid : Ident.t option) (f : Equiv.any_form) (s : S.t) : bool
+    =
+
+    (* get the formula [f] we operate upon *)
+    let f, is_glob =
+      match f with
+      | Equiv.Local f -> f, false
+      | Equiv.Global f ->
+        match Equiv.destr_reach f with
+        | None -> soft_failure (Failure "must be a global atom [·] or a local atom")
+        | Some { formula; bound; } ->
+          if bound <> None then
+            soft_failure (Failure "concrete logic unsupported");
+          (* FIXME: inductive *)
+          formula, true
+    in
+
+    (* reduction state *)
+    let red_state =
+      lazy(
+        let system = S.system s in
+        let in_system =
+          if is_glob then
+            SE.{set = (oget system.pair :> SE.t); pair = None;}
+          else system
+        in
+        let pc = S.proof_context ~in_system s in
+        Reduction.mk_state pc ~red_param:Reduction.rp_full
+      )
+    in
+
+    let table = S.table s in
+
+    (** try to reduce the left or right term and retry [func] *)
+    let try_reduce func (l : Term.term) (r : Term.term) =
+      let l, has_red = Reduction.whnf_term ~strat:Std (Lazy.force red_state) l in
+      if has_red then func l r
+      else
+        let r, has_red = Reduction.whnf_term ~strat:Std (Lazy.force red_state) r in
+        if has_red then func l r
+        else
+          soft_failure (Failure "ill-formed hypothesis")
+    in
+
+    (** equality discriminate *)
+    let rec discriminate_eq (l : Term.t) (r : Term.t) : bool =
+      match Term.decompose_app l, Term.decompose_app r with
+      | (Int i, []), (Int j,[]) -> not (Z.equal i j)
+      | (String l,[]), (String r,[]) -> not (String.equal l r)
+
+      | (Fun (fsl, ftyl), argsl),
+        (Fun (fsr, ftyr), argsr) ->
+        begin
+          match Symbols.OpData.constructor_of fsl table,
+                Symbols.OpData.constructor_of fsr table with
+          | Some cl, Some cr ->
+            assert (Symbols.path_equal cl cr);
+            if Symbols.path_equal fsl fsr &&
+               List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args then
+              (* same constructor on both side,
+                 look for a diverging constructor below a shared constructor *)
+              List.exists2 discriminate_eq argsl argsr
+
+            (* we found an equality between different constructors *)
+            else true 
+          | _ -> try_reduce discriminate_eq l r
+        end
+
+      (* look for a diverging constructor below a tuple *)
+      | (Tuple l, []), (Tuple r, []) -> List.exists2 discriminate_eq l r
+
+      | _ -> try_reduce discriminate_eq l r
+    in
+
+    (** Check if [l] is a subterm of [r] *)
+    let rec find_subterm (l : Term.t) (r : Term.t) : bool =
+      Term.equal l r ||
+      Term.texists (find_subterm l) r
+    in
+
+    (** In-equality discriminate, try to show that [l < r] (or [l ≤ r]
+        if [large]), where the standard ordering [<] is the structural
+        on inductive types, ordering constructors arguments in
+        lexicographic orders. *)
+    let discriminate_lt ~(large : bool) (l : Term.t) (r : Term.t) : bool =      
+      (** - [true] means ([l < r] if [not large], and [l ≤ r] if [large]), 
+          - [false] mean [l = r]
+            Raise a user-level error if we do not manage to compare [l] and [r]. *)
+      let rec doit ?(large : bool = false) (l : Term.t) (r : Term.t) : bool =
+        if large && Term.equal l r then true else
+          match r with
+          | App (Fun (fsr, _), argsr) ->
+            begin
+              match Symbols.OpData.constructor_of fsr table with
+              | Some _ ->
+                List.exists (find_subterm l) argsr ||
+                doit_rec l r
+              | _ -> try_reduce (doit ~large) l r
+            end
+
+          | Tuple argsr ->
+            List.exists (find_subterm l) argsr ||
+            doit_rec l r
+
+          | _ ->
+            if Term.equal l r then false
+            else try_reduce (doit ~large) l r
+
+      (** try to recurse below [l] and [r] if they starts with a
+          common top-level constructors, and show that [l < r] *)
+      and doit_rec (l : Term.t) (r : Term.t) : bool =
+        match l, r with
+        | App (Fun (fsl, ftyl), argsl),
+          App (Fun (fsr, ftyr), argsr) ->
+          begin
+            match Symbols.OpData.constructor_of fsl table,
+                  Symbols.OpData.constructor_of fsr table with
+            | Some cl, Some cr ->
+              assert (Symbols.path_equal cl cr);
+              if Symbols.path_equal fsl fsr &&
+                 List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args then
+                (* same constructor on both side,
+                   recurse in lexicographic ordering *)
+                List.exists2 doit argsl argsr
+
+              (* We found an inequality between different constructors,
+                 we do not know how to recurse. *)
+              else soft_failure (Failure "cannot compare terms")
+            | _ -> try_reduce doit_rec l r
+          end
+
+        (* recurse below a tuple, in lexicographic order *)
+        | Tuple l, Tuple r -> List.exists2 doit l r
+
+        | _ -> try_reduce doit_rec l r
+      in
+      doit ~large l r
+    in
+
+    (* apply discriminate, selecting the equality or disequality mode *)
+    let rec doit (f : Term.term) =
+      let open Symbols in
+      match Term.decompose_app f with
+      | Fun (fn, _), [l;r] when fn = fs_eq ->
+        if hid = None then
+          soft_failure
+            (Failure "equality discriminate does not apply on the conclusion");
+        discriminate_eq l r
+
+      | Fun (fn, _), [l;r] when fn = fs_lt  ->
+        if hid <> None then
+          (* we have [l < r] as hypothesis, show by contradiction that
+             [r ≤ l] *)
+          discriminate_lt ~large:true r l
+        else
+          (* show that [l < r] *)
+          discriminate_lt ~large:false l r
+
+      (* similar reasoning for the remaining cases *)            
+      | Fun (fn, _), [l;r] when fn = fs_gt  ->
+        if hid <> None then
+          discriminate_lt ~large:true  l r
+        else
+          discriminate_lt ~large:false r l
+
+      | Fun (fn, _), [l;r] when fn = fs_leq ->
+        if hid <> None then
+          discriminate_lt ~large:false r l          
+        else
+          discriminate_lt ~large:true  l r
+
+
+      | Fun (fn, _), [l;r] when fn = fs_geq ->
+        if hid <> None then
+          discriminate_lt ~large:false l r
+        else
+          discriminate_lt ~large:true  r l            
+
+      | _ ->
+        let f, has_red = Reduction.whnf_term ~strat:Std (Lazy.force red_state) f in
+        if has_red then doit f else
+          soft_failure (Failure "must be an equality or disequality")
+    in
+    doit f
+
+        
+  (*------------------------------------------------------------------*)
+  let discriminate_tac_args args (s : S.t) : S.t list =
+    let hyp_opt =
+      match Args.as_p_path args with
+      | Some (    [], str) -> Some (S.Hyps.by_name_k str Hyp s)
+      | Some (_ :: _,   _) -> bad_args ()
+      | None -> None
+    in
+    let hid, f =
+      match hyp_opt with
+      | Some (hid,f) ->
+        (Some hid, Equiv.Babel.convert ~src:S.hyp_kind ~dst:Equiv.Any_t f)
+      | None ->
+        let f =
+          S.conclusion s |>
+          Equiv.Babel.convert ~src:S.conc_kind ~dst:Equiv.Any_t
+        in
+        None, f
+    in
+    if discriminate hid f s then []
+    else soft_failure (Failure "discriminate failed")
+
+  let discriminate_tac args =
+    wrap_fail (discriminate_tac_args args)
 end
 
 (*------------------------------------------------------------------*)
@@ -3711,6 +3928,12 @@ let () =
     (genfun_of_any_fun_arg
        TraceLT.weak_tac
        EquivLT.weak_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "discriminate"
+    ~pq_sound:true
+    (gentac_of_any_tac_arg TraceLT.discriminate_tac EquivLT.discriminate_tac)
 
 (*------------------------------------------------------------------*)
     

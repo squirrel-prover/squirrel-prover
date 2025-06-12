@@ -179,6 +179,7 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
+  "discriminate"
   "assumption"
   "congruence"
   "constraints"

@@ -200,6 +200,9 @@ Proof.
   by rewrite or_comm.
 Qed.
 
+lemma [any] absurd (a:boolean) : not (not a) => a.
+Proof. auto. Qed.
+
 (*------------------------------------------------------------------*)
 (* not: more lemmas *)
 
