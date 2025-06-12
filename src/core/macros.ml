@@ -993,6 +993,11 @@ let basic_match
 
     | Term.Var x, _ -> add_or_fail x t2
 
+    | Term.Fun (fs1,fty1), Term.Fun (fs2,fty2)
+      when Symbols.OpData.is_constructor fs1 table &&
+           Symbols.path_equal fs1 fs2 &&
+           List.for_all2 Type.equal fty1.ty_args fty2.ty_args -> ()
+
     | _ -> raise Unknown
   in
   try

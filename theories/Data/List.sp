@@ -15,4 +15,8 @@ namespace List.
   Proof.
     intro > <-; discriminate. 
   Qed.
+
+  lemma length_nil @system:any ['a] :
+    length Nil = 0.
+  Proof. rewrite /length; apply eq_refl. Qed. 
 end List.
