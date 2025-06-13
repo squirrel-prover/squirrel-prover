@@ -643,7 +643,15 @@ module PatternMatching = struct
       let partition =
         match check ~depth:0 [init_case] ~partition:[] with
         | `Ok partition -> partition
-        | `Missing _cases -> raise NonExhaustive
+        | `Missing cases ->
+          let ppe = default_ppe ~table () in
+          Printer.prt `Warning
+            "@[<v 0>Pattern-matching is not exhaustive,@;\
+             generate proof-obligations instead:@;\
+            \  @[<v 0>%a@]
+                   @]"
+          (Fmt.list ~sep:Fmt.cut (_pp_case ppe)) cases;
+          raise NonExhaustive
       in
 
       (* For every match instance, look for a case in [partition] that
@@ -1277,7 +1285,12 @@ let parse_fun_decls
               if exhaustive then [] else [mk_exhaustive_formula bodies match_arg]
             in
             let mut_formulas =
-              if mutually_exclusive then [] else [mk_exclusive_formula bodies match_arg]
+              if mutually_exclusive then [] else begin
+                Printer.prt `Warning
+                  "Could not prove that the pattern-match cases are mutually exclusive,@;\
+                   generate proof-obligations instead";
+                [mk_exclusive_formula bodies match_arg]
+              end
             in
             bodies, (mut_formulas @ exhs_formulas)
 
