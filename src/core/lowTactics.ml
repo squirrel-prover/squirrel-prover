@@ -3188,7 +3188,7 @@ type form_type =
   (** [hid] is [None] if [f] is the conclusion, and [Some H] if [H :
       f] appears in the proof-context. *)
   let discriminate
-      (hid : Ident.t option) (f : Equiv.any_form) (s : S.t) : bool
+      (hid : Ident.t option) (f : Equiv.any_form) (pc : ProofContext.t) : bool
     =
 
     (* get the formula [f] we operate upon *)
@@ -3208,134 +3208,36 @@ type form_type =
     (* reduction state *)
     let red_state =
       lazy(
-        let system = S.system s in
-        let in_system =
+        let system = pc.env.system in
+        let system =
           if is_glob then
             SE.{set = (oget system.pair :> SE.t); pair = None;}
           else system
         in
-        let pc = S.proof_context ~in_system s in
+        let pc = ProofContext.change_system ~system pc in
         Reduction.mk_state pc ~red_param:Reduction.rp_full
       )
     in
 
-    let table = S.table s in
+    let table = pc.env.table in
 
-    (** try to reduce the left or right term and retry [func] *)
-    let try_reduce func (l : Term.term) (r : Term.term) =
-      let l, has_red = Reduction.whnf_term ~strat:Std (Lazy.force red_state) l in
-      if has_red then func l r
-      else
-        let r, has_red = Reduction.whnf_term ~strat:Std (Lazy.force red_state) r in
-        if has_red then func l r
-        else
-          soft_failure (Failure "ill-formed hypothesis")
+    let discriminate_eq =
+      PatternMatching.discriminate_eq red_state table
     in
 
-    (** equality discriminate *)
-    let rec discriminate_eq (l : Term.t) (r : Term.t) : bool =
-      match Term.decompose_app l, Term.decompose_app r with
-      | (Int i, []), (Int j,[]) -> not (Z.equal i j)
-      | (String l,[]), (String r,[]) -> not (String.equal l r)
-
-      | (Fun (fsl, ftyl), argsl),
-        (Fun (fsr, ftyr), argsr) ->
-        begin
-          match Symbols.OpData.constructor_of fsl table,
-                Symbols.OpData.constructor_of fsr table with
-          | Some cl, Some cr ->
-            assert (Symbols.path_equal cl cr);
-            if Symbols.path_equal fsl fsr &&
-               List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args then
-              (* same constructor on both side,
-                 look for a diverging constructor below a shared constructor *)
-              List.exists2 discriminate_eq argsl argsr
-
-            (* we found an equality between different constructors *)
-            else true 
-          | _ -> try_reduce discriminate_eq l r
-        end
-
-      (* look for a diverging constructor below a tuple *)
-      | (Tuple l, []), (Tuple r, []) -> List.exists2 discriminate_eq l r
-
-      | _ -> try_reduce discriminate_eq l r
+    let discriminate_lt =
+      PatternMatching.discriminate_lt red_state table
     in
-
-    (** Check if [l] is a subterm of [r] *)
-    let rec find_subterm (l : Term.t) (r : Term.t) : bool =
-      Term.equal l r ||
-      Term.texists (find_subterm l) r
-    in
-
-    (** In-equality discriminate, try to show that [l < r] (or [l ≤ r]
-        if [large]), where the standard ordering [<] is the structural
-        on inductive types, ordering constructors arguments in
-        lexicographic orders. *)
-    let discriminate_lt ~(large : bool) (l : Term.t) (r : Term.t) : bool =      
-      (** - [true] means ([l < r] if [not large], and [l ≤ r] if [large]), 
-          - [false] mean [l = r]
-            Raise a user-level error if we do not manage to compare [l] and [r]. *)
-      let rec doit ?(large : bool = false) (l : Term.t) (r : Term.t) : bool =
-        if large && Term.equal l r then true else
-          match r with
-          | App (Fun (fsr, _), argsr) ->
-            begin
-              match Symbols.OpData.constructor_of fsr table with
-              | Some _ ->
-                List.exists (find_subterm l) argsr ||
-                doit_rec l r
-              | _ -> try_reduce (doit ~large) l r
-            end
-
-          | Tuple argsr ->
-            List.exists (find_subterm l) argsr ||
-            doit_rec l r
-
-          | _ ->
-            if Term.equal l r then false
-            else try_reduce (doit ~large) l r
-
-      (** try to recurse below [l] and [r] if they starts with a
-          common top-level constructors, and show that [l < r] *)
-      and doit_rec (l : Term.t) (r : Term.t) : bool =
-        match l, r with
-        | App (Fun (fsl, ftyl), argsl),
-          App (Fun (fsr, ftyr), argsr) ->
-          begin
-            match Symbols.OpData.constructor_of fsl table,
-                  Symbols.OpData.constructor_of fsr table with
-            | Some cl, Some cr ->
-              assert (Symbols.path_equal cl cr);
-              if Symbols.path_equal fsl fsr &&
-                 List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args then
-                (* same constructor on both side,
-                   recurse in lexicographic ordering *)
-                List.exists2 doit argsl argsr
-
-              (* We found an inequality between different constructors,
-                 we do not know how to recurse. *)
-              else soft_failure (Failure "cannot compare terms")
-            | _ -> try_reduce doit_rec l r
-          end
-
-        (* recurse below a tuple, in lexicographic order *)
-        | Tuple l, Tuple r -> List.exists2 doit l r
-
-        | _ -> try_reduce doit_rec l r
-      in
-      doit ~large l r
-    in
-
+    
     (* apply discriminate, selecting the equality or disequality mode *)
-    let rec doit (f : Term.term) =
+    let rec doit (f : Term.term) : bool =
       let open Symbols in
       match Term.decompose_app f with
       | Fun (fn, _), [l;r] when fn = fs_eq ->
         if hid = None then
           soft_failure
             (Failure "equality discriminate does not apply on the conclusion");
-        discriminate_eq l r
+        discriminate_eq l r 
 
       | Fun (fn, _), [l;r] when fn = fs_lt  ->
         if hid <> None then
@@ -3355,7 +3257,7 @@ type form_type =
 
       | Fun (fn, _), [l;r] when fn = fs_leq ->
         if hid <> None then
-          discriminate_lt ~large:false r l          
+          discriminate_lt ~large:false r l
         else
           discriminate_lt ~large:true  l r
 
@@ -3393,7 +3295,8 @@ type form_type =
         in
         None, f
     in
-    if discriminate hid f s then []
+    let pc = S.proof_context s in
+    if discriminate hid f pc then []
     else soft_failure (Failure "discriminate failed")
 
   let discriminate_tac args =

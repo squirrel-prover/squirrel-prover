@@ -206,24 +206,29 @@ let build_recursive_body
   doit t
 
 (*------------------------------------------------------------------*)
+(* FIXME: move code in [patternMatching.ml] *)
 module PatternMatching = struct
-  (** [Action] constructors have a non-standard axiomatization:
 
-     - timestamp are partitioned into non-happening timestamps, and
-       happening timestamps. Only the latter boasts of a standard
-       constructor axiomatization.
+  (*------------------------------------------------------------------*)
+    (** {3 Mutual exclusiveness and exhaustivity} *)
 
-     - further, which constructors partition the set of happening actions
-       depends on the system compatibility class the lemma is stated
-       in. 
+    (** [Action] constructors have a non-standard axiomatization:
 
-     E.g. if [P] has two actions [A i] and [B], then the following
-     pattern-match is exhaustive (and cannot be simplified while
-     remaining so):
-     [match t with
-      | A _ when happens t -> ... 
-      | B   when happens t -> ...
-      | _   when not happens t -> ...] *)
+        - timestamp are partitioned into non-happening timestamps, and
+          happening timestamps. Only the latter boasts of a standard
+          constructor axiomatization.
+
+        - further, which constructors partition the set of happening actions
+          depends on the system compatibility class the lemma is stated
+          in. 
+
+        E.g. if [P] has two actions [A i] and [B], then the following
+        pattern-match is exhaustive (and cannot be simplified while
+        remaining so):
+        [match t with
+        | A _ when happens t -> ... 
+        | B   when happens t -> ...
+        | _   when not happens t -> ...] *)
 
   (*------------------------------------------------------------------*)
   (** A case term is a match pattern (see [check_match_pattern]) used

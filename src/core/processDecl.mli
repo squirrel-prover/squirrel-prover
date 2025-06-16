@@ -36,3 +36,4 @@ val declare_list :
 
 (*------------------------------------------------------------------*)
 val add_hint : Symbols.table -> Hint.p_hint -> Symbols.table
+
