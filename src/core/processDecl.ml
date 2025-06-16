@@ -531,8 +531,6 @@ module PatternMatching = struct
          bodies)
 
   (*------------------------------------------------------------------*)
-  exception NonExhaustive      
-
   let[@warning "-32"] exhaustiveness_error loc table (cases : case list) =
     let ppe = default_ppe ~table () in
     error loc KDecl
@@ -600,10 +598,7 @@ module PatternMatching = struct
     in
     let max_depth = max_depth table bodies in
 
-    let unfold_case (t : case) : 'a = 
-      try unfold_case table system se_vars t with
-      | UnfoldFailed -> raise NonExhaustive
-    in
+    let unfold_case (t : case) : 'a = unfold_case table system se_vars t in
     
     (* Check that all [cases] are instances of [patterns].
 
@@ -643,47 +638,98 @@ module PatternMatching = struct
 
     let init_case = { term = wildcard match_arg_ty; conds = Mt.empty; } in
 
-    try
-      (* [partition] is a partition of [init_case] *)
-      let partition =
-        match check ~depth:0 [init_case] ~partition:[] with
-        | `Ok partition -> partition
-        | `Missing cases ->
-          let ppe = default_ppe ~table () in
-          Printer.prt `Warning
-            "@[<v 0>Pattern-matching is not exhaustive,@;\
-             generate proof-obligations instead:@;\
-            \  @[<v 0>%a@]
-                   @]"
-          (Fmt.list ~sep:Fmt.cut (_pp_case ppe)) cases;
-          raise NonExhaustive
-      in
+    (* [partition] is a partition of [init_case].
 
-      (* For every match instance, look for a case in [partition] that
-         covers it.
+       We can compute such a partition only if the pattern-matching is
+       exhaustive. *)
+    let partition =
+      match check ~depth:0 [init_case] ~partition:[] with
+      | `Ok partition -> Result.Ok partition
+      | `Missing cases -> Result.Error (Some cases)
+      | exception UnfoldFailed -> Result.Error None
+    in
 
-         If each case in [partition] covers at-most a single match
-         instance, we know that they are mutually exclusive. *)
-      let mutually_exclusive =
+    let partition =
+      match partition with
+      | Result.Ok p -> Some p
+      | Result.Error cases_opt ->
+        let ppe = default_ppe ~table () in
+        let pp_cases fmt =
+          match cases_opt with
+          | None -> ()
+          | Some cases ->
+            Format.fprintf fmt "@;  @[<v 0>%a@]"
+              (Fmt.list ~sep:Fmt.cut (_pp_case ppe)) cases;
+        in
+        Printer.prt `Warning
+          "Pattern-matching is not exhaustive,@;\
+           generate proof-obligations instead.@;\
+           %t"
+          pp_cases;
+        None
+    in
+
+    (* First test that the pattern-matching is mutually-exclusive.
+
+       For every match instance, look for a case in [partition] that
+       covers it.
+       If each case in [partition] covers at-most a single match
+       instance, we know that they are mutually exclusive. *)
+    let mutually_exclusive1 () =
+      match partition with
+      | None -> false
+      | Some partition ->
         let exception NonMutuallyExclusive in
         try
           let used = Array.make (List.length partition) false in
-            List.iter (fun pattern ->
-                List.iteri (fun i case -> 
-                    let is_instance =
-                      is_instance table system ~case:pattern ~pat:case
-                    in
-                    if is_instance then begin
-                      if used.(i) then raise NonMutuallyExclusive;
-                      used.(i) <- true
-                    end
-                  ) partition
-              ) patterns;
-            true
+          List.iter (fun pattern ->
+              List.iteri (fun i case -> 
+                  let is_instance =
+                    is_instance table system ~case:pattern ~pat:case
+                  in
+                  if is_instance then begin
+                    if used.(i) then raise NonMutuallyExclusive;
+                    used.(i) <- true
+                  end
+                ) partition
+            ) patterns;
+          true
         with NonMutuallyExclusive -> false
+    in
+
+    (* Second test that the pattern-matching is mutually-exclusive. *)
+    let mutually_exclusive2 () =
+      let exception NonMutuallyExclusive in
+
+      let red_state =
+        lazy (
+          let system =
+            omap (fun system -> SE.{ set = system; pair = None; }) system
+          in
+          let env = Env.init ~table ?system ~se_vars () in
+          let pc = ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty in
+          Reduction.mk_state pc ~red_param:Reduction.rp_full
+        )
       in
-      (true, mutually_exclusive)
-    with NonExhaustive -> false, false
+      try
+        List.iteri (fun i0 (case0 : case) ->
+            List.iteri (fun i1 (case1 : case) ->
+                if i0 <> i1 then begin
+                  if case0.conds <> Mt.empty || case1.conds <> Mt.empty then
+                    raise NonMutuallyExclusive;
+
+                  if not (PatternMatching.discriminate_eq
+                            red_state table
+                            case0.term case1.term) then
+                    raise NonMutuallyExclusive
+                end 
+              ) patterns
+          ) patterns;
+        true
+      with NonMutuallyExclusive -> false
+    in
+    
+    (partition <> None, mutually_exclusive1 () || mutually_exclusive2 ())
 end
 
 (*------------------------------------------------------------------*)

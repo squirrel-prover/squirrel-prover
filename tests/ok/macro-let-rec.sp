@@ -257,23 +257,7 @@ let rec fac2 (x : int) with
 Proof. 
  smt. 
 Qed.
-Proof.
-  split. 
-  + repeat split.
-    - intro x0 * /=. 
-      smt.
-    - auto. 
-    - intro x. 
-      smt.
-    - intro x * /=. 
-      smt.
- + intro x /=. have ? : 
-x < 0 || 0 = x || exists (y:int), y + 1 = x && x > 0  by admit.
-   case H.
-   - by left. 
-   - right; left; auto.
-   - right; right; auto.
-Qed.
+Proof. smt. Qed.
 
 lemma _ @set:'P : fac2 5 = 120.
 Proof.
