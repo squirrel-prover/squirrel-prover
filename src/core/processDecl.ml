@@ -491,12 +491,30 @@ module PatternMatching = struct
 
       | _ -> assert false       (* cannot happen *)
 
+    (* Unfold a list of terms, computing the cartesian product of all
+       possible cases, and merging cases according to [merge_terms].
+       Note that this is exponential: a more clever algorithm would
+       only unfold case when needed.
+
+       Succeed if at-least one of the term can be unfolded. 
+       Raise @UnfoldFailed otherwise. *)
     and unfold_list 
         (merge_terms : Term.t list -> Term.t)
         (l : Term.t list) (conds : _ Mt.t) : case list 
       =
-      let l = List.map (fun term -> unfold {term; conds}) l in
-      List.map (merge merge_terms) (cartesian_product l)
+      let success = ref false in (* [true] if there is at least one success *)
+      let l =
+        List.map (fun term ->
+            let case = {term; conds;} in
+            try
+              let cases = unfold case in
+              success := true;
+              cases
+            with UnfoldFailed -> [case]
+          ) l
+      in
+      if not !success then raise UnfoldFailed
+      else List.map (merge merge_terms) (cartesian_product l)
     in
     unfold t
 
