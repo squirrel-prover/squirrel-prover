@@ -301,7 +301,7 @@ Proof.
     intro [???].
     by collision.
  
-    intro [[TFneg] TFeq].
+    intro [TFneg TFeq].
     use TFneg with j,i => //.
 
     intro [H2 ?].
@@ -324,7 +324,7 @@ Proof.
     by collision.
 
 
-    intro [[TFneg] TFeq].
+    intro [TFneg TFeq].
     by use TFneg with l,l0.
 
     intro [H2 Meq1].

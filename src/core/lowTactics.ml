@@ -1291,144 +1291,143 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let env = S.env s in
     assert (len > 0);
-    if len = 1 then ([`Hyp hid], s) else
-      let form = Hyps.by_id_k hid Hyp s in
-      let s = Hyps.remove hid s in
+    let form = Hyps.by_id_k hid Hyp s in
+    let s = Hyps.remove hid s in
 
-      (* local exception for failed destructions *)
-      let exception Failed in
+    (* local exception for failed destructions *)
+    let exception Failed in
 
-      let try_destr_eq form =
-        let table = S.table s in
+    let try_destr_eq form =
+      let table = S.table s in
 
-        let eqs =
-          match S.Reduce.destr_eq s S.hyp_kind form with
-          | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
-            let l1 = oget (Term.destr_tuple a) in
-            let l2 = oget (Term.destr_tuple b) in
-            List.map2 Term.mk_eq l1 l2
+      let eqs =
+        match S.Reduce.destr_eq s S.hyp_kind form with
+        | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
+          let l1 = oget (Term.destr_tuple a) in
+          let l2 = oget (Term.destr_tuple b) in
+          List.map2 Term.mk_eq l1 l2
 
 
-          | Some (a,b) when Term.is_pair a && Term.is_pair b ->
-            let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
-            and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
-            let f1 = Term.mk_eq a1 b1
-            and f2 = Term.mk_eq a2 b2 in
-            [f1;f2]
+        | Some (a,b) when Term.is_pair a && Term.is_pair b ->
+          let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
+          and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
+          let f1 = Term.mk_eq a1 b1
+          and f2 = Term.mk_eq a2 b2 in
+          [f1;f2]
 
-          | Some (a,b) ->
-            begin
-              match Term.decompose_app a, Term.decompose_app b with
-              | (Fun (fsl, ftyl), argsl),
-                (Fun (fsr, ftyr), argsr) ->
-                (* check that [a] and [b] start with the same constructor *)
-                let () = 
-                  match Symbols.OpData.constructor_of fsl table,
-                        Symbols.OpData.constructor_of fsr table with
-                  | Some cl, Some cr ->
-                    assert (Symbols.path_equal cl cr);
-                    if not (Symbols.path_equal fsl fsr) then raise Failed;
-                    if not (List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args) then
-                      raise Failed;
-                  | _ -> raise Failed
-                in
-                List.map2 Term.mk_eq argsl argsr
-              | _ -> raise Failed
-            end
-
-          | _ -> raise Failed 
-        in
-        let forms =
-          List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) eqs
-        in
-        let ids, s = Hyps.add_i_list forms s in
-        List.map (fun id -> `Hyp id) ids, s
-      in
-        
-      let try_destr_and form =
-        (* [`LR] as we are looking for hypotheses implied by [form] *)
-        if S.Hyp.is_and ~mode:`LR ~env form then
+        | Some (a,b) ->
           begin
-            let ands =
-              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands ~mode:`LR ~env len form)
-            in
-            let ands = List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) ands in
-            let ids, s = Hyps.add_i_list ands s in
-            List.map (fun id -> `Hyp id) ids, s
+            match Term.decompose_app a, Term.decompose_app b with
+            | (Fun (fsl, ftyl), argsl),
+              (Fun (fsr, ftyr), argsr) ->
+              (* check that [a] and [b] start with the same constructor *)
+              let () = 
+                match Symbols.OpData.constructor_of fsl table,
+                      Symbols.OpData.constructor_of fsr table with
+                | Some cl, Some cr ->
+                  assert (Symbols.path_equal cl cr);
+                  if not (Symbols.path_equal fsl fsr) then raise Failed;
+                  if not (List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args) then
+                    raise Failed;
+                | _ -> raise Failed
+              in
+              List.map2 Term.mk_eq argsl argsr
+            | _ -> raise Failed
           end
-        else raise Failed
+
+        | _ -> raise Failed 
       in
-
-      let try_destr_iff form =
-        if S.Hyp.is_iff form then
-          begin 
-            if len <> 2 then destr_fail (fun fmt -> Fmt.pf fmt "expected 2 patterns");
-      
-            let f1, f2 =
-              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
-            in
-            let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
-            let forms =
-              List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) forms
-            in
-            let ids, s = Hyps.add_i_list forms s in
-            List.map (fun id -> `Hyp id) ids, s
-          end
-        else raise Failed
+      let forms =
+        List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) eqs
       in
+      let ids, s = Hyps.add_i_list forms s in
+      List.map (fun id -> `Hyp id) ids, s
+    in
 
-      let try_destr_exists form =
-        if S.Hyp.is_exists ~env form then
-          begin
-            let vs, f =
-              get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists_tagged ~env form)
-            in
-
-            if List.length vs < len - 1 then
-              soft_failure (Tactics.PatNumError (len - 1, List.length vs));
-
-            let vs, vs' = List.takedrop (len - 1) vs in
-
-            let vs_fresh, subst = Term.refresh_vars_w_info vs in
-
-            let f = S.Hyp.mk_exists_tagged vs' f in
-            let f = S.subst_hyp subst f in
-
-            let idf, s = Hyps.add_i Args.Unnamed (TopHyps.LHyp f) s in
-
-            ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
-          end
-        else raise Failed
-      in
-
-      (* list of possible destruct function *)
-      let init_destr_list = [
-        try_destr_eq;
-        try_destr_and;
-        try_destr_iff;
-        try_destr_exists; 
-      ] in
-
-      (* Try all destruct function on [form].
-         If all fail, reduce [form] once and recurse. *)
-      let rec doit (form : S.hyp_form) destr_list = 
-        match destr_list with
-        | try_destr :: destr_list ->
-          begin
-            try try_destr form with
-            | Failed -> doit form destr_list
-          end
-
-        | [] ->
-          let form, has_red = 
-            S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
+    let try_destr_and form =
+      (* [`LR] as we are looking for hypotheses implied by [form] *)
+      if S.Hyp.is_and ~mode:`LR ~env form then
+        begin
+          let ands =
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_ands ~mode:`LR ~env len form)
           in
-          if has_red = True then 
-            doit form init_destr_list (* start again *)
-          else 
-            destr_fail (fun fmt -> S._pp_hyp ppe fmt form)
-      in
-      doit form init_destr_list
+          let ands = List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) ands in
+          let ids, s = Hyps.add_i_list ands s in
+          List.map (fun id -> `Hyp id) ids, s
+        end
+      else raise Failed
+    in
+
+    let try_destr_iff form =
+      if S.Hyp.is_iff form then
+        begin 
+          if len <> 2 then destr_fail (fun fmt -> Fmt.pf fmt "expected 2 patterns");
+
+          let f1, f2 =
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
+          in
+          let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
+          let forms =
+            List.map (fun x -> Args.Unnamed, TopHyps.LHyp x) forms
+          in
+          let ids, s = Hyps.add_i_list forms s in
+          List.map (fun id -> `Hyp id) ids, s
+        end
+      else raise Failed
+    in
+
+    let try_destr_exists form =
+      if S.Hyp.is_exists ~env form then
+        begin
+          let vs, f =
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists_tagged ~env form)
+          in
+
+          if List.length vs < len - 1 then
+            soft_failure (Tactics.PatNumError (len - 1, List.length vs));
+
+          let vs, vs' = List.takedrop (len - 1) vs in
+
+          let vs_fresh, subst = Term.refresh_vars_w_info vs in
+
+          let f = S.Hyp.mk_exists_tagged vs' f in
+          let f = S.subst_hyp subst f in
+
+          let idf, s = Hyps.add_i Args.Unnamed (TopHyps.LHyp f) s in
+
+          ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
+        end
+      else raise Failed
+    in
+
+    (* list of possible destruct function *)
+    let init_destr_list = [
+      try_destr_eq;
+      try_destr_and;
+      try_destr_iff;
+      try_destr_exists; 
+    ] in
+
+    (* Try all destruct function on [form].
+       If all fail, reduce [form] once and recurse. *)
+    let rec doit (form : S.hyp_form) destr_list = 
+      match destr_list with
+      | try_destr :: destr_list ->
+        begin
+          try try_destr form with
+          | Failed -> doit form destr_list
+        end
+
+      | [] ->
+        let form, has_red = 
+          S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
+        in
+        if has_red = True then 
+          doit form init_destr_list (* start again *)
+        else 
+          destr_fail (fun fmt -> S._pp_hyp ppe fmt form)
+    in
+    doit form init_destr_list
 
   (*------------------------------------------------------------------*)
   (* utility function *)

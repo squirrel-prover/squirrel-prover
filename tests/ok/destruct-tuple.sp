@@ -1,3 +1,4 @@
+(*------------------------------------------------------------------*)
 (* check that `destruct` handles tuple equalities *)
 
 lemma [any] _ ['a 'b] (i1,i2 : 'a, j1,j2 : 'b) :
@@ -33,3 +34,21 @@ Proof.
   + assumption H1.
   + assumption H2.
 Qed.
+
+inductive C a = 
+| A : a -> C a
+| B : a -> C a.
+
+lemma [any] _ ['a] (i1,i2 : 'a, a1,a2 : 'a) :
+  A i1 = A i2 => i1 = i2.
+Proof. 
+  intro [H]. 
+  assumption H.
+Qed.
+
+
+lemma [any] _ ['a] (i1,i2 : 'a, a1,a2 : 'a) :
+  A i1 = B i2 => i1 = i2.
+Proof. 
+  checkfail intro [H] exn Failure.
+Abort.
