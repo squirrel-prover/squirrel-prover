@@ -18,3 +18,18 @@ Proof.
   + assumption H2.
   + assumption H3.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* same on inductive types *)
+
+inductive MyTuple a b = 
+| T : a -> b -> MyTuple a b.
+
+lemma [any] _ ['a 'b 'c] (i1,i2 : 'a, j1,j2 : 'b) :
+  T i1 j1 = T i2 j2 => i1 = i2 && j1 = j2.
+Proof.
+  intro [H1 H2].
+  split. 
+  + assumption H1.
+  + assumption H2.
+Qed.

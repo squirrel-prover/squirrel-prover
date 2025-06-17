@@ -1299,33 +1299,52 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let exception Failed in
 
       let try_destr_eq form =
-        match S.Reduce.destr_eq s S.hyp_kind form with
-        | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
-          let l1 = oget (Term.destr_tuple a) in
-          let l2 = oget (Term.destr_tuple b) in
-          let eqs = List.map2 Term.mk_eq l1 l2 in
+        let table = S.table s in
 
-          let forms =
-            List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) eqs
-          in
-          let ids, s = Hyps.add_i_list forms s in
-          List.map (fun id -> `Hyp id) ids, s
+        let eqs =
+          match S.Reduce.destr_eq s S.hyp_kind form with
+          | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
+            let l1 = oget (Term.destr_tuple a) in
+            let l2 = oget (Term.destr_tuple b) in
+            List.map2 Term.mk_eq l1 l2
 
-        | Some (a,b) when Term.is_pair a && Term.is_pair b ->
-          let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
-          and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
-          let f1 = Term.mk_eq a1 b1
-          and f2 = Term.mk_eq a2 b2 in
 
-          let forms =
-            List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) [f1;f2]
-          in
-          let ids, s = Hyps.add_i_list forms s in
-          List.map (fun id -> `Hyp id) ids, s
+          | Some (a,b) when Term.is_pair a && Term.is_pair b ->
+            let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
+            and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
+            let f1 = Term.mk_eq a1 b1
+            and f2 = Term.mk_eq a2 b2 in
+            [f1;f2]
 
-        | _ -> raise Failed 
+          | Some (a,b) ->
+            begin
+              match Term.decompose_app a, Term.decompose_app b with
+              | (Fun (fsl, ftyl), argsl),
+                (Fun (fsr, ftyr), argsr) ->
+                (* check that [a] and [b] start with the same constructor *)
+                let () = 
+                  match Symbols.OpData.constructor_of fsl table,
+                        Symbols.OpData.constructor_of fsr table with
+                  | Some cl, Some cr ->
+                    assert (Symbols.path_equal cl cr);
+                    if not (Symbols.path_equal fsl fsr) then raise Failed;
+                    if not (List.for_all2 Type.equal ftyl.ty_args ftyr.ty_args) then
+                      raise Failed;
+                  | _ -> raise Failed
+                in
+                List.map2 Term.mk_eq argsl argsr
+              | _ -> raise Failed
+            end
+
+          | _ -> raise Failed 
+        in
+        let forms =
+          List.map (fun x -> Args.Unnamed, TopHyps.LHyp (S.unwrap_hyp (Local x))) eqs
+        in
+        let ids, s = Hyps.add_i_list forms s in
+        List.map (fun id -> `Hyp id) ids, s
       in
-
+        
       let try_destr_and form =
         (* [`LR] as we are looking for hypotheses implied by [form] *)
         if S.Hyp.is_and ~mode:`LR ~env form then
