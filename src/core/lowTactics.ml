@@ -947,8 +947,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
         SE.action_to_term table system
           (Action.subst_action sbst action)
       in
-      (* FIXME: is this second substitution useful ? *)
-      let name = Term.subst sbst name in
 
       (* in a global sequent, flag introduce variables as constant
          if [ts] is constant. *)
