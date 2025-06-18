@@ -727,27 +727,56 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let mult, id_opt, rw_erule = rw in
 
+    (* rewrite at a target [f] named [tgt_id], which is
+       w.r.t. [system] *)
     let doit_tgt : do_target_func =
       fun (f,system,tgt_id) ->
-        if hyp_is_same id_opt tgt_id
-        then f, []
-        else
-          match
-            Rewrite.rewrite_exn
-              ~param:Match.logic_param
-              ~loc (S.table s) (S.params s) (S.vars s) system InSequent
-              (S.get_trace_hyps s)
-              mult rw_erule f
-          with
-          | f, subs ->
-            found := true;
-            f, List.map (fun (se, l) -> se, S.unwrap_conc (Local l)) subs
 
-          | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
-            if all then f, []
-            else soft_failure ~loc Tactics.NothingToRewrite
+        (* call to indicate that rewriting in target [f] failed *)
+        let failed () =
+          if all then f, []
+          else soft_failure ~loc Tactics.NothingToRewrite
+        in
+        
+        (* To rewrite in [f], we start with the initial rewriting rule
+           [rw_erule]. If [rw_erule] cannot be used to rewrite in [f],
+           try alternative rewriting rules (if applicable). *)
+        let rec doit (rw_erule : LowRewrite.rw_rule) =
+          if hyp_is_same id_opt tgt_id
+          then f, []
+          else
+            match
+              Rewrite.rewrite_exn
+                ~param:Match.logic_param
+                ~loc (S.table s) (S.params s) (S.vars s) system InSequent
+                (S.get_trace_hyps s)
+                mult rw_erule f
+            with
+            | f, subs ->        (* rewrite succeeded *)
+              found := true;
+              f, List.map (fun (se, l) -> se, S.unwrap_conc (Local l)) subs
+
+            (* rewrite failed, try to find an alternative rewriting rule or fail *)
+            | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
+              let l,r = rw_erule.rw_rw in
+
+              (* Look for an alternative rewriting rule, essentially
+                 by replacing [(∀ x. u = v) → ⊤] with [u → v] (where
+                 [x] must be inferred). *)
+              if Term.equal r Term.mk_true then
+                let state = S.Reduce.to_state ~system Reduction.rp_full s in
+                let l, has_red = Reduction.whnf_term state l in
+                if has_red then
+                  let args, l = Term.decompose_forall_tagged l in
+                  match S.Reduce.destr_eq s Equiv.Local_t l with
+                  | None -> failed ()
+                  | Some (l,new_r) ->
+                    doit { rw_erule with rw_rw = (l, new_r); rw_vars = args @ rw_erule.rw_vars; }
+                else failed ()
+              else failed ()
+        in
+        doit rw_erule
     in
-
     let s, subs = do_targets doit_tgt s targets in
 
     if all && not !found then soft_failure ~loc Tactics.NothingToRewrite;
