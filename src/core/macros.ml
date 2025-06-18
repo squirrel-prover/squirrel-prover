@@ -991,6 +991,8 @@ let basic_match
 
     | Term.App (t1,tl1), Term.App (t2,tl2) -> aux t1 t2; List.iter2 aux tl1 tl2
 
+    | Term.Tuple l1, Term.Tuple l2 -> List.iter2 aux l1 l2
+
     | Term.Var x, _ -> add_or_fail x t2
 
     | Term.Fun (fs1,fty1), Term.Fun (fs2,fty2)
