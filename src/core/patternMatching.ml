@@ -95,8 +95,12 @@ let discriminate_lt
         Raise [Failed] if we do not manage to compare [l] and [r]. *)
   let rec doit ?(large : bool = false) (l : Term.t) (r : Term.t) : bool =
     if large && Term.equal l r then true else
-      match r with
-      | App (Fun (fsr, _), argsr) ->
+      match r,l with
+      | Int r, Int l -> Z.lt l r
+      | String r, String l -> 
+        String.compare l r < 0
+
+      | App (Fun (fsr, _), argsr),_ ->
         begin
           match Symbols.OpData.constructor_of fsr table with
           | Some _ ->
@@ -105,7 +109,7 @@ let discriminate_lt
           | _ -> try_reduce_doit ~large l r
         end
 
-      | Tuple argsr ->
+      | Tuple argsr,_ ->
         List.exists (find_subterm l) argsr ||
         doit_rec l r
 

@@ -113,3 +113,50 @@ Proof. intro H. discriminate H. Qed.
 lemma _ @system:any (x : int) (l : list int) :
   Cons x l > l => false.
 Proof. intro H. checkfail discriminate H exn Failure. Abort.
+
+(*------------------------------------------------------------------*)
+(* lexicographic *)
+
+lemma _ @system:any (x, y : int) :
+  (0, 0) < (1, 1).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  (0, 0) < (1, 0).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  (0, 0) < (0, 1).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  (1, 0) < (1, 0).
+Proof. checkfail discriminate exn Failure. Abort.
+
+lemma _ @system:any (x, y : int) :
+  (1, 0) < (1, 1).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  (0, 1) < (1, 0).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  ("0", 0) < ("0", 1).
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  ("0", 1) < ("0", 0).
+Proof. checkfail discriminate exn Failure. Abort.
+
+lemma _ @system:any (x, y : int) :
+  "01" < "10".
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  "01" < "11".
+Proof. discriminate. Qed.
+
+lemma _ @system:any (x, y : int) :
+  "10" < "01".
+Proof. checkfail discriminate exn Failure. Abort.
