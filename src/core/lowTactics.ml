@@ -2440,8 +2440,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Induction} *)
 
   (** Induction, for both global and local sequents.
-      On a sequent where the conclusion is of the form forall x. phi,
-      performs an induction on x.
+      On a sequent where the conclusion is of the form [forall x. phi],
+      performs an induction on [x].
       Global induction is sound only over finite types. *)
   let induction (s : S.t) : S.t list =
     let conclusion = S.conclusion s in
@@ -2449,6 +2449,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let vs0, f = S.Conc.decompose_forall_tagged conclusion in
     let vs0, subst = Term.refresh_vars_w_info vs0 in
     let f = S.subst_conc subst f in
+
+    (*------------------------------------------------------------------*)
+    (* check that induction applies *)
     
     let (v, tag), vs =
       match vs0 with
@@ -2460,17 +2463,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     if not (HighType.is_well_founded (S.table s) (Vars.ty v)) then
       soft_failure
-        (Failure "induction supports only well-founded types");
+        (Failure "the type must be well-founded");
 
-    begin
-    match S.conc_kind with
-    | Equiv.Global_t ->
-    if (not tag.const)  then
-      soft_failure
-        (Failure "induction supports only constants variables");
-    | Equiv.Local_t -> ()
-    | _ -> assert false
-    end;
+    (* check that the induction is over a constant term *)
+    let () =
+      match S.conc_kind with
+      | Equiv.Global_t ->
+        if not tag.const then
+          soft_failure
+            (Failure "global induction must be on a constant term");
+      | Equiv.Local_t -> ()
+      | _ -> assert false
+    in
+
+    (*------------------------------------------------------------------*)
+    (* apply induction *)
 
     let v' = Vars.refresh v in
     
