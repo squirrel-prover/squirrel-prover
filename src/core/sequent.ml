@@ -884,6 +884,16 @@ module Mk (Args : MkArgs) : S with
     soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
+  let pt_decompose_forall (pt : PT.t) : PT.t =
+    let f_args, form = decompose_forall_tagged_k Equiv.Any_t pt.form in
+    let f_args, subst = Term.refresh_vars_w_info f_args in
+
+    let form = Equiv.Any.subst subst form in
+    let args = List.append f_args pt.args in
+
+    { pt with form; args; }
+    
+  (*------------------------------------------------------------------*)
   (** Apply proof-term ([PT.t]) to some term ([Term.term]):
       pop the first universally quantified variable in the proof-term's
       conclusion and instantiate it with given term. *)
@@ -1517,15 +1527,7 @@ module Mk (Args : MkArgs) : S with
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)
-    let pt =
-      let f_args, form = decompose_forall_tagged_k Equiv.Any_t form in
-      let f_args, subst = Term.refresh_vars_w_info f_args in
-      
-      let form = Equiv.Any.subst subst form in
-      let args = List.append f_args args in
-      
-      { pt with form; args; } 
-    in
+    let pt = pt_decompose_forall pt in
 
     name, pat_params, pt
 
