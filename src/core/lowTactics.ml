@@ -2444,6 +2444,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       performs an induction on [x].
       Global induction is sound only over finite types. *)
   let induction (s : S.t) : S.t list =
+    let table = S.table s in
     let conclusion = S.conclusion s in
 
     let vs0, f = S.Conc.decompose_forall_tagged conclusion in
@@ -2478,34 +2479,63 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (*------------------------------------------------------------------*)
     (* apply induction *)
-
-    let v' = Vars.refresh v in
+    let ty_rec = Vars.ty v in
     
-    let ih =
-      let atom_lt =
-        Equiv.Babel.convert
-          ~dst:S.conc_kind
-          ~src:Equiv.Local_t
-          (Term.mk_lt (Term.mk_var v') (Term.mk_var v))
+    (* induction principle on inductive types *)
+    if HighType.is_inductive table ty_rec then begin
+      (* requantify the variables [vs] in [f] *)
+      let f = S.Conc.mk_forall_tagged ~simpl:false vs f in
+      
+      let t = Term.mk_var v in
+      let cases = destruct_inductive t s in
+      List.map (fun (args, t0) ->
+          (* induction hypotheses, one per occurence of the inductive
+             type in [args] *)
+          let ihs = 
+            List.filter_map (fun (arg,_) ->
+                if not (Type.equal (Vars.ty arg) ty_rec) then None else
+                  some @@
+                  (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var arg)] f)
+              ) args
+          in
+
+          let subst = [Term.ESubst (t, t0)] in
+          let conc =
+            S.Conc.mk_forall_tagged ~simpl:true args
+              (S.Conc.mk_impls ihs (S.subst_conc subst f))
+          in
+          S.set_conclusion conc s
+        ) cases
+
+      (* generic induction principle using the ordering [<]  *)
+    end else begin
+      let v' = Vars.refresh v in
+
+      let ih =
+        let atom_lt =
+          Equiv.Babel.convert
+            ~dst:S.conc_kind
+            ~src:Equiv.Local_t
+            (Term.mk_lt (Term.mk_var v') (Term.mk_var v))
+        in
+
+        S.Conc.mk_forall_tagged ~simpl:false
+          ((v',tag) :: vs)
+          (S.Conc.mk_impl ~simpl:false
+             (atom_lt)
+             (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
       in
 
-      S.Conc.mk_forall_tagged ~simpl:false
-        ((v',tag) :: vs)
-        (S.Conc.mk_impl ~simpl:false
-           (atom_lt)
-           (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
-    in
+      let new_conclusion =
+        S.Conc.mk_forall_tagged ~simpl:false
+          [v,tag]
+          (S.Conc.mk_impl ~simpl:false
+             ih
+             (S.Conc.mk_forall_tagged ~simpl:false vs f))
+      in
 
-    let new_conclusion =
-      S.Conc.mk_forall_tagged ~simpl:false
-        [v,tag]
-        (S.Conc.mk_impl ~simpl:false
-           ih
-           (S.Conc.mk_forall_tagged ~simpl:false vs f))
-    in
-
-    [S.set_conclusion new_conclusion s]
-
+      [S.set_conclusion new_conclusion s]
+    end
 
 (**  When a term is given on which to perform the induction, 
      we first generalize this term (in the given system) *)
