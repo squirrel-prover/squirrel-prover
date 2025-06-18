@@ -160,9 +160,9 @@ module MkCommonLowTac (S : Sequent.S) : sig
 
   type c_res = c_handler * S.sequent
 
-  (** Case analysis on a timestamp *)
-  val timestamp_case : Term.term -> S.t -> S.t list
-
+  (** Case analysis on [timestamp] or an inductive type. *)
+  val type_based_case : Term.t -> S.t -> S.t list
+    
   (** Case analysis on disjunctions in an hypothesis.
       When [nb=`Any], recurses.
       When [nb=`Some l], destruct at most [l]. *)

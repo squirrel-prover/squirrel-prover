@@ -345,11 +345,12 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
       (EquivLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
+    let table = ES.table s in
     match EquivLT.convert_args s args Args.(Sort Term) with
     | Args.Arg (Term (ty, f, loc)) ->
-      begin
-        match ty with
-        | Type.Timestamp when type_based ->
+      if type_based && (Type.equal ty Type.ttimestamp ||
+                        HighType.is_inductive table ty) then
+        begin
           let env = ES.env s in
           if not (HighTerm.is_constant     env f &&
                   HighTerm.is_system_indep env f   ) then
@@ -357,10 +358,11 @@ let do_case_tac (args : Args.parser_arg list) s : ES.t list =
               (Failure "global case must be on a constant and \
                         system-independent term");
 
-          EquivLT.timestamp_case f s
+          EquivLT.type_based_case f s
+        end
+        
+        else bad_args ()
 
-        | _ -> bad_args ()
-      end
     | _ -> bad_args ()
 
 let case_tac (args : Args.parser_args) : LT.etac =

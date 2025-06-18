@@ -144,3 +144,26 @@ let is_enum table ty : bool =
 let is_well_founded table ty : bool =
   check_info_on_closed_term false table ty Well_founded
 
+
+(*------------------------------------------------------------------*)
+(** {3 Inductive types} *)
+
+let is_inductive table (ty : Type.ty) : bool =
+  match ty with
+  | Type.TConstr (p,_args) ->
+    begin
+      match get_data (Symbols.Ty.of_s_path p) table with
+      | Abstract _ -> false
+      | Inductive _d -> true
+    end
+  | _ -> false
+
+let constructors table (ty : Type.ty) : (Symbols.fname list * Type.ty list) option =
+  match ty with
+  | Type.TConstr (p,args) ->
+    begin
+      match get_data (Symbols.Ty.of_s_path p) table with
+      | Abstract _ -> None
+      | Inductive d -> Some (d.constructors, args)
+    end
+  | _ -> None

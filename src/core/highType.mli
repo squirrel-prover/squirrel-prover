@@ -78,3 +78,14 @@ val is_name_fixed_length : Symbols.table -> Type.ty -> bool
 (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp]
     or [Message]. *)
 val is_well_founded : Symbols.table -> Type.ty -> bool
+
+(*------------------------------------------------------------------*)
+(** {3 Inductive types} *)
+  
+(** Is the type an inductive type. *)
+val is_inductive : Symbols.table -> Type.ty -> bool
+
+(** Return the construtors and the type argument of an inductive type,
+    if applicable. *)
+val constructors :
+  Symbols.table -> Type.ty -> (Symbols.fname list * Type.ty list) option

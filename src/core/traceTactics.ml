@@ -147,15 +147,16 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
       (TraceLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
+    let table = TS.table s in
     match TraceLT.convert_args s args Args.(Sort Term) with
     | Args.Arg (Term (ty, f, _)) ->
-      begin
-        match ty with
-        | Type.Timestamp when type_based -> TraceLT.timestamp_case f s
-        | Type.Boolean   when type_based -> boolean_case   f s
-        | _ when structure_based -> conditional_case f s
-        | _ -> bad_args ()
-      end
+      if type_based && (Type.equal ty Type.ttimestamp ||
+                        HighType.is_inductive table ty) then
+        TraceLT.type_based_case f s
+      else if Type.equal ty Type.tboolean && type_based then
+        boolean_case f s
+      else if structure_based then conditional_case f s
+      else bad_args ()
 
     | _ -> bad_args ()
 

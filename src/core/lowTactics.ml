@@ -928,6 +928,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   type c_res = c_handler * S.sequent
 
+  (*------------------------------------------------------------------*)
+  (* Build tagged arguments from [args], using [t] to determine the
+     allowed tags.
+     This is used in the [case] tactics. *)
+  let case_get_args
+      (t : Term.t) (args : Vars.vars) (env : Env.t)
+    : Vars.tagged_vars
+    =
+    let tags = HighTerm.tags_of_term env t in
+
+    match S.conc_kind with
+    | Equiv.Local_t  -> Vars.Tag.local_vars                                  args
+    | Equiv.Global_t -> Vars.Tag.global_vars ~const:tags.const ~adv:tags.adv args
+    | Equiv.Any_t    -> assert false
+
+    
   (** Case analysis on a timestamp *)
   let timestamp_case (ts : Term.term) (s : S.t) : S.t list =
     let table = S.table s in
@@ -947,19 +963,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         SE.action_to_term table system
           (Action.subst_action sbst action)
       in
-
-      (* in a global sequent, flag introduce variables as constant
-         if [ts] is constant. *)
-      let const = HighTerm.is_constant                  (S.env s) ts in
-      (* idem for [adv] *)
-      let adv   = HighTerm.is_ptime_deducible ~si:false (S.env s) ts in
       
-      let indices =
-        match S.conc_kind with
-        | Equiv.Local_t  -> Vars.Tag.local_vars              indices
-        | Equiv.Global_t -> Vars.Tag.global_vars ~const ~adv indices
-        | Equiv.Any_t    -> assert false
-      in
+      let indices = case_get_args ts indices (S.env s) in
+
       indices, name
     in
 
@@ -977,6 +983,55 @@ module MkCommonLowTac (S : Sequent.S) = struct
         S.set_conclusion (S.Conc.mk_impl ~simpl:false prem conclusion) s
       ) cases
 
+  (*------------------------------------------------------------------*)
+  (** Given a term [t : ty] where [ty] is an inductive type with
+      constructors [constructors], destruct [t] into a list of pairs
+      [args, t0] where [t = ⋁_{c ∈ constructors} ∃args. t = t0]. *)
+  let destruct_inductive (t : Term.term) (s : S.t) : (Vars.tagged_vars * Term.t) list =
+    let constructors, ty_args =
+      match HighType.constructors (S.table s) (Term.ty t) with
+      | None -> assert false
+      | Some (constructors, ty_args) -> constructors, ty_args 
+    in
+    let table = S.table s in
+    List.map (fun constructor ->
+        let constructor =
+          Term.mk_fun table constructor ~ty_args []
+        in
+        let ty_args, _ty_out = Type.decompose_funs (Term.ty constructor) in
+        let args =
+          List.map (fun ty -> Vars.make_fresh ty "x") ty_args
+        in
+        let t0 = Term.mk_app constructor (List.map Term.mk_var args) in
+        let args = case_get_args t args (S.env s) in
+        (args, t0)
+      ) constructors
+
+  (*------------------------------------------------------------------*)
+  (** Case analysis on an inductive.
+      Saner behavior than [timestamp_case], which introduces a lot of
+      existentialy quantified variables. *)
+  let inductive_case (t : Term.term) (s : S.t) : S.t list =
+    let conc = S.conclusion s in
+    let cases = destruct_inductive t s in
+    List.map (fun (args, t0) ->
+        let subst = [Term.ESubst (t, t0)] in
+        let conc =
+          S.Conc.mk_forall_tagged ~simpl:true args (S.subst_conc subst conc)
+        in
+        S.set_conclusion conc s
+      ) cases
+    
+  (*------------------------------------------------------------------*)
+  (** Case analysis on [timestamp] or an inductive type. *)
+  let type_based_case (t : Term.t) (s : S.t) : S.t list =
+    let ty = Term.ty t in
+    if Type.equal ty Type.ttimestamp then timestamp_case t s
+    else if HighType.is_inductive (S.table s) ty then
+      inductive_case t s
+    else assert false
+
+  (*------------------------------------------------------------------*)    
   (** Case analysis on disjunctions in an hypothesis.
       When [nb=`Any], recurses.
       When [nb=`Some l], destruct at most [l]. *)
