@@ -29,6 +29,7 @@
   "set"
   "axiom"
   "lemma"
+  "termination_by"
   "theorem"
   "global"
   "local"
