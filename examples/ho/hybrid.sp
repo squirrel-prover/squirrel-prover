@@ -4,41 +4,41 @@
 *)
 
 include Core.
-include MyInt.
+include MyNat.
 
 system null.
 
-(* Case analysis axiom on integers.
+(* Case analysis axiom on natural numbers.
    Squirrel does not (yet) support user-defined inductive data-type, 
    which would allow to do this cleanly.
    Remark that the new higher-order semantics can easily account for
    such an extension. *)
-global axiom case_int (i : int[const]) : 
+global axiom case_nat (i : nat[const]) : 
   [i = i0] \/ 
-  Exists (j : int[const]), [i = succi j].
+  Exists (j : nat[const]), [i = succi j].
 
 global lemma hybrid ['a] 
- (N1 : int[const]) (fR, fL : int -> 'a) (z : 'a) (u : message) :
+ (N1 : nat[const]) (fR, fL : nat -> 'a) (z : 'a) (u : message) :
  (* Inductive case of the hybrid proof *)
- (Forall (N0 : int[const]), 
+ (Forall (N0 : nat[const]), 
    [N0 <= N1] ->
-   equiv(u, z, (fun (i:int) => if i < N0 then (diff(fL,fR)) i else z)) ->
+   equiv(u, z, (fun (i:nat) => if i < N0 then (diff(fL,fR)) i else z)) ->
    equiv( u,
           z,
-          (fun (i:int) =>(if i < N0 then (diff(fL,fR)) i else z)),
+          (fun (i:nat) =>(if i < N0 then (diff(fL,fR)) i else z)),
           (diff(fL,fR)) N0) ) ->
 
   (* Conclusion *)
   equiv(
     u,z,
-    (fun (i : int) => if i <= N1 then (diff(fL,fR)) i else z)).
+    (fun (i : nat) => if i <= N1 then (diff(fL,fR)) i else z)).
 Proof. 
   induction N1 => N IH Hyp. 
-  have [Eq0 | [N0 Eq0]] := case_int N; rewrite Eq0 /= in *.
+  have [Eq0 | [N0 Eq0]] := case_nat N; rewrite Eq0 /= in *.
   * rewrite !i0_lub.
     constseq 2:
-      (fun (i : int) => i = i0) ((diff(fL,fR)) i0)
-      (fun (i : int) => i <> i0) z.
+      (fun (i : nat) => i = i0) ((diff(fL,fR)) i0)
+      (fun (i : nat) => i <> i0) z.
      + intro u0.
        by case u0 = i0. 
      + split.
@@ -48,13 +48,13 @@ Proof.
        rewrite if_false; 1: by intro i; apply not_lt_i0. 
        auto.
 
-  * splitseq 2: (fun (i:int) => i = succi N0) z. 
+  * splitseq 2: (fun (i:nat) => i = succi N0) z. 
     rewrite if_then_then /= in 2,3.
     rewrite -lt_succ. 
 
     constseq 2:
-      (fun (i : int) => i = succi N0) ((diff(fL,fR)) (succi N0))
-      (fun (i : int) => i <> succi N0) z.
+      (fun (i : nat) => i = succi N0) ((diff(fL,fR)) (succi N0))
+      (fun (i : nat) => i <> succi N0) z.
      + intro u0.
        by case u0 = succi N0. 
      + split.
