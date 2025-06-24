@@ -21,7 +21,7 @@ type quantum_message.
 
 type string[fixed].
   
-type int[well_founded, fixed].
+type int[well_founded, fixed, serializable].
 
 (*------------------------------------------------------------------*)
 (* `Classic` defines the macros for the classical execution model *)

@@ -79,10 +79,6 @@ val equal : ty -> ty -> bool
 
 val contains_tuni : ty -> bool
 
-(** Are the element of the type all encodable as bit-strings *)
-val is_bitstring_encodable : ty -> bool
-
-
 (*------------------------------------------------------------------*)
 (** Free variables in types *)
 

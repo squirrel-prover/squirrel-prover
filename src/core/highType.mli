@@ -69,6 +69,9 @@ val is_fixed : Symbols.table -> Type.ty -> bool
       are type variables). *)
 val serializability_order : Symbols.table -> Type.ty -> int option
 
+(** Are the element of the type all encodable as bit-strings *)
+val is_bitstring_encodable : Symbols.table -> Type.ty -> bool
+
 (** Is the type enumerable in polynomial time. *)
 val is_enum : Symbols.table -> Type.ty -> bool
 

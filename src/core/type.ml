@@ -290,21 +290,6 @@ let rec contains_tuni = function
   | TUnivar _ -> true
   | _ as ty -> exists contains_tuni ty
 
-let rec is_bitstring_encodable = function 
-  | Message
-  | Boolean
-  | Index  
-  | Timestamp -> true
-
-  (* FIXME: inductive: have a more precise test, as this reject valid
-     cases, e.g. `list int` *)
-  | TConstr (_s,args)  -> 
-    args = [] 
-
-  | Tuple tys -> List.for_all is_bitstring_encodable tys
-
-  | Fun _ | TVar _ | TUnivar _ -> false
-
 (*------------------------------------------------------------------*)
 let fv (t : ty) : Fv.t = 
   let rec fuvs acc t =

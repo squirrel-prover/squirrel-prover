@@ -101,7 +101,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       let info = try Vars.get_info v env.vars with Not_found -> Vars.Tag.gtag in
       let ty_v = Infer.norm_ty ienv (Vars.ty v) in
       let is_ty_enum = HighType.is_enum env.table ty_v in
-      let is_ty_encodable = Type.is_bitstring_encodable ty_v in
+      let is_ty_encodable = HighType.is_bitstring_encodable env.table ty_v in
       let adv =
         (* FIXME: could be improved into `info.det && is_ty_enum` *)
         (info.const && is_ty_enum) || 

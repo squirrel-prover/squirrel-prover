@@ -38,7 +38,7 @@ let get_mode (s : ES.t) : mode =
     begin
       let concl = ES.conclusion_as_computability s in
       let ty_right = Term.ty (CP.right concl) in
-      if not (Type.is_bitstring_encodable ty_right) then
+      if not (HighType.is_bitstring_encodable (ES.table s) ty_right) then
         soft_failure
           (Tactics.GoalBadShape
              "The right part of the (non-)deduction goal \
@@ -67,12 +67,15 @@ let get_terms (mode : mode) : Term.terms =
 let convert_arg
     (term : Typing.term)
     (cenv : Typing.conv_env)
-    : Term.term * Type.ty * Type.ty =
+  : Term.term * Type.ty * Type.ty
+  =
+  let table = cenv.env.table in
   let t, ty = Typing.convert cenv term in
   match ty with
   | Type.(Fun (ty1, ty2)) ->
     (* TODO: add support for oracles with multiple arguments *)
-    if Type.is_bitstring_encodable ty1 && Type.is_bitstring_encodable ty2 then
+    if HighType.is_bitstring_encodable table ty1 &&
+       HighType.is_bitstring_encodable table ty2 then
       t, ty1, ty2
     else
       soft_failure 

@@ -120,12 +120,23 @@ let serializability_order table ty : int option =
     | Boolean | Index | Timestamp | Message -> 0
     | Tuple l -> List.fold_left (fun m t -> max (order t) m) 0 l 
     | Fun (t1, t2) -> max (order t1 + 1) (order t2)
-    | TConstr _ as ty ->
+    | TConstr (_s,args) as ty ->
+      (* FIXME: inductive: have a more precise test, as this reject valid
+         cases, e.g. `list int` *)
+      if args <> [] then raise Unknown;
+
       if check_ty_info table ty Serializable then 0 else raise Unknown
+
     | TVar _ | TUnivar _ -> raise Unknown
   in    
   try Some (order ty) with Unknown -> None
 
+(** See `.mli` *)
+let is_bitstring_encodable table ty =
+  match serializability_order table ty with
+  | Some 0 -> true
+  | _ -> false
+  
 (** See `.mli` *)
 let is_enum table ty : bool =
   let rec check : Type.ty -> bool = function
