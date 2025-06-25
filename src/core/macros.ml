@@ -4,7 +4,10 @@ open Ppenv
 module L = Location
 module S = System
 module SE = SystemExpr
+
 module Mv = Vars.Mv
+module Sv = Vars.Sv
+
 (*------------------------------------------------------------------*)
 (** {2 Macro for mutable state} *)
 
@@ -82,7 +85,24 @@ let _pp_structured_macro_data ppe fmt s =
     | Systems p -> Fmt.pf fmt " @system:(%a)" SE.pp p
     | Like    s -> Fmt.pf fmt " @like:%a" Symbols.pp_path s
   in
-  let pp_body fmt b =
+
+  let pp_body fmt (b : body) =
+    let _, vars, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_cd = 
+        List.fold_left
+          ((^~) Sv.remove) (Sv.union (Term.fv b.out) (Term.fv b.when_cond))
+          b.vars
+      in
+      Term.add_vars_simpl_env (Vars.of_set fv_cd) b.vars
+    in
+    let b = { 
+      vars; 
+      pattern = omap (Term.subst s) b.pattern; 
+      out = Term.subst s b.out; 
+      when_cond = Term.subst s b.when_cond; 
+    } 
+    in
+
     let pp_pattern fmt =
       match b.pattern with
       | None -> Fmt.pf fmt "_"
@@ -97,11 +117,13 @@ let _pp_structured_macro_data ppe fmt s =
       pp_pattern pp_when
       (Term._pp ppe) b.out
   in
+
   let pp_args fmt args =
     if args = [] then () 
     else
       Fmt.pf fmt "(%a) " (Vars._pp_typed_list ppe) args
   in
+
   let pp_bodies fmt =
     if s.info.is_match then
       Fmt.pf fmt "with@ @[<v 0>%a@]"
@@ -115,7 +137,12 @@ let _pp_structured_macro_data ppe fmt s =
         Fmt.pf fmt "=@ @[%a@]" (Term._pp ppe) single_body.out
       end
   in
-  Fmt.pf fmt "@[<hv 2>@[let%s %a%t %a: %a @]%t@]"
+
+  Fmt.pf fmt "@[<hv 2>@[\
+              @[<hv 2>let%s %a%t@ @[%a@]@,: %a@] \
+              @]\
+              %t\
+              @]"
     (if s.info.is_rec then " rec" else "")
     Symbols.pp_path s.name 
     pp_in_systems

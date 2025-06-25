@@ -284,6 +284,20 @@ let to_string (ty : ty) : string =
     | _          -> Fmt.pf ppf "%a"   pp t
   in
   Fmt.str "%a" doit ty
+
+(*------------------------------------------------------------------*)
+(** Short name, for automatic variable naming. *)
+let short_name (ty : ty) : string =
+  match ty with
+  | Message           -> "m"
+  | Index             -> "i"
+  | Timestamp         -> "t"
+  | Boolean           -> "b"
+  | TConstr ((_,s),_) -> s
+  | TVar id           -> Ident.name id
+  | TUnivar u         -> Ident.name u
+  | Tuple _           -> "t"
+  | Fun (_, _)        -> "f"
   
 (*------------------------------------------------------------------*)
 let rec contains_tuni = function

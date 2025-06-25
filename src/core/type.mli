@@ -74,6 +74,9 @@ val _pp    : dbg:bool -> ty formatter
     parenthesis. *)
 val to_string : ty -> string
 
+(** Short name, based on the type (for automatic variable naming) *)
+val short_name : ty -> string
+
 (** Equality relation *)
 val equal : ty -> ty -> bool
 
