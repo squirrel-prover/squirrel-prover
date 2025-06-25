@@ -1872,6 +1872,101 @@ let positive_tvars table (ty : Type.ty) : Sid.t * Sid.t =
   doit Sid.empty Sid.empty ty
 
 (*------------------------------------------------------------------*)
+(** Defines the generic matching function on an inductive
+    datatype [ty_name : ty]. *)
+let define_match
+    table (loc : L.t) 
+    (ty_name : Symbols.ty)
+    (data : HighType.inductive_data) : Symbols.table 
+  =
+  let table, name =
+    Symbols.Macro.reserve
+      ~approx:false table 
+      (L.mk_loc loc (Symbols.to_string ty_name.s ^ "_match"))
+  in
+  let info = 
+    Term.{
+      is_rec = false; is_match = true;
+      is_ptime = true;
+      has_dist_param = true;    (* since there is a match *)
+      pp_style = `Standard;
+    } 
+  in
+
+  (* type parameter [a] of the match *)
+  let out_param_ty = Type.tvar (Type.mk_tvar "τ") in
+
+  (* Type parameter of the inductive type [ty_name].
+     E.g. if build a matcher on [list a], this is be [a]. *)
+  let inductive_ty_vars = List.map Type.tvar data.ty_vars in
+
+  (* the (applied) type of the inductive datatype named [ty_name] *)
+  let ty = HighType.of_path ~args:inductive_ty_vars table ty_name in
+
+  (* the variable of type [ty] we are matching upon *)
+  let match_param = Vars.make_fresh ty "x" in
+
+  (* for each constructor [c : τ0 → ... → τn → τ], we have a parameter
+     [vc : τ0 → ... → τn → a] *)
+  let case_parameters : Vars.var list =
+    List.map (fun constructor ->
+        let fty = Symbols.OpData.ftype table constructor in
+        let args, _ = Type.decompose_funs (HighType.apply_ftype fty inductive_ty_vars) in
+        Vars.make_fresh
+          (Type.fun_l args out_param_ty)
+          ("f_" ^ Symbols.to_string constructor.s)
+      ) data.constructors
+  in
+  let bodies : Macros.body list =
+    List.map2 (fun param constructor ->
+        let args_ty, _out_ty = Type.decompose_funs (Vars.ty param) in
+        let vars = List.map (fun ty -> Vars.make_fresh ty (Type.short_name ty)) args_ty in
+        let vars_t = List.map Term.mk_var vars in
+        let pattern = 
+          Term.mk_fun
+            table constructor ~ty_args:inductive_ty_vars 
+            vars_t
+          |> some
+        in
+        Macros.{
+          vars;
+          pattern;
+          when_cond = Term.mk_true;
+          out = Term.mk_app (Term.mk_var param) vars_t
+        }
+      ) case_parameters data.constructors
+  in
+
+  let data0 = 
+    Macros.{
+      name;
+      ty_params = data.ty_vars;
+      params = case_parameters;
+      dist_param = Some match_param; 
+      bodies; 
+      in_systems = Any;
+      ty = out_param_ty; 
+      rw_strat = Exact;
+      info;
+      decreasing_quantity = None; (* no recursion *)
+      decreasing_info = {
+        group = `UserDefined (name);
+        decreasing_quantity_type=Type.tmessage;
+        order = Library.Prelude.fs_lt;
+      };      
+    }
+  in
+
+  let data = 
+    Symbols.Macro (General (Macros.Macro_data (Structured data0)))
+  in
+  let table = Symbols.Macro.define table ~data name in
+
+  let ppe = default_ppe ~table () in
+  Printer.prt `Result "%a@." (Macros._pp_structured_macro_data ppe) data0;
+  table
+
+(*------------------------------------------------------------------*)
 let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =  
     match decl.ty_body with
     | `Abstract ->
@@ -1998,6 +2093,7 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
             let negative_vars = Sid.diff negative_vars c_pos in
 
             let ty_args, ty_out = Type.decompose_funs ty in
+
             (* declare a new constructor *)
             let table, c_name =
               Typing.declare_abstract table
@@ -2008,11 +2104,21 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
             (table,positive_vars, negative_vars, c_rec || is_rec), c_name
           ) (table, Sid.of_list ty_vars, Sid.of_list ty_vars, false) p_data.constructors
       in
-      let data = 
-        HighType.Inductive { ty_vars; positive_vars; negative_vars; constructors; is_rec } 
+      let data : HighType.inductive_data = 
+        { ty_vars; positive_vars; negative_vars; constructors; is_rec } 
       in
-      Symbols.Ty.redefine table name ~data:(HighType.Type data) 
 
+      (* define the inductive type *)
+      let table = 
+        Symbols.Ty.redefine
+          table name
+          ~data:(HighType.Type (HighType.Inductive data)) 
+      in
+
+      (* define the matcher over this inductive type *)
+      let table = define_match table (L.loc decl.ty_name) name data in
+
+      table
     
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
