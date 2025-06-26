@@ -780,12 +780,15 @@ let not_match_formula (match_arg : Vars.var) (body:Macros.body) : Term.t =
       (mk_simpl_not body.when_cond)
 
 (*------------------------------------------------------------------*)
-let mk_exhaustive_formula (bodies:Macros.body list) (match_arg:Vars.var) =
-  Term.mk_forall [match_arg] @@
-  Term.mk_ors (List.map (match_formula match_arg) bodies)
+let mk_exhaustive_formula (bodies:Macros.body list) (match_arg:Vars.var) (params:Vars.vars) =
+  let ors = Term.mk_ors (List.map (match_formula match_arg) bodies) in
+  let fv = Term.get_vars ors in
+  let params = List.filter (fun x -> List.mem x fv) params in
+  Term.mk_forall (match_arg::params) ors
+
 
 (*------------------------------------------------------------------*)
-let mk_exclusive_formula (bodies:Macros.body list) (match_arg:Vars.var) =
+let mk_exclusive_formula (bodies:Macros.body list) (match_arg:Vars.var) (params:Vars.vars) =
   let neg_cases = 
     List.map (fun b -> (b, not_match_formula match_arg b)) bodies 
   in
@@ -803,15 +806,21 @@ let mk_exclusive_formula (bodies:Macros.body list) (match_arg:Vars.var) =
          (i.e. [body.args]). 
          If we have a pattern, there we fully substitute [match_arg],
          so we do not quantify over it. *)
-      let args = if body.pattern = None then [match_arg] else body.vars in
-
-      let form = 
-        Term.mk_forall ~simpl:true args @@
+      let conc =
         subst_pattern @@
         Term.mk_impl ~simpl:true
           body.when_cond
           (Term.mk_ands ~simpl:true
              (head @ (List.map snd tail)))
+      in
+      
+      let fv = Term.get_vars conc in
+      let params = List.filter (fun x -> List.mem x fv) params in
+      let args = if body.pattern = None then match_arg::params else body.vars@params in
+
+      let form = 
+        Term.mk_forall ~simpl:true args conc
+
       in
       form :: mk_impl (case::head) tail
   in  
@@ -1351,14 +1360,14 @@ let parse_fun_decls
                 ~bodies; 
             in
             let exhs_formulas =
-              if exhaustive then [] else [mk_exhaustive_formula bodies match_arg]
+              if exhaustive then [] else [mk_exhaustive_formula bodies match_arg fdecl.params]
             in
             let mut_formulas =
               if mutually_exclusive then [] else begin
                 Printer.prt `Warning
                   "Could not prove that the pattern-match cases are mutually exclusive,@;\
                    generate proof-obligations instead";
-                [mk_exclusive_formula bodies match_arg]
+                [mk_exclusive_formula bodies match_arg fdecl.params]
               end
             in
             bodies, (mut_formulas @ exhs_formulas)

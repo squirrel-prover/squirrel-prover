@@ -343,14 +343,13 @@ op prop : bool.
 let f0 @system:P (x : int) u with
 | A i     when happens (A i) && prop -> 0
 | init                               -> 1
-| _       when not (happens u)       -> 2.
+| _       when not (happens u) && x=0 -> 2
+| _       when not (happens u) && x=1 -> 3.
 Proof.
-split.
-auto.
 
-have H : forall (u:timestamp),
+have H : forall (u:timestamp,x:int),
   (exists (i:index), A(i) = u && happens(A(i)) && prop) ||
-  init = u || not(happens(u)) by admit.
+  init = u || (not(happens(u)) && x = 0) || not(happens(u)) && x = 1 by admit.
 assumption.
 Qed.
 
