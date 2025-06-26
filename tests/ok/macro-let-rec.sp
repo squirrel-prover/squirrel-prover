@@ -367,3 +367,16 @@ have H : forall (u:timestamp),
  by admit.
 assumption.
 Qed.
+
+
+let rec plus (x : int) (y:int) with
+| 0 -> y
+| _ when y= 0 ->  x
+| 1 -> y + 1
+| _ when y=1 -> 1 + x
+| 0 -> 1
+| _ when y > 1 && x>1 -> 1+ (plus (x) (y-1)).
+Proof.
+have H : forall (x,y:int), y > 1 && x > 1 => (y - 1) < y by admit.
+assumption.
+Qed.

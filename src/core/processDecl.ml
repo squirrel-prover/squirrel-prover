@@ -836,10 +836,11 @@ let mk_wf_goal table env (rec_op:Symbols.fname) rec_domain_ty =
   Printer.prt `Default "ok";
   let wf_formulas =
     Term.mk_fun_infer_tyargs table (Library.Logic.fs_well_founded table) [fun_rec_op]
-  in        
-  [Goal.(Local (LowTraceSequent.init ~env wf_formulas))]
-
-
+  in
+  let fv = Term.get_vars wf_formulas in
+  [Goal.(Local (LowTraceSequent.init ~env
+                @@
+                Term.mk_forall ~simpl:true fv wf_formulas))]
 
 
 type partial_decl = {
@@ -1454,9 +1455,12 @@ let parse_fun_decls
            let child_quantity, _ =
              Macros.get_macro_deacreasing_info table rec_occ.child_call rec_occ.arg_call
            in
-           Term.mk_forall ~simpl:true [rec_occ.rec_arg] @@
-           rec_occ.when_cond_builder
-             (Term.mk_fun_infer_tyargs table rec_op [child_quantity; parent_quantity])
+           let conc = rec_occ.when_cond_builder
+               (Term.mk_fun_infer_tyargs table rec_op [child_quantity; parent_quantity])
+           in
+           let fv = Term.get_vars conc in
+           Term.mk_forall ~simpl:true fv @@ conc
+
         )
         rec_occs
     in
