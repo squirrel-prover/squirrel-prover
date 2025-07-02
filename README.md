@@ -5,9 +5,12 @@ of cryptographic protocols. It relies on a higher-order probabilistic
 logic following the computationnally complete symbolic attacker
 approach, and provides guarantees in the computational model.
 
+You may like to browse the
+[project's website](https://squirrel-prover.github.io/).
+
 ## Try it
 
-An online version of `Squirrel` is available with a complete tutorial
+An online version of `Squirrel` is available with several tutorials
 [here](https://squirrel-prover.github.io/jsquirrel/?open=0-logic.sp).
 
 You can find more examples in the `examples` directory.
@@ -16,9 +19,6 @@ You can find more examples in the `examples` directory.
 
 The manual is available online
 [here](https://squirrel-prover.github.io/documentation/).
-
-For more information, the presentation site is on
-[github.io](https://squirrel-prover.github.io/).
 
 ## Installation
 
@@ -237,28 +237,12 @@ the `examples/basic-tutorial/tutorial.sp`, that provides a run-through of the
 syntax with executables snippets. Then, browsing the `examples` folder should
 provide a wide variety of examples, starting e.g. with `basic-hash.sp`.
 
-### Detailed Tutorial
+### Detailed Tutorials
 
-A more complete tutorial is available in
-```
-examples/tutorial/
-```
-
-This tutorial consists in a series of exercises of increasing
-difficulty, and covers the basic logical constructs and tactics
-manipulating them, several cryptographic assumptions, accessibility
-properties (authentication, injective authentication), equivalence
-properties (unlinkability), stateful protocol, and protocol
-composition.
-
-- [0-logic](examples/tutorial/0-logic.sp)
-- [1-crypto-hash](examples/tutorial/1-crypto-hash.sp)
-- [2-crypto-enc](examples/tutorial/2-crypto-enc.sp)
-- [3-hash-lock-auth](examples/tutorial/3-hash-lock-auth.sp)
-- [4-hash-lock-unlink](examples/tutorial/4-hash-lock-unlink.sp)
-- [5-stateful](examples/tutorial/5-stateful.sp)
-- [6-key-establishment](examples/tutorial/6-key-establishment.sp)
-
+Detailed tutorials corresponding to research schools are available
+in `examples/nancy2022` and `examples/ejcp2025`. See
+[our website](https://squirrel-prover.github.io/events.html)
+for more information on these events.
 
 ## Developper details
 
