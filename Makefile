@@ -55,6 +55,7 @@ PROVER_TESTS = $(wildcard tests/ok/*.sp)
 
 PROVER_EXAMPLES =\
   $(wildcard examples/*.sp)                     \
+  $(wildcard examples/movep/*.sp)  	            \
   $(wildcard examples/nancy2022/*.sp)            \
   $(wildcard examples/nancy2022/solutions/*.sp)  \
   $(wildcard examples/ejcp2025/*.sp)            \

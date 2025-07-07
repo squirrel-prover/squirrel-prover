@@ -55,7 +55,7 @@ process reader(j:index) =
 system BasicHash = ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Show the set of actions obtained from above process. *)
-print system [BasicHash].
+print system BasicHash.
 
 (** Prove `wa_R` as in `basic-hash-wa.sp` slightly modified to also
     hold for single-session system.
@@ -80,7 +80,7 @@ lemma [BasicHash] wa_R :
 Proof.
   intro tau Hap. split => [i k Meq].
   + project. (* Here we need to separate the proof for each projection. *)
-    ++ euf Meq => *; by exists i,k0.
+    ++ euf Meq. intro [k0 [_ _]]. by exists i,k0.
     ++ euf Meq => *; by exists i,k.
   (** For the second implication (<=), the conclusion of the goal can directly
        be obtained from the hypotheses.*)

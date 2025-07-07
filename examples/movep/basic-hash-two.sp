@@ -71,7 +71,7 @@ system null.
    going to prove (phi ~ true). Logical connectives in phi
    are thus the dotted connectives, i.e. function symbols
    representing boolean operations. *)
-lemma authentication :
+theorem authentication :
   (* Assume tag T1 has run a session with nonce nt,
      and T2 with nonce nt'. *)
   (
@@ -102,12 +102,10 @@ Qed.
 (* To prove an equivalence we use a global goal.
    The two sides of the equivalence are given at once,
    using diff(_,_) when the left and right sides differ. *)
-global goal privacy :
+global theorem privacy :
   equiv(<nt,h(nt,k1)>,
         diff(<nt',h(nt',k1)>,
              <nt',h(nt',k2)>)).
-
-
 Proof.
   (* First break the pairs. *)
   fa 0.

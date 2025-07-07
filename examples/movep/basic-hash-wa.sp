@@ -57,7 +57,7 @@ process reader(j:index) =
 system BasicHash = ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Show the set of actions obtained from above process. *)
-print system [BasicHash].
+print system BasicHash.
 
 (** Whenever a reader accepts a message (_i.e._ the condition of the action
     `R(j)` evaluates to `true`), there exists an action `T(i,k)` that has been
@@ -91,8 +91,10 @@ Proof.
         that has already been hashed before.
         The only possibility is that this hash comes from the output of a tag
         that has played before (thus the new hypothesis on timestamps).*)
-    euf Meq => *. exists i,k. auto.
+    euf Meq.
+    intro [k [_ _]].
+    by exists i,k.
   (** For the second implication (<=), the conclusion of the goal can directly
        be obtained from the hypotheses.*)
-  + intro [i k Meq]. exists i. auto.
+  + intro [i k Meq]. by exists i.
 Qed.
