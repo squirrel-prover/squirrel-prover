@@ -185,7 +185,7 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
    secret signing keys and :g:`typk` for public verification keys.
    It is assumed unforgeable against
    chosen message attacks (EUF-CMA) and satisfying the equation
-   :g:`ver(sig(m,sk),m,pk(sk)) = true`.
+   :g:`ver(m,sig(m,sk),pk(sk)) = true`.
 
    Enables the use of :tacn:`euf`.
 
