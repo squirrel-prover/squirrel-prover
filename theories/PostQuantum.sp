@@ -13,6 +13,10 @@ namespace Quantum.
   axiom [any] exec_init (tau:timestamp) : tau = init => exec@tau = true.
   axiom [any] cond_init (tau:timestamp) : tau = init => cond@tau = true.
   
+  hint smt exec_not_init. 
+  hint smt cond_init. 
+  hint smt exec_init.
+
   lemma [any] exec_le (tau,tau':timestamp) : tau' <= tau => exec@tau => exec@tau'.
   Proof.
     induction tau => tau IH Hle Hexec.
@@ -44,5 +48,7 @@ namespace Quantum.
       have H := exec_not_init t.
       by rewrite H in Hex.
   Qed.
+
+  hint smt executability.
 
 end Quantum.

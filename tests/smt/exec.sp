@@ -1,4 +1,4 @@
-set timeout=10.
+include Core.
 
 lemma[any] _  : exec@init. Proof. smt. Qed.
 

@@ -16,6 +16,7 @@ val is_valid :
   timeout:int ->
   steps:int option -> 
   provers:(string*string) list->
+  Env.t -> 
   Symbols.table ->
   SystemExpr.fset option ->
   Vars.var list ->

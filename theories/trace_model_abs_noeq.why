@@ -75,29 +75,5 @@ theory Trace_model_abs_noeq
   (*Definition and specificatoin of macros*)
 
   predicate macro_cond timestamp
-  predicate macro_exec timestamp
-  function input timestamp : message
-  function frame timestamp : message 
-  function output timestamp : message 
-
   axiom macro_cond_happens : forall t : timestamp. macro_cond t -> happens t
-  axiom macro_cond_init    : macro_cond ( init )
-
-  axiom macro_exec_def : forall t : timestamp.
-    macro_exec t <-> (t =  init  \/ (macro_cond t /\ macro_exec (pred t)))
-
-  axiom executable : forall ts t : timestamp. (macro_exec ts) -> (t <~ ts -> (macro_exec t))
-
-  axiom input_init : forall t : timestamp. 
-    ((not (happens t) )\/ t = init) -> input t = empty   
-  axiom expand_input :  forall t : timestamp. 
-    (happens t /\ not t = init) -> input t = att (frame (pred t))
-
-  axiom frame_init : forall t : timestamp. 
-    ((not (happens t) )\/ t = init) -> frame t = empty   
-  axiom expand_frame : forall t : timestamp. 
-    (happens t /\ not t = init) -> frame t = (pair 
-      (of_bool (macro_exec t)) 
-      (pair (if (macro_exec t) then (output t) else (empty)) (frame (pred t))))
-
 end

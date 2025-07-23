@@ -52,13 +52,17 @@ lemma [any] ax4_macro: forall t:timestamp, not(not(happens(t)) || t= init) => in
 Proof. smt. Qed.
 
 (* Same here *)
-lemma [any] ax5_macro: forall t:timestamp, (not(happens(t)) || t = init) => (frame@t) = empty.
-Proof. smt ~style:abstract. Qed.
+lemma [any] ax5_macro: forall t:timestamp, (t = init) => (frame@t) = zero.
+Proof. smt. Qed.
+
+(* Same here *)
+lemma [any] ax52_macro: forall t:timestamp, (not(happens(t))) => (frame@t) = empty.
+Proof. smt. Qed.
 
 (* Same here *)
 lemma [any] ax6_macro: forall t: timestamp, not(not(happens(t)) || t= init) => 
-                                         frame@t = < (of_bool (exec@t)), 
-                                                      < if (exec@t) then (output@t) else empty, frame@(pred t)>>.
+                                         frame@t = < frame@pred(t), 
+                                                      < (of_bool (exec@t)), if (exec@t) then (output@t) else zero>>.
 Proof. smt.  Qed.
 
 (* Same here *)

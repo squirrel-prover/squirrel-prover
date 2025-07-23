@@ -110,7 +110,7 @@ lemma lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
 Proof.
   intro i.
   induction.
-  smt ~steps:31054. 
+  smt ~steps:16514. 
 Qed.
 
 
@@ -122,7 +122,7 @@ lemma lastupdate_A: forall (i:index, j:index, tau:timestamp),
 Proof.
   intro i j.
   induction.
-  smt ~steps:43781. 
+  smt ~steps:31257. 
 Qed.
 
 
@@ -134,7 +134,7 @@ lemma lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
 Proof.
   intro i tau. 
  induction tau.
- smt ~prover:Z3 ~steps:62541.
+ smt ~prover:Z3 ~steps:118136.
 Qed.
 
 (** The contents of distinct memory cells never coincide. *)

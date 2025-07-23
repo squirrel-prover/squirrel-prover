@@ -39,7 +39,7 @@ let _pp_body ppe fmt (b : body) : unit =
               pattern: @[%a@]@;\
               when_cond: @[%a@]@;\
               out: @[%a@]@;\
-              @]%!"    
+              @]%!"
     (Vars._pp_typed_list ppe) b.vars
     (Fmt.option (Term._pp ppe)) b.pattern
     (Term._pp ppe) b.when_cond
@@ -1336,7 +1336,7 @@ let _unfold
       try    
         let unapplied_descr, descr_subst =
           match rec_arg with
-          |Term.Action(asymb, aidx) ->
+          | Term.Action(asymb, aidx) ->
             let action = Action.of_term asymb aidx table in
             (try
                SE.descr_of_action table fset_system action
@@ -1356,7 +1356,8 @@ let _unfold
                 List.length ns_params = List.length args
               ) unapplied_descr.updates
           in
-          List.map (Term.subst descr_subst) ns_params, Term.subst descr_subst msg
+          List.map (Term.subst descr_subst) ns_params,
+          Term.subst descr_subst msg
         in
 
         (* Init case: we substitute the indices by their definition. *)
@@ -1383,7 +1384,8 @@ let _unfold
              when_cond = Term.mk_happens rec_arg;
              out = msg}]
           (* Otherwise, we need to take into account the possibility that
-             [param] and [ns_params] might be equal, and generate a conditional.  *)
+             [param] and [ns_params] might be equal,
+             and generate a conditional.  *)
         else
           [{ vars = [];
              pattern = None;
@@ -1398,12 +1400,10 @@ let _unfold
       with
       | Not_found ->
         (* state{se}@A with state not updated by A *)
+        assert (not (Term.equal rec_arg Term.init));
         [{ vars = [];
            pattern = None;
-           when_cond =
-             if Term.equal rec_arg Term.init then
-               Term.mk_true
-             else Term.mk_happens rec_arg;         
+           when_cond = Term.mk_happens rec_arg;         
            out = Term.mk_macro symb args (Term.mk_pred rec_arg)
          }]
 
@@ -1412,6 +1412,8 @@ let _unfold
         let st_bodies =
           SE.fold_descrs
             (fun (descr : Action.descr) (acc : body list) ->
+              if (List.exists (fun (msymb,_,_) -> msymb=symb.s_symb) descr.updates) 
+              then begin
                List.fold_left (fun acc (msymb, margs, body) ->
                    (* Represent the update [msymb(margs)@descr.action := body]. *)
                    if msymb = symb.s_symb then
@@ -1477,8 +1479,21 @@ let _unfold
                    else
                      acc
                  )
-                 acc descr.updates                 
-            )
+                 acc descr.updates
+              end 
+              else
+                let action =
+                  SE.action_to_term table fset_system
+                  @@ Action.to_action descr.action
+                in
+                { vars = Action.get_args_v descr.action;
+                  pattern = Some action;
+                  when_cond =
+                  Term.mk_happens rec_arg;
+                  out = Term.mk_macro symb args (Term.mk_pred rec_arg)
+                }
+                :: acc
+              )
             table fset_system []
         in
         st_bodies
@@ -1528,7 +1543,7 @@ let _unfold
       end
 
     with MatchFailed ->
-      let {action = (strict, glob_a)} as gdata = get_global_data gdat in      
+      let {action = (strict, glob_a)} as gdata = get_global_data gdat in
       let glob_bodies =
         SE.fold_descrs
           (fun (descr : Action.descr) (acc : body list) ->
@@ -1540,7 +1555,7 @@ let _unfold
                 when_cond =
                   if Term.equal rec_arg Term.init then
                     Term.mk_true
-                  else Term.mk_happens rec_arg;                                 
+                  else Term.mk_happens rec_arg;
                 out = get_def_glob ~allow_dummy:false fset_system table
                     symb ~args action gdata}
                :: acc
