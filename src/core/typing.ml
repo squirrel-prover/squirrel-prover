@@ -366,13 +366,20 @@ type conv_env = {
     constructs. *)
 module Option = struct
   type t = {
-    pat    : bool;              (** pattern variables can occur *)
+    pat    : [`All | `Holes | `None];
+    (** can there be pattern variables:
+        - [`Holes]: term holes [_] may occur 
+        - [`All]: term holes [_] and identifiers (e.g. [i], [toto],
+          ...) can occur 
+
+        [`All] is used to parse pattern-matching cases. *)
+    
     names  : bool;              (** names can occur *)
     macros : bool;              (** macros can occur *)
   }
 
   let default = {
-    pat      = false;
+    pat      = `None;
     names    = true;
     macros   = true;
   }
@@ -980,7 +987,7 @@ and convert0
 
   (*------------------------------------------------------------------*)
   | Tpat ->
-    if not state.option.pat then
+    if state.option.pat = `None then
       error (L.loc tm) PatNotAllowed;
 
     make_pat state "_" ty
@@ -1052,7 +1059,7 @@ and convert0
 
         (* in case of failure, and if pattern variables are allowed,
            create a fresh variable *)
-        with Error _ when state.option.pat && top = [] -> 
+        with Error _ when state.option.pat = `All && top = [] -> 
           if applied_symb.ty_args <> None then
             error loc (Failure "cannot apply type arguments here");
           if applied_symb.se_args <> None then

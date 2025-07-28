@@ -261,7 +261,14 @@ val var   : L.t -> string -> term
     constructs. *)
 module Option : sig
   type t = {
-    pat    : bool;              (** pattern variables can occur *)
+    pat    : [`All | `Holes | `None];
+    (** can there be pattern variables:
+        - [`Hole]: term holes [_] may occur 
+        - [`All]: term holes [_] and identifiers (e.g. [i], [toto],
+          ...) can occur 
+
+        [`All] is used to parse pattern-matching cases. *)
+    
     names  : bool;              (** names can occur *)
     macros : bool;              (** macros can occur *)
   }

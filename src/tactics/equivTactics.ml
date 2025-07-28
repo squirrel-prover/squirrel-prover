@@ -836,7 +836,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     =
     let t, _ty =
       Typing.convert
-        ~option:{Typing.Option.default with pat = true; }
+        ~option:{Typing.Option.default with pat = `Holes; }
         ~ienv cntxt tpat
     in
     let vars =

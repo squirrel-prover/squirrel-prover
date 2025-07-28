@@ -1244,7 +1244,7 @@ module Mk (Args : MkArgs) : S with
       let ty = Vars.ty f_arg in
       let arg, _ =
         Typing.convert
-          ~option:{Typing.Option.default with pat = true; }
+          ~option:{Typing.Option.default with pat = `Holes; }
           ~ienv cenv ~ty p_arg
       in
       

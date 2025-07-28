@@ -1118,7 +1118,7 @@ let parse_fun_decls
                       omap 
                         (fst -|
                          Typing.convert
-                           ~option:{Typing.Option.default with pat = true; }
+                           ~option:{Typing.Option.default with pat = `All; }
                            ~ienv ~ty:(Vars.ty (Lazy.force pd.match_param))
                            { env = pat_env; cntxt = InGoal; })
                         pattern 

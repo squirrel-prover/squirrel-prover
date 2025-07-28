@@ -54,7 +54,7 @@ let convert_pat_arg
   let ienv = Infer.mk_env () in
   let t, ty =
     Typing.convert
-      ~option:{Typing.Option.default with pat = true; }
+      ~option:{Typing.Option.default with pat = `Holes; }
       conv_cntxt ~ienv p
   in
   let res = occurrences_of_pat ~ienv conv_cntxt.env t ~target:conc in

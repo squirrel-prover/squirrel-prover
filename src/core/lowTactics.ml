@@ -2002,7 +2002,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             let ienv = Infer.mk_env () in
             let arg, _ty =
               convert 
-                ~option:{Typing.Option.default with pat = true; }
+                ~option:{Typing.Option.default with pat = `Holes; }
                 ~ienv s p_arg
             in 
             ( arg, Some (L.loc p_arg), Some ienv )
@@ -2070,7 +2070,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let ienv = Infer.mk_env () in
       let pat, _ =
         convert
-          ~option:{Typing.Option.default with pat = true; }
+          ~option:{Typing.Option.default with pat = `Holes; }
           ~system:(SE.reachability_context in_system)
           ~ienv s p_pat
       in

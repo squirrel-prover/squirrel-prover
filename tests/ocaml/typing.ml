@@ -484,6 +484,7 @@ let generic_typing () =
       "\
 type E[enum].
 type T.
+axiom foo @system:any (x : message) : x = empty.
 "
   in
   (* positive tests *)
@@ -491,7 +492,9 @@ type T.
   let _ : Term.term = term_of_string st "seq(i : index => i)" in
   let _ : Term.term = term_of_string st "seq(i : timestamp => i)" in
 
+  (*------------------------------------------------------------------*)
   (* negative tests *)
+  
   Alcotest.check_raises "seq enum 1" Ok
     (fun () ->
        let _ : Term.term =
@@ -500,6 +503,7 @@ type T.
        in
        raise Ko
     );
+  
   Alcotest.check_raises "seq enum 2" Ok
     (fun () ->
        let _ : Term.term =
@@ -508,10 +512,41 @@ type T.
        in
        raise Ko
     );
+  
   Alcotest.check_raises "seq enum 3" Ok
     (fun () ->
        let _ : Term.term =
          try term_of_string st "seq(i : message => i)" with
+         | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
+       in
+       raise Ko
+    );
+
+  (*------------------------------------------------------------------*)
+  (* positive test, should succeed *)
+  
+  Alcotest.check_raises "known symbol" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "\
+lemma _ @system:any (x : message): false.
+Proof. 
+ have ? := foo x."
+         with
+         | _ -> raise Ko
+       in
+       raise Ok
+    );
+
+  (* negative test, should fail *)
+    Alcotest.check_raises "unknown symbol" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "\
+lemma _ @system:any : false.
+Proof. 
+ have ? := foo toto."
+         with
          | Squirrelcore.Typing.Error (_, Failure _) -> raise Ok
        in
        raise Ko

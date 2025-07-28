@@ -455,14 +455,14 @@ let search_about
   | Local p -> 
     let t, _ =
       Typing.convert
-        ~option:{Typing.Option.default with pat = true; }
+        ~option:{Typing.Option.default with pat = `Holes; }
         ~ienv cntxt p
     in
     find t
   | Global f ->
     let t =
       Typing.convert_global_formula
-        ~option:{Typing.Option.default with pat = true; }
+        ~option:{Typing.Option.default with pat = `Holes; }
         ~ienv cntxt f
     in
     let pat_op_vars =
