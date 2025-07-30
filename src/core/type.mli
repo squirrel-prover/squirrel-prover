@@ -139,11 +139,10 @@ val func   : ty          -> ty     -> ty
 val fun_l  : ty list     -> ty     -> ty
 val tuple  : ty list     -> ty
 
-(* Check if a type cannot be quantum *)
+(** Check if a type is definitely classical *)
 val is_classical_type : ty -> bool
 
-(* Check if a type is explicitely quantum, i.e. directly depends on a
-   base quantum type, and not just through variables.  *)
+(** Check if a type is definitely quantum *)
 val is_quantum_type : ty -> bool
 
 (*------------------------------------------------------------------*)  

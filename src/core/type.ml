@@ -199,7 +199,7 @@ let rec equal (a : ty) (b : ty) : bool =
    | _ -> false
 
 
-(** Check if a type is not quantum *)
+(** Check if a type is definitely classical *)
 let rec is_classical_type = function
   | Message  | Boolean   | Index    | Timestamp -> true
     
@@ -216,6 +216,7 @@ let rec is_classical_type = function
   | Tuple ls -> List.for_all is_classical_type ls
   | Fun (i,o) -> is_classical_type i && is_classical_type o
 
+(** Check if a type is definitely quantum *)
 let rec is_quantum_type = function
   | Message  | Boolean   | Index    | Timestamp -> false
     

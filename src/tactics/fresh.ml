@@ -246,9 +246,9 @@ let fresh_trace_tac (args : TacticsArgs.parser_args) : LowTactics.ttac =
 let phi_fresh_pair
     ~(use_path_cond : bool)
     ?(loc  = L._dummy )
-    (s : ES.sequent)     
+    (s       : ES.sequent)     
     (t       : Term.term)
-    (biframe      : Term.terms)
+    (biframe : Term.terms)
   =
   let env = ES.env s in
   let system = ((Utils.oget env.system.pair) :> SE.fset) in

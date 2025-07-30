@@ -43,8 +43,8 @@ type tags = {
       to the protocol randomness *)
 
   qadv     : bool;
-  (** [t] is computable in quantum ptime by an adversary with no direct access
-      to the protocol randomness *)  
+  (** [t] is computable in quantum ptime by an adversary with no
+      direct access to the protocol randomness *)  
 
   si      : bool; 
   (** [t] system-independent, i.e. its semantics does not change when
@@ -78,7 +78,7 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
   {
     const   = tags1.const   && tags2.const   ;
     adv     = tags1.adv     && tags2.adv     ;
-    qadv     = tags1.qadv     && tags2.qadv     ;    
+    qadv    = tags1.qadv     && tags2.qadv   ;    
     si      = tags1.si      && tags2.si      ;
     det     = tags1.det     && tags2.det     ;
     no_diff = tags1.no_diff && tags2.no_diff ;
@@ -118,7 +118,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       {
         const   = info.const        ;
         adv     = adv               ;
-        qadv    = adv ;                
+        qadv    = adv               ; (* since `adv` implies `qadv` *)
         si      = info.system_indep ;
         no_diff = true              ;
         det     = info.const        ;
@@ -138,15 +138,15 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       let is_si = Operator.is_system_indep env.table f in
       let is_classical_fun =
         Type.is_classical_type @@
-          apply_ftype afty.fty afty.ty_args
+        apply_ftype afty.fty afty.ty_args
       in
       {
         const   = not (is_att || is_qatt);
-        adv     = not (is_qatt)  && is_classical_fun;
-        (* all functions BUT qatt are assumed to be adv over explicit
-           types. Indeed, currently, we do not allow declaring user
-           defined quantum functions.  To note, the first check is
-           redundant, with the is_classical_fun test. *)
+        adv     = not is_qatt && is_classical_fun;
+        (* all operators BUT [qatt] are assumed to be [adv] over
+           classical types (indeed, currently, we do not allow to
+           declare user-defined quantum operators). Note that the
+           check [not is_qatt] is redundant with [is_classical_fun]. *)
         qadv    = true       ;
         si      = is_si      ;
         no_diff = true       ;
