@@ -125,7 +125,9 @@ let serializability_order table ty : int option =
          cases, e.g. `list int` *)
       if args <> [] then raise Unknown;
 
-      if check_ty_info table ty Serializable then 0 else raise Unknown
+      if check_ty_info table ty Serializable || 
+         check_ty_info table ty Finite
+      then 0 else raise Unknown
 
     | TVar _ | TUnivar _ -> raise Unknown
   in    
@@ -155,6 +157,41 @@ let is_enum table ty : bool =
 let is_well_founded table ty : bool =
   check_info_on_closed_term false table ty Well_founded
 
+(*------------------------------------------------------------------*)
+(** Check if a type is definitely classical *)
+let is_classical table (ty : Type.ty) : bool = 
+  let rec doit : Type.ty -> bool = function
+    | Message  | Boolean   | Index    | Timestamp -> true
+
+    | TConstr(_, args) as t -> 
+      is_bitstring_encodable table t &&
+      List.for_all doit args
+    (** A bit-string encodable user-defined types is classical *)
+
+    | TVar _ -> false  (** Type variable might be quantum *)
+
+    | TUnivar _ -> false   (** Type unification variable might be quantum *)
+
+    | Tuple ls -> List.for_all doit ls
+    | Fun (i,o) -> doit i && doit o
+  in
+  doit ty
+
+(** Check if a type is definitely quantum *)
+let rec is_quantum : Type.ty -> bool = function
+  | Message  | Boolean   | Index    | Timestamp -> false
+    
+  | TConstr(_, args) as t -> 
+    assert (args = []);
+    Type.equal t Type.tquantum_message
+  (** User-defined types *)
+        
+  | TVar _ -> false  (** Type variable *)
+
+  | TUnivar _ -> false   (** Type unification variable *)
+
+  | Tuple ls -> List.exists is_quantum ls
+  | Fun (i,o) -> is_quantum i || is_quantum o
 
 (*------------------------------------------------------------------*)
 (** {3 Inductive types} *)

@@ -199,41 +199,6 @@ let rec equal (a : ty) (b : ty) : bool =
    | _ -> false
 
 
-(** Check if a type is definitely classical *)
-let rec is_classical_type = function
-  | Message  | Boolean   | Index    | Timestamp -> true
-    
-  | TConstr(_, args) as t -> 
-    not (equal t tquantum_message) && 
-    List.for_all is_classical_type args
-  (** User-defined types are all classical, except for the built-in
-      quantum message type *)
-        
-  | TVar _ -> false  (** Type variable might be quantum *)
-
-  | TUnivar _ -> false   (** Type unification variable might be quantum *)
-
-  | Tuple ls -> List.for_all is_classical_type ls
-  | Fun (i,o) -> is_classical_type i && is_classical_type o
-
-(** Check if a type is definitely quantum *)
-let rec is_quantum_type = function
-  | Message  | Boolean   | Index    | Timestamp -> false
-    
-  | TConstr(_, args) as t -> 
-    equal t tquantum_message &&
-    List.for_all is_quantum_type args
-  (** User-defined types *)
-        
-  | TVar _ -> false  (** Type variable *)
-
-  | TUnivar _ -> false   (** Type unification variable *)
-
-  | Tuple ls -> List.exists is_quantum_type ls
-  | Fun (i,o) -> is_quantum_type i || is_quantum_type o
-
-
-
 (*------------------------------------------------------------------*)
 let toplevel_prec = 0
 

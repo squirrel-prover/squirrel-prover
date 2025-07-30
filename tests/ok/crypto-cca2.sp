@@ -1,9 +1,10 @@
 include Core.
 
-type seed[large].
-type sk_enc[large].
-type pk_enc.
-type ctxt.
+type seed[large, serializable].
+type sk_enc[large, serializable].
+type pk_enc[serializable].
+type ctxt[serializable].
+
 abstract pk_enc : sk_enc -> pk_enc.
 abstract enc : message -> pk_enc -> seed -> ctxt.
 abstract dec : ctxt -> sk_enc -> message.

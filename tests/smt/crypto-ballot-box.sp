@@ -6,13 +6,14 @@ set timeout = 10.
 set smtSteps=10000.
 
 (* A type seed, for any ponctual randomness (in signature and encryption *)
-type seed[large].
+type seed[large, serializable].
 
 (* ------------------------------------------------------------------- *)
 (* Encryption *)
-type sk_enc[large].
-type pk_enc.
-type ctxt.
+type sk_enc[large, serializable].
+type pk_enc[serializable].
+type ctxt[serializable].
+
 abstract pk_enc : sk_enc -> pk_enc.
 abstract encr : message -> pk_enc -> seed -> ctxt.
 abstract decr : ctxt -> sk_enc -> message.

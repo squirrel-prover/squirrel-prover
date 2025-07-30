@@ -6,7 +6,7 @@ include Core.
    crypto assumptions on h imply that kty is large -- otherwise
    the attacker could brute force the crypto games. *)
 
-type kty.
+type kty[serializable].
 abstract h : message * kty -> message.
 
 game PRF = {

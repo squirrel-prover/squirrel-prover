@@ -139,12 +139,6 @@ val func   : ty          -> ty     -> ty
 val fun_l  : ty list     -> ty     -> ty
 val tuple  : ty list     -> ty
 
-(** Check if a type is definitely classical *)
-val is_classical_type : ty -> bool
-
-(** Check if a type is definitely quantum *)
-val is_quantum_type : ty -> bool
-
 (*------------------------------------------------------------------*)  
 (** If [decompose_funs t = (targs, tout)] then:
     - [t = t1 -> ... -> tn -> tout] where [targs = \[t1; ...; tn\]]

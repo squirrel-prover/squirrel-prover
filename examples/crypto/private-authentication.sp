@@ -38,7 +38,7 @@ include Core.
 (* We assume a type `ptxt` for plain-text messages, of bounded length.
    This is achieved by taking a truncation function from messages
    to plain-texts. We don't need any explicit axiom on this function. *)
-type ptxt[large].
+type ptxt[large, serializable].
 abstract truncate : message -> ptxt.
 
 (* Cryptographic primitives. We use custom projection functions rather

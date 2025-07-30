@@ -1296,7 +1296,7 @@ let parse_fun_decls
         | `Abstract (in_tys, out_ty) ->       (* abstract declaration *)
           let in_tys = List.map Vars.ty fdecl.pdecl.args @ in_tys in
 
-          if List.exists Type.is_quantum_type @@ out_ty :: in_tys then
+          if List.exists HighType.is_quantum @@ out_ty :: in_tys then
             error loc KDecl
               (Failure "Cannot declare an abstract function depending on \
                         a quantum type, all abstract are assumed to be \

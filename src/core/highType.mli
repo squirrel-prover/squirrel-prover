@@ -83,6 +83,13 @@ val is_name_fixed_length : Symbols.table -> Type.ty -> bool
 val is_well_founded : Symbols.table -> Type.ty -> bool
 
 (*------------------------------------------------------------------*)
+(** Check if a type is definitely classical *)
+val is_classical : Symbols.table -> Type.ty -> bool
+
+(** Check if a type is definitely quantum *)
+val is_quantum : Type.ty -> bool
+
+(*------------------------------------------------------------------*)
 (** {3 Inductive types} *)
   
 (** Is the type an inductive type. *)

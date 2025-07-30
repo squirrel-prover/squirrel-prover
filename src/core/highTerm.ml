@@ -137,7 +137,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       let is_qatt = f = Symbols.fs_qatt in
       let is_si = Operator.is_system_indep env.table f in
       let is_classical_fun =
-        Type.is_classical_type @@
+        HighType.is_classical env.table @@
         apply_ftype afty.fty afty.ty_args
       in
       {

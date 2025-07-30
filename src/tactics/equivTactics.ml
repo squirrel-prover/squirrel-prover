@@ -807,7 +807,7 @@ let fa_expand
       let app_fty = Term.apply_ftype fty.fty fty.ty_args in
 
       (* if [tf] is classical, use the classical FA rule *)
-      if Type.is_classical_type app_fty then
+      if HighType.is_classical env.table app_fty then
         let l = if is_deducible_vars l then [] else l in
         let tf = if HighTerm.is_ptime_deducible ~si:true env tf then [] else [tf] in
         tf @ l, []
@@ -1065,8 +1065,10 @@ let fa_tac args = match args with
 let is_dup
     (s : ES.t) (elem : Term.term) (elems : Term.term list) : bool 
   =
+  let table = ES.table s in
+
   (* the [dup] rule only applies to fully classical values *)
-  if not (Type.is_classical_type @@ Term.ty elem) then false else
+  if not (HighType.is_classical table @@ Term.ty elem) then false else
 
   let system = 
     let system_s = ES.system s in
@@ -1211,6 +1213,7 @@ let filter_deduce
       (ES.proof_context ~in_system s)
       ~support:[]
   in
+  let table = ES.table s in
 
   (** Invariant: [knows, results, to_filter ▷ to_filter_init] *)
   let rec doit result to_filter : Term.terms =
@@ -1222,7 +1225,7 @@ let filter_deduce
          TODO: quantum: this is probably insuficient to be sound, one
          should work on Match.deduce, but if we disallow to deduce
          polymorphic elements, we loose some deduce lemmas. *)
-      if not (Type.is_classical_type (Term.ty e)) then
+      if not (HighType.is_classical table (Term.ty e)) then
         doit (e :: result) to_filter0
       else
       let inputs = result @ to_filter0 @ knows in (* without [e] *)
