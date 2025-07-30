@@ -1,4 +1,78 @@
 include Core.
+
+(* --------------------------------------------------------- *)
+system Q = null.
+
+global lemma [Q] _ (f:message -> message) x :
+ equiv(x) ->
+ equiv(x, f x).
+Proof.
+  intro E.
+
+  (* fails because `f` is not `adv` *)
+  checkfail deduce 1 exn ApplyMatchFailure. 
+Abort.
+
+(* same lemma, but assuming that `adv(f)` *)
+global lemma [Q] _ (f:message -> message[adv]) x :
+ equiv(x) ->
+ equiv(x, f x).
+Proof.
+  intro E.
+  deduce 1.                       (* should succeed *)
+  apply E.
+Qed.
+
+(* same lemma, but `f` is polymorphique *)
+global lemma [Q] _ ['a] (f:'a -> message[adv]) x :
+ equiv(x) ->
+ equiv(x, f x).
+Proof.
+  nosimpl intro E.
+
+  deduce 1.
+  (* succeed because `f` is assumed to be `adv`, even though we use a
+     type variable `'a` *)
+
+  apply E.
+Qed.
+
+(* This declares an abstract polymorphic operator `f`.
+
+   Squirrel assumes that polymorphic operators are `adv` for all
+   instantiation of `'a` as a classical type. *)
+op f ['a] : 'a -> message.
+
+global lemma [Q] _ (x : message) :
+ equiv(x) ->
+ equiv(x, f x).
+Proof.
+  nosimpl intro E.
+
+  deduce 1. 
+  (* since `f` is an operator applied to a classical type `message`,
+     it is `adv`, and `deduce` succeeds  *)
+
+  apply E.
+Qed.
+
+(* same as above, but `x` is of type `'a` for some arbitrary `'a` *)
+global lemma [Q] _ ['a] (x : 'a) :
+ equiv(x) ->
+ equiv(x, f x).
+Proof.
+  nosimpl intro E.
+
+  checkfail deduce 1 exn ApplyMatchFailure.
+  (* since `f` is an operator applied to an type `'a` that could not
+     be classical, we do not know that `f` is `adv`, and `deduce`
+     fails *)
+
+  checkfail fa 1 exn Failure.
+  (* `fa` must fail for the same reason *)
+Abort.
+
+(* --------------------------------------------------------- *)
 channel c.
 
 mutable s = empty.
