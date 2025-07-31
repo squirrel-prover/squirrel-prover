@@ -156,170 +156,221 @@ let () =
     (LT.genfun_of_efun sym_tac)
 
 (*------------------------------------------------------------------*)
+(** Takes a sequent [s] whose goal is an equivalence [l ~ r {pair sl, sr}],
+    intermediary terms [m] and system [sm],
+    and returns two sequents [l ~ m {pair sl, sm}] and [m ~ r {pair sm, sr}].
+    [m] must have the same length as [l] and [r].
+    In the two sequents produced, the set is either
+    updated to be the same as the pair, or left unchanged, depending on the
+    parameter [update_set]. *)
+let transitivity_internal
+    ~(update_set : bool)
+    (system_m : SE.Single.t)
+    (terms_m : Term.term list)
+    (s : ES.t)
+  : ES.t * ES.t =
+  
+  let table = ES.table s in
+  let equiv_lr = ES.conclusion_as_equiv s in
+  let terms_lr = equiv_lr.terms in
 
-(** Prove a sequent s whose conclusion is an equivalence
-    from s1,s2,s3 where:
+  (* we should always get the correct number of terms in
+     the intermediate sequence *)
+  assert (List.length terms_lr = List.length terms_m);
 
-    - s1 shows that the left projections of the equivalence
-      are equivalent for the old and new left systems;
+  (* get the labels and systems of the initial equivalence *)
+  let proj_l, proj_r = ES.get_system_pair_projs s in
+  let old_set = (ES.system s).set in
+  let pair_lr = ES.get_system_pair s in
+  let (_, system_l), (_, system_r) = SE.fst pair_lr, SE.snd pair_lr in
 
-    - s3 shows that the right projections of the equivalence
-      are equivalent for the old and new right systems;
-
-    - s2 proves the same equivalence as s1 but for the new systems.
-
-    For convenience a new context is passed and not just a new pair.
-    This allows to change the set annotations for s2 by the way. *)
-let transitivity_systems ~loc (new_context : SE.context) (s : ES.t) =
-  check_conclusion_is_equiv s;
-
-  let old_context = ES.system s in
-  let table       = ES.table  s in
-
-  if not (SE.compatible table (ES.env s).se_vars new_context.set old_context.set) then
-    soft_failure ~loc
-      (Failure "the new system context must be compatible \
-                with the current context");
-
-  (* FIXME: get rid of this limitation *)
-  if new_context.pair <> None && SE.is_var (oget new_context.pair) then
-    soft_failure ~loc
-      (Failure "the pair component of the new system context must \
-                not be a variable");
-
-  let l_proj, r_proj = ES.get_system_pair_projs s in
-
-  (* Extract data from initial sequent. *)
-  let equiv_left = ES.get_frame l_proj s |> Utils.oget in
-  let equiv_right = ES.get_frame r_proj s |> Utils.oget in
-  let old_pair = Utils.oget old_context.pair in
-
-  let new_pair = Utils.oget new_context.SE.pair in
-
-  (* Extract data from new context. *)
-  let _, new_left = SE.fst new_pair in
-  let _, new_right = SE.snd new_pair in
-
-  (* Create new system annotations for s1 and s3.
-     The order of single systems in {left,right}_systems does not
-     matter for soundness but the choice below seems most natural
-     to understand the chain of transitivities, and it also maximizes
-     the chances that the context does not change in new sequents,
-     which will allow set_conclusion_in_context to keep a maximum of
-     hypotheses. *)
-  let left_systems =
-    SE.make_pair (l_proj, snd (SE.fst old_pair)) (r_proj, new_left)
+  (* construct the new contexts for the two transitivity steps: L/M and M/R*)
+  let mk_context s1 s2 =
+    let pair = SE.make_pair (proj_l, s1) (proj_r, s2) in
+    let set =
+      if update_set then
+        (SE.make_fset table ~labels:[Some proj_l; Some proj_r] [s1; s2]
+         :> SE.arbitrary)
+      else 
+        old_set
+    in
+    if not (SE.compatible table (ES.env s).se_vars set old_set) then
+      soft_failure
+        (Failure "The new system context must be compatible \
+                  with the current context");
+    SE.{set = set; pair = Some pair;}
   in
-  let right_systems =
-    SE.make_pair (l_proj, new_right) (r_proj, snd (SE.snd old_pair))
-  in
+  
+  let context_lm = mk_context system_l system_m in
+  let context_mr = mk_context system_m system_r in
 
-  let s1 =
-    ES.set_conclusion_in_context
-      { old_context with pair = Some left_systems }
-      (Atom (Equiv equiv_left))
-      s
-  in
-  let s3 =
-    ES.set_conclusion_in_context
-      { old_context with pair = Some right_systems }
-      (Atom (Equiv equiv_right))
-      s
-  in
-  let s2 = ES.set_conclusion_in_context new_context (ES.conclusion s) s in
-
-  [Goal.Global s1;Goal.Global s2;Goal.Global s3]
-
-(* Term transitivity, on the right:
-   u ~_{L,R} w -> 
-   w ~_{R,R} v -> 
-   u ~_{L,R} v *)
-let trans_terms (args : (int L.located * Typing.term) list) (s : ES.t) : Goal.t list =
-  let _, r_sys = SE.snd (ES.get_system_pair s) in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
-
-  let cenv =
-    (* fset with only the right system, once *)
-    let fset_r = SE.make_fset (ES.table s) ~labels:[Some r_proj] [r_sys] in
-
-    (* remove the pair when parsing, to prevent diffs *)
-    let system = SE.{ set = (fset_r :> SE.arbitrary); pair = None; } in
-    let env = { (ES.env s) with system; } in
-    Typing.{ env; cntxt = InGoal; } 
+  (* the two new equivalence goals *)
+  let equiv_lm, equiv_mr =
+    List.split
+      (List.map2
+         (fun lr m ->
+            let l = Term.project [proj_l] lr in
+            let r = Term.project [proj_r] lr in
+            let mk x y =
+              if Term.equal x y then x
+              else Term.mk_diff [proj_l, x; proj_r, y]
+            in
+            mk l m, mk m r)
+         equiv_lr.terms
+         terms_m)
   in
 
-  let args = List.map (fun (i,t) -> i, fst (Typing.convert cenv t)) args in
-
-  let equiv = ES.conclusion_as_equiv s in
-
-  let context = ES.system s in
-
-  let l_system, r_system = 
-    let pair = Utils.oget context.pair in
-    snd (SE.fst pair), snd (SE.snd pair)
-  in
-
-  let pair1 = SE.make_pair (l_proj, l_system) (r_proj, r_system) in (* L/R *)
-  let pair2 = SE.make_pair (l_proj, r_system) (r_proj, r_system) in (* R/R *)
-
-  (* fset with only the right system, twice *)
-  let fset_r2 =
-    SE.make_fset (ES.table s) ~labels:[Some l_proj;Some r_proj] [r_sys; r_sys]
-  in
-
-  let context1 = { context with pair = Some pair1; } in
-  let context2 = SE.{ set = (fset_r2 :> SE.arbitrary); pair = Some pair2; } in
-
-  let equiv1, equiv2 = 
-    List.mapi (fun i t ->
-        let t1 = Term.project1 l_proj t in
-        let t2 = Term.project1 r_proj t in
-        match List.find_opt (fun (j,_) -> i = L.unloc j) args with
-        | None ->
-          t, 
-          Term.simple_bi_term
-            [l_proj; r_proj]
-            (Term.mk_diff [(l_proj, t2); (r_proj,    t2)])
-
-        | Some (_,new_t) ->
-          Term.mk_diff [(l_proj,    t1); (r_proj, new_t) ],
-          Term.mk_diff [(l_proj, new_t); (r_proj,    t2) ]
-      ) equiv.terms
-    (*TODO:Concrete : Probably something to do to create a bounded goal*)
-    |> List.split
-  in
-
-  let goal1 = ES.set_conclusion_in_context context1 (Atom (Equiv {terms = equiv1; bound = None})) s in
+  (* the two sequents *)
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
-  let goal2 = ES.set_conclusion_in_context context2 (Atom (Equiv {terms = equiv2; bound = None})) s in
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
+  let mk_s c e =
+    ES.set_conclusion_in_context c (Atom (Equiv {terms = e; bound = None})) s
+  in
+  let s_lm = mk_s context_lm equiv_lm in
+  let s_mr = mk_s context_mr equiv_mr in
+  (s_lm, s_mr)
+  
+
+(** Same as transitivity_internal, but instead of the sequence of intermediate
+    terms, takes a list of positions to update in [u] or [v] (depending on
+    [side]) and what to replace them with *)
+let transitivity
+    ~(update_set:bool)
+    ~(side : Equiv.side)
+    (system_m : SE.Single.t)
+    (terms_up : (int * Term.term) list)
+    (s : ES.t)
+  : ES.t * ES.t =
+  let terms = (ES.conclusion_as_equiv s).terms in
+  let projs = ES.get_system_pair_projs s in
+  let proj = match side with | Left -> fst projs | Right -> snd projs in
+  let terms_ini = List.map (Term.project [proj]) terms in
+  let terms_m =
+    List.mapi (fun i t ->  List.assoc_dflt t i terms_up)
+      terms_ini
+  in
+  transitivity_internal ~update_set system_m terms_m s
 
 
-  [Goal.Global goal1; Goal.Global goal2 ]
 
 
+(** The actual transitivity tactic, for a goal [u ~ v {pair: Sl, Sr}].
+    Two use cases:
+    - [trans ~left ~system:Sm i1:w1,i2:w2,…]
+      transforms the sequent into two proof obligations
+      [u ~ u' {pair:Sl, Sm}] and [u' ~ v {pair:Sm, Sr}]
+      where [u'] is [u] with elements of indices [i1,i2,…] replaced by [w1,w2,…]
+      In each, the set is updated to match the pair.
+
+      [trans ~right] is similar, but replaces in [v] instead.
+      By default, [Sm] is [Sl] when [~left], [Sr] when [~right], 
+      and the default is [~right].
+
+      In particular, if [w] contains all indices and [Sm] is specified,
+      [~left/~right] do not matter.
+    
+    - [trans {left:Sml, right:Smr}]
+      transforms the sequent into three proof obligations
+      [u ~ u {pair:Sl, Sml}], [u ~ v {pair:Sml, Smr}], [v ~ v {pair:Smr, Sr}].
+      In the first and third, the set is unchanged; in the middle one 
+      it is set to the set given to the tactic.
+      This corresponds to [trans ~left ~system:Sml []] followed by
+      [trans ~right ~system:Smr []] (except wrt the set) *)
 let trans_tac args s =
+  (* check the goal is an equivalence *)
+  if not (ES.conclusion_is_equiv s) then
+    hard_failure (Failure "Expected an equivalence goal");
+
+  let table = ES.table s in
+  let env = ES.env s in
+
   match args with
-  | [Args.Trans (Args.TransSystem (new_sys as annot))] ->
-    let table = ES.table s in
-    let se_env = (ES.env s).se_vars in
+  (* transitivity on terms *)
+  | [Args.Trans (Args.TransTerms (nargs, system_m, terms_up))] ->
+    (* by default, side is right *)
+    let side:Equiv.side =
+      match nargs with
+      | [] | [Args.NArg {L.pl_desc="right"}] -> Right
+      | [Args.NArg {L.pl_desc="left"}] -> Left
+      | _ -> bad_args ()
+    in
+
+    (* by default, system_m is l if side=left, r if side=right *)
+    let pair = ES.get_system_pair s in
+    if not (SE.is_fset pair) then (* it must be an explicit pair *) 
+      soft_failure (Failure "the current system context \
+                             must have an explicit pair");
+    let (_, system_l), (_, system_r) = SE.fst pair, SE.snd pair in
+    let system_m =
+      match system_m, side with
+      | None, Left -> system_l
+      | None, Right -> system_r
+      | Some {pl_loc = _; pl_desc = [system_m];}, _ ->
+        SE.Parse.parse_single table system_m
+      | Some {pl_loc = loc; pl_desc = _;}, _ ->
+        soft_failure ~loc (Failure "A single system must be provided")
+    in
+
+    (* terms are parsed in system_m *)
+    let cenv =
+      (* should we add a label? *)
+      let set = SE.make_fset table ~labels:[None] [system_m] in
+      let context = SE.{ set = SE.to_arbitrary set; pair = None; } in
+      let env = { env with system=context; } in
+      Typing.{ env; cntxt = InGoal; } 
+    in
+    let len = List.length (ES.conclusion_as_equiv s).terms in
+    let terms_up =
+      List.map
+        (fun (i, t) -> let j = L.unloc i in
+          if j < 0 || j >= len then (* fail if index out of range *)
+            soft_failure ~loc:(L.loc i)
+              (Failure "Index does not exist in the goal");
+          (j, fst (Typing.convert cenv t)))
+        terms_up
+    in
+
+    let s_lm, s_mr = transitivity ~update_set:true ~side system_m terms_up s in
+    [s_lm; s_mr]
+
+  (* transitivity on systems *)
+  | [Args.Trans (Args.TransSystem annot) ] ->
+    (* parse the system annotation *)
+    let se_env = env.se_vars in
     let _, context =
       SE.Parse.parse_global_context ~implicit:false ~se_env table annot
     in
-    fun sk fk ->
-      begin match transitivity_systems ~loc:(L.loc new_sys) context s with
-        | l -> sk l fk
-        | exception Tactics.Tactic_soft_failure e -> fk e
-      end
 
-  | [Args.Trans (Args.TransTerms l)] ->
-    fun sk fk -> 
-      begin match trans_terms l s with
-        | l -> sk l fk
-        | exception Tactics.Tactic_soft_failure e -> fk e
-      end
+    if not (SE.compatible table env.se_vars context.set (ES.system s).set) then
+      soft_failure ~loc:(L.loc annot)
+        (Failure "the new system context must be compatible \
+                  with the current context");
 
+    (* FIXME: get rid of this limitation *)
+    if context.pair = None || not (SE.is_fset (Option.get context.pair)) then
+      soft_failure ~loc:(L.loc annot) 
+        (Failure "the pair component of the new system context must \
+                  not be a variable");
+    let pair = Option.get context.pair in
+    let (_, system_ml), (_, system_mr) = SE.fst pair, SE.snd pair in
+
+    (* careful with the set *)
+    let s_lml, s_mlr =
+      transitivity ~update_set:false ~side:Left system_ml [] s
+    in
+    let s_mlmr, s_mrr =
+      transitivity ~update_set:false ~side:Right system_mr [] s_mlr
+    in
+    let s_mlmr = 
+      ES.set_conclusion_in_context context 
+        (ES.conclusion s_mlmr) s_mlmr 
+    in
+    [s_lml; s_mlmr; s_mrr]
+    
   | _ -> bad_args ()
+           
+
+let trans_tac args s = List.map (fun x -> Goal.Global x) (trans_tac args s)
+let trans_tac args = wrap_fail (trans_tac args)
 
 let () =
   T.register_general "trans"

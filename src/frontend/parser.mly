@@ -1197,9 +1197,7 @@ trans_arg_item:
 | i=loc(int) COLON t=term %prec tac_prec { i,t }
 
 trans_arg:
-| l=lloc(empty)                          { TacticsArgs.TransSystem (L.mk_loc l SE.Parse.NoSystem) }
-| LBRACKET annot=system_context RBRACKET { TacticsArgs.TransSystem annot }
-| l=slist1(trans_arg_item, COMMA) { TacticsArgs.TransTerms l }
+| l=slist(trans_arg_item, COMMA) { l }
 
 (*------------------------------------------------------------------*)
 fresh_arg:
@@ -1465,8 +1463,12 @@ tac:
     { mk_abstract l "deduce" [TacticsArgs.Deduce (a,i,w)] }
 
   (*------------------------------------------------------------------*)
-  | l=lloc(TRANS) arg=trans_arg
-    { mk_abstract l "trans" [TacticsArgs.Trans arg] }
+
+  | l=lloc(TRANS) LBRACKET annot=system_context RBRACKET
+    { mk_abstract l "trans" [TacticsArgs.(Trans (TransSystem annot))] }
+
+  | l=lloc(TRANS) a=named_args s=at_X_annot(SYSTEM)? arg=trans_arg
+    { mk_abstract l "trans" [TacticsArgs.(Trans (TransTerms (a, s, arg)))] }
 
   | l=lloc(FRESH) a=named_args arg=fresh_arg
     { mk_abstract l "fresh" [TacticsArgs.Fresh (a,Some arg)] }

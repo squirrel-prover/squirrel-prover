@@ -9,7 +9,10 @@ module SE = SystemExpr
 (** {2 Equivalence} *)
 
 (*------------------------------------------------------------------*)
+type side = Left | Right
+            
 type equiv = {terms : Term.term list; bound : Term.term option}
+
 
 val pp_equiv : equiv formatter
 

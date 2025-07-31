@@ -231,12 +231,12 @@ module Parse = struct
         let v = Var.of_ident (Ident.create sub) in
         ( se_env @ [v, implicit_infos], var v)
 
-      (* parse a concrete systeme expression *)
+      (* parse a concrete system expression *)
       | None ->
         (se_env, of_system table (System.convert table system))
 
     else
-      (* parse a concrete systeme expression *)
+      (* parse a concrete system expression *)
       (se_env, of_system table (System.convert table system))
       
   let parse_single table item =

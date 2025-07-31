@@ -136,7 +136,7 @@ type fresh_arg =
 
 type trans_arg =
   | TransSystem of SE.Parse.p_context
-  | TransTerms  of (int L.located * Typing.term) list
+  | TransTerms  of named_args * SE.Parse.t option * ((int L.located * Typing.term) list)
 
 (*------------------------------------------------------------------*)
 (** {2 Weak tactic arguments} *)

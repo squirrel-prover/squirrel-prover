@@ -145,10 +145,13 @@ module Parse : sig
 
   type t = item list Location.located
 
+  (** Parses a single system *)
+  val parse_single : Symbols.table -> item -> Single.t
+
   (** Parse a system expression.
       If [implicit], then implicit system variables starting with a ['P] 
       are added to [env] during parsing, with infos [implicit_infos]. 
-      If not [allow_vars], then the returned environment is exactly
+      If not [implicit], then the returned environment is exactly
       the environment given as input. *)
   val parse :
     implicit:bool ->
