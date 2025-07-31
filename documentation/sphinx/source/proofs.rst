@@ -962,13 +962,100 @@ Global tactics
 
     Swap the left and right system of the equivalence goal.
 
-.. tace:: trans
+.. tace:: trans {? {| ~left | ~right}} {? @@system : @single_system_expr } {*, @position : @term }
    :name: trans
 
     Prove an equivalence by transitivity.
 
-    .. todo::
-       Adrien: this deserves an explanation, the tactic actually does a lot.
+    Used when proving a goal :g:`equiv(u)`, where :g:`u` is a sequence
+    of terms whose left and right projections are :g:`u_l` and :g:`u_r`,
+    in a system context :g:`equiv: S_l, S_r`.
+    The tactic introduces an intermediate sequence :g:`u_m` and system :g:`S_m`
+    and splits the goal in two, asking to prove first the equivalence
+    of :g:`u_l` and :g:`u_m` in context :g:`equiv: S_l, S_m`, and
+    then the equivalence of :g:`u_m` and :g:`u_r` in context
+    :g:`equiv: S_m, S_r`.
+
+    The sequence :g:`u_m` is constructed by taking :g:`u_l` or :g:`u_r`,
+    depending on the :g:`~left` or :g:`~right` parameter, and replacing
+    in it the elements at the specified positions with the terms
+    given as parameter.
+    By default, :g:`~right` is used.
+
+    The system :g:`S_m` in which :g:`u_m` is understood is the one given
+    as parameter. By default, :g:`S_l` is used when :g:`~left` is specified,
+    and :g:`S_r` when :g:`~right` is.
+
+    In the resulting goals, the :g:`set` of the system context is set to be
+    equal to the :g:`equiv`.
+
+    .. example:: Transitivity on terms
+
+       If the conclusion of the goal to prove is
+  
+       .. squirreldoc::
+
+          0:diff(a,a')
+          1:diff(b,b')
+          2:diff(c,c')
+
+       then calling :g:`trans ~left 1:d, 2:e` will produce the intermediate terms
+       :g:`u_m = 0:a, 1:d, 2:e`, and use the intermediate system :g:`S_l`.
+
+       The conclusions of the resulting goals will then be
+
+       .. squirreldoc::
+
+          0:diff(a,a)
+          1:diff(b,d)
+          2:diff(c,e)
+
+       and 
+
+       .. squirreldoc::
+ 
+          0:diff(a,a')
+          1:diff(d,b')
+          2:diff(e,c')
+
+       to be proved respectively in contexts :g:`equiv: S_l, S_l` and
+       :g:`equiv: S_l, S_r`.
+
+    .. example:: Particular case to change systems
+ 
+       In particular, when no indices and terms to modify are specified,
+       only the system changes. For instance,
+       when proving :g:`equiv(frame@tau)` in :g:`equiv: S1, S2`,
+       one may call :g:`trans @system:S3`, resulting in two goals asking
+       to prove :g:`equiv(frame@tau)`, first in :g:`equiv: S1, S3`,
+       and then in :g:`equiv: S3, S2`.
+
+
+    
+.. tace:: trans @system_context
+   
+    Prove a goal by transitivity on systems.
+    This tactic transposes the current equivalence goal in a different system context.
+
+    When proving that :g:`u ~ v` in :g:`equiv:S1,S2`, calling
+    :g:`trans [S3, S4]` will split the goal in three, asking to prove that
+    
+      * :g:`u ~ u` in :g:`equiv:S1,S3`
+      * :g:`u ~ v` in :g:`equiv:S3,S4`
+      * :g:`v ~ v` in :g:`equiv:S4,S2`
+    
+    The :g:`set` of the system context will be unchanged in the first and
+    third of these goals, and set to :g:`S3,S4` (the same as the :g:`equiv`)
+    in the middle one.
+
+    A set can even be specified when calling the tactic, e.g.
+    :g:`trans [set:S5; equiv:S3,S4]`, in which case that set will be used
+    for the middle goal (the others remain unchanged).
+
+    This tactic can be seen as a particular case of the :g:`trans @system` tactic
+    described above, performing two transitivity steps without changing the terms
+    (roughly :g:`trans ~left @system:S3` followed by :g:`trans ~right @system:S4`).
+
 
 .. tace:: splitseq @position: (fun @binders => @term)
    :name: splitseq
