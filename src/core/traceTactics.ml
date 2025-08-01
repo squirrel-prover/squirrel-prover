@@ -151,7 +151,8 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     match TraceLT.convert_args s args Args.(Sort Term) with
     | Args.Arg (Term (ty, f, _)) ->
       if type_based && (Type.equal ty Type.ttimestamp ||
-                        HighType.is_inductive table ty) then
+                        HighType.is_inductive table ty ||
+                        Type.is_tuple ty) then
         TraceLT.type_based_case f s
       else if Type.equal ty Type.tboolean && type_based then
         boolean_case f s

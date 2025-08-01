@@ -22,6 +22,13 @@ Proof.
   + intro i; right; exists i; auto.
 Qed.
 
+(* tuples *)
+lemma _ @system:any ['a 'b] (t: 'a * 'b) : exists x y, t = (x,y).
+Proof.
+  case t => x y.
+  by exists x, y.
+Qed.
+
 (*------------------------------------------------------------------*)
 inductive tree a =
 | leaf : tree a

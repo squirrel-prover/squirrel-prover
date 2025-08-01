@@ -1015,26 +1015,48 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Given a term [t : ty] where [ty] is an inductive type with
       constructors [constructors], destruct [t] into a list of pairs
-      [args, t0] where [t = ⋁_{c ∈ constructors} ∃args. t = t0]. *)
-  let destruct_inductive (t : Term.term) (s : S.t) : (Vars.tagged_vars * Term.t) list =
-    let constructors, ty_args =
-      match HighType.constructors (S.table s) (Term.ty t) with
-      | None -> assert false
-      | Some (constructors, ty_args) -> constructors, ty_args 
-    in
-    let table = S.table s in
-    List.map (fun constructor ->
-        let constructor =
-          Term.mk_fun table constructor ~ty_args []
-        in
-        let ty_args, _ty_out = Type.decompose_funs (Term.ty constructor) in
-        let args =
-          List.map (fun ty -> Vars.make_fresh ty "x") ty_args
-        in
-        let t0 = Term.mk_app constructor (List.map Term.mk_var args) in
-        let args = case_get_args t args (S.env s) in
-        (args, t0)
-      ) constructors
+      [args, t0] where [t = ⋁_{c ∈ constructors} ∃args. t = t0]. 
+
+      Also destruct tuples, even though those are declared as
+      inductive in the symbol tables (because they are variadic). *)
+  let destruct_inductive
+      (t : Term.term) (s : S.t)
+    : (Vars.tagged_vars * Term.t) list
+    =
+    let ty = Term.ty t in
+
+    (* ad hoc code for tuples *)
+    if Type.is_tuple ty then begin
+      let tys = Type.decompose_tuple ty in
+      let args =
+        List.map (fun ty -> Vars.make_fresh ty "x") tys
+      in
+      let t0 = Term.mk_tuple (List.map Term.mk_var args) in
+      let args = case_get_args t args (S.env s) in
+      [args, t0]
+    end
+
+    (* inductives *)
+    else begin
+      let constructors, ty_args =
+        match HighType.constructors (S.table s) (Term.ty t) with
+        | None -> assert false
+        | Some (constructors, ty_args) -> constructors, ty_args 
+      in
+      let table = S.table s in
+      List.map (fun constructor ->
+          let constructor =
+            Term.mk_fun table constructor ~ty_args []
+          in
+          let ty_args, _ty_out = Type.decompose_funs (Term.ty constructor) in
+          let args =
+            List.map (fun ty -> Vars.make_fresh ty "x") ty_args
+          in
+          let t0 = Term.mk_app constructor (List.map Term.mk_var args) in
+          let args = case_get_args t args (S.env s) in
+          (args, t0)
+        ) constructors
+    end
 
   (*------------------------------------------------------------------*)
   (** Case analysis on an inductive.
@@ -1056,8 +1078,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let type_based_case (t : Term.t) (s : S.t) : S.t list =
     let ty = Term.ty t in
     if Type.equal ty Type.ttimestamp then timestamp_case t s
-    else if HighType.is_inductive (S.table s) ty then
-      inductive_case t s
+    else if
+      HighType.is_inductive (S.table s) ty ||
+      Type.is_tuple ty
+    then inductive_case t s
     else assert false
 
   (*------------------------------------------------------------------*)    

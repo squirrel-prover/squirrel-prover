@@ -149,6 +149,9 @@ val decompose_funs : ty -> ty list * ty
 val decompose_tuple : ty -> ty list
 
 (*------------------------------------------------------------------*)
+val is_tuple : ty -> bool
+
+(*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 
 (** Type of a function symbol: 

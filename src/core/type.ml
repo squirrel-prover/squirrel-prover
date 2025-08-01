@@ -348,6 +348,11 @@ let univar v = TUnivar v
 let tvar   v = TVar v
 
 (*------------------------------------------------------------------*)
+let is_tuple : ty -> bool = function
+  | Tuple _ -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 
 (** Type of a function symbol: 
