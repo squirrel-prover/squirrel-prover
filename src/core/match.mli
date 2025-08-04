@@ -417,18 +417,19 @@ val pp_cond_term : Format.formatter -> cond_term -> unit
          cond    = ψ; 
          se; }]
     represents the set of terms [\{t | ∀ vars, s.t. ψ \}] taken in system [se]. *)
-type term_set = {
+type 'info term_set = {
   term : Term.term;
   vars : Vars.tagged_vars; 
   cond : Term.terms;
   se   : SE.t;                  (* system kind *)
+  info : 'info;
 }
 
 (** Given a term, return some [known_sets] that can be deduced from it.
     Use ad hoc built-in rules + user-provided deduction rules. *)
 val term_set_strengthen : 
   Env.t -> TraceHyps.hyps ->
-  inputs:term_set list -> term_set -> term_set list
+  inputs:'info term_set list -> 'info term_set -> 'info term_set list
 
 (** [deduce_mem cterm knonw st] try to obtain [cterm] from one of the
     value (or oracle) in [known], possibly instantiating
@@ -437,7 +438,7 @@ val term_set_strengthen :
     cleared). *)
 val deduce_mem :
   cond_term ->
-  term_set ->
+  'info term_set ->
   unif_state -> Mvar.t option
 
 (** Check if [inputs ▷ outputs].

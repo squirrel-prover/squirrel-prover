@@ -451,6 +451,7 @@ let deduce_mem
          instantiated, as the latter is cleared from the substitution
          returned by [deduce_mem]. *)
       se   = pc.env.system.set; 
+      info = ();
     }
   in
   let unif_state =
@@ -3404,11 +3405,13 @@ let term_set_strengthen (pc : ProofContext.t) (k : TSet.t) : TSet.t list =
       term = k.term; 
       vars = Vars.Tag.global_vars ~const:false ~adv:true k.vars; 
       cond = k.conds; 
-      se = env.system.set; } 
+      se = env.system.set;       
+      info = ();
+    }
   in
   let l = Match.term_set_strengthen ~inputs:[] env pc.hyps k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
-  List.map (fun (k : Match.term_set) ->
+  List.map (fun (k : unit Match.term_set) ->
       assert (
         (* We check that we only use global tags with `const` at
            `false`, as we will not check that the arguments of the

@@ -2296,15 +2296,18 @@ let pat_of_cand_set
 
     Additional invariant only used in [Match.ml]: 
     Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible *)
-type term_set = {
+type 'info term_set = {
   term : Term.term;
   vars : Vars.tagged_vars; 
   cond : Term.terms;
   se   : SE.t;                  (* system kind *)
+  info : 'info;
 }
 
 (*------------------------------------------------------------------*)
-let _pp_term_set ppe fmt (ts : term_set) =
+let _pp_term_set
+    ?(pp_info = fun _fmt _info -> ()) ppe fmt (ts : 'info term_set) 
+  =
   let _, vars, s = (* rename quantified vars. to avoid name clashes *)
     let fv_b =
       List.fold_left
@@ -2316,7 +2319,8 @@ let _pp_term_set ppe fmt (ts : term_set) =
   in
   let vars = List.map2 (fun v (_,tag) -> v,tag)vars ts.vars in
   let term,cond = Term.subst s ts.term, List.map (Term.subst s) ts.cond in
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a%s@[%a@]}@]"
+  Fmt.pf fmt "@[<hv 2>@[%a@]{ @[%a@] |@ %a%s@[%a@]}@]"
+    pp_info ts.info
     (Term._pp ppe) term
     Vars.pp_typed_tagged_list vars
     (if ts.vars = [] then "" else ". ")
@@ -2327,7 +2331,7 @@ let[@warning "-32"] pp_term_set_dbg = _pp_term_set (default_ppe ~dbg:true ())
 
 (*------------------------------------------------------------------*)
 (* return: condition, pattern *)
-let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
+let pat_of_term_set (known : 'info term_set) : Term.term * Term.term pat_op =
   Term.mk_ands known.cond,
   { pat_op_term   = known.term;
     pat_op_vars   = known.vars;
@@ -2335,16 +2339,16 @@ let pat_of_term_set (known : term_set) : Term.term * Term.term pat_op =
   }
 
 (*------------------------------------------------------------------*)
-let refresh_term_set (known : term_set) : term_set =
+let refresh_term_set (known : 'info term_set) : 'info term_set =
   let vars, subst = Term.refresh_vars_w_info known.vars in
-  { vars; se = known.se;
+  { vars; se = known.se; info = known.info;
     term = Term.subst subst known.term;
     cond = List.map (Term.subst subst) known.cond; }
 
 (*------------------------------------------------------------------*)
 (** Check if [k] appears in [l] modulo alpha *)
 let term_set_mem_alpha
-    (k : term_set) (l : term_set list) : bool
+    (k : 'info term_set) (l : 'info term_set list) : bool
   =
   let k = refresh_term_set k in
   List.exists (fun k' ->
@@ -2369,24 +2373,28 @@ let term_set_mem_alpha
 (** add [k] to [l] if [k] is not already present in [l] (modulo
     alpha) *)
 let term_set_add
-    (k : term_set) (l : term_set list) : term_set list
+    (k : 'info term_set) (l : 'info term_set list) : 'info term_set list
   =
   if term_set_mem_alpha k l then l else k :: l
 
 (** computes the union of [l1] and [l2], avoiding some redundant term
     sets (two set that are equal modulo alpha are not added).  *)
 let term_set_union
-    (l1 : term_set list) (l2 : term_set list) : term_set list
+    (l1 : 'info term_set list) (l2 : 'info term_set list) : 'info term_set list
   =
   List.fold_left (fun l2 k -> term_set_add k l2) l2 l1
 
 (*------------------------------------------------------------------*)
-type known_sets = term_set list
+(** A list of sets of terms decorated with a boolean flag indicating
+    if the input was already used. *)
+type 'info known_sets = 'info term_set list
 
 (*------------------------------------------------------------------*)
-let _pp_known_sets ppe fmt (ks : known_sets) =
+let _pp_known_sets
+    ?pp_info ppe fmt (ks : 'info known_sets) 
+  =
   Fmt.pf fmt "@[<v>%a@]"
-  (Fmt.list ~sep:Fmt.cut (_pp_term_set ppe)) ks
+  (Fmt.list ~sep:Fmt.cut (_pp_term_set ?pp_info ppe)) ks
 
 let[@warning "-32"] pp_known_sets     = _pp_known_sets (default_ppe ~dbg:false ())
 let[@warning "-32"] pp_known_sets_dbg = _pp_known_sets (default_ppe ~dbg:true ())
@@ -2621,10 +2629,11 @@ let known_set_check_impl
 (*------------------------------------------------------------------*)
 (** {3 Deduction: right reasoning} *)
 
+(*------------------------------------------------------------------*)
 (** Try to obtain [cterm] from one of the value (or oracle) in [known]. *)
 let deduce_mem0
     (cterm : cond_term)
-    (known : term_set)
+    (known : 'info term_set)
     (st    : unif_state) : Mvar.t option
   =
   let known = refresh_term_set known in
@@ -2672,7 +2681,7 @@ let deduce_mem0
 
 let deduce_mem
     (cterm : cond_term)
-    (known : term_set)
+    (known : 'info term_set)
     (st    : unif_state) : Mvar.t option
   =
   (* FIXME:
@@ -2712,8 +2721,8 @@ let deduce_mem
 (** Try to match [term] as an element of a sequence in [elems]. *)
 let deduce_mem_list
     (cterm : cond_term)
-    (elems : known_sets)
-    (st    : unif_state) : Mvar.t option
+    (elems : 'info known_sets)
+    (st    : unif_state) : Mvar.t option 
   =
   List.find_map (fun elem -> deduce_mem cterm elem st) elems
 
@@ -2836,9 +2845,10 @@ let fa_decompose
 *)
 let rec deduce
     ~(output : cond_term)
-    ~(inputs : known_sets)
+    ~(inputs : 'info known_sets)
     (st      : unif_state)
-    (minfos  : match_infos) : Mvar.t * match_infos
+    (minfos  : match_infos) :
+  Mvar.t * match_infos
   =
   match deduce_mem_list output inputs st with
   | Some mv ->
@@ -2852,7 +2862,7 @@ let rec deduce
     See [deduce] for the precise semantics of [inputs ▷ output]. *)
 and deduce_fa
     ~(output : cond_term)
-    ~(inputs : known_sets)
+    ~(inputs : 'info known_sets)
     (st      : unif_state)
     (minfos  : match_infos) : Mvar.t * match_infos
   =
@@ -2886,16 +2896,18 @@ and deduce_fa
 (*------------------------------------------------------------------*)
 (** {3 Deduction: left reasoning} *)
 
-let term_set_of_term (se : SE.t) (term : Term.term) : term_set =
+type info = { used : bool; }
+
+let term_set_of_term (se : SE.t) (term : Term.term) : info term_set =
   { term = term;
     vars = [];
     cond = [];
-    se; }
+    se; info = { used = false; }}
 
 (** Apply the user deduction rules to [k].
     Do it only once: we do not try to reach a fixpoint.
     (We could do a fixpoint computation, with proper entailment pruning.) *)
-let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
+let apply_user_deduction_rules (env : Env.t) (k : 'info term_set) : 'info term_set list =
   let deduction_rules = Hint.get_deduce_db env.table in
 
   List.filter_map (fun (hint : Hint.deduce_hint) ->
@@ -2953,9 +2965,9 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
                  arguments *)
               let vars = Vars.Tag.global_vars ~const:false ~adv:true vars in
 
-              { term = right;
+              { term = right; 
                 vars = vars @ k.vars;
-                se = k.se;
+                se = k.se; info = k.info;
                 cond = cond :: k.cond; }
               |> some 
 
@@ -2970,11 +2982,11 @@ let apply_user_deduction_rules (env : Env.t) (k : term_set) : term_set list =
     - [k] is deducible from [inputs,(k1, ..., kn)] *)
 let term_set_decompose
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs:term_set list) (known : term_set) : term_set list 
+    ~(inputs: 'info term_set list) (known : 'info term_set) : 'info term_set list 
   =
 
   (* wrapper around deduction *)
-  let deduce ~(inputs:term_set list) (t : term_set) : bool =
+  let deduce ~(inputs:'info term_set list) (t : 'info term_set) : bool =
     let output : cond_term = {
       term = t.term;
       cond = Term.mk_ands t.cond;
@@ -3002,7 +3014,7 @@ let term_set_decompose
 
   (* recursive computation decomposing the set of term [k] into
      smaller, more elementary, sets of terms *)
-  let rec doit ~(inputs:term_set list) (k : term_set) : term_set list =
+  let rec doit ~(inputs:'info term_set list) (k : 'info term_set) : 'info term_set list =
     (* deduction parametrizes reduction its own way for now
        (i.e. we do not use [st.red_param] and [st.red_strat]) 
         
@@ -3059,7 +3071,7 @@ let term_set_decompose
       let term = Term.subst s term in
       let k = 
         { term; 
-          se = k.se;
+          se = k.se; info = k.info;
           vars = k.vars @ (Vars.Tag.global_vars ~adv:true vars);
           cond = k.cond }
       in
@@ -3076,7 +3088,7 @@ let term_set_decompose
 (** Exported, see `.mli` *)
 let term_set_strengthen
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs:term_set list) (k : term_set) : term_set list 
+    ~(inputs: 'info term_set list) (k : 'info term_set) : 'info term_set list 
   =
   let k_decomposed = term_set_decompose ~inputs env hyps k in
   let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
@@ -3086,7 +3098,7 @@ let term_set_strengthen
     [inputs, term ▷ knowns] *)
 let term_set_list_of_term
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs:term_set list) (term : Term.term) : term_set list 
+    ~(inputs: 'info term_set list) (term : Term.term) : 'info term_set list 
   =
   let k = term_set_of_term env.system.set term in
   term_set_strengthen ~inputs env hyps k
@@ -3094,7 +3106,7 @@ let term_set_list_of_term
 let known_sets_of_terms 
     (env : Env.t) (hyps : TraceHyps.hyps)
     (terms : Term.terms) 
-  : known_sets 
+  : info known_sets 
   =
   List.fold_left (fun inputs term ->
       term_set_union
@@ -3216,7 +3228,7 @@ let pp_msets fmt (msets : msets) =
 (*------------------------------------------------------------------*)
 (** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add
     an additional constraint [t ≤ ts']. *)
-let term_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : term_set =
+let term_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : info term_set =
   let t = Vars.make_fresh Type.ttimestamp "t" in
   let term = Term.mk_macro mset.msymb mset.args (Term.mk_var t) in
   let cond =
@@ -3232,13 +3244,13 @@ let term_set_of_mset ?extra_cond_le (se : SE.t) (mset : MCset.t) : term_set =
     in
     cond_le @ extra_cond_le
   in
-  { term; se; cond;
+  { term; se; cond; info = { used = false; };
     vars = Vars.Tag.global_vars ~adv:true (t :: mset.indices); }
 
 let known_sets_of_mset_l
-    ?extra_cond_le (se : SE.t) (msets : MCset.t list) : known_sets 
+    ?extra_cond_le (se : SE.t) (msets : MCset.t list) : info known_sets 
   =
-  List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
+  List.fold_left (fun (known_sets : info known_sets) (mset : MCset.t) ->
       let new_ks = term_set_of_mset ?extra_cond_le se mset in
       new_ks :: known_sets
     ) [] msets
@@ -3407,7 +3419,7 @@ let specialize
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
-    (known  : term_set) : cand_set option
+    (known  : info term_set) : cand_set option
   =
   let known = refresh_term_set known in
 
@@ -3444,11 +3456,11 @@ let specialize_all
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
-    (known_sets : known_sets) : cand_sets
+    (known_sets : info known_sets) : cand_sets
   =
   let cand_head = Term.get_head cand.term in
   let cands =
-    List.fold_left (fun acc (known : term_set) ->
+    List.fold_left (fun acc (known : info term_set) ->
         let head = Term.get_head known.term in
         if cand_head = HVar || head = HVar || cand_head = head then
           specialize table system cand known :: acc
@@ -3470,7 +3482,7 @@ let rec specialize_deduce
     (env    : Vars.env)
     (system : SE.fset)
     (cand   : cand_set)
-    (known_sets : known_sets) : cand_sets
+    (known_sets : info known_sets) : cand_sets
   =
   let direct_deds = specialize_all table system cand known_sets in
   let fa_deds = specialize_deduce_fa table env system cand known_sets in
@@ -3484,7 +3496,7 @@ and specialize_deduce_list
     (env    : Vars.env)
     (system : SE.fset)
     (cand : cand_tuple_set)
-    (known_sets : known_sets) : cand_tuple_sets
+    (known_sets : info known_sets) : cand_tuple_sets
   =
   match cand.term with
   | [] -> [cand]
@@ -3514,7 +3526,7 @@ and specialize_deduce_fa
     (env    : Vars.env)
     (system : SE.fset)
     (cand   : cand_set)
-    (known_sets : known_sets) : cand_sets
+    (known_sets : info known_sets) : cand_sets
   =
   (* [mk_cand_of_terms] build back the know terms from the known 
      sub-terms. *)
@@ -3605,7 +3617,7 @@ let strengthen
   let filter_specialize_deduce_action
       (a : Symbols.action)
       (cand : MCset.t)
-      (init_terms : known_sets)              (* initial terms *)
+      (init_terms : info known_sets)              (* initial terms *)
       (known_sets : MCset.t list)            (* induction *)
     : MCset.t list
     =
@@ -3692,7 +3704,7 @@ let strengthen
   let filter_specialize_deduce_action_list
       (a : Symbols.action)
       (cands : msets)
-      (init_terms : known_sets)              (* initial terms *)
+      (init_terms : info known_sets)         (* initial terms *)
       (known_sets : MCset.t list)            (* induction *)
     : msets
     =
@@ -3710,7 +3722,7 @@ let strengthen
      [cands] stable by each action. *)
   let filter_specialize_deduce_all_actions
       (cands : msets)
-      (init_terms : known_sets)              (* initial terms *)
+      (init_terms : info known_sets)         (* initial terms *)
       (known_sets : MCset.t list)            (* induction *)
     : msets
     =
@@ -3722,7 +3734,7 @@ let strengthen
 
   let rec specialize_deduce_fixpoint
       (cands : msets)
-      (init_terms : known_sets) (* initial terms *)
+      (init_terms : info known_sets) (* initial terms *)
     : msets
     =
     let init_known : MCset.t list = msets_to_list cands in
