@@ -410,6 +410,15 @@ val mk_cond_term : Term.term -> Term.term -> cond_term
 val pp_cond_term : Format.formatter -> cond_term -> unit
 
 (*------------------------------------------------------------------*)
+(** Information attached to the inputs when returning from a deduction
+    step. *)
+type info = {
+  used : bool;
+  (** [true] if the input was used. Allow to implement linearity
+      condition for quantum inputs *)
+}
+
+(*------------------------------------------------------------------*)
 (** Set of terms over some variables of sort index or timestamp,
     under a condition.
       [{ term    = t;
@@ -429,21 +438,30 @@ type 'info term_set = {
     Use ad hoc built-in rules + user-provided deduction rules. *)
 val term_set_strengthen : 
   Env.t -> TraceHyps.hyps ->
-  inputs:'info term_set list -> 'info term_set -> 'info term_set list
+  inputs:info term_set list -> info term_set -> info term_set list
 
 (** [deduce_mem cterm knonw st] try to obtain [cterm] from one of the
     value (or oracle) in [known], possibly instantiating
     [known.vars] and [st.support]. 
     The returned substitution has domain [st.support] ([known.vars] is
-    cleared). *)
+    cleared). 
+
+    Build a classical or quantum reduction, according to
+    [quantum_reduction]. *)
 val deduce_mem :
+  quantum_reduction:bool ->
   cond_term ->
-  'info term_set ->
+  info term_set ->
   unif_state -> Mvar.t option
 
 (** Check if [inputs ▷ outputs].
-    [outputs] and [inputs] are over [st.system.set]. *)
-val deduce_terms : outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
+    [outputs] and [inputs] are over [st.system.set]. 
+
+    Build a classical or quantum reduction, according to
+    [quantum_reduction] (default to [false]). *)
+val deduce_terms : 
+  ?quantum_reduction:bool ->
+  outputs:Term.terms -> inputs:Term.terms -> unif_state -> match_res
 
 
 (** Starting from a (possibly empty) substutition [θ], check that

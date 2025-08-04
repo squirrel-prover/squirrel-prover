@@ -38,6 +38,8 @@ close Classic.
 
 system [postquantum] PQ = null.
 
+set postQuantumEquivs=true.
+
 global lemma [PQ] _ (tau:timestamp[const]) :
   equiv(frame@pred(tau)) ->
   equiv(frame@pred(tau), input@tau).
@@ -63,3 +65,5 @@ Proof.
   admit 1.
   auto.
 Qed.
+
+set postQuantumEquivs=false.

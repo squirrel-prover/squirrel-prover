@@ -5,7 +5,7 @@ include Core.
 system null.
 
 (*------------------------------------------------------------------*)
-global lemma bar ['a 'b 'c] (b : bool, d: 'b, x : 'a, y : 'b, z : 'c) : 
+global lemma bar (b : bool, d, x, y, z: message) : 
   equiv (x, b, if b then y else d, if not b then y else d, z) ->
   equiv (x, y, z).
 Proof.
@@ -15,7 +15,7 @@ Proof.
   apply H.
 Qed.
 
-global axiom p ['a] (x : 'a) : (* equiv(x) ->  *)equiv(x).
+global axiom p ['a] (x : 'a) : equiv(x).
 global axiom q ['a] (x : 'a) : equiv(x) -> equiv(x).
 
 global axiom ax_bool (x : bool) : [x] -> [x].

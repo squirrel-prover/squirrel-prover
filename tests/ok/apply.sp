@@ -69,7 +69,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* transitivity *)
-type T.
+type T[serializable].
 abstract ( -- ) : T -> T -> boolean.
 
 axiom mtrans (x,y,z : T) : x -- y => y -- z => x -- z.
@@ -90,7 +90,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* small group axioms *)
 
-type G.
+type G[serializable].
 
 abstract ( ** ) : G -> G -> G.
 
@@ -149,7 +149,9 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test `equiv` in system `any` *)
 
-global lemma [any] _ ['a] (u : 'a) (f :  _ -> message[adv]) :
+type A[serializable].
+
+global lemma [any] _ (u : A) (f :  _ -> message[adv]) :
   equiv (u) -> equiv(f u).
 Proof.
   intro H. apply H.
@@ -357,10 +359,10 @@ Proof.
 Qed.
 
 (* ========================================================= *)
-global axiom myax  ['a] (x, y : 'a) : equiv(x,y) -> [x = y].
-global axiom myax1 ['a] (x, y : 'a) : equiv(x,y).
+global axiom myax  (x, y : A) : equiv(x,y) -> [x = y].
+global axiom myax1 (x, y : A) : equiv(x,y).
 
-global lemma _ ['a] (x,y : 'a) : [x = y]. 
+global lemma _ (x,y : A) : [x = y]. 
 Proof. 
   apply myax _ _ _. 
   have A := myax1 x y.
@@ -371,16 +373,16 @@ Qed.
 (* three proofs of the same goal, using an axiom mixing local and 
    global hypotheses *)
 
-abstract p ['a] : 'a -> 'a -> bool.
-abstract q ['a] : 'a -> 'a -> bool.
+abstract p : A -> A -> bool.
+abstract q : A -> A -> bool.
 
-global axiom bar ['a] (x,y : 'a) : equiv(x,y) -> [p x y => q x y].
+global axiom bar (x,y : A) : equiv(x,y) -> [p x y => q x y].
 
-axiom        foo1 ['a] (x,y : 'a) : p x y.
-global axiom foo2 ['a] (x,y : 'a) : equiv(x,y).
+axiom        foo1 (x,y : A) : p x y.
+global axiom foo2 (x,y : A) : equiv(x,y).
 
 (* using `have` *)
-global lemma _ ['a] (x,y : 'a[const]) : [q x y].
+global lemma _ (x,y : A[const]) : [q x y].
 Proof. 
   byequiv.
 
@@ -389,7 +391,7 @@ Proof.
 Qed. 
 
 (* using `apply` *)
-global lemma _ ['a] (x,y : 'a[adv]) : [q x y].
+global lemma _ (x,y : A[adv]) : [q x y].
 Proof. 
   byequiv.
 
@@ -398,7 +400,7 @@ Proof.
 Qed. 
 
 (* using `apply` with discharge *)
-global lemma _ ['a] (x,y : 'a[const]) : [q x y].
+global lemma _ (x,y : A[const]) : [q x y].
 Proof. 
   byequiv.
 
@@ -407,7 +409,7 @@ Qed.
 
 (* ========================================================= *)
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[adv]) : [p x y] -> [q x y].
+global lemma _ (x,y : A[adv]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
@@ -422,7 +424,7 @@ Proof.
 Qed.
 
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[adv]) : [p x y] -> [q x y].
+global lemma _ (x,y : A[adv]) : [p x y] -> [q x y].
 Proof.
   intro H.
 
@@ -437,7 +439,7 @@ Proof.
 Qed.
 
 (* `apply`, in a forward style *)
-global lemma _ ['a] (x,y : 'a[const]) : equiv(x,y) -> [q x y].
+global lemma _ (x,y : A[const]) : equiv(x,y) -> [q x y].
 Proof.
   intro H. 
 

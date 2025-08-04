@@ -2306,7 +2306,7 @@ type 'info term_set = {
 
 (*------------------------------------------------------------------*)
 let _pp_term_set
-    ?(pp_info = fun _fmt _info -> ()) ppe fmt (ts : 'info term_set) 
+    ?(pp_info = fun _fmt (_info : 'info) -> ()) ppe fmt (ts : 'info term_set) 
   =
   let _, vars, s = (* rename quantified vars. to avoid name clashes *)
     let fv_b =
@@ -2326,11 +2326,11 @@ let _pp_term_set
     (if ts.vars = [] then "" else ". ")
     (Term._pp ppe) (Term.mk_ands cond)
 
-let[@warning "-32"] pp_term_set     = _pp_term_set (default_ppe ~dbg:false ())
-let[@warning "-32"] pp_term_set_dbg = _pp_term_set (default_ppe ~dbg:true ())
+let[@warning "-32"] pp_term_set     fmt x = _pp_term_set (default_ppe ~dbg:false ()) fmt x
+let[@warning "-32"] pp_term_set_dbg fmt x = _pp_term_set (default_ppe ~dbg:true  ()) fmt x
 
 (*------------------------------------------------------------------*)
-(* return: condition, pattern *)
+(** return: condition, pattern *)
 let pat_of_term_set (known : 'info term_set) : Term.term * Term.term pat_op =
   Term.mk_ands known.cond,
   { pat_op_term   = known.term;
@@ -2625,6 +2625,35 @@ let known_set_check_impl
     `Ok (if has_mv then Some mv else None )
   with Failed -> `Failed
 
+(*------------------------------------------------------------------*)
+(** {3 Deduction: states data-types} *)
+
+(*------------------------------------------------------------------*)
+(** A (descending) deduction state *)
+type deduce_state = { 
+  unif_state        : unif_state; 
+  minfos            : match_infos;
+  quantum_reduction : bool;
+}
+
+(*------------------------------------------------------------------*)
+(** Information attached to the inputs when returning from a deduction
+    step. *)
+type info = {
+  used : bool;
+  (** [true] if the input was used. Allow to implement linearity
+      condition for quantum inputs.
+
+      This value is only meaningful for **quantum** input (it may be
+      incorrectly set for classical inputs). *)
+}
+
+(** A (ascending) deduction result *)
+type deduce_result = { 
+  mv     : Mvar.t;
+  minfos : match_infos;
+  inputs : info known_sets;
+}
 
 (*------------------------------------------------------------------*)
 (** {3 Deduction: right reasoning} *)
@@ -2679,11 +2708,30 @@ let deduce_mem0
       Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
   with NoMatch _ -> None
 
+(* check if [known ▷ cterm] *)
 let deduce_mem
+    ~(quantum_reduction : bool)
     (cterm : cond_term)
-    (known : 'info term_set)
+    (known : info term_set)
     (st    : unif_state) : Mvar.t option
   =
+  (* If [cterm] is quantum, then the reduction must be quantum and
+     [known] must not have been used before. *)
+  let allowed =
+    (* ¬ classical ⇒ (quantum_reduction ∧ ¬ used) *)
+    (HighType.is_classical st.table (Term.ty cterm.term)) ||
+    (quantum_reduction && not known.info.used)
+  in
+    
+  (* We can circumvent the order check if the deduction order guard
+     flag is false. Note that we only allow to ignore the order guard
+     in classical mode. *)
+  if not
+      (allowed ||
+       (not (TConfig.deduction_order_guard st.table) &&
+        not quantum_reduction))
+  then None else
+
   (* FIXME:
      if [st.support] is not empty, then we need to find [mv] such that:
      - [mv] represents a substitution θ whose support is included in
@@ -2718,13 +2766,37 @@ let deduce_mem
       let st = { st with bvs = []; support = []; env; } in
       deduce_mem0 cterm known st
 
-(** Try to match [term] as an element of a sequence in [elems]. *)
+(*------------------------------------------------------------------*)
+(** Try to match [term] as an element of a sequence in [elems]. 
+    Update the [used] field of the input set used in [inputs]. *)
 let deduce_mem_list
-    (cterm : cond_term)
-    (elems : 'info known_sets)
-    (st    : unif_state) : Mvar.t option 
+    ~quantum_reduction
+    (cterm  : cond_term)
+    (inputs : info known_sets)
+    (st     : unif_state) 
+  : (Mvar.t * info known_sets) option 
   =
-  List.find_map (fun elem -> deduce_mem cterm elem st) elems
+  let rec doit tried_inputs inputs =
+    match inputs with 
+    | [] -> None (* all [inputs] tried and failed *)
+    | input :: inputs ->
+      match deduce_mem ~quantum_reduction cterm input st with
+
+      (* fail to use [input], move to the remaining inputs *)
+      | None -> doit (input :: tried_inputs) inputs
+
+      (* successfully used [input], compute the list of original
+         inputs with an updated [used] field *)
+      | Some mv -> 
+        let[@warning "-23"] input =
+          { input with info = {input.info with used = true;}} 
+        in
+        let result_inputs = 
+          List.rev_append tried_inputs (input :: inputs)
+        in
+        Some (mv, result_inputs)
+  in
+  doit [] inputs
 
 (*------------------------------------------------------------------*)
 (** [fa_decompose output st] return a list of deduction conditions
@@ -2736,7 +2808,7 @@ let deduce_mem_list
     See [deduce] for the precise semantics of [· ▷ output]. *)
 let fa_decompose
     (output : cond_term) (st : unif_state)
-  : (unif_state * cond_term) list option
+  : (Vars.vars * cond_term) list option
   =
   let env = env_of_unif_state st in
   match output.term with
@@ -2749,26 +2821,26 @@ let fa_decompose
     let cond1 = Term.mk_and b output.cond
     and cond2 = Term.mk_and (Term.mk_not b) output.cond in
 
-    Some (List.map (fun t -> st, t) [{ term = b ; cond = output.cond; };
-                                     { term = t1; cond = cond1; };
-                                     { term = t2; cond = cond2; }])
+    Some (List.map (fun t -> [],t) [{ term = b ; cond = output.cond; };
+                                    { term = t1; cond = cond1; };
+                                    { term = t2; cond = cond2; }])
 
   (* function: and *)
   | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_and -> 
     let cond = Term.mk_and t1 output.cond in
-    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+    Some (List.map (fun t -> [],t) [{ term = t1 ; cond=output.cond};
                                     { term = t2 ; cond }])
 
   (* function: or *)
   | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_or -> 
     let cond = Term.mk_and (Term.mk_not t1) output.cond in
-    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+    Some (List.map (fun t -> [],t) [{ term = t1 ; cond=output.cond};
                                     { term = t2 ; cond }])
 
   (* function: impl *)
   | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_impl -> 
     let cond = Term.mk_and t1 output.cond in
-    Some (List.map (fun t -> st,t) [{ term = t1 ; cond=output.cond};
+    Some (List.map (fun t -> [],t) [{ term = t1 ; cond=output.cond};
                                     { term = t2 ; cond }])
 
   (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
@@ -2776,13 +2848,13 @@ let fa_decompose
   (* action and tuples *)
   | Term.Action (_, terms)
   | Term.Tuple terms ->
-    Some (List.map (fun term -> st, { output with term } ) terms)
+    Some (List.map (fun term -> [], { output with term } ) terms)
 
   | Term.Proj (_, t) ->
-    Some [st, { output with term = t }]
+    Some [[], { output with term = t }]
 
   | Term.App (t, terms) ->
-    Some (List.map (fun term -> st, { output with term } ) (t :: terms))
+    Some (List.map (fun term -> [], { output with term } ) (t :: terms))
 
   | Term.Quant (q, es, term) ->
     (* [Seq], [ForAll] and [Exists] require to quantify over
@@ -2798,10 +2870,7 @@ let fa_decompose
       let es, subst = Term.refresh_vars es in
       let term = Term.subst subst term in
 
-      (* binder variables are declared global, constant and adv,
-         as these are inputs (hence known values) to the adversary  *)
-      let st = { st with bvs = (Vars.Tag.global_vars ~adv:true es) @ st.bvs; } in
-      Some [(st, { output with term; })]
+      Some [(es, { output with term; })]
 
   | Find (is, c, d, e)
     when
@@ -2809,9 +2878,6 @@ let fa_decompose
     ->
     let is, subst = Term.refresh_vars is in
     let c, d = Term.subst subst c, Term.subst subst d in
-
-    (* idem, binder variables are declared global, constant and adv *)
-    let st1 = { st with bvs = (Vars.Tag.global_vars ~adv:true is) @ st.bvs; } in
 
     let d_cond = Term.mk_and output.cond c in
     let e_cond =
@@ -2825,7 +2891,7 @@ let fa_decompose
     and e = { term = e; cond = e_cond; } in
 
 
-    Some [(st1, c); (st1, d); (st, e)]
+    Some [(is, c); (is, d); ([], e)]
 
   | _ -> None
 
@@ -2845,58 +2911,125 @@ let fa_decompose
 *)
 let rec deduce
     ~(output : cond_term)
-    ~(inputs : 'info known_sets)
-    (st      : unif_state)
-    (minfos  : match_infos) :
-  Mvar.t * match_infos
+    ~(inputs : info known_sets)
+    (st      : deduce_state) 
+  : deduce_result
   =
-  match deduce_mem_list output inputs st with
-  | Some mv ->
-    (mv, minfos_ok output.term minfos)
+  match 
+    deduce_mem_list
+      ~quantum_reduction:st.quantum_reduction
+      output inputs st.unif_state 
+  with
+  | Some (mv, inputs) ->
+    { mv; inputs; minfos = minfos_ok output.term st.minfos; }
   | None ->
     (* if that fails, decompose [term] through the Function Application
        rule, and recurse. *)
-    deduce_fa ~output ~inputs st minfos
+    deduce_fa ~output ~inputs st
       
 (** Check if [inputs ▷ output] using the function application rules. 
     See [deduce] for the precise semantics of [inputs ▷ output]. *)
 and deduce_fa
     ~(output : cond_term)
-    ~(inputs : 'info known_sets)
-    (st      : unif_state)
-    (minfos  : match_infos) : Mvar.t * match_infos
+    ~(inputs : info known_sets)
+    (st      : deduce_state)
+  : deduce_result
   =
   (* deduction parametrizes reduction its own way for now
      (i.e. we do not use [st.red_param] and [st.red_strat]) *)
   let red_param = ReductionCore.rp_crypto in
   let strat = ReductionCore.(MayRedSub rp_crypto) in
-  match fa_decompose output st with
+  match fa_decompose output st.unif_state with
   | None ->
     (* We could not decompose [output] through into deduction sub-goals.
        Try to reduce [output] and restart [deduce]. *)
-    let term, has_red = whnf ~red_param ~strat st output.term in
+    let term, has_red = whnf ~red_param ~strat st.unif_state output.term in
     if has_red then
-      deduce ~output:{ output with term; } ~inputs st minfos
+      deduce ~output:{ output with term; } ~inputs st
     else
-      (st.mv, minfos_failed output.term minfos)
+      { 
+        mv = st.unif_state.mv; 
+        inputs; 
+        minfos = minfos_failed output.term st.minfos; 
+      }
 
   | Some fa_conds ->
     let minfos =
-      let st = List.map (fun (x : _ * cond_term) -> (snd x).term) fa_conds in
-      minfos_check_st output.term st minfos
+      let subterms = List.map (fun (x : _ * cond_term) -> (snd x).term) fa_conds in
+      minfos_check_st output.term subterms st.minfos
     in
 
-    List.fold_left (fun (mv, minfos) (st, t) ->
-        let mv, minfos =
-          deduce ~output:t ~inputs { st with mv } minfos
-        in
-        mv, minfos
-      ) (st.mv, minfos) fa_conds
+    deduce_list ~outputs:fa_conds ~inputs { st with minfos; }
 
+(** Check if [inputs ▷ outputs] using the transitivity and quantifier
+    rule. An entry [(vars, output)] in [outputs] represents the term
+    [λ vars. output] to be deduced.
+
+    See [deduce] for the precise semantics of [inputs ▷ output]. *)
+and deduce_list
+    ~(outputs : (Vars.vars * cond_term) list)
+    ~(inputs  : info known_sets)
+    (st       : deduce_state)
+  : deduce_result
+  =
+  let init_deduce_result = {
+    mv = st.unif_state.mv;
+    minfos = st.minfos;
+    inputs; 
+  } in
+
+  (* In quantum mode, we must:
+     - Properly forward tagged inputs (with updated [used] flags)
+       between calls to [deduce], to track which quantum inputs have
+       been used.
+     - If we recurse below a quantifier (i.e. if [vars ≠ ∅]), we must
+       clear all quantum inputs.   *)
+  List.fold_left (fun { minfos; mv; inputs; } (vars, t) ->       
+      let unif_state = {
+        st.unif_state with
+
+        (* bound variables are declared global, constant and adv,
+           as these are inputs (hence known values) to the adversary *)
+        bvs = Vars.Tag.global_vars ~adv:true vars @ st.unif_state.bvs;
+        mv = mv;
+      } in
+      
+      let st = { st with unif_state; minfos; } in
+
+      if vars = [] then
+        deduce ~output:t ~inputs st
+      else
+        deduce_classical ~output:t ~inputs st
+    ) init_deduce_result outputs
+
+(** In classical mode, this is exactly [deduce].
+    In quantum mode, this forces the sub-deduction to be classical.
+*)
+and deduce_classical
+    ~(output : cond_term)
+    ~(inputs : info known_sets)
+    (st      : deduce_state) 
+  : deduce_result
+  =
+  if st.quantum_reduction then
+    (* Disallow all quantum inputs by setting [used] to [true]. *)
+    let classical_inputs =
+      List.map
+        (fun input -> { input with info = { used = true; }})
+        inputs
+    in
+
+    (* deduce [output] *)
+    let result =
+      deduce ~output ~inputs:classical_inputs st
+    in
+
+    (* restore previous inputs with their [used] flags *)
+    { result with inputs; }
+  else deduce ~output ~inputs st
+  
 (*------------------------------------------------------------------*)
 (** {3 Deduction: left reasoning} *)
-
-type info = { used : bool; }
 
 let term_set_of_term (se : SE.t) (term : Term.term) : info term_set =
   { term = term;
@@ -2982,11 +3115,14 @@ let apply_user_deduction_rules (env : Env.t) (k : 'info term_set) : 'info term_s
     - [k] is deducible from [inputs,(k1, ..., kn)] *)
 let term_set_decompose
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs: 'info term_set list) (known : 'info term_set) : 'info term_set list 
+    ~(inputs: info term_set list) (known : info term_set) : info term_set list 
   =
+  let inputs = 
+    List.map (fun input -> { input with info = { used = false; }}) inputs 
+  in
 
   (* wrapper around deduction *)
-  let deduce ~(inputs:'info term_set list) (t : 'info term_set) : bool =
+  let deduce ~(inputs:info term_set list) (t : info term_set) : bool =
     let output : cond_term = {
       term = t.term;
       cond = Term.mk_ands t.cond;
@@ -3002,19 +3138,29 @@ let term_set_decompose
     (* binder variables are declared global, constant and adv,
        as these are inputs (hence known values) to the adversary  *)
     let env = { env with vars = Vars.add_vars t.vars env.vars} in
-    let st =
+    let unif_state =
       mk_unif_state
         ~param:crypto_param (* FIXME: should always take a default value? *)
         (ProofContext.make ~env ~hyps)
         ~support:[]
     in
-    let _, minfos = deduce ~inputs ~output st init_minfos in
-    deduce_succeed minfos
+    let st = 
+      (* For left reasoning, we use a classical reduction only 
+         (if we used a quantum reduction, we would have to track which
+         quantum values have been used and forward it to the right
+         reasoning phase). *)
+      { unif_state; minfos = init_minfos; quantum_reduction = false; }
+    in
+    let result = deduce ~inputs ~output st in
+    deduce_succeed result.minfos
   in
 
   (* recursive computation decomposing the set of term [k] into
      smaller, more elementary, sets of terms *)
-  let rec doit ~(inputs:'info term_set list) (k : 'info term_set) : 'info term_set list =
+  let rec doit
+      ~(inputs: info term_set list) (k : info term_set) : 
+    info term_set list 
+    =
     (* deduction parametrizes reduction its own way for now
        (i.e. we do not use [st.red_param] and [st.red_strat]) 
         
@@ -3058,8 +3204,13 @@ let term_set_decompose
          [(if b then u else v | ϕ)] 
        by:
          [(u | b ∧ ϕ), (v | ¬b ∧ ϕ)]
-       when [inputs ▷ (b | ϕ)] *)
-    | Term.App (Fun (fs, _), [b;u;v]) when fs = Term.f_ite ->
+       when [inputs ▷ (b | ϕ)].
+
+       This is only sound in classical mode (in quantum mode, we
+       cannot have multiple quantum values on the left of ▷). *)
+    | Term.App (Fun (fs, _), [b;u;v])
+      when fs = Term.f_ite &&
+           HighType.is_classical env.table (Term.ty u) ->
       let kb = { k with term = b; } in
       if not (deduce ~inputs kb) then [k] else
         let ku = { k with term = u; cond =             b :: k.cond } 
@@ -3088,7 +3239,7 @@ let term_set_decompose
 (** Exported, see `.mli` *)
 let term_set_strengthen
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs: 'info term_set list) (k : 'info term_set) : 'info term_set list 
+    ~(inputs: info term_set list) (k : info term_set) : info term_set list 
   =
   let k_decomposed = term_set_decompose ~inputs env hyps k in
   let k_decomposed' = List.concat_map (apply_user_deduction_rules env) k_decomposed in
@@ -3098,7 +3249,7 @@ let term_set_strengthen
     [inputs, term ▷ knowns] *)
 let term_set_list_of_term
     (env : Env.t) (hyps : TraceHyps.hyps)
-    ~(inputs: 'info term_set list) (term : Term.term) : 'info term_set list 
+    ~(inputs: info term_set list) (term : Term.term) : info term_set list 
   =
   let k = term_set_of_term env.system.set term in
   term_set_strengthen ~inputs env hyps k
@@ -3752,7 +3903,7 @@ let strengthen
      frame. If there is no such timestamp, we have no constraints. *)
   let cond_le =
     List.find_map (function
-        (* TODO: quantum: update or remove the `apply ~inductive` function altogether *)
+        (* FEAT: port to the post-quantum execution model *)
         | Term.Macro (ms, _, ts) when ms.s_symb = Symbols.Classic.frame -> Some ts
         | _ -> None
       ) init_terms
@@ -3804,44 +3955,142 @@ let strengthen
 (*------------------------------------------------------------------*)
 (** {3 Deduction: high-level functionality} *)
 
+(** Check that the arguments of the deduction judgement are supported,
+    and filter the inputs that are not supported (we can safely
+    discard unsupported inputs, but must deduce all outputs). *)
+let check_deduce_args
+    ~(quantum_reduction : bool)
+    ~(outputs : Term.terms) ~(inputs : Term.terms) (env : Env.t)
+  : bool * Term.terms
+  =
+  let table = env.table in
+
+  (* check if a type is not classical and quantum of order 0 *)
+  let is_quantum ty =
+    match 
+      HighType.serializability_order ~quantum:false table ty, 
+      HighType.serializability_order ~quantum:true  table ty
+    with
+    | Some 0, _ -> false        (* classical order 0 *)
+    | _, Some 0 -> true         (* quantum order 0 \ classical order 0 *)
+    | _ -> false                (* otherwise *)
+  in
+
+  let is_order1 ty =
+    match 
+      HighType.serializability_order ~quantum:quantum_reduction table ty
+    with
+    | Some i -> i <= 1
+    | _ -> false
+  in
+
+  (* In a quantum reduction, we only support a single quantum input
+     and a single quantum output. Further, they must be of order 0. *)
+  let cond_count =
+    if not quantum_reduction then true else begin
+      let quantum_inputs = ref 0 in
+      List.iter
+        (fun input ->
+           if is_quantum (Term.ty input) then incr quantum_inputs)
+        inputs;
+
+      let quantum_outputs = ref 0 in
+      List.iter
+        (fun output ->
+           if is_quantum (Term.ty output) then incr quantum_outputs)
+        outputs;
+
+      !quantum_inputs <= 1 && !quantum_outputs <= 1 
+    end;
+  in
+
+  (* Outputs must be (classical or quantum, according to
+     [quantum_reduction]) order at-most one. *)
+  let cond_output_order =
+    not (TConfig.deduction_order_guard table) || (* check is disabled *)
+    List.for_all
+      (fun output -> is_order1 (Term.ty output))
+      outputs
+  in
+
+  (* filter inputs that are of order greater-or-equal to two *)
+  let inputs = 
+    if not (TConfig.deduction_order_guard table) then inputs (* check is disabled *)
+    else
+      List.filter
+        (fun input -> is_order1 (Term.ty input))
+        inputs
+  in
+
+  (cond_count && cond_output_order, inputs)
+
+(*------------------------------------------------------------------*)  
 (** Check if [inputs ▷ outputs].
     [outputs] and [inputs] are over [st.system.set]. *)
 let deduce_terms
-    ~(outputs : Term.terms) ~(inputs  : Term.terms) (st : unif_state)
+    ?(quantum_reduction : bool = false)
+    ~(outputs : Term.terms) ~(inputs  : Term.terms) (unif_state : unif_state)
   : match_res
   =
-  let se = st.system.set in
+  let system = unif_state.system in
+  let table  = unif_state.table  in
+  let vars   = unif_state.env    in
+  let hyps   = unif_state.hyps   in
 
-  (* If [st.support] is not empty, we cannot strengthen the invariant.
-     See explanation in [mset_mem_one]. *)
-  let mset_l =
-    if st.support = [] && st.use_fadup && SE.is_fset se then
-      let system = SE.to_fset se in
-      let msets = strengthen st.table system st.env st.hyps inputs in
-      msets_to_list msets
-    else []
-  in
-  if st.support = [] && st.use_fadup &&
-     TConfig.show_strengthened_hyp st.table then
-    (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
+  let env = Env.init ~table ~system ~vars () in
+  let se = system.set in
 
-  let env = Env.init ~table:st.table ~system:st.system ~vars:st.env () in
-  let inputs =
-    term_set_union
-      (known_sets_of_mset_l se mset_l)
-      (known_sets_of_terms env st.hyps inputs)
+  (* check that this is a supported deduction query *)
+  let is_supported, inputs = 
+    check_deduce_args ~quantum_reduction ~outputs ~inputs env
   in
 
-  let mv, minfos =
-    List.fold_left (fun (mv, minfos) output ->
-        let output = { term = output; cond = Term.mk_true; } in
-        deduce ~output ~inputs { st with mv } minfos
-      ) (st.mv, init_minfos) outputs
-  in
+  (* FIXME: provide a useful error-message in case of failure *)
+  if not is_supported then NoMatch None else begin
+    (* If [st.support] is not empty, we cannot strengthen the invariant.
+       See explanation in [mset_mem_one]. *)
+    let mset_l =
+      if unif_state.support = [] && unif_state.use_fadup && SE.is_fset se
+         && not (TConfig.post_quantum_equivs table)
+      then
+        let system = SE.to_fset se in
+        let msets = strengthen table system vars hyps inputs in
+        msets_to_list msets
+      else []
+    in
+    if unif_state.support = [] && unif_state.use_fadup &&
+       TConfig.show_strengthened_hyp table then
+      (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
 
-  if deduce_succeed minfos
-  then Match mv
-  else NoMatch (Some (outputs, minfos_norm minfos))
+    let inputs =
+      term_set_union
+        (known_sets_of_mset_l se mset_l)
+        (known_sets_of_terms env hyps inputs)
+    in
+
+    let init_deduce_result = {
+      mv = unif_state.mv;
+      minfos = init_minfos; 
+      inputs; 
+    } 
+    in
+
+    let result =
+      List.fold_left (fun {mv; minfos; inputs;} output ->
+          let deduce_state = { 
+            unif_state = { unif_state with mv; };
+            minfos; 
+            quantum_reduction; } 
+          in
+          let output = { term = output; cond = Term.mk_true; } in
+          deduce ~output ~inputs deduce_state
+        ) init_deduce_result outputs
+    in
+
+    if deduce_succeed result.minfos
+    then Match result.mv
+    else NoMatch (Some (outputs, minfos_norm result.minfos))
+  end
 
 (*------------------------------------------------------------------*)
 (** {3 Equiv matching and unification} *)
@@ -3897,6 +4146,7 @@ module E = struct
       - [EntailLR]: [equiv(terms ) → equiv(terms0)]
       - [EntailRL]: [equiv(terms ) ← equiv(terms0)] *)
   let tunif_deduce
+      ?(quantum_reduction : bool option)
       ~(mode  : [`Eq | `EntailLR | `EntailRL])
       (terms  : Term.terms)
       (terms0 : Term.terms)
@@ -3908,12 +4158,12 @@ module E = struct
 
     | `EntailLR ->
       (* [terms ▷ terms0 → equiv(terms) → equiv(terms0)] *)
-      deduce_terms ~outputs:terms0 ~inputs:terms  st |>
+      deduce_terms ?quantum_reduction ~outputs:terms0 ~inputs:terms  st |>
       success_or_user_error
 
     | `EntailRL     ->
       (* [terms0 ▷ terms → equiv(terms0) → equiv(terms)] *)
-      deduce_terms ~outputs:terms  ~inputs:terms0 st |>
+      deduce_terms ?quantum_reduction ~outputs:terms  ~inputs:terms0 st |>
       success_or_user_error
 
   (*------------------------------------------------------------------*)
@@ -3944,7 +4194,8 @@ module E = struct
         SE.{ set = (oget st.system.pair :> SE.t); pair = None; } 
       in
       let st = st_change_context st system in
-      let mv = tunif_deduce ~mode es.terms pat_es.terms st in
+      let quantum_reduction = TConfig.post_quantum_equivs st.table in
+      let mv = tunif_deduce ~quantum_reduction ~mode es.terms pat_es.terms st in
       begin
         match es.bound, pat_es.bound with
         | None, None -> mv
@@ -3995,6 +4246,9 @@ module E = struct
         | _ -> assert false
       in
 
+      (* Both steps below are sound because [Secrecy.symb_deduce] and
+         [Secrecy.symb_not_deduce] use classical deduction (not
+         quantum deduction).  *)
       if p.psymb = Secrecy.symb_deduce st.table then begin
         (* We check if:
            [(l ▷ r) → (l0 ▷ r0)] 

@@ -17,8 +17,11 @@ global axiom case_nat (i : nat[const]) :
   [i = i0] \/ 
   Exists (j : nat[const]), [i = succi j].
 
-global lemma hybrid ['a] 
- (N1 : nat[const]) (fR, fL : nat -> 'a) (z : 'a) (u : message) :
+(* arbitrary serializable type `T` *)
+type T[serializable].
+
+global lemma hybrid 
+ (N1 : nat[const]) (fR, fL : nat -> T) (z : T) (u : message) :
  (* Inductive case of the hybrid proof *)
  (Forall (N0 : nat[const]), 
    [N0 <= N1] ->

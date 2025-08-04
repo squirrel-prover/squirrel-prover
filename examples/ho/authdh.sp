@@ -5,8 +5,8 @@ abstract ok : message
 
 (*------------------------------------------------------------------*)
 (* gdh group *)
-type G
-type E [large]
+type G[serializable]
+type E [serializable,large]
 
 gdh gen, (^), ( ** ) where group:G exponents:E.
 

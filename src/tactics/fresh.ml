@@ -99,7 +99,8 @@ let phi_fresh
   : Term.terms
   =
   let table = context.env.table in
-  let err = Format.asprintf "%a" Term.pp n in
+  let ppe = default_ppe ~table () in
+  let err = Format.asprintf "%a" (Term._pp ppe) n in
 
   let n : Name.t = 
     match n with
@@ -195,7 +196,7 @@ let fresh_trace
   =
   let use_path_cond = p_fresh_arg opt_args in
   let loc = L.loc m in
-
+  
   if (TS.bound s) <> None then
     soft_failure 
       (Tactics.GoalBadShape "fresh does not handle concrete bounds.");
@@ -204,11 +205,12 @@ let fresh_trace
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
     let context = TS.proof_context s in
+    let ppe = default_ppe ~table:context.env.table () in    
     let (n, t) =
       fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, context) hyp s
     in
 
-    Printer.pr "Freshness of %a:@; @[<v 0>" Term.pp n;
+    Printer.pr "Freshness of %a:@; @[<v 0>" (Term._pp ppe) n;
     let phis =
       phi_fresh
         ~negate:false ~use_path_cond ~checklarge:true ~loc

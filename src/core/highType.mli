@@ -65,9 +65,14 @@ val is_fixed : Symbols.table -> Type.ty -> bool
     - [message -> message]              is order 1. 
     - [message -> message -> message]   is order 1.
     - [(message -> message) -> message] is order 2. 
-      Returns [None] if no order could be inferred (e.g. because there
-      are type variables). *)
-val serializability_order : Symbols.table -> Type.ty -> int option
+
+    If [quantum] is [true], consider [quantum_message] as an order 0
+    type ([quantum] default to [false]).
+
+    Returns [None] if no order could be inferred (e.g. because there
+    are type variables). *)
+val serializability_order : 
+  ?quantum:bool -> Symbols.table -> Type.ty -> int option
 
 (** Are the element of the type all encodable as bit-strings *)
 val is_bitstring_encodable : Symbols.table -> Type.ty -> bool
@@ -83,10 +88,13 @@ val is_name_fixed_length : Symbols.table -> Type.ty -> bool
 val is_well_founded : Symbols.table -> Type.ty -> bool
 
 (*------------------------------------------------------------------*)
-(** Check if a type is definitely classical *)
+(** Check if a type is definitely classical.
+    A type is classical if its serializability order is at-most
+    one. *)
 val is_classical : Symbols.table -> Type.ty -> bool
 
-(** Check if a type is definitely quantum *)
+(** Check if a type is definitely quantum.
+    FIXME: what does this formally mean? *)
 val is_quantum : Type.ty -> bool
 
 (*------------------------------------------------------------------*)

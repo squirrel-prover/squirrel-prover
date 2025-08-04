@@ -451,7 +451,7 @@ let deduce_mem
          instantiated, as the latter is cleared from the substitution
          returned by [deduce_mem]. *)
       se   = pc.env.system.set; 
-      info = ();
+      info = {used = false;};   (* TODO: quantum: do we need to set this? *)
     }
   in
   let unif_state =
@@ -459,7 +459,11 @@ let deduce_mem
       ~param:Match.crypto_param
       pc ~support:vars
   in
-  Match.deduce_mem cterm known_set unif_state
+  Match.deduce_mem
+    (* TODO: quantum: do not always set to [true] + correctly set the
+       [used] bit above *)
+    ~quantum_reduction:true
+    cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
 let record_deduce_mem_query =
@@ -3406,12 +3410,12 @@ let term_set_strengthen (pc : ProofContext.t) (k : TSet.t) : TSet.t list =
       vars = Vars.Tag.global_vars ~const:false ~adv:true k.vars; 
       cond = k.conds; 
       se = env.system.set;       
-      info = ();
+      info = {used = false; };
     }
   in
   let l = Match.term_set_strengthen ~inputs:[] env pc.hyps k in (* FIXME: provide useful inputs *)
   (* convert back the [Match.term_set] to [TSet.t] *)
-  List.map (fun (k : unit Match.term_set) ->
+  List.map (fun (k : Match.info Match.term_set) ->
       assert (
         (* We check that we only use global tags with `const` at
            `false`, as we will not check that the arguments of the

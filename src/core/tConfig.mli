@@ -63,11 +63,23 @@ val auto_fadup : Symbols.table -> bool
 (** New equivalence induction principle. *)
 val new_ind : Symbols.table -> bool
 
-(** Post-quantum soundness. *)
+(** Post-quantum soundness. 
+    This is the old DEPRECATED quantum mode, which is no longer
+    supported. *)
 val post_quantum : Symbols.table -> bool
 
-(** All equivs become PQ. *)
+(** All equivs become PQ.
+    Temporary mode, until equivalences are properly decorated with a
+    bit indicating whether they are quantum or classical. *)
 val post_quantum_equivs : Symbols.table -> bool
+
+(** Allow to turn-off the guards on the order of the terms in the
+    deduction engine. 
+
+    Turning-off the guard can lead to unsoundness, e.g. by allowing a
+    quantum state to be duplicated. But this is the only way to allow
+    to prove polymorphic deduction properties. *)
+val deduction_order_guard : Symbols.table -> bool
 
 (** Verbose mode for crypto tactic *)
 val verbose_crypto : Symbols.table -> bool

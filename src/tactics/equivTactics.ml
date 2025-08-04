@@ -448,10 +448,20 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
       (function
         | Equiv.Equiv {terms = equiv; bound = None}  ->
           (*TODO:Concrete : Probably something to do to create a bounded goal*)
-          List.for_all (fun elem ->
-              List.exists (ES.Reduce.conv_term s elem)
-                equiv
-            ) conclusion
+
+          (* In classical mode, check for inclusion modulo duplication. 
+             In quantum mode, we use a less powerful check as we must 
+             be more careful. *)
+          if TConfig.post_quantum_equivs (ES.table s) then
+            List.length equiv = List.length conclusion &&
+            List.for_all2 (fun elem1 elem2 ->
+                ES.Reduce.conv_term s elem1 elem2
+              ) equiv conclusion
+          else
+            List.for_all (fun elem ->
+                List.exists (ES.Reduce.conv_term s elem)
+                  equiv
+              ) conclusion
         | Equiv.Pred  _ -> false
         | Equiv.Reach _ -> false
         |_ -> false)
@@ -1214,23 +1224,23 @@ let filter_deduce
       ~support:[]
   in
   let table = ES.table s in
+  (* let quantum_reduction = TConfig.post_quantum_equivs table in *)
 
   (** Invariant: [knows, results, to_filter ▷ to_filter_init] *)
   let rec doit result to_filter : Term.terms =
     match to_filter with
     | [] -> List.rev result
     | e :: to_filter0 ->
-      (* We do not eliminate any quantum element from the frame.
+      (* We do not eliminate any quantum element from the frame, and
+         we use only classical deduction.
          
-         TODO: quantum: this is probably insuficient to be sound, one
-         should work on Match.deduce, but if we disallow to deduce
-         polymorphic elements, we loose some deduce lemmas. *)
+         FEAT: quantum: do we want to do better? *)
       if not (HighType.is_classical table (Term.ty e)) then
         doit (e :: result) to_filter0
       else
       let inputs = result @ to_filter0 @ knows in (* without [e] *)
       let match_result = 
-        Match.deduce_terms ~outputs:[e] ~inputs st
+        Match.deduce_terms ~quantum_reduction:false ~outputs:[e] ~inputs st
       in
       match match_result with
       | NoMatch _ -> doit (e :: result) to_filter0
@@ -1313,23 +1323,31 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
+  let pc = ES.proof_context ~in_system s in
 
-  let to_deduce, rest = get_elems l equiv.terms in
+  let to_deduce, inputs = get_elems l equiv.terms in
+
+  let quantum_reduction = TConfig.post_quantum_equivs pc.env.table in
+
+  (* For classical equivalences, we optimize the deduction goal by
+     remoing [inputs] from [outputs]. In quantum equivalences, we
+     cannot do that, as quantum deduction is not compositional. *)
+  let outputs = 
+    if quantum_reduction then equiv.terms else to_deduce
+  in
 
   let st =
-    Match.mk_unif_state
-      ~param:Match.crypto_param
-      (ES.proof_context ~in_system s) ~support:[]
+    Match.mk_unif_state ~param:Match.crypto_param pc ~support:[]
   in
 
   let match_result = 
-    Match.deduce_terms ~outputs:to_deduce ~inputs:rest st
+    Match.deduce_terms ~quantum_reduction ~outputs ~inputs st
   in
   match match_result with
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
     assert (Match.Mvar.is_empty mv);
-    [ES.set_equiv_conclusion {terms = rest; bound = None} s]
+    [ES.set_equiv_conclusion {terms = inputs; bound = None} s]
 
 
 (*------------------------------------------------------------------*)

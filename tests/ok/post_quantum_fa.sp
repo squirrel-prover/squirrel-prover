@@ -23,17 +23,15 @@ Proof.
   apply E.
 Qed.
 
-(* same lemma, but `f` is polymorphique *)
-global lemma [Q] _ ['a] (f:'a -> message[adv]) x :
+type A[serializable].
+
+(* same lemma, but `f` inputs type is changed. *)
+global lemma [Q] _ (f:A -> message[adv]) x :
  equiv(x) ->
  equiv(x, f x).
 Proof.
   nosimpl intro E.
-
   deduce 1.
-  (* succeed because `f` is assumed to be `adv`, even though we use a
-     type variable `'a` *)
-
   apply E.
 Qed.
 
@@ -88,6 +86,10 @@ close Classic.
 (* --------------------------------------------------------- *)
 (* We should not be able to prove the following lemma, as we are not
    in the PQ setting. *)
+
+(* ensure that this is [false], even though it should be the default value *)
+set postQuantumEquivs = false.
+
 global lemma [PQ] _ (t:timestamp [const]) :
  [happens(t)] ->  equiv(frame@t).
 Proof.
@@ -96,7 +98,7 @@ Proof.
   + by expand.
   + rewrite /frame /state. 
     fa 0.
-    fa 1. 
+    fa 1.
     checkfail fa 1 exn Failure.
 Abort.
 
@@ -132,9 +134,7 @@ Proof.
   + by expand.
   + rewrite /frame /state /transcript /exec /cond /output /input .   
     fa 0.
-    fa 2.
-    fa 3.
-    fa 4.
+    fa !<_,_>.
     deduce.
 
     nosimpl(fa 0). 
@@ -149,7 +149,7 @@ Proof.
       (* the freshness condition is trivial *)
       assumption A.
     }.
-    deduce.   
+    deduce 1. 
     assumption.
 Qed.
 
@@ -184,3 +184,5 @@ Proof.
     by admit.  
     assumption E.
 Qed.
+
+set postQuantumEquivs=false.

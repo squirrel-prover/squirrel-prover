@@ -114,19 +114,28 @@ let is_name_fixed_length table ty : bool =
   check_info_on_closed_term false table ty Name_fixed_length
 
 (** See `.mli` *)
-let serializability_order table ty : int option =
+let serializability_order
+    ?(quantum = false) table ty : int option 
+  =
   let exception Unknown in
   let rec order : Type.ty -> int = function
     | Boolean | Index | Timestamp | Message -> 0
     | Tuple l -> List.fold_left (fun m t -> max (order t) m) 0 l 
-    | Fun (t1, t2) -> max (order t1 + 1) (order t2)
+
+    | Fun (t1, t2) ->
+      let o1, o2 = order t1, order t2 in
+      (* if [t1] is finite and of order 0, [t1 → t2] can be encoded as
+         an array indexed by [t1] of values in [t2] *)
+      if is_finite table t1 && o1 = 0 then o2 else max (o1 + 1) o2
+
     | TConstr (_s,args) as ty ->
       (* FIXME: inductive: have a more precise test, as this reject valid
          cases, e.g. `list int` *)
       if args <> [] then raise Unknown;
 
       if check_ty_info table ty Serializable || 
-         check_ty_info table ty Finite
+         check_ty_info table ty Finite ||
+         (quantum && Type.equal ty Type.tquantum_message)
       then 0 else raise Unknown
 
     | TVar _ | TUnivar _ -> raise Unknown
@@ -159,30 +168,17 @@ let is_well_founded table ty : bool =
 
 (*------------------------------------------------------------------*)
 (** Check if a type is definitely classical *)
-let is_classical table (ty : Type.ty) : bool = 
-  let rec doit : Type.ty -> bool = function
-    | Message  | Boolean   | Index    | Timestamp -> true
-
-    | TConstr(_, args) as t -> 
-      is_bitstring_encodable table t &&
-      List.for_all doit args
-    (** A bit-string encodable user-defined types is classical *)
-
-    | TVar _ -> false  (** Type variable might be quantum *)
-
-    | TUnivar _ -> false   (** Type unification variable might be quantum *)
-
-    | Tuple ls -> List.for_all doit ls
-    | Fun (i,o) -> doit i && doit o
-  in
-  doit ty
-
+let is_classical table (ty : Type.ty) : bool =
+  match serializability_order table ty with
+  | Some i -> i <= 1
+  | _ -> false
+  
 (** Check if a type is definitely quantum *)
 let rec is_quantum : Type.ty -> bool = function
   | Message  | Boolean   | Index    | Timestamp -> false
     
   | TConstr(_, args) as t -> 
-    assert (args = []);
+    args <> [] &&               (* FIXME: inductive: improve precision *)
     Type.equal t Type.tquantum_message
   (** User-defined types *)
         

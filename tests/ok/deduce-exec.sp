@@ -52,6 +52,8 @@ system [postquantum] PQ =
 open Quantum.
 close Classic.
 
+set postQuantumEquivs=true.
+
 global theorem [PQ] _ (i : _[const]) :
   [happens(A i)]->
   equiv(frame@A i) ->
@@ -130,3 +132,5 @@ Proof.
  intro Hap H. 
  checkfail deduce 1 exn ApplyMatchFailure.
 Abort.
+
+set postQuantumEquivs=false.

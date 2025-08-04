@@ -2,6 +2,11 @@ include Core.
 
 include WeakSecrecy.
 
+(* Disable the order guards in deduction, because this is the only way
+   to prove polymorphic deduction lemma currently. *)
+
+set deductionOrderGuard = false.
+
 (*------------------------------------------------------------------*)
 (* `apply` can infers arguments by unification *)
 global lemma _ @system:any ['a 'b 'c] (u0 : 'a) (v0 : 'b) (w0 : 'c) :
