@@ -47,7 +47,7 @@ Qed.
 
 include WeakSecrecy.
 
-type key [finite,large].
+type key [serializable,finite,large].
 
 name h : key -> key.
 

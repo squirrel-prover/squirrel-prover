@@ -887,7 +887,8 @@ let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
              let ienv = Infer.mk_env () in
              let cenv = Typing.{env = ES.env s; cntxt = InGoal; } in
              let a, _ty =
-               Typing.convert ~ienv cenv p
+               Typing.convert ~option:{Typing.Option.default with pat=`Holes}
+                 ~ienv cenv p
              in
              (a, Some (L.loc p), Some ienv))
           opat
