@@ -1825,7 +1825,7 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
   let _, togen, sbst = (* rename variables to be generalized, to avoid name clashes *)
     Term.add_vars_simpl_env (Vars.to_simpl_env goal.env.vars) goal.vars
   in
-  let st = subst_goal sbst goal in
+  let goal = subst_goal sbst goal in
   
   let pp_env fmt =
     if ppe.dbg then Fmt.pf fmt "@[<hov 2>env:@ @[%a@]@]@;" Vars.pp_env_dbg goal.env.vars
@@ -1836,12 +1836,12 @@ let _pp_gen_goal (ppe : ppenv) fmt (goal:goal) =
       Fmt.pf fmt "@[%a@] :@ " (Vars._pp_typed_list ppe) togen
   in
   let pp_all_inputs fmt =
-    if st.rec_inputs = [] && st.extra_inputs=[] then Fmt.pf fmt "∅" else
+    if goal.rec_inputs = [] && goal.extra_inputs=[] then Fmt.pf fmt "∅" else
       Fmt.pf fmt "%a%t%t%a"
-        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) st.rec_inputs
-        (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (fun fmt -> if st.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
-        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) st.extra_inputs
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp     ppe)) goal.rec_inputs
+        (fun fmt -> if goal.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
+        (fun fmt -> if goal.rec_inputs <> [] then Fmt.pf fmt ",@ " else ())
+        (Fmt.list ~sep:(Fmt.any ",@ ") (TSet._pp ppe)) goal.extra_inputs
   in
   let pp_output fmt = Fmt.pf fmt "%a" (CondTerm._pp ppe)
       (CondTerm.mk ~term:goal.output_term ~conds:goal.output_conds)
