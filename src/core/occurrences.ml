@@ -658,12 +658,12 @@ let get_rec_args_ext
 
     match t with
     | _ when mode = PTimeSI  
-          && HighTerm.is_ptime_deducible ~si:true  env' t -> []
+          && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:true  env' t -> []
     | _ when mode = PTimeNoSI 
-          && HighTerm.is_ptime_deducible ~si:false env' t -> []
+          && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t -> []
     | _ when mode = NoHonestRand &&
              (HighTerm.is_constant env t ||
-              HighTerm.is_ptime_deducible ~si:false env' t) -> []
+              HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t) -> []
 
     | Term.Var v -> 
       let err_str =

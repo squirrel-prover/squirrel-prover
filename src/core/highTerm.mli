@@ -32,7 +32,8 @@ val is_constant :
     If [si], also checks that [t] can be seen as a single term whose
     semantics is independent of the system (among all single systems
     of [env.system]). *)
-val is_ptime_deducible : 
+val is_ptime_deducible :
+  ?ignore_qatt:bool ->          (* TODO: quantum: remove flag *)
   si:bool ->
   ?ienv:Infer.env ->
   Env.t -> Term.term -> bool

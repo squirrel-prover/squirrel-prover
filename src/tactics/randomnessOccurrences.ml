@@ -306,7 +306,7 @@ let get_bad_randoms
   in
 
   match t with
-  | _ when HighTerm.is_ptime_deducible ~si:false env t -> []
+  | _ when HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env t -> []
   (* SI not needed here *)
 
   (* non ptime deterministic variable -> forbidden *)

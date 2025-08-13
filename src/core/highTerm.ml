@@ -85,7 +85,11 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
   }
     
 (*------------------------------------------------------------------*)
-let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
+let tags_of_term
+    ?(ignore_qatt : bool = false)
+    (* temporary unsound flag while transitioning to a pq-sound tool  *)
+    (env : Env.t) ~ienv (t : Term.term) : tags
+  =
 
   let rec doit_subterms (env : Env.t) (t : Term.term) : tags =
     Term.tfold
@@ -142,7 +146,7 @@ let tags_of_term (env : Env.t) ~ienv (t : Term.term) : tags =
       in
       {
         const   = not (is_att || is_qatt);
-        adv     = not is_qatt && is_classical_fun;
+        adv     = ignore_qatt || (not is_qatt && is_classical_fun);
         (* all operators BUT [qatt] are assumed to be [adv] over
            classical types (indeed, currently, we do not allow to
            declare user-defined quantum operators). Note that the
@@ -274,11 +278,13 @@ let is_single_term_in_se
 
 (*------------------------------------------------------------------*)
 let is_ptime_deducible
+    ?(ignore_qatt : bool option)
+    (* temporary unsound flag while transitioning to a pq-sound tool  *)
     ~(si : bool)
     ?(ienv:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
-  let tags = tags_of_term env ~ienv t in
+  let tags = tags_of_term ?ignore_qatt env ~ienv t in
   tags.adv &&
   (not si ||
    let single_systems = SE.single_systems_of_context env.system in
