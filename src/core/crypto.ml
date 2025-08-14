@@ -1189,8 +1189,10 @@ module[@warning "-32"] AbstractSet : sig
   val widening : ProofContext.t -> mem -> mem -> mem
 
   (** Replace the last formula in [mem] by the provided list of arguments.
-      Essentially, this is a weakening followed by a [join] with an assertion. *)
-  val change_last_form : mem -> Term.t list -> mem
+      Further, assert that the last formula is [assert_is_last]. *)
+  val change_last_form :
+    assert_is_last : Term.t ->
+    mem -> Term.t list -> mem
 
   (*------------------------------------------------------------------*)
   (** abstract operation on the memory *)
@@ -1362,7 +1364,10 @@ end = struct
     | (v,tl)::q when Vars.equal var v -> (v, (union pc tl abstract_var))::q
     | head::q -> head::(append pc var abstract_var q)
 
-  let change_last_form (mem : mem) (forms : Term.t list) : mem =
+  let change_last_form
+      ~(assert_is_last : Term.t)
+      (mem : mem) (forms : Term.t list) : mem
+    =
     List.map (fun (v, sets) ->
         match sets with
         | Top -> (v, Top)
@@ -1370,7 +1375,9 @@ end = struct
           let sets =
             List.map (fun (set : TSet.t) ->
                 assert (set.conds <> []);
-                let conds, _last = List.takedrop (List.length set.conds - 1) set.conds in
+                let conds, last = List.takedrop (List.length set.conds - 1) set.conds in
+                let last = as_seq1 last in
+                assert (Term.alpha_conv assert_is_last last);
                 TSet.make ~term:set.term ~conds:(conds @ forms) ~vars:set.vars
               ) sets
           in
@@ -3763,7 +3770,13 @@ let bideduce_recursive_subgoals
                    pc.env.table rec_info.order
                    [dec_quantity; rec_var_t]
                in
-               AbstractSet.change_last_form mem [rec_cond; rec_predicate] |>
+              
+               (* If we are in an action [A i] and the maximum 
+                  timestamp is [t], replace [A i ≤ t] by  
+                  [A i < τ ∧ τ ≤ t] *)
+               AbstractSet.change_last_form
+                 ~assert_is_last:(oget goal.rec_predicate)
+                 mem [rec_cond; rec_predicate] |>
                AbstractSet.generalize goal.vars
              end 
              else result.final_mem
