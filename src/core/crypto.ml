@@ -2584,6 +2584,8 @@ let knowledge_mem_condterm_sets
     (extra_inputs : TSet.t list) 
   : (Term.terms * Term.term * Term.term) list
   =
+  let table = pc.env.table in
+  
   let is_in (input : TSet.t) : (Term.terms * Term.term * Term.term) option =
     match TSet.cterm_mem_cond pc.env pc.hyps ~output ~input with
     | (None,_,_) -> None
@@ -2597,8 +2599,15 @@ let knowledge_mem_condterm_sets
       let args =
         List.map (fun x -> Term.subst subst (Term.mk_var x)) bound_vars
       in
-      (* TODO: check that [free_vars] are fixed+enum, to make sure
-         that [cond] is deducible from extra inputs. *)
+
+      let free_var_enumarable =
+        List.for_all
+          (fun v -> HighType.is_enum table (Vars.ty v))
+          free_vars
+      in
+
+      (* check that [free_vars] are [enum], to make sure
+         that [cond] is deducible from [extra_inputs]. *)
       let phi =
         Term.mk_exists ~simpl:true free_vars (Term.mk_ands conds)
       in
@@ -2606,14 +2615,16 @@ let knowledge_mem_condterm_sets
         Term.mk_forall ~simpl:true free_vars
           (Term.mk_ors (List.map Term.mk_not conds))
       in
+      
       (* FIXME: we could forward [mv] to [Match] (through
          [unsatisfiable]) and update [support] (in [unsatisfiable]
          accordingly to conclude more often *)
 
-      (* Discard any extra input that we know will never be useful (by
-         trying to show that the condition for this input never
-         holds). *)
-      if unsatisfiable pc phi then
+      (* Discard any extra input if:
+         - we know it will never be useful (by trying to show that 
+           the condition for this input never holds);
+         - we cannot use it, because [free_vars] is not enumarable *)
+      if unsatisfiable pc phi || not free_var_enumarable then
         (* [input] never useful, we can discard it *)
         None
       else
