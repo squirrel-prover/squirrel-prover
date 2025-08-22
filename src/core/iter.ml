@@ -883,7 +883,7 @@ let get_macro_occs
     (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].
 
        Must be synchronized with corresponding code in
-       [Occurrences.get_actions_ext],
+       [Occurrences.get_rec_args_ext],
        [Occurrences.fold_bad_occs]
        [Crypto]. *)
     let t =
@@ -892,12 +892,19 @@ let get_macro_occs
       let strat = Reduction.(MayRedSub rp_full) in
       fst (Reduction.whnf_term ~strat st t)
     in
+
+    (* marking all variables bound above [t] as [adv],
+       in the [env'] used to check whether [t] is ptime-deducible *)       
+    let fv' = Vars.Tag.global_vars ~adv:true fv in
+    let vars' = Vars.add_vars fv' env.vars in 
+    let env' = Env.set_vars env vars' in
+
     match t with
-    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env t -> []
-    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env t -> []
+    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~si:true  env' t -> []
+    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env' t -> []
     | _ when mode = NoHonestRand &&
              (HighTerm.is_constant env t ||
-              HighTerm.is_ptime_deducible ~si:false env t) -> []
+              HighTerm.is_ptime_deducible ~si:false env' t) -> []
 
     | Term.Var v -> 
       let err_str =
