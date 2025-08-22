@@ -2765,7 +2765,23 @@ let query_add_vars_to_env (query : query) (vars : Vars.vars) : query =
       query.env
       (Vars.add_vars (Vars.Tag.global_vars ~adv:true vars) query.env.vars)
   in
-  { query with env; } 
+  { query with env; }
+
+
+(*------------------------------------------------------------------------*)
+(* Check that [l1] and [l2] represents the same memoization hints. 
+
+   We exploit the fact that our proof-search will return both list
+   of memoization hints in the same order, and do a point-wise
+   equality test. *)
+let check_memoization_hints
+    (pc : ProofContext.t) (l1 : TSet.t list) (l2 : TSet.t list) : bool
+  =
+  List.length l1 = List.length l2
+  &&
+  List.for_all2
+    (fun ts1 ts2 -> TSet.is_leq pc ts1 ts2 && TSet.is_leq pc ts2 ts1)
+    l1 l2 
 
 (*------------------------------------------------------------------------*)
 (** {2 Main bi-deduction functions} *)
@@ -2891,11 +2907,23 @@ let rec bideduce_term_strict
 
         notify_bideduce_loop query extra_inputs;
 
-        (* TODO: check that extra inputs are indeed computed as
-           expected during the second pass *)
-        bideduce_fp es
-          {query with env; extra_inputs = extra_inputs @ query.extra_inputs }
-          output_body
+        let result =
+          bideduce_fp es
+            {query with env; extra_inputs = extra_inputs @ query.extra_inputs }
+            output_body
+        in
+
+        (* Both passes should have the same memoization hints, to
+           ensure that we could soundly add the memoization hint of
+           [result0] as an memoized values in the second pass. *)
+        let same_memo_hints =
+          check_memoization_hints pc
+            result0.extra_outputs
+            result.extra_outputs
+        in
+        (* If memoization hints are not invariant, fall back to [result0]
+           (though this should never happen). *)
+        if not same_memo_hints then result0 else result
       end
       else result0
     in
@@ -3113,7 +3141,7 @@ and bideduce_oracle
       (* We bideduced [initial_output], add it to the [extra_outputs].
          Remark that we added the full value [initial_output], not
          just the result of the oracle calls.
-         Our heuristics only value when oracles are involed. *)
+         Our heuristics only memoize values when oracles are involed. *)
       let extra_outputs = 
         TSet.make
           ~term:initial_output.term
@@ -4057,8 +4085,7 @@ let bideduce_all_goals
         Some (constraints, result_direct.final_mem, subgoals)
       | None -> None
     in
-    (* first argument is useless in [`Standard] mode *)
-    ([], result)
+    (next_recursive_goals, result)
 
 (*------------------------------------------------------------------*)
 (** Exported *)
@@ -4281,9 +4308,7 @@ let prove
     add_extra_inputs ~kind:`Direct direct_bided_subgs 
   in
 
-  (* TODO: check that extra inputs are indeed computed as
-     expected during the second pass *)
-  let _, res = 
+  let final_bided_subgs, res = 
     bideduce_all_goals
       ~pass:`Standard game_loc
       ~pc ~param ~let_init
@@ -4292,6 +4317,30 @@ let prove
       rec_bided_subgs direct_bided_subgs 
   in
 
+  (*------------------------------------------------------------------*)
+  if param.time_sensitive then begin
+    (* [goal] is from the first pass, while [goal_final] is from the final pass.
+
+       In time-sensitive mode, both passes should have the same
+       memoization hints, to ensure that we could soundly add the
+       memoization hint of [goal] as memoization inputs in the second
+       pass. *)
+    let inductive_memoization_hints =
+      assert (List.length next_bided_subgs = List.length final_bided_subgs);
+      List.for_all2 (fun goal goal_final ->
+          check_memoization_hints pc
+            goal.extra_outputs
+            goal_final.extra_outputs
+        ) next_bided_subgs final_bided_subgs
+    in
+
+    if not inductive_memoization_hints then
+      Tactics.soft_failure ~loc:game_loc
+        (Failure "failed to apply the game (heuristic failed, \
+                  memoization hints not invariant, sorry")
+  end;
+
+  (*------------------------------------------------------------------*)
   Printer.pr "@;@]"; (* close vertical box of second pass *)
   match res with
   | Some (constraints, final_memory, subgoals) -> 
@@ -4317,7 +4366,7 @@ let prove
     let state = Reduction.mk_state pc ~red_param in
     List.remove_duplicate (Reduction.conv state) (consts_subgs @ subgoals)
   | None ->
-    Tactics.hard_failure ~loc:(game_loc) (Failure "failed to apply the game" )
+    Tactics.hard_failure ~loc:game_loc (Failure "failed to apply the game" )
 
 
 (*------------------------------------------------------------------*)
