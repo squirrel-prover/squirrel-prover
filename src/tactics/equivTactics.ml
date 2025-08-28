@@ -361,8 +361,12 @@ let trans_tac args s =
       transitivity ~update_set:false ~side:Right system_mr [] s_mlr
     in
     let s_mlmr = 
-      ES.set_conclusion_in_context context 
-        (ES.conclusion s_mlmr) s_mlmr 
+      ES.set_conclusion_in_context context
+        (* We know that [s] and [smlml] have the same conclusion
+           (modulo diff-rewriting), but the diffs in [s] may have been
+           manually placed by the user. We thus prefer [s]. *)
+        (ES.conclusion s)
+        s_mlmr 
     in
     [s_lml; s_mlmr; s_mrr]
     
