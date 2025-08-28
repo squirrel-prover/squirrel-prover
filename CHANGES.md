@@ -1,3 +1,13 @@
+### `crypto` tactic with time-sensitive invariants
+  [commit: `b79f6b94`]
+
+Alternative version of `crypto` which infers time-sensitive memory
+invariants for a class of supported games. The alternative deduction
+inference engine can be used as follows:
+```
+  crypto ~time_sensitive Game.
+```
+
 ### Support user-defined functions
   [commit: `543810eb`, **breaking change**]
 
