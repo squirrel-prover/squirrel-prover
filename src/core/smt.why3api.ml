@@ -77,17 +77,19 @@ let create_call limit_time steps prover config_prover task :
         Why3.Pretty.print_task (Why3.Driver.prepare_task driver task);
       close_out oc 
     end;
-    (* TODO : currently steps limits are broken due to Why3. *)
-    let limits = match steps with 
+    let limits, cmd = match steps with 
       | None -> 
         { Why3.Call_provers.empty_limits 
-          with limit_time = float_of_int limit_time }
-      | Some s -> { Why3.Call_provers.empty_limits with limit_steps = s }
+          with limit_time = float_of_int limit_time },
+        config_prover.command
+      | Some s ->
+        { Why3.Call_provers.empty_limits with limit_steps = s },
+        Option.get config_prover.command_steps
     in
     Some
       (Why3.Driver.prove_task
         ~config:main
-        ~command:config_prover.command
+        ~command:cmd
         ~limits
         driver
         task)
