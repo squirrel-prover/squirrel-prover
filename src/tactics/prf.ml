@@ -392,6 +392,9 @@ let prf_param
 (*------------------------------------------------------------------*)
 (** PRF formula *)
 
+type oracle_mode = Normal | Unreachable | Equality
+let _ = Equality
+
 (** Constructs the formula expressing that in
     [terms], [terms_no_adv], [msg], and the indices of [key]:
     - [key] is correctly used (only as hash key)
@@ -420,7 +423,7 @@ let phi_prf
     ?(use_path_cond=false)
     ?(under_hash=true)  (* do we also look for occurrences
                            in the m being hashed *)
-    ?(oracle=false)  (* finer handling of the hashing oracle *)
+    ?(oracle=Normal)  (* finer handling of the hashing oracle *)
     ?(nprf : Name.t option)  (* a name which must not appear in the 
                                 resulting formula. typically, the n_prf
                                 which stands for the hash in the context. *)
@@ -481,9 +484,9 @@ let phi_prf
   (* the messages where we look for occurrences *)
   (* if [under_hash] is set to false, we ignore [msg]
      and handle it separately *)
-  (* in addition we ignore the oracle in [terms] if [oracle] *)
+  (* in addition we ignore the oracle in [terms] if [oracle<>Normal] *)
   let terms_occ = 
-    if oracle then List.filter (fun x -> not (is_oracle x)) terms
+    if oracle <> Normal then List.filter (fun x -> not (is_oracle x)) terms
     else terms
   in
   let terms_occ = k.args @ terms_occ @ terms_no_adv in
@@ -530,11 +533,13 @@ let phi_prf
              "The hash was in a bad context, the generated formula has holes")
   in
   
-  (* Additionally, if [oracle] and if a hashing oracle was indeed present,
+  (* TODO update this comment
+     Additionally, if [oracle] and if a hashing oracle was indeed present,
      generate a subgoal asking that terms *> msg (note that the oracle
      is in terms, and that terms_no_adv are ignored.) *)
   let ded_goal =
-    if oracle && (List.exists is_oracle terms) then
+    match oracle with
+    | Unreachable when List.exists is_oracle terms ->
       Some (CP.make 
               env.table CP.NotDeduce
               (SE.to_fset env.system.set)
@@ -542,8 +547,18 @@ let phi_prf
               ~right_ty:(Term.ty msg)
               ~left:terms 
               ~right:msg)
-    else 
-      None
+    | Equality when List.exists is_oracle terms ->
+      let xv = Vars.make_fresh (Term.ty msg) "x" in
+      let x = Term.mk_var xv in
+      let eqtest = Term.mk_quant Term.Lambda [xv] (Term.mk_eq x msg) in 
+      Some (CP.make
+              env.table CP.Deduce
+              (SE.to_fset env.system.set)
+              ~left_tys:(List.map Term.ty terms)
+              ~right_ty:(Term.ty eqtest)
+              ~left:terms
+              ~right:eqtest)
+    | _ -> None
   in
   phi, ded_goal
 
@@ -554,7 +569,7 @@ let phi_prf_proj
     ?(use_path_cond=false)
     ?(under_hash=true)       (* do we also look for occurrences
                                 in the m being hashed *)
-    ?(oracle=false)          (* finer handling of the hashing oracle *)
+    ?(oracle=Normal)          (* finer handling of the hashing oracle *)
     ?(nprf : Name.t option)  (* a name which must not appear in the 
                                 resulting formula. typically, the n_prf
                                 which stands for the hash in the context. *)
@@ -594,9 +609,15 @@ let phi_prf_proj
 let prf_equiv
     (i:int L.located)
     ?(opat : (Term.term * L.t option * Infer.env option) option)
-    ?(oracle:bool = false)
+    ?(oracle:oracle_mode=Normal)
     (s:sequent) : sequent list =
+  
   let loc = L.loc i in
+
+  (* TODO I disabled this for now, maybe it's still sound though *)
+  if oracle <> Normal then
+    soft_failure ~loc
+      (Tactics.Failure "Unsupported oracle mode");
 
   if not (ES.conclusion_is_equiv s) then 
     soft_failure ~loc 
@@ -626,22 +647,23 @@ let prf_equiv
     prf_param ~loc ?opat e s
   in
   (* let context = {context with table=table_nprf} in *)
-
+  
   Printer.pr
     "@[<v 0>Applying PRF to %a@;@;"
     (Term._pp ppe) (Term.mk_fun table_nprf hash_f [Term.mk_tuple [m;k]]);  
-let phi_prf_proj p =
+
+  let phi_prf_proj p =
     let se = SE.project [p] system in
     let new_system = { env.system with set = (se :> SE.arbitrary); } in
     let context = ES.proof_context ~in_system:new_system s in
-  
+    
     phi_prf_proj ~use_path_cond:false ~under_hash:true ~oracle ~nprf loc
       context ~hash_f 
       ~terms:(cc_nprf::biframe) ~terms_no_adv:[] ~msg:m ~key:k [p]
       (* FEATURE: allow the user to set [use_path_cond] to true *)
-
+      
   in
-
+  
   Printer.pr "@[<v 0>Checking for occurrences on the left@; @[<v 0>";
   (* get proof obligation for occurrences *)
   let phi_l, nded_l = phi_prf_proj proj_l in
@@ -706,15 +728,15 @@ let phi_prf_proj p =
 
   (* non-deduction sequents *)
   let nded_sequents =
-    if oracle then 
+    match oracle with
+    | Unreachable ->
       let mk_nded nd =
         match nd with 
         | None -> []
         | Some nd -> [ES.set_conclusion (CP.to_global nd) s]
       in
       List.concat_map mk_nded [nded_l; nded_r]
-    else
-      []
+    | _ -> []           
   in
 
   let new_biframe = List.rev_append before (cc_nprf::after) in
@@ -753,7 +775,6 @@ let phi_prf_proj p =
 
 
 
-
 (** PRF for secrecy goals.
    In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
    or [v] as [v1, th, v2] (depending on [side]), where [th=h(m,k)] is the [i]-th
@@ -764,9 +785,16 @@ let phi_prf_proj p =
    does not hash [m] with [k] and correctly uses [k].
    [m] itself must also correctly use [k] (but no conditions on hashes in it).
    If [u1, u2] (left) or [u] (right) contain a hash oracle [lambda x. h(x,k)],
-   ignores the corresponding occurrence, and adds a subgoal [u *> m]. *)
+   ignores the corresponding occurrence, and adds a subgoal [u *> m].
+   (TODO update this comment)
+*)
 let prf_secrecy
-    ?(side:CP.side=CP.Right) (i:int L.located) (s:sequent) : sequent list =
+    ~(side:CP.side)
+    ~(oracle:oracle_mode)
+    ~(under_hash:bool)
+    (i:int L.located)
+    (s:sequent)
+  : sequent list =
   let ppe = default_ppe ~table:(ES.table s) () in
   let loc = L.loc i in
   let table = ES.table s in
@@ -829,7 +857,7 @@ let prf_secrecy
     "@[<v 0>Applying PRF to %a@;@;"
     (Term._pp ppe) (Term.mk_fun table hash_f [Term.mk_tuple [msg;key]]);  
   let phi, nded =
-    phi_prf ~use_path_cond:false ~under_hash:false ~oracle:true
+    phi_prf ~use_path_cond:false ~under_hash ~oracle
       loc context ~hash_f 
       ~terms:us ~terms_no_adv ~msg ~key
   in
@@ -858,7 +886,8 @@ let prf_secrecy
     | None -> []
     | Some nded when (* when the additional non-deduction subgoal is the same
                         as the remaining sequent *)
-        (Term.equal (CP.right sgoal) (CP.right nded))
+           (CP.kind table nded = CP.kind table sgoal)
+        && (Term.equal (CP.right sgoal) (CP.right nded))
         && (Term.equal (CP.left remaining_sgoal) (CP.left nded))
         && side = CP.Left ->
       []
@@ -902,27 +931,55 @@ let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
   then 
     match args with 
     | [TacticsArgs.Prf (nargs, i, None)] ->
-      let side =
+      let fail loc =
+        Tactics.hard_failure ~loc (Failure "incompatible arguments")
+      in
+      (* TODO this is ugly *)
+      let oracle, under_hash, side =
         List.fold_left
-          (fun side narg ->
+          (fun (oracle, under_hash, side) narg ->
              match narg with
              | Args.NArg L.{ pl_loc = loc; pl_desc = "left" } -> 
                if side = None then 
-                 Some CP.Left
-               else
-                 Tactics.hard_failure ~loc (Failure "incompatible arguments")
+                 oracle, under_hash, Some CP.Left
+               else fail loc
+
              | Args.NArg L.{ pl_loc = loc; pl_desc = "right" } -> 
                if side = None then 
-                 Some CP.Right
-               else
-                 Tactics.hard_failure ~loc (Failure "incompatible arguments")
+                 oracle, under_hash, Some CP.Right
+               else fail loc
+
+             | Args.NArg L.{pl_loc = loc; pl_desc = "normal_oracle"} ->
+               if oracle = None then
+                 Some Normal, under_hash, side
+               else fail loc
+
+             | Args.NArg L.{pl_loc = loc; pl_desc = "unreachable"} ->
+               if oracle = None then
+                 Some Unreachable, under_hash, side
+               else fail loc
+
+             | Args.NArg L.{pl_loc = loc; pl_desc = "equality"} ->
+               if oracle = None then
+                 Some Equality, under_hash, side
+               else fail loc
+
+             | Args.NArg L.{pl_loc = loc; pl_desc = "under_hash"} ->
+               if under_hash = None then
+                 oracle, Some true, side
+               else fail loc
+
              | Args.NList (l,_) 
              | Args.NArg  l     ->
                Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument"))
-          None
+          (None, None, None)
           nargs 
       in
-      prf_secrecy ?side i s
+      let oracle = oget_dflt Unreachable oracle in
+      let under_hash = oget_dflt false under_hash in
+      let side = oget_dflt CP.Right side in
+      if side = CP.Right && oracle = Equality then fail L._dummy;
+      prf_secrecy ~side ~oracle ~under_hash i s
     | _ -> LowTactics.bad_args ()
 
   else 
