@@ -38,11 +38,20 @@ namespace Classic.
     - by rewrite exec_not_init in Hexec.
     - by rewrite cond_init.
   Qed.
-  
-  axiom [any] executability (t:timestamp):
-   happens(t) => 
-   exec@t => 
-   forall (t0:timestamp), t0 <= t => exec@t0.
+
+  lemma [any] executability (t:timestamp):
+    happens(t) =>
+    exec@t =>
+    forall (t0:timestamp), t0 <= t => exec@t0.
+  Proof.
+    induction t.
+    intro t IH Hap Hex t' Hle.
+    have [_|_] : (t' = t || t' < t) by constraints.
+    + congruence.
+    + apply IH (pred t) => //.
+      have H := exec_not_init t.
+      by rewrite H in Hex.
+  Qed.
 
   lemma [any] frame_not_init (tau:timestamp) :
     init < tau => 
