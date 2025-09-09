@@ -2714,7 +2714,6 @@ let notify_bideduce_second_pass ~vbs ~dbg =
   if not vbs && not dbg then () else
     (* close vertical box of first pass *)
     Printer.pr "@;@]\
-                @.
                 #---------------------------------------#@\n\
                 |              Second pass              |@\n\
                 #---------------------------------------#@.\
