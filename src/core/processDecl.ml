@@ -831,9 +831,7 @@ let mk_wf_goal table env (rec_op:Symbols.fname) rec_domain_ty =
   
   let elem = Vars.make_fresh rec_domain_ty "x"  in
   let elem' = Vars.make_fresh rec_domain_ty "y" in
-  Printer.prt `Default "ok";
   let fun_rec_op = Term.mk_lambda [elem'; elem] (Term.mk_fun_infer_tyargs table rec_op [Term.mk_var elem'; Term.mk_var elem]) in
-  Printer.prt `Default "ok";
   let wf_formulas =
     Term.mk_fun_infer_tyargs table (Library.Logic.fs_well_founded table) [fun_rec_op]
   in
@@ -1238,7 +1236,9 @@ let parse_fun_decls
   in
 
   let rec_op, wf_goals =
-    match op_kind with       
+    match op_kind with
+    (* If the recursion order is a user defined function, we must
+       check that the order is well-founded to define a recursion. *)
     | `Let (`RecWithOrd op) ->
       let op = Symbols.Operator.convert_path op table in
       let fty = Symbols.OpData.ftype table op in
@@ -1261,6 +1261,10 @@ let parse_fun_decls
             (Failure "the well-founded recursion order must have a \
                       type of the form 'a -> 'a -> bool");
       end
+    (* when the recursion order is the default `<` symbol, we do not
+       have to check that it is a well-founded order. Indeed the `<`
+       function symbol is assumed in the theory to be well-founded
+       over any type, see `theories/Logic.sp` for details. *)
     | _ -> Symbols.fs_lt, []
   in                  
 
