@@ -149,7 +149,7 @@ lemma counterIncreaseStrictSA(i,j1:index, t:timestamp):
     (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@SenderA(i,j1).
 Proof.
-  use counterIncreaseA. smt ~steps:38679.
+  use counterIncreaseA. smt ~steps:43032.
 Qed.
 
 lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
@@ -157,7 +157,7 @@ lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
 Proof.
-  use counterIncreaseA. smt ~steps:71061.
+  use counterIncreaseA. smt ~steps:76165.
 Qed.
 
 (* The counter cellB(i) strictly increases between t and t'
@@ -176,7 +176,7 @@ lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
 Proof.
-  use counterIncreaseB. smt ~steps:33584.
+  use counterIncreaseB. smt ~steps:50058.
 Qed.
 
 (* SECURITY PROPERTIES *)

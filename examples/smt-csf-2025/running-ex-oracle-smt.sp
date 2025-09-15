@@ -122,7 +122,7 @@ lemma lastupdate_A: forall (i:index, j:index, tau:timestamp),
 Proof.
   intro i j.
   induction.
-  smt ~steps:31257. 
+  smt ~steps:39671. 
 Qed.
 
 

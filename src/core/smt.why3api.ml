@@ -210,7 +210,7 @@ type context = {
    for some reason there were issues when relying only on Why3.Ident.id_fresh. *)
 let id_fresh context name = 
   context.fresh:=!(context.fresh)+1;
-  Why3.Ident.id_fresh (name ^ (string_of_int !(context.fresh)))
+  Why3.Ident.id_fresh (name ^ "_" ^(string_of_int !(context.fresh)))
 
 exception InternalError
 
@@ -702,6 +702,8 @@ let add_macros context =
       | "Classic_cond" ->
         Hashtbl.add context.macros_tbl str (context.macro_cond_symb,mn)
       | _ -> 
+        if (not(TConfig.smt_quantum context.table) && (String.starts_with ~prefix:"Quantum" str)) ||
+           (not(TConfig.smt_classic context.table) && (String.starts_with ~prefix:"Classic" str)) then () else
         begin try
             let params,rec_type,ty = match def with 
               | General d -> 
@@ -1237,10 +1239,44 @@ let add_name_axioms context =
        add_why_axiom context ax (id_fresh context id_ax))
     (List.map (fun x -> ("axiom_distinct", x)) name_inj_axioms)
 
+(* Check if the hint is valid in any system. *)
+let local_stmt_valid_in_any_system (hint : Hint.smt_hint) =
+  match (hint.system.set :> SE.exposed).cnt with
+  | Var v -> 
+    let infos = List.assoc v hint.params.se_vars in
+    infos = []
+  | _ -> false
+
+(* Add the hint to the theory, after a substitution if needed. *)
+let add_hint context system hint =
+  let hint_system = hint.Hint.system.set 
+  and name = hint.Hint.name in 
+  if SE.subset_modulo context.table system hint_system then begin
+    let subst_proj =
+      let (_, s) = 
+        SE.mk_proj_subst
+          ~strict:false ~src:hint_system ~dst:system
+      in fun t -> Term.subst_projs ~project:true s t
+    in let fmla = subst_proj hint.Hint.formula.Equiv.formula
+    and name = hint.Hint.name in 
+    add_why_axiom context (sqterm_to_wfmla context fmla) (id_fresh context name) 
+  end
+  else begin
+    if local_stmt_valid_in_any_system hint then 
+      add_why_axiom 
+        context 
+        (sqterm_to_wfmla context hint.Hint.formula.Equiv.formula) 
+        (id_fresh context name)
+  end
+
 let build_task ~timestamp_style ~macro_axioms env table system
-                evars hypotheses conclusion tm_theory = 
+                evars hypotheses hints conclusion tm_theory = 
+  let system_fset = match SystemExpr.to_fset system with 
+  | exception SystemExpr.(Error (_,Expected_fset)) -> None 
+  | fsys -> Some fsys 
+  in
   let context = 
-    context_init ~timestamp_style tm_theory evars env table system
+    context_init ~timestamp_style tm_theory evars env table system_fset
   in 
   add_actions context; 
   add_var context;
@@ -1248,8 +1284,9 @@ let build_task ~timestamp_style ~macro_axioms env table system
   add_macros context;
   add_names context;
   add_equational_axioms context;
+  List.iter (fun hint -> add_hint context system hint) hints;
   if macro_axioms then add_macro_axioms context;
-  if system<>None then add_timestamp_axioms context;
+  if system_fset<>None then add_timestamp_axioms context;
   add_name_axioms context;
     
 
@@ -1299,7 +1336,7 @@ let unique_id =
 
 let is_valid
     ~timestamp_style ~macro_axioms ~timeout ~steps ~provers
-    sqenv table system evars hypotheses conclusion
+    sqenv table system evars hypotheses hints conclusion
   =
   if disable_smt then
       (Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
@@ -1314,7 +1351,7 @@ let is_valid
       ~timestamp_style
       ~macro_axioms
       sqenv table system
-      evars hypotheses conclusion
+      evars hypotheses hints conclusion
       theory
   in
   begin match Sys.getenv_opt "SMT_VERBOSE" with
@@ -1337,13 +1374,9 @@ let sequent_is_valid
   =
   let env = TraceSequent.env s in
   let table = env.table in
-  let system = match SystemExpr.to_fset env.system.set with 
-    | exception SystemExpr.(Error (_,Expected_fset)) -> None 
-    | fsys -> Some fsys 
-  in
+  let system = env.system.set in
   let evars = Vars.to_vars_list env.vars in
   let hypotheses =
-    Hint.get_smt_db table @
     List.filter_map
       (function
         | _, Hyps.LHyp (Equiv.Local h) -> Some h
@@ -1352,10 +1385,11 @@ let sequent_is_valid
   (* TODO:Concrete : Probably something to do to create a bounded goal. *)
          | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
+  and hints = Hint.get_smt_db table
   in
   let conclusion = LowTraceSequent.conclusion s in
   try is_valid ~timestamp_style ~timeout ~steps ~provers
-    env table system evars hypotheses conclusion
+    env table system evars hypotheses hints conclusion
   with 
     | e -> raise e
 

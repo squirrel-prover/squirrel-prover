@@ -289,7 +289,7 @@ Proof.
   (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
   not involved in another successful login, and this is done automatically 
   relying on counterIncreaseBis and the smt tactic *)
-  use counterIncreaseBis. smt ~prover:CVC5 ~steps:193943. 
+  use counterIncreaseBis. smt ~prover:CVC5 ~steps:409616. 
 Qed.
 
 

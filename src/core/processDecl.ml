@@ -2045,15 +2045,6 @@ let declare_list table decls =
   table, List.flatten subgs
 
 (*------------------------------------------------------------------*)
-(** Check that [lem] applies to an unconstrained system variable [v]. *)
-let local_stmt_valid_in_any_system (lem : Goal.local_statement) =
-  match (lem.system.set :> SE.exposed).cnt with
-  | Var v -> 
-    let infos = List.assoc v lem.params.se_vars in
-    infos = []
-  | _ -> false
-
-(*------------------------------------------------------------------*)
 (** {3 Hints } *)
 
 (*------------------------------------------------------------------*)
@@ -2074,21 +2065,22 @@ let add_hint_rewrite table (s : Symbols.p_path) =
 let add_hint_smt table (s : Symbols.p_path) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
+  let ty_vars = lem.params.ty_vars in
 
-  (* TODO: concrete: only support exact hint rather *)
+  if bound <> None && ty_vars <> [] then 
+    Tactics.hard_failure ~loc:(L.loc (snd s))
+      (Failure "smt polymorphic hints must be exact");
+
   if bound <> None && bound <> Some (Library.Real.mk_zero table) then
     Tactics.hard_failure ~loc:(L.loc (snd s))
       (Failure "smt hints must be asymptotic or exact");
 
-  if not (local_stmt_valid_in_any_system lem) then
-    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
-      (Failure "smt hints must apply to any system");
+  let hint : Hint.smt_hint =
+    { name = lem.name ; formula = lem.formula ;
+      params = lem.params ; system = lem.system }
+  in
+  Hint.add_hint_smt hint table
 
-  if lem.params.se_vars = [] then
-    Tactics.hard_failure ~loc:(Symbols.p_path_loc s)
-      (Failure "smt hints do not support system variables");
-
-  Hint.add_hint_smt lem.Goal.formula.formula table
 
 (*------------------------------------------------------------------*)
 let deduction_hint_of_global_formula

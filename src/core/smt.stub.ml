@@ -5,7 +5,7 @@ type timestamp_style =
 
 let[@warning "-27"] is_valid
   ~timestamp_style ~macro_axioms ~timeout ~steps ~provers
-  env tbl system vars hyps concl
+  env tbl system vars hyps hints concl
 =
   Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
   false

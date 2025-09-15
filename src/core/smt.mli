@@ -18,8 +18,9 @@ val is_valid :
   provers:(string*string) list->
   Env.t -> 
   Symbols.table ->
-  SystemExpr.fset option ->
+  < > SystemExprSyntax.expr ->
   Vars.var list ->
   Term.term list ->
+  Hint.smt_hint list ->
   Term.term ->
   bool

@@ -42,10 +42,23 @@ val pp_deduce_hint     : deduce_hint formatter
 val pp_deduce_hint_dbg : deduce_hint formatter
 
 (*------------------------------------------------------------------*)
+(** {3 Smt hints } *)
+
+(** This is the same as [Goal.local_statement] but referring to it
+    here would create a dependency cycle. *)
+type smt_hint = {
+  name    : string;
+  params  : Params.t;
+  system  : SE.context;
+  formula : Equiv.bform;
+}
+
+
+(*------------------------------------------------------------------*)
 (** {3 Adding and retrieving hints } *)
 
 val get_rewrite_db : Symbols.table -> rewrite_db
-val get_smt_db     : Symbols.table -> Term.term list
+val get_smt_db     : Symbols.table -> smt_hint list
 val get_deduce_db  : Symbols.table -> deduce_db
 
 (*------------------------------------------------------------------*)
@@ -59,6 +72,6 @@ type p_hint =
 val add_hint_rewrite : 
   Symbols.p_path -> Params.t -> SE.t -> Term.term -> Symbols.table -> Symbols.table
 
-val add_hint_smt : Term.term -> Symbols.table -> Symbols.table
+val add_hint_smt : smt_hint -> Symbols.table -> Symbols.table
 
 val add_hint_deduce : deduce_hint -> Symbols.table -> Symbols.table

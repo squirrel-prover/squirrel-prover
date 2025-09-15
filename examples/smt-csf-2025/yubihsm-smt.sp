@@ -299,7 +299,7 @@ lemma noreplayInv (j, j', pid:index):
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
-  use counterIncreaseBis; smt ~provers:CVC5_stringscounterexamples ~steps:755250. 
+  use counterIncreaseBis; smt ~provers:Z3 ~steps:274758. 
 Qed.
 
 lemma noreplay (j, j', pid:index):
@@ -655,5 +655,5 @@ Proof.
 
   intro j' Hap' Hexec'.
   use counterIncreaseBis as HH. 
-  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:CVC5_stringscounterexamples ~steps:206103.
+  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:Z3 ~steps:603311.
 Qed.

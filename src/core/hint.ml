@@ -110,13 +110,21 @@ let[@warning "-32"] pp_deduce_db : deduce_db formatter_p =
   in
   Fmt.pf fmt "@[<v>%a@]" (Fmt.list pp_el) db
      
+(*------------------------------------------------------------------*)
+(** {3 Smt hints } *)
 
+type smt_hint = {
+  name    : string;
+  params  : Params.t;
+  system  : SE.context;
+  formula : Equiv.bform;
+}
 (*------------------------------------------------------------------*)
 (** {3 Hint database } *)
 
 type hint_db = { 
   db_rewrite : rewrite_db;
-  db_smt     : Term.term list;
+  db_smt     : smt_hint list;
   db_deduce  : deduce_db;
 }
 
@@ -193,9 +201,9 @@ let add_hint_rewrite (s : Symbols.p_path) pat_params system form table : Symbols
     { db with db_rewrite = add_rewrite_rule head h db.db_rewrite; }
 
 (*------------------------------------------------------------------*)
-let add_hint_smt formula table : Symbols.table =
+let add_hint_smt (h : smt_hint) table : Symbols.table =
   let db = hint_db table in
-  set_hint_db table { db with db_smt = formula :: db.db_smt }
+  set_hint_db table { db with db_smt = h :: db.db_smt }
 
 (*------------------------------------------------------------------*)
 let add_hint_deduce (h : deduce_hint) table : Symbols.table =

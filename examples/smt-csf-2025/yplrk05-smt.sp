@@ -101,7 +101,7 @@ lemma noUpdateTag (t:timestamp, i,j:index):
 Proof.
   induction t.
   use sequentiality.
-  smt ~steps:37666.
+  smt ~steps:43240.
 Qed.
 
 (* SECURITY PROPERTIES *)
