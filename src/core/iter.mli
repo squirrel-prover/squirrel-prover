@@ -271,8 +271,14 @@ end
 
     - `NoHonestRand` means any computation that does not depends on
        the protocol randomness (we do not check for system-independence
-       here). *)
-type allowed = NoHonestRand | PTimeSI | PTimeNoSI
+       here).
+
+    - Any does not perform any check on the possible instantiations of
+      variables, hence it MUST NOT be used in the context of a
+      cryptographic reduction.
+
+*)
+type allowed = Any | NoHonestRand | PTimeSI | PTimeNoSI
 
 val update_context : 
   extra_vars:Vars.vars -> SE.context ->

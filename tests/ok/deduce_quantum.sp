@@ -10,22 +10,25 @@ set postQuantumEquivs=true.
 axiom foo @system:any ['a] (x : 'a) : x = (x,1)#1.
 
 global lemma _ @system:Q (x : quantum_message) : 
-  equiv(x,x).
+  [false].
 Proof. 
+  ghave _ : equiv(x,x).
   deduce.                       (* `deduce` should leave `1` unchanged *)
   rewrite foo in 1. (* check that item `1` still exists *)
 Abort.
 
 global lemma _ @system:Q (x : quantum_message) : 
-  equiv(x) -> equiv(x,x).
+ [false].
 Proof.
+  ghave _ : equiv(x) -> equiv(x,x).
   intro E. 
   checkfail apply E exn ApplyMatchFailure.
 Abort.
 
 global lemma _ @system:Q (x : quantum_message) : 
-  equiv(x) -> equiv(x,x).
+ [false].
 Proof.
+  ghave _ : equiv(x) -> equiv(x,x).
   intro E. 
   checkfail deduce 1 exn ApplyMatchFailure.
 Abort.
@@ -41,16 +44,18 @@ Proof.
 Abort.
 
 global lemma _ @system:Q (x : quantum_message) : 
-  equiv(x, fun (_ : index) => x).
+ [false].
 Proof. 
+  ghave _ : equiv(x, fun (_ : index) => x).
   checkfail deduce 1 exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)
 (* test the `assumption` tactic *)
 global lemma _ @system:Q (x : quantum_message) :
-  equiv(x) -> equiv(x,x).
-Proof.
+  [false].
+Proof. 
+  ghave _ : equiv(x) -> equiv(x,x).
   intro E. 
   checkfail assumption E exn NotHypothesis.
 Abort.

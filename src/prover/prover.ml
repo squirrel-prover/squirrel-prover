@@ -5,6 +5,8 @@ module SE = SystemExpr
 module L  = Location
 module Sv = Vars.Sv
 
+module ES = LowEquivSequent
+  
 (*------------------ Prover ----------------------------------*)
 (** {2 Prover state}
     The term "goal" refers to two things below:
@@ -219,12 +221,46 @@ let first_goal (ps:state) : ProverLib.pending_proof =
 let do_add_goal (st:state) (g:Goal.Parsed.t L.located) : state =
   let new_ps = add_new_goal st g in
   (* for printing new goal ↓ *)
+  
+  (* When declaring a post_quantum goal, we check if it is well-formed. *)
+    
   let goal,name = 
     match first_goal new_ps with
     | ProverLib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
     | _ -> assert false (* should be only ↑ *)
   in
   let ppe = default_ppe ~table:st.table () in
+
+  if TConfig.post_quantum_equivs st.table then
+    (* if equivalences are meant to be post-quantum sound *)
+    begin
+      match goal with
+      | Local _ -> ()
+      | Global e ->
+        (* we collect all the equivalences appearing in the goal.*)
+        let equivs = ES.get_all_equiv e in
+        
+        (* we initialize the env and system we will work in. *)
+        let env = ES.env e in
+        let in_system = 
+          { env.system with set = (Utils.oget env.system.pair :> SE.t) ; } 
+        in        
+
+        List.iter
+          (fun ((equiv : Equiv.equiv), vars) ->
+             (* For each equivalence and corresponding bound variables. *)
+             let proof_context =
+               (* we set up the proof context by adding the additional bound variables. *)
+               let env = Env.update ~system:in_system ~vars:(Vars.add_vars vars (env.vars)) env in          
+               ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty
+             in             
+             if not @@ PostQuantum.check_quantum_simulable proof_context equiv.terms then
+               (* We raise an error if any of the equivalence is not post-quantum sound. *)
+               ProverLib.error (L.loc g) 
+                 "cannot add new goal: it is not post quantum sound";
+          )
+          equivs
+    end;
   Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name (Goal.pp_init ppe) goal;
   (* return toplevel state with new prover_state *)
   new_ps

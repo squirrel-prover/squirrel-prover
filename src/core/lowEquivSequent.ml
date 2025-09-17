@@ -297,6 +297,25 @@ let get_frame proj j = match j.conclusion with
   (*TODO:Concrete : Probably something to do to create a bounded goal*)
   | _ -> None
 
+
+let get_all_equiv j =
+  (* [get_equivs acc_forms vars phi] recursively explores [phi],
+     returning any equivalence atoms it encounters concatened to the
+     current [acc_forms] accumulated formulas. [vars] are the current
+     bound vars, collected when going over a quantifier. *)
+  let rec get_equivs acc_forms vars (phi : conc_form) =
+    match phi with
+    | Equiv.Atom (Equiv.Equiv e) when e.bound = None -> (e, vars)::acc_forms
+    | Quant (_,vs,f) -> get_equivs acc_forms (vs @ vars) f
+    | Let (v,_,f) -> get_equivs acc_forms ((v, Vars.Tag.make Local)::vars) f
+    | Equiv.Atom _ -> []
+    | Impl (f1,f2) | And (f1,f2) | Or (f1,f2) ->
+      get_equivs acc_forms vars f1
+      @
+      get_equivs acc_forms vars f2
+  in
+  get_equivs [] [] j.conclusion
+
 (*------------------------------------------------------------------*)
 let subst subst s =
   { s with conclusion = Equiv.subst subst s.conclusion;
@@ -401,7 +420,7 @@ let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.query_happens ~precise s a
 
-
+(* DEPRECATED *)
 let check_pq_sound_sequent s =
   match conclusion s with
   | Atom (Equiv.Equiv e) ->
@@ -413,6 +432,15 @@ let check_pq_sound_sequent s =
       else
         s
   | _ -> s
+
+let check_quantum_simulable_sequent (s : sequent) =
+  let env = env s in  
+  let bi_system = 
+      { env.system with set = (Utils.oget env.system.pair :> SE.t) ; } 
+  in            
+  let context = proof_context ~in_system:bi_system s in    
+  PostQuantum.check_quantum_simulable context (conclusion_as_equiv s).terms
+
 
 (*------------------------------------------------------------------*)
 let set_equiv_conclusion e j =

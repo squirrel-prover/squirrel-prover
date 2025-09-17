@@ -84,3 +84,10 @@ val pair_proof_context : sequent -> ProofContext.t
 
 (** fails if the goal is not an equivalence *)
 val check_conclusion_is_equiv : sequent -> unit
+
+(** Returns the list of equivalence atoms appearing in the goal, along
+    with the bound variables on the path. *)  
+val get_all_equiv : sequent ->  (Equiv.equiv * Vars.tagged_vars) list
+
+(** Checks that the conclusion of the sequent is quantum simulable. *)
+val check_quantum_simulable_sequent : sequent -> bool

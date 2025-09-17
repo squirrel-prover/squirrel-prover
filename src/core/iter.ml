@@ -814,7 +814,7 @@ end
 (** {2 Macros} *)
 
 (** see `.mli` *)
-type allowed = NoHonestRand | PTimeSI | PTimeNoSI
+type allowed = Any | NoHonestRand | PTimeSI | PTimeNoSI
 
 (*------------------------------------------------------------------*)
 (** occurrences of a macro [n(i,...,j)] *)
@@ -906,12 +906,14 @@ let get_macro_occs
              (HighTerm.is_constant env t ||
               HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t) -> []
 
+    | Term.Var _ when mode = Any -> []
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s: @[%a@]" 
           (match mode with
              NoHonestRand -> "variable that may depend on honest randomness"
-           | PTimeSI | PTimeNoSI -> "non-ptime variable")
+           | PTimeSI | PTimeNoSI -> "non-ptime variable"
+           | Any -> assert false)
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
