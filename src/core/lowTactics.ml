@@ -614,7 +614,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** exported *)
   let expand_all_l targets s : S.sequent list =
     let targets, _all = make_in_targets targets s in
-    [expand_all targets s]
+    let exn = Tactics.Tactic_hard_failure (None, TacTimeout) in
+    [ Utils.timeout exn
+      (TConfig.solver_timeout (S.table s))
+      (expand_all targets) s ]
 
   (** parse a expand argument *)
   let p_rw_expand_arg (s : S.t) (arg : Typing.term) : expand_kind =

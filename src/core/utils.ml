@@ -725,32 +725,24 @@ let pp_hashtbl pp_key_value ppf tbl =
 let fst3 (a, _, _) = a
 
 (*------------------------------------------------------------------*)
- let timeout exn timeout f x =
+let timeout exn timeout f x =
   assert (timeout > 0);
 
   let exception Timeout in
-  (* Set new handler, and store old one. *)
-  let old_handler = Sys.signal Sys.sigalrm
-    (Sys.Signal_handle (fun _ -> raise Timeout)) in
 
-  let finish () =
-    (* Cancels the alarm:
-     * "If seconds is zero, any pending alarm is canceled."
-     * see: man 2 alarm *)
-    ignore (Unix.alarm 0);
-    (* Restores previous handler. *)
-    ignore (Sys.signal Sys.sigalrm old_handler) in
+  let max = Unix.gettimeofday () +. float timeout in
 
-  try
-    (* Raises [Sys.sigalrm] after [timeout] seconds. *)
-    ignore (Unix.alarm timeout);
+  let alarm =
+    Gc.create_alarm (fun () ->
+      if Unix.gettimeofday () > max then raise Timeout)
+  in
 
-    let res = f x in
-    finish ();
-    res
-  with
-  | Timeout -> finish (); raise exn
-  | e     -> finish (); raise e
+  let finish () = Gc.delete_alarm alarm in
+
+  match f x with
+  | v                 -> finish (); v
+  | exception Timeout -> finish (); raise exn
+  | exception e       -> finish (); raise e
 
 (* -------------------------------------------------------------------- *)
 let fst_map f (x,_) = f x
