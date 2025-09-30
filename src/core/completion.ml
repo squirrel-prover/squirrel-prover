@@ -1405,7 +1405,7 @@ let init_erules table =
 
 let state_id = ref 0
 
-let complete_cterms table (l : (cterm * cterm) list) : state =
+let complete_cterms ct_memo table (l : (cterm * cterm) list) : state =
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
       and  eqs', xeqs', b = flatten v in
@@ -1422,7 +1422,7 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
     sat_xor_rules = None;
     e_rules       = init_erules table;
     completed     = false;
-    ct_memo       = mk_ct_memo table; } 
+    ct_memo; } 
   in
 
   complete_state state
@@ -1469,7 +1469,7 @@ let complete table (l : Term.esubst list) : state =
       []
       l
   in
-  complete_cterms table l 
+  complete_cterms ct_memo table l 
 
 (** With memoisation *)
 let complete : Symbols.table -> Term.esubst list -> state =
@@ -1649,7 +1649,8 @@ let () =
        let v = ccst (Cst.Var ((snd (
            Vars.make `Approx Vars.empty_env (Type.tmessage) "v" ()))))
        in
-       let state0 = complete_cterms table [(a,b); (b,c);
+       let ct_memo = mk_ct_memo table in
+       let state0 = complete_cterms ct_memo table [(a,b); (b,c);
                                            (b,d); (e,e'); 
                                            (v,v)] in
        Alcotest.(check bool) "simple"
@@ -1667,7 +1668,7 @@ let () =
        Alcotest.(check bool) "simple"
          (check_disequality_cterm state0 [] (f a a, h a a)) true;
 
-       let state1 = complete_cterms table [(a,e'); 
+       let state1 = complete_cterms ct_memo table [(a,e'); 
                                            (a ++ b, c); 
                                            (e' ++ d, e)] in
        Alcotest.(check bool) "xor"
