@@ -243,7 +243,7 @@ let mk_var : unit -> cterm =
 (*------------------------------------------------------------------*)
 (** Stateful memoization for conversion of [Term.term] to [cterm] *)
 type ct_memo = { 
-  cstate       : Reduction.state ;  (** State to check for convertability  *)
+  cstate       : Reduction.state ;  (** State to check for convertibility  *)
   mutable memo : cterm Mt.t;        (** Memoized results *)
 }
 
@@ -1486,7 +1486,7 @@ let complete
     table l 
   : state 
   =
-  Utils.timeout exn (TConfig.solver_timeout (table)) (complete table) l 
+  Utils.timeout exn (TConfig.solver_timeout table) (complete table) l
         
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"

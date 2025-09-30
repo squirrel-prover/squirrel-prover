@@ -11,7 +11,19 @@ let rev_subst subst =
 (*------------------------------------------------------------------*)
 (** {2 Core reduction functions} *)
 
-module Core (* : ReductionCore.S *) = struct
+(** reduction state *)
+type reduction_state = {
+  table     : Symbols.table;
+  params    : Params.t;
+  vars      : Vars.env;         (* Used to get variable tags. *)
+  system    : SE.context;
+  hyps      : THyps.hyps;
+  red_param : red_param;
+  expand_context : Macros.expand_context;
+    (** Expansion mode for macros. See [Macros.expand_context]. *)
+}
+
+module Core : (ReductionCore.Sig with type state = reduction_state) = struct
 
   (*------------------------------------------------------------------*)
   let parse_simpl_args
@@ -55,18 +67,7 @@ module Core (* : ReductionCore.S *) = struct
 
   (*------------------------------------------------------------------*)
   (** reduction state *)
-  type state = {
-    table     : Symbols.table;
-    params    : Params.t;
-    vars      : Vars.env;         (* used to get variable tags *)
-    system    : SE.context;
-    hyps      : THyps.hyps;
-
-    red_param : red_param;
-
-    expand_context : Macros.expand_context;
-    (** expantion mode for macros. See [Macros.expand_context]. *)
-  }
+  type state = reduction_state
 
   (*------------------------------------------------------------------*)
   (** Make a reduction state directly *)

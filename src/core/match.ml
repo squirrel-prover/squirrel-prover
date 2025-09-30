@@ -2419,9 +2419,7 @@ let known_set_check_unify
     ) hyps
     
 (*------------------------------------------------------------------*)
-(** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology 
-    w.r.t. to the theory of trace constraints
-    Rely on the module [Constr]. *)
+(** Check that [hyps] implies [cond] using [Constr]. *)
 let known_set_check_impl_sat
     (table : Symbols.table) ~(hyps : Term.term list) (cond : Term.term)
   =
