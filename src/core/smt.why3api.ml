@@ -99,8 +99,6 @@ let create_call limit_time steps prover config_prover task :
       prover.Why3.Whyconf.prover_name Why3.Exn_printer.exn_printer e;
       None
 
-(* TODO : bugged when calling several provers in parallel. Some results 
-   are reused in later calls. *)
 let run_all_async ~timeout ~steps ~provers task =
   Why3.Prove_client.set_max_running_provers 4;
   let timer = start_timer () in
@@ -158,6 +156,17 @@ let run_all_async ~timeout ~steps ~provers task =
   (* Interrupt remaining calls. *)
   Why3.Whyconf.Mprover.iter
     (fun _ (_,c) -> Why3.Call_provers.interrupt_call ~config:main c) calls;
+  while !n>0 do
+    if smt_debug then
+      Format.eprintf "Waiting for %d interrupted calls...@." !n;
+    let results = Why3.Call_provers.get_new_results ~blocking:true in
+    if smt_debug then
+      Format.printf
+        "%d result(s) obtained after %.2fs.@."
+        (List.length results)
+        (timer ());
+    n := !n - List.length results
+  done;
   !res
   
 (** Context for SMT translation, providing information on:
