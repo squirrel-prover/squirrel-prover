@@ -673,14 +673,7 @@ let add_functions context =
        Hashtbl.add context.functions_tbl
          (path_to_string fname)
          (Why3.Theory.ns_find_ls context.tm_export [symb]))
-    [(Symbols.fs_pair,"pair");
-     (Symbols.fs_fst,"fst");
-     (Symbols.fs_snd,"snd");
-     (* TODO: quantum: add quantum adversarial symbol. *) 
-     (Symbols.fs_att,"att");
-     (Symbols.fs_of_bool,"of_bool");
-     (Symbols.fs_empty,"empty");
-     (Symbols.fs_xor,"xor");
+    [(Symbols.fs_xor,"xor");
      (Symbols.fs_pred,"pred");
      (Term.f_happens,"happens")
     ];
@@ -1391,7 +1384,6 @@ let sequent_is_valid
         | _, Hyps.LHyp (Equiv.Local h) -> Some h
         | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = None})))
           -> Some f
-  (* TODO:Concrete : Probably something to do to create a bounded goal. *)
          | _ -> None)
       (LowTraceSequent.Hyps.to_list s)
   and hints = Hint.get_smt_db table

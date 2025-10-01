@@ -128,5 +128,5 @@ lemma noReplay (i,i',j,j':index) :
    => (i<>i' || j<>j')  
    => fst(input@RA(i,j)) <> fst(input@RA(i',j')).
 Proof. 
- use authA. use ctrIncA. smt ~prover:Z3 ~steps:3798103.
+ use authA. use ctrIncA. smt ~prover:Z3 ~steps:5833000.
 Qed.

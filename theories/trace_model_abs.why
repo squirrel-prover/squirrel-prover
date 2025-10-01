@@ -51,12 +51,6 @@ theory Trace_model_abs
   axiom xor_comm : forall x y : message. xor x y = xor y x
   axiom xor_nil : forall x y : message. xor (xor x x) y = y
   predicate msg_is_true message
-  constant empty : message
-  function pair message message : message 
-  function fst message : message 
-  function snd message : message 
-  function att message : message 
-  function of_bool bool : message
  
   (*Definition and specificatoin of macros*)
 

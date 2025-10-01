@@ -655,5 +655,5 @@ Proof.
 
   intro j' Hap' Hexec'.
   use counterIncreaseBis as HH. 
-  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:Z3 ~steps:603311.
+  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:Z3 ~steps:629900.
 Qed.
