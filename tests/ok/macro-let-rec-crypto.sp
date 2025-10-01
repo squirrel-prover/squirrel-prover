@@ -97,7 +97,7 @@ intro i Meq.
      equiv(diff( h (<stA (pred_i (i)),att (my_frame (pred (A(i))))>, k) <> sinit
          ,true)).
      
-     by crypto PIR (goal:sinit) (k:k).
+     by crypto ~no_memoization PIR (goal:sinit) (k:k).
    
  by  rewrite equiv CollOrig.
    }
@@ -113,7 +113,7 @@ intro i Meq.
      equiv(diff(  h (<sinit,att (my_frame (pred (A(null_i))))>, k) <> sinit
          ,true)).
      
-     crypto PIR (goal:sinit) (k:k).
+     crypto ~no_memoization PIR (goal:sinit) (k:k).
      
   by rewrite equiv CollOrig.
    }

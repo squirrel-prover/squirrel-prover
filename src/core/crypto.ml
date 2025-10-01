@@ -223,11 +223,13 @@ let _pp_game ppe fmt (g : game) : unit =
 type param = { 
   subgoal_on_failure : bool; 
   time_sensitive     : bool;
+  memoize            : bool;
 }
 
 let default_param = { 
   subgoal_on_failure = true; 
   time_sensitive     = false;
+  memoize            = true;
 }
 
 (*------------------------------------------------------------------*)
@@ -2768,11 +2770,11 @@ let query_add_vars_to_env (query : query) (vars : Vars.vars) : query =
 
 
 (*------------------------------------------------------------------------*)
-(* Check that [l1] and [l2] represents the same memoization hints. 
-
-   We exploit the fact that our proof-search will return both list
-   of memoization hints in the same order, and do a point-wise
-   equality test. *)
+(** Check that [l1] and [l2] represents the same memoization hints. 
+    
+    We exploit the fact that our proof-search will return both list
+    of memoization hints in the same order, and do a point-wise
+    equality test. *)
 let check_memoization_hints
     (pc : ProofContext.t) (l1 : TSet.t list) (l2 : TSet.t list) : bool
   =
@@ -2884,12 +2886,14 @@ let rec bideduce_term_strict
     in
 
     let result = 
-      if List.for_all (HighType.is_finite query.env.table -| Vars.ty) es
-      && List.for_all (HighType.is_fixed  query.env.table -| Vars.ty) es
-      && result0.extra_outputs <> []
+      if query.param.memoize &&
+         List.for_all (HighType.is_finite query.env.table -| Vars.ty) es &&
+         List.for_all (HighType.is_fixed  query.env.table -| Vars.ty) es &&
+         result0.extra_outputs <> []
       then begin
-        (* if the type is finite+fixed, start a second pass, using the
-           extra outputs computed during the first pass *)
+        (* if the type is [finite+fixed] and simulator memoization is
+           enabled, start a second pass, using the extra outputs
+           computed during the first pass *)
         let extra_outputs = result0.extra_outputs in
         let new_vars, new_subst = Term.refresh_vars es in 
         let extra_inputs =
@@ -3167,6 +3171,7 @@ and bideduce_oracle
 (*------------------------------------------------------------------*)
 (** solves the bi-deduction sub-goal [state ▷ outputs] *)
 and bideduce (query : query) (outputs : CondTerm.t list) : result option =
+  assert (query.extra_inputs = [] || query.param.memoize);
   match outputs with
   | [] -> Some (empty_result query.initial_mem)
   | term :: outputs ->
@@ -4291,17 +4296,20 @@ let prove
       ) source.extra_outputs
   in
 
+  (* add extra inputs if memoization is enabled *)
   let add_extra_inputs ~(kind:[`Recursive | `Direct]) (target:goal) : goal =
-    let extra_inputs = 
-      List.concat_map
-        (fun source -> get_extra_inputs ~kind ~target ~source) 
-        next_bided_subgs
-    in
-    { target with extra_inputs; }
+    if param.memoize then
+      let extra_inputs = 
+        List.concat_map
+          (fun source -> get_extra_inputs ~kind ~target ~source) 
+          next_bided_subgs
+      in
+      { target with extra_inputs; }
+    else target
   in
 
-  let rec_bided_subgs = 
-    List.map (add_extra_inputs ~kind:`Recursive) next_bided_subgs 
+  let rec_bided_subgs =
+    List.map (add_extra_inputs ~kind:`Recursive) next_bided_subgs
   in
   let direct_bided_subgs = 
     add_extra_inputs ~kind:`Direct direct_bided_subgs 
@@ -4317,13 +4325,12 @@ let prove
   in
 
   (*------------------------------------------------------------------*)
-  if param.time_sensitive then begin
+  if param.memoize then begin
     (* [goal] is from the first pass, while [goal_final] is from the final pass.
 
-       In time-sensitive mode, both passes should have the same
-       memoization hints, to ensure that we could soundly add the
-       memoization hint of [goal] as memoization inputs in the second
-       pass. *)
+       When memoizing, both passes should have the same memoization
+       hints, to ensure that we could soundly add the memoization hint
+       of [goal] as memoization inputs in the second pass. *)
     let inductive_memoization_hints =
       assert (List.length next_bided_subgs = List.length final_bided_subgs);
       List.for_all2 (fun goal goal_final ->

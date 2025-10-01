@@ -65,6 +65,9 @@ type param = {
 
   time_sensitive : bool;
   (** Do we infer a time-sensitive memory invariant or not. *)
+
+  memoize : bool;
+  (** Do we infer a memoizing simulator or not. *)
 }
 
 (** Default parameters for the `crypto` tactic. *)
