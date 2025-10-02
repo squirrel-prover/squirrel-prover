@@ -1,3 +1,19 @@
+### Memoizing simulators in `crypto`
+  [commit: `0909e688`, **breaking change**]
+
+The `crypto` tactic synthesizes memoizing simulators by default. To do
+that, it heuristically guesses a memoization invariant and then check
+that this invariant is inductive. In the rare cases where the
+memoization invariant is not inductive, it must abort the
+proof. Previous version of `crypto` did not abort the proof in all the
+necessary situations (this has been fixed by this commit).
+
+Memoization can be turned-off during simulator synthesis (e.g. to
+avoid situations where the memoizing heuristics fail) as follows:
+```
+  crypto ~no_memoization Game.
+```
+
 ### `crypto` tactic with time-sensitive invariants
   [commit: `b79f6b94`]
 
