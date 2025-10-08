@@ -25,6 +25,7 @@ type state_macro_decl = {
   args      : Typing.bnds;
   out_ty    : Typing.ty option;
   init_body : Typing.term;
+  m_sty     : SecrecyTyping.stype_i;
 }
 
 (*------------------------------------------------------------------*)
@@ -39,6 +40,7 @@ type mutex_decl = {
 type name_decl = {
   n_name : lsymb ;
   n_ty   : Typing.ty list;
+  n_sty  : SecrecyTyping.stype_i;
 }
 
 (*------------------------------------------------------------------*)
@@ -180,7 +182,7 @@ type declaration_i =
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
   | Decl_action    of action_decl
-  | Decl_name      of lsymb * Typing.ty
+  | Decl_name      of lsymb * Typing.ty * SecrecyTyping.stype_i
   | Decl_state     of state_macro_decl
   | Decl_mutex     of mutex_decl
   | Decl_funs      of op_kind * op_in_system * op_tyargs * fun_decl list

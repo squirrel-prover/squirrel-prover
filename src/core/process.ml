@@ -562,7 +562,7 @@ let parse
         let nb_args = List.length l in
         begin
           match Symbols.get_macro_data s table with
-          | Symbols.State (arity,ty',_) ->
+          | Symbols.State (arity,ty',_,_) ->
             begin match !target_ty with
             | None -> target_ty := Some ty'
             | Some ty ->

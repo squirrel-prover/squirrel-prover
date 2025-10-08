@@ -113,6 +113,12 @@ let pp fmt symb = Fmt.string fmt symb.name
 
 module Msymb = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
+(** Security types. Stored in the data for names and states.
+    One constructor is defined here to reprensent missing type.
+    This type is extended in secrecyTyping.ml *)
+type stype = ..
+type stype += Wrong
+
 (*------------------------------------------------------------------*)
 (** Phantom type to get some type safety outside of the [Symbols] module *)
 
@@ -1182,7 +1188,7 @@ type state_macro_def = ..
 
 type macro_data =
   | General of general_macro_def
-  | State   of int * Type.ty * state_macro_def
+  | State   of int * Type.ty * stype * state_macro_def
   | Global  of int * Type.ty * global_macro_def
 
 type data += Macro of macro_data
@@ -1202,6 +1208,7 @@ let get_macro_data (ms : macro) (table : table) : macro_data =
 
 type name_data = {
   n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
+  n_sty   : stype;
 }
 
 type data += Name of name_data

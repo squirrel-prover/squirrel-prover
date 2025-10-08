@@ -300,6 +300,25 @@ class DeclObject(NotationObject):
         m = re.match(r"[a-zA-Z0-9_ ]+", signature)
         return m.group(0).strip() if m else None
 
+
+class DeclVariantObject(DeclObject):
+    """A variant of a declaration.
+
+    Example::
+
+       .. decl:: name @name_id
+               declares a name.
+       .. declv:: name @name_id : @type
+               optionally specify a type
+    """
+    index_suffix = "(declaration variant)"
+    annotation = "Declaration Variant"
+
+    def _name_from_signature(self, signature):
+        return None
+
+    
+    
 class VernacVariantObject(VernacObject):
     """A variant of a Coq command.
 
@@ -1216,6 +1235,7 @@ class SquirrelDomain(Domain):
     object_types = {
         # ObjType (= directive type) → (Local name, *xref-roles)
         'decl': ObjType('decl', 'decl'),
+        'declv': ObjType('declv', 'decl'),
         'cmd': ObjType('cmd', 'cmd'),
         'cmdv': ObjType('cmdv', 'cmd'),
         'tacn': ObjType('tacn', 'tacn'),
@@ -1238,6 +1258,7 @@ class SquirrelDomain(Domain):
         # there's one directive per object type, but some object types map to
         # the same role.
         'decl': DeclObject,
+        'declv': DeclVariantObject,
         'cmd': VernacObject,
         'cmdv': VernacVariantObject,
         'tacn': TacticObject,

@@ -3762,7 +3762,7 @@ let strengthen
           begin
             let ty, indices =
               match data with
-              | Symbols.State (i, ty,_) ->
+              | Symbols.State (i, ty, _, _) ->
                 ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
               | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
               | _ -> assert false

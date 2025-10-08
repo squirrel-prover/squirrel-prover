@@ -190,6 +190,12 @@ val path : npath -> 'a t -> 'a path
 type data = ..
 type data += Empty
 
+(** Security types. Stored in the data for names and states.
+    One constructor is defined here to reprensent missing type.
+    This type is extended in secrecyTyping.ml *)
+type stype = ..
+type stype += Wrong
+
 (*------------------------------------------------------------------*)
 (** A symbol table mapping symbol paths to their definition (=
     [status] + [data]). *)
@@ -462,7 +468,7 @@ type state_macro_def = ..
 type macro_data =
   | General of general_macro_def
   (** General macro definition. *)
-  | State  of int * Type.ty * state_macro_def
+  | State  of int * Type.ty * stype * state_macro_def
   (** Stateful cells. *)
   | Global of int * Type.ty * global_macro_def
   (** Global macros are used to encapsulate let-definitions. *)
@@ -480,7 +486,8 @@ val get_macro_data : macro -> table -> macro_data
 (** {3 Name data} *)
 
 type name_data = {
-  n_fty : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
+  n_fty : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *) 
+  n_sty : stype;
 }
 
 type data += Name of name_data

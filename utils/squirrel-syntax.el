@@ -187,6 +187,7 @@
   "auto"
   "smt"
   "refl"
+  "typing"
   "hint"
 ))
 

@@ -341,6 +341,7 @@ let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
       Type.univar (Infer.mk_ty_univar ienv)
 
 (*------------------------------------------------------------------*)
+
 (** {2 Conversion contexts and states} *)
 
 (** Conversion contexts.
@@ -1435,11 +1436,14 @@ let declare_signature table
   let check_fty = mk_ftype_tuple [] [m_ty; sig_ty; pk_ty] (Some Type.tboolean) in
   let pk_fty    = mk_ftype_tuple [] [sk_ty              ] pk_ty                in
 
-  let sign_data = mk_abstract_op sig_fty Sign in
-  let table,sign = Operator.declare ~approx:false table sign ~data:sign_data in
-
   let pk_data = mk_abstract_op pk_fty PublicKey in
   let table,pk = Operator.declare ~approx:false table pk ~data:pk_data in
+
+  let sign_data =
+    mk_abstract_op sig_fty Sign
+      ~associated_functions:[Operator.of_string (Symbols.scope table) (L.unloc checksign); pk]
+  in
+  let table,sign = Operator.declare ~approx:false table sign ~data:sign_data in
 
   let check_data =
     mk_abstract_op check_fty CheckSign ~associated_functions:[sign; pk]
@@ -1834,7 +1838,6 @@ let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
   match p with
   | Local  p -> Local (fst (convert ~ty:Type.tboolean cenv p))
   | Global p -> Global (convert_global_formula cenv p)
-
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)

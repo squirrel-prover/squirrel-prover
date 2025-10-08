@@ -56,8 +56,8 @@ PROVER_TESTS = $(wildcard tests/ok/*.sp)
 PROVER_EXAMPLES =\
   $(wildcard examples/*.sp)                     \
   $(wildcard examples/movep/*.sp)  	            \
-  $(wildcard examples/nancy2022/*.sp)            \
-  $(wildcard examples/nancy2022/solutions/*.sp)  \
+  $(wildcard examples/nancy2022/*.sp)           \
+  $(wildcard examples/nancy2022/solutions/*.sp) \
   $(wildcard examples/ejcp2025/*.sp)            \
   $(wildcard examples/ejcp2025/solutions/*.sp)  \
   $(wildcard examples/basic-tutorial/*.sp)      \
@@ -65,7 +65,9 @@ PROVER_EXAMPLES =\
   $(wildcard examples/postQuantumKE/*.sp)       \
   $(wildcard examples/ho/authdh.sp)             \
   $(wildcard examples/ho/hybrid.sp)             \
-  $(wildcard examples/crypto/*.sp)				
+  $(wildcard examples/crypto/*.sp)              \
+  $(wildcard examples/typing/ok/*.sp)              \
+  $(wildcard examples/typing/ko/*.sp)				
 
 # Check if why3 is installed before adding the smt case studies
 

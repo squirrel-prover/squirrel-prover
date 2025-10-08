@@ -355,7 +355,7 @@ let indcca_param
     let n_fty = Type.mk_ftype [] [] cty in
 
     (* adding X to the table *)
-    let xcdef = Symbols.Name {n_fty} in
+    let xcdef = Symbols.Name { n_fty ; n_sty = Symbols.Wrong } in
     let s = L.mk_loc L._dummy "X" in
     let table, xcs =
       Symbols.Name.declare ~approx:true table s ~data:xcdef

@@ -43,6 +43,7 @@
 %token MUTABLE MUTEX SYSTEM LIKE SET
 %token LEMMA THEOREM
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
+%token MSG HIGH LOW SBOOL CST SK AK SSK RAND
 %token EXISTS FORALL QUANTIF EQUIV DARROW DEQUIVARROW AXIOM
 %token UEXISTS UFORALL
 %token LOCAL GLOBAL
@@ -606,6 +607,38 @@ ty:
 | ty=loc(ty_i) { ty }
 
 (*------------------------------------------------------------------*)
+/* security types */
+
+message_ty:
+| MSG { SecrecyTyping.Msg }
+| HIGH { SecrecyTyping.High }
+| LOW { SecrecyTyping.Low }
+| SBOOL { SecrecyTyping.Bool }
+| CST p=path { SecrecyTyping.Cst p }
+| mty1=message_ty PLUS mty2=message_ty { SecrecyTyping.Sum(mty1,mty2) }
+| mty1=message_ty STAR mty2=message_ty { SecrecyTyping.Prod(mty1,mty2) }
+| LPAREN mty=message_ty RPAREN { mty }
+
+key_ty:
+| SK LBRACKET enc=path COMMA mty=message_ty RBRACKET
+    { SecrecyTyping.SK(mty,enc) }
+| AK LBRACKET enc=path COMMA mty=message_ty RBRACKET
+    { SecrecyTyping.AK(mty,enc) }
+| SSK LBRACKET sign=path COMMA mty=message_ty RBRACKET
+    { SecrecyTyping.SSK(mty,sign) }
+
+sec_ty:
+| mty=message_ty  { SecrecyTyping.Message mty }
+| kty=key_ty      { SecrecyTyping.Key kty }
+| RAND            { SecrecyTyping.Rand }
+
+colon_sec_ty:
+| COLON sty=sec_ty { sty }
+
+comma_sec_ty:
+| COMMA sty=sec_ty { sty }
+
+(*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
 | l=lsymb COLON ty=sty { Decl.{ cty_space = l;
@@ -752,8 +785,8 @@ declaration_i:
       let m, m_info = mm in
       Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
-| NAME e=lsymb COLON ty=ty
-                          { Decl.Decl_name (e, ty) }
+| NAME e=lsymb COLON ty=ty sty=comma_sec_ty?
+                          { Decl.Decl_name (e, ty, Option.value sty ~default:SecrecyTyping.Wrong) }
 
 | ACTION e=lsymb COLON a_arity=int
                           { Decl.Decl_action { a_name = e; a_arity; } }
@@ -807,8 +840,21 @@ declaration_i:
                 pred_simpl_args = simpl_args;
                 pred_body       = body; }) }
 
-| MUTABLE name=lsymb args=bnds_strict out_ty=colon_ty? EQ init_body=term
-                          { Decl.Decl_state {name; args; out_ty; init_body; }}
+| MUTABLE name=lsymb args=bnds_strict m_sty=colon_sec_ty? EQ init_body=term
+                          { Decl.Decl_state
+                              { name;
+                                args;
+                                out_ty = None;
+                                init_body;
+                                m_sty = Option.value m_sty ~default:SecrecyTyping.Wrong } }
+
+| MUTABLE name=lsymb args=bnds_strict COLON out_ty=ty m_sty=comma_sec_ty? EQ init_body=term
+                          { Decl.Decl_state
+                              { name;
+                                args;
+                                out_ty = Some out_ty;
+                                init_body;
+                                m_sty = Option.value m_sty ~default:SecrecyTyping.Wrong; } }
 
 | MUTEX name=lsymb COLON arity=INT
                           { Decl.Decl_mutex {name; arity} }

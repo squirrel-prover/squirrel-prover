@@ -45,7 +45,9 @@ type system_map_arg = Macros.system_map_arg
     [clone_system table old new f] registers a new system [new],
     obtained by modifying the actions of [old] with [f].
     Returns the updated table and system symbol.
-    Does not clone global macros. *)
+    Does not clone global macros.
+    Since this function modifies action descriptors, we do not preserve the
+    field [well_typed] from the old system. *)
 let clone_system 
     (table      : Symbols.table)
     (old_system : SE.fset)
@@ -399,7 +401,7 @@ let global_prf
   (* Instantiation of the fresh name *)
   let ty_args = List.map Vars.ty is in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
-  let ndef = Symbols.Name { n_fty } in
+  let ndef = Symbols.Name { n_fty ; n_sty = Symbols.Wrong } in
   let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
   let table = Lemma.add_namelength_axiom table n n_fty in
@@ -567,7 +569,7 @@ let global_cca
   (* Instantiation of the fresh replacement *)
   let ty_args = List.map Term.ty enc_rnd.args in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
-  let ndef = Symbols.Name { n_fty } in
+  let ndef = Symbols.Name { n_fty ; n_sty = Symbols.Wrong } in
   let s = L.mk_loc L._dummy "n_CCA" in
   let table,n = Symbols.Name.declare ~approx:true table s ~data:ndef in
   let table = Lemma.add_namelength_axiom table n n_fty in
@@ -646,7 +648,7 @@ let global_cca
   let ty_args = List.map Vars.ty is in
   let n_fty = Type.mk_ftype_tuple [] ty_args Type.tmessage in
   let table, r =
-    let rdef = Symbols.Name { n_fty } in
+    let rdef = Symbols.Name { n_fty = n_fty ; n_sty = Symbols.Wrong } in
     Symbols.Name.declare ~approx:true table s ~data:rdef
   in
   let table = Lemma.add_namelength_axiom table r n_fty in

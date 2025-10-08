@@ -80,5 +80,8 @@ val log_mem_crypto : Symbols.table -> string
 (** Pretty-print the refication of terms *)
 val prettyprint_reify : Symbols.table -> bool
 
+(** Allows security types and the tactic "typing" *)
+val security_types : Symbols.table -> bool
+
 val smt_classic : Symbols.table -> bool
 val smt_quantum : Symbols.table -> bool

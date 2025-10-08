@@ -96,7 +96,7 @@ let register_name n_var ty indices table =
   (* declare a new name symbol *)
   let table, nsymb =
     let n_lsymb = mk_dummy (Vars.name n_var) in
-    let data = Symbols.Name { n_fty } in
+    let data = Symbols.Name { n_fty ; n_sty = Symbols.Wrong } in
     (* location not useful, declaration cannot fail *)
     Symbols.Name.declare ~approx:true table n_lsymb ~data
   in
@@ -1705,12 +1705,91 @@ let system_conflicts
   let locks = locks projs tproc in
   conflicts table projs bound_variables locks tproc
 
+(* [check_types table system_name projection] checks, for each projection
+   in [projections], that the system [system_name] stored in [table].
+   It returns the list of well-typed projections and the list of goals
+   necessary to prove the typing.*)
+let check_types table system_name projections =
+  (* To reduce the number of goals, we first check if the system contains a diff.
+     If not, we only type the first projection.*)
+  let rec no_diff_term = function
+    | Term.Diff _ -> false
+    | t -> Term.tforall no_diff_term t
+  in
+  let no_diff_descr (action_descr : Action.descr) = 
+    let condition_term = snd action_descr.condition in
+    let output_term = snd action_descr.output in
+    let updates = List.map (fun (_,_,body) -> body) action_descr.updates in
+    List.for_all no_diff_term (condition_term :: output_term :: updates)
+  in
+  let descrs = System.descrs table system_name in
+  let is_no_diff = System.Msh.for_all (fun _ descr -> no_diff_descr descr) descrs in
+  let projections_to_type =
+    if is_no_diff then
+      [List.hd projections]
+    else
+      projections
+  in
+  (* We check that the system is well-types in any projection considered,
+     and accumulate proof goals when one is well typed.*)
+  List.fold_left
+    (fun acc proj -> match SecrecyTyping.check_system table proj system_name with
+      | Ok (forms) ->
+        Printer.pr "System %a/%a is well-typed.@."
+          Symbols.pp_path system_name
+          Projection.pp proj;
+        if forms <> [] then
+          Printer.pr "Formulas to proves before simplification:@.%a@."
+            Format.(pp_print_list ~pp_sep:pp_print_newline Term.pp) forms;
+        let form = Term.mk_ands forms in
+        (*We build a sequent for the proof goal*)
+        let system = SystemExprSyntax.{ 
+          set = to_arbitrary (singleton (System.Single.make table system_name proj));
+          pair = None }
+        in
+        let env = Env.init ~table ~system () in
+        let seq = LowTraceSequent.init ~env form in
+        (*We simplify the proof goal*)
+        let reduced_seq = LowTactics.TraceLT.reduce_conclusion
+            (ReductionCore.{rp_default with constr = true})
+            seq
+        in
+        let (well_typed, goals) = acc in
+        (*If the reduced sequent is not trivial, we add a goal to the list.*)
+        let tautology = LowTraceSequent.conclusion reduced_seq = Term.mk_true in
+        let new_goals =
+          if tautology then
+            goals
+          else
+            let new_goal = Goal.Local reduced_seq in 
+            new_goal :: goals
+        in
+        (*If the system contains no diff, we type all projectins at once*)
+        let new_projs =
+          if is_no_diff then
+            projections
+          else
+            proj :: well_typed
+        in
+        (new_projs, new_goals)
+      | Error e ->
+        Printer.kw
+          `Error
+          (Printer.get_std ()) 
+          "System %a/%a is not well-typed.@.%a"
+            Symbols.pp_path system_name
+            Projection.pp proj
+            SecrecyTyping.pp_error e;
+        acc)
+    ([], [])
+    projections_to_type
+
 (* FIXME: fix user-defined projections miss-used *)
 let declare_system
     (table : Symbols.table) (exec_model : Action.exec_model)
     (system_name : lsymb option)
     (projs : Projection.t list) (proc : Parse.t)
-  : Symbols.table
+  : Symbols.table * Goal.t list
   =
   (* Type-check the process. *)
   let time, p =
@@ -1786,6 +1865,18 @@ let declare_system
   check_actions_all_def table tproc;
 
   let table = Lemma.add_depends_mutex_lemmas table system_name in
+ 
+  (* check security types in each projection and stored
+     in the table the name of well-typed projection *)
+  let well_typed, goals =
+    if TConfig.security_types table then
+      check_types table system_name projections
+    else
+      [], []
+    in
+  
+  let table = System.add_well_typed table system_name well_typed in
+  Printer.pr "@.";
 
   Printer.pr "%a" (System.pp_system table) system_name;
-  table
+  table, goals

@@ -137,12 +137,14 @@ let rec token buf =
   | "abstract" -> !?ABSTRACT
   | "action" -> !?ACTION
   | "aenc" -> !?AENC
+  | "AK" -> !?AK
   | "apply" -> !?APPLY
   | "as" -> !?AS
   | "assert" -> !?ASSERT
   | "auto" -> !?AUTO
   | "axiom" -> !?AXIOM
   | "bool" -> !?BOOL
+  | "Bool" -> !?SBOOL
   | "boolean" -> !?BOOLEAN
   | "by" -> !?BY
   | "case" -> !?CASE
@@ -153,6 +155,7 @@ let rec token buf =
   | "constseq" -> !?CONSTSEQ
   | "crypto" -> !?CRYPTO
   | "cs" -> !?CS
+  | "Cst" -> !?CST
   | "cycle" -> !?CYCLE
   | "ddh" -> !?DDH
   | "dependent" -> !?DEPENDENT
@@ -182,6 +185,7 @@ let rec token buf =
   | "have" -> !?HAVE
   | "ghave" -> !?GHAVE
   | "help" -> !?HELP
+  | "High" -> !?HIGH
   | "hint" -> !?HINT
   | "if" -> !?IF
   | "include" -> !?INCLUDE
@@ -197,8 +201,10 @@ let rec token buf =
   | "localize" -> !?LOCALIZE
   | "local" -> !?LOCAL
   | "lock" -> !?LOCK
+  | "Low" -> !?LOW
   | "memseq" -> !?MEMSEQ
   | "message" -> !?MESSAGE
+  | "Msg" -> !?MSG
   | "mutable" -> !?MUTABLE
   | "mutex" -> !?MUTEX
   | "name" -> !?NAME
@@ -216,6 +222,7 @@ let rec token buf =
   | "print" -> !?PRINT
   | "process" -> !?PROCESS
   | "prof" -> !?PROF
+  | "Rand" -> !?RAND
   | "reduce" -> !?REDUCE
   | "remember" -> !?REMEMBER
   | "rename" -> !?RENAME
@@ -230,6 +237,8 @@ let rec token buf =
   | "set" -> !?SET
   | "signature" -> !?SIGNATURE
   | "simpl" -> !?SIMPL
+  | "SK" -> !?SK
+  | "SSK" -> !?SSK
   | "smt" -> !?SMT
   | "termination_by" -> !?TERMINATIONBY
   | "deduce" -> !?DEDUCE

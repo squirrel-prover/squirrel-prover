@@ -9,7 +9,7 @@ type lsymb = Symbols.lsymb
     as a set of actions. *)
 val declare_system :
   Symbols.table -> Action.exec_model -> lsymb option ->
-  Projection.t list -> Process.Parse.t -> Symbols.table
+  Projection.t list -> Process.Parse.t -> Symbols.table * Goal.t list
 
 (*------------------------------------------------------------------*)
 (** Testing utility that corresponds to the first steps of [declare_system]

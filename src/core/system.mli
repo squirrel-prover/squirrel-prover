@@ -14,6 +14,20 @@ val projections : Symbols.table -> t -> Projection.t list
 (** Check whether a system supports a given projection. *)
 val valid_projection : Symbols.table -> t -> Projection.t -> bool
 
+(** Indicates whether a system supports a given projection
+    and this projection is well-typed w.r.t. the secrecy type system. *)
+val well_typed_projection : Symbols.table -> t -> Projection.t -> bool
+
+(*------------------------------------------------------------------*)
+(** Check that two systems are strongly compatible.
+    This implies the theoretical notion of compatibility,
+    and relies on [Action.strongly_compatible_descr] to ensure
+    that descriptions can be merged later on. *)
+val compatible : Symbols.table -> t -> t -> bool
+
+(*------------------------------------------------------------------*)
+(** Convert a symbol to a system. *)
+val convert : Symbols.table -> Symbols.p_path -> t
 (** The execution model of a system. *)
 val exec_model : Symbols.table -> t -> Action.exec_model
 
@@ -68,6 +82,18 @@ val declare_empty :
 val register_action :
   Symbols.table -> t -> Action.descr ->
   Symbols.table * Symbols.action * Action.descr
+
+(** Modify the list of well typed projection stored in the table for a
+  * given system.
+  * Returns the updated table. *)
+val add_well_typed :
+  Symbols.table -> t -> Projection.t list -> Symbols.table
+
+(** Removes the list of well typed projection stored in the table for any
+  * system.
+  * Returns the updated table. *)
+val remove_all_well_typed :
+  Symbols.table -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Single systems} *)

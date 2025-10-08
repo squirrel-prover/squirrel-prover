@@ -298,7 +298,7 @@ let prf_param_pattern
 
   (* generate a new name n_PRF to replace the hash with *)
   let n_fty = Type.mk_ftype [] [] hty in
-  let nprfdef = Symbols.Name {n_fty} in
+  let nprfdef = Symbols.Name { n_fty = n_fty ; n_sty = Symbols.Wrong } in
   let sn_prf = L.mk_loc L._dummy "n_PRF" in
   let table, nprfs =
     Symbols.Name.declare ~approx:true table sn_prf ~data:nprfdef

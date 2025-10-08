@@ -16,7 +16,7 @@ type Symbols.state_macro_def += StateInit_data of Vars.var list * Term.term
 let get_init_states table : (Symbols.macro * Term.terms * Term.term) list =
   Symbols.Macro.fold (fun s data acc ->
       match data with
-      | Symbols.Macro (State (_arity,kind,StateInit_data (l,t))) ->
+      | Symbols.Macro (State (_arity, kind, _, StateInit_data (l,t))) ->
         assert (Type.equal kind (Term.ty t));
         (s,List.map Term.mk_var l,t) :: acc
       | _ -> acc
@@ -853,7 +853,7 @@ let fty
         | ProtocolMacro `Cond   -> [], Type.tboolean, `At Type.ttimestamp
       end
 
-    | Symbols.State (_,ty,data) ->
+    | Symbols.State (_, ty, _, data) ->
       begin
         match data with
         | StateInit_data (vs,_) -> List.map Vars.ty vs, ty, `At Type.ttimestamp

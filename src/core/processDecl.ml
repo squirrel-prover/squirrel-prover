@@ -73,7 +73,7 @@ let () =
     expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 let parse_state_decl
     (table : Symbols.table)
-    ({ name; args = p_args; out_ty; init_body; } : Decl.state_macro_decl)
+    ({ name; args = p_args; out_ty; init_body; m_sty = p_m_sty} : Decl.state_macro_decl)
   =
   let ts_init = Term.mk_action Symbols.init_action [] in
 
@@ -102,6 +102,26 @@ let parse_state_decl
   let t = Term.gsubst tsubst t in
   let args = List.map (Subst.subst_var tsubst) args in
 
+  (* Check security type if one is given.
+     If the initial term does not type, we remove the well-typed annotation of
+     any system declared previously.*)
+  let m_sty = SecrecyTyping.convert table p_m_sty in
+  let table =
+    if m_sty = Symbols.Wrong then 
+      table
+    else begin
+      SecrecyTyping.check_config table;
+      SecrecyTyping.check_state_type name m_sty;
+      if SecrecyTyping.check_initial_state table t args m_sty then
+        table
+      else begin
+        Printer.kw `Error (Printer.get_std ()) 
+          "The initial state of the mutable does not type.@.Previously defined systems are not well-typed anymore.@.";
+        System.remove_all_well_typed table
+      end
+    end
+  in
+
   (* FIXME: generalize allowed types *)
   List.iter2 (fun v (_, pty) ->
       if not (Type.equal (Vars.ty v) Type.tindex) then
@@ -110,7 +130,7 @@ let parse_state_decl
 
   let data =
     Symbols.Macro
-      (State (List.length p_args,out_ty, Macros.StateInit_data (args,t)))
+      (State (List.length p_args, out_ty, m_sty, Macros.StateInit_data (args,t)))
   in
   let table, _ = Symbols.Macro.declare ~approx:false table name ~data in
   table
@@ -1900,7 +1920,7 @@ let declare table decl : Symbols.table * Goal.t list =
       | Some { pl_desc = "postquantum" } -> Action.PostQuantum
       | Some l -> error (L.loc l) KDecl (Failure "unknown system option")
     in
-    ProcessSystem.declare_system table exec_model sdecl.sname projs sdecl.sprocess, []
+    ProcessSystem.declare_system table exec_model sdecl.sname projs sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table =
@@ -1948,7 +1968,7 @@ let declare table decl : Symbols.table * Goal.t list =
 
     Typing.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
-  | Decl.Decl_name (s, p_ty) ->
+  | Decl.Decl_name (s, p_ty, n_sty_i) ->
     let env = Env.init ~table () in
 
     let p_args_tys, p_out_ty =
@@ -1991,8 +2011,16 @@ let declare table decl : Symbols.table * Goal.t list =
           error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
 
+    let n_sty = SecrecyTyping.convert table n_sty_i in
+    if n_sty <> Symbols.Wrong then begin
+      SecrecyTyping.check_config table;
+      SecrecyTyping.check_name_type s n_sty;
+      if not HighType.(check_ty_info table out_ty Info.Large) then
+        SecrecyTyping.check_large_req s n_sty out_ty;
+    end;
+    
     let table, n =
-      let data = Symbols.Name Symbols.{ n_fty } in
+      let data = Symbols.Name Symbols.{ n_fty; n_sty } in
       Symbols.Name.declare ~approx:false table s ~data
     in
     Lemma.add_namelength_axiom table n n_fty, []

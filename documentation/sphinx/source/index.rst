@@ -34,6 +34,11 @@ Table of contents
    tutorial
 
 .. toctree::
+   :caption: Extensions
+
+   typing
+
+.. toctree::
    :caption: Appendix
 
    appendix/indexes/index

@@ -105,6 +105,9 @@ let v_post_quantum = Param_bool false
 let s_prettyprint_reify = "prettyPrintReify"
 let v_prettyprint_reify = Param_bool true
 
+let s_security_types = "securityTypes"
+let v_security_types = Param_bool false
+
 let s_smt_classic_macros = "smtClassicMacros"
 let v_smt_classic_macros = Param_bool true
 
@@ -131,6 +134,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_log_unsat_crypto      v_log_unsat_crypto
   |> declare s_log_mem_crypto        v_log_mem_crypto
   |> declare s_prettyprint_reify     v_prettyprint_reify
+  |> declare s_security_types        v_security_types
   |> declare s_smt_classic_macros    v_smt_classic_macros
   |> declare s_smt_quantum_macros    v_smt_quantum_macros
 
@@ -174,5 +178,6 @@ let verbose_crypto          = get_bool   s_verbose_crypto
 let log_unsat_crypto        = get_string s_log_unsat_crypto
 let log_mem_crypto          = get_string s_log_mem_crypto
 let prettyprint_reify       = get_bool   s_prettyprint_reify
+let security_types          = get_bool   s_security_types
 let smt_classic             = get_bool   s_smt_classic_macros
 let smt_quantum             = get_bool   s_smt_quantum_macros

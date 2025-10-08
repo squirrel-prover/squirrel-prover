@@ -728,7 +728,7 @@ let add_macros context =
                   | ProtocolMacro `Cond ->
                     [],[context.ts_ty],convert_type context Type.tboolean
                 end  
-              | State(i,t,_) | Global(i,t,_) -> 
+              | State(i,t,_,_) | Global(i,t,_) -> 
                 List.init i (fun _ -> context.index_ty),
                 [context.ts_ty],convert_type context t 
             in
@@ -1122,7 +1122,7 @@ let add_macro_axioms context =
           | Structured d -> d.params,d.dist_param
           | _ -> [], Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
         end
-      | State (i,_,_) | Global (i,_,_) ->
+      | State (i,_,_,_) | Global (i,_,_) ->
         List.init i 
           (fun i -> 
              Vars.mk (sq_id_fresh ("ind_"^(string_of_int i))) Type.tindex

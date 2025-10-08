@@ -2537,7 +2537,7 @@ let xor arg (s : ES.t) =
   let n_fty = Type.mk_ftype [] [] Type.tmessage in
   let sym = L.mk_loc L._dummy "n_XOR" in
   let table,n =
-    let data = Symbols.Name { n_fty } in
+    let data = Symbols.Name { n_fty = n_fty ; n_sty = Symbols.Wrong } in
     Symbols.Name.declare ~approx:true (ES.table s) sym ~data
   in
   let table = Lemma.add_namelength_axiom table n n_fty in

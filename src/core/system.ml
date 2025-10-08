@@ -6,11 +6,13 @@ include SystemSyntax
 module Msh = Map.Make (Action.Shape)
 
 (** For each system we store the list of projections (which defines
-    the system's arity) and a map from action shapes to action descriptions,
-    which also contain action symbols. *)
+    the system's arity), the set of well-typed projections with regard
+    to security types, and a map from action shapes to action
+    descriptions, which also contain action symbols. *)
 type data = {
   exec_model  : Action.exec_model;
   projections : Projection.t list;
+  well_typed  : Projection.t list;
   actions     : Action.descr Msh.t
 }
 
@@ -19,7 +21,11 @@ type Symbols.data += System_data of data
 let declare_empty table exec_model system_name projections =
   assert (List.length (List.sort_uniq Stdlib.compare projections) =
           List.length projections);
-  let data = System_data { projections; actions=Msh.empty; exec_model; } in
+  let data = System_data
+    { projections;
+      well_typed = [];
+      actions = Msh.empty;
+      exec_model } in
   Symbols.System.declare ~approx:false table system_name ~data 
 
 let get_data table (s_symb : Symbols.system) =
@@ -30,6 +36,10 @@ let get_data table (s_symb : Symbols.system) =
 let projections table s = (get_data table s).projections
 
 let valid_projection table s proj = List.mem proj (projections table s)
+
+let well_typed_projection table s proj = 
+  let well_typed = (get_data table s).well_typed in
+  List.mem proj well_typed
 
 let exec_model table s = (get_data table s).exec_model
 
@@ -81,7 +91,7 @@ let add_action table system descr =
   assert (not (Msh.mem shape actions));
   let actions = Msh.add shape descr actions in
   let data = System_data { data with actions } in
-  Symbols.System.redefine table system ~data 
+  Symbols.System.redefine table system ~data
 
 (*------------------------------------------------------------------*)
 let descr_of_shape table system shape =
@@ -141,7 +151,24 @@ let register_action table system_symb (descr : Action.descr) =
     let table = add_action table system_symb descr in
 
     table, symb2, descr
-  
+
+(*------------------------------------------------------------------*)
+(** See .mli *)
+let add_well_typed  table system_symb well_typed =
+  let data = get_data table system_symb in
+  let updated_data = System_data {data with well_typed = well_typed} in
+  Symbols.System.redefine table system_symb ~data:updated_data
+
+(** See .mli *)
+let remove_all_well_typed (table : Symbols.table) : Symbols.table =
+  let remove _ = function
+    | System_data data -> System_data { data with well_typed = [] } 
+    | _ -> assert false
+  in
+  Symbols.System.map remove table
+
+
+
 (*------------------------------------------------------------------*)
 (** Single systems *)
 
