@@ -1,3 +1,22 @@
+### Type system for non-deduction
+  [commit:`4d5ed2a8`]
+
+Implements the type system for secrecy defined in the paper
+
+  Secrecy by Typing in the Computational Model.
+  Stéphanie Delaune, Clément Hérouard, Joseph Lallemand.
+  CSF'25
+
+In practice, setting `set securityTypes = true` enables the
+user to give security types (`High`, `Low`, `SK[…]`, etc.) to names
+and mutable states, and to use the `typing` tactic.
+All systems are typechecked at declaration. When
+proving a goal in a well-typed system, calling `typing H`
+on a hypothesis `H: t_1 = t_2` when `t_1` and `t_2`
+can be proved distinct by typing (one is public, one is secret)
+may close the current goal.
+
+
 ### Memoizing simulators in `crypto`
   [commit: `0909e688`, **breaking change**]
 
