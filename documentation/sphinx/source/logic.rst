@@ -244,7 +244,7 @@ enclosing a :token:`term` in parentheses yields a
 :token:`sterm`.
 
 .. note::
-   Since :cite:`bkl23hal`, terms no longer necessarily represent
+   Since :cite:`bkl23lics`, terms no longer necessarily represent
    (PTIME) computable values.
    An example of a non PTIME-computable term is
    :g:`forall (x:message), x = f(x)`

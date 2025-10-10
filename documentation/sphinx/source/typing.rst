@@ -15,7 +15,7 @@ i.e., a message possibly known by the attacker,
 cannot be equal to a secret term.
 
 .. note::
-  This tactic implements the work published in :cite:`dhl25`.
+  This tactic implements the work published in :cite:`dhl25csf`.
 
 .. flag:: securityTypes
 
@@ -99,7 +99,7 @@ In particular, it cannot consider terms with user-defined types, higher-order,
 or names and mutable states with non-index arguments.
 
 The typing procedure is sound w.r.t the type system described in
-:cite:`dhl25`, but it is not complete.
+:cite:`dhl25csf`, but it is not complete.
 One notable source of incompleteness is a rule of the type system
 that allows, when a variable is known to be of type :n:`T_1 + T_2`,
 to perform a case disjunction, and continue the typechecking twice,
@@ -202,7 +202,7 @@ Tactic
     that it appears under a condition that implies :n:`happens(tau)`.
 
   In these subgoals, not all hypotheses from the original proof context are sound to keep,
-  according to the soundness proof of the type system in :cite:`dhl25`.
+  according to the soundness proof of the type system in :cite:`dhl25csf`.
   The tactic only keeps global hypotheses, and local hypotheses that are either
   :n:`[const]` or of type :n:`Bool` in the type system.
 

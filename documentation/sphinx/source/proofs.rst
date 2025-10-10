@@ -1563,7 +1563,7 @@ Common tactics
    In all cases, the :g:`precise_ts` makes the tactic use
    `precise_occur` instead of `occur`.
 
-   Latest formal Squirrel description: :cite:`bkl23hal` (Appendix F).
+   Latest formal Squirrel description: :cite:`bkl23lics` (Appendix F).
 
 Local tactics
 ~~~~~~~~~~~~~
@@ -1634,7 +1634,7 @@ Local tactics
    As this implements the known-key variant of the collision resistance assumption,
    no side condition is checked on the hash key.
 
-   Latest formal Squirrel description: :cite:`bkl23hal` (only as an example).       
+   Latest formal Squirrel description: :cite:`bkl23lics` (only as an example).       
 
 .. tact:: euf @hypothesis_id
    :name: euf
@@ -1692,7 +1692,7 @@ Local tactics
    correctly used, i.e. with conclusion
    :g:`not(occur(k,goal,sign(_,k), pk(k))`.
     
-   Latest formal Squirrel description: :cite:`bkl23hal`.
+   Latest formal Squirrel description: :cite:`bkl23lics`.
 
 .. tact:: intctxt @hypothesis_id
    :name: intctxt
@@ -1766,7 +1766,7 @@ Global tactics
    that all encryptions are made with distinct fresh randoms (and not
    just the the encryption we are looking at).
 
-   Latest formal Squirrel description::cite:`bkl23hal`.  
+   Latest formal Squirrel description::cite:`bkl23lics`.  
     
 .. tace:: ddh @term, @term, @term, @term
    :name: ddh
@@ -1936,7 +1936,7 @@ Global tactics
    first one is targeted by default. Calling the tactic with an
    optional :n:`@term_pat` allows to target a specific hash occurrence.
 
-   Latest formal Squirrel description: :cite:`bkl23hal`.
+   Latest formal Squirrel description: :cite:`bkl23lics`.
 
 .. tace:: xor @position {? , @term_pat} {? , @term_pat}
    :name: xor
