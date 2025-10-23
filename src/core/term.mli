@@ -624,7 +624,9 @@ val destr_pair : term -> (term * term) option
     Consistent with [Term.destr_tuple_flatten]. *)
 val destr_ty_tuple_flatten : Type.ty -> Type.ty list
 
-val decompose_fun : term -> Vars.var list * term 
+val decompose_fun : term -> Vars.var list * term
+
+val decompose_tuple : term -> terms
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

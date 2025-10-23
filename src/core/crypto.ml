@@ -4,6 +4,7 @@ open Ppenv
 module SE = SystemExpr
 module L = Location
 
+module St = Term.St
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 module Sp = Match.Pos.Sp
@@ -451,7 +452,7 @@ let deduce_mem
          instantiated, as the latter is cleared from the substitution
          returned by [deduce_mem]. *)
       se   = pc.env.system.set; 
-      info = {used = false;};   (* TODO: quantum: do we need to set this? *)
+      info = {used = false;};   (* can be set to [false] since [term] is classical *)
     }
   in
   let unif_state =
@@ -460,9 +461,7 @@ let deduce_mem
       pc ~support:vars
   in
   Match.deduce_mem
-    (* TODO: quantum: do not always set to [true] + correctly set the
-       [used] bit above *)
-    ~quantum_reduction:true
+    ~quantum_reduction:false
     cterm known_set unif_state
 
 (*------------------------------------------------------------------*)
@@ -2510,7 +2509,11 @@ let knowledge_mem_tsets
     (output : CondTerm.t)
     (rec_inputs : TSet.t list)
   =
+  let quantum = TConfig.post_quantum_equivs pc.env.table in
   let is_in (input : TSet.t) : Term.terms option =
+    (* TODO: quantum: this assert is temporary, and should eventually
+       be removed *)
+    assert(not quantum || HighType.is_classical pc.env.table (Term.ty input.term));
     let input = TSet.refresh input in
     match TSet.cterm_mem pc output input with
     | None -> None
@@ -2891,7 +2894,7 @@ let rec bideduce_term_strict
 
   | Term.(Fun _ as fs)
   | Term.(App (Fun _ as fs,_))
-    when HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:true query.env fs ->
+    when HighTerm.is_ptime_deducible ~ignore_qatt:false ~si:true query.env fs ->
     let _, args = Term.decompose_app output_term.term in
     let args = List.map (fun x -> CondTerm.{term=x; conds}) args in
     notify_bideduce_term_strict query "Function Application";
@@ -3064,7 +3067,7 @@ and bideduce_term
 
   (* if [adv(t)] and [ϕ] is already bi-deduced (invariant of the
      proof-search), we are done *)
-  else if HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:true env output.term then
+  else if HighTerm.is_ptime_deducible ~ignore_qatt:false ~si:true env output.term then
     begin
       notify_bideduce_directly_computable query;
       Some (empty_result query.initial_mem)
@@ -3481,6 +3484,19 @@ let notify_bideduction_subgoals table ~direct ~recursive : unit =
     (Fmt.list ~sep:(Fmt.any "@;@;") (_pp_gen_goal ppe)) recursive
 
 (*------------------------------------------------------------------*)
+(** Result of a successful call to [derecursify]. *)
+type derecursify_result = {
+  recursive_goals : goal list;     (** recursive subgoals *)
+  direct_goal     : goal;          (** direct subgoal *)
+  rec_arg_occs    : Occurrences.rec_arg_occ list;
+  (** Argument of calls to recursive macros. 
+
+      If we are dealing with the standard execution model, this gives
+      the maximal value up-to with simulation took place. We use this
+      value in quantum mode, to known what quantum state is live at
+      the end of the simulation. *)
+}
+
 (** Slightly outdated specification that do not accound for extra
     inputs/outputs (see the description of the [goal] data-type for a
     more recent description). Nonetheless, we keep the description
@@ -3518,7 +3534,7 @@ let derecursify
     (pc : ProofContext.t)
     (targets : Term.terms)
     (game : game) 
-  : goal list * goal            (* recursive subgoals, direct subgoals *)
+  : derecursify_result
   =
   let env  = pc.env in
   let hyps = pc.hyps in
@@ -3567,11 +3583,12 @@ let derecursify
   (* direct bi-deduction sub-goals assuming recursive calls are bideducible *)
   let direct : goal =
     let t = Term.mk_tuple targets in
-    (* FIXME : add rec_inputs for any time before macros in t. *)
     mk_bideduction_goal
       ~rec_fun:None ~rec_arg:None ~rec_predicate:None (* direct subgoal use [None] *)
       ~hyps ~vars:[] ~term:t ~conds:[]
   in
+
+  let all_rec_arg_occs = ref [] in
 
   (* indirect bi-deduction goals for recursive calls *)
   let recursive : goal list =
@@ -3592,7 +3609,11 @@ let derecursify
           then iocc.iocc_path_cond
           else PathCond.Top
         in
-        let time_form = Occurrences.rec_arg_formula env ts iocc.iocc_fun ~path_cond rec_arg_occs in
+        let time_form =
+          Occurrences.rec_arg_formula env ts iocc.iocc_fun ~path_cond rec_arg_occs
+        in
+
+        all_rec_arg_occs := rec_arg_occs @ !all_rec_arg_occs;
 
         let hyps =
           TraceHyps.add Args.AnyName (LHyp (Local (iocc.iocc_cond))) hyps (*|>*)
@@ -3611,10 +3632,12 @@ let derecursify
   in
 
   let recursive = List.map (simplify_rec_goal env.table) recursive in
-
-  (* notify the user *)
-  notify_bideduction_subgoals env.table ~direct ~recursive;
-  recursive, direct
+  
+  {
+    recursive_goals = recursive;
+    direct_goal = direct;
+    rec_arg_occs = !all_rec_arg_occs;
+  }
 
 (*------------------------------------------------------------------*)
 (** Given a list of **recursive** subgoals, return:
@@ -4109,21 +4132,21 @@ let bideduce_all_goals
     ~(initial_constraints : Const.t list)
     ~(let_init            : Term.t Mv.t)
     ~(param               : param)
-    (rec_bided_subgs      : goal list)
-    (direct_bided_subgs   : goal)
+    (recursive_goals      : goal list)
+    (direct_goal          : goal)
   : goal list * (Const.t list * AbstractSet.mem * Term.t list) option
   (* next goals, constraints, memory, subgoals to discharge *)
   =
   (* First, synthesize a simulator for the recursive part of the target terms. *)
   let next_recursive_goals, constraints_rec, memory_rec, subgoals_rec =
-    (* If [rec_bided_subgs], no need to call [bideduce_recursive_subgoals]. *)
-    if rec_bided_subgs = [] then [], initial_constraints, initial_mem, [] else
+    (* If [recursive_goals], no need to call [bideduce_recursive_subgoals]. *)
+    if recursive_goals = [] then [], initial_constraints, initial_mem, [] else
       bideduce_recursive_subgoals
         ~pass
         locate pc
         ~let_init ~param
         ~initial_constraints ~initial_mem
-        rec_bided_subgs
+        recursive_goals
   in
   match pass with
   (* When infering the values to be memoized, there is no need to run
@@ -4135,8 +4158,8 @@ let bideduce_all_goals
     (* build the direct output and query *)
     let output =
       CondTerm.mk
-        ~term:direct_bided_subgs.output_term
-        ~conds:direct_bided_subgs.output_conds
+        ~term:direct_goal.output_term
+        ~conds:direct_goal.output_conds
     in
     let query_direct = 
       goal_to_query
@@ -4144,7 +4167,7 @@ let bideduce_all_goals
         ~initial_mem:memory_rec
         ~let_init
         ~param
-        direct_bided_subgs 
+        direct_goal 
     in
 
     (* notify the user *)
@@ -4161,6 +4184,141 @@ let bideduce_all_goals
     in
     (next_recursive_goals, result)
 
+
+(*------------------------------------------------------------------*)
+(** Ad hoc quantum induction rule for quantum equivalences and in the
+    quantum execution model.
+
+    Essentially, the rule allow to ignore the [state] and [frame]
+    macro (these are implicitely simulated by the induction itself).
+
+    Currently, restricted to the time-insensitive mode. *)
+let post_quantum_execution_model_induction
+  (game_loc : L.t) (param : param) (table : Symbols.table)
+  (recursive_goals : goal list) (direct_goal : goal)
+  (rec_arg_occs : Occurrences.rec_arg_occ list)
+  : goal list * goal            (* recursive, direct *)
+  =
+  if param.time_sensitive then
+    Tactics.hard_failure ~loc:game_loc
+      (Failure "time-sensitive mode unsupported in quantum mode");
+  (* FEATURE: I am being very cautious there, because I only
+     checked this for the time-insensitive mode. I have no
+     reason to believe the approach we use would not work in
+     time-sensitive mode too. *)
+
+  let recursive_goals =
+    List.filter_map (fun goal ->
+        let macro = oget goal.rec_fun in (* always succeed for recursive goals *)
+
+        (* The ad hoc induction rule for the quantum execution
+           model let us ignore the input, frame and state. *)
+        if Symbols.path_equal macro Symbols.Quantum.inp ||
+           Symbols.path_equal macro Symbols.Quantum.frame ||
+           Symbols.path_equal macro Symbols.Quantum.state then None
+
+        else
+          begin
+            let macro_ty = Term.ty goal.output_term in
+
+            (* if there are other quantum macros, we fail *)
+            if not (HighType.is_classical table macro_ty) then
+              Tactics.hard_failure ~loc:game_loc
+                (Failure
+                   ("only quantum macros of the builtin \
+                     post-quantum execution model are supported (" ^
+                    Symbols.path_to_string macro ^ " is quantum)"));
+
+            assert (goal.extra_inputs = []);
+
+            (* remove all quantum inputs from [rec_inputs] *)
+            let rec_inputs =
+              List.filter (fun (set : TSet.t) ->
+                  HighType.is_classical table (Term.ty set.term)
+                ) goal.rec_inputs
+            in
+            Some { goal with rec_inputs;}
+          end
+      ) recursive_goals
+  in
+
+  let direct_goal =
+    (* remove all quantum inputs from [rec_inputs] *)
+    let rec_inputs =
+      List.filter (fun (set : TSet.t) ->
+          HighType.is_classical table (Term.ty set.term)
+        ) direct_goal.rec_inputs
+    in
+
+    let failed t () =
+      let ppe = default_ppe ~table () in
+      let err_str =
+        Fmt.str "@[<v 0>failed to bi-deduce:@;\
+                \ @[%a@]@;\
+                 which may be a quantum value.@;\
+                 Only support a single occurrence of frame@t or \
+                 state@t at top-level"
+          (Term._pp ppe) t
+      in
+      Tactics.hard_failure ~loc:game_loc (Failure err_str);
+    in
+
+    (* check that the output contains a single quantum output,
+       which must be [state@t] or [frame@t] at the appropriate
+       time [t] *)
+    let output_term =
+      let output = direct_goal.output_term in
+      let terms = Term.decompose_tuple output in
+
+      let found = ref false in
+
+      let terms =
+        List.filter (fun term ->
+            HighType.is_classical table (Term.ty term) ||
+            begin
+              if !found then failed term ();
+
+              match term with
+              | Term.Macro (m, _, t) when
+                  let macro = m.s_symb in
+                  Symbols.path_equal macro Symbols.Quantum.frame ||
+                  Symbols.path_equal macro Symbols.Quantum.state 
+                ->
+                if not
+                    (List.for_all
+                       (fun (arg : Occurrences.rec_arg_occ) ->
+                          Term.equal arg.so_cnt.value t &&
+                          arg.so_cond = [])
+                       rec_arg_occs) then failed term ();
+
+                found := true;
+                false     (* discard value *)
+              | _ -> failed term ()
+            end
+          ) terms
+      in
+      Term.mk_tuple terms
+    in
+
+    { direct_goal with rec_inputs; output_term; }
+  in
+
+  (recursive_goals, direct_goal)
+
+(*------------------------------------------------------------------*)
+(** When using the ad hoc induction rule for the post-quantum
+    execution model, the name [qrnd] may not be used by the simulator
+    being synthesized. *)
+let quantum_induction_check_constraints
+    (loc : L.t) (constraints : Const.t list) : unit
+  =
+  List.iter (fun (c : Const.t) ->
+      if c.name.s_symb = Symbols.Quantum.qrnd then
+        Tactics.soft_failure ~loc
+          (Failure "invalid constraints in quantum mode:\n\
+                    qrnd must not be used by the simulator");
+    ) constraints
+
 (*------------------------------------------------------------------*)
 (** Exported *)
 let prove
@@ -4173,6 +4331,8 @@ let prove
   let env = pc.env in
   let table = env.table in
   let ppe = default_ppe ~table () in
+
+  let quantum = TConfig.post_quantum_equivs env.table in
 
   if terms.bound <> None then
     Tactics.soft_failure (Failure "concrete logic unsupported");
@@ -4250,6 +4410,30 @@ let prove
   Printer.pr "@;@]"; (* close vertical box of preliminary deductions *)
 
   (*------------------------------------------------------------------*)
+  (** Apply induction *)
+
+  (* compute the recursive and direct bideduction subgoals *)
+  let { recursive_goals; direct_goal; rec_arg_occs; } =
+    derecursify pc terms.terms game
+  in
+
+  (* for a quantum equivalence and in the quantum execution model,
+     apply the ad hoc quantum induction rule *)
+  let recursive_goals, direct_goal =
+    if quantum then
+      post_quantum_execution_model_induction
+        game_loc param table
+        recursive_goals direct_goal rec_arg_occs
+    else (recursive_goals, direct_goal) 
+  in
+
+  (* notify the user *)
+  notify_bideduction_subgoals
+    env.table
+    ~direct:direct_goal
+    ~recursive:recursive_goals;
+
+  (*------------------------------------------------------------------*)
   (** First bideduction pass.
 
       The game is now initialized using values in [let_init], and
@@ -4259,10 +4443,6 @@ let prove
 
   notify_bideduce_first_pass ~dbg ~vbs;
 
-  let rec_bided_subgs, direct_bided_subgs =
-    derecursify pc terms.terms game 
-  in
-
   (* First pass on bideduction, to find values to be memoized.*)
   let next_bided_subgs, _res =
     bideduce_all_goals
@@ -4271,7 +4451,7 @@ let prove
       ~param ~let_init 
       ~initial_constraints:(res0.consts @ init_consts)
       ~initial_mem:res0.final_mem
-      rec_bided_subgs direct_bided_subgs 
+      recursive_goals direct_goal 
   in
 
   (*------------------------------------------------------------------*)
@@ -4378,11 +4558,11 @@ let prove
     else target
   in
 
-  let rec_bided_subgs =
+  let recursive_goals =
     List.map (add_extra_inputs ~kind:`Recursive) next_bided_subgs
   in
-  let direct_bided_subgs = 
-    add_extra_inputs ~kind:`Direct direct_bided_subgs 
+  let direct_goal =
+    add_extra_inputs ~kind:`Direct direct_goal
   in
 
   let final_bided_subgs, res = 
@@ -4391,7 +4571,7 @@ let prove
       ~pc ~param ~let_init
       ~initial_constraints:(res0.consts @ init_consts)
       ~initial_mem:res0.final_mem
-      rec_bided_subgs direct_bided_subgs 
+      recursive_goals direct_goal 
   in
 
   (*------------------------------------------------------------------*)
@@ -4423,6 +4603,9 @@ let prove
     Printer.pr "@[<v 0>"; (* open vertical box of final result *)
 
     let consts_subgs = Const.to_subgoals ~vbs ~dbg table game constraints in
+
+    if quantum then
+      quantum_induction_check_constraints game_loc constraints;
 
     Printer.pr
       "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"

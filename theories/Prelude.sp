@@ -19,7 +19,7 @@ system Empty = null.
 (*------------------------------------------------------------------*)
 type quantum_message.
 
-type quantum_measures_rnd.
+type quantum_measures_rnd[serializable, finite].
 
 type string[fixed].
   

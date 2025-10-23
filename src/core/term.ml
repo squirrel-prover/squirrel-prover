@@ -821,6 +821,11 @@ module SmartDestructors = struct
   let decompose_exists_tagged = decompose_quant_tagged Exists
 
   (*------------------------------------------------------------------*)
+  let decompose_tuple = function
+  | Tuple l -> l
+  | _ as t -> [t]
+
+  (*------------------------------------------------------------------*)
   let destr_false f = oas_seq0 (destr_app ~fs:f_false ~arity:0 f)
   let destr_true  f = oas_seq0 (destr_app ~fs:f_true ~arity:0  f)
 
