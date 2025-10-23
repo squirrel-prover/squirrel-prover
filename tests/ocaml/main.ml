@@ -221,7 +221,7 @@ let equivalence =
     "Bad qrnd usage not PQ Sound", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
-           try run ~test "tests/alcotest/pq_unsound_qatt1.sp" with
+           try run ~test "tests/alcotest/pq_unsound_qatt2.sp" with
            |  Squirrelcore.ProverLib.Error (_,
               "cannot add new goal: it is not post quantum sound") -> raise Ok)
     end    
