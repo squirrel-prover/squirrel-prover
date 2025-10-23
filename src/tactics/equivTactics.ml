@@ -789,6 +789,10 @@ let fa_expand
 
   let env = ES.env s in
 
+  let quantum_witness = 
+    Library.Prelude.mk_witness env.table ~ty_arg:Type.tquantum_message
+  in
+
   let is_deducible_vars (l : Term.terms) : bool =
     List.for_all (fun t ->
         Term.is_var t &&
@@ -809,7 +813,9 @@ let fa_expand
 
     (* use [tf] to check that the function symbol is pptime computable. *)
     | Fun _ as tf -> 
-      if HighTerm.is_ptime_deducible ~si:true env tf then ([], []) else 
+      if HighTerm.is_ptime_deducible ~si:true env tf ||
+         Term.equal tf quantum_witness
+      then ([], []) else 
         raise (No_FA `HeadNoFun)
 
     | App (Fun (fn,fty) as tf, [Tuple l]) 

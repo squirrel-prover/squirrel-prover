@@ -2807,14 +2807,23 @@ let deduce_mem_list
 
     See [deduce] for the precise semantics of [· ▷ output]. *)
 let fa_decompose
-    (output : cond_term) (st : unif_state)
+    (output : cond_term) (deduce_state : deduce_state)
   : (Vars.vars * cond_term) list option
   =
+  let st = deduce_state.unif_state in
+  let quantum_witness =
+    Library.Prelude.mk_witness st.table ~ty_arg:Type.tquantum_message
+  in
+
   let env = env_of_unif_state st in
   match output.term with
   | t when HighTerm.is_ptime_deducible ~si:true env t -> Some []
   (* we do not need to check that [· ▷ output.cond], since we know
      that we already have [output.cond] on the left of [▷]. *)
+
+  | t when deduce_state.quantum_reduction && 
+           Term.equal t quantum_witness -> 
+    Some []
 
   (* function: if-then-else *)
   | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
@@ -2939,7 +2948,7 @@ and deduce_fa
      (i.e. we do not use [st.red_param] and [st.red_strat]) *)
   let red_param = ReductionCore.rp_crypto in
   let strat = ReductionCore.(MayRedSub rp_crypto) in
-  match fa_decompose output st.unif_state with
+  match fa_decompose output st with
   | None ->
     (* We could not decompose [output] through into deduction sub-goals.
        Try to reduce [output] and restart [deduce]. *)
