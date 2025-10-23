@@ -108,6 +108,9 @@ let v_post_quantum_equivs = Param_bool false
 let s_deduction_order_guard = "deductionOrderGuard"
 let v_deduction_order_guard = Param_bool true
 
+let s_quantum_check_toplevel = "quantumCheckToplevel"
+let v_quantum_check_toplevel = Param_bool true
+
 let s_prettyprint_reify = "prettyPrintReify"
 let v_prettyprint_reify = Param_bool true
 
@@ -140,6 +143,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_post_quantum          v_post_quantum
   |> declare s_post_quantum_equivs   v_post_quantum_equivs 
   |> declare s_deduction_order_guard v_deduction_order_guard
+  |> declare s_quantum_check_toplevel v_quantum_check_toplevel
   |> declare s_verbose_crypto        v_verbose_crypto
   |> declare s_log_unsat_crypto      v_log_unsat_crypto
   |> declare s_log_mem_crypto        v_log_mem_crypto
@@ -187,6 +191,7 @@ let new_ind                 = get_bool   s_new_ind
 let post_quantum            = get_bool   s_post_quantum
 let post_quantum_equivs     = get_bool   s_post_quantum_equivs
 let deduction_order_guard   = get_bool   s_deduction_order_guard
+let quantum_check_toplevel  = get_bool   s_quantum_check_toplevel
 let verbose_crypto          = get_bool   s_verbose_crypto
 let log_unsat_crypto        = get_string s_log_unsat_crypto
 let log_mem_crypto          = get_string s_log_mem_crypto

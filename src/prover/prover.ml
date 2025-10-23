@@ -254,7 +254,8 @@ let do_add_goal (st:state) (g:Goal.Parsed.t L.located) : state =
                let env = Env.update ~system:in_system ~vars:(Vars.add_vars vars (env.vars)) env in          
                ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty
              in             
-             if not @@ PostQuantum.check_quantum_simulable proof_context equiv.terms then
+             if TConfig.quantum_check_toplevel proof_context.env.table &&
+                not @@ PostQuantum.check_quantum_simulable proof_context equiv.terms then
                (* We raise an error if any of the equivalence is not post-quantum sound. *)
                ProverLib.error (L.loc g) 
                  "cannot add new goal: it is not post quantum sound";

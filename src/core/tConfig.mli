@@ -81,6 +81,10 @@ val post_quantum_equivs : Symbols.table -> bool
     to prove polymorphic deduction properties. *)
 val deduction_order_guard : Symbols.table -> bool
 
+(** Should Squirrel check that the top-level terms in equivalences are
+    such that their approximated and exact semantics coincide. *)
+val quantum_check_toplevel : Symbols.table -> bool
+
 (** Verbose mode for crypto tactic *)
 val verbose_crypto : Symbols.table -> bool
 
