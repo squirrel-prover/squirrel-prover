@@ -3386,7 +3386,8 @@ let derecursify_term
         in
         begin
           match Macros.unfold pc.env ms l ts with
-          | `Results [r]  -> acc, `Map (
+          | `Results [r]  -> 
+            acc, `Map (
               Term.mk_ite
                 r.when_cond
                 r.out

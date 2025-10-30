@@ -1042,7 +1042,7 @@ let macro_support
         let tv_var = Vars.make_fresh mset.rec_arg_type "tau" in
         let tv = Term.mk_var tv_var in
         match
-          Macros.unfold env mset.msymb (Term.mk_vars mset.args) tv 
+          Macros.unfold ~unfold_opaque:true env mset.msymb (Term.mk_vars mset.args) tv 
         with
         | `Results res ->
           List.fold_left (fun acc (obody : Macros.body) ->
@@ -1210,7 +1210,7 @@ let fold_macro_support
     (fun acc (_, ((srcs, mset) : _ * Mset.t)) ->
        let tv_var = Vars.make_fresh mset.rec_arg_type "t" in
        let tv = Term.mk_var tv_var in 
-       match Macros.unfold env mset.msymb (Term.mk_vars mset.args) tv with
+       match Macros.unfold ~unfold_opaque:true env mset.msymb (Term.mk_vars mset.args) tv with
        | `Results res ->
          List.fold_left (fun acc (obody : Macros.body) ->
              let (body : Macros.body) = Macros.refresh_body obody in

@@ -340,6 +340,7 @@ type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
 *)
 val unfold :
   ?expand_context:expand_context ->
+  ?unfold_opaque:bool ->
   Env.t ->
   Term.msymb ->
   Term.term list ->

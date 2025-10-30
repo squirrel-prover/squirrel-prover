@@ -25,7 +25,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------------ *)
-system [postquantum] Q = !_i in(c,x); out(c, <x, diff(f x, g x)>).
+system [postquantum] Q = !_i in(c,x); A: out(c, <x, diff(f x, g x)>).
 
 (* ------------------------------------------------------------------------ *)
 
@@ -68,6 +68,27 @@ Proof.
   intro H. 
   crypto G.
 Qed.
+
+global lemma _ @system:Q (tt:_[const]) : 
+  [happens(tt)] -> equiv(transcript@tt, Quantum.frame@tt).
+Proof.
+  intro H. 
+  crypto G.
+Qed.
+
+(* global lemma _ @system:Q (i:_[adv]): *)
+(*   [happens(A i)] -> equiv(Quantum.frame@A i). *)
+(* Proof. *)
+(*   intro H. *)
+(*   crypto G. *)
+(* Qed. *)
+
+(* global lemma _ @system:Q (i:_[adv]): *)
+(*   [happens(A i)] -> equiv(transcript@A i, Quantum.frame@A i). *)
+(* Proof. *)
+(*   intro H. *)
+(*   crypto G. *)
+(* Qed. *)
 
 (* ------------------------------------------------------------------------ *)
 (* negative checks *)

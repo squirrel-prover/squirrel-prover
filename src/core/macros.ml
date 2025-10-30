@@ -1097,6 +1097,7 @@ exception UnfoldFailed
 let unfold_failed () = raise UnfoldFailed
 
 let unfold_structured_macro
+    ~(unfold_opaque : bool)
     (env     : Env.t)
     (data    : structured_macro_data)
     (args    : Term.term list)
@@ -1105,6 +1106,8 @@ let unfold_structured_macro
   =
   let system = env.system.set in
   let table = env.table in
+
+  if not unfold_opaque && data.rw_strat = Opaque then unfold_failed ();
 
   (* Compute the projection substitution, if necessary *)
   let do_proj_subst =
@@ -1201,7 +1204,8 @@ let init_macro_body ty =
 
 (*------------------------------------------------------------------*)
 let _unfold
-    ?(expand_context = InSequent)
+    ~(expand_context : expand_context)
+    ~(unfold_opaque : bool)
     (env     : Env.t)
     (symb    : Term.msymb)
     (args    : Term.term list)
@@ -1220,7 +1224,7 @@ let _unfold
     begin
       match get_general_macro_data data with
       | Structured data ->
-        unfold_structured_macro env data args rec_arg
+        unfold_structured_macro ~unfold_opaque env data args rec_arg
 
       | ProtocolMacro `Output ->
         if not (SE.is_fset system) then unfold_failed ();
@@ -1573,13 +1577,14 @@ let _unfold
 
 let unfold
     ?(expand_context = InSequent)
+    ?(unfold_opaque = false)
     (env     : Env.t)
     (symb    : Term.msymb)
     (args    : Term.term list)
     (rec_arg : Term.term) :
   [ `Results of body list | `Unknown ]
   =
-  match _unfold ~expand_context env symb args rec_arg with
+  match _unfold ~expand_context ~unfold_opaque env symb args rec_arg with
   | exception UnfoldFailed -> `Unknown
   | bodies -> `Results (List.rev bodies)
 

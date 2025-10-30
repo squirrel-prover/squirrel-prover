@@ -1580,6 +1580,7 @@ let is_happen : Term.t list -> bool = function
 (** Perform δ-reduction once for macro at head position. *)
 let reduce_delta_macro1
     ?(force_happens=false)
+    ?(unfold_opaque=false)
     ~(constr : bool)    
     ?(mode : Macros.expand_context = InSequent)
     (env : Env.t)
@@ -1589,10 +1590,6 @@ let reduce_delta_macro1
   =
   match t with
   | Term.Macro (ms, l, ts) ->
-    let rw_strat = Macros.get_rw_strat env.table ms in
-    if rw_strat = Opaque then
-      t, False
-    else
       let models = 
         let exception NoExp in
         try
@@ -1613,7 +1610,7 @@ let reduce_delta_macro1
       in 
 
       let cases =
-        match Macros.unfold ~expand_context:mode env ms l ta with
+        match Macros.unfold ~unfold_opaque ~expand_context:mode env ms l ta with
         | `Results r -> r
         | `Unknown -> []
       in
@@ -1648,6 +1645,7 @@ let reduce_delta_macro1
     (macro, operator and definition unfolding). *)
 let reduce_delta1
     ?(force_happens=false)
+    ?(unfold_opaque=false)
     ?(delta = ReductionCore.delta_full)
     ~(constr : bool)
     ~(mode : Macros.expand_context)
@@ -1659,7 +1657,7 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~force_happens ~constr ~mode env ~hyps t
+    reduce_delta_macro1 ~unfold_opaque ~force_happens ~constr ~mode env ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->
