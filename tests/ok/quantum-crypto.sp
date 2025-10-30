@@ -76,19 +76,19 @@ Proof.
   crypto G.
 Qed.
 
-(* global lemma _ @system:Q (i:_[adv]): *)
-(*   [happens(A i)] -> equiv(Quantum.frame@A i). *)
-(* Proof. *)
-(*   intro H. *)
-(*   crypto G. *)
-(* Qed. *)
+global lemma _ @system:Q (i:_[adv]):
+  [happens(A i)] -> equiv(Quantum.state@A i).
+Proof.
+  intro H. 
+  crypto G.
+Qed.
 
-(* global lemma _ @system:Q (i:_[adv]): *)
-(*   [happens(A i)] -> equiv(transcript@A i, Quantum.frame@A i). *)
-(* Proof. *)
-(*   intro H. *)
-(*   crypto G. *)
-(* Qed. *)
+global lemma _ @system:Q (i:_[adv]):
+  [happens(A i)] -> equiv(transcript@A i, Quantum.state@A i).
+Proof.
+  intro H.
+  crypto G.
+Qed.
 
 (* ------------------------------------------------------------------------ *)
 (* negative checks *)

@@ -4304,7 +4304,17 @@ let post_quantum_execution_model_induction
                   Symbols.path_equal macro Symbols.Quantum.frame ||
                   Symbols.path_equal macro Symbols.Quantum.state 
                 ->
-                if not (List.exists (Term.equal t) rec_arg_occs) then
+                (* We simulated all macros up-to time [m = max rec_arg_occs].
+
+                   Thus, we can either allow for [state@m],
+                   [transcript@m], or [state@(next m)]. *)
+                if not (
+                    List.exists
+                      (fun arg -> Term.equal arg t || 
+                                  (Symbols.path_equal m.s_symb Symbols.Quantum.state &&
+                                   Term.equal arg (Term.mk_pred t)))
+                      rec_arg_occs) 
+                then
                   failed
                     ~target:term
                     ~message:(
