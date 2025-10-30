@@ -313,8 +313,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let unfold_term_exn
       ?(force_happens = false)
       ?(mode   : Macros.expand_context = InSequent)
-      ~(force_exhaustive:bool)      
-      ~(is_rec : bool)
+      ~(force_exhaustive:bool)
       (t       : Term.term)
       (se      : SE.arbitrary)
       (s       : S.sequent)
@@ -365,8 +364,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         begin
           let t, has_red = try_expand t in
           if has_red = True then t else 
-          if not is_rec && 
-             Macros.get_rw_strat table ms = Exhaustive 
+          if Macros.get_rw_strat table ms = Exhaustive 
           then expand_full t
           else failed ()
         end
@@ -383,14 +381,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ?(force_happens = false)
       ~(force_exhaustive:bool)         
       ?(mode   : Macros.expand_context option)
-      ~(is_rec : bool)
       ~(strict : bool)
       (t       : Term.term)
       (se      : SE.arbitrary)
       (s       : S.sequent)
     : Term.term option
     =
-    try Some (unfold_term_exn ~force_happens ~force_exhaustive ?mode ~is_rec t se s) with
+    try Some (unfold_term_exn ~force_happens ~force_exhaustive ?mode t se s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   type expand_kind = 
@@ -461,7 +458,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* unfold in local sub-terms *)
     let unfold_term (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
-      match unfold_local ~force_exhaustive ~mode ~is_rec ~strict occ se s with
+      match unfold_local ~force_exhaustive ~mode ~strict occ se s with
       | None -> `Continue
       | Some t ->
         found1 := true;
@@ -574,7 +571,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     !found1, s
 
   (** expand all macros (not operators) in a term relatively to a system *)
-  let expand_all_macros
+  let deprecated_expand_all_macros
       ?(force_happens = false)    
       (f : Term.term)
       (sexpr : SE.arbitrary)
@@ -592,7 +589,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
                 ) s conds
             in
             match
-              unfold_local ~is_rec:true ~force_exhaustive:false ~force_happens ~strict:false occ se s
+              unfold_local ~force_exhaustive:false ~force_happens ~strict:false occ se s
             with
             | None -> `Continue
             | Some t -> `Map t
@@ -633,7 +630,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
         hard_failure ~loc:(L.loc arg)
           (Tactics.Failure "expected a term of sort message")
 
-  let expand_arg ~(force_exhaustive:bool) (targets : target list) (arg : Typing.term) (s : S.t) : S.t =
+  let expand_arg
+      ~(force_exhaustive:bool)
+      (targets : target list) (arg : Typing.term) (s : S.t) : S.t 
+    =
     let expnd_arg = p_rw_expand_arg s arg in
     let found, s = expand ~force_exhaustive ~is_rec:false targets expnd_arg s in
     if not found then

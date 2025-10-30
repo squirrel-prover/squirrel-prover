@@ -2087,12 +2087,12 @@ let global_diff_eq (s : ES.t) =
       let s1 = 
         let sexpr1 = SE.project [p1] (ES.system s).set in
         Term.project1 p1
-          (EquivLT.expand_all_macros ~force_happens:true s1 sexpr1 s) 
+          (EquivLT.deprecated_expand_all_macros ~force_happens:true s1 sexpr1 s) 
       in
       let s2 = 
         let sexpr2 = SE.project [p2] (ES.system s).set in
         Term.project1 p2
-          (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
+          (EquivLT.deprecated_expand_all_macros ~force_happens:true s2 sexpr2 s)
       in
       Goal.Global
         (ES.set_conclusion
