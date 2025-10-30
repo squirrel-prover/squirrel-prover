@@ -392,7 +392,7 @@ let prf_param
 (*------------------------------------------------------------------*)
 (** PRF formula *)
 
-type oracle_mode = Normal | Unreachable | Equality
+type oracle_mode = Normal | Unreachable | Equality | Ignore
 let _ = Equality
 
 (** Constructs the formula expressing that in
@@ -404,11 +404,16 @@ let _ = Equality
     inside [msg] (the message being hashed in PRF), though occs of [key] are 
     still recorded. This option is useful when dealing with non-deduction goals.
 
-    When [oracle] is set to [true], ignores the occurrences of a hash
+    When [oracle] is set to anything other than [Normal],
+    ignores the occurrences of a hash
     caused by the presence of a hash oracle [lambda x. (hash x key)] in [terms],
     and generates instead (if such an oracle was indeed present)
-    the formula [terms *> msg], which is the second return value 
-    of the function. [terms_no_adv] is meant to contain terms in which we wish 
+    a proof obligation, which is the second return value 
+    of the function:
+    - the formula [terms *> msg],if [oracle=Unreachable];
+    - the formula [terms |> lambda x. x = msg], if [oracle=Equality];
+    - nothing, if [oracle=Ignore].
+    [terms_no_adv] is meant to contain terms in which we wish 
     to search for occurrences, but which are not given to the adversary, and 
     thus oracles there are not ignored. 
 
@@ -533,10 +538,7 @@ let phi_prf
              "The hash was in a bad context, the generated formula has holes")
   in
   
-  (* TODO update this comment
-     Additionally, if [oracle] and if a hashing oracle was indeed present,
-     generate a subgoal asking that terms *> msg (note that the oracle
-     is in terms, and that terms_no_adv are ignored.) *)
+  (* additional (non-)deduction goal, when oracle is Unreachable or Equality *)
   let ded_goal =
     match oracle with
     | Unreachable when List.exists is_oracle terms ->
@@ -606,6 +608,8 @@ let phi_prf_proj
 (** The PRF tactic *)
 
 (** PRF on an equivalence goal. *)
+(* [oracle] should only be set to Normal until we know whether
+   other modes are sound *)
 let prf_equiv
     (i:int L.located)
     ?(opat : (Term.term * L.t option * Infer.env option) option)
@@ -726,7 +730,7 @@ let prf_equiv
       [left_sequent; leftright_sequent; right_sequent]
   in
 
-  (* non-deduction sequents *)
+  (* non-deduction sequents (currently unused) *)
   let nded_sequents =
     match oracle with
     | Unreachable ->
@@ -778,15 +782,24 @@ let prf_equiv
 (** PRF for secrecy goals.
    In a sequent with a conclusion [u *>{S} v], sees [u] as [u1, th, u2]
    or [v] as [v1, th, v2] (depending on [side]), where [th=h(m,k)] is the [i]-th
-   element. Fails if that element is not a a hash.
-   Returns the sequent with an updated conclusion [u1, u2 *> v],
-   or closes the goal, and adds all proof obligations required by [prf].
+   element. Fails if that element is not a hash.
+   Returns the sequent with an updated conclusion [u1, u2 *> v] (if [Left])
+   or closes the goal (if [Right]),
+   and adds all proof obligations required by [prf].
    This is done by checking that [u1, u2, v] (left) or [u] (right)
    does not hash [m] with [k] and correctly uses [k].
-   [m] itself must also correctly use [k] (but no conditions on hashes in it).
+   [m] itself must also correctly use [k],
+   and if [under_hash] then we further check that it does not hash itself.
+    
    If [u1, u2] (left) or [u] (right) contain a hash oracle [lambda x. h(x,k)],
-   ignores the corresponding occurrence, and adds a subgoal [u *> m].
-   (TODO update this comment)
+   and [oracle <> Normal], the corresponding occurrence is ignored,
+   and a subgoal may be added, depending on [oracle] and [side]:
+    - [u1, u2 |> lambda x. x = m] if [oracle=Equality] and [side=Left];
+    - [u1, u2 *> m] if [oracle=Unreachable] and [side=Left];
+    - [u *> m] if [oracle=Unreachable] and [side=Right];
+    - nothing, if [oracle=Ignore] and [side=Left].
+    ([oracle=Equality] or [Ignore] are currently forbidden
+    with [side=Right].)
 *)
 let prf_secrecy
     ~(side:CP.side)
@@ -798,6 +811,11 @@ let prf_secrecy
   let ppe = default_ppe ~table:(ES.table s) () in
   let loc = L.loc i in
   let table = ES.table s in
+
+  (* prevent forbidden oracle modes on the right *)
+  if side = CP.Right && oracle <> Normal && oracle <> Unreachable then
+    soft_failure ~loc
+      (Tactics.Failure "Unsupported oracle mode");
 
   (* find the system in the secrecy predicate *)
   let sgoal = ES.conclusion_as_computability s in
@@ -849,7 +867,7 @@ let prf_secrecy
      anyway). *)
   let terms_no_adv = if side = CP.Left then vs else [] in
 
-  (* compute the prf formula + non-deduction goal (if needed). 
+  (* compute the prf formula + optional (non-)deduction goal. 
      note that we do not project here, and work directly on the predicate's set.
      that may cause the tactic to fail e.g. if the key was diff(k1, k2):
      in that case, project before applying the tactic? *)
@@ -964,6 +982,11 @@ let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
                  Some Equality, under_hash, side
                else fail loc
 
+             | Args.NArg L.{pl_loc = loc; pl_desc = "ignore_oracle"} ->
+               if oracle = None then
+                 Some Ignore, under_hash, side
+               else fail loc
+
              | Args.NArg L.{pl_loc = loc; pl_desc = "under_hash"} ->
                if under_hash = None then
                  oracle, Some true, side
@@ -978,7 +1001,6 @@ let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
       let oracle = oget_dflt Unreachable oracle in
       let under_hash = oget_dflt false under_hash in
       let side = oget_dflt CP.Right side in
-      if side = CP.Right && oracle = Equality then fail L._dummy;
       prf_secrecy ~side ~oracle ~under_hash i s
     | _ -> LowTactics.bad_args ()
 
