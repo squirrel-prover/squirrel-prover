@@ -4242,6 +4242,8 @@ let post_quantum_execution_model_induction
       ) recursive_goals
   in
 
+  let ppe = default_ppe ~table () in
+
   let direct_goal =
     (* remove all quantum inputs from [rec_inputs] *)
     let rec_inputs =
@@ -4250,19 +4252,25 @@ let post_quantum_execution_model_induction
         ) direct_goal.rec_inputs
     in
 
-    let failed t () =
-      let ppe = default_ppe ~table () in
+    let failed ~target ~message =
       let err_str =
         Fmt.str "@[<v 0>failed to bi-deduce:@;\
-                \ @[%a@]@;\
+                \  @[%a@]@;\
                  which may be a quantum value.@;\
-                 Only support a single occurrence of frame@t or \
-                 state@t at top-level"
-          (Term._pp ppe) t
+                 %s@]"
+          (Term._pp ppe) target message
       in
       Tactics.hard_failure ~loc:game_loc (Failure err_str);
     in
 
+    let rec_arg_occs =
+      List.filter_map
+        (fun (arg : Occurrences.rec_arg_occ) ->
+           if arg.so_cond = [] then Some arg.so_cnt.value else None)
+        rec_arg_occs
+      |> List.sort_uniq Stdlib.compare
+    in
+    
     (* check that the output contains a single quantum output,
        which must be [state@t] or [frame@t] at the appropriate
        time [t] *)
@@ -4270,13 +4278,24 @@ let post_quantum_execution_model_induction
       let output = direct_goal.output_term in
       let terms = Term.decompose_tuple output in
 
-      let found = ref false in
+      let found = ref None in
 
       let terms =
         List.filter (fun term ->
             HighType.is_classical table (Term.ty term) ||
             begin
-              if !found then failed term ();
+              (* Fail to apply [crypto]: there are multiple quantum
+                 values at top-level in the equivalence under study. *)
+              if !found <> None then
+                failed
+                  ~target:term
+                  ~message:(
+                    Fmt.str "@[<v 0>The crypto tactic only support a \
+                             single occurrence of@;\
+                             frame@t or state@t at top-level, and the following term:@;\
+                            \  @[%a@]@;\
+                             has already been bi-deduced.@]"
+                      (Term._pp ppe) (oget !found));
 
               match term with
               | Term.Macro (m, _, t) when
@@ -4284,16 +4303,28 @@ let post_quantum_execution_model_induction
                   Symbols.path_equal macro Symbols.Quantum.frame ||
                   Symbols.path_equal macro Symbols.Quantum.state 
                 ->
-                if not
-                    (List.for_all
-                       (fun (arg : Occurrences.rec_arg_occ) ->
-                          Term.equal arg.so_cnt.value t &&
-                          arg.so_cond = [])
-                       rec_arg_occs) then failed term ();
+                if not (List.exists (Term.equal t) rec_arg_occs) then
+                  failed
+                    ~target:term
+                    ~message:(
+                      Fmt.str "@[<v 0>The timestamp argument @[%a@] must belong to:@;\
+                              \  @[%a@]@]"
+                        (Term._pp ppe) t
+                        (Fmt.list (fun fmt (arg : Term.t) ->
+                             Fmt.pf fmt "@[%a@]"
+                               (Term._pp ppe) arg))
+                        rec_arg_occs);
 
-                found := true;
+                found := Some term;
                 false     (* discard value *)
-              | _ -> failed term ()
+
+              | _ ->
+                failed
+                  ~target:term
+                  ~message:(
+                    Fmt.str
+                      "@[<v 0>The crypto tactic only support a single occurrence of@;\
+                       frame@t or state@t at top-level.@]");
             end
           ) terms
       in
