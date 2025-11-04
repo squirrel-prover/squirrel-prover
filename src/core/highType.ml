@@ -176,12 +176,12 @@ let is_classical table (ty : Type.ty) : bool =
 (** Check if a type is definitely quantum *)
 let rec is_quantum : Type.ty -> bool = function
   | Message  | Boolean   | Index    | Timestamp -> false
-    
-  | TConstr(_, args) as t -> 
-    args <> [] &&               (* FIXME: inductive: improve precision *)
-    Type.equal t Type.tquantum_message
+
   (** User-defined types *)
-        
+  | TConstr(_, args) as t ->
+    Type.equal t Type.tquantum_message ||
+    List.exists is_quantum args
+
   | TVar _ -> false  (** Type variable *)
 
   | TUnivar _ -> false   (** Type unification variable *)

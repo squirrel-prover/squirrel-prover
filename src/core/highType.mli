@@ -94,7 +94,8 @@ val is_well_founded : Symbols.table -> Type.ty -> bool
 val is_classical : Symbols.table -> Type.ty -> bool
 
 (** Check if a type is definitely quantum.
-    FIXME: what does this formally mean? *)
+    This is an approximation: if it returns [true], then the type 
+    is quantum.  *)
 val is_quantum : Type.ty -> bool
 
 (*------------------------------------------------------------------*)
