@@ -139,7 +139,6 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val p_rw_expand_arg : S.t -> Typing.term -> expand_kind 
 
   val expand_term :
-    mode:Macros.expand_context ->
     is_rec:bool ->
     ?force_exhaustive:bool ->
     expand_kind -> S.sequent ->

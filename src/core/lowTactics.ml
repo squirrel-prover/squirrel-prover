@@ -311,7 +311,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       The sequent [s] is used to discharge Happens subgoals.
       If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
   let unfold_term_exn
-      ?(mode   : Macros.expand_context = InSequent)
       ~(unfold_opaque : bool)
       ~(force_exhaustive:bool)
       (t       : Term.term)
@@ -337,7 +336,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         in
         let ta = odflt ts ta in
         begin
-          match Macros.unfold ~unfold_opaque ~expand_context:mode env ms l ta with
+          match Macros.unfold ~unfold_opaque env ms l ta with
           | `Results cases -> Macros.mk_term_of_bodies table cases ta
           | `Unknown -> failed ()
         end
@@ -350,7 +349,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Match.reduce_delta1
         ~unfold_opaque
         ~delta:ReductionCore.delta_full ~constr:true
-        ~mode (Lazy.force pc).env (Lazy.force pc).hyps target
+        (Lazy.force pc).env (Lazy.force pc).hyps target
     in
     
     match t with
@@ -381,7 +380,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let unfold_local
       ~(force_exhaustive:bool)         
       ~(unfold_opaque : bool)
-      ?(mode   : Macros.expand_context option)
       ~(strict : bool)
       (t       : Term.term)
       (se      : SE.arbitrary)
@@ -392,7 +390,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       Some (
         unfold_term_exn
           ~unfold_opaque ~force_exhaustive
-          ?mode t se s) 
+          t se s) 
     with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
@@ -443,7 +441,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Mterm _           -> false
 
   let expand_term
-      ~(mode  : Macros.expand_context)
       ~(is_rec: bool)
       ?(force_exhaustive=false)
       (target : expand_kind)
@@ -464,7 +461,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* unfold in local sub-terms *)
     let unfold_term (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
-      match unfold_local ~unfold_opaque:(not is_rec) ~force_exhaustive ~mode ~strict occ se s with
+      match unfold_local ~unfold_opaque:(not is_rec) ~force_exhaustive ~strict occ se s with
       | None -> `Continue
       | Some t ->
         found1 := true;
@@ -565,7 +562,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let doit : do_target_func =
       fun (f,system,_) ->
         let found1', f =
-          expand_term ~force_exhaustive ~mode:Macros.InSequent ~is_rec target s f system
+          expand_term ~force_exhaustive ~is_rec target s f system
         in
         found1 := found1' || !found1;
         f, []
@@ -724,7 +721,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             match
               Rewrite.rewrite_exn
                 ~param:Match.logic_param
-                ~loc (S.table s) (S.params s) (S.vars s) system InSequent
+                ~loc (S.table s) (S.params s) (S.vars s) system
                 (S.get_trace_hyps s)
                 mult rw_erule f
             with
@@ -1851,7 +1848,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match
         Rewrite.rewrite
           ~param:Match.logic_param
-          (S.table s) (S.params s) (S.vars s) (S.system s) InSequent
+          (S.table s) (S.params s) (S.vars s) (S.system s)
           (S.get_trace_hyps s)
           Once rw_rule target
       with

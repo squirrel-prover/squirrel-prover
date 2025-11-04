@@ -1231,9 +1231,6 @@ type unif_state = {
   system  : SE.context;       (** system context applying at the current position *)
   params  : Params.t;
   
-  expand_context : Macros.expand_context; 
-  (** expantion mode for macros. See [Macros.expand_context]. *)
-
   ienv    : Infer.env;
 
   hyps : Hyps.TraceHyps.hyps; (** hypotheses, taken in [system] *)
@@ -1259,7 +1256,6 @@ let mk_unif_state
     bvs            = [];
     subst_vs       = Sv.empty;
     support        = Vars.Tag.local_vars support;
-    expand_context = Macros.InSequent;
     ienv           = Infer.mk_env () ;
 
     env    = pc.env.vars;
@@ -1580,7 +1576,6 @@ let is_happen : Term.t list -> bool = function
 let reduce_delta_macro1
     ?(unfold_opaque=false)
     ~(constr : bool)    
-    ?(mode : Macros.expand_context = InSequent)
     (env : Env.t)
     ?(hyps : Hyps.TraceHyps.hyps = TraceHyps.empty)
     (t : Term.term)
@@ -1608,7 +1603,7 @@ let reduce_delta_macro1
       in 
 
       let cases =
-        match Macros.unfold ~unfold_opaque ~expand_context:mode env ms l ta with
+        match Macros.unfold ~unfold_opaque env ms l ta with
         | `Results r -> r
         | `Unknown -> []
       in
@@ -1645,7 +1640,6 @@ let reduce_delta1
     ?(unfold_opaque=false)
     ?(delta = ReductionCore.delta_full)
     ~(constr : bool)
-    ~(mode : Macros.expand_context)
     (env : Env.t)
     (hyps : Hyps.TraceHyps.hyps)
     (t : Term.term) 
@@ -1654,7 +1648,7 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~unfold_opaque ~constr ~mode env ~hyps t
+    reduce_delta_macro1 ~unfold_opaque ~constr env ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->
@@ -1729,7 +1723,6 @@ module type S = sig
     ?env:Vars.env ->
     ?ienv:Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps ->
-    ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context ->
     t -> 
@@ -1763,7 +1756,6 @@ let unif_gen (type a)
     ?(env    : Vars.env option)
     ?(ienv : Infer.env option)
     ?(hyps   : Hyps.TraceHyps.hyps = Hyps.TraceHyps.empty)
-    ?(expand_context : Macros.expand_context = InSequent)
     (table   : Symbols.table)
     (system  : SE.context)
     (t1      : a pat_op)
@@ -1816,8 +1808,6 @@ let unif_gen (type a)
     mv = mv_init;
 
     subst_vs = Sv.empty;
-
-    expand_context;
 
     params = Params.empty;      (* FIXME: LPC *)
     
@@ -1957,7 +1947,6 @@ module T (* : S with type t = Term.term *) = struct
         let t,t_red =
           reduce_delta_macro1
             ~constr:false
-            ~mode:st.expand_context
             (to_env st) t
         in
         if t_red <> True then default ()
@@ -1965,7 +1954,6 @@ module T (* : S with type t = Term.term *) = struct
           let pat,pat_red =
             reduce_delta_macro1
               ~constr:false
-              ~mode:st.expand_context
               (to_env st) pat
           in
           if pat_red <> True then default () else tunif t pat st
@@ -2147,7 +2135,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported.
       Remark: term matching ignores [mode]. *)
   let try_match
-      ~param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
@@ -2158,7 +2146,7 @@ module T (* : S with type t = Term.term *) = struct
       (fun[@warning "-27"] ~mode -> tunif)
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ~param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps 
       table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
@@ -2207,8 +2195,7 @@ module T (* : S with type t = Term.term *) = struct
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match
-            try_match ~expand_context:InSequent 
-              ?ienv ~param table subterm_system e pat
+            try_match ?ienv ~param table subterm_system e pat
           with
           | Match _ -> e :: acc, `Continue
           | _       -> acc, `Continue
@@ -3439,10 +3426,9 @@ let mset_incl
   in
 
   let context = SE.{ set = system; pair = None; } in
-  (* FIXME: use better expand_context mode when possible *)
   match 
     T.try_match
-      ~param:default_param ~expand_context:InSequent
+      ~param:default_param 
       table context
       term1 pat2
   with
@@ -4317,7 +4303,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let try_match
-      ~param ?mv ?env ?ienv ?hyps ?expand_context
+      ~param ?mv ?env ?ienv ?hyps
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Equiv.form)
@@ -4328,7 +4314,7 @@ module E = struct
        unif_global
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ~param ?mv ?env ?ienv ?hyps ?expand_context table system
+      ~param ?mv ?env ?ienv ?hyps table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
   
@@ -4355,8 +4341,7 @@ module E = struct
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match 
-            T.try_match ~expand_context:InSequent
-              ?ienv ~param table subterm_system e pat 
+            T.try_match ?ienv ~param table subterm_system e pat 
           with
           | Match _ -> e :: acc, `Continue
           | _       ->      acc, `Continue
@@ -4378,8 +4363,7 @@ module E = struct
     let f_fold : (Equiv.form list) Pos.f_map_fold_g =
       fun e se _vars _p acc ->
         match 
-          try_match ~expand_context:InSequent
-            ?ienv ~param table se e pat
+          try_match ?ienv ~param table se e pat
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

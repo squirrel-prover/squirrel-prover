@@ -145,15 +145,6 @@ let iter_descrs table system (f : Action.descr -> unit) =
   let f _ a = f a in
   System.Msh.iter f (descrs table system)
 
-let map_descrs
-    (type b)
-    (f : Action.descr -> 'a)
-    (table : Symbols.table) (system : b expr)
-  : 'a list
-  =
-  let m = System.Msh.map f (descrs table system) in
-  List.map Stdlib.snd (System.Msh.bindings m)
-
 let actions table (system : _ expr) : 'a list =
   let f Action.{action;name;indices} = (action,name,indices) in
   let m = System.Msh.map f (descrs table system) in

@@ -59,7 +59,6 @@
 %token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION CRYPTO DEDUCE
 %token PROOF QED RESET UNDO ABORT HINT
 %token TACTIC
-%token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH PROF
 %token NAMESPACE END OPEN CLOSE
 %token SMT
@@ -697,20 +696,6 @@ predicate_body:
 | EQ form=global_formula { form }
 
 (*------------------------------------------------------------------*)
-system_modifier:
-| RENAME gf=global_formula
-    { Decl.Rename gf }
-
-| GCCA args=bnds_strict COMMA enc=term
-    { Decl.CCA (args, enc) }
-
-| GPRF args=bnds_strict COMMA hash=term
-    { Decl.PRF (args, hash) }
-
-| REWRITE p=rw_args
-    { Decl.Rewrite p }
-
-(*------------------------------------------------------------------*)
 (* for now, a single option is enough *)
 %inline system_option:
 | LBRACKET l=lsymb RBRACKET { Some l }
@@ -920,13 +905,6 @@ termination_by:
 /* declaration that must always be followed by the terminator symbol `.` */
 declaration_no_concat_i:
 | TACTIC lsymb EQ tac                     { Decl.Tactic ($2,$4) }
-
-/* system modifiers */
-| SYSTEM id=lsymb EQ LBRACKET from_sys=system_expr RBRACKET WITH modifier=system_modifier
-    { Decl.(Decl_system_modifier
-              { from_sys = from_sys;
-                modifier;
-                name = id}) }
 
 /* declares a new generalized function */
 | LET is_rec=rec_decl e=lsymb_gen_decl

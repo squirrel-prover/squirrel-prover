@@ -165,9 +165,6 @@ kw<Term> { @specialize[@name={Term}]<ID, Term> }
   DDH[@name=tackeyw] { kw<"ddh"> }
   CDH[@name=tackeyw] { kw<"cdh"> }
   GDH[@name=tackeyw] { kw<"gdh"> }
-  RENAME[@name=tackeyw] { kw<"rename"> }
-  GPRF[@name=tackeyw] { kw<"gprf"> }
-  GCCA[@name=tackeyw] { kw<"gcca"> }
   INCLUDE { kw<"include"> }
   SMT { kw<"smt"> }
   PRINT[@name=tackeyw] { kw<"print"> }
@@ -899,14 +896,6 @@ dh_flags {
   commaSep1<dh_flag>
 }
 
-system_modifier {
-  RENAME Global_formula
-| GCCA bnds_strict COMMA Term
-| GPRF bnds_strict COMMA Term
-| GPRF TIME bnds_strict COMMA Term
-| REWRITE rw_args
-}
-
 Declaration {
   HASH Lsymb c_tys |
   HASH Lsymb WITH ORACLE Term |
@@ -929,8 +918,7 @@ Declaration {
    LOCAL AXIOM Local_statement |
   GLOBAL AXIOM Global_statement |
   SYSTEM projs ~decl Process |
-  SYSTEM LBRACKET Lsymb RBRACKET projs Process |
-  SYSTEM ~decl Lsymb !EQ EQ system_expr WITH system_modifier
+  SYSTEM LBRACKET Lsymb RBRACKET projs Process
 }
 
 declaration_list {

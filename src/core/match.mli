@@ -327,7 +327,6 @@ module type S = sig
     ?env:Vars.env ->            (* used to get variables tags *)
     ?ienv:Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps ->
-    ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context -> 
     t -> 
@@ -366,7 +365,6 @@ val reduce_delta_def1 :
 val reduce_delta_macro1 :
   ?unfold_opaque:bool ->
   constr:bool ->
-  ?mode:Macros.expand_context ->
   Env.t ->
   ?hyps:Hyps.TraceHyps.hyps ->
   Term.term ->
@@ -379,7 +377,6 @@ val reduce_delta1 :
   ?unfold_opaque:bool ->
   ?delta:ReductionCore.delta ->
   constr:bool ->
-  mode:Macros.expand_context ->
   Env.t -> Hyps.TraceHyps.hyps ->
   Term.term ->
   Term.term * ReductionCore.head_has_red 

@@ -103,10 +103,6 @@ val fold_descrs :
   'a ->
   'a
 
-val map_descrs  :
-  (Action.descr -> 'a) -> Symbols.table -> <fset:unit;..> expr -> 'a list
-
-
 (*------------------------------------------------------------------*)
 (** {2 Miscelaneous} *)
 

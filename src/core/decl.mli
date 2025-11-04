@@ -74,23 +74,6 @@ type system_decl = {
 }
 
 (*------------------------------------------------------------------*)
-(** Information for a system declaration using a global modifier    *)
-
-(** Global cryptographic rules *)
-type global_rule =
-  | Rename  of Typing.global_formula
-  | PRF     of Typing.bnds * Typing.term
-  | CCA     of Typing.bnds * Typing.term
-  | Rewrite of TacticsArgs.rw_arg list
-
-(** System modifier, comprising:
-    the original system, the global rule to apply, and the name of 
-    the new system. *)
-type system_modifier = { 
-  from_sys : SE.Parse.t;
-  modifier : global_rule;
-  name     : Symbols.lsymb
-}
 
 type op_kind =  [`Op | `Let of [`NoRec | `Rec | `RecWithOrd of Symbols.p_path]]
   (** - [`Op] is for an abstract or concrete operator (i.e. `adv`)
@@ -165,7 +148,6 @@ type declaration_i =
   | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
-  | Decl_system_modifier  of system_modifier
 
   | Decl_dh of
       Symbols.OpData.dh_hyp list * lsymb * 

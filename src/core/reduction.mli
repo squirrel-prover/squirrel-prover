@@ -19,25 +19,21 @@ module type S = sig
   (** Build a conversion state from a sequent.  
       The term to be reduced is taken in [system.set]. *)
   val to_state :
-    ?expand_context:Macros.expand_context  ->
     ?system:SE.context ->
     ?vars:Vars.env ->
     red_param -> t -> state
 
   (*------------------------------------------------------------------*)
   val reduce_global :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     red_param -> t -> Equiv.form -> Equiv.form
 
   val reduce :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   (** Reduces once at head position *)
   val reduce_head1 :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
 
@@ -60,21 +56,18 @@ module type S = sig
   (** {2 Conversion from a sequent } *)
 
   val conv_term :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool
 
   val conv_global :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     ?param:red_param ->
     t ->
     Equiv.form -> Equiv.form -> bool
 
   val conv_kind :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context ->
     ?param:red_param ->
     t -> 'a Equiv.f_kind ->

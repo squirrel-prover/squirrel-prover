@@ -19,45 +19,6 @@ exception Deprecated_Var_found
 exception Deprecated_Not_name
 
 (*------------------------------------------------------------------*)
-(** Deprecated. *)
-class deprecated_find_name ~(context:ProofContext.t) exact name = object (_self)
-  inherit Iter.deprecated_iter_approx_macros ~exact ~context as super
-
-  method visit_message t = match t with
-    | Term.Name (ns,_) -> if ns.s_symb = name then raise Deprecated_Name_found
-    | Term.Var m
-      when Vars.ty m <> Type.ttimestamp && Vars.ty m <> Type.tindex ->
-      (* FEATURE: this function is only used in [SystemModifiers], where
-         variables are probabbly fine, regardless of their types. *)
-      raise Deprecated_Var_found
-    | _ -> super#visit_message t
-end
-
-(** Deprecated, use [get_actions_ext]. *)
-class deprecated_get_actions ~(context:ProofContext.t) = object (_self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~context as super
-
-  val mutable actions : Term.term list = []
-  method get_actions = actions
-
-  method visit_macro mn _args a =
-    let cleara, a' =
-      if mn.s_symb = Symbols.Classic.inp then
-        true,  Term.mk_pred a
-
-      (* no implemented, as this is a depracated function *)
-      else if Symbols.is_quantum_macro mn.s_symb then assert false
-      else false, a
-    in
-    if not (List.mem a' actions) then
-      actions <- a' :: actions;
-
-    (* remove [(a,false)] if it appeared in [actions] *)
-    if cleara then
-      actions <- List.filter (fun a0 -> a0 <> a) actions
- end
-
-(*------------------------------------------------------------------*)
 (** occurrence of a name [n(i,...,j)] *)
 type deprecated_name_occ = Term.term list Iter.occ
 

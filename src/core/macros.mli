@@ -293,13 +293,6 @@ val declare_global :
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
-(** A expand context:
-    - [InSequent]: when in a sequent. Most common mode.
-    - [InGlobal {inputs}]: when in a global macro definition.
-      In that case, [inputs] are the inputs variables of the global
-      macro we are doing the expansion in. *)
-type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
-
 (*------------------------------------------------------------------*)
 (** [unfol env m args rec_arg] unfolds the macro [m] with arguments
     [args] and the recursive argument [rec_arg] in system
@@ -339,7 +332,6 @@ type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
     supported.
 *)
 val unfold :
-  ?expand_context:expand_context ->
   ?unfold_opaque:bool ->
   Env.t ->
   Term.msymb ->

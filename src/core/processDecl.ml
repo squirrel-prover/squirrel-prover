@@ -1929,13 +1929,6 @@ let declare table decl : Symbols.table * Goal.t list =
     in
     ProcessSystem.declare_system table exec_model sdecl.sname projs sdecl.sprocess
 
-  | Decl.Decl_system_modifier sdecl ->
-    let new_lemma, proof_obls, table =
-      SystemModifiers.declare_system table sdecl
-    in
-    let table = omap_dflt table (Lemma.add_lemma `Lemma ^~ table) new_lemma in
-    table, proof_obls
-
   | Decl.Decl_dh (h, g, ex, om, ctys) ->
      let ctys =
        parse_ctys table ctys ["group"; "exponents"]

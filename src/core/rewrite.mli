@@ -16,7 +16,6 @@ val rewrite_head :
   Symbols.table ->
   Params.t ->
   Vars.env ->
-  Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
   SE.t ->
   rw_rule ->
@@ -37,7 +36,6 @@ val rewrite :
   Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)
   SE.context ->
-  Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
   rw_rule ->
@@ -54,7 +52,6 @@ val rewrite_exn :
   Params.t ->
   Vars.env ->                   (* used to get variable tags when matching *)
   SE.context ->
-  Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
   rw_rule ->

@@ -890,38 +890,6 @@ let is_prefix strict a b =
     | `Strict -> i > 0
 
 (*------------------------------------------------------------------*)
-(** Give the **internal** definition of a global macro.
-    Meaningless when working in a sequent.
-    Used for global rewriting, when rewriting in another global macro. *)
-let get_def_glob_internal
-    (table : Symbols.table) (system : SE.fset)
-    (symb : Term.msymb)  ~(args : Term.term list)
-    ~(ts : Term.term) (inputs : Vars.vars option)
-  : Term.term * Vars.vars
-  =
-  assert (is_global table symb.s_symb);
-
-  let data = as_global_macro (Symbols.Macro.get_data symb.s_symb table) in
-  let body = get_body table system data in
-
-  let subst =
-    (match inputs with
-     | None -> []
-     | Some inputs ->
-       let prefix_inputs = List.take (List.length data.inputs) inputs in       
-       List.map2
-         (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
-         data.inputs prefix_inputs
-    )
-    @
-    List.map2
-      (fun i t' -> Term.ESubst (Term.mk_var i, t'))
-      data.indices args
-  in
-  let subst = Term.ESubst (Term.mk_var data.ts, ts) :: subst in
-  (Term.subst subst body, data.inputs)
-
-(*------------------------------------------------------------------*)
 (** Exported, see `.mli`. *)
 let global_defined_from
     table (m : Symbols.macro) : [`Strict | `Large] * Action.shape
@@ -1181,8 +1149,6 @@ let unfold_structured_macro
     ) [] data.bodies
 
 (*------------------------------------------------------------------*)
-type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
-
 
 let not_happens_macro_body ty ts =
   { vars=[];
@@ -1204,7 +1170,6 @@ let init_macro_body ty =
 
 (*------------------------------------------------------------------*)
 let _unfold
-    ~(expand_context : expand_context)
     ~(unfold_opaque : bool)
     (env     : Env.t)
     (symb    : Term.msymb)
@@ -1513,43 +1478,26 @@ let _unfold
     let fset_system = SE.to_fset system in
     
     try
-      begin
-        match expand_context with
-        | InSequent ->
-          begin
-            let action =
-              match rec_arg with
-              |Term.Action(asymb, aidx) -> Action.of_term asymb aidx table
-              | _ -> match_failed ()
-            in
-            let {action = (strict, glob_a)} as gdata = get_global_data gdat in
+      let action =
+        match rec_arg with
+        |Term.Action(asymb, aidx) -> Action.of_term asymb aidx table
+        | _ -> match_failed ()
+      in
+      let {action = (strict, glob_a)} as gdata = get_global_data gdat in
 
-            (* We are unfolding [m@B] for a global macro [m] that we
-               know is not defined at [B]. We decided to refuse to
-               unfold the macro. Alternatively, we could decide to
-               return a default value (e.g. [witness]). *)
-            if not (is_prefix strict glob_a (Action.get_shape action)) then
-              unfold_failed ();
-            
-            [{
-              vars = [];
-              pattern = None;
-              when_cond = Term.mk_true;
-              out = get_def_glob ~allow_dummy:false fset_system table
-                  symb ~args action gdata}]
-          end
+      (* We are unfolding [m@B] for a global macro [m] that we
+         know is not defined at [B]. We decided to refuse to
+         unfold the macro. Alternatively, we could decide to
+         return a default value (e.g. [witness]). *)
+      if not (is_prefix strict glob_a (Action.get_shape action)) then
+        unfold_failed ();
 
-        | InGlobal ins ->
-          let t, _ =
-            get_def_glob_internal
-              table fset_system
-              symb ~args ~ts:rec_arg (Some ins.inputs)
-          in
-          [{ vars = [];
-             pattern = None;
-             when_cond = Term.mk_true;
-             out = t}]
-      end
+      [{
+        vars = [];
+        pattern = None;
+        when_cond = Term.mk_true;
+        out = get_def_glob ~allow_dummy:false fset_system table
+            symb ~args action gdata}]
 
     with MatchFailed ->
       let {action = (strict, glob_a)} as gdata = get_global_data gdat in
@@ -1576,7 +1524,6 @@ let _unfold
       glob_bodies
 
 let unfold
-    ?(expand_context = InSequent)
     ?(unfold_opaque = false)
     (env     : Env.t)
     (symb    : Term.msymb)
@@ -1584,7 +1531,7 @@ let unfold
     (rec_arg : Term.term) :
   [ `Results of body list | `Unknown ]
   =
-  match _unfold ~expand_context ~unfold_opaque env symb args rec_arg with
+  match _unfold ~unfold_opaque env symb args rec_arg with
   | exception UnfoldFailed -> `Unknown
   | bodies -> `Results (List.rev bodies)
 

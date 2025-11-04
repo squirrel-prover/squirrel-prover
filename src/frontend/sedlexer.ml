@@ -176,11 +176,9 @@ let rec token buf =
   | "fresh" -> !?FRESH
   | "fun" -> !?FUN
   | "game" -> !?GAME
-  | "gcca" -> !?GCCA
   | "gdh" -> !?GDH
   | "generalize" -> !?GENERALIZE
   | "global" -> !?GLOBAL
-  | "gprf" -> !?GPRF
   | "hash" -> !?HASH
   | "have" -> !?HAVE
   | "ghave" -> !?GHAVE
@@ -225,7 +223,6 @@ let rec token buf =
   | "Rand" -> !?RAND
   | "reduce" -> !?REDUCE
   | "remember" -> !?REMEMBER
-  | "rename" -> !?RENAME
   | "repeat" -> !?REPEAT
   | "return" -> !?RETURN
   | "revert" -> !?REVERT

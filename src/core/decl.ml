@@ -59,19 +59,6 @@ type system_decl = {
   sprojs        : lsymb list option;
   sprocess      : Process.Parse.t;
 }
-
-(*------------------------------------------------------------------*)
-type global_rule =
-  | Rename  of Typing.global_formula
-  | PRF     of Typing.bnds * Typing.term
-  | CCA     of Typing.bnds * Typing.term
-  | Rewrite of TacticsArgs.rw_arg list
-
-type system_modifier = { 
-  from_sys : SE.Parse.t;
-  modifier : global_rule;
-  name     : Symbols.lsymb
-}
             
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
@@ -129,7 +116,6 @@ type declaration_i =
   | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
-  | Decl_system_modifier  of system_modifier
 
   | Decl_dh of
       Symbols.OpData.dh_hyp list * lsymb *

@@ -416,7 +416,7 @@ let indcca_param
                  table (ES.params s)
                  Vars.empty_env (* only local variables,
                                    hence [env] is useless here *)
-                 secontx InSequent hyps TacticsArgs.Once
+                 secontx hyps TacticsArgs.Once
                  rule
                  Equiv.(Global (Atom (Equiv {terms = [t]; bound = None})))
                  (* TODO: Concrete: Probably something to do to create

@@ -19,8 +19,6 @@ type reduction_state = {
   system    : SE.context;
   hyps      : THyps.hyps;
   red_param : red_param;
-  expand_context : Macros.expand_context;
-    (** Expansion mode for macros. See [Macros.expand_context]. *)
 }
 
 module Core : (ReductionCore.Sig with type state = reduction_state) = struct
@@ -72,7 +70,6 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
   (*------------------------------------------------------------------*)
   (** Make a reduction state directly *)
   let mk_state0
-      ?(expand_context = Macros.InSequent)
       ?(hyps      = THyps.empty)
       ?(params    = Params.empty )
       ~(system    : SE.context)
@@ -81,10 +78,9 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
       (table      : Symbols.table)
     : state 
     =
-    { table; system; params; red_param; hyps; expand_context; vars; }
+    { table; system; params; red_param; hyps; vars; }
 
   let mk_state
-      ?(expand_context = Macros.InSequent)
       (pc : ProofContext.t) ~red_param
     : state
     =
@@ -96,7 +92,6 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
       vars   = env.vars;
       hyps   = pc.hyps; 
       red_param;
-      expand_context;
     }
 
   (*------------------------------------------------------------------*)
@@ -466,7 +461,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
     Match.reduce_delta1
       ~constr:st.red_param.constr
       ~delta:st.red_param.delta
-      ~mode:st.expand_context (to_env st) st.hyps t
+      (to_env st) st.hyps t
 
   and reduce_builtin1 (st : state) (t : Term.t) : Term.t * head_has_red =
     if not (st.red_param.builtin && Library.Int.is_loaded st.table) then t, False
@@ -553,7 +548,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
             Rewrite.rewrite_head
               ~param:Match.default_param 
               (* no reduction here, to keep performances reasonable *)
-              st.table st.params st.vars st.expand_context st.hyps st.system.set
+              st.table st.params st.vars st.hyps st.system.set
               rule t 
           with
           | None -> None
@@ -819,25 +814,21 @@ module type S = sig
 
   (*------------------------------------------------------------------*)
   val to_state :
-    ?expand_context:Macros.expand_context  ->
     ?system:SE.context ->
     ?vars:Vars.env ->
     red_param -> t -> state
 
   (*------------------------------------------------------------------*)
   val reduce_global : 
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> Equiv.form -> Equiv.form
 
   val reduce : 
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   (** reduces once at head position *)
   val reduce_head1 :
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
 
@@ -859,22 +850,19 @@ module type S = sig
   (*------------------------------------------------------------------*)
   (** {2 conversion from a sequent } *)
 
-  val conv_term :
-    ?expand_context:Macros.expand_context -> 
+  val conv_term : 
     ?system:SE.context -> 
     ?param:red_param ->
     t ->
     Term.term -> Term.term -> bool
 
   val conv_global : 
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->
     t ->
     Equiv.form -> Equiv.form -> bool
 
   val conv_kind : 
-    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->
     t -> 'a Equiv.f_kind ->
@@ -887,7 +875,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (** Build a reduction state from a sequent. 
       [system] is the system of the term being reduced. *)
   let to_state
-      ?(expand_context : Macros.expand_context = InSequent) 
       ?(system   : SE.context option)
       ?(vars     : Vars.env option) (* overloads [s] variables *)
       (red_param : red_param)
@@ -912,19 +899,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       system = new_context;
       vars;
       red_param;
-      hyps;
-      expand_context; } 
+      hyps; } 
 
   (*------------------------------------------------------------------*)
   (** Exported.
       We need type introspection here. *)
   let reduce_head1 (type a) 
-      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       (param : red_param) (s : S.t)
       (k : a Equiv.f_kind) (x : a) : a * head_has_red
     =
-    let st = to_state ?expand_context ?system param s in
+    let st = to_state ?system param s in
     match k with
     | Local_t  -> reduce_head1_term   st x
     | Global_t -> reduce_head1_global st x
@@ -941,7 +926,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let reduce_global
-      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       (param : red_param) (s : S.t) (e : Equiv.form) 
     : Equiv.form 
@@ -983,7 +967,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
             (* reduce [t], which is w.r.t. [pair] *)
             let system = { system with set = (oget system.pair :> SE.t); } in
-            let state = to_state ?expand_context ~system ~vars param s in
+            let state = to_state ~system ~vars param s in
             let t = reduce_term state t in
 
             Equiv.Let (v,t,f)
@@ -999,14 +983,14 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         Equiv.Impl (reduce_g vars e1, reduce_g vars e2)
 
       | Equiv.Atom (Reach f) ->
-        let state = to_state ?expand_context ~system ~vars param s in
+        let state = to_state ~system ~vars param s in
         let f = reduce_term state f.formula in
         Equiv.Atom (Reach {formula =f; bound = None})
        (*TODO:Concrete : Probably something to do to create a bounded goal*)
 
       | Equiv.Atom (Equiv e) ->
         let system = { system with set = (oget system.pair :> SE.t); } in
-        let state = to_state ?expand_context ~system ~vars param s in
+        let state = to_state ~system ~vars param s in
 
         let e = List.map (reduce_term state) e.terms in
         Equiv.Atom (Equiv.Equiv {terms = e; bound = None})
@@ -1017,13 +1001,13 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           (* terms in [simpl_args] are single terms (thus [k=1])
              defined in no systems (thus the empty system) *)
           let system = { system with set = (SE.fset_empty ~k:1 env.table :> SE.t); } in
-          let state = to_state ?expand_context ~system ~vars param s in
+          let state = to_state ~system ~vars param s in
           List.map (reduce_term state) pa.simpl_args
         in
         let multi_args =
           List.map (fun (se,args) ->
               let system = { system with set = se; } in
-              let state = to_state ?expand_context ~system ~vars param s in
+              let state = to_state ~system ~vars param s in
               ( se, List.map (reduce_term state) args )
             ) pa.multi_args
         in
@@ -1033,19 +1017,18 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (** We need type introspection there *)
   let reduce (type a) 
-      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       (param : red_param)
       (s : S.t) (k : a Equiv.f_kind) (x : a) : a 
     =
-    let st = to_state ?expand_context ?system param s in
+    let st = to_state ?system param s in
     match k with
     | Local_t  -> reduce_term st x
-    | Global_t -> reduce_global ?expand_context ?system param s x
+    | Global_t -> reduce_global ?system param s x
     | Any_t ->
       match x with
       | Local  x -> Local  (reduce_term st x)
-      | Global x -> Global (reduce_global ?expand_context ?system param s x)
+      | Global x -> Global (reduce_global ?system param s x)
 
   (*------------------------------------------------------------------*)
   (** Destruct [x] according to an arbitrary destruct function [destr_f], 
@@ -1157,41 +1140,38 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (*------------------------------------------------------------------*)
   (** Exported. *)
   let conv_term
-      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
       (s : S.t)
       (t1 : Term.term) (t2 : Term.term) : bool
     =
-    let state = to_state ?expand_context ?system param s in
+    let state = to_state ?system param s in
     conv state t1 t2
 
   (** Exported. *)
   let conv_global
-      ?(expand_context : Macros.expand_context option)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
       (s : S.t)
       (e1 : Equiv.form) (e2 : Equiv.form) : bool
     =
-    let state = to_state ?expand_context ?system param s in
+    let state = to_state ?system param s in
     conv_g state e1 e2
 
   (** We need type introspection there *)
   let conv_kind (type a) 
-      ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
       (s : S.t) (k : a Equiv.f_kind)
       (x1 : a) (x2 : a) : bool
     =
     match k with
-    | Local_t  -> conv_term   ~expand_context ?system ~param s x1 x2
-    | Global_t -> conv_global ~expand_context ?system ~param s x1 x2
+    | Local_t  -> conv_term   ?system ~param s x1 x2
+    | Global_t -> conv_global ?system ~param s x1 x2
     | Any_t ->
       match x1, x2 with
-      | Local  x1, Local  x2 -> conv_term   ~expand_context ?system ~param s x1 x2
-      | Global x1, Global x2 -> conv_global ~expand_context ?system ~param s x1 x2
+      | Local  x1, Local  x2 -> conv_term   ?system ~param s x1 x2
+      | Global x1, Global x2 -> conv_global ?system ~param s x1 x2
       | _, _ -> false
 
 end
