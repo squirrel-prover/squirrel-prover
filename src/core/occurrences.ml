@@ -733,6 +733,17 @@ let get_rec_args_ext
       in
       Tactics.soft_failure (Tactics.Failure err_str)
 
+
+    | Fun (_, _) when mode = PTimeSI &&
+                      not(quantum)
+                   && not (HighType.is_classical env.table (Term.ty t))
+      ->
+      let err_str =
+        Fmt.str "terms contain a non-ptime function: @[%a@]"
+          Term.pp_dbg t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
     (* In PTimeSI + quantum mode, we only allow for now either qatt or witness
        functions as non classical ptime functions. *)
     | Fun (f, _) when (mode = PTimeNoSI || mode = PTimeSI)

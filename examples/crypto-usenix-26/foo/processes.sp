@@ -328,7 +328,7 @@ process mixer_open_collect_CCA
 ------------------------------------------------------------------- *)
 
 (* Randomness provided to the adversarial function `att'` *)
-type att_rand[large].
+type att_rand[serializable,large].
 
 name n_v0 : att_rand.
 name n_v1 : att_rand.

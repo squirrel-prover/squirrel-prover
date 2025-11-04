@@ -1,3 +1,16 @@
+###  Fix ptime verifications in legacy crypto applications
+  [commit: `TODO`]
+
+By adding checks that terms that need to be simulated in ptime do not
+contain quantum values, we fix an older unsoundness issue, where it
+was not checked that such terms did not contain function symbols of a
+type depending on non instantiated type variables that might not be
+serializable.
+
+If proofs are broken by this new check, it can probably be fixed by
+adding the [serializable] tag to the needed types. (see the update of
+some tests in this commit)
+
 ### Type system for non-deduction
   [commit:`4d5ed2a8`]
 

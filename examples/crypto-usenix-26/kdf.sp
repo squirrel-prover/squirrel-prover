@@ -2,7 +2,7 @@ include Core.
 
 channel c.
 
-type key.
+type key[serializable].
 
 op h : message * key -> message.
 

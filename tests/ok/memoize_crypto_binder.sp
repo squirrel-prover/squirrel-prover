@@ -2,8 +2,8 @@ include Core.
 
 channel c.
 
-type key.
-type rand.
+type key [serializable].
+type rand [serializable].
 
 op enc : message -> rand -> key -> message.
 op dec : message -> key -> message.

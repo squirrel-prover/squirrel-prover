@@ -960,7 +960,17 @@ let get_macro_occs
 
 
     (* See [Occurrences.get_rec_args_ext] for the three below conditions] *)
-        
+
+    | Fun (_, _) when mode = PTimeSI &&
+                      not(quantum)
+                   && not (HighType.is_classical env.table (Term.ty t))
+      ->
+      let err_str =
+        Fmt.str "terms contain a non-ptime function: @[%a@]"
+          Term.pp_dbg t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
     (* In PTimeSI + quantum mode, we only allow for now either qatt or
        witness functions as non classical ptime functions. *)
     | Fun (f, _) when mode = PTimeSI && quantum

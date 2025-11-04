@@ -99,7 +99,7 @@ Qed.
 
 (** # Similar example relying on PRF requires time sensitivity *)
 
-type kty.
+type kty[serializable].
 abstract h : message * kty -> message.
 
 game PRF = {

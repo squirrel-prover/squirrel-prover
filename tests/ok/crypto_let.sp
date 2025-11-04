@@ -2,7 +2,7 @@ include Core.
 
 (* TODO : enlever les admits, remplacer par un axiom étant les subgoals.*)
 
-type kty.
+type kty [serializable].
 abstract h : message * kty -> message.
 
 game EUF = {
