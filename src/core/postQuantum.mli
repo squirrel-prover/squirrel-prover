@@ -18,8 +18,3 @@ quantum simulator.
 *)  
 val check_quantum_simulable:
   ProofContext.t -> Term.term list -> bool
-
-(* DEPRECATED *)
-val is_attacker_call_synchronized :
-  ProofContext.t -> Constr.models -> Term.term list -> bool
-

@@ -420,19 +420,6 @@ let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.query_happens ~precise s a
 
-(* DEPRECATED *)
-let check_pq_sound_sequent s =
-  match conclusion s with
-  | Atom (Equiv.Equiv e) ->
-      let models = get_models None s in
-      let cntxt = pair_proof_context s in
-      if not (PostQuantum.is_attacker_call_synchronized cntxt models e.terms) then
-  (*TODO:Concrete : Probably something to do to create a bounded goal*)
-        Tactics.hard_failure Tactics.GoalNotPQSound
-      else
-        s
-  | _ -> s
-
 let check_quantum_simulable_sequent (s : sequent) =
   let env = env s in  
   let bi_system = 
@@ -444,10 +431,7 @@ let check_quantum_simulable_sequent (s : sequent) =
 
 (*------------------------------------------------------------------*)
 let set_equiv_conclusion e j =
-  let new_sequent = set_conclusion Equiv.(Atom (Equiv e)) j in
-  if TConfig.post_quantum (table j) then
-   check_pq_sound_sequent new_sequent
-  else new_sequent
+  set_conclusion Equiv.(Atom (Equiv e)) j
 
 
 let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) conclusion =
@@ -460,9 +444,7 @@ let init ?(no_sanity_check=false) ~env ?(hyp : Equiv.form option) conclusion =
   let new_sequent = { env; proof_context; conclusion } in
   if not no_sanity_check then sanity_check new_sequent;
 
-  if TConfig.post_quantum (env.table) then
-   check_pq_sound_sequent new_sequent
-  else new_sequent
+  new_sequent
 
 let mem_felem i s =
   conclusion_is_equiv s &&

@@ -70,7 +70,6 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
-  | GoalNotPQSound
   | TacticNotPQSound
   | CongrFail
   | GoalNotClosed
@@ -169,7 +168,7 @@ module type S = sig
   type arg
   type judgment
   val eval_abstract :
-    post_quantum:bool -> modifiers:string list ->
+    modifiers:string list ->
     lsymb -> arg list -> judgment tac
 end
 
@@ -179,14 +178,13 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  (** [eval post_quantum modifiers ast] evaluates an AST as a tactic,
-      given a [post_quantum] flag and a list of modifiers.
-      TODO ideally, drop PQ flag as this module should be Squirrel-agnostic *)
-  val eval : post_quantum:bool -> modifiers:string list -> t -> judgment tac
+  (** [eval ~modifiers ast] evaluates an AST as a tactic,
+      given a list of modifiers. *)
+  val eval : modifiers:string list -> t -> judgment tac
 
   (* TODO document; this is the only place where hard/soft failures matter
      so it may be beneficial to move this to ProverTactics *)
-  val eval_judgment : post_quantum:bool -> t -> judgment -> judgment list
+  val eval_judgment : t -> judgment -> judgment list
 
   val pp : t formatter
 

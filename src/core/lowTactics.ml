@@ -3828,7 +3828,6 @@ let intro_tac (simpl : f_simpl) args : gentac =
 
 let () =
   T.register_general "admit"
-    ~pq_sound:true
     (function
       | [] -> fun _ sk fk -> sk [] fk
       | [Args.Term_parsed { pl_desc = Int i}] ->
@@ -3848,13 +3847,11 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "clear"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.clear_tac EquivLT.clear_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "revert"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.revert_tac EquivLT.revert_tac)
 
 (*------------------------------------------------------------------*)
@@ -3886,37 +3883,31 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "reduce"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.reduce_tac EquivLT.reduce_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "destruct"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.destruct_tac EquivLT.destruct_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "left"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.left_tac EquivLT.left_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "right"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.right_tac EquivLT.right_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "exists"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.exists_intro_tac EquivLT.exists_intro_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "apply"
-    ~pq_sound:true
     (genfun_of_any_fun_arg TraceLT.apply_tac EquivLT.apply_tac)
 
 (*------------------------------------------------------------------*)
@@ -3934,20 +3925,17 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_typed "depends"
-    ~pq_sound:true
     (genfun_of_any_pure_fun_arg TraceLT.depends EquivLT.depends)
     Args.(Pair (Timestamp, Timestamp))
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "expand"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.expand_tac EquivLT.expand_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register "expandall"
-    ~pq_sound:true
     (genfun_of_any_pure_fun
        (TraceLT.expand_all_l `All)
        (EquivLT.expand_all_l `All))
@@ -3956,7 +3944,6 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "split"
-    ~pq_sound:true
     (gentac_of_any_tac_arg
        TraceLT.wrap_and_split
        EquivLT.wrap_and_split)
@@ -3964,7 +3951,6 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "weak"
-    ~pq_sound:true
     (genfun_of_any_fun_arg
        TraceLT.weak_tac
        EquivLT.weak_tac)
@@ -3972,7 +3958,6 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "discriminate"
-    ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.discriminate_tac EquivLT.discriminate_tac)
 
 (*------------------------------------------------------------------*)

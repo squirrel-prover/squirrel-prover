@@ -475,5 +475,4 @@ let fresh_global_tac
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "fresh"
-    ~pq_sound:true
     (LowTactics.gentac_of_any_tac_arg fresh_trace_tac fresh_global_tac)

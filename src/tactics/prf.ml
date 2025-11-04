@@ -579,6 +579,5 @@ let prf_tac arg =
 
 let () =
   T.register_typed "prf"
-    ~pq_sound:true
     (LT.genfun_of_pure_efun_arg prf_tac)
     Args.(Pair (Int, Opt Message))

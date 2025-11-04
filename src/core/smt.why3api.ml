@@ -1775,7 +1775,7 @@ let parse_args args table =
 
 let () =
   if not disable_smt then
-    ProverTactics.register_general "smt" ~pq_sound:true
+    ProverTactics.register_general "smt"
       (fun args s sk fk ->
           let args = match args with
             | [Named_args_gen args] -> args

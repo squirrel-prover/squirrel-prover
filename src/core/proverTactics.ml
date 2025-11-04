@@ -3,7 +3,6 @@ open Ppenv
 
 type 'a tac_infos = {
   maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
-  pq_sound : bool;
 }
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
@@ -14,7 +13,7 @@ module TacTable : sig
   val tac_count_table : (string, int) Hashtbl.t
 
   val get :
-    post_quantum:bool -> loc:Location.t ->
+    loc:Location.t ->
     string -> TacticsArgs.parser_arg list ->
     Goal.t Tactics.tac
 
@@ -29,14 +28,11 @@ end = struct
     Hashtbl.add tac_count_table id 0;
     Hashtbl.add table id tacinfo
 
-  let get ~post_quantum ~loc id =
+  let get ~loc id =
     try let tac = Hashtbl.find table id in
-      if not tac.pq_sound && post_quantum then
-        Tactics.hard_failure Tactics.TacticNotPQSound
-      else
-        let count = Hashtbl.find tac_count_table id in
-        Hashtbl.replace tac_count_table id (count+1);
-        tac.maker
+      let count = Hashtbl.find tac_count_table id in
+      Hashtbl.replace tac_count_table id (count+1);
+      tac.maker
     with
       | Not_found -> Tactics.hard_failure ~loc
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
@@ -60,7 +56,7 @@ module AST :
   type arg = TacticsArgs.parser_arg
   type judgment = Goal.t
 
-  let autosimpl () = TacTable.get ~post_quantum:false ~loc:Location._dummy "autosimpl" []
+  let autosimpl () = TacTable.get ~loc:Location._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
   (** Modify a tactic to decorate its unlocated failures (passed to the
@@ -70,9 +66,9 @@ module AST :
   let re_raise_tac loc tac s sk fk : Tactics.a =
     tac s sk (function (None,e) -> fk (Some loc, e) | x -> fk x)
 
-  let eval_abstract ~post_quantum ~modifiers id args =
+  let eval_abstract ~modifiers id args =
     let loc, id = Location.loc id, Location.unloc id in
-    let tac = re_raise_tac loc (TacTable.get ~post_quantum ~loc id args) in
+    let tac = re_raise_tac loc (TacTable.get ~loc id args) in
     match modifiers with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
@@ -92,7 +88,7 @@ type judgment = Goal.t
 
 type tac = judgment Tactics.tac
 
-let register_general id ?(pq_sound=false) f =
+let register_general id f =
   let () = assert (not (Hashtbl.mem table id)) in
 
   let f args s sk fk =
@@ -101,7 +97,7 @@ let register_general id ?(pq_sound=false) f =
     f args s sk fk
   in
 
-  add_tac id { maker = f ; pq_sound }
+  add_tac id { maker = f }
 
 let register_macro id ast =
   register_general id
@@ -111,7 +107,7 @@ let register_macro id ast =
           Format.sprintf "tactic %S does not accept any argument." id in
         Tactics.(hard_failure (Failure msg))
       else
-        AST.eval ~post_quantum:true ~modifiers:[] ast)
+        AST.eval ~modifiers:[] ast)
 
 let convert_args j parser_args tactic_type =
   let env, conc =
@@ -123,8 +119,8 @@ let convert_args j parser_args tactic_type =
   in
   HighTacticsArgs.convert_args env parser_args tactic_type conc
 
-let register id ?(pq_sound=false) f =
-  register_general id ~pq_sound
+let register id f =
+  register_general id 
     (function
       | [] ->
         fun s sk fk -> begin match f s with
@@ -133,9 +129,8 @@ let register id ?(pq_sound=false) f =
           end
       | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-let register_typed id ?(pq_sound=false) f sort =
+let register_typed id f sort =
   register_general id
-    ~pq_sound
     (fun args s sk fk ->
        match convert_args s args (TacticsArgs.Sort sort) with
        | TacticsArgs.Arg th  ->
@@ -167,7 +162,6 @@ let pp_list_count (file:string) : unit =
 (*-------- Declare Tactics here ! TODO move as commands ---------------*)
 let () =
   register_general "lemmas"
-    ~pq_sound:true
     (fun _ s sk fk ->
        let table = Goal.table s in
        Printer.prt `Result "%a" Lemma.print_all table;
@@ -175,5 +169,4 @@ let () =
 
 let () =
   register_general "id"
-    ~pq_sound:true
     (fun _ -> Tactics.id)

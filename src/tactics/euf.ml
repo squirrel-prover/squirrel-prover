@@ -366,5 +366,4 @@ let euf_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "euf"
-    ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg euf_tac)

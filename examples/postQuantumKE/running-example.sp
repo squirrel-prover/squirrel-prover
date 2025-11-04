@@ -38,9 +38,6 @@ include Core.
 (* Global Declarations *)
 (***********************)
 
-(* Enable post-quantum checks so that results are post-quantum sound. *)
-set postQuantumSound = true.
-
 (* Declare a hash function h, that is assumed to be a prf. *)
 hash h.
 

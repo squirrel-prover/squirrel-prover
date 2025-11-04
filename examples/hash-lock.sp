@@ -9,8 +9,6 @@ T --> R : < nT, h(<nR,nT>,kT) >
 R --> T : ok
 *******************************************************************************)
 
-set postQuantumSound = true.
-
 include Core.
 
 hash h

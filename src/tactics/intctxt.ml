@@ -404,5 +404,4 @@ let intctxt_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   LT.T.register_general "intctxt"
-    ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg intctxt_tac)

@@ -313,8 +313,7 @@ let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state =
     if not (Bullets.tactic_allowed ps.bullets) then
       Tactics.hard_failure (Failure "bullet needed before tactic");
     
-    let post_quantum = TConfig.post_quantum (ps.table) in
-    let new_j = ProverTactics.AST.eval_judgment ~post_quantum tac judge in
+    let new_j = ProverTactics.AST.eval_judgment tac judge in
     begin
       try
         let bullets = Bullets.expand_goal (List.length new_j) ps.bullets in

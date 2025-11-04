@@ -776,5 +776,4 @@ let indcca1_tac args =
 
 let () =
   T.register_general "cca1"
-    ~pq_sound:true
     (LT.gentac_of_etac_arg indcca1_tac)

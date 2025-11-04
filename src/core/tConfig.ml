@@ -99,9 +99,6 @@ let v_auto_fadup = Param_bool true
 let s_new_ind = "newInduction"
 let v_new_ind = Param_bool false
 
-let s_post_quantum = "postQuantumSound"
-let v_post_quantum = Param_bool false
-
 let s_post_quantum_equivs = "postQuantumEquivs"
 let v_post_quantum_equivs = Param_bool false
 
@@ -140,7 +137,6 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_show_strengthened_hyp v_show_strengthened_hyp
   |> declare s_auto_fadup            v_auto_fadup
   |> declare s_new_ind               v_new_ind
-  |> declare s_post_quantum          v_post_quantum
   |> declare s_post_quantum_equivs   v_post_quantum_equivs 
   |> declare s_deduction_order_guard v_deduction_order_guard
   |> declare s_quantum_check_toplevel v_quantum_check_toplevel
@@ -188,7 +184,6 @@ let strict_let_mode         = get_bool   s_strict_let_mode
 let show_strengthened_hyp   = get_bool   s_show_strengthened_hyp
 let auto_fadup              = get_bool   s_auto_fadup
 let new_ind                 = get_bool   s_new_ind
-let post_quantum            = get_bool   s_post_quantum
 let post_quantum_equivs     = get_bool   s_post_quantum_equivs
 let deduction_order_guard   = get_bool   s_deduction_order_guard
 let quantum_check_toplevel  = get_bool   s_quantum_check_toplevel

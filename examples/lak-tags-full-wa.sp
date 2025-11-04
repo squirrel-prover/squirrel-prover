@@ -4,8 +4,6 @@
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
 (* R --> T: h(<h(<nR, nT, tag1>, k), nr, tag2>, k)*)
 
-set postQuantumSound = true.
-
 include Core.
 
 hash h

@@ -219,5 +219,4 @@ let typing_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "typing"
-    ~pq_sound:false
     (LowTactics.gentac_of_ttac_arg typing_tac)

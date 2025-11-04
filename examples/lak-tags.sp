@@ -14,8 +14,6 @@ We consider tags in the messages (tag1 and tag2) to ease the proof.
 This is a "light" model without the last check of T.
 *******************************************************************************)
 
-set postQuantumSound=true.
-
 include Core.
 
 hash h

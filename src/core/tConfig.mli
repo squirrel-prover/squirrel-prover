@@ -63,11 +63,6 @@ val auto_fadup : Symbols.table -> bool
 (** New equivalence induction principle. *)
 val new_ind : Symbols.table -> bool
 
-(** Post-quantum soundness. 
-    This is the old DEPRECATED quantum mode, which is no longer
-    supported. *)
-val post_quantum : Symbols.table -> bool
-
 (** All equivs become PQ.
     Temporary mode, until equivalences are properly decorated with a
     bit indicating whether they are quantum or classical. *)

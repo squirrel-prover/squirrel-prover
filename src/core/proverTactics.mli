@@ -14,7 +14,6 @@ module AST : Tactics.AST_sig
 (** General-purpose tactic registration function. *)
 val register_general :
   string ->
-  ?pq_sound:bool ->
   (TacticsArgs.parser_arg list -> tac) -> unit
 
 (* Register a macro, built using the AST. *)
@@ -28,17 +27,15 @@ val register_macro : string -> AST.t -> unit
    or with typed arguments (for [register_typed]). *)
 
 val register : string ->
-  ?pq_sound:bool ->
   (judgment -> judgment list) -> unit
 
 val register_typed :
   string ->
-  ?pq_sound:bool ->
   ('a TacticsArgs.arg -> judgment -> judgment list) ->
   'a TacticsArgs.sort  -> unit
 
 val get :
-  post_quantum:bool -> loc:Location.t ->
+  loc:Location.t ->
   string -> TacticsArgs.parser_arg list -> tac
 
 (** Print usage count for all tactics. *)

@@ -4,8 +4,6 @@
 
 include Core.
 
-set postQuantumSound=true.
-
 hash h
 name k : message.
 name nfresh : message.

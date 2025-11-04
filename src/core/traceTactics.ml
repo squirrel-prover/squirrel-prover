@@ -50,7 +50,6 @@ let true_intro (s : TS.t) =
 
 let () =
   T.register "true"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun true_intro)
 
 (*------------------------------------------------------------------*)
@@ -292,7 +291,6 @@ let localize h h' s =
 
 let () =
   T.register_general "localize"
-    ~pq_sound:true
     (function
        | TacticsArgs.[String_name h; NamingPat h'] ->
            fun s sk fk ->
@@ -518,7 +516,6 @@ let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)
 
 let () =
   T.register_general "rewrite equiv"
-    ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)
 
 (*------------------------------------------------------------------*)
@@ -556,7 +553,6 @@ let congruence_tac (s : TS.t) =
 
 let () =
   T.register "congruence"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun congruence_tac)
 
 (*------------------------------------------------------------------*)
@@ -681,7 +677,6 @@ let const_tac (Args.Term (ty, f, loc)) (s : TS.t) =
 
 let () =
   T.register_typed "const"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg const_tac)
     Args.((Term : _ sort))
 
@@ -727,7 +722,6 @@ let eq_names (s : TS.t) =
 
 let () =
   T.register "eqnames"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_names)
 
 (*------------------------------------------------------------------*)
@@ -921,7 +915,6 @@ let substitute_tac arg s =
 
 let () =
   T.register_typed "subst"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg substitute_tac)
     Args.(Pair (Term, Term))
 
@@ -947,7 +940,6 @@ let exec (Args.Message (a,_)) s =
 
 let () =
   T.register_typed "executable"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg exec)
     Args.Timestamp
 
@@ -1386,7 +1378,6 @@ let project s =
 
 let () =
   T.register "project"
-    ~pq_sound:true
      (LowTactics.genfun_of_pure_tfun project)
 
 (*------------------------------------------------------------------*)
@@ -1478,6 +1469,5 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
 
 let () =
   T.register_typed "collision"
-    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg collision_resistance)
     Args.(Opt String)

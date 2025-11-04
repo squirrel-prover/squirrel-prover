@@ -330,7 +330,6 @@ let cdh_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "cdh"
-    ~pq_sound:false
     (LowTactics.gentac_of_ttac_arg cdh_tac)
 
 (*------------------------------------------------------------------*)
@@ -342,5 +341,4 @@ let gdh_tac args s =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "gdh"
-    ~pq_sound:false
     (LowTactics.gentac_of_ttac_arg gdh_tac)

@@ -48,7 +48,6 @@ admits.
 include Core.
 
 set timeout=10.
-set postQuantumSound=true.
 
 channel cR
 channel cT

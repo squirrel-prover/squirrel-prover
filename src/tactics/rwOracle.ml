@@ -241,5 +241,4 @@ let rewrite_oracle_tac args s sk fk =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "rewrite oracle"
-    ~pq_sound:false
     (LT.gentac_of_etac_arg rewrite_oracle_tac)

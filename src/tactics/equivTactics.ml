@@ -125,7 +125,6 @@ let refl_tac (s : ES.t) =
 
 let () =
   T.register "refl"
-    ~pq_sound:true
     (LT.genfun_of_efun refl_tac)
 
 (*------------------------------------------------------------------*)
@@ -152,7 +151,6 @@ let sym_tac (s : ES.t) : Goal.t list =
 
 let () =
   T.register "sym"
-    ~pq_sound:true
     (LT.genfun_of_efun sym_tac)
 
 (*------------------------------------------------------------------*)
@@ -378,7 +376,6 @@ let trans_tac args = wrap_fail (trans_tac args)
 
 let () =
   T.register_general "trans"
-    ~pq_sound:true
     (LT.genfun_of_efun_arg trans_tac)
 
 (*------------------------------------------------------------------*)
@@ -743,7 +740,6 @@ let enrich_tac args s sk fk =
 
 let () =
   T.register_general "enrich"
-    ~pq_sound:true
     (LT.gentac_of_etac_arg enrich_tac)
 
 
@@ -1722,7 +1718,6 @@ let deduce args = wrap_fail (deduce args)
 
 let () =
   T.register_general "deduce"
-    ~pq_sound:true
     (LT.genfun_of_efun_arg deduce)
 
 
@@ -2401,7 +2396,6 @@ let enckp arg (s : ES.t) =
 
 let () =
   T.register_typed "enckp"
-    ~pq_sound:true
     (LT.genfun_of_efun_arg enckp)
     Args.(Pair (Int, Pair (Opt Message,Opt Message)))
 
@@ -2599,7 +2593,6 @@ let xor arg (s : ES.t) =
 
 let () =
   T.register_typed "xor"
-    ~pq_sound:true
     (LT.genfun_of_pure_efun_arg xor)
     Args.(Pair (Int, Pair (Opt Message, Opt Message)))
 

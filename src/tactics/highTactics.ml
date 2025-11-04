@@ -23,13 +23,11 @@ let bad_args = LT.bad_args
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "case"
-    ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "assumption"
-    ~pq_sound:true
     (LT.gentac_of_any_tac_arg
        TraceTactics.assumption_tac
        EquivTactics.assumption_tac)
@@ -37,7 +35,6 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "constraints"
-    ~pq_sound:true
     (LT.gentac_of_any_tac_arg
        TraceTactics.constraints_tac
        EquivTactics.constraints_tac)
@@ -45,12 +42,10 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "fa"
-    ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "induction"
-    ~pq_sound:true
     (LT.gentac_of_any_tac_arg
        (LT.TraceLT.induction_tac ~dependent:false)
        EquivTactics.old_or_new_induction)
@@ -100,33 +95,27 @@ let tac_auto (args : 'a list) ~(strong:bool) ~(close:bool) : Goal.t Tactics.tac 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "autosimpl"
-    ~pq_sound:true
     tac_autosimpl
 
 let () =
   T.register_general "simpl"
-    ~pq_sound:true
     (tac_auto ~close:false ~strong:true)
 
 let () =
   T.register_general "auto"
-    ~pq_sound:true
     (tac_auto ~close:true ~strong:true)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "have"
-    ~pq_sound:true
     (LT.have_tac auto)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "rewrite"
-    ~pq_sound:true
     (LT.rewrite_tac auto)
 
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "intro"
-    ~pq_sound:true
     (LT.intro_tac auto)

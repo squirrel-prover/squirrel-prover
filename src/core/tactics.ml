@@ -51,7 +51,6 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
-  | GoalNotPQSound
   | TacticNotPQSound
 
   | CongrFail
@@ -118,7 +117,6 @@ let rec tac_error_to_string ?(short = false) = function
   | HypAlreadyExists  _    -> "HypAlreadyExists"
   | HypUnknown        _    -> "HypUnknown"
   | GoalBadShape      _    -> "GoalBadShape"
-  | GoalNotPQSound         -> "GoalNotPQSound"
   | TacticNotPQSound       -> "TacticNotPQSound"
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
@@ -201,9 +199,6 @@ let pp_tac_error_i ppf = function
 
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
-
-  | GoalNotPQSound ->
-    Fmt.pf ppf "the goal is not Post-Quantum Sound"
 
   | TacticNotPQSound ->
     Fmt.pf ppf "the tactic is not Post-Quantum Sound"
@@ -625,9 +620,7 @@ module type S = sig
   type arg
   type judgment
 
-  (* TODO post-quantum flag probably shouldn't be here *)
   val eval_abstract :
-    post_quantum:bool ->
     modifiers:string list ->
     lsymb -> arg list -> judgment tac
 end
@@ -638,8 +631,8 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : post_quantum:bool -> modifiers:string list -> t -> judgment tac
-  val eval_judgment : post_quantum:bool -> t -> judgment -> judgment list
+  val eval : modifiers:string list -> t -> judgment tac
+  val eval_judgment : t -> judgment -> judgment list
   val pp : t formatter
 
 end
@@ -658,28 +651,28 @@ struct
   type arg = M.arg
   type judgment = M.judgment
 
-  let rec eval (post_quantum:bool) modifiers = function
-    | Abstract (id,args) -> eval_abstract ~post_quantum ~modifiers id args
-    | AndThen tl -> andthen_list (List.map (eval post_quantum modifiers) tl)
+  let rec eval modifiers = function
+    | Abstract (id,args) -> eval_abstract ~modifiers id args
+    | AndThen tl -> andthen_list (List.map (eval modifiers) tl)
     | AndThenSel (t,tl) ->
       let tl =
-        List.map (fun (s,t') -> s, (eval post_quantum modifiers t')) tl in
-      andthen_sel (eval post_quantum modifiers t) tl
+        List.map (fun (s,t') -> s, (eval modifiers t')) tl in
+      andthen_sel (eval modifiers t) tl
     | OrElse tl ->
-      orelse_list (List.map (eval post_quantum modifiers) tl)
-    | Try t -> try_tac (eval post_quantum modifiers t)
+      orelse_list (List.map (eval modifiers) tl)
+    | Try t -> try_tac (eval modifiers t)
     | By (t,loc) ->
-      andthen_list [eval post_quantum modifiers t;
-                    eval post_quantum modifiers
+      andthen_list [eval modifiers t;
+                    eval modifiers
                       (Abstract (L.mk_loc loc "auto",[]))]
 
-    | Repeat t            -> repeat (eval post_quantum modifiers t)
+    | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
-    | Modifier (id,t)     -> eval post_quantum (id::modifiers) t
-    | CheckFail (e,t)     -> checkfail_tac e (eval post_quantum modifiers t)
-    | Time t              -> check_time (eval post_quantum modifiers t)
+    | Modifier (id,t)     -> eval (id::modifiers) t
+    | CheckFail (e,t)     -> checkfail_tac e (eval modifiers t)
+    | Time t              -> check_time (eval modifiers t)
 
-  let eval ~post_quantum ~modifiers ast = eval post_quantum modifiers ast
+  let eval ~modifiers ast = eval modifiers ast
 
   let rec pp ppf = function
     | Abstract (i,_args) -> Fmt.pf ppf "@[(%s)@]" (L.unloc i)
@@ -729,8 +722,8 @@ struct
       i.e. calls its failure continuation.
       May raise any exception actually raised by the tactic,
       typically a [Tactic_hard_failure]. *)
-  let eval_judgment ~post_quantum ast j =
-    let tac = eval ~post_quantum ~modifiers:[] ast in
+  let eval_judgment ast j =
+    let tac = eval ~modifiers:[] ast in
     (* We avoid raising [Tactic_soft_failure] directly from the
        failure continuation, as this has lead to bugs in the past:
        these exceptions thrown in the middle of the CPS-style computation

@@ -4,7 +4,6 @@
    they do not type. *)
 
 set securityTypes = true.
-set postQuantumSound = true.
 
 channel c.
 
@@ -14,8 +13,6 @@ system [postquantum] sys = (in(c, x); out(c,x)).
 
 name h : message, High
 name l : message, Low.
-
-set postQuantumSound = false.
 
 lemma[sys] _ : h=l => false.
 Proof.

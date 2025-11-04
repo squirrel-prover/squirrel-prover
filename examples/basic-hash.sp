@@ -27,10 +27,6 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 
 *)
 
-(** When this option is set to `true`, Squirrel checks that proofs are
-    also sound for quantum attackers. *)
-set postQuantumSound=true.
-
 include Core.
 
 (** We start by declaring the function symbol `h` for the hash function,
