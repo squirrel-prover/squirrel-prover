@@ -69,13 +69,6 @@ val constraints_valid :  ?system : SystemExpr.arbitrary option -> sequent -> boo
 val get_ts_equalities :
   precise:bool -> sequent -> Term.terms list
 
-(** [maximal_elems s ts] returns the maximal elements of the timestamps,
-    according to their ordering derived from the hypothesis in [s]. 
-    May timeout. *)
-val maximal_elems : 
-  precise:bool -> sequent -> Term.terms -> 
-  Term.terms 
-
 (** [get_all_messages s] returns all the messages appearing at toplevel
     in [s]. *)
 val get_all_messages : sequent -> Term.terms

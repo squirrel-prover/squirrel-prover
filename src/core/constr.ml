@@ -1542,46 +1542,6 @@ let query ~precise (models : models) (terms : Term.terms) =
 
 
 (*------------------------------------------------------------------*)
-(** [max_elems_model model elems] returns the maximal elements of [elems]
-    in [model], *with* redundancy modulo [model]'s equality relation. *)
-let max_elems_model (model : model) elems =
-  let memo = mk_memo () in
-  (* We normalize to obtain the representant of each timestamp. *)
-  let model, l = List.fold_left (fun (model, l) ts ->
-      let model, ut = ext_support model (term_to_ut memo ts) in
-      (model, (ts,ut) :: l)
-    ) (model,[]) elems in
-
-  (* We keep elements that are maximal in [model] *)
-  let melems = List.filter (fun (_,u) ->
-      List.for_all (fun (_,u') ->
-          ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
-        ) l ) l
-               |> List.map fst
-               |> List.sort_uniq Stdlib.compare in
-
-  model, melems
-
-let maximal_elems ~precise (models : models) (elems : Term.term list) =
-  let memo, models_list = models in
-  
-  (* Invariant: [maxs_acc] is sorted and without duplicates. *)
-  let models_list, maxs =
-    List.fold_left (fun (models_list, maxs_acc) m ->
-        let m, m_maxs = max_elems_model m elems in
-        (m :: models_list, List.merge_uniq Stdlib.compare maxs_acc m_maxs)
-      ) ([],[]) models_list
-  in
-  let models_list = List.rev models_list in
-
-  (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
-     and are equal in every model of [models], by picking an arbitrary
-     element in each equivalence class. *)
-  Utils.classes (fun ts ts' ->
-      query ~precise (memo, models_list) [Term.mk_eq ts ts']
-    ) maxs
-  |> List.map List.hd
-
 let get_ts_equalities ~precise (models : models) ts =
   Utils.classes (fun ts ts' ->
       query ~precise models [Term.mk_eq ts ts']

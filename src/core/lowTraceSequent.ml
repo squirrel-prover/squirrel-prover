@@ -266,10 +266,6 @@ let query ?(system : SE.arbitrary option = None) ~precise s q =
 
 (** Other uses of Constr *)
 
-let maximal_elems ~precise s tss =
-  let models = get_models None s in
-  Constr.maximal_elems ~precise models tss
-
 let get_ts_equalities ~precise s =
   let models = get_models None s in
   let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.proof_context)
