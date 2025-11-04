@@ -439,14 +439,6 @@ let prf (i:int L.located) (p:Term.term option) (s:sequent) : sequent list =
   let proj_l, proj_r = ES.get_system_pair_projs s in
   let system = ((Utils.oget env.system.pair) :> SE.fset) in
 
-  if
-    TConfig.post_quantum_equivs (ES.table s)
-    &&
-    not @@ ES.check_quantum_simulable_sequent s
-  then
-      soft_failure ~loc
-      Tactics.TacticNotPQSound;
-
   let before, e, after = LT.split_equiv_conclusion i s in
   let biframe = List.rev_append before after in
 

@@ -829,6 +829,131 @@ let get_rec_args_ext
   in
   get t ~fv:[] ~cond:[] ~p:MP.root ~se:system.set
 
+exception DuplicateQuantVal of Term.term * string
+
+(** Exported (see `.mli`) *)
+let check_single_quantum_component (pc : ProofContext.t) (terms:Term.terms)
+    (rec_arg_occs:rec_arg_occs) =
+  let env = pc.env in
+  let table = env.table in  
+  let found = ref None in
+
+  let ppe = default_ppe ~table () in
+
+  let rec_arg_occs =
+    List.filter_map
+      (fun (arg : rec_arg_occ) ->
+         if arg.so_cond = [] then Some arg.so_cnt.value else None)
+      rec_arg_occs
+    |> List.sort_uniq Stdlib.compare
+  in
+
+  let terms =
+    List.filter (fun term ->
+        HighType.is_classical table (Term.ty term)
+        ||          
+        begin
+          (* Fail to apply: there are multiple quantum
+             values at top-level in the equivalence under study. *)
+          if !found <> None then
+            raise @@ DuplicateQuantVal(term,
+                                       Fmt.str "@[<v 0>When doing a cryptographic \
+                                                reduction, there can only be a single \
+                                                occurrence of@;\
+                                                frame@t or state@t at top-level, and the \
+                                                following term:@;\
+                                               \ @[%a@]@;\
+                                                has already been encountered.@]"
+                                         (Term._pp ppe) (oget !found));
+
+          match term with
+          | Term.Macro (m, _, t) when
+              let macro = m.s_symb in
+              Symbols.path_equal macro Symbols.Quantum.frame ||
+              Symbols.path_equal macro Symbols.Quantum.state 
+            ->
+            let models = 
+              let exception TO in
+              try
+                Hyps.get_models ~exn:TO ~system:(Some env.system.set) table pc.hyps
+              with TO -> Constr.empty_model
+            in
+
+            (* We simulated all macros up-to time [m = max rec_arg_occs].
+
+               Thus, we can either allow for [state@m], [frame@m],
+               or [state@(next m)].
+
+               To see why the latter is sound, observe that if we
+               simulated all macros up-to [m], then we simulated
+               [transcript@m, state@m]. From there, we can
+               simulate the quantum state one step further, which
+               consumes [state@m] and produces [state@(next m)].
+
+               Concretely, we check that all macros are applied at
+               a timestamp [t0] such that [t0 ≤ t] and that one
+               macro is applied to [t]. Further, we account for
+               the [state@(next m)] possibility by running the
+               same check with [pred t]. *)
+            let is_maximum (t : Term.term) =
+              if Term.equal t Term.init && rec_arg_occs = [] then
+                true
+              else
+                (* [t] appears in [rec_arg_occs] *)
+                let is_in = 
+                  List.exists (fun arg -> Term.equal arg t) rec_arg_occs
+                in
+                
+                (* any element [arg] of [rec_arg_occs] is smaller than [t] *)
+                let is_ub =
+                  List.for_all (fun arg -> 
+                      let b = Constr.query ~precise:true models [Term.mk_leq arg t] in
+                      b
+                    ) rec_arg_occs
+                in
+                
+                is_ub && is_in
+            in
+
+            if not (
+                is_maximum t || 
+                ( Symbols.path_equal m.s_symb Symbols.Quantum.state && 
+                  is_maximum (Term.mk_pred t) )
+              ) 
+            then
+              raise @@
+              DuplicateQuantVal(term,
+                                (
+                                  Fmt.str "@[<v 0>The timestamp argument @[%t@] must be the maximum of:@;\
+                                          \  @[%a@]@]"
+                                    (fun fmt ->
+                                       if Symbols.path_equal m.s_symb Symbols.Quantum.state then
+                                         Fmt.pf fmt "%a or %a" (Term._pp ppe) t (Term._pp ppe) (Term.mk_pred t)
+                                       else 
+                                         Fmt.pf fmt "%a" (Term._pp ppe) t)
+                                    (Fmt.list
+                                       ~sep:(Fmt.any ",@ ") 
+                                       (fun fmt (arg : Term.t) ->
+                                          Fmt.pf fmt "@[%a@]"
+                                            (Term._pp ppe) arg))
+                                    rec_arg_occs));
+            
+            found := Some term;
+            false     (* discard value *)
+            
+          | _ ->
+            raise @@
+            DuplicateQuantVal(term,
+                              (
+                                Fmt.str
+                                  "@[<v 0>The cryptographics tactics only support a single occurrence of@;\
+                                   either frame@t or state@t at top-level.@]"));
+        end
+      ) terms;
+  in
+  terms
+
+
 
 (** Returns all recursive arguments occuring in macros in a list of terms.
     Should only be used when sources are directly occurring,
@@ -845,7 +970,29 @@ let get_macro_rec_args
   let actions =
     List.concat_map (fun t -> get_rec_args_ext ~mode t ei) sources
   in
-  RecArgOcc.clear_subsumed env.table (SE.to_fset env.system.set) actions
+  let rec_arg_occs =
+    RecArgOcc.clear_subsumed env.table (SE.to_fset env.system.set) actions
+  in
+  if TConfig.post_quantum_equivs context.env.table then
+    let _ =
+      try
+        let sources = List.flatten @@ List.map Term.decompose_tuple sources in 
+        check_single_quantum_component context sources rec_arg_occs
+      with
+
+    | DuplicateQuantVal (t, message) ->
+      let err_str =
+        Fmt.str "The following term cannot be simulated in pqtime :: \
+                 @[%a@]@;\
+                 it may be a quantum value.@;\
+                 %s@]"
+          Term.pp t message
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+    in
+    rec_arg_occs
+  else
+    rec_arg_occs
 
 (*------------------------------------------------------------------*)
 (** Occurrence search *)

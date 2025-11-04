@@ -245,24 +245,6 @@ let intctxt
   let env = context.env in
 
   let icp = intctxt_param ~loc hyp s in
-
-  if TConfig.post_quantum_equivs (TS.table s) then
-    (* We only need to check that the terms in the equality modeling a
-       forgery can be simulated to build a reduction to intctxt. *)    
-    (
-      let terms =
-        (match icp.ip_t with
-           None -> []
-         | Some t -> [t])
-        @ [icp.ip_c; Name.to_term icp.ip_k]
-      in
-    if not @@
-      PostQuantum.check_direct_quantum_value_occurences context terms
-    then
-      soft_failure ~loc:(L.loc h)
-        Tactics.TacticNotPQSound
-  );  
-  
   
   (* Printers for [k] and the randomness *)
   let pp_k ppf () = Fmt.pf ppf "%a" (Name.pp ppe) icp.ip_k in

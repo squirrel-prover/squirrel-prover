@@ -420,15 +420,6 @@ let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.query_happens ~precise s a
 
-let check_quantum_simulable_sequent (s : sequent) =
-  let env = env s in  
-  let bi_system = 
-      { env.system with set = (Utils.oget env.system.pair :> SE.t) ; } 
-  in            
-  let context = proof_context ~in_system:bi_system s in    
-  PostQuantum.check_direct_quantum_value_occurences context (conclusion_as_equiv s).terms
-
-
 (*------------------------------------------------------------------*)
 let set_equiv_conclusion e j =
   set_conclusion Equiv.(Atom (Equiv e)) j

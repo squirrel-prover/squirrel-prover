@@ -318,6 +318,21 @@ val expand_macro_check_once : expand_info -> Term.term -> Term.term option
     (only at toplevel, not in subterms). *)
 val expand_macro_check_all : expand_info -> Term.term -> Term.term
 
+
+exception DuplicateQuantVal of Term.term * string
+
+(** Checks that a list of terms contains a single quantum element
+    which is either frame@t or state@t. Used in occurences check and
+    crypto to ensure that a frame is pqtime simultable.  Returns the
+    list of terms minus the quantum value if there are no issues, and
+    otherwise raises [DuplicateQuantumElement]
+*)
+val check_single_quantum_component :
+  ProofContext.t ->
+  Term.terms ->
+  rec_arg_occs ->
+  Term.terms
+
 (** Returns all recursive arguments used for macros in a list of terms.
     Should only be used on source terms that are directly occurring,
     not themselves produced by unfolding macros. *)

@@ -281,15 +281,6 @@ let euf (h : lsymb) (s : sequent) : sequent list =
     Fmt.pf ppf "bad occurrences of key %a,@ and messages authenticated by it" 
       (Name.pp ppe) k
   in
-
-  if TConfig.post_quantum_equivs (TS.table s) then
-    (* We only need to check that the terms in the equality modeling a
-       forgery can be simulated to build a reduction to eufcma. *)
-    if not @@
-      PostQuantum.check_direct_quantum_value_occurences context [m; Name.to_term k; t]
-    then
-      soft_failure ~loc:(L.loc h)
-      Tactics.TacticNotPQSound;  
   
   (* apply euf: first construct the IOS.f_fold_occs to use *)
   let get_bad : IOS.f_fold_occs = get_bad_occs m k int_f ~pk_f in
