@@ -612,12 +612,11 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
   | _ -> ()
 
 (*------------------------------------------------------------------*)
-(*
-    This function does similar ptime/qtime check as [Iter.get_macro_occs].
+(** This function does similar ptime/qtime check as [Iter.get_macro_occs].
 
     Overall, to verify if a term is pterm/qterm,   
     - [Iter.get_macro_occs] checks that, assuming that all macros are
-    p(q)time, the top-lvel term containing the direct occurences is
+    p(q)time, the top-level term containing the direct occurences is
     p(q)time.   
     - [get_macro_rec_args] checks that the body of all macors is
     p(q)time, assuming that the recursive calls are.
@@ -627,15 +626,10 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
     for occurences, which yield impractical situations.  Indeed,
     looking for occurences in general implies to go down at the level
     of all leafs of a term.  However, checking for ptime/qtime
-    functions requires to ignore some leaks, and we can only decide if
-    a term is ptime/qtime by looking at it in full:   
-    - for instance, for a function application [f u v] with [f]
-    polymorphic, it is only when, looking at the full term that we can
-    know if f is user in a classical context, or if it might be in
-    fact a quantum function call.
-    - also, for qatt occurences, we must also look at the level of the
-    function application, to see if it correctly uses the quantum
-    randomness.
+    functions requires to ignore some leafs, and we can only decide if
+    a term is ptime/qtime by looking at it in full. Notably, for qatt
+    occurences, we must also look at the level of the function
+    application, to see if it correctly uses the quantum randomness.
 
    Here, we prove that a term is qtime by having a very strong restriction:
     1) only qadv and witness are of quantum types;
@@ -644,27 +638,23 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
     4) the top-level term contains a single occurence of state@tau,
     and tau must be the maximum timestamp of the term.
 
-    1) is a general restriction of the current possible declarations.
-    2) and 3) can be checked inside the occurence search. 4) must be
-    checked for the moment checked in a separate place, see
+    1), 2) and 3) can be checked inside the occurence search. 4) must
+    be checked for the moment checked in a separate place, see
     [PostQuantum].
 
-    When having quantum value, checking ptime also becomes
-    cumbersome. Indeed, there is the issue of polymorphic
-    functions. Here, we once again can manage this thanks to condition
-    1. Here, we check that:   
+    When having quantum value, checking ptime implies to forbid them
+    in addition to the older checks.
+
+    Here, we check that:
     5) qadv, quantum type witness, qinput and qstate never occurs
     6) and rely on the older ptm checks.
 
     5) can once again be done at the same time as looking for
-    occurences. And, because we do not have anything producing quantum
-    types, we are safe and do not have to forbid polymorphic
-    functions.
+    occurences. 
 
-    If we at some point want to allow additional quantum functions or
+    If at some point we want to allow additional quantum functions or
     more general term, it might become necessary to disantangle the
     p(q)time checks from the occurence check.
-
  *)
 let get_rec_args_ext
     ~(mode : Iter.allowed ) (* allowed sub-terms without further checks *)
