@@ -4195,11 +4195,15 @@ let bideduce_all_goals
 
     Currently, restricted to the time-insensitive mode. *)
 let post_quantum_execution_model_induction
-  (game_loc : L.t) (param : param) (table : Symbols.table)
+  (game_loc : L.t) (param : param)
+  (pc : ProofContext.t)
   (recursive_goals : goal list) (direct_goal : goal)
   (rec_arg_occs : Occurrences.rec_arg_occ list)
   : goal list * goal            (* recursive, direct *)
   =
+  let env = pc.env in
+  let table = env.table in
+
   if param.time_sensitive then
     Tactics.hard_failure ~loc:game_loc
       (Failure "time-sensitive mode unsupported in quantum mode");
@@ -4304,26 +4308,67 @@ let post_quantum_execution_model_induction
                   Symbols.path_equal macro Symbols.Quantum.frame ||
                   Symbols.path_equal macro Symbols.Quantum.state 
                 ->
+                let models = 
+                  let exception TO in
+                  try
+                    Hyps.get_models ~exn:TO ~system:(Some env.system.set) table pc.hyps
+                  with TO -> Constr.empty_model
+                in
+
                 (* We simulated all macros up-to time [m = max rec_arg_occs].
 
-                   Thus, we can either allow for [state@m],
-                   [transcript@m], or [state@(next m)]. *)
+                   Thus, we can either allow for [state@m], [frame@m],
+                   or [state@(next m)].
+
+                   To see why the latter is sound, observe that if we
+                   simulated all macros up-to [m], then we simulated
+                   [transcript@m, state@m]. From there, we can
+                   simulate the quantum state one step further, which
+                   consumes [state@m] and produces [state@(next m)].
+
+                   Concretely, we check that all macros are applied at
+                   a timestamp [t0] such that [t0 ≤ t] and that one
+                   macro is applied to [t]. Further, we account for
+                   the [state@(next m)] possibility by running the
+                   same check with [pred t]. *)
+                let is_maximum (t : Term.term) =
+                  (* [t] appears in [rec_arg_occs] *)
+                  let is_in = 
+                    List.exists (fun arg -> Term.equal arg t) rec_arg_occs
+                  in
+
+                  (* any element [arg] of [rec_arg_occs] is smaller than [t] *)
+                  let is_ub =
+                    List.for_all (fun arg -> 
+                        let b = Constr.query ~precise:true models [Term.mk_leq arg t] in
+                        b
+                      ) rec_arg_occs
+                  in
+
+                  is_ub && is_in
+                in
+
                 if not (
-                    List.exists
-                      (fun arg -> Term.equal arg t || 
-                                  (Symbols.path_equal m.s_symb Symbols.Quantum.state &&
-                                   Term.equal arg (Term.mk_pred t)))
-                      rec_arg_occs) 
+                    is_maximum t || 
+                    ( Symbols.path_equal m.s_symb Symbols.Quantum.state && 
+                      is_maximum (Term.mk_pred t) )
+                  ) 
                 then
                   failed
                     ~target:term
                     ~message:(
-                      Fmt.str "@[<v 0>The timestamp argument @[%a@] must belong to:@;\
+                      Fmt.str "@[<v 0>The timestamp argument @[%t@] must be the maximum of:@;\
                               \  @[%a@]@]"
-                        (Term._pp ppe) t
-                        (Fmt.list (fun fmt (arg : Term.t) ->
-                             Fmt.pf fmt "@[%a@]"
-                               (Term._pp ppe) arg))
+                        (fun fmt ->
+                           if Symbols.path_equal m.s_symb Symbols.Quantum.state then
+                             Fmt.pf fmt "%a or %a" (Term._pp ppe) t (Term._pp ppe) (Term.mk_pred t)
+                           else 
+                             Fmt.pf fmt "%a" (Term._pp ppe) t)
+                        (Fmt.list
+                           ~sep:(Fmt.any ",@ ") 
+                           (fun fmt (arg : Term.t) ->
+                              Fmt.pf fmt "@[%a@]"
+                                (Term._pp ppe) arg))
                         rec_arg_occs);
 
                 found := Some term;
@@ -4464,7 +4509,7 @@ let prove
   let recursive_goals, direct_goal =
     if quantum then
       post_quantum_execution_model_induction
-        game_loc param table
+        game_loc param pc
         recursive_goals direct_goal rec_arg_occs
     else (recursive_goals, direct_goal) 
   in
