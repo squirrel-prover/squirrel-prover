@@ -172,7 +172,6 @@
   "localize"
   "memseq"
   "byequiv"
-  "diffeq"
   "gcca"
   "rename"
   "gprf"

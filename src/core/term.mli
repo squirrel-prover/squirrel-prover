@@ -664,11 +664,6 @@ val head_normal_biterm0 : Projection.t list -> term -> term * bool (* bool = red
 val simple_bi_term  : Projection.t list -> term -> term
 val simple_bi_term0 : Projection.t list -> term -> term * bool (* bool = reduction occurred *)
 
-(** Same as [simple_bi_term], but does not try to normalize try-finds. 
-    Ad-hoc fix to keep diffeq tactic working properly. 
-    FIXME: remove it. *)
-val simple_bi_term_no_alpha_find : Projection.t list -> term -> term
-
 val combine : (Projection.t * term) list -> term
 
 (** All projections of the term are names. *)

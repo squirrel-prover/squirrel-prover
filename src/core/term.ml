@@ -2208,7 +2208,7 @@ let head_pi_term (s : Projection.t) (t : term) : term =
 (*------------------------------------------------------------------*)
 (** Normalize a term of system kind [lproj,rproj]. *)
 let make_normal_biterm_pair
-    ~(dorec : bool) ~(alpha_find : bool)
+    ~(dorec : bool)
     ~(lproj : Projection.t) ~(rproj : Projection.t)
     (t : term) : term * bool
   =
@@ -2290,7 +2290,7 @@ let make_normal_biterm_pair
         Var x
 
       | Find (is,c,t,e), Find (is',c',t',e')
-        when List.length is = List.length is' && alpha_find ->
+        when List.length is = List.length is' ->
         let s' = alpha_bnds s is is' in
         check_reduced ();
         Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
@@ -2311,14 +2311,14 @@ let make_normal_biterm_pair
 
 (*------------------------------------------------------------------*)
 let make_normal_biterm
-    (dorec : bool) ?(alpha_find = true)
+    (dorec : bool)
     (projs : Projection.t list)
     (t : term) : term * bool
   =
   match projs with
   | [] -> t, false
   | [lproj;rproj] -> 
-    make_normal_biterm_pair ~dorec ~alpha_find ~lproj ~rproj t 
+    make_normal_biterm_pair ~dorec ~lproj ~rproj t 
   | _ -> t, false         (* TODO: support more than two projections *)
 
 (*------------------------------------------------------------------*)
@@ -2327,10 +2327,6 @@ let head_normal_biterm projs t : term = fst @@ make_normal_biterm false projs t
 
 let simple_bi_term0     projs t : term * bool = make_normal_biterm  true projs t
 let head_normal_biterm0 projs t : term * bool = make_normal_biterm false projs t
-
-(* Ad-hoc fix to keep diffeq tactic working properly. *)
-let simple_bi_term_no_alpha_find projs t : term =
-  fst @@ make_normal_biterm true ~alpha_find:false projs t
     
 (*------------------------------------------------------------------*)
 let combine = function

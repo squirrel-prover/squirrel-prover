@@ -311,7 +311,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       The sequent [s] is used to discharge Happens subgoals.
       If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
   let unfold_term_exn
-      ?(force_happens = false)
       ?(mode   : Macros.expand_context = InSequent)
       ~(unfold_opaque : bool)
       ~(force_exhaustive:bool)
@@ -350,7 +349,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* we reduce, not allowing exhaustive expansion of macro when we are recursive. *)
       Match.reduce_delta1
         ~unfold_opaque
-        ~force_happens ~delta:ReductionCore.delta_full ~constr:true
+        ~delta:ReductionCore.delta_full ~constr:true
         ~mode (Lazy.force pc).env (Lazy.force pc).hyps target
     in
     
@@ -380,7 +379,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** If [strict] is true, the unfolding must succeed. *)
   let unfold_local
-      ?(force_happens = false)
       ~(force_exhaustive:bool)         
       ~(unfold_opaque : bool)
       ?(mode   : Macros.expand_context option)
@@ -393,7 +391,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     try
       Some (
         unfold_term_exn
-          ~unfold_opaque ~force_happens ~force_exhaustive
+          ~unfold_opaque ~force_exhaustive
           ?mode t se s) 
     with
     | Tactics.Tactic_soft_failure _ when not strict -> None
@@ -577,42 +575,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     assert (subs = []);
 
     !found1, s
-
-  (** expand all macros (not operators) in a term relatively to a system *)
-  let deprecated_expand_all_macros
-      ?(force_happens = false)    
-      (f : Term.term)
-      (sexpr : SE.arbitrary)
-      (s : S.t)
-    : Term.term
-    =
-    let expand_inst : Match.Pos.f_map =
-      fun (occ : Term.term) se _vars conds _p ->
-        match occ with
-        | Term.Macro _ ->
-          begin
-            let s =             (* add [conds] in [s] *)
-              List.fold_left (fun s cond ->
-                  S.Hyps.add AnyName (LHyp (S.unwrap_hyp (Local cond))) s
-                ) s conds
-            in
-            match
-              unfold_local
-                ~unfold_opaque:false ~force_exhaustive:false
-                ~force_happens ~strict:false
-                occ se s
-            with
-            | None -> `Continue
-            | Some t -> `Map t
-          end
-
-        | _ -> `Continue
-    in
-    let _, f =
-      Match.Pos.map
-        ~mode:(`TopDown true) expand_inst sexpr f
-    in
-    f
 
   (** expand all macro of some targets in a sequent *)
   let expand_all targets (s : S.sequent) : S.sequent =

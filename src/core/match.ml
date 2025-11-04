@@ -1526,7 +1526,7 @@ let rec happens_term
 
     Return the list of atoms in [conds] that cannot be proved. *)
 let check_conds
-    ?(force_happens=false) (table : Symbols.table)
+    (table : Symbols.table)
     ~(equal_ts : Term.terms)
     ?(hyps : TraceHyps.hyps = TraceHyps.empty)
     ?(hyps_list : Term.terms = [])
@@ -1546,8 +1546,7 @@ let check_conds
            match Term.decompose_app cond with
            (* [happens(t)] *)
            | Term.Fun (fs,_), [t] when Symbols.path_equal fs Symbols.fs_happens ->
-             if force_happens then false
-             else not (happens_term table ~hyp ~t ~equal_ts)
+             not (happens_term table ~hyp ~t ~equal_ts)
            | _ -> true)
         !conds
   in
@@ -1579,7 +1578,6 @@ let is_happen : Term.t list -> bool = function
 (*------------------------------------------------------------------*)
 (** Perform δ-reduction once for macro at head position. *)
 let reduce_delta_macro1
-    ?(force_happens=false)
     ?(unfold_opaque=false)
     ~(constr : bool)    
     ?(mode : Macros.expand_context = InSequent)
@@ -1619,7 +1617,7 @@ let reduce_delta_macro1
           if p.Macros.pattern = None then
             let remaining_conds = 
               check_conds
-                ~force_happens env.table ~equal_ts:ts_list ~hyps
+                env.table ~equal_ts:ts_list ~hyps
                 p.when_cond 
             in
             (* FEATURE: we could try to check convertibility of
@@ -1644,7 +1642,6 @@ let reduce_delta_macro1
 (** Perform δ-reduction once at head position
     (macro, operator and definition unfolding). *)
 let reduce_delta1
-    ?(force_happens=false)
     ?(unfold_opaque=false)
     ?(delta = ReductionCore.delta_full)
     ~(constr : bool)
@@ -1657,7 +1654,7 @@ let reduce_delta1
   match t with
   (* macro *)
   | Macro _ when delta.macro ->
-    reduce_delta_macro1 ~unfold_opaque ~force_happens ~constr ~mode env ~hyps t
+    reduce_delta_macro1 ~unfold_opaque ~constr ~mode env ~hyps t
 
   (* definition *)
   | Var   _ when delta.def ->

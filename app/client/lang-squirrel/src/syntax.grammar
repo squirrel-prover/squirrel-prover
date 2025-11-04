@@ -123,7 +123,6 @@ kw<Term> { @specialize[@name={Term}]<ID, Term> }
   intctxt[@name=tackeyw] { kw<"intctxt"> }
   trivialif[@name=tackeyw] { kw<"trivialif"> }
   byequiv[@name=tackeyw] { kw<"byequiv"> }
-  diffeq[@name=tackeyw] { kw<"diffeq"> }
   CONSTSEQ[@name=tackeyw] { kw<"constseq"> }
   MEMSEQ[@name=tackeyw] { kw<"memseq"> }
   REMEMBER[@name=tackeyw] { kw<"remember"> }
@@ -298,7 +297,6 @@ tac {
   | enrich Term (COMMA Term)*
   | EXPAND commaSep1<Term>
   | byequiv
-  | diffeq
   | eqnames
   | expandall
   | CONST Term
@@ -324,8 +322,6 @@ tac {
   /* | adv */
   | notleft
   | simpl_left
-  // TODO ↓ give grammar of tactic !
-  /* | diffeq diffeq_arg */
   | equivalent
   | show
   | deduce

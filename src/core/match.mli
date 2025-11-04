@@ -364,7 +364,6 @@ val reduce_delta_def1 :
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
-  ?force_happens:bool ->
   ?unfold_opaque:bool ->
   constr:bool ->
   ?mode:Macros.expand_context ->
@@ -377,7 +376,6 @@ val reduce_delta_macro1 :
 (** Perform δ-reduction once at head position
     (macro, operator and definition unrolling). *)
 val reduce_delta1 :
-  ?force_happens:bool ->
   ?unfold_opaque:bool ->
   ?delta:ReductionCore.delta ->
   constr:bool ->
