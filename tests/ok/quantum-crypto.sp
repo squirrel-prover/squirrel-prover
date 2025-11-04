@@ -37,7 +37,7 @@ global lemma _ @system:Q (tt:_[const]) :
   [happens(tt)] -> equiv(Quantum.transcript@tt).
 Proof.
   intro H. 
-  checkfail by crypto G exn GoalNotClosed.
+  checkfail by crypto G exn Failure.
 Abort.
 
 (* Idem, except that we moreover have to bi-deduce the frame, which is
@@ -46,7 +46,7 @@ global lemma _ @system:Q (tt:_[const]) :
   [happens(tt)] -> equiv(Quantum.frame@tt).
 Proof.
   intro H.
-  checkfail by crypto G exn GoalNotClosed.
+  checkfail by crypto G exn Failure.
 Abort.
 
 (* ------------------------------------------------------------------------ *)
