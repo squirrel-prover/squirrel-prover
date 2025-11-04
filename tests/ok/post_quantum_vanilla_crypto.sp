@@ -94,3 +94,26 @@ Proof.
 intro Eq.
 checkfail intctxt Eq exn Failure.
 Abort.
+
+
+ddh g, (^) where group:message exponents:message.
+
+name a : message
+
+name b : message
+
+name d : message.
+
+lemma [set: PQ; equiv: PQ]  _ tau : input@tau <>g^a^b.
+Proof.
+ intro Eq.
+ checkfail cdh Eq, g exn TacticNotPQSound.
+ checkfail gdh Eq, g exn TacticNotPQSound.
+ Abort.
+
+(* TODO: the following checkfail does not catch the exception as expected. *)
+(*
+global lemma [set: PQ; equiv: PQ]  _ : equiv(diff( g^a^b, g^d)).
+Proof.
+ checkfail (by ddh g, a, b, d) exn TacticNotPQSound.
+*)

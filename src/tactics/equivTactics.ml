@@ -2719,6 +2719,11 @@ let ddh
     (lgen : Symbols.p_path) (na : Symbols.p_path) (nb : Symbols.p_path) (nc : Symbols.p_path)
     s sk fk
   =
+
+  if TConfig.post_quantum_equivs (ES.table s) then
+    soft_failure ~loc:(Symbols.p_path_loc lgen)
+      Tactics.TacticNotPQSound;  
+  
   let tbl = ES.table s in
   let gen_symb = Symbols.Operator.convert_path lgen tbl in
 
