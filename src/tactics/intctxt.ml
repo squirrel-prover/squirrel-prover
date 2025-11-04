@@ -257,7 +257,7 @@ let intctxt
         @ [icp.ip_c; Name.to_term icp.ip_k]
       in
     if not @@
-      PostQuantum.check_quantum_simulable context terms
+      PostQuantum.check_direct_quantum_value_occurences context terms
     then
       soft_failure ~loc:(L.loc h)
         Tactics.TacticNotPQSound

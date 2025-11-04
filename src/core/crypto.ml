@@ -2894,7 +2894,7 @@ let rec bideduce_term_strict
 
   | Term.(Fun _ as fs)
   | Term.(App (Fun _ as fs,_))
-    when HighTerm.is_ptime_deducible ~ignore_qatt:false ~si:true query.env fs ->
+    when HighTerm.is_ptime_deducible ~si:true query.env fs ->
     let _, args = Term.decompose_app output_term.term in
     let args = List.map (fun x -> CondTerm.{term=x; conds}) args in
     notify_bideduce_term_strict query "Function Application";
@@ -3067,7 +3067,7 @@ and bideduce_term
 
   (* if [adv(t)] and [ϕ] is already bi-deduced (invariant of the
      proof-search), we are done *)
-  else if HighTerm.is_ptime_deducible ~ignore_qatt:false ~si:true env output.term then
+  else if HighTerm.is_ptime_deducible ~si:true env output.term then
     begin
       notify_bideduce_directly_computable query;
       Some (empty_result query.initial_mem)

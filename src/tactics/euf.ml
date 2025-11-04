@@ -286,7 +286,7 @@ let euf (h : lsymb) (s : sequent) : sequent list =
     (* We only need to check that the terms in the equality modeling a
        forgery can be simulated to build a reduction to eufcma. *)
     if not @@
-      PostQuantum.check_quantum_simulable context [m; Name.to_term k; t]
+      PostQuantum.check_direct_quantum_value_occurences context [m; Name.to_term k; t]
     then
       soft_failure ~loc:(L.loc h)
       Tactics.TacticNotPQSound;  

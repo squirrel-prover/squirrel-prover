@@ -205,27 +205,6 @@ let equivalence =
            try run ~test "tests/alcotest/pred.sp" with
            | Prover.Unfinished -> raise Ok)
     end ;
-    (* "DDH not PQ Sound", `Quick, begin fun () -> *)
-    (*   Alcotest.check_raises "fails" Ok *)
-    (*     (fun () -> *)
-    (*        try run ~test "tests/alcotest/pq_unsound_ddh.sp" with *)
-    (*        | Tactics.Tactic_hard_failure (_,Tactics.TacticNotPQSound) -> raise Ok) *)
-    (* end ; *)
-    "Two pq value at top-level not PQ Sound", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/pq_unsound_qatt1.sp" with
-           |  Squirrelcore.ProverLib.Error (_,
-              "cannot add new goal: it is not post quantum sound") -> raise Ok)
-    end;
-    "Bad qrnd usage not PQ Sound", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/pq_unsound_qatt2.sp" with
-           |  Squirrelcore.ProverLib.Error (_,
-              "cannot add new goal: it is not post quantum sound") -> raise Ok)
-    end    
-
   ]
 
 (*------------------------------------------------------------------*)

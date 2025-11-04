@@ -33,10 +33,10 @@ val is_constant :
     semantics is independent of the system (among all single systems
     of [env.system]). *)
 val is_ptime_deducible :
-  ?ignore_qatt:bool ->          (* TODO: quantum: remove flag *)
   si:bool ->
   ?ienv:Infer.env ->
   Env.t -> Term.term -> bool
+
 
 (** Compute the tag satisfied by a term *)
 val tags_of_term :

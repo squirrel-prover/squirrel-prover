@@ -426,7 +426,7 @@ let check_quantum_simulable_sequent (s : sequent) =
       { env.system with set = (Utils.oget env.system.pair :> SE.t) ; } 
   in            
   let context = proof_context ~in_system:bi_system s in    
-  PostQuantum.check_quantum_simulable context (conclusion_as_equiv s).terms
+  PostQuantum.check_direct_quantum_value_occurences context (conclusion_as_equiv s).terms
 
 
 (*------------------------------------------------------------------*)

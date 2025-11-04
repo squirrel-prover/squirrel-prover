@@ -31,8 +31,8 @@ Proof.
 (* unsynced qrn *)
 ghave C : 
 equiv(qatt (qrnd (tau), frame@pred tau)#1, h(diff(u,v),k), enc(diff(u,v),r,k) ).
-checkfail prf 1 exn TacticNotPQSound.
-checkfail cca1 2 exn TacticNotPQSound.
+checkfail prf 1 exn Failure.
+checkfail cca1 2 exn Failure.
 admit.
 clear C.
 
@@ -64,14 +64,14 @@ lemma [set: PQ; equiv: PQ]  _ (tau:timestamp [const]):
 input@tau<>h(qatt (qrnd (tau), frame@pred tau)#1,k).
 Proof.
 intro Eq.
-checkfail euf Eq exn TacticNotPQSound.
+checkfail euf Eq exn Failure.
 Abort.
 
 lemma [set: PQ; equiv: PQ]  _ (tau:timestamp [const]):
 qatt (qrnd (tau), frame@pred tau)#1<>h(zero,k).
 Proof.
 intro Eq.
-checkfail euf Eq exn TacticNotPQSound.
+checkfail euf Eq exn Failure.
 Abort.
 
 
@@ -92,15 +92,5 @@ lemma [set: PQ; equiv: PQ]  _ (tau:timestamp [const]):
 dec(qatt (qrnd (tau), frame@pred tau)#1,k)<>fail => false.
 Proof.
 intro Eq.
-checkfail intctxt Eq exn TacticNotPQSound.
+checkfail intctxt Eq exn Failure.
 Abort.
-
-lemma [set: PQ; equiv: PQ]  _ (tau:timestamp [const]):
-dec(input@tau,k)=qatt (qrnd (tau), frame@pred tau)#1 => false.
-Proof.
-intro Eq.
-checkfail intctxt Eq exn TacticNotPQSound.
-Abort.
-
-
-

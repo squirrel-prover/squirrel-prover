@@ -854,6 +854,39 @@ let update_context
   (* need to call [change_system] separately, to properly deal with
      hypotheses *)
 
+
+
+(** Internal.
+    Builds a pattern `qatt(qrnd tau, frame@tau)`
+*)    
+let qatt_pat =
+    let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
+    let ts_t = Term.mk_var ts_v in
+    let qrnd_ty = Type.tmeasure_rnd in  
+    let qrnd : Term.nsymb = Term.mk_symb Symbols.Quantum.qrnd ~info:() qrnd_ty in
+    let qrnd_name = Term.mk_name_with_tuple_args qrnd [ts_t] in
+    let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage] in
+    let info = Term.macro_info_builtin in  
+    let frame  : Term.msymb = Term.mk_symb Symbols.Quantum.frame ~info frame_ty in  
+    let qinput =
+      Term.mk_fun0
+        Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }
+        [Term.mk_tuple [qrnd_name; Term.mk_macro frame [] (ts_t)]]
+    in    
+    Term.{
+      pat_op_term   = qinput;
+      pat_op_params = Params.Open.empty;
+      pat_op_vars   = Vars.Tag.local_vars [ts_v]; 
+    }
+
+(** see `.mli` *)
+let is_valid_qatt_occ (context : ProofContext.t) t =
+  let table  = context.env.table  in
+  let system = context.env.system in  
+   match Match.T.try_match ~param:Match.crypto_param table system t qatt_pat with
+        | Match _ -> true
+        | NoMatch _ -> false
+
 (*------------------------------------------------------------------*)
 (** Internal. 
     Looks for macro occurrences in a term.  
@@ -861,7 +894,12 @@ let update_context
     Unfold (and thus ignores and does not consider as an occurences)
     some macros, depending on the strategy defined by [expand_mode].
 
-    @raise a user-level error if a non-ptime term variable occurs in the term. *)
+    @raise a user-level error if a non-ptime/qtime term occurs in
+      the term. In combination with the additional checks of
+      [Occurences.get_rec_args_ext], this ensures that a term is
+      ptime, or qtime. See this other function for details.
+
+*)
 let get_macro_occs
     ~(mode  : allowed )   (* allowed sub-terms without further checks *)
     ?(expand_mode : 
@@ -899,24 +937,66 @@ let get_macro_occs
     let vars' = Vars.add_vars fv' env.vars in 
     let env' = Env.set_vars env vars' in
 
+    let quantum = TConfig.post_quantum_equivs context.env.table in
+
     match t with
-    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:true  env' t -> []
-    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t -> []
+    | _ when mode = PTimeSI && HighTerm.is_ptime_deducible ~si:true  env' t -> []
+    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~si:false env' t -> []
     | _ when mode = NoHonestRand &&
              (HighTerm.is_constant env t ||
-              HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t) -> []
+              HighTerm.is_ptime_deducible ~si:false env' t) -> []
 
     | Term.Var _ when mode = Any -> []
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s: @[%a@]" 
           (match mode with
-             NoHonestRand -> "variable that may depend on honest randomness"
+             NoHonestRand -> "variable that may depend on honest randomness"      
            | PTimeSI | PTimeNoSI -> "non-ptime variable"
            | Any -> assert false)
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
+
+
+    (* See [Occurrences.get_rec_args_ext] for the three below conditions] *)
+        
+    (* In PTimeSI + quantum mode, we only allow for now either qatt or
+       witness functions as non classical ptime functions. *)
+    | Fun (f, _) when mode = PTimeSI && quantum
+                   && not (HighType.is_classical env.table (Term.ty t))                     
+                   && not ((f = Symbols.fs_qatt) || (f = Library.Prelude.fs_witness) )
+      ->       
+      let err_str =
+        Fmt.str "terms contain a non-pqtime function: @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
+    (* In PTimeSI + quantum mode, all qatt occurences must be from
+       Quantum.input/Quantum.state macro expansions, forcing the term
+       to follow the quantum execution model.  *)
+    | App (Fun (f, _), _) when mode = PTimeSI && quantum
+                            && (f = Symbols.fs_qatt)
+                            && not(is_valid_qatt_occ context t)
+      ->       
+      let err_str =
+        Fmt.str "terms contain an invalid qatt occurence which is not \
+                 of the form `qatt(qrn tau, frame@tau)`:: @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
+    | Macro (m, _, _) when not(quantum) &&
+                          (m.s_symb = Symbols.Quantum.inp   || 
+                           m.s_symb = Symbols.Quantum.state) ->
+      let err_str =
+        Fmt.str "terms contain a quantum macro but should be ptime :: \
+                 @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)      
+
 
     | Term.Macro (ms, l, ts) ->
       begin

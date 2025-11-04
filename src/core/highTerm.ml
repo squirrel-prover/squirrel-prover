@@ -42,10 +42,6 @@ type tags = {
   (** [t] is computable in ptime by an adversary with no direct access
       to the protocol randomness *)
 
-  qadv     : bool;
-  (** [t] is computable in quantum ptime by an adversary with no
-      direct access to the protocol randomness *)  
-
   si      : bool; 
   (** [t] system-independent, i.e. its semantics does not change when
       the system does *)
@@ -61,13 +57,12 @@ type tags = {
 let mk_tags
   ?(const   = false)
   ?(adv     = false)
-  ?(qadv    = false)  
   ?(si      = false)
   ?(det     = false)
   ?(no_diff = false)
   ()
   =
-  { const ; qadv ; adv ; si ; det; no_diff; }
+  { const ; adv ; si ; det; no_diff; }
 
 let to_vars_tags (tags : tags) : Vars.Tag.t =
   { const        = tags.const ;
@@ -78,7 +73,6 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
   {
     const   = tags1.const   && tags2.const   ;
     adv     = tags1.adv     && tags2.adv     ;
-    qadv    = tags1.qadv     && tags2.qadv   ;    
     si      = tags1.si      && tags2.si      ;
     det     = tags1.det     && tags2.det     ;
     no_diff = tags1.no_diff && tags2.no_diff ;
@@ -86,15 +80,14 @@ let merge_tags (tags1 : tags) (tags2 : tags): tags =
     
 (*------------------------------------------------------------------*)
 let tags_of_term
-    ?(ignore_qatt : bool = false)
-    (* temporary unsound flag while transitioning to a pq-sound tool  *)
     (env : Env.t) ~ienv (t : Term.term) : tags
   =
 
   let rec doit_subterms (env : Env.t) (t : Term.term) : tags =
+    (* As soon as we recurse, we cannot easily conclude if something is qadv. *)
     Term.tfold
       (fun term tag -> merge_tags tag (doit env term))
-      t { const = true; adv = true; qadv = true; si = true; det = true; no_diff = true; }
+      t { const = true; adv = true; si = true; det = true; no_diff = true; }
 
   and doit (env : Env.t) (t : Term.term) : tags =
     match t with
@@ -102,7 +95,6 @@ let tags_of_term
       {
         const   = true ;
         adv     = true ;
-        qadv    = true ;        
         si      = true ;
         no_diff = true ;
         det     = true ;
@@ -122,7 +114,6 @@ let tags_of_term
       {
         const   = info.const        ;
         adv     = adv               ;
-        qadv    = adv               ; (* since `adv` implies `qadv` *)
         si      = info.system_indep ;
         no_diff = true              ;
         det     = info.const        ;
@@ -138,7 +129,7 @@ let tags_of_term
 
     | Fun (f,afty) -> 
       let is_att = f = Symbols.fs_att in
-      let is_qatt = f = Symbols.fs_qatt in
+      let is_qatt = f = Symbols.fs_qatt in      
       let is_si = Operator.is_system_indep env.table f in
       let is_classical_fun =
         HighType.is_classical env.table @@
@@ -146,12 +137,7 @@ let tags_of_term
       in
       {
         const   = not (is_att || is_qatt);
-        adv     = ignore_qatt || (not is_qatt && is_classical_fun);
-        (* all operators BUT [qatt] are assumed to be [adv] over
-           classical types (indeed, currently, we do not allow to
-           declare user-defined quantum operators). Note that the
-           check [not is_qatt] is redundant with [is_classical_fun]. *)
-        qadv    = true       ;
+        adv     = is_classical_fun;
         si      = is_si      ;
         no_diff = true       ;
         det     = not (is_att || is_qatt) ;
@@ -278,13 +264,11 @@ let is_single_term_in_se
 
 (*------------------------------------------------------------------*)
 let is_ptime_deducible
-    ?(ignore_qatt : bool option)
-    (* temporary unsound flag while transitioning to a pq-sound tool  *)
     ~(si : bool)
     ?(ienv:Infer.env = Infer.mk_env ())
     (env : Env.t) (t : Term.term) : bool
   =
-  let tags = tags_of_term ?ignore_qatt env ~ienv t in
+  let tags = tags_of_term env ~ienv t in
   tags.adv &&
   (not si ||
    let single_systems = SE.single_systems_of_context env.system in

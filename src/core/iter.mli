@@ -373,3 +373,9 @@ val fold_macro_support1 :
   Term.term list -> 
   'a -> 
   'a
+
+(** Checks wether the term t is unifiable with a pattern of the form
+    `qatt(qrnd tau, frame@tau)`, i.e. whether it follows the quantum
+    execution model. *) 
+val is_valid_qatt_occ:
+  ProofContext.t -> Term.term -> bool

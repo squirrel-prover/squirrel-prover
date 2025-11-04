@@ -398,7 +398,7 @@ let phi_proj
 
   (* get the bad key occs, and the messages hashed,
      in frame + cc + m + kargs *) 
-  let occs = 
+  let occs =
     IOS.find_all_occurrences ~mode:PTimeSI ~pp_descr:(Some pp_k)
       get_bad context (cc_nprf :: m :: k.args @ frame)
   in

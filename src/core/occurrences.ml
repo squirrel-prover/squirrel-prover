@@ -612,6 +612,60 @@ let check_top_quantifier_enumerable table (t : Term.t) : unit =
   | _ -> ()
 
 (*------------------------------------------------------------------*)
+(*
+    This function does similar ptime/qtime check as [Iter.get_macro_occs].
+
+    Overall, to verify if a term is pterm/qterm,   
+    - [Iter.get_macro_occs] checks that, assuming that all macros are
+    p(q)time, the top-lvel term containing the direct occurences is
+    p(q)time.   
+    - [get_macro_rec_args] checks that the body of all macors is
+    p(q)time, assuming that the recursive calls are.
+
+
+    Note that we do this at the same time as folding over and looking
+    for occurences, which yield impractical situations.  Indeed,
+    looking for occurences in general implies to go down at the level
+    of all leafs of a term.  However, checking for ptime/qtime
+    functions requires to ignore some leaks, and we can only decide if
+    a term is ptime/qtime by looking at it in full:   
+    - for instance, for a function application [f u v] with [f]
+    polymorphic, it is only when, looking at the full term that we can
+    know if f is user in a classical context, or if it might be in
+    fact a quantum function call.
+    - also, for qatt occurences, we must also look at the level of the
+    function application, to see if it correctly uses the quantum
+    randomness.
+
+   Here, we prove that a term is qtime by having a very strong restriction:
+    1) only qadv and witness are of quantum types;
+    2) qadv and witness can only occur in the form produced by qinput/qstate; 
+    3) all the rest of the term is ptime;   
+    4) the top-level term contains a single occurence of state@tau,
+    and tau must be the maximum timestamp of the term.
+
+    1) is a general restriction of the current possible declarations.
+    2) and 3) can be checked inside the occurence search. 4) must be
+    checked for the moment checked in a separate place, see
+    [PostQuantum].
+
+    When having quantum value, checking ptime also becomes
+    cumbersome. Indeed, there is the issue of polymorphic
+    functions. Here, we once again can manage this thanks to condition
+    1. Here, we check that:   
+    5) qadv, quantum type witness, qinput and qstate never occurs
+    6) and rely on the older ptm checks.
+
+    5) can once again be done at the same time as looking for
+    occurences. And, because we do not have anything producing quantum
+    types, we are safe and do not have to forbid polymorphic
+    functions.
+
+    If we at some point want to allow additional quantum functions or
+    more general term, it might become necessary to disantangle the
+    p(q)time checks from the occurence check.
+
+ *)
 let get_rec_args_ext
     ~(mode : Iter.allowed ) (* allowed sub-terms without further checks *)
     (t : Term.term)
@@ -656,26 +710,66 @@ let get_rec_args_ext
     let vars' = Vars.add_vars fv' env.vars in 
     let env' = Env.set_vars env vars' in
 
+    let quantum = TConfig.post_quantum_equivs context.env.table in
+    
     match t with
     | _ when mode = PTimeSI  
-          && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:true  env' t -> []
+          && HighTerm.is_ptime_deducible ~si:true  env' t -> []
     | _ when mode = PTimeNoSI 
-          && HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t -> []
+          && HighTerm.is_ptime_deducible ~si:false env' t -> []
     | _ when mode = NoHonestRand &&
              (HighTerm.is_constant env t ||
-              HighTerm.is_ptime_deducible ~ignore_qatt:true ~si:false env' t) -> []
+              HighTerm.is_ptime_deducible ~si:false env' t) -> []
 
     | Term.Var _ when mode = Any -> []
     | Term.Var v -> 
       let err_str =
         Fmt.str "terms contain a %s: @[%a@]"
           (match mode with
-           | NoHonestRand -> "variable that may depend on honest randomness" 
+           | NoHonestRand -> "variable that may depend on honest randomness"
            | PTimeSI | PTimeNoSI -> "non-ptime variable"
            | Any -> assert false)
           Vars.pp v
       in
       Tactics.soft_failure (Tactics.Failure err_str)
+
+    (* In PTimeSI + quantum mode, we only allow for now either qatt or witness
+       functions as non classical ptime functions. *)
+    | Fun (f, _) when (mode = PTimeNoSI || mode = PTimeSI)
+                   && quantum
+                   && not (HighType.is_classical env.table (Term.ty t))                                     
+                   && not ((f = Symbols.fs_qatt) || (f = Library.Prelude.fs_witness) )
+      ->       
+      let err_str =
+        Fmt.str "terms contain a non-pqtime function: @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
+    (* In PTimeSI + quantum mode, all qatt occurences must be from
+       Quantum.input/Quantum.state macro expansions, forcing the term
+       to follow the quantum execution model.  *)
+    | App (Fun (f, _), _) when (mode = PTimeNoSI || mode = PTimeSI)
+                            && quantum
+                            && (f = Symbols.fs_qatt)
+                            && not(Iter.is_valid_qatt_occ context t)
+      ->       
+      let err_str =
+        Fmt.str "terms contain an invalid qatt occurence which is not \
+                 of the form `qatt(qrn tau, frame@tau)`:: @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
+
+    | Macro (m, _, _) when not(quantum) &&
+                          (m.s_symb = Symbols.Quantum.inp   || 
+                           m.s_symb = Symbols.Quantum.state) ->
+      let err_str =
+        Fmt.str "terms contain a quantum macro but should be ptime :: \
+                 @[%a@]"
+          Term.pp t
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)      
 
     | Macro (m, l, ts) ->
       begin
@@ -737,7 +831,9 @@ let get_rec_args_ext
 
 (** Returns all recursive arguments occuring in macros in a list of terms.
     Should only be used when sources are directly occurring,
-    not themselves produced by unfolding macros. *)
+    not themselves produced by unfolding macros. 
+    
+*)
 let get_macro_rec_args
     ~(mode    : Iter.allowed)   (* allowed sub-terms without further checks *)
     ~(context : ProofContext.t)

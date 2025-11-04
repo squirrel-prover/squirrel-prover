@@ -1,20 +1,10 @@
 
-(* [check_qatt_occs context ts] verifies the following syntactic
-   conditions over ts:
-   
-   1) all the direct or indirect occurences of `qatt(u,v)` in ts can
-    be unified with the pattern `qatt(qrnd tau, frame tau)`.
-   
-   2) there is a single occurence of a quantum level a top-level in the
-   list [ts], that is, not under a function appliction.
+(* [check_direct_quantum_value_occurences context ts] verifies that
+   there is a single direct occurence of a quantum value.
 
-   3) the only quantum values under functions are as the second
-   argument of `qatt.
-
-
-Those conditions notably imply that the list of terms can be produced by a
-quantum simulator.
-   
+   <!> WIP:  Here, we just forbid two or more quantum values at top level. This is
+     insufficient. We must check a stronger property, where the only
+     allowed quantum value is state@tau_max.    
 *)  
-val check_quantum_simulable:
+val check_direct_quantum_value_occurences :
   ProofContext.t -> Term.term list -> bool

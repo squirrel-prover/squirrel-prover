@@ -58,6 +58,7 @@ Proof.
   crypto G.
   have A : forall (n:index), A(n) <= t => m n = read 42 by admit.
   assumption A.
+
 Qed.
 
 (*-----------------------------------------------------------------*)
