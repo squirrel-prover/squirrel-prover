@@ -21,7 +21,7 @@ type quantum_message.
 
 type quantum_measures_rnd[serializable, finite].
 
-type string[fixed].
+type string[serializable, fixed].
   
 type int[well_founded, fixed, serializable].
 
