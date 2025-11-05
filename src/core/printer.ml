@@ -191,13 +191,11 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
 (* Another function to assure that all styling stops if the formatter is flushed *)
 let ansi_out_funs ppf =
   let base_funs = pp_get_formatter_out_functions ppf () in
-  { out_string = base_funs.out_string ;
-    out_flush = (fun () ->
-      base_funs.out_string "\x1B[0m" 0 4;
-      base_funs.out_flush ()) ;
-    out_newline = base_funs.out_newline ;
-    out_spaces = base_funs.out_spaces ;
-    out_indent = base_funs.out_indent ; }
+  { base_funs with
+    out_flush =
+      (fun () ->
+         base_funs.out_string "\x1B[0m" 0 4;
+         base_funs.out_flush ()) }
 
   (** HTML **)
 
@@ -220,13 +218,10 @@ let html_out_funs ppf =
       escaping := true
     end
   in
-  { out_string =
+  { base_funs with
+    out_string =
       (fun s i j ->
-         String.iter (html_out_char (ref true)) (String.sub s i j)) ;
-    out_flush = base_funs.out_flush ;
-    out_newline = base_funs.out_newline ;
-    out_spaces = base_funs.out_spaces ;
-    out_indent = base_funs.out_indent ; }
+         String.iter (html_out_char (ref true)) (String.sub s i j)) }
 
 
 (** Printer initialization **)
