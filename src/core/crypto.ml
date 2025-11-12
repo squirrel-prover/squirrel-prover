@@ -28,6 +28,12 @@ let pp_xmark fmt = Printer.kw `Goal fmt "✗"
 let pp_yellow_xmark fmt = Printer.kw `GoalName fmt "✗"
 
 (*------------------------------------------------------------------*)
+(** Create a fresh identifier to annotate bideduction queries. *)
+let fresh_id =
+  let c = ref (-1) in
+  fun () -> incr c; !c
+
+(*------------------------------------------------------------------*)
 module QueryLogger = struct
   (** Make a query logger that records query of type ['a] *)
   let make 
@@ -2663,15 +2669,56 @@ let notify_bideduce_directly_computable (query : query) =
     Printer.pr "%t done: output directly computable@;@;"
       pp_check_mark
 
-let notify_bideduce_loop
+(*------------------------------------------------------------------------*)
+let notify_bideduce_loop_start
+    (query : query) : int (* new query identifier *)
+  =
+  let id = fresh_id () in
+  begin
+    if not query.vbs && not query.dbg then () else
+      Printer.pr "Starting loop (id=%d)@;" id;
+  end;
+  id
+
+let notify_bideduce_loop_second_pass
+    ~(loop_id:int)
     (query : query)
     (extra_inputs : TSet.t list)
+  : int (* new query identifier *)
   =
-  if not query.vbs && not query.dbg then () else
-    let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
-    Printer.pr "Starting second pass in the loop with extra inputs:@; %a@;"
-      (Fmt.list ~sep:(Fmt.any ",@;") (TSet._pp ppe)) extra_inputs
+  let id = fresh_id () in
+  begin
+    if not query.vbs && not query.dbg then () else
+      let ppe = default_ppe ~table:query.env.table ~dbg:query.dbg () in
+      Printer.pr "Starting second pass (id=%d) in the loop (id=%d) \
+                  with extra inputs:@; %a@;"
+        id
+        loop_id
+        (Fmt.list ~sep:(Fmt.any ",@;") (TSet._pp ppe)) extra_inputs;
+  end;
+  id
 
+(*------------------------------------------------------------------------*)
+let notify_fp_done ~(id:int) ~(initial_id:int) (query : query) : unit =
+  if not query.vbs && not query.dbg then () else
+    Printer.pr "%a Fixpoint for (id=%d) reached by (id=%d).@;@;"
+      (Printer.kw `GoalAction) "🔁"
+      initial_id id
+
+let notify_fp_restart
+    ~(id:int) (query : query) : int (* new query identifier *)
+  =
+  let new_id = fresh_id () in
+  begin
+    if not query.vbs && not query.dbg then () else
+      Printer.pr "%a Fixpoint for (id=%d) not reached, \
+                  starting new iteration (new id=%d).@;@;"
+        (Printer.kw `Goal) "🔁"
+        id new_id
+  end;
+  new_id
+
+(*------------------------------------------------------------------------*)
 let notify_bideduce_oracle_extra_inputs
     (query : query)
     (extra_inputs : TSet.t list)
@@ -2737,14 +2784,18 @@ let notify_bideduce_oracle_already_call (query : query) already_called =
       (Fmt.list ~sep:(Fmt.any "@;") (Term._pp ppe)) already_called
 
 let notify_query_goal_start ((qs,_) as query : query * _) =
+  let id = fresh_id () in
   let ppe = default_ppe ~table:qs.env.table ~dbg:qs.dbg () in
-  if not qs.vbs && not qs.dbg then () else
-    Printer.pr "@[<v 0>@;\
-                Starting bideduction proof of:@;\
-                ------------------------------@;\
-               \  @[%a@]@;\
-                ------------------------------@;@;@]"
-      (_pp_query ppe) query
+  begin
+    if not qs.vbs && not qs.dbg then () else
+      Printer.pr "@[<v 0>@;\
+                  Starting bideduction proof (id=%d) of:@;\
+                  ------------------------------@;\
+                 \  @[%a@]@;\
+                  ------------------------------@;@;@]"
+        id (_pp_query ppe) query
+  end;
+  id
 
 (*------------------------------------------------------------------*)
 let get_result_or_fail
@@ -2880,9 +2931,12 @@ let rec bideduce_term_strict
     (* the quantifier's body that must be deduced  *)
     let output_body = [CondTerm.mk ~term ~conds:output_term.conds] in
 
+    (* Notify the start of the first pass and register a query identifier. *)
+    let loop_id = notify_bideduce_loop_start query in
+
     (* first pass *)
     let result0 =
-      bideduce_fp es { query with env } output_body
+      bideduce_fp ~initial_id:loop_id es { query with env } output_body
     in
 
     let result = 
@@ -2908,10 +2962,10 @@ let rec bideduce_term_strict
             extra_outputs
         in
 
-        notify_bideduce_loop query extra_inputs;
+        let loop_id2 = notify_bideduce_loop_second_pass ~loop_id query extra_inputs in
 
         let result =
-          bideduce_fp es
+          bideduce_fp ~initial_id:loop_id2 es
             {query with env; extra_inputs = extra_inputs @ query.extra_inputs }
             output_body
         in
@@ -3218,6 +3272,7 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
     Note: currently, the procedure applies to any type [τ], by 
     generalizing over [x]. *)
 and bideduce_fp
+    ~(initial_id:int)
     ?loc
     (togen : Vars.vars) (query : query) (outputs : CondTerm.t list)
   : result
@@ -3225,7 +3280,7 @@ and bideduce_fp
   let pre0 = query.initial_mem in    (* [φ₀] *)
 
   (* [pre = φ] *)
-  let rec compute_fp pre =
+  let rec compute_fp ~id pre =
     let env =
       Env.set_vars
         query.env
@@ -3248,13 +3303,21 @@ and bideduce_fp
     then
       begin
         assert (AbstractSet.is_leq pc pre0 pre); (* [φ₀ ⇒ φ] *)
+
+        notify_fp_done ~initial_id ~id query;
+
         Some {result with final_mem = gen_post; }
       end
     else
-      let pre = AbstractSet.widening pc pre gen_post in
-      compute_fp pre 
+      begin
+        let pre = AbstractSet.widening pc pre gen_post in
+
+        let id = notify_fp_restart ~id query in
+        
+        compute_fp ~id pre
+      end
   in
-  oget (compute_fp pre0)
+  oget (compute_fp ~id:initial_id pre0)
 
 
 
@@ -3667,7 +3730,7 @@ let bideduce_recursive_subgoals
       (query : query) ~(togen : Vars.vars) (output : CondTerm.t list) 
     : result 
     =
-    notify_query_goal_start (query,output);
+    let id = notify_query_goal_start (query,output) in
 
     let result = 
       (* In time-sensitive mode, we simply run the deduction
@@ -3680,7 +3743,7 @@ let bideduce_recursive_subgoals
         bideduce query output |>
         get_result_or_fail ~loc query output
       else  
-        bideduce_fp ~loc togen query output 
+        bideduce_fp ~initial_id:id ~loc togen query output 
     in
 
     let consts = Const.generalize togen result.consts in (* final constraints [∀ x, C] *)
@@ -4078,7 +4141,7 @@ let bideduce_all_goals
     in
 
     (* notify the user *)
-    notify_query_goal_start (query_direct,[output]);
+    let _id = notify_query_goal_start (query_direct,[output]) in
 
     (* bideduce the direct part *)
     let result = 
