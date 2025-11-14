@@ -1764,7 +1764,8 @@ type query = {
 (*------------------------------------------------------------------*)
 (** Results state of a bideduction computation. *)
 type result = {
-  subgoals     : Term.terms;
+  unreach_subgoals    : Term.terms;
+  memory_subgoals     : Term.terms;
   (** TODO: all these subgoals must be always true, not simply almost always true. 
       Currently, we cannot create such subgoals in Squirrel. *)    
   extra_outputs : TSet.t list;
@@ -1777,10 +1778,11 @@ type result = {
 }
 
 let empty_result (mem: AbstractSet.mem) : result =
-  { subgoals      = [];
-    extra_outputs = [];
-    final_mem     = mem;
-    consts        = [];}
+  { unreach_subgoals = [];
+    memory_subgoals  = [];
+    extra_outputs    = [];
+    final_mem        = mem;
+    consts           = [];}
 
 (*------------------------------------------------------------------*)
 let pc_of_query (q : query) : ProofContext.t =
@@ -1807,10 +1809,11 @@ let transitivity_get_next_query
   }
 
 let chain_results (res1 : result) (res2 : result) : result=
-  { subgoals      = res1.subgoals @ res2.subgoals;
-    extra_outputs = res1.extra_outputs @ res2.extra_outputs;
-    final_mem     = res2.final_mem;
-    consts        = res1.consts @ res2.consts; }
+  { unreach_subgoals = res1.unreach_subgoals @ res2.unreach_subgoals;
+    memory_subgoals  = res1.memory_subgoals @ res2.memory_subgoals;
+    extra_outputs    = res1.extra_outputs @ res2.extra_outputs;
+    final_mem        = res2.final_mem;
+    consts           = res1.consts @ res2.consts; }
 
 (*------------------------------------------------------------------*)
 (** A sub-goal of a recursive bi-deduction proof, which should be read as:
@@ -3017,7 +3020,8 @@ let rec bideduce_term_strict
 
     (* generalize constraints, subgoals and extra/save outputs *)
     let consts = Const.generalize es result.consts in (* final constraints [∀ x, C] *)
-    let subgoals = List.map (Term.mk_forall ~simpl:true es) result.subgoals in
+    let unreach_subgoals = List.map (Term.mk_forall ~simpl:true es) result.unreach_subgoals in
+    let memory_subgoals = List.map (Term.mk_forall ~simpl:true es) result.memory_subgoals in
 
     (* build the [TSet] containing all computed extra and save outputs *)
     let extra_outputs =
@@ -3032,7 +3036,7 @@ let rec bideduce_term_strict
            that indeeds contains the additional terms computed during
            the recursive evaluation *)
     in
-    some {result with consts;subgoals;extra_outputs;}
+    some {result with consts;unreach_subgoals;memory_subgoals;extra_outputs;}
 
   | Term.Proj (_,l) ->
     notify_bideduce_term_strict query "Projection";
@@ -3201,7 +3205,8 @@ and bideduce_oracle
 
       (* add the subgoals required by the [oracle_match] to the state *)
       let result_call =
-        { subgoals = mem_subgoals @ subgoals;
+        { unreach_subgoals = [];
+          memory_subgoals = mem_subgoals @ subgoals;
           final_mem = post;
           consts;
           extra_outputs = [];   (* we do not produce the extra output yet *)
@@ -3275,7 +3280,7 @@ and bideduce (query : query) (outputs : CondTerm.t list) : result option =
         match bideduce query outputs with
         | None -> None
         | Some result ->
-          Some { result with subgoals = subg :: result.subgoals; }
+          Some { result with unreach_subgoals = subg :: result.unreach_subgoals; }
       end
 
     | Some result ->
@@ -3767,7 +3772,7 @@ let bideduce_recursive_subgoals
     ~(let_init            : Term.t Mv.t)
     ~(param               : param)
     (bided_subgoals       : goal list) 
-  : goal list * Const.t list * AbstractSet.mem * Term.t list
+  : goal list * Const.t list * AbstractSet.mem * Term.t list *Term.t list
   =
   let rec_ty, rec_info = get_rec_infos pc.env bided_subgoals in
 
@@ -3804,9 +3809,10 @@ let bideduce_recursive_subgoals
     in
 
     let consts = Const.generalize togen result.consts in (* final constraints [∀ x, C] *)
-    let subgoals = List.map (Term.mk_forall ~simpl:true togen) result.subgoals in
+    let unreach_subgoals = List.map (Term.mk_forall ~simpl:true togen) result.unreach_subgoals in
+    let memory_subgoals = List.map (Term.mk_forall ~simpl:true togen) result.memory_subgoals in
     { 
-      consts; subgoals;
+      consts; unreach_subgoals; memory_subgoals;
       (* no changes for extra ouptuts and memory*)
       extra_outputs = result.extra_outputs;
       final_mem = result.final_mem;
@@ -3848,11 +3854,11 @@ let bideduce_recursive_subgoals
   let step
       ~(step_pass : [`InferMemoryInvariant | `Run])
       (initial_mem : AbstractSet.mem)
-    : goal list * Const.t list * AbstractSet.mem list * Term.t list
+    : goal list * Const.t list * AbstractSet.mem list * Term.t list * Term.t list
     =
-    let next_goals, constraints, memories, subgoals = 
+    let next_goals, constraints, memories, unreach_subgoals, memory_subgoals = 
       List.fold_left 
-        (fun (goals, initial_constraints, memories, subgoals) (goal : goal) ->
+        (fun (goals, initial_constraints, memories, unreach_subgoals, memory_subgoals) (goal : goal) ->
            let rec_arg = oget goal.rec_arg in (* cannot be [None] for a recursive goal *)          
            (* decreasing quantity in the body covered by [goal] *)
            let dec_quantity, _ = 
@@ -3883,7 +3889,8 @@ let bideduce_recursive_subgoals
              extra_outputs = [];
              consts       = initial_constraints;
              final_mem    = initial_mem;
-             subgoals     = subgoals;
+             unreach_subgoals = unreach_subgoals;
+             memory_subgoals = memory_subgoals;
            };
            in
 
@@ -3945,30 +3952,31 @@ let bideduce_recursive_subgoals
              else result.final_mem
            in
 
-           ( goal :: goals, result.consts, final_mem :: memories, result.subgoals ) )
+           ( goal :: goals, result.consts, final_mem :: memories, result.unreach_subgoals,result.memory_subgoals ) )
         ( [],                   (* goals *)
           initial_constraints,
           [],                   (* memories *)
-          []                    (* subgoals *))
+          [],                    (* unreach_subgoals *)
+          []                    (* memory_subgoals *))
         bided_subgoals
     in
-    (List.rev next_goals, constraints, memories, subgoals)
+    (List.rev next_goals, constraints, memories, unreach_subgoals, memory_subgoals)
   in
 
   match pass with
   | `InferMemoizedValues -> 
-    let next_goals, _constraints, _memories, _subgoals =
+    let next_goals, _constraints, _memories, _unreach_subgoals, _memory_subgoals =
       step initial_mem ~step_pass:`Run
     in
 
     let _memory = List.hd _memories in
     (* all values but [next_goals] are meaningless *)
-    next_goals, _constraints, _memory, _subgoals
+    next_goals, _constraints, _memory, _unreach_subgoals, _memory_subgoals
 
   | `Standard ->
     (* Run proof-search to infer the memory invariant.
        (The other values produced by this proof-search pass are dropped.) *)
-    let _next_goals, _constraints, memories, _subgoals =
+    let _next_goals, _constraints, memories, _unreach_subgoals, _memory_subgoals =
       step initial_mem ~step_pass:`InferMemoryInvariant
     in
 
@@ -3982,14 +3990,14 @@ let bideduce_recursive_subgoals
       List.fold_left (AbstractSet.join pc) initial_mem memories
     in
 
-    let next_goals, constraints, memories_post, subgoals =
+    let next_goals, constraints, memories_post, unreach_subgoals, memory_subgoals =
       step memory_pre ~step_pass:`Run
     in
 
     if param.time_sensitive then
       let memory_pre = AbstractSet.generalize [rec_var] memory_pre in
       (* let subgoals = List.map (Term.mk_forall ~simpl:true [rec_var]) subgoals in *)
-      (next_goals, constraints, memory_pre, subgoals)
+      (next_goals, constraints, memory_pre, unreach_subgoals, memory_subgoals)
     else begin
       (* We assert that we have a post fix-point, as we did not check
          (on paper) that this is always the case, but it seems to be. *)
@@ -3999,7 +4007,7 @@ let bideduce_recursive_subgoals
            memories_post);
 
       (* memory-pre is an inductive invariant *)
-      (next_goals, constraints, memory_pre, subgoals)
+      (next_goals, constraints, memory_pre, unreach_subgoals, memory_subgoals)
     end
 
 (*------------------------------------------------------------------*)
@@ -4161,13 +4169,13 @@ let bideduce_all_goals
     ~(param               : param)
     (recursive_goals      : goal list)
     (direct_goal          : goal)
-  : goal list * (Const.t list * AbstractSet.mem * Term.t list) option
+  : goal list * (Const.t list * AbstractSet.mem * Term.t list * Term.t list) option
   (* next goals, constraints, memory, subgoals to discharge *)
   =
   (* First, synthesize a simulator for the recursive part of the target terms. *)
-  let next_recursive_goals, constraints_rec, memory_rec, subgoals_rec =
+  let next_recursive_goals, constraints_rec, memory_rec, unreach_subgoals_rec, memory_subgoals_rec =
     (* If [recursive_goals], no need to call [bideduce_recursive_subgoals]. *)
-    if recursive_goals = [] then [], initial_constraints, initial_mem, [] else
+    if recursive_goals = [] then [], initial_constraints, initial_mem, [], [] else
       bideduce_recursive_subgoals
         ~pass
         locate pc
@@ -4205,8 +4213,9 @@ let bideduce_all_goals
       match bideduce query_direct [output] with
       | Some result_direct ->
         let constraints = constraints_rec @ result_direct.consts in
-        let subgoals = subgoals_rec @ result_direct.subgoals in
-        Some (constraints, result_direct.final_mem, subgoals)
+        let unreach_subgoals = unreach_subgoals_rec @ result_direct.unreach_subgoals in
+        let memory_subgoals = memory_subgoals_rec @ result_direct.memory_subgoals in
+        Some (constraints, result_direct.final_mem, unreach_subgoals, memory_subgoals)
       | None -> None
     in
     (next_recursive_goals, result)
@@ -4610,7 +4619,7 @@ let prove
   (*------------------------------------------------------------------*)
   Printer.pr "@;@]"; (* close vertical box of second pass *)
   match res with
-  | Some (constraints, final_memory, subgoals) -> 
+  | Some (constraints, final_memory, unreach_subgoals, memory_subgoals) -> 
     Printer.pr "@[<v 0>"; (* open vertical box of final result *)
 
     let consts_subgs = Const.to_subgoals ~vbs ~dbg table game constraints in
@@ -4625,16 +4634,20 @@ let prove
       "@[<v 2>Constraints subgoals are:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe)) consts_subgs;
     Printer.pr
+      "@[<v 2>Unreach subgoals are:@ %a@]@;"
+      (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
+      unreach_subgoals;
+    Printer.pr
       "@[<v 2>Oracle subgoals are:@ %a@]@;"
       (Fmt.list ~sep:(Fmt.any "@;@;") (Term._pp ppe))
-      subgoals;
+      memory_subgoals;
     Printer.pr "@[<2>Final memory is:@ %a@]@;" (AbstractSet._pp_mem ppe) final_memory;
 
     Printer.pr "@;@]"; (* close vertical box of final result *)
 
     let red_param = Reduction.rp_default in
     let state = Reduction.mk_state pc ~red_param in
-    List.remove_duplicate (Reduction.conv state) (consts_subgs @ subgoals)
+    List.remove_duplicate (Reduction.conv state) (consts_subgs @ unreach_subgoals @ memory_subgoals)
   | None ->
     Tactics.hard_failure ~loc:game_loc (Failure "failed to apply the game" )
 
