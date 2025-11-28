@@ -292,8 +292,7 @@ let cgdh
   =
 
   if TConfig.post_quantum_equivs (TS.table s) then
-    soft_failure ~loc:(L.loc m)
-      Tactics.TacticNotPQSound;
+    soft_failure Tactics.TacticNotPQSound;
 
   let ppe = default_ppe ~table:(TS.table s) () in
   let _, hyp = TS.Hyps.by_name_k m Hyp s in

@@ -2716,13 +2716,13 @@ let is_ddh_gen tbl gen =
 
 (*------------------------------------------------------------------*)
 let ddh
-    (lgen : Symbols.p_path) (na : Symbols.p_path) (nb : Symbols.p_path) (nc : Symbols.p_path)
-    s sk fk
+    (lgen : Symbols.p_path) 
+    (na : Symbols.p_path) (nb : Symbols.p_path) (nc : Symbols.p_path)
+    (s : ES.t) 
+  : ES.t list
   =
-
   if TConfig.post_quantum_equivs (ES.table s) then
-    soft_failure ~loc:(Symbols.p_path_loc lgen)
-      Tactics.TacticNotPQSound;  
+    soft_failure Tactics.TacticNotPQSound;  
   
   let tbl = ES.table s in
   let gen_symb = Symbols.Operator.convert_path lgen tbl in
@@ -2746,8 +2746,13 @@ let ddh
   if is_ddh_context ~gen ~exp ~context ~l_proj ~r_proj
       na nb nc (ES.conclusion_as_equiv s).terms
       (*TODO:Concrete : Probably something to do to create a bounded goal*)
-  then sk [] fk
+  then []
   else soft_failure Tactics.NotDDHContext
+
+let ddh_tac args s =
+  match args with
+  | [Args.DH (DDH { gen; na; nb; nc; })] -> wrap_fail (ddh gen na nb nc) s
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (* DDH is called on strings that correspond to names, put potentially without
@@ -2757,9 +2762,7 @@ let ddh
 
 let () =
   T.register_general "ddh"
-    (function
-      | [Args.DH (DDH { gen; na; nb; nc; })] -> LT.gentac_of_etac (ddh gen na nb nc)
-      | _ -> bad_args ())
+    (LT.gentac_of_etac_arg ddh_tac)
 
 (*------------------------------------------------------------------*)
 let crypto
