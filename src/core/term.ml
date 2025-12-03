@@ -1585,7 +1585,9 @@ and _pp
         (Utils.pp_ne_list
            "@[<hov> %a@]"
            (Fmt.list ~sep:(Fmt.any " ") (pp (fixity, `Right)))) l
-        (if m.s_info.pp_style = `At then "@" else " ")
+        (if m.s_info.pp_style = `At then "@"
+         else if l = [] && not m.s_info.has_dist_param then ""
+         else " ")
         pp_last_arg
     in
     maybe_paren ~outer ~side ~inner:fixity pp fmt ()
