@@ -134,7 +134,7 @@ lemma lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
 Proof.
   intro i tau. 
  induction tau.
- smt ~prover:Z3 ~steps:118136.
+ smt.
 Qed.
 
 (** The contents of distinct memory cells never coincide. *)

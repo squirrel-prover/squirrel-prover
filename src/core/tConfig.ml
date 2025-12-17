@@ -114,6 +114,8 @@ let v_smt_classic_macros = Param_bool true
 let s_smt_quantum_macros = "smtQuantumMacros"
 let v_smt_quantum_macros = Param_bool false
 
+let s_smt_steps = "smtSteps"
+let v_smt_steps = Param_int 0
 
 let init_params (table:Symbols.table) : Symbols.table =
   table
@@ -137,6 +139,7 @@ let init_params (table:Symbols.table) : Symbols.table =
   |> declare s_security_types        v_security_types
   |> declare s_smt_classic_macros    v_smt_classic_macros
   |> declare s_smt_quantum_macros    v_smt_quantum_macros
+  |> declare s_smt_steps             v_smt_steps    
 
 (*------------------------------------------------------------------*)
 let get_int s table : int =
@@ -181,3 +184,4 @@ let prettyprint_reify       = get_bool   s_prettyprint_reify
 let security_types          = get_bool   s_security_types
 let smt_classic             = get_bool   s_smt_classic_macros
 let smt_quantum             = get_bool   s_smt_quantum_macros
+let smt_steps               = get_int    s_smt_steps

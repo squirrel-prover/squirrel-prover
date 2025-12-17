@@ -1,11 +1,6 @@
-type timestamp_style =
-  | Abstract
-  | Abstract_eq
-  | Nat
-
 let[@warning "-27"] is_valid
-  ~timestamp_style ~macro_axioms ~timeout ~steps ~provers
-  env tbl system vars hyps hints concl
+  ~macro_axioms ~timeout ~steps ~provers ~cmd_flag
+  ~poly ~hint_tables env tbl system vars hyps hints concl
 =
   Format.eprintf "SMT support unavailable, please recompile with Why3.@.";
   false

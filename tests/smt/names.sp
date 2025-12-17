@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 name n : (index*(index*index)) -> message.
 name m : ((index*index)*index) -> message. 
 

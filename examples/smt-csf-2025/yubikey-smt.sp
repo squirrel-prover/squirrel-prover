@@ -235,7 +235,7 @@ lemma noreplayInv (ii, ii1, i:index):
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. *)
 Proof.
- use counterIncreaseBis; smt ~prover:CVC5 ~steps:38732.
+ use counterIncreaseBis; smt ~prover:CVC5 ~steps:60000.
 Qed.
 
 
@@ -307,6 +307,6 @@ lemma monotonicity (ii, ii1, i:index):
       && SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk =>
          S(ii,i) < S(ii1,i).
 Proof.
-use noreplayInv; smt ~prover:CVC5 ~steps:34885.
+use noreplayInv; smt ~prover:CVC5 ~steps:40000.
 Qed.
 

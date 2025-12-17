@@ -12,8 +12,9 @@ lemma [real] rw (y:index) : forall x, x = y => skR x = skR y. Proof. auto. Qed.
 lemma [real] _ (j:index) :
   (try find i:index such that i = j in skR i) = (skR j).
 Proof.
-  rewrite (rw j) //. 
-  have H := try_choose (fun i => i = j) (fun _ => skR j) zero j _; 1: auto. 
+  rewrite (rw j) //.
+  have H := try_true_1 (fun i => i = j) (fun _ => skR j) zero _.
+  by exists j.
   by auto.
 Qed.
 
@@ -21,5 +22,7 @@ Qed.
 lemma [real] _ (j:index) :
   (try find i:index such that i = j in skR i) = (skR j).
 Proof.
-  rewrite (rw j) // (try_choose _ (fun _ => skR j) _ j) //.
+  rewrite (rw j) // (try_true_1 _ (fun _ => skR j) _).
+  by exists j.
+  auto.
 Qed.

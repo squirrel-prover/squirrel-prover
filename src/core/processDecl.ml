@@ -2090,14 +2090,18 @@ let add_hint_rewrite table (s : Symbols.p_path) =
   Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula table
 
 (*------------------------------------------------------------------*)
-let add_hint_smt table (s : Symbols.p_path) =
+let add_hint_smt table (s : Symbols.p_path) (smt_table : string) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
   let ty_vars = lem.params.ty_vars in
 
-  if bound <> None && ty_vars <> [] then 
-    Tactics.hard_failure ~loc:(L.loc (snd s))
-      (Failure "smt polymorphic hints must be exact");
+  if ty_vars <> [] && bound <> Some (Library.Real.mk_zero table) then begin 
+    if (Sys.getenv_opt "SMT_UNSAFE" <> None) then 
+      Format.printf "Warning : smt polymorphic hints must be exact.@."
+    else
+      Tactics.hard_failure ~loc:(L.loc (snd s))
+        (Failure "smt polymorphic hints must be exact")
+    end;
 
   if bound <> None && bound <> Some (Library.Real.mk_zero table) then
     Tactics.hard_failure ~loc:(L.loc (snd s))
@@ -2107,7 +2111,7 @@ let add_hint_smt table (s : Symbols.p_path) =
     { name = lem.name ; formula = lem.formula ;
       params = lem.params ; system = lem.system }
   in
-  Hint.add_hint_smt hint table
+  Hint.add_hint_smt hint smt_table table
 
 
 (*------------------------------------------------------------------*)
@@ -2185,6 +2189,6 @@ let add_hint_deduce table (s : Symbols.p_path) =
 (*------------------------------------------------------------------*)
 let add_hint (table : Symbols.table) (h : Hint.p_hint) : Symbols.table =
   match h with
-  | Hint.Hint_rewrite id -> add_hint_rewrite table id 
-  | Hint.Hint_smt     id -> add_hint_smt     table id 
-  | Hint.Hint_deduce  id -> add_hint_deduce  table id 
+  | Hint.Hint_rewrite id            -> add_hint_rewrite table id 
+  | Hint.Hint_smt   (id, smt_table) -> add_hint_smt     table id smt_table
+  | Hint.Hint_deduce  id            -> add_hint_deduce  table id 

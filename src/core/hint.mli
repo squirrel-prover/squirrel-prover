@@ -58,20 +58,20 @@ type smt_hint = {
 (** {3 Adding and retrieving hints } *)
 
 val get_rewrite_db : Symbols.table -> rewrite_db
-val get_smt_db     : Symbols.table -> smt_hint list
+val get_smt_db     : Symbols.table -> (smt_hint list) Utils.Ms.t 
 val get_deduce_db  : Symbols.table -> deduce_db
 
 (*------------------------------------------------------------------*)
 (** Surface AST to add hints. *)
 type p_hint =
   | Hint_rewrite of Symbols.p_path
-  | Hint_smt     of Symbols.p_path
+  | Hint_smt     of Symbols.p_path*string
   | Hint_deduce  of Symbols.p_path
 
 (*------------------------------------------------------------------*)
 val add_hint_rewrite : 
   Symbols.p_path -> Params.t -> SE.t -> Term.term -> Symbols.table -> Symbols.table
 
-val add_hint_smt : smt_hint -> Symbols.table -> Symbols.table
+val add_hint_smt : smt_hint -> string -> Symbols.table -> Symbols.table
 
 val add_hint_deduce : deduce_hint -> Symbols.table -> Symbols.table

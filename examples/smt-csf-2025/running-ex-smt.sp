@@ -78,7 +78,7 @@ lemma lastupdateTag (i:index,tau:timestamp):
         forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau.
-  smt ~prover:Z3 ~steps:128308.
+  smt ~steps:38000.
 Qed.
 
 lemma lastupdateReader (ii:index,tau:timestamp):
@@ -91,7 +91,7 @@ lemma lastupdateReader (ii:index,tau:timestamp):
           happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
 induction tau.
-smt ~prover:Z3 ~steps:155222.
+smt ~steps:41000.
 Qed.
 
 (* The following lemma states that values of different memory cells do not

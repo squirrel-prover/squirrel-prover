@@ -1,4 +1,5 @@
 include Logic.
+set smtSteps=10000.
 
 abstract h: message -> message.
 

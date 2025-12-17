@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 name s0 : index -> message.
 mutable cellR(i:index) : message = s0 i.
 hash H.

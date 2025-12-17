@@ -230,7 +230,7 @@ lemma injectivity(i,j,j':index) :
 Proof.
   use counterIncreaseStrictSB.
   use authA.
-  smt ~steps:70796.  
+  smt ~steps:110000.  
 Qed.
 
 
@@ -248,7 +248,7 @@ Proof.
   use counterIncreaseStrictRA.
   use authA.
   use authB.
-  smt ~prover:CVC5 ~steps:61676.
+  smt ~prover:CVC5 ~steps:230000.
 Qed.
 
 (* 2nd property w.r.t. B and B *)

@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 channel c
 abstract m : message
 abstract n : message
@@ -50,3 +52,15 @@ Proof. smt. Qed.
 
 lemma condB1_false(i:index) : happens(B1(i)) => cond@B1(i).
 Proof. checkfail smt exn Failure. Abort.
+
+name k  : message.
+
+let m_let : message = k.
+
+let m2_let x : message = <x,k>.
+
+lemma[any] m_let_value : m_let=k. 
+Proof. smt. Qed.
+
+lemma[any] m2_let_value : forall x:message,  m2_let x = <x,k>. 
+Proof. smt. Qed.

@@ -124,7 +124,7 @@ type smt_hint = {
 
 type hint_db = { 
   db_rewrite : rewrite_db;
-  db_smt     : smt_hint list;
+  db_smt     : (smt_hint list) Utils.Ms.t;
   db_deduce  : deduce_db;
 }
 
@@ -140,7 +140,7 @@ let default_hint_p   : Symbols.hintdb = Symbols.HintDB.of_s_path default_hint_sp
 (*------------------------------------------------------------------*)
 let empty_hint_db = { 
   db_rewrite = empty_rewrite_db; 
-  db_smt     = []; 
+  db_smt     = Utils.Ms.empty; 
   db_deduce  = []; 
 }
 
@@ -178,7 +178,7 @@ let get_deduce_db  table = (hint_db table).db_deduce
 (** Surface AST to add hints. *)
 type p_hint =
   | Hint_rewrite of Symbols.p_path
-  | Hint_smt     of Symbols.p_path
+  | Hint_smt     of Symbols.p_path*string
   | Hint_deduce  of Symbols.p_path
 
 (*------------------------------------------------------------------*)
@@ -201,9 +201,13 @@ let add_hint_rewrite (s : Symbols.p_path) pat_params system form table : Symbols
     { db with db_rewrite = add_rewrite_rule head h db.db_rewrite; }
 
 (*------------------------------------------------------------------*)
-let add_hint_smt (h : smt_hint) table : Symbols.table =
+let add_hint_smt (h : smt_hint) (smt_table : string) table : Symbols.table =
   let db = hint_db table in
-  set_hint_db table { db with db_smt = h :: db.db_smt }
+  let hints_smt = Utils.oget_dflt [] (Utils.Ms.find_opt smt_table db.db_smt) in 
+    set_hint_db table 
+      { db with db_smt =
+        Ms.add smt_table (h::hints_smt) db.db_smt}
+
 
 (*------------------------------------------------------------------*)
 let add_hint_deduce (h : deduce_hint) table : Symbols.table =

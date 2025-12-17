@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 abstract ok : message
 abstract ko : message 
 channel c

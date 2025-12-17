@@ -1397,6 +1397,18 @@ tac:
   (* SMT *)
   | l=lloc(SMT) a=named_args_gen(tacargs_string_int)
     { mk_abstract l "smt" [TacticsArgs.Named_args_gen a] }
+    
+  | l=lloc(SMT) a=named_args_gen(tacargs_string_int)
+    HINT hints=slist1(lsymb, COMMA)
+    { let open TacticsArgs in
+      let hints = List.map (fun s -> String_name s) hints in
+      let rec update = function
+        | NList ({pl_desc="hint"} as h,l) :: tl -> NList (h,l@hints) :: tl
+        | hd :: tl -> hd :: update tl
+        | [] -> [ NList (L.mk_loc l "hint",hints) ]
+      in
+      let a = update a in
+      mk_abstract l "smt" [TacticsArgs.Named_args_gen a] } 
 
   (* Case_Study, equiv tactic, patterns *)
   | l=lloc(CS) t=tac_term
@@ -1787,7 +1799,8 @@ set_option:
 (*------------------------------------------------------------------*)
 _hint:
 | HINT REWRITE id=path   { Hint.Hint_rewrite id }
-| HINT SMT     id=path   { Hint.Hint_smt     id }
+| HINT SMT id=path { Hint.Hint_smt (id,"default")}
+| HINT SMT     id=path  IN table=id { Hint.Hint_smt     (id,table) }
 | HINT DEDUCE  id=path   { Hint.Hint_deduce  id }
 
 hint:

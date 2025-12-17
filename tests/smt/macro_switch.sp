@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 channel c.
 
 system S = out(c,empty).

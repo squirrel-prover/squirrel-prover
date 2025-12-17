@@ -1,4 +1,5 @@
 channel c.
+set smtSteps=10000.
 
 type T
 type C

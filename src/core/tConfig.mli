@@ -85,3 +85,4 @@ val security_types : Symbols.table -> bool
 
 val smt_classic : Symbols.table -> bool
 val smt_quantum : Symbols.table -> bool
+val smt_steps : Symbols.table -> int

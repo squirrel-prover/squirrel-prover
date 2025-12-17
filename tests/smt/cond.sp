@@ -1,4 +1,5 @@
 include Core.
+set smtSteps=10000.
 
 lemma[any] _ : cond@init. Proof. smt. Qed. 
 

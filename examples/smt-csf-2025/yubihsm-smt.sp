@@ -285,7 +285,7 @@ lemma counterIncreaseBis:
       SCtr(pid)@t = SCtr(pid)@t').
 Proof.
   induction.
-  use counterIncrease; smt ~prover:CVC5_stringscounterexamples  ~steps:94058.
+  use counterIncrease; smt ~prover:CVC5  ~steps:36700.
 Qed.
 
 (*------------------------------------------------------------------------------
@@ -299,7 +299,7 @@ lemma noreplayInv (j, j', pid:index):
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
-  use counterIncreaseBis; smt ~provers:Z3 ~steps:274758. 
+  use counterIncreaseBis; smt ~steps:400000. 
 Qed.
 
 lemma noreplay (j, j', pid:index):
@@ -309,7 +309,7 @@ lemma noreplay (j, j', pid:index):
   SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=>
   j = j'.
 Proof.
-  use noreplayInv; smt  ~steps:27749. 
+  use noreplayInv; smt  ~steps:30000. 
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -319,7 +319,7 @@ lemma monotonicity (j, j', pid:index):
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
   Server(pid,j) < Server(pid,j').
 Proof.
- use noreplayInv; smt  ~steps:80863. 
+ use noreplayInv; smt  ~steps:160000. 
 Qed.
 
 
@@ -397,7 +397,7 @@ lemma if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
    if b && (x = y && b0) && b1 then
     snd(dec(z,diff(fst(dec(x,u)),v))).
 Proof. 
-project; smt  ~steps:24906. 
+project; smt  ~steps:27995. 
 Qed.
 
 set showStrengthenedHyp=true.
@@ -441,7 +441,7 @@ Proof.
       - simpl;smt  ~steps:25261.
       - rewrite if_then_then in 3.
         assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t))
-        as H. smt  ~steps:25612.
+        as H. smt  ~steps:30000.
         rewrite /= H -le_pred_lt in 3.
         rewrite /AEAD in 1.
         fa 1.
@@ -585,7 +585,7 @@ Proof.
   use equiv_real_ideal_enrich_tmax0 as [Hap C U].
   split; 1: auto.
   split; 1: auto.
-  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt  ~steps:26119.
+  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt  ~steps:30000.
   rewrite !Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) => happens(t')).
@@ -597,18 +597,18 @@ Proof.
     (fun (i : index, t' : timestamp) => happens(t')) zero
     (fun (i : index, t' : timestamp) => not (happens(t'))) empty. 
     + simpl; smt  ~steps:23391.
-    + simpl. smt  ~steps:24825.   
+    + simpl. smt  ~steps:30000.   
 
     + constseq 4 :
       (fun (i : index, t' : timestamp) => happens(t')) zero
       (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
         - simpl; smt  ~steps:23391.
-        - simpl; smt  ~steps:24825.
+        - simpl; smt  ~steps:30000.
        - constseq 2 :
         (fun (t' : timestamp) => happens(t')) false
         (fun (t' : timestamp) => not (happens(t'))) exec_dflt.
           * simpl;smt  ~steps:23391.
-          * simpl;smt  ~steps:26081.
+          * simpl;smt  ~steps:30000.
           * by apply U.
 Qed.
 

@@ -1,3 +1,5 @@
+set smtSteps=10000.
+
 channel c.
 abstract m1:message.
 abstract m2:message. 

@@ -1,28 +1,47 @@
-(*Theory imported when timestamps are represented by integers*)
+(*Theory imported when timestamps are represented by an abstract type*)
+(*The equality between timestamps is represented with "="*)
 theory Trace_model
 
   use int.Int
 
-  (*Type declarations*)
+  (*Type declarations*) 
 
   type index
-  type timestamp = int
+  type timestamp
   type message 
 
-  (*Definition and specification of functions on timestamps*)
+  (*Functions on timestamps*)
 
   constant  init : timestamp
-  constant max_int : int
+  predicate happens (t : timestamp)
+  predicate (<~)  (t : timestamp) (t' : timestamp) 
+  function pred (t : timestamp) : timestamp 
 
-  predicate happens (t : timestamp) = t >= 1 /\ max_int>=t
-  predicate (~~)  (t : timestamp) (t' : timestamp) =
-    (happens t \/ happens t') -> t = t'
-  predicate (<~)  (t : timestamp) (t' : timestamp) =
-    happens t /\ happens t' /\ t <= t'
+  (*Specification of these functions*)
 
-  axiom act_init :  init  = 1
+  axiom eq_nothapp : forall t1 t2 : timestamp.  
+    (happens t1) \/ (happens t2) \/ (t1 = t2)
 
-  function pred (t : timestamp) : timestamp = if happens t then t - 1 else 0
+  axiom orderpred : forall t : timestamp. (happens (pred t ))-> ((pred t) <~ t) 
+  axiom ordertrans : forall t1 t2 t3 : timestamp. 
+    ((t1 <~ t2) /\ (t2 <~ t3)) -> (t1 <~ t3)
+  axiom ordermin : forall t : timestamp. (happens t) -> (init <~ t) 
+  axiom total_order : forall t1 t2 : timestamp. 
+    (happens t1 /\ happens t2) <-> ((t1 <~ t2) \/ (t2 <~ t1))
+
+ 
+  axiom anti_symmetry : forall t1 t2 : timestamp. 
+    ((t1 <~ t2) /\ (t2 <~ t1)) -> (t1 = t2) 
+
+  axiom pred_def : forall t1 t2 : timestamp. 
+    (happens (pred t1)) -> (happens t2) ->
+      ((t2 <~ (pred t1) )\/ (t1 <~ t2))
+  axiom pred_def2 : forall t : timestamp. (happens t) -> not ((pred t) = t)
+
+  axiom happ_pred : forall t : timestamp. 
+    (happens t) -> (happens (pred t)) \/ (t=init)
+  
+  axiom happ_init : happens init
 
   (*Definition and specification of various functions*)
 
@@ -32,10 +51,17 @@ theory Trace_model
   axiom xor_comm : forall x y : message. xor x y = xor y x
   axiom xor_nil : forall x y : message. xor (xor x x) y = y
   predicate msg_is_true message
-
+ 
   (*Definition and specificatoin of macros*)
 
   predicate macro_cond timestamp
   axiom macro_cond_happens : forall t : timestamp. macro_cond t -> happens t
+
+  (*Function choose and its axiomatization*)
+
+  function choose ('a -> bool) : 'a 
+
+  axiom choose_def : forall phi:'a -> bool.
+    if (exists x:'a. phi x) then (phi (choose phi)) else true
 
 end

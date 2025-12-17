@@ -131,7 +131,7 @@ lemma authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [H1 H2 H3].
   use ctrIncA.
-  euf H3; smt ~steps:35993.
+  euf H3; smt ~steps:40000.
 Qed.
 
 lemma noReplay (i,i',j,j':index) : 
