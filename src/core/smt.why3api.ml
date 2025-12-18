@@ -299,6 +299,10 @@ let rec convert_type context = function
       when Symbols.s_path_to_string (ns,t) = "int" ->
       assert (args=[]);
       context.int_ty
+  | Type.TConstr ((ns,t),args)
+      when Symbols.s_path_to_string (ns,t) = "string" ->
+      assert (args=[]);
+      Why3.Ty.ty_str
   | Type.TConstr ((ns,t),args) -> begin
     if args <> [] then raise InternalError; (* FEAT: support type arguments *)
     let s = Symbols.s_path_to_string (ns,t) in
