@@ -971,9 +971,10 @@ let get_macro_occs
       in
       Tactics.soft_failure (Tactics.Failure err_str)
 
-    (* In PTimeSI + quantum mode, we only allow for now either qatt or
+    (* In PTime + quantum mode, we only allow for now either qatt or
        witness functions as non classical ptime functions. *)
-    | Fun (f, _) when mode = PTimeSI && quantum
+    | Fun (f, _) when (mode = PTimeNoSI || mode = PTimeSI)
+                   && quantum
                    && not (HighType.is_classical env.table (Term.ty t))                     
                    && not ((f = Symbols.fs_qatt) || (f = Library.Prelude.fs_witness) )
       ->       
@@ -983,10 +984,11 @@ let get_macro_occs
       in
       Tactics.soft_failure (Tactics.Failure err_str)
 
-    (* In PTimeSI + quantum mode, all qatt occurences must be from
+    (* In PTime + quantum mode, all qatt occurences must be from
        Quantum.input/Quantum.state macro expansions, forcing the term
        to follow the quantum execution model.  *)
-    | App (Fun (f, _), _) when mode = PTimeSI && quantum
+    | App (Fun (f, _), _) when (mode = PTimeNoSI || mode = PTimeSI)
+                            && quantum   
                             && (f = Symbols.fs_qatt)
                             && not(is_valid_qatt_occ context t)
       ->       
@@ -998,6 +1000,7 @@ let get_macro_occs
       Tactics.soft_failure (Tactics.Failure err_str)
 
     | Macro (m, _, _) when not(quantum) &&
+                           (mode = PTimeSI || mode = PTimeNoSI) &&
                           (m.s_symb = Symbols.Quantum.inp   || 
                            m.s_symb = Symbols.Quantum.state) ->
       let err_str =

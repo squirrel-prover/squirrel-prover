@@ -763,6 +763,7 @@ let get_rec_args_ext
       Tactics.soft_failure (Tactics.Failure err_str)
 
     | Macro (m, _, _) when not(quantum) &&
+                           (mode = PTimeSI || mode = PTimeNoSI) &&                           
                           (m.s_symb = Symbols.Quantum.inp   || 
                            m.s_symb = Symbols.Quantum.state) ->
       let err_str =
