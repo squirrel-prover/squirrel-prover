@@ -1,15 +1,30 @@
-###  Fix ptime verifications in legacy crypto applications
-  [commit: `TODO`]
+###  Added missing serializability checks
+  [commits: `bd4ad9e3`, `504cb30bc`, **breaking change**]
 
-By adding checks that terms that need to be simulated in ptime do not
-contain quantum values, we fix an older unsoundness issue, where it
-was not checked that such terms did not contain function symbols of a
-type depending on non instantiated type variables that might not be
-serializable.
+- Deduction now checks that the order of the terms involved. This may
+  break some existing developements, notably:
 
-If proofs are broken by this new check, it can probably be fixed by
-adding the [serializable] tag to the needed types. (see the update of
-some tests in this commit)
+  + If they used user-declared types without a serializability
+    assumption. If applicable, the assumption can be added using the
+    `serializable` type restriction. E.g. `type key[large].` may need to
+    become `type key[large, serializable]`.
+  
+  + If they used polymorphic types, e.g. to prove polymorphic deduction
+    lemmas. Such lemmas cannot be easily fixed because we currently have
+    no way of restricting type variables instantiations. As a temporary
+    solution, it is possible to disable order guards in the deduction
+    engine using `set deductionOrderGuard=false` (note that doing so could
+    lead to unsoundness if incorrectly used).
+
+- Fix poly-time verifications in legacy crypto applications:
+
+  We check that terms do not contain function symbols of a type
+  depending on non instantiated type variables that might not be
+  serializable.
+
+  If proofs are broken by this new check, it can likely be fixed by
+  adding the [serializable] tag to the needed types.
+
 
 ### Type system for non-deduction
   [commit:`4d5ed2a8`]
