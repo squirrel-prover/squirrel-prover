@@ -66,8 +66,10 @@ PROVER_EXAMPLES =\
   $(wildcard examples/ho/authdh.sp)             \
   $(wildcard examples/ho/hybrid.sp)             \
   $(wildcard examples/crypto/*.sp)              \
-  $(wildcard examples/typing/ok/*.sp)              \
-  $(wildcard examples/typing/ko/*.sp)				
+  $(wildcard examples/typing/ok/*.sp)           \
+  $(wildcard examples/typing/ko/*.sp)           \
+  $(wildcard examples/crypto-usenix-26/*.sp)    \
+  $(wildcard examples/crypto-usenix-26/foo/*.sp)    
 
 # Check if why3 is installed before adding the smt case studies
 
