@@ -13,6 +13,15 @@ type t = {
 let tag t = t.tag
 
 (*------------------------------------------------------------------*)
+(** See `.mli` *)
+(* Add the missing field warning, to ensure that we do not forget to
+   extend this function when fields are added. *)
+let[@warning "+9"] equal_fields t t' =
+  let { env; hyps; concrete; tag = _ } = t in
+  let { env = env'; concrete = concrete'; hyps = hyps'; tag = _ } = t' in
+  env == env' && hyps == hyps' && concrete = concrete'
+
+(*------------------------------------------------------------------*)
 let cpt = ref 0
 
 let make ~env ~hyps ~concrete =

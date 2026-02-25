@@ -19,6 +19,10 @@ type t = private {
 val tag : t -> int
 
 (*------------------------------------------------------------------*)
+(** Test physical equality of the fields, excluding [tag] *)
+val equal_fields : t -> t -> bool
+
+(*------------------------------------------------------------------*)
 val make : env:Env.t -> hyps:TraceHyps.hyps -> concrete:bool -> t
 
 (*------------------------------------------------------------------*)

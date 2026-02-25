@@ -1020,13 +1020,14 @@ module TSet = struct
     make ~term:tset.term ~conds:tset.conds ~vars
 
   (** add memoization *)
-  let normalize (tset : t) : t =
+  let normalize : t -> t =
     let memo = Memo1.create 1024 in
-    try Memo1.find memo tset with
-    | Not_found ->
-      let r = normalize tset in
-      Memo1.add memo tset r;
-      r
+    fun (tset : t) ->
+      try Memo1.find memo tset with
+      | Not_found ->
+        let r = normalize tset in
+        Memo1.add memo tset r;
+        r
 
   (*------------------------------------------------------------------*)
   let refresh (tset : t) : t =
@@ -1089,27 +1090,18 @@ module TSet = struct
     singleton_incl ~refresh:false pc tset1 tset2
 
   (** add memoization *)
-  let is_leq (pc : ProofContext.t) (tset1 : t) (tset2 : t) : bool =
+  let is_leq : ProofContext.t -> t -> t -> bool
+    =
     let memo = Memo2.create 1024 in
-    let env, hyps = pc.env, pc.hyps in
-    (* FIXME: see if using pc.tag to memoize is enough *)
-    try
-      (* We do not track the environment and hypotheses in the weak
-         hash-table, as we have no cheap way of doing so for now (with
-         term hashconsing, doing so for the hypotheses would be
-         cheap).
-
-         Instead, each entry in the hashtable records the environment
-         and hypotheses it corresponds to, and we check consistency at
-         retrieval (and replace the record in case of mismatch) *)
-      (* FIXME: term hashconsing *)
-      let env0, hyps0, r = Memo2.find memo (tset1, tset2) in
-      if env0 == env && hyps0 == hyps then r else raise Not_found
-    with
-    | Not_found ->
-      let r = is_leq pc tset1 tset2 in
-      Memo2.add memo (tset1, tset2) (env, hyps, r);
-      r
+    fun (pc : ProofContext.t) (tset1 : t) (tset2 : t) ->
+      try
+        let pc0, r = Memo2.find memo (tset1, tset2) in
+        if ProofContext.equal_fields pc pc0 then r else raise Not_found
+      with
+      | Not_found ->
+        let r = is_leq pc tset1 tset2 in
+        Memo2.add memo (tset1, tset2) (pc, r);
+        r
 
   (*------------------------------------------------------------------*)    
   (** Check if [cond_term ∈ tset] and returns the instantiation of 
