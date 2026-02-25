@@ -1759,7 +1759,24 @@ let is_valid
   end;
   if smt_debug then
     Format.printf "%a@." Why3.Pretty.print_task task;
-  run_all_async ~timeout ~steps ~provers ~cmd_flag task
+
+  let run_task () =
+    run_all_async ~timeout ~steps ~provers ~cmd_flag task
+  in
+  
+  if Sys.ocaml_release.major = 5 then begin
+    let control = Gc.get () in
+    let restore () = Gc.set control in
+    Gc.set { control with space_overhead = min 20 control.space_overhead; };
+    try
+      let x = run_task () in
+      restore ();
+      x
+    with
+    | e -> restore (); raise e
+  end
+  else run_task ()
+
 
 (* Tactic registration. *)
 
