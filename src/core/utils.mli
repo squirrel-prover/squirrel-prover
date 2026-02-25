@@ -97,6 +97,29 @@ module List : sig
   exception Out_of_range
 end
 
+
+(*------------------------------------------------------------------*)
+(** Handle memoization tables across the project (printing statistics,
+    reseting the tables) *)
+module MemoizationTables : sig
+  val record :
+    name:string ->
+    stats:(unit -> Hashtbl.statistics) ->
+    reset:(unit -> unit) ->
+    unit
+
+  val record_ephemeron :
+    name:string ->
+    stats_full:(unit -> Hashtbl.statistics) ->
+    stats_alive:(unit -> Hashtbl.statistics) ->
+    reset:(unit -> unit) ->
+    unit
+
+  val pp_stats : Format.formatter -> unit
+
+  val reset : unit -> unit
+end
+
 (*------------------------------------------------------------------*)
 module String : sig
     include module type of String 

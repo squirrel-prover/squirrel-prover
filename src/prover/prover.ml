@@ -1,4 +1,5 @@
 open Squirrelcore
+open Utils
 open Ppenv
 
 module SE = SystemExpr
@@ -137,6 +138,10 @@ let complete_proof (ps:state) : state =
 let do_qed (st : state) : state =
   let prover_state = complete_proof st in
   Printer.prt `Result "Exiting proof mode.@.";
+
+  (* Fmt.epr "%t@." MemoizationTables.pp_stats; *)
+  MemoizationTables.reset ();
+
   prover_state
 
 let start_proof

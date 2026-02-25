@@ -1022,6 +1022,13 @@ module TSet = struct
   (** add memoization *)
   let normalize : t -> t =
     let memo = Memo1.create 1024 in
+    let () =
+      MemoizationTables.record_ephemeron
+        ~name:"[match.ml] to_subst_locals"
+        ~stats_alive:(fun () -> Memo1.stats_alive memo)
+        ~stats_full:(fun () -> Memo1.stats memo)
+        ~reset:Memo1.(fun () -> reset memo)
+    in
     fun (tset : t) ->
       try Memo1.find memo tset with
       | Not_found ->
@@ -1093,6 +1100,13 @@ module TSet = struct
   let is_leq : ProofContext.t -> t -> t -> bool
     =
     let memo = Memo2.create 1024 in
+    let () =
+      MemoizationTables.record_ephemeron
+        ~name:"[crypto.ml] is_leq"
+        ~stats_alive:(fun () -> Memo2.stats_alive memo)
+        ~stats_full:(fun () -> Memo2.stats memo)
+        ~reset:Memo2.(fun () -> reset memo)
+    in
     fun (pc : ProofContext.t) (tset1 : t) (tset2 : t) ->
       try
         let pc0, r = Memo2.find memo (tset1, tset2) in

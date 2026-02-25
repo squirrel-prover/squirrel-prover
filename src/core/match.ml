@@ -1082,7 +1082,7 @@ end = struct
     | `BadInst pp_err ->
       Fmt.epr "%t@." pp_err;
       assert false (* cannot happen for unrestricted variables *)
-
+  
   (* [to_subst_locals] with memoisation *)
   let to_subst_locals =
     let module H1 = struct
@@ -1098,6 +1098,13 @@ end = struct
     end in
     let module Memo = Ephemeron.K2.Make (H1) (H2) in
     let memo = Memo.create 256 in
+    let () =
+      MemoizationTables.record_ephemeron
+        ~name:"[match.ml] to_subst_locals"
+        ~stats_alive:(fun () -> Memo.stats_alive memo)
+        ~stats_full:(fun () -> Memo.stats memo)
+        ~reset:Memo.(fun () -> reset memo)
+    in
     fun ~mode t ->
       try Memo.find memo (t,mode) with
       | Not_found ->

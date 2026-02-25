@@ -732,6 +732,13 @@ let term_uf_normalize =
   end in 
   let module Memo = Cuf.Memo2 (U) in
   let memo = Memo.create 256 in
+  let () =
+    MemoizationTables.record_ephemeron
+      ~name:"[completion.ml] normalization"
+      ~stats_alive:(fun () -> Memo.stats_alive memo)
+      ~stats_full:(fun () -> Memo.stats memo)
+      ~reset:Memo.(fun () -> reset memo)
+  in
   fun uf v ->
     try Memo.find memo (uf,v) with
     | Not_found -> 
@@ -1024,6 +1031,13 @@ module Unify = struct
     end in 
     let module Memo = Ephemeron.K2.Make (U) (U) in
     let memo = Memo.create 256 in
+    let () =
+      MemoizationTables.record_ephemeron
+        ~name:"[completion.ml] unify"
+        ~stats_alive:(fun () -> Memo.stats_alive memo)
+        ~stats_full:(fun () -> Memo.stats memo)
+        ~reset:Memo.(fun () -> reset memo)
+    in
     fun u v ->
       try Memo.find memo (u,v) with
       | Not_found -> 
@@ -1474,6 +1488,12 @@ let complete table (l : Term.esubst list) : state =
 (** With memoisation *)
 let complete : Symbols.table -> Term.esubst list -> state =
   let memo = Memo.create 256 in
+  let () =
+    MemoizationTables.record
+      ~name:"[completion.ml] complete"
+      ~stats:(fun () -> Memo.stats memo)
+      ~reset:Memo.(fun () -> reset memo)
+  in
   fun table l ->
     try Memo.find memo (table,l) with
     | Not_found -> 

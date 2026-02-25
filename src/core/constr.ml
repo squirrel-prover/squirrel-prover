@@ -602,6 +602,13 @@ let get_class uf u =
 let get_class =
   let module Memo = Uuf.Memo2 (Ut) in
   let memo = Memo.create 256 in
+  let () =
+    MemoizationTables.record_ephemeron
+      ~name:"[constr.ml] get classes"
+      ~stats_alive:(fun () -> Memo.stats_alive memo)
+      ~stats_full:(fun () -> Memo.stats memo)
+      ~reset:Memo.(fun () -> reset memo)
+  in
   fun uf (ut : ut) ->
     try Memo.find memo (uf,ut) with
     | Not_found ->
@@ -1422,6 +1429,13 @@ end
 (** Memoisation *)
 let models_conjunct =
   let memo = Args.Memo.create 256 in
+  let () =
+    MemoizationTables.record_ephemeron
+      ~name:"[constr.ml] build models"
+      ~stats_alive:(fun () -> Args.Memo.stats_alive memo)
+      ~stats_full:(fun () -> Args.Memo.stats memo)
+      ~reset:Args.Memo.(fun () -> reset memo)
+  in
   fun ~allow_disjunction table (terms : Term.terms) ->
     let terms_array = Args.mk ~allow_disjunction terms table in
     try Args.Memo.find memo terms_array with

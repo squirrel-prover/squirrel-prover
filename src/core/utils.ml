@@ -459,6 +459,76 @@ let get_result = function
   | Error e -> raise e
 
 (*------------------------------------------------------------------*)
+module MemoizationTables = struct
+
+  (*------------------------------------------------------------------*)
+  type ephemeron_data = {
+    full  : unit -> Hashtbl.statistics;
+    alive : unit -> Hashtbl.statistics;
+  }
+
+  (*------------------------------------------------------------------*)
+  type record = {
+    name : string;
+    stats : [
+      | `Table     of unit -> Hashtbl.statistics
+      | `Ephemeron of ephemeron_data
+    ];
+    reset : unit -> unit;
+  }
+  
+  (*------------------------------------------------------------------*)
+  (** Recorded memoization tables *)
+  let tables = ref []
+
+  (*------------------------------------------------------------------*)
+  let record
+      ~(name : string)
+      ~(stats : unit -> Hashtbl.statistics)
+      ~(reset : unit -> unit)
+    : unit
+    =
+    tables := { name; stats = `Table stats; reset; } :: !tables
+
+  let record_ephemeron
+      ~(name : string)
+      ~(stats_full  : unit -> Hashtbl.statistics)
+      ~(stats_alive : unit -> Hashtbl.statistics)
+      ~(reset : unit -> unit)
+    : unit
+    =
+    tables :=
+      {
+        name;
+        stats = `Ephemeron {full = stats_full; alive = stats_alive;};
+        reset
+      }
+      :: !tables
+
+  (*------------------------------------------------------------------*)
+  let pp_record fmt (r : record) =
+    Fmt.pf fmt "@[<v 2>%s:@;%t@]" r.name
+      (fun fmt ->
+         match r.stats with
+         | `Table stats ->
+           Fmt.pf fmt "%d entries" (stats ()).num_bindings
+             
+         | `Ephemeron { full; alive; } ->
+           Fmt.pf fmt "%d live entries (total: %d)"
+             (alive ()).num_bindings
+             (full ()).num_bindings)
+
+  (*------------------------------------------------------------------*)
+  let pp_stats fmt =
+    Fmt.pf fmt "@[<v 0>%a@]"
+      (Fmt.list pp_record)
+      !tables
+
+  (*------------------------------------------------------------------*)
+  let reset () = List.iter (fun r -> r.reset ()) !tables
+end
+
+(*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
   val compare : t -> t -> int
@@ -669,6 +739,13 @@ module Uf (Ord: Ordered) = struct
 
   let memo_cl = Memo.create 256
 
+  let () =
+    MemoizationTables.record_ephemeron
+      ~name:"[utils.ml] union_find_classes"
+      ~stats_alive:(fun () -> Memo.stats_alive memo_cl)
+      ~stats_full:(fun () -> Memo.stats memo_cl)
+      ~reset:Memo.(fun () -> reset memo_cl)
+
   (* memoisation *)
   let classes t = try Memo.find memo_cl t with
     | Not_found ->
@@ -771,3 +848,4 @@ module Lazy = struct
 
   let map f x = lazy (f (Lazy.force x))
 end
+
