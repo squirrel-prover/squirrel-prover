@@ -33,7 +33,7 @@ extensions = [
     'sphinxcontrib.bibtex',
     'squirreldomain',
     'sphinxcontrib.jquery',
-    'sphinx_search.extension'
+    'sphinx_search.extension' #Needs `pip install readthedocs-sphinx-search package`
 ]
 
 latex_additional_files = [

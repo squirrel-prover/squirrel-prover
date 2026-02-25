@@ -144,6 +144,8 @@ with built-in axiomatizations.
 * The pairing function :n:`pair` (also noted :n:`<x,y>`) with
   its projection functions :n:`fst` and :n:`snd`.
 * A length function for the number of bits in a message, :n:`len`, as well as a function producing a bitstring of zeroes of the same length as its input, :n:`zeroes`.
+
+* The empty set constant :n:`empty_set`, the set constructor :n:`add t s` that build the set by adding the term :n:`t` in the set :n:`s`, along with membership check function :n:`mem`.
    
 
 Cryptographic functions
@@ -655,3 +657,109 @@ The system context of a lemma can also be provided using the following legacy sy
   .. squirreldoc::
      global lemma [set: real/left; equiv: real/left,ideal/right] ideal_real_equiv :
        Forall (tau:timestamp[const]), [happens(tau)] -> equiv(frame@tau)
+
+
+Games
+=====
+
+Squirrel supports reductions to user-declared cryptographic hardness
+assumptions using the :tacn:`crypto` tactic.  This section details how
+users can declare their own cryptographic games. Currently, Squirrel
+only supports the declaration of indistinguishability cryptographic
+games (builtin support for reachability games is planned for the
+future).
+
+For further details on how these games are used in proofs, see the
+section on the :ref:`cryptographic reduction tactic
+<section-crypto-reduction>`.
+
+Program instructions
+--------------------
+
+Games uses the following set of instructions:
+
+* .. prodn:: random_sampling ::=  rnd @sampling_id : @type ;
+   sampling_id ::= @ident
+
+  samples a variable :n:`@sampling_id` of type :n:`type`.
+  Random samplings can be at top-level, in which case they are
+  globally accessible, or local to an oracle.
+
+* .. prodn:: mutable_decl ::= var  @var_id {? : @type} = @term  ;
+     var_id ::= @ident
+
+  declares a mutable variable :n:`@var_id` initialized to :n:`@term`.
+
+* .. prodn:: let_decl ::=  let @var_id {? : @type} = {| @term | #init} ;
+
+ declares a non-mutable variable :n:`@var_id`. This variable is either
+ initialized to :n:`@term`, or left un-initialized using the
+ :n:`#init` keyword. The latter construct is reserved to top-level
+ :n:`let` declarations, and let the adversary sets the value of the
+ variable before the oracles become accessible. This user must provide
+ the value of every un-initialized variable when calling the
+ :tacn:`crypto` tactic.
+
+* .. prodn:: assign ::=  @var_id := @term ;
+
+  updates the value of the variable :n:`@var_id` to :n:`@term`.
+
+
+Oracles
+-------
+
+An oracle is a program that takes some inputs, declares variables,
+performs random samplings, update mutable variables, and optionally
+return a value.
+
+.. prodn:: oracle_decl ::= oracle @oracle_id = { @oracle_body }
+           oracle_id ::= @ident
+           oracle_body ::= {* @random_sampling} {* @mutable_decl} {* @assign} {? return @term}
+
+  declares an oracle named :n:`@oracle_id` with inputs :n:`@var_id*` and body :n:`@oracle_body`.
+
+	  
+Games
+-----
+
+Games names are identifiers:
+
+.. prodn:: game_id ::= @ident
+          
+A :gdef:`cryptographic game` is a sequence of global sampling declarations, then global variable declarations and finally oracle declarations.
+
+.. decl:: game @game_id = { {* @random_sampling} {* @mutable_decl | @let_decl} {* @oracle_decl} }
+
+   declares the game :n:`@game_id`.
+
+   
+.. example:: The empty game
+       
+   The empty game has no oracles, global variables, or random
+   samplings, and can be declared as follows.
+
+   .. squirreldoc::
+      game Empty = {}
+
+   The PRF game can be declared as below.
+
+   .. squirreldoc::
+      game PRF = {
+        rnd key : kty;
+        var lhash = empty_set; (* Log for ohash queries.     *)
+        var lchal = empty_set; (* Log for challenge queries. *)
+
+        oracle ohash x = {
+          lhash := add x lhash;
+          return if mem x lchal then zero else h(x,key)
+         }
+
+        oracle challenge x = {
+          rnd r : message;
+          var old_lchal = lchal;
+          old_lchal := old_lchal;
+          lchal := add x lchal;
+          return if mem x old_lchal || mem x lhash then zero else diff(r, h(x,key))
+        }
+      }.
+

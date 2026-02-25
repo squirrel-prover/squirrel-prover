@@ -494,8 +494,8 @@ Tactics are organized in three categories:
 
  - :ref:`generic tactics <section-generic-tactics>`, that rely on generic logical reasoning;
  - :ref:`structural tactics <section-structural-tactics>`, that rely on properties of protocols and equality;
- - :ref:`cryptographic tactics <section-crypto-tactics>`, that rely on
-   cryptographic assumptions.
+ - :ref:`generic cryptographic tactics <section-crypto-tactics>` and :ref:`cryptographic reduction tactic <section-crypto-reduction>` that rely on
+   cryptographic assumptions, either respectivally ad-hoc in Squirrel or user-defined using games.
 
 In addition, they are also split between tactics applicable to local
 goals only, global goals only, or tactics common to both types of
@@ -1355,8 +1355,8 @@ Global tactics
 
 .. _section-crypto-tactics:
 
-Cryptographic tactics
----------------------
+Generic cryptographic tactics
+-----------------------------
 
 Cryptographic tactics enable reasoning over cryptographic and
 probabilistic properties of random samplings and primitives.
@@ -1882,8 +1882,133 @@ Global tactics
 
    Latest formal Squirrel description: :cite:`bkl23lics`.
 
+.. _section-crypto-reduction:
+
+Cryptographic reduction tactic
+------------------------------
+
+   The :tacn:`crypto` tactic automatically reduce an equivalence to a
+   hardness assumption expressed as a user-provided
+   :term:`cryptographic game` using cryptographic bideduction. The
+   tactic may return subgoals that the user must discharge to ensure
+   the cryptographic reduction is correct. For more details on
+   cryptographic bideduction, see
+   :cite:`DBLP:conf/ccs/BaeldeKS24`. See :cite:`baelde2026leveraging`
+   for a description of the proof-search procedure.
+
+
+Inputs
+~~~~~~
+
+
+.. tace:: crypto {* ~option} @game_id {* (@sampling_id : @name_id {? @term})} {* (@var_id : @term)}
+   :name: crypto
+
+   The tactic takes several inputs and options:
+
+   * :n:`@game_id` is the indistinguishability game we are reducing to.
+     
+   * :n:`(@sampling_id:@name_id {? @term})` adds a name constraint
+     associating :n:`@sampling_id` to the term :n:`(@name_id @term)`.
+     The tactic checks that :n:`@term` can be bideduced without oracle calls.
+
+   * :n:`(@var_id : @term)` initializes the variable :n:`@var_id` to :n:`@term`.
+     The tactic checks that :n:`@term` is bideducible without oracle calls.
+     
+   * Options are passed using the syntax
+     :n:`~option`. They allow user control the proof search procedure.
+   
+      - :n:`~no_subgoal_on_failure` forces proof search to fail
+        whenever it reaches a branch it cannot bideduce. Without this
+        option, we ask the user to prove that the branch where the
+        failure occurred is unreachable. When such failures should not
+        happen, this makes the tactic fail early and helps with
+        understanding why :tacn:`crypto` cannot build the wanted
+        reduction.
+   
+      - :n:`~time_sensitive` change the heuritic used to automatically
+        infer inductive invariants during proof search. The
+        alternative heuristics generates time-sensitive invariant (see
+        :cite:`baelde2026leveraging` for details).
+
+   For mutable variables, the tactic uses an abstract interpretation
+   technique that only supports monotonously increasing sets of
+   messages, by maintaining an over-approximation of these sets.
+
+.. example::
+
+   Consider two names and a game with a global random sampling and one uninitialized variable.
+   
+   .. squirreldoc::
+      name n:message.
+      name nn:message.
+
+      game FOO = {
+        rnd k:message;
+        let m :message = #init;
+      }.
+
+      system null.
+
+      global lemma _ : equiv(zero).
+      Proof.
+        crypto ~time_sensitive FOO (m:n) (k:nn).
+      Qed.
+
+   The proof above use the :tacn:`crypto` tactic in an equivalence, with the
+   :n:`~time_sensitive` option, mapping the game random sampling :n:`k` to name
+   :n:`nn` and the variable :n:`m` to the term :n:`n`.
+
+
+Output
+~~~~~~~~~~~~~
+
+
+By default, the tactic prints:
+
+  * The final constraint system
+
+    .. squirreldoc::
+       Constraints are ...
+
+  * The final memory of the game
+
+    .. squirreldoc::
+       Final memory is ...
+
+It generates and prints the following subgoals:
+
+   * Branches that must be proved unreachable
+
+     .. squirreldoc::
+       Unreach subgoals are ...
+
+     
+   * Subgoals ensuring the validity of the constraint
+
+     .. squirreldoc::
+       Constraints subgoals are ...
+     
+   * Subgoals ensuring that oracles where correctly called
+
+     .. squirreldoc::
+       Oracle subgoals are:
+       ...
+
+The :n:`verboseCrypto` option turns-in a verbose mode in which the
+steps taken by the proof search procedures are logged on the output
+buffer. The option can be set by
+
+.. squirreldoc::
+     set verboseCrypto = true.
+
+.. warning::
+   For large protocols, this mode may slows the tactic and the emacs
+   Proof General mode.
+
+
 .. _section-utility-tactics:
-  
+
 Utility tactics
 ---------------
 
