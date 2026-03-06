@@ -1,3 +1,98 @@
+### Support for concrete reachability logic
+[commits: `f15476a7`, **breaking change**]
+
+Add support for the concrete version of the reachability logic.
+
+**Breaking changes:** We now require that rewrite hints are exact. Further, some bug-fixes (see list below) changed the behavior of some tactics in a minor way: for example, `assumption H` now checks that `H` is actually used.
+
+**Note:** Library axioms and lemmas, e.g. in `Logic.sp`, are now assumed to hold exactly.
+This should not impact existing asymptotic-level proofs, as the exact logic extension was implemented in a compatible way with existing asymptotic proofs (for example, there is no need to import the concrete library files to use exact lemmas).
+
+The changes are split in two parts. First, we list changes that also affect the asymptotic fragment, which include changes in the exact fragment. Second, we list extension to the concrete setting.
+
+*Asymptotic fragment changes*
+
+ - **breaking change** `assumption H` fails if `H` is not used.
+
+ - Option to control higher-order unification strategy
+   (`set HigherOrderUnification= All | BoundVars | None`)
+   with `All` always allowing eta-expansion of variables, `BoundVar` only on bound variables and `None` never.
+
+ - Add additional test on the order of an inductive datatype.
+
+ - Add the possibility to assume that a macro runs in polynomial time using the syntax :
+   ```
+     let rec f ˜admit_ptime ...
+   ```
+
+ - New variant of the case tactic `case ˜tags` that derives tags during a case analysis (however, this requires to automatically introduce and name the variables created by the case tactic, which may be less usable).
+
+ - Improvement to the proof-term elaborator with a more systematic handling of implicit localization (less manual localizations should be necessary)
+
+ - Added various axioms on integers in the library `Int.sp`.
+
+ - Most library files are now exact (notably `Logic.sp`, `Classic.sp` and `Int.sp`).
+
+ - Add syntax to declare exact lemmas and axioms
+   An exact local lemma can be declared with the syntax
+   ```
+     exact lemma lemmaName ...
+   ```
+   There is a similar syntax for exact axioms.
+
+ - Add `smt` tactic support for exact goal.
+ - When declaring a system, the generated executability axioms are now exact.
+
+ - Various messaging improvements:
+   - Better error message for case;
+   - Better debugging information for ill-formed judgment;
+   - Better failure messages when not all variables are inferred when closing a proof-term.
+
+ - Bug-fixes:
+   - Remove a possible anomaly in proof-term elaborator;
+   - **breaking change** `hint rewrite` must be exact (Fix #247);
+   - Fix rewrite checks on local hypothesis (Fix #298);
+   - Fix the context used in rewrite sub-goals (Fix #301).
+
+*Concrete reasoning changes*
+
+ - Support for real numbers with the library `Real.sp`.
+ - `reduce` now comes with builtin reduction rules operations on reals.
+ - Add `smt` support for real reasoning (Thanks Stanislas Riou!).
+
+ - Syntax for declaring a concrete local lemma
+   ```
+   lemma foo @system:P (x: a) : formula <: bound
+   ```
+   where bound is of type `real`.
+
+ - Syntax for concrete reachability atoms `[.]` with
+   ```
+   [formula <: bound]
+   ```
+
+ - Support for most reachability tactics in the concrete setting, namely `destruct, true, split, case, congurence, assumption, constraints, expand, auto, simpl, simplauto, project, subst, remember, fa, revert, use, have,ghave, assert, rewrite, fresh, apply, intctxt, euf, induction, set`
+
+   Some cryptographic tactics are not yet supported (e.g. DH assumptions tactics). Deprecated tactics, such as executable, are also not supported.
+
+   Some of tactics may create multiple sub-goals where the bound must be distributed (for example, a local case disjunction). To help with this, multiple modes are supported.
+
+   First option: the user can give no bound indication. In that case, the tool tries to infer bounds, and the syntax remains the same as in the asymptotic case.
+
+   Second option: the user can give all the possible annotations with the syntax`tac <: b1,b2,..., bN` (where N is the number of sub-goals after the application of the tactics). In that case, the tool creates a new subgoal to prove the compatibility of the subgoals' bounds with the original bound (usually, b1+...+bN` must be smaller than the original bound).
+
+   Last option: the user can give a subset of the bound' annotation with the syntax `tac <: b1,b2,..., bk` (with k < N). In that case, the tool infers the remaining necessary bound annotation.
+
+ - A new syntax for the bound annotation in the case disjunction of an introduction pattern has been added `[H <: b1 | H <: b2]`. As in tactics, it is possible to omit a subset of bound annotations.
+
+ - `rewrite` can now rewrite in bounds (Fix #331).
+
+ - Add proof-term syntax for bound weakening `(pt <: b)`.
+ - The proof-term elaborator accounts for bounds.
+ - Bound weakening is inferred during elaboration.
+ - Example of proofs in the concrete setting can be found in folder `examples/concrete/`.
+ 
+ 
 ###  Added missing serializability checks
   [commits: `bd4ad9e3`, `504cb30bc`, **breaking change**]
 
