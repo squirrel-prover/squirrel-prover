@@ -7,6 +7,8 @@ This is the documentation tool for **Squirrel-prover**. It uses
 Dependences
 -----------
 
+This documention works for Python 3.13.7. 
+
 First, install ``sphinx``, for instance with `pip3 install -U sphinx` (see
 sphinx's [documentation](https://www.sphinx-doc.org/en/master/usage/installation.html)
 for alternatives). 
@@ -15,13 +17,21 @@ Then with pip :
 
 .. code::
    pip3 install sphinx_rtd_theme beautifulsoup4 sphinx-tabs readthedocs-sphinx-search\
-   antlr4-python3-runtime==4.7.1 pexpect sphinxcontrib-bibtex myst-parser
+   antlr4-python3-runtime==4.13.2 pexpect sphinxcontrib-bibtex myst-parser
 
 The generated doc relies on syntax coloration through a fork of [fork
 of `pygments`](https://github.com/squirrel-prover/pygments) including
 a lexer for `squirrel` files. This repository must be pull, and then
 the corresponding python module installed with `pip install -e .` inside
 the repository.
+
+If `antlr4-python3-runtime` needs to be updated, note that the files
+in `documentation/sphinx/source/ext/notations` need to be regenarated
+with the exact same version of antlr4: install the corresponding
+antlr4 version from e..,
+https://www.cs.upc.edu/~cl/practica/install.html, and then run make in
+the `notations` subdirectory.
+
 
 Build
 -----

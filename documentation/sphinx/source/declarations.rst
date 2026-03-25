@@ -244,7 +244,7 @@ defined through processes written in a dialect of the applied pi-calculus.
   The first presentations of Squirrel's logic relied explicitly on
   notions of systems, first without state :cite:`bdjkm21sp` and then
   with state :cite:`bdkm22csf`. The latest presentation
-  :cite:`bkl23hal` does not feature a notion of system, but
+  :cite:`bkl23lics` does not feature a notion of system, but
   allows to encode systems through a more expressive logic.
   So far, the translation from processes to systems has not been
   formally defined in the literature.

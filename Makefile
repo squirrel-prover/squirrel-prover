@@ -425,7 +425,6 @@ jsquirrel:
 	rm -rf app/www/static/theories
 	mkdir -p app/www/static/theories
 	cp ./theories/*.sp app/www/static/theories
-	cp ./examples/tutorial/*.sp app/www/static/theories/.
 	cp ./examples/*.sp app/www/static/theories/.
 	cp ./examples/stateful/*.sp app/www/static/theories/.
 
