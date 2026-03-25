@@ -55,13 +55,15 @@ export class FileManager {
       this.lib = lib;
 
       let tuto = [
-        "0-logic.sp",
-        "1-crypto-hash.sp",
-        "2-crypto-enc.sp",
-        "3-hash-lock-auth.sp",
-        "4-hash-lock-unlink.sp",
-        "5-stateful.sp",
-        "6-key-establishment.sp",
+              "0-logic.sp",
+	      "1-names.sp",
+	      "2-cdh.sp",
+	      "2.5-cdh-signed-dh.sp",
+	      "3-signed-dh.sp",
+	      "3.5-signed-dh-many.sp",
+	      "4-signed-dh-mitm.sp",
+	      "5-crypto-hash.sp",
+	      "6-hash-lock-auth.sp",
       ];
 
       let ex_sandp = [
