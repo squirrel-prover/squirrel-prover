@@ -19,15 +19,16 @@ protocols relying on cryptography. It works within a high-order logic,
 and a first step is to be able to model all the components of a
 protocol inside the logic.
 
-First, let us load the standard library of Squirrel, `Core`, loaded in
-most examples, and which provides basic logical reasonings
-capabilities (the standard library can be found in the `theories/`
-subfolder of Squirrel).
+Libraries
++++++++++
+
+Most Squirrel file typically start by including the core library,
+which provides basic logical reasonings capabilities (the standard
+library can be found in the `theories/` subfolder of Squirrel).
 
 .. squirreltop::  in
 
-   include Core. (* as a preliminary, we simply load the Core library,
-   preload in all files. *)
+   include Core. (* as a preliminary, we load the Core library. *)
 
 Messages
 ++++++++
@@ -160,12 +161,6 @@ Each is declared in the following way.
    hash h
    senc enc,dec
    aenc asenc,asdec,aspk.
-
-Libraries
-+++++++++
-
-Libraries can be included, most Squirrel file typically include (at the begining), the core library, with:
-
 
 
 
