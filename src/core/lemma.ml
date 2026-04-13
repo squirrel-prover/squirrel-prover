@@ -97,13 +97,20 @@ let mem_global gname table : bool =
 (*------------------------------------------------------------------*)
 let add_lemma
     ?(loc = L._dummy)
+    ?scope
     (kind : [`Axiom | `Lemma]) (gconcl : Goal.statement)
     (table : Symbols.table) : Symbols.table
   =
+  let scope = match scope with
+    | Some np -> np
+    | None -> Symbols.scope table
+  in
   let lem = { stmt = gconcl; kind } in
   let data = Lemma lem in
   let table, _ =
-    Symbols.Lemma.declare ~approx:false table (L.mk_loc loc gconcl.Goal.name) ~data 
+    Symbols.Lemma.declare
+      ~approx:false ~scope table
+      (L.mk_loc loc gconcl.Goal.name) ~data
   in
   let ppe = default_ppe ~table () in
   Printer.pr "%a@;" (_pp ppe) lem;
@@ -213,6 +220,11 @@ let mk_namelength_statement
   : Symbols.table * Goal.statement
   =
   let tyn = ftype.fty_out in
+  (* scope for namelength constant = type's scope *)
+  let scope = match tyn with
+    | TConstr ((s_npath,_),_) -> Symbols.of_s_npath s_npath
+    | _ -> Symbols.top_npath
+  in
 
   (* create fresh variables regarding to arity of n *)
   let vars = List.map (fun x -> Vars.make_fresh x "i") ftype.fty_args in
@@ -221,15 +233,20 @@ let mk_namelength_statement
   (* build name term n *)
   let tn = Term.mk_name (Term.nsymb n tyn) tvars in
 
-  (* cst hash is built from hash of output type of n : tyn *)
+  (* constant symbol namelength_[tyn] represents length of names in [tyn] *)
   let cst = Type.to_string tyn in
   let cst_name = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy cst_name in
 
-  (* find or build constant function [namelength_hashS] *)
+  (* find or build constant function namelength_[tyn], of type [message] *)
   let table, fname =
-    if Symbols.Operator.mem_s (Symbols.scope table) cst_name table then
-      let fname = Symbols.Operator.convert_path ([],lsy) table in
+    if Symbols.Operator.mem_s scope cst_name table then
+      let p_npath : Symbols.p_npath =
+        List.map
+          (fun s -> L.mk_loc L._dummy @@ Symbols.to_string s)
+          scope.npath
+      in
+      let fname = Symbols.Operator.convert_path (p_npath,lsy) table in
       (table, fname)
     else
       let ftype = Type.mk_ftype [] [] Type.tmessage in
@@ -241,7 +258,7 @@ let mk_namelength_statement
               (Abstract { fixity = `Prefix; constructor_of = None;}, [])
         }
       in
-      Symbols.Operator.declare ~approx:false table lsy ~data 
+      Symbols.Operator.declare ~approx:false ~scope table lsy ~data 
   in
   let cst = Term.mk_fun table fname [] in
   (* len(n) = cst *)
@@ -279,12 +296,12 @@ let add_namelength_axiom
     table
   else
     let name = "namelength_" ^ (Symbols.to_string n.s) in
-    (* if already defined in current scope, return the table unchanged *)
-    if Symbols.Lemma.mem_s (Symbols.scope table) name table 
-    then table
-    else
+    (* target scope = name's scope *)
+    let scope = n.np in
+    (* if already defined in target scope, return the table unchanged *)
+    if Symbols.Lemma.mem_s scope name table then table else
       let table, stmt = mk_namelength_statement name table n ftype in
-      add_lemma ~loc `Axiom stmt table
+      add_lemma ~loc ~scope `Axiom stmt table
 
 (*------------------------------------------------------------------*)
 (** {2 Depends, Mutex } *)
