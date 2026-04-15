@@ -982,7 +982,17 @@ let namespace_exit (t : table) (nl : p_npath): table =
     in
     update t ~scope:(npath top) ~current ~stack
   in
-  List.fold_left exit1 t (List.rev nl)
+
+  let t = List.fold_left exit1 t (List.rev nl) in
+
+  (* We re-open [t]'s final scope, to bring any possibly missing
+     symbol in scope.
+     
+     This can happen, e.g., if while in scope [A.B], we add a symbol
+     [s] to scope [A]: then, when exiting [B], we cannot simply
+     restore [current] as it was before entering [B], since this
+     version of [current] does not contain [s]. *)
+  namespace_open t t.scope
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and maps} *)
