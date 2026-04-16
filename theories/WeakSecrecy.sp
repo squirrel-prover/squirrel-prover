@@ -51,7 +51,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------- *)
-global lemma d_nd @system:any ['a 'b] (u : 'a) (v : 'b) : 
+global lemma d_neg1 @system:any ['a 'b] (u : 'a) (v : 'b) : 
     $(u *> v) ->
     $(u |> v) ->
     [false].
@@ -60,7 +60,17 @@ Proof.
   by have ? := H f. 
 Qed.
 
-global lemma neq @system:any ['a 'b] (u : 'a) (v, w : 'b) :
+global lemma d_neg2 @system:any ['a 'b] (u : 'a) (v : 'b) : 
+    $(u |> v) ->
+    $(u *> v) ->
+    [false].
+Proof.
+  
+  intro @/( *> ) @/( |> ) [f H] G.
+  by have ? := G f. 
+Qed.
+
+global lemma s_ineq @system:any ['a 'b] (u : 'a) (v, w : 'b) :
     $(u |> v) ->
     $( u *> w) ->
     [v <> w].
@@ -68,6 +78,19 @@ Proof.
   intro @/( |> ) @/( *> ) [f H1] H2.
   by have ? := (H2 f).
 Qed.
+
+global lemma [any] d_trans ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) :
+  $(u |> v) ->
+  $(v |> w) ->
+  $(u |> w).
+Proof.
+  intro @/( |> ) [f H] [f1 H1].
+  exists (fun u => f1 (f u)). 
+  reduce.
+  rewrite H H1.
+  apply eq_refl.
+Qed.
+
 
 global lemma [any]
   s_weak_l ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) : 
@@ -92,23 +115,32 @@ Proof.
   auto.
 Qed.
 
-global lemma [any] d_trans ['a 'b 'c] (u : 'a) (v : 'b) (w : 'c) :
-  $(u     |> v) ->
-  $((u,v) |> w) ->
-  $(u     |> w).
-Proof.
-  intro @/( |> ) [f H] [f1 H1].
-  exists (fun u => f1 (u, f u)). 
-  reduce.
-  rewrite H H1.
-  apply eq_refl.
-Qed.
 
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Equiv *)
-(*
-TODO: manage in the PQ setting. 
 
+global lemma [set: none/left; equiv:none/left,none/left] 
+  RwEquiv (u1, u2, v1, v2 : message): 
+    $(u2 *> v2)->
+    equiv(diff(u1,u2), diff(v1,v2)) ->
+    $(u1 *> v1).
+Proof.
+  intro Nded.
+  intro equ.
+  rewrite /( *> ) in *.
+  intro f.
+  ghave equ' : equiv(diff(f(u1) <> v1,f(u2) <> v2)). {
+    fa 0; fa 0.
+    deduce 0.
+    auto.
+  }.
+  rewrite equiv equ'.
+  by have C := Nded f.
+Qed.
+
+
+
+(* TODO: manage in the PQ setting for the polymorphic version:
 global lemma [set: none/left; equiv:none/left,none/left] 
   RwEquiv ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
     $(u2 *> v2)->
@@ -127,6 +159,7 @@ Proof.
   rewrite equiv equ'.
   by have C := Nded f.
 Qed.
+
 
 global lemma [set: none/left; equiv:none/left,none/left] 
   RwEquivWeak ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
@@ -152,8 +185,8 @@ Proof.
   have C := Nded f. 
   auto.
 Qed.
-
 *)
+
 (* ------------------------------------------------------------------- *)
 (* Rule Rw:Oracle *)
 

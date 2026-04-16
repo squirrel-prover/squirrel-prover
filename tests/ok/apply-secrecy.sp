@@ -10,7 +10,7 @@ set deductionOrderGuard = false.
 (*------------------------------------------------------------------*)
 (* `apply` can infers arguments by unification *)
 global lemma _ @system:any ['a 'b 'c] (u0 : 'a) (v0 : 'b) (w0 : 'c) :
-  $(u0 |> v0) -> $((u0, v0) |> w0) -> $(u0 |> w0).
+  $(u0 |> v0) -> $(v0 |> w0) -> $(u0 |> w0).
 Proof.
   intro H G. 
   apply Deduction.d_trans _ _ _ H.
