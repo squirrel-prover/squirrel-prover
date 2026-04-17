@@ -425,9 +425,35 @@ let add_why_axiom context fmla name =
           (Why3.Decl.create_prsymbol @@  name)
           fmla)
 
+(* Auxillary function to create a projection in Why3 *)
+let why3_proj context i term_tuple type_list = 
+  let pat_list,len,v =
+    List.fold_left
+    (fun (acc,j,v) ty ->
+      if i=j then
+      (* Create a temp var symbol used for pattern matching. *)
+        let v' =
+          Why3.Term.create_vsymbol ((id_fresh context ("temp"))) ty
+        in
+          (pat_as (pat_wild ty) v' :: acc, j+1, Some v')
+        else
+          (pat_wild ty :: acc, j+1, v))
+      ([],1,None)
+      type_list
+  in
+  let pat_list = List.rev pat_list in
+  Why3.Term.t_case_close
+    term_tuple
+    [pat_app
+      (fs_tuple (len-1))
+      pat_list
+      (Why3.Ty.ty_tuple type_list),
+      t_var (Option.get v)]
+
 
 (* Declares new choose functions and the associated axioms for a given arity *)
 let declare_choose context i =
+  let sq_choose = List.hd (Hashtbl.find context.choose_symbs 1) in
   let ty_vars = (List.init i
     (fun k -> Why3.Ty.ty_var (Why3.Ty.tv_of_string ("a"^(string_of_int k)))))
   in let fun_ty =
@@ -476,9 +502,34 @@ let declare_choose context i =
         ))
         t_true
       )
+  and choose_link = let open Why3.Term in 
+    let var_phi = create_vsymbol (id_fresh context "phi") fun_ty in
+    let phi = t_var var_phi in
+    let var_tuple = create_vsymbol 
+      (id_fresh context "tuple_symb") 
+      (Why3.Ty.ty_tuple ty_vars) 
+    in let tuple_symb = t_var var_tuple in 
+    t_forall_close [var_phi] []
+      (t_equ
+        (t_tuple (List.map 
+          (fun choose_symb -> t_app_infer choose_symb [phi])
+          choose_symbs
+        ))
+        (t_app_infer 
+          sq_choose 
+          [t_lambda [var_tuple] []
+            (t_func_app_beta_l phi 
+            (List.init (List.length ty_vars)
+              (fun i -> why3_proj context (i+1) tuple_symb ty_vars)))
+          ]
+        )
+      )
   in add_why_axiom
     context axiom_choose
     (id_fresh context ("choose_def_"^(string_of_int i)));
+  add_why_axiom 
+    context choose_link 
+    (id_fresh context ("choose_link_"^(string_of_int i)));
   choose_symbs
 
 (* Transforms a list of Squirrel terms to a list of Why3 terms. *)
@@ -681,29 +732,7 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
     | Term.Proj (i,t) ->
       begin match (Term.ty t) with
         | Type.Tuple l ->
-          let pat_list,len,v =
-            List.fold_left
-              (fun (acc,j,v) ty ->
-                let ty' = convert_type context ty in
-                if i=j then
-                  (* Create a temp var symbol used for pattern matching. *)
-                  let v' =
-                    Why3.Term.create_vsymbol ((id_fresh context ("temp"))) ty'
-                  in
-                  (pat_as (pat_wild ty') v' :: acc, j+1, Some v')
-                else
-                  (pat_wild ty' :: acc, j+1, v))
-              ([],1,None)
-              l
-          in
-          let pat_list = List.rev pat_list in
-          Why3.Term.t_case_close
-            (sqterm_to_wfmla context t)
-            [pat_app
-              (fs_tuple (len-1))
-              pat_list
-              (Why3.Ty.ty_tuple (List.map (convert_type context) l)),
-             t_var (Option.get v)]
+          why3_proj context i (sqterm_to_wfmla context t) (List.map (convert_type context) l)
 
         | _ -> assert false
       end
@@ -1552,7 +1581,11 @@ let add_name_axioms context =
           let cst =
             Why3.Term.create_fsymbol
               (Why3.Ident.id_fresh cst_name) [] context.msg_ty
-          in Hashtbl.add context.functions_tbl cst_name (cst,[]); cst
+          in Hashtbl.add context.functions_tbl cst_name (cst,[]); 
+          context.theory:= Why3.Theory.add_decl_with_tuples
+              !(context.theory)
+              (Why3.Decl.create_param_decl cst);
+          cst
       in let len_fun = match Hashtbl.find context.functions_tbl "len" with
         | f,_ -> f
         | exception Not_found -> assert false
@@ -1730,15 +1763,24 @@ let is_valid
 
 (* Tactic registration. *)
 
-let sequent_is_valid
-    ~timeout ~steps ~provers ~cmd_flag
-    ~poly ~exact ~hint_tables
-    (s:TraceSequent.t)
+let sequent_is_valid ~macro_axioms
+    ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
+    (s:TraceSequent.t) : bool
   =
   let env = TraceSequent.env s in
   let table = env.table in
   let system = env.system.set in
   let evars = Vars.to_vars_list env.vars in
+  let exact =
+    match TraceSequent.bound s with
+    | ReachAsym -> false
+    | ReachConc t ->
+      if not (Real.is_zero table t) then
+        Tactics.hard_failure
+          (Failure "concrete SMT requires a zero bound");
+        true;
+    | Glob -> assert false
+  in
   let hypotheses =
     List.filter_map
       (function
@@ -1766,10 +1808,23 @@ let sequent_is_valid
       (LowTraceSequent.Hyps.to_list s)
   and hints = Hint.get_smt_db table in
   let conclusion = LowTraceSequent.conclusion s in
-  is_valid
+  is_valid ~macro_axioms ~poly ~exact ~hint_tables
     ~timeout ~steps ~provers ~cmd_flag
-    ~poly ~exact ~hint_tables
     env table system evars hypotheses hints conclusion
+
+let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+  ~hint_tables goal
+=
+  let list_sequent = match SE.to_list (SE.to_fset (TraceSequent.system goal).set) with
+    | exception SystemExpr.(Error (_,Expected_fset)) | [_] -> [goal]
+    | l ->
+      List.map (fun (lbl,_) -> TraceSequent.pi lbl goal) l
+    in List.for_all
+      (fun s ->
+        sequent_is_valid
+          ~macro_axioms ~timeout
+          ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+      ) list_sequent
 
 type parameters = {
   timeout : int;
@@ -1780,14 +1835,17 @@ type parameters = {
   hint_tables: string list;
 }
 
-let default_prover =
+
+let all_provers =
   if disable_smt then []
   else
-    let l =
-      List.map
-        (fun p ->
-            Why3.Whyconf.(p.prover_name,p.prover_altern))
-        (Why3.Whyconf.Mprover.keys why3_provers)
+    let no_counterex alt = not (String.ends_with ~suffix:"counterexamples" alt)
+    in let l =
+      List.filter
+        (fun (name,alt) -> name <> "CVC4" && no_counterex alt)
+        (List.map
+            (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
+          (Why3.Whyconf.Mprover.keys why3_provers))
     in
     match l with
     | [] -> Tactics.(hard_failure (Failure "No SMT solvers detected"))
@@ -1800,7 +1858,7 @@ let default_parameters table = {
       Some (TConfig.smt_steps table) 
     else 
       None;
-  provers = default_prover;
+  provers = all_provers;
   macro_axioms = true;
   poly = true;
   hint_tables = ["default"];
@@ -1820,15 +1878,7 @@ let parse_arg parameters = let open TacticsArgs in function
     (* Provers. *)
     | NList ({Location.pl_desc="prover"},[String_name {Location.pl_desc="All"}])
     | NList ({Location.pl_desc="provers"},[String_name {Location.pl_desc="All"}])
-      ->
-      let l =
-        List.filter
-          (fun (name,_) -> name <> "CVC4")
-          (List.map
-              (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
-              (Why3.Whyconf.Mprover.keys why3_provers))
-      in
-      {parameters with provers = l}
+      -> {parameters with provers = all_provers}
     | NList ({Location.pl_desc="prover"},l)
     | NList ({Location.pl_desc="provers"},l) ->
       let process_prover provers {Location.pl_desc=prover_alt} =
@@ -1886,27 +1936,15 @@ let () =
           in
           let table = (TraceSequent.env s).table in
           let {timeout;steps;
-              provers;macro_axioms;poly;hint_tables} =
+               provers;macro_axioms;poly;hint_tables} =
             parse_args args table
           in
           let cmd_flag = match provers with
             | ["CVC5",_] -> "--enum-inst"
             | _ -> ""
           in
-          let exact =
-            match TraceSequent.bound s with
-            | ReachAsym -> false
-            | ReachConc t ->
-              if not (Real.is_zero table t) then
-                Tactics.hard_failure
-                  (Failure "concrete SMT requires a zero bound");
-              true;
-            | Glob -> assert false
-          in
-          if
-            sequent_is_valid
-              ~macro_axioms ~timeout
-              ~steps ~provers ~cmd_flag ~poly ~exact ~hint_tables s
+          if sequent_is_valid ~macro_axioms ~timeout
+               ~steps ~provers ~cmd_flag ~poly ~hint_tables s
           then
             sk [] fk
           else
@@ -1917,13 +1955,7 @@ let () =
   let provers = match Sys.getenv_opt "SMT_PROVERS" with
     | None -> ["CVC5",""]
     | Some s when s="All" ->
-      List.filter
-        (fun (name,_) -> name<>"CVC4")
-        (List.map
-            (fun p ->
-                Why3.Whyconf.(p.prover_name,p.prover_altern))
-            (Why3.Whyconf.Mprover.keys why3_provers)
-        )
+      all_provers
     | Some s -> List.map parse_prover_arg (String.split_on_char ':' s)
   in
   let flags = match Sys.getenv_opt "SMT_FLAGS" with
@@ -1951,9 +1983,6 @@ let () =
     let cmd_flag = if cmd_flag="" then cmd_flag else "_" ^ cmd_flag in
     Format.sprintf "SMT_%s%s%s" prover alt cmd_flag
   in
-  let sequent_is_valid =
-    sequent_is_valid ~macro_axioms:true 
-  in
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
@@ -1965,15 +1994,20 @@ let () =
                     | None -> s
                     | Some q ->
                       let conclusion = Term.mk_ands q in
+                      let s =
+                        if concrete then
+                          TraceSequent.set_bound (ReachConc Term.mk_zero) s
+                        else s
+                      in
                       TraceSequent.set_conclusion conclusion s
                   in
                   sequent_is_valid
+                    ~macro_axioms:true
                     ~timeout:10
                     ~steps:None
                     ~provers:[prover,alt]
                     ~cmd_flag:""
                     ~poly:poly
-                    ~exact:concrete
                     ~hint_tables:[]
                     s))
       provers;
@@ -1985,12 +2019,12 @@ let () =
               (bench_name prover alt cmd_flag)
               (fun s ->
                   sequent_is_valid
+                    ~macro_axioms:true
                     ~timeout:1
                     ~steps:None
                     ~provers:[prover,alt]
                     ~cmd_flag:cmd_flag
                     ~poly:poly
-                    ~exact:(LowTraceSequent.concrete s)
                     ~hint_tables:[]
                     s,
                   None);
@@ -2013,13 +2047,12 @@ let () =
               (bench_name prover alt "")
               (fun (_,s) ->
                     sequent_is_valid
+                      ~macro_axioms:true
                       ~timeout:10
                       ~steps:None
                       ~provers:[prover,alt]
                       ~cmd_flag:""
                       ~poly:poly
-                      ~exact:(LowTraceSequent.concrete s)
                       ~hint_tables:[]
                       s))
       provers
-

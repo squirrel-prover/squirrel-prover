@@ -299,7 +299,7 @@ lemma noreplayInv (j, j', pid:index):
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
-  use counterIncreaseBis; smt ~steps:400000. 
+  use counterIncreaseBis; smt ~steps:500000. 
 Qed.
 
 lemma noreplay (j, j', pid:index):
