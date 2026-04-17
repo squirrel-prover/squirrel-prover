@@ -618,7 +618,7 @@ let prf_equiv
   
   let loc = L.loc i in
 
-  (* TODO I disabled this for now, maybe it's still sound though *)
+  (* FEATURE: disabled for now, could be sound *)
   if oracle <> Normal then
     soft_failure ~loc
       (Tactics.Failure "Unsupported oracle mode");
@@ -923,7 +923,7 @@ let prf_secrecy
 
 (*------------------------------------------------------------------*)
 (** Parses the arguments and calls the appropriate version of PRF.
-    TO DO: this is largely copied from fa and generalize… *)
+    TODO: this is largely copied from fa and generalize… *)
 let prf_tac (args : TacticsArgs.parser_args) (s:ES.t) =
   if ES.conclusion_is_equiv s then 
     match args with 
