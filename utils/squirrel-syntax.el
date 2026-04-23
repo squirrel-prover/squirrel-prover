@@ -65,6 +65,7 @@
   "action"
   "channel"
   "mutable"
+  "mutex"
   "process"
   "with oracle"
   "with hash"
