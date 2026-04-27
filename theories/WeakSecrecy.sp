@@ -187,27 +187,6 @@ Proof.
 Qed.
 *)
 
-(* ------------------------------------------------------------------- *)
-(* Rule Rw:Oracle *)
-
-global axiom [any]
-  RwOracle1 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
-  (* Warning : 'd must be a simple type *)
-    (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t1) = t2 (f u t1)]) ->
-    (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
-
-global lemma [any] 
-  RwOracle2 ['a 'b 'c 'd] (u : 'a) (t1, t2 : 'b -> 'c) : 
-    (Forall (f : 'a -> ('b -> 'c) -> 'b [adv]), [t1 (f u t2) = t2 (f u t2)]) ->
-    (Forall (f : 'a -> ('b -> 'c) -> 'd [adv]), [f u t1 = f u t2]).
-Proof.
-  intro H.
-  rewrite eq_sym .
-  apply RwOracle1 u t2 t1.
-  rewrite eq_sym.
-  auto.
-Qed.
-
 end Deduction.
 
 (* ------------------------------------------------------------------- *)
