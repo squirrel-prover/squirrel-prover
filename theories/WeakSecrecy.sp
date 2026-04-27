@@ -138,55 +138,6 @@ Proof.
   by have C := Nded f.
 Qed.
 
-
-
-(* TODO: manage in the PQ setting for the polymorphic version:
-global lemma [set: none/left; equiv:none/left,none/left] 
-  RwEquiv ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
-    $(u2 *> v2)->
-    equiv(diff(u1,u2), diff(v1,v2)) ->
-    $(u1 *> v1).
-Proof.
-  intro Nded.
-  intro equ.
-  rewrite /( *> ) in *.
-  intro f.
-  ghave equ' : equiv(diff(f(u1) <> v1,f(u2) <> v2)). {
-    fa 0; fa 0.
-    deduce 0.
-    auto.
-  }.
-  rewrite equiv equ'.
-  by have C := Nded f.
-Qed.
-
-
-global lemma [set: none/left; equiv:none/left,none/left] 
-  RwEquivWeak ['a 'b] (u1, u2 : 'a) (v1, v2 : 'b) : 
-    $(u2 *> v2)->
-    equiv(diff(u1,u2), (fun x => x=diff(v1,v2))) ->
-    $(u1 *> v1).
-Proof.
-  intro Nded.
-  intro equ.
-  rewrite /( *> ) in *.
-  intro f.
-
-  ghave equ' : equiv(diff(f u1 <> v1,f u2 <> v2)). {
-   
-    have -> : forall (u:'a,v:'b), (f u <> v) = (fun x => not (x = v)) (f u) by auto.
-    fa 0; fa 1. fa 0.
-    deduce 1.
-    auto.  
-  }.
-
-  rewrite equiv equ'.
-
-  have C := Nded f. 
-  auto.
-Qed.
-*)
-
 end Deduction.
 
 (* ------------------------------------------------------------------- *)
