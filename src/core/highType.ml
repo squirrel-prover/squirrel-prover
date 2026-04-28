@@ -65,27 +65,6 @@ let arity (table : Symbols.table) (symb : Symbols.ty) : int =
   | Abstract _ -> 0
   | Inductive data -> List.length data.ty_vars
 
-(*------------------------------------------------------------------*)
-let get_ty_infos table (ty : Type.ty) : infos =
-  match ty with
-  | Type.Index | Type.Timestamp | Type.Boolean ->
-    [Fixed; Finite; Well_founded; Serializable; Enum; ]
-
-  | Type.Message -> [Fixed; Well_founded; Large; Name_fixed_length; Serializable; ]
-  | Type.TConstr ((np,b),_args) ->
-    let np = Symbols.of_s_npath np in
-    let data = get_data (Symbols.Ty.of_string np b) table in
-    begin
-      match data with
-      | Abstract infos -> assert (_args=[]); infos
-      | Inductive _data -> [Well_founded]
-      (* FIXME: inductive: infer more infos depending on the
-         constructors' types. We likely need to add a bunch of ad hoc
-         rules, e.g. because recursive types are not finite, etc. *)
-    end
-
-  | _ -> []
-
 
 (*------------------------------------------------------------------*)
 (** {2 Inductive types utilities} *)
@@ -113,32 +92,59 @@ let constructors table (ty : Type.ty) : (Symbols.fname list * Type.ty list) opti
 (*------------------------------------------------------------------*)
 (** {2 Check that a type has some properties. } *)
 
-let check_ty_info table (ty : Type.ty) (info : Info.t) : bool =
-  let infos = get_ty_infos table ty in
-  List.mem info infos
+let allow_funs (info : Info.t) : bool =
+  match info with
+  | Finite | Fixed -> true
+  | Large | Enum | Serializable | Name_fixed_length | Well_founded -> false
+    
+(** Exported *)
+let check_ty_info
+    (table : Symbols.table) (ty : Type.ty) (info : Info.t) : bool
+  =
+  let allow_funs = allow_funs info in
 
-(*------------------------------------------------------------------*)
-let check_info_on_closed_term allow_funs table ty def : bool =
   let rec check : Type.ty -> bool = function
     | TVar _ | TUnivar _ -> false
     | Tuple l -> List.for_all check l
     | Fun (t1, t2) -> allow_funs && check t1 && check t2
-    | Type.Index | Type.Timestamp | Type.Boolean | Type.Message
-    | TConstr _ as ty -> check_ty_info table ty def
+
+    | Type.Index | Type.Timestamp | Type.Boolean ->
+      begin
+        match info with
+        | Fixed | Finite | Well_founded | Serializable | Enum -> true
+        | _ -> false
+      end
+
+    | Type.Message ->
+      begin
+        match info with
+        | Fixed | Well_founded | Large | Name_fixed_length | Serializable -> true
+        | _ -> false
+      end
+
+    | Type.TConstr ((np,b),_args) ->
+      let np = Symbols.of_s_npath np in
+      let data = get_data (Symbols.Ty.of_string np b) table in
+      begin
+        match data with
+        | Abstract infos -> assert (_args=[]); List.mem info infos
+        | Inductive _data -> List.mem info [Well_founded]
+        (* FIXME: inductive: infer more infos depending on the
+           constructors' types. We likely need to add a bunch of ad hoc
+           rules, e.g. because recursive types are not finite, etc. *)
+      end
   in
   check ty
 
+(*------------------------------------------------------------------*)
 (** See `.mli` *)
-let is_finite table ty : bool =
-  check_info_on_closed_term true table ty Finite
+let is_finite table ty : bool = check_ty_info table ty Finite
 
 (** See `.mli` *)
-let is_fixed table ty : bool =
-  check_info_on_closed_term true table ty Fixed
+let is_fixed table ty : bool = check_ty_info table ty Fixed
 
 (** See `.mli` *)
-let is_name_fixed_length table ty : bool =
-  check_info_on_closed_term false table ty Name_fixed_length
+let is_name_fixed_length table ty : bool = check_ty_info table ty Name_fixed_length
 
 (** See `.mli` *)
 let serializability_order
@@ -198,8 +204,7 @@ let is_enum table ty : bool =
    is_finite table ty &&
    is_fixed table ty)
 
-let is_well_founded table ty : bool =
-  check_info_on_closed_term false table ty Well_founded
+let is_well_founded table ty : bool = check_ty_info table ty Well_founded
 
 (*------------------------------------------------------------------*)
 (** Check if a type is definitely classical *)
