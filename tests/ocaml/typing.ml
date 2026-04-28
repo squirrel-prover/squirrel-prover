@@ -553,6 +553,20 @@ Proof.
        raise Ko
     );
 
+    (* negative test, should fail *)
+    Alcotest.check_raises "type error" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "\
+op f : message -> message.
+let rec toto t = f (toto t) t."
+         with
+         | Squirrelcore.Typing.Error (_, _) -> raise Ok
+       in
+       raise Ko
+    );
+
+    (*------------------------------------------------------------------*)
     ()
 
 (*------------------------------------------------------------------*)

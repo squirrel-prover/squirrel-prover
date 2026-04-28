@@ -322,7 +322,8 @@ let rec destr_ty_tuple_flatten (t : Type.ty) : Type.ty list =
   | _ -> [t]
 
 (*------------------------------------------------------------------*)
-let ty ?ienv (t : term) : Type.ty =
+(** Exported, see `.mli`. *)
+let ty ?(for_printing=false) ?ienv (t : term) : Type.ty =
   let must_close, ienv = match ienv with
     | None      -> true, Infer.mk_env ()
     | Some ienv -> false, ienv
@@ -348,6 +349,10 @@ let ty ?ienv (t : term) : Type.ty =
       begin
         match Infer.norm_ty ienv (ty t) with
         | Type.Tuple tys -> List.nth tys (i - 1)
+
+        | _ when for_printing -> Type.tvar (Type.mk_tvar "unknown_proj")
+        (* for printing, return an unknown type instead of crashing *)
+
         | _ -> assert false
       end
 
@@ -378,6 +383,8 @@ let ty ?ienv (t : term) : Type.ty =
       (* TODO: system variables: clean-up *)
       match Infer.close (Env.init ~table:(Symbols.builtins_table ()) ()) ienv with
       | Infer.Closed subst -> subst
+
+      | _ when for_printing -> Infer.unsafe_to_subst ienv
 
       | _ -> assert false
       (* [ienv] should be closed as we only use it for type variable
@@ -1535,7 +1542,7 @@ and _pp
   | App (Fun (s,fty_app), ([bl;br] as args)) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
-    let args_ty = List.map ty args in
+    let args_ty = List.map (ty ~for_printing:true) args in
     let pp fmt () =
       Fmt.pf fmt "@[<0>%a %a@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
@@ -1553,7 +1560,7 @@ and _pp
 
   (* name *)
   | Name (n,l) ->
-    let args_ty = List.map ty l in
+    let args_ty = List.map (ty ~for_printing:true) l in
       if l = [] then
         _pp_name ~args_ty info.ppe fmt n.s_symb
       else
@@ -1587,7 +1594,8 @@ and _pp
     let fixity = 
       if m.s_info.pp_style = `At then macro_fixity else app_fixity
     in
-    let args_ty, ty_rec = (List.map ty l, ty ts) in
+    let args_ty = List.map (ty ~for_printing:true) l in
+    let ty_rec = ty ~for_printing:true ts in
     let pp_last_arg fmt =
       if m.s_info.has_dist_param then
         pp (fixity, `Right) fmt ts
@@ -1634,7 +1642,7 @@ and _pp
   | Tuple [term;_] when
       Symbols.Import.mem_sp ([],"Reify") info.ppe.table
       && TConfig.prettyprint_reify info.ppe.table
-      && ty term = !reify_type info.ppe.table
+      && ty ~for_printing:true term = !reify_type info.ppe.table
       && Lazy.force unquote_lazy <> None ->
     let t = Utils.oget (Lazy.force unquote_lazy) in
     Fmt.pf fmt "@[<hov 2>{\"%a\"}@]" (pp (quote_fixity, `NonAssoc)) t
@@ -1743,7 +1751,7 @@ and pp_app
   let pp_head fmt =
     match head with
     | Fun (f, fty_app) ->
-      let args_ty = List.map ty args in
+      let args_ty = List.map (ty ~for_printing:true) args in
       pp_fname ~args_ty info.ppe fmt (f,fty_app)
 
     | _ -> pp info (app_fixity, `Left) fmt head

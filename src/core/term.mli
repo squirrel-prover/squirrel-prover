@@ -252,7 +252,10 @@ val pp_info : ?ppe:ppenv -> unit -> pp_info
 val pp_with_info : pp_info -> term formatter
 
 (*------------------------------------------------------------------*)
-val ty : ?ienv:Infer.env -> term -> Type.ty
+(** [for_printing]: use unsafe functions to close the typing
+    environement, ensuring that this always succeed (printing should
+    never crash). *)
+val ty : ?for_printing:bool -> ?ienv:Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
