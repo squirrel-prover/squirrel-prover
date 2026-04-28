@@ -122,16 +122,20 @@ let check_ty_info
         | _ -> false
       end
 
-    | Type.TConstr ((np,b),_args) ->
+    | Type.TConstr ((np,b),args) ->
       let np = Symbols.of_s_npath np in
       let data = get_data (Symbols.Ty.of_string np b) table in
       begin
         match data with
-        | Abstract infos -> assert (_args=[]); List.mem info infos
-        | Inductive _data -> List.mem info [Well_founded]
-        (* FIXME: inductive: infer more infos depending on the
-           constructors' types. We likely need to add a bunch of ad hoc
-           rules, e.g. because recursive types are not finite, etc. *)
+        | Abstract infos -> assert (args=[]); List.mem info infos
+        | Inductive _data ->
+          match info with
+          | Well_founded -> true
+          | Fixed -> List.for_all check args
+          | _ -> false
+          (* FEAT: inductive: infer more infos depending on the
+             constructors' types. We likely need to add a bunch of ad hoc
+             rules, e.g. because recursive types are not finite, etc. *)
       end
   in
   check ty
