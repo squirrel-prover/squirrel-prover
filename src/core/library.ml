@@ -184,10 +184,10 @@ end
 module Secrecy = struct
 
   let is_loaded table =
-    Symbols.Import.mem_sp ([], "WeakSecrecy") table
+    Symbols.Import.mem_sp ([], "NonDeduction") table
   let check_load table =
     if not (is_loaded table) then
-      Tactics.hard_failure (Failure "theory WeakSecrecy is not loaded")
+      Tactics.hard_failure (Failure "theory NonDeduction is not loaded")
         
   let get_predicate table s =
     check_load table;

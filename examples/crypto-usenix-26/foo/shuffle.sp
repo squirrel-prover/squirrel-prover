@@ -1,7 +1,7 @@
 include Libs.
 include Games.
 include[admit] processes.
-include WeakSecrecy.
+include NonDeduction.
 
 (*******************************************************************************
 # Shuffle opening lemmas.

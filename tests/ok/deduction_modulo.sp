@@ -1,5 +1,5 @@
 include Core.
-include WeakSecrecy.
+include NonDeduction.
 
 global lemma _ 
   { P : system[pair] } @set:P @equiv:P

@@ -1,4 +1,4 @@
-include WeakSecrecy.
+include NonDeduction.
 
 name n:message.
 

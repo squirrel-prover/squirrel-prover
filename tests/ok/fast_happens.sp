@@ -1,5 +1,5 @@
 include Core.
-include WeakSecrecy.
+include NonDeduction.
 
 name n: index -> message.
 channel c.

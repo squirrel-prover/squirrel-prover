@@ -2,7 +2,7 @@ include Core.
 include Libs.
 include Games.
 include[admit] processes.
-include WeakSecrecy.
+include NonDeduction.
 include[admit] shuffle.
 include[admit] distinctEncryptions.
 include[admit] distinctCommits.

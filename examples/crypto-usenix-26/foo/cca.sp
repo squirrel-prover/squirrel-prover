@@ -1,7 +1,7 @@
 include Core.
 include Libs.
 include Games.
-include WeakSecrecy.
+include NonDeduction.
 include[admit] processes.
 include[admit] macros.
 

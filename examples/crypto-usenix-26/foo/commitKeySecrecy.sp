@@ -4,7 +4,7 @@ include Core.
 include Libs.
 include Games.
 include[admit] processes.
-include WeakSecrecy.
+include NonDeduction.
 include[admit] blinding.
 include[admit] macros.
 

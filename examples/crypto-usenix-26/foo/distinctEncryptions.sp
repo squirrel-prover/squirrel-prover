@@ -22,7 +22,7 @@ The main lemmas are:
 *******************************************************************************)
 
 include Core.
-include WeakSecrecy.
+include NonDeduction.
 include Libs.
 include Games.
 include[admit] processes.

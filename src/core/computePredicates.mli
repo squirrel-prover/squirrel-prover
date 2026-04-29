@@ -7,7 +7,7 @@ module SE = SystemExpr
     - deducibility [u |> v] 
     - secrecy      [u *> v]
 
-    These predicates are defined in [WeakSecrecy.sp]. *)
+    These predicates are defined in [NonDeduction.sp]. *)
 
 
 (** There are two kinds of computability formulas:
@@ -26,12 +26,12 @@ val other : side -> side
 type form
 
 (** Checks whether a global formula is a computability formula. 
-    Notably checks that [WeakSecrecy] is loaded. *)
+    Notably checks that [NonDeduction] is loaded. *)
 val is_computability : Symbols.table -> Equiv.form -> bool
 
 (** Constructs a computability formula. 
     [left] and [left_tys] must have the same lengths.
-    The [WeakSecrecy] module must be loaded. *)
+    The [NonDeduction] module must be loaded. *)
 val make : 
   Symbols.table -> kind -> SE.fset -> 
   left_tys:Type.ty list -> right_ty:Type.ty -> 

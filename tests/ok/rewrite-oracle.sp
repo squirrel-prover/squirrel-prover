@@ -45,7 +45,7 @@ Proof.
   - admit.
 Qed.
 
-include WeakSecrecy.
+include NonDeduction.
 
 type key [serializable,finite,large].
 

@@ -3,7 +3,7 @@
 **************************)
 
 include[admit] Core.
-include[admit] WeakSecrecy.
+include[admit] NonDeduction.
 include[admit] Libs.
 include[admit] Games.
 include[admit] processes.

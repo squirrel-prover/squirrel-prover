@@ -1,5 +1,5 @@
 include Core.
-include WeakSecrecy.
+include NonDeduction.
 include Libs.
 include Games.
 include[admit] processes.

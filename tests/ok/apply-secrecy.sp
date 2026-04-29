@@ -1,6 +1,5 @@
 include Core.
-
-include WeakSecrecy.
+include NonDeduction.
 
 (* Disable the order guards in deduction, because this is the only way
    to prove polymorphic deduction lemma currently. *)
