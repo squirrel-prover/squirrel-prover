@@ -2279,6 +2279,18 @@ let make_normal_biterm_pair
     let doit () =
       (* TODO generalize to non-binary diff *)
       match t1, t2 with
+      | String s, String s' -> 
+        if String.equal s s' then 
+          let () = check_reduced () in
+          String s
+        else diff t1 t2
+
+      | Int i, Int i' -> 
+        if Z.equal i i' then 
+          let () = check_reduced () in
+          Int i 
+        else diff t1 t2
+
       (* FIXME: if the head function symb. could be not SI, then this would not work *)
       | App (Fun _ as t, l), App (Fun _ as t', l') ->
         if alpha_conv t t' then
