@@ -463,8 +463,17 @@ let mk_projection_renaming
     ~(src:t) ~(dst:t) : Projection.renaming
   =
   match src.cnt, dst.cnt with
-  | Var _, _ | _, Var _ 
-  | _, Any | Any , _ -> assert false     (* [src] and [dst] should be concrete *)
+  | Var v, Var v' ->
+    assert (Ident.equal v v');
+    { dst_labels = `Abstract; map = []; } 
+
+  | _, Any -> 
+    (* because [subset_modulo dst src], [src] should be [Any] too, and
+       we do not have to rename anything *)
+    { dst_labels = `Abstract; map = []; } 
+
+  | Var _, _ | _, Var _ | Any , _ -> assert false
+  (* should be impossible because [subset_modulo dst src] *)
 
   | List src, List dst ->
       (* [l] contains tuples [(p,q), single] where:
@@ -478,7 +487,7 @@ let mk_projection_renaming
             (q,p)
           ) dst
       in
-      let dst_labels = List.map Stdlib.fst dst in
+      let dst_labels = `Concrete (List.map Stdlib.fst dst) in
       { dst_labels; map; }
 
 (*------------------------------------------------------------------*)

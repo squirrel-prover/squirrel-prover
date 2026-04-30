@@ -19,13 +19,20 @@ module M = Ms
 
 (*------------------------------------------------------------------*)
 type renaming = {
-  dst_labels : t list; 
-  (** labels of [dst] *)
+  dst_labels : [`Concrete of t list | `Abstract]; 
+  (** labels of [dst] if it is concrete *)
   map : (t * t) list; 
-  (** map from [dst] labels to [src] labels *)
+  (** map from [dst] labels to [src] labels 
+      (empty when [dst] is abstract) *)
 }
 
 let pp_renaming fmt (r : renaming) =
-  Fmt.pf fmt "@[<v 0>dst_labels: @[%a@]@;map: @[%a@]@]"
-    (Fmt.list Fmt.string) r.dst_labels
-    (Fmt.list (fun fmt (p,q) -> Fmt.pf fmt "%s ↦ %s" p q)) r.map
+  match r.dst_labels with
+  | `Abstract -> 
+    assert (r.map = []); 
+    Fmt.pf fmt "no renaming [abstract systems]"
+
+  | `Concrete dst_labels ->
+    Fmt.pf fmt "@[<v 0>dst_labels: @[%a@]@;map: @[%a@]@]"
+      (Fmt.list Fmt.string) dst_labels
+      (Fmt.list (fun fmt (p,q) -> Fmt.pf fmt "%s ↦ %s" p q)) r.map

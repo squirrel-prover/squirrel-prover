@@ -86,9 +86,9 @@ lemma [P/left, P/left] _ x i j :
   f x (B (i,j)) = <b, format (x,i,j,B (i,j))> &&
   f x D         = format 0. 
 Proof.
-  intro H.
-  rewrite /f. 
-  auto.
+  intro H. 
+  rewrite /f.
+  auto ~diffr.
 Qed.
 
 (*------------------------------------------------------------------*)

@@ -23,10 +23,8 @@ val right : t
 
 (*------------------------------------------------------------------*)
 type renaming = {
-  dst_labels : t list; 
-  (** labels of [dst] *)
+  dst_labels : [`Concrete of t list | `Abstract]; 
   map : (t * t) list; 
-  (** map from [dst] labels to [src] labels *)
 }
 
 val pp_renaming : renaming formatter

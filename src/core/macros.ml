@@ -1101,10 +1101,10 @@ let unfold_structured_macro
          want to unfold the macro in [system]. 
          C.f. description of the [in_systems] data-type. 
          (Note [p]'s projections are all distincts.) *)
-      let _, proj_subst =
-        SE.mk_proj_subst ~strict:false ~src:p ~dst:system
+      let p_renaming = 
+        SE.mk_projection_renaming ~src:p ~dst:system
       in
-      Term.subst_projs ~project:true proj_subst 
+      Term.apply_projection_renaming p_renaming 
   in
 
   let subst =

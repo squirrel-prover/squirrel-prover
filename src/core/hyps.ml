@@ -634,11 +634,10 @@ let setup_change_hyps_context
     if SE.is_any old_context.set then (fun f -> Some f) else
       let subst_proj =
         if SE.subset_modulo table new_context.set old_context.set then
-          let (_, s) = (* rename the projections and project *)
-            SE.mk_proj_subst
-              ~strict:false ~src:old_context.set ~dst:new_context.set
+          let p_renaming = 
+            SE.mk_projection_renaming ~src:old_context.set ~dst:new_context.set 
           in
-          fun t -> Some (Term.subst_projs ~project:true s t)
+          fun t -> Some (Term.apply_projection_renaming p_renaming t)
         else
           fun _ -> None
       in

@@ -293,8 +293,7 @@ val subst_projs : (Projection.t * Projection.t) list -> 'a expr -> 'a expr
 (** Build a substitution allowing to obtain a record with [dst] labels
     from a record with [src] labels. 
 
-    Pre-conditions:
-    - [dst] and [src] must be concrete
+    Pre-condition:
     - [subset_modulo dst src]
 
     To fill the data associated to a label [l] of [dst], this

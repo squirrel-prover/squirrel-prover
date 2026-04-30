@@ -1403,21 +1403,24 @@ let subst_projs
     [Projection.renaming] and [SE.mk_projection_renaming] for
     details). *)
 let apply_projection_renaming (proj : Projection.renaming) (t : term): term =
-  let rec do_subst : term -> term = function
-    | Diff (Explicit l) ->
-      let new_l =
-        List.map 
-          (fun q -> 
-             let t = List.assoc (List.assoc q proj.map) l in 
-             (q,t))
-          proj.dst_labels
-      in
-      mk_diff new_l
+  match proj.dst_labels with
+  | `Abstract -> assert (proj.map = []); t
 
-    | _ as t -> tmap do_subst t
+  | `Concrete dst_labels ->
+    let rec do_subst : term -> term = function
+      | Diff (Explicit l) ->
+        let new_l =
+          List.map 
+            (fun q -> 
+               let t = List.assoc (List.assoc q proj.map) l in 
+               (q,t))
+            dst_labels
+        in
+        mk_diff new_l
 
-  in
-  do_subst t
+      | _ as t -> tmap do_subst t
+    in
+    do_subst t
 
 
 (*------------------------------------------------------------------*)
