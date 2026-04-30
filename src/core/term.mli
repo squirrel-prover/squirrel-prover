@@ -341,6 +341,14 @@ val subst_projs :
   ?project:bool -> (Projection.t * Projection.t) list -> term -> term 
 
 (*------------------------------------------------------------------*)
+(** [proj] is a renaming from [src:SE.t] to [dst:SE.t].
+    
+    Build a [dst] term from a [src] term using [proj] (see
+    [Projection.renaming] and [SE.mk_projection_renaming] for
+    details). *)
+val apply_projection_renaming : Projection.renaming -> term -> term 
+
+(*------------------------------------------------------------------*)
 val refresh_vars        : (Vars.var     ) list -> (Vars.var     ) list * subst
 val refresh_vars_w_info : (Vars.var * 'a) list -> (Vars.var * 'a) list * subst
 

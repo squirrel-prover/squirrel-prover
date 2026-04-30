@@ -272,7 +272,13 @@ val project_set_opt : Projection.t list option -> context -> context
     projections of [dst], if any.
     - if [strict] is [true], ensure that all systems in [src] have a corresponding
       system in [dst].
-    - if [strict] is [false], substitution can be partial. *)
+    - if [strict] is [false], substitution can be partial. 
+
+    **IMPORTANT NOTE:** it is likely that you are better of using
+    [mk_projection_renaming] (below), as [mk_proj_subst] is likely
+    incorrect in many application, and should be removed in the
+    future.
+*)
 val mk_proj_subst :
   strict:bool -> src:t  -> dst:t ->
   Projection.t list option * (Projection.t * Projection.t) list
@@ -283,6 +289,32 @@ val mk_proj_subst :
     into the single systems). *)
 val subst_projs : (Projection.t * Projection.t) list -> 'a expr -> 'a expr
 
+(*------------------------------------------------------------------*)
+(** Build a substitution allowing to obtain a record with [dst] labels
+    from a record with [src] labels. 
+
+    Pre-conditions:
+    - [dst] and [src] must be concrete
+    - [subset_modulo dst src]
+
+    To fill the data associated to a label [l] of [dst], this
+    substitution will use a value coming from a [src] label [l'] iff
+    [dsl.l = src.l']. If several such labels exist, take a random one.
+
+    E.g., if 
+
+      [src = {l1  ↦ P; l2  ↦ Q; l3  ↦ R}] 
+      [dst = {l1' ↦ P; l2' ↦ P; l3' ↦ Q}] 
+    
+    Then we use the substitution [dst = {l1' ↦ l1; l2' ↦ l1; l3' ↦ l2}].
+    Applying this substitution to, say, the [src] term 
+
+      [{l1 ↦ a; l2 ↦ b; l3 ↦ c}]
+
+    would yield the [dst] term
+
+      [{l1' ↦ a; l2' ↦ a; l3' ↦ b}] *)
+val mk_projection_renaming : src:t -> dst:t -> Projection.renaming
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)

@@ -193,7 +193,7 @@ type p_bnds = p_bnd list
 
 type cnt =
   | Var of Var.t
-  | Any
+  | Any                         (** Deprecated, use system variables instead *)
   | List of (Projection.t * Single.t) list
   (** Each single system is identified by a label. Can be empty.
       All single systems are compatible. *)
@@ -457,6 +457,29 @@ let mk_proj_subst
       let projs = List.map Stdlib.snd psubst in
       Some projs, psubst
 
+(*------------------------------------------------------------------*)
+(** Cf `.mli` *)
+let mk_projection_renaming
+    ~(src:t) ~(dst:t) : Projection.renaming
+  =
+  match src.cnt, dst.cnt with
+  | Var _, _ | _, Var _ 
+  | _, Any | Any , _ -> assert false     (* [src] and [dst] should be concrete *)
+
+  | List src, List dst ->
+      (* [l] contains tuples [(p,q), single] where:
+         - [p] is a projection of [src] for [single]
+         - [q] is a projection of [dst] for [single] *)
+      let map =
+        List.map (fun (q, single) ->
+            let p, _ =
+              List.find (fun (_p, src_single) -> single = src_single) src
+            in
+            (q,p)
+          ) dst
+      in
+      let dst_labels = List.map Stdlib.fst dst in
+      { dst_labels; map; }
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)

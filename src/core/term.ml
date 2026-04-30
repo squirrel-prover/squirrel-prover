@@ -1397,6 +1397,30 @@ let subst_projs
   do_subst t
 
 (*------------------------------------------------------------------*)
+(** [proj] is a renaming from [src:SE.t] to [dst:SE.t].
+    
+    Build a [dst] term from a [src] term using [proj] (see
+    [Projection.renaming] and [SE.mk_projection_renaming] for
+    details). *)
+let apply_projection_renaming (proj : Projection.renaming) (t : term): term =
+  let rec do_subst : term -> term = function
+    | Diff (Explicit l) ->
+      let new_l =
+        List.map 
+          (fun q -> 
+             let t = List.assoc (List.assoc q proj.map) l in 
+             (q,t))
+          proj.dst_labels
+      in
+      mk_diff new_l
+
+    | _ as t -> tmap do_subst t
+
+  in
+  do_subst t
+
+
+(*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
 let _pp_indices (ppe : ppenv) fmt l =

@@ -91,6 +91,8 @@ let open_rw_rule table (rule : rw_rule) (system : SE.t) : open_rw_rule =
       match Infer.unify_se ienv rule_system system with
       | `Ok   -> `Equal
       | `Fail -> open_failed ()
+    else if SE.equal table system rule_system then
+      `Equal
     else if SE.subset_modulo table system rule_system then
       `Subset
     else
@@ -103,13 +105,17 @@ let open_rw_rule table (rule : rw_rule) (system : SE.t) : open_rw_rule =
   let mk_form_proj =
     match is_compatible with
     | `Equal -> fun x -> x
+    | `Subset when SE.is_any system -> fun x -> x
     | `Subset -> 
-      let projs, psubst = 
-        SE.mk_proj_subst ~strict:false ~src:rule_system ~dst:system
+      assert (SE.is_fset rule_system); (* this case should no longer happen *)
+      assert (SE.is_fset system);
+
+      let p_renaming = 
+        SE.mk_projection_renaming ~src:rule_system ~dst:system
       in
-      let doit f = Term.project_opt projs (Term.subst_projs psubst f) in
-      (* FIXME: svars: remove the [~proj] field of [Term.subst_projs]
-         and replace by the code above? *)
+      let doit f = 
+        Term.apply_projection_renaming p_renaming f 
+      in
 
       (* check that all projection of [rule] on [projs] are valid *)
       if not (SE.equal0 rule.rw_system systems) then
