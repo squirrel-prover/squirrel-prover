@@ -4,11 +4,11 @@ channel c.
 abstract ok : message
 
 (*------------------------------------------------------------------*)
-(* gdh group *)
+(* cdh group *)
 type G[serializable]
 type E [serializable,large]
 
-gdh gen, (^), ( ** ) where group:G exponents:E.
+cdh gen, (^), ( ** ) where group:G exponents:E.
 
 (*------------------------------------------------------------------*)
 (* This assumes INT-CTXT + IND-CPA, and adds the rewrite rule:
@@ -126,7 +126,7 @@ Proof.
      rewrite /gkA Hy /= in He.
      apply f_apply toG in He; simpl.
 
-     by gdh He, gen.
+     by cdh He, gen.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -150,8 +150,8 @@ Proof.
     rewrite /gy in Hy.
     rewrite /gkA Hy /= in He.
     apply f_apply toG in He; simpl.
-    (* we use the GDH hypothesis *)
-    by gdh He, gen.
+    (* we use the CDH hypothesis *)
+    by cdh He, gen.
 Qed.
 
 (*------------------------------------------------------------------*)
