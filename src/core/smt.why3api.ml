@@ -1627,26 +1627,32 @@ let local_stmt_valid_in_any_system (hint : Hint.smt_hint) =
 
 (* Add the hint to the theory if it is compatible with the system.
   A substitution is applied if needed. *)
-let add_hint context system hint =
-  let hint_system = hint.Hint.system.set
-  and name = hint.Hint.name in
-  if SE.subset_modulo context.table system hint_system then begin
-    let subst_proj =
-      let (_, s) =
-        SE.mk_proj_subst
-          ~strict:false ~src:hint_system ~dst:system
-      in fun t -> Term.subst_projs ~project:true s t
-    in let fmla = subst_proj hint.Hint.formula.Equiv.formula
-    and name = hint.Hint.name in
-    add_why_axiom context (sqterm_to_wfmla context fmla) (id_fresh context name);
-  end
-  else begin
-    if local_stmt_valid_in_any_system hint then
-      add_why_axiom
-        context
-        (sqterm_to_wfmla context hint.Hint.formula.Equiv.formula)
-        (id_fresh context name);
-  end
+let add_hint ~(exact:bool) context system (hint:Hint.smt_hint) =
+  if hint.formula.bound = None && exact then () else
+    begin
+      let hint_system = hint.system.set
+      and name = hint.name in
+      if SE.subset_modulo context.table system hint_system then begin
+        let subst_proj =
+          let (_, s) =
+            SE.mk_proj_subst
+              ~strict:false ~src:hint_system ~dst:system
+          in
+          fun t -> Term.subst_projs ~project:true s t
+        in
+        let fmla = subst_proj hint.formula.Equiv.formula
+        and name = hint.name in
+        add_why_axiom context (sqterm_to_wfmla context fmla) (id_fresh context name);
+      end
+      else begin
+        if local_stmt_valid_in_any_system hint then
+          add_why_axiom
+            context
+            (sqterm_to_wfmla context hint.Hint.formula.Equiv.formula)
+            (id_fresh context name);
+      end
+    end
+    
 let build_task
     ~macro_axioms ~poly ~exact ~hint_tables
     (env : Env.t) (table : Symbols.table) (system : SE.t)
@@ -1667,7 +1673,7 @@ let build_task
   List.iter
     (fun hint_table -> 
       List.iter
-        (fun hint -> add_hint context system hint)
+        (fun hint -> add_hint ~exact context system hint)
         (Utils.oget_dflt [] (Utils.Ms.find_opt hint_table hints))
     ) hint_tables;
   
