@@ -347,29 +347,9 @@ val unfold :
 val get_dummy_definition :
   Symbols.table -> SE.fset -> Term.msymb -> args:Term.term list -> Term.term  
 
-(*------------------------------------------------------------------*)
-type system_map_arg =
-  | ADescr  of Action.descr
-  | AGlobal of { is : Vars.vars; ts : Vars.var;
-                 ac_descrs : Action.descr list; inputs : Vars.vars }
-  (** ac_descrs is the list of actions that have a shape where the macro
-      is defined *)
 
 (*------------------------------------------------------------------*)
 type global_data
-
-(** Given the name [ns] of a macro as well as a function [f] over
-    terms, an [old_single_system] and a [new_single_system], takes the
-    existing definition of [ns] in the old system, applies [f] to the
-    existing definition, and update the value of [ns] accordingly in
-    the new system. *)
-val update_global_data :
-  Symbols.table ->
-  Symbols.macro ->
-  System.Single.t ->
-  System.Single.t ->
-  (system_map_arg -> Symbols.macro -> Term.term -> Term.term) ->
-  Symbols.table
 
 val as_global_macro : Symbols.data -> global_data
 
