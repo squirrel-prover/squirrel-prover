@@ -267,16 +267,17 @@ end
 
 (** Allowed computations in terms for cryptographic and probabilistic
     tactics:
-    - SI stands for system-independent.
+    - [SI] stands for system-independent, and [PTime] that a
+      computation is polynomial-time using only the adversarial
+      randomness.
 
-    - `NoHonestRand` means any computation that does not depends on
+    - [NoHonestRand] means any computation that does not depends on
        the protocol randomness (we do not check for system-independence
        here).
 
-    - Any does not perform any check on the possible instantiations of
+    - [Any] does not perform any check on the possible instantiations of
       variables, hence it MUST NOT be used in the context of a
       cryptographic reduction.
-
 *)
 type allowed = Any | NoHonestRand | PTimeSI | PTimeNoSI
 
