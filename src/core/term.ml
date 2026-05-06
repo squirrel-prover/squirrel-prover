@@ -1665,7 +1665,7 @@ and _pp
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp_elem)
       list
 
-  (*quote of a term*)
+  (* quote of a term *)
   | Tuple [term;_] when
       Symbols.Import.mem_sp ([],"Reify") info.ppe.table
       && TConfig.prettyprint_reify info.ppe.table
@@ -1673,13 +1673,18 @@ and _pp
       && Lazy.force unquote_lazy <> None ->
     let t = Utils.oget (Lazy.force unquote_lazy) in
     Fmt.pf fmt "@[<hov 2>{\"%a\"}@]" (pp (quote_fixity, `NonAssoc)) t
-      (*
-         Here we print the quotation of a term t as {"t"} while the syntax to declare one is |"t"|.
-This is to explicit break the invariant that something that is pretty-printed can be intrepreted.
-Indeed, we cannot keep this invariant and the pretty-printing of the quoted terms due to the ident.
-As an exemple, ( fun (x : bool) => |"x"|) = (fun (x : bool) => |"x"|)
-don't hold since x doesn't have the same ident in both places
-          *)
+      (* We print the quotation of a term [t] as [{"t"}], while the
+         user-level syntax is [|"t"|]. 
+
+         This is on purpose, to ensure that we cannot re-interpreted
+         the printed quotation (e.g. by copy-pasting from Squirrel
+         outputs to the input file). Indeed, pretty-printing of a
+         quoted term cannot guaranteed to be reparsable: e.g.
+         
+         [( fun (x : bool) => |"x"|) = (fun (x : bool) => |"x"|)]
+
+         does not hold since [x] does not have the same internal
+         identifier in both cases, *)
 
   (* tuple *)
   | Tuple ts ->
