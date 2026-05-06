@@ -10,7 +10,7 @@ module type S = sig
   (** Pretty-printing for inputs and outputs of considered computation. *)
 
   val pp_input : input formatter
-  val pp_result : (output, exn) Result.t formatter
+  val pp_result : (output,(exn*Printexc.raw_backtrace)) Result.t formatter
 
   (** Prefix for benchmark data file.
       Benchmark data is only produced if BENCHMARK_DIR is set in

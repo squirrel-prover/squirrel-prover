@@ -8,7 +8,7 @@ module type S = sig
   type output
   val default : string * (input -> output)
   val pp_input : input formatter
-  val pp_result : (output,exn) Result.t formatter
+  val pp_result : (output,(exn*Printexc.raw_backtrace)) Result.t formatter
   val basename : string
 end
 
@@ -46,14 +46,17 @@ module Make (M:S) = struct
     let t0 = Unix.gettimeofday () in
     match f input with
     | r -> name, input, Ok r, Unix.gettimeofday () -. t0
-    | exception e -> name, input, Error e, Unix.gettimeofday () -. t0
+    | exception e -> 
+      (* record the exception backtrace to re-raise it properly later *)
+      let back_trace = Printexc.get_raw_backtrace () in
+      (name, input, Error (e,back_trace), Unix.gettimeofday () -. t0)
 
   let run runner =
     incr query_id;
     let results = List.map (get_result runner) !query_methods in
     List.iter log results;
     match List.hd results with
-    | _,_,Error e,_ -> raise e
+    | _,_,Error (e,back_trace),_ -> Printexc.raise_with_backtrace e back_trace
     | _,_,Ok r,_ -> r
 
 end
