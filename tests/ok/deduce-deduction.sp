@@ -1,10 +1,11 @@
 include Core.
-include NonDeduction.
 
 system P = null.
 
 
-global lemma[set:P/left; equiv:none] _:
+include Deduction.
+
+global lemma[set:P/left; equiv:P/left,P/left] _:
   $((empty, empty) |> (zero)).
 Proof.
   deduce ~right.
@@ -17,33 +18,33 @@ Proof.
   deduce. 
 Qed.
 
-global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+global lemma[set:P/left; equiv:P/left,P/left] _ (tau : timestamp[const]):
   $((frame@tau, frame@tau) |> (exec@tau)).
 Proof.
   deduce ~right 0.
 Qed.
 
-global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+global lemma[set:P/left; equiv:P/left,P/left] _ (tau : timestamp[const]):
   $((frame@tau, frame@tau) |> (exec@tau)).
 Proof.
   deduce ~left 0.
   deduce.
 Qed.
 
-global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+global lemma[set:P/left; equiv:P/left,P/left] _ (tau : timestamp[const]):
   $((frame@tau) |> (frame@(pred tau))).
 Proof.
   deduce.
 Qed.
 
-global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+global lemma[set:P/left; equiv:P/left,P/left] _ (tau : timestamp[const]):
   [exec@tau] -> $((frame@tau) |> (output@tau)).
 Proof.
   intro H.
   deduce.
 Qed.
 
-global lemma[set:P/left; equiv:none] _ (tau : timestamp[const]):
+global lemma[set:P/left; equiv:P/left,P/left] _ (tau : timestamp[const]):
   $((frame@tau) |> (output@tau)).
 Proof. 
   checkfail (deduce ~all) exn ApplyMatchFailure.
@@ -61,14 +62,14 @@ Qed.
 (* deduce modulo reduction *)
 
 (* macros are reduced *)
-global lemma[set:P/left; equiv:none] _:
+global lemma[set:P/left; equiv:P/left,P/left] _:
   [happens(init)] -> $(empty |> (frame@init,exec@init)).
 Proof.
   intro H.
   deduce.
 Qed.
 
-global lemma[set:P/left; equiv:none] _:
+global lemma[set:P/left; equiv:P/left,P/left] _:
   $(empty |> (frame@init,exec@init)).
 Proof.
   deduce ~all.
@@ -78,7 +79,7 @@ op a : message.
 op b = a.
 
 (* operators are reduced *)
-global lemma[set:P/left; equiv:none] _:
+global lemma[set:P/left; equiv:P/left,P/left] _:
   $(a |> b).
 Proof.
   deduce.
@@ -92,7 +93,7 @@ Proof.
 Qed.
 
 (* operators are reduced *)
-global lemma[set:P/left; equiv:none] _:
+global lemma[set:P/left; equiv:P/left,P/left] _:
   Let x = b in
   $(a |> x).
 Proof.

@@ -1,5 +1,6 @@
 module SE = SystemExpr
 module LS = Library.Secrecy
+module LD = Library.Deduction
 
 (*------------------------------------------------------------------*)
 
@@ -13,25 +14,34 @@ let other (s:side) =
 type kind = Deduce | NotDeduce 
 
 let predicate_to_kind table (p : Symbols.predicate) : kind =
-  if p = LS.symb_deduce     table then Deduce    else
+  if p = LD.symb_deduce     table then Deduce    else
   if p = LS.symb_not_deduce table then NotDeduce
   else assert false
 
 let kind_to_predicate table (k : kind) : Symbols.predicate =
   match k with
-  | Deduce -> LS.symb_deduce     table
+  | Deduce -> LD.symb_deduce     table
   | NotDeduce -> LS.symb_not_deduce table
 
 (*------------------------------------------------------------------*)
 type form = Equiv.pred_app
 
-let is_computability (table:Symbols.table) (e:Equiv.form) : bool =
+let is_non_deduction (table:Symbols.table) (e:Equiv.form) : bool =
   LS.is_loaded table &&
   match e with
   | Atom (Pred pred_app) when
-      pred_app.psymb = LS.symb_deduce table ||
       pred_app.psymb = LS.symb_not_deduce table -> true
   | _ -> false
+
+let is_deduction (table:Symbols.table) (e:Equiv.form) : bool =
+  LD.is_loaded table &&
+  match e with
+  | Atom (Pred pred_app) when
+      pred_app.psymb = LD.symb_deduce table -> true
+  | _ -> false
+
+let is_computability (table:Symbols.table) (e:Equiv.form) : bool =
+ is_non_deduction table e || is_deduction table e
 
 let make
     (table     : Symbols.table) 
@@ -43,7 +53,9 @@ let make
     ~(right    : Term.term) : form 
   =
   assert (List.length left_tys = List.length left);
-  assert (LS.is_loaded table);
+  (match sk with
+    | Deduce -> assert (LD.is_loaded table)
+    | NotDeduce -> assert (LS.is_loaded table));
   let se = (se :> SE.arbitrary) in
   let left_tys, left =
     match left_tys, left with 

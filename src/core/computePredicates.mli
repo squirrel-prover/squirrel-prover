@@ -25,13 +25,14 @@ val other : side -> side
 (** The type of a computability formula. *)
 type form
 
-(** Checks whether a global formula is a computability formula. 
-    Notably checks that [NonDeduction] is loaded. *)
+(** Checks whether a global formula is either a dedction or a
+    non deduction formula. *)
 val is_computability : Symbols.table -> Equiv.form -> bool
 
 (** Constructs a computability formula. 
     [left] and [left_tys] must have the same lengths.
-    The [NonDeduction] module must be loaded. *)
+    The corresponding [Deduction] or [NonDeduction] module
+    must be loaded. *)
 val make : 
   Symbols.table -> kind -> SE.fset -> 
   left_tys:Type.ty list -> right_ty:Type.ty -> 
@@ -39,7 +40,6 @@ val make :
 (* TODO: why do we put a list on the left and a single term on the right?
    internally the list is turned into a tuple anyway, why not put lists on
    both sides then? *)
-
 
 (*------------------------------------------------------------------*)
 (** Constructs a computability goal from a global formula. 

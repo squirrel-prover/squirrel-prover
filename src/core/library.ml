@@ -193,7 +193,6 @@ module Secrecy = struct
     check_load table;
     Symbols.Predicate.of_s_path ([],s)
   
-  let symb_deduce table = get_predicate table "|>"
   let symb_not_deduce table = get_predicate table "*>"
 end
 
@@ -220,6 +219,9 @@ end
 module Deduction = struct
   let name = "DeductionSyntax"
 
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], name) table
+
   let check_load_deduction_syntax table =
     if not (Symbols.Import.mem_sp ([], name) table) then
       Tactics.hard_failure (Failure "theory DeductionSyntax is not loaded")
@@ -228,6 +230,7 @@ module Deduction = struct
     check_load_deduction_syntax table;
     Symbols.Predicate.of_s_path ([],s)
 
+  let symb_deduce table = get_predicate table "|>"
   let uniform_deduction table = get_predicate table "|1>"
 end  
 

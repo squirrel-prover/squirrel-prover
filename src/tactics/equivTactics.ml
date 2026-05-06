@@ -1914,7 +1914,7 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
     else
       Tactics.soft_failure 
         (Tactics.GoalBadShape 
-           "expected an equivalence or secrecy goal.")
+           "expected an equivalence, a deduction goal or a secrecy goal.")
   in
   let subgs =
     List.map (function 

@@ -7,6 +7,7 @@ module Sv = Vars.Sv
 module Mv = Vars.Mv
 
 module Secrecy = Library.Secrecy
+module Deduction = Library.Deduction
 
 module TraceHyps = Hyps.TraceHyps
                      
@@ -4376,10 +4377,10 @@ module E = struct
        - the support is empty (we do not know how to mix deduction and
          variable inference) *)
     | Atom (Pred p), Atom (Pred ppat) when
-        p.psymb = ppat.psymb && 
-        ( Secrecy.is_loaded st.table &&
-          (p.psymb = Secrecy.symb_deduce st.table || 
-           p.psymb = Secrecy.symb_not_deduce st.table) ) &&
+        p.psymb = ppat.psymb &&
+        ( (Secrecy.is_loaded st.table && p.psymb = Secrecy.symb_not_deduce st.table)
+          || (Deduction.is_loaded st.table && p.psymb = Deduction.symb_deduce st.table)
+           ) &&
         mode <> `Eq && st.support = [] ->
 
       (* unify system arguments *)
@@ -4411,10 +4412,11 @@ module E = struct
         | _ -> assert false
       in
 
-      (* Both steps below are sound because [Secrecy.symb_deduce] and
+      (* Both steps below are sound because [Deduction.symb_deduce] and
          [Secrecy.symb_not_deduce] use classical deduction (not
          quantum deduction).  *)
-      if p.psymb = Secrecy.symb_deduce st.table then begin
+      if Deduction.is_loaded st.table
+      && p.psymb = Deduction.symb_deduce st.table then begin
         (* We check if:
            [(l ▷ r) → (l0 ▷ r0)] 
            using the transitivity rule:

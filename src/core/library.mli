@@ -110,14 +110,15 @@ module Secrecy : sig
   val is_loaded : Symbols.table -> bool
   val check_load : Symbols.table -> unit
 
-  val symb_deduce : Symbols.table -> Symbols.predicate
   val symb_not_deduce : Symbols.table -> Symbols.predicate
 end
 
 (*------------------------------------------------------------------*)
 module Deduction : sig
+  val is_loaded : Symbols.table -> bool
   val check_load_deduction_syntax : Symbols.table -> unit
 
+  val symb_deduce : Symbols.table -> Symbols.predicate
   val uniform_deduction : Symbols.table -> Symbols.predicate
 end
 

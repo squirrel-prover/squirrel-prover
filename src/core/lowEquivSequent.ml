@@ -392,7 +392,7 @@ let to_trace_sequent s =
     in 
     trace_s
 
-(*------------------------------------------------------------------*)
+(*------------------------------------------------------------------*)    
 let conclusion_is_computability (s : t) : bool =
   ComputePredicates.is_computability s.env.table s.conclusion
 
