@@ -728,14 +728,15 @@ let validate
         if not is_compatible then not_compatible ();
       end
 
-  | Term.Macro (m,args,_t) ->
+  | Term.Macro (m,args0,_t) ->
     if not state.option.macros then
       error loc (Failure "cannot use a macro here");
     
-    let n = List.length args in
+    let n = List.length args0 + 1 in (* +1 is for [t] *)
     let fty, _rec_ty = Macros.fty table m.s_symb in
     let arity = List.length fty.fty_args in
-    (* we require that macros are used in eta-long form *)
+    (* we require that macros are used in eta-long form, i.e.
+       [List.length (args0 @ [t]) = List.length [fty.fty_args] *)
     if arity <> n then
       error loc (Arity_error (Symbols.path_to_string m.s_symb,n,arity))
 
@@ -758,17 +759,17 @@ let validate
     the information that:
     - [p]'s type arguments must be of type [ty_args] (optional). 
     - [p]'s arguments must be of type [args_ty]. 
-    - optionally, [p] takes a [@] argument of type [ty_rec] *)
+    - optionally, [p] takes a distinguished [@] argument of type [ty_rec] *)
 let resolve_path
     ?(ienv = Infer.mk_env ())
     (table    : Symbols.table) (p : Symbols.p_path)
     ~(ty_args : Type.ty list option)
     ~(args_ty : Type.ty list)
     ~(ty_rec  : [
-        | `Standard of Type.ty
         | `At of Type.ty
         | `MaybeAt of Type.ty
-        | `NoAt | `Unknown
+        | `NoAt
+        | `Unknown
       ])
   : 
     ([
@@ -791,7 +792,7 @@ let resolve_path
      [ty_rec_symb]) is comptatible with the information provided
      (i.e. [ty_args], [args_ty] and [ty_rec]) *)
   let check_arg_tys
-      ?(ty_rec_symb : Macros.rec_arg_ty = `None) (fty : Type.ftype) 
+      ?(ty_rec_symb : Macros.rec_arg_ty option) (fty : Type.ftype) 
     :
       Type.ftype_op * Term.applied_ftype * Infer.env
     =
@@ -804,7 +805,7 @@ let resolve_path
 
     let fty_op = Term.open_ftype ienv fty in
     let fty_vars = List.map (fun u -> Type.univar u) fty_op.fty_vars in
-    
+
     (* if the user manually provided type arguments, process them *)    
     if ty_args <> None then
       begin
@@ -812,13 +813,34 @@ let resolve_path
         if List.length fty_vars <> List.length ty_args then failed ();
         List.iter2 check_ty fty_vars ty_args;
       end;
-        
+
     let symb_args_ty =
       let extra_args, _ = Type.decompose_funs fty_op.fty_out in
-      fty_op.fty_args @ 
-      (* a standard match argument is handled like the other arguments *)
-      (match ty_rec_symb with `Standard ty -> [ty] | _ -> []) @
-      extra_args
+      begin
+        match ty_rec_symb with 
+        (* [None] is used for everybody but macros *)
+        | None -> fty_op.fty_args
+
+        (* the last argument of [fty] is a dummy [unit] argument that
+           the user must not provide *)
+        | Some `DummyUnit -> 
+          let tys, _unit = 
+            List.takedrop (List.length fty_op.fty_args - 1) fty_op.fty_args
+          in
+          tys
+
+        (* a standard match argument require no particular handling *)
+        | Some (`Standard _) -> fty_op.fty_args
+
+        (* the last argument of [fty] is the distinguished argument
+           that must be provided with an [@] by the user. Handle it
+           separatly. *)
+        | Some (`At _) -> 
+          List.take (List.length fty_op.fty_args - 1) fty_op.fty_args
+      end 
+
+      (* add the extra arguments from [fty.fty_out] *)
+      @ extra_args
     in
     (* keep as many arguments as possible from [args_ty] and [op_args_ty] *)
     let n = min args_ty_len (List.length symb_args_ty) in
@@ -830,16 +852,19 @@ let resolve_path
 
     let () =
       match ty_rec, ty_rec_symb with
-      | `Standard ty, `Standard ty'
-      | (`At ty | `MaybeAt ty), `At ty' -> check_ty ty ty'
+      (* may or must have [@], got [@] → success if type match *)
+      | (`At ty | `MaybeAt ty), Some (`At ty') -> check_ty ty ty'
 
-      (* maybe parsing in a processus declaration *)
-      | `MaybeAt _, (`None | `Standard _) -> () 
+      (* may or must not have [@], got no [@] → success *)
+      | (`MaybeAt _ | `NoAt), (None | Some (`DummyUnit | `Standard _)) -> () 
 
-      | `Standard _, (`None | `At _) 
-      | `At _, (`None | `Standard _) | `NoAt , `At _ -> failed ()
+      (* must have [@], got no [@] → fail *)
+      | `At _, (None | Some (`DummyUnit | `Standard _)) -> failed ()
 
-      | `NoAt , (`None | `Standard _) -> ()
+      (* must not have [@], got [@] → fail *)
+      | `NoAt , Some (`At _) -> failed ()
+
+      (* no condition on [@] → success *)
       | `Unknown, _ -> ()
     in
 
@@ -1175,12 +1200,12 @@ and convert0
 
           if not (HighType.is_enum state.env.table (Vars.ty v)) then
             error loc (Failure "sequence must be over enumerable types")
-              
+
         | L_tuple l,_ ->
           let loc = L.mergeall (List.map L.loc l) in
           error loc (Failure "tuples unsupported in seq");
       ) evs vs;
-    
+
     Term.mk_seq ~simpl:false evs t
 
   | Quant (Lambda,vs,t) ->
@@ -1200,7 +1225,7 @@ and convert0
     let tyv = Type.univar (Infer.mk_ty_univar state.ienv) in
     let e, t = Reify.quote Reify.Set state.env state.ienv (conv tyv t) in
     Term.mk_tuple [t;e]
-   (*Quote return a tuple since it return the reified term as well as the EvalEnv needed to unquote it*)
+(*Quote return a tuple since it return the reified term as well as the EvalEnv needed to unquote it*)
 
 and convert_app
     (state     : conv_state)
@@ -1222,6 +1247,7 @@ and convert_app
   let args_ty =                 (* types of arguments [args] *)
     List.map (fun _ -> Type.univar (Infer.mk_ty_univar state.ienv)) args
   in
+
   (* convert arguments *)
   let args = List.map2 (convert state) args args_ty in
 
@@ -1258,59 +1284,87 @@ and convert_app
   let nb_args = 
     List.length applied_fty.fty.fty_args 
     +
-    begin (* special case for macros without the `@` notation *)
+    begin (* special case for macros with the `@` notation *)
       match symb with
       | `Operator _ | `Name _ | `Action _ -> 0         
       | `Macro m ->
         let i = Macros.get_macro_info state.env.table m in
-        if i.has_dist_param && i.pp_style = `Standard then 1 else 0
+        if i.has_dist_param && i.pp_style = `At then -1 else 0
     end
   in
-  let args, args' = List.takedrop nb_args args in
+  (* split the user-provided argument [args] into [args0] which are
+     consumed by [symb.fty_args], and [args1] that remains *)
+  let args0, args1 = List.takedrop nb_args args in
 
-  let t0 =
+  (* there is a subtelty: an argument of [symb] may be implicit *)
+  let remove_n_arg : int =
     match symb with
-    | `Operator f -> Term.mk_fun0 f applied_fty args
-    | `Name     n -> Term.mk_name (Term.nsymb n fty_op.fty_out) args
+    | `Operator _ | `Name _ | `Action _ -> 0
 
-    | `Action   a -> 
-      let args = match args with | [Term.Tuple args] -> args | _ -> args in
-      Term.mk_action a args
-
-    | `Macro    m ->
+    | `Macro m ->
       let ms = Macros.msymb state.env.table m in
       let i = ms.s_info in
-      let args, rec_arg =
-        if i.has_dist_param then
-          match app_cntxt with
-          | At ts | MaybeAt ts when i.pp_style = `At -> args, ts
+      if i.has_dist_param then
+        match app_cntxt with
+        | At _ | MaybeAt _ when i.pp_style = `At -> 1
+        (* The [@] argument is provided implicitely by the
+           [app_context], e.g. because we are typing a process. *)
 
-          | _ when i.pp_style = `Standard -> 
-            let args, rec_arg = List.takedrop (nb_args - 1) args in
-
-            if rec_arg = [] then error loc (Failure "missing arguments");
-
-            args, as_seq1 rec_arg
-
-          | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
-        else (args, Term.mk_unit)       (* [unit] used as a spurious value *)
-      in
-
-      Term.mk_macro ms args rec_arg
+        | _ -> 0
+      else 1
+      (* When [symb] has no distinguished parameter, we use a spurious
+         value [unit] that the user must not provide *)
   in
 
+  (* compute the type of the partial application [symb args0] *)
   let ty0 = 
     (* [tys]: arguments of [symb] that have not yet been provided *)
-    let _, tys = List.takedrop (List.length args) fty_op.fty_args in
+    let _, tys = 
+      List.takedrop (List.length args0 + remove_n_arg) fty_op.fty_args 
+    in
     Type.fun_l tys fty_op.fty_out
   in
   (* [ty0 = tys → ty_out] *)
 
-  (* check that [ty0] can receive [args'] as arguments *)
-  check_ty_eq state ~loc ~of_t:t0 ty0 (Type.fun_l (List.map Term.ty args') ty);
+  (* apply [symb] to [args0] *)
+  let t0 =
+    match symb with
+    | `Operator f -> Term.mk_fun0 f applied_fty args0
+    | `Name     n -> Term.mk_name (Term.nsymb n fty_op.fty_out) args0
+
+    | `Action   a -> 
+      let args0 = 
+        match args0 with | [Term.Tuple args0] -> args0 | _ -> args0 
+      in
+      Term.mk_action a args0
+
+    | `Macro    m ->
+      let ms = Macros.msymb state.env.table m in
+      let i = ms.s_info in
+      let args0, rec_arg =
+        if i.has_dist_param then
+          match app_cntxt with
+          | At ts | MaybeAt ts when i.pp_style = `At -> args0, ts
+
+          | _ when i.pp_style = `Standard -> 
+            let args0, rec_arg = List.takedrop (nb_args - 1) args0 in
+
+            if rec_arg = [] then error loc (Failure "missing arguments");
+
+            args0, as_seq1 rec_arg
+
+          | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
+        else (args0, Term.mk_unit)       (* [unit] used as a spurious value *)
+      in
+
+      Term.mk_macro ms args0 rec_arg
+  in
+
+  (* check that [t0 : ty0] can receive [args1] as arguments *)
+  check_ty_eq state ~loc ~of_t:t0 ty0 (Type.fun_l (List.map Term.ty args1) ty);
 
   (* build the final term and check additional syntactic constraints *)
-  let t = Term.mk_app t0 args' in
+  let t = Term.mk_app t0 args1 in
   validate loc state t;
 
   t

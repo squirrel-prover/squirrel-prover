@@ -1,14 +1,14 @@
 include Core.
 
-mutable pre  : message = empty
-mutable s    : message = empty
-mutable post : message = empty
+mutable pre  : message = empty.
+mutable s    : message = empty.
+mutable post : message = empty.
 
-mutex l : 0
+mutex l : 0.
 
-abstract v : message
+abstract v : message.
 
-channel c
+channel c.
 
 system
   !_i

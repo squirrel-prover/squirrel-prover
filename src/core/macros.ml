@@ -828,7 +828,11 @@ let declare_global
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-type rec_arg_ty = [`At of Type.ty | `Standard of Type.ty | `None]
+type rec_arg_ty = [
+  | `At of Type.ty
+  | `Standard of Type.ty
+  | `DummyUnit
+]
 
 (** see `.mli` *)
 let fty
@@ -840,30 +844,44 @@ let fty
     match Symbols.get_macro_data ms table with
     | Symbols.Global (_, ty, data) ->
       let data = get_global_data data in
-      List.map Vars.ty data.indices, ty, `At Type.ttimestamp
+      ( List.map Vars.ty data.indices @ [Type.ttimestamp], 
+        ty, 
+        `At Type.ttimestamp )
     | General def ->
       begin
         match get_general_macro_data def with
         | Structured     data   ->
           let rec_ty =
             match data.dist_param with
-            | None -> `None
+            | None -> `DummyUnit
             | Some v -> 
               match data.info.pp_style with
               | `At        -> `At (Vars.ty v) 
               | `Standard -> `Standard (Vars.ty v)
           in
-          List.map Vars.ty data.params, data.ty, rec_ty
-        | ProtocolMacro `Output -> [], Type.tmessage, `At Type.ttimestamp
-        | ProtocolMacro `Cond   -> [], Type.tboolean, `At Type.ttimestamp
+          let fty_args =
+            let ty_args0 = List.map Vars.ty data.params in
+            let rty =
+              match rec_ty with
+              | `At rty | `Standard rty -> rty
+              | `DummyUnit              -> Type.tunit
+            in
+            ty_args0 @ [rty]
+          in
+          fty_args, data.ty, rec_ty
+        | ProtocolMacro `Output -> 
+          ([Type.ttimestamp], Type.tmessage, `At Type.ttimestamp)
+        | ProtocolMacro `Cond   -> 
+          ([Type.ttimestamp], Type.tboolean, `At Type.ttimestamp)
       end
 
     | Symbols.State (_, ty, _, data) ->
-      begin
+      let vs = 
         match data with
-        | StateInit_data (vs,_) -> List.map Vars.ty vs, ty, `At Type.ttimestamp
-        | _ -> assert false
-      end
+        | StateInit_data (vs,_) -> vs
+        | _ -> assert false 
+      in
+      (List.map Vars.ty vs @ [Type.ttimestamp], ty, `At Type.ttimestamp)
   in
   Type.mk_ftype [] fty_args fty_out, rec_ty
 

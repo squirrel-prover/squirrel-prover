@@ -361,7 +361,11 @@ val global_defined_from :
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-type rec_arg_ty = [`At of Type.ty | `Standard of Type.ty | `None]
+type rec_arg_ty = [
+  | `At of Type.ty
+  | `Standard of Type.ty
+  | `DummyUnit
+]
 
 (** Get the ftype of a macro.
     The second argument is the type of the variable we are recursing
@@ -370,8 +374,8 @@ type rec_arg_ty = [`At of Type.ty | `Standard of Type.ty | `None]
     - [`Standard] : this is the last argument of the macro;
     - [`None]     : the macro has no final argument.
 
-    Note that this last argument is not part of the return ftype's
-    arguments [fty_args]. *)
+    Note that this last argument is **already** included in the
+    returned ftype's arguments [fty_args]. *)
 val fty : 
   Symbols.table -> Symbols.macro -> 
   Type.ftype * rec_arg_ty

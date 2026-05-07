@@ -200,10 +200,10 @@ val set_resolve_path :
     ty_args:Type.ty list option ->  (* optional type arguments of [p] *)
     args_ty:Type.ty list ->         (* types of [p]'s (term) arguments  *)
     ty_rec:[
-        | `Standard of Type.ty
         | `At of Type.ty
         | `MaybeAt of Type.ty
-        | `NoAt | `Unknown
+        | `NoAt 
+        | `Unknown
       ] ->
     ([
       `Operator of Symbols.fname  |

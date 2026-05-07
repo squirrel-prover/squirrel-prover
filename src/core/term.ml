@@ -93,10 +93,10 @@ let[@warning "-27"] resolve_path =
     fun
       ?(ienv) _ _ ~ty_args ~args_ty 
       ~(ty_rec  : [
-          | `Standard of Type.ty
           | `At of Type.ty
-        | `MaybeAt of Type.ty
-          | `NoAt | `Unknown
+          | `MaybeAt of Type.ty
+          | `NoAt
+          | `Unknown
         ]) ->
       assert false)
 
@@ -1626,7 +1626,8 @@ and _pp
     let pp_last_arg fmt =
       if m.s_info.has_dist_param then
         pp (fixity, `Right) fmt ts
-      else (assert (equal ts (Tuple []))) (* [unit] used as spurious argument *)
+      else (assert (equal ts (Tuple []))) 
+      (* this is [unit], which is used as spurious argument *)
     in
     let pp fmt () =
       Fmt.pf fmt "@[%a%a%s%t@]"

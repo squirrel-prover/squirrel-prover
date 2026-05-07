@@ -644,21 +644,15 @@ let infer_type (st : unquote_state) (t : Term.term) : Type.ty option =
 
     (* similar to [Name], with an additional check for [rec_ty] and
        [u] *)
-    | Term.Macro (ms, args, u) ->
-      let fty, rec_ty = Macros.fty st.table ms.s_symb in
+    | Term.Macro (ms, args0, u) ->
+      let fty, _rec_ty = Macros.fty st.table ms.s_symb in
       assert (fty.fty_vars = []);
 
-      let rec_ty = 
-        match rec_ty with
-        | `At ty | `Standard ty -> ty
-        | `None -> Type.tunit
-      in
+      let args = args0 @ [u] in
 
       (* must be used in η-long form *)
       check_length fty.fty_args args;
       check_tys_eq fty.fty_args (infer_tys st args);
-
-      check_ty_eq rec_ty (infer_ty st u);
 
       fty.fty_out
 
