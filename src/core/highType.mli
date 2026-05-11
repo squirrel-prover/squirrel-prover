@@ -108,3 +108,9 @@ val is_inductive : Symbols.table -> Type.ty -> bool
     if applicable. *)
 val constructors :
   Symbols.table -> Type.ty -> (Symbols.fname list * Type.ty list) option
+
+(*------------------------------------------------------------------*)
+(** {3 Applied ftypes} *)
+
+(** apply a [ftype] to some type arguments *)
+val apply_ftype : Type.ftype -> Type.ty list -> Type.ty

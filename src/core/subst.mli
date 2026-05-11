@@ -44,6 +44,7 @@ val add_se_var : t -> SE.Var.t    -> SE.t    -> t
 
 val subst_se_var : t -> SE.Var.t -> SE.t
 
-val subst_ty     : Type.ty    substitution
-val subst_var    : Vars.var   substitution
-val subst_ftype  : Type.ftype substitution
+val subst_ty            : Type.ty            substitution
+val subst_var           : Vars.var           substitution
+val subst_ftype         : Type.ftype         substitution
+val subst_applied_ftype : Type.applied_ftype substitution

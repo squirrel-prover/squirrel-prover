@@ -32,7 +32,7 @@ end
 (**generalized function name *)
 type gfname =
   | N of Symbols.name * Type.ty             (** name *)
-  | F of Symbols.fname * Term.applied_ftype (** function symbol *)
+  | F of Symbols.fname * Type.applied_ftype (** function symbol *)
   | A of Symbols.action                     (** action *)
   | M of Symbols.macro * Type.ty            (** macro *)
   | T of int                                (** constructor of `i` tuple *)

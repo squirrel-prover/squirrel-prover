@@ -142,7 +142,7 @@ let tags_of_term
       let is_si = Operator.is_system_indep env.table f in
       let is_classical_fun =
         HighType.is_classical env.table @@
-        apply_ftype afty.fty afty.ty_args
+        HighType.apply_ftype afty.fty afty.ty_args
       in
       {
         const   = not (is_att || is_qatt);

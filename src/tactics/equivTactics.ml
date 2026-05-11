@@ -883,7 +883,7 @@ let fa_expand
 
     | App (Fun (fn,fty) as tf, [Tuple l]) 
     | App (Fun (fn,fty) as tf, l) ->
-      let app_fty = Term.apply_ftype fty.fty fty.ty_args in
+      let app_fty = HighType.apply_ftype fty.fty fty.ty_args in
 
       (* if [tf] is classical, use the classical FA rule *)
       if HighType.is_classical env.table app_fty then

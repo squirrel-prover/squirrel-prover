@@ -79,3 +79,12 @@ let subst_ftype (ts : t) (fty : Type.ftype) : Type.ftype =
     fty_args = List.map (subst_ty ts) fty.fty_args;
     fty_out  = subst_ty ts fty.fty_out;
   }
+
+(*------------------------------------------------------------------*)
+let subst_applied_ftype
+    (ts : t) ({ fty; ty_args;} : Type.applied_ftype)
+  =
+  Type.{
+    fty     = subst_ftype ts fty; 
+    ty_args = List.map (subst_ty ts) ty_args;
+  }

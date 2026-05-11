@@ -412,5 +412,18 @@ let mk_ftype_tuple vars args out : ftype =
          
   (* arity ≥ 2 *)
   | _ -> mk_ftype vars [tuple args] out
-  
+
+
+(*------------------------------------------------------------------*)
+(** See `.mli` *)
+type applied_ftype = { 
+  fty     : ftype; 
+  ty_args : ty list; 
+}
+
+let pp_applied_ftype pf { fty; ty_args; } =
+  Fmt.pf pf "@[<hov 2>(%a)[%a]@]"
+    pp_ftype fty
+    (Fmt.list ~sep:Fmt.sp pp) ty_args
+
 

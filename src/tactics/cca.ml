@@ -246,7 +246,7 @@ let rec has_enc (table:Symbols.table) (t:term) : bool =
     Does the same if each ti is Tuple(argsi)
     (but returns None as the function in that case). *)
 let same_head_function (ts:Term.terms) :
-  ((Symbols.fname * applied_ftype) option * Term.terms list) option =
+  ((Symbols.fname * Type.applied_ftype) option * Term.terms list) option =
   if ts = [] then Some (None, [])
   else
     let exception NotTheSame in

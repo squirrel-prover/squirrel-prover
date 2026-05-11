@@ -142,7 +142,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
 
   (*------------------------------------------------------------------*)
   let conv_applied_ftype
-      (ft1 : Term.applied_ftype) (ft2 : Term.applied_ftype) 
+      (ft1 : Type.applied_ftype) (ft2 : Type.applied_ftype) 
     : unit 
     =
     conv_ty  ft1.fty.fty_out  ft2.fty.fty_out;

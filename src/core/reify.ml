@@ -610,7 +610,7 @@ let infer_type (st : unquote_state) (t : Term.term) : Type.ty option =
 
     | Fun (_, { fty; ty_args; }) ->
       check_length fty.fty_vars ty_args;
-      Term.apply_ftype fty ty_args
+      HighType.apply_ftype fty ty_args
 
     | Term.Name (ns, args) ->
       let data = Symbols.Name.get_data ns.s_symb st.table in
@@ -860,7 +860,7 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     let gn = unquote_path_operator st.table gn in
     let fty = Symbols.OpData.ftype st.table gn in
     let ty_args = AList.unquote_list Ty st.table (unquote_type st) ty_args in
-    let app_fty = Term.{ fty; ty_args; } in
+    let app_fty = Type.{ fty; ty_args; } in
     Term.mk_fun0 gn app_fty []
 
   | Term.App (Term.Fun (fn,_), [nn; args]) when fn = R.Term.fs_name st.table ->

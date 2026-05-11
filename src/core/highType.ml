@@ -232,3 +232,14 @@ let rec is_quantum : Type.ty -> bool = function
 
   | Tuple ls -> List.exists is_quantum ls
   | Fun (i,o) -> is_quantum i || is_quantum o
+
+(*------------------------------------------------------------------*)
+(** {3 Applied ftypes} *)
+
+(** apply a [ftype] to some type arguments *)
+let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
+  (* substitute pending type variables by the type arguments *)
+  let tsubst = 
+    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
+  in
+  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)

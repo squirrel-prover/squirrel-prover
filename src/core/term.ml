@@ -9,26 +9,6 @@ module Mv = Vars.Mv
 module Sid = Ident.Sid
 
 (*------------------------------------------------------------------*)
-(** See `.mli` *)
-type applied_ftype = { 
-  fty     : Type.ftype; 
-  ty_args : Type.ty list; 
-}
-
-let pp_applied_ftype pf { fty; ty_args; } =
-  Fmt.pf pf "@[<hov 2>(%a)[%a]@]"
-    Type.pp_ftype fty
-    (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
-
-(** apply a [ftype] to some type arguments *)
-let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
-  (* substitute pending type variables by the type arguments *)
-  let tsubst = 
-    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
-  in
-  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
-
-(*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
 (*------------------------------------------------------------------*)
@@ -128,7 +108,7 @@ let pp_path
 let pp_fname0
     (ppe : ppenv) (mode : [`Short | `Qualified])
     (fmt : Format.formatter)
-    ((f,fty_app) : Symbols.fname * applied_ftype)
+    ((f,fty_app) : Symbols.fname * Type.applied_ftype)
   =
   if not ppe.dbg || fty_app.ty_args = [] then
     Fmt.pf fmt "@[<hov 2>%a@]" (pp_path mode `GoalFunction) f
@@ -149,7 +129,7 @@ let pp_macro0 (mode : [`Short | `Qualified]) fmt (ms : Symbols.macro) =
 (** pretty-print a [Symbols.fname]. *)
 let pp_fname
     ?(args_ty : Type.ty list = []) 
-    (ppe : ppenv) (fmt : Format.formatter) ((f,fty_app) : Symbols.fname * applied_ftype)
+    (ppe : ppenv) (fmt : Format.formatter) ((f,fty_app) : Symbols.fname * Type.applied_ftype)
   =
   let fp = s_path_to_p_path ([],Symbols.to_string f.s) in
   let mode =
@@ -216,7 +196,7 @@ type term =
   | Int    of Z.t
   | String of String.t
   | App    of term * term list
-  | Fun    of Symbols.fname * applied_ftype
+  | Fun    of Symbols.fname * Type.applied_ftype
   | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
   | Action of Symbols.action * term list
@@ -335,7 +315,7 @@ let ty ?(for_printing=false) ?ienv (t : term) : Type.ty =
     match t with
     | Int _ -> Type.tint
     | String _ -> Type.tstring
-    | Fun (_, { fty; ty_args; }) -> apply_ftype fty ty_args
+    | Fun (_, { fty; ty_args; }) -> HighType.apply_ftype fty ty_args
 
     | App (t1, l) ->
       let _tys, t_out = destr_ty_funs ~ienv (ty t1) (List.length l) in      
@@ -528,7 +508,7 @@ let mk_diff l =
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors for function applications.} *)
 
-let mk_fun0 fname (app_fty : applied_ftype) terms = 
+let mk_fun0 fname (app_fty : Type.applied_ftype) terms = 
   mk_app_ns (Fun (fname, app_fty)) terms
 
 let mk_fun table fname ?(ty_args = []) terms =
@@ -2121,18 +2101,14 @@ end
 
 include Smart
 
-
-let gsubst_applied_ftype (ts : Subst.t) { fty; ty_args;} =
-  { fty     = Subst.subst_ftype ts fty; 
-    ty_args = List.map (Subst.subst_ty ts) ty_args; }
-
+(*------------------------------------------------------------------*)
 let gsubst (ts : Subst.t) (t : term) : term =
   let rec doit : term -> term = function
     | Int _ | String _ as t -> t
     | Var v -> Var (Subst.subst_var ts v)
 
     | Fun (fn, fty_app) -> 
-      Fun (fn, gsubst_applied_ftype ts fty_app)
+      Fun (fn, Subst.subst_applied_ftype ts fty_app)
 
     | Name (n,args) -> 
       Name ({ n with s_typ = Subst.subst_ty ts n.s_typ}, 

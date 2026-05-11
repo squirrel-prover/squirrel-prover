@@ -184,3 +184,14 @@ val mk_ftype : 'a list -> ty list -> ty -> 'a ftype_g
 (** Declare a function of arity one (all arguments are grouped 
     into a tuple). *)
 val mk_ftype_tuple : tvar list -> ty list -> ty -> ftype
+
+
+(*------------------------------------------------------------------*)
+(** An applied function type.
+    Invariant: [List.length fty.fty_vars = List.length ty_args] *)
+type applied_ftype = { 
+  fty     : ftype; 
+  ty_args : ty list; 
+}
+
+val pp_applied_ftype : applied_ftype formatter

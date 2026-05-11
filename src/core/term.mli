@@ -73,19 +73,6 @@ type msymb = {
 }
 
 (** To create a macro symbol, use [Macros.msymb]. *)
-
-(*------------------------------------------------------------------*)
-(** An applied function type.
-    Invariant: [List.length fty.fty_vars = List.length ty_args] *)
-type applied_ftype = { 
-  fty     : Type.ftype; 
-  ty_args : Type.ty list; 
-}
-
-val pp_applied_ftype : applied_ftype formatter
-
-(** apply a [ftype] to some type arguments *)
-val apply_ftype : Type.ftype -> Type.ty list -> Type.ty
                                                                 
 (*------------------------------------------------------------------*)
 (** {3 Printing} *)
@@ -116,7 +103,7 @@ type term = private
   | Int    of Z.t
   | String of String.t
   | App    of term * term list
-  | Fun    of Symbols.fname * applied_ftype
+  | Fun    of Symbols.fname * Type.applied_ftype
   (** An applied function type, instantiating type variable when [f] 
       is polymorphic. *)
   | Name   of nsymb * term list    (** [Name(s,l)] : [l] of length 0 or 1 *)
@@ -223,7 +210,7 @@ val set_resolve_path :
       `Action   of Symbols.action
     ]
       * Type.ftype_op
-      * applied_ftype
+      * Type.applied_ftype
       * Infer.env
     ) list
   ) -> unit
@@ -335,8 +322,6 @@ val subst_vars : subst -> Vars.vars -> Vars.vars
 (** general substitution *)
 
 val gsubst : term Subst.substitution
-
-val gsubst_applied_ftype : applied_ftype Subst.substitution
 
 (*------------------------------------------------------------------*)
 
@@ -567,7 +552,7 @@ val mk_iff : ?simpl:bool -> term -> term -> term
   
 (*------------------------------------------------------------------*)
 (** Low-level smart constructor for application of a function symbol. *)
-val mk_fun0 : Symbols.fname -> applied_ftype -> term list -> term
+val mk_fun0 : Symbols.fname -> Type.applied_ftype -> term list -> term
 
 (** [mk_fun table f ~ty_args terms] create the term [(f' terms)] 
     where [f'] is [f] applied to the type variables [ty_args]. *)

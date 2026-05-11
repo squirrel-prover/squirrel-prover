@@ -648,7 +648,7 @@ struct
     in
     match t with
     | App (Fun (f,app_ftype), args) ->
-      let ty = Term.apply_ftype app_ftype.fty app_ftype.ty_args in
+      let ty = HighType.apply_ftype app_ftype.fty app_ftype.ty_args in
       let parse_list = List.combine args (fst (Type.decompose_funs ty)) in
       let indices, node_ids, dag1 = List.fold_left
         parse

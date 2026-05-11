@@ -779,7 +779,7 @@ let resolve_path
       `Action   of Symbols.action 
     ]
       * Type.ftype_op
-      * Term.applied_ftype
+      * Type.applied_ftype
       * Infer.env
     ) list
   = 
@@ -794,7 +794,7 @@ let resolve_path
   let check_arg_tys
       ?(ty_rec_symb : Macros.rec_arg_ty option) (fty : Type.ftype) 
     :
-      Type.ftype_op * Term.applied_ftype * Infer.env
+      Type.ftype_op * Type.applied_ftype * Infer.env
     =
     let ienv = Infer.copy ienv in
     let check_ty ty1 ty2 =
@@ -875,7 +875,7 @@ let resolve_path
             Infer.norm_ty ienv u
           ) fty_vars 
       in
-      Term.{ fty = fty; ty_args; }
+      Type.{ fty = fty; ty_args; }
     in
     
     fty_op, applied_fty, ienv
@@ -950,7 +950,7 @@ let failure_cannot_desambiguate loc symbs =
                  | `Name     s -> Fmt.pf fmt "name %a"   Symbols.pp_path s
                  | `Macro    s -> Fmt.pf fmt "macro %a"  Symbols.pp_path s
               )
-              Type.pp_ftype fty_app.Term.fty
+              Type.pp_ftype fty_app.Type.fty
          )
       ) symbs
   in
