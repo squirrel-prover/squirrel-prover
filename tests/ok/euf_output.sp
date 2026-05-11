@@ -2,12 +2,7 @@ hash h
 name k:message
 channel c
 
-name n : index->message
-
-(* TODO having a new n under the ! should be equivalent;
-        it does not seem to be the case at the moment *)
-
-system !_a out(c,h(n(a),k)).
+system !_a new n; out(c,h(n,k)).
 
 lemma unforgeable (a:index, b:index):
   happens(A(b)) => b <> a => output@A(b) <> h(n(a),k).

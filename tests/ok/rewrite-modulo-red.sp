@@ -1,5 +1,3 @@
-
-
 channel c.
 
 abstract a : message.
@@ -13,9 +11,8 @@ system B = !_i O: (in(c,x); out(c, a)).
 lemma [A] _ : a = b => f = b.
 Proof. by intro ->. Qed.
 
-(* FIXME: should work, see FIXME in `expand_head_once` in `Match.ml` *)
-(* goal [any] _ : a = b => f = b. *)
-(* Proof. by intro ->. Qed. *)
+lemma [any] _ : a = b => f = b.
+Proof. by intro ->. Qed.
 
 lemma [B] _ (t : timestamp, i : index) : 
   happens(t) => t = O(i) => a = b => output@t = b.

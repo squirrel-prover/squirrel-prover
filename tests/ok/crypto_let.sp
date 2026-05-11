@@ -1,7 +1,5 @@
 include Core.
 
-(* TODO : enlever les admits, remplacer par un axiom étant les subgoals.*)
-
 type kty [serializable].
 abstract h : message * kty -> message.
 
@@ -48,10 +46,10 @@ Let f = att(<x,y>) in
 equiv(diff(f<>h(m,k),true)).
 Proof.
 intro *.
-(* crypto EUF *)
-(*  FIXME : try_match used in bideduction handles the variables defines by let, but not the bideduction itself *)
-(* cf occurences.ml : l 686*)
-Abort.
+crypto EUF. 
++ admit. 
++ admit.
+Qed.
 
 
 
