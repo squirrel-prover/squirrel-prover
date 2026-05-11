@@ -38,28 +38,39 @@ type macro_info = {
 val macro_info_builtin : macro_info 
 
 (*------------------------------------------------------------------*)
-(** A typed symbol.
-    Invariant: [s_typ] do not contain tvar or univars *)
-type ('a, 'info) isymb = {
+(** A typed symbol, used for names. *)
+type 'a isymb = {
   s_symb : 'a;
   s_typ  : Type.ty;
-  s_info : 'info;
 }
 
-val mk_symb : 'a -> info:'info -> Type.ty -> ('a,'info) isymb
-
 (*------------------------------------------------------------------*)
-(** Names represent random values of length the security parameter. *)
-type nsymb = (Symbols.name , unit ) isymb
+(** Names represent random values of length the security parameter.
+    Names must be used in partial η-long:
+    - If we declare [n : ty → ty'], then [n] must always appear
+      applied to an argument of type [ty]. 
+    - If [ty'] is itself an arrow type [ty0' → ty1'], we do *not* need
+      to provide the [ty0'] argument (this is why the η-long form is partial). *)
+type nsymb = Symbols.name isymb
 
 (** create a name symbol *)
 val nsymb : Symbols.name -> Type.ty -> nsymb
 
 (*------------------------------------------------------------------*)
-(** Macros are used to represent inputs, outputs, contents of state
-    variables, and let definitions: everything that is expanded when
-    translating the meta-logic to the base logic. *)
-type msymb = (Symbols.macro, macro_info) isymb
+(** Macros are general symbols of the logic which allow arbitrary
+    usage of the random tape (adversarial and honest). *)
+type msymb = {
+  s_symb : Symbols.macro;
+  s_fty  : Type.ftype;
+  (** The ftype of the symbol. 
+
+      Macros must be used in partial η-long form w.r.t. [s_fty],
+      i.e. all arguments of [s_fty.fty_args] must be supplied.
+      Possible arguments in [s_fty.fty_out] do not need to be
+      supplied. *)
+
+  s_info : macro_info;
+}
 
 (** To create a macro symbol, use [Macros.msymb]. *)
 

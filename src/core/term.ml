@@ -9,7 +9,49 @@ module Mv = Vars.Mv
 module Sid = Ident.Sid
 
 (*------------------------------------------------------------------*)
+(** See `.mli` *)
+type applied_ftype = { 
+  fty     : Type.ftype; 
+  ty_args : Type.ty list; 
+}
+
+let pp_applied_ftype pf { fty; ty_args; } =
+  Fmt.pf pf "@[<hov 2>(%a)[%a]@]"
+    Type.pp_ftype fty
+    (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
+
+(** apply a [ftype] to some type arguments *)
+let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
+  (* substitute pending type variables by the type arguments *)
+  let tsubst = 
+    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
+  in
+  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
+
+(*------------------------------------------------------------------*)
 (** {2 Symbols} *)
+
+(*------------------------------------------------------------------*)
+(** a typed symbol, currently only used for names *)
+type 'a isymb = {
+  s_symb : 'a;
+  s_typ  : Type.ty;
+}
+
+let mk_symb (s : 'a) (ty : Type.ty) = {
+  s_symb = s;
+  s_typ  = ty; 
+}
+
+(*------------------------------------------------------------------*)
+let hash_isymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
+
+(*------------------------------------------------------------------*)
+(** a name symbol *)
+type nsymb = Symbols.name isymb
+
+(** create a name symbol *)
+let nsymb (s : Symbols.name) (t : Type.ty) = mk_symb s t
 
 (*------------------------------------------------------------------*)
 (** see `.mli` *)
@@ -34,57 +76,17 @@ let macro_info_builtin : macro_info = {
 } 
 
 (*------------------------------------------------------------------*)
-(** A typed symbol.
-    Invariant: [s_typ] do not contain tvar or univars *)
-type ('a, 'info) isymb = {
-  s_symb : 'a;
-  s_typ  : Type.ty;
-  s_info : 'info;
+(** a macro symbol *)
+type msymb = {
+  s_symb : Symbols.macro;
+  s_fty  : Type.ftype;
+  s_info : macro_info;
 }
-
-let mk_symb (s : 'a) ~(info : 'b) (t : Type.ty) =
-  let () = 
-    match t with
-    | Type.TVar _ | Type.TUnivar _ -> assert false;
-    | _ -> ()
-  in
-  {
-    s_symb = s;
-    s_typ  = t; 
-    s_info = info; 
-  }
-
-(*------------------------------------------------------------------*)
-let hash_isymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
-
-(*------------------------------------------------------------------*)
-type nsymb = (Symbols.name ,      unit ) isymb
-type msymb = (Symbols.macro, macro_info) isymb
-
-(** create a name symbol *)
-let nsymb (s : Symbols.name) (t : Type.ty) = mk_symb s ~info:() t
 
 (** To create a macro symbol, use [Macros.msymb]. *)
 
 (*------------------------------------------------------------------*)
-(** See `.mli` *)
-type applied_ftype = { 
-  fty     : Type.ftype; 
-  ty_args : Type.ty list; 
-}
-
-let pp_applied_ftype pf { fty; ty_args; } =
-  Fmt.pf pf "@[<hov 2>(%a)[%a]@]"
-    Type.pp_ftype fty
-    (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
-
-(** apply a [ftype] to some type arguments *)
-let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
-  (* substitute pending type variables by the type arguments *)
-  let tsubst = 
-    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
-  in
-  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
+let hash_msymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
@@ -252,7 +254,7 @@ let rec hash : term -> int = function
     hcombine 1 (hcombine (Symbols.path_id f) (Hashtbl.hash fty))
 
   | Macro (m, l, ts)  ->
-    let h = hcombine_list hash (hash_isymb m) l in
+    let h = hcombine_list hash (hash_msymb m) l in
     hcombine 2 (hcombine h (hash ts))
 
   | Diff (Explicit l) -> hcombine 5 (hash_l (List.map snd l) 3)
@@ -340,7 +342,11 @@ let ty ?(for_printing=false) ?ienv (t : term) : Type.ty =
       t_out
 
     | Name (ns, _) -> ns.s_typ
-    | Macro (s,_,_)  -> s.s_typ
+
+    | Macro (s,l,_t)  -> 
+      (* check that we are in η-long form w.r.t. [s_fty] *)
+      assert (List.length l + 1 (* +1 is for [t] *) = List.length s.s_fty.fty_args); 
+      s.s_fty.fty_out
 
     | Tuple ts -> 
       Type.tuple (List.map ty ts)
@@ -1167,7 +1173,7 @@ let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t =
     | App (t, l) -> doit_list acc (t :: l)
 
     | Macro (s, l, ts) ->
-      let acc = Type.Fv.union (isymb_ty_fv s) acc in
+      let acc = Type.Fv.union (Type.ftype_fv s.s_fty) acc in
       doit_list acc (ts :: l)
 
     | Name (s,l) ->
@@ -2132,9 +2138,10 @@ let gsubst (ts : Subst.t) (t : term) : term =
       Name ({ n with s_typ = Subst.subst_ty ts n.s_typ}, 
             List.map doit args)
 
-    | Macro (m,args,arg) -> Macro ({ m with s_typ = Subst.subst_ty ts m.s_typ}, 
-                                   List.map doit args,
-                                   doit arg)
+    | Macro (m,args,arg) -> 
+      Macro ({ m with s_fty = Subst.subst_ftype ts m.s_fty}, 
+             List.map doit args,
+             doit arg)
 
     | Quant (q, vs, f) -> Quant (q, List.map (Subst.subst_var ts) vs, doit f)
 

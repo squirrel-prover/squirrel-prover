@@ -185,6 +185,8 @@ val decreasing_info0 :
 val decreasing_info :
   Symbols.table -> ?env:Env.t -> Symbols.macro -> Term.term -> Term.term * decreasing_info
 
+(** Create a macro symbol object (as expected by [Term.Macro]) from a
+    macro symbol *)
 val msymb : Symbols.table -> Symbols.macro -> Term.msymb
 
 (*------------------------------------------------------------------*)
@@ -398,6 +400,14 @@ module Classic : sig
   val frame_ty : Type.ty
   val exec_ty  : Type.ty
 
+  (*------------------------------------------------------------------*)
+  val out_fty   : Type.ftype
+  val cond_fty  : Type.ftype
+  val inp_fty   : Type.ftype
+  val frame_fty : Type.ftype
+  val exec_fty  : Type.ftype
+
+  (*------------------------------------------------------------------*)
   val inp   : Term.msymb
   val out   : Term.msymb
   val frame : Term.msymb
@@ -405,6 +415,7 @@ module Classic : sig
   val exec  : Term.msymb
 end
 
+(*------------------------------------------------------------------*)
 module Quantum : sig
   val out_ty        : Type.ty
   val cond_ty       : Type.ty
@@ -414,6 +425,18 @@ module Quantum : sig
   val frame_ty      : Type.ty
   val exec_ty       : Type.ty
 
+  val qrnd_ty : Type.ty
+
+  (*------------------------------------------------------------------*)
+  val out_fty        : Type.ftype
+  val cond_fty       : Type.ftype
+  val inp_fty        : Type.ftype
+  val transcript_fty : Type.ftype
+  val state_fty      : Type.ftype
+  val frame_fty      : Type.ftype
+  val exec_fty       : Type.ftype
+
+  (*------------------------------------------------------------------*)
   val inp        : Term.msymb
   val transcript : Term.msymb
   val out        : Term.msymb
@@ -421,6 +444,8 @@ module Quantum : sig
   val cond       : Term.msymb
   val exec       : Term.msymb
   val state      : Term.msymb
+
+  val qrnd : Term.nsymb
 end
 
 (*------------------------------------------------------------------*)

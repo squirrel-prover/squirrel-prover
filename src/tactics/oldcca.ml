@@ -167,7 +167,7 @@ let deprecated_check_encryption_randomness
     Tactics.soft_failure Tactics.SEncSharedRandom
 
 
-let deprecated_symenc_rnd_ssc ~concrete ~context head_fn ~key ~key_is elems =
+let deprecated_symenc_rnd_ssc ~concrete ~context head_fn ~(key : Term.nsymb) ~key_is elems =
   let rule =
     OldEuf.mk_rule
       ~concrete ~fun_wrap_key:None

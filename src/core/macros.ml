@@ -304,22 +304,35 @@ let mk_timestamp_body_default ts default : body =
     when_cond = Term.mk_not (Term.mk_happens ts);
     out       = default}
 
+(*------------------------------------------------------------------*)
+let msymb0
+    (symb : Symbols.macro) (fty : Type.ftype)
+    ~(info:Term.macro_info) 
+  : Term.msymb 
+  =
+  Term.{ s_symb = symb; s_fty = fty; s_info = info; }
 
+(*------------------------------------------------------------------*)
 module Classic = struct
-
   let out_ty   = Type.tmessage
   let cond_ty  = Type.tboolean
   let inp_ty   = Type.tmessage
   let frame_ty = Type.tmessage
   let exec_ty  = Type.tboolean
 
+  let out_fty   = Type.mk_ftype [] [Type.ttimestamp] Type.tmessage
+  let cond_fty  = Type.mk_ftype [] [Type.ttimestamp] Type.tboolean
+  let inp_fty   = Type.mk_ftype [] [Type.ttimestamp] Type.tmessage
+  let frame_fty = Type.mk_ftype [] [Type.ttimestamp] Type.tmessage
+  let exec_fty  = Type.mk_ftype [] [Type.ttimestamp] Type.tboolean
+
   let info = Term.macro_info_builtin
 
-  let inp   : Term.msymb = Term.mk_symb Symbols.Classic.inp ~info inp_ty
-  let out   : Term.msymb = Term.mk_symb Symbols.Classic.out ~info out_ty
-  let frame : Term.msymb = Term.mk_symb Symbols.Classic.frame ~info frame_ty
-  let cond  : Term.msymb = Term.mk_symb Symbols.Classic.cond ~info cond_ty
-  let exec  : Term.msymb = Term.mk_symb Symbols.Classic.exec ~info exec_ty
+  let inp   : Term.msymb = msymb0 Symbols.Classic.inp   ~info inp_fty
+  let out   : Term.msymb = msymb0 Symbols.Classic.out   ~info out_fty
+  let frame : Term.msymb = msymb0 Symbols.Classic.frame ~info frame_fty
+  let cond  : Term.msymb = msymb0 Symbols.Classic.cond  ~info cond_fty
+  let exec  : Term.msymb = msymb0 Symbols.Classic.exec  ~info exec_fty
 
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
@@ -421,6 +434,11 @@ end (* Classic *)
 (*------------------------------------------------------------------*)
 module Quantum = struct
 
+  (*------------------------------------------------------------------*)
+  let qrnd_ty = Type.tmeasure_rnd
+  let qrnd : Term.nsymb = Term.nsymb Symbols.Quantum.qrnd qrnd_ty
+
+  (*------------------------------------------------------------------*)
   let out_ty        = Type.tmessage
   let cond_ty       = Type.tboolean
   let inp_ty        = Type.tmessage
@@ -428,20 +446,29 @@ module Quantum = struct
   let state_ty      = Type.tquantum_message
   let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage]
   let exec_ty       = Type.tboolean
-  let qrnd_ty       = Type.tmeasure_rnd
 
+  (*------------------------------------------------------------------*)
+  let out_fty        = Type.mk_ftype [] [Type.ttimestamp] out_ty
+  let cond_fty       = Type.mk_ftype [] [Type.ttimestamp] cond_ty
+  let inp_fty        = Type.mk_ftype [] [Type.ttimestamp] inp_ty
+  let transcript_fty = Type.mk_ftype [] [Type.ttimestamp] transcript_ty
+  let state_fty      = Type.mk_ftype [] [Type.ttimestamp] state_ty
+  let frame_fty      = Type.mk_ftype [] [Type.ttimestamp] frame_ty
+  let exec_fty      = Type.mk_ftype [] [Type.ttimestamp] exec_ty
+
+  (*------------------------------------------------------------------*)
   let info = Term.macro_info_builtin
-  
-  let out        : Term.msymb = Term.mk_symb Symbols.Quantum.out        ~info out_ty
-  let cond       : Term.msymb = Term.mk_symb Symbols.Quantum.cond       ~info cond_ty
-  let inp        : Term.msymb = Term.mk_symb Symbols.Quantum.inp        ~info inp_ty
-  let transcript : Term.msymb = Term.mk_symb Symbols.Quantum.transcript ~info transcript_ty
-  let state      : Term.msymb = Term.mk_symb Symbols.Quantum.state      ~info state_ty
-  let frame      : Term.msymb = Term.mk_symb Symbols.Quantum.frame      ~info frame_ty
-  let exec       : Term.msymb = Term.mk_symb Symbols.Quantum.exec       ~info exec_ty
-  let qrnd       : Term.nsymb = Term.mk_symb Symbols.Quantum.qrnd       ~info:() qrnd_ty       
 
+  (*------------------------------------------------------------------*)  
+  let out        : Term.msymb = msymb0 Symbols.Quantum.out        ~info out_fty
+  let cond       : Term.msymb = msymb0 Symbols.Quantum.cond       ~info cond_fty
+  let inp        : Term.msymb = msymb0 Symbols.Quantum.inp        ~info inp_fty
+  let transcript : Term.msymb = msymb0 Symbols.Quantum.transcript ~info transcript_fty
+  let state      : Term.msymb = msymb0 Symbols.Quantum.state      ~info state_fty
+  let frame      : Term.msymb = msymb0 Symbols.Quantum.frame      ~info frame_fty
+  let exec       : Term.msymb = msymb0 Symbols.Quantum.exec       ~info exec_fty
 
+  (*------------------------------------------------------------------*)
   let model table =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts   = Term.mk_var ts_v in
@@ -889,7 +916,7 @@ let fty
 let msymb (table : Symbols.table) (symb : Symbols.macro) : Term.msymb =
   let fty, _ = fty table symb in
   let info = get_macro_info table symb in
-  Term.mk_symb symb ~info fty.fty_out
+  Term.{ s_symb = symb; s_info = info; s_fty = fty; }
 
 (*------------------------------------------------------------------*)
 let is_global table (ms : Symbols.macro) : bool =

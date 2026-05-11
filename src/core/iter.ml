@@ -853,19 +853,16 @@ let update_context
      hypotheses *)
 
 
-
+(*------------------------------------------------------------------*)
 (** Internal.
     Builds a pattern `qatt(qrnd tau, frame@tau)`
 *)    
 let qatt_pat =
     let ts_v = Vars.mk (Ident.create "τ") Type.ttimestamp in
     let ts_t = Term.mk_var ts_v in
-    let qrnd_ty = Type.tmeasure_rnd in  
-    let qrnd : Term.nsymb = Term.mk_symb Symbols.Quantum.qrnd ~info:() qrnd_ty in
+    let qrnd : Term.nsymb = Macros.Quantum.qrnd in
     let qrnd_name = Term.mk_name_with_tuple_args qrnd [ts_t] in
-    let frame_ty      = Type.tuple [Type.ttimestamp; Type.tquantum_message; Type.tmessage] in
-    let info = Term.macro_info_builtin in  
-    let frame  : Term.msymb = Term.mk_symb Symbols.Quantum.frame ~info frame_ty in  
+    let frame : Term.msymb = Macros.Quantum.frame in
     let qinput =
       Term.mk_fun0
         Symbols.fs_qatt { fty = Symbols.ftype_builtin Symbols.fs_qatt; ty_args = [] }

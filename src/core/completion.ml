@@ -287,7 +287,7 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
     | Macro (ms,l,ts) -> 
       let is = List.map cterm_of_term l in
       cfun
-        (ccst (Cst.of_macro ms.s_symb ms.s_typ))
+        (ccst (Cst.of_macro ms.s_symb ms.s_fty.fty_out))
         (is @ [cterm_of_term ts])
 
     | Term.Action (a,is) ->

@@ -2050,7 +2050,7 @@ module T (* : S with type t = Term.term *) = struct
     (* unifying `s(terms)@ts` and `s'(terms')@ts'` *)
     | Macro (s, terms, ts),
       Macro (s', terms', ts') when s.s_symb = s'.s_symb -> 
-      assert (Type.equal s.s_typ s'.s_typ && List.length terms = List.length terms');
+      assert (List.length terms = List.length terms');
 
       (* default strategy, unify `ts :: terms` and `ts' :: terms'` *)
       let default () =
@@ -4084,14 +4084,14 @@ let strengthen
            won't find a deduction invariant with them. *)
         if not in_init then msets else
           begin
-            let ty, indices =
+            let indices =
               match data with
-              | Symbols.State (i, ty, _, _) ->
-                ty, List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
-              | _ when mn = Symbols.Classic.cond -> Type.tboolean, []
+              | Symbols.State (i, _, _, _) ->
+                List.init i (fun _ -> Vars.make_fresh Type.tindex "i")
+              | _ when mn = Symbols.Classic.cond -> []
               | _ -> assert false
             in
-            let ms = Term.mk_symb mn ~info:(Macros.get_macro_info table mn) ty in
+            let ms = Macros.msymb table mn in
             let mset = 
               MCset.mk ~env
                 ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 

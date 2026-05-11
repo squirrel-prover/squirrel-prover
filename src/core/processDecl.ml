@@ -1082,7 +1082,7 @@ let parse_fun_decls
             | Some ty -> true , Typing.convert_ty ~ienv env ty
          in
 
-         (* for defintions using recursion or pattern-matching, the last
+         (* for definitions using recursion or pattern-matching, the last
             argument is handled in a particular way *)         
           let match_param =
             lazy (             
@@ -1374,12 +1374,21 @@ let parse_fun_decls
           if is_rec then
             (* number of arguments for a recursive function *)
             List.fold_left
-              (fun t
-                fdecl
-                ->
+              (fun (t : Term.t) (fdecl : final_decl) ->
                   let name, info = oget fdecl.name, oget fdecl.info in
                   let nb_args = List.length fdecl.pdecl.args in
-                  let m = Term.mk_symb name ~info fdecl.pdecl.out_ty in
+                  let fty : Type.ftype = Type.{
+                      fty_vars = ty_vars;
+                      fty_args = List.map Vars.ty fdecl.pdecl.args;
+                      fty_out = fdecl.pdecl.out_ty;
+                    }
+                  in
+                  let m = Term.{
+                      s_symb = name;
+                      s_info = info;
+                      s_fty = fty;
+                    }
+                  in
                   build_recursive_body table (oget fdecl.pdecl.f_rec) (`Macro m) ~nb_args t
               )
               t
