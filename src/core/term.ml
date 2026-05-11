@@ -1622,7 +1622,7 @@ and _pp
            "@[<hov> %a@]"
            (Fmt.list ~sep:(Fmt.any " ") (pp (fixity, `Right)))) l
         (if m.s_info.pp_style = `At then "@"
-         else if l = [] && not m.s_info.has_dist_param then ""
+         else if not m.s_info.has_dist_param then ""
          else " ")
         pp_last_arg
     in
