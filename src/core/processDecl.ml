@@ -1377,16 +1377,32 @@ let parse_fun_decls
               (fun (t : Term.t) (fdecl : final_decl) ->
                   let name, info = oget fdecl.name, oget fdecl.info in
                   let nb_args = List.length fdecl.pdecl.args in
-                  let fty : Type.ftype = Type.{
-                      fty_vars = ty_vars;
-                      fty_args = List.map Vars.ty fdecl.pdecl.args;
-                      fty_out = fdecl.pdecl.out_ty;
+                  
+                  let fty : Type.ftype =
+                    (* build a ftype with fresh type variables *)
+                    let subst, refreshed_ty_vars =
+                      List.fold_left_map (fun subst tv ->
+                          let tv' = Ident.fresh tv in
+                          let subst = Subst.add_tvar subst tv (Type.tvar tv') in
+                          (subst, tv')
+                        ) Subst.empty_subst ty_vars
+                    in
+
+                    let ty_args =
+                      List.map (Subst.subst_ty subst -| Vars.ty) fdecl.pdecl.args
+                    in
+
+                    Type.{
+                      fty_vars = refreshed_ty_vars;
+                      fty_args = ty_args;
+                      fty_out = Subst.subst_ty subst fdecl.pdecl.out_ty;
                     }
                   in
+                  
                   let m = Term.{
                       s_symb = name;
                       s_info = info;
-                      s_fty = fty;
+                      s_ty = Type.{ fty; ty_args = List.map Type.tvar ty_vars; };
                     }
                   in
                   build_recursive_body table (oget fdecl.pdecl.f_rec) (`Macro m) ~nb_args t
@@ -1473,7 +1489,8 @@ let parse_fun_decls
         in
         let data0 = 
           Macros.{
-            name; 
+            name;
+            ty_params = ty_vars;
             params=fdecl.params;
             dist_param=fdecl.dist_param; 
             bodies; 

@@ -125,7 +125,7 @@ namespace Term.
   op App : t -> List.t -> t.
   op Fun : string -> Type.List.t -> t.
   op Name : string -> List.t -> t.
-  op Macro : string -> List.t -> t -> t.
+  op Macro : string -> Type.List.t -> List.t -> t -> t.
   op Action : string -> List.t -> t.
   op Var : Var.t -> t.
   op Letc : Var.t -> t -> t -> t.

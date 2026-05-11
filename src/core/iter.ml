@@ -466,7 +466,8 @@ let fold_descr
       in
       let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
       let res =
-        let msymb = Macros.msymb env.table mg in
+        (* [] because global macros are not polymorphique *)
+        let msymb = Macros.msymb env.table mg [] in
         match Macros.unfold env msymb args ts with
         | `Results bodies ->
           List.fold_left

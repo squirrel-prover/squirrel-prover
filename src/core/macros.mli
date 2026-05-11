@@ -127,6 +127,7 @@ val builtin_decreasing_info : Action.exec_model -> decreasing_info
 *)
 type structured_macro_data = {
   name                : Symbols.macro;        (** a macro [m] *)
+  ty_params           : Type.tvars;           (** type parameters (e.g. ['a]) *)
   params              : Vars.vars;            (** the parameters of the macro *)
   dist_param          : Vars.var option;
   (** the (optional) distinguished parameter, which is used for the
@@ -186,8 +187,8 @@ val decreasing_info :
   Symbols.table -> ?env:Env.t -> Symbols.macro -> Term.term -> Term.term * decreasing_info
 
 (** Create a macro symbol object (as expected by [Term.Macro]) from a
-    macro symbol *)
-val msymb : Symbols.table -> Symbols.macro -> Term.msymb
+    macro symbol and some type arguments. *)
+val msymb : Symbols.table -> Symbols.macro -> Type.ty list -> Term.msymb
 
 (*------------------------------------------------------------------*)
 (** {2 Execution models} *)

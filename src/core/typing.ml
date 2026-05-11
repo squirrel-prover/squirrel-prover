@@ -1302,8 +1302,7 @@ and convert_app
     | `Operator _ | `Name _ | `Action _ -> 0
 
     | `Macro m ->
-      let ms = Macros.msymb state.env.table m in
-      let i = ms.s_info in
+      let i = Macros.get_macro_info state.env.table m in
       if i.has_dist_param then
         match app_cntxt with
         | At _ | MaybeAt _ when i.pp_style = `At -> 1
@@ -1339,8 +1338,7 @@ and convert_app
       Term.mk_action a args0
 
     | `Macro    m ->
-      let ms = Macros.msymb state.env.table m in
-      let i = ms.s_info in
+      let i = Macros.get_macro_info state.env.table m in
       let args0, rec_arg =
         if i.has_dist_param then
           match app_cntxt with
@@ -1356,7 +1354,8 @@ and convert_app
           | _ -> error loc (Timestamp_expected (Symbols.p_path_to_string f))
         else (args0, Term.mk_unit)       (* [unit] used as a spurious value *)
       in
-
+      let ms = Term.{ s_symb = m; s_info = i; s_ty = applied_fty; } in
+      
       Term.mk_macro ms args0 rec_arg
   in
 

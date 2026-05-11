@@ -85,6 +85,7 @@ let builtin_decreasing_info exec_model = {
 (** See `.mli`. *)
 type structured_macro_data = {
   name                : Symbols.macro;
+  ty_params           : Type.tvars;
   params              : Vars.vars;
   dist_param          : Vars.var option;
   bodies              : body list;
@@ -305,12 +306,16 @@ let mk_timestamp_body_default ts default : body =
     out       = default}
 
 (*------------------------------------------------------------------*)
+(** Internal *)
 let msymb0
-    (symb : Symbols.macro) (fty : Type.ftype)
-    ~(info:Term.macro_info) 
+    (symb : Symbols.macro)
+    ?(ty_args = []) (* type arguments of [fty] *)
+    ~(info:Term.macro_info)
+    (fty : Type.ftype)
   : Term.msymb 
   =
-  Term.{ s_symb = symb; s_fty = fty; s_info = info; }
+  let applied_ftype = Type.{fty = fty; ty_args; } in
+  Term.{ s_symb = symb; s_ty = applied_ftype; s_info = info; }
 
 (*------------------------------------------------------------------*)
 module Classic = struct
@@ -354,6 +359,7 @@ module Classic = struct
       and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
         name                = Symbols.Classic.frame;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -377,6 +383,7 @@ module Classic = struct
       and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
         name                = Symbols.Classic.inp;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -400,6 +407,7 @@ module Classic = struct
       and body_default = mk_timestamp_body_default ts Term.mk_false in
       Structured {
         name                = Symbols.Classic.exec;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -487,6 +495,7 @@ module Quantum = struct
       and body_default = mk_timestamp_body_default ts @@ Term.mk_tuple [Term.init; qwitness; Term.empty  ] in
       Structured {
         name                = Symbols.Quantum.frame;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -517,6 +526,7 @@ module Quantum = struct
       in
       Structured {
         name                = Symbols.Quantum.transcript;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -543,6 +553,7 @@ module Quantum = struct
       and body_default = mk_timestamp_body_default ts qwitness in      
       Structured {
         name                =  Symbols.Quantum.state;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -567,6 +578,7 @@ module Quantum = struct
       and body_default = mk_timestamp_body_default ts Term.empty in
       Structured {
         name                =  Symbols.Quantum.inp;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -589,6 +601,7 @@ module Quantum = struct
       and body_default = mk_timestamp_body_default ts Term.mk_false in
       Structured {
         name                = Symbols.Quantum.exec;
+        ty_params           = [];
         params              = [];
         dist_param          = Some ts_v;
         bodies              = [body_main; body_init; body_default];
@@ -867,56 +880,67 @@ let fty
     (ms : Symbols.macro) 
   : Type.ftype * rec_arg_ty
   =
-  let fty_args, fty_out, rec_ty =
-    match Symbols.get_macro_data ms table with
-    | Symbols.Global (_, ty, data) ->
-      let data = get_global_data data in
-      ( List.map Vars.ty data.indices @ [Type.ttimestamp], 
+  match Symbols.get_macro_data ms table with
+  | Symbols.Global (_, ty, data) ->
+    let data = get_global_data data in
+    ( Type.mk_ftype []
+        (List.map Vars.ty data.indices @ [Type.ttimestamp])
         ty, 
-        `At Type.ttimestamp )
-    | General def ->
-      begin
-        match get_general_macro_data def with
-        | Structured     data   ->
-          let rec_ty =
-            match data.dist_param with
-            | None -> `DummyUnit
-            | Some v -> 
-              match data.info.pp_style with
-              | `At        -> `At (Vars.ty v) 
-              | `Standard -> `Standard (Vars.ty v)
-          in
-          let fty_args =
-            let ty_args0 = List.map Vars.ty data.params in
-            let rty =
-              match rec_ty with
-              | `At rty | `Standard rty -> rty
-              | `DummyUnit              -> Type.tunit
-            in
-            ty_args0 @ [rty]
-          in
-          fty_args, data.ty, rec_ty
-        | ProtocolMacro `Output -> 
-          ([Type.ttimestamp], Type.tmessage, `At Type.ttimestamp)
-        | ProtocolMacro `Cond   -> 
-          ([Type.ttimestamp], Type.tboolean, `At Type.ttimestamp)
-      end
+      `At Type.ttimestamp )
 
-    | Symbols.State (_, ty, _, data) ->
-      let vs = 
-        match data with
-        | StateInit_data (vs,_) -> vs
-        | _ -> assert false 
-      in
-      (List.map Vars.ty vs @ [Type.ttimestamp], ty, `At Type.ttimestamp)
-  in
-  Type.mk_ftype [] fty_args fty_out, rec_ty
+  | General def ->
+    begin
+      match get_general_macro_data def with
+      (* general case *)
+      | Structured data ->
+        let rec_ty =
+          match data.dist_param with
+          | None -> `DummyUnit
+          | Some v -> 
+            match data.info.pp_style with
+            | `At       -> `At (Vars.ty v) 
+            | `Standard -> `Standard (Vars.ty v)
+        in
+        let fty_args =
+          let ty_args0 = List.map Vars.ty data.params in
+          let rty =
+            match rec_ty with
+            | `At rty | `Standard rty -> rty
+            | `DummyUnit              -> Type.tunit
+          in
+          ty_args0 @ [rty]
+        in
+        ( Type.mk_ftype data.ty_params fty_args data.ty,
+          rec_ty)
+
+      (* builtin: output *)
+      | ProtocolMacro `Output -> 
+        ( Type.mk_ftype [] [Type.ttimestamp] Type.tmessage,
+          `At Type.ttimestamp)
+
+      (* builtin: cond *)
+      | ProtocolMacro `Cond   -> 
+        ( Type.mk_ftype [] [Type.ttimestamp] Type.tboolean,
+          `At Type.ttimestamp)
+    end
+
+  | Symbols.State (_, ty, _, data) ->
+    let vs = 
+      match data with
+      | StateInit_data (vs,_) -> vs
+      | _ -> assert false 
+    in
+    ( Type.mk_ftype [] (List.map Vars.ty vs @ [Type.ttimestamp]) ty,
+      `At Type.ttimestamp)
 
 (*------------------------------------------------------------------*)
-let msymb (table : Symbols.table) (symb : Symbols.macro) : Term.msymb =
+let msymb
+    (table : Symbols.table) (symb : Symbols.macro) (ty_args : Type.ty list)
+  : Term.msymb
+  =
   let fty, _ = fty table symb in
   let info = get_macro_info table symb in
-  Term.{ s_symb = symb; s_info = info; s_fty = fty; }
+  Term.{ s_symb = symb; s_info = info; s_ty = Type.{ fty; ty_args; } }
 
 (*------------------------------------------------------------------*)
 let is_global table (ms : Symbols.macro) : bool =
@@ -1047,7 +1071,8 @@ let basic_match
   =
   let exception Failure in
   let exception Unknown in
-  
+
+  (*------------------------------------------------------------------*)
   let mv : (Vars.var, Term.term) Hashtbl.t = Hashtbl.create 32 in
 
   let add_or_fail (v : Vars.var) t =
@@ -1056,7 +1081,8 @@ let basic_match
     assert (not (Hashtbl.mem mv v));
     Hashtbl.add mv v t 
   in
-  
+
+  (*------------------------------------------------------------------*)
   let rec aux (t1 : Term.term) (t2 : Term.term) : unit =
     match t1, t2 with
     | Term.Int i1, Term.Int i2 -> if not (Z.equal i1 i2) then raise Failure
@@ -1076,43 +1102,57 @@ let basic_match
            Z.leq i1 i2 ->
       add_or_fail x1 (Library.Int.mk_add table x2 (Term.mk_int Z.(i2 - i1)))
 
+    (* actions *)
     | Term.Action (asymb1, aidx1), Term.Action (asymb2, aidx2) ->
       if asymb1 <> asymb2 then
         raise Failure;
 
       List.iter2 aux aidx1 aidx2
 
+    (* applications *)
     | Term.App (t1,tl1), Term.App (t2,tl2) -> aux t1 t2; List.iter2 aux tl1 tl2
 
+    (* tuples *)
     | Term.Tuple l1, Term.Tuple l2 -> List.iter2 aux l1 l2
 
+    (* add new variable binding *)
     | Term.Var x, _ -> add_or_fail x t2
 
     | Term.Fun (fs1,fty1), Term.Fun (fs2,fty2)
       when Symbols.OpData.is_constructor fs1 table &&
            Symbols.path_equal fs1 fs2 &&
            List.for_all2 Type.equal fty1.ty_args fty2.ty_args -> ()
+    (* FIXME: this is imprecise: if [fs1] and [fs2] are different
+       constructors, we could return [`MatchFailure] *)
 
     | _ -> raise Unknown
   in
   try
     aux pattern term;
-    `Match
-      (List.map (fun (v, t) ->
-           Term.ESubst (Term.mk_var v, t))
-          (Hashtbl.to_list mv))
+
+    let subst =
+      List.map
+        (fun (v, t) -> Term.ESubst (Term.mk_var v, t))
+        (Hashtbl.to_list mv)
+    in
+    `Match subst
   with
   | Failure -> `MatchFailure
   | Unknown -> `Unknown
 
+(*------------------------------------------------------------------*)
 (** not exported *)
 exception UnfoldFailed
+
 let unfold_failed () = raise UnfoldFailed
 
+(*------------------------------------------------------------------*)
+(** not exported *)
 let unfold_structured_macro
     ~(unfold_opaque : bool)
     (env     : Env.t)
     (data    : structured_macro_data)
+    (ty_args : Type.ty list)
     (args    : Term.term list)
     (rec_arg : Term.term)
   : body list
@@ -1152,6 +1192,7 @@ let unfold_structured_macro
       Term.apply_projection_renaming p_renaming 
   in
 
+  (* substitution instantiating the macro parameters *)
   let subst =
     (omap_dflt []
        (fun dist_param -> [Term.ESubst (Term.mk_var dist_param, rec_arg)]) 
@@ -1165,10 +1206,22 @@ let unfold_structured_macro
     )
   in
 
+  (* substitution instantiating the macro type parameters *)
+  let ty_subst =
+    List.fold_left2
+      Subst.add_tvar
+      Subst.empty_subst
+      data.ty_params ty_args
+  in
+  
   (* apply the projection substitution and the substitution [subst]
      to [body] *)
   let do_subst subst body =
-    let doit = do_proj_subst -| Term.subst subst in
+    let doit =
+      do_proj_subst -|
+      Term.subst subst -|
+      Term.gsubst ty_subst
+    in
     { body with
       when_cond = doit body.when_cond;
       out       = doit body.out;
@@ -1182,6 +1235,7 @@ let unfold_structured_macro
       match body.pattern with
       | None -> do_subst subst body :: acc
       | Some pat ->
+        let pat = Term.gsubst ty_subst pat in
         match basic_match table ~pattern:pat ~term:rec_arg with
         | `Match rec_subst -> 
           (* the match succeeded, so we clear the match and
@@ -1189,7 +1243,9 @@ let unfold_structured_macro
           let body = { body with vars = []; pattern = None; } in
           do_subst (rec_subst @ subst) body
           :: acc
-        | `Unknown         -> do_subst (subst) body :: acc
+
+        | `Unknown -> do_subst subst body :: acc
+
         | `MatchFailure -> acc
     ) [] data.bodies
 
@@ -1227,6 +1283,8 @@ let _unfold
   let table = env.table in
   let system = env.system.set in
 
+  let ty_args = symb.s_ty.ty_args in
+
   (* fails if the action is not defined in the current system
      (because it comes from another uncompatible system) *)
   match Symbols.get_macro_data symb.s_symb table with
@@ -1234,9 +1292,10 @@ let _unfold
     begin
       match get_general_macro_data data with
       | Structured data ->
-        unfold_structured_macro ~unfold_opaque env data args rec_arg
+        unfold_structured_macro ~unfold_opaque env data ty_args args rec_arg
 
       | ProtocolMacro `Output ->
+        assert (ty_args = []);
         if not (SE.is_fset system) then unfold_failed ();
         let fset_system = SE.to_fset system in
 
@@ -1292,6 +1351,7 @@ let _unfold
         end
 
       | ProtocolMacro `Cond ->
+        assert (ty_args = []);
         if not (SE.is_fset system) then unfold_failed ();
         let fset_system = SE.to_fset system in
 
@@ -1348,6 +1408,7 @@ let _unfold
     end
 
   | State _ ->
+    assert (ty_args = []);
     if not (SE.is_fset system) then unfold_failed ();
     let fset_system = SE.to_fset system in
 
@@ -1519,6 +1580,7 @@ let _unfold
     end
 
   | Global (_,_,gdat) ->
+    assert (ty_args = []);
     if not (SE.is_fset system) then unfold_failed ();
     let fset_system = SE.to_fset system in
     

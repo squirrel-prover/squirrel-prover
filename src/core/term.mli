@@ -61,7 +61,7 @@ val nsymb : Symbols.name -> Type.ty -> nsymb
     usage of the random tape (adversarial and honest). *)
 type msymb = {
   s_symb : Symbols.macro;
-  s_fty  : Type.ftype;
+  s_ty   : Type.applied_ftype;
   (** The ftype of the symbol. 
 
       Macros must be used in partial η-long form w.r.t. [s_fty],

@@ -1418,7 +1418,9 @@ let register_globals
   (* Term to which the let-bound variable will translate. *)
   let args = Term.mk_vars (List.rev penv.indices) in
   let glob_term =
-    Term.mk_macro (Macros.msymb table symb) args (Term.mk_var penv.time) in
+    (* [] because global let macros have no type arguments *)
+    let ms = Macros.msymb table symb [] in
+    Term.mk_macro ms args (Term.mk_var penv.time) in
 
   { penv with table }, symb, glob_term
 
@@ -1572,8 +1574,10 @@ let process_system_decl
              The update multiterm for a projection coincides with [t]
              on that projection and is [s@pred τ] on others. *)
           let default s args =
+            (* [] because global let macros have no type arguments *)
+            let ms = Macros.msymb penv.table s [] in
             Term.mk_macro
-              (Macros.msymb penv.table s)
+              ms
               args
               (Term.mk_var penv.time)
           in

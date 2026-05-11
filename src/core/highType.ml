@@ -236,6 +236,9 @@ let rec is_quantum : Type.ty -> bool = function
 (*------------------------------------------------------------------*)
 (** {3 Applied ftypes} *)
 
+let subst_of_applied_ftype (fty : Type.applied_ftype) : Subst.t =
+  List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty.fty_vars fty.ty_args
+
 (** apply a [ftype] to some type arguments *)
 let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
   (* substitute pending type variables by the type arguments *)

@@ -34,7 +34,7 @@ type gfname =
   | N of Symbols.name * Type.ty             (** name *)
   | F of Symbols.fname * Type.applied_ftype (** function symbol *)
   | A of Symbols.action                     (** action *)
-  | M of Symbols.macro * Type.ty            (** macro *)
+  | M of Symbols.macro * Type.applied_ftype (** macro *)
   | T of int                                (** constructor of `i` tuple *)
   | P of int                                (** i-th projection *)
 
@@ -287,7 +287,7 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
     | Macro (ms,l,ts) -> 
       let is = List.map cterm_of_term l in
       cfun
-        (ccst (Cst.of_macro ms.s_symb ms.s_fty.fty_out))
+        (ccst (Cst.of_macro ms.s_symb ms.s_ty))
         (is @ [cterm_of_term ts])
 
     | Term.Action (a,is) ->
@@ -332,10 +332,12 @@ let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
           let term = as_seq1 args in
           Term.mk_proj i term
 
-        | M (m,_) -> 
+        | M (m,fty_app) -> 
           let is, ts = List.takedrop (List.length args - 1) args in
           let ts = as_seq1 ts in
-          let m = Macros.msymb table m in
+          let m = Macros.msymb table m fty_app.ty_args in
+          (* A bit inefficient, as [Macros.msymb] will reconstruct
+             [fty_app] from [m] and [fty_app.ty_args]. *)
           Term.mk_macro m is ts
 
         | A a -> 

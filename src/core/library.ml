@@ -12,12 +12,13 @@ let get_type (s : Symbols.s_path) : Symbols.ty =
   try Symbols.Ty.of_s_path s with
   | Symbols.Error _ -> assert false
 
-let mk_zero  f table         = Term.mk_fun table (f table) []
-let mk_one   f table x       = Term.mk_fun table (f table) [x]
-let mk_two   f table x y     = Term.mk_fun table (f table) [x;y]
-let mk_three f table x y z   = Term.mk_fun table (f table) [x;y;z]
-let mk_four  f table x y z t = Term.mk_fun table (f table) [x;y;z;t]
+let mk_zero  f table           = Term.mk_fun table (f table) []
+let mk_one   f table x         = Term.mk_fun table (f table) [x]
+let mk_two   f table x y       = Term.mk_fun table (f table) [x;y]
+let mk_three f table x y z     = Term.mk_fun table (f table) [x;y;z]
+let mk_four  f table x y z t   = Term.mk_fun table (f table) [x;y;z;t]
 let mk_five  f table x y z t u = Term.mk_fun table (f table) [x;y;z;t;u]
+
 (*------------------------------------------------------------------*)
 module Prelude = struct
   let mk_fun table str ~ty_args args =
@@ -624,7 +625,7 @@ module Reify = struct
     let mk_app          = mk_two   fs_app
     let mk_fun          = mk_two   fs_func
     let mk_name         = mk_two   fs_name
-    let mk_macro        = mk_three fs_macro
+    let mk_macro        = mk_four  fs_macro
     let mk_action       = mk_two   fs_action
     let mk_var          = mk_one   fs_var
     let mk_let          = mk_three fs_letc

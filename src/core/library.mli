@@ -377,32 +377,32 @@ module Reify : sig
     val mk_int    : Symbols.table -> Term.t -> Term.t
     val mk_string : Symbols.table -> Term.t -> Term.t
     val mk_app    : Symbols.table -> Term.t -> Term.t -> Term.t
-    (*term (function), term list (arguments)*)
+    (* term (function), term list (arguments) *)
     val mk_fun    : Symbols.table -> Term.t -> Term.t -> Term.t
     (* fname, ty_args *)
     val mk_name   : Symbols.table -> Term.t -> Term.t -> Term.t
-    (*path (symbol name),term list (arguments)*)
+    (* path (symbol name),term list (arguments) *)
     val mk_macro  :
-      Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t
-    (*path (macro name),term list, term*)
+      Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t -> Term.t
+    (* path (macro name),ty_args, term list, term *)
     val mk_action : Symbols.table -> Term.t -> Term.t -> Term.t
-    (*path (action name), term list (args)*)
+    (* path (action name), term list (args) *)
     val mk_var    : Symbols.table -> Term.t -> Term.t
-                                                    (*Ident (var indentifer)*)
+    (* ident (var identifier) *)
     val mk_let    :
       Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t
-    (*Ident (var identifier), term (definition of the variable), term (using the variable)*)
+    (* Ident (var identifier), term (definition of the variable), term (using the variable) *)
     val mk_tuple  : Symbols.table -> Term.t -> Term.t
-    (*term list*)
+    (* term list *)
     val mk_proj   : Symbols.table -> Term.t -> Term.t -> Term.t
-    (*int,term*)
+    (* int,term *)
     val mk_diff   : Symbols.table -> Term.t -> Term.t
-    (*diff_terms*)
+    (* diff_terms *)
     val mk_find   :
       Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t -> Term.t
-    (*vars list (to find), term (in find), term (used if find), term (if not find)*)
+    (* vars list (to find), term (in find), term (used if find), term (if not find) *)
     val mk_quant  :
       Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t
-      (*Term.Quant, var list, term *)
+      (* Term.Quant, var list, term *)
   end (* Term *)
 end

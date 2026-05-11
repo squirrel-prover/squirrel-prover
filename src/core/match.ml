@@ -4091,7 +4091,9 @@ let strengthen
               | _ when mn = Symbols.Classic.cond -> []
               | _ -> assert false
             in
-            let ms = Macros.msymb table mn in
+            (* no type variables in state or cond macro (c.f. test
+               above *)
+            let ms = Macros.msymb table mn [] in
             let mset = 
               MCset.mk ~env
                 ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 

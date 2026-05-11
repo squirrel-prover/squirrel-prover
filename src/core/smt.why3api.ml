@@ -745,6 +745,10 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
     | Action (a,indices) ->
       t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a)))
         (sqfmlas_to_wterms context indices)
+
+    | Macro (ms,_,_) when ms.s_ty.ty_args <> [] && not context.poly ->
+         unsupported_term context fmla "unsupp_poly"
+
     | Macro (ms,l,ts) ->
       begin match Hashtbl.find context.macros_tbl (path_to_string ms.s_symb) with
         | m,_ ->
@@ -759,6 +763,7 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
         | exception Not_found ->
           unsupported_term context fmla "unsupp_macro_not_found"
       end
+      
     | Name (ns,args) ->
       t_app
         (Hashtbl.find context.names_tbl (path_to_string ns.s_symb))
@@ -1436,27 +1441,40 @@ let sq_id_fresh s = Ident.fresh (Ident.create s)
 (* Add the unfold of every macro. *)
 let add_macro_axioms context =
   Hashtbl.iter (fun _ (_,mn) ->
-    let m_symb = Macros.msymb context.table mn
-    and str = path_to_string mn
+    let str = path_to_string mn
     and def = Symbols.get_macro_data mn context.table in
-    let params_vars, rec_arg_var = match def with
+
+    let ty_params, params_vars, rec_arg_var =
+      match def with
       | General d -> begin
           match Macros.get_general_macro_data d with
-          | Structured d -> d.params,d.dist_param
-          | _ -> [], Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
+          | Structured d -> (d.ty_params, d.params, d.dist_param)
+          | ProtocolMacro _ ->
+            ([], [], Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp))
         end
       | State (i,_,_,_) | Global (i,_,_) ->
-        List.init i
-          (fun i ->
-             Vars.mk (sq_id_fresh ("ind_"^(string_of_int i))) Type.tindex
-          ),
-        Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
+        let params_vars =
+          List.init i
+            (fun i ->
+               Vars.mk (sq_id_fresh ("ind_"^(string_of_int i))) Type.tindex
+            )
+        in
+        let rec_arg_var =
+          Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
+        in
+        ([], params_vars, rec_arg_var)
     in
+
+    (* TODO: macro type variables: support polymorphism in macros *)
+    if ty_params <> [] then raise InternalError;
+    let m_symb = Macros.msymb context.table mn [] in
+
     let params_terms = List.map Term.mk_var params_vars in
     let rec_arg = match rec_arg_var with
       | None -> Term.mk_unit
       | Some v -> Term.mk_var v
     in
+    
     let unfolded_l = Macros.unfold context.env m_symb params_terms rec_arg in
     let sqaxioms =
       match unfolded_l with

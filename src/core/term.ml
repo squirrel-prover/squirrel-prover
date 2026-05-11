@@ -59,7 +59,7 @@ let macro_info_builtin : macro_info = {
 (** a macro symbol *)
 type msymb = {
   s_symb : Symbols.macro;
-  s_fty  : Type.ftype;
+  s_ty   : Type.applied_ftype;
   s_info : macro_info;
 }
 
@@ -325,8 +325,10 @@ let ty ?(for_printing=false) ?ienv (t : term) : Type.ty =
 
     | Macro (s,l,_t)  -> 
       (* check that we are in η-long form w.r.t. [s_fty] *)
-      assert (List.length l + 1 (* +1 is for [t] *) = List.length s.s_fty.fty_args); 
-      s.s_fty.fty_out
+      assert (List.length l + 1 (* +1 is for [t] *) =
+              List.length s.s_ty.fty.fty_args);
+      let subst = HighType.subst_of_applied_ftype s.s_ty in
+      Subst.subst_ty subst s.s_ty.fty.fty_out
 
     | Tuple ts -> 
       Type.tuple (List.map ty ts)
@@ -1153,7 +1155,10 @@ let ty_fv ?(acc = Type.Fv.empty) (t : term) : Type.Fv.t =
     | App (t, l) -> doit_list acc (t :: l)
 
     | Macro (s, l, ts) ->
-      let acc = Type.Fv.union (Type.ftype_fv s.s_fty) acc in
+      let acc =
+        Type.Fv.union (Type.ftype_fv s.s_ty.fty) acc |>
+        Type.Fv.union (Type.fvs s.s_ty.ty_args)
+      in
       doit_list acc (ts :: l)
 
     | Name (s,l) ->
@@ -2115,7 +2120,7 @@ let gsubst (ts : Subst.t) (t : term) : term =
             List.map doit args)
 
     | Macro (m,args,arg) -> 
-      Macro ({ m with s_fty = Subst.subst_ftype ts m.s_fty}, 
+      Macro ({ m with s_ty = Subst.subst_applied_ftype ts m.s_ty}, 
              List.map doit args,
              doit arg)
 

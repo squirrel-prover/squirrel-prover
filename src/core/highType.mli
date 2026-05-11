@@ -112,5 +112,7 @@ val constructors :
 (*------------------------------------------------------------------*)
 (** {3 Applied ftypes} *)
 
+val subst_of_applied_ftype : Type.applied_ftype -> Subst.t
+
 (** apply a [ftype] to some type arguments *)
 val apply_ftype : Type.ftype -> Type.ty list -> Type.ty

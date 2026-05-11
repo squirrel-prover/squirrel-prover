@@ -1,5 +1,6 @@
 include Int.
 include Reify.
+include "Data/List.sp".
 
 type T.
 op f : T -> bool.
@@ -18,13 +19,18 @@ op s : string.
 op i : int.
 name n : bool.
 op y ['a] = forall t : 'a, |"psi t"|#1 = witness.
+op l ['a] : list 'a.
 
-lemma _ @system:toto : true.
+lemma _ @system:toto ['a] : true.
 Proof.
 (*check that we can reify action*)
 have _ : |"A"| = |"A"|; 1 : auto.
+
 (*check that we can reify macros*)
 have _ : |"input@A"| = |"input@A"|; 1 : auto.
+have _ : |"List.length['a] l"| = |"List.length['a] l"|; 1 : auto.
+
+
 remember phi true as x => H1.
 
 (*check that we can reify quantify variables, we also check that we can use and rewrite it*)

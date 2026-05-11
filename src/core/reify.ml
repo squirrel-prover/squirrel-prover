@@ -260,11 +260,13 @@ let quote_term (t : Symbols.table) (ienv : Infer.env) (u : Term.t) : Term.t =
     | Term.Macro (m, l, u)      ->
       R.Term.mk_macro t
         (quote_path m.s_symb)
+        (AList.quote_list Ty t (quote_type t ienv) m.s_ty.ty_args)
         (AList.quote_list Term t doit l
          |> assert_ty (AList.ty Term t))
         (doit u)
-    (* we do not reify [m.s_typ], as it can be recomputed from the
-       symbol table and [m.s_symb] using [Macros.fty] *)
+    (* we do not reify [m.s_ty], as it can be recomputed from the
+       symbol table, [m.s_ty.ty_args] and [m.s_symb] using
+       [Macros.fty] *)
 
     | Term.Action (a, l)        ->
       R.Term.mk_action t
@@ -645,16 +647,22 @@ let infer_type (st : unquote_state) (t : Term.term) : Type.ty option =
     (* similar to [Name], with an additional check for [rec_ty] and
        [u] *)
     | Term.Macro (ms, args0, u) ->
-      let fty, _rec_ty = Macros.fty st.table ms.s_symb in
-      assert (fty.fty_vars = []);
+      let fty = ms.s_ty.fty in
 
+      (* add the last argument [u] to [args0] *)
       let args = args0 @ [u] in
 
       (* must be used in η-long form *)
       check_length fty.fty_args args;
-      check_tys_eq fty.fty_args (infer_tys st args);
 
-      fty.fty_out
+      (* apply the [ftype] *)
+      let subst = HighType.subst_of_applied_ftype ms.s_ty in
+      let ty_args = List.map (Subst.subst_ty subst) fty.fty_args in
+      let ty_out = Subst.subst_ty subst fty.fty_out in
+
+      check_tys_eq ty_args (infer_tys st args);
+
+      ty_out
 
     | Term.Var v -> Vars.ty v
 
@@ -842,19 +850,23 @@ let unquote_projection (st : unquote_state) (t : Term.t) : Projection.t =
 
 let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
   match u with
+  (* Term.Int *)
   | Term.App (Term.Fun (fn,_), [Term.Int _ as arg])
     when fn = R.Term.fs_int st.table ->
     arg
 
+  (* Term.String *)
   | Term.App (Term.Fun (fn,_), [Term.String _ as arg])
     when fn = R.Term.fs_string st.table ->
     arg
 
+  (* Term.App *)
   | Term.App (Term.Fun (fn,_), [h; tl]) when fn = R.Term.fs_app st.table ->
     let h = unquote_term0 st h in
     let tl = AList.unquote_list Term st.table (unquote_term0 st) tl in
     Term.mk_app h tl
 
+  (* Term.Fun *)
   | Term.App (Term.Fun (fn,_), [gn; ty_args])
     when fn = R.Term.fs_func st.table ->
     let gn = unquote_path_operator st.table gn in
@@ -863,6 +875,7 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     let app_fty = Type.{ fty; ty_args; } in
     Term.mk_fun0 gn app_fty []
 
+  (* Term.Name *)
   | Term.App (Term.Fun (fn,_), [nn; args]) when fn = R.Term.fs_name st.table ->
     let nn = unquote_path_name st.table nn in
     let nftype = (Symbols.get_name_data nn st.table).n_fty in
@@ -871,22 +884,28 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     in
     Term.mk_name (Term.nsymb nn nftype.fty_out) terms
 
-  | Term.App (Term.Fun (fn,_), [m;terms;arg]) when fn = R.Term.fs_macro st.table ->
+  (* Term.Macro *)
+  | Term.App (Term.Fun (fn,_), [m;ty_args;terms;arg]) when fn = R.Term.fs_macro st.table ->
     let m = unquote_path_macro st.table m in
+    let ty_args = AList.unquote_list Ty st.table (unquote_type st) ty_args in
     let terms =
-      AList.unquote_list Term st.table (unquote_term0 st) terms in
+      AList.unquote_list Term st.table (unquote_term0 st) terms
+    in
     let arg = unquote_term0 st arg in
-    Term.mk_macro (Macros.msymb st.table m) terms arg
+    Term.mk_macro (Macros.msymb st.table m ty_args) terms arg
 
+  (* Term.Action *)
   | Term.App (Term.Fun (fn,_), [a;terms]) when fn = R.Term.fs_action st.table ->
     let a = unquote_path_action st.table a in
     let terms = AList.unquote_list Term st.table (unquote_term0 st) terms in
     Term.mk_action a terms
 
+  (* Term.Var *)
   | Term.App (Term.Fun (fn,_), [v]) when fn = R.Term.fs_var st.table ->
     let v = unquote_var st v in
     let _,y = List.find (fun (x,_) -> Ident.equal v x) st.vars in y
 
+  (* Term.Let *)
   | Term.App (Term.Fun (fn,_), [v;t1;t2]) when fn = R.Term.fs_letc st.table ->
     let t1 = unquote_term0 st t1 in
     let vtype =
@@ -899,14 +918,17 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     let t2 = unquote_term0 st t2 in
     Term.mk_let v' t1 t2
 
+  (* Term.Tuple *)
   | Term.App (Term.Fun (fn,_), [terms]) when fn = R.Term.fs_tuple st.table ->
     Term.mk_tuple (AList.unquote_list Term st.table (unquote_term0 st) terms)
 
+  (* Term.Proj *)
   | Term.App (Term.Fun (fn,_), [i;u]) when fn = R.Term.fs_proj st.table ->
     Term.mk_proj
       ( i |> get_z |> Z.to_int)
       (unquote_term0 st u)
 
+  (* Term.Diff *)
   | Term.App (Term.Fun (fn,_), [args]) when fn = R.Term.fs_diff st.table ->
     Term.mk_diff
       (AList.unquote_list Diff st.table
@@ -920,6 +942,7 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
             end
          ) args)
 
+  (* Term.Find *)
   | Term.App (Term.Fun (fn,_), [vars;b;u;e]) when fn = R.Term.fs_find st.table ->
     let e    = unquote_term0 st e in
     let vars = AList.unquote_list Binder st.table (unquote_binder st) vars in
@@ -928,6 +951,7 @@ let rec unquote_term0 (st : unquote_state) (u : Term.t) : Term.t =
     let b    = unquote_term0 st b in
     Term.mk_find vars b u e
 
+  (* Term.Quant *)
   | Term.App (Term.Fun (fn,_), [q;vars;u]) when fn = R.Term.fs_quant st.table ->
     let q    = unquote_quant st q in
     let vars = AList.unquote_list Binder st.table (unquote_binder st) vars in
