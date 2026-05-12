@@ -353,8 +353,8 @@ module Reify = struct
 
   (*------------------------------------------------------------------*)
   module Ident = struct
-    let ty table = get_type table ~path:["Ident"] "t"
-    let fs_ident table = get_fsymb table ~path:["Ident"] "ident"
+    let ty table = get_type table "ident"
+    let fs_ident table = get_fsymb table "Ident"
     let mk_ident       = mk_two fs_ident
   end (*ident*)
 

@@ -17,17 +17,14 @@
 include "Data/List.sp".
 
 (* ------------------------------------------------------------------- *)
-(* Ident (identifiers) *)
-namespace Ident.
-  type t.
-  op ident : string -> int -> t.
-end Ident.
+(* identifiers *)
+inductive ident = Ident : string -> int -> ident.
 
 (* ------------------------------------------------------------------- *)
 (* Tvar (type variables) *)
 namespace Tvar.
   type t.
-  op tvar : Ident.t -> t.
+  op tvar : ident -> t.
 end Tvar.
 
 (* ------------------------------------------------------------------- *)
@@ -54,13 +51,13 @@ end Type.
 (* Untyped var, used to avoid redondant information *)
 namespace Var.
   type t.
-  op cons : Ident.t ->  t.
+  op cons : ident ->  t.
 end Var.
 
 (* Typed var, used for `Find` and `Quant` *)
 namespace Binder.
   type t.
-  op cons : Ident.t -> Type.t ->  t.
+  op cons : ident -> Type.t ->  t.
 end Binder.
 
 (* ------------------------------------------------------------------- *)
@@ -109,7 +106,7 @@ end Term.
 (* System variables *)
 namespace SysVar.
   type t.
-  op Of_ident : Ident.t -> t.
+  op Of_ident : ident -> t.
   op Set : t.
   op Pair : t.
 end SysVar.
