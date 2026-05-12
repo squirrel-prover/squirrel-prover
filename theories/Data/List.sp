@@ -1,7 +1,6 @@
 include Logic.
 include Int.
 open Int.
-include Reify.
 
 (*------------------------------------------------------------------*)
 inductive list a = 
@@ -58,5 +57,5 @@ namespace List.
 
   lemma length_rev @system:any ['a] (l : list 'a) :
     length (rev l) = length l.
-  Proof. set a := |"length l"|. by rewrite /rev length_append_rev. Qed.
+  Proof. by rewrite /rev length_append_rev. Qed.
 end List.
