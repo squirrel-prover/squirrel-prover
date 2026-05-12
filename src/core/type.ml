@@ -346,6 +346,9 @@ let tuple = function
   | l -> Tuple l
 
 (*------------------------------------------------------------------*)
+let constr (s : s_path) (args : ty list) : ty = TConstr (s, args)
+
+(*------------------------------------------------------------------*)
 let univar v = TUnivar v
 let tvar   v = TVar v
 

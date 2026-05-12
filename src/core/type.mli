@@ -134,11 +134,12 @@ val tstring          : ty
 
 
 (*------------------------------------------------------------------*)
-val univar : univar                -> ty
-val tvar   : tvar                  -> ty
-val func   : ty          -> ty     -> ty
-val fun_l  : ty list     -> ty     -> ty
-val tuple  : ty list     -> ty
+val univar : univar                 -> ty
+val tvar   : tvar                   -> ty
+val func   : ty          -> ty      -> ty
+val fun_l  : ty list     -> ty      -> ty
+val tuple  : ty list                -> ty
+val constr : s_path      -> ty list -> ty
 
 (*------------------------------------------------------------------*)  
 (** If [decompose_funs t = (targs, tout)] then:

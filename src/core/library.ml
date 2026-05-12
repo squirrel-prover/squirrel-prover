@@ -29,9 +29,7 @@ module Prelude = struct
     let symb = get_fsymb str in
     Term.mk_fun_infer_tyargs table symb args
 
-  (*------------------------------------------------------------------*)
-  (*------------------------------------------------------------------*)
-  
+  (*------------------------------------------------------------------*)  
   let witness_p = ([], "witness" )
   let zeroes_p  = ([], "zeroes"  )
   let eq_p      = ([], "="       )
@@ -179,6 +177,44 @@ module[@warning "-32"] Real = struct
       Type.equal ty_r treal);
 
     Term.mk_fun table ~ty_args:[ty0] (fs_sum  table)  [x;y]
+end
+
+(*------------------------------------------------------------------*)
+module List = struct
+
+  (* namespace path *)
+  let list_p = ["List"]
+
+  let is_loaded table =
+    Symbols.Import.mem_sp ([], "List") table
+
+  let check_load table =
+    if not (Symbols.Import.mem_sp ([],"List") table) then
+      Tactics.hard_failure (Failure "theory List is not loaded")
+
+  (*------------------------------------------------------------------*)
+  let get_fsymb table ?(p=list_p) s =
+    check_load table;
+    get_fsymb (p,s)
+
+  let[@warning "-32"] get_type table ?(p=list_p) s =
+    check_load table;
+    get_type  (p,s)
+
+  (*------------------------------------------------------------------*)
+  let tlist (t : Type.ty) : Type.ty =
+    Type.constr (list_p,"list") [t]
+
+  (*------------------------------------------------------------------*)
+  let fs_nil  table = get_fsymb table ~p:[] "Nil"
+  let fs_cons table = get_fsymb table ~p:[] "Cons"
+
+  (*------------------------------------------------------------------*)
+  let nil table (ty : Type.ty) = 
+    Term.mk_fun table (fs_nil table) ~ty_args:[ty] []
+
+  let cons table (x : Term.t) (l : Term.t) : Term.t = 
+    Term.mk_fun table (fs_cons table) ~ty_args:[Term.ty x] [x;l]
 end
 
 (*------------------------------------------------------------------*)

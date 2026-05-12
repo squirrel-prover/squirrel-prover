@@ -102,15 +102,28 @@ module Real : sig
   val mk_sum   : Symbols.table -> Term.t -> Term.t -> Term.t
 end  
 
+(*------------------------------------------------------------------*)
 module Logic : sig
   val fs_well_founded  : Symbols.table -> Symbols.fname
 end
 
+(*------------------------------------------------------------------*)
 module Secrecy : sig
   val is_loaded : Symbols.table -> bool
   val check_load : Symbols.table -> unit
 
   val symb_not_deduce : Symbols.table -> Symbols.predicate
+end
+
+(*------------------------------------------------------------------*)
+module List : sig
+  val is_loaded : Symbols.table -> bool
+  val check_load : Symbols.table -> unit
+
+  val tlist : Type.ty -> Type.ty
+
+  val nil  : Symbols.table -> Type.ty           -> Term.t
+  val cons : Symbols.table -> Term.t  -> Term.t -> Term.t
 end
 
 (*------------------------------------------------------------------*)
