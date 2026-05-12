@@ -14,15 +14,7 @@
   
   This file declares representations for terms, types, and systems.
 *)
-  
-
-(* ------------------------------------------------------------------- *)
-(* List of string, used to represent paths *)
-namespace StringList.
-  type t.
-  op empty : t.
-  op add : string -> t -> t.
-end StringList.
+include "Data/List.sp".
 
 (* ------------------------------------------------------------------- *)
 (* Ident (identifiers) *)
@@ -46,20 +38,13 @@ end Tvar.
 namespace Type.
   type t.
 
-  (*List of type*)
-  namespace List.
-    type t.
-    op empty : t.
-    op add : Type.t -> t -> t.
-  end List.
-
   op Message : t.
   op Boolean : t.
   op Index : t.
   op Timestamp : t.
-  op Tbase : StringList.t -> string -> t.
+  op Tbase : list string -> string -> t.
   op Tvar : Tvar.t -> t.
-  op Tuple : List.t -> t.
+  op Tuple : list t -> t.
   op Fun : t -> t -> t.
 end Type.
 
@@ -76,12 +61,6 @@ end Var.
 namespace Binder.
   type t.
   op cons : Ident.t -> Type.t ->  t.
-
-  namespace List.
-    type t.
-    op empty : t.
-    op add : Binder.t -> t -> t.
-  end List.
 end Binder.
 
 (* ------------------------------------------------------------------- *)
@@ -105,35 +84,23 @@ end Projection.
 (* Terms *)
 namespace Term.
   type t.
-
-  (* List of terms *)
-  namespace List.
-    type t.
-    op empty : t.
-    op add : Term.t -> t -> t.
-  end List.
   
-  (* Diff-terms *)
-  namespace Diff.
-    type t
-    op empty : t.
-    op add : Projection.t * Term.t -> t -> t.
-  end Diff.
+  (* a diff-term is a list of `Projection.t * Term.t` *)
   
   op Int : int -> t.
   op String : string -> t.
-  op App : t -> List.t -> t.
-  op Fun : string -> Type.List.t -> t.
-  op Name : string -> List.t -> t.
-  op Macro : string -> Type.List.t -> List.t -> t -> t.
-  op Action : string -> List.t -> t.
+  op App : t -> list t -> t.
+  op Fun : string -> list Type.t -> t.
+  op Name : string -> list t -> t.
+  op Macro : string -> list Type.t -> list t -> t -> t.
+  op Action : string -> list t -> t.
   op Var : Var.t -> t.
   op Letc : Var.t -> t -> t -> t.
-  op Tuple : List.t -> t.
+  op Tuple : list t -> t.
   op Proj : int -> t -> t.
-  op Diff : Diff.t -> t.
-  op Find : Binder.List.t -> t -> t -> t -> t.
-  op Quant : Quant.t -> Binder.List.t -> t -> t.
+  op Diff : (Projection.t * Term.t) -> t.
+  op Find : list Binder.t -> t -> t -> t -> t.
+  op Quant : Quant.t -> list Binder.t -> t -> t.
 end Term.
 
 (* ------------------------------------------------------------------- *)
@@ -152,18 +119,12 @@ namespace Single.
   op make : Projection.t -> string -> t.
 end Single.
 
-namespace CntList.
-  type t.
-  op empty : t.
-  op add : Projection.t * Single.t -> t -> t.
-end CntList.
-
 (* Systems *)
 namespace Sys.
   type t.
   op Var : SysVar.t -> t.
   op Any : t.
-  op List : CntList.t -> t.
+  op List : list (Projection.t * Single.t) -> t.
 end Sys.
 
 (* ------------------------------------------------------------------- *)
@@ -211,36 +172,18 @@ namespace SysDecl.
 end SysDecl.
 
 (* ------------------------------------------------------------------- *)
-(* An `EvalEnv.t` is a list of `TyDecl.t`, `VarDecl.t` and `SysDecl.t`. *)
+(* An `EvalEnv.t` is a list of `TyDecl.t`, `VarDecl.t` and `SysDecl.t`:
+   - type     environement: list of `TyDecl.t`
+   - variable environement: list of `VarDecl.t`
+   - system   environement: list of `SysDecl.t`
+ *)
 namespace EvalEnv.
   type t.
 
-  (* List of TyDecl *)
-  namespace TyEnv.
-    type t.
-    op empty : t.
-    op add : TyDecl.t -> t -> t.
-  end TyEnv.
-
- (* List of VarDecl *)
-
-  namespace VarEnv.
-    type t.
-    op empty : t.
-    op add : VarDecl.t -> t -> t.
-  end VarEnv.
-
- (* List of SysDecl *)
-  namespace SysEnv.
-    type t.
-    op empty : t.
-    op add : SysDecl.t -> t -> t.
-  end SysEnv.
-
-  op make : TyEnv.t -> VarEnv.t -> SysEnv.t -> Sys.t -> t.
+  op make : list TyDecl.t -> list VarDecl.t -> list SysDecl.t -> Sys.t -> t.
 end EvalEnv.
 
 (* ------------------------------------------------------------------- *)
-op hastype : (Term.t*EvalEnv.t) -> Type.t -> bool.
-op Time0 : (Term.t*EvalEnv.t) -> int.
-op Time1 :  (Term.t*EvalEnv.t) -> int -> int.
+op hastype : (Term.t * EvalEnv.t) -> Type.t -> bool.
+op Time0   : (Term.t * EvalEnv.t) -> int.
+op Time1   : (Term.t * EvalEnv.t) -> int -> int.

@@ -122,6 +122,9 @@ module List : sig
 
   val tlist : Type.ty -> Type.ty
 
+  val fs_nil  : Symbols.table -> Symbols.fname
+  val fs_cons : Symbols.table -> Symbols.fname
+
   val nil  : Symbols.table -> Type.ty           -> Term.t
   val cons : Symbols.table -> Term.t  -> Term.t -> Term.t
 end
@@ -173,14 +176,6 @@ module Reify : sig
   val get_fsymb  : Symbols.table -> ?path:string list -> string -> Symbols.fname
   val get_type   : Symbols.table -> ?path:string list -> string -> Symbols.ty
 
-  module StringList : sig
-    val ty       : Symbols.table -> Type.ty
-    val fs_empty : Symbols.table -> Symbols.fname
-    val fs_add   : Symbols.table -> Symbols.fname
-    val mk_empty : Symbols.table -> Term.t
-    val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-  end (*StringList*)
-
   module Ident : sig
     val ty       : Symbols.table -> Type.ty
     val fs_ident : Symbols.table -> Symbols.fname
@@ -196,14 +191,6 @@ module Reify : sig
   module Ty : sig
     val ty : Symbols.table -> Type.ty
 
-    module List : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*List*)
-
     val fs_message   : Symbols.table -> Symbols.fname
     val fs_boolean   : Symbols.table -> Symbols.fname
     val fs_index     : Symbols.table -> Symbols.fname
@@ -218,11 +205,11 @@ module Reify : sig
     val mk_index     : Symbols.table -> Term.t
     val mk_timestamp : Symbols.table -> Term.t
     val mk_tbase     : Symbols.table -> Term.t -> Term.t -> Term.t
-    (*[StringList.ty] (path), [string] (name)*)
+    (*[list string] (path), [string] (name)*)
     val mk_tvar      : Symbols.table -> Term.t -> Term.t
     (*[Tvar.ty] (tvar)*)
     val mk_tuple     : Symbols.table -> Term.t -> Term.t
-    (*[List.ty] (list of types)*)
+    (*[list ty] (list of types)*)
     val mk_func      : Symbols.table -> Term.t -> Term.t -> Term.t
     (*[ty] (input type),[ty] (output type)*)
   end (*Ty*)
@@ -237,14 +224,6 @@ module Reify : sig
     val ty      : Symbols.table -> Type.ty
     val fs_cons : Symbols.table -> Symbols.fname
     val mk_cons : Symbols.table -> Term.t -> Term.t -> Term.t
-
-    module List : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*List*)
   end (*Binder*)
 
   module Quant : sig
@@ -324,53 +303,12 @@ module Reify : sig
   module EvalEnv : sig
     val ty      : Symbols.table -> Type.ty
 
-    module TyEnv : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*TyEnv*)
-
-    module VarEnv : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*VarEnv*)
-
-    module SysEnv : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*SysEnv*)
-
     val fs_make  : Symbols.table -> Symbols.fname
     val mk_make  : Symbols.table -> Term.t -> Term.t -> Term.t -> Term.t -> Term.t
   end (*EvalEnv*)
 
   module Term : sig
     val ty : Symbols.table -> Type.ty
-
-    module List : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-    end (*List*)
-
-    module Diff : sig
-      val ty       : Symbols.table -> Type.ty
-      val fs_empty : Symbols.table -> Symbols.fname
-      val fs_add   : Symbols.table -> Symbols.fname
-      val mk_empty : Symbols.table -> Term.t
-      val mk_add   : Symbols.table -> Term.t -> Term.t -> Term.t
-      (*Projection * Term, Diff*)
-    end (*Diff*)
 
     val fs_int    : Symbols.table -> Symbols.fname
     val fs_string : Symbols.table -> Symbols.fname

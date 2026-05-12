@@ -37,7 +37,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 let assert_ty (ty : Type.ty) (t : Term.t) : Term.t =
-  assert(Type.equal (Term.ty t) ty);
+  if not @@ Type.equal (Term.ty t) ty then begin
+    Fmt.epr "%a ≠ %a (%a)@." Type.pp ty Type.pp (Term.ty t) Term.pp t;
+    assert false
+  end;
   t
 
 (*------------------------------------------------------------------*)
@@ -54,86 +57,56 @@ type kind =
  | VarEnv
  | SysEnv
 
+let ty_of_kind (k : kind) (t : Symbols.table) : Type.ty =
+  match k with
+  | Ty      -> R.Ty.ty t
+  | St      -> Type.tstring
+  | Binder  -> R.Binder.ty t
+  | Term    -> R.Term.ty t
+  | Diff    -> Type.tuple [R.Projection.ty t; R.Term.ty t]
+  | CntList -> Type.tuple [R.Projection.ty t; R.Single.ty t]
+  | TyEnv   -> R.TyDecl.ty t
+  | VarEnv  -> R.VarDecl.ty t
+  | SysEnv  -> R.SysDecl.ty t
+
 module AList = struct
   let ty (k : kind) (t : Symbols.table) : Type.ty =
-    match k with
-    | Ty      -> R.Ty.List.ty t
-    | St      -> R.StringList.ty t
-    | Binder  -> R.Binder.List.ty t
-    | Term    -> R.Term.List.ty t
-    | Diff    -> R.Term.Diff.ty t
-    | CntList -> R.CntList.ty t
-    | TyEnv   -> R.EvalEnv.TyEnv.ty t
-    | VarEnv  -> R.EvalEnv.VarEnv.ty t
-    | SysEnv  -> R.EvalEnv.SysEnv.ty t
+    Library.List.tlist (ty_of_kind k t)
 
-
-  let fs_empty (k : kind) (t : Symbols.table) : Symbols.fname =
-    match k with
-    | Ty      -> R.Ty.List.fs_empty t
-    | St      -> R.StringList.fs_empty t
-    | Binder  -> R.Binder.List.fs_empty t
-    | Term    -> R.Term.List.fs_empty t
-    | Diff    -> R.Term.Diff.fs_empty t
-    | CntList -> R.CntList.fs_empty t
-    | TyEnv   -> R.EvalEnv.TyEnv.fs_empty t
-    | VarEnv  -> R.EvalEnv.VarEnv.fs_empty t
-    | SysEnv   -> R.EvalEnv.SysEnv.fs_empty t
-
-  let fs_add (k : kind) (t : Symbols.table) : Symbols.fname =
-    match k with
-    | Ty      -> R.Ty.List.fs_add t
-    | St      -> R.StringList.fs_add t
-    | Binder  -> R.Binder.List.fs_add t
-    | Term    -> R.Term.List.fs_add t
-    | Diff    -> R.Term.Diff.fs_add t
-    | CntList -> R.CntList.fs_add t
-    | TyEnv   -> R.EvalEnv.TyEnv.fs_add t
-    | VarEnv  -> R.EvalEnv.VarEnv.fs_add t
-    | SysEnv  -> R.EvalEnv.SysEnv.fs_add t
-
+  (*------------------------------------------------------------------*)
   let mk_empty (k : kind) (t : Symbols.table) : Term.term =
-    match k with
-    | Ty      -> R.Ty.List.mk_empty t
-    | St      -> R.StringList.mk_empty t
-    | Binder  -> R.Binder.List.mk_empty t
-    | Term    -> R.Term.List.mk_empty t
-    | Diff    -> R.Term.Diff.mk_empty t
-    | CntList -> R.CntList.mk_empty t
-    | TyEnv   -> R.EvalEnv.TyEnv.mk_empty t
-    | VarEnv  -> R.EvalEnv.VarEnv.mk_empty t
-    | SysEnv  -> R.EvalEnv.SysEnv.mk_empty t
+    Library.List.nil t (ty_of_kind k t)
 
-  let mk_add (k : kind) (t : Symbols.table) : Term.term -> Term.term -> Term.term =
-    match k with
-    | Ty      -> R.Ty.List.mk_add t
-    | St      -> R.StringList.mk_add t
-    | Binder  -> R.Binder.List.mk_add t
-    | Term    -> R.Term.List.mk_add t
-    | Diff    -> R.Term.Diff.mk_add t
-    | CntList -> R.CntList.mk_add t
-    | TyEnv   -> R.EvalEnv.TyEnv.mk_add t
-    | VarEnv  -> R.EvalEnv.VarEnv.mk_add t
-    | SysEnv   -> R.EvalEnv.SysEnv.mk_add t
+  let mk_add (t : Symbols.table) : Term.term -> Term.term -> Term.term =
+    Library.List.cons t
 
+  (*------------------------------------------------------------------*)
   let quote_list
       (k : kind) (t : Symbols.table)
       (quote : 'a -> Term.term)
-      (l : 'a list) : Term.term =
+      (l : 'a list) : Term.term 
+    =
     List.fold_left
-      (fun list term -> mk_add k t (quote term) list)
+      (fun list term -> mk_add t (quote term) list)
       (mk_empty k t)
       (List.rev l)
-
+      
   let rec unquote_list
       (k : kind) (t : Symbols.table)
       (unquote : Term.term -> 'a)
-      (l : Term.term) : 'a list =
+      (l : Term.term) : 'a list 
+    =
     match l with
-    | Term.Fun (fn,_) when fn = fs_empty k t ->
+    | Term.Fun (fn,{fty = _; ty_args = [ty0]}) 
+      when fn = Library.List.fs_nil t && 
+           Type.equal ty0 (ty_of_kind k t) ->
       []
-    | Term.App (Term.Fun (fn,_), [head;tail]) when fn = fs_add k t ->
+
+    | Term.App (Term.Fun (fn,{fty = _; ty_args = [ty0]}), [head;tail]) 
+      when fn = Library.List.fs_cons t && 
+           Type.equal ty0 (ty_of_kind k t) ->
       (unquote head) :: (unquote_list k t unquote tail)
+
     | _ -> unquote_failed ()
 
 end
