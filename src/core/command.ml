@@ -25,8 +25,11 @@ let pp_error_i fmt = function
 
   | IncludeCycle s       -> Fmt.pf fmt "Include cycle (%s)." s
 
-  | IncludeNotFound (s, paths)
-    -> Fmt.pf fmt "Could not locate theory %s. Tried to find it inside %a." s (Fmt.list Fmt.string) paths
+  | IncludeNotFound (s, paths) ->
+    Fmt.pf fmt
+      "@[<v 0>Could not locate theory %s.@;\
+       @[<v 2>I looked in@ %a@]@]"
+      s (Fmt.list Fmt.string) paths
 
   | InvalidExtension s   -> Fmt.pf fmt "Invalid extension (not a .sp): %s." s
 
