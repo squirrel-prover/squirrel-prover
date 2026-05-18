@@ -12,7 +12,7 @@ type cmd_error =
 
 exception Cmd_error of cmd_error
 
-let pp_cmd_error fmt = function
+let pp_error_i fmt = function
   | UnexpectedCommand    -> Fmt.pf fmt "Unexpected command."
 
   | StartProofError s    -> Fmt.pf fmt "%s" s
@@ -34,11 +34,17 @@ let pp_cmd_error fmt = function
 
   | InvalidSetOption s   -> Fmt.pf fmt "Set failed: %s." s
 
+let pp_error pp_loc_error fmt e =
+  let loc = Location._dummy in  (* FIXME: provide useful error location *)
+  Fmt.pf fmt "%a%a"
+    pp_loc_error loc
+    pp_error_i e
+
 let cmd_error e = raise (Cmd_error e)
 
 let () =
   Errors.register (function
     | Cmd_error e ->
         Some { printer =
-          fun _ fmt -> pp_cmd_error fmt e }
+          fun pp_loc_error fmt -> pp_error pp_loc_error fmt e }
     | _ -> None)
