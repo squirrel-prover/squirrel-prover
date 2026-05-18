@@ -2461,16 +2461,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = S.env s in
     let concrete = S.concrete s in
 
+    let ienv = match ienv with None -> Infer.mk_env () | Some ienv -> ienv in
+
     (* find an occurrence of [pat] in the conclusion *)
     let term =
       let no_term_holes = Sv.for_all (not -| Vars.is_hole) (Term.fv pat) in
       let ty_subst_opt =
-        obind
-          (fun ienv ->
-             match Infer.close env ienv with
-             | Infer.Closed s -> Some s
-             | _ -> None)
-          ienv
+        match Infer.close env ienv with
+        | Infer.Closed s -> Some s
+        | _ -> None
       in
       (* If there are no term holes and type holes can be inferred, we
          are done. *)
@@ -2483,21 +2482,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
         begin
           let occurrences_conc =
             let target = S.conclusion s |> S.wrap_conc in
-            Args.occurrences_of_pat ~concrete ?ienv ~in_system env pat ~target
+            Args.occurrences_of_pat ~concrete ~ienv ~in_system env pat ~target
           in
           let occurrences_bound =
             if occurrences_conc = [] && concrete then
               let target = Equiv.Local (S.bound s |> Concrete.get) in
-              Args.occurrences_of_pat ~concrete ?ienv ~in_system env pat ~target
+              Args.occurrences_of_pat ~concrete ~ienv ~in_system env pat ~target
             else []
           in
           let occurrences = occurrences_conc @ occurrences_bound in
           if occurrences = [] then
             soft_failure ?loc (Failure "no occurrence found");
+
           List.hd occurrences
         end
-
     in
+
+    (* substiture inferred type variables in [v] *)
+    let gsubst =
+      match Infer.close env ienv with
+      | Infer.Closed s -> s
+      | _ -> assert false
+    in
+    let v = Subst.subst_var gsubst v in
 
     let rw_rule =
       Rewrite.simple_rw_rule in_system (S.table s) ~left:term ~right:(Term.mk_var v)
