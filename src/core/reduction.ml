@@ -215,6 +215,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
 
     | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
       when ms1.s_symb = ms2.s_symb ->
+      conv_applied_ftype ms1.s_ty ms2.s_ty;
       conv_l st (ts1 :: terms1) (ts2 :: terms2)
 
     | Term.Quant  (q, is1, t1), Term.Quant (q', is2, t2) when q = q' ->

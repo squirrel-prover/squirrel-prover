@@ -2052,6 +2052,9 @@ module T (* : S with type t = Term.term *) = struct
       Macro (s', terms', ts') when s.s_symb = s'.s_symb -> 
       assert (List.length terms = List.length terms');
 
+      (* unify type arguments *)
+      unif_tys st s.s_ty.ty_args s'.s_ty.ty_args;
+
       (* default strategy, unify `ts :: terms` and `ts' :: terms'` *)
       let default () =
         let mv = tunif_l terms terms' st in
