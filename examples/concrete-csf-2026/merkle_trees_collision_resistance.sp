@@ -182,30 +182,30 @@ open Real.                      (* export of_nat in the root namespace *)
 
 (* A membership proof *)
 inductive proof =
-| Emp : proof
-| Cons : side -> message -> proof -> proof.
+| MEmp : proof
+| MCons : side -> message -> proof -> proof.
 (* `Cons s h p`: `s` is the side we go down
     in the tree, and `h` is the hash of the other side. *)
 
 let rec length (p : proof) with
-| Emp -> Z
-| Cons _ _ p' -> S (length p').
+| MEmp -> Z
+| MCons _ _ p' -> S (length p').
 Proof. intro > <-; discriminate. Qed.
 
 (* Descend in `t` following the proof `p`, and retrieve the
    corresponding sub-tree. *)
 let rec lookup ( (p,t) : proof * tree) : tree with
-| (Emp, _) -> t
-| (Cons side _ psub, Node l r) -> lookup (psub, select l r side)
-| (Cons _ _ _, Leaf _) -> witness.
+| (MEmp, _) -> t
+| (MCons side _ psub, Node l r) -> lookup (psub, select l r side)
+| (MCons _ _ _, Leaf _) -> witness.
 Proof. intro > <-; discriminate. Qed.
 
 (* If `p` proves that a tree `tsub` with hash `hsub` is a
    sub-tree of `t`, computes `hash_tree t`. 
    We admit that `hash_path` can be computed in polynomial-time. *)
 let rec hash_path ~admit_ptime (hsub : message) (p : proof) : message  with
-| Emp -> hsub
-| Cons side ha psub -> 
+| MEmp -> hsub
+| MCons side ha psub -> 
   let hb = hash_path hsub psub in
   let h0 = select hb ha side in
   let h1 = select ha hb side in

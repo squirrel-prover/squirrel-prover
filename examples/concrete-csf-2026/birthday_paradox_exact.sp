@@ -18,30 +18,31 @@ Qed.
     if two position `a` and `b` are in the range of the list and not equal then
     the element at those position are also not equal
 *)
-predicate NoDuplicates {set : system} {set : (l : list)} =
+predicate NoDuplicates {set : system} {set : (l : mylist)} =
     Forall (a,b : nat[const]),
         [ltn (a,(length l)) <: z] /\ [ltn (b,(length l))  <: z]
          -> [a <> b => get a l <> get b l <: z].
 
 (*Map function that take a list and apply n to each element*)
-let rec map (l :list) with
-| Emp -> Emp
-| Cons m l -> Cons (n m) (map l).
+let rec map (l :mylist) with
+| MEmp -> MEmp
+| MCons m l -> MCons (n m) (map l).
 Proof.
 intro > <-; discriminate.
 Qed.
 
 (* `true` iff. there no collision in list of indices `l` with the
    `n` name *)
-let rec no_collision (l : list) with
-| Emp -> true
-| Cons m l -> no_collision l && not (in_list (n m) (map l)).
+let rec no_collision (l : mylist) with
+| MEmp -> true
+| MCons m l -> no_collision l && not (in_list (n m) (map l)).
 Proof.
 intro > <-; discriminate.
 Qed.
 
-global lemma [any] case_list_const (l : list[const]) :
-    [l = Emp <: z] \/ Exists(h : lval[const], t : list[const]), [l = Cons h t <: z].
+global lemma [any] case_list_const (l : mylist[const]) :
+    [l = MEmp <: z] \/ 
+    Exists(h : lval[const], t : mylist[const]), [l = MCons h t <: z].
 Proof.
    case l; [ 1: by left | 2: by intro h t; right; exists h; exists t].
 Qed.
@@ -49,8 +50,8 @@ Qed.
 (* ------------------------------------------------------------------- *)
 (* Lemmas on the `NoDuplicates` predicate *)
 
-global lemma [any] no_duplicates_cons (h : lval) (t : list) :
-     NoDuplicates (Cons h t) -> NoDuplicates t.
+global lemma [any] no_duplicates_cons (h : lval) (t : mylist) :
+     NoDuplicates (MCons h t) -> NoDuplicates t.
 Proof.
    intro @/NoDuplicates H_ a b [H1 H2]. intro H'.
    rewrite (get_in_cons h) (get_in_cons h _ b).
@@ -58,8 +59,8 @@ Proof.
    by apply sn_inj.
 Qed.
 
-global lemma no_duplicates_cons_in @system:P (h : lval) (t : list[const]) :
-     NoDuplicates (Cons h t) -> [not(in_list h t ) <: z].
+global lemma no_duplicates_cons_in @system:P (h : lval) (t : mylist[const]) :
+     NoDuplicates (MCons h t) -> [not(in_list h t ) <: z].
 Proof.
 generalize h.
 induction ~general t => t IH h.
@@ -69,7 +70,7 @@ have [ H | [h0 [t0 H]] ] := case_list_const t; rewrite !H.
    have neqhh0 : h <> h0.
    ++ intro Heq. rewrite /NoDuplicates in H_.
         have H1 := H_ zn (sn zn) _ _; [1 : intro Hzn ; discriminate Hzn | 2 : by split].
-        ghave H2 :  [get zn (Cons h (Cons h t0)) = get (sn zn) (Cons h (Cons h t0)) <: z]; auto.
+        ghave H2 :  [get zn (MCons h (MCons h t0)) = get (sn zn) (MCons h (MCons h t0)) <: z]; auto.
    ++ rewrite /in_list //= not_or; split; 1 : auto.
         apply IH; 2 : rewrite H; discriminate.
         rewrite /NoDuplicates. intro n1 n2.
@@ -78,14 +79,14 @@ have [ H | [h0 [t0 H]] ] := case_list_const t; rewrite !H.
            intro [Hleq1 Hleq2] @/get @/ltn //= . rewrite /NoDuplicates in H_.
            have Hx := localize(H_ zn (sn (sn x)) _) _; [1:  intro temp; discriminate temp | 3 : auto].
             split.
-            ** rewrite (ltn_trans _ (length (Cons h t0))); 2 : auto. split ; 1 :auto. rewrite /length /ltn /length.
+            ** rewrite (ltn_trans _ (length (MCons h t0))); 2 : auto. split ; 1 :auto. rewrite /length /ltn /length.
                 induction length t0; auto.
             ** by rewrite /length /ltn.
         * case ~tags n2; try auto.
            ** intro _ @/get @/ltn //= . rewrite /NoDuplicates in H_.
                 have Hx := localize(H_ (sn (sn x)) zn _) _; [1:  intro temp; discriminate temp | 3 : auto]. split.
                 *** by rewrite /length /ltn.
-                *** rewrite (ltn_trans _ (length (Cons h t0))); 2 : auto. split ; 1 :auto. rewrite /length /ltn /length.
+                *** rewrite (ltn_trans _ (length (MCons h t0))); 2 : auto. split ; 1 :auto. rewrite /length /ltn /length.
                        induction length t0; auto.
             **  intro _ _ @/get @/ltn //= . rewrite /NoDuplicates in H_.
                 have Hx := localize(H_ (sn (sn x)) (sn (sn x0)) _) _; [1:  by apply sn_inj| 3 : auto].
@@ -94,7 +95,7 @@ Qed.
 
 (* ------------------------------------------------------------------- *)
 (*Show that `n x` is in the list `map l` only if `x` is in the list `x`*)
-exact lemma [P] col_list (x : lval[const]) (l : list[const]) : 
+exact lemma [P] col_list (x : lval[const]) (l : mylist[const]) : 
   in_list (n x) (map l) => in_list x l.
 Proof.
    induction l; 1 :  auto.
@@ -103,7 +104,7 @@ Proof.
    * right. apply IH; assumption H.
 Qed.
 
-global lemma [P] birthday (l : list[const]) :
+global lemma [P] birthday (l : mylist[const]) :
    NoDuplicates l -> [no_collision l <: of_int 0].
 Proof.
   induction ~general l.
