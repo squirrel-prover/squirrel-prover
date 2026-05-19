@@ -148,32 +148,32 @@ reasoning. *)
 
 include Concrete.
 
-lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x <: Real.z.
+exact lemma [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
-lemma [any]  fst_apply (x,y : message) : x = y => fst(x) = fst(y) <: Real.z.
+exact lemma [any]  fst_apply (x,y : message) : x = y => fst(x) = fst(y).
 Proof. auto. Qed.
 
-lemma [any]  snd_apply (x,y : message) : x = y => snd(x) = snd(y) <: Real.z.
+exact lemma [any]  snd_apply (x,y : message) : x = y => snd(x) = snd(y).
 Proof. auto. Qed.
 
-lemma dec_apply (x,y,x1,y1 : message) :
- x = y => x1 = y1 => dec(x,x1) = dec(y,y1) <: Real.z.
+exact lemma dec_apply (x,y,x1,y1 : message) :
+ x = y => x1 = y1 => dec(x,x1) = dec(y,y1).
 Proof. auto. Qed.
 
 (** #### AXIOMS
 
 The following axioms are used to reason on counter values. *)
 
-axiom orderTrans (n1,n2,n3:message):
-  n1 ~< n2 = orderOk => n2 ~< n3 = orderOk => n1 ~< n3 = orderOk <: Real.z.
+exact axiom orderTrans (n1,n2,n3:message):
+  n1 ~< n2 = orderOk => n2 ~< n3 = orderOk => n1 ~< n3 = orderOk.
 
-axiom orderStrict (n1,n2:message):
-  n1 = n2 => n1 ~< n2 <> orderOk <: Real.z.
+exact axiom orderStrict (n1,n2:message):
+  n1 = n2 => n1 ~< n2 <> orderOk.
 
-axiom orderSucc (n1,n2:message):
-  n1 = n2 => n1 ~< mySucc(n2) = orderOk <: Real.z.
+exact axiom orderSucc (n1,n2:message):
+  n1 = n2 => n1 ~< mySucc(n2) = orderOk.
 
 (** #### HELPING LEMMAS
 
@@ -184,33 +184,57 @@ in the proofs of the security properties.
 
 (** The counter `SCpt(i)` strictly increases at each action `S` performed
 by the server with tag `i`. *)
-lemma counterIncreaseStrictly (ii,i:index):
+exact lemma counterIncreaseStrictly (ii,i:index):
   happens(S(ii,i)) =>
     cond@S(ii,i) =>
-      SCpt(i)@pred(S(ii,i)) ~< SCpt(i)@S(ii,i) = orderOk <: Real.z.
+      SCpt(i)@pred(S(ii,i)) ~< SCpt(i)@S(ii,i) = orderOk.
 (** The proof is automatically done by Squirrel. *)
 Proof. auto. Qed.
 
 (** The counter `SCpt(i)` increases (not strictly) between `pred(t)`
 and `t`. *)
-lemma counterIncrease (t:timestamp, i : index) :
+exact lemma counterIncrease (t:timestamp, i : index) :
   happens(t) =>
     (t > init && exec@t) =>
       (SCpt(i)@pred(t) ~< SCpt(i)@t = orderOk) ||
-       SCpt(i)@t = SCpt(i)@pred(t) <: Real.z.
+       SCpt(i)@t = SCpt(i)@pred(t).
 Proof.
-  case t=> Heq Hap [Ht Hexec] //=; destruct Heq as [ii i0 _].
-  case (i = i0)=> _; [1 : by rewrite if_true | 2: by rewrite if_false].
+  (** After having introduced the hypotheses, we perform a case analysis
+  on all possible values that the timestamp `t` can take.
+  Most cases are trivial and automatically handled by Squirrel (`=> //`)
+  because most actions do not update `SCpt(i)` so we automatically have
+  that `SCpt(i)@t = SCpt(i)@pred(t)`. *)
+  intro Hap [Ht Hexec].
+  case t => //.
+
+  (** Case where t = S(ii,i0):
+  This is the interesting case, where `t` is an action that updates the
+  mutable cell `SCpt(i0)`.
+  We distinguish two cases: `i = i0` and `i <> i0`. *)
+  intro [ii i0 _].
+  case (i = i0) => _.
+      (** The case `i = i0` corresponds to the left disjunct, which is a
+      direct consequence of the condition of the action `SCpt(i)`.
+      This is done automatically by Squirrel. *)
+    + by rewrite if_true //.
+      (** The case `i <> i0` corresponds to the right disjunct. When expanding
+      the macro `SCpt(i)@t`, we notice that it is an `if _ then _ else _` term
+      with a condition that is always false. This can be simplified using the
+      `rewrite` tactic with lemma `if_false` (which is included in the `Logic`
+      library. *)
+    + right.
+      by rewrite if_false.
+    (** The two previous tactics can be merged into a single one:
+    by rewrite /SCpt if_false. *)
 Qed.
 
 (** The counter `SCpt(i)` increases (not strictly) between `t'` and `t`
 when `t' < t`. *)
-lemma counterIncreaseBis:
+exact lemma counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (i:index),
     happens(t) =>
       exec@t && t' < t =>
-        (SCpt(i)@t' ~< SCpt(i)@t = orderOk || SCpt(i)@t = SCpt(i)@t')
-         <: Real.z.
+        (SCpt(i)@t' ~< SCpt(i)@t = orderOk || SCpt(i)@t = SCpt(i)@t').
 (** This proof is done by induction, relying on the previous `counterIncrease`
 lemma to prove the induction step. *)
 Proof.
@@ -283,10 +307,10 @@ YubiKey (represented by the index `i`), the counter value must have increased
 compared to the last time the server accepted for this YubiKey.
 *)
 open Real.
-lemma noreplayInv (ii, ii1, i:index):
+exact lemma noreplayInv (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
   exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
-  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk <: Real.z.
+  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. *)
 Proof.
@@ -303,11 +327,10 @@ Proof.
       by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
 Qed.
 
-lemma noreplay (ii, ii1, i:index):
+exact lemma noreplay (ii, ii1, i:index):
   happens(S(ii1,i)) =>
     exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) =>
-      ii = ii1
-         <: Real.z.
+      ii = ii1.
 Proof.
   intro Hap [Hexec Ht Meq].
   assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1;
@@ -322,8 +345,7 @@ Proof.
 Qed.
 
 
-(**
-#### Property 2: injective correspondence
+(** #### Property 2: injective correspondence
 This property states that a successful login for the YubiKey `pid(i)`
 (_i.e._ the execution of action `S(ii,i)`) must have been preceded by
 a button press on this YubiKey for the same counter value (`P(i,j)` with
@@ -332,7 +354,7 @@ involved in another successful login.
 
 Proving this property requires to reason on counter values, but also requires
 the use of the INT-CTXT cryptographic assumption.
-* *)
+*)
 open ConcreteCrypto.ReifyOption.
 lemma injective_correspondence (ii,i:index[adv]):
   happens(S(ii,i)) =>
@@ -362,8 +384,8 @@ Proof.
   of an action `Press(i,j)` that happens before `S(ii,i)`. *)
   intctxt Mneq=> //=.
   (* randomness condition *)
-  intro [j [Ht M1]].
-  exists j.
+  ++ intro [j [Ht M1]].
+    exists j.
 
   (** The two first conjucts of the conclusion are automatically proved
   by Squirrel (the equality of counter values is a consequence of M1 once
@@ -393,7 +415,9 @@ Proof.
             by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
           * rewrite /cond.
             rewrite /exec /cond in Hexec1.
-            by destruct Hexec1 as [H1 [H2 H22] H3].
+            destruct Hexec1 as [H1 [H2 H22] H3].
+            clear Eq H H0 Mneq Meq M1 Ht Hexec' Hap Hap' Hexecpred.
+            auto.
 
         - (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
           use counterIncreaseStrictly with ii',i; 2,3: auto.
@@ -401,13 +425,13 @@ Proof.
           case H1.
             * use orderTrans with
                 SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i);
-              2,3: by id.
+              2,3: auto.
               by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i).
             * subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
               by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i).
 
     + (* 2nd case: S(ii,i) > S(ii',i) *)
-      assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)); 1 : auto.
+      assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) by auto.
       case H0.
 
         - (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
@@ -436,11 +460,11 @@ monotonically increasing in time.
 Note that proving this property does not rely on any assumption on cryptographic
 primitives: it relies only on reasonings about counter values.
 *)
-lemma monotonicity (ii, ii1, i:index):
+exact lemma monotonicity (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
     exec@S(ii1,i) && exec@S(ii,i)
       && SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk =>
-        S(ii,i) < S(ii1,i) <: Real.z.
+        S(ii,i) < S(ii1,i).
 Proof.
   intro Hap [Hexec H].
   (** We introduce a case disjunction, and we will show that the cases
