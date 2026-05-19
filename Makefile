@@ -54,23 +54,23 @@ NC=\033[0m
 PROVER_TESTS = $(wildcard tests/ok/*.sp) 
 
 PROVER_EXAMPLES =\
-  $(wildcard examples/*.sp)                     \
-  $(wildcard examples/movep/*.sp)  	            \
-  $(wildcard examples/nancy2022/*.sp)           \
-  $(wildcard examples/nancy2022/solutions/*.sp) \
-  $(wildcard examples/ejcp2025/*.sp)            \
-  $(wildcard examples/ejcp2025/solutions/*.sp)  \
-  $(wildcard examples/basic-tutorial/*.sp)      \
-  $(wildcard examples/stateful/*.sp)            \
-  $(wildcard examples/postQuantumKE/*.sp)       \
-  $(wildcard examples/ho/authdh.sp)             \
-  $(wildcard examples/ho/hybrid.sp)             \
-  $(wildcard examples/crypto/*.sp)              \
-  $(wildcard examples/typing/ok/*.sp)           \
-  $(wildcard examples/typing/ko/*.sp)           \
-  $(wildcard examples/crypto-usenix-26/*.sp)    \
-  $(wildcard examples/crypto-usenix-26/foo/*.sp)\
-  $(wildcard examples/concrete/*.sp)
+  $(wildcard examples/*.sp)                      \
+  $(wildcard examples/movep/*.sp)  	             \
+  $(wildcard examples/nancy2022/*.sp)            \
+  $(wildcard examples/nancy2022/solutions/*.sp)  \
+  $(wildcard examples/ejcp2025/*.sp)             \
+  $(wildcard examples/ejcp2025/solutions/*.sp)   \
+  $(wildcard examples/basic-tutorial/*.sp)       \
+  $(wildcard examples/stateful/*.sp)             \
+  $(wildcard examples/postQuantumKE/*.sp)        \
+  $(wildcard examples/ho/authdh.sp)              \
+  $(wildcard examples/ho/hybrid.sp)              \
+  $(wildcard examples/crypto/*.sp)               \
+  $(wildcard examples/typing/ok/*.sp)            \
+  $(wildcard examples/typing/ko/*.sp)            \
+  $(wildcard examples/crypto-usenix-26/*.sp)     \
+  $(wildcard examples/crypto-usenix-26/foo/*.sp) \
+  $(wildcard examples/concrete-csf-2026/*.sp)    
 
 # Check if why3 is installed before adding the smt case studies
 
