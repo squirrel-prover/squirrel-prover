@@ -70,7 +70,9 @@ PROVER_EXAMPLES =\
   $(wildcard examples/typing/ko/*.sp)            \
   $(wildcard examples/crypto-usenix-26/*.sp)     \
   $(wildcard examples/crypto-usenix-26/foo/*.sp) \
-  $(wildcard examples/concrete-csf-2026/*.sp)    
+  $(wildcard examples/concrete-csf-2026/*.sp)    \
+  $(wildcard examples/pq-ccs-2026/bikem/*.sp)    \
+  $(wildcard examples/pq-ccs-2026/protocols/*.sp)
 
 # Check if why3 is installed before adding the smt case studies
 
