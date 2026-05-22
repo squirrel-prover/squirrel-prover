@@ -137,7 +137,6 @@ hash expd
 name skex : message.
 
 exact axiom [any] expd_len (x,y:message) : len(expd(x,y)) = namelength_message.
-hint smt expd_len.
 
 (** long term key of I *)
 
@@ -622,7 +621,7 @@ Proof.
     auto.
     fa 5.
 
-    have ? : R(j,k) < R1(j,k) by smt.
+    have ? : R(j,k) < R1(j,k) by constraints.
 
     trans ~left 5:nfresh. 
     ++ crypto ~no_subgoal_on_failure XOR_SINGLE.
