@@ -280,7 +280,7 @@ A default HTML template can be found at `scripts/html_export/page.html`.
 ```
 
 The previous command will create a copy of `page.html` in the same directory pointed
-by `PATH1` named `squirrel_name.html`. **Beware** that, if a file already
+by `PATH2` named `squirrel_name.html`. **Beware** that, if a file already
 exists with this name, it will be deleted by this operation.
 
 This new file will have the output of Squirrel formatted in HTML and placed
