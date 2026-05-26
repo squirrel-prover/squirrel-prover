@@ -412,10 +412,10 @@ between the real system and an ideal one, using sequences to enrich the frame.
 lemma valid_decode (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
-  (aead_dec pid j@t <> fail) =
+  (aead_dec@t <> fail) =
   (exists(pid0 : index),
    Setup(pid0) < t &&
-   AEAD(pid0)@Setup(pid0) = aead pid j@t).
+   AEAD(pid0)@Setup(pid0) = aead@t).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
@@ -440,21 +440,21 @@ Qed.
 lemma valid_decode_charac (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) =>
-  ( aead_dec pid j@t <> fail &&
-    otp_dec pid j@t <> fail &&
-    fst(otp_dec pid j@t) = snd(snd(aead_dec pid j@t)) &&
-    mpid(pid) = fst(snd(aead_dec pid j@t)) )
+  ( aead_dec@t <> fail &&
+    otp_dec@t <> fail &&
+    fst(otp_dec@t) = snd(snd(aead_dec@t)) &&
+    mpid(pid) = fst(snd(aead_dec@t)) )
   =
-  ( AEAD(pid)@Setup(pid) = aead pid j@t &&
-    dec(otp pid j@t,k(pid)) <> fail &&
-    fst(dec(otp pid j@t,k(pid))) = sid(pid) ).
+  ( AEAD(pid)@Setup(pid) = aead@t &&
+    dec(otp@t,k(pid)) <> fail &&
+    fst(dec(otp@t,k(pid))) = sid(pid) ).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
 
   + (* => case *)
     intro [AEAD_dec OTP_dec Sid_eq Pid_eq].
-    rewrite valid_decode // in AEAD_dec.
+    rewrite (valid_decode t pid j) // in AEAD_dec.
     destruct AEAD_dec as [pid0 [Clt AEAD_dec]].
 
     assert (pid0 = pid).
@@ -463,7 +463,7 @@ Proof.
 
   + (* <= case *)
     intro [AEAD_dec OTP_dec Sid_eq].
-    rewrite valid_decode //.
+    rewrite (valid_decode t pid j) //.
     case Eq;
     (depends Setup(pid), t by auto);
     intro Clt;
@@ -597,7 +597,7 @@ Proof.
     rewrite /frame /exec /output /cond in 0.
     fa 0; fa 1; fa 1.
 
-    rewrite valid_decode_charac //.
+    rewrite (valid_decode_charac t pid j) //.
     (* rewrite the content of the then branch *)
     rewrite /otp_dec /aead_dec if_aux /= in 2.
     fa 2.
@@ -615,7 +615,7 @@ Proof.
     depends Setup(pid), t by auto => H.
     rewrite /frame /exec /output /cond in 0.
     fa 0; fa 1; fa 1.
-    rewrite valid_decode_charac //.
+    rewrite (valid_decode_charac t pid j) //.
     rewrite /otp /aead.
     fa _ && _, not (_), !_ && _. fa 1.
     rewrite -(if_true (Setup(pid) <= pred t) _ zero) in 1 => //.

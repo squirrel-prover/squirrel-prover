@@ -95,7 +95,7 @@ Qed.
 lemma key_secrecy_server: forall (tau:timestamp), forall (i,j,k:index),
    happens(tau) =>  tau >= S(i,j,k) => 
    att(frame@tau) <> 
-   if cond@S(i,j,k) then kS i j k@S(i,j,k) else Kfresh.
+   if cond@S(i,j,k) then kS@S(i,j,k) else Kfresh.
 Proof.
   intro *. 
   expandall.
@@ -106,7 +106,7 @@ Qed.
 lemma key_secrecy_resp : forall (tau:timestamp), forall (i,j,k:index),
    happens(tau) => tau >= R2(i,j,k) => 
    att(frame@tau) <> 
-   if cond@R2(i,j,k) then kR i j k@R2(i,j,k) else Kfresh.
+   if cond@R2(i,j,k) then kR@R2(i,j,k) else Kfresh.
 Proof.
   intro *.
   expandall. 

@@ -43,8 +43,8 @@ Qed.
 
 process C (i:index) = 
 let ma = h a in 
-let m = h diff(<ma, m i>,b) in 
-out(c,m)
+let mglob = h diff(<ma, m i>,b) in 
+out(c,mglob)
 
 process D (i:index) = 
 out(c, h diff(<h a, m i>,b)).
@@ -58,6 +58,6 @@ Proof.
 intro Hap.
 crypto FOO. 
 * auto.
-* smt.
+* smt ~no_macros.
 * auto.
 Qed.

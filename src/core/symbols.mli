@@ -470,7 +470,7 @@ type macro_data =
   (** General macro definition. *)
   | State  of int * Type.ty * stype * state_macro_def
   (** Stateful cells. *)
-  | Global of int * Type.ty * global_macro_def
+  | Global of Type.ty * global_macro_def
   (** Global macros are used to encapsulate let-definitions. *)
 
 type data += Macro of macro_data

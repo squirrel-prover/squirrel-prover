@@ -106,15 +106,15 @@ lemma [PQ] _ i :
   let t'' = Z i in
   happens(t,t',t'') =>
 
-  output@t = <input@t,<a i @t,s@t>> &&
+  output@t = <input@t,<a@t,s@t>> &&
 
-  a i@t   = <input@t,s@pred t> &&
-  b i@t'  = <input@t,<input@t',<a i@t',s@t'>>> &&
-  d i@t'' = <input@t,
+  a@t   = <input@t,s@pred t> &&
+  b@t'  = <input@t,<input@t',<a@t',s@t'>>> &&
+  d@t'' = <input@t,
              <input@t',
-              <input@t'',<<a i@t'',s@pred t''>,b i@t''>>>> &&
+              <input@t'',<<a@t'',s@pred t''>,b@t''>>>> &&
 
-  s  @t   = <input@t,<a(i)@t,s@pred t>>.
+  s  @t   = <input@t,<a@t,s@pred t>>.
 Proof.
   intro t t' t'' H.
   rewrite /t /t' /t'' in *.

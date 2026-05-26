@@ -84,7 +84,7 @@ Qed.
 
 lemma secrecy_A : forall (tau : timestamp), forall (i, j, k : index),
   happens(tau) => A1(i, j, k) <= tau =>
-  att(frame@tau) <> if cond@A1(i, j, k) then nb i j k@A1(i,j,k) else Nfresh(i, j, k).
+  att(frame@tau) <> if cond@A1(i, j, k) then nb@A1(i,j,k) else Nfresh(i, j, k).
 Proof.
   intro *.
   expandall.

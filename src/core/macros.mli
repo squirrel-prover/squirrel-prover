@@ -344,11 +344,11 @@ val unfold :
 
 
 (** When [m] is a global macro symbol,
-    [get_dummy_definition table se m ~args:li] returns a term which resembles
+    [get_dummy_definition table se m:li] returns a term which resembles
     the one that would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SE.fset -> Term.msymb -> args:Term.term list -> Term.term  
+  Symbols.table -> SE.fset -> Term.msymb -> Term.term  
 
 
 (*------------------------------------------------------------------*)

@@ -69,7 +69,7 @@ Qed.
 lemma better_secret (t:timestamp,i:index) :
   happens(t,A1 i) =>
   exec@(A1 i) =>
-  Y' i @ (A1 i) ^ x i <> att(frame@t).
+  Y'@ (A1 i) ^ x i <> att(frame@t).
 Proof.
   admit. (* TODO *)
 Qed.
@@ -79,8 +79,8 @@ lemma auth_B (j:index) :
   happens(B1 j) =>
   cond@B1 j =>
   exists i, A1 i < B1 j              &&
-            X' j @ B j = X i  @ A i  &&
-            Y j  @ B j = Y' i @ A1 i.
+            X'@ B j = X@ A i  &&
+            Y@ B j = Y'@ A1 i.
 Proof.
   admit. (* TODO *)
 Qed.

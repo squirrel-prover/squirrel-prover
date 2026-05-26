@@ -381,7 +381,7 @@ Qed.
 lemma [idealnormal] KMacAgreement :
   forall i:index, forall j:index,
   happens(A1(i)) && happens(B1(j)) &&
-  input@B(j) = kem_pub (eskA i) && output@B(j) = input@A1(i) =>  kmacB(j)@B1(j) = kmacA(i)@A1(i).
+  input@B(j) = kem_pub (eskA i) && output@B(j) = input@A1(i) =>  kmacB@B1(j) = kmacA@A1(i).
 
 Proof.
   intro i j [HapA HapB HinputBj HoutputBj].
@@ -414,9 +414,9 @@ Qed.
 lemma [idealnormal] WauthA_iff :
   forall (tau:timestamp), forall (i:index),
   happens(tau) && (tau = A2(i) || tau = A3(i)) =>
-  (xB(i)@tau = b &&
-   checksign (<tag0,<<epkA(i)@A(i),input@A1(i)>,<rA(i),xrB(i)@tau>>>, xsigmaB(i)@tau,vk (skB)) &&
-   mac (<tag0,b>, kmacA(i)@A1(i)) = xmacB(i)@tau)
+  (xB@tau = b &&
+   checksign (<tag0,<<epkA@A(i),input@A1(i)>,<rA(i),xrB@tau>>>, xsigmaB@tau,vk (skB)) &&
+   mac (<tag0,b>, kmacA@A1(i)) = xmacB@tau)
   <=>
   exists j:index, (B1(j) < tau
     && fst(output@B1(j)) = fst(input@tau)
@@ -431,7 +431,7 @@ Proof.
   assert(A1(i) < tau) by (destruct HapA as [_|_]; by depends A1(i),tau).
   use depends_A_A1 with i; [2: constraints].
 
-  assert(epkA(i)@tau = kem_pub(eskA i)) as Exp_epkA by destruct HapA as [_|_]; rewrite /epkA.
+  assert(epkA@tau = kem_pub(eskA i)) as Exp_epkA by destruct HapA as [_|_]; rewrite /epkA.
 
   split.
   * (** => *)
@@ -450,12 +450,12 @@ Proof.
     + by destruct HapA as [HapA1 | HapA2].
     + rewrite /sigmaB.
       use sufcma with
-        <tag0,<<epkA(i)@tau,input@A1(i)>,<rA(i),xrB(i)@tau>>>,xsigmaB(i)@tau,skB as EqCMA; [2: 
+        <tag0,<<epkA@tau,input@A1(i)>,<rA(i),xrB@tau>>>,xsigmaB@tau,skB as EqCMA; [2: 
          rewrite Exp_epkA; rewrite /epkA in EqSignA; assumption].
       rewrite /c HinputB tryFind. by destruct HapA as [_ | _].
     + rewrite /macB.
       assert(input@A1(i) = encap_public (r (i,j0)) (kem_pub (eskA i))) as HinputA1 by auto.
-      assert( kmacA(i)@A1(i) = kdf(<tagmac,<kem_pub (eskA i),input@A1(i)>>, diff(kBh(i, j0), decap (input@A1(i)) (eskA i)) )) as HkA. {
+      assert( kmacA@A1(i) = kdf(<tagmac,<kem_pub (eskA i),input@A1(i)>>, diff(kBh(i, j0), decap (input@A1(i)) (eskA i)) )) as HkA. {
         rewrite /kmacA HinputA1 /epkA.
         assert forall j:index,
           encap_public (r (i,j0)) (kem_pub (eskA i)) =
@@ -501,9 +501,9 @@ Qed.
 lemma [idealnormal] WauthA_eq :
   forall (tau:timestamp), forall (i:index),
   happens(tau) && (tau = A2(i) || tau = A3(i)) =>
-  (xB(i)@tau = b &&
-    checksign (<tag0,<<epkA(i)@A(i),input@A1(i)>,<rA(i),xrB(i)@tau>>>, xsigmaB(i)@tau,vk (skB)) &&
-         mac (<tag0,b>, kmacA(i)@A1(i)) = xmacB(i)@tau)
+  (xB@tau = b &&
+    checksign (<tag0,<<epkA@A(i),input@A1(i)>,<rA(i),xrB@tau>>>, xsigmaB@tau,vk (skB)) &&
+         mac (<tag0,b>, kmacA@A1(i)) = xmacB@tau)
   =
   exists (j:index),
     (B1(j) < tau
@@ -535,7 +535,7 @@ Proof.
   use WauthA_iff with A2(i),i; 2: constraints. destruct H as [W1 W2]. clear W2.
   expand cond@A2(i).
   use W1 with Hc. destruct H as [j [H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11]].
-  expand output@B(j). expand c(j)@B(j). expand output@A(i). expand epkA(i)@A(i).
+  expand output@B(j). expand c@B(j). expand output@A(i). expand epkA@A(i).
   rewrite -H11 in H9. simpl.
   use tryFind with i as Htf0.
   use Htf0 with j as Htf.
@@ -553,10 +553,10 @@ lemma [idealnormal] WauthB_iff :
   forall tau:timestamp, forall (j:index),
   (happens(tau) && (tau = B2(j) || tau = B3(j)) && exec@pred(tau)) =>
   (exec@pred(tau) && happens(tau) &&
-   yA(j)@tau = a &&
-   checksign (<tag1,<<input@B(j),c(j)@B(j)>,<input@B1(j),rB j>>>,
-              ysigmaA(j)@tau, vk (skA)) &&
-   mac (<tag1,a>, kmacB(j)@B1(j)) = ymacA(j)@tau )
+   yA@tau = a &&
+   checksign (<tag1,<<input@B(j),c@B(j)>,<input@B1(j),rB j>>>,
+              ysigmaA@tau, vk (skA)) &&
+   mac (<tag1,a>, kmacB@B1(j)) = ymacA@tau )
   <=>
   exists (i:index),
     (exec@pred(tau)
@@ -582,20 +582,20 @@ Proof.
 
 
   (** expansions *)
-  assert(c(j)@B(j) =
+  assert(c@B(j) =
      try find i:index such that (input@B(j) = kem_pub (eskA i))
       in encap_public (r (i,j)) (input@B(j))
       else encap_public (r' j) (input@B(j))) as  Exp_c
-  by destruct HtauB as [HB2 | HB3]; try expand c(j)@tauB.
+  by destruct HtauB as [HB2 | HB3]; try expand c@tauB.
 
-  assert( ysigmaA(j)@tauB = fst(snd(input@tauB)) ) as Exp_ysigmaA
-  by destruct HtauB as [HtauB2 | HtauB3]; try expand ysigmaA(j)@tauB.
+  assert( ysigmaA@tauB = fst(snd(input@tauB)) ) as Exp_ysigmaA
+  by destruct HtauB as [HtauB2 | HtauB3]; try expand ysigmaA@tauB.
 
-  assert(ymacA(j)@tauB = snd (snd (input@tauB))) as Exp_ymacA
-  by destruct HtauB as [_|_]; try expand ymacA(j)@tauB.
+  assert(ymacA@tauB = snd (snd (input@tauB))) as Exp_ymacA
+  by destruct HtauB as [_|_]; try expand ymacA@tauB.
 
-  assert(yA(j)@tauB = fst(input@tauB)) as Exp_yA
-  by destruct HtauB as [_|_]; try expand yA(j)@tauB.
+  assert(yA@tauB = fst(input@tauB)) as Exp_yA
+  by destruct HtauB as [_|_]; try expand yA@tauB.
 
   split.
 
@@ -636,16 +636,16 @@ Proof.
     split.
      expand output@A2(i). 
 
-     use sufcma with  <tag1,<<input@B(j),c(j)@B(j)>,<input@B1(j),rB(j)>>>, fst (snd (input@tauB)), skA. simpl. constraints.  assumption. 
+     use sufcma with  <tag1,<<input@B(j),c@B(j)>,<input@B1(j),rB(j)>>>, fst (snd (input@tauB)), skA. simpl. constraints.  assumption. 
 
 rewrite /output. simpl. rewrite /epkA.  rewrite -Meq.  rewrite -Ha9. rewrite /output.
 
-     use sufcma with  <tag1,<<input@B(j),c(j)@B(j)>,<input@B1(j),rB(j)>>>, fst (snd (input@tauB)), skA.  rewrite -Ha7 /output in Meq1. rewrite /xrB -Ha3 /output. simpl. assumption. assumption. 
+     use sufcma with  <tag1,<<input@B(j),c@B(j)>,<input@B1(j),rB(j)>>>, fst (snd (input@tauB)), skA.  rewrite -Ha7 /output in Meq1. rewrite /xrB -Ha3 /output. simpl. assumption. assumption. 
 
   * (** <= *)
 intro [i [H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16]].
-  assert(cond@tauB = ((yA(j)@tauB = a && checksign(<tag1,<<input@B(j),c(j)@B(j)>,<input@B1(j),rB j>>>,
-           ysigmaA(j)@tauB, vk (skA)) &&  mac (<tag1,a>, kmacB(j)@B1(j)) = ymacA(j)@tauB) = (tauB = B2(j)))) as Exp_cond.
+  assert(cond@tauB = ((yA@tauB = a && checksign(<tag1,<<input@B(j),c@B(j)>,<input@B1(j),rB j>>>,
+           ysigmaA@tauB, vk (skA)) &&  mac (<tag1,a>, kmacB@B1(j)) = ymacA@tauB) = (tauB = B2(j)))) as Exp_cond.
   { rewrite eq_iff. split.
     + intro Hrw. destruct HtauB as [HB | HB]. rewrite /cond in Hrw; rewrite Hrw HB eq_iff; clear Hrw. simpl. constraints.    
  rewrite /cond in Hrw; rewrite Hrw HB eq_iff; clear Hrw.    simpl. constraints. 
@@ -663,16 +663,16 @@ intro [i [H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16]].
 repeat split.  
         + auto.
         + destruct HtauB as [HtauB2 | HtauB3].  
-              ++ rewrite HtauB2 in *.  simpl. expand cond@B2(j). expand ysigmaA(j)@B2(j). expand output@A2(i). simpl.   rewrite -H4.  expandall.  simpl. rewrite H14.  auto. 
-              ++ rewrite HtauB3 in *.  simpl. expand cond@B3(j). expand ysigmaA(j)@B3(j). expand output@A2(i).  rewrite -H4. simpl.  rewrite /xrB. rewrite -H16 /output /c /epkA -H12 -H14 /output /c. 
+              ++ rewrite HtauB2 in *.  simpl. expand cond@B2(j). expand ysigmaA@B2(j). expand output@A2(i). simpl.   rewrite -H4.  expandall.  simpl. rewrite H14.  auto. 
+              ++ rewrite HtauB3 in *.  simpl. expand cond@B3(j). expand ysigmaA@B3(j). expand output@A2(i).  rewrite -H4. simpl.  rewrite /xrB. rewrite -H16 /output /c /epkA -H12 -H14 /output /c. 
 auto. 
         + destruct HtauB as [HtauB2 | HtauB3].
-                ++ rewrite HtauB2 in *.  simpl. expand ymacA(j)@B2(j). rewrite -H5. rewrite /output. simpl. 
+                ++ rewrite HtauB2 in *.  simpl. expand ymacA@B2(j). rewrite -H5. rewrite /output. simpl. 
                    use KMacAgreement with i,j.  clear Exp_cond H1 H10 H12 H14 H16 H3 H4 H5 H7 H8 H9.
                 
  expandall. simpl. constraints. 
  repeat split. constraints. constraints. rewrite -H16 /output /epkA; constraints; constraints. constraints.
-               ++ rewrite HtauB3 in *.  simpl. expand ymacA(j)@B3(j). rewrite -H5. rewrite /output. simpl. 
+               ++ rewrite HtauB3 in *.  simpl. expand ymacA@B3(j). rewrite -H5. rewrite /output. simpl. 
                    use KMacAgreement with i,j.  clear Exp_cond H1 H10 H12 H14 H16 H3 H4 H5 H7 H8 H9.
  expandall. simpl. constraints. 
  repeat split. constraints. constraints. rewrite -H16 /output /epkA; constraints; constraints. constraints.
@@ -685,10 +685,10 @@ Qed.
 lemma [idealnormal] WauthB_eq :
   forall tau:timestamp, forall (j:index),
   (happens(tau) && (tau = B2(j) || tau = B3(j)) && exec@pred(tau)) =>
-  (yA(j)@tau = a &&
-    checksign (<tag1,<<input@B(j),c(j)@B(j)>,<input@B1(j),rB j>>>,
-           ysigmaA(j)@tau, vk (skA)) &&
-    mac (<tag1,a>, kmacB(j)@B1(j)) = ymacA(j)@tau)
+  (yA@tau = a &&
+    checksign (<tag1,<<input@B(j),c@B(j)>,<input@B1(j),rB j>>>,
+           ysigmaA@tau, vk (skA)) &&
+    mac (<tag1,a>, kmacB@B1(j)) = ymacA@tau)
   =
   exists (i:index),
     (exec@pred(tau)
@@ -914,15 +914,15 @@ Proof.
       =
       if exec@A2(i)  then
         try find j such that
-          (input@A1(i) = encap_public (r (i,j)) (epkA(i)@A2(i)))
+          (input@A1(i) = encap_public (r (i,j)) (epkA@A2(i)))
         in
           <a,
            <sign (<tag1,
-                   <<epkA(i)@A2(i),input@A1(i)>,<rA i,fst (snd (input@A2(i)))>>>,
+                   <<epkA@A2(i),input@A1(i)>,<rA i,fst (snd (input@A2(i)))>>>,
                   skA),
             mac(<tag1,a>,
-                kdf(<tagmac,<epkA(i)@A2(i), encap_public (r (i,j)) (epkA(i)@A2(i))>>,
-                diff((kBh (i,j)), encap_shared (r (i,j)) (epkA(i)@A2(i)))))>>
+                kdf(<tagmac,<epkA@A2(i), encap_public (r (i,j)) (epkA@A2(i))>>,
+                diff((kBh (i,j)), encap_shared (r (i,j)) (epkA@A2(i)))))>>
       as aux_A2_output.
     { rewrite /output. expand exec@A2(i).
       case cond@A2(i); 2:auto. intro Hcond. simpl. 
@@ -930,7 +930,7 @@ Proof.
       rewrite !ax3.  rewrite -ITF_A1. rewrite !ax3. rewrite /xrB /epkA. rewrite !ax4. auto. }. 
 
  rewrite aux_A2_output.   clear aux_A2_output.
-    fa (if _ then _). expand epkA(i)@A2(i). fa 0.
+    fa (if _ then _). expand epkA@A2(i). fa 0.
     deduce 12. (** try find *)
     rewrite /exec /cond WauthA_eq in 11; 1: auto.  deduce 11.
 
@@ -975,8 +975,8 @@ Proof.
 
   + (** B1 ok *)
     rewrite /frame /state /transcript /output /exec /cond; fa (_,_,_), !<_,_>; simpl.
-    expand sigmaB(j)@B1(j). expand macB(j)@B1(j). (*expand c(j)@B1(j).*)
-    expand kmacB(j)@B1(j).  (** expand c(j)@B1(j). *)
+    expand sigmaB@B1(j). expand macB@B1(j). (*expand c(j)@B1(j).*)
+    expand kmacB@B1(j).  (** expand c(j)@B1(j). *)
     fa 6. fa !<_,_>. fa sign _. fa mac _. fa kdf _. fa !<_,_>.
     assert
       (forall i,
@@ -1018,7 +1018,7 @@ Proof.
 
   + (** B2 *)
     rewrite /frame /state /transcript; fa (_,_,_), !<_,_>.
-    expand output@B2(j). expand keyB(j)@B2(j). expand kB(j)@B(j).
+    expand output@B2(j). expand keyB@B2(j). expand kB@B(j).
     assert
       (forall i,
        input@B(j) = kem_pub (eskA i) =>
@@ -1044,8 +1044,8 @@ Proof.
      { rewrite /output.
       case exec@B2(j); 2: auto. intro Hexec. simpl.
       use axB2_input_B with j as [j0 [ax1 ax2 ax3]]; 2,3: auto.
-      rewrite !ax3. expand keyB(j)@B2(j).
-      expand kB(j)@B(j). rewrite ax3. 
+      rewrite !ax3. expand keyB@B2(j).
+      expand kB@B(j). rewrite ax3. 
       case (try find i such that (input@B(j) = kem_pub (eskA i))
             in diff(kBh (i,j), encap_shared (r (i,j)) (input@B(j))) else _).
       intro [i [Hm HH]]. rewrite HH.    

@@ -70,13 +70,13 @@ Qed.
 lemma better_secret (t:timestamp,i:index) :
   happens(t,A1 i) =>
   exec@(A1 i) =>
-  Y' i @ (A1 i) ^ x i <> att(frame@t).
+  Y'@ (A1 i) ^ x i <> att(frame@t).
 Proof.
   intro Hap [Hex Hcond] Heq.
   rewrite /cond /s /X in Hcond.
   euf Hcond.
   intro [j [_ Hs]].
-  assert Y j @ B j ^ x i = att (frame@t) as Heq' by auto.
+  assert Y@ B j ^ x i = att (frame@t) as Heq' by auto.
   cdh Heq', g.
 Qed.
 
@@ -85,8 +85,8 @@ lemma auth_B (j:index) :
   happens(B1 j) =>
   cond@B1 j =>
   exists i, A1 i < B1 j              &&
-            X' j @ B j = X i  @ A i  &&
-            Y j  @ B j = Y' i @ A1 i.
+            X'@ B j = X@ A i  &&
+            Y@ B j = Y'@ A1 i.
 Proof.
   intro Hap.
   rewrite /cond.

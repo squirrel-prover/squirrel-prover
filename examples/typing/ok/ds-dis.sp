@@ -126,7 +126,7 @@ Qed.
 lemma key_secrecy_init: forall (tau:timestamp), forall (i,j,k:index),
    happens(tau) => tau >= IH2(i,j,k) => 
    att(frame@tau) <> 
-   if cond@IH2(i,j,k) then kIH i j k@IH2(i,j,k) else Kfresh.
+   if cond@IH2(i,j,k) then kIH@IH2(i,j,k) else Kfresh.
 Proof.
   intro *. 
   expandall.
@@ -145,7 +145,7 @@ Qed.
 lemma key_secrecy_resp : forall (tau:timestamp), forall (i,j,k:index),
    happens(tau) => tau >= RH(i,j,k) => 
    att(frame@tau) <> 
-   if cond@RH(i,j,k) then kRH i j k@RH(i,j,k) else Kfresh.
+   if cond@RH(i,j,k) then kRH@RH(i,j,k) else Kfresh.
 Proof.
   intro *.
   expandall.

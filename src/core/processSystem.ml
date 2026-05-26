@@ -1415,12 +1415,10 @@ let register_globals
   assert (not (TConfig.strict_let_mode penv.table &&
                name <> Symbols.to_string symb.s));
 
-  (* Term to which the let-bound variable will translate. *)
-  let args = Term.mk_vars (List.rev penv.indices) in
   let glob_term =
     (* [] because global let macros have no type arguments *)
     let ms = Macros.msymb table symb [] in
-    Term.mk_macro ms args (Term.mk_var penv.time) in
+    Term.mk_macro ms [] (Term.mk_var penv.time) in
 
   { penv with table }, symb, glob_term
 

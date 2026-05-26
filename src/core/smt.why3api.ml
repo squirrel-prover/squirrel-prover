@@ -1062,9 +1062,11 @@ let add_macros context =
                   | ProtocolMacro `Cond ->
                     [],[context.ts_ty],convert_type context Type.tboolean
                 end
-              | State(i,t,_,_) | Global(i,t,_) ->
+              | State(i,t,_,_) ->
                 List.init i (fun _ -> context.index_ty),
                 [context.ts_ty],convert_type context t
+              | Global(t,_) ->
+                [],[context.ts_ty],convert_type context t
             in
             Hashtbl.add context.macros_tbl str (symb params rec_type ty, mn)
           with InternalError ->
@@ -1452,7 +1454,7 @@ let add_macro_axioms context =
           | ProtocolMacro _ ->
             ([], [], Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp))
         end
-      | State (i,_,_,_) | Global (i,_,_) ->
+      | State (i,_,_,_) ->
         let params_vars =
           List.init i
             (fun i ->
@@ -1463,6 +1465,11 @@ let add_macro_axioms context =
           Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
         in
         ([], params_vars, rec_arg_var)
+      | Global (_,_) ->
+        let rec_arg_var =
+          Some (Vars.mk (sq_id_fresh "rec_arg") Type.ttimestamp)
+        in
+        ([], [], rec_arg_var)        
     in
 
     (* TODO: macro type variables: support polymorphism in macros *)

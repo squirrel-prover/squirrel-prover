@@ -415,12 +415,12 @@ Proof.
     depends SDIS, Sok => // _.
     have _: happens(SDIS); 1: auto.
     have _: happens(P3(i)); 1: case Euf; auto.
-    expand x3(i)@P3(i).
+    expand x3@P3(i).
     use H2 with P3(i) as H3; 2: case Euf; auto.
     expand exec, cond.
     destruct H3 as [H3 [Mneq Meq0]].
 
-    assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1 => //.
+    assert (x3@P3(i) = dec(input@P3(i),k11)) as D1 => //.
     (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
     intctxt D1 => //.
       - (* Ill-tagged case 1 *)
@@ -430,7 +430,7 @@ Proof.
       - (* Honest case *)
         intro [H4 Meq1].
         assert happens(PDIS5) as U; 1: by case Euf.
-        expand x3(i)@P3(i), sidPa.
+        expand x3@P3(i), sidPa.
         assert PDIS5 <= Sok;
         1: by case Euf.
         use H2 with PDIS5; 2: by auto.

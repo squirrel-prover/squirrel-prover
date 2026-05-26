@@ -258,7 +258,7 @@ game Empty = {}. (* trick to prove equiv(frame@tau) when no diffs *)
 (* from the point of view of Init *)
 global lemma strong_secrecy_ka (tau:timestamp[const]) (i,j,k:index[const]):
    [IH2(i,j,k) <= tau] ->
-   equiv(frame@tau, diff(Ka i j k@IH2(i, j, k), Kfresh)).
+   equiv(frame@tau, diff(Ka@IH2(i, j, k), Kfresh)).
 Proof.
   intro Hle.
   rewrite /Ka in 1.
@@ -275,7 +275,7 @@ Qed.
 (* from the point of view of Resp *)
 global lemma strong_secrecy_kb (tau:timestamp[const]) (i,j,k:index[const]):
    [RH2(i,j,k) <= tau] ->
-   equiv(frame@tau, diff(Kb i j k@RH2(i, j, k), Kfresh)).
+   equiv(frame@tau, diff(Kb@RH2(i, j, k), Kfresh)).
 Proof.
   intro Hle.
   rewrite /Kb in 1.

@@ -75,7 +75,7 @@ Proof.
   typing Meq.
 Qed.
 
-lemma secrecy_B : forall (tau : timestamp), forall (i, j, k : index), B(i, j, k) <= tau => att(frame@tau) <> if cond@B(i, j, k) then n i j k@B(i,j,k) else Nfresh(i, j, k).
+lemma secrecy_B : forall (tau : timestamp), forall (i, j, k : index), B(i, j, k) <= tau => att(frame@tau) <> if cond@B(i, j, k) then n@B(i,j,k) else Nfresh(i, j, k).
 Proof.
   intro *.
   expandall.

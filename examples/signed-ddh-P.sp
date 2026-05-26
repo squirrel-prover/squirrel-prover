@@ -116,7 +116,7 @@ the secret key is not known by the attacker.
 Proof.
   (** We start by introducing the hypotheses and expanding the macros. *)
   intro Hap Hcond.
-  expand cond, pkS(i)@Pchall1(i).
+  expand cond, pkS@Pchall1(i).
   destruct Hcond as [Meq Meq0].
 
   (** We then rewrite Meq using the message equality Meq0. *)

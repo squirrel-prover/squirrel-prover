@@ -240,7 +240,7 @@ let get_rw_strat
       | ProtocolMacro _ -> Exact
     end        
   | State _ -> Exact
-  | Global (_,_,_) -> Exact
+  | Global (_,_) -> Exact
 
 let get_macro_info
     (table : Symbols.table) (symb : Symbols.macro) : Term.macro_info
@@ -682,7 +682,7 @@ type global_data = {
 type Symbols.global_macro_def += Global_data of global_data
 
 let data_of_global_data (d : global_data) : Symbols.data =
-  Symbols.Macro (Global (List.length d.indices, d.ty, Global_data d))
+  Symbols.Macro (Global (d.ty, Global_data d))
 
 (*------------------------------------------------------------------*)
 let get_global_data : Symbols.global_macro_def -> global_data = function
@@ -690,7 +690,7 @@ let get_global_data : Symbols.global_macro_def -> global_data = function
   | _ -> assert false
 
 let as_global_macro : Symbols.data -> global_data = function
-  | Symbols.Macro Global (_, _, g) -> get_global_data g
+  | Symbols.Macro Global ( _, g) -> get_global_data g
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -760,7 +760,7 @@ let decreasing_info0
         builtin_decreasing_info_from_system env
     end
   | State _ -> builtin_decreasing_info_from_system env
-  | Global (_,_,global_data) -> 
+  | Global (_,global_data) -> 
     let exec_model = (get_global_data global_data).exec_model in
     builtin_decreasing_info exec_model
 
@@ -881,10 +881,9 @@ let fty
   : Type.ftype * rec_arg_ty
   =
   match Symbols.get_macro_data ms table with
-  | Symbols.Global (_, ty, data) ->
-    let data = get_global_data data in
+  | Symbols.Global ( ty, _) ->
     ( Type.mk_ftype []
-        (List.map Vars.ty data.indices @ [Type.ttimestamp])
+        ([Type.ttimestamp])
         ty, 
       `At Type.ttimestamp )
 
@@ -945,7 +944,7 @@ let msymb
 (*------------------------------------------------------------------*)
 let is_global table (ms : Symbols.macro) : bool =
   match Symbols.get_macro_data ms table with
-  | Symbols.Global (_, _, _) -> true
+  | Symbols.Global ( _, _) -> true
   | _ -> false
 
 (*------------------------------------------------------------------*)
@@ -1002,18 +1001,12 @@ let get_def_glob
     (system : SE.fset)
     (table  : Symbols.table)
     (_symb  : Term.msymb)
-    ~(args  : Term.term list)
     (action : Action.action)
     (data   : global_data)
   : Term.term
   =
   assert (List.length data.inputs <= List.length action) ;
-  let idx_subst =
-    List.map2
-      (fun i t -> Term.ESubst (Term.mk_var i, t))
-      data.indices
-      args
-  in
+
 
   let ts =                      (* a bit complex because of dummy actions *)
     let strict, prefix_shape = data.action in
@@ -1025,6 +1018,18 @@ let get_def_glob
     in
     SE.action_to_term table system ts_action
   in
+
+  let idx = match ts with
+    | Action (_, i) -> i
+    | _ -> assert false
+  in
+  let idx_subst =
+    List.map2
+      (fun i t -> Term.ESubst (Term.mk_var i, t))
+      data.indices
+      idx
+  in
+
     
   let ts_subst = Term.ESubst (Term.mk_var data.ts, ts) in
   (* Compute the relevant part of the action, i.e. the
@@ -1579,7 +1584,7 @@ let _unfold
         st_bodies
     end
 
-  | Global (_,_,gdat) ->
+  | Global (_,gdat) ->
     assert (ty_args = []);
     if not (SE.is_fset system) then unfold_failed ();
     let fset_system = SE.to_fset system in
@@ -1604,7 +1609,7 @@ let _unfold
         pattern = None;
         when_cond = Term.mk_true;
         out = get_def_glob ~allow_dummy:false fset_system table
-            symb ~args action gdata}]
+            symb action gdata}]
 
     with MatchFailed ->
       let {action = (strict, glob_a)} as gdata = get_global_data gdat in
@@ -1621,7 +1626,7 @@ let _unfold
                     Term.mk_true
                   else Term.mk_happens rec_arg;
                 out = get_def_glob ~allow_dummy:false fset_system table
-                    symb ~args action gdata}
+                    symb action gdata}
                :: acc
              else
                acc
@@ -1648,7 +1653,6 @@ let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.fset)
     (symb   : Term.msymb)
-    ~(args  : Term.term list)
   : Term.term
   =
   let { action = strict,action; } as gdata =
@@ -1667,5 +1671,5 @@ let get_dummy_definition
   in
 
   get_def_glob ~allow_dummy:true
-    system table symb ~args dummy_action gdata
+    system table symb dummy_action gdata
 

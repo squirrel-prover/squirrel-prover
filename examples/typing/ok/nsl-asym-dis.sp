@@ -120,7 +120,7 @@ Qed.
 lemma Nb_secrecy_init: forall (tau:timestamp), forall (i,j,k:index),
    happens(tau) => tau >= IH2(i,j,k) => 
    att(frame@tau) <> 
-   if cond@IH2(i,j,k) then (nbIH i j k)@IH2(i,j,k) else Kfresh.
+   if cond@IH2(i,j,k) then nbIH@IH2(i,j,k) else Kfresh.
 Proof.
   intro *. 
   expandall.  

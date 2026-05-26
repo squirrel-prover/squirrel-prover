@@ -262,11 +262,11 @@ lemma injective_correspondence (ii,i:index):
   happens(S(ii,i)) =>
   exec@S(ii,i) =>
   exists (j:index),
-    Press(i,j) < S(ii,i) && cpt i j@Press(i,j) = SCpt(i)@S(ii,i) && 
+    Press(i,j) < S(ii,i) && cpt@Press(i,j) = SCpt(i)@S(ii,i) && 
     forall (ii1:index), 
       happens(S(ii1,i)) => 
       exec@S(ii1,i) =>
-      cpt i j@Press(i,j) = SCpt(i)@S(ii1,i) => 
+      cpt@Press(i,j) = SCpt(i)@S(ii1,i) => 
       ii1 = ii.
 (** The high-level idea of this proof is to use the INT-CTXT assumption:
 if the message received by the server is a valid ciphertext, then it must

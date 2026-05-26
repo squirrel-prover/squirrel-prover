@@ -111,7 +111,7 @@ lemma [default] kA_secret (A,B,i:index, t:timestamp):
   not (happens(corrupt(B))) =>
   happens(A2(A,B,i)) =>
   cond@A2(A,B,i) =>
-  input@t = ofG(gkA A B i@A2(A,B,i)) =>
+  input@t = ofG(gkA@A2(A,B,i)) =>
   false.
 Proof.
   intro Hhap HB Hhap2 Hs He.
@@ -136,7 +136,7 @@ lemma [default] kA_weak_forward_secret (A,B,i:index, t:timestamp):
   not (corrupt(B) < A2(A,B,i)) =>
   happens(A2(A,B,i)) =>
   cond@A2(A,B,i) =>
-  input@t = ofG(gkA A B i@A2(A,B,i)) =>
+  input@t = ofG(gkA@A2(A,B,i)) =>
   false.
 Proof.
   intro Hhap HB Hhap2 Hs He.
@@ -162,9 +162,9 @@ lemma [default] A_agreement (A,B,i:index):
    (cond@A2(A,B,i) <=>
     exists (j:index),
       B1(A,B,j) < A2(A,B,i) && 
-      gkA A B i@A2(A,B,i) = gen^(x(A,B,i) ** y (A,B,j)) &&
+      gkA@A2(A,B,i) = gen^(x(A,B,i) ** y (A,B,j)) &&
       fst (input@A2(A,B,i)) = fst (output@B1(A,B,j)) &&
-      input@B1(A, B, j) = ofG (gen ^ xA A B i@A2(A, B, i)) &&
+      input@B1(A, B, j) = ofG (gen ^ xA@A2(A, B, i)) &&
       checksign(<tag1,<agent A,<ofG (gen ^ y(A, B, j)),ofG (gen ^ x(A, B, i))>>>, 
                 snd (input@A2(A,B,i)), 
                 pk(k(B)))).
@@ -187,8 +187,8 @@ Proof.
 
   - intro [j [H1 [H2 H3 H4 H5]]]. 
     rewrite /cond /sA. 
-    have ->: gy A B i@A2(A, B, i) = ofG (gen ^ y(A, B, j)) by auto.
-    have ->: ofG (gen ^ xA A B i@A1(A, B, i)) = ofG (gen ^ x(A, B, i)) by auto. 
+    have ->: gy@A2(A, B, i) = ofG (gen ^ y(A, B, j)) by auto.
+    have ->: ofG (gen ^ xA@A1(A, B, i)) = ofG (gen ^ x(A, B, i)) by auto. 
     auto. 
 Qed.
 
@@ -199,7 +199,7 @@ lemma [default] B_agreement (A,B,i:index):
    not (corrupt(A) < B2(A,B,i)) =>
    cond@B2(A,B,i) =>
    exists (j:index),
-     A2(A,B,j) < B2(A,B,i) && gkB A B i@B2(A,B,i) = gen^(x(A,B,j) ** y (A,B,i)).
+     A2(A,B,j) < B2(A,B,i) && gkB@B2(A,B,i) = gen^(x(A,B,j) ** y (A,B,i)).
 Proof.
   intro Hhap HB Hc.
   rewrite /cond in Hc.
@@ -246,7 +246,7 @@ global lemma [set:default/left; equiv:default/left, default/left]
   [not (corrupt B < t)] ->
   equiv(
     frame@t0, 
-    if cond@t then diff(kA A B i@t, nfresh)).
+    if cond@t then diff(kA@t, nfresh)).
 Proof.
   intro Heq Hhap Hcorrupt. 
   rewrite /kA.

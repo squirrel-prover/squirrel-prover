@@ -134,7 +134,7 @@ class deprecated_iter_approx_macros ~exact ~(context:ProofContext.t) =
         self#visit_message
           (Macros.get_dummy_definition
              context.env.table
-             (SE.to_fset context.env.system.set) ms ~args)
+             (SE.to_fset context.env.system.set) ms)
           (* FIXME: to_fset? *)
       end
 
@@ -459,12 +459,7 @@ let fold_descr
   let ts = SE.action_to_term env.table system (Action.to_action descr.action) in
   (* fold over global macros in scope of [descr.action] *)
   List.fold_left (fun mval (mg : Symbols.macro) ->
-      let is_arr, _ =
-        match Symbols.get_macro_data mg env.table with
-        | Global (is,ty,_) -> is, ty
-        | _ -> assert false
-      in
-      let args = Term.mk_vars (List.take is_arr descr.Action.indices) in
+      let args = [] in
       let res =
         (* [] because global macros are not polymorphique *)
         let msymb = Macros.msymb env.table mg [] in
