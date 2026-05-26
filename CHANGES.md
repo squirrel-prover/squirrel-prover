@@ -1,3 +1,22 @@
+### Fix global let macro (Fix #152)
+[commits: `0e01c293`, **breaking change**]
+
+**breaking change** the arity of global macros has changed, and `x i@A i`
+is now incorrect, it has become `x@A i`.
+
+Previously, declaring a `let x = ...` under a replication `!_i`
+defined a macro `x i@tau`. This lead to incorrect behaviour, if e.g.,
+`x i@A j` was refered to.
+
+We agreed that the extra arguments were in fact not needed, the
+timestamp is enough to infer the definition, and additional arguments
+only add confusion. 
+
+A `let x = ...` inside action `A is` is defined for `A is` and any of
+its decedent. (it behaves as the old `x is@A is`).
+
+
+
 ### Support for concrete reachability logic
 [commits: `f15476a7`, **breaking change**]
 
