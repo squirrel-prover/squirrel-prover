@@ -1870,7 +1870,8 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
       (* pre-declare the type name to make it available in the
          constructors (in case the type is recursive), and so that
          [Typing] knows how many type arguments it expects. *)
-      let data = HighType.Inductive { 
+      let data = HighType.Inductive {
+          is_rec = false;       (* we will correctly set this field later *)
           constructors = [];    (* we will populate this field later *)
           positive_vars = Sid.empty;
           negative_vars = Sid.empty;
@@ -1884,8 +1885,8 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
       let env = Env.init ~table ~ty_vars:(List.rev ty_vars) () in
       (* reverse [ty_vars] to properly handle capture *)
 
-      let (table, positive_vars, negative_vars), constructors =
-        List.map_fold (fun (table,positive_vars, negative_vars) (c_name, c_ty) -> 
+      let (table, positive_vars, negative_vars, is_rec), constructors =
+        List.map_fold (fun (table,positive_vars, negative_vars, is_rec) (c_name, c_ty) -> 
             let ty = Typing.convert_ty env c_ty in
 
             (* Let [τ = path args] be the (possibly recursive) type
@@ -1901,7 +1902,9 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
                Finally, returns the set of type parameters used in
                positive and negative position in the constructor. *)
             let check_inductive_decl_usage
-                loc ~(path : Symbols.ty) ~(args : Type.ty list) (ty : Type.ty) : Sid.t * Sid.t
+                loc ~(path : Symbols.ty) ~(args : Type.ty list) (ty : Type.ty)
+              : Sid.t * Sid.t * bool
+              (* positive, negative, recursive *)
               =
               let ty_decl = HighType.of_path name ~args:(List.map Type.tvar ty_vars) in
 
@@ -1927,10 +1930,10 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
                                negative position@]"
                         Symbols.pp path.s));
 
-              (Sid.remove tau pos, Sid.remove tau neg)
+              (Sid.remove tau pos, Sid.remove tau neg, Sid.mem tau pos || Sid.mem tau neg)
             in
             
-            let c_pos, c_neg = 
+            let c_pos, c_neg, c_rec = 
               check_inductive_decl_usage
                 (L.loc c_ty) 
                 ~path:name ~args:(List.map Type.tvar ty_vars) ty
@@ -1950,11 +1953,11 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
                 ~constructor_of:name
                 c_name `Prefix
             in
-            (table,positive_vars, negative_vars), c_name
-          ) (table, Sid.of_list ty_vars, Sid.of_list ty_vars) p_data.constructors
+            (table,positive_vars, negative_vars, c_rec || is_rec), c_name
+          ) (table, Sid.of_list ty_vars, Sid.of_list ty_vars, false) p_data.constructors
       in
       let data = 
-        HighType.Inductive { ty_vars; positive_vars; negative_vars; constructors; } 
+        HighType.Inductive { ty_vars; positive_vars; negative_vars; constructors; is_rec } 
       in
       Symbols.Ty.redefine table name ~data:(HighType.Type data) 
 

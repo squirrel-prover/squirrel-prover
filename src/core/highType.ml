@@ -7,6 +7,22 @@ module L = Location
 type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
+(** {3 Applied ftypes} *)
+
+let subst_of_applied_ftype (fty : Type.applied_ftype) : Subst.t =
+  List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty.fty_vars fty.ty_args
+
+(** apply a [ftype] to some type arguments *)
+let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
+  (* substitute pending type variables by the type arguments *)
+  let tsubst = 
+    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
+  in
+  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)
+
+(*------------------------------------------------------------------*)
+(** {3 Type information} *)
+
 module Info = struct
   (** Type information associated to abstract types.
       Restrict the instantiation domain of a type. *)
@@ -36,6 +52,7 @@ end
 type infos = Info.t list
 
 type inductive_data = {
+  is_rec        : bool;
   ty_vars       : Ident.t list;
   positive_vars : Ident.Sid.t;
   negative_vars : Ident.Sid.t;
@@ -103,6 +120,10 @@ let check_ty_info
   =
   let allow_funs = allow_funs info in
 
+  (* remember checked types, to avoid circularity issue when checking
+     some recursive types *)
+  let checked = ref [] in
+
   let rec check : Type.ty -> bool = function
     | TVar _ | TUnivar _ -> false
     | Tuple l -> List.for_all check l
@@ -122,20 +143,45 @@ let check_ty_info
         | _ -> false
       end
 
-    | Type.TConstr ((np,b),args) ->
+    | Type.TConstr ((np,b),args) as ty ->
       let np = Symbols.of_s_npath np in
       let data = get_data (Symbols.Ty.of_string np b) table in
       begin
         match data with
         | Abstract infos -> assert (args=[]); List.mem info infos
-        | Inductive _data ->
+        | Inductive data ->
           match info with
           | Well_founded -> true
-          | Fixed -> List.for_all check args
+
+          | Fixed ->
+            if List.exists (Type.equal ty) !checked then true
+            else begin
+              checked := ty :: !checked;
+              List.for_all (fun constructor ->
+                  let fty = Symbols.OpData.ftype table constructor in
+                  let constructor_ty = apply_ftype fty args in
+                  let constructor_args_tys, _constructor_out_ty =
+                    Type.decompose_funs constructor_ty
+                  in
+                  List.for_all check constructor_args_tys
+                ) data.constructors
+            end
+
+          | Finite ->
+            if data.is_rec then false
+            else
+              List.for_all (fun constructor ->
+                  let fty = Symbols.OpData.ftype table constructor in
+                  let constructor_ty = apply_ftype fty args in
+                  let constructor_args_tys, _constructor_out_ty =
+                    Type.decompose_funs constructor_ty
+                  in
+                  List.for_all check constructor_args_tys
+                ) data.constructors
+
           | _ -> false
           (* FEAT: inductive: infer more infos depending on the
-             constructors' types. We likely need to add a bunch of ad hoc
-             rules, e.g. because recursive types are not finite, etc. *)
+             constructors' types, using ad hoc rules. *)
       end
   in
   check ty
@@ -232,17 +278,3 @@ let rec is_quantum : Type.ty -> bool = function
 
   | Tuple ls -> List.exists is_quantum ls
   | Fun (i,o) -> is_quantum i || is_quantum o
-
-(*------------------------------------------------------------------*)
-(** {3 Applied ftypes} *)
-
-let subst_of_applied_ftype (fty : Type.applied_ftype) : Subst.t =
-  List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty.fty_vars fty.ty_args
-
-(** apply a [ftype] to some type arguments *)
-let apply_ftype (fty : Type.ftype) (ty_args : Type.ty list) : Type.ty =
-  (* substitute pending type variables by the type arguments *)
-  let tsubst = 
-    List.fold_left2 Subst.add_tvar Subst.empty_subst fty.fty_vars ty_args 
-  in
-  Subst.subst_ty tsubst (Type.fun_l fty.fty_args fty.fty_out)

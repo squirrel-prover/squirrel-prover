@@ -26,6 +26,7 @@ end
 type infos = Info.t list
 
 type inductive_data = {
+  is_rec        : bool;
   ty_vars       : Ident.t list;   (** type parameters *)
   positive_vars : Ident.Sid.t;    (** is a type parameter used only in positive position *)
   negative_vars : Ident.Sid.t;    (** is a type parameter used only in negative position *)

@@ -102,6 +102,7 @@
 
 %start declarations
 %start top_formula
+%start top_ty
 /* %start system_expr */ (* Menhir bug *)
 %start top_process
 %start interactive
@@ -111,6 +112,7 @@
 %start top_global_formula
 %type <Decl.declarations> declarations
 %type <Typing.term> top_formula
+%type <Typing.ty> top_ty
 %type <Typing.global_formula> top_global_formula
 %type <SystemExpr.Parse.t> system_expr
 %type <Process.Parse.t> top_process
@@ -467,6 +469,10 @@ se_ty:
 (*------------------------------------------------------------------*)
 top_formula:
 | f=term EOF                    { f }
+
+(*------------------------------------------------------------------*)
+top_ty:
+| f=ty EOF                    { f }
 
 (*------------------------------------------------------------------*)
 (* Processes *)

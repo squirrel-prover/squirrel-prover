@@ -40,7 +40,7 @@ val copy : env -> env
 val set : tgt:env -> value:env -> unit
 
 (*------------------------------------------------------------------*)
-(** Creates a type unification to be inferred. *)
+(** Creates a type unification variable to be inferred. *)
 val mk_ty_univar : env -> Type.univar
 
 (** Creates a system expression variable to be inferred.

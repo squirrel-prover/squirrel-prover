@@ -22,6 +22,12 @@ let term_of_string st string : Term.term =
   let t,_ = Typing.convert Typing.{ env ; cntxt = InGoal } t_p in
   t
 
+(** utility to parse a type from a string. *)
+let ty_of_string st string : Type.ty =
+  let t_p = Util.parse_from_string Parser.top_ty string in
+  let env = Env.init ~table:(Prover.get_table st) () in
+  Typing.convert_ty env t_p 
+
 (*------------------------------------------------------------------*)
 let reify () =
   let st = Prover.init () in
@@ -601,6 +607,160 @@ let cycle_detection () =
 
 
 (*------------------------------------------------------------------*)
+let type_tags () =
+  let st = Prover.init () in
+  let st = 
+    Prover.exec_all ~test:true st "
+type F[finite,fixed].
+type NF.
+
+(* enum type *)
+inductive e = A : e | B : e.
+
+(* list *)
+inductive mlist a = 
+| MLN : a -> mlist a
+| MLC : a -> mlist a -> mlist a.
+
+(* pairs *)
+inductive pair a b = P   : a -> b  -> pair a b.
+inductive pairF  a = PF  : a -> F  -> pairF a.
+inductive pairNF a = PNF : a -> NF -> pairNF a.
+"
+  in
+
+  let table = Prover.get_table st in
+
+  (*------------------------------------------------------------------*)
+  (* fixed types *)
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 1" ~expected:true
+    ~actual:(
+      ty_of_string st "timestamp" 
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 2" ~expected:true
+    ~actual:(
+      ty_of_string st "timestamp * timestamp"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 3" ~expected:true
+    ~actual:(
+      ty_of_string st "pair timestamp timestamp"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 4" ~expected:true
+    ~actual:(
+      ty_of_string st "pair timestamp F"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 5" ~expected:true
+    ~actual:(
+      ty_of_string st "pairF timestamp"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 6" ~expected:true
+    ~actual:(
+      ty_of_string st "mlist F"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"fixed 7" ~expected:true
+    ~actual:(
+      ty_of_string st "e" 
+      |> HighType.is_fixed table);
+
+  (*------------------------------------------------------------------*)
+  Alcotest.(check' bool) 
+    ~msg:"not fixed 1" ~expected:false
+    ~actual:(
+      ty_of_string st "pair timestamp NF"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"not fixed 2" ~expected:false
+    ~actual:(
+      ty_of_string st "pairNF timestamp"
+      |> HighType.is_fixed table);
+
+  Alcotest.(check' bool) 
+    ~msg:"not fixed 3" ~expected:false
+    ~actual:(
+      ty_of_string st "mlist NF"
+      |> HighType.is_fixed table);
+
+  (*------------------------------------------------------------------*)
+  (* finite types *)
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 1" ~expected:true
+    ~actual:(
+      ty_of_string st "timestamp" 
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 2" ~expected:true
+    ~actual:(
+      ty_of_string st "timestamp * timestamp"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 3" ~expected:true
+    ~actual:(
+      ty_of_string st "pair timestamp timestamp"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 4" ~expected:true
+    ~actual:(
+      ty_of_string st "pair timestamp F"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 5" ~expected:true
+    ~actual:(
+      ty_of_string st "pairF timestamp"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"finite 6" ~expected:true
+    ~actual:(
+      ty_of_string st "e" 
+      |> HighType.is_finite table);
+
+  (*------------------------------------------------------------------*)
+  Alcotest.(check' bool) 
+    ~msg:"not finite 1" ~expected:false
+    ~actual:(
+      ty_of_string st "pair timestamp NF"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"not finite 2" ~expected:false
+    ~actual:(
+      ty_of_string st "pairNF timestamp"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"note finite 3" ~expected:false
+    ~actual:(
+      ty_of_string st "mlist F"
+      |> HighType.is_finite table);
+
+  Alcotest.(check' bool) 
+    ~msg:"not finite 4" ~expected:false
+    ~actual:(
+      ty_of_string st "mlist NF"
+      |> HighType.is_finite table);
+  ()
+
+(*------------------------------------------------------------------*)
 let tests = [
   ("generic typing" , `Quick, Util.catch_error generic_typing);
   ("namespaces"     , `Quick, Util.catch_error namespaces);
@@ -609,4 +769,5 @@ let tests = [
   ("let def"        , `Quick, Util.catch_error let_def);
   ("reify"          , `Quick, Util.catch_error reify);
   ("cycle detection", `Quick, Util.catch_error cycle_detection);
+  ("type tags"      , `Quick, Util.catch_error type_tags);
 ]
