@@ -761,7 +761,9 @@ module Const = struct
   let notify_valid_formula table ~vbs ~dbg ~const1 ~const2 form : unit =
     if not vbs && not dbg then () else
       let ppe = default_ppe ~table ~dbg () in
-      Printer.pr "Between @[%a@]@; and @[%a@]  @; Corresponding formula : %a@; ---@; "
+      Printer.pr "@[<v 2>\
+                  @[<hov2>Between@ @[%a@]@ and @[%a@]@]@;\
+                  @[<hov 2>Formula:@ @[%a@]@]@]@;@;"
         (Const._pp ppe) const1
         (Const._pp ppe) const2
         (Term._pp  ppe) form
@@ -4626,6 +4628,8 @@ let prove
 
     if quantum then
       quantum_induction_check_constraints game_loc constraints;
+
+    Printer.pr "@;";
 
     Printer.pr
       "@[<v 2>Constraints are:@ @[<v 0>%a@]@]@;"
