@@ -1240,6 +1240,9 @@ let fold_macro_support
       []
       indirect_sm
   in
+
+  (*------------------------------------------------------------------*)
+  (* debug printing *)
   if TConfig.debug_macros table then
     (List.iter (fun (sr, mset_abs) -> 
          Fmt.epr "indirect macro_support of source %a :@.%a@." 
@@ -1250,6 +1253,7 @@ let fold_macro_support
            Term.pp_dbg sr MsetAbs.pp mset_abs 
        ) direct_sm);
 
+  (*------------------------------------------------------------------*)
   (* reversing the association map: we want to map macros to
      pairs of possible sources and macro set *)
   let macro_ind_occs : (Term.term list * Mset.t) Mp.t =
@@ -1265,7 +1269,17 @@ let fold_macro_support
       ) Mp.empty indirect_sm
   in 
 
-  (* Check that we have a single mutually recursive group of functions
+  (*------------------------------------------------------------------*)
+  (* run some checks on the recursive functions involved *)
+  let () =
+    let decreasing_infos = 
+      List.map
+        (fun (m,_) -> Macros.decreasing_info0 table ~env m) 
+        (Mp.bindings macro_ind_occs) 
+    in
+
+    (*------------------------------------------------------------------*)
+    (* Check that we have a single mutually recursive group of functions
      involved. This limitation can likely be lifted, but this would
      require a rework of how inductive reasoning is handled.
 
@@ -1273,16 +1287,12 @@ let fold_macro_support
      entry-point in the infinite call-tree of a macros's definition,
      as a macro [f] in group 1 could be reachable from the body of a
      macro [g] in group 2. *)
-  let () =
-    let decreasing_infos = 
-      List.map
-        (fun (m,_) -> Macros.decreasing_info0 table ~env m) 
-        (Mp.bindings macro_ind_occs) |>
-      List.sort_uniq Stdlib.compare
+    let groups =
+      List.map (fun x -> x.Macros.group) decreasing_infos |>
+      List.sort_uniq Macros.compare_group
     in
-    let groups = List.map (fun x -> x.Macros.group) decreasing_infos in
 
-    if List.length groups > 2 then
+    if List.length groups >= 2 then begin
       let err_message =
         Fmt.str
           "@[<hov 2>\
@@ -1292,8 +1302,45 @@ let fold_macro_support
           (Fmt.list ~sep:(Fmt.any ",@ ") Macros.pp_group) groups
       in
       Tactics.soft_failure (Tactics.Failure err_message)
+    end;
+      
+    (*------------------------------------------------------------------*)
+    if decreasing_infos = []
+    then () (* no recursive function, thus no further checks needed *)
+    else begin
+      let decreasing_info = List.hd decreasing_infos in
+
+      let dec_ty = decreasing_info.decreasing_quantity_type in
+
+      let check_ptime =
+        match mode with
+        | PTimeNoSI | PTimeSI -> true
+        | NoHonestRand | Any -> false
+      in
+      
+      (* If the simulation must be ptime, we check that the type is
+         finite+fixed, as this ensures that the simulation is polynomial. *)
+      if check_ptime && not (HighType.is_fixed table dec_ty) then begin
+        let err_message =
+          Fmt.str
+            "@[<hov 2>The type of the decreasing quantity must be fixed:@ @[%a@]@]"
+            Type.pp dec_ty
+        in
+        Tactics.soft_failure (Tactics.Failure err_message)
+      end;
+
+      if check_ptime && not (HighType.is_finite table dec_ty) then begin
+        let err_message =
+          Fmt.str
+            "@[<hov 2>The type of the decreasing quantity must be finite:@ @[%a@]@]"
+            Type.pp dec_ty
+        in
+        Tactics.soft_failure (Tactics.Failure err_message)
+      end;
+    end
   in
 
+  (*------------------------------------------------------------------*)
   List.fold_left
     (fun acc (_, ((srcs, mset) : _ * Mset.t)) ->
        let tv_var = Vars.make_fresh mset.rec_arg_type "t" in

@@ -1317,6 +1317,13 @@ let parse_fun_decls
     | _ -> Symbols.fs_lt, []
   in                  
 
+  (* when processing recursive declaration, type of the decreasing
+     quantity to be inferred *)
+  let rec_dec_quantity_ty =
+    if not is_rec then None else
+      Infer.mk_ty_univar ienv |> Type.univar |> some
+  in
+
   let finalize_decl table fdecl =
     match op_kind with
     | `Op ->                    (* deterministic operator *)
@@ -1439,7 +1446,6 @@ let parse_fun_decls
           }
         in
 
-
         let bodies, ex_formulas =
           match fdecl.body with
           | `Match bodies -> 
@@ -1487,14 +1493,20 @@ let parse_fun_decls
 
         let decreasing_quantity : Term.term option =
           match fdecl.pdecl.decl.op_terby with
-          | _ when not(is_rec) -> None
+          | _ when not is_rec -> None
+
           | Some t ->
-            let q_ty = Type.univar (Infer.mk_ty_univar ienv) in
-            Some (
-              fst @@ Typing.convert ~ienv ~ty:q_ty { env=fdecl.pdecl.env; cntxt = InGoal; } t
-            )
+            let dec_quantity_ty = oget rec_dec_quantity_ty in (* cannot be [None] *)
+            Typing.convert ~ienv ~ty:dec_quantity_ty { env=fdecl.pdecl.env; cntxt = InGoal; } t
+            |> fst |> some
+
           | None -> let dp = oget fdecl.dist_param in Some (Term.mk_var dp)
         in
+
+        let decreasing_quantity_type =
+          omap_dflt Type.tunit (Subst.subst_ty tsubst -| Term.ty) decreasing_quantity
+        in
+
         let data0 = 
           Macros.{
             name;
@@ -1506,9 +1518,10 @@ let parse_fun_decls
             ty = fdecl.pdecl.out_ty; 
             rw_strat = fdecl.rw_strat;
             info;
-            decreasing_quantity;            
+            decreasing_quantity;
             decreasing_info = {
-              group = `UserDefined (get_group ()); 
+              group = `UserDefined (get_group ());
+              decreasing_quantity_type;
               order = rec_op;
             };
           }

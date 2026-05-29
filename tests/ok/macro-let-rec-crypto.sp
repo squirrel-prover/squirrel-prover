@@ -45,24 +45,25 @@ name k : message.
 name sinit : message.
 name dum : message.
 
+inductive C = O : C | S : C | F : C.
+
 let rec my_output @system:P t with
 | A i     when happens t -> h2(stA i, att(my_frame (pred t)))
 | init -> empty
 | _ when not (happens t) -> empty
-termination_by (t,1)
-and
-stA i with
+termination_by (t,O)
+
+and stA i with
 | _ when not(happens(A i)) -> dum
 | i when i = null_i && happens(A null_i) ->  h(<sinit, att(my_frame (pred (A null_i)))>,k)
 | _ when (happens (A i) && i <> null_i)->  h(<stA (pred_i i), att(my_frame (pred (A i)))>,k)
-termination_by (A i,0)
-and
-my_frame  t with
+termination_by (A i,S)
+
+and my_frame  t with
 | t     when happens t && t<> init -> <my_frame (pred t), my_output t>
 | init -> empty
 | _ when not (happens t) -> empty
-termination_by (t,2)
-.
+termination_by (t,F).
 Proof.
 admit.
 Qed.

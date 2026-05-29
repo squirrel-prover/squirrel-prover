@@ -825,7 +825,11 @@ let get_rec_args_ext
               ~content:ts
               ~collision:
                 {value =Library.Prelude.mk_witness table ~ty_arg:Type.ttimestamp;
-                 decreasing_info= { group = `Builtin Action.Classic; order = Library.Prelude.fs_lt; }
+                 decreasing_info= {
+                   group = `Builtin Action.Classic;
+                   decreasing_quantity_type = Type.ttimestamp;
+                   order = Library.Prelude.fs_lt;
+                 }
                 } (* unused, so always set to some arbitrary value *)
               ~data:() (* unused *)
               ~vars:(List.rev fv) (* rev nicer for printing *)

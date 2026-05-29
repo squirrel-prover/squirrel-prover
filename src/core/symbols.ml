@@ -167,6 +167,9 @@ external (!>) : _path -> 'a path = "%identity"
 external (!<) : 'a path -> _path = "%identity"
 
 (*------------------------------------------------------------------*)
+let compare_path x y = Stdlib.compare x.id y.id
+
+(*------------------------------------------------------------------*)
 type channel   = _channel   path
 type config    = _config    path
 type oracle    = _oracle    path

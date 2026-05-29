@@ -78,21 +78,29 @@ type group = [`Builtin of Action.exec_model | `UserDefined of Symbols.macro]
 
 val pp_group : group formatter
 
+val compare_group : group -> group -> int
+
+(*------------------------------------------------------------------*)
 type decreasing_info = {
   group : group;
   (** Characterizes a group of mutually defined functions (in the
       [`UserDefined] case, the symbol is the first function the user
       defined in the group). *)
 
+  decreasing_quantity_type : Type.ty;
+  (** the type used by all the decreasing quantities in this group *)
+
   order : Symbols.fname;
   (** Common order used to compare the decreasing quantities of the 
       functions in this group. 
       Must be a well-founded relation. 
-      The decreasing quantity can be different for each functions 
-      of the group. *)
+      The decreasing quantity can be defined differently for each
+      functions of the group. *)
 }
 
 val builtin_decreasing_info : Action.exec_model -> decreasing_info
+
+val pp_decreasing_info : decreasing_info formatter
 
 (*------------------------------------------------------------------*)
 (** A macro with [name = m] is a recursive procedure defined in a given system [se] as:

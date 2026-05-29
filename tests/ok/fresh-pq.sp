@@ -1,8 +1,10 @@
 name n : message.
 
-system null.
+system [postquantum] null.
 
 include Core.
+
+set debugMacros=true.
 
 lemma fresh_test (tau:_):
   (* fresh should not care if the LHS is ptime or pqtime or whatever. *)

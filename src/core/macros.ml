@@ -65,6 +65,13 @@ type in_systems =
 (*------------------------------------------------------------------*)
 type group = [`Builtin of Action.exec_model | `UserDefined of Symbols.macro]
 
+let compare_group (g : group) (g' : group) =
+  match g,g' with
+  | `UserDefined m, `UserDefined m' -> Symbols.compare_path m m'
+  | `Builtin e, `Builtin e' -> Stdlib.compare e e'
+  | `Builtin _, `UserDefined _ -> -1
+  | `UserDefined _, `Builtin _ -> 1
+
 let pp_group fmt = function
   | `Builtin em -> Fmt.pf fmt "builtin(%s)" (Action.exec_model_to_string em)
   | `UserDefined m -> Symbols.pp_path fmt m
@@ -73,14 +80,25 @@ let pp_group fmt = function
 (** See `.mli`. *)
 type decreasing_info = {
   group : [`Builtin of Action.exec_model | `UserDefined of Symbols.macro];
+  decreasing_quantity_type : Type.ty;
   order : Symbols.fname;
 }
 
 let builtin_decreasing_info exec_model = { 
   group = `Builtin exec_model;
+  decreasing_quantity_type = Type.ttimestamp;
   order = Library.Prelude.fs_lt;
 }
 
+let pp_decreasing_info fmt info =
+  Fmt.pf fmt "@[<v 0>\
+              group: %a@;\
+              decreasing quantity type: %a@;\
+              order: %a@]"
+    pp_group info.group
+    Type.pp info.decreasing_quantity_type
+    Symbols.pp_path info.order
+  
 (*------------------------------------------------------------------*)
 (** See `.mli`. *)
 type structured_macro_data = {

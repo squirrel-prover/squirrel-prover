@@ -131,6 +131,9 @@ type 'a path = private {
 }
 
 (*------------------------------------------------------------------*)
+val compare_path : 'a path -> 'a path -> int
+
+(*------------------------------------------------------------------*)
 type channel   = _channel   path
 type config    = _config    path
 type oracle    = _oracle    path

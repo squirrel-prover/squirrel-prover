@@ -3,7 +3,6 @@
 
    Thus, this files mostly checks that Squirrel correctly check
    constancy. *)
-
 include Core.
 include "Data/List.sp".
 
@@ -53,3 +52,5 @@ ghave [ Cdom | Cdom ] :
     (att2 (fun (lf1:list int) => zero))
     ].
 Abort.
+
+(*------------------------------------------------------------------*)
