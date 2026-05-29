@@ -887,6 +887,7 @@ type final_decl = {
     ];
   name        :  Symbols.macro option;
   is_match    : bool;
+  rw_strat    : Macros.rw_strategy;
   info        : Term.macro_info option
 }
 
@@ -978,7 +979,10 @@ let get_rec_occs
     [] bodies 
 
 (*------------------------------------------------------------------*)
-type op_annot = { is_ptime : bool; }
+type op_annot = {
+  admit_ptime : bool;
+  opaque : bool;
+}
 
 let[@warning "-23"] 
   parse_op_annot (annots : (_ TacticsArgs.named_arg) list) 
@@ -987,11 +991,12 @@ let[@warning "-23"]
   let doit annot (arg : _ Args.named_arg) =
     match arg with
     (* disable the opposite case if asked to *)
-    | NArg {L.pl_desc="admit_ptime"} -> { annot with is_ptime = true; }
+    | NArg {L.pl_desc="admit_ptime"} -> { annot with admit_ptime = true; }
+    | NArg {L.pl_desc="opaque"} -> { annot with opaque = true; }
     | NArg l | NList (l, _) ->
       Tactics.hard_failure ~loc:(L.loc l) (Failure "invalid argument")
   in
-  List.fold_left doit { is_ptime = false; } annots
+  List.fold_left doit { admit_ptime = false; opaque = false; } annots
 
 (*------------------------------------------------------------------*)
 (** Parse an abstract or concrete list of function declarations. *)
@@ -1227,7 +1232,10 @@ let parse_fun_decls
           (* is the declaration defined by pattern-matching *)
           let is_match  = match pd.decl.Decl.op_body with `Match _ -> true | _ -> false in 
 
-          let { is_ptime } = parse_op_annot pd.decl.Decl.op_annots in
+          let { admit_ptime; opaque } = parse_op_annot pd.decl.Decl.op_annots in
+
+          (* choose the rewrite strategy for the macro *)
+          let rw_strat = if opaque then Macros.Opaque else Macros.Exact in
 
           let table, name, info =
             match op_kind with
@@ -1245,7 +1253,7 @@ let parse_fun_decls
                   pp_style = `Standard;
                   (* the `@` notation is currently reserved to builtin (this
                    could be changed) *)
-                  is_ptime;
+                  is_ptime = admit_ptime;
                 } 
               in
               table, Some name, Some info
@@ -1261,7 +1269,7 @@ let parse_fun_decls
           in
           table, (
             {pdecl={pd with args; out_ty; match_param};
-             params; dist_param; body; name; is_match; info})            
+             params; dist_param; body; name; is_match; info; rw_strat; })
       )
       table
       decls
@@ -1496,7 +1504,7 @@ let parse_fun_decls
             bodies; 
             in_systems;
             ty = fdecl.pdecl.out_ty; 
-            rw_strat = Exact;
+            rw_strat = fdecl.rw_strat;
             info;
             decreasing_quantity;            
             decreasing_info = {
