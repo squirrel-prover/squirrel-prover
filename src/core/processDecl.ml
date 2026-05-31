@@ -1563,6 +1563,13 @@ let parse_fun_decls
            let child_quantity, _ =
              Macros.decreasing_info table rec_occ.child_call rec_occ.arg_call
            in
+           if not @@ Type.equal (Term.ty parent_quantity) (Term.ty child_quantity) then
+             error loc
+               KDecl (Failure "all mutual declarations must have \
+                               decreasing quantity of the same type \
+                               (either because they have the same \
+                               input type, or because they have \
+                               termination_by hints.");
            let conc = rec_occ.when_cond_builder
                (Term.mk_fun_infer_tyargs table rec_op [child_quantity; parent_quantity])
            in

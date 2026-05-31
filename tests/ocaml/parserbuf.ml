@@ -287,6 +287,12 @@ let models =
            with Process.Error (_,
                                DuplicatedUpdate "s") -> raise Ok)
     end ;
+    "Mutual let rec with multipe types", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try Squirrellib.Main.run ~test "tests/alcotest/macro-let-rec.sp" with
+           | ProcessDecl.(Error (_,_,Failure "all mutual declarations must have decreasing quantity of the same type (either because they have the same input type, or because they have termination_by hints.")) -> raise Ok)
+    end ;    
   ]
 
 let conflicts =
