@@ -4,10 +4,10 @@ SQUIRREL
 This is the documentation tool for **Squirrel-prover**. It uses
 **Sphinx** and a custom **Squirrel Domain** described here.
 
-Dependences
------------
+Dependencies
+------------
 
-This documention works for Python 3.13.7. 
+This documention has been tested for Python 3.13.7. 
 
 First, create a python virtual env, from inside the `documentation/sphinx` folder.
 
@@ -17,12 +17,12 @@ First, create a python virtual env, from inside the `documentation/sphinx` folde
    source .venv/bin/activate
 
 
-Here, your terminal should be running the python3 virtual env, you can
-run `which pip3` to check this, with the expected output
-`.../squirrel-prover/documentation/sphinx/.venv/bin/pip3`. The current
-terminal will stay in the venv until it is closed.
+Here, your terminal should be running the python3 virtual environment.
+You can run `which pip3` to check this, with the expected output
+`.../squirrel-prover/documentation/sphinx/.venv/bin/pip3`.
+The current terminal will stay in the virtual environment until it is closed.
 
-Then with pip :
+Then with pip:
 
 .. code::
    pip3 install sphinx==9.1.0 sphinx_rtd_theme beautifulsoup4 sphinx-tabs readthedocs-sphinx-search\
@@ -30,9 +30,9 @@ Then with pip :
 
 The generated doc relies on syntax coloration through a fork of [fork
 of `pygments`](https://github.com/squirrel-prover/pygments) including
-a lexer for `squirrel` files. It should be installed as a package in
-pip3, by doing: (after having done `source .venv/bin/activate` if you
-are in a new terminal)
+a lexer for `squirrel` files. It must be installed as a package,
+by doing (do not forget to run `source .venv/bin/activate` if you
+are in a new terminal):
 
 .. code::
    git clone https://github.com/squirrel-prover/pygments
@@ -67,18 +67,17 @@ git pull
 python3.8 -m pip install -e .
 ```
 
-Rebuilding
-----------
+Upgrading `antlr4`
+------------------
 
+If the python package `antlr4-python3-runtime` (currently for
+`antlr4`, version 4.13.2) needs to be upgraded to another version of
+`antlr4`, the files in `documentation/sphinx/source/ext/notations`
+need to be regenarated with the exact same version of `antlr4`.
 
-
-If the python package `antlr4-python3-runtime` needs to be upgraded to another version, note
-that the files in `documentation/sphinx/source/ext/notations` need to be regenarated
-with the exact same version of antlr4: install the corresponding
-antlr4 version from e..,
-https://www.cs.upc.edu/~cl/practica/install.html, and then run make in
-the `notations` subdirectory.
-
+To do that, install the corresponding `antlr4` version from e.g.,
+https://www.cs.upc.edu/~cl/practica/install.html, and then run `make`
+in the `documentation/sphinx/source/ext/notations` subdirectory.
 
 
 Deployement
