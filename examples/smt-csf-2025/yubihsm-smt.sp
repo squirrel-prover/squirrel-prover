@@ -221,6 +221,49 @@ system !_pid
   (!_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
 
 (*------------------------------------------------------------------*)
+include Set.
+
+(* Game IK-CCA from 
+   Key-Privacy in Public-Key Encryption
+   Mihir Bellare, Alexandra Boldyreva, Anand Desai, David Pointcheval
+   AsiaCrypt 2001
+ *)
+game Enckp = {
+ rnd k0:message;
+ rnd k1:message;
+ var log = empty_set;
+
+ (*------------------------------------------------------------------*)
+ oracle enc0 x = {
+   rnd r:message;
+   return enc(x,r,k0)
+ }
+
+ oracle enc1 x = {
+   rnd r:message;
+   return enc(x,r,k1)
+ }
+
+ (*------------------------------------------------------------------*)
+ oracle dec0 c = {
+   return if not (mem c log) then dec(c,k0)
+ }
+
+ oracle dec1 c = {
+   return if not (mem c log) then dec(c,k1)
+ }
+
+ (*------------------------------------------------------------------*)
+ oracle challenge x = {
+   rnd r:message;
+   var c = enc(x,r,diff(k0,k1));
+   log := add c log;
+   return c
+ }
+}.
+
+
+(*------------------------------------------------------------------*)
 (* AXIOMS *)
 
 include Real.
@@ -469,17 +512,23 @@ Proof.
            =
            enc (tlen, rinit(pid), diff(mkey,keyFresh))
           by project. 
-          rewrite Eq_len.
-          enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh. {
-            by intro ? [].
-          }.
-          fa 2; fa 2.
-          fresh 4; 1:auto.
-          fresh 3. {
-            by intro /= ? []. 
-          }.
-          rewrite /* in 0.
-          by apply Hind (pred t).
+                 trans
+           ~left @system:default/left
+           2: enc (tlen, rinit pid, keyFresh) ; simpl ~diffr. {
+           rewrite Eq_len.
+           crypto ~no_subgoal_on_failure Enckp (k0: mkey) (k1: keyFresh) => //.
+            smt ~no_macros. 
+         }
+         rewrite Eq_len.
+         fa 2; fa 2.
+         fresh 4; 1:auto.
+         fresh 3. 
+         intro pid0.                    
+         intro C. case C; auto.
+
+         rewrite /* in 0.
+         by apply Hind (pred t).
+
         * have ->:
             diff(
               enc (tlen, rinit(pid), keyFresh),
@@ -487,15 +536,8 @@ Proof.
             =
             enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project.
           rewrite Eq_len. 
-          enckp 2. {
-            by intro /= ? []. 
-          }.
-          fa 2; fa 2.
-          fresh 4; 1:auto.
-          fresh 3. {
-            by intro /= ? []. 
-          }.
-          refl.
+          crypto ~no_subgoal_on_failure Enckp (k1: mkey) (k0: keyFresh) => //.
+          smt ~no_macros. 
 
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
