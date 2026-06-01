@@ -12,7 +12,7 @@ all: squirrel test ## Build Squirrel and run tests.
 
 .PHONY: doc
 doc: ## Generate user manual and API documentation.
-	dune build @refman-html
+	make -C documentation/sphinx/ html
 	dune build @doc
 	@$(ECHO) "API doc available: _build/default/_doc/_html/squirrel/index.html"
 	@$(ECHO) "User manual available: _build/default/documentation/sphinx/public/index.html"

@@ -17,9 +17,10 @@ First, create a python virtual env, from inside the `documentation/sphinx` folde
    source .venv/bin/activate
 
 
-Here, your terminal should be running the python3 virtual env, you
-can run `which pip3` to check this, with the expected output
-`.../squirrel-prover/documentation/sphinx/.venv/bin/pip3`.
+Here, your terminal should be running the python3 virtual env, you can
+run `which pip3` to check this, with the expected output
+`.../squirrel-prover/documentation/sphinx/.venv/bin/pip3`. The current
+terminal will stay in the venv until it is closed.
 
 Then with pip :
 
@@ -29,10 +30,16 @@ Then with pip :
 
 The generated doc relies on syntax coloration through a fork of [fork
 of `pygments`](https://github.com/squirrel-prover/pygments) including
-a lexer for `squirrel` files. This repository must be pulled, and then
-the corresponding python module installed with `pip3 install -e .`
-inside the repository (while still inside the venv, so reruning
-`source .venv/bin/activate` if needed).
+a lexer for `squirrel` files. It should be installed as a package in
+pip3, by doing: (after having done `source .venv/bin/activate` if you
+are in a new terminal)
+
+.. code::
+   git clone https://github.com/squirrel-prover/pygments
+   cd pygmnents
+   git checkout squirrel-pygment2.17.1 
+   pip3 install -e .
+
 
 Build
 -----
