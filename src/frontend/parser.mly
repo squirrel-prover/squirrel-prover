@@ -52,7 +52,7 @@
 %token GAME VAR RND RETURN
 %token TIME WHERE WITH WHEN ORACLE EXN
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE PRF
+%token TRY CYCLE REPEAT NOSIMPL HELP CDH GDH CHECKFAIL ASSERT GHAVE HAVE WEAK USE PRF
 %token REDUCE SIMPL AUTO
 %token REWRITE PUNCTURE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE CASE
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -172,7 +172,6 @@ __rlist1(X, S):                         (* left-recursive *)
 (*------------------------------------------------------------------*)
 (* DH flags *)
 dh_flag:
-| DDH { Symbols.OpData.DH_DDH }
 | CDH { Symbols.OpData.DH_CDH }
 | GDH { Symbols.OpData.DH_GDH }
 
@@ -1316,8 +1315,6 @@ cdh_arg:
 gdh_arg:
 | hyp=lsymb COMMA gen=lpath { TacticsArgs.GDH { hyp; gen; } }
 
-ddh_arg:
-| gen=lpath COMMA na=lpath COMMA nb=lpath COMMA nc=lpath { TacticsArgs.DDH { gen; na; nb; nc; } }
 
 (*------------------------------------------------------------------*)
 /* crypto tactic arguments */
@@ -1396,9 +1393,6 @@ tac:
   (* Crypto tactic *)
   | l=lloc(CRYPTO) a=named_args game=path args=slist(crypto_arg,empty)
     { mk_abstract l "crypto" [TacticsArgs.Crypto (a, game,args)] }
-
-  | l=lloc(DDH) arg=ddh_arg
-    { mk_abstract l "ddh" [TacticsArgs.DH arg] }
 
   | l=lloc(GDH) arg=gdh_arg
     { mk_abstract l "gdh" [TacticsArgs.DH arg] }

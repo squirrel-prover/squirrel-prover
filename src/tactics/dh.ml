@@ -219,7 +219,7 @@ let has_cgdh
   | false, (Symbols.OpData.DHgen l, _) ->
     List.exists
       (fun x -> List.mem x l)
-      Symbols.OpData.[DH_CDH; DH_GDH; DH_DDH]
+      Symbols.OpData.[DH_CDH; DH_GDH]
   | true, (Symbols.OpData.DHgen l, _) ->
     List.mem Symbols.OpData.DH_GDH l
   | _ -> false

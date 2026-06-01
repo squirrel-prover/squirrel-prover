@@ -169,36 +169,12 @@ let equivalence =
            | Tactics.Tactic_soft_failure (_,Tactics.GoalNotClosed) ->
              raise Ok)
     end ;
-    "DDH", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/ddh.sp" with
-           | Tactics.Tactic_soft_failure (_,Tactics.NotDDHContext) -> raise Ok)
-    end ;
-
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/fadup_input.sp" with
            | Tactics.Tactic_soft_failure (_,Tactics.NoReflMacroVar) -> raise Ok)
-    end ;
-    "XOR2", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/xor2.sp" with
-           | Tactics.Tactic_soft_failure
-               (_, Failure "name is not XORed on both sides") ->
-             raise Ok)
-    end ;
-    "Not XOR", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/notxor.sp" with
-           | Tactics.Tactic_soft_failure
-               (_, Failure "Xor can only be applied on a term with at least one \
-                            occurrence of a term xor(t,k)")  ->
-             raise Ok)
-    end ;
+    end ;  
     "Pred Init", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

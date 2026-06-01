@@ -97,7 +97,7 @@ checkfail intctxt Eq exn Failure.
 Abort.
 
 
-ddh g, (^) where group:message exponents:message.
+gdh g, (^) where group:message exponents:message.
 
 name a : message
 
@@ -111,8 +111,3 @@ Proof.
  checkfail cdh Eq, g exn TacticNotPQSound.
  checkfail gdh Eq, g exn TacticNotPQSound.
  Abort.
-
-global lemma [set: PQ; equiv: PQ]  _ : equiv(diff( g^a^b, g^d)).
-Proof. 
- checkfail (ddh g, a, b, d) exn TacticNotPQSound.
-Abort.

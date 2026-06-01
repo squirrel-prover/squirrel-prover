@@ -1451,7 +1451,7 @@ an occurrence of :g:`n`.
 
 We also generalize occur to allow for collecting multiple name
 occurrences at once, which is useful when we want to allow patterns depending on
-two names at once (see e.g. :tacn:`gdh` or :tacn:`ddh`).
+two names at once (see e.g. :tacn:`gdh`).
 
 .. todo::
    Adrien: how name occurrences are computed is quite complicated, and
@@ -1567,9 +1567,9 @@ Local tactics
    it is computationally hard to compute :math:`g^{ab}`
    when only :math:`g^a` and :math:`g^b` are known.
 
-   A :g:`cdh`, :g:`ddh` or :g:`gdh`
+   A :g:`cdh` or :g:`gdh`
    :term:`group declaration <group declaration>` must have been
-   specified (the DDH or GDH assumptions indeed both imply the CDH assumption).
+   specified (the GDH assumptions indeed imply the CDH assumption).
    For a group with generator :g:`g` and exponentiation
    :g:`^`, the tactic :g:`cdh M, g` may be called in a local goal on
    a message equality hypothesis :g:`M` of the form `t=g^{a b}`.
@@ -1756,116 +1756,7 @@ Global tactics
    just the the encryption we are looking at).
 
    Latest formal Squirrel description::cite:`bkl23lics`.  
-    
-.. tace:: ddh @term, @term, @term, @term
-   :name: ddh
 
-
-   This tactic applies the Decisional Diffie-Helman assumption (see
-   e.g. :cite:`okamoto2001gap`), stating that for a generator :math:`g`,
-   and randomly sampled exponents :math:`a`, :math:`b`, :math:`c`, it
-   is computationally hard to distinguish :math:`g^{ab}` from :math:`g^c`,
-   when only :math:`g^a` and :math:`g^b` are known.
-   
-
-   A :g:`ddh` :term:`group declaration <group declaration>` must have been
-   specified.
-
-   When calling, :g:`ddh g,a,b,k`, the goal must contain only diff
-   terms of the form :g:`diff(g^(ab),g^(c)))`. The tactic will close
-   the goal if the formula
-   :g:`occur((a,b,c),goal,(g^a,g^b,diff(g^(ab),c)))` instantly reduces
-   to false (see the definition of the :term:`occurrence formula`).
-
-   Latest formal Squirrel description: :cite:`bdjkm21sp`.
-       
-.. tace:: enckp @position {? @term_pat } {? @term }
-   :name: enckp
-
-   ENC-KP assumes that a symmetric or an asymmetric encryption scheme
-   does not leak any information about the public (or secret) key
-   used to encrypt the plaintext. It is based on the IK-CPA notion of
-   :cite:`bellare2001key`.
-
-   The tactic can be called on a bi-frame element containing a term of
-   the form :g:`C[enc(n, r, m)]`, where
-        
-   • :g:`r` must be a fresh name;
-   • there is no decryption in :g:`C`;
-   • no universal message variable occurs;
-   • :g:`m` is either a key or the diff of two keys, that
-     only appear in key position, i.e. under :g:`pk`, :g:`dec` or
-     :g:`enc`;
-   • if :g:`m` is a key, and a second key has been given as argument to the
-     tactic, that key must also occur only in key position.
-
-   When :g:`m` is the diff of two keys, the diff is simplified by keeping
-   only the key on the left. When :g:`m` is just one key, a new key with
-   which it is replaced can be specified as arugment.
-   
-   .. example:: Basic ENC-KP application
-   
-      On a bi-frame element of the form
-      
-      .. squirreldoc::
-         i : enc(n,r,diff(pk(k1),pk(k2)))
-   
-      calling the tactic :g:`enckp i` will simplify the bi-frame
-      element by only keeping the key on the left, yielding
-      
-      .. squirreldoc::
-         i: enc(n,r,pk(k1))
-
-   The tactic expects as arguments:
-   
-   • the position identifying the bi-frame element;
-   • optional: the encryption term on which to apply the tactic;
-   • optional: the new key with which to replace the key.
-
-
-   .. example:: Switching key with ENC-KP
-    
-      On a bi-frame element of the form
-      
-      .. squirreldoc::   
-         i: enc(n,r,m)
-
-      the tactic :g:`enckp i, k` will simplify the bi-frame element by using the specified
-      key, yielding
-      
-      .. squirreldoc::
-         i: enc(n,r,pk(k))
-
-
-   .. example:: Targeted ENC-KP application
-       
-      On a bi-frame element of the form
-      
-      .. squirreldoc::
-         i: ⟨ enc(n,r,m),m'⟩
-
-      the tactic :g:`enckp i,enc(n,r,m), k` will simplify the bi-frame
-      element by using the specified key, yielding
-      
-      .. squirreldoc::
-         i: ⟨ enc(n,r,pk(k)),m '⟩
-
-
-   To apply the enckp tactic, the key :g:`k` must be such that
-   :g:`occur(k,bi-frame,(enc(_,_,k), dec(_,k))` (see the definition of
-   the :term:`occurrence formula`) is trivially false. (or
-   :g:`occur(k,bi-frame,(pk(k), dec(_,k))`) for the asymmetric case).
-
-   When it is not trivially true, a sub-goal is created, asking to prove the
-   freshness of the random used in the encryption, with the conclusion
-   :g:`occur(r,bi-frame,enc(n,r,m))`.
-
-   In the symmetric case, an additional check is performed ensuring
-   that all encryptions are made with distinct fresh randoms (and not
-   just the encryption we are looking at).
-   
-   Latest formal Squirrel description::cite:`bdjkm21sp`.
-      
 .. tace:: prf @position {? , @term_pat}
    :name: prf
 
@@ -1926,29 +1817,6 @@ Global tactics
    optional :n:`@term_pat` allows to target a specific hash occurrence.
 
    Latest formal Squirrel description: :cite:`bkl23lics`.
-
-.. tace:: xor @position {? , @term_pat} {? , @term_pat}
-   :name: xor
-
-   This tactic applies the unconditionally sound one time pad property
-   of the xor operation.
-
-   The tactic applied to a bi-frame element of the form :g:`i : C[n XOR
-   t]` will replace the XOR term by
-
-   .. squirreldoc::
-      if occur(n,bi-frame, i : C[n XOR t] ) && len(n) = len(t) then n_FRESH else (n XOR t)
-
-   This new term then allows us to drop the old term only if :g:`n` and
-   :g:`t` do have the same length (as the one time pad does not work otherwise),
-   and if this is the only occurrence of :g:`n` in the
-   bi-frame.
-
-   When multiple XOR occur in the bi-frame, one can specify one or two
-   optional term patterns, to specify in any order the name :g:`n` or
-   the full XOR-ed term :g:`n XOR t` to target.    
-
-   Latest formal Squirrel description: :cite:`bdjkm21sp`.
 
 .. _section-utility-tactics:
   

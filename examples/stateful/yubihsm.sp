@@ -630,7 +630,6 @@ Proof.
             =
             enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project.
 
-
           rewrite Eq_len.
           crypto ~no_subgoal_on_failure Enckp (k1: mkey) (k0: keyFresh) => //.
           smt ~no_macros. 

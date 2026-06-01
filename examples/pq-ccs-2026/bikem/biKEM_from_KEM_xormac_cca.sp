@@ -22,6 +22,15 @@
 *)
 
 include Core.
+
+game XOR_SINGLE = {
+  oracle o_xor(x: message) = {
+    rnd n1: message;
+    rnd n2: message;
+    return if len n1 = len x then diff(xor n1 x, n2)
+  }
+}.
+
 close Classic.
 open Quantum.
 set postQuantumEquivs=true.
@@ -645,10 +654,8 @@ Proof.
   induction tau.
 
   (** Init *)
-  + 
-    xor 6, rand1.
+  + rewrite /frame. fa 0. crypto XOR_SINGLE.
     rewrite namelength_rand1 kem2_shared_length //=.
-    fresh 6. {constraints. } rewrite /frame. refl.
  (** Pub *)
   + rewrite /frame /transcript /exec /cond /output /=.
     fa (_,_,_). rewrite /input /state. fa !<_,_>. fa 1. fa(qatt _). {constraints. }

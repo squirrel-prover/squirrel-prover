@@ -16,9 +16,8 @@ Proof.
   expandall.
   fa 0. fa 1; fa 1.
   prf 1.
-
-  xor 1,n_PRF.
-  rewrite if_true in 1.
-  by rewrite namelength_m namelength_n_PRF.
-  by fresh 1.
+  fa 1.
+  fresh 1. by assumption.
+  fresh 1. by assumption.
+  by assumption.    
 Qed.

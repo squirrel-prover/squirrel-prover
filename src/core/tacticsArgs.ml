@@ -179,10 +179,6 @@ type have_pt_arg = Typing.pt * have_ip option * [`IntroImpl | `None]
 type dh_arg =
   | CDH of { hyp : Symbols.lsymb; gen : Symbols.p_path; }
   | GDH of { hyp : Symbols.lsymb; gen : Symbols.p_path; }
-  | DDH of { gen : Symbols.p_path;
-             na  : Symbols.p_path;
-             nb  : Symbols.p_path;
-             nc  : Symbols.p_path; }
 
 (*------------------------------------------------------------------*)
 (** {3 Crypto tactic arguments} *)

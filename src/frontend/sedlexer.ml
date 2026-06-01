@@ -158,7 +158,6 @@ let rec token buf =
   | "cs" -> !?CS
   | "Cst" -> !?CST
   | "cycle" -> !?CYCLE
-  | "ddh" -> !?DDH
   | "dependent" -> !?DEPENDENT
   | "depends" -> !?DEPENDS
   | "destruct" -> !?DESTRUCT

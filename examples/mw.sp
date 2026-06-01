@@ -17,6 +17,26 @@ This is a "light" model without the last check of T.
 
 include Core.
 
+(** Simple XOR game without log, where a new name n1 is used to hide
+    the parameter of the o_xor oracle for each new oracle call. *)
+game XOR_HIDE = {
+  oracle o_xor(x,y: message) = {
+    rnd n: message;
+    return if len x = len y && len x = len n then xor diff(x,y) n
+  }
+}.
+
+game XOR_SINGLE = {
+  oracle o_xor(x: message) = {
+    rnd n1: message;
+    rnd n2: message;
+    return if len n1 = len x then diff(xor n1 x, n2)
+  }
+}.
+
+
+game empty = {}.
+
 hash H
 
 abstract id : index -> message
@@ -200,9 +220,11 @@ Proof.
     prf 1. 
     * by use tags_neq.
     * by use tags_neq.
-    * xor 1,n_PRF.
-      rewrite len_id len_id' namelength_n_PRF //=.
-      by fresh 1.
+    * trans [default/left,default/left]. 
+      ** crypto empty.
+      ** crypto XOR_HIDE.
+         rewrite len_id len_id' namelength_n_PRF //=.
+      ** fa 1. fresh 1. by assumption. by assumption.
 
   (* Case R2 *)
   + expand frame, exec, cond, output.
@@ -224,7 +246,9 @@ Proof.
       repeat split => > _ [_ [_ Meq]];
         by fresh Meq.
     * fresh 1 => //.
-      xor 1, n_PRF.
-      rewrite len_id len_id' namelength_n_PRF //=.
-      by fresh 1.
+      trans [default/left,default/left]. 
+      ** crypto empty.
+      ** crypto XOR_HIDE.
+         rewrite len_id len_id' namelength_n_PRF //=.
+      ** fa 1. fresh 1. by assumption. by assumption.
 Qed.

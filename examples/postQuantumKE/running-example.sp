@@ -34,6 +34,14 @@ Final key derivation: KIR := h(s,kI2) XOR h(s,kR2).
 
 include Core.
 
+game XOR_SINGLE = {
+  oracle o_xor(x: message) = {
+    rnd n1: message;
+    rnd n2: message;
+    return if len n1 = len x then diff(xor n1 x, n2)
+  }
+}.
+
 (***********************)
 (* Global Declarations *)
 (***********************)
@@ -170,10 +178,8 @@ Proof.
   (* tau = Initiator1 *)
   simpl. rewrite /sIR.
   prf 1, h(s,kI).
-  xor 1.
-  rewrite if_true.
+  crypto XOR_SINGLE.
   + by rewrite len_h namelength_n_PRF.
-  + by fresh 1.
 Qed.
 
 (* Technical lemma. *)

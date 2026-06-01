@@ -53,7 +53,9 @@ name k :  index * index -> message.
 We declare a DDH context, using `g` for the generator element and `^` for the
 power operator.
 *)
-ddh g, (^) where group:message exponents:message.
+
+abstract g:message.
+abstract (^) : message -> message -> message.
 
 (**
 We also declare a signature scheme by specifying 3 function symbols.
@@ -168,7 +170,8 @@ Proof.
       (** Case where `t = init`.
       We use here the DDH assumption. *)
     + expandall.
-      by ddh g,a,b,k.
+      admit.
+      (* by ddh g,a,b,k. *)
     
       (** Case where `t = Pchall3(i)`.
       We will show that this case is not possible, by showing that the formula

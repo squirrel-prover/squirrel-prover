@@ -20,6 +20,16 @@ where (c1, ke1) = Encap1(pk1)
 
 include Core.
 
+ 
+game XOR_SINGLE = {
+  oracle o_xor(x: message) = {
+    rnd n1: message;
+    rnd n2: message;
+    return if len n1 = len x then diff(n2, xor n1 x)
+  }
+}.
+
+
 close Classic.
 open Quantum.
 set postQuantumEquivs=true.
@@ -228,10 +238,12 @@ Proof.
   intro Hap.
   induction tau.
   (** Init *)
-  + xor 3, rand1.
-    rewrite if_true. 
-    rewrite namelength_rand1 kem2_shared_length; constraints.
-    fresh 3. constraints. rewrite /frame. refl. 
+  + trans ~right @system:(real/right) 3:rand.
+    ++ rewrite /frame.  fa 0.
+       crypto KEM1_CPA_SINGLE.
+    ++ rewrite /frame.  fa 0.
+       crypto XOR_SINGLE.    
+       rewrite namelength_rand1 kem2_shared_length; constraints.
   (** Pub *)
   + rewrite /frame /transcript /exec /cond /output /=. 
     rewrite bikem_pub_spec /=. 

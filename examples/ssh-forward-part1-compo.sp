@@ -66,7 +66,28 @@ name k : index * index -> message
 abstract enc : message * message -> message
 abstract dec : message * message -> message
 
-ddh g, (^) where group:message exponents:message.
+abstract g:message.
+abstract (^) : message -> message -> message.
+
+game DDH =
+{
+ rnd a : message;
+ rnd b : message;
+ rnd c : message;
+  
+ oracle Oa = {return g^a}
+
+ oracle Ob = {return g^b}
+
+ oracle indif_one = {
+  return diff(g^a^b, g^c)
+ } 
+ 
+ oracle indif_two = {
+  return diff(g^b^a, g^c)
+ } 
+}.
+
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and the attacker can compute h values with the oracle.  *)
@@ -143,7 +164,7 @@ system secret = (PDDH | SDDH).
 (** The strong secrecy is directly obtained through ddh. *)
 equiv [secret] secret.
 Proof.
-   ddh g, a1, b1, k11.
+   crypto DDH.
 Qed.
 
 

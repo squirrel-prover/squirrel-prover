@@ -49,7 +49,28 @@ name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
 
-ddh g, (^) where group:message exponents:message.
+abstract g:message.
+abstract (^) : message -> message -> message.
+
+game DDH =
+{
+ rnd a : message;
+ rnd b : message;
+ rnd c : message;
+  
+ oracle Oa = {return g^a}
+
+ oracle Ob = {return g^b}
+
+ oracle indif_one = {
+  return diff(g^a^b, g^c)
+ } 
+ 
+ oracle indif_two = {
+  return diff(g^b^a, g^c)
+ } 
+}.
+
 
 signature sign,checksign,pk with oracle 
  forall (m:message,sk:message),
@@ -171,7 +192,7 @@ Qed.
 (** The strong secrecy is directly obtained through ddh. *)
 equiv [secret] secret.
 Proof.
-   ddh g, a1, b1, k11.
+   crypto DDH (a:a1) (b:b1) (c:k11).   
 Qed.
 
 (** The equivalence for authentication is obtained by using the unreachability

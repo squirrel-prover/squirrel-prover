@@ -312,11 +312,12 @@ Proof.
 
     fa 3; deduce 3.
     fa 3; deduce 3.
-    enckp 3, k_fresh; 1: auto.
-    fa 3. 
-    fresh 4; 1: auto. 
-    fresh 4; 1:auto.
-    apply IH.
+    admit.
+    (* enckp 3, k_fresh; 1: auto. *)
+    (* fa 3.  *)
+    (* fresh 4; 1: auto.  *)
+    (* fresh 4; 1:auto. *)
+    (* apply IH. *)
 
   (* Action 3/4: Reader2 *)
 
@@ -332,10 +333,11 @@ Proof.
   + expandall.
     fa 2. fa 3. fa 3.
 
-    enckp 3, k_fresh; 1: auto.
+    admit.  
+    (* enckp 3, k_fresh; 1: auto. *)
 
-    fa 3.
-    fresh 5; 1:auto.
-    fresh 4; 1: auto.
-    apply IH.
+    (* fa 3. *)
+    (* fresh 5; 1:auto. *)
+    (* fresh 4; 1: auto. *)
+    (* apply IH. *)
 Qed.

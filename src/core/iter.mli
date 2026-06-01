@@ -3,62 +3,7 @@ open Utils
 module Sv = Vars.Sv
 module SE = SystemExpr
 
-module TraceHyps = Hyps.TraceHyps
-                     
-(*------------------------------------------------------------------*)
-(** Fold over all subterms.
-    Bound variables are represented as newly generated fresh variables.
-    When a macro is encountered, its expansion is visited as well.
-    Note that [iter] could be obtained as a derived class of [fold],
-    but this would break the way we modify the iteration using inheritance. 
-
-    Deprecated: use [Match.Pos.fold] or [fold_macro_support] instead. *)
-class ['a] deprecated_fold :
-  context:ProofContext.t ->
-  object method fold_message : 'a -> Term.term -> 'a end
-
-(*------------------------------------------------------------------*)
-(** Iterator that does not visit macro expansions but guarantees that,
-    for macro symbols [m] other that input, output, cond, exec, frame
-    and states, if [m(...)@..] occurs in the visited terms then
-    a specific expansion of [m] will have been visited, without
-    any guarantee on the indices and action used for that expansion,
-    because [get_dummy_definition] is used -- this behaviour is disabled
-    with [exact], in which case all macros will be expanded and must
-    thus be defined.
-
-    Deprecated: use [Match.Pos.fold] or [fold_macro_support]. *)
-class deprecated_iter_approx_macros :
-  exact:bool ->
-  context:ProofContext.t ->
-  object
-    val mutable checked_macros : Symbols.macro list
-    method visit_macro : Term.msymb -> Term.terms -> Term.term -> unit
-    method visit_message : Term.term -> unit
-  end
-
-(*------------------------------------------------------------------*)
-(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function
-    name [f] and name [k]. We use the exact version of
-    [deprecated_iter_approx_macros], otherwise we might obtain
-    meaningless terms provided by [get_dummy_definition].  Patterns
-    must be of the form [f(_,_,g(k(_)))] if allow_funs is defined and
-    [allows_funs g] returns true.
-
-    Deprecated *)
-class deprecated_get_f_messages :
-  ?drop_head:bool ->
-  ?fun_wrap_key:(Symbols.fname -> bool) option ->
-  context:ProofContext.t ->
-  Symbols.fname ->
-  Symbols.name ->
-  object
-    val mutable checked_macros : Symbols.macro list
-    val mutable occurrences : (Term.term list * Term.term) list
-    method get_occurrences : (Term.term  list * Term.term) list
-    method visit_macro : Term.msymb -> Term.terms -> Term.term -> unit
-    method visit_message : Term.term -> unit
-  end
+module TraceHyps = Hyps.TraceHyps                     
 
 (*------------------------------------------------------------------*)
 (** {2 Occurrences} *)

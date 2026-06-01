@@ -1090,7 +1090,6 @@ module OpData = struct
   (*------------------------------------------------------------------*)
   (** Different variants on the Diffie-Hellman crypto assumption *)
   type dh_hyp =
-    | DH_DDH
     | DH_CDH
     | DH_GDH
 

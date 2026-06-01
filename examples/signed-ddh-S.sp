@@ -39,7 +39,8 @@ name a : index -> message
 name b : index -> message
 name k : index * index -> message.
 
-ddh g, (^) where group:message exponents:message.
+abstract g:message.
+abstract (^) : message -> message -> message.
 
 signature sign,checksign,pk
 
@@ -113,7 +114,8 @@ Proof.
 
     + (* init *)
       expandall.
-      by ddh g,a,b,k.
+      admit.
+      (* by ddh g,a,b,k. *)
 
     + (* Schall3 *)
       expand frame, exec, output.

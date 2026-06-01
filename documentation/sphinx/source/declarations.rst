@@ -201,7 +201,7 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
    It is assumed IND-CCA1 and ENC-KP, and satisfying the equation
    :g:`dec(enc(m,pk(sk)),sk) = m`.
       
-   Enables the use of :tacn:`cca1` and :tacn:`enckp`.
+   Enables the use of :tacn:`cca1`.
    
 
 .. decl:: senc @fun_id, @fun_id, @fun_id {? where {+ @crypto_ty_arg}}
@@ -215,9 +215,9 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
    It is assumed IND-CPA and INT-CTXT, and satisfying the equation
    :g:`dec(enc(m,sk),sk) = m`.
       
-   Enables the use of :tacn:`cca1`, :tacn:`intctxt` and :tacn:`enckp`.
+   Enables the use of :tacn:`cca1` and :tacn:`intctxt`.
 
-.. decl:: {| ddh | cdh | gdh } @fun_id, @fun_id {? ,@fun_id} {? where {+ @crypto_ty_arg}}
+.. decl:: {| cdh | gdh } @fun_id, @fun_id {? ,@fun_id} {? where {+ @crypto_ty_arg}}
 
    The :gdef:`group declaration`:
    
@@ -226,10 +226,10 @@ If no argument is provided for :n:`@ident`, :n:`@type` default to :g:`message`.
 
    declares a group with generator :g:`g`, exponentation :g:`(^)` and
    exponent multiplication :g:`( ** )`.  The group is assumed to
-   satisfy the DDH assumption when declared with :g:`ddh`, the CDH
-   assumption with :g:`cdh`, and the Gap-DH assumption with g:`gdh`.
+   satisfy the CDH assumption with :g:`cdh`, and the Gap-DH assumption
+   with g:`gdh`.
    
-   Enables the use of :tacn:`cdh`, :tacn:`gdh` and :tacn:`ddh`.
+   Enables the use of :tacn:`cdh` and :tacn:`gdh`.
 
 .. _section-processes:
 
