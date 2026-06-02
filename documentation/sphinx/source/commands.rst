@@ -98,6 +98,8 @@ Commands
    A :n:`{| @system_id | @system_expr }` can be specified, otherwise the command searches in :n:`@any`
    system.
 
+   Search can only be called inside a proof.
+
   .. example:: searching axioms with included patterns
 
     .. squirreltop:: in
@@ -110,6 +112,12 @@ Commands
         search exists (x : _), _.
         search exists (x : _ -> _), _.
 
+  .. warning::
+
+     The name of lemmas currently returned by search does not take
+     into account their namespaces. If trying to use the lemma
+     fails, one may need to look given the name of the lemma where
+     it is defined to find the corresponding namespace.
 
 .. cmd:: hint rewrite @ident
 
