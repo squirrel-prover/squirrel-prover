@@ -401,7 +401,7 @@ called automatically after each tactic, unless the tactical
      In the degenerate case where no conjunct remains, the goal will be :g:`true`.
 
      When the conclusion of the goal is an equivalence, the tactic
-     will automatically perform :tacn:`fa` when at most one of the remaining
+     will automatically perform :g:`fa` when at most one of the remaining
      sub-terms is non-deducible. It may thus remove a deducible item
      from the equivalence, or replace an item :g:`<u,v>` with :g:`u`
      if it determines that :g:`v` is deducible.
@@ -1125,23 +1125,29 @@ Common tactics
      Attempt to conclude by automated reasoning on trace literals.
      Literals are collected from hypotheses, both local and global,
      after the destruction of conjunctions (but no case analysis is
-     performed to handle conjunctive hypotheses). If the conclusion
+     performed to handle disjunctive hypotheses). If the conclusion
      is a trace literal then it is taken into account as well.
 
 
 .. tacn:: depends @timestamp, @timestamp
 
     If the second action depends on the first action, and if the second
-    action happens, then add the corresponding timestamp inequality.
+    action happens, add the corresponding timestamp inequality to the
+    hypotheses.
 
     .. exn:: Not dependent
 
        The two actions are not dependent, i.e. were not derived
        from two outputs in sequence in the source process.
 
+    .. warning::
+
+      This tactic is deprecated: it is now more convenient to use the
+      dependency axioms generated when systems are declared.
+
 .. tacn:: expand {+, @macro_id | @macro_application }
     
-    Expand all occurences of the given macros in both the conclusion
+    Expand all occurrences of the given macros in both the conclusion
     and proof-context, either fully specified with an action or simply
     a type of macro.
     
@@ -1149,40 +1155,6 @@ Common tactics
     
     Expand all possible macros in the current proof-context and conclusion. 
              
-
-.. tacn:: fa {|@position | {+, @fa_arg}}
-   :name: fa
-    
-   .. prodn::
-      fa_arg ::= {? {| ! | ?}} @term_pat
-
-   Apply the function application rule, simplifying the goal by
-   removing the head function symbol, as follows:
-   
-   * in a local goal with conclusion :g:`f u = f v`, the conclusion is
-     replaced with :g:`u=v`. This produces as many sub-goals as there are arguments
-     of the head function symbol. For a local goal, the tactic takes no
-     arguments.
-   * in a global goal, :g:`f(u1,...,un)` is replaced with :g:`u1,...,un`.
-
-     
-   In the global goal setting, the target can be selected with its
-   :n:`@position`, or using a :n:`@fa_arg`, which behave as follow:
-
-   * :g:`fa` :n:`@term_pat` selects the first position in the equivalence
-     that matches :n:`@term_pat`.
-   * :g:`fa !t` repeats the function application as many times
-     as possible, but at least once.
-   * :g:`fa ?t` repeats the function application as many times
-     as possible, including 0.
-   * :g:`fa arg1, arg2, ...` is syntactic sugar for
-     :g:`fa arg1; fa arg2; ...`.
-   
-   .. todo::
-      `fa` reachability does not behave as described. Also, it seems
-      useless to me now, except for `try find` constructs.
-      Finally, `fa` reach takes no arguments.
-
 
 Local tactics
 ~~~~~~~~~~~~~
@@ -1490,7 +1462,6 @@ two names at once (see e.g. :tacn:`gdh`).
 Common tactics
 ~~~~~~~~~~~~~~
 
-
 .. tacn:: fresh {? ~precise_ts} {| @position | @hypothesis_id }
    :name: fresh
 
@@ -1581,6 +1552,37 @@ Common tactics
 Local tactics
 ~~~~~~~~~~~~~
 
+.. tact:: fa
+   :name: fa (in a local goal)
+
+   In a local goal whose conclusion is an equality :g:`u = v`
+   where :g:`u` and :g:`v` have the same toplevel construct,
+   produce subgoals requiring to prove that the respective components
+   of :g:`u` and :g:`v` are pairwise equal.
+   For example, :g:`f x1 y1 = f x2 y2` becomes
+   :g:`x1 = x2` and :g:`y1 = y2`.
+   Similarly, an equality between tuples :g:`(u1,u2,...) = (v1,v2,...)`
+   is turned into a collection of equalities for each component.
+
+   The tactic can handle equalities between lambda abstraction and
+   quantified terms: for example, :g:`(fun x => u) = (fun x => v)`
+   becomes :g:`u = v` in a context where `x` is a newly introduced variable,
+   that is assumed to be constant.
+
+   The tactic also has a specific treatment of conditionals. A goal
+   :g:`(if c1 then t1 else e1) = (if c2 then t2 else e2)` is broken into
+   three subgoals: first, :g:`c1 <=> c2`;
+   second, :g:`t1 = t2` under the assumptions :g:`c1` and :g:`c2`;
+   third, the same for the else branch.
+
+   More generally, try-find constructs are decomposed by taking into account
+   an assumption regarding unused variables:
+   when a try find selects multiple values with some values
+   unused in both the condition and the :g:`in` branch, these values
+   have no effect on the choice of the other values.
+   As a result, if one of the selected variables :g:`x` does not appear
+   in the condition and resulting value in the left try-find,
+   one will only have to prove :g:`c1 <=> exists x, c2`.
 
 .. tact:: cdh @hypothesis_id, @term
    :name: cdh
@@ -1740,6 +1742,29 @@ Local tactics
 
 Global tactics
 ~~~~~~~~~~~~~~
+
+.. tace:: fa {|@position | {+, @fa_arg}}
+   :name: fa (in an equivalence goal)
+
+   .. prodn::
+      fa_arg ::= {? {| ! | ?}} @term_pat
+
+   Derive an indistinguishability using the function application rule,
+   which roughly replaces an item :g:`f(u1,...,un)` by the
+   component items :g:`u1,...,un`.
+
+   The target can be selected with its
+   :n:`@position`, or using a :n:`@fa_arg`, which behave as follow:
+
+   * :g:`fa` :n:`@term_pat` selects the first position in the equivalence
+     that matches :n:`@term_pat`.
+   * :g:`fa !t` repeats the function application as many times
+     as possible, but at least once.
+   * :g:`fa ?t` repeats the function application as many times
+     as possible, including 0.
+   * :g:`fa arg1, arg2, ...` is syntactic sugar for
+     :g:`fa arg1; fa arg2; ...`.
+
 
 .. tace:: cca1 @position
    :name: cca1

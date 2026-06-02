@@ -9,7 +9,8 @@ Dependencies
 
 This documention has been tested for Python 3.13.7. 
 
-First, create a python virtual env, from inside the `documentation/sphinx` folder.
+First, create a python virtual env, from inside the `documentation/sphinx`
+folder. The specific name `.venv` matters as the `Makefile` relies on it.
 
 .. code::
    cd documentation/sphinx
@@ -28,7 +29,7 @@ Then with pip:
    pip3 install sphinx==9.1.0 sphinx_rtd_theme beautifulsoup4 sphinx-tabs readthedocs-sphinx-search\
    antlr4-python3-runtime==4.13.2 pexpect sphinxcontrib-bibtex myst-parser
 
-The generated doc relies on syntax coloration through a fork of [fork
+The generated doc relies on syntax coloration through a [fork
 of `pygments`](https://github.com/squirrel-prover/pygments) including
 a lexer for `squirrel` files. It must be installed as a package,
 by doing (do not forget to run `source .venv/bin/activate` if you
@@ -36,13 +37,16 @@ are in a new terminal):
 
 .. code::
    git clone https://github.com/squirrel-prover/pygments
-   cd pygmnents
+   cd pygments
    git checkout squirrel-pygment2.17.1 
    pip3 install -e .
 
 
 Build
 -----
+
+From the `documentation/sphinx/` directory you can build the doc
+using the following commands.
 
 ``make html`` Build html version
 ``make latex`` Build latex version then go in ``build/latex/`` and
@@ -80,8 +84,8 @@ https://www.cs.upc.edu/~cl/practica/install.html, and then run `make`
 in the `documentation/sphinx/source/ext/notations` subdirectory.
 
 
-Deployement
------------
+Deployment
+----------
 
 The documentation is manually deployed as part of the [Squirrel github
 page](https://github.com/squirrel-prover/Squirrel-Prover.github.io).
