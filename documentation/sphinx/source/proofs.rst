@@ -652,41 +652,65 @@ Common tactics
    All hypotheses in which generalization occurred are pushed back into the
    conclusion before the newly added quantified variables.
 
-.. tacn:: have @have_ip : {|@term|@global_formula}
-   
-   .. prodn:: have_ip ::= {* @s_item} @simpl_ip {* @s_item}
+.. tacn:: have @have_ip : @term
 
-   :n:`have @have_ip : F` introduces the new hypothesis :n:`F`, which
-   can be a :n:`@term` or a :n:`@global_formula`. The new
-   hypothesis is processed by :n:`@have_ip` (see below). A new
-   sub-goal requiring to prove :n:`F` is created.
+      .. prodn:: have_ip ::= {* @s_item} @simpl_ip {* @s_item}
 
-   If :n:`@have_ip` is the introduction pattern :n:`@s_item__pre @simpl_ip @s_item__post` then:
+      :n:`have @have_ip : F` introduces the new hypothesis :n:`F`, which
+      must be a :n:`@term`. The new
+      hypothesis is processed by :n:`@have_ip` (see below). A new
+      sub-goal requiring to prove :n:`F` is created.
 
-   * the simplification item :n:`@s_item__pre` is applied to the *conclusion*
-     before adding the hypothesis;
+      If :n:`@have_ip` is the introduction pattern :n:`@s_item__pre @simpl_ip @s_item__post` then:
 
-   * the simple intro-pattern :n:`@simpl_ip` is applied to introduce the
-     *new hypothesis* :n:`F`;
+      * the simplification item :n:`@s_item__pre` is applied to the *conclusion*
+	before adding the hypothesis;
 
-   * the simplification item :n:`@s_item__post` is applied to the *conclusions*
-     after adding the hypothesis.
+      * the simple intro-pattern :n:`@simpl_ip` is applied to introduce the
+	*new hypothesis* :n:`F`;
 
-   It there are mutliple pre or post simplification items, they are
-   applied in order.
+      * the simplification item :n:`@s_item__post` is applied to the *conclusions*
+	after adding the hypothesis.
+
+      It there are mutliple pre or post simplification items, they are
+      applied in order.
+
+      If the intro-pattern is a case, it thus split the current goals
+      into two goals.
+
+      The tactic can be used in a global lemma, in which case the global
+      hypothesis :n:`[@term]` is introduced.
 
 .. tacn:: assert @term {? as @simpl_ip}
    
    This is an alternative syntax for :n:`have @simpl_ip : @term`,
    where :n:`@simpl_ip` defaults to :g:`?`.
 
+.. tacn:: ghave @have_ip : @global_formula
+
+   Similar to :tacn:`have` over a formula (and not a proof term), but
+   to introduce a new global hypothesis, following the intro patterns
+   of :n:`@have_ip`.
+
+   Of note, a special automated treatment of local disjunction is
+   supported: if the :n:`@global_formula` is of the form :g:`[ u ||
+   v]` and both terms :g:`u` and :g:`v` are :g:`[const]`, then, as we
+   have :g:`[ u || v] <-> ([u] \/ [v])`, this formula can be
+   automatically split using a case intro pattern. That is, in this
+   case, :g:`ghave [U | V] : [ u || v]`, splits the current goal into
+   two sub-goals, one with :g:`U: u` and one with :g:`V: v`.
+
 .. tacn:: have @have_ip := @proof_term
-   :name: have    
+   :name: have (proof terms)
 
    :n:`have @have_ip := @proof_term` :ref:`resolves <section-pt-resolution>` 
    :n:`@proof_term` --- requiring that the term unification
    enviroment is closed --- and processes the resulting formula using introduction
    pattern :n:`@have_ip`.
+
+   The :n:`@proof_term` can either reduce to a local or global
+   formula, which will be introduced in the context.
+
         
 .. tacn:: apply @proof_term
    :name: apply 
