@@ -1,3 +1,13 @@
+### Deprecate old tactics
+[commits: `933cac81`, **breaking change**]
+
+**breaking change** `ddh`, `xor` and `enckp` have been deprecated.
+They had soundness issues, and were using very old cold that we needed
+to clean-up.
+
+Most of their usages can be done through crypto, see the `XOR_SINGLE`,
+`ENCKP` and `DDH` games defined in some examples.
+
 ### Fix global let macro (Fix #152)
 [commits: `0e01c293`, **breaking change**]
 
@@ -14,8 +24,6 @@ only add confusion.
 
 A `let x = ...` inside action `A is` is defined for `A is` and any of
 its decedent. (it behaves as the old `x is@A is`).
-
-
 
 ### Support for concrete reachability logic
 [commits: `f15476a7`, **breaking change**]
