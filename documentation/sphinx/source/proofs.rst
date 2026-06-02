@@ -320,7 +320,9 @@ Several tactics (e.g., :tacn:`simpl` and :tacn:`auto`) rely on a
 reduction engine. This engine repeatedly applies several
 transformations, corresponding to the following flags.
 
-.. prodn:: simpl_flags ::= ~flags:[ {*, {| rw | beta | proj | delta | constr } } ]
+.. prodn::
+  simpl_flag ::= {| rw | beta | constr | proj | diffr | delta | def | op | macro | zeta | builtin }
+  simpl_flags ::= ~@simpl_flag | ~flags:[{*, @simpl_flag}]
 
 Leaving the flags unspecified results in the :g:`rw`, :g:`beta` and
 :g:`proj` transformations being used. Specifying an empty list of
@@ -329,10 +331,16 @@ specified transformations are applied, as described next:
 
   - :g:`rw`: perform user-defined rewriting;
   - :g:`beta`: perform beta-reductions;
-  - :g:`proj`: compute tuple projections;
-  - :g:`delta`: replace macros and operators with their definitions;
   - :g:`constr`: automatically simplify trace formulas using
-    constraint reasoning.
+    constraint reasoning;
+  - :g:`proj`: compute tuple projections;
+  - :g:`diffr`: simplify diff operators by factoring common parts;
+  - :g:`delta`: expand macros, definitions and operators into their definitions;
+  - :g:`def`: expand definitions;
+  - :g:`op`: expand definitions;
+  - :g:`macro`: expand definitions;
+  - :g:`zeta`: remove let definitions by inlining them in terms;
+  - :g:`builtin`: perform computation on builtin types, e.g. addition on integers.
 
 The :g:`constr` transformation replaces trace (sub-)formulas that
 are provably equal to :g:`true` or :g:`false` with that value.
