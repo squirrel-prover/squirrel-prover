@@ -886,6 +886,27 @@ Local tactics
     
    Close a goal when the conclusion is (syntactically) :g:`true`. 
 
+
+.. tacn:: localize @hypothesis as @simpl_ip
+
+    Change a global hypothesis containing a reachability formula
+    :n:`[@term]` to a local hypothesis :n:`@term`, and applies the
+    given simple introduction pattern :n:`@simpl_ip` to the new hypothesis.
+
+    For example, the tactic turns :n:`[F],G ⊢ H` into :n:`F,G ⊢ H`.
+
+
+.. tact:: subst @term, @term
+   :name: subst
+
+    If :g:`x = t` where :g:`x` is a variable, then :g:`subst x, t`
+    substitutes all occurrences of :g:`x` with :g:`t` and removes :g:`x`
+    from the :term:`logical variables <logical_var>`.
+
+    .. exn:: Unequal arguments
+
+       Terms given as argument are not equal.
+
       
 Global tactics
 ~~~~~~~~~~~~~~
@@ -956,13 +977,6 @@ Global tactics
     Note that this changes the positions of items in the equivalence, and
     if added before other tactics may break later references.
 
-.. tacn:: localize @hypothesis as @simpl_ip
-
-    Change a global hypothesis containing a reachability formula
-    :n:`[@term]` to a local hypothesis :n:`@term`, and applies the
-    given simple introduction pattern :n:`@simpl_ip` to the new hypothesis.
-
-    For example, the tactic turns :n:`[F],G ⊢ H` into :n:`F,G ⊢ H`.
 
 .. tace:: memseq
    :name: memseq
@@ -1191,6 +1205,9 @@ Local tactics
 .. tact:: executable @term
    :name: executable
     
+    .. warning::
+      This tactic is deprecated in favour of lemma :n:`Classic.executability` in :n:`theories/Classic.sp` included by `Core`.
+
     Assert that :g:`exec@_` implies :g:`exec@_` for all previous
     timestamps. 
 
@@ -1267,16 +1284,6 @@ Local tactics
     We can chose to translate timestamps to integers (`nat`) or to an abstract 
     type with the usual equality (`abstract`) or not (`abstract_noeq`).
 
-.. tact:: subst @term, @term
-   :name: subst
-
-    If :g:`x = t` where :g:`x` is a variable, then :g:`subst x, t`
-    substitutes all occurrences of :g:`x` with :g:`t` and removes :g:`x`
-    from the :term:`logical variables <logical_var>`.
-
-    .. exn:: Unequal arguments
-
-       Terms given as argument are not equal.
        
     
     
