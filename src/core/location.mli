@@ -21,12 +21,9 @@ type t = {
 (* -------------------------------------------------------------------- *)
 val _dummy        : t
 val make          : position -> position -> t
-val of_lexbuf     : lexbuf -> t
 val tostring      : t -> string
-val tostring_raw  : ?with_fname:bool -> t -> string
 val merge         : t -> t -> t
 val mergeall      : t list -> t
-val isdummy       : t -> bool
 
 (* -------------------------------------------------------------------- *)
 type 'a located = {
@@ -36,14 +33,4 @@ type 'a located = {
 
 val loc    : 'a located -> t
 val unloc  : 'a located -> 'a
-val unlocs : ('a located) list -> 'a list
 val mk_loc : t -> 'a -> 'a located
-val lmap   : ('a -> 'b) -> 'a located -> 'b located
-
-(* -------------------------------------------------------------------- *)
-exception LocError of t * exn
-
-val locate_error : t -> exn -> 'a
-
-val set_loc  : t -> ('a -> 'b) -> 'a -> 'b
-val set_oloc : t option -> ('a -> 'b) -> 'a -> 'b

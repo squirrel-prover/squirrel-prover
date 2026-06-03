@@ -72,12 +72,6 @@ val constraints_valid :
   ?system : SystemExpr.arbitrary option ->
   sequent -> bool 
 
-(** [get_ts_equalities s] returns all the equalities between timestamps
-    derivable from its hypothesis. 
-    May timeout. *)
-val get_ts_equalities :
-  concrete:bool -> precise:bool -> sequent -> Term.terms list
-
 (** [get_all_messages s] returns all the messages appearing at toplevel
     in [s]. *)
 val get_all_messages : sequent -> Term.terms

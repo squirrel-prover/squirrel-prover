@@ -282,18 +282,6 @@ let constraints_valid ?(system : 'a SE.expr option = None) s =
 let query ?(system : SE.arbitrary option = None) ~concrete ~precise s q =
    query ~system ~concrete ~precise s (Some q)
 
-(*------------------------------------------------------------------*)
-(** Other uses of Constr *)
-
-let get_ts_equalities ~concrete ~precise s =
-  let models = get_models ~concrete None s in
-  let ts =
-    List.map
-      (fun (_,x) -> x)
-      (Hyps.get_trace_literals ~concrete s.env.table s.proof_context)
-    |>  Atom.trace_atoms_ts in
-  Constr.get_ts_equalities ~precise models ts
-
 (*------------------------------------------------------------------*)  
 module Hyps
   : Hyps.S1 with type hyp  = Equiv.any_form 

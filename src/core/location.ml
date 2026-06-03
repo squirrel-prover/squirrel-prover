@@ -37,17 +37,6 @@ let make (p1 : position) (p2 : position) =
       loc_bchar = p1.pos_cnum ;
       loc_echar = p2.pos_cnum ; }
 
-let of_lexbuf (lb : lexbuf) =
-  let p1 = Lexing.lexeme_start_p lb in
-  let p2 = Lexing.lexeme_end_p lb in
-  make p1 p2
-
-let tostring_raw ?(with_fname = true) (p : t) =
-  let aout =
-    Printf.sprintf "%d:%d %d:%d"
-      (fst p.loc_start) (snd p.loc_start) (fst p.loc_end) (snd p.loc_end) in
-  if with_fname then Printf.sprintf "%s %s" p.loc_fname aout else aout
-
 let tostring (p : t) =
   let spos =
     if p.loc_start = p.loc_end then
@@ -75,9 +64,6 @@ let mergeall (p : t list) =
   | []      -> _dummy
   | t :: ts -> List.fold_left merge t ts
 
-let isdummy (p : t) =
-  p.loc_bchar < 0 || p.loc_echar < 0
-
 (* -------------------------------------------------------------------- *)
 type 'a located = {
   pl_loc  : t;
@@ -87,26 +73,6 @@ type 'a located = {
 (* -------------------------------------------------------------------- *)
 let loc    x = x.pl_loc
 let unloc  x = x.pl_desc
-let unlocs x = List.map unloc x
-
-let lmap f x =
-  { x with pl_desc = f x.pl_desc }
 
 let mk_loc loc x =
   { pl_loc = loc; pl_desc = x; }
-
-(* -------------------------------------------------------------------- *)
-exception LocError of t * exn
-
-let locate_error loc exn =
-  match exn with
-  | LocError _ -> raise exn
-  | _ -> raise (LocError(loc,exn))
-
-let set_loc loc f x =
-  try f x with e -> locate_error loc e
-
-let set_oloc oloc f x =
-  match oloc with
-  | None     -> f x
-  | Some loc -> set_loc loc f x

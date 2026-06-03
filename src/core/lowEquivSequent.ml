@@ -303,24 +303,6 @@ let get_frame proj j = match j.conclusion with
   (* FEAT: concrete: implement the concrete equiv logic *)
   | _ -> None
 
-let get_all_equiv j =
-  (* [get_equivs acc_forms vars phi] recursively explores [phi],
-     returning any equivalence atoms it encounters concatened to the
-     current [acc_forms] accumulated formulas. [vars] are the current
-     bound vars, collected when going over a quantifier. *)
-  let rec get_equivs acc_forms vars (phi : conc_form) =
-    match phi with
-    | Equiv.Atom (Equiv.Equiv e) when e.bound = None -> (e, vars)::acc_forms
-    | Quant (_,vs,f) -> get_equivs acc_forms (vs @ vars) f
-    | Let (v,_,f) -> get_equivs acc_forms ((v, Vars.Tag.make Local)::vars) f
-    | Equiv.Atom _ -> []
-    | Impl (f1,f2) | And (f1,f2) | Or (f1,f2) ->
-      get_equivs acc_forms vars f1
-      @
-      get_equivs acc_forms vars f2
-  in
-  get_equivs [] [] j.conclusion
-
 let get_bound j = match j.conclusion with
   | Equiv.Atom (Equiv.Equiv e) -> e.bound
   |  Equiv.Atom (Equiv.Reach r) -> r.bound
